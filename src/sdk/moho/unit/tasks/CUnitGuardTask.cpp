@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <new>
@@ -1599,6 +1599,29 @@ namespace moho
         // (+0x554): a strategic launcher owns a silo-build impl but no builder
         // impl, so testing AiBuilder made hive silo-assist never dispatch.
         (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, true);
+      }
+
+      // TEMPORARY PROBE -- silo-assist triage: whether dispatch actually
+      // allocates the silo-assist repair task and what the owner's request
+      // lane looks like. Delete when resolved.
+      {
+        static int sProbeDispatch = 0;
+        if ((++sProbeDispatch % 10) == 1) {
+          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+            std::fprintf(
+              sink,
+              "[SILODISPATCH] n=%d owner=%p target=%p siloBuild=%d state=%d repair=%d req=%p\n",
+              sProbeDispatch,
+              static_cast<void*>(mUnit),
+              static_cast<void*>(targetUnit),
+              static_cast<int>(targetUnit->AiSiloBuild != nullptr),
+              static_cast<int>(targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)),
+              static_cast<int>(shouldIssueRepairTask),
+              static_cast<void*>(mUnit->mConsumptionData)
+            );
+            std::fclose(sink);
+          }
+        }
       }
       return;
     }

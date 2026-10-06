@@ -314,14 +314,23 @@ namespace moho
         ++sProbeSiloSeen;
         if ((sProbeSiloSeen % 200) == 0) {
           if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+            const float reqE = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mRequested.energy : -1.0f;
+            const float reqM = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mRequested.mass : -1.0f;
+            const float grantE = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mGranted.energy : -1.0f;
+            const float grantM = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mGranted.mass : -1.0f;
             std::fprintf(
               sink,
-              "[SILOASSIST] owner=%p focus=%p e=%.2f m=%.2f consumed=%.3f\n",
+              "[SILOASSIST] owner=%p focus=%p e=%.2f m=%.2f consumed=%.3f reqE=%.2f reqM=%.2f grE=%.2f grM=%.2f paused=%d\n",
               static_cast<void*>(ownerUnit),
               static_cast<void*>(focusUnit),
               perSecond.energy,
               perSecond.mass,
-              resourceConsumed
+              resourceConsumed,
+              reqE,
+              reqM,
+              grantE,
+              grantM,
+              static_cast<int>(ownerUnit->mUnitVarDat.mIsPaused)
             );
             std::fclose(sink);
           }

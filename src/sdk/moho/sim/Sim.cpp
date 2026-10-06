@@ -8524,6 +8524,38 @@ void Sim::IssueCommand(
     return;
   }
 
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  {
+    static int sProbeSimIssue = 0;
+    if ((++sProbeSimIssue % 5) == 1) {
+      std::size_t resolvedCount = 0;
+      unsigned int firstRaw = 0xDEAD;
+      entities.ForEachValue([this, &resolvedCount, &firstRaw](const unsigned int value) {
+        if (firstRaw == 0xDEAD) {
+          firstRaw = value;
+        }
+        Entity* entity = FindEntityById(mEntityDB, static_cast<EntId>(value));
+        if (entity != nullptr && OkayToMessWith(entity)) {
+          ++resolvedCount;
+        }
+      });
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink,
+          "[BEATPIPE] simIssue n=%d type=%u cmdId=0x%08x bits=%u first=0x%08x resolved=%u curSrc=%d\n",
+          sProbeSimIssue,
+          static_cast<unsigned>(static_cast<std::uint32_t>(commandIssueData.mCommandType)),
+          static_cast<unsigned>(commandIssueData.nextCommandId),
+          static_cast<unsigned>(entities.Bits().Count()),
+          firstRaw,
+          static_cast<unsigned>(resolvedCount),
+          static_cast<int>(mCurCommandSource)
+        );
+        std::fclose(sink);
+      }
+    }
+  }
+
   EntitySetTemplate<Unit> selectedUnits{};
 
   auto collectUnit = [this, &selectedUnits](const EntId entId) {
@@ -10298,7 +10330,21 @@ int Sim::SimLua(
   }
 
   sim->Printf("%s", commandText.c_str());
-  (void)SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
+
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  {
+    if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+      std::fprintf(sink, "[BEATPIPE] simLua running len=%u head=%.60s\n", static_cast<unsigned>(commandText.size()), commandText.c_str());
+      std::fclose(sink);
+    }
+  }
+  const int luaResult = SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
+  {
+    if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+      std::fprintf(sink, "[BEATPIPE] simLua result=%d\n", luaResult);
+      std::fclose(sink);
+    }
+  }
   clearSelectedUnitGlobal();
   return 0;
 }
@@ -10549,6 +10595,23 @@ void Sim::AdvanceBeat(const int amt)
         static_cast<int>(mSingleStep),
         static_cast<unsigned>(mArmiesList.size())
       );
+    }
+  }
+  {
+    static int sProbeBeat = 0;
+    if ((++sProbeBeat % 200) == 0) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink,
+          "[BEATPIPE] simAdvanceBeat n=%d beat=%u tick=%u paused=%d singleStep=%d\n",
+          sProbeBeat,
+          mCurBeat,
+          mCurTick,
+          static_cast<int>(mPausedByCommandSource),
+          static_cast<int>(mSingleStep)
+        );
+        std::fclose(sink);
+      }
     }
   }
 

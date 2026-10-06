@@ -9,6 +9,7 @@
 #include <iterator>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <cstdint>
 #include <cstdlib>
@@ -11691,6 +11692,26 @@ int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
   if (!unit) {
     LuaPlus::LuaState::Error(state, "CreateUnitHPR(%s) failed", blueprintName.c_str());
   }
+
+  // TEMPORARY PROBE -- replay beat-pipeline triage: map blueprint -> real
+  // wire EntId so injected replay orders can target these units. Delete when
+  // resolved.
+  {
+    static int sProbeSpawn = 0;
+    if ((++sProbeSpawn % 1) == 0) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink,
+          "[SCENSPAWN] n=%d bp=%s entId=0x%08x\n",
+          sProbeSpawn,
+          blueprintName.c_str(),
+          static_cast<unsigned>(unit->id_)
+        );
+        std::fclose(sink);
+      }
+    }
+  }
+
   unit->mLuaObj.PushStack(state);
   return 1;
 }

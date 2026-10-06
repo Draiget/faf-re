@@ -9,6 +9,8 @@
 #include "lua/LuaObject.h"
 #include "moho/command/ICommandSink.h"
 
+#include <cstdio>
+
 namespace moho
 {
   class INetConnector;
@@ -341,6 +343,9 @@ namespace moho
      * Slot: 0
      */
     virtual ~CClientManagerImpl();
+
+    // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+    void DumpClientLanesForProbe(std::FILE* sink);
 
     /**
      * Address: 0x0053E180

@@ -1,5 +1,6 @@
 #include "CDecoder.h"
 
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -431,6 +432,25 @@ namespace moho
     SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_None);
     DecodeCommandData(reader, "CDecoder::DecodeIssueCommand()", commandData);
 
+    // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+    {
+      static int sProbeIssue = 0;
+      if ((++sProbeIssue % 10) == 1) {
+        if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[BEATPIPE] issueCmd n=%d bits=%u type=%u cmdId=0x%08x target=0x%08x\n",
+            sProbeIssue,
+            static_cast<unsigned>(entities.Bits().Count()),
+            static_cast<unsigned>(static_cast<std::uint8_t>(commandData.mCommandType)),
+            static_cast<unsigned>(commandData.nextCommandId),
+            static_cast<unsigned>(commandData.mTarget.mEntityId)
+          );
+          std::fclose(sink);
+        }
+      }
+    }
+
     std::uint8_t clearQueue = 0;
     reader.ReadExact(clearQueue);
     if (clearQueue >= 2u) {
@@ -579,6 +599,23 @@ namespace moho
     reader.ReadString(&command);
     reader.ReadExact(worldPos);
     reader.ReadExact(focusArmy);
+
+    // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+    {
+      static int sProbeDbg = 0;
+      if ((++sProbeDbg % 10) == 1) {
+        if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[BEATPIPE] debugCmd n=%d focus=%u cmd=%.80s\n",
+            sProbeDbg,
+            static_cast<unsigned>(focusArmy),
+            command.c_str()
+          );
+          std::fclose(sink);
+        }
+      }
+    }
 
     const BVSet<EntId, EntIdUniverse> entities = DecodeEntIdSet(reader);
     mSink->ExecuteDebugCommand(command.c_str(), worldPos, static_cast<std::uint32_t>(focusArmy), entities);
