@@ -13,6 +13,7 @@
 #include "gpg/gal/EffectVariable.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
@@ -97,14 +98,7 @@ namespace
   ) noexcept
   {
     Wm3::Vector3<float> out{};
-    // Ground truth (FUN_00491760.c, EmitInterpolatedBeamQuadVertices) rotates
-    // via Moho::MultQuadVec, not the generic Wm3::MultiplyQuaternionVector --
-    // same quaternion-convention mismatch as the other orient_-consuming
-    // sites. `orientation` here is a Wm3::Quaternion::Nlerp of two orient_
-    // fields; Nlerp treats all four lanes symmetrically (component-wise lerp
-    // + Dot-based hemisphere check + normalize), so it preserves whatever
-    // convention its inputs were in, and orient_ is always in
-    // VMatrix4::Set's convention.
+    // Use the same scalar-first quaternion rotation as entity/bone transforms.
     moho::MultQuadVec(&out, &vector, &orientation);
     return out;
   }
@@ -389,9 +383,11 @@ namespace moho
   {
     const float interpolation = std::min(beam.mLastInterpolation * frameAlpha, 1.0f);
 
-    const Wm3::Quaternion<float> startOrientation =
-      Wm3::Quaternion<float>::Nlerp(beam.mLastStart.orient_, beam.mCurStart.orient_, interpolation);
-    const Wm3::Vector3<float> startBasePosition = LerpVector3(beam.mLastStart.pos_, beam.mCurStart.pos_, interpolation);
+    // The first sample is the committed sim transform, the second is pending.
+    // QuatLERP blends its second argument toward its first as alpha increases.
+    Wm3::Quaternion<float> startOrientation{};
+    (void)QuatLERP(&beam.mLastStart.orient_, &beam.mCurStart.orient_, &startOrientation, interpolation);
+    const Wm3::Vector3<float> startBasePosition = LerpVector3(beam.mCurStart.pos_, beam.mLastStart.pos_, interpolation);
     const Wm3::Vector3<float> startWorldPosition = Wm3::Vector3<float>::Add(
       startBasePosition, RotateVectorByOrientation(beam.mStart, startOrientation)
     );
@@ -399,8 +395,8 @@ namespace moho
     Wm3::Quaternion<float> endOrientation = startOrientation;
     Wm3::Vector3<float> endBasePosition = startBasePosition;
     if (beam.mFromStart) {
-      endOrientation = Wm3::Quaternion<float>::Nlerp(beam.mLastEnd.orient_, beam.mCurEnd.orient_, interpolation);
-      endBasePosition = LerpVector3(beam.mLastEnd.pos_, beam.mCurEnd.pos_, interpolation);
+      (void)QuatLERP(&beam.mLastEnd.orient_, &beam.mCurEnd.orient_, &endOrientation, interpolation);
+      endBasePosition = LerpVector3(beam.mCurEnd.pos_, beam.mLastEnd.pos_, interpolation);
     }
 
     const Wm3::Vector3<float> endWorldPosition =
@@ -507,6 +503,9 @@ namespace moho
       }
 
       vertices.clear();
+      // Four vertices per beam are known before expansion. Reserve once so
+      // dense construction effects do not repeatedly copy the growing array.
+      vertices.reserve(beamList.size() * 4U);
       for (const SWorldBeam& beam : beamList) {
         EmitInterpolatedBeamQuadVertices(beam, frameAlpha, vertices);
       }

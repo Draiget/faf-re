@@ -522,7 +522,7 @@ namespace moho
     mVisible = startVisible || reconDb->BeamIsVisible(mBeam);
 
     static int sBeamVisProbe = 0;
-    if (!mVisible && (sBeamVisProbe++ % 60) == 0) {
+    if (dbg_EfxBeams && !mVisible && (sBeamVisProbe++ % 60) == 0) {
       // Probe every sense as well: RECON_AnySense == 0 at the same point means
       // the focus army has no intel there at all (so a culled beam is correct
       // behaviour and the base only looks lit because terrain stays explored
@@ -614,8 +614,10 @@ namespace moho
       Entity* const endEntity = ResolveAttachEntity(mEnd);
       if (endEntity == nullptr) {
         mBeam.mFromStart = false;
+        // Effects tick before AdvanceCoords: retain current/pending samples.
+        // SWorldBeam's legacy mLast* names denote the second (pending) sample.
         mBeam.mCurStart = sourceEntity->mVarDat.mCurTransform;
-        mBeam.mLastStart = sourceEntity->mVarDat.mLastTransform;
+        mBeam.mLastStart = sourceEntity->mPendingTransform;
         mBeam.mStart = FetchVectorParam(*this, 0);
 
         const float beamLength = GetFloatParam(6);
@@ -641,10 +643,12 @@ namespace moho
         mBeam.mLastEnd.pos_ = ApplyPoint(mBeam.mLastStart, mBeam.mEnd);
       } else {
         mBeam.mFromStart = true;
+        // Effects tick before AdvanceCoords: retain current/pending samples.
+        // SWorldBeam's legacy mLast* names denote the second (pending) sample.
         mBeam.mCurStart = sourceEntity->mVarDat.mCurTransform;
-        mBeam.mLastStart = sourceEntity->mVarDat.mLastTransform;
+        mBeam.mLastStart = sourceEntity->mPendingTransform;
         mBeam.mCurEnd = endEntity->mVarDat.mCurTransform;
-        mBeam.mLastEnd = endEntity->mVarDat.mLastTransform;
+        mBeam.mLastEnd = endEntity->mPendingTransform;
 
         const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
         const Wm3::Vec3f localStart = FetchVectorParam(*this, 0);
