@@ -5171,6 +5171,8 @@ namespace
   constexpr const char* kConsoleStartupUiDebugAltClickDescription = "Enable ALT+Click debug command to switch armies";
   constexpr const char* kConsoleStartupUiDisableCursorFixingDescription = "Allows you to toggle the cursor fixing functionality that is used for the mouse-controlled camera spinning/scrolling";
   constexpr const char* kConsoleStartupUiDragSelect2DDescription = "Use a 2D (screen-space) drag-selection box";
+  constexpr const char* kConsoleStartupUiAttackGroundIgnoresFireStateDescription =
+    "Attack orders on bare ground make every selected unit attack the position (0 = retail: Return Fire units attack-move)";
   constexpr const char* kConsoleStartupUiDrawPathPreviewDescription = "Turns on/off the arrow line";
   constexpr const char* kConsoleStartupUiExtractSnapToleranceDescription = "Sets the extraction unit 'snap-to' tolerance (in meters) for building.  Increase this to make it easier to auto-snap to extraction sites.";
   constexpr const char* kConsoleStartupUiFootprintMinThicknessDescription = "Mimimum render size for the footprint outline.";
@@ -5249,6 +5251,7 @@ namespace moho
   extern bool ui_DebugAltClick;
   extern bool ui_DisableCursorFixing;
   extern bool ui_DragSelect2D;
+  extern bool ui_AttackGroundIgnoresFireState;
   extern bool ui_DrawPathPreview;
   extern float ui_ExtractSnapTolerance;
   extern float ui_FootprintMinThickness;
@@ -5572,6 +5575,14 @@ namespace moho
     "ui_DragSelect2D",
     kConsoleStartupUiDragSelect2DDescription,
     &moho::ui_DragSelect2D
+  );
+
+  // Not in the binary: the switch for the attack-ground deviation (see
+  // `ui_AttackGroundIgnoresFireState` in UiRuntimeTypes.h).
+  TConVar<bool> gTConVar_ui_AttackGroundIgnoresFireState(
+    "ui_AttackGroundIgnoresFireState",
+    kConsoleStartupUiAttackGroundIgnoresFireStateDescription,
+    &moho::ui_AttackGroundIgnoresFireState
   );
 
   /**
