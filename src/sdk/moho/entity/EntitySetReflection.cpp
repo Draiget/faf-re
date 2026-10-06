@@ -7,11 +7,11 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityFastVectorReflection.h"
-#include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -119,7 +119,9 @@ namespace
   // ResolveFastVectorEntityPointerType above is the real, heavily-used
   // resolver and already covers this address's behavior.
 
-  [[nodiscard]] gpg::RRef MakeEntitySetBaseRef(moho::EntitySetBase* object)
+  [[nodiscard]] gpg::RRef MakeEntitySetBaseRef(
+    moho::EntitySetBase* object
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -167,7 +169,11 @@ namespace
    * What it does:
    * Deserializes one `EntitySetBase` object lane through archive owner context.
    */
-  void ReadEntitySetBaseArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  void ReadEntitySetBaseArchiveObjectLane1(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
   {
     archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
   }
@@ -290,7 +296,9 @@ namespace
    * What it does:
    * Clears reflected base/field vectors for `EntitySetBaseTypeInfo`.
    */
-  void reset_EntitySetBaseTypeInfoVectors(moho::EntitySetBaseTypeInfo* const typeInfo)
+  void reset_EntitySetBaseTypeInfoVectors(
+    moho::EntitySetBaseTypeInfo* const typeInfo
+  )
   {
     if (!typeInfo) {
       return;
@@ -306,7 +314,9 @@ namespace
    * What it does:
    * Clears reflected base/field vectors for `EntitySetTypeInfo`.
    */
-  void reset_EntitySetTypeInfoVectors(moho::EntitySetTypeInfo* const typeInfo)
+  void reset_EntitySetTypeInfoVectors(
+    moho::EntitySetTypeInfo* const typeInfo
+  )
   {
     if (!typeInfo) {
       return;
@@ -322,7 +332,9 @@ namespace
    * What it does:
    * Clears reflected base/field vectors for `WeakEntitySetTypeInfo`.
    */
-  void reset_WeakEntitySetTypeInfoVectors(moho::WeakEntitySetTypeInfo* const typeInfo)
+  void reset_WeakEntitySetTypeInfoVectors(
+    moho::WeakEntitySetTypeInfo* const typeInfo
+  )
   {
     if (!typeInfo) {
       return;
@@ -399,7 +411,9 @@ namespace moho
   /**
    * Address: 0x00694180 (FUN_00694180, Moho::EntitySetTypeInfo::AddBase_EntitySetBase)
    */
-  void EntitySetTypeInfo::AddBase_EntitySetBaseVariant1(gpg::RType* const typeInfo)
+  void EntitySetTypeInfo::AddBase_EntitySetBaseVariant1(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = ResolveEntitySetBaseType();
 
@@ -424,7 +438,9 @@ namespace moho
    * What it does:
    * Bridge thunk that forwards to `EntitySetTypeInfo::AddBase_EntitySetBase`.
    */
-  void add_EntitySetBaseBase(gpg::RType* const typeInfo)
+  void add_EntitySetBaseBase(
+    gpg::RType* const typeInfo
+  )
   {
     EntitySetTypeInfo::AddBase_EntitySetBaseVariant1(typeInfo);
   }
@@ -468,7 +484,9 @@ namespace moho
   /**
    * Address: 0x00694260 (FUN_00694260, Moho::WeakEntitySetTypeInfo::AddBase_EntitySetTemplate_Entity)
    */
-  void WeakEntitySetTypeInfo::AddBase_EntitySet(gpg::RType* const typeInfo)
+  void WeakEntitySetTypeInfo::AddBase_EntitySet(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = ResolveEntitySetType();
 
@@ -493,7 +511,9 @@ namespace moho
    * What it does:
    * Bridge thunk that forwards to `WeakEntitySetTypeInfo::AddBase_EntitySet`.
    */
-  void add_EntitySetBaseWeakBase(gpg::RType* const typeInfo)
+  void add_EntitySetBaseWeakBase(
+    gpg::RType* const typeInfo
+  )
   {
     WeakEntitySetTypeInfo::AddBase_EntitySet(typeInfo);
   }
@@ -551,9 +571,18 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EntitySetBaseTypeInfo_2618e1, moho::register_EntitySetBaseTypeInfo)
-GPG_PREREGISTER_INIT(register_EntitySetTypeInfo_2618e1, moho::register_EntitySetTypeInfo)
-GPG_PREREGISTER_INIT(register_WeakEntitySetTypeInfo_2618e1, moho::register_WeakEntitySetTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EntitySetBaseTypeInfo_2618e1,
+  moho::register_EntitySetBaseTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_EntitySetTypeInfo_2618e1,
+  moho::register_EntitySetTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_WeakEntitySetTypeInfo_2618e1,
+  moho::register_WeakEntitySetTypeInfo
+)
 
 namespace moho
 {
@@ -564,7 +593,9 @@ namespace moho
    * Tracks one `EntitySetBase` pointer lane and deserializes the embedded
    * `fastvector<Entity*>` payload from archive storage.
    */
-  void EntitySetBase::MemberDeserialize(gpg::ReadArchive* const archive)
+  void EntitySetBase::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -584,7 +615,9 @@ namespace moho
    * Marks one pre-created `EntitySetBase` pointer lane and serializes the
    * embedded `fastvector<Entity*>` payload to archive storage.
    */
-  void EntitySetBase::MemberSerialize(gpg::WriteArchive* const archive) const
+  void EntitySetBase::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -598,25 +631,33 @@ namespace moho
   }
 
   template <class T>
-  void EntitySetTemplate<T>::MemberDeserialize(gpg::ReadArchive* const archive)
+  void EntitySetTemplate<T>::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->Read(gpg::RTypeOf<EntitySetBase>(), static_cast<EntitySetBase*>(this), gpg::RRef{});
   }
 
   template <class T>
-  void EntitySetTemplate<T>::MemberSerialize(gpg::WriteArchive* const archive) const
+  void EntitySetTemplate<T>::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->Write(gpg::RTypeOf<EntitySetBase>(), static_cast<const EntitySetBase*>(this), gpg::RRef{});
   }
 
   template <class T>
-  void WeakEntitySetTemplate<T>::MemberDeserialize(gpg::ReadArchive* const archive)
+  void WeakEntitySetTemplate<T>::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->Read(gpg::RTypeOf<EntitySetTemplate<T>>(), static_cast<EntitySetTemplate<T>*>(this), gpg::RRef{});
   }
 
   template <class T>
-  void WeakEntitySetTemplate<T>::MemberSerialize(gpg::WriteArchive* const archive) const
+  void WeakEntitySetTemplate<T>::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->Write(gpg::RTypeOf<EntitySetTemplate<T>>(), static_cast<const EntitySetTemplate<T>*>(this), gpg::RRef{});
   }

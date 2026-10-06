@@ -21,7 +21,7 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x00693570 (FUN_00693570)
+     * Address: 0x00693570 (FUN_00693570)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `EntitySetBase`.
@@ -63,7 +63,7 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x00693760 (FUN_00693760)
+     * Address: 0x00693760 (FUN_00693760)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `EntitySetTemplate<Entity>`.
@@ -109,7 +109,7 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x006939B0 (FUN_006939B0)
+     * Address: 0x006939B0 (FUN_006939B0)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `WeakEntitySetTemplate<Entity>`.
@@ -154,8 +154,6 @@ namespace moho
    * Constructs global `EntitySetBaseTypeInfo` and registers process-exit cleanup.
    */
   void register_EntitySetBaseTypeInfo();
-
-
 
   /**
    * Address: 0x00BD57D0 (FUN_00BD57D0, sub_BD57D0)

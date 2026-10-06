@@ -178,6 +178,7 @@ namespace gpg::gal
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTexture(const DWORD stage, IDirect3DBaseTexture9* const texture)
   {
+    return device_->SetTexture(stage, texture);
   }
 
   /**

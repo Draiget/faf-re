@@ -56,10 +56,6 @@
 #include "moho/render/d3d/CD3DDepthStencil.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/render/d3d/WD3DViewport.h"
-namespace gpg::gal
-{
-  long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
-}
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -3961,7 +3957,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     }
 
     // Rebuild the global mesh-renderer batch map for this frame/view before the
-FogOn(worldView->mView->CameraGetZoom());
+    // mesh draw passes below. Binary (WRenViewport::Render @0x007F90D0, the
     // GetInstance+Batch pair at 0x007F9452..0x007F9478) invokes it as
     //   MeshRenderer::Batch(instance, sCurGameTick, sDeltaFrame,
     //                       *viewport->mCam, viewport->mCam->viewport.r[1]);
@@ -4012,7 +4008,7 @@ FogOn(worldView->mView->CameraGetZoom());
     // at 0x007F9509), not the sim delta - the blinky-box cycle advances on
     // wall-clock frame time while the bracket geometry interpolates on
     // `sDeltaFrame`.
-RenderEffects(true);
+    // The `ebx` these three gates test is NOT the `+0x2140` lane this file
     // models as `mSession`. `+0x2140` is written once per loop iteration at
     // 0x007F9379, alongside `mCam` at `+0x219C`, and both are cleared together
     // at 0x007F9709 - it is the per-iteration current world view, and slot 0 is
@@ -4022,7 +4018,7 @@ RenderEffects(true);
     // The session the binary tests is the plain `sWldSession` global, cached
     // into a stack local ahead of the loop (`v79 = Moho::sWldSession`).
     moho::CWldSession* const renderSession = moho::WLD_GetActiveSession();
-FogOn(worldView->mView->CameraGetZoom());
+    if (moho::ren_PlayableBoundary && renderSession != nullptr && worldView->mView != nullptr) {
       moho::RenderPlayableBoundary(
         static_cast<unsigned int>(head), mBoundaryRenderer, *renderSession,
         *mCam
@@ -4075,7 +4071,7 @@ FogOn(worldView->mView->CameraGetZoom());
 
     RenderRefractingEffects();
 
-RenderEffects(false);
+    // 0x007F95B3..0x007F95EA: the world view's own overlay pass, dispatched
     // through `IRenderWorldView` slot 0 on the `+0x2140` lane this loop seeded
     // at 0x007F9379. The four arguments are laid down at 0x007F95BC..0x007F95E7:
     // the raw `CD3DPrimBatcher*` from `mPrimBatcher` at `+0x215C`,
@@ -4225,7 +4221,28 @@ RenderEffects(false);
   // where mLocks1[0] is the primary render-target writer-lock slot at +0x2164.
   // It is a no-op unless frame dumping has been armed via `dump_frameRate`.
 
+  // few frames so we get a BMP of exactly what the renderer produced. The whole
+  // terrain path measures healthy (rectCacheCount=122..128, DrawNormals=1,
+  // colour writes 0x07, camera over the map, cartographic drew=0) yet the
+  // window shows a flat fill -- this distinguishes "terrain is in the target
+  // but never reaches the screen" from "the draw genuinely produces nothing".
+  {
+    // Arm LATE: the first dumps came out as the Cybran loading screen because
+    // they fired on the very first Render call, during loading. Wait several
+    // thousand frames so the capture is unambiguously in-session.
+    static int sRenderCalls = 0;
+    static bool sArmedDump = false;
+    ++sRenderCalls;
+    if (!sArmedDump && sRenderCalls > 4000 && getenv("FAF_DUMP_FRAMES") != nullptr) {
+      sArmedDump = true;
+      moho::dump_frameDumpName.assign("C:\\ProgramData\\FAForever\\bin\\framedump");
+      moho::dump_frameRate = 3;
+      gpg::Warnf("[DUMPDIAG] armed frame dump -> %s", moho::dump_frameDumpName.c_str());
+    }
+  }
+
   moho::REN_MaybeDumpFrame(mPrimaryTargetLocks[0].get());
+}
 
 /**
  * Address: 0x007F80C0 (FUN_007F80C0)
@@ -4264,10 +4281,10 @@ void moho::WRenViewport::RenderSkyDome()
   const float simDeltaSeconds = moho::REN_GetSimDeltaSeconds();
   const int gameTick = moho::REN_GetGameTick();
 
-  if (probeSky) {
-    ++sSkyBudget;
-    ::OutputDebugStringA("[SKYDIAG] 1 enter\n");
-  }
+  // loop) fires 787x per run while a probe placed immediately AFTER this call
+  // fires 0x, so RenderSkyDome throws every frame and aborts the whole world
+  // pass before terrain/mesh/water ever draw -- which is why the HUD renders
+  // but the 3D viewport is empty. Step markers to find which call throws.
 
   skyDome.CreateRenderAbility();
   skyDome.RenderAtmosphere(cam);
@@ -4311,6 +4328,22 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
   );
   terrain->DrawTerrainSkirt();
 
+  // (rectCacheCount=122..128) and the vertex upload runs, yet the viewport is
+  // flat -- so the failure is at or after this composite dispatch. Report
+  // whether this is even reached, what DrawNormals returned, and whether the
+  // primary target lock it draws into is bound.
+  {
+    static int sCompositeBudget = 0;
+    if (sCompositeBudget < 5) {
+      ++sCompositeBudget;
+      gpg::Warnf(
+        "[COMPDIAG] RenderCompositeTerrain head=%d drewNormals=%d target=%08X shadowCtx=%08X",
+        mHead, static_cast<int>(drewNormals),
+        static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(
+          mPrimaryTargetLocks[mHead].get())),
+        static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(shadowContext)));
+    }
+  }
 }
 
 /**
@@ -4794,3 +4827,4 @@ void moho::WRenViewport::TransformTerrainNormals()
   mFrame.SetTexture(0u, mSecondaryTargetLocks[head]);
   mFrame.Render(headWidth, headHeight);
 }
+

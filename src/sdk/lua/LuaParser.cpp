@@ -3460,8 +3460,6 @@ namespace
     );
     f->sizep = fs->np;
 
-    LocVar* const probeOldLocvars = f->locvars;
-
     f->locvars = static_cast<LocVar*>(
       luaM_realloc(
         ls->L,
@@ -3471,21 +3469,6 @@ namespace
       )
     );
     f->sizelocvars = fs->nlocvars;
-
-    if (probeOldLocvars != f->locvars) {
-      static int sShrinkBudget = 0;
-      if (sShrinkBudget < 100000) {
-        ++sShrinkBudget;
-        char probe[192];
-        sprintf_s(probe, sizeof(probe),
-                  "[LOCVARSHRINK] proto=%08X old=%08X new=%08X n=%d\n",
-                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f)),
-                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(probeOldLocvars)),
-                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->locvars)),
-                  fs->nlocvars);
-        ::OutputDebugStringA(probe);
-      }
-    }
 
     f->upvalues = static_cast<TString**>(
       luaM_realloc(
