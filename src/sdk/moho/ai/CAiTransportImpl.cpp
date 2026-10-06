@@ -681,7 +681,8 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
 
   const msvc8::vector<Entity*>& attached = mUnit->GetAttachedEntities();
   for (Entity* const* it = attached.begin(); it != attached.end(); ++it) {
-    Unit* const attachedUnit = static_cast<Unit*>(*it);
+    // 0x005E6180: non-unit attachments are filtered through IsUnit().
+    Unit* const attachedUnit = (*it)->IsUnit();
     if (!attachedUnit) {
       continue;
     }
@@ -1560,7 +1561,9 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
 
   const msvc8::vector<Entity*>& attachedCopy = mUnit->GetAttachedEntities();
   for (Entity* const* it = attachedCopy.begin(); it != attachedCopy.end(); ++it) {
-    Unit* const unit = static_cast<Unit*>(*it);
+    // 0x005E7483: attachments include non-unit entities (Lua Entity helpers,
+    // shields, effect dummies), so the binary filters through IsUnit().
+    Unit* const unit = (*it)->IsUnit();
     if (!unit || unit->IsDead()) {
       continue;
     }
