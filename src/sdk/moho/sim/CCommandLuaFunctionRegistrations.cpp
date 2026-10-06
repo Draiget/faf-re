@@ -2649,10 +2649,15 @@ namespace moho
             // retained when the unit has no pending Upgrade commands.
             perUnit = targetBuildable;
 
+            // 0x008404CC..0x008404D3: FUN_00401A90 is called with ESI = this
+            // per-unit set (the destination it masks) and EDI = the target's
+            // own blueprint-id category (the bits removed), so the upgrade
+            // target itself drops out of the menu and the shared rules
+            // category is only read.
             const char* const bpId = targetBp->mBlueprintId.c_str();
             if (bpId != nullptr) {
               const EntityCategorySet* const rulesCat = session->mRules->GetEntityCategory(bpId);
-              const_cast<EntityCategorySet*>(rulesCat)->mBits.RemoveAllFrom(&perUnit.mBits);
+              perUnit.mBits.RemoveAllFrom(&rulesCat->mBits);
             }
           }
         }

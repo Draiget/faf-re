@@ -3260,21 +3260,15 @@ namespace
           return false;
         }
 
-        // FAF Binary Patch (non-1:1 with original binary):
-        // The retail path allows restricted upgrades to pass initial validation,
-        // which can later reach CUnitUpgradeTask::TaskTick (FUN_005F8890) and
-        // crash on a null-vtable weak-focus dereference at 0x005F8B20.
-        // Fixed behavior: reject restricted upgrades at issue time (including
-        // restricted mex tier-up), so the crashing task path is never entered.
-        // Related: https://github.com/FAForever/FA-Binary-Patches/issues/125
-        if (!unit->CanBuild(upgradeBlueprint)) {
-          return false;
-        }
-
+        // 0x006F00A9: the arm goes straight from the blueprint lookup to the
+        // SeedUnit / UpgradesTo / UpgradesFromBase tests. There is no buildable-
+        // category gate here, so a later tier (T1 mex -> T3 mex, issued after a
+        // queued T2 by FAF's IssueUpgradeOrders) is accepted through
+        // UpgradesFromBase.
         const char* const seedUnitId = upgradeBlueprint->General.SeedUnit.name.c_str();
         if (seedUnitId != nullptr && seedUnitId[0] != '\0') {
-          if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), seedUnitId)
-              && !EqualsNoCase(unitBlueprint->General.UpgradesFromBase.name.c_str(), seedUnitId)) {
+          // 0x006F00DD..0x006F0102: one compare, the unit's own blueprint id.
+          if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), seedUnitId)) {
             return false;
           }
         } else {
