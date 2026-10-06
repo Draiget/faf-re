@@ -3149,10 +3149,14 @@ namespace moho
     }
 
     float bankFactor = air.BankFactor;
+    // 0x006BDC75..0x006BDCA8 uses the unrotated horizontal target
+    // direction, not the ten-times-yaw steering vector above. Banking from
+    // that steering vector amplifies small approach corrections and also
+    // introduces banking when only the requested elevation changes.
     float forwardAlignment =
-      (rotatedSelectedVector.x * referenceVector.x) +
-      (rotatedSelectedVector.y * referenceVector.y) +
-      (rotatedSelectedVector.z * referenceVector.z);
+      (selectedPlanarVector.y * referenceVector.y) +
+      (selectedPlanarVector.z * referenceVector.z) +
+      (selectedPlanarVector.x * referenceVector.x);
 
     if (combatState == kAirCombatStateNormalTurn) {
       const float alignmentSquared = forwardAlignment * forwardAlignment;

@@ -3189,20 +3189,20 @@ namespace moho
     const float bombDx = bombDropPosition.x - unitPosition.x;
     const float bombDz = bombDropPosition.z - unitPosition.z;
     const float bombDropDistance = std::sqrt((bombDx * bombDx) + (bombDz * bombDz));
+    const float bombDropThreshold = weaponBlueprint->BombDropThreshold;
 
     if (ShouldRenderBombDropZone(ownerUnit->SimulationRef)) {
       if (CDebugCanvas* const debugCanvas = ownerUnit->SimulationRef->GetDebugCanvas(); debugCanvas != nullptr) {
         const Wm3::Vec3f upAxis{0.0f, 1.0f, 0.0f};
-        debugCanvas->AddWireCircle(upAxis, bombDropPosition, bombDropDistance, kBombDropInnerCircleDepth, 6u);
-        debugCanvas->AddWireCircle(upAxis, bombDropPosition, bombDropDistance * 2.0f, kBombDropOuterCircleDepth, 6u);
+        debugCanvas->AddWireCircle(upAxis, bombDropPosition, bombDropThreshold, kBombDropInnerCircleDepth, 6u);
+        debugCanvas->AddWireCircle(upAxis, bombDropPosition, bombDropThreshold * 2.0f, kBombDropOuterCircleDepth, 6u);
       }
     }
 
-    const float bombDropThreshold = weaponBlueprint->BombDropThreshold;
-    if (bombDropThreshold >= bombDropDistance * 2.0f) {
+    if (bombDropDistance >= bombDropThreshold * 2.0f) {
       return false;
     }
-    if (bombDropThreshold < bombDropDistance) {
+    if (bombDropDistance < bombDropThreshold) {
       return weapon->mCanFire != 0u;
     }
 
@@ -3211,35 +3211,17 @@ namespace moho
     Wm3::Vec3f forward{};
     MultQuadVec(&forward, &forwardAxis, &ownerOrientation);
 
-    // Heading gates, decoded from FUN_006D4C80 @0x006D516B..0x006D51D5. The
-    // binary loads the TARGET deltas (0x006D516B..0x006D517C: unit - target,
-    // `[esp+0x2C]-[eax+8]` / `[esp+0x24]-[eax]`) and rejects when their
-    // forward dot is POSITIVE (`comiss xmm0, 0; ja reject` @0x006D51A9):
-    // unit - target pointing forward means the target is BEHIND the nose, so
-    // a release is only allowed while the bomber still flies at its target.
-    // It then loads the BOMB-DROP deltas (0x006D51AE..0x006D51C2: unit -
-    // bombDrop) and rejects when 0.866 (0xE4F924, kBombDropHeadingDotThreshold)
-    // EXCEEDS that dot (`comiss xmm1, xmm0; ja reject` @0x006D51D2): by
-    // release time the computed impact point must lie well BEHIND the
-    // aircraft - that is what "the bombs fall where the plane has flown to,
-    // not where it is going" means, and the ballistic lead comes from
-    // CalcBombDrop/PredictAheadForBombDrop, not from the nose pointing there.
-    //
-    // The previous transcription had both dots computed target-minus-unit and
-    // bombDrop-minus-unit with the tests as `releaseDot > 0 -> reject` /
-    // `targetDot < 0.866 -> reject`: the release gate demanded the impact
-    // point NOT be ahead of the nose (drop only "backwards") and the target
-    // gate demanded 0.866 forwardness from the TARGET, which the
-    // no-heading-check window above usually bypassed anyway.
-    const float targetDot =
-      ((unitPosition.z - targetPosition.z) * forward.z) + ((unitPosition.x - targetPosition.x) * forward.x);
-    if (targetDot > 0.0f) {
+    // In the outer release window, the release point must have been passed
+    // while the target remains ahead. FUN_006D4C80 uses release-minus-unit
+    // for the <= 0 test and target-minus-unit for the >= 0.866 test.
+    const float releaseDot = (bombDz * forward.z) + (bombDx * forward.x);
+    if (releaseDot > 0.0f) {
       return false;
     }
 
-    const float releaseDot =
-      ((unitPosition.z - bombDropPosition.z) * forward.z) + ((unitPosition.x - bombDropPosition.x) * forward.x);
-    if (kBombDropHeadingDotThreshold > releaseDot) {
+    const float targetDot =
+      ((targetPosition.z - unitPosition.z) * forward.z) + ((targetPosition.x - unitPosition.x) * forward.x);
+    if (kBombDropHeadingDotThreshold > targetDot) {
       return false;
     }
 
