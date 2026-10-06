@@ -85,20 +85,25 @@ namespace
 
 
 
-  /**
-   * Address: 0x005528C0 (FUN_005528C0, preregister_SSTICommandVariableDataTypeInfo)
-   *
-   * What it does:
-   * Constructs/preregisters RTTI metadata for `SSTICommandVariableData`.
-   */
+} // namespace
+
+// Address: 0x005528C0 (FUN_005528C0, preregister_SSTICommandVariableDataTypeInfo)
+//
+// Constructs/preregisters RTTI metadata for `SSTICommandVariableData`. Must be
+// defined in namespace `moho`: the GPG_PREREGISTER_INIT thunk at the bottom of
+// this file references `moho::preregister_...`. When b3ed371f's lane cleanup
+// left the definition inside the anonymous namespace above, the reference went
+// unresolved (LNK2019) and /FORCE resolved it to zero, so the CRT init-table
+// walk jumped to imagebase+0 and killed the process during static init.
+namespace moho
+{
   gpg::RType* preregister_SSTICommandVariableDataTypeInfo()
   {
     static SSTICommandVariableDataTypeInfo typeInfo;
     gpg::PreRegisterRType(typeid(moho::SSTICommandVariableData), &typeInfo);
     return &typeInfo;
   }
-
-} // namespace
+} // namespace moho
 
 namespace moho
 {
