@@ -146,19 +146,8 @@ namespace
       }
     }
 
-    using VertexSheetList = moho::TDatList<moho::CD3DVertexSheet, void>;
-    using IndexSheetList = moho::TDatList<moho::CD3DIndexSheet, void>;
-    using RenderTargetList = moho::TDatList<moho::CD3DRenderTarget, void>;
-    using DepthStencilList = moho::TDatList<moho::CD3DDepthStencil, void>;
-    using DynamicTextureSheetList = moho::TDatList<moho::CD3DDynamicTextureSheet, void>;
-
-    for (auto* node = resources.mVertexSheet2.mLink.mNext; node != &resources.mVertexSheet2.mLink; node = node->mNext) {
-      auto* const vertexSheet =
-        VertexSheetList::template owner_from_member_node<moho::CD3DVertexSheet, &moho::CD3DVertexSheet::mLink>(node);
-      if (vertexSheet == nullptr) {
-        continue;
-      }
-
+    for (auto* vertexSheet :
+         resources.mVertexSheet2.mLink.owners_member<moho::CD3DVertexSheet, &moho::CD3DVertexSheet::mLink>()) {
       const std::uint32_t streamCount = static_cast<std::uint32_t>(vertexSheet->mStreams.size());
       for (std::uint32_t streamIndex = 0U; streamIndex < streamCount; ++streamIndex) {
         if (!vertexSheet->mOwnedStreamMask.TestBit(streamIndex)) {
@@ -171,39 +160,25 @@ namespace
       }
     }
 
-    for (auto* node = resources.mIndexSheet2.mLink.mNext; node != &resources.mIndexSheet2.mLink; node = node->mNext) {
-      auto* const indexSheet =
-        IndexSheetList::template owner_from_member_node<moho::CD3DIndexSheet, &moho::CD3DIndexSheet::mLink>(node);
-      if (indexSheet != nullptr) {
-        indexSheet->mBuffer.reset();
-      }
+    for (auto* indexSheet :
+         resources.mIndexSheet2.mLink.owners_member<moho::CD3DIndexSheet, &moho::CD3DIndexSheet::mLink>()) {
+      indexSheet->mBuffer.reset();
     }
 
-    for (auto* node = resources.mRenderTarget.mLink.mNext; node != &resources.mRenderTarget.mLink; node = node->mNext) {
-      auto* const renderTarget =
-        RenderTargetList::template owner_from_member_node<moho::CD3DRenderTarget, &moho::CD3DRenderTarget::mLink>(
-          node);
-      if (renderTarget != nullptr) {
-        renderTarget->mSurface.reset();
-      }
+    for (auto* renderTarget :
+         resources.mRenderTarget.mLink.owners_member<moho::CD3DRenderTarget, &moho::CD3DRenderTarget::mLink>()) {
+      renderTarget->mSurface.reset();
     }
 
-    for (auto* node = resources.mDepthStencil.mLink.mNext; node != &resources.mDepthStencil.mLink; node = node->mNext) {
-      auto* const depthStencil =
-        DepthStencilList::template owner_from_member_node<moho::CD3DDepthStencil, &moho::CD3DDepthStencil::mLink>(
-          node);
-      if (depthStencil != nullptr) {
-        depthStencil->mSurface.reset();
-      }
+    for (auto* depthStencil :
+         resources.mDepthStencil.mLink.owners_member<moho::CD3DDepthStencil, &moho::CD3DDepthStencil::mLink>()) {
+      depthStencil->mSurface.reset();
     }
 
-    for (auto* node = resources.mTextureSheet.mLink.mNext; node != &resources.mTextureSheet.mLink; node = node->mNext) {
-      auto* const dynamicSheet = DynamicTextureSheetList::template owner_from_member_node<
-        moho::CD3DDynamicTextureSheet,
-        &moho::CD3DDynamicTextureSheet::mLink>(node);
-      if (dynamicSheet != nullptr) {
-        dynamicSheet->mTexture.reset();
-      }
+    for (auto* dynamicSheet : resources.mTextureSheet.mLink.owners_member<
+                               moho::CD3DDynamicTextureSheet,
+                               &moho::CD3DDynamicTextureSheet::mLink>()) {
+      dynamicSheet->mTexture.reset();
     }
 
     if (destroyEffects) {

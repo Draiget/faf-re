@@ -485,6 +485,109 @@ namespace moho
     {
       ListLinkBefore(head);
     }
+
+    template <class Owner, item_t Owner::* Member>
+    static Owner* owner_from_member_node(item_t* node) noexcept
+    {
+      const auto* const memberPtr = &(reinterpret_cast<Owner const volatile*>(0)->*Member);
+      const auto memberOffset = static_cast<std::ptrdiff_t>(reinterpret_cast<std::uintptr_t>(memberPtr));
+      return reinterpret_cast<Owner*>(reinterpret_cast<char*>(node) - memberOffset);
+    }
+
+    template <class Owner, item_t Owner::* Member>
+    static const Owner* owner_from_member_node(const item_t* node) noexcept
+    {
+      return owner_from_member_node<Owner, Member>(const_cast<item_t*>(node));
+    }
+
+    /**
+     * Iterator over a ring anchored at any node (list head or embedded
+     * sentinel member), yielding the owning objects behind each node.
+     */
+    template <class Owner, item_t Owner::* Member, bool IsConst>
+    struct member_owner_iterator
+    {
+      using node_type = std::conditional_t<IsConst, const item_t, item_t>;
+      using owner_type = std::conditional_t<IsConst, const Owner, Owner>;
+      using difference_type = std::ptrdiff_t;
+      using iterator_category = std::bidirectional_iterator_tag;
+
+      node_type* pos{nullptr};
+
+      member_owner_iterator& operator++() noexcept
+      {
+        pos = pos->mNext;
+        return *this;
+      }
+      member_owner_iterator& operator--() noexcept
+      {
+        pos = pos->mPrev;
+        return *this;
+      }
+
+      owner_type* operator*() const noexcept
+      {
+        if constexpr (IsConst) {
+          return owner_from_member_node<Owner, Member>(pos);
+        }
+        return owner_from_member_node<Owner, Member>(const_cast<item_t*>(pos));
+      }
+
+      owner_type* operator->() const noexcept
+      {
+        return **this;
+      }
+
+      bool operator==(const member_owner_iterator& r) const noexcept
+      {
+        return pos == r.pos;
+      }
+      bool operator!=(const member_owner_iterator& r) const noexcept
+      {
+        return pos != r.pos;
+      }
+    };
+
+    template <class Owner, item_t Owner::* Member, bool IsConst>
+    struct member_owner_range
+    {
+      using iterator = member_owner_iterator<Owner, Member, IsConst>;
+
+      iterator b;
+      iterator e;
+
+      iterator begin() const noexcept
+      {
+        return b;
+      }
+      iterator end() const noexcept
+      {
+        return e;
+      }
+    };
+
+    /**
+     * The owners linked through `Owner::Member` starting after this node,
+     * as a range-for-compatible range. Works on any ring anchor: a real
+     * `TDatList` head or a plain sentinel member node.
+     */
+    template <class Owner, item_t Owner::* Member>
+    member_owner_range<Owner, Member, false> owners_member() noexcept
+    {
+      return {
+        member_owner_iterator<Owner, Member, false>{this->mNext},
+        member_owner_iterator<Owner, Member, false>{static_cast<item_t*>(this)}
+      };
+    }
+
+    template <class Owner, item_t Owner::* Member>
+    member_owner_range<Owner, Member, true> owners_member() const noexcept
+    {
+      return {
+        member_owner_iterator<Owner, Member, true>{this->mNext},
+        member_owner_iterator<Owner, Member, true>{static_cast<const item_t*>(this)}
+      };
+    }
   };
 
   /**
@@ -819,20 +922,6 @@ namespace moho
       };
     }
 
-    template <class Owner, item_t Owner::* Member>
-    static Owner* owner_from_member_node(item_t* node) noexcept
-    {
-      const auto* const memberPtr = &(reinterpret_cast<Owner const volatile*>(0)->*Member);
-      const auto memberOffset = static_cast<std::ptrdiff_t>(reinterpret_cast<std::uintptr_t>(memberPtr));
-      return reinterpret_cast<Owner*>(reinterpret_cast<char*>(node) - memberOffset);
-    }
-
-    template <class Owner, item_t Owner::* Member>
-    static const Owner* owner_from_member_node(const item_t* node) noexcept
-    {
-      return owner_from_member_node<Owner, Member>(const_cast<item_t*>(node));
-    }
-
     template <class Owner, class MemberNode, MemberNode Owner::* Member>
     /**
      * Address: 0x00442D90 (FUN_00442D90)
@@ -868,86 +957,6 @@ namespace moho
         return nullptr;
       }
       return owner_from_member<Owner, MemberNode, Member>(const_cast<MemberNode*>(node));
-    }
-
-    template <class Owner, item_t Owner::* Member, bool IsConst>
-    struct member_owner_iterator
-    {
-      using node_type = std::conditional_t<IsConst, const item_t, item_t>;
-      using owner_type = std::conditional_t<IsConst, const Owner, Owner>;
-      using difference_type = std::ptrdiff_t;
-      using iterator_category = std::bidirectional_iterator_tag;
-
-      node_type* pos{nullptr};
-
-      member_owner_iterator& operator++() noexcept
-      {
-        pos = pos->mNext;
-        return *this;
-      }
-      member_owner_iterator& operator--() noexcept
-      {
-        pos = pos->mPrev;
-        return *this;
-      }
-
-      owner_type* operator*() const noexcept
-      {
-        if constexpr (IsConst) {
-          return owner_from_member_node<Owner, Member>(pos);
-        }
-        return owner_from_member_node<Owner, Member>(const_cast<item_t*>(pos));
-      }
-
-      owner_type* operator->() const noexcept
-      {
-        return **this;
-      }
-
-      bool operator==(const member_owner_iterator& r) const noexcept
-      {
-        return pos == r.pos;
-      }
-      bool operator!=(const member_owner_iterator& r) const noexcept
-      {
-        return pos != r.pos;
-      }
-    };
-
-    template <class Owner, item_t Owner::* Member, bool IsConst>
-    struct member_owner_range
-    {
-      using iterator = member_owner_iterator<Owner, Member, IsConst>;
-
-      iterator b;
-      iterator e;
-
-      iterator begin() const noexcept
-      {
-        return b;
-      }
-      iterator end() const noexcept
-      {
-        return e;
-      }
-    };
-
-    template <class Owner, item_t Owner::* Member>
-    member_owner_range<Owner, Member, false> owners_member() noexcept
-    {
-      return {
-        member_owner_iterator<Owner, Member, false>{this->mNext},
-        member_owner_iterator<Owner, Member, false>{static_cast<item_t*>(this)}
-      };
-    }
-
-    template <class Owner, item_t Owner::* Member>
-    member_owner_range<Owner, Member, true> owners_member() const noexcept
-    {
-      return {
-        member_owner_iterator<Owner, Member, true>{this->mNext},
-        member_owner_iterator<Owner, Member, true>{static_cast<const item_t*>(this)}
-      };
     }
   };
 } // namespace moho
