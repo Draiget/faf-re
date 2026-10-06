@@ -2266,6 +2266,20 @@ const UnitAttributes& UserUnit::GetAttributes() const
 }
 
 /**
+ * Address: 0x0085B0B0 (FUN_0085B0B0, Moho::UserUnit::HasScriptBit)
+ *
+ * What it does:
+ * Tests the sign-extended script flags with the original 64-bit shift semantics.
+ */
+bool UserUnit::HasScriptBit(const std::uint8_t bitIndex) const
+{
+  const auto scriptBits = static_cast<std::uint64_t>(
+    static_cast<std::int64_t>(static_cast<std::int32_t>(mUnitVarDat.mScriptbits))
+  );
+  return bitIndex < 64u && (scriptBits & (std::uint64_t{1} << bitIndex)) != 0u;
+}
+
+/**
  * Address: 0x008BF0C0 (FUN_008BF0C0, Moho::IUnit_UserUnit::GetStat)
  * IUnit slot 18.
  *

@@ -104,6 +104,8 @@
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
+#include "moho/unit/core/UnitAttributes.h"
+#include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/command/CommandIssueHelper.h"
 #include "moho/task/CTask.h"
 #include "moho/task/CTaskThread.h"
@@ -13661,8 +13663,6 @@ namespace moho
    *    `v148.playableRectX1` in the original binary - hovered units are
    *    excluded from all four runs below, matching the binary, but nothing
    *    collects or consumes that slot's own icon data yet).
-   *  - The "toggled off a scripted ability" half of the paused-overlay flag
-   *    below, which currently reflects only `mUnitVarDat.mIsPaused`.
    *  - The formation-ghost pass ("TStrategicFormationIcon"): needs
    *    `IFormationInstance::Contains`, not modelled yet - a separate,
    *    already-tracked blocker (see the `CFormationInstance` split notes).
@@ -13763,7 +13763,20 @@ namespace moho
         focusArmy == nullptr || focusArmy->IsAlly(static_cast<std::uint32_t>(entity->mArmy->mArmyIndex));
 
       iconData.mShowStunnedOverlay = asUnit != nullptr && asUnit->mUnitVarDat.mStunTicks != 0;
-      iconData.mShowPausedOverlay = asUnit != nullptr && asUnit->mUnitVarDat.mIsPaused;
+      if (iconData.mIsFriendly && asUnit != nullptr) {
+        const std::uint32_t toggleCaps = asUnit->GetAttributes().toggleCapsMask;
+        // Script-bit indices from 0x0085BE51..0x0085BEFA. Shield uses
+        // the opposite polarity; weapon and special toggles are excluded.
+        iconData.mShowPausedOverlay =
+          ((toggleCaps & RULEUTC_ShieldToggle) != 0u && !asUnit->HasScriptBit(0)) ||
+          ((toggleCaps & RULEUTC_JammingToggle) != 0u && asUnit->HasScriptBit(2)) ||
+          ((toggleCaps & RULEUTC_IntelToggle) != 0u && asUnit->HasScriptBit(3)) ||
+          ((toggleCaps & RULEUTC_ProductionToggle) != 0u && asUnit->HasScriptBit(4)) ||
+          ((toggleCaps & RULEUTC_StealthToggle) != 0u && asUnit->HasScriptBit(5)) ||
+          ((toggleCaps & RULEUTC_GenericToggle) != 0u && asUnit->HasScriptBit(6)) ||
+          ((toggleCaps & RULEUTC_CloakToggle) != 0u && asUnit->HasScriptBit(8)) ||
+          asUnit->mUnitVarDat.mIsPaused;
+      }
 
       if (focusArmy == nullptr || entity->mArmy == focusArmy) {
         if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr &&

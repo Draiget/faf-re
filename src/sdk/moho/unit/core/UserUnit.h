@@ -322,6 +322,14 @@ namespace moho
     /** Address: 0x008BEF40 - IUnit slot 17. */
     [[nodiscard]] const UnitAttributes& GetAttributes() const override;
 
+    /**
+     * Address: 0x0085B0B0 (FUN_0085B0B0, Moho::UserUnit::HasScriptBit)
+     *
+     * What it does:
+     * Tests a script-bit index in the replicated unit script flags.
+     */
+    [[nodiscard]] bool HasScriptBit(std::uint8_t bitIndex) const;
+
     /** Address: 0x008BF0C0 - IUnit slot 18. Named string stat under this unit's stats root. */
     [[nodiscard]] StatItem* GetStat(gpg::StrArg statPath, const std::string& defaultValue) override;
 
