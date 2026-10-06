@@ -891,8 +891,8 @@ void IAiCommandDispatchImpl::OnEvent(const EUnitCommandQueueStatus event)
  * Address: 0x0060A490 (FUN_0060A490, Moho::IAiCommandDispatchImpl::Stop)
  *
  * What it does:
- * Stops the unit's AI-side attack/silo work, requests a UI refresh, and marks
- * the dispatch result as stopped.
+ * Stops the unit's AI-side attack/silo work, marks the unit for the next
+ * sync beat, and marks the dispatch result as stopped.
  */
 int IAiCommandDispatchImpl::Stop()
 {
@@ -904,7 +904,11 @@ int IAiCommandDispatchImpl::Stop()
     mUnit->AiSiloBuild->SiloStopBuild();
   }
 
-  mUnit->VarDat().mDidRefresh = true;
+  // 0x0060A4B9 `mov byte [esi+0A2h], 1`: the entity's needs-sync flag, not
+  // `mUnitVarDat.mDidRefresh` (which SyncInterface clears before use). Without
+  // it a stationary unit whose queue was just cleared is never re-synced, so
+  // the UI keeps the stopped command (e.g. an upgrade stays "pending").
+  mUnit->MarkNeedsSyncGameData();
   mLinkResult = static_cast<EAiResult>(1);
   return 1;
 }
