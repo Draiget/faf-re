@@ -483,30 +483,6 @@ namespace moho
     constexpr std::int32_t kNoEmitters = 0;
     (void)sEngineStatRenderActiveEmitters->SetInt(&kNoEmitters);
 
-    // TEMPORARY PROBE -- effect-accumulation triage (assist lag), delete when
-    // resolved. Active effect list growth without bound means leaks (beams
-    // whose owning script threw before adding them to a TrashBag never get
-    // destroyed); sampled every 100 ticks.
-    {
-      static std::uint32_t sSampleMod = 0;
-      if ((++sSampleMod % 100u) == 0u) {
-        static int sSampleCount = 0;
-        if (sSampleCount++ < 600) {
-          std::size_t activeCount = 0;
-          for (IEffect* const effect : mActiveEffects.owners_safe()) {
-            (void)effect;
-            ++activeCount;
-          }
-          std::size_t destroyedCount = 0;
-          for (IEffect* const effect : mDestroyedEffects.owners_safe()) {
-            (void)effect;
-            ++destroyedCount;
-          }
-          DiagLine("[EFXDIAG] EffectCount active=%zu destroyedPending=%zu", activeCount, destroyedCount);
-        }
-      }
-    }
-
     // The successor is read before each OnTick, as the binary does: an effect
     // that destroys itself relinks into mDestroyedEffects mid-walk.
     for (IEffect* const effect : mActiveEffects.owners_safe()) {

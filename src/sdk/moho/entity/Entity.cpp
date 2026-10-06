@@ -2765,55 +2765,11 @@ namespace moho
 
     if (Entity* const attachTarget = mAttachInfo.GetAttachTargetEntity(); attachTarget != nullptr) {
       if (attachTarget->mLastTickProcessed == mLastTickProcessed) {
-        // TEMPORARY PROBE -- attached-unit freeze triage (hive drones stop
-        // moving): reports, strided, both sides of the skip gate plus the
-        // attach info so a frozen-drone session shows whether the parent ever
-        // advances its processed-tick lane. Delete when resolved.
-        {
-          static int sProbeAttachSeen = 0;
-          ++sProbeAttachSeen;
-          if ((sProbeAttachSeen % 400) == 0) {
-            if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-              std::fprintf(
-                sink,
-                "[ATTACHSKIP] self=%p isUnit=%d ownTick=%u parentTick=%u parent=%p bone=%d\n",
-                static_cast<void*>(this),
-                IsUnit() != nullptr ? 1 : 0,
-                mLastTickProcessed,
-                attachTarget->mLastTickProcessed,
-                static_cast<void*>(attachTarget),
-                mAttachInfo.mParentBoneIndex
-              );
-              std::fclose(sink);
-            }
-          }
-        }
         return -4;
       }
 
       const VTransform attachedTransform = CalculateAttachedTransform();
       SetPendingTransform(attachedTransform, 1.0f);
-    } else if (mAttachInfo.HasAttachTarget()) {
-      // TEMPORARY PROBE -- attached-unit freeze triage, second shape: if the
-      // weak slot is set but resolves null the follow never runs and a unit
-      // with no motion task of its own freezes exactly where it spawned.
-      // Strided; delete when resolved.
-      {
-        static int sProbeDeadSeen = 0;
-        ++sProbeDeadSeen;
-        if ((sProbeDeadSeen % 100) == 0) {
-          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-            std::fprintf(
-              sink,
-              "[ATTACHDEAD] self=%p isUnit=%d bone=%d\n",
-              static_cast<void*>(this),
-              IsUnit() != nullptr ? 1 : 0,
-              mAttachInfo.mParentBoneIndex
-            );
-            std::fclose(sink);
-          }
-        }
-      }
     }
 
     mLastTickProcessed = SimulationRef->mCurTick;
