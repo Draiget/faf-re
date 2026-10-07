@@ -15132,9 +15132,12 @@ bool moho::CMauiMovie::LoadFile(
 )
 {
 #if defined(_M_X64)
-  // The Sofdec movie middleware is not ported to x64 yet: it carries pointers
-  // as 32-bit words through its own layout views, and opening a movie faults.
-  // Until it is, x64 takes the same path `/nomovie` does.
+  // The Sofdec SFD/SFBUF/SFTRN/SFTIM layers are x64-clean, but the MPV video
+  // decoder still describes its handle twice (`MPVHandleInit` in
+  // MPVDecoder.cpp and `MPVDecoderScanContext` in MPVDecoder.h) with pointer
+  // fields in different slots, so x64 decodes fail with DATA ERROR and the
+  // movie never leaves the prepare state. Until that merge lands, x64 takes
+  // the same path `/nomovie` does.
   constexpr bool kMoviePlaybackSupported = false;
 #else
   constexpr bool kMoviePlaybackSupported = true;

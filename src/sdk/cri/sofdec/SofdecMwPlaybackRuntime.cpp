@@ -268,7 +268,7 @@
   /**
    * Address: 0x00B16E60 (FUN_00B16E60, sub_B16E60)
    */
-  std::int32_t SofdecResetSpatialPreset(moho::SofdecSoundPort* const soundPort)
+  SofdecAddressWord SofdecResetSpatialPreset(moho::SofdecSoundPort* const soundPort)
   {
     SofdecAddressWord result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(soundPort));
     if (soundPort->monoRoutingMode != 1) {
@@ -285,7 +285,7 @@
    */
   std::int32_t SofdecSetChannelMode(moho::SofdecSoundPort* const soundPort, const std::int32_t channelMode)
   {
-    std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(soundPort));
+    SofdecAddressWord result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(soundPort));
     if (soundPort->used != 0) {
       if (soundPort->primaryBuffer == nullptr) {
         return ADXERR_CallErrFunc1_(kSofdecErrNullPrimaryBuffer);
@@ -332,7 +332,7 @@
   /**
    * Address: 0x00B16B80 (FUN_00B16B80, SofDecVirt2_Func7)
    */
-  std::int32_t SofdecSetPlaybackFrequencyHz(moho::SofdecSoundPort* const soundPort, const std::int32_t frequencyHz)
+  SofdecAddressWord SofdecSetPlaybackFrequencyHz(moho::SofdecSoundPort* const soundPort, const std::int32_t frequencyHz)
   {
     SofdecAddressWord result = soundPort->used;
     if (result != 0) {

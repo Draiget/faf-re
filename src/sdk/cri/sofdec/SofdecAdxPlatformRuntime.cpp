@@ -478,49 +478,6 @@
     constexpr char kSofdecTagIntime[] = "INTIME";
     constexpr char kSofdecTagDurtime[] = "DURTIME";
 
-    struct MwsfdTagInfo
-    {
-      std::uint8_t mUnknown00_A7[0xA8]{};
-      void* sfxHandle = nullptr; // +0xA8
-      std::uint8_t mUnknownAC_17B[0xD0]{};
-      moho::SofdecSjRingBufferHandle* sjTagRingHandle = nullptr; // +0x17C
-      std::int8_t* ainfSearchBuffer = nullptr; // +0x180
-      std::uint8_t mUnknown184_187[0x04]{};
-      std::int8_t* ainfUserBuffer = nullptr; // +0x188
-      std::uint8_t mUnknown18C_18F[0x04]{};
-      std::int32_t ainfTagInfoSlot0 = 0; // +0x190
-      std::int32_t ainfTagInfoReady = 0; // +0x194
-      SofdecAddressWord ainfTagInfoDataAddress = 0; // +0x198
-      std::int32_t ainfTagInfoLength = 0; // +0x19C
-    };
-
-    static_assert(
-      offsetof(MwsfdTagInfo, sfxHandle) == 0xA8, "MwsfdTagInfo::sfxHandle offset must be 0xA8"
-    );
-    static_assert(
-      offsetof(MwsfdTagInfo, sjTagRingHandle) == 0x17C,
-      "MwsfdTagInfo::sjTagRingHandle offset must be 0x17C"
-    );
-    static_assert(
-      offsetof(MwsfdTagInfo, ainfSearchBuffer) == 0x180,
-      "MwsfdTagInfo::ainfSearchBuffer offset must be 0x180"
-    );
-    static_assert(
-      offsetof(MwsfdTagInfo, ainfUserBuffer) == 0x188,
-      "MwsfdTagInfo::ainfUserBuffer offset must be 0x188"
-    );
-    static_assert(
-      offsetof(MwsfdTagInfo, ainfTagInfoReady) == 0x194,
-      "MwsfdTagInfo::ainfTagInfoReady offset must be 0x194"
-    );
-    static_assert(
-      offsetof(MwsfdTagInfo, ainfTagInfoDataAddress) == 0x198,
-      "MwsfdTagInfo::ainfTagInfoDataAddress offset must be 0x198"
-    );
-    static_assert(
-      offsetof(MwsfdTagInfo, ainfTagInfoLength) == 0x19C,
-      "MwsfdTagInfo::ainfTagInfoLength offset must be 0x19C"
-    );
 
     struct SfxzTagGroup
     {
@@ -880,15 +837,15 @@
       return nullptr;
     }
 
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
+    auto* const tagInfo = ply;
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = static_cast<moho::SofdecSjRingBufferHandle*>(tagInfo->ainfSjHandle);
     const std::int32_t availableAinfBytes = (sjRingHandle != nullptr) ? SJRBF_GetNumData(sjRingHandle, 1) : 0;
     const char* result = reinterpret_cast<const char*>(static_cast<std::intptr_t>(availableAinfBytes));
 
     moho::MwsfTagWindow inputWindow{};
     moho::MwsfTagWindow outputWindow{};
     if (availableAinfBytes != 0) {
-      inputWindow.data = tagInfo->ainfSearchBuffer;
+      inputWindow.data = static_cast<std::int8_t*>(tagInfo->ainfBuffer);
       inputWindow.size = availableAinfBytes;
       result = SJ_SearchTag(&inputWindow, kSofdecTagCritags, kSofdecTagCritage, &outputWindow);
     }
@@ -1027,9 +984,9 @@
    * Extracts `SFXINFS` tag payload from cached AINF lanes and applies it to
    * the current SFX handle.
    */
-  std::int32_t mwsftag_GetSFXinfFromAinf(moho::MwsfdPlaybackStateSubobj* const ply)
+  SofdecAddressWord mwsftag_GetSFXinfFromAinf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    auto* const tagInfo = ply;
     if (tagInfo->ainfTagInfoDataAddress == 0) {
       return SFX_SetTagInf(tagInfo->sfxHandle, 0, 0);
     }
@@ -1056,14 +1013,14 @@
    * Populates playback AINF/SFX tag lanes once when SJ ring input exists and
    * cached tag state is not yet marked ready.
    */
-  std::int32_t MWSFTAG_SetTagInf(moho::MwsfdPlaybackStateSubobj* const ply)
+  SofdecAddressWord MWSFTAG_SetTagInf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
     if (ply == nullptr) {
       return 0;
     }
 
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    const SofdecAddressWord result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(tagInfo->sjTagRingHandle));
+    auto* const tagInfo = ply;
+    const SofdecAddressWord result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(tagInfo->ainfSjHandle));
     if (result != 0 && tagInfo->ainfTagInfoReady != 1) {
       (void)mwsftag_GetAinfFromSj(ply);
       return mwsftag_GetSFXinfFromAinf(ply);
@@ -1083,8 +1040,8 @@
       return 0;
     }
 
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    const std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(tagInfo->sjTagRingHandle));
+    auto* const tagInfo = ply;
+    const SofdecAddressWord result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(tagInfo->ainfSjHandle));
     if (result != 0) {
       (void)mwsftag_GetAinfFromSj(ply);
       return mwsftag_GetSFXinfFromAinf(ply);
@@ -1105,8 +1062,8 @@
       return 0;
     }
 
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    if (tagInfo->sjTagRingHandle != nullptr) {
+    auto* const tagInfo = ply;
+    if (tagInfo->ainfSjHandle != nullptr) {
       return -(SFD_SetUsrSj(static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(ply->handle)), 2, 0, 0) != 0);
     }
     return 0;
@@ -1277,8 +1234,8 @@
    */
   void MWSFTAG_DestroyAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
+    auto* const tagInfo = ply;
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = static_cast<moho::SofdecSjRingBufferHandle*>(tagInfo->ainfSjHandle);
     if (sjRingHandle != nullptr) {
       sjrbf_Destroy(sjRingHandle);
     }
@@ -1301,8 +1258,8 @@
       return 0;
     }
 
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
+    auto* const tagInfo = ply;
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = static_cast<moho::SofdecSjRingBufferHandle*>(tagInfo->ainfSjHandle);
     if (sjRingHandle == nullptr) {
       return 0;
     }
@@ -1328,7 +1285,7 @@
    */
   void MWSFTAG_InitTagInf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    auto* const tagInfo = ply;
     tagInfo->ainfTagInfoReady = 0;
     tagInfo->ainfTagInfoDataAddress = 0;
     tagInfo->ainfTagInfoLength = 0;
@@ -1347,8 +1304,8 @@
    */
   SofdecAddressWord MWSFTAG_ResetAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
+    auto* const tagInfo = ply;
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = static_cast<moho::SofdecSjRingBufferHandle*>(tagInfo->ainfSjHandle);
     if (sjRingHandle == nullptr) {
       return 0;
     }
@@ -1371,7 +1328,7 @@
     std::int32_t* const outTagDataLength
   )
   {
-    const auto* const tagInfo = reinterpret_cast<const MwsfdTagInfo*>(ply);
+    const auto* const tagInfo = ply;
     *outTagDataAddress = tagInfo->ainfTagInfoDataAddress;
     *outTagDataLength = tagInfo->ainfTagInfoLength;
     return tagInfo->ainfTagInfoLength;
@@ -2122,7 +2079,7 @@
   // Defined later in this aggregate translation unit.
   moho::SofdecSfdWorkctrlSubobj* sfply_Create(moho::SfplyCreateParams* createParams, std::int32_t createContext);
   std::int32_t SFD_SetErrFn(SofdecAddressWord errorObjectAddress, SofdecAddressWord callbackAddress, std::int32_t callbackObject);
-  std::int32_t SFD_SetSupplySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* supplyDescriptorWords);
+  std::int32_t SFD_SetSupplySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const SofdecAddressWord* supplyDescriptorWords);
   std::int32_t SFD_SetAdxtPara(const moho::SofdecAdxtParams* params);
   std::int32_t SFD_SetCond(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t value);
   SofdecAddressWord SFD_GetTrHn(
@@ -2181,7 +2138,7 @@
   // shared parameter types so the C-linkage symbols still match.
   extern "C" std::int32_t SFD_SetMpvParaTbl(
     const moho::MwsfdMpvPara* parameterTable,
-    const std::int32_t* ringFrameBufferAddressTable,
+    void* const* ringFrameBufferAddressTable,
     void* const* sofDecTabAddressTable
   );
   // `SFD_SetM2tsPara` is declared against the SFD runtime's own view of this
@@ -2349,7 +2306,7 @@
     supplyDescriptor.mUnknown14 = 0;
 
     const std::int32_t status =
-      SFD_SetSupplySj(workctrl, reinterpret_cast<const std::int32_t*>(&supplyDescriptor));
+      SFD_SetSupplySj(workctrl, reinterpret_cast<const SofdecAddressWord*>(&supplyDescriptor));
     if (status != 0) {
       (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeSetSupplySj);
       return MWSFSVM_Error(kMwsfcreErrSetSupplySjFailed);
@@ -2457,17 +2414,17 @@
    * Fills the in-handle seek-key-group descriptor and publishes a pointer to
    * it. The descriptor lives inside the handle, so there is nothing to free.
    */
-  std::int32_t* MWSKG_Create(
+  moho::MwsfdPicUserBufferDescriptor* MWSKG_Create(
     moho::MwsfdPlaybackStateSubobj* const ply,
     const SofdecAddressWord recordBufferAddress,
     const std::int32_t recordBlockBytes,
     const std::int32_t recordEntryBytes
   )
   {
-    ply->seekKeyGroup[0] = recordBufferAddress;
-    ply->seekKeyGroup[1] = recordBlockBytes;
-    ply->seekKeyGroup[2] = recordEntryBytes;
-    ply->seekKeyGroupPtr = ply->seekKeyGroup.data();
+    ply->seekKeyGroup.bufferAddress = recordBufferAddress;
+    ply->seekKeyGroup.bufferBytes = recordBlockBytes;
+    ply->seekKeyGroup.bytesPerFrame = recordEntryBytes;
+    ply->seekKeyGroupPtr = &ply->seekKeyGroup;
     return ply->seekKeyGroupPtr;
   }
 
@@ -3275,7 +3232,7 @@
 
     SFD_SetMpvParaTbl(
       &mwsfd_mpvpara,
-      reinterpret_cast<const std::int32_t*>(referenceFrames.data()),
+      referenceFrames.data(),
       framePool.data());
     if (ftype == moho::kMwsfcreStreamMps) {
       SFD_SetAdxtPara(&mwsfd_adxtpara);
@@ -3310,7 +3267,7 @@
 
     ply->fname = static_cast<char*>(recordBuffer);
     ply->fnameCapacity = recordBytes;
-    (void)MWSKG_Create(ply, reinterpret_cast<std::int32_t>(seekRecord), kMwsfcreSofdecPackBytes, 64);
+    (void)MWSKG_Create(ply, SjPointerToAddress(seekRecord), kMwsfcreSofdecPackBytes, 64);
     ply->apiType = 0;
     return workctrl;
   }
@@ -4233,7 +4190,7 @@
    * What it does:
    * Returns aggregate dropped-frame count (decode-skip + display-skip).
    */
-  std::int32_t mwPlyGetNumDropFrm(moho::MwsfdPlaybackStateSubobj* const ply)
+  SofdecAddressWord mwPlyGetNumDropFrm(moho::MwsfdPlaybackStateSubobj* const ply)
   {
     if (MWSFD_IsEnableHndl(ply) == 1) {
       return mwPlyGetNumSkipDec(ply) + mwPlyGetNumSkipDisp(ply);
@@ -4320,7 +4277,7 @@
    * MWSFD_GetCond below, down to the same two tail jumps into SFD_SetCond
    * (0x00ACB93F, 0x00ACB94A).
    */
-  std::int32_t MWSFD_SetCond(
+  SofdecAddressWord MWSFD_SetCond(
     moho::MwsfdPlaybackStateSubobj* const ply,
     const std::int32_t conditionId,
     const std::int32_t conditionValue
@@ -5134,27 +5091,10 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleTermSupply);
     }
 
-    struct SfplyTermSupply
-    {
-      std::uint8_t mUnknown00[0x44]{};
-      std::int32_t termRequestedFlag = 0; // +0x44
-      std::uint8_t mUnknown48[0x1EFC]{};
-      std::int32_t sfbufLaneIndex = 0; // +0x1F44
-    };
-    static_assert(
-      offsetof(SfplyTermSupply, termRequestedFlag) == 0x44,
-      "SfplyTermSupply::termRequestedFlag offset must be 0x44"
-    );
-    static_assert(
-      offsetof(SfplyTermSupply, sfbufLaneIndex) == 0x1F44,
-      "SfplyTermSupply::sfbufLaneIndex offset must be 0x1F44"
-    );
-
-    auto* const runtime = reinterpret_cast<SfplyTermSupply*>(workctrlSubobj);
-    const std::int32_t laneIndex = runtime->sfbufLaneIndex;
+    const std::int32_t laneIndex = workctrlSubobj->transferState.lanes[moho::kSftrnMemoryLane].targetLaneIndex[0];
     if (SFBUF_GetTermFlg(sfdHandleAddress, laneIndex) != 1) {
       (void)SFBUF_SetTermFlg(sfdHandleAddress, laneIndex, 1);
-      runtime->termRequestedFlag = 1;
+      workctrlSubobj->serverWorkPending = 1;
     }
     return 0;
   }
@@ -5807,7 +5747,7 @@
   /**
    * Address: 0x00ACB020 (FUN_00ACB020, _mwPlyStartMem)
    */
-  std::int32_t mwPlyStartMem(
+  SofdecAddressWord mwPlyStartMem(
     moho::MwsfdPlaybackStateSubobj* const ply,
     const SofdecAddressWord bufferAddress,
     const std::int32_t bufferSize
@@ -5851,7 +5791,7 @@
   /**
    * Address: 0x00ACB0C0 (FUN_00ACB0C0, _mwPlyStartSj)
    */
-  std::int32_t mwPlyStartSj(moho::MwsfdPlaybackStateSubobj* const ply, moho::SofdecSjSupplyHandle* const supplyHandle)
+  SofdecAddressWord mwPlyStartSj(moho::MwsfdPlaybackStateSubobj* const ply, moho::SofdecSjSupplyHandle* const supplyHandle)
   {
     if (MWSFD_IsEnableHndl(ply) != 1) {
       return MWSFSVM_Error(kMwsfdErrStartSjInvalidHandle);
@@ -6265,23 +6205,7 @@
   std::int32_t gLscErrorObject = 0;
   std::int32_t gLscInitCount = 0;
 
-  struct LscSjInterfaceVtable
-  {
-    std::uint8_t mUnknown00_23[0x24]{};
-    std::int32_t(__cdecl* getNumData)(void* sjHandle, std::int32_t lane) = nullptr; // +0x24
-  };
-
-  struct LscSjHandle
-  {
-    std::int32_t runtimeSlot = 0; // +0x00
-  };
-
   static_assert(sizeof(gLscObjectPool) == 0x8E00, "LSC object pool size must be 0x8E00");
-  static_assert(
-    offsetof(LscSjInterfaceVtable, getNumData) == 0x24,
-    "LscSjInterfaceVtable::getNumData offset must be 0x24"
-  );
-  static_assert(sizeof(LscSjHandle) == 0x04, "LscSjHandle size must be 0x04");
 
   using LscStatusChangeCallback = std::int32_t(__cdecl*)(std::int32_t callbackObjectPrimary, std::int32_t callbackObjectSecondary);
   LscStatusChangeCallback gLscStatusChangeCallback = nullptr;
@@ -6323,10 +6247,8 @@
 
   [[nodiscard]] std::int32_t LscGetSjNumData(void* const sjHandle, const std::int32_t lane)
   {
-    const auto* const sjRuntime = reinterpret_cast<const LscSjHandle*>(sjHandle);
-    const auto* const runtimeInterface =
-      reinterpret_cast<const LscSjInterfaceVtable*>(SjAddressToPointer(sjRuntime->runtimeSlot));
-    return runtimeInterface->getNumData(sjHandle, lane);
+    auto* const sj = static_cast<moho::SofdecSjSupplyHandle*>(sjHandle);
+    return sj->dispatchTable->queryAvailableBytes(sj, lane);
   }
 
   [[nodiscard]] LscStreamEntry& LscCurrentStreamEntry(LscInstance* const lsc) noexcept
@@ -9269,7 +9191,7 @@
    * Public ADXRNA control-word-`0x44` setter thunk; tail-calls the internal
    * core.
    */
-  std::int32_t ADXRNA_SetControlWord44(const SofdecAddressWord rnaHandle, const std::int32_t controlWord)
+  SofdecAddressWord ADXRNA_SetControlWord44(const SofdecAddressWord rnaHandle, const std::int32_t controlWord)
   {
     return adxrna_SetControlWord44Core(rnaHandle, controlWord);
   }
@@ -11052,7 +10974,7 @@
    * What it does:
    * Runs one terminate-supply tick across AHX/MPA/M2A codec lanes.
    */
-  std::int32_t ADXSJD_TermSupply(const SofdecAddressWord sjdHandle)
+  SofdecAddressWord ADXSJD_TermSupply(const SofdecAddressWord sjdHandle)
   {
     auto* const decoder = AdxsjdStateOf(sjdHandle)->Decoder();
     ADXB_AhxTermSupply(decoder);
@@ -12112,7 +12034,7 @@
   /**
    * Address: 0x00B18F50 (FUN_00B18F50, _ADXSJD_RestoreSnapshot)
    */
-  std::int32_t ADXSJD_RestoreSnapshot(const SofdecAddressWord sjdHandle)
+  SofdecAddressWord ADXSJD_RestoreSnapshot(const SofdecAddressWord sjdHandle)
   {
     return ADXB_RestoreSnapshot(AdxsjdStateOf(sjdHandle)->Decoder());
   }
@@ -12687,7 +12609,7 @@
    * What it does:
    * Forwards one ADXT header-filter callback lane into ADXSJD filter registration.
    */
-  std::int32_t adxt_SetCbHdrDec(
+  SofdecAddressWord adxt_SetCbHdrDec(
     void* const adxtRuntime,
     void* const filterCallbackAddress,
     const std::int32_t filterCallbackContext
@@ -12780,7 +12702,7 @@
    * What it does:
    * Forwards one ADXT decode callback lane into ADXSJD decode callback registration.
    */
-  std::int32_t adxt_SetCbDec(
+  SofdecAddressWord adxt_SetCbDec(
     void* const adxtRuntime,
     void* const decodeCallbackAddress,
     const std::int32_t decodeCallbackContext
@@ -12947,7 +12869,7 @@
    * What it does:
    * Forwards one ADXT default-format update to ADXSJD using runtime SJD lane.
    */
-  std::int32_t adxt_SetDefFmt(void* const adxtRuntime, const std::int32_t requestedFormat)
+  SofdecAddressWord adxt_SetDefFmt(void* const adxtRuntime, const std::int32_t requestedFormat)
   {
     const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return ADXSJD_SetDefFmt(runtime->sjdHandle, requestedFormat);
@@ -13082,13 +13004,13 @@
    * general loop-boundary trap callback (`adxt_trap_entry`) at the loop
    * point itself.
    */
-  std::int32_t adxt_trap_entry_lps(void* const adxtRuntime)
+  SofdecAddressWord adxt_trap_entry_lps(void* const adxtRuntime)
   {
     auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const SofdecAddressWord sjdHandle = runtime->sjdHandle;
 
     const std::int32_t loopStartPos = ADXSJD_GetLpStartPos(sjdHandle);
-    const std::int32_t loopStartOffset = ADXSJD_GetLpStartOfst(sjdHandle);
+    const SofdecAddressWord loopStartOffset = ADXSJD_GetLpStartOfst(sjdHandle);
     const std::int32_t loopEndPos = ADXSJD_GetLpEndPos(sjdHandle);
     ADXSJD_TakeSnapshot(sjdHandle);
     ADXSJD_SetTrapCnt(sjdHandle, 0);
@@ -14224,8 +14146,7 @@
    */
   void mwsfcre_AttachPicUsrBuf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    const auto* const playbackView = reinterpret_cast<const MwsfdPlaybackPicUser*>(ply);
-    const MwsfdPicUserBufferDescriptor* const userBuffer = playbackView->picUserBuffer;
+    const moho::MwsfdPicUserBufferDescriptor* const userBuffer = ply->seekKeyGroupPtr;
     if (userBuffer == nullptr) {
       (void)MWSFSVM_Error(kMwsfcreErrAttachPicUsrBufInternal);
       return;
@@ -17588,7 +17509,7 @@
    * What it does:
    * Export thunk that forwards completion-sector update into `adxstm_SetEos`.
    */
-  std::int32_t ADXSTM_SetEos(void* const streamHandle, const std::int32_t eosSector)
+  SofdecAddressWord ADXSTM_SetEos(void* const streamHandle, const std::int32_t eosSector)
   {
     return adxstm_SetEos(streamHandle, eosSector);
   }
@@ -20615,7 +20536,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     const SofdecAddressWord payloadAddress = sfdFrame->pictureUserPayload[0];
     const std::int32_t payloadBytes = sfdFrame->pictureUserPayload[1];
 
-    if (MWSFD_GetUsePicUsr() != 1 || ply->seekKeyGroupPtr == ply->seekKeyGroup.data()) {
+    if (MWSFD_GetUsePicUsr() != 1 || ply->seekKeyGroupPtr == &ply->seekKeyGroup) {
       outFrameInfo->pictureUserAddress = 0;
       outFrameInfo->frameFieldType = 0;
       return SjPointerToAddress(outFrameInfo);
@@ -20640,7 +20561,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * Publishes the subtitle record carried in this frame's picture-user
    * payload, if any, on the outgoing frame info.
    */
-  std::int32_t mwsffrm_SetSudDatInf(
+  SofdecAddressWord mwsffrm_SetSudDatInf(
     moho::MwsfdPlaybackStateSubobj* const /*ply*/,
     const SofdecSfdFrame* const sfdFrame,
     MwsfdFrameInfoFill* const outFrameInfo
@@ -20932,7 +20853,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
   {
-    const std::int32_t planeWidth = frm->planeWidth;
+    const SofdecAddressWord planeWidth = frm->planeWidth;
     const SofdecAddressWord planeHeight = frm->planeHeight;
     outSfx->cachedWidth = planeWidth;
     outSfx->cachedHeight = planeHeight;

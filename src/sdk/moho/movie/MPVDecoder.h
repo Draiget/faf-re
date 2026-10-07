@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "cri/sofdec/SofdecAddressWord.h"
+
 namespace moho::movie
 {
   struct MPVDecoderContextPrefix;
@@ -759,7 +761,7 @@ extern "C"
    * carves `objectCount` decoder slots plus the conceal-state arena out of
    * `workAddress`, and initializes every MPV decode stage against it.
    */
-  std::int32_t MPV_Init(std::int32_t objectCount, std::int32_t workAddress);
+  std::int32_t MPV_Init(std::int32_t objectCount, SofdecAddressWord workAddress);
 
   /**
    * Address: 0x00AEAE60 (FUN_00AEAE60, _MPVERR_Init)

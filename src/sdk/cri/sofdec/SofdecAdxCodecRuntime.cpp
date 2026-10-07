@@ -247,7 +247,7 @@
    */
   std::int32_t ADXAMP_ExecServer()
   {
-    std::int32_t result = 0;
+    SofdecAddressWord result = 0;
     for (auto& runtime : adxamp_obj) {
       if (runtime.used == 1u) {
         result = ADXAMP_ExecHndl(&runtime);
@@ -3727,7 +3727,7 @@
    * partial block needs when the trap cuts it), and by the room left in the
    * PCM ring; then queues it on the mono, stereo or PL2 path.
    */
-  std::int32_t ADXB_EvokeDecode(moho::AdxBitstreamDecoderState* decoder)
+  SofdecAddressWord ADXB_EvokeDecode(moho::AdxBitstreamDecoderState* decoder)
   {
     const std::int32_t blockSamples = decoder->outputBlockSamples;
     const std::int32_t channels = decoder->outputChannels;
@@ -4939,7 +4939,7 @@
    * What it does:
    * Updates Dolby matrix lookup-table index lanes from signed user parameters.
    */
-  std::int32_t ADXT_SetMixTableIndices(
+  SofdecAddressWord ADXT_SetMixTableIndices(
     AdxtDolbyState* state,
     const std::int32_t matrixParamA,
     const std::int32_t matrixParamB

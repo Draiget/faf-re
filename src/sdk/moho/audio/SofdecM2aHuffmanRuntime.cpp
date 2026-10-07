@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include "cri/sofdec/SofdecAddressWord.h"
+
 extern "C"
 {
   extern std::size_t huffman_codebook[];

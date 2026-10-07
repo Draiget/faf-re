@@ -1,6 +1,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "cri/sofdec/SofdecAddressWord.h"
+
 extern "C"
 {
   extern int __cdecl mpabsr_ReadBitStm(

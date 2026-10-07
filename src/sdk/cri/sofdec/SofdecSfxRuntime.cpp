@@ -113,7 +113,7 @@ using SfxCnvFrmCallback = std::int32_t(__cdecl*)(
   );
 using SfxCopyAlphaCallback = std::uint8_t*(__cdecl*)(
   std::uint8_t** sourcePlanes,
-  const std::int32_t* conversionWords,
+  const SofdecAddressWord* conversionWords,
   const SofdecAddressWord* userTableAddress
 );
 

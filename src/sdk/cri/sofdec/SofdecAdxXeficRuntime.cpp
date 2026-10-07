@@ -2333,7 +2333,7 @@
   )
   {
     mpasjd_lock();
-    const std::int32_t result = mpasjd_GetIoSj(decoder, outSourceStream, outOutputStreamCount, outOutputStreams);
+    const SofdecAddressWord result = mpasjd_GetIoSj(decoder, outSourceStream, outOutputStreamCount, outOutputStreams);
     mpasjd_unlock();
     return result;
   }
@@ -7506,7 +7506,7 @@
       return SjAddressToPointer(chunkRange->bufferAddress);
     }
 
-    [[nodiscard]] std::int32_t SjPointerToAddress(const void* const pointer)
+    [[nodiscard]] SofdecAddressWord SjPointerToAddress(const void* const pointer)
     {
       return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
     }

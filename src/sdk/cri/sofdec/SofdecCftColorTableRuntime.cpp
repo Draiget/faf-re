@@ -356,7 +356,7 @@ namespace
   );
   static_assert(sizeof(CftYcc420A256Target) == 0x10, "CftYcc420A256Target size must be 0x10");
 
-  [[nodiscard]] SofdecAddressWord PointerToAddress32(const void* const pointer)
+  [[nodiscard]] SofdecAddressWord PointerToAddressWord(const void* const pointer)
   {
     return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
   }
@@ -428,7 +428,7 @@ std::int32_t cnvDynamicYcc420plnToA256UserTable(
     sourceCursor += sourceRowAdvance;
   }
 
-  return PointerToAddress32(destinationCursor);
+  return PointerToAddressWord(destinationCursor);
 }
 
 /**
@@ -440,21 +440,21 @@ std::int32_t cnvDynamicYcc420plnToA256UserTable(
  */
 std::uint8_t* CFT_Ycc420plnToA256V(
   std::uint8_t** const sourcePlanes,
-  const std::int32_t* const conversionWords,
-  const std::int32_t* const userTableAddress
+  const SofdecAddressWord* const conversionWords,
+  const SofdecAddressWord* const userTableAddress
 )
 {
   CftYcc420A256Source sourceView{};
-  sourceView.sourceRowAddress = PointerToAddress32(sourcePlanes[1]);
-  sourceView.reserved04Address = PointerToAddress32(sourcePlanes[5]);
-  sourceView.reserved08Address = PointerToAddress32(sourcePlanes[9]);
-  sourceView.sourceStrideBytes = PointerToAddress32(sourcePlanes[4]);
+  sourceView.sourceRowAddress = PointerToAddressWord(sourcePlanes[1]);
+  sourceView.reserved04Address = PointerToAddressWord(sourcePlanes[5]);
+  sourceView.reserved08Address = PointerToAddressWord(sourcePlanes[9]);
+  sourceView.sourceStrideBytes = PointerToAddressWord(sourcePlanes[4]);
 
   CftYcc420A256Target targetView{};
   targetView.destinationAddress = conversionWords[1];
-  targetView.widthPixels = conversionWords[2];
-  targetView.heightPixels = conversionWords[3];
-  targetView.destinationStrideBytes = conversionWords[4];
+  targetView.widthPixels = static_cast<std::int32_t>(conversionWords[2]);
+  targetView.heightPixels = static_cast<std::int32_t>(conversionWords[3]);
+  targetView.destinationStrideBytes = static_cast<std::int32_t>(conversionWords[4]);
 
   if (*userTableAddress != 0) {
     const SofdecAddressWord convertedAddress =

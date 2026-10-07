@@ -216,7 +216,7 @@
    * What it does:
    * Forwards requested default format to ADXSJD for the owning ADXT SJD handle.
    */
-  std::int32_t adxt_SetDefFmt(void* adxtRuntime, std::int32_t requestedFormat);
+  SofdecAddressWord adxt_SetDefFmt(void* adxtRuntime, std::int32_t requestedFormat);
   /**
    * Address: 0x00B0E830 (FUN_00B0E830, _ADXT_GetStm)
    *
@@ -908,7 +908,7 @@
    * What it does:
    * Forwards one ADXT header-filter callback lane into ADXSJD filter registration.
    */
-  std::int32_t adxt_SetCbHdrDec(void* adxtRuntime, void* filterCallbackAddress, std::int32_t filterCallbackContext);
+  SofdecAddressWord adxt_SetCbHdrDec(void* adxtRuntime, void* filterCallbackAddress, std::int32_t filterCallbackContext);
   /**
    * Address: 0x00B0EB10 (FUN_00B0EB10, _ADXT_GetDecNumSmpl)
    *
@@ -950,7 +950,7 @@
    * What it does:
    * Forwards one ADXT decode callback lane into ADXSJD decode callback registration.
    */
-  std::int32_t adxt_SetCbDec(void* adxtRuntime, void* decodeCallbackAddress, std::int32_t decodeCallbackContext);
+  SofdecAddressWord adxt_SetCbDec(void* adxtRuntime, void* decodeCallbackAddress, std::int32_t decodeCallbackContext);
   /**
    * Address: 0x00B0EC10 (FUN_00B0EC10, _ADXT_IsHeader)
    *
@@ -1002,7 +1002,7 @@
   std::int32_t adxt_stat_prep(void* adxtRuntime);
   std::int32_t adxt_stat_playing(void* adxtRuntime);
   std::int32_t adxt_stat_decend(void* adxtRuntime);
-  std::int32_t adxt_trap_entry_lps(void* adxtRuntime);
+  SofdecAddressWord adxt_trap_entry_lps(void* adxtRuntime);
   std::int32_t adxt_trap_entry(void* adxtRuntime);
   std::int32_t adxt_nlp_trap_entry(void* adxtRuntime);
   int ADX_ScanInfoCode(const std::uint8_t* sourceBytes, std::int32_t sourceLength, std::int16_t* outOffset);
@@ -1598,7 +1598,7 @@
    * What it does:
    * Dispatches ADXT MPEG-2 AAC detach through the installed link callback lane.
    */
-  SofdecAddressWord ADXT_DetachMPEG2AAC(void* adxtRuntime);
+  extern "C" SofdecAddressWord ADXT_DetachMPEG2AAC(void* adxtRuntime);
   void adxt_Stop(void* adxtRuntime);
   std::int32_t ADXB_SetAhxInSj(moho::AdxBitstreamDecoderState* decoder);
   std::uint32_t ADXB_SetAhxDecSmpl(moho::AdxBitstreamDecoderState* decoder, std::int32_t maxDecodeSamples);
@@ -1654,7 +1654,7 @@
   std::int32_t ADXSJD_GetFmtBps(SofdecAddressWord sjdHandle);
   SofdecAddressWord ADXSJD_GetSpsdInfo(SofdecAddressWord sjdHandle);
   std::int32_t ADXSJD_TakeSnapshot(SofdecAddressWord sjdHandle);
-  std::int32_t ADXSJD_RestoreSnapshot(SofdecAddressWord sjdHandle);
+  SofdecAddressWord ADXSJD_RestoreSnapshot(SofdecAddressWord sjdHandle);
   std::int32_t ADXSJD_GetDecDtLen(SofdecAddressWord sjdHandle);
   std::int32_t ADXSJD_SetTrapNumSmpl(SofdecAddressWord sjdHandle, std::int32_t trapSampleCount);
   std::int32_t ADXSJD_GetTrapNumSmpl(SofdecAddressWord sjdHandle);
@@ -1683,7 +1683,7 @@
   std::int32_t ADXSJD_GetSfreq(SofdecAddressWord sjdHandle);
   std::int32_t ADXSJD_GetStat(SofdecAddressWord sjdHandle);
   std::int32_t ADXSJD_GetDecNumSmpl(SofdecAddressWord sjdHandle);
-  std::int32_t ADXSJD_TermSupply(SofdecAddressWord sjdHandle);
+  SofdecAddressWord ADXSJD_TermSupply(SofdecAddressWord sjdHandle);
   std::int32_t ADXAMP_Start(void* channelExpandHandle);
   void ADXAMP_Stop(void* channelExpandHandle);
   void CRIERR_CallErr(const char* format, ...);
@@ -1869,7 +1869,7 @@
    * What it does:
    * Export thunk that updates ADXSTM end-of-stream sector lane.
    */
-  std::int32_t ADXSTM_SetEos(void* streamHandle, std::int32_t eosSector);
+  SofdecAddressWord ADXSTM_SetEos(void* streamHandle, std::int32_t eosSector);
   /**
    * Address: 0x00B10110 (FUN_00B10110, _ADXSTM_SetBufSize)
    *
@@ -3096,7 +3096,7 @@
   std::int32_t sfply_StatPrep(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_IsPrepEnd(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_AdjustPrepEnd(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
-  std::int32_t sfply_FixAvPlay(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  SofdecAddressWord sfply_FixAvPlay(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_AdjustSyncMode(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_AdjustEtrg(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_StatStby(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
@@ -3382,7 +3382,7 @@
   extern char wxfic_cache_file[0x140];
   extern XeciObject xedir_work[80];
   extern CvFsUserErrorBridgeFn cvfs_errfn;
-  extern std::int32_t cvfs_errobj;
+  extern SofdecAddressWord cvfs_errobj;
   extern MfciHandle mfci_obj[80];
   extern CvFsUserErrorBridgeFn mfci_err_func;
   extern std::int32_t mfci_err_obj;
@@ -3492,7 +3492,7 @@
   char wxfic_cache_file[0x140]{};
   XeciObject xedir_work[80]{};
   CvFsUserErrorBridgeFn cvfs_errfn = nullptr;
-  std::int32_t cvfs_errobj = 0;
+  SofdecAddressWord cvfs_errobj = 0;
   moho::AdxmErrorCallback crierr_callback_func = nullptr;
   std::int32_t crierr_callback_obj = 0;
   char crierr_err_msg[0x100]{};
@@ -3607,22 +3607,6 @@
   );
   static_assert(sizeof(SflibLibWork) == 0x288, "SflibLibWork size must be 0x288");
 
-  struct SflibErrorOwner
-  {
-    std::uint8_t mUnknown00[0x48]{};
-    std::int32_t handleState = 0; // +0x48
-    std::uint8_t mUnknown4C[0x9AC]{};
-    moho::SflibErrorInfo errInfo{}; // +0x9F8
-  };
-
-  static_assert(
-    offsetof(SflibErrorOwner, handleState) == 0x48,
-    "SflibErrorOwner::handleState offset must be 0x48"
-  );
-  static_assert(
-    offsetof(SflibErrorOwner, errInfo) == 0x9F8,
-    "SflibErrorOwner::errInfo offset must be 0x9F8"
-  );
 
   SflibLibWork gSflibLibWork{};
 
@@ -5055,38 +5039,6 @@ namespace
     "ADXT runtime slot pool size must be 0x1880 bytes"
   );
   std::array<AdxtState, kAdxtRuntimeSlotCount> gAdxtRuntimePool{};
-
-  struct MwsfdPicUserBufferDescriptor
-  {
-    SofdecAddressWord bufferAddress = 0; // +0x00
-    std::int32_t bufferBytes = 0; // +0x04
-    std::int32_t bytesPerFrame = 0; // +0x08
-  };
-
-  static_assert(
-    offsetof(MwsfdPicUserBufferDescriptor, bufferAddress) == 0x00,
-    "MwsfdPicUserBufferDescriptor::bufferAddress offset must be 0x00"
-  );
-  static_assert(
-    offsetof(MwsfdPicUserBufferDescriptor, bufferBytes) == 0x04,
-    "MwsfdPicUserBufferDescriptor::bufferBytes offset must be 0x04"
-  );
-  static_assert(
-    offsetof(MwsfdPicUserBufferDescriptor, bytesPerFrame) == 0x08,
-    "MwsfdPicUserBufferDescriptor::bytesPerFrame offset must be 0x08"
-  );
-  static_assert(sizeof(MwsfdPicUserBufferDescriptor) == 0x0C, "MwsfdPicUserBufferDescriptor size must be 0x0C");
-
-  struct MwsfdPlaybackPicUser
-  {
-    std::uint8_t mUnknown00[0x178]{};
-    MwsfdPicUserBufferDescriptor* picUserBuffer = nullptr; // +0x178
-  };
-
-  static_assert(
-    offsetof(MwsfdPlaybackPicUser, picUserBuffer) == 0x178,
-    "MwsfdPlaybackPicUser::picUserBuffer offset must be 0x178"
-  );
 
   struct AdxfHandle
   {
@@ -6540,7 +6492,7 @@ namespace
       metricsRuntime->appliedOutputVolume = metricsRuntime->streamInfoWordA0;
     }
 
-    std::int32_t result = metricsRuntime->appliedSampleRate;
+    SofdecAddressWord result = metricsRuntime->appliedSampleRate;
     if (metricsRuntime->calculatedSampleRate != metricsRuntime->appliedSampleRate) {
       runtime->outputRuntime->dispatchTable->setLaneWordPair(runtime->outputRuntime, 5, metricsRuntime->calculatedSampleRate, 0);
       result = metricsRuntime->calculatedSampleRate;
@@ -6801,7 +6753,7 @@ namespace
     return reinterpret_cast<T*>(static_cast<std::uintptr_t>(addressWord));
   }
 
-  [[nodiscard]] std::int32_t M2aPtrToWord(const void* pointer)
+  [[nodiscard]] SofdecAddressWord M2aPtrToWord(const void* pointer)
   {
     return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
   }

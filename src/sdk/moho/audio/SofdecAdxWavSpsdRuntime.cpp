@@ -469,11 +469,9 @@ extern "C"
    * What it does:
    * Converts one 1024-sample float window into clipped signed-16 PCM samples.
    */
-  std::int32_t __cdecl m2adec_convert_to_pcm16(float* sourceSamples, std::int32_t destinationAddress)
+  std::int32_t __cdecl m2adec_convert_to_pcm16(float* sourceSamples, SofdecAddressWord destinationAddress)
   {
-    auto* const destination = reinterpret_cast<std::int16_t*>(
-      static_cast<std::uintptr_t>(destinationAddress))
-    );
+    auto* const destination = reinterpret_cast<std::int16_t*>(destinationAddress);
 
     for (std::int32_t sampleIndex = 0; sampleIndex < 1024; ++sampleIndex) {
       destination[sampleIndex] = ConvertFloatSampleToPcm16(sourceSamples[sampleIndex]);

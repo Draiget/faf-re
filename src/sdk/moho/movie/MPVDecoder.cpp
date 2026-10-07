@@ -1,5 +1,7 @@
 #include "moho/movie/MPVDecoder.h"
 
+#include "cri/sofdec/SofdecAddressWord.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -3684,7 +3686,7 @@ extern "C" void concealOff(int)
  * the picture type and macroblock-type lanes it has to spoof to make the skip
  * run behave like the right picture type.
  */
-extern "C" int concealOn(const int handleAddress)
+extern "C" int concealOn(const SofdecAddressWord handleAddress)
 {
   constexpr int kPictureTypeI = 1;
   constexpr int kPictureTypeP = 2;

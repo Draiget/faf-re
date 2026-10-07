@@ -5646,7 +5646,7 @@
   /**
    * Address: 0x00ADE2B0 (FUN_00ADE2B0, _SFXA_MakeAlpLumiTbl)
    */
-  std::int32_t SFXA_MakeAlpLumiTbl(
+  SofdecAddressWord SFXA_MakeAlpLumiTbl(
     const SofdecAddressWord sfxaHandleAddress,
     const std::int32_t reservedMode,
     const SofdecAddressWord tableAddress
@@ -5671,7 +5671,7 @@
   /**
    * Address: 0x00ADE2E0 (FUN_00ADE2E0, _SFXA_MakeAlp3110Tbl)
    */
-  std::int32_t SFXA_MakeAlp3110Tbl(
+  SofdecAddressWord SFXA_MakeAlp3110Tbl(
     const SofdecAddressWord sfxaHandleAddress,
     const std::int32_t reservedMode,
     const SofdecAddressWord tableAddress
@@ -5830,20 +5830,19 @@
   /**
    * Address: 0x00ADE8E0 (FUN_00ADE8E0, _sfbuf_InitBufData)
    */
-  std::int32_t* sfbuf_InitBufData(
-    std::int32_t* const sfbufLaneWords,
+  moho::SfbufLane* sfbuf_InitBufData(
+    moho::SfbufLane* const laneView,
     const std::int32_t laneType,
     const std::int32_t setupState
   )
   {
-    auto* const laneView = reinterpret_cast<SfbufRingLane*>(sfbufLaneWords);
     laneView->laneType = laneType;
     laneView->isSetup = setupState;
     laneView->prepFlag = 0;
     laneView->termFlag = 0;
     laneView->runtimeState0 = 9;
     laneView->runtimeState1 = 9;
-    return sfbufLaneWords;
+    return laneView;
   }
 
   /**
@@ -5858,9 +5857,9 @@
    * `FF000409` ("lane not awaiting supply") for a lane that had never been
    * initialised at all.
    */
-  std::array<SfbufRingLane, 9>& SfbufLanesAt(const SofdecAddressWord sfbufLaneArrayAddress)
+  std::array<moho::SfbufLane, 9>& SfbufLanesAt(const SofdecAddressWord sfbufLaneArrayAddress)
   {
-    return *reinterpret_cast<std::array<SfbufRingLane, 9>*>(SjAddressToPointer(sfbufLaneArrayAddress));
+    return reinterpret_cast<moho::SfbufBufferState*>(SjAddressToPointer(sfbufLaneArrayAddress))->lanes;
   }
 
   /**
@@ -5892,8 +5891,8 @@
     (void)bufferAddressTable;
     (void)bufferSizeTable;
 
-    SfbufRingLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
-    (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 3, 1);
+    moho::SfbufLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
+    (void)sfbuf_InitBufData(laneView, 3, 1);
     return sfbuf_InitUoSj(&laneView->sourceBufferAddress);
   }
 
@@ -5907,9 +5906,9 @@
     const std::int32_t laneIndex
   )
   {
-    SfbufRingLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
+    moho::SfbufLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     const std::int32_t setupState = (bufferSizeTable[laneIndex] != 0) ? 1 : 0;
-    (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 2, setupState);
+    (void)sfbuf_InitBufData(laneView, 2, setupState);
     laneView->sourceBufferAddress = bufferAddressTable[laneIndex];
     const std::int32_t sourceBufferBytes = bufferSizeTable[laneIndex];
     laneView->laneParam18 = 0;
@@ -5920,8 +5919,8 @@
     laneView->delimiterSecondaryAddress = 0;
     laneView->writeTotalBytes = 0;
     laneView->readTotalBytes = 0;
-    laneView->laneParam38 = 0;
-    laneView->laneParam3C = 0;
+    laneView->ptsQueue.entriesBaseAddress = 0;
+    laneView->ptsQueue.entryCapacity = 0;
     laneView->sourceBufferBytes = sourceBufferBytes;
     return sourceBufferBytes;
   }
@@ -5942,8 +5941,8 @@
     const std::int32_t transferParam0
   )
   {
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[laneIndex];
 
     const SofdecAddressWord primarySampleBaseAddress = laneView->sourceBufferAddress;
     std::int32_t sampleWindowBytes = laneView->sourceBufferBytes;
@@ -5975,26 +5974,22 @@
     const std::int32_t laneIndex
   )
   {
-    constexpr std::int32_t kVfrmScratchBaseOffset = 0x16B0;
-    constexpr std::int32_t kVfrmScratchClearSpan = 0x880;
-    constexpr std::int32_t kVfrmScratchStride = 0x88;
-
-    SfbufRingLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
+    moho::SfbufLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     const std::int32_t setupState = (bufferSizeTable[laneIndex] != 0) ? 1 : 0;
-    (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 1, setupState);
+    (void)sfbuf_InitBufData(laneView, 1, setupState);
     laneView->sourceBufferAddress = bufferAddressTable[laneIndex];
     laneView->sourceBufferBytes = bufferSizeTable[laneIndex];
     laneView->laneParam18 = 0;
     laneView->queuedDataBytes = 0;
-    laneView->laneParam20 = vfrmOwnerAddress + kVfrmScratchBaseOffset;
-
-    std::int32_t scratchOffset = 0;
-    while (scratchOffset < kVfrmScratchClearSpan) {
-      auto* const scratchWord = reinterpret_cast<std::int32_t*>(SjAddressToPointer(laneView->laneParam20 + scratchOffset));
-      *scratchWord = 0;
-      scratchOffset += kVfrmScratchStride;
+    // `owner + 0x16B0`: the workctrl's 16 VFRM data lanes (0x88 apart), whose
+    // draw states are cleared here.
+    auto* const vfrmOwner = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(vfrmOwnerAddress));
+    auto& vfrmDataLanes = vfrmOwner->bufferState.frames.vfrmDataLanes;
+    laneView->laneParam20 = SjPointerToAddress(&vfrmDataLanes[0]);
+    for (moho::SfmpvfVfrmDataLane& dataLane : vfrmDataLanes) {
+      dataLane.vfrmData.drawState = 0;
     }
-    return scratchOffset;
+    return static_cast<std::int32_t>(sizeof(vfrmDataLanes));
   }
 
   /**
@@ -6040,10 +6035,10 @@
     const std::int32_t extraBufferBytes
   )
   {
-    SfbufRingLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
+    moho::SfbufLane* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     const std::int32_t laneBufferBytes = bufferSizeTable[laneIndex];
     if (laneBufferBytes == 0) {
-      (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 4, 0);
+      (void)sfbuf_InitBufData(laneView, 4, 0);
       return 0;
     }
 
@@ -6064,7 +6059,7 @@
       SjPointerToAddress(laneView),
       1
     );
-    (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 5, 1);
+    (void)sfbuf_InitBufData(laneView, 5, 1);
     return 0;
   }
 
@@ -6135,7 +6130,7 @@
   /**
    * Address: 0x00ADE9C0 (FUN_00ADE9C0, _sfbuf_ChkSupSj)
    */
-  std::int32_t sfbuf_ChkSupSj(const std::int32_t* const supplyDescriptorWords)
+  std::int32_t sfbuf_ChkSupSj(const SofdecAddressWord* const supplyDescriptorWords)
   {
     if (supplyDescriptorWords[1] == 0) {
       return -1;
@@ -6194,7 +6189,7 @@
   )
   {
     SFLIB_LockCs();
-    auto* const laneOwner = reinterpret_cast<SfbufRingLane*>(SjAddressToPointer(ownerLaneAddress));
+    auto* const laneOwner = reinterpret_cast<moho::SfbufLane*>(SjAddressToPointer(ownerLaneAddress));
     laneOwner->isSetup = setupState;
 
     for (std::int32_t laneWord = 0; laneWord < 6; ++laneWord) {
@@ -6213,26 +6208,26 @@
    */
   std::int32_t sfbuf_SetSupplySjSub(
     const SofdecAddressWord sfbufHandleAddress,
-    const std::int32_t* const supplyDescriptorWords,
+    const SofdecAddressWord* const supplyDescriptorWords,
     const std::int32_t transferLaneIndex
   )
   {
     constexpr std::int32_t kSfbufLaneStateAwaitingSupply = 4;
     constexpr std::int32_t kSfbufErrLaneNotAwaitingSupply = -16776183;
 
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[transferLaneIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[transferLaneIndex];
     if (laneView->laneType != kSfbufLaneStateAwaitingSupply) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrLaneNotAwaitingSupply);
     }
 
     const std::int32_t setupState = (supplyDescriptorWords[1] != 0) ? 1 : 0;
-   void sfbuf_SetSupSj(
-  SofdecAddressWord* supplyLaneWords,
-  const SofdecAddressWord* supplyDescriptorWords,
-  SofdecAddressWord ownerLaneAddress,
-  std::int32_t setupState
-);
+    sfbuf_SetSupSj(
+      &laneView->sourceBufferAddress,
+      supplyDescriptorWords,
+      SjPointerToAddress(laneView),
+      setupState
+    );
     return 0;
   }
 
@@ -6241,7 +6236,7 @@
    */
   std::int32_t SFBUF_SetSupplySj(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    const std::int32_t* const supplyDescriptorWords
+    const SofdecAddressWord* const supplyDescriptorWords
   )
   {
     constexpr std::int32_t kSfbufErrInvalidSupplyDescriptor = -16776184;
@@ -6265,15 +6260,15 @@
   /**
    * Address: 0x00ADEAE0 (FUN_00ADEAE0, _SFBUF_SetUoch)
    */
-  std::int32_t* SFBUF_SetUoch(
+  SofdecAddressWord* SFBUF_SetUoch(
     const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t uochSlotIndex,
-    const std::int32_t* const chunkDescriptorWords
+    const SofdecAddressWord* const chunkDescriptorWords
   )
   {
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[laneIndex];
     auto* const uochEntry = reinterpret_cast<SfbufUochDescriptor*>(
       &laneView->sourceBufferAddress + (uochSlotIndex * 4)
     );
@@ -6291,11 +6286,11 @@
     const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t uochSlotIndex,
-    std::int32_t* const outChunkDescriptorWords
+    SofdecAddressWord* const outChunkDescriptorWords
   )
   {
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[laneIndex];
     const auto* const uochEntry = reinterpret_cast<const SfbufUochDescriptor*>(
       &laneView->sourceBufferAddress + (uochSlotIndex * 4)
     );
@@ -6312,11 +6307,11 @@
   std::int32_t SFBUF_GetRingSj(
     const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
-    std::int32_t* const outRingHandleAddress
+    SofdecAddressWord* const outRingHandleAddress
   )
   {
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    *outRingHandleAddress = sfbuf->lanes[laneIndex].sourceBufferBytes;
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    *outRingHandleAddress = sfbuf->bufferState.lanes[laneIndex].sourceBufferBytes;
     return sfbufHandleAddress;
   }
 
@@ -6335,8 +6330,8 @@
     outCursor->secondChunk = {};
     outCursor->reservedWords = {0, 0, 0};
 
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if ((laneView->isSetup != 0) && (laneView->sourceBufferBytes != 0)) {
       (void)sfbuf_PeekChunk(
         laneView->sourceBufferBytes,
@@ -6361,8 +6356,8 @@
     constexpr std::int32_t kSfbufErrAdvanceMismatch = -16776181;
 
     std::int32_t status = 0;
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if ((advanceCount == 0) || (laneView->isSetup == 0) || (laneView->sourceBufferBytes == 0)) {
       return 0;
     }
@@ -6386,8 +6381,8 @@
       laneView->writeTotalBytes += advanceCount;
     }
 
-    auto* const runtimeStatus = reinterpret_cast<SfbufStatus*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeStatus->dirtyFlag = 1;
+    auto* const runtimeStatus = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    runtimeStatus->serverWorkPending = 1;
     return status;
   }
 
@@ -6510,13 +6505,13 @@
   void SFBUF_RingGetDlm(
     const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
-    std::int32_t* const outPrimaryDelimiterAddress,
-    std::int32_t* const outSecondaryDelimiterAddress
+    SofdecAddressWord* const outPrimaryDelimiterAddress,
+    SofdecAddressWord* const outSecondaryDelimiterAddress
   )
   {
     SFLIB_LockCs();
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     *outPrimaryDelimiterAddress = laneView->delimiterPrimaryAddress;
     *outSecondaryDelimiterAddress = laneView->delimiterSecondaryAddress;
     SFLIB_UnlockCs();
@@ -6533,8 +6528,8 @@
   )
   {
     SFLIB_LockCs();
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     laneView->delimiterPrimaryAddress = primaryDelimiterAddress;
     laneView->delimiterSecondaryAddress = secondaryDelimiterAddress;
     SFLIB_UnlockCs();
@@ -6548,8 +6543,8 @@
     constexpr std::int32_t kSfbufTotalSaturated = 0x7FFFFFFF;
 
     SFLIB_LockCs();
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
 
     std::int32_t totalWriteBytes = laneView->writeTotalBytes;
     const std::int32_t totalReadBytes = laneView->readTotalBytes;
@@ -6573,14 +6568,14 @@
   std::int32_t SFBUF_RingGetSj(
     const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
-    std::int32_t* const outRingHandleAddress
+    SofdecAddressWord* const outRingHandleAddress
   )
   {
     constexpr std::int32_t kSfbufErrRingNotSetup = -16776191;
 
     *outRingHandleAddress = 0;
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6597,8 +6592,8 @@
     const std::int32_t addBytes
   )
   {
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if (laneView->readTotalBytes >= 0) {
       laneView->readTotalBytes += addBytes;
     }
@@ -6616,8 +6611,8 @@
   {
     constexpr std::int32_t kSfbufErrRingNotSetup = -16776191;
 
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6686,8 +6681,8 @@
       return 0;
     }
 
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6710,8 +6705,8 @@
       status = SFLIB_SetErr(sfbufHandleAddress, kSfbufErrAringWriteOverflow);
     }
 
-    auto* const runtimeStatus = reinterpret_cast<SfbufStatus*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeStatus->dirtyFlag = 1;
+    auto* const runtimeStatus = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    runtimeStatus->serverWorkPending = 1;
     SFLIB_UnlockCs();
     return status;
   }
@@ -6727,8 +6722,8 @@
   {
     constexpr std::int32_t kSfbufErrRingNotSetup = -16776191;
 
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6797,8 +6792,8 @@
       return 0;
     }
 
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6821,8 +6816,8 @@
       status = SFLIB_SetErr(sfbufHandleAddress, kSfbufErrAringReadOverflow);
     }
 
-    auto* const runtimeStatus = reinterpret_cast<SfbufStatus*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeStatus->dirtyFlag = 1;
+    auto* const runtimeStatus = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    runtimeStatus->serverWorkPending = 1;
     SFLIB_UnlockCs();
     return status;
   }
@@ -6840,8 +6835,8 @@
    */
   std::int32_t SFBUF_VfrmAddWrite(const SofdecAddressWord sfbufHandleAddress)
   {
-    auto* const runtimeStatus = reinterpret_cast<SfbufStatus*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeStatus->dirtyFlag = 1;
+    auto* const runtimeStatus = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    runtimeStatus->serverWorkPending = 1;
     return 0;
   }
 
@@ -6855,8 +6850,8 @@
     const std::int32_t arg1
   )
   {
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[laneIndex];
     if (laneView->isSetup != 0) {
       return 0;
     }
@@ -6874,13 +6869,13 @@
   )
   {
     std::int32_t result = 0;
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    const moho::SfbufLane* const laneView = &sfbuf->bufferState.lanes[laneIndex];
     if (laneView->isSetup == 0) {
       result = SFTRN_CallTrtTrif(sfbufHandleAddress, laneView->runtimeState0, 12, arg0, arg1);
     }
-    auto* const runtimeStatus = reinterpret_cast<SfbufStatus*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeStatus->dirtyFlag = 1;
+    auto* const runtimeStatus = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    runtimeStatus->serverWorkPending = 1;
     return result;
   }
 
@@ -6893,8 +6888,8 @@
     const std::int32_t prepFlag
   )
   {
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    sfbuf->lanes[laneIndex].prepFlag = prepFlag;
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    sfbuf->bufferState.lanes[laneIndex].prepFlag = prepFlag;
     return prepFlag;
   }
 
@@ -6903,8 +6898,8 @@
    */
   std::int32_t SFBUF_GetPrepFlg(const SofdecAddressWord sfbufHandleAddress, const std::int32_t laneIndex)
   {
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    return sfbuf->lanes[laneIndex].prepFlag;
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    return sfbuf->bufferState.lanes[laneIndex].prepFlag;
   }
 
   /**
@@ -6916,8 +6911,8 @@
     const std::int32_t termFlag
   )
   {
-    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    sfbuf->lanes[laneIndex].termFlag = termFlag;
+    auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    sfbuf->bufferState.lanes[laneIndex].termFlag = termFlag;
     return termFlag;
   }
 
@@ -6926,8 +6921,8 @@
    */
   std::int32_t SFBUF_GetTermFlg(const SofdecAddressWord sfbufHandleAddress, const std::int32_t laneIndex)
   {
-    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    return sfbuf->lanes[laneIndex].termFlag;
+    const auto* const sfbuf = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(sfbufHandleAddress));
+    return sfbuf->bufferState.lanes[laneIndex].termFlag;
   }
 
   /**
@@ -7083,21 +7078,21 @@
   SofdecAddressWord SFTRN_InitHn(
     const SofdecAddressWord workctrlAddress,
     const SofdecAddressWord transferDataArrayAddress,
-    const std::int32_t* const transferBuildConfigAddressPtr
+    const SofdecAddressWord* const transferBuildConfigAddressPtr
   )
   {
     constexpr std::int32_t kSftrnTransferLaneCount = 9;
     constexpr std::int32_t kSftrnErrBuildFailed = -16776446;
 
     const SofdecAddressWord transferBuildConfigAddress = *transferBuildConfigAddressPtr;
-    auto* const transferLanes = reinterpret_cast<SftrnTransferDataLane*>(SjAddressToPointer(transferDataArrayAddress));
+    auto* const transferLanes = reinterpret_cast<moho::SftrnTransferLane*>(SjAddressToPointer(transferDataArrayAddress));
     const auto* const transferBuildConfigWords =
-      reinterpret_cast<const std::int32_t*>(SjAddressToPointer(transferBuildConfigAddress));
+      reinterpret_cast<const SofdecAddressWord*>(SjAddressToPointer(transferBuildConfigAddress));
 
     for (std::int32_t laneIndex = 0; laneIndex < kSftrnTransferLaneCount; ++laneIndex) {
-      transferLanes[laneIndex].setupState = 0;
+      transferLanes[laneIndex].transferHandle = 0;
       (void)sftrn_InitTrData(
-        reinterpret_cast<std::int32_t*>(&transferLanes[laneIndex]),
+        &transferLanes[laneIndex],
         transferBuildConfigWords[laneIndex]
       );
     }
@@ -7112,18 +7107,17 @@
   /**
    * Address: 0x00ADF8D0 (FUN_00ADF8D0, _sftrn_InitTrData)
    */
-  std::int32_t* sftrn_InitTrData(std::int32_t* const transferDataWords, const SofdecAddressWord transferDescriptorAddress)
+  moho::SftrnTransferLane* sftrn_InitTrData(moho::SftrnTransferLane* const transferLane, const SofdecAddressWord transferDescriptorAddress)
   {
-    auto* const transferLane = reinterpret_cast<SftrnTransferDataLane*>(transferDataWords);
     transferLane->termFlag = 0;
     transferLane->prepFlag = 0;
     transferLane->transferDescriptorAddress = transferDescriptorAddress;
     transferLane->sourceLaneIndex = 8;
-    transferLane->targetLaneIndex0 = 8;
-    transferLane->targetLaneIndex1 = 8;
-    transferLane->targetLaneIndex2 = 8;
+    transferLane->targetLaneIndex[0] = 8;
+    transferLane->targetLaneIndex[1] = 8;
+    transferLane->targetLaneIndex[2] = 8;
     transferLane->transferEndState = -1;
-    return transferDataWords;
+    return transferLane;
   }
 
   /**
@@ -7131,14 +7125,13 @@
    */
   std::int32_t sftrn_BuildAll(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    const std::int32_t* const transferBuildConfigWords
+    const SofdecAddressWord* const transferBuildConfigWords
   )
   {
     constexpr std::int32_t kSfsetAudioCondition = 5;
     constexpr std::int32_t kSfsetVideoCondition = 6;
 
     const auto* const transferBuildConfig = reinterpret_cast<const SftrnBuildConfig*>(transferBuildConfigWords);
-    auto* const workctrlState = reinterpret_cast<SftrnWorkctrlState*>(workctrlSubobj);
 
     if (transferBuildConfig->hasSystemLane != 0) {
       (void)sftrn_ConnTrnBuf0(workctrlSubobj, 0, 0);
@@ -7149,14 +7142,14 @@
       (void)sftrn_ConnTrnBuf0(workctrlSubobj, 0, 1);
       (void)sftrn_BuildAudio(workctrlSubobj, transferBuildConfigWords);
       SFSET_SetCond(workctrlSubobj, kSfsetVideoCondition, 0);
-      workctrlState->videoConditionState = 0;
+      workctrlSubobj->defaultConditions[kSfsetVideoCondition] = 0;
       return 0;
     }
     if (transferBuildConfig->hasVideoLane != 0) {
       (void)sftrn_ConnTrnBuf0(workctrlSubobj, 0, 2);
       (void)sftrn_BuildVideo(workctrlSubobj, transferBuildConfigWords);
       SFSET_SetCond(workctrlSubobj, kSfsetAudioCondition, 0);
-      workctrlState->audioConditionState = 0;
+      workctrlSubobj->defaultConditions[kSfsetAudioCondition] = 0;
       return 0;
     }
     if (transferBuildConfig->hasUserLane != 0) {
@@ -7164,8 +7157,8 @@
       (void)sftrn_BuildUsr(workctrlSubobj);
       SFSET_SetCond(workctrlSubobj, kSfsetVideoCondition, 0);
       SFSET_SetCond(workctrlSubobj, kSfsetAudioCondition, 0);
-      workctrlState->audioConditionState = 0;
-      workctrlState->videoConditionState = 0;
+      workctrlSubobj->defaultConditions[kSfsetAudioCondition] = 0;
+      workctrlSubobj->defaultConditions[kSfsetVideoCondition] = 0;
       return 0;
     }
     return -1;
@@ -7176,14 +7169,13 @@
    */
   std::int32_t sftrn_BuildSystem(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    const std::int32_t* const transferBuildConfigWords
+    const SofdecAddressWord* const transferBuildConfigWords
   )
   {
     constexpr std::int32_t kSfsetAudioCondition = 5;
     constexpr std::int32_t kSfsetVideoCondition = 6;
 
     const auto* const transferBuildConfig = reinterpret_cast<const SftrnBuildConfig*>(transferBuildConfigWords);
-    auto* const workctrlState = reinterpret_cast<SftrnWorkctrlState*>(workctrlSubobj);
 
     (void)sftrn_ConnBufTrn(workctrlSubobj, 0, 1);
     if (transferBuildConfig->hasAudioLane != 0) {
@@ -7191,7 +7183,7 @@
       (void)sftrn_BuildAudio(workctrlSubobj, transferBuildConfigWords);
     } else {
       SFSET_SetCond(workctrlSubobj, kSfsetAudioCondition, 0);
-      workctrlState->audioConditionState = 0;
+      workctrlSubobj->defaultConditions[kSfsetAudioCondition] = 0;
     }
 
     if (transferBuildConfig->hasVideoLane != 0) {
@@ -7199,7 +7191,7 @@
       (void)sftrn_BuildVideo(workctrlSubobj, transferBuildConfigWords);
     } else {
       SFSET_SetCond(workctrlSubobj, kSfsetVideoCondition, 0);
-      workctrlState->videoConditionState = 0;
+      workctrlSubobj->defaultConditions[kSfsetVideoCondition] = 0;
     }
 
     const std::int32_t hasUserLane = transferBuildConfig->hasUserLane;
@@ -7215,7 +7207,7 @@
    */
   std::int32_t sftrn_BuildAudio(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    const std::int32_t* const transferBuildConfigWords
+    const SofdecAddressWord* const transferBuildConfigWords
   )
   {
     const auto* const transferBuildConfig = reinterpret_cast<const SftrnBuildConfig*>(transferBuildConfigWords);
@@ -7234,7 +7226,7 @@
    */
   std::int32_t sftrn_BuildVideo(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    const std::int32_t* const transferBuildConfigWords
+    const SofdecAddressWord* const transferBuildConfigWords
   )
   {
     const auto* const transferBuildConfig = reinterpret_cast<const SftrnBuildConfig*>(transferBuildConfigWords);

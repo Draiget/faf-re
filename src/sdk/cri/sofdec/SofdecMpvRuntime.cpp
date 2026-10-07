@@ -174,7 +174,7 @@ extern "C" {
     std::int32_t* outStreamScale
   );
   std::int32_t sfmpv_DestroySub(SofdecAddressWord decoderHandle);
-  std::int32_t* SFBUF_AddRtotSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
+  SofdecAddressWord* SFBUF_AddRtotSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
   std::int32_t sfmpv_AddRtotSj(SofdecAddressWord workctrlAddress, std::int32_t consumedBytes);
   std::int32_t SFMPVF_HoldFrm(SofdecAddressWord workctrlAddress);
   std::int32_t
@@ -440,7 +440,7 @@ extern "C" {
     SofdecAddressWord workctrlAddress,
     const moho::SfmpvPictureDecodeLane* pictureDecodeLane,
     SfmpvDecodeFrameParam* decodeFrameParam,
-    std::int32_t* outFrameObjectAddress
+    SofdecAddressWord* outFrameObjectAddress
   );
   std::int32_t sfmpv_ReadRefErrCnt(
     SofdecAddressWord workctrlAddress,
@@ -1057,13 +1057,13 @@ extern "C" {
   std::int32_t sfmpv_conv_59_94[8] = { 215784, 35964, 3600, 3596, 56, 60, 10, 4 };
 
   extern SfmpvPara sfmpv_para;
-  extern std::int32_t sfmpv_rfb_adr_tbl[2];
+  extern SofdecAddressWord sfmpv_rfb_adr_tbl[2];
   extern std::uint8_t sfmpv_work[];
   extern std::int32_t sfmpv_discard_wsiz;
   extern std::int32_t sfmpv_picusr_pbuf;
   extern std::int32_t sfmpv_picusr_bufnum;
   extern std::int32_t sfmpv_picusr_buf1siz;
-  extern std::int32_t sSofDec_tabs[16];
+  extern SofdecAddressWord sSofDec_tabs[16];
 }
 
 extern "C" alignas(4) std::uint8_t mpvm2v_lib_work[0x38020]{};
@@ -1116,12 +1116,12 @@ namespace
     return reinterpret_cast<std::int32_t (*)()>(static_cast<std::uintptr_t>(conditionWord));
   }
 
-  [[nodiscard]] std::int32_t AlignAddressTo0x800(const std::int32_t address) noexcept
+  [[nodiscard]] SofdecAddressWord AlignAddressTo0x800(const SofdecAddressWord address) noexcept
   {
-    return static_cast<std::int32_t>((static_cast<std::uint32_t>(address) + 0x7FFu) & 0xFFFFF800u);
+    return (address + 0x7FF) & ~static_cast<SofdecAddressWord>(0x7FF);
   }
 
-  [[nodiscard]] std::int32_t PointerToAddress(const void* pointer) noexcept
+  [[nodiscard]] SofdecAddressWord PointerToAddress(const void* pointer) noexcept
   {
     return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
   }
@@ -1151,10 +1151,10 @@ namespace
     return (modulo < 0) ? (modulo + 32) : modulo;
   }
 
-  [[nodiscard]] moho::SfbufSupplyLane*
+  [[nodiscard]] moho::SfbufLane*
   GetSfptsSourceLane(moho::SofdecSfdWorkctrlSubobj* const workctrl, const std::int32_t sourceLaneIndex) noexcept
   {
-    return &workctrl->bufferState.supplyLanes[sourceLaneIndex];
+    return &workctrl->bufferState.lanes[sourceLaneIndex];
   }
 
   void AddSigned32ToLane(std::int64_t* const counter, const std::int32_t delta) noexcept
@@ -1334,26 +1334,27 @@ void sfmpv_InitPicAtr(void* picAtrState)
  * Address: 0x00AD4E30 (FUN_00AD4E30, _sfmpv_InitFrmObj)
  *
  * What it does:
- * Initialises an array of frame objects. Each frame object is 58 DWORDs
- * (0xE8 bytes). Clears control fields, initialises the embedded timer,
+ * Initialises an array of frame objects (0xE8 bytes each). Clears control
+ * fields, initialises the embedded timer,
  * copies one tab entry per frame, and inits picture attributes.
  */
-void sfmpv_InitFrmObj(std::uint32_t* frameObjects, const std::int32_t* tabEntries, std::int32_t count)
+void sfmpv_InitFrmObj(moho::SfmpvfFrameObject* const frameObjects, const SofdecAddressWord* const tabEntries, const std::int32_t count)
 {
-  for (std::int32_t i = 0; i < count; ++i, frameObjects += 58) {
-    frameObjects[0] = 0;
-    frameObjects[1] = 0;
-    SFTIM_InitTtu(frameObjects + 3, 0);
-    frameObjects[2] = static_cast<std::uint32_t>(tabEntries[i]);
-    frameObjects[14] = 0;
-    frameObjects[15] = 1;
-    frameObjects[16] = 0;
-    frameObjects[17] = 0;
-    frameObjects[18] = 0;
-    frameObjects[19] = 0;
-    frameObjects[20] = 0;
-    frameObjects[22] = 0xFFFFFFFF; // -1
-    sfmpv_InitPicAtr(frameObjects + 23);
+  for (std::int32_t i = 0; i < count; ++i) {
+    moho::SfmpvfFrameObject& frame = frameObjects[i];
+    frame.decodeState = 0;
+    frame.allocationState = 0;
+    SFTIM_InitTtu(reinterpret_cast<std::uint32_t*>(&frame.frameTtu), 0);
+    frame.frameSurfaceBaseAddress = tabEntries[i];
+    frame.presentationTimeMajor = 0;
+    frame.presentationTimeMinor = 1;
+    frame.referenceErrorMajor = 0;
+    frame.referenceErrorMinor = 0;
+    frame.decodeConcatOrdinal = 0;
+    frame.frameDetailWord4C = 0;
+    frame.frameDetailWord50 = 0;
+    frame.frameId = -1;
+    sfmpv_InitPicAtr(&frame.pictureDecodeLane);
   }
 }
 
@@ -1381,19 +1382,15 @@ void sfmpv_InitComplementPts(std::uint32_t* complementPts)
  * Zeroes the picture-user state: 5 header DWORDs followed by 16 pairs
  * (32 DWORDs).
  */
-void SFMPVF_InitPicUsr(std::uint32_t* picUsrState)
+void SFMPVF_InitPicUsr(moho::SfmpvInfo* const mpvInfo)
 {
-  picUsrState[0] = 0;
-  picUsrState[1] = 0;
-  picUsrState[2] = 0;
-  picUsrState[3] = 0;
-  picUsrState[4] = 0;
-
-  std::uint32_t* cursor = picUsrState + 5;
-  for (std::int32_t i = 0; i < 16; ++i) {
-    cursor[0] = 0;
-    cursor[1] = 0;
-    cursor += 2;
+  mpvInfo->pictureUserBufferAddress = 0;
+  mpvInfo->pictureUserBufferCount = 0;
+  mpvInfo->pictureUserBufferSize = 0;
+  mpvInfo->pictureUserBufferMirrorAddress = 0;
+  mpvInfo->pictureUserFlags = 0;
+  for (moho::SfmpvPicUsr::PicUsrEntry& entry : mpvInfo->pictureUserEntries) {
+    entry = {};
   }
 }
 
@@ -1407,7 +1404,7 @@ void SFMPVF_InitPicUsr(std::uint32_t* picUsrState)
  */
 std::int32_t SFD_SetMpvParaTbl(
   const SfmpvPara* const parameterTable,
-  const std::int32_t* const ringFrameBufferAddressTable,
+  void* const* const ringFrameBufferAddressTable,
   void* const* const sofDecTabAddressTable
 )
 {
@@ -1416,7 +1413,7 @@ std::int32_t SFD_SetMpvParaTbl(
   sfmpv_para.val8 = 0;
 
   for (std::int32_t tableIndex = 0; tableIndex < kSfmpvRfbAddressTableCount; ++tableIndex) {
-    sfmpv_rfb_adr_tbl[tableIndex] = AlignAddressTo0x800(ringFrameBufferAddressTable[tableIndex]);
+    sfmpv_rfb_adr_tbl[tableIndex] = AlignAddressTo0x800(PointerToAddress(ringFrameBufferAddressTable[tableIndex]));
   }
 
   for (std::int32_t tabIndex = 0; tabIndex < kSfmpvMaxFramePoolCount; ++tabIndex) {
@@ -1448,8 +1445,7 @@ std::int32_t sfmpvf_SetPicUsrBuf(
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
-  auto* const picUsrState = reinterpret_cast<std::uint32_t*>(&mpvInfo->pictureUserBufferAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   if (userBufferAddress != 0 && frameSlotCount != 0 && bytesPerFrame != 0) {
     if (frameSlotCount < (workctrl->createTemplate.framePoolWork + 3)) {
@@ -1474,7 +1470,7 @@ std::int32_t sfmpvf_SetPicUsrBuf(
       entryAddress += bytesPerFrame;
     }
   } else {
-    SFMPVF_InitPicUsr(picUsrState);
+    SFMPVF_InitPicUsr(mpvInfo);
   }
 
   return 0;
@@ -1515,7 +1511,7 @@ std::int32_t sfmpv_SetCondY16(const SofdecAddressWord workctrlAddress)
 std::int32_t sfmpv_ProcessAuxShc(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   SfbufRingChunk pictureRange{};
   pictureRange.bufferAddress = reinterpret_cast<std::uint8_t*>(
@@ -1719,7 +1715,7 @@ std::int32_t SFMPV_Init()
     }
   }
 
-  const std::int32_t initResult = MPV_Init(kSfmpvMpvObjectCount, reinterpret_cast<std::int32_t>(sfmpv_work));
+  const std::int32_t initResult = MPV_Init(kSfmpvMpvObjectCount, reinterpret_cast<SofdecAddressWord>(sfmpv_work));
   if (initResult != 0) {
     std::int32_t errorCode = -(initResult != -16515323);
     errorCode &= 0xEE;
@@ -1849,66 +1845,49 @@ std::int32_t sfmpvf_CheckMpvPara()
  * structure, then initialises frame objects, picture attributes,
  * complement points, picture-user state, and links user-stream slots.
  */
-std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, std::uint32_t* infoBlock)
+std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, moho::SfmpvInfo* const mpvInfo)
 {
   if (sfmpvf_CheckMpvPara() != 0) {
     return SFLIB_SetErr(0, kSfmpvErrInvalidPara);
   }
 
-  // Copy parameter block (9 DWORDs = 0x24 bytes) starting at infoBlock[1]
-  std::memcpy(infoBlock + 1, &sfmpv_para, 0x24);
+  mpvInfo->persistedPara = sfmpv_para;
+  mpvInfo->persistedRfbAddressTable[0] = sfmpv_rfb_adr_tbl[0];
+  mpvInfo->persistedRfbAddressTable[1] = sfmpv_rfb_adr_tbl[1];
+  std::copy(std::begin(sSofDec_tabs), std::end(sSofDec_tabs), std::begin(mpvInfo->persistedSofDecTabs));
 
-  // Copy rfb address table entries
-  infoBlock[10] = static_cast<std::uint32_t>(sfmpv_rfb_adr_tbl[0]);
-  infoBlock[11] = static_cast<std::uint32_t>(sfmpv_rfb_adr_tbl[1]);
+  mpvInfo->decoderHandle = 0;
+  mpvInfo->activeFrameObjectAddress = 0;
+  mpvInfo->defectPictureTypeState = 5;
+  mpvInfo->concatControlFlags = 0xC0;
+  mpvInfo->primaryFrameToggleIndex = 0;
+  mpvInfo->secondaryFrameToggleIndex = 1;
+  mpvInfo->termDecodeState = 0;
+  mpvInfo->allowSingleFrameOutput = 0;
+  mpvInfo->primaryReferenceFrameObjectAddress = 0;
+  mpvInfo->secondaryReferenceFrameObjectAddress = 0;
+  mpvInfo->pendingFrameObjectAddress = 0;
+  mpvInfo->skipIssuedFlag = 0;
+  mpvInfo->picAtrPrimedLatch = 0;
+  mpvInfo->referenceErrorCarryFlag = 0;
 
-  // Copy SofDec tabs (16 DWORDs = 0x40 bytes) starting at infoBlock[12]
-  std::memcpy(infoBlock + 12, sSofDec_tabs, 0x40);
+  sfmpv_InitFrmObj(mpvInfo->frameObjects, mpvInfo->persistedSofDecTabs, 16);
 
-  // Zero/init header and control fields
-  infoBlock[0] = 0;
-  infoBlock[28] = 0;
-  infoBlock[29] = 5;
-  infoBlock[30] = 192;       // 0xC0
-  infoBlock[78] = 0;
-  infoBlock[79] = 1;
-  infoBlock[31] = 0;
-  infoBlock[32] = 0;
-  infoBlock[88] = 0;
-  infoBlock[89] = 0;
-  infoBlock[90] = 0;
-  infoBlock[91] = 0;
-  infoBlock[92] = 0;
-  infoBlock[93] = 0;
+  mpvInfo->lateFrameCounter = 0;
+  mpvInfo->concatAdvanceCount = 0;
+  sfmpv_InitPicAtr(&mpvInfo->pictureDecodeLane);
 
-  // Initialise frame objects (16 entries starting at infoBlock[96], using tab entries from infoBlock[12])
-  sfmpv_InitFrmObj(infoBlock + 96, reinterpret_cast<const std::int32_t*>(infoBlock + 12), 16);
+  mpvInfo->lastPictureSequenceStamp = -1;
+  mpvInfo->linkDefectCheckEnabled = 0;
+  mpvInfo->vbvWriteThreshold = 0x7FFFFFFF;
+  sfmpv_InitComplementPts(reinterpret_cast<std::uint32_t*>(&mpvInfo->complementPts));
 
-  infoBlock[33] = 0;
-  infoBlock[34] = 0;
+  SFMPVF_InitPicUsr(mpvInfo);
 
-  // Initialise picture attributes at infoBlock[35]
-  sfmpv_InitPicAtr(infoBlock + 35);
-
-  // Sentinel and control fields
-  infoBlock[67] = 0xFFFFFFFF; // -1
-  infoBlock[68] = 0;
-  infoBlock[69] = 0x7FFFFFFF;
-
-  // Initialise complement points at infoBlock[70]
-  sfmpv_InitComplementPts(infoBlock + 70);
-
-  // Initialise picture-user state at infoBlock[1024]
-  SFMPVF_InitPicUsr(infoBlock + 1024);
-
-  // Link 16 user-stream slots: each frame object slot (stride 58 DWORDs)
-  // gets a pointer to its corresponding picture-user entry pair (stride 2 DWORDs)
-  auto* slotPtr = infoBlock + 117;       // first frame object's user-stream link field
-  auto* picUsrEntry = infoBlock + 1029;   // first picture-user entry (after 5-DWORD header)
-  for (std::int32_t i = 0; i < 16; ++i) {
-    *slotPtr = reinterpret_cast<std::uint32_t>(picUsrEntry);
-    picUsrEntry += 2;
-    slotPtr += 58;
+  // Each frame object's picture-user link points at its own entry pair.
+  for (std::size_t frameIndex = 0; frameIndex < 16; ++frameIndex) {
+    mpvInfo->frameObjects[frameIndex].pictureUserInfoAddress =
+      PointerToAddress(&mpvInfo->pictureUserEntries[frameIndex]);
   }
 
   return 0;
@@ -1924,7 +1903,7 @@ std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, std::uint32_t* infoBlock)
 std::int32_t sfmpv_IsVbvEnough(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   const SofdecAddressWord decoderHandle = mpvInfo->decoderHandle;
 
   const std::int32_t termSourceState = sfmpv_GetTermSrc(workctrlAddress);
@@ -1932,7 +1911,7 @@ std::int32_t sfmpv_IsVbvEnough(const SofdecAddressWord workctrlAddress)
     return termSourceState;
   }
 
-  if (workctrl->frameHeaderHandle != 0 && workctrl->vbvBypassFlag == 0) {
+  if (workctrl->fileHeader.headerValid != 0 && workctrl->fileHeader.toolVersionMajor == 0) {
     return 1;
   }
 
@@ -1962,7 +1941,7 @@ std::int32_t sfmpv_IsVbvEnough(const SofdecAddressWord workctrlAddress)
 std::int32_t sfmpv_CheckViBufSiz(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const std::int32_t ringIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
+  const std::int32_t ringIndex = workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex;
   const std::int32_t ringBufferBytes = SFBUF_GetRingBufSiz(workctrlAddress, ringIndex);
   const std::int32_t readableBytes = SFBUF_RingGetDataSiz(workctrlAddress, ringIndex);
   if ((readableBytes - ringBufferBytes) >= workctrl->createTemplate.packBytes) {
@@ -1980,7 +1959,7 @@ std::int32_t sfmpv_CheckViBufSiz(const SofdecAddressWord workctrlAddress)
 std::int32_t SFMPVF_IsTermDec(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  const auto* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   return mpvInfo->termDecodeState;
 }
 
@@ -1998,7 +1977,7 @@ std::int32_t SFMPVF_GetNumFrm(const SofdecAddressWord workctrlAddress)
 
   std::int32_t decodableFrameCount = 0;
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  const auto* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   for (std::int32_t frameIndex = 0; frameIndex < mpvInfo->frameObjectCount; ++frameIndex) {
     const moho::SfmpvfFrameObject& frameObject = mpvInfo->frameObjects[frameIndex];
     if ((frameObject.decodeState == 2 || frameObject.decodeState == 4) && frameObject.frameId == -1) {
@@ -2070,7 +2049,7 @@ std::int32_t SFMPVF_HoldFrm(const SofdecAddressWord workctrlAddress)
   std::int32_t selectableFrameCount = 0;
 
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  auto* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   if (mpvInfo->frameObjectCount > 0) {
     for (std::int32_t frameIndex = 0; frameIndex < mpvInfo->frameObjectCount; ++frameIndex) {
       auto* const candidateFrameObject = &mpvInfo->frameObjects[frameIndex];
@@ -2156,8 +2135,8 @@ std::int32_t sfmpv_FixedStartTtu(const SofdecAddressWord workctrlAddress)
 std::int32_t sfmpv_ChkPrepFlg(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const std::int32_t prepDestinationLaneIndex = workctrl->transferState.transfer.demux.prepDestinationLaneIndex;
-  const std::int32_t prepSourceLaneIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
+  const std::int32_t prepDestinationLaneIndex = workctrl->transferState.lanes[moho::kSftrnVideoLane].targetLaneIndex[0];
+  const std::int32_t prepSourceLaneIndex = workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex;
 
   std::int32_t result = SFBUF_GetPrepFlg(workctrlAddress, prepDestinationLaneIndex);
   if (result == 1) {
@@ -2213,7 +2192,7 @@ std::int32_t sfmpv_IsFinalFrmGotten(const SofdecAddressWord workctrlAddress, con
 std::int32_t sfmpv_SetTermDst(const SofdecAddressWord workctrlAddress, const std::int32_t termFlag)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  return SFBUF_SetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepDestinationLaneIndex, termFlag);
+  return SFBUF_SetTermFlg(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].targetLaneIndex[0], termFlag);
 }
 
 /**
@@ -2230,10 +2209,10 @@ std::int32_t sfmpv_ChkTermFlg(const SofdecAddressWord workctrlAddress)
 
   if (frameCount == -1 || sfmpv_IsFinalFrmGotten(workctrlAddress, frameCount) != 0) {
     (void)sfmpv_SetTermDst(workctrlAddress, 1);
-    if (workctrl->playbackInfo.publishedAddress == 0) {
+    if (workctrl->playbackInfo.pictureCounts.decodedPictureCount == 0) {
       return SFSET_SetCond(workctrlAddress, 5, 0);
     }
-    return workctrl->playbackInfo.publishedAddress;
+    return workctrl->playbackInfo.pictureCounts.decodedPictureCount;
   }
   return 0;
 }
@@ -2254,14 +2233,14 @@ std::int32_t sfmpv_GetActiveSize(
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   SfbufRingCursorSnapshot ringCursor{};
-  const std::int32_t sourceLaneIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
+  const std::int32_t sourceLaneIndex = workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex;
 
   *outActiveSize = 0;
   *outDelimiterFlags = 0;
   *outHasActiveUnit = 0;
 
   const std::int32_t ringReadResult =
-   std::int32_t SFBUF_RingGetRead(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor);
+    SFBUF_RingGetRead(workctrlAddress, sourceLaneIndex, reinterpret_cast<std::int32_t*>(&ringCursor));
   if (ringReadResult != 0) {
     return ringReadResult;
   }
@@ -2645,7 +2624,7 @@ std::int32_t sfmpv_DecodeOneUnit(
 )
 {
   const SofdecAddressWord workctrlAddress = PointerToAddress(workctrl);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   *outUnitProcessed = 0;
   workctrl->playbackInfo.decodeStarvedLatch = 0;
@@ -2656,7 +2635,7 @@ std::int32_t sfmpv_DecodeOneUnit(
   }
 
   SofdecAddressWord streamBufferAddress = 0;
-  std::int32_t decodeResult = SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, &streamBufferAddress);
+  std::int32_t decodeResult = SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex, &streamBufferAddress);
   if (decodeResult != 0 || streamBufferAddress == 0) {
     return 0;
   }
@@ -2784,8 +2763,8 @@ void sfmpv_FixedForSeek(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
-  if (workctrl->transferState.transfer.demux.seekFixedReadTotal < 0) {
-    workctrl->transferState.transfer.demux.seekFixedReadTotal = SFBUF_GetRTot(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex) + 4;
+  if (workctrl->transferState.lanes[moho::kSftrnVideoLane].transferEndState < 0) {
+    workctrl->transferState.lanes[moho::kSftrnVideoLane].transferEndState = SFBUF_GetRTot(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex) + 4;
   }
 
   if (workctrl->timingLane.seekFixedBaselineTtu.timeMajor < 0) {
@@ -2827,7 +2806,7 @@ std::int32_t sfmpv_Concat(const SofdecAddressWord workctrlAddress, const SofdecA
 std::int32_t sfmpv_ConcatSub(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   std::int32_t concatTotalTime = 0;
   if (SFSET_GetCond(workctrlAddress, 6) != 0) {
@@ -3220,7 +3199,7 @@ void sfmpv_DiscardSec(const SofdecAddressWord workctrlAddress, const SofdecAddre
 std::int32_t sfmpv_AddRtotSj(const SofdecAddressWord workctrlAddress, const std::int32_t consumedBytes)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  (void)SFBUF_AddRtotSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, consumedBytes);
+  (void)SFBUF_AddRtotSj(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex, consumedBytes);
   AddSigned32ToLane(&workctrl->playbackInfo.flowCounter1.consumedBytes, consumedBytes);
   return FlowWordHigh(workctrl->playbackInfo.flowCounter1.consumedBytes);
 }
@@ -3239,7 +3218,7 @@ void sfmpv_PeekChnk(const SofdecAddressWord workctrlAddress, std::int32_t* const
   if (
     SFBUF_RingGetRead(
       workctrlAddress,
-      workctrl->transferState.transfer.demux.prepSourceLaneIndex,
+      workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex,
       reinterpret_cast<std::int32_t*>(&ringCursor)
     )
     == 0
@@ -3262,7 +3241,7 @@ void sfmpv_PeekChnk(const SofdecAddressWord workctrlAddress, std::int32_t* const
 std::int32_t sfmpv_GetTermDst(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepDestinationLaneIndex);
+  return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].targetLaneIndex[0]);
 }
 
 /**
@@ -3274,7 +3253,7 @@ std::int32_t sfmpv_GetTermDst(const SofdecAddressWord workctrlAddress)
 std::int32_t sfmpv_GetTermSrc(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex);
+  return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex);
 }
 
 /**
@@ -3354,7 +3333,7 @@ std::int32_t sfmpv_DecodePicAtr(
     void(__cdecl*)(std::int32_t callbackContext, SofdecAddressWord chunkBaseAddress, std::int32_t payloadOffsetBytes);
 
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   auto* const pictureDecodeLane = &mpvInfo->pictureDecodeLane;
   const auto* const chunk = reinterpret_cast<const SfbufRingChunk*>(chunkWords);
 
@@ -3599,7 +3578,7 @@ std::int64_t sfmpv_ReadPtsQue(
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   outPresentationPtsWords[0] = -1;
   outPresentationPtsWords[1] = -1;
@@ -3613,7 +3592,7 @@ std::int64_t sfmpv_ReadPtsQue(
   std::int32_t queuedPtsWords[4]{};
   SFPTS_ReadPtsQue(
     workctrlAddress,
-    workctrl->transferState.transfer.demux.prepSourceLaneIndex,
+    workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex,
     PointerToAddress(delimiterCursor),
     queuedPtsWords
   );
@@ -3775,7 +3754,7 @@ std::int32_t sfmpv_CalcFrmTtu(const SofdecAddressWord workctrlAddress, const Sof
 std::int32_t sfmpv_DecodeFrm(const SofdecAddressWord workctrlAddress, const SofdecAddressWord streamBufferAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   const SofdecAddressWord decoderHandle = mpvInfo->decoderHandle;
 
   SfmpvDecodeFrameParam decodeFrameParam{};
@@ -3869,11 +3848,11 @@ std::int32_t sfmpv_SetFrmPara(
   const SofdecAddressWord workctrlAddress,
   const moho::SfmpvPictureDecodeLane* const pictureDecodeLane,
   SfmpvDecodeFrameParam* const decodeFrameParam,
-  std::int32_t* const outFrameObjectAddress
+  SofdecAddressWord* const outFrameObjectAddress
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   const SofdecAddressWord pendingFrameObjectAddress = mpvInfo->pendingFrameObjectAddress;
   SofdecAddressWord frameObjectAddress = pendingFrameObjectAddress;
@@ -3940,19 +3919,46 @@ std::int32_t sfmpv_SetFrmPara(
       mpvInfo->secondaryReferenceFrameObjectAddress = frameObjectAddress;
     }
 
-    const std::int32_t* const framePlaneTable = &mpvInfo->primaryLumaPlaneBaseAddress;
-    const std::int32_t* const primaryPlaneSet = framePlaneTable + (4 * mpvInfo->primaryFrameToggleIndex);
-    const std::int32_t* const secondaryPlaneSet = framePlaneTable + (4 * mpvInfo->secondaryFrameToggleIndex);
+    // The binary indexes the two plane sets as a 4-word table at +0x140 with
+    // stride 4 words; toggle 0 is the primary set, 1 the secondary one.
+    struct FramePlaneSet
+    {
+      SofdecAddressWord lumaPlaneAddress;
+      SofdecAddressWord chromaPlaneAddress;
+      SofdecAddressWord frameBaseAddress;
+      std::int32_t stridePacked;
+    };
+    const auto selectPlaneSet = [mpvInfo](const std::int32_t toggleIndex) -> FramePlaneSet {
+      const auto packStrides = [](const std::uint16_t lumaStride, const std::uint16_t chromaStride) {
+        return static_cast<std::int32_t>((static_cast<std::uint32_t>(lumaStride) << 16) | chromaStride);
+      };
+      if (toggleIndex == 0) {
+        return {
+          mpvInfo->primaryLumaPlaneBaseAddress,
+          mpvInfo->primaryChromaUPlaneBaseAddress,
+          mpvInfo->primaryFrameBaseAddress,
+          packStrides(mpvInfo->primaryLumaStride, mpvInfo->primaryChromaStride)
+        };
+      }
+      return {
+        mpvInfo->secondaryLumaPlaneBaseAddress,
+        mpvInfo->secondaryChromaUPlaneBaseAddress,
+        mpvInfo->secondaryFrameBaseAddress,
+        packStrides(mpvInfo->secondaryLumaStride, mpvInfo->secondaryChromaStride)
+      };
+    };
+    const FramePlaneSet primaryPlaneSet = selectPlaneSet(mpvInfo->primaryFrameToggleIndex);
+    const FramePlaneSet secondaryPlaneSet = selectPlaneSet(mpvInfo->secondaryFrameToggleIndex);
 
-    decodeFrameParam->primaryLumaPlaneAddress = primaryPlaneSet[0];
-    decodeFrameParam->primaryChromaPlaneAddress = primaryPlaneSet[1];
-    decodeFrameParam->primaryFrameBaseAddress = primaryPlaneSet[2];
-    decodeFrameParam->primaryStridePacked = primaryPlaneSet[3];
+    decodeFrameParam->primaryLumaPlaneAddress = primaryPlaneSet.lumaPlaneAddress;
+    decodeFrameParam->primaryChromaPlaneAddress = primaryPlaneSet.chromaPlaneAddress;
+    decodeFrameParam->primaryFrameBaseAddress = primaryPlaneSet.frameBaseAddress;
+    decodeFrameParam->primaryStridePacked = primaryPlaneSet.stridePacked;
 
-    decodeFrameParam->secondaryLumaPlaneAddress = secondaryPlaneSet[0];
-    decodeFrameParam->secondaryChromaPlaneAddress = secondaryPlaneSet[1];
-    decodeFrameParam->secondaryFrameBaseAddress = secondaryPlaneSet[2];
-    decodeFrameParam->secondaryStridePacked = secondaryPlaneSet[3];
+    decodeFrameParam->secondaryLumaPlaneAddress = secondaryPlaneSet.lumaPlaneAddress;
+    decodeFrameParam->secondaryChromaPlaneAddress = secondaryPlaneSet.chromaPlaneAddress;
+    decodeFrameParam->secondaryFrameBaseAddress = secondaryPlaneSet.frameBaseAddress;
+    decodeFrameParam->secondaryStridePacked = secondaryPlaneSet.stridePacked;
   }
 
   decodeFrameParam->decodedFrameBaseAddress = frameObject->frameSurfaceBaseAddress;
@@ -4110,7 +4116,7 @@ std::int32_t sfmpv_CalcRepeatField(
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const frameRepeat = AddressToPointer<SfmpvfFrameRepeat>(frameObjectAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   sfmpv_ReadTcode(frameObjectAddress, &workctrl->timingLane.repeatFieldTimecode);
 
@@ -4195,7 +4201,7 @@ moho::SfmpvfFrameObject* SFMPVF_AllocFrm(const SofdecAddressWord workctrlAddress
   SFLIB_LockCs();
 
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  auto* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   const std::int32_t frameObjectCount = mpvInfo->frameObjectCount;
 
   moho::SfmpvfFrameObject* allocatedFrameObject = nullptr;
@@ -4222,7 +4228,7 @@ moho::SfmpvfFrameObject* SFMPVF_AllocFrm(const SofdecAddressWord workctrlAddress
 std::int32_t sfmpv_ChkBufSiz(const SofdecAddressWord workctrlAddress, const std::int32_t* const frameDimensions)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   const std::int32_t requestedWidth = frameDimensions[0];
   const std::int32_t requestedHeight = frameDimensions[1];
@@ -4301,12 +4307,12 @@ std::int32_t sfmpv_ChkBufSiz(const SofdecAddressWord workctrlAddress, const std:
     auto* const mpvFrameInfo = mpvInfo;
     mpvFrameInfo->frameObjectCount = movableFrameCount + 2;
     sfmpv_InitFrmObj(
-      reinterpret_cast<std::uint32_t*>(&mpvFrameInfo->frameObjects[0]),
+      &mpvFrameInfo->frameObjects[0],
       &mpvInfo->persistedRfbAddressTable[0],
       2
     );
     sfmpv_InitFrmObj(
-      reinterpret_cast<std::uint32_t*>(&mpvFrameInfo->frameObjects[2]),
+      &mpvFrameInfo->frameObjects[2],
       &mpvInfo->persistedSofDecTabs[0],
       movableFrameCount
     );
@@ -4322,7 +4328,7 @@ std::int32_t sfmpv_ChkBufSiz(const SofdecAddressWord workctrlAddress, const std:
     auto* const mpvFrameInfo = mpvInfo;
     mpvFrameInfo->frameObjectCount = frameObjectCount;
     sfmpv_InitFrmObj(
-      reinterpret_cast<std::uint32_t*>(&mpvFrameInfo->frameObjects[0]),
+      &mpvFrameInfo->frameObjects[0],
       &mpvInfo->persistedSofDecTabs[0],
       frameObjectCount
     );
@@ -4340,14 +4346,14 @@ std::int32_t sfmpv_ChkBufSiz(const SofdecAddressWord workctrlAddress, const std:
  */
 std::int32_t sfmpv_GoDdelim(
   const SofdecAddressWord workctrlAddress,
-  const std::int32_t /*streamBufferAddress*/,
+  const SofdecAddressWord /*streamBufferAddress*/,
   const std::int32_t delimiterMask
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   SfbufRingCursorSnapshot ringCursor{};
-  if (SFBUF_RingGetRead(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, reinterpret_cast<std::int32_t*>(&ringCursor)) != 0) {
+  if (SFBUF_RingGetRead(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex, reinterpret_cast<std::int32_t*>(&ringCursor)) != 0) {
     return 0;
   }
 
@@ -4406,7 +4412,7 @@ std::int32_t sfmpv_GoDdelim(
 std::int32_t sfmpv_RingAddRead(const SofdecAddressWord workctrlAddress, const std::int32_t advanceCount)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  return SFBUF_RingAddRead(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, advanceCount);
+  return SFBUF_RingAddRead(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex, advanceCount);
 }
 
 /**
@@ -4420,7 +4426,7 @@ std::int32_t sfmpv_UpdateFlowCnt(const SofdecAddressWord workctrlAddress)
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   SofdecAddressWord streamHandleAddress = 0;
-  (void)SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, &streamHandleAddress);
+  (void)SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.lanes[moho::kSftrnVideoLane].sourceLaneIndex, &streamHandleAddress);
   std::int32_t result = streamHandleAddress;
   if (streamHandleAddress != 0) {
     std::int32_t nextFlowLow = 0;
@@ -4749,7 +4755,7 @@ std::int32_t sfmpv_FirstPicAtr(
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   if (workctrl->movieInfo.frameRateBase != 0) {
     return 0;
   }
@@ -4866,7 +4872,7 @@ std::int32_t sfmpv_SetMpvHd(
 std::int32_t sfmpv_IsSkip(const SofdecAddressWord workctrlAddress, const std::int32_t* const chunkWords)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   const SofdecAddressWord defectLaneAddress = PointerToAddress(&mpvInfo->pictureDecodeLane);
   const auto* const defectLane = AddressToPointer<moho::SfmpvPictureDecodeLane>(defectLaneAddress);
 
@@ -4914,7 +4920,7 @@ std::int32_t sfmpv_UpdateDefect(
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   const auto* const defectLane = AddressToPointer<SfmpvDefectLane>(defectLaneAddress);
 
   std::int32_t result = mpvInfo->linkDefectCheckEnabled;
@@ -5035,7 +5041,7 @@ std::int32_t sfmpv_CopyPicUsrInf(const SofdecAddressWord destinationInfoAddress,
 std::int32_t sfmpv_IsDefect(const SofdecAddressWord workctrlAddress, const std::int32_t pictureType)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   if (mpvInfo->defectPictureTypeState == 2) {
     return (pictureType == 2 || pictureType == 3) ? 1 : 0;
@@ -5125,7 +5131,7 @@ std::int32_t sfmpv_IsLate(const SofdecAddressWord workctrlAddress, const std::in
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const timingLane = &workctrl->timingLane;
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   std::int32_t interpolationTime = 0;
   if (timingLane->interpolationEnabled != 0) {
@@ -5239,7 +5245,7 @@ std::int32_t m2v_SkipFrm(const SofdecAddressWord decoderHandle, const SofdecAddr
 std::int32_t sfmpv_SkipFrm(const SofdecAddressWord workctrlAddress, const SofdecAddressWord streamBufferAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   sfmpv_SetSkipTtu(workctrlAddress);
   const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1);
@@ -5284,10 +5290,10 @@ std::int32_t SFMPV_Create(const SofdecAddressWord workctrlAddress)
   }
 
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = &workctrl->transferState.transfer.demux.m2tsMpvInfo.embeddedMpvInfo;
-  workctrl->transferState.transfer.demux.mpvInfoHandle = mpvInfo;
+  moho::SfmpvInfo* const mpvInfo = &workctrl->transferState.m2tsMpvInfo.embeddedMpvInfo;
+  workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo = mpvInfo;
 
-  const std::int32_t initInfoResult = sfmpv_InitInf(workctrlAddress, reinterpret_cast<std::uint32_t*>(mpvInfo));
+  const std::int32_t initInfoResult = sfmpv_InitInf(workctrlAddress, mpvInfo);
   if (initInfoResult != 0) {
     return initInfoResult;
   }
@@ -5324,7 +5330,7 @@ std::int32_t SFMPV_Create(const SofdecAddressWord workctrlAddress)
 std::int32_t SFMPV_Destroy(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   const SofdecAddressWord decoderHandle = mpvInfo->decoderHandle;
   if (decoderHandle == 0) {
     return 0;
@@ -5491,7 +5497,7 @@ void sfmpvf_SearchFrmInf(
 
   *outFrameInfo = frameInfo;
   vfrmData->drawState = 1;
-  workctrl->transferState.transfer.demux.mpvInfoHandle->activeFrameObjectAddress = frameObjectAddress;
+  workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo->activeFrameObjectAddress = frameObjectAddress;
 
   frameInfo->pictureWidthPixels = frameObject->pictureDecodeLane.pictureWidthPixels;
   frameInfo->pictureHeightPixels = frameObject->pictureDecodeLane.pictureHeightPixels;
@@ -5568,7 +5574,7 @@ std::int32_t sfmpvf_AddReadSub(
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   SofdecAddressWord frameObjectAddress = 0;
   moho::SfmpvfVfrmData* vfrmData = nullptr;
@@ -5619,15 +5625,15 @@ std::int32_t sfmpvf_GetVfrmDataFromFrmInf(const SofdecAddressWord workctrlAddres
 std::int32_t SFMPVF_SearchVfrmData(const SofdecAddressWord workctrlAddress, const SofdecAddressWord frameObjectAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const std::int32_t frameObjectCount = workctrl->transferState.transfer.demux.mpvInfoHandle->frameObjectCount;
+  const std::int32_t frameObjectCount = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo->frameObjectCount;
   if (frameObjectCount <= 0) {
     return 0;
   }
 
   for (std::int32_t frameIndex = 0; frameIndex < frameObjectCount; ++frameIndex) {
-    const auto* const frameObject = &workctrl->transferState.transfer.demux.mpvInfoHandle->frameObjects[frameIndex];
+    const auto* const frameObject = &workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo->frameObjects[frameIndex];
     if (PointerToAddress(frameObject) == frameObjectAddress) {
-      return PointerToAddress(&workctrl->bufferState.vfrmDataLanes[frameIndex]);
+      return PointerToAddress(&workctrl->bufferState.frames.vfrmDataLanes[frameIndex]);
     }
   }
 
@@ -5644,7 +5650,7 @@ std::int32_t SFMPVF_SearchVfrmData(const SofdecAddressWord workctrlAddress, cons
 std::int32_t SFMPVF_SearchFrmObjFromId(const SofdecAddressWord workctrlAddress, const std::int32_t frameObjectId)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  const auto* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   for (std::int32_t frameIndex = 0; frameIndex < 16; ++frameIndex) {
     const auto* const frameObject = &mpvInfo->frameObjects[frameIndex];
@@ -5665,7 +5671,7 @@ std::int32_t SFMPVF_SearchFrmObjFromId(const SofdecAddressWord workctrlAddress, 
 std::int32_t SFMPVF_TermDec(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  auto* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
   mpvInfo->termDecodeState = 1;
   return workctrlAddress;
 }
@@ -5780,7 +5786,7 @@ std::int32_t SFMPVF_IssueFrmId(const SofdecAddressWord workctrlAddress)
 void SFMPVF_FixDispOrder(const SofdecAddressWord workctrlAddress, const std::int32_t shouldSort)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  workctrl->transferState.transfer.demux.mpvInfoHandle->allowSingleFrameOutput = shouldSort;
+  workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo->allowSingleFrameOutput = shouldSort;
 }
 
 /**
@@ -5793,7 +5799,7 @@ void SFMPVF_FixDispOrder(const SofdecAddressWord workctrlAddress, const std::int
 std::int32_t SFMPV_Seek(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo;
 
   std::int32_t reprocessed = 0;
   const std::int32_t result =
@@ -5864,7 +5870,7 @@ std::int32_t sfmpv_GetHd(const SofdecAddressWord workctrlAddress)
     return 0;
   }
 
-  if (workctrl->transferState.transfer.demux.mpvInfoHandle->concatAdvanceCount > 0) {
+  if (workctrl->transferState.lanes[moho::kSftrnVideoLane].mpvInfo->concatAdvanceCount > 0) {
     return 0;
   }
 

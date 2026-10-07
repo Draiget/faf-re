@@ -57,6 +57,8 @@
 
 #include <cstdint>
 
+#include "cri/sofdec/SofdecAddressWord.h"
+
 // === Function stubs (cdecl no-arg, return 0/null) ===
 extern "C" {
   // ADXM_Finish (0x00B06DC0): real body in SofdecAdxPlatformRuntime.cpp,
@@ -558,12 +560,12 @@ extern "C" {
   std::uint8_t mpvvlt_p_mbtype[4096] = {};
   std::uint8_t mpvvlt_y_dcsiz[4096] = {};
   std::uint8_t mwsfd_init_flag[4096] = {};
-  std::uint8_t sSofDec_tabs[4096] = {};
+  SofdecAddressWord sSofDec_tabs[16] = {};
   std::uint8_t sfcre_fhd[4096] = {};
   std::uint8_t sfcre_mpv_picrate[4096] = {};
   std::uint8_t sfh_workinfo[4096] = {};
   std::uint8_t sfmpv_para[4096] = {};
-  std::uint8_t sfmpv_rfb_adr_tbl[4096] = {};
+  SofdecAddressWord sfmpv_rfb_adr_tbl[2] = {};
   // sftim_tc2time (0x00D7FA50) is an 18-entry converter dispatch table, not a
   // buffer. Zeroed here, SFTIM_Tc2Time found a null slot for every frame rate
   // and raised FF000221 forever. Defined from the binary bytes next to the

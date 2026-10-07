@@ -60,11 +60,11 @@ namespace moho
     std::int32_t chromaHeight = 0;     // +0x04
     std::int32_t widthPrimary = 0;     // +0x08
     std::int32_t heightPrimary = 0;    // +0x0C
-    std::int32_t reserved10 = 0;       // +0x10
+    SofdecAddressWord reserved10 = 0;  // +0x10 (SfmpvPara::val4)
     std::int32_t widthSecondary = 0;   // +0x14
     std::int32_t heightSecondary = 0;  // +0x18
     std::int32_t framePoolWork = 0;    // +0x1C
-    std::int32_t reserved20 = 0;       // +0x20
+    SofdecAddressWord reserved20 = 0;  // +0x20 (SfmpvPara::val8)
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfdMpvPara) == 0x24, "MwsfdMpvPara size must be 0x24");
@@ -581,20 +581,29 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyMovieInfo) == 0x40, "SfplyMovieInfo size must be 0x40");
 
+  /// Decoded/skipped picture counters at the head of the playback info;
+  /// the condition-36/37 callbacks receive a pointer to this pair.
+  struct SfplyPictureCount
+  {
+    std::int32_t decodedPictureCount = 0; // +0x00
+    std::int32_t skippedPictureCount = 0; // +0x04
+  };
+  static_assert(sizeof(SfplyPictureCount) == 0x08, "SfplyPictureCount size must be 0x08");
+
   /**
    * SFPLY playback-info lane initialized by `_sfply_InitPlyInf`.
    */
   struct SfplyPlaybackInfo
   {
-    SofdecAddressWord publishedAddress = 0;         // +0x00 self-address SFPLY publishes
-    std::int32_t mUnknown04 = 0;             // +0x04
+    SfplyPictureCount pictureCounts{};         // +0x00 decoded/skipped pictures (SFPLY_AddDecPic/AddSkipPic)
     std::int32_t decoderDctCountPrimary = 0;   // +0x08 (workctrl +0x958)
     std::int32_t decoderDctCountSecondary = 0; // +0x0C
     std::int32_t emptyBpicCount = 0;           // +0x10
     std::int32_t emptyPpicCount = 0;           // +0x14
     std::int32_t preparedFrameCount = 0;       // +0x18
     std::int32_t consumedFrameCount = 0;       // +0x1C
-    std::array<std::int32_t, 2> mUnknown20{};  // +0x20
+    std::int32_t bpaActiveFlag = 0;            // +0x20 B-picture-adjust window active (also the SFTIM freeze gate)
+    std::int32_t bpaToggleCount = 0;           // +0x24
     std::int32_t decodeStarvedLatch = 0;       // +0x28 (workctrl +0x978)
     std::int32_t frameAllocationFailed = 0;    // +0x2C (workctrl +0x97C)
     std::int32_t activeLockedFrameCount = 0;   // +0x30 (workctrl +0x980, SFD_LockFrm)
@@ -681,13 +690,40 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyTimerSummary) == 0x20, "SfplyTimerSummary size must be 0x20");
 
+  /// Frame-rate measurement window (`sfply_MeasureFps`): the tick pair of the
+  /// previous and current sample, the timer unit, the sampled frame count and
+  /// the resulting rate. `SFD_GetFrm` reuses the first pair as the first
+  /// retained frame's time.
+  struct SfplyFrameRateSample
+  {
+    std::uint32_t previousMeasureTicksLow = 0;  // +0x00
+    std::uint32_t previousMeasureTicksHigh = 0; // +0x04
+    std::uint32_t currentMeasureTicksLow = 0;   // +0x08
+    std::uint32_t currentMeasureTicksHigh = 0;  // +0x0C
+    std::uint32_t timerUnitLow = 0;             // +0x10
+    std::uint32_t timerUnitHigh = 0;            // +0x14
+    std::int32_t sampledFrameCount = 0;         // +0x18
+    float measuredFramesPerSecond = 0.0f;       // +0x1C
+  };
+  static_assert(sizeof(SfplyFrameRateSample) == 0x20, "SfplyFrameRateSample size must be 0x20");
+
+  /// The playback-time stamp of the last packet, kept across a handle rebuild
+  /// (`SFPLY_SetPtsInfo`); lives in the SFTIM timer tail at workctrl +0x12E0.
+  struct SfplyPtsInfoLane
+  {
+    std::int32_t presentationTimeLow = 0;  // +0x00
+    std::int32_t presentationTimeHigh = 0; // +0x04
+    std::int32_t payloadBytes = 0;         // +0x08
+  };
+  static_assert(sizeof(SfplyPtsInfoLane) == 0x0C, "SfplyPtsInfoLane size must be 0x0C");
+
   /**
    * SFPLY timer-info lane initialized by `_sfply_InitTmrInf`.
    */
   struct SfplyTimerInfo
   {
     std::array<SfplyTimerSummary, 6> summaries{}; // +0x00
-    std::array<std::int32_t, 8> mUnknownC0{};     // +0xC0
+    SfplyFrameRateSample frameRateSample{};       // +0xC0 (`sfply_MeasureFps`)
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -695,8 +731,8 @@ namespace moho
     "SfplyTimerInfo::summaries offset must be 0x00"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyTimerInfo, mUnknownC0) == 0xC0,
-    "SfplyTimerInfo::mUnknownC0 offset must be 0xC0"
+    offsetof(SfplyTimerInfo, frameRateSample) == 0xC0,
+    "SfplyTimerInfo::frameRateSample offset must be 0xC0"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyTimerInfo) == 0xE0, "SfplyTimerInfo size must be 0xE0");
 
@@ -714,15 +750,16 @@ namespace moho
   };
   static_assert(sizeof(SfptsQueueEntry) == 0x10, "SfptsQueueEntry size must be 0x10");
 
-  /// PTS queue control block embedded in each SFBUF supply lane at +0x28
-  /// (`SFPTS_ReadPtsQue` 0x00AE5C40 reaches it at `lane + 0x28`).
+  /// PTS queue control block embedded in each SFBUF lane at +0x38
+  /// (`SFPTS_ReadPtsQue` 0x00AE5C40). Word-sized: the lane clears it as
+  /// five of its payload words.
   struct SfptsPtsQueue
   {
     SofdecAddressWord entriesBaseAddress = 0; // +0x00 entry array base address
-    std::int32_t entryCapacity = 0;      // +0x04
-    std::int32_t queuedEntryCount = 0;   // +0x08
-    std::int32_t writeIndex = 0;         // +0x0C (`_sfpts` producer cursor)
-    std::int32_t readCursor = 0;         // +0x10
+    SofdecAddressWord entryCapacity = 0;      // +0x04
+    SofdecAddressWord queuedEntryCount = 0;   // +0x08
+    SofdecAddressWord writeIndex = 0;         // +0x0C (`_sfpts` producer cursor)
+    SofdecAddressWord readCursor = 0;         // +0x10
   };
   static_assert(offsetof(SfptsPtsQueue, entryCapacity) == 0x04, "SfptsPtsQueue::entryCapacity offset must be 0x04");
   static_assert(offsetof(SfptsPtsQueue, queuedEntryCount) == 0x08, "SfptsPtsQueue::queuedEntryCount offset must be 0x08");
@@ -771,11 +808,11 @@ namespace moho
     std::int32_t field_0x04 = 0; // +0x04
     std::int32_t field_0x08 = 0; // +0x08
     std::int32_t field_0x0C = 0; // +0x0C
-    std::int32_t val4 = 0;       // +0x10 checked by sfmpvf_CheckMpvPara
+    SofdecAddressWord val4 = 0;  // +0x10 reference-frame base when caller-allocated; checked by sfmpvf_CheckMpvPara
     std::int32_t field_0x14 = 0; // +0x14
     std::int32_t field_0x18 = 0; // +0x18
     std::int32_t nfrmPoolWork = 0; // +0x1C max 16 frame pool entries
-    std::int32_t val8 = 0;       // +0x20 checked by sfmpvf_CheckMpvPara
+    SofdecAddressWord val8 = 0;  // +0x20 frame-pool base when caller-allocated; checked by sfmpvf_CheckMpvPara
   };
   static_assert(sizeof(SfmpvPara) == 0x24, "SfmpvPara size must be 0x24");
 
@@ -863,7 +900,7 @@ namespace moho
     std::int32_t decodeState = 0;              // +0x00
     std::int32_t allocationState = 0;          // +0x04
     SofdecAddressWord frameSurfaceBaseAddress = 0;  // +0x08
-    std::uint8_t mUnknown0CTo37[0x2C]{};       // +0x0C
+    SfmpvTtu frameTtu{};                       // +0x0C `sfmpv_InitFrmObj` SFTIM_InitTtu
     std::int32_t presentationTimeMajor = 0;    // +0x38
     std::int32_t presentationTimeMinor = 0;    // +0x3C
     std::int32_t referenceErrorMajor = 0;      // +0x40
@@ -890,8 +927,8 @@ namespace moho
   {
     SofdecAddressWord decoderHandle = 0;                        // +0x00
     SfmpvPara persistedPara{};                             // +0x04
-    std::int32_t persistedRfbAddressTable[2]{};            // +0x28
-    std::int32_t persistedSofDecTabs[16]{};                // +0x30
+    SofdecAddressWord persistedRfbAddressTable[2]{};       // +0x28
+    SofdecAddressWord persistedSofDecTabs[16]{};           // +0x30
     SofdecAddressWord activeFrameObjectAddress = 0;             // +0x70
     std::int32_t defectPictureTypeState = 0;               // +0x74
     std::int32_t concatControlFlags = 0;                   // +0x78
@@ -980,14 +1017,24 @@ namespace moho
   /// late-frame decision callback lives at +0x18 (`FUN_00AD4100` reads it via
   /// `lea edi, [ebx+0xD30]`); the concat-time and total-sample queues at
   /// +0x168.. are tail fields owned by `SfmpvTimingLaneTail`.
+  struct SofdecSfdWorkctrlSubobj;
+
+  /// SFTIM "now time" source (`SFTIM_SetTimeFn` slot, `SFTIM_GetNowTime` dispatch).
+  using SftimGetNowTimeFunction =
+    std::int32_t(__cdecl*)(SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
+  /// External-clock callback (`SFD_SetExtClock`), called with its registered context.
+  using SftimExternalTimeCallback =
+    std::int32_t(__cdecl*)(SofdecAddressWord callbackContext, std::int32_t* outExternalMajor, std::int32_t* outExternalMinor);
+
   struct SfmpvTimingLaneHead
   {
     using IsLateCallback = std::int32_t(__cdecl*)(
       SofdecAddressWord workctrlAddress, std::int32_t mode, std::int32_t interpolationTime, std::int32_t baseFraction
     );
 
-    std::uint8_t mUnknown00To17[0x18]{}; // +0x00
-    IsLateCallback isLateCallback = nullptr; // +0x18
+    /// Time sources per SFTIM mode: none, vsync, (2), user frame, (4), external clock.
+    std::array<SftimGetNowTimeFunction, 6> nowTimeFunctions{}; // +0x00
+    IsLateCallback isLateCallback = nullptr; // +0x18 (`SFTIM_InitHn` clears it; `sfmpv_IsLate` calls it)
     SfmpvPackedTimecode repeatFieldTimecode{}; // +0x1C
     std::uint32_t concatVideoTimeUnit[11]{};   // +0x3C
     std::uint32_t concatAudioTimeUnit[11]{};   // +0x68
@@ -998,7 +1045,9 @@ namespace moho
     std::uint32_t activeStartTimecodeWords[8]{}; // +0x11C
     std::int32_t frameInterpolationTime = 0;   // +0x13C
     std::int32_t frameInterpolationMinor = 0;  // +0x140
-    std::uint8_t mUnknown144To14F[0x0C]{};     // +0x144
+    std::int32_t startTimeMajor = 0;           // +0x144
+    std::int32_t startTimeMinor = 0;           // +0x148
+    std::int32_t mUnknown14C = 0;              // +0x14C
   };
   static_assert(offsetof(SfmpvTimingLaneHead, isLateCallback) == 0x18, "SfmpvTimingLaneHead::isLateCallback offset must be 0x18");
   static_assert(offsetof(SfmpvTimingLaneHead, repeatFieldTimecode) == 0x1C, "SfmpvTimingLaneHead::repeatFieldTimecode offset must be 0x1C");
@@ -1014,7 +1063,7 @@ namespace moho
   /// repeat-field history at +0x11E0 absolute.
   struct SfmpvTimingLaneTail
   {
-    std::uint8_t mUnknown00To03[0x04]{};          // +0x00 (absolute +0xE90)
+    std::int32_t seekResetTimeMajor = 0;          // +0x00 (absolute +0xE90)
     std::int32_t decodeProgressTime = 0;          // +0x04 (absolute +0xE94)
     std::int32_t concatTimeHistoryWriteOrdinal = 0; // +0x08 (absolute +0xE98)
     std::int32_t concatTimeHistory[32]{};         // +0x0C
@@ -1027,14 +1076,34 @@ namespace moho
     std::int32_t readFrameTimeMinor = 0;          // +0x120
     std::int32_t maxFrameTimeMajor = 0;           // +0x124
     std::int32_t maxFrameTimeMinor = 0;           // +0x128
-    std::uint8_t mUnknown12CTo133[0x08]{};        // +0x12C
+    std::int32_t currentTimeMajor = 0;            // +0x12C (absolute +0xFBC) last resolved SFTIM time
+    std::int32_t currentTimeMinor = 0;            // +0x130 (absolute +0xFC0)
     std::int32_t interpolationWindowTimeBase = 0;     // +0x134 (absolute +0xFC4)
     std::int32_t interpolationWindowAdaptiveStep = 0; // +0x138
     std::int32_t interpolationWindowMaxStep = 0;      // +0x13C
     std::int32_t interpolationWindowMinStep = 0;      // +0x140
-    std::uint8_t mUnknown144To34F[0x20C]{};       // +0x144
+    std::int32_t userFrameSyncSequence = 0;       // +0x144 (absolute +0xFD4)
+    std::int32_t vsyncTimeMajor = 0;              // +0x148 (absolute +0xFD8) accumulated vsync ticks
+    std::int32_t timeBaseScale = 0;               // +0x14C (absolute +0xFDC) vsync tick step
+    std::int32_t displaySyncSequence = 0;         // +0x150 (absolute +0xFE0) also the start-sync bypass gate
+    std::int32_t displaySyncTimeMajor = 0;        // +0x154 (absolute +0xFE4)
+    std::int32_t displaySyncTimeMinor = 0;        // +0x158 (absolute +0xFE8)
+    std::int32_t graceWindowCounter = 0;          // +0x15C (absolute +0xFEC)
+    float lastLowerSample = 0.0f;                 // +0x160 (absolute +0xFF0)
+    std::int32_t lastGraceResult = 0;             // +0x164 (absolute +0xFF4)
+    float lastUpperSample = 0.0f;                 // +0x168 (absolute +0xFF8)
+    std::int32_t vblankStateTicks = 0;            // +0x16C (absolute +0xFFC) also the take-off/start-sync tick
+    std::int32_t currentVtimeMajor = 0;           // +0x170 (absolute +0x1000)
+    SftimExternalTimeCallback externalTimeCallback = nullptr; // +0x174 (absolute +0x1004)
+    std::int32_t previousExternalMinor = 0;       // +0x178 (absolute +0x1008)
+    std::int32_t externalAccumulatedMajor = 0;    // +0x17C (absolute +0x100C)
+    std::int32_t externalReportedMinor = 0;       // +0x180 (absolute +0x1010)
+    std::int32_t externalWrapMinorLimit = 0;      // +0x184 (absolute +0x1014)
+    SofdecAddressWord externalCallbackContext = 0; // +0x188 (absolute +0x1018)
+    std::uint8_t mUnknown18C[0x1C4]{};            // +0x18C
     SfmpvRepeatFieldHistory repeatFieldHistory{}; // +0x350 (absolute +0x11E0)
-    std::uint8_t mUnknown450To47F[0x30]{};        // +0x450
+    SfplyPtsInfoLane ptsInfoLane{};               // +0x450 (absolute +0x12E0) cleared by SFTIM_InitHn
+    std::uint8_t mUnknown45C[0x24]{};             // +0x45C
   };
   static_assert(offsetof(SfmpvTimingLaneTail, decodeProgressTime) == 0x04, "SfmpvTimingLaneTail::decodeProgressTime offset must be 0x04");
   static_assert(offsetof(SfmpvTimingLaneTail, concatTimeHistoryWriteOrdinal) == 0x08, "SfmpvTimingLaneTail::concatTimeHistoryWriteOrdinal offset must be 0x08");
@@ -1058,42 +1127,79 @@ namespace moho
   static_assert(offsetof(SflibErrorInfo, firstErrorCode) == 0x08, "SflibErrorInfo::firstErrorCode offset must be 0x08");
   static_assert(sizeof(SflibErrorInfo) == 0x14, "SflibErrorInfo size must be 0x14");
 
-  /// One SFBUF ring-lane descriptor in the buffer-manager's lane table
-  /// (`workctrl+0x1320`, stride 0x74 - `getSupSj` 0x00ACF630). Lane 0 is the
-  /// input supply (its join address is the SFMEM in-SJ), lanes 1/2 the video
-  /// and audio destinations the PTS callback dispatches on.
-  struct SfbufSupplyLane
+  /**
+   * One SFBUF lane (`workctrl + 0x1310 + lane * 0x74`, `SFBUF_InitHn`). Lane 0
+   * is the input supply, 1/2 the video/audio stream rings, 3/5 the VFRM frame
+   * lanes, 4/6 the audio sample rings, 7 the user-output lane; 8 is the
+   * transfer strategies' "no lane" sentinel.
+   *
+   * The middleware fills the payload from +0x10 as a flat word array
+   * (`sfbuf_SetSupSj` copies 15 words, `sfbuf_InitUoSj` clears 12,
+   * `sfbuf_ClearSupplyTailFiveWords` the last 5) and overlays per-kind views
+   * on it (`SfbufSjCreateState`, `SfbufAringLaneState`, UO chunk descriptors),
+   * so every field is one `SofdecAddressWord`: on x86 that is the binary's
+   * 0x74-byte lane, on x64 the word-indexed views stay aligned with the names.
+   */
+  struct SfbufLane
   {
-    std::int32_t mUnknown00 = 0;                // +0x00
-    SofdecAddressWord supplyJoinAddress = 0;         // +0x04 SJ join address of the lane
-    SofdecAddressWord ringWindowStartAddress = 0;    // +0x08 ring window base (SJRBF start)
-    std::int32_t ringWindowSpanBytes = 0;       // +0x0C prep-end threshold / ring window span
-    std::int32_t mUnknown10 = 0;                 // +0x10
-    std::int32_t mUnknown14 = 0;                 // +0x14
-    std::array<std::int32_t, 4> mUnknown18{};    // +0x18
-    SfptsPtsQueue ptsQueue{};                   // +0x28 embedded PTS queue
-    std::uint8_t mUnknown3C[0x38]{};            // +0x3C
+    SofdecAddressWord laneType = 0;  // +0x00
+    SofdecAddressWord isSetup = 0;   // +0x04
+    SofdecAddressWord prepFlag = 0;  // +0x08
+    SofdecAddressWord termFlag = 0;  // +0x0C
+    SofdecAddressWord sourceBufferAddress = 0; // +0x10 buffer base; supply kind on ring lanes
+    union
+    {
+      SofdecAddressWord sourceBufferBytes; // +0x14 buffer bytes on frame/sample lanes
+      SofdecAddressWord supplyJoinAddress; //       the SJ handle on ring lanes
+    };
+    union
+    {
+      SofdecAddressWord laneParam18;            // +0x18
+      SofdecAddressWord ringWindowStartAddress; //       ring window base (SJRBF start)
+    };
+    union
+    {
+      SofdecAddressWord queuedDataBytes;     // +0x1C
+      SofdecAddressWord ringWindowSpanBytes; //       prep-end threshold / ring window span
+    };
+    SofdecAddressWord laneParam20 = 0;               // +0x20
+    SofdecAddressWord laneParam24 = 0;               // +0x24
+    SofdecAddressWord delimiterPrimaryAddress = 0;   // +0x28
+    SofdecAddressWord delimiterSecondaryAddress = 0; // +0x2C
+    SofdecAddressWord writeTotalBytes = 0;           // +0x30
+    SofdecAddressWord readTotalBytes = 0;            // +0x34
+    SfptsPtsQueue ptsQueue{};                        // +0x38 embedded PTS queue
+    SofdecAddressWord runtimeState0 = 0;             // +0x4C
+    SofdecAddressWord runtimeState1 = 0;             // +0x50
+    std::array<SofdecAddressWord, 8> mUnknown54{};   // +0x54
   };
-  static_assert(offsetof(SfbufSupplyLane, ringWindowStartAddress) == 0x08, "SfbufSupplyLane::ringWindowStartAddress offset must be 0x08");
-  static_assert(offsetof(SfbufSupplyLane, ringWindowSpanBytes) == 0x0C, "SfbufSupplyLane::ringWindowSpanBytes offset must be 0x0C");
-  static_assert(offsetof(SfbufSupplyLane, ptsQueue) == 0x28, "SfbufSupplyLane::ptsQueue offset must be 0x28");
-  static_assert(sizeof(SfbufSupplyLane) == 0x74, "SfbufSupplyLane size must be 0x74");
+  static_assert(offsetof(SfbufLane, sourceBufferAddress) == 0x10, "SfbufLane::sourceBufferAddress offset must be 0x10");
+  static_assert(offsetof(SfbufLane, supplyJoinAddress) == 0x14, "SfbufLane::supplyJoinAddress offset must be 0x14");
+  static_assert(offsetof(SfbufLane, ringWindowSpanBytes) == 0x1C, "SfbufLane::ringWindowSpanBytes offset must be 0x1C");
+  static_assert(offsetof(SfbufLane, delimiterPrimaryAddress) == 0x28, "SfbufLane::delimiterPrimaryAddress offset must be 0x28");
+  static_assert(offsetof(SfbufLane, readTotalBytes) == 0x34, "SfbufLane::readTotalBytes offset must be 0x34");
+  static_assert(offsetof(SfbufLane, ptsQueue) == 0x38, "SfbufLane::ptsQueue offset must be 0x38");
+  static_assert(offsetof(SfbufLane, runtimeState0) == 0x4C, "SfbufLane::runtimeState0 offset must be 0x4C");
+  static_assert(sizeof(SfbufLane) == 0x74, "SfbufLane size must be 0x74");
 
   /// SFBUF buffer-manager sub-object at `workctrl+0x1310` (0xC20 bytes),
-  /// initialized by `SFBUF_InitHn`.
+  /// initialized by `SFBUF_InitHn`: eight lanes, then the 16 VFRM data lanes
+  /// `SFMPVF_SearchVfrmData` (0x00ADC0D0) indexes at `workctrl + 0x16B0` in
+  /// 0x88 strides. Lane 8 is only ever the "no lane" sentinel, and the binary
+  /// reads its flags out of the first VFRM data lane, so the two share storage.
   struct SfbufBufferState
   {
-    std::uint8_t mUnknown00[0x10]{};
-    /// Seven configured supply lanes (only lanes 0..2 are dispatched: input,
-    /// video, audio). The eighth slot's storage is the head of the VFRM lane
-    /// table below - `SFMPVF_SearchVfrmData` (0x00ADC0D0) indexes
-    /// `workctrl + 0x16B0` in 0x88 strides, exactly where lane 7 would end.
-    std::array<SfbufSupplyLane, 7> supplyLanes{}; // +0x10 (workctrl +0x1320)
-    std::uint8_t mUnknown33C[0x64]{};             // +0x33C
-    SfmpvfVfrmDataLane vfrmDataLanes[16]{};       // +0x3A0 (workctrl +0x16B0)
+    union
+    {
+      std::array<SfbufLane, 9> lanes{};          // +0x00
+      struct
+      {
+        std::array<SfbufLane, 8> lanes;          // +0x00
+        SfmpvfVfrmDataLane vfrmDataLanes[16];    // +0x3A0 (workctrl +0x16B0)
+      } frames;
+    };
   };
-  static_assert(offsetof(SfbufBufferState, supplyLanes) == 0x10, "SfbufBufferState::supplyLanes offset must be 0x10");
-  static_assert(offsetof(SfbufBufferState, vfrmDataLanes) == 0x3A0, "SfbufBufferState::vfrmDataLanes offset must be 0x3A0");
+  static_assert(offsetof(SfbufBufferState, frames.vfrmDataLanes) == 0x3A0, "SfbufBufferState::vfrmDataLanes offset must be 0x3A0");
   static_assert(sizeof(SfbufBufferState) == 0xC20, "SfbufBufferState size must be 0xC20");
 
   /// Per-source-lane input descriptor `SFM2TS_Create` reads when opening one
@@ -1208,90 +1314,100 @@ namespace moho
   };
   static_assert(sizeof(SfdDemuxInitBlock) == 0x15C, "SfdDemuxInitBlock size must be 0x15C");
 
-  /// One SFSET transfer-lane slot (`SFSET_GetTrHn` indexes them 0x44 apart).
-  struct SfsetTransferLane
-  {
-    SofdecAddressWord transferHandleAddress = 0; // +0x00 demux/parser handle on demux lanes
-    std::uint8_t mUnknown04[0x40]{};        // +0x04
-  };
-  static_assert(sizeof(SfsetTransferLane) == 0x44, "SfsetTransferLane size must be 0x44");
-
   /**
-   * Named demux-lane model of the transfer state's bytes: SFMEM ring lane word,
-   * the system lane's active-demux pointer and destination bookkeeping, and
-   * the two mutually-exclusive demux init blocks.
+   * One SFTRN transfer lane (`workctrl + 0x1F30 + lane * 0x44`). Lane 0 is the
+   * SFMEM supply, 1 the system (MPS/M2TS) demux, 2 the MPV video decoder,
+   * 3 the ADXT audio decoder, 6/7 the video/audio output strategies and 8
+   * the user-output lane. `SFSET_GetTrHn` hands out `&lane.transferHandle`
+   * (`workctrl + 0x1F38 + lane * 0x44`), and each strategy keeps its own
+   * object there: the demux init block, the MPV info block, the ADXT runtime,
+   * the audio output ops, or the user-output descriptor table.
    */
-  struct SftrnDemuxState
+  struct SftrnTransferLane
   {
-    std::uint8_t mUnknown00[0x0C]{};          // +0x00 lane 0 head
-    std::int32_t memoryPrepLaneIndex = 0;     // +0x0C SFMEM ring lane (workctrl +0x1F44)
-    std::uint8_t mUnknown10[0x34]{};          // +0x10 lane 0 tail / lane 1 head
-    SfdDemuxInitBlock* demuxInit = nullptr;   // +0x44 active demux block (workctrl +0x1F7C)
-    std::int32_t mUnknown48 = 0;              // +0x48
-    std::int32_t activeSupplyLaneIndex = 0;   // +0x4C (workctrl +0x1F84)
-    std::int32_t termDestinationLane[3]{};    // +0x50 video/audio/user destinations
-    std::int32_t effectiveEndcodeBoundaryBytes = -1; // +0x5C
-    std::uint8_t mUnknown60[0x28]{};          // +0x60 lanes 2..4
-    SfmpvInfo* mpvInfoHandle = nullptr;       // +0x88 (workctrl +0x1FC0) published by SFMPV_Create
-    std::uint8_t mUnknown8C[0x04]{};          // +0x8C
-    std::int32_t prepSourceLaneIndex = 0;     // +0x90 (workctrl +0x1FC8)
-    std::int32_t prepDestinationLaneIndex = 0; // +0x94 (workctrl +0x1FCC)
-    std::uint8_t mUnknown98[0x08]{};          // +0x98
-    std::int32_t seekFixedReadTotal = -1;     // +0xA0 (workctrl +0x1FD8)
-    std::uint8_t mUnknownA4[0x1BC]{};         // +0xA4 lane tail to the init blocks
-    SfdDemuxInitBlock mpsInit{};              // +0x260 (workctrl +0x2198)
-    std::uint8_t mUnknown3BC[0x04]{};         // +0x3BC
-    /// One storage, two lifecycle phases: the M2TS demux init block
-    /// (create/teardown; its destroy-lane tail is dead once playback runs),
-    /// and the SFMPV info block `SFMPV_Create` (0x00AD4BBA,
-    /// `lea ebx, [esi+0x23A8]`) publishes at demux +0x470. The first 0xB0
-    /// bytes of the phase struct are the M2TS block's own bytes.
+    std::int32_t prepFlag = 0; // +0x00
+    std::int32_t termFlag = 0; // +0x04
     union
     {
-      SfdDemuxInitBlock m2tsInit;             // +0x3C0 (workctrl +0x22F8)
-      struct
-      {
-        std::uint8_t m2tsInitBytes[0xB0]{};   // +0x3C0 m2tsInit head (mutually exclusive in time)
-        SfmpvInfo embeddedMpvInfo{};          // +0x470 (workctrl +0x23A8)
-      } m2tsMpvInfo;
+      SofdecAddressWord transferHandle;  // +0x08 the strategy object, as SFSET publishes it
+      SfdDemuxInitBlock* demuxInit;      // lane 1
+      SfmpvInfo* mpvInfo;                // lane 2
+      void* strategyObject;              // lanes 3, 7 (ADXT runtime, audio output ops)
+      SofdecAddressWord* uochDescriptorWords; // lane 8 (SfuoDescriptorTable)
     };
+    SofdecAddressWord transferDescriptorAddress = 0; // +0x0C the lane's SofdecTransferStrategy
+    std::int32_t sourceLaneIndex = 0;                 // +0x10 SFBUF lane the strategy reads
+    std::int32_t targetLaneIndex[3]{};                // +0x14 SFBUF lanes it writes (video/audio/user on lane 1)
+    std::int32_t transferEndState = 0;                // +0x20 lane-specific (lane 1 endcode bytes, lane 2 seek read total)
+    std::int32_t strategyWords[8]{};                  // +0x24
   };
-  static_assert(offsetof(SftrnDemuxState, memoryPrepLaneIndex) == 0x0C, "SftrnDemuxState::memoryPrepLaneIndex offset must be 0x0C");
-  static_assert(offsetof(SftrnDemuxState, demuxInit) == 0x44, "SftrnDemuxState::demuxInit offset must be 0x44");
-  static_assert(offsetof(SftrnDemuxState, activeSupplyLaneIndex) == 0x4C, "SftrnDemuxState::activeSupplyLaneIndex offset must be 0x4C");
-  static_assert(offsetof(SftrnDemuxState, termDestinationLane) == 0x50, "SftrnDemuxState::termDestinationLane offset must be 0x50");
-  static_assert(offsetof(SftrnDemuxState, effectiveEndcodeBoundaryBytes) == 0x5C, "SftrnDemuxState::effectiveEndcodeBoundaryBytes offset must be 0x5C");
-  static_assert(offsetof(SftrnDemuxState, mpsInit) == 0x260, "SftrnDemuxState::mpsInit offset must be 0x260");
-  static_assert(offsetof(SftrnDemuxState, mpvInfoHandle) == 0x88, "SftrnDemuxState::mpvInfoHandle offset must be 0x88");
-  static_assert(offsetof(SftrnDemuxState, prepSourceLaneIndex) == 0x90, "SftrnDemuxState::prepSourceLaneIndex offset must be 0x90");
-  static_assert(offsetof(SftrnDemuxState, prepDestinationLaneIndex) == 0x94, "SftrnDemuxState::prepDestinationLaneIndex offset must be 0x94");
-  static_assert(offsetof(SftrnDemuxState, seekFixedReadTotal) == 0xA0, "SftrnDemuxState::seekFixedReadTotal offset must be 0xA0");
-  static_assert(offsetof(SftrnDemuxState, m2tsInit) == 0x3C0, "SftrnDemuxState::m2tsInit offset must be 0x3C0");
-  static_assert(offsetof(SftrnDemuxState, m2tsMpvInfo.embeddedMpvInfo) == 0x470, "SftrnDemuxState embedded MPV info @0x470 (workctrl 0x23A8)");
-  static_assert(offsetof(SftrnDemuxState, m2tsMpvInfo.embeddedMpvInfo) + sizeof(SfmpvInfo) == 0x1510, "SftrnDemuxState embedded MPV info end @0x1510");
-  static_assert(sizeof(SftrnDemuxState) == 0x1510, "SftrnDemuxState size must be 0x1510");
+  static_assert(offsetof(SftrnTransferLane, transferHandle) == 0x08, "SftrnTransferLane::transferHandle offset must be 0x08");
+  static_assert(offsetof(SftrnTransferLane, transferDescriptorAddress) == 0x0C, "SftrnTransferLane::transferDescriptorAddress offset must be 0x0C");
+  static_assert(offsetof(SftrnTransferLane, sourceLaneIndex) == 0x10, "SftrnTransferLane::sourceLaneIndex offset must be 0x10");
+  static_assert(offsetof(SftrnTransferLane, transferEndState) == 0x20, "SftrnTransferLane::transferEndState offset must be 0x20");
+  static_assert(sizeof(SftrnTransferLane) == 0x44, "SftrnTransferLane size must be 0x44");
+
+  /// Transfer-lane indices (the strategy-table slots).
+  inline constexpr std::size_t kSftrnMemoryLane = 0;
+  inline constexpr std::size_t kSftrnSystemLane = 1;
+  inline constexpr std::size_t kSftrnVideoLane = 2;
+  inline constexpr std::size_t kSftrnAudioLane = 3;
+  inline constexpr std::size_t kSftrnVideoOutputLane = 6;
+  inline constexpr std::size_t kSftrnAudioOutputLane = 7;
+  inline constexpr std::size_t kSftrnUserLane = 8;
+
+  /// One user-output chunk descriptor (`sfuo_SetUoch` 0x00ACE2C0): word 0 is
+  /// the source SJ handle; the rest are the per-slot callback lanes.
+  struct SfuoDescriptor
+  {
+    SofdecAddressWord word0 = 0; // +0x00
+    SofdecAddressWord word1 = 0; // +0x04
+    SofdecAddressWord word2 = 0; // +0x08
+    SofdecAddressWord word3 = 0; // +0x0C
+  };
+  static_assert(sizeof(SfuoDescriptor) == 0x10, "SfuoDescriptor size must be 0x10");
+
+  /// The handle's inline user-output descriptor table (`sfuo_InitInf`): a
+  /// header word, then three UOCH slots. Lane 8's transfer handle points at it.
+  struct SfuoDescriptorTable
+  {
+    SofdecAddressWord header = 0;        // +0x00
+    SfuoDescriptor descriptors[3]{};     // +0x04
+  };
+  static_assert(sizeof(SfuoDescriptorTable) == 0x34, "SfuoDescriptorTable size must be 0x34");
 
   /**
-   * SFTRN transfer sub-object at `workctrl+0x1F30` (0x1620 bytes). The SFSET
-   * handle table starts at +0x08 (workctrl +0x1F38, nine 0x44 lanes); the
-   * same bytes carry the demux state: lane 0's +0x0C word is the SFMEM ring
-   * lane, lane 1 holds the active demux pointer and destination bookkeeping,
-   * and the MPS / M2TS init blocks sit at +0x268 / +0x3C8. One storage, the
-   * generic lane table and the named demux model.
+   * SFTRN transfer sub-object at `workctrl+0x1F30` (0x1620 bytes): the nine
+   * transfer lanes, then the two demux init blocks. The M2TS block shares its
+   * storage with the SFMPV info block `SFMPV_Create` (0x00AD4BBA,
+   * `lea ebx, [esi+0x23A8]`) anchors at +0x478: the two are never live at once,
+   * and the first 0xB0 bytes of the phase struct are the M2TS block's own bytes.
    */
   struct SftrnTransferState
   {
-    std::uint8_t mUnknown00[0x08]{};
+    std::array<SftrnTransferLane, 9> lanes{}; // +0x00 (workctrl +0x1F30)
+    std::uint8_t mUnknown264[0x04]{};         // +0x264
+    SfdDemuxInitBlock mpsInit{};              // +0x268 (workctrl +0x2198)
+    std::uint8_t mUnknown3C4[0x04]{};         // +0x3C4
     union
     {
-      /// SFSET's flat transfer-handle table.
-      std::array<SfsetTransferLane, 9> lanes; // +0x08 (workctrl +0x1F38)
-      SftrnDemuxState demux;                  // +0x08
-    } transfer;                               // +0x08
-    std::uint8_t mUnknownTail[0x108]{};       // +0x1518
+      SfdDemuxInitBlock m2tsInit;             // +0x3C8 (workctrl +0x22F8)
+      struct
+      {
+        std::uint8_t m2tsInitBytes[0xB0]{};   // +0x3C8 m2tsInit head (mutually exclusive in time)
+        SfmpvInfo embeddedMpvInfo{};          // +0x478 (workctrl +0x23A8)
+      } m2tsMpvInfo;
+    };
+    std::uint8_t mUnknown1518[0xB4]{};        // +0x1518
+    SofdecAddressWord audioOutputTableHeader = 0; // +0x15CC (workctrl +0x34FC) lane 7's descriptor head (`SFAOAP_Create`)
+    std::uint8_t mUnknown15D0[0x18]{};        // +0x15D0
+    SfuoDescriptorTable userOutputTable{};    // +0x15E8 (workctrl +0x3518)
+    std::uint8_t mUnknown161C[0x04]{};        // +0x161C
   };
-  static_assert(offsetof(SftrnTransferState, mUnknownTail) == 0x1518, "SftrnTransferState::mUnknownTail offset must be 0x1518");
-  static_assert(offsetof(SftrnTransferState, transfer) == 0x08, "SftrnTransferState::transfer offset must be 0x08");
+  static_assert(offsetof(SftrnTransferState, mpsInit) == 0x268, "SftrnTransferState::mpsInit offset must be 0x268");
+  static_assert(offsetof(SftrnTransferState, m2tsInit) == 0x3C8, "SftrnTransferState::m2tsInit offset must be 0x3C8");
+  static_assert(offsetof(SftrnTransferState, m2tsMpvInfo.embeddedMpvInfo) == 0x478, "SftrnTransferState embedded MPV info @0x478 (workctrl 0x23A8)");
+  static_assert(offsetof(SftrnTransferState, userOutputTable) == 0x15E8, "SftrnTransferState::userOutputTable offset must be 0x15E8");
   static_assert(sizeof(SftrnTransferState) == 0x1620, "SftrnTransferState size must be 0x1620");
 
   /**
@@ -1307,6 +1423,85 @@ namespace moho
     std::int32_t requestWords[3]{}; // +0x04 seek request lane
   };
   static_assert(sizeof(SfseeOwnerState) == 0x10, "SfseeOwnerState size must be 0x10");
+
+  /**
+   * The parsed SFD file header. `sfhds_DoProcessHdr` (0x00AE7440) writes every
+   * one of these lanes in order, which is what fixes both the field names and
+   * the size: it stores as far as index 35, so the struct is 0x90 and not the
+   * 0x70 previously modelled here. The three lanes that were already named
+   * land at exactly the offsets that model gave them (0x64/0x68/0x6C), which
+   * is the cross-check that the rest of the numbering is right.
+   */
+  struct SfcreHeader
+  {
+    std::int32_t headerValid = 0;          // +0x00  set to 1 once parsed
+    std::int32_t toolVersionMajor = 0;     // +0x04
+    std::int32_t toolVersionMinor = 0;     // +0x08
+    std::int32_t byteRate = 0;             // +0x0C  negated below tool ver 1.10
+    std::int32_t headerSizeBytes = 0;      // +0x10
+    std::int32_t packType = 0;             // +0x14
+    std::int32_t packetSizeLength = 0;     // +0x18
+    std::int32_t packSizeBytes = 0;        // +0x1C
+    std::int32_t elementCountTotal = 0;    // +0x20
+    std::int32_t elementCountAudio = 0;    // +0x24
+    std::int32_t elementCountVideo = 0;    // +0x28
+    std::int32_t elementCountPrivate = 0;  // +0x2C
+    std::int32_t maxPlayLengthAudio = 0;   // +0x30
+    std::int32_t maxPlayLengthVideo = 0;   // +0x34
+    std::int32_t maxFrameNumber = 0;       // +0x38
+    std::int32_t streamIdPrivate1 = 0;     // +0x3C  0xBD
+    std::int32_t streamIdPrivate2 = 0;     // +0x40  0xBF
+    std::int32_t streamIdAudio = 0;        // +0x44  0xC0..0xDF
+    std::int32_t streamIdVideo = 0;        // +0x48  0xE0..0xEF
+    std::int32_t audioCodec = 0;           // +0x4C
+    std::int32_t audioLayer = 0;           // +0x50
+    std::int32_t audioChannelCount = 0;    // +0x54
+    std::int32_t audioSampleRateHz = 0;    // +0x58
+    std::int32_t videoCodec = 0;           // +0x5C
+    std::int32_t videoBitRate = 0;         // +0x60
+    std::int32_t widthPixels = 0;          // +0x64
+    std::int32_t heightPixels = 0;         // +0x68
+    std::int32_t videoFrameMetric = 0;     // +0x6C  picture rate
+    std::int32_t featureInfoPresent = 0;   // +0x70
+    std::int32_t featureColourType = 0;    // +0x74
+    std::int32_t featurePictureType = 0;   // +0x78
+    std::int32_t featureFixedFlag = 0;     // +0x7C
+    std::int32_t featureShcFixedFlag = 0;  // +0x80
+    std::int32_t featureExpand = 0;        // +0x84
+    std::int32_t featureGopN = 0;          // +0x88
+    std::int32_t featureGopM = 0;          // +0x8C
+    // `sfcre_ProcessHdr` (0x00ADA360) copies up to 0x800 header bytes to +0x94
+    // and stores the copied length at +0x90; `SFHDS_ProcessHdr` (0x00AE7400)
+    // then analyses exactly that pair. They were missing here, so that copy was
+    // writing 2 KiB past the end of this object.
+    std::int32_t copiedHeaderBytes = 0;    // +0x90
+    std::uint8_t headerBuffer[0x800]{};    // +0x94
+  };
+  static_assert(offsetof(SfcreHeader, byteRate) == 0x0C, "SfcreHeader::byteRate offset must be 0x0C");
+  static_assert(
+    offsetof(SfcreHeader, streamIdAudio) == 0x44,
+    "SfcreHeader::streamIdAudio offset must be 0x44"
+  );
+  static_assert(offsetof(SfcreHeader, videoCodec) == 0x5C, "SfcreHeader::videoCodec offset must be 0x5C");
+  static_assert(offsetof(SfcreHeader, widthPixels) == 0x64, "SfcreHeader::widthPixels offset must be 0x64");
+  static_assert(
+    offsetof(SfcreHeader, heightPixels) == 0x68,
+    "SfcreHeader::heightPixels offset must be 0x68"
+  );
+  static_assert(
+    offsetof(SfcreHeader, videoFrameMetric) == 0x6C,
+    "SfcreHeader::videoFrameMetric offset must be 0x6C"
+  );
+  static_assert(offsetof(SfcreHeader, featureGopM) == 0x8C, "SfcreHeader::featureGopM offset must be 0x8C");
+  static_assert(
+    offsetof(SfcreHeader, copiedHeaderBytes) == 0x90,
+    "SfcreHeader::copiedHeaderBytes offset must be 0x90"
+  );
+  static_assert(
+    offsetof(SfcreHeader, headerBuffer) == 0x94,
+    "SfcreHeader::headerBuffer offset must be 0x94"
+  );
+  static_assert(sizeof(SfcreHeader) == 0x894, "SfcreHeader size must be 0x894");
 
   /**
    * The SFPLY playback handle. `sfply_InitHn` (0x00AD7AE0) builds one of these
@@ -1325,20 +1520,18 @@ namespace moho
   {
     /// `sfply_InitHn` copies the create parameters in verbatim.
     SfplyCreateParams createTemplate{};       // +0x00
-    std::int32_t initialized = 0;             // +0x44
+    std::int32_t serverWorkPending = 0;       // +0x44 set by every state change, consumed by the SFD server
     std::int32_t handleState = 0;             // +0x48 (`flibHn`)
-    std::int32_t createComplete = 0;          // +0x4C
-    std::int32_t reserved50 = 0;              // +0x50
-    std::int32_t reserved54 = 0;              // +0x54
+    std::int32_t playbackPhase = 0;           // +0x4C
+    std::int32_t pauseRequestedFlag = 0;      // +0x50 also SFTIM's start-up gate
+    std::int32_t pauseDepth = 0;              // +0x54
     std::int32_t decodePathMode = 0;          // +0x58 MPV decode path mode
     std::int32_t frameIdCounter = 0;          // +0x5C
     std::uint8_t mUnknown60[0x18]{};
-    /// Sofdec file-header record (`SFHDS_InitFhd`), 0x894 bytes - the same
-    /// layout the header analyzer fills. Word +0x00 is the header handle
-    /// (`SFMPV` checks it before the VBV bypass at +0x7C), both kept named.
-    SofdecAddressWord frameHeaderHandle = 0;       // +0x78
-    std::int32_t vbvBypassFlag = 0;           // +0x7C
-    std::uint8_t fileHeaderBody[0x88C]{};     // +0x80
+    /// Sofdec file-header record (`SFHDS_InitFhd`), the layout the header
+    /// analyzer fills. SFMPV's VBV gate reads its `headerValid` and
+    /// `toolVersionMajor` words (+0x78/+0x7C).
+    SfcreHeader fileHeader{};                 // +0x78 (`SFHDS_InitFhd`, 0x894 bytes)
     SfplyMovieInfo movieInfo{};               // +0x90C
     std::uint8_t mUnknown94C[0x04]{};
     SfplyPlaybackInfo playbackInfo{};         // +0x950
@@ -1373,10 +1566,9 @@ namespace moho
     SfplyTimerInfo timerInfo{};               // +0x3560
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, initialized) == 0x44, "workctrl initialized @0x44");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, createComplete) == 0x4C, "workctrl createComplete @0x4C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, frameHeaderHandle) == 0x78, "workctrl frame header handle @0x78");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, vbvBypassFlag) == 0x7C, "workctrl vbv bypass flag @0x7C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, serverWorkPending) == 0x44, "workctrl serverWorkPending @0x44");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, playbackPhase) == 0x4C, "workctrl playbackPhase @0x4C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, fileHeader) == 0x78, "workctrl file header @0x78");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, movieInfo) == 0x90C, "workctrl movieInfo @0x90C");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, playbackInfo) == 0x950, "workctrl playbackInfo @0x950");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, errorInfo) == 0x9F8, "workctrl errorInfo @0x9F8");
@@ -1395,16 +1587,8 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, transferState) == 0x1F30, "workctrl transferState @0x1F30");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekState) == 0x3550, "workctrl seekState @0x3550");
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SofdecSfdWorkctrlSubobj, bufferState) + offsetof(SfbufBufferState, supplyLanes) == 0x1320,
-    "workctrl supply-lane table @0x1320"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SofdecSfdWorkctrlSubobj, transferState) + 0x0C == 0x1F3C,
     "workctrl SFMEM ring lane word @0x1F3C region"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer) == 0x1F38,
-    "workctrl SFSET lane table @0x1F38"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerInfo) == 0x3560, "workctrl timerInfo @0x3560");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSfdWorkctrlSubobj) == 0x3640, "workctrl size must be 0x3640");
@@ -1414,33 +1598,21 @@ namespace moho
     "SofdecSfdWorkctrlSubobj::handleState offset must be 0x48"
   );
   static_assert(
-    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
-      + offsetof(SftrnDemuxState, memoryPrepLaneIndex)
-      == 0x1F44,
-    "workctrl SFMEM ring lane index @0x1F44"
-  );
-  static_assert(
-    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
-      + offsetof(SftrnDemuxState, demuxInit)
-      == 0x1F7C,
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + kSftrnSystemLane * sizeof(SftrnTransferLane)
+      + offsetof(SftrnTransferLane, demuxInit) == 0x1F7C,
     "workctrl active demux pointer @0x1F7C"
   );
   static_assert(
-    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
-      + offsetof(SftrnDemuxState, activeSupplyLaneIndex)
-      == 0x1F84,
-    "workctrl active supply lane index @0x1F84"
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + kSftrnVideoLane * sizeof(SftrnTransferLane)
+      + offsetof(SftrnTransferLane, mpvInfo) == 0x1FC0,
+    "workctrl MPV info pointer @0x1FC0"
   );
   static_assert(
-    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
-      + offsetof(SftrnDemuxState, mpsInit)
-      == 0x2198,
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, mpsInit) == 0x2198,
     "workctrl MPS parser init @0x2198"
   );
   static_assert(
-    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
-      + offsetof(SftrnDemuxState, m2tsInit)
-      == 0x22F8,
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, m2tsInit) == 0x22F8,
     "workctrl M2TS init @0x22F8"
   );
 
@@ -1588,6 +1760,16 @@ namespace moho
     "SofdecSjSupplyHandle::dispatchTable offset must be 0x00"
   );
 
+  /// Picture-user / seek-record buffer descriptor (`MWSKG_Create` 0x00AC8B30):
+  /// record buffer address, record block bytes, bytes per frame record.
+  struct MwsfdPicUserBufferDescriptor
+  {
+    SofdecAddressWord bufferAddress = 0; // +0x00
+    std::int32_t bufferBytes = 0;        // +0x04
+    std::int32_t bytesPerFrame = 0;      // +0x08
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfdPicUserBufferDescriptor) == 0x0C, "MwsfdPicUserBufferDescriptor size must be 0x0C");
+
   /**
    * Partial runtime view for Sofdec playback object lanes touched directly by
    * `_mw_sfd_start_ex`.
@@ -1660,19 +1842,24 @@ namespace moho
     /// Ring of Sofdec-header records filled by the header-analysis callback.
     /// `MWSFFRM_InitSfhInfTable` primes every `state` to the 0x11 sentinel.
     std::array<SofdecSfhInfoEntry, 8> sfhInfoTable{}; // +0xC0 .. +0x160
-    /// Seek-key-group descriptor built in place by `MWSKG_Create`; the handle
-    /// keeps a pointer to its own block at +0x178.
-    std::array<std::int32_t, 3> seekKeyGroup{}; // +0x160
+    /// Seek-key-group / picture-user buffer descriptor built in place by
+    /// `MWSKG_Create`; the handle keeps a pointer to its own block at +0x178,
+    /// which `mwsfcre_AttachPicUsrBuf` reads back as the picture-user buffer.
+    MwsfdPicUserBufferDescriptor seekKeyGroup{}; // +0x160
     std::uint8_t mUnknown16C[0x0C]{};
-    std::int32_t* seekKeyGroupPtr = nullptr; // +0x178
+    MwsfdPicUserBufferDescriptor* seekKeyGroupPtr = nullptr; // +0x178
     /// Additional-info side stream (AINF), only built when the stream carries
     /// one; `ainfBuffer`/`ainfBufferBytes` back the SJ ring at `ainfSjHandle`.
     void* ainfSjHandle = nullptr;    // +0x17C
     void* ainfBuffer = nullptr;      // +0x180
     std::int32_t ainfBufferBytes = 0; // +0x184
-    std::uint8_t mUnknown188[0x08]{};
+    std::int8_t* ainfUserBuffer = nullptr; // +0x188 caller-supplied AINF copy buffer
+    std::uint8_t mUnknown18C[0x04]{};
     std::int32_t additionalInfoStamp = 0; // +0x190
-    std::uint8_t mUnknown194[0x10]{};
+    std::int32_t ainfTagInfoReady = 0;    // +0x194
+    SofdecAddressWord ainfTagInfoDataAddress = 0; // +0x198
+    std::int32_t ainfTagInfoLength = 0;   // +0x19C
+    std::uint8_t mUnknown1A0[0x04]{};
     char* fname = nullptr;                                  // +0x1A4
     std::int32_t fnameCapacity = 0;                         // +0x1A8
     std::int32_t pendingStartRequestType = 0;               // +0x1AC
@@ -2413,17 +2600,17 @@ namespace moho
 
   struct SofdecSjUnifyHandle
   {
-    std::int32_t runtimeSlot = 0;         // +0x00
+    SofdecAddressWord runtimeSlot = 0;    // +0x00
     std::uint8_t used = 0;                // +0x04
     std::uint8_t mergeAdjacentChunks = 0; // +0x05
     std::uint8_t mUnknown06[0x2]{};
-    std::int32_t uuid = 0;                               // +0x08
+    SofdecAddressWord uuid = 0;                          // +0x08
     SofdecSjUnifyChunkNode* chainPoolBase = nullptr;     // +0x0C
     std::int32_t chainPoolCount = 0;                     // +0x10
     SofdecSjUnifyChunkNode* chainPoolFreeList = nullptr; // +0x14
     SofdecSjUnifyChunkNode* laneHeads[4]{};              // +0x18
     SofdecErrorHandler errFunc = nullptr;                // +0x28
-    std::int32_t errObj = 0;                             // +0x2C
+    SofdecAddressWord errObj = 0;                        // +0x2C
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -2466,9 +2653,9 @@ namespace moho
 
   struct SofdecSjRingBufferHandle
   {
-    std::int32_t runtimeSlot = 0;         // +0x00
+    SofdecAddressWord runtimeSlot = 0;    // +0x00
     std::int32_t used = 0;                // +0x04
-    std::int32_t uuid = 0;                // +0x08
+    SofdecAddressWord uuid = 0;           // +0x08
     std::int32_t pendingLane1Bytes = 0;   // +0x0C
     std::int32_t pendingLane0Bytes = 0;   // +0x10
     std::int32_t lane0Cursor = 0;         // +0x14
@@ -2478,7 +2665,7 @@ namespace moho
     std::int32_t extraSize = 0;           // +0x24
     std::int32_t flowCounters[4]{};       // +0x28
     SofdecErrorHandler errFunc = nullptr; // +0x38
-    std::int32_t errObj = 0;              // +0x3C
+    SofdecAddressWord errObj = 0;         // +0x3C
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -2533,15 +2720,15 @@ namespace moho
 
   struct SofdecSjMemoryHandle
   {
-    std::int32_t runtimeSlot = 0;         // +0x00
+    SofdecAddressWord runtimeSlot = 0;    // +0x00
     std::int32_t used = 0;                // +0x04
-    std::int32_t uuid = 0;                // +0x08
+    SofdecAddressWord uuid = 0;           // +0x08
     std::int32_t pendingBytes = 0;        // +0x0C
     std::int32_t consumeOffset = 0;       // +0x10
     std::int32_t produceOffset = 0;       // +0x14
     std::int32_t bufferSize = 0;          // +0x18
     SofdecErrorHandler errFunc = nullptr; // +0x1C
-    std::int32_t errObj = 0;              // +0x20
+    SofdecAddressWord errObj = 0;         // +0x20
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -2957,7 +3144,7 @@ std::int32_t SofdecGetPlaybackFrameCursor(moho::SofdecSoundPort* soundPort);
  * What it does:
  * Sets one target playback frequency lane with [100,100000] clamp.
  */
-std::int32_t SofdecSetPlaybackFrequencyHz(moho::SofdecSoundPort* soundPort, std::int32_t frequencyHz);
+SofdecAddressWord SofdecSetPlaybackFrequencyHz(moho::SofdecSoundPort* soundPort, std::int32_t frequencyHz);
 
 /**
  * Address: 0x00B16BD0 (FUN_00B16BD0, SofDecVirt2_Func8)
@@ -3023,7 +3210,7 @@ SofdecApplySpatialPresetInternal(moho::SofdecSoundPort* soundPort, std::int32_t 
  * What it does:
  * Clears spatial preset offset and reapplies base pan/volume lanes.
  */
-std::int32_t SofdecResetSpatialPreset(moho::SofdecSoundPort* soundPort);
+SofdecAddressWord SofdecResetSpatialPreset(moho::SofdecSoundPort* soundPort);
 
 /**
  * Address: 0x00B16E90 (FUN_00B16E90, SofDecVirt2_Func14)
@@ -3456,7 +3643,7 @@ SofdecAddressWord mwPlyGetSfdHn(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Returns aggregate dropped-frame count (decode-skip + display-skip).
  */
-std::int32_t mwPlyGetNumDropFrm(moho::MwsfdPlaybackStateSubobj* ply);
+SofdecAddressWord mwPlyGetNumDropFrm(moho::MwsfdPlaybackStateSubobj* ply);
 
 /**
  * Address: 0x00ACB660 (_mwPlyGetNumSkipDec)
@@ -3845,7 +4032,7 @@ std::int32_t sfply_AdjustPrepEnd(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
  * What it does:
  * Clears stale AV condition lanes when ring-buffer totals are empty.
  */
-std::int32_t sfply_FixAvPlay(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+SofdecAddressWord sfply_FixAvPlay(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
 
 /**
  * Address: 0x00AD71C0 (FUN_00AD71C0, _sfply_AdjustSyncMode)
@@ -4245,7 +4432,7 @@ void mwsfsvr_StartPlayback(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Replaces active SJ supply with memory-backed source and restarts playback.
  */
-std::int32_t mwPlyStartMem(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWord bufferAddress, std::int32_t bufferSize);
+SofdecAddressWord mwPlyStartMem(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWord bufferAddress, std::int32_t bufferSize);
 
 /**
  * Address: 0x00ACB0C0 (_mwPlyStartSj)
@@ -4253,7 +4440,7 @@ std::int32_t mwPlyStartMem(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWor
  * What it does:
  * Binds one SJ supply handle as active source and restarts playback.
  */
-std::int32_t mwPlyStartSj(moho::MwsfdPlaybackStateSubobj* ply, moho::SofdecSjSupplyHandle* supplyHandle);
+SofdecAddressWord mwPlyStartSj(moho::MwsfdPlaybackStateSubobj* ply, moho::SofdecSjSupplyHandle* supplyHandle);
 
 /**
  * Address: 0x00ACB1D0 (FUN_00ACB1D0, _mwply_Stop)
@@ -4756,7 +4943,7 @@ std::int32_t CFT_MakeArgb8888ColAdjTbl(SofdecAddressWord tableAddress);
  * optional user remap table.
  */
 std::uint8_t*
-CFT_Ycc420plnToA256V(std::uint8_t** sourcePlanes, const std::int32_t* conversionWords, const SofdecAddressWord* userTableAddress);
+CFT_Ycc420plnToA256V(std::uint8_t** sourcePlanes, const SofdecAddressWord* conversionWords, const SofdecAddressWord* userTableAddress);
 
 /**
  * Address: 0x00AED990 (FUN_00AED990, _CFT_MakeArgb8888AlpLumiTbl)
@@ -4905,7 +5092,7 @@ void SFXA_Destroy(SofdecAddressWord sfxaHandleAddress);
  * Builds luminance table through optional per-handle callback and clears the
  * pending-update flag.
  */
-std::int32_t SFXA_MakeAlpLumiTbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
+SofdecAddressWord SFXA_MakeAlpLumiTbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00ADE2E0 (_SFXA_MakeAlp3110Tbl)
@@ -4913,7 +5100,7 @@ std::int32_t SFXA_MakeAlpLumiTbl(SofdecAddressWord sfxaHandleAddress, std::int32
  * What it does:
  * Builds alpha table in 3110 mode through optional per-handle callback.
  */
-std::int32_t SFXA_MakeAlp3110Tbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
+SofdecAddressWord SFXA_MakeAlp3110Tbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00ADE310 (_SFXA_MakeAlp3211Tbl)
@@ -5007,7 +5194,7 @@ sfbuf_MakeBufPtr(SofdecAddressWord* outBufferPointers, const std::int32_t* ringB
  * Initializes one SFBUF lane header with type/setup flags and default state
  * lanes.
  */
-std::int32_t* sfbuf_InitBufData(std::int32_t* sfbufLaneWords, std::int32_t laneType, std::int32_t setupState);
+moho::SfbufLane* sfbuf_InitBufData(moho::SfbufLane* laneView, std::int32_t laneType, std::int32_t setupState);
 
 /**
  * Address: 0x00ADE910 (_sfbuf_InitUoSj)
@@ -5101,7 +5288,7 @@ SFBUF_InitHn(SofdecAddressWord vfrmOwnerAddress, SofdecAddressWord sfbufHandleAd
  * What it does:
  * Validates one SFBUF supply-state descriptor lane.
  */
-std::int32_t sfbuf_ChkSupSj(const std::int32_t* supplyDescriptorWords);
+std::int32_t sfbuf_ChkSupSj(const SofdecAddressWord* supplyDescriptorWords);
 
 /**
  * Address: 0x00ADEA60 (_sfbuf_SetSupSj)
@@ -5125,7 +5312,7 @@ void sfbuf_SetSupSj(
  */
 std::int32_t sfbuf_SetSupplySjSub(
   SofdecAddressWord sfbufHandleAddress,
-  const std::int32_t* supplyDescriptorWords,
+  const SofdecAddressWord* supplyDescriptorWords,
   std::int32_t transferLaneIndex
 );
 
@@ -5136,7 +5323,7 @@ std::int32_t sfbuf_SetSupplySjSub(
  * Binds one supply descriptor to active SFTRN lane routing.
  */
 std::int32_t
-SFBUF_SetSupplySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* supplyDescriptorWords);
+SFBUF_SetSupplySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const SofdecAddressWord* supplyDescriptorWords);
 
 /**
  * Address: 0x00ADEAC0 (_sfbuf_InitConti)
@@ -5152,11 +5339,11 @@ SofdecAddressWord* sfbuf_InitConti(SofdecAddressWord* continuityStateWords);
  * What it does:
  * Stores one user-output chunk descriptor into an SFBUF lane slot.
  */
-std::int32_t* SFBUF_SetUoch(
+SofdecAddressWord* SFBUF_SetUoch(
   SofdecAddressWord sfbufHandleAddress,
   std::int32_t laneIndex,
   std::int32_t uochSlotIndex,
-  const std::int32_t* chunkDescriptorWords
+  const SofdecAddressWord* chunkDescriptorWords
 );
 
 /**
@@ -5169,7 +5356,7 @@ std::int32_t SFBUF_GetUoch(
   SofdecAddressWord sfbufHandleAddress,
   std::int32_t laneIndex,
   std::int32_t uochSlotIndex,
-  std::int32_t* outChunkDescriptorWords
+  SofdecAddressWord* outChunkDescriptorWords
 );
 
 /**
@@ -5179,7 +5366,7 @@ std::int32_t SFBUF_GetUoch(
  * Returns one SFBUF lane SJ ring handle pointer word.
  */
 std::int32_t
-SFBUF_GetRingSj(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, std::int32_t* outRingHandleAddress);
+SFBUF_GetRingSj(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, SofdecAddressWord* outRingHandleAddress);
 
 /**
  * Address: 0x00ADEBF0 (_sfbuf_RingGetSub)
@@ -5278,8 +5465,8 @@ std::int32_t SFBUF_RingAddRead(SofdecAddressWord sfbufHandleAddress, std::int32_
 void SFBUF_RingGetDlm(
   SofdecAddressWord sfbufHandleAddress,
   std::int32_t ringIndex,
-  std::int32_t* outPrimaryDelimiterAddress,
-  std::int32_t* outSecondaryDelimiterAddress
+  SofdecAddressWord* outPrimaryDelimiterAddress,
+  SofdecAddressWord* outSecondaryDelimiterAddress
 );
 
 /**
@@ -5310,7 +5497,7 @@ std::int32_t SFBUF_GetWTot(SofdecAddressWord sfbufHandleAddress, std::int32_t ri
  * Validates one SFBUF ring lane setup state and returns its SJ handle.
  */
 std::int32_t
-SFBUF_RingGetSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outRingHandleAddress);
+SFBUF_RingGetSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, SofdecAddressWord* outRingHandleAddress);
 
 /**
  * Address: 0x00ADF070 (_SFBUF_AddRtotSj)
@@ -5511,7 +5698,7 @@ std::int32_t sftrn_CallTrEntry(void* transferEntryTable, std::int32_t entrySelec
 SofdecAddressWord SFTRN_InitHn(
   SofdecAddressWord workctrlAddress,
   SofdecAddressWord transferDataArrayAddress,
-  const std::int32_t* transferBuildConfigAddressPtr
+  const SofdecAddressWord* transferBuildConfigAddressPtr
 );
 
 /**
@@ -5520,7 +5707,7 @@ SofdecAddressWord SFTRN_InitHn(
  * What it does:
  * Resets one transfer lane runtime header and seeds stage defaults.
  */
-std::int32_t* sftrn_InitTrData(std::int32_t* transferDataWords, SofdecAddressWord transferDescriptorAddress);
+moho::SftrnTransferLane* sftrn_InitTrData(moho::SftrnTransferLane* transferLane, SofdecAddressWord transferDescriptorAddress);
 
 /**
  * Address: 0x00ADF910 (_sftrn_BuildAll)
@@ -5529,7 +5716,7 @@ std::int32_t* sftrn_InitTrData(std::int32_t* transferDataWords, SofdecAddressWor
  * Selects system/audio/video/user transfer route graph for one workctrl.
  */
 std::int32_t
-sftrn_BuildAll(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* transferBuildConfigWords);
+sftrn_BuildAll(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const SofdecAddressWord* transferBuildConfigWords);
 
 /**
  * Address: 0x00ADF9F0 (_sftrn_BuildSystem)
@@ -5538,7 +5725,7 @@ sftrn_BuildAll(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t
  * Builds system-root transfer route and optional downstream lanes.
  */
 std::int32_t
-sftrn_BuildSystem(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* transferBuildConfigWords);
+sftrn_BuildSystem(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const SofdecAddressWord* transferBuildConfigWords);
 
 /**
  * Address: 0x00ADFA90 (_sftrn_BuildAudio)
@@ -5547,7 +5734,7 @@ sftrn_BuildSystem(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int3
  * Builds audio transfer route graph with optional extended branch.
  */
 std::int32_t
-sftrn_BuildAudio(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* transferBuildConfigWords);
+sftrn_BuildAudio(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const SofdecAddressWord* transferBuildConfigWords);
 
 /**
  * Address: 0x00ADFAF0 (_sftrn_BuildVideo)
@@ -5556,7 +5743,7 @@ sftrn_BuildAudio(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32
  * Builds video transfer route graph with optional extended branch.
  */
 std::int32_t
-sftrn_BuildVideo(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* transferBuildConfigWords);
+sftrn_BuildVideo(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const SofdecAddressWord* transferBuildConfigWords);
 
 /**
  * Address: 0x00ADFB50 (_sftrn_BuildUsr)
@@ -5630,7 +5817,7 @@ sftrn_ConnBufTrn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t sou
  * What it does:
  * Calls one setup callback slot across transfer descriptor lanes.
  */
-std::int32_t SFTRN_CallTrSetup(SofdecAddressWord workctrlAddress, std::int32_t callbackIndex);
+SofdecAddressWord SFTRN_CallTrSetup(SofdecAddressWord workctrlAddress, std::int32_t callbackIndex);
 
 /**
  * Address: 0x00ADFCA0 (_SFTRN_CallTrtTrif)
@@ -5849,7 +6036,7 @@ std::int32_t mwsftag_IsPlayVideoElementary(const moho::MwsfdPlaybackStateSubobj*
  * Ensures AINF/SFX tag lanes are populated once for one playback object when
  * SJ ring input is available.
  */
-std::int32_t MWSFTAG_SetTagInf(moho::MwsfdPlaybackStateSubobj* ply);
+SofdecAddressWord MWSFTAG_SetTagInf(moho::MwsfdPlaybackStateSubobj* ply);
 
 /**
  * Address: 0x00AC7080 (_MWSFTAG_UpdateTagInf)
@@ -5876,7 +6063,7 @@ const char* mwsftag_GetAinfFromSj(moho::MwsfdPlaybackStateSubobj* ply);
  * Resolves one `SFXINFS`/`SFXINFE` span from cached AINF data and forwards it
  * into SFX runtime tag state.
  */
-std::int32_t mwsftag_GetSFXinfFromAinf(moho::MwsfdPlaybackStateSubobj* ply);
+SofdecAddressWord mwsftag_GetSFXinfFromAinf(moho::MwsfdPlaybackStateSubobj* ply);
 
 /**
  * Address: 0x00AC7290 (_MWSFTAG_ClearUsrSj)
