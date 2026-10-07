@@ -1752,7 +1752,7 @@
   {
     mpasjd_err_func = callback;
     mpasjd_err_obj = callbackObject;
-    MPARBD_EntryErrFunc(reinterpret_cast<std::int32_t>(&mpasjd_call_err_func2), 0);
+    MPARBD_EntryErrFunc(reinterpret_cast<SofdecAddressWord>(&mpasjd_call_err_func2), 0);
     return 0;
   }
 
@@ -1897,8 +1897,8 @@
     decoderStorage->interleaveBuffer = reinterpret_cast<std::int8_t*>(storageBase + kMpasjdWorkBaseOffsetBytes);
     mpasjd_set_global_work(storageBase + kMpasjdReservedWorkBytes, storageBytes - kMpasjdReservedWorkBytes);
 
-    MPARBD_SetUsrMallocFunc(reinterpret_cast<std::int32_t>(&mpasjd_malloc_func));
-    MPARBD_SetUsrFreeFunc(reinterpret_cast<std::int32_t>(&mpasjd_free_func));
+    MPARBD_SetUsrMallocFunc(reinterpret_cast<SofdecAddressWord>(&mpasjd_malloc_func));
+    MPARBD_SetUsrFreeFunc(reinterpret_cast<SofdecAddressWord>(&mpasjd_free_func));
 
     MparbdDecoderState* decoderContext = nullptr;
     if (MPARBD_Create(&decoderContext) < 0) {
@@ -2378,7 +2378,7 @@
   )
   {
     mpasjd_lock();
-    const std::int32_t result = mpasjd_SetIoSj(decoder, sourceStream, outputStreamCount, outputStreams);
+    const SofdecAddressWord result = mpasjd_SetIoSj(decoder, sourceStream, outputStreamCount, outputStreams);
     mpasjd_unlock();
     return result;
   }
@@ -2433,7 +2433,7 @@
    */
   std::int32_t __cdecl MPALINK_DetachMpa(AdxtState* const adxtRuntime)
   {
-    std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(adxtRuntime));
+    std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(adxtRuntime));
 
     auto* const decoder = AdxsjdStateOf(adxtRuntime->sjdHandle)->Decoder();
     auto* const mpaDecoder = static_cast<MpasjdDecoderState*>(decoder->mpegAudioDecoder);
@@ -2462,7 +2462,7 @@
     if (mpaDecoder != nullptr) {
       return MPASJD_Stop(mpaDecoder);
     }
-    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(mpaDecoder));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(mpaDecoder));
   }
 
   /**
@@ -2705,7 +2705,7 @@
   std::int32_t __cdecl mpasjd_input_proc(MpasjdDecoderState* const decoder)
   {
     std::uint32_t freeBytes = 0;
-    const std::int32_t primaryBitReaderHandle = decoder->decoderContext->bitReaderHandlePrimary;
+    const SofdecAddressWord primaryBitReaderHandle = decoder->decoderContext->bitReaderHandlePrimary;
     MPARBF_GetFreeSize(primaryBitReaderHandle, &freeBytes);
     if (freeBytes == 0) {
       return 0;
@@ -2759,7 +2759,7 @@
     }
 
     std::uint32_t availableInterleavedBytes = 0;
-    const std::int32_t secondaryBitReaderHandle = decoder->decoderContext->bitReaderHandleSecondary;
+    const SofdecAddressWord secondaryBitReaderHandle = decoder->decoderContext->bitReaderHandleSecondary;
     MPARBF_GetDataSize(secondaryBitReaderHandle, &availableInterleavedBytes);
     if (availableInterleavedBytes == 0) {
       return 0;
@@ -2800,8 +2800,8 @@
 
     auto* interleavedPcm = reinterpret_cast<std::int16_t*>(decoder->interleaveBuffer);
     std::array<std::int16_t*, 2> outputPcmChannels{
-      reinterpret_cast<std::int16_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(outputChunks[0].bufferAddress))),
-      reinterpret_cast<std::int16_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(outputChunks[1].bufferAddress)))
+      reinterpret_cast<std::int16_t*>(static_cast<std::uintptr_t>(outputChunks[0].bufferAddress)),
+      reinterpret_cast<std::int16_t*>(static_cast<std::uintptr_t>(outputChunks[1].bufferAddress))
     };
     for (std::uint32_t sampleIndex = 0; sampleIndex < writeSampleCount; ++sampleIndex) {
       for (std::int32_t channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
@@ -2974,7 +2974,7 @@
    * Creates one M2ASJD decoder handle under the global decoder lock.
    */
   std::int32_t __cdecl M2ASJD_Create(
-    const std::int32_t heapManagerHandle,
+    const SofdecAddressWord heapManagerHandle,
     const std::int32_t heapManagerOwner,
     M2asjdDecoderState** const outDecoder
   )
@@ -3006,7 +3006,7 @@
    * Allocates one decoder lane and links it into the global active list.
    */
   std::int32_t __cdecl m2asjd_Create(
-    const std::int32_t heapBufferAddress,
+    const SofdecAddressWord heapBufferAddress,
     const std::int32_t heapByteCount,
     M2asjdDecoderState** const outDecoder
   )
@@ -3021,7 +3021,7 @@
     void* heapManagerHandle = nullptr;
     if (heapBufferAddress != 0) {
       HEAPMNG_Create(
-        reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(heapBufferAddress))),
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(heapBufferAddress)),
         static_cast<std::uint32_t>(heapByteCount),
         &heapManagerHandle
       );
@@ -3148,8 +3148,8 @@
 
     const std::int32_t copyBytes = (sourceChunk.byteCount < stagingChunk.byteCount) ? sourceChunk.byteCount : stagingChunk.byteCount;
     m2asjd_copy(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(stagingChunk.bufferAddress))),
-      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceChunk.bufferAddress))),
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(stagingChunk.bufferAddress)),
+      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(sourceChunk.bufferAddress)),
       static_cast<std::uint32_t>(copyBytes)
     );
 
@@ -3919,7 +3919,7 @@
    * SofdecAdxCodecRuntime.cpp, which carried this one's. Nothing called it
    * under that name, so SFD_DetachMPEG2AAC's one caller reached the stub.
    */
-  extern "C" std::int32_t ADXT_DetachMPEG2AAC(void* const adxtRuntime)
+  extern "C" SofdecAddressWord ADXT_DetachMPEG2AAC(void* const adxtRuntime)
   {
     if (m2adetachfunc != nullptr) {
       return m2adetachfunc(adxtRuntime);
@@ -3935,7 +3935,7 @@
    */
   std::int32_t __cdecl M2ALINK_DetachM2a(AdxtState* const adxtRuntime)
   {
-    std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(adxtRuntime));
+    std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(adxtRuntime));
 
     auto* const decoder = AdxsjdStateOf(adxtRuntime->sjdHandle)->Decoder();
     auto* const m2aDecoder = static_cast<M2asjdDecoderState*>(decoder->mpeg2AacDecoder);
@@ -3964,7 +3964,7 @@
     if (m2aDecoder != nullptr) {
       return M2ASJD_Stop(m2aDecoder);
     }
-    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(m2aDecoder));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(m2aDecoder));
   }
 
   /**
@@ -4186,12 +4186,12 @@
    * What it does:
    * Allocates one M2ASJD memory block via heap-manager lane or process heap.
    */
-  void* __cdecl m2asjd_malloc(const std::int32_t heapManagerHandle, const SIZE_T byteCount)
+  void* __cdecl m2asjd_malloc(const SofdecAddressWord heapManagerHandle, const SIZE_T byteCount)
   {
     if (heapManagerHandle != 0) {
-      std::int32_t allocatedWord = heapManagerHandle;
+      SofdecAddressWord allocatedWord = heapManagerHandle;
       HEAPMNG_Allocate(heapManagerHandle, byteCount, &allocatedWord);
-      return reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(allocatedWord)));
+      return reinterpret_cast<void*>(static_cast<std::uintptr_t>(allocatedWord));
     }
 
     if (m2asjd_global_heap == nullptr) {
@@ -4210,10 +4210,10 @@
    * What it does:
    * Frees one M2ASJD memory block through matching allocation backend.
    */
-  void __cdecl m2asjd_free(const std::int32_t heapManagerHandle, LPVOID const memoryBlock)
+  void __cdecl m2asjd_free(const SofdecAddressWord heapManagerHandle, LPVOID const memoryBlock)
   {
     if (heapManagerHandle != 0) {
-      HEAPMNG_Free(heapManagerHandle, static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(memoryBlock)));
+      HEAPMNG_Free(heapManagerHandle, static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(memoryBlock)));
       return;
     }
 
@@ -4381,7 +4381,7 @@
     }
 
     auto* const destinationBytes = reinterpret_cast<std::uint8_t*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(writableChunk.bufferAddress))
+      static_cast<std::uintptr_t>(writableChunk.bufferAddress)
     );
     const auto* const inputBytes = static_cast<const std::uint8_t*>(sourceBytes);
 
@@ -4853,7 +4853,7 @@
       return 0;
     }
     if (requestedChunkCount < 0) {
-      xeci_assert(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(object)), kXeciReqReadNegativeCountMessage);
+      xeci_assert(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(object)), kXeciReqReadNegativeCountMessage);
       return 0;
     }
     if (requestedChunkCount == 0) {
@@ -4939,7 +4939,7 @@
     if (readBuffer != nullptr) {
       return object->readChunkCount;
     }
-    xeci_assert(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(object)), kXeciReqReadNullBufferMessage);
+    xeci_assert(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(object)), kXeciReqReadNullBufferMessage);
     return 0;
   }
 
@@ -5232,7 +5232,7 @@
    * What it does:
    * Clears one MFCI handle slot and returns zero.
    */
-  std::int32_t __cdecl mfci_free(const std::int32_t handleAddress)
+  std::int32_t __cdecl mfci_free(const SofdecAddressWord handleAddress)
   {
     std::memset(AsMfciHandle(handleAddress), 0, sizeof(MfciHandle));
     return 0;
@@ -5244,7 +5244,7 @@
    * What it does:
    * Reinitializes one MFCI handle slot after open/reset.
    */
-  std::int32_t __cdecl mfci_reset_hn(const std::int32_t handleAddress)
+  std::int32_t __cdecl mfci_reset_hn(const SofdecAddressWord handleAddress)
   {
     MfciHandle* const handle = AsMfciHandle(handleAddress);
 
@@ -5267,7 +5267,7 @@
    * What it does:
    * Stops transfer state and releases one active MFCI handle slot.
    */
-  void __cdecl mfCiClose(const std::int32_t handleAddress)
+  void __cdecl mfCiClose(const SofdecAddressWord handleAddress)
   {
     if (handleAddress == 0) {
       return;
@@ -5290,7 +5290,7 @@
    * to `[0, sectorCount]`.
    */
   std::int32_t __cdecl mfCiSeek(
-    const std::int32_t handleAddress,
+    const SofdecAddressWord handleAddress,
     const std::int32_t seekOffset,
     const std::int32_t seekOrigin
   )
@@ -5333,7 +5333,7 @@
    * What it does:
    * Returns current MFCI cursor lane.
    */
-  std::int32_t __cdecl mfCiTell(const std::int32_t handleAddress)
+  std::int32_t __cdecl mfCiTell(const SofdecAddressWord handleAddress)
   {
     if (handleAddress != 0) {
       return AsMfciHandleConst(handleAddress)->sectorCursor;
@@ -5349,7 +5349,7 @@
    * What it does:
    * Clears transfer-running state for one MFCI handle under MFCI lock.
    */
-  void __cdecl mfCiStopTr(const std::int32_t handleAddress)
+  void __cdecl mfCiStopTr(const SofdecAddressWord handleAddress)
   {
     if (handleAddress == 0) {
       (void)mfci_call_errfn(0, kXeciNullHandleMessage);
@@ -5367,7 +5367,7 @@
    * What it does:
    * Returns signed transfer-state byte from one MFCI handle.
    */
-  std::int32_t __cdecl mfCiGetStat(const std::int32_t handleAddress)
+  std::int32_t __cdecl mfCiGetStat(const SofdecAddressWord handleAddress)
   {
     if (handleAddress != 0) {
       return static_cast<std::int32_t>(static_cast<std::int8_t>(AsMfciHandleConst(handleAddress)->state));
@@ -5383,7 +5383,7 @@
    * What it does:
    * Returns current MFCI sector-size lane from one media-file handle.
    */
-  std::int32_t __cdecl mfCiGetSctLen(const std::int32_t handleAddress)
+  std::int32_t __cdecl mfCiGetSctLen(const SofdecAddressWord handleAddress)
   {
     if (handleAddress != 0) {
       return AsMfciHandleConst(handleAddress)->sectorSizeBytes;
@@ -5400,7 +5400,7 @@
    * Updates MFCI sector geometry lanes and re-scales cursor/transfer state for
    * the requested sector size.
    */
-  void __cdecl mfCiSetSctLen(const std::int32_t handleAddress, const std::int32_t sectorSizeBytes)
+  void __cdecl mfCiSetSctLen(const SofdecAddressWord handleAddress, const std::int32_t sectorSizeBytes)
   {
     if (handleAddress == 0) {
       (void)mfci_call_errfn(0, kMfciSetSctLenNullHandleMessage);
@@ -5422,7 +5422,7 @@
    * What it does:
    * Returns transferred-byte count lane from one MFCI handle.
    */
-  std::int32_t __cdecl mfCiGetNumTr(const std::int32_t handleAddress)
+  std::int32_t __cdecl mfCiGetNumTr(const SofdecAddressWord handleAddress)
   {
     if (handleAddress != 0) {
       return AsMfciHandleConst(handleAddress)->transferredBytes;
@@ -5455,7 +5455,7 @@
       return 0;
     }
 
-    const std::int32_t handleAddress = mfci_alloc();
+    const SofdecAddressWord handleAddress = mfci_alloc();
     if (handleAddress == 0) {
       (void)mfci_call_errfn(0, kMfciOpenEntryNoHandleResourceMessage);
       return 0;
@@ -5472,7 +5472,7 @@
    * Dispatches legacy MFCI option IDs to transfer-count and parsed file-size
    * query lanes.
    */
-  std::int32_t __cdecl mfCiOptFn1(const std::int32_t optionTargetAddress, const std::int32_t optionCode)
+  std::int32_t __cdecl mfCiOptFn1(const SofdecAddressWord optionTargetAddress, const std::int32_t optionCode)
   {
     if (optionTargetAddress == 0) {
       return 0;
@@ -5489,7 +5489,7 @@
     case 203:
     case 205:
       return mfCiGetFileSize(reinterpret_cast<const char*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(optionTargetAddress))
+        static_cast<std::uintptr_t>(optionTargetAddress)
       ));
     default:
       return 0;
@@ -6694,7 +6694,7 @@
    * What it does:
    * Returns ADXRNA transfer-enable bit (`stateFlags bit0`) for one RNA handle.
    */
-  std::int32_t adxrna_IsTransferEnabled(const std::int32_t rnaHandle)
+  std::int32_t adxrna_IsTransferEnabled(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6710,7 +6710,7 @@
    * What it does:
    * Forwards one stop request to ADXRNA output runtime dispatch slot `0x58`.
    */
-  void ADXRNA_Stop(const std::int32_t rnaHandle)
+  void ADXRNA_Stop(const SofdecAddressWord rnaHandle)
   {
     auto* const runtime = AdxrnaTransportOf(rnaHandle);
     (void)runtime->outputRuntime->dispatchTable->stopPlayback(runtime->outputRuntime, 0);
@@ -6722,7 +6722,7 @@
    * What it does:
    * Polls ADXRNA output lanes for stop completion and clears stop-pending lane.
    */
-  std::int32_t adxrna_PollTransferStopState(const std::int32_t rnaHandle)
+  std::int32_t adxrna_PollTransferStopState(const SofdecAddressWord rnaHandle)
   {
     auto* const runtime = AdxrnaTransportOf(rnaHandle);
     if (runtime->transferStopPending == 0) {
@@ -6756,7 +6756,7 @@
    * What it does:
    * Repeatedly polls ADXRNA stop completion up to 200 iterations.
    */
-  std::int32_t adxrna_WaitForTransferStop(const std::int32_t rnaHandle)
+  std::int32_t adxrna_WaitForTransferStop(const SofdecAddressWord rnaHandle)
   {
     gAdxrnaTransferDrainPollCount = 0;
     std::int32_t pollResult = 0;
@@ -6779,7 +6779,7 @@
    * Advances ADXRNA transfer cursors by pending carry units and returns the new
    * accumulated transfer-unit lane.
    */
-  std::int32_t adxrna_AdvanceTransferCursors(const std::int32_t rnaHandle)
+  std::int32_t adxrna_AdvanceTransferCursors(const SofdecAddressWord rnaHandle)
   {
     auto* const runtime = AdxrnaTransportOf(rnaHandle);
     const std::int32_t transferCarryUnits = runtime->transferCarryUnits;
@@ -6828,7 +6828,7 @@
    * What it does:
    * Updates ADXRNA transfer-enable lane and synchronizes transfer cursors.
    */
-  void ADXRNA_SetTransSw(const std::int32_t rnaHandle, const std::int32_t enabled)
+  void ADXRNA_SetTransSw(const SofdecAddressWord rnaHandle, const std::int32_t enabled)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6893,10 +6893,10 @@
 
     CRICRS_Enter();
     if (runtime->stateFlags != 0) {
-      ADXRNA_Stop(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(runtime)));
+      ADXRNA_Stop(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(runtime)));
       while (runtime->serverPendingCount != 0) {
         ADXRNA_ExecServer();
-        ADXRNA_Stop(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(runtime)));
+        ADXRNA_Stop(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(runtime)));
       }
     }
     CRICRS_Leave();
@@ -6904,7 +6904,7 @@
     CRICRS_Enter();
     while (gAdxrnaDestroyGuard != 0) {
       CRICRS_Leave();
-      (void)adxrna_WaitForTransferStop(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(runtime)));
+      (void)adxrna_WaitForTransferStop(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(runtime)));
       CRICRS_Enter();
     }
     gAdxrnaDestroyGuard = 1;
@@ -6932,7 +6932,7 @@
    * What it does:
    * Transitions ADXRNA into stop/replay transfer state and enables transfer.
    */
-  void adxrna_StopAndEnableTransfer(const std::int32_t rnaHandle)
+  void adxrna_StopAndEnableTransfer(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6971,11 +6971,9 @@
    * What it does:
    * Thunk wrapper to RNA runtime creation.
    */
-  std::int32_t ADXRNA_Create(const std::int32_t sourceJoinHandleTableAddress, const std::int32_t channelCount)
+  SofdecAddressWord ADXRNA_Create(const SofdecAddressWord sourceJoinHandleTableAddress, const std::int32_t channelCount)
   {
-    return static_cast<std::int32_t>(
-      reinterpret_cast<std::uintptr_t>(mwRnaCreate(sourceJoinHandleTableAddress, channelCount))
-    );
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(mwRnaCreate(sourceJoinHandleTableAddress, channelCount)));
   }
 
   /**
@@ -6984,7 +6982,7 @@
    * What it does:
    * Stops one ADXRNA runtime and forwards teardown to destroy core.
    */
-  void ADXRNA_Destroy(const std::int32_t rnaHandle)
+  void ADXRNA_Destroy(const SofdecAddressWord rnaHandle)
   {
     ADXRNA_Stop(rnaHandle);
     (void)adxrna_DestroyCore(AdxrnaTransportOf(rnaHandle));
@@ -6996,7 +6994,7 @@
    * What it does:
    * Thunk wrapper to ADXRNA stop/replay transfer transition.
    */
-  [[maybe_unused]] void ADXRNA_StopAndEnableTransferThunk(const std::int32_t rnaHandle)
+  [[maybe_unused]] void ADXRNA_StopAndEnableTransferThunk(const SofdecAddressWord rnaHandle)
   {
     adxrna_StopAndEnableTransfer(rnaHandle);
   }
@@ -7007,7 +7005,7 @@
    * What it does:
    * Thunk wrapper to `ADXRNA_Stop`.
    */
-  void j__ADXRNA_Stop(const std::int32_t rnaHandle)
+  void j__ADXRNA_Stop(const SofdecAddressWord rnaHandle)
   {
     ADXRNA_Stop(rnaHandle);
   }
@@ -7018,7 +7016,7 @@
    * What it does:
    * Thunk wrapper to `ADXRNA_SetTransSw`.
    */
-  void j__ADXRNA_SetTransSw(const std::int32_t rnaHandle, const std::int32_t enabled)
+  void j__ADXRNA_SetTransSw(const SofdecAddressWord rnaHandle, const std::int32_t enabled)
   {
     ADXRNA_SetTransSw(rnaHandle, enabled);
   }
@@ -7041,7 +7039,7 @@
    * Returns ADXRNA time-scale base lane and emits queued/decoded delta units.
    */
   std::int32_t adxrna_GetTimeCore(
-    const std::int32_t rnaHandle,
+    const SofdecAddressWord rnaHandle,
     std::int32_t* const outQueuedDeltaUnits,
     std::int32_t* const outTimeScaleBase
   )
@@ -7065,7 +7063,7 @@
    * Thunk wrapper to ADXRNA time query core.
    */
   std::int32_t ADXRNA_GetTime(
-    const std::int32_t rnaHandle,
+    const SofdecAddressWord rnaHandle,
     std::int32_t* const outQueuedDeltaUnits,
     std::int32_t* const outTimeScaleBase
   )
@@ -7079,7 +7077,7 @@
    * What it does:
    * Returns ADXRNA queued-data lane at offset `0x34`.
    */
-  std::int32_t adxrna_GetNumDataCore(const std::int32_t rnaHandle)
+  std::int32_t adxrna_GetNumDataCore(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7095,7 +7093,7 @@
    * What it does:
    * Thunk wrapper to ADXRNA queued-data query core.
    */
-  std::int32_t ADXRNA_GetNumData(const std::int32_t rnaHandle)
+  std::int32_t ADXRNA_GetNumData(const SofdecAddressWord rnaHandle)
   {
     return adxrna_GetNumDataCore(rnaHandle);
   }
@@ -7106,7 +7104,7 @@
    * What it does:
    * Returns ADXRNA play-flag bit (`stateFlags bit1`) for one RNA handle.
    */
-  std::int32_t ADXRNA_IsPlaySwEnabled(const std::int32_t rnaHandle)
+  std::int32_t ADXRNA_IsPlaySwEnabled(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7123,7 +7121,7 @@
    * What it does:
    * Returns ADXRNA transfer-state bit2 from transport `stateFlags`.
    */
-  [[maybe_unused]] std::int32_t ADXRNA_IsTransportFlagBit2Set(const std::int32_t rnaHandle)
+  [[maybe_unused]] std::int32_t ADXRNA_IsTransportFlagBit2Set(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7139,7 +7137,7 @@
    * What it does:
    * Returns ADXRNA transfer headroom (`ringSize - queuedUnits`).
    */
-  [[maybe_unused]] std::int32_t ADXRNA_GetTransferHeadroomUnits(const std::int32_t rnaHandle)
+  [[maybe_unused]] std::int32_t ADXRNA_GetTransferHeadroomUnits(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7156,7 +7154,7 @@
    * What it does:
    * Updates ADXRNA play-switch lane and transition flags under RNA lock.
    */
-  void ADXRNA_SetPlaySw(const std::int32_t rnaHandle, const std::int32_t enabled)
+  void ADXRNA_SetPlaySw(const SofdecAddressWord rnaHandle, const std::int32_t enabled)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7187,7 +7185,7 @@
    * What it does:
    * Thunk wrapper to `ADXRNA_SetPlaySw`.
    */
-  void j__ADXRNA_SetPlaySw(const std::int32_t rnaHandle, const std::int32_t enabled)
+  void j__ADXRNA_SetPlaySw(const SofdecAddressWord rnaHandle, const std::int32_t enabled)
   {
     ADXRNA_SetPlaySw(rnaHandle, enabled);
   }
@@ -7239,7 +7237,7 @@
 
     for (auto& runtime : gAdxrnaRuntimePool) {
       if (runtime.inUse == 1u) {
-        ADXRNA_Stop(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&runtime)));
+        ADXRNA_Stop(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(&runtime)));
       }
     }
 
@@ -7443,7 +7441,7 @@
    * What it does:
    * Returns ADXT filesystem-server active state under ADX enter/leave guards.
    */
-  std::int32_t ADXT_IsActiveFsSvr()
+  SofdecAddressWord ADXT_IsActiveFsSvr()
   {
     ADXCRS_Enter();
     const std::int32_t activeState = static_cast<std::int32_t>(adxt_IsActiveFsSvr());
@@ -7498,9 +7496,9 @@
     constexpr const char* kSjMemoryErrorTag = "SJMEM_Error";
     constexpr const char* kSjUnifyErrorTag = "SJUNI_Error";
 
-    [[nodiscard]] std::int8_t* SjAddressToPointer(const std::int32_t addressWord)
+    [[nodiscard]] std::int8_t* SjAddressToPointer(const SofdecAddressWord addressWord)
     {
-      return reinterpret_cast<std::int8_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(addressWord)));
+      return reinterpret_cast<std::int8_t*>(static_cast<std::uintptr_t>(addressWord));
     }
 
     [[nodiscard]] std::int8_t* SjChunkBuffer(moho::SjChunkRange* const chunkRange)
@@ -7510,7 +7508,7 @@
 
     [[nodiscard]] std::int32_t SjPointerToAddress(const void* const pointer)
     {
-      return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(pointer));
+      return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
     }
 
     [[nodiscard]] std::int32_t SjFlowCounterOffset(const std::int32_t lane, const std::int32_t counterIndex)
@@ -7634,10 +7632,10 @@
    * Queries one SJ runtime status block through owner dispatch and returns
    * success/failure as `0/-1`.
    */
-  [[maybe_unused]] std::int32_t sj_QueryLegacyIoStatus(const std::int32_t ioClientAddress)
+  [[maybe_unused]] std::int32_t sj_QueryLegacyIoStatus(const SofdecAddressWord ioClientAddress)
   {
     auto* const client = reinterpret_cast<SjLegacyIoClient*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(ioClientAddress))
+      static_cast<std::uintptr_t>(ioClientAddress)
     );
 
     SjLegacyStatusWordBlock statusWords{};
@@ -7776,7 +7774,7 @@
    * Address: 0x00B07D30 (FUN_00B07D30, _SJRBF_Create)
    */
   moho::SofdecSjRingBufferHandle* SJRBF_Create(
-    const std::int32_t bufferAddress, const std::int32_t bufferSize, const std::int32_t extraSize
+    const SofdecAddressWord bufferAddress, const std::int32_t bufferSize, const std::int32_t extraSize
   )
   {
     SJCRS_Lock();
@@ -7789,7 +7787,7 @@
    * Address: 0x00B07D60 (FUN_00B07D60, _sjrbf_Create)
    */
   moho::SofdecSjRingBufferHandle* sjrbf_Create(
-    const std::int32_t bufferAddress, const std::int32_t bufferSize, const std::int32_t extraSize
+    const SofdecAddressWord bufferAddress, const std::int32_t bufferSize, const std::int32_t extraSize
   )
   {
     std::int32_t slotIndex = 0;
@@ -8196,7 +8194,7 @@
       return;
     }
 
-    const std::int32_t chunkAddress = chunkRange->bufferAddress;
+    const SofdecAddressWord chunkAddress = chunkRange->bufferAddress;
     if (chunkAddress == 0) {
       return;
     }
@@ -8312,10 +8310,10 @@
   /**
    * Address: 0x00B085F0 (FUN_00B085F0, _SJRBF_GetBufPtr)
    */
-  std::int32_t SJRBF_GetBufPtr(moho::SofdecSjRingBufferHandle* const handle)
+  SofdecAddressWord SJRBF_GetBufPtr(moho::SofdecSjRingBufferHandle* const handle)
   {
     SJCRS_Lock();
-    const std::int32_t bufferAddress = sjrbf_GetBufPtr(handle);
+    const SofdecAddressWord bufferAddress = sjrbf_GetBufPtr(handle);
     SJCRS_Unlock();
     return bufferAddress;
   }
@@ -8526,7 +8524,7 @@
   /**
    * Address: 0x00B090C0 (FUN_00B090C0, _SJMEM_Create)
    */
-  moho::SofdecSjMemoryHandle* SJMEM_Create(const std::int32_t bufferAddress, const std::int32_t bufferSize)
+  moho::SofdecSjMemoryHandle* SJMEM_Create(const SofdecAddressWord bufferAddress, const std::int32_t bufferSize)
   {
     SJCRS_Lock();
     moho::SofdecSjMemoryHandle* const handle = sjmem_Create(bufferAddress, bufferSize);
@@ -8537,7 +8535,7 @@
   /**
    * Address: 0x00B090F0 (FUN_00B090F0, _sjmem_Create)
    */
-  moho::SofdecSjMemoryHandle* sjmem_Create(const std::int32_t bufferAddress, const std::int32_t bufferSize)
+  moho::SofdecSjMemoryHandle* sjmem_Create(const SofdecAddressWord bufferAddress, const std::int32_t bufferSize)
   {
     std::int32_t slotIndex = 0;
     while (slotIndex < kSofdecSjMemoryPoolSize) {
@@ -8994,10 +8992,10 @@
    * What it does:
    * Lock-wrapper returning SJMEM base buffer address lane.
    */
-  std::int32_t SJMEM_GetBufPtr(moho::SofdecSjMemoryHandle* const handle)
+  SofdecAddressWord SJMEM_GetBufPtr(moho::SofdecSjMemoryHandle* const handle)
   {
     SJCRS_Lock();
-    const std::int32_t bufferAddress = sjmem_GetBufPtr(handle);
+    const SofdecAddressWord bufferAddress = sjmem_GetBufPtr(handle);
     SJCRS_Unlock();
     return bufferAddress;
   }
@@ -9118,7 +9116,7 @@
    * Address: 0x00B099F0 (FUN_00B099F0, _SJUNI_Create)
    */
   moho::SofdecSjUnifyHandle* SJUNI_Create(
-    const std::uint8_t mergeAdjacentChunks, const std::int32_t chainPoolAddress, const std::int32_t chainPoolBytes
+    const std::uint8_t mergeAdjacentChunks, const SofdecAddressWord chainPoolAddress, const std::int32_t chainPoolBytes
   )
   {
     SJCRS_Lock();
@@ -9131,7 +9129,7 @@
    * Address: 0x00B09A20 (FUN_00B09A20, _sjuni_Create)
    */
   moho::SofdecSjUnifyHandle* sjuni_Create(
-    const std::uint8_t mergeAdjacentChunks, const std::int32_t chainPoolAddress, const std::int32_t chainPoolBytes
+    const std::uint8_t mergeAdjacentChunks, const SofdecAddressWord chainPoolAddress, const std::int32_t chainPoolBytes
   )
   {
     std::int32_t slotIndex = 0;
@@ -9472,7 +9470,7 @@
       return;
     }
 
-    const std::int32_t chunkAddress = chunkRange->bufferAddress;
+    const SofdecAddressWord chunkAddress = chunkRange->bufferAddress;
     if (chunkAddress == 0) {
       return;
     }
@@ -9485,7 +9483,7 @@
     }
 
     if (handle->mergeAdjacentChunks == 1 && tailNode != nullptr) {
-      const std::int32_t tailEndAddress = tailNode->bufferAddress + tailNode->byteCount;
+      const SofdecAddressWord tailEndAddress = tailNode->bufferAddress + tailNode->byteCount;
       if (tailEndAddress == chunkAddress) {
         tailNode->byteCount += chunkBytes;
         return;
@@ -9547,7 +9545,7 @@
       return;
     }
 
-    const std::int32_t chunkAddress = chunkRange->bufferAddress;
+    const SofdecAddressWord chunkAddress = chunkRange->bufferAddress;
     if (chunkAddress == 0) {
       return;
     }
@@ -10181,7 +10179,7 @@
     std::int32_t* const outPayloadWord
   )
   {
-    std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(owner));
+    std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(owner));
     if (owner != nullptr && outPayloadWord != nullptr) {
       result = adxpc_GetNestedPayloadWord(owner);
       *outPayloadWord = result;

@@ -54,7 +54,7 @@
    * Registers one VINT callback lane and caches selected slot id.
    */
   std::int32_t MWSFSVM_EntryVint(
-    const std::int32_t callbackAddress,
+    const SofdecAddressWord callbackAddress,
     const std::int32_t callbackObject,
     const char* const callbackName
   )
@@ -71,7 +71,7 @@
    * Registers one VSYNC callback lane and caches selected slot id.
    */
   std::int32_t MWSFSVM_EntryVfunc(
-    const std::int32_t callbackAddress,
+    const SofdecAddressWord callbackAddress,
     const std::int32_t callbackObject,
     const char* const callbackName
   )
@@ -90,7 +90,7 @@
    */
   std::int32_t MWSFSVM_EntryIdVfunc(
     const std::int32_t laneId,
-    const std::int32_t callbackAddress,
+    const SofdecAddressWord callbackAddress,
     const std::int32_t callbackObject,
     const char* const callbackName
   )
@@ -107,7 +107,7 @@
    * Registers one MAIN callback lane and caches selected slot id.
    */
   std::int32_t MWSFSVM_EntryMainFunc(
-    const std::int32_t callbackAddress,
+    const SofdecAddressWord callbackAddress,
     const std::int32_t callbackObject,
     const char* const callbackName
   )
@@ -124,7 +124,7 @@
    * Registers one IDLE callback lane and caches selected slot id.
    */
   std::int32_t MWSFSVM_EntryIdleFunc(
-    const std::int32_t callbackAddress,
+    const SofdecAddressWord callbackAddress,
     const std::int32_t callbackObject,
     const char* const callbackName
   )
@@ -393,7 +393,7 @@
    */
   void mwPlyEntryAfs(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    const std::int32_t afsHandle,
+    const SofdecAddressWord afsHandle,
     const std::int32_t fileIndex
   )
   {
@@ -419,7 +419,7 @@
    */
   void mwPlyStartAfsLp(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    const std::int32_t afsHandle,
+    const SofdecAddressWord afsHandle,
     const std::int32_t fileIndex
   )
   {
@@ -676,7 +676,7 @@
     const std::int32_t luminancePivot,
     const std::int32_t luminanceMin,
     const std::int32_t luminanceMax,
-    const std::int32_t tableAddress
+    const SofdecAddressWord tableAddress
   )
   {
     auto* const tableWords = reinterpret_cast<std::int16_t*>(SjAddressToPointer(tableAddress));
@@ -750,7 +750,7 @@
    * [0x800..0x17FF].
    */
   std::int32_t CFT_MakeArgb8888Alp3110Tbl(
-    const std::int32_t tableAddress,
+    const SofdecAddressWord tableAddress,
     const std::int32_t alpha0,
     const std::int32_t alpha1,
     const std::int32_t alpha2
@@ -810,7 +810,7 @@
    * [0x800..0x17FF].
    */
   std::int32_t CFT_MakeArgb8888Alp3211Tbl(
-    const std::int32_t tableAddress,
+    const SofdecAddressWord tableAddress,
     const std::int32_t alpha0,
     const std::int32_t alpha1,
     const std::int32_t alpha2
@@ -2400,11 +2400,11 @@
 
     static_assert(sizeof(cftbgra256x3) == 3 * 256 * 8, "cftbgra256x3 must be three 256-entry BGRA planes");
 
-    [[nodiscard]] const void* ResolveArgb8888UserTable(const std::int32_t* const userTableAddress) noexcept
+    [[nodiscard]] const void* ResolveArgb8888UserTable(const SofdecAddressWord* const userTableAddress) noexcept
     {
       if (userTableAddress != nullptr && *userTableAddress != 0) {
         return reinterpret_cast<const void*>(
-          static_cast<std::uintptr_t>(static_cast<std::uint32_t>(*userTableAddress))
+          static_cast<std::uintptr_t>(*userTableAddress)
         );
       }
 
@@ -2689,7 +2689,7 @@
   std::int32_t CFT_Ycc420plnToArgb8888Int(
     const CftYcc420PlanarPackedWords* const inputWords,
     const CftRgb16OutputPackedWords* const outputWords,
-    const std::int32_t* const scratchBufferWords
+    const SofdecAddressWord* const scratchBufferWords
   )
   {
 
@@ -2710,7 +2710,7 @@
     const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
     const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
     const std::uintptr_t scratchBufferAddress =
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(scratchBufferWords[1]));
+      static_cast<std::uintptr_t>(scratchBufferWords[1]);
 
     if (CFTCOM_GetOptimizeSpeed() != 0) {
       return CFT_Ycc420plnToArgb8888Int1smp(
@@ -2743,7 +2743,7 @@
   std::int32_t CFT_Ycc420plnToArgb8888Prg(
     const CftYcc420PlanarPackedWords* const inputWords,
     const CftRgb16OutputPackedWords* const outputWords,
-    const std::int32_t* const scratchBufferWords
+    const SofdecAddressWord* const scratchBufferWords
   )
   {
 
@@ -2767,7 +2767,7 @@
     const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
     const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
     const std::uintptr_t scratchBufferAddress =
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(scratchBufferWords[1]));
+      static_cast<std::uintptr_t>(scratchBufferWords[1]);
 
     if (CFTCOM_GetOptimizeSpeed() != 0) {
       return CFT_Ycc420plnToArgb8888Prg1smp(
@@ -2808,7 +2808,7 @@
   std::int32_t CFT_Ycc420plnToArgb8888(
     const CftYcc420PlanarPackedWords* const inputWords,
     const CftRgb16OutputPackedWords* const outputWords,
-    const std::int32_t* const userTableAddress
+    const SofdecAddressWord* const userTableAddress
   )
   {
 
@@ -2845,7 +2845,7 @@
   std::int32_t CFT_Ycc420plnToArgb8888Split(
     const CftYcc420PlanarPackedWords* const inputWords,
     const CftRgb16OutputPackedWords* const outputWords,
-    const std::int32_t* const userTableAddress
+    const SofdecAddressWord* const userTableAddress
   )
   {
 
@@ -3128,7 +3128,7 @@
    * Publishes SSE lane identity, aligns caller scratch workspace, and executes
    * the two-sample YCC420 planar -> YCC422 pixel2/int conversion pipeline.
    */
-  std::int32_t cft_sse_Ycc420plnToYcc422pix2Int2smp(
+  SofdecAddressWord cft_sse_Ycc420plnToYcc422pix2Int2smp(
     const CftYcc420PlanarInputLanes* const inputLanes,
     const CftPixelSurfaceLanes* const outputSurface,
     const std::uintptr_t scratchBufferAddress,
@@ -3141,9 +3141,7 @@
     (void)alignedScratchBufferAddress;
     (void)scratchBufferSizeBytes;
 
-    return static_cast<std::int32_t>(
-      reinterpret_cast<std::intptr_t>(ConvertYcc420PlanarToYcc422pix2Int2smp(inputLanes, outputSurface))
-    );
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(ConvertYcc420PlanarToYcc422pix2Int2smp(inputLanes, outputSurface)));
   }
 
   /**
@@ -3153,15 +3151,13 @@
    * Chooses scalar or SSE 1-sample YCC420->YCC422 pixel2/int conversion lane
    * based on alignment/stride preconditions.
    */
-  std::int32_t CFT_Ycc420plnToYcc422pix2Int1smp(
+  SofdecAddressWord CFT_Ycc420plnToYcc422pix2Int1smp(
     const CftYcc420PlanarInputLanes* const inputLanes,
     const CftPixelSurfaceLanes* const outputSurface
   )
   {
     if (UTY_SupportSse() == 0) {
-      return static_cast<std::int32_t>(
-        reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface))
-      );
+      return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface)));
     }
 
     const std::uintptr_t alignmentMask =
@@ -3170,23 +3166,17 @@
       reinterpret_cast<std::uintptr_t>(inputLanes->cbPlane) |
       reinterpret_cast<std::uintptr_t>(inputLanes->crPlane);
     if ((alignmentMask & 0x0Fu) != 0u) {
-      return static_cast<std::int32_t>(
-        reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface))
-      );
+      return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface)));
     }
 
     if ((outputSurface->heightPixels & 3) != 0) {
-      return static_cast<std::int32_t>(
-        reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface))
-      );
+      return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface)));
     }
 
     const std::int32_t widthPixels = outputSurface->widthPixels;
     const std::int32_t alignedWidthPixels = (widthPixels + 15) & ~15;
     if ((widthPixels & 0x0F) != 0 || std::abs(outputSurface->strideBytes) < (2 * alignedWidthPixels)) {
-      return static_cast<std::int32_t>(
-        reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface))
-      );
+      return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface)));
     }
 
     return cft_sse_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface);
@@ -3200,10 +3190,10 @@
    * fast lane or the two-sample scalar/SSE lane based on optimize mode and
    * alignment/stride preconditions.
    */
-  std::int32_t CFT_Ycc420plnToYcc422pix2Int(
+  SofdecAddressWord CFT_Ycc420plnToYcc422pix2Int(
     const CftYcc420PlanarPackedWords* const inputWords,
     const CftRgb16OutputPackedWords* const outputWords,
-    const std::int32_t* const scratchBufferWords
+    const SofdecAddressWord* const scratchBufferWords
   )
   {
 
@@ -3247,14 +3237,10 @@
       (outputSurface.widthPixels & 0x0F) != 0 ||
       std::abs(outputSurface.strideBytes) < (2 * alignedWidthPixels)
     ) {
-      return static_cast<std::int32_t>(
-        reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int2smp(inputLanesPtr, outputSurfacePtr))
-      );
+      return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int2smp(inputLanesPtr, outputSurfacePtr)));
     }
 
-    const std::uintptr_t scratchBufferAddress = static_cast<std::uintptr_t>(
-      static_cast<std::uint32_t>(scratchBufferWords[0])
-    );
+    const std::uintptr_t scratchBufferAddress = static_cast<std::uintptr_t>(scratchBufferWords[0]);
     const std::int32_t scratchBufferSizeBytes = scratchBufferWords[1];
     return cft_sse_Ycc420plnToYcc422pix2Int2smp(
       inputLanesPtr,
@@ -5592,7 +5578,7 @@
   /**
    * Address: 0x00ADE230 (FUN_00ADE230, _sfxamv_SearchFreeHn)
    */
-  std::int32_t sfxamv_SearchFreeHn()
+  SofdecAddressWord sfxamv_SearchFreeHn()
   {
     const std::int32_t maxHandleCount = gSfxaLibWork.last;
     if (maxHandleCount <= 0) {
@@ -5612,9 +5598,9 @@
   /**
    * Address: 0x00ADE200 (FUN_00ADE200, _SFXA_Create)
    */
-  std::int32_t SFXA_Create()
+  SofdecAddressWord SFXA_Create()
   {
-    const std::int32_t sfxaHandleAddress = sfxamv_SearchFreeHn();
+    const SofdecAddressWord sfxaHandleAddress = sfxamv_SearchFreeHn();
     if (sfxaHandleAddress == 0) {
       return 0;
     }
@@ -5629,7 +5615,7 @@
   /**
    * Address: 0x00ADE260 (FUN_00ADE260, _sfxamv_InitHn)
    */
-  std::int32_t sfxamv_InitHn(const std::int32_t sfxaHandleAddress)
+  SofdecAddressWord sfxamv_InitHn(const SofdecAddressWord sfxaHandleAddress)
   {
     auto* const handleView = reinterpret_cast<SfxaHandle*>(SjAddressToPointer(sfxaHandleAddress));
     handleView->luminancePivot = 0;
@@ -5646,7 +5632,7 @@
   /**
    * Address: 0x00ADE290 (FUN_00ADE290, _SFXA_Destroy)
    */
-  void SFXA_Destroy(const std::int32_t sfxaHandleAddress)
+  void SFXA_Destroy(const SofdecAddressWord sfxaHandleAddress)
   {
     if (sfxaHandleAddress == 0) {
       return;
@@ -5661,15 +5647,15 @@
    * Address: 0x00ADE2B0 (FUN_00ADE2B0, _SFXA_MakeAlpLumiTbl)
    */
   std::int32_t SFXA_MakeAlpLumiTbl(
-    const std::int32_t sfxaHandleAddress,
+    const SofdecAddressWord sfxaHandleAddress,
     const std::int32_t reservedMode,
-    const std::int32_t tableAddress
+    const SofdecAddressWord tableAddress
   )
   {
     (void)reservedMode;
 
     auto* const handleView = reinterpret_cast<SfxaHandle*>(SjAddressToPointer(sfxaHandleAddress));
-    std::int32_t callbackResult = 0;
+    SofdecAddressWord callbackResult = 0;
     if (handleView->luminanceBuilder != nullptr) {
       callbackResult = handleView->luminanceBuilder(
         handleView->luminancePivot,
@@ -5686,15 +5672,15 @@
    * Address: 0x00ADE2E0 (FUN_00ADE2E0, _SFXA_MakeAlp3110Tbl)
    */
   std::int32_t SFXA_MakeAlp3110Tbl(
-    const std::int32_t sfxaHandleAddress,
+    const SofdecAddressWord sfxaHandleAddress,
     const std::int32_t reservedMode,
-    const std::int32_t tableAddress
+    const SofdecAddressWord tableAddress
   )
   {
     (void)reservedMode;
 
     const auto* const handleView = reinterpret_cast<SfxaHandle*>(SjAddressToPointer(sfxaHandleAddress));
-    std::int32_t callbackResult = sfxaHandleAddress;
+    SofdecAddressWord callbackResult = sfxaHandleAddress;
     if (handleView->alpha3110Builder != nullptr) {
       callbackResult = handleView->alpha3110Builder(
         tableAddress,
@@ -5710,9 +5696,9 @@
    * Address: 0x00ADE310 (FUN_00ADE310, _SFXA_MakeAlp3211Tbl)
    */
   std::int32_t SFXA_MakeAlp3211Tbl(
-    const std::int32_t sfxaHandleAddress,
+    const SofdecAddressWord sfxaHandleAddress,
     const std::int32_t reservedMode,
-    const std::int32_t tableAddress
+    const SofdecAddressWord tableAddress
   )
   {
     (void)reservedMode;
@@ -5733,7 +5719,7 @@
   /**
    * Address: 0x00ADE340 (FUN_00ADE340, _SFXA_IsNeedUpdateLumiTbl)
    */
-  std::int32_t SFXA_IsNeedUpdateLumiTbl(const std::int32_t sfxaHandleAddress)
+  std::int32_t SFXA_IsNeedUpdateLumiTbl(const SofdecAddressWord sfxaHandleAddress)
   {
     const auto* const handleView = reinterpret_cast<SfxaHandle*>(SjAddressToPointer(sfxaHandleAddress));
     return handleView->needsLumiTableUpdate;
@@ -5742,8 +5728,8 @@
   /**
    * Address: 0x00ADE350 (FUN_00ADE350, _SFXA_SetLumiPrm)
    */
-  std::int32_t SFXA_SetLumiPrm(
-    const std::int32_t sfxaHandleAddress,
+  SofdecAddressWord SFXA_SetLumiPrm(
+    const SofdecAddressWord sfxaHandleAddress,
     const std::int32_t luminanceMin,
     const std::int32_t luminanceMax,
     const std::int32_t luminancePivot
@@ -5761,7 +5747,7 @@
    * Address: 0x00ADE380 (FUN_00ADE380, _SFXA_GetLumiPrm)
    */
   std::int32_t SFXA_GetLumiPrm(
-    const std::int32_t sfxaHandleAddress,
+    const SofdecAddressWord sfxaHandleAddress,
     std::int32_t* const outLuminanceMin,
     std::int32_t* const outLuminanceMax,
     std::int32_t* const outLuminancePivot
@@ -5777,8 +5763,8 @@
   /**
    * Address: 0x00ADE3A0 (FUN_00ADE3A0, _SFXA_SetAlp3Prm)
    */
-  std::int32_t SFXA_SetAlp3Prm(
-    const std::int32_t sfxaHandleAddress,
+  SofdecAddressWord SFXA_SetAlp3Prm(
+    const SofdecAddressWord sfxaHandleAddress,
     const std::int8_t alpha0,
     const std::int8_t alpha1,
     const std::int8_t alpha2
@@ -5795,7 +5781,7 @@
    * Address: 0x00ADE3C0 (FUN_00ADE3C0, _SFXA_GetAlp3Prm)
    */
   std::int32_t SFXA_GetAlp3Prm(
-    const std::int32_t sfxaHandleAddress,
+    const SofdecAddressWord sfxaHandleAddress,
     std::int8_t* const outAlpha0,
     std::int8_t* const outAlpha1,
     std::int8_t* const outAlpha2
@@ -5827,10 +5813,10 @@
   /**
    * Address: 0x00ADE580 (FUN_00ADE580, _sfbuf_MakeBufPtr)
    */
-  std::int32_t sfbuf_MakeBufPtr(
-    std::int32_t* const outBufferPointers,
+  SofdecAddressWord sfbuf_MakeBufPtr(
+    SofdecAddressWord* const outBufferPointers,
     const std::int32_t* const ringBufferSizes,
-    std::int32_t baseBufferAddress
+    SofdecAddressWord baseBufferAddress
   )
   {
     constexpr std::int32_t kSfbufRingLaneCount = 8;
@@ -5872,7 +5858,7 @@
    * `FF000409` ("lane not awaiting supply") for a lane that had never been
    * initialised at all.
    */
-  std::array<SfbufRingLane, 9>& SfbufLanesAt(const std::int32_t sfbufLaneArrayAddress)
+  std::array<SfbufRingLane, 9>& SfbufLanesAt(const SofdecAddressWord sfbufLaneArrayAddress)
   {
     return *reinterpret_cast<std::array<SfbufRingLane, 9>*>(SjAddressToPointer(sfbufLaneArrayAddress));
   }
@@ -5880,9 +5866,9 @@
   /**
    * Address: 0x00ADE910 (FUN_00ADE910, _sfbuf_InitUoSj)
    */
-  std::int32_t* sfbuf_InitUoSj(std::int32_t* const uoSjStateWords)
+  SofdecAddressWord* sfbuf_InitUoSj(SofdecAddressWord* const uoSjStateWords)
   {
-    std::int32_t* cursor = uoSjStateWords + 2;
+    SofdecAddressWord* cursor = uoSjStateWords + 2;
     for (std::int32_t block = 0; block < 3; ++block) {
       cursor[-2] = 0;
       cursor[-1] = 0;
@@ -5896,9 +5882,9 @@
   /**
    * Address: 0x00ADE8B0 (FUN_00ADE8B0, _sfbuf_InitUoSjBuf)
    */
-  std::int32_t* sfbuf_InitUoSjBuf(
-    const std::int32_t sfbufLaneArrayAddress,
-    const std::int32_t* const bufferAddressTable,
+  SofdecAddressWord* sfbuf_InitUoSjBuf(
+    const SofdecAddressWord sfbufLaneArrayAddress,
+    const SofdecAddressWord* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex
   )
@@ -5915,8 +5901,8 @@
    * Address: 0x00ADE7D0 (FUN_00ADE7D0, _sfbuf_InitAringBuf)
    */
   std::int32_t sfbuf_InitAringBuf(
-    const std::int32_t sfbufLaneArrayAddress,
-    const std::int32_t* const bufferAddressTable,
+    const SofdecAddressWord sfbufLaneArrayAddress,
+    const SofdecAddressWord* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex
   )
@@ -5949,7 +5935,7 @@
    * stores the updated aring descriptor lanes.
    */
   std::int32_t SFBUF_FixAringBuf(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t sampleMode,
     const std::int32_t transferParam2,
@@ -5959,7 +5945,7 @@
     auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
     SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
 
-    const std::int32_t primarySampleBaseAddress = laneView->sourceBufferAddress;
+    const SofdecAddressWord primarySampleBaseAddress = laneView->sourceBufferAddress;
     std::int32_t sampleWindowBytes = laneView->sourceBufferBytes;
     if (transferParam2 > 1) {
       sampleWindowBytes /= transferParam2;
@@ -5982,9 +5968,9 @@
    * Address: 0x00ADE740 (FUN_00ADE740, _sfbuf_InitVfrmBuf)
    */
   std::int32_t sfbuf_InitVfrmBuf(
-    const std::int32_t vfrmOwnerAddress,
-    const std::int32_t sfbufLaneArrayAddress,
-    const std::int32_t* const bufferAddressTable,
+    const SofdecAddressWord vfrmOwnerAddress,
+    const SofdecAddressWord sfbufLaneArrayAddress,
+    const SofdecAddressWord* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex
   )
@@ -6015,8 +6001,8 @@
    * Address: 0x00ADE650 (FUN_00ADE650, _sfbuf_CreateSj)
    */
   std::int32_t sfbuf_CreateSj(
-    std::int32_t* const outSjCreateStateWords,
-    const std::int32_t sourceBufferAddress,
+    SofdecAddressWord* const outSjCreateStateWords,
+    const SofdecAddressWord sourceBufferAddress,
     const std::int32_t sourceBufferBytes,
     const std::int32_t extraBufferBytes
   )
@@ -6047,8 +6033,8 @@
    * Address: 0x00ADE5B0 (FUN_00ADE5B0, _sfbuf_InitRingSj)
    */
   std::int32_t sfbuf_InitRingSj(
-    const std::int32_t sfbufLaneArrayAddress,
-    const std::int32_t* const bufferAddressTable,
+    const SofdecAddressWord sfbufLaneArrayAddress,
+    const SofdecAddressWord* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex,
     const std::int32_t extraBufferBytes
@@ -6063,7 +6049,7 @@
 
     SfbufSjCreateState createState{};
     const std::int32_t status = sfbuf_CreateSj(
-      reinterpret_cast<std::int32_t*>(&createState),
+      reinterpret_cast<SofdecAddressWord*>(&createState),
       bufferAddressTable[laneIndex],
       laneBufferBytes,
       extraBufferBytes
@@ -6074,7 +6060,7 @@
 
     (void)sfbuf_SetSupSj(
       &laneView->sourceBufferAddress,
-      reinterpret_cast<const std::int32_t*>(&createState),
+      reinterpret_cast<const SofdecAddressWord*>(&createState),
       SjPointerToAddress(laneView),
       1
     );
@@ -6086,8 +6072,8 @@
    * Address: 0x00ADE4B0 (FUN_00ADE4B0, _SFBUF_InitHn)
    */
   std::int32_t SFBUF_InitHn(
-    const std::int32_t vfrmOwnerAddress,
-    const std::int32_t sfbufLaneArrayAddress,
+    const SofdecAddressWord vfrmOwnerAddress,
+    const SofdecAddressWord sfbufLaneArrayAddress,
     const std::int32_t* const sfbufInitConfigWords
   )
   {
@@ -6102,7 +6088,7 @@
 
     const auto* const initConfig = reinterpret_cast<const SfbufInitLayoutConfig*>(sfbufInitConfigWords);
     const std::int32_t* const laneBufferSizes = initConfig->laneBufferSizes.data();
-    std::array<std::int32_t, 8> laneBufferAddresses{};
+    std::array<SofdecAddressWord, 8> laneBufferAddresses{};
     (void)sfbuf_MakeBufPtr(laneBufferAddresses.data(), laneBufferSizes, initConfig->baseBufferAddress);
 
     std::int32_t status = sfbuf_InitRingSj(
@@ -6172,7 +6158,7 @@
   /**
    * Address: 0x00ADEAC0 (FUN_00ADEAC0, _sfbuf_InitConti)
    */
-  std::int32_t* sfbuf_InitConti(std::int32_t* const continuityStateWords)
+  SofdecAddressWord* sfbuf_InitConti(SofdecAddressWord* const continuityStateWords)
   {
     continuityStateWords[0] = 0;
     continuityStateWords[1] = 0;
@@ -6185,7 +6171,7 @@
    * What it does:
    * Clears one 5-word supply-lane tail payload and returns the same base lane.
    */
-  std::int32_t* sfbuf_ClearSupplyTailFiveWords(std::int32_t* const tailWords) noexcept
+  SofdecAddressWord* sfbuf_ClearSupplyTailFiveWords(SofdecAddressWord* const tailWords) noexcept
   {
     if (tailWords == nullptr) {
       return nullptr;
@@ -6201,9 +6187,9 @@
    * Address: 0x00ADEA60 (FUN_00ADEA60, _sfbuf_SetSupSj)
    */
   void sfbuf_SetSupSj(
-    std::int32_t* const supplyLaneWords,
-    const std::int32_t* const supplyDescriptorWords,
-    const std::int32_t ownerLaneAddress,
+    SofdecAddressWord* const supplyLaneWords,
+    const SofdecAddressWord* const supplyDescriptorWords,
+    const SofdecAddressWord ownerLaneAddress,
     const std::int32_t setupState
   )
   {
@@ -6226,7 +6212,7 @@
    * Address: 0x00ADEA00 (FUN_00ADEA00, _sfbuf_SetSupplySjSub)
    */
   std::int32_t sfbuf_SetSupplySjSub(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t* const supplyDescriptorWords,
     const std::int32_t transferLaneIndex
   )
@@ -6241,12 +6227,12 @@
     }
 
     const std::int32_t setupState = (supplyDescriptorWords[1] != 0) ? 1 : 0;
-    sfbuf_SetSupSj(
-      &laneView->sourceBufferAddress,
-      supplyDescriptorWords,
-      SjPointerToAddress(laneView),
-      setupState
-    );
+   void sfbuf_SetSupSj(
+  SofdecAddressWord* supplyLaneWords,
+  const SofdecAddressWord* supplyDescriptorWords,
+  SofdecAddressWord ownerLaneAddress,
+  std::int32_t setupState
+);
     return 0;
   }
 
@@ -6260,7 +6246,7 @@
   {
     constexpr std::int32_t kSfbufErrInvalidSupplyDescriptor = -16776184;
 
-    const std::int32_t sfbufHandleAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
+    const SofdecAddressWord sfbufHandleAddress = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
     if (sfbuf_ChkSupSj(supplyDescriptorWords) != 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrInvalidSupplyDescriptor);
     }
@@ -6280,7 +6266,7 @@
    * Address: 0x00ADEAE0 (FUN_00ADEAE0, _SFBUF_SetUoch)
    */
   std::int32_t* SFBUF_SetUoch(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t uochSlotIndex,
     const std::int32_t* const chunkDescriptorWords
@@ -6302,7 +6288,7 @@
    * Address: 0x00ADEB30 (FUN_00ADEB30, _SFBUF_GetUoch)
    */
   std::int32_t SFBUF_GetUoch(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t uochSlotIndex,
     std::int32_t* const outChunkDescriptorWords
@@ -6324,7 +6310,7 @@
    * Address: 0x00ADEB80 (FUN_00ADEB80, _SFBUF_GetRingSj)
    */
   std::int32_t SFBUF_GetRingSj(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     std::int32_t* const outRingHandleAddress
   )
@@ -6338,7 +6324,7 @@
    * Address: 0x00ADEBF0 (FUN_00ADEBF0, _sfbuf_RingGetSub)
    */
   std::int32_t sfbuf_RingGetSub(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outCursorWords,
     const std::int32_t laneMode
@@ -6366,7 +6352,7 @@
    * Address: 0x00ADECB0 (FUN_00ADECB0, _sfbuf_RingAddSub)
    */
   std::int32_t sfbuf_RingAddSub(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     const std::int32_t advanceCount,
     const std::int32_t laneMode
@@ -6408,7 +6394,7 @@
   /**
    * Address: 0x00ADEDA0 (FUN_00ADEDA0, _sfbuf_ResetConti)
    */
-  std::uint32_t sfbuf_ResetConti(std::int32_t* const supplyStateWords)
+  std::uint32_t sfbuf_ResetConti(SofdecAddressWord* const supplyStateWords)
   {
     auto* const supplyState = reinterpret_cast<SfbufSupplyStateWindow*>(supplyStateWords);
     moho::SjChunkRange firstChunk{};
@@ -6431,7 +6417,7 @@
    * Address: 0x00ADEE00 (FUN_00ADEE00, _sfbuf_PeekChunk)
    */
   std::int32_t sfbuf_PeekChunk(
-    const std::int32_t ringHandleAddress,
+    const SofdecAddressWord ringHandleAddress,
     const std::int32_t laneMode,
     moho::SjChunkRange* const outFirstChunk,
     moho::SjChunkRange* const outSecondChunk
@@ -6457,7 +6443,7 @@
    * Address: 0x00ADEE90 (FUN_00ADEE90, _sfbuf_MoveChunk)
    */
   std::int32_t sfbuf_MoveChunk(
-    const std::int32_t ringHandleAddress,
+    const SofdecAddressWord ringHandleAddress,
     const std::int32_t laneMode,
     const std::int32_t requestedBytes
   )
@@ -6474,7 +6460,7 @@
    * Address: 0x00ADEBB0 (FUN_00ADEBB0, _SFBUF_RingGetWrite)
    */
   std::int32_t SFBUF_RingGetWrite(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outCursor
   )
@@ -6486,7 +6472,7 @@
    * Address: 0x00ADEBD0 (FUN_00ADEBD0, _SFBUF_RingGetRead)
    */
   std::int32_t SFBUF_RingGetRead(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outCursor
   )
@@ -6498,7 +6484,7 @@
    * Address: 0x00ADEC80 (FUN_00ADEC80, _SFBUF_RingAddWrite)
    */
   std::int32_t SFBUF_RingAddWrite(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     const std::int32_t advanceCount
   )
@@ -6510,7 +6496,7 @@
    * Address: 0x00ADEC90 (FUN_00ADEC90, _SFBUF_RingAddRead)
    */
   std::int32_t SFBUF_RingAddRead(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     const std::int32_t advanceCount
   )
@@ -6522,7 +6508,7 @@
    * Address: 0x00ADEED0 (FUN_00ADEED0, _SFBUF_RingGetDlm)
    */
   void SFBUF_RingGetDlm(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outPrimaryDelimiterAddress,
     std::int32_t* const outSecondaryDelimiterAddress
@@ -6540,10 +6526,10 @@
    * Address: 0x00ADEF20 (FUN_00ADEF20, _SFBUF_RingSetDlm)
    */
   void SFBUF_RingSetDlm(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
-    const std::int32_t primaryDelimiterAddress,
-    const std::int32_t secondaryDelimiterAddress
+    const SofdecAddressWord primaryDelimiterAddress,
+    const SofdecAddressWord secondaryDelimiterAddress
   )
   {
     SFLIB_LockCs();
@@ -6557,7 +6543,7 @@
   /**
    * Address: 0x00ADEFB0 (FUN_00ADEFB0, _SFBUF_GetWTot)
    */
-  std::int32_t SFBUF_GetWTot(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
+  std::int32_t SFBUF_GetWTot(const SofdecAddressWord sfbufHandleAddress, const std::int32_t ringIndex)
   {
     constexpr std::int32_t kSfbufTotalSaturated = 0x7FFFFFFF;
 
@@ -6585,7 +6571,7 @@
    * Address: 0x00ADF020 (FUN_00ADF020, _SFBUF_RingGetSj)
    */
   std::int32_t SFBUF_RingGetSj(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outRingHandleAddress
   )
@@ -6605,8 +6591,8 @@
   /**
    * Address: 0x00ADF070 (FUN_00ADF070, _SFBUF_AddRtotSj)
    */
-  std::int32_t* SFBUF_AddRtotSj(
-    const std::int32_t sfbufHandleAddress,
+  SofdecAddressWord* SFBUF_AddRtotSj(
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     const std::int32_t addBytes
   )
@@ -6623,7 +6609,7 @@
    * Address: 0x00ADF0A0 (FUN_00ADF0A0, _SFBUF_AringGetWrite)
    */
   std::int32_t SFBUF_AringGetWrite(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outAringSnapshotWords
   )
@@ -6641,8 +6627,8 @@
     const std::int32_t transferParam0 = aringState->transferParam0;
     const std::int32_t sampleMode = aringState->sampleMode;
     const std::int32_t transferParam2 = aringState->transferParam2;
-    const std::int32_t primarySampleBaseAddress = aringState->primarySampleBaseAddress;
-    const std::int32_t secondarySampleBaseAddress = aringState->secondarySampleBaseAddress;
+    const SofdecAddressWord primarySampleBaseAddress = aringState->primarySampleBaseAddress;
+    const SofdecAddressWord secondarySampleBaseAddress = aringState->secondarySampleBaseAddress;
     const std::int32_t ringCapacitySamples = aringState->ringCapacitySamples;
     const std::int32_t writeCursorSamples = aringState->writeCursorSamples;
     const std::int32_t readCursorSamples = aringState->readCursorSamples;
@@ -6688,7 +6674,7 @@
    * Address: 0x00ADF220 (FUN_00ADF220, _SFBUF_AringAddWrite)
    */
   std::int32_t SFBUF_AringAddWrite(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     const std::int32_t addSamples
   )
@@ -6734,7 +6720,7 @@
    * Address: 0x00ADF2D0 (FUN_00ADF2D0, _SFBUF_AringGetRead)
    */
   std::int32_t SFBUF_AringGetRead(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     std::int32_t* const outAringSnapshotWords
   )
@@ -6752,8 +6738,8 @@
     const std::int32_t transferParam0 = aringState->transferParam0;
     const std::int32_t sampleMode = aringState->sampleMode;
     const std::int32_t transferParam2 = aringState->transferParam2;
-    const std::int32_t primarySampleBaseAddress = aringState->primarySampleBaseAddress;
-    const std::int32_t secondarySampleBaseAddress = aringState->secondarySampleBaseAddress;
+    const SofdecAddressWord primarySampleBaseAddress = aringState->primarySampleBaseAddress;
+    const SofdecAddressWord secondarySampleBaseAddress = aringState->secondarySampleBaseAddress;
     const std::int32_t ringCapacitySamples = aringState->ringCapacitySamples;
     const std::int32_t writeCursorSamples = aringState->writeCursorSamples;
     const std::int32_t readCursorSamples = aringState->readCursorSamples;
@@ -6799,7 +6785,7 @@
    * Address: 0x00ADF450 (FUN_00ADF450, _SFBUF_AringAddRead)
    */
   std::int32_t SFBUF_AringAddRead(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t ringIndex,
     const std::int32_t addSamples
   )
@@ -6852,7 +6838,7 @@
   /**
    * Address: 0x00ADF510 (FUN_00ADF510, _SFBUF_VfrmAddWrite)
    */
-  std::int32_t SFBUF_VfrmAddWrite(const std::int32_t sfbufHandleAddress)
+  std::int32_t SFBUF_VfrmAddWrite(const SofdecAddressWord sfbufHandleAddress)
   {
     auto* const runtimeStatus = reinterpret_cast<SfbufStatus*>(SjAddressToPointer(sfbufHandleAddress));
     runtimeStatus->dirtyFlag = 1;
@@ -6863,7 +6849,7 @@
    * Address: 0x00ADF520 (FUN_00ADF520, _SFBUF_VfrmGetRead)
    */
   std::int32_t SFBUF_VfrmGetRead(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t arg0,
     const std::int32_t arg1
@@ -6881,7 +6867,7 @@
    * Address: 0x00ADF570 (FUN_00ADF570, _SFBUF_VfrmAddRead)
    */
   std::int32_t SFBUF_VfrmAddRead(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t arg0,
     const std::int32_t arg1
@@ -6902,7 +6888,7 @@
    * Address: 0x00ADF5C0 (FUN_00ADF5C0, _SFBUF_SetPrepFlg)
    */
   std::int32_t SFBUF_SetPrepFlg(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t prepFlag
   )
@@ -6915,7 +6901,7 @@
   /**
    * Address: 0x00ADF5E0 (FUN_00ADF5E0, _SFBUF_GetPrepFlg)
    */
-  std::int32_t SFBUF_GetPrepFlg(const std::int32_t sfbufHandleAddress, const std::int32_t laneIndex)
+  std::int32_t SFBUF_GetPrepFlg(const SofdecAddressWord sfbufHandleAddress, const std::int32_t laneIndex)
   {
     const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
     return sfbuf->lanes[laneIndex].prepFlag;
@@ -6925,7 +6911,7 @@
    * Address: 0x00ADF600 (FUN_00ADF600, _SFBUF_SetTermFlg)
    */
   std::int32_t SFBUF_SetTermFlg(
-    const std::int32_t sfbufHandleAddress,
+    const SofdecAddressWord sfbufHandleAddress,
     const std::int32_t laneIndex,
     const std::int32_t termFlag
   )
@@ -6938,7 +6924,7 @@
   /**
    * Address: 0x00ADF620 (FUN_00ADF620, _SFBUF_GetTermFlg)
    */
-  std::int32_t SFBUF_GetTermFlg(const std::int32_t sfbufHandleAddress, const std::int32_t laneIndex)
+  std::int32_t SFBUF_GetTermFlg(const SofdecAddressWord sfbufHandleAddress, const std::int32_t laneIndex)
   {
     const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
     return sfbuf->lanes[laneIndex].termFlag;
@@ -6947,7 +6933,7 @@
   /**
    * Address: 0x00ADF640 (FUN_00ADF640, _SFBUF_GetRingBufSiz)
    */
-  std::int32_t SFBUF_GetRingBufSiz(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
+  std::int32_t SFBUF_GetRingBufSiz(const SofdecAddressWord sfbufHandleAddress, const std::int32_t ringIndex)
   {
     SfbufRingCursorSnapshot ringSnapshot{};
     (void)SFBUF_RingGetRead(sfbufHandleAddress, ringIndex, reinterpret_cast<std::int32_t*>(&ringSnapshot));
@@ -6957,7 +6943,7 @@
   /**
    * Address: 0x00ADF670 (FUN_00ADF670, _SFBUF_RingGetFreeSiz)
    */
-  std::int32_t SFBUF_RingGetFreeSiz(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
+  std::int32_t SFBUF_RingGetFreeSiz(const SofdecAddressWord sfbufHandleAddress, const std::int32_t ringIndex)
   {
     SfbufRingCursorSnapshot ringSnapshot{};
     (void)SFBUF_RingGetWrite(sfbufHandleAddress, ringIndex, reinterpret_cast<std::int32_t*>(&ringSnapshot));
@@ -6986,7 +6972,7 @@
   /**
    * Address: 0x00ADF770 (FUN_00ADF770, _sfbuf_IsSjRbf)
    */
-  std::int32_t sfbuf_IsSjRbf(const std::int32_t sjHandleAddress)
+  std::int32_t sfbuf_IsSjRbf(const SofdecAddressWord sjHandleAddress)
   {
     auto* const ringBufferHandle = reinterpret_cast<moho::SofdecSjRingBufferHandle*>(SjAddressToPointer(sjHandleAddress));
     return (SJRBF_GetUuid(ringBufferHandle) == gSfbufSjRingBufferUuid) ? 1 : 0;
@@ -6995,7 +6981,7 @@
   /**
    * Address: 0x00ADF790 (FUN_00ADF790, _sfbuf_IsSjMem)
    */
-  std::int32_t sfbuf_IsSjMem(const std::int32_t sjHandleAddress)
+  std::int32_t sfbuf_IsSjMem(const SofdecAddressWord sjHandleAddress)
   {
     auto* const memoryHandle = reinterpret_cast<moho::SofdecSjMemoryHandle*>(SjAddressToPointer(sjHandleAddress));
     return (SJMEM_GetUuid(memoryHandle) == gSfbufSjMemoryUuid) ? 1 : 0;
@@ -7005,7 +6991,7 @@
    * Address: 0x00ADF6A0 (FUN_00ADF6A0, _SFBUF_GetFlowCnt)
    */
   std::int32_t SFBUF_GetFlowCnt(
-    const std::int32_t sjHandleAddress,
+    const SofdecAddressWord sjHandleAddress,
     std::int32_t* const outLane1FlowCount,
     std::int32_t* const outLane0FlowCount
   )
@@ -7028,7 +7014,7 @@
 
     *outLane1FlowCount = 0;
     *outLane0FlowCount = 0;
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(outLane1FlowCount));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(outLane1FlowCount));
   }
 
   /**
@@ -7094,16 +7080,16 @@
   /**
    * Address: 0x00ADF870 (FUN_00ADF870, _SFTRN_InitHn)
    */
-  std::int32_t SFTRN_InitHn(
-    const std::int32_t workctrlAddress,
-    const std::int32_t transferDataArrayAddress,
+  SofdecAddressWord SFTRN_InitHn(
+    const SofdecAddressWord workctrlAddress,
+    const SofdecAddressWord transferDataArrayAddress,
     const std::int32_t* const transferBuildConfigAddressPtr
   )
   {
     constexpr std::int32_t kSftrnTransferLaneCount = 9;
     constexpr std::int32_t kSftrnErrBuildFailed = -16776446;
 
-    const std::int32_t transferBuildConfigAddress = *transferBuildConfigAddressPtr;
+    const SofdecAddressWord transferBuildConfigAddress = *transferBuildConfigAddressPtr;
     auto* const transferLanes = reinterpret_cast<SftrnTransferDataLane*>(SjAddressToPointer(transferDataArrayAddress));
     const auto* const transferBuildConfigWords =
       reinterpret_cast<const std::int32_t*>(SjAddressToPointer(transferBuildConfigAddress));
@@ -7126,7 +7112,7 @@
   /**
    * Address: 0x00ADF8D0 (FUN_00ADF8D0, _sftrn_InitTrData)
    */
-  std::int32_t* sftrn_InitTrData(std::int32_t* const transferDataWords, const std::int32_t transferDescriptorAddress)
+  std::int32_t* sftrn_InitTrData(std::int32_t* const transferDataWords, const SofdecAddressWord transferDescriptorAddress)
   {
     auto* const transferLane = reinterpret_cast<SftrnTransferDataLane*>(transferDataWords);
     transferLane->termFlag = 0;

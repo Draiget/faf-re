@@ -428,7 +428,7 @@ extern "C" {
 extern "C" {
   void(*ahxsetdecsmplfunc)(void*, std::int32_t) = nullptr;
   void(*ahxsetextfunc)(void*, const std::int16_t*) = nullptr;
-  std::int32_t(*SFPLY_SetPtsInfo)(std::int32_t, std::int32_t*) = nullptr;
+  std::int32_t(*SFPLY_SetPtsInfo)(SofdecAddressWord, SofdecAddressWord*) = nullptr;
   // SFPLY_ResetPtsm (0x011F9150) is the library's optional "handle was rebuilt,
   // re-seed your PTS map" hook. `sfply_ResetHn` is its only reader and nothing
   // in this binary ever installs one, so it stays null - the guard there is kept

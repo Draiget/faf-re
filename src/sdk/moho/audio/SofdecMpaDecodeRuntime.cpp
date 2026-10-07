@@ -106,7 +106,7 @@ extern "C"
         &rawBitValue
       );
 
-      *outValue = static_cast<int>(reinterpret_cast<std::uintptr_t>(rawBitValue));
+      *outValue = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(rawBitValue));
       return status;
     }
 

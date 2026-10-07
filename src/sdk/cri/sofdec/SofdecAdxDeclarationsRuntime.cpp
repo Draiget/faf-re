@@ -195,14 +195,14 @@
    * What it does:
    * Returns ADXT RNA handle lane under ADXCRS enter/leave guards.
    */
-  std::int32_t ADXT_GetRna(void* adxtRuntime);
+  SofdecAddressWord ADXT_GetRna(void* adxtRuntime);
   /**
    * Address: 0x00B0EF10 (FUN_00B0EF10, _adxt_GetRna)
    *
    * What it does:
    * Returns ADXT RNA handle lane at offset `+0x0C`.
    */
-  std::int32_t adxt_GetRna(void* adxtRuntime);
+  SofdecAddressWord adxt_GetRna(void* adxtRuntime);
   /**
    * Address: 0x00B0EF20 (FUN_00B0EF20, _ADXT_SetDefFmt)
    *
@@ -223,14 +223,14 @@
    * What it does:
    * Returns ADXT stream handle lane under ADXCRS enter/leave guards.
    */
-  std::int32_t ADXT_GetStm(void* adxtRuntime);
+  SofdecAddressWord ADXT_GetStm(void* adxtRuntime);
   /**
    * Address: 0x00B0E850 (FUN_00B0E850, _adxt_GetStm)
    *
    * What it does:
    * Returns ADXT runtime stream handle lane.
    */
-  std::int32_t adxt_GetStm(void* adxtRuntime);
+  SofdecAddressWord adxt_GetStm(void* adxtRuntime);
   /**
    * Address: 0x00B0E860 (FUN_00B0E860, _ADXT_TermSupply)
    *
@@ -657,7 +657,7 @@
    * What it does:
    * Returns ADXT input-SJ handle lane under ADXCRS enter/leave guards.
    */
-  std::int32_t ADXT_GetInputSj(void* adxtRuntime);
+  SofdecAddressWord ADXT_GetInputSj(void* adxtRuntime);
   /**
    * Address: 0x00B0E510 (FUN_00B0E510, _adxt_GetInputSj)
    *
@@ -665,7 +665,7 @@
    * Returns ADXT runtime input-SJ handle lane or reports null-runtime parameter
    * error.
    */
-  std::int32_t adxt_GetInputSj(void* adxtRuntime);
+  SofdecAddressWord adxt_GetInputSj(void* adxtRuntime);
   /**
    * Address: 0x00B0E530 (FUN_00B0E530, _ADXT_SetWaitPlayStart)
    *
@@ -774,7 +774,7 @@
    * What it does:
    * Returns ADXT transpose lanes from RNA transpose words.
    */
-  std::int32_t adxt_GetTranspose(void* adxtRuntime, std::int32_t* outTransposeOctaves, std::int32_t* outTransposeCents);
+  SofdecAddressWord adxt_GetTranspose(void* adxtRuntime, std::int32_t* outTransposeOctaves, std::int32_t* outTransposeCents);
   /**
    * Address: 0x00B0E8F0 (FUN_00B0E8F0, _ADXT_EntryErrFunc)
    *
@@ -858,7 +858,7 @@
    * What it does:
    * Returns ADXT playback time units/frequency pair from RNA/SJD lanes.
    */
-  std::int32_t adxt_GetTimeSfreq(void* adxtRuntime, std::int32_t* outTimeUnits, std::int32_t* outTimeScale);
+  SofdecAddressWord adxt_GetTimeSfreq(void* adxtRuntime, std::int32_t* outTimeUnits, std::int32_t* outTimeScale);
   /**
    * Address: 0x00B0D4F0 (FUN_00B0D4F0, _ADXT_GetTimeSfreq2)
    *
@@ -992,7 +992,7 @@
   std::int32_t ADXT_SetOutputMonoMode(std::int32_t enabled);
   std::int32_t ADXT_GetStatRead(void* adxtRuntime);
   std::int32_t adxt_GetStatRead(void* adxtRuntime);
-  std::int32_t adxt_eos_entry(void* adxtRuntime);
+  SofdecAddressWord adxt_eos_entry(void* adxtRuntime);
   std::int32_t adxt_set_outpan(void* adxtRuntime);
   using AdxtEndDecodeInfoCallback =
     std::int32_t(__cdecl*)(std::int32_t adxtRuntime, std::int32_t sampleRate, std::int32_t channelCount, std::int32_t sampleCount);
@@ -1054,12 +1054,12 @@
   std::int32_t ADXT_SetLnkSw(void* adxtRuntime, std::int32_t enabled);
   std::int32_t SFTRN_IsSetup(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t transferLaneType);
   std::int32_t SFTRN_CallTrtTrif(
-    std::int32_t sfbufHandleAddress,
-    std::int32_t transferHandleAddress,
-    std::int32_t trifCommandId,
-    std::int32_t arg0,
-    std::int32_t arg1
-  );
+  SofdecAddressWord workctrlAddress,
+  std::int32_t transferLaneIndex,
+  std::int32_t callbackIndex,
+  std::int32_t arg0,
+  std::int32_t arg1
+);
   std::int32_t sftrn_ConnBufTrn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t sourceLane, std::int32_t targetLane);
   std::int32_t sftrn_ConnTrnBuf0(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t sourceLane, std::int32_t targetLane);
   std::int32_t sftrn_ConnTrnBufV(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t sourceLane, std::int32_t targetLane);
@@ -1185,7 +1185,7 @@
   std::int32_t CFT_Ycc420plnToArgb8888Split(
     const CftYcc420PlanarPackedWords* inputWords,
     const CftRgb16OutputPackedWords* outputWords,
-    const std::int32_t* userTableAddress
+    const SofdecAddressWord* userTableAddress
   );
 
   /**
@@ -1195,10 +1195,10 @@
    * Repackages packed conversion lanes and dispatches one-sample or two-sample
    * YCC420->YCC422 conversion path using optimize/alignment rules.
    */
-  std::int32_t CFT_Ycc420plnToYcc422pix2Int(
+  SofdecAddressWord CFT_Ycc420plnToYcc422pix2Int(
     const CftYcc420PlanarPackedWords* inputWords,
     const CftRgb16OutputPackedWords* outputWords,
-    const std::int32_t* scratchBufferWords
+    const SofdecAddressWord* scratchBufferWords
   );
 
   /**
@@ -1208,7 +1208,7 @@
    * Chooses scalar or SSE 1-sample YCC420->YCC422 pixel2/int conversion lane
    * based on runtime alignment and stride constraints.
    */
-  std::int32_t CFT_Ycc420plnToYcc422pix2Int1smp(
+  SofdecAddressWord CFT_Ycc420plnToYcc422pix2Int1smp(
     const CftYcc420PlanarInputLanes* inputLanes,
     const CftPixelSurfaceLanes* outputSurface
   );
@@ -1278,7 +1278,7 @@
    * SSE-eligible two-sample conversion lane using caller-provided scratch
    * workspace.
    */
-  std::int32_t cft_sse_Ycc420plnToYcc422pix2Int2smp(
+  SofdecAddressWord cft_sse_Ycc420plnToYcc422pix2Int2smp(
     const CftYcc420PlanarInputLanes* inputLanes,
     const CftPixelSurfaceLanes* outputSurface,
     std::uintptr_t scratchBufferAddress,
@@ -1302,41 +1302,41 @@
   );
   void SUD_Init();
   std::int32_t SUD_Finish();
-  std::int32_t SFLIB_SetErr(std::int32_t errorObjectAddress, std::int32_t errorCode);
+  std::int32_t SFLIB_SetErr(SofdecAddressWord errorObjectAddress, std::int32_t errorCode);
   std::int32_t sfbuf_InitSjUuid();
   void sfbuf_SetSupSj(
-    std::int32_t* supplyLaneWords,
-    const std::int32_t* createdSjStateWords,
-    std::int32_t ownerAddress,
-    std::int32_t ownershipMode
-  );
-  std::int32_t sfbuf_RingGetSub(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor, std::int32_t laneMode);
+  SofdecAddressWord* supplyLaneWords,
+  const SofdecAddressWord* supplyDescriptorWords,
+  SofdecAddressWord ownerLaneAddress,
+  std::int32_t setupState
+);
+  std::int32_t sfbuf_RingGetSub(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor, std::int32_t laneMode);
   std::int32_t sfbuf_RingAddSub(
-    std::int32_t sfbufHandleAddress,
+    SofdecAddressWord sfbufHandleAddress,
     std::int32_t ringIndex,
     std::int32_t advanceCount,
     std::int32_t laneMode
   );
-  std::uint32_t sfbuf_ResetConti(std::int32_t* supplyStateWords);
+  std::uint32_t sfbuf_ResetConti(SofdecAddressWord* supplyStateWords);
   std::int32_t sfbuf_PeekChunk(
-    std::int32_t ringHandleAddress,
+    SofdecAddressWord ringHandleAddress,
     std::int32_t laneMode,
     moho::SjChunkRange* outFirstChunk,
     moho::SjChunkRange* outSecondChunk
   );
-  std::int32_t sfbuf_MoveChunk(std::int32_t ringHandleAddress, std::int32_t laneMode, std::int32_t requestedBytes);
+  std::int32_t sfbuf_MoveChunk(SofdecAddressWord ringHandleAddress, std::int32_t laneMode, std::int32_t requestedBytes);
   std::int32_t SFX_DecideTableAlph3(moho::SfxCallbackFrameContext* conversionState, moho::SfxStreamState* streamState);
   void SFX_MakeTable(moho::SfxCallbackFrameContext* conversionState, moho::SfxStreamState* streamState, std::int32_t tableMode);
   void sfxcnv_ExecCnvFrmByCbFunc(
     moho::SfxCallbackFrameContext* conversionState,
     moho::SfxStreamState* streamState,
-    std::int32_t callbackArg,
+    SofdecAddressWord callbackArg,
     std::int32_t useLookupTable
   );
   void sfxcnv_ExecFullAlphaByCbFunc(
     moho::SfxCallbackFrameContext* conversionState,
     moho::SfxStreamState* streamState,
-    std::int32_t callbackArg
+    SofdecAddressWord callbackArg
   );
   void SFXLIB_Error(moho::SfxCallbackFrameContext* conversionState, moho::SfxStreamState* streamState, const char* message);
   std::int32_t ADXT_IsInitialized();
@@ -1388,10 +1388,10 @@
    * `\\` separator when missing.
    */
   std::int32_t xeDirSetRootDir(const char* rootDirectory);
-  std::int32_t cvFsEntryErrFunc(std::int32_t errorCallbackAddress, std::int32_t errorObjectAddress);
+  SofdecAddressWord cvFsEntryErrFunc(SofdecAddressWord errorCallbackAddress, SofdecAddressWord errorObjectAddress);
   std::int32_t cvFsSetDefDev(const char* deviceName);
   std::int32_t cvFsError_(const char* message);
-  void cvFsCallUsrErrFn(std::int32_t errorObjectAddress, const char* message);
+  void cvFsCallUsrErrFn(SofdecAddressWord errorObjectAddress, const char* message);
   const char* cvFsGetDevName(const CvFsHandle* handle);
   std::int32_t cvFsOptFn1(CvFsHandle* handle, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
   std::int32_t cvFsOptFn2(CvFsHandle* handle, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
@@ -1409,8 +1409,8 @@
   std::int32_t cvFsLoadDirInfo(char* fileName, std::int32_t optionArg0, std::int32_t optionArg1);
   char* cvFsGetDefDev();
   std::int32_t cvFsTell(CvFsHandle* handle);
-  std::int32_t cvFsReqRd(CvFsHandle* handle, std::int32_t bufferAddress, std::int32_t byteCount);
-  std::int32_t cvFsReqWr(CvFsHandle* handle, std::int32_t bufferAddress, std::int32_t byteCount);
+  std::int32_t cvFsReqRd(CvFsHandle* handle, SofdecAddressWord bufferAddress, std::int32_t byteCount);
+  std::int32_t cvFsReqWr(CvFsHandle* handle, SofdecAddressWord bufferAddress, std::int32_t byteCount);
   std::int32_t cvFsStopTr(CvFsHandle* handle);
   void cvFsExecServer();
   std::int32_t cvFsGetFileSizeEx(char* fileName, std::int32_t optionArg);
@@ -1484,7 +1484,7 @@
   std::int32_t cvFsAddVolumeEx(
     char* deviceName,
     std::int32_t volumeName,
-    std::int32_t imageHandleAddress,
+    SofdecAddressWord imageHandleAddress,
     std::int32_t modeOrFlags
   );
   std::int32_t cvFsDelVolume(char* deviceName, std::int32_t volumeName);
@@ -1528,13 +1528,13 @@
   std::uint32_t __cdecl mfci_strtoul(const char* text, const char** outNextText, std::int32_t base);
   std::uint32_t __cdecl mfci_get_adr_size(const char* addressAndSizeText, std::uint32_t* outSizeBytes);
   std::int32_t __cdecl mfci_alloc();
-  std::int32_t __cdecl mfci_free(std::int32_t handleAddress);
-  std::int32_t __cdecl mfci_reset_hn(std::int32_t handleAddress);
-  void __cdecl mfCiClose(std::int32_t handleAddress);
-  std::int32_t __cdecl mfCiSeek(std::int32_t handleAddress, std::int32_t seekOffset, std::int32_t seekOrigin);
-  std::int32_t __cdecl mfCiTell(std::int32_t handleAddress);
-  void __cdecl mfCiStopTr(std::int32_t handleAddress);
-  std::int32_t __cdecl mfCiGetStat(std::int32_t handleAddress);
+  std::int32_t __cdecl mfci_free(SofdecAddressWord handleAddress);
+  std::int32_t __cdecl mfci_reset_hn(SofdecAddressWord handleAddress);
+  void __cdecl mfCiClose(SofdecAddressWord handleAddress);
+  std::int32_t __cdecl mfCiSeek(SofdecAddressWord handleAddress, std::int32_t seekOffset, std::int32_t seekOrigin);
+  std::int32_t __cdecl mfCiTell(SofdecAddressWord handleAddress);
+  void __cdecl mfCiStopTr(SofdecAddressWord handleAddress);
+  std::int32_t __cdecl mfCiGetStat(SofdecAddressWord handleAddress);
   std::int32_t __cdecl mfCiGetFileSize(const char* fileNameOrAddressRange);
   void mfCrsLock();
   void mfCrsUnlock();
@@ -1560,7 +1560,7 @@
    * What it does:
    * Dispatches ADXT MPEG-audio detach through installed detach callback lane.
    */
-  std::int32_t ADXT_DetachMpa();
+  SofdecAddressWord ADXT_DetachMpa();
   /**
    * Address: 0x00B0CB60 (FUN_00B0CB60, _ADXT_Create)
    *
@@ -1598,7 +1598,7 @@
    * What it does:
    * Dispatches ADXT MPEG-2 AAC detach through the installed link callback lane.
    */
-  extern "C" std::int32_t ADXT_DetachMPEG2AAC(void* adxtRuntime);
+  SofdecAddressWord ADXT_DetachMPEG2AAC(void* adxtRuntime);
   void adxt_Stop(void* adxtRuntime);
   std::int32_t ADXB_SetAhxInSj(moho::AdxBitstreamDecoderState* decoder);
   std::uint32_t ADXB_SetAhxDecSmpl(moho::AdxBitstreamDecoderState* decoder, std::int32_t maxDecodeSamples);
@@ -1612,8 +1612,8 @@
   std::int32_t ADXB_GetDecDtLen(const moho::AdxBitstreamDecoderState* decoder);
   std::int32_t ADXB_GetDecNumSmpl(const moho::AdxBitstreamDecoderState* decoder);
   std::int32_t ADXB_Reset(moho::AdxBitstreamDecoderState* decoder);
-  std::int32_t ADXSJD_Create(
-    std::int32_t inputSourceHandleAddress,
+  SofdecAddressWord ADXSJD_Create(
+    SofdecAddressWord inputSourceHandleAddress,
     std::int32_t outputHandleCount,
     std::int32_t* outputHandleAddresses
   );
@@ -1623,81 +1623,81 @@
     std::int32_t* outWritableSamples,
     std::int32_t* outUntilTrapSamples
   );
-  std::int32_t ADXSJD_Stop(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_SetInSj(std::int32_t sjdHandle, void* sourceJoinHandle);
-  std::int32_t ADXSJD_SetOutSj(std::int32_t sjdHandle, std::int32_t outputLane, void* outputHandle);
-  std::uint32_t ADXSJD_SetMaxDecSmpl(std::int32_t sjdHandle, std::int32_t maxDecodeSamples);
-  std::int32_t ADXSJD_Start(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetDecPos(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_SetDecPos(std::int32_t sjdHandle, std::int32_t decodePosition);
-  std::int32_t ADXSJD_SetCbDec(std::int32_t sjdHandle, void* callbackAddress, std::int32_t callbackContext);
-  std::int32_t ADXSJD_SetLnkSw(std::int32_t sjdHandle, std::int32_t enabled);
-  std::int32_t ADXSJD_GetLnkSw(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetNumChan(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetOutBps(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetBlkSmpl(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetBlkLen(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetTotalNumSmpl(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetCof(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetNumLoop(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetLpInsNsmpl(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetLpStartPos(std::int32_t sjdHandle);
-  std::int16_t ADXSJD_GetDefPan(std::int32_t sjdHandle, std::int32_t laneIndex);
-  std::int32_t ADXSJD_SetDefFmt(std::int32_t sjdHandle, std::int32_t requestedFormat);
-  std::int32_t ADXSJD_GetLpStartOfst(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetLpEndPos(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetLpEndOfst(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetAinfLen(std::int32_t sjdHandle);
-  std::int16_t ADXSJD_GetDefOutVol(std::int32_t sjdHandle);
-  std::uint8_t* ADXSJD_GetDataId(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetHdrLen(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetFmtBps(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetSpsdInfo(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_TakeSnapshot(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_RestoreSnapshot(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetDecDtLen(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_SetTrapNumSmpl(std::int32_t sjdHandle, std::int32_t trapSampleCount);
-  std::int32_t ADXSJD_GetTrapNumSmpl(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_SetTrapCnt(std::int32_t sjdHandle, std::int32_t trapCount);
-  std::int32_t ADXSJD_GetTrapCnt(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_SetTrapDtLen(std::int32_t sjdHandle, std::int32_t trapDataLengthBytes);
-  std::int32_t ADXSJD_GetTrapDtLen(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_EntryTrapFunc(std::int32_t sjdHandle, void* callbackAddress, std::int32_t callbackContext);
-  std::int32_t ADXSJD_EntryFltFunc(std::int32_t sjdHandle, void* callbackAddress, std::int32_t callbackContext);
-  std::int32_t ADXSJD_AdjustSmpl(std::int32_t sjdHandle, std::int32_t sampleDelta);
-  moho::AdxBitstreamDecoderState* ADXSJD_SetExtString(std::int32_t sjdHandle, const char* extString);
+  std::int32_t ADXSJD_Stop(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_SetInSj(SofdecAddressWord sjdHandle, void* sourceJoinHandle);
+  SofdecAddressWord ADXSJD_SetOutSj(SofdecAddressWord sjdHandle, std::int32_t outputLane, void* outputHandle);
+  std::uint32_t ADXSJD_SetMaxDecSmpl(SofdecAddressWord sjdHandle, std::int32_t maxDecodeSamples);
+  SofdecAddressWord ADXSJD_Start(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetDecPos(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_SetDecPos(SofdecAddressWord sjdHandle, std::int32_t decodePosition);
+  SofdecAddressWord ADXSJD_SetCbDec(SofdecAddressWord sjdHandle, void* callbackAddress, std::int32_t callbackContext);
+  std::int32_t ADXSJD_SetLnkSw(SofdecAddressWord sjdHandle, std::int32_t enabled);
+  std::int32_t ADXSJD_GetLnkSw(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetNumChan(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetOutBps(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetBlkSmpl(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetBlkLen(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetTotalNumSmpl(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetCof(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetNumLoop(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetLpInsNsmpl(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetLpStartPos(SofdecAddressWord sjdHandle);
+  std::int16_t ADXSJD_GetDefPan(SofdecAddressWord sjdHandle, std::int32_t laneIndex);
+  SofdecAddressWord ADXSJD_SetDefFmt(SofdecAddressWord sjdHandle, std::int32_t requestedFormat);
+  SofdecAddressWord ADXSJD_GetLpStartOfst(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetLpEndPos(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetLpEndOfst(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetAinfLen(SofdecAddressWord sjdHandle);
+  std::int16_t ADXSJD_GetDefOutVol(SofdecAddressWord sjdHandle);
+  std::uint8_t* ADXSJD_GetDataId(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetHdrLen(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetFmtBps(SofdecAddressWord sjdHandle);
+  SofdecAddressWord ADXSJD_GetSpsdInfo(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_TakeSnapshot(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_RestoreSnapshot(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetDecDtLen(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_SetTrapNumSmpl(SofdecAddressWord sjdHandle, std::int32_t trapSampleCount);
+  std::int32_t ADXSJD_GetTrapNumSmpl(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_SetTrapCnt(SofdecAddressWord sjdHandle, std::int32_t trapCount);
+  std::int32_t ADXSJD_GetTrapCnt(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_SetTrapDtLen(SofdecAddressWord sjdHandle, std::int32_t trapDataLengthBytes);
+  std::int32_t ADXSJD_GetTrapDtLen(SofdecAddressWord sjdHandle);
+  SofdecAddressWord ADXSJD_EntryTrapFunc(SofdecAddressWord sjdHandle, void* callbackAddress, std::int32_t callbackContext);
+  SofdecAddressWord ADXSJD_EntryFltFunc(SofdecAddressWord sjdHandle, void* callbackAddress, std::int32_t callbackContext);
+  std::int32_t ADXSJD_AdjustSmpl(SofdecAddressWord sjdHandle, std::int32_t sampleDelta);
+  moho::AdxBitstreamDecoderState* ADXSJD_SetExtString(SofdecAddressWord sjdHandle, const char* extString);
   std::int32_t ADXSJD_SetDefExtString(const char* extString);
   std::int16_t ADXSJD_GetExtParams(
-    std::int32_t sjdHandle,
+    SofdecAddressWord sjdHandle,
     std::int16_t* outK0,
     std::int16_t* outKMultiplier,
     std::int16_t* outKAdder
   );
   moho::AdxBitstreamDecoderState* ADXSJD_SetExtParams(
-    std::int32_t sjdHandle,
+    SofdecAddressWord sjdHandle,
     std::int16_t k0,
     std::int16_t kMultiplier,
     std::int16_t kAdder
   );
-  std::int32_t ADXSJD_GetFormat(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetSfreq(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetStat(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_GetDecNumSmpl(std::int32_t sjdHandle);
-  std::int32_t ADXSJD_TermSupply(std::int32_t sjdHandle);
+  std::int32_t ADXSJD_GetFormat(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetSfreq(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetStat(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_GetDecNumSmpl(SofdecAddressWord sjdHandle);
+  std::int32_t ADXSJD_TermSupply(SofdecAddressWord sjdHandle);
   std::int32_t ADXAMP_Start(void* channelExpandHandle);
   void ADXAMP_Stop(void* channelExpandHandle);
   void CRIERR_CallErr(const char* format, ...);
   std::int32_t j__CRIERR_SetCbErr(moho::AdxmErrorCallback callbackFunction, std::int32_t callbackObject);
   std::int32_t ADXRNA_EntryErrFunc(moho::AdxmErrorCallback callbackFunction, std::int32_t callbackObject);
-  std::int32_t ADXRNA_Create(std::int32_t sourceJoinHandleTableAddress, std::int32_t channelCount);
-  std::int32_t ADXRNA_GetNumData(std::int32_t rnaHandle);
-  void ADXRNA_ExecHndl(std::int32_t rnaHandle);
-  void j__ADXRNA_Stop(std::int32_t rnaHandle);
-  void j__ADXRNA_SetTransSw(std::int32_t rnaHandle, std::int32_t enabled);
-  void j__ADXRNA_SetPlaySw(std::int32_t rnaHandle, std::int32_t enabled);
-  void ADXRNA_Destroy(std::int32_t rnaHandle);
-  void* mwRnaCreate(std::int32_t sourceJoinHandleTableAddress, std::int32_t channelCount);
-  void ADXSJD_Destroy(std::int32_t sjdHandle);
+  SofdecAddressWord ADXRNA_Create(SofdecAddressWord sourceJoinHandleTableAddress, std::int32_t channelCount);
+  std::int32_t ADXRNA_GetNumData(SofdecAddressWord rnaHandle);
+  void ADXRNA_ExecHndl(SofdecAddressWord rnaHandle);
+  void j__ADXRNA_Stop(SofdecAddressWord rnaHandle);
+  void j__ADXRNA_SetTransSw(SofdecAddressWord rnaHandle, std::int32_t enabled);
+  void j__ADXRNA_SetPlaySw(SofdecAddressWord rnaHandle, std::int32_t enabled);
+  void ADXRNA_Destroy(SofdecAddressWord rnaHandle);
+  void* mwRnaCreate(SofdecAddressWord sourceJoinHandleTableAddress, std::int32_t channelCount);
+  void ADXSJD_Destroy(SofdecAddressWord sjdHandle);
   void* adxf_AllocAdxFs();
   struct AdxstmServerSlot;
   /**
@@ -1815,7 +1815,7 @@
    * Export thunk that forwards EOS callback registration into ADXSTM runtime.
    */
   std::int32_t
-  ADXSTM_EntryEosFunc(std::int32_t streamHandleAddress, std::int32_t callbackAddress, std::int32_t callbackContext);
+  ADXSTM_EntryEosFunc(SofdecAddressWord streamHandleAddress, SofdecAddressWord callbackAddress, std::int32_t callbackContext);
   /**
    * Address: 0x00B0FB30 (FUN_00B0FB30, _ADXSTM_StopNw)
    *
@@ -2058,14 +2058,14 @@
   void* adxf_CreateAdxFs();
   void* adxf_OpenAfsNw(void* afsPointHandle, std::int32_t fileIndex);
   std::int32_t adxf_GetFnameRangeEx(
-    std::int32_t afsHandle,
+    SofdecAddressWord afsHandle,
     std::int32_t fileIndex,
     char* outFileName,
     std::int32_t* outStartOffset,
     std::int32_t* outRangeStart,
     std::int32_t* outRangeEnd
   );
-  const char* adxf_GetFnameFromPt(std::int32_t afsHandle);
+  const char* adxf_GetFnameFromPt(SofdecAddressWord afsHandle);
   std::int32_t adxf_SetAfsFileInfo(void* adxfHandle, void* afsPointHandle, std::int32_t fileIndex);
   // The second and third arguments are a file name and a bind offset, not an
   // AFS point handle and an index: adxf_SetFileInfoEx hands them straight to
@@ -2093,7 +2093,7 @@
    * What it does:
    * Appends one ADXF command history entry and updates per-command call count.
    */
-  std::int32_t adxf_SetCmdHstry(
+  SofdecAddressWord adxf_SetCmdHstry(
     std::int32_t commandId,
     std::int32_t commandStage,
     void* handleArg0,
@@ -2104,13 +2104,13 @@
   // The third argument is the caller's buffer address, not a mode:
   // adxf_ReadNw32 hands it to SJRBF_Create (0x00B0B8EF) as the ring's backing
   // store, and rejects it with `'buf' is NULL` when it is zero.
-  std::int32_t adxf_ReadNw32(void* adxfHandle, std::int32_t requestedSectors, std::int32_t bufferAddress);
+  std::int32_t adxf_ReadNw32(void* adxfHandle, std::int32_t requestedSectors, SofdecAddressWord bufferAddress);
   std::int32_t adxf_GetStat(void* adxfHandle);
   void adxf_wait_until_file_open(void* streamHandle);
   std::int32_t adxf_GetPtStat(std::int32_t pointId);
   std::int32_t adxf_GetPtStatJumpThunk(std::int32_t pointId);
   std::int32_t adxf_CloseLdptnwHn();
-  std::int32_t adxf_StopPtLd();
+  SofdecAddressWord adxf_StopPtLd();
   std::int32_t SofdecSetMonoRoutingMode(std::int32_t monoRoutingMode);
   std::int32_t SofdecGetMonoRoutingMode();
   std::int32_t SofdecSetBufferPlacementMode(std::int32_t bufferPlacementMode);
@@ -2267,7 +2267,7 @@
    * Runs one ADXSTM filesystem-handle service lane.
    */
   std::int32_t ADXSTMF_ExecHndl(void* streamHandle);
-  std::int32_t ADXT_IsActiveFsSvr();
+  SofdecAddressWord ADXT_IsActiveFsSvr();
   void ADXCRS_Enter();
   void ADXCRS_Leave();
   /**
@@ -2304,8 +2304,8 @@
 
   std::int32_t __cdecl HEAPMNG_Create(void* heapBuffer, std::uint32_t heapByteCount, void** outHeapManager);
   std::int32_t __cdecl HEAPMNG_Destroy(void* heapManagerHandle);
-  int HEAPMNG_Allocate(int heapManagerHandle, SIZE_T byteCount, int* outPointer);
-  int HEAPMNG_Free(int heapManagerHandle, int pointerValue);
+  int HEAPMNG_Allocate(SofdecAddressWord heapManagerHandle, SIZE_T byteCount, SofdecAddressWord* outPointer);
+  int HEAPMNG_Free(SofdecAddressWord heapManagerHandle, SofdecAddressWord pointerValue);
 
   void SJCRS_Init();
   std::int32_t SJCRS_Finish();
@@ -2395,25 +2395,25 @@
    * Leaves SVM lock lane using default lock-type token `1`.
    */
   void SVM_Unlock();
-  int M2ABSR_Read(std::int32_t bitstreamHandle, std::int32_t bitCount, void* outBits);
-  int M2ABSR_Tell(std::int32_t bitstreamHandle, std::int32_t* outBitPosition);
-  int M2ABSR_Seek(std::int32_t bitstreamHandle, std::int32_t bitPosition, std::int32_t origin);
-  int M2ABSR_Overruns(std::int32_t bitstreamHandle, std::int32_t* outOverrunFlag);
-  int M2ABSR_AlignToByteBoundary(std::int32_t bitstreamHandle);
+  int M2ABSR_Read(SofdecAddressWord bitstreamHandle, std::int32_t bitCount, void* outBits);
+  int M2ABSR_Tell(SofdecAddressWord bitstreamHandle, std::int32_t* outBitPosition);
+  int M2ABSR_Seek(SofdecAddressWord bitstreamHandle, std::int32_t bitPosition, std::int32_t origin);
+  int M2ABSR_Overruns(SofdecAddressWord bitstreamHandle, std::int32_t* outOverrunFlag);
+  int M2ABSR_AlignToByteBoundary(SofdecAddressWord bitstreamHandle);
   int M2ABSR_Initialize();
   int M2ABSR_Finalize();
-  int M2ABSR_Create(std::int32_t heapManagerHandle, std::int32_t** outBitstream);
+  int M2ABSR_Create(SofdecAddressWord heapManagerHandle, std::int32_t** outBitstream);
   int M2ABSR_Destroy(std::int32_t* bitstreamHandle);
   int M2ABSR_Reset(std::uint32_t* bitstreamState);
   int M2ABSR_SetBuffer(std::uint32_t* bitstreamState, std::int32_t sourceBuffer, std::int32_t sourceBytes);
-  int M2ABSR_IsEndOfBuffer(std::int32_t bitstreamHandle, std::int32_t* outIsEnd);
+  int M2ABSR_IsEndOfBuffer(SofdecAddressWord bitstreamHandle, std::int32_t* outIsEnd);
   int M2AHUFFMAN_Initialize();
   int M2AHUFFMAN_Finalize();
   int M2AIMDCT_Initialize();
   int M2AIMDCT_Finalize();
   std::int32_t M2ADEC_Initialize();
   std::int32_t M2ADEC_Finalize();
-  std::int32_t __cdecl M2ADEC_Create(const std::int32_t heapManagerHandle, M2aDecoderContext** outContext);
+  std::int32_t __cdecl M2ADEC_Create(const SofdecAddressWord heapManagerHandle, M2aDecoderContext** outContext);
   std::int32_t __cdecl M2ADEC_Destroy(M2aDecoderContext* context);
 
   std::int32_t __cdecl M2ADEC_Reset(M2aDecoderContext* context);
@@ -2423,7 +2423,7 @@
   std::int32_t __cdecl M2ADEC_Stop(M2aDecoderContext* context);
   std::int32_t __cdecl M2ADEC_Process(
     M2aDecoderContext* context,
-    std::int32_t sourceAddress,
+    SofdecAddressWord sourceAddress,
     std::int32_t sourceBytes,
     std::int32_t* outConsumedBytes
   );
@@ -2435,19 +2435,19 @@
   std::int32_t __cdecl M2ADEC_GetFrequency(M2aDecoderContext* context, std::int32_t* outFrequency);
   std::int32_t __cdecl M2ADEC_GetNumChannels(M2aDecoderContext* context, std::int32_t* outChannelCount);
   std::int32_t __cdecl M2ADEC_GetChannelConfiguration(M2aDecoderContext* context, std::int32_t* outChannelConfiguration);
-  std::int32_t __cdecl M2ADEC_GetPcm(M2aDecoderContext* context, std::int32_t channelIndex, std::int32_t destinationAddress);
+  std::int32_t __cdecl M2ADEC_GetPcm(M2aDecoderContext* context, std::int32_t channelIndex, SofdecAddressWord destinationAddress);
   std::int32_t __cdecl M2ADEC_GetDownmixedPcm(
     M2aDecoderContext* context,
     std::int32_t outputChannelIndex,
-    std::int32_t destinationAddress
+    SofdecAddressWord destinationAddress
   );
   std::int32_t __cdecl M2ADEC_GetSurroundPcm(
     M2aDecoderContext* context,
     std::int32_t outputChannelIndex,
-    std::int32_t destinationAddress
+    SofdecAddressWord destinationAddress
   );
-  HANDLE __cdecl m2adec_malloc(std::int32_t heapManagerHandle, SIZE_T byteCount);
-  HANDLE __cdecl m2adec_free(std::int32_t heapManagerHandle, LPVOID memoryBlock);
+  HANDLE __cdecl m2adec_malloc(SofdecAddressWord heapManagerHandle, SIZE_T byteCount);
+  HANDLE __cdecl m2adec_free(SofdecAddressWord heapManagerHandle, LPVOID memoryBlock);
   std::int32_t __cdecl m2adec_decode_header(M2aDecoderContext* context);
   std::int32_t __cdecl m2adec_get_header_type(
     const std::uint8_t* sourceBytes,
@@ -2474,31 +2474,31 @@
   std::int32_t __cdecl m2adec_decode_pce(M2aDecoderContext* context);
   std::int32_t __cdecl m2adec_specify_location(M2aDecoderContext* context);
   std::int32_t __cdecl m2adec_find_sync_offset(M2aDecoderContext* context, std::int32_t* outOffset);
-  std::int32_t __cdecl m2adec_convert_to_pcm16(float* sourceSamples, std::int32_t destinationAddress);
+  std::int32_t __cdecl m2adec_convert_to_pcm16(float* sourceSamples, SofdecAddressWord destinationAddress);
 
   int __cdecl mpabdr_Init();
   int __cdecl mpabdr_Finish();
-  int __cdecl MPARBF_SetUsrMallocFunc(std::int32_t allocatorFunctionAddress);
-  int __cdecl MPARBF_SetUsrFreeFunc(std::int32_t freeFunctionAddress);
-  int __cdecl MPARBF_Create(std::int32_t bufferBytes, std::int32_t* outHandle);
-  int __cdecl MPARBF_Destroy(std::int32_t* handleAddress);
-  int __cdecl MPARBF_Reset(std::int32_t handleAddress);
-  int __cdecl MPARBF_GetDataSize(std::int32_t bitReaderHandle, std::uint32_t* outDataBytes);
-  int __cdecl MPARBF_GetFreeSize(std::int32_t bitReaderHandle, std::uint32_t* outFreeBytes);
+  int __cdecl MPARBF_SetUsrMallocFunc(SofdecAddressWord allocatorFunctionAddress);
+  int __cdecl MPARBF_SetUsrFreeFunc(SofdecAddressWord freeFunctionAddress);
+  int __cdecl MPARBF_Create(std::int32_t bufferBytes, SofdecAddressWord* outHandle);
+  int __cdecl MPARBF_Destroy(SofdecAddressWord* handleAddress);
+  int __cdecl MPARBF_Reset(SofdecAddressWord handleAddress);
+  int __cdecl MPARBF_GetDataSize(SofdecAddressWord bitReaderHandle, std::uint32_t* outDataBytes);
+  int __cdecl MPARBF_GetFreeSize(SofdecAddressWord bitReaderHandle, std::uint32_t* outFreeBytes);
   int __cdecl MPARBF_ReadData(
-    std::int32_t bitReaderHandle,
+    SofdecAddressWord bitReaderHandle,
     char* destinationBytes,
     std::uint32_t byteCount,
     std::uint32_t* outReadBytes
   );
   int __cdecl MPARBF_WriteData(
-    std::int32_t bitReaderHandle,
-    std::int32_t sourceAddress,
+    SofdecAddressWord bitReaderHandle,
+    SofdecAddressWord sourceAddress,
     std::uint32_t byteCount,
     std::uint32_t* outWrittenBytes
   );
   int __cdecl MPARBF_ReturnData(
-    std::int32_t bitReaderHandle,
+    SofdecAddressWord bitReaderHandle,
     std::uint32_t returnBytes,
     std::uint32_t* outReturnedBytes
   );
@@ -2527,9 +2527,9 @@
   std::int32_t __cdecl mparbd_GetNumChannel(MparbdDecoderState* decoder, std::int32_t* outChannelCount);
   std::int32_t __cdecl MPARBD_GetNumBit(MparbdDecoderState* decoder, std::int32_t* outBitsPerSample);
   std::int32_t __cdecl mparbd_GetNumBit(MparbdDecoderState* decoder, std::int32_t* outBitsPerSample);
-  std::int32_t __cdecl MPARBD_EntryErrFunc(std::int32_t callbackFunctionAddress, std::int32_t callbackContext);
-  std::int32_t __cdecl MPARBD_SetUsrMallocFunc(std::int32_t allocatorFunctionAddress);
-  std::int32_t __cdecl MPARBD_SetUsrFreeFunc(std::int32_t freeFunctionAddress);
+  std::int32_t __cdecl MPARBD_EntryErrFunc(SofdecAddressWord callbackFunctionAddress, std::int32_t callbackContext);
+  std::int32_t __cdecl MPARBD_SetUsrMallocFunc(SofdecAddressWord allocatorFunctionAddress);
+  std::int32_t __cdecl MPARBD_SetUsrFreeFunc(SofdecAddressWord freeFunctionAddress);
   std::int32_t __cdecl MPARBD_Init();
   std::int32_t __cdecl MPARBD_Finish();
   std::int32_t __cdecl MPARBD_Create(MparbdDecoderState** outDecoder);
@@ -2628,15 +2628,15 @@
   std::uint32_t m2adec_copy(void* destination, const void* source, std::size_t byteCount);
   std::int32_t __cdecl m2adec_clear(void* destination, std::uint32_t byteCount);
   int M2AHUFFMAN_GetCodebook(int index, std::uintptr_t* outCodebook);
-  int M2AHUFFMAN_Decode(int codebookHandle, int bitstreamHandle);
+  int M2AHUFFMAN_Decode(int codebookHandle, SofdecAddressWord bitstreamHandle);
   int M2AHUFFMAN_Unpack(
     std::uint32_t* codebook,
     int packedValue,
     std::int32_t* outValues,
     std::int32_t* outDimension,
-    int bitstreamHandle
+    SofdecAddressWord bitstreamHandle
   );
-  int M2AHUFFMAN_GetEscValue(int valuesHandle, int bitstreamHandle);
+  int M2AHUFFMAN_GetEscValue(int valuesHandle, SofdecAddressWord bitstreamHandle);
   extern float m2adec_tns_decode_table[];
   extern std::int32_t m2adec_frequency_table[];
   extern std::int32_t m2adec_num_spectra_per_sfb[];
@@ -2723,9 +2723,9 @@
   std::int32_t __cdecl M2ASJD_Init();
   std::int32_t __cdecl M2ASJD_Finish();
   std::int32_t __cdecl
-  M2ASJD_Create(std::int32_t heapManagerHandle, std::int32_t heapManagerOwner, M2asjdDecoderState** outDecoder);
+  M2ASJD_Create(SofdecAddressWord heapManagerHandle, std::int32_t heapManagerOwner, M2asjdDecoderState** outDecoder);
   std::int32_t __cdecl
-  m2asjd_Create(std::int32_t heapManagerHandle, std::int32_t heapManagerOwner, M2asjdDecoderState** outDecoder);
+  m2asjd_Create(SofdecAddressWord heapManagerHandle, std::int32_t heapManagerOwner, M2asjdDecoderState** outDecoder);
   std::int32_t __cdecl M2ASJD_Destroy(M2asjdDecoderState* decoder);
   std::int32_t __cdecl m2asjd_SetCbDcd(M2asjdDecodeCallback decodeCallback, std::int32_t callbackObject);
   std::int32_t __cdecl m2asjd_default_callback(std::int32_t callbackObject, const char* errorMessage);
@@ -2776,8 +2776,8 @@
     std::int32_t outputStreamCount,
     M2asjdIoStream** outputStreams
   );
-  void* __cdecl m2asjd_malloc(std::int32_t heapManagerHandle, SIZE_T byteCount);
-  void __cdecl m2asjd_free(std::int32_t heapManagerHandle, LPVOID memoryBlock);
+  void* __cdecl m2asjd_malloc(SofdecAddressWord heapManagerHandle, SIZE_T byteCount);
+  void __cdecl m2asjd_free(SofdecAddressWord heapManagerHandle, LPVOID memoryBlock);
   std::int32_t __cdecl m2asjd_clear(void* destinationBytes, std::uint32_t byteCount);
   std::uint32_t __cdecl m2asjd_copy(void* destinationBytes, const void* sourceBytes, std::uint32_t byteCount);
   std::int32_t __cdecl M2ASJD_GetDownmixMode(M2asjdDecoderState* decoder, std::int32_t* outDownmixMode);
@@ -3023,22 +3023,22 @@
   std::int32_t __cdecl adxsje_calc_rsig(AdxStreamJoinEncoderState* encoder, std::int32_t channelIndex);
   std::int32_t __cdecl adxsje_set_rsig(AdxStreamJoinEncoderState* encoder, std::int32_t channelIndex);
   char* __cdecl iirflt_create();
-  std::int32_t __cdecl iirflt_destroy(std::int32_t iirFilterHandle);
+  std::int32_t __cdecl iirflt_destroy(SofdecAddressWord iirFilterHandle);
   std::int32_t __cdecl
-  iirflt_set_coef(std::int32_t iirFilterHandle, std::int16_t coefficient0, std::int16_t coefficient1);
+  iirflt_set_coef(SofdecAddressWord iirFilterHandle, std::int16_t coefficient0, std::int16_t coefficient1);
   std::int32_t __cdecl
-  iirflt_set_delay(std::int32_t iirFilterHandle, std::int16_t delay0, std::int16_t delay1);
+  iirflt_set_delay(SofdecAddressWord iirFilterHandle, std::int16_t delay0, std::int16_t delay1);
   std::int16_t __cdecl
-  iirflt_get_delay(std::int32_t iirFilterHandle, std::int16_t* outDelay0, std::int16_t* outDelay1);
-  std::int16_t __cdecl iirflt_put_sig(std::int32_t iirFilterHandle, std::int16_t sample);
+  iirflt_get_delay(SofdecAddressWord iirFilterHandle, std::int16_t* outDelay0, std::int16_t* outDelay1);
+  std::int16_t __cdecl iirflt_put_sig(SofdecAddressWord iirFilterHandle, std::int16_t sample);
   std::int32_t __cdecl
-  pflt_set_coef(std::int32_t filterHandle, std::int16_t coefficient0, std::int16_t coefficient1);
-  std::int32_t __cdecl pflt_set_delay(std::int32_t filterHandle, std::int16_t delay0, std::int16_t delay1);
-  std::int32_t __cdecl pflt_put_sig(std::int32_t filterHandle, std::int32_t sampleIndex, std::int16_t sample);
-  std::int32_t __cdecl pflt_calc_gain(std::int32_t filterHandle);
-  std::int16_t __cdecl pflt_get_rsig(std::int32_t filterHandle, std::int32_t sampleIndex);
-  std::int8_t __cdecl pflt_get_rsig_q(std::int32_t filterHandle, std::int32_t sampleIndex);
-  std::int8_t __cdecl pflt_set_rsig_q(std::int32_t filterHandle, std::int32_t sampleIndex, std::int8_t value);
+  pflt_set_coef(SofdecAddressWord filterHandle, std::int16_t coefficient0, std::int16_t coefficient1);
+  std::int32_t __cdecl pflt_set_delay(SofdecAddressWord filterHandle, std::int16_t delay0, std::int16_t delay1);
+  std::int32_t __cdecl pflt_put_sig(SofdecAddressWord filterHandle, std::int32_t sampleIndex, std::int16_t sample);
+  std::int32_t __cdecl pflt_calc_gain(SofdecAddressWord filterHandle);
+  std::int16_t __cdecl pflt_get_rsig(SofdecAddressWord filterHandle, std::int32_t sampleIndex);
+  std::int8_t __cdecl pflt_get_rsig_q(SofdecAddressWord filterHandle, std::int32_t sampleIndex);
+  std::int8_t __cdecl pflt_set_rsig_q(SofdecAddressWord filterHandle, std::int32_t sampleIndex, std::int8_t value);
   std::int32_t __cdecl ADX_GetCoefficient(
     std::int32_t coefficientIndex,
     std::int32_t sampleRate,
@@ -3054,8 +3054,8 @@
   void __cdecl ADXCRS_Lock();
   void __cdecl ADXCRS_Unlock();
   std::int32_t __cdecl pflt_create(std::int32_t blockSampleCount);
-  void __cdecl pflt_destroy(std::int32_t filterHandle);
-  std::int32_t __cdecl pflt_calc_coef(std::int32_t filterHandle, std::int32_t preset, std::int32_t sampleRate);
+  void __cdecl pflt_destroy(SofdecAddressWord filterHandle);
+  std::int32_t __cdecl pflt_calc_coef(SofdecAddressWord filterHandle, std::int32_t preset, std::int32_t sampleRate);
   std::int32_t __cdecl iirflt_init();
 
   std::uint8_t* adxb_ResetAinf(moho::AdxBitstreamDecoderState* decoder);
@@ -3072,12 +3072,12 @@
   int ADXB_DecodeHeaderAu(moho::AdxBitstreamDecoderState* decoder, const std::uint8_t* headerBytes, std::int32_t headerSize);
   int ADXB_DecodeHeaderMpa(moho::AdxBitstreamDecoderState* decoder, const std::uint8_t* headerBytes, std::int32_t headerSize);
   int ADXB_DecodeHeaderM2a(moho::AdxBitstreamDecoderState* decoder, const std::uint8_t* headerBytes, std::int32_t headerSize);
-  std::int32_t ADXB_SetMpaInSj(moho::AdxBitstreamDecoderState* decoder);
+  SofdecAddressWord ADXB_SetMpaInSj(moho::AdxBitstreamDecoderState* decoder);
   std::uint32_t ADXB_SetMpaDecSmpl(moho::AdxBitstreamDecoderState* decoder, std::int32_t maxDecodeSamples);
   std::int32_t ADXB_SetM2aInSj(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t ADXB_SetM2aDecSmpl(moho::AdxBitstreamDecoderState* decoder, std::int32_t maxDecodeSamples);
-  std::int32_t ADXB_MpaTermSupply(moho::AdxBitstreamDecoderState* decoder);
-  std::int32_t ADXB_M2aTermSupply(moho::AdxBitstreamDecoderState* decoder);
+  SofdecAddressWord ADXB_MpaTermSupply(moho::AdxBitstreamDecoderState* decoder);
+  SofdecAddressWord ADXB_M2aTermSupply(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t __cdecl ADXB_ExecOneWav(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t __cdecl ADXB_ExecOneSpsd(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t __cdecl ADXB_ExecOneAiff(moho::AdxBitstreamDecoderState* decoder);
@@ -3108,10 +3108,10 @@
   std::int32_t sfply_IsBpaOff(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t SFD_VbIn();
   void SFD_VbOut();
-  std::int32_t sfply_ExecOneSub(std::int32_t workctrlAddress);
-  std::int32_t sfply_TrExecServer(std::int32_t workctrlAddress);
-  std::int32_t SFSEE_ExecServer(std::int32_t workctrlAddress);
-  std::int32_t SFSEE_FixAvPlay(std::int32_t workctrlAddress, std::int32_t condition5State, std::int32_t condition6State);
+  std::int32_t sfply_ExecOneSub(SofdecAddressWord workctrlAddress);
+  std::int32_t sfply_TrExecServer(SofdecAddressWord workctrlAddress);
+  std::int32_t SFSEE_ExecServer(SofdecAddressWord workctrlAddress);
+  SofdecAddressWord SFSEE_FixAvPlay(SofdecAddressWord workctrlAddress, std::int32_t condition5State, std::int32_t condition6State);
   std::int32_t sfply_ExecOne(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_ChkFin(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_IsEtime(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
@@ -3123,7 +3123,7 @@
   std::int32_t sfply_ChkCrePara(const moho::SfplyCreateParams* createParams);
   std::int32_t sfply_SearchFreeHn();
   std::int32_t sfply_InitMvInf(moho::SfplyMovieInfo* movieInfo);
-  std::int32_t sfply_InitPlyInf(moho::SfplyPlaybackInfo* playbackInfo);
+  SofdecAddressWord sfply_InitPlyInf(moho::SfplyPlaybackInfo* playbackInfo);
   moho::SfplyFlowCount* sfply_InitFlowCnt(moho::SfplyFlowCount* flowCount);
   std::int32_t sfply_InitTmrInf(moho::SfplyTimerInfo* timerInfo);
   std::int32_t SFPLY_AddDecPic(
@@ -3145,7 +3145,7 @@
   std::int32_t SFPLY_Stop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t SFPLY_SetResetFlg(std::int32_t enabled);
   std::int32_t SFPLY_GetResetFlg();
-  std::int32_t sfply_TrStop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  SofdecAddressWord sfply_TrStop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_ResetHn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   moho::SofdecSfdWorkctrlSubobj* sfply_InitHn(moho::SfplyCreateParams* createParams, std::int32_t createContext);
   std::int32_t sfply_IsAnyoneTerm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
@@ -3202,7 +3202,7 @@
    * What it does:
    * Converts ADXT start PTS (90 kHz) to sample index at requested sample rate.
    */
-  std::int32_t SFTIM_GetAudioStartSample(void* adxtRuntime, std::int32_t audioSampleRate);
+  SofdecAddressWord SFTIM_GetAudioStartSample(void* adxtRuntime, std::int32_t audioSampleRate);
   /**
    * Address: 0x00ADAF90 (FUN_00ADAF90, _SFTIM_GetVideoStartSample)
    *
@@ -3218,22 +3218,22 @@
    * Stores one per-handle playback start-time pair.
    */
   std::int32_t
-  SFTIM_SetStartTime(std::int32_t workctrlAddress, std::int32_t startTimeMajor, std::int32_t startTimeMinor);
-  void SFTIM_GetTime(std::int32_t workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
+  SFTIM_SetStartTime(SofdecAddressWord workctrlAddress, std::int32_t startTimeMajor, std::int32_t startTimeMinor);
+  void SFTIM_GetTime(SofdecAddressWord workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
   /**
    * Address: 0x00ADBEC0 (FUN_00ADBEC0, _SFTIM_SetSpeed)
    *
    * What it does:
    * Stores one per-handle timer speed rational lane.
    */
-  std::int32_t SFTIM_SetSpeed(std::int32_t workctrlAddress, std::int32_t speedRational);
+  std::int32_t SFTIM_SetSpeed(SofdecAddressWord workctrlAddress, std::int32_t speedRational);
   /**
    * Address: 0x00ADBED0 (FUN_00ADBED0, _SFTIM_GetSpeed)
    *
    * What it does:
    * Returns one per-handle timer speed rational lane.
    */
-  std::int32_t SFTIM_GetSpeed(std::int32_t workctrlAddress);
+  std::int32_t SFTIM_GetSpeed(SofdecAddressWord workctrlAddress);
   std::int32_t SFTIM_GetTimeSub(
     moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
     std::int32_t* outTimeMajor,
@@ -3541,7 +3541,7 @@
   {
     std::uint8_t mUnknown00[0x3C]{};
     std::int32_t resetParameter = 0; // +0x3C
-    std::int32_t adxtHandle = 0; // +0x40
+    SofdecAddressWord adxtHandle = 0; // +0x40
   };
 
   static_assert(
@@ -3818,7 +3818,7 @@
   using M2vDispatchCallback = std::int32_t(__cdecl*)(...);
   using M2vVersionStringCallback = const char*(__cdecl*)();
   using M2vSimpleCallback = std::int32_t(__cdecl*)();
-  using M2vDestroyCallback = std::int32_t(__cdecl*)(std::int32_t decoderHandle);
+  using M2vDestroyCallback = std::int32_t(__cdecl*)(SofdecAddressWord decoderHandle);
   using M2pVersionStringCallback = const char*(__cdecl*)();
   using M2pSimpleCallback = std::int32_t(__cdecl*)();
   std::int32_t m2vapi_issetup = 0;
@@ -4692,9 +4692,9 @@ namespace
     std::uint8_t mUnknown01 = 0; // +0x01
     std::uint8_t mUnknown02 = 0; // +0x02
     std::int8_t maxChannelCount = 0; // +0x03
-    std::int32_t sjdHandle = 0; // +0x04
+    SofdecAddressWord sjdHandle = 0; // +0x04
     void* streamHandle = nullptr; // +0x08
-    std::int32_t rnaHandle = 0; // +0x0C
+    SofdecAddressWord rnaHandle = 0; // +0x0C
     AdxtDestroyableHandle* sourceRingHandle = nullptr; // +0x10
     AdxtStreamJoinHandle* streamJoinInputHandle = nullptr; // +0x14
     std::uint8_t mUnknown18[0x24]{}; // +0x18
@@ -5058,7 +5058,7 @@ namespace
 
   struct MwsfdPicUserBufferDescriptor
   {
-    std::int32_t bufferAddress = 0; // +0x00
+    SofdecAddressWord bufferAddress = 0; // +0x00
     std::int32_t bufferBytes = 0; // +0x04
     std::int32_t bytesPerFrame = 0; // +0x08
   };
@@ -5900,41 +5900,41 @@ namespace
     return pointer + (4u - misalignment);
   }
 
-  [[nodiscard]] AdxsjdState* AdxsjdStateOf(const std::int32_t sjdHandle)
+  [[nodiscard]] AdxsjdState* AdxsjdStateOf(const SofdecAddressWord sjdHandle)
   {
-    return reinterpret_cast<AdxsjdState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sjdHandle)));
+    return reinterpret_cast<AdxsjdState*>(static_cast<std::uintptr_t>(sjdHandle));
   }
 
-  [[nodiscard]] AdxrnaState* AdxrnaStateOf(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaState* AdxrnaStateOf(const SofdecAddressWord rnaHandle)
   {
-    return reinterpret_cast<AdxrnaState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle)));
+    return reinterpret_cast<AdxrnaState*>(static_cast<std::uintptr_t>(rnaHandle));
   }
 
-  [[nodiscard]] AdxrnaTransport* AdxrnaTransportOf(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaTransport* AdxrnaTransportOf(const SofdecAddressWord rnaHandle)
   {
     return reinterpret_cast<AdxrnaTransport*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
+      static_cast<std::uintptr_t>(rnaHandle)
     );
   }
 
-  [[nodiscard]] AdxrnaPlaySwitch* AdxrnaPlaySwitchOf(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaPlaySwitch* AdxrnaPlaySwitchOf(const SofdecAddressWord rnaHandle)
   {
     return reinterpret_cast<AdxrnaPlaySwitch*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
+      static_cast<std::uintptr_t>(rnaHandle)
     );
   }
 
-  [[nodiscard]] AdxrnaLegacyMetrics* AdxrnaLegacyMetricsOf(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaLegacyMetrics* AdxrnaLegacyMetricsOf(const SofdecAddressWord rnaHandle)
   {
     return reinterpret_cast<AdxrnaLegacyMetrics*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
+      static_cast<std::uintptr_t>(rnaHandle)
     );
   }
 
-  [[nodiscard]] AdxrnaStateControl* AdxrnaStateControlOf(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaStateControl* AdxrnaStateControlOf(const SofdecAddressWord rnaHandle)
   {
     return reinterpret_cast<AdxrnaStateControl*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
+      static_cast<std::uintptr_t>(rnaHandle)
     );
   }
 
@@ -6007,7 +6007,7 @@ namespace
   }
 
   [[nodiscard]] std::int16_t ResolveAdxsjdDefaultPanLane(
-    const std::int32_t sjdHandle,
+    const SofdecAddressWord sjdHandle,
     const std::int32_t channelIndex
   )
   {
@@ -6021,7 +6021,7 @@ namespace
     return -128;
   }
 
-  [[nodiscard]] std::int32_t ResolveAdxsjdChannelCount(const std::int32_t sjdHandle)
+  [[nodiscard]] std::int32_t ResolveAdxsjdChannelCount(const SofdecAddressWord sjdHandle)
   {
     return ADXB_GetNumChan(AdxsjdStateOf(sjdHandle)->adxbHandle);
   }
@@ -6044,7 +6044,7 @@ namespace
     void* callbackOwner,
     std::int32_t channelIndex,
     std::int32_t startUnit,
-    std::int32_t sourceAddress,
+    SofdecAddressWord sourceAddress,
     std::int32_t transferUnits
   );
 
@@ -6171,7 +6171,7 @@ namespace
     MwlRna* const runtime,
     const std::int32_t channelIndex,
     const std::int32_t startUnit,
-    const std::int32_t sourceAddress,
+    const SofdecAddressWord sourceAddress,
     const std::int32_t transferUnits
   )
   {
@@ -6300,7 +6300,7 @@ namespace
    * Samples output transfer-read cursor, aligns it to transfer stride, then
    * reconciles queued/decode cursor lanes under RNA critical section.
    */
-  [[maybe_unused]] void adxrna_UpdateTransferReadState(const std::int32_t rnaHandle)
+  [[maybe_unused]] void adxrna_UpdateTransferReadState(const SofdecAddressWord rnaHandle)
   {
     auto* const runtime = AdxrnaTransportOf(rnaHandle);
     auto* const mwlRuntime = reinterpret_cast<MwlRna*>(runtime);
@@ -6351,7 +6351,7 @@ namespace
   {
     for (auto& runtime : gAdxrnaRuntimePool) {
       if (runtime.inUse == 1u) {
-        ADXRNA_ExecHndl(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&runtime)));
+        ADXRNA_ExecHndl(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(&runtime)));
       }
     }
   }
@@ -6362,7 +6362,7 @@ namespace
    * What it does:
    * Sets decode-control pending byte lane (`+0x06`) on one RNA runtime.
    */
-  [[maybe_unused]] AdxrnaTransport* adxrna_SetDecodeControlPending(const std::int32_t rnaHandle)
+  [[maybe_unused]] AdxrnaTransport* adxrna_SetDecodeControlPending(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6440,7 +6440,7 @@ namespace
     adxrna_GetTime = getTimeCallback;
   }
 
-  [[maybe_unused]] void adxrna_CommitOutputSyncState(const std::int32_t rnaHandle);
+  [[maybe_unused]] void adxrna_CommitOutputSyncState(const SofdecAddressWord rnaHandle);
 
   /**
    * Address: 0x00B15370 (FUN_00B15370, sub_B15370)
@@ -6479,7 +6479,7 @@ namespace
 
     const std::uintptr_t scratchAddressAligned
       = (reinterpret_cast<std::uintptr_t>(scratchBase + 32u)) & static_cast<std::uintptr_t>(~0x1Fu);
-    const std::int32_t scratchWordAddress = static_cast<std::int32_t>(scratchAddressAligned);
+    const SofdecAddressWord scratchWordAddress = static_cast<std::int32_t>(scratchAddressAligned);
 
     const std::int32_t channelCount = static_cast<std::int32_t>(runtime->channelCount);
     if (channelCount > 0) {
@@ -6558,7 +6558,7 @@ namespace
    */
   [[maybe_unused]] std::int32_t adxrna_SetPauseAllState(const std::int32_t pauseAllEnabled)
   {
-    std::int32_t result = gAdxrnaPauseAllState;
+    SofdecAddressWord result = gAdxrnaPauseAllState;
     if (pauseAllEnabled == 1) {
       if (gAdxrnaPauseAllState != 1) {
         gAdxrnaPauseAllState = 1;
@@ -6570,7 +6570,7 @@ namespace
       }
     } else if (gAdxrnaPauseAllState != 0) {
       for (auto& runtime : gAdxrnaRuntimePool) {
-        const std::int32_t rnaHandle = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&runtime));
+        const SofdecAddressWord rnaHandle = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(&runtime));
         result = rnaHandle;
         if (runtime.inUse == 1u) {
           result = static_cast<std::int32_t>((runtime.stateFlags >> 1) & 1u);
@@ -6602,7 +6602,7 @@ namespace
    * Latches output-sync request state and runs one immediate sync pass for the
    * target RNA handle.
    */
-  [[maybe_unused]] void adxrna_RequestOutputSyncPass(const std::int32_t rnaHandle)
+  [[maybe_unused]] void adxrna_RequestOutputSyncPass(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6658,7 +6658,7 @@ namespace
    * Completes one pending output-sync pass and restores play-switch lane when
    * latched sync state requires active playback.
    */
-  [[maybe_unused]] void adxrna_CompleteOutputSyncPass(const std::int32_t rnaHandle)
+  [[maybe_unused]] void adxrna_CompleteOutputSyncPass(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6686,7 +6686,7 @@ namespace
    * What it does:
    * Returns ADXRNA output-sync-pending flag.
    */
-  [[maybe_unused]] std::int32_t adxrna_IsOutputSyncPending(const std::int32_t rnaHandle)
+  [[maybe_unused]] std::int32_t adxrna_IsOutputSyncPending(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle != 0) {
       return static_cast<std::int32_t>(AdxrnaTransportOf(rnaHandle)->outputSyncPending);
@@ -6703,7 +6703,7 @@ namespace
    * Commits one pending transfer/output sync pass, reconciling transport cursor
    * lanes from output-consumed unit counts.
    */
-  [[maybe_unused]] void adxrna_CommitOutputSyncState(const std::int32_t rnaHandle)
+  [[maybe_unused]] void adxrna_CommitOutputSyncState(const SofdecAddressWord rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6796,19 +6796,19 @@ namespace
   }
 
   template <typename T>
-  [[nodiscard]] T* M2aWordToPtr(const std::int32_t addressWord)
+  [[nodiscard]] T* M2aWordToPtr(const SofdecAddressWord addressWord)
   {
-    return reinterpret_cast<T*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(addressWord)));
+    return reinterpret_cast<T*>(static_cast<std::uintptr_t>(addressWord));
   }
 
   [[nodiscard]] std::int32_t M2aPtrToWord(const void* pointer)
   {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(pointer));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
   }
 
-  [[nodiscard]] void* M2aAllocFromHeap(const std::int32_t heapManagerHandle, const SIZE_T byteCount)
+  [[nodiscard]] void* M2aAllocFromHeap(const SofdecAddressWord heapManagerHandle, const SIZE_T byteCount)
   {
-    int allocatedPointer = 0;
+    SofdecAddressWord allocatedPointer = 0;
     if (heapManagerHandle != 0 && HEAPMNG_Allocate(heapManagerHandle, byteCount, &allocatedPointer) >= 0) {
       return M2aWordToPtr<void>(allocatedPointer);
     }
@@ -7256,14 +7256,14 @@ namespace
     return static_cast<std::int32_t>(static_cast<double>(static_cast<std::uint32_t>(micros)) * scale);
   }
 
-  [[nodiscard]] MparbfBuffer* AsMparbfBuffer(const std::int32_t handleAddress)
+  [[nodiscard]] MparbfBuffer* AsMparbfBuffer(const SofdecAddressWord handleAddress)
   {
     return reinterpret_cast<MparbfBuffer*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handleAddress))
+      static_cast<std::uintptr_t>(handleAddress)
     );
   }
 
-  void M2aFreeHeapAllocation(const std::int32_t heapManagerHandle, void* allocation)
+  void M2aFreeHeapAllocation(const SofdecAddressWord heapManagerHandle, void* allocation)
   {
     if (allocation != nullptr) {
       HEAPMNG_Free(heapManagerHandle, M2aPtrToWord(allocation));

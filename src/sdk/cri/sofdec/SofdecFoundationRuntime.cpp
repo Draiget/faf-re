@@ -174,19 +174,19 @@ static_assert(offsetof(MfciHandle, transferredSectors) == 0x18, "MfciHandle::tra
 static_assert(offsetof(MfciHandle, addressAndSizeText) == 0x1C, "MfciHandle::addressAndSizeText offset must be 0x1C");
 static_assert(sizeof(MfciHandle) == 0x38, "MfciHandle size must be 0x38");
 
-[[nodiscard]] MfciHandle* AsMfciHandle(const std::int32_t handleAddress)
+[[nodiscard]] MfciHandle* AsMfciHandle(const SofdecAddressWord handleAddress)
 {
-  return reinterpret_cast<MfciHandle*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handleAddress)));
+  return reinterpret_cast<MfciHandle*>(static_cast<std::uintptr_t>(handleAddress));
 }
 
-[[nodiscard]] const MfciHandle* AsMfciHandleConst(const std::int32_t handleAddress)
+[[nodiscard]] const MfciHandle* AsMfciHandleConst(const SofdecAddressWord handleAddress)
 {
-  return reinterpret_cast<const MfciHandle*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handleAddress)));
+  return reinterpret_cast<const MfciHandle*>(static_cast<std::uintptr_t>(handleAddress));
 }
 
-[[nodiscard]] std::int32_t MfciHandleToAddress(const MfciHandle* const handle)
+[[nodiscard]] SofdecAddressWord MfciHandleToAddress(const MfciHandle* const handle)
 {
-  return static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(handle)));
+  return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(handle));
 }
 
 struct AdxStreamJoinEncoderState
@@ -436,7 +436,7 @@ struct AdxsjePredictorFilterState
   std::int16_t gainStep = 0; // +0x7C
   std::uint8_t mUnknown7E[0x2]{}; // +0x7E
   double residualScale = 0.0; // +0x80
-  std::int32_t iirFilterHandle = 0; // +0x88
+  SofdecAddressWord iirFilterHandle = 0; // +0x88
   std::uint8_t mUnknown8C[0x4]{}; // +0x8C
 };
 
@@ -545,8 +545,8 @@ static_assert(offsetof(M2aBitstreamState, overrunCount) == 0x14, "M2aBitstreamSt
 struct MparbdDecoderState
 {
   std::uint8_t mUnknown00[0x3514]{};
-  std::int32_t bitReaderHandlePrimary = 0; // +0x3514
-  std::int32_t bitReaderHandleSecondary = 0; // +0x3518
+  SofdecAddressWord bitReaderHandlePrimary = 0; // +0x3514
+  SofdecAddressWord bitReaderHandleSecondary = 0; // +0x3518
   std::uint8_t mUnknown351C[0x18]{};
   MparbdDecoderState* nextNewer = nullptr; // +0x3534
   MparbdDecoderState* previousOlder = nullptr; // +0x3538
@@ -605,8 +605,8 @@ static_assert(sizeof(MparbfBuffer) == 0x18, "MparbfBuffer size must be 0x18");
 
 struct SfxaHandle
 {
-  using LuminanceTableBuilderCallback = std::int32_t(__cdecl*)(std::int32_t laneA, std::int32_t laneB, std::int32_t laneC, std::int32_t laneD);
-  using AlphaTableBuilderCallback = std::int32_t(__cdecl*)(std::int32_t destinationAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
+  using LuminanceTableBuilderCallback = std::int32_t(__cdecl*)(std::int32_t laneA, std::int32_t laneB, std::int32_t laneC, SofdecAddressWord laneD);
+  using AlphaTableBuilderCallback = std::int32_t(__cdecl*)(SofdecAddressWord destinationAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
 
   std::int32_t used = 0; // +0x00
   std::int32_t needsLumiTableUpdate = 0; // +0x04
@@ -662,7 +662,7 @@ static_assert(sizeof(SfxaLibWork) == 0x488, "SfxaLibWork size must be 0x488");
 struct SfbufInitLayoutConfig
 {
   std::int32_t mUnknown00 = 0; // +0x00
-  std::int32_t baseBufferAddress = 0; // +0x04
+  SofdecAddressWord baseBufferAddress = 0; // +0x04
   std::array<std::int32_t, 8> laneBufferSizes{}; // +0x08
   std::int32_t lane0ExtraModuloDivisor = 0; // +0x28
 };
@@ -685,7 +685,7 @@ struct SfbufSjCreateState
 {
   std::int32_t ownerTag = 0; // +0x00
   moho::SofdecSjRingBufferHandle* sjHandle = nullptr; // +0x04
-  std::int32_t sourceBufferAddress = 0; // +0x08
+  SofdecAddressWord sourceBufferAddress = 0; // +0x08
   std::int32_t sourceBufferBytes = 0; // +0x0C
   std::int32_t extraBufferBytes = 0; // +0x10
   std::int32_t mUnknown14 = 0; // +0x14
@@ -712,14 +712,14 @@ struct SfbufRingLane
   std::int32_t isSetup = 0; // +0x04
   std::int32_t prepFlag = 0; // +0x08
   std::int32_t termFlag = 0; // +0x0C
-  std::int32_t sourceBufferAddress = 0; // +0x10
+  SofdecAddressWord sourceBufferAddress = 0; // +0x10
   std::int32_t sourceBufferBytes = 0; // +0x14
   std::int32_t laneParam18 = 0; // +0x18
   std::int32_t queuedDataBytes = 0; // +0x1C
   std::int32_t laneParam20 = 0; // +0x20
   std::int32_t laneParam24 = 0; // +0x24
-  std::int32_t delimiterPrimaryAddress = 0; // +0x28
-  std::int32_t delimiterSecondaryAddress = 0; // +0x2C
+  SofdecAddressWord delimiterPrimaryAddress = 0; // +0x28
+  SofdecAddressWord delimiterSecondaryAddress = 0; // +0x2C
   std::int32_t writeTotalBytes = 0; // +0x30
   std::int32_t readTotalBytes = 0; // +0x34
   std::int32_t laneParam38 = 0; // +0x38
@@ -809,14 +809,14 @@ static_assert(sizeof(SfbufRingCursorSnapshot) == 0x1C, "SfbufRingCursorSnapshot 
 
 struct SfbufSupplyStateWindow
 {
-  std::int32_t sourceBufferAddress = 0; // +0x00
-  std::int32_t ringHandleAddress = 0; // +0x04
-  std::int32_t ownerLaneAddress = 0; // +0x08
+  SofdecAddressWord sourceBufferAddress = 0; // +0x00
+  SofdecAddressWord ringHandleAddress = 0; // +0x04
+  SofdecAddressWord ownerLaneAddress = 0; // +0x08
   std::int32_t queuedDataBytes = 0; // +0x0C
   std::int32_t laneParam20 = 0; // +0x10
   std::int32_t laneParam24 = 0; // +0x14
-  std::int32_t delimiterPrimaryAddress = 0; // +0x18
-  std::int32_t delimiterSecondaryAddress = 0; // +0x1C
+  SofdecAddressWord delimiterPrimaryAddress = 0; // +0x18
+  SofdecAddressWord delimiterSecondaryAddress = 0; // +0x1C
 };
 
 static_assert(
@@ -846,8 +846,8 @@ struct SfbufAringLaneState
   std::int32_t transferParam0 = 0; // +0x00
   std::int32_t sampleMode = 0; // +0x04
   std::int32_t transferParam2 = 0; // +0x08
-  std::int32_t primarySampleBaseAddress = 0; // +0x0C
-  std::int32_t secondarySampleBaseAddress = 0; // +0x10
+  SofdecAddressWord primarySampleBaseAddress = 0; // +0x0C
+  SofdecAddressWord secondarySampleBaseAddress = 0; // +0x10
   std::int32_t ringCapacitySamples = 0; // +0x14
   std::int32_t writeCursorSamples = 0; // +0x18
   std::int32_t readCursorSamples = 0; // +0x1C
@@ -856,7 +856,7 @@ struct SfbufAringLaneState
   std::int32_t mUnknown28 = 0; // +0x28
   std::int32_t mUnknown2C = 0; // +0x2C
   std::int32_t mUnknown30 = 0; // +0x30
-  std::int32_t transferHandleAddress = 0; // +0x34
+  SofdecAddressWord transferHandleAddress = 0; // +0x34
 };
 
 static_assert(
@@ -912,10 +912,10 @@ struct SfbufAringTransferSnapshot
   std::int32_t transferParam2 = 0; // +0x08
   std::int32_t chunkSampleCount = 0; // +0x0C
   std::int32_t wrapCursorSample = 0; // +0x10
-  std::int32_t primaryChunkAddress = 0; // +0x14
-  std::int32_t secondaryChunkAddress = 0; // +0x18
-  std::int32_t primaryWrapAddress = 0; // +0x1C
-  std::int32_t secondaryWrapAddress = 0; // +0x20
+  SofdecAddressWord primaryChunkAddress = 0; // +0x14
+  SofdecAddressWord secondaryChunkAddress = 0; // +0x18
+  SofdecAddressWord primaryWrapAddress = 0; // +0x1C
+  SofdecAddressWord secondaryWrapAddress = 0; // +0x20
   std::int32_t writeTotalSamples = 0; // +0x24
   std::int32_t readTotalSamples = 0; // +0x28
 };
@@ -1035,7 +1035,7 @@ struct SftrnTransferDataLane
   std::int32_t prepFlag = 0; // +0x00
   std::int32_t termFlag = 0; // +0x04
   std::int32_t setupState = 0; // +0x08
-  std::int32_t transferDescriptorAddress = 0; // +0x0C
+  SofdecAddressWord transferDescriptorAddress = 0; // +0x0C
   std::int32_t sourceLaneIndex = 0; // +0x10
   std::int32_t targetLaneIndex0 = 0; // +0x14
   std::int32_t targetLaneIndex1 = 0; // +0x18
@@ -1333,7 +1333,7 @@ static bool SfbufContainsAddress(const moho::SjChunkRange& chunkRange, const std
 
 static std::int32_t SfbufAringScaledAddress(
   const std::int32_t sampleMode,
-  const std::int32_t baseAddress,
+  const SofdecAddressWord baseAddress,
   const std::int32_t sampleOffset
 )
 {
@@ -1586,16 +1586,16 @@ static_assert(offsetof(MwsfdPlaybackInfoSummary, noSupplyCount) == 0x10, "MwsfdP
 static_assert(offsetof(MwsfdPlaybackInfoSummary, timerSample) == 0x14, "MwsfdPlaybackInfoSummary::timerSample offset must be 0x14");
 static_assert(sizeof(MwsfdPlaybackInfoSummary) == 0x18, "MwsfdPlaybackInfoSummary size must be 0x18");
 
-using CvFsUserErrorBridgeFn = void(__cdecl*)(std::int32_t errorObjectAddress, const char* message);
-using CvFsRegisterUserErrorFn = void(__cdecl*)(CvFsUserErrorBridgeFn bridgeCallback, std::int32_t errorObjectAddress);
+using CvFsUserErrorBridgeFn = void(__cdecl*)(SofdecAddressWord errorObjectAddress, const char* message);
+using CvFsRegisterUserErrorFn = void(__cdecl*)(CvFsUserErrorBridgeFn bridgeCallback, SofdecAddressWord errorObjectAddress);
 using CvFsDeviceOpenFn = std::int32_t(__cdecl*)(char* fileName, std::int32_t openMode, std::int32_t openFlags);
-using CvFsCloseBridgeFn = void(__cdecl*)(std::int32_t handleAddress);
-using CvFsSeekBridgeFn = std::int32_t(__cdecl*)(std::int32_t handleAddress, std::int32_t seekOffset, std::int32_t seekOrigin);
-using CvFsGetStatBridgeFn = std::int32_t(__cdecl*)(std::int32_t handleAddress);
+using CvFsCloseBridgeFn = void(__cdecl*)(SofdecAddressWord handleAddress);
+using CvFsSeekBridgeFn = std::int32_t(__cdecl*)(SofdecAddressWord handleAddress, std::int32_t seekOffset, std::int32_t seekOrigin);
+using CvFsGetStatBridgeFn = std::int32_t(__cdecl*)(SofdecAddressWord handleAddress);
 using CvFsNoArgOperationFn = std::int32_t(__cdecl*)();
-using CvFsHandleOperationFn = std::int32_t(__cdecl*)(std::int32_t handleAddress);
-using CvFsHandleReadWriteFn = std::int32_t(__cdecl*)(std::int32_t handleAddress, std::int32_t bufferAddress, std::int32_t byteCount);
-using CvFsGetMaxByteRateFn = std::int32_t(__cdecl*)(std::int32_t handleAddress);
+using CvFsHandleOperationFn = std::int32_t(__cdecl*)(SofdecAddressWord handleAddress);
+using CvFsHandleReadWriteFn = std::int32_t(__cdecl*)(SofdecAddressWord handleAddress, SofdecAddressWord bufferAddress, std::int32_t byteCount);
+using CvFsGetMaxByteRateFn = std::int32_t(__cdecl*)(SofdecAddressWord handleAddress);
 using CvFsPathOperationFn = std::int32_t(__cdecl*)(char* filePath);
 using CvFsPathArgOperationFn = std::int32_t(__cdecl*)(char* filePath, std::int32_t optionArg);
 using CvFsLoadDirInfoFn = std::int32_t(__cdecl*)(char* fileName, std::int32_t optionArg0, std::int32_t optionArg1);
@@ -1681,7 +1681,7 @@ static_assert(sizeof(CvFsDeviceInterface) == 0x68, "CvFsDeviceInterface size mus
 struct CvFsHandle
 {
   CvFsDeviceInterface* interfaceView = nullptr; // +0x00
-  std::int32_t handleAddress = 0; // +0x04
+  SofdecAddressWord handleAddress = 0; // +0x04
 };
 
 static_assert(offsetof(CvFsHandle, interfaceView) == 0x00, "CvFsHandle::interfaceView offset must be 0x00");
@@ -1764,12 +1764,12 @@ extern "C"
   std::int32_t MWSFSVM_Error(const char* message, ...);
   std::int32_t MWSFSVM_EntryIdVfunc(
     std::int32_t laneId,
-    std::int32_t callbackAddress,
+    SofdecAddressWord callbackAddress,
     std::int32_t callbackObject,
     const char* callbackName
   );
-  std::int32_t MWSFSVM_EntryMainFunc(std::int32_t callbackAddress, std::int32_t callbackObject, const char* callbackName);
-  std::int32_t MWSFSVM_EntryIdleFunc(std::int32_t callbackAddress, std::int32_t callbackObject, const char* callbackName);
+  std::int32_t MWSFSVM_EntryMainFunc(SofdecAddressWord callbackAddress, std::int32_t callbackObject, const char* callbackName);
+  std::int32_t MWSFSVM_EntryIdleFunc(SofdecAddressWord callbackAddress, std::int32_t callbackObject, const char* callbackName);
   BOOL MWSFSVM_TestAndSet(std::int32_t* signalLane);
   BOOL SVM_TestAndSet(std::int32_t* signalLane);
   void __cdecl MWSFSVR_VsyncThrdProc();
@@ -1791,15 +1791,15 @@ extern "C"
   std::int32_t SFD_Destroy(void* sfdHandle);
   std::int32_t SFD_IsVersionCompatible(const char* versionText, std::int32_t versionTag);
   std::int32_t SFD_Init(moho::MwsfdInitSfdParams* initParams);
-  std::int32_t SFD_SetErrFn(std::int32_t errorObjectAddress, std::int32_t callbackAddress, std::int32_t callbackObject);
-  std::int32_t SFD_GetErrInf(std::int32_t errorObjectAddress, void* outErrInfo);
+  std::int32_t SFD_SetErrFn(SofdecAddressWord errorObjectAddress, SofdecAddressWord callbackAddress, std::int32_t callbackObject);
+  std::int32_t SFD_GetErrInf(SofdecAddressWord errorObjectAddress, void* outErrInfo);
   std::int32_t SFD_Stop(void* sfdHandle);
   std::int32_t SFD_IsSvrWait();
   std::int32_t SFD_GetIdFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outFrameId, void** outFrame);
-  std::int32_t SFD_GetFrm(std::int32_t sfdHandleAddress, void** outFrame);
-  void SFD_RelFrm(std::int32_t sfdHandleAddress, void* frameAddress);
-  std::int32_t SFD_IsNextFrmReady(std::int32_t sfdHandleAddress);
-  std::int32_t mwPlyGetSfdHn(moho::MwsfdPlaybackStateSubobj* ply);
+  std::int32_t SFD_GetFrm(SofdecAddressWord sfdHandleAddress, void** outFrame);
+  void SFD_RelFrm(SofdecAddressWord sfdHandleAddress, void* frameAddress);
+  std::int32_t SFD_IsNextFrmReady(SofdecAddressWord sfdHandleAddress);
+  SofdecAddressWord mwPlyGetSfdHn(moho::MwsfdPlaybackStateSubobj* ply);
   void* MWSFSFX_GetSfxHn(const moho::MwsfdPlaybackStateSubobj* ply);
   void SFX_SetOutBufSize(void* sfxHandle, std::int32_t outputPitch, std::int32_t outputHeight);
   void SFX_SetUnitWidth(void* sfxHandle, std::int32_t unitWidth);
@@ -1809,7 +1809,7 @@ extern "C"
   std::int32_t SFD_GetTime(void* sfdHandle, std::int32_t* outTime, std::int32_t* outScale);
   std::int32_t SFD_SetPicUsrBuf(
     void* sfdHandle,
-    std::int32_t bufferAddress,
+    SofdecAddressWord bufferAddress,
     std::int32_t frameSlotCount,
     std::int32_t bytesPerFrame
   );
@@ -1818,8 +1818,8 @@ extern "C"
   std::int32_t SFD_GetOutVol(void* sfdHandle);
   std::int32_t SFD_SetOutPan(void* sfdHandle, std::int32_t laneIndex, std::int32_t panLevel);
   std::int32_t SFD_GetOutPan(void* sfdHandle, std::int32_t laneIndex);
-  std::int32_t SFD_GetPlyInf(std::int32_t sfdHandleAddress, void* outPlyInfo);
-  std::int32_t SFD_GetTmrInf(std::int32_t sfdHandleAddress, void* outTimerInfo);
+  std::int32_t SFD_GetPlyInf(SofdecAddressWord sfdHandleAddress, void* outPlyInfo);
+  std::int32_t SFD_GetTmrInf(SofdecAddressWord sfdHandleAddress, void* outTimerInfo);
   std::int32_t MWSST_GetStat(moho::MwsstStreamStateSubobj* streamState);
   std::int32_t MWSST_Stop(moho::MwsstStreamStateSubobj* streamState);
   void MWSST_Destroy(moho::MwsstStreamStateSubobj* streamState);
@@ -1830,8 +1830,8 @@ extern "C"
     std::int32_t rightTime,
     std::int32_t currentTime
   );
-  std::int32_t SFD_SetUsrSj(std::int32_t sfdHandleAddress, std::int32_t mode, std::int32_t arg0, std::int32_t arg1);
-  std::int32_t SFX_SetTagInf(void* sfxHandle, std::int32_t tagDataAddress, std::int32_t tagDataLength);
+  std::int32_t SFD_SetUsrSj(SofdecAddressWord sfdHandleAddress, std::int32_t mode, std::int32_t arg0, std::int32_t arg1);
+  SofdecAddressWord SFX_SetTagInf(void* sfxHandle, SofdecAddressWord tagDataAddress, std::int32_t tagDataLength);
   void MWSFTAG_DestroyAinfSj(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t MWSFTAG_UpdateTagInf(moho::MwsfdPlaybackStateSubobj* ply);
   void MWSFSFX_Destroy(void* sfxHandle);
@@ -1853,11 +1853,11 @@ extern "C"
   std::int32_t MWSFD_IsEnableHndl(moho::MwsfdPlaybackStateSubobj* ply);
   void mwsffrm_SetFrmApi(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t type);
   void mwsffrm_CheckAinf(moho::MwsfdPlaybackStateSubobj* ply, const moho::MwsfdFrameInfo* frameInfo);
-  void mwl_convFrmInfFromSFD(std::int32_t playbackAddress, std::int32_t sfdFrameAddress, std::int32_t outFrameInfoAddress);
-  void mwsffrm_SaveFrmDetail(std::int32_t playbackAddress, std::int32_t sfdFrameAddress);
+  void mwl_convFrmInfFromSFD(SofdecAddressWord playbackAddress, SofdecAddressWord sfdFrameAddress, SofdecAddressWord outFrameInfoAddress);
+  void mwsffrm_SaveFrmDetail(SofdecAddressWord playbackAddress, SofdecAddressWord sfdFrameAddress);
   std::int32_t mwPlyIsNextFrmReady(moho::MwsfdPlaybackStateSubobj* ply);
   void MWSFCRE_DestroySfd(char* sfdHandleAddress);
-  std::int32_t MWSFCRE_SetSupplySj(moho::MwsfdPlaybackStateSubobj* ply);
+  SofdecAddressWord MWSFCRE_SetSupplySj(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t MWSFD_GetReqSvrBdrLib();
   void mwSfdStartFnameSub(
     moho::MwsfdPlaybackStateSubobj* ply,
@@ -1894,25 +1894,25 @@ extern "C"
     std::int32_t rangeEnd
   );
   std::int32_t ADXF_GetFnameRangeEx(
-    std::int32_t afsHandle,
+    SofdecAddressWord afsHandle,
     std::int32_t fileIndex,
     char* outFileName,
     std::int32_t* outStartOffset,
     std::int32_t* outRangeStart,
     std::int32_t* outRangeEnd
   );
-  const char* ADXF_GetFnameFromPt(std::int32_t afsHandle);
+  const char* ADXF_GetFnameFromPt(SofdecAddressWord afsHandle);
   std::int32_t SFD_ExecOne(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
-  std::int32_t SFD_IsHnSvrWait(std::int32_t sfdHandleAddress);
+  std::int32_t SFD_IsHnSvrWait(SofdecAddressWord sfdHandleAddress);
   void mwPlySfdStart(moho::MwsfdPlaybackStateSubobj* ply);
   void mwPlyPause(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t paused);
   void mwPlyLinkStm(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t linkMode);
-  bool MWSTM_IsFsStatErr(std::int32_t streamHandleAddress);
+  bool MWSTM_IsFsStatErr(SofdecAddressWord streamHandleAddress);
   bool MWSFLSC_IsFsStatErr(void* lscHandle);
   std::int32_t MWSFSVR_SetHnMwplySvrFlg(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t enabled);
   std::int32_t MWSFSVR_GetHnMwplySvrFlg(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t MWSFSVR_SetHnSfdSvrFlg(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t enabled);
-  void mwPlyEntryAfs(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t afsHandle, std::int32_t fileIndex);
+  void mwPlyEntryAfs(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWord afsHandle, std::int32_t fileIndex);
   void mwPlyReleaseSeamless(moho::MwsfdPlaybackStateSubobj* ply);
   void mwPlyEntryFnameRange(
     moho::MwsfdPlaybackStateSubobj* ply,
@@ -1933,7 +1933,7 @@ extern "C"
   std::int32_t mwsfd_CheckFsErr(moho::MwsfdPlaybackStateSubobj* ply);
   void mwsfsvr_CheckSupply();
   std::int32_t mwPlyChkSupply(moho::MwsfdPlaybackStateSubobj* ply);
-  std::int32_t sfply_TermSupply(std::int32_t sfdHandleAddress);
+  std::int32_t sfply_TermSupply(SofdecAddressWord sfdHandleAddress);
   std::int32_t mwSfdExecDecSvrHndl(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t mwsfd_ExecSvrHndl(moho::MwsfdPlaybackStateSubobj* ply);
   void mwPlyEntryFname(moho::MwsfdPlaybackStateSubobj* ply, const char* fname);

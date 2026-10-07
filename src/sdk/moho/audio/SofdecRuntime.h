@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "cri/sofdec/SofdecAddressWord.h"
+
 struct IDirectSound;
 struct IDirectSoundBuffer;
 struct SofdecTransferStrategy;
@@ -584,7 +586,7 @@ namespace moho
    */
   struct SfplyPlaybackInfo
   {
-    std::int32_t publishedAddress = 0;         // +0x00 self-address SFPLY publishes
+    SofdecAddressWord publishedAddress = 0;         // +0x00 self-address SFPLY publishes
     std::int32_t mUnknown04 = 0;             // +0x04
     std::int32_t decoderDctCountPrimary = 0;   // +0x08 (workctrl +0x958)
     std::int32_t decoderDctCountSecondary = 0; // +0x0C
@@ -716,7 +718,7 @@ namespace moho
   /// (`SFPTS_ReadPtsQue` 0x00AE5C40 reaches it at `lane + 0x28`).
   struct SfptsPtsQueue
   {
-    std::int32_t entriesBaseAddress = 0; // +0x00 entry array base address
+    SofdecAddressWord entriesBaseAddress = 0; // +0x00 entry array base address
     std::int32_t entryCapacity = 0;      // +0x04
     std::int32_t queuedEntryCount = 0;   // +0x08
     std::int32_t writeIndex = 0;         // +0x0C (`_sfpts` producer cursor)
@@ -860,7 +862,7 @@ namespace moho
   {
     std::int32_t decodeState = 0;              // +0x00
     std::int32_t allocationState = 0;          // +0x04
-    std::int32_t frameSurfaceBaseAddress = 0;  // +0x08
+    SofdecAddressWord frameSurfaceBaseAddress = 0;  // +0x08
     std::uint8_t mUnknown0CTo37[0x2C]{};       // +0x0C
     std::int32_t presentationTimeMajor = 0;    // +0x38
     std::int32_t presentationTimeMinor = 0;    // +0x3C
@@ -869,7 +871,7 @@ namespace moho
     std::int32_t decodeConcatOrdinal = 0;      // +0x48
     std::int32_t frameDetailWord4C = 0;        // +0x4C
     std::int32_t frameDetailWord50 = 0;        // +0x50
-    std::int32_t pictureUserInfoAddress = 0;   // +0x54
+    SofdecAddressWord pictureUserInfoAddress = 0;   // +0x54
     std::int32_t frameId = 0;                  // +0x58
     SfmpvPictureDecodeLane pictureDecodeLane{}; // +0x5C
     std::uint8_t mUnknownDCToDF[0x04]{};       // +0xDC
@@ -886,11 +888,11 @@ namespace moho
   /// lane at +0x1000 and the error seeds at +0x1098.
   struct SfmpvInfo
   {
-    std::int32_t decoderHandle = 0;                        // +0x00
+    SofdecAddressWord decoderHandle = 0;                        // +0x00
     SfmpvPara persistedPara{};                             // +0x04
     std::int32_t persistedRfbAddressTable[2]{};            // +0x28
     std::int32_t persistedSofDecTabs[16]{};                // +0x30
-    std::int32_t activeFrameObjectAddress = 0;             // +0x70
+    SofdecAddressWord activeFrameObjectAddress = 0;             // +0x70
     std::int32_t defectPictureTypeState = 0;               // +0x74
     std::int32_t concatControlFlags = 0;                   // +0x78
     std::int32_t termDecodeState = 0;                      // +0x7C
@@ -904,29 +906,29 @@ namespace moho
     SfmpvComplementPts complementPts = {};                 // +0x118
     std::int32_t primaryFrameToggleIndex = 0;              // +0x138
     std::int32_t secondaryFrameToggleIndex = 0;            // +0x13C
-    std::int32_t primaryLumaPlaneBaseAddress = 0;          // +0x140
-    std::int32_t primaryChromaUPlaneBaseAddress = 0;       // +0x144
-    std::int32_t primaryFrameBaseAddress = 0;              // +0x148
+    SofdecAddressWord primaryLumaPlaneBaseAddress = 0;          // +0x140
+    SofdecAddressWord primaryChromaUPlaneBaseAddress = 0;       // +0x144
+    SofdecAddressWord primaryFrameBaseAddress = 0;              // +0x148
     std::uint16_t primaryChromaStride = 0;                 // +0x14C
     std::uint16_t primaryLumaStride = 0;                   // +0x14E
-    std::int32_t secondaryLumaPlaneBaseAddress = 0;        // +0x150
-    std::int32_t secondaryChromaUPlaneBaseAddress = 0;     // +0x154
-    std::int32_t secondaryFrameBaseAddress = 0;            // +0x158
+    SofdecAddressWord secondaryLumaPlaneBaseAddress = 0;        // +0x150
+    SofdecAddressWord secondaryChromaUPlaneBaseAddress = 0;     // +0x154
+    SofdecAddressWord secondaryFrameBaseAddress = 0;            // +0x158
     std::uint16_t secondaryChromaStride = 0;               // +0x15C
     std::uint16_t secondaryLumaStride = 0;                 // +0x15E
-    std::int32_t primaryReferenceFrameObjectAddress = 0;   // +0x160
-    std::int32_t secondaryReferenceFrameObjectAddress = 0; // +0x164
-    std::int32_t pendingFrameObjectAddress = 0;            // +0x168
+    SofdecAddressWord primaryReferenceFrameObjectAddress = 0;   // +0x160
+    SofdecAddressWord secondaryReferenceFrameObjectAddress = 0; // +0x164
+    SofdecAddressWord pendingFrameObjectAddress = 0;            // +0x168
     std::int32_t skipIssuedFlag = 0;                       // +0x16C
     std::int32_t picAtrPrimedLatch = 0;                    // +0x170
     std::int32_t referenceErrorCarryFlag = 0;              // +0x174
     std::int32_t frameObjectCount = 0;                     // +0x178
     std::uint8_t mUnknown17CTo17F[0x04]{};                 // +0x17C
     SfmpvfFrameObject frameObjects[16]{};                  // +0x180
-    std::int32_t pictureUserBufferAddress = 0;             // +0x1000
+    SofdecAddressWord pictureUserBufferAddress = 0;             // +0x1000
     std::int32_t pictureUserBufferCount = 0;               // +0x1004
     std::int32_t pictureUserBufferSize = 0;                // +0x1008
-    std::int32_t pictureUserBufferMirrorAddress = 0;       // +0x100C
+    SofdecAddressWord pictureUserBufferMirrorAddress = 0;       // +0x100C
     std::int32_t pictureUserFlags = 0;                     // +0x1010
     SfmpvPicUsr::PicUsrEntry pictureUserEntries[16]{};     // +0x1014
     std::uint8_t mUnknown1094To1097[0x04]{};               // +0x1094
@@ -948,7 +950,7 @@ namespace moho
   struct SfmpvfVfrmData
   {
     std::int32_t drawState = 0;             // +0x00
-    std::int32_t ownerFrameObjectAddress = 0; // +0x04
+    SofdecAddressWord ownerFrameObjectAddress = 0; // +0x04
   };
   static_assert(sizeof(SfmpvfVfrmData) == 0x08, "SfmpvfVfrmData size must be 0x08");
 
@@ -981,7 +983,7 @@ namespace moho
   struct SfmpvTimingLaneHead
   {
     using IsLateCallback = std::int32_t(__cdecl*)(
-      std::int32_t workctrlAddress, std::int32_t mode, std::int32_t interpolationTime, std::int32_t baseFraction
+      SofdecAddressWord workctrlAddress, std::int32_t mode, std::int32_t interpolationTime, std::int32_t baseFraction
     );
 
     std::uint8_t mUnknown00To17[0x18]{}; // +0x00
@@ -1063,8 +1065,8 @@ namespace moho
   struct SfbufSupplyLane
   {
     std::int32_t mUnknown00 = 0;                // +0x00
-    std::int32_t supplyJoinAddress = 0;         // +0x04 SJ join address of the lane
-    std::int32_t ringWindowStartAddress = 0;    // +0x08 ring window base (SJRBF start)
+    SofdecAddressWord supplyJoinAddress = 0;         // +0x04 SJ join address of the lane
+    SofdecAddressWord ringWindowStartAddress = 0;    // +0x08 ring window base (SJRBF start)
     std::int32_t ringWindowSpanBytes = 0;       // +0x0C prep-end threshold / ring window span
     std::int32_t mUnknown10 = 0;                 // +0x10
     std::int32_t mUnknown14 = 0;                 // +0x14
@@ -1098,7 +1100,7 @@ namespace moho
   /// SJRBF ring buffer per configured M2TS transfer lane.
   struct Sfm2tsSourceLane
   {
-    std::int32_t sourceAddress = 0;   // +0x00
+    SofdecAddressWord sourceAddress = 0;   // +0x00
     std::int32_t sourceSizeBytes = 0; // +0x04
   };
   static_assert(sizeof(Sfm2tsSourceLane) == 0x08, "Sfm2tsSourceLane size must be 0x08");
@@ -1108,7 +1110,7 @@ namespace moho
   struct Sfm2tsTransferLaneOverride
   {
     std::int32_t streamIdFilter = -1;      // +0x00 (-1 = keep M2TSD's current filter)
-    std::int32_t outStreamJoinAddress = 0; // +0x04 (0 = unset; falls back to a supply lane)
+    SofdecAddressWord outStreamJoinAddress = 0; // +0x04 (0 = unset; falls back to a supply lane)
     SofdecSjRingBufferHandle* relayRingBuffer = nullptr; // +0x08
   };
   static_assert(sizeof(Sfm2tsTransferLaneOverride) == 0x0C, "Sfm2tsTransferLaneOverride size must be 0x0C");
@@ -1136,7 +1138,7 @@ namespace moho
   /// `SFM2TS_Destroy`.
   struct Sfm2tsParameterSnapshot
   {
-    std::int32_t workAddress = 0;   // +0x00 M2TSD work buffer address
+    SofdecAddressWord workAddress = 0;   // +0x00 M2TSD work buffer address
     std::int32_t workSizeBytes = 0; // +0x04
     std::int32_t laneCount = 0;     // +0x08 source-lane count (destroy walk count)
     union
@@ -1151,7 +1153,7 @@ namespace moho
   /// it; `SFMPS_Create` 0x00AD6990 stores the `MPS_Create` handle at +0x00).
   struct SfmpsParserState
   {
-    std::int32_t parserHandleAddress = 0;    // +0x00
+    SofdecAddressWord parserHandleAddress = 0;    // +0x00
     std::int32_t cachedSystemField3Max = 0;  // +0x04
     std::int32_t cachedSystemField2Max = 0;  // +0x08
     std::int32_t mUnknown0C = 0;             // +0x0C
@@ -1168,7 +1170,7 @@ namespace moho
     std::int32_t audioChannel = -1;          // +0x38
     std::int32_t effectiveEndcodeMode = 0;   // +0x3C
     std::array<std::int32_t, 68> elementOutSjByElementType{}; // +0x40 element types 188..255
-    std::int32_t copyElemOutCallbackAddress = 0; // +0x150
+    SofdecAddressWord copyElemOutCallbackAddress = 0; // +0x150
     std::int32_t copyElemOutCallbackContext = 0; // +0x154
     std::int32_t selectedElementaryLane = -1;    // +0x158
   };
@@ -1181,7 +1183,7 @@ namespace moho
   /// from +0x58 during teardown - one storage, two lifecycle phases.
   struct Sfm2tsInitInfo
   {
-    std::int32_t m2tsdRuntimeAddress = 0; // +0x00 M2TSD demux handle
+    SofdecAddressWord m2tsdRuntimeAddress = 0; // +0x00 M2TSD demux handle
     Sfm2tsParameterSnapshot parameters{}; // +0x04 create template / destroy snapshot
     union
     {
@@ -1209,7 +1211,7 @@ namespace moho
   /// One SFSET transfer-lane slot (`SFSET_GetTrHn` indexes them 0x44 apart).
   struct SfsetTransferLane
   {
-    std::int32_t transferHandleAddress = 0; // +0x00 demux/parser handle on demux lanes
+    SofdecAddressWord transferHandleAddress = 0; // +0x00 demux/parser handle on demux lanes
     std::uint8_t mUnknown04[0x40]{};        // +0x04
   };
   static_assert(sizeof(SfsetTransferLane) == 0x44, "SfsetTransferLane size must be 0x44");
@@ -1334,7 +1336,7 @@ namespace moho
     /// Sofdec file-header record (`SFHDS_InitFhd`), 0x894 bytes - the same
     /// layout the header analyzer fills. Word +0x00 is the header handle
     /// (`SFMPV` checks it before the VBV bypass at +0x7C), both kept named.
-    std::int32_t frameHeaderHandle = 0;       // +0x78
+    SofdecAddressWord frameHeaderHandle = 0;       // +0x78
     std::int32_t vbvBypassFlag = 0;           // +0x7C
     std::uint8_t fileHeaderBody[0x88C]{};     // +0x80
     SfplyMovieInfo movieInfo{};               // +0x90C
@@ -1624,7 +1626,7 @@ namespace moho
     std::int32_t decodeServerDispatchFlag = 0; // +0x68
     /// Transfer handle for lane 3, fetched with `SFD_GetTrHn` at create time
     /// and left at 0 when the stream has no such lane.
-    std::int32_t audioTransferHandle = 0; // +0x6C
+    SofdecAddressWord audioTransferHandle = 0; // +0x6C
     std::uint8_t concatPlayArmed = 0; // +0x70
     std::uint8_t isPrepared = 0;
     std::int8_t paused = 0;
@@ -1682,7 +1684,7 @@ namespace moho
     /// SJ ring geometry `mwsfcre_CreateSj` feeds to `SJRBF_Create`: the
     /// aligned buffer address, the usable extent (stream budget minus one
     /// pack) and the pack size.
-    std::int32_t sjRingBufferAddress = 0; // +0x1C4
+    SofdecAddressWord sjRingBufferAddress = 0; // +0x1C4
     std::int32_t sjRingUsableBytes = 0;   // +0x1C8
     std::int32_t sjRingPackBytes = 0;     // +0x1CC
     std::int32_t sjSupplyMode = 0;                  // +0x1D0
@@ -1690,7 +1692,7 @@ namespace moho
     std::int32_t sjSupplyArg1 = 0;                  // +0x1D8
     std::int32_t sjSupplyArg2 = 0;                  // +0x1DC
     SofdecSjMemoryHandle* sjMemoryHandle = nullptr; // +0x1E0
-    std::int32_t sjMemoryBufferAddress = 0;         // +0x1E4
+    SofdecAddressWord sjMemoryBufferAddress = 0;         // +0x1E4
     std::int32_t sjMemoryBufferSize = 0;            // +0x1E8
     // Bump allocator carved out of the caller-supplied work buffer.
     // `mwsfcre_InitMemMng` seeds base/limit/cursor from the create params and
@@ -1879,7 +1881,7 @@ namespace moho
 
   struct MwsfdFrameInfo
   {
-    std::int32_t bufferAddress = 0; // +0x00
+    SofdecAddressWord bufferAddress = 0; // +0x00
     std::int32_t frameId = 0;       // +0x04
     std::uint8_t mUnknown08[0x1C]{};
     std::int32_t frameNumber = 0; // +0x24
@@ -2197,7 +2199,7 @@ namespace moho
    * ADXB add-write callback (`addwr`): commits one decoded span as
    * (input bytes consumed, output samples produced).
    */
-  using AdxbAddWriteFunc = std::int32_t(__cdecl*)(void* context, std::int32_t decodedBytes, std::int32_t decodedSamples);
+  using AdxbAddWriteFunc = SofdecAddressWord(__cdecl*)(void* context, std::int32_t decodedBytes, std::int32_t decodedSamples);
 
   /**
    * ADXB decode-progress callback (`ADXB_SetCbDec`): receives the input bytes
@@ -2287,7 +2289,7 @@ namespace moho
     std::uint8_t dataIdBytes[0x10]{};          // +0xDC
     std::int16_t defaultOutputVolume = 0;      // +0xEC
     std::int16_t defaultPanByChannel[3]{};     // +0xEE
-    std::int32_t channelExpandHandle = 0;      // +0xF4
+    SofdecAddressWord channelExpandHandle = 0;      // +0xF4
     std::int32_t expandMatrixParamA = 0;       // +0xF8
     std::int32_t expandMatrixParamB = 0;       // +0xFC
     std::int32_t decodeCallbackReportedBytes = 0; // +0x100  lastDecodedBytes at the previous report
@@ -2376,7 +2378,7 @@ namespace moho
 
   struct SjChunkRange
   {
-    std::int32_t bufferAddress = 0; // +0x00
+    SofdecAddressWord bufferAddress = 0; // +0x00
     std::int32_t byteCount = 0;     // +0x04
   };
 
@@ -2391,7 +2393,7 @@ namespace moho
   {
     SofdecSjUnifyChunkNode* next = nullptr; // +0x00
     std::int32_t reserved = 0;              // +0x04
-    std::int32_t bufferAddress = 0;         // +0x08
+    SofdecAddressWord bufferAddress = 0;         // +0x08
     std::int32_t byteCount = 0;             // +0x0C
   };
 
@@ -2633,7 +2635,7 @@ struct M2aDecoderContext
   const std::uint8_t* inputBuffer = nullptr; // +0x18  M2ADEC_Process source span
   std::int32_t inputByteCount = 0;           // +0x1C
   std::uint8_t mUnknown20[0x04]{};
-  std::int32_t bitstreamHandle = 0;          // +0x24
+  SofdecAddressWord bitstreamHandle = 0;          // +0x24
   std::int32_t activeElementIndex = 0;       // +0x28
   std::int32_t activeWindowGroupIndex = 0;   // +0x2C
   std::uint8_t mUnknown30[0x04]{};
@@ -3446,7 +3448,7 @@ std::int32_t mwPlyGetNumSkipDisp(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Returns active SFD handle-address lane when playback handle is valid.
  */
-std::int32_t mwPlyGetSfdHn(moho::MwsfdPlaybackStateSubobj* ply);
+SofdecAddressWord mwPlyGetSfdHn(moho::MwsfdPlaybackStateSubobj* ply);
 
 /**
  * Address: 0x00ACB620 (_mwPlyGetNumDropFrm)
@@ -3462,7 +3464,7 @@ std::int32_t mwPlyGetNumDropFrm(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Returns decode-skip counter lane from SFD playback-info snapshot.
  */
-std::int32_t mwPlyGetNumSkipDec(moho::MwsfdPlaybackStateSubobj* ply);
+SofdecAddressWord mwPlyGetNumSkipDec(moho::MwsfdPlaybackStateSubobj* ply);
 
 /**
  * Address: 0x00ACB8E0 (_MWSFD_GetPlyInf)
@@ -3470,7 +3472,7 @@ std::int32_t mwPlyGetNumSkipDec(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Copies current SFD playback-info snapshot into caller output buffer.
  */
-std::int32_t MWSFD_GetPlyInf(moho::MwsfdPlaybackStateSubobj* ply, void* outPlyInfo);
+SofdecAddressWord MWSFD_GetPlyInf(moho::MwsfdPlaybackStateSubobj* ply, void* outPlyInfo);
 
 /**
  * Address: 0x00ACB950 (FUN_00ACB950, _MWSFD_GetCond)
@@ -3479,8 +3481,7 @@ std::int32_t MWSFD_GetPlyInf(moho::MwsfdPlaybackStateSubobj* ply, void* outPlyIn
  * Reads one condition lane from the active playback SFD handle, or from
  * process-global defaults when playback handle is null.
  */
-std::int32_t
-MWSFD_GetCond(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t conditionId, std::int32_t* outConditionValue);
+SofdecAddressWord MWSFD_GetCond(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t conditionId, std::int32_t* outConditionValue);
 
 namespace moho
 {
@@ -3564,9 +3565,9 @@ std::int32_t SFD_SetMpvPara(const void* parameterSnapshot);
 std::int32_t SFD_SetVideoUsrSj(
   moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
   std::int32_t streamIndex,
-  std::int32_t streamObjectAddress,
-  std::int32_t streamCallbackAddress,
-  std::int32_t streamContextAddress
+  SofdecAddressWord streamObjectAddress,
+  SofdecAddressWord streamCallbackAddress,
+  SofdecAddressWord streamContextAddress
 );
 
   /**
@@ -3611,23 +3612,23 @@ std::int32_t SFD_SetVideoUsrSj(
    * strategy table, so only these need cross-TU declarations.
    */
   std::int32_t SFMPV_Finish();
-  std::int32_t SFMPV_ExecServer(std::int32_t workctrlAddress);
-  std::int32_t SFMPV_Create(std::int32_t workctrlAddress);
-  std::int32_t SFMPV_Destroy(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_ExecServer(SofdecAddressWord workctrlAddress);
+  std::int32_t SFMPV_Create(SofdecAddressWord workctrlAddress);
+  std::int32_t SFMPV_Destroy(SofdecAddressWord workctrlAddress);
   std::int32_t SFMPV_RequestStop();
   std::int32_t SFMPV_Start();
   std::int32_t SFMPV_Stop();
   std::int32_t SFMPV_Pause();
-  std::int32_t SFMPV_GetWrite(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_GetWrite(SofdecAddressWord workctrlAddress);
   struct SfmpvfFrameInfo;
   std::int32_t SFMPVF_GetRead(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     SfmpvfFrameInfo** outFrameInfo,
     std::int32_t* outFrameId
   );
-  std::int32_t SFMPV_AddWrite(std::int32_t workctrlAddress);
-  std::int32_t SFMPV_AddRead(std::int32_t workctrlAddress, std::int32_t frameInfoIndex, std::int32_t frameObjectId);
-  std::int32_t SFMPV_Seek(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_AddWrite(SofdecAddressWord workctrlAddress);
+  std::int32_t SFMPV_AddRead(SofdecAddressWord workctrlAddress, std::int32_t frameInfoIndex, std::int32_t frameObjectId);
+  std::int32_t SFMPV_Seek(SofdecAddressWord workctrlAddress);
 
   /**
    * Address: 0x00AD9290 (FUN_00AD9290, _mwSfdVsync)
@@ -3660,7 +3661,7 @@ void SFD_VbOut();
  * What it does:
  * Returns whether one SFD handle can proceed outside server-wait states.
  */
-std::int32_t SFD_IsHnSvrWait(std::int32_t sfdHandleAddress);
+std::int32_t SFD_IsHnSvrWait(SofdecAddressWord sfdHandleAddress);
 
 /**
  * Address: 0x00AD6EC0 (FUN_00AD6EC0, _SFD_ExecServer)
@@ -3686,7 +3687,7 @@ std::int32_t SFD_ExecOne(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
  * Validates one SFD handle and writes one seek-position table lane value into
  * attached SFSEE runtime state.
  */
-std::int32_t SFD_SetSeekPosTbl(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t seekTableAddress);
+std::int32_t SFD_SetSeekPosTbl(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SofdecAddressWord seekTableAddress);
 
 /**
  * Address: 0x00AECF30 (FUN_00AECF30, _SFD_StartHeadAnaly)
@@ -3755,7 +3756,7 @@ SFD_OutDispSync(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t disp
  * Locks one frame-object lane resolved from a frame-search slot and increments
  * per-handle lock depth.
  */
-std::int32_t SFD_LockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t frameSearchLaneAddress);
+std::int32_t SFD_LockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SofdecAddressWord frameSearchLaneAddress);
 
 /**
  * Address: 0x00ADBFD0 (FUN_00ADBFD0, _SFD_UnlockFrm)
@@ -3764,7 +3765,7 @@ std::int32_t SFD_LockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int
  * Unlocks one frame-object lane resolved from a frame-search slot and
  * decrements per-handle lock depth.
  */
-std::int32_t SFD_UnlockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t frameSearchLaneAddress);
+std::int32_t SFD_UnlockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SofdecAddressWord frameSearchLaneAddress);
 
 /**
  * Address: 0x00AE0C70 (FUN_00AE0C70, _M2PES_GetVersionStr)
@@ -3796,7 +3797,7 @@ extern "C" const char* M2TSD_GetVersionStr();
  * What it does:
  * Executes transfer-server and SFSEE server lanes for one SFD handle.
  */
-std::int32_t sfply_ExecOneSub(std::int32_t workctrlAddress);
+std::int32_t sfply_ExecOneSub(SofdecAddressWord workctrlAddress);
 
 /**
  * Address: 0x00AD6FF0 (FUN_00AD6FF0, _sfply_TrExecServer)
@@ -3804,7 +3805,7 @@ std::int32_t sfply_ExecOneSub(std::int32_t workctrlAddress);
  * What it does:
  * Dispatches transfer setup callback lane `2` for one SFD handle.
  */
-std::int32_t sfply_TrExecServer(std::int32_t workctrlAddress);
+std::int32_t sfply_TrExecServer(SofdecAddressWord workctrlAddress);
 
 /**
  * Address: 0x00AD7000 (FUN_00AD7000, _sfply_StatStop)
@@ -4037,7 +4038,7 @@ std::int32_t sfply_InitMvInf(moho::SfplyMovieInfo* movieInfo);
  * What it does:
  * Clears one SFPLY playback-info lane and initializes embedded flow counters.
  */
-std::int32_t sfply_InitPlyInf(moho::SfplyPlaybackInfo* playbackInfo);
+SofdecAddressWord sfply_InitPlyInf(moho::SfplyPlaybackInfo* playbackInfo);
 
 /**
  * Address: 0x00AD7CF0 (FUN_00AD7CF0, _sfply_InitFlowCnt)
@@ -4165,7 +4166,7 @@ std::int32_t SFPLY_GetResetFlg();
  * What it does:
  * Dispatches transfer stop transition and updates local stop-state lanes.
  */
-std::int32_t sfply_TrStop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+SofdecAddressWord sfply_TrStop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
 
 /**
  * Address: 0x00ACBA90 (FUN_00ACBA90, _mwPlyGetStat)
@@ -4199,7 +4200,7 @@ std::int32_t mwPlyGetNumSkipEmptyB(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Writes six playback-debug counters into caller-provided output words.
  */
-std::int32_t mwPlyGetPlyInf(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t* outInfoWords);
+SofdecAddressWord mwPlyGetPlyInf(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t* outInfoWords);
 
 /**
  * Address: 0x00ACC6C0 (FUN_00ACC6C0, _mwPlyGetTimerCh)
@@ -4218,7 +4219,7 @@ void* mwPlyGetTimerCh(void* timerChannelFallback);
 void SFX_CnvFrmByCbFunc(
   moho::SfxCallbackFrameContext* conversionState,
   moho::SfxStreamState* streamState,
-  std::int32_t callbackArg
+  SofdecAddressWord callbackArg
 );
 
 /**
@@ -4244,7 +4245,7 @@ void mwsfsvr_StartPlayback(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Replaces active SJ supply with memory-backed source and restarts playback.
  */
-std::int32_t mwPlyStartMem(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t bufferAddress, std::int32_t bufferSize);
+std::int32_t mwPlyStartMem(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWord bufferAddress, std::int32_t bufferSize);
 
 /**
  * Address: 0x00ACB0C0 (_mwPlyStartSj)
@@ -4325,7 +4326,7 @@ void mwPlyReleaseSeamless(moho::MwsfdPlaybackStateSubobj* ply);
  * What it does:
  * Starts seamless-loop playback from AFS source range.
  */
-void mwPlyStartAfsLp(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t afsHandle, std::int32_t fileIndex);
+void mwPlyStartAfsLp(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWord afsHandle, std::int32_t fileIndex);
 
 /**
  * Address: 0x00ADDD60 (_mwPlyEntryAfs)
@@ -4333,7 +4334,7 @@ void mwPlyStartAfsLp(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t afsHandle
  * What it does:
  * Resolves one AFS file range and queues it into the playback LSC lane.
  */
-void mwPlyEntryAfs(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t afsHandle, std::int32_t fileIndex);
+void mwPlyEntryAfs(moho::MwsfdPlaybackStateSubobj* ply, SofdecAddressWord afsHandle, std::int32_t fileIndex);
 
 /**
  * Address: 0x00ADDE50 (_mwPlyEntryFnameRange)
@@ -4484,7 +4485,7 @@ std::int32_t MWSTM_FinishStatic();
  * What it does:
  * Updates ADX stream requested read-sector window when stream handle exists.
  */
-std::int32_t MWSTM_SetRdSct(std::int32_t streamHandleAddress, std::int32_t requestedSectorCount);
+std::int32_t MWSTM_SetRdSct(SofdecAddressWord streamHandleAddress, std::int32_t requestedSectorCount);
 
 /**
  * Address: 0x00AD8F90 (_MWSTM_SetTrSct)
@@ -4492,7 +4493,7 @@ std::int32_t MWSTM_SetRdSct(std::int32_t streamHandleAddress, std::int32_t reque
  * What it does:
  * Placeholder transfer-sector setter lane for this build (no-op, success).
  */
-std::int32_t MWSTM_SetTrSct(std::int32_t streamHandleAddress, std::int32_t transferSectorCount);
+std::int32_t MWSTM_SetTrSct(SofdecAddressWord streamHandleAddress, std::int32_t transferSectorCount);
 
 /**
  * Address: 0x00AD9020 (_MWSTM_Start)
@@ -4500,7 +4501,7 @@ std::int32_t MWSTM_SetTrSct(std::int32_t streamHandleAddress, std::int32_t trans
  * What it does:
  * Starts one ADX stream handle and returns success code lane.
  */
-std::int32_t MWSTM_Start(std::int32_t streamHandleAddress);
+std::int32_t MWSTM_Start(SofdecAddressWord streamHandleAddress);
 
 /**
  * Address: 0x00AD9030 (_MWSTM_IsFsStatErr)
@@ -4508,7 +4509,7 @@ std::int32_t MWSTM_Start(std::int32_t streamHandleAddress);
  * What it does:
  * Returns true when one ADX stream reports filesystem-error status class.
  */
-bool MWSTM_IsFsStatErr(std::int32_t streamHandleAddress);
+bool MWSTM_IsFsStatErr(SofdecAddressWord streamHandleAddress);
 
 /**
  * Address: 0x00AED7D0 (FUN_00AED7D0, _mwPlySwitchToIdle)
@@ -4616,7 +4617,7 @@ std::int32_t SFD_SetByteRate(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std:
  * after handle validation.
  */
 std::int32_t
-SFD_SetVideoPts(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t ptsQueueSourceAddress, std::int32_t ptsEntryCount);
+SFD_SetVideoPts(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SofdecAddressWord ptsQueueSourceAddress, std::int32_t ptsEntryCount);
 
 /**
  * Address: 0x00AE5E90 (FUN_00AE5E90, _SFD_SetConcatPlay)
@@ -4736,7 +4737,7 @@ void CFT_Init();
  * What it does:
  * Builds one YCC422 color-adjust table pack for Sofdec conversion lanes.
  */
-std::int32_t CFT_MakeYcc422ColAdjTbl(std::int32_t tableAddress);
+std::int32_t CFT_MakeYcc422ColAdjTbl(SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00AEE090 (FUN_00AEE090, _CFT_MakeArgb8888ColAdjTbl)
@@ -4745,7 +4746,7 @@ std::int32_t CFT_MakeYcc422ColAdjTbl(std::int32_t tableAddress);
  * Initializes ARGB8888 Y/Cb/Cr conversion table lane pointers and rebuilds
  * conversion tables.
  */
-std::int32_t CFT_MakeArgb8888ColAdjTbl(std::int32_t tableAddress);
+std::int32_t CFT_MakeArgb8888ColAdjTbl(SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00AED830 (FUN_00AED830, _CFT_Ycc420plnToA256V)
@@ -4755,7 +4756,7 @@ std::int32_t CFT_MakeArgb8888ColAdjTbl(std::int32_t tableAddress);
  * optional user remap table.
  */
 std::uint8_t*
-CFT_Ycc420plnToA256V(std::uint8_t** sourcePlanes, const std::int32_t* conversionWords, const std::int32_t* userTableAddress);
+CFT_Ycc420plnToA256V(std::uint8_t** sourcePlanes, const std::int32_t* conversionWords, const SofdecAddressWord* userTableAddress);
 
 /**
  * Address: 0x00AED990 (FUN_00AED990, _CFT_MakeArgb8888AlpLumiTbl)
@@ -4765,7 +4766,7 @@ CFT_Ycc420plnToA256V(std::uint8_t** sourcePlanes, const std::int32_t* conversion
  * ramp and shared chroma side tables.
  */
 std::int32_t
-CFT_MakeArgb8888AlpLumiTbl(std::int32_t luminancePivot, std::int32_t luminanceMin, std::int32_t luminanceMax, std::int32_t tableAddress);
+CFT_MakeArgb8888AlpLumiTbl(std::int32_t luminancePivot, std::int32_t luminanceMin, std::int32_t luminanceMax, SofdecAddressWord tableAddress);
 
 /**
   * Alias of FUN_00AEDB70 (non-canonical helper lane).
@@ -4774,7 +4775,7 @@ CFT_MakeArgb8888AlpLumiTbl(std::int32_t luminancePivot, std::int32_t luminanceMi
  * Builds one ARGB8888 alpha table pack for 3110 blend mode.
  */
 std::int32_t
-CFT_MakeArgb8888Alp3110Tbl(std::int32_t tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
+CFT_MakeArgb8888Alp3110Tbl(SofdecAddressWord tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
 
 /**
   * Alias of FUN_00AEDD50 (non-canonical helper lane).
@@ -4783,7 +4784,7 @@ CFT_MakeArgb8888Alp3110Tbl(std::int32_t tableAddress, std::int32_t alpha0, std::
  * Builds one ARGB8888 alpha table pack for 3211 blend mode.
  */
 std::int32_t
-CFT_MakeArgb8888Alp3211Tbl(std::int32_t tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
+CFT_MakeArgb8888Alp3211Tbl(SofdecAddressWord tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
 
 /**
  * Address: 0x00B03CE0 (FUN_00B03CE0, _UTY_SupportSse)
@@ -4871,7 +4872,7 @@ std::int32_t sfxalp_InitLibWork();
  * What it does:
  * Returns first unused SFXA runtime-handle slot address.
  */
-std::int32_t sfxamv_SearchFreeHn();
+SofdecAddressWord sfxamv_SearchFreeHn();
 
 /**
  * Address: 0x00ADE200 (_SFXA_Create)
@@ -4879,7 +4880,7 @@ std::int32_t sfxamv_SearchFreeHn();
  * What it does:
  * Acquires one free SFXA handle, initializes it, and marks it active.
  */
-std::int32_t SFXA_Create();
+SofdecAddressWord SFXA_Create();
 
 /**
  * Address: 0x00ADE260 (_sfxamv_InitHn)
@@ -4887,7 +4888,7 @@ std::int32_t SFXA_Create();
  * What it does:
  * Initializes one SFXA handle with default luminance and alpha lanes.
  */
-std::int32_t sfxamv_InitHn(std::int32_t sfxaHandleAddress);
+SofdecAddressWord sfxamv_InitHn(SofdecAddressWord sfxaHandleAddress);
 
 /**
  * Address: 0x00ADE290 (_SFXA_Destroy)
@@ -4895,7 +4896,7 @@ std::int32_t sfxamv_InitHn(std::int32_t sfxaHandleAddress);
  * What it does:
  * Releases one SFXA handle slot and decrements active-handle count.
  */
-void SFXA_Destroy(std::int32_t sfxaHandleAddress);
+void SFXA_Destroy(SofdecAddressWord sfxaHandleAddress);
 
 /**
  * Address: 0x00ADE2B0 (_SFXA_MakeAlpLumiTbl)
@@ -4904,7 +4905,7 @@ void SFXA_Destroy(std::int32_t sfxaHandleAddress);
  * Builds luminance table through optional per-handle callback and clears the
  * pending-update flag.
  */
-std::int32_t SFXA_MakeAlpLumiTbl(std::int32_t sfxaHandleAddress, std::int32_t reservedMode, std::int32_t tableAddress);
+std::int32_t SFXA_MakeAlpLumiTbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00ADE2E0 (_SFXA_MakeAlp3110Tbl)
@@ -4912,7 +4913,7 @@ std::int32_t SFXA_MakeAlpLumiTbl(std::int32_t sfxaHandleAddress, std::int32_t re
  * What it does:
  * Builds alpha table in 3110 mode through optional per-handle callback.
  */
-std::int32_t SFXA_MakeAlp3110Tbl(std::int32_t sfxaHandleAddress, std::int32_t reservedMode, std::int32_t tableAddress);
+std::int32_t SFXA_MakeAlp3110Tbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00ADE310 (_SFXA_MakeAlp3211Tbl)
@@ -4920,7 +4921,7 @@ std::int32_t SFXA_MakeAlp3110Tbl(std::int32_t sfxaHandleAddress, std::int32_t re
  * What it does:
  * Builds alpha table in 3211 mode through optional per-handle callback.
  */
-std::int32_t SFXA_MakeAlp3211Tbl(std::int32_t sfxaHandleAddress, std::int32_t reservedMode, std::int32_t tableAddress);
+std::int32_t SFXA_MakeAlp3211Tbl(SofdecAddressWord sfxaHandleAddress, std::int32_t reservedMode, SofdecAddressWord tableAddress);
 
 /**
  * Address: 0x00ADE350 (_SFXA_SetLumiPrm)
@@ -4928,8 +4929,8 @@ std::int32_t SFXA_MakeAlp3211Tbl(std::int32_t sfxaHandleAddress, std::int32_t re
  * What it does:
  * Stores one SFXA luminance-parameter triplet and marks table-update needed.
  */
-std::int32_t SFXA_SetLumiPrm(
-  std::int32_t sfxaHandleAddress,
+SofdecAddressWord SFXA_SetLumiPrm(
+  SofdecAddressWord sfxaHandleAddress,
   std::int32_t luminanceMin,
   std::int32_t luminanceMax,
   std::int32_t luminancePivot
@@ -4942,7 +4943,7 @@ std::int32_t SFXA_SetLumiPrm(
  * Returns one SFXA luminance-parameter triplet.
  */
 std::int32_t SFXA_GetLumiPrm(
-  std::int32_t sfxaHandleAddress,
+  SofdecAddressWord sfxaHandleAddress,
   std::int32_t* outLuminanceMin,
   std::int32_t* outLuminanceMax,
   std::int32_t* outLuminancePivot
@@ -4954,8 +4955,7 @@ std::int32_t SFXA_GetLumiPrm(
  * What it does:
  * Stores one SFXA alpha triplet lane.
  */
-std::int32_t
-SFXA_SetAlp3Prm(std::int32_t sfxaHandleAddress, std::int8_t alpha0, std::int8_t alpha1, std::int8_t alpha2);
+SofdecAddressWord SFXA_SetAlp3Prm(SofdecAddressWord sfxaHandleAddress, std::int8_t alpha0, std::int8_t alpha1, std::int8_t alpha2);
 
 /**
  * Address: 0x00ADE3C0 (_SFXA_GetAlp3Prm)
@@ -4964,7 +4964,7 @@ SFXA_SetAlp3Prm(std::int32_t sfxaHandleAddress, std::int8_t alpha0, std::int8_t 
  * Returns one SFXA alpha triplet lane.
  */
 std::int32_t
-SFXA_GetAlp3Prm(std::int32_t sfxaHandleAddress, std::int8_t* outAlpha0, std::int8_t* outAlpha1, std::int8_t* outAlpha2);
+SFXA_GetAlp3Prm(SofdecAddressWord sfxaHandleAddress, std::int8_t* outAlpha0, std::int8_t* outAlpha1, std::int8_t* outAlpha2);
 
 /**
  * Address: 0x00ADE340 (_SFXA_IsNeedUpdateLumiTbl)
@@ -4973,7 +4973,7 @@ SFXA_GetAlp3Prm(std::int32_t sfxaHandleAddress, std::int8_t* outAlpha0, std::int
  * Returns the pending "update luminance table" flag lane from one SFXA
  * runtime handle.
  */
-std::int32_t SFXA_IsNeedUpdateLumiTbl(std::int32_t sfxaHandleAddress);
+std::int32_t SFXA_IsNeedUpdateLumiTbl(SofdecAddressWord sfxaHandleAddress);
 
 /**
  * Address: 0x00ADE3E0 (_SFXSUD_Init)
@@ -4997,8 +4997,8 @@ std::int32_t SFXSUD_Finish();
  * What it does:
  * Expands contiguous SFBUF lane sizes into per-lane base-address pointers.
  */
-std::int32_t
-sfbuf_MakeBufPtr(std::int32_t* outBufferPointers, const std::int32_t* ringBufferSizes, std::int32_t baseBufferAddress);
+SofdecAddressWord
+sfbuf_MakeBufPtr(SofdecAddressWord* outBufferPointers, const std::int32_t* ringBufferSizes, SofdecAddressWord baseBufferAddress);
 
 /**
  * Address: 0x00ADE8E0 (_sfbuf_InitBufData)
@@ -5015,7 +5015,7 @@ std::int32_t* sfbuf_InitBufData(std::int32_t* sfbufLaneWords, std::int32_t laneT
  * What it does:
  * Clears three four-word SFBUF UO/SJ state blocks.
  */
-std::int32_t* sfbuf_InitUoSj(std::int32_t* uoSjStateWords);
+SofdecAddressWord* sfbuf_InitUoSj(SofdecAddressWord* uoSjStateWords);
 
 /**
  * Address: 0x00ADE8B0 (_sfbuf_InitUoSjBuf)
@@ -5023,9 +5023,9 @@ std::int32_t* sfbuf_InitUoSj(std::int32_t* uoSjStateWords);
  * What it does:
  * Initializes one SFBUF UO/SJ lane and clears its UO/SJ state block.
  */
-std::int32_t* sfbuf_InitUoSjBuf(
-  std::int32_t sfbufHandleAddress,
-  const std::int32_t* bufferAddressTable,
+SofdecAddressWord* sfbuf_InitUoSjBuf(
+  SofdecAddressWord sfbufHandleAddress,
+  const SofdecAddressWord* bufferAddressTable,
   const std::int32_t* bufferSizeTable,
   std::int32_t laneIndex
 );
@@ -5037,8 +5037,8 @@ std::int32_t* sfbuf_InitUoSjBuf(
  * Initializes one SFBUF audio-ring lane from base-address/size tables.
  */
 std::int32_t sfbuf_InitAringBuf(
-  std::int32_t sfbufHandleAddress,
-  const std::int32_t* bufferAddressTable,
+  SofdecAddressWord sfbufHandleAddress,
+  const SofdecAddressWord* bufferAddressTable,
   const std::int32_t* bufferSizeTable,
   std::int32_t laneIndex
 );
@@ -5050,9 +5050,9 @@ std::int32_t sfbuf_InitAringBuf(
  * Initializes one SFBUF video-frame lane and clears its frame-state words.
  */
 std::int32_t sfbuf_InitVfrmBuf(
-  std::int32_t vfrmOwnerAddress,
-  std::int32_t sfbufHandleAddress,
-  const std::int32_t* bufferAddressTable,
+  SofdecAddressWord vfrmOwnerAddress,
+  SofdecAddressWord sfbufHandleAddress,
+  const SofdecAddressWord* bufferAddressTable,
   const std::int32_t* bufferSizeTable,
   std::int32_t laneIndex
 );
@@ -5065,8 +5065,8 @@ std::int32_t sfbuf_InitVfrmBuf(
  * inputs.
  */
 std::int32_t sfbuf_CreateSj(
-  std::int32_t* outSjCreateStateWords,
-  std::int32_t sourceBufferAddress,
+  SofdecAddressWord* outSjCreateStateWords,
+  SofdecAddressWord sourceBufferAddress,
   std::int32_t sourceBufferBytes,
   std::int32_t extraBufferBytes
 );
@@ -5079,8 +5079,8 @@ std::int32_t sfbuf_CreateSj(
  * created SJ ring handle.
  */
 std::int32_t sfbuf_InitRingSj(
-  std::int32_t sfbufHandleAddress,
-  const std::int32_t* bufferAddressTable,
+  SofdecAddressWord sfbufHandleAddress,
+  const SofdecAddressWord* bufferAddressTable,
   const std::int32_t* bufferSizeTable,
   std::int32_t laneIndex,
   std::int32_t extraBufferBytes
@@ -5093,7 +5093,7 @@ std::int32_t sfbuf_InitRingSj(
  * Initializes SFBUF ring/audio/video/UO lanes from one layout-config block.
  */
 std::int32_t
-SFBUF_InitHn(std::int32_t vfrmOwnerAddress, std::int32_t sfbufHandleAddress, const std::int32_t* sfbufInitConfigWords);
+SFBUF_InitHn(SofdecAddressWord vfrmOwnerAddress, SofdecAddressWord sfbufHandleAddress, const std::int32_t* sfbufInitConfigWords);
 
 /**
  * Address: 0x00ADE9C0 (_sfbuf_ChkSupSj)
@@ -5111,9 +5111,9 @@ std::int32_t sfbuf_ChkSupSj(const std::int32_t* supplyDescriptorWords);
  * lock.
  */
 void sfbuf_SetSupSj(
-  std::int32_t* supplyLaneWords,
-  const std::int32_t* supplyDescriptorWords,
-  std::int32_t ownerLaneAddress,
+  SofdecAddressWord* supplyLaneWords,
+  const SofdecAddressWord* supplyDescriptorWords,
+  SofdecAddressWord ownerLaneAddress,
   std::int32_t setupState
 );
 
@@ -5124,7 +5124,7 @@ void sfbuf_SetSupSj(
  * Routes one validated supply descriptor into selected SFBUF transfer lane.
  */
 std::int32_t sfbuf_SetSupplySjSub(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   const std::int32_t* supplyDescriptorWords,
   std::int32_t transferLaneIndex
 );
@@ -5144,7 +5144,7 @@ SFBUF_SetSupplySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int3
  * What it does:
  * Clears one SFBUF continuity state pair.
  */
-std::int32_t* sfbuf_InitConti(std::int32_t* continuityStateWords);
+SofdecAddressWord* sfbuf_InitConti(SofdecAddressWord* continuityStateWords);
 
 /**
  * Address: 0x00ADEAE0 (_SFBUF_SetUoch)
@@ -5153,7 +5153,7 @@ std::int32_t* sfbuf_InitConti(std::int32_t* continuityStateWords);
  * Stores one user-output chunk descriptor into an SFBUF lane slot.
  */
 std::int32_t* SFBUF_SetUoch(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   std::int32_t laneIndex,
   std::int32_t uochSlotIndex,
   const std::int32_t* chunkDescriptorWords
@@ -5166,7 +5166,7 @@ std::int32_t* SFBUF_SetUoch(
  * Reads one user-output chunk descriptor from an SFBUF lane slot.
  */
 std::int32_t SFBUF_GetUoch(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   std::int32_t laneIndex,
   std::int32_t uochSlotIndex,
   std::int32_t* outChunkDescriptorWords
@@ -5179,7 +5179,7 @@ std::int32_t SFBUF_GetUoch(
  * Returns one SFBUF lane SJ ring handle pointer word.
  */
 std::int32_t
-SFBUF_GetRingSj(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::int32_t* outRingHandleAddress);
+SFBUF_GetRingSj(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, std::int32_t* outRingHandleAddress);
 
 /**
  * Address: 0x00ADEBF0 (_sfbuf_RingGetSub)
@@ -5188,7 +5188,7 @@ SFBUF_GetRingSj(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::in
  * Peeks one SFBUF ring lane into contiguous two-chunk cursor output.
  */
 std::int32_t sfbuf_RingGetSub(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   std::int32_t ringIndex,
   std::int32_t* outCursor,
   std::int32_t laneMode
@@ -5201,7 +5201,7 @@ std::int32_t sfbuf_RingGetSub(
  * Advances one SFBUF ring lane and updates accumulated write/read totals.
  */
 std::int32_t sfbuf_RingAddSub(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   std::int32_t ringIndex,
   std::int32_t advanceCount,
   std::int32_t laneMode
@@ -5214,7 +5214,7 @@ std::int32_t sfbuf_RingAddSub(
  * Clears delimiter continuity markers when they are outside current read
  * chunks.
  */
-std::uint32_t sfbuf_ResetConti(std::int32_t* supplyStateWords);
+std::uint32_t sfbuf_ResetConti(SofdecAddressWord* supplyStateWords);
 
 /**
  * Address: 0x00ADEE00 (_sfbuf_PeekChunk)
@@ -5223,7 +5223,7 @@ std::uint32_t sfbuf_ResetConti(std::int32_t* supplyStateWords);
  * Reads current readable chunk windows without consuming ring bytes.
  */
 std::int32_t sfbuf_PeekChunk(
-  std::int32_t ringHandleAddress,
+  SofdecAddressWord ringHandleAddress,
   std::int32_t laneMode,
   moho::SjChunkRange* outFirstChunk,
   moho::SjChunkRange* outSecondChunk
@@ -5235,7 +5235,7 @@ std::int32_t sfbuf_PeekChunk(
  * What it does:
  * Moves one chunk span from input lane to output lane in SJ ring.
  */
-std::int32_t sfbuf_MoveChunk(std::int32_t ringHandleAddress, std::int32_t laneMode, std::int32_t requestedBytes);
+std::int32_t sfbuf_MoveChunk(SofdecAddressWord ringHandleAddress, std::int32_t laneMode, std::int32_t requestedBytes);
 
 /**
  * Address: 0x00ADEBB0 (_SFBUF_RingGetWrite)
@@ -5243,7 +5243,7 @@ std::int32_t sfbuf_MoveChunk(std::int32_t ringHandleAddress, std::int32_t laneMo
  * What it does:
  * Reads one SFBUF ring write cursor lane through shared ring-get helper.
  */
-std::int32_t SFBUF_RingGetWrite(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor);
+std::int32_t SFBUF_RingGetWrite(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor);
 
 /**
  * Address: 0x00ADEBD0 (_SFBUF_RingGetRead)
@@ -5251,7 +5251,7 @@ std::int32_t SFBUF_RingGetWrite(std::int32_t sfbufHandleAddress, std::int32_t ri
  * What it does:
  * Reads one SFBUF ring read cursor lane through shared ring-get helper.
  */
-std::int32_t SFBUF_RingGetRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor);
+std::int32_t SFBUF_RingGetRead(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor);
 
 /**
  * Address: 0x00ADEC80 (_SFBUF_RingAddWrite)
@@ -5259,7 +5259,7 @@ std::int32_t SFBUF_RingGetRead(std::int32_t sfbufHandleAddress, std::int32_t rin
  * What it does:
  * Advances one SFBUF ring write cursor by a requested count.
  */
-std::int32_t SFBUF_RingAddWrite(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t advanceCount);
+std::int32_t SFBUF_RingAddWrite(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t advanceCount);
 
 /**
  * Address: 0x00ADEC90 (_SFBUF_RingAddRead)
@@ -5267,7 +5267,7 @@ std::int32_t SFBUF_RingAddWrite(std::int32_t sfbufHandleAddress, std::int32_t ri
  * What it does:
  * Advances one SFBUF ring read cursor by a requested count.
  */
-std::int32_t SFBUF_RingAddRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t advanceCount);
+std::int32_t SFBUF_RingAddRead(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t advanceCount);
 
 /**
  * Address: 0x00ADEED0 (_SFBUF_RingGetDlm)
@@ -5276,7 +5276,7 @@ std::int32_t SFBUF_RingAddRead(std::int32_t sfbufHandleAddress, std::int32_t rin
  * Returns current delimiter marker pair for one SFBUF ring lane.
  */
 void SFBUF_RingGetDlm(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   std::int32_t ringIndex,
   std::int32_t* outPrimaryDelimiterAddress,
   std::int32_t* outSecondaryDelimiterAddress
@@ -5289,10 +5289,10 @@ void SFBUF_RingGetDlm(
  * Stores delimiter marker pair for one SFBUF ring lane.
  */
 void SFBUF_RingSetDlm(
-  std::int32_t sfbufHandleAddress,
+  SofdecAddressWord sfbufHandleAddress,
   std::int32_t ringIndex,
-  std::int32_t primaryDelimiterAddress,
-  std::int32_t secondaryDelimiterAddress
+  SofdecAddressWord primaryDelimiterAddress,
+  SofdecAddressWord secondaryDelimiterAddress
 );
 
 /**
@@ -5301,7 +5301,7 @@ void SFBUF_RingSetDlm(
  * What it does:
  * Returns cumulative write total for one SFBUF ring lane.
  */
-std::int32_t SFBUF_GetWTot(std::int32_t sfbufHandleAddress, std::int32_t ringIndex);
+std::int32_t SFBUF_GetWTot(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex);
 
 /**
  * Address: 0x00ADF020 (_SFBUF_RingGetSj)
@@ -5310,7 +5310,7 @@ std::int32_t SFBUF_GetWTot(std::int32_t sfbufHandleAddress, std::int32_t ringInd
  * Validates one SFBUF ring lane setup state and returns its SJ handle.
  */
 std::int32_t
-SFBUF_RingGetSj(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outRingHandleAddress);
+SFBUF_RingGetSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outRingHandleAddress);
 
 /**
  * Address: 0x00ADF070 (_SFBUF_AddRtotSj)
@@ -5318,7 +5318,7 @@ SFBUF_RingGetSj(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::in
  * What it does:
  * Adds one byte-count increment to ring read-total lane when nonnegative.
  */
-std::int32_t* SFBUF_AddRtotSj(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
+SofdecAddressWord* SFBUF_AddRtotSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
 
 /**
  * Address: 0x00ADF0A0 (_SFBUF_AringGetWrite)
@@ -5327,7 +5327,7 @@ std::int32_t* SFBUF_AddRtotSj(std::int32_t sfbufHandleAddress, std::int32_t ring
  * Builds one audio-ring write snapshot window from SFBUF aring lane state.
  */
 std::int32_t
-SFBUF_AringGetWrite(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outAringSnapshotWords);
+SFBUF_AringGetWrite(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outAringSnapshotWords);
 
 /**
  * Address: 0x00ADF220 (_SFBUF_AringAddWrite)
@@ -5335,7 +5335,7 @@ SFBUF_AringGetWrite(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std
  * What it does:
  * Advances one aring write cursor and updates aring write-total counter.
  */
-std::int32_t SFBUF_AringAddWrite(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addSamples);
+std::int32_t SFBUF_AringAddWrite(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addSamples);
 
 /**
  * Address: 0x00ADF2D0 (_SFBUF_AringGetRead)
@@ -5344,7 +5344,7 @@ std::int32_t SFBUF_AringAddWrite(std::int32_t sfbufHandleAddress, std::int32_t r
  * Builds one audio-ring read snapshot window from SFBUF aring lane state.
  */
 std::int32_t
-SFBUF_AringGetRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outAringSnapshotWords);
+SFBUF_AringGetRead(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outAringSnapshotWords);
 
 /**
  * Address: 0x00ADF450 (_SFBUF_AringAddRead)
@@ -5352,7 +5352,7 @@ SFBUF_AringGetRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std:
  * What it does:
  * Advances one aring read cursor and updates aring read-total counter.
  */
-std::int32_t SFBUF_AringAddRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addSamples);
+std::int32_t SFBUF_AringAddRead(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addSamples);
 
 /**
  * Address: 0x00ADF500 (_SFBUF_VfrmGetWrite)
@@ -5368,7 +5368,7 @@ std::int32_t SFBUF_VfrmGetWrite();
  * What it does:
  * Marks SFBUF runtime dirty after vfrm write-lane update.
  */
-std::int32_t SFBUF_VfrmAddWrite(std::int32_t sfbufHandleAddress);
+std::int32_t SFBUF_VfrmAddWrite(SofdecAddressWord sfbufHandleAddress);
 
 /**
  * Address: 0x00ADF520 (_SFBUF_VfrmGetRead)
@@ -5377,7 +5377,7 @@ std::int32_t SFBUF_VfrmAddWrite(std::int32_t sfbufHandleAddress);
  * Reads vfrm transfer state via SFTRN bridge when lane is not setup.
  */
 std::int32_t
-SFBUF_VfrmGetRead(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::int32_t arg0, std::int32_t arg1);
+SFBUF_VfrmGetRead(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, std::int32_t arg0, std::int32_t arg1);
 
 /**
  * Address: 0x00ADF570 (_SFBUF_VfrmAddRead)
@@ -5386,7 +5386,7 @@ SFBUF_VfrmGetRead(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::
  * Commits vfrm read lane via SFTRN bridge when lane is not setup.
  */
 std::int32_t
-SFBUF_VfrmAddRead(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::int32_t arg0, std::int32_t arg1);
+SFBUF_VfrmAddRead(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, std::int32_t arg0, std::int32_t arg1);
 
 /**
  * Address: 0x00ADF5C0 (_SFBUF_SetPrepFlg)
@@ -5394,7 +5394,7 @@ SFBUF_VfrmAddRead(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::
  * What it does:
  * Writes one per-lane prep flag in SFBUF lane state.
  */
-std::int32_t SFBUF_SetPrepFlg(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::int32_t prepFlag);
+std::int32_t SFBUF_SetPrepFlg(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, std::int32_t prepFlag);
 
 /**
  * Address: 0x00ADF5E0 (_SFBUF_GetPrepFlg)
@@ -5402,7 +5402,7 @@ std::int32_t SFBUF_SetPrepFlg(std::int32_t sfbufHandleAddress, std::int32_t lane
  * What it does:
  * Reads one per-lane prep flag from SFBUF lane state.
  */
-std::int32_t SFBUF_GetPrepFlg(std::int32_t sfbufHandleAddress, std::int32_t laneIndex);
+std::int32_t SFBUF_GetPrepFlg(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex);
 
 /**
  * Address: 0x00ADF600 (_SFBUF_SetTermFlg)
@@ -5410,7 +5410,7 @@ std::int32_t SFBUF_GetPrepFlg(std::int32_t sfbufHandleAddress, std::int32_t lane
  * What it does:
  * Writes one per-lane term flag in SFBUF lane state.
  */
-std::int32_t SFBUF_SetTermFlg(std::int32_t sfbufHandleAddress, std::int32_t laneIndex, std::int32_t termFlag);
+std::int32_t SFBUF_SetTermFlg(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex, std::int32_t termFlag);
 
 /**
  * Address: 0x00ADF620 (_SFBUF_GetTermFlg)
@@ -5418,7 +5418,7 @@ std::int32_t SFBUF_SetTermFlg(std::int32_t sfbufHandleAddress, std::int32_t lane
  * What it does:
  * Reads one per-lane term flag from SFBUF lane state.
  */
-std::int32_t SFBUF_GetTermFlg(std::int32_t sfbufHandleAddress, std::int32_t laneIndex);
+std::int32_t SFBUF_GetTermFlg(SofdecAddressWord sfbufHandleAddress, std::int32_t laneIndex);
 
 /**
  * Address: 0x00ADF640 (_SFBUF_GetRingBufSiz)
@@ -5426,7 +5426,7 @@ std::int32_t SFBUF_GetTermFlg(std::int32_t sfbufHandleAddress, std::int32_t lane
  * What it does:
  * Returns sum of current read-side chunk spans for one SFBUF ring lane.
  */
-std::int32_t SFBUF_GetRingBufSiz(std::int32_t sfbufHandleAddress, std::int32_t ringIndex);
+std::int32_t SFBUF_GetRingBufSiz(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex);
 
 /**
  * Address: 0x00ADF670 (_SFBUF_RingGetFreeSiz)
@@ -5434,7 +5434,7 @@ std::int32_t SFBUF_GetRingBufSiz(std::int32_t sfbufHandleAddress, std::int32_t r
  * What it does:
  * Returns sum of current write-side chunk spans for one SFBUF ring lane.
  */
-std::int32_t SFBUF_RingGetFreeSiz(std::int32_t sfbufHandleAddress, std::int32_t ringIndex);
+std::int32_t SFBUF_RingGetFreeSiz(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex);
 
 /**
  * Address: 0x00ADF720 (_sfbuf_InitSjUuid)
@@ -5450,7 +5450,7 @@ std::int32_t sfbuf_InitSjUuid();
  * What it does:
  * Checks whether one SJ handle resolves to ring-buffer supply UUID.
  */
-std::int32_t sfbuf_IsSjRbf(std::int32_t sjHandleAddress);
+std::int32_t sfbuf_IsSjRbf(SofdecAddressWord sjHandleAddress);
 
 /**
  * Address: 0x00ADF790 (_sfbuf_IsSjMem)
@@ -5458,7 +5458,7 @@ std::int32_t sfbuf_IsSjRbf(std::int32_t sjHandleAddress);
  * What it does:
  * Checks whether one SJ handle resolves to memory supply UUID.
  */
-std::int32_t sfbuf_IsSjMem(std::int32_t sjHandleAddress);
+std::int32_t sfbuf_IsSjMem(SofdecAddressWord sjHandleAddress);
 
 /**
  * Address: 0x00ADF6A0 (_SFBUF_GetFlowCnt)
@@ -5467,7 +5467,7 @@ std::int32_t sfbuf_IsSjMem(std::int32_t sjHandleAddress);
  * Extracts lane flow counters from ring or memory SJ supply owners.
  */
 std::int32_t
-SFBUF_GetFlowCnt(std::int32_t sjHandleAddress, std::int32_t* outLane1FlowCount, std::int32_t* outLane0FlowCount);
+SFBUF_GetFlowCnt(SofdecAddressWord sjHandleAddress, std::int32_t* outLane1FlowCount, std::int32_t* outLane0FlowCount);
 
 /**
  * Address: 0x00ADF7B0 (_SFBUF_UpdateFlowCnt)
@@ -5508,9 +5508,9 @@ std::int32_t sftrn_CallTrEntry(void* transferEntryTable, std::int32_t entrySelec
  * Initializes transfer lane runtime data and builds route graph for one
  * playback workctrl owner.
  */
-std::int32_t SFTRN_InitHn(
-  std::int32_t workctrlAddress,
-  std::int32_t transferDataArrayAddress,
+SofdecAddressWord SFTRN_InitHn(
+  SofdecAddressWord workctrlAddress,
+  SofdecAddressWord transferDataArrayAddress,
   const std::int32_t* transferBuildConfigAddressPtr
 );
 
@@ -5520,7 +5520,7 @@ std::int32_t SFTRN_InitHn(
  * What it does:
  * Resets one transfer lane runtime header and seeds stage defaults.
  */
-std::int32_t* sftrn_InitTrData(std::int32_t* transferDataWords, std::int32_t transferDescriptorAddress);
+std::int32_t* sftrn_InitTrData(std::int32_t* transferDataWords, SofdecAddressWord transferDescriptorAddress);
 
 /**
  * Address: 0x00ADF910 (_sftrn_BuildAll)
@@ -5630,7 +5630,7 @@ sftrn_ConnBufTrn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t sou
  * What it does:
  * Calls one setup callback slot across transfer descriptor lanes.
  */
-std::int32_t SFTRN_CallTrSetup(std::int32_t workctrlAddress, std::int32_t callbackIndex);
+std::int32_t SFTRN_CallTrSetup(SofdecAddressWord workctrlAddress, std::int32_t callbackIndex);
 
 /**
  * Address: 0x00ADFCA0 (_SFTRN_CallTrtTrif)
@@ -5639,7 +5639,7 @@ std::int32_t SFTRN_CallTrSetup(std::int32_t workctrlAddress, std::int32_t callba
  * Calls one transfer descriptor callback for one transfer lane.
  */
 std::int32_t SFTRN_CallTrtTrif(
-  std::int32_t workctrlAddress,
+  SofdecAddressWord workctrlAddress,
   std::int32_t transferLaneIndex,
   std::int32_t callbackIndex,
   std::int32_t arg0,
@@ -5652,7 +5652,7 @@ std::int32_t SFTRN_CallTrtTrif(
  * What it does:
  * Sets one transfer-lane prep flag.
  */
-std::int32_t SFTRN_SetPrepFlg(std::int32_t workctrlAddress, std::int32_t transferLaneIndex, std::int32_t prepFlag);
+SofdecAddressWord SFTRN_SetPrepFlg(SofdecAddressWord workctrlAddress, std::int32_t transferLaneIndex, std::int32_t prepFlag);
 
 /**
  * Address: 0x00ADFD00 (_SFTRN_GetPrepFlg)
@@ -5660,7 +5660,7 @@ std::int32_t SFTRN_SetPrepFlg(std::int32_t workctrlAddress, std::int32_t transfe
  * What it does:
  * Returns one transfer-lane prep flag.
  */
-std::int32_t SFTRN_GetPrepFlg(std::int32_t workctrlAddress, std::int32_t transferLaneIndex);
+std::int32_t SFTRN_GetPrepFlg(SofdecAddressWord workctrlAddress, std::int32_t transferLaneIndex);
 
 /**
  * Address: 0x00ADFD20 (_SFTRN_SetTermFlg)
@@ -5668,7 +5668,7 @@ std::int32_t SFTRN_GetPrepFlg(std::int32_t workctrlAddress, std::int32_t transfe
  * What it does:
  * Sets one transfer-lane terminate flag.
  */
-std::int32_t SFTRN_SetTermFlg(std::int32_t workctrlAddress, std::int32_t transferLaneIndex, std::int32_t termFlag);
+SofdecAddressWord SFTRN_SetTermFlg(SofdecAddressWord workctrlAddress, std::int32_t transferLaneIndex, std::int32_t termFlag);
 
 /**
  * Address: 0x00ADFD40 (_SFTRN_GetTermFlg)
@@ -5676,7 +5676,7 @@ std::int32_t SFTRN_SetTermFlg(std::int32_t workctrlAddress, std::int32_t transfe
  * What it does:
  * Returns one transfer-lane terminate flag.
  */
-std::int32_t SFTRN_GetTermFlg(std::int32_t workctrlAddress, std::int32_t transferLaneIndex);
+std::int32_t SFTRN_GetTermFlg(SofdecAddressWord workctrlAddress, std::int32_t transferLaneIndex);
 
 /**
  * Address: 0x00ADFD60 (_SFTRN_IsSetup)
@@ -5692,7 +5692,7 @@ std::int32_t SFTRN_IsSetup(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::i
  * What it does:
  * Returns queued byte-count lane for one SFBUF ring.
  */
-std::int32_t SFBUF_RingGetDataSiz(std::int32_t sfbufHandleAddress, std::int32_t ringIndex);
+std::int32_t SFBUF_RingGetDataSiz(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex);
 
 /**
  * Address: 0x00ADEF90 (_SFBUF_GetRTot)
@@ -5700,7 +5700,7 @@ std::int32_t SFBUF_RingGetDataSiz(std::int32_t sfbufHandleAddress, std::int32_t 
  * What it does:
  * Returns cumulative-read total lane for one SFBUF ring.
  */
-std::int32_t SFBUF_GetRTot(std::int32_t sfbufHandleAddress, std::int32_t ringIndex);
+std::int32_t SFBUF_GetRTot(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex);
 
 /**
  * Address: 0x00ACAE90 (_mwPlyStartFname)
@@ -5752,7 +5752,7 @@ void mw_sfd_start_ex(moho::MwsfdPlaybackStateSubobj* ply);
  * bounded error-code history) and forwards formatted diagnostics into
  * `MWSFSVM_Error`.
  */
-std::int32_t MWSFLIB_SfdErrFunc(std::int32_t mwsfdHandle, std::int32_t errorCode);
+std::int32_t MWSFLIB_SfdErrFunc(SofdecAddressWord mwsfdHandle, std::int32_t errorCode);
 
 /**
  * Address: 0x00AD8E90 (_SFLIB_CheckHn)
@@ -5951,7 +5951,7 @@ std::int32_t mwsftag_GetIntVal(
  * Advances one source window past the current child tag and emits the
  * remaining window span.
  */
-std::int32_t mwsftag_MoveNextTag(
+SofdecAddressWord mwsftag_MoveNextTag(
   const moho::MwsfTagWindow* sourceWindow,
   const moho::MwsfTagWindow* currentTagWindow,
   moho::MwsfTagWindow* outRemainingWindow
@@ -6045,7 +6045,7 @@ void ADXT_ExecFsServer();
  * What it does:
  * Returns whether ADXT filesystem-server dispatch is currently active.
  */
-std::int32_t ADXT_IsActiveFsSvr();
+SofdecAddressWord ADXT_IsActiveFsSvr();
 
 /**
  * Address: 0x00B17B90 (_ADXCRS_Lock)
@@ -6107,13 +6107,13 @@ std::int32_t sjrbf_Finish();
  * Address: 0x00B07D30 (_SJRBF_Create)
  */
 moho::SofdecSjRingBufferHandle*
-SJRBF_Create(std::int32_t bufferAddress, std::int32_t bufferSize, std::int32_t extraSize);
+SJRBF_Create(SofdecAddressWord bufferAddress, std::int32_t bufferSize, std::int32_t extraSize);
 
 /**
  * Address: 0x00B07D60 (_sjrbf_Create)
  */
 moho::SofdecSjRingBufferHandle*
-sjrbf_Create(std::int32_t bufferAddress, std::int32_t bufferSize, std::int32_t extraSize);
+sjrbf_Create(SofdecAddressWord bufferAddress, std::int32_t bufferSize, std::int32_t extraSize);
 
 /**
  * Address: 0x00B07DD0 (_SJRBF_Destroy)
@@ -6241,7 +6241,7 @@ std::int32_t sjrbf_IsGetChunk(
 /**
  * Address: 0x00B085F0 (_SJRBF_GetBufPtr)
  */
-std::int32_t SJRBF_GetBufPtr(moho::SofdecSjRingBufferHandle* handle);
+SofdecAddressWord SJRBF_GetBufPtr(moho::SofdecSjRingBufferHandle* handle);
 
 /**
  * Address: 0x00B08610 (_sjrbf_GetBufPtr)
@@ -6326,12 +6326,12 @@ std::int32_t sjmem_Finish();
 /**
  * Address: 0x00B090C0 (_SJMEM_Create)
  */
-moho::SofdecSjMemoryHandle* SJMEM_Create(std::int32_t bufferAddress, std::int32_t bufferSize);
+moho::SofdecSjMemoryHandle* SJMEM_Create(SofdecAddressWord bufferAddress, std::int32_t bufferSize);
 
 /**
  * Address: 0x00B090F0 (_sjmem_Create)
  */
-moho::SofdecSjMemoryHandle* sjmem_Create(std::int32_t bufferAddress, std::int32_t bufferSize);
+moho::SofdecSjMemoryHandle* sjmem_Create(SofdecAddressWord bufferAddress, std::int32_t bufferSize);
 
 /**
  * Address: 0x00B091D0 (_SJMEM_CallErr_)
@@ -6492,7 +6492,7 @@ std::int32_t sjmem_IsGetChunk(
  * What it does:
  * Lock-wrapper returning SJMEM base buffer address lane.
  */
-std::int32_t SJMEM_GetBufPtr(moho::SofdecSjMemoryHandle* handle);
+SofdecAddressWord SJMEM_GetBufPtr(moho::SofdecSjMemoryHandle* handle);
 
 /**
  * Address: 0x00B09780 (_sjmem_GetBufPtr)
@@ -6547,13 +6547,13 @@ std::int32_t sjuni_Finish();
  * Address: 0x00B099F0 (_SJUNI_Create)
  */
 moho::SofdecSjUnifyHandle*
-SJUNI_Create(std::uint8_t mergeAdjacentChunks, std::int32_t chainPoolAddress, std::int32_t chainPoolBytes);
+SJUNI_Create(std::uint8_t mergeAdjacentChunks, SofdecAddressWord chainPoolAddress, std::int32_t chainPoolBytes);
 
 /**
  * Address: 0x00B09A20 (_sjuni_Create)
  */
 moho::SofdecSjUnifyHandle*
-sjuni_Create(std::uint8_t mergeAdjacentChunks, std::int32_t chainPoolAddress, std::int32_t chainPoolBytes);
+sjuni_Create(std::uint8_t mergeAdjacentChunks, SofdecAddressWord chainPoolAddress, std::int32_t chainPoolBytes);
 
 /**
  * Address: 0x00B09AA0 (_SJUNI_Destroy)
@@ -6720,7 +6720,7 @@ void CRICRS_Leave();
  * What it does:
  * Returns ADXRNA play-flag bit (`stateFlags bit1`) for one RNA handle.
  */
-std::int32_t ADXRNA_IsPlaySwEnabled(std::int32_t rnaHandle);
+std::int32_t ADXRNA_IsPlaySwEnabled(SofdecAddressWord rnaHandle);
 
 /**
  * Address: 0x00B14E40 (FUN_00B14E40, _ADXRNA_SetPlaySw)
@@ -6728,7 +6728,7 @@ std::int32_t ADXRNA_IsPlaySwEnabled(std::int32_t rnaHandle);
  * What it does:
  * Updates ADXRNA play-switch lane and transition flags under RNA lock.
  */
-void ADXRNA_SetPlaySw(std::int32_t rnaHandle, std::int32_t enabled);
+void ADXRNA_SetPlaySw(SofdecAddressWord rnaHandle, std::int32_t enabled);
 
 /**
  * Address: 0x00B207F0 (adxrna_Init)
@@ -7225,7 +7225,7 @@ std::int32_t ADXB_TakeSnapshot(moho::AdxBitstreamDecoderState* decoder);
  * What it does:
  * Restores ADX packet-decoder delay/ext-key lanes from ADXB snapshot fields.
  */
-std::int32_t ADXB_RestoreSnapshot(moho::AdxBitstreamDecoderState* decoder);
+SofdecAddressWord ADXB_RestoreSnapshot(moho::AdxBitstreamDecoderState* decoder);
 
 /**
  * Address: 0x00B21460 (ADXSJE_SetExtString)
@@ -7329,7 +7329,7 @@ moho::AdxBitstreamDecoderState* ADXB_Start(moho::AdxBitstreamDecoderState* decod
  * What it does:
  * Runs optional post-process detach and stops one ADX packet decoder.
  */
-std::int32_t ADXB_Stop(moho::AdxBitstreamDecoderState* decoder);
+SofdecAddressWord ADXB_Stop(moho::AdxBitstreamDecoderState* decoder);
 
 /**
  * Address: 0x0109BC6C data lane assigned by ADXT attach helpers.

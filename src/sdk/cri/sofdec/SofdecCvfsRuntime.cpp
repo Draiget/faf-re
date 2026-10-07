@@ -3,7 +3,7 @@
 
   extern "C" std::int32_t cvFsError_(const char* const message)
   {
-    cvFsCallUsrErrFn(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&gCvFsErrorObject)), message);
+    cvFsCallUsrErrFn(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(&gCvFsErrorObject)), message);
     return 0;
   }
 
@@ -13,7 +13,7 @@
    * What it does:
    * Dispatches one CVFS error message to the registered user callback object.
    */
-  void cvFsCallUsrErrFn(const std::int32_t errorObjectAddress, const char* const message)
+  void cvFsCallUsrErrFn(const SofdecAddressWord errorObjectAddress, const char* const message)
   {
     (void)errorObjectAddress;
     if (cvfs_errfn != nullptr) {
@@ -27,7 +27,7 @@
    * What it does:
    * Registers or clears the global CVFS user-error callback pair.
    */
-  std::int32_t cvFsEntryErrFunc(const std::int32_t errorCallbackAddress, const std::int32_t errorObjectAddress)
+  SofdecAddressWord cvFsEntryErrFunc(const SofdecAddressWord errorCallbackAddress, const SofdecAddressWord errorObjectAddress)
   {
     if (errorCallbackAddress == 0) {
       cvfs_errfn = nullptr;
@@ -36,7 +36,7 @@
     }
 
     cvfs_errfn = reinterpret_cast<CvFsUserErrorBridgeFn>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(errorCallbackAddress))
+      static_cast<std::uintptr_t>(errorCallbackAddress)
     );
     cvfs_errobj = errorObjectAddress;
     return errorObjectAddress;
@@ -143,7 +143,7 @@
     }
 
     return optionBridge(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->handleAddress))),
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(handle->handleAddress)),
       optionCode,
       optionArg0,
       optionArg1
@@ -175,7 +175,7 @@
     }
 
     return optionBridge(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->handleAddress))),
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(handle->handleAddress)),
       optionCode,
       optionArg0,
       optionArg1
@@ -333,7 +333,7 @@
    * Validates one CVFS handle lane, invokes vtable close callback when
    * available, and releases the handle bookkeeping.
    */
-  extern "C" std::int32_t cvFsClose(CvFsHandle* const handle)
+  extern "C" SofdecAddressWord cvFsClose(CvFsHandle* const handle)
   {
     if (handle == nullptr) {
       return cvFsError_(kCvFsErrCloseHandle);
@@ -349,7 +349,7 @@
     }
 
     closeBridge(handle->handleAddress);
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(releaseCvFsHn(handle)));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(releaseCvFsHn(handle)));
   }
 
   /**
@@ -393,7 +393,7 @@
    */
   extern "C" std::int32_t cvFsReqRd(
     CvFsHandle* const handle,
-    const std::int32_t bufferAddress,
+    const SofdecAddressWord bufferAddress,
     const std::int32_t byteCount
   )
   {
@@ -419,7 +419,7 @@
    */
   extern "C" std::int32_t cvFsReqWr(
     CvFsHandle* const handle,
-    const std::int32_t bufferAddress,
+    const SofdecAddressWord bufferAddress,
     const std::int32_t byteCount
   )
   {
@@ -571,7 +571,7 @@
     }
 
     return optionBridge(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->handleAddress))),
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(handle->handleAddress)),
       kCvFsOptionGetFileSizeByHandle,
       0,
       0
@@ -900,7 +900,7 @@
     }
 
     return optionBridge(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->handleAddress))),
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(handle->handleAddress)),
       299,
       0,
       0
@@ -949,7 +949,7 @@
   extern "C" std::int32_t cvFsAddVolumeEx(
     char* const deviceName,
     const std::int32_t volumeName,
-    const std::int32_t imageHandleAddress,
+    const SofdecAddressWord imageHandleAddress,
     const std::int32_t modeOrFlags
   )
   {
@@ -972,7 +972,7 @@
       return -1;
     }
 
-    std::int32_t optionValues[5]{};
+    SofdecAddressWord optionValues[5]{};
     optionValues[0] = imageHandleAddress;
     optionValues[1] = volumeName;
     optionValues[2] = modeOrFlags;
@@ -1087,9 +1087,9 @@
       return 0;
     }
 
-    const std::int32_t handleAddress = handle->handleAddress;
+    const SofdecAddressWord handleAddress = handle->handleAddress;
     const void* const optionContext
-      = reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handleAddress)));
+      = reinterpret_cast<void*>(static_cast<std::uintptr_t>(handleAddress));
 
     const std::uint32_t highPart = static_cast<std::uint32_t>(optionBridge(const_cast<void*>(optionContext), 200, 0, 0));
     const std::uint32_t lowPart = static_cast<std::uint32_t>(optionBridge(const_cast<void*>(optionContext), 201, 0, 0));
@@ -1114,8 +1114,8 @@
       return 0;
     }
 
-    const std::int32_t pathAddress
-      = static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(filePath)));
+    const SofdecAddressWord pathAddress
+      = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(filePath));
     const std::uint32_t highPart
       = static_cast<std::uint32_t>(optionBridge(fileName, 202, pathAddress, 0));
     const std::uint32_t lowPart
@@ -1147,8 +1147,8 @@
       return 0;
     }
 
-    const std::int32_t pathAddress
-      = static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(filePath)));
+    const SofdecAddressWord pathAddress
+      = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(filePath));
     const std::uint32_t highPart
       = static_cast<std::uint32_t>(optionBridge(fileName, 204, pathAddress, optionArg));
     const std::uint32_t lowPart
@@ -1542,7 +1542,7 @@
   int ADXPC_SetupFileSystem(const char** const rootDirArgv)
   {
     (void)ADXPC_GetVersion();
-    (void)cvFsEntryErrFunc(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&ADXPC_ReportDvdError)), 0);
+    (void)cvFsEntryErrFunc(static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(&ADXPC_ReportDvdError)), 0);
 
     cvFsAddDev(kCvFsDeviceMf, &mfCiGetInterface);
     xeCiInit();

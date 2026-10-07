@@ -5,12 +5,12 @@
    * Installs MPARBD error callback and caller context lanes.
    */
   std::int32_t __cdecl MPARBD_EntryErrFunc(
-    const std::int32_t callbackFunctionAddress,
+    const SofdecAddressWord callbackFunctionAddress,
     const std::int32_t callbackContext
   )
   {
     mparbd_err_func = reinterpret_cast<MparbdErrorCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(callbackFunctionAddress))
+      static_cast<std::uintptr_t>(callbackFunctionAddress)
     );
     mparbd_err_param = callbackContext;
     return 0;
@@ -40,10 +40,10 @@
    * What it does:
    * Updates MPARBD allocator callback and mirrors it into MPARBF runtime.
    */
-  std::int32_t __cdecl MPARBD_SetUsrMallocFunc(const std::int32_t allocatorFunctionAddress)
+  std::int32_t __cdecl MPARBD_SetUsrMallocFunc(const SofdecAddressWord allocatorFunctionAddress)
   {
     mparbd_malloc_func = reinterpret_cast<MparbdUserMallocCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(allocatorFunctionAddress))
+      static_cast<std::uintptr_t>(allocatorFunctionAddress)
     );
     MPARBF_SetUsrMallocFunc(allocatorFunctionAddress);
     return 0;
@@ -55,10 +55,10 @@
    * What it does:
    * Updates MPARBD free callback and mirrors it into MPARBF runtime.
    */
-  std::int32_t __cdecl MPARBD_SetUsrFreeFunc(const std::int32_t freeFunctionAddress)
+  std::int32_t __cdecl MPARBD_SetUsrFreeFunc(const SofdecAddressWord freeFunctionAddress)
   {
     mparbd_free_func = reinterpret_cast<MparbdUserFreeCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(freeFunctionAddress))
+      static_cast<std::uintptr_t>(freeFunctionAddress)
     );
     MPARBF_SetUsrFreeFunc(freeFunctionAddress);
     return 0;
@@ -134,14 +134,14 @@
       return status;
     }
 
-    std::int32_t primaryBitReaderHandle = 0;
+    SofdecAddressWord primaryBitReaderHandle = 0;
     status = MPARBF_Create(0x2000, &primaryBitReaderHandle);
     if (status < 0) {
       mparbd_free_func(reinterpret_cast<void**>(&decoder));
       return status;
     }
 
-    std::int32_t secondaryBitReaderHandle = 0;
+    SofdecAddressWord secondaryBitReaderHandle = 0;
     status = MPARBF_Create(0x2000, &secondaryBitReaderHandle);
     if (status < 0) {
       MPARBF_Destroy(&primaryBitReaderHandle);
@@ -541,7 +541,7 @@
 
       MPARBF_WriteData(
         secondaryBitReaderHandle,
-        static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoderWords + kMparbdSynthesisHistoryBaseIndex)),
+        static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(decoderWords + kMparbdSynthesisHistoryBaseIndex)),
         writeBytes,
         nullptr
       );
@@ -881,10 +881,10 @@
    * What it does:
    * Updates MPARBF user allocation callback pointer.
    */
-  std::int32_t __cdecl MPARBF_SetUsrMallocFunc(const std::int32_t allocatorFunctionAddress)
+  std::int32_t __cdecl MPARBF_SetUsrMallocFunc(const SofdecAddressWord allocatorFunctionAddress)
   {
     mparbf_malloc_func = reinterpret_cast<MparbdUserMallocCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(allocatorFunctionAddress))
+      static_cast<std::uintptr_t>(allocatorFunctionAddress)
     );
     return 0;
   }
@@ -895,10 +895,10 @@
    * What it does:
    * Updates MPARBF user free callback pointer.
    */
-  std::int32_t __cdecl MPARBF_SetUsrFreeFunc(const std::int32_t freeFunctionAddress)
+  std::int32_t __cdecl MPARBF_SetUsrFreeFunc(const SofdecAddressWord freeFunctionAddress)
   {
     mparbf_free_func = reinterpret_cast<MparbdUserFreeCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(freeFunctionAddress))
+      static_cast<std::uintptr_t>(freeFunctionAddress)
     );
     return 0;
   }
@@ -909,7 +909,7 @@
    * What it does:
    * Allocates one MPARBF ring-buffer object and backing byte storage.
    */
-  std::int32_t __cdecl MPARBF_Create(const std::int32_t bufferBytes, std::int32_t* outHandle)
+  std::int32_t __cdecl MPARBF_Create(const std::int32_t bufferBytes, SofdecAddressWord* outHandle)
   {
     MparbfBuffer* ringBuffer = nullptr;
     auto status = mparbf_malloc_func(
@@ -932,12 +932,10 @@
     ringBuffer->capacityBytes = static_cast<std::uint32_t>(bufferBytes);
     ringBuffer->data = storage;
     MPARBF_Reset(
-      static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(ringBuffer)))
+      static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(ringBuffer))
     );
 
-    *outHandle = static_cast<std::int32_t>(
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(ringBuffer))
-    );
+    *outHandle = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(ringBuffer));
     return 0;
   }
 
@@ -947,7 +945,7 @@
    * What it does:
    * Clears and releases MPARBF ring-buffer storage and object instance.
    */
-  std::int32_t __cdecl MPARBF_Destroy(std::int32_t* handleAddress)
+  std::int32_t __cdecl MPARBF_Destroy(SofdecAddressWord* handleAddress)
   {
     auto* ringBuffer = AsMparbfBuffer(*handleAddress);
     void* storageAddress = ringBuffer->data;
@@ -967,7 +965,7 @@
    * What it does:
    * Clears ring-buffer bytes and resets all cursor/size lanes.
    */
-  std::int32_t __cdecl MPARBF_Reset(const std::int32_t handleAddress)
+  std::int32_t __cdecl MPARBF_Reset(const SofdecAddressWord handleAddress)
   {
     auto* const ringBuffer = AsMparbfBuffer(handleAddress);
     std::memset(ringBuffer->data, 0, ringBuffer->capacityBytes);
@@ -984,7 +982,7 @@
    * What it does:
    * Returns currently queued byte count in MPARBF ring-buffer.
    */
-  std::int32_t __cdecl MPARBF_GetDataSize(const std::int32_t handleAddress, std::uint32_t* outDataBytes)
+  std::int32_t __cdecl MPARBF_GetDataSize(const SofdecAddressWord handleAddress, std::uint32_t* outDataBytes)
   {
     *outDataBytes = AsMparbfBuffer(handleAddress)->dataBytes;
     return 0;
@@ -996,7 +994,7 @@
    * What it does:
    * Returns currently free byte capacity in MPARBF ring-buffer.
    */
-  std::int32_t __cdecl MPARBF_GetFreeSize(const std::int32_t handleAddress, std::uint32_t* outFreeBytes)
+  std::int32_t __cdecl MPARBF_GetFreeSize(const SofdecAddressWord handleAddress, std::uint32_t* outFreeBytes)
   {
     *outFreeBytes = AsMparbfBuffer(handleAddress)->freeBytes;
     return 0;
@@ -1009,7 +1007,7 @@
    * Reads up to requested bytes from ring-buffer and advances read cursor.
    */
   std::int32_t __cdecl MPARBF_ReadData(
-    const std::int32_t handleAddress,
+    const SofdecAddressWord handleAddress,
     char* destinationBytes,
     const std::uint32_t byteCount,
     std::uint32_t* outReadBytes
@@ -1054,15 +1052,15 @@
    * cursor.
    */
   std::int32_t __cdecl MPARBF_WriteData(
-    const std::int32_t handleAddress,
-    const std::int32_t sourceAddress,
+    const SofdecAddressWord handleAddress,
+    const SofdecAddressWord sourceAddress,
     const std::uint32_t byteCount,
     std::uint32_t* outWrittenBytes
   )
   {
     auto* const ringBuffer = AsMparbfBuffer(handleAddress);
     const auto* const sourceBytes = reinterpret_cast<const std::uint8_t*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceAddress))
+      static_cast<std::uintptr_t>(sourceAddress)
     );
 
     std::uint32_t freeBytes = 0;
@@ -1101,7 +1099,7 @@
    * Returns consumed bytes back to ring-buffer by rewinding read cursor.
    */
   std::int32_t __cdecl MPARBF_ReturnData(
-    const std::int32_t handleAddress,
+    const SofdecAddressWord handleAddress,
     const std::uint32_t returnBytes,
     std::uint32_t* outReturnedBytes
   )

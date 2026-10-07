@@ -26,26 +26,26 @@ struct Mpvcmc;
 // ---------------------------------------------------------------------------
 
 extern "C" {
-  std::int32_t SFLIB_SetErr(std::int32_t errorObjectAddress, std::int32_t errorCode);
+  std::int32_t SFLIB_SetErr(SofdecAddressWord errorObjectAddress, std::int32_t errorCode);
   std::int32_t sfmpv_ChkFatal();
-  std::int32_t MPVLIB_CheckHn(std::int32_t decoderHandle);
-  std::int32_t MPV_GoNextDelimSj(std::int32_t streamBufferAddress);
-  std::int32_t MPV_MoveChunk(std::int32_t streamBufferAddress, std::int32_t laneIndex, std::int32_t byteCount);
+  std::int32_t MPVLIB_CheckHn(SofdecAddressWord decoderHandle);
+  std::int32_t MPV_GoNextDelimSj(SofdecAddressWord streamBufferAddress);
+  std::int32_t MPV_MoveChunk(SofdecAddressWord streamBufferAddress, std::int32_t laneIndex, std::int32_t byteCount);
   std::int32_t MPV_Finish();
-  std::int32_t MPVERR_SetCode(std::int32_t decoderHandle, std::int32_t errorCode);
-  std::int32_t SFMPVF_IsTermDec(std::int32_t workctrlAddress);
-  std::int32_t SFMPVF_GetNumFrm(std::int32_t workctrlAddress);
-  std::int32_t MPV_Init(std::int32_t framePoolCount, std::int32_t workAddress);
+  std::int32_t MPVERR_SetCode(SofdecAddressWord decoderHandle, std::int32_t errorCode);
+  std::int32_t SFMPVF_IsTermDec(SofdecAddressWord workctrlAddress);
+  std::int32_t SFMPVF_GetNumFrm(SofdecAddressWord workctrlAddress);
+  std::int32_t MPV_Init(std::int32_t framePoolCount, SofdecAddressWord workAddress);
   std::int32_t MPV_Create();
-  std::int32_t MPV_SetErrFunc(std::int32_t handleAddress, std::int32_t errorCallbackAddress, std::int32_t errorCallbackContext);
-  std::int32_t MPV_SetCond(std::int32_t handleAddress, std::int32_t conditionId, std::int32_t (*conditionCallback)());
+  std::int32_t MPV_SetErrFunc(SofdecAddressWord handleAddress, SofdecAddressWord errorCallbackAddress, std::int32_t errorCallbackContext);
+  std::int32_t MPV_SetCond(SofdecAddressWord handleAddress, std::int32_t conditionId, std::int32_t (*conditionCallback)());
   std::int32_t M2V_Init(std::int32_t framePoolCount, void* workAddress, std::int32_t workBytes);
   std::int32_t UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
   std::int32_t UTY_MulDiv(std::int32_t lhs, std::int32_t rhs, std::int32_t divisor);
   std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue);
   void SFTIM_UpdateItime(void* timerState, std::int32_t interpolationTime);
   std::int32_t SFTIM_GetNextItime(void* timerState, std::int32_t interpolationTime);
-  std::int32_t SFTIM_IsGetFrmTime(std::int32_t workctrlAddress, const SfmpvfFrameInfo* frameInfo);
+  std::int32_t SFTIM_IsGetFrmTime(SofdecAddressWord workctrlAddress, const SfmpvfFrameInfo* frameInfo);
   /**
    * Address: 0x00AE5C40 (FUN_00AE5C40, _SFPTS_ReadPtsQue)
    *
@@ -54,9 +54,9 @@ extern "C" {
    * lanes to `-1` when no queue hit is available.
    */
   std::int32_t SFPTS_ReadPtsQue(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t sourceLaneIndex,
-    std::int32_t delimiterAddress,
+    SofdecAddressWord delimiterAddress,
     std::int32_t* outPtsWords
   );
   /**
@@ -68,9 +68,9 @@ extern "C" {
    */
   std::int32_t* sfpts_ReadPtsQueSub(
     moho::SfptsPtsQueue* ptsQueue,
-    std::int32_t normalizedDelimiterAddress,
+    SofdecAddressWord normalizedDelimiterAddress,
     std::int32_t* outPtsWords,
-    std::int32_t sourceLaneStartAddress,
+    SofdecAddressWord sourceLaneStartAddress,
     std::int32_t sourceLaneSpanBytes
   );
   std::int32_t sfpts_SearchPtsQue(
@@ -79,20 +79,20 @@ extern "C" {
     std::uint32_t sourceLaneStartAddress,
     std::int32_t sourceLaneSpanBytes
   );
-  void SFTIM_GetTime(std::int32_t workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
+  void SFTIM_GetTime(SofdecAddressWord workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
   /**
    * Address: 0x00ADBED0 (FUN_00ADBED0, _SFTIM_GetSpeed)
    *
    * What it does:
    * Returns one per-handle timer speed rational lane.
    */
-  std::int32_t SFTIM_GetSpeed(std::int32_t workctrlAddress);
-  std::int32_t SFSET_SetCond(std::int32_t workctrlAddress, std::int32_t conditionId, std::int32_t value);
-  std::int32_t SFSET_GetCond(std::int32_t workctrlAddress, std::int32_t conditionId);
-  std::int32_t SFHDS_GetColType(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_DetectTcErr(std::int32_t workctrlAddress, const SfmpvPictureAttribute* pictureAttribute);
+  std::int32_t SFTIM_GetSpeed(SofdecAddressWord workctrlAddress);
+  std::int32_t SFSET_SetCond(SofdecAddressWord workctrlAddress, std::int32_t conditionId, std::int32_t value);
+  std::int32_t SFSET_GetCond(SofdecAddressWord workctrlAddress, std::int32_t conditionId);
+  std::int32_t SFHDS_GetColType(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_DetectTcErr(SofdecAddressWord workctrlAddress, const SfmpvPictureAttribute* pictureAttribute);
   std::int32_t sfmpv_DoReformTc(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     SfmpvPictureAttribute* pictureAttribute,
     std::int64_t presentationPts,
     std::int32_t detectErrorMode
@@ -108,8 +108,8 @@ extern "C" {
     const moho::SfmpvPackedTimecode* sourceTimecode,
     moho::SfmpvPackedTimecode* outTimecode
   );
-  std::int32_t sfmpv_CalcAudioTotTime(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_CalcVideoTotTime(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_CalcAudioTotTime(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_CalcVideoTotTime(SofdecAddressWord workctrlAddress);
   /**
    * Address: 0x00AE5F50 (FUN_00AE5F50, _SFCON_UpdateConcatTime)
    *
@@ -117,7 +117,7 @@ extern "C" {
    * Adds one concat-time delta to runtime timing state and records the updated
    * total in a 32-slot history ring.
    */
-  void SFCON_UpdateConcatTime(std::int32_t workctrlAddress, std::int32_t totalTime);
+  void SFCON_UpdateConcatTime(SofdecAddressWord workctrlAddress, std::int32_t totalTime);
   /**
    * Address: 0x00AE5FB0 (FUN_00AE5FB0, _SFCON_WriteTotSmplQue)
    *
@@ -126,7 +126,7 @@ extern "C" {
    * total-sample queue when capacity is available.
    */
   std::int32_t SFCON_WriteTotSmplQue(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t totalSamples,
     std::int32_t sampleRate
   );
@@ -137,47 +137,46 @@ extern "C" {
     std::int32_t rhsMinor
   );
   std::int32_t sfmpv_GetDtime(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t mode,
     std::int32_t* outDeltaMajor,
     std::int32_t* outDeltaMinor
   );
-  std::int32_t sfmpv_ExecServerSub(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_SetSkipTtu(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_UpdateDefect(std::int32_t workctrlAddress, std::int32_t defectLaneAddress, std::int32_t defectDetected);
-  std::int32_t sfmpv_IsSeekSkip(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_IsDefect(std::int32_t workctrlAddress, std::int32_t pictureType);
-  std::int32_t sfmpv_IsPtypeSkip(std::int32_t workctrlAddress, std::int32_t pictureType);
+  std::int32_t sfmpv_ExecServerSub(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_SetSkipTtu(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_UpdateDefect(SofdecAddressWord workctrlAddress, SofdecAddressWord defectLaneAddress, std::int32_t defectDetected);
+  std::int32_t sfmpv_IsSeekSkip(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_IsDefect(SofdecAddressWord workctrlAddress, std::int32_t pictureType);
+  std::int32_t sfmpv_IsPtypeSkip(SofdecAddressWord workctrlAddress, std::int32_t pictureType);
   std::uint8_t*
-  sfmpv_IsEmptyBpic(std::int32_t workctrlAddress, std::int32_t pictureType, const SfbufRingChunk* chunkWords);
-  std::int32_t sfmpv_CopyPicUsrInf(std::int32_t destinationInfoAddress, std::int32_t sourceInfoAddress);
-  std::int32_t sfmpv_SetMpvHd(std::int32_t workctrlAddress, std::int32_t frameRateBase, std::int32_t pictureHeaderChunkAddress);
-  std::int32_t sfmpv_SetStartTtu(std::int32_t workctrlAddress);
+  sfmpv_IsEmptyBpic(SofdecAddressWord workctrlAddress, std::int32_t pictureType, const SfbufRingChunk* chunkWords);
+  std::int32_t sfmpv_CopyPicUsrInf(SofdecAddressWord destinationInfoAddress, SofdecAddressWord sourceInfoAddress);
+  std::int32_t sfmpv_SetMpvHd(SofdecAddressWord workctrlAddress, std::int32_t frameRateBase, SofdecAddressWord pictureHeaderChunkAddress);
+  std::int32_t sfmpv_SetStartTtu(SofdecAddressWord workctrlAddress);
   std::int32_t sfmpv_ChkMpvErr(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t decodeResult,
     std::int32_t consumedBytes,
     std::int32_t errorCode
   );
-  std::int32_t sfmpv_GetTermDst(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_GetTermSrc(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_ChkPrepFlg(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_ChkTermFlg(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_IsPrepEnd(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_IsPrepFrmEnough(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_IsVbvEnough(std::int32_t workctrlAddress);
-  std::int32_t MPV_GetBitRate(std::int32_t decoderHandle, std::int32_t* outBitRate);
+  std::int32_t sfmpv_GetTermDst(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_GetTermSrc(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_ChkPrepFlg(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_ChkTermFlg(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_IsPrepEnd(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_IsPrepFrmEnough(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_IsVbvEnough(SofdecAddressWord workctrlAddress);
+  std::int32_t MPV_GetBitRate(SofdecAddressWord decoderHandle, std::int32_t* outBitRate);
   std::int32_t MPV_GetVbvBufSiz(
-    std::int32_t decoderHandle,
+    SofdecAddressWord decoderHandle,
     std::int32_t* outBufferBytes,
     std::int32_t* outVbvLevel,
     std::int32_t* outStreamScale
   );
-  std::int32_t sfmpv_DestroySub(std::int32_t decoderHandle);
-  std::int32_t*
-  SFBUF_AddRtotSj(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
-  std::int32_t sfmpv_AddRtotSj(std::int32_t workctrlAddress, std::int32_t consumedBytes);
-  std::int32_t SFMPVF_HoldFrm(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_DestroySub(SofdecAddressWord decoderHandle);
+  std::int32_t* SFBUF_AddRtotSj(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
+  std::int32_t sfmpv_AddRtotSj(SofdecAddressWord workctrlAddress, std::int32_t consumedBytes);
+  std::int32_t SFMPVF_HoldFrm(SofdecAddressWord workctrlAddress);
   std::int32_t
   sfmpvf_IsChkFirst(const moho::SfmpvfFrameObject* selectedFrameObject, const moho::SfmpvfFrameObject* candidateFrameObject);
   /**
@@ -187,7 +186,7 @@ extern "C" {
    * Returns the current frame-object id lane and advances it, wrapping back
    * to zero when the increment would become negative.
    */
-  std::int32_t SFMPVF_IssueFrmId(std::int32_t workctrlAddress);
+  std::int32_t SFMPVF_IssueFrmId(SofdecAddressWord workctrlAddress);
   /**
    * Address: 0x00ADC2A0 (FUN_00ADC2A0, _SFMPVF_EndRefFrm)
    *
@@ -195,7 +194,7 @@ extern "C" {
    * Clears a frame-object's standby/reference state unless it is already in
    * the reference-standby lane.
    */
-  std::int32_t SFMPVF_EndRefFrm(std::int32_t frameObjectAddress);
+  std::int32_t SFMPVF_EndRefFrm(SofdecAddressWord frameObjectAddress);
   /**
    * Address: 0x00ADC250 (FUN_00ADC250, _SFMPVF_FreeFrm)
    *
@@ -203,7 +202,7 @@ extern "C" {
    * Clears one frame-object decode-state lane back to free (`0`) when the
    * address is valid.
    */
-  void SFMPVF_FreeFrm(std::int32_t frameObjectAddress);
+  void SFMPVF_FreeFrm(SofdecAddressWord frameObjectAddress);
   /**
    * Address: 0x00ADC260 (FUN_00ADC260, _SFMPVF_StbyFrm)
    *
@@ -211,7 +210,7 @@ extern "C" {
    * Places the frame object into standby state when the input address is
    * valid.
    */
-  std::int32_t SFMPVF_StbyFrm(std::int32_t frameObjectAddress);
+  std::int32_t SFMPVF_StbyFrm(SofdecAddressWord frameObjectAddress);
   /**
    * Address: 0x00ADC270 (FUN_00ADC270, _SFMPVF_RefStbyFrm)
    *
@@ -219,19 +218,19 @@ extern "C" {
    * Places the frame object into reference-standby state when the input
    * address is valid.
    */
-  std::int32_t SFMPVF_RefStbyFrm(std::int32_t frameObjectAddress);
+  std::int32_t SFMPVF_RefStbyFrm(SofdecAddressWord frameObjectAddress);
   void sfmpvf_SearchFrmInf(
-    std::int32_t workctrlAddress,
-    std::int32_t frameObjectAddress,
+    SofdecAddressWord workctrlAddress,
+    SofdecAddressWord frameObjectAddress,
     SfmpvfFrameInfo** outFrameInfo
   );
-  std::int32_t sfmpvf_GetVfrmDataFromFrmInf(std::int32_t workctrlAddress, std::int32_t frameInfoIndex);
+  std::int32_t sfmpvf_GetVfrmDataFromFrmInf(SofdecAddressWord workctrlAddress, std::int32_t frameInfoIndex);
   std::int32_t sfmpvf_AddReadSub(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t frameInfoIndex,
     std::int32_t frameObjectId
   );
-  std::int32_t SFMPVF_SearchFrmObj(std::int32_t workctrlAddress, std::int32_t frameInfoIndex);
+  std::int32_t SFMPVF_SearchFrmObj(SofdecAddressWord workctrlAddress, std::int32_t frameInfoIndex);
   /**
    * Address: 0x00ADC0A0 (FUN_00ADC0A0, _SFMPVF_SearchFrmObjFromId)
    *
@@ -239,7 +238,7 @@ extern "C" {
    * Scans the fixed 16-frame object table for the frame id and returns the
    * matching frame-object address when found.
    */
-  std::int32_t SFMPVF_SearchFrmObjFromId(std::int32_t workctrlAddress, std::int32_t frameObjectId);
+  std::int32_t SFMPVF_SearchFrmObjFromId(SofdecAddressWord workctrlAddress, std::int32_t frameObjectId);
   /**
    * Address: 0x00ADC0D0 (FUN_00ADC0D0, _SFMPVF_SearchVfrmData)
    *
@@ -247,7 +246,7 @@ extern "C" {
    * Scans the active MPV frame-object array for the supplied frame-object
    * address and returns the owning VFRM data lane when found.
    */
-  std::int32_t SFMPVF_SearchVfrmData(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
+  std::int32_t SFMPVF_SearchVfrmData(SofdecAddressWord workctrlAddress, SofdecAddressWord frameObjectAddress);
   /**
    * Address: 0x00ADC280 (FUN_00ADC280, _SFMPVF_EndDrawFrm)
    *
@@ -255,14 +254,14 @@ extern "C" {
    * Clears the frame id, then transitions the frame from reference-draw or
    * non-reference draw state back to the appropriate idle lane.
    */
-  std::int32_t SFMPVF_EndDrawFrm(std::int32_t frameObjectAddress);
+  std::int32_t SFMPVF_EndDrawFrm(SofdecAddressWord frameObjectAddress);
   std::uint8_t*
-  sfmpv_SearchDelim(const std::int32_t ringCursorSnapshotAddress, std::int32_t delimiterMask, std::int32_t* outDelimiterState);
+  sfmpv_SearchDelim(const SofdecAddressWord ringCursorSnapshotAddress, std::int32_t delimiterMask, std::int32_t* outDelimiterState);
   std::int32_t sfmpv_CalcDistance(const std::int32_t* ringCursorSnapshotWords, const std::uint8_t* targetAddress);
   std::int32_t sfmpv_NeedSafeDlmRefresh(
     const std::int32_t* ringCursorSnapshotWords,
     std::int32_t delimiterFlags,
-    std::int32_t primaryDelimiterAddress
+    SofdecAddressWord primaryDelimiterAddress
   );
   std::uint8_t*
   sfmpv_BsearchDelim(const std::int32_t* ringCursorSnapshotWords, std::int32_t delimiterMask, std::int32_t* outDelimiterType);
@@ -275,17 +274,17 @@ extern "C" {
    * returns both sample-total and sample-rate lanes.
    */
   std::int32_t SFCON_ReadTotSmplQue(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t* outTotalSamples,
     std::int32_t* outSampleRate
   );
   void SFD_tr_ad_adxt();
-  std::int32_t MPV_GetLinkFlg(std::int32_t decoderHandle, std::int32_t* outStreamLinkFlag, std::int32_t* outLinkState);
-  std::int32_t MPV_DecodePicAtr(std::int32_t handleAddress, const std::int32_t* pictureDataRange, std::int32_t* outConsumedBytes);
-  void MPV_SetPicUsrBuf(std::int32_t decoderHandle, std::int32_t userBufferAddress, std::int32_t userBufferSize);
-  std::int32_t MPV_DecodePicAtrSj(std::int32_t decoderHandle, std::int32_t streamBufferAddress);
-  std::int32_t MPV_GetPicAtr(std::int32_t decoderHandle, moho::SfmpvPictureDecodeLane* outPictureDecodeLane);
-  void MPV_GetPicUsr(std::int32_t decoderHandle, std::int32_t laneIndex, std::int32_t* outPictureUserFlags);
+  std::int32_t MPV_GetLinkFlg(SofdecAddressWord decoderHandle, std::int32_t* outStreamLinkFlag, std::int32_t* outLinkState);
+  std::int32_t MPV_DecodePicAtr(SofdecAddressWord handleAddress, const std::int32_t* pictureDataRange, std::int32_t* outConsumedBytes);
+  void MPV_SetPicUsrBuf(SofdecAddressWord decoderHandle, SofdecAddressWord userBufferAddress, std::int32_t userBufferSize);
+  std::int32_t MPV_DecodePicAtrSj(SofdecAddressWord decoderHandle, SofdecAddressWord streamBufferAddress);
+  std::int32_t MPV_GetPicAtr(SofdecAddressWord decoderHandle, moho::SfmpvPictureDecodeLane* outPictureDecodeLane);
+  void MPV_GetPicUsr(SofdecAddressWord decoderHandle, std::int32_t laneIndex, std::int32_t* outPictureUserFlags);
   char* MPV_SearchDelim(const char* chunkAddress, std::int32_t chunkBytes, std::int32_t delimiterMask);
   std::uint8_t* MPV_BsearchDelim(
     const std::uint8_t* chunkTailAddress,
@@ -293,8 +292,8 @@ extern "C" {
     std::int32_t delimiterMask
   );
   std::int32_t MPV_DecodeFrmSj(
-    std::int32_t decoderHandle,
-    std::int32_t streamBufferAddress,
+    SofdecAddressWord decoderHandle,
+    SofdecAddressWord streamBufferAddress,
     const SfmpvDecodeFrameParam* decodeFrameParam
   );
   /**
@@ -342,7 +341,7 @@ extern "C" {
    * Ends one UMC frame-decode pass (no-op in this binary).
    */
   void MPVUMC_EndOfFrame();
-  void MPV_GetDctCnt(std::int32_t decoderHandle, std::int32_t* outPrimaryCount, std::int32_t* outSecondaryCount);
+  void MPV_GetDctCnt(SofdecAddressWord decoderHandle, std::int32_t* outPrimaryCount, std::int32_t* outSecondaryCount);
   std::int64_t SFTMR_GetTmr();
   void* SFTMR_AddTsum(void* timeSumLane, std::int32_t deltaLow, std::int32_t deltaHigh);
   void* MPV_IsEmptyBpic(const char* chunkAddress, std::int32_t chunkBytes, std::int32_t frameAreaProduct);
@@ -355,9 +354,9 @@ extern "C" {
    * Copies the caller-supplied display-order latch into the MPV info lane's
    * single-frame-output flag and returns to the caller.
    */
-  void SFMPVF_FixDispOrder(std::int32_t workctrlAddress, std::int32_t shouldSort);
-  void sfmpv_FixedForSeek(std::int32_t workctrlAddress);
-  std::int32_t SFCON_IsEndcodeSkip(std::int32_t workctrlAddress);
+  void SFMPVF_FixDispOrder(SofdecAddressWord workctrlAddress, std::int32_t shouldSort);
+  void sfmpv_FixedForSeek(SofdecAddressWord workctrlAddress);
+  std::int32_t SFCON_IsEndcodeSkip(SofdecAddressWord workctrlAddress);
   /**
    * Address: 0x00AE5F20 (FUN_00AE5F20, _SFCON_IsVideoEndcodeSkip)
    *
@@ -365,27 +364,27 @@ extern "C" {
    * Returns 1 when either condition lane `49` or lane `57` is enabled;
    * otherwise returns 0.
    */
-  std::int32_t SFCON_IsVideoEndcodeSkip(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_Concat(std::int32_t workctrlAddress, std::int32_t streamBufferAddress);
-  void sfmpv_DiscardSec(std::int32_t workctrlAddress, std::int32_t streamBufferAddress);
-  std::int32_t sfmpv_IsTerm(std::int32_t workctrlAddress, std::int32_t activeSize, std::int32_t delimiterState);
+  std::int32_t SFCON_IsVideoEndcodeSkip(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_Concat(SofdecAddressWord workctrlAddress, SofdecAddressWord streamBufferAddress);
+  void sfmpv_DiscardSec(SofdecAddressWord workctrlAddress, SofdecAddressWord streamBufferAddress);
+  std::int32_t sfmpv_IsTerm(SofdecAddressWord workctrlAddress, std::int32_t activeSize, std::int32_t delimiterState);
   /**
    * Address: 0x00ADC120 (FUN_00ADC120, _SFMPVF_TermDec)
    *
    * What it does:
    * Marks the per-handle MPV info lane as term-decode active.
    */
-  std::int32_t SFMPVF_TermDec(std::int32_t workctrlAddress);
-  void sfmpv_PeekChnk(std::int32_t workctrlAddress, std::int32_t* outChunkWords);
+  std::int32_t SFMPVF_TermDec(SofdecAddressWord workctrlAddress);
+  void sfmpv_PeekChnk(SofdecAddressWord workctrlAddress, std::int32_t* outChunkWords);
   std::int32_t sfmpv_DecodePicAtr(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     const std::int32_t* chunkWords,
-    std::int32_t streamBufferAddress,
+    SofdecAddressWord streamBufferAddress,
     std::int32_t delimiterState,
     std::int32_t* outDecodeState
   );
   std::int64_t sfmpv_ReadPtsQue(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     moho::SfmpvPictureDecodeLane* pictureDecodeLane,
     char* delimiterCursor,
     std::int32_t* outPresentationPtsWords,
@@ -401,18 +400,18 @@ extern "C" {
     std::int32_t* outReferenceSeedWords
   );
   std::int64_t sfmpv_Nfrm2Pts(std::int32_t frameCount, std::int32_t frameRateScale);
-  std::int32_t sfmpv_SetHeadTtu(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_SetDecTtu(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_GoDdelim(std::int32_t workctrlAddress, std::int32_t streamBufferAddress, std::int32_t delimiterMask);
-  std::int32_t sfmpv_IsSkip(std::int32_t workctrlAddress, const std::int32_t* chunkWords);
-  std::int32_t sfmpv_DecodeFrm(std::int32_t workctrlAddress, std::int32_t streamBufferAddress);
+  std::int32_t sfmpv_SetHeadTtu(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_SetDecTtu(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_GoDdelim(SofdecAddressWord workctrlAddress, SofdecAddressWord streamBufferAddress, std::int32_t delimiterMask);
+  std::int32_t sfmpv_IsSkip(SofdecAddressWord workctrlAddress, const std::int32_t* chunkWords);
+  std::int32_t sfmpv_DecodeFrm(SofdecAddressWord workctrlAddress, SofdecAddressWord streamBufferAddress);
   std::int32_t SFTIM_Tc2Time(
     const void* timecodeLane,
     std::int32_t* outTimeMajor,
     std::int32_t* outTimeMinor
   );
   std::int32_t sfmpv_GetActiveSize(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     std::int32_t* outActiveSize,
     std::int32_t* outDelimiterFlags,
     std::int32_t* outHasActiveUnit
@@ -424,12 +423,12 @@ extern "C" {
     std::int32_t hasActiveUnit,
     std::int32_t* outUnitProcessed
   );
-  std::int32_t sfmpv_DecodeSomePic(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_DecodeSomePic(SofdecAddressWord workctrlAddress);
   std::int32_t sfmpv_FirstPicAtr(
-    std::int32_t workctrlAddress,
-    std::int32_t decoderHandleAddress,
-    std::int32_t mvInfoAddress,
-    std::int32_t pictureHeaderChunkAddress
+    SofdecAddressWord workctrlAddress,
+    SofdecAddressWord decoderHandleAddress,
+    SofdecAddressWord mvInfoAddress,
+    SofdecAddressWord pictureHeaderChunkAddress
   );
   std::int32_t sfmpv_SetMvInf(
     moho::SfplyMovieInfo* destinationInfo,
@@ -438,29 +437,29 @@ extern "C" {
     std::int32_t vbvBufferBytes
   );
   std::int32_t sfmpv_SetFrmPara(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     const moho::SfmpvPictureDecodeLane* pictureDecodeLane,
     SfmpvDecodeFrameParam* decodeFrameParam,
     std::int32_t* outFrameObjectAddress
   );
   std::int32_t sfmpv_ReadRefErrCnt(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     const moho::SfmpvInfo* mpvInfo,
     std::int32_t* outErrorMajor,
     std::int32_t* outErrorMinor
   );
-  std::int32_t sfmpv_SetFrmTime(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
-  std::int32_t sfmpv_CalcRepeatField(std::int32_t workctrlAddress, std::int32_t frameObjectAddress, std::int32_t resetHistory);
-  std::int32_t sfmpv_ChkBufSiz(std::int32_t workctrlAddress, const std::int32_t* frameDimensions);
-  std::int32_t sfmpv_CalcFrmTtu(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
-  std::int32_t sfmpv_ReadTcode(std::int32_t frameObjectAddress, moho::SfmpvPackedTimecode* outTimecodeLane);
-  std::int32_t sfmpv_CalcFrmTime(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
-  std::int32_t sfmpv_UpdateFlowCnt(std::int32_t workctrlAddress);
-  std::int32_t sfmpv_RingAddRead(std::int32_t workctrlAddress, std::int32_t advanceCount);
+  std::int32_t sfmpv_SetFrmTime(SofdecAddressWord workctrlAddress, SofdecAddressWord frameObjectAddress);
+  std::int32_t sfmpv_CalcRepeatField(SofdecAddressWord workctrlAddress, SofdecAddressWord frameObjectAddress, std::int32_t resetHistory);
+  std::int32_t sfmpv_ChkBufSiz(SofdecAddressWord workctrlAddress, const std::int32_t* frameDimensions);
+  std::int32_t sfmpv_CalcFrmTtu(SofdecAddressWord workctrlAddress, SofdecAddressWord frameObjectAddress);
+  std::int32_t sfmpv_ReadTcode(SofdecAddressWord frameObjectAddress, moho::SfmpvPackedTimecode* outTimecodeLane);
+  std::int32_t sfmpv_CalcFrmTime(SofdecAddressWord workctrlAddress, SofdecAddressWord frameObjectAddress);
+  std::int32_t sfmpv_UpdateFlowCnt(SofdecAddressWord workctrlAddress);
+  std::int32_t sfmpv_RingAddRead(SofdecAddressWord workctrlAddress, std::int32_t advanceCount);
   std::int32_t
-  sfmpv_ReprocessShc(std::int32_t workctrlAddress, const std::int32_t* decoderHandleLane, std::int32_t* outReprocessed);
-  std::int32_t sfmpv_GetHd(std::int32_t workctrlAddress);
-  moho::SfmpvfFrameObject* SFMPVF_AllocFrm(std::int32_t workctrlAddress);
+  sfmpv_ReprocessShc(SofdecAddressWord workctrlAddress, const std::int32_t* decoderHandleLane, std::int32_t* outReprocessed);
+  std::int32_t sfmpv_GetHd(SofdecAddressWord workctrlAddress);
+  moho::SfmpvfFrameObject* SFMPVF_AllocFrm(SofdecAddressWord workctrlAddress);
 }
 
 namespace
@@ -685,16 +684,16 @@ static_assert(
  */
 struct SfmpvDecodeFrameParam
 {
-  std::int32_t primaryLumaPlaneAddress = 0; // +0x00
-  std::int32_t primaryChromaPlaneAddress = 0; // +0x04
-  std::int32_t primaryFrameBaseAddress = 0; // +0x08
+  SofdecAddressWord primaryLumaPlaneAddress = 0; // +0x00
+  SofdecAddressWord primaryChromaPlaneAddress = 0; // +0x04
+  SofdecAddressWord primaryFrameBaseAddress = 0; // +0x08
   std::int32_t primaryStridePacked = 0; // +0x0C
-  std::int32_t secondaryLumaPlaneAddress = 0; // +0x10
-  std::int32_t secondaryChromaPlaneAddress = 0; // +0x14
-  std::int32_t secondaryFrameBaseAddress = 0; // +0x18
+  SofdecAddressWord secondaryLumaPlaneAddress = 0; // +0x10
+  SofdecAddressWord secondaryChromaPlaneAddress = 0; // +0x14
+  SofdecAddressWord secondaryFrameBaseAddress = 0; // +0x18
   std::int32_t secondaryStridePacked = 0; // +0x1C
-  std::int32_t decodedFrameBaseAddress = 0; // +0x20
-  std::int32_t pictureDecodeLaneAddress = 0; // +0x24
+  SofdecAddressWord decodedFrameBaseAddress = 0; // +0x20
+  SofdecAddressWord pictureDecodeLaneAddress = 0; // +0x24
   std::int32_t reserved28 = 0; // +0x28
   std::int32_t reserved2C = 0; // +0x2C
 };
@@ -879,18 +878,18 @@ static_assert(
 );
 
 using SfmpvStreamBufferReadWindowProc = void(__cdecl*)(
-  std::int32_t streamBufferAddress,
+  SofdecAddressWord streamBufferAddress,
   std::int32_t laneIndex,
   std::int32_t byteCount,
   SfmpvStreamWindowCursor* cursorWindow
 );
 using SfmpvStreamBufferCommitWindowProc = std::int32_t(__cdecl*)(
-  std::int32_t streamBufferAddress,
+  SofdecAddressWord streamBufferAddress,
   std::int32_t laneIndex,
   SfmpvStreamWindowCursor* cursorWindow
 );
 using SfmpvStreamBufferAdvanceWindowProc = void(__cdecl*)(
-  std::int32_t streamBufferAddress,
+  SofdecAddressWord streamBufferAddress,
   std::int32_t discardMode,
   SfmpvStreamWindowCursor* cursorWindow
 );
@@ -960,11 +959,11 @@ struct Mpvcmc
   std::uint8_t reserved01D8_027F[0xA8]{};
   std::int16_t initWord280 = 0; // +0x280
   std::int16_t initWord282 = 0; // +0x282
-  std::int32_t outputRfbBaseAddress = 0; // +0x284
+  SofdecAddressWord outputRfbBaseAddress = 0; // +0x284
   std::uint8_t reserved0288_0293[0x0C]{};
-  std::int32_t outputYPlaneAddress = 0; // +0x294
-  std::int32_t outputCPlaneAddress = 0; // +0x298
-  std::int32_t outputYPlaneBaseAddress = 0; // +0x29C
+  SofdecAddressWord outputYPlaneAddress = 0; // +0x294
+  SofdecAddressWord outputCPlaneAddress = 0; // +0x298
+  SofdecAddressWord outputYPlaneBaseAddress = 0; // +0x29C
   std::int16_t outputChromaStrideBytes = 0; // +0x2A0
   std::int16_t outputLumaStrideBytes = 0; // +0x2A2
   std::uint8_t reserved02A4_0D1F[0xA7C]{};
@@ -1103,7 +1102,7 @@ namespace
   template <typename T>
   [[nodiscard]] T* AddressToPointer(const std::int32_t address) noexcept
   {
-    return reinterpret_cast<T*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
+    return reinterpret_cast<T*>(static_cast<std::uintptr_t>(address));
   }
 
   /**
@@ -1114,7 +1113,7 @@ namespace
    */
   [[nodiscard]] std::int32_t (*AsMpvConditionCallback(const std::int32_t conditionWord) noexcept)()
   {
-    return reinterpret_cast<std::int32_t (*)()>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(conditionWord)));
+    return reinterpret_cast<std::int32_t (*)()>(static_cast<std::uintptr_t>(conditionWord));
   }
 
   [[nodiscard]] std::int32_t AlignAddressTo0x800(const std::int32_t address) noexcept
@@ -1124,7 +1123,7 @@ namespace
 
   [[nodiscard]] std::int32_t PointerToAddress(const void* pointer) noexcept
   {
-    return static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer)));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
   }
 
   [[nodiscard]] std::int32_t RoundUpDivPow2Signed(const std::int32_t value, const std::int32_t shift) noexcept
@@ -1317,7 +1316,7 @@ std::int32_t UTY_MemsetDword(void* const destination, const std::uint32_t value,
     --blockCount;
   }
 
-  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(destination));
+  return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(destination));
 }
 
 /**
@@ -1425,7 +1424,7 @@ std::int32_t SFD_SetMpvParaTbl(
       sSofDec_tabs[tabIndex] = 0;
     } else {
       const auto tabAddress =
-        static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sofDecTabAddressTable[tabIndex])));
+        static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(sofDecTabAddressTable[tabIndex]));
       sSofDec_tabs[tabIndex] = AlignAddressTo0x800(tabAddress);
     }
   }
@@ -1442,8 +1441,8 @@ std::int32_t SFD_SetMpvParaTbl(
  * picture-user entries; clears picture-user state when any input argument is 0.
  */
 std::int32_t sfmpvf_SetPicUsrBuf(
-  const std::int32_t workctrlAddress,
-  const std::int32_t userBufferAddress,
+  const SofdecAddressWord workctrlAddress,
+  const SofdecAddressWord userBufferAddress,
   const std::int32_t frameSlotCount,
   const std::int32_t bytesPerFrame
 )
@@ -1463,7 +1462,7 @@ std::int32_t sfmpvf_SetPicUsrBuf(
     mpvInfo->pictureUserBufferSize = bytesPerFrame;
     mpvInfo->pictureUserFlags = 0;
 
-    std::int32_t entryAddress = userBufferAddress + bytesPerFrame;
+    SofdecAddressWord entryAddress = userBufferAddress + bytesPerFrame;
     std::int32_t entryCount = frameSlotCount - 1;
     if (entryCount > 16) {
       entryCount = 16;
@@ -1488,7 +1487,7 @@ std::int32_t sfmpvf_SetPicUsrBuf(
  * When condition lane `28` is enabled, probes SFHDS color-type lane and updates
  * MPV condition `5`; returns unchanged condition probe result otherwise.
  */
-std::int32_t sfmpv_SetCondY16(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_SetCondY16(const SofdecAddressWord workctrlAddress)
 {
   std::int32_t result = SFSET_GetCond(workctrlAddress, 28);
   if (result == 0) {
@@ -1498,7 +1497,7 @@ std::int32_t sfmpv_SetCondY16(const std::int32_t workctrlAddress)
   result = SFHDS_GetColType(workctrlAddress);
   if (result != -1) {
     const auto cond5Arg =
-      reinterpret_cast<std::int32_t(*)()>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(result == 0)));
+      reinterpret_cast<std::int32_t(*)()>(static_cast<std::uintptr_t>(result == 0));
     return SFD_SetMpvCond(AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress), 5, cond5Arg);
   }
 
@@ -1513,7 +1512,7 @@ std::int32_t sfmpv_SetCondY16(const std::int32_t workctrlAddress)
  * decodes picture attributes when concat control is in the initial state, and
  * flips MPV info state to reprocessed-concat mode on successful decode.
  */
-std::int32_t sfmpv_ProcessAuxShc(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_ProcessAuxShc(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -1561,7 +1560,7 @@ Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* const mc)
 {
   mc->initWord154 = (mc->initWord1A4 != 0) ? 4 : -1;
 
-  const std::int32_t tableAddress = PointerToAddress(&mc->initWord0D20);
+  const SofdecAddressWord tableAddress = PointerToAddress(&mc->initWord0D20);
   mc->initWord158 = tableAddress;
   mc->initWord160 = tableAddress;
   mc->initWord168 = tableAddress;
@@ -1636,7 +1635,7 @@ extern "C" std::int32_t MPVUMC_InitOutRfb(Mpvcmc* const mc)
 {
   std::int32_t widthPixels = mc->outputWidthPixels;
   std::int32_t heightPixels = mc->outputHeightPixels;
-  const std::int32_t outputRfbBaseAddress = mc->outputRfbBaseAddress;
+  const SofdecAddressWord outputRfbBaseAddress = mc->outputRfbBaseAddress;
 
   if (mc->umcHalfResMode != 0) {
     widthPixels = RoundUpDivPow2Signed(widthPixels, 3);
@@ -1654,12 +1653,12 @@ extern "C" std::int32_t MPVUMC_InitOutRfb(Mpvcmc* const mc)
   mc->outputChromaStrideBytes = static_cast<std::int16_t>(chromaStrideUnits << 5);
 
   const std::int32_t macroblockRows = RoundUpDivPow2Signed(heightPixels, 5);
-  const std::int32_t outputYPlaneAddress = outputRfbBaseAddress + ((lumaStrideUnits * macroblockRows) << 10);
+  const SofdecAddressWord outputYPlaneAddress = outputRfbBaseAddress + ((lumaStrideUnits * macroblockRows) << 10);
   mc->outputYPlaneAddress = outputYPlaneAddress;
 
   const std::int32_t macroblockRowBytes = macroblockRows << 5;
   const std::int32_t halfMacroblockRowBytes = Div2TowardZero(macroblockRowBytes);
-  const std::int32_t outputCPlaneAddress =
+  const SofdecAddressWord outputCPlaneAddress =
     outputYPlaneAddress + (((halfMacroblockRowBytes * chromaStrideUnits) << 5));
   mc->outputCPlaneAddress = outputCPlaneAddress;
   return outputCPlaneAddress;
@@ -1754,7 +1753,7 @@ std::int32_t SFMPV_Finish()
  * What it does:
  * Forwards one MPV server-execution tick to `sfmpv_ExecServerSub`.
  */
-std::int32_t SFMPV_ExecServer(const std::int32_t workctrlAddress)
+std::int32_t SFMPV_ExecServer(const SofdecAddressWord workctrlAddress)
 {
   return sfmpv_ExecServerSub(workctrlAddress);
 }
@@ -1774,7 +1773,7 @@ std::int32_t SFMPV_ExecServer(const std::int32_t workctrlAddress)
  * prep and term flags - the prep latch is what raises SFBUF's prep flag for the
  * video-output lane, which is how SFPLY learns that PREP is complete.
  */
-std::int32_t sfmpv_ExecServerSub(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_ExecServerSub(const SofdecAddressWord workctrlAddress)
 {
   constexpr std::int32_t kSfsetCondVideo = 5;
   constexpr std::int32_t kSfplyExecutionStagePrep = 2;
@@ -1922,11 +1921,11 @@ std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, std::uint32_t* infoBlock)
  * Evaluates whether the active MPV stream ring has enough VBV data available
  * to continue decode without underflow.
  */
-std::int32_t sfmpv_IsVbvEnough(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_IsVbvEnough(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
-  const std::int32_t decoderHandle = mpvInfo->decoderHandle;
+  const SofdecAddressWord decoderHandle = mpvInfo->decoderHandle;
 
   const std::int32_t termSourceState = sfmpv_GetTermSrc(workctrlAddress);
   if (termSourceState == 1) {
@@ -1960,7 +1959,7 @@ std::int32_t sfmpv_IsVbvEnough(const std::int32_t workctrlAddress)
  * Verifies that video-ring readable bytes minus ring-buffer overhead meets one
  * per-handle minimum threshold lane.
  */
-std::int32_t sfmpv_CheckViBufSiz(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_CheckViBufSiz(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t ringIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
@@ -1978,7 +1977,7 @@ std::int32_t sfmpv_CheckViBufSiz(const std::int32_t workctrlAddress)
  * What it does:
  * Returns MPV term-decode state lane from the per-handle MPV info owner.
  */
-std::int32_t SFMPVF_IsTermDec(const std::int32_t workctrlAddress)
+std::int32_t SFMPVF_IsTermDec(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -1993,7 +1992,7 @@ std::int32_t SFMPVF_IsTermDec(const std::int32_t workctrlAddress)
  * object pool under SFLIB lock; returns `-1` when term-decode is active and no
  * decodable frames remain.
  */
-std::int32_t SFMPVF_GetNumFrm(const std::int32_t workctrlAddress)
+std::int32_t SFMPVF_GetNumFrm(const SofdecAddressWord workctrlAddress)
 {
   SFLIB_LockCs();
 
@@ -2063,7 +2062,7 @@ std::int32_t sfmpvf_IsChkFirst(
  * under SFLIB lock, with single-frame holdback when output-gate lanes are not
  * enabled.
  */
-std::int32_t SFMPVF_HoldFrm(const std::int32_t workctrlAddress)
+std::int32_t SFMPVF_HoldFrm(const SofdecAddressWord workctrlAddress)
 {
   SFLIB_LockCs();
 
@@ -2099,7 +2098,7 @@ std::int32_t SFMPVF_HoldFrm(const std::int32_t workctrlAddress)
  * Tests whether currently decoded/prepared frame count reaches the MPV prep
  * threshold lane for this workctrl.
  */
-std::int32_t sfmpv_IsPrepFrmEnough(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_IsPrepFrmEnough(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
@@ -2123,7 +2122,7 @@ std::int32_t sfmpv_IsPrepFrmEnough(const std::int32_t workctrlAddress)
  * Reports MPV prep completion when decoder is already in term-decode state, or
  * when both prep-frame and VBV readiness predicates are satisfied.
  */
-std::int32_t sfmpv_IsPrepEnd(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_IsPrepEnd(const SofdecAddressWord workctrlAddress)
 {
   if (SFMPVF_IsTermDec(workctrlAddress) != 0) {
     return 1;
@@ -2138,7 +2137,7 @@ std::int32_t sfmpv_IsPrepEnd(const std::int32_t workctrlAddress)
  * Arms fixed-start TTU latch when finite frame interpolation threshold is
  * present in the MPV timing lane.
  */
-std::int32_t sfmpv_FixedStartTtu(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_FixedStartTtu(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   if (workctrl->timingLane.frameInterpolationTime != 0x7FFFFFFF) {
@@ -2154,7 +2153,7 @@ std::int32_t sfmpv_FixedStartTtu(const std::int32_t workctrlAddress)
  * Latches MPV prep destination lane once source prep is available and MPV prep
  * completion predicate succeeds.
  */
-std::int32_t sfmpv_ChkPrepFlg(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_ChkPrepFlg(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t prepDestinationLaneIndex = workctrl->transferState.transfer.demux.prepDestinationLaneIndex;
@@ -2186,7 +2185,7 @@ std::int32_t sfmpv_ChkPrepFlg(const std::int32_t workctrlAddress)
  * Reports final-frame completion gate based on term-decode state, frame count,
  * decode path mode, and prepared/consumed frame counters.
  */
-std::int32_t sfmpv_IsFinalFrmGotten(const std::int32_t workctrlAddress, const std::int32_t frameCount)
+std::int32_t sfmpv_IsFinalFrmGotten(const SofdecAddressWord workctrlAddress, const std::int32_t frameCount)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   if (SFMPVF_IsTermDec(workctrlAddress) == 0) {
@@ -2211,7 +2210,7 @@ std::int32_t sfmpv_IsFinalFrmGotten(const std::int32_t workctrlAddress, const st
  * What it does:
  * Writes term flag into the active MPV destination SFBUF lane.
  */
-std::int32_t sfmpv_SetTermDst(const std::int32_t workctrlAddress, const std::int32_t termFlag)
+std::int32_t sfmpv_SetTermDst(const SofdecAddressWord workctrlAddress, const std::int32_t termFlag)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   return SFBUF_SetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepDestinationLaneIndex, termFlag);
@@ -2224,7 +2223,7 @@ std::int32_t sfmpv_SetTermDst(const std::int32_t workctrlAddress, const std::int
  * Latches MPV destination term flag when final-frame condition is reached and
  * clears condition `5` when no playback info object is currently bound.
  */
-std::int32_t sfmpv_ChkTermFlg(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_ChkTermFlg(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t frameCount = SFMPVF_GetNumFrm(workctrlAddress);
@@ -2247,7 +2246,7 @@ std::int32_t sfmpv_ChkTermFlg(const std::int32_t workctrlAddress)
  * delimiter cache lanes when required, and returns one decodable active-span.
  */
 std::int32_t sfmpv_GetActiveSize(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   std::int32_t* const outActiveSize,
   std::int32_t* const outDelimiterFlags,
   std::int32_t* const outHasActiveUnit
@@ -2262,7 +2261,7 @@ std::int32_t sfmpv_GetActiveSize(
   *outHasActiveUnit = 0;
 
   const std::int32_t ringReadResult =
-    SFBUF_RingGetRead(workctrlAddress, sourceLaneIndex, reinterpret_cast<std::int32_t*>(&ringCursor));
+   std::int32_t SFBUF_RingGetRead(SofdecAddressWord sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursor);
   if (ringReadResult != 0) {
     return ringReadResult;
   }
@@ -2296,8 +2295,8 @@ std::int32_t sfmpv_GetActiveSize(
     return 0;
   }
 
-  std::int32_t primaryDelimiterAddress = 0;
-  std::int32_t secondaryDelimiterAddress = 0;
+  SofdecAddressWord primaryDelimiterAddress = 0;
+  SofdecAddressWord secondaryDelimiterAddress = 0;
   SFBUF_RingGetDlm(workctrlAddress, sourceLaneIndex, &primaryDelimiterAddress, &secondaryDelimiterAddress);
 
   if (
@@ -2363,7 +2362,7 @@ std::int32_t sfmpv_GetActiveSize(
 std::int32_t sfmpv_NeedSafeDlmRefresh(
   const std::int32_t* const ringCursorSnapshotWords,
   const std::int32_t delimiterFlags,
-  const std::int32_t primaryDelimiterAddress
+  const SofdecAddressWord primaryDelimiterAddress
 )
 {
   auto* const primaryDelimiter = AddressToPointer<std::uint8_t>(primaryDelimiterAddress);
@@ -2490,7 +2489,7 @@ std::int32_t sfmpv_CalcDistance(
  * chunk while returning resolved delimiter type to caller.
  */
 std::uint8_t* sfmpv_SearchDelim(
-  const std::int32_t ringCursorSnapshotAddress,
+  const SofdecAddressWord ringCursorSnapshotAddress,
   const std::int32_t delimiterMask,
   std::int32_t* const outDelimiterType
 )
@@ -2619,16 +2618,16 @@ std::uint8_t* sfmpv_BsearchDelim(
 
 // Forward declarations for helpers defined later in this TU — needed because
 // callers below reference them before their definitions.
-std::int32_t sfmpv_SkipFrm(std::int32_t workctrlAddress, std::int32_t streamBufferAddress);
-std::int32_t sfmpv_ConcatSub(std::int32_t workctrlAddress);
+std::int32_t sfmpv_SkipFrm(SofdecAddressWord workctrlAddress, SofdecAddressWord streamBufferAddress);
+std::int32_t sfmpv_ConcatSub(SofdecAddressWord workctrlAddress);
 struct SfmpvPictureAttribute;
 std::int32_t sfmpv_ReformTc(
-    std::int32_t workctrlAddress,
+    SofdecAddressWord workctrlAddress,
     SfmpvPictureAttribute* pictureAttribute,
     std::int64_t presentationPts,
     std::int32_t detectErrorMode);
-std::int32_t sfmpv_IsLate(std::int32_t workctrlAddress, std::int32_t updateMode);
-std::int32_t sfmpv_ErrFn(std::int32_t workctrlAddress, std::int32_t statusCode);
+std::int32_t sfmpv_IsLate(SofdecAddressWord workctrlAddress, std::int32_t updateMode);
+std::int32_t sfmpv_ErrFn(SofdecAddressWord workctrlAddress, std::int32_t statusCode);
 
 /**
  * Address: 0x00AD2690 (FUN_00AD2690, _sfmpv_DecodeOneUnit)
@@ -2645,7 +2644,7 @@ std::int32_t sfmpv_DecodeOneUnit(
   std::int32_t* const outUnitProcessed
 )
 {
-  const std::int32_t workctrlAddress = PointerToAddress(workctrl);
+  const SofdecAddressWord workctrlAddress = PointerToAddress(workctrl);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   *outUnitProcessed = 0;
@@ -2656,7 +2655,7 @@ std::int32_t sfmpv_DecodeOneUnit(
     activeDelimiterMask &= 0xCC;
   }
 
-  std::int32_t streamBufferAddress = 0;
+  SofdecAddressWord streamBufferAddress = 0;
   std::int32_t decodeResult = SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, &streamBufferAddress);
   if (decodeResult != 0 || streamBufferAddress == 0) {
     return 0;
@@ -2748,7 +2747,7 @@ std::int32_t sfmpv_DecodeOneUnit(
  * Repeatedly decodes active picture units until one loop marks no progress or
  * returns an error, then updates stream flow counters.
  */
-std::int32_t sfmpv_DecodeSomePic(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_DecodeSomePic(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
@@ -2781,7 +2780,7 @@ std::int32_t sfmpv_DecodeSomePic(const std::int32_t workctrlAddress)
  * Initializes seek fixed-read total once and snapshots concat-audio TTU lanes
  * into seek baseline storage when baseline time is still unset.
  */
-void sfmpv_FixedForSeek(const std::int32_t workctrlAddress)
+void sfmpv_FixedForSeek(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
@@ -2806,7 +2805,7 @@ void sfmpv_FixedForSeek(const std::int32_t workctrlAddress)
  * Executes concat-sub processing and, on success, discards trailing section
  * delimiters from the active stream lane.
  */
-std::int32_t sfmpv_Concat(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
+std::int32_t sfmpv_Concat(const SofdecAddressWord workctrlAddress, const SofdecAddressWord streamBufferAddress)
 {
   const std::int32_t concatResult = sfmpv_ConcatSub(workctrlAddress);
   if (concatResult == -1) {
@@ -2825,7 +2824,7 @@ std::int32_t sfmpv_Concat(const std::int32_t workctrlAddress, const std::int32_t
  * when a positive delta exists, resets concat timer lanes, and re-arms concat
  * control flags.
  */
-std::int32_t sfmpv_ConcatSub(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_ConcatSub(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -2858,7 +2857,7 @@ std::int32_t sfmpv_ConcatSub(const std::int32_t workctrlAddress)
  * Computes concat total-time from video TTU lane by advancing concat-audio
  * packed timecode by one frame and converting that lane through `SFTIM_Tc2Time`.
  */
-std::int32_t sfmpv_CalcVideoTotTime(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_CalcVideoTotTime(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const auto* const concatAudioTtu =
@@ -2887,7 +2886,7 @@ std::int32_t sfmpv_CalcVideoTotTime(const std::int32_t workctrlAddress)
  * Computes concat total-time from audio sample totals using transport read
  * mode, cumulative sample lane, and configured concat-video time scale.
  */
-std::int32_t sfmpv_CalcAudioTotTime(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_CalcAudioTotTime(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
@@ -2993,14 +2992,14 @@ std::int32_t sfpts_SearchPtsQue(
  */
 std::int32_t* sfpts_ReadPtsQueSub(
   moho::SfptsPtsQueue* const ptsQueue,
-  const std::int32_t normalizedDelimiterAddress,
+  const SofdecAddressWord normalizedDelimiterAddress,
   std::int32_t* const outPtsWords,
-  const std::int32_t sourceLaneStartAddress,
+  const SofdecAddressWord sourceLaneStartAddress,
   const std::int32_t sourceLaneSpanBytes
 )
 {
   auto* result = reinterpret_cast<std::int32_t*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(ptsQueue->queuedEntryCount))
+    static_cast<std::uintptr_t>(ptsQueue->queuedEntryCount)
   );
   if (result != nullptr) {
     const std::int32_t queueOffset = sfpts_SearchPtsQue(
@@ -3010,7 +3009,7 @@ std::int32_t* sfpts_ReadPtsQueSub(
       sourceLaneSpanBytes
     );
     result = reinterpret_cast<std::int32_t*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(queueOffset))
+      static_cast<std::uintptr_t>(queueOffset)
     );
 
     if (queueOffset != -1) {
@@ -3049,9 +3048,9 @@ std::int32_t* sfpts_ReadPtsQueSub(
  * source window, and dispatches one queue read when queue storage is present.
  */
 std::int32_t SFPTS_ReadPtsQue(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t sourceLaneIndex,
-  const std::int32_t delimiterAddress,
+  const SofdecAddressWord delimiterAddress,
   std::int32_t* const outPtsWords
 )
 {
@@ -3091,7 +3090,7 @@ std::int32_t SFPTS_ReadPtsQue(
  * Returns `1` when either condition lane 49 or 57 is set; otherwise returns
  * the second condition result (`0`).
  */
-std::int32_t SFCON_IsVideoEndcodeSkip(const std::int32_t workctrlAddress)
+std::int32_t SFCON_IsVideoEndcodeSkip(const SofdecAddressWord workctrlAddress)
 {
   if (SFSET_GetCond(workctrlAddress, 49) != 0) {
     return 1;
@@ -3112,7 +3111,7 @@ std::int32_t SFCON_IsVideoEndcodeSkip(const std::int32_t workctrlAddress)
  * Adds one concat-time delta to runtime timing state and records the updated
  * total in a 32-slot history ring.
  */
-void SFCON_UpdateConcatTime(const std::int32_t workctrlAddress, const std::int32_t totalTime)
+void SFCON_UpdateConcatTime(const SofdecAddressWord workctrlAddress, const std::int32_t totalTime)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
@@ -3134,7 +3133,7 @@ void SFCON_UpdateConcatTime(const std::int32_t workctrlAddress, const std::int32
  * total-sample queue when capacity is available.
  */
 std::int32_t SFCON_WriteTotSmplQue(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t totalSamples,
   const std::int32_t sampleRate
 )
@@ -3163,7 +3162,7 @@ std::int32_t SFCON_WriteTotSmplQue(
  * returns both sample-total and sample-rate lanes.
  */
 std::int32_t SFCON_ReadTotSmplQue(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   std::int32_t* const outTotalSamples,
   std::int32_t* const outSampleRate
 )
@@ -3192,7 +3191,7 @@ std::int32_t SFCON_ReadTotSmplQue(
  * Consumes repeated section-end delimiters (`0x80`) from the active stream
  * lane and accumulates consumed bytes into read-total lanes.
  */
-void sfmpv_DiscardSec(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
+void sfmpv_DiscardSec(const SofdecAddressWord workctrlAddress, const SofdecAddressWord streamBufferAddress)
 {
   const auto* const streamBuffer = AddressToPointer<const SfmpvStreamBuffer>(streamBufferAddress);
   SfmpvStreamWindowCursor cursorWindow{};
@@ -3218,7 +3217,7 @@ void sfmpv_DiscardSec(const std::int32_t workctrlAddress, const std::int32_t str
  * Adds consumed bytes to SFBUF read-total lanes for active source ring and
  * mirrors the same signed 64-bit accumulation in workctrl read-total fields.
  */
-std::int32_t sfmpv_AddRtotSj(const std::int32_t workctrlAddress, const std::int32_t consumedBytes)
+std::int32_t sfmpv_AddRtotSj(const SofdecAddressWord workctrlAddress, const std::int32_t consumedBytes)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   (void)SFBUF_AddRtotSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, consumedBytes);
@@ -3233,7 +3232,7 @@ std::int32_t sfmpv_AddRtotSj(const std::int32_t workctrlAddress, const std::int3
  * Peeks the current source-ring read window and returns the first chunk lane
  * (`address + byteCount`) to callers that decode delimiters/picture headers.
  */
-void sfmpv_PeekChnk(const std::int32_t workctrlAddress, std::int32_t* const outChunkWords)
+void sfmpv_PeekChnk(const SofdecAddressWord workctrlAddress, std::int32_t* const outChunkWords)
 {
   const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   SfbufRingCursorSnapshot ringCursor{};
@@ -3260,7 +3259,7 @@ void sfmpv_PeekChnk(const std::int32_t workctrlAddress, std::int32_t* const outC
  * Returns destination-lane terminal flag from the active prep destination
  * ring.
  */
-std::int32_t sfmpv_GetTermDst(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_GetTermDst(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepDestinationLaneIndex);
@@ -3272,7 +3271,7 @@ std::int32_t sfmpv_GetTermDst(const std::int32_t workctrlAddress)
  * What it does:
  * Returns source-lane terminal flag from the active prep source ring.
  */
-std::int32_t sfmpv_GetTermSrc(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_GetTermSrc(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex);
@@ -3286,7 +3285,7 @@ std::int32_t sfmpv_GetTermSrc(const std::int32_t workctrlAddress)
  * and current source-lane terminal flag.
  */
 std::int32_t sfmpv_IsTerm(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t activeSize,
   const std::int32_t delimiterState
 )
@@ -3308,7 +3307,7 @@ std::int32_t sfmpv_IsTerm(
  * fatal/non-progress conditions to SFLIB error lanes.
  */
 std::int32_t sfmpv_ChkMpvErr(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t decodeResult,
   const std::int32_t consumedBytes,
   const std::int32_t fallbackErrorCode
@@ -3342,9 +3341,9 @@ std::int32_t sfmpv_ChkMpvErr(
  * picture/user/timestamp lanes, and runs repeat/timecode/first-picture setup.
  */
 std::int32_t sfmpv_DecodePicAtr(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t* const chunkWords,
-  const std::int32_t streamBufferAddress,
+  const SofdecAddressWord streamBufferAddress,
   const std::int32_t delimiterState,
   std::int32_t* const outDecodeState
 )
@@ -3352,7 +3351,7 @@ std::int32_t sfmpv_DecodePicAtr(
   using PictureFilterCallback =
     std::int32_t(__cdecl*)(std::int32_t callbackContext, std::int32_t widthPixels, std::int32_t heightPixels);
   using DelimiterObserverCallback =
-    void(__cdecl*)(std::int32_t callbackContext, std::int32_t chunkBaseAddress, std::int32_t payloadOffsetBytes);
+    void(__cdecl*)(std::int32_t callbackContext, SofdecAddressWord chunkBaseAddress, std::int32_t payloadOffsetBytes);
 
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -3396,7 +3395,7 @@ std::int32_t sfmpv_DecodePicAtr(
     }
 
     const auto filterCallback = reinterpret_cast<PictureFilterCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(SFSET_GetCond(workctrlAddress, 95)))
+      static_cast<std::uintptr_t>(SFSET_GetCond(workctrlAddress, 95))
     );
     const std::int32_t filterContext = SFSET_GetCond(workctrlAddress, 95);
     if (
@@ -3438,7 +3437,7 @@ std::int32_t sfmpv_DecodePicAtr(
 
   if ((delimiterState & 0x40) != 0) {
     const auto delimiterObserver = reinterpret_cast<DelimiterObserverCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(SFSET_GetCond(workctrlAddress, 77)))
+      static_cast<std::uintptr_t>(SFSET_GetCond(workctrlAddress, 77))
     );
     const std::int32_t observerContext = SFSET_GetCond(workctrlAddress, 78);
     if (delimiterObserver != nullptr) {
@@ -3591,7 +3590,7 @@ std::int64_t sfmpv_ComplementPts(
  * using timing/complement state into presentation and reference-seed outputs.
  */
 std::int64_t sfmpv_ReadPtsQue(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   moho::SfmpvPictureDecodeLane* const pictureDecodeLane,
   char* const delimiterCursor,
   std::int32_t* const outPresentationPtsWords,
@@ -3646,7 +3645,7 @@ std::int64_t sfmpv_ReadPtsQue(
  * Seeds head-TTU snapshot once from current repeat-timecode lane and latches
  * converted head time for decode-TTU delta tracking.
  */
-std::int32_t sfmpv_SetHeadTtu(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_SetHeadTtu(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const timingLane = &workctrl->timingLane;
@@ -3680,7 +3679,7 @@ std::int32_t sfmpv_SetHeadTtu(const std::int32_t workctrlAddress)
  * Refreshes decode-TTU from current repeat-timecode lane, computes delta to
  * head-TTU major time, and updates promoted decode TTU snapshot when advanced.
  */
-std::int32_t sfmpv_SetDecTtu(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_SetDecTtu(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const timingLane = &workctrl->timingLane;
@@ -3717,7 +3716,7 @@ std::int32_t sfmpv_SetDecTtu(const std::int32_t workctrlAddress)
  * workspace and clears the accumulated-repeat word.
  */
 std::int32_t sfmpv_ReadTcode(
-  const std::int32_t frameObjectAddress,
+  const SofdecAddressWord frameObjectAddress,
   moho::SfmpvPackedTimecode* const outTimecodeLane
 )
 {
@@ -3741,7 +3740,7 @@ std::int32_t sfmpv_ReadTcode(
  * Converts one frame-object packed timecode lane into TTU major/minor values,
  * marks the frame TTU valid, and updates max-observed TTU snapshot.
  */
-std::int32_t sfmpv_CalcFrmTtu(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
+std::int32_t sfmpv_CalcFrmTtu(const SofdecAddressWord workctrlAddress, const SofdecAddressWord frameObjectAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
@@ -3773,14 +3772,14 @@ std::int32_t sfmpv_CalcFrmTtu(const std::int32_t workctrlAddress, const std::int
  * Builds one decode-frame parameter block, runs MPV frame decode on current
  * stream lane, updates frame/timing/error state, and enqueues decoded picture.
  */
-std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
+std::int32_t sfmpv_DecodeFrm(const SofdecAddressWord workctrlAddress, const SofdecAddressWord streamBufferAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
-  const std::int32_t decoderHandle = mpvInfo->decoderHandle;
+  const SofdecAddressWord decoderHandle = mpvInfo->decoderHandle;
 
   SfmpvDecodeFrameParam decodeFrameParam{};
-  std::int32_t frameObjectAddress = 0;
+  SofdecAddressWord frameObjectAddress = 0;
   if (sfmpv_SetFrmPara(workctrlAddress, &mpvInfo->pictureDecodeLane, &decodeFrameParam, &frameObjectAddress) != 0) {
     return 0;
   }
@@ -3840,7 +3839,7 @@ std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int3
     mpvInfo->pendingFrameObjectAddress = frameObjectAddress;
   }
 
-  const std::int32_t pendingFrameObjectAddress = mpvInfo->pendingFrameObjectAddress;
+  const SofdecAddressWord pendingFrameObjectAddress = mpvInfo->pendingFrameObjectAddress;
   mpvInfo->skipIssuedFlag = 0;
   mpvInfo->picAtrPrimedLatch = 0;
   if (pendingFrameObjectAddress == 0) {
@@ -3867,7 +3866,7 @@ std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int3
  * into it, and builds decode-plane address/stride parameters for MPV decode.
  */
 std::int32_t sfmpv_SetFrmPara(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const moho::SfmpvPictureDecodeLane* const pictureDecodeLane,
   SfmpvDecodeFrameParam* const decodeFrameParam,
   std::int32_t* const outFrameObjectAddress
@@ -3876,8 +3875,8 @@ std::int32_t sfmpv_SetFrmPara(
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
-  const std::int32_t pendingFrameObjectAddress = mpvInfo->pendingFrameObjectAddress;
-  std::int32_t frameObjectAddress = pendingFrameObjectAddress;
+  const SofdecAddressWord pendingFrameObjectAddress = mpvInfo->pendingFrameObjectAddress;
+  SofdecAddressWord frameObjectAddress = pendingFrameObjectAddress;
   if (frameObjectAddress == 0) {
     auto* const allocatedFrame = SFMPVF_AllocFrm(workctrlAddress);
     frameObjectAddress = PointerToAddress(allocatedFrame);
@@ -3920,7 +3919,7 @@ std::int32_t sfmpv_SetFrmPara(
 
     const std::int32_t heightBlocks32 = (pictureDecodeLane->pictureHeightPixels + 31) / 32;
     const std::int32_t lumaPlaneOffsetBytes = (lumaBlocks32 * heightBlocks32) << 10;
-    const std::int32_t primaryLumaAddress = decodeFrameParam->primaryFrameBaseAddress + lumaPlaneOffsetBytes;
+    const SofdecAddressWord primaryLumaAddress = decodeFrameParam->primaryFrameBaseAddress + lumaPlaneOffsetBytes;
     decodeFrameParam->primaryLumaPlaneAddress = primaryLumaAddress;
 
     const std::int32_t chromaPlaneBytes = (32 * chromaBlocks32) * ((32 * heightBlocks32) / 2);
@@ -3930,7 +3929,7 @@ std::int32_t sfmpv_SetFrmPara(
       AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->secondaryReferenceFrameObjectAddress);
     decodeFrameParam->secondaryFrameBaseAddress = secondaryReferenceFrame->frameSurfaceBaseAddress;
 
-    const std::int32_t secondaryLumaAddress = decodeFrameParam->secondaryFrameBaseAddress + lumaPlaneOffsetBytes;
+    const SofdecAddressWord secondaryLumaAddress = decodeFrameParam->secondaryFrameBaseAddress + lumaPlaneOffsetBytes;
     decodeFrameParam->secondaryLumaPlaneAddress = secondaryLumaAddress;
     decodeFrameParam->secondaryChromaPlaneAddress = secondaryLumaAddress + chromaPlaneBytes;
   } else {
@@ -3972,7 +3971,7 @@ std::int32_t sfmpv_SetFrmPara(
  * P/B picture decode paths, or zeroes outputs when not applicable.
  */
 std::int32_t sfmpv_ReadRefErrCnt(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const moho::SfmpvInfo* const mpvInfo,
   std::int32_t* const outErrorMajor,
   std::int32_t* const outErrorMinor
@@ -4019,7 +4018,7 @@ std::int32_t sfmpv_ReadRefErrCnt(
  * Seeds the start-TTU lane once from pending packed timecode, applies defect
  * and picture-type skip gating, and latches converted start time.
  */
-std::int32_t sfmpv_SetStartTtu(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_SetStartTtu(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const timingLane = &workctrl->timingLane;
@@ -4058,7 +4057,7 @@ std::int32_t sfmpv_SetStartTtu(const std::int32_t workctrlAddress)
  * Copies pending start-TTU lane into one frame object's timing lane and then
  * recalculates resolved frame time values.
  */
-std::int32_t sfmpv_SetFrmTime(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
+std::int32_t sfmpv_SetFrmTime(const SofdecAddressWord workctrlAddress, const SofdecAddressWord frameObjectAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
@@ -4074,7 +4073,7 @@ std::int32_t sfmpv_SetFrmTime(const std::int32_t workctrlAddress, const std::int
  * Updates resolved frame timing lanes from TTU state and decode progress
  * lanes, while tracking global max resolved frame time in the workctrl.
  */
-std::int32_t sfmpv_CalcFrmTime(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
+std::int32_t sfmpv_CalcFrmTime(const SofdecAddressWord workctrlAddress, const SofdecAddressWord frameObjectAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
@@ -4104,8 +4103,8 @@ std::int32_t sfmpv_CalcFrmTime(const std::int32_t workctrlAddress, const std::in
  * values to reference-frame lanes, and refreshes reference frame timing.
  */
 std::int32_t sfmpv_CalcRepeatField(
-  const std::int32_t workctrlAddress,
-  const std::int32_t frameObjectAddress,
+  const SofdecAddressWord workctrlAddress,
+  const SofdecAddressWord frameObjectAddress,
   const std::int32_t resetHistory
 )
 {
@@ -4121,7 +4120,7 @@ std::int32_t sfmpv_CalcRepeatField(
     }
     workctrl->timerTail.repeatFieldHistory.samples[0].accumulatedRepeatCount = -1;
   } else if (frameRepeat->pictureType == 1 || frameRepeat->pictureType == 2) {
-    const std::int32_t referenceFrameAddress = mpvInfo->secondaryReferenceFrameObjectAddress;
+    const SofdecAddressWord referenceFrameAddress = mpvInfo->secondaryReferenceFrameObjectAddress;
     const auto* const referenceFrame = AddressToPointer<SfmpvfFrameRepeat>(referenceFrameAddress);
 
     std::int32_t scanOrdinal = referenceFrame->decodeOrderIndex;
@@ -4168,7 +4167,7 @@ std::int32_t sfmpv_CalcRepeatField(
   workctrl->timingLane.repeatFieldTimecode.repeatFieldAccumulated = currentSample.accumulatedRepeatCount;
 
   if (frameRepeat->pictureType == 3 && currentSample.repeatFieldCount != 0) {
-    const std::int32_t referenceFrameAddress = mpvInfo->secondaryReferenceFrameObjectAddress;
+    const SofdecAddressWord referenceFrameAddress = mpvInfo->secondaryReferenceFrameObjectAddress;
     auto* const referenceFrame = AddressToPointer<SfmpvfFrameRepeat>(referenceFrameAddress);
 
     const std::int32_t referenceIndex = Modulo64Index(referenceFrame->decodeOrderIndex);
@@ -4191,7 +4190,7 @@ std::int32_t sfmpv_CalcRepeatField(
  * Finds the first frame object whose owner-state pair is clear, marks it
  * allocated, and returns its frame-object address under SFLIB lock.
  */
-moho::SfmpvfFrameObject* SFMPVF_AllocFrm(const std::int32_t workctrlAddress)
+moho::SfmpvfFrameObject* SFMPVF_AllocFrm(const SofdecAddressWord workctrlAddress)
 {
   SFLIB_LockCs();
 
@@ -4220,7 +4219,7 @@ moho::SfmpvfFrameObject* SFMPVF_AllocFrm(const std::int32_t workctrlAddress)
  * Validates configured frame-buffer capacity against requested dimensions and
  * rebuilds frame-object base lanes and color-plane address lanes.
  */
-std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int32_t* const frameDimensions)
+std::int32_t sfmpv_ChkBufSiz(const SofdecAddressWord workctrlAddress, const std::int32_t* const frameDimensions)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -4340,7 +4339,7 @@ std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int3
  * read counters for delimiter and total-read lanes.
  */
 std::int32_t sfmpv_GoDdelim(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t /*streamBufferAddress*/,
   const std::int32_t delimiterMask
 )
@@ -4404,7 +4403,7 @@ std::int32_t sfmpv_GoDdelim(
  * What it does:
  * Adds one read advance on the active source ring lane.
  */
-std::int32_t sfmpv_RingAddRead(const std::int32_t workctrlAddress, const std::int32_t advanceCount)
+std::int32_t sfmpv_RingAddRead(const SofdecAddressWord workctrlAddress, const std::int32_t advanceCount)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   return SFBUF_RingAddRead(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, advanceCount);
@@ -4416,11 +4415,11 @@ std::int32_t sfmpv_RingAddRead(const std::int32_t workctrlAddress, const std::in
  * What it does:
  * Updates per-handle stream-flow counters from current source-lane SJ flow.
  */
-std::int32_t sfmpv_UpdateFlowCnt(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_UpdateFlowCnt(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
-  std::int32_t streamHandleAddress = 0;
+  SofdecAddressWord streamHandleAddress = 0;
   (void)SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, &streamHandleAddress);
   std::int32_t result = streamHandleAddress;
   if (streamHandleAddress != 0) {
@@ -4449,7 +4448,7 @@ std::int32_t sfmpv_UpdateFlowCnt(const std::int32_t workctrlAddress)
  * against concat-audio baseline TTU time under condition-53 tolerance.
  */
 std::int32_t sfmpv_DetectTcErr(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const SfmpvPictureAttribute* const /*pictureAttribute*/
 )
 {
@@ -4640,7 +4639,7 @@ std::int32_t sfmpv_NextTc(
  * baseline TTU state, and updates repeat-history carry lanes when requested.
  */
 std::int32_t sfmpv_DoReformTc(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   SfmpvPictureAttribute* const pictureAttribute,
   const std::int64_t presentationPts,
   const std::int32_t detectErrorMode
@@ -4702,7 +4701,7 @@ std::int32_t sfmpv_DoReformTc(
  * reformation helper when condition 52 is active or newly latched.
  */
 std::int32_t sfmpv_ReformTc(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   SfmpvPictureAttribute* const pictureAttribute,
   const std::int64_t presentationPts,
   const std::int32_t detectErrorMode
@@ -4743,10 +4742,10 @@ std::int32_t sfmpv_ReformTc(
  * MPV header + MV info lanes, and validates frame-buffer sizing.
  */
 std::int32_t sfmpv_FirstPicAtr(
-  const std::int32_t workctrlAddress,
-  const std::int32_t decoderHandleAddress,
-  const std::int32_t frameInfoAddress,
-  const std::int32_t pictureHeaderChunkAddress
+  const SofdecAddressWord workctrlAddress,
+  const SofdecAddressWord decoderHandleAddress,
+  const SofdecAddressWord frameInfoAddress,
+  const SofdecAddressWord pictureHeaderChunkAddress
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
@@ -4821,9 +4820,9 @@ std::int32_t sfmpv_SetMvInf(
  * and latches timing/header state for later seek reprocessing.
  */
 std::int32_t sfmpv_SetMpvHd(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t frameRateBase,
-  const std::int32_t pictureHeaderChunkAddress
+  const SofdecAddressWord pictureHeaderChunkAddress
 )
 {
   std::int32_t result = sfmpv_GetHd(workctrlAddress);
@@ -4864,11 +4863,11 @@ std::int32_t sfmpv_SetMpvHd(
  * Evaluates all MPV skip gates for the current picture-type lane and updates
  * defect state from seek/ptype/empty/late decisions.
  */
-std::int32_t sfmpv_IsSkip(const std::int32_t workctrlAddress, const std::int32_t* const chunkWords)
+std::int32_t sfmpv_IsSkip(const SofdecAddressWord workctrlAddress, const std::int32_t* const chunkWords)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
-  const std::int32_t defectLaneAddress = PointerToAddress(&mpvInfo->pictureDecodeLane);
+  const SofdecAddressWord defectLaneAddress = PointerToAddress(&mpvInfo->pictureDecodeLane);
   const auto* const defectLane = AddressToPointer<moho::SfmpvPictureDecodeLane>(defectLaneAddress);
 
   if (SFSET_GetCond(workctrlAddress, 47) == 1) {
@@ -4909,8 +4908,8 @@ std::int32_t sfmpv_IsSkip(const std::int32_t workctrlAddress, const std::int32_t
  * picture-type lane state.
  */
 std::int32_t sfmpv_UpdateDefect(
-  const std::int32_t workctrlAddress,
-  const std::int32_t defectLaneAddress,
+  const SofdecAddressWord workctrlAddress,
+  const SofdecAddressWord defectLaneAddress,
   const std::int32_t defectDetected
 )
 {
@@ -4963,7 +4962,7 @@ std::int32_t sfmpv_UpdateDefect(
  * Checks whether current seek target time equals the pending start-TTU time
  * while start-TTU interpolation is still inactive.
  */
-std::int32_t sfmpv_IsSeekSkip(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_IsSeekSkip(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t seekTimeMajor = workctrl->seekState.requestWords[1];
@@ -4995,7 +4994,7 @@ std::int32_t sfmpv_IsSeekSkip(const std::int32_t workctrlAddress)
  * Mirrors the pending start-TTU lane into the skip-seed lane when current
  * pending time is behind the interpolated frame time.
  */
-std::int32_t sfmpv_SetSkipTtu(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_SetSkipTtu(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   if (workctrl->timingLane.pendingStartTtu.timeMajor < workctrl->timingLane.frameInterpolationTime) {
@@ -5011,7 +5010,7 @@ std::int32_t sfmpv_SetSkipTtu(const std::int32_t workctrlAddress)
  * Copies one picture-user payload range from frame info into the destination
  * picture-user lane and mirrors copied byte count.
  */
-std::int32_t sfmpv_CopyPicUsrInf(const std::int32_t destinationInfoAddress, const std::int32_t sourceInfoAddress)
+std::int32_t sfmpv_CopyPicUsrInf(const SofdecAddressWord destinationInfoAddress, const SofdecAddressWord sourceInfoAddress)
 {
   auto* const destinationInfo = AddressToPointer<SfbufRingChunk>(destinationInfoAddress);
   const auto* const sourceInfo = AddressToPointer<SfbufRingChunk>(sourceInfoAddress);
@@ -5033,7 +5032,7 @@ std::int32_t sfmpv_CopyPicUsrInf(const std::int32_t destinationInfoAddress, cons
  * Checks whether the current MPV defect state requires skipping the specified
  * picture type (P/B).
  */
-std::int32_t sfmpv_IsDefect(const std::int32_t workctrlAddress, const std::int32_t pictureType)
+std::int32_t sfmpv_IsDefect(const SofdecAddressWord workctrlAddress, const std::int32_t pictureType)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -5056,7 +5055,7 @@ std::int32_t sfmpv_IsDefect(const std::int32_t workctrlAddress, const std::int32
  * Returns whether decoding should skip one picture type according to per-type
  * enable flags in the workctrl.
  */
-std::int32_t sfmpv_IsPtypeSkip(const std::int32_t workctrlAddress, const std::int32_t pictureType)
+std::int32_t sfmpv_IsPtypeSkip(const SofdecAddressWord workctrlAddress, const std::int32_t pictureType)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
@@ -5080,7 +5079,7 @@ std::int32_t sfmpv_IsPtypeSkip(const std::int32_t workctrlAddress, const std::in
  * picture counters when the corresponding codec probe reports empty data.
  */
 std::uint8_t* sfmpv_IsEmptyBpic(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t pictureType,
   const SfbufRingChunk* const chunkWords
 )
@@ -5122,7 +5121,7 @@ std::uint8_t* sfmpv_IsEmptyBpic(
  * Computes one MPV late-frame condition using current interpolation/time lanes,
  * optional callback override, and per-handle late-frame gate counters.
  */
-std::int32_t sfmpv_IsLate(const std::int32_t workctrlAddress, const std::int32_t updateMode)
+std::int32_t sfmpv_IsLate(const SofdecAddressWord workctrlAddress, const std::int32_t updateMode)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const timingLane = &workctrl->timingLane;
@@ -5182,7 +5181,7 @@ std::int32_t sfmpv_IsLate(const std::int32_t workctrlAddress, const std::int32_t
  * Returns cached frame-delta time lanes from workctrl timing state.
  */
 std::int32_t sfmpv_GetDtime(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t /*mode*/,
   std::int32_t* const outDeltaMajor,
   std::int32_t* const outDeltaMinor
@@ -5202,7 +5201,7 @@ std::int32_t sfmpv_GetDtime(
  * Validates decoder handle, advances source stream to next MPEG delimiter lane,
  * and reports CRI MPV skip-frame status through `MPVERR_SetCode`.
  */
-std::int32_t m2v_SkipFrm(const std::int32_t decoderHandle, const std::int32_t streamBufferAddress)
+std::int32_t m2v_SkipFrm(const SofdecAddressWord decoderHandle, const SofdecAddressWord streamBufferAddress)
 {
   constexpr std::int32_t kMpvErrInvalidHandle = -16580086;
   constexpr std::int32_t kMpvErrDelimiterScanFailed = -16579835;
@@ -5237,7 +5236,7 @@ std::int32_t m2v_SkipFrm(const std::int32_t decoderHandle, const std::int32_t st
  * Runs one MPV frame-skip decode step, updates consumed-stream counters, and
  * records one skipped-picture callback when skip succeeds.
  */
-std::int32_t sfmpv_SkipFrm(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
+std::int32_t sfmpv_SkipFrm(const SofdecAddressWord workctrlAddress, const SofdecAddressWord streamBufferAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -5278,7 +5277,7 @@ std::int32_t sfmpv_SkipFrm(const std::int32_t workctrlAddress, const std::int32_
  * reset. With the video condition off the whole thing is skipped and it
  * succeeds silently.
  */
-std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
+std::int32_t SFMPV_Create(const SofdecAddressWord workctrlAddress)
 {
   if (SFSET_GetCond(workctrlAddress, 5) == 0) {
     return 0;
@@ -5293,12 +5292,12 @@ std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
     return initInfoResult;
   }
 
-  const std::int32_t decoderHandle = MPV_Create();
+  const SofdecAddressWord decoderHandle = MPV_Create();
   if (decoderHandle == 0) {
     return SFLIB_SetErr(0, kSfmpvErrCreateFailed);
   }
 
-  if (MPV_SetErrFunc(decoderHandle, reinterpret_cast<std::int32_t>(&sfmpv_ErrFn), workctrlAddress) != 0) {
+  if (MPV_SetErrFunc(decoderHandle, reinterpret_cast<SofdecAddressWord>(&sfmpv_ErrFn), workctrlAddress) != 0) {
     sfmpv_DestroySub(decoderHandle);
     return SFLIB_SetErr(0, kSfmpvErrSetErrFuncFailed);
   }
@@ -5322,11 +5321,11 @@ std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
  * Destroys active MPV decoder handle and persists current per-handle MPV
  * parameter/tables back into global MPV state.
  */
-std::int32_t SFMPV_Destroy(const std::int32_t workctrlAddress)
+std::int32_t SFMPV_Destroy(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
-  const std::int32_t decoderHandle = mpvInfo->decoderHandle;
+  const SofdecAddressWord decoderHandle = mpvInfo->decoderHandle;
   if (decoderHandle == 0) {
     return 0;
   }
@@ -5356,7 +5355,7 @@ std::int32_t SFMPV_Destroy(const std::int32_t workctrlAddress)
  * Normalizes MPV control-path return lanes: forwards non-zero/non-(-2/-3)
  * errors through `SFLIB_SetErr`, otherwise returns input status unchanged.
  */
-std::int32_t sfmpv_ErrFn(const std::int32_t workctrlAddress, const std::int32_t statusCode)
+std::int32_t sfmpv_ErrFn(const SofdecAddressWord workctrlAddress, const std::int32_t statusCode)
 {
   if (statusCode < -3 || (statusCode > -2 && statusCode != 0)) {
     return SFLIB_SetErr(workctrlAddress, statusCode);
@@ -5414,7 +5413,7 @@ std::int32_t SFMPV_Pause()
  * What it does:
  * Reports unsupported write-lane API for MPV transport (`FF000F0D`).
  */
-std::int32_t SFMPV_GetWrite(const std::int32_t workctrlAddress)
+std::int32_t SFMPV_GetWrite(const SofdecAddressWord workctrlAddress)
 {
   return SFLIB_SetErr(workctrlAddress, kSfmpvErrWriteApiUnsupported);
 }
@@ -5425,7 +5424,7 @@ std::int32_t SFMPV_GetWrite(const std::int32_t workctrlAddress)
  * What it does:
  * Reports unsupported write-lane API for MPV transport (`FF000F0D`).
  */
-std::int32_t SFMPV_AddWrite(const std::int32_t workctrlAddress)
+std::int32_t SFMPV_AddWrite(const SofdecAddressWord workctrlAddress)
 {
   return SFLIB_SetErr(workctrlAddress, kSfmpvErrWriteApiUnsupported);
 }
@@ -5438,13 +5437,13 @@ std::int32_t SFMPV_AddWrite(const std::int32_t workctrlAddress)
  * issues a frame id for decode-path mode 2 readers.
  */
 std::int32_t SFMPVF_GetRead(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   SfmpvfFrameInfo** const outFrameInfo,
   std::int32_t* const outFrameId
 )
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  const std::int32_t frameObjectAddress = SFMPVF_HoldFrm(workctrlAddress);
+  const SofdecAddressWord frameObjectAddress = SFMPVF_HoldFrm(workctrlAddress);
   if (frameObjectAddress == 0) {
     *outFrameInfo = nullptr;
     return 0;
@@ -5479,8 +5478,8 @@ std::int32_t SFMPVF_GetRead(
  * drawing, records the active frame-object, and copies exported frame fields.
  */
 void sfmpvf_SearchFrmInf(
-  const std::int32_t workctrlAddress,
-  const std::int32_t frameObjectAddress,
+  const SofdecAddressWord workctrlAddress,
+  const SofdecAddressWord frameObjectAddress,
   SfmpvfFrameInfo** const outFrameInfo
 )
 {
@@ -5544,7 +5543,7 @@ void sfmpvf_SearchFrmInf(
  * Wraps one frame-read completion in CRI critical-section enter/leave guards.
  */
 std::int32_t SFMPV_AddRead(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t frameInfoIndex,
   const std::int32_t frameObjectId
 )
@@ -5563,7 +5562,7 @@ std::int32_t SFMPV_AddRead(
  * finalizes the associated frame-object draw owner.
  */
 std::int32_t sfmpvf_AddReadSub(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t frameInfoIndex,
   const std::int32_t frameObjectId
 )
@@ -5571,7 +5570,7 @@ std::int32_t sfmpvf_AddReadSub(
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
-  std::int32_t frameObjectAddress = 0;
+  SofdecAddressWord frameObjectAddress = 0;
   moho::SfmpvfVfrmData* vfrmData = nullptr;
 
   if (workctrl->decodePathMode == 2) {
@@ -5604,7 +5603,7 @@ std::int32_t sfmpvf_AddReadSub(
  * What it does:
  * Converts one exported frame-info pointer back to the owning VFRM data lane.
  */
-std::int32_t sfmpvf_GetVfrmDataFromFrmInf(const std::int32_t workctrlAddress, const std::int32_t frameInfoIndex)
+std::int32_t sfmpvf_GetVfrmDataFromFrmInf(const SofdecAddressWord workctrlAddress, const std::int32_t frameInfoIndex)
 {
   (void)workctrlAddress;
   return frameInfoIndex - static_cast<std::int32_t>(sizeof(moho::SfmpvfVfrmData));
@@ -5617,7 +5616,7 @@ std::int32_t sfmpvf_GetVfrmDataFromFrmInf(const std::int32_t workctrlAddress, co
  * Scans the active MPV frame-object array for the supplied frame-object
  * address and returns the owning VFRM data lane when found.
  */
-std::int32_t SFMPVF_SearchVfrmData(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
+std::int32_t SFMPVF_SearchVfrmData(const SofdecAddressWord workctrlAddress, const SofdecAddressWord frameObjectAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t frameObjectCount = workctrl->transferState.transfer.demux.mpvInfoHandle->frameObjectCount;
@@ -5642,7 +5641,7 @@ std::int32_t SFMPVF_SearchVfrmData(const std::int32_t workctrlAddress, const std
  * Scans the fixed 16-frame object table for the frame id and returns the
  * matching frame-object address when found.
  */
-std::int32_t SFMPVF_SearchFrmObjFromId(const std::int32_t workctrlAddress, const std::int32_t frameObjectId)
+std::int32_t SFMPVF_SearchFrmObjFromId(const SofdecAddressWord workctrlAddress, const std::int32_t frameObjectId)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -5663,7 +5662,7 @@ std::int32_t SFMPVF_SearchFrmObjFromId(const std::int32_t workctrlAddress, const
  * What it does:
  * Marks the per-handle MPV info lane as term-decode active.
  */
-std::int32_t SFMPVF_TermDec(const std::int32_t workctrlAddress)
+std::int32_t SFMPVF_TermDec(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -5678,7 +5677,7 @@ std::int32_t SFMPVF_TermDec(const std::int32_t workctrlAddress)
  * Clears one frame-object decode-state lane back to free (`0`) when the
  * address is valid.
  */
-void SFMPVF_FreeFrm(const std::int32_t frameObjectAddress)
+void SFMPVF_FreeFrm(const SofdecAddressWord frameObjectAddress)
 {
   auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
@@ -5693,7 +5692,7 @@ void SFMPVF_FreeFrm(const std::int32_t frameObjectAddress)
  * Places the frame object into standby state when the input address is
  * valid.
  */
-std::int32_t SFMPVF_StbyFrm(const std::int32_t frameObjectAddress)
+std::int32_t SFMPVF_StbyFrm(const SofdecAddressWord frameObjectAddress)
 {
   auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
@@ -5709,7 +5708,7 @@ std::int32_t SFMPVF_StbyFrm(const std::int32_t frameObjectAddress)
  * Places the frame object into reference-standby state when the input
  * address is valid.
  */
-std::int32_t SFMPVF_RefStbyFrm(const std::int32_t frameObjectAddress)
+std::int32_t SFMPVF_RefStbyFrm(const SofdecAddressWord frameObjectAddress)
 {
   auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
@@ -5725,7 +5724,7 @@ std::int32_t SFMPVF_RefStbyFrm(const std::int32_t frameObjectAddress)
  * Clears the frame id, then transitions the frame from reference-draw or
  * non-reference draw state back to the appropriate idle lane.
  */
-std::int32_t SFMPVF_EndDrawFrm(const std::int32_t frameObjectAddress)
+std::int32_t SFMPVF_EndDrawFrm(const SofdecAddressWord frameObjectAddress)
 {
   auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
@@ -5743,7 +5742,7 @@ std::int32_t SFMPVF_EndDrawFrm(const std::int32_t frameObjectAddress)
  * Clears a frame-object's standby/reference state unless it is already in
  * the reference-standby lane.
  */
-std::int32_t SFMPVF_EndRefFrm(const std::int32_t frameObjectAddress)
+std::int32_t SFMPVF_EndRefFrm(const SofdecAddressWord frameObjectAddress)
 {
   auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
@@ -5759,7 +5758,7 @@ std::int32_t SFMPVF_EndRefFrm(const std::int32_t frameObjectAddress)
  * Returns the current frame-object id lane and advances it, wrapping back
  * to zero when the increment would become negative.
  */
-std::int32_t SFMPVF_IssueFrmId(const std::int32_t workctrlAddress)
+std::int32_t SFMPVF_IssueFrmId(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t frameId = workctrl->frameIdCounter;
@@ -5778,7 +5777,7 @@ std::int32_t SFMPVF_IssueFrmId(const std::int32_t workctrlAddress)
  * Copies the caller-supplied display-order latch into the MPV info lane's
  * single-frame-output flag and returns to the caller.
  */
-void SFMPVF_FixDispOrder(const std::int32_t workctrlAddress, const std::int32_t shouldSort)
+void SFMPVF_FixDispOrder(const SofdecAddressWord workctrlAddress, const std::int32_t shouldSort)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   workctrl->transferState.transfer.demux.mpvInfoHandle->allowSingleFrameOutput = shouldSort;
@@ -5791,7 +5790,7 @@ void SFMPVF_FixDispOrder(const std::int32_t workctrlAddress, const std::int32_t 
  * Reprocesses cached MPV picture attributes for seek and re-arms concat
  * control flags based on condition 48 and reprocess availability.
  */
-std::int32_t SFMPV_Seek(const std::int32_t workctrlAddress)
+std::int32_t SFMPV_Seek(const SofdecAddressWord workctrlAddress)
 {
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
@@ -5821,7 +5820,7 @@ std::int32_t SFMPV_Seek(const std::int32_t workctrlAddress)
  * seek path and returns whether the reprocess pass was applied.
  */
 std::int32_t sfmpv_ReprocessShc(
-  const std::int32_t workctrlAddress,
+  const SofdecAddressWord workctrlAddress,
   const std::int32_t* const decoderHandleLane,
   std::int32_t* const outReprocessed
 )
@@ -5829,7 +5828,7 @@ std::int32_t sfmpv_ReprocessShc(
   auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   *outReprocessed = 0;
 
-  const std::int32_t headerAddress = sfmpv_GetHd(workctrlAddress);
+  const SofdecAddressWord headerAddress = sfmpv_GetHd(workctrlAddress);
   auto* const header = AddressToPointer<SfmpvHeader>(headerAddress);
   if (header != nullptr && header->hasHeader != 0) {
     // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
@@ -5857,10 +5856,10 @@ std::int32_t sfmpv_ReprocessShc(
  * Returns the active seek-header workspace pointer when the concat-advance
  * gate allows header reuse; otherwise returns null.
  */
-std::int32_t sfmpv_GetHd(const std::int32_t workctrlAddress)
+std::int32_t sfmpv_GetHd(const SofdecAddressWord workctrlAddress)
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
-  std::int32_t headerWorkspaceAddress = PointerToAddress(workctrl->seekState.handle);
+  SofdecAddressWord headerWorkspaceAddress = PointerToAddress(workctrl->seekState.handle);
   if (headerWorkspaceAddress == 0) {
     return 0;
   }

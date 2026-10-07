@@ -50,7 +50,7 @@
   /**
    * Address: 0x00AD8F70 (FUN_00AD8F70, _MWSTM_SetRdSct)
    */
-  std::int32_t MWSTM_SetRdSct(const std::int32_t streamHandleAddress, const std::int32_t requestedSectorCount)
+  std::int32_t MWSTM_SetRdSct(const SofdecAddressWord streamHandleAddress, const std::int32_t requestedSectorCount)
   {
     if (streamHandleAddress != 0) {
       ADXSTM_SetReqRdSize(SjAddressToPointer(streamHandleAddress), requestedSectorCount);
@@ -61,7 +61,7 @@
   /**
    * Address: 0x00AD8F90 (FUN_00AD8F90, _MWSTM_SetTrSct)
    */
-  std::int32_t MWSTM_SetTrSct(const std::int32_t streamHandleAddress, const std::int32_t transferSectorCount)
+  std::int32_t MWSTM_SetTrSct(const SofdecAddressWord streamHandleAddress, const std::int32_t transferSectorCount)
   {
     (void)streamHandleAddress;
     (void)transferSectorCount;
@@ -71,7 +71,7 @@
   /**
    * Address: 0x00AD9020 (FUN_00AD9020, _MWSTM_Start)
    */
-  std::int32_t MWSTM_Start(const std::int32_t streamHandleAddress)
+  std::int32_t MWSTM_Start(const SofdecAddressWord streamHandleAddress)
   {
     ADXSTM_Start(SjAddressToPointer(streamHandleAddress));
     return 0;
@@ -80,7 +80,7 @@
   /**
    * Address: 0x00AD9030 (FUN_00AD9030, _MWSTM_IsFsStatErr)
    */
-  bool MWSTM_IsFsStatErr(const std::int32_t streamHandleAddress)
+  bool MWSTM_IsFsStatErr(const SofdecAddressWord streamHandleAddress)
   {
     return ADXSTM_GetStat(SjAddressToPointer(streamHandleAddress)) == kAdxstmStatusFilesystemError;
   }
@@ -232,7 +232,7 @@
       (void)ADXERR_CallErrFunc1_(kSofdecErrUnlockFailed);
     }
 
-    soundPort->playbackCursorByteOffset = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(lockedPrimary));
+    soundPort->playbackCursorByteOffset = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(lockedPrimary));
     return static_cast<std::int32_t>((static_cast<std::int32_t>(gSofdecPortBufferBytesPerChannel) / soundPort->format.bitsPerSample) * 8);
   }
 
@@ -270,7 +270,7 @@
    */
   std::int32_t SofdecResetSpatialPreset(moho::SofdecSoundPort* const soundPort)
   {
-    std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(soundPort));
+    SofdecAddressWord result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(soundPort));
     if (soundPort->monoRoutingMode != 1) {
       soundPort->spatialPresetVolumeOffset = 0;
       soundPort->primaryBuffer->lpVtbl->SetPan(soundPort->primaryBuffer, 0);
@@ -285,7 +285,7 @@
    */
   std::int32_t SofdecSetChannelMode(moho::SofdecSoundPort* const soundPort, const std::int32_t channelMode)
   {
-    std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(soundPort));
+    std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(soundPort));
     if (soundPort->used != 0) {
       if (soundPort->primaryBuffer == nullptr) {
         return ADXERR_CallErrFunc1_(kSofdecErrNullPrimaryBuffer);
@@ -334,7 +334,7 @@
    */
   std::int32_t SofdecSetPlaybackFrequencyHz(moho::SofdecSoundPort* const soundPort, const std::int32_t frequencyHz)
   {
-    std::int32_t result = soundPort->used;
+    SofdecAddressWord result = soundPort->used;
     if (result != 0) {
       if (soundPort->primaryBuffer == nullptr) {
         return ADXERR_CallErrFunc1_(kSofdecErrNullPrimaryBuffer);
@@ -372,7 +372,7 @@
    */
   std::int32_t SofdecSetOutputBitsPerSample(moho::SofdecSoundPort* const soundPort, const std::int16_t bitsPerSample)
   {
-    std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(soundPort));
+    std::int32_t result = static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(soundPort));
     if (soundPort->used != 0) {
       if (soundPort->primaryBuffer != nullptr) {
         soundPort->format.bitsPerSample = static_cast<std::uint16_t>(bitsPerSample);

@@ -40,7 +40,7 @@ void SFX_Init();
 
 /// Installs the SFX error callback and its context. Defined below, once the
 /// work-area globals are in scope.
-std::int32_t SFX_SetErrFn(std::int32_t errorCallbackAddress,
+std::int32_t SFX_SetErrFn(SofdecAddressWord errorCallbackAddress,
                           std::int32_t errorCallbackContext);
 
 /// SFX core teardown. Pairs with SFX_Init().
@@ -49,7 +49,7 @@ std::int32_t SFX_Finish();
 /// Allocates / initialises an SFX handle from a caller-provided work buffer,
 /// work-buffer size, and configuration tag. Returns an opaque handle pointer
 /// (`struct_sofdec_sfx_hn*`).
-void* SFX_Create(std::int32_t workBufferAddress,
+void* SFX_Create(SofdecAddressWord workBufferAddress,
                  std::int32_t workBufferSize,
                  std::int32_t configTag);
 
@@ -107,14 +107,14 @@ namespace moho_cri_sfx_internal {
 /// seeds the lanes below; `sfx_SearchFreeHn` walks the pool at stride 0x94
 /// testing the first dword.
 using SfxCnvFrmCallback = std::int32_t(__cdecl*)(
-  const CftYcc420PlanarPackedWords* source,
-  const CftRgb16OutputPackedWords* target,
-  const std::int32_t* tableParams
-);
+    const CftYcc420PlanarPackedWords* source,
+    const CftRgb16OutputPackedWords* target,
+    const SofdecAddressWord* tableParams
+  );
 using SfxCopyAlphaCallback = std::uint8_t*(__cdecl*)(
   std::uint8_t** sourcePlanes,
   const std::int32_t* conversionWords,
-  const std::int32_t* userTableAddress
+  const SofdecAddressWord* userTableAddress
 );
 
 /// Signature of the three alpha/luminance table builders reached through the
@@ -123,11 +123,20 @@ using SfxMakeTableCallback = std::int32_t(__cdecl*)(
   std::int32_t luminancePivot,
   std::int32_t luminanceMin,
   std::int32_t luminanceMax,
-  std::int32_t tableAddress
+  SofdecAddressWord tableAddress
 );
 
 /// The colour-adjust builder takes only the table address.
-using SfxMakeColorAdjustTableCallback = std::int32_t(__cdecl*)(std::int32_t tableAddress);
+using SfxMakeColorAdjustTableCallback = std::int32_t(__cdecl*)(SofdecAddressWord tableAddress);
+
+/// The two alpha builders take the table address first, then the three alpha
+/// lanes; the luminance builder (SfxMakeTableCallback) takes them last.
+using SfxMakeAlpTableCallback = std::int32_t(__cdecl*)(
+  SofdecAddressWord tableAddress,
+  std::int32_t alpha0,
+  std::int32_t alpha1,
+  std::int32_t alpha2
+);
 
 struct SfxHandle {
   std::int32_t used;          ///< +0x00 set to 1 by sfx_InitHn
@@ -136,21 +145,21 @@ struct SfxHandle {
   std::int32_t outputBufferHeight; ///< +0x0C SFX_Set/GetOutBufSize
   std::int32_t unitWidth;     ///< +0x10 SFX_SetUnitWidth
   std::uint8_t mUnknown14[0x10]; ///< +0x14
-  std::int32_t sfxz;          ///< +0x24 SFXZ sub-handle (SFX_Create)
+  SofdecAddressWord sfxz;    ///< +0x24 SFXZ sub-handle (SFX_Create)
   std::uint8_t mUnknown28_[0x08]; ///< +0x28 (+0x28 = 1, +0x2C = 0)
-  std::int32_t sfxa;          ///< +0x30 SFXA sub-handle (SFX_Create)
+  SofdecAddressWord sfxa;    ///< +0x30 SFXA sub-handle (SFX_Create)
   /// +0x34 active composition-table pattern id (`sfxcnv_IsNeedUpdateTbl`,
   /// `sfxcnv_MakeTable`). Sentinel 100 means "never needs a table rebuild".
   std::int32_t tblPattern;
-  std::int32_t planeBase;     ///< +0x38 work address aligned up to 32
-  std::int32_t plane1;        ///< +0x3C planeBase + 1024
-  std::int32_t plane2;        ///< +0x40 plane1 + 1024
-  std::int32_t plane3;        ///< +0x44 plane2 + 1024
+  SofdecAddressWord planeBase; ///< +0x38 work address aligned up to 32
+  SofdecAddressWord plane1;    ///< +0x3C planeBase + 1024
+  SofdecAddressWord plane2;    ///< +0x40 plane1 + 1024
+  SofdecAddressWord plane3;    ///< +0x44 plane2 + 1024
   std::uint8_t mUnknown48[0x08]; ///< +0x48
   /// +0x50 seeded with the raw work address by `sfx_InitHn`, then reused by
   /// `SFX_CnvFrmARGB8888ByCbFunc` as the colour-adjust table base. Nothing
   /// reads it back as a work address, so both writes stand.
-  std::int32_t tableBase;
+  SofdecAddressWord tableBase;
   std::int32_t configTag;     ///< +0x54
   std::int32_t splitField;    ///< +0x58 seeded to -1 = "decide from the stream"
   std::int32_t progOut;       ///< +0x5C progressive-output request
@@ -187,7 +196,7 @@ constexpr std::int32_t kSfxHandlePoolSize = 32;
 struct SfxLibWorkHead {
   std::int32_t  cur;             ///< +0x00 live-handle count (SFX_Create/Destroy)
   std::int32_t  last;            ///< +0x04 last-cell sentinel (= 32)
-  std::int32_t  errFn;           ///< +0x08 error callback (SFX_SetErrFn)
+  SofdecAddressWord errFn;        ///< +0x08 error callback (SFX_SetErrFn)
   std::int32_t  errParam;        ///< +0x0C error callback context
   std::int32_t  numErrs;         ///< +0x10 error count (SFXLIB_Error)
   std::int32_t  cirFx;           ///< +0x14 CCIR matrix selector
@@ -196,7 +205,6 @@ struct SfxLibWorkHead {
 
 static_assert(offsetof(SfxLibWorkHead, objs) == 0x18,
               "SfxLibWorkHead::objs must live at offset 0x18");
-
 static_assert(offsetof(SfxLibWorkHead, last) == 0x04,
               "SfxLibWorkHead::last must live at offset 0x04");
 static_assert(offsetof(SfxLibWorkHead, errFn) == 0x08,
@@ -298,12 +306,12 @@ extern "C" {
  * Installs the SFX error callback and its context, and echoes the callback
  * back to the caller.
  */
-std::int32_t SFX_SetErrFn(std::int32_t errorCallbackAddress,
+std::int32_t SFX_SetErrFn(SofdecAddressWord errorCallbackAddress,
                           std::int32_t errorCallbackContext)
 {
   sfx_libwork.errFn = errorCallbackAddress;
   sfx_libwork.errParam = errorCallbackContext;
-  return errorCallbackAddress;
+  return static_cast<std::int32_t>(errorCallbackAddress);
 }
 
 /**
@@ -446,7 +454,7 @@ std::int32_t MWSFSFX_Init()
 {
   SFX_Init();
   return SFX_SetErrFn(
-      reinterpret_cast<std::int32_t>(&mwsfsfx_SfxErrCbFn),
+      reinterpret_cast<SofdecAddressWord>(&mwsfsfx_SfxErrCbFn),
       0);
 }
 
@@ -550,7 +558,7 @@ std::int32_t MWSFSFX_CalcHnWorkSiz(std::int32_t cellCount)
  * (`jmp _SFX_Create`); the C++ forwarder below preserves the same
  * externally observable behaviour.
  */
-void* MWSFSFX_Create(std::int32_t workBufferAddress,
+void* MWSFSFX_Create(SofdecAddressWord workBufferAddress,
                      std::int32_t workBufferSize,
                      std::int32_t configTag)
 {
@@ -795,13 +803,14 @@ std::int32_t sfx_IsEnoughHnWorkSize(const std::int32_t workBytes, const std::int
  */
 std::int32_t sfx_InitHn(
   moho_cri_sfx_internal::SfxHandle* const handle,
-  const std::int32_t workAddress,
+  const SofdecAddressWord workAddress,
   const std::int32_t configTag
 )
 {
   std::memset(handle, 0, sizeof(*handle));
 
-  const std::int32_t planeBase = (workAddress + (kSfxPlaneAlignBytes - 1)) & ~(kSfxPlaneAlignBytes - 1);
+  const SofdecAddressWord planeBase =
+    (workAddress + (kSfxPlaneAlignBytes - 1)) & ~static_cast<SofdecAddressWord>(kSfxPlaneAlignBytes - 1);
   handle->tableBase = workAddress;
   handle->planeBase = planeBase;
   handle->plane1 = planeBase + kSfxPlaneStrideBytes;
@@ -1300,9 +1309,12 @@ std::int32_t SFXZ_MakeCnvZTbl(char* const sfxzWorkBuffer, const std::int32_t ent
   char* rangeStart = nullptr;
   std::int32_t rangeEnd = 0;
   (void)SFXZ_GetZfrmRange(sfxzWorkBuffer, entryStrideBytes, &rangeStart, &rangeEnd);
-  return sfxzmv_MakeCnvZTbl(
-    handle, static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(rangeStart)), rangeEnd, outCnvZTable
-  );
+  // `rangeStart` carries one 32-bit zoom-frame ramp value read back through a
+  // pointer slot, not a real pointer: the Z-table builders consume it as an
+  // int with a 0x80000000 sentinel, so the 32-bit extraction is the behaviour.
+  const auto rangeStartValue =
+    static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(rangeStart)));
+  return sfxzmv_MakeCnvZTbl(handle, rangeStartValue, rangeEnd, outCnvZTable);
 }
 
 /**
@@ -1318,7 +1330,7 @@ std::int32_t SFXZ_MakeCnvZTbl(char* const sfxzWorkBuffer, const std::int32_t ent
  * claimed tears the whole handle back down.
  */
 void* SFX_Create(
-  const std::int32_t workAddress,
+  const SofdecAddressWord workAddress,
   const std::int32_t workBytes,
   const std::int32_t frameWidth
 )
@@ -1341,9 +1353,9 @@ void* SFX_Create(
     SFX_Destroy(handle);
     return nullptr;
   }
-  handle->sfxz = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(depthHandle));
+  handle->sfxz = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(depthHandle));
 
-  const std::int32_t audioHandle = SFXA_Create();
+  const SofdecAddressWord audioHandle = SFXA_Create();
   if (audioHandle == 0) {
     SFXLIB_Error(nullptr, nullptr, kSfxErrSfxaCreate);
     SFX_Destroy(handle);
@@ -1411,7 +1423,7 @@ static_assert(sizeof(SfxCftSourceBuffer) == 0x44, "SfxCftSourceBuffer must be 68
 struct SfxCftTargetBuffer
 {
   std::int32_t planeCount; ///< +0x00
-  std::int32_t pixels;     ///< +0x04
+  SofdecAddressWord pixels;     ///< +0x04
   std::int32_t width;      ///< +0x08
   std::int32_t height;     ///< +0x0C
   std::int32_t pitch;      ///< +0x10 negative once flipped bottom-up
@@ -1532,7 +1544,7 @@ void sfxcnv_MakeCftSrcBuf(
 void sfxcnv_ExecCnvFrmByCbFunc(
   moho::SfxCallbackFrameContext* const conversionState,
   moho::SfxStreamState* const streamState,
-  const std::int32_t callbackArg,
+  const SofdecAddressWord callbackArg,
   const std::int32_t useLookupTable
 )
 {
@@ -1545,7 +1557,7 @@ void sfxcnv_ExecCnvFrmByCbFunc(
   SfxCftSourceBuffer source{};
   sfxcnv_MakeCftSrcBuf(handle, frameInfo, &source);
 
-  const std::int32_t tableParams[2] = {
+  const SofdecAddressWord tableParams[2] = {
     (useLookupTable == 1) ? handle->planeBase : 0,
     handle->tableBase,
   };
@@ -1641,7 +1653,7 @@ std::int32_t sfxcnv_IsNeedUpdateTbl(
 void sfxcnv_MakeAlpFull(moho_cri_sfx_internal::SfxHandle* const handle)
 {
   SFXCNV_MakeCcirFromY(
-    reinterpret_cast<std::int32_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->planeBase)))
+    reinterpret_cast<std::int32_t*>(static_cast<std::uintptr_t>(handle->planeBase))
   );
 }
 
@@ -1718,9 +1730,9 @@ std::int32_t sfxcnv_MakeZTbl(void* const sfxHandle, MwsfdSfxFrameInfo* const sfx
 {
   auto* const handle = static_cast<moho_cri_sfx_internal::SfxHandle*>(sfxHandle);
   return SFXZ_MakeCnvZTbl(
-    reinterpret_cast<char*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->sfxz))),
+    reinterpret_cast<char*>(static_cast<std::uintptr_t>(handle->sfxz)),
     sfxFrameInfo->nfrm,
-    reinterpret_cast<char*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->planeBase)))
+    reinterpret_cast<char*>(static_cast<std::uintptr_t>(handle->planeBase))
   );
 }
 
@@ -1812,8 +1824,8 @@ struct SfxaTableCallbacks
 {
   std::uint8_t mUnknown00[0x18];         ///< +0x00
   SfxMakeTableCallback makeLumiTable;    ///< +0x18
-  SfxMakeTableCallback makeAlp3110Table; ///< +0x1C
-  SfxMakeTableCallback makeAlp3Table;    ///< +0x20
+  SfxMakeAlpTableCallback makeAlp3110Table; ///< +0x1C
+  SfxMakeAlpTableCallback makeAlp3Table; ///< +0x20
 };
 static_assert(offsetof(SfxaTableCallbacks, makeLumiTable) == 0x18, "SfxaTableCallbacks::makeLumiTable offset");
 static_assert(offsetof(SfxaTableCallbacks, makeAlp3110Table) == 0x1C, "SfxaTableCallbacks::makeAlp3110Table offset");
@@ -1822,7 +1834,7 @@ static_assert(offsetof(SfxaTableCallbacks, makeAlp3Table) == 0x20, "SfxaTableCal
 [[nodiscard]] inline SfxaTableCallbacks* SfxaTableCallbacksOf(SfxHandle* const handle) noexcept
 {
   return reinterpret_cast<SfxaTableCallbacks*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->sfxa))
+    static_cast<std::uintptr_t>(handle->sfxa)
   );
 }
 
@@ -1877,7 +1889,7 @@ moho_cri_sfx_internal::SfxHandle* SFX_SetMakeLumiTableCbFunc(
  * Installs the 3-bit-alpha (3:2:1:1) table builder on the SFXA sub-handle.
  */
 moho_cri_sfx_internal::SfxHandle* SFX_SetMakeAlp3TableCbFunc(
-  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeTableCallback callback
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeAlpTableCallback callback
 )
 {
   moho_cri_sfx_internal::SfxaTableCallbacksOf(handle)->makeAlp3Table = callback;
@@ -1891,7 +1903,7 @@ moho_cri_sfx_internal::SfxHandle* SFX_SetMakeAlp3TableCbFunc(
  * Installs the 3:1:1:0-alpha table builder on the SFXA sub-handle.
  */
 moho_cri_sfx_internal::SfxHandle* SFX_SetMakeAlp3110TableCbFunc(
-  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeTableCallback callback
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeAlpTableCallback callback
 )
 {
   moho_cri_sfx_internal::SfxaTableCallbacksOf(handle)->makeAlp3110Table = callback;
@@ -1931,12 +1943,12 @@ moho_cri_sfx_internal::SfxMakeColorAdjustTableCallback SFX_SetMakeColAdjTableCbF
 extern "C" std::int32_t CFT_Ycc420plnToArgb8888Prg(
   const CftYcc420PlanarPackedWords* inputWords,
   const CftRgb16OutputPackedWords* outputWords,
-  const std::int32_t* userTableAddress
+  const SofdecAddressWord* userTableAddress
 );
 extern "C" std::int32_t CFT_Ycc420plnToArgb8888Int(
   const CftYcc420PlanarPackedWords* inputWords,
   const CftRgb16OutputPackedWords* outputWords,
-  const std::int32_t* userTableAddress
+  const SofdecAddressWord* userTableAddress
 );
 
 namespace moho_cri_sfx_internal {
@@ -2152,7 +2164,7 @@ std::int32_t sfxcnv_IsCnvUpHalf(const moho_cri_sfx_internal::SfxHandle* const ha
 std::int32_t sfxcnv_MakeDstBufInf(
   const moho_cri_sfx_internal::SfxHandle* const handle,
   const MwsfdSfxFrameInfo* const frameInfo,
-  const std::int32_t pixels,
+  const SofdecAddressWord pixels,
   moho_cri_sfx_internal::SfxCftTargetBuffer* const outTarget,
   const std::int32_t recordIndex
 )
@@ -2186,7 +2198,7 @@ std::int32_t sfxcnv_MakeDstBufInf(
 std::int32_t SFX_Make1PlaneCftDstBuf(
   moho_cri_sfx_internal::SfxHandle* const handle,
   MwsfdSfxFrameInfo* const frameInfo,
-  const std::int32_t pixels,
+  const SofdecAddressWord pixels,
   moho_cri_sfx_internal::SfxCftTargetBuffer* const outTarget,
   const std::int32_t left,
   const std::int32_t top,
@@ -2278,7 +2290,7 @@ std::int32_t SUD_Finish()
  * shape as SUD_AnalyTypeDivField below against the next byte of the type
  * string. MWSFD_IsColAdjFrame (0x00AC680E) is its caller.
  */
-std::int32_t SUD_AnalyTypeCcs(const std::int32_t sudRecordAddress, const std::int32_t sudFieldIndex)
+std::int32_t SUD_AnalyTypeCcs(const SofdecAddressWord sudRecordAddress, const std::int32_t sudFieldIndex)
 {
   using namespace moho_cri_sfx_internal;
 
@@ -2287,7 +2299,7 @@ std::int32_t SUD_AnalyTypeCcs(const std::int32_t sudRecordAddress, const std::in
   }
 
   const auto* const typeString = reinterpret_cast<const char*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sudRecordAddress)) + kSudCcsTypeStringOffset
+    static_cast<std::uintptr_t>(sudRecordAddress) + kSudCcsTypeStringOffset
   );
   return std::strncmp(typeString, kSudCcsTypeTag, 1) == 0 ? 1 : 0;
 }
@@ -2302,7 +2314,7 @@ std::int32_t SUD_AnalyTypeCcs(const std::int32_t sudRecordAddress, const std::in
  * Reports whether a SUD record describes a divided-field stream, which it does
  * by matching the first character of the type string in the record.
  */
-std::int32_t SUD_AnalyTypeDivField(const std::int32_t sudRecordAddress, const std::int32_t sudFieldIndex)
+std::int32_t SUD_AnalyTypeDivField(const SofdecAddressWord sudRecordAddress, const std::int32_t sudFieldIndex)
 {
   using namespace moho_cri_sfx_internal;
 
@@ -2311,7 +2323,7 @@ std::int32_t SUD_AnalyTypeDivField(const std::int32_t sudRecordAddress, const st
   }
 
   const auto* const typeString = reinterpret_cast<const char*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sudRecordAddress)) + kSudTypeStringOffset
+    static_cast<std::uintptr_t>(sudRecordAddress) + kSudTypeStringOffset
   );
   return std::strncmp(typeString, kSudDivFieldTypeTag, 1) == 0 ? 1 : 0;
 }
@@ -2341,7 +2353,7 @@ std::int32_t SFX_IsMergeField(
     return (splitField == 1) ? 1 : 0;
   }
 
-  const std::int32_t sudRecordAddress = frameInfo->sudRecordAddress;
+  const SofdecAddressWord sudRecordAddress = frameInfo->sudRecordAddress;
   if (sudRecordAddress != 0 && SUD_AnalyTypeDivField(sudRecordAddress, frameInfo->sudFieldIndex) != 0) {
     return (SFX_GetProgOut(const_cast<moho_cri_sfx_internal::SfxHandle*>(handle)) == 0) ? 1 : 0;
   }
@@ -2435,7 +2447,7 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
   SFX_CnvFrmByCbFunc(
     reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
     reinterpret_cast<moho::SfxStreamState*>(frameInfo),
-    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
+    static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(target))
   );
 
   SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
@@ -2449,7 +2461,7 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
   SFX_CnvFrmByCbFunc(
     reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
     reinterpret_cast<moho::SfxStreamState*>(frameInfo),
-    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
+    static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(target))
   );
   return 0;
 }
@@ -2500,7 +2512,7 @@ std::int32_t SFX_CnvFrmARGB8888ByCbFunc(
   SFX_CnvFrmByCbFunc(
     reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
     reinterpret_cast<moho::SfxStreamState*>(frameInfo),
-    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
+    static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(target))
   );
   return 0;
 }
@@ -2539,7 +2551,7 @@ void mwPlyFxCnvFrmClipARGB8888(
   (void)SFX_Make1PlaneCftDstBuf(
     handle,
     &frameInfo,
-    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(outputBits)),
+    static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(outputBits)),
     &target,
     left,
     top,

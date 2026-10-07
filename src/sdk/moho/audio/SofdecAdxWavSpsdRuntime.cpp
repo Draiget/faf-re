@@ -43,7 +43,7 @@ namespace
     std::uint32_t spanBytes = 0;      // +0x04  header + alignment slack + payload
     HeapManagerBlock* prev = nullptr; // +0x08  lower-addressed neighbour
     HeapManagerBlock* next = nullptr; // +0x0C  higher-addressed neighbour
-    std::uint32_t userAddress = 0;    // +0x10  address handed to the caller
+    std::uintptr_t userAddress = 0;   // +0x10  address handed to the caller
   };
   static_assert(offsetof(HeapManagerBlock, prev) == 0x08);
   static_assert(offsetof(HeapManagerBlock, userAddress) == 0x10);
@@ -62,9 +62,9 @@ namespace
     HeapManagerBlock* head = nullptr;   // +0x0C  lowest-addressed block
 
     /** First `alignment` boundary past the header of a block at `startOffset`. */
-    [[nodiscard]] std::uint32_t UserAddressAt(const std::uint32_t startOffset) const
+    [[nodiscard]] std::uintptr_t UserAddressAt(const std::uint32_t startOffset) const
     {
-      const auto blockAddress = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(arenaBase)) + startOffset;
+      const auto blockAddress = reinterpret_cast<std::uintptr_t>(arenaBase) + startOffset;
       return (blockAddress + kHeapHeaderBytes + alignment - 1) / alignment * alignment;
     }
 
@@ -90,9 +90,9 @@ namespace
   static_assert(sizeof(HeapManager) == 0x10);
 
   /** Opaque `HEAPMNG` handle, as the M2A callers hold it, to the arena header. */
-  [[nodiscard]] HeapManager* HeapManagerFromHandle(const int handle)
+  [[nodiscard]] HeapManager* HeapManagerFromHandle(const SofdecAddressWord handle)
   {
-    return reinterpret_cast<HeapManager*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle)));
+    return reinterpret_cast<HeapManager*>(static_cast<std::uintptr_t>(handle));
   }
 
   struct XefindFoundFileInfo
@@ -472,7 +472,7 @@ extern "C"
   std::int32_t __cdecl m2adec_convert_to_pcm16(float* sourceSamples, std::int32_t destinationAddress)
   {
     auto* const destination = reinterpret_cast<std::int16_t*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(destinationAddress))
+      static_cast<std::uintptr_t>(destinationAddress))
     );
 
     for (std::int32_t sampleIndex = 0; sampleIndex < 1024; ++sampleIndex) {
@@ -684,7 +684,7 @@ extern "C"
    * What it does:
    * Places the first block of an empty arena right after the arena header.
    */
-  std::int32_t __cdecl heapmng_first_alloc(HeapManager* manager, const std::uint32_t byteCount, std::uint32_t* outAddress)
+  std::int32_t __cdecl heapmng_first_alloc(HeapManager* manager, const std::uint32_t byteCount, std::uintptr_t* outAddress)
   {
     const std::uint32_t span = manager->SpanFor(byteCount);
     if (span > manager->arenaBytes - kHeapHeaderBytes) {
@@ -706,7 +706,7 @@ extern "C"
    * gap after the arena header fits, else in the first gap between blocks that
    * fits, else appended after the last block.
    */
-  std::int32_t __cdecl heapmng_second_alloc(HeapManager* manager, const std::uint32_t byteCount, std::uint32_t* outAddress)
+  std::int32_t __cdecl heapmng_second_alloc(HeapManager* manager, const std::uint32_t byteCount, std::uintptr_t* outAddress)
   {
     *outAddress = 0;
     const std::uint32_t span = manager->SpanFor(byteCount);
@@ -750,7 +750,7 @@ extern "C"
    * Allocates `byteCount` bytes from the arena. `*outPointer` is zeroed first,
    * so it stays zero when the arena is full.
    */
-  std::int32_t __cdecl HEAPMNG_Allocate(int heapManagerHandle, const SIZE_T byteCount, int* outPointer)
+  std::int32_t __cdecl HEAPMNG_Allocate(SofdecAddressWord heapManagerHandle, const SIZE_T byteCount, SofdecAddressWord* outPointer)
   {
     if (heapManagerHandle == 0 || outPointer == nullptr) {
       heapmng_debug_log(kHeapNullPointerMessage);
@@ -763,7 +763,7 @@ extern "C"
 
     *outPointer = 0;
     HeapManager* const manager = HeapManagerFromHandle(heapManagerHandle);
-    std::uint32_t address = 0;
+    std::uintptr_t address = 0;
     const std::int32_t result = (manager->head == nullptr)
       ? heapmng_first_alloc(manager, static_cast<std::uint32_t>(byteCount), &address)
       : heapmng_second_alloc(manager, static_cast<std::uint32_t>(byteCount), &address);
@@ -771,7 +771,7 @@ extern "C"
       return result;
     }
 
-    *outPointer = static_cast<int>(address);
+    *outPointer = static_cast<SofdecAddressWord>(address);
     return 0;
   }
 
@@ -783,7 +783,7 @@ extern "C"
    */
   std::int32_t __cdecl heapmng_find_block_by_user_pointer(
     HeapManager* manager,
-    const std::uint32_t userAddress,
+    const std::uintptr_t userAddress,
     HeapManagerBlock** outBlock
   )
   {
@@ -805,7 +805,7 @@ extern "C"
    * Unlinks the block that handed out `pointerValue`; the arena bytes simply
    * become a gap for later first-fit placement.
    */
-  std::int32_t __cdecl HEAPMNG_Free(int heapManagerHandle, int pointerValue)
+  std::int32_t __cdecl HEAPMNG_Free(SofdecAddressWord heapManagerHandle, SofdecAddressWord pointerValue)
   {
     if (heapManagerHandle == 0 || pointerValue == 0) {
       heapmng_debug_log(kHeapNullPointerMessage);
@@ -814,7 +814,7 @@ extern "C"
 
     HeapManager* const manager = HeapManagerFromHandle(heapManagerHandle);
     HeapManagerBlock* block = manager->head;
-    while (block != nullptr && block->userAddress != static_cast<std::uint32_t>(pointerValue)) {
+    while (block != nullptr && block->userAddress != static_cast<std::uintptr_t>(pointerValue)) {
       block = block->next;
     }
     if (block == nullptr) {
@@ -847,7 +847,7 @@ extern "C"
     void* heapManagerHandle,
     void* currentPointer,
     const std::uint32_t byteCount,
-    std::uint32_t* outPointer
+    std::uintptr_t* outPointer
   )
   {
     if (heapManagerHandle == nullptr || currentPointer == nullptr || outPointer == nullptr) {
@@ -860,7 +860,7 @@ extern "C"
     }
 
     auto* const manager = static_cast<HeapManager*>(heapManagerHandle);
-    const auto currentAddress = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(currentPointer));
+    const auto currentAddress = reinterpret_cast<std::uintptr_t>(currentPointer);
     *outPointer = 0;
 
     HeapManagerBlock* block = nullptr;
@@ -885,21 +885,21 @@ extern "C"
       }
     }
 
-    const auto handle = static_cast<int>(reinterpret_cast<std::uintptr_t>(heapManagerHandle));
-    int newPointer = 0;
+    const auto handle = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(heapManagerHandle));
+    SofdecAddressWord newPointer = 0;
     result = HEAPMNG_Allocate(handle, static_cast<SIZE_T>(byteCount), &newPointer);
     if (result < 0) {
       *outPointer = currentAddress;
       return result;
     }
 
-    heapmng_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(newPointer))), currentPointer, byteCount);
-    result = HEAPMNG_Free(handle, static_cast<int>(currentAddress));
+    heapmng_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(newPointer)), currentPointer, byteCount);
+    result = HEAPMNG_Free(handle, static_cast<SofdecAddressWord>(currentAddress));
     if (result < 0) {
       return result;
     }
 
-    *outPointer = static_cast<std::uint32_t>(newPointer);
+    *outPointer = static_cast<std::uintptr_t>(newPointer);
     return 0;
   }
 

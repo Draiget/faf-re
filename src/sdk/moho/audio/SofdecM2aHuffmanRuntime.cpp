@@ -141,7 +141,7 @@ extern "C"
    * What it does:
    * Reads one Huffman symbol from bitstream using table row walk.
    */
-  int __cdecl M2AHUFFMAN_Decode(int codebookHandle, const int bitstreamHandle)
+  int __cdecl M2AHUFFMAN_Decode(int codebookHandle, const SofdecAddressWord bitstreamHandle)
   {
     auto* entry = reinterpret_cast<std::int32_t*>(codebookHandle);
     std::int32_t bitCount = entry[1];
@@ -179,7 +179,7 @@ extern "C"
     const int packedValue,
     std::int32_t* const outValues,
     std::int32_t* const outDimension,
-    const int bitstreamHandle
+    const SofdecAddressWord bitstreamHandle
   )
   {
     const auto radix = static_cast<std::int32_t>(codebook[3]);
@@ -230,7 +230,7 @@ extern "C"
    * Resolves escape-coded Huffman value lanes (`abs(value)==16`) by reading
    * unary-prefix length and additional payload bits.
    */
-  int __cdecl M2AHUFFMAN_GetEscValue(const int valuesHandle, const int bitstreamHandle)
+  int __cdecl M2AHUFFMAN_GetEscValue(const int valuesHandle, const SofdecAddressWord bitstreamHandle)
   {
     auto* const values = reinterpret_cast<std::int32_t*>(valuesHandle);
 

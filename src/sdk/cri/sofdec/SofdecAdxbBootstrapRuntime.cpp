@@ -99,12 +99,12 @@
    * Default add-write callback: advances the buffered and decoded sample
    * counts by the samples of the committed span.
    */
-  std::int32_t adxb_DefAddWr(void* const context, std::int32_t /*decodedBytes*/, const std::int32_t decodedSamples)
+  SofdecAddressWord adxb_DefAddWr(void* const context, std::int32_t /*decodedBytes*/, const std::int32_t decodedSamples)
   {
     auto* const decoder = static_cast<moho::AdxBitstreamDecoderState*>(context);
     decoder->bufferedSampleCount += decodedSamples;
     decoder->decodedSampleTotal += decodedSamples;
-    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(decoder));
   }
 
   /**

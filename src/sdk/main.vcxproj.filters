@@ -4896,6 +4896,9 @@
     <ClInclude Include="moho\audio\SParamKeyTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cri\sofdec\SofdecAddressWord.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\audio\SofdecRuntime.h">
       <Filter>Header Files</Filter>
     </ClInclude>

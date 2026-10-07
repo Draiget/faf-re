@@ -244,7 +244,7 @@ namespace
      * dispatching frame decode to the M2V runtime handle.
      */
     int MPVM2V_DecodeFrm(int handleAddress, moho::movie::MPVSjStream* stream, moho::movie::MPVFrameDecodeSession* frameSession);
-    moho::SofdecSjMemoryHandle* SJMEM_Create(std::int32_t bufferAddress, std::int32_t bufferSize);
+    moho::SofdecSjMemoryHandle* SJMEM_Create(SofdecAddressWord bufferAddress, std::int32_t bufferSize);
     std::int32_t SJMEM_GetNumData(moho::SofdecSjMemoryHandle* handle, std::int32_t lane);
     void SJMEM_Destroy(moho::SofdecSjMemoryHandle* handle);
     int mpvcmc_InitMcOiTa(void* handleAddress);
@@ -325,7 +325,7 @@ namespace
      * handler callback from condition-lane dispatch table.
      */
     void MPVCONCEAL_StartFrame(int handleAddress);
-    std::int32_t concealOn(std::int32_t handleAddress);
+    std::int32_t concealOn(SofdecAddressWord handleAddress);
     int MPVSL_DecPicture(int handleAddress, moho::movie::MPVSjStream* stream);
     /**
      * Address: 0x00AF61D0 (FUN_00AF61D0, _MPVUMC_EndOfFrame)
@@ -409,7 +409,7 @@ namespace
      * boundaries.
      */
     int MPV_GoNextDelimSj(moho::movie::MPVSjStream* stream);
-    unsigned int __cdecl concealOnExec(std::int32_t decoderAddress, unsigned int startMacroblock);
+    unsigned int __cdecl concealOnExec(SofdecAddressWord decoderAddress, unsigned int startMacroblock);
   }
 
   using moho::movie::MPVBitstreamState;
@@ -745,7 +745,7 @@ namespace
 
   inline std::uint8_t* AddressToMutablePointer(const int address)
   {
-    return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
+    return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(address));
   }
 
   inline MPVHandleInit* AsHandleView(const int address)
@@ -755,7 +755,7 @@ namespace
 
   inline const std::uint8_t* AddressToPointer(const int address)
   {
-    return reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
+    return reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(address));
   }
 
   inline std::uint8_t ReadAddressedSample(const int baseAddress, const int sampleOffset)
@@ -1119,21 +1119,21 @@ std::int32_t DCT_AcIdctDouble(const double* inputCoefficients, double* outputCoe
 std::int32_t M2V_IsSetup();
 std::int32_t M2V_Finish();
 std::int32_t M2V_Create();
-std::int32_t M2V_Destroy(std::int32_t decoderHandle);
+std::int32_t M2V_Destroy(SofdecAddressWord decoderHandle);
 std::int32_t M2V_SetMbCb(std::uintptr_t macroblockCallback);
 std::int32_t M2V_SetUsrSj(
-  std::int32_t decoderHandle, std::int32_t userSlotIndex, std::int32_t lane0, std::int32_t lane1, std::int32_t lane2
+  SofdecAddressWord decoderHandle, std::int32_t userSlotIndex, std::int32_t lane0, std::int32_t lane1, std::int32_t lane2
 );
-std::int32_t M2V_SetPicUsrBuf(std::int32_t decoderHandle, std::uintptr_t userBufferAddress, std::int32_t userBufferSizeBytes);
-std::int32_t M2V_DecodePicAtr(std::int32_t decoderHandle, std::int32_t decodeMode);
-std::int32_t M2V_DecodeFrm(std::int32_t decoderHandle, std::int32_t streamObjectAddress, std::int32_t frameSessionAddress);
-std::int32_t M2V_GetPicUsr(std::int32_t decoderHandle, std::int32_t userSlotIndex, void* outUserBuffer);
-std::int32_t M2V_GetPicAtr(std::int32_t decoderHandle, void* outPictureAttributes);
-std::int32_t M2V_GetBitRate(std::int32_t decoderHandle, std::int32_t* outBitRate);
+std::int32_t M2V_SetPicUsrBuf(SofdecAddressWord decoderHandle, std::uintptr_t userBufferAddress, std::int32_t userBufferSizeBytes);
+std::int32_t M2V_DecodePicAtr(SofdecAddressWord decoderHandle, std::int32_t decodeMode);
+std::int32_t M2V_DecodeFrm(SofdecAddressWord decoderHandle, SofdecAddressWord streamObjectAddress, std::int32_t frameSessionAddress);
+std::int32_t M2V_GetPicUsr(SofdecAddressWord decoderHandle, std::int32_t userSlotIndex, void* outUserBuffer);
+std::int32_t M2V_GetPicAtr(SofdecAddressWord decoderHandle, void* outPictureAttributes);
+std::int32_t M2V_GetBitRate(SofdecAddressWord decoderHandle, std::int32_t* outBitRate);
 std::int32_t M2V_GetVbvBufSiz(
-  std::int32_t decoderHandle, std::int32_t* outVbvBufferSize, std::int32_t* outVbvPayloadSize, void* outVbvFlags
+  SofdecAddressWord decoderHandle, std::int32_t* outVbvBufferSize, std::int32_t* outVbvPayloadSize, void* outVbvFlags
 );
-std::int32_t M2V_GetLinkFlg(std::int32_t decoderHandle, std::int32_t* outLinkFlag, std::int32_t* outLinkState);
+std::int32_t M2V_GetLinkFlg(SofdecAddressWord decoderHandle, std::int32_t* outLinkFlag, std::int32_t* outLinkState);
 std::int32_t mpvcdec_InitDct();
 std::int32_t M2VAPRD_Init();
 }
@@ -1488,7 +1488,7 @@ extern "C" void mpverr_SetCodeSub(void* const errorInfoAddress, const int errorC
   if (errorCode != 0 && errorInfo->callbackAddress != 0) {
     using ErrorCallbackFn = void(__cdecl*)(int callbackContext, int callbackCode);
     auto* const callback = reinterpret_cast<ErrorCallbackFn>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(errorInfo->callbackAddress))
+      static_cast<std::uintptr_t>(errorInfo->callbackAddress)
     );
     callback(errorInfo->callbackContext, errorCode);
   }
@@ -1720,7 +1720,7 @@ extern "C" const std::uint32_t mpvlib_cond_dfl[16] = {
  * colour conversion, the clip table, the object table, the DCT scale table and
  * finally the M2V backend.
  */
-extern "C" std::int32_t MPV_Init(const std::int32_t objectCount, const std::int32_t workAddress)
+extern "C" std::int32_t MPV_Init(const std::int32_t objectCount, const SofdecAddressWord workAddress)
 {
   cri_verstr_ptr_mpv = kMpvLibVersionString;
 
@@ -2245,7 +2245,7 @@ extern "C" int MPV_SetCond(const int handleAddress, const int conditionIndex, in
   if (conditionIndex == kMpvConditionIndexConcealDefault && resolvedCallback == nullptr) {
     resolvedCallback = &mpvlib_DefaultConditionNoOp;
   }
-  const int callbackAddress = static_cast<int>(reinterpret_cast<std::uintptr_t>(resolvedCallback));
+  const int callbackAddress = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(resolvedCallback));
 
   if (handleAddress == 0) {
     mpvlib_SetCondAll(conditionIndex, callbackAddress);
@@ -2566,7 +2566,7 @@ extern "C" int MPVM2V_DecodePicAtr(const int handleAddress, MPVSjStream* const s
 
   M2V_SetPicUsrBuf(
     handle->m2vDecoderHandle,
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->pictureUserBufferAddress)),
+    static_cast<std::uintptr_t>(handle->pictureUserBufferAddress),
     handle->pictureUserContextAddress
   );
 
