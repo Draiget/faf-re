@@ -16,6 +16,7 @@
 #include <new>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 
 namespace moho
@@ -451,6 +452,98 @@ namespace
         return sMode;
     }
 
+#if defined(_M_X64)
+    // FAF_HIGHMEM=1 (x64 port test mode). With a large-address-aware image,
+    // every free region below 4 GB is reserved from the TLS callback, before
+    // the CRT starts, and the engine's system heap is a private heap created
+    // afterwards. Every later allocation, thread stack and DLL then lands
+    // above 4 GB, so a pointer still squeezed through a 32-bit word faults on
+    // first use instead of silently aliasing. Without large-address support
+    // the process cannot use memory above 2 GB at all, so the mode is skipped.
+    struct HighMemoryReservation
+    {
+        bool requested = false;
+        bool active = false;
+        std::uint64_t reservedBytes = 0;
+        std::uint32_t reservedRegions = 0;
+        HANDLE engineHeap = nullptr;
+    };
+
+    HighMemoryReservation gHighMemoryReservation;
+
+    [[nodiscard]] bool HighMemoryModeRequested() noexcept
+    {
+        char value[4] = {};
+        const DWORD written = ::GetEnvironmentVariableA("FAF_HIGHMEM", value, static_cast<DWORD>(sizeof(value)));
+        return written == 1u && value[0] == '1';
+    }
+
+    [[nodiscard]] bool ImageIsLargeAddressAware() noexcept
+    {
+        const HMODULE image = ::GetModuleHandleW(nullptr);
+        const auto* const dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
+        // PE header walk: the NT headers sit `e_lfanew` bytes into the image.
+        const auto* const ntHeaders = reinterpret_cast<const IMAGE_NT_HEADERS*>(
+            reinterpret_cast<const std::uint8_t*>(dosHeader) + dosHeader->e_lfanew
+        );
+        return (ntHeaders->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) != 0;
+    }
+
+    void ReserveAddressSpaceBelow4Gb() noexcept
+    {
+        constexpr std::uintptr_t kLowAddressLimit = 0x100000000ull;
+        constexpr std::uintptr_t kAllocationGranularity = 0x10000u;
+
+        std::uintptr_t cursor = kAllocationGranularity;
+        while (cursor < kLowAddressLimit) {
+            MEMORY_BASIC_INFORMATION region{};
+            if (::VirtualQuery(reinterpret_cast<const void*>(cursor), &region, sizeof(region)) == 0) {
+                break;
+            }
+
+            const std::uintptr_t regionBase = reinterpret_cast<std::uintptr_t>(region.BaseAddress);
+            const std::uintptr_t regionEnd = regionBase + region.RegionSize;
+            if (region.State == MEM_FREE) {
+                // Reservations start on the 64 KB allocation granularity.
+                const std::uintptr_t start = (regionBase + kAllocationGranularity - 1) & ~(kAllocationGranularity - 1);
+                const std::uintptr_t end = (regionEnd < kLowAddressLimit) ? regionEnd : kLowAddressLimit;
+                if (start < end
+                    && ::VirtualAlloc(reinterpret_cast<void*>(start), end - start, MEM_RESERVE, PAGE_NOACCESS) != nullptr) {
+                    gHighMemoryReservation.reservedBytes += end - start;
+                    ++gHighMemoryReservation.reservedRegions;
+                }
+            }
+            cursor = regionEnd;
+        }
+    }
+
+    void BeginHighMemoryMode() noexcept
+    {
+        if (!HighMemoryModeRequested()) {
+            return;
+        }
+        gHighMemoryReservation.requested = true;
+        if (!ImageIsLargeAddressAware()) {
+            return;
+        }
+        ReserveAddressSpaceBelow4Gb();
+        gHighMemoryReservation.engineHeap = ::HeapCreate(0, 0, 0);
+        gHighMemoryReservation.active = true;
+    }
+#endif
+
+    /// The heap the system-heap allocator path draws from: the FAF_HIGHMEM
+    /// private heap when that mode is active, the process heap otherwise.
+    [[nodiscard]] HANDLE EngineSystemHeap() noexcept
+    {
+#if defined(_M_X64)
+        if (gHighMemoryReservation.engineHeap != nullptr) {
+            return gHighMemoryReservation.engineHeap;
+        }
+#endif
+        return ::GetProcessHeap();
+    }
+
     [[nodiscard]] bool ProbeUseSystemHeap() noexcept
     {
         return ProbeHeapModeSelected() != ProbeHeapMode::Engine;
@@ -462,7 +555,7 @@ namespace
         if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
             return ::_malloc_dbg(bytes, _NORMAL_BLOCK, "engine", 0);
         }
-        return ::HeapAlloc(::GetProcessHeap(), 0, bytes);
+        return ::HeapAlloc(EngineSystemHeap(), 0, bytes);
     }
 
     void ProbeSystemHeapFree(void* const ptr) noexcept
@@ -471,7 +564,7 @@ namespace
             ::_free_dbg(ptr, _NORMAL_BLOCK);
             return;
         }
-        (void)::HeapFree(::GetProcessHeap(), 0, ptr);
+        (void)::HeapFree(EngineSystemHeap(), 0, ptr);
     }
 
     [[nodiscard]] std::size_t ProbeSystemHeapSize(void* const ptr) noexcept
@@ -479,7 +572,7 @@ namespace
         if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
             return ::_msize_dbg(ptr, _NORMAL_BLOCK);
         }
-        const SIZE_T heapSize = ::HeapSize(::GetProcessHeap(), 0, ptr);
+        const SIZE_T heapSize = ::HeapSize(EngineSystemHeap(), 0, ptr);
         return (heapSize == static_cast<SIZE_T>(-1)) ? 0u : static_cast<std::size_t>(heapSize);
     }
     // Victim block address observed by [CLOBBER]; heap layout is deterministic.
@@ -1230,6 +1323,14 @@ namespace
         (void)moduleHandle;
         (void)reserved;
 
+#if defined(_M_X64)
+        // Not in the binary: the x64 FAF_HIGHMEM test mode has to run before
+        // the CRT allocates anything, and this callback is the first code the
+        // loader runs in the image.
+        if (reason == DLL_PROCESS_ATTACH) {
+            BeginHighMemoryMode();
+        }
+#endif
         if (reason == DLL_THREAD_DETACH) {
             FlushCurrentThreadHeapCache();
         }
@@ -1656,6 +1757,25 @@ namespace
 #pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1;
 #pragma const_seg()
+
+#if defined(_M_X64)
+void gpg::LogHighMemoryReservation()
+{
+    if (!gHighMemoryReservation.requested) {
+        return;
+    }
+    if (!gHighMemoryReservation.active) {
+        gpg::Warnf("FAF_HIGHMEM: skipped, the image is not large-address-aware (build with /p:FafX64LargeAddress=heap|full)");
+        return;
+    }
+    gpg::Logf(
+        "FAF_HIGHMEM: reserved %llu MB below 4 GB in %u regions; engine heap %p",
+        static_cast<unsigned long long>(gHighMemoryReservation.reservedBytes >> 20),
+        static_cast<unsigned int>(gHighMemoryReservation.reservedRegions),
+        static_cast<void*>(gHighMemoryReservation.engineHeap)
+    );
+}
+#endif
 
 // 0x0093EDE0
 void gpg::HandleAssertFailure(const char* msg, int line, const char* file)

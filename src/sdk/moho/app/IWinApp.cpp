@@ -145,6 +145,12 @@ bool IWinApp::AppInitCommonServices()
     }
   }
 
+#if defined(_M_X64)
+  // x64 port test mode, not in the binary; see gpg::LogHighMemoryReservation.
+  // After the `/log` target exists so the line lands in the .sclog.
+  gpg::LogHighMemoryReservation();
+#endif
+
   gpg::REF_RegisterAllTypes();
   RES_EnsureResourceManager();
   RES_ActivatePendingFactories();

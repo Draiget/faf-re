@@ -78,6 +78,15 @@ namespace gpg
 	 */
 	void GetHeapInfo(HeapStats* outStats);
 
+#if defined(_M_X64)
+	/**
+	 * x64 port test mode (not in the binary): logs what `FAF_HIGHMEM=1` reserved
+	 * below 4 GB before the CRT started, or why it was skipped. No-op when the
+	 * mode was not requested.
+	 */
+	void LogHighMemoryReservation();
+#endif
+
 	/**
 	 * Address: 0x008D8FA0 (FUN_008D8FA0, func_ParseNum)
 	 *

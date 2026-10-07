@@ -91,6 +91,20 @@
          must sit beside SupComDataPath.lua. Override on the command line or
          in a .user file to run against a different install. -->
     <FafRunDir Condition="'$(FafRunDir)' == ''">C:\ProgramData\FAForever\bin\</FafRunDir>
+    <!-- x64 address-space mode: `none` is the 2 GB image the x64 engine
+         ships as today; `heap` is large-address-aware with the image pinned
+         low (/BASE:0x10000000, no high-entropy ASLR), so only the heap can go
+         above 4 GB; `full` is large-address-aware with high-entropy ASLR.
+         heap/full link main_x64_la.exe so main_x64.exe stays in place.
+         Select with /p:FafX64LargeAddress=heap|full. -->
+    <FafX64LargeAddress Condition="'$(FafX64LargeAddress)' == ''">none</FafX64LargeAddress>
+    <FafX64LargeAddressAware>false</FafX64LargeAddressAware>
+    <FafX64LargeAddressAware Condition="'$(FafX64LargeAddress)' != 'none'">true</FafX64LargeAddressAware>
+    <FafX64AddressLinkOptions>/HIGHENTROPYVA:NO</FafX64AddressLinkOptions>
+    <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'heap'">/HIGHENTROPYVA:NO /BASE:0x10000000</FafX64AddressLinkOptions>
+    <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'full'"></FafX64AddressLinkOptions>
+    <FafX64TargetName>main_x64</FafX64TargetName>
+    <FafX64TargetName Condition="'$(FafX64LargeAddress)' != 'none'">main_x64_la</FafX64TargetName>
     <Wm3FoundationDir>$(FafRepoRoot)dependencies\WildMagic3p8\Foundation</Wm3FoundationDir>
     <Wm3IncludePath>$(Wm3FoundationDir);$(Wm3FoundationDir)\Approximation;$(Wm3FoundationDir)\Collision;$(Wm3FoundationDir)\Containment;$(Wm3FoundationDir)\Controllers;$(Wm3FoundationDir)\Curves;$(Wm3FoundationDir)\Detail;$(Wm3FoundationDir)\Distance;$(Wm3FoundationDir)\Effects;$(Wm3FoundationDir)\ImageAnalysis;$(Wm3FoundationDir)\Interpolation;$(Wm3FoundationDir)\Intersection;$(Wm3FoundationDir)\Math;$(Wm3FoundationDir)\Meshes;$(Wm3FoundationDir)\Miscellaneous;$(Wm3FoundationDir)\Numerics;$(Wm3FoundationDir)\ObjectSystem;$(Wm3FoundationDir)\Physics;$(Wm3FoundationDir)\RationalArithmetic;$(Wm3FoundationDir)\SceneGraph;$(Wm3FoundationDir)\Shaders;$(Wm3FoundationDir)\SharedArrays;$(Wm3FoundationDir)\Sorting;$(Wm3FoundationDir)\Surfaces;$(Wm3FoundationDir)\System;$(Wm3FoundationDir)\Terrain;$(Wm3FoundationDir)\Tessellation;$(FafRepoRoot)dependencies\WildMagic3p8\Renderers\Dx9Renderer;$(FafRepoRoot)dependencies\WildMagic3p8\Applications</Wm3IncludePath>
   </PropertyGroup>
@@ -111,14 +125,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>main_x64</TargetName>
+    <TargetName>$(FafX64TargetName)</TargetName>
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>main_x64</TargetName>
+    <TargetName>$(FafX64TargetName)</TargetName>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -252,7 +266,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
            code still stores pointers in 32-bit words in places (reflection
            serializer callbacks take the object as an int, the allocator's
            page-owner map covers exactly 4 GB); below 2 GB those round-trip
-           exactly. Lift this once those are pointer-sized.
+           exactly. FafX64LargeAddress=heap|full (above) builds the
+           large-address-aware main_x64_la.exe for finding the rest.
          - 4 MB of stack instead of the binary's 2 MB: every frame that
            holds pointers is bigger. -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -277,10 +292,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/IGNORE:4006 /HIGHENTROPYVA:NO %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
-      <LargeAddressAware>false</LargeAddressAware>
+      <LargeAddressAware>$(FafX64LargeAddressAware)</LargeAddressAware>
       <StackReserveSize>4000000</StackReserveSize>
     </Link>
     <PostBuildEvent>
@@ -309,10 +324,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/IGNORE:4006 /HIGHENTROPYVA:NO %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
-      <LargeAddressAware>false</LargeAddressAware>
+      <LargeAddressAware>$(FafX64LargeAddressAware)</LargeAddressAware>
       <StackReserveSize>4000000</StackReserveSize>
     </Link>
     <PostBuildEvent>
