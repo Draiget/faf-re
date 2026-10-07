@@ -24,31 +24,23 @@ namespace
 {
   struct MPVLibWorkState
   {
-    std::uint32_t conditionDefaults[16]; // +0x00
+    SofdecAddressWord conditionDefaults[16]; // +0x00
     int primaryAddressMaskEnable;        // +0x40
     int secondaryAddressMaskEnable;      // +0x44
     std::int32_t reserved_48;            // +0x48
-    int objectTableBaseAddress;          // +0x4C
-    int concealStateBaseAddress;         // +0x50
+    SofdecAddressWord objectTableBaseAddress; // +0x4C (x86)
+    moho::movie::MPVSharedWork* sharedWork; // +0x50 (x86)
     int objectCount;                     // +0x54
-    int alignedWorkBaseAddress;          // +0x58
+    SofdecAddressWord alignedWorkBaseAddress; // +0x58 (x86)
   };
 
-  static_assert(sizeof(MPVLibWorkState) == 0x5C, "MPVLibWorkState size must be 0x5C");
-  static_assert(offsetof(MPVLibWorkState, primaryAddressMaskEnable) == 0x40, "MPVLibWorkState::primaryAddressMaskEnable offset must be 0x40");
-  static_assert(offsetof(MPVLibWorkState, secondaryAddressMaskEnable) == 0x44, "MPVLibWorkState::secondaryAddressMaskEnable offset must be 0x44");
-  static_assert(offsetof(MPVLibWorkState, objectTableBaseAddress) == 0x4C, "MPVLibWorkState::objectTableBaseAddress offset must be 0x4C");
-  static_assert(offsetof(MPVLibWorkState, concealStateBaseAddress) == 0x50, "MPVLibWorkState::concealStateBaseAddress offset must be 0x50");
-  static_assert(offsetof(MPVLibWorkState, objectCount) == 0x54, "MPVLibWorkState::objectCount offset must be 0x54");
-  static_assert(offsetof(MPVLibWorkState, alignedWorkBaseAddress) == 0x58, "MPVLibWorkState::alignedWorkBaseAddress offset must be 0x58");
-
-  struct MPVObjectSlot
-  {
-    std::uint8_t reserved_000[0x188];
-    std::uint32_t activeMarker; // +0x188
-  };
-
-  static_assert(offsetof(MPVObjectSlot, activeMarker) == 0x188, "MPVObjectSlot::activeMarker offset must be 0x188");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVLibWorkState) == 0x5C, "MPVLibWorkState size must be 0x5C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVLibWorkState, primaryAddressMaskEnable) == 0x40, "MPVLibWorkState::primaryAddressMaskEnable offset must be 0x40");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVLibWorkState, secondaryAddressMaskEnable) == 0x44, "MPVLibWorkState::secondaryAddressMaskEnable offset must be 0x44");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVLibWorkState, objectTableBaseAddress) == 0x4C, "MPVLibWorkState::objectTableBaseAddress offset must be 0x4C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVLibWorkState, sharedWork) == 0x50, "MPVLibWorkState::sharedWork offset must be 0x50");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVLibWorkState, objectCount) == 0x54, "MPVLibWorkState::objectCount offset must be 0x54");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVLibWorkState, alignedWorkBaseAddress) == 0x58, "MPVLibWorkState::alignedWorkBaseAddress offset must be 0x58");
 
   extern std::uint8_t gMpvIntraScanPermutationRuntime[64];
   extern std::uint8_t gMpvDefaultIntraQuantMatrix[64];
@@ -130,7 +122,7 @@ namespace
      * Constant-false VLC size gate used by MPV fatal preflight.
      */
     int MPVVLC_IsVlcSizErr();
-    int MPVLIB_CheckHn(int handleAddress);
+    int MPVLIB_CheckHn(SofdecAddressWord handleAddress);
 
     /**
      * Address: 0x00AF5C40 (FUN_00AF5C40, _MPVM2V_Init)
@@ -146,7 +138,7 @@ namespace
     std::uint8_t* MPV_CopyAndSearchDelim(
       std::uint8_t* destinationCursor, const std::uint8_t* sourceCursor, int scanLengthBytes, int delimiterMask
     );
-    int MPV_MoveChunk(moho::movie::MPVSjStream* stream, int lane, int byteCount);
+    int MPV_MoveChunk(moho::SofdecSjSupplyHandle* stream, int lane, int byteCount);
     int UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
     std::int32_t* UTY_MemcpyDword(void* destination, const void* source, unsigned int dwordCount);
     unsigned int DCT_FsriInit();
@@ -159,7 +151,7 @@ namespace
      * Executes one FSRI 8x8 transform pass pair and packs signed 16-bit output
      * words for one macroblock lane.
      */
-    int DCT_FsriTrans(const float* sourceCoefficients, std::int32_t* destinationPackedWords, int scaleTableBaseAddress);
+    int DCT_FsriTrans(const float* sourceCoefficients, std::int32_t* destinationPackedWords, SofdecAddressWord scaleTableBaseAddress);
     /**
      * Address: 0x00AF8350 (FUN_00AF8350, _DCT_FsriTransCore)
      *
@@ -167,7 +159,7 @@ namespace
      * Runs per-block FSRI transform dispatch for six macroblock blocks,
      * selecting full transform or DC-only replication from block activity bits.
      */
-    int DCT_FsriTransCore(int workStateAddress, int codedBlockMask);
+    int DCT_FsriTransCore(moho::movie::MPVDecoderScanContext* handle, int codedBlockMask);
     /**
      * Address: 0x00AF7F20 (FUN_00AF7F20, _DCT_FsriTrans6Blk)
      *
@@ -175,7 +167,7 @@ namespace
      * Forces FSRI transform over all six blocks by passing `-1` coded-block
      * mask to `DCT_FsriTransCore`.
      */
-    int DCT_FsriTrans6Blk(int workStateAddress);
+    int DCT_FsriTrans6Blk(moho::movie::MPVDecoderScanContext* handle);
     /**
      * Address: 0x00AF7F30 (FUN_00AF7F30, _DCT_FsriTransCbp)
      *
@@ -183,7 +175,7 @@ namespace
      * Runs FSRI transform using the runtime coded-block-pattern mask from the
      * transform work state.
      */
-    int DCT_FsriTransCbp(int workStateAddress);
+    int DCT_FsriTransCbp(moho::movie::MPVDecoderScanContext* handle);
     /**
      * Address: 0x00AF84D0 (FUN_00AF84D0, _dctfsri_TransCoreThumbnail)
      *
@@ -191,14 +183,14 @@ namespace
      * Converts one DC sample from each of six blocks into thumbnail-word output
      * lanes when selected by coded-block mask progression.
      */
-    int dctfsri_TransCoreThumbnail(int workStateAddress, int codedBlockMask);
+    int dctfsri_TransCoreThumbnail(moho::movie::MPVDecoderScanContext* handle, int codedBlockMask);
     /**
      * Address: 0x00AF84A0 (FUN_00AF84A0, _DCT_FsriTrans6BlkThumbnail)
      *
      * What it does:
      * Forces thumbnail transform dispatch for all six block lanes.
      */
-    int DCT_FsriTrans6BlkThumbnail(int workStateAddress);
+    int DCT_FsriTrans6BlkThumbnail(moho::movie::MPVDecoderScanContext* handle);
     /**
      * Address: 0x00AF84B0 (FUN_00AF84B0, _DCT_FsriTransCbpThumbnail)
      *
@@ -206,7 +198,7 @@ namespace
      * Runs thumbnail transform dispatch using the runtime coded-block-pattern
      * mask in work state.
      */
-    int DCT_FsriTransCbpThumbnail(int workStateAddress);
+    int DCT_FsriTransCbpThumbnail(moho::movie::MPVDecoderScanContext* handle);
     /**
      * Address: 0x00AF5C30 (FUN_00AF5C30, _MPVM2V_IsSetup)
      *
@@ -221,7 +213,7 @@ namespace
      * Forwards handle-create dispatch to `M2V_Create`; wrapper keeps one legacy
      * caller argument lane unused.
      */
-    int MPVM2V_Create(int handleAddress);
+    int MPVM2V_Create(SofdecAddressWord handleAddress);
     /**
      * Address: 0x00AF5C80 (FUN_00AF5C80, _MPVM2V_Destroy)
      *
@@ -229,15 +221,15 @@ namespace
      * Adapts MPV handle address to embedded M2V handle lane, then forwards to
      * `M2V_Destroy`.
      */
-    void MPVM2V_Destroy(int handleAddress);
+    void MPVM2V_Destroy(SofdecAddressWord handleAddress);
     /**
      * Address: 0x00AF5CA0 (FUN_00AF5CA0, _MPVM2V_SetCond)
      *
      * What it does:
      * Routes one MPV handle (or null-handle lane) into `M2V_SetMbCb`.
      */
-    int MPVM2V_SetCond(int handleAddress, int conditionIndex, int callbackAddress);
-    int MPVM2V_DecodePicAtr(int handleAddress, moho::movie::MPVSjStream* stream);
+    int MPVM2V_SetCond(SofdecAddressWord handleAddress, int conditionIndex, int callbackAddress);
+    int MPVM2V_DecodePicAtr(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
     /**
      * Address: 0x00AF5E30 (FUN_00AF5E30, _MPVM2V_DecodeFrm)
      *
@@ -245,7 +237,7 @@ namespace
      * Validates M2V setup and one per-handle decode-ready gate before
      * dispatching frame decode to the M2V runtime handle.
      */
-    int MPVM2V_DecodeFrm(int handleAddress, moho::movie::MPVSjStream* stream, moho::movie::MPVFrameDecodeSession* frameSession);
+    int MPVM2V_DecodeFrm(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream, moho::movie::MPVFrameDecodeSession* frameSession);
     moho::SofdecSjMemoryHandle* SJMEM_Create(SofdecAddressWord bufferAddress, std::int32_t bufferSize);
     std::int32_t SJMEM_GetNumData(moho::SofdecSjMemoryHandle* handle, std::int32_t lane);
     void SJMEM_Destroy(moho::SofdecSjMemoryHandle* handle);
@@ -258,9 +250,9 @@ namespace
      * setup to `mpvcmc_InitMcOiTa`.
      */
     int MPVCMC_InitObj(void* handleAddress);
-    int mpvlib_ResetDctPlaneState(void* dctPlaneStateAddress);
-    std::int32_t* MPV_SetUsrSj(int handleAddress, int streamIndex, int streamObject, int streamCallback, int streamContext);
-    std::int32_t* MPV_SetPicUsrBuf(int handleAddress, int userBufferAddress, int userContextAddress);
+    int mpvlib_ResetDctPlaneState(moho::movie::MPVDecoderScanContext* handle);
+    std::int32_t* MPV_SetUsrSj(SofdecAddressWord handleAddress, int streamIndex, int streamObject, int streamCallback, int streamContext);
+    std::int32_t* MPV_SetPicUsrBuf(SofdecAddressWord handleAddress, SofdecAddressWord userBufferAddress, int userBufferBytes);
     std::uint8_t mpvhdec_ReadKernelIntraIdcPrec3(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
     std::uint8_t mpvhdec_ReadKernelIntraDefault(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
     std::uint8_t mpvhdec_ReadKernelPredictedDefault(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
@@ -279,16 +271,16 @@ namespace
      */
     void MPVM2V_Finish();
     int MPVCONCEAL_Finish(int concealStateBaseAddress, int concealStateSizeBytes);
-    int mpvhdec_GetCodec(int handleAddress, moho::movie::MPVSjChunk* chunk);
-    int MPVHDEC_RecoverSj(int handleAddress, int expectedDelimiter, moho::movie::MPVSjStream* stream);
-    int mpvhdec_GetCurDelim(moho::movie::MPVSjStream* stream);
-    int mpvhdec_DecPscSj(int handleAddress, moho::movie::MPVSjStream* stream);
-    int mpvhdec_DecGscSj(int handleAddress, moho::movie::MPVSjStream* stream);
-    int mpvhdec_DecEscSj(int handleAddress, moho::movie::MPVSjStream* stream);
-    int mpvhdec_DecUdscSj(int handleAddress, moho::movie::MPVSjStream* stream);
-    int mpvhdec_DecShcSj(int handleAddress, moho::movie::MPVSjStream* stream);
-    std::int32_t* mpvhdec_InitIqm(int handleAddress);
-    std::int32_t* mpvhdec_InitNqm(int handleAddress);
+    int mpvhdec_GetCodec(SofdecAddressWord handleAddress, moho::SjChunkRange* chunk);
+    int MPVHDEC_RecoverSj(SofdecAddressWord handleAddress, int expectedDelimiter, moho::SofdecSjSupplyHandle* stream);
+    int mpvhdec_GetCurDelim(moho::SofdecSjSupplyHandle* stream);
+    int mpvhdec_DecPscSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
+    int mpvhdec_DecGscSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
+    int mpvhdec_DecEscSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
+    int mpvhdec_DecUdscSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
+    int mpvhdec_DecShcSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
+    std::int32_t* mpvhdec_InitIqm(SofdecAddressWord handleAddress);
+    std::int32_t* mpvhdec_InitNqm(SofdecAddressWord handleAddress);
     int mpvhdec_AnalyUd(std::int32_t* handleWords, std::uint8_t* userDataStart, int chunkSize);
     int mpvhdec_DecSeqUdsc(std::int32_t* handleWords, const std::uint8_t* userDataStart, int consumedByteCount);
     // The two scan-state initializers the picture header installs as this
@@ -302,15 +294,15 @@ namespace
      * Computes output RFB geometry and plane stride lanes for the current
      * decode frame.
      */
-    void MPVUMC_InitOutRfb(int handleAddress);
-    void MPVCMC_InitMcOiRt(int handleAddress);
+    void MPVUMC_InitOutRfb(SofdecAddressWord handleAddress);
+    void MPVCMC_InitMcOiRt(SofdecAddressWord handleAddress);
     /**
      * Address: 0x00AF6010 (FUN_00AF6010, _MPVCMC_SetCcnt)
      *
      * What it does:
      * Recomputes CMC count/state lanes from the runtime mode gate.
      */
-    void MPVCMC_SetCcnt(int handleAddress);
+    void MPVCMC_SetCcnt(SofdecAddressWord handleAddress);
     /**
      * Address: 0x00B00D20 (FUN_00B00D20, _MPVBDEC_StartFrame)
      *
@@ -318,7 +310,7 @@ namespace
      * Selects thumbnail DCT dispatch lanes when the thumbnail codec flag is
      * active.
      */
-    void MPVBDEC_StartFrame(int handleAddress);
+    void MPVBDEC_StartFrame(SofdecAddressWord handleAddress);
     /**
      * Address: 0x00B00D50 (FUN_00B00D50, _MPVCONCEAL_StartFrame)
      *
@@ -326,16 +318,16 @@ namespace
      * Resets per-frame conceal progress marker and selects active conceal
      * handler callback from condition-lane dispatch table.
      */
-    void MPVCONCEAL_StartFrame(int handleAddress);
+    void MPVCONCEAL_StartFrame(SofdecAddressWord handleAddress);
     std::int32_t concealOn(SofdecAddressWord handleAddress);
-    int MPVSL_DecPicture(int handleAddress, moho::movie::MPVSjStream* stream);
+    int MPVSL_DecPicture(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
     /**
      * Address: 0x00AF61D0 (FUN_00AF61D0, _MPVUMC_EndOfFrame)
      *
      * What it does:
      * Finalizes UMC runtime state (no-op in this binary).
      */
-    void MPVUMC_EndOfFrame(int handleAddress);
+    void MPVUMC_EndOfFrame(SofdecAddressWord handleAddress);
     /**
      * Address: 0x00AF5E70 (FUN_00AF5E70, _MPVCDEC_Init)
      *
@@ -357,7 +349,7 @@ namespace
      * Decodes one thumbnail intra MB by computing destination sample pointers
      * and writing one output sample for each of the six 8x8 blocks.
      */
-    int MPVUMCT_Intra(moho::movie::MPVDecoderContextPrefix* context);
+    int MPVUMCT_Intra(moho::movie::MPVDecoderScanContext* context);
     /**
      * Address: 0x00B00350 (FUN_00B00350, _MPVUMCT_Forward)
      *
@@ -365,7 +357,7 @@ namespace
      * Reconstructs one thumbnail forward-predicted MB and writes one output
      * sample per block using sign-state indexed fetch gating.
      */
-    int MPVUMCT_Forward(moho::movie::MPVDecoderContextPrefix* context);
+    int MPVUMCT_Forward(moho::movie::MPVDecoderScanContext* context);
     /**
      * Address: 0x00B003E0 (FUN_00B003E0, _MPVUMCT_Backward)
      *
@@ -373,7 +365,7 @@ namespace
      * Reconstructs one thumbnail backward-predicted MB and writes one output
      * sample per block using sign-state indexed fetch gating.
      */
-    int MPVUMCT_Backward(moho::movie::MPVDecoderContextPrefix* context);
+    int MPVUMCT_Backward(moho::movie::MPVDecoderScanContext* context);
     /**
      * Address: 0x00B00470 (FUN_00B00470, _MPVUMCT_BiDirect)
      *
@@ -381,7 +373,7 @@ namespace
      * Reconstructs one thumbnail bidirectional MB from forward/backward lanes
      * and writes one blended output sample per block.
      */
-    int MPVUMCT_BiDirect(moho::movie::MPVDecoderContextPrefix* context);
+    int MPVUMCT_BiDirect(moho::movie::MPVDecoderScanContext* context);
     /**
      * Address: 0x00B00AE0 (FUN_00B00AE0, _MPVUMCT_PpicSkipped)
      *
@@ -389,7 +381,7 @@ namespace
      * Rewinds thumbnail MB address by skip count and propagates one skipped
      * P-picture sample span from forward to backward offsets per MB.
      */
-    int MPVUMCT_PpicSkipped(moho::movie::MPVDecoderContextPrefix* context, int skippedMacroblockCount);
+    int MPVUMCT_PpicSkipped(moho::movie::MPVDecoderScanContext* context, int skippedMacroblockCount);
     /**
      * Address: 0x00B00BF0 (FUN_00B00BF0, _MPVUMCT_BpicSkipped)
      *
@@ -397,10 +389,10 @@ namespace
      * Rewinds thumbnail MB address by skip count and decodes skipped B-picture
      * MBs through the configured skip-macroblock callback.
      */
-    int MPVUMCT_BpicSkipped(moho::movie::MPVDecoderContextPrefix* context, int skippedMacroblockCount);
+    int MPVUMCT_BpicSkipped(moho::movie::MPVDecoderScanContext* context, int skippedMacroblockCount);
 
     void SJ_SplitChunk(
-      moho::movie::MPVSjChunk* sourceChunk, int splitOffset, moho::movie::MPVSjChunk* leftChunk, moho::movie::MPVSjChunk* rightChunk
+      moho::SjChunkRange* sourceChunk, int splitOffset, moho::SjChunkRange* leftChunk, moho::SjChunkRange* rightChunk
     );
     /**
      * Address: 0x00AE97F0 (FUN_00AE97F0, _MPV_GoNextDelimSj)
@@ -410,7 +402,7 @@ namespace
      * the 3-byte overlap needed to detect delimiters split across chunk
      * boundaries.
      */
-    int MPV_GoNextDelimSj(moho::movie::MPVSjStream* stream);
+    int MPV_GoNextDelimSj(moho::SofdecSjSupplyHandle* stream);
     unsigned int __cdecl concealOnExec(SofdecAddressWord decoderAddress, unsigned int startMacroblock);
   }
 
@@ -418,44 +410,27 @@ namespace
   using moho::movie::MPVCoefficientDecodeState;
   using moho::movie::MPVBlockSourceSet;
   using moho::movie::MPVCopyDestinationSet;
-  using moho::movie::MPVDecoderContextPrefix;
   using moho::movie::MPVDecoderScanContext;
-  using moho::movie::MPVDecoderStats;
+  using moho::movie::MPVDecoderScanContext;
+  using moho::movie::MPVPictureAttributeExportBlock;
+  using moho::movie::MPVPictureAttributes;
+  using moho::movie::MPVUserSjLane;
+  using moho::movie::MPVConcealFrameFn;
+  using moho::movie::MPVDecodeContextFn;
   using moho::movie::MPVDecodeReadKernelFn;
+  using moho::movie::MPVDecodeSkipRunFn;
+  using moho::movie::MPVDctTransformFn;
   using moho::movie::MPVFrameDecodeSession;
+using moho::movie::MPVErrorInfo;
   using moho::movie::MPVInterpolationKernelFn;
   using moho::movie::MPVMacroblockOffsets;
   using moho::movie::MPVPredictionVectorSet;
   using moho::movie::MPVPredictionKernelState;
-  using moho::movie::MPVSjChunk;
-  using moho::movie::MPVSjStream;
-  using moho::movie::MPVSjStreamVTable;
   using moho::movie::MPVSpatialDelta;
-  using MPVDecodeSliceFn = int(__cdecl*)(MPVDecoderScanContext* context, MPVSjStream* stream);
-  using MPVSkipMacroblockFn = int(__cdecl*)(MPVDecoderContextPrefix* context, int skippedMacroblockCount);
-  using MPVMacroblockDecodeFn = int(__cdecl*)(MPVDecoderContextPrefix* context);
-
-  struct MPVDctPlaneState
-  {
-    std::uint8_t reserved_00[0x18];
-    int primaryDecodeCount;        // +0x18
-    int secondaryDecodeCount;      // +0x1C
-    std::uint8_t reserved_20[0x2C - 0x20];
-    int primaryScratchAddress;     // +0x2C
-    int secondaryScratchAddress;   // +0x30
-    std::uint8_t reserved_34[0x48 - 0x34];
-    int coefficientScratchAddress; // +0x48
-    std::uint8_t reserved_4C[0x54 - 0x4C];
-  };
-
-  struct MPVUserSjLane
-  {
-    int streamObjectAddress;   // +0x00
-    int streamCallbackAddress; // +0x04
-    int streamContextAddress;  // +0x08
-  };
-
-  static_assert(sizeof(MPVUserSjLane) == 0xC, "MPVUserSjLane size must be 0xC");
+using moho::movie::MPVSharedWork;
+  using MPVDecodeSliceFn = int(__cdecl*)(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream);
+  using MPVSkipMacroblockFn = int(__cdecl*)(MPVDecoderScanContext* context, int skippedMacroblockCount);
+  using MPVMacroblockDecodeFn = int(__cdecl*)(MPVDecoderScanContext* context);
 
   struct MPVPictureDataRange
   {
@@ -463,314 +438,37 @@ namespace
     int bufferSize;    // +0x04
   };
 
-  static_assert(sizeof(MPVPictureDataRange) == 0x08, "MPVPictureDataRange size must be 0x08");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVPictureDataRange) == 0x08, "MPVPictureDataRange size must be 0x08");
 
-  static_assert(sizeof(MPVDctPlaneState) == 0x54, "MPVDctPlaneState size must be 0x54");
-  static_assert(offsetof(MPVDctPlaneState, primaryDecodeCount) == 0x18, "MPVDctPlaneState::primaryDecodeCount offset must be 0x18");
-  static_assert(offsetof(MPVDctPlaneState, secondaryDecodeCount) == 0x1C, "MPVDctPlaneState::secondaryDecodeCount offset must be 0x1C");
-  static_assert(offsetof(MPVDctPlaneState, primaryScratchAddress) == 0x2C, "MPVDctPlaneState::primaryScratchAddress offset must be 0x2C");
-  static_assert(offsetof(MPVDctPlaneState, secondaryScratchAddress) == 0x30, "MPVDctPlaneState::secondaryScratchAddress offset must be 0x30");
-  static_assert(
-    offsetof(MPVDctPlaneState, coefficientScratchAddress) == 0x48,
-    "MPVDctPlaneState::coefficientScratchAddress offset must be 0x48"
-  );
-
-  struct MPVDctFsriTransformWork
-  {
-    std::uint8_t blockHasAcCoefficients[6]; // +0x00
-    std::uint8_t reserved_06[0x28 - 0x06];
-    int codedBlockPatternMask; // +0x28
-    float* blockCoefficientBase; // +0x2C
-    std::int32_t** blockOutputWordPointers; // +0x30
-    std::uint8_t reserved_34[0x48 - 0x34];
-    int scaleTableBaseAddress; // +0x48
-  };
-
-  static_assert(
-    offsetof(MPVDctFsriTransformWork, codedBlockPatternMask) == 0x28,
-    "MPVDctFsriTransformWork::codedBlockPatternMask offset must be 0x28"
-  );
-  static_assert(
-    offsetof(MPVDctFsriTransformWork, blockCoefficientBase) == 0x2C,
-    "MPVDctFsriTransformWork::blockCoefficientBase offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(MPVDctFsriTransformWork, blockOutputWordPointers) == 0x30,
-    "MPVDctFsriTransformWork::blockOutputWordPointers offset must be 0x30"
-  );
-  static_assert(
-    offsetof(MPVDctFsriTransformWork, scaleTableBaseAddress) == 0x48,
-    "MPVDctFsriTransformWork::scaleTableBaseAddress offset must be 0x48"
-  );
-
-  struct MPVDctFsriThumbnailWork
-  {
-    std::uint8_t reserved_00[0x28]{};
-    int codedBlockPatternMask = 0; // +0x28
-    float* blockCoefficientBase = nullptr; // +0x2C
-    std::int16_t** blockOutputSamplePointers = nullptr; // +0x30
-  };
-
-  static_assert(
-    offsetof(MPVDctFsriThumbnailWork, codedBlockPatternMask) == 0x28,
-    "MPVDctFsriThumbnailWork::codedBlockPatternMask offset must be 0x28"
-  );
-  static_assert(
-    offsetof(MPVDctFsriThumbnailWork, blockCoefficientBase) == 0x2C,
-    "MPVDctFsriThumbnailWork::blockCoefficientBase offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(MPVDctFsriThumbnailWork, blockOutputSamplePointers) == 0x30,
-    "MPVDctFsriThumbnailWork::blockOutputSamplePointers offset must be 0x30"
-  );
-
-
-  struct MPVUserDataSinkVTable
-  {
-    std::uint8_t reserved_00[0x18];
-    void(__cdecl* requestChunk)(void* sinkObject, int lane, int requestedBytes, MPVSjChunk* outChunk); // +0x18
-    std::uint8_t reserved_1C[0x04];
-    void(__cdecl* submitChunk)(void* sinkObject, int lane, MPVSjChunk* chunk); // +0x20
-  };
-
-  struct MPVUserDataSink
-  {
-    MPVUserDataSinkVTable* vtable;
-  };
-
-  using MPVDctTransformFn = int(__cdecl*)(int workStateAddress);
-  using MPVConcealFrameFn = int(__cdecl*)(int handleAddress);
-
-  struct MPVPictureAttributes
-  {
-    std::int32_t headerControlWords[14]; // +0x00
-    int pictureCodingType;               // +0x38
-    int fullPelForwardVector;            // +0x3C
-    int fullPelBackwardVector;           // +0x40
-    int concealMotionVectors;            // +0x44
-    std::int32_t reserved_48;            // +0x48
-    std::int32_t reserved_4C;            // +0x4C
-    std::int16_t forwardFCode;           // +0x50
-    std::int16_t backwardFCode;          // +0x52
-    std::int8_t intraDcPrecision;        // +0x54
-    std::int8_t pictureStructure;        // +0x55
-    std::int8_t topFieldFirst;           // +0x56
-    std::int8_t framePredFrameDct;       // +0x57
-    std::int8_t concealmentMotionVector; // +0x58
-    std::int8_t qScaleType;              // +0x59
-    std::int8_t intraVlcFormat;          // +0x5A
-    std::int8_t alternateScan;           // +0x5B
-    std::int8_t repeatFirstField;        // +0x5C
-    std::int8_t chroma420Type;           // +0x5D
-    std::int8_t progressiveFrame;        // +0x5E
-    std::int8_t compositeDisplayFlag;    // +0x5F
-    std::int8_t vAxis;                   // +0x60
-    std::int8_t fieldSequence;           // +0x61
-    std::int8_t subCarrier;              // +0x62
-    std::int8_t burstAmplitude;          // +0x63
-    std::int8_t subCarrierPhase;         // +0x64
-    std::uint8_t reserved_65[3];         // +0x65
-    std::int32_t extensionFlags;         // +0x68
-  };
-
-  static_assert(sizeof(MPVPictureAttributes) == 0x6C, "MPVPictureAttributes size must be 0x6C");
-  static_assert(offsetof(MPVPictureAttributes, pictureCodingType) == 0x38, "MPVPictureAttributes::pictureCodingType offset must be 0x38");
-  static_assert(offsetof(MPVPictureAttributes, forwardFCode) == 0x50, "MPVPictureAttributes::forwardFCode offset must be 0x50");
-  static_assert(offsetof(MPVPictureAttributes, qScaleType) == 0x59, "MPVPictureAttributes::qScaleType offset must be 0x59");
-  static_assert(offsetof(MPVPictureAttributes, extensionFlags) == 0x68, "MPVPictureAttributes::extensionFlags offset must be 0x68");
-
-  struct MPVPictureAttributeExportBlock
-  {
-    MPVPictureAttributes pictureAttributes;
-    std::uint8_t reserved_6C_to_7F[0x14];
-  };
-
-  static_assert(sizeof(MPVPictureAttributeExportBlock) == 0x80, "MPVPictureAttributeExportBlock size must be 0x80");
-
-  struct MPVHandleInit
-  {
-    std::uint8_t reserved_000[0x10];
-    int runLevel8Address;          // +0x10
-    int runLevel4AddressMinus16;   // +0x14
-    int runLevel2AddressMinus32;   // +0x18
-    int runLevel1AddressMinus32;   // +0x1C
-    int runLevel0aAddress;         // +0x20
-    int runLevel0bAddress;         // +0x24
-    int runLevel0cAddress;         // +0x28
-    int concealLaneAddress1120;    // +0x2C
-    int concealLaneAddress1100;    // +0x30
-    int concealLaneAddress1160;    // +0x34
-    int concealLaneAddress1260;    // +0x38
-    int concealLaneAddress1280;    // +0x3C
-    int clipBaseAddress;           // +0x40
-    std::uint8_t reserved_044[0x78 - 0x44];
-    MPVDctPlaneState dctPlaneState; // +0x78
-    int mcOiRuntimeHeaderWords[4]; // +0xCC
-    std::uint8_t reserved_0DC[0x110 - 0xDC];
-    int clipBaseAddressMirror;     // +0x110
-    int scanLutBaseAddress;        // +0x114
-    int scanLutAddressD20;         // +0x118
-    int scanLutAddressEA0;         // +0x11C
-    std::uint8_t reserved_120[0x188 - 0x120];
-    int objectSlotState;           // +0x188
-    int objectInitStatus;          // +0x18C
-    union
-    {
-      std::int32_t conditionCallbacks[16]; // +0x190
-      struct
-      {
-        std::uint8_t reserved_190_to_1AB[0x1AC - 0x190];
-        int serviceReloadInterval; // +0x1AC
-      };
-    };
-    MPVPictureAttributes pictureAttributes; // +0x1D0
-    std::uint8_t reserved_23C[0x250 - 0x23C];
-    std::uint8_t reserved_250[0x25C - 0x250];
-    int recoverEventCounter;      // +0x25C
-    int recoverConditionCounter;  // +0x260
-    std::uint8_t reserved_264[0x2A4 - 0x264];
-    int sequenceAspectRatioCode;    // +0x2A4
-    int sequenceBitRateCode;        // +0x2A8
-    int sequenceVbvBufferCode;      // +0x2AC
-    int constrainedParametersFlag;  // +0x2B0
-    int gopClosedFlag;              // +0x2B4
-    int gopBrokenLinkFlag;          // +0x2B8
-    int pictureVbvDelay;            // +0x2BC
-    MPVDecodeSliceFn decodeMacroblockByType;            // +0x2C0
-    MPVSkipMacroblockFn decodeSkipRunByType;            // +0x2C4
-    MPVMacroblockDecodeFn decodeReadKernelPrimary;      // +0x2C8
-    MPVMacroblockDecodeFn decodeReadKernelSecondary;    // +0x2CC
-    MPVMacroblockDecodeFn decodeIntraMacroblockByType;  // +0x2D0
-    MPVMacroblockDecodeFn decodePredictedMode0;         // +0x2D4
-    MPVMacroblockDecodeFn decodePredictedMode1;         // +0x2D8
-    MPVMacroblockDecodeFn decodePredictedMode2;         // +0x2DC
-    MPVMacroblockDecodeFn decodePredictedMode3;         // +0x2E0
-    MPVDctTransformFn dctTransformSixBlocks; // +0x2E4
-    MPVDctTransformFn dctTransformCbp;       // +0x2E8
-    std::uint8_t reserved_2EC_to_2EF[0x2F0 - 0x2EC];
-    int fullPelForwardVector;    // +0x2F0
-    int forwardFCodeMinus1;      // +0x2F4
-    int forwardFCodeWrapShift;   // +0x2F8
-    int forwardFCodeScale;       // +0x2FC
-    std::uint8_t reserved_300_to_313[0x314 - 0x300];
-    int fullPelBackwardVector;   // +0x314
-    int backwardFCodeMinus1;     // +0x318
-    int backwardFCodeWrapShift;  // +0x31C
-    int backwardFCodeScale;      // +0x320
-    std::uint8_t reserved_324_to_35B[0x35C - 0x324];
-    int pictureCodecClassification; // +0x35C
-    int sequenceStcCodePrimary;     // +0x360
-    int sequenceStcCodeSecondary;   // +0x364
-    int sequenceStcCodeTertiary;    // +0x368
-    int scanScratchAddress4A0;     // +0x36C
-    int scanScratchAddress520;     // +0x370
-    int scanScratchAddress5A0;     // +0x374
-    int scanScratchAddress620;     // +0x378
-    int scanScratchAddress3A0;     // +0x37C
-    int scanScratchAddress420;     // +0x380
-    std::uint8_t reserved_384[0x1320 - 0x384];
-    int recoverNeededFlag;         // +0x1320
-    int recoverState;              // +0x1324
-    MPVSjChunk activeHeaderChunk;  // +0x1328
-    int reserved_1330;             // +0x1330
-    int sequenceUserDataIdcPrecisionMode; // +0x1334
-    MPVDecodeReadKernelFn decodeReadKernelIntra;     // +0x1338
-    MPVDecodeReadKernelFn decodeReadKernelPredicted; // +0x133C
-    std::uint8_t reserved_1340[0x1344 - 0x1340];
-    int serviceCountdown;          // +0x1344
-    const std::uint16_t* decodeTablePrimary;   // +0x1348
-    const std::uint16_t* decodeTableSecondary; // +0x134C
-    int m2vDecoderHandle;          // +0x1350
-    int currentHeaderContext;      // +0x1354
-    MPVUserSjLane userSjLanes[4];  // +0x1358
-    int pictureUserBufferAddress;  // +0x1388
-    int pictureUserContextAddress; // +0x138C
-    int pictureUserDecodeState;    // +0x1390
-    int reserved_1394;             // +0x1394
-    MPVConcealFrameFn concealFrameHandler; // +0x1398
-    int concealScanStartMacroblock; // +0x139C
-    int postCreateMarker;           // +0x13A0
-    int headerProgressPrimary;      // +0x13A4
-    int headerProgressSecondary;    // +0x13A8
-    int motionClampCounter;         // +0x13AC
-  };
-
-  static_assert(sizeof(MPVHandleInit) == 0x13B0, "MPVHandleInit size must be 0x13B0");
-  static_assert(offsetof(MPVHandleInit, clipBaseAddress) == 0x40, "MPVHandleInit::clipBaseAddress offset must be 0x40");
-  static_assert(offsetof(MPVHandleInit, dctPlaneState) == 0x78, "MPVHandleInit::dctPlaneState offset must be 0x78");
-  static_assert(
-    offsetof(MPVHandleInit, mcOiRuntimeHeaderWords) == 0xCC,
-    "MPVHandleInit::mcOiRuntimeHeaderWords offset must be 0xCC"
-  );
-  static_assert(offsetof(MPVHandleInit, objectSlotState) == 0x188, "MPVHandleInit::objectSlotState offset must be 0x188");
-  static_assert(offsetof(MPVHandleInit, conditionCallbacks) == 0x190, "MPVHandleInit::conditionCallbacks offset must be 0x190");
-  static_assert(offsetof(MPVHandleInit, pictureAttributes) == 0x1D0, "MPVHandleInit::pictureAttributes offset must be 0x1D0");
-  static_assert(offsetof(MPVHandleInit, recoverEventCounter) == 0x25C, "MPVHandleInit::recoverEventCounter offset must be 0x25C");
-  static_assert(offsetof(MPVHandleInit, recoverConditionCounter) == 0x260, "MPVHandleInit::recoverConditionCounter offset must be 0x260");
-  static_assert(offsetof(MPVHandleInit, sequenceAspectRatioCode) == 0x2A4, "MPVHandleInit::sequenceAspectRatioCode offset must be 0x2A4");
-  static_assert(offsetof(MPVHandleInit, pictureVbvDelay) == 0x2BC, "MPVHandleInit::pictureVbvDelay offset must be 0x2BC");
-  static_assert(offsetof(MPVHandleInit, decodeMacroblockByType) == 0x2C0, "MPVHandleInit::decodeMacroblockByType offset must be 0x2C0");
-  static_assert(offsetof(MPVHandleInit, dctTransformSixBlocks) == 0x2E4, "MPVHandleInit::dctTransformSixBlocks offset must be 0x2E4");
-  static_assert(offsetof(MPVHandleInit, fullPelForwardVector) == 0x2F0, "MPVHandleInit::fullPelForwardVector offset must be 0x2F0");
-  static_assert(offsetof(MPVHandleInit, fullPelBackwardVector) == 0x314, "MPVHandleInit::fullPelBackwardVector offset must be 0x314");
-  static_assert(
-    offsetof(MPVHandleInit, pictureCodecClassification) == 0x35C,
-    "MPVHandleInit::pictureCodecClassification offset must be 0x35C"
-  );
-  static_assert(offsetof(MPVHandleInit, sequenceStcCodePrimary) == 0x360, "MPVHandleInit::sequenceStcCodePrimary offset must be 0x360");
-  static_assert(offsetof(MPVHandleInit, sequenceStcCodeTertiary) == 0x368, "MPVHandleInit::sequenceStcCodeTertiary offset must be 0x368");
-  static_assert(offsetof(MPVHandleInit, recoverNeededFlag) == 0x1320, "MPVHandleInit::recoverNeededFlag offset must be 0x1320");
-  static_assert(offsetof(MPVHandleInit, activeHeaderChunk) == 0x1328, "MPVHandleInit::activeHeaderChunk offset must be 0x1328");
-  static_assert(
-    offsetof(MPVHandleInit, sequenceUserDataIdcPrecisionMode) == 0x1334,
-    "MPVHandleInit::sequenceUserDataIdcPrecisionMode offset must be 0x1334"
-  );
-  static_assert(offsetof(MPVHandleInit, decodeReadKernelIntra) == 0x1338, "MPVHandleInit::decodeReadKernelIntra offset must be 0x1338");
-  static_assert(offsetof(MPVHandleInit, decodeTablePrimary) == 0x1348, "MPVHandleInit::decodeTablePrimary offset must be 0x1348");
-  static_assert(offsetof(MPVHandleInit, m2vDecoderHandle) == 0x1350, "MPVHandleInit::m2vDecoderHandle offset must be 0x1350");
-  static_assert(offsetof(MPVHandleInit, currentHeaderContext) == 0x1354, "MPVHandleInit::currentHeaderContext offset must be 0x1354");
-  static_assert(offsetof(MPVHandleInit, userSjLanes) == 0x1358, "MPVHandleInit::userSjLanes offset must be 0x1358");
-  static_assert(offsetof(MPVHandleInit, pictureUserBufferAddress) == 0x1388, "MPVHandleInit::pictureUserBufferAddress offset must be 0x1388");
-  static_assert(offsetof(MPVHandleInit, pictureUserContextAddress) == 0x138C, "MPVHandleInit::pictureUserContextAddress offset must be 0x138C");
-  static_assert(offsetof(MPVHandleInit, pictureUserDecodeState) == 0x1390, "MPVHandleInit::pictureUserDecodeState offset must be 0x1390");
-  static_assert(offsetof(MPVHandleInit, concealFrameHandler) == 0x1398, "MPVHandleInit::concealFrameHandler offset must be 0x1398");
-  static_assert(
-    offsetof(MPVHandleInit, concealScanStartMacroblock) == 0x139C,
-    "MPVHandleInit::concealScanStartMacroblock offset must be 0x139C"
-  );
-  static_assert(offsetof(MPVHandleInit, postCreateMarker) == 0x13A0, "MPVHandleInit::postCreateMarker offset must be 0x13A0");
-  static_assert(offsetof(MPVHandleInit, headerProgressPrimary) == 0x13A4, "MPVHandleInit::headerProgressPrimary offset must be 0x13A4");
-  static_assert(offsetof(MPVHandleInit, motionClampCounter) == 0x13AC, "MPVHandleInit::motionClampCounter offset must be 0x13AC");
-
-  MPVInterpolationKernelFn g_mpvInterpolationDispatch[8]{};
+    MPVInterpolationKernelFn g_mpvInterpolationDispatch[8]{};
   bool g_mpvInterpolationDispatchInitialized = false;
 
-  inline std::uint8_t* AddressToMutablePointer(const int address)
+  inline std::uint8_t* AddressToMutablePointer(const SofdecAddressWord address)
   {
     return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(address));
   }
 
-  inline MPVHandleInit* AsHandleView(const int address)
+  inline MPVDecoderScanContext* AsHandleView(const SofdecAddressWord address)
   {
-    return reinterpret_cast<MPVHandleInit*>(AddressToMutablePointer(address));
+    return reinterpret_cast<MPVDecoderScanContext*>(AddressToMutablePointer(address));
   }
 
-  inline const std::uint8_t* AddressToPointer(const int address)
+  inline const std::uint8_t* AddressToPointer(const SofdecAddressWord address)
   {
     return reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(address));
   }
 
-  inline std::uint8_t ReadAddressedSample(const int baseAddress, const int sampleOffset)
+  inline std::uint8_t ReadAddressedSample(const SofdecAddressWord baseAddress, const int sampleOffset)
   {
     return *AddressToPointer(baseAddress + sampleOffset);
   }
 
-  inline int PointerToAddress(const void* pointer)
+  inline SofdecAddressWord PointerToAddress(const void* pointer)
   {
-    return static_cast<int>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer)));
+    return static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(pointer));
   }
 
-  inline void CopyDwordsToAddress(const int destinationAddress, const void* source, const std::size_t dwordCount)
+  inline void CopyDwordsToAddress(const SofdecAddressWord destinationAddress, const void* source, const std::size_t dwordCount)
   {
     // Codec scratch IO: dword blob into decoded-address scratch memory.
     std::copy_n(
@@ -780,36 +478,36 @@ namespace
     );
   }
 
-  inline MPVUserDataSink* AsUserDataSinkView(const int sinkObjectAddress)
+  inline moho::SofdecSjSupplyHandle* AsUserDataSinkView(const int sinkObjectAddress)
   {
-    return reinterpret_cast<MPVUserDataSink*>(AddressToMutablePointer(sinkObjectAddress));
+    return reinterpret_cast<moho::SofdecSjSupplyHandle*>(AddressToMutablePointer(sinkObjectAddress));
   }
 
-  inline void SjRequestChunk(MPVSjStream* stream, MPVSjChunk& outChunk)
+  inline void SjRequestChunk(moho::SofdecSjSupplyHandle* stream, moho::SjChunkRange& outChunk)
   {
-    stream->vtable->requestChunk(stream, 1, 0x7FFFFFFF, &outChunk);
+    stream->dispatchTable->getChunk(stream, 1, 0x7FFFFFFF, &outChunk);
   }
 
-  inline void SjSubmitTailChunk(MPVSjStream* stream, MPVSjChunk& tailChunk)
+  inline void SjSubmitTailChunk(moho::SofdecSjSupplyHandle* stream, moho::SjChunkRange& tailChunk)
   {
-    stream->vtable->submitChunk(stream, 1, &tailChunk);
+    stream->dispatchTable->ungetChunk(stream, 1, &tailChunk);
   }
 
-  inline void SjReleaseHeadChunk(MPVSjStream* stream, MPVSjChunk& headChunk)
+  inline void SjReleaseHeadChunk(moho::SofdecSjSupplyHandle* stream, moho::SjChunkRange& headChunk)
   {
-    stream->vtable->releaseChunk(stream, 0, &headChunk);
+    stream->dispatchTable->putChunk(stream, 0, &headChunk);
   }
 
-  inline void UserDataSinkRequestChunk(const int sinkObjectAddress, const int requestedBytes, MPVSjChunk& outChunk)
+  inline void UserDataSinkRequestChunk(const int sinkObjectAddress, const int requestedBytes, moho::SjChunkRange& outChunk)
   {
-    MPVUserDataSink* const sink = AsUserDataSinkView(sinkObjectAddress);
-    sink->vtable->requestChunk(sink, 0, requestedBytes, &outChunk);
+    moho::SofdecSjSupplyHandle* const sink = AsUserDataSinkView(sinkObjectAddress);
+    sink->dispatchTable->getChunk(sink, 0, requestedBytes, &outChunk);
   }
 
-  inline void UserDataSinkSubmitChunk(const int sinkObjectAddress, MPVSjChunk& chunk)
+  inline void UserDataSinkSubmitChunk(const int sinkObjectAddress, moho::SjChunkRange& chunk)
   {
-    MPVUserDataSink* const sink = AsUserDataSinkView(sinkObjectAddress);
-    sink->vtable->submitChunk(sink, 1, &chunk);
+    moho::SofdecSjSupplyHandle* const sink = AsUserDataSinkView(sinkObjectAddress);
+    sink->dispatchTable->putChunk(sink, 1, &chunk);
   }
 
   inline std::uint32_t ReadBigEndianWord(const std::uint8_t* cursor)
@@ -840,15 +538,15 @@ namespace
   constexpr int kMpvHeaderStartCodeSkipBytes = 4;
 
   inline void LoadBitstreamFromChunk(
-    const MPVSjChunk& chunk,
+    const moho::SjChunkRange& chunk,
     const int bitAlignment,
     MPVBitstreamState& bitstreamState,
     const int alignedBaseSkipBytes = 0
   )
   {
     std::uint8_t* alignedData =
-      reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(chunk.data) & static_cast<std::uintptr_t>(0xFFFFFFFCu));
-    const int byteOffset = static_cast<int>(reinterpret_cast<std::uintptr_t>(chunk.data) - reinterpret_cast<std::uintptr_t>(alignedData));
+      reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(chunk.bytes()) & ~static_cast<std::uintptr_t>(3));
+    const int byteOffset = static_cast<int>(reinterpret_cast<std::uintptr_t>(chunk.bytes()) - reinterpret_cast<std::uintptr_t>(alignedData));
     const int chunkBitOffset = byteOffset * 8;
     int bitCount = bitAlignment + chunkBitOffset;
 
@@ -940,23 +638,23 @@ namespace
     return ConsumeHeaderBits(bitstreamState, 1) != 0;
   }
 
-  inline void CommitHeaderChunkSplit(MPVHandleInit* handle, MPVSjStream* stream, const int splitOffset)
+  inline void CommitHeaderChunkSplit(MPVDecoderScanContext* handle, moho::SofdecSjSupplyHandle* stream, const int splitOffset)
   {
-    MPVSjChunk tailChunk{};
-    SJ_SplitChunk(&handle->activeHeaderChunk, splitOffset, &handle->activeHeaderChunk, &tailChunk);
-    SjReleaseHeadChunk(stream, handle->activeHeaderChunk);
+    moho::SjChunkRange tailChunk{};
+    SJ_SplitChunk(&handle->activeChunk, splitOffset, &handle->activeChunk, &tailChunk);
+    SjReleaseHeadChunk(stream, handle->activeChunk);
     SjSubmitTailChunk(stream, tailChunk);
   }
 
-  inline void LoadHeaderChunkBitstream(MPVHandleInit* handle, MPVSjStream* stream, MPVBitstreamState& bitstreamState)
+  inline void LoadHeaderChunkBitstream(MPVDecoderScanContext* handle, moho::SofdecSjSupplyHandle* stream, MPVBitstreamState& bitstreamState)
   {
-    SjRequestChunk(stream, handle->activeHeaderChunk);
-    LoadBitstreamFromChunk(handle->activeHeaderChunk, 0, bitstreamState, kMpvHeaderStartCodeSkipBytes);
+    SjRequestChunk(stream, handle->activeChunk);
+    LoadBitstreamFromChunk(handle->activeChunk, 0, bitstreamState, kMpvHeaderStartCodeSkipBytes);
   }
 
-  inline int ComputeHeaderChunkSplitOffset(const MPVHandleInit* handle, const MPVBitstreamState& bitstreamState)
+  inline int ComputeHeaderChunkSplitOffset(const MPVDecoderScanContext* handle, const MPVBitstreamState& bitstreamState)
   {
-    return ComputeBitstreamSplitOffset(bitstreamState, handle->activeHeaderChunk.data, false);
+    return ComputeBitstreamSplitOffset(bitstreamState, handle->activeChunk.bytes(), false);
   }
 
   inline void LoadQuantizationMatrix(MPVBitstreamState& bitstreamState, std::uint8_t* matrixStorage)
@@ -968,12 +666,12 @@ namespace
 
   constexpr int kMpvStartCodeByteCount = 4;
 
-  inline MPVDecoderStats* DecoderStatsOf(MPVDecoderContextPrefix* context)
+  inline MPVDecoderScanContext* DecoderStatsOf(MPVDecoderScanContext* context)
   {
-    return reinterpret_cast<MPVDecoderStats*>(context);
+    return context;
   }
 
-  inline MPVPredictionKernelState* AsPredictionKernelState(MPVDecoderContextPrefix* context)
+  inline MPVPredictionKernelState* AsPredictionKernelState(MPVDecoderScanContext* context)
   {
     return &context->predictionKernelState;
   }
@@ -988,7 +686,7 @@ namespace
     }
   }
 
-  inline void ConfigureCopyTargetPlanes(MPVDecoderContextPrefix* context, const MPVSpatialDelta& delta)
+  inline void ConfigureCopyTargetPlanes(MPVDecoderScanContext* context, const MPVSpatialDelta& delta)
   {
     context->copyTargets.blocks[0].pixels = AddressToMutablePointer(delta.luma + context->planeBase0);
     context->copyTargets.blocks[1].pixels = AddressToMutablePointer(delta.luma + context->planeBase1);
@@ -1043,7 +741,7 @@ namespace
   template <std::size_t BlockCount>
   inline void ClearScanScratchBlocks(MPVDecoderScanContext* context)
   {
-    static_assert(BlockCount <= 6, "BlockCount must not exceed the six MPEG scan scratch blocks");
+    MOHO_MOVIE_X86_LAYOUT_ASSERT(BlockCount <= 6, "BlockCount must not exceed the six MPEG scan scratch blocks");
     std::memset(context->scanScratch0, 0, BlockCount * sizeof(context->scanScratch0));
   }
 
@@ -1065,7 +763,7 @@ namespace
   template <std::size_t SlotIndex>
   inline std::uint8_t ProbeScanSlot(MPVDecoderScanContext* context, const MPVDecodeReadKernelFn readKernel)
   {
-    static_assert(SlotIndex < 6, "SlotIndex must be between 0 and 5");
+    MOHO_MOVIE_X86_LAYOUT_ASSERT(SlotIndex < 6, "SlotIndex must be between 0 and 5");
     return ProbeScanSlot(context, readKernel, context->scanScratch0 + SlotIndex * sizeof(context->scanScratch0));
   }
 
@@ -1104,7 +802,7 @@ extern "C" MPVMacroblockDecodeFn thumbnail_mc_backward_func[10]{};
 extern "C" MPVMacroblockDecodeFn thumbnail_mc_bidirect_func[10]{};
 extern "C" void mpvlib_NoOpInitializeRange(void* stateBaseAddress, int stateSizeBytes);
 extern "C" int mpvlib_DefaultConditionNoOp();
-extern "C" int mpvlib_InitDctPa(int handleAddress);
+extern "C" int mpvlib_InitDctPa(SofdecAddressWord handleAddress);
 extern "C" int mpvlib_SetCondAll(int conditionIndex, int callbackAddress);
 
 // These DCT/M2V/MPV symbols are defined inside the moho/audio/SofdecRuntime.cpp
@@ -1146,16 +844,14 @@ namespace
   constexpr std::uint32_t kMpvAddressWindowLowMask = 0x0FFFFFFFu;
   constexpr std::uint32_t kMpvAddressWindowHighBit = 0x80000000u;
   constexpr int kMpvWorkAlignBytes = 0x20;
-  constexpr int kMpvObjectStrideBytes = 0x13C0;
-  constexpr int kMpvConcealStateOffset = 0x3A0;
-  constexpr int kMpvConcealStateSizeBytes = 0x1C60;
-  constexpr int kMpvHandleSizeBytes = 0x13B0;
-  constexpr int kMpvDctScaleTableOffset = 0x1160;
+  constexpr std::size_t kMpvObjectStrideBytes = sizeof(MPVDecoderScanContext) + 0x10;
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(kMpvObjectStrideBytes == 0x13C0, "MPV object stride must remain 0x13C0 on x86");
+  constexpr int kMpvSharedWorkOffset = 0x3A0;
+  constexpr std::size_t kMpvHandleSizeBytes = sizeof(MPVDecoderScanContext);
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(kMpvHandleSizeBytes == 0x13B0, "MPV handle size must remain 0x13B0 on x86");
   constexpr int kMpvClipTableBaseOffset = 0x180;
   /** Runtime VLC lane arena, relative to the conceal-state base. */
-  constexpr int kMpvVlcContextOffset = 0x12B0;
   /** Per-run clip-table mirror, relative to the conceal-state base. */
-  constexpr int kMpvClipTableStorageOffset = 0x1860;
   constexpr unsigned int kMpvClipTableDwordCount = 0x100;
   constexpr unsigned int kMpvConditionCallbackDwordCount = 0x10;
   constexpr int kMpvHandleSlotStateFree = 1;
@@ -1183,7 +879,6 @@ namespace
    * returning. Both gates pass in this build, so the spin is unreachable.
    */
   constexpr int kMpvFatalStatusReportable = -16515323;
-  constexpr int kMpvErrorInfoOffset = 0x250;
   constexpr const char kExpectedMpvDecoderVersion[] = "1.958";
 
   /**
@@ -1273,37 +968,6 @@ namespace
     0x00000000u,
   };
 
-  struct MPVAbdecRunLevelLane
-  {
-    int tableBaseMinusBias; // +0x00
-    int bitLength;          // +0x04
-  };
-
-  static_assert(sizeof(MPVAbdecRunLevelLane) == 0x08, "MPVAbdecRunLevelLane size must be 0x08");
-  static_assert(
-    offsetof(MPVAbdecRunLevelLane, tableBaseMinusBias) == 0x00,
-    "MPVAbdecRunLevelLane::tableBaseMinusBias offset must be 0x00"
-  );
-  static_assert(offsetof(MPVAbdecRunLevelLane, bitLength) == 0x04, "MPVAbdecRunLevelLane::bitLength offset must be 0x04");
-
-  struct MPVAbdecSetup
-  {
-    std::uint8_t reserved_0000[0x1100];
-    std::uint32_t forwardMaskLut[kMpvAbdecForwardMaskCount]; // +0x1100
-    std::uint8_t intraScanPermutation[kMpvBlockEntryCount]; // +0x1120
-    std::uint8_t reserved_1160[0x1260 - 0x1160];
-    std::uint32_t thresholdLut[kMpvAbdecThresholdCount]; // +0x1260
-    MPVAbdecRunLevelLane runLevelLanes[kMpvRunLevelLaneCount]; // +0x1280
-  };
-
-  static_assert(offsetof(MPVAbdecSetup, forwardMaskLut) == 0x1100, "MPVAbdecSetup::forwardMaskLut offset must be 0x1100");
-  static_assert(
-    offsetof(MPVAbdecSetup, intraScanPermutation) == 0x1120,
-    "MPVAbdecSetup::intraScanPermutation offset must be 0x1120"
-  );
-  static_assert(offsetof(MPVAbdecSetup, thresholdLut) == 0x1260, "MPVAbdecSetup::thresholdLut offset must be 0x1260");
-  static_assert(offsetof(MPVAbdecSetup, runLevelLanes) == 0x1280, "MPVAbdecSetup::runLevelLanes offset must be 0x1280");
-
   const char* gFsriVersionString = nullptr;
   double gFsriScaleTable[kMpvBlockEntryCount]{};
   float gFsriPrecomputedIdct[kMpvBlockEntryCount * kMpvBlockEntryCount]{};
@@ -1312,25 +976,11 @@ namespace
   std::uint8_t gMpvIntraScanPermutationRuntime[64]{};
   std::uint8_t gMpvDefaultIntraQuantMatrix[64]{};
 
-  struct MPVErrorInfo
-  {
-    int callbackAddress = 0; // +0x00
-    int callbackContext = 0; // +0x04
-    int errorCode = 0;       // +0x08
-    int reserved0C = 0;      // +0x0C
-    int reserved10 = 0;      // +0x10
-  };
-
-  static_assert(sizeof(MPVErrorInfo) == 0x14, "MPVErrorInfo size must be 0x14");
-  static_assert(offsetof(MPVErrorInfo, callbackAddress) == 0x0, "MPVErrorInfo::callbackAddress offset must be 0x0");
-  static_assert(offsetof(MPVErrorInfo, callbackContext) == 0x4, "MPVErrorInfo::callbackContext offset must be 0x4");
-  static_assert(offsetof(MPVErrorInfo, errorCode) == 0x8, "MPVErrorInfo::errorCode offset must be 0x8");
-
   MPVErrorInfo mpverrinf{};
 
-  [[nodiscard]] inline MPVErrorInfo* ResolveHandleErrorInfo(const int handleAddress)
+  [[nodiscard]] inline MPVErrorInfo* ResolveHandleErrorInfo(const SofdecAddressWord handleAddress)
   {
-    return reinterpret_cast<MPVErrorInfo*>(AddressToMutablePointer(handleAddress + kMpvErrorInfoOffset));
+    return &AsHandleView(handleAddress)->errorInfo;
   }
 
   inline std::uint8_t* AsMutableTableBytes(std::uint16_t* table)
@@ -1413,8 +1063,8 @@ extern "C" void MPVERR_InitErrInf(void* const errorInfoAddress)
   errorInfo->callbackAddress = 0;
   errorInfo->callbackContext = 0;
   errorInfo->errorCode = 0;
-  errorInfo->reserved0C = 0;
-  errorInfo->reserved10 = 0;
+  errorInfo->recoverEventCounter = 0;
+  errorInfo->recoverConditionCounter = 0;
 }
 
 /**
@@ -1445,8 +1095,8 @@ extern "C" int MPVERR_SetCode(int errorContext, int errorCode);
  * Stores one per-handle error callback address/context pair.
  */
 extern "C" int MPV_SetErrFunc(
-  const int handleAddress,
-  const int errorCallbackAddress,
+  const SofdecAddressWord handleAddress,
+  const SofdecAddressWord errorCallbackAddress,
   const int errorCallbackContext
 )
 {
@@ -1466,7 +1116,7 @@ extern "C" int MPV_SetErrFunc(
  * What it does:
  * Copies one per-handle 0x14-byte error-info lane into caller storage.
  */
-extern "C" int MPV_GetErrInf(const int handleAddress, void* const outErrorInfoAddress)
+extern "C" int MPV_GetErrInf(const SofdecAddressWord handleAddress, void* const outErrorInfoAddress)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidGetErrInfoHandle);
@@ -1743,20 +1393,18 @@ extern "C" std::int32_t MPV_Init(const std::int32_t objectCount, const SofdecAdd
 
   // Every stage below is rooted at the conceal-state base `mpvlib_InitWork`
   // just published, which sits past the per-object slot array.
-  const int runtimeWorkBase = mpvlib_libwork.concealStateBaseAddress;
+  MPVSharedWork* const sharedWork = mpvlib_libwork.sharedWork;
 
   MPVERR_Init();
   MPVHDEC_Init();
   MPVFRM_Init();
-  MPVVLC_Init(runtimeWorkBase + kMpvVlcContextOffset, runtimeWorkBase);
-  MPVBDEC_Init(runtimeWorkBase);
+  MPVVLC_Init(PointerToAddress(sharedWork->vlcTableArena), PointerToAddress(sharedWork));
+  MPVBDEC_Init(sharedWork);
   MPVUMC_Init();
   MPVCDEC_Init();
-  mpvlib_InitClip(
-    reinterpret_cast<std::int32_t*>(AddressToMutablePointer(runtimeWorkBase + kMpvClipTableStorageOffset))
-  );
+  mpvlib_InitClip(sharedWork->clipTableStorage);
   mpvlib_InitObjTbl();
-  mpvlib_InitDct(runtimeWorkBase);
+  mpvlib_InitDct(sharedWork);
   MPVM2V_Init();
   return 0;
 }
@@ -1795,7 +1443,7 @@ extern "C" void mpvlib_ChkCacheMode()
  * What it does:
  * Returns work-memory base address unchanged.
  */
-extern "C" int MPVLIB_ConvWorkAddr(const int workAddress)
+extern "C" SofdecAddressWord MPVLIB_ConvWorkAddr(const SofdecAddressWord workAddress)
 {
   return workAddress;
 }
@@ -1807,7 +1455,7 @@ extern "C" int MPVLIB_ConvWorkAddr(const int workAddress)
  * Applies the MPV library primary address-mask policy (OR 0x02000000 when
  * enabled by runtime work state).
  */
-extern "C" int MPVLIB_ConvAddrPrimary(const int address)
+extern "C" SofdecAddressWord MPVLIB_ConvAddrPrimary(const SofdecAddressWord address)
 {
   if (mpvlib_libwork.primaryAddressMaskEnable != 0) {
     return address | kMpvAddressSegmentMask;
@@ -1822,7 +1470,7 @@ extern "C" int MPVLIB_ConvAddrPrimary(const int address)
  * Applies the MPV library secondary address-mask policy (OR 0x02000000 when
  * enabled by runtime work state).
  */
-extern "C" int MPVLIB_ConvAddrSecondary(const int address)
+extern "C" SofdecAddressWord MPVLIB_ConvAddrSecondary(const SofdecAddressWord address)
 {
   if (mpvlib_libwork.secondaryAddressMaskEnable != 0) {
     return address | kMpvAddressSegmentMask;
@@ -1837,7 +1485,7 @@ extern "C" int MPVLIB_ConvAddrSecondary(const int address)
  * Re-encodes a pointer into MPV window-8 form by preserving low 28 bits and
  * forcing the high bit.
  */
-extern "C" std::uint32_t MPVLIB_ConvAddrWindow8(const int address)
+extern "C" std::uint32_t MPVLIB_ConvAddrWindow8(const SofdecAddressWord address)
 {
   return (static_cast<std::uint32_t>(address) & kMpvAddressWindowLowMask) | kMpvAddressWindowHighBit;
 }
@@ -1893,10 +1541,10 @@ extern "C" void mpvlib_InitObjTbl()
     return;
   }
 
-  auto* slot = reinterpret_cast<MPVObjectSlot*>(AddressToMutablePointer(mpvlib_libwork.alignedWorkBaseAddress));
+  auto* slot = AsHandleView(mpvlib_libwork.alignedWorkBaseAddress);
   for (int i = 0; i < mpvlib_libwork.objectCount; ++i) {
-    slot->activeMarker = 1;
-    slot = reinterpret_cast<MPVObjectSlot*>(reinterpret_cast<std::uint8_t*>(slot) + kMpvObjectStrideBytes);
+    slot->objectSlotState = 1;
+    slot = reinterpret_cast<MPVDecoderScanContext*>(reinterpret_cast<std::uint8_t*>(slot) + kMpvObjectStrideBytes);
   }
 }
 
@@ -1907,10 +1555,10 @@ extern "C" void mpvlib_InitObjTbl()
  * Initializes DCT runtime state and scale table lane rooted in the work
  * arena.
  */
-extern "C" int mpvlib_InitDct(const int workAreaBaseAddress)
+extern "C" int mpvlib_InitDct(MPVSharedWork* const sharedWork)
 {
   DCT_FsriInit();
-  return DCT_FsriInitScaleTbl(workAreaBaseAddress + kMpvDctScaleTableOffset);
+  return DCT_FsriInitScaleTbl(PointerToAddress(sharedWork->dequantScaleTable));
 }
 
 /**
@@ -1921,20 +1569,21 @@ extern "C" int mpvlib_InitDct(const int workAreaBaseAddress)
  * default library condition lanes, and publishes key work pointers in global
  * runtime state.
  */
-extern "C" std::int32_t* mpvlib_InitWork(const int objectCount, const int workMemoryBaseAddress)
+extern "C" std::int32_t* mpvlib_InitWork(const int objectCount, const SofdecAddressWord workMemoryBaseAddress)
 {
-  const int alignedWorkBaseAddress = (workMemoryBaseAddress + (kMpvWorkAlignBytes - 1)) & ~(kMpvWorkAlignBytes - 1);
+  const SofdecAddressWord alignedWorkBaseAddress = (workMemoryBaseAddress + (kMpvWorkAlignBytes - 1)) & ~(static_cast<SofdecAddressWord>(kMpvWorkAlignBytes) - 1);
   const unsigned int clearDwordCount = static_cast<unsigned int>((objectCount + 1) << 13) >> 2;
   UTY_MemsetDword(AddressToMutablePointer(alignedWorkBaseAddress), 0u, clearDwordCount);
 
-  const int objectTableBaseAddress = alignedWorkBaseAddress + objectCount * kMpvObjectStrideBytes;
-  const int concealStateBaseAddress = objectTableBaseAddress + kMpvConcealStateOffset;
-  mpvlib_NoOpInitializeRange(AddressToMutablePointer(concealStateBaseAddress), kMpvConcealStateSizeBytes);
+  const SofdecAddressWord objectTableBaseAddress = alignedWorkBaseAddress + objectCount * static_cast<SofdecAddressWord>(kMpvObjectStrideBytes);
+  auto* const sharedWork = reinterpret_cast<MPVSharedWork*>(AddressToMutablePointer(objectTableBaseAddress + kMpvSharedWorkOffset));
+  mpvlib_NoOpInitializeRange(sharedWork, sizeof(MPVSharedWork));
 
-  std::int32_t* result = UTY_MemcpyDword(&mpvlib_libwork, mpvlib_cond_dfl, 16u);
+  std::copy_n(mpvlib_cond_dfl, 16, mpvlib_libwork.conditionDefaults);
+  auto* result = reinterpret_cast<std::int32_t*>(mpvlib_libwork.conditionDefaults);
   mpvlib_libwork.alignedWorkBaseAddress = alignedWorkBaseAddress;
   mpvlib_libwork.objectTableBaseAddress = objectTableBaseAddress;
-  mpvlib_libwork.concealStateBaseAddress = concealStateBaseAddress;
+  mpvlib_libwork.sharedWork = sharedWork;
   mpvlib_libwork.objectCount = objectCount;
   return result;
 }
@@ -1949,7 +1598,7 @@ extern "C" int MPV_Finish()
 {
   MPVUMC_Finish();
   MPVM2V_Finish();
-  return MPVCONCEAL_Finish(mpvlib_libwork.concealStateBaseAddress, kMpvConcealStateSizeBytes);
+  return MPVCONCEAL_Finish(PointerToAddress(mpvlib_libwork.sharedWork), static_cast<int>(sizeof(MPVSharedWork)));
 }
 
 /**
@@ -1961,7 +1610,7 @@ extern "C" int MPV_Finish()
 extern "C" int mpvlib_SearchFreeHn()
 {
   const int objectCount = mpvlib_libwork.objectCount;
-  int handleAddress = mpvlib_libwork.alignedWorkBaseAddress;
+  SofdecAddressWord handleAddress = mpvlib_libwork.alignedWorkBaseAddress;
   for (int index = 0; index < objectCount; ++index) {
     if (AsHandleView(handleAddress)->objectSlotState == kMpvHandleSlotStateFree) {
       return handleAddress;
@@ -2020,37 +1669,37 @@ extern "C" int mpvlib_InitPicAtr(const int pictureAttributesAddress)
  * Binds VLC tables, clip lanes, scratch addresses, and DCT callbacks into one
  * MPV handle object.
  */
-extern "C" int mpvlib_InitObj(const int handleAddress)
+extern "C" int mpvlib_InitObj(const SofdecAddressWord handleAddress)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
-  const int concealStateBaseAddress = mpvlib_libwork.concealStateBaseAddress;
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  MPVSharedWork* const sharedWork = mpvlib_libwork.sharedWork;
 
-  handle->runLevel8Address = PointerToAddress(mpvvlc_run_level_8);
-  handle->runLevel4AddressMinus16 = PointerToAddress(mpvvlc_run_level_4) - 0x10;
-  handle->runLevel2AddressMinus32 = PointerToAddress(mpvvlc_run_level_2) - 0x20;
-  handle->runLevel1AddressMinus32 = PointerToAddress(mpvvlc_run_level_1) - 0x20;
-  handle->runLevel0aAddress = PointerToAddress(mpvvlc_run_level_0a);
-  handle->runLevel0bAddress = PointerToAddress(mpvvlc_run_level_0b);
-  handle->runLevel0cAddress = PointerToAddress(mpvvlc_run_level_0c);
+  handle->acShortRunLevelTable = mpvvlc_run_level_8;
+  handle->acLongRunLevelTables[0] = reinterpret_cast<const std::uint16_t*>(PointerToAddress(mpvvlc_run_level_4) - 0x10);
+  handle->acLongRunLevelTables[1] = reinterpret_cast<const std::uint16_t*>(PointerToAddress(mpvvlc_run_level_2) - 0x20);
+  handle->acLongRunLevelTables[2] = reinterpret_cast<const std::uint16_t*>(PointerToAddress(mpvvlc_run_level_1) - 0x20);
+  handle->acLongRunLevelTables[3] = reinterpret_cast<const std::uint16_t*>(PointerToAddress(mpvvlc_run_level_0a));
+  handle->acLongRunLevelTables[4] = reinterpret_cast<const std::uint16_t*>(PointerToAddress(mpvvlc_run_level_0b));
+  handle->acLongRunLevelTables[5] = reinterpret_cast<const std::uint16_t*>(PointerToAddress(mpvvlc_run_level_0c));
 
-  handle->concealLaneAddress1120 = concealStateBaseAddress + 0x1120;
-  handle->concealLaneAddress1100 = concealStateBaseAddress + 0x1100;
-  handle->concealLaneAddress1160 = concealStateBaseAddress + 0x1160;
-  handle->concealLaneAddress1260 = concealStateBaseAddress + 0x1260;
-  handle->concealLaneAddress1280 = concealStateBaseAddress + 0x1280;
+  handle->coefficientWriteCursor = sharedWork->intraScanPermutation;
+  handle->bitMaskByWidth = reinterpret_cast<const std::uint16_t*>(sharedWork->forwardMaskLut);
+  handle->dequantScaleTable = sharedWork->dequantScaleTable;
+  handle->abdecThresholdLutAddress = PointerToAddress(sharedWork->thresholdLut);
+  handle->abdecRunLevelLanesAddress = PointerToAddress(sharedWork->runLevelLanes);
 
-  handle->clipBaseAddress = mpv_clip_0_255_base;
-  handle->clipBaseAddressMirror = mpv_clip_0_255_base;
-  handle->scanLutBaseAddress = handleAddress + 0x3A0;
-  handle->scanLutAddressD20 = handleAddress + 0xD20;
-  handle->scanLutAddressEA0 = handleAddress + 0xEA0;
+  handle->lumaBaseAddress = mpv_clip_0_255_base;
+  handle->blockSources.clipTableAddress = mpv_clip_0_255_base;
+  handle->blockSources.sampleAddressLut = handle->scanLut3A0();
+  handle->blockSources.forwardSamples = handle->decodeWorkScratchPredicted + 0x40;
+  handle->blockSources.backwardSamples = handle->decodeWorkScratchPredicted + 0x1C0;
 
-  handle->scanScratchAddress4A0 = handleAddress + 0x4A0;
-  handle->scanScratchAddress520 = handleAddress + 0x520;
-  handle->scanScratchAddress5A0 = handleAddress + 0x5A0;
-  handle->scanScratchAddress620 = handleAddress + 0x620;
-  handle->scanScratchAddress3A0 = handleAddress + 0x3A0;
-  handle->scanScratchAddress420 = handleAddress + 0x420;
+  handle->scanScratchAddress4A0 = PointerToAddress(handle->scanLut4A0());
+  handle->scanScratchAddress520 = PointerToAddress(handle->scanLut520());
+  handle->scanScratchAddress5A0 = PointerToAddress(handle->scanLut5A0());
+  handle->scanScratchAddress620 = PointerToAddress(handle->scanLut620());
+  handle->scanScratchAddress3A0 = PointerToAddress(handle->scanLut3A0());
+  handle->scanScratchAddress420 = PointerToAddress(handle->scanLut420());
 
   handle->dctTransformSixBlocks = &DCT_FsriTrans6Blk;
   handle->dctTransformCbp = &DCT_FsriTransCbp;
@@ -2064,22 +1713,22 @@ extern "C" int mpvlib_InitObj(const int handleAddress)
  * Initializes one MPV handle lane after allocation, including callback
  * defaults, error state, picture attributes, and user stream hooks.
  */
-extern "C" int mpvlib_InitHn(const int handleAddress)
+extern "C" int mpvlib_InitHn(const SofdecAddressWord handleAddress)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
 
   mpvlib_InitObj(handleAddress);
   handle->objectInitStatus = 0;
-  UTY_MemcpyDword(handle->conditionCallbacks, &mpvlib_libwork, kMpvConditionCallbackDwordCount);
-  MPVERR_InitErrInf(AddressToMutablePointer(handleAddress + 0x250));
+  std::copy_n(mpvlib_libwork.conditionDefaults, kMpvConditionCallbackDwordCount, handle->conditionCallbacks);
+  MPVERR_InitErrInf(&handle->errorInfo);
   MPVCMC_InitObj(handle);
   mpvlib_InitDctPa(handleAddress);
-  mpvlib_InitPicAtr(handleAddress + 0x1D0);
+  mpvlib_InitPicAtr(PointerToAddress(&handle->pictureAttributes));
 
   handle->recoverNeededFlag = 0;
   handle->recoverState = 0;
-  handle->decodeTablePrimary = mpvvlc_y_dcsiz;
-  handle->decodeTableSecondary = mpvvlc_c_dcsiz;
+  handle->decodeTablePrimary = reinterpret_cast<const std::uint8_t*>(mpvvlc_y_dcsiz);
+  handle->decodeTableSecondary = reinterpret_cast<const std::uint8_t*>(mpvvlc_c_dcsiz);
   handle->pictureCodecClassification = 0;
   handle->sequenceStcCodePrimary = 0;
   handle->sequenceStcCodeSecondary = 0;
@@ -2087,7 +1736,7 @@ extern "C" int mpvlib_InitHn(const int handleAddress)
   handle->sequenceUserDataIdcPrecisionMode = 0;
   handle->decodeReadKernelIntra = &mpvhdec_ReadKernelIntraDefault;
   handle->decodeReadKernelPredicted = &mpvhdec_ReadKernelPredictedDefault;
-  handle->serviceCountdown = handle->serviceReloadInterval;
+  handle->serviceCountdown = static_cast<int>(handle->serviceReloadInterval());
 
   for (int streamIndex = 0; streamIndex < 4; ++streamIndex) {
     MPV_SetUsrSj(handleAddress, streamIndex, 0, 0, 0);
@@ -2123,15 +1772,26 @@ extern "C" int MPV_Create()
  * Address: 0x00AF7E40 (FUN_00AF7E40)
  *
  * What it does:
- * Clears one 0x54-byte DCT plane runtime lane and returns zero.
+ * Clears the handle's DCT state: the decode counters, the block mask, the
+ * coefficient/output/scale bindings and the motion-kernel words that follow
+ * them (0x54 bytes from +0x90 on x86). Returns zero.
  */
-extern "C" int mpvlib_ResetDctPlaneState(void* const dctPlaneStateAddress)
+extern "C" int mpvlib_ResetDctPlaneState(MPVDecoderScanContext* const handle)
 {
-  if (dctPlaneStateAddress == nullptr) {
+  if (handle == nullptr) {
     return 0;
   }
 
-  std::memset(dctPlaneStateAddress, 0, 0x54u);
+  handle->primaryDctDecodeCount = 0;
+  handle->secondaryDctDecodeCount = 0;
+  std::fill(std::begin(handle->reserved_0098), std::end(handle->reserved_0098), std::uint8_t{0});
+  handle->codedBlockPatternMask = 0;
+  handle->dctCoefficients = nullptr;
+  handle->dctBlockOutputAddresses = nullptr;
+  std::fill(std::begin(handle->reserved_00AC), std::end(handle->reserved_00AC), std::uint8_t{0});
+  handle->dctScaleTableAddress = 0;
+  std::fill(std::begin(handle->reserved_00C4), std::end(handle->reserved_00C4), std::uint8_t{0});
+  std::fill(std::begin(handle->predictionKernelState.reserved_00), std::end(handle->predictionKernelState.reserved_00), 0);
   return 0;
 }
 
@@ -2142,14 +1802,14 @@ extern "C" int mpvlib_ResetDctPlaneState(void* const dctPlaneStateAddress)
  * Initializes per-handle DCT plane state and binds per-handle DCT scratch
  * lanes used by decode kernels.
  */
-extern "C" int mpvlib_InitDctPa(const int handleAddress)
+extern "C" int mpvlib_InitDctPa(const SofdecAddressWord handleAddress)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
-  mpvlib_ResetDctPlaneState(&handle->dctPlaneState);
-  handle->dctPlaneState.primaryScratchAddress = handleAddress + 0x6A0;
-  handle->dctPlaneState.secondaryScratchAddress = handleAddress + 0x36C;
-  handle->dctPlaneState.coefficientScratchAddress = handleAddress + 0xD20;
-  return handle->dctPlaneState.coefficientScratchAddress;
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  mpvlib_ResetDctPlaneState(handle);
+  handle->dctCoefficients = reinterpret_cast<float*>(handle->scanScratch0);
+  handle->dctBlockOutputAddresses = &handle->scanScratchAddress4A0;
+  handle->dctScaleTableAddress = PointerToAddress(handle->decodeWorkScratchPredicted + 0x40);
+  return handle->dctScaleTableAddress;
 }
 
 /**
@@ -2158,11 +1818,11 @@ extern "C" int mpvlib_InitDctPa(const int handleAddress)
  * What it does:
  * Reads DCT primary/secondary decode counters from one MPV handle.
  */
-extern "C" int MPV_GetDctCnt(const int handleAddress, int* const outPrimaryCount, int* const outSecondaryCount)
+extern "C" int MPV_GetDctCnt(const SofdecAddressWord handleAddress, int* const outPrimaryCount, int* const outSecondaryCount)
 {
-  MPVDctPlaneState* const dctPlaneState = &AsHandleView(handleAddress)->dctPlaneState;
-  *outPrimaryCount = dctPlaneState->primaryDecodeCount;
-  const int secondaryDecodeCount = dctPlaneState->secondaryDecodeCount;
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  *outPrimaryCount = handle->primaryDctDecodeCount;
+  const int secondaryDecodeCount = handle->secondaryDctDecodeCount;
   *outSecondaryCount = secondaryDecodeCount;
   return secondaryDecodeCount;
 }
@@ -2174,7 +1834,7 @@ extern "C" int MPV_GetDctCnt(const int handleAddress, int* const outPrimaryCount
  * Validates one MPV handle, tears down M2V/conceal lanes, and marks the
  * handle slot free again.
  */
-extern "C" int MPV_Destroy(const int handleAddress)
+extern "C" int MPV_Destroy(const SofdecAddressWord handleAddress)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidDestroyHandle);
@@ -2192,7 +1852,7 @@ extern "C" int MPV_Destroy(const int handleAddress)
  * What it does:
  * Thin wrapper that forwards one MPV handle destroy request to `MPV_Destroy`.
  */
-extern "C" int sfmpv_DestroySub(const int handleAddress)
+extern "C" int sfmpv_DestroySub(const SofdecAddressWord handleAddress)
 {
   return MPV_Destroy(handleAddress);
 }
@@ -2241,7 +1901,7 @@ extern "C" int mpvlib_DefaultConditionNoOp()
  * Installs one condition callback globally or for a specific MPV handle, and
  * propagates the update into MPVM2V runtime state.
  */
-extern "C" int MPV_SetCond(const int handleAddress, const int conditionIndex, int (*conditionCallback)())
+extern "C" int MPV_SetCond(const SofdecAddressWord handleAddress, const int conditionIndex, int (*conditionCallback)())
 {
   int (*resolvedCallback)() = conditionCallback;
   if (conditionIndex == kMpvConditionIndexConcealDefault && resolvedCallback == nullptr) {
@@ -2274,10 +1934,10 @@ extern "C" int MPV_SetCond(const int handleAddress, const int conditionIndex, in
 extern "C" int mpvlib_SetCondAll(const int conditionIndex, const int callbackAddress)
 {
   int remainingObjectCount = mpvlib_libwork.objectCount;
-  int handleAddress = mpvlib_libwork.alignedWorkBaseAddress;
+  SofdecAddressWord handleAddress = mpvlib_libwork.alignedWorkBaseAddress;
 
   while (remainingObjectCount > 0) {
-    MPVHandleInit* const handle = AsHandleView(handleAddress);
+    MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
     if (handle->objectSlotState == kMpvHandleSlotStateAllocated) {
       handle->conditionCallbacks[conditionIndex] = callbackAddress;
     }
@@ -2295,7 +1955,7 @@ extern "C" int mpvlib_SetCondAll(const int conditionIndex, const int callbackAdd
  * Reads one condition callback from global defaults or from a specific MPV
  * handle.
  */
-extern "C" int MPV_GetCond(const int handleAddress, const int conditionIndex, int* const outCallbackAddress)
+extern "C" int MPV_GetCond(const SofdecAddressWord handleAddress, const int conditionIndex, int* const outCallbackAddress)
 {
   if (handleAddress == 0) {
     *outCallbackAddress = static_cast<int>(mpvlib_libwork.conditionDefaults[conditionIndex]);
@@ -2317,7 +1977,7 @@ extern "C" int MPV_GetCond(const int handleAddress, const int conditionIndex, in
  * Stores last checked handle for diagnostics and returns 0 for an allocated
  * MPV handle; otherwise returns -1.
  */
-extern "C" int MPVLIB_CheckHn(const int handleAddress)
+extern "C" int MPVLIB_CheckHn(const SofdecAddressWord handleAddress)
 {
   mpvlib_deb_hn_last = handleAddress;
   if (handleAddress == 0) {
@@ -2392,7 +2052,7 @@ extern "C" void MPVHDEC_Init()
  * lane table.
  */
 extern "C" std::int32_t* MPV_SetUsrSj(
-  const int handleAddress, const int streamIndex, const int streamObjectAddress, const int streamCallbackAddress,
+  const SofdecAddressWord handleAddress, const int streamIndex, const int streamObjectAddress, const int streamCallbackAddress,
   const int streamContextAddress
 )
 {
@@ -2410,11 +2070,11 @@ extern "C" std::int32_t* MPV_SetUsrSj(
  * Sets picture-user buffer/context fields and clears per-picture decode-state
  * latch.
  */
-extern "C" std::int32_t* MPV_SetPicUsrBuf(const int handleAddress, const int userBufferAddress, const int userContextAddress)
+extern "C" std::int32_t* MPV_SetPicUsrBuf(const SofdecAddressWord handleAddress, const SofdecAddressWord userBufferAddress, const int userBufferBytes)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   handle->pictureUserBufferAddress = userBufferAddress;
-  handle->pictureUserContextAddress = userContextAddress;
+  handle->pictureUserBufferBytes = userBufferBytes;
   handle->pictureUserDecodeState = 0;
   return reinterpret_cast<std::int32_t*>(handle);
 }
@@ -2426,9 +2086,9 @@ extern "C" std::int32_t* MPV_SetPicUsrBuf(const int handleAddress, const int use
  * Reads picture-user buffer and decode-state fields from one handle into
  * optional outputs.
  */
-extern "C" int* MPV_GetPicUsr(const int handleAddress, int* const outUserBufferAddress, int* const outDecodeState)
+extern "C" int* MPV_GetPicUsr(const SofdecAddressWord handleAddress, int* const outUserBufferAddress, int* const outDecodeState)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   if (outUserBufferAddress != nullptr) {
     *outUserBufferAddress = handle->pictureUserBufferAddress;
   }
@@ -2467,7 +2127,7 @@ extern "C" void MPVM2V_Finish()
  * Thin wrapper that forwards handle-create dispatch to `M2V_Create`; incoming
  * MPV handle argument is unused by this thunk.
  */
-extern "C" int MPVM2V_Create(const int handleAddress)
+extern "C" int MPVM2V_Create(const SofdecAddressWord handleAddress)
 {
   (void)handleAddress;
   return M2V_Create();
@@ -2480,9 +2140,9 @@ extern "C" int MPVM2V_Create(const int handleAddress)
  * Reads the embedded M2V decoder handle from one MPV handle and forwards
  * destroy dispatch to `M2V_Destroy`.
  */
-extern "C" void MPVM2V_Destroy(const int handleAddress)
+extern "C" void MPVM2V_Destroy(const SofdecAddressWord handleAddress)
 {
-  const MPVHandleInit* const handle = AsHandleView(handleAddress);
+  const MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   (void)M2V_Destroy(handle->m2vDecoderHandle);
 }
 
@@ -2493,7 +2153,7 @@ extern "C" void MPVM2V_Destroy(const int handleAddress)
  * Forwards one callback lane to `M2V_SetMbCb`, using the active handle's M2V
  * decoder handle when `handleAddress != 0`.
  */
-extern "C" int MPVM2V_SetCond(const int handleAddress, const int conditionIndex, const int callbackAddress)
+extern "C" int MPVM2V_SetCond(const SofdecAddressWord handleAddress, const int conditionIndex, const int callbackAddress)
 {
   (void)conditionIndex;
   (void)callbackAddress;
@@ -2501,7 +2161,7 @@ extern "C" int MPVM2V_SetCond(const int handleAddress, const int conditionIndex,
     return M2V_SetMbCb(0);
   }
 
-  const MPVHandleInit* const handle = AsHandleView(handleAddress);
+  const MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   return M2V_SetMbCb(static_cast<std::uintptr_t>(handle->m2vDecoderHandle));
 }
 
@@ -2512,9 +2172,9 @@ extern "C" int MPVM2V_SetCond(const int handleAddress, const int conditionIndex,
  * Pulls decoded picture-attribute and bitrate/VBV/link flag lanes from the M2V
  * decoder into the MPV handle runtime fields.
  */
-static int CopyM2vPictureAttributesToHandle(const int handleAddress)
+static int CopyM2vPictureAttributesToHandle(const SofdecAddressWord handleAddress)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
 
   MPVPictureAttributeExportBlock pictureAttributeBlock{};
   std::int32_t bitRateCode = 0;
@@ -2548,13 +2208,13 @@ static int CopyM2vPictureAttributesToHandle(const int handleAddress)
  * the current stream, then copies decoded attribute state back into handle
  * fields.
  */
-extern "C" int MPVM2V_DecodePicAtr(const int handleAddress, MPVSjStream* const stream)
+extern "C" int MPVM2V_DecodePicAtr(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
   if (M2V_IsSetup() == 0) {
     return -1;
   }
 
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   for (std::int32_t laneIndex = 0; laneIndex < 4; ++laneIndex) {
     const MPVUserSjLane& lane = handle->userSjLanes[laneIndex];
     M2V_SetUsrSj(
@@ -2569,7 +2229,7 @@ extern "C" int MPVM2V_DecodePicAtr(const int handleAddress, MPVSjStream* const s
   M2V_SetPicUsrBuf(
     handle->m2vDecoderHandle,
     static_cast<std::uintptr_t>(handle->pictureUserBufferAddress),
-    handle->pictureUserContextAddress
+    handle->pictureUserBufferBytes
   );
 
   if (M2V_DecodePicAtr(handle->m2vDecoderHandle, PointerToAddress(stream)) != 0) {
@@ -2589,8 +2249,8 @@ extern "C" int MPVM2V_DecodePicAtr(const int handleAddress, MPVSjStream* const s
  * dispatching frame decode to the M2V runtime handle.
  */
 extern "C" int MPVM2V_DecodeFrm(
-  const int handleAddress,
-  MPVSjStream* const stream,
+  const SofdecAddressWord handleAddress,
+  moho::SofdecSjSupplyHandle* const stream,
   MPVFrameDecodeSession* const frameSession
 )
 {
@@ -2598,13 +2258,115 @@ extern "C" int MPVM2V_DecodeFrm(
     return -1;
   }
 
-  const MPVHandleInit* const handle = AsHandleView(handleAddress);
+  const MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   if (handle->pictureAttributes.fullPelForwardVector != 1) {
     return -1;
   }
 
   M2V_DecodeFrm(handle->m2vDecoderHandle, PointerToAddress(stream), PointerToAddress(frameSession));
   return 0;
+}
+
+namespace
+{
+  /** `mpvcmc_InitMcOiTa`/`MPVCMC_InitMcOiRt`/`MPVCMC_SetCcnt`: condition 5 selects the 4-block mode. */
+  [[nodiscard]] int McOutputModeFor(const MPVDecoderScanContext* const handle) noexcept
+  {
+    return (handle->conditionCallbacks[5] != 0) ? 4 : -1;
+  }
+
+  [[nodiscard]] int RoundUpShift(const int value, const int shift) noexcept
+  {
+    return (value + (1 << shift) - 1) >> shift;
+  }
+} // namespace
+
+/**
+ * Address: 0x00AF5F50 (FUN_00AF5F50, _mpvcmc_InitMcOiTa)
+ *
+ * What it does:
+ * Points all six prediction scratch blocks at the handle's 8-byte-stride
+ * scratch area (+0xD20) and selects the block mode.
+ */
+extern "C" int mpvcmc_InitMcOiTa(void* const handleAddress)
+{
+  auto* const handle = static_cast<MPVDecoderScanContext*>(handleAddress);
+  handle->scratchTargets.outputMode = McOutputModeFor(handle);
+  std::uint8_t* const scratch = handle->blockSources.forwardSamples;
+  for (moho::movie::MPVBlockWriteTarget& block : handle->scratchTargets.blocks) {
+    block.pixels = scratch;
+    block.stride = 8;
+  }
+  return PointerToAddress(handle);
+}
+
+/**
+ * Address: 0x00AF5FC0 (FUN_00AF5FC0, _MPVCMC_InitMcOiRt)
+ *
+ * What it does:
+ * Selects the block mode and gives the two chroma output blocks the frame's
+ * chroma stride and the four luma blocks its luma stride.
+ */
+extern "C" void MPVCMC_InitMcOiRt(const SofdecAddressWord handleAddress)
+{
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  handle->copyTargets.outputMode = McOutputModeFor(handle);
+  const int chromaStride = handle->frameSession.backwardReference.chromaStride;
+  const int lumaStride = handle->frameSession.backwardReference.lumaStride;
+  handle->copyTargets.blocks[0].stride = chromaStride;
+  handle->copyTargets.blocks[1].stride = chromaStride;
+  for (int blockIndex = 2; blockIndex < 6; ++blockIndex) {
+    handle->copyTargets.blocks[blockIndex].stride = lumaStride;
+  }
+}
+
+/**
+ * Address: 0x00AF6010 (FUN_00AF6010, _MPVCMC_SetCcnt)
+ *
+ * What it does:
+ * Re-selects the block mode for both the scratch and the output block sets.
+ */
+extern "C" void MPVCMC_SetCcnt(const SofdecAddressWord handleAddress)
+{
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  const int outputMode = McOutputModeFor(handle);
+  handle->scratchTargets.outputMode = outputMode;
+  handle->copyTargets.outputMode = outputMode;
+}
+
+/**
+ * Address: 0x00AF6100 (FUN_00AF6100, _MPVUMC_InitOutRfb)
+ *
+ * What it does:
+ * Lays the output frame out from `frameSession.outputFrameAddress`: 32-byte
+ * aligned luma and chroma strides, then the three plane addresses
+ * (`planeBase2` luma, `planeBase0`/`planeBase1` the chroma planes after it).
+ * Condition 10 halves the geometry for 1/8 scale output.
+ */
+extern "C" void MPVUMC_InitOutRfb(const SofdecAddressWord handleAddress)
+{
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  int widthPixels = handle->pictureAttributes.headerControlWords[0];
+  int heightPixels = handle->pictureAttributes.headerControlWords[1];
+  const SofdecAddressWord frameAddress = handle->frameSession.outputFrameAddress;
+
+  if (handle->conditionCallbacks[10] != 0) {
+    widthPixels = RoundUpShift(widthPixels, 3);
+    heightPixels = RoundUpShift(heightPixels, 3);
+  }
+
+  handle->planeBase2 = frameAddress;
+
+  const int alignedLumaWidth = RoundUpShift(widthPixels, 4) << 4;
+  const int lumaStrideUnits = RoundUpShift(alignedLumaWidth, 5);
+  handle->planeBase2Stride = static_cast<std::int16_t>(lumaStrideUnits << 5);
+
+  const int chromaStrideUnits = RoundUpShift(alignedLumaWidth / 2, 5);
+  handle->planeBase1Stride = static_cast<std::int16_t>(chromaStrideUnits << 5);
+
+  const int macroblockRows = RoundUpShift(heightPixels, 5);
+  handle->planeBase0 = frameAddress + ((lumaStrideUnits * macroblockRows) << 10);
+  handle->planeBase1 = handle->planeBase0 + ((((macroblockRows << 5) / 2) * chromaStrideUnits) << 5);
 }
 
 /**
@@ -2616,8 +2378,8 @@ extern "C" int MPVM2V_DecodeFrm(
  */
 extern "C" int MPVCMC_InitObj(void* const handleAddress)
 {
-  auto* const handle = static_cast<MPVHandleInit*>(handleAddress);
-  std::fill_n(handle->mcOiRuntimeHeaderWords, 4, 0);
+  auto* const handle = static_cast<MPVDecoderScanContext*>(handleAddress);
+  std::memset(&handle->predictionKernelState, 0, 4u * sizeof(std::int32_t));
   return mpvcmc_InitMcOiTa(handleAddress);
 }
 
@@ -2676,7 +2438,7 @@ extern "C" std::int32_t* UTY_MemcpyDword(
  * Decodes picture attributes from SJ stream lanes, including delimiter-walk
  * recovery loop and M2V codec fast path.
  */
-extern "C" int MPV_DecodePicAtrSj(const int handleAddress, MPVSjStream* const stream)
+extern "C" int MPV_DecodePicAtrSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidDecodePicAtrHandle);
@@ -2684,11 +2446,11 @@ extern "C" int MPV_DecodePicAtrSj(const int handleAddress, MPVSjStream* const st
 
   AsHandleView(handleAddress)->pictureUserDecodeState = 0;
 
-  MPVSjChunk streamChunk{};
+  moho::SjChunkRange streamChunk{};
   SjRequestChunk(stream, streamChunk);
   SjSubmitTailChunk(stream, streamChunk);
 
-  MPVSjChunk codecProbeChunk = streamChunk;
+  moho::SjChunkRange codecProbeChunk = streamChunk;
   if (mpvhdec_GetCodec(handleAddress, &codecProbeChunk) == 2) {
     return MPVM2V_DecodePicAtr(handleAddress, stream);
   }
@@ -2741,13 +2503,13 @@ extern "C" int MPV_DecodePicAtrSj(const int handleAddress, MPVSjStream* const st
  * Probes the current SJ stream chunk and returns delimiter type when at least
  * four bytes are available, otherwise returns zero.
  */
-extern "C" int mpvhdec_GetCurDelim(MPVSjStream* const stream)
+extern "C" int mpvhdec_GetCurDelim(moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVSjChunk chunk{};
+  moho::SjChunkRange chunk{};
   SjRequestChunk(stream, chunk);
   SjSubmitTailChunk(stream, chunk);
-  if (chunk.size >= 4) {
-    return MPV_CheckDelim(chunk.data);
+  if (chunk.byteCount >= 4) {
+    return MPV_CheckDelim(chunk.bytes());
   }
   return 0;
 }
@@ -2759,7 +2521,7 @@ extern "C" int mpvhdec_GetCurDelim(MPVSjStream* const stream)
  * Wraps picture-attribute decode over an SJ memory stream and reports consumed
  * bytes.
  */
-extern "C" int MPV_DecodePicAtr(const int handleAddress, const int* const pictureDataRange, int* const outConsumedBytes)
+extern "C" int MPV_DecodePicAtr(const SofdecAddressWord handleAddress, const int* const pictureDataRange, int* const outConsumedBytes)
 {
   const auto* const bufferRange = reinterpret_cast<const MPVPictureDataRange*>(pictureDataRange);
   moho::SofdecSjMemoryHandle* const sjMemoryHandle = SJMEM_Create(bufferRange->bufferAddress, bufferRange->bufferSize);
@@ -2767,7 +2529,7 @@ extern "C" int MPV_DecodePicAtr(const int handleAddress, const int* const pictur
     return -1;
   }
 
-  const int decodeResult = MPV_DecodePicAtrSj(handleAddress, reinterpret_cast<MPVSjStream*>(sjMemoryHandle));
+  const int decodeResult = MPV_DecodePicAtrSj(handleAddress, reinterpret_cast<moho::SofdecSjSupplyHandle*>(sjMemoryHandle));
   *outConsumedBytes = bufferRange->bufferSize - SJMEM_GetNumData(sjMemoryHandle, 1);
   SJMEM_Destroy(sjMemoryHandle);
   return decodeResult;
@@ -2780,17 +2542,17 @@ extern "C" int MPV_DecodePicAtr(const int handleAddress, const int* const pictur
  * Classifies stream codec state for one handle by scanning delim markers in
  * current chunk and caching result in handle state.
  */
-extern "C" int mpvhdec_GetCodec(const int handleAddress, MPVSjChunk* const chunk)
+extern "C" int mpvhdec_GetCodec(const SofdecAddressWord handleAddress, moho::SjChunkRange* const chunk)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   if (handle->pictureCodecClassification != 0) {
     return handle->pictureCodecClassification;
   }
 
-  const std::uint8_t* const sequenceHeader = MPV_SearchDelim(reinterpret_cast<const std::uint8_t*>(chunk->data), chunk->size, 64);
+  const std::uint8_t* const sequenceHeader = MPV_SearchDelim(reinterpret_cast<const std::uint8_t*>(chunk->bytes()), chunk->byteCount, 64);
   if (sequenceHeader != nullptr) {
     const std::uint8_t* const probeStart = sequenceHeader + 4;
-    const int remainingBytes = chunk->size - static_cast<int>(probeStart - reinterpret_cast<const std::uint8_t*>(chunk->data));
+    const int remainingBytes = chunk->byteCount - static_cast<int>(probeStart - reinterpret_cast<const std::uint8_t*>(chunk->bytes()));
     const std::uint8_t* const nextDelimiter = MPV_SearchDelim(probeStart, remainingBytes, -1);
     if (nextDelimiter != nullptr) {
       const int delimiterType = MPV_CheckDelim(nextDelimiter);
@@ -2814,7 +2576,7 @@ extern "C" int mpvhdec_GetCodec(const int handleAddress, MPVSjChunk* const chunk
  * Restores the default intra quantization matrix into the active decode
  * scratch lane.
  */
-extern "C" std::int32_t* mpvhdec_InitIqm(const int handleAddress)
+extern "C" std::int32_t* mpvhdec_InitIqm(const SofdecAddressWord handleAddress)
 {
   auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(AsHandleView(handleAddress));
   return UTY_MemcpyDword(decodeContext->decodeWorkScratchIntra, gMpvDefaultIntraQuantMatrix, 16u);
@@ -2827,7 +2589,7 @@ extern "C" std::int32_t* mpvhdec_InitIqm(const int handleAddress)
  * Fills the non-intra quantization matrix lane with the canonical `0x10`
  * coefficients.
  */
-extern "C" std::int32_t* mpvhdec_InitNqm(const int handleAddress)
+extern "C" std::int32_t* mpvhdec_InitNqm(const SofdecAddressWord handleAddress)
 {
   auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(AsHandleView(handleAddress));
   UTY_MemsetDword(decodeContext->decodeWorkScratchPredicted, 0x10101010u, 16u);
@@ -2841,9 +2603,9 @@ extern "C" std::int32_t* mpvhdec_InitNqm(const int handleAddress)
  * Decodes one sequence header start-code payload from SJ stream state,
  * including optional quantization matrix loads and derived macroblock geometry.
  */
-extern "C" int mpvhdec_DecShcSj(const int handleAddress, MPVSjStream* const stream)
+extern "C" int mpvhdec_DecShcSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(handle);
 
   int& sequenceHorizontalSize = handle->pictureAttributes.headerControlWords[0];
@@ -2881,9 +2643,9 @@ extern "C" int mpvhdec_DecShcSj(const int handleAddress, MPVSjStream* const stre
     mpvhdec_InitNqm(handleAddress);
   }
 
-  decodeContext->macroblocksPerRow = (sequenceHorizontalSize + 15) >> 4;
-  decodeContext->macroblockRowsCount = (sequenceVerticalSize + 15) >> 4;
-  decodeContext->macroblockLinearLimit = decodeContext->macroblocksPerRow * decodeContext->macroblockRowsCount - 1;
+  decodeContext->macroblocksPerRow() = (sequenceHorizontalSize + 15) >> 4;
+  decodeContext->macroblockRowsCount() = (sequenceVerticalSize + 15) >> 4;
+  decodeContext->macroblockLinearLimit = decodeContext->macroblocksPerRow() * decodeContext->macroblockRowsCount() - 1;
 
   handle->pictureAttributes.reserved_48 = handle->sequenceBitRateCode;
   handle->pictureAttributes.reserved_4C = handle->sequenceVbvBufferCode;
@@ -2901,9 +2663,9 @@ extern "C" int mpvhdec_DecShcSj(const int handleAddress, MPVSjStream* const stre
  * Decodes one group-of-pictures header from SJ stream state and stores GOP
  * time-code/flag fields in the active handle state.
  */
-extern "C" int mpvhdec_DecGscSj(const int handleAddress, MPVSjStream* const stream)
+extern "C" int mpvhdec_DecGscSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   int& groupHeaderCount = handle->pictureAttributes.headerControlWords[12];
   int& gopTimeCodePacked = handle->pictureAttributes.headerControlWords[7];
   int& gopHours = handle->pictureAttributes.headerControlWords[8];
@@ -2941,9 +2703,9 @@ extern "C" int mpvhdec_DecGscSj(const int handleAddress, MPVSjStream* const stre
  * Decodes picture-header fields from SJ stream state and refreshes macroblock
  * dispatch function lanes for the active picture coding type.
  */
-extern "C" int mpvhdec_DecPscSj(const int handleAddress, MPVSjStream* const stream)
+extern "C" int mpvhdec_DecPscSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   int& pictureTemporalReference = handle->pictureAttributes.headerControlWords[5];
   int& pictureCodingType = handle->pictureAttributes.headerControlWords[6];
 
@@ -2966,20 +2728,20 @@ extern "C" int mpvhdec_DecPscSj(const int handleAddress, MPVSjStream* const stre
   }
 
   if (pictureCodingType == 2 || pictureCodingType == 3) {
-    handle->fullPelForwardVector = static_cast<int>(ConsumeHeaderFlag(bitstreamState));
+    handle->forwardPredictionVector.decodeConfig.fullPelFlag = static_cast<int>(ConsumeHeaderFlag(bitstreamState));
 
     const int forwardFCode = static_cast<int>(ConsumeHeaderBits(bitstreamState, 3));
-    handle->forwardFCodeMinus1 = forwardFCode - 1;
-    handle->forwardFCodeWrapShift = 27 - handle->forwardFCodeMinus1;
-    handle->forwardFCodeScale = 1 << handle->forwardFCodeMinus1;
+    handle->forwardPredictionVector.decodeConfig.fCodeMinus1 = forwardFCode - 1;
+    handle->forwardPredictionVector.decodeConfig.wrapShift = 27 - handle->forwardPredictionVector.decodeConfig.fCodeMinus1;
+    handle->forwardPredictionVector.decodeConfig.fScale = 1 << handle->forwardPredictionVector.decodeConfig.fCodeMinus1;
 
     if (pictureCodingType == 3) {
-      handle->fullPelBackwardVector = static_cast<int>(ConsumeHeaderFlag(bitstreamState));
+      handle->backwardPredictionVector.decodeConfig.fullPelFlag = static_cast<int>(ConsumeHeaderFlag(bitstreamState));
 
       const int backwardFCode = static_cast<int>(ConsumeHeaderBits(bitstreamState, 3));
-      handle->backwardFCodeMinus1 = backwardFCode - 1;
-      handle->backwardFCodeWrapShift = 27 - handle->backwardFCodeMinus1;
-      handle->backwardFCodeScale = 1 << handle->backwardFCodeMinus1;
+      handle->backwardPredictionVector.decodeConfig.fCodeMinus1 = backwardFCode - 1;
+      handle->backwardPredictionVector.decodeConfig.wrapShift = 27 - handle->backwardPredictionVector.decodeConfig.fCodeMinus1;
+      handle->backwardPredictionVector.decodeConfig.fScale = 1 << handle->backwardPredictionVector.decodeConfig.fCodeMinus1;
     }
   }
 
@@ -2988,28 +2750,28 @@ extern "C" int mpvhdec_DecPscSj(const int handleAddress, MPVSjStream* const stre
   const int dispatchIndex = pictureCodingType + profileBias * 5;
   const int intraDispatchIndex = 10 * handle->conditionCallbacks[4] + pictureCodingType + profileBias * 5;
 
-  handle->decodeReadKernelPrimary = reinterpret_cast<MPVMacroblockDecodeFn>(&moho::movie::MPVDEC_InitScanStateIntra);
-  handle->decodeReadKernelSecondary = reinterpret_cast<MPVMacroblockDecodeFn>(&moho::movie::MPVDEC_InitScanStatePredicted);
+  handle->decodeIntraMacroblock = reinterpret_cast<MPVDecodeContextFn>(&moho::movie::MPVDEC_InitScanStateIntra);
+  handle->decodeResidualMacroblock = reinterpret_cast<MPVDecodeContextFn>(&moho::movie::MPVDEC_InitScanStatePredicted);
   handle->decodeMacroblockByType = dec_mbs_func[pictureCodingType];
 
   if (handle->conditionCallbacks[10] != 0) {
-    handle->decodeSkipRunByType = thumbnail_skip_func[dispatchIndex];
-    handle->decodeIntraMacroblockByType = thumbnail_mc_intra_func[intraDispatchIndex];
-    handle->decodePredictedMode1 = thumbnail_mc_backward_func[dispatchIndex];
-    handle->decodePredictedMode2 = thumbnail_mc_forward_func[dispatchIndex];
-    handle->decodePredictedMode3 = thumbnail_mc_bidirect_func[dispatchIndex];
+    handle->decodeSkipRun = reinterpret_cast<MPVDecodeSkipRunFn>(thumbnail_skip_func[dispatchIndex]);
+    handle->decodePostIntraMacroblock = reinterpret_cast<MPVDecodeContextFn>(thumbnail_mc_intra_func[intraDispatchIndex]);
+    handle->decodePredictedModes[1] = reinterpret_cast<MPVDecodeContextFn>(thumbnail_mc_backward_func[dispatchIndex]);
+    handle->decodePredictedModes[2] = reinterpret_cast<MPVDecodeContextFn>(thumbnail_mc_forward_func[dispatchIndex]);
+    handle->decodePredictedModes[3] = reinterpret_cast<MPVDecodeContextFn>(thumbnail_mc_bidirect_func[dispatchIndex]);
   } else {
-    handle->decodeSkipRunByType = skip_func[dispatchIndex];
-    handle->decodeIntraMacroblockByType = s_mc_intra_func[intraDispatchIndex];
-    handle->decodePredictedMode1 = s_mc_backward_func[dispatchIndex];
-    handle->decodePredictedMode2 = s_mc_forward_func[dispatchIndex];
-    handle->decodePredictedMode3 = s_mc_bidirect_func[dispatchIndex];
+    handle->decodeSkipRun = reinterpret_cast<MPVDecodeSkipRunFn>(skip_func[dispatchIndex]);
+    handle->decodePostIntraMacroblock = reinterpret_cast<MPVDecodeContextFn>(s_mc_intra_func[intraDispatchIndex]);
+    handle->decodePredictedModes[1] = reinterpret_cast<MPVDecodeContextFn>(s_mc_backward_func[dispatchIndex]);
+    handle->decodePredictedModes[2] = reinterpret_cast<MPVDecodeContextFn>(s_mc_forward_func[dispatchIndex]);
+    handle->decodePredictedModes[3] = reinterpret_cast<MPVDecodeContextFn>(s_mc_bidirect_func[dispatchIndex]);
   }
-  handle->decodePredictedMode0 = handle->decodePredictedMode2;
+  handle->decodePredictedModes[0] = handle->decodePredictedModes[2];
 
   while (ConsumeHeaderFlag(bitstreamState)) {
     (void)ConsumeHeaderBits(bitstreamState, 8);
-    if (ComputeHeaderChunkSplitOffset(handle, bitstreamState) >= handle->activeHeaderChunk.size) {
+    if (ComputeHeaderChunkSplitOffset(handle, bitstreamState) >= handle->activeChunk.byteCount) {
       return -3;
     }
   }
@@ -3025,10 +2787,10 @@ extern "C" int mpvhdec_DecPscSj(const int handleAddress, MPVSjStream* const stre
  * Consumes one extension start-code delimiter payload lane from SJ stream state
  * and advances to the next delimiter.
  */
-extern "C" int mpvhdec_DecEscSj(const int handleAddress, MPVSjStream* const stream)
+extern "C" int mpvhdec_DecEscSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
-  SjRequestChunk(stream, handle->activeHeaderChunk);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  SjRequestChunk(stream, handle->activeChunk);
   CommitHeaderChunkSplit(handle, stream, kMpvStartCodeByteCount);
   MPV_GoNextDelimSj(stream);
   return 0;
@@ -3041,15 +2803,15 @@ extern "C" int mpvhdec_DecEscSj(const int handleAddress, MPVSjStream* const stre
  * Parses user-data start-code payload through the user-data analyzer, commits
  * consumed bytes, and advances to the next delimiter.
  */
-extern "C" int mpvhdec_DecUdscSj(const int handleAddress, MPVSjStream* const stream)
+extern "C" int mpvhdec_DecUdscSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
-  SjRequestChunk(stream, handle->activeHeaderChunk);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  SjRequestChunk(stream, handle->activeChunk);
 
   const int analyzeResult = mpvhdec_AnalyUd(
     reinterpret_cast<std::int32_t*>(handle),
-    handle->activeHeaderChunk.data,
-    handle->activeHeaderChunk.size
+    handle->activeChunk.bytes(),
+    handle->activeChunk.byteCount
   );
 
   CommitHeaderChunkSplit(handle, stream, kMpvStartCodeByteCount);
@@ -3066,7 +2828,7 @@ extern "C" int mpvhdec_DecUdscSj(const int handleAddress, MPVSjStream* const str
  */
 extern "C" int mpvhdec_DecSeqUdsc(std::int32_t* const handleWords, const std::uint8_t* const userDataStart, const int consumedByteCount)
 {
-  auto* const handle = reinterpret_cast<MPVHandleInit*>(handleWords);
+  auto* const handle = reinterpret_cast<MPVDecoderScanContext*>(handleWords);
   const std::uint8_t* const payloadStart = userDataStart + 4;
   const int payloadBytes = consumedByteCount - 4;
 
@@ -3087,8 +2849,8 @@ extern "C" int mpvhdec_DecSeqUdsc(std::int32_t* const handleWords, const std::ui
 
   const bool useIdcPrecisionKernel = (handle->sequenceUserDataIdcPrecisionMode != 0);
   handle->decodeReadKernelIntra = useIdcPrecisionKernel ? &mpvhdec_ReadKernelIntraIdcPrec3 : &mpvhdec_ReadKernelIntraDefault;
-  handle->decodeTablePrimary = useIdcPrecisionKernel ? mpvvlc2_y_dcsiz : mpvvlc_y_dcsiz;
-  handle->decodeTableSecondary = useIdcPrecisionKernel ? mpvvlc2_c_dcsiz : mpvvlc_c_dcsiz;
+  handle->decodeTablePrimary = reinterpret_cast<const std::uint8_t*>(useIdcPrecisionKernel ? mpvvlc2_y_dcsiz : mpvvlc_y_dcsiz);
+  handle->decodeTableSecondary = reinterpret_cast<const std::uint8_t*>(useIdcPrecisionKernel ? mpvvlc2_c_dcsiz : mpvvlc_c_dcsiz);
 
   if (handle->sequenceStcCodePrimary == 8) {
     return -1;
@@ -3108,7 +2870,7 @@ extern "C" int mpvhdec_DecSeqUdsc(std::int32_t* const handleWords, const std::ui
  */
 extern "C" int mpvhdec_AnalyUd(std::int32_t* const handleWords, std::uint8_t* const userDataStart, const int chunkSize)
 {
-  auto* const handle = reinterpret_cast<MPVHandleInit*>(handleWords);
+  auto* const handle = reinterpret_cast<MPVDecoderScanContext*>(handleWords);
   int userDataStatus = 0;
   int fallbackStatus = 0;
 
@@ -3131,23 +2893,23 @@ extern "C" int mpvhdec_AnalyUd(std::int32_t* const handleWords, std::uint8_t* co
   if (currentHeaderContext >= 0 && currentHeaderContext < 4) {
     MPVUserSjLane& userLane = handle->userSjLanes[currentHeaderContext];
     if (userLane.streamObjectAddress != 0) {
-      MPVSjChunk sinkChunk{};
+      moho::SjChunkRange sinkChunk{};
       UserDataSinkRequestChunk(userLane.streamObjectAddress, consumedBytes, sinkChunk);
 
-      const int firstCopyBytes = std::min(sinkChunk.size, consumedBytes);
+      const int firstCopyBytes = std::min(sinkChunk.byteCount, consumedBytes);
       // Bitstream IO: user-data bytes into the sink chunk.
-      std::copy_n(userDataStart, static_cast<std::size_t>(firstCopyBytes), sinkChunk.data);
-      sinkChunk.size = firstCopyBytes;
+      std::copy_n(userDataStart, static_cast<std::size_t>(firstCopyBytes), sinkChunk.bytes());
+      sinkChunk.byteCount = firstCopyBytes;
       UserDataSinkSubmitChunk(userLane.streamObjectAddress, sinkChunk);
 
       if (firstCopyBytes < consumedBytes) {
-        MPVSjChunk tailSinkChunk{};
+        moho::SjChunkRange tailSinkChunk{};
         const int remainingBytes = consumedBytes - firstCopyBytes;
         UserDataSinkRequestChunk(userLane.streamObjectAddress, remainingBytes, tailSinkChunk);
-        const int tailCopyBytes = std::min(tailSinkChunk.size, remainingBytes);
+        const int tailCopyBytes = std::min(tailSinkChunk.byteCount, remainingBytes);
         // Bitstream IO: user-data tail bytes into the wrapped sink chunk.
-        std::copy_n(userDataStart + firstCopyBytes, static_cast<std::size_t>(tailCopyBytes), tailSinkChunk.data);
-        tailSinkChunk.size = tailCopyBytes;
+        std::copy_n(userDataStart + firstCopyBytes, static_cast<std::size_t>(tailCopyBytes), tailSinkChunk.bytes());
+        tailSinkChunk.byteCount = tailCopyBytes;
         UserDataSinkSubmitChunk(userLane.streamObjectAddress, tailSinkChunk);
       }
 
@@ -3159,7 +2921,7 @@ extern "C" int mpvhdec_AnalyUd(std::int32_t* const handleWords, std::uint8_t* co
   }
 
   if (currentHeaderContext == 3 && handle->pictureUserBufferAddress != 0) {
-    const int userCopyBytes = std::max(0, std::min(consumedBytes, handle->pictureUserContextAddress));
+    const int userCopyBytes = std::max(0, std::min(consumedBytes, static_cast<int>(handle->pictureUserBufferBytes)));
     // Bitstream IO: user-data bytes into the caller picture buffer.
     std::copy_n(userDataStart, static_cast<std::size_t>(userCopyBytes), static_cast<std::uint8_t*>(AddressToMutablePointer(handle->pictureUserBufferAddress)));
     handle->pictureUserDecodeState = userCopyBytes;
@@ -3402,35 +3164,35 @@ extern "C" int MPVHDEC_GoNextDelim(std::uint8_t** const cursor, int* const remai
  * preserving a 3-byte suffix when no delimiter is present so split delimiters
  * across chunk boundaries are still detected on the next request.
  */
-extern "C" int MPV_GoNextDelimSj(MPVSjStream* const stream)
+extern "C" int MPV_GoNextDelimSj(moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVSjChunk activeChunk{};
+  moho::SjChunkRange activeChunk{};
   SjRequestChunk(stream, activeChunk);
-  if (activeChunk.size < 4) {
+  if (activeChunk.byteCount < 4) {
     SjSubmitTailChunk(stream, activeChunk);
     return 0;
   }
 
   while (true) {
-    std::uint8_t* const delimiterCursor = MPV_SearchDelim(activeChunk.data, activeChunk.size, -1);
+    std::uint8_t* const delimiterCursor = MPV_SearchDelim(activeChunk.bytes(), activeChunk.byteCount, -1);
     if (delimiterCursor != nullptr) {
       const int delimiterMask = MPV_CheckDelim(delimiterCursor);
-      MPVSjChunk tailChunk{};
-      const int splitOffset = static_cast<int>(delimiterCursor - activeChunk.data);
+      moho::SjChunkRange tailChunk{};
+      const int splitOffset = static_cast<int>(delimiterCursor - activeChunk.bytes());
       SJ_SplitChunk(&activeChunk, splitOffset, &activeChunk, &tailChunk);
       SjReleaseHeadChunk(stream, activeChunk);
       SjSubmitTailChunk(stream, tailChunk);
       return delimiterMask;
     }
 
-    MPVSjChunk carryChunk{};
-    const int splitOffset = activeChunk.size - 3;
+    moho::SjChunkRange carryChunk{};
+    const int splitOffset = activeChunk.byteCount - 3;
     SJ_SplitChunk(&activeChunk, splitOffset, &activeChunk, &carryChunk);
     SjReleaseHeadChunk(stream, activeChunk);
     SjSubmitTailChunk(stream, carryChunk);
 
     SjRequestChunk(stream, activeChunk);
-    if (activeChunk.size < 4) {
+    if (activeChunk.byteCount < 4) {
       SjSubmitTailChunk(stream, activeChunk);
       return 0;
     }
@@ -3444,19 +3206,19 @@ extern "C" int MPV_GoNextDelimSj(MPVSjStream* const stream)
  * Recovers SJ stream position to required delimiter mask and updates per-handle
  * recovery counters/flags.
  */
-extern "C" int MPVHDEC_RecoverSj(const int handleAddress, const int expectedDelimiterMask, MPVSjStream* const stream)
+extern "C" int MPVHDEC_RecoverSj(const SofdecAddressWord handleAddress, const int expectedDelimiterMask, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   const int conditionLaneValue = handle->conditionCallbacks[1];
 
   if (handle->recoverNeededFlag != 0) {
     ++handle->recoverState;
     handle->recoverNeededFlag = 0;
-    ++handle->recoverEventCounter;
+    ++handle->errorInfo.recoverEventCounter;
     if (conditionLaneValue == 0) {
       return -2;
     }
-    ++handle->recoverConditionCounter;
+    ++handle->errorInfo.recoverConditionCounter;
   }
 
   const int fallbackStatus = (conditionLaneValue != 0) ? -3 : -2;
@@ -3484,12 +3246,12 @@ extern "C" int MPVHDEC_RecoverSj(const int handleAddress, const int expectedDeli
  * Requests a chunk slice from one lane, ungets it to the opposite lane policy,
  * and returns moved byte count.
  */
-extern "C" int MPV_MoveChunk(MPVSjStream* const stream, const int lane, const int byteCount)
+extern "C" int MPV_MoveChunk(moho::SofdecSjSupplyHandle* const stream, const int lane, const int byteCount)
 {
-  MPVSjChunk chunk{};
-  stream->vtable->requestChunk(stream, lane, byteCount, &chunk);
-  stream->vtable->releaseChunk(stream, lane == 0 ? 1 : 0, &chunk);
-  return chunk.size;
+  moho::SjChunkRange chunk{};
+  stream->dispatchTable->getChunk(stream, lane, byteCount, &chunk);
+  stream->dispatchTable->putChunk(stream, lane == 0 ? 1 : 0, &chunk);
+  return chunk.byteCount;
 }
 
 /**
@@ -3500,16 +3262,16 @@ extern "C" int MPV_MoveChunk(MPVSjStream* const stream, const int lane, const in
  * row/bitstate lanes, splits consumed bytes, and dispatches picture-type
  * macroblock decoding.
  */
-extern "C" int MPVSL_DecSliceOne(const int handleAddress, MPVSjStream* const stream)
+extern "C" int MPVSL_DecSliceOne(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(handle);
 
-  stream->vtable->requestChunk(stream, 1, 0x7FFFFFFF, &decodeContext->activeChunk);
+  stream->dispatchTable->getChunk(stream, 1, 0x7FFFFFFF, &decodeContext->activeChunk);
 
-  const std::uint8_t* const chunkBase = decodeContext->activeChunk.data;
+  const std::uint8_t* const chunkBase = decodeContext->activeChunk.bytes();
   std::uint8_t* byteCursor = reinterpret_cast<std::uint8_t*>(
-    reinterpret_cast<std::uintptr_t>(chunkBase) & static_cast<std::uintptr_t>(0xFFFFFFFCu)
+    reinterpret_cast<std::uintptr_t>(chunkBase) & ~static_cast<std::uintptr_t>(3)
   );
 
   const int bitShift = static_cast<int>(
@@ -3541,7 +3303,7 @@ extern "C" int MPVSL_DecSliceOne(const int handleAddress, MPVSjStream* const str
 
   decodeContext->macroblockColumn = -1;
   const int macroblockRow = static_cast<int>(static_cast<std::uint8_t>(sliceStartCode)) - 1;
-  decodeContext->macroblockLinearIndex = macroblockRow * decodeContext->macroblocksPerRow - 1;
+  decodeContext->macroblockLinearIndex = macroblockRow * decodeContext->macroblocksPerRow() - 1;
   decodeContext->macroblockRow = macroblockRow;
 
   int consumedBitCount = 0;
@@ -3565,9 +3327,9 @@ extern "C" int MPVSL_DecSliceOne(const int handleAddress, MPVSjStream* const str
 
   MPVDEC_ResetMv(reinterpret_cast<moho::movie::MPVMotionState*>(&decodeContext->forwardPredictionVector));
   MPVDEC_ResetMv(reinterpret_cast<moho::movie::MPVMotionState*>(&decodeContext->backwardPredictionVector));
-  MPVDEC_ResetDc(reinterpret_cast<MPVDecoderContextPrefix*>(decodeContext));
+  MPVDEC_ResetDc(reinterpret_cast<MPVDecoderScanContext*>(decodeContext));
 
-  MPVSjChunk tailChunk{};
+  moho::SjChunkRange tailChunk{};
   if (static_cast<std::int32_t>(extensionBits) < 0) {
     int trackedBitCount = consumedBitCount + 7;
     while (true) {
@@ -3586,8 +3348,8 @@ extern "C" int MPVSL_DecSliceOne(const int handleAddress, MPVSjStream* const str
       const int consumedOffset = static_cast<int>(
         reinterpret_cast<std::intptr_t>(byteCursor + (trackedBitCount >> 3)) - reinterpret_cast<std::intptr_t>(chunkBase) - 8
       );
-      if (decodeContext->activeChunk.size <= consumedOffset) {
-        return decodeContext->activeChunk.size;
+      if (decodeContext->activeChunk.byteCount <= consumedOffset) {
+        return decodeContext->activeChunk.byteCount;
       }
 
       if (static_cast<std::int32_t>(extensionBits) >= 0) {
@@ -3611,53 +3373,97 @@ extern "C" int MPVSL_DecSliceOne(const int handleAddress, MPVSjStream* const str
   );
 
   SJ_SplitChunk(&decodeContext->activeChunk, splitOffset, &decodeContext->activeChunk, &tailChunk);
-  stream->vtable->releaseChunk(stream, 0, &decodeContext->activeChunk);
-  stream->vtable->submitChunk(stream, 1, &tailChunk);
+  stream->dispatchTable->putChunk(stream, 0, &decodeContext->activeChunk);
+  stream->dispatchTable->ungetChunk(stream, 1, &tailChunk);
   return handle->decodeMacroblockByType(decodeContext, stream);
 }
 
-namespace
+/**
+ * Address: 0x00B00EB0 (FUN_00B00EB0, _concealOnExec)
+ *
+ * What it does:
+ * Conceals every macroblock from `startMacroblock` up to the current decode
+ * position by cloning the row above; on the top row it smears the pixel to the
+ * left, and the very first macroblock is filled with mid-grey (Y 0x10, C 0x80).
+ * Condition 10 (1/8-scale output) disables it.
+ */
+extern "C" unsigned int __cdecl concealOnExec(const SofdecAddressWord handleAddress, const unsigned int startMacroblock)
 {
-  struct MPVConcealOffMarking
-  {
-    std::uint8_t reserved000_1B7[0x1B8]{};
-    std::int32_t thumbnailCodecEnabled = 0; // +0x1B8
-    std::uint8_t reserved1BC_1D7[0x1C]{};
-    std::int32_t macroblocksPerRow = 0; // +0x1D8
-    std::uint8_t reserved1DC_293[0xB8]{};
-    std::int32_t outputChromaPlaneBase = 0; // +0x294
-    std::uint8_t reserved298_29F[0x08]{};
-    std::int16_t lumaStrideBytes = 0; // +0x2A0
-    std::uint8_t reserved2A2_337[0x96]{};
-    std::int32_t macroblockLinearLimit = 0; // +0x338
-    std::uint8_t reserved33C_139B[0x1060]{};
-    std::int32_t concealScanStartMacroblock = 0; // +0x139C
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
+  unsigned int result = static_cast<unsigned int>(handle->conditionCallbacks[10]);
+  if (result != 0u) {
+    return result;
+  }
+
+  const std::int32_t lumaStride = handle->planeBase2Stride;
+  const std::int32_t chromaStride = handle->planeBase1Stride;
+  const unsigned int macroblockLimit = static_cast<unsigned int>(handle->macroblockLinearIndex);
+  std::uint8_t* const lumaPlane = AddressToMutablePointer(handle->planeBase2);
+  std::uint8_t* const chromaUPlane = AddressToMutablePointer(handle->planeBase0);
+  std::uint8_t* const chromaVPlane = AddressToMutablePointer(handle->planeBase1);
+
+  unsigned int macroblockIndex = startMacroblock;
+  if (macroblockIndex >= macroblockLimit) {
+    return result;
+  }
+
+  const std::int32_t lumaRowAdvance = static_cast<std::int32_t>((static_cast<std::uint32_t>(lumaStride) >> 2u) << 2u);
+  const std::int32_t chromaRowAdvance = static_cast<std::int32_t>((static_cast<std::uint32_t>(chromaStride) >> 2u) << 2u);
+
+  // Fills one 8- or 16-wide block either from the row above, by smearing the
+  // pixel on its left, or with a constant.
+  const auto cloneFromAbove =
+    [](std::uint8_t* write, const std::int32_t stride, const std::int32_t rowAdvance, const int rows, const std::size_t width) {
+    const std::uint8_t* read = write - stride;
+    for (int row = 0; row < rows; ++row) {
+      std::memcpy(write, read, width);
+      write += rowAdvance;
+      read += rowAdvance;
+    }
   };
-  static_assert(
-    offsetof(MPVConcealOffMarking, thumbnailCodecEnabled) == 0x1B8,
-    "MPVConcealOffMarking::thumbnailCodecEnabled offset must be 0x1B8"
-  );
-  static_assert(
-    offsetof(MPVConcealOffMarking, macroblocksPerRow) == 0x1D8,
-    "MPVConcealOffMarking::macroblocksPerRow offset must be 0x1D8"
-  );
-  static_assert(
-    offsetof(MPVConcealOffMarking, outputChromaPlaneBase) == 0x294,
-    "MPVConcealOffMarking::outputChromaPlaneBase offset must be 0x294"
-  );
-  static_assert(
-    offsetof(MPVConcealOffMarking, lumaStrideBytes) == 0x2A0,
-    "MPVConcealOffMarking::lumaStrideBytes offset must be 0x2A0"
-  );
-  static_assert(
-    offsetof(MPVConcealOffMarking, macroblockLinearLimit) == 0x338,
-    "MPVConcealOffMarking::macroblockLinearLimit offset must be 0x338"
-  );
-  static_assert(
-    offsetof(MPVConcealOffMarking, concealScanStartMacroblock) == 0x139C,
-    "MPVConcealOffMarking::concealScanStartMacroblock offset must be 0x139C"
-  );
-} // namespace
+  const auto smearFromLeft = [](std::uint8_t* write, const std::int32_t rowAdvance, const int rows, const std::size_t width) {
+    for (int row = 0; row < rows; ++row) {
+      std::memset(write, write[-1], width);
+      write += rowAdvance;
+    }
+  };
+  const auto fillConstant = [](std::uint8_t* write, const std::int32_t rowAdvance, const int rows, const std::size_t width, const int value) {
+    for (int row = 0; row < rows; ++row) {
+      std::memset(write, value, width);
+      write += rowAdvance;
+    }
+  };
+
+  do {
+    const unsigned int macroblocksPerRow = static_cast<unsigned int>(handle->macroblocksPerRow());
+    const std::int32_t macroblockColumn = static_cast<std::int32_t>(macroblockIndex % macroblocksPerRow);
+    const std::int32_t lumaRowBase = static_cast<std::int32_t>((macroblockIndex / macroblocksPerRow) << 4u);
+    const std::int32_t chromaRowBase = lumaRowBase >> 1;
+    const std::int32_t chromaColumn = (macroblockColumn << 4) >> 1;
+
+    std::uint8_t* const lumaCurrent = lumaPlane + ((macroblockColumn << 4) + (lumaStride * lumaRowBase));
+    std::uint8_t* const chromaUCurrent = chromaUPlane + (chromaColumn + (chromaStride * chromaRowBase));
+    std::uint8_t* const chromaVCurrent = chromaVPlane + (chromaColumn + (chromaStride * chromaRowBase));
+
+    if (chromaRowBase != 0) {
+      cloneFromAbove(lumaCurrent, lumaStride, lumaRowAdvance, 16, 16u);
+      cloneFromAbove(chromaUCurrent, chromaStride, chromaRowAdvance, 8, 8u);
+      cloneFromAbove(chromaVCurrent, chromaStride, chromaRowAdvance, 8, 8u);
+    } else if (chromaColumn != 0) {
+      smearFromLeft(lumaCurrent, lumaRowAdvance, 16, 16u);
+      smearFromLeft(chromaUCurrent, chromaRowAdvance, 8, 8u);
+      smearFromLeft(chromaVCurrent, chromaRowAdvance, 8, 8u);
+    } else {
+      fillConstant(lumaCurrent, lumaRowAdvance, 16, 16u, 0x10);
+      fillConstant(chromaUCurrent, chromaRowAdvance, 8, 8u, 0x80);
+      fillConstant(chromaVCurrent, chromaRowAdvance, 8, 8u, 0x80);
+    }
+
+    result = ++macroblockIndex;
+  } while (macroblockIndex < macroblockLimit);
+
+  return result;
+}
 
 /**
  * Address: 0x00B00D80 (FUN_00B00D80, _concealOff)
@@ -3699,7 +3505,7 @@ extern "C" int concealOn(const SofdecAddressWord handleAddress)
   auto* const context = reinterpret_cast<MPVDecoderScanContext*>(handle);
 
   const int concealStart =
-    (handle->concealScanStartMacroblock < 0) ? 0 : handle->concealScanStartMacroblock;
+    (handle->lastDecodedMacroblockIndex < 0) ? 0 : handle->lastDecodedMacroblockIndex;
 
   int& pictureType = handle->pictureAttributes.headerControlWords[6];
   if (pictureType == kPictureTypeP && handle->postCreateMarker == 0) {
@@ -3753,30 +3559,30 @@ extern "C" int concealOn(const SofdecAddressWord handleAddress)
  * Applies conceal-off chroma damping over all macroblocks from the current
  * conceal scan marker to the linear decode limit.
  */
-extern "C" unsigned int concealOffMarking(const int handleAddress)
+extern "C" unsigned int concealOffMarking(const SofdecAddressWord handleAddress)
 {
-  auto* const handle = reinterpret_cast<MPVConcealOffMarking*>(AddressToMutablePointer(handleAddress));
-  unsigned int result = static_cast<unsigned int>(handle->thumbnailCodecEnabled);
+  auto* const handle = AsHandleView(handleAddress);
+  unsigned int result = static_cast<unsigned int>(handle->conditionCallbacks[10]);
   if (result != 0u) {
     return result;
   }
 
-  const int concealStart = handle->concealScanStartMacroblock;
+  const int concealStart = handle->lastDecodedMacroblockIndex;
   const unsigned int startMacroblock = (concealStart < 0) ? 0u : static_cast<unsigned int>(concealStart);
-  const unsigned int macroblockLimit = static_cast<unsigned int>(handle->macroblockLinearLimit);
+  const unsigned int macroblockLimit = static_cast<unsigned int>(handle->macroblockLinearIndex);
   if (startMacroblock >= macroblockLimit) {
     return result;
   }
 
-  const unsigned int lumaStrideBytes = static_cast<unsigned int>(static_cast<std::uint16_t>(handle->lumaStrideBytes));
-  const int rowAdvanceBytes = static_cast<int>(4u * (lumaStrideBytes >> 2u));
+  const unsigned int planeBase1Stride = static_cast<unsigned int>(static_cast<std::uint16_t>(handle->planeBase1Stride));
+  const int rowAdvanceBytes = static_cast<int>(4u * (planeBase1Stride >> 2u));
   unsigned int macroblockIndex = startMacroblock;
   while (true) {
-    const unsigned int macroblockColumn = macroblockIndex % static_cast<unsigned int>(handle->macroblocksPerRow);
-    const unsigned int macroblockRow = macroblockIndex / static_cast<unsigned int>(handle->macroblocksPerRow);
+    const unsigned int macroblockColumn = macroblockIndex % static_cast<unsigned int>(handle->macroblocksPerRow());
+    const unsigned int macroblockRow = macroblockIndex / static_cast<unsigned int>(handle->macroblocksPerRow());
     auto* rowWords = reinterpret_cast<std::uint32_t*>(AddressToMutablePointer(
-      handle->outputChromaPlaneBase + static_cast<int>((16u * macroblockColumn) >> 1u)
-      + static_cast<int>(lumaStrideBytes * ((16u * macroblockRow) >> 1u))
+      handle->planeBase0 + static_cast<int>((16u * macroblockColumn) >> 1u)
+      + static_cast<int>(planeBase1Stride * ((16u * macroblockRow) >> 1u))
     ));
 
     for (int row = 0; row < 8; ++row) {
@@ -3803,7 +3609,7 @@ extern "C" unsigned int concealOffMarking(const int handleAddress)
  * Executes the conceal-on stage and immediately follows with conceal-off
  * marking for the same decode handle.
  */
-extern "C" int concealOnMarking(const int handleAddress)
+extern "C" int concealOnMarking(const SofdecAddressWord handleAddress)
 {
   concealOn(handleAddress);
   return static_cast<int>(concealOffMarking(handleAddress));
@@ -3818,11 +3624,11 @@ extern "C" int concealOnMarking(const int handleAddress)
  * call it through there. A zeroed table put a null pointer in that lane, so
  * the first discontinuity in any picture killed the decode thread outright.
  */
-extern "C" int (__cdecl* conceal_fn_tbl[4])(int handleAddress) = {
-  reinterpret_cast<int(__cdecl*)(int)>(&::concealOff),
-  reinterpret_cast<int(__cdecl*)(int)>(&::concealOn),
-  reinterpret_cast<int(__cdecl*)(int)>(&::concealOffMarking),
-  reinterpret_cast<int(__cdecl*)(int)>(&::concealOnMarking),
+extern "C" MPVConcealFrameFn conceal_fn_tbl[4] = {
+  reinterpret_cast<MPVConcealFrameFn>(&::concealOff),
+  reinterpret_cast<MPVConcealFrameFn>(&::concealOn),
+  reinterpret_cast<MPVConcealFrameFn>(&::concealOffMarking),
+  reinterpret_cast<MPVConcealFrameFn>(&::concealOnMarking),
 };
 
 /**
@@ -3832,12 +3638,12 @@ extern "C" int (__cdecl* conceal_fn_tbl[4])(int handleAddress) = {
  * Selects conceal callback dispatch from condition lane `12` and resets the
  * per-frame conceal scan marker.
  */
-extern "C" void MPVCONCEAL_StartFrame(const int handleAddress)
+extern "C" void MPVCONCEAL_StartFrame(const SofdecAddressWord handleAddress)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   const int concealMode = handle->conditionCallbacks[kMpvConditionIndexConcealMode];
-  handle->concealScanStartMacroblock = -1;
-  handle->concealFrameHandler = ::conceal_fn_tbl[concealMode];
+  handle->lastDecodedMacroblockIndex = -1;
+  handle->macroblockDiscontinuityHandler = reinterpret_cast<MPVDecodeContextFn>(::conceal_fn_tbl[concealMode]);
 }
 
 /**
@@ -3848,12 +3654,12 @@ extern "C" void MPVCONCEAL_StartFrame(const int handleAddress)
  * needed and fixing macroblock lane state when trailing data leaves a partial
  * frame.
  */
-extern "C" int MPVSL_DecPicture(const int handleAddress, MPVSjStream* const stream)
+extern "C" int MPVSL_DecPicture(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(handle);
 
-  decodeContext->serviceCountdown = handle->serviceReloadInterval;
+  decodeContext->serviceCountdown = static_cast<int>(handle->serviceReloadInterval());
   MPVCONCEAL_StartFrame(handleAddress);
   decodeContext->motionClampCounter = 0;
 
@@ -3862,15 +3668,15 @@ extern "C" int MPVSL_DecPicture(const int handleAddress, MPVSjStream* const stre
     return MPVERR_SetCode(handleAddress, recoverStatus);
   }
 
-  MPVSjChunk currentChunk{};
+  moho::SjChunkRange currentChunk{};
   while (true) {
-    stream->vtable->requestChunk(stream, 1, 0x7FFFFFFF, &currentChunk);
-    stream->vtable->submitChunk(stream, 1, &currentChunk);
+    stream->dispatchTable->getChunk(stream, 1, 0x7FFFFFFF, &currentChunk);
+    stream->dispatchTable->ungetChunk(stream, 1, &currentChunk);
 
-    if (currentChunk.size < 4) {
+    if (currentChunk.byteCount < 4) {
       break;
     }
-    if ((MPV_CheckDelim(currentChunk.data) & 1) == 0) {
+    if ((MPV_CheckDelim(currentChunk.bytes()) & 1) == 0) {
       break;
     }
 
@@ -3886,16 +3692,16 @@ extern "C" int MPVSL_DecPicture(const int handleAddress, MPVSjStream* const stre
   }
 
   if (decodeContext->macroblockLinearIndex != decodeContext->macroblockLinearLimit) {
-    ++handle->recoverEventCounter;
+    ++handle->errorInfo.recoverEventCounter;
     decodeContext->macroblockLinearIndex = decodeContext->macroblockLinearLimit + 1;
-    decodeContext->macroblockRow = decodeContext->macroblockRowsCount;
+    decodeContext->macroblockRow = decodeContext->macroblockRowsCount();
     decodeContext->macroblockColumn = 0;
     decodeContext->macroblockDiscontinuityHandler(decodeContext);
   }
 
   ++decodeContext->lastDecodedMacroblockIndex;
   if (decodeContext->motionClampCounter != 0) {
-    handle->recoverEventCounter += decodeContext->motionClampCounter;
+    handle->errorInfo.recoverEventCounter += decodeContext->motionClampCounter;
   }
 
   return 0;
@@ -3908,13 +3714,13 @@ extern "C" int MPVSL_DecPicture(const int handleAddress, MPVSjStream* const stre
  * Exports current picture-attribute block for one decoder handle and applies
  * optional tile-count normalization when condition lane `10` is enabled.
  */
-extern "C" int MPV_GetPicAtr(const int handleAddress, MPVPictureAttributeExportBlock* const outPictureAttributes)
+extern "C" int MPV_GetPicAtr(const SofdecAddressWord handleAddress, MPVPictureAttributeExportBlock* const outPictureAttributes)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidDecodePicAtrHandle);
   }
 
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   const auto* const sourceAttributes = reinterpret_cast<const MPVPictureAttributeExportBlock*>(&handle->pictureAttributes);
   *outPictureAttributes = *sourceAttributes;
 
@@ -3936,7 +3742,7 @@ extern "C" int MPV_GetPicAtr(const int handleAddress, MPVPictureAttributeExportB
  * What it does:
  * Returns sequence bit-rate code lane for one decoder handle.
  */
-extern "C" int MPV_GetBitRate(const int handleAddress, int* const outBitRateCode)
+extern "C" int MPV_GetBitRate(const SofdecAddressWord handleAddress, int* const outBitRateCode)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidGetBitRateHandle);
@@ -3954,13 +3760,13 @@ extern "C" int MPV_GetBitRate(const int handleAddress, int* const outBitRateCode
  * estimate from sequence bitrate and picture delay codes.
  */
 extern "C" int
-MPV_GetVbvBufSiz(const int handleAddress, int* const outVbvBufferBytes, int* const outPictureVbvDelay, int* const outNominalByteRate)
+MPV_GetVbvBufSiz(const SofdecAddressWord handleAddress, int* const outVbvBufferBytes, int* const outPictureVbvDelay, int* const outNominalByteRate)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidGetVbvBufferSizeHandle);
   }
 
-  const MPVHandleInit* const handle = AsHandleView(handleAddress);
+  const MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   *outVbvBufferBytes = handle->sequenceVbvBufferCode << 11;
   *outPictureVbvDelay = handle->pictureVbvDelay;
 
@@ -3979,13 +3785,13 @@ MPV_GetVbvBufSiz(const int handleAddress, int* const outVbvBufferBytes, int* con
  * What it does:
  * Returns GOP closed/broken-link flags captured from decoded GOP headers.
  */
-extern "C" int MPV_GetLinkFlg(const int handleAddress, int* const outClosedGopFlag, int* const outBrokenLinkFlag)
+extern "C" int MPV_GetLinkFlg(const SofdecAddressWord handleAddress, int* const outClosedGopFlag, int* const outBrokenLinkFlag)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidGetLinkFlagsHandle);
   }
 
-  const MPVHandleInit* const handle = AsHandleView(handleAddress);
+  const MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   *outClosedGopFlag = handle->gopClosedFlag;
   *outBrokenLinkFlag = handle->gopBrokenLinkFlag;
   return 0;
@@ -3999,14 +3805,14 @@ extern "C" int MPV_GetLinkFlg(const int handleAddress, int* const outClosedGopFl
  * `MPV_DecodeFrmSj`, and returns consumed-byte count.
  */
 extern "C" int
-MPV_DecodeFrm(const int handleAddress, const int* const frameBufferRange, int* const outConsumedBytes, MPVFrameDecodeSession* const frameSession)
+MPV_DecodeFrm(const SofdecAddressWord handleAddress, const int* const frameBufferRange, int* const outConsumedBytes, MPVFrameDecodeSession* const frameSession)
 {
   moho::SofdecSjMemoryHandle* const sjMemoryHandle = SJMEM_Create(frameBufferRange[0], frameBufferRange[1]);
   if (sjMemoryHandle == nullptr) {
     return -1;
   }
 
-  const int decodeResult = MPV_DecodeFrmSj(handleAddress, reinterpret_cast<MPVSjStream*>(sjMemoryHandle), frameSession);
+  const int decodeResult = MPV_DecodeFrmSj(handleAddress, reinterpret_cast<moho::SofdecSjSupplyHandle*>(sjMemoryHandle), frameSession);
   *outConsumedBytes = frameBufferRange[1] - SJMEM_GetNumData(sjMemoryHandle, 1);
   SJMEM_Destroy(sjMemoryHandle);
   return decodeResult;
@@ -4019,7 +3825,7 @@ MPV_DecodeFrm(const int handleAddress, const int* const frameBufferRange, int* c
  * Scans one raw frame buffer for next skip-eligible delimiter mask (`0xCC`)
  * and reports skipped byte count.
  */
-extern "C" int MPV_SkipFrm(const int handleAddress, const int* const frameBufferRange, int* const outSkippedBytes)
+extern "C" int MPV_SkipFrm(const SofdecAddressWord handleAddress, const int* const frameBufferRange, int* const outSkippedBytes)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidSkipFrameHandle);
@@ -4044,9 +3850,9 @@ extern "C" int MPV_SkipFrm(const int handleAddress, const int* const frameBuffer
  * Selects thumbnail DCT dispatch lanes when the thumbnail codec flag is
  * active.
  */
-extern "C" void MPVBDEC_StartFrame(const int handleAddress)
+extern "C" void MPVBDEC_StartFrame(const SofdecAddressWord handleAddress)
 {
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   if (handle->conditionCallbacks[10] != 0) {
     handle->dctTransformSixBlocks = &DCT_FsriTrans6BlkThumbnail;
     handle->dctTransformCbp = &DCT_FsriTransCbpThumbnail;
@@ -4070,22 +3876,21 @@ extern "C" void MPVFRM_Init()
  * Decodes one frame from SJ stream lanes, exports the handle picture-attribute
  * block, and returns recovery-counter deltas through the decode session.
  */
-extern "C" int MPV_DecodeFrmSj(const int handleAddress, MPVSjStream* const stream, MPVFrameDecodeSession* const frameSession)
+extern "C" int MPV_DecodeFrmSj(const SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* const stream, MPVFrameDecodeSession* const frameSession)
 {
   if (MPVLIB_CheckHn(handleAddress) != 0) {
     return MPVERR_SetCode(0, kMpvErrInvalidDecodeFrameHandle);
   }
 
-  MPVHandleInit* const handle = AsHandleView(handleAddress);
+  MPVDecoderScanContext* const handle = AsHandleView(handleAddress);
   if (handle->pictureCodecClassification == 2) {
     return MPVM2V_DecodeFrm(handleAddress, stream, frameSession);
   }
 
-  const int recoverEventCounterBefore = handle->recoverEventCounter;
-  const int recoverConditionCounterBefore = handle->recoverConditionCounter;
+  const int recoverEventCounterBefore = handle->errorInfo.recoverEventCounter;
+  const int recoverConditionCounterBefore = handle->errorInfo.recoverConditionCounter;
 
-  // Raw handle-storage install: frame session block over the reserved lane.
-  std::memcpy(handle->reserved_264, frameSession, sizeof(*frameSession));
+  handle->frameSession = *frameSession;
   MPVUMC_InitOutRfb(handleAddress);
   MPVCMC_InitMcOiRt(handleAddress);
   MPVCMC_SetCcnt(handleAddress);
@@ -4113,8 +3918,8 @@ extern "C" int MPV_DecodeFrmSj(const int handleAddress, MPVSjStream* const strea
       SignedRoundUpShift(outPictureAttributes->pictureAttributes.headerControlWords[1], 4);
   }
 
-  frameSession->recoverEventDelta = handle->recoverEventCounter - recoverEventCounterBefore;
-  frameSession->recoverConditionDelta = handle->recoverConditionCounter - recoverConditionCounterBefore;
+  frameSession->recoverEventDelta = handle->errorInfo.recoverEventCounter - recoverEventCounterBefore;
+  frameSession->recoverConditionDelta = handle->errorInfo.recoverConditionCounter - recoverConditionCounterBefore;
   return decodeResult;
 }
 
@@ -4151,20 +3956,13 @@ extern "C" int mpvbdec_SetupIxa(const int sourceSequenceAddress, std::uint8_t* c
  * Address: 0x00AF62A0 (FUN_00AF62A0, _MPVABDEC_Init)
  *
  * What it does:
- * Seeds ABDEC per-handle decode LUT lanes (scan permutation, mask LUTs, and
- * run-level table descriptors).
+ * Seeds the shared AB-decode tables (scan permutation, mask LUT, thresholds
+ * and run-level lane descriptors).
  */
-extern "C" int MPVABDEC_Init(const int handleAddress)
+extern "C" int MPVABDEC_Init(MPVSharedWork* const setup)
 {
-  auto* const setup = reinterpret_cast<MPVAbdecSetup*>(AddressToMutablePointer(handleAddress));
-
-  if (handleAddress + static_cast<int>(offsetof(MPVAbdecSetup, intraScanPermutation)) != 0) {
-    UTY_MemcpyDword(setup->intraScanPermutation, gMpvIntraScanPermutationRuntime, 0x10u);
-  }
-
-  if (handleAddress + static_cast<int>(offsetof(MPVAbdecSetup, forwardMaskLut)) != 0) {
-    UTY_MemcpyDword(setup->forwardMaskLut, kMpvAbdecForwardMaskLut, 8u);
-  }
+  UTY_MemcpyDword(setup->intraScanPermutation, gMpvIntraScanPermutationRuntime, 0x10u);
+  UTY_MemcpyDword(setup->forwardMaskLut, kMpvAbdecForwardMaskLut, 8u);
 
   // Codec table blob install: static threshold LUT into setup storage.
   std::copy_n(kMpvAbdecThresholdLut, kMpvAbdecThresholdCount, setup->thresholdLut);
@@ -4176,7 +3974,7 @@ extern "C" int MPVABDEC_Init(const int handleAddress)
   setup->runLevelLanes[2].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_1) - 0x20;
   setup->runLevelLanes[2].bitLength = 0x12;
 
-  const int runLevel0aBaseMinusBias = PointerToAddress(mpvvlc_run_level_0a) - 0x20;
+  const SofdecAddressWord runLevel0aBaseMinusBias = PointerToAddress(mpvvlc_run_level_0a) - 0x20;
   setup->runLevelLanes[3].tableBaseMinusBias = runLevel0aBaseMinusBias;
   setup->runLevelLanes[3].bitLength = 0x11;
   setup->runLevelLanes[4].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_0b) - 0x20;
@@ -4184,7 +3982,7 @@ extern "C" int MPVABDEC_Init(const int handleAddress)
   setup->runLevelLanes[5].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_0c) - 0x20;
   setup->runLevelLanes[5].bitLength = 0x0F;
 
-  return runLevel0aBaseMinusBias;
+  return static_cast<int>(runLevel0aBaseMinusBias);
 }
 
 /**
@@ -4194,7 +3992,7 @@ extern "C" int MPVABDEC_Init(const int handleAddress)
  * Builds B-picture decoder scan remap/quant tables and then applies ABDEC
  * per-handle setup.
  */
-extern "C" int MPVBDEC_Init(const int handleAddress)
+extern "C" int MPVBDEC_Init(MPVSharedWork* const sharedWork)
 {
   nullsub_50();
 
@@ -4216,7 +4014,7 @@ extern "C" int MPVBDEC_Init(const int handleAddress)
     gMpvDefaultIntraQuantMatrix[quantizerLane] = quantizerValue;
   }
 
-  return MPVABDEC_Init(handleAddress);
+  return MPVABDEC_Init(sharedWork);
 }
 
 /**
@@ -5119,7 +4917,7 @@ extern "C" unsigned int DCT_FsriInit()
  * matrix, then column-domain stage with packed signed-16 output writes.
  */
 extern "C" int
-DCT_FsriTrans(const float* const sourceCoefficients, std::int32_t* const destinationPackedWords, const int scaleTableBaseAddress)
+DCT_FsriTrans(const float* const sourceCoefficients, std::int32_t* const destinationPackedWords, const SofdecAddressWord scaleTableBaseAddress)
 {
   const int b0TableAddress = static_cast<int>(gFsriB0AlignedAddress);
   const auto* const b0Table = reinterpret_cast<const __m128*>(AddressToMutablePointer(b0TableAddress));
@@ -5281,20 +5079,19 @@ DCT_FsriTrans(const float* const sourceCoefficients, std::int32_t* const destina
  * Runs six-block FSRI transform dispatch using coded-block mask progression,
  * falling back to DC-only replicated lanes for zero-AC blocks.
  */
-extern "C" int DCT_FsriTransCore(const int workStateAddress, int codedBlockMask)
+extern "C" int DCT_FsriTransCore(MPVDecoderScanContext* const handle, int codedBlockMask)
 {
-  auto* const workState = reinterpret_cast<MPVDctFsriTransformWork*>(AddressToMutablePointer(workStateAddress));
-  float* blockCoefficients = workState->blockCoefficientBase;
-  std::int32_t** blockOutputs = workState->blockOutputWordPointers;
-  const int scaleTableBaseAddress = workState->scaleTableBaseAddress;
+  float* blockCoefficients = handle->dctCoefficients;
+  const SofdecAddressWord* blockOutputs = handle->dctBlockOutputAddresses;
+  const SofdecAddressWord scaleTableBaseAddress = handle->dctScaleTableAddress;
 
   int remainingBlocks = 6;
-  const std::uint8_t* blockHasAc = workState->blockHasAcCoefficients;
+  const std::uint8_t* blockHasAc = handle->decodeFlags;
 
   do {
     if (codedBlockMask < 0) {
       if (*blockHasAc != 0) {
-        (void)DCT_FsriTrans(blockCoefficients, *blockOutputs, scaleTableBaseAddress);
+        (void)DCT_FsriTrans(blockCoefficients, reinterpret_cast<std::int32_t*>(AddressToMutablePointer(*blockOutputs)), scaleTableBaseAddress);
       } else {
         const float dcSample = blockCoefficients[0];
         const float roundedValue = (dcSample >= 0.0f) ? (dcSample + 0.5f) : (dcSample - 0.5f);
@@ -5303,7 +5100,7 @@ extern "C" int DCT_FsriTransCore(const int workStateAddress, int codedBlockMask)
           static_cast<std::uint16_t>(dcWord)
           | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(dcWord)) << 16u);
 
-        std::int32_t* const outputWords = *blockOutputs;
+        auto* const outputWords = reinterpret_cast<std::int32_t*>(AddressToMutablePointer(*blockOutputs));
         for (int i = 0; i < 32; ++i) {
           outputWords[i] = static_cast<std::int32_t>(packedWord);
         }
@@ -5326,9 +5123,9 @@ extern "C" int DCT_FsriTransCore(const int workStateAddress, int codedBlockMask)
  * What it does:
  * Forces transform processing on all six macroblock lanes.
  */
-extern "C" int DCT_FsriTrans6Blk(const int workStateAddress)
+extern "C" int DCT_FsriTrans6Blk(MPVDecoderScanContext* const handle)
 {
-  return DCT_FsriTransCore(workStateAddress, -1);
+  return DCT_FsriTransCore(handle, -1);
 }
 
 /**
@@ -5337,10 +5134,9 @@ extern "C" int DCT_FsriTrans6Blk(const int workStateAddress)
  * What it does:
  * Processes FSRI transform only for lanes selected by runtime CBP mask.
  */
-extern "C" int DCT_FsriTransCbp(const int workStateAddress)
+extern "C" int DCT_FsriTransCbp(MPVDecoderScanContext* const handle)
 {
-  auto* const workState = reinterpret_cast<MPVDctFsriTransformWork*>(AddressToMutablePointer(workStateAddress));
-  return DCT_FsriTransCore(workStateAddress, workState->codedBlockPatternMask);
+  return DCT_FsriTransCore(handle, handle->codedBlockPatternMask);
 }
 
 /**
@@ -5350,13 +5146,12 @@ extern "C" int DCT_FsriTransCbp(const int workStateAddress)
  * Runs six-lane thumbnail DC conversion, writing one rounded signed 16-bit
  * sample per block when selected by coded-block mask progression.
  */
-extern "C" int dctfsri_TransCoreThumbnail(const int workStateAddress, int codedBlockMask)
+extern "C" int dctfsri_TransCoreThumbnail(MPVDecoderScanContext* const handle, int codedBlockMask)
 {
-  auto* const workState = reinterpret_cast<MPVDctFsriThumbnailWork*>(AddressToMutablePointer(workStateAddress));
-  const float* blockCoefficients = workState->blockCoefficientBase;
-  std::int16_t** blockOutputs = workState->blockOutputSamplePointers;
+  const float* blockCoefficients = handle->dctCoefficients;
+  const SofdecAddressWord* blockOutputs = handle->dctBlockOutputAddresses;
 
-  int result = workStateAddress;
+  int result = PointerToAddress(handle);
   int remainingBlocks = 6;
   do {
     if (codedBlockMask < 0) {
@@ -5371,10 +5166,10 @@ extern "C" int dctfsri_TransCoreThumbnail(const int workStateAddress, int codedB
         roundedSample = static_cast<std::int16_t>(roundedWord);
         result = roundedWord;
       } else {
-        result = PointerToAddress(*blockOutputs);
+        result = static_cast<int>(*blockOutputs);
       }
 
-      *(*blockOutputs) = roundedSample;
+      *reinterpret_cast<std::int16_t*>(AddressToMutablePointer(*blockOutputs)) = roundedSample;
     }
 
     blockCoefficients += 64;
@@ -5392,9 +5187,9 @@ extern "C" int dctfsri_TransCoreThumbnail(const int workStateAddress, int codedB
  * What it does:
  * Forces thumbnail DC conversion across all six block lanes.
  */
-extern "C" int DCT_FsriTrans6BlkThumbnail(const int workStateAddress)
+extern "C" int DCT_FsriTrans6BlkThumbnail(MPVDecoderScanContext* const handle)
 {
-  return dctfsri_TransCoreThumbnail(workStateAddress, -1);
+  return dctfsri_TransCoreThumbnail(handle, -1);
 }
 
 /**
@@ -5403,33 +5198,14 @@ extern "C" int DCT_FsriTrans6BlkThumbnail(const int workStateAddress)
  * What it does:
  * Runs thumbnail DC conversion for block lanes selected by runtime CBP mask.
  */
-extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
+extern "C" int DCT_FsriTransCbpThumbnail(MPVDecoderScanContext* const handle)
 {
-  const auto* const workState = reinterpret_cast<const MPVDctFsriThumbnailWork*>(AddressToMutablePointer(workStateAddress));
-  return dctfsri_TransCoreThumbnail(workStateAddress, workState->codedBlockPatternMask);
+  return dctfsri_TransCoreThumbnail(handle, handle->codedBlockPatternMask);
 }
 
   using MPVThumbnailReferenceKernelFn = int(__cdecl*)(MPVPredictionKernelState* kernelState);
 
-  struct MPVThumbnailPlaneLayout
-  {
-    int lumaPlane0Base;       // +0x00
-    int lumaPlane1Base;       // +0x04
-    int chromaPlaneBase;      // +0x08
-    std::int16_t lumaStride;  // +0x0C
-    std::int16_t chromaStride; // +0x0E
-  };
-
-  static_assert(sizeof(MPVThumbnailPlaneLayout) == 0x10, "MPVThumbnailPlaneLayout size must be 0x10");
-  static_assert(offsetof(MPVThumbnailPlaneLayout, lumaStride) == 0x0C, "MPVThumbnailPlaneLayout::lumaStride offset must be 0x0C");
-  static_assert(offsetof(MPVThumbnailPlaneLayout, chromaStride) == 0x0E, "MPVThumbnailPlaneLayout::chromaStride offset must be 0x0E");
-
-  inline const MPVThumbnailPlaneLayout& GetThumbnailPlaneLayout(const MPVDecoderContextPrefix* context)
-  {
-    return *reinterpret_cast<const MPVThumbnailPlaneLayout*>(&context->planeBase0);
-  }
-
-  inline void ConfigureThumbnailCopyTargetSamples(MPVDecoderContextPrefix* context, const MPVSpatialDelta& delta)
+  inline void ConfigureThumbnailCopyTargetSamples(MPVDecoderScanContext* context, const MPVSpatialDelta& delta)
   {
     context->copyTargets.blocks[0].pixels = AddressToMutablePointer(delta.luma + context->planeBase0);
     context->copyTargets.blocks[1].pixels = AddressToMutablePointer(delta.luma + context->planeBase1);
@@ -5458,7 +5234,7 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Computes thumbnail luma/chroma byte offsets for the current MB row/column
    * from caller-provided luma/chroma stride values.
    */
-  int mpvumct_CalcOfs(const MPVDecoderContextPrefix* context, const int lumaStride, const int chromaStride, MPVSpatialDelta& outDelta)
+  int mpvumct_CalcOfs(const MPVDecoderScanContext* context, const int lumaStride, const int chromaStride, MPVSpatialDelta& outDelta)
   {
     const int macroblockRow = context->macroblockRow;
     const int macroblockColumn = context->macroblockColumn;
@@ -5548,22 +5324,22 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * including motion clamp accounting and 6-block kernel dispatch.
    */
   int mpvumct_OneReadMb(
-    MPVDecoderContextPrefix* context,
+    MPVDecoderScanContext* context,
     const int predictionWriteBaseAddress,
     MPVSpatialDelta& outDelta,
     const MPVMacroblockOffsets& blockOffsets,
     const MPVPredictionVectorSet& motionVector
   )
   {
-    const int lumaStride = static_cast<int>(blockOffsets.lumaStride);
-    const int chromaStride = static_cast<int>(blockOffsets.chromaStride);
+    const int lumaStride = static_cast<int>(blockOffsets.chromaStride);
+    const int chromaStride = static_cast<int>(blockOffsets.lumaStride);
     mpvumct_CalcOfs(context, lumaStride, chromaStride, outDelta);
 
     int motionX = motionVector.horizontalDelta;
     int motionY = motionVector.verticalDelta;
 
     const int minMotionX = -32 * context->macroblockColumn;
-    const int maxMotionX = 32 * (context->macroblocksPerRow - context->macroblockColumn) - 32;
+    const int maxMotionX = 32 * (context->macroblocksPerRow() - context->macroblockColumn) - 32;
     if (motionX < minMotionX) {
       motionX = minMotionX;
       ++DecoderStatsOf(context)->motionClampCounter;
@@ -5573,7 +5349,7 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
     }
 
     const int minMotionY = -32 * context->macroblockRow;
-    const int maxMotionY = 32 * (context->macroblockRowsCount - context->macroblockRow) - 32;
+    const int maxMotionY = 32 * (context->macroblockRowsCount() - context->macroblockRow) - 32;
     if (motionY < minMotionY) {
       motionY = minMotionY;
       ++DecoderStatsOf(context)->motionClampCounter;
@@ -5601,18 +5377,18 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
     kernelState->destinationStride = lumaStride;
 
     kernelState->destinationBlockBase = predictionWriteBaseAddress;
-    kernelState->sourcePrimary = blockOffsets.lumaOffset + lumaSourceBase;
+    kernelState->sourcePrimary = blockOffsets.chromaUPlaneAddress + lumaSourceBase;
     kernelState->sourceSecondary = kernelState->sourcePrimary + lumaHorizontalParity + lumaStride;
     lumaKernel(kernelState);
 
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0x40;
-    kernelState->sourcePrimary = blockOffsets.chromaUOffset + lumaSourceBase;
+    kernelState->sourcePrimary = blockOffsets.chromaVPlaneAddress + lumaSourceBase;
     kernelState->sourceSecondary = kernelState->sourcePrimary + lumaHorizontalParity + lumaStride;
     lumaKernel(kernelState);
 
     kernelState->destinationStride = chromaStride;
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0x80;
-    kernelState->sourcePrimary = blockOffsets.chromaVOffset + chromaSourceBase;
+    kernelState->sourcePrimary = blockOffsets.lumaPlaneAddress + chromaSourceBase;
     kernelState->sourceSecondary = kernelState->sourcePrimary + chromaHorizontalParity + chromaStride;
     chromaKernel(kernelState);
 
@@ -5641,43 +5417,43 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    */
   int mpvumct_OneMakeMb(const MPVBlockSourceSet& source, MPVCopyDestinationSet& destinations, const int predictionSignBits)
   {
-    const int sampleBaseBias = source.sampleBaseBias;
+    const SofdecAddressWord clipTableAddress = source.clipTableAddress;
     const std::int16_t* const sampleAddressLut = source.sampleAddressLut;
     const std::uint8_t* const predictionSamples = source.forwardSamples;
 
     int result = static_cast<int>(predictionSamples[0]);
     if (predictionSignBits < 0) {
-      result = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[0]) + result));
+      result = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[0]) + result));
     }
     *destinations.blocks[0].pixels = static_cast<std::uint8_t>(result);
 
     std::uint8_t sample = predictionSamples[64];
     if ((predictionSignBits & 0x40000000) != 0) {
-      sample = ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[64]) + static_cast<int>(sample));
+      sample = ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[64]) + static_cast<int>(sample));
     }
     *destinations.blocks[1].pixels = sample;
 
     sample = predictionSamples[128];
     if ((predictionSignBits & 0x20000000) != 0) {
-      sample = ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[128]) + static_cast<int>(sample));
+      sample = ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[128]) + static_cast<int>(sample));
     }
     *destinations.blocks[2].pixels = sample;
 
     sample = predictionSamples[192];
     if ((predictionSignBits & 0x10000000) != 0) {
-      sample = ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[192]) + static_cast<int>(sample));
+      sample = ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[192]) + static_cast<int>(sample));
     }
     *destinations.blocks[3].pixels = sample;
 
     sample = predictionSamples[256];
     if ((predictionSignBits & 0x08000000) != 0) {
-      sample = ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[256]) + static_cast<int>(sample));
+      sample = ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[256]) + static_cast<int>(sample));
     }
     *destinations.blocks[4].pixels = sample;
 
     sample = predictionSamples[320];
     if ((predictionSignBits & 0x04000000) != 0) {
-      sample = ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[320]) + static_cast<int>(sample));
+      sample = ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[320]) + static_cast<int>(sample));
     }
     *destinations.blocks[5].pixels = sample;
     return static_cast<int>(sample);
@@ -5692,44 +5468,44 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    */
   int mpvumct_BiMakeMb(const MPVBlockSourceSet& source, MPVCopyDestinationSet& destinations, const int predictionSignBits)
   {
-    const int sampleBaseBias = source.sampleBaseBias;
+    const SofdecAddressWord clipTableAddress = source.clipTableAddress;
     const std::int16_t* const sampleAddressLut = source.sampleAddressLut;
     const std::uint8_t* const forwardSamples = source.forwardSamples;
     const std::uint8_t* const backwardSamples = source.backwardSamples;
 
     int blended = (static_cast<int>(forwardSamples[0]) + static_cast<int>(backwardSamples[0]) + 1) >> 1;
     if (predictionSignBits < 0) {
-      blended = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[0]) + blended));
+      blended = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[0]) + blended));
     }
     *destinations.blocks[0].pixels = static_cast<std::uint8_t>(blended);
 
     blended = (static_cast<int>(forwardSamples[64]) + static_cast<int>(backwardSamples[64]) + 1) >> 1;
     if ((predictionSignBits & 0x40000000) != 0) {
-      blended = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[64]) + blended));
+      blended = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[64]) + blended));
     }
     *destinations.blocks[1].pixels = static_cast<std::uint8_t>(blended);
 
     blended = (static_cast<int>(forwardSamples[128]) + static_cast<int>(backwardSamples[128]) + 1) >> 1;
     if ((predictionSignBits & 0x20000000) != 0) {
-      blended = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[128]) + blended));
+      blended = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[128]) + blended));
     }
     *destinations.blocks[2].pixels = static_cast<std::uint8_t>(blended);
 
     blended = (static_cast<int>(forwardSamples[192]) + static_cast<int>(backwardSamples[192]) + 1) >> 1;
     if ((predictionSignBits & 0x10000000) != 0) {
-      blended = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[192]) + blended));
+      blended = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[192]) + blended));
     }
     *destinations.blocks[3].pixels = static_cast<std::uint8_t>(blended);
 
     blended = (static_cast<int>(forwardSamples[256]) + static_cast<int>(backwardSamples[256]) + 1) >> 1;
     if ((predictionSignBits & 0x08000000) != 0) {
-      blended = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[256]) + blended));
+      blended = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[256]) + blended));
     }
     *destinations.blocks[4].pixels = static_cast<std::uint8_t>(blended);
 
     blended = (static_cast<int>(forwardSamples[320]) + static_cast<int>(backwardSamples[320]) + 1) >> 1;
     if ((predictionSignBits & 0x04000000) != 0) {
-      blended = static_cast<int>(ReadAddressedSample(sampleBaseBias, static_cast<int>(sampleAddressLut[320]) + blended));
+      blended = static_cast<int>(ReadAddressedSample(clipTableAddress, static_cast<int>(sampleAddressLut[320]) + blended));
     }
     *destinations.blocks[5].pixels = static_cast<std::uint8_t>(blended);
     return blended;
@@ -5746,8 +5522,7 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
     *destinations.blocks[0].pixels = ReadAddressedSample(lumaBaseAddress, static_cast<int>(sourceAddressLut[0]));
     *destinations.blocks[1].pixels = ReadAddressedSample(lumaBaseAddress, static_cast<int>(sourceAddressLut[64]));
 
-    const std::uintptr_t thumbnailMode = reinterpret_cast<std::uintptr_t>(destinations.block0Base);
-    if (thumbnailMode == 4u) {
+    if (destinations.outputMode == 4) {
       lumaBaseAddress -= 0x10;
     }
 
@@ -5765,7 +5540,7 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Decrements thumbnail MB address by skip amount and wraps row/column across
    * the left boundary.
    */
-  MPVDecoderContextPrefix* mpvumct_SubMbadr(MPVDecoderContextPrefix* context, const int decrement)
+  MPVDecoderScanContext* mpvumct_SubMbadr(MPVDecoderScanContext* context, const int decrement)
   {
     int nextColumn = context->macroblockColumn + (1 - decrement);
     context->macroblockLinearIndex += (1 - decrement);
@@ -5774,7 +5549,7 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
     if (nextColumn < 0) {
       int row = context->macroblockRow;
       do {
-        nextColumn += context->macroblocksPerRow;
+        nextColumn += context->macroblocksPerRow();
         --row;
       } while (nextColumn < 0);
 
@@ -5791,12 +5566,12 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * What it does:
    * Increments thumbnail MB address by one and wraps row/column at row width.
    */
-  MPVDecoderContextPrefix* mpvumct_IncreMbadr(MPVDecoderContextPrefix* context)
+  MPVDecoderScanContext* mpvumct_IncreMbadr(MPVDecoderScanContext* context)
   {
     const int nextColumn = context->macroblockColumn + 1;
     context->macroblockColumn = nextColumn;
 
-    if (nextColumn >= context->macroblocksPerRow) {
+    if (nextColumn >= context->macroblocksPerRow()) {
       context->macroblockColumn = 0;
       ++context->macroblockRow;
     }
@@ -5816,13 +5591,13 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
     const MPVSpatialDelta& delta, const MPVMacroblockOffsets& sourceOffsets, const MPVMacroblockOffsets& destinationOffsets
   )
   {
-    *AddressToMutablePointer(delta.luma + destinationOffsets.lumaOffset) = ReadAddressedSample(delta.luma, sourceOffsets.lumaOffset);
-    *AddressToMutablePointer(delta.luma + destinationOffsets.chromaUOffset) = ReadAddressedSample(delta.luma, sourceOffsets.chromaUOffset);
+    *AddressToMutablePointer(delta.luma + destinationOffsets.chromaUPlaneAddress) = ReadAddressedSample(delta.luma, sourceOffsets.chromaUPlaneAddress);
+    *AddressToMutablePointer(delta.luma + destinationOffsets.chromaVPlaneAddress) = ReadAddressedSample(delta.luma, sourceOffsets.chromaVPlaneAddress);
 
-    const int destinationChromaOffset = destinationOffsets.chromaVOffset;
-    const int sourceChromaAddress = delta.chroma + sourceOffsets.chromaVOffset;
+    const int destinationChromaOffset = destinationOffsets.lumaPlaneAddress;
+    const int sourceChromaAddress = delta.chroma + sourceOffsets.lumaPlaneAddress;
     const int destinationChromaAddress = delta.chroma + destinationChromaOffset;
-    const int chromaStride = static_cast<int>(destinationOffsets.chromaStride);
+    const int chromaStride = static_cast<int>(destinationOffsets.lumaStride);
 
     const std::uint8_t sourceTopLeft = *AddressToPointer(sourceChromaAddress);
     const std::uint8_t sourceTopRight = *AddressToPointer(sourceChromaAddress + 1);
@@ -5843,14 +5618,13 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Decodes one thumbnail intra MB by building destination sample pointers and
    * writing one sample per 8x8 block.
    */
-  extern "C" int MPVUMCT_Intra(MPVDecoderContextPrefix* context)
+  extern "C" int MPVUMCT_Intra(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
-    const MPVThumbnailPlaneLayout& thumbnailPlaneLayout = GetThumbnailPlaneLayout(context);
     mpvumct_CalcOfs(
       context,
-      static_cast<int>(thumbnailPlaneLayout.lumaStride),
-      static_cast<int>(thumbnailPlaneLayout.chromaStride),
+      static_cast<int>(context->planeBase1Stride),
+      static_cast<int>(context->planeBase2Stride),
       delta
     );
     ConfigureThumbnailCopyTargetSamples(context, delta);
@@ -5864,14 +5638,14 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Reconstructs one thumbnail forward-predicted MB and writes one output
    * sample per block.
    */
-  extern "C" int MPVUMCT_Forward(MPVDecoderContextPrefix* context)
+  extern "C" int MPVUMCT_Forward(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
     mpvumct_OneReadMb(
       context,
       PointerToAddress(context->blockSources.forwardSamples),
       delta,
-      context->forwardOffsets,
+      context->frameSession.forwardReference,
       context->forwardPredictionVector
     );
     ConfigureThumbnailCopyTargetSamples(context, delta);
@@ -5885,14 +5659,14 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Reconstructs one thumbnail backward-predicted MB and writes one output
    * sample per block.
    */
-  extern "C" int MPVUMCT_Backward(MPVDecoderContextPrefix* context)
+  extern "C" int MPVUMCT_Backward(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
     mpvumct_OneReadMb(
       context,
       PointerToAddress(context->blockSources.forwardSamples),
       delta,
-      context->backwardOffsets,
+      context->frameSession.backwardReference,
       context->backwardPredictionVector
     );
     ConfigureThumbnailCopyTargetSamples(context, delta);
@@ -5906,21 +5680,21 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Reconstructs one thumbnail bidirectional MB from forward/backward lanes
    * and writes one blended output sample per block.
    */
-  extern "C" int MPVUMCT_BiDirect(MPVDecoderContextPrefix* context)
+  extern "C" int MPVUMCT_BiDirect(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
     mpvumct_OneReadMb(
       context,
       PointerToAddress(context->blockSources.forwardSamples),
       delta,
-      context->forwardOffsets,
+      context->frameSession.forwardReference,
       context->forwardPredictionVector
     );
     mpvumct_OneReadMb(
       context,
       PointerToAddress(context->blockSources.backwardSamples),
       delta,
-      context->backwardOffsets,
+      context->frameSession.backwardReference,
       context->backwardPredictionVector
     );
 
@@ -5935,7 +5709,7 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Rewinds thumbnail MB address by skip count and propagates skipped P-picture
    * sample spans from forward to backward offsets.
    */
-  extern "C" int MPVUMCT_PpicSkipped(MPVDecoderContextPrefix* context, const int skippedMacroblockCount)
+  extern "C" int MPVUMCT_PpicSkipped(MPVDecoderScanContext* context, const int skippedMacroblockCount)
   {
     const int previousLinearIndex = context->macroblockLinearIndex;
     mpvumct_SubMbadr(context, skippedMacroblockCount);
@@ -5944,11 +5718,11 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
       MPVSpatialDelta delta{};
       mpvumct_CalcOfs(
         context,
-        static_cast<int>(context->forwardOffsets.lumaStride),
-        static_cast<int>(context->forwardOffsets.chromaStride),
+        static_cast<int>(context->frameSession.forwardReference.chromaStride),
+        static_cast<int>(context->frameSession.forwardReference.lumaStride),
         delta
       );
-      mpvumct_PpicSkipMb(delta, context->forwardOffsets, context->backwardOffsets);
+      mpvumct_PpicSkipMb(delta, context->frameSession.forwardReference, context->frameSession.backwardReference);
       mpvumct_IncreMbadr(context);
     }
 
@@ -5962,9 +5736,9 @@ extern "C" int DCT_FsriTransCbpThumbnail(const int workStateAddress)
    * Rewinds thumbnail MB address by skip count and decodes skipped B-picture
    * MBs through the configured callback.
    */
-  extern "C" int MPVUMCT_BpicSkipped(MPVDecoderContextPrefix* context, const int skippedMacroblockCount)
+  extern "C" int MPVUMCT_BpicSkipped(MPVDecoderScanContext* context, const int skippedMacroblockCount)
   {
-    const auto decodeMacroblock = context->decodeSkippedBpicMacroblock;
+    const auto decodeMacroblock = context->decodePredictedModes[0];
     const int previousLinearIndex = context->macroblockLinearIndex;
 
     context->predictionSignState = 0;
@@ -5987,14 +5761,14 @@ namespace moho::movie
    * macroblock plane-offset descriptor.
    */
   int MPVUMC_GetMacroblockPlaneOffsets(
-    const MPVDecoderContextPrefix* context, const MPVMacroblockOffsets& blockOffsets, MPVSpatialDelta& outDelta
+    const MPVDecoderScanContext* context, const MPVMacroblockOffsets& blockOffsets, MPVSpatialDelta& outDelta
   )
   {
     const int macroblockRowTimes16 = 16 * context->macroblockRow;
     const int macroblockColumnTimes8 = 8 * context->macroblockColumn;
 
-    outDelta.luma = macroblockColumnTimes8 + 8 * context->macroblockRow * static_cast<int>(blockOffsets.lumaStride);
-    outDelta.chroma = macroblockRowTimes16 * static_cast<int>(blockOffsets.chromaStride) + 2 * macroblockColumnTimes8;
+    outDelta.luma = macroblockColumnTimes8 + 8 * context->macroblockRow * static_cast<int>(blockOffsets.chromaStride);
+    outDelta.chroma = macroblockRowTimes16 * static_cast<int>(blockOffsets.lumaStride) + 2 * macroblockColumnTimes8;
 
     return macroblockRowTimes16;
   }
@@ -6062,11 +5836,11 @@ namespace moho::movie
   )
   {
     const int chromaDelta = mbDelta.luma;
-    const int chromaStride = static_cast<int>(destinationOffsets.lumaStride);
-    const std::uint8_t* const srcChromaU = AddressToPointer(chromaDelta + sourceOffsets.lumaOffset);
-    const std::uint8_t* const srcChromaV = AddressToPointer(chromaDelta + sourceOffsets.chromaUOffset);
-    std::uint8_t* const dstChromaU = AddressToMutablePointer(chromaDelta + destinationOffsets.lumaOffset);
-    std::uint8_t* const dstChromaV = AddressToMutablePointer(chromaDelta + destinationOffsets.chromaUOffset);
+    const int chromaStride = static_cast<int>(destinationOffsets.chromaStride);
+    const std::uint8_t* const srcChromaU = AddressToPointer(chromaDelta + sourceOffsets.chromaUPlaneAddress);
+    const std::uint8_t* const srcChromaV = AddressToPointer(chromaDelta + sourceOffsets.chromaVPlaneAddress);
+    std::uint8_t* const dstChromaU = AddressToMutablePointer(chromaDelta + destinationOffsets.chromaUPlaneAddress);
+    std::uint8_t* const dstChromaV = AddressToMutablePointer(chromaDelta + destinationOffsets.chromaVPlaneAddress);
 
     for (int row = 0; row < 8; ++row) {
       const int rowOffset = row * chromaStride;
@@ -6077,9 +5851,9 @@ namespace moho::movie
     }
 
     const int lumaDelta = mbDelta.chroma;
-    const int lumaStride = static_cast<int>(destinationOffsets.chromaStride);
-    const std::uint8_t* const srcLuma = AddressToPointer(lumaDelta + sourceOffsets.chromaVOffset);
-    std::uint8_t* const dstLuma = AddressToMutablePointer(lumaDelta + destinationOffsets.chromaVOffset);
+    const int lumaStride = static_cast<int>(destinationOffsets.lumaStride);
+    const std::uint8_t* const srcLuma = AddressToPointer(lumaDelta + sourceOffsets.lumaPlaneAddress);
+    std::uint8_t* const dstLuma = AddressToMutablePointer(lumaDelta + destinationOffsets.lumaPlaneAddress);
 
     for (int row = 0; row < 16; ++row) {
       const int rowOffset = row * lumaStride;
@@ -6224,7 +5998,7 @@ namespace moho::movie
    * dispatches interpolation kernels for 6 block destinations.
    */
   int form_prediction(
-    MPVDecoderContextPrefix* context,
+    MPVDecoderScanContext* context,
     int predictionWriteBaseAddress,
     MPVSpatialDelta* outDelta,
     const MPVMacroblockOffsets* blockOffsets,
@@ -6238,7 +6012,7 @@ namespace moho::movie
     int motionY = motionVector->verticalDelta;
 
     const int minHorizontal = -32 * context->macroblockColumn;
-    const int maxHorizontal = 32 * (context->macroblocksPerRow - context->macroblockColumn) - 32;
+    const int maxHorizontal = 32 * (context->macroblocksPerRow() - context->macroblockColumn) - 32;
     if (motionX < minHorizontal) {
       motionX = minHorizontal;
       ++DecoderStatsOf(context)->motionClampCounter;
@@ -6248,7 +6022,7 @@ namespace moho::movie
     }
 
     const int minVertical = -32 * context->macroblockRow;
-    const int maxVertical = 32 * (context->macroblockRowsCount - context->macroblockRow) - 32;
+    const int maxVertical = 32 * (context->macroblockRowsCount() - context->macroblockRow) - 32;
     if (motionY < minVertical) {
       motionY = minVertical;
       ++DecoderStatsOf(context)->motionClampCounter;
@@ -6257,7 +6031,7 @@ namespace moho::movie
       ++DecoderStatsOf(context)->motionClampCounter;
     }
 
-    const std::uint32_t interpolationParity = static_cast<std::uint32_t>(context->interpolationParity);
+    const std::uint32_t interpolationParity = static_cast<std::uint32_t>(context->interpolationParity());
     const std::uint32_t fullKernelIndex = (static_cast<std::uint32_t>(motionX) & 1u) + (((static_cast<std::uint32_t>(motionY) & 1u) + interpolationParity * 2u) * 2u);
     const std::uint32_t halfKernelIndex = static_cast<std::uint32_t>(((motionX / 2) & 1) + ((((motionY / 2) & 1) + static_cast<int>(interpolationParity) * 2) * 2));
 
@@ -6269,29 +6043,29 @@ namespace moho::movie
     const int halfHorizontalParity = halfHorizontal & 1;
     const int halfVerticalParity = halfVertical & 1;
 
-    const int lumaSourceBase = outDelta->luma + (halfHorizontal >> 1) + (halfVertical >> 1) * static_cast<int>(blockOffsets->lumaStride);
+    const int lumaSourceBase = outDelta->luma + (halfHorizontal >> 1) + (halfVertical >> 1) * static_cast<int>(blockOffsets->chromaStride);
     const int chromaSourceBase =
-      outDelta->chroma + (motionX >> 1) + (motionY >> 1) * static_cast<int>(blockOffsets->chromaStride);
+      outDelta->chroma + (motionX >> 1) + (motionY >> 1) * static_cast<int>(blockOffsets->lumaStride);
 
     auto* const kernelState = AsPredictionKernelState(context);
     const int lumaParityBias = halfHorizontalParity & static_cast<int>(interpolationParity);
     const int chromaParityBias = (motionX & 1) & static_cast<int>(interpolationParity);
 
-    kernelState->destinationStride = static_cast<int>(blockOffsets->lumaStride);
+    kernelState->destinationStride = static_cast<int>(blockOffsets->chromaStride);
     kernelState->destinationBlockBase = predictionWriteBaseAddress;
-    kernelState->sourcePrimary = blockOffsets->lumaOffset + lumaSourceBase;
-    kernelState->sourceSecondary = kernelState->sourcePrimary + lumaParityBias + static_cast<int>(blockOffsets->lumaStride);
+    kernelState->sourcePrimary = blockOffsets->chromaUPlaneAddress + lumaSourceBase;
+    kernelState->sourceSecondary = kernelState->sourcePrimary + lumaParityBias + static_cast<int>(blockOffsets->chromaStride);
     halfKernel(kernelState);
 
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0x40;
-    kernelState->sourcePrimary = blockOffsets->chromaUOffset + lumaSourceBase;
-    kernelState->sourceSecondary = kernelState->sourcePrimary + lumaParityBias + static_cast<int>(blockOffsets->lumaStride);
+    kernelState->sourcePrimary = blockOffsets->chromaVPlaneAddress + lumaSourceBase;
+    kernelState->sourceSecondary = kernelState->sourcePrimary + lumaParityBias + static_cast<int>(blockOffsets->chromaStride);
     halfKernel(kernelState);
 
-    kernelState->destinationStride = static_cast<int>(blockOffsets->chromaStride);
+    kernelState->destinationStride = static_cast<int>(blockOffsets->lumaStride);
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0x80;
-    kernelState->sourcePrimary = blockOffsets->chromaVOffset + chromaSourceBase;
-    kernelState->sourceSecondary = kernelState->sourcePrimary + chromaParityBias + static_cast<int>(blockOffsets->chromaStride);
+    kernelState->sourcePrimary = blockOffsets->lumaPlaneAddress + chromaSourceBase;
+    kernelState->sourceSecondary = kernelState->sourcePrimary + chromaParityBias + static_cast<int>(blockOffsets->lumaStride);
     fullKernel(kernelState);
 
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0xC0;
@@ -6300,8 +6074,8 @@ namespace moho::movie
     fullKernel(kernelState);
 
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0x100;
-    kernelState->sourcePrimary += 8 * static_cast<int>(blockOffsets->chromaStride) - 8;
-    kernelState->sourceSecondary += 8 * static_cast<int>(blockOffsets->chromaStride) - 8;
+    kernelState->sourcePrimary += 8 * static_cast<int>(blockOffsets->lumaStride) - 8;
+    kernelState->sourceSecondary += 8 * static_cast<int>(blockOffsets->lumaStride) - 8;
     fullKernel(kernelState);
 
     kernelState->destinationBlockBase = predictionWriteBaseAddress + 0x140;
@@ -6316,14 +6090,14 @@ namespace moho::movie
    * What it does:
    * Recovers forward-predicted MB samples then writes frame420 blocks.
    */
-  int MPVUMC_Forward(MPVDecoderContextPrefix* context)
+  int MPVUMC_Forward(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
     form_prediction(
       context,
       PointerToAddress(context->blockSources.forwardSamples),
       &delta,
-      &context->forwardOffsets,
+      &context->frameSession.forwardReference,
       &context->forwardPredictionVector
     );
     ConfigureCopyTargetPlanes(context, delta);
@@ -6336,14 +6110,14 @@ namespace moho::movie
    * What it does:
    * Recovers backward-predicted MB samples then writes frame420 blocks.
    */
-  int MPVUMC_Backward(MPVDecoderContextPrefix* context)
+  int MPVUMC_Backward(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
     form_prediction(
       context,
       PointerToAddress(context->blockSources.forwardSamples),
       &delta,
-      &context->backwardOffsets,
+      &context->frameSession.backwardReference,
       &context->backwardPredictionVector
     );
     ConfigureCopyTargetPlanes(context, delta);
@@ -6357,21 +6131,21 @@ namespace moho::movie
    * Recovers forward+backward MB samples and writes bi-directional frame420
    * blend blocks.
    */
-  int MPVUMC_BiDirect(MPVDecoderContextPrefix* context)
+  int MPVUMC_BiDirect(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
     form_prediction(
       context,
       PointerToAddress(context->blockSources.forwardSamples),
       &delta,
-      &context->forwardOffsets,
+      &context->frameSession.forwardReference,
       &context->forwardPredictionVector
     );
     form_prediction(
       context,
       PointerToAddress(context->blockSources.backwardSamples),
       &delta,
-      &context->backwardOffsets,
+      &context->frameSession.backwardReference,
       &context->backwardPredictionVector
     );
     ConfigureCopyTargetPlanes(context, delta);
@@ -6387,10 +6161,10 @@ namespace moho::movie
    * Computes destination plane pointers for the current MB and writes the six
    * intra 8x8 blocks through the LUT-based luma copy path.
    */
-  int MPVUMC_Intra(MPVDecoderContextPrefix* context)
+  int MPVUMC_Intra(MPVDecoderScanContext* context)
   {
     MPVSpatialDelta delta{};
-    MPVUMC_GetMacroblockPlaneOffsets(context, context->forwardOffsets, delta);
+    MPVUMC_GetMacroblockPlaneOffsets(context, context->frameSession.forwardReference, delta);
     ConfigureCopyTargetPlanes(context, delta);
     return MPVUMC_CopyIntraBlocks(context->intraCopyAddressLut, context->copyTargets, context->lumaBaseAddress);
   }
@@ -6415,28 +6189,28 @@ namespace moho::movie
           [&](std::uint8_t* dst)
           {
             dst[0] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[0]) + static_cast<int>(forwardSamples[0])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[0]) + static_cast<int>(forwardSamples[0])
             );
             dst[1] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[1]) + static_cast<int>(forwardSamples[1])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[1]) + static_cast<int>(forwardSamples[1])
             );
             dst[2] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[2]) + static_cast<int>(forwardSamples[2])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[2]) + static_cast<int>(forwardSamples[2])
             );
             dst[3] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[3]) + static_cast<int>(forwardSamples[3])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[3]) + static_cast<int>(forwardSamples[3])
             );
             dst[4] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[4]) + static_cast<int>(forwardSamples[4])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[4]) + static_cast<int>(forwardSamples[4])
             );
             dst[5] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[5]) + static_cast<int>(forwardSamples[5])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[5]) + static_cast<int>(forwardSamples[5])
             );
             dst[6] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[6]) + static_cast<int>(forwardSamples[6])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[6]) + static_cast<int>(forwardSamples[6])
             );
             dst[7] = ReadAddressedSample(
-              source->sampleBaseBias, static_cast<int>(sampleAddressLut[7]) + static_cast<int>(forwardSamples[7])
+              source->clipTableAddress, static_cast<int>(sampleAddressLut[7]) + static_cast<int>(forwardSamples[7])
             );
 
             sampleAddressLut += 8;
@@ -6484,35 +6258,35 @@ namespace moho::movie
           [&](std::uint8_t* dst)
           {
             dst[0] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[0]) + ((static_cast<int>(forwardSamples[0]) + static_cast<int>(backwardSamples[0]) + 1) >> 1)
             );
             dst[1] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[1]) + ((static_cast<int>(forwardSamples[1]) + static_cast<int>(backwardSamples[1]) + 1) >> 1)
             );
             dst[2] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[2]) + ((static_cast<int>(forwardSamples[2]) + static_cast<int>(backwardSamples[2]) + 1) >> 1)
             );
             dst[3] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[3]) + ((static_cast<int>(forwardSamples[3]) + static_cast<int>(backwardSamples[3]) + 1) >> 1)
             );
             dst[4] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[4]) + ((static_cast<int>(forwardSamples[4]) + static_cast<int>(backwardSamples[4]) + 1) >> 1)
             );
             dst[5] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[5]) + ((static_cast<int>(forwardSamples[5]) + static_cast<int>(backwardSamples[5]) + 1) >> 1)
             );
             dst[6] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[6]) + ((static_cast<int>(forwardSamples[6]) + static_cast<int>(backwardSamples[6]) + 1) >> 1)
             );
             dst[7] = ReadAddressedSample(
-              source->sampleBaseBias,
+              source->clipTableAddress,
               static_cast<int>(sampleAddressLut[7]) + ((static_cast<int>(forwardSamples[7]) + static_cast<int>(backwardSamples[7]) + 1) >> 1)
             );
 
@@ -6555,15 +6329,15 @@ namespace moho::movie
    * Rewinds MB address by skip count and copies forward prediction lanes into
    * backward lanes for each skipped P-picture MB.
    */
-  int MPVUMC_PpicSkipped(MPVDecoderContextPrefix* context, int skippedMacroblockCount)
+  int MPVUMC_PpicSkipped(MPVDecoderScanContext* context, int skippedMacroblockCount)
   {
     const int previousLinearIndex = context->macroblockLinearIndex;
     mpvumc_SubMbadr(context, skippedMacroblockCount);
 
     while (context->macroblockLinearIndex < previousLinearIndex) {
       MPVSpatialDelta mbDelta{};
-      MPVUMC_GetMacroblockPlaneOffsets(context, context->forwardOffsets, mbDelta);
-      MPVUMC_CopyPredictionSpan(mbDelta, context->forwardOffsets, context->backwardOffsets);
+      MPVUMC_GetMacroblockPlaneOffsets(context, context->frameSession.forwardReference, mbDelta);
+      MPVUMC_CopyPredictionSpan(mbDelta, context->frameSession.forwardReference, context->frameSession.backwardReference);
       mpvumc_IncreMbadr(context);
     }
 
@@ -6577,9 +6351,9 @@ namespace moho::movie
    * Rewinds MB address by skip count and decodes B-picture skipped MBs through
    * the configured callback until the prior linear MB index is reached.
    */
-  int MPVUMC_BpicSkipped(MPVDecoderContextPrefix* context, int skippedMacroblockCount)
+  int MPVUMC_BpicSkipped(MPVDecoderScanContext* context, int skippedMacroblockCount)
   {
-    const MPVDecodeMacroblockFn decodeMacroblock = context->decodeSkippedBpicMacroblock;
+    const MPVDecodeMacroblockFn decodeMacroblock = context->decodePredictedModes[0];
     const int previousLinearIndex = context->macroblockLinearIndex;
 
     context->predictionSignState = 0;
@@ -6599,7 +6373,7 @@ namespace moho::movie
    * Decrements MB address by a skip amount and wraps row/column indices when
    * the column crosses the left boundary.
    */
-  MPVDecoderContextPrefix* mpvumc_SubMbadr(MPVDecoderContextPrefix* context, int decrement)
+  MPVDecoderScanContext* mpvumc_SubMbadr(MPVDecoderScanContext* context, int decrement)
   {
     int nextColumn = context->macroblockColumn + (1 - decrement);
     context->macroblockLinearIndex += (1 - decrement);
@@ -6608,7 +6382,7 @@ namespace moho::movie
     if (nextColumn < 0) {
       int row = context->macroblockRow;
       do {
-        nextColumn += context->macroblocksPerRow;
+        nextColumn += context->macroblocksPerRow();
         --row;
       } while (nextColumn < 0);
 
@@ -6626,12 +6400,12 @@ namespace moho::movie
    * Increments MB address by one and wraps row/column indices when the column
    * reaches row width.
    */
-  MPVDecoderContextPrefix* mpvumc_IncreMbadr(MPVDecoderContextPrefix* context)
+  MPVDecoderScanContext* mpvumc_IncreMbadr(MPVDecoderScanContext* context)
   {
     const int nextColumn = context->macroblockColumn + 1;
     context->macroblockColumn = nextColumn;
 
-    if (nextColumn >= context->macroblocksPerRow) {
+    if (nextColumn >= context->macroblocksPerRow()) {
       context->macroblockColumn = 0;
       ++context->macroblockRow;
     }
@@ -6647,7 +6421,7 @@ namespace moho::movie
    * Decodes I-picture macroblocks for the current slice chunk and dispatches
    * intra decode callbacks for each accepted macroblock.
    */
-  int MPVDEC_DecIpicMb(MPVDecoderScanContext* context, MPVSjStream* stream)
+  int MPVDEC_DecIpicMb(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream)
   {
     SjRequestChunk(stream, context->activeChunk);
     LoadBitstreamFromChunk(context->activeChunk, context->sliceBitAlignment, context->bitstreamState);
@@ -6703,8 +6477,8 @@ namespace moho::movie
 
       const int macroblockAdvance = context->macroblockLinearIndex - previousLinearIndex;
       context->macroblockColumn += macroblockAdvance;
-      while (context->macroblockColumn >= context->macroblocksPerRow) {
-        context->macroblockColumn -= context->macroblocksPerRow;
+      while (context->macroblockColumn >= context->macroblocksPerRow()) {
+        context->macroblockColumn -= context->macroblocksPerRow();
         ++context->macroblockRow;
       }
 
@@ -6738,13 +6512,13 @@ namespace moho::movie
       context->lastDecodedMacroblockIndex = context->macroblockLinearIndex;
       --context->serviceCountdown;
       if (context->serviceCountdown <= 0) {
-        context->serviceCountdown = context->serviceReloadInterval;
-        context->serviceCallback(context->serviceCallbackToken);
+        context->serviceCountdown = static_cast<int>(context->serviceReloadInterval());
+        context->serviceCallback()(context->serviceCallbackToken());
       }
 
-      const int refillSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.data, true);
-      if (context->activeChunk.size - refillSplitOffset <= 0x800) {
-        MPVSjChunk tailChunk{};
+      const int refillSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.bytes(), true);
+      if (context->activeChunk.byteCount - refillSplitOffset <= 0x800) {
+        moho::SjChunkRange tailChunk{};
         SJ_SplitChunk(&context->activeChunk, refillSplitOffset, &context->activeChunk, &tailChunk);
         SjReleaseHeadChunk(stream, context->activeChunk);
         SjSubmitTailChunk(stream, tailChunk);
@@ -6755,8 +6529,8 @@ namespace moho::movie
       }
     }
 
-    MPVSjChunk tailChunk{};
-    const int finalSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.data, false);
+    moho::SjChunkRange tailChunk{};
+    const int finalSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.bytes(), false);
     SJ_SplitChunk(&context->activeChunk, finalSplitOffset, &context->activeChunk, &tailChunk);
     SjReleaseHeadChunk(stream, context->activeChunk);
     SjSubmitTailChunk(stream, tailChunk);
@@ -6770,7 +6544,7 @@ namespace moho::movie
    * Decodes P-picture macroblocks for the current slice chunk, including
    * skip-run handling, forward motion decode, and CBP dispatch.
    */
-  int MPVDEC_DecPpicMb(MPVDecoderScanContext* context, MPVSjStream* stream)
+  int MPVDEC_DecPpicMb(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream)
   {
     int isFirstMacroblock = 1;
     SjRequestChunk(stream, context->activeChunk);
@@ -6827,8 +6601,8 @@ namespace moho::movie
 
       const int macroblockAdvance = context->macroblockLinearIndex - previousLinearIndex;
       context->macroblockColumn += macroblockAdvance;
-      while (context->macroblockColumn >= context->macroblocksPerRow) {
-        context->macroblockColumn -= context->macroblocksPerRow;
+      while (context->macroblockColumn >= context->macroblocksPerRow()) {
+        context->macroblockColumn -= context->macroblocksPerRow();
         ++context->macroblockRow;
       }
 
@@ -6839,7 +6613,7 @@ namespace moho::movie
       if (isFirstMacroblock == 0 && macroblockAdvance > 1) {
         context->decodeSkipRun(context, static_cast<unsigned int>(macroblockAdvance));
         MPVDEC_ResetMv(reinterpret_cast<MPVMotionState*>(&context->forwardPredictionVector));
-        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderContextPrefix*>(context));
+        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderScanContext*>(context));
       } else if (context->macroblockLinearIndex > context->lastDecodedMacroblockIndex + 1) {
         context->macroblockDiscontinuityHandler(context);
       }
@@ -6916,7 +6690,7 @@ namespace moho::movie
           context->decodeResidualMacroblock(context);
         }
         context->decodePredictedModes[2](context);
-        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderContextPrefix*>(context));
+        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderScanContext*>(context));
       }
 
       if (context->recoverNeededFlag != 0) {
@@ -6926,13 +6700,13 @@ namespace moho::movie
       context->lastDecodedMacroblockIndex = context->macroblockLinearIndex;
       --context->serviceCountdown;
       if (context->serviceCountdown <= 0) {
-        context->serviceCountdown = context->serviceReloadInterval;
-        context->serviceCallback(context->serviceCallbackToken);
+        context->serviceCountdown = static_cast<int>(context->serviceReloadInterval());
+        context->serviceCallback()(context->serviceCallbackToken());
       }
 
-      const int refillSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.data, true);
-      if (context->activeChunk.size - refillSplitOffset <= 0x800) {
-        MPVSjChunk tailChunk{};
+      const int refillSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.bytes(), true);
+      if (context->activeChunk.byteCount - refillSplitOffset <= 0x800) {
+        moho::SjChunkRange tailChunk{};
         SJ_SplitChunk(&context->activeChunk, refillSplitOffset, &context->activeChunk, &tailChunk);
         SjReleaseHeadChunk(stream, context->activeChunk);
         SjSubmitTailChunk(stream, tailChunk);
@@ -6945,8 +6719,8 @@ namespace moho::movie
       isFirstMacroblock = 0;
     }
 
-    MPVSjChunk tailChunk{};
-    const int finalSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.data, false);
+    moho::SjChunkRange tailChunk{};
+    const int finalSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.bytes(), false);
     SJ_SplitChunk(&context->activeChunk, finalSplitOffset, &context->activeChunk, &tailChunk);
     SjReleaseHeadChunk(stream, context->activeChunk);
     SjSubmitTailChunk(stream, tailChunk);
@@ -6974,7 +6748,7 @@ namespace moho::movie
    * What it does:
    * Resets Y/Cb/Cr DC predictors to MPEG baseline value (0x400).
    */
-  MPVDecoderContextPrefix* MPVDEC_ResetDc(MPVDecoderContextPrefix* context)
+  MPVDecoderScanContext* MPVDEC_ResetDc(MPVDecoderScanContext* context)
   {
     context->dcPredictorY = 1024;
     context->dcPredictorCr = 1024;
@@ -7063,7 +6837,7 @@ namespace moho::movie
    * Decodes B-picture macroblocks from the active stream chunk, including
    * motion vectors, CBP flags, macroblock mode dispatch, and chunk refills.
    */
-  int MPVDEC_DecBpicMb(MPVDecoderScanContext* context, MPVSjStream* stream)
+  int MPVDEC_DecBpicMb(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream)
   {
     int isFirstMacroblock = 1;
     SjRequestChunk(stream, context->activeChunk);
@@ -7120,8 +6894,8 @@ namespace moho::movie
 
       const unsigned int macroblockAdvance = static_cast<unsigned int>(context->macroblockLinearIndex - previousLinearIndex);
       context->macroblockColumn += static_cast<int>(macroblockAdvance);
-      while (context->macroblockColumn >= context->macroblocksPerRow) {
-        context->macroblockColumn -= context->macroblocksPerRow;
+      while (context->macroblockColumn >= context->macroblocksPerRow()) {
+        context->macroblockColumn -= context->macroblocksPerRow();
         ++context->macroblockRow;
       }
 
@@ -7135,7 +6909,7 @@ namespace moho::movie
       // P-picture loop has the same shape.
       if (isFirstMacroblock == 0 && macroblockAdvance > 1) {
         context->decodeSkipRun(context, macroblockAdvance);
-        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderContextPrefix*>(context));
+        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderScanContext*>(context));
       } else if (context->macroblockLinearIndex > context->lastDecodedMacroblockIndex + 1) {
         context->macroblockDiscontinuityHandler(context);
       }
@@ -7233,7 +7007,7 @@ namespace moho::movie
           context->decodeResidualMacroblock(context);
         }
         decodeMode(context);
-        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderContextPrefix*>(context));
+        MPVDEC_ResetDc(reinterpret_cast<MPVDecoderScanContext*>(context));
       }
 
       if (context->recoverNeededFlag != 0) {
@@ -7243,13 +7017,13 @@ namespace moho::movie
       context->lastDecodedMacroblockIndex = context->macroblockLinearIndex;
       --context->serviceCountdown;
       if (context->serviceCountdown <= 0) {
-        context->serviceCountdown = context->serviceReloadInterval;
-        context->serviceCallback(context->serviceCallbackToken);
+        context->serviceCountdown = static_cast<int>(context->serviceReloadInterval());
+        context->serviceCallback()(context->serviceCallbackToken());
       }
 
-      const int refillSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.data, true);
-      if (context->activeChunk.size - refillSplitOffset <= 0x800) {
-        MPVSjChunk tailChunk{};
+      const int refillSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.bytes(), true);
+      if (context->activeChunk.byteCount - refillSplitOffset <= 0x800) {
+        moho::SjChunkRange tailChunk{};
         SJ_SplitChunk(&context->activeChunk, refillSplitOffset, &context->activeChunk, &tailChunk);
         SjReleaseHeadChunk(stream, context->activeChunk);
         SjSubmitTailChunk(stream, tailChunk);
@@ -7262,8 +7036,8 @@ namespace moho::movie
       isFirstMacroblock = 0;
     }
 
-    MPVSjChunk tailChunk{};
-    const int finalSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.data, false);
+    moho::SjChunkRange tailChunk{};
+    const int finalSplitOffset = ComputeBitstreamSplitOffset(context->bitstreamState, context->activeChunk.bytes(), false);
     SJ_SplitChunk(&context->activeChunk, finalSplitOffset, &context->activeChunk, &tailChunk);
     SjReleaseHeadChunk(stream, context->activeChunk);
     SjSubmitTailChunk(stream, tailChunk);
@@ -7285,7 +7059,7 @@ namespace moho::movie
     state.quantScale = context->decodeBitWindow;
     state.quantMatrix = context->decodeWorkScratchIntra;
     context->blockScanPhase = 0;
-    state.dcSizeTable = AddressToPointer(context->decodeTablePrimary);
+    state.dcSizeTable = context->decodeTablePrimary;
     state.dcAccumulator = &context->dcPredictorY;
 
     // The four luma blocks share the luma DC predictor and DC size table.
@@ -7296,14 +7070,14 @@ namespace moho::movie
 
     // Both chroma blocks switch to the chroma DC size table, each with its own
     // DC predictor.
-    state.dcSizeTable = AddressToPointer(context->decodeTableSecondary);
+    state.dcSizeTable = context->decodeTableSecondary;
     state.dcAccumulator = &context->dcPredictorCb;
     context->decodeFlags[4] = ProbeScanSlot<4>(context, context->decodeReadKernelIntra);
 
     state.dcAccumulator = &context->dcPredictorCr;
     context->decodeFlags[5] = ProbeScanSlot<5>(context, context->decodeReadKernelIntra);
 
-    context->decodeFinalizeIntra(context->decodeFlags);
+    context->dctTransformSixBlocks(context);
     return 0;
   }
 
@@ -7323,7 +7097,7 @@ namespace moho::movie
 
     // Non-intra blocks carry no DC prediction, so the DC lanes are left alone.
     int signLadder = context->predictionSignState * 4;
-    context->decodeSignLadder = signLadder;
+    context->codedBlockPatternMask = signLadder;
 
     const MPVDecodeReadKernelFn readKernel = context->decodeReadKernelPredicted;
     std::uint8_t* scanScratchBase = context->scanScratch0;
@@ -7336,7 +7110,7 @@ namespace moho::movie
       scanScratchBase += sizeof(context->scanScratch0);
     }
 
-    context->decodeFinalizePredicted(context->decodeFlags);
+    context->dctTransformCbp(context);
     return 0;
   }
   namespace
@@ -7579,7 +7353,7 @@ namespace moho::movie
     state.scanIndex = 0;
 
     // ---- AC run/level pass -----------------------------------------------
-    if (decoderContext->coefficientScanMode != kMpvScanModeDcOnly) {
+    if (decoderContext->coefficientScanMode() != kMpvScanModeDcOnly) {
       const std::uint8_t* scanCursor = decoderContext->coefficientWriteCursor;
       const std::uint8_t* const scanEnd = scanCursor + kMpvCoefficientsPerBlock;
 

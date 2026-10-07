@@ -15131,18 +15131,7 @@ bool moho::CMauiMovie::LoadFile(
   const char* const filename
 )
 {
-#if defined(_M_X64)
-  // The Sofdec SFD/SFBUF/SFTRN/SFTIM layers are x64-clean, but the MPV video
-  // decoder still describes its handle twice (`MPVHandleInit` in
-  // MPVDecoder.cpp and `MPVDecoderScanContext` in MPVDecoder.h) with pointer
-  // fields in different slots, so x64 decodes fail with DATA ERROR and the
-  // movie never leaves the prepare state. Until that merge lands, x64 takes
-  // the same path `/nomovie` does.
-  constexpr bool kMoviePlaybackSupported = false;
-#else
-  constexpr bool kMoviePlaybackSupported = true;
-#endif
-  if (!kMoviePlaybackSupported || moho::CFG_GetArgOption("/nomovie", 0u, nullptr)) {
+  if (moho::CFG_GetArgOption("/nomovie", 0u, nullptr)) {
     return false;
   }
 

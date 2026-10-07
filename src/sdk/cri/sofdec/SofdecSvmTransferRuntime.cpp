@@ -2687,25 +2687,25 @@
    * on alternate rows.
    */
   std::int32_t CFT_Ycc420plnToArgb8888Int(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords,
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords,
     const SofdecAddressWord* const scratchBufferWords
   )
   {
 
     CftYcc420PlanarInputLanes inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
-    inputLanes.yStrideBytes = inputWords->yStrideBytes;
-    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
-    inputLanes.crStrideBytes = inputWords->crStrideBytes;
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[0].bytes()));
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[1].bytes()));
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[2].bytes()));
+    inputLanes.yStrideBytes = inputWords->planes[0].pitch;
+    inputLanes.cbStrideBytes = inputWords->planes[1].pitch;
+    inputLanes.crStrideBytes = inputWords->planes[2].pitch;
 
     CftPixelSurfaceLanes outputSurface{};
-    outputSurface.pixelBase = outputWords->pixelBase;
-    outputSurface.widthPixels = outputWords->widthPixels;
-    outputSurface.heightPixels = outputWords->heightPixels;
-    outputSurface.strideBytes = outputWords->strideBytes;
+    outputSurface.pixelBase = outputWords->planes[0].bytes();
+    outputSurface.widthPixels = outputWords->planes[0].width;
+    outputSurface.heightPixels = outputWords->planes[0].height;
+    outputSurface.strideBytes = outputWords->planes[0].pitch;
 
     const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
     const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
@@ -2741,28 +2741,28 @@
   }
 
   std::int32_t CFT_Ycc420plnToArgb8888Prg(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords,
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords,
     const SofdecAddressWord* const scratchBufferWords
   )
   {
 
     CftYcc420PlanarInputLanes inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
-    inputLanes.yStrideBytes = inputWords->yStrideBytes;
-    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
-    inputLanes.crStrideBytes = inputWords->crStrideBytes;
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[0].bytes()));
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[1].bytes()));
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[2].bytes()));
+    inputLanes.yStrideBytes = inputWords->planes[0].pitch;
+    inputLanes.cbStrideBytes = inputWords->planes[1].pitch;
+    inputLanes.crStrideBytes = inputWords->planes[2].pitch;
 
     // The four words 0x00AEEB74-0x00AEEB8B copy across. `reserved` is left
     // alone here, unlike the interlaced siblings that zero it: nothing below
     // reads it.
     CftPixelSurfaceLanes outputSurface{};
-    outputSurface.pixelBase = outputWords->pixelBase;
-    outputSurface.widthPixels = outputWords->widthPixels;
-    outputSurface.heightPixels = outputWords->heightPixels;
-    outputSurface.strideBytes = outputWords->strideBytes;
+    outputSurface.pixelBase = outputWords->planes[0].bytes();
+    outputSurface.widthPixels = outputWords->planes[0].width;
+    outputSurface.heightPixels = outputWords->planes[0].height;
+    outputSurface.strideBytes = outputWords->planes[0].pitch;
 
     const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
     const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
@@ -2806,25 +2806,25 @@
    * pointer or the default ARGB table.
    */
   std::int32_t CFT_Ycc420plnToArgb8888(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords,
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords,
     const SofdecAddressWord* const userTableAddress
   )
   {
 
     CftYcc420PlanarInputLanes inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
-    inputLanes.yStrideBytes = inputWords->yStrideBytes;
-    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
-    inputLanes.crStrideBytes = inputWords->crStrideBytes;
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[0].bytes()));
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[1].bytes()));
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[2].bytes()));
+    inputLanes.yStrideBytes = inputWords->planes[0].pitch;
+    inputLanes.cbStrideBytes = inputWords->planes[1].pitch;
+    inputLanes.crStrideBytes = inputWords->planes[2].pitch;
 
     CftPixelSurfaceLanes outputSurface{};
-    outputSurface.pixelBase = outputWords->pixelBase;
-    outputSurface.widthPixels = outputWords->widthPixels;
-    outputSurface.heightPixels = outputWords->heightPixels;
-    outputSurface.strideBytes = outputWords->strideBytes;
+    outputSurface.pixelBase = outputWords->planes[0].bytes();
+    outputSurface.widthPixels = outputWords->planes[0].width;
+    outputSurface.heightPixels = outputWords->planes[0].height;
+    outputSurface.strideBytes = outputWords->planes[0].pitch;
     outputSurface.reserved = 0;
 
     return cft_Ycc420plnToArgb8888UserTable(
@@ -2843,25 +2843,25 @@
    * pointer or the default ARGB table.
    */
   std::int32_t CFT_Ycc420plnToArgb8888Split(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords,
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords,
     const SofdecAddressWord* const userTableAddress
   )
   {
 
     CftYcc420PlanarInputLanes inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
-    inputLanes.yStrideBytes = inputWords->yStrideBytes;
-    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
-    inputLanes.crStrideBytes = inputWords->crStrideBytes;
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[0].bytes()));
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[1].bytes()));
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[2].bytes()));
+    inputLanes.yStrideBytes = inputWords->planes[0].pitch;
+    inputLanes.cbStrideBytes = inputWords->planes[1].pitch;
+    inputLanes.crStrideBytes = inputWords->planes[2].pitch;
 
     CftPixelSurfaceLanes outputSurface{};
-    outputSurface.pixelBase = outputWords->pixelBase;
-    outputSurface.widthPixels = outputWords->widthPixels;
-    outputSurface.heightPixels = outputWords->heightPixels;
-    outputSurface.strideBytes = outputWords->strideBytes;
+    outputSurface.pixelBase = outputWords->planes[0].bytes();
+    outputSurface.widthPixels = outputWords->planes[0].width;
+    outputSurface.heightPixels = outputWords->planes[0].height;
+    outputSurface.strideBytes = outputWords->planes[0].pitch;
     outputSurface.reserved = 0;
 
     return cft_Ycc420plnToArgb8888SplitUserTable(
@@ -3191,25 +3191,25 @@
    * alignment/stride preconditions.
    */
   SofdecAddressWord CFT_Ycc420plnToYcc422pix2Int(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords,
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords,
     const SofdecAddressWord* const scratchBufferWords
   )
   {
 
     CftYcc420PlanarInputLanes inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
-    inputLanes.yStrideBytes = inputWords->yStrideBytes;
-    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
-    inputLanes.crStrideBytes = inputWords->crStrideBytes;
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[0].bytes()));
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[1].bytes()));
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uint32_t*>(inputWords->planes[2].bytes()));
+    inputLanes.yStrideBytes = inputWords->planes[0].pitch;
+    inputLanes.cbStrideBytes = inputWords->planes[1].pitch;
+    inputLanes.crStrideBytes = inputWords->planes[2].pitch;
 
     CftPixelSurfaceLanes outputSurface{};
-    outputSurface.pixelBase = outputWords->pixelBase;
-    outputSurface.widthPixels = outputWords->widthPixels;
-    outputSurface.heightPixels = outputWords->heightPixels;
-    outputSurface.strideBytes = outputWords->strideBytes;
+    outputSurface.pixelBase = outputWords->planes[0].bytes();
+    outputSurface.widthPixels = outputWords->planes[0].width;
+    outputSurface.heightPixels = outputWords->planes[0].height;
+    outputSurface.strideBytes = outputWords->planes[0].pitch;
     outputSurface.reserved = 0;
 
     if (CFTCOM_GetOptimizeSpeed() != 0) {
@@ -5041,8 +5041,8 @@
 
   std::int32_t CftYcc420plnToRgb16Core(
     const char* const functionName,
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords,
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords,
     const std::int32_t* const yToY2,
     const std::int32_t* const crToR,
     const std::int32_t* const cbToG,
@@ -5056,28 +5056,28 @@
   {
     CFTCOM_SetCftFunctionName(functionName);
 
-    auto* yTop = inputWords->yPlaneWords;
+    auto* yTop = reinterpret_cast<std::uint32_t*>(inputWords->planes[0].bytes());
     auto* yBottom =
-      reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uint8_t*>(yTop) + inputWords->yStrideBytes);
-    auto* cbWords = inputWords->cbPlaneWords;
-    auto* crWords = inputWords->crPlaneWords;
+      reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uint8_t*>(yTop) + inputWords->planes[0].pitch);
+    auto* cbWords = reinterpret_cast<std::uint32_t*>(inputWords->planes[1].bytes());
+    auto* crWords = reinterpret_cast<std::uint32_t*>(inputWords->planes[2].bytes());
 
-    std::uint16_t* topOut = reinterpret_cast<std::uint16_t*>(outputWords->pixelBase);
-    const std::int32_t outputStrideEvenBytes = 2 * (outputWords->strideBytes >> 1);
-    std::uint16_t* bottomOut = reinterpret_cast<std::uint16_t*>(outputWords->pixelBase + outputStrideEvenBytes);
+    std::uint16_t* topOut = reinterpret_cast<std::uint16_t*>(outputWords->planes[0].bytes());
+    const std::int32_t outputStrideEvenBytes = 2 * (outputWords->planes[0].pitch >> 1);
+    std::uint16_t* bottomOut = reinterpret_cast<std::uint16_t*>(outputWords->planes[0].bytes() + outputStrideEvenBytes);
 
     const std::uint32_t yRowTailWords =
-      static_cast<std::uint32_t>((2 * inputWords->yStrideBytes) - outputWords->widthPixels) >> 2;
+      static_cast<std::uint32_t>((2 * inputWords->planes[0].pitch) - outputWords->planes[0].width) >> 2;
     const std::uint32_t cbRowTailWords =
-      static_cast<std::uint32_t>(inputWords->cbStrideBytes - (outputWords->widthPixels / 2)) >> 2;
+      static_cast<std::uint32_t>(inputWords->planes[1].pitch - (outputWords->planes[0].width / 2)) >> 2;
     const std::uint32_t crRowTailWords =
-      static_cast<std::uint32_t>(inputWords->crStrideBytes - (outputWords->widthPixels / 2)) >> 2;
+      static_cast<std::uint32_t>(inputWords->planes[2].pitch - (outputWords->planes[0].width / 2)) >> 2;
 
-    const std::int32_t rowTailBytes = outputStrideEvenBytes - outputWords->widthPixels;
+    const std::int32_t rowTailBytes = outputStrideEvenBytes - outputWords->planes[0].width;
     const std::int32_t rowPairAdvanceBytes = 2 * rowTailBytes;
 
     std::int32_t result = rowTailBytes;
-    std::int32_t remainingRowPairs = outputWords->heightPixels / 2;
+    std::int32_t remainingRowPairs = outputWords->planes[0].height / 2;
     if (remainingRowPairs <= 0) {
       return result;
     }
@@ -5087,7 +5087,7 @@
       : std::array<std::uint32_t, 4>{0u, 0u, 0u, 0u};
 
     do {
-      std::int32_t blocks = outputWords->widthPixels / 8;
+      std::int32_t blocks = outputWords->planes[0].width / 8;
       while (blocks-- > 0) {
         const std::uint32_t cbPacked = *cbWords++;
         const std::uint32_t crPacked = *crWords++;
@@ -5217,8 +5217,8 @@
    * prebuilt fixed-point lookup tables.
    */
   std::int32_t CFT_Ycc420plnToRgb555(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords
   )
   {
     return CftYcc420plnToRgb16Core(
@@ -5245,8 +5245,8 @@
    * 4-phase dither clip tables.
    */
   std::int32_t CFT_Ycc420plnToRgb555WithDither(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords
   )
   {
     return CftYcc420plnToRgb16Core(
@@ -5273,8 +5273,8 @@
    * prebuilt fixed-point lookup tables.
    */
   std::int32_t CFT_Ycc420plnToRgb565(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords
   )
   {
     return CftYcc420plnToRgb16Core(
@@ -5301,8 +5301,8 @@
    * 4-phase dither clip tables.
    */
   std::int32_t CFT_Ycc420plnToRgb565WithDither(
-    const CftYcc420PlanarPackedWords* const inputWords,
-    const CftRgb16OutputPackedWords* const outputWords
+    const moho::CftBuffer* const inputWords,
+    const moho::CftBuffer* const outputWords
   )
   {
     return CftYcc420plnToRgb16Core(

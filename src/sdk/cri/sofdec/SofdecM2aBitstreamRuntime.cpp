@@ -77,7 +77,7 @@
   void m2absr_free(const SofdecAddressWord heapManagerHandle, LPVOID memoryBlock)
   {
     if (heapManagerHandle != 0) {
-      HEAPMNG_Free(heapManagerHandle, reinterpret_cast<int>(memoryBlock));
+      HEAPMNG_Free(heapManagerHandle, reinterpret_cast<SofdecAddressWord>(memoryBlock));
       return;
     }
 

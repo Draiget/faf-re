@@ -107,8 +107,8 @@ namespace moho_cri_sfx_internal {
 /// seeds the lanes below; `sfx_SearchFreeHn` walks the pool at stride 0x94
 /// testing the first dword.
 using SfxCnvFrmCallback = std::int32_t(__cdecl*)(
-    const CftYcc420PlanarPackedWords* source,
-    const CftRgb16OutputPackedWords* target,
+    const moho::CftBuffer* source,
+    const moho::CftBuffer* target,
     const SofdecAddressWord* tableParams
   );
 using SfxCopyAlphaCallback = std::uint8_t*(__cdecl*)(
@@ -416,7 +416,7 @@ std::int32_t sfx_init_cnt = 0;
 /// Discardable slot used by `SFX_Init` to keep the version-string call
 /// from being optimised out. Reflects the original CRI source pattern
 /// (`sfx_dummy = (int)sfx_GetVersionStr();`).
-std::int32_t sfx_dummy = 0;
+SofdecAddressWord sfx_dummy = 0;
 
 /// SFX converter "force split" flag. Reset to `0` by `SFX_Init` so that
 /// the converter does not inherit a stale setting across re-inits.
@@ -691,7 +691,7 @@ std::int32_t SFXZ_Init()
 void SFX_Init()
 {
   if (sfx_init_cnt < 1) {
-    sfx_dummy = reinterpret_cast<std::int32_t>(sfx_GetVersionStr());
+    sfx_dummy = reinterpret_cast<SofdecAddressWord>(sfx_GetVersionStr());
     sfx_InitLibWork();
     SFXSUD_Init();
     SFXZ_Init();
@@ -1389,47 +1389,6 @@ void* SFX_Create(
 
 namespace moho_cri_sfx_internal {
 
-/// One plane descriptor in the buffer the CFT kernels read.
-struct SfxCftPlaneRecord
-{
-  std::int32_t address; ///< +0x00
-  std::int32_t width;   ///< +0x04
-  std::int32_t height;  ///< +0x08
-  std::int32_t pitch;   ///< +0x0C
-};
-static_assert(sizeof(SfxCftPlaneRecord) == 0x10, "SfxCftPlaneRecord must be 16 bytes");
-
-/**
- * Source descriptor `sfxcnv_MakeCftSrcBuf` fills.
- *
- * The CFT side sees this same block as `CftYcc420PlanarPackedWords`, which is
- * why the plane addresses land at +0x04 / +0x14 / +0x24 and the pitches at
- * +0x10 / +0x20 / +0x30. The binary's stack object is 68 bytes and memset to
- * zero before use, so the tail beyond the three records is kept.
- */
-struct SfxCftSourceBuffer
-{
-  std::int32_t planeCount = 0;      ///< +0x00 1 = packed, 3 = planar YCbCr
-  SfxCftPlaneRecord planes[3]{};    ///< +0x04, +0x14, +0x24
-  std::int32_t reserved34[4]{};     ///< +0x34
-};
-static_assert(offsetof(SfxCftSourceBuffer, planes) == 0x04, "SfxCftSourceBuffer::planes offset must be 0x04");
-static_assert(sizeof(SfxCftSourceBuffer) == 0x44, "SfxCftSourceBuffer must be 68 bytes");
-
-/**
- * Destination rectangle handed to the CFT kernels; the CFT side sees it as
- * `CftRgb16OutputPackedWords`.
- */
-struct SfxCftTargetBuffer
-{
-  std::int32_t planeCount; ///< +0x00
-  SofdecAddressWord pixels;     ///< +0x04
-  std::int32_t width;      ///< +0x08
-  std::int32_t height;     ///< +0x0C
-  std::int32_t pitch;      ///< +0x10 negative once flipped bottom-up
-};
-static_assert(offsetof(SfxCftTargetBuffer, pitch) == 0x10, "SfxCftTargetBuffer::pitch offset must be 0x10");
-
 constexpr char kSfxErrCnvSrcFrameFormat[] = "E4111901: sfxcnv_MakeCftSrcBuf : frame format is invalid.";
 
 /// Composition codes `sfxcnv_MakeCftSrcBuf` accepts, from the frame info's +0x00 lane.
@@ -1463,12 +1422,13 @@ std::int32_t SFX_GetCnvBottomUp(const moho_cri_sfx_internal::SfxHandle* const ha
  * Re-points a destination rectangle at its last row and negates the pitch, so
  * the same kernel fills it bottom-up without needing a second code path.
  */
-moho_cri_sfx_internal::SfxCftTargetBuffer*
-SFX_SetBottomUpDstBuf(moho_cri_sfx_internal::SfxCftTargetBuffer* const target)
+moho::CftBuffer*
+SFX_SetBottomUpDstBuf(moho::CftBuffer* const target)
 {
-  const std::int32_t pitch = target->pitch;
-  target->pixels += pitch * (target->height - 1);
-  target->pitch = -pitch;
+  moho::CftPlane& surface = target->planes[0];
+  const std::int32_t pitch = surface.pitch;
+  surface.address += pitch * (surface.height - 1);
+  surface.pitch = -pitch;
   return target;
 }
 
@@ -1490,7 +1450,7 @@ SFX_SetBottomUpDstBuf(moho_cri_sfx_internal::SfxCftTargetBuffer* const target)
 void sfxcnv_MakeCftSrcBuf(
   moho_cri_sfx_internal::SfxHandle* const handle,
   const MwsfdSfxFrameInfo* const frameInfo,
-  moho_cri_sfx_internal::SfxCftSourceBuffer* const outSource
+  moho::CftBuffer* const outSource
 )
 {
   using namespace moho_cri_sfx_internal;
@@ -1552,9 +1512,9 @@ void sfxcnv_ExecCnvFrmByCbFunc(
 
   auto* const handle = reinterpret_cast<SfxHandle*>(conversionState);
   const auto* const frameInfo = reinterpret_cast<const MwsfdSfxFrameInfo*>(streamState);
-  auto* const target = reinterpret_cast<SfxCftTargetBuffer*>(static_cast<std::uintptr_t>(callbackArg));
+  auto* const target = reinterpret_cast<moho::CftBuffer*>(static_cast<std::uintptr_t>(callbackArg));
 
-  SfxCftSourceBuffer source{};
+  moho::CftBuffer source{};
   sfxcnv_MakeCftSrcBuf(handle, frameInfo, &source);
 
   const SofdecAddressWord tableParams[2] = {
@@ -1568,8 +1528,8 @@ void sfxcnv_ExecCnvFrmByCbFunc(
 
   if (handle->cnvFrmCallback != nullptr) {
     (void)handle->cnvFrmCallback(
-      reinterpret_cast<const CftYcc420PlanarPackedWords*>(&source),
-      reinterpret_cast<const CftRgb16OutputPackedWords*>(target),
+      &source,
+      target,
       tableParams
     );
   }
@@ -1941,13 +1901,13 @@ moho_cri_sfx_internal::SfxMakeColorAdjustTableCallback SFX_SetMakeColAdjTableCbF
 // interlaced one (0x00AEE960) and its own 2-sample leaf tier are the next
 // recovery step.
 extern "C" std::int32_t CFT_Ycc420plnToArgb8888Prg(
-  const CftYcc420PlanarPackedWords* inputWords,
-  const CftRgb16OutputPackedWords* outputWords,
+  const moho::CftBuffer* inputWords,
+  const moho::CftBuffer* outputWords,
   const SofdecAddressWord* userTableAddress
 );
 extern "C" std::int32_t CFT_Ycc420plnToArgb8888Int(
-  const CftYcc420PlanarPackedWords* inputWords,
-  const CftRgb16OutputPackedWords* outputWords,
+  const moho::CftBuffer* inputWords,
+  const moho::CftBuffer* outputWords,
   const SofdecAddressWord* userTableAddress
 );
 
@@ -2158,33 +2118,26 @@ std::int32_t sfxcnv_IsCnvUpHalf(const moho_cri_sfx_internal::SfxHandle* const ha
  * rows.
  *
  * The records overlap by one dword - record N owns dwords 4N..4N+4 - so the
- * pitch of record N is written through the base of record N+1, exactly as the
- * binary does.
+ * pitch of record N lands in the slot right before record N+1's address, which
+ * is `planes[N].pitch`.
  */
 std::int32_t sfxcnv_MakeDstBufInf(
   const moho_cri_sfx_internal::SfxHandle* const handle,
   const MwsfdSfxFrameInfo* const frameInfo,
   const SofdecAddressWord pixels,
-  moho_cri_sfx_internal::SfxCftTargetBuffer* const outTarget,
+  moho::CftBuffer* const outTarget,
   const std::int32_t recordIndex
 )
 {
   using namespace moho_cri_sfx_internal;
 
-  auto* const record = reinterpret_cast<SfxCftTargetBuffer*>(
-    reinterpret_cast<std::uint8_t*>(outTarget) + (0x10 * recordIndex)
-  );
-
-  record->pixels = pixels;
-  record->width = frameInfo->cachedWidth;
-  record->height =
-    (sfxcnv_IsCnvUpHalf(handle) == 1) ? frameInfo->cachedHeight / 2 : frameInfo->cachedHeight;
+  moho::CftPlane& plane = outTarget->planes[recordIndex];
+  plane.address = pixels;
+  plane.width = frameInfo->cachedWidth;
+  plane.height = (sfxcnv_IsCnvUpHalf(handle) == 1) ? frameInfo->cachedHeight / 2 : frameInfo->cachedHeight;
 
   const std::int32_t outputBufferWidth = handle->outputBufferWidth;
-  auto* const nextRecord = reinterpret_cast<SfxCftTargetBuffer*>(
-    reinterpret_cast<std::uint8_t*>(outTarget) + (0x10 * (recordIndex + 1))
-  );
-  nextRecord->planeCount = (outputBufferWidth != 0) ? outputBufferWidth : frameInfo->cachedWidth;
+  plane.pitch = (outputBufferWidth != 0) ? outputBufferWidth : frameInfo->cachedWidth;
   return outputBufferWidth;
 }
 
@@ -2199,7 +2152,7 @@ std::int32_t SFX_Make1PlaneCftDstBuf(
   moho_cri_sfx_internal::SfxHandle* const handle,
   MwsfdSfxFrameInfo* const frameInfo,
   const SofdecAddressWord pixels,
-  moho_cri_sfx_internal::SfxCftTargetBuffer* const outTarget,
+  moho::CftBuffer* const outTarget,
   const std::int32_t left,
   const std::int32_t top,
   const std::int32_t width,
@@ -2429,7 +2382,7 @@ std::int32_t SFX_GetOutBufSize(
 std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
   moho_cri_sfx_internal::SfxHandle* const handle,
   MwsfdSfxFrameInfo* const frameInfo,
-  moho_cri_sfx_internal::SfxCftTargetBuffer* const target
+  moho::CftBuffer* const target
 )
 {
   const std::int32_t fullHeight = frameInfo->cachedHeight;
@@ -2442,7 +2395,7 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
   frameInfo->cachedHeight /= 2;
   (void)SFX_SetMaxRowToYccPln(frameInfo, fullHeight / 2);
   (void)SFX_Make1PlaneCftDstBuf(
-    handle, frameInfo, target->pixels, target, 0, 0, frameInfo->cachedWidth, frameInfo->cachedHeight
+    handle, frameInfo, target->planes[0].address, target, 0, 0, frameInfo->cachedWidth, frameInfo->cachedHeight
   );
   SFX_CnvFrmByCbFunc(
     reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
@@ -2454,9 +2407,9 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
   (void)SFX_SetMaxRowToYccPln(frameInfo, fullHeight);
   SFX_ShiftYccPtrByLine(frameInfo, fullHeight / 2);
 
-  target->pixels += outputBufferWidth;
+  target->planes[0].address += outputBufferWidth;
   (void)SFX_Make1PlaneCftDstBuf(
-    handle, frameInfo, target->pixels, target, 0, 0, frameInfo->cachedWidth, frameInfo->cachedHeight
+    handle, frameInfo, target->planes[0].address, target, 0, 0, frameInfo->cachedWidth, frameInfo->cachedHeight
   );
   SFX_CnvFrmByCbFunc(
     reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
@@ -2485,7 +2438,7 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
 std::int32_t SFX_CnvFrmARGB8888ByCbFunc(
   moho_cri_sfx_internal::SfxHandle* const handle,
   MwsfdSfxFrameInfo* const frameInfo,
-  moho_cri_sfx_internal::SfxCftTargetBuffer* const target
+  moho::CftBuffer* const target
 )
 {
   using namespace moho_cri_sfx_internal;
@@ -2532,7 +2485,7 @@ std::int32_t SFX_CnvFrmARGB8888ByCbFunc(
  */
 void mwPlyFxCnvFrmClipARGB8888(
   moho::MwsfdPlaybackStateSubobj* const ply,
-  MwsfdSfdFrmObj* const frm,
+  moho::MwsfdFrameInfo* const frm,
   void* const outputBits,
   const std::int32_t left,
   const std::int32_t top,
@@ -2547,7 +2500,7 @@ void mwPlyFxCnvFrmClipARGB8888(
   MwsfdSfxFrameInfo frameInfo{};
   (void)MWSFSFX_CnvFrmInfToSfx(ply, frm, &frameInfo);
 
-  SfxCftTargetBuffer target{};
+  moho::CftBuffer target{};
   (void)SFX_Make1PlaneCftDstBuf(
     handle,
     &frameInfo,
@@ -2579,9 +2532,6 @@ void mwPlyFxCnvFrmARGB8888(
   moho::MwsfdPlaybackStateSubobj* const ply, const moho::MwsfdFrameInfo* const frameObject, void* const outputBits
 )
 {
-  // The parameter type comes from the declaration CMovie.cpp calls through;
-  // `moho::MwsfdFrameInfo` and `MwsfdSfdFrmObj` model the same SFD frame
-  // descriptor, and only the latter names the plane geometry this needs.
-  auto* const frm = const_cast<MwsfdSfdFrmObj*>(reinterpret_cast<const MwsfdSfdFrmObj*>(frameObject));
-  mwPlyFxCnvFrmClipARGB8888(ply, frm, outputBits, 0, 0, frm->planeWidth, frm->planeHeight);
+  auto* const frm = const_cast<moho::MwsfdFrameInfo*>(frameObject);
+  mwPlyFxCnvFrmClipARGB8888(ply, frm, outputBits, 0, 0, frm->widthPixels, frm->heightPixels);
 }

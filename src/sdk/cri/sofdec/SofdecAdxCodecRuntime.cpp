@@ -1629,7 +1629,7 @@
     SjChunkRange writableChunk{};
     outputSjHandle->dispatchTable->getChunk(outputSjHandle, 0, 0x7FFFFFFF, &writableChunk);
     const std::int32_t writableBytes = writableChunk.byteCount;
-    outputSjHandle->dispatchTable->putChunk(outputSjHandle, 0, &writableChunk);
+    outputSjHandle->dispatchTable->ungetChunk(outputSjHandle, 0, &writableChunk);
     if (writableBytes < encoder->headerInfoSizeBytes + 4) {
       return 0;
     }
@@ -2218,7 +2218,7 @@
           std::memcpy(channelSamplePlanes[channelIndex] + samplesRead, sourceBytes, sourceChunk.byteCount);
 
           samplesRead += static_cast<std::int16_t>(sourceChunk.byteCount >> 1);
-          inputHandle->dispatchTable->putChunk(inputHandle, 0, &sourceChunk);
+          inputHandle->dispatchTable->ungetChunk(inputHandle, 0, &sourceChunk);
         }
       }
     }
@@ -2692,7 +2692,7 @@
           SjChunkRange chunkRange{};
           inputSjHandle->dispatchTable->getChunk(inputSjHandle, 0, primingBytes, &chunkRange);
           if (chunkRange.byteCount != primingBytes) {
-            inputSjHandle->dispatchTable->putChunk(inputSjHandle, 0, &chunkRange);
+            inputSjHandle->dispatchTable->ungetChunk(inputSjHandle, 0, &chunkRange);
             while (true) {
               Sleep(0);
             }
@@ -2703,7 +2703,7 @@
             0,
             static_cast<std::size_t>(chunkRange.byteCount)
           );
-          inputSjHandle->dispatchTable->submitChunk(inputSjHandle, 1, &chunkRange);
+          inputSjHandle->dispatchTable->putChunk(inputSjHandle, 1, &chunkRange);
         }
 
         ++laneIndex;
@@ -3238,7 +3238,7 @@
         );
         stagedPredictorStates[preparedLaneCount] = *sourceSample;
         stagedPredictorStates[preparedLaneCount + 2] = *sourceSample;
-        inputSjHandle->dispatchTable->putChunk(inputSjHandle, 1, &sourceChunk);
+        inputSjHandle->dispatchTable->ungetChunk(inputSjHandle, 1, &sourceChunk);
       }
     }
 

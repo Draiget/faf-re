@@ -748,16 +748,16 @@
   HANDLE __cdecl m2adec_free(const SofdecAddressWord heapManagerHandle, LPVOID memoryBlock)
   {
     if (heapManagerHandle != 0) {
-      return reinterpret_cast<HANDLE>(HEAPMNG_Free(heapManagerHandle, M2aPtrToWord(memoryBlock)));
+      return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(HEAPMNG_Free(heapManagerHandle, M2aPtrToWord(memoryBlock))));
     }
 
     if (m2adec_global_heap != nullptr) {
-      return reinterpret_cast<HANDLE>(HeapFree(m2adec_global_heap, 0, memoryBlock));
+      return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(HeapFree(m2adec_global_heap, 0, memoryBlock)));
     }
 
     m2adec_global_heap = GetProcessHeap();
     if (m2adec_global_heap != nullptr) {
-      return reinterpret_cast<HANDLE>(HeapFree(m2adec_global_heap, 0, memoryBlock));
+      return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(HeapFree(m2adec_global_heap, 0, memoryBlock)));
     }
 
     return m2adec_global_heap;

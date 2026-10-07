@@ -4,17 +4,19 @@
 #include <cstdint>
 
 #include "cri/sofdec/SofdecAddressWord.h"
+#include "moho/audio/SofdecRuntime.h"
 
 namespace moho::movie
 {
-  struct MPVDecoderContextPrefix;
+#ifndef MOHO_MOVIE_X86_LAYOUT_ASSERT
+#define MOHO_MOVIE_X86_LAYOUT_ASSERT(expr, message) static_assert((sizeof(void*) != 4) || (expr), message)
+#endif
+
   struct MPVDecoderScanContext;
-  struct MPVSjStreamVTable;
-  struct MPVSjStream;
   struct MPVPredictionKernelState;
 
 
-  using MPVDecodeMacroblockFn = void(__cdecl*)(MPVDecoderContextPrefix*);
+  using MPVDecodeMacroblockFn = void(__cdecl*)(MPVDecoderScanContext*);
   using MPVInterpolationKernelFn = int(__cdecl*)(MPVPredictionKernelState*);
 
   struct MPVBitstreamState
@@ -25,45 +27,9 @@ namespace moho::movie
     std::uint8_t* byteCursor;         // +0x0C
   };
 
-  static_assert(sizeof(MPVBitstreamState) == 0x10, "MPVBitstreamState size must be 0x10");
-  static_assert(offsetof(MPVBitstreamState, bitCount) == 0x08, "MPVBitstreamState::bitCount offset must be 0x08");
-  static_assert(offsetof(MPVBitstreamState, byteCursor) == 0x0C, "MPVBitstreamState::byteCursor offset must be 0x0C");
-
-  struct MPVSjChunk
-  {
-    std::uint8_t* data; // +0x00
-    int size;           // +0x04
-  };
-
-  static_assert(sizeof(MPVSjChunk) == 0x08, "MPVSjChunk size must be 0x08");
-
-  /// SJ stream virtual interface (`requestChunk`/`submitChunk`/`releaseChunk`
-  /// at +0x18/+0x1C/+0x20).
-  struct MPVSjStreamVTable
-  {
-    std::uint8_t reserved_00[0x18];
-    void(__cdecl* requestChunk)(MPVSjStream* stream, int lane, int maxSize, MPVSjChunk* outChunk); // +0x18
-    void(__cdecl* submitChunk)(MPVSjStream* stream, int lane, MPVSjChunk* chunk);                  // +0x1C
-    void(__cdecl* releaseChunk)(MPVSjStream* stream, int lane, MPVSjChunk* chunk);                 // +0x20
-  };
-
-  /// The MPV SJ stream object: one vtable pointer.
-  struct MPVSjStream
-  {
-    MPVSjStreamVTable* vtable; // +0x00
-  };
-  static_assert(sizeof(MPVSjStream) == 0x04, "MPVSjStream size must be 0x04");
-
-
-  struct MPVFrameDecodeSession
-  {
-    std::int32_t decodeControlWords[9]; // +0x00
-    int pictureAttributesAddress;       // +0x24
-    int recoverEventDelta;              // +0x28
-    int recoverConditionDelta;          // +0x2C
-  };
-
-  static_assert(sizeof(MPVFrameDecodeSession) == 0x30, "MPVFrameDecodeSession size must be 0x30");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVBitstreamState) == 0x10, "MPVBitstreamState size must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVBitstreamState, bitCount) == 0x08, "MPVBitstreamState::bitCount offset must be 0x08");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVBitstreamState, byteCursor) == 0x0C, "MPVBitstreamState::byteCursor offset must be 0x0C");
 
   struct MPVBlockWriteTarget
   {
@@ -71,37 +37,68 @@ namespace moho::movie
     int stride;           // +0x04
   };
 
-  static_assert(sizeof(MPVBlockWriteTarget) == 0x08, "MPVBlockWriteTarget size must be 0x08");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVBlockWriteTarget) == 0x08, "MPVBlockWriteTarget size must be 0x08");
 
   struct MPVCopyDestinationSet
   {
-    std::uint8_t* block0Base;   // +0x00
+    int outputMode;                // +0x00 4 while condition 5 is set, otherwise -1 (`MPVCMC_SetCcnt`)
     MPVBlockWriteTarget blocks[6]; // +0x04
   };
 
-  static_assert(sizeof(MPVCopyDestinationSet) == 0x34, "MPVCopyDestinationSet size must be 0x34");
-  static_assert(offsetof(MPVCopyDestinationSet, blocks) == 0x04, "MPVCopyDestinationSet::blocks offset must be 0x04");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVCopyDestinationSet) == 0x34, "MPVCopyDestinationSet size must be 0x34");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCopyDestinationSet, blocks) == 0x04, "MPVCopyDestinationSet::blocks offset must be 0x04");
 
   struct MPVBlockSourceSet
   {
-    int sampleBaseBias;              // +0x00
+    SofdecAddressWord clipTableAddress; // +0x00 `mpv_clip_0_255` base
     std::int16_t* sampleAddressLut;  // +0x04
     std::uint8_t* forwardSamples;    // +0x08
     std::uint8_t* backwardSamples;   // +0x0C
   };
 
-  static_assert(sizeof(MPVBlockSourceSet) == 0x10, "MPVBlockSourceSet size must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVBlockSourceSet) == 0x10, "MPVBlockSourceSet size must be 0x10");
 
+  /// One reference frame's planes as `sfmpv_SetFrmPara` lays them out: the
+  /// luma plane is the frame base, U follows it and V follows U.
   struct MPVMacroblockOffsets
   {
-    int lumaOffset;          // +0x00
-    int chromaUOffset;       // +0x04
-    int chromaVOffset;       // +0x08
-    std::int16_t lumaStride; // +0x0C
-    std::int16_t chromaStride; // +0x0E
+    SofdecAddressWord chromaUPlaneAddress; // +0x00
+    SofdecAddressWord chromaVPlaneAddress; // +0x04
+    SofdecAddressWord lumaPlaneAddress;    // +0x08
+    std::int16_t chromaStride;            // +0x0C
+    std::int16_t lumaStride;              // +0x0E
   };
 
-  static_assert(sizeof(MPVMacroblockOffsets) == 0x10, "MPVMacroblockOffsets size must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVMacroblockOffsets) == 0x10, "MPVMacroblockOffsets size must be 0x10");
+
+  /// The per-frame decode request `sfmpv_DecodeFrm` hands `MPV_DecodeFrmSj`.
+  /// The decoder copies it whole into the handle (`frameSession` at +0x264) and
+  /// writes the two recover deltas back when the picture is done.
+  struct MPVFrameDecodeSession
+  {
+    MPVMacroblockOffsets forwardReference;  // +0x00
+    MPVMacroblockOffsets backwardReference; // +0x10
+    SofdecAddressWord outputFrameAddress;   // +0x20 `MPVUMC_InitOutRfb` lays the output planes out from here
+    SofdecAddressWord pictureAttributesAddress; // +0x24
+    int recoverEventDelta;                  // +0x28
+    int recoverConditionDelta;              // +0x2C
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVFrameDecodeSession) == 0x30, "MPVFrameDecodeSession size must be 0x30");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVFrameDecodeSession, outputFrameAddress) == 0x20, "MPVFrameDecodeSession::outputFrameAddress offset must be 0x20");
+
+  /// Per-handle error lane (`MPVERR_InitErrInf` clears all 0x14 bytes and
+  /// `MPV_GetErrInf` copies them out, recover counters included).
+  struct MPVErrorInfo
+  {
+    SofdecAddressWord callbackAddress; // +0x00
+    int callbackContext;               // +0x04
+    int errorCode;                     // +0x08
+    int recoverEventCounter;           // +0x0C
+    int recoverConditionCounter;       // +0x10
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVErrorInfo) == 0x14, "MPVErrorInfo size must be 0x14");
 
   struct MPVSpatialDelta
   {
@@ -109,7 +106,7 @@ namespace moho::movie
     int chroma; // +0x04
   };
 
-  static_assert(sizeof(MPVSpatialDelta) == 0x08, "MPVSpatialDelta size must be 0x08");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVSpatialDelta) == 0x08, "MPVSpatialDelta size must be 0x08");
 
   struct MPVPredictionKernelState
   {
@@ -121,11 +118,11 @@ namespace moho::movie
     int sourceSecondary;         // +0x28
   };
 
-  static_assert(offsetof(MPVPredictionKernelState, destinationBlockBase) == 0x18, "MPVPredictionKernelState::destinationBlockBase offset must be 0x18");
-  static_assert(offsetof(MPVPredictionKernelState, destinationStride) == 0x20, "MPVPredictionKernelState::destinationStride offset must be 0x20");
-  static_assert(offsetof(MPVPredictionKernelState, sourcePrimary) == 0x24, "MPVPredictionKernelState::sourcePrimary offset must be 0x24");
-  static_assert(offsetof(MPVPredictionKernelState, sourceSecondary) == 0x28, "MPVPredictionKernelState::sourceSecondary offset must be 0x28");
-  static_assert(sizeof(MPVPredictionKernelState) == 0x2C, "MPVPredictionKernelState size must be 0x2C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionKernelState, destinationBlockBase) == 0x18, "MPVPredictionKernelState::destinationBlockBase offset must be 0x18");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionKernelState, destinationStride) == 0x20, "MPVPredictionKernelState::destinationStride offset must be 0x20");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionKernelState, sourcePrimary) == 0x24, "MPVPredictionKernelState::sourcePrimary offset must be 0x24");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionKernelState, sourceSecondary) == 0x28, "MPVPredictionKernelState::sourceSecondary offset must be 0x28");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVPredictionKernelState) == 0x2C, "MPVPredictionKernelState size must be 0x2C");
 
   struct MPVPredictionVectorSet
   {
@@ -145,13 +142,13 @@ namespace moho::movie
     std::int32_t reserved_20;   // +0x20
   };
 
-  static_assert(offsetof(MPVPredictionVectorSet, decodeConfig) == 0x00, "MPVPredictionVectorSet::decodeConfig offset must be 0x00");
-  static_assert(offsetof(MPVPredictionVectorSet, predictorX) == 0x10, "MPVPredictionVectorSet::predictorX offset must be 0x10");
-  static_assert(offsetof(MPVPredictionVectorSet, predictorY) == 0x14, "MPVPredictionVectorSet::predictorY offset must be 0x14");
-  static_assert(offsetof(MPVPredictionVectorSet, horizontalDelta) == 0x18, "MPVPredictionVectorSet::horizontalDelta offset must be 0x18");
-  static_assert(offsetof(MPVPredictionVectorSet, verticalDelta) == 0x1C, "MPVPredictionVectorSet::verticalDelta offset must be 0x1C");
-  static_assert(sizeof(MPVPredictionVectorSet) == 0x24, "MPVPredictionVectorSet size must be 0x24");
-  static_assert(sizeof(MPVPredictionVectorSet::MPVMotionDecodeConfig) == 0x10, "MPVMotionDecodeConfig size must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionVectorSet, decodeConfig) == 0x00, "MPVPredictionVectorSet::decodeConfig offset must be 0x00");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionVectorSet, predictorX) == 0x10, "MPVPredictionVectorSet::predictorX offset must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionVectorSet, predictorY) == 0x14, "MPVPredictionVectorSet::predictorY offset must be 0x14");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionVectorSet, horizontalDelta) == 0x18, "MPVPredictionVectorSet::horizontalDelta offset must be 0x18");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPredictionVectorSet, verticalDelta) == 0x1C, "MPVPredictionVectorSet::verticalDelta offset must be 0x1C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVPredictionVectorSet) == 0x24, "MPVPredictionVectorSet size must be 0x24");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVPredictionVectorSet::MPVMotionDecodeConfig) == 0x10, "MPVMotionDecodeConfig size must be 0x10");
 
   struct MPVMotionState
   {
@@ -159,86 +156,73 @@ namespace moho::movie
     std::int32_t predictors[4]; // +0x10
   };
 
-  static_assert(offsetof(MPVMotionState, predictors) == 0x10, "MPVMotionState::predictors offset must be 0x10");
-  static_assert(sizeof(MPVMotionState) == 0x20, "MPVMotionState size must be 0x20");
-
-  struct MPVDecoderContextPrefix
-  {
-    std::uint8_t reserved_0000[0x40];
-    int lumaBaseAddress; // +0x40
-    std::uint8_t reserved_0044[0xCC - 0x44];
-    MPVPredictionKernelState predictionKernelState; // +0xCC
-    std::uint8_t reserved_00F8[0x110 - 0xF8];
-
-    MPVBlockSourceSet blockSources;       // +0x110
-    MPVCopyDestinationSet copyTargets;    // +0x120
-
-    std::uint8_t reserved_0154[0x19C - 0x154];
-    int interpolationParity; // +0x19C
-    std::uint8_t reserved_01A0[0x1D8 - 0x1A0];
-    int macroblocksPerRow;    // +0x1D8
-    int macroblockRowsCount;  // +0x1DC
-    std::uint8_t reserved_01E0[0x264 - 0x1E0];
-
-    MPVMacroblockOffsets forwardOffsets;   // +0x264 (+612)
-    MPVMacroblockOffsets backwardOffsets;  // +0x274 (+628)
-
-    std::uint8_t reserved_0284[0x294 - 0x284];
-    int planeBase0; // +0x294 (+660)
-    int planeBase1; // +0x298 (+664)
-    int planeBase2; // +0x29C (+668)
-    std::uint8_t reserved_02A0[0x2A2 - 0x2A0];
-    std::int16_t planeBase2Stride; // +0x2A2 (+674)
-
-    std::uint8_t reserved_02A4[0x2D4 - 0x2A4];
-    MPVDecodeMacroblockFn decodeSkippedBpicMacroblock; // +0x2D4 (+724)
-    std::uint8_t reserved_02D8[0x2F0 - 0x2D8];
-    MPVPredictionVectorSet forwardPredictionVector;   // +0x2F0 (+752)
-    MPVPredictionVectorSet backwardPredictionVector;  // +0x314 (+788)
-
-    int macroblockLinearIndex; // +0x338 (+824)
-    int macroblockRow;         // +0x33C (+828)
-    int macroblockColumn;      // +0x340 (+832)
-
-    std::uint8_t reserved_0344[0x34C - 0x344];
-    int predictionSignState; // +0x34C (+844)
-    std::int32_t dcPredictorY;  // +0x350
-    std::int32_t dcPredictorCb; // +0x354
-    std::int32_t dcPredictorCr; // +0x358
-    std::uint8_t reserved_035C[0x3A0 - 0x35C];
-    std::int16_t intraCopyAddressLut[384]; // +0x3A0 .. +0x69F
-  };
-
-  static_assert(offsetof(MPVDecoderContextPrefix, blockSources) == 0x110, "MPVDecoderContextPrefix::blockSources offset must be 0x110");
-  static_assert(offsetof(MPVDecoderContextPrefix, copyTargets) == 0x120, "MPVDecoderContextPrefix::copyTargets offset must be 0x120");
-  static_assert(offsetof(MPVDecoderContextPrefix, interpolationParity) == 0x19C, "MPVDecoderContextPrefix::interpolationParity offset must be 0x19C");
-  static_assert(offsetof(MPVDecoderContextPrefix, macroblocksPerRow) == 0x1D8, "MPVDecoderContextPrefix::macroblocksPerRow offset must be 0x1D8");
-  static_assert(offsetof(MPVDecoderContextPrefix, forwardOffsets) == 0x264, "MPVDecoderContextPrefix::forwardOffsets offset must be 0x264");
-  static_assert(offsetof(MPVDecoderContextPrefix, backwardOffsets) == 0x274, "MPVDecoderContextPrefix::backwardOffsets offset must be 0x274");
-  static_assert(offsetof(MPVDecoderContextPrefix, planeBase0) == 0x294, "MPVDecoderContextPrefix::planeBase0 offset must be 0x294");
-  static_assert(offsetof(MPVDecoderContextPrefix, planeBase2Stride) == 0x2A2, "MPVDecoderContextPrefix::planeBase2Stride offset must be 0x2A2");
-  static_assert(offsetof(MPVDecoderContextPrefix, decodeSkippedBpicMacroblock) == 0x2D4, "MPVDecoderContextPrefix::decodeSkippedBpicMacroblock offset must be 0x2D4");
-  static_assert(offsetof(MPVDecoderContextPrefix, forwardPredictionVector) == 0x2F0, "MPVDecoderContextPrefix::forwardPredictionVector offset must be 0x2F0");
-  static_assert(offsetof(MPVDecoderContextPrefix, backwardPredictionVector) == 0x314, "MPVDecoderContextPrefix::backwardPredictionVector offset must be 0x314");
-  static_assert(offsetof(MPVDecoderContextPrefix, macroblockLinearIndex) == 0x338, "MPVDecoderContextPrefix::macroblockLinearIndex offset must be 0x338");
-  static_assert(offsetof(MPVDecoderContextPrefix, predictionSignState) == 0x34C, "MPVDecoderContextPrefix::predictionSignState offset must be 0x34C");
-  static_assert(offsetof(MPVDecoderContextPrefix, dcPredictorY) == 0x350, "MPVDecoderContextPrefix::dcPredictorY offset must be 0x350");
-  static_assert(offsetof(MPVDecoderContextPrefix, intraCopyAddressLut) == 0x3A0, "MPVDecoderContextPrefix::intraCopyAddressLut offset must be 0x3A0");
-  static_assert(sizeof(MPVDecoderContextPrefix) == 0x6A0, "MPVDecoderContextPrefix size must be 0x6A0");
-
-  struct MPVDecoderStats
-  {
-    std::uint8_t reserved_0000[0x13AC];
-    int motionClampCounter; // +0x13AC
-  };
-
-  static_assert(offsetof(MPVDecoderStats, motionClampCounter) == 0x13AC, "MPVDecoderStats::motionClampCounter offset must be 0x13AC");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVMotionState, predictors) == 0x10, "MPVMotionState::predictors offset must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVMotionState) == 0x20, "MPVMotionState size must be 0x20");
 
   using MPVDecodeReadKernelFn = std::uint8_t(__cdecl*)(MPVDecoderScanContext* decoderContext, void* decodeState);
-  using MPVDecodeFinalizeFlagsFn = void(__cdecl*)(std::uint8_t* flags);
   using MPVDecodeContextFn = void(__cdecl*)(MPVDecoderScanContext* decoderContext);
   using MPVDecodeSkipRunFn = void(__cdecl*)(MPVDecoderScanContext* decoderContext, unsigned int skipCount);
-  using MPVDecoderServiceFn = void(__cdecl*)(int serviceToken);
+  using MPVDecodeSliceFn = int(__cdecl*)(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream);
+  using MPVSkipMacroblockFn = int(__cdecl*)(MPVDecoderScanContext* context, int skippedMacroblockCount);
+  using MPVMacroblockDecodeFn = int(__cdecl*)(MPVDecoderScanContext* context);
+  using MPVDctTransformFn = int(__cdecl*)(MPVDecoderScanContext* handle);
+  using MPVConcealFrameFn = int(__cdecl*)(SofdecAddressWord handleAddress);
+  using MPVDecoderServiceFn = void(__cdecl*)(SofdecAddressWord serviceToken);
+
+  struct MPVUserSjLane
+  {
+    SofdecAddressWord streamObjectAddress;   // +0x00
+    SofdecAddressWord streamCallbackAddress; // +0x04 (x86)
+    SofdecAddressWord streamContextAddress;  // +0x08 (x86)
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVUserSjLane) == 0x0C, "MPVUserSjLane size must be 0x0C");
+
+  struct MPVPictureAttributes
+  {
+    std::int32_t headerControlWords[14]; // +0x00
+    int pictureCodingType;               // +0x38
+    int fullPelForwardVector;            // +0x3C
+    int fullPelBackwardVector;           // +0x40
+    int concealMotionVectors;            // +0x44
+    std::int32_t reserved_48;            // +0x48
+    std::int32_t reserved_4C;            // +0x4C
+    std::int16_t forwardFCode;           // +0x50
+    std::int16_t backwardFCode;          // +0x52
+    std::int8_t intraDcPrecision;        // +0x54
+    std::int8_t pictureStructure;        // +0x55
+    std::int8_t topFieldFirst;           // +0x56
+    std::int8_t framePredFrameDct;       // +0x57
+    std::int8_t concealmentMotionVector; // +0x58
+    std::int8_t qScaleType;              // +0x59
+    std::int8_t intraVlcFormat;          // +0x5A
+    std::int8_t alternateScan;           // +0x5B
+    std::int8_t repeatFirstField;        // +0x5C
+    std::int8_t chroma420Type;           // +0x5D
+    std::int8_t progressiveFrame;        // +0x5E
+    std::int8_t compositeDisplayFlag;    // +0x5F
+    std::int8_t vAxis;                   // +0x60
+    std::int8_t fieldSequence;           // +0x61
+    std::int8_t subCarrier;              // +0x62
+    std::int8_t burstAmplitude;          // +0x63
+    std::int8_t subCarrierPhase;         // +0x64
+    std::uint8_t reserved_65[3];         // +0x65
+    std::int32_t extensionFlags;         // +0x68
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVPictureAttributes) == 0x6C, "MPVPictureAttributes size must be 0x6C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPictureAttributes, pictureCodingType) == 0x38, "MPVPictureAttributes::pictureCodingType offset must be 0x38");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPictureAttributes, forwardFCode) == 0x50, "MPVPictureAttributes::forwardFCode offset must be 0x50");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPictureAttributes, qScaleType) == 0x59, "MPVPictureAttributes::qScaleType offset must be 0x59");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVPictureAttributes, extensionFlags) == 0x68, "MPVPictureAttributes::extensionFlags offset must be 0x68");
+
+  struct MPVPictureAttributeExportBlock
+  {
+    MPVPictureAttributes pictureAttributes;
+    std::uint8_t reserved_6C_to_7F[0x14];
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVPictureAttributeExportBlock) == 0x80, "MPVPictureAttributeExportBlock size must be 0x80");
 
   /**
    * The per-block working state the read kernels
@@ -288,189 +272,222 @@ namespace moho::movie
     const std::uint8_t* dcSizeTable;  // +0x2C
   };
 
-  static_assert(offsetof(MPVCoefficientDecodeState, codeLengthBits) == 0x0C, "MPVCoefficientDecodeState::codeLengthBits offset must be 0x0C");
-  static_assert(offsetof(MPVCoefficientDecodeState, scanIndex) == 0x14, "MPVCoefficientDecodeState::scanIndex offset must be 0x14");
-  static_assert(offsetof(MPVCoefficientDecodeState, coefficients) == 0x1C, "MPVCoefficientDecodeState::coefficients offset must be 0x1C");
-  static_assert(offsetof(MPVCoefficientDecodeState, quantMatrix) == 0x20, "MPVCoefficientDecodeState::quantMatrix offset must be 0x20");
-  static_assert(offsetof(MPVCoefficientDecodeState, quantScale) == 0x24, "MPVCoefficientDecodeState::quantScale offset must be 0x24");
-  static_assert(offsetof(MPVCoefficientDecodeState, dcAccumulator) == 0x28, "MPVCoefficientDecodeState::dcAccumulator offset must be 0x28");
-  static_assert(offsetof(MPVCoefficientDecodeState, dcSizeTable) == 0x2C, "MPVCoefficientDecodeState::dcSizeTable offset must be 0x2C");
-  static_assert(sizeof(MPVCoefficientDecodeState) == 0x30, "MPVCoefficientDecodeState size must be 0x30");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, codeLengthBits) == 0x0C, "MPVCoefficientDecodeState::codeLengthBits offset must be 0x0C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, scanIndex) == 0x14, "MPVCoefficientDecodeState::scanIndex offset must be 0x14");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, coefficients) == 0x1C, "MPVCoefficientDecodeState::coefficients offset must be 0x1C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, quantMatrix) == 0x20, "MPVCoefficientDecodeState::quantMatrix offset must be 0x20");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, quantScale) == 0x24, "MPVCoefficientDecodeState::quantScale offset must be 0x24");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, dcAccumulator) == 0x28, "MPVCoefficientDecodeState::dcAccumulator offset must be 0x28");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVCoefficientDecodeState, dcSizeTable) == 0x2C, "MPVCoefficientDecodeState::dcSizeTable offset must be 0x2C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVCoefficientDecodeState) == 0x30, "MPVCoefficientDecodeState size must be 0x30");
+
+  struct MPVAbdecRunLevelLane
+  {
+    SofdecAddressWord tableBaseMinusBias; // +0x00
+    std::int32_t bitLength;               // +0x04 (x86)
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVAbdecRunLevelLane) == 0x08, "MPVAbdecRunLevelLane size must be 0x08");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVAbdecRunLevelLane, tableBaseMinusBias) == 0x00, "MPVAbdecRunLevelLane::tableBaseMinusBias offset must be 0x00");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVAbdecRunLevelLane, bitLength) == 0x04, "MPVAbdecRunLevelLane::bitLength offset must be 0x04");
+
+  /// The table block `mpvlib_InitWork` places past the decoder slots (0x3A0 into
+  /// the object table). Every decoder handle points into it: the AB-decode mask,
+  /// scan and threshold tables, the dequantisation scale table, the run-level
+  /// lane descriptors, the VLC tables (`mpvvlc_SetupVlc` fills the arena from its
+  /// end downward) and the 0..255 clip table.
+  struct MPVSharedWork
+  {
+    std::uint8_t reserved_0000[0x1100];          // +0x0000
+    std::uint32_t forwardMaskLut[8];             // +0x1100 also read as the 16-bit mask-by-width table
+    std::uint8_t intraScanPermutation[64];       // +0x1120
+    float dequantScaleTable[64];                 // +0x1160 (`DCT_FsriInitScaleTbl`)
+    std::uint32_t thresholdLut[8];               // +0x1260
+    MPVAbdecRunLevelLane runLevelLanes[6];       // +0x1280
+    std::uint8_t vlcTableArena[0x5B0];           // +0x12B0
+    std::int32_t clipTableStorage[0x100];        // +0x1860 (`mpvlib_InitClip`)
+  };
+
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVSharedWork, forwardMaskLut) == 0x1100, "MPVSharedWork::forwardMaskLut offset must be 0x1100");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVSharedWork, runLevelLanes) == 0x1280, "MPVSharedWork::runLevelLanes offset must be 0x1280");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVSharedWork, vlcTableArena) == 0x12B0, "MPVSharedWork::vlcTableArena offset must be 0x12B0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVSharedWork, clipTableStorage) == 0x1860, "MPVSharedWork::clipTableStorage offset must be 0x1860");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVSharedWork) == 0x1C60, "MPVSharedWork size must be 0x1C60");
 
   struct MPVDecoderScanContext
   {
+    static constexpr int kServiceReloadIntervalCondition = 7;
+    static constexpr int kServiceCallbackCondition = 8;
+    static constexpr int kServiceCallbackTokenCondition = 9;
+
     MPVBitstreamState bitstreamState; // +0x00
-    /**
-     * The 128-entry dword dispatch table (`mpvvlt_run_level_8`) covering
-     * every MPEG-1 Table B-14 AC code whose top window bit is clear. It is
-     * indexed by window bits 30..24, and each entry packs
-     * `length << 16 | level << 8 | run` with the level signed. Entries 0..3
-     * are zero, meaning "too long for this table - fall through to
-     * `acLongRunLevelTables`"; entries 4..7 carry the escape marker
-     * (a run of 64).
-     */
     const std::uint32_t* acShortRunLevelTable; // +0x10
-    /**
-     * Word tables for the codes with seven or more leading zeros, in the
-     * order the decode switch selects them by code length:
-     * [0] = 11 bits, [1] = 13, [2] = 14, [3] = 15, [4] = 16, [5] = 17.
-     * Each is indexed by the code bits with the trailing sign bit shifted
-     * out, and yields `level << 8 | run` with the level signed.
-     */
-    const std::uint16_t* acLongRunLevelTables[6]; // +0x14 .. +0x2B
-    /** Base of the 64-entry zigzag scan order; the AC cursor walks it. */
-    std::uint8_t* coefficientWriteCursor;        // +0x2C
-    /** Width-indexed bit masks: `bitMaskByWidth[n] & window` keeps n bits. */
-    const std::uint16_t* bitMaskByWidth;         // +0x30
-    /** Per-scan-position float scale folded into each dequantized coefficient. */
-    const float* dequantScaleTable;              // +0x34
-    std::uint8_t reserved_0038[0x44 - 0x38];
-    /**
-     * The parameter/result block the read kernels work through. Both scan-state
-     * initializers hand its address straight to the kernel - `sub_C0E1B0` calls
-     * `readKernel(context, context + 68)` - and the kernel reads `dcSizeTable`
-     * as `[edx+2Ch]` (0x00AFAE90), i.e. context +0x70. That anchors the view
-     * here at +0x44, and every field then lands on the lane the initializers
-     * fill: `coefficients` +0x60, `quantMatrix` +0x64, `quantScale` +0x68,
-     * `dcAccumulator` +0x6C, `dcSizeTable` +0x70.
-     */
+    const std::uint16_t* acLongRunLevelTables[6]; // +0x14 .. +0x2B (x86)
+    std::uint8_t* coefficientWriteCursor; // +0x2C
+    const std::uint16_t* bitMaskByWidth; // +0x30
+    const float* dequantScaleTable; // +0x34
+    SofdecAddressWord abdecThresholdLutAddress; // +0x38
+    SofdecAddressWord abdecRunLevelLanesAddress; // +0x3C
+    SofdecAddressWord lumaBaseAddress; // +0x40
     MPVCoefficientDecodeState coefficientDecodeState; // +0x44
-    /** Zero while reading an intra macroblock, one while reading a predicted one. */
-    int blockScanPhase;          // +0x74
+    int blockScanPhase; // +0x74
     std::uint8_t decodeFlags[6]; // +0x78
-    std::uint8_t reserved_007E[0xA0 - 0x7E];
-    int decodeSignLadder; // +0xA0
-    std::uint8_t reserved_00A4[0x1AC - 0xA4];
-    int serviceReloadInterval; // +0x1AC
-    MPVDecoderServiceFn serviceCallback; // +0x1B0
-    int serviceCallbackToken; // +0x1B4
-    std::uint8_t reserved_01B8[0x1D8 - 0x1B8];
-    int macroblocksPerRow;   // +0x1D8
-    int macroblockRowsCount; // +0x1DC
-    std::uint8_t reserved_01E0[0x1E8 - 0x1E0];
-    /**
-     * Selects how far the read kernels scan a block. A value of 4 means
-     * DC-only: the kernel emits the DC coefficient and returns without
-     * running the AC run/level loop at all.
-     */
-    int coefficientScanMode; // +0x1E8
-    std::uint8_t reserved_01EC[0x2C4 - 0x1EC];
+    std::uint8_t reserved_007E[0x90 - 0x7E];
+    int primaryDctDecodeCount; // +0x90
+    int secondaryDctDecodeCount; // +0x94
+    std::uint8_t reserved_0098[0xA0 - 0x98];
+    int codedBlockPatternMask; // +0xA0 one bit per block, MSB first
+    float* dctCoefficients; // +0xA4 six 64-coefficient blocks (`scanScratch0` onward)
+    SofdecAddressWord* dctBlockOutputAddresses; // +0xA8 the six block output addresses (`scanScratchAddress4A0` onward)
+    std::uint8_t reserved_00AC[0xC0 - 0xAC];
+    SofdecAddressWord dctScaleTableAddress; // +0xC0
+    std::uint8_t reserved_00C4[0xCC - 0xC4];
+    MPVPredictionKernelState predictionKernelState; // +0xCC
+    std::uint8_t reserved_00F8[0x110 - 0xF8];
+    MPVBlockSourceSet blockSources; // +0x110 clip table, scan LUT and the two prediction scratch areas
+    MPVCopyDestinationSet copyTargets; // +0x120 reconstruction output blocks (`MPVCMC_InitMcOiRt`)
+    MPVCopyDestinationSet scratchTargets; // +0x154 prediction scratch blocks (`mpvcmc_InitMcOiTa`)
+    int objectSlotState; // +0x188
+    int objectInitStatus; // +0x18C
+    SofdecAddressWord conditionCallbacks[16]; // +0x190
+    MPVPictureAttributes pictureAttributes; // +0x1D0
+    std::uint8_t reserved_023C[0x250 - 0x23C];
+    MPVErrorInfo errorInfo; // +0x250
+    MPVFrameDecodeSession frameSession; // +0x264
+    SofdecAddressWord planeBase0; // +0x294
+    SofdecAddressWord planeBase1; // +0x298
+    SofdecAddressWord planeBase2; // +0x29C
+    std::int16_t planeBase1Stride; // +0x2A0
+    std::int16_t planeBase2Stride; // +0x2A2
+    int sequenceAspectRatioCode; // +0x2A4
+    int sequenceBitRateCode; // +0x2A8
+    int sequenceVbvBufferCode; // +0x2AC
+    int constrainedParametersFlag; // +0x2B0
+    int gopClosedFlag; // +0x2B4
+    int gopBrokenLinkFlag; // +0x2B8
+    int pictureVbvDelay; // +0x2BC
+    MPVDecodeSliceFn decodeMacroblockByType; // +0x2C0
     MPVDecodeSkipRunFn decodeSkipRun; // +0x2C4
     MPVDecodeContextFn decodeIntraMacroblock; // +0x2C8
     MPVDecodeContextFn decodeResidualMacroblock; // +0x2CC
     MPVDecodeContextFn decodePostIntraMacroblock; // +0x2D0
     MPVDecodeContextFn decodePredictedModes[4]; // +0x2D4 .. +0x2E3
-    MPVDecodeFinalizeFlagsFn decodeFinalizeIntra;     // +0x2E4
-    MPVDecodeFinalizeFlagsFn decodeFinalizePredicted; // +0x2E8
-    int decodeBitWindow; // +0x2EC (also quant scale in MB decode paths)
-    MPVPredictionVectorSet forwardPredictionVector;  // +0x2F0
+    MPVDctTransformFn dctTransformSixBlocks; // +0x2E4 intra pictures: all six blocks
+    MPVDctTransformFn dctTransformCbp; // +0x2E8 predicted pictures: the coded-block-pattern blocks
+    int decodeBitWindow; // +0x2EC
+    MPVPredictionVectorSet forwardPredictionVector; // +0x2F0
     MPVPredictionVectorSet backwardPredictionVector; // +0x314
     int macroblockLinearIndex; // +0x338
-    int macroblockRow;         // +0x33C
-    int macroblockColumn;      // +0x340
+    int macroblockRow; // +0x33C
+    int macroblockColumn; // +0x340
     int macroblockLinearLimit; // +0x344
-    int macroblockTypeFlags;   // +0x348
+    int macroblockTypeFlags; // +0x348
     int predictionSignState; // +0x34C
-    std::int32_t dcPredictorY;  // +0x350
+    std::int32_t dcPredictorY; // +0x350
     std::int32_t dcPredictorCb; // +0x354
     std::int32_t dcPredictorCr; // +0x358
-    std::uint8_t reserved_035C[0x6A0 - 0x35C];
+    int pictureCodecClassification; // +0x35C
+    int sequenceStcCodePrimary; // +0x360
+    int sequenceStcCodeSecondary; // +0x364
+    int sequenceStcCodeTertiary; // +0x368
+    SofdecAddressWord scanScratchAddress4A0; // +0x36C
+    SofdecAddressWord scanScratchAddress520; // +0x370
+    SofdecAddressWord scanScratchAddress5A0; // +0x374
+    SofdecAddressWord scanScratchAddress620; // +0x378
+    SofdecAddressWord scanScratchAddress3A0; // +0x37C
+    SofdecAddressWord scanScratchAddress420; // +0x380
+    std::uint8_t reserved_0384[0x3A0 - 0x384];
+    std::int16_t intraCopyAddressLut[384]; // +0x3A0 .. +0x69F
     std::uint8_t scanScratch0[0x100]; // +0x6A0
     std::uint8_t scanScratch1[0x100]; // +0x7A0
     std::uint8_t scanScratch2[0x100]; // +0x8A0
     std::uint8_t scanScratch3[0x100]; // +0x9A0
     std::uint8_t scanScratch4[0x100]; // +0xAA0
     std::uint8_t scanScratch5[0x100]; // +0xBA0
-    std::uint8_t decodeWorkScratchIntra[0x40];      // +0xCA0
+    std::uint8_t decodeWorkScratchIntra[0x40]; // +0xCA0
     std::uint8_t decodeWorkScratchPredicted[0x258]; // +0xCE0
     std::uint8_t reserved_0F38[0x1320 - 0x0F38];
     int recoverNeededFlag; // +0x1320
-    std::uint8_t reserved_1324[0x1328 - 0x1324];
-    MPVSjChunk activeChunk; // +0x1328
+    int recoverState; // +0x1324
+    moho::SjChunkRange activeChunk; // +0x1328
     int sliceBitAlignment; // +0x1330
-    std::uint8_t reserved_1334[0x1338 - 0x1334];
-    MPVDecodeReadKernelFn decodeReadKernelIntra;     // +0x1338
+    int sequenceUserDataIdcPrecisionMode; // +0x1334
+    MPVDecodeReadKernelFn decodeReadKernelIntra; // +0x1338
     MPVDecodeReadKernelFn decodeReadKernelPredicted; // +0x133C
     std::uint8_t reserved_1340[0x1344 - 0x1340];
     int serviceCountdown; // +0x1344
-    int decodeTablePrimary;   // +0x1348
-    int decodeTableSecondary; // +0x134C
-    std::uint8_t reserved_1350[0x1398 - 0x1350];
+    const std::uint8_t* decodeTablePrimary; // +0x1348
+    const std::uint8_t* decodeTableSecondary; // +0x134C
+    SofdecAddressWord m2vDecoderHandle; // +0x1350
+    SofdecAddressWord currentHeaderContext; // +0x1354
+    MPVUserSjLane userSjLanes[4]; // +0x1358
+    SofdecAddressWord pictureUserBufferAddress; // +0x1388
+    int pictureUserBufferBytes; // +0x138C
+    int pictureUserDecodeState; // +0x1390
+    int reserved_1394; // +0x1394
     MPVDecodeContextFn macroblockDiscontinuityHandler; // +0x1398
     int lastDecodedMacroblockIndex; // +0x139C
-    std::uint8_t reserved_13A0[0x13AC - 0x13A0];
+    int postCreateMarker; // +0x13A0
+    int headerProgressPrimary; // +0x13A4
+    int headerProgressSecondary; // +0x13A8
     int motionClampCounter; // +0x13AC
+
+    [[nodiscard]] std::int16_t* scanLut3A0() noexcept { return intraCopyAddressLut; }
+    [[nodiscard]] std::int16_t* scanLut420() noexcept { return intraCopyAddressLut + 64; }
+    [[nodiscard]] std::int16_t* scanLut4A0() noexcept { return intraCopyAddressLut + 128; }
+    [[nodiscard]] std::int16_t* scanLut520() noexcept { return intraCopyAddressLut + 192; }
+    [[nodiscard]] std::int16_t* scanLut5A0() noexcept { return intraCopyAddressLut + 256; }
+    [[nodiscard]] std::int16_t* scanLut620() noexcept { return intraCopyAddressLut + 320; }
+    [[nodiscard]] int macroblocksPerRow() const noexcept { return pictureAttributes.headerControlWords[2]; }
+    [[nodiscard]] int& macroblocksPerRow() noexcept { return pictureAttributes.headerControlWords[2]; }
+    [[nodiscard]] int macroblockRowsCount() const noexcept { return pictureAttributes.headerControlWords[3]; }
+    [[nodiscard]] int& macroblockRowsCount() noexcept { return pictureAttributes.headerControlWords[3]; }
+    [[nodiscard]] int coefficientScanMode() const noexcept { return pictureAttributes.headerControlWords[6]; }
+    [[nodiscard]] int& coefficientScanMode() noexcept { return pictureAttributes.headerControlWords[6]; }
+    [[nodiscard]] int interpolationParity() const noexcept { return static_cast<int>(conditionCallbacks[3]); }
+    [[nodiscard]] SofdecAddressWord serviceReloadInterval() const noexcept { return conditionCallbacks[kServiceReloadIntervalCondition]; }
+    [[nodiscard]] SofdecAddressWord& serviceReloadInterval() noexcept { return conditionCallbacks[kServiceReloadIntervalCondition]; }
+    [[nodiscard]] MPVDecoderServiceFn serviceCallback() const noexcept
+    {
+      return reinterpret_cast<MPVDecoderServiceFn>(static_cast<std::uintptr_t>(conditionCallbacks[kServiceCallbackCondition]));
+    }
+    [[nodiscard]] SofdecAddressWord serviceCallbackToken() const noexcept { return conditionCallbacks[kServiceCallbackTokenCondition]; }
   };
 
-  static_assert(offsetof(MPVDecoderScanContext, bitstreamState) == 0x00, "MPVDecoderScanContext::bitstreamState offset must be 0x00");
-  static_assert(
-    offsetof(MPVDecoderScanContext, dequantScaleTable) == 0x34,
-    "MPVDecoderScanContext::dequantScaleTable offset must be 0x34"
-  );
-
-  static_assert(
-    offsetof(MPVDecoderScanContext, acShortRunLevelTable) == 0x10,
-    "MPVDecoderScanContext::acShortRunLevelTable offset must be 0x10"
-  );
-  static_assert(
-    offsetof(MPVDecoderScanContext, acLongRunLevelTables) == 0x14,
-    "MPVDecoderScanContext::acLongRunLevelTables offset must be 0x14"
-  );
-  static_assert(
-    offsetof(MPVDecoderScanContext, coefficientScanMode) == 0x1E8,
-    "MPVDecoderScanContext::coefficientScanMode offset must be 0x1E8"
-  );
-  static_assert(
-    offsetof(MPVDecoderScanContext, coefficientWriteCursor) == 0x2C,
-    "MPVDecoderScanContext::coefficientWriteCursor offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(MPVDecoderScanContext, bitMaskByWidth) == 0x30,
-    "MPVDecoderScanContext::bitMaskByWidth offset must be 0x30"
-  );
-
-  static_assert(
-    offsetof(MPVDecoderScanContext, coefficientDecodeState) == 0x44,
-    "MPVDecoderScanContext::coefficientDecodeState offset must be 0x44"
-  );
-  static_assert(
-    offsetof(MPVDecoderScanContext, coefficientDecodeState.coefficients) == 0x60,
-    "MPVCoefficientDecodeState::coefficients must land on context +0x60"
-  );
-  static_assert(
-    offsetof(MPVDecoderScanContext, coefficientDecodeState.dcSizeTable) == 0x70,
-    "MPVCoefficientDecodeState::dcSizeTable must land on context +0x70"
-  );
-  static_assert(offsetof(MPVDecoderScanContext, blockScanPhase) == 0x74, "MPVDecoderScanContext::blockScanPhase offset must be 0x74");
-  static_assert(offsetof(MPVDecoderScanContext, decodeFlags) == 0x78, "MPVDecoderScanContext::decodeFlags offset must be 0x78");
-  static_assert(offsetof(MPVDecoderScanContext, decodeSignLadder) == 0xA0, "MPVDecoderScanContext::decodeSignLadder offset must be 0xA0");
-  static_assert(offsetof(MPVDecoderScanContext, serviceReloadInterval) == 0x1AC, "MPVDecoderScanContext::serviceReloadInterval offset must be 0x1AC");
-  static_assert(offsetof(MPVDecoderScanContext, macroblocksPerRow) == 0x1D8, "MPVDecoderScanContext::macroblocksPerRow offset must be 0x1D8");
-  static_assert(offsetof(MPVDecoderScanContext, decodeSkipRun) == 0x2C4, "MPVDecoderScanContext::decodeSkipRun offset must be 0x2C4");
-  static_assert(offsetof(MPVDecoderScanContext, decodeFinalizeIntra) == 0x2E4, "MPVDecoderScanContext::decodeFinalizeIntra offset must be 0x2E4");
-  static_assert(offsetof(MPVDecoderScanContext, decodeFinalizePredicted) == 0x2E8, "MPVDecoderScanContext::decodeFinalizePredicted offset must be 0x2E8");
-  static_assert(offsetof(MPVDecoderScanContext, decodeBitWindow) == 0x2EC, "MPVDecoderScanContext::decodeBitWindow offset must be 0x2EC");
-  static_assert(offsetof(MPVDecoderScanContext, forwardPredictionVector) == 0x2F0, "MPVDecoderScanContext::forwardPredictionVector offset must be 0x2F0");
-  static_assert(offsetof(MPVDecoderScanContext, backwardPredictionVector) == 0x314, "MPVDecoderScanContext::backwardPredictionVector offset must be 0x314");
-  static_assert(offsetof(MPVDecoderScanContext, macroblockLinearIndex) == 0x338, "MPVDecoderScanContext::macroblockLinearIndex offset must be 0x338");
-  static_assert(offsetof(MPVDecoderScanContext, macroblockLinearLimit) == 0x344, "MPVDecoderScanContext::macroblockLinearLimit offset must be 0x344");
-  static_assert(offsetof(MPVDecoderScanContext, macroblockTypeFlags) == 0x348, "MPVDecoderScanContext::macroblockTypeFlags offset must be 0x348");
-  static_assert(offsetof(MPVDecoderScanContext, predictionSignState) == 0x34C, "MPVDecoderScanContext::predictionSignState offset must be 0x34C");
-  static_assert(offsetof(MPVDecoderScanContext, dcPredictorY) == 0x350, "MPVDecoderScanContext::dcPredictorY offset must be 0x350");
-  static_assert(offsetof(MPVDecoderScanContext, scanScratch0) == 0x6A0, "MPVDecoderScanContext::scanScratch0 offset must be 0x6A0");
-  static_assert(offsetof(MPVDecoderScanContext, scanScratch5) == 0xBA0, "MPVDecoderScanContext::scanScratch5 offset must be 0xBA0");
-  static_assert(offsetof(MPVDecoderScanContext, decodeWorkScratchIntra) == 0xCA0, "MPVDecoderScanContext::decodeWorkScratchIntra offset must be 0xCA0");
-  static_assert(offsetof(MPVDecoderScanContext, decodeWorkScratchPredicted) == 0xCE0, "MPVDecoderScanContext::decodeWorkScratchPredicted offset must be 0xCE0");
-  static_assert(offsetof(MPVDecoderScanContext, recoverNeededFlag) == 0x1320, "MPVDecoderScanContext::recoverNeededFlag offset must be 0x1320");
-  static_assert(offsetof(MPVDecoderScanContext, activeChunk) == 0x1328, "MPVDecoderScanContext::activeChunk offset must be 0x1328");
-  static_assert(offsetof(MPVDecoderScanContext, sliceBitAlignment) == 0x1330, "MPVDecoderScanContext::sliceBitAlignment offset must be 0x1330");
-  static_assert(offsetof(MPVDecoderScanContext, decodeReadKernelIntra) == 0x1338, "MPVDecoderScanContext::decodeReadKernelIntra offset must be 0x1338");
-  static_assert(offsetof(MPVDecoderScanContext, decodeReadKernelPredicted) == 0x133C, "MPVDecoderScanContext::decodeReadKernelPredicted offset must be 0x133C");
-  static_assert(offsetof(MPVDecoderScanContext, serviceCountdown) == 0x1344, "MPVDecoderScanContext::serviceCountdown offset must be 0x1344");
-  static_assert(offsetof(MPVDecoderScanContext, decodeTablePrimary) == 0x1348, "MPVDecoderScanContext::decodeTablePrimary offset must be 0x1348");
-  static_assert(offsetof(MPVDecoderScanContext, decodeTableSecondary) == 0x134C, "MPVDecoderScanContext::decodeTableSecondary offset must be 0x134C");
-  static_assert(offsetof(MPVDecoderScanContext, macroblockDiscontinuityHandler) == 0x1398, "MPVDecoderScanContext::macroblockDiscontinuityHandler offset must be 0x1398");
-  static_assert(offsetof(MPVDecoderScanContext, lastDecodedMacroblockIndex) == 0x139C, "MPVDecoderScanContext::lastDecodedMacroblockIndex offset must be 0x139C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, bitstreamState) == 0x00, "MPVDecoderScanContext::bitstreamState offset must be 0x00");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, acShortRunLevelTable) == 0x10, "MPVDecoderScanContext::acShortRunLevelTable offset must be 0x10");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, acLongRunLevelTables) == 0x14, "MPVDecoderScanContext::acLongRunLevelTables offset must be 0x14");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, coefficientWriteCursor) == 0x2C, "MPVDecoderScanContext::coefficientWriteCursor offset must be 0x2C");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, bitMaskByWidth) == 0x30, "MPVDecoderScanContext::bitMaskByWidth offset must be 0x30");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, dequantScaleTable) == 0x34, "MPVDecoderScanContext::dequantScaleTable offset must be 0x34");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, coefficientDecodeState) == 0x44, "MPVDecoderScanContext::coefficientDecodeState offset must be 0x44");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, primaryDctDecodeCount) == 0x90, "MPVDecoderScanContext::primaryDctDecodeCount offset must be 0x90");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, blockSources) == 0x110, "MPVDecoderScanContext::blockSources offset must be 0x110");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, copyTargets) == 0x120, "MPVDecoderScanContext::copyTargets offset must be 0x120");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, scratchTargets) == 0x154, "MPVDecoderScanContext::scratchTargets offset must be 0x154");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, objectSlotState) == 0x188, "MPVDecoderScanContext::objectSlotState offset must be 0x188");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, conditionCallbacks) == 0x190, "MPVDecoderScanContext::conditionCallbacks offset must be 0x190");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, pictureAttributes) == 0x1D0, "MPVDecoderScanContext::pictureAttributes offset must be 0x1D0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, errorInfo) == 0x250, "MPVDecoderScanContext::errorInfo offset must be 0x250");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, frameSession) == 0x264, "MPVDecoderScanContext::frameSession offset must be 0x264");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, planeBase0) == 0x294, "MPVDecoderScanContext::planeBase0 offset must be 0x294");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, sequenceAspectRatioCode) == 0x2A4, "MPVDecoderScanContext::sequenceAspectRatioCode offset must be 0x2A4");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, decodeMacroblockByType) == 0x2C0, "MPVDecoderScanContext::decodeMacroblockByType offset must be 0x2C0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, decodePredictedModes) == 0x2D4, "MPVDecoderScanContext::decodePredictedModes offset must be 0x2D4");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, forwardPredictionVector) == 0x2F0, "MPVDecoderScanContext::forwardPredictionVector offset must be 0x2F0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, macroblockLinearIndex) == 0x338, "MPVDecoderScanContext::macroblockLinearIndex offset must be 0x338");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, intraCopyAddressLut) == 0x3A0, "MPVDecoderScanContext::intraCopyAddressLut offset must be 0x3A0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, scanScratch0) == 0x6A0, "MPVDecoderScanContext::scanScratch0 offset must be 0x6A0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, decodeWorkScratchIntra) == 0xCA0, "MPVDecoderScanContext::decodeWorkScratchIntra offset must be 0xCA0");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, recoverNeededFlag) == 0x1320, "MPVDecoderScanContext::recoverNeededFlag offset must be 0x1320");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, activeChunk) == 0x1328, "MPVDecoderScanContext::activeChunk offset must be 0x1328");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, decodeReadKernelIntra) == 0x1338, "MPVDecoderScanContext::decodeReadKernelIntra offset must be 0x1338");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, decodeTablePrimary) == 0x1348, "MPVDecoderScanContext::decodeTablePrimary offset must be 0x1348");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, userSjLanes) == 0x1358, "MPVDecoderScanContext::userSjLanes offset must be 0x1358");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, pictureUserBufferAddress) == 0x1388, "MPVDecoderScanContext::pictureUserBufferAddress offset must be 0x1388");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, macroblockDiscontinuityHandler) == 0x1398, "MPVDecoderScanContext::macroblockDiscontinuityHandler offset must be 0x1398");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(offsetof(MPVDecoderScanContext, motionClampCounter) == 0x13AC, "MPVDecoderScanContext::motionClampCounter offset must be 0x13AC");
+  MOHO_MOVIE_X86_LAYOUT_ASSERT(sizeof(MPVDecoderScanContext) == 0x13B0, "MPVDecoderScanContext x86 size must be 0x13B0");
 
   /**
    * Address: 0x00C0C000 (FUN_00C0C000)
@@ -481,7 +498,7 @@ namespace moho::movie
    * Computes destination plane pointers for the current MB and writes the six
    * intra 8x8 blocks through the LUT-based luma copy path.
    */
-  int MPVUMC_Intra(MPVDecoderContextPrefix* context);
+  int MPVUMC_Intra(MPVDecoderScanContext* context);
 
   /**
    * Address: 0x00C0C080 (FUN_00C0C080)
@@ -502,7 +519,7 @@ namespace moho::movie
    * dispatches interpolation kernels for 6 block destinations.
    */
   int form_prediction(
-    MPVDecoderContextPrefix* context,
+    MPVDecoderScanContext* context,
     int predictionWriteBaseAddress,
     MPVSpatialDelta* outDelta,
     const MPVMacroblockOffsets* blockOffsets,
@@ -515,7 +532,7 @@ namespace moho::movie
    * What it does:
    * Recovers forward-predicted MB samples then writes frame420 blocks.
    */
-  int MPVUMC_Forward(MPVDecoderContextPrefix* context);
+  int MPVUMC_Forward(MPVDecoderScanContext* context);
 
   /**
    * Address: 0x00C0C250 (FUN_00C0C250)
@@ -523,7 +540,7 @@ namespace moho::movie
    * What it does:
    * Recovers backward-predicted MB samples then writes frame420 blocks.
    */
-  int MPVUMC_Backward(MPVDecoderContextPrefix* context);
+  int MPVUMC_Backward(MPVDecoderScanContext* context);
 
   /**
    * Address: 0x00C0C2E0 (FUN_00C0C2E0)
@@ -532,7 +549,7 @@ namespace moho::movie
    * Recovers forward+backward MB samples and writes bi-directional frame420
    * blend blocks.
    */
-  int MPVUMC_BiDirect(MPVDecoderContextPrefix* context);
+  int MPVUMC_BiDirect(MPVDecoderScanContext* context);
 
   /**
    * Address: 0x00C0C5C0 (FUN_00C0C5C0)
@@ -559,7 +576,7 @@ namespace moho::movie
    * Rewinds MB address by skip count and decodes B-picture skipped MBs through
    * the configured callback until the prior linear MB index is reached.
    */
-  int MPVUMC_BpicSkipped(MPVDecoderContextPrefix* context, int skippedMacroblockCount);
+  int MPVUMC_BpicSkipped(MPVDecoderScanContext* context, int skippedMacroblockCount);
 
   /**
    * Address: 0x00C0C9B0 (FUN_00C0C9B0)
@@ -568,7 +585,7 @@ namespace moho::movie
    * Rewinds MB address by skip count and copies forward prediction lanes into
    * backward lanes for each skipped P-picture MB.
    */
-  int MPVUMC_PpicSkipped(MPVDecoderContextPrefix* context, int skippedMacroblockCount);
+  int MPVUMC_PpicSkipped(MPVDecoderScanContext* context, int skippedMacroblockCount);
 
   /**
    * Address: 0x00C0CA20 (FUN_00C0CA20)
@@ -677,7 +694,7 @@ namespace moho::movie
    * macroblock plane-offset descriptor.
    */
   int MPVUMC_GetMacroblockPlaneOffsets(
-    const MPVDecoderContextPrefix* context, const MPVMacroblockOffsets& blockOffsets, MPVSpatialDelta& outDelta
+    const MPVDecoderScanContext* context, const MPVMacroblockOffsets& blockOffsets, MPVSpatialDelta& outDelta
   );
 
   /**
@@ -687,7 +704,7 @@ namespace moho::movie
    * Decrements MB address by a skip amount and wraps row/column indices when
    * the column crosses the left boundary.
    */
-  MPVDecoderContextPrefix* mpvumc_SubMbadr(MPVDecoderContextPrefix* context, int decrement);
+  MPVDecoderScanContext* mpvumc_SubMbadr(MPVDecoderScanContext* context, int decrement);
 
   /**
    * Address: 0x00C0CD10 (FUN_00C0CD10)
@@ -696,7 +713,7 @@ namespace moho::movie
    * Increments MB address by one and wraps row/column indices when the column
    * reaches row width.
    */
-  MPVDecoderContextPrefix* mpvumc_IncreMbadr(MPVDecoderContextPrefix* context);
+  MPVDecoderScanContext* mpvumc_IncreMbadr(MPVDecoderScanContext* context);
 
   /**
    * Address: 0x00C0D880 (FUN_00C0D880)
@@ -712,7 +729,7 @@ namespace moho::movie
    * What it does:
    * Resets Y/Cb/Cr DC predictors to MPEG baseline value (0x400).
    */
-  MPVDecoderContextPrefix* MPVDEC_ResetDc(MPVDecoderContextPrefix* context);
+  MPVDecoderScanContext* MPVDEC_ResetDc(MPVDecoderScanContext* context);
 
   /**
    * Address: 0x00C0D8C0 (FUN_00C0D8C0)
@@ -731,7 +748,7 @@ namespace moho::movie
    * What it does:
    * Decodes I-picture macroblocks from the current slice chunk stream.
    */
-  int MPVDEC_DecIpicMb(MPVDecoderScanContext* context, MPVSjStream* stream);
+  int MPVDEC_DecIpicMb(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream);
 
   /**
    * Address: 0x00C0D1D0 (FUN_00C0D1D0)
@@ -739,7 +756,7 @@ namespace moho::movie
    * What it does:
    * Decodes P-picture macroblocks from the current slice chunk stream.
    */
-  int MPVDEC_DecPpicMb(MPVDecoderScanContext* context, MPVSjStream* stream);
+  int MPVDEC_DecPpicMb(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream);
 
   /**
    * Address: 0x00C0DA80 (FUN_00C0DA80)
@@ -748,7 +765,7 @@ namespace moho::movie
    * Decodes B-picture macroblocks from the current slice chunk stream,
    * including MBAI/MB-type/CBP/motion paths and chunk refill handling.
    */
-  int MPVDEC_DecBpicMb(MPVDecoderScanContext* context, MPVSjStream* stream);
+  int MPVDEC_DecBpicMb(MPVDecoderScanContext* context, moho::SofdecSjSupplyHandle* stream);
 } // namespace moho::movie
 
 extern "C"
@@ -785,7 +802,7 @@ extern "C"
    * What it does:
    * Initializes block-decode state in the runtime work arena.
    */
-  int MPVBDEC_Init(int handleAddress);
+  int MPVBDEC_Init(moho::movie::MPVSharedWork* sharedWork);
 
   /**
    * Address: 0x00AF6030 (FUN_00AF6030, _MPVUMC_Init)
@@ -827,7 +844,7 @@ extern "C"
    * Converts caller-provided work memory address into runtime work-space
    * address form (identity on PC build).
    */
-  int MPVLIB_ConvWorkAddr(int workAddress);
+  SofdecAddressWord MPVLIB_ConvWorkAddr(SofdecAddressWord workAddress);
 
   /**
    * Address: 0x00AE7A50 (FUN_00AE7A50)
@@ -836,7 +853,7 @@ extern "C"
    * Applies optional work-address tag lane A when the corresponding runtime
    * flag is enabled.
    */
-  int MPVLIB_ConvAddrPrimary(int address);
+  SofdecAddressWord MPVLIB_ConvAddrPrimary(SofdecAddressWord address);
 
   /**
    * Address: 0x00AE7A70 (FUN_00AE7A70)
@@ -845,7 +862,7 @@ extern "C"
    * Applies optional work-address tag lane B when the corresponding runtime
    * flag is enabled.
    */
-  int MPVLIB_ConvAddrSecondary(int address);
+  SofdecAddressWord MPVLIB_ConvAddrSecondary(SofdecAddressWord address);
 
   /**
    * Address: 0x00AE7A90 (FUN_00AE7A90)
@@ -854,7 +871,7 @@ extern "C"
    * Normalizes an address into the high-bit tagged address domain used by MPV
    * runtime lanes.
    */
-  std::uint32_t MPVLIB_ConvAddrWindow8(int address);
+  std::uint32_t MPVLIB_ConvAddrWindow8(SofdecAddressWord address);
 
   /**
    * Address: 0x00AE7AA0 (FUN_00AE7AA0, _mpvlib_InitClip)
@@ -888,7 +905,7 @@ extern "C"
    * What it does:
    * Initializes DCT runtime kernels and scale tables in caller work memory.
    */
-  int mpvlib_InitDct(int runtimeWorkBase);
+  int mpvlib_InitDct(moho::movie::MPVSharedWork* sharedWork);
 
   /**
    * Address: 0x00AE7B60 (FUN_00AE7B60, _mpvlib_InitWork)
@@ -897,7 +914,7 @@ extern "C"
    * Clears/aligned MPV work arena, seeds conceal workspace, and stores active
    * runtime lane pointers into global MPV work state.
    */
-  std::int32_t* mpvlib_InitWork(int objectCount, int workMemoryBaseAddress);
+  std::int32_t* mpvlib_InitWork(int objectCount, SofdecAddressWord workMemoryBaseAddress);
 
   /**
    * Address: 0x00AE7BE0 (FUN_00AE7BE0, _MPV_Finish)
@@ -931,7 +948,7 @@ extern "C"
    * Performs full per-handle initialization: object lanes, error state,
    * picture attributes, callback defaults, and stream hooks.
    */
-  int mpvlib_InitHn(int handleAddress);
+  int mpvlib_InitHn(SofdecAddressWord handleAddress);
 
   /**
    * Address: 0x00AE7D60 (FUN_00AE7D60, _mpvlib_InitObj)
@@ -939,7 +956,7 @@ extern "C"
    * What it does:
    * Binds VLC/clip/transform and internal scratch lanes for one MPV handle.
    */
-  int mpvlib_InitObj(int handleAddress);
+  int mpvlib_InitObj(SofdecAddressWord handleAddress);
 
   /**
    * Address: 0x00AE7E70 (FUN_00AE7E70, _mpvlib_InitPicAtr)
@@ -955,7 +972,7 @@ extern "C"
    * What it does:
    * Initializes per-handle DCT plane state and binds DCT count/scratch lanes.
    */
-  int mpvlib_InitDctPa(int handleAddress);
+  int mpvlib_InitDctPa(SofdecAddressWord handleAddress);
 
   /**
    * Address: 0x00AE7F40 (FUN_00AE7F40, _MPV_GetDctCnt)
@@ -963,7 +980,7 @@ extern "C"
    * What it does:
    * Reads two per-handle DCT counters into caller outputs.
    */
-  int MPV_GetDctCnt(int handleAddress, int* outPrimaryCount, int* outSecondaryCount);
+  int MPV_GetDctCnt(SofdecAddressWord handleAddress, int* outPrimaryCount, int* outSecondaryCount);
 
   /**
    * Address: 0x00AE7F60 (FUN_00AE7F60, _MPV_Destroy)
@@ -971,7 +988,7 @@ extern "C"
    * What it does:
    * Validates and destroys one MPV handle lane, then marks it free.
    */
-  int MPV_Destroy(int handleAddress);
+  int MPV_Destroy(SofdecAddressWord handleAddress);
 
   /**
    * Address: 0x00AE7FB0 (FUN_00AE7FB0, nullsub_48)
@@ -1003,7 +1020,7 @@ extern "C"
    * What it does:
    * Sets one runtime condition callback either globally or per handle.
    */
-  int MPV_SetCond(int handleAddress, int conditionIndex, int (*conditionCallback)());
+  int MPV_SetCond(SofdecAddressWord handleAddress, int conditionIndex, int (*conditionCallback)());
 
   /**
    * Address: 0x00AE8060 (FUN_00AE8060, _mpvlib_SetCondAll)
@@ -1019,7 +1036,7 @@ extern "C"
    * What it does:
    * Gets one runtime condition callback from either global state or a handle.
    */
-  int MPV_GetCond(int handleAddress, int conditionIndex, int* outCallbackAddress);
+  int MPV_GetCond(SofdecAddressWord handleAddress, int conditionIndex, int* outCallbackAddress);
 
   /**
    * Address: 0x00AE8100 (FUN_00AE8100, _MPVLIB_CheckHn)
@@ -1027,7 +1044,7 @@ extern "C"
    * What it does:
    * Validates that a handle exists and is currently allocated.
    */
-  int MPVLIB_CheckHn(int handleAddress);
+  int MPVLIB_CheckHn(SofdecAddressWord handleAddress);
 
   /**
    * Address: 0x00AE8120 (FUN_00AE8120, _MPVHDEC_Init)
@@ -1045,7 +1062,7 @@ extern "C"
    * Sets one user SJ stream slot (object/callback/context) for a handle.
    */
   std::int32_t* MPV_SetUsrSj(
-    int handleAddress, int streamIndex, int streamObjectAddress, int streamCallbackAddress, int streamContextAddress
+    SofdecAddressWord handleAddress, int streamIndex, int streamObjectAddress, int streamCallbackAddress, int streamContextAddress
   );
 
   /**
@@ -1055,7 +1072,7 @@ extern "C"
    * Sets per-handle picture-user buffer/context and clears picture decode-state
    * latch.
    */
-  std::int32_t* MPV_SetPicUsrBuf(int handleAddress, int userBufferAddress, int userContextAddress);
+  std::int32_t* MPV_SetPicUsrBuf(SofdecAddressWord handleAddress, SofdecAddressWord userBufferAddress, int userBufferBytes);
 
   /**
    * Address: 0x00AE82D0 (FUN_00AE82D0, _MPV_GetPicUsr)
@@ -1063,7 +1080,7 @@ extern "C"
    * What it does:
    * Reads per-handle picture-user buffer/decode-state fields.
    */
-  int* MPV_GetPicUsr(int handleAddress, int* outUserBufferAddress, int* outDecodeState);
+  int* MPV_GetPicUsr(SofdecAddressWord handleAddress, int* outUserBufferAddress, int* outDecodeState);
 
   /**
    * Address: 0x00AE8300 (FUN_00AE8300, _MPV_DecodePicAtrSj)
@@ -1072,7 +1089,7 @@ extern "C"
    * Decodes picture attributes from an SJ stream using delimiter recovery
    * semantics.
    */
-  int MPV_DecodePicAtrSj(int handleAddress, moho::movie::MPVSjStream* stream);
+  int MPV_DecodePicAtrSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream);
 
   /**
    * Address: 0x00AE84C0 (FUN_00AE84C0, _mpvhdec_GetCurDelim)
@@ -1080,7 +1097,7 @@ extern "C"
    * What it does:
    * Reads current stream delimiter type from the active SJ chunk.
    */
-  int mpvhdec_GetCurDelim(moho::movie::MPVSjStream* stream);
+  int mpvhdec_GetCurDelim(moho::SofdecSjSupplyHandle* stream);
 
   /**
    * Address: 0x00AE8510 (FUN_00AE8510, _MPV_DecodePicAtr)
@@ -1089,7 +1106,7 @@ extern "C"
    * Decodes picture attributes from a raw buffer range through SJ memory
    * wrapper stream.
    */
-  int MPV_DecodePicAtr(int handleAddress, const int* pictureDataRange, int* outConsumedBytes);
+  int MPV_DecodePicAtr(SofdecAddressWord handleAddress, const int* pictureDataRange, int* outConsumedBytes);
 
   /**
    * Address: 0x00AEAB20 (FUN_00AEAB20, _MPV_DecodeFrmSj)
@@ -1098,7 +1115,7 @@ extern "C"
    * Decodes one frame from an SJ stream, refreshes exported picture attributes,
    * and reports recovery-counter deltas.
    */
-  int MPV_DecodeFrmSj(int handleAddress, moho::movie::MPVSjStream* stream, moho::movie::MPVFrameDecodeSession* frameSession);
+  int MPV_DecodeFrmSj(SofdecAddressWord handleAddress, moho::SofdecSjSupplyHandle* stream, moho::movie::MPVFrameDecodeSession* frameSession);
 
   /**
    * Address: 0x00AE8570 (FUN_00AE8570, _mpvhdec_GetCodec)
@@ -1106,7 +1123,7 @@ extern "C"
    * What it does:
    * Classifies codec lane for current chunk and caches result in handle state.
    */
-  int mpvhdec_GetCodec(int handleAddress, moho::movie::MPVSjChunk* chunk);
+  int mpvhdec_GetCodec(SofdecAddressWord handleAddress, moho::SjChunkRange* chunk);
 
   /**
    * Address: 0x00AE94C0 (FUN_00AE94C0, _mpvhdec_AnalyUd)
@@ -1133,7 +1150,7 @@ extern "C"
    * Advances/realigns SJ stream to matching delimiter mask with recovery
    * counters.
    */
-  int MPVHDEC_RecoverSj(int handleAddress, int expectedDelimiterMask, moho::movie::MPVSjStream* stream);
+  int MPVHDEC_RecoverSj(SofdecAddressWord handleAddress, int expectedDelimiterMask, moho::SofdecSjSupplyHandle* stream);
 
   /**
    * Address: 0x00AE9AB0 (FUN_00AE9AB0, _MPV_MoveChunk)
@@ -1141,7 +1158,7 @@ extern "C"
    * What it does:
    * Moves one stream chunk between lanes and returns moved byte count.
    */
-  int MPV_MoveChunk(moho::movie::MPVSjStream* stream, int lane, int byteCount);
+  int MPV_MoveChunk(moho::SofdecSjSupplyHandle* stream, int lane, int byteCount);
 
   /**
    * Address: 0x00AE78E0 (FUN_00AE78E0, _MPV_IsConformable)

@@ -4376,7 +4376,7 @@
     const std::int32_t requestedBytes = bytesPerElement * elementCount;
     outputSjHandle->dispatchTable->getChunk(outputSjHandle, 0, requestedBytes, &writableChunk);
     if (writableChunk.byteCount < requestedBytes) {
-      outputSjHandle->dispatchTable->putChunk(outputSjHandle, 0, &writableChunk);
+      outputSjHandle->dispatchTable->ungetChunk(outputSjHandle, 0, &writableChunk);
       return 0;
     }
 
@@ -4420,7 +4420,7 @@
       }
     }
 
-    outputSjHandle->dispatchTable->submitChunk(outputSjHandle, 1, &writableChunk);
+    outputSjHandle->dispatchTable->putChunk(outputSjHandle, 1, &writableChunk);
     return elementCount;
   }
 
@@ -7763,10 +7763,8 @@
     /* +0x10 */ reinterpret_cast<moho::SofdecSjSupplyGetUuidFn>(&SJRBF_GetUuid),
     /* +0x14 */ reinterpret_cast<moho::SofdecSjSupplyOnStartFn>(&SJRBF_Reset),
     /* +0x18 */ reinterpret_cast<moho::SofdecSjSupplyGetChunkFn>(&SJRBF_GetChunk),
-    // The binary's +0x1C/+0x20 pair is unget/put, which is the reverse of what
-    // the generic field names suggest. Wired by slot, per the table above.
-    /* +0x1C */ reinterpret_cast<moho::SofdecSjSupplyPutChunkFn>(&SJRBF_UngetChunk),
-    /* +0x20 */ reinterpret_cast<moho::SofdecSjSupplySubmitChunkFn>(&SJRBF_PutChunk),
+    /* +0x1C */ reinterpret_cast<moho::SofdecSjSupplyUngetChunkFn>(&SJRBF_UngetChunk),
+    /* +0x20 */ reinterpret_cast<moho::SofdecSjSupplyPutChunkFn>(&SJRBF_PutChunk),
     /* +0x24 */ reinterpret_cast<moho::SofdecSjSupplyQueryAvailableFn>(&SJRBF_GetNumData),
   };
 

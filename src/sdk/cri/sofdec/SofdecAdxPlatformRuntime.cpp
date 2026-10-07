@@ -1097,11 +1097,10 @@
   // to MWSFSFX_CnvFrmInfToSfx, whose recovered body lives in the lower half
   // of this translation unit. Forward-declared here so any caller in the
   // upper half can reference it.
-  struct MwsfdSfdFrmObj;
   struct MwsfdSfxFrameInfo;
   std::int32_t MWSFSFX_CnvFrmInfToSfx(
     moho::MwsfdPlaybackStateSubobj* ply,
-    MwsfdSfdFrmObj* frm,
+    moho::MwsfdFrameInfo* frm,
     MwsfdSfxFrameInfo* outSfx
   );
 
@@ -1361,7 +1360,7 @@
 
   // FUN_00AC7380 (MWSFD_GetZfrmRange), FUN_00AC74B0 (MWSFD_MakeTblZ16) and
   // FUN_00AC7530 (MWSFD_MakeTblZ32) are implemented later in this translation
-  // unit (after MwsfdSfdFrmObj / MwsfdSfxFrameInfo / MWSFSFX_CnvFrmInfToSfx are
+  // unit (after moho::MwsfdFrameInfo / MwsfdSfxFrameInfo / MWSFSFX_CnvFrmInfToSfx are
   // in scope).
 
   /**
@@ -2556,7 +2555,7 @@
     }
 
     void* const ainfSj = SJRBF_Create(
-      reinterpret_cast<std::int32_t>(ply->ainfBuffer), ply->ainfBufferBytes, 0);
+      reinterpret_cast<SofdecAddressWord>(ply->ainfBuffer), ply->ainfBufferBytes, 0);
     if (ainfSj != nullptr) {
       return ainfSj;
     }
@@ -2580,7 +2579,7 @@
       workctrl,
       kSfdCondSofdecHeaderCallback,
       reinterpret_cast<SofdecAddressWord>(&mwsffrm_CallbackAnalyzeSofdecHeader));
-    (void)SFD_SetCond(workctrl, kSfdCondSofdecHeaderContext, reinterpret_cast<std::int32_t>(ply));
+    (void)SFD_SetCond(workctrl, kSfdCondSofdecHeaderContext, reinterpret_cast<SofdecAddressWord>(ply));
   }
 
   /**
@@ -2658,7 +2657,7 @@
     ply->sfhInfoWriteIndex = 0;
     for (moho::SofdecSfhInfoEntry& entry : ply->sfhInfoTable) {
       entry = moho::SofdecSfhInfoEntry{};
-      entry.state = moho::kSofdecSfhInfoSlotUnused;
+      entry.fxType = moho::kSofdecSfhInfoSlotUnused;
     }
   }
 
@@ -2837,11 +2836,11 @@
 
       const std::int32_t slot = ply->sfhInfoWriteIndex;
       moho::SofdecSfhInfoEntry& entry = ply->sfhInfoTable[static_cast<std::size_t>(slot)];
-      entry.streamPosition = 1;
+      entry.valid = 1;
       entry.frameIndex = ply->retrievedFrameCount - 1;
-      entry.headerWord0 = colourIsHsyuv;
-      entry.headerWord1 = totalFrames;
-      entry.state = effectType;
+      entry.colourIsHsyuv = colourIsHsyuv;
+      entry.totalFrames = totalFrames;
+      entry.fxType = effectType;
 
       ply->sfhInfoWriteIndex = (slot + 1) % kSofdecSfhInfoRingSize;
     }
@@ -3179,8 +3178,8 @@
     mwsfd_mpvpara.reserved10 = 0;
     mwsfd_mpvpara.reserved20 = 0;
     mwsfd_mpvpara.framePoolWork = framePoolWork;
-    mwsfd_adxtpara.value4 = reinterpret_cast<std::int32_t>(adxInput);
-    mwsfd_adxtpara.value0 = reinterpret_cast<std::int32_t>(adxWork);
+    mwsfd_adxtpara.value4 = reinterpret_cast<SofdecAddressWord>(adxInput);
+    mwsfd_adxtpara.value0 = reinterpret_cast<SofdecAddressWord>(adxWork);
 
     moho::SfplyCreateParams createParams{};
     switch (ftype) {
@@ -3256,9 +3255,9 @@
     }
 
     if (SFD_SetErrFn(
-          reinterpret_cast<std::int32_t>(workctrl),
+          reinterpret_cast<SofdecAddressWord>(workctrl),
           reinterpret_cast<SofdecAddressWord>(&MWSFLIB_SfdErrFunc),
-          reinterpret_cast<std::int32_t>(ply))
+          reinterpret_cast<SofdecAddressWord>(ply))
         != 0) {
       (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeSetErrCb);
       (void)MWSFSVM_Error(kMwsfcreErrSfdSetErrCbFailed);
@@ -3297,7 +3296,7 @@
     }
 
     moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
-    auto* const slots = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(libWork->playbackSlotsRaw);
+    auto* const slots = libWork->playbackSlots;
 
     moho::MwsfdPlaybackStateSubobj* ply = nullptr;
     std::int32_t slotIndex = 0;
@@ -3849,7 +3848,7 @@
       return;
     }
 
-    auto* const slots = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(libWork->playbackSlotsRaw);
+    auto* const slots = libWork->playbackSlots;
     std::int32_t destroyedSlotCount = 0;
     for (std::int32_t slotIndex = 0; slotIndex < moho::kMwsfdDecodeServerSlotCount; ++slotIndex) {
       if (slots[slotIndex].used == 1) {
@@ -4704,10 +4703,7 @@
   [[nodiscard]] moho::MwsfdPlaybackStateSubobj*
   GetMwsfdDecodeServerPlaybackSlot(moho::MwsfdLibWork* const libWork, const std::int32_t slotIndex)
   {
-    auto* const slotBase = reinterpret_cast<std::uint8_t*>(libWork->playbackSlotsRaw);
-    return reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(
-      slotBase + (static_cast<std::size_t>(slotIndex) * sizeof(moho::MwsfdPlaybackStateSubobj))
-    );
+    return &libWork->playbackSlots[slotIndex];
   }
 
   /**
@@ -7028,244 +7024,6 @@
       return m2sapi_m2p_GetVersionStr();
     }
     return nullptr;
-  }
-
-  /**
-   * Runtime view for M2V concealment paths (`_concealOn*` lane family).
-   */
-  struct M2vConcealState
-  {
-    std::uint8_t mUnknown0000_01B7[0x1B8]{};
-    std::int32_t concealDisableFlag = 0; // +0x1B8
-    std::uint8_t mUnknown01BC_01D7[0x1C]{};
-    std::int32_t macroblocksPerRow = 0; // +0x1D8
-    std::uint8_t mUnknown01DC_01E7[0x0C]{};
-    std::int32_t decodeStage = 0; // +0x1E8
-    std::uint8_t mUnknown01EC_0293[0xA8]{};
-    std::uint8_t* chromaPlaneUBase = nullptr; // +0x294
-    std::uint8_t* chromaPlaneVBase = nullptr; // +0x298
-    std::uint8_t* lumaPlaneBase = nullptr; // +0x29C
-    std::int16_t chromaRowStride = 0; // +0x2A0
-    std::int16_t lumaRowStride = 0; // +0x2A2
-    std::uint8_t mUnknown02A4_02C3[0x20]{};
-    void(__cdecl* concealDispatchFn)(SofdecAddressWord decoderAddress, std::int32_t macroblockCount) = nullptr; // +0x2C4
-    std::uint8_t mUnknown02C8_0307[0x40]{};
-    std::int32_t concealStateWord308 = 0; // +0x308
-    std::int32_t concealStateWord30C = 0; // +0x30C
-    std::uint8_t mUnknown0310_032B[0x1C]{};
-    std::int32_t concealStateWord32C = 0; // +0x32C
-    std::int32_t concealStateWord330 = 0; // +0x330
-    std::uint8_t mUnknown0334_0337[0x4]{};
-    std::int32_t macroblockCount = 0; // +0x338
-    std::uint8_t mUnknown033C_0347[0x0C]{};
-    std::int32_t concealFlags = 0; // +0x348
-    std::uint8_t mUnknown034C_139B[0x1050]{};
-    std::int32_t concealStartMacroblock = 0; // +0x139C
-    std::int32_t concealDeferredFlag = 0; // +0x13A0
-  };
-  static_assert(offsetof(M2vConcealState, concealDisableFlag) == 0x1B8);
-  static_assert(offsetof(M2vConcealState, macroblocksPerRow) == 0x1D8);
-  static_assert(offsetof(M2vConcealState, decodeStage) == 0x1E8);
-  static_assert(offsetof(M2vConcealState, chromaPlaneUBase) == 0x294);
-  static_assert(offsetof(M2vConcealState, chromaPlaneVBase) == 0x298);
-  static_assert(offsetof(M2vConcealState, lumaPlaneBase) == 0x29C);
-  static_assert(offsetof(M2vConcealState, chromaRowStride) == 0x2A0);
-  static_assert(offsetof(M2vConcealState, lumaRowStride) == 0x2A2);
-  static_assert(offsetof(M2vConcealState, concealDispatchFn) == 0x2C4);
-  static_assert(offsetof(M2vConcealState, concealStateWord308) == 0x308);
-  static_assert(offsetof(M2vConcealState, concealStateWord30C) == 0x30C);
-  static_assert(offsetof(M2vConcealState, concealStateWord32C) == 0x32C);
-  static_assert(offsetof(M2vConcealState, concealStateWord330) == 0x330);
-  static_assert(offsetof(M2vConcealState, macroblockCount) == 0x338);
-  static_assert(offsetof(M2vConcealState, concealFlags) == 0x348);
-  static_assert(offsetof(M2vConcealState, concealStartMacroblock) == 0x139C);
-  static_assert(offsetof(M2vConcealState, concealDeferredFlag) == 0x13A0);
-
-  [[nodiscard]] inline M2vConcealState* M2vConcealOf(const SofdecAddressWord decoderAddress) noexcept
-  {
-    return reinterpret_cast<M2vConcealState*>(static_cast<std::uintptr_t>(decoderAddress));
-  }
-
-  /**
-   * Address: 0x00B00EB0 (FUN_00B00EB0, _concealOnExec)
-   *
-   * What it does:
-   * Fills macroblock lanes from the conceal start index to frame end by
-   * cloning previous-row pixels (or left-edge/constant fallback for first row).
-   */
-  extern "C" unsigned int __cdecl concealOnExec(const SofdecAddressWord decoderAddress, const unsigned int startMacroblock)
-  {
-    auto* const runtime = M2vConcealOf(decoderAddress);
-    unsigned int result = static_cast<unsigned int>(runtime->concealDisableFlag);
-    if (result != 0u) {
-      return result;
-    }
-
-    const std::int32_t lumaStride = static_cast<std::int32_t>(runtime->lumaRowStride);
-    const std::int32_t chromaStride = static_cast<std::int32_t>(runtime->chromaRowStride);
-    const unsigned int macroblockLimit = static_cast<unsigned int>(runtime->macroblockCount);
-    unsigned int macroblockIndex = startMacroblock;
-    if (macroblockIndex < macroblockLimit) {
-      const std::int32_t lumaRowAdvance = static_cast<std::int32_t>((static_cast<std::uint32_t>(lumaStride) >> 2u) << 2u);
-      const std::int32_t chromaRowAdvance = static_cast<std::int32_t>((static_cast<std::uint32_t>(chromaStride) >> 2u) << 2u);
-      do {
-        const unsigned int macroblocksPerRow = static_cast<unsigned int>(runtime->macroblocksPerRow);
-        const std::int32_t macroblockColumn = static_cast<std::int32_t>(macroblockIndex % macroblocksPerRow);
-        const std::int32_t lumaRowBase = static_cast<std::int32_t>((macroblockIndex / macroblocksPerRow) << 4u);
-        const std::int32_t chromaRowBase = lumaRowBase >> 1;
-
-        std::uint8_t* const lumaCurrent =
-          runtime->lumaPlaneBase + static_cast<std::ptrdiff_t>((macroblockColumn << 4) + (lumaStride * lumaRowBase));
-        const std::uint8_t* const lumaPrevious =
-          runtime->lumaPlaneBase + static_cast<std::ptrdiff_t>((macroblockColumn << 4) + (lumaStride * (lumaRowBase - 1)));
-
-        const std::int32_t chromaColumn = (macroblockColumn << 4) >> 1;
-        std::uint8_t* const chromaUCurrent =
-          runtime->chromaPlaneUBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * chromaRowBase));
-        const std::uint8_t* const chromaUPrevious =
-          runtime->chromaPlaneUBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * (chromaRowBase - 1)));
-        std::uint8_t* const chromaVCurrent =
-          runtime->chromaPlaneVBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * chromaRowBase));
-        const std::uint8_t* const chromaVPrevious =
-          runtime->chromaPlaneVBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * (chromaRowBase - 1)));
-
-        if (chromaRowBase != 0) {
-          std::uint8_t* lumaWrite = lumaCurrent;
-          const std::uint8_t* lumaRead = lumaPrevious;
-          for (std::int32_t row = 0; row < 16; ++row) {
-            // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
-            std::memcpy(lumaWrite, lumaRead, 16u);
-            lumaWrite += lumaRowAdvance;
-            lumaRead += lumaRowAdvance;
-          }
-
-          std::uint8_t* chromaUWrite = chromaUCurrent;
-          const std::uint8_t* chromaURead = chromaUPrevious;
-          for (std::int32_t row = 0; row < 8; ++row) {
-            // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
-            std::memcpy(chromaUWrite, chromaURead, 8u);
-            chromaUWrite += chromaRowAdvance;
-            chromaURead += chromaRowAdvance;
-          }
-
-          std::uint8_t* chromaVWrite = chromaVCurrent;
-          const std::uint8_t* chromaVRead = chromaVPrevious;
-          for (std::int32_t row = 0; row < 8; ++row) {
-            // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
-            std::memcpy(chromaVWrite, chromaVRead, 8u);
-            chromaVWrite += chromaRowAdvance;
-            chromaVRead += chromaRowAdvance;
-          }
-        } else if (chromaColumn != 0) {
-          std::uint8_t* lumaWrite = lumaCurrent;
-          for (std::int32_t row = 0; row < 16; ++row) {
-            std::memset(lumaWrite, static_cast<int>(lumaWrite[-1]), 16u);
-            lumaWrite += lumaRowAdvance;
-          }
-
-          std::uint8_t* chromaUWrite = chromaUCurrent;
-          for (std::int32_t row = 0; row < 8; ++row) {
-            std::memset(chromaUWrite, static_cast<int>(chromaUWrite[-1]), 8u);
-            chromaUWrite += chromaRowAdvance;
-          }
-
-          std::uint8_t* chromaVWrite = chromaVCurrent;
-          for (std::int32_t row = 0; row < 8; ++row) {
-            std::memset(chromaVWrite, static_cast<int>(chromaVWrite[-1]), 8u);
-            chromaVWrite += chromaRowAdvance;
-          }
-        } else {
-          std::uint8_t* lumaWrite = lumaCurrent;
-          for (std::int32_t row = 0; row < 16; ++row) {
-            std::memset(lumaWrite, 0x10, 16u);
-            lumaWrite += lumaRowAdvance;
-          }
-
-          std::uint8_t* chromaUWrite = chromaUCurrent;
-          for (std::int32_t row = 0; row < 8; ++row) {
-            std::memset(chromaUWrite, 0x80, 8u);
-            chromaUWrite += chromaRowAdvance;
-          }
-
-          std::uint8_t* chromaVWrite = chromaVCurrent;
-          for (std::int32_t row = 0; row < 8; ++row) {
-            std::memset(chromaVWrite, 0x80, 8u);
-            chromaVWrite += chromaRowAdvance;
-          }
-        }
-
-        result = ++macroblockIndex;
-      } while (macroblockIndex < macroblockLimit);
-    }
-
-    return result;
-  }
-
-  /**
-   * Address: 0x00B00D80 (FUN_00B00D80, _concealOff)
-   *
-   * What it does:
-   * Preserves the conceal-off callback lane as a deliberate no-op.
-   */
-  extern "C" std::int32_t __cdecl concealOff(const SofdecAddressWord decoderAddress)
-  {
-    static_cast<void>(decoderAddress);
-    return 0;
-  }
-
-  /**
-   * Address: 0x00B00D90 (FUN_00B00D90, _concealOn)
-   *
-   * What it does:
-   * Applies conceal-mode state transitions, runs the conceal dispatch lane,
-   * then restores decoder state words captured before conceal execution.
-   */
-  extern "C" std::int32_t __cdecl concealOn(const SofdecAddressWord decoderAddress)
-  {
-    auto* const runtime = M2vConcealOf(decoderAddress);
-    const std::int32_t concealStartMacroblock = (runtime->concealStartMacroblock < 0) ? 0 : runtime->concealStartMacroblock;
-
-    const std::int32_t decodeStage = runtime->decodeStage;
-    if (decodeStage == 1 && runtime->concealDeferredFlag == 0) {
-      return static_cast<std::int32_t>(concealOnExec(decoderAddress, static_cast<unsigned int>(concealStartMacroblock)));
-    }
-
-    const std::int32_t savedState330 = runtime->concealStateWord330;
-    const std::int32_t savedState308 = runtime->concealStateWord308;
-    const std::int32_t savedState30C = runtime->concealStateWord30C;
-    const std::int32_t savedState32C = runtime->concealStateWord32C;
-    const std::int32_t savedConcealFlags = runtime->concealFlags;
-    const std::int32_t savedDecodeStage = decodeStage;
-
-    if (decodeStage == 1) {
-      runtime->decodeStage = 2;
-      runtime->concealFlags = 8;
-    }
-
-    if (runtime->decodeStage == 2) {
-      runtime->concealFlags |= 8;
-    }
-    if (runtime->decodeStage == 3) {
-      const std::int32_t flags = runtime->concealFlags;
-      if ((flags & 0x0C) == 0) {
-        runtime->concealFlags = flags | 4;
-      }
-    }
-
-    const std::int32_t remainingMacroblocks = runtime->macroblockCount - concealStartMacroblock;
-    runtime->concealStateWord308 = 0;
-    runtime->concealStateWord30C = 0;
-    runtime->concealStateWord32C = 0;
-    runtime->concealStateWord330 = 0;
-    runtime->concealDispatchFn(decoderAddress, remainingMacroblocks + 1);
-
-    runtime->concealStateWord32C = savedState32C;
-    runtime->concealStateWord30C = savedState30C;
-    runtime->concealStateWord308 = savedState308;
-    runtime->concealStateWord330 = savedState330;
-    runtime->decodeStage = savedDecodeStage;
-    runtime->concealFlags = savedConcealFlags;
-    return savedConcealFlags;
   }
 
   /**
@@ -11075,7 +10833,7 @@
     SjChunkRange* const chunk
   )
   {
-    handle->dispatchTable->putChunk(handle, lane, chunk);
+    handle->dispatchTable->ungetChunk(handle, lane, chunk);
   }
 
   static void ADXSJD_SubmitSupplyChunk(
@@ -11084,7 +10842,7 @@
     SjChunkRange* const chunk
   )
   {
-    handle->dispatchTable->submitChunk(handle, lane, chunk);
+    handle->dispatchTable->putChunk(handle, lane, chunk);
   }
 
   [[nodiscard]] static std::int32_t ADXSJD_QuerySupplyAvailableBytes(
@@ -13307,7 +13065,7 @@
             ADXSTM_SetEos(runtime->streamHandle, loopEndSector);
             ADXSTM_EntryEosFunc(
               static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(runtime->streamHandle)),
-              reinterpret_cast<std::int32_t>(adxt_eos_entry),
+              reinterpret_cast<SofdecAddressWord>(adxt_eos_entry),
               static_cast<SofdecAddressWord>(reinterpret_cast<std::intptr_t>(runtime))
             );
           }
@@ -17538,8 +17296,8 @@
         SjChunkRange submittedChunk{};
         SjChunkRange trailingChunk{};
         SJ_SplitChunk(&runtime->pendingChunk, readByteCount, &submittedChunk, &trailingChunk);
-        sourceHandle->dispatchTable->submitChunk(sourceHandle, 1, &submittedChunk);
-        sourceHandle->dispatchTable->putChunk(sourceHandle, 0, &trailingChunk);
+        sourceHandle->dispatchTable->putChunk(sourceHandle, 1, &submittedChunk);
+        sourceHandle->dispatchTable->ungetChunk(sourceHandle, 0, &trailingChunk);
 
         runtime->currentSectorOffset += runtime->pendingReadSectors;
         runtime->sourceStreamedBytes += readByteCount;
@@ -17573,7 +17331,7 @@
 
       runtime->readFlag = 0;
       adxstm_unlock();
-      sourceHandle->dispatchTable->putChunk(sourceHandle, 0, &runtime->pendingChunk);
+      sourceHandle->dispatchTable->ungetChunk(sourceHandle, 0, &runtime->pendingChunk);
       runtime->pendingChunk.bufferAddress = 0;
       runtime->pendingChunk.byteCount = 0;
 
@@ -17650,7 +17408,7 @@
       return;
     }
 
-    sourceHandle->dispatchTable->putChunk(sourceHandle, 0, &runtime->pendingChunk);
+    sourceHandle->dispatchTable->ungetChunk(sourceHandle, 0, &runtime->pendingChunk);
     runtime->pendingChunk.bufferAddress = 0;
     runtime->pendingChunk.byteCount = 0;
     runtime->readFlag = 0;
@@ -19606,7 +19364,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   //
   // The block below recovers the cluster of small CRI helpers in the
   // 0x00AC66D0 .. 0x00AC6AB0 range. They convert one MWSFD-side decoded frame
-  // descriptor (`MwsfdSfdFrmObj`) into the SFX-side `MwsfdSfxFrameInfo` block
+  // descriptor (`moho::MwsfdFrameInfo`) into the SFX-side `MwsfdSfxFrameInfo` block
   // that the Sofdec SFX runtime consumes when laying out a single composed
   // frame. They also expose the public MWSFSFX_/MWSFD_ facade entries used by
   // the rest of the movie player to bind/destroy SFX handles, query per-stream
@@ -19681,60 +19439,6 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   // ---------------------------------------------------------------------------
   // Typed views over the MWSFSFX frame-info structs
   // ---------------------------------------------------------------------------
-
-  /**
-   * Recovered subset of one MWSFD-side decoded frame descriptor.
-   *
-   * The full layout is the SDK's `_MwsfdFrmObj` (a.k.a. `MwsfdFrameInfo` in
-   * other recovered files), but several lanes touched by the MWSFSFX
-   * conversion helpers live past the conservative 0x90-byte size that the
-   * existing `moho::MwsfdFrameInfo` view captures. Until the full struct is
-   * pinned by additional evidence we expose only the lanes proven by the
-   * 0x00AC66D0..0x00AC6AB0 disassembly here, and assert each offset against
-   * the binary so that any future re-typing of the canonical struct stays
-   * compatible.
-   *
-   * Field names mirror the original CRI ones (`buffmt`, `concat_cnt`, ...).
-   */
-  struct MwsfdSfdFrmObj
-  {
-    SofdecAddressWord bufferAddress;                    ///< +0x00 base of decoded frame
-    std::int32_t mUnknown04;                       ///< +0x04
-    std::int32_t buffmt;                           ///< +0x08 buffer-format type
-    std::int32_t planeWidth;                       ///< +0x0C width  (Y plane)
-    std::int32_t planeHeight;                      ///< +0x10 height (Y plane)
-    std::uint8_t mUnknown14[0x1C];                 ///< +0x14
-    std::int32_t concat_cnt;                       ///< +0x30 stream-table index
-    std::int32_t nfrm;                             ///< +0x34 frame count in pool
-    std::uint8_t mUnknown38[0x50];                 ///< +0x38
-    SofdecAddressWord sudRecordAddress;      ///< +0x88
-    std::int32_t sudFieldIndex;             ///< +0x8C
-    std::int32_t picture_structure_src;            ///< +0x90
-    std::int32_t chroma_format_src;                ///< +0x94
-    std::int32_t picture_detail_unknown_98;        ///< +0x98
-    std::int32_t chroma_pos_lo_src;                ///< +0x9C
-    std::int32_t chroma_pos_hi_src;                ///< +0xA0
-  };
-  static_assert(offsetof(MwsfdSfdFrmObj, buffmt) == 0x08, "MwsfdSfdFrmObj::buffmt offset must be 0x08");
-  static_assert(offsetof(MwsfdSfdFrmObj, planeWidth) == 0x0C, "MwsfdSfdFrmObj::planeWidth offset must be 0x0C");
-  static_assert(offsetof(MwsfdSfdFrmObj, planeHeight) == 0x10, "MwsfdSfdFrmObj::planeHeight offset must be 0x10");
-  static_assert(offsetof(MwsfdSfdFrmObj, concat_cnt) == 0x30, "MwsfdSfdFrmObj::concat_cnt offset must be 0x30");
-  static_assert(offsetof(MwsfdSfdFrmObj, nfrm) == 0x34, "MwsfdSfdFrmObj::nfrm offset must be 0x34");
-  static_assert(
-    offsetof(MwsfdSfdFrmObj, sudRecordAddress) == 0x88,
-    "MwsfdSfdFrmObj::sudRecordAddress offset must be 0x88"
-  );
-  static_assert(
-    offsetof(MwsfdSfdFrmObj, sudFieldIndex) == 0x8C,
-    "MwsfdSfdFrmObj::sudFieldIndex offset must be 0x8C"
-  );
-  static_assert(
-    offsetof(MwsfdSfdFrmObj, picture_structure_src) == 0x90,
-    "MwsfdSfdFrmObj::picture_structure_src offset must be 0x90"
-  );
-  static_assert(offsetof(MwsfdSfdFrmObj, chroma_format_src) == 0x94, "MwsfdSfdFrmObj::chroma_format_src offset must be 0x94");
-  static_assert(offsetof(MwsfdSfdFrmObj, chroma_pos_lo_src) == 0x9C, "MwsfdSfdFrmObj::chroma_pos_lo_src offset must be 0x9C");
-  static_assert(offsetof(MwsfdSfdFrmObj, chroma_pos_hi_src) == 0xA0, "MwsfdSfdFrmObj::chroma_pos_hi_src offset must be 0xA0");
 
   /**
    * One <address, pitch, height> SFX buffer descriptor written by
@@ -19870,25 +19574,6 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   static_assert(offsetof(MwsfdSfxFrameInfo, isColAdjFrame) == 0x90, "MwsfdSfxFrameInfo::isColAdjFrame offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, fxType) == 0x94, "MwsfdSfxFrameInfo::fxType offset");
 
-  /**
-   * One per-stream entry in the MWSFD library work-area concat-stream table.
-   *
-   * The MWSFD work-area starts at base+0xC0 and contains 8 records of 20
-   * bytes each (`a1 + 20*(concat_cnt % 8) + 192` in the decompiler). Only the
-   * `validFlag` and `fxType` lanes are touched by the helpers in this block.
-   */
-  struct MwsfdSfdConcatStreamRecord
-  {
-    std::int32_t validFlag;     ///< +0x00 (== 1 when the per-stream lane is populated)
-    std::int32_t mUnknown04;    ///< +0x04
-    std::int32_t mUnknown08;    ///< +0x08
-    std::int32_t mUnknown0C;    ///< +0x0C
-    std::int32_t fxType;        ///< +0x10 SFX composition-mode override for this stream
-  };
-  static_assert(sizeof(MwsfdSfdConcatStreamRecord) == 20, "MwsfdSfdConcatStreamRecord must be 20 bytes");
-  static_assert(offsetof(MwsfdSfdConcatStreamRecord, validFlag) == 0x00, "MwsfdSfdConcatStreamRecord::validFlag offset");
-  static_assert(offsetof(MwsfdSfdConcatStreamRecord, fxType) == 0x10, "MwsfdSfdConcatStreamRecord::fxType offset");
-
   // ---------------------------------------------------------------------------
   // Internal SFX handle work-area view used by `SFX_Destroy`
   // ---------------------------------------------------------------------------
@@ -19948,15 +19633,15 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
 
   // Forward decls for the helpers below (definition order matches the
   // address-sorted CRI source).
-  std::int32_t MWSFD_GetFxType(std::int32_t mwsfdLibBase, std::int32_t concatCount);
-  std::int32_t MWSFD_IsColAdjFile(std::int32_t mwsfdLibBase, std::int32_t concatCount);
-  std::int32_t MWSFD_IsColAdjFrame(std::int32_t mwsfdLibBase, MwsfdSfdFrmObj* frm);
-  std::int32_t mwsfsfx_DecideCompoMode(moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfdFrmObj* frm);
+  std::int32_t MWSFD_GetFxType(const moho::MwsfdPlaybackStateSubobj* ply, std::int32_t concatCount);
+  std::int32_t MWSFD_IsColAdjFile(const moho::MwsfdPlaybackStateSubobj* ply, std::int32_t concatCount);
+  std::int32_t MWSFD_IsColAdjFrame(const moho::MwsfdPlaybackStateSubobj* ply, moho::MwsfdFrameInfo* frm);
+  std::int32_t mwsfsfx_DecideCompoMode(moho::MwsfdPlaybackStateSubobj* ply, moho::MwsfdFrameInfo* frm);
   std::int32_t mwsfsfx_CnvFrmFmtTypeToSfx(std::int32_t buffmt);
   void mwsfsfx_SetSfxBufInf(MwsfdSfxBufInf* outBufInf, std::int32_t address, std::int32_t pitch, std::int32_t height);
-  MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
-  void mwsfsfx_SetNfrm(const MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
-  void mwsfsfx_SetSfxInfTag(moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
+  MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(moho::MwsfdFrameInfo* frm, MwsfdSfxFrameInfo* outSfx);
+  void mwsfsfx_SetNfrm(const moho::MwsfdFrameInfo* frm, MwsfdSfxFrameInfo* outSfx);
+  void mwsfsfx_SetSfxInfTag(moho::MwsfdPlaybackStateSubobj* ply, moho::MwsfdFrameInfo* frm, MwsfdSfxFrameInfo* outSfx);
   void mwsfsfx_SetFrmDetail(const moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfxFrameInfo* outSfx);
   std::int32_t mwsfsfx_CnvPictureStructure(const moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t mwsfsfx_CnvSfxChromaFormat(const moho::MwsfdPlaybackStateSubobj* ply);
@@ -20060,7 +19745,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t MWSFD_CnvFrmInfToSfx(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    MwsfdSfdFrmObj* const frm,
+    moho::MwsfdFrameInfo* const frm,
     MwsfdSfxFrameInfo* const outSfx
   )
   {
@@ -20087,11 +19772,11 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t MWSFSFX_CnvFrmInfToSfx(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    MwsfdSfdFrmObj* const frm,
+    moho::MwsfdFrameInfo* const frm,
     MwsfdSfxFrameInfo* const outSfx
   )
   {
-    outSfx->compositionMode = mwsfsfx_CnvFrmFmtTypeToSfx(frm->buffmt);
+    outSfx->compositionMode = mwsfsfx_CnvFrmFmtTypeToSfx(frm->bufferFormat);
     (void)mwsfsfx_SetYcc420plnInfToSfx(frm, outSfx);
     mwsfsfx_SetNfrm(frm, outSfx);
     mwsfsfx_SetSfxInfTag(ply, frm, outSfx);
@@ -20102,12 +19787,11 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     // sudFieldIndex}` pair as a single QWORD load/store, matching the
     // `mov ecx,[esi+0x88] / mov [edi+0x88], ecx / mov edx,[esi+0x8C] /
     // mov [edi+0x8C], edx` sequence in the binary.
-    outSfx->sudRecordAddress = frm->sudRecordAddress;
-    outSfx->sudFieldIndex = frm->sudFieldIndex;
+    outSfx->sudRecordAddress = frm->subtitleDataAddress;
+    outSfx->sudFieldIndex = frm->subtitleDataBytes;
 
-    const SofdecAddressWord plyAddress = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(ply));
-    outSfx->isColAdjFrame = MWSFD_IsColAdjFrame(plyAddress, frm);
-    outSfx->fxType = MWSFD_GetFxType(plyAddress, frm->concat_cnt);
+    outSfx->isColAdjFrame = MWSFD_IsColAdjFrame(ply, frm);
+    outSfx->fxType = MWSFD_GetFxType(ply, frm->concatCount);
     return mwsfsfx_DecideCompoMode(ply, frm);
   }
 
@@ -20129,12 +19813,11 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t mwsfsfx_DecideCompoMode(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    MwsfdSfdFrmObj* const frm
+    moho::MwsfdFrameInfo* const frm
   )
   {
     if (ply->sfxCompoModeLocked == 0) {
-      const SofdecAddressWord plyAddress = static_cast<SofdecAddressWord>(reinterpret_cast<std::uintptr_t>(ply));
-      const std::int32_t fxType = MWSFD_GetFxType(plyAddress, frm->concat_cnt);
+      const std::int32_t fxType = MWSFD_GetFxType(ply, frm->concatCount);
       if (fxType == -1) {
         ply->sfxCompoModeOverride = kSfxCompoModeOverrideDefault;
       } else {
@@ -20151,34 +19834,23 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   // ---------------------------------------------------------------------------
 
   /**
-   * Helper: locate one MWSFD per-stream record in the lib work area.
-   *
-   * The MWSFD library state stores 8 per-stream records starting at
-   * `base + 0xC0`, each 20 bytes wide. Stream selection wraps via
-   * `concatCount % 8`, matching the original `lea / imul / add` form in the
-   * binary (`a1 + 20*(a2 % 8) + 192`).
+   * The header-analysis ring record `mwsffrm_CallbackAnalyzeSofdecHeader`
+   * filed for the concatenated stream `concatCount`. The ring is indexed by
+   * `concatCount % 8`, matching the binary's `ply + 20*(concatCount % 8) + 0xC0`.
    */
-  [[nodiscard]] inline MwsfdSfdConcatStreamRecord* MwsfdLocateConcatRecord(
-    const std::int32_t mwsfdLibBase,
+  [[nodiscard]] const moho::SofdecSfhInfoEntry& MwsfdSfhInfoForConcat(
+    const moho::MwsfdPlaybackStateSubobj* const ply,
     const std::int32_t concatCount
   )
   {
-    constexpr std::int32_t kConcatTableBaseOffset = 0xC0;
-    constexpr std::int32_t kConcatTableSize = 8;
-    auto* const tableBase = reinterpret_cast<std::uint8_t*>(
-      static_cast<std::uintptr_t>(mwsfdLibBase) + kConcatTableBaseOffset
-    );
-    const std::int32_t streamSlot = concatCount % kConcatTableSize;
-    return reinterpret_cast<MwsfdSfdConcatStreamRecord*>(
-      tableBase + (streamSlot * sizeof(MwsfdSfdConcatStreamRecord))
-    );
+    return ply->sfhInfoTable[static_cast<std::size_t>(concatCount % kSofdecSfhInfoRingSize)];
   }
 
   /**
    * Address: 0x00AC67E0 (FUN_00AC67E0, _MWSFD_IsColAdjFrame)
    *
    * IDA signature:
-   * BOOL __cdecl MWSFD_IsColAdjFrame(int mwsfdLibBase, MwsfdFrmObj* frm);
+   * BOOL __cdecl MWSFD_IsColAdjFrame(MWPLY ply, MwsfdFrmObj* frm);
    *
    * What it does:
    * Returns 1 when the supplied frame is a colour-adjust frame.
@@ -20188,13 +19860,13 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * (`SUD_AnalyTypeCcs`) is consulted with the constrained-parameters lane
    * and the progressive-sequence lane.
    */
-  std::int32_t MWSFD_IsColAdjFrame(const std::int32_t mwsfdLibBase, MwsfdSfdFrmObj* const frm)
+  std::int32_t MWSFD_IsColAdjFrame(const moho::MwsfdPlaybackStateSubobj* const ply, moho::MwsfdFrameInfo* const frm)
   {
-    const std::int32_t isColAdjFile = MWSFD_IsColAdjFile(mwsfdLibBase, frm->concat_cnt);
-    const SofdecAddressWord sudRecordAddress = frm->sudRecordAddress;
+    const std::int32_t isColAdjFile = MWSFD_IsColAdjFile(ply, frm->concatCount);
+    const SofdecAddressWord sudRecordAddress = frm->subtitleDataAddress;
     const std::int32_t fileResult = (isColAdjFile == 1) ? 1 : 0;
     if (sudRecordAddress != 0) {
-      return SUD_AnalyTypeCcs(sudRecordAddress, frm->sudFieldIndex);
+      return SUD_AnalyTypeCcs(sudRecordAddress, frm->subtitleDataBytes);
     }
     return fileResult;
   }
@@ -20203,52 +19875,38 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * Address: 0x00AC6820 (FUN_00AC6820, _MWSFD_IsColAdjFile)
    *
    * IDA signature:
-   * int __cdecl MWSFD_IsColAdjFile(int mwsfdLibBase, int concatCount);
+   * int __cdecl MWSFD_IsColAdjFile(MWPLY ply, int concatCount);
    *
    * What it does:
-   * Looks up the per-stream MWSFD concat record for `concatCount` and, when
-   * the record is populated (`validFlag == 1`), returns the colour-adjust
-   * file lane stored 50 dwords into the per-stream sub-block. Otherwise
-   * returns 0. The dword index `4 * (5 * (concatCount % 8) + 50)` in the
-   * decompiler resolves to the same byte the original CRI source labelled
-   * `g_mwsfdInf.streams[idx].colorAdjFileFlag`.
+   * Returns the HSYUV colour flag recorded for the stream's header when its
+   * ring record is valid, otherwise 0.
    */
-  std::int32_t MWSFD_IsColAdjFile(const std::int32_t mwsfdLibBase, const std::int32_t concatCount)
+  std::int32_t MWSFD_IsColAdjFile(const moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t concatCount)
   {
-    const MwsfdSfdConcatStreamRecord* const record = MwsfdLocateConcatRecord(mwsfdLibBase, concatCount);
-    if (record->validFlag != 1) {
+    const moho::SofdecSfhInfoEntry& entry = MwsfdSfhInfoForConcat(ply, concatCount);
+    if (entry.valid != 1) {
       return 0;
     }
-    constexpr std::int32_t kColorAdjFileFlagDwordIndex = 50;
-    constexpr std::int32_t kColorAdjFileFlagOffset = 4 * kColorAdjFileFlagDwordIndex;
-    const auto* const colorAdjFileFlag = reinterpret_cast<const std::int32_t*>(
-      reinterpret_cast<const std::uint8_t*>(mwsfdLibBase) + kColorAdjFileFlagOffset
-    );
-    // The original asm walks `mwsfdLibBase + (5 * (concatCount % 8) + 50) * 4`
-    // which combines a per-stream stride of 5 dwords with the +50-dword base.
-    const std::int32_t streamSlot = concatCount % 8;
-    return colorAdjFileFlag[5 * streamSlot];
+    return entry.colourIsHsyuv;
   }
 
   /**
    * Address: 0x00AC6850 (FUN_00AC6850, _MWSFD_GetFxType)
    *
    * IDA signature:
-   * int __cdecl MWSFD_GetFxType(int mwsfdLibBase, int concatCount);
+   * int __cdecl MWSFD_GetFxType(MWPLY ply, int concatCount);
    *
    * What it does:
-   * Returns the per-stream SFX composition-mode override for `concatCount`,
-   * or the default (`0x11`) sentinel when the per-stream record is not
-   * populated (`validFlag != 1`). The override lives at offset 0x10 of the
-   * 20-byte per-stream record at `base + 0xC0 + 20 * (concatCount % 8)`.
+   * Returns the effect type recorded for the stream's header when its ring
+   * record is valid, otherwise the default (`0x11`) composition sentinel.
    */
-  std::int32_t MWSFD_GetFxType(const std::int32_t mwsfdLibBase, const std::int32_t concatCount)
+  std::int32_t MWSFD_GetFxType(const moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t concatCount)
   {
-    const MwsfdSfdConcatStreamRecord* const record = MwsfdLocateConcatRecord(mwsfdLibBase, concatCount);
-    if (record->validFlag != 1) {
+    const moho::SofdecSfhInfoEntry& entry = MwsfdSfhInfoForConcat(ply, concatCount);
+    if (entry.valid != 1) {
       return kSfxCompoModeOverrideDefault;
     }
-    return record->fxType;
+    return entry.fxType;
   }
 
   /**
@@ -20328,114 +19986,6 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   // conversion below, which is compiled first, needs them declared here.
   std::int32_t SFD_GetFps(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outFramesPerSecond);
   std::int32_t SUD_AnalyTypeDivField(SofdecAddressWord sudRecordAddress, std::int32_t sudFieldIndex);
-
-  /**
-   * The SFD-side frame descriptor `SFD_GetFrm` hands back, as the
-   * frame-info conversion lane reads it. Offsets are the `a2[n]` indices in
-   * `mwl_convFrmInfFromSFD` (0x00ACA210) and `mwsffrm_SaveFrmDetail`
-   * (0x00ACA4E0).
-   */
-  struct SofdecSfdFrame
-  {
-    std::int32_t widthPixels = 0;          // +0x00
-    std::int32_t heightPixels = 0;         // +0x04
-    std::int32_t lumaStrideBytes = 0;      // +0x08
-    std::int32_t chromaStrideBytes = 0;    // +0x0C
-    std::int32_t sfdPictureType = 0;       // +0x10
-    std::int32_t reserved14 = 0;           // +0x14
-    std::int32_t frameRateDivisor = 0;     // +0x18
-    std::int32_t sfdBufferFormat = 0;      // +0x1C
-    SofdecAddressWord frameBufferAddress = 0;   // +0x20
-    std::int32_t cropOffsetX = 0;          // +0x24
-    std::int32_t cropOffsetY = 0;          // +0x28
-    std::int32_t frameNumber = 0;          // +0x2C
-    std::int32_t decodeTimeUnits = 0;      // +0x30
-    std::int32_t presentTimeUnits = 0;     // +0x34
-    /** `{ address, byteCount }` of this frame's picture-user payload. */
-    const std::int32_t* pictureUserPayload = nullptr; // +0x38
-    /// Picture-detail lanes `mwsffrm_SaveFrmDetail` (0x00ACA4E0) lifts into the
-    /// playback handle. `sfmpvf_SearchFrmInf` (0x00AD50C0) is what fills them:
-    /// +0x3C/+0x40 from the frame object's +0x9C/+0xA0 chroma-position pair,
-    /// +0x58/+0x5C from its +0x94/+0x98 pair, and +0x6C..+0x6E from the three
-    /// bytes at +0xB1..+0xB3.
-    std::int32_t chromaPositionLow = 0;      // +0x3C
-    std::int32_t chromaPositionHigh = 0;     // +0x40
-    std::uint8_t reserved44_57[0x14]{};      // +0x44
-    std::int32_t pictureStructure = 0;       // +0x58
-    std::int32_t chromaFormat = 0;           // +0x5C
-    std::uint8_t reserved60_6B[0x0C]{};      // +0x60
-    std::int8_t pictureDetail[3]{};          // +0x6C
-    std::uint8_t reserved6F_7F[0x11]{};      // +0x6F
-
-    /// The 0x38-byte run starting at +0x48 that `mwl_convFrmInfFromSFD`
-    /// block-copies wholesale into the outward-facing frame info.
-    [[nodiscard]] const std::uint8_t* TrailingDetail() const noexcept
-    {
-      return reinterpret_cast<const std::uint8_t*>(this) + 0x48;
-    }
-  };
-  static_assert(
-    offsetof(SofdecSfdFrame, frameBufferAddress) == 0x20,
-    "SofdecSfdFrame::frameBufferAddress offset must be 0x20"
-  );
-  static_assert(
-    offsetof(SofdecSfdFrame, pictureUserPayload) == 0x38,
-    "SofdecSfdFrame::pictureUserPayload offset must be 0x38"
-  );
-  static_assert(
-    offsetof(SofdecSfdFrame, chromaPositionLow) == 0x3C,
-    "SofdecSfdFrame::chromaPositionLow offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(SofdecSfdFrame, pictureStructure) == 0x58,
-    "SofdecSfdFrame::pictureStructure offset must be 0x58"
-  );
-  static_assert(
-    offsetof(SofdecSfdFrame, chromaFormat) == 0x5C,
-    "SofdecSfdFrame::chromaFormat offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(SofdecSfdFrame, pictureDetail) == 0x6C,
-    "SofdecSfdFrame::pictureDetail offset must be 0x6C"
-  );
-  static_assert(sizeof(SofdecSfdFrame) == 0x80, "SofdecSfdFrame size must be 0x80");
-
-  /** Lanes of `MwsfdFrameInfo` the conversion fills that the struct leaves unnamed. */
-  struct MwsfdFrameInfoFill
-  {
-    SofdecAddressWord frameBufferAddress = 0;  // +0x00
-    std::int32_t frameId = 0;             // +0x04
-    std::int32_t bufferFormat = 0;        // +0x08
-    std::int32_t widthPixels = 0;         // +0x0C
-    std::int32_t heightPixels = 0;        // +0x10
-    std::int32_t lumaStrideBytes = 0;     // +0x14
-    std::int32_t chromaStrideBytes = 0;   // +0x18
-    std::int32_t pictureType = 0;         // +0x1C
-    std::int32_t frameRateTimes1000 = 0;  // +0x20
-    std::int32_t presentFrameCount = 0;   // +0x24
-    std::int32_t presentTimeUnits = 0;    // +0x28
-    std::int32_t frameRateDivisor = 0;    // +0x2C
-    std::int32_t frameNumber = 0;         // +0x30
-    std::int32_t decodeFrameCount = 0;    // +0x34
-    std::int32_t decodeTimeUnits = 0;     // +0x38
-    std::int32_t cropOffsetX = 0;         // +0x3C
-    std::int32_t cropOffsetY = 0;         // +0x40
-    std::int32_t reserved44 = 0;          // +0x44
-    SofdecAddressWord pictureUserAddress = 0;  // +0x48
-    std::int32_t frameFieldType = 0;      // +0x4C
-    std::uint8_t trailingDetail[0x38]{};  // +0x50
-    SofdecAddressWord subtitleDataAddress = 0; // +0x88
-    std::int32_t subtitleDataBytes = 0;   // +0x8C
-  };
-  static_assert(
-    offsetof(MwsfdFrameInfoFill, frameFieldType) == 0x4C,
-    "MwsfdFrameInfoFill::frameFieldType offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(MwsfdFrameInfoFill, subtitleDataAddress) == 0x88,
-    "MwsfdFrameInfoFill::subtitleDataAddress offset must be 0x88"
-  );
-  static_assert(sizeof(MwsfdFrameInfoFill) == 0x90, "MwsfdFrameInfoFill size must be 0x90");
 
   /**
    * Address: 0x00ACD590 (FUN_00ACD590, _SUD_GetSudDatSize)
@@ -20527,14 +20077,15 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t mwsffrm_SetPicUsrInf(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    const SofdecSfdFrame* const sfdFrame,
-    MwsfdFrameInfoFill* const outFrameInfo
+    const moho::SfmpvfFrameInfo* const sfdFrame,
+    moho::MwsfdFrameInfo* const outFrameInfo
   )
   {
     constexpr std::int32_t kPictureUserHeaderBytes = 4;
 
-    const SofdecAddressWord payloadAddress = sfdFrame->pictureUserPayload[0];
-    const std::int32_t payloadBytes = sfdFrame->pictureUserPayload[1];
+    const auto* const payload = reinterpret_cast<const moho::SjChunkRange*>(SjAddressToPointer(sfdFrame->pictureUserInfoAddress));
+    const SofdecAddressWord payloadAddress = payload->bufferAddress;
+    const std::int32_t payloadBytes = payload->byteCount;
 
     if (MWSFD_GetUsePicUsr() != 1 || ply->seekKeyGroupPtr == &ply->seekKeyGroup) {
       outFrameInfo->pictureUserAddress = 0;
@@ -20563,14 +20114,15 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   SofdecAddressWord mwsffrm_SetSudDatInf(
     moho::MwsfdPlaybackStateSubobj* const /*ply*/,
-    const SofdecSfdFrame* const sfdFrame,
-    MwsfdFrameInfoFill* const outFrameInfo
+    const moho::SfmpvfFrameInfo* const sfdFrame,
+    moho::MwsfdFrameInfo* const outFrameInfo
   )
   {
     constexpr std::int32_t kPictureUserHeaderBytes = 4;
 
-    const SofdecAddressWord payloadAddress = sfdFrame->pictureUserPayload[0];
-    SofdecAddressWord result = sfdFrame->pictureUserPayload[1];
+    const auto* const payload = reinterpret_cast<const moho::SjChunkRange*>(SjAddressToPointer(sfdFrame->pictureUserInfoAddress));
+    const SofdecAddressWord payloadAddress = payload->bufferAddress;
+    SofdecAddressWord result = payload->byteCount;
 
     outFrameInfo->subtitleDataAddress = 0;
     outFrameInfo->subtitleDataBytes = 0;
@@ -20606,19 +20158,19 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t mwsffrm_DecideFrmType(
     moho::MwsfdPlaybackStateSubobj* const /*ply*/,
-    const SofdecSfdFrame* const sfdFrame,
+    const moho::SfmpvfFrameInfo* const sfdFrame,
     const SofdecAddressWord subtitleRecordAddress,
     const std::int32_t subtitleRecordBytes
   )
   {
     constexpr std::int32_t kFrameTypeFieldPaired = 2;
 
-    const std::int32_t declaredStructure = sfdFrame->pictureStructure;
+    const std::int32_t declaredStructure = sfdFrame->referenceUpdateMode;
 
     std::int32_t frameType = 0;
     if (declaredStructure <= 0 || declaredStructure > 3) {
       (void)MWSFSVM_Error(kMwsfdErrInvalidFrameStructure);
-    } else if (declaredStructure <= 2 || sfdFrame->pictureDetail[0] == 0) {
+    } else if (declaredStructure <= 2 || static_cast<std::int8_t>(sfdFrame->pictureDecodeFlagA) == 0) {
       frameType = kFrameTypeFieldPaired;
     }
 
@@ -20644,13 +20196,13 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   {
     auto* const ply = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
     const auto* const sfdFrame =
-      reinterpret_cast<const SofdecSfdFrame*>(SjAddressToPointer(sfdFrameAddress));
+      reinterpret_cast<const moho::SfmpvfFrameInfo*>(SjAddressToPointer(sfdFrameAddress));
 
-    ply->framePictureStructure = sfdFrame->pictureStructure;
+    ply->framePictureStructure = sfdFrame->referenceUpdateMode;
     ply->frameChromaFormat = sfdFrame->chromaFormat;
-    ply->framePictureDetail0 = sfdFrame->pictureDetail[0];
-    ply->framePictureDetail1 = sfdFrame->pictureDetail[1];
-    ply->framePictureDetail2 = sfdFrame->pictureDetail[2];
+    ply->framePictureDetail0 = static_cast<std::int8_t>(sfdFrame->pictureDecodeFlagA);
+    ply->framePictureDetail1 = static_cast<std::int8_t>(sfdFrame->pictureDecodeFlagB);
+    ply->framePictureDetail2 = static_cast<std::int8_t>(sfdFrame->pictureDecodeFlagC);
     ply->frameChromaPositionLow = sfdFrame->chromaPositionLow;
     ply->frameChromaPositionHigh = sfdFrame->chromaPositionHigh;
     ply->frameDetailReserved = 0;
@@ -20678,33 +20230,33 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   {
     auto* const ply = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
     const auto* const sfdFrame =
-      reinterpret_cast<const SofdecSfdFrame*>(SjAddressToPointer(sfdFrameAddress));
+      reinterpret_cast<const moho::SfmpvfFrameInfo*>(SjAddressToPointer(sfdFrameAddress));
     auto* const outFrameInfo =
-      reinterpret_cast<MwsfdFrameInfoFill*>(SjAddressToPointer(outFrameInfoAddress));
+      reinterpret_cast<moho::MwsfdFrameInfo*>(SjAddressToPointer(outFrameInfoAddress));
 
     std::int32_t frameRateTimes1000 = 0;
     if (SFD_GetFps(static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle), &frameRateTimes1000) != 0) {
       (void)MWSFSVM_Error(kMwsfdErrGetFpsFailed);
     }
 
-    outFrameInfo->frameBufferAddress = sfdFrame->frameBufferAddress;
-    outFrameInfo->bufferFormat = mwl_convBufFmtFromSFD(sfdFrame->sfdBufferFormat);
-    outFrameInfo->widthPixels = sfdFrame->widthPixels;
-    outFrameInfo->heightPixels = sfdFrame->heightPixels;
+    outFrameInfo->bufferAddress = sfdFrame->frameSurfaceBaseAddress;
+    outFrameInfo->bufferFormat = mwl_convBufFmtFromSFD(sfdFrame->bufferFormat);
+    outFrameInfo->widthPixels = sfdFrame->pictureWidthPixels;
+    outFrameInfo->heightPixels = sfdFrame->pictureHeightPixels;
     outFrameInfo->lumaStrideBytes = sfdFrame->lumaStrideBytes;
     outFrameInfo->chromaStrideBytes = sfdFrame->chromaStrideBytes;
-    outFrameInfo->pictureType = mwl_convPtypeFromSFD(sfdFrame->sfdPictureType);
+    outFrameInfo->pictureType = mwl_convPtypeFromSFD(sfdFrame->pictureType);
     outFrameInfo->frameRateTimes1000 = frameRateTimes1000;
-    outFrameInfo->presentFrameCount =
-      mwsffrm_CalcFrmCnt(sfdFrame->presentTimeUnits, frameRateTimes1000, sfdFrame->frameRateDivisor);
-    outFrameInfo->presentTimeUnits = sfdFrame->presentTimeUnits;
-    outFrameInfo->frameRateDivisor = sfdFrame->frameRateDivisor;
-    outFrameInfo->frameNumber = sfdFrame->frameNumber;
+    outFrameInfo->frameNumber =
+      mwsffrm_CalcFrmCnt(sfdFrame->frameEndTimeMajor, frameRateTimes1000, sfdFrame->presentationTimeMinor);
+    outFrameInfo->presentTimeUnits = sfdFrame->frameEndTimeMajor;
+    outFrameInfo->frameRateDivisor = sfdFrame->presentationTimeMinor;
+    outFrameInfo->concatCount = sfdFrame->decodeConcatOrdinal;
     outFrameInfo->decodeFrameCount =
-      mwsffrm_CalcFrmCnt(sfdFrame->decodeTimeUnits, frameRateTimes1000, sfdFrame->frameRateDivisor);
-    outFrameInfo->decodeTimeUnits = sfdFrame->decodeTimeUnits;
-    outFrameInfo->cropOffsetX = sfdFrame->cropOffsetX;
-    outFrameInfo->cropOffsetY = sfdFrame->cropOffsetY;
+      mwsffrm_CalcFrmCnt(sfdFrame->frameStartTimeMajor, frameRateTimes1000, sfdFrame->presentationTimeMinor);
+    outFrameInfo->decodeTimeUnits = sfdFrame->frameStartTimeMajor;
+    outFrameInfo->cropOffsetX = sfdFrame->referenceErrorMajor;
+    outFrameInfo->cropOffsetY = sfdFrame->referenceErrorMinor;
 
     (void)mwsffrm_SetPicUsrInf(ply, sfdFrame, outFrameInfo);
     (void)mwsffrm_SetSudDatInf(ply, sfdFrame, outFrameInfo);
@@ -20713,7 +20265,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
       mwsffrm_DecideFrmType(ply, sfdFrame, outFrameInfo->subtitleDataAddress, outFrameInfo->subtitleDataBytes);
     outFrameInfo->frameFieldType = frameType;
     // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
-    std::memcpy(outFrameInfo->trailingDetail, sfdFrame->TrailingDetail(), sizeof(outFrameInfo->trailingDetail));
+    std::memcpy(outFrameInfo->trailingDetail, &sfdFrame->chromaLayoutClass, sizeof(outFrameInfo->trailingDetail));
   }
 
   /**
@@ -20851,15 +20403,15 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * original CRI return convention used by the chained `mwsfsfx_SetSfxBufInf`
    * calls in the binary.
    */
-  MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
+  MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(moho::MwsfdFrameInfo* const frm, MwsfdSfxFrameInfo* const outSfx)
   {
-    const SofdecAddressWord planeWidth = frm->planeWidth;
-    const SofdecAddressWord planeHeight = frm->planeHeight;
+    const SofdecAddressWord planeWidth = frm->widthPixels;
+    const SofdecAddressWord planeHeight = frm->heightPixels;
     outSfx->cachedWidth = planeWidth;
     outSfx->cachedHeight = planeHeight;
 
     const SofdecAddressWord bufferAddress = frm->bufferAddress;
-    if (frm->buffmt != 3) {
+    if (frm->bufferFormat != 3) {
       mwsfsfx_SetSfxBufInf(&outSfx->yPlane, bufferAddress, planeWidth, planeHeight);
       return &outSfx->yPlane;
     }
@@ -20888,9 +20440,9 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * returned the input pointer (compiler artefact); the recovered version
    * keeps the side effect and drops the discard return.
    */
-  void mwsfsfx_SetNfrm(const MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
+  void mwsfsfx_SetNfrm(const moho::MwsfdFrameInfo* const frm, MwsfdSfxFrameInfo* const outSfx)
   {
-    outSfx->nfrm = frm->nfrm;
+    outSfx->nfrm = frm->decodeFrameCount;
   }
 
   /**
@@ -20935,7 +20487,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   void mwsfsfx_SetSfxInfTag(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    MwsfdSfdFrmObj* const /*frm*/,
+    moho::MwsfdFrameInfo* const /*frm*/,
     MwsfdSfxFrameInfo* const outSfx
   )
   {
@@ -21585,7 +21137,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   }
 
   // ---------------------------------------------------------------------------
-  // MWSFD frame-info -> SFX scratch wrappers (use MwsfdSfdFrmObj which is in
+  // MWSFD frame-info -> SFX scratch wrappers (use moho::MwsfdFrameInfo which is in
   // scope here at the end of the SFX-cluster block).
   // ---------------------------------------------------------------------------
 
@@ -21600,7 +21152,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * `MwsfdSfxFrameInfo` block via `MWSFSFX_CnvFrmInfToSfx`, then queries the
    * bound SFX runtime handle for the zoom-frame range covering it.
    */
-  std::int32_t MWSFD_GetZfrmRange(moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfdFrmObj* const frm)
+  std::int32_t MWSFD_GetZfrmRange(moho::MwsfdPlaybackStateSubobj* const ply, moho::MwsfdFrameInfo* const frm)
   {
     void* const sfxHandle = MWSFSFX_GetSfxHn(ply);
     MwsfdSfxFrameInfo sfxFrameInfo{};
@@ -21619,7 +21171,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * after converting the MWSFD frame descriptor into the SFX-side scratch
    * layout; reports `E202283`/`E202284` for invalid handle / null get-frame.
    */
-  void MWSFD_MakeTblZ16(moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfdFrmObj* const frm)
+  void MWSFD_MakeTblZ16(moho::MwsfdPlaybackStateSubobj* const ply, moho::MwsfdFrameInfo* const frm)
   {
     if (MWSFD_IsEnableHndl(ply) != 1) {
       (void)MWSFSVM_Error(kMwsfdErrMakeTblZ16InvalidHandle);
@@ -21647,7 +21199,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * after converting the MWSFD frame descriptor into the SFX-side scratch
    * layout; reports `E202285`/`E202286` for invalid handle / null get-frame.
    */
-  void MWSFD_MakeTblZ32(moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfdFrmObj* const frm)
+  void MWSFD_MakeTblZ32(moho::MwsfdPlaybackStateSubobj* const ply, moho::MwsfdFrameInfo* const frm)
   {
     if (MWSFD_IsEnableHndl(ply) != 1) {
       (void)MWSFSVM_Error(kMwsfdErrMakeTblZ32InvalidHandle);

@@ -1083,8 +1083,6 @@
    */
   void CFT_Ycc420plnToArgb8888IntInit();
   void CFT_Ycc420plnToArgb8888PrgInit();
-  struct CftYcc420PlanarPackedWords;
-  struct CftRgb16OutputPackedWords;
 
   /**
    * Address: 0x00AF37F0 (FUN_00AF37F0, _CFT_Ycc420plnToRgb555)
@@ -1094,8 +1092,8 @@
    * clip lookup tables.
    */
   std::int32_t CFT_Ycc420plnToRgb555(
-    const CftYcc420PlanarPackedWords* inputWords,
-    const CftRgb16OutputPackedWords* outputWords
+    const moho::CftBuffer* inputWords,
+    const moho::CftBuffer* outputWords
   );
 
   /**
@@ -1106,8 +1104,8 @@
    * clip lookup tables.
    */
   std::int32_t CFT_Ycc420plnToRgb555WithDither(
-    const CftYcc420PlanarPackedWords* inputWords,
-    const CftRgb16OutputPackedWords* outputWords
+    const moho::CftBuffer* inputWords,
+    const moho::CftBuffer* outputWords
   );
 
   /**
@@ -1118,8 +1116,8 @@
    * clip lookup tables.
    */
   std::int32_t CFT_Ycc420plnToRgb565(
-    const CftYcc420PlanarPackedWords* inputWords,
-    const CftRgb16OutputPackedWords* outputWords
+    const moho::CftBuffer* inputWords,
+    const moho::CftBuffer* outputWords
   );
 
   /**
@@ -1130,8 +1128,8 @@
    * clip lookup tables.
    */
   std::int32_t CFT_Ycc420plnToRgb565WithDither(
-    const CftYcc420PlanarPackedWords* inputWords,
-    const CftRgb16OutputPackedWords* outputWords
+    const moho::CftBuffer* inputWords,
+    const moho::CftBuffer* outputWords
   );
   /**
    * Address: 0x00B031B0 (FUN_00B031B0, _cft_sse_Ycc420plnToRgb888Prg)
@@ -1183,8 +1181,8 @@
    * ARGB8888 conversion through user/default table selection.
    */
   std::int32_t CFT_Ycc420plnToArgb8888Split(
-    const CftYcc420PlanarPackedWords* inputWords,
-    const CftRgb16OutputPackedWords* outputWords,
+    const moho::CftBuffer* inputWords,
+    const moho::CftBuffer* outputWords,
     const SofdecAddressWord* userTableAddress
   );
 
@@ -1196,8 +1194,8 @@
    * YCC420->YCC422 conversion path using optimize/alignment rules.
    */
   SofdecAddressWord CFT_Ycc420plnToYcc422pix2Int(
-    const CftYcc420PlanarPackedWords* inputWords,
-    const CftRgb16OutputPackedWords* outputWords,
+    const moho::CftBuffer* inputWords,
+    const moho::CftBuffer* outputWords,
     const SofdecAddressWord* scratchBufferWords
   );
 
@@ -3727,45 +3725,6 @@
   );
   static_assert(sizeof(CftPixelSurfaceLanes) == 0x14, "CftPixelSurfaceLanes size must be 0x14");
 
-  struct CftYcc420PlanarPackedWords
-  {
-    std::int32_t reserved00 = 0; // +0x00
-    std::uint32_t* yPlaneWords = nullptr; // +0x04
-    std::int32_t reserved08 = 0; // +0x08
-    std::int32_t reserved0C = 0; // +0x0C
-    std::int32_t yStrideBytes = 0; // +0x10
-    std::uint32_t* cbPlaneWords = nullptr; // +0x14
-    std::int32_t reserved18 = 0; // +0x18
-    std::int32_t reserved1C = 0; // +0x1C
-    std::int32_t cbStrideBytes = 0; // +0x20
-    std::uint32_t* crPlaneWords = nullptr; // +0x24
-    std::int32_t reserved28 = 0; // +0x28
-    std::int32_t reserved2C = 0; // +0x2C
-    std::int32_t crStrideBytes = 0; // +0x30
-  };
-  static_assert(offsetof(CftYcc420PlanarPackedWords, yPlaneWords) == 0x04, "CftYcc420PlanarPackedWords::yPlaneWords offset must be 0x04");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, yStrideBytes) == 0x10, "CftYcc420PlanarPackedWords::yStrideBytes offset must be 0x10");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, cbPlaneWords) == 0x14, "CftYcc420PlanarPackedWords::cbPlaneWords offset must be 0x14");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, cbStrideBytes) == 0x20, "CftYcc420PlanarPackedWords::cbStrideBytes offset must be 0x20");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, crPlaneWords) == 0x24, "CftYcc420PlanarPackedWords::crPlaneWords offset must be 0x24");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, crStrideBytes) == 0x30, "CftYcc420PlanarPackedWords::crStrideBytes offset must be 0x30");
-  static_assert(sizeof(CftYcc420PlanarPackedWords) == 0x34, "CftYcc420PlanarPackedWords size must be 0x34");
-
-  struct CftRgb16OutputPackedWords
-  {
-    std::int32_t reserved00 = 0; // +0x00
-    std::uint8_t* pixelBase = nullptr; // +0x04
-    std::int32_t widthPixels = 0; // +0x08
-    std::int32_t heightPixels = 0; // +0x0C
-    std::int32_t strideBytes = 0; // +0x10
-  };
-  static_assert(offsetof(CftRgb16OutputPackedWords, pixelBase) == 0x04, "CftRgb16OutputPackedWords::pixelBase offset must be 0x04");
-  static_assert(offsetof(CftRgb16OutputPackedWords, widthPixels) == 0x08, "CftRgb16OutputPackedWords::widthPixels offset must be 0x08");
-  static_assert(offsetof(CftRgb16OutputPackedWords, heightPixels) == 0x0C, "CftRgb16OutputPackedWords::heightPixels offset must be 0x0C");
-  static_assert(offsetof(CftRgb16OutputPackedWords, strideBytes) == 0x10, "CftRgb16OutputPackedWords::strideBytes offset must be 0x10");
-  static_assert(sizeof(CftRgb16OutputPackedWords) == 0x14, "CftRgb16OutputPackedWords size must be 0x14");
-
-
   std::array<std::int16_t, 0x10000> yuv_to_tmp{};
   std::array<std::uint32_t, 0x10000> yuv_to_r{};
   std::array<std::uint8_t, 0x10000> yuv_to_b{};
@@ -6002,7 +5961,7 @@ namespace
 
   struct MwlRnaTransferSinkVtable
   {
-    std::uint8_t mUnknown00[0x54]{};
+    void(__cdecl* reservedSlots[21])(){}; // +0x00 slots this lane never reaches
     MwlRnaTransferChunkFn transferChunk = nullptr; // +0x54
   };
 
@@ -6214,8 +6173,8 @@ namespace
           &headChunk,
           &tailChunk
         );
-        sjHandle->dispatchTable->submitChunk(sjHandle, 0, &headChunk);
-        sjHandle->dispatchTable->putChunk(sjHandle, 1, &tailChunk);
+        sjHandle->dispatchTable->putChunk(sjHandle, 0, &headChunk);
+        sjHandle->dispatchTable->ungetChunk(sjHandle, 1, &tailChunk);
       }
 
       runtime->lastTransferUnits = transferredUnits;
@@ -6229,7 +6188,7 @@ namespace
         CRIERR_CallErr(kMwlRnaStartTransNullSjMessage);
       }
 
-      sjHandle->dispatchTable->putChunk(sjHandle, 1, &sourceChunks[static_cast<std::size_t>(channelIndex)]);
+      sjHandle->dispatchTable->ungetChunk(sjHandle, 1, &sourceChunks[static_cast<std::size_t>(channelIndex)]);
     }
 
     return 0;
