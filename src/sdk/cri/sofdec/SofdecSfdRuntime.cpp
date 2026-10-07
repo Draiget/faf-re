@@ -16872,20 +16872,21 @@
     return SFPL2_Standby(workctrlSubobj);
   }
 
-  [[nodiscard]] static std::int32_t& SFPLY_ResetFlagLane()
-  {
-    return *reinterpret_cast<std::int32_t*>(&gSflibLibWork.objectHandles[0]);
-  }
-
   /**
    * Address: 0x00AD7FA0 (FUN_00AD7FA0, _SFPLY_SetResetFlg)
    *
    * What it does:
    * Writes SFPLY global reset-guard flag and returns written value.
+   *
+   * The flag is `SFLIB_libwork+0x1FC` (`SFPLY_GetResetFlg` reads dword 127),
+   * the lane `sflib_InitResetPara` clears - not `objectHandles[0]` at +0x204.
+   * Aliasing it onto the handle table made every `SFPLY_Stop` null slot 0,
+   * dropping that live movie from `SFTIM_VbIn`: its server never got another
+   * work tick, so it froze after one frame (campaign briefing movies).
    */
   std::int32_t SFPLY_SetResetFlg(const std::int32_t enabled)
   {
-    SFPLY_ResetFlagLane() = enabled;
+    gSflibLibWork.transferInitState.resetParameter = enabled;
     return enabled;
   }
 
@@ -16897,7 +16898,7 @@
    */
   std::int32_t SFPLY_GetResetFlg()
   {
-    return SFPLY_ResetFlagLane();
+    return gSflibLibWork.transferInitState.resetParameter;
   }
 
   /**
