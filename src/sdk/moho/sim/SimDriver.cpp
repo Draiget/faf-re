@@ -1245,22 +1245,32 @@ void CSimDriver::ThreadRun()
           if (::GetThreadContext(simThread, &ctx)) {
             STACKFRAME frame{};
             frame.AddrPC.Mode = AddrModeFlat;
+#if defined(_M_X64)
+            frame.AddrPC.Offset = ctx.Rip;
+            frame.AddrStack.Offset = ctx.Rsp;
+            frame.AddrFrame.Offset = ctx.Rbp;
+            constexpr DWORD kStallMachine = IMAGE_FILE_MACHINE_AMD64;
+            const unsigned long long stallPc = ctx.Rip;
+#else
             frame.AddrPC.Offset = ctx.Eip;
-            frame.AddrStack.Mode = AddrModeFlat;
             frame.AddrStack.Offset = ctx.Esp;
-            frame.AddrFrame.Mode = AddrModeFlat;
             frame.AddrFrame.Offset = ctx.Ebp;
+            constexpr DWORD kStallMachine = IMAGE_FILE_MACHINE_I386;
+            const unsigned long long stallPc = ctx.Eip;
+#endif
+            frame.AddrStack.Mode = AddrModeFlat;
+            frame.AddrFrame.Mode = AddrModeFlat;
             if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
               std::fprintf(
                 sink,
-                "[SIMSTALL] dispatchBeat=%d state=%d eip=0x%08x\n",
+                "[SIMSTALL] dispatchBeat=%d state=%d eip=0x%08llx\n",
                 static_cast<int>(mDispatchBeat),
                 static_cast<int>(mState),
-                ctx.Eip
+                stallPc
               );
               for (int i = 0; i < 40; ++i) {
                 if (::StackWalk(
-                      IMAGE_FILE_MACHINE_I386,
+                      kStallMachine,
                       ::GetCurrentProcess(),
                       simThread,
                       &frame,
