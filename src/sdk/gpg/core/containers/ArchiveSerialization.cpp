@@ -346,7 +346,7 @@ namespace
      * `ownerRef` are unused -- the real body passes a fresh empty `RRef`
      * to the nested archive call rather than forwarding either.
      */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x007631D0 (FUN_007631D0, Moho::NavPathSerializer::Serialize)
@@ -355,7 +355,7 @@ namespace
      * Writes one `std::vector<HPathCell>` payload directly at `objectPtr`
      * through the reflected vector type, mirroring `Deserialize`.
      */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00763370 (FUN_00763370, gpg::SerSaveLoadHelper_NavPath::Init)
@@ -384,7 +384,7 @@ namespace
   NavPathSerializer::~NavPathSerializer() = default;
 
   void NavPathSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+    gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
     gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
@@ -393,7 +393,7 @@ namespace
   }
 
   void NavPathSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+    gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
     gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
@@ -587,7 +587,7 @@ namespace gpg
    */
   void SaveFastVectorUnitWeaponInfo(
     gpg::WriteArchive* const archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int /*version*/,
     gpg::RRef* const ownerRef
   )
@@ -642,7 +642,7 @@ namespace gpg
    */
   void SaveVectorSPerArmyReconInfo(
     gpg::WriteArchive* const archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int /*version*/,
     gpg::RRef* const ownerRef
   )
@@ -683,7 +683,7 @@ namespace gpg
    */
   void LoadVectorSPerArmyReconInfo(
     gpg::ReadArchive* const archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int /*version*/,
     gpg::RRef* /*ownerRef*/
   )
@@ -720,7 +720,7 @@ namespace gpg
    */
   void SaveVectorEntitySetTemplateUnit(
     gpg::WriteArchive* const archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int /*version*/,
     gpg::RRef* const ownerRef
   )
@@ -993,7 +993,7 @@ void gpg::WriteRawPointer(
       }
 
       objectType->serSaveFunc_(
-        archive, reinterpret_cast<int>(objectRef.mObj), objectType->version_, const_cast<RRef*>(&ownerRef)
+        archive, reinterpret_cast<std::intptr_t>(objectRef.mObj), objectType->version_, const_cast<RRef*>(&ownerRef)
       );
     }
 
@@ -1128,7 +1128,7 @@ TrackedPointerInfo& gpg::ReadRawPointer(ReadArchive* const archive, const RRef& 
 
     handle.type->serLoadFunc_(
       archive,
-      reinterpret_cast<int>(constructResult.mInfo.object),
+      reinterpret_cast<std::intptr_t>(constructResult.mInfo.object),
       handle.version,
       const_cast<RRef*>(&ownerRef)
     );

@@ -535,7 +535,7 @@ namespace
 
   void DeserializeCUnitCarrierRetrieveSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -545,7 +545,7 @@ namespace
 
   void SerializeCUnitCarrierRetrieveSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )

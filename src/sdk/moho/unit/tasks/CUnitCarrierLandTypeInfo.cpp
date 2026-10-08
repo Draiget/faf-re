@@ -312,7 +312,7 @@ namespace
    */
   void DeserializeCUnitCarrierLandSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -335,7 +335,7 @@ namespace
    */
   void SerializeCUnitCarrierLandSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )

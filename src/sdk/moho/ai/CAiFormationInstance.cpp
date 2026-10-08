@@ -82,13 +82,13 @@ namespace
    */
   void LoadBroadcasterEFormationdStatusListeners(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
     auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
@@ -117,13 +117,13 @@ namespace
    */
   void SaveBroadcasterEFormationdStatusListeners(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
   {
     auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
@@ -478,7 +478,7 @@ namespace
    */
   void DeserializeSUnitOffsetInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -501,7 +501,7 @@ namespace
    */
   void SerializeSUnitOffsetInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -546,7 +546,7 @@ namespace
    */
   void DeserializeIFormationInstanceSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -569,7 +569,7 @@ namespace
    */
   void SerializeIFormationInstanceSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -603,7 +603,7 @@ namespace
    */
   void DeserializeSAssignedLocInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -626,7 +626,7 @@ namespace
    */
   void SerializeSAssignedLocInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -695,10 +695,10 @@ namespace
      * MemberSerialize` hands this type its first member). `Init` below sets
      * `size_ = 0x0C`, the `{proxy, head, size}` map footprint.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       const auto* const mapObject = reinterpret_cast<const UnitOffsetMap*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+        objectPtr
       );
       if (!archive || !mapObject) {
         return;
@@ -725,7 +725,7 @@ namespace
      * Address: 0x0056D9D0 (FUN_0056D9D0, gpg::RMapType_EntId_SUnitOffsetInfo::SerLoad)
      *
      * IDA signature:
-     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, int objectPtr, int version, gpg::RRef *ownerRef);
+     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, std::intptr_t objectPtr, int version, gpg::RRef *ownerRef);
      *
      * What it does:
      * Read mirror of `SerSave`: empties the map (the inlined `_Tree::clear`
@@ -737,10 +737,10 @@ namespace
      * unlinked again by the scratch destructor at loop end -- the map node's
      * own copy owns the membership from then on.
      */
-    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto* const mapObject = reinterpret_cast<UnitOffsetMap*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+        objectPtr
       );
       if (!archive) {
         return;
@@ -855,10 +855,10 @@ namespace
      * Serializes one `std::map<EntId,SCoordsVec2>` payload by writing key/value
      * pairs with the reflected EntId and SCoordsVec2 descriptors.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       const auto* const mapObject = reinterpret_cast<const CoordMap*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+        objectPtr
       );
       if (!archive || !mapObject) {
         return;
@@ -889,10 +889,10 @@ namespace
      * destination map, reads an element count, then reads that many
      * reflected EntId/SCoordsVec2 pairs, inserting each by key.
      */
-    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto* const mapObject = reinterpret_cast<CoordMap*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+        objectPtr
       );
       if (!archive) {
         return;
@@ -1748,7 +1748,7 @@ namespace moho
    * 0x0056DF17) -- then deserializes each group through `ReadArchive::Read`
    * with the element descriptor cached in `SOffsetInfo::sType` (0x0056DF43).
    */
-  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1775,7 +1775,7 @@ namespace moho
    * Writes one reflected `fastvector<SOffsetInfo>` payload as archive count
    * plus per-group reflected serialization, mirroring `LoadFastVectorSOffsetInfo`.
    */
-  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1819,7 +1819,7 @@ namespace moho
    * `fastvector<SAssignedLocInfo>` filling appended entries from a zeroed
    * prototype, then deserializes each 0x10 entry through `ReadArchive::Read`.
    */
-  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1847,7 +1847,7 @@ namespace moho
    * count plus per-entry reflected serialization, mirroring
    * `LoadFastVectorSAssignedLocInfo`.
    */
-  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -2070,7 +2070,7 @@ namespace moho
    */
   void SOffsetInfoSerializer::Serialize(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -2140,7 +2140,7 @@ namespace moho
    */
   void SOffsetInfoSerializer::Deserialize(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )

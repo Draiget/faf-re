@@ -131,7 +131,7 @@ namespace
   /**
    * Address: 0x0067CD30 (FUN_0067CD30, Moho::RWeakPtrType_Entity::SerLoad)
    */
-  void LoadWeakPtrEntity(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadWeakPtrEntity(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtrEntity*>(objectPtr);
     if (!archive || !weak) {
@@ -145,7 +145,7 @@ namespace
   /**
    * Address: 0x0067CD60 (FUN_0067CD60, Moho::RWeakPtrType_Entity::SerSave)
    */
-  void SaveWeakPtrEntity(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveWeakPtrEntity(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtrEntity*>(objectPtr);
     if (!archive || !weak) {
@@ -159,7 +159,7 @@ namespace
   /**
    * Address: 0x0067CDA0 (FUN_0067CDA0, gpg::RVectorType_Entity_P::SerLoad)
    */
-  void LoadEntityPointerVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadEntityPointerVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<EntityPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -192,7 +192,7 @@ namespace
   /**
    * Address: 0x0067CEB0 (FUN_0067CEB0, gpg::RVectorType_Entity_P::SerSave)
    */
-  void SaveEntityPointerVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveEntityPointerVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<const EntityPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -219,7 +219,7 @@ namespace
    * What it does:
    * Deserializes tracked `Entity*` pointer lanes into `fastvector<Entity*>` storage.
    */
-  void LoadFastVectorEntityPointer(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorEntityPointer(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -272,7 +272,7 @@ namespace
    */
   void LoadFastVectorEntityPointerLane1(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -305,7 +305,7 @@ namespace
    */
   void SaveFastVectorEntityPointerLane1(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -330,7 +330,7 @@ namespace
    * What it does:
    * Serializes tracked `Entity*` pointer lanes from `fastvector<Entity*>` storage.
    */
-  void SaveFastVectorEntityPointer(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorEntityPointer(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -383,7 +383,7 @@ namespace moho
   /**
     * Alias of FUN_0067CD30 (non-canonical helper lane).
    */
-  void WeakPtr_Entity::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Entity::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     LoadWeakPtrEntity(archive, objectPtr, 0, ownerRef);
   }
@@ -391,7 +391,7 @@ namespace moho
   /**
     * Alias of FUN_0067CD60 (non-canonical helper lane).
    */
-  void WeakPtr_Entity::Serialize(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Entity::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     SaveWeakPtrEntity(archive, objectPtr, 0, ownerRef);
   }

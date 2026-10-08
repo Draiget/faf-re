@@ -140,7 +140,7 @@ namespace
   /**
    * Address: 0x006EA8F0 (FUN_006EA8F0, sub_6EA8F0)
    */
-  void LoadWeakPtrCUnitCommandVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadWeakPtrCUnitCommandVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<WeakPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -175,7 +175,7 @@ namespace
   /**
    * Address: 0x006EAA40 (FUN_006EAA40, sub_6EAA40)
    */
-  void SaveWeakPtrCUnitCommandVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveWeakPtrCUnitCommandVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<const WeakPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -274,7 +274,7 @@ namespace moho
   /**
    * Address: 0x006EA880 (FUN_006EA880, Moho::RWeakPtrType_CUnitCommand::SerLoad)
    */
-  void WeakPtr_CUnitCommand::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_CUnitCommand::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtr<CUnitCommand>*>(objectPtr);
     if (!archive || !weak) {
@@ -288,7 +288,7 @@ namespace moho
   /**
    * Address: 0x006EA8B0 (FUN_006EA8B0, Moho::RWeakPtrType_CUnitCommand::SerSave)
    */
-  void WeakPtr_CUnitCommand::Serialize(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_CUnitCommand::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtr<CUnitCommand>*>(objectPtr);
     if (!archive || !weak) {

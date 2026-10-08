@@ -114,7 +114,7 @@ namespace moho
   /**
    * Address: 0x006AF1E0 (FUN_006AF1E0, Moho::RWeakPtrType_Unit::SerLoad)
    */
-  void WeakPtr_Unit::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Unit::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtr<Unit>*>(objectPtr);
     if (!archive || !weak) {
@@ -128,7 +128,7 @@ namespace moho
   /**
    * Address: 0x006AF210 (FUN_006AF210, Moho::RWeakPtrType_Unit::SerSave)
    */
-  void WeakPtr_Unit::Serialize(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Unit::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtr<Unit>*>(objectPtr);
     if (!archive || !weak) {

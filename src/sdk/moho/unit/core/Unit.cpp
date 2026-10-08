@@ -11035,7 +11035,7 @@ namespace
    */
   void DeserializeUnitWeaponInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -11058,7 +11058,7 @@ namespace
    */
   void SerializeUnitWeaponInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -11084,7 +11084,7 @@ namespace
    */
   void SSTIUnitVariableDataSerializerDeserialize(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -11110,7 +11110,7 @@ namespace
    */
   void SSTIUnitVariableDataSerializerSerialize(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )

@@ -17,7 +17,7 @@ namespace
 
   void SerializeAudioRequestFastVector(
     gpg::WriteArchive* archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int version,
     gpg::RRef* ownerRef
   );
@@ -53,7 +53,7 @@ namespace
    */
   void SerializeAudioRequestFastVector(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -63,7 +63,7 @@ namespace
     }
 
     const auto* const requests = reinterpret_cast<const gpg::fastvector<moho::SAudioRequest>*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
 
     const unsigned int count = requests != nullptr

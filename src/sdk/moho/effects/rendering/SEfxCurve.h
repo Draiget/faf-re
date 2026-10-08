@@ -63,7 +63,7 @@ namespace moho
      * What it does:
      * Archive callback adapter that deserializes one `SEfxCurve` object.
      */
-    static void DeserializeFromArchive(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void DeserializeFromArchive(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00514D50 (FUN_00514D50, Moho::SEfxCurveSerializer::Serialize)
@@ -71,7 +71,7 @@ namespace moho
      * What it does:
      * Archive callback adapter that serializes one `SEfxCurve` object.
      */
-    static void SerializeToArchive(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerializeToArchive(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00516D20 (FUN_00516D20, Moho::SEfxCurve::MemberDeserialize)

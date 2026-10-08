@@ -181,7 +181,7 @@ namespace
    * Loads one weak pointer lane targeting `STaskEventLinkage` and binds this
    * weak-link node to the decoded owner object.
    */
-  void LoadWeakPtrSTaskEventLinkage(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void LoadWeakPtrSTaskEventLinkage(gpg::ReadArchive* archive, std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -197,7 +197,7 @@ namespace
    * Saves one weak pointer lane targeting `STaskEventLinkage` as an unowned
    * tracked pointer entry.
    */
-  void SaveWeakPtrSTaskEventLinkage(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void SaveWeakPtrSTaskEventLinkage(gpg::WriteArchive* archive, std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);

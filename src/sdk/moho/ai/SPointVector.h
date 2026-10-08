@@ -194,7 +194,7 @@ namespace gpg
      * Loads one `vector<SPointVector>` payload from archive and replaces the
      * destination storage.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0057F400 (FUN_0057F400, gpg::RVectorType_SPointVector::SerSave)
@@ -202,7 +202,7 @@ namespace gpg
      * What it does:
      * Saves one `vector<SPointVector>` payload to archive element-by-element.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0057E160 (FUN_0057E160, gpg::RVectorType_SPointVector::SubscriptIndex)

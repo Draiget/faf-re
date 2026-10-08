@@ -15,7 +15,7 @@ namespace moho
      * What it does:
      * Deserializes one `WeakPtr<CUnitCommand>` payload from a tracked pointer.
      */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006EA8B0 (FUN_006EA8B0, Moho::RWeakPtrType_CUnitCommand::SerSave)
@@ -23,7 +23,7 @@ namespace moho
      * What it does:
      * Serializes one `WeakPtr<CUnitCommand>` payload as an unowned tracked pointer.
      */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   template <class T>

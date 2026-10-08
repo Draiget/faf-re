@@ -44,12 +44,12 @@ namespace gpg
     /**
      * Address: 0x00523D50 (FUN_00523D50, gpg::RVectorType_RUnitBlueprintWeapon::SerLoad)
      */
-    static void SerLoad(ReadArchive* archive, int objectPtr, int version, RRef* ownerRef);
+    static void SerLoad(ReadArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
 
     /**
      * Address: 0x00523E80 (FUN_00523E80, gpg::RVectorType_RUnitBlueprintWeapon::SerSave)
      */
-    static void SerSave(WriteArchive* archive, int objectPtr, int version, RRef* ownerRef);
+    static void SerSave(WriteArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
 
     /**
      * Address: 0x00523650 (FUN_00523650, gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex)

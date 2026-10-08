@@ -148,7 +148,7 @@ namespace
      * Reads one serialized string-vector lane (count + string elements) and
      * replaces destination storage.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00512F60 (FUN_00512F60, gpg::RVectorType_string::SerSave)
@@ -156,7 +156,7 @@ namespace
      * What it does:
      * Writes one reflected string-vector lane as count + element payloads.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     [[nodiscard]] gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     [[nodiscard]] size_t GetCount(void* obj) const override;
@@ -247,7 +247,7 @@ namespace
    */
   void RStringVectorTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -274,7 +274,7 @@ namespace
 
   void RStringVectorTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )

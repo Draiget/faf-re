@@ -68,12 +68,12 @@ namespace gpg
     /**
      * Address: 0x0065F450 (FUN_0065F450, gpg::RFastVectorType_SEfxCurve::SerLoad)
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0065F540 (FUN_0065F540, gpg::RFastVectorType_SEfxCurve::SerSave)
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(RFastVectorType<moho::SEfxCurve>) == 0x68, "RFastVectorType<SEfxCurve> size must be 0x68");
@@ -108,7 +108,7 @@ namespace gpg
    * fill, then deserializes each element with the archived owner reference.
    */
   void RFastVectorType<moho::SEfxCurve>::SerLoad(
-    gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
+    gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
     auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
@@ -132,7 +132,7 @@ namespace gpg
    * Writes current vector length, then serializes each `SEfxCurve` element.
    */
   void RFastVectorType<moho::SEfxCurve>::SerSave(
-    gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
+    gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
     auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
@@ -473,7 +473,7 @@ namespace moho
    * Address: 0x00514D40 (FUN_00514D40, Moho::SEfxCurveSerializer::Deserialize)
    */
   void SEfxCurve::DeserializeFromArchive(
-    gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
+    gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
   )
   {
     auto* const curve = reinterpret_cast<SEfxCurve*>(objectPtr);
@@ -490,7 +490,7 @@ namespace moho
    * Address: 0x00514D50 (FUN_00514D50, Moho::SEfxCurveSerializer::Serialize)
    */
   void SEfxCurve::SerializeToArchive(
-    gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
+    gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
   )
   {
     const auto* const curve = reinterpret_cast<const SEfxCurve*>(objectPtr);

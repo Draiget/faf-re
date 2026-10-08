@@ -634,7 +634,7 @@ moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
  */
 [[maybe_unused]] void SerializePathCellVectorArchive(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
@@ -644,7 +644,7 @@ moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
   }
 
   const auto* const vectorObject = reinterpret_cast<const PathCellVector*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    objectPtr
   );
 
   const unsigned int count = vectorObject != nullptr ? static_cast<unsigned int>(vectorObject->size()) : 0u;

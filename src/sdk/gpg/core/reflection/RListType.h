@@ -83,7 +83,7 @@ namespace gpg
      * a fresh `T` (`ReadElement`: a value through its reflected type, a raw
      * pointer or a `boost::shared_ptr` as a tracked pointer) and appends it.
      */
-    static void SerLoad(ReadArchive* const archive, const int objectPtr, const int, RRef* const ownerRef)
+    static void SerLoad(ReadArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const ownerRef)
     {
       list_type& list = *reinterpret_cast<list_type*>(static_cast<std::uintptr_t>(objectPtr));
 
@@ -101,7 +101,7 @@ namespace gpg
      * What it does:
      * Writes the element count, then each element (`WriteElement`).
      */
-    static void SerSave(WriteArchive* const archive, const int objectPtr, const int, RRef* const ownerRef)
+    static void SerSave(WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const ownerRef)
     {
       const list_type& list = *reinterpret_cast<const list_type*>(static_cast<std::uintptr_t>(objectPtr));
 

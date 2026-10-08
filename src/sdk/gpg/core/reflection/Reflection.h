@@ -1195,7 +1195,7 @@ namespace gpg
    * addressed by `vectorPtr`. Signature matches `RType::load_func_t`; the
    * trailing version/owner lanes are unused by this vector body.
    */
-  void DeserializeSimArmyPtrVector(ReadArchive* archive, int vectorPtr, int version, RRef* ownerRef);
+  void DeserializeSimArmyPtrVector(ReadArchive* archive, std::intptr_t vectorPtr, int version, RRef* ownerRef);
 
   /**
    * Address: 0x0074E350 (FUN_0074E350, gpg::RVectorType<SimArmy*> element serializer)
@@ -1205,7 +1205,7 @@ namespace gpg
    * unowned tracked raw pointer. Signature matches `RType::save_func_t`; the
    * trailing version/owner lanes are unused by this vector body.
    */
-  void SerializeSimArmyPtrVector(WriteArchive* archive, int vectorPtr, int version, RRef* ownerRef);
+  void SerializeSimArmyPtrVector(WriteArchive* archive, std::intptr_t vectorPtr, int version, RRef* ownerRef);
 
   /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
@@ -2239,10 +2239,10 @@ namespace gpg
     // and forwards arg_0, arg_4 and arg_10 to the body at 0x004E0CD0.
     using save_construct_args_func_t =
       void (*)(WriteArchive* archive, void* object, int version, RRef* ownerRef, SerSaveConstructArgsResult* result);
-    using save_func_t = void (*)(WriteArchive*, int, int, RRef*);
+    using save_func_t = void (*)(WriteArchive*, std::intptr_t, int, RRef*);
     using construct_func_t =
       void (*)(ReadArchive* archive, int version, RRef* ownerRef, SerConstructResult* result);
-    using load_func_t = void (*)(ReadArchive*, int, int, RRef*);
+    using load_func_t = void (*)(ReadArchive*, std::intptr_t, int, RRef*);
     using new_ref_func_t = RRef (*)();
     using cpy_ref_func_t = RRef (*)(RRef*);
     using delete_func_t = void (*)(void*);
@@ -2834,7 +2834,7 @@ namespace gpg
      * takes that too (the Lua objects read their payload against the
      * owning thread).
      */
-    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int version, RRef* const ownerRef)
+    static void Deserialize(ReadArchive* const archive, const std::intptr_t objectPtr, const int version, RRef* const ownerRef)
     {
       T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
       if constexpr (requires { object.MemberDeserialize(archive, version, *ownerRef); }) {
@@ -2854,7 +2854,7 @@ namespace gpg
      * `T::MemberSerialize`, with the version and the owner reference when
      * `T`'s takes them.
      */
-    static void Serialize(WriteArchive* const archive, const int objectPtr, const int version, RRef* const ownerRef)
+    static void Serialize(WriteArchive* const archive, const std::intptr_t objectPtr, const int version, RRef* const ownerRef)
     {
       T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
       if constexpr (requires { object.MemberSerialize(archive, version, *ownerRef); }) {
@@ -3229,7 +3229,7 @@ namespace gpg
      * Reads one `IntType` lane from the archive and stores it into the
      * reflected object as a `T` value.
      */
-    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int, RRef* const)
+    static void Deserialize(ReadArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const)
     {
       IntType value{};
       archive->ReadInt(&value);
@@ -3262,7 +3262,7 @@ namespace gpg
      * What it does:
      * Writes the reflected object's `T` value as one `IntType` lane.
      */
-    static void Serialize(WriteArchive* const archive, const int objectPtr, const int, RRef* const)
+    static void Serialize(WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const)
     {
       const auto value = *reinterpret_cast<const T*>(static_cast<std::uintptr_t>(objectPtr));
       archive->WriteInt(static_cast<int>(value));

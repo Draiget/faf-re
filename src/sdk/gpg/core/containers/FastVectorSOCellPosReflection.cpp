@@ -40,7 +40,7 @@ namespace
    * same compiled body `SetCount` and `Moho::CDecoder::DecodeCells` dispatch
    * through.
    */
-  void LoadFastVectorSOCellPos(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorSOCellPos(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -70,7 +70,7 @@ namespace
    * Writes one reflected `fastvector<Moho::SOCellPos>` payload as archive
    * count plus per-lane reflected `SOCellPos` serialization.
    */
-  void SaveFastVectorSOCellPos(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorSOCellPos(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

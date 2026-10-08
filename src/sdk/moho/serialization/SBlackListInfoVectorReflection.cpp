@@ -42,7 +42,7 @@ namespace
    * staging vector is swapped into the destination and the old elements die
    * with it. Nothing is null-tested.
    */
-  void LoadSBlackListInfoVector(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef*)
+  void LoadSBlackListInfoVector(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto& storage = *reinterpret_cast<msvc8::vector<moho::SBlackListInfo>*>(objectPtr);
 
@@ -68,7 +68,7 @@ namespace
    * through the reflected `SBlackListInfo` type with the caller's owner.
    * Nothing is null-tested.
    */
-  void SaveSBlackListInfoVector(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* const ownerRef)
+  void SaveSBlackListInfoVector(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* const ownerRef)
   {
     const auto& storage = *reinterpret_cast<const msvc8::vector<moho::SBlackListInfo>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(storage.size());

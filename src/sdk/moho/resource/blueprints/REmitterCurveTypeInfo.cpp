@@ -43,11 +43,11 @@ namespace
     /**
      * Address: 0x00516100 (FUN_00516100, gpg::RVectorType_REmitterCurveKey::SerLoad)
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
     /**
      * Address: 0x00516230 (FUN_00516230, gpg::RVectorType_REmitterCurveKey::SerSave)
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -487,7 +487,7 @@ namespace
    * and replaces destination storage with the loaded sequence.
    */
   void CurveKeyVectorTypeInfo::SerLoad(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+    gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
     if (archive == nullptr || objectPtr == 0) {
@@ -520,7 +520,7 @@ namespace
    * reflected write callbacks.
    */
   void CurveKeyVectorTypeInfo::SerSave(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+    gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef
   )
   {
     if (archive == nullptr) {

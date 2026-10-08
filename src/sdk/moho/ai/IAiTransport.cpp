@@ -50,7 +50,7 @@ namespace moho
      * reading listener pointers until a null sentinel and relinking each
      * listener node into the broadcaster ring.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005E9EB0 (FUN_005E9EB0, moho::RBroadcasterRType_EAiTransportEvent::SerSave)
@@ -60,7 +60,7 @@ namespace moho
      * each linked listener pointer as `UNOWNED` and terminating with one null
      * pointer record.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005ECC40 (FUN_005ECC40, moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent)
@@ -166,7 +166,7 @@ namespace gpg
      * What it does:
      * Deserializes one `msvc8::vector<int>` payload from archive lanes.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005EA020 (FUN_005EA020, gpg::RVectorType_int::SerSave)
@@ -174,7 +174,7 @@ namespace gpg
      * What it does:
      * Serializes one `msvc8::vector<int>` payload into archive lanes.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
@@ -224,7 +224,7 @@ namespace gpg
      * What it does:
      * Deserializes one `vector<SAiReservedTransportBone>` payload.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005EA1E0 (FUN_005EA1E0, gpg::RVectorType_SAiReservedTransportBone::SerSave)
@@ -232,7 +232,7 @@ namespace gpg
      * What it does:
      * Serializes one `vector<SAiReservedTransportBone>` payload.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
@@ -282,7 +282,7 @@ namespace gpg
      * What it does:
      * Deserializes one `vector<SAttachPoint>` payload.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005EA370 (FUN_005EA370, gpg::RVectorType_SAttachPoint::SerSave)
@@ -290,7 +290,7 @@ namespace gpg
      * What it does:
      * Serializes one `vector<SAttachPoint>` payload.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
@@ -389,15 +389,15 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<TObject*>(objectPtr);
   }
 
   template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<const TObject*>(objectPtr);
   }
 
   template <class TVector>
@@ -432,7 +432,7 @@ const char* moho::RBroadcasterRType_EAiTransportEvent::GetName() const
  */
 void moho::RBroadcasterRType_EAiTransportEvent::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
@@ -461,7 +461,7 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerLoad(
  */
 void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -591,7 +591,7 @@ void gpg::RVectorType_int::Init()
  * Deserializes one integer vector from archive lanes and replaces destination
  * storage in one assignment.
  */
-void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
 {
   auto* const storage = PointerFromArchiveInt<IntVector>(objectPtr);
   GPG_ASSERT(archive != nullptr);
@@ -620,7 +620,7 @@ void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const int ob
  * What it does:
  * Serializes one integer vector payload element-by-element.
  */
-void gpg::RVectorType_int::SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+void gpg::RVectorType_int::SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
 {
   const auto* const storage = ConstPointerFromArchiveInt<IntVector>(objectPtr);
   GPG_ASSERT(archive != nullptr);
@@ -739,7 +739,7 @@ void gpg::RVectorType_SAiReservedTransportBone::Init()
  */
 void gpg::RVectorType_SAiReservedTransportBone::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -784,7 +784,7 @@ void gpg::RVectorType_SAiReservedTransportBone::SerLoad(
  */
 void gpg::RVectorType_SAiReservedTransportBone::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
@@ -910,7 +910,7 @@ void gpg::RVectorType_SAttachPoint::Init()
  * What it does:
  * Deserializes attach-point vector payload and replaces destination storage.
  */
-void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
 {
   auto* const storage = PointerFromArchiveInt<AttachPointVector>(objectPtr);
   GPG_ASSERT(archive != nullptr);
@@ -949,7 +949,7 @@ void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, con
  */
 void gpg::RVectorType_SAttachPoint::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )

@@ -156,7 +156,7 @@ namespace
    * What it does:
    * Loads a `fastvector<SAniManipBinding>` runtime view and deserializes each element.
    */
-  void LoadFastVectorSAniManipBinding(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void LoadFastVectorSAniManipBinding(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -182,7 +182,7 @@ namespace
    * What it does:
    * Saves a `fastvector<SAniManipBinding>` runtime view and serializes each element.
    */
-  void SaveFastVectorSAniManipBinding(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void SaveFastVectorSAniManipBinding(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;

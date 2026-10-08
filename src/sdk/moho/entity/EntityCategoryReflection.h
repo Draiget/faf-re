@@ -81,7 +81,7 @@ namespace moho
      * What it does:
      * Serializes helper dword (+0x00) and BVIntSet payload (+0x08).
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unused, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00556870 (FUN_00556870, Moho::EntityCategory::SerLoad)
@@ -89,7 +89,7 @@ namespace moho
      * What it does:
      * Deserializes helper dword (+0x00) and BVIntSet payload (+0x08).
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unused, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0052BB50 (FUN_0052BB50, Moho::EntityCategory::Add)

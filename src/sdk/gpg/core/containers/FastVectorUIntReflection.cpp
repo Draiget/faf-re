@@ -456,7 +456,7 @@ namespace
    * What it does:
    * Reads vector count and serialized uint lanes into reflected fastvector storage.
    */
-  void LoadFastVectorUInt(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+  void LoadFastVectorUInt(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -483,7 +483,7 @@ namespace
    * What it does:
    * Writes vector count and serialized uint lanes from reflected fastvector storage.
    */
-  void SaveFastVectorUInt(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
+  void SaveFastVectorUInt(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -612,7 +612,7 @@ namespace
    * What it does:
    * Loads one reflected `fastvector<float>` payload from archive count + lanes.
    */
-  void LoadFastVectorFloat(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+  void LoadFastVectorFloat(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -639,7 +639,7 @@ namespace
    * What it does:
    * Saves one reflected `fastvector<float>` payload as archive count + lanes.
    */
-  void SaveFastVectorFloat(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
+  void SaveFastVectorFloat(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -689,7 +689,7 @@ namespace
    * Loads one reflected `fastvector<msvc8::string>` payload from archive count
    * + lanes.
    */
-  void LoadFastVectorString(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+  void LoadFastVectorString(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -717,7 +717,7 @@ namespace
    * Saves one reflected `fastvector<msvc8::string>` payload as archive count +
    * lanes.
    */
-  void SaveFastVectorString(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
+  void SaveFastVectorString(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -880,7 +880,7 @@ namespace
    * resizes backing storage with zeroed fill lanes, then deserializes each
    * element through `ReadArchive::Read`.
    */
-  void LoadFastVectorVector3f(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorVector3f(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -913,7 +913,7 @@ namespace
    */
   void LoadFastVectorSSTIEntityAttachInfo(
     gpg::ReadArchive* archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -947,7 +947,7 @@ namespace
    * Writes one reflected `fastvector<Wm3::Vector3f>` payload as archive count
    * plus per-lane `WriteArchive::Write` serialization.
    */
-  void SaveFastVectorVector3f(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorVector3f(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -976,7 +976,7 @@ namespace
    */
   void SaveFastVectorSSTIEntityAttachInfo(
     gpg::WriteArchive* archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -1018,7 +1018,7 @@ namespace
    * destroys it at 0x0055D523, immediately after the resize at 0x0055D50F and
    * before the read loop.
    */
-  void LoadFastVectorUnitWeaponInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorUnitWeaponInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

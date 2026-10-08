@@ -772,7 +772,7 @@ namespace
   /**
    * Address: 0x005567F0 (FUN_005567F0, Moho::EntityCategory::SerSave)
    */
-  void EntityCategory::SerSave(gpg::WriteArchive* archive, const int objectPtr, const int, gpg::RRef* ownerRef)
+  void EntityCategory::SerSave(gpg::WriteArchive* archive, const std::intptr_t objectPtr, const int, gpg::RRef* ownerRef)
   {
     auto* const set = reinterpret_cast<EntityCategorySet*>(objectPtr);
     GPG_ASSERT(set != nullptr);
@@ -790,7 +790,7 @@ namespace
   /**
    * Address: 0x00556870 (FUN_00556870, Moho::EntityCategory::SerLoad)
    */
-  void EntityCategory::SerLoad(gpg::ReadArchive* archive, const int objectPtr, const int, gpg::RRef* ownerRef)
+  void EntityCategory::SerLoad(gpg::ReadArchive* archive, const std::intptr_t objectPtr, const int, gpg::RRef* ownerRef)
   {
     auto* const set = reinterpret_cast<EntityCategorySet*>(objectPtr);
     GPG_ASSERT(set != nullptr);

@@ -274,7 +274,7 @@ namespace
   /**
    * Address: 0x00419DE0 (FUN_00419DE0, func_ReadArchive_Stats_StatItem)
    */
-  void DeserializeStatsStatItem(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void DeserializeStatsStatItem(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
@@ -289,7 +289,7 @@ namespace
   /**
    * Address: 0x00419E70 (FUN_00419E70, func_WriteArchive_Stats_StatItem)
    */
-  void SerializeStatsStatItem(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SerializeStatsStatItem(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);

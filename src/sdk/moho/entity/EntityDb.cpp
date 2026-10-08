@@ -1118,7 +1118,7 @@ namespace
      * on their RbTree.h members) exactly as every other `msvc8::map`
      * instantiation in this codebase does -- no per-map reimplementation.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00686B10 (FUN_00686B10, std::map_IdPool::Serialize)
@@ -1130,7 +1130,7 @@ namespace
      * `FUN_00685FA0`/`FUN_00686CE0`, cited on `rb_increment` in RbTree.h) --
      * no separate iteration mechanic is introduced here.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
   static_assert(sizeof(EntityDbIdPoolMapTypeInfo) == 0x64, "EntityDbIdPoolMapTypeInfo size must be 0x64");
 
@@ -1165,7 +1165,7 @@ namespace
    */
   void EntityDbIdPoolMapTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -1203,7 +1203,7 @@ namespace
    */
   void EntityDbIdPoolMapTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )

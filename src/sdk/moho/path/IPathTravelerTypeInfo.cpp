@@ -56,7 +56,7 @@ namespace gpg
      * Reads unowned `IPathTraveler` pointers until null and links each
      * traveler node into the destination intrusive list.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00767480 (FUN_00767480, gpg::RDListType_IPathTraveler::SerSave)
@@ -65,7 +65,7 @@ namespace gpg
      * Serializes each intrusive-list traveler as an unowned raw-pointer lane,
      * then emits a trailing null traveler sentinel.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 } // namespace gpg
 
@@ -77,9 +77,9 @@ namespace
   gpg::RType* gDListIPathTravelerType = nullptr;
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<TObject*>(objectPtr);
   }
 
   [[nodiscard]] gpg::RType* ResolveDListVoidType()
@@ -153,7 +153,7 @@ void gpg::RDListType_IPathTraveler::Init()
  */
 void gpg::RDListType_IPathTraveler::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
@@ -188,7 +188,7 @@ void gpg::RDListType_IPathTraveler::SerLoad(
  */
 void gpg::RDListType_IPathTraveler::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )

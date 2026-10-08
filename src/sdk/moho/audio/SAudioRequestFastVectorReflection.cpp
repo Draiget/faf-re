@@ -130,7 +130,7 @@ namespace
    * runtime view, and deserializes each element in place (forwarding the
    * caller's owner reference). Bound as `serLoadFunc_`.
    */
-  void LoadFastVectorSAudioRequest(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void LoadFastVectorSAudioRequest(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -157,7 +157,7 @@ namespace
    * Writes the element count then serializes each `SAudioRequest` in place
    * (forwarding the caller's owner reference). Bound as `serSaveFunc_`.
    */
-  void SaveFastVectorSAudioRequest(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void SaveFastVectorSAudioRequest(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;

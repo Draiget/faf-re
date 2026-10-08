@@ -457,7 +457,7 @@ namespace moho
    */
   void RCountedPtrType<moho::IFormationInstance>::SerLoad(
     gpg::ReadArchive* archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -488,7 +488,7 @@ namespace moho
    */
   void RCountedPtrType<moho::IFormationInstance>::SerSave(
     gpg::WriteArchive* archive,
-    int objectPtr,
+    std::intptr_t objectPtr,
     int,
     gpg::RRef* ownerRef
   )

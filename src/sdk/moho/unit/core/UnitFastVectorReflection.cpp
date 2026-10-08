@@ -171,7 +171,7 @@ namespace
    * What it does:
    * Deserializes `fastvector<WeakPtr<Entity>>` count/lane payloads.
    */
-  void LoadFastVectorWeakPtrEntity(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* const ownerRef)
+  void LoadFastVectorWeakPtrEntity(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* const ownerRef)
   {
     auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>*>(objectPtr);
 
@@ -189,7 +189,7 @@ namespace
    * What it does:
    * Serializes `fastvector<WeakPtr<Entity>>` count/lane payloads.
    */
-  void SaveFastVectorWeakPtrEntity(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* const ownerRef)
+  void SaveFastVectorWeakPtrEntity(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* const ownerRef)
   {
     const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::WeakPtr<moho::Entity>>*>(objectPtr);
 
@@ -206,7 +206,7 @@ namespace
    * What it does:
    * Deserializes `fastvector<ReconBlip*>` count and tracked-pointer lanes.
    */
-  void LoadFastVectorReconBlipPointer(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorReconBlipPointer(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -232,7 +232,7 @@ namespace
    * What it does:
    * Serializes `fastvector<ReconBlip*>` count and tracked-pointer lanes.
    */
-  void SaveFastVectorReconBlipPointer(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorReconBlipPointer(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;

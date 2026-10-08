@@ -980,7 +980,7 @@ namespace
 
   void DeserializeCUnitMoveTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -990,7 +990,7 @@ namespace
 
   void SerializeCUnitMoveTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )

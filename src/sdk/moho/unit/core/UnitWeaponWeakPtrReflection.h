@@ -15,7 +15,7 @@ namespace moho
      * What it does:
      * Deserializes one `WeakPtr<UnitWeapon>` payload from a tracked pointer lane.
      */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00675250 (FUN_00675250, Moho::WeakPtr_UnitWeapon::Serialize)
@@ -23,7 +23,7 @@ namespace moho
      * What it does:
      * Serializes one `WeakPtr<UnitWeapon>` payload as an unowned tracked pointer.
      */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   template <class T>

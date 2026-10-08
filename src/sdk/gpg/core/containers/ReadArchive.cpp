@@ -1109,7 +1109,7 @@ void ReadArchive::Read(const RType* const type, void* const object, const RRef& 
     ));
   }
 
-  type->serLoadFunc_(this, reinterpret_cast<int>(object), handle.version, const_cast<RRef*>(&ownerRef));
+  type->serLoadFunc_(this, reinterpret_cast<std::intptr_t>(object), handle.version, const_cast<RRef*>(&ownerRef));
 
   if (NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
     ThrowSerializationError(STR_Printf(

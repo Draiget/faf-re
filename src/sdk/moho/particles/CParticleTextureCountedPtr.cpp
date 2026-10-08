@@ -158,7 +158,7 @@ namespace
     throw gpg::SerializationError(message.c_str());
   }
 
-  void LoadCountedPtrCParticleTexture(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadCountedPtrCParticleTexture(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
     if (!counted || !archive) {
@@ -170,7 +170,7 @@ namespace
     (void)moho::AssignCountedParticleTexturePtr(counted, texture);
   }
 
-  void SaveCountedPtrCParticleTexture(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveCountedPtrCParticleTexture(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
     if (!counted || !archive) {
@@ -189,7 +189,7 @@ namespace
    * Loads one reflected `fastvector<CountedPtr<CParticleTexture>>` payload
    * from archive count + lanes.
    */
-  void LoadFastVectorCountedPtrCParticleTexture(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorCountedPtrCParticleTexture(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -220,7 +220,7 @@ namespace
    * Saves one reflected `fastvector<CountedPtr<CParticleTexture>>` payload as
    * archive count + lanes.
    */
-  void SaveFastVectorCountedPtrCParticleTexture(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorCountedPtrCParticleTexture(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -436,7 +436,7 @@ namespace moho
    * What it does:
    * Loads one counted-pointer texture lane through shared-pointer archive path.
    */
-  void RCountedPtrType<moho::CParticleTexture>::SerLoad(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void RCountedPtrType<moho::CParticleTexture>::SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     LoadCountedPtrCParticleTexture(archive, objectPtr, 0, ownerRef);
   }
@@ -447,7 +447,7 @@ namespace moho
    * What it does:
    * Saves one counted-pointer texture lane through shared-pointer archive path.
    */
-  void RCountedPtrType<moho::CParticleTexture>::SerSave(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void RCountedPtrType<moho::CParticleTexture>::SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     SaveCountedPtrCParticleTexture(archive, objectPtr, 0, ownerRef);
   }

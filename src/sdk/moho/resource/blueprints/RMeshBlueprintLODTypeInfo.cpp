@@ -35,8 +35,8 @@ namespace
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -156,7 +156,7 @@ namespace
    * Deserializes one `vector<RMeshBlueprintLOD>` payload and replaces destination
    * storage in one assignment.
    */
-  void VectorTypeInfo::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  void VectorTypeInfo::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
   {
     auto* const storage = reinterpret_cast<LODVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -211,7 +211,7 @@ namespace
    */
   void VectorTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )

@@ -153,7 +153,7 @@ void gpg::RVectorType_ResourceDeposit::Init()
  */
 void gpg::RVectorType_ResourceDeposit::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -194,7 +194,7 @@ void gpg::RVectorType_ResourceDeposit::SerLoad(
  */
 void gpg::RVectorType_ResourceDeposit::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )

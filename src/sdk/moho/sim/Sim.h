@@ -1370,8 +1370,8 @@ namespace moho
 
     // CArmyImpl binary methods read several Sim internals directly (same pattern as retail layout codepaths).
     friend class CArmyImpl;
-    friend void SimSerializerLoadThunk(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*);
-    friend void SimSerializerSaveThunk(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*);
+    friend void SimSerializerLoadThunk(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*);
+    friend void SimSerializerSaveThunk(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*);
 
   public:
     static gpg::RType* sType;

@@ -213,7 +213,7 @@ namespace moho
    * directly through the archive (matches the binary's `ReadUInt` call on
    * the raw 4-byte id storage).
    */
-  void EntIdSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void EntIdSerializer::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
     auto* const object = reinterpret_cast<std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
     archive->ReadInt(object);
@@ -227,7 +227,7 @@ namespace moho
    * directly through the archive (matches the binary's `WriteUInt` call on
    * the raw 4-byte id storage).
    */
-  void EntIdSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void EntIdSerializer::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
     const auto* const object = reinterpret_cast<const std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
     archive->WriteInt(*object);

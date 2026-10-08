@@ -48,8 +48,8 @@ namespace
   // Forward declarations: SSTITargetSerializer's constructor below binds
   // these as its load/save callback pointers; their bodies are defined
   // further down in this same anonymous namespace.
-  void DeserializeSSTITargetSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void SerializeSSTITargetSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void DeserializeSSTITargetSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void SerializeSSTITargetSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
 
   [[nodiscard]] gpg::RType* CachedSSTITargetType()
   {
@@ -71,7 +71,7 @@ namespace
    */
   void DeserializeSSTITargetSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -94,7 +94,7 @@ namespace
    */
   void SerializeSSTITargetSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )

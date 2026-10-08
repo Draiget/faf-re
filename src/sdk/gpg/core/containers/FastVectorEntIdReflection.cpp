@@ -61,7 +61,7 @@ namespace
    * the linker folds both `T` instantiations of the resize-fill routine
    * together.
    */
-  void LoadFastVectorEntId(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorEntId(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -91,7 +91,7 @@ namespace
    * Writes one reflected `fastvector<Moho::EntId>` payload as archive count
    * plus per-lane reflected `EntId` serialization.
    */
-  void SaveFastVectorEntId(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorEntId(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

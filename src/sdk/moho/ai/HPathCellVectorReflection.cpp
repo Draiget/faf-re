@@ -50,7 +50,7 @@ namespace
    * releasing the destination's old storage. Bound as `serLoadFunc_`;
    * `version`/`ownerRef` are unused by the binary body.
    */
-  void LoadHPathCellVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+  void LoadHPathCellVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<HPathCellVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -84,7 +84,7 @@ namespace
    * (via `WriteArchive::Write`, forwarding the caller's owner reference). Bound
    * as `serSaveFunc_`.
    */
-  void SaveHPathCellVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveHPathCellVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<const HPathCellVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

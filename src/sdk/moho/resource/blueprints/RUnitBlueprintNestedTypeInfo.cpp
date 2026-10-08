@@ -201,7 +201,7 @@ namespace
      * (caller address 0x52336E in the binary). The address-take is the
      * source-level invocation that keeps the per-T body in the final binary.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
     {
       if (!archive || objectPtr == 0) {
         return;
@@ -231,7 +231,7 @@ namespace
      * Writes the reflected float vector as an element count followed by each
      * float.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
     {
       if (!archive) {
         return;

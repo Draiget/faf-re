@@ -80,12 +80,12 @@ namespace
     /**
      * Address: 0x00543530 (FUN_00543530)
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005436C0 (FUN_005436C0)
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(ArmyLaunchInfoVectorTypeInfo) == 0x68, "ArmyLaunchInfoVectorTypeInfo size must be 0x68");
@@ -594,7 +594,7 @@ namespace
   /**
    * Address: 0x00543530 (FUN_00543530)
    */
-  void ArmyLaunchInfoVectorTypeInfo::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  void ArmyLaunchInfoVectorTypeInfo::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
   {
     auto* const vectorStorage = reinterpret_cast<ArmyLaunchInfoVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -629,7 +629,7 @@ namespace
    * Address: 0x005436C0 (FUN_005436C0)
    */
   void ArmyLaunchInfoVectorTypeInfo::SerSave(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+    gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef
   )
   {
     const auto* const vectorStorage = reinterpret_cast<const ArmyLaunchInfoVector*>(objectPtr);

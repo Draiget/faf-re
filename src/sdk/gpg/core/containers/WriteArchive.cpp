@@ -899,7 +899,7 @@ void WriteArchive::Write(const RType* const type, const void* const object, cons
 
     WriteMarker(static_cast<int>(ArchiveToken::ObjectStart));
     WriteRefCounts(type);
-    type->serSaveFunc_(this, reinterpret_cast<int>(const_cast<void*>(object)), type->version_, const_cast<RRef*>(&ownerRef));
+    type->serSaveFunc_(this, reinterpret_cast<std::intptr_t>(const_cast<void*>(object)), type->version_, const_cast<RRef*>(&ownerRef));
     WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
 }
 
@@ -969,9 +969,9 @@ void WriteArchive::EndSection(const bool skipOwnershipValidation)
         for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
             if (it->second.ownership == TrackedPointerState::Unowned) {
                 ThrowSerializationError(STR_Printf(
-                    "Error while creating archive: nobody claimed ownership of %s 0x%08x",
+                    "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
                     SafeTypeName(it->first.mType),
-                    reinterpret_cast<unsigned int>(it->first.mObj)
+                    static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(it->first.mObj))
                 ));
             }
 

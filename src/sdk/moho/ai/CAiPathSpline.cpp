@@ -688,7 +688,7 @@ namespace
    * the literal `7`, not `0`. Bound as `RType::serLoadFunc_` via
    * `FastVectorCPathPointTypeInfo::Init` below.
    */
-  void LoadFastVectorCPathPoint(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorCPathPoint(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -728,7 +728,7 @@ namespace
    * helper pair whose calls do not appear anywhere in this address's real
    * disassembly -- removed there; this is the real, already-wired body.
    */
-  void SaveFastVectorCPathPoint(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorCPathPoint(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;

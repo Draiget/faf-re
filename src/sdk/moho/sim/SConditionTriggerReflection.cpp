@@ -292,7 +292,7 @@ namespace
      * Invocation: installed as this type's `serLoadFunc_` in the
      * registration block below, which is how the archive layer reaches it.
      */
-    static void Deserialize(gpg::ReadArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void Deserialize(gpg::ReadArchive* archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto& vec = *reinterpret_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
       unsigned int count = 0;
@@ -314,7 +314,7 @@ namespace
      * Serializes one `fastvector<SCondition>` lane by writing element count and
      * then each `SCondition` payload through reflected write callbacks.
      */
-    static void Serialize(gpg::WriteArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void Serialize(gpg::WriteArchive* archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto& vec = *reinterpret_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
       const unsigned int count = static_cast<unsigned int>(vec.size());
@@ -395,7 +395,7 @@ namespace
    */
   void DeserializeUnitBlueprintWeightMap(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -428,7 +428,7 @@ namespace
    */
   void SerializeUnitBlueprintWeightMap(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -468,7 +468,7 @@ namespace
    */
   void DeserializeStringArmyStatItemMap(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -501,7 +501,7 @@ namespace
    */
   void SerializeStringArmyStatItemMap(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -535,10 +535,10 @@ namespace
    * Locks one `Stats<CArmyStatItem>` lane, reads an owned root pointer from
    * archive, swaps it into `mItem`, and deletes the previous root.
    */
-  void DeserializeStatsCArmyStatItemOwnedRootLane(gpg::ReadArchive* const archive, const int ownerToken)
+  void DeserializeStatsCArmyStatItemOwnedRootLane(gpg::ReadArchive* const archive, const std::intptr_t ownerToken)
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(ownerToken))
+      ownerToken
     );
     if (archive == nullptr || stats == nullptr) {
       return;
@@ -562,10 +562,10 @@ namespace
    * (`lea esi, [edi+8]`), so the binary's lock is embedded where this layout
    * keeps a pointer; the load half above locks the same way.
    */
-  void SerializeStatsCArmyStatItemOwnedRoot(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  void SerializeStatsCArmyStatItemOwnedRoot(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
     boost::mutex::scoped_lock lock(stats->mLock);
     archive->WritePointer(stats->mItem.get(), gpg::TrackedPointerState::Owned, gpg::RRef{});

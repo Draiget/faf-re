@@ -74,7 +74,7 @@ namespace gpg
    * Clears destination storage, then reads `count` serialized
    * `string -> float` pairs from the archive.
    */
-  void RMapStringFloatTypeInfo::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  void RMapStringFloatTypeInfo::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
   {
     if (archive == nullptr || objectPtr == 0) {
       return;
@@ -100,7 +100,7 @@ namespace gpg
    * What it does:
    * Writes map size followed by each key/value pair in map-order.
    */
-  void RMapStringFloatTypeInfo::SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void RMapStringFloatTypeInfo::SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
     if (archive == nullptr) {
       return;

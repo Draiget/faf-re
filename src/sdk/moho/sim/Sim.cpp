@@ -3726,7 +3726,7 @@ namespace
   {
     gpg::RType* type = RequireRTypeByNameAny(typeNames);
     GPG_ASSERT(type != nullptr && type->serSaveFunc_ != nullptr);
-    type->serSaveFunc_(archive, reinterpret_cast<int>(object), type->version_, const_cast<gpg::RRef*>(&ownerRef));
+    type->serSaveFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, const_cast<gpg::RRef*>(&ownerRef));
   }
 
   void LoadObjectByRType(
@@ -3738,7 +3738,7 @@ namespace
   {
     gpg::RType* type = RequireRTypeByNameAny(typeNames);
     GPG_ASSERT(type != nullptr && type->serLoadFunc_ != nullptr);
-    type->serLoadFunc_(archive, reinterpret_cast<int>(object), type->version_, const_cast<gpg::RRef*>(&ownerRef));
+    type->serLoadFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, const_cast<gpg::RRef*>(&ownerRef));
   }
 
   void WriteArchiveUIntCompat(gpg::WriteArchive* archive, const std::uint32_t value)
@@ -5343,7 +5343,7 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
  * Ser-load callback thunk: forwards archive/object args to 0x00754C60.
  * Extra serializer callback args are ignored in retail.
  */
-void moho::SimSerializerLoadThunk(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+void moho::SimSerializerLoadThunk(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
 {
   if (objectPtr == 0) {
     return;
@@ -5362,7 +5362,7 @@ void moho::SimSerializerLoadThunk(gpg::ReadArchive* archive, int objectPtr, int,
  * Ser-save callback thunk: forwards archive/object args to 0x007551C0.
  * Extra serializer callback args are ignored in retail.
  */
-void moho::SimSerializerSaveThunk(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
+void moho::SimSerializerSaveThunk(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
 {
   if (objectPtr == 0) {
     return;

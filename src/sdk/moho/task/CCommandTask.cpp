@@ -429,7 +429,7 @@ Unit* CCommandTask::GetUnit() const noexcept
  * CCommandTask deserialize callback body.
  */
 void DeserializeCCommandTaskThunkVariantA(
-  gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+  gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
 }
@@ -442,7 +442,7 @@ void DeserializeCCommandTaskThunkVariantA(
  * shared CCommandTask deserialize callback body.
  */
 void DeserializeCCommandTaskThunkVariantB(
-  gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+  gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
 }
@@ -455,7 +455,7 @@ void DeserializeCCommandTaskThunkVariantB(
  * CCommandTask serialize callback body.
  */
 void SerializeCCommandTaskThunkVariantA(
-  gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+  gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
 }
@@ -468,7 +468,7 @@ void SerializeCCommandTaskThunkVariantA(
  * shared CCommandTask serialize callback body.
  */
 void SerializeCCommandTaskThunkVariantB(
-  gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+  gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
 }

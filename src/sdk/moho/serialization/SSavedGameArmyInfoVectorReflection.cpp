@@ -66,7 +66,7 @@ namespace
    * Reads vector count, deserializes each SSavedGameArmyInfo element, and
    * replaces the destination vector.
    */
-  void LoadSavedGameArmyInfoVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+  void LoadSavedGameArmyInfoVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -120,7 +120,7 @@ namespace
    * What it does:
    * Writes vector count and serializes each SSavedGameArmyInfo element.
    */
-  void SaveSavedGameArmyInfoVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveSavedGameArmyInfoVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

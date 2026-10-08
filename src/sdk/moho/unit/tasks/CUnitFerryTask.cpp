@@ -1134,7 +1134,7 @@ namespace moho
    */
   void DeserializeCUnitFerryTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int /*version*/,
     gpg::RRef* const /*ownerRef*/
   )
@@ -1157,7 +1157,7 @@ namespace moho
    */
   void SerializeCUnitFerryTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int /*version*/,
     gpg::RRef* const /*ownerRef*/
   )

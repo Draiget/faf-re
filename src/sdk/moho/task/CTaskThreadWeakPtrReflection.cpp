@@ -218,7 +218,7 @@ gpg::RRef moho::RWeakPtrType<moho::CTaskThread>::SubscriptIndex(void* const obj,
  * Address: 0x0040AD50 (FUN_0040AD50, Moho::WeakPtr_CTaskThread::Deserialize)
  */
 void moho::WeakPtr_CTaskThread::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, int /*version*/, gpg::RRef* ownerRef
+  gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef
 )
 {
   auto* const weak = reinterpret_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);
@@ -232,7 +232,7 @@ void moho::WeakPtr_CTaskThread::Deserialize(
  * Address: 0x0040AD80 (FUN_0040AD80, Moho::WeakPtr_CTaskThread::Serialize)
  */
 void moho::WeakPtr_CTaskThread::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, int /*version*/, gpg::RRef* ownerRef
+  gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef
 )
 {
   auto* const weak = reinterpret_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);

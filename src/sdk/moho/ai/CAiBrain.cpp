@@ -1285,10 +1285,10 @@ namespace
      * in-place rather than copying the raw link fields; `RebindBuildResourceInfoLinks`
      * / `UnlinkBuildResourceInfoLink` reproduce that hand-off.
      */
-    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto* const mapObject = reinterpret_cast<BuildReserveMapStorage*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+        objectPtr
       );
       if (!archive || !mapObject) {
         return;
@@ -1329,10 +1329,10 @@ namespace
      * Serializes one `std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>` payload
      * by writing each key/value pair through reflected type lanes.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
     {
       const auto* const mapObject = reinterpret_cast<const BuildReserveMapStorage*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+        objectPtr
       );
       if (!archive || !mapObject) {
         return;

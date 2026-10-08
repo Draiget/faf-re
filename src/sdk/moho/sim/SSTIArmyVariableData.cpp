@@ -16,11 +16,6 @@
 
 namespace
 {
-  [[nodiscard]] int PointerToArchiveInt(const void* ptr)
-  {
-    return static_cast<int>(reinterpret_cast<std::uintptr_t>(ptr));
-  }
-
   [[nodiscard]] gpg::RType* FindRTypeByNameAny(const std::initializer_list<const char*>& names)
   {
     gpg::TypeMap& map = gpg::GetRTypeMap();
@@ -58,7 +53,7 @@ namespace
   {
     gpg::RType* type = RequireRTypeByNameAny(typeNames);
     GPG_ASSERT(type != nullptr && type->serLoadFunc_ != nullptr);
-    type->serLoadFunc_(archive, PointerToArchiveInt(object), type->version_, ownerRef);
+    type->serLoadFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, ownerRef);
   }
 
   void SerializeObjectByRTypeName(
@@ -70,7 +65,7 @@ namespace
   {
     gpg::RType* type = RequireRTypeByNameAny(typeNames);
     GPG_ASSERT(type != nullptr && type->serSaveFunc_ != nullptr);
-    type->serSaveFunc_(archive, PointerToArchiveInt(object), type->version_, ownerRef);
+    type->serSaveFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, ownerRef);
   }
 
   /**

@@ -211,7 +211,7 @@ namespace
    */
   void DeserializeSSTIEntityAttachInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -235,7 +235,7 @@ namespace
    */
   void SerializeSSTIEntityAttachInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -266,7 +266,7 @@ namespace
 
   void DeserializeEntityAttributesSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -276,7 +276,7 @@ namespace
 
   void SerializeEntityAttributesSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -300,7 +300,7 @@ namespace
 
   void DeserializeSSTIEntityVariableDataSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -315,7 +315,7 @@ namespace
 
   void SerializeSSTIEntityVariableDataSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )

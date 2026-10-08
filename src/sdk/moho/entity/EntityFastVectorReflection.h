@@ -17,7 +17,7 @@ namespace moho
      * What it does:
      * Deserializes one `WeakPtr<Entity>` payload from tracked pointer lanes.
      */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
       * Alias of FUN_0067CD60 (non-canonical helper lane).
@@ -25,7 +25,7 @@ namespace moho
      * What it does:
      * Serializes one `WeakPtr<Entity>` payload as an unowned tracked pointer.
      */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   template <class T>

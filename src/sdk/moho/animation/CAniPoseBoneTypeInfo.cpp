@@ -74,7 +74,7 @@ namespace
    * What it does:
    * Deserializes one `fastvector<CAniPoseBone>` count and element payload lanes.
    */
-  void LoadFastVectorCAniPoseBone(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void LoadFastVectorCAniPoseBone(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -104,7 +104,7 @@ namespace
    * What it does:
    * Serializes one `fastvector<CAniPoseBone>` count and element payload lanes.
    */
-  void SaveFastVectorCAniPoseBone(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void SaveFastVectorCAniPoseBone(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;

@@ -75,7 +75,7 @@ namespace
    * matching the binary's reserve-then-read pattern where each grown slot is
    * copy-constructed from a default-initialized prototype.
    */
-  void LoadEntityCategorySetVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadEntityCategorySetVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<EntityCategorySetVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -119,7 +119,7 @@ namespace
    * What it does:
    * Writes a `vector<EntityCategorySet>` payload element-by-element.
    */
-  void SaveEntityCategorySetVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveEntityCategorySetVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<const EntityCategorySetVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

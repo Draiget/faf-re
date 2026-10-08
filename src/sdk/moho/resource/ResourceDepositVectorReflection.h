@@ -44,12 +44,12 @@ namespace gpg
     /**
      * Address: 0x00547950 (FUN_00547950, gpg::RVectorType_ResourceDeposit::SerLoad)
      */
-    static void SerLoad(ReadArchive* archive, int objectPtr, int version, RRef* ownerRef);
+    static void SerLoad(ReadArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
 
     /**
      * Address: 0x00547A50 (FUN_00547A50, gpg::RVectorType_ResourceDeposit::SerSave)
      */
-    static void SerSave(WriteArchive* archive, int objectPtr, int version, RRef* ownerRef);
+    static void SerSave(WriteArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
 
     /**
      * Address: 0x00547690 (FUN_00547690, gpg::RVectorType_ResourceDeposit::SubscriptIndex)

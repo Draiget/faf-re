@@ -618,7 +618,7 @@ namespace
    */
   void DeserializeCBuildTaskHelperSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -641,7 +641,7 @@ namespace
    */
   void SerializeCBuildTaskHelperSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )

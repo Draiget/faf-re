@@ -143,12 +143,12 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
   }
 
-  [[nodiscard]] moho::SInfoCache* AsSInfoCacheView(int objectPtr) noexcept
+  [[nodiscard]] moho::SInfoCache* AsSInfoCacheView(std::intptr_t objectPtr) noexcept
   {
     return reinterpret_cast<moho::SInfoCache*>(objectPtr);
   }
 
-  [[nodiscard]] const moho::SInfoCache* AsConstSInfoCacheView(int objectPtr) noexcept
+  [[nodiscard]] const moho::SInfoCache* AsConstSInfoCacheView(std::intptr_t objectPtr) noexcept
   {
     return reinterpret_cast<const moho::SInfoCache*>(objectPtr);
   }

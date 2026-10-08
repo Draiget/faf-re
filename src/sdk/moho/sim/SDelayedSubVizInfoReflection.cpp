@@ -157,7 +157,7 @@ namespace
    * Loads delayed-sub-viz vector elements from archive and replaces destination
    * storage.
    */
-  void LoadSDelayedSubVizInfoVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadSDelayedSubVizInfoVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const out = reinterpret_cast<DelayedSubVizVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -193,7 +193,7 @@ namespace
    * What it does:
    * Saves delayed-sub-viz vector payload to archive element-by-element.
    */
-  void SaveSDelayedSubVizInfoVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveSDelayedSubVizInfoVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const source = reinterpret_cast<const DelayedSubVizVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

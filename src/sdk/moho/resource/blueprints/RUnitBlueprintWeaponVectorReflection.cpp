@@ -324,7 +324,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::Init()
  */
 void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -368,7 +368,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
  */
 void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )

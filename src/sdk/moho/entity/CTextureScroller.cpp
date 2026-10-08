@@ -685,12 +685,12 @@ namespace
 {
   // Forward declarations: CTextureScrollerSerializer's constructor binds
   // these as its load/save callback pointers; bodies defined below.
-  void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
 
   void DeserializeCTextureScrollerSerializerCallback(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -700,7 +700,7 @@ namespace
 
   void SerializeCTextureScrollerSerializerCallback(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )

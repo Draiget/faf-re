@@ -20,22 +20,22 @@ namespace
   /**
    * Address: 0x005C58E0 (FUN_005C58E0)
    */
-  void DeserializeReconBlipPointerVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef);
+  void DeserializeReconBlipPointerVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x005C59F0 (FUN_005C59F0)
    */
-  void SerializeReconBlipPointerVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef);
+  void SerializeReconBlipPointerVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x005C6210 (FUN_005C6210)
    */
-  void DeserializeReconBlipMapStorage(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef);
+  void DeserializeReconBlipMapStorage(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x005C6390 (FUN_005C6390)
    */
-  void SerializeReconBlipMapStorage(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef);
+  void SerializeReconBlipMapStorage(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
 
   class ReconBlipPointerVectorType final : public gpg::RType, public gpg::RIndexed
   {
@@ -464,14 +464,14 @@ namespace
    * so a mid-read failure leaves the destination untouched rather than
    * partially overwritten.
    */
-  void DeserializeReconBlipPointerVector(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void DeserializeReconBlipPointerVector(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
     auto* const storage =
-      reinterpret_cast<msvc8::vector<ReconBlip*>*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+      reinterpret_cast<msvc8::vector<ReconBlip*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -491,14 +491,14 @@ namespace
   /**
    * Address: 0x005C59F0 (FUN_005C59F0)
    */
-  void SerializeReconBlipPointerVector(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void SerializeReconBlipPointerVector(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
     const auto* const storage = reinterpret_cast<const msvc8::vector<ReconBlip*>*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
 
     const unsigned int count = static_cast<unsigned int>(storage->size());
@@ -514,14 +514,14 @@ namespace
   /**
    * Address: 0x005C6210 (FUN_005C6210)
    */
-  void DeserializeReconBlipMapStorage(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void DeserializeReconBlipMapStorage(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
     auto* const storage = reinterpret_cast<ReconBlipMap*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
 
     unsigned int count = 0;
@@ -549,14 +549,14 @@ namespace
   /**
    * Address: 0x005C6390 (FUN_005C6390)
    */
-  void SerializeReconBlipMapStorage(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void SerializeReconBlipMapStorage(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
     const auto* const storage = reinterpret_cast<const ReconBlipMap*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
 
     const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;

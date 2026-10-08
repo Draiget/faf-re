@@ -58,7 +58,7 @@ namespace gpg
      * Clears destination map storage, then reads `count` key/value pairs and
      * inserts them into `std::map<std::string,float>`.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006AF390 (FUN_006AF390, gpg::RMapType_string_float::SerSave)
@@ -66,7 +66,7 @@ namespace gpg
      * What it does:
      * Writes map size and serializes each key/value pair in map-order.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006AE350 (FUN_006AE350, gpg::RMapType_string_float::Init)

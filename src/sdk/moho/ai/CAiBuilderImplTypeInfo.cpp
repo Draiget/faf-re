@@ -172,7 +172,7 @@ namespace
    */
   void DeserializeBuilderRebuildMap(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -182,7 +182,7 @@ namespace
     }
 
     auto* const map = reinterpret_cast<SBuilderRebuildMap*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
 
     unsigned int count = 0u;
@@ -207,7 +207,7 @@ namespace
    */
   void SerializeBuilderRebuildMap(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -217,7 +217,7 @@ namespace
     }
 
     const auto* const map = reinterpret_cast<const SBuilderRebuildMap*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      objectPtr
     );
     const unsigned int count = map ? static_cast<unsigned int>(map->size()) : 0u;
     archive->WriteUInt(count);

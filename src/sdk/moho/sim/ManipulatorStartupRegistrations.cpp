@@ -113,8 +113,8 @@ namespace
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00641DB0 (FUN_00641DB0, gpg::RVectorType_bool::SubscriptIndex)
@@ -131,15 +131,15 @@ namespace
   using VectorBoolStorage = moho::SBitStorage32;
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<TObject*>(objectPtr);
   }
 
   template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<const TObject*>(objectPtr);
   }
 
   thread_local msvc8::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
@@ -399,7 +399,7 @@ namespace
    * insert via the canonical per-bit `VectorBoolInsertOneBit` lane to match
    * the original binary loop shape.
    */
-  void RVectorTypeBool::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  void RVectorTypeBool::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
   {
     auto* const storage = PointerFromArchiveInt<VectorBoolStorage>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -453,7 +453,7 @@ namespace
    * Writes packed boolean bit-count/value lanes to archive payload in index
    * order from one `SBitStorage32` source.
    */
-  void RVectorTypeBool::SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  void RVectorTypeBool::SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
   {
     const auto* const storage = ConstPointerFromArchiveInt<VectorBoolStorage>(objectPtr);
     GPG_ASSERT(archive != nullptr);

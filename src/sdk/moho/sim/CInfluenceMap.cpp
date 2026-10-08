@@ -258,15 +258,15 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<TObject*>(objectPtr);
   }
 
   template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const int objectPtr)
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const std::intptr_t objectPtr)
   {
-    return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+    return reinterpret_cast<const TObject*>(objectPtr);
   }
 
   [[nodiscard]] float DecayThreatLane(const float value, const float decay) noexcept
@@ -635,7 +635,7 @@ namespace
    * What it does:
    * Loads one `map<unsigned int,int>` payload from archive lanes.
    */
-  void LoadUIntIntMap(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void LoadUIntIntMap(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
     auto* const mapObject = PointerFromArchiveInt<UIntIntMap>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -663,7 +663,7 @@ namespace
    * What it does:
    * Saves one `map<unsigned int,int>` payload into archive lanes.
    */
-  void SaveUIntIntMap(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void SaveUIntIntMap(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
     const auto* const mapObject = ConstPointerFromArchiveInt<UIntIntMap>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -685,7 +685,7 @@ namespace
    * What it does:
    * Loads one `map<unsigned int,InfluenceMapEntry>` payload from archive lanes.
    */
-  void LoadUIntInfluenceMapEntryMap(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  void LoadUIntInfluenceMapEntryMap(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
   {
     auto* const mapObject = PointerFromArchiveInt<UIntInfluenceMapEntryMap>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -722,7 +722,7 @@ namespace
    */
   void SaveUIntInfluenceMapEntryMap(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -784,7 +784,7 @@ namespace
    */
   void LoadInfluenceGridVectorArchive(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef*
   )
@@ -831,7 +831,7 @@ namespace
    */
   void SaveInfluenceGridVectorArchive(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -881,7 +881,7 @@ namespace
    */
   void LoadSThreatVectorArchive(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -917,7 +917,7 @@ namespace
 
   void SaveSThreatVectorArchive(
     gpg::WriteArchive* const archive,
-    const int objectPtr,
+    const std::intptr_t objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )

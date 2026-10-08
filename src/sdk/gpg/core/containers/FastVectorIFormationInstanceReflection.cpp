@@ -24,7 +24,7 @@ namespace
    * elements -- see `FastVector.h`'s `Resize()` citation, which documents the
    * same address for this exact specialization.
    */
-  void LoadFastVectorIFormationInstance(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorIFormationInstance(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);
@@ -53,7 +53,7 @@ namespace
    * archive count followed by per-lane `unowned` tracked-pointer writes built
    * from `gpg::RRef_IFormationInstance`.
    */
-  void SaveFastVectorIFormationInstance(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
+  void SaveFastVectorIFormationInstance(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);

@@ -24,7 +24,7 @@ namespace moho
      * What it does:
      * Deserializes one `WeakPtr<IEffect>` payload from a tracked pointer lane.
      */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006751E0 (FUN_006751E0, Moho::WeakPtr_IEffect::Serialize)
@@ -32,7 +32,7 @@ namespace moho
      * What it does:
      * Serializes one `WeakPtr<IEffect>` payload as an unowned tracked pointer.
      */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   template <class T>

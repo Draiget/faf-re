@@ -95,13 +95,13 @@ namespace moho
      * Address: 0x006EAAC0 (FUN_006EAAC0, Moho::RCountedPtrType<Moho::IFormationInstance>::SerLoad)
      * Slot: 11
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006EAB10 (FUN_006EAB10, Moho::RCountedPtrType<Moho::IFormationInstance>::SerSave)
      * Slot: 12
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(RCountedPtrType<moho::IFormationInstance>) == 0x68, "RCountedPtrType<IFormationInstance> size must be 0x68");

@@ -22,7 +22,7 @@ namespace
    * Reads vector count, deserializes each `PrefetchHandleBase` element, and
    * replaces destination vector storage.
    */
-  void LoadPrefetchHandleBaseVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
+  void LoadPrefetchHandleBaseVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<msvc8::vector<moho::PrefetchHandleBase>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -53,7 +53,7 @@ namespace
    * What it does:
    * Writes vector count and serializes each `PrefetchHandleBase` element.
    */
-  void SavePrefetchHandleBaseVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SavePrefetchHandleBaseVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<msvc8::vector<moho::PrefetchHandleBase>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);

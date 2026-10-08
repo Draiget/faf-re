@@ -33,7 +33,7 @@ namespace moho
      * Deserializes listener pointer lanes and relinks them into the target
      * broadcaster ring.
      */
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005A7800 (FUN_005A7800)
@@ -42,7 +42,7 @@ namespace moho
      * Serializes broadcaster listener pointers as `UNOWNED` and appends a null
      * pointer sentinel.
      */
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     [[nodiscard]] const char* GetName() const override;
 
@@ -353,13 +353,13 @@ const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
  */
 void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
   auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    objectPtr
   );
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
@@ -384,13 +384,13 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
  */
 void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
   auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(
-    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    objectPtr
   );
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);

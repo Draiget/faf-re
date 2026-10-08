@@ -238,7 +238,7 @@ void gpg::RVectorType<moho::SPointVector>::Init()
  */
 void gpg::RVectorType<moho::SPointVector>::SerLoad(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -279,7 +279,7 @@ void gpg::RVectorType<moho::SPointVector>::SerLoad(
  */
 void gpg::RVectorType<moho::SPointVector>::SerSave(
   gpg::WriteArchive* const archive,
-  const int objectPtr,
+  const std::intptr_t objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )

@@ -135,7 +135,7 @@ namespace
    * What it does:
    * Loads tracked pointer payload and assigns the weak pointer from the upcast IUnit object.
    */
-  void LoadWeakPtrIUnit(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadWeakPtrIUnit(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -173,7 +173,7 @@ namespace
    * What it does:
    * Converts the weak pointer payload into `RRef` and writes it as an unowned raw pointer.
    */
-  void SaveWeakPtrIUnit(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveWeakPtrIUnit(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const weak = reinterpret_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -193,7 +193,7 @@ namespace
    * (`ReadArchive::Read`, 0x00953DA0) -- not by calling the element type's
    * load callback directly.
    */
-  void LoadFastVectorWeakPtrIUnit(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorWeakPtrIUnit(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto& weakUnits = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 
@@ -212,7 +212,7 @@ namespace
    * Writes the element count, then every element through the archive
    * (`WriteArchive::Write`, 0x00953CA0) owned by `ownerRef`.
    */
-  void SaveFastVectorWeakPtrIUnit(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorWeakPtrIUnit(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     const auto& weakUnits = *reinterpret_cast<const gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 

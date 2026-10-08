@@ -19,7 +19,7 @@ namespace moho
      * Loads one weak-pointer lane targeting `CTaskThread` and rebinds the
      * intrusive weak owner-link state.
      */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0040AD80 (FUN_0040AD80, Moho::WeakPtr_CTaskThread::Serialize)
@@ -28,7 +28,7 @@ namespace moho
      * Saves one weak-pointer lane targeting `CTaskThread` as an unowned tracked
      * pointer record.
      */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   /**
