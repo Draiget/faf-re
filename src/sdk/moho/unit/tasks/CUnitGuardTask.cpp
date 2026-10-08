@@ -120,7 +120,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::CUnitGuardTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    reinterpret_cast<moho::CUnitGuardTask*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeCUnitGuardTaskSerializerCallback(
@@ -130,7 +130,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::CUnitGuardTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    reinterpret_cast<const moho::CUnitGuardTask*>(objectPtr)->MemberSerialize(archive);
   }
 
   CUnitGuardTaskSerializerHelper::CUnitGuardTaskSerializerHelper()

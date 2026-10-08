@@ -1171,7 +1171,7 @@ namespace
   )
   {
     auto* const map =
-      reinterpret_cast<msvc8::map<std::uint32_t, moho::IdPool>*>(static_cast<std::uintptr_t>(objectPtr));
+      reinterpret_cast<msvc8::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1209,7 +1209,7 @@ namespace
   )
   {
     const auto* const map =
-      reinterpret_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(static_cast<std::uintptr_t>(objectPtr));
+      reinterpret_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }

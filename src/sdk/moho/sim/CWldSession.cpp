@@ -563,7 +563,7 @@ namespace
       return;
     }
 
-    auto* const destination = reinterpret_cast<EntIdStringMultiMap*>(static_cast<std::uintptr_t>(objectPtr));
+    auto* const destination = reinterpret_cast<EntIdStringMultiMap*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
@@ -599,7 +599,7 @@ namespace
       return;
     }
 
-    const auto* const source = reinterpret_cast<const EntIdStringMultiMap*>(static_cast<std::uintptr_t>(objectPtr));
+    const auto* const source = reinterpret_cast<const EntIdStringMultiMap*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
     if (source == nullptr) {

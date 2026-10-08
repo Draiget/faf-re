@@ -539,7 +539,7 @@ namespace moho
       gpg::RRef* const
     )
     {
-      reinterpret_cast<PathQueue*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+      reinterpret_cast<PathQueue*>(objectPtr)->MemberDeserialize(archive);
     }
 
     /**
@@ -555,7 +555,7 @@ namespace moho
       gpg::RRef* const
     )
     {
-      reinterpret_cast<const PathQueue*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+      reinterpret_cast<const PathQueue*>(objectPtr)->MemberSerialize(archive);
     }
 
     /**
@@ -811,7 +811,7 @@ namespace moho
       gpg::RRef* const
     )
     {
-      reinterpret_cast<PathQueue::Impl*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+      reinterpret_cast<PathQueue::Impl*>(objectPtr)->MemberDeserialize(archive);
     }
 
     /**
@@ -828,7 +828,7 @@ namespace moho
       gpg::RRef* const
     )
     {
-      reinterpret_cast<const PathQueue::Impl*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+      reinterpret_cast<const PathQueue::Impl*>(objectPtr)->MemberSerialize(archive);
     }
 
     /**

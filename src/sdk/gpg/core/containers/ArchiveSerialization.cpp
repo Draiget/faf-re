@@ -597,7 +597,7 @@ namespace gpg
     }
 
     const auto& weapons =
-      *reinterpret_cast<const gpg::core::FastVector<moho::UnitWeaponInfo>*>(static_cast<std::uintptr_t>(objectPtr));
+      *reinterpret_cast<const gpg::core::FastVector<moho::UnitWeaponInfo>*>(objectPtr);
     SaveContiguousArchiveVectorPayload(
       archive,
       weapons.Data(),
@@ -652,7 +652,7 @@ namespace gpg
     }
 
     const auto* const storage =
-      reinterpret_cast<const msvc8::vector<moho::SPerArmyReconInfo>*>(static_cast<std::uintptr_t>(objectPtr));
+      reinterpret_cast<const msvc8::vector<moho::SPerArmyReconInfo>*>(objectPtr);
     SaveContiguousArchiveVectorPayload(
       archive, storage->data(), static_cast<unsigned int>(storage->size()),
       CachedCompatRType<moho::SPerArmyReconInfo>(), ownerRef ? *ownerRef : gpg::RRef{}
@@ -689,7 +689,7 @@ namespace gpg
   )
   {
     auto* const outVector =
-      reinterpret_cast<msvc8::vector<moho::SPerArmyReconInfo>*>(static_cast<std::uintptr_t>(objectPtr));
+      reinterpret_cast<msvc8::vector<moho::SPerArmyReconInfo>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -730,7 +730,7 @@ namespace gpg
     }
 
     const auto* const storage = reinterpret_cast<const msvc8::vector<moho::EntitySetTemplate<moho::Unit>>*>(
-      static_cast<std::uintptr_t>(objectPtr)
+      objectPtr
     );
     SaveContiguousArchiveVectorPayload(
       archive, storage->data(), static_cast<unsigned int>(storage->size()),

@@ -540,7 +540,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::CUnitCarrierRetrieve*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    reinterpret_cast<moho::CUnitCarrierRetrieve*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeCUnitCarrierRetrieveSerializerCallback(
@@ -550,7 +550,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::CUnitCarrierRetrieve*>(static_cast<std::uintptr_t>(objectPtr))
+    reinterpret_cast<const moho::CUnitCarrierRetrieve*>(objectPtr)
       ->MemberSerialize(archive);
   }
 

@@ -215,7 +215,7 @@ namespace moho
    */
   void EntIdSerializer::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
-    auto* const object = reinterpret_cast<std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
+    auto* const object = reinterpret_cast<std::int32_t*>(objectPtr);
     archive->ReadInt(object);
   }
 
@@ -229,7 +229,7 @@ namespace moho
    */
   void EntIdSerializer::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
-    const auto* const object = reinterpret_cast<const std::int32_t*>(static_cast<std::intptr_t>(objectPtr));
+    const auto* const object = reinterpret_cast<const std::int32_t*>(objectPtr);
     archive->WriteInt(*object);
   }
 

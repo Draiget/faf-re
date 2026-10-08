@@ -1139,7 +1139,7 @@ namespace moho
     gpg::RRef* const /*ownerRef*/
   )
   {
-    reinterpret_cast<CUnitFerryTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    reinterpret_cast<CUnitFerryTask*>(objectPtr)->MemberDeserialize(archive);
   }
 
   /**
@@ -1162,7 +1162,7 @@ namespace moho
     gpg::RRef* const /*ownerRef*/
   )
   {
-    reinterpret_cast<const CUnitFerryTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    reinterpret_cast<const CUnitFerryTask*>(objectPtr)->MemberSerialize(archive);
   }
 } // namespace moho
 

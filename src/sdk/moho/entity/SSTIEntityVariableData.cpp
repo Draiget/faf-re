@@ -223,7 +223,7 @@ namespace
     }
 
     const gpg::RRef entIdRef{};
-    archive->Read(type, reinterpret_cast<void*>(static_cast<std::uintptr_t>(objectPtr)), entIdRef);
+    archive->Read(type, reinterpret_cast<void*>(objectPtr), entIdRef);
   }
 
   /**
@@ -247,7 +247,7 @@ namespace
     }
 
     const gpg::RRef entIdRef{};
-    archive->Write(type, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)), entIdRef);
+    archive->Write(type, reinterpret_cast<const void*>(objectPtr), entIdRef);
   }
 
   /**
@@ -271,7 +271,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::EntityAttributes*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    reinterpret_cast<moho::EntityAttributes*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeEntityAttributesSerializerCallback(
@@ -281,7 +281,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::EntityAttributes*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    reinterpret_cast<const moho::EntityAttributes*>(objectPtr)->MemberSerialize(archive);
   }
 
   /**
@@ -305,7 +305,7 @@ namespace
     gpg::RRef*
   )
   {
-    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(static_cast<std::uintptr_t>(objectPtr));
+    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(objectPtr);
     if (archive == nullptr || object == nullptr) {
       return;
     }
@@ -320,7 +320,7 @@ namespace
     gpg::RRef*
   )
   {
-    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(static_cast<std::uintptr_t>(objectPtr));
+    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(objectPtr);
     if (archive == nullptr || object == nullptr) {
       return;
     }

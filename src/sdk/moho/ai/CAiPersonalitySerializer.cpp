@@ -189,7 +189,7 @@ void SValuePairSerializer::Deserialize(
     return;
   }
 
-  auto* const valuePair = reinterpret_cast<SValuePair*>(static_cast<std::uintptr_t>(objectPtr));
+  auto* const valuePair = reinterpret_cast<SValuePair*>(objectPtr);
   archive->ReadFloat(&valuePair->mMinValue);
   archive->ReadFloat(&valuePair->mMaxValue);
 }
@@ -208,7 +208,7 @@ void SValuePairSerializer::Serialize(
     return;
   }
 
-  const auto* const valuePair = reinterpret_cast<const SValuePair*>(static_cast<std::uintptr_t>(objectPtr));
+  const auto* const valuePair = reinterpret_cast<const SValuePair*>(objectPtr);
   archive->WriteFloat(valuePair->mMinValue);
   archive->WriteFloat(valuePair->mMaxValue);
 }

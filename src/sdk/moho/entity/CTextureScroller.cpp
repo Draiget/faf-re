@@ -695,7 +695,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::CTextureScroller*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+    reinterpret_cast<moho::CTextureScroller*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeCTextureScrollerSerializerCallback(
@@ -705,7 +705,7 @@ namespace
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::CTextureScroller*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+    reinterpret_cast<const moho::CTextureScroller*>(objectPtr)->MemberSerialize(archive);
   }
 
 } // namespace

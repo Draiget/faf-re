@@ -50,13 +50,13 @@ namespace
 
   void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
-    auto* const task = reinterpret_cast<moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
+    auto* const task = reinterpret_cast<moho::CUnitUpgradeTask*>(objectPtr);
     task->MemberDeserialize(archive);
   }
 
   void SerializeCUnitUpgradeTaskSerializerCallback(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
-    const auto* const task = reinterpret_cast<const moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
+    const auto* const task = reinterpret_cast<const moho::CUnitUpgradeTask*>(objectPtr);
     task->MemberSerialize(archive);
   }
 

@@ -2836,7 +2836,7 @@ namespace gpg
      */
     static void Deserialize(ReadArchive* const archive, const std::intptr_t objectPtr, const int version, RRef* const ownerRef)
     {
-      T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
+      T& object = *reinterpret_cast<T*>(objectPtr);
       if constexpr (requires { object.MemberDeserialize(archive, version, *ownerRef); }) {
         object.MemberDeserialize(archive, version, *ownerRef);
       } else if constexpr (requires { object.MemberDeserialize(archive, version); }) {
@@ -2856,7 +2856,7 @@ namespace gpg
      */
     static void Serialize(WriteArchive* const archive, const std::intptr_t objectPtr, const int version, RRef* const ownerRef)
     {
-      T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
+      T& object = *reinterpret_cast<T*>(objectPtr);
       if constexpr (requires { object.MemberSerialize(archive, version, *ownerRef); }) {
         object.MemberSerialize(archive, version, *ownerRef);
       } else if constexpr (requires { object.MemberSerialize(archive, version); }) {
@@ -3233,7 +3233,7 @@ namespace gpg
     {
       IntType value{};
       archive->ReadInt(&value);
-      *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<T>(value);
+      *reinterpret_cast<T*>(objectPtr) = static_cast<T>(value);
     }
 
     /**
@@ -3264,7 +3264,7 @@ namespace gpg
      */
     static void Serialize(WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const)
     {
-      const auto value = *reinterpret_cast<const T*>(static_cast<std::uintptr_t>(objectPtr));
+      const auto value = *reinterpret_cast<const T*>(objectPtr);
       archive->WriteInt(static_cast<int>(value));
     }
 
