@@ -13,6 +13,7 @@ scripts/**/*.txt
 .tmp*
 tmp/
 bin/
+# Local-only recovery workspace, including decomp/recovery/reports/; never force-add.
 decomp/
 buildstage/
 dumps/
