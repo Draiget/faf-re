@@ -35,9 +35,19 @@ Most symbols in the retail engine were never hand-written code — they are temp
 - Wild Magic `3.8`
 - [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64)
 - BugSplat
-- CRI Middleware (Sofdec + ADX)
+- CRI Middleware (Sofdec + ADX) in the original; replaced here by FFmpeg/libav* for SFD movie playback.
 - DirectX 9/10 with XACT audio, where the DX10 path was already partial in the original.
 
 ## Credits
 
 Built on many years of engine study by the Forged Alliance Forever community. Particular thanks to [Hdt80bro](https://github.com/Hdt80bro) and [4z0t](https://github.com/4z0t).
+
+## Independent SFD movie playback
+
+The engine does not use or distribute the CRI Sofdec/ADX runtime. `.sfd`
+compatibility is independently implemented with FFmpeg and a bounded FAF metadata
+parser. Legacy `mwPly*`/`ADXM_*` names are retained internally as a compatibility
+facade for recovered Forged Alliance call sites, not the original CRI implementation.
+Embedded audio and optional external XACT sound/voice cues remain separate.
+See [the compatibility profile and dependency setup](docs/FAF_SFD_COMPATIBILITY.md)
+and [validation results](docs/FAF_SFD_VALIDATION.md), including unsupported composition modes.

@@ -91,6 +91,10 @@
          must sit beside SupComDataPath.lua. Override on the command line or
          in a .user file to run against a different install. -->
     <FafRunDir Condition="'$(FafRunDir)' == ''">C:\ProgramData\FAForever\bin\</FafRunDir>
+    <!-- FFmpeg DLL names are shared across architectures. Keep x64 output
+         separate unless an architecture-specific run directory is requested. -->
+    <FafStageToRunDir Condition="'$(FafStageToRunDir)' == '' and '$(Platform)' == 'Win32'">true</FafStageToRunDir>
+    <FafStageToRunDir Condition="'$(FafStageToRunDir)' == ''">false</FafStageToRunDir>
     <!-- x64 address-space mode: `none` is the 2 GB image the x64 engine
          ships as today; `heap` is large-address-aware with the image pinned
          low (/BASE:0x10000000, no high-entropy ASLR), so only the heap can go
@@ -135,6 +139,9 @@
     <TargetName>$(FafX64TargetName)</TargetName>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
+  <PropertyGroup>
+    <FafFfmpegRoot Condition="'$(FafFfmpegRoot)'==''">$(FafRepoRoot)dependencies\ffmpeg\$(Platform)</FafFfmpegRoot>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -145,7 +152,7 @@
            helpers, templates and lambdas, so with inlining off every 8-byte
            std::memcpy and every per-row lambda becomes a real call, and /JMC
            and /RTC1 then add their own prologue work to each of those calls.
-           Verified on moho\movie\MPVDecoder.cpp: the stock Debug flags emit
+           Verified on the former movie decoder: the stock Debug flags emit
            __CheckForDebuggerJustMyCode and _RTC_CheckStackVars throughout;
            with these settings both are gone and the object is 26% smaller.
            /Ob1 only expands functions already marked inline (or defined in a
@@ -178,13 +185,13 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
@@ -207,7 +214,7 @@
       <LargeAddressAware>true</LargeAddressAware>
       <StackReserveSize>2000000</StackReserveSize>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(FafStageToRunDir)' == 'true'">
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
       <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
 if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
@@ -225,13 +232,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <!-- Mirror of the Debug link, which excludes the release CRT so nothing
            can drag it in beside the debug one. This configuration uses the
@@ -246,7 +253,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LargeAddressAware>true</LargeAddressAware>
       <StackReserveSize>2000000</StackReserveSize>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(FafStageToRunDir)' == 'true'">
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
       <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
 if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
@@ -285,20 +292,20 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
       <LargeAddressAware>$(FafX64LargeAddressAware)</LargeAddressAware>
       <StackReserveSize>4000000</StackReserveSize>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(FafStageToRunDir)' == 'true'">
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
       <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
 if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
@@ -317,20 +324,20 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
       <LargeAddressAware>$(FafX64LargeAddressAware)</LargeAddressAware>
       <StackReserveSize>4000000</StackReserveSize>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(FafStageToRunDir)' == 'true'">
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
       <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
 if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
@@ -546,23 +553,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\particles\SWorldParticle.cpp" />
     <ClCompile Include="moho\misc\CDecoder.cpp" />
     <ClCompile Include="moho\movie\CMovie.cpp" />
-    <!-- The two hottest translation units in the movie pipeline are compiled
-         optimised even in Debug. Both are numeric kernels - the MPEG decoder's
-         IDCT/motion-compensation loops and the Sofdec CFT colour converter that
-         turns every decoded 720x512 frame into ARGB8888 - and the converter's
-         fast path is written in SSE intrinsics, which /Od spills to a stack slot
-         after every single instruction. At /Od the pair cost enough per frame
-         that the renderer managed roughly one frame a second while the Sofdec
-         clock kept real time, so the picture crawled while the audio stayed
-         correct. Neither file is one you step through: they are verified
-         against the binary and their state is inspected through the probe
-         recipes in the recovery notes, not the debugger. Drop these two blocks
-         if you do need to single-step them. -->
-    <ClCompile Include="moho\movie\MPVDecoder.cpp">
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MaxSpeed</Optimization>
-      <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AnySuitable</InlineFunctionExpansion>
-      <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</IntrinsicFunctions>
-    </ClCompile>
     <ClCompile Include="moho\misc\CombinedMilitaryExtractor.cpp" />
     <ClCompile Include="moho\misc\CountermeasureExtractor.cpp" />
     <ClCompile Include="moho\particles\CWorldParticles.cpp" />
@@ -1070,8 +1060,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\vision\VisionDB.cpp" />
     <ClCompile Include="moho\math\Wm3Segment3FafExtras.cpp" />
     <ClCompile Include="moho\math\Wm3AxisAlignedBox3FafExtras.cpp" />
-    <ClCompile Include="cri\sofdec\SofdecExternalStubs.cpp" />
-    <ClCompile Include="cri\sofdec\SofdecMpvRuntime.cpp" />
     <ClCompile Include="moho\unit\CUnitCommandQueueReflection.cpp" />
     <ClCompile Include="moho\sim\CCommandLuaFunctionRegistrations.cpp" />
     <ClCompile Include="moho\entity\PropTypeInfo.cpp" />
@@ -1310,13 +1298,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</IntrinsicFunctions>
     </ClCompile>
-    <ClCompile Include="moho\audio\SofdecAdxDecodeRuntime.cpp" />
-    <ClCompile Include="moho\audio\SofdecAdxWavSpsdRuntime.cpp" />
-    <ClCompile Include="moho\audio\SofdecM2aHuffmanRuntime.cpp" />
-    <ClCompile Include="moho\audio\SofdecM2aImdctRuntime.cpp" />
-    <ClCompile Include="moho\audio\SofdecMpaBitReaderRuntime.cpp" />
-    <ClCompile Include="moho\audio\SofdecMpaFrameRuntime.cpp" />
-    <ClCompile Include="moho\audio\SofdecMpaDecodeRuntime.cpp" />
     <ClCompile Include="moho\app\CScApp.cpp" />
     <ClCompile Include="moho\app\CWaitHandleSet.cpp" />
     <ClCompile Include="moho\app\IWinApp.cpp" />
@@ -1601,7 +1582,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\audio\SAudioRequestTypeInfo.h" />
     <ClInclude Include="moho\audio\SParamKey.h" />
     <ClInclude Include="moho\audio\SParamKeyTypeInfo.h" />
-    <ClInclude Include="cri\sofdec\SofdecAddressWord.h" />
     <ClInclude Include="moho\audio\SofdecRuntime.h" />
     <ClInclude Include="moho\app\CScApp.h" />
     <ClInclude Include="moho\app\CWaitHandleSet.h" />
@@ -2011,7 +1991,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\math\VMatrix4.h" />
     <ClInclude Include="moho\misc\CDecoder.h" />
     <ClInclude Include="moho\movie\CMovie.h" />
-    <ClInclude Include="moho\movie\MPVDecoder.h" />
     <ClInclude Include="moho\misc\CSaveGameRequestImpl.h" />
     <ClInclude Include="moho\misc\ISaveRequest.h" />
     <ClInclude Include="moho\misc\CombinedMilitaryExtractor.h" />
@@ -2401,25 +2380,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ui\EUIActionTypeTypeInfo.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="cri\sofdec\SofdecAdxCodecRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecAdxDeclarationsRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecAdxPlatformRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecAdxRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecAdxXeficRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecAdxbBootstrapRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecCftColorTableRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecCvfsRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecFoundationRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecM2aBitstreamRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecM2aDecoderRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecMpaRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecMwPlaybackRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecSfdRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecSfxRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecSvmTransferRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecVirtualDispatchRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecVirtualDispatchTableRuntime.cpp" />
-  
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="moho\ai\CAiPathSpline.h" />
@@ -2525,4 +2485,27 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
+  <ItemGroup>
+    <ClCompile Include="moho\movie\sfd\IndependentSfdBackend.cpp" />
+    <ClInclude Include="moho\movie\sfd\IndependentSfdBackend.h" />
+    <ClCompile Include="moho\movie\sfd\SfdHeaderParser.cpp" />
+    <ClInclude Include="moho\movie\sfd\SfdHeaderParser.h" />
+    <ClCompile Include="moho\movie\sfd\FfmpegSfdDecoder.cpp">
+      <AdditionalOptions>/external:I"$(FafFfmpegRoot)\include" %(AdditionalOptions)</AdditionalOptions>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+    </ClCompile>
+    <ClInclude Include="moho\movie\sfd\FfmpegSfdDecoder.h" />
+    <ClCompile Include="moho\movie\sfd\DirectSoundMovieSink.cpp" />
+    <ClInclude Include="moho\movie\sfd\DirectSoundMovieSink.h" />
+    <ClCompile Include="moho\movie\sfd\SfdMetadata.cpp" />
+    <ClInclude Include="moho\movie\sfd\SfdMetadata.h" />
+  </ItemGroup>
+  <Target Name="CheckFafFfmpeg" BeforeTargets="ClCompile">
+    <Error Condition="!Exists('$(FafFfmpegRoot)\include\libavcodec\avcodec.h')" Text="FFmpeg development package missing. Set FafFfmpegRoot; see docs/FAF_SFD_COMPATIBILITY.md." />
+  </Target>
+  <Target Name="StageFafFfmpeg" AfterTargets="Build">
+    <ItemGroup><FafFfmpegDll Include="$(FafFfmpegRoot)\bin\*.dll" /></ItemGroup>
+    <Copy SourceFiles="@(FafFfmpegDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy Condition="'$(FafStageToRunDir)'=='true' and Exists('$(FafRunDir)')" SourceFiles="@(FafFfmpegDll)" DestinationFolder="$(FafRunDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

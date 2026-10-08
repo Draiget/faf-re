@@ -525,9 +525,6 @@
     <ClCompile Include="moho\movie\CMovie.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\movie\MPVDecoder.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\misc\CombinedMilitaryExtractor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2361,24 +2358,6 @@
     <ClCompile Include="moho\audio\SofdecRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\audio\SofdecAdxDecodeRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\audio\SofdecAdxWavSpsdRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\audio\SofdecM2aHuffmanRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\audio\SofdecM2aImdctRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\audio\SofdecMpaBitReaderRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\audio\SofdecMpaFrameRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClInclude Include="moho\sim\CEconomy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2653,9 +2632,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\movie\CMovie.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\movie\MPVDecoder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\misc\CSaveGameRequestImpl.h">
@@ -4896,9 +4872,6 @@
     <ClInclude Include="moho\audio\SParamKeyTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cri\sofdec\SofdecAddressWord.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\audio\SofdecRuntime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5163,7 +5136,6 @@
     <ClInclude Include="moho\animation\CAniPoseBoneTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\animation\CAniPoseTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\animation\CAniPoseTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
-    <ClCompile Include="moho\audio\SofdecMpaDecodeRuntime.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="moho\command\CCommandDb.cpp"><Filter>Source Files</Filter></ClCompile>
     
     <ClInclude Include="moho\effects\rendering\CEfxEmitter.h"><Filter>Header Files</Filter></ClInclude>
@@ -5243,54 +5215,6 @@
   
   </ItemGroup>
   <ItemGroup>
-    <None Include="cri\sofdec\SofdecAdxCodecRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecAdxDeclarationsRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecAdxPlatformRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecAdxRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecAdxXeficRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecAdxbBootstrapRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecCvfsRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecFoundationRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecM2aBitstreamRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecM2aDecoderRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecMpaRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecMwPlaybackRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecSfdRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecSvmTransferRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecVirtualDispatchRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="cri\sofdec\SofdecVirtualDispatchTableRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </None>
     <ClCompile Include="moho\ai\CAiPathSpline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5385,9 +5309,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   
-    <None Include="cri\sofdec\SofdecCftColorTableRuntime.cpp"><Filter>Source Files</Filter></None>
-    <None Include="cri\sofdec\SofdecMpvRuntime.cpp"><Filter>Source Files</Filter></None>
-    <None Include="cri\sofdec\SofdecSfxRuntime.cpp"><Filter>Source Files</Filter></None>
     <None Include="gpg\core\reflection\RFloatType.cpp"><Filter>Source Files</Filter></None>
     <None Include="gpg\core\reflection\RIntegerTypes.cpp"><Filter>Source Files</Filter></None>
     <None Include="gpg\core\reflection\RStringType.cpp"><Filter>Source Files</Filter></None>
@@ -5609,5 +5530,17 @@
     <ClInclude Include="moho\unit\core\SUnitConstructionParams.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="moho\movie\sfd\IndependentSfdBackend.cpp" />
+    <ClInclude Include="moho\movie\sfd\IndependentSfdBackend.h" />
+    <ClCompile Include="moho\movie\sfd\SfdHeaderParser.cpp" />
+    <ClInclude Include="moho\movie\sfd\SfdHeaderParser.h" />
+    <ClCompile Include="moho\movie\sfd\FfmpegSfdDecoder.cpp" />
+    <ClInclude Include="moho\movie\sfd\FfmpegSfdDecoder.h" />
+    <ClCompile Include="moho\movie\sfd\DirectSoundMovieSink.cpp" />
+    <ClInclude Include="moho\movie\sfd\DirectSoundMovieSink.h" />
+    <ClCompile Include="moho\movie\sfd\SfdMetadata.cpp" />
+    <ClInclude Include="moho\movie\sfd\SfdMetadata.h" />
   </ItemGroup>
 </Project>

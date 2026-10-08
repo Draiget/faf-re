@@ -63,3 +63,6 @@ RECOVERY_STATUS.md
 
 # Resolve-Deps.ps1 download cache for the upstream dependency archives.
 .depcache/
+
+# Local FFmpeg headers, import libraries and DLLs; see docs/FAF_SFD_COMPATIBILITY.md.
+dependencies/ffmpeg/

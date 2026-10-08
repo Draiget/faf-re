@@ -15,76 +15,6 @@
 #include "moho/render/textures/DeviceExitListener.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 
-/**
- * Address: 0x00ACB220 (FUN_00ACB220, _mwPlyPause)
- *
- * What it does:
- * Sets one playback handle pause state (`0` play, `1` pause) and returns the
- * runtime status lane.
- */
-std::int32_t mwPlyPause(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t paused);
-
-/**
- * Address: 0x00ACAE40 (FUN_00ACAE40, _mwPlyIsPause)
- *
- * What it does:
- * Returns non-zero when playback is currently paused.
- */
-std::int32_t mwPlyIsPause(moho::MwsfdPlaybackStateSubobj* ply);
-
-/**
- * Address: 0x00AC9710 (FUN_00AC9710, _mwPlyGetSubtitle)
- *
- * What it does:
- * Writes subtitle text for the current frame into caller buffer and returns
- * non-zero when subtitle output was produced.
- */
-std::int32_t mwPlyGetSubtitle(
-  moho::MwsfdPlaybackStateSubobj* ply,
-  char* subtitleBuffer,
-  std::int32_t subtitleBufferBytes,
-  std::int32_t* subtitleStats
-);
-
-/**
- * Address: 0x00B06E60 (FUN_00B06E60, _ADXM_WaitVsync)
- *
- * What it does:
- * Blocks until the next Sofdec playback vsync boundary. Declared `extern "C"`
- * to match the C-linkage stub provided in cri/sofdec/SofdecExternalStubs.cpp;
- * without this, the C++ mangling would not resolve at link time.
- */
-extern "C" std::int32_t ADXM_WaitVsync();
-
-/**
- * Address: 0x00ACC6E0 (FUN_00ACC6E0, _mwPlyFxCnvFrmARGB8888)
- *
- * What it does:
- * Converts one decoded MWSFD frame descriptor into ARGB8888 pixels in the
- * caller-provided output buffer.
- */
-// extern "C" to match the definition's linkage. The Sofdec side declares this inside an extern "C" block, so it
-// exports _mwPlyFxCnvFrmARGB8888; without this the call would ask for
-// ?mwPlyFxCnvFrmARGB8888@@YAX... and go unresolved.
-extern "C" void mwPlyFxCnvFrmARGB8888(
-  moho::MwsfdPlaybackStateSubobj* ply,
-  const moho::MwsfdFrameInfo* frameInfo,
-  void* outputBits
-);
-
-// mwPlyCalcWorkCprmSfd / mwPlyCreateSofdec are declared with their real
-// parameter type in moho/audio/SofdecRuntime.h. They used to be declared here
-// taking `void*`, which gave them a different C++ mangling from the recovered
-// definitions and left both unresolved.
-
-/**
- * Address: 0x00AC9F60 (FUN_00AC9F60, _mwPlySetFrmSync)
- *
- * What it does:
- * Sets the frame-sync mode on one Sofdec playback handle.
- */
-extern "C" void mwPlySetFrmSync(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t mode);
-
 namespace moho
 {
   extern bool debug_movie;
@@ -105,10 +35,8 @@ namespace moho
 
     static_assert(sizeof(MoviePlaybackInfoDebug) == 0x14, "MoviePlaybackInfoDebug size must be 0x14");
 
-    // _mwsfcre_MallocTab create-params; the binary memsets 0x30 bytes then fills.
-    // The create-parameter layout is shared with the recovered mwsfcre create
-    // path, so it lives in moho/audio/SofdecRuntime.h rather than being
-    // duplicated here.
+    // Legacy compatibility parameters. The independent backend ignores the
+    // caller arena; CMovie retains its work-buffer field to preserve layout.
     using SofdecCreateParams = ::moho::MwsfcreCreateParams;
 
     constexpr std::int32_t kSofdecStatFailed = 4;
@@ -376,7 +304,7 @@ namespace moho
     }
     std::memset(mWorkbuffer.px, 0, static_cast<std::size_t>(createParams.workSize));
 
-    // Create the Sofdec player, destroying any prior handle first.
+    // Create the independent player through its legacy compatibility name.
     MwsfdPlaybackStateSubobj* const created = ::mwPlyCreateSofdec(&createParams);
     ReplaceSofdecPlaybackHandle(created, &mPly);
     if (created == nullptr || ::mwPlyGetStat(created) == kSofdecStatFailed) {

@@ -1,3 +1,4 @@
+#include "moho/movie/sfd/IndependentSfdBackend.h"
 #include "moho/misc/StartupHelpers.h"
 
 #include "legacy/containers/AutoPtr.h"
@@ -5942,6 +5943,7 @@ moho::CMovieManager::~CMovieManager()
  */
 void moho::CMovieManager::ReleaseDirectSound()
 {
+  ::ADXPC_SetupSoundDirectSound8(nullptr);
   if (mPrimaryBuffer != nullptr) {
     mPrimaryBuffer->Release();
     mPrimaryBuffer = nullptr;
@@ -5964,6 +5966,7 @@ void moho::CMovieManager::SetVolume(float volume)
 {
   volume = std::min(1.0f, volume);
   mVolume = static_cast<float>(static_cast<std::int32_t>(DSBVOLUME_MIN - volume * DSBVOLUME_MIN));
+  moho::sfd::SetVolume(static_cast<long>(mVolume));
 }
 
 /**
