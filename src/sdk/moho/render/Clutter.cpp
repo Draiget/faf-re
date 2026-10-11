@@ -31,10 +31,6 @@ namespace
     virtual ~DestroyInstanceVtableTag() = default;
   };
 
-  struct UpdateInstanceVtableTag
-  {
-    virtual ~UpdateInstanceVtableTag() = default;
-  };
 
   struct SurfaceVtableResetTag
   {
@@ -52,17 +48,11 @@ namespace
     moho::MeshRenderer* instance;
   };
 
-  struct UpdateInstanceLane
-  {
-    void* vtable;
-    std::int32_t ownerToken;
-  };
 
 
 
 
   DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
-  UpdateInstanceVtableTag gUpdateInstanceVtableTag{};
   SurfaceVtableResetTag gSurfaceVtableResetTag{};
   SeedVtableResetTag gSeedVtableResetTag{};
 
@@ -77,45 +67,8 @@ namespace
     return *reinterpret_cast<void**>(&gDestroyInstanceVtableTag);
   }
 
-  [[nodiscard]] void* UpdateInstanceVtableToken()
-  {
-    return *reinterpret_cast<void**>(&gUpdateInstanceVtableTag);
-  }
 
-  /**
-   * Address: 0x007D5E30 (FUN_007D5E30)
-   *
-   * What it does:
-   * Initializes one update-instance helper lane with owner token payload.
-   */
-  [[maybe_unused]] UpdateInstanceLane* InitializeUpdateInstanceLane(
-    UpdateInstanceLane* const outLane,
-    const std::int32_t ownerToken
-  ) noexcept
-  {
-    if (outLane == nullptr) {
-      return nullptr;
-    }
 
-    outLane->vtable = UpdateInstanceVtableToken();
-    outLane->ownerToken = ownerToken;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x007D5E40 (FUN_007D5E40)
-   *
-   * What it does:
-   * Resets one update-instance helper lane to the `UpdateInstance` vtable.
-   */
-  [[maybe_unused]] void ResetUpdateInstanceLaneVtable(UpdateInstanceLane* const lane) noexcept
-  {
-    if (lane == nullptr) {
-      return;
-    }
-
-    lane->vtable = UpdateInstanceVtableToken();
-  }
 
   /**
    * Address: 0x007D9820 (FUN_007D9820)
@@ -138,26 +91,6 @@ namespace
     return outLane;
   }
 
-  /**
-   * Address: 0x007D9830 (FUN_007D9830)
-   *
-   * What it does:
-   * Initializes one update-instance lane from another lane's owner-token
-   * payload while restoring the update-instance vtable token.
-   */
-  [[maybe_unused]] UpdateInstanceLane* InitializeUpdateInstanceLaneFromSource(
-    UpdateInstanceLane* const outLane,
-    const UpdateInstanceLane* const sourceLane
-  ) noexcept
-  {
-    if (outLane == nullptr) {
-      return nullptr;
-    }
-
-    outLane->vtable = UpdateInstanceVtableToken();
-    outLane->ownerToken = sourceLane != nullptr ? sourceLane->ownerToken : 0;
-    return outLane;
-  }
 
   /**
    * Address: 0x007D5EA0 (FUN_007D5EA0)
@@ -310,31 +243,6 @@ namespace
     ResetDestroyInstanceLaneVtable(&destroyLane);
   }
 
-  /**
-   * Address: 0x007D9440 (FUN_007D9440)
-   *
-   * What it does:
-   * Rebinds each region-map mesh instance to the provided clutter owner and
-   * refreshes one update-instance helper lane to the update vtable token.
-   */
-  UpdateInstanceLane* BindRegionMeshInstancesToOwner(
-    UpdateInstanceLane* const lane,
-    moho::ClutterPayloadList& payloads,
-    const std::int32_t ownerToken
-  ) noexcept
-  {
-    if (lane == nullptr) {
-      return nullptr;
-    }
-
-    for (void* const entry : payloads) {
-      static_cast<moho::MeshInstance*>(entry)->unk24 = ownerToken;
-    }
-
-    lane->ownerToken = ownerToken;
-    lane->vtable = UpdateInstanceVtableToken();
-    return lane;
-  }
 
   [[nodiscard]] moho::ClutterRegion* AllocateRegionPoolBlock()
   {
@@ -777,16 +685,13 @@ namespace moho
    * Address: 0x007D7050 (FUN_007D7050, ?UpdateRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@PAVRegion@12@@Z)
    *
    * What it does:
-   * Rebinds each mesh-instance payload in one region map to this clutter
-   * owner lane.
+   * Binds each mesh instance in the region to the supplied camera.
    */
   void Clutter::UpdateRegion(const GeomCamera3* const camera, ClutterRegion* const region)
   {
-    (void)camera;
-
-    UpdateInstanceLane updateLane{};
-    const auto ownerToken = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(this));
-    (void)BindRegionMeshInstancesToOwner(&updateLane, region->mMap, ownerToken);
+    for (void* const entry : region->mMap) {
+      static_cast<MeshInstance*>(entry)->visibilityCamera = camera;
+    }
   }
 
   /**
@@ -957,7 +862,7 @@ namespace moho
         stance.pos_.y = terrainY;
         stance.pos_.z = spawnZ;
         meshInstance->SetStance(stance, stance);
-        meshInstance->unk24 = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&heightField));
+        meshInstance->visibilityCamera = camera;
 
         region->mMap.push_back(meshInstance);
         break;

@@ -2442,13 +2442,7 @@ namespace gpg::gal
       ThrowGalError("TextureD3D10.cpp", 205, "invalid texture");
     }
 
-    if (context_.dataCount_ != nullptr) {
-      context_.dataCount_->release();
-      context_.dataCount_ = nullptr;
-    }
-    context_.dataArray_ = nullptr;
-    context_.dataBegin_ = 0U;
-    context_.dataEnd_ = 0U;
+    context_.ClearDataBuffer();
 
     lockHistory_ = new TextureLockRect[context_.mipmapLevels_];
     contextFormatBackup_ = static_cast<int>(context_.format_);
@@ -3725,13 +3719,13 @@ namespace gpg::gal
         ThrowGalErrorFromHresult("DeviceD3D10.cpp", 886, createTextureResult);
       }
     } else {
-      if (context->dataEnd_ == context->dataBegin_) {
+      if (context->dataBuffer_.mEnd == context->dataBuffer_.mBegin) {
         ThrowGalError("DeviceD3D10.cpp", 855, "attempt to create texture from uninitialized memory");
       }
 
       ID3D10Resource* textureResource = nullptr;
-      const auto* const sourceData = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(context->dataBegin_));
-      const SIZE_T sourceBytes = context->dataEnd_ - context->dataBegin_;
+      const char* const sourceData = context->dataBuffer_.mBegin;
+      const SIZE_T sourceBytes = context->DataSizeBytes();
       const HRESULT createFromMemoryResult =
         mD3DX10CreateTextureFromMemory(mDevice, sourceData, sourceBytes, nullptr, nullptr, &textureResource);
       if (createFromMemoryResult < 0) {

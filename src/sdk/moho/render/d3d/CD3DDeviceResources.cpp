@@ -838,7 +838,7 @@ namespace moho
 
     for (auto* textureResource : mTextureList.owners_member<RD3DTextureResource, &RD3DTextureResource::mResources>()) {
       const int byteCount =
-        static_cast<int>(textureResource->mContext.dataEnd_ - textureResource->mContext.dataBegin_);
+        static_cast<int>(textureResource->mContext.DataSizeBytes());
       if (byteCount == 0) {
         continue;
       }

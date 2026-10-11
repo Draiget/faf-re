@@ -2767,7 +2767,7 @@ namespace moho
     , mesh(meshArg)
     , color(colorArg)
     , meshColor(0.0f)
-    , unk24(0)
+    , visibilityCamera(nullptr)
     , isHidden(0)
     , isReflected(1)
     , pad_2A_2B{}
@@ -4873,15 +4873,8 @@ namespace moho
         continue;
       }
 
-      // Per-instance tick filter (+0x24). It is 0 for every constructed mesh
-      // instance today, so the `filter == 0` short-circuit always accepts and
-      // the game tick is only compared when a future stamp is present. The
-      // binary loads this compare operand from a stale register lane that IDA
-      // splits across the arg0/deltaFrame stack slots; both are dead while the
-      // filter is 0, so we transcribe the intent (compare against the frame
-      // tick) faithfully.
-      const std::int32_t renderTickFilter = instance->unk24;
-      if (renderTickFilter != 0 && renderTickFilter != gameTick) {
+      // Clutter belongs to the camera that generated its region.
+      if (instance->visibilityCamera != nullptr && instance->visibilityCamera != &camera) {
         continue;
       }
 

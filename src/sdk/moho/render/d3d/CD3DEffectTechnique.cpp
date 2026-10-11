@@ -17,7 +17,7 @@
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
-#include "gpg/gal/TextureContext.hpp"
+#include "gpg/gal/TextureContext.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"

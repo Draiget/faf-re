@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "gpg/gal/TextureContext.hpp"
+#include "gpg/gal/TextureContext.h"
 #include "moho/containers/TDatList.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "Wm3Vector2.h"

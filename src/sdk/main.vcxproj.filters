@@ -3312,7 +3312,7 @@
     <ClInclude Include="gpg\gal\Texture.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gpg\gal\TextureContext.hpp">
+    <ClInclude Include="gpg\gal\TextureContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\VertexBuffer.hpp">

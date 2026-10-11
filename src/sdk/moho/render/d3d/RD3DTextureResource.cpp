@@ -108,7 +108,7 @@ namespace moho
       return true;
     }
 
-    if (mContext.dataBegin_ == 0) {
+    if (mContext.dataBuffer_.mBegin == nullptr) {
       return false;
     }
 

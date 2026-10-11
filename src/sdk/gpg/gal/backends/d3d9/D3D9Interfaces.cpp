@@ -2474,18 +2474,7 @@ namespace gpg::gal
             return kVertexFormatsByCode[formatCode];
         }
 
-        void ClearTextureContextData(TextureContext& context) noexcept
-        {
-            if (context.dataCount_ != nullptr)
-            {
-                context.dataCount_->release();
-            }
 
-            context.dataArray_ = nullptr;
-            context.dataCount_ = nullptr;
-            context.dataBegin_ = 0U;
-            context.dataEnd_ = 0U;
-        }
     }
 
     /**
@@ -2538,10 +2527,10 @@ namespace gpg::gal
 
         TextureContext textureContext{};
         textureContext.AssignFrom(*context);
-        ClearTextureContextData(textureContext);
+        textureContext.ClearDataBuffer();
 
-        const auto* const sourceData = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(context->dataBegin_));
-        const unsigned int sourceBytes = context->dataEnd_ - context->dataBegin_;
+        const char* const sourceData = context->dataBuffer_.mBegin;
+        const unsigned int sourceBytes = static_cast<unsigned int>(context->DataSizeBytes());
 
         IDirect3DBaseTexture9* nativeTexture = nullptr;
         if (context->source_ == 2U)
@@ -2582,7 +2571,7 @@ namespace gpg::gal
         }
         else if (context->source_ == 1U)
         {
-            if (context->dataEnd_ == context->dataBegin_)
+            if (context->dataBuffer_.mEnd == context->dataBuffer_.mBegin)
             {
                 ThrowGalError("DeviceD3D9.cpp", 350, "attempt to create texture from uninitialized memory");
             }

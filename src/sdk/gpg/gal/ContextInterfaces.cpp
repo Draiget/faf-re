@@ -14,7 +14,7 @@
 #include "RenderTarget.hpp"
 #include "RenderTargetContext.hpp"
 #include "Texture.hpp"
-#include "TextureContext.hpp"
+#include "TextureContext.h"
 #include "VertexBuffer.hpp"
 #include "VertexBufferContext.hpp"
 #include "VertexFormat.hpp"
@@ -288,10 +288,7 @@ namespace gpg::gal
     TextureContext::TextureContext()
         : source_(0),
           location_(),
-          dataArray_(nullptr),
-          dataCount_(nullptr),
-          dataBegin_(0),
-          dataEnd_(0),
+          dataBuffer_(),
           type_(0),
           usage_(0),
           format_(0),
@@ -321,10 +318,7 @@ namespace gpg::gal
             (location != nullptr) ? location : "",
             static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
           ),
-          dataArray_(nullptr),
-          dataCount_(nullptr),
-          dataBegin_(0U),
-          dataEnd_(0U),
+          dataBuffer_(),
           type_(0U),
           usage_(1U),
           format_(format),
@@ -356,10 +350,7 @@ namespace gpg::gal
             (location != nullptr) ? location : "",
             static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
           ),
-          dataArray_(nullptr),
-          dataCount_(nullptr),
-          dataBegin_(0U),
-          dataEnd_(0U),
+          dataBuffer_(data),
           type_(0U),
           usage_(1U),
           format_(format),
@@ -369,11 +360,6 @@ namespace gpg::gal
           height_(height),
           reserved0x50_(0U)
     {
-        const boost::SharedPtrRaw<const char> retainedData = boost::SharedPtrRawFromSharedRetained(data.mData);
-        dataArray_ = const_cast<char*>(retainedData.px);
-        dataCount_ = retainedData.pi;
-        dataBegin_ = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(data.mBegin));
-        dataEnd_ = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(data.mEnd));
     }
 
     /**
@@ -386,10 +372,7 @@ namespace gpg::gal
     TextureContext::TextureContext(const TextureContext& other)
         : source_(other.source_),
           location_(),
-          dataArray_(other.dataArray_),
-          dataCount_(other.dataCount_),
-          dataBegin_(other.dataBegin_),
-          dataEnd_(other.dataEnd_),
+          dataBuffer_(),
           type_(other.type_),
           usage_(other.usage_),
           format_(other.format_),
@@ -400,9 +383,7 @@ namespace gpg::gal
           reserved0x50_(other.reserved0x50_)
     {
         location_.assign(other.location_, 0U, msvc8::string::npos);
-        if (dataCount_ != nullptr) {
-            dataCount_->add_ref_copy();
-        }
+        dataBuffer_ = other.dataBuffer_;
     }
 
     /**
@@ -432,10 +413,7 @@ namespace gpg::gal
     {
         source_ = other.source_;
         location_.assign(other.location_, 0U, msvc8::string::npos);
-        dataArray_ = other.dataArray_;
-        AssignSharedCount(dataCount_, other.dataCount_);
-        dataBegin_ = other.dataBegin_;
-        dataEnd_ = other.dataEnd_;
+        dataBuffer_ = other.dataBuffer_;
         type_ = other.type_;
         usage_ = other.usage_;
         format_ = other.format_;
@@ -1025,14 +1003,24 @@ namespace gpg::gal
      * What it does:
      * Releases texture payload shared-count ownership before string/member teardown.
      */
-    TextureContext::~TextureContext()
+    TextureContext::~TextureContext() = default;
+
+    void TextureContext::SetDataBuffer(const gpg::MemBuffer<const char>& data)
     {
-        if (dataCount_ != nullptr)
-        {
-            dataCount_->release();
-            dataCount_ = nullptr;
-            dataArray_ = nullptr;
+        dataBuffer_ = data;
+    }
+
+    void TextureContext::ClearDataBuffer() noexcept
+    {
+        dataBuffer_.Reset();
+    }
+
+    std::size_t TextureContext::DataSizeBytes() const noexcept
+    {
+        if (dataBuffer_.mBegin == dataBuffer_.mEnd || dataBuffer_.mEnd < dataBuffer_.mBegin) {
+            return 0;
         }
+        return dataBuffer_.Size();
     }
 
     /**

@@ -1523,7 +1523,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\RenderTargetContext.hpp" />
     <ClInclude Include="gpg\gal\StateCache.h" />
     <ClInclude Include="gpg\gal\Texture.hpp" />
-    <ClInclude Include="gpg\gal\TextureContext.hpp" />
+    <ClInclude Include="gpg\gal\TextureContext.h" />
     <ClInclude Include="gpg\gal\VertexBuffer.hpp" />
     <ClInclude Include="gpg\gal\VertexBufferContext.hpp" />
     <ClInclude Include="gpg\gal\VertexFormat.hpp" />

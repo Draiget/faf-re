@@ -28,7 +28,7 @@
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/MeshVertex.h"
 #include "gpg/gal/Texture.hpp"
-#include "gpg/gal/TextureContext.hpp"
+#include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"

@@ -425,8 +425,7 @@ namespace moho
      * Address: 0x007D7050 (FUN_007D7050, ?UpdateRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@PAVRegion@12@@Z)
      *
      * What it does:
-     * Rebinds each mesh-instance payload in one region map to this clutter
-     * owner lane.
+     * Binds each mesh instance in the region to the supplied camera.
      */
     void UpdateRegion(const GeomCamera3* camera, ClutterRegion* region);
 

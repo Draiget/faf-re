@@ -8,7 +8,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Texture.hpp"
-#include "gpg/gal/TextureContext.hpp"
+#include "gpg/gal/TextureContext.h"
 
 namespace gpg::gal
 {

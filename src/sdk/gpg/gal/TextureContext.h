@@ -82,36 +82,13 @@ namespace gpg::gal
     virtual ~TextureContext();
 
   public:
-    void SetDataBuffer(const gpg::MemBuffer<const char>& data)
-    {
-      auto& sharedData = *reinterpret_cast<boost::shared_ptr<const char>*>(&dataArray_);
-      sharedData = data.mData;
-      dataBegin_ = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(data.mBegin));
-      dataEnd_ = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(data.mEnd));
-    }
-
-    void ClearDataBuffer()
-    {
-      auto& sharedData = *reinterpret_cast<boost::shared_ptr<const char>*>(&dataArray_);
-      sharedData.reset();
-      dataBegin_ = 0;
-      dataEnd_ = 0;
-    }
-
-    [[nodiscard]] std::size_t DataSizeBytes() const
-    {
-      if (dataEnd_ < dataBegin_) {
-        return 0;
-      }
-      return static_cast<std::size_t>(dataEnd_ - dataBegin_);
-    }
+    void SetDataBuffer(const gpg::MemBuffer<const char>& data);
+    void ClearDataBuffer() noexcept;
+    [[nodiscard]] std::size_t DataSizeBytes() const noexcept;
 
     std::uint32_t source_ = 0;                            // +0x04
     msvc8::string location_{};                            // +0x08
-    void* dataArray_ = nullptr;                           // +0x24
-    boost::detail::sp_counted_base* dataCount_ = nullptr; // +0x28
-    std::uint32_t dataBegin_ = 0;                         // +0x2C
-    std::uint32_t dataEnd_ = 0;                           // +0x30
+    gpg::MemBuffer<const char> dataBuffer_{};             // +0x24, shared owner and native pointer bounds
     std::uint32_t type_ = 0;                              // +0x34
     std::uint32_t usage_ = 0;                             // +0x38
     std::uint32_t format_ = 0;                            // +0x3C
@@ -124,8 +101,8 @@ namespace gpg::gal
 
   static_assert(offsetof(TextureContext, source_) == 0x04, "TextureContext::source_ offset must be 0x04");
   static_assert(offsetof(TextureContext, location_) == 0x08, "TextureContext::location_ offset must be 0x08");
-  static_assert(offsetof(TextureContext, dataArray_) == 0x24, "TextureContext::dataArray_ offset must be 0x24");
-  static_assert(offsetof(TextureContext, dataCount_) == 0x28, "TextureContext::dataCount_ offset must be 0x28");
+  static_assert(offsetof(TextureContext, dataBuffer_) == 0x24, "TextureContext::dataBuffer_ offset must be 0x24");
+  static_assert(sizeof(gpg::MemBuffer<const char>) == 0x10, "TextureContext data buffer size must be 0x10");
   static_assert(offsetof(TextureContext, type_) == 0x34, "TextureContext::type_ offset must be 0x34");
   static_assert(offsetof(TextureContext, mipmapLevels_) == 0x40, "TextureContext::mipmapLevels_ offset must be 0x40");
   static_assert(offsetof(TextureContext, width_) == 0x48, "TextureContext::width_ offset must be 0x48");

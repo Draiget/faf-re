@@ -717,7 +717,7 @@ namespace moho
     boost::shared_ptr<Mesh> mesh; // +0x14
     std::int32_t color;           // +0x1C
     float meshColor;              // +0x20
-    std::int32_t unk24;           // +0x24
+    const GeomCamera3* visibilityCamera; // +0x24, null or the camera that owns this clutter
     std::uint8_t isHidden;        // +0x28
     std::uint8_t isReflected;     // +0x29
     std::uint8_t pad_2A_2B[0x02]{};
@@ -1347,6 +1347,7 @@ namespace moho
 
   static_assert(offsetof(MeshInstance, db) == 0x0C, "MeshInstance::db offset must be 0x0C");
   static_assert(offsetof(MeshInstance, mesh) == 0x14, "MeshInstance::mesh offset must be 0x14");
+  static_assert(offsetof(MeshInstance, visibilityCamera) == 0x24, "MeshInstance::visibilityCamera offset must be 0x24");
   static_assert(offsetof(MeshInstance, isHidden) == 0x28, "MeshInstance::isHidden offset must be 0x28");
   static_assert(offsetof(MeshInstance, isReflected) == 0x29, "MeshInstance::isReflected offset must be 0x29");
   static_assert(
