@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <initializer_list>
 #include <iterator>
 #include <new>
 #include <typeinfo>
@@ -16,58 +15,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* FindRTypeByNameAny(const std::initializer_list<const char*>& names)
-  {
-    gpg::TypeMap& map = gpg::GetRTypeMap();
-    for (const char* name : names) {
-      if (!name || !*name) {
-        continue;
-      }
-
-      const auto it = map.find(name);
-      if (it != map.end()) {
-        return it->second;
-      }
-
-      for (auto jt = map.begin(); jt != map.end(); ++jt) {
-        const char* registeredName = jt->first;
-        if (registeredName && std::strstr(registeredName, name) != nullptr) {
-          return jt->second;
-        }
-      }
-    }
-
-    return nullptr;
-  }
-
-  [[nodiscard]] gpg::RType* RequireRTypeByNameAny(const std::initializer_list<const char*>& names)
-  {
-    gpg::RType* type = FindRTypeByNameAny(names);
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  void DeserializeObjectByRTypeName(
-    gpg::ReadArchive* archive, void* object, const std::initializer_list<const char*>& typeNames, gpg::RRef* ownerRef
-  )
-  {
-    gpg::RType* type = RequireRTypeByNameAny(typeNames);
-    GPG_ASSERT(type != nullptr && type->serLoadFunc_ != nullptr);
-    type->serLoadFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, ownerRef);
-  }
-
-  void SerializeObjectByRTypeName(
-    gpg::WriteArchive* archive,
-    const void* object,
-    const std::initializer_list<const char*>& typeNames,
-    gpg::RRef* ownerRef
-  )
-  {
-    gpg::RType* type = RequireRTypeByNameAny(typeNames);
-    GPG_ASSERT(type != nullptr && type->serSaveFunc_ != nullptr);
-    type->serSaveFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, ownerRef);
-  }
-
   /**
    * Address: 0x00BF4810 (FUN_00BF4810, atexit destructor of the SSTIArmyVariableDataTypeInfo object)
    */
@@ -138,7 +85,7 @@ namespace moho
   {
     std::memset(&mEconomyTotals, 0, sizeof(mEconomyTotals));
     mWordVectorWithMeta.mMetaWord = 0u;
-    mCategoryFilterSet.ResetToEmpty(0u);
+    mCategoryFilterSet.ResetToEmpty(EntityCategoryHelper{});
     mArmyStart = Wm3::Vector2f(0.0f, 0.0f);
     mNoRushOffset = Wm3::Vector2f(0.0f, 0.0f);
   }
@@ -223,20 +170,22 @@ namespace moho
       return;
     }
 
-    DeserializeObjectByRTypeName(archive, &mEconomyTotals, {"SEconTotals", "Moho::SEconTotals"}, nullptr);
+    const gpg::RRef ownerRef{};
+
+    archive->Read(gpg::RTypeOf<decltype(mEconomyTotals)>(), &mEconomyTotals, ownerRef);
 
     bool boolValue = false;
     archive->ReadBool(&boolValue);
     mIsResourceSharingEnabled = boolValue ? 1u : 0u;
 
-    DeserializeObjectByRTypeName(archive, &mNeutrals, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
-    DeserializeObjectByRTypeName(archive, &mAllies, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
-    DeserializeObjectByRTypeName(archive, &mEnemies, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
+    archive->Read(gpg::RTypeOf<decltype(mNeutrals)>(), &mNeutrals, ownerRef);
+    archive->Read(gpg::RTypeOf<decltype(mAllies)>(), &mAllies, ownerRef);
+    archive->Read(gpg::RTypeOf<decltype(mEnemies)>(), &mEnemies, ownerRef);
 
     archive->ReadBool(&boolValue);
     mIsAlly = boolValue ? 1u : 0u;
 
-    DeserializeObjectByRTypeName(archive, &mValidCommandSources, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
+    archive->Read(gpg::RTypeOf<decltype(mValidCommandSources)>(), &mValidCommandSources, ownerRef);
 
     archive->ReadUInt(&mPlayerColorBgra);
     archive->ReadUInt(&mArmyColorBgra);
@@ -249,22 +198,15 @@ namespace moho
     archive->ReadBool(&boolValue);
     mShowScore = boolValue ? 1u : 0u;
 
-    DeserializeObjectByRTypeName(
-      archive,
-      &mCategoryFilterSet,
-      {"BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>",
-       "Moho::BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>",
-       "BVSet<RBlueprint const *,EntityCategoryHelper>"},
-      nullptr
-    );
+    archive->Read(gpg::RTypeOf<decltype(mCategoryFilterSet)>(), &mCategoryFilterSet, ownerRef);
 
     archive->ReadBool(&boolValue);
     mIsOutOfGame = boolValue ? 1u : 0u;
 
-    DeserializeObjectByRTypeName(archive, &mArmyStart, {"Vector2<float>", "Wm3::Vector2<float>"}, nullptr);
+    archive->Read(gpg::RTypeOf<decltype(mArmyStart)>(), &mArmyStart, ownerRef);
     archive->ReadInt(&mNoRushTimer);
     archive->ReadFloat(&mNoRushRadius);
-    DeserializeObjectByRTypeName(archive, &mNoRushOffset, {"Vector2<float>", "Wm3::Vector2<float>"}, nullptr);
+    archive->Read(gpg::RTypeOf<decltype(mNoRushOffset)>(), &mNoRushOffset, ownerRef);
     archive->ReadFloat(&mHandicapValue);
     archive->ReadFloat(&mHandicapExtra);
   }
@@ -278,15 +220,17 @@ namespace moho
       return;
     }
 
-    SerializeObjectByRTypeName(archive, &mEconomyTotals, {"SEconTotals", "Moho::SEconTotals"}, nullptr);
+    const gpg::RRef ownerRef{};
+
+    archive->Write(gpg::RTypeOf<decltype(mEconomyTotals)>(), &mEconomyTotals, ownerRef);
     archive->WriteBool(mIsResourceSharingEnabled != 0u);
 
-    SerializeObjectByRTypeName(archive, &mNeutrals, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
-    SerializeObjectByRTypeName(archive, &mAllies, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
-    SerializeObjectByRTypeName(archive, &mEnemies, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
+    archive->Write(gpg::RTypeOf<decltype(mNeutrals)>(), &mNeutrals, ownerRef);
+    archive->Write(gpg::RTypeOf<decltype(mAllies)>(), &mAllies, ownerRef);
+    archive->Write(gpg::RTypeOf<decltype(mEnemies)>(), &mEnemies, ownerRef);
 
     archive->WriteBool(mIsAlly != 0u);
-    SerializeObjectByRTypeName(archive, &mValidCommandSources, {"BVIntSet", "Moho::BVIntSet"}, nullptr);
+    archive->Write(gpg::RTypeOf<decltype(mValidCommandSources)>(), &mValidCommandSources, ownerRef);
 
     archive->WriteUInt(mPlayerColorBgra);
     archive->WriteUInt(mArmyColorBgra);
@@ -295,20 +239,13 @@ namespace moho
     archive->WriteBool(mUseWholeMap != 0u);
     archive->WriteBool(mShowScore != 0u);
 
-    SerializeObjectByRTypeName(
-      archive,
-      &mCategoryFilterSet,
-      {"BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>",
-       "Moho::BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>",
-       "BVSet<RBlueprint const *,EntityCategoryHelper>"},
-      nullptr
-    );
+    archive->Write(gpg::RTypeOf<decltype(mCategoryFilterSet)>(), &mCategoryFilterSet, ownerRef);
 
     archive->WriteBool(mIsOutOfGame != 0u);
-    SerializeObjectByRTypeName(archive, &mArmyStart, {"Vector2<float>", "Wm3::Vector2<float>"}, nullptr);
+    archive->Write(gpg::RTypeOf<decltype(mArmyStart)>(), &mArmyStart, ownerRef);
     archive->WriteInt(mNoRushTimer);
     archive->WriteFloat(mNoRushRadius);
-    SerializeObjectByRTypeName(archive, &mNoRushOffset, {"Vector2<float>", "Wm3::Vector2<float>"}, nullptr);
+    archive->Write(gpg::RTypeOf<decltype(mNoRushOffset)>(), &mNoRushOffset, ownerRef);
     archive->WriteFloat(mHandicapValue);
     archive->WriteFloat(mHandicapExtra);
   }

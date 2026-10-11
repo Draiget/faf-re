@@ -227,14 +227,11 @@ namespace gpg
 
 namespace
 {
-  using UIntIntMap = std::map<std::uint32_t, int>;
-  using UIntInfluenceMapEntryMap = std::map<std::uint32_t, moho::InfluenceMapEntry>;
+  using UIntIntMap = msvc8::map<std::uint32_t, int>;
+  using UIntInfluenceMapEntryMap = msvc8::map<std::uint32_t, moho::InfluenceMapEntry>;
   using InfluenceGridVector = msvc8::vector<moho::InfluenceGrid>;
   using SThreatVector = msvc8::vector<moho::SThreat>;
-  using InfluenceEntrySet = msvc8::set<moho::InfluenceMapEntry, moho::InfluenceMapEntryLess>;
-  using InfluenceMapCellSet = msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>;
-  using InfluenceEntryIterator = InfluenceEntrySet::iterator;
-  using InfluenceMapCellIterator = InfluenceMapCellSet::iterator;
+  using InfluenceEntryIterator = UIntInfluenceMapEntryMap::iterator;
 
   template <class TMap>
   [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
@@ -653,7 +650,7 @@ namespace
       int value = 0;
       archive->ReadUInt(&key);
       archive->ReadInt(&value);
-      (*mapObject)[key] = value;
+      mapObject->insert(std::make_pair(key, value));
     }
   }
 
@@ -710,7 +707,7 @@ namespace
       moho::InfluenceMapEntry value{};
       archive->ReadUInt(&key);
       archive->Read(valueType, &value, owner);
-      (*mapObject)[key] = value;
+      mapObject->insert(std::make_pair(key, value));
     }
   }
 
@@ -958,9 +955,7 @@ namespace
     const std::uint32_t entityId
   )
   {
-    moho::InfluenceMapEntry key{};
-    key.entityId = entityId;
-    return grid.entries.lower_bound(key);
+    return grid.entries.lower_bound(entityId);
   }
 
   /**
@@ -968,16 +963,13 @@ namespace
    *
    * What it does:
    * Finds the exact `InfluenceMapEntry` for one entity id using the ordered
-   * set lookup lane.
+   * map lookup lane.
    */
   template <class TEntries>
   [[nodiscard]] auto FindInfluenceMapEntry(TEntries& entries, const std::uint32_t entityId)
   {
-    moho::InfluenceMapEntry key{};
-    key.entityId = entityId;
-
-    auto it = entries.lower_bound(key);
-    if (it == entries.end() || it->entityId != entityId) {
+    auto it = entries.lower_bound(entityId);
+    if (it == entries.end() || it->first != entityId) {
       return entries.end();
     }
 
@@ -1667,7 +1659,7 @@ namespace moho
    *
    * What it does:
    * Copy-constructs one grid from `other`:
-   *   1) `entries()` below builds the sentinel-only ordered-set header that the
+   *   1) `entries()` below builds the sentinel-only ordered-map header that the
    *      binary creates at the head of `CopyConstructInfluenceGridEntries`
    *      (0x0071C1F0, called at 0x0071C173), and the clone loop in the body is
    *      that helper's second half;
@@ -1863,11 +1855,11 @@ namespace moho
     if (it == entries.end()) {
       return nullptr;
     }
-    if (it->entityId != entityId) {
+    if (it->first != entityId) {
       return nullptr;
     }
 
-    return const_cast<InfluenceMapEntry*>(&(*it));
+    return &it->second;
   }
 
   const InfluenceMapEntry* InfluenceGrid::FindEntry(const std::uint32_t entityId) const
@@ -1877,7 +1869,7 @@ namespace moho
       return nullptr;
     }
 
-    return &(*it);
+    return &it->second;
   }
 
   bool InfluenceGrid::RemoveEntry(const std::uint32_t entityId)
@@ -1886,7 +1878,7 @@ namespace moho
     if (it == entries.end()) {
       return false;
     }
-    if (it->entityId != entityId) {
+    if (it->first != entityId) {
       return false;
     }
 
@@ -1990,7 +1982,7 @@ namespace moho
     const std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* const sourceBlueprint
   )
   {
-    const InfluenceMapCellIndex* const knownCell = FindBlipCell(blipId);
+    const std::int32_t* const knownCell = FindBlipCell(blipId);
     const std::int32_t newCellIndex = VectorToCoords(position);
 
     if (!knownCell) {
@@ -1998,7 +1990,7 @@ namespace moho
       return;
     }
 
-    const std::int32_t oldCellIndex = knownCell->cellIndex;
+    const std::int32_t oldCellIndex = *knownCell;
     if (oldCellIndex == newCellIndex && oldCellIndex >= 0 && oldCellIndex < mTotal) {
       InfluenceGrid& cell = mMapEntries[static_cast<std::size_t>(oldCellIndex)];
       if (InfluenceMapEntry* const entry = cell.FindEntry(blipId)) {
@@ -2257,7 +2249,7 @@ namespace moho
       cell->ClearPerArmyThreats();
 
       for (auto it = cell->entries.begin(); it != cell->entries.end();) {
-        InfluenceMapEntry& entry = const_cast<InfluenceMapEntry&>(*it);
+        InfluenceMapEntry& entry = it->second;
 
         if (entry.decayTicks > 0) {
           --entry.decayTicks;
@@ -2383,45 +2375,28 @@ namespace moho
     return sim->mArmiesList[armyIndex];
   }
 
-  const InfluenceMapCellIndex* CInfluenceMap::FindBlipCell(const std::uint32_t blipId) const
+  const std::int32_t* CInfluenceMap::FindBlipCell(const std::uint32_t blipId) const
   {
-    InfluenceMapCellIndex key{};
-    key.entityId = blipId;
-    const auto it = mBlipCells.find(key);
+    const auto it = mBlipCells.find(blipId);
     if (it == mBlipCells.end()) {
       return nullptr;
     }
 
-    return &(*it);
+    return &it->second;
   }
 
   /**
-   * Absorbs binary helper:
-   * Address: 0x00718360 (FUN_00718360, msvc8::map<uint32, cellIndex>::operator[])
-   *
-   * The binary's `CInfluenceMap::InsertEntry` used the
-   * `msvc8::map<uint32, int32>::operator[]` template emission
-   * (FUN_00718360) to find-or-default-insert a `blipId -> cellIndex`
-   * lookup entry, then assigned the cell index to the returned slot.
-   * The recovered `UpsertBlipCell` expresses the same role through
-   * `mBlipCells` (a `set<InfluenceMapCellIndex>` keyed by entityId)
-   * with a remove + insert pair, so the binary's `_Tree::operator[]`
-   * template emission is absorbed by this named helper. The inner
-   * insert helper FUN_00719AB0 (still blocked) corresponds to the
-   * RB-tree allocate-and-link path inside the modern `insert(...)`
-   * call.
+   * Covered by typed source construct: msvc8::map<uint32_t,int32_t>::operator[].
+   * The binary emits FUN_00718360 for the actual InsertEntry callsite.
    */
   void CInfluenceMap::UpsertBlipCell(const std::uint32_t blipId, const std::int32_t cellIndex)
   {
-    RemoveBlipCell(blipId);
-    mBlipCells.insert(InfluenceMapCellIndex{blipId, cellIndex});
+    mBlipCells[blipId] = cellIndex;
   }
 
   void CInfluenceMap::RemoveBlipCell(const std::uint32_t blipId)
   {
-    InfluenceMapCellIndex key{};
-    key.entityId = blipId;
-    const auto it = mBlipCells.find(key);
+    const auto it = mBlipCells.find(blipId);
     if (it != mBlipCells.end()) {
       mBlipCells.erase(it);
     }
@@ -2458,11 +2433,7 @@ namespace moho
     entry.decayTicks = 10;
 
     InfluenceGrid& cell = mMapEntries[static_cast<std::size_t>(cellIndex)];
-    const auto [it, inserted] = cell.entries.insert(entry);
-    if (!inserted) {
-      InfluenceMapEntry& mutableEntry = const_cast<InfluenceMapEntry&>(*it);
-      mutableEntry = entry;
-    }
+    cell.entries[blipId] = entry;
 
     UpsertBlipCell(blipId, cellIndex);
   }
@@ -2476,12 +2447,12 @@ namespace moho
    */
   void CInfluenceMap::RemoveEntry(const std::uint32_t blipId)
   {
-    const InfluenceMapCellIndex* const blipCell = FindBlipCell(blipId);
+    const std::int32_t* const blipCell = FindBlipCell(blipId);
     if (!blipCell) {
       return;
     }
 
-    const std::int32_t cellIndex = blipCell->cellIndex;
+    const std::int32_t cellIndex = *blipCell;
     if (cellIndex >= 0 && cellIndex < mTotal) {
       // InfluenceGrid::RemoveEntry reports whether an entry was actually erased;
       // the binary ignores that result here and unconditionally drops the blip
@@ -2707,13 +2678,13 @@ namespace moho
    * Deserializes one `InfluenceGrid` payload in archive field order:
    * `entries`, `threats`, aggregate threat, and decay lanes.
    */
-  void InfluenceGrid::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void InfluenceGrid::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
   {
     if (archive == nullptr || this == nullptr) {
       return;
     }
 
-    const gpg::RRef owner = ownerRef;
+    const gpg::RRef owner{};
 
     gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
     GPG_ASSERT(entryMapType != nullptr);
@@ -2745,20 +2716,20 @@ namespace moho
    * Serializes one `InfluenceGrid` payload in archive field order:
    * `entries`, `threats`, aggregate threat, and decay lanes.
    */
-  void InfluenceGrid::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  void InfluenceGrid::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
   {
     if (archive == nullptr || this == nullptr) {
       return;
     }
 
-    const gpg::RRef owner = ownerRef;
+    const gpg::RRef owner{};
 
     gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
     GPG_ASSERT(entryMapType != nullptr);
     if (!entryMapType) {
       return;
     }
-    archive->Write(entryMapType, this, owner);
+    archive->Write(entryMapType, &entries, owner);
 
     gpg::RType* const threatVectorType = CachedSThreatVectorType();
     GPG_ASSERT(threatVectorType != nullptr);
@@ -2784,12 +2755,14 @@ namespace moho
    * `EntId`, `SimArmy*`, `Vector3f` position, `RUnitBlueprint*`, `ELayer`,
    * detail flag, threat magnitude/decay, and decay tick count.
    */
-  void InfluenceMapEntry::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void InfluenceMapEntry::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
   {
     if (archive == nullptr) {
       return;
     }
 
+
+    const gpg::RRef ownerRef{};
 
     static gpg::RType* entIdType = nullptr;
     if (entIdType == nullptr) {
@@ -2799,7 +2772,7 @@ namespace moho
 
     moho::SimArmy* loadedArmy = nullptr;
     archive->ReadPointer(&loadedArmy, &ownerRef);
-    sourceArmy = reinterpret_cast<moho::CArmyImpl*>(loadedArmy);
+    sourceArmy = static_cast<moho::CArmyImpl*>(loadedArmy);
 
     static gpg::RType* vector3fType = nullptr;
     if (vector3fType == nullptr) {
@@ -2833,12 +2806,14 @@ namespace moho
    * Serializes one `InfluenceMapEntry` payload in archive field order using
    * unowned pointer lanes for `SimArmy*` and `RUnitBlueprint*`.
    */
-  void InfluenceMapEntry::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  void InfluenceMapEntry::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
   {
     if (archive == nullptr) {
       return;
     }
 
+
+    const gpg::RRef ownerRef{};
 
     static gpg::RType* entIdType = nullptr;
     if (entIdType == nullptr) {
@@ -2846,7 +2821,7 @@ namespace moho
     }
     archive->Write(entIdType, &entityId, ownerRef);
 
-    archive->WritePointer<moho::SimArmy>(reinterpret_cast<moho::SimArmy*>(sourceArmy), gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::SimArmy>(static_cast<moho::SimArmy*>(sourceArmy), gpg::TrackedPointerState::Unowned, ownerRef);
 
     static gpg::RType* vector3fType = nullptr;
     if (vector3fType == nullptr) {

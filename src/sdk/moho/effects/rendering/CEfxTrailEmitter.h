@@ -19,7 +19,7 @@ namespace moho
   struct RTrailBlueprint;
 
   /**
-   * VFTABLE: 0x00E25E18
+   * VFTABLE: 0x00E268D4
    *
    * Runtime trail-emitter effect implementation.
    *
@@ -32,6 +32,14 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+
+    /**
+     * Address: 0x006711C0 (FUN_006711C0, Moho::CEfxTrailEmitter::GetClass)
+     *
+     * What it does:
+     * Resolves the concrete trail descriptor for reflected pointer writes.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x00671200 (FUN_00671200, Moho::CEfxTrailEmitter::CEfxTrailEmitter)

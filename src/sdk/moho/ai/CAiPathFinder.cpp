@@ -8,7 +8,6 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
-#include <list>
 #include <new>
 #include <typeinfo>
 
@@ -259,71 +258,6 @@ namespace
     return pathFinder ? pathFinder->mUnit : nullptr;
   }
 
-  struct RectHistoryNode
-  {
-    RectHistoryNode* next;
-    RectHistoryNode* prev;
-    gpg::Rect2i rect;
-  };
-
-  static_assert(sizeof(RectHistoryNode) == 0x18, "RectHistoryNode size must be 0x18");
-
-  [[nodiscard]] RectHistoryNode* RectHistoryHead(const SRectList& history) noexcept
-  {
-    return static_cast<RectHistoryNode*>(history.mHead);
-  }
-
-  /**
-   * Address: 0x005AB3A0 (FUN_005AB3A0, checked-allocate-and-self-link
-   * emission for `std::list<Rect2i>::_Node` per IDA's own type library --
-   * via the checked wrapper FUN_005ABB00, elementSize=0x18 matching
-   * RectHistoryNode's own static_assert. Reached from CAiPathFinder's
-   * default and reset paths via this function.)
-   */
-  [[nodiscard]] RectHistoryNode* AllocateRectSentinel()
-  {
-    auto* const node = static_cast<RectHistoryNode*>(::operator new(sizeof(RectHistoryNode)));
-    node->next = node;
-    node->prev = node;
-    node->rect = {};
-    return node;
-  }
-
-  /**
-   * Address: 0x005AB710 (FUN_005AB710)
-   *
-   * IDA signature:
-   * int *__userpurge sub_5AB710@<eax>(gpg::Rect2i *a1@<esi>, int a2, int a3);
-   *
-   * What it does:
-   * Allocates one `std::list<gpg::Rect2i>`-style intrusive history node via the
-   * canonical checked 24-byte allocator lane and initializes
-   * `{next=a2, prev=a3, rect=*a1}` in that order. The original binary also
-   * contains MSVC8 null-pointer-optimization guards (`result != -4` /
-   * `result != -8`) on the second and third field writes; those compare an
-   * allocator result against impossible truncated-pointer sentinels and are
-   * preserved here as `node != nullptr` runtime gates so behavior matches
-   * exactly when the checked allocator returns a valid block.
-   */
-  [[nodiscard]] RectHistoryNode* AllocateRectHistoryNode(
-    RectHistoryNode* const next,
-    RectHistoryNode* const prev,
-    const gpg::Rect2i& rect
-  )
-  {
-    auto* const node = msvc8::detail::allocate_checked<RectHistoryNode>(1u);
-    if (node != nullptr) {
-      node->next = next;
-    }
-    if (node != nullptr) {
-      node->prev = prev;
-    }
-    if (node != nullptr) {
-      node->rect = rect;
-    }
-    return node;
-  }
-
   gpg::RType* gBroadcasterNavPathType = nullptr;
   gpg::RType* gUnitType = nullptr;
   gpg::RType* gSimType = nullptr;
@@ -419,16 +353,13 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedSearchType()
   {
-    return CachedType<EAiPathSearchType>(gSearchType);
+    return CachedType<ESearchType>(gSearchType);
   }
 
   [[nodiscard]] gpg::RType* CachedRect2iListType()
   {
     if (!gRect2iListType) {
-      gRect2iListType = gpg::LookupRType(typeid(std::list<gpg::Rect2i>));
-      if (!gRect2iListType) {
-        gRect2iListType = ResolveTypeByAnyName({"std::list<gpg::Rect2<int>>", "list<gpg::Rect2<int>>"});
-      }
+      gRect2iListType = gpg::RTypeOf<msvc8::list<gpg::Rect2i>>();
     }
     return gRect2iListType;
   }
@@ -764,10 +695,6 @@ CAiPathFinder::CAiPathFinder()
   , mPad77(0)
   , mMaxFootprintSpan(1)
 {
-
-  mRecentSearchRects.mAllocatorOrProxy = nullptr;
-  mRecentSearchRects.mHead = AllocateRectSentinel();
-  mRecentSearchRects.mSize = 0;
 }
 
 /**
@@ -775,13 +702,6 @@ CAiPathFinder::CAiPathFinder()
  */
 CAiPathFinder::~CAiPathFinder()
 {
-  ClearRectHistory();
-
-  if (mRecentSearchRects.mHead) {
-    ::operator delete(mRecentSearchRects.mHead);
-    mRecentSearchRects.mHead = nullptr;
-  }
-
   // The `IPathTraveler` node and the `Broadcaster` base unlink in their own
   // destructors (0x005AA033, 0x005AA04E). Only self-linking them here, as this
   // body used to, left a deleted path finder threaded on the path queue.
@@ -1265,7 +1185,7 @@ void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int
   }
 
   if (gpg::RType* const searchType = CachedSearchType()) {
-    EAiPathSearchType search = AIPATHSEARCH_None;
+    ESearchType search = static_cast<ESearchType>(AIPATHSEARCH_None);
     archive->Read(searchType, &search, owner);
     (void)SetPathFinderSearchModeRaw(this, static_cast<std::int32_t>(search));
   }
@@ -1332,7 +1252,7 @@ void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
   }
 
   if (gpg::RType* const searchType = CachedSearchType()) {
-    EAiPathSearchType search = mSearchType;
+    const ESearchType search = static_cast<ESearchType>(mSearchType);
     archive->Write(searchType, &search, owner);
   }
 
@@ -1349,56 +1269,28 @@ void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
   }
 }
 
+/**
+ * Covered by the list member operation in the owning path-finder methods.
+ */
 void CAiPathFinder::ClearRectHistory()
 {
-  RectHistoryNode* const head = RectHistoryHead(mRecentSearchRects);
-  if (!head) {
-    mRecentSearchRects.mSize = 0;
-    return;
-  }
-
-  RectHistoryNode* it = head->next;
-  while (it != head) {
-    RectHistoryNode* const next = it->next;
-    ::operator delete(it);
-    it = next;
-  }
-
-  head->next = head;
-  head->prev = head;
-  mRecentSearchRects.mSize = 0;
+  mRecentSearchRects.clear();
 }
 
+/**
+ * Inlined block from FUN_005AA310: retain the three most recent rectangles.
+ */
 void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
 {
   if (!IsStrictRect(rect)) {
     return;
   }
 
-  RectHistoryNode* head = RectHistoryHead(mRecentSearchRects);
-  if (!head) {
-    mRecentSearchRects.mHead = AllocateRectSentinel();
-    head = RectHistoryHead(mRecentSearchRects);
+  // Original +0x70 test removes the oldest entry before pushing at the front.
+  if (mRecentSearchRects.size() > 2) {
+    mRecentSearchRects.pop_back();
   }
-
-  // 0x005AA4E0: `if (size > 2) pop_back()` -- the list is push_front'ed
-  // below, so the oldest rect is the back (`head->prev`), not the front.
-  while (mRecentSearchRects.mSize > 2) {
-    RectHistoryNode* const oldest = head->prev;
-    if (oldest == head) {
-      mRecentSearchRects.mSize = 0;
-      break;
-    }
-    oldest->next->prev = oldest->prev;
-    oldest->prev->next = oldest->next;
-    ::operator delete(oldest);
-    --mRecentSearchRects.mSize;
-  }
-
-  auto* const node = AllocateRectHistoryNode(head->next, head, rect);
-  head->next->prev = node;
-  head->next = node;
-  ++mRecentSearchRects.mSize;
+  mRecentSearchRects.push_front(rect);
 }
 
 void CAiPathFinder::UpdatePlayableRectGate()
@@ -1418,15 +1310,13 @@ void CAiPathFinder::UpdatePlayableRectGate()
       : 0u;
 }
 
+/**
+ * Inlined block from FUN_005AA860: test the recent search rectangles.
+ */
 bool CAiPathFinder::RectHistoryIntersects(const gpg::Rect2i& rect) const
 {
-  const RectHistoryNode* const head = RectHistoryHead(mRecentSearchRects);
-  if (!head) {
-    return false;
-  }
-
-  for (const RectHistoryNode* it = head->next; it != head; it = it->next) {
-    if (RectsOverlapStrict(rect, it->rect)) {
+  for (const gpg::Rect2i& historyRect : mRecentSearchRects) {
+    if (RectsOverlapStrict(rect, historyRect)) {
       return true;
     }
   }

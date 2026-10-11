@@ -10,26 +10,18 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/sim/CIntelGrid.h"
+#include "moho/command/SSTITarget.h"
 #include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
-  // The real ctor's cache slot (Moho__EntId__sType) resolves via
-  // typeid(??_R0?AVEntId@Moho@@@8) -- a *class*-mangled ('V' prefix) RTTI
-  // descriptor, meaning the 2007 source declared `EntId` as its own
-  // distinct class, not a bare integer alias. The current codebase-wide
-  // recovery models EntId as `using EntId = std::int32_t;` in five separate
-  // headers (Entity.h, Sim.h, IUnit.h, CWldSession.h,
-  // SSTICommandVariableData.h), under which typeid(EntId) resolves to
-  // typeid(std::int32_t) by alias transparency. Reconciling that whole-
-  // codebase typedef-vs-class divergence is out of scope for this pass;
-  // this cache intentionally matches the current alias definition so
-  // behavior is consistent with every other EntId call site today.
+  // Resolve the distinct class RTTI key used by the original helper;
+  // integer aliases at other callsites must not redirect it to int's type.
   [[nodiscard]] gpg::RType* CachedEntIdType()
   {
     static gpg::RType* sCachedType = nullptr;
     if (!sCachedType) {
-      sCachedType = gpg::LookupRType(typeid(std::int32_t));
+      sCachedType = gpg::RTypeOf<moho::EntIdValue>();
     }
     return sCachedType;
   }
@@ -215,8 +207,8 @@ namespace moho
    */
   void EntIdSerializer::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
-    auto* const object = reinterpret_cast<std::int32_t*>(objectPtr);
-    archive->ReadInt(object);
+    auto* const object = reinterpret_cast<std::uint32_t*>(objectPtr);
+    archive->ReadUInt(object);
   }
 
   /**
@@ -229,8 +221,8 @@ namespace moho
    */
   void EntIdSerializer::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
   {
-    const auto* const object = reinterpret_cast<const std::int32_t*>(objectPtr);
-    archive->WriteInt(*object);
+    const auto* const object = reinterpret_cast<const std::uint32_t*>(objectPtr);
+    archive->WriteUInt(*object);
   }
 
   /**

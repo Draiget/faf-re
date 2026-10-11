@@ -12,10 +12,7 @@ namespace
 {
   [[nodiscard]] gpg::RRef MakeCArmyImplRef(moho::CArmyImpl* const object)
   {
-    gpg::RRef out{};
-    out.mObj = object;
-    out.mType = moho::CArmyImpl::StaticGetClass();
-    return out;
+    return gpg::MakeRRef(object);
   }
 
   moho::CArmyImplTypeInfo gCArmyImplTypeInfo;
@@ -77,34 +74,46 @@ namespace moho
 
   /**
    * Address: 0x007034D0 (FUN_007034D0, sub_7034D0)
+   *
+   * What it does:
+   * Allocates and default-constructs a reflected army object.
    */
   gpg::RRef CArmyImplTypeInfo::NewRef()
   {
-    return MakeCArmyImplRef(nullptr);
+    return MakeCArmyImplRef(new CArmyImpl());
   }
 
   /**
    * Address: 0x00703570 (FUN_00703570, sub_703570)
+   *
+   * What it does:
+   * Default-constructs an army in caller-owned storage when present.
    */
   gpg::RRef CArmyImplTypeInfo::CtrRef(void* const objectStorage)
   {
-    return MakeCArmyImplRef(static_cast<CArmyImpl*>(objectStorage));
+    return MakeCArmyImplRef(objectStorage ? new (objectStorage) CArmyImpl() : nullptr);
   }
 
   /**
    * Address: 0x00703550 (FUN_00703550, sub_703550)
+   *
+   * What it does:
+   * Deletes a reflected army through its virtual destructor.
    */
   void CArmyImplTypeInfo::Delete(void* const objectStorage)
   {
-    (void)objectStorage;
+    delete static_cast<CArmyImpl*>(objectStorage);
   }
 
   /**
    * Address: 0x007035E0 (FUN_007035E0, sub_7035E0)
+   *
+   * What it does:
+   * Runs the virtual army destructor without freeing its storage.
    */
   void CArmyImplTypeInfo::Destruct(void* const objectStorage)
   {
-    (void)objectStorage;
+    static_cast<CArmyImpl*>(objectStorage)->~CArmyImpl();
   }
 
   /**

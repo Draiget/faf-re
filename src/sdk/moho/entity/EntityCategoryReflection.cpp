@@ -12,6 +12,7 @@
 #include "lua/LuaObject.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/REntityBlueprint.h"
@@ -139,9 +140,7 @@ namespace
 
   [[nodiscard]] moho::RRuleGameRulesImpl* ResolveCategoryRules(const moho::EntityCategorySet& categorySet) noexcept
   {
-    return reinterpret_cast<moho::RRuleGameRulesImpl*>(
-      static_cast<std::uintptr_t>(categorySet.mUniverse.mWordUniverseHandle)
-    );
+    return static_cast<moho::RRuleGameRulesImpl*>(categorySet.mUniverse.mRules);
   }
 
   /**
@@ -261,7 +260,7 @@ namespace
     }
 
     const std::uint32_t endWordIndex = bits->mFirstWordIndex + static_cast<std::uint32_t>(wordCount);
-    out->mWordUniverseHandle = categorySet->mUniverse.mWordUniverseHandle;
+    out->mRules = categorySet->mUniverse.mRules;
     out->mSet = bits;
     out->mCurBit = static_cast<std::int32_t>(endWordIndex << 5u);
     return out;
@@ -299,19 +298,19 @@ namespace
    * Address: 0x00BC9E60 (FUN_00BC9E60, register_EntityCategory)
    *
    * What it does:
-   * Reads and returns the current head of the `Core` Lua init-form set. See
-   * the declaration in `EntityCategoryReflection.h` for the full evidence
-   * trail on why the binary's list-prepend half is not reproduced here.
+   * Links the class binder that publishes the shared entity-category
+   * metatable as moho.EntityCategory into the Core Lua init-form set.
    */
   CScrLuaInitForm* register_EntityCategory()
   {
-    CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
-    CScrLuaInitForm* const previousHead = coreSet.mForms;
-    // Prepend intentionally omitted - the anchor's real identity cannot be
-    // recovered from available evidence (see header doc comment), and a
-    // placeholder object would corrupt the list per the already-diagnosed
-    // register_CAiAttackerImplLuaInitFormAnchor case in CAiAttackerImpl.cpp.
-    return previousHead;
+    static CScrLuaClassBinder binder(
+      CoreLuaInitSet(),
+      "moho.EntityCategory",
+      &EntityCategoryLuaMetatableFactory::Instance(),
+      kEntityCategoryLuaClassName,
+      ""
+    );
+    return &binder;
   }
 
   /**
@@ -780,7 +779,7 @@ namespace
       return;
     }
 
-    auto* const helper = reinterpret_cast<EntityCategoryHelper*>(set);
+    auto* const helper = &set->mUniverse;
     const gpg::RRef owner = ownerRef ? *ownerRef : NullOwnerRef();
 
     archive->Write(EntityCategoryHelper::StaticGetClass(), helper, owner);
@@ -798,7 +797,7 @@ namespace
       return;
     }
 
-    auto* const helper = reinterpret_cast<EntityCategoryHelper*>(set);
+    auto* const helper = &set->mUniverse;
     const gpg::RRef owner = ownerRef ? *ownerRef : NullOwnerRef();
 
     archive->Read(EntityCategoryHelper::StaticGetClass(), helper, owner);
@@ -837,21 +836,17 @@ namespace
     Finish();
   }
 
-  /**
-   * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer)
-   */
-  EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer() = default;
-
-  /**
-   * Address: 0x0052C8E0 (FUN_0052C8E0, Moho::EntityCategoryHelperSerializer::Init)
-   */
-  void EntityCategoryHelperSerializer::Init()
+  /** Inlined block from FUN_0052B860. */
+  void EntityCategoryHelper::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    gpg::RType* const type = EntityCategoryHelper::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
+    const gpg::RRef ownerRef{};
+    archive->ReadPointer(&mRules, &ownerRef);
+  }
+
+  /** Inlined block from FUN_0052B890. */
+  void EntityCategoryHelper::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WritePointer(mRules, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 
   /**
@@ -862,14 +857,6 @@ namespace
     (void)AcquireEntityCategoryHelperTypeInfo();
   }
 
-  /**
-   * Address: 0x00BC8F30 (FUN_00BC8F30, dynamic initializer for the global
-   * `EntityCategoryHelperSerializer` singleton)
-   */
-  EntityCategoryHelperSerializer::EntityCategoryHelperSerializer()
-    : mSerLoadFunc(&EntityCategory::SerLoad)
-    , mSerSaveFunc(&EntityCategory::SerSave)
-  {}
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

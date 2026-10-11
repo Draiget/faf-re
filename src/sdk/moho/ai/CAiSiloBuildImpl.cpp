@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <list>
 #include <new>
 #include <stdexcept>
 #include <typeinfo>
@@ -79,7 +78,7 @@ namespace
 
   [[nodiscard]] gpg::RType* ResolveESiloTypeListType()
   {
-    return CachedType<std::list<ESiloType>>(gESiloTypeListType);
+    return CachedType<SSiloTypeList>(gESiloTypeListType);
   }
 
   [[nodiscard]] gpg::RType* ResolveUnitType()

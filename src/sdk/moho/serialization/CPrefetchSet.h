@@ -167,12 +167,4 @@ namespace moho
    */
   int register_CScrLuaMetatableFactory_CPrefetchSet_Index();
 
-  /**
-   * Address: 0x00BC59E0 (FUN_00BC59E0, sub_BC59E0)
-   *
-   * What it does:
-   * Saves current `core` Lua-init form chain head and relinks it to the
-   * recovered CPrefetchSet startup anchor lane.
-   */
-  CScrLuaInitForm* register_core_CoreInits_mForms_CPrefetchSetAnchor();
 } // namespace moho

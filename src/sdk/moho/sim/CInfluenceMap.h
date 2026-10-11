@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "legacy/containers/Set.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "Wm3Vector3.h"
@@ -159,28 +159,6 @@ namespace moho
     std::int32_t decayTicks;             // +0x28
   };
 
-  struct InfluenceMapEntryLess
-  {
-    [[nodiscard]] bool operator()(const InfluenceMapEntry& lhs, const InfluenceMapEntry& rhs) const noexcept
-    {
-      return lhs.entityId < rhs.entityId;
-    }
-  };
-
-  struct InfluenceMapCellIndex
-  {
-    std::uint32_t entityId; // +0x00
-    std::int32_t cellIndex; // +0x04
-  };
-
-  struct InfluenceMapCellIndexLess
-  {
-    [[nodiscard]] bool operator()(const InfluenceMapCellIndex& lhs, const InfluenceMapCellIndex& rhs) const noexcept
-    {
-      return lhs.entityId < rhs.entityId;
-    }
-  };
-
   class InfluenceGrid
   {
   public:
@@ -257,7 +235,7 @@ namespace moho
     [[nodiscard]] bool RemoveEntry(std::uint32_t entityId);
 
   public:
-    msvc8::set<InfluenceMapEntry, InfluenceMapEntryLess> entries; // +0x00
+    msvc8::map<std::uint32_t, InfluenceMapEntry> entries; // +0x00
     msvc8::vector<SThreat> threats;                               // +0x0C
     SThreat threat;                                               // +0x1C
     SThreat decay;                                                // +0x54
@@ -427,10 +405,10 @@ namespace moho
     );
 
   private:
-    using BlipCellSet = msvc8::set<InfluenceMapCellIndex, InfluenceMapCellIndexLess>;
+    using BlipCellMap = msvc8::map<std::uint32_t, std::int32_t>;
 
     [[nodiscard]] CArmyImpl* ResolveSourceArmy(std::uint32_t blipId) const;
-    [[nodiscard]] const InfluenceMapCellIndex* FindBlipCell(std::uint32_t blipId) const;
+    [[nodiscard]] const std::int32_t* FindBlipCell(std::uint32_t blipId) const;
     void UpsertBlipCell(std::uint32_t blipId, std::int32_t cellIndex);
     void RemoveBlipCell(std::uint32_t blipId);
 
@@ -468,13 +446,12 @@ namespace moho
     std::int32_t mWidth;                  // +0x08
     std::int32_t mHeight;                 // +0x0C
     std::int32_t mGridSize;               // +0x10
-    BlipCellSet mBlipCells;               // +0x14
+    BlipCellMap mBlipCells;               // +0x14
     msvc8::vector<InfluenceGrid> mMapEntries; // +0x20
   };
 
   static_assert(sizeof(SThreat) == 0x38, "SThreat size must be 0x38");
   static_assert(sizeof(InfluenceMapEntry) == 0x2C, "InfluenceMapEntry size must be 0x2C");
-  static_assert(sizeof(InfluenceMapCellIndex) == 0x08, "InfluenceMapCellIndex size must be 0x08");
   static_assert(sizeof(InfluenceGrid) == 0x8C, "InfluenceGrid size must be 0x8C");
   static_assert(offsetof(InfluenceGrid, entries) == 0x00, "InfluenceGrid::entries offset must be 0x00");
   static_assert(offsetof(InfluenceGrid, threats) == 0x0C, "InfluenceGrid::threats offset must be 0x0C");

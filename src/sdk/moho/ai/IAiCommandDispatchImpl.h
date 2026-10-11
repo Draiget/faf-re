@@ -74,7 +74,7 @@ namespace moho
      * dispatch when the unit is ready and consuming queue-result transitions
      * when the linked command task finishes.
      */
-    virtual ETaskStatus TaskTick();
+    int Execute() override;
 
     /**
      * Address: 0x00599030 (FUN_00599030, ?OnEvent@IAiCommandDispatchImpl@Moho@@UAEXW4EUnitCommandQueueStatus@2@@Z)

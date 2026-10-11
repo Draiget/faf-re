@@ -742,9 +742,7 @@ namespace moho
      */
     [[nodiscard]] gpg::RRef NewPathQueueImplRefCallback()
     {
-      gpg::RRef objectRef{};
-      (void)gpg::RRef_PathQueue_Impl(&objectRef, new PathQueue::Impl());
-      return objectRef;
+      return gpg::MakeRRef(new PathQueue::Impl());
     }
 
     /**
@@ -756,9 +754,7 @@ namespace moho
      */
     [[nodiscard]] gpg::RRef ConstructPathQueueImplRefCallback(void* const objectStorage)
     {
-      gpg::RRef objectRef{};
-      (void)gpg::RRef_PathQueue_Impl(&objectRef, ::new (objectStorage) PathQueue::Impl());
-      return objectRef;
+      return gpg::MakeRRef(::new (objectStorage) PathQueue::Impl());
     }
 
     /**
@@ -1268,14 +1264,12 @@ namespace moho
    * What it does:
    * Writes the `Impl` as an owned tracked pointer. Inlined into
    * `PathQueueSerializer::Serialize` (0x00766980), which builds the
-   * reference through `gpg::RRef_PathQueue_Impl` (0x0076A5F0).
+   * reference through `gpg::MakeRRef<Impl>` (0x0076A5F0).
    */
   void PathQueue::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef owner{};
-    gpg::RRef payload{};
-    (void)gpg::RRef_PathQueue_Impl(&payload, mImpl.get());
-    gpg::WriteRawPointer(archive, payload, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer(mImpl.get(), gpg::TrackedPointerState::Owned, owner);
   }
 
   /**

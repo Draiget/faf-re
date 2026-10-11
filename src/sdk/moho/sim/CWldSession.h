@@ -269,53 +269,10 @@ namespace moho
   static_assert(offsetof(CommandModeData, mMouseDragEnd) == 0x30, "CommandModeData::mMouseDragEnd offset must be 0x30");
   static_assert(offsetof(CommandModeData, mModifiers) == 0x54, "CommandModeData::mModifiers offset must be 0x54");
 
-  struct SSessionSaveNodeLabel
-  {
-    std::uint32_t mCommandSourceId; // +0x00
-    msvc8::string mSaveNodeName;    // +0x04
-  };
-
-  static_assert(sizeof(SSessionSaveNodeLabel) == 0x20, "SSessionSaveNodeLabel size must be 0x20");
-  static_assert(
-    offsetof(SSessionSaveNodeLabel, mCommandSourceId) == 0x00,
-    "SSessionSaveNodeLabel::mCommandSourceId offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SSessionSaveNodeLabel, mSaveNodeName) == 0x04, "SSessionSaveNodeLabel::mSaveNodeName offset must be 0x04"
-  );
-
-  struct SSessionSaveNodeMapNode
-  {
-    SSessionSaveNodeMapNode* mLeft;   // +0x00
-    SSessionSaveNodeMapNode* mParent; // +0x04
-    SSessionSaveNodeMapNode* mRight;  // +0x08
-    SSessionSaveNodeLabel mLabel;     // +0x0C
-    std::uint8_t mColor;              // +0x2C
-    std::uint8_t mIsSentinel;         // +0x2D
-    std::uint8_t pad_2E[2];
-  };
-
-  static_assert(sizeof(SSessionSaveNodeMapNode) == 0x30, "SSessionSaveNodeMapNode size must be 0x30");
-  static_assert(
-    offsetof(SSessionSaveNodeMapNode, mLabel) == 0x0C, "SSessionSaveNodeMapNode::mLabel offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SSessionSaveNodeMapNode, mColor) == 0x2C, "SSessionSaveNodeMapNode::mColor offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(SSessionSaveNodeMapNode, mIsSentinel) == 0x2D, "SSessionSaveNodeMapNode::mIsSentinel offset must be 0x2D"
-  );
-
-  struct SSessionSaveNodeMap
-  {
-    void* mAllocProxy;              // +0x00
-    SSessionSaveNodeMapNode* mHead; // +0x04
-    std::uint32_t mSize;            // +0x08
-  };
-
+  // The binary RTTI names std::multimap<Moho::EntId,std::string>.
+  // FUN_008992D0 uses unsigned key comparison (setb at 0x008992F5).
+  using SSessionSaveNodeMap = msvc8::multimap<EntId, msvc8::string, std::less<std::uint32_t>>;
   static_assert(sizeof(SSessionSaveNodeMap) == 0x0C, "SSessionSaveNodeMap size must be 0x0C");
-  static_assert(offsetof(SSessionSaveNodeMap, mHead) == 0x04, "SSessionSaveNodeMap::mHead offset must be 0x04");
-  static_assert(offsetof(SSessionSaveNodeMap, mSize) == 0x08, "SSessionSaveNodeMap::mSize offset must be 0x08");
 
   struct SSessionSaveData
   {
@@ -353,16 +310,6 @@ namespace moho
      */
     ~SSessionSaveData();
 
-    /**
-       * Address: 0x008992D0 (FUN_008992D0)
-     *
-     * What it does:
-     * Inserts one `(commandSourceId, saveNodeName)` record into session save-data map.
-     * Source-side helpers (`InsertSaveDataLabelNode`, `FixupSaveDataInsert`,
-     * `RotateSaveDataLeft`, `RotateSaveDataRight`) are a typed decomposition of that
-     * binary chain, not standalone exported game methods.
-     */
-    void InsertNodeLabel(std::uint32_t commandSourceId, const msvc8::string& saveNodeName);
   };
 
   static_assert(sizeof(SSessionSaveData) == 0x0C, "SSessionSaveData size must be 0x0C");

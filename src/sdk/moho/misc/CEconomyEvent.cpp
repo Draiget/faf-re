@@ -13,6 +13,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/exceptions/StdExcept.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
@@ -979,6 +980,14 @@ namespace
   };
 
   const CEconomyEventLuaFuncDefBootstrap gCEconomyEventLuaFuncDefBootstrap{};
+
+  moho::CScrLuaClassBinder gEconomyEventClassBinder(
+    SimLuaInitSet(),
+    "moho.EconomyEvent",
+    &moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Instance(),
+    "CEconomyEvent",
+    ""
+  );
 } // namespace
 
 namespace moho

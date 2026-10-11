@@ -139,19 +139,6 @@ namespace moho
   static_assert(sizeof(PathQueue) == 0x04, "PathQueue size must be 0x04");
 } // namespace moho
 
-namespace gpg
-{
-  /**
-   * Address: 0x0076A5F0 (FUN_0076A5F0, gpg::RRef_PathQueue_Impl)
-   *
-   * What it does:
-   * Wraps a `PathQueue::Impl*` as a reflected reference. Declared here rather
-   * than beside `RRef_PathQueue` in Reflection.h because only this header can
-   * name the nested type; defined in gpg/core/containers/ArchiveSerialization.cpp.
-   */
-  RRef* RRef_PathQueue_Impl(RRef* outRef, moho::PathQueue::Impl* value);
-} // namespace gpg
-
 namespace moho
 {
 

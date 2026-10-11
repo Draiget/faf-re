@@ -145,7 +145,7 @@ namespace moho
 
     // Binary seeds the out set to empty using the table's word-universe handle
     // (the decompiler labels the +0x38 lane `mHelper.mRules`).
-    out->ResetToEmpty(lookupTable->mWordUniverseHandle);
+    out->ResetToEmpty(EntityCategoryHelper{lookupTable->mRules});
 
     if (!categoryExpression) {
       return out;
@@ -156,7 +156,7 @@ namespace moho
     const char* clauseEnd = nullptr;
     while (NextSegmentToken(clauseCursor, ',', clauseStart, clauseEnd)) {
       EntityCategorySet clauseAccum;
-      clauseAccum.ResetToEmpty(lookupTable->mWordUniverseHandle);
+      clauseAccum.ResetToEmpty(EntityCategoryHelper{lookupTable->mRules});
       bool hasResolvedClauseTerm = false;
 
       const char* termCursor = clauseStart;

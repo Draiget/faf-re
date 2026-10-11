@@ -125,18 +125,6 @@ namespace
   };
   constexpr const char* kPickBestTravelFormationIndexName = "PickBestTravelFormationIndex";
 
-  /**
-   * The category-word universe lane is a 4-byte handle that the sim fills with
-   * the owning `RRuleGameRules` instance (`mov [slot+8], rules` at
-   * 0x00576960, later overwritten by `mov edx,[category]` at 0x00576A21). This
-   * keeps the one narrowing conversion in a single named place instead of
-   * spelling a pointer cast at the assignment site.
-   */
-  [[nodiscard]] std::uint32_t ToCategoryUniverseHandle(const RRuleGameRules* const gameRules) noexcept
-  {
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(gameRules));
-  }
-
   [[nodiscard]] int ToFormationBucketIndex(const EFormationType type)
   {
     const int bucket = static_cast<int>(type);
@@ -545,7 +533,7 @@ moho::SFormationScriptResult moho::FORMATION_RunScript(
         // pointer as the category universe handle before anything else; the
         // category read below then overwrites it with the category's own.
         SFormationScriptSlot slot{};
-        slot.mCategory.mUniverse.mWordUniverseHandle = ToCategoryUniverseHandle(gameRules);
+        slot.mCategory.mUniverse.mRules = gameRules;
 
         slot.mOffset.x = static_cast<float>(entry[1].GetNumber());
         slot.mOffset.z = static_cast<float>(entry[2].GetNumber());

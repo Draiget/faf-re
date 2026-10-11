@@ -244,6 +244,12 @@ namespace moho
    * `cfunc_LoadSavedGameL`.
    */
   int cfunc_LoadSavedGame(lua_State* luaContext);
+  /**
+   * Address: 0x00880CC0 (FUN_00880CC0, cfunc_LoadSavedGameL)
+   *
+   * What it does:
+   * Loads session information, begins the session, and returns Lua status/error values.
+   */
   int cfunc_LoadSavedGameL(LuaPlus::LuaState* state);
 
   /**

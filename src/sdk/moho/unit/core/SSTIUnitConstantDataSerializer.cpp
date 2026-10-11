@@ -19,18 +19,29 @@ namespace
   class SSTIUnitConstantDataTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0055C490 (FUN_0055C490, Moho::SSTIUnitConstantDataTypeInfo::GetName)
+     */
     [[nodiscard]] const char* GetName() const override
     {
       return "SSTIUnitConstantData";
     }
 
+    /**
+     * Address: 0x0055C470 (FUN_0055C470, Moho::SSTIUnitConstantDataTypeInfo::Init)
+     *
+     * What it does:
+     * Sets the native object size and archive version 1, then finishes the descriptor.
+     */
     void Init() override
     {
       size_ = sizeof(moho::SSTIUnitConstantData);
       gpg::RType::Init();
+      Version(1);
       Finish();
     }
   };
+  static_assert(sizeof(SSTIUnitConstantDataTypeInfo) == 0x64, "SSTIUnitConstantDataTypeInfo size must be 0x64");
 
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {

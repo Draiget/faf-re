@@ -18,6 +18,7 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Vector.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/serialization/SaveGameFileHeader.h"
 #include "moho/serialization/SSavedGameHeader.h"
@@ -107,48 +108,6 @@ namespace
     outHeader.mGameIdPart4 = moho::APP_GetGameIdPart(3);
   }
 
-  /**
-   * Address: 0x00882520 (FUN_00882520)
-   *
-   * What it does:
-   * Resizes one legacy string vector to an exact count by appending one fill
-   * string for growth and erasing tail lanes for shrink.
-   */
-  void ResizeLegacyStringVectorExact(
-    msvc8::vector<msvc8::string>& outStrings,
-    const std::size_t targetCount,
-    const msvc8::string& fillValue
-  )
-  {
-    const std::size_t currentCount = outStrings.size();
-    if (currentCount < targetCount) {
-      outStrings.resize(targetCount, fillValue);
-    }
-
-    if (currentCount > targetCount) {
-      outStrings.erase(
-        outStrings.begin() + static_cast<std::ptrdiff_t>(targetCount),
-        outStrings.end()
-      );
-    }
-  }
-
-  /**
-   * Address: 0x00881FA0 (FUN_00881FA0)
-   *
-   * What it does:
-   * Resizes one legacy string vector to the requested count using one empty
-   * fill-string lane.
-   */
-  [[maybe_unused]] void ResizeLegacyStringVectorWithEmptyFill(
-    msvc8::vector<msvc8::string>& outStrings,
-    const unsigned int targetCount
-  )
-  {
-    const msvc8::string emptyFill{};
-    ResizeLegacyStringVectorExact(outStrings, static_cast<std::size_t>(targetCount), emptyFill);
-  }
-
   [[nodiscard]] moho::SSavedGameHeader BuildSavedGameHeader(const moho::CWldSession* const session)
   {
     moho::SSavedGameHeader header{};
@@ -159,27 +118,15 @@ namespace
     header.mMapName = session->mMapName;
     header.mFocusArmy = session->FocusArmy;
 
-    msvc8::vector<msvc8::string> armyNames{};
-    ResizeLegacyStringVectorWithEmptyFill(armyNames, static_cast<unsigned int>(session->userArmies.size()));
+    header.mArmyInfo.resize(session->userArmies.size());
     for (std::size_t armyIndex = 0; armyIndex < session->userArmies.size(); ++armyIndex) {
       const moho::UserArmy* const userArmy = session->userArmies[armyIndex];
       if (userArmy != nullptr) {
-        armyNames[armyIndex] = userArmy->mPlayerName;
+        header.mArmyInfo[armyIndex].mPlayerName = userArmy->mPlayerName;
       }
     }
 
-    header.mArmyInfo.clear();
-    header.mArmyInfo.reserve(armyNames.size());
-    for (const msvc8::string& armyName : armyNames) {
-      moho::SSavedGameArmyInfo armyInfo{};
-      armyInfo.mPlayerName = armyName;
-      header.mArmyInfo.push_back(armyInfo);
-    }
-
-    const char* const scenarioInfoText = session->mScenarioInfo.GetString();
-    if (scenarioInfoText != nullptr) {
-      header.mScenarioInfoText.assign_owned(scenarioInfoText);
-    }
+    header.mScenarioInfoText = moho::SCR_ToString(session->GetScenarioInfo());
 
     header.mLaunchInfo = boost::SharedPtrRawFromSharedRetained(session->mLaunchInfo);
     return header;
@@ -312,6 +259,7 @@ namespace moho
     , mFile()
     , mArchive(nullptr)
   {
+    const SSavedGameHeader header = BuildSavedGameHeader(WLD_GetActiveSession());
     const msvc8::string tempPath = MakeTempSavePath(mSavePath);
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
     std::FILE* file = nullptr;
@@ -331,7 +279,6 @@ namespace moho
     }
 
     std::unique_ptr<gpg::WriteArchive> archive(gpg::CreateBinaryWriteArchive(mFile));
-    const SSavedGameHeader header = BuildSavedGameHeader(WLD_GetActiveSession());
     const gpg::RRef ownerRef{nullptr, nullptr};
     archive->Write(SSavedGameHeader::StaticGetClass(), &header, ownerRef);
     archive->EndSection(false);

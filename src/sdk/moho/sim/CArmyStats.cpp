@@ -32,7 +32,6 @@
 #include "legacy/containers/Set.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiBrain.h"
-#include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -156,17 +155,6 @@ namespace
     out.append(text.c_str(), text.size());
   }
 
-  /**
-   * The stat keys are unit blueprints. `RUnitBlueprint` derives from
-   * `RBlueprint` in the binary (RTTI), but `REntityBlueprint` still repeats
-   * the `RBlueprint` fields inline here rather than deriving from it, so the
-   * downcast cannot be spelled `static_cast` yet.
-   */
-  [[nodiscard]] const moho::RUnitBlueprint* AsUnitBlueprint(const moho::RBlueprint* const blueprint) noexcept
-  {
-    return reinterpret_cast<const moho::RUnitBlueprint*>(blueprint);
-  }
-
   [[nodiscard]] const moho::EntityCategorySet*
   ResolveStatsCategory(const moho::RRuleGameRules* const rules, const char* const categoryName)
   {
@@ -190,7 +178,7 @@ namespace
   }
 
   void CollectBlueprintStatKeys(
-    msvc8::set<const moho::RBlueprint*>& outKeys,
+    msvc8::set<const moho::RUnitBlueprint*>& outKeys,
     const moho::CArmyStatItem* const item
   )
   {
@@ -230,7 +218,7 @@ namespace
 
   // --- shared red-black erase mechanics --------------------------------------
   //
-  // The per-blueprint stat map (`std::map<const RBlueprint*, float>`) and the
+  // The per-blueprint stat map (`std::map<const RUnitBlueprint*, float>`) and the
   // stat-path name index (`std::map<msvc8::string, CArmyStatItem*>`) are two
   // instantiations of one MSVC8 `std::_Tree`, so the erase rebalance below is
   // written once and shared by both node families through the `RotateRb*`
@@ -294,10 +282,10 @@ namespace
   )
   {
     for (const auto& entry : tree) {
-      const moho::RBlueprint* const blueprint = entry.first;
+      const moho::RUnitBlueprint* const blueprint = entry.first;
       const int value = static_cast<int>(entry.second);
-      gpg::Logf(logFormat, blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
-      writer.Printf("%s(%s), %d\n", blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
+      gpg::Logf(logFormat, blueprint->mBlueprintId.c_str(), blueprint->mBlueprintLabel.c_str(), value);
+      writer.Printf("%s(%s), %d\n", blueprint->mBlueprintId.c_str(), blueprint->mBlueprintLabel.c_str(), value);
     }
   }
 
@@ -452,7 +440,7 @@ namespace moho
     blueprints.AssignNewTable(state, 0, 0);
 
     for (const auto& entry : mBlueprintStats) {
-      const RBlueprint* const blueprint = entry.first;
+      const RUnitBlueprint* const blueprint = entry.first;
       if (blueprint != nullptr) {
         const msvc8::string value = gpg::STR_Printf("%.2f", entry.second);
         blueprints.SetString(blueprint->mBlueprintId.c_str(), value.c_str());
@@ -467,18 +455,18 @@ namespace moho
    */
   float CArmyStatItem::SumCategory(const EntityCategorySet* const categorySet) const
   {
-    if (categorySet == nullptr || categorySet->mUniverse.mWordUniverseHandle == 0u) {
+    if (categorySet == nullptr || categorySet->mUniverse.mRules == nullptr) {
       return 0.0f;
     }
 
     float total = 0.0f;
     for (const auto& entry : mBlueprintStats) {
-      const RBlueprint* const blueprint = entry.first;
+      const RUnitBlueprint* const blueprint = entry.first;
       if (blueprint == nullptr) {
         continue;
       }
 
-      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprint->mBlueprintOrdinal))) {
+      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprint->mCategoryBitIndex))) {
         total += entry.second;
       }
     }
@@ -494,7 +482,7 @@ namespace moho
    * zero-initialized node when missing, and returns a writable pointer to that
    * lane.
    */
-  float* CArmyStatItem::FindOrCreateBlueprintStatValue(const RBlueprint* const blueprint)
+  float* CArmyStatItem::FindOrCreateBlueprintStatValue(const RUnitBlueprint* const blueprint)
   {
     // The binary is VC8's `map::operator[]`: lower_bound, then a *hinted*
     // insert of a zero-initialised mapped value when the key is absent, and
@@ -805,13 +793,13 @@ namespace moho
     CArmyStatItem* const damageDealt = GetItem("Units_TotalDamageDealt");
     CArmyStatItem* const damageReceived = GetItem("Units_TotalDamageReceive");
 
-    msvc8::set<const RBlueprint*> blueprintKeys;
+    msvc8::set<const RUnitBlueprint*> blueprintKeys;
     CollectBlueprintStatKeys(blueprintKeys, unitsActive);
     CollectBlueprintStatKeys(blueprintKeys, enemiesKilled);
 
     AppendMsvcString(xml, gpg::STR_Printf("%s    <UnitStats>\n", indentText));
-    for (const RBlueprint* const blueprint : blueprintKeys) {
-      const RUnitBlueprint* const unitBlueprint = AsUnitBlueprint(blueprint);
+    for (const RUnitBlueprint* const blueprint : blueprintKeys) {
+      const RUnitBlueprint* const unitBlueprint = blueprint;
       const EntityCategorySet* const unitCategory = ResolveStatsCategory(rules, blueprint->mBlueprintId.c_str());
 
       AppendMsvcString(
@@ -820,7 +808,7 @@ namespace moho
           "%s      <Unit id=\"%s\" type=\"%s\" built=\"%d\" lost=\"%d\" killed=\"%d\" damagedealt=\"%.2f\" damagereceived=\"%.2f\" masscost=\"%.2f\" energycost=\"%.2f\" buildtime=\"%.2f\"/>\n",
           indentText,
           blueprint->mBlueprintId.c_str(),
-          blueprint->mDescription.c_str(),
+          blueprint->mBlueprintLabel.c_str(),
           SumStatCategoryInt(unitsActive, unitCategory),
           SumStatCategoryInt(unitsLost, unitCategory),
           SumStatCategoryInt(enemiesKilled, unitCategory),
@@ -1060,7 +1048,7 @@ namespace moho
    * in that item, applies `delta`, and returns the updated lane pointer.
    */
   float*
-  CArmyStats::AddBlueprintStatDelta(const char* const statPath, const RBlueprint* const blueprint, const float delta)
+  CArmyStats::AddBlueprintStatDelta(const char* const statPath, const RUnitBlueprint* const blueprint, const float delta)
   {
     CArmyStatItem* const statItem = ResolveArmyStatItemCachedCreate(this, statPath);
     float* const lane = statItem->FindOrCreateBlueprintStatValue(blueprint);

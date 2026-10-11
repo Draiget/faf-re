@@ -21,16 +21,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAimManipulatorType()
-  {
-    gpg::RType* type = moho::CAimManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAimManipulator));
-      moho::CAimManipulator::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
     gpg::RType* type = moho::IAniManipulator::sType;
@@ -43,10 +33,7 @@ namespace
 
   [[nodiscard]] gpg::RRef MakeCAimManipulatorRef(moho::CAimManipulator* const object)
   {
-    gpg::RRef out{};
-    out.mObj = object;
-    out.mType = CachedCAimManipulatorType();
-    return out;
+    return gpg::MakeRRef(object);
   }
 
 } // namespace
@@ -107,34 +94,49 @@ namespace moho
 
   /**
    * Address: 0x00632EA0 (FUN_00632EA0, Moho::CAimManipulatorTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates and default-constructs one reflected aim manipulator.
    */
   gpg::RRef CAimManipulatorTypeInfo::NewRef()
   {
-    return MakeCAimManipulatorRef(nullptr);
+    return MakeCAimManipulatorRef(new CAimManipulator());
   }
 
   /**
    * Address: 0x00632F40 (FUN_00632F40, Moho::CAimManipulatorTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Default-constructs supplied storage and returns its reflected reference.
    */
   gpg::RRef CAimManipulatorTypeInfo::CtrRef(void* const objectStorage)
   {
-    return MakeCAimManipulatorRef(static_cast<CAimManipulator*>(objectStorage));
+    CAimManipulator* const object = objectStorage
+      ? ::new (objectStorage) CAimManipulator()
+      : nullptr;
+    return MakeCAimManipulatorRef(object);
   }
 
   /**
    * Address: 0x00632F20 (FUN_00632F20, Moho::CAimManipulatorTypeInfo::Delete)
+   *
+   * What it does:
+   * Deletes the reflected object through its virtual destructor.
    */
   void CAimManipulatorTypeInfo::Delete(void* const objectStorage)
   {
-    (void)objectStorage;
+    delete static_cast<CAimManipulator*>(objectStorage);
   }
 
   /**
    * Address: 0x00632FB0 (FUN_00632FB0, Moho::CAimManipulatorTypeInfo::Destruct)
+   *
+   * What it does:
+   * Runs the virtual destructor without releasing supplied storage.
    */
   void CAimManipulatorTypeInfo::Destruct(void* const objectStorage)
   {
-    (void)objectStorage;
+    static_cast<CAimManipulator*>(objectStorage)->~CAimManipulator();
   }
 
   /**

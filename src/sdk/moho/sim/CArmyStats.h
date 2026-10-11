@@ -23,24 +23,24 @@ namespace moho
 {
   class CArmyStatItem;
   class CAiBrain;
-  struct RBlueprint;
+  struct RUnitBlueprint;
   struct STrigger;
   enum ETriggerOperator : std::int32_t;
 
   /**
-   * The per-blueprint stat table is a plain `std::map<const RBlueprint*, float>`
+   * The per-blueprint stat table is a plain `std::map<const RUnitBlueprint*, float>`
    * in the original: the node is 0x18 with the links at 0/4/8, the key pointer
    * at +0x0C, the float at +0x10 and the colour/nil pair at +0x14/+0x15, which
    * is exactly what `msvc8::map` lays out for an 8-byte `value_type`. The key
    * comparison in the binary is a raw pointer compare, so the default
    * `std::less` is the right predicate rather than a name-ordering one.
-   * The consumers read the key's `mBlueprintId` (+0x08), `mDescription`
-   * (+0x24) and `mBlueprintOrdinal` (+0x5C); callers pass unit blueprints.
+   * The consumers read the key's `mBlueprintId` (+0x08), `mBlueprintLabel`
+   * (+0x24) and `mCategoryBitIndex` (+0x5C); callers pass unit blueprints.
    */
-  using ArmyBlueprintStatTree = msvc8::map<const RBlueprint*, float>;
+  using ArmyBlueprintStatTree = msvc8::map<const RUnitBlueprint*, float>;
   // The 0x18 node is not nameable from here -- `msvc8::map` keeps `node_type`
   // private -- but it is pinned by construction: links at 0/4/8, an 8-byte
-  // `pair<const RBlueprint*, float>` at +0x0C, colour at +0x14 and
+  // `pair<const RUnitBlueprint*, float>` at +0x0C, colour at +0x14 and
   // nil at +0x15, which the RbTree node template lays out exactly.
   static_assert(sizeof(ArmyBlueprintStatTree) == 0x0C, "ArmyBlueprintStatTree size must be 0x0C");
 
@@ -151,7 +151,7 @@ namespace moho
      * zero-initialized node when the key is missing, and returns a writable
      * pointer to that lane.
      */
-    [[nodiscard]] float* FindOrCreateBlueprintStatValue(const RBlueprint* blueprint);
+    [[nodiscard]] float* FindOrCreateBlueprintStatValue(const RUnitBlueprint* blueprint);
 
     /**
      * Address: 0x0070ADD0 (FUN_0070ADD0, sub_70ADD0)
@@ -296,7 +296,7 @@ namespace moho
      */
     [[nodiscard]] float* AddBlueprintStatDelta(
       const char* statPath,
-      const RBlueprint* blueprint,
+      const RUnitBlueprint* blueprint,
       float delta
     );
 

@@ -3717,29 +3717,7 @@ namespace
     return out;
   }
 
-  void SaveObjectByRType(
-    gpg::WriteArchive* archive,
-    void* object,
-    const std::initializer_list<const char*>& typeNames,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::RType* type = RequireRTypeByNameAny(typeNames);
-    GPG_ASSERT(type != nullptr && type->serSaveFunc_ != nullptr);
-    type->serSaveFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, const_cast<gpg::RRef*>(&ownerRef));
-  }
 
-  void LoadObjectByRType(
-    gpg::ReadArchive* archive,
-    void* object,
-    const std::initializer_list<const char*>& typeNames,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::RType* type = RequireRTypeByNameAny(typeNames);
-    GPG_ASSERT(type != nullptr && type->serLoadFunc_ != nullptr);
-    type->serLoadFunc_(archive, reinterpret_cast<std::intptr_t>(object), type->version_, const_cast<gpg::RRef*>(&ownerRef));
-  }
 
   void WriteArchiveUIntCompat(gpg::WriteArchive* archive, const std::uint32_t value)
   {
@@ -3754,37 +3732,7 @@ namespace
     }
   }
 
-  void SavePointerByRType(
-    gpg::WriteArchive* archive,
-    void* object,
-    const std::initializer_list<const char*>& typeNames,
-    const gpg::TrackedPointerState state,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::RRef objectRef{};
-    objectRef.mObj = object;
-    objectRef.mType = RequireRTypeByNameAny(typeNames);
-    gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
-  }
 
-  void* LoadPointerByRType(
-    gpg::ReadArchive* archive, const std::initializer_list<const char*>& typeNames, const gpg::RRef& ownerRef
-  )
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RType* expected = RequireRTypeByNameAny(typeNames);
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    const gpg::RRef casted = gpg::REF_UpcastPtr(source, expected);
-    GPG_ASSERT(casted.mObj != nullptr);
-    return casted.mObj ? casted.mObj : tracked.object;
-  }
 
   /**
    * Address: 0x00744C90 (FUN_00744C90, func_ArchiveWriteLuaObj)
@@ -3827,31 +3775,7 @@ namespace
     return rectType;
   }
 
-  void SaveTaskStages(
-    gpg::WriteArchive* archive,
-    CTaskStage* stageA,
-    CTaskStage* diskWatcherStage,
-    CTaskStage* stageB,
-    const gpg::RRef& ownerRef
-  )
-  {
-    SaveObjectByRType(archive, stageA, {"CTaskStage", "Moho::CTaskStage"}, ownerRef);
-    SaveObjectByRType(archive, diskWatcherStage, {"CTaskStage", "Moho::CTaskStage"}, ownerRef);
-    SaveObjectByRType(archive, stageB, {"CTaskStage", "Moho::CTaskStage"}, ownerRef);
-  }
 
-  void LoadTaskStages(
-    gpg::ReadArchive* archive,
-    CTaskStage* stageA,
-    CTaskStage* diskWatcherStage,
-    CTaskStage* stageB,
-    const gpg::RRef& ownerRef
-  )
-  {
-    LoadObjectByRType(archive, stageA, {"CTaskStage", "Moho::CTaskStage"}, ownerRef);
-    LoadObjectByRType(archive, diskWatcherStage, {"CTaskStage", "Moho::CTaskStage"}, ownerRef);
-    LoadObjectByRType(archive, stageB, {"CTaskStage", "Moho::CTaskStage"}, ownerRef);
-  }
 
   bool IsSimDebugCheatsEnabled()
   {
@@ -5115,58 +5039,66 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
     return;
   }
 
-  const gpg::RRef ownerRef = MakeSimOwnerRef(this);
-
-  // 0x00754C95..0x00754E1C: the nine objects the reader already holds are
-  // pushed into the tracked-pointer table before a byte of payload is read,
-  // so the indices the writer emitted resolve to the live objects.
+  const gpg::RRef ownerRef{};
   gpg::RRef roots[9]{};
   CollectSimArchiveRoots(this, roots);
   for (const gpg::RRef& root : roots) {
     (void)archive->TrackPointer(root);
   }
 
-  // 0x00754E34: the sim's `Sync` table is emptied before the incoming state
-  // is applied, so nothing from the previous session leaks into this one.
   (void)SCR_LuaDoString("ResetSyncTable()", mLuaState);
-
-  // 0x00754C60 order recovered from IDA/decomp.
   SerMapData(archive);
   archive->ReadUInt(&mCurTick);
 
-  mRngState =
-    static_cast<CRandomStream*>(LoadPointerByRType(archive, {"CRandomStream", "Moho::CRandomStream"}, ownerRef));
-  mPhysConstants =
-    static_cast<SPhysConstants*>(LoadPointerByRType(archive, {"SPhysConstants", "Moho::SPhysConstants"}, ownerRef));
-  mOGrid = static_cast<COGrid*>(LoadPointerByRType(archive, {"COGrid", "Moho::COGrid"}, ownerRef));
-  mFormationDB =
-    static_cast<CAiFormationDBImpl*>(LoadPointerByRType(archive, {"IAiFormationDB", "Moho::IAiFormationDB"}, ownerRef));
-  mEntityDB =
-    static_cast<EntityDB*>(LoadPointerByRType(archive, {"EntityDB", "CEntityDB", "Moho::EntityDB"}, ownerRef));
+  CRandomStream* random = nullptr;
+  archive->ReadPointerOwned(&random, &ownerRef);
+  delete std::exchange(mRngState, random);
+  SPhysConstants* physics = nullptr;
+  archive->ReadPointerOwned(&physics, &ownerRef);
+  delete std::exchange(mPhysConstants, physics);
+
+  // The grid is constructed with this Sim; its serializer registers that
+  // existing instance rather than constructing a replacement pointer.
+  archive->Read(gpg::RTypeOf<COGrid>(), mOGrid, ownerRef);
+  IAiFormationDB* formation = nullptr;
+  archive->ReadPointerOwned(&formation, &ownerRef);
+  delete std::exchange(mFormationDB, static_cast<CAiFormationDBImpl*>(formation));
+
+  {
+    boost::shared_ptr<ISimResources> resources;
+    archive->ReadPointerShared(&resources, &ownerRef);
+    mSimResources.reset_from_owner(boost::static_pointer_cast<CSimResources>(resources));
+  }
+  SerArmies(archive);
+
+  CCommandDB* commands = nullptr;
+  archive->ReadPointerOwned(&commands, &ownerRef);
+  delete std::exchange(mCommandDB, commands);
   archive->ReadUInt(&mReserved98C);
-  mDecalBuffer =
-    static_cast<CDecalBuffer*>(LoadPointerByRType(archive, {"CDecalBuffer", "Moho::CDecalBuffer"}, ownerRef));
-  mEffectManager =
-    static_cast<CEffectManagerImpl*>(LoadPointerByRType(archive, {"IEffectManager", "Moho::IEffectManager"}, ownerRef));
-  mSoundManager =
-    static_cast<CSimSoundManager*>(LoadPointerByRType(archive, {"ISoundManager", "Moho::ISoundManager"}, ownerRef));
 
-  LoadTaskStages(archive, &mTaskStageA, &mDiskWatcherTaskStage, &mTaskStageB, ownerRef);
+  CDecalBuffer* decals = nullptr;
+  archive->ReadPointerOwned(&decals, &ownerRef);
+  delete std::exchange(mDecalBuffer, decals);
+  IEffectManager* effects = nullptr;
+  archive->ReadPointerOwned(&effects, &ownerRef);
+  delete std::exchange(mEffectManager, static_cast<CEffectManagerImpl*>(effects));
+  ISoundManager* sound = nullptr;
+  archive->ReadPointerOwned(&sound, &ownerRef);
+  delete std::exchange(mSoundManager, static_cast<CSimSoundManager*>(sound));
+
+  archive->Read(gpg::RTypeOf<CTaskStage>(), &mTaskStageA, ownerRef);
+  archive->Read(gpg::RTypeOf<CTaskStage>(), &mDiskWatcherTaskStage, ownerRef);
+  archive->Read(gpg::RTypeOf<CTaskStage>(), &mTaskStageB, ownerRef);
   SerVars(archive);
-  LoadObjectByRType(archive, &mShields, {"std::list<Moho::Shield *>", "list<Moho::Shield *>"}, ownerRef);
+  archive->Read(gpg::RTypeOf<decltype(mShields)>(), &mShields, ownerRef);
   SerDirtyEnts(archive);
+  archive->ReadBool(&mCheatsEnabled);
+  archive->ReadBool(&mGameOver);
 
-  bool bitFlag = false;
-  archive->ReadBool(&bitFlag);
-  mCheatsEnabled = bitFlag;
-  archive->ReadBool(&bitFlag);
-  mGameOver = bitFlag;
+  EntityDB* entities = nullptr;
+  archive->ReadPointerOwned(&entities, &ownerRef);
+  delete std::exchange(mEntityDB, entities);
 
-  mCommandDB =
-    static_cast<CCommandDB*>(LoadPointerByRType(archive, {"CCommandDB", "CCommandDB", "Moho::CCommandDB"}, ownerRef));
-
-  // Restore the sim's Lua globals table: read (key, value) pairs into the globals
-  // until a nil-key sentinel (binary tail: mLuaState->GetGlobals() + FUN_00744E50).
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   ReadLuaTableEntriesFromArchive(archive, globals);
 }
@@ -5272,63 +5204,38 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
     return;
   }
 
-  const gpg::RRef ownerRef = MakeSimOwnerRef(this);
-
-  // 0x0075520A..0x00755391: the nine objects the reader already holds are
-  // registered before any payload is written, so every nested reference to
-  // them goes out as an index rather than as an object the far side would
-  // have to construct.
+  const gpg::RRef ownerRef{};
   gpg::RRef roots[9]{};
   CollectSimArchiveRoots(this, roots);
   for (const gpg::RRef& root : roots) {
     (void)archive->PreCreatedPtr(root);
   }
 
-  // 0x007553A9: `Sync` is emptied once the snapshot has been taken.
   (void)SCR_LuaDoString("ResetSyncTable()", mLuaState);
-
-  // 0x007551C0 order recovered from IDA/decomp.
   SerMapData(archive);
-  WriteArchiveUIntCompat(archive, mCurTick);
-
-  SavePointerByRType(
-    archive, mRngState, {"CRandomStream", "Moho::CRandomStream"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
-  SavePointerByRType(
-    archive, mPhysConstants, {"SPhysConstants", "Moho::SPhysConstants"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
-  SavePointerByRType(archive, mOGrid, {"COGrid", "Moho::COGrid"}, gpg::TrackedPointerState::Owned, ownerRef);
-  SavePointerByRType(
-    archive, mFormationDB, {"IAiFormationDB", "Moho::IAiFormationDB"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
-  SavePointerByRType(
-    archive, mEntityDB, {"EntityDB", "CEntityDB", "Moho::EntityDB"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
+  archive->WriteUInt(mCurTick);
+  archive->WritePointer(mRngState, gpg::TrackedPointerState::Owned, ownerRef);
+  archive->WritePointer(mPhysConstants, gpg::TrackedPointerState::Owned, ownerRef);
+  archive->Write(gpg::RTypeOf<COGrid>(), mOGrid, ownerRef);
+  archive->WritePointer(static_cast<IAiFormationDB*>(mFormationDB), gpg::TrackedPointerState::Owned, ownerRef);
+  archive->WritePointer(static_cast<ISimResources*>(mSimResources.px), gpg::TrackedPointerState::Shared, ownerRef);
   SerArmies(archive);
-  WriteArchiveUIntCompat(archive, mReserved98C);
-  SavePointerByRType(
-    archive, mDecalBuffer, {"CDecalBuffer", "Moho::CDecalBuffer"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
-  SavePointerByRType(
-    archive, mEffectManager, {"IEffectManager", "Moho::IEffectManager"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
-  SavePointerByRType(
-    archive, mSoundManager, {"ISoundManager", "Moho::ISoundManager"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
+  archive->WritePointer(mCommandDB, gpg::TrackedPointerState::Owned, ownerRef);
+  archive->WriteUInt(mReserved98C);
+  archive->WritePointer(mDecalBuffer, gpg::TrackedPointerState::Owned, ownerRef);
+  archive->WritePointer(static_cast<IEffectManager*>(mEffectManager), gpg::TrackedPointerState::Owned, ownerRef);
+  archive->WritePointer(static_cast<ISoundManager*>(mSoundManager), gpg::TrackedPointerState::Owned, ownerRef);
 
-  SaveTaskStages(archive, &mTaskStageA, &mDiskWatcherTaskStage, &mTaskStageB, ownerRef);
+  archive->Write(gpg::RTypeOf<CTaskStage>(), &mTaskStageA, ownerRef);
+  archive->Write(gpg::RTypeOf<CTaskStage>(), &mDiskWatcherTaskStage, ownerRef);
+  archive->Write(gpg::RTypeOf<CTaskStage>(), &mTaskStageB, ownerRef);
   SerVars(archive);
-  SaveObjectByRType(archive, &mShields, {"std::list<Moho::Shield *>", "list<Moho::Shield *>"}, ownerRef);
+  archive->Write(gpg::RTypeOf<decltype(mShields)>(), &mShields, ownerRef);
   SerDirtyEnts(archive);
-
   archive->WriteBool(mCheatsEnabled);
   archive->WriteBool(mGameOver);
-  SavePointerByRType(
-    archive, mCommandDB, {"CCommandDB", "CCommandDB", "Moho::CCommandDB"}, gpg::TrackedPointerState::Owned, ownerRef
-  );
+  archive->WritePointer(mEntityDB, gpg::TrackedPointerState::Owned, ownerRef);
 
-  // Persist the sim's Lua globals table as (key, value) entries + nil terminator
-  // (binary tail: mLuaState->GetGlobals() + func_ArchiveWriteLuaObj).
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   (void)func_ArchiveWriteLuaObj(archive, &globals);
 }
@@ -11257,7 +11164,7 @@ namespace
    * (`pair<const msvc8::string, CategoryLookupValue>`), materialising the
    * temporary this function passes to `insert()`. The binary builds that
    * temporary's second half inline as "an empty `BVIntSet` seeded with
-   * `lookup->mWordUniverseHandle`" (0x00555601-0x00555625 hand-assembles a
+   * `lookup->mRules`" (0x00555601-0x00555625 hand-assembles a
    * `FastVectorN<uint,2>`-shaped empty vector on the stack, pointing its
    * inline storage at itself) rather than calling a named `ResetToEmpty` --
    * that inlining is why the key-assign and value-reset land in one fused
@@ -11296,7 +11203,7 @@ namespace
     CategoryLookupMap::iterator it = categoryMap.find(categoryName);
     if (it == categoryMap.end()) {
       CategoryLookupValue freshValue{};
-      freshValue.ResetToEmpty(lookup.mWordUniverseHandle);
+      freshValue.ResetToEmpty(EntityCategoryHelper{lookup.mRules});
       it = categoryMap.insert(CategoryLookupMap::value_type(categoryName, freshValue)).first;
     }
     if (it == categoryMap.end()) {

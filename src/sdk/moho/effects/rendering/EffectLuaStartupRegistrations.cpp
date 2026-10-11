@@ -3161,4 +3161,14 @@ namespace
   };
 
   const EffectLuaStartupRegistrationsLuaFuncDefBootstrap gEffectLuaStartupRegistrationsLuaFuncDefBootstrap{};
+
+  // The original Sim class-binder record publishes the same factory table
+  // targeted by CDecalHandle.Destroy's method binder.
+  moho::CScrLuaClassBinder gDecalHandleClassBinder(
+    SimLuaInitSet(),
+    "moho.CDecalHandle",
+    &moho::CScrLuaMetatableFactory<moho::CDecalHandle>::Instance(),
+    "CDecalHandle",
+    ""
+  );
 } // namespace

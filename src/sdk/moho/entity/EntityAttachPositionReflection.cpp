@@ -439,7 +439,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructPositionHistoryRefInPlace(void* const objectStorage)
   {
-    auto* const history = new (objectStorage) moho::PositionHistory;
+    auto* const history = objectStorage ? new (objectStorage) moho::PositionHistory : nullptr;
 
     gpg::RRef out{};
     out = gpg::MakeRRef<moho::PositionHistory>(history);
@@ -533,59 +533,6 @@ namespace
     ::operator delete(objectStorage);
   }
 
-  /**
-   * Address: 0x0067C340 (FUN_0067C340)
-   *
-   * What it does:
-   * Binds the `new/construct/delete/destruct` callback lanes for
-   * `PositionHistory` reflection storage.
-   */
-  [[nodiscard]] gpg::RType* BindPositionHistoryNewCtorDeleteDtr(gpg::RType* const typeInfo)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    if (typeInfo == nullptr) {
-      return nullptr;
-    }
-
-    typeInfo->newRefFunc_ = &NewPositionHistoryRef;
-    typeInfo->ctorRefFunc_ = &ConstructPositionHistoryRefInPlace;
-    typeInfo->deleteFunc_ = &DeletePositionHistoryStorage;
-    typeInfo->dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x0067C360 (FUN_0067C360)
-   *
-   * What it does:
-   * Binds the `copy/move/delete/destruct` callback lanes for
-   * `PositionHistory` reflection storage.
-   */
-  [[nodiscard]] gpg::RType* BindPositionHistoryCopyMoveDeleteDtr(gpg::RType* const typeInfo)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    if (typeInfo == nullptr) {
-      return nullptr;
-    }
-
-    typeInfo->cpyRefFunc_ = &CopyPositionHistoryRef;
-    typeInfo->movRefFunc_ = &ConstructPositionHistoryRefFromSource;
-    typeInfo->deleteFunc_ = &DeletePositionHistoryStorage;
-    typeInfo->dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x006770A0 (FUN_006770A0)
-   *
-   * What it does:
-   * Binds all lifecycle callback lanes for `PositionHistory` reflection:
-   * `new/copy/delete/construct/move/destruct`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* BindPositionHistoryLifecycleCallbacks(gpg::RType* const typeInfo)
-  {
-    return BindPositionHistoryCopyMoveDeleteDtr(BindPositionHistoryNewCtorDeleteDtr(typeInfo));
-  }
 } // namespace
 
 namespace moho
@@ -752,9 +699,13 @@ namespace moho
   void PositionHistoryTypeInfo::Init()
   {
     size_ = sizeof(PositionHistory);
-    ctorRefFunc_ = &ConstructPositionHistoryRefInPlace;
-    dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
     gpg::RType::Init();
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this, &NewPositionHistoryRef, &ConstructPositionHistoryRefInPlace,
+      &DeletePositionHistoryStorage, &PositionHistoryTypeInfoNoOpCallback
+    );
+    cpyRefFunc_ = &CopyPositionHistoryRef;
+    movRefFunc_ = &ConstructPositionHistoryRefFromSource;
     Finish();
   }
 

@@ -76,8 +76,23 @@ namespace gpg
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
+    /**
+     * Address: 0x0063C4D0 (FUN_0063C4D0)
+     * What it does:
+     * Returns a reflected reference to one animation binding.
+     */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+    /**
+     * Address: 0x0063C480 (FUN_0063C480)
+     * What it does:
+     * Returns the number of live animation bindings.
+     */
     size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x0063C490 (FUN_0063C490)
+     * What it does:
+     * Resizes animation bindings while preserving inline storage ownership.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
@@ -165,9 +180,9 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAniManipBinding>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(objectPtr);
     moho::SAniManipBinding fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
 
     gpg::RType* const elementType = CachedSAniManipBindingType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -188,7 +203,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAniManipBinding>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -295,6 +310,11 @@ namespace gpg
     serSaveFunc_ = &SaveFastVectorSAniManipBinding;
   }
 
+  /**
+   * Address: 0x0063C4D0 (FUN_0063C4D0)
+   * What it does:
+   * Returns a reflected reference to one animation binding.
+   */
   gpg::RRef RFastVectorType<moho::SAniManipBinding>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
@@ -304,7 +324,7 @@ namespace gpg
       return out;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAniManipBinding>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(obj);
     if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
@@ -313,13 +333,18 @@ namespace gpg
     return out;
   }
 
+  /**
+   * Address: 0x0063C480 (FUN_0063C480)
+   * What it does:
+   * Returns the number of live animation bindings.
+   */
   size_t RFastVectorType<moho::SAniManipBinding>::GetCount(void* obj) const
   {
     if (!obj) {
       return 0u;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAniManipBinding>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(obj);
     if (vec.Data() == nullptr) {
       return 0u;
     }
@@ -327,15 +352,20 @@ namespace gpg
     return vec.size();
   }
 
+  /**
+   * Address: 0x0063C490 (FUN_0063C490)
+   * What it does:
+   * Resizes animation bindings while preserving inline storage ownership.
+   */
   void RFastVectorType<moho::SAniManipBinding>::SetCount(void* obj, const int count) const
   {
     if (!obj || count < 0) {
       return;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAniManipBinding>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(obj);
     moho::SAniManipBinding fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
   }
 } // namespace gpg
 

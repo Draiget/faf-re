@@ -38,6 +38,7 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
@@ -2965,4 +2966,12 @@ namespace
   };
 
   const CAiAttackerImplLuaFuncDefBootstrap gCAiAttackerImplLuaFuncDefBootstrap{};
+
+  moho::CScrLuaClassBinder gAttackerMethodsClassBinder(
+    SimLuaInitSet(),
+    "moho.CAiAttackerImpl_methods",
+    &moho::CScrLuaMetatableFactory<moho::CAiAttackerImpl>::Instance(),
+    "CAiAttackerImpl",
+    ""
+  );
 } // namespace

@@ -31,6 +31,14 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0065B970 (FUN_0065B970, Moho::CEfxEmitter::GetClass)
+     *
+     * What it does:
+     * Resolves the concrete emitter descriptor for reflected pointer writes.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
      * Address: 0x0065DD70 (FUN_0065DD70, Moho::CEfxEmitter::dtr)
      *
      * What it does:

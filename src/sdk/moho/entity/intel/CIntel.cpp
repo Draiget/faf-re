@@ -58,24 +58,6 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::CIntelPosHandle* ReadPosHandlePointer(gpg::ReadArchive& archive, const gpg::RRef& ownerRef)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(&archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelPosHandleType());
-    // The binary reads this owned pointer via ReadPointerOwned_CIntelPosHandle,
-    // which assigns the loaded pointer with no upcast type-check or throw -- a
-    // type mismatch simply yields a null field, it does not abort the load.
-    return static_cast<moho::CIntelPosHandle*>(upcast.mObj);
-  }
-
   // 0x0076E4EA: `CIntel::Update` decides whether a handle has to be re-rastered
   // by calling `Vector3<float>::CompareArrays` (0x004F0A50) on the new and last
   // positions: a 12-byte memcmp, i.e. WildMagic's own `operator!=`, so any bit
@@ -249,8 +231,10 @@ namespace moho
    */
   void CIntel::MemberDeserialize(gpg::ReadArchive* const archive)
   {
+    const gpg::RRef ownerRef{};
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      CIntelPosHandle* const loaded = ReadPosHandlePointer(*archive, gpg::RRef{});
+      CIntelPosHandle* loaded = nullptr;
+      archive->ReadPointerOwned(&loaded, &ownerRef);
       CIntelPosHandle* const previous = mIntelHandles[i];
       mIntelHandles[i] = loaded;
       if (previous) {

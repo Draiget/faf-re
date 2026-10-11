@@ -826,6 +826,17 @@ gpg::RType* CScriptEvent::GetClass() const
 }
 
 /**
+ * Address: 0x004C93C0 (FUN_004C93C0, Moho::CScriptEvent::StaticGetClass)
+ *
+ * What it does:
+ * Lazily resolves the distinct event descriptor rather than its script-object base.
+ */
+gpg::RType* CScriptEvent::StaticGetClass()
+{
+  return CachedCScriptEventType();
+}
+
+/**
  * Address: 0x004C9400 (FUN_004C9400, ?GetDerivedObjectRef@CScriptEvent@Moho@@UAE?AVRRef@gpg@@XZ)
  */
 gpg::RRef CScriptEvent::GetDerivedObjectRef()

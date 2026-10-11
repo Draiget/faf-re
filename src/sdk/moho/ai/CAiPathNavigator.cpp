@@ -105,7 +105,7 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedSearchType()
   {
-    return CachedType<EAiPathSearchType>(gSearchType);
+    return CachedType<ESearchType>(gSearchType);
   }
 
   template <typename TObject>
@@ -1683,7 +1683,8 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
     archive->Read(CachedNavigatorStateType(), &mState, owner);
   }
 
-  CAiPathFinder* const loadedPathFinder = ReadPointerWithType<CAiPathFinder>(archive, owner, CachedCAiPathFinderType());
+  CAiPathFinder* loadedPathFinder = nullptr;
+  archive->ReadPointerOwned(&loadedPathFinder, &owner);
   CAiPathFinder* const oldPathFinder = mPathFinder;
   mPathFinder = loadedPathFinder;
   if (oldPathFinder) {
@@ -1737,7 +1738,9 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
   mUseExtendedPathProbe = boolValue ? 1u : 0u;
   archive->ReadBool(&boolValue);
   mTargetWithinOneCell = boolValue ? 1u : 0u;
-  archive->Read(CachedSearchType(), &mPathRequestMode, owner);
+  ESearchType searchType{};
+  archive->Read(CachedSearchType(), &searchType, owner);
+  mPathRequestMode = static_cast<std::int32_t>(searchType);
   archive->ReadInt(&mPathRequestCountdown);
   archive->ReadInt(&mTickBucket7);
   archive->ReadInt(&mTickBucket13);
@@ -1789,7 +1792,8 @@ void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const i
   archive->WriteBool(mRepathRequested != 0u);
   archive->WriteBool(mUseExtendedPathProbe != 0u);
   archive->WriteBool(mTargetWithinOneCell != 0u);
-  archive->Write(CachedSearchType(), &mPathRequestMode, owner);
+  const ESearchType searchType = static_cast<ESearchType>(mPathRequestMode);
+  archive->Write(CachedSearchType(), &searchType, owner);
   archive->WriteInt(mPathRequestCountdown);
   archive->WriteInt(mTickBucket7);
   archive->WriteInt(mTickBucket13);

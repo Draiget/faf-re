@@ -946,7 +946,7 @@ namespace
   void AssignAllUnitsCategoryFilter(moho::CArmyImpl& army)
   {
     if (army.Simulation == nullptr || army.Simulation->mRules == nullptr) {
-      army.mVarDat.mCategoryFilterSet.ResetToEmpty(0u);
+      army.mVarDat.mCategoryFilterSet.ResetToEmpty(moho::EntityCategoryHelper{});
       return;
     }
 

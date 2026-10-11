@@ -5284,7 +5284,7 @@ namespace
 		 *
 		 * What it does:
 		 * Constructs the TObject runtime type descriptor and preregisters it with
-		 * reflection registry using `typeid(TObject)`.
+		 * reflection registry using `typeid(LuaPlus::TObject)`.
 		 */
 		TObjectTypeInfo();
 
@@ -5905,11 +5905,11 @@ namespace
 	 *
 	 * What it does:
 	 * Constructs the TObject runtime type descriptor and preregisters it with
-	 * reflection registry using `typeid(TObject)`.
+	 * reflection registry using `typeid(LuaPlus::TObject)`.
 	 */
 	TObjectTypeInfo::TObjectTypeInfo()
 	{
-		gpg::PreRegisterRType(typeid(TObject), this);
+		gpg::PreRegisterRType(typeid(LuaPlus::TObject), this);
 	}
 
 	const char* TObjectTypeInfo::GetName() const
@@ -5925,7 +5925,7 @@ namespace
 	 */
 	void TObjectTypeInfo::Init()
 	{
-		size_ = sizeof(TObject);
+		size_ = sizeof(LuaPlus::TObject);
 		gpg::RType::Init();
 		Finish();
 	}
@@ -17906,13 +17906,6 @@ void LuaState::SetState(lua_State* const state)
 }
 
 /**
- * Address: 0x00921050 (FUN_00921050, lua_State::MemberSerialize)
- *
- * What it does:
- * Serializes raw lua_State stack/callframe/global/upvalue lanes for archive
- * persistence.
- */
-/**
  * Address: 0x00921480 (FUN_00921480, func_SerializeNameLuaObject)
  *
  * What it does:
@@ -18465,8 +18458,8 @@ void lua_State::MemberDeserialize(gpg::ReadArchive* const archive, const int, co
 	int topIndex = 0;
 	int baseIndex = 0;
 	archive->ReadInt(&stackSize);
-	archive->ReadInt(&topIndex);
 	archive->ReadInt(&baseIndex);
+	archive->ReadInt(&topIndex);
 
 	if (baseIndex < 0 || baseIndex > topIndex || topIndex > stackSize) {
 		throw gpg::SerializationError("Consistency check failed: 0 <= ibase && ibase <= itop && itop <= stacksize");
@@ -18573,6 +18566,13 @@ void lua_State::MemberDeserialize(gpg::ReadArchive* const archive, const int, co
 	}
 }
 
+/**
+ * Address: 0x00921050 (FUN_00921050, lua_State::MemberSerialize)
+ *
+ * What it does:
+ * Serializes raw lua_State stack/callframe/global/upvalue lanes for archive
+ * persistence.
+ */
 void lua_State::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");

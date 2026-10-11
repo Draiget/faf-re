@@ -1,12 +1,12 @@
 #include "moho/serialization/CPrefetchSet.h"
 
-#include <cstring>
 #include <new>
 #include <typeinfo>
 
 #include "gpg/core/reflection/BadRefCast.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "lua/LuaTableIterator.h"
 
@@ -16,8 +16,6 @@ namespace
   constexpr const char* kPrefetchSetUpdateHelpText =
     "CPrefetchSet:Update({d3d_textures=..., batch_textures=..., models=..., anims=...})";
   constexpr const char* kPrefetchSetResetHelpText = "CPrefetchSet:Reset()";
-  moho::CScrLuaInitForm* gRecoveredCoreLuaInitFormPrev_CPrefetchSetStartup = nullptr;
-  moho::CScrLuaInitForm* gRecoveredCoreLuaInitFormAnchor_CPrefetchSetStartup = nullptr;
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
@@ -31,17 +29,6 @@ namespace
 
     static moho::CScrLuaInitFormSet sSet("Core");
     return sSet;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
   }
 
   template <moho::CScrLuaInitForm* (*Target)()>
@@ -418,40 +405,6 @@ namespace moho
     return index;
   }
 
-  /**
-   * Address: 0x00BC59E0 (FUN_00BC59E0, sub_BC59E0)
-   *
-   * What it does:
-   * Prepends this translation unit's class-binder form to the `core` init set.
-   *
-   * The binary does this by hand because its form is a *statically
-   * initialised* object in .data - the compiler emitted its vtable pointer and
-   * strings at link time, so no constructor ever runs and nothing links it
-   * into the set. Dumping 0x00F593F0 out of the image shows exactly that: a
-   * vtable at +0x00, "moho.CPrefetchSet" at +0x04, "CPrefetchSet" at +0x08 and
-   * the mNextInSet lane at +0x10 that this function patches.
-   *
-   * That does not carry over. Our equivalent form is a real C++ object whose
-   * constructor already calls CScrLuaInitFormSet::AddInit, so the prepend has
-   * happened by the time anything calls this. Re-doing it here is what broke
-   * startup: the previous recovery assigned `mForms` the *address of a
-   * CScrLuaInitForm* variable*, so the set's head was a pointer-sized lane
-   * whose first word - read as a vtable pointer - was null, and
-   * RunLuaInitFormSetIfPresent access-violated on the first virtual call. It
-   * also dropped every form registered before it, because the old head was
-   * saved into a "Prev" variable that nothing ever relinked.
-   */
-  CScrLuaInitForm* register_core_CoreInits_mForms_CPrefetchSetAnchor()
-  {
-    CScrLuaInitFormSet* coreSet = FindLuaInitFormSetByName("Core");
-    if (coreSet == nullptr) {
-      coreSet = &CoreLuaInitSet();
-    }
-
-    CScrLuaInitForm* const result = coreSet->mForms;
-    gRecoveredCoreLuaInitFormPrev_CPrefetchSetStartup = result;
-    return result;
-  }
 } // namespace moho
 
 namespace
@@ -460,7 +413,6 @@ namespace
   {
     CPrefetchSetLuaStartupBootstrap()
     {
-      (void)moho::register_core_CoreInits_mForms_CPrefetchSetAnchor();
       (void)moho::register_CScrLuaMetatableFactory_CPrefetchSet_Index();
       (void)moho::register_CreatePrefetchSet_LuaFuncDef();
       (void)moho::register_CPrefetchSetUpdate_LuaFuncDef();
@@ -499,4 +451,12 @@ namespace
   };
 
   const CPrefetchSetLuaFuncDefBootstrap gCPrefetchSetLuaFuncDefBootstrap{};
+
+  moho::CScrLuaClassBinder gPrefetchSetClassBinder(
+    CoreLuaInitSet(),
+    "moho.CPrefetchSet",
+    &moho::CScrLuaMetatableFactory<moho::CPrefetchSet>::Instance(),
+    "CPrefetchSet",
+    ""
+  );
 } // namespace

@@ -500,7 +500,7 @@ namespace moho
             const RUnitBlueprint* const blueprint = instigatorUnit->GetBlueprint();
             (void)armyStats->AddBlueprintStatDelta(
               "Units_TotalDamageDealt",
-              reinterpret_cast<const RBlueprint*>(blueprint),
+              blueprint,
               postArmorAmount
             );
 
@@ -539,7 +539,7 @@ namespace moho
             const RUnitBlueprint* const targetBlueprint = targetUnitForStats->GetBlueprint();
             (void)armyStats->AddBlueprintStatDelta(
               "Units_TotalDamageReceive",
-              reinterpret_cast<const RBlueprint*>(targetBlueprint),
+              targetBlueprint,
               postArmorAmount
             );
 

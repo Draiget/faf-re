@@ -787,10 +787,7 @@ namespace
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::REF_FindTypeNamed("Moho::UnitWeaponInfo");
-      if (!cached) {
-        cached = gpg::LookupRType(typeid(int));
-      }
+      cached = gpg::RTypeOf<moho::UnitWeaponInfo>();
     }
     return cached;
   }

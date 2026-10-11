@@ -4,6 +4,7 @@
 
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/script/CScriptEvent.h"
@@ -877,4 +878,13 @@ namespace
   };
 
   const CDamageLuaFunctionRegistrationsLuaFuncDefBootstrap gCDamageLuaFunctionRegistrationsLuaFuncDefBootstrap{};
+
+  // Publish the original Sim class table used by CDamage's method binders.
+  moho::CScrLuaClassBinder gDamageClassBinder(
+    SimLuaInitSet(),
+    "moho.CDamage",
+    &moho::CScrLuaMetatableFactory<moho::CDamage>::Instance(),
+    kCDamageLuaClassName,
+    ""
+  );
 } // namespace

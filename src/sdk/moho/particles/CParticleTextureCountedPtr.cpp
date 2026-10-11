@@ -7,7 +7,6 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/resource/CParticleTexture.h"
 #include "moho/resource/CParticleTextureReflection.h"
@@ -131,33 +130,6 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::CParticleTexture* ReadPointerSharedCParticleTexture(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
-  {
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    const gpg::RType* const expectedType = CachedCParticleTextureType();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    if (upcast.mObj) {
-      return static_cast<moho::CParticleTexture*>(upcast.mObj);
-    }
-
-    const char* const expected = expectedType ? expectedType->GetName() : "CParticleTexture";
-    const char* const actual = tracked.type ? tracked.type->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
-      expected,
-      actual
-    );
-    throw gpg::SerializationError(message.c_str());
-  }
-
   void LoadCountedPtrCParticleTexture(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
@@ -165,8 +137,8 @@ namespace
       return;
     }
 
-    moho::CParticleTexture* const texture =
-      ReadPointerSharedCParticleTexture(archive, ownerRef ? *ownerRef : gpg::RRef{});
+    moho::CParticleTexture* texture = nullptr;
+    archive->ReadPointer_CParticleTexture(&texture, ownerRef);
     (void)moho::AssignCountedParticleTexturePtr(counted, texture);
   }
 

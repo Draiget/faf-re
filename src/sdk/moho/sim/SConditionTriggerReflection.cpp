@@ -383,8 +383,10 @@ namespace
   };
   static_assert(sizeof(RFastVectorSConditionTypeInfo) == 0x68, "RFastVectorSConditionTypeInfo size must be 0x68");
 
-  using UnitBlueprintWeightMap = std::map<const moho::RUnitBlueprint*, float>;
-  using StringToArmyStatItemMap = std::map<std::string, moho::CArmyStatItem*>;
+  using UnitBlueprintWeightMap = moho::ArmyBlueprintStatTree;
+  static_assert(sizeof(UnitBlueprintWeightMap) == 0x0C, "UnitBlueprintWeightMap size must be 0x0C");
+  using StringToArmyStatItemMap = decltype(moho::CArmyStats::mNameIndex);
+  static_assert(sizeof(StringToArmyStatItemMap) == 0x0C, "StringToArmyStatItemMap size must be 0x0C");
 
   /**
    * Address: 0x0070FE00 (FUN_0070FE00, gpg::RMapType_RUnitBlueprintP_float::SerLoad)
@@ -415,7 +417,7 @@ namespace
       float value = 0.0f;
       archive->ReadPointer(&blueprint, &owner);
       archive->ReadFloat(&value);
-      (*destination)[blueprint] = value;
+      destination->insert(std::make_pair(blueprint, value));
     }
   }
 
@@ -446,7 +448,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (const auto& entry : *source) {
-      archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry.first), gpg::TrackedPointerState::Unowned, owner);
+      archive->WritePointer(entry.first, gpg::TrackedPointerState::Unowned, owner);
       archive->WriteFloat(entry.second);
     }
   }
@@ -488,7 +490,7 @@ namespace
       moho::CArmyStatItem* value = nullptr;
       archive->ReadString(&key);
       archive->ReadPointer(&value, &owner);
-      (*destination)[key.c_str()] = value;
+      destination->insert(std::make_pair(key, value));
     }
   }
 
@@ -519,8 +521,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (const auto& entry : *source) {
-      msvc8::string key(entry.first.c_str());
-      archive->WriteString(&key);
+      archive->WriteString(const_cast<msvc8::string*>(&entry.first));
 
       gpg::RRef pointerRef{};
       gpg::RRef_CArmyStatItem(&pointerRef, entry.second);

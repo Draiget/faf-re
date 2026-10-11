@@ -74,7 +74,7 @@ namespace moho
    */
   void CEfxEmitterTypeInfo::Init()
   {
-    size_ = 0x6F8;  // sizeof(CEfxEmitter)
+    size_ = sizeof(CEfxEmitter);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CEfxEmitterTypeInfo::NewRef,

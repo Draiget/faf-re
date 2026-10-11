@@ -969,7 +969,7 @@ namespace moho
    *
    * What it does:
    * Parses one `(filename)` argument, builds a `CSavedGame`, and creates the
-   * single-player session info that starts loading the saved game.
+   * single-player session info, schedules loading, and returns status/error results.
    */
   int cfunc_LoadSavedGameL(LuaPlus::LuaState* const state)
   {
@@ -985,9 +985,27 @@ namespace moho
       LuaPlus::LuaStackObject::TypeError(&filenameArg, "string");
     }
 
-    CSavedGame savedGame(filename);
-    (void)savedGame.CreateSinglePlayerSessionInfo();
-    return 0;
+    try {
+      msvc8::auto_ptr<SWldSessionInfo> sessionInfo;
+      {
+        CSavedGame savedGame(filename);
+        sessionInfo = savedGame.CreateSinglePlayerSessionInfo();
+      }
+      WLD_BeginSession(sessionInfo);
+      lua_pushboolean(rawState, 1);
+      return 1;
+    } catch (const SaveLoadError& error) {
+      gpg::Warnf("Loading save game \"%s\" failed: %s", filename, error.what());
+      lua_pushboolean(rawState, 0);
+      lua_pushstring(rawState, error.GetRawMessage().c_str());
+      return 2;
+    } catch (const std::exception& error) {
+      gpg::Warnf("Loading save game \"%s\" failed: %s", filename, error.what());
+      lua_pushboolean(rawState, 0);
+      lua_pushstring(rawState, "InternalError");
+      lua_pushstring(rawState, error.what());
+      return 3;
+    }
   }
 
   /**
@@ -1294,21 +1312,21 @@ namespace moho
     }
     boost::shared_ptr<std::FILE> file(rawFile, moho::SFileStarCloser{});
     if (!file.get()) {
-      throw std::runtime_error("CantOpen");
+      throw SaveLoadError("CantOpen");
     }
 
     SSaveGameFileHeader fileHeader{};
     if (std::fread(&fileHeader, sizeof(fileHeader), 1, file.get()) != 1 ||
         fileHeader.mMagic != kSaveGameFileHeaderMagic || fileHeader.mVersion != kSaveGameFileHeaderVersion ||
         !MatchesSavedGameIdentity(fileHeader)) {
-      throw std::runtime_error("InvalidFormat");
+      throw SaveLoadError("InvalidFormat");
     }
 
     (void)ReplaceReadArchiveLane(mReader, gpg::CreateBinaryReadArchive(file));
     (void)ReadSavedGameHeaderPayload(mReader, &mHeader, nullptr);
     mReader->EndSection(false);
     if (mHeader.mVersion != 20) {
-      throw std::runtime_error("WrongVersion");
+      throw SaveLoadError("WrongVersion");
     }
   }
 

@@ -2,7 +2,6 @@
 #include "EntityDb.h"
 
 #include <cstdlib>
-#include <initializer_list>
 #include <list>
 #include <limits>
 #include <map>
@@ -22,6 +21,7 @@
 #include "legacy/containers/Tree.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/entity/Prop.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/CArmyImpl.h"
@@ -264,65 +264,18 @@ namespace
     }
   }
 
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] gpg::RType* ResolveEntIdType()
   {
     static gpg::RType* sEntIdType = nullptr;
     if (!sEntIdType) {
-      sEntIdType = ResolveTypeByAnyName({"EntId", "Moho::EntId", "int", "signed int"});
-      if (!sEntIdType) {
-        sEntIdType = gpg::LookupRType(typeid(int));
-      }
+      sEntIdType = gpg::RTypeOf<moho::EntIdValue>();
     }
     return sEntIdType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntityType()
-  {
-    static gpg::RType* sEntityType = nullptr;
-    if (!sEntityType) {
-      sEntityType = ResolveTypeByAnyName({"Entity", "Moho::Entity"});
-      if (!sEntityType) {
-        sEntityType = gpg::LookupRType(typeid(moho::Entity));
-      }
-    }
-    return sEntityType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
-  {
-    static gpg::RType* sEntitySetBaseType = nullptr;
-    if (!sEntitySetBaseType) {
-      sEntitySetBaseType = ResolveTypeByAnyName({"EntitySetBase", "Moho::EntitySetBase"});
-    }
-    return sEntitySetBaseType;
   }
 
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
     return {};
-  }
-
-  [[nodiscard]] gpg::RRef MakeObjectRef(void* const object, gpg::RType* const type) noexcept
-  {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = object ? type : nullptr;
-    return ref;
   }
 
   [[nodiscard]] moho::Entity* ReadOwnedEntityPointer(gpg::ReadArchive* const archive)
@@ -331,19 +284,10 @@ namespace
       return nullptr;
     }
 
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, NullOwnerRef());
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RType* const entityType = ResolveEntityType();
-    if (!entityType || !tracked.type) {
-      return static_cast<moho::Entity*>(tracked.object);
-    }
-
-    const gpg::RRef source = MakeObjectRef(tracked.object, tracked.type);
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, entityType);
-    return static_cast<moho::Entity*>(upcast.mObj ? upcast.mObj : tracked.object);
+    moho::Entity* entity = nullptr;
+    const gpg::RRef owner{};
+    archive->ReadPointerOwned(&entity, &owner);
+    return entity;
   }
 
   [[nodiscard]] moho::EntitySetBase* ReadEntitySetPointer(gpg::ReadArchive* const archive)
@@ -352,19 +296,10 @@ namespace
       return nullptr;
     }
 
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, NullOwnerRef());
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RType* const expectedType = ResolveEntitySetBaseType();
-    if (!expectedType || !tracked.type) {
-      return static_cast<moho::EntitySetBase*>(tracked.object);
-    }
-
-    const gpg::RRef source = MakeObjectRef(tracked.object, tracked.type);
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    return static_cast<moho::EntitySetBase*>(upcast.mObj ? upcast.mObj : tracked.object);
+    moho::EntitySetBase* entitySet = nullptr;
+    const gpg::RRef owner{};
+    archive->ReadPointer(&entitySet, &owner);
+    return entitySet;
   }
 
   [[nodiscard]] moho::CEntityDbAllUnitsNode*
@@ -1870,7 +1805,6 @@ namespace moho
     }
 
     gpg::RType* const entIdType = ResolveEntIdType();
-    gpg::RType* const entityType = ResolveEntityType();
     if (!entIdType) {
       return;
     }
@@ -1879,12 +1813,7 @@ namespace moho
     // `EntId`, then the node value (+0x10) as an owned pointer.
     for (const auto& [entityId, entity] : mAllUnits) {
       archive->Write(entIdType, &entityId, NullOwnerRef());
-      gpg::WriteRawPointer(
-        archive,
-        MakeObjectRef(entity, entityType),
-        gpg::TrackedPointerState::Owned,
-        NullOwnerRef()
-      );
+      archive->WritePointer(entity, gpg::TrackedPointerState::Owned, NullOwnerRef());
     }
 
     const std::uint32_t sentinel = kEntityIdInvalidSentinel;
@@ -1919,23 +1848,11 @@ namespace moho
       return;
     }
 
-    gpg::RType* const setType = ResolveEntitySetBaseType();
-
     for (auto* node = mRegisteredEntitySets.mNext; node != &mRegisteredEntitySets; node = node->mNext) {
-      gpg::WriteRawPointer(
-        archive,
-        MakeObjectRef(static_cast<EntitySetBase*>(node), setType),
-        gpg::TrackedPointerState::Unowned,
-        NullOwnerRef()
-      );
+      archive->WritePointer(static_cast<EntitySetBase*>(node), gpg::TrackedPointerState::Unowned, NullOwnerRef());
     }
 
-    gpg::WriteRawPointer(
-      archive,
-      MakeObjectRef(nullptr, setType),
-      gpg::TrackedPointerState::Unowned,
-      NullOwnerRef()
-    );
+    archive->WritePointer(static_cast<EntitySetBase*>(nullptr), gpg::TrackedPointerState::Unowned, NullOwnerRef());
   }
 
   /**

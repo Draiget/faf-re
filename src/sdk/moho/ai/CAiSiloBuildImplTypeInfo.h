@@ -44,6 +44,8 @@ namespace moho
     static void AddBase_IAiSiloBuild(gpg::RType* typeInfo);
   };
 
+  static_assert(sizeof(CAiSiloBuildImplTypeInfo) == 0x64, "CAiSiloBuildImplTypeInfo size must be 0x64");
+
   /**
    * Address: 0x00BCE090 (FUN_00BCE090, register_SSiloBuildInfoTypeInfo)
    *

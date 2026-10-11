@@ -67,6 +67,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/task/ETaskStatus.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/path/PathTables.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
@@ -1716,7 +1717,7 @@ namespace
       return;
     }
 
-    (void)armyStats->AddBlueprintStatDelta(statPath, reinterpret_cast<const RBlueprint*>(blueprint), delta);
+    (void)armyStats->AddBlueprintStatDelta(statPath, blueprint, delta);
   }
 
   void IncrementArmyIntStatByName(CArmyStats* const armyStats, const char* const statPath)
@@ -10913,13 +10914,13 @@ namespace
 
   // Lazy reflected-type caches used by SSTIUnitVariableData::MemberDeserialize.
   // Mirror the binary's `if (!X::sType) X::sType = gpg::LookupRType(&X RTTI)`
-  // idiom at FUN_0055E030; typeid(T) resolves to the same ??_R0 descriptor the
-  // binary passes to LookupRType.
+  // idiom at FUN_0055E030. EntId's distinct class RTTI is represented by
+  // EntIdValue while runtime id fields retain their integer aliases.
   [[nodiscard]] gpg::RType* CachedEntIdType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(EntId));
+      cached = gpg::RTypeOf<EntIdValue>();
     }
     return cached;
   }
@@ -10969,7 +10970,7 @@ namespace
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::fastvector_n<UnitWeaponInfo, 1>));
+      cached = gpg::RTypeOf<gpg::fastvector<UnitWeaponInfo>>();
     }
     return cached;
   }
@@ -12016,12 +12017,13 @@ void SSTIUnitVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadBool(&mIsPaused);
   archive->ReadBool(&mIsValidTarget);
   archive->ReadBool(&mRepeatQueue);
-  // Binary reads mJobType/mFireState via the reflected Moho::EJobType /
-  // Moho::EFireState enum RTypes; those enums are not modeled in the SDK, and
-  // for a 4-byte enum-storage lane the reflected read is byte-identical to a
-  // plain 32-bit read, so ReadInt preserves the exact stream behavior.
-  archive->ReadInt(&mJobType);
-  archive->ReadInt(&mFireState);
+  // These enum values include reflected archive framing around the integer.
+  EJobType jobType{};
+  archive->Read(CachedEJobTypeType(), &jobType, ownerRef);
+  mJobType = static_cast<int>(jobType);
+  EFireState fireState{};
+  archive->Read(CachedEFireStateType(), &fireState, ownerRef);
+  mFireState = static_cast<int>(fireState);
   archive->ReadFloat(&mWorkProgress);
 
   // Binary emits a 2-iteration, stride-4 interleaved loop over the tactical/
@@ -12048,7 +12050,9 @@ void SSTIUnitVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadPointerShared(&mPriorSharedPose, &ownerRef);
   archive->ReadPointerShared(&mSharedPose, &ownerRef);
 
-  archive->Read(CachedUnitWeaponInfoVectorType(), &mWeaponInfo, ownerRef);
+  archive->Read(
+    CachedUnitWeaponInfoVectorType(), static_cast<gpg::core::FastVectorInline<UnitWeaponInfo>*>(&mWeaponInfo), ownerRef
+  );
   archive->Read(CachedUnitAttributesType(), &mAttributes, ownerRef);
 
   archive->ReadInt(reinterpret_cast<int*>(&mScriptbits));
@@ -12089,12 +12093,10 @@ void SSTIUnitVariableData::MemberSerialize(gpg::WriteArchive* const archive)
   archive->WriteBool(mIsPaused);
   archive->WriteBool(mIsValidTarget);
   archive->WriteBool(mRepeatQueue);
-  // Binary writes mJobType/mFireState through the reflected Moho::EJobType /
-  // Moho::EFireState enum RTypes; those enums are not modeled in the SDK, and
-  // for a 4-byte enum-storage lane the reflected write is byte-identical to a
-  // plain 32-bit write, so WriteInt preserves the exact stream behavior.
-  archive->Write(CachedEJobTypeType(), &mJobType, ownerRef);
-  archive->Write(CachedEFireStateType(), &mFireState, ownerRef);
+  const EJobType jobType = static_cast<EJobType>(mJobType);
+  archive->Write(CachedEJobTypeType(), &jobType, ownerRef);
+  const EFireState fireState = static_cast<EFireState>(mFireState);
+  archive->Write(CachedEFireStateType(), &fireState, ownerRef);
   archive->WriteFloat(mWorkProgress);
 
   // Binary emits a 2-iteration, stride-4 interleaved loop over the tactical/
@@ -12130,7 +12132,9 @@ void SSTIUnitVariableData::MemberSerialize(gpg::WriteArchive* const archive)
   poseRef = gpg::MakeRRef<moho::CAniPose>(mSharedPose.get());
   gpg::WriteRawPointer(archive, poseRef, gpg::TrackedPointerState::Shared, ownerRef);
 
-  archive->Write(CachedUnitWeaponInfoVectorType(), &mWeaponInfo, ownerRef);
+  archive->Write(
+    CachedUnitWeaponInfoVectorType(), static_cast<const gpg::core::FastVectorInline<UnitWeaponInfo>*>(&mWeaponInfo), ownerRef
+  );
   archive->Write(CachedUnitAttributesType(), &mAttributes, ownerRef);
 
   archive->WriteInt(static_cast<int>(mScriptbits));

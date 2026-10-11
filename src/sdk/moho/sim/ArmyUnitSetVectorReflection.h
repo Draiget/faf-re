@@ -67,6 +67,12 @@ namespace gpg
      * +0x8 (`gpg::RIndexed` sub-vtable), confirmed via data xref.
      */
     void SetCount(void* obj, int count) const override;
+
+  private:
+    // Canonical RVectorType<T> callbacks; emitted template addresses are
+    // documented in the reconstruction report.
+    static void SerLoad(ReadArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
+    static void SerSave(WriteArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
   };
 
   static_assert(

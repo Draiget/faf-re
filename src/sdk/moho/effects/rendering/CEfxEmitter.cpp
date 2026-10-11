@@ -171,6 +171,20 @@ namespace moho
   gpg::RType* CEfxEmitter::sType = nullptr;
 
   /**
+   * Address: 0x0065B970 (FUN_0065B970, Moho::CEfxEmitter::GetClass)
+   *
+   * What it does:
+   * Lazily resolves the concrete emitter RTTI descriptor.
+   */
+  gpg::RType* CEfxEmitter::GetClass() const
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CEfxEmitter));
+    }
+    return sType;
+  }
+
+  /**
    * Address: 0x0065B9B0 (FUN_0065B9B0, Moho::CEfxEmitter::CEfxEmitter)
    *
    * What it does:

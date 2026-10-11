@@ -124,23 +124,6 @@ namespace
   }
 
   template <typename TObject>
-  [[nodiscard]] TObject* ReadPointerWithType(
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef,
-    gpg::RType* const expectedType
-  )
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    const gpg::RRef source{tracked.object, tracked.type};
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    return static_cast<TObject*>(upcast.mObj);
-  }
-
-  template <typename TObject>
   [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType)
   {
     gpg::RRef ref{};
@@ -247,8 +230,8 @@ void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
   const gpg::RRef ownerRef{};
   archive->Read(CachedCAiNavigatorImplType(), this, ownerRef);
 
-  CAiPathNavigator* const loadedPathNavigator =
-    ReadPointerWithType<CAiPathNavigator>(archive, ownerRef, CachedCAiPathNavigatorType());
+  CAiPathNavigator* loadedPathNavigator = nullptr;
+  archive->ReadPointerOwned(&loadedPathNavigator, &ownerRef);
 
   if (this) {
     CAiPathNavigator* const oldPathNavigator = mPathNavigator;

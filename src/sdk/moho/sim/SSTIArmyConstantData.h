@@ -125,7 +125,7 @@ namespace moho
   /**
    * VFTABLE: 0x00E17E5C
    *
-   * Reflection serializer for `EntId` (`std::int32_t`). Adjacent to
+   * Reflection serializer for the distinct `EntId` descriptor. Adjacent to
    * `SSTIArmyConstantDataSerializer` in the binary's registration cluster
    * (0x00BC9AB0/0x00BC9F80 sit in the same address range), suggesting the
    * original 2007 translation unit housed both together.
@@ -174,12 +174,9 @@ namespace moho
      * via incoming_xrefs from both vtables)
      *
      * What it does:
-     * Binds load/save serializer callbacks into `EntId` RTTI. `EntId` is a
-     * `std::int32_t` alias (not a class), so unlike `SSTIArmyConstantData`
-     * it cannot host its own `static RType* sType` member; the cached type
-     * pointer lives as a translation-unit-local static instead (matches the
-     * real ctor's `Moho__EntId__sType` target, a plain data symbol rather
-     * than a class static member).
+     * Binds load/save serializer callbacks into the original distinct class
+     * RTTI, represented by EntIdValue while engine callsites use integer
+     * aliases. The per-type cache must not resolve int's descriptor.
      */
     void Init() override;
 

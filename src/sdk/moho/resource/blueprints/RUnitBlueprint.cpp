@@ -482,8 +482,7 @@ namespace moho
   {
     // The set's own construction leaves its word vector on the inline buffer;
     // the universe word is the owning rules object, as the binary stores it.
-    CategoryCache.mUniverse.mWordUniverseHandle =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(rules));
+    CategoryCache.mUniverse.mRules = rules;
   }
 
   /**

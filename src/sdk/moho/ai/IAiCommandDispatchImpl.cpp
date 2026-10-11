@@ -69,22 +69,6 @@ using namespace moho;
 
 namespace
 {
-  class IAiCommandDispatchImplConstructed final : public IAiCommandDispatchImpl
-  {
-  public:
-    using IAiCommandDispatchImpl::IAiCommandDispatchImpl;
-
-    int Execute() override
-    {
-      return static_cast<int>(TaskTick());
-    }
-  };
-
-  static_assert(
-    sizeof(IAiCommandDispatchImplConstructed) == sizeof(IAiCommandDispatchImpl),
-    "IAiCommandDispatchImplConstructed size must match IAiCommandDispatchImpl"
-  );
-
   [[nodiscard]] gpg::RType* CachedIAiCommandDispatchImplType()
   {
     gpg::RType* type = IAiCommandDispatchImpl::sType;
@@ -800,7 +784,7 @@ gpg::RType* IAiCommandDispatchImpl::sType = nullptr;
  */
 IAiCommandDispatch* moho::AI_CreateCommandDispatch(Unit* const unit)
 {
-  auto* const dispatch = new (std::nothrow) IAiCommandDispatchImplConstructed(unit);
+  auto* const dispatch = new (std::nothrow) IAiCommandDispatchImpl(unit);
   (void)new (std::nothrow) CUnitGetBuiltTask(static_cast<CCommandTask*>(dispatch));
   return dispatch ? static_cast<IAiCommandDispatch*>(dispatch) : nullptr;
 }
@@ -967,7 +951,7 @@ void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit, CCommandTask
  * the queue state back into the current command, rotates or removes entries as
  * needed, and then re-enters the dispatch-ready check.
  */
-ETaskStatus IAiCommandDispatchImpl::TaskTick()
+int IAiCommandDispatchImpl::Execute()
 {
   auto tryDispatchHead = [this]() -> ETaskStatus {
     if (mUnit == nullptr || mCommandQueue == nullptr) {
@@ -1140,7 +1124,7 @@ void IAiCommandDispatchImpl::MemberConstruct(
   gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result
 )
 {
-  result.SetUnowned(MakeDispatchObjectRef(new IAiCommandDispatchImplConstructed()), 0u);
+  result.SetUnowned(MakeDispatchObjectRef(new IAiCommandDispatchImpl()), 0u);
 }
 
 /**

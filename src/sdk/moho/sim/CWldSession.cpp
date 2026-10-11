@@ -485,7 +485,7 @@ namespace
 {
   gpg::RType* gEntIdStringMultiMapKeyType = nullptr;
   gpg::RType* gEntIdStringMultiMapValueType = nullptr;
-  using EntIdStringMultiMap = std::multimap<moho::EntId, msvc8::string>;
+  using EntIdStringMultiMap = moho::SSessionSaveNodeMap;
 
   [[nodiscard]] gpg::RType* ResolveEntIdTypeForMultiMapName()
   {
@@ -625,8 +625,8 @@ namespace
  */
 void gpg::RMultiMapType_EntId_string::Init()
 {
-  static_assert(sizeof(msvc8::multimap<moho::EntId, msvc8::string>) == 0x0C, "msvc8::multimap<moho::EntId, msvc8::string> is 0x0C bytes on x86");
-  size_ = sizeof(msvc8::multimap<moho::EntId, msvc8::string>);
+  static_assert(sizeof(EntIdStringMultiMap) == 0x0C, "EntIdStringMultiMap size must be 0x0C");
+  size_ = sizeof(EntIdStringMultiMap);
   version_ = 1;
   serSaveFunc_ = &SerializeEntIdStringMultiMap;
   serLoadFunc_ = &DeserializeEntIdStringMultiMap;
@@ -7589,247 +7589,6 @@ namespace moho
       return terrainRes->SetPlayableMapRect(VisibilityRect::FromRect2i(playableRect));
     }
 
-    /**
-     * Address: 0x0089A970 (FUN_0089A970) allocation path (FUN_0089A970) for insert-node creation.
-     *
-     * Source-side typed helper used to keep node allocation/layout explicit.
-     */
-    [[nodiscard]] SSessionSaveNodeMapNode* AllocateSaveDataMapNode()
-    {
-      auto* const raw = ::operator new(sizeof(SSessionSaveNodeMapNode));
-      auto* const node = new (raw) SSessionSaveNodeMapNode{};
-      node->mColor = 0u;
-      node->mIsSentinel = 0u;
-      return node;
-    }
-
-    /**
-     * Address: 0x0089AC40 (FUN_0089AC40) cleanup chain (FUN_008971A0 -> FUN_0089AC40 call path).
-     */
-    void DestroySaveDataMapNode(SSessionSaveNodeMapNode* const node)
-    {
-      if (!node) {
-        return;
-      }
-
-      node->~SSessionSaveNodeMapNode();
-      ::operator delete(node);
-    }
-
-    /**
-     * Address: 0x0089A930 (FUN_0089A930) sentinel header-node allocation/init path.
-     */
-    [[nodiscard]] SSessionSaveNodeMapNode* CreateSaveDataMapHead()
-    {
-      SSessionSaveNodeMapNode* const head = AllocateSaveDataMapNode();
-      head->mColor = 1u;
-      head->mIsSentinel = 1u;
-      head->mLeft = head;
-      head->mParent = head;
-      head->mRight = head;
-      return head;
-    }
-
-    /**
-     * Address: 0x00897140 (FUN_00897140)
-     *
-     * What it does:
-     * Initializes one session save-node map header lane (sentinel self-links)
-     * and clears entry count.
-     */
-    SSessionSaveNodeMap* InitializeSessionSaveNodeMapHeader(
-      SSessionSaveNodeMap* const outMap
-    )
-    {
-      SSessionSaveNodeMapNode* const head = CreateSaveDataMapHead();
-      outMap->mHead = head;
-      head->mIsSentinel = 1u;
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      outMap->mSize = 0u;
-      return outMap;
-    }
-
-    /**
-     * Address: 0x0089A8E0 (FUN_0089A8E0).
-     */
-    void RotateSaveDataLeft(SSessionSaveNodeMap& map, SSessionSaveNodeMapNode* const node)
-    {
-      SSessionSaveNodeMapNode* const head = map.mHead;
-      SSessionSaveNodeMapNode* const pivot = node->mRight;
-      node->mRight = pivot->mLeft;
-      if (!IsSentinelNode(pivot->mLeft)) {
-        pivot->mLeft->mParent = node;
-      }
-
-      pivot->mParent = node->mParent;
-      if (node == head->mParent) {
-        head->mParent = pivot;
-      } else if (node == node->mParent->mLeft) {
-        node->mParent->mLeft = pivot;
-      } else {
-        node->mParent->mRight = pivot;
-      }
-
-      pivot->mLeft = node;
-      node->mParent = pivot;
-    }
-
-    /**
-     * Address: 0x0089A880 (FUN_0089A880).
-     */
-    void RotateSaveDataRight(SSessionSaveNodeMap& map, SSessionSaveNodeMapNode* const node)
-    {
-      SSessionSaveNodeMapNode* const head = map.mHead;
-      SSessionSaveNodeMapNode* const pivot = node->mLeft;
-      node->mLeft = pivot->mRight;
-      if (!IsSentinelNode(pivot->mRight)) {
-        pivot->mRight->mParent = node;
-      }
-
-      pivot->mParent = node->mParent;
-      if (node == head->mParent) {
-        head->mParent = pivot;
-      } else if (node == node->mParent->mRight) {
-        node->mParent->mRight = pivot;
-      } else {
-        node->mParent->mLeft = pivot;
-      }
-
-      pivot->mRight = node;
-      node->mParent = pivot;
-    }
-
-    /**
-     * Address: 0x00899DC0 (FUN_00899DC0) RB-tree insert rebalance sequence.
-     *
-     * Source-side typed split of the original monolithic helper body.
-     */
-    void FixupSaveDataInsert(SSessionSaveNodeMap& map, SSessionSaveNodeMapNode* node)
-    {
-      SSessionSaveNodeMapNode* const head = map.mHead;
-      while (node->mParent->mColor == 0u) {
-        SSessionSaveNodeMapNode* const parent = node->mParent;
-        SSessionSaveNodeMapNode* const grand = parent->mParent;
-        if (parent == grand->mLeft) {
-          SSessionSaveNodeMapNode* const uncle = grand->mRight;
-          if (uncle->mColor == 0u) {
-            parent->mColor = 1u;
-            uncle->mColor = 1u;
-            grand->mColor = 0u;
-            node = grand;
-          } else {
-            if (node == parent->mRight) {
-              node = parent;
-              RotateSaveDataLeft(map, node);
-            }
-            node->mParent->mColor = 1u;
-            node->mParent->mParent->mColor = 0u;
-            RotateSaveDataRight(map, node->mParent->mParent);
-          }
-        } else {
-          SSessionSaveNodeMapNode* const uncle = grand->mLeft;
-          if (uncle->mColor == 0u) {
-            parent->mColor = 1u;
-            uncle->mColor = 1u;
-            grand->mColor = 0u;
-            node = grand;
-          } else {
-            if (node == parent->mLeft) {
-              node = parent;
-              RotateSaveDataRight(map, node);
-            }
-            node->mParent->mColor = 1u;
-            node->mParent->mParent->mColor = 0u;
-            RotateSaveDataLeft(map, node->mParent->mParent);
-          }
-        }
-      }
-
-      head->mParent->mColor = 1u;
-    }
-
-    /**
-      * Alias of FUN_008992D0 (non-canonical helper lane).
-     * (FUN_008992D0 -> FUN_00899DC0 -> FUN_0089A970 chain).
-     *
-     * Source-side typed split around search/insert/fixup stages.
-     */
-    void InsertSaveDataLabelNode(SSessionSaveNodeMap& map, const SSessionSaveNodeLabel& label)
-    {
-      SSessionSaveNodeMapNode* const head = map.mHead;
-      SSessionSaveNodeMapNode* parent = head;
-      SSessionSaveNodeMapNode* current = head->mParent;
-      bool insertLeft = true;
-
-      while (!IsSentinelNode(current)) {
-        parent = current;
-        insertLeft = (label.mCommandSourceId < current->mLabel.mCommandSourceId);
-        current = insertLeft ? current->mLeft : current->mRight;
-      }
-
-      SSessionSaveNodeMapNode* const node = AllocateSaveDataMapNode();
-      node->mLabel.mCommandSourceId = label.mCommandSourceId;
-      node->mLabel.mSaveNodeName = label.mSaveNodeName;
-      node->mLeft = head;
-      node->mRight = head;
-      node->mParent = parent;
-
-      ++map.mSize;
-      if (parent == head) {
-        head->mParent = node;
-        head->mLeft = node;
-        head->mRight = node;
-      } else if (insertLeft) {
-        parent->mLeft = node;
-        if (parent == head->mLeft) {
-          head->mLeft = node;
-        }
-      } else {
-        parent->mRight = node;
-        if (parent == head->mRight) {
-          head->mRight = node;
-        }
-      }
-
-      FixupSaveDataInsert(map, node);
-    }
-
-    /**
-      * Alias of FUN_008971A0 (non-canonical helper lane).
-     *
-     * Source-side typed cleanup helper equivalent.
-     */
-    void DestroySaveDataSubtree(SSessionSaveNodeMapNode* const node, SSessionSaveNodeMapNode* const head)
-    {
-      if (!node || node == head || node->mIsSentinel != 0u) {
-        return;
-      }
-
-      DestroySaveDataSubtree(node->mLeft, head);
-      DestroySaveDataSubtree(node->mRight, head);
-      DestroySaveDataMapNode(node);
-    }
-
-    /**
-      * Alias of FUN_008971A0 (non-canonical helper lane).
-     */
-    void ClearSaveDataMap(SSessionSaveNodeMap& map)
-    {
-      SSessionSaveNodeMapNode* const head = map.mHead;
-      if (!head) {
-        map.mSize = 0u;
-        return;
-      }
-
-      DestroySaveDataSubtree(head->mParent, head);
-      head->mLeft = head;
-      head->mParent = head;
-      head->mRight = head;
-      map.mSize = 0u;
-    }
-
     [[nodiscard]] ECommandMode DefaultModeFromDrag(const std::int32_t dragWord) noexcept
     {
       const std::uint32_t dragMask = static_cast<std::uint32_t>(dragWord) & 0xFF000000u;
@@ -8384,34 +8143,12 @@ namespace moho
   /**
    * Address: 0x00896F00 (FUN_00896F00) init path (FUN_00896F00 -> sub_89A930).
    */
-  SSessionSaveData::SSessionSaveData()
-  {
-    mNodeMap.mAllocProxy = nullptr;
-    (void)InitializeSessionSaveNodeMapHeader(&mNodeMap);
-  }
+  SSessionSaveData::SSessionSaveData() = default;
 
   /**
    * Address: 0x008971A0 cleanup path (FUN_008971A0 + sub_89AC40).
    */
-  SSessionSaveData::~SSessionSaveData()
-  {
-    ClearSaveDataMap(mNodeMap);
-    DestroySaveDataMapNode(mNodeMap.mHead);
-    mNodeMap.mHead = nullptr;
-    mNodeMap.mAllocProxy = nullptr;
-    mNodeMap.mSize = 0u;
-  }
-
-  /**
-   * Address: 0x008992D0 (FUN_008992D0)/0x00899DC0/0x0089A970 helper chain.
-   */
-  void SSessionSaveData::InsertNodeLabel(const std::uint32_t commandSourceId, const msvc8::string& saveNodeName)
-  {
-    SSessionSaveNodeLabel label{};
-    label.mCommandSourceId = commandSourceId;
-    label.mSaveNodeName = saveNodeName;
-    InsertSaveDataLabelNode(mNodeMap, label);
-  }
+  SSessionSaveData::~SSessionSaveData() = default;
 
   /**
    * Address: 0x00893160 (FUN_00893160,
@@ -9819,9 +9556,8 @@ namespace moho
     selectionSetsByName.AssignNewTable(mState, 0, 0);
 
     SSessionSaveData& saveData = *mPendingSaveData;
-    SSessionSaveNodeMapNode* const head = saveData.mNodeMap.mHead;
-    for (SSessionSaveNodeMapNode* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)) {
-      UserEntity* const entity = LookupEntityId(static_cast<EntId>(node->mLabel.mCommandSourceId));
+    for (const auto& label : saveData.mNodeMap) {
+      UserEntity* const entity = LookupEntityId(label.first);
       if (entity == nullptr) {
         continue;
       }
@@ -9831,7 +9567,7 @@ namespace moho
         continue;
       }
 
-      const char* const selectionSetName = node->mLabel.mSaveNodeName.c_str();
+      const char* const selectionSetName = label.second.c_str();
       unit->AddSelectionSet(selectionSetName);
 
       LuaPlus::LuaObject setUnits = selectionSetsByName[selectionSetName];
@@ -12388,7 +12124,7 @@ namespace moho
       }
 
       for (const msvc8::string& selectionSet : unit->mSelectionSets) {
-        saveData->InsertNodeLabel(entityId, selectionSet);
+        saveData->mNodeMap.insert(std::make_pair(entityId, selectionSet));
       }
     }
 

@@ -435,7 +435,7 @@ namespace
     const std::uint32_t wordCount = static_cast<std::uint32_t>((wordEnd - wordBegin) >> 2u);
     const std::uint32_t endWordIndex = bits->mFirstWordIndex + wordCount;
 
-    out->mWordUniverseHandle = categorySet->mUniverse.mWordUniverseHandle;
+    out->mRules = categorySet->mUniverse.mRules;
     out->mSet = bits;
     out->mCurBit = static_cast<std::int32_t>(endWordIndex << 5u);
     return out;
@@ -2935,10 +2935,9 @@ namespace moho
     mTarget.targetPoint = -1;
     mTarget.targetIsMobile = false;
 
-    const std::uint32_t categoryUniverseBits =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mSim->mRules));
-    mCat1.ResetToEmpty(categoryUniverseBits);
-    mCat2.ResetToEmpty(categoryUniverseBits);
+    const EntityCategoryHelper categoryUniverse{mSim->mRules};
+    mCat1.ResetToEmpty(categoryUniverse);
+    mCat2.ResetToEmpty(categoryUniverse);
 
     if (!mWeaponBlueprint->ProjectileId.name.empty()) {
       mProjectileBlueprint = mSim->mRules->GetProjectileBlueprint(mWeaponBlueprint->ProjectileId);
@@ -4318,7 +4317,7 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    archive->Read(CScriptEvent::StaticGetClass(), this, ownerRef);
+    archive->Read(CScriptEvent::StaticGetClass(), static_cast<CScriptEvent*>(this), ownerRef);
     mSim = ReadTrackedPointer<Sim>(*archive, ownerRef);
     mWeaponBlueprint = ReadTrackedPointer<RUnitBlueprintWeapon>(*archive, ownerRef);
     mProjectileBlueprint = ReadTrackedPointer<RProjectileBlueprint>(*archive, ownerRef);
@@ -4335,8 +4334,10 @@ namespace moho
     archive->ReadString(&mLabel);
     archive->Read(CachedRType<CAiTarget>(), &mTarget, ownerRef);
 
+    CFireWeaponTask* loadedTask = nullptr;
+    archive->ReadPointerOwned(&loadedTask, &ownerRef);
     CFireWeaponTask* const oldTask = mFireWeaponTask;
-    mFireWeaponTask = ReadTrackedPointer<CFireWeaponTask>(*archive, ownerRef);
+    mFireWeaponTask = loadedTask;
     if (oldTask) {
       delete oldTask;
     }
@@ -4368,7 +4369,7 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    archive->Write(CScriptEvent::StaticGetClass(), this, ownerRef);
+    archive->Write(CScriptEvent::StaticGetClass(), static_cast<const CScriptEvent*>(this), ownerRef);
     WriteTrackedPointer(*archive, mSim, gpg::TrackedPointerState::Unowned, ownerRef);
     WriteTrackedPointer(*archive, mWeaponBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
     WriteTrackedPointer(*archive, mProjectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);

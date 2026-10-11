@@ -421,21 +421,6 @@ namespace
    */
   moho::SPathNeighborSerializer gSPathNeighborSerializerHelper;
 
-  [[nodiscard]] gpg::RType* CachedPathQueueImplType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::PathQueue::Impl");
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("PathQueue::Impl");
-      }
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("PathQueue_Impl");
-      }
-    }
-    return sType;
-  }
-
   [[nodiscard]] gpg::RType* CachedSOffsetInfoType()
   {
     static gpg::RType* sType = nullptr;
@@ -535,44 +520,6 @@ namespace gpg
 
     gpg::RRef temp{};
     temp = gpg::MakeRRef<moho::CTextureScroller>(value);
-    outRef->mObj = temp.mObj;
-    outRef->mType = temp.mType;
-    return outRef;
-  }
-
-  /**
-   * Address: 0x0076A5F0 (FUN_0076A5F0, gpg::RRef_PathQueue_Impl)
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::PathQueue::Impl` using the
-   * preregistered named RTTI lane for the opaque impl payload.
-   */
-  gpg::RRef* RRef_PathQueue_Impl(gpg::RRef* const outRef, moho::PathQueue::Impl* const value)
-  {
-    if (outRef == nullptr) {
-      return nullptr;
-    }
-
-    outRef->mObj = value;
-    outRef->mType = CachedPathQueueImplType();
-    return outRef;
-  }
-
-  /**
-   * Address: 0x00768CA0 (FUN_00768CA0)
-   *
-   * What it does:
-   * Builds one temporary `RRef_PathQueue_Impl` and copies its `(mObj,mType)`
-   * pair into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_PathQueue_Impl(gpg::RRef* const outRef, moho::PathQueue::Impl* const value)
-  {
-    if (outRef == nullptr) {
-      return nullptr;
-    }
-
-    gpg::RRef temp{};
-    (void)RRef_PathQueue_Impl(&temp, value);
     outRef->mObj = temp.mObj;
     outRef->mType = temp.mType;
     return outRef;
@@ -711,32 +658,6 @@ namespace gpg
     *outVector = std::move(loaded);
   }
 
-  /**
-   * Address: 0x00702250 (FUN_00702250)
-   *
-   * What it does:
-   * Writes one contiguous `vector<EntitySetTemplate<Unit>>` payload by saving
-   * the element count and each reflected lane in order.
-   */
-  void SaveVectorEntitySetTemplateUnit(
-    gpg::WriteArchive* const archive,
-    std::intptr_t objectPtr,
-    int /*version*/,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    const auto* const storage = reinterpret_cast<const msvc8::vector<moho::EntitySetTemplate<moho::Unit>>*>(
-      objectPtr
-    );
-    SaveContiguousArchiveVectorPayload(
-      archive, storage->data(), static_cast<unsigned int>(storage->size()),
-      CachedCompatRType<moho::EntitySetTemplate<moho::Unit>>(), ownerRef ? *ownerRef : gpg::RRef{}
-    );
-  }
 } // namespace gpg
 
 namespace

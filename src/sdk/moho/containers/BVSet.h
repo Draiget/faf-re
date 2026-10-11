@@ -21,12 +21,12 @@ namespace moho
    * payload used by the engine for category/entity set storage.
    *
    * Layout (1:1 with binary at every specialization):
-   *   +0x00  U mUniverse;        // 4-byte typed universe handle
+   *   +0x00  U mUniverse;        // typed universe value (4 bytes on x86)
    *   +0x04  uint32 mReserved04; // gap (binary always-zero observed)
    *   +0x08  BVIntSet mBits;     // word-bitset payload (size 0x20)
    *
    * The `T` template parameter is a value-type marker only; it does not
-   * appear in the layout. The `U` parameter must be a 4-byte trivially
+   * appear in the layout. The `U` parameter must fit a native pointer and be a trivially
    * copyable type that names the universe lane (e.g. EntityCategoryHelper,
    * EntIdUniverse, uint32_t).
    *
@@ -52,7 +52,7 @@ namespace moho
   {
     // `EntIdUniverse` is empty (sizeof 1); `mReserved04` keeps `mBits` at
     // +0x08 either way.
-    static_assert(sizeof(U) <= 4u, "BVSet<T,U>::U must fit the 4-byte universe lane.");
+    static_assert(sizeof(U) <= sizeof(void*), "BVSet<T,U>::U must fit the native universe lane.");
 
     /**
      * The value iterator (0x0C): a copy of the set's universe, then the
@@ -216,20 +216,6 @@ namespace moho
     void ResetToEmpty(const U& universe) noexcept
     {
       mUniverse = universe;
-      mReserved04 = 0u;
-      mBits = BVIntSet{};
-    }
-
-    // Convenience overload for the common case where the universe is supplied
-    // as a raw 4-byte word (e.g. `lookup.wordUniverseHandle`). Reinterprets
-    // the bits as the typed `U` lane via the static-size guarantee above.
-    template <class V = U, std::enable_if_t<!std::is_same_v<V, std::uint32_t>, int> = 0>
-    void ResetToEmpty(const std::uint32_t universeBits) noexcept
-    {
-      static_assert(std::is_trivially_copyable_v<U>, "BVSet<T,U>::U must be trivially copyable.");
-      // Raw universe-word reinterpret: U may be narrower than 4 bytes, so the
-      // low bytes of the caller's word are loaded into the typed lane.
-      std::memcpy(&mUniverse, &universeBits, sizeof(U));
       mReserved04 = 0u;
       mBits = BVIntSet{};
     }

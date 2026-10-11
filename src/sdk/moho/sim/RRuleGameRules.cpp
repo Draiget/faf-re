@@ -720,7 +720,7 @@ namespace moho
   } // namespace
 
   // The `owner` handle written below (mCategoryFallback's universe lane and
-  // mWordUniverseHandle) is the table's only back-reference to the rules
+  // mRules) is the table's only back-reference to the rules
   // that own it: `ParseEntityCategory` seeds every clause accumulator from
   // it (0x00555323 reads [esi+38h]), each map entry it creates inherits the
   // same handle, and `EntityCategory::Add` calls `GetBlueprintFromOrdinal`
@@ -766,9 +766,8 @@ namespace moho
     // 0x0055525A-0x00555276 rather than silently dropped as dead code.
     mCategoryMap.clear();
 
-    const auto ownerHandle = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owner));
-    mCategoryFallback.ResetToEmpty(ownerHandle);
-    mWordUniverseHandle = ownerHandle;
+    mRules = const_cast<RRuleGameRulesImpl*>(owner);
+    mCategoryFallback.ResetToEmpty(EntityCategoryHelper{mRules});
   }
 
   const EntityCategorySet* EntityCategoryLookupTable::TryFind(

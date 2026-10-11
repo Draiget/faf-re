@@ -161,17 +161,6 @@ void CAiSiloBuildImplTypeInfo::Init()
   size_ = sizeof(CAiSiloBuildImpl);
   gpg::RType::Init();
 
-  gpg::RType* const baseType = CachedIAiSiloBuildType();
-  if (baseType) {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    AddBase(baseField);
-  }
-
   AddBase_IAiSiloBuild(this);
   Finish();
 }

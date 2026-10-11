@@ -6,6 +6,7 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/List.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/path/IPathTraveler.h"
 #include "moho/sim/SFootprint.h"
@@ -17,12 +18,7 @@ namespace moho
   class Sim;
   class Unit;
 
-  struct SRectList
-  {
-    void* mAllocatorOrProxy; // +0x00
-    void* mHead;             // +0x04 (intrusive sentinel node)
-    std::int32_t mSize;      // +0x08
-  };
+  using SRectList = msvc8::list<gpg::Rect2i>;
 
   static_assert(sizeof(SRectList) == 0x0C, "SRectList size must be 0x0C");
 

@@ -119,6 +119,20 @@ namespace moho
   gpg::RType* CEfxTrailEmitter::sType = nullptr;
 
   /**
+   * Address: 0x006711C0 (FUN_006711C0, Moho::CEfxTrailEmitter::GetClass)
+   *
+   * What it does:
+   * Lazily resolves the concrete trail-emitter RTTI descriptor.
+   */
+  gpg::RType* CEfxTrailEmitter::GetClass() const
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CEfxTrailEmitter));
+    }
+    return sType;
+  }
+
+  /**
    * Address: 0x00671200 (FUN_00671200, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
    *
    * What it does:

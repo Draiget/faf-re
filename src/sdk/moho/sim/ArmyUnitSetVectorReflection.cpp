@@ -186,6 +186,38 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::Init()
 {
   size_ = sizeof(EntitySetVector);
   version_ = 1;
+  serLoadFunc_ = &SerLoad;
+  serSaveFunc_ = &SerSave;
+}
+
+void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerLoad(
+  ReadArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const
+)
+{
+  auto* const storage = reinterpret_cast<EntitySetVector*>(objectPtr);
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  EntitySetVector loaded;
+  loaded.reserve(count);
+  const RRef owner{};
+  for (unsigned int index = 0; index < count; ++index) {
+    moho::EntitySetTemplate<moho::Unit> element;
+    archive->Read(CachedEntitySetTemplateUnitReflType(), &element, owner);
+    loaded.push_back(element);
+  }
+  storage->swap(loaded);
+}
+
+void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerSave(
+  WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const ownerRef
+)
+{
+  const auto* const storage = reinterpret_cast<const EntitySetVector*>(objectPtr);
+  archive->WriteUInt(static_cast<unsigned int>(storage->size()));
+  for (const auto& element : *storage) {
+    archive->Write(CachedEntitySetTemplateUnitReflType(), &element, *ownerRef);
+  }
 }
 
 gpg::RRef gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SubscriptIndex(void* const obj, const int ind) const

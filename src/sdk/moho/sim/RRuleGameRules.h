@@ -47,6 +47,7 @@ namespace moho
   // further below) because `EntityCategoryLookupTable`'s
   // constructor takes a `const RRuleGameRulesImpl*` parameter -- a pointer
   // to an incomplete type is a legal declaration.
+  class RRuleGameRules;
   class RRuleGameRulesImpl;
   struct LuaReloadRequestNode;
 
@@ -137,7 +138,7 @@ namespace moho
     // +0x0C is the alignment hole the 8-aligned fallback opens, not a field -
     // see the evidence block above. The tail beyond +0x3C is the same.
     EntityCategorySet mCategoryFallback; // +0x10
-    std::uint32_t mWordUniverseHandle;       // +0x38
+    RRuleGameRules* mRules;       // +0x38
 
     /**
      * Address: 0x00555290 (FUN_00555290, sub_555290)
@@ -168,13 +169,8 @@ namespace moho
      * What it does:
      * In-place constructs the (empty, sentinel-headed) category-name map and
      * the fallback `EntityCategorySet`, seeding both the fallback's
-     * universe lane and the trailing `mWordUniverseHandle` with `owner`
-     * reinterpreted as a 4-byte handle - the same raw pointer value the
-     * binary writes to +0x10 and +0x38 (IDA types both writes as the plain
-     * `RRuleGameRulesImpl*` pointer rather than a bit-cast integer, but the
-     * two are bit-identical on this 32-bit ABI, so the pre-existing
-     * `uint32_t` field typing is kept here - only the field names changed
-     * in this pass, not their type or behavior).
+     * universe lane and the trailing `mRules` with the borrowed `owner`
+     * pointer (binary writes at +0x10 and +0x38).
      *
      * `mCategoryMap`'s sentinel head is default-constructed implicitly
      * (member init, before this body runs) - the binary's own
@@ -227,8 +223,8 @@ namespace moho
     "EntityCategoryLookupTable::mCategoryFallback offset"
   );
   static_assert(
-    offsetof(EntityCategoryLookupTable, mWordUniverseHandle) == 0x38,
-    "EntityCategoryLookupTable::mWordUniverseHandle offset"
+    offsetof(EntityCategoryLookupTable, mRules) == 0x38,
+    "EntityCategoryLookupTable::mRules offset"
   );
   static_assert(
     sizeof(EntityCategoryLookupTable) == 0x40,

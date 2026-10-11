@@ -16,6 +16,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class RRuleGameRules;
   struct RBlueprint;
   struct REntityBlueprint;
   class CScrLuaInitForm;
@@ -29,7 +30,13 @@ namespace moho
   {
     static gpg::RType* sType;
 
-    std::uint32_t mWordUniverseHandle{0}; // +0x00
+    RRuleGameRules* mRules{nullptr}; // +0x00
+
+    /** Inlined block from FUN_0052B860: reads the unowned rules pointer. */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /** Inlined block from FUN_0052B890: writes the unowned rules pointer. */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address family:
@@ -51,7 +58,7 @@ namespace moho
    */
   struct EntityCategoryIterator
   {
-    std::uint32_t mWordUniverseHandle; // +0x00
+    RRuleGameRules* mRules; // +0x00
     BVIntSet* mSet;                    // +0x04
     std::int32_t mCurBit;              // +0x08
   };
@@ -164,54 +171,13 @@ namespace moho
   static_assert(sizeof(EntityCategoryHelperTypeInfo) == 0x64, "EntityCategoryHelperTypeInfo size must be 0x64");
 
   /**
-   * VFTABLE: 0x00E162C4
-   * COL: 0x00E69FD8
-   *
-   * `EntityCategory::SerLoad`/`SerSave` operate on the combined
-   * `{EntityCategoryHelper dword, BVIntSet payload}` layout, not on
-   * `EntityCategoryHelper::MemberDeserialize`/`MemberSerialize` (no such
-   * methods exist), so this stays a direct `SerHelperBase` derivative
-   * rather than a `gpg::SerSaveLoadHelper<EntityCategoryHelper>` alias.
+   * Canonical SerSaveLoadHelper<EntityCategoryHelper>, vtable 0x00E162C4.
+   * FUN_0052B860/0052B890 are its emitted callbacks, not EntityCategory's.
+   * CRT construction: FUN_00BC8F30; Init: FUN_0052C8E0;
+   * destruction: FUN_00BF3AD0. See the reconstruction report.
    */
-  class EntityCategoryHelperSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC8F30 (FUN_00BC8F30, dynamic initializer for the global
-     * `EntityCategoryHelperSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    EntityCategoryHelperSerializer();
-
-    /**
-     * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer)
-     */
-    ~EntityCategoryHelperSerializer();
-
-    /**
-     * Address: 0x0052C8E0 (FUN_0052C8E0, Moho::EntityCategoryHelperSerializer::Init)
-     *
-     * What it does:
-     * Registers helper load/save callbacks on `EntityCategoryHelper` RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(EntityCategoryHelperSerializer, mSerLoadFunc) == 0x0C,
-    "EntityCategoryHelperSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EntityCategoryHelperSerializer, mSerSaveFunc) == 0x10,
-    "EntityCategoryHelperSerializer::mSerSaveFunc offset must be 0x10"
-  );
+  struct EntityCategoryHelperSerializer : gpg::SerSaveLoadHelper<EntityCategoryHelper>
+  {};
   static_assert(sizeof(EntityCategoryHelperSerializer) == 0x14, "EntityCategoryHelperSerializer size must be 0x14");
 
   /**
@@ -243,40 +209,8 @@ namespace moho
    * Address: 0x00BC9E60 (FUN_00BC9E60, register_EntityCategory)
    *
    * What it does:
-   * Reads the current head of the `Core` Lua init-form set
-   * (`Moho::scr_CoreInits`) and returns it, matching the read half of the
-   * binary's list-prepend.
-   *
-   * The binary's own body is only 5 instructions: construct nothing, then
-   * splice a link-time-constant object into `scr_CoreInits.mForms` by raw
-   * pointer:
-   *
-   *   mov eax, scr_CoreInits.mForms          ; save old head
-   *   mov resource_deposit_t_end.mPrevDef, eax  ; anchor->mNextInSet = old head
-   *   mov scr_CoreInits.mForms, offset resource_deposit_t_end
-   *   retn
-   *
-   * IDA's `resource_deposit_t_end` label is a proximity artifact, not this
-   * object's identity - it is literally the one-past-end address of the
-   * unrelated `resource_deposit_t` string array read by
-   * `Moho::IResources::Translate` (FUN_00546CD0); the linker simply placed
-   * the next `.data` object at that exact byte. The write at +0x10 into that
-   * address matches `CScrLuaInitForm::mNextInSet`, so the anchor genuinely
-   * is a `CScrLuaInitForm`-derived object (most likely `CScrLuaBinder`,
-   * matching the RTTI-dumped `Moho::<anon>::ParseEntityCategory_LuaFuncDef :
-   * CScrLuaBinder, CScrLuaInitForm`), but this call site has zero callees:
-   * the object's own fields - name, docstring, and (for a `CScrLuaBinder`)
-   * the bound Lua C function pointer - are baked in as link-time-constant
-   * data with no constructor call and no code xref, so nothing in the
-   * available IDA exports identifies which Lua form it actually is.
-   *
-   * Reproducing the write with a placeholder object would either publish a
-   * null-vtable node (crashing the first `CScrLuaInitFormSet::RunInits`
-   * walk) or fabricate unverified behavior for whatever form this really
-   * is - both forbidden by this project's fidelity rules. This mirrors the
-   * already-diagnosed `register_CAiAttackerImplLuaInitFormAnchor` case in
-   * `CAiAttackerImpl.cpp` (see the "Init-form anchor bug" writeup): keep the
-   * provable read, omit the unprovable write.
+   * Registers the class binder that publishes moho.EntityCategory, so Lua
+   * save setup can export its native metatable methods by name.
    */
   CScrLuaInitForm* register_EntityCategory();
 

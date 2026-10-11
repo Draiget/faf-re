@@ -206,32 +206,6 @@ namespace
     return static_cast<moho::StatItem*>(upcast.mObj);
   }
 
-  [[nodiscard]] moho::StatItem* ReadArchiveStatItemPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    moho::StatItem* const item = CastStatItemFromRef(source);
-    if (!item) {
-      const char* const expectedName = CachedStatItemType()->GetName();
-      const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
-      const msvc8::string msg = gpg::STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        expectedName ? expectedName : "StatItem",
-        actualName ? actualName : "null"
-      );
-      throw std::runtime_error(msg.c_str());
-    }
-    return item;
-  }
-
   /**
     * Alias of FUN_0041A3D0 (non-canonical helper lane).
    *
@@ -280,8 +254,9 @@ namespace
     GPG_ASSERT(stats != nullptr);
 
     boost::mutex::scoped_lock lock(stats->mLock);
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    moho::StatItem* const loadedRoot = ReadArchiveStatItemPointer(archive, owner);
+    const gpg::RRef owner{};
+    moho::StatItem* loadedRoot = nullptr;
+    archive->ReadPointerOwned(&loadedRoot, &owner);
 
     stats->mItem.reset(loadedRoot);
   }

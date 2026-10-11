@@ -66,6 +66,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004C93C0 (FUN_004C93C0, Moho::CScriptEvent::StaticGetClass)
+     *
+     * What it does:
+     * Resolves the event descriptor, including both reflected base subobjects.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
      * Address: 0x004C9420 (FUN_004C9420, ??0CScriptEvent@Moho@@QAE@@Z)
      *
      * What it does:

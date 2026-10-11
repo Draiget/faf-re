@@ -2598,11 +2598,11 @@ namespace moho
     // The category universe word is the owning rules object, stored as the
     // binary stores it (see `RUnitBlueprint`'s CategoryCache).
     EntityCategorySet accCategory{};
-    accCategory.ResetToEmpty(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(session->mRules)));
+    accCategory.ResetToEmpty(EntityCategoryHelper{session->mRules});
 
     for (int i = 1; i <= unitCount; ++i) {
       EntityCategorySet perUnit{};
-      perUnit.ResetToEmpty(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(session->mRules)));
+      perUnit.ResetToEmpty(EntityCategoryHelper{session->mRules});
 
       const LuaPlus::LuaObject unitObject = unitTable[i];
       UserUnit* const unit = GetUserUnitOptional(unitObject, state);
