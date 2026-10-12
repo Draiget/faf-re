@@ -55,8 +55,12 @@ namespace moho
      * virtual `Destroy()` method, releases shared-control-block references
      * held by the batch-texture and dynamic-texture-sheet weak-style
      * handles, then frees the primitive and vertex legacy-vector storage.
+     *
+     * Not virtual: the class has no vtable. The constructor stores the texture
+     * batcher at +0x00, and `sp_counted_impl_p<CD3DPrimBatcher>::dispose`
+     * (0x007FC1C0) calls this destructor directly.
      */
-    virtual ~CD3DPrimBatcher();
+    ~CD3DPrimBatcher();
 
     /**
      * Address: 0x00438560 (FUN_00438560)
@@ -341,11 +345,20 @@ namespace moho
       boost::detail::sp_counted_base* pi;    // +0x04
     };
 
-    // +0x00 is the vtable pointer the virtuals above install.
+    // Offsets proven from the binary:
+    //   0x00438331 (constructor) `mov [ebx], eax` stores the texture batcher at +0x00.
+    //   0x004383DC (constructor) fills the three vertex sheets from `lea ecx, [ebx+4]`.
+    //   0x0043A268 (Flush) advances +0x10 with `idiv` by 3, and 0x0043A26E
+    //   indexes the vertex sheets with it (`[ebp+edx*4+4]`).
+    //   0x0043A2FF (Flush) loads the index sheet from +0x14 to lock it.
+    // +0x18 and +0x28 are the leading dwords of the two MSVC8 vectors: the
+    // constructor reserves them at 0x00438433 with `ecx = this + 0x18` and at
+    // 0x0043843B with `ecx = this + 0x28`, and never writes either dword.
+    CD3DTextureBatcher* mTextureBatcher = nullptr;      // +0x00
     CD3DVertexSheet* mVertexSheets[3]{};                // +0x04
-    CD3DTextureBatcher* mTextureBatcher = nullptr;      // +0x10
+    std::int32_t mCurVertexSheet = 0;                   // +0x10
     CD3DIndexSheet* mIndexSheet = nullptr;              // +0x14
-    std::int32_t mCurVertexSheet = 0;                   // +0x18
+    std::uint32_t mUnknown018 = 0;                      // +0x18
     LegacyVector<CD3DPrimBatcher::Vertex> mVertices{};  // +0x1C
     std::uint32_t mUnknown028 = 0;                      // +0x28
     LegacyVector<std::int16_t> mPrimitives{};           // +0x2C
@@ -384,6 +397,22 @@ namespace moho
   static_assert(offsetof(CD3DPrimBatcher::Vertex, mV) == 0x14, "moho::CD3DPrimBatcher::Vertex::mV offset must be 0x14");
 
 
+  static_assert(
+    offsetof(CD3DPrimBatcher, mTextureBatcher) == 0x00,
+    "moho::CD3DPrimBatcher::mTextureBatcher offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CD3DPrimBatcher, mVertexSheets) == 0x04,
+    "moho::CD3DPrimBatcher::mVertexSheets offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CD3DPrimBatcher, mCurVertexSheet) == 0x10,
+    "moho::CD3DPrimBatcher::mCurVertexSheet offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CD3DPrimBatcher, mIndexSheet) == 0x14,
+    "moho::CD3DPrimBatcher::mIndexSheet offset must be 0x14"
+  );
   static_assert(
     offsetof(CD3DPrimBatcher, mVertices) == 0x1C,
     "moho::CD3DPrimBatcher::mVertices offset must be 0x1C"
