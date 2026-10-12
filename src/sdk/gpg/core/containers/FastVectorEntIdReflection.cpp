@@ -7,43 +7,18 @@
 #include "gpg/core/containers/FastVectorUIntReflection.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/command/SSTITarget.h"
 
 namespace
 {
-  /**
-   * Address: 0x00552E70 / 0x005535B0 / 0x00553630 family (shared
-   * `Moho::EntId::sType` cache)
-   *
-   * What it does:
-   * Name-keyed lazy resolver for the reflected `EntId` element type.
-   * `Moho::EntId` is a plain `typedef int32_t EntId` in this recovered
-   * source (moho/unit/core/IUnit.h), not a real class, so
-   * `gpg::LookupRType(typeid(moho::EntId))` cannot recover the binary's
-   * distinct `??_R0?AVEntId@Moho@@@8` class descriptor -- it would just
-   * collide with `int`'s single `type_info`-keyed preregistration slot. This
-   * mirrors `moho::preregister_EntIdTypeInfo`'s registration key exactly
-   * (SSTITarget.cpp's `ResolveEntIdType()` is the same name-keyed fallback
-   * for the same underlying-typedef problem).
-   */
+  // Inlined block from FUN_00553630 (also FUN_005535B0/00552E70).
+  // Resolve the binary's distinct Moho::EntId descriptor, not the recovered
+  // integer storage alias. Its serializer is bound to EntIdValue's RTTI key.
   [[nodiscard]] gpg::RType* CachedEntIdType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      constexpr const char* kEntIdTypeCandidates[] = {"EntId", "Moho::EntId", "int", "signed int"};
-      for (const char* const candidate : kEntIdTypeCandidates) {
-        if (!candidate) {
-          continue;
-        }
-
-        cached = gpg::REF_FindTypeNamed(candidate);
-        if (cached != nullptr) {
-          break;
-        }
-      }
-
-      if (!cached) {
-        cached = gpg::LookupRType(typeid(int));
-      }
+      cached = gpg::RTypeOf<moho::EntIdValue>();
     }
 
     return cached;

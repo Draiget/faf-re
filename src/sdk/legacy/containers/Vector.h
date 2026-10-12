@@ -12544,7 +12544,14 @@ namespace msvc8
         {
             _Node_alloc_type al;
             _Node* node = al.allocate(1);
-            new (node) _Node(v);
+            try {
+                new (node) _Node(v);
+            } catch (...) {
+                // VC8's _Buynode unwind frees the raw allocation when the
+                // value copy throws (for example FUN_008304D0 at 0x00830540).
+                al.deallocate(node, 1);
+                throw;
+            }
             node->_Next = next;
             node->_Prev = prev;
             return node;

@@ -4,6 +4,7 @@
 #include <wx/app.h>
 
 #include "legacy/algorithms/Sort.h"
+#include "legacy/containers/HashMap.h"
 
 #include <algorithm>
 #include <bit>
@@ -916,46 +917,6 @@ namespace moho
   public:
     using CommandGraphNode = UICommandGraphNode;
 
-    /**
-     * `mMapD`'s node: keyed by the edge's own touch count (the same 32-bit
-     * `key ^ 0xDEADBEEF` Park-Miller-Schrage hash `mMapAB0`/`mMapAB1` use -
-     * see `FindHashListNode10`/`InsertOrFindHashListNode10` below), payload
-     * is the memoized orderline width `CalculateWaypointLineWidth` returned
-     * for that touch count. `LinkCommandGraphEdge` (0x00826960) uses this
-     * table purely as a per-frame cache so it can skip re-invoking the Lua
-     * width calculation on every visit of an edge it has already priced.
-     * Confirmed 2-dword payload from `sub_82FB10`'s (0x0082FB10) construct
-     * body: `result[2] = *a1; result[3] = a1[1];`, no third field.
-     */
-    struct HashListNode10
-    {
-      HashListNode10* mNext; // +0x00
-      HashListNode10* mPrev; // +0x04
-      std::uint32_t mKey;    // +0x08, CommandGraphEdge::mTouchCount at cache time
-      float mWidth;          // +0x0C, cached CalculateWaypointLineWidth() result
-    };
-    static_assert(sizeof(HashListNode10) == 0x10, "UICommandGraph::HashListNode10 size must be 0x10");
-
-    /**
-     * `mMapC`'s node forward declaration - its payload is a full
-     * `CommandGraphEdge`, which isn't a complete type yet at this point in
-     * the class; the full definition sits just after `CommandGraphEdge`
-     * below.
-     */
-    struct HashListNode2C;
-
-    /**
-     * One dword lane in the engine's four-pointer `gpg::fastvector` shape, with
-     * inline storage for a single element.
-     *
-     * `mCapacity` points one past `mInline[0]` while the lane is inline. When
-     * the grow helper spills the lane to the heap it stashes that inline
-     * capacity-end *into* `mInline[0]` before overwriting `mBegin`
-     * (0x0082E708: `if (begin == inlineOrigin) *inlineOrigin = capacity;`),
-     * which is exactly what lets `ReleaseToInline` below restore the capacity
-     * with one indirect load rather than recomputing it. `mInline[1]` is
-     * reserved storage the constructor deliberately keeps outside the capacity.
-     */
     struct CommandGraphEdge;
 
     /**
@@ -979,16 +940,13 @@ namespace moho
       std::uint8_t mHasResolvedPosition;   // +0x1C
       std::uint8_t mIsChainBoundary;       // +0x1D
       std::uint8_t mIsVisible;             // +0x1E
-      std::uint8_t pad_1F;                 // +0x1F
       /**
        * The node's drawable mesh, owned strongly. `sub_826550` decrements the
-       * control block's *use* count at +0x04 and calls vtable slot 1 (dispose)
-       * on last release, which is `release()` and not `weak_release()` — the
-       * two differ by which counter they touch, so getting it wrong either
-       * leaks the mesh or frees it early. 0x008282B0 / 0x00828DD0 read the same
-       * lane back as a `MeshInstance*` to stance it at the node's anchor.
+       * control block's use count at +0x04 and calls disposal on last release.
+       * Normal shared_ptr copy, assignment and destruction preserve that
+       * ownership, including constructor failure while copying the edge lists.
        */
-      boost::SharedPtrRaw<MeshInstance> mMeshInstance; // +0x20
+      boost::shared_ptr<MeshInstance> mMeshInstance; // +0x20
       /**
        * Orderline tangent override: 0x008288D0 reads this as one `Vector3f`
        * (previously mis-split as `field_0x28`(uint32)/`field_0x2C`/
@@ -1014,12 +972,12 @@ namespace moho
       std::uint32_t mCompletionTick;       // +0x44
       /**
        * The two edge lists: `mLaneA` holds the edges arriving here, `mLaneB`
-       * the edges leaving. Each is the 0x10 header plus two inline slots;
+       * the edges leaving. Each holds one inline edge, with 8-byte alignment;
        * growth, copy and release go through the template (`push_back`, the
        * copy constructor, `ResetStorageToInline`).
        */
-      gpg::fastvector_n<CommandGraphEdge*, 2> mLaneA; // +0x48
-      gpg::fastvector_n<CommandGraphEdge*, 2> mLaneB; // +0x60
+      gpg::fastvector_n<CommandGraphEdge*, 1> mLaneA; // +0x48
+      gpg::fastvector_n<CommandGraphEdge*, 1> mLaneB; // +0x60
 
       /**
        * Address: 0x00824600 (FUN_00824600, sub_824600)
@@ -1028,7 +986,7 @@ namespace moho
        * A fresh node: no command (`-1`), not linked to any helper, zero
        * position sum/weight/orientation/centroid/scale/ETA, no mesh, visible,
        * both edge lanes empty on their inline storage. Callers:
-       * `FindOrInsertCommandGraphDrawNode` (0x0082B300) and
+       * `DrawNodeMap::operator[]` (0x0082B300) and
        * `AddCommandQueueToCommandGraph` (0x00826140).
        */
       UICommandGraphDrawNode();
@@ -1043,49 +1001,6 @@ namespace moho
        */
       ~UICommandGraphDrawNode();
     };
-
-    /**
-     * The AB tables' node. Unlike the 0x2C and 0x10 tables this one carries a
-     * non-trivial payload, so `ClearHashListNodes` runs `DestroyPayload` before
-     * releasing the allocation — mirroring the binary's list-erase helper at
-     * 0x0082EF80, which calls the payload destructor on `node + 0x10` and only
-     * then frees the node.
-     */
-    struct HashListNode88
-    {
-      HashListNode88* mNext;          // +0x00
-      HashListNode88* mPrev;          // +0x04
-      std::uint32_t mKey;             // +0x08
-      std::uint32_t mKeyHigh;         // +0x0C
-      UICommandGraphDrawNode mDraw;   // +0x10
-
-      static void DestroyPayload(HashListNode88* const node) noexcept
-      {
-        node->mDraw.~UICommandGraphDrawNode();
-      }
-    };
-
-    // {_Alproxy, _Myfirst, _Mylast, _Myend} at +0x00/04/08/0C, 0x10 bytes --
-    // this is msvc8::vector<void*>, not a distinct type.
-    using HashBucketVector = msvc8::vector<void*>;
-
-    template <typename TNode>
-    struct HashTable
-    {
-      std::uint8_t mOwnerByte; // +0x00
-      std::uint8_t pad_01[7];
-      TNode* mListHead;           // +0x08
-      std::uint32_t mListSize;    // +0x0C
-      HashBucketVector mBuckets;  // +0x10
-      std::uint32_t mBucketMask;  // +0x20
-      std::uint32_t mBucketCount; // +0x24
-    };
-    static_assert(sizeof(HashTable<void>) == 0x28, "HashTable<TNode> size must be 0x28");
-    static_assert(offsetof(HashTable<void>, mListHead) == 0x08, "HashTable<TNode>::mListHead offset must be 0x08");
-    static_assert(offsetof(HashTable<void>, mListSize) == 0x0C, "HashTable<TNode>::mListSize offset must be 0x0C");
-    static_assert(offsetof(HashTable<void>, mBuckets) == 0x10, "HashTable<TNode>::mBuckets offset must be 0x10");
-    static_assert(offsetof(HashTable<void>, mBucketMask) == 0x20, "HashTable<TNode>::mBucketMask offset must be 0x20");
-    static_assert(offsetof(HashTable<void>, mBucketCount) == 0x24, "HashTable<TNode>::mBucketCount offset must be 0x24");
 
     /**
      * `mCommandGraphTree`'s value: a texture-keyed bucket of orderline edges.
@@ -1143,9 +1058,8 @@ namespace moho
      * `{boost::SharedPtrRaw<ID3DTextureSheet>, msvc8::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
      *
-     * `mEdge` sits at offset +0x10 of the 0x2C-byte `HashListNode2C` that
-     * owns it (`mNext@0/mPrev@4/mKeyLow@8/mKeyHigh@0xC/mEdge@0x10`), which
-     * pins this struct's size at exactly 0x1C (0x2C - 0x10).
+     * In the original EdgeMap list node, the two pointer keys occupy +8/+12
+     * and this payload begins at +16, giving it a proven x86 size of 0x1C.
      */
     struct CommandGraphEdge
     {
@@ -1189,26 +1103,33 @@ namespace moho
     static_assert(offsetof(CommandGraphEdge, mLaneADistribution) == 0x14, "CommandGraphEdge::mLaneADistribution offset must be 0x14");
     static_assert(offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18, "CommandGraphEdge::mForceHighlightStyle offset must be 0x18");
 
-    /**
-     * `mMapC`'s node (forward-declared above `CommandGraphEdge`): keyed by
-     * the 64-bit `{fromNode, toNode}` draw-node pointer pair as two raw
-     * dwords, payload is the edge itself. `LinkCommandGraphEdge`'s
-     * find-or-create (0x0082B490 / 0x0082C750 / 0x0082C480) confirmed this
-     * shape - 0x008269AA/0x008269AD write `mFromNode`/`mToNode` through the
-     * pointer `FindOrInsertCommandGraphEdge` returns, which is exactly
-     * `&node->mEdge` (node+0x10).
-     */
-    struct HashListNode2C
+    using DrawNodeMap = msvc8::hash_map<UserCommandIssueHelper*, UICommandGraphDrawNode>;
+    using DrawNodePair = std::pair<UICommandGraphDrawNode*, UICommandGraphDrawNode*>;
+
+    // The original pair hash combines both pointer words before the VC8
+    // Park-Miller step. Ordering always compares the complete pointers.
+    struct EdgeKeyHashCompare
     {
-      HashListNode2C* mNext;   // +0x00
-      HashListNode2C* mPrev;   // +0x04
-      std::uint32_t mKeyLow;   // +0x08, fromNode (draw-node pointer, as key dword)
-      std::uint32_t mKeyHigh;  // +0x0C, toNode
-      CommandGraphEdge mEdge;  // +0x10
+      static constexpr std::size_t bucket_size = 4;
+      static constexpr std::size_t min_buckets = 8;
+      std::size_t operator()(const DrawNodePair& key) const noexcept;
+      bool operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) const noexcept;
     };
-    static_assert(sizeof(HashListNode2C) == 0x2C, "UICommandGraph::HashListNode2C size must be 0x2C");
-    static_assert(offsetof(HashListNode2C, mKeyHigh) == 0x0C, "UICommandGraph::HashListNode2C::mKeyHigh offset must be 0x0C");
-    static_assert(offsetof(HashListNode2C, mEdge) == 0x10, "UICommandGraph::HashListNode2C::mEdge offset must be 0x10");
+
+    using EdgeMap = msvc8::hash_map<DrawNodePair, CommandGraphEdge, EdgeKeyHashCompare>;
+    using WidthMap = msvc8::hash_map<std::uint32_t, float>;
+
+    static_assert(sizeof(CountedPtr<CD3DFont>) == 0x04, "Debug font handle size must be 0x04");
+    static_assert(sizeof(DrawNodeMap) == 0x28, "DrawNodeMap size must be 0x28");
+    static_assert(sizeof(DrawNodeMap::value_type) == 0x80, "DrawNodeMap value size must be 0x80");
+    static_assert(offsetof(DrawNodeMap::value_type, second) == 0x08, "DrawNodeMap payload offset must be 0x08");
+    static_assert(sizeof(DrawNodePair) == 0x08, "DrawNodePair size must be 0x08");
+    static_assert(sizeof(EdgeKeyHashCompare) == 0x01, "EdgeKeyHashCompare size must be 0x01");
+    static_assert(sizeof(EdgeMap) == 0x28, "EdgeMap size must be 0x28");
+    static_assert(sizeof(EdgeMap::value_type) == 0x24, "EdgeMap value size must be 0x24");
+    static_assert(offsetof(EdgeMap::value_type, second) == 0x08, "EdgeMap payload offset must be 0x08");
+    static_assert(sizeof(WidthMap) == 0x28, "WidthMap size must be 0x28");
+    static_assert(sizeof(WidthMap::value_type) == 0x08, "WidthMap value size must be 0x08");
 
     /**
      * `EstimateDrawNodeWorkTicks` (0x00826F10) reaches the game rules through
@@ -1236,7 +1157,7 @@ namespace moho
 
     /**
      * `AddCommandQueueToCommandGraph` (0x00826140) needs `mMapAB0`/`mMapAB1`/
-     * `mSession` and `FindOrInsertCommandGraphDrawNode` - declared here for
+     * `mSession` and the pointer-keyed draw maps - declared here for
      * the same reason `LinkCommandGraphEdge` is.
      */
     friend void AddCommandQueueToCommandGraph(UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue);
@@ -1294,415 +1215,6 @@ namespace moho
       ResolveDrawNodeHighlightState(const UICommandGraphDrawNode& drawNode) const;
 
   private:
-    static void ReleaseIntrusive(CD3DFont*& font);
-    static void AssignIntrusive(CD3DFont*& dst, CD3DFont* src);
-
-    /**
-     * Address: 0x0082F030 (FUN_0082F030)
-     */
-    static HashListNode88* AllocateMapABListSentinel();
-
-    /**
-     * Address: 0x0082F5B0 (FUN_0082F5B0)
-     */
-    static HashListNode2C* AllocateMapCListSentinel();
-
-    /**
-     * Address: 0x0082FAF0 (FUN_0082FAF0)
-     */
-    static HashListNode10* AllocateMapDListSentinel();
-
-    /**
-     * Address: 0x0082BF40 (FUN_0082BF40)
-     */
-    static void InitMapAB(HashTable<HashListNode88>& table, const UICommandGraph* owner);
-
-    /**
-     * Address: 0x0082C400 (FUN_0082C400)
-     */
-    static void InitMapC(HashTable<HashListNode2C>& table, const UICommandGraph* owner);
-
-    /**
-     * Address: 0x0082C8D0 (FUN_0082C8D0)
-     */
-    static void InitMapD(HashTable<HashListNode10>& table, const UICommandGraph* owner);
-
-    /**
-     * Address: 0x0082FAB0 (FUN_0082FAB0, MSVC8 std::list<T>::clear inline expansion)
-     * Address: 0x0082C840 (FUN_0082C840, the HashListNode2C instantiation)
-     *
-     * What it does:
-     * Clears one sentinel-headed hash-list in place without freeing the
-     * sentinel head. Payload nodes are trivially destructible.
-     */
-    template <typename TNode>
-    static void ClearHashListNodes(HashTable<TNode>& table) noexcept;
-
-    template <typename TNode>
-    static void DestroyMap(HashTable<TNode>& table);
-
-    /**
-     * The value portion of one HashListNode88 - everything after the
-     * intrusive mNext/mPrev link header. ConstructHashListNode88
-     * copy-constructs a new node's mKey/mDraw from one of these; the source
-     * may be a real existing node's tail (during rehash relocation,
-     * `&oldNode->mKey` overlays this exactly - the ctor-arg evidence at
-     * 0x00830523) or a freestanding stack composite built for a fresh
-     * insert (mMapAB0's insert-if-missing path, sub_82B300 at 0x0082B35C).
-     *
-     * mUnused04 mirrors HashListNode88::mKeyHigh's position but is never
-     * read by any of mMapAB0's find/insert primitives recovered below -
-     * only the low key dword participates in hashing/comparison, so this
-     * field is left exactly as uninitialized as the binary leaves it
-     * (0x00831D80 copies just the leading dword before delegating the tail
-     * to the draw-node relocate at 0x0082D530).
-     */
-    struct HashListNode88Value
-    {
-      std::uint32_t mKey;             // +0x00
-      std::uint32_t mUnused04;        // +0x04
-      UICommandGraphDrawNode mDraw;   // +0x08
-    };
-
-    /**
-     * Address: 0x0082D530 (FUN_0082D530, sub_82D530)
-     * Address: 0x00826620 (FUN_00826620, the no-EH emission of this same body)
-     *
-     * What it does:
-     * Relocate-copies one command-graph draw node's full payload: command
-     * id, the intrusive command-issue helper chain link (re-publishing the
-     * helper's head to point at `destination` in place of `source`),
-     * position/weight/flag scalars, the owned mesh instance (retaining a
-     * new strong reference on the shared control block rather than
-     * transferring it, since `source` keeps its own reference until
-     * destroyed separately), the orientation hint/previous-centroid/
-     * reserved scalars, and both dword lanes. Used by the hash node
-     * constructor below whenever a node is built from an existing node's
-     * payload (rehash relocation) or a fresh stack value.
-     */
-    static UICommandGraphDrawNode* RelocateDrawNode(UICommandGraphDrawNode* destination, UICommandGraphDrawNode& source);
-
-    /**
-     * Address: 0x00831AB0 (FUN_00831AB0, sub_831AB0)
-     *
-     * What it does:
-     * Overflow-checked `operator new` for `count` HashListNode88 (0x88-byte)
-     * slots; throws `std::bad_alloc` when `count` would overflow the byte
-     * count. Matches the legacy VC8 `std::_Allocate<T>` shape already used
-     * throughout legacy/containers/Vector.h for other element sizes.
-     */
-    [[nodiscard]] static void* AllocateHashListNode88Storage(std::size_t count);
-
-    /**
-     * Address: 0x00831D80 (FUN_00831D80, sub_831D80)
-     *
-     * What it does:
-     * Constructs one HashListNode88Value in place: copies the key dword,
-     * then relocate-copies the draw-node payload via RelocateDrawNode.
-     * `mUnused04` is left untouched, matching the binary exactly.
-     */
-    static HashListNode88Value* ConstructHashListNode88Value(HashListNode88Value* destination, HashListNode88Value& source);
-
-    /**
-     * Address: 0x008304D0 (FUN_008304D0, sub_8304D0)
-     *
-     * What it does:
-     * Allocates one HashListNode88, links it explicitly via the caller-
-     * supplied `next`/`prev` (the classic Dinkumware `_Buynode(_Next, _Prev,
-     * _Val)` shape), then constructs its value portion from `valueSource`.
-     * If construction throws, the raw node is freed before the exception
-     * propagates (matches the binary's SEH cleanup funclet at 0x00830540).
-     */
-    [[nodiscard]] static HashListNode88* ConstructHashListNode88(
-      HashListNode88* next, HashListNode88* prev, HashListNode88Value& valueSource
-    );
-
-    /**
-     * Address: 0x0082C240 (FUN_0082C240, sub_82C240)
-     *
-     * What it does:
-     * Finds the node whose key exactly matches `key` within its hash
-     * bucket, or returns the table's list sentinel (`mListHead`) when no
-     * exact match exists - the same "not found" convention
-     * InsertOrFindHashListNode88/FindOrInsertCommandGraphDrawNode use to
-     * detect a miss.
-     */
-    [[nodiscard]] static HashListNode88* FindHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
-
-    /**
-     * Address: 0x0082C2E0 (FUN_0082C2E0, sub_82C2E0)
-     *
-     * What it does:
-     * Returns the `[first, last)` equal-range of nodes matching `key`
-     * within their hash bucket. An empty range collapses both ends to the
-     * table's list sentinel (`mListHead`), matching the binary's fallback
-     * (it reuses the sentinel rather than the bucket's own end pointer once
-     * no match is found).
-     */
-    [[nodiscard]] static std::pair<HashListNode88*, HashListNode88*>
-      EqualRangeHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
-
-    /**
-     * Address: 0x0082B450 (FUN_0082B450, sub_82B450)
-     *
-     * What it does:
-     * Counts nodes matching `key` by walking EqualRangeHashListNode88's
-     * `[first, last)` range one `mNext` step at a time.
-     */
-    [[nodiscard]] static std::uint32_t CountHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
-
-    /**
-     * Address: 0x0082F050 (FUN_0082F050, sub_82F050)
-     *
-     * What it does:
-     * Adds `count` to `sizeField` after an overflow guard against the
-     * legacy VC8 list max-size (0x1FFFFFF), throwing
-     * `std::length_error("list<T> too long")` on overflow. Calls the same
-     * shared throw lane as msvc8::vector<T>::throw_too_long.
-     */
-    static std::uint32_t CheckedIncrementListSize(std::uint32_t count, std::uint32_t& sizeField);
-
-    /**
-     * Address: 0x0082BFB0 (FUN_0082BFB0, sub_82BFB0)
-     *
-     * What it does:
-     * `mMapAB0`'s hash-bucket insert lane: grows/rehashes one bucket at a
-     * time when the load factor is exceeded, then finds-or-inserts `key`,
-     * returning the existing node when found (`outInserted=false`) or a
-     * freshly constructed node linked into its bucket and the table's
-     * global list (`outInserted=true`, `mListSize` bumped via
-     * CheckedIncrementListSize).
-     */
-    static HashListNode88*
-      InsertOrFindHashListNode88(HashTable<HashListNode88>& table, HashListNode88Value& valueSource, bool& outInserted);
-
-    /**
-     * Address: 0x0082B300 (FUN_0082B300, sub_82B300)
-     *
-     * What it does:
-     * `mMapAB0`'s public find-or-insert entry point: looks `key` up via
-     * FindHashListNode88 first; on a miss, default-constructs a temporary
-     * draw node payload (0x00824600), relocate-copies it into a second
-     * temporary, and inserts a real node built from `{key, temporary}` via
-     * InsertOrFindHashListNode88. Always returns a pointer to the resolved
-     * node's draw-node payload (`&node->mDraw`).
-     */
-    [[nodiscard]] static UICommandGraphDrawNode*
-      FindOrInsertCommandGraphDrawNode(std::uint32_t key, HashTable<HashListNode88>& table);
-
-    /**
-     * The value portion of one HashListNode2C - `mMapC`'s payload,
-     * everything after the intrusive mNext/mPrev link header. Mirrors
-     * HashListNode88Value's role for the 88-byte table: `MakeHashListNode2C`
-     * copy-constructs a fresh node's `mKeyLow`/`mKeyHigh`/`mEdge` from one of
-     * these (0x00830700's `qmemcpy(result + 2, a3, 0x24u)` copies exactly
-     * this 0x24-byte shape).
-     */
-    struct HashListNode2CValue
-    {
-      std::uint32_t mKeyLow;   // +0x00
-      std::uint32_t mKeyHigh;  // +0x04
-      CommandGraphEdge mEdge;  // +0x08
-    };
-    static_assert(sizeof(HashListNode2CValue) == 0x24, "UICommandGraph::HashListNode2CValue size must be 0x24");
-
-    /**
-     * The value portion of one HashListNode10 - `mMapD`'s payload.
-     * `MakeHashListNode10` copies both dwords from one of these
-     * (0x0082FB10's `result[2] = *a1; result[3] = a1[1];`).
-     */
-    struct HashListNode10Value
-    {
-      std::uint32_t mKey;  // +0x00
-      float mWidth;         // +0x04
-    };
-    static_assert(sizeof(HashListNode10Value) == 0x08, "UICommandGraph::HashListNode10Value size must be 0x08");
-
-    /**
-     * Addresses: 0x00831BA0 (FUN_00831BA0, HashListNode2C's overflow-checked
-     * `operator new`) and 0x00831C90 (FUN_00831C90, HashListNode10's).
-     * Same shape as `AllocateHashListNode88Storage` for each node's own
-     * size, generalised over `TNode` instead of forked per node size.
-     */
-    template <typename TNode>
-    [[nodiscard]] static void* NewHashListNodeStorage(std::size_t count);
-
-    /**
-     * Address: 0x00830700 (FUN_00830700, sub_830700)
-     *
-     * What it does:
-     * Allocates one HashListNode2C, links it via the caller-supplied
-     * `next`/`prev`, and copies its value from `valueSource` - the binary
-     * uses a flat `qmemcpy` here rather than a placement-construct chain,
-     * because `CommandGraphEdge` (and the key dwords) are trivially
-     * copyable, unlike `HashListNode88Value`'s owned draw-node payload.
-     */
-    [[nodiscard]] static HashListNode2C* MakeHashListNode2C(
-      HashListNode2C* next, HashListNode2C* prev, HashListNode2CValue& valueSource
-    );
-
-    /**
-     * Address: 0x0082FB10 (FUN_0082FB10, sub_82FB10)
-     *
-     * What it does:
-     * Allocates one HashListNode10, links it via the caller-supplied
-     * `next`/`prev`, and copies its 2-dword value from `valueSource`.
-     */
-    [[nodiscard]] static HashListNode10* MakeHashListNode10(
-      HashListNode10* next, HashListNode10* prev, HashListNode10Value& valueSource
-    );
-
-    /**
-     * Address: 0x0082F5D0 (FUN_0082F5D0, sub_82F5D0)
-     *
-     * What it does:
-     * `CheckedIncrementListSize` for `HashListNode2C`'s own Dinkumware
-     * `list<T>::max_size()` bound (`119304647`, i.e. `0xFFFFFFFF / 0x24 - 1`
-     * for the 0x24-byte `HashListNode2CValue`). Byte-identical shape to
-     * `CheckedIncrementListSize` (0x0082F050) apart from that constant.
-     */
-    static std::uint32_t CheckedIncrementListSize2C(std::uint32_t count, std::uint32_t& sizeField);
-
-    /**
-     * Address: 0x0082DD60 (FUN_0082DD60, sub_82DD60)
-     *
-     * What it does:
-     * `CheckedIncrementListSize` for `HashListNode10`'s own max-size bound
-     * (`0x1FFFFFFF`). Byte-identical shape to `CheckedIncrementListSize`
-     * (0x0082F050) apart from that constant.
-     */
-    static std::uint32_t CheckedIncrementListSize10(std::uint32_t count, std::uint32_t& sizeField);
-
-    /**
-     * Not a distinct binary function - the scalar 32-bit-key half of the
-     * hash scramble, generalised over `TNode` so `HashListNode10` (`mMapD`)
-     * shares this template with `HashListNode88` (`mMapAB0`/`mMapAB1`)
-     * rather than forking a copy - both tables hash the exact same way
-     * (0x0082C240's scramble == 0x0082C950's).
-     *
-     * The scramble is Park-Miller "minimal standard":
-     * `ldiv(key ^ 0xDEADBEEF, 127773)` then `16807*rem - 2836*quot`, with
-     * negative results wrapped by `+0x7FFFFFFF`. The binary inlines it
-     * independently at every hash-table site (0x0082C240, 0x0082C2E0,
-     * 0x0082BFB0 x2) rather than sharing it; it is lifted into this one
-     * named helper per the intent-first helper contract.
-     *
-     * A non-template `HashListNode88` declaration of this name used to sit
-     * above `CheckedIncrementListSize10`. Being an exact match it won
-     * overload resolution against this template at every `mMapAB0`/`mMapAB1`
-     * call site, and it had no definition anywhere - so those calls resolved
-     * to nothing and, under /FORCE, linked against garbage.
-     */
-    template <typename TNode>
-    [[nodiscard]] static std::uint32_t HashKeyToBucketIndex(const HashTable<TNode>& table, std::uint32_t key) noexcept;
-
-    /**
-     * Not a distinct binary function - the 64-bit pair-key half of
-     * `HashKeyToBucketIndex`'s scramble, used only by `HashListNode2C`
-     * (`mMapC`). Diffed against the scalar scramble above: identical
-     * Park-Miller-Schrage tail, different combine step
-     * (`3863*lo + 7919*hi + 53849*(lo^hi)` vs `key ^ 0xDEADBEEF`) -
-     * confirmed from 0x0082D960 (the 2C lane's dedicated hash function),
-     * genuinely called from 0x0082C750/`FindHashListNode2C`'s rehash loop.
-     * `FUN_0082C480`/`ObtainHashListNode2C` does NOT call 0x0082D960 -
-     * the identical formula is inlined there twice instead (its own final-
-     * insert step and rehash loop both compute it directly); confirmed via
-     * `_callgraph_index.sqlite`, whose complete caller set for 0x0082D960
-     * is `{FUN_0082C750, an unclassified owner=<none> byte-gap chunk at
-     * 0x0082D924}` - `FUN_0082C480` is absent. The recovered C++ is
-     * unaffected either way (`HashKeyToBucketIndex<TNode>`'s pair overload
-     * is correctly called by name from both real call sites, matching
-     * RULE ONE's "recover the shared function even where the compiler
-     * inlined one instantiation" pattern) - only this prose previously
-     * overstated the binary call graph.
-     */
-    template <typename TNode>
-    [[nodiscard]] static std::uint32_t
-      HashKeyToBucketIndex(const HashTable<TNode>& table, std::uint32_t keyLow, std::uint32_t keyHigh) noexcept;
-
-    /**
-     * Not a distinct binary function - the shared scalar-key find shape
-     * `FindHashListNode88` (0x0082C240) and `FindHashListNode10`
-     * (0x0082C950) both compile to (same load-factor-free bucket walk,
-     * same "== bucketEnd -> sentinel" miss convention), generalised over
-     * `TNode` per RULE ONE rather than duplicated per node size.
-     */
-    template <typename TNode>
-    [[nodiscard]] static TNode* FindHashListNode(HashTable<TNode>& table, std::uint32_t key) noexcept;
-
-    /**
-     * Not a distinct binary function - the shared 64-bit pair-key find
-     * shape, used only by `FindHashListNode2C` (0x0082C750).
-     */
-    template <typename TNode>
-    [[nodiscard]] static TNode*
-      FindHashListNode(HashTable<TNode>& table, std::uint32_t keyLow, std::uint32_t keyHigh) noexcept;
-
-    /**
-     * Not a distinct binary function - the shared scalar-key
-     * rehash/insert-point-walk shape `InsertOrFindHashListNode88`
-     * (0x0082BFB0) and `ObtainHashListNode10` (0x0082B5E0) both compile to.
-     * `constructNode`/`incrementListSize` are the two points where the two
-     * instantiations genuinely differ (node size, max-size bound), passed
-     * in rather than duplicating the ~80-line rehash body per node size.
-     */
-    template <typename TNode, typename TValue>
-    [[nodiscard]] static TNode* ObtainHashListNode(
-      HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
-      TNode* (*constructNode)(TNode*, TNode*, TValue&), std::uint32_t (*incrementListSize)(std::uint32_t, std::uint32_t&)
-    );
-
-    /**
-     * Not a distinct binary function - the shared 64-bit pair-key
-     * rehash/insert-point-walk shape, used only by `ObtainHashListNode2C`
-     * (0x0082C480).
-     */
-    template <typename TNode, typename TValue>
-    [[nodiscard]] static TNode* ObtainHashListNodePair(
-      HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
-      TNode* (*constructNode)(TNode*, TNode*, TValue&), std::uint32_t (*incrementListSize)(std::uint32_t, std::uint32_t&)
-    );
-
-    /**
-     * Address: 0x0082C750 (FUN_0082C750, sub_82C750)
-     */
-    [[nodiscard]] static HashListNode2C*
-      FindHashListNode2C(HashTable<HashListNode2C>& table, std::uint32_t keyLow, std::uint32_t keyHigh) noexcept;
-
-    /**
-     * Address: 0x0082C480 (FUN_0082C480, sub_82C480)
-     */
-    static HashListNode2C* ObtainHashListNode2C(
-      HashTable<HashListNode2C>& table, HashListNode2CValue& valueSource, bool& outInserted
-    );
-
-    /**
-     * Address: 0x0082C950 (FUN_0082C950, sub_82C950)
-     */
-    [[nodiscard]] static HashListNode10* FindHashListNode10(HashTable<HashListNode10>& table, std::uint32_t key) noexcept;
-
-    /**
-     * Address: 0x0082B5E0 (FUN_0082B5E0, sub_82B5E0)
-     */
-    static HashListNode10*
-      ObtainHashListNode10(HashTable<HashListNode10>& table, HashListNode10Value& valueSource, bool& outInserted);
-
-    /**
-     * Address: 0x0082B490 (FUN_0082B490, sub_82B490)
-     *
-     * What it does:
-     * `mMapC`'s public find-or-insert entry point, the exact analogue of
-     * `FindOrInsertCommandGraphDrawNode` for the edge table: looks the
-     * `{fromNode, toNode}` pair up via `FindHashListNode2C` first; on a
-     * miss, inserts a zero-initialized `CommandGraphEdge` (the binary
-     * `memset`s the value composite before the insert - a fresh edge has no
-     * source line of its own, matching `CommandGraphEdge`'s in-class
-     * default member initializers). Always returns `&node->mEdge`.
-     */
-    [[nodiscard]] static CommandGraphEdge* FindOrInsertCommandGraphEdge(
-      UICommandGraphDrawNode* fromNode, UICommandGraphDrawNode* toNode, HashTable<HashListNode2C>& table
-    );
-
     /**
      * Address: 0x008300D0 (FUN_008300D0)
      */
@@ -2100,16 +1612,15 @@ namespace moho
     CommandGraphNode mNodes[40];        // +0x0004
     CWldSession* mSession;              // +0x0D24
     void* mSessionRes1;                 // +0x0D28
-    CD3DFont* mDebugFont;               // +0x0D2C
-    HashTable<HashListNode88> mMapAB0;  // +0x0D30
-    HashTable<HashListNode88> mMapAB1;  // +0x0D58
-    HashTable<HashListNode2C> mMapC;    // +0x0D80
-    HashTable<HashListNode10> mMapD;    // +0x0DA8
+    CountedPtr<CD3DFont> mDebugFont;               // +0x0D2C
+    DrawNodeMap mMapAB0;  // +0x0D30
+    DrawNodeMap mMapAB1;  // +0x0D58
+    EdgeMap mMapC;    // +0x0D80
+    WidthMap mMapD;    // +0x0DA8
     CommandGraphTree mCommandGraphTree; // +0x0DD0
   };
 
   static_assert(sizeof(UICommandGraph::CommandGraphNode) == 0x54, "UICommandGraph::CommandGraphNode size must be 0x54");
-  static_assert(sizeof(UICommandGraph::HashListNode88) == 0x88, "UICommandGraph::HashListNode88 size must be 0x88");
   static_assert(
     sizeof(UICommandGraph::UICommandGraphDrawNode::mLaneA) == 0x18,
     "UICommandGraph::UICommandGraphDrawNode::mLaneA size must be 0x18"
@@ -2117,10 +1628,6 @@ namespace moho
   static_assert(
     sizeof(UICommandGraph::UICommandGraphDrawNode) == 0x78,
     "UICommandGraph::UICommandGraphDrawNode size must be 0x78"
-  );
-  static_assert(
-    offsetof(UICommandGraph::HashListNode88, mDraw) == 0x10,
-    "UICommandGraph::HashListNode88::mDraw offset must be 0x10"
   );
   static_assert(
     offsetof(UICommandGraph::UICommandGraphDrawNode, mHelperLink) == 0x04,
@@ -2153,13 +1660,6 @@ namespace moho
   static_assert(
     offsetof(UICommandGraph::UICommandGraphDrawNode, mLaneB) == 0x60,
     "UICommandGraphDrawNode::mLaneB offset must be 0x60"
-  );
-  static_assert(sizeof(UICommandGraph::HashListNode2C) == 0x2C, "UICommandGraph::HashListNode2C size must be 0x2C");
-  static_assert(sizeof(UICommandGraph::HashListNode10) == 0x10, "UICommandGraph::HashListNode10 size must be 0x10");
-  static_assert(sizeof(UICommandGraph::HashBucketVector) == 0x10, "UICommandGraph::HashBucketVector size must be 0x10");
-  static_assert(
-    sizeof(UICommandGraph::HashTable<UICommandGraph::HashListNode88>) == 0x28,
-    "UICommandGraph::HashTable size must be 0x28"
   );
   static_assert(
     sizeof(UICommandGraph::CommandGraphTreeNode) == 0x28, "UICommandGraph::CommandGraphTreeNode size must be 0x28"
@@ -3214,59 +2714,8 @@ namespace moho
       return iconData.mBlueprint->mStrategicIconRest;
     }
 
-    template <typename TNode>
-    [[nodiscard]] TNode* AllocateSelfLinkedNode()
-    {
-      auto* const node = static_cast<TNode*>(::operator new(sizeof(TNode)));
-      std::memset(node, 0, sizeof(TNode));
-      node->mNext = node;
-      node->mPrev = node;
-      return node;
-    }
-
   } // namespace
 
-  void UICommandGraph::ReleaseIntrusive(CD3DFont*& font)
-  {
-    if (!font) {
-      return;
-    }
-
-    --font->mRefCount;
-    if (font->mRefCount == 0) {
-      font->Release(1);
-    }
-    font = nullptr;
-  }
-
-  void UICommandGraph::AssignIntrusive(CD3DFont*& dst, CD3DFont* const src)
-  {
-    if (dst == src) {
-      return;
-    }
-
-    ReleaseIntrusive(dst);
-    dst = src;
-    if (dst) {
-      ++dst->mRefCount;
-    }
-  }
-
-  /**
-   * Address: 0x00826550 (FUN_00826550, sub_826550)
-   *
-   * IDA signature:
-   * _DWORD *__stdcall sub_826550(int a1);
-   *
-   * What it does:
-   * Tears one draw node down: both dword lanes are released back to their
-   * inline storage (freeing the spilled heap block if there is one), the weak
-   * owner reference is dropped, and the node is spliced out of its command's
-   * intrusive chain.
-   *
-   * The binary releases lane B before lane A; the order is preserved because
-   * `operator delete[]` is observable.
-   */
   /**
    * Address: 0x00824600 (FUN_00824600, sub_824600)
    *
@@ -3276,15 +2725,10 @@ namespace moho
    * flag bytes cleared and `mIsVisible = 1` (+0x1E; the pad byte at +0x1F is
    * not written), no mesh, the +0x28..+0x44 run zeroed, then both lanes armed
    * on their inline windows. It was a free function over a padded 0x78-byte
-   * view that `FindOrInsertCommandGraphDrawNode` then reinterpreted as this
+   * view that the map insertion then reinterpreted as this
    * type.
    *
-   * The binary arms each lane with a one-slot capacity (`lea edx,[ecx+4]` at
-   * 0x00824667/0x00824670, and the same in the lane copy constructor
-   * 0x0082E5E0); the lanes here are modelled as two-slot `fastvector_n`s, so
-   * their own constructor arms two. Every default node is only ever copied
-   * (`RelocateDrawNode`) and destroyed, neither of which reads the capacity
-   * of an empty inline lane.
+   * Each edge vector has one inline slot, as the +4 capacity stores prove.
    */
   UICommandGraph::UICommandGraphDrawNode::UICommandGraphDrawNode()
     : mCommandId(-1)
@@ -3303,1079 +2747,30 @@ namespace moho
     , mLaneB()
   {}
 
-  UICommandGraph::UICommandGraphDrawNode::~UICommandGraphDrawNode()
-  {
-    mLaneB.ResetStorageToInline();
-    mLaneA.ResetStorageToInline();
-
-    mMeshInstance.release();
-    // `mHelperLink` unlinks as the last member (0x008265E8).
-  }
-
   /**
-   * Address: 0x0082F030 (FUN_0082F030)
-   */
-  UICommandGraph::HashListNode88* UICommandGraph::AllocateMapABListSentinel()
-  {
-    return AllocateSelfLinkedNode<HashListNode88>();
-  }
-
-  /**
-   * Address: 0x0082F5B0 (FUN_0082F5B0)
-   */
-  UICommandGraph::HashListNode2C* UICommandGraph::AllocateMapCListSentinel()
-  {
-    return AllocateSelfLinkedNode<HashListNode2C>();
-  }
-
-  /**
-   * Address: 0x0082FAF0 (FUN_0082FAF0)
-   */
-  UICommandGraph::HashListNode10* UICommandGraph::AllocateMapDListSentinel()
-  {
-    return AllocateSelfLinkedNode<HashListNode10>();
-  }
-
-  /**
-   * Address: 0x0082BF40 (FUN_0082BF40)
-   */
-  void UICommandGraph::InitMapAB(HashTable<HashListNode88>& table, const UICommandGraph* const owner)
-  {
-    table.mOwnerByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(owner) & 0xFFu);
-    table.mListHead = AllocateMapABListSentinel();
-    table.mListSize = 0u;
-    table.mBuckets.assign(9u, table.mListHead);
-    table.mBucketMask = 1u;
-    table.mBucketCount = 1u;
-  }
-
-  /**
-   * Address: 0x0082C400 (FUN_0082C400)
-   */
-  void UICommandGraph::InitMapC(HashTable<HashListNode2C>& table, const UICommandGraph* const owner)
-  {
-    table.mOwnerByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(owner) & 0xFFu);
-    table.mListHead = AllocateMapCListSentinel();
-    table.mListSize = 0u;
-    table.mBuckets.assign(9u, table.mListHead);
-    table.mBucketMask = 1u;
-    table.mBucketCount = 1u;
-  }
-
-  /**
-   * Address: 0x0082C8D0 (FUN_0082C8D0)
-   */
-  void UICommandGraph::InitMapD(HashTable<HashListNode10>& table, const UICommandGraph* const owner)
-  {
-    table.mOwnerByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(owner) & 0xFFu);
-    table.mListHead = AllocateMapDListSentinel();
-    table.mListSize = 0u;
-    table.mBuckets.assign(9u, table.mListHead);
-    table.mBucketMask = 1u;
-    table.mBucketCount = 1u;
-  }
-
-  /**
-   * Address: 0x0082FAB0 (FUN_0082FAB0, MSVC8 `std::list<T>::clear` inline expansion for
-   *                      trivial-destructor hash-list nodes)
-   * Address: 0x0082C840 (FUN_0082C840, the `HashListNode2C` instantiation of this same
-   *                      template, reached from mMapC's teardown. Verified as the same
-   *                      body rather than assumed: both are 19 instructions with an
-   *                      identical mnemonic sequence, and the sole `call rel32` in each
-   *                      resolves to the same target, 0x00957A60 `operator delete`. The
-   *                      two node types compile to identical code because neither
-   *                      payload needs destroying, so only the link teardown remains.)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_82FAB0@<eax>(int a1@<esi>);
+   * Address: 0x00826550 (FUN_00826550)
    *
    * What it does:
-   * Clears one sentinel-headed doubly-linked list in place. Resets the sentinel
-   * head's next/prev to itself, zeroes the size lane, then walks each former
-   * payload node, destroys its payload and frees its allocation.
-   *
-   * 0x0082FAB0 is the 0x10-node table's clear and frees without destroying,
-   * because that table's payload really is trivially destructible. The AB
-   * tables are not: their list-erase helper at 0x0082EF80 calls the draw-node
-   * destructor on `node + 0x10` before `operator delete(node)`, so `TNode`
-   * opts in through `DestroyPayload`. Without that call each cleared node
-   * leaks both spilled dword lanes and one weak reference.
-   *
-   * Address: 0x0082EFF0 (FUN_0082EFF0, the `HashListNode88` instantiation
-   * predicted above -- confirmed against its own decompile, not just the
-   * prose prediction: `_DWORD* v2` per-node cursor, `v2 + 4` in the raw
-   * pseudocode is DWORD-stride pointer arithmetic (`v2` is `_DWORD*`), i.e.
-   * byte offset `+0x10`, matching this citation's "node + 0x10" exactly.
-   * Self-link reset (`*headSlot = headSlot`) happens BEFORE the destroy
-   * loop, matching this member's reentrancy-safety ordering. Reached from
-   * three call sites: `UICommandGraph::UICommandGraph` (0x00824810),
-   * `~UICommandGraph` (0x00824B80), and `InitMapAB` (0x0082BF40, cited
-   * below) -- `InitMapAB` calling a clear routine before its own
-   * from-scratch setup reads as a defensive pre-clear; the ctor's own
-   * direct call likely covers a table `InitMapAB` doesn't own. The
-   * "0x0082EF80" address this comment predicted for the per-node
-   * destructor-calling helper is a separate, still-unrecovered token from
-   * this one (0x0082EFF0 is the whole clear-loop, not the inner call);
-   * not chased down further in this pass.)
+   * Destroys outgoing then incoming edges, releases the mesh, and unlinks
+   * the helper reference through the members' normal reverse destruction.
    */
-  template <typename TNode>
-  void UICommandGraph::ClearHashListNodes(HashTable<TNode>& table) noexcept
+  UICommandGraph::UICommandGraphDrawNode::~UICommandGraphDrawNode() = default;
+
+  std::size_t UICommandGraph::EdgeKeyHashCompare::operator()(const DrawNodePair& key) const noexcept
   {
-    TNode* const head = table.mListHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    // Detach circular list: sentinel becomes empty before node frees so any
-    // re-entrancy during ::operator delete cannot observe stale next/prev links.
-    TNode* current = head->mNext;
-    head->mNext = head;
-    head->mPrev = head;
-    table.mListSize = 0u;
-
-    while (current != head) {
-      TNode* const next = current->mNext;
-      // The sentinel head is deliberately excluded from this walk: the binary
-      // never constructs its payload, and neither does AllocateSelfLinkedNode.
-      if constexpr (requires(TNode* node) { TNode::DestroyPayload(node); }) {
-        TNode::DestroyPayload(current);
-      }
-      ::operator delete(current);
-      current = next;
-    }
+    const auto fromAddress = reinterpret_cast<std::uintptr_t>(key.first);
+    const auto toAddress = reinterpret_cast<std::uintptr_t>(key.second);
+    // Hash only: retain the binary's 32-bit combine; equality uses full pointers.
+    const auto combined = static_cast<std::uint32_t>(
+      3863u * fromAddress + 7919u * toAddress + 53849u * (fromAddress ^ toAddress)
+    );
+    return msvc8::hash_value(static_cast<long>(combined));
   }
 
-  template <typename TNode>
-  void UICommandGraph::DestroyMap(HashTable<TNode>& table)
+  bool UICommandGraph::EdgeKeyHashCompare::operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) const noexcept
   {
-    ClearHashListNodes(table);
-
-    if (table.mListHead) {
-      ::operator delete(table.mListHead);
-      table.mListHead = nullptr;
-    }
-
-    table.mBuckets = HashBucketVector{};  // VC8 _Tidy(): destroy + free + null the lanes
-    table.mBucketMask = 1u;
-    table.mBucketCount = 1u;
-  }
-
-  /**
-   * Address: 0x0082D530 (FUN_0082D530, sub_82D530 -- the SEH-wrapped emission:
-   *                      it installs SEH_82D530, carries unwind funclets at
-   *                      0x00B843xx and ends in ___CxxFrameHandler3_0)
-   * Address: 0x00826620 (FUN_00826620, the same source body emitted without EH
-   *                      scaffolding, 86 instructions vs 128)
-   *
-   * NOTE: these two are NOT ICF twins, despite an earlier note in the progress
-   * DB saying so - ICF folds byte-identical COMDATs and these differ in size
-   * and at the very first instruction (`push ebx` vs `mov eax, large fs:0`).
-   * They are one source function emitted twice, once in a context needing
-   * exception scaffolding and once not; the field-by-field copy order is
-   * identical in both (mCommandId, helper-link relink, the +0x0C..+0x18 float
-   * quad, the three +0x1C..+0x1E bytes, +0x20, the +0x24 weak_release/
-   * lock-xadd add_ref pair, the +0x28..+0x40 float run, +0x44, then the two
-   * dword-lane copies).
-   */
-  UICommandGraph::UICommandGraphDrawNode* UICommandGraph::RelocateDrawNode(
-    UICommandGraphDrawNode* const destination, UICommandGraphDrawNode& source
-  )
-  {
-    destination->mCommandId = source.mCommandId;
-
-    // `WeakPtr`'s copy constructor into the raw destination slot: the copy
-    // joins the source's helper chain, and the source stays on it until its
-    // caller destroys it.
-    ::new (static_cast<void*>(&destination->mHelperLink)) WeakPtr<UserCommandIssueHelper>(source.mHelperLink);
-
-    destination->mPositionSum = source.mPositionSum;
-    destination->mWeight = source.mWeight;
-    destination->mHasResolvedPosition = source.mHasResolvedPosition;
-    destination->mIsChainBoundary = source.mIsChainBoundary;
-    destination->mIsVisible = source.mIsVisible;
-
-    // Retain a new strong reference on the shared control block rather than
-    // transferring ownership - `source` keeps its own reference and is torn
-    // down separately by its caller.
-    destination->mMeshInstance = source.mMeshInstance.clone_retained();
-
-    destination->mOrientationHint = source.mOrientationHint;
-    destination->mPreviousCentroid = source.mPreviousCentroid;
-    destination->mUnitCountScale = source.mUnitCountScale;
-    destination->mCompletionTick = source.mCompletionTick;
-
-    // The two lane copies: `fastvector_n<CommandGraphEdge*, 2>`'s copy constructor
-    // (0x0082E5E0, cited on FastVector.h) into the raw destination slots.
-    ::new (static_cast<void*>(&destination->mLaneA)) gpg::fastvector_n<CommandGraphEdge*, 2>(source.mLaneA);
-    ::new (static_cast<void*>(&destination->mLaneB)) gpg::fastvector_n<CommandGraphEdge*, 2>(source.mLaneB);
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x00831AB0 (FUN_00831AB0, sub_831AB0)
-   */
-  void* UICommandGraph::AllocateHashListNode88Storage(const std::size_t count)
-  {
-    if ((0xFFFFFFFFu / static_cast<std::uint32_t>(count)) < sizeof(HashListNode88)) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(sizeof(HashListNode88) * count);
-  }
-
-  /**
-   * Address: 0x00831D80 (FUN_00831D80, sub_831D80)
-   */
-  UICommandGraph::HashListNode88Value* UICommandGraph::ConstructHashListNode88Value(
-    HashListNode88Value* const destination, HashListNode88Value& source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-    destination->mKey = source.mKey;
-    RelocateDrawNode(&destination->mDraw, source.mDraw);
-    return destination;
-  }
-
-  /**
-   * Address: 0x008304D0 (FUN_008304D0, sub_8304D0)
-   */
-  UICommandGraph::HashListNode88* UICommandGraph::ConstructHashListNode88(
-    HashListNode88* const next, HashListNode88* const prev, HashListNode88Value& valueSource
-  )
-  {
-    auto* const node = static_cast<HashListNode88*>(AllocateHashListNode88Storage(1));
-    node->mNext = next;
-    node->mPrev = prev;
-    try {
-      ConstructHashListNode88Value(reinterpret_cast<HashListNode88Value*>(&node->mKey), valueSource);
-    } catch (...) {
-      ::operator delete(node);
-      throw;
-    }
-    return node;
-  }
-
-  /**
-   * Not a distinct binary function - see the declaration's doc comment.
-   */
-  template <typename TNode>
-  std::uint32_t UICommandGraph::HashKeyToBucketIndex(const HashTable<TNode>& table, const std::uint32_t key) noexcept
-  {
-    const std::ldiv_t split = std::ldiv(static_cast<long>(key ^ 0xDEADBEEFu), 127773L);
-    long scrambled = 16807L * split.rem - 2836L * split.quot;
-    if (scrambled < 0) {
-      scrambled += 0x7FFFFFFFL;
-    }
-    std::uint32_t bucketIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
-    if (table.mBucketCount <= bucketIndex) {
-      bucketIndex += static_cast<std::uint32_t>(-1) - (table.mBucketMask >> 1u);
-    }
-    return bucketIndex;
-  }
-
-  /**
-   * Not a distinct binary function - see the declaration's doc comment.
-   * Address: 0x0082D960 (FUN_0082D960, sub_82D960, the pair-key combine step).
-   */
-  template <typename TNode>
-  std::uint32_t UICommandGraph::HashKeyToBucketIndex(
-    const HashTable<TNode>& table, const std::uint32_t keyLow, const std::uint32_t keyHigh
-  ) noexcept
-  {
-    const std::ldiv_t split =
-      std::ldiv(static_cast<long>(3863u * keyLow + 7919u * keyHigh + 53849u * (keyLow ^ keyHigh)), 127773L);
-    long scrambled = 16807L * split.rem - 2836L * split.quot;
-    if (scrambled < 0) {
-      scrambled += 0x7FFFFFFFL;
-    }
-    std::uint32_t bucketIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
-    if (table.mBucketCount <= bucketIndex) {
-      bucketIndex += static_cast<std::uint32_t>(-1) - (table.mBucketMask >> 1u);
-    }
-    return bucketIndex;
-  }
-
-  /**
-   * Not a distinct binary function - see the declaration's doc comment.
-   * Shared scalar-key find shape (`FindHashListNode10` = 0x0082C950).
-   */
-  template <typename TNode>
-  TNode* UICommandGraph::FindHashListNode(HashTable<TNode>& table, const std::uint32_t key) noexcept
-  {
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
-    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
-    TNode* node = bucketSlots[bucketIndex];
-    TNode* const bucketEnd = bucketSlots[bucketIndex + 1u];
-
-    if (node == bucketEnd) {
-      return table.mListHead;
-    }
-    while (node->mKey < key) {
-      node = node->mNext;
-      if (node == bucketEnd) {
-        return table.mListHead;
-      }
-    }
-    return (key >= node->mKey) ? node : table.mListHead;
-  }
-
-  /**
-   * Not a distinct binary function - see the declaration's doc comment.
-   * Shared pair-key find shape (`FindHashListNode2C` = 0x0082C750).
-   */
-  template <typename TNode>
-  TNode* UICommandGraph::FindHashListNode(
-    HashTable<TNode>& table, const std::uint32_t keyLow, const std::uint32_t keyHigh
-  ) noexcept
-  {
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, keyLow, keyHigh);
-    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
-    TNode* node = bucketSlots[bucketIndex];
-    TNode* const bucketEnd = bucketSlots[bucketIndex + 1u];
-
-    if (node == bucketEnd) {
-      return table.mListHead;
-    }
-
-    const auto lexicographicLessEqual = [](const std::uint32_t lhsLow, const std::uint32_t lhsHigh,
-                                            const std::uint32_t rhsLow, const std::uint32_t rhsHigh) {
-      return lhsLow < rhsLow || (lhsLow == rhsLow && lhsHigh <= rhsHigh);
-    };
-
-    while (!lexicographicLessEqual(keyLow, keyHigh, node->mKeyLow, node->mKeyHigh)) {
-      node = node->mNext;
-      if (node == bucketEnd) {
-        return table.mListHead;
-      }
-    }
-    return lexicographicLessEqual(node->mKeyLow, node->mKeyHigh, keyLow, keyHigh) ? node : table.mListHead;
-  }
-
-  /**
-   * Address: 0x0082C240 (FUN_0082C240, sub_82C240)
-   *
-   * The hash bucket vector stores one boundary pointer per bucket index
-   * plus one trailing sentinel-adjacent boundary (N+1 slots for N buckets):
-   * bucket[i]'s range is `[mBuckets.mStart[i], mBuckets.mStart[i+1])`, so
-   * adjacent buckets share a slot (bucket i's end is bucket i+1's begin).
-   * Confirmed directly from this function's own disassembly
-   * (`lea ecx,[ecx+eax*4]` - single dword stride per bucket index, not
-   * doubled).
-   */
-  UICommandGraph::HashListNode88* UICommandGraph::FindHashListNode88(
-    HashTable<HashListNode88>& table, const std::uint32_t key
-  ) noexcept
-  {
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
-    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
-    HashListNode88* node = bucketSlots[bucketIndex];
-    HashListNode88* const bucketEnd = bucketSlots[bucketIndex + 1u];
-
-    if (node == bucketEnd) {
-      return table.mListHead;
-    }
-    while (node->mKey < key) {
-      node = node->mNext;
-      if (node == bucketEnd) {
-        return table.mListHead;
-      }
-    }
-    return (key >= node->mKey) ? node : table.mListHead;
-  }
-
-  /**
-   * Address: 0x0082C2E0 (FUN_0082C2E0, sub_82C2E0)
-   */
-  std::pair<UICommandGraph::HashListNode88*, UICommandGraph::HashListNode88*> UICommandGraph::EqualRangeHashListNode88(
-    HashTable<HashListNode88>& table, const std::uint32_t key
-  ) noexcept
-  {
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
-    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
-    HashListNode88* node = bucketSlots[bucketIndex];
-    HashListNode88* const bucketEnd = bucketSlots[bucketIndex + 1u];
-
-    if (node != bucketEnd) {
-      while (node->mKey < key) {
-        node = node->mNext;
-        if (node == bucketEnd) {
-          break;
-        }
-      }
-    }
-
-    if (node == bucketEnd) {
-      return {table.mListHead, table.mListHead};
-    }
-
-    HashListNode88* const first = node;
-    do {
-      if (key < node->mKey) {
-        break;
-      }
-      node = node->mNext;
-    } while (node != bucketEnd);
-
-    if (first == node) {
-      return {table.mListHead, table.mListHead};
-    }
-    return {first, node};
-  }
-
-  /**
-   * Address: 0x0082B450 (FUN_0082B450, sub_82B450)
-   */
-  std::uint32_t UICommandGraph::CountHashListNode88(HashTable<HashListNode88>& table, const std::uint32_t key) noexcept
-  {
-    const auto [first, last] = EqualRangeHashListNode88(table, key);
-    std::uint32_t count = 0u;
-    for (HashListNode88* node = first; node != last; node = node->mNext) {
-      ++count;
-    }
-    return count;
-  }
-
-  /**
-   * Address: 0x0082F050 (FUN_0082F050, sub_82F050)
-   */
-  std::uint32_t UICommandGraph::CheckedIncrementListSize(const std::uint32_t count, std::uint32_t& sizeField)
-  {
-    if ((0x1FFFFFFu - sizeField) < count) {
-      EngineThrowContainerTooLong("list<T> too long");
-    }
-    sizeField += count;
-    return sizeField;
-  }
-
-  /**
-   * Address: 0x0082BFB0 (FUN_0082BFB0, sub_82BFB0)
-   */
-  UICommandGraph::HashListNode88* UICommandGraph::InsertOrFindHashListNode88(
-    HashTable<HashListNode88>& table, HashListNode88Value& valueSource, bool& outInserted
-  )
-  {
-    if (table.mBucketCount <= (table.mListSize >> 2u)) {
-      // Load factor exceeded: grow the bucket boundary array (or just the
-      // mask, when slack already covers it) and redistribute exactly one
-      // old bucket's nodes between it and the newly-available bucket - the
-      // binary's incremental (split-one-bucket-per-insert) rehash, not a
-      // full rebuild.
-      const auto bucketVectorLength = static_cast<std::uint32_t>(table.mBuckets.size());
-
-      if ((bucketVectorLength - 1u) > table.mBucketCount) {
-        if (table.mBucketMask < table.mBucketCount) {
-          table.mBucketMask = 2u * table.mBucketMask + 1u;
-        }
-      } else {
-        const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
-        table.mBucketMask = newMask;
-        table.mBuckets.resize(newMask + 2u, table.mListHead);
-      }
-
-      auto* const rehashBucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
-      const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
-      HashListNode88* node = rehashBucketSlots[splitBucketIndex];
-      // The loop condition re-reads the split bucket's END slot on every pass:
-      // 0x0082C0F1 is `while (*(int**)(4 * v11 + a1[5] + 4) != v12)`, a
-      // do-while whose test is a fresh load of `bucketSlots[split + 1]`. Fresh
-      // is the point -- the splice below rewrites those slots.
-      //
-      // Hoisting it into a `const` and running `for (;;)` instead left the
-      // `rehashedIndex == splitBucketIndex` arm, which only advances `node`,
-      // with no way out: once a run of keys all rehashed back into the split
-      // bucket, `node` walked past the sentinel and around the circular list
-      // forever. Queueing several buildings in one shift-drag is exactly that
-      // burst, and it hung the main thread inside `CreateMeshes`.
-      if (rehashBucketSlots[splitBucketIndex + 1u] != node) {
-        do {
-          // Raw masked hash WITHOUT the wraparound adjustment
-          // HashKeyToBucketIndex applies elsewhere: the binary compares
-          // this directly against splitBucketIndex, which by construction
-          // is always already within [0, mask] on this path.
-          const std::ldiv_t split = std::ldiv(static_cast<long>(node->mKey ^ 0xDEADBEEFu), 127773L);
-          long scrambled = 16807L * split.rem - 2836L * split.quot;
-          if (scrambled < 0) {
-            scrambled += 0x7FFFFFFFL;
-          }
-          const std::uint32_t rehashedIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
-
-          if (rehashedIndex == splitBucketIndex) {
-            node = node->mNext;
-          } else {
-            HashListNode88* const next = node->mNext;
-            if (next != table.mListHead) {
-              if (rehashBucketSlots[splitBucketIndex] == node) {
-                std::uint32_t walkIndex = splitBucketIndex;
-                for (;;) {
-                  rehashBucketSlots[walkIndex] = next;
-                  if (walkIndex == 0u) {
-                    break;
-                  }
-                  --walkIndex;
-                  if (rehashBucketSlots[walkIndex] != node) {
-                    break;
-                  }
-                }
-              }
-
-              // Splice `node` out of its current position and onto the
-              // tail of the table's global list, immediately before the
-              // sentinel - exactly where the newly-available bucket's
-              // range belongs.
-              HashListNode88* const sentinel = table.mListHead;
-              HashListNode88* const oldTail = sentinel->mPrev;
-              node->mPrev->mNext = next;
-              next->mPrev = node->mPrev;
-              node->mNext = sentinel;
-              node->mPrev = oldTail;
-              oldTail->mNext = node;
-              sentinel->mPrev = node;
-            }
-
-            // Cascade: any bucket boundary between the split point and the
-            // new bucket that still holds the sentinel as its own begin
-            // (hasn't been individually established yet) is retargeted to
-            // this node's new tail position too.
-            std::uint32_t cascadeIndex = table.mBucketCount;
-            while (cascadeIndex > splitBucketIndex && rehashBucketSlots[cascadeIndex] == table.mListHead) {
-              rehashBucketSlots[cascadeIndex] = node;
-              --cascadeIndex;
-            }
-
-            if (next == table.mListHead) {
-              break;
-            }
-            node = next;
-          }
-        } while (rehashBucketSlots[splitBucketIndex + 1u] != node);
-      }
-
-      ++table.mBucketCount;
-    }
-
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKey);
-    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
-    HashListNode88* insertionPoint = bucketSlots[bucketIndex + 1u];
-
-    if (bucketSlots[bucketIndex] != insertionPoint) {
-      bool reachedBegin = false;
-      for (;;) {
-        insertionPoint = insertionPoint->mPrev;
-        if (insertionPoint->mKey <= valueSource.mKey) {
-          break;
-        }
-        if (bucketSlots[bucketIndex] == insertionPoint) {
-          reachedBegin = true;
-          break;
-        }
-      }
-
-      if (!reachedBegin) {
-        if (insertionPoint->mKey >= valueSource.mKey) {
-          outInserted = false;
-          return insertionPoint;
-        }
-        insertionPoint = insertionPoint->mNext;
-      }
-    }
-
-    HashListNode88* const newNode = ConstructHashListNode88(insertionPoint, insertionPoint->mPrev, valueSource);
-    CheckedIncrementListSize(1u, table.mListSize);
-
-    HashListNode88* const oldPrev = newNode->mPrev;
-    insertionPoint->mPrev = newNode;
-    oldPrev->mNext = newNode;
-
-    if (bucketSlots[bucketIndex] == insertionPoint) {
-      std::uint32_t cascadeIndex = bucketIndex;
-      for (;;) {
-        bucketSlots[cascadeIndex] = newNode;
-        if (cascadeIndex == 0u) {
-          break;
-        }
-        --cascadeIndex;
-        if (bucketSlots[cascadeIndex] != insertionPoint) {
-          break;
-        }
-      }
-    }
-
-    outInserted = true;
-    return newNode;
-  }
-
-  /**
-   * Not a distinct binary function - see the declaration's doc comment.
-   * Shared scalar-key rehash/insert-point-walk shape
-   * (`ObtainHashListNode10` = 0x0082B5E0). Direct generalisation of
-   * `InsertOrFindHashListNode88`'s body above over `TNode`, with the two
-   * genuinely per-node-type steps (allocate+link a fresh node, bump the
-   * checked list-size counter) passed in as function pointers rather than
-   * duplicated.
-   */
-  template <typename TNode, typename TValue>
-  TNode* UICommandGraph::ObtainHashListNode(
-    HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
-    TNode* (*const constructNode)(TNode*, TNode*, TValue&),
-    std::uint32_t (*const incrementListSize)(std::uint32_t, std::uint32_t&)
-  )
-  {
-    if (table.mBucketCount <= (table.mListSize >> 2u)) {
-      const auto bucketVectorLength = static_cast<std::uint32_t>(table.mBuckets.size());
-
-      if ((bucketVectorLength - 1u) > table.mBucketCount) {
-        if (table.mBucketMask < table.mBucketCount) {
-          table.mBucketMask = 2u * table.mBucketMask + 1u;
-        }
-      } else {
-        const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
-        table.mBucketMask = newMask;
-        table.mBuckets.resize(newMask + 2u, table.mListHead);
-      }
-
-      auto* const rehashBucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
-      const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
-      TNode* node = rehashBucketSlots[splitBucketIndex];
-      // The loop condition re-reads the split bucket's END slot on every pass:
-      // 0x0082C0F1 is `while (*(int**)(4 * v11 + a1[5] + 4) != v12)`, a
-      // do-while whose test is a fresh load of `bucketSlots[split + 1]`. Fresh
-      // is the point -- the splice below rewrites those slots.
-      //
-      // Hoisting it into a `const` and running `for (;;)` instead left the
-      // `rehashedIndex == splitBucketIndex` arm, which only advances `node`,
-      // with no way out: once a run of keys all rehashed back into the split
-      // bucket, `node` walked past the sentinel and around the circular list
-      // forever. Queueing several buildings in one shift-drag is exactly that
-      // burst, and it hung the main thread inside `CreateMeshes`.
-      if (rehashBucketSlots[splitBucketIndex + 1u] != node) {
-        do {
-          const std::ldiv_t split = std::ldiv(static_cast<long>(node->mKey ^ 0xDEADBEEFu), 127773L);
-          long scrambled = 16807L * split.rem - 2836L * split.quot;
-          if (scrambled < 0) {
-            scrambled += 0x7FFFFFFFL;
-          }
-          const std::uint32_t rehashedIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
-
-          if (rehashedIndex == splitBucketIndex) {
-            node = node->mNext;
-          } else {
-            TNode* const next = node->mNext;
-            if (next != table.mListHead) {
-              if (rehashBucketSlots[splitBucketIndex] == node) {
-                std::uint32_t walkIndex = splitBucketIndex;
-                for (;;) {
-                  rehashBucketSlots[walkIndex] = next;
-                  if (walkIndex == 0u) {
-                    break;
-                  }
-                  --walkIndex;
-                  if (rehashBucketSlots[walkIndex] != node) {
-                    break;
-                  }
-                }
-              }
-
-              TNode* const sentinel = table.mListHead;
-              TNode* const oldTail = sentinel->mPrev;
-              node->mPrev->mNext = next;
-              next->mPrev = node->mPrev;
-              node->mNext = sentinel;
-              node->mPrev = oldTail;
-              oldTail->mNext = node;
-              sentinel->mPrev = node;
-            }
-
-            std::uint32_t cascadeIndex = table.mBucketCount;
-            while (cascadeIndex > splitBucketIndex && rehashBucketSlots[cascadeIndex] == table.mListHead) {
-              rehashBucketSlots[cascadeIndex] = node;
-              --cascadeIndex;
-            }
-
-            if (next == table.mListHead) {
-              break;
-            }
-            node = next;
-          }
-        } while (rehashBucketSlots[splitBucketIndex + 1u] != node);
-      }
-
-      ++table.mBucketCount;
-    }
-
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKey);
-    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
-    TNode* insertionPoint = bucketSlots[bucketIndex + 1u];
-
-    if (bucketSlots[bucketIndex] != insertionPoint) {
-      bool reachedBegin = false;
-      for (;;) {
-        insertionPoint = insertionPoint->mPrev;
-        if (insertionPoint->mKey <= valueSource.mKey) {
-          break;
-        }
-        if (bucketSlots[bucketIndex] == insertionPoint) {
-          reachedBegin = true;
-          break;
-        }
-      }
-
-      if (!reachedBegin) {
-        if (insertionPoint->mKey >= valueSource.mKey) {
-          outInserted = false;
-          return insertionPoint;
-        }
-        insertionPoint = insertionPoint->mNext;
-      }
-    }
-
-    TNode* const newNode = constructNode(insertionPoint, insertionPoint->mPrev, valueSource);
-    incrementListSize(1u, table.mListSize);
-
-    TNode* const oldPrev = newNode->mPrev;
-    insertionPoint->mPrev = newNode;
-    oldPrev->mNext = newNode;
-
-    if (bucketSlots[bucketIndex] == insertionPoint) {
-      std::uint32_t cascadeIndex = bucketIndex;
-      for (;;) {
-        bucketSlots[cascadeIndex] = newNode;
-        if (cascadeIndex == 0u) {
-          break;
-        }
-        --cascadeIndex;
-        if (bucketSlots[cascadeIndex] != insertionPoint) {
-          break;
-        }
-      }
-    }
-
-    outInserted = true;
-    return newNode;
-  }
-
-  /**
-   * Not a distinct binary function - see the declaration's doc comment.
-   * Shared pair-key rehash/insert-point-walk shape
-   * (`ObtainHashListNode2C` = 0x0082C480). Same structure as
-   * `ObtainHashListNode` above; only the rehash split-index hash and the
-   * insertion-point comparisons switch from scalar `<` to lexicographic
-   * `(lo, hi)` ordering.
-   */
-  template <typename TNode, typename TValue>
-  TNode* UICommandGraph::ObtainHashListNodePair(
-    HashTable<TNode>& table, TValue& valueSource, bool& outInserted,
-    TNode* (*const constructNode)(TNode*, TNode*, TValue&),
-    std::uint32_t (*const incrementListSize)(std::uint32_t, std::uint32_t&)
-  )
-  {
-    const auto lexicographicLessEqual = [](const std::uint32_t lhsLow, const std::uint32_t lhsHigh,
-                                            const std::uint32_t rhsLow, const std::uint32_t rhsHigh) {
-      return lhsLow < rhsLow || (lhsLow == rhsLow && lhsHigh <= rhsHigh);
-    };
-
-    if (table.mBucketCount <= (table.mListSize >> 2u)) {
-      const auto bucketVectorLength = static_cast<std::uint32_t>(table.mBuckets.size());
-
-      if ((bucketVectorLength - 1u) > table.mBucketCount) {
-        if (table.mBucketMask < table.mBucketCount) {
-          table.mBucketMask = 2u * table.mBucketMask + 1u;
-        }
-      } else {
-        const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
-        table.mBucketMask = newMask;
-        table.mBuckets.resize(newMask + 2u, table.mListHead);
-      }
-
-      auto* const rehashBucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
-      const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
-      TNode* node = rehashBucketSlots[splitBucketIndex];
-      // The loop condition re-reads the split bucket's END slot on every pass:
-      // 0x0082C0F1 is `while (*(int**)(4 * v11 + a1[5] + 4) != v12)`, a
-      // do-while whose test is a fresh load of `bucketSlots[split + 1]`. Fresh
-      // is the point -- the splice below rewrites those slots.
-      //
-      // Hoisting it into a `const` and running `for (;;)` instead left the
-      // `rehashedIndex == splitBucketIndex` arm, which only advances `node`,
-      // with no way out: once a run of keys all rehashed back into the split
-      // bucket, `node` walked past the sentinel and around the circular list
-      // forever. Queueing several buildings in one shift-drag is exactly that
-      // burst, and it hung the main thread inside `CreateMeshes`.
-      if (rehashBucketSlots[splitBucketIndex + 1u] != node) {
-        do {
-          const std::ldiv_t split = std::ldiv(
-            static_cast<long>(3863u * node->mKeyLow + 7919u * node->mKeyHigh + 53849u * (node->mKeyLow ^ node->mKeyHigh)),
-            127773L
-          );
-          long scrambled = 16807L * split.rem - 2836L * split.quot;
-          if (scrambled < 0) {
-            scrambled += 0x7FFFFFFFL;
-          }
-          const std::uint32_t rehashedIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
-
-          if (rehashedIndex == splitBucketIndex) {
-            node = node->mNext;
-          } else {
-            TNode* const next = node->mNext;
-            if (next != table.mListHead) {
-              if (rehashBucketSlots[splitBucketIndex] == node) {
-                std::uint32_t walkIndex = splitBucketIndex;
-                for (;;) {
-                  rehashBucketSlots[walkIndex] = next;
-                  if (walkIndex == 0u) {
-                    break;
-                  }
-                  --walkIndex;
-                  if (rehashBucketSlots[walkIndex] != node) {
-                    break;
-                  }
-                }
-              }
-
-              TNode* const sentinel = table.mListHead;
-              TNode* const oldTail = sentinel->mPrev;
-              node->mPrev->mNext = next;
-              next->mPrev = node->mPrev;
-              node->mNext = sentinel;
-              node->mPrev = oldTail;
-              oldTail->mNext = node;
-              sentinel->mPrev = node;
-            }
-
-            std::uint32_t cascadeIndex = table.mBucketCount;
-            while (cascadeIndex > splitBucketIndex && rehashBucketSlots[cascadeIndex] == table.mListHead) {
-              rehashBucketSlots[cascadeIndex] = node;
-              --cascadeIndex;
-            }
-
-            if (next == table.mListHead) {
-              break;
-            }
-            node = next;
-          }
-        } while (rehashBucketSlots[splitBucketIndex + 1u] != node);
-      }
-
-      ++table.mBucketCount;
-    }
-
-    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKeyLow, valueSource.mKeyHigh);
-    auto* const bucketSlots = reinterpret_cast<TNode**>(table.mBuckets.data());
-    TNode* insertionPoint = bucketSlots[bucketIndex + 1u];
-
-    if (bucketSlots[bucketIndex] != insertionPoint) {
-      bool reachedBegin = false;
-      for (;;) {
-        insertionPoint = insertionPoint->mPrev;
-        if (lexicographicLessEqual(insertionPoint->mKeyLow, insertionPoint->mKeyHigh, valueSource.mKeyLow, valueSource.mKeyHigh)) {
-          break;
-        }
-        if (bucketSlots[bucketIndex] == insertionPoint) {
-          reachedBegin = true;
-          break;
-        }
-      }
-
-      if (!reachedBegin) {
-        if (lexicographicLessEqual(valueSource.mKeyLow, valueSource.mKeyHigh, insertionPoint->mKeyLow, insertionPoint->mKeyHigh)) {
-          outInserted = false;
-          return insertionPoint;
-        }
-        insertionPoint = insertionPoint->mNext;
-      }
-    }
-
-    TNode* const newNode = constructNode(insertionPoint, insertionPoint->mPrev, valueSource);
-    incrementListSize(1u, table.mListSize);
-
-    TNode* const oldPrev = newNode->mPrev;
-    insertionPoint->mPrev = newNode;
-    oldPrev->mNext = newNode;
-
-    if (bucketSlots[bucketIndex] == insertionPoint) {
-      std::uint32_t cascadeIndex = bucketIndex;
-      for (;;) {
-        bucketSlots[cascadeIndex] = newNode;
-        if (cascadeIndex == 0u) {
-          break;
-        }
-        --cascadeIndex;
-        if (bucketSlots[cascadeIndex] != insertionPoint) {
-          break;
-        }
-      }
-    }
-
-    outInserted = true;
-    return newNode;
-  }
-
-  /**
-   * Addresses: 0x00831BA0 (FUN_00831BA0) and 0x00831C90 (FUN_00831C90) -
-   * see the declaration's doc comment.
-   */
-  template <typename TNode>
-  void* UICommandGraph::NewHashListNodeStorage(const std::size_t count)
-  {
-    if ((0xFFFFFFFFu / static_cast<std::uint32_t>(count)) < sizeof(TNode)) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(sizeof(TNode) * count);
-  }
-
-  /**
-   * Address: 0x00830700 (FUN_00830700, sub_830700)
-   */
-  UICommandGraph::HashListNode2C* UICommandGraph::MakeHashListNode2C(
-    HashListNode2C* const next, HashListNode2C* const prev, HashListNode2CValue& valueSource
-  )
-  {
-    auto* const node = static_cast<HashListNode2C*>(NewHashListNodeStorage<HashListNode2C>(1));
-    node->mNext = next;
-    node->mPrev = prev;
-    node->mKeyLow = valueSource.mKeyLow;
-    node->mKeyHigh = valueSource.mKeyHigh;
-    node->mEdge = valueSource.mEdge;
-    return node;
-  }
-
-  /**
-   * Address: 0x0082FB10 (FUN_0082FB10, sub_82FB10)
-   */
-  UICommandGraph::HashListNode10* UICommandGraph::MakeHashListNode10(
-    HashListNode10* const next, HashListNode10* const prev, HashListNode10Value& valueSource
-  )
-  {
-    auto* const node = static_cast<HashListNode10*>(NewHashListNodeStorage<HashListNode10>(1));
-    node->mNext = next;
-    node->mPrev = prev;
-    node->mKey = valueSource.mKey;
-    node->mWidth = valueSource.mWidth;
-    return node;
-  }
-
-  /**
-   * Address: 0x0082F5D0 (FUN_0082F5D0, sub_82F5D0)
-   */
-  std::uint32_t UICommandGraph::CheckedIncrementListSize2C(const std::uint32_t count, std::uint32_t& sizeField)
-  {
-    if ((119304647u - sizeField) < count) {
-      EngineThrowContainerTooLong("list<T> too long");
-    }
-    sizeField += count;
-    return sizeField;
-  }
-
-  /**
-   * Address: 0x0082DD60 (FUN_0082DD60, sub_82DD60)
-   */
-  std::uint32_t UICommandGraph::CheckedIncrementListSize10(const std::uint32_t count, std::uint32_t& sizeField)
-  {
-    if ((0x1FFFFFFFu - sizeField) < count) {
-      EngineThrowContainerTooLong("list<T> too long");
-    }
-    sizeField += count;
-    return sizeField;
-  }
-
-  /**
-   * Address: 0x0082C750 (FUN_0082C750, sub_82C750)
-   */
-  UICommandGraph::HashListNode2C* UICommandGraph::FindHashListNode2C(
-    HashTable<HashListNode2C>& table, const std::uint32_t keyLow, const std::uint32_t keyHigh
-  ) noexcept
-  {
-    return FindHashListNode(table, keyLow, keyHigh);
-  }
-
-  /**
-   * Address: 0x0082C480 (FUN_0082C480, sub_82C480)
-   */
-  UICommandGraph::HashListNode2C* UICommandGraph::ObtainHashListNode2C(
-    HashTable<HashListNode2C>& table, HashListNode2CValue& valueSource, bool& outInserted
-  )
-  {
-    return ObtainHashListNodePair(table, valueSource, outInserted, &MakeHashListNode2C, &CheckedIncrementListSize2C);
-  }
-
-  /**
-   * Address: 0x0082C950 (FUN_0082C950, sub_82C950)
-   */
-  UICommandGraph::HashListNode10* UICommandGraph::FindHashListNode10(
-    HashTable<HashListNode10>& table, const std::uint32_t key
-  ) noexcept
-  {
-    return FindHashListNode(table, key);
-  }
-
-  /**
-   * Address: 0x0082B5E0 (FUN_0082B5E0, sub_82B5E0)
-   */
-  UICommandGraph::HashListNode10* UICommandGraph::ObtainHashListNode10(
-    HashTable<HashListNode10>& table, HashListNode10Value& valueSource, bool& outInserted
-  )
-  {
-    return ObtainHashListNode(table, valueSource, outInserted, &MakeHashListNode10, &CheckedIncrementListSize10);
-  }
-
-  /**
-   * Address: 0x0082B490 (FUN_0082B490, sub_82B490)
-   */
-  UICommandGraph::CommandGraphEdge* UICommandGraph::FindOrInsertCommandGraphEdge(
-    UICommandGraphDrawNode* const fromNode, UICommandGraphDrawNode* const toNode, HashTable<HashListNode2C>& table
-  )
-  {
-    const auto fromKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(fromNode));
-    const auto toKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(toNode));
-
-    HashListNode2C* found = FindHashListNode2C(table, fromKey, toKey);
-    if (found != table.mListHead) {
-      return &found->mEdge;
-    }
-
-    // Miss: the binary zero-initializes the value composite before the
-    // insert (sub_82B490's memset), matching `CommandGraphEdge`'s in-class
-    // default member initializers - a fresh edge has no source line of its
-    // own, so a value-initialized temporary is the natural expression.
-    HashListNode2CValue insertValue{};
-    insertValue.mKeyLow = fromKey;
-    insertValue.mKeyHigh = toKey;
-
-    bool inserted = false;
-    HashListNode2C* const resultNode = ObtainHashListNode2C(table, insertValue, inserted);
-    return &resultNode->mEdge;
-  }
-
-  /**
-   * Address: 0x0082B300 (FUN_0082B300, sub_82B300)
-   */
-  UICommandGraph::UICommandGraphDrawNode* UICommandGraph::FindOrInsertCommandGraphDrawNode(
-    const std::uint32_t key, HashTable<HashListNode88>& table
-  )
-  {
-    HashListNode88* const found = FindHashListNode88(table, key);
-    if (found != table.mListHead) {
-      return &found->mDraw;
-    }
-
-    // Miss: build a default draw node (its constructor, 0x00824600),
-    // relocate-copy it into a second temporary, and insert a real node built
-    // from `{key, temporary}`. The temporaries die as locals on the way out;
-    // the explicit destructor calls this used to make ran `tempRelocated`'s
-    // destructor twice, and the default node used to be a padded 0x78-byte
-    // view reinterpreted as this type.
-    UICommandGraphDrawNode tempDefault;
-    UICommandGraphDrawNode tempRelocated;
-    RelocateDrawNode(&tempRelocated, tempDefault);
-
-    HashListNode88Value insertValue{};
-    insertValue.mKey = key;
-    RelocateDrawNode(&insertValue.mDraw, tempRelocated);
-
-    bool inserted = false;
-    HashListNode88* const resultNode = InsertOrFindHashListNode88(table, insertValue, inserted);
-    return &resultNode->mDraw;
+    const std::less<UICommandGraphDrawNode*> less;
+    return less(lhs.first, rhs.first) || (!less(rhs.first, lhs.first) && less(lhs.second, rhs.second));
   }
 
   /**
@@ -4845,7 +3240,7 @@ namespace moho
     constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0xD800D800u);
 
     // Already has its ghost - the mesh outlives the rebuild that made it.
-    if (drawNode.mMeshInstance.px != nullptr) {
+    if (drawNode.mMeshInstance != nullptr) {
       return;
     }
 
@@ -4906,8 +3301,8 @@ namespace moho
       graph.mSession->mGameTick, kPreviewCreateColor, meshBlueprint, previewScale, false, material
     );
 
-    boost::ResetSharedPtrRawOwning(drawNode.mMeshInstance, meshInstance);
-    drawNode.mMeshInstance.px->color = kPreviewTranslucentGreen;
+    drawNode.mMeshInstance.reset(meshInstance);
+    drawNode.mMeshInstance->color = kPreviewTranslucentGreen;
 
     // The binary builds the stance at the origin (0x00827514..0x00827532) and
     // only afterwards divides the node's accumulated position by its weight,
@@ -4922,7 +3317,7 @@ namespace moho
 
     // Same transform as both start and end: the placement ghost snaps to the
     // order's position rather than interpolating toward it.
-    drawNode.mMeshInstance.px->SetStance(stance, stance);
+    drawNode.mMeshInstance->SetStance(stance, stance);
   }
 
   /**
@@ -4938,8 +3333,8 @@ namespace moho
       rebuilt = true;
     }
 
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      UICommandGraphDrawNode& drawNode = node->mDraw;
+    for (auto& entry : mMapAB0) {
+      UICommandGraphDrawNode& drawNode = entry.second;
 
       // Commands retire and are re-issued between frames while their draw node
       // survives, so a node that is currently chained to *some* helper is
@@ -4961,12 +3356,12 @@ namespace moho
     }
 
     if (rebuilt) {
-      for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-        ResolveDrawNodeCompletionTick(node->mDraw);
+      for (auto& entry : mMapAB0) {
+        ResolveDrawNodeCompletionTick(entry.second);
       }
 
-      for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-        CreateBuildPreviewMesh(node->mDraw, *this);
+      for (auto& entry : mMapAB0) {
+        CreateBuildPreviewMesh(entry.second, *this);
       }
     }
 
@@ -5121,13 +3516,7 @@ namespace moho
    */
   void UICommandGraph::PrepareForRebuild()
   {
-    // Edge table: drop every node, then put the bucket vector back to the
-    // one-bucket starting state. `ClearHashListNodes` is 0x0082C840 here - the
-    // 0x2C node carries no owning payload, so it frees without destroying.
-    ClearHashListNodes(mMapC);
-    mMapC.mBuckets.assign(9u, mMapC.mListHead);
-    mMapC.mBucketMask = 1u;
-    mMapC.mBucketCount = 1u;
+    mMapC.clear();
 
     // Texture-keyed orderline tree: free every bucket, then re-empty the
     // sentinel in place. Unlike `DestroyTree` the head survives - the rebuild
@@ -5140,19 +3529,19 @@ namespace moho
 
     // Draw nodes survive a rebuild; only the edge lanes they own are dropped,
     // back to inline storage so the common single-edge case never re-allocates.
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      node->mDraw.mLaneA.ResetStorageToInline();
-      node->mDraw.mLaneB.ResetStorageToInline();
+    for (auto& entry : mMapAB0) {
+      entry.second.mLaneA.ResetStorageToInline();
+      entry.second.mLaneB.ResetStorageToInline();
     }
 
     // Queue-head nodes additionally lose their accumulated centroid: the
     // rebuild re-adds one weighted position per unit sharing the queue, so
     // leaving the old sum in place would double-count every frame.
-    for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
-      node->mDraw.mLaneA.ResetStorageToInline();
-      node->mDraw.mLaneB.ResetStorageToInline();
-      node->mDraw.mPositionSum = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
-      node->mDraw.mWeight = 0.0f;
+    for (auto& entry : mMapAB1) {
+      entry.second.mLaneA.ResetStorageToInline();
+      entry.second.mLaneB.ResetStorageToInline();
+      entry.second.mPositionSum = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+      entry.second.mWeight = 0.0f;
     }
   }
 
@@ -5161,12 +3550,12 @@ namespace moho
    */
   void UICommandGraph::RecomputeAllDrawNodeOrientations()
   {
-    for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
-      RecomputeDrawNodeOrientation(node->mDraw);
+    for (auto& entry : mMapAB1) {
+      RecomputeDrawNodeOrientation(entry.second);
     }
 
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      RecomputeDrawNodeOrientation(node->mDraw);
+    for (auto& entry : mMapAB0) {
+      RecomputeDrawNodeOrientation(entry.second);
     }
   }
 
@@ -5511,15 +3900,15 @@ namespace moho
     const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
   ) const
   {
-    if (mMapAB0.mListHead->mNext == mMapAB0.mListHead) {
+    if (mMapAB0.empty()) {
       return -1;
     }
 
     float bestScaledDistance = gpg::pInf;
     CmdId bestCommandId = -1;
 
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      const UICommandGraphDrawNode& drawNode = node->mDraw;
+    for (auto& entry : mMapAB0) {
+      const UICommandGraphDrawNode& drawNode = entry.second;
 
       const float invWeight = 1.0f / drawNode.mWeight;
       const Wm3::Vector3f avg{
@@ -5626,7 +4015,7 @@ namespace moho
    */
   void UICommandGraph::DrawPositionNodeMesh(UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher) const
   {
-    if (!drawNode.mMeshInstance.px) {
+    if (!drawNode.mMeshInstance) {
       return;
     }
     auto* const helper = drawNode.mHelperLink.GetObjectPtr();
@@ -5653,7 +4042,7 @@ namespace moho
     }
 
     const VTransform transform{anchor, Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f}};
-    drawNode.mMeshInstance.px->SetStance(transform, transform);
+    drawNode.mMeshInstance->SetStance(transform, transform);
 
     if (unitBlueprint == nullptr) {
       return;
@@ -5698,7 +4087,7 @@ namespace moho
    * Glyph size is `mUnitCountScale * (style scale for the resolved highlight
    * state)`; the label anchors at the node's averaged position offset by
    * that glyph size in X/-Z, then is projected to screen space and nudged
-   * by `mDebugFont->mDescent + 1` pixels vertically.
+   * by `mDebugFont.tex->mDescent + 1` pixels vertically.
    */
   void UICommandGraph::DisplayCommandNode(
     const GeomCamera3& camera, const UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher
@@ -5752,7 +4141,7 @@ namespace moho
     const Wm3::Vector2f projected = camera.Project(textAnchor);
     const Wm3::Vector2f screenPos{
       static_cast<float>(static_cast<std::int32_t>(projected.x + 1.0f)),
-      static_cast<float>(static_cast<std::int32_t>(projected.y - (mDebugFont->mDescent + 1.0f)))
+      static_cast<float>(static_cast<std::int32_t>(projected.y - (mDebugFont.tex->mDescent + 1.0f)))
     };
 
     // Color/scale/maxAdvance are elided register args at this callsite the
@@ -5760,7 +4149,7 @@ namespace moho
     // value the raw decompile states literally, preserved as-is (an
     // unclipped label). Color/scale use this file's other text-draw
     // defaults (opaque white, unscaled) pending a dedicated re-verification.
-    mDebugFont->Render2D(gpg::StrArg(label.c_str()), &batcher, screenPos, 0xFFFFFFFFu, 1.0f, std::numeric_limits<float>::quiet_NaN());
+    mDebugFont.tex->Render2D(gpg::StrArg(label.c_str()), &batcher, screenPos, 0xFFFFFFFFu, 1.0f, std::numeric_limits<float>::quiet_NaN());
   }
 
   /**
@@ -5966,16 +4355,16 @@ namespace moho
 
     // Pass C: waypoint marker billboards.
     (void)batcher.Setup("TAlphaBlendLinearSampleNoDepth");
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      DrawWaypointMarker(camera, batcher, node->mDraw);
+    for (auto& entry : mMapAB0) {
+      DrawWaypointMarker(camera, batcher, entry.second);
     }
     batcher.Flush();
 
     // Pass D: position-node meshes/skirts, over a flat white texture.
     (void)batcher.Setup("TAlphaBlendLinearSample");
     batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      DrawPositionNodeMesh(node->mDraw, batcher);
+    for (auto& entry : mMapAB0) {
+      DrawPositionNodeMesh(entry.second, batcher);
     }
     batcher.Flush();
 
@@ -5990,8 +4379,8 @@ namespace moho
     batcher.SetViewMatrix(VMatrix4::Identity());
 
     // Pass F: per-node ETA text labels, in the screen-space projection just set.
-    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      DisplayCommandNode(camera, node->mDraw, batcher);
+    for (auto& entry : mMapAB0) {
+      DisplayCommandNode(camera, entry.second, batcher);
     }
     batcher.Flush();
   }
@@ -6296,27 +4685,31 @@ namespace moho
     , mNodes{}
     , mSession(session)
     , mSessionRes1(session ? session->mCommandManager : nullptr)
-    , mDebugFont(nullptr)
+    , mDebugFont()
     , mMapAB0{}
     , mMapAB1{}
     , mMapC{}
     , mMapD{}
     , mCommandGraphTree{}
   {
-    InitMapAB(mMapAB0, this);
-    InitMapAB(mMapAB1, this);
-    InitMapC(mMapC, this);
-    InitMapD(mMapD, this);
     InitTree(mCommandGraphTree);
 
-    boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(10, "Andale Mono");
-    AssignIntrusive(mDebugFont, createdFont.px);
-    createdFont.release();
+    try {
+      boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(10, "Andale Mono");
+      mDebugFont.reset(createdFont.px);
+      createdFont.release();
 
-    LoadPathParams();
-    LoadWaypointParams();
-    CreateMeshes();
-    OnCommandGraphShow(mSession ? mSession->mState : nullptr, true);
+      LoadPathParams();
+      LoadWaypointParams();
+      CreateMeshes();
+      OnCommandGraphShow(mSession ? mSession->mState : nullptr, true);
+    } catch (...) {
+      // The binary's constructor unwind releases this tree at 0x00BC186A.
+      // Its existing manual representation needs the same cleanup here;
+      // the typed maps and counted font then unwind as ordinary members.
+      DestroyTree(mCommandGraphTree);
+      throw;
+    }
   }
 
   /**
@@ -6326,14 +4719,6 @@ namespace moho
   {
     OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
     DestroyTree(mCommandGraphTree);
-    DestroyMap(mMapD);
-    DestroyMap(mMapC);
-    DestroyMap(mMapAB1);
-    DestroyMap(mMapAB0);
-    ReleaseIntrusive(mDebugFont);
-    mSessionRes1 = nullptr;
-    mSession = nullptr;
-    mNeedsRebuild = 0u;
   }
 
   namespace
@@ -7370,12 +5755,11 @@ namespace moho
       // identity, not its command id (0x0082C2E3: sub_82C2E0 dereferences
       // its "key" arg once via [esi]; this function's own call passes
       // &result where result held the helper pointer's raw value).
-      const auto drawNodeKey = reinterpret_cast<std::uint32_t>(helper);
 
       bool suppressDispatch = false;
-      if (UICommandGraph::CountHashListNode88(graph.mMapAB0, drawNodeKey) != 0) {
+      if (graph.mMapAB0.count(helper) != 0) {
         UICommandGraph::UICommandGraphDrawNode* const drawNode =
-          UICommandGraph::FindOrInsertCommandGraphDrawNode(drawNodeKey, graph.mMapAB0);
+          &graph.mMapAB0[helper];
 
         drawNode->mPositionSum = mouse;
         drawNode->mWeight = 1.0f;
@@ -8055,9 +6439,8 @@ namespace moho
    * a node only exists here if the drag actually moved the mouse at least
    * once, so a helper with no existing node is also left alone
    * (0x0082A085..0x0082A0AE: an inlined equal-range walk over
-   * `EqualRangeHashListNode88`'s `[first,last)`, exactly what
-   * `CountHashListNode88` already does). Otherwise finds that node
-   * (0x0082A0BD, `FindOrInsertCommandGraphDrawNode`) and snaps it back to a
+   * the legacy map's equal range, now expressed by `count`). Otherwise finds that node
+   * (0x0082A0BD, `DrawNodeMap::operator[]`) and snaps it back to a
    * single-contributor anchor at the command's own real position
    * (0x0082A0D2, `ResolveCommandIssueHelperAnchorPosition`), replacing
    * `mPositionSum`, forcing `mWeight` back to `1.0f`, and clearing
@@ -8081,11 +6464,10 @@ namespace moho
 
     // Same keying convention as ProcessCommandDrag's own note: mMapAB0's
     // draw-node hash is keyed by the helper's own pointer identity.
-    const auto drawNodeKey = reinterpret_cast<std::uint32_t>(helper);
 
-    if (UICommandGraph::CountHashListNode88(graph.mMapAB0, drawNodeKey) != 0) {
+    if (graph.mMapAB0.count(helper) != 0) {
       UICommandGraph::UICommandGraphDrawNode* const drawNode =
-        UICommandGraph::FindOrInsertCommandGraphDrawNode(drawNodeKey, graph.mMapAB0);
+        &graph.mMapAB0[helper];
 
       drawNode->mPositionSum = ResolveCommandIssueHelperAnchorPosition(*helper);
       drawNode->mWeight = 1.0f;
@@ -8432,6 +6814,15 @@ namespace moho
       userArmies[armyIndex] = nullptr;
     }
 
+    // 0x00893AF0..0x00893B85: orphan entities still own render instances.
+    // Advance before deletion because the entity destructor removes its weak
+    // registration. These instances must die while their blueprints are live.
+    for (auto orphan = mOrphans.begin(); orphan != mOrphans.end();) {
+      UserEntity* const entity = *orphan;
+      ++orphan;
+      delete entity;
+    }
+
     mSimResources.release();
     mBeatDebugCanvas.release();
     mDebugCanvas.release();
@@ -8443,14 +6834,16 @@ namespace moho
     // here, which is exactly what `clear` compiles to.
     gFormationPreviews.clear();
 
-    if (mRules) {
-      delete mRules;
-      mRules = nullptr;
-    }
-
     if (mWldMap) {
       delete mWldMap;
       mWldMap = nullptr;
+    }
+
+    // 0x0089404E..0x00894078: map ownership ends before the rules that
+    // supply its mesh blueprints.
+    if (mRules) {
+      delete mRules;
+      mRules = nullptr;
     }
 
     // Tear the session task stage down before the Lua state it is published
@@ -8607,7 +7000,7 @@ namespace moho
    *
    * What it does:
    * Finds-or-creates the `{fromNode, toNode}` edge in `graph.mMapC`
-   * (`FindOrInsertCommandGraphEdge`, 0x0082B490), and on first touch wires
+   * (`EdgeMap::operator[]`, 0x0082B490), and on first touch wires
    * its `mFromNode`/`mToNode`, appends it into both endpoints' dword lanes
    * (`fromNode.mLaneB`, `toNode.mLaneA`), retains its owning command's
    * per-command-type orderline texture (`graph.mNodes[commandType]`) into
@@ -8618,38 +7011,8 @@ namespace moho
    * Lua result keyed by touch count, so repeat visits within the same
    * rebuild skip the Lua round-trip.
    *
-   * Recovered by generalising `FindHashListNode88`/`InsertOrFindHashListNode88`
-   * into the `FindHashListNode`/`ObtainHashListNode` templates in
-   * `UICommandGraph`'s class body (RULE ONE: `HashListNode2C`/`HashListNode10`
-   * are emissions of the same hash-list template, not bespoke containers -
-   * 0x0082C480 diffed byte-for-byte against 0x0082BFB0's
-   * rehash/insert-point-walk shape, differing only in the pair-key hash and
-   * lexicographic compare), and by transcribing
-   * `legacy/containers/RbTree.h`'s already-cited `insert_at` / `insert_hint`
-   * / `insert_unique` / `rotate_left` / `rotate_right` shape against
-   * `CommandGraphTreeNode`'s own field names for
-   * `AttachCommandGraphNodeAt`/`AtHint`/`Unique` and
-   * `PivotLeft`/`PivotCommandGraphTreeRight` (also in the class body;
-   * kept as a transcription rather than a literal `detail::rb_tree<Traits>`
-   * instantiation because `boost::SharedPtrRaw<T>` is an explicit-retain,
-   * non-owning view by design - see `BoostWrappers.h` - so `rb_tree`'s
-   * generic value-type copy construction would silently skip the add-ref
-   * the binary performs explicitly via 0x0082D330).
-   *
-   * Two decompiler artifacts that must not be transcribed literally, both
-   * MSVC stack-slot reuse rather than real aliasing:
-   *  - the 4th parameter looks like it is both a `bool` and a dereferenced
-   *    pointer in the decompile. It is a `bool` by value; the callee reuses
-   *    that incoming stack slot as a local `HashListNode10*`
-   *    (0x00826AA5 passes `&arg_4` to the `mMapD` find, which overwrites
-   *    it) - expressed here as an ordinary local instead.
-   *  - `graph.mNodes[commandType]`'s texture retain/release around the
-   *    tree-bucket lookup (`_InterlockedExchangeAdd`/vtable-dispatched
-   *    release in the binary) is expressed as a scoped
-   *    `boost::shared_ptr<CD3DBatchTexture>` (RAII), matching
-   *    `DrawWaypointMarker`'s already-established
-   *    `boost::SharedPtrFromRawRetained` pattern for the same
-   *    `SharedPtrRaw<void>`-typed style-table field.
+   * Native pointer-keyed EdgeMap and the integral WidthMap provide the
+   * original legacy hash-table find/insert behavior.
    */
   void LinkCommandGraphEdge(
     UICommandGraph::UICommandGraphDrawNode& toNode, UICommandGraph::UICommandGraphDrawNode& fromNode,
@@ -8657,7 +7020,7 @@ namespace moho
   )
   {
     UICommandGraph::CommandGraphEdge* const edge =
-      UICommandGraph::FindOrInsertCommandGraphEdge(&fromNode, &toNode, graph.mMapC);
+      &graph.mMapC[UICommandGraph::DrawNodePair{&fromNode, &toNode}];
 
     if (edge->mToNode == nullptr) {
       edge->mFromNode = &fromNode;
@@ -8685,21 +7048,16 @@ namespace moho
     ++edge->mTouchCount;
     edge->mForceHighlightStyle = forceHighlight;
 
-    UICommandGraph::HashListNode10* const cached =
-      UICommandGraph::FindHashListNode10(graph.mMapD, edge->mTouchCount);
+    const auto cached = graph.mMapD.find(edge->mTouchCount);
     float width;
-    if (cached == graph.mMapD.mListHead) {
+    if (cached == graph.mMapD.end()) {
       const LuaPlus::LuaObject waypointModule = SCR_Import(g_UIManager->mLuaState, "/lua/ui/game/commandwaypoint.lua");
       LuaPlus::LuaFunction<float> calculateWaypointLineWidth{waypointModule["CalculateWaypointLineWidth"]};
       width = calculateWaypointLineWidth(edge->mTouchCount);
 
-      UICommandGraph::HashListNode10Value insertValue{};
-      insertValue.mKey = edge->mTouchCount;
-      insertValue.mWidth = width;
-      bool inserted = false;
-      (void)UICommandGraph::ObtainHashListNode10(graph.mMapD, insertValue, inserted);
+      graph.mMapD.insert(std::make_pair(edge->mTouchCount, width));
     } else {
-      width = cached->mWidth;
+      width = cached->second;
     }
     edge->mBaseWidth = width;
   }
@@ -8766,9 +7124,8 @@ namespace moho
 
     // Queue-head node: keyed by the first resolved link's helper pointer,
     // accumulates every unit sharing this queue's centroid.
-    const auto queueHeadKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(queueLinks->front().GetObjectPtr()));
     UICommandGraph::UICommandGraphDrawNode* queueHeadNode =
-      UICommandGraph::FindOrInsertCommandGraphDrawNode(queueHeadKey, graph.mMapAB1);
+      &graph.mMapAB1[queueLinks->front().GetObjectPtr()];
     queueHeadNode->mPositionSum.x += entity.mVariableData.mCurTransform.pos_.x;
     queueHeadNode->mPositionSum.y += entity.mVariableData.mCurTransform.pos_.y;
     queueHeadNode->mPositionSum.z += entity.mVariableData.mCurTransform.pos_.z;
@@ -8820,11 +7177,12 @@ namespace moho
         continue;
       }
 
-      const auto helperKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(helper));
       UICommandGraph::UICommandGraphDrawNode* const currentNode =
-        UICommandGraph::FindOrInsertCommandGraphDrawNode(helperKey, graph.mMapAB0);
+        &graph.mMapAB0[helper];
 
       if (!currentNode->mHelperLink.HasValue()) {
+        // 0x00826374/0x00826386: reset an expired node before binding a new helper.
+        *currentNode = UICommandGraph::UICommandGraphDrawNode{};
         // First touch: publish the command id, join the owning helper's
         // draw-node chain, and seed the node's own anchor position/weight
         // from the helper's command history.

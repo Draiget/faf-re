@@ -42,6 +42,7 @@
  */
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <iterator>
@@ -113,7 +114,11 @@ namespace msvc8
          */
         [[nodiscard]] std::size_t operator()(const Key& key) const
         {
-            if constexpr (std::is_integral_v<Key>) {
+            if constexpr (std::is_pointer_v<Key>) {
+                // VC8 hashes the low address bits, while std::less<Key>
+                // compares the complete pointer. Collisions are valid on x64.
+                return hash_value(static_cast<long>(reinterpret_cast<std::uintptr_t>(key) ^ hash_seed));
+            } else if constexpr (std::is_integral_v<Key>) {
                 return hash_value(static_cast<long>(static_cast<std::size_t>(key) ^ hash_seed));
             } else {
                 return hash_value(key);
@@ -199,6 +204,18 @@ namespace msvc8
         [[nodiscard]] const_iterator end() const { return mList.end(); }
         [[nodiscard]] size_type size() const { return mList.size(); }
         [[nodiscard]] bool empty() const { return mList.empty(); }
+
+        /**
+         * Address: 0x0082B450 (FUN_0082B450, command-graph pointer-key map)
+         *
+         * What it does:
+         * Counts the elements in the key's equal range.
+         */
+        [[nodiscard]] size_type count(const key_type& key)
+        {
+            const auto range = equal_range(key);
+            return static_cast<size_type>(std::distance(range.first, range.second));
+        }
 
         /**
          * Address: 0x007676A0 + 0x00767C70 (the two halves of the reset lane

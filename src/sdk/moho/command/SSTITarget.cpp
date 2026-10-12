@@ -139,10 +139,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (sType == nullptr) {
-      sType = ResolveTypeByAnyName({"EntId", "Moho::EntId", "int", "signed int"});
-      if (sType == nullptr) {
-        sType = moho::preregister_EntIdTypeInfo();
-      }
+      sType = gpg::RTypeOf<moho::EntIdValue>();
     }
     return sType;
   }

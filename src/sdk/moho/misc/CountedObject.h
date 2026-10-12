@@ -82,6 +82,16 @@ namespace moho
       return *this;
     }
 
+    void reset(T* const payload = nullptr) noexcept
+    {
+      if (tex != payload) {
+        T* const previous = tex;
+        tex = payload;
+        Retain(tex);
+        Release(previous);
+      }
+    }
+
     /**
      * Address: 0x00423870 (FUN_00423870 -- `CountedPtr<T>::~CountedPtr` emitted
      * out of line: `--[tex+4]`, on zero a delete through vtable slot 0 with
