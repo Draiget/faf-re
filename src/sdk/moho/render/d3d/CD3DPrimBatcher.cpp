@@ -38,7 +38,10 @@ namespace moho
 namespace
 {
   constexpr float kTau = 6.28318530717958647692f;
-  constexpr std::uint32_t kLegacyPrimQueueLimit = 0x8000u;
+  // Fixed queue capacity the constructor reserves for both batcher queues
+  // (0x00438433/0x0043843B); Draw*/Add* flush before a primitive would
+  // overflow it.
+  constexpr std::uint32_t kPrimQueueCapacity = 0x8000u;
   constexpr std::uint32_t kAxisColorX = 0xFFFF0000u;
   constexpr std::uint32_t kAxisColorY = 0xFF00FF00u;
   constexpr std::uint32_t kAxisColorZ = 0xFF0000FFu;
@@ -114,119 +117,6 @@ namespace
     return rotated;
   }
 
-  template <typename TValue>
-  [[nodiscard]] std::uint32_t LegacyVectorCount(
-    const moho::CD3DPrimBatcher::LegacyVector<TValue>& vector
-  ) noexcept
-  {
-    if (vector.mFirst == nullptr || vector.mLast == nullptr || vector.mLast < vector.mFirst) {
-      return 0u;
-    }
-    return static_cast<std::uint32_t>(vector.mLast - vector.mFirst);
-  }
-
-  template <typename TValue>
-  [[nodiscard]] std::uint32_t LegacyVectorCapacity(
-    const moho::CD3DPrimBatcher::LegacyVector<TValue>& vector
-  ) noexcept
-  {
-    if (vector.mFirst == nullptr || vector.mEnd == nullptr || vector.mEnd < vector.mFirst) {
-      return 0u;
-    }
-    return static_cast<std::uint32_t>(vector.mEnd - vector.mFirst);
-  }
-
-  template <typename TValue>
-  void EnsureLegacyQueueCapacity(
-    moho::CD3DPrimBatcher::LegacyVector<TValue>& vector,
-    const std::uint32_t queueLimit
-  )
-  {
-    const std::uint32_t count = LegacyVectorCount(vector);
-    const std::uint32_t capacity = LegacyVectorCapacity(vector);
-    if (capacity >= queueLimit && vector.mFirst != nullptr) {
-      return;
-    }
-
-    auto* const newStorage = static_cast<TValue*>(::operator new(sizeof(TValue) * queueLimit));
-    if (count != 0u && vector.mFirst != nullptr) {
-      // Raw array move is required: capacity-growth relocation of trivially
-      // relocatable elements inside the owning queue's storage helper.
-      std::copy_n(vector.mFirst, count, newStorage);
-    }
-
-    if (vector.mFirst != nullptr) {
-      ::operator delete(static_cast<void*>(vector.mFirst));
-    }
-
-    vector.mFirst = newStorage;
-    vector.mLast = newStorage + count;
-    vector.mEnd = newStorage + queueLimit;
-  }
-
-  template <typename TValue>
-  TValue* PushBackLegacyQueue(
-    moho::CD3DPrimBatcher::LegacyVector<TValue>& vector,
-    const TValue& value,
-    const std::uint32_t queueLimit
-  )
-  {
-    EnsureLegacyQueueCapacity(vector, queueLimit);
-
-    const std::uint32_t count = LegacyVectorCount(vector);
-    if (count >= queueLimit) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    TValue* const slot = vector.mLast;
-    *slot = value;
-    vector.mLast = slot + 1;
-    return slot;
-  }
-
-  template <typename TPointee>
-  [[nodiscard]] boost::SharedCountPair* AsSharedCountPair(
-    moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>* const sharedHandle
-  ) noexcept
-  {
-    return reinterpret_cast<boost::SharedCountPair*>(sharedHandle);
-  }
-
-  // The batcher's texture/sheet members are genuine `boost::shared_ptr<T>`
-  // objects; `LegacySharedHandle<T>` only exists so the runtime view stays a
-  // trivially-initialisable layout overlay with `offsetof` guards. Bridging
-  // through this accessor keeps every refcount transition inside boost instead
-  // of open-coding `use_count_` / `weak_count_` arithmetic here.
-  template <typename TPointee>
-  [[nodiscard]] boost::shared_ptr<TPointee>& AsSharedPtr(
-    moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>& handle
-  ) noexcept
-  {
-    static_assert(
-      sizeof(boost::shared_ptr<TPointee>) ==
-        sizeof(moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>),
-      "boost::shared_ptr<T> layout must match LegacySharedHandle<T>"
-    );
-    return reinterpret_cast<boost::shared_ptr<TPointee>&>(handle);
-  }
-
-  /**
-   * Rebinds one batcher-owned `shared_ptr<T>` lane, matching the binary's
-   * inlined `shared_count::operator=` at 0x004387A5-0x004387CC and
-   * 0x00438903-0x00438927: store `px` unconditionally, then - only when the
-   * incoming control block differs - `add_ref_copy()` the new one and
-   * `release()` the previous one. Boost 1.34.1's `shared_ptr::operator=` is
-   * literally `px = r.px; pn = r.pn;`, so this is the same instruction shape.
-   */
-  template <typename TPointee>
-  void AssignSharedHandle(
-    moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>& handle,
-    const boost::shared_ptr<TPointee>& sharedHandle
-  ) noexcept
-  {
-    AsSharedPtr(handle) = sharedHandle;
-  }
-
   /**
    * Address: 0x007FC1C0 (FUN_007FC1C0)
    *
@@ -294,11 +184,7 @@ namespace
     const std::uint16_t index
   )
   {
-    (void)PushBackLegacyQueue(
-      runtime.mPrimitives,
-      static_cast<std::int16_t>(index),
-      kLegacyPrimQueueLimit
-    );
+    runtime.mPrimitives.push_back(static_cast<std::int16_t>(index));
   }
 
   void InitializeIndexedVertexRemap(gpg::fastvector<std::uint16_t>& remap, const std::uint32_t sourceVertexCount)
@@ -330,44 +216,14 @@ namespace moho
    * identity view/projection/composite matrices.
    */
   CD3DPrimBatcher::CD3DPrimBatcher(CD3DTextureBatcher* const textureBatcher)
+    : mTextureBatcher(textureBatcher)
   {
     auto* const runtime = this;
-
-    runtime->mTextureBatcher = textureBatcher;
-    runtime->mCurVertexSheet = 0;
-    runtime->mIndexSheet = nullptr;
-
-    runtime->mVertices.mFirst = nullptr;
-    runtime->mVertices.mLast = nullptr;
-    runtime->mVertices.mEnd = nullptr;
-
-    runtime->mUnknown028 = 0u;
-
-    runtime->mPrimitives.mFirst = nullptr;
-    runtime->mPrimitives.mLast = nullptr;
-    runtime->mPrimitives.mEnd = nullptr;
-
-    runtime->mMode = 0u;
-    runtime->mDynamicTexSheet.px = nullptr;
-    runtime->mDynamicTexSheet.pi = nullptr;
-    runtime->mTexture.px = nullptr;
-    runtime->mTexture.pi = nullptr;
-
-    runtime->mP2x = 0.0f;
-    runtime->mP2y = 0.0f;
-    runtime->mP1x = 1.0f;
-    runtime->mP1y = 1.0f;
 
     const VMatrix4 identity = VMatrix4::Identity();
     runtime->mViewMatrix = identity;
     runtime->mProjectionMatrix = identity;
     runtime->mComposite = identity;
-
-    runtime->mResetComposite = 0u;
-    runtime->mRebuildComposite = 0u;
-    runtime->mUnknown11ETo11F[0] = 0u;
-    runtime->mUnknown11ETo11F[1] = 0u;
-    runtime->mAlphaMultiplier = 1.0f;
 
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     for (CD3DVertexSheet*& sheet : runtime->mVertexSheets) {
@@ -376,6 +232,12 @@ namespace moho
     }
 
     runtime->mIndexSheet = resources->CreateIndexSheet(true, 0x8000);
+
+    // Binary order (0x00438433 then 0x0043843B): the vertex queue reserve is
+    // emitted first (`reserve` body 0x0043A470), then the index queue reserve
+    // (0x0043A6C0). Both preallocate the 0x8000-element flush capacity.
+    runtime->mVertices.reserve(kPrimQueueCapacity);
+    runtime->mPrimitives.reserve(kPrimQueueCapacity);
   }
 
   /**
@@ -385,47 +247,24 @@ namespace moho
    * void __stdcall Moho::CD3DPrimBatcher::~CD3DPrimBatcher(int a1);
    *
    * What it does:
-   * Tears down one prim-batcher instance in the binary's original order:
-   * destroy the three vertex sheets and the index sheet through their
-   * typed `Destroy` virtuals, release shared-control-block references
-   * held by the batch-texture and dynamic-texture-sheet weak-style
-   * handles, then release the primitive and vertex legacy-vector heap
-   * storage and null their tracking pointers.
+   * Destroys the three vertex sheets and the index sheet through their
+   * typed `Destroy` virtuals. The remaining teardown - the batch-texture
+   * handle release (+0x48 control block, 0x004384A8), the dynamic-sheet
+   * handle release (+0x40, 0x004384DE), then the index and vertex queue
+   * vector frees (+0x2C/+0x1C, 0x00438517/0x00438530) - runs in reverse
+   * member order and is emitted by the member destructors themselves.
    */
   CD3DPrimBatcher::~CD3DPrimBatcher()
   {
-    auto* const runtime = this;
-
-    for (CD3DVertexSheet* const sheet : runtime->mVertexSheets) {
+    for (CD3DVertexSheet* const sheet : mVertexSheets) {
       if (sheet != nullptr) {
         sheet->Destroy();
       }
     }
 
-    if (runtime->mIndexSheet != nullptr) {
-      runtime->mIndexSheet->Destroy();
+    if (mIndexSheet != nullptr) {
+      mIndexSheet->Destroy();
     }
-
-    // Binary order is +0x48 first (0x004384A8 `mov edi, [esi+48h]`, the batch
-    // texture's control block) and +0x40 second (0x004384DE), each dropping a
-    // strong reference: `lock xadd [pi+4], -1` -> dispose -> `lock xadd
-    // [pi+8], -1` -> destroy.
-    boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mTexture));
-    boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mDynamicTexSheet));
-
-    if (runtime->mPrimitives.mFirst != nullptr) {
-      ::operator delete(static_cast<void*>(runtime->mPrimitives.mFirst));
-    }
-    runtime->mPrimitives.mFirst = nullptr;
-    runtime->mPrimitives.mLast = nullptr;
-    runtime->mPrimitives.mEnd = nullptr;
-
-    if (runtime->mVertices.mFirst != nullptr) {
-      ::operator delete(static_cast<void*>(runtime->mVertices.mFirst));
-    }
-    runtime->mVertices.mFirst = nullptr;
-    runtime->mVertices.mLast = nullptr;
-    runtime->mVertices.mEnd = nullptr;
   }
 
   /**
@@ -455,7 +294,7 @@ namespace moho
   void CD3DPrimBatcher::SetViewMatrix(const VMatrix4& matrix)
   {
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements()) {
+    if (!runtime->mVertices.empty()) {
       Flush();
     }
 
@@ -473,7 +312,7 @@ namespace moho
   void CD3DPrimBatcher::SetProjectionMatrix(const VMatrix4& matrix)
   {
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements()) {
+    if (!runtime->mVertices.empty()) {
       Flush();
     }
 
@@ -491,7 +330,7 @@ namespace moho
   void CD3DPrimBatcher::SetViewProjMatrix(const GeomCamera3& camera)
   {
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements()) {
+    if (!runtime->mVertices.empty()) {
       Flush();
     }
 
@@ -568,18 +407,18 @@ namespace moho
     const bool useDirectTexture = texture->mWidth >= atlasHalfWidth || texture->mHeight >= atlasHalfHeight;
 
     if (useDirectTexture) {
-      if (runtime->mVertices.HasElements() && runtime->mTexture.px != texture.get()) {
+      if (!runtime->mVertices.empty() && runtime->mTexture.get() != texture.get()) {
         Flush();
       }
 
-      AssignSharedHandle(runtime->mTexture, texture);
+      runtime->mTexture = texture;
 
       CD3DBatchTexture::TextureSheetHandle textureSheet{};
       Wm3::Vector2f uvScale{};
       Wm3::Vector2f uvBorder{};
       texture->GetTextureSheet(textureSheet, uvScale, uvBorder);
 
-      AssignSharedHandle(runtime->mDynamicTexSheet, texture->mTextureSheet);
+      runtime->mDynamicTexSheet = texture->mTextureSheet;
       runtime->mP1x = uvScale.x;
       runtime->mP1y = uvScale.y;
       runtime->mP2x = uvBorder.x;
@@ -587,13 +426,13 @@ namespace moho
       return;
     }
 
-    if (runtime->mVertices.HasElements() && runtime->mDynamicTexSheet.px != nullptr) {
+    if (!runtime->mVertices.empty() && runtime->mDynamicTexSheet) {
       Flush();
     }
 
     const gpg::Rect2f* uvRect = runtime->mTextureBatcher->AddTexture(texture);
     if (uvRect == nullptr) {
-      if (runtime->mVertices.HasElements()) {
+      if (!runtime->mVertices.empty()) {
         Flush();
       }
       runtime->mTextureBatcher->Reset();
@@ -604,8 +443,8 @@ namespace moho
     // texture lane), then 0x00438730 `lea eax, [edi+3Ch]` -> call 0x0043A860
     // (dynamic sheet lane). Both lanes are dropped before the atlas UV rect is
     // published, so a subsequent Flush takes the composite-atlas branch.
-    ResetSharedBatchTextureHandle(AsSharedPtr(runtime->mTexture));
-    ResetSharedDynamicTextureSheetHandle(AsSharedPtr(runtime->mDynamicTexSheet));
+    ResetSharedBatchTextureHandle(runtime->mTexture);
+    ResetSharedDynamicTextureSheetHandle(runtime->mDynamicTexSheet);
 
     runtime->mP2x = uvRect->x0;
     runtime->mP2y = uvRect->z0;
@@ -620,7 +459,7 @@ namespace moho
    * Binds one retained dynamic texture sheet directly without going through
    * the atlas path. Flushes queued primitives if a different sheet is already
    * bound, releases any held batch-texture handle, assigns the new sheet to
-   * the legacy-weak handle lane, and resets UV scale/border to the identity
+   * the dynamic-sheet handle lane, and resets UV scale/border to the identity
    * rectangle (scale = 1,1; border = 0,0).
    *
    * Parameter is the ID3DTextureSheet base interface, but the runtime
@@ -635,15 +474,15 @@ namespace moho
     const boost::shared_ptr<CD3DDynamicTextureSheet> derivedSheet =
       boost::static_pointer_cast<CD3DDynamicTextureSheet>(sheet);
 
-    if (runtime->mVertices.HasElements() && runtime->mDynamicTexSheet.px != derivedSheet.get()) {
+    if (!runtime->mVertices.empty() && runtime->mDynamicTexSheet.get() != derivedSheet.get()) {
       Flush();
     }
 
     // 0x004388C0-0x004388E8 inlines the very same lane reset the atlas path
     // reaches through 0x0043A8B0; expressed here through the named recovery so
     // both emissions share one source body.
-    ResetSharedBatchTextureHandle(AsSharedPtr(runtime->mTexture));
-    AssignSharedHandle(runtime->mDynamicTexSheet, derivedSheet);
+    ResetSharedBatchTextureHandle(runtime->mTexture);
+    runtime->mDynamicTexSheet = derivedSheet;
 
     runtime->mP2x = 0.0f;
     runtime->mP2y = 0.0f;
@@ -667,12 +506,12 @@ namespace moho
   {
     auto* const runtime = this;
 
-    if (runtime->mVertices.HasElements()) {
-      const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
-      const std::uint32_t primitiveCount = LegacyVectorCount(runtime->mPrimitives);
+    if (!runtime->mVertices.empty()) {
+      const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+      const std::uint32_t primitiveCount = static_cast<std::uint32_t>(runtime->mPrimitives.size());
       if (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType) ||
-          (vertexCount + 4u) > kLegacyPrimQueueLimit ||
-          (primitiveCount + 6u) > kLegacyPrimQueueLimit) {
+          (vertexCount + 4u) > kPrimQueueCapacity ||
+          (primitiveCount + 6u) > kPrimQueueCapacity) {
         Flush();
       }
     }
@@ -680,12 +519,12 @@ namespace moho
     runtime->mMode = static_cast<std::uint32_t>(kTriangleListPrimitiveType);
 
     const std::uint16_t baseVertexIndex =
-      static_cast<std::uint16_t>(LegacyVectorCount(runtime->mVertices));
+      static_cast<std::uint16_t>(runtime->mVertices.size());
 
-    (void)PushBackLegacyQueue(runtime->mVertices, BuildTransformedVertex(*runtime, topLeft), kLegacyPrimQueueLimit);
-    (void)PushBackLegacyQueue(runtime->mVertices, BuildTransformedVertex(*runtime, topRight), kLegacyPrimQueueLimit);
-    (void)PushBackLegacyQueue(runtime->mVertices, BuildTransformedVertex(*runtime, bottomRight), kLegacyPrimQueueLimit);
-    (void)PushBackLegacyQueue(runtime->mVertices, BuildTransformedVertex(*runtime, bottomLeft), kLegacyPrimQueueLimit);
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, topLeft));
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, topRight));
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, bottomRight));
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, bottomLeft));
 
     AppendPrimitiveIndex(*runtime, baseVertexIndex);
     AppendPrimitiveIndex(*runtime, static_cast<std::uint16_t>(baseVertexIndex + 1u));
@@ -730,7 +569,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
 
@@ -756,7 +595,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
 
@@ -775,12 +614,12 @@ namespace moho
   {
     auto* const runtime = this;
 
-    if (runtime->mVertices.HasElements()) {
-      const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
-      const std::uint32_t primitiveCount = LegacyVectorCount(runtime->mPrimitives);
+    if (!runtime->mVertices.empty()) {
+      const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+      const std::uint32_t primitiveCount = static_cast<std::uint32_t>(runtime->mPrimitives.size());
       if (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType) ||
-          (vertexCount + 3u) > kLegacyPrimQueueLimit ||
-          (primitiveCount + 3u) > kLegacyPrimQueueLimit) {
+          (vertexCount + 3u) > kPrimQueueCapacity ||
+          (primitiveCount + 3u) > kPrimQueueCapacity) {
         Flush();
       }
     }
@@ -788,7 +627,7 @@ namespace moho
     runtime->mMode = static_cast<std::uint32_t>(kTriangleListPrimitiveType);
 
     const std::uint16_t baseVertexIndex =
-      static_cast<std::uint16_t>(LegacyVectorCount(runtime->mVertices));
+      static_cast<std::uint16_t>(runtime->mVertices.size());
 
     AddVert(v0);
     AddVert(v1);
@@ -813,7 +652,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
 
@@ -839,7 +678,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
 
@@ -858,12 +697,12 @@ namespace moho
   {
     auto* const runtime = this;
 
-    if (runtime->mVertices.HasElements()) {
-      const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
-      const std::uint32_t primitiveCount = LegacyVectorCount(runtime->mPrimitives);
+    if (!runtime->mVertices.empty()) {
+      const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+      const std::uint32_t primitiveCount = static_cast<std::uint32_t>(runtime->mPrimitives.size());
       if (runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType) ||
-          (vertexCount + 2u) > kLegacyPrimQueueLimit ||
-          (primitiveCount + 2u) > kLegacyPrimQueueLimit) {
+          (vertexCount + 2u) > kPrimQueueCapacity ||
+          (primitiveCount + 2u) > kPrimQueueCapacity) {
         Flush();
       }
     }
@@ -871,10 +710,10 @@ namespace moho
     runtime->mMode = static_cast<std::uint32_t>(kLineListPrimitiveType);
 
     const std::uint16_t baseVertexIndex =
-      static_cast<std::uint16_t>(LegacyVectorCount(runtime->mVertices));
+      static_cast<std::uint16_t>(runtime->mVertices.size());
 
-    (void)PushBackLegacyQueue(runtime->mVertices, BuildTransformedVertex(*runtime, start), kLegacyPrimQueueLimit);
-    (void)PushBackLegacyQueue(runtime->mVertices, BuildTransformedVertex(*runtime, end), kLegacyPrimQueueLimit);
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, start));
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, end));
 
     AppendPrimitiveIndex(*runtime, baseVertexIndex);
     AppendPrimitiveIndex(*runtime, static_cast<std::uint16_t>(baseVertexIndex + 1u));
@@ -893,7 +732,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) {
       Flush();
     }
 
@@ -915,7 +754,7 @@ namespace moho
   )
   {
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) {
       Flush();
     }
 
@@ -934,14 +773,14 @@ namespace moho
   {
     auto* const runtime = this;
 
-    if (runtime->mVertices.HasElements()) {
+    if (!runtime->mVertices.empty()) {
       if (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
         Flush();
       } else {
-        const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
-        const std::uint32_t primitiveCount = LegacyVectorCount(runtime->mPrimitives);
-        if ((vertexCount + 2u) > kLegacyPrimQueueLimit ||
-            (primitiveCount + 2u) > kLegacyPrimQueueLimit) {
+        const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+        const std::uint32_t primitiveCount = static_cast<std::uint32_t>(runtime->mPrimitives.size());
+        if ((vertexCount + 2u) > kPrimQueueCapacity ||
+            (primitiveCount + 2u) > kPrimQueueCapacity) {
           Flush();
         }
       }
@@ -950,7 +789,7 @@ namespace moho
     runtime->mMode = static_cast<std::uint32_t>(kLineListPrimitiveType);
 
     const std::uint16_t baseVertexIndex =
-      static_cast<std::uint16_t>(LegacyVectorCount(runtime->mVertices));
+      static_cast<std::uint16_t>(runtime->mVertices.size());
     AddVert(vertex);
     AppendPrimitiveIndex(*runtime, baseVertexIndex);
   }
@@ -972,7 +811,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kMode1PrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kMode1PrimitiveType)) {
       Flush();
     }
 
@@ -999,7 +838,7 @@ namespace moho
     }
 
     auto* const runtime = this;
-    if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kMode1PrimitiveType)) {
+    if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kMode1PrimitiveType)) {
       Flush();
     }
 
@@ -1027,11 +866,11 @@ namespace moho
     auto* const runtime = this;
     while (primitiveCount != 0u) {
       const std::uint32_t indicesPerPrimitive = (verticesPerPrimitive == 4u) ? 6u : verticesPerPrimitive;
-      const std::uint32_t usedPrimitiveIndices = LegacyVectorCount(runtime->mPrimitives);
-      const std::uint32_t usedVertices = LegacyVectorCount(runtime->mVertices);
+      const std::uint32_t usedPrimitiveIndices = static_cast<std::uint32_t>(runtime->mPrimitives.size());
+      const std::uint32_t usedVertices = static_cast<std::uint32_t>(runtime->mVertices.size());
 
-      const std::uint32_t maxByIndices = (kLegacyPrimQueueLimit - usedPrimitiveIndices) / indicesPerPrimitive;
-      const std::uint32_t maxByVertices = (kLegacyPrimQueueLimit - usedVertices) / verticesPerPrimitive;
+      const std::uint32_t maxByIndices = (kPrimQueueCapacity - usedPrimitiveIndices) / indicesPerPrimitive;
+      const std::uint32_t maxByVertices = (kPrimQueueCapacity - usedVertices) / verticesPerPrimitive;
       const std::uint32_t batchPrimitiveCount = std::min(primitiveCount, std::min(maxByIndices, maxByVertices));
       if (batchPrimitiveCount == 0u) {
         Flush();
@@ -1042,11 +881,7 @@ namespace moho
       const std::uint32_t vertexBatchCount = verticesPerPrimitive * batchPrimitiveCount;
 
       for (std::uint32_t vertexIndex = 0; vertexIndex < vertexBatchCount; ++vertexIndex) {
-        (void)PushBackLegacyQueue(
-          runtime->mVertices,
-          BuildTransformedVertex(*runtime, sourceVertices[vertexIndex]),
-          kLegacyPrimQueueLimit
-        );
+        runtime->mVertices.push_back(BuildTransformedVertex(*runtime, sourceVertices[vertexIndex]));
       }
       sourceVertices += vertexBatchCount;
 
@@ -1080,11 +915,7 @@ namespace moho
   void CD3DPrimBatcher::AddVert(const Vertex& sourceVertex)
   {
     auto* const runtime = this;
-    (void)PushBackLegacyQueue(
-      runtime->mVertices,
-      BuildTransformedVertex(*runtime, sourceVertex),
-      kLegacyPrimQueueLimit
-    );
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, sourceVertex));
   }
 
   /**
@@ -1106,13 +937,9 @@ namespace moho
     }
 
     auto* const runtime = this;
-    const std::uint16_t mappedIndex = static_cast<std::uint16_t>(LegacyVectorCount(runtime->mVertices));
+    const std::uint16_t mappedIndex = static_cast<std::uint16_t>(runtime->mVertices.size());
 
-    (void)PushBackLegacyQueue(
-      runtime->mVertices,
-      BuildTransformedVertex(*runtime, sourceVertices[sourceIndex]),
-      kLegacyPrimQueueLimit
-    );
+    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, sourceVertices[sourceIndex]));
 
     remap[sourceIndex] = mappedIndex;
     return mappedIndex;
@@ -1139,11 +966,11 @@ namespace moho
     auto* const runtime = this;
     while (primitiveCount != 0u) {
       const std::uint32_t indicesPerPrimitive = (verticesPerPrimitive == 4u) ? 6u : verticesPerPrimitive;
-      const std::uint32_t usedPrimitiveIndices = LegacyVectorCount(runtime->mPrimitives);
-      const std::uint32_t usedVertices = LegacyVectorCount(runtime->mVertices);
+      const std::uint32_t usedPrimitiveIndices = static_cast<std::uint32_t>(runtime->mPrimitives.size());
+      const std::uint32_t usedVertices = static_cast<std::uint32_t>(runtime->mVertices.size());
 
-      const std::uint32_t maxByIndices = (kLegacyPrimQueueLimit - usedPrimitiveIndices) / indicesPerPrimitive;
-      const std::uint32_t maxByVertices = (kLegacyPrimQueueLimit - usedVertices) / verticesPerPrimitive;
+      const std::uint32_t maxByIndices = (kPrimQueueCapacity - usedPrimitiveIndices) / indicesPerPrimitive;
+      const std::uint32_t maxByVertices = (kPrimQueueCapacity - usedVertices) / verticesPerPrimitive;
       const std::uint32_t batchPrimitiveCount = std::min(primitiveCount, std::min(maxByIndices, maxByVertices));
       if (batchPrimitiveCount == 0u) {
         Flush();
@@ -1188,7 +1015,7 @@ namespace moho
   void CD3DPrimBatcher::Flush()
   {
     auto* const runtime = this;
-    if (!runtime->mVertices.HasElements()) {
+    if (runtime->mVertices.empty()) {
       return;
     }
 
@@ -1208,10 +1035,8 @@ namespace moho
       shaderVarPrimBatcherAlphaMultiplier.mEffectVariable->SetFloat(runtime->mAlphaMultiplier);
     }
 
-    if (runtime->mDynamicTexSheet.px != nullptr) {
-      const auto& boundDynamicTextureSheet =
-        reinterpret_cast<const boost::shared_ptr<CD3DDynamicTextureSheet>&>(runtime->mDynamicTexSheet);
-      shaderVarPrimBatcherTexture1.GetTexture(boundDynamicTextureSheet);
+    if (runtime->mDynamicTexSheet) {
+      shaderVarPrimBatcherTexture1.GetTexture(runtime->mDynamicTexSheet);
     } else {
       (void)runtime->mTextureBatcher->GetCompositeTexture();
       shaderVarPrimBatcherTexture1.GetTexture(runtime->mTextureBatcher->mDynTexSheet);
@@ -1220,16 +1045,16 @@ namespace moho
     runtime->mCurVertexSheet = (runtime->mCurVertexSheet + 1) % 3;
 
     ID3DVertexStream* const vertexStream = runtime->mVertexSheets[runtime->mCurVertexSheet]->GetVertStream(0);
-    const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
+    const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
     void* const lockedVertices = vertexStream->Lock(0, static_cast<int>(vertexCount), false, true);
     // Raw GPU upload: vertex blob into the locked D3D stream.
-    std::copy_n(runtime->mVertices.mFirst, vertexCount, static_cast<Vertex*>(lockedVertices));
+    std::copy_n(runtime->mVertices.data(), vertexCount, static_cast<Vertex*>(lockedVertices));
     vertexStream->Unlock();
 
-    const std::uint32_t primitiveCount = LegacyVectorCount(runtime->mPrimitives);
+    const std::uint32_t primitiveCount = static_cast<std::uint32_t>(runtime->mPrimitives.size());
     std::int16_t* const lockedPrimitives = runtime->mIndexSheet->Lock(0, primitiveCount, false, true);
     // Raw GPU upload: index blob into the locked D3D sheet.
-    std::copy_n(runtime->mPrimitives.mFirst, primitiveCount, lockedPrimitives);
+    std::copy_n(runtime->mPrimitives.data(), primitiveCount, lockedPrimitives);
     runtime->mIndexSheet->Unlock();
 
     SD3DIndexRange indexSheetView{};
@@ -1247,8 +1072,8 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
     (void)device->DrawTriangleList(&vertexSheetView, &indexSheetView, &primitiveType);
 
-    runtime->mVertices.mLast = runtime->mVertices.mFirst;
-    runtime->mPrimitives.mLast = runtime->mPrimitives.mFirst;
+    runtime->mVertices.clear();
+    runtime->mPrimitives.clear();
   }
 
   /**

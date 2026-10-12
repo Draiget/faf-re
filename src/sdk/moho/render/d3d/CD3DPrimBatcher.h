@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/Vector.h"
 #include "boost/shared_ptr.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/math/Vector3f.h"
@@ -52,9 +53,9 @@ namespace moho
      *
      * What it does:
      * Destroys the three vertex sheets and the index sheet through their
-     * virtual `Destroy()` method, releases shared-control-block references
-     * held by the batch-texture and dynamic-texture-sheet weak-style
-     * handles, then frees the primitive and vertex legacy-vector storage.
+     * virtual `Destroy()` method, then releases the batch-texture and
+     * dynamic-texture-sheet `boost::shared_ptr` lanes and the two queue
+     * vectors' storage in reverse member order.
      *
      * Not virtual: the class has no vtable. The constructor stores the texture
      * batcher at +0x00, and `sp_counted_impl_p<CD3DPrimBatcher>::dispose`
@@ -319,49 +320,24 @@ namespace moho
     );
 
   public:
-    template <typename T>
-    struct LegacyVector
-    {
-      T* mFirst;  // +0x00
-      T* mLast;   // +0x04
-      T* mEnd;    // +0x08
-
-      [[nodiscard]] bool HasElements() const noexcept
-      {
-        return mFirst != nullptr && mLast != mFirst;
-      }
-    };
-
-    // Layout-compatible overlay for a `boost::shared_ptr<T>` member of the
-    // batcher. Ownership is *strong*: the binary's rebind lane at 0x004387B4
-    // does `lock xadd [pi+4], 1` (`use_count_`, i.e. `add_ref_copy`) and drops
-    // the previous control block through 0x004229B0, which decrements
-    // `use_count_` at +0x04 and only then falls through to the weak lane -
-    // that is `sp_counted_base::release()`, not `weak_release()`.
-    template <typename T>
-    struct LegacySharedHandle
-    {
-      T* px;                                 // +0x00
-      boost::detail::sp_counted_base* pi;    // +0x04
-    };
-
     // Offsets proven from the binary:
     //   0x00438331 (constructor) `mov [ebx], eax` stores the texture batcher at +0x00.
     //   0x004383DC (constructor) fills the three vertex sheets from `lea ecx, [ebx+4]`.
     //   0x0043A268 (Flush) advances +0x10 with `idiv` by 3, and 0x0043A26E
     //   indexes the vertex sheets with it (`[ebp+edx*4+4]`).
     //   0x0043A2FF (Flush) loads the index sheet from +0x14 to lock it.
-    // +0x18 and +0x28 are the leading dwords of the two MSVC8 vectors: the
-    // constructor reserves them at 0x00438433 with `ecx = this + 0x18` and at
-    // 0x0043843B with `ecx = this + 0x28`, and never writes either dword.
+    // The vertex and index queues are VC8 `std::vector`s (debug-iterator
+    // layout: proxy dword + {first,last,end} triple): the constructor
+    // reserves them at 0x00438433 (`ecx = this + 0x18`) and 0x0043843B
+    // (`ecx = this + 0x28`) via the `reserve` emissions 0x0043A470/0x0043A6C0,
+    // the append lane is `push_back` at 0x0043A5C0, and the empty() probe is
+    // 0x0043A570. The proxy dwords are never read by the binary.
     CD3DTextureBatcher* mTextureBatcher = nullptr;      // +0x00
     CD3DVertexSheet* mVertexSheets[3]{};                // +0x04
     std::int32_t mCurVertexSheet = 0;                   // +0x10
     CD3DIndexSheet* mIndexSheet = nullptr;              // +0x14
-    std::uint32_t mUnknown018 = 0;                      // +0x18
-    LegacyVector<CD3DPrimBatcher::Vertex> mVertices{};  // +0x1C
-    std::uint32_t mUnknown028 = 0;                      // +0x28
-    LegacyVector<std::int16_t> mPrimitives{};           // +0x2C
+    msvc8::vector<Vertex> mVertices{};                  // +0x18
+    msvc8::vector<std::int16_t> mPrimitives{};          // +0x28
     std::uint32_t mMode = 0;                            // +0x38
     // Offsets proven from the binary, not from field order:
     //   0x00438870 `cmp [esi+3Ch], ebx` tests the incoming *sheet* pointer, and
@@ -369,8 +345,11 @@ namespace moho
     //   +0x3C to the texture shader var as a `shared_ptr<CD3DDynamicTextureSheet>`.
     //   0x004387A5 `mov [edi+44h], edx` stores the incoming CD3DBatchTexture*,
     //   with its control block at +0x48 (`cmp esi, [edi+48h]`).
-    LegacySharedHandle<CD3DDynamicTextureSheet> mDynamicTexSheet{}; // +0x3C
-    LegacySharedHandle<CD3DBatchTexture> mTexture{};                // +0x44
+    // Both handles are strong `boost::shared_ptr<T>` lanes: the rebind at
+    // 0x004387A5 stores `px` then `lock xadd [pi+4], 1` (add_ref_copy) and
+    // releases the old block through 0x004229B0 (sp_counted_base::release).
+    boost::shared_ptr<CD3DDynamicTextureSheet> mDynamicTexSheet{}; // +0x3C
+    boost::shared_ptr<CD3DBatchTexture> mTexture{};                // +0x44
     float mP2x = 0.0f;                                  // +0x4C
     float mP2y = 0.0f;                                  // +0x50
     float mP1x = 1.0f;                                  // +0x54
@@ -380,7 +359,6 @@ namespace moho
     VMatrix4 mComposite{};                              // +0xDC
     std::uint8_t mResetComposite = 0;                  // +0x11C
     std::uint8_t mRebuildComposite = 0;                // +0x11D
-    std::uint8_t mUnknown11ETo11F[0x02]{};             // +0x11E
     float mAlphaMultiplier = 1.0f;                     // +0x120
 
   };
@@ -414,12 +392,12 @@ namespace moho
     "moho::CD3DPrimBatcher::mIndexSheet offset must be 0x14"
   );
   static_assert(
-    offsetof(CD3DPrimBatcher, mVertices) == 0x1C,
-    "moho::CD3DPrimBatcher::mVertices offset must be 0x1C"
+    offsetof(CD3DPrimBatcher, mVertices) == 0x18,
+    "moho::CD3DPrimBatcher::mVertices offset must be 0x18"
   );
   static_assert(
-    offsetof(CD3DPrimBatcher, mPrimitives) == 0x2C,
-    "moho::CD3DPrimBatcher::mPrimitives offset must be 0x2C"
+    offsetof(CD3DPrimBatcher, mPrimitives) == 0x28,
+    "moho::CD3DPrimBatcher::mPrimitives offset must be 0x28"
   );
   static_assert(
     offsetof(CD3DPrimBatcher, mMode) == 0x38,
