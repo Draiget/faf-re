@@ -1990,13 +1990,8 @@ namespace moho
     delete mPositionHistory;
     mPositionHistory = nullptr;
 
-    // The binary destructor ends the variable-data block by calling its own
-    // destructor (`Moho::SSTIEntityVariableData::~SSTIEntityVariableData(&this->
-    // mVarDat)`, FUN_006785D0 line 72). The one lane of that block this tree
-    // does not already tear down through a named `Entity` member is the inline
-    // auxiliary-id vector, which leaks its heap buffer once
-    // `Entity::SyncInterface` has grown it past the inline capacity.
-    mVarDat.mAuxValueVector.ReleaseDynamicStorage();
+    // mVarDat's member destructor releases the attachment vector and shared
+    // resources (0x0067879A), before the base destructors below.
 
     // Leaving Sim::mCoordEntities (binary FUN_006785D0 lines 75-78: the splice
     // and self-reset at +0x60/+0x64) is the dirty-list base's own
@@ -3233,10 +3228,13 @@ namespace moho
     Entity* const parent = mAttachInfo.GetAttachTargetEntity();
     mVarDat.mAttachmentParentRef = parent ? parent->id_ : kInvalidEntityId;
 
-    mVarDat.mAuxValueVector.Resize(mAttachedEntities.size(), kInvalidEntityId);
+    mVarDat.mAuxValueVector.resize(
+      mAttachedEntities.size(), SSTIEntityAttachInfo{std::bit_cast<std::int32_t>(kInvalidEntityId)}
+    );
     for (std::size_t i = 0; i < mAttachedEntities.size(); ++i) {
       Entity* const child = mAttachedEntities[i];
-      mVarDat.mAuxValueVector.mBegin[i] = child ? child->id_ : kInvalidEntityId;
+      mVarDat.mAuxValueVector[i].mAttachedEntityId =
+        std::bit_cast<std::int32_t>(child ? child->id_ : kInvalidEntityId);
     }
     // The whole block goes to the client verbatim. It is a plain member now, so
     // this is an ordinary argument rather than the `(char*)this + 0x78` cast the

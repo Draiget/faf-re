@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/entity/EntityAttributes.h"
 #include "moho/render/camera/VTransform.h"
@@ -34,14 +35,11 @@ namespace moho
 
 
   /**
-   * Recovered placeholder for `Moho::SSTIEntityAttachInfo` — used by
+   * Attachment entity-id record for `Moho::SSTIEntityAttachInfo`, used by
    * `gpg::RRef_SSTIEntityAttachInfo` (FUN_00559790) and the
    * `gpg::fastvector<SSTIEntityAttachInfo>` lane embedded in
-   * `SSTIEntityVariableData`. The complete-object size and field
-   * layout have not yet been confirmed from binary evidence; the
-   * struct is given a single `std::uintptr_t` body so it remains a
-   * complete C++ type (so `typeid()` works) while keeping the
-   * placeholder explicit.
+   * `SSTIEntityVariableData`. The serializer passes the record address to
+   * EntId serialization; the indexed vector uses a four-byte element stride.
    *
    * Resolved: `SSTIEntityAttachInfoSerializer::Deserialize`/`::Serialize`
    * (FUN_00558310/FUN_00558350) pass this struct's address directly as the
@@ -71,35 +69,6 @@ namespace moho
   };
 
   inline constexpr std::uint32_t kUserEntityUnderwaterLayerMaskBits = 0x6u;
-
-  struct SSTIInlineUIntVector
-  {
-    std::uint32_t* mBegin;       // 0x00
-    std::uint32_t* mEnd;         // 0x04
-    std::uint32_t* mCapacityEnd; // 0x08
-    std::uint32_t* mInlineBegin; // 0x0C
-    // Binary small-buffer quirk: this lane is inline element 0 while inline,
-    // but stores the inline-capacity restore pointer while dynamic.
-    std::uint32_t mInlineStorage0; // 0x10
-    std::uint32_t mInlineStorage1; // 0x14
-
-    void ResetToInlineStorage() noexcept;
-    void ReleaseDynamicStorage() noexcept;
-    void AssignFrom(const SSTIInlineUIntVector& rhs);
-
-    /**
-     * Address: 0x00558EC0 (FUN_00558EC0) + 0x00559190 grow lane
-     *
-     * What it does:
-     * Resizes to exactly `count` slots, filling any newly created tail slots
-     * with `fillValue`; grows through a fresh heap block when inline/spare
-     * capacity is insufficient.
-     */
-    void Resize(const std::size_t count, const std::uint32_t fillValue);
-
-    [[nodiscard]] std::size_t Size() const noexcept;
-    [[nodiscard]] std::size_t Capacity() const noexcept;
-  };
 
   /**
    * Recovered shape for replicated user-entity variable payload.
@@ -144,9 +113,8 @@ namespace moho
      * small-buffer-aware copy `sub_560B90` instead of copying those six words
      * inline as it does for every trivial lane around it.
      *
-     * `mAuxValueVector` keeps its first two elements inside the object and
-     * points `mInlineBegin` at itself, so the implicit member-wise copy leaves
-     * the copy aliasing the source's storage: sharing its heap buffer when
+     * `mAuxValueVector` has one inline element, so copying only its pointer
+     * lanes would make the copy alias the source's storage: its heap buffer when
      * dynamic, or pointing into the source object itself when inline. That is
      * live in `msvc8::vector<SEntityVariableUpdateEntry>::insert`, whose
      * `uninit_move_n` copy-constructs each element into the newly grown buffer
@@ -212,7 +180,7 @@ namespace moho
     float mCurImpactValue;                        // 0x5C
     float mFractionComplete;                      // 0x60
     std::uint32_t mAttachmentParentRef;           // 0x64
-    SSTIInlineUIntVector mAuxValueVector;         // 0x68
+    gpg::fastvector_n<SSTIEntityAttachInfo, 1> mAuxValueVector; // 0x68, one inline attachment id
     /**
      * Texture-scroll UV at the start and at the end of the beat.
      * `UserEntity::GetInterpolatedScroll` renders
@@ -292,21 +260,14 @@ namespace moho
   static_assert(sizeof(SSTIIntelAttributes) == 0x20, "SSTIIntelAttributes size must be 0x20");
   static_assert(sizeof(EUserEntityVisibilityMode) == 0x04, "EUserEntityVisibilityMode size must be 0x04");
 
-  static_assert(offsetof(SSTIInlineUIntVector, mBegin) == 0x00, "SSTIInlineUIntVector::mBegin offset must be 0x00");
-  static_assert(offsetof(SSTIInlineUIntVector, mEnd) == 0x04, "SSTIInlineUIntVector::mEnd offset must be 0x04");
   static_assert(
-    offsetof(SSTIInlineUIntVector, mCapacityEnd) == 0x08, "SSTIInlineUIntVector::mCapacityEnd offset must be 0x08"
+    offsetof(decltype(SSTIEntityVariableData::mAuxValueVector), inlineVec_) == 0x10,
+    "Entity attachment vector inline storage offset must be 0x10"
   );
   static_assert(
-    offsetof(SSTIInlineUIntVector, mInlineBegin) == 0x0C, "SSTIInlineUIntVector::mInlineBegin offset must be 0x0C"
+    sizeof(decltype(SSTIEntityVariableData::mAuxValueVector)) == 0x18,
+    "Entity attachment vector size must be 0x18"
   );
-  static_assert(
-    offsetof(SSTIInlineUIntVector, mInlineStorage0) == 0x10, "SSTIInlineUIntVector::mInlineStorage0 offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SSTIInlineUIntVector, mInlineStorage1) == 0x14, "SSTIInlineUIntVector::mInlineStorage1 offset must be 0x14"
-  );
-  static_assert(sizeof(SSTIInlineUIntVector) == 0x18, "SSTIInlineUIntVector size must be 0x18");
   static_assert(
     offsetof(SSTIEntityVariableData, mScmResource) == 0x00, "SSTIEntityVariableData::mScmResource offset must be 0x00"
   );

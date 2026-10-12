@@ -400,20 +400,7 @@ namespace
 
   [[nodiscard]] gpg::RType* ResolveAttachInfoVectorType()
   {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = ResolveTypeByAnyName(
-        {
-          "fastvector<SSTIEntityAttachInfo>",
-          "gpg::fastvector<Moho::SSTIEntityAttachInfo>",
-          "gpg::fastvector<SSTIEntityAttachInfo>",
-        }
-      );
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::SSTIInlineUIntVector));
-      }
-    }
-    return sType;
+    return gpg::RTypeOf<gpg::fastvector<moho::SSTIEntityAttachInfo>>();
   }
 
   [[nodiscard]] gpg::RType* ResolveCSndParamsType()
@@ -486,107 +473,6 @@ namespace moho
 {
   gpg::RType* SSTIEntityVariableData::sType = nullptr;
 
-  void SSTIInlineUIntVector::ResetToInlineStorage() noexcept
-  {
-    mInlineBegin = &mInlineStorage0;
-    mBegin = mInlineBegin;
-    mEnd = mInlineBegin;
-    mCapacityEnd = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(mInlineStorage0));
-  }
-
-  void SSTIInlineUIntVector::ReleaseDynamicStorage() noexcept
-  {
-    if (mBegin != mInlineBegin) {
-      delete[] mBegin;
-      mBegin = mInlineBegin;
-      mCapacityEnd = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(mInlineStorage0));
-    }
-    mEnd = mBegin;
-  }
-
-  void SSTIInlineUIntVector::AssignFrom(const SSTIInlineUIntVector& rhs)
-  {
-    if (this == &rhs) {
-      return;
-    }
-
-    const std::size_t srcCount = rhs.Size();
-    if (Capacity() < srcCount) {
-      std::uint32_t* const newStorage = new std::uint32_t[srcCount];
-      if (mBegin == mInlineBegin) {
-        mInlineStorage0 = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mCapacityEnd));
-      } else {
-        delete[] mBegin;
-      }
-      mBegin = newStorage;
-      mCapacityEnd = newStorage + srcCount;
-    }
-
-    if (srcCount != 0u) {
-      // Trivially copyable u32 element array copy inside the owning inline vector.
-      std::memcpy(mBegin, rhs.mBegin, srcCount * sizeof(std::uint32_t));
-    }
-    mEnd = mBegin + srcCount;
-  }
-
-  /**
-   * Address: 0x00558EC0 (FUN_00558EC0) + 0x00559190 grow lane
-   *
-   * What it does:
-   * Resizes to exactly `count` slots, filling any newly created tail slots
-   * with `fillValue`. Shrinks in place by moving `mEnd` (matches the
-   * `v6 != a3->end` early-out at 0x00558EC0); grows in place when spare
-   * capacity is sufficient, otherwise reallocates a fresh block via the
-   * grow lane (`sub_559190`) and installs it, preserving the binary
-   * small-buffer quirk on `mInlineStorage0`.
-   */
-  void SSTIInlineUIntVector::Resize(const std::size_t count, const std::uint32_t fillValue)
-  {
-    const std::size_t current = Size();
-    if (count <= current) {
-      mEnd = mBegin + count;
-      return;
-    }
-
-    if (count > Capacity()) {
-      std::uint32_t* const newStorage = new std::uint32_t[count];
-      if (mBegin == mInlineBegin) {
-        mInlineStorage0 =
-          static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mCapacityEnd));
-      } else {
-        delete[] mBegin;
-      }
-      if (current != 0u) {
-        // Trivially copyable u32 element array copy inside the owning inline vector.
-        std::memcpy(newStorage, mBegin, current * sizeof(std::uint32_t));
-      }
-      mBegin = newStorage;
-      mCapacityEnd = newStorage + count;
-    }
-
-    std::uint32_t* const newEnd = mBegin + count;
-    for (std::uint32_t* slot = mBegin + current; slot != newEnd; ++slot) {
-      *slot = fillValue;
-    }
-    mEnd = newEnd;
-  }
-
-  std::size_t SSTIInlineUIntVector::Size() const noexcept
-  {
-    if (!mBegin || !mEnd || mEnd < mBegin) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(mEnd - mBegin);
-  }
-
-  std::size_t SSTIInlineUIntVector::Capacity() const noexcept
-  {
-    if (!mBegin || !mCapacityEnd || mCapacityEnd < mBegin) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(mCapacityEnd - mBegin);
-  }
-
   /**
    * Address: 0x00558760 (FUN_00558760, ??0SSTIEntityVariableData@Moho@@QAE@XZ)
    */
@@ -619,11 +505,7 @@ namespace moho
     , pad_00A6_00A7{0, 0}
     , mUnderlayTexture()
     , mIntelAttributes{0, 0, 0, 0, 0, 0, 0, 0}
-  {
-    mAuxValueVector.mInlineStorage0 =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&mAuxValueVector.mInlineStorage1));
-    mAuxValueVector.ResetToInlineStorage();
-  }
+  {}
 
   /**
    * Address: 0x00560150 (FUN_00560150, ??0SSTIEntityVariableData@Moho@@QAE@ABU01@@Z)
@@ -645,7 +527,7 @@ namespace moho
     , mCurImpactValue(rhs.mCurImpactValue)
     , mFractionComplete(rhs.mFractionComplete)
     , mAttachmentParentRef(rhs.mAttachmentParentRef)
-    , mAuxValueVector()
+    , mAuxValueVector(rhs.mAuxValueVector)
     , mScrollBeatStart(rhs.mScrollBeatStart)
     , mScrollBeatEnd(rhs.mScrollBeatEnd)
     , mAmbientSound(rhs.mAmbientSound)
@@ -659,28 +541,12 @@ namespace moho
     , pad_00A6_00A7{0, 0}
     , mUnderlayTexture(rhs.mUnderlayTexture)
     , mIntelAttributes(rhs.mIntelAttributes)
-  {
-    // The aux vector must own its storage before it can take a copy: seed the
-    // inline lanes exactly as the default constructor does -- `mInlineStorage0`
-    // carries the inline-capacity restore pointer while dynamic, so it has to
-    // be planted before `ResetToInlineStorage` reads it back as the capacity
-    // end -- then let `AssignFrom` (0x00560B90) allocate if `rhs` outgrew the
-    // inline buffer.
-    mAuxValueVector.mInlineStorage0 =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&mAuxValueVector.mInlineStorage1));
-    mAuxValueVector.ResetToInlineStorage();
-    mAuxValueVector.AssignFrom(rhs.mAuxValueVector);
-  }
+  {}
 
   /**
    * Address: 0x00560310 (FUN_00560310, ??1SSTIEntityVariableData@Moho@@QAE@XZ)
    */
-  SSTIEntityVariableData::~SSTIEntityVariableData()
-  {
-    mUnderlayTexture.reset();
-    mAuxValueVector.ReleaseDynamicStorage();
-    mScmResource.reset();
-  }
+  SSTIEntityVariableData::~SSTIEntityVariableData() = default;
 
   /**
    * Address: 0x0067A3E0 (FUN_0067A3E0, ??4SSTIEntityVariableData@Moho@@QAEAAU01@ABU01@@Z)

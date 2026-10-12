@@ -853,23 +853,6 @@ namespace
   }
 
   /**
-   * Address: 0x00558EC0 (FUN_00558EC0, gpg::fastvector_n1_SSTIEntityAttachInfo::resize_fill)
-   *
-   * What it does:
-   * Resizes one runtime `fastvector<moho::SSTIEntityAttachInfo>` lane and
-   * fills appended elements from `*fillValue`.
-   */
-  void FastVectorSSTIEntityAttachInfoResize(
-    const moho::SSTIEntityAttachInfo* fillValue,
-    const unsigned int newSize,
-    void* objectStorage
-  )
-  {
-    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(objectStorage);
-    elements.resize(newSize, *fillValue);
-  }
-
-  /**
    * Address: 0x00515FF0 (FUN_00515FF0, gpg::RFastVectorType_Vector3f::SerLoad)
    *
    * What it does:
@@ -927,11 +910,11 @@ namespace
 
     moho::SSTIEntityAttachInfo fill{};
     fill.mAttachedEntityId = kInvalidAttachedEntityId;
-    FastVectorSSTIEntityAttachInfoResize(&fill, count, storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(storage);
+    elements.resize(count, fill);
 
     gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(attachInfoType, elements.Data() + (i), owner);
     }
@@ -1487,7 +1470,8 @@ void gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::SetCount(void* obj, const
 {
   moho::SSTIEntityAttachInfo fill{};
   fill.mAttachedEntityId = kInvalidAttachedEntityId;
-  FastVectorSSTIEntityAttachInfoResize(&fill, static_cast<unsigned int>(count), obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(obj);
+  elements.resize(static_cast<unsigned int>(count), fill);
 }
 
 // ---------------------------------------------------------------------------

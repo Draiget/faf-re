@@ -31,23 +31,18 @@ namespace moho
   {
   public:
     /**
-     * Weak references to a user entity link into the chain at +0x08, which
-     * RTTI says is the binary's `WeakObject` base. The constructor leaves
-     * +0x04 untouched (0x008B85E0): the binary pads the vfptr to 8, which MSVC
-     * does only for a member with 8-byte alignment, and that member is not
-     * identified yet. Until it is, this recovery's base sits at +0x04 and the
-     * +0x08 chain is the `mWeakObject` member, so the entity names it here.
+     * Weak references use the WeakObject base at +0x08. The canonical inline
+     * attachment vector supplies the original eight-byte alignment, leaving
+     * +0x04 as vfptr padding rather than a second weak-reference head.
      */
     [[nodiscard]] static void* WeakLinkHeadOf(UserEntity* const entity) noexcept
     {
-      return entity != nullptr ? static_cast<void*>(&entity->mWeakObject) : nullptr;
+      return static_cast<WeakObject*>(entity);
     }
 
     [[nodiscard]] static UserEntity* FromWeakLinkHead(void* const head) noexcept
     {
-      return head != nullptr
-        ? reinterpret_cast<UserEntity*>(static_cast<std::byte*>(head) - offsetof(UserEntity, mWeakObject))
-        : nullptr;
+      return static_cast<UserEntity*>(static_cast<WeakObject*>(head));
     }
 
     /**
@@ -298,14 +293,6 @@ namespace moho
     [[nodiscard]] UserEntity* GetAttachmentParent();
 
   public:
-    // 0x04 is the `WeakObject` base's `weakLinkHead_`: the head of the
-    // intrusive chain of `WeakPtr<UserEntity>` nodes that name this entity.
-    // It used to be restated here as a second field, which pushed every
-    // offset below it four bytes past the binary.
-    /// RTTI's `WeakObject` base: the chain every `WeakPtr<UserEntity>` and
-    /// `WeakPtr<UserUnit>` naming this entity links into (a `WeakSet` entry,
-    /// a camera target, a bracket). `~UserEntity` drains it at 0x008B8892.
-    WeakObject mWeakObject;                       // 0x08
     CWldSession* mSession;                        // 0x0C
     /// The entity's registration in the session's mesh spatial database. The
     /// constructor registers it at 0x008B8721 against `CWldSession + 0x50`
@@ -353,7 +340,7 @@ namespace moho
   // shifting every unit field.
   static_assert(sizeof(UserEntity) == 0x148, "UserEntity size must be 0x148");
   static_assert(offsetof(UserEntity, mSession) == 0x0C, "UserEntity::mSession offset must be 0x0C");
-  static_assert(offsetof(UserEntity, mWeakObject) == 0x08, "UserEntity::mWeakObject offset must be 0x08");
+  static_assert(offsetof(UserEntity, weakLinkHead_) == 0x08, "UserEntity weak base head offset must be 0x08");
   static_assert(offsetof(UserEntity, mSpatialDbEntry) == 0x10, "UserEntity::mSpatialDbEntry offset must be 0x10");
   static_assert(offsetof(UserEntity, mVisionHandle) == 0x18, "UserEntity::mVisionHandle offset must be 0x18");
   static_assert(offsetof(UserEntity, mPosePrimary) == 0x1C, "UserEntity::mPosePrimary offset must be 0x1C");

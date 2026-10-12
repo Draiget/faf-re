@@ -890,6 +890,13 @@ namespace gpg::core
      * Address: 0x0056D1D0 (FUN_0056D1D0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` (the 0x10 header of `CFormationInstance::mUnits`, element 0x08): shrink through 0x0056EF40, grow through `ReallocateInsert_` 0x0056D2B0, then copy-construct `value` (link at the owner head) into each new slot; callers `RFastVectorType<WeakPtr<IUnit>>::SetCount` 0x0056BF9D and its loader 0x0056DDC7; formerly `ResizeWeakPtrVector` over `WeakPtrVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (RULE THREE), removed 2026-09-30.)
      * Address: 0x006AF0A0 (FUN_006AF0A0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::Entity>>` (the 0x10 header of `Unit::mBlipsInRange`): callers `RFastVectorType<WeakPtr<Entity>>::SetCount` 0x006AE570 and its load callback 0x006AF3F0, each with a default `WeakPtr` temporary as the fill, and the vector's copy constructor 0x006ADE50. It was tagged `external_dependency` as an "all-external-callees thunk".)
      */
+    /**
+     * Address: 0x00558EC0 (FUN_00558EC0, SSTIEntityAttachInfo resize emission)
+     *
+     * What it does:
+     * Resizes the inline-backed attachment vector, preserving its origin and
+     * filling appended records with the supplied entity-id sentinel.
+     */
     void resize(const size_type n, const T& value)
     {
       ResizeFill_(value, n);
@@ -1048,6 +1055,7 @@ namespace gpg::core
 
     /**
      * Address: 0x004028E0 (FUN_004028E0, the 4-byte lane emission)
+     * Address: 0x00561A70 (FUN_00561A70, SSTIEntityAttachInfo assignment emission)
      * Address: 0x00561D90 (FUN_00561D90, the `gpg::fastvector_n<Moho::UnitWeaponInfo, 1>`
      * emission -- the 0x98-byte weapon-info snapshot, stride confirmed by the three `/152` size
      * divides at 0x00561DA5/0x00561DB6/0x00561DC8 and the `152 * v3` prefix offset. Reached by
@@ -1237,7 +1245,9 @@ namespace gpg::core
      * safe: an abandoned inline slot after a heap grow is not a live object
      * whose destructor would run a second time.
      */
-    alignas(8) alignas(T) std::byte inlineVec_[N * ElemSize];
+    // A spilled vector stores a native capacity pointer in the abandoned
+    // inline window, even when its live inline payload is smaller than one.
+    alignas(8) alignas(T) std::byte inlineVec_[std::max(N * ElemSize, sizeof(T*))];
 
     [[nodiscard]] T* InlineStorage() noexcept
     {
@@ -1391,6 +1401,13 @@ namespace gpg::core
      * Address: 0x0056B200 (FUN_0056B200, sub_56B200 -- the copy constructor of `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08): `mUnits(units)` in `CFormationInstance::CFormationInstance` (0x005694B0); each copied `WeakPtr<IUnit>` relinks into its unit's weak chain.)
      * Address: 0x0082E5E0 (FUN_0082E5E0 -- copy constructor for a 4-byte element; Initializes one stack-style inline dword-vector scratch lane and assigns source content into that lane via `AssignDwordVectorRange`.)
      * Address: 0x0057D3F0 (FUN_0057D3F0 -- the copy constructor -- seat the three lanes plus `originalVec_` on the inline block at `this+0x10`, then `AddAll` the source; ten callers, `EntitySetTemplate<Unit>`'s own copy constructor 0x00579500 among them for `gpg::core::FastVectorN<moho::Entity*, 4>` (`EntitySetTemplate<Unit>::mVec` at +0x08; the 0x10 head sits in front of its own four-slot inline block); callers 0x00579500, 0x005ADC70, 0x005FA790; formerly `CopyEntityInlineVector` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
+     */
+    /**
+     * Address: 0x00560B90 (FUN_00560B90, SSTIEntityAttachInfo N=1 copy emission)
+     *
+     * What it does:
+     * Binds the copy to its own one-slot inline window, then copies the source
+     * through AssignFrom, allocating only when the source outgrows it.
      */
     FastVectorN(const FastVectorN& other)
       : FastVectorN()

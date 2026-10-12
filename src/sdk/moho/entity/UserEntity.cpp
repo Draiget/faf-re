@@ -196,7 +196,6 @@ namespace moho
    */
   UserEntity::UserEntity(CWldSession& session, const SCreateEntityParams& createParams)
     : WeakObject()
-    , mWeakObject()
     , mSession(&session)
     , mSpatialDbEntry{}
     , mVisionHandle(nullptr)

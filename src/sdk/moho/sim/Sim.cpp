@@ -15496,13 +15496,8 @@ int moho::cfunc_GetAttachedUnitsListL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      const SSTIInlineUIntVector& attachedIdList = sourceEntity->mVariableData.mAuxValueVector;
-      if (attachedIdList.mBegin == nullptr || attachedIdList.mEnd == nullptr || attachedIdList.mEnd < attachedIdList.mBegin) {
-        continue;
-      }
-
-      for (const std::uint32_t* attachedIdIt = attachedIdList.mBegin; attachedIdIt < attachedIdList.mEnd; ++attachedIdIt) {
-        UserEntity* const attachedEntity = FindUserSessionEntityById(session, static_cast<std::int32_t>(*attachedIdIt));
+      for (const SSTIEntityAttachInfo& attachment : sourceEntity->mVariableData.mAuxValueVector) {
+        UserEntity* const attachedEntity = FindUserSessionEntityById(session, attachment.mAttachedEntityId);
         if (attachedEntity == nullptr || attachedEntity->mVariableData.mIsDead != 0u) {
           continue;
         }
