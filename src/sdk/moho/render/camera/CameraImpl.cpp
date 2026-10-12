@@ -248,21 +248,6 @@ namespace
   }
 
 
-  struct CameraTransitionFlag
-  {
-    std::uint8_t mUnknown000To00F[0x10]{};
-    std::uint8_t mTransitionPending = 0; // +0x10
-  };
-  static_assert(
-    offsetof(CameraTransitionFlag, mTransitionPending) == 0x10,
-    "CameraTransitionFlag::mTransitionPending offset must be 0x10"
-  );
-
-  [[nodiscard]] CameraTransitionFlag* AsTransitionFlagView(moho::CameraImpl* const camera) noexcept
-  {
-    return reinterpret_cast<CameraTransitionFlag*>(camera);
-  }
-
   /**
    * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
    *
@@ -1397,7 +1382,9 @@ void moho::CameraImpl::TimedMoveInit(const float seconds, const float transition
     mTimedMoveZoom = mTargetZoom;
     mTimedMovePitch = mFarPitch;
     mTimedMoveHeading = moho::NormalizeAngleSignedRadians(mHeading);
-    AsTransitionFlagView(this)->mTransitionPending = 0u;
+    // Retail 0x007A7598 clears CTaskEvent::mTriggered in the CScriptEvent
+    // base. Its complete-object offset changes with native pointer width.
+    mTriggered = false;
   }
 }
 
