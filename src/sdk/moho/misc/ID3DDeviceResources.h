@@ -4,7 +4,6 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
 
 namespace gpg
 {
@@ -39,7 +38,6 @@ namespace moho
     using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
     using TextureResourceHandle = boost::shared_ptr<RD3DTextureResource>;
     using PrefetchDataHandle = boost::shared_ptr<PrefetchData>;
-    using DynamicTextureSheetWeakHandle = boost::weak_ptr<CD3DDynamicTextureSheet>;
 
     /**
      * Address: 0x00440630 (FUN_00440630, sub_440630)
@@ -210,9 +208,11 @@ namespace moho
      * Address: 0x00A82547 (_purecall slot)
      *
      * What it does:
-     * Preserves one weak-handle release lane used by dynamic sheet dispatch.
+     * Accepts a named shader source and dynamic sheet for shader-based filling.
      */
-    virtual bool Func9(int arg1, int arg2, DynamicTextureSheetWeakHandle weakSheet) = 0;
+    virtual bool FillDynamicTexture(
+      const char* shaderName, const char* shaderSource, DynamicTextureSheetHandle sheet
+    ) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall slot)

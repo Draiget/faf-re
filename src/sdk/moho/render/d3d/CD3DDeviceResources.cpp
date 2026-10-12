@@ -617,13 +617,16 @@ namespace moho
    * Address: 0x00441D20 (FUN_00441D20)
    *
    * What it does:
-   * Legacy weak-handle release lane for dynamic texture sheet callbacks.
+   * Accepts a shader fill request and returns success. The original backend
+   * leaves the texture unchanged and releases its copied strong handle.
    */
-  bool CD3DDeviceResources::Func9(const int arg1, const int arg2, DynamicTextureSheetWeakHandle weakSheet)
+  bool CD3DDeviceResources::FillDynamicTexture(
+    const char* const shaderName, const char* const shaderSource, DynamicTextureSheetHandle sheet
+  )
   {
-    (void)arg1;
-    (void)arg2;
-    (void)weakSheet;
+    (void)shaderName;
+    (void)shaderSource;
+    (void)sheet;
     return true;
   }
 

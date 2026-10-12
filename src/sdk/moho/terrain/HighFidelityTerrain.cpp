@@ -368,12 +368,7 @@ namespace moho
         kNoiseFillTextureFormat
       );
 
-      ID3DDeviceResources::DynamicTextureSheetWeakHandle weakNoiseFillTexture(sHighFidelityNoiseFillTexture);
-      (void)resources->Func9(
-        static_cast<int>(reinterpret_cast<std::uintptr_t>(kNoiseFillName)),
-        static_cast<int>(reinterpret_cast<std::uintptr_t>(kNoiseFillShaderSource)),
-        weakNoiseFillTexture
-      );
+      (void)resources->FillDynamicTexture(kNoiseFillName, kNoiseFillShaderSource, sHighFidelityNoiseFillTexture);
     }
 
     if (!sHighFidelityCubicBlendLookupTexture) {
