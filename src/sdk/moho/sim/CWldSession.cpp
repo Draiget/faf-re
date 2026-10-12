@@ -77,6 +77,7 @@
 #include "moho/misc/TimeBar.h"
 #include "moho/particles/CWorldParticles.h"
 #include "moho/render/RCamManager.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
@@ -6802,6 +6803,12 @@ namespace moho
   CWldSession::~CWldSession()
   {
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
+
+    // 0x00893A88..0x00893A99: viewport-owned border meshes borrow the
+    // session's blueprints and must be retired before any session owners.
+    if (ren_Viewport != nullptr) {
+      ren_Viewport->mMapImager.ClearBorder();
+    }
 
     // 0x00893A9E..0x00893AEE: the very first thing the session unwinds is its
     // army-mirror table. Every populated slot is deleted - `~UserArmy`

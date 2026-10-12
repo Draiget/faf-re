@@ -359,19 +359,12 @@ namespace
     "AudioInMemoryWaveBankLoader::mMappedBuffer offset must be 0x28"
   );
 
-  struct AudioStreamingWaveBankCreateParams
-  {
-    HANDLE mFileHandle;        // +0x00
-    std::uint32_t mOffset;     // +0x04
-    std::uint32_t mReserved08; // +0x08
-    std::uint16_t mPacketSize; // +0x0C
-    std::uint16_t mReserved0E; // +0x0E
-  };
+  using AudioStreamingWaveBankCreateParams = XACT_STREAMING_PARAMETERS;
   static_assert(
-    offsetof(AudioStreamingWaveBankCreateParams, mPacketSize) == 0x0C,
-    "AudioStreamingWaveBankCreateParams::mPacketSize offset must be 0x0C"
+    offsetof(AudioStreamingWaveBankCreateParams, packetSize) == sizeof(HANDLE) + 8,
+    "XACT streaming packet size offset mismatch"
   );
-  static_assert(sizeof(AudioStreamingWaveBankCreateParams) == 0x10, "AudioStreamingWaveBankCreateParams size must be 0x10");
+  static_assert(sizeof(AudioStreamingWaveBankCreateParams) == (sizeof(void*) == 4 ? 0x10 : 0x18), "XACT streaming parameter size mismatch");
 
   [[nodiscard]] bool IsCategoryArgValid(const gpg::StrArg category)
   {
@@ -502,20 +495,6 @@ namespace
     return true;
   }
 
-#pragma pack(push, 1)
-  struct AudioStreamingWaveBankNotificationDesc
-  {
-    std::uint8_t mType;         // +0x00
-    std::uint32_t mWaveBankId;  // +0x01
-    std::uint8_t mReserved[20]; // +0x05
-  };
-#pragma pack(pop)
-  static_assert(
-    offsetof(AudioStreamingWaveBankNotificationDesc, mWaveBankId) == 0x01,
-    "AudioStreamingWaveBankNotificationDesc::mWaveBankId offset must be 0x01"
-  );
-  static_assert(sizeof(AudioStreamingWaveBankNotificationDesc) == 0x19, "AudioStreamingWaveBankNotificationDesc size must be 0x19");
-
   /**
    * Address: 0x004DADF0 (FUN_004DADF0, Moho::RWaveBankResStreaming::LoadBank)
    *
@@ -551,11 +530,10 @@ namespace
     }
 
     AudioStreamingWaveBankCreateParams createParams{};
-    createParams.mFileHandle = mFileHandle;
-    createParams.mOffset = 0u;
-    createParams.mReserved08 = 0u;
-    createParams.mPacketSize = 0x12u;
-    createParams.mReserved0E = 0u;
+    createParams.file = mFileHandle;
+    createParams.offset = 0u;
+    createParams.flags = 0u;
+    createParams.packetSize = 0x12u;
 
     const int createResult = mEngine->mInstance->CreateStreamingWaveBank(&createParams, &mWaveBank);
     if (createResult < 0) {
@@ -565,15 +543,17 @@ namespace
 
     mName = moho::FILE_Base(waveBankPath, true);
 
-    AudioStreamingWaveBankNotificationDesc notification{};
-    notification.mType = 17u;
-    notification.mWaveBankId = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mWaveBank));
+    moho::AudioNotificationDesc notification{};
+    notification.type = XACTNOTIFICATIONTYPE_WAVEBANKPREPARED;
+    // The notification holds an opaque XACT interface identity. It never calls
+    // through the SDK's XACT 3 vtable on this recovered XACT 2 instance.
+    notification.pWaveBank = reinterpret_cast<IXACT3WaveBank*>(mWaveBank);
     const int registerResult = mEngine->mInstance->RegisterNotification(&notification);
     if (registerResult < 0) {
       gpg::Warnf("SND: Error registering notification.\n%s", moho::func_SoundErrorCodeToMsg(registerResult));
     }
 
-    gpg::Debugf("SND: Loaded WaveBank '%s' at %x", mName.c_str(), notification.mWaveBankId);
+    gpg::Debugf("SND: Loaded WaveBank '%s' at %p", mName.c_str(), static_cast<void*>(mWaveBank));
     return true;
   }
 
@@ -614,9 +594,9 @@ namespace
 
     mName = moho::FILE_Base(waveBankPath, true);
     gpg::Debugf(
-      "SND: Loaded WaveBank '%s' at %x",
+      "SND: Loaded WaveBank '%s' at %p",
       mName.c_str(),
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mWaveBank))
+      static_cast<void*>(mWaveBank)
     );
     return true;
   }
@@ -1645,61 +1625,6 @@ namespace moho
 
   namespace
   {
-    struct SoundNotificationEventData
-    {
-      std::uint8_t mType;                                 // +0x00
-      std::array<std::uint8_t, 0x08> mReserved01{};      // +0x01
-      std::array<std::uint8_t, 0x04> mWaveBankToken{};   // +0x09
-      std::array<std::uint8_t, 0x06> mReserved0D{};      // +0x0D
-      std::array<std::uint8_t, 0x02> mVariableId{};      // +0x13
-      std::array<std::uint8_t, 0x04> mVariableValue{};   // +0x15
-
-      [[nodiscard]] std::uint16_t VariableId() const noexcept
-      {
-        std::uint16_t value = 0;
-        // Unaligned scalar load from the packed notification byte fields.
-        std::memcpy(&value, mVariableId.data(), sizeof(value));
-        return value;
-      }
-
-      [[nodiscard]] float VariableValue() const noexcept
-      {
-        float value = 0.0f;
-        // Unaligned scalar load from the packed notification byte fields.
-        std::memcpy(&value, mVariableValue.data(), sizeof(value));
-        return value;
-      }
-
-      [[nodiscard]] std::uint32_t WaveBankId() const noexcept
-      {
-        std::uint32_t value = 0;
-        // Unaligned scalar load from the packed notification byte fields.
-        std::memcpy(&value, mWaveBankToken.data(), sizeof(value));
-        return value;
-      }
-    };
-    static_assert(offsetof(SoundNotificationEventData, mType) == 0x00, "SoundNotificationEventData::mType offset must be 0x00");
-    static_assert(
-      offsetof(SoundNotificationEventData, mWaveBankToken) == 0x09,
-      "SoundNotificationEventData::mWaveBankToken offset must be 0x09"
-    );
-    static_assert(
-      offsetof(SoundNotificationEventData, mVariableId) == 0x13,
-      "SoundNotificationEventData::mVariableId offset must be 0x13"
-    );
-    static_assert(
-      offsetof(SoundNotificationEventData, mVariableValue) == 0x15,
-      "SoundNotificationEventData::mVariableValue offset must be 0x15"
-    );
-    static_assert(sizeof(SoundNotificationEventData) == 0x19, "SoundNotificationEventData size must be 0x19");
-
-    struct AudioNotificationDesc
-    {
-      std::uint8_t type;
-      std::uint8_t flags;
-      std::uint8_t reserved[0x18];
-    };
-
     void RegisterNotificationOrWarn(AudioEngineImpl* const impl, const std::uint8_t notificationType)
     {
       if (impl == nullptr || impl->mInstance == nullptr) {
@@ -1740,13 +1665,7 @@ namespace moho
     , mReserved29{}
     , mSpeakerConfiguration(3u)
     , mAudioModule(nullptr)
-    , mLookAheadTimeMs(0u)
-    , mGlobalSettingsStart(nullptr)
-    , mGlobalSettingsLength(0u)
-    , mRuntimeFlags(0u)
-    , mReserved44{}
-    , mHandleSoundEvent(nullptr)
-    , mReserved54{}
+    , mRuntimeParams{}
     , mAudition(0u)
     , mReserved59{}
   {
@@ -1833,21 +1752,21 @@ namespace moho
    * variable-value changes, GUI connect/disconnect signals, and wavebank
    * streaming state changes.
    */
-  void __stdcall func_HandleSoundEvent(const std::uint8_t* const eventDataBytes)
+  void __stdcall func_HandleSoundEvent(const AudioNotification* const eventDataBytes)
   {
     if (eventDataBytes == nullptr) {
       return;
     }
 
-    const auto& eventData = *reinterpret_cast<const SoundNotificationEventData*>(eventDataBytes);
-    switch (eventData.mType) {
+    const auto& eventData = *eventDataBytes;
+    switch (eventData.type) {
     case 0x08:
-      gpg::Logf("SND: Local var changed %i = %f", eventData.VariableId(), eventData.VariableValue());
+      gpg::Logf("SND: Local var changed %i = %f", eventData.variable.variableIndex, eventData.variable.variableValue);
       break;
 
     case 0x09: {
-      const msvc8::string variableName = SND_GetVariableName(static_cast<int>(eventData.VariableId()));
-      gpg::Logf("SND: Global var changed [%s] = %f", variableName.c_str(), eventData.VariableValue());
+      const msvc8::string variableName = SND_GetVariableName(static_cast<int>(eventData.variable.variableIndex));
+      gpg::Logf("SND: Global var changed [%s] = %f", variableName.c_str(), eventData.variable.variableValue);
       break;
     }
 
@@ -1860,11 +1779,11 @@ namespace moho
       break;
 
     case 0x11:
-      gpg::Debugf("Wavebank prepared: %x", eventData.WaveBankId());
+      gpg::Debugf("Wavebank prepared: %p", static_cast<void*>(eventData.waveBank.pWaveBank));
       break;
 
     case 0x12:
-      gpg::Logf("Error streaming from wavebank %x, invalid content", eventData.WaveBankId());
+      gpg::Logf("Error streaming from wavebank %p, invalid content", static_cast<void*>(eventData.waveBank.pWaveBank));
       break;
 
     default:
@@ -1901,10 +1820,10 @@ namespace moho
     );
 
     if (sSoundConfiguration->mNoSound == 0u) {
-      sSoundConfiguration->mLookAheadTimeMs = 250u;
-      sSoundConfiguration->mHandleSoundEvent =
-        reinterpret_cast<std::uint32_t (__cdecl*)(int*)>(&moho::func_HandleSoundEvent);
-      sSoundConfiguration->mRuntimeFlags = 0u;
+      sSoundConfiguration->mRuntimeParams.lookAheadTime = 250u;
+      sSoundConfiguration->mRuntimeParams.fnNotificationCallback =
+        &moho::func_HandleSoundEvent;
+      sSoundConfiguration->mRuntimeParams.globalSettingsFlags = 0u;
 
       moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
       msvc8::string mountedPath{};
@@ -1915,11 +1834,11 @@ namespace moho
       sSoundConfiguration->mGlobalSettingsBuffer = loadedBuffer;
 
       if (sSoundConfiguration->mGlobalSettingsBuffer.mBegin != nullptr) {
-        sSoundConfiguration->mGlobalSettingsLength = static_cast<std::uint32_t>(
+        sSoundConfiguration->mRuntimeParams.globalSettingsBufferSize = static_cast<std::uint32_t>(
           sSoundConfiguration->mGlobalSettingsBuffer.mEnd -
           sSoundConfiguration->mGlobalSettingsBuffer.mBegin
         );
-        sSoundConfiguration->mGlobalSettingsStart =
+        sSoundConfiguration->mRuntimeParams.pGlobalSettingsBuffer =
           sSoundConfiguration->mGlobalSettingsBuffer.mBegin;
       }
     }
@@ -2210,26 +2129,13 @@ namespace moho
 
     gpg::MD5Context md5Context{};
     md5Context.Reset();
-    md5Context.Update(configuration->mGlobalSettingsStart, configuration->mGlobalSettingsLength);
+    md5Context.Update(configuration->mRuntimeParams.pGlobalSettingsBuffer, configuration->mRuntimeParams.globalSettingsBufferSize);
     const msvc8::string globalSettingsDigest = md5Context.Digest().ToString();
     gpg::Logf("MD5 of global settings: %s", globalSettingsDigest.c_str());
 
-    // XACT's runtime-parameter block is embedded in SoundConfiguration starting
-    // at +0x34, so the engine hands it the address of that field rather than a
-    // separate struct. The binary is explicit about it:
-    //
-    //   mov edx, sSoundConfiguration
-    //   add edx, 34h                  ; <- params head = &mLookAheadTimeMs
-    //   push edx
-    //
-    // and func_InitSound fills that block through the same offsets:
-    // [+0x34] = 0xFA (250 ms look-ahead), [+0x38]/[+0x3C] the global-settings
-    // pointer and length, [+0x40] the flags, [+0x50] func_HandleSoundEvent.
-    //
-    // This passed &mSpeakerConfiguration (+0x2C) instead, i.e. the block eight
-    // bytes early, so XACT read lookAheadTime = 3 and took mAudioModule
-    // as the global-settings pointer and rejected the lot with "Invalid arg".
-    const int initializeResult = mImpl->mInstance->Initialize(&configuration->mLookAheadTimeMs);
+    // FUN_004D9410 passes SoundConfiguration +0x34, the embedded XACT 2.5
+    // parameter object. Typed callback fields grow and align natively on x64.
+    const int initializeResult = mImpl->mInstance->Initialize(&configuration->mRuntimeParams);
     if (initializeResult < 0) {
       gpg::Warnf("SND: Error initializing audio engine.\n%s", func_SoundErrorCodeToMsg(initializeResult));
       configuration->mNoSound = 1u;
@@ -2784,7 +2690,9 @@ namespace moho
    */
   bool AudioEngine::IsStopped(IXACTCue* const cue) const
   {
-    int cueState = static_cast<int>(reinterpret_cast<std::uintptr_t>(this));
+    // The original push ecx reserves this output local; it is not a
+    // pointer-valued cue state. Successful GetState calls overwrite it.
+    int cueState = 0;
     if (mImpl->mInstance == nullptr || cue == nullptr) {
       return false;
     }

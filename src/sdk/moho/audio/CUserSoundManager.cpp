@@ -12,6 +12,7 @@
 #include <cstdio>
 
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
@@ -432,17 +433,16 @@ namespace
       return false;
     }
 
-    // Raw {px_, pi_} of the weak_ptr at +0x48. boost::weak_ptr does not expose
-    // pi_, and the whole question is whether it is a real control block, so
-    // read the lane rather than trusting the type.
-    std::uint32_t engineLane[2] = {0u, 0u};
-    // Diagnostic byte-image lane: raw control-word read for the shadow check.
-    std::memcpy(engineLane, &params->mEngine, sizeof(engineLane));
+    // Diagnostic snapshot of Boost's pointer/control pair, without touching
+    // a potentially damaged control block or changing its reference counts.
+    boost::SharedPtrLayout<moho::AudioEngine> engineLane{};
+    static_assert(sizeof(engineLane) == sizeof(params->mEngine), "Audio weak pointer snapshot size mismatch");
+    std::memcpy(&engineLane, &params->mEngine, sizeof(engineLane));
 
     const std::uint32_t policy = params->mResolvePolicy;
-    const std::uint32_t control = engineLane[1];
-    const char* const controlRegion = SndDiagRegionState(reinterpret_cast<const void*>(control));
-    const bool controlUsable = control == 0u || std::strcmp(controlRegion, "commit") == 0;
+    const auto* const control = engineLane.pi;
+    const char* const controlRegion = SndDiagRegionState(control);
+    const bool controlUsable = control == nullptr || std::strcmp(controlRegion, "commit") == 0;
     if (policy <= 4u && controlUsable) {
       return true;
     }
@@ -451,7 +451,7 @@ namespace
     std::snprintf(
       verdict,
       sizeof(verdict),
-      "[SNDDIAG] %s arm=%s entity=%p entityId=%d params=%p bank=%u cue=%u policy=%u px=%08X pi=%08X "
+      "[SNDDIAG] %s arm=%s entity=%p entityId=%d params=%p bank=%u cue=%u policy=%u px=%p pi=%p "
       "piRegion=%.16s -- descriptor is registered and mapped, so %s",
       controlUsable ? "TAIL OVERWRITTEN" : "ENGINE CONTROL BLOCK FREED",
       arm,
@@ -461,8 +461,8 @@ namespace
       static_cast<unsigned>(params->mBankId),
       static_cast<unsigned>(params->mCueId),
       policy,
-      engineLane[0],
-      control,
+      static_cast<void*>(engineLane.px),
+      static_cast<const void*>(control),
       controlRegion,
       controlUsable ? "a stray write hit params+0x40/+0x4C in place."
                     : "the AudioEngine control block was released while this weak_ptr still referenced it."

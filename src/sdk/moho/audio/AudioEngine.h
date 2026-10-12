@@ -3,6 +3,10 @@
 #include <cstddef>
 #include "legacy/containers/Vector.h"
 #include <cstdint>
+#include <Windows.h>
+#include <mmreg.h>
+#include <mmsystem.h>
+#include <xact3.h>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/MemBufferStream.h"
@@ -30,6 +34,34 @@ namespace moho
   class IXACTCue;
   class IXACTWaveBank;
   struct AudioEngineImpl;
+
+  // XACT 2.5 and XACT 3 use these same packed notification data contracts.
+  // The SDK's interface pointers are opaque here; engine calls still use the
+  // recovered XACT 2 interfaces below.
+  using AudioNotificationDesc = ::XACT_NOTIFICATION_DESCRIPTION;
+  using AudioNotification = ::XACT_NOTIFICATION;
+  static_assert(sizeof(AudioNotificationDesc) == 6 + 5 * sizeof(void*), "XACT notification descriptor size mismatch");
+  static_assert(offsetof(AudioNotificationDesc, pWaveBank) == 2 + sizeof(void*), "XACT wave-bank field offset mismatch");
+  static_assert(sizeof(AudioNotification) == 9 + 5 * sizeof(void*), "XACT notification size mismatch");
+  static_assert(offsetof(AudioNotification, waveBank) == 5 + sizeof(void*), "XACT notification payload offset mismatch");
+
+  // XACT 2.5's runtime parameters end at pRendererID. The June 2010 SDK's
+  // XACT_RUNTIME_PARAMETERS adds two XAudio2 pointers, so it cannot replace
+  // this embedded object without changing the original x86 layout.
+  struct AudioRuntimeParams
+  {
+    DWORD lookAheadTime;
+    void* pGlobalSettingsBuffer;
+    DWORD globalSettingsBufferSize;
+    DWORD globalSettingsFlags;
+    DWORD globalSettingsAllocAttributes;
+    XACT_FILEIO_CALLBACKS fileIOCallbacks;
+    XACT_NOTIFICATION_CALLBACK fnNotificationCallback;
+    PWSTR pRendererID;
+  };
+  static_assert(sizeof(AudioRuntimeParams) == (sizeof(void*) == 4 ? 0x24 : 0x40), "AudioRuntimeParams size mismatch");
+  static_assert(offsetof(AudioRuntimeParams, fnNotificationCallback) == offsetof(XACT_RUNTIME_PARAMETERS, fnNotificationCallback), "XACT runtime callback offset mismatch");
+  static_assert(offsetof(AudioRuntimeParams, pRendererID) == offsetof(XACT_RUNTIME_PARAMETERS, pRendererID), "XACT runtime renderer offset mismatch");
 
   /**
    * Address: 0x004DE650 (FUN_004DE650, ??0WeakPtr_AudioEngine@Moho@@QAE@@Z)
@@ -151,7 +183,7 @@ namespace moho
     virtual std::int32_t __stdcall
     GetRendererDetails(std::uint16_t rendererIndex, void* outRendererDetails) = 0;       // +0x10
     virtual std::int32_t __stdcall GetFinalMixFormat(void* outWaveFormatExtensible) = 0; // +0x14
-    virtual std::int32_t __stdcall Initialize(const void* runtimeParams) = 0;            // +0x18
+    virtual std::int32_t __stdcall Initialize(const AudioRuntimeParams* runtimeParams) = 0; // +0x18
     virtual void __stdcall ShutDown() = 0;                                               // +0x1C
     virtual std::int32_t __stdcall DoWork() = 0;                                         // +0x20
     virtual std::int32_t __stdcall CreateSoundBank(
@@ -200,8 +232,8 @@ namespace moho
       std::uint8_t loopCount,
       void** outWave
     ) = 0;                                                                                   // +0x38
-    virtual std::int32_t __stdcall RegisterNotification(const void* notificationDesc) = 0;   // +0x3C
-    virtual std::int32_t __stdcall UnRegisterNotification(const void* notificationDesc) = 0; // +0x40
+    virtual std::int32_t __stdcall RegisterNotification(const AudioNotificationDesc* notificationDesc) = 0;   // +0x3C
+    virtual std::int32_t __stdcall UnRegisterNotification(const AudioNotificationDesc* notificationDesc) = 0; // +0x40
 
     /**
      * VTable slot 17 (+0x44).
@@ -326,13 +358,7 @@ namespace moho
     std::uint8_t mReserved29[0x03];    // +0x29
     std::uint32_t mSpeakerConfiguration; // +0x2C
     void* mAudioModule;         // +0x30 (`HMODULE`)
-    std::uint32_t mLookAheadTimeMs;    // +0x34
-    const void* mGlobalSettingsStart;  // +0x38
-    std::uint32_t mGlobalSettingsLength; // +0x3C
-    std::uint32_t mRuntimeFlags;       // +0x40
-    std::uint8_t mReserved44[0x0C];    // +0x44
-    std::uint32_t (__cdecl* mHandleSoundEvent)(int*); // +0x50
-    std::uint8_t mReserved54[0x04];    // +0x54
+    AudioRuntimeParams mRuntimeParams; // +0x34
     std::uint8_t mAudition;            // +0x58
     std::uint8_t mReserved59[0x07];    // +0x59
 
@@ -436,20 +462,20 @@ namespace moho
     "SoundConfiguration::mAudioModule offset must be 0x30"
   );
   static_assert(
-    offsetof(SoundConfiguration, mLookAheadTimeMs) == 0x34,
-    "SoundConfiguration::mLookAheadTimeMs offset must be 0x34"
+    offsetof(SoundConfiguration, mRuntimeParams) == 0x34,
+    "SoundConfiguration::mRuntimeParams offset must be 0x34"
   );
   static_assert(
-    offsetof(SoundConfiguration, mGlobalSettingsStart) == 0x38,
-    "SoundConfiguration::mGlobalSettingsStart offset must be 0x38"
+    offsetof(SoundConfiguration, mRuntimeParams) + offsetof(AudioRuntimeParams, pGlobalSettingsBuffer) == 0x38,
+    "SoundConfiguration global settings pointer offset must be 0x38"
   );
   static_assert(
-    offsetof(SoundConfiguration, mGlobalSettingsLength) == 0x3C,
-    "SoundConfiguration::mGlobalSettingsLength offset must be 0x3C"
+    offsetof(SoundConfiguration, mRuntimeParams) + offsetof(AudioRuntimeParams, globalSettingsBufferSize) == 0x3C,
+    "SoundConfiguration global settings size offset must be 0x3C"
   );
   static_assert(
-    offsetof(SoundConfiguration, mHandleSoundEvent) == 0x50,
-    "SoundConfiguration::mHandleSoundEvent offset must be 0x50"
+    offsetof(SoundConfiguration, mRuntimeParams) + offsetof(AudioRuntimeParams, fnNotificationCallback) == 0x50,
+    "SoundConfiguration sound callback offset must be 0x50"
   );
   static_assert(offsetof(SoundConfiguration, mAudition) == 0x58, "SoundConfiguration::mAudition offset must be 0x58");
   static_assert(sizeof(SoundConfiguration) == 0x60, "SoundConfiguration size must be 0x60");
@@ -710,7 +736,7 @@ namespace moho
    * Handles XACT notification events and emits diagnostic logs for variable
    * changes, GUI connection state, and wavebank preparation failures.
    */
-  void __stdcall func_HandleSoundEvent(const std::uint8_t* eventData);
+  void __stdcall func_HandleSoundEvent(const AudioNotification* eventData);
 
   /**
    * Address: 0x004D8C00 (FUN_004D8C00, func_InitSound)

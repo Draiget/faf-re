@@ -10700,28 +10700,8 @@ void Sim::Shutdown()
   // coord node - it never erases from `mAllUnits` - so walking the tree while
   // calling it is safe, which is why the binary does exactly that.
   //
-  // KNOWN DIVERGENCE, deliberate: the `IsUnit()` filter below is ours, not the
-  // binary's. 0x00745810/13 destroys every value in the tree; dropping the
-  // filter to match was tried and backed out, because it kills the process on
-  // the way out somewhere else entirely:
-  //
-  //   ACCESS_VIOLATION reading 15E0E345 (a MEM_RESERVE page, Protect=0)
-  //   #00 IsSpatialMapSentinel        moho/mesh/Mesh.cpp:734
-  //   #01 SpatialMapNextNode          moho/mesh/Mesh.cpp:755
-  //   #02 EraseSpatialMapRange        moho/mesh/Mesh.cpp:1081
-  //   #03 DestroySpatialMapTree       moho/mesh/Mesh.cpp:1149
-  //   #04 SpatialShardData::~SpatialShardData   moho/mesh/Mesh.cpp:3054
-  //   #06 SpatialShard::~SpatialShard          moho/mesh/Mesh.cpp:2896
-  //   #10 DestroySpatialDbMeshStorage          moho/mesh/Mesh.cpp:2468
-  //   #11 SpatialDB_MeshInstance::DestroyStorage moho/mesh/Mesh.cpp:3491
-  //   #12 CWldSession::~CWldSession    moho/sim/CWldSession.cpp:14931
-  //   #16 WLD_Teardown                 moho/sim/CWldSession.cpp:22126
-  //
-  // Queueing props, projectiles and effects here retires their mesh instances
-  // before `~CWldSession` tears the spatial DB down, and that walk then runs
-  // off its tree. That is a defect in the spatial map, not a reason the
-  // binary's shutdown is wrong - but it has to be fixed before this filter can
-  // come off, so the filter stays and this note records why.
+  // Retire props and other entities too: the driver's final Sync publishes
+  // their interface removals before world teardown releases the blueprints.
   if (mEntityDB != nullptr) {
     for (auto& entry : mEntityDB->mAllUnits) {
       // `DoReserveId` (0x00684480) inserts `{id, nullptr}` before
@@ -10729,7 +10709,7 @@ void Sim::Shutdown()
       // still be in the tree. The binary does not test for it; this does,
       // because it costs one compare and the alternative is a null `this`.
       Entity* const entity = entry.second;
-      if (entity != nullptr && entity->IsUnit() != nullptr) {
+      if (entity != nullptr) {
         entity->Destroy();
       }
     }
