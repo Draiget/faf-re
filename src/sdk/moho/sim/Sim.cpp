@@ -26336,23 +26336,20 @@ namespace moho
       return; // No-rush rejection; the by-value `data` destructs on return.
     }
 
-    // Decode the selected units into an entity-id set and dispatch to the driver.
-    // NOTE: the binary callsite discards a return-by-value command cookie; the
-    // recovered 3-arg driver IssueCommand returns void, so nothing is discarded.
+    // The driver returns the beat that acknowledges this issue. Queue edits
+    // and the helper's retirement use that beat (0x008B0405/0x008B0451),
+    // while the published command keeps its packed source/id identity.
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
     func_DecodeEntIdSet(issuedEntitySet, units);
 
-    if (ISTIDriver* const simDriver = WLD_GetDriver()) {
-      simDriver->IssueCommand(issuedEntitySet, data, clearQueue);
-    }
+    const CmdId issueBeat = WLD_GetDriver()->IssueCommand(issuedEntitySet, data, clearQueue);
 
     // Publish the constant command descriptor and find/create its helper.
     SSTICommandConstantData commandConstantData{};
     InitializePublishedCommandDescriptorFromIssueData(&commandConstantData, &data);
 
-    const std::int32_t commandId = data.nextCommandId;
     UserCommandIssueHelper* const commandHelper =
-      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, commandId);
+      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, issueBeat);
 
     // Overwrite the helper's variable payload from the issue data and mark dirty.
     commandHelper->mVariableData = SSTICommandVariableData(data);
@@ -26400,12 +26397,12 @@ namespace moho
       }
 
       if (clearQueue) {
-        ResetUserUnitManagerState(unitManager, commandId);
+        ResetUserUnitManagerState(unitManager, issueBeat);
       }
       // The add's last argument is `data.mIndex` (`[esp+0x148]`, i.e. data+0x08
       // once LTCG's `units, clearQueue, data` stack order is accounted for),
       // not the clear flag; -1 appends.
-      UserUnitManagerAdd(unitManager, commandHelper, commandId, data.mIndex);
+      UserUnitManagerAdd(unitManager, commandHelper, issueBeat, data.mIndex);
     }
 
     UI_OnCommandIssued(units, data, clearQueue);

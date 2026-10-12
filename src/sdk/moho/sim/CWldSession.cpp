@@ -10335,16 +10335,15 @@ namespace moho
 
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
     func_DecodeEntIdSet(issuedEntitySet, units);
-    if (ISTIDriver* const simDriver = sSimDriver.get()) {
-      simDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
-    }
+    // The returned execution beat expires local edits and retires the helper;
+    // the packed command id remains in the published descriptor.
+    const CmdId issueBeat = sSimDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
 
     SSTICommandConstantData commandConstantData{};
     InitializePublishedCommandDescriptorFromIssueData(&commandConstantData, &commandIssueData);
 
-    const CmdId commandId = static_cast<CmdId>(commandIssueData.nextCommandId);
     UserCommandIssueHelper* const commandHelper =
-      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, commandId);
+      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, issueBeat);
     commandHelper->mVariableData = SSTICommandVariableData(commandIssueData);
     commandHelper->mVariableDataDirty = 1u;
 
@@ -10356,12 +10355,12 @@ namespace moho
 
       if (GetUserUnitManagerQueueSize(factoryQueue) <= 500) {
         if (clearQueue) {
-          ResetUserUnitManagerState(factoryQueue, commandId);
+          ResetUserUnitManagerState(factoryQueue, issueBeat);
         }
-        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, commandIssueData.mIndex);
+        UserUnitManagerAdd(factoryQueue, commandHelper, issueBeat, commandIssueData.mIndex);
       } else if (clearQueue) {
-        ResetUserUnitManagerState(factoryQueue, commandId);
-        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, commandIssueData.mIndex);
+        ResetUserUnitManagerState(factoryQueue, issueBeat);
+        UserUnitManagerAdd(factoryQueue, commandHelper, issueBeat, commandIssueData.mIndex);
       }
     }
 
