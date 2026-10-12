@@ -184,30 +184,6 @@ namespace
     return static_cast<int>(std::lrintf(value));
   }
 
-  class UnitAttackTaskStateGate
-  {
-  public:
-    virtual ~UnitAttackTaskStateGate() = default;
-    virtual void Reserved00() = 0;
-    virtual void Reserved04() = 0;
-    virtual void Reserved08() = 0;
-    virtual void Reserved0C() = 0;
-    virtual void Reserved10() = 0;
-    virtual void Reserved14() = 0;
-    virtual void Reserved18() = 0;
-    virtual void Reserved1C() = 0;
-    virtual void Reserved20() = 0;
-    virtual void Reserved24() = 0;
-    virtual void Reserved28() = 0;
-    virtual void Reserved2C() = 0;
-    virtual bool IsAttackTaskStateReady() = 0;
-  };
-
-  [[nodiscard]] bool IsOwnerAttackTaskStateReady(moho::Unit* const unit) noexcept
-  {
-    return reinterpret_cast<UnitAttackTaskStateGate*>(unit)->IsAttackTaskStateReady();
-  }
-
   void WakeOwnerThreadForImmediateTick(moho::CCommandTask* const commandTask)
   {
     if (commandTask == nullptr || commandTask->mOwnerThread == nullptr) {
@@ -861,10 +837,6 @@ namespace moho
       return;
     }
 
-    auto ownerStateReady = [commandTask]() -> bool {
-      return IsOwnerAttackTaskStateReady(commandTask->mUnit);
-    };
-
     if (mTarget.HasTarget()) {
       switch (static_cast<std::int32_t>(event)) {
         case 1:
@@ -873,7 +845,7 @@ namespace moho
 
         case 2:
         case 4:
-          if (ownerStateReady()) {
+          if (commandTask->mUnit->IsMobile()) {
             commandTask->mTaskState = TASKSTATE_Waiting;
           } else {
             *commandTask->mDispatchResult = static_cast<EAiResult>(2);
@@ -882,18 +854,9 @@ namespace moho
           break;
 
         case 3:
-          // Jump table (PE @ 0x005F3FE0, index 2 -> 0x005F3F71..0x005F3F8A):
-          // ready -> `mov [edi-0x10], 2` = TASKSTATE_Starting, not ready ->
-          // `mov [edi-0x10], 4` = TASKSTATE_Complete. There is no dispatch
-          // result write in either arm. "Cannot attack right now" (a bomber
-          // sitting inside its bomb MinRadius over the target is exactly
-          // this) must send the task back through Starting to re-navigate and
-          // re-approach; the fail/abort this recovery had here ended the
-          // attack order instead, so the bomber parked over its target with
-          // no desired target, never re-entered an attack run, and never
-          // dropped bombs again until the player re-issued the order.
-          if (ownerStateReady()) {
-            commandTask->mTaskState = TASKSTATE_Starting;
+          if (commandTask->mUnit->IsMobile()) {
+            *commandTask->mDispatchResult = static_cast<EAiResult>(2);
+            commandTask->mTaskState = TASKSTATE_5;
           } else {
             commandTask->mTaskState = TASKSTATE_Complete;
           }
@@ -909,7 +872,7 @@ namespace moho
           break;
 
         case 7:
-          if (ownerStateReady()) {
+          if (commandTask->mUnit->IsMobile()) {
             commandTask->mTaskState = TASKSTATE_Starting;
           } else {
             *commandTask->mDispatchResult = static_cast<EAiResult>(2);
@@ -926,7 +889,7 @@ namespace moho
           break;
       }
     } else {
-      commandTask->mTaskState = ownerStateReady() ? TASKSTATE_Processing : TASKSTATE_5;
+      commandTask->mTaskState = commandTask->mUnit->IsMobile() ? TASKSTATE_Processing : TASKSTATE_5;
     }
 
     WakeOwnerThreadForImmediateTick(commandTask);
