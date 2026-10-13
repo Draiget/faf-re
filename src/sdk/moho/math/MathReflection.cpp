@@ -1341,31 +1341,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00A8DCD0 (FUN_00A8DCD0, acos)
- *
- * What it does:
- * Preserves the CRT's SSE2/control-word dispatch gate and computes arccosine
- * for the supplied angle lane.
- */
-// Optimizing builds turn `acos` into an intrinsic, which makes defining it an
-// error. The engine ships its own body, so ask for the real function.
-#pragma function(acos)
-extern "C" double __cdecl acos(double value)
-{
-  if (global_mode_sse2 != 0) {
-    const unsigned int mxcsr = _mm_getcsr() & 0x1F80u;
-    if (mxcsr == 0x1F80u) {
-      unsigned int controlWord = 0;
-      if (_controlfp_s(&controlWord, 0, 0) == 0 && (controlWord & 0x7Fu) == 0x7Fu) {
-        return msvc8::atan2(std::sqrt(1.0 - (value * value)), value);
-      }
-    }
-  }
-
-  return msvc8::atan2(std::sqrt(1.0 - (value * value)), value);
-}
-
-/**
  * Address: 0x00A840A0 (FUN_00A840A0, ceil)
  *
  * What it does:
