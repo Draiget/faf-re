@@ -1432,7 +1432,16 @@ bool CAiSteeringImpl::ProcessSplineMovement()
   bool doPathRefresh = false;
   bool allowContinuation = false;
 
+  if (sim) {
+    // 0x005D2C09..0x005D2C1D entry trace ("  0x%08x->ProcessSplineMovement()\n").
+    sim->Logf("  0x%08x->ProcessSplineMovement()\n", static_cast<std::uint32_t>(mOwnerUnit->GetEntityId()));
+  }
+
   if (motion && motion->mIsBeingPushed != 0) {
+    if (sim) {
+      // 0x005D2C38 pushes "    pushed!\n" before the Stop() decision.
+      sim->Logf("    pushed!\n");
+    }
     if (mPath) {
       Stop();
     }
@@ -1530,6 +1539,12 @@ bool CAiSteeringImpl::ProcessSplineMovement()
  */
 bool CAiSteeringImpl::DriveToNextWaypoint()
 {
+  if (mOwnerUnit && mOwnerUnit->SimulationRef) {
+    // 0x005D3008..0x005D301A entry trace ("  0x%08x->DriveToNextWaypoint()\n").
+    mOwnerUnit->SimulationRef->Logf(
+      "  0x%08x->DriveToNextWaypoint()\n", static_cast<std::uint32_t>(mOwnerUnit->GetEntityId()));
+  }
+
   const bool processResult = ProcessSplineMovement();
   const bool refreshPending = mNeedsWaypointRefresh != 0;
 

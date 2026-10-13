@@ -8,6 +8,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/IAiSteering.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -507,6 +508,11 @@ bool CAiNavigatorLand::NavigatorMakeIdle()
  */
 int CAiNavigatorLand::Execute()
 {
+  if (mUnit && mUnit->SimulationRef) {
+    // 0x005A428E..0x005A42A3 logs before any early return ("0x%08x's nav tick.\n").
+    mUnit->SimulationRef->Logf("0x%08x's nav tick.\n", static_cast<std::uint32_t>(mUnit->GetEntityId()));
+  }
+
   if (!mUnit || !mPathNavigator) {
     return 1;
   }
