@@ -1416,6 +1416,9 @@
     <ClCompile Include="gpg\core\diagnostics\CrashHooks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\core\diagnostics\CrashReport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\script\CScriptEvent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3154,6 +3157,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\diagnostics\CrashHooks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\diagnostics\CrashReport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\String.h">

@@ -26,6 +26,7 @@
 
 #include "CScApp.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
+#include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -242,10 +243,56 @@ namespace
    *
    * What it does:
    * Fatal die-handler callback registered by WinMain.
+   *
+   * Deviation from the 2007 binary (documented): also writes the local crash
+   * report (`faf_crash.txt`) before the dialog, so an engine `Die()` leaves a
+   * persistent record instead of only a transient message box.
    */
   void FatalErrorDieHandler(const char* const message)
   {
+    gpg::diag::CrashReportContext reportContext{};
+    reportContext.reason = (message != nullptr) ? message : "engine Die()";
+    (void)gpg::diag::WriteCrashReport(reportContext);
+    (void)gpg::diag::WriteCrashMinidump(nullptr);
     moho::WIN_ShowCrashDialog(2, nullptr, "Fatal Error", message != nullptr ? message : "");
+  }
+
+  /**
+   * `/crashtest <kind>` (deviation, documented): drives one crash path on
+   * purpose, so the report contents can be verified per kind. Kinds:
+   *   nullread         - access violation reading address 0
+   *   nullwrite        - access violation writing address 0
+   *   intdiv           - integer divide by zero
+   *   purecall         - pure virtual call (CRT fatal)
+   *   terminate        - std::terminate (uncaught exception)
+   *   lua_table_corrupt- reserved for the Phase 2 Lua section (currently
+   *                      behaves as nullread inside a Lua table helper)
+   */
+  [[noreturn]]
+  void RunCrashTest(const char* const kind)
+  {
+    gpg::diag::DiagLine("[CRASHTEST] kind=%s", (kind != nullptr) ? kind : "(none)");
+
+    if (kind != nullptr && std::strcmp(kind, "nullwrite") == 0) {
+      *static_cast<volatile int*>(nullptr) = 1;
+    } else if (kind != nullptr && std::strcmp(kind, "intdiv") == 0) {
+      volatile int zero = 0;
+      volatile int one = 1;
+      (void)(one / zero);
+    } else if (kind != nullptr && std::strcmp(kind, "purecall") == 0) {
+      // Directly into the CRT purecall handler (the same one CrashHooks
+      // installs its logger under); a constructed-dangling-vtable route is
+      // UB-shaped and less deterministic than the handler itself.
+      extern void __cdecl _purecall();
+      _purecall();
+    } else if (kind != nullptr && std::strcmp(kind, "terminate") == 0) {
+      throw std::runtime_error("crashtest: uncaught exception");
+    } else { // default: nullread
+      (void)*static_cast<volatile const int*>(nullptr);
+    }
+
+    // If a kind somehow survived, force the issue.
+    std::abort();
   }
 
   /**
@@ -341,6 +388,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   gpg::diag::CrtDiagOptions diagOptions{};
   diagOptions.enableHeapCheck = moho::CFG_GetArgOption("/heapcheck", 0, nullptr);
   gpg::diag::InstallCrtDiagnosticHooks(diagOptions);
+
+  // `/crashtest <kind>`: verify one crash path's report before anything
+  // else can interfere. The SEH filter is normally installed inside
+  // WIN_AppExecute, so install it here first to make the test deterministic.
+  if (moho::CFG_GetArgOption("/crashtest", 0, nullptr)) {
+    msvc8::vector<msvc8::string> crashTestArgs;
+    const char* kind = "nullread";
+    if (moho::CFG_GetArgOption("/crashtest", 1, &crashTestArgs) && !crashTestArgs.empty()) {
+      kind = crashTestArgs[0].c_str();
+    }
+    moho::PLAT_Init();
+    moho::PLAT_CatchStructuredExceptions();
+    RunCrashTest(kind);
+  }
 
   if (moho::CFG_GetArgOption("/waitfordebugger", 0, nullptr)) {
     ::MessageBoxW(nullptr, L"Attach the debugger and click OK.", L"Waiting", 0);

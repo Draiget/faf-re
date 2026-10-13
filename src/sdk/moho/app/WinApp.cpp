@@ -33,6 +33,7 @@
 #include "boost/mutex.h"
 #include "CWaitHandleSet.h"
 #include "CScApp.h"
+#include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/time/Timer.h"
 #include "IWinApp.h"
@@ -983,13 +984,6 @@ namespace
   constexpr wchar_t kPathSeparator = L'\\';
   constexpr wchar_t kDxdiagOutputFileName[] = L"dxdiag.txt";
   constexpr wchar_t kDxdiagCommandPrefix[] = L"dxdiag.exe ";
-  constexpr std::uint32_t kBugSplatPrepareAttachmentsEvent = 0x100;
-  constexpr std::uint32_t kBugSplatQueryAttachmentPathEvent = 0x1101;
-  constexpr char kBugSplatModuleName[] = "BugSplat.dll";
-  constexpr char kMiniDmpSenderCtorExport[] = "??0MiniDmpSender@@QAE@PBD000K@Z";
-  constexpr char kMiniDmpSenderDtorExport[] = "??1MiniDmpSender@@UAE@XZ";
-  constexpr char kMiniDmpSenderSetCallbackExport[] = "?setCallback@MiniDmpSender@@QAEXP6A_NIPAX0@Z@Z";
-  constexpr char kMiniDmpSenderCreateReportExport[] = "?createReport@MiniDmpSender@@QAEXPAU_EXCEPTION_POINTERS@@@Z";
   std::wstring sLegacyErrorReportOutputDir{};
 
   /**
@@ -1544,186 +1538,6 @@ namespace
     return parsed;
   }
 
-  using BugSplatAttachmentCallbackFn = bool(__cdecl*)(std::uint32_t, void*, void*);
-  void DestroyBugSplatMiniDmpSenderAtExit();
-
-
-  /**
-   * Address: 0x010A87B8 (`bugsplat_miniDmpSender`)
-   *
-   * What it does:
-   * Process-global opaque `MiniDmpSender` object storage used by BugSplat
-   * methods. IDA data-item sizing marks this global at 8 bytes.
-   */
-  struct BugSplatMiniDmpSender
-  {
-    std::byte mOpaqueStorage[0x8]{};
-  };
-
-  static_assert(
-    sizeof(BugSplatMiniDmpSender) == 0x8,
-    "BugSplatMiniDmpSender size must be 0x8"
-  );
-
-  class BugSplatApi
-  {
-  public:
-    using MiniDmpSenderCtorFn =
-      void* (__thiscall*)(void*, const char*, const char*, const char*, const char*, unsigned long);
-    using MiniDmpSenderDtorFn = void(__thiscall*)(void*);
-    using MiniDmpSenderSetCallbackFn = void(__thiscall*)(void*, BugSplatAttachmentCallbackFn);
-    using MiniDmpSenderCreateReportFn = void(__thiscall*)(void*, _EXCEPTION_POINTERS*);
-
-    [[nodiscard]]
-    bool Resolve()
-    {
-      if (resolveAttempted_) {
-        return ctor_ != nullptr && dtor_ != nullptr && setCallback_ != nullptr && createReport_ != nullptr;
-      }
-
-      resolveAttempted_ = true;
-      module_ = ::GetModuleHandleA(kBugSplatModuleName);
-      if (module_ == nullptr) {
-        module_ = ::LoadLibraryA(kBugSplatModuleName);
-      }
-      if (module_ == nullptr) {
-        return false;
-      }
-
-      ctor_ = reinterpret_cast<MiniDmpSenderCtorFn>(::GetProcAddress(module_, kMiniDmpSenderCtorExport));
-      dtor_ = reinterpret_cast<MiniDmpSenderDtorFn>(::GetProcAddress(module_, kMiniDmpSenderDtorExport));
-      setCallback_ =
-        reinterpret_cast<MiniDmpSenderSetCallbackFn>(::GetProcAddress(module_, kMiniDmpSenderSetCallbackExport));
-      createReport_ =
-        reinterpret_cast<MiniDmpSenderCreateReportFn>(::GetProcAddress(module_, kMiniDmpSenderCreateReportExport));
-
-      return ctor_ != nullptr && dtor_ != nullptr && setCallback_ != nullptr && createReport_ != nullptr;
-    }
-
-    /**
-     * Address: 0x00A814F0 (FUN_00A814F0, ??0MiniDmpSender@@QAE@PBD000K@Z)
-     *
-     * What it does:
-     * Typed import-thunk model for `MiniDmpSender` constructor export.
-     */
-    void Construct(
-      BugSplatMiniDmpSender* const senderStorage,
-      const char* const database,
-      const char* const appName,
-      const char* const versionText,
-      const char* const userName,
-      const unsigned long flags
-    ) const
-    {
-      (void)ctor_(static_cast<void*>(senderStorage), database, appName, versionText, userName, flags);
-    }
-
-    /**
-     * Address: 0x00A814EA (FUN_00A814EA, ??1MiniDmpSender@@UAE@XZ)
-     *
-     * What it does:
-     * Typed import-thunk model for `MiniDmpSender` destructor export.
-     */
-    void Destroy(BugSplatMiniDmpSender* const senderStorage) const
-    {
-      dtor_(static_cast<void*>(senderStorage));
-    }
-
-    /**
-     * Address: 0x00A814DE (FUN_00A814DE, ?setCallback@MiniDmpSender@@QAEXP6A_NIPAX0@Z@Z)
-     *
-     * What it does:
-     * Typed import-thunk model for `MiniDmpSender::setCallback` export.
-     */
-    void SetCallback(BugSplatMiniDmpSender* const senderStorage, const BugSplatAttachmentCallbackFn callback)
-      const
-    {
-      setCallback_(static_cast<void*>(senderStorage), callback);
-    }
-
-    /**
-     * Address: 0x00A814E4 (FUN_00A814E4, ?createReport@MiniDmpSender@@QAEXPAU_EXCEPTION_POINTERS@@@Z)
-     *
-     * What it does:
-     * Typed import-thunk model for `MiniDmpSender::createReport` export.
-     */
-    void CreateReport(BugSplatMiniDmpSender* const senderStorage, _EXCEPTION_POINTERS* const exceptionInfo)
-      const
-    {
-      createReport_(static_cast<void*>(senderStorage), exceptionInfo);
-    }
-
-  private:
-    HMODULE module_ = nullptr;
-    bool resolveAttempted_ = false;
-    MiniDmpSenderCtorFn ctor_ = nullptr;
-    MiniDmpSenderDtorFn dtor_ = nullptr;
-    MiniDmpSenderSetCallbackFn setCallback_ = nullptr;
-    MiniDmpSenderCreateReportFn createReport_ = nullptr;
-  };
-
-  class BugSplatMiniDmpSenderRegistry
-  {
-  public:
-    [[nodiscard]]
-    bool Register()
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      return RegisterLocked();
-    }
-
-    [[nodiscard]]
-    bool SetCallbackAndCreateReport(_EXCEPTION_POINTERS* const exceptionInfo, const BugSplatAttachmentCallbackFn callback)
-    {
-      if (exceptionInfo == nullptr || callback == nullptr) {
-        return false;
-      }
-
-      std::lock_guard<std::mutex> lock(mutex_);
-      if (!RegisterLocked()) {
-        return false;
-      }
-
-      api_.SetCallback(&sender_, callback);
-      api_.CreateReport(&sender_, exceptionInfo);
-      return true;
-    }
-
-    void DestroyAtProcessExit()
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      if (!isRegistered_) {
-        return;
-      }
-
-      api_.Destroy(&sender_);
-      isRegistered_ = false;
-    }
-
-  private:
-    [[nodiscard]]
-    bool RegisterLocked()
-    {
-      if (isRegistered_) {
-        return true;
-      }
-      if (!api_.Resolve()) {
-        return false;
-      }
-
-      const msvc8::string versionText = gpg::STR_Printf("%i", 3620);
-      api_.Construct(&sender_, "gaspowered", "SupremeCommander", versionText.c_str(), nullptr, 0x20u);
-      isRegistered_ = true;
-      (void)std::atexit(&DestroyBugSplatMiniDmpSenderAtExit);
-      return true;
-    }
-
-    std::mutex mutex_;
-    BugSplatApi api_{};
-    BugSplatMiniDmpSender sender_{};
-    bool isRegistered_ = false;
-  };
-
   class CrashReportAttachmentRegistry
   {
   public:
@@ -1793,8 +1607,6 @@ namespace
   };
 
   CrashReportAttachmentRegistry sCrashReportAttachments;
-  BugSplatMiniDmpSenderRegistry sBugSplatMiniDmpSenderRegistry;
-
   /**
    * Address: 0x004A1CA0 (FUN_004A1CA0, sub_4A1CA0)
    *
@@ -1854,53 +1666,6 @@ namespace
     if (moho::FILE_GetFileInfo(outputPathUtf8.c_str(), nullptr, false)) {
       moho::PLAT_RegisterFileForErrorReport(outputPath.c_str());
     }
-  }
-
-  /**
-   * Address: 0x004A1610 (FUN_004A1610, sub_4A1610)
-   *
-   * What it does:
-   * Handles BugSplat attachment callback events:
-   * - `0x100`: regenerates attachment files and reports attachment count.
-   * - `0x1101`: returns one attachment path as a `GlobalAlloc` wide string.
-   */
-  bool BugSplatAttachmentCallback(const std::uint32_t callbackCode, void* const outPayload, void* const callbackData)
-  {
-    if (callbackCode == kBugSplatPrepareAttachmentsEvent) {
-      moho::PLAT_CreateGameLogForReport();
-      PLAT_CreateDxdiagForReport();
-      if (outPayload != nullptr) {
-        *static_cast<std::size_t*>(outPayload) = sCrashReportAttachments.GetFileCount();
-      }
-      return true;
-    }
-
-    if (callbackCode != kBugSplatQueryAttachmentPathEvent || outPayload == nullptr) {
-      return false;
-    }
-
-    const auto oneBasedIndex = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callbackData));
-    std::wstring selectedPath;
-    if (!sCrashReportAttachments.GetFileByOneBasedIndex(oneBasedIndex, &selectedPath)) {
-      return false;
-    }
-
-    const std::size_t payloadBytes = (selectedPath.size() + 1) * sizeof(wchar_t);
-    const HGLOBAL globalText = ::GlobalAlloc(0, payloadBytes);
-    *static_cast<HGLOBAL*>(outPayload) = globalText;
-    if (globalText == nullptr) {
-      return false;
-    }
-
-    wchar_t* const destination = static_cast<wchar_t*>(::GlobalLock(globalText));
-    if (destination == nullptr) {
-      return false;
-    }
-
-    // Raw clipboard blob copy (wchar path text incl. NUL) into the HGLOBAL.
-    std::copy_n(selectedPath.c_str(), payloadBytes / sizeof(wchar_t), destination);
-    (void)::GlobalUnlock(globalText);
-    return true;
   }
 
   /**
@@ -2139,21 +1904,11 @@ namespace
   }
 
   /**
-   * Address: 0x004A1740 (FUN_004A1740, sub_4A1740)
-   *
-   * What it does:
-   * Enables BugSplat reporting when `/bugreport` is present, otherwise keeps
-   * BugSplat enabled unless `/nobugreport` is present.
+   * Suspends every thread of this process except the calling one, so a crash
+   * report can walk their stacks without them moving. Counterpart to
+   * `ResumeSiblingThreads` semantics: callers must terminate the process
+   * afterwards; the retail BugSplat path never resumed them either.
    */
-  [[nodiscard]]
-  bool ShouldUseBugSplatPath()
-  {
-    if (moho::CFG_GetArgOption("/bugreport", 0, nullptr)) {
-      return true;
-    }
-    return !moho::CFG_GetArgOption("/nobugreport", 0, nullptr);
-  }
-
   void SuspendSiblingThreadsForCrashReport()
   {
     const HANDLE snapshot = ::CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
@@ -2210,47 +1965,6 @@ namespace
     if (loadedNow && faultReportingModule != nullptr) {
       (void)::FreeLibrary(faultReportingModule);
     }
-  }
-
-  /**
-   * Address: 0x00BF0280 (FUN_00BF0280, DestroyBugSplatMiniDmpSenderAtExit)
-   *
-   * What it does:
-   * Process-exit callback that tears down the process-global BugSplat sender.
-   */
-  void DestroyBugSplatMiniDmpSenderAtExit()
-  {
-    sBugSplatMiniDmpSenderRegistry.DestroyAtProcessExit();
-  }
-
-  /**
-   * Address: 0x00BC5850 (FUN_00BC5850, register_MiniDmpSender)
-   *
-   * What it does:
-   * Constructs the process-global BugSplat sender using build-version text
-   * and registers an `atexit` callback for destructor teardown.
-   */
-  void register_MiniDmpSender()
-  {
-    (void)sBugSplatMiniDmpSenderRegistry.Register();
-  }
-
-  /**
-   * Address: 0x004A1780 (FUN_004A1780, sub_4A1780)
-   *
-   * What it does:
-   * Calls `ReportFault`, then dispatches BugSplat callback+report creation on
-   * the process-global `MiniDmpSender`.
-   */
-  void ReportFaultAndCreateBugSplatReport(_EXCEPTION_POINTERS* const exceptionInfo)
-  {
-    if (exceptionInfo == nullptr) {
-      return;
-    }
-
-    TryReportFault(exceptionInfo);
-    register_MiniDmpSender();
-    (void)sBugSplatMiniDmpSenderRegistry.SetCallbackAndCreateReport(exceptionInfo, &BugSplatAttachmentCallback);
   }
 
   /**
@@ -2459,8 +2173,15 @@ namespace
    * Address: 0x004A2B30 (FUN_004A2B30, TopLevelExceptionFilter)
    *
    * What it does:
-   * Handles unhandled structured exceptions and chooses BugSplat/report-fault
-   * flow or local crash-dialog flow based on startup command-line switches.
+   * Handles unhandled structured exceptions: writes the local crash report
+   * first, then offers WER ReportFault when `/bugreport` is present, then
+   * shows the local crash-report dialog.
+   *
+   * Deviation from the 2007 binary (documented): the BugSplat
+   * `MiniDmpSender` arm is removed. The FAF distribution carries no
+   * BugSplat.dll and no reachable endpoint, and the sender blocks forever
+   * waiting for a report that never completes - a crash presented as a
+   * silent freeze. The local report replaces it unconditionally.
    */
   LONG WINAPI TopLevelExceptionFilter(_EXCEPTION_POINTERS* const exceptionInfo)
   {
@@ -2468,59 +2189,39 @@ namespace
       return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    // Record the fault before anything else runs. The BugSplat sender below
-    // blocks in WaitForSingleObject waiting on a report this build never
-    // completes, so a crash taken down that path presents as a freeze with an
-    // empty log - the process is alive, the window is gone, and nothing says
-    // why. Logging first means every crash leaves a symbolised record no
-    // matter which path handles it, and it costs nothing on the path that
-    // does show a dialog.
+    // The full report first, before anything that can block or fail: all
+    // threads, registers, modules, log tail. Everything after this line is
+    // best-effort.
+    gpg::diag::CrashReportContext reportContext{};
+    reportContext.exceptionInfo = exceptionInfo;
+    (void)gpg::diag::WriteCrashReport(reportContext);
+    (void)gpg::diag::WriteCrashMinidump(exceptionInfo);
+
+    // Same record into the engine log and the legacy per-crash file.
     LogCrashSummaryAndCallstack(exceptionInfo);
 
-    if (ShouldUseBugSplatPath()) {
-      if (moho::sMainWindow != nullptr) {
-        (void)::DestroyWindow(
-          reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
-        );
-      }
-
-      SuspendSiblingThreadsForCrashReport();
-      ReportFaultAndCreateBugSplatReport(exceptionInfo);
-      return EXCEPTION_EXECUTE_HANDLER;
+    if (moho::sMainWindow != nullptr) {
+      (void)::DestroyWindow(
+        reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
+      );
     }
 
-    const DWORD exceptionCode = exceptionInfo->ExceptionRecord->ExceptionCode;
-    if (exceptionCode == EXCEPTION_BREAKPOINT) {
+    if (moho::CFG_GetArgOption("/bugreport", 0, nullptr)) {
+      // Windows Error Reporting, opt-in (the retail default reached for a
+      // BugSplat sender that never completes in the FAF distribution). The
+      // game log and dxdiag are still generated and registered as report
+      // attachments, as the BugSplat callback used to do.
+      moho::PLAT_CreateGameLogForReport();
+      PLAT_CreateDxdiagForReport();
+      SuspendSiblingThreadsForCrashReport();
+      TryReportFault(exceptionInfo);
+    }
+
+    if (exceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT) {
       return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    const std::uintptr_t exceptionAddressRaw =
-      reinterpret_cast<std::uintptr_t>(exceptionInfo->ExceptionRecord->ExceptionAddress);
-    char message[256]{};
-    std::snprintf(
-      message,
-      sizeof(message),
-      "%s (0x%08X) at address %p",
-      StructuredExceptionToString(exceptionCode),
-      static_cast<unsigned int>(exceptionCode),
-      static_cast<unsigned int>(exceptionAddressRaw)
-    );
-
-    std::string dialogText(message);
-    if (exceptionCode == EXCEPTION_ACCESS_VIOLATION && exceptionInfo->ExceptionRecord->NumberParameters >= 2u) {
-      const char* const operation = exceptionInfo->ExceptionRecord->ExceptionInformation[0] == 0 ? "read" : "write";
-      char accessViolationDetails[128]{};
-      std::snprintf(
-        accessViolationDetails,
-        sizeof(accessViolationDetails),
-        "\n    attempted to %s memory at %p",
-        operation,
-        static_cast<unsigned int>(exceptionInfo->ExceptionRecord->ExceptionInformation[1])
-      );
-      dialogText += accessViolationDetails;
-    }
-
-    moho::WIN_ShowCrashDialog(0, exceptionInfo, "Unhandled Exception", dialogText.c_str());
+    gpg::diag::ShowCrashReportDialog(gpg::diag::CrashReportPath());
     return EXCEPTION_CONTINUE_SEARCH;
   }
 

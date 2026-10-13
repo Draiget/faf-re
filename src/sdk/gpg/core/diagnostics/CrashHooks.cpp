@@ -18,6 +18,7 @@
 #include <exception>
 
 #include "gpg/core/diagnostics/CrashHooks.h"
+#include "gpg/core/diagnostics/CrashReport.h"
 
 namespace gpg::diag
 {
@@ -223,6 +224,10 @@ namespace gpg::diag
     {
       DiagLine("[CRTDIAG] std::terminate (uncaught exception or noexcept violation)");
       DiagLogStack("terminate");
+      // Leave the persistent record before the CRT kills the process.
+      CrashReportContext reportContext{};
+      reportContext.reason = "std::terminate (uncaught exception or noexcept violation)";
+      (void)WriteCrashReport(reportContext);
       // Let the CRT's own terminate run so behaviour is unchanged.
       (void)std::signal(SIGABRT, SIG_DFL);
       std::abort();
@@ -232,6 +237,9 @@ namespace gpg::diag
     {
       DiagLine("[CRTDIAG] pure virtual call");
       DiagLogStack("purecall");
+      CrashReportContext reportContext{};
+      reportContext.reason = "pure virtual call";
+      (void)WriteCrashReport(reportContext);
     }
 
     // First-chance, log-only. Always continues the search, so the debugger still
