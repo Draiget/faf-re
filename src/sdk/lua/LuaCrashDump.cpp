@@ -26,6 +26,7 @@ namespace
   {
     void* volatile states[kMaxLuaVms] = {};
     DWORD threadIds[kMaxLuaVms] = {};
+    char names[kMaxLuaVms][24] = {}; // diagnostics-only display name
     volatile LONG activeCount = 0;
   };
 
@@ -296,6 +297,18 @@ namespace
     }
   }
 
+  // Display name for a registry slot, or a stable fallback.
+  const char* VmNameAt(const int index)
+  {
+    VmRegistry& registry = VmRegistryInstance();
+    if (index >= 0 && index < kMaxLuaVms && registry.names[index][0] != '\0') {
+      return registry.names[index];
+    }
+    static char fallback[16] = {};
+    (void)::sprintf_s(fallback, sizeof(fallback), "VM %d", index);
+    return fallback;
+  }
+
   void DescribeVm(std::FILE* const sink, lua_State* const state, const int index)
   {
     if (IsPlausiblePointer(state)) {
@@ -306,7 +319,7 @@ namespace
         // hint, not a claim that Lua is executing right now.
         const bool lastActive = IsPlausiblePointer(state->l_G) && state->l_G->lstate == state;
         DumpLine(
-          sink, "  VM %d: opened on tid %lu (root was last active: %s)", index, registry.threadIds[index],
+          sink, "  %s: opened on tid %lu (root was last active: %s)", VmNameAt(index), registry.threadIds[index],
           lastActive ? "yes" : "no - see coroutine below"
         );
       }
@@ -317,11 +330,11 @@ namespace
   void DescribeVmInternal(std::FILE* const sink, lua_State* const state, const int index, const bool followLstate)
   {
     if (!IsPlausiblePointer(state)) {
-      DumpLine(sink, "VM %d: <bad pointer>", index);
+      DumpLine(sink, "%s: <bad pointer>", VmNameAt(index));
       return;
     }
 
-    DumpLine(sink, "VM %d: %p", index, static_cast<void*>(state));
+    DumpLine(sink, "%s: %p", VmNameAt(index), static_cast<void*>(state));
 
     if (!IsPlausiblePointer(state->l_G) || !IsPlausiblePointer(state->stack)
         || !IsPlausiblePointer(state->base_ci)) {
@@ -502,6 +515,21 @@ namespace lua
                         static_cast<int>(count + 1));
   }
 
+  void NameLuaVm(lua_State* const state, const char* const name)
+  {
+    if (state == nullptr || name == nullptr) {
+      return;
+    }
+    VmRegistry& registry = VmRegistryInstance();
+    const LONG count = registry.activeCount;
+    for (LONG i = 0; i < count && i < kMaxLuaVms; ++i) {
+      if (registry.states[i] == static_cast<void*>(state)) {
+        (void)::strncpy_s(registry.names[i], sizeof(registry.names[i]), name, _TRUNCATE);
+        return;
+      }
+    }
+  }
+
   void UnregisterLuaVm(lua_State* const state)
   {
     if (state == nullptr) {
@@ -511,11 +539,13 @@ namespace lua
     const LONG count = registry.activeCount;
     for (LONG i = 0; i < count; ++i) {
       if (registry.states[i] == static_cast<void*>(state)) {
-        // Swap-with-last keeps the live prefix dense.
+        // Swap-with-last keeps the live prefix dense (name travels with it).
         registry.states[i] = registry.states[count - 1];
         registry.threadIds[i] = registry.threadIds[count - 1];
+        (void)::strcpy_s(registry.names[i], sizeof(registry.names[i]), registry.names[count - 1]);
         registry.states[count - 1] = nullptr;
         registry.threadIds[count - 1] = 0;
+        registry.names[count - 1][0] = '\0';
         ::InterlockedDecrement(&registry.activeCount);
         return;
       }

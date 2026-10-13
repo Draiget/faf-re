@@ -62,6 +62,7 @@
 #include "moho/sim/SpecialFileType.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/CUIManager.h"
+#include "lua/LuaCrashDump.h"
 
 extern int __argc;
 extern char** __argv;
@@ -1519,6 +1520,7 @@ namespace moho
       , mState(LuaPlus::LuaState::LIB_BASE)
       , mRoot()
     {
+      lua::NameLuaVm(mState.m_state, "UserPrefs"); // diagnostics label only
       mRoot.AssignNewTable(&mState, 0, 0);
     }
 
@@ -5738,6 +5740,7 @@ bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const 
   // has created it this early in startup, so it came back null and none of the
   // script's globals were ever read.
   LuaPlus::LuaState localStartupState{LuaPlus::LuaState::LIB_OSIO};
+  lua::NameLuaVm(localStartupState.m_state, "Startup"); // diagnostics label only
   LuaPlus::LuaState* const startupState = &localStartupState;
   if (startupState->m_state == nullptr) {
     return false;

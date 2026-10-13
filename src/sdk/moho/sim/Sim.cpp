@@ -170,6 +170,7 @@
 #include "moho/sim/SimDebugCommandRegistrations.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "lua/LuaCrashDump.h"
 
 using namespace moho;
 using EntId = std::int32_t;
@@ -6831,6 +6832,7 @@ Sim::Sim(LaunchInfoBase* const info)
       delete previousState;
     }
   }
+  lua::NameLuaVm(mLuaState->m_state, "Sim"); // diagnostics label only
   lua_setglobaluserdata(mLuaState->m_state, this);
 
   if (CScrLuaInitFormSet* const coreSet = SCR_FindLuaInitFormSet("Core"); coreSet != nullptr) {

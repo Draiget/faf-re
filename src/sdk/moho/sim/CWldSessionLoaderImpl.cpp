@@ -15,6 +15,7 @@
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "lua/LuaCrashDump.h"
 
 namespace moho
 {
@@ -132,6 +133,7 @@ namespace moho
         delete previousState;
       }
       scenario->mState = createdState;
+      lua::NameLuaVm(createdState->m_state, "Lobby"); // diagnostics label only
 
       {
         const std::string marker(" World Session Load 3", 21u);

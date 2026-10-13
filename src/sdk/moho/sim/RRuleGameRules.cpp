@@ -47,6 +47,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/BlueprintLoaderContext.h"
 #include "moho/sim/CBackgroundTaskControl.h"
+#include "lua/LuaCrashDump.h"
 
 namespace moho
 {
@@ -833,6 +834,7 @@ namespace moho
     new (&RuleMutexView(*this)) boost::mutex();
 
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+    lua::NameLuaVm(mLuaState->m_state, "GameRules"); // diagnostics label only
 
     // `mMaps{}` in the member-init list above already default-constructs a
     // real, empty `msvc8::vector<RRuleGameRulesLuaExportBinding>` (null

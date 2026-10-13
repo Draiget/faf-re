@@ -21,6 +21,7 @@
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
+#include "lua/LuaCrashDump.h"
 
 namespace
 {
@@ -61,6 +62,7 @@ namespace
   [[nodiscard]] LuaPlus::LuaState* GetColorLuaState()
   {
     static LuaPlus::LuaState sColorLuaState(LuaPlus::LuaState::LIB_OSIO);
+    lua::NameLuaVm(sColorLuaState.m_state, "Colors"); // diagnostics label only
     return &sColorLuaState;
   }
 

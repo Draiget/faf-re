@@ -114,6 +114,7 @@
 #include "Wm3Box3.h"
 #include "Wm3IntrLine3Box3.h"
 #include "Wm3Line3.h"
+#include "lua/LuaCrashDump.h"
 
 namespace
 {
@@ -25657,6 +25658,7 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
 
   sUserStage = &sStage;
   gUserLuaState = &sLuaState;
+  lua::NameLuaVm(gUserLuaState->m_state, "UI"); // diagnostics label only
 
   if (SCR_IsDebugWindowActive()) {
     lua_sethook(gUserLuaState->m_state, &DebugLuaHook, 4, 0);

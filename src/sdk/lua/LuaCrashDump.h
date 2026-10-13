@@ -26,6 +26,13 @@ namespace lua
   void RegisterLuaVm(lua_State* state);
   void UnregisterLuaVm(lua_State* state);
 
+  /**
+   * Attaches a diagnostics-only display name ("UI", "Sim", "Lobby", ...) to
+   * one registered root VM. The name lives in the crash-dump registry only -
+   * never in lua_State, never serialized, invisible to the simulation.
+   */
+  void NameLuaVm(lua_State* state, const char* name);
+
   /** Marks `state` as the VM running on the current thread (crash handler). */
   void SetThreadActiveLuaVm(lua_State* state);
 
