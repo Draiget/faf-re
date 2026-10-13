@@ -8,12 +8,15 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as m
 
 | | |
 |---|---|
-| Builds | ✅ `main.exe` links and runs |
+| Builds | ✅ `main.exe` (x86) and `main_x64.exe` link and run |
 | Renders | ✅ main menu, cinematic playback, in-game world view |
+| Plays | ✅ native save/load on both architectures |
+| Gameplay testing | ✅ x86 ↔ x64 lockstep multiplayer: hundreds of consecutive checksum-identical beats, no desync |
+| Retail parity | 🔬 under test — first checksum divergence at beat ~50 (float/RNG finalization); being chased |
 | Source bodies written | ~39,000 functions |
 | Genuinely outstanding | ~430 |
 
-*Snapshot: 23/09/2026.*
+*Snapshot: 13/10/2026.*
 
 Most symbols in the retail engine were never hand-written code — they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, not as hundreds of separate functions, so the function count understates how much is covered.
 
