@@ -62,6 +62,16 @@ namespace gpg::diag
   bool WriteCrashReport(const CrashReportContext& context);
 
   /**
+   * One fatal path end-to-end: write the report, write the minidump, show
+   * the crash-report dialog. The dialog appears only on the call that
+   * actually wrote the report - nested fatals (abort after terminate) stay
+   * silent so the user never sees two dialogs. Use for every non-SEH fatal
+   * path (engine Die, std::terminate, purecall, abort) so all of them leave
+   * the same visible, copyable record.
+   */
+  void HandleFatalPath(const CrashReportContext& context);
+
+  /**
    * Writes `<exe dir>\faf_crash.dmp` via MiniDumpWriteDump. On by default;
    * set FAF_MINIDUMP=0 to disable. (Operator decision 2026-10-13: the dump
    * is what answers the questions the text report cannot.)

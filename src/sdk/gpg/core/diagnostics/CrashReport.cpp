@@ -726,6 +726,16 @@ namespace gpg::diag
     return true;
   }
 
+  void HandleFatalPath(const CrashReportContext& context)
+  {
+    const bool wroteReport = WriteCrashReport(context);
+    if (!wroteReport) {
+      return; // nested fault while a report is already being written
+    }
+    (void)WriteCrashMinidump(context.exceptionInfo);
+    ShowCrashReportDialog(CrashLatestReportPath());
+  }
+
   bool WriteCrashMinidump(_EXCEPTION_POINTERS* const exceptionInfo)
   {
     // FAF_MINIDUMP=0 disables; anything else (including unset) leaves the

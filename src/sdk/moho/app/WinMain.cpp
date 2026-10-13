@@ -294,9 +294,7 @@ namespace
   {
     gpg::diag::CrashReportContext reportContext{};
     reportContext.reason = (message != nullptr) ? message : "engine Die()";
-    (void)gpg::diag::WriteCrashReport(reportContext);
-    (void)gpg::diag::WriteCrashMinidump(nullptr);
-    moho::WIN_ShowCrashDialog(2, nullptr, "Fatal Error", message != nullptr ? message : "");
+    gpg::diag::HandleFatalPath(reportContext);
   }
 
   /**

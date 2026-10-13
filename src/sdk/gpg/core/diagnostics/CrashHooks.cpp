@@ -222,21 +222,21 @@ namespace gpg::diag
       // abort() is a process-killing path too (the CRT raises it for the
       // debug-heap reports and for failed runtime checks - verified by
       // /crashtest intdiv, where the divide never becomes SEH in a Debug
-      // CRT). Leave the same persistent record terminate/purecall do.
+      // CRT). The full fatal path: report, dump, dialog.
       CrashReportContext reportContext{};
       reportContext.reason = "abort() raised (CRT fatal or runtime check)";
-      (void)WriteCrashReport(reportContext);
+      HandleFatalPath(reportContext);
     }
 
     void DiagTerminateHandler()
     {
       DiagLine("[CRTDIAG] std::terminate (uncaught exception or noexcept violation)");
       DiagLogStack("terminate");
-      // Leave the persistent record before the CRT kills the process.
+      // The full fatal path: report, dump, dialog. After the dialog closes,
+      // let the CRT's own terminate run so behaviour is unchanged.
       CrashReportContext reportContext{};
       reportContext.reason = "std::terminate (uncaught exception or noexcept violation)";
-      (void)WriteCrashReport(reportContext);
-      // Let the CRT's own terminate run so behaviour is unchanged.
+      HandleFatalPath(reportContext);
       (void)std::signal(SIGABRT, SIG_DFL);
       std::abort();
     }
@@ -247,7 +247,7 @@ namespace gpg::diag
       DiagLogStack("purecall");
       CrashReportContext reportContext{};
       reportContext.reason = "pure virtual call";
-      (void)WriteCrashReport(reportContext);
+      HandleFatalPath(reportContext);
     }
 
     // First-chance, log-only. Always continues the search, so the debugger still
