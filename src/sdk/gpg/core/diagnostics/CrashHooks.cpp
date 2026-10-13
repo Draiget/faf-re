@@ -219,6 +219,13 @@ namespace gpg::diag
     {
       DiagLine("[CRTDIAG] abort() raised");
       DiagLogStack("abort");
+      // abort() is a process-killing path too (the CRT raises it for the
+      // debug-heap reports and for failed runtime checks - verified by
+      // /crashtest intdiv, where the divide never becomes SEH in a Debug
+      // CRT). Leave the same persistent record terminate/purecall do.
+      CrashReportContext reportContext{};
+      reportContext.reason = "abort() raised (CRT fatal or runtime check)";
+      (void)WriteCrashReport(reportContext);
     }
 
     void DiagTerminateHandler()
