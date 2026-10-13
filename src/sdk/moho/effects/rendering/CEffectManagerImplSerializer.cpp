@@ -41,15 +41,7 @@ namespace
 
   void WriteOwnedIEffectPointer(gpg::WriteArchive* const archive, moho::IEffect* const effect, const gpg::RRef& ownerRef)
   {
-    gpg::RRef effectRef{};
-    if (effect) {
-      effectRef = effect->GetDerivedObjectRef();
-      if (!effectRef.mType) {
-        effectRef.mType = moho::IEffect::StaticGetClass();
-      }
-    }
-
-    gpg::WriteRawPointer(archive, effectRef, gpg::TrackedPointerState::Owned, ownerRef);
+    gpg::WriteRawPointer(archive, gpg::MakeRRef(effect), gpg::TrackedPointerState::Owned, ownerRef);
   }
 
 } // namespace

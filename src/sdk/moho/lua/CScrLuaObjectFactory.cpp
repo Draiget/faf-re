@@ -41,10 +41,7 @@ namespace
   };
   static_assert(sizeof(LuaConcatLoadData) == 0x1C, "LuaConcatLoadData size must be 0x1C");
 
-  [[nodiscard]] std::uint32_t AsAddress32(const void* const value) noexcept
-  {
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(value));
-  }
+
 
   [[nodiscard]] const char* ReflectedTypeNameOrNull(const gpg::RType* const type) noexcept
   {
@@ -404,9 +401,9 @@ namespace
 
     if (!destination.mType->SetLexical(destination, lexicalValue.c_str())) {
       gpg::Die(
-        "Invalid value for %s at 0x%08x: %s",
+        "Invalid value for %s at %p: %s",
         ReflectedTypeNameOrNull(destination.mType),
-        AsAddress32(destination.mObj),
+        destination.mObj,
         lexicalValue.c_str()
       );
     }
@@ -1209,9 +1206,9 @@ namespace moho
       }
 
       gpg::Warnf(
-        "Invalid value for %s at 0x%08x: %s %s",
+        "Invalid value for %s at %p: %s %s",
         ReflectedTypeNameOrNull(destination.mType),
-        AsAddress32(destination.mObj),
+        destination.mObj,
         LuaObjectTypeName(valueObject),
         lexicalValue.c_str()
       );
@@ -1225,9 +1222,9 @@ namespace moho
       }
 
       gpg::Warnf(
-        "Invalid value for %s at 0x%08x: %s %s",
+        "Invalid value for %s at %p: %s %s",
         ReflectedTypeNameOrNull(destination.mType),
-        AsAddress32(destination.mObj),
+        destination.mObj,
         LuaObjectTypeName(valueObject),
         booleanValue
       );
@@ -1236,9 +1233,9 @@ namespace moho
 
     if (!valueObject.IsTable()) {
       gpg::Warnf(
-        "Invalid type for %s at 0x%08x: %s",
+        "Invalid type for %s at %p: %s",
         ReflectedTypeNameOrNull(destination.mType),
-        AsAddress32(destination.mObj),
+        destination.mObj,
         LuaObjectTypeName(valueObject)
       );
       return false;
@@ -1274,9 +1271,9 @@ namespace moho
       std::string keyName;
       if (!LuaObjectTryToString(keyObject, keyName)) {
         gpg::Warnf(
-          "Bad key initializing %s at 0x%08x, expected string but got %s",
+          "Bad key initializing %s at %p, expected string but got %s",
           ReflectedTypeNameOrNull(destination.mType),
-          AsAddress32(destination.mObj),
+          destination.mObj,
           LuaObjectTypeName(keyObject)
         );
         recovered = false;
@@ -1284,10 +1281,10 @@ namespace moho
         const gpg::RField* const field = destination.mType->GetFieldNamed(keyName.c_str());
         if (field) {
           const msvc8::string fieldContext = gpg::STR_Printf(
-            "Initializing field %s of %s at 0x%08x",
+            "Initializing field %s of %s at %p",
             keyName.c_str(),
             destination.GetName(),
-            AsAddress32(destination.mObj)
+            destination.mObj
           );
           gpg::ScopedLogContext scope(fieldContext);
 
@@ -1302,10 +1299,10 @@ namespace moho
           }
         } else if (!ignoreMissingFields) {
           gpg::Warnf(
-            "No such field %s in %s at 0x%08x",
+            "No such field %s in %s at %p",
             keyName.c_str(),
             destination.GetName(),
-            AsAddress32(destination.mObj)
+            destination.mObj
           );
           recovered = false;
         }

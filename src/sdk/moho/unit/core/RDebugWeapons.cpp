@@ -9,6 +9,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
 #include "moho/ui/SDebugWorldText.h"
 #include "moho/unit/core/Unit.h"
@@ -32,9 +33,10 @@ namespace
   constexpr std::uint32_t kWeaponDepthAlpha = 0xAF000000u;
   constexpr std::uint32_t kWeaponDepthMask = 0x00FFFFFFu;
 
-  [[nodiscard]] std::uint32_t ResolveWeaponDebugDepth(const moho::Sim* const sim) noexcept
+  [[nodiscard]] std::uint32_t ResolveWeaponDebugDepth(const moho::Unit& unit) noexcept
   {
-    const auto raw = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sim));
+    // 0x00652E56..0x00652E62: Unit+0x154 owns the army; army+0x150 is player color.
+    const std::uint32_t raw = unit.ArmyRef->mVarDat.mPlayerColorBgra;
     return (raw & kWeaponDepthMask) | kWeaponDepthAlpha;
   }
 
@@ -154,7 +156,6 @@ namespace moho
       return;
     }
 
-    const std::uint32_t depth = ResolveWeaponDebugDepth(sim);
     const Wm3::Vector3f upAxis{0.0f, 1.0f, 0.0f};
 
     CEntityDbAllUnitsNode* node = sim->mEntityDB->AllUnitsEnd(0u);
@@ -167,6 +168,7 @@ namespace moho
 
       CAiAttackerImpl* const attacker = unit->AiAttacker;
       if (attacker != nullptr) {
+        const std::uint32_t depth = ResolveWeaponDebugDepth(*unit);
         const int weaponCount = attacker->GetWeaponCount();
         const RUnitBlueprint* const blueprint = unit->GetBlueprint();
         const auto* const weaponBlueprints = blueprint ? blueprint->Weapons.WeaponBlueprints.begin() : nullptr;

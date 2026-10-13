@@ -26,20 +26,6 @@ namespace
     return kNullOwner;
   }
 
-  [[nodiscard]] std::uint32_t ResolveCommandUnitEntryAddressForDump(const moho::Entity* const entry) noexcept
-  {
-    if (entry == nullptr) {
-      return 0u;
-    }
-
-    // An entry whose unit is null is printed as the raw word.
-    const moho::Unit* const unit = static_cast<const moho::Unit*>(entry);
-    if (unit == nullptr) {
-      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entry));
-    }
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(unit));
-  }
-
   void WriteCommandEntryDump(
     std::ostringstream& stream, const moho::CmdId key, const moho::CUnitCommand* const command
   )
@@ -63,7 +49,7 @@ namespace
     stream << gpg::STR_Printf("    %d Unit%s\n", unitCount, unitSuffix).c_str();
 
     for (const moho::Entity* const entry : entries) {
-      stream << gpg::STR_Printf("      0x%08x\n", ResolveCommandUnitEntryAddressForDump(entry)).c_str();
+      stream << gpg::STR_Printf("      %p\n", static_cast<const void*>(static_cast<const moho::Unit*>(entry))).c_str();
     }
   }
 

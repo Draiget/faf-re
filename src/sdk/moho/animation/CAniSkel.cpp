@@ -125,68 +125,6 @@ namespace
 
 
   /**
-   * `Moho::ANI_DumpSkeleton`'s per-parent-bone dedup map is a real
-   * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>` (see the
-   * `operator[]`/`insert_unique`/`erase_range` citations in
-   * `legacy/containers/Map.h` and `RbTree.h`) - a hand-rolled
-   * `AniSkeletonVisitedBoneNodeLanes` node struct used to stand in for that
-   * template before those instantiations were identified and cited; it and
-   * its `InitializeAniSkeletonVisitedBoneNode`/`StageAniSkeletonVisitedBoneNode`
-   * helpers (reached only from a static bootstrap object invented purely to
-   * keep them reachable-by-name, never from real engine code) are removed
-   * below in favor of `Moho::ANI_DumpSkeleton` building and tearing down its
-   * dedup tree and selection set through those typed containers directly.
-   */
-
-  /**
-   * The record `PrintAniSkeletonBoneHierarchy` (FUN_007B2050) reads through
-   * each bone pointer stored in a per-parent dedup set. Proven from raw
-   * `.asm` (movss reads at `[pointer+0x08]`/`+0x0C`/`+0x10`/`+0x14`/`+0x18`/
-   * `+0x1C`/`+0x20`, name read at `[pointer+0x00]`): this does NOT match
-   * either `SAniSkelBone` (name@0x00 matches, but its `mBoneTransform` sits
-   * at +0x24, with `mLocalOffsetX/Y/Z`/`mLocalScale`/`mChildStartIndex`/
-   * `mChildCount`/`mFlags` in between that this dump never reads) or
-   * `CAniPoseBone` (`mCompositeTransform` at +0x00, no name field at all).
-   *
-   * The pointer stored in the dedup set is independently proven (from
-   * `Moho::ANI_DumpSkeleton`'s per-bone loop, 0x007B2421-0x007B2432) to be a
-   * genuine `&skel->mBones[i]`, i.e. a real `SAniSkelBone*` - so the shipped
-   * binary's `ANI_DumpSkeleton` debug command reads its name/quaternion/
-   * position fields at byte offsets that do not correspond to
-   * `SAniSkelBone`'s current fields beyond the shared name prefix.
-   * Reproduced 1:1 as a raw offset view rather than "corrected" to
-   * `SAniSkelBone`'s named fields, matching the binary's actual (evidently
-   * stale relative to the current on-disk bone format) reads exactly - per
-   * this project's typed-placeholder-struct allowance for fields not yet
-   * fully owned. Whether this reflects a console command that was never
-   * updated after `SAniSkelBone`'s on-disk layout changed, or some other
-   * historical mismatch, is not resolved by this pass.
-   */
-  struct AniSkeletonBoneDumpFields
-  {
-    const char* mName;        // +0x00
-    std::uint32_t field_0x04; // +0x04 (never read by the dump)
-    float mQuatW;             // +0x08
-    float mQuatX;              // +0x0C
-    float mQuatY;               // +0x10
-    float mQuatZ;                // +0x14
-    float mPosX;                  // +0x18
-    float mPosY;                   // +0x1C
-    float mPosZ;                    // +0x20
-  };
-  static_assert(
-    offsetof(AniSkeletonBoneDumpFields, mQuatW) == 0x08,
-    "AniSkeletonBoneDumpFields::mQuatW offset must be 0x08"
-  );
-  static_assert(
-    offsetof(AniSkeletonBoneDumpFields, mPosX) == 0x18,
-    "AniSkeletonBoneDumpFields::mPosX offset must be 0x18"
-  );
-  static_assert(
-    sizeof(AniSkeletonBoneDumpFields) == 0x24, "AniSkeletonBoneDumpFields size must be 0x24"
-  );
-
-  /**
    * Address: 0x007B2050 (FUN_007B2050, sub_7B2050)
    *
    * IDA signature:
@@ -211,16 +149,15 @@ namespace
    * loop already builds).
    */
   void PrintAniSkeletonBoneHierarchy(
-    const msvc8::set<std::uint32_t>& children,
+    const msvc8::set<const moho::SAniSkelBone*>& children,
     const std::uint32_t indent,
-    msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>& dedupTree
+    msvc8::map<const moho::SAniSkelBone*, msvc8::set<const moho::SAniSkelBone*>>& dedupTree
   )
   {
-    for (const std::uint32_t boneKey : children) {
-      const auto* const fields =
-        reinterpret_cast<const AniSkeletonBoneDumpFields*>(static_cast<std::uintptr_t>(boneKey));
+    for (const moho::SAniSkelBone* const bone : children) {
+      const moho::VTransform& transform = bone->mLocalTransform;
 
-      const std::size_t nameLength = std::strlen(fields->mName);
+      const std::size_t nameLength = std::strlen(bone->mBoneName);
       const int rawPadWidth = 50 - static_cast<int>(nameLength) - static_cast<int>(indent);
       const std::size_t namePadWidth = static_cast<std::size_t>(rawPadWidth > 2 ? rawPadWidth : 2);
 
@@ -232,21 +169,21 @@ namespace
       const msvc8::string line = gpg::STR_Printf(
         "%s%s%sp=<%5.2f,%5.2f,%5.2f> q=<%5.2f,%5.2f,%5.2f,%5.2f>",
         indentPad.c_str(),
-        fields->mName,
+        bone->mBoneName,
         namePad.c_str(),
-        fields->mPosX,
-        fields->mPosY,
-        fields->mPosZ,
-        fields->mQuatX,
-        fields->mQuatY,
-        fields->mQuatZ,
-        fields->mQuatW
+        transform.pos_.x,
+        transform.pos_.y,
+        transform.pos_.z,
+        transform.orient_.x,
+        transform.orient_.y,
+        transform.orient_.z,
+        transform.orient_.w
       );
 
       moho::CON_Printf("%s", line.c_str());
       gpg::Logf("%s", line.c_str());
 
-      PrintAniSkeletonBoneHierarchy(dedupTree[boneKey], indent + 2u, dedupTree);
+      PrintAniSkeletonBoneHierarchy(dedupTree[bone], indent + 2u, dedupTree);
     }
   }
 } // namespace
@@ -613,14 +550,12 @@ namespace moho
       skel = skelHandle.get();
     }
 
-    msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>> dedupTree;
+    msvc8::map<const SAniSkelBone*, msvc8::set<const SAniSkelBone*>> dedupTree;
     for (const SAniSkelBone& bone : skel->mBones) {
       const SAniSkelBone* const parentBone = skel->GetBone(static_cast<std::uint32_t>(bone.mParentBoneIndex));
-      const std::uint32_t parentKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(parentBone));
-      const std::uint32_t boneKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&bone));
-      (void)dedupTree[parentKey].insert(boneKey);
+      (void)dedupTree[parentBone].insert(&bone);
     }
 
-    PrintAniSkeletonBoneHierarchy(dedupTree[0u], 0u, dedupTree);
+    PrintAniSkeletonBoneHierarchy(dedupTree[nullptr], 0u, dedupTree);
   }
 } // namespace moho
