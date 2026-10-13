@@ -3760,7 +3760,8 @@ extern "C"
 
 		if (oldHashBits != 0) {
 			const lu_mem oldNodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(oldNodeCount);
-			return static_cast<int>(reinterpret_cast<std::uintptr_t>(luaM_realloc(state, oldNodeArray, oldNodeBytes, 0u)));
+			(void)luaM_realloc(state, oldNodeArray, oldNodeBytes, 0u);
+			return 0; // The allocator always returns nullptr after freeing a block.
 		}
 
 		return oldNodeCount;

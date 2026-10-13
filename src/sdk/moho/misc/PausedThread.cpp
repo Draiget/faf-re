@@ -18,17 +18,17 @@ namespace moho
 /**
  * Address: 0x004B4570 (FUN_004B4570, sub_4B4570)
  *
- * int,int
+ * LuaPlus::LuaState*,lua_Debug*
  *
  * What it does:
- * Captures current thread id, stores pause context lanes, and allocates one
+ * Captures current thread id, stores Lua state/debug-frame pointers, and allocates one
  * auto-reset resume event.
  */
-moho::PausedMainThread::PausedMainThread(const int pauseContextA, const int pauseContextB)
+moho::PausedMainThread::PausedMainThread(LuaPlus::LuaState* const luaState, lua_Debug* const debugFrame)
   : mResumeEvent(nullptr)
   , mThreadId(::GetCurrentThreadId())
-  , mPauseContextA(pauseContextA)
-  , mPauseContextB(pauseContextB)
+  , mLuaState(luaState)
+  , mDebugFrame(debugFrame)
 {
   mResumeEvent = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
 }
@@ -57,17 +57,17 @@ std::uint32_t moho::PausedMainThread::GetThreadId() const
 /**
  * Address: 0x004B45D0 (FUN_004B45D0, sub_4B45D0)
  */
-int moho::PausedMainThread::GetPauseContextA() const
+LuaPlus::LuaState* moho::PausedMainThread::GetLuaState() const
 {
-  return mPauseContextA;
+  return mLuaState;
 }
 
 /**
  * Address: 0x004B45E0 (FUN_004B45E0, sub_4B45E0)
  */
-int moho::PausedMainThread::GetPauseContextB() const
+lua_Debug* moho::PausedMainThread::GetDebugFrame() const
 {
-  return mPauseContextB;
+  return mDebugFrame;
 }
 
 /**
@@ -107,19 +107,19 @@ bool moho::PausedMainThread::Resume()
 /**
  * Address: 0x004B46A0 (FUN_004B46A0, sub_4B46A0)
  *
- * int,int,int
+ * std::uint32_t,LuaPlus::LuaState*,lua_Debug*
  *
  * What it does:
- * Stores paused thread id/context lanes and allocates one auto-reset
+ * Stores paused thread id and Lua state/debug-frame pointers and allocates one auto-reset
  * resume event.
  */
 moho::PausedChildThread::PausedChildThread(
-  const std::uint32_t pausedThreadId, const int pauseContextA, const int pauseContextB
+  const std::uint32_t pausedThreadId, LuaPlus::LuaState* const luaState, lua_Debug* const debugFrame
 )
   : mResumeEvent(nullptr)
   , mThreadId(pausedThreadId)
-  , mPauseContextA(pauseContextA)
-  , mPauseContextB(pauseContextB)
+  , mLuaState(luaState)
+  , mDebugFrame(debugFrame)
 {
   mResumeEvent = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
 }
@@ -148,17 +148,17 @@ std::uint32_t moho::PausedChildThread::GetThreadId() const
 /**
  * Address: 0x004B4700 (FUN_004B4700, sub_4B4700)
  */
-int moho::PausedChildThread::GetPauseContextA() const
+LuaPlus::LuaState* moho::PausedChildThread::GetLuaState() const
 {
-  return mPauseContextA;
+  return mLuaState;
 }
 
 /**
  * Address: 0x004B4710 (FUN_004B4710, sub_4B4710)
  */
-int moho::PausedChildThread::GetPauseContextB() const
+lua_Debug* moho::PausedChildThread::GetDebugFrame() const
 {
-  return mPauseContextB;
+  return mDebugFrame;
 }
 
 /**

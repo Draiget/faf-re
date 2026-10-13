@@ -2539,15 +2539,11 @@ namespace
     // 0x007F4101: client manager is the local send-stamp source.
     CClientManagerImpl* const clientMgr = simDriver->GetClientManager();
 
-    // 0x007F4108..0x007F411B: coordinate bases.
-    //   rightEdgeX = (batcher pointer value) + graphLeftBase (v67.x seed
-    //     @0x007F4108-0x007F410F). A latent 2007 debug-HUD quirk: the batcher
-    //     pointer is reused as an X coordinate base, preserved 1:1 (mirrors
-    //     DrawNetworkStats reusing `this` as a coordinate).
-    //   graphBottomY = graphRightExtent + graphHeightBase (var_130 @0x007F411B).
-    const int rightEdgeX =
-      static_cast<int>(reinterpret_cast<std::uintptr_t>(batcher)) + graphLeftBase; // v67.x seed
-    const int graphBottomY = graphRightExtent + graphHeightBase;                   // var_130
+    // Three stack arguments follow the two register arguments. After the
+    // prologue, +0x14C is the batcher, +0x150 is the graph width, and
+    // +0x154 is its top coordinate. The coordinate adds read the latter two.
+    const int rightEdgeX = graphRightExtent + graphLeftBase;
+    const int graphBottomY = graphHalfHeight + graphHeightBase;
 
     // 0x007F411A..0x007F413C: retained 10pt Courier New font handle.
     boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(10, "Courier New");

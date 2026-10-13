@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 
+namespace LuaPlus { class LuaState; }
+struct lua_Debug;
+
 namespace moho
 {
   /**
@@ -17,8 +20,8 @@ namespace moho
   public:
     virtual ~PausedThread() = 0;
     [[nodiscard]] virtual std::uint32_t GetThreadId() const = 0;
-    [[nodiscard]] virtual int GetPauseContextA() const = 0;
-    [[nodiscard]] virtual int GetPauseContextB() const = 0;
+    [[nodiscard]] virtual LuaPlus::LuaState* GetLuaState() const = 0;
+    [[nodiscard]] virtual lua_Debug* GetDebugFrame() const = 0;
     [[nodiscard]] virtual std::uintptr_t WaitUntilResumedAndDelete() = 0;
     [[nodiscard]] virtual bool Resume() = 0;
   };
@@ -32,13 +35,13 @@ namespace moho
     /**
      * Address: 0x004B4570 (FUN_004B4570, sub_4B4570)
      *
-     * int,int
+     * LuaPlus::LuaState*,lua_Debug*
      *
      * What it does:
-     * Captures current thread id, stores pause context lanes, and allocates one
+     * Captures current thread id, stores Lua state/debug-frame pointers, and allocates one
      * auto-reset resume event.
      */
-    PausedMainThread(int pauseContextA, int pauseContextB);
+    PausedMainThread(LuaPlus::LuaState* luaState, lua_Debug* debugFrame);
 
     /**
      * Address: 0x004B45A0 (FUN_004B45A0, sub_4B45A0)
@@ -57,12 +60,12 @@ namespace moho
     /**
      * Address: 0x004B45D0 (FUN_004B45D0, sub_4B45D0)
      */
-    [[nodiscard]] int GetPauseContextA() const override;
+    [[nodiscard]] LuaPlus::LuaState* GetLuaState() const override;
 
     /**
      * Address: 0x004B45E0 (FUN_004B45E0, sub_4B45E0)
      */
-    [[nodiscard]] int GetPauseContextB() const override;
+    [[nodiscard]] lua_Debug* GetDebugFrame() const override;
 
     /**
      * Address: 0x004B45F0 (FUN_004B45F0, sub_4B45F0)
@@ -80,8 +83,8 @@ namespace moho
   public:
     void* mResumeEvent;          // +0x04
     std::uint32_t mThreadId;     // +0x08
-    int mPauseContextA;          // +0x0C
-    int mPauseContextB;          // +0x10
+    LuaPlus::LuaState* mLuaState;          // +0x0C
+    lua_Debug* mDebugFrame;          // +0x10
   };
 
   /**
@@ -93,13 +96,13 @@ namespace moho
     /**
      * Address: 0x004B46A0 (FUN_004B46A0, sub_4B46A0)
      *
-     * int,int,int
+     * std::uint32_t,LuaPlus::LuaState*,lua_Debug*
      *
      * What it does:
-     * Stores paused thread id/context lanes and allocates one auto-reset
+     * Stores paused thread id and Lua state/debug-frame pointers and allocates one auto-reset
      * resume event.
      */
-    PausedChildThread(std::uint32_t pausedThreadId, int pauseContextA, int pauseContextB);
+    PausedChildThread(std::uint32_t pausedThreadId, LuaPlus::LuaState* luaState, lua_Debug* debugFrame);
 
     /**
      * Address: 0x004B46D0 (FUN_004B46D0, sub_4B46D0)
@@ -118,12 +121,12 @@ namespace moho
     /**
      * Address: 0x004B4700 (FUN_004B4700, sub_4B4700)
      */
-    [[nodiscard]] int GetPauseContextA() const override;
+    [[nodiscard]] LuaPlus::LuaState* GetLuaState() const override;
 
     /**
      * Address: 0x004B4710 (FUN_004B4710, sub_4B4710)
      */
-    [[nodiscard]] int GetPauseContextB() const override;
+    [[nodiscard]] lua_Debug* GetDebugFrame() const override;
 
     /**
      * Address: 0x004B4720 (FUN_004B4720, sub_4B4720)
@@ -141,21 +144,31 @@ namespace moho
   public:
     void* mResumeEvent;          // +0x04
     std::uint32_t mThreadId;     // +0x08
-    int mPauseContextA;          // +0x0C
-    int mPauseContextB;          // +0x10
+    LuaPlus::LuaState* mLuaState;          // +0x0C
+    lua_Debug* mDebugFrame;          // +0x10
   };
 
+#if INTPTR_MAX == INT32_MAX
   static_assert(sizeof(PausedThread) == 0x04, "PausedThread size must be 0x04");
 
   static_assert(offsetof(PausedMainThread, mResumeEvent) == 0x04, "PausedMainThread::mResumeEvent offset must be 0x04");
   static_assert(offsetof(PausedMainThread, mThreadId) == 0x08, "PausedMainThread::mThreadId offset must be 0x08");
-  static_assert(offsetof(PausedMainThread, mPauseContextA) == 0x0C, "PausedMainThread::mPauseContextA offset must be 0x0C");
-  static_assert(offsetof(PausedMainThread, mPauseContextB) == 0x10, "PausedMainThread::mPauseContextB offset must be 0x10");
+  static_assert(offsetof(PausedMainThread, mLuaState) == 0x0C, "PausedMainThread::mLuaState offset must be 0x0C");
+  static_assert(offsetof(PausedMainThread, mDebugFrame) == 0x10, "PausedMainThread::mDebugFrame offset must be 0x10");
   static_assert(sizeof(PausedMainThread) == 0x14, "PausedMainThread size must be 0x14");
 
   static_assert(offsetof(PausedChildThread, mResumeEvent) == 0x04, "PausedChildThread::mResumeEvent offset must be 0x04");
   static_assert(offsetof(PausedChildThread, mThreadId) == 0x08, "PausedChildThread::mThreadId offset must be 0x08");
-  static_assert(offsetof(PausedChildThread, mPauseContextA) == 0x0C, "PausedChildThread::mPauseContextA offset must be 0x0C");
-  static_assert(offsetof(PausedChildThread, mPauseContextB) == 0x10, "PausedChildThread::mPauseContextB offset must be 0x10");
+  static_assert(offsetof(PausedChildThread, mLuaState) == 0x0C, "PausedChildThread::mLuaState offset must be 0x0C");
+  static_assert(offsetof(PausedChildThread, mDebugFrame) == 0x10, "PausedChildThread::mDebugFrame offset must be 0x10");
   static_assert(sizeof(PausedChildThread) == 0x14, "PausedChildThread size must be 0x14");
+#else
+  static_assert(sizeof(PausedThread) == 0x08, "PausedThread native size must be 0x08");
+  static_assert(sizeof(PausedMainThread) == 0x28, "PausedMainThread native size must be 0x28");
+  static_assert(sizeof(PausedChildThread) == 0x28, "PausedChildThread native size must be 0x28");
+  static_assert(offsetof(PausedMainThread, mLuaState) == 0x18, "PausedMainThread native Lua pointer offset");
+  static_assert(offsetof(PausedMainThread, mDebugFrame) == 0x20, "PausedMainThread native debug pointer offset");
+  static_assert(offsetof(PausedChildThread, mLuaState) == 0x18, "PausedChildThread native Lua pointer offset");
+  static_assert(offsetof(PausedChildThread, mDebugFrame) == 0x20, "PausedChildThread native debug pointer offset");
+#endif
 } // namespace moho

@@ -194,7 +194,7 @@ namespace
       return nullptr;
     }
 
-    return reinterpret_cast<LuaPlus::LuaState*>(pausedThread->GetPauseContextA());
+    return pausedThread->GetLuaState();
   }
 
   void BindLuaStateForHook(ScrDebugState& runtime, LuaPlus::LuaState* const state)
@@ -309,12 +309,10 @@ namespace
         runtime.debugWindowOwnerThreadId = currentThreadId;
       }
 
-      const int pauseContextA = reinterpret_cast<int>(luaState);
-      const int pauseContextB = reinterpret_cast<int>(debugFrame);
       if (currentThreadId == runtime.debugWindowOwnerThreadId) {
-        pausedThread = new moho::PausedMainThread(pauseContextA, pauseContextB);
+        pausedThread = new moho::PausedMainThread(luaState, debugFrame);
       } else {
-        pausedThread = new moho::PausedChildThread(currentThreadId, pauseContextA, pauseContextB);
+        pausedThread = new moho::PausedChildThread(currentThreadId, luaState, debugFrame);
       }
 
       if (pausedThread != nullptr) {
@@ -647,7 +645,7 @@ void moho::SCR_DebugStep()
     return;
   }
 
-  LuaPlus::LuaState* const pausedState = reinterpret_cast<LuaPlus::LuaState*>(pausedThread->GetPauseContextA());
+  LuaPlus::LuaState* const pausedState = pausedThread->GetLuaState();
   if (pausedState != nullptr && pausedState->m_rootState != nullptr) {
     QueueSingleStepRootState(runtime, pausedState->m_rootState);
   }
