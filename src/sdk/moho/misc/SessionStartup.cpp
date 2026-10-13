@@ -345,9 +345,10 @@ namespace moho
     /// terminator the string overloads would add.
     constexpr char kReplayFormatBanner[] = "Replay v1.9\r\n";
     constexpr std::size_t kReplayFormatBannerBytes = sizeof(kReplayFormatBanner) - 1u;
-    /// The build the retail replay header advertises.
     constexpr double kReplayEngineVersion = 1.5;
-    constexpr int kReplayEngineBuild = 3764;
+    /// The build the replay header advertises: 0xEFB (3835) in the target binary
+    /// (FUN_00875B60 writer, FUN_008765E0 reader, FUN_004D3D30 GetEngineVersion).
+    constexpr int kReplayEngineBuild = 3835;
     /// Terminates one army's unit-source list; no source index can reach it.
     constexpr std::uint8_t kReplayUnitSourceListEnd = 0xFFu;
   } // namespace
@@ -373,7 +374,7 @@ namespace moho
    * directories, and only when `name` carries no separator of its own.
    *
    * Header layout, in write order:
-   *   "Supreme Commander v1.50.3764" NUL, "\r\n" NUL, "Replay v1.9\r\n" (raw),
+   *   "Supreme Commander v1.50.3835" NUL, "\r\n" NUL, "Replay v1.9\r\n" (raw),
    *   map name NUL, "\r\n" NUL,
    *   u32 game-mods length + those bytes,
    *   u32 scenario-info length + those bytes,
@@ -494,7 +495,7 @@ namespace moho
     }
 
     gpg::BinaryReader replayReader(replayStream.get());
-    const msvc8::string expectedVersion = gpg::STR_Printf("Supreme Commander v%1.2f.%4i", 1.5, 3764);
+    const msvc8::string expectedVersion = gpg::STR_Printf("Supreme Commander v%1.2f.%4i", 1.5, kReplayEngineBuild);
     msvc8::string replayVersion{};
     replayReader.ReadString(&replayVersion);
     if (replayVersion.view() != expectedVersion.view()) {

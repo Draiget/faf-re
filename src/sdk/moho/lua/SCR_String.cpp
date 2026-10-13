@@ -384,7 +384,11 @@ moho::CScrLuaInitForm* moho::register_STR_GetTokens_LuaFuncDef()
  */
 msvc8::string moho::GetEngineVersion()
 {
-  return gpg::STR_Printf("%1.1f.%i", 1.5, 3764);
+  /// The build the engine reports (0xEFB / 3835 in the target binary;
+  /// see FUN_004D3D30 asm `push 0xefb` under `%1.1f.%i`).
+  constexpr int kEngineBuild = 3835;
+
+  return gpg::STR_Printf("%1.1f.%i", 1.5, kEngineBuild);
 }
 
 /**
