@@ -25,6 +25,7 @@
 #include "LuaAssertion.h"
 #include "LuaCrashDump.h"
 #include "LuaError.h"
+#include "gpg/core/diagnostics/ProbeWatch.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
 #include "LuaUndump.h"
@@ -14829,6 +14830,23 @@ extern "C"
 	 */
 	void luaG_errormsg(lua_State* const state)
 	{
+		// FADeepProbe request smuggling (deviation, documented): mods request
+		// watches/probes with pcall(error, "FADeepProbe watchaddr ..."), and
+		// the request is readable right here - the error object is on the
+		// stack and pcall has not swallowed it yet. Arming is a side effect;
+		// the error itself still raises normally, so mod-visible behaviour is
+		// unchanged.
+		if (state->top > state->stack && state->top[-1].tt == LUA_TSTRING) {
+			const TString* const request = static_cast<const TString*>(state->top[-1].value.p);
+			if (request != nullptr && request->len >= 18
+				&& std::strncmp(request->str, "FADeepProbe ", 12) == 0) {
+				char text[128] = {};
+				const std::size_t bytes = (request->len < sizeof(text) - 1) ? request->len : sizeof(text) - 1;
+				std::memcpy(text, request->str, bytes);
+				(void)gpg::diag::ParseFadepProbeRequest(text);
+			}
+		}
+
 		TString* const key = luaS_newlstr(state, "_TRACEBACK", 10u);
 		state->top->tt = static_cast<int>(key->tt);
 		state->top->value.p = key;

@@ -27,6 +27,7 @@
 #include "CScApp.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
+#include "gpg/core/diagnostics/ProbeWatch.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -271,6 +272,8 @@ namespace
    *   intdiv           - integer divide by zero
    *   purecall         - pure virtual call (CRT fatal)
    *   terminate        - std::terminate (uncaught exception)
+   *   watch            - arm a hardware watchpoint on a local, write it,
+   *                      verify the first-write report fires
    *   lua_table_corrupt- opens a Lua VM, builds a table with a
    *                      nil-key/non-nil-value node (the stray-write
    *                      signature), then faults reading null: the report's
@@ -292,6 +295,11 @@ namespace
       // installs its logger under); a constructed-dangling-vtable route is
       // UB-shaped and less deterministic than the handler itself.
       ::_purecall();
+    } else if (kind != nullptr && std::strcmp(kind, "watch") == 0) {
+      // End-to-end hardware-watchpoint verification.
+      gpg::diag::InstallProbeWatchHandler();
+      gpg::diag::ProbeWatchSelfTest();
+      std::abort(); // the self-test log is in faf_diag.log and the report
     } else if (kind != nullptr && std::strcmp(kind, "terminate") == 0) {
       throw std::runtime_error("crashtest: uncaught exception");
     } else if (kind != nullptr && std::strcmp(kind, "lua_table_corrupt") == 0) {
@@ -426,6 +434,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     moho::PLAT_Init();
     moho::PLAT_CatchStructuredExceptions();
     RunCrashTest(kind);
+  }
+
+  // FADeepProbe-compatible startup arming: /w <addr[+off][,...]> arms up to
+  // four hardware write watches; /p <addr[:expr][,addr...]> arms int3 code
+  // probes. The handler stays dormant (one atomic load per debug exception)
+  // until something is armed.
+  {
+    gpg::diag::InstallProbeWatchHandler();
+
+    msvc8::vector<msvc8::string> watchArgs;
+    if (moho::CFG_GetArgOption("/w", 1, &watchArgs) && !watchArgs.empty()) {
+      (void)gpg::diag::ParseWatchSpec(watchArgs[0].c_str());
+    }
+
+    msvc8::vector<msvc8::string> probeArgs;
+    if (moho::CFG_GetArgOption("/p", 1, &probeArgs) && !probeArgs.empty()) {
+      // One address per comma-separated token.
+      const char* p = probeArgs[0].c_str();
+      while (*p != '\0') {
+        char one[128] = {};
+        const char* const comma = std::strchr(p, ',');
+        const std::size_t length = (comma != nullptr) ? static_cast<std::size_t>(comma - p) : std::strlen(p);
+        if (length == 0 || length >= sizeof(one)) {
+          break;
+        }
+        (void)::strncpy_s(one, sizeof(one), p, length);
+        (void)gpg::diag::ParseProbeSpec(one);
+        if (comma == nullptr) {
+          break;
+        }
+        p = comma + 1;
+      }
+    }
   }
 
   if (moho::CFG_GetArgOption("/waitfordebugger", 0, nullptr)) {
