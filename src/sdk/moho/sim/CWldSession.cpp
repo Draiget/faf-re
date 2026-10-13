@@ -113,6 +113,8 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/task/ScrDiskWatcherTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/diagnostics/CrashReport.h"
+#include "moho/sim/Sim.h"
 
 namespace
 {
@@ -2018,6 +2020,54 @@ namespace moho
      * twins.
      */
     boost::scoped_ptr<ISTIDriver> sSimDriver;
+
+    // ---- Crash-report "Sim" section (new diagnostics functionality) ----
+    //
+    // Everything a crash report reader asks first: what map, live or replay,
+    // which beat, and whether the sim had already desynced. Reads only the
+    // two globals above plus Sim::sInstance; guarded so a teardown-time crash
+    // still prints the rest.
+    void WriteSimCrashSectionAdapter(std::FILE* const sink, const gpg::diag::CrashSectionInfo& info)
+    {
+      (void)info;
+      const auto line = [sink](const char* const format, ...) {
+        va_list args;
+        va_start(args, format);
+        (void)std::vfprintf(sink, format, args);
+        va_end(args);
+        (void)std::fputc('\n', sink);
+        (void)std::fflush(sink);
+      };
+
+      if (CWldSession* const session = gActiveWldSession) {
+        line("session   : active");
+        line("map       : %s", session->mMapName.c_str());
+        line("replay    : %s", session->IsReplay ? "yes" : "no");
+      } else {
+        line("session   : none (menu/lobby/teardown)");
+      }
+
+      if (ISTIDriver* const driver = sSimDriver.get()) {
+        const auto* const simDriver = static_cast<const CSimDriver*>(driver);
+        line("driver    : state=%d dispatchBeat=%d nextIssueBeat=%d",
+             static_cast<int>(simDriver->DiagDriverState()), simDriver->DiagDispatchBeat(),
+             simDriver->DiagNextIssueBeat());
+      } else {
+        line("driver    : none");
+      }
+
+      if (Sim* const sim = Sim::sInstance) {
+        line("sim       : beat=%u tick=%u gameEnded=%d gameOver=%d", sim->mCurBeat, sim->mCurTick,
+             sim->mGameEnded ? 1 : 0, sim->mGameOver ? 1 : 0);
+        line("desync    : %s (%u record(s))", sim->mIsDesyncFree ? "free" : "DESYNCED",
+             static_cast<unsigned>(sim->mDesyncs.size()));
+      } else {
+        line("sim       : none");
+      }
+    }
+
+    const bool sSimCrashSectionRegistered =
+      (gpg::diag::AddCrashSection("Sim", &WriteSimCrashSectionAdapter), true);
 
     /**
      * The next session's launch description (0x010C4F58), a `std::auto_ptr`.

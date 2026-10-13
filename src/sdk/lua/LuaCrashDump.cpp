@@ -30,6 +30,19 @@ namespace
     volatile LONG activeCount = 0;
   };
 
+  // Bounded ring of recent Lua error records for the crash report. Each
+  // entry: vm name (stripped to 23 chars), first line of the message.
+  // Written only when an error raises, read only on the crash path.
+  constexpr int kMaxErrorRecords = 32;
+  struct ErrorRing
+  {
+    char vm[24] = {};
+    char message[240] = {};
+  };
+  ErrorRing gErrorRing[kMaxErrorRecords];
+  volatile LONG gErrorRingCount = 0;
+  volatile LONG gErrorRingHead = 0;
+
   VmRegistry& VmRegistryInstance()
   {
     static VmRegistry registry;
@@ -530,6 +543,41 @@ namespace lua
     }
   }
 
+  void RecordLuaError(lua_State* const state, const char* const message)
+  {
+    if (message == nullptr) {
+      return;
+    }
+
+    // Resolve the owning root VM's name (thread states share l_G).
+    const char* vmName = "unknown";
+    VmRegistry& registry = VmRegistryInstance();
+    const LONG count = registry.activeCount;
+    for (LONG i = 0; i < count && i < kMaxLuaVms; ++i) {
+      const lua_State* const registered = static_cast<lua_State*>(registry.states[i]);
+      if (registered != nullptr && IsPlausiblePointer(state) && state->l_G != nullptr
+          && state->l_G == registered->l_G) {
+        vmName = VmNameAt(static_cast<int>(i));
+        break;
+      }
+    }
+
+    const LONG slot = gErrorRingHead % kMaxErrorRecords;
+    (void)::strncpy_s(gErrorRing[slot].vm, sizeof(gErrorRing[slot].vm), vmName, _TRUNCATE);
+    // First line only - tracebacks run long and the ring is for shape, not
+    // full text (the engine log already carries the whole thing).
+    const char* const newline = std::strchr(message, '\n');
+    const std::size_t length =
+      (newline != nullptr) ? static_cast<std::size_t>(newline - message) : std::strlen(message);
+    (void)::strncpy_s(gErrorRing[slot].message, sizeof(gErrorRing[slot].message), message,
+                      (length < 239) ? length : 239);
+    gErrorRing[slot].message[(length < 239) ? length : 239] = '\0';
+    (void)::InterlockedIncrement(&gErrorRingHead);
+    if (gErrorRingCount < kMaxErrorRecords) {
+      (void)::InterlockedIncrement(&gErrorRingCount);
+    }
+  }
+
   void UnregisterLuaVm(lua_State* const state)
   {
     if (state == nullptr) {
@@ -565,6 +613,19 @@ namespace lua
     VmRegistry& registry = VmRegistryInstance();
     const LONG count = registry.activeCount;
     DumpLine(sink, "registered VMs: %d", static_cast<int>(count));
+
+    // Recent Lua errors first: the crash is often the tail of a running
+    // script failure, and these records connect them.
+    const LONG errorCount = (gErrorRingCount < kMaxErrorRecords) ? gErrorRingCount : kMaxErrorRecords;
+    if (errorCount > 0) {
+      DumpLine(sink, "recent Lua errors (%d, oldest first):", static_cast<int>(errorCount));
+      const LONG start = gErrorRingHead - errorCount;
+      for (LONG e = 0; e < errorCount; ++e) {
+        const LONG slot = ((start + e) % kMaxErrorRecords + kMaxErrorRecords) % kMaxErrorRecords;
+        DumpLine(sink, "  [%s] %s", gErrorRing[slot].vm, gErrorRing[slot].message);
+      }
+    }
+
     for (LONG i = 0; i < count && i < kMaxLuaVms; ++i) {
       if (registry.states[i] == nullptr) {
         continue;

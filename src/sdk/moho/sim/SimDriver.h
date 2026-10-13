@@ -806,6 +806,11 @@ namespace moho
      */
     DWORD PerformNextEvent();
 
+    // ---- diagnostics-only readouts (crash report section; no behaviour) ----
+    [[nodiscard]] int32_t DiagDispatchBeat() const { return mDispatchBeat; }
+    [[nodiscard]] int32_t DiagNextIssueBeat() const { return mNextIssueBeat; }
+    [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
+
   private:
     /**
      * Address: 0x0073D8C0 (FUN_0073D8C0, thunk to FUN_0128FAC0)

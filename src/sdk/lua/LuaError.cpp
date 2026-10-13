@@ -1,5 +1,7 @@
 #include "lua/LuaError.h"
 
+#include "lua/LuaCrashDump.h"
+
 /**
  * Address: 0x009140D0 (FUN_009140D0)
  * Mangled: ??0lua_Error@lua@@Z_0
@@ -12,6 +14,9 @@
 lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const char* const err)
   : msvc8::runtime_error(err), L(lua_state), code(errcode)
 {
+  // Crash-report ring (deviation, documented): record the error so a later
+  // crash report shows the failing script history. Log-only, bounded.
+  RecordLuaError(lua_state, err);
 }
 
 /**
@@ -26,6 +31,8 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const c
 lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
   : msvc8::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
 {
+  // See the (state, errcode, err) overload for the diagnostics ring.
+  RecordLuaError(lua_state, what());
 }
 
 /**

@@ -33,6 +33,14 @@ namespace lua
    */
   void NameLuaVm(lua_State* state, const char* name);
 
+  /**
+   * Records one Lua error message (already traceback-formatted - callers
+   * pass lua_Error::what()) into a bounded ring the crash report prints.
+   * The record carries the VM name, so "which script kept failing" is
+   * answerable from the report alone.
+   */
+  void RecordLuaError(lua_State* state, const char* message);
+
   /** Marks `state` as the VM running on the current thread (crash handler). */
   void SetThreadActiveLuaVm(lua_State* state);
 
