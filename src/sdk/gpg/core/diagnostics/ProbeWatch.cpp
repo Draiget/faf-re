@@ -14,7 +14,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <intrin.h>
 
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -115,16 +114,6 @@ namespace gpg::diag
       return dr7;
     }
 
-    void WriteDebugRegsCurrent(const Watch watches[kMaxWatches])
-    {
-      __writedr(0, watches[0].armed ? watches[0].address : 0);
-      __writedr(1, watches[1].armed ? watches[1].address : 0);
-      __writedr(2, watches[2].armed ? watches[2].address : 0);
-      __writedr(3, watches[3].armed ? watches[3].address : 0);
-      __writedr(6, 0);
-      __writedr(7, ComputeDr7(watches));
-    }
-
     void ApplyDebugRegsToThread(HANDLE thread, const Watch watches[kMaxWatches])
     {
       CONTEXT context{};
@@ -140,6 +129,60 @@ namespace gpg::diag
       context.Dr7 = ComputeDr7(watches);
       context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
       (void)::SetThreadContext(thread, &context);
+    }
+
+
+    // Arguments for the arming helper thread (namespace scope so the helper
+    // function can reach them; single armer at a time - arming is a rare,
+    // operator-driven event).
+    struct HelperArgs
+    {
+      DWORD targetTid = 0;
+      Watch watches[kMaxWatches] = {};
+      HANDLE done = nullptr;
+    };
+    HelperArgs gArmingHelperArgs;
+
+    DWORD WINAPI ArmingHelperThread(LPVOID)
+    {
+      HelperArgs& a = gArmingHelperArgs;
+      HANDLE target =
+        ::OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, a.targetTid);
+      if (target == nullptr) {
+        (void)::SetEvent(a.done);
+        return 0;
+      }
+      if (::SuspendThread(target) != static_cast<DWORD>(-1)) {
+        ApplyDebugRegsToThread(target, a.watches);
+        (void)::ResumeThread(target);
+      }
+      (void)::CloseHandle(target);
+      (void)::SetEvent(a.done);
+      return 0;
+    }
+
+    void WriteDebugRegsCurrent(const Watch watches[kMaxWatches])
+    {
+      // `mov drX` is privileged (ring 0); the only user-mode route is
+      // SuspendThread + SetThreadContext, and a thread cannot suspend
+      // itself. A short-lived helper suspends us, writes the registers and
+      // resumes - the standard in-process arming dance.
+      HelperArgs& args = gArmingHelperArgs;
+      args.targetTid = ::GetCurrentThreadId();
+      for (int i = 0; i < kMaxWatches; ++i) {
+        args.watches[i] = watches[i];
+      }
+      args.done = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+      if (args.done == nullptr) {
+        return;
+      }
+
+      HANDLE thread = ::CreateThread(nullptr, 0, &ArmingHelperThread, nullptr, 0, nullptr);
+      if (thread != nullptr) {
+        (void)::WaitForSingleObject(args.done, 2000);
+        (void)::CloseHandle(thread);
+      }
+      (void)::CloseHandle(args.done);
     }
 
     void BroadcastDebugRegs()

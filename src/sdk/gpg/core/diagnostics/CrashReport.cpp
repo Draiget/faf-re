@@ -7,6 +7,7 @@
 #include <Windows.h>
 
 #include <dbghelp.h>
+#include <psapi.h>
 #include <tlhelp32.h>
 #include <shellapi.h>
 
@@ -161,25 +162,49 @@ namespace gpg::diag
       ReportLine(sink, "Compiler  : MSVC %d", _MSC_VER);
 #endif
 
-      // PDB identity: the signature GUID + age dbghelp reads from the
-      // executable. With this pair, any module+RVA line in this report and
-      // the .dmp resolve against exactly one archived PDB - no guesswork
-      // about which build crashed.
-      if (DiagSymbolsReady()) {
-        IMAGEHLP_MODULEW64 moduleInfo{};
-        moduleInfo.SizeOfStruct = sizeof(moduleInfo);
-        if (::SymGetModuleInfoW64(::GetCurrentProcess(),
-                                  reinterpret_cast<DWORD64>(GetModuleHandleW(nullptr)), &moduleInfo)
-            != FALSE) {
-          const GUID& sig = moduleInfo.PdbSig70;
-          ReportLine(
-            sink, "PDB       : {%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X} age=%lu",
-            sig.Data1, sig.Data2, sig.Data3, sig.Data4[0], sig.Data4[1], sig.Data4[2], sig.Data4[3],
-            sig.Data4[4], sig.Data4[5], sig.Data4[6], sig.Data4[7], moduleInfo.PdbAge
-          );
-          ReportLine(
-            sink, "PDB file  : %ls", (moduleInfo.LoadedPdbName[0] != L'\0') ? moduleInfo.LoadedPdbName : L"(none)"
-          );
+      // PDB identity read straight from the PE debug directory (deterministic,
+      // no symbol machinery): the RSDS record carries the signature GUID and
+      // age. With this pair, any module+RVA line in this report and the .dmp
+      // resolve against exactly one archived PDB.
+      {
+        const HMODULE exeModule = ::GetModuleHandleW(nullptr);
+        if (exeModule != nullptr) {
+          const auto* const base = reinterpret_cast<const unsigned char*>(exeModule);
+          const auto* const dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+          if (dos->e_magic == IMAGE_DOS_SIGNATURE) {
+            const auto* const nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
+            if (nt->Signature == IMAGE_NT_SIGNATURE) {
+              const auto& debugDirectory = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+              if (debugDirectory.Size != 0) {
+                const auto* const debug = reinterpret_cast<const IMAGE_DEBUG_DIRECTORY*>(
+                  base + debugDirectory.VirtualAddress
+                );
+                const DWORD entries = debugDirectory.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+                for (DWORD e = 0; e < entries; ++e) {
+                  if (debug[e].Type != IMAGE_DEBUG_TYPE_CODEVIEW || debug[e].AddressOfRawData == 0) {
+                    continue;
+                  }
+                  // CV_INFO_PDB70: 'RSDS', GUID, age, zero-terminated path.
+                  // AddressOfRawData is the mapped RVA (PointerToRawData is a
+                  // file offset and does not map into memory).
+                  const auto* const cv =
+                    reinterpret_cast<const unsigned char*>(base) + debug[e].AddressOfRawData;
+                  if (cv[0] == 'R' && cv[1] == 'S' && cv[2] == 'D' && cv[3] == 'S') {
+                    const GUID& sig = *reinterpret_cast<const GUID*>(cv + 4);
+                    const DWORD age = *reinterpret_cast<const DWORD*>(cv + 20);
+                    const char* const pdbPath = reinterpret_cast<const char*>(cv + 24);
+                    ReportLine(
+                      sink, "PDB       : {%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X} age=%lu",
+                      sig.Data1, sig.Data2, sig.Data3, sig.Data4[0], sig.Data4[1], sig.Data4[2], sig.Data4[3],
+                      sig.Data4[4], sig.Data4[5], sig.Data4[6], sig.Data4[7], age
+                    );
+                    ReportLine(sink, "PDB file  : %s", pdbPath);
+                    break;
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -488,20 +513,20 @@ namespace gpg::diag
         return;
       }
 
-      MODULEENTRY32 module{};
+      MODULEENTRY32W module{};
       module.dwSize = sizeof(module);
-      if (::Module32First(snapshot, &module) == FALSE) {
+      if (::Module32FirstW(snapshot, &module) == FALSE) {
         ReportLine(sink, "module enumeration failed: %lu", ::GetLastError());
         (void)::CloseHandle(snapshot);
         return;
       }
 
       do {
-        ReportLine(sink, "%016llX %8lu %s", static_cast<unsigned long long>(
-                                          reinterpret_cast<std::uintptr_t>(module.modBaseAddr)
-                                        ),
+        ReportLine(sink, "%016llX %8lu %ls", static_cast<unsigned long long>(
+                                             reinterpret_cast<std::uintptr_t>(module.modBaseAddr)
+                                           ),
                    module.modBaseSize, module.szModule);
-      } while (::Module32Next(snapshot, &module) != FALSE);
+      } while (::Module32NextW(snapshot, &module) != FALSE);
       (void)::CloseHandle(snapshot);
     }
 
@@ -805,10 +830,13 @@ namespace gpg::diag
     {
       HFONT font = static_cast<HFONT>(::GetStockObject(DEFAULT_GUI_FONT));
 
+      // Created at dummy coordinates: the real geometry comes from
+      // LayoutCrashDialogChildren, which runs right after this on the actual
+      // client rect (and again on every WM_SIZE).
       HWND edit = ::CreateWindowExW(
         WS_EX_CLIENTEDGE, L"EDIT", sCrashDialogText,
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
-        8, 8, 600, 400, dialog, reinterpret_cast<HMENU>(static_cast<std::uintptr_t>(kEditControlId)),
+        0, 0, 100, 100, dialog, reinterpret_cast<HMENU>(static_cast<std::uintptr_t>(kEditControlId)),
         nullptr, nullptr
       );
       if (edit != nullptr) {
@@ -820,21 +848,26 @@ namespace gpg::diag
 
       const wchar_t* const labels[] = {L"Copy report", L"Open report folder", L"Close"};
       const int ids[] = {kCopyButtonId, kOpenFolderButtonId, kCloseButtonId};
-      int x = 8;
       for (int i = 0; i < 3; ++i) {
         HWND button = ::CreateWindowExW(
-          0, L"BUTTON", labels[i], WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, x, 440, 170, 30, dialog,
+          0, L"BUTTON", labels[i], WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 100, 30, dialog,
           reinterpret_cast<HMENU>(static_cast<std::uintptr_t>(ids[i])), nullptr, nullptr
         );
         if (button != nullptr) {
           (void)::SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         }
-        x += 180;
       }
     }
 
-    void LayoutCrashDialogChildren(HWND dialog, const int clientWidth, const int clientHeight)
+    void LayoutCrashDialogChildren(HWND dialog)
     {
+      RECT client{};
+      if (::GetClientRect(dialog, &client) == FALSE) {
+        return;
+      }
+      const int clientWidth = client.right - client.left;
+      const int clientHeight = client.bottom - client.top;
+
       const int margin = 8;
       const int buttonHeight = 32;
       const int buttonWidth = 170;
@@ -864,11 +897,31 @@ namespace gpg::diag
       switch (message) {
         case WM_INITDIALOG: {
           (void)lParam;
+
+          // Size to 3/4 of the primary monitor's work area. The template's
+          // 500x350 dialog units are only a fallback; the report text is
+          // much longer than any fixed size.
+          HMONITOR monitor = ::MonitorFromWindow(dialog, MONITOR_DEFAULTTOPRIMARY);
+          MONITORINFO monitorInfo{};
+          monitorInfo.cbSize = sizeof(monitorInfo);
+          if (::GetMonitorInfoW(monitor, &monitorInfo) != FALSE) {
+            const int width = ((monitorInfo.rcWork.right - monitorInfo.rcWork.left) * 3) / 4;
+            const int height = ((monitorInfo.rcWork.bottom - monitorInfo.rcWork.top) * 3) / 4;
+            const int x = monitorInfo.rcWork.left + ((monitorInfo.rcWork.right - monitorInfo.rcWork.left) - width) / 2;
+            const int y =
+              monitorInfo.rcWork.top + ((monitorInfo.rcWork.bottom - monitorInfo.rcWork.top) - height) / 2;
+            (void)::SetWindowPos(dialog, HWND_TOP, x, y, width, height, SWP_SHOWWINDOW);
+          }
+
           CreateCrashDialogChildren(dialog);
+          // The dialog's own WM_SIZE arrived before WM_INITDIALOG (children
+          // did not exist yet), so lay out once now against the real client
+          // rect; every later WM_SIZE re-runs it.
+          LayoutCrashDialogChildren(dialog);
           return TRUE;
         }
         case WM_SIZE:
-          LayoutCrashDialogChildren(dialog, LOWORD(lParam), HIWORD(lParam));
+          LayoutCrashDialogChildren(dialog);
           return TRUE;
         case WM_COMMAND: {
           const int id = LOWORD(wParam);

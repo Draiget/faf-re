@@ -347,6 +347,13 @@ namespace
         DumpLine(sink, "  VM %d   [%d] %s", index, s, valueText);
       }
     }
+
+    // The globals table is the one object every report reader wants named.
+    // Dump its summary (and corruption check) even when no frame is running.
+    if (state->_gt.tt == LUA_TTABLE && IsPlausiblePointer(state->_gt.value.p)) {
+      DumpLine(sink, "  VM %d globals table:", index);
+      DumpSuspectTable(sink, static_cast<const Table*>(state->_gt.value.p));
+    }
   }
 
 } // namespace
