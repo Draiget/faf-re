@@ -23,7 +23,7 @@
 namespace moho
 {
   msvc8::string WIN_GetLastError();
-  std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uint32_t* outFrames);
+  std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uintptr_t* outFrames);
 }
 
 using namespace moho;
@@ -68,7 +68,7 @@ namespace
 
   [[noreturn]] void ThrowFileWildError(const char* const message)
   {
-    std::uint32_t callstack[32]{};
+    std::uintptr_t callstack[32]{};
     const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 32u, callstack);
     const msvc8::string fullMessage = gpg::STR_Printf(
       "%s: %s", "Moho::FILE_Wild", message != nullptr ? message : "File error."

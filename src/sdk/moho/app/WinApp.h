@@ -18,11 +18,11 @@ namespace moho
   struct SPlatSymbolInfo
   {
     // +0x00
-    std::uint32_t addr;
+    std::uintptr_t addr;
     // +0x04
     msvc8::string symbol;
     // +0x20
-    std::uint32_t symDis;
+    std::uintptr_t symDis;
     // +0x24
     msvc8::string filename;
     // +0x40
@@ -38,6 +38,15 @@ namespace moho
     [[nodiscard]] msvc8::string FormatResolvedLine() const;
   };
 
+#if defined(_WIN64)
+  static_assert(offsetof(SPlatSymbolInfo, addr) == 0x00, "SPlatSymbolInfo::addr offset must be 0x00");
+  static_assert(offsetof(SPlatSymbolInfo, symbol) == 0x08, "SPlatSymbolInfo::symbol offset must be 0x08");
+  static_assert(offsetof(SPlatSymbolInfo, symDis) == 0x28, "SPlatSymbolInfo::symDis offset must be 0x28");
+  static_assert(offsetof(SPlatSymbolInfo, filename) == 0x30, "SPlatSymbolInfo::filename offset must be 0x30");
+  static_assert(offsetof(SPlatSymbolInfo, lineNum) == 0x50, "SPlatSymbolInfo::lineNum offset must be 0x50");
+  static_assert(offsetof(SPlatSymbolInfo, lineDis) == 0x54, "SPlatSymbolInfo::lineDis offset must be 0x54");
+  static_assert(sizeof(SPlatSymbolInfo) == 0x58, "SPlatSymbolInfo size must be 0x58");
+#else
   static_assert(offsetof(SPlatSymbolInfo, addr) == 0x00, "SPlatSymbolInfo::addr offset must be 0x00");
   static_assert(offsetof(SPlatSymbolInfo, symbol) == 0x04, "SPlatSymbolInfo::symbol offset must be 0x04");
   static_assert(offsetof(SPlatSymbolInfo, symDis) == 0x20, "SPlatSymbolInfo::symDis offset must be 0x20");
@@ -45,6 +54,7 @@ namespace moho
   static_assert(offsetof(SPlatSymbolInfo, lineNum) == 0x40, "SPlatSymbolInfo::lineNum offset must be 0x40");
   static_assert(offsetof(SPlatSymbolInfo, lineDis) == 0x44, "SPlatSymbolInfo::lineDis offset must be 0x44");
   static_assert(sizeof(SPlatSymbolInfo) == 0x48, "SPlatSymbolInfo size must be 0x48");
+#endif
 
   /**
    * Address: 0x004F2480 (FUN_004F2480, ?WIN_GetBeforeEventsStage@Moho@@YAAAVCTaskStage@1@XZ)
@@ -199,7 +209,7 @@ namespace moho
    * Captures up to `maxFrames` return addresses from the supplied CPU context
    * (or current thread context when null).
    */
-  std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uint32_t* outFrames);
+  std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uintptr_t* outFrames);
 
   /**
    * Address: 0x004A2440 (FUN_004A2440)
@@ -208,7 +218,7 @@ namespace moho
    * What it does:
    * Resolves one callstack address into symbol/file/line metadata when available.
    */
-  bool PLAT_GetSymbolInfo(std::uint32_t address, SPlatSymbolInfo* outInfo);
+  bool PLAT_GetSymbolInfo(std::uintptr_t address, SPlatSymbolInfo* outInfo);
 
   /**
    * Address: 0x004A26E0 (FUN_004A26E0)
@@ -218,7 +228,7 @@ namespace moho
    * What it does:
    * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
    */
-  msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uint32_t* frames);
+  msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 
   /**
    * Address: 0x004A25D0 (FUN_004A25D0)

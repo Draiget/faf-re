@@ -615,7 +615,7 @@ namespace
 
   [[noreturn]] void ThrowStartupFileError(const char* const functionName, const char* const message)
   {
-    std::uint32_t callstack[32]{};
+    std::uintptr_t callstack[32]{};
     const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 32u, callstack);
     const msvc8::string errorText = gpg::STR_Printf(
       "%s: %s", functionName != nullptr ? functionName : "Moho::File", message != nullptr ? message : "File error."

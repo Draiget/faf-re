@@ -2359,32 +2359,31 @@ namespace
     }
 
     const EXCEPTION_RECORD& record = *exceptionInfo->ExceptionRecord;
-    const auto faultAddress =
-      static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(record.ExceptionAddress));
+    const std::uintptr_t faultAddress = reinterpret_cast<std::uintptr_t>(record.ExceptionAddress);
 
     gpg::Logf(
-      "CRASH: %s (0x%08X) at address 0x%08X",
+      "CRASH: %s (0x%08X) at address %p",
       StructuredExceptionToString(record.ExceptionCode),
       static_cast<unsigned int>(record.ExceptionCode),
-      faultAddress
+      record.ExceptionAddress
     );
     WriteCrashRecordLine(
-      "CRASH: %s (0x%08X) at address 0x%08X",
+      "CRASH: %s (0x%08X) at address %p",
       StructuredExceptionToString(record.ExceptionCode),
       static_cast<unsigned int>(record.ExceptionCode),
-      faultAddress
+      record.ExceptionAddress
     );
 
     if (record.ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record.NumberParameters >= 2u) {
       gpg::Logf(
-        "CRASH: attempted to %s memory at 0x%08X",
-        record.ExceptionInformation[0] != 0u ? "write" : "read",
-        static_cast<unsigned int>(record.ExceptionInformation[1])
+        "CRASH: attempted to %s memory at %p",
+        record.ExceptionInformation[0] == 8u ? "execute" : (record.ExceptionInformation[0] != 0u ? "write" : "read"),
+        reinterpret_cast<const void*>(record.ExceptionInformation[1])
       );
       WriteCrashRecordLine(
-        "CRASH: attempted to %s memory at 0x%08X",
-        record.ExceptionInformation[0] != 0u ? "write" : "read",
-        static_cast<unsigned int>(record.ExceptionInformation[1])
+        "CRASH: attempted to %s memory at %p",
+        record.ExceptionInformation[0] == 8u ? "execute" : (record.ExceptionInformation[0] != 0u ? "write" : "read"),
+        reinterpret_cast<const void*>(record.ExceptionInformation[1])
       );
     }
 
@@ -2399,14 +2398,13 @@ namespace
         ::GetModuleFileNameA(faultModule, faultModulePath, MAX_PATH) != 0u) {
       const char* moduleName = std::strrchr(faultModulePath, '\\');
       moduleName = moduleName != nullptr ? moduleName + 1 : faultModulePath;
-      const auto offset = faultAddress - static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(faultModule));
-      gpg::Logf("CRASH: fault is %s+0x%08X (module base 0x%08X)", moduleName, offset,
-                static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(faultModule)));
-      WriteCrashRecordLine("CRASH: fault is %s+0x%08X (module base 0x%08X)", moduleName, offset,
-                           static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(faultModule)));
+      const std::uintptr_t moduleBase = reinterpret_cast<std::uintptr_t>(faultModule);
+      const std::uintptr_t offset = faultAddress - moduleBase;
+      gpg::Logf("CRASH: fault is %s+0x%zX (module base %p)", moduleName, offset, static_cast<void*>(faultModule));
+      WriteCrashRecordLine("CRASH: fault is %s+0x%zX (module base %p)", moduleName, offset, static_cast<void*>(faultModule));
     }
 
-    std::uint32_t stackFrames[64]{};
+    std::uintptr_t stackFrames[64]{};
     std::uint32_t frameCount = moho::PLAT_GetCallStack(exceptionInfo->ContextRecord, 64, stackFrames);
     if (frameCount == 0u) {
       // A fault late in shutdown comes after PLAT_Exit has released the symbol
@@ -2452,8 +2450,8 @@ namespace
     // Raw return addresses as well: when symbolisation fails for a frame the
     // text above says nothing useful, but these still resolve against main.pdb.
     for (std::uint32_t frame = 0u; frame < frameCount; ++frame) {
-      gpg::Logf("CRASH   frame[%u] = 0x%08X", frame, stackFrames[frame]);
-      WriteCrashRecordLine("CRASH   frame[%u] = 0x%08X", frame, stackFrames[frame]);
+      gpg::Logf("CRASH   frame[%u] = %p", frame, reinterpret_cast<const void*>(stackFrames[frame]));
+      WriteCrashRecordLine("CRASH   frame[%u] = %p", frame, reinterpret_cast<const void*>(stackFrames[frame]));
     }
   }
 
@@ -2502,7 +2500,7 @@ namespace
     std::snprintf(
       message,
       sizeof(message),
-      "%s (0x%08X) at address 0x%08X",
+      "%s (0x%08X) at address %p",
       StructuredExceptionToString(exceptionCode),
       static_cast<unsigned int>(exceptionCode),
       static_cast<unsigned int>(exceptionAddressRaw)
@@ -2515,7 +2513,7 @@ namespace
       std::snprintf(
         accessViolationDetails,
         sizeof(accessViolationDetails),
-        "\n    attempted to %s memory at 0x%08X",
+        "\n    attempted to %s memory at %p",
         operation,
         static_cast<unsigned int>(exceptionInfo->ExceptionRecord->ExceptionInformation[1])
       );
@@ -2643,7 +2641,7 @@ moho::CWaitHandleSet* moho::WIN_GetWaitHandleSet()
 msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 {
   return gpg::STR_Printf(
-    "%s + %u bytes (%s(%u) + %u bytes)",
+    "%s + %zu bytes (%s(%u) + %u bytes)",
     symbol.c_str(),
     symDis,
     filename.c_str(),
@@ -3003,7 +3001,7 @@ void moho::PLAT_CreateGameLogForReport()
  * (or current thread context when null).
  */
 std::uint32_t moho::PLAT_GetCallStack(
-  void* const contextRecord, const std::uint32_t maxFrames, std::uint32_t* const outFrames
+  void* const contextRecord, const std::uint32_t maxFrames, std::uintptr_t* const outFrames
 )
 {
   if (outFrames == nullptr || maxFrames == 0) {
@@ -3073,8 +3071,6 @@ std::uint32_t moho::PLAT_GetCallStack(
 
   return frameCount;
 #elif defined(_M_X64)
-  // The x64 build links /LARGEADDRESSAWARE:NO, so every code address fits the
-  // 32-bit frame slots this interface was written with.
   CONTEXT context{};
   if (contextRecord != nullptr) {
     context = *static_cast<const CONTEXT*>(contextRecord);
@@ -3116,7 +3112,7 @@ std::uint32_t moho::PLAT_GetCallStack(
       frameAddress -= 1;
     }
 
-    outFrames[frameCount] = static_cast<std::uint32_t>(frameAddress);
+    outFrames[frameCount] = static_cast<std::uintptr_t>(frameAddress);
     ++frameCount;
   }
 
@@ -3136,7 +3132,7 @@ std::uint32_t moho::PLAT_GetCallStack(
  * What it does:
  * Resolves one callstack address into symbol/file/line metadata when available.
  */
-bool moho::PLAT_GetSymbolInfo(const std::uint32_t address, SPlatSymbolInfo* const outInfo)
+bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* const outInfo)
 {
   if (outInfo == nullptr) {
     return false;
@@ -3192,7 +3188,7 @@ bool moho::PLAT_GetSymbolInfo(const std::uint32_t address, SPlatSymbolInfo* cons
  * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
  */
 msvc8::string moho::PLAT_FormatCallstack(
-  std::int32_t firstFrame, const std::int32_t endFrame, const std::uint32_t* const frames
+  std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames
 )
 {
   msvc8::string formatted;
@@ -3212,7 +3208,7 @@ msvc8::string moho::PLAT_FormatCallstack(
       assembled.append(symbolInfo.FormatResolvedLine().c_str());
       assembled.append("\r\n");
     } else {
-      const msvc8::string line = gpg::STR_Printf("\tUnknown symbol (address 0x%08x)\r\n", frames[frameIndex]);
+      const msvc8::string line = gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
       assembled.append(line.c_str());
     }
   }
@@ -3504,7 +3500,7 @@ void moho::WIN_ShowCrashDialog(
     skipCallstackFrames += 2;
   }
 
-  std::uint32_t stackFrames[64]{};
+  std::uintptr_t stackFrames[64]{};
   const std::uint32_t frameCount = PLAT_GetCallStack(contextRecord, 64, stackFrames);
   const std::uint32_t firstFrame =
     skipCallstackFrames > 0 ? static_cast<std::uint32_t>(skipCallstackFrames) : static_cast<std::uint32_t>(0);

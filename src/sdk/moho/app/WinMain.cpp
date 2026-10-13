@@ -74,7 +74,7 @@ namespace
   std::FILE* sAllocLogFile = nullptr;
   CRITICAL_SECTION sAllocLogLock{};
   bool sInMemHook = false;
-  msvc8::hash_set<std::uint32_t> sMemHookAddr;
+  msvc8::hash_set<std::uintptr_t> sMemHookAddr;
 
   STICKYKEYS sSavedStickyKeys{};
   TOGGLEKEYS sSavedToggleKeys{};
@@ -125,7 +125,7 @@ namespace
       std::fwrite(&size, sizeof(size), 1, sAllocLogFile);
       std::fwrite(&pointer, sizeof(pointer), 1, sAllocLogFile);
 
-      std::uint32_t frames[64];
+      std::uintptr_t frames[64];
       const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 64, frames);
       for (std::uint32_t index = 0; index < frameCount; ++index) {
         std::fwrite(&frames[index], sizeof(frames[index]), 1, sAllocLogFile);
@@ -138,7 +138,7 @@ namespace
         }
       }
 
-      const std::uint32_t terminator = 0;
+      const std::uintptr_t terminator = 0;
       std::fwrite(&terminator, sizeof(terminator), 1, sAllocLogFile);
       sInMemHook = false;
     }

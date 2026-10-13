@@ -6,8 +6,8 @@
 
 namespace moho
 {
-    std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uint32_t* outFrames);
-    msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uint32_t* frames);
+    std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uintptr_t* outFrames);
+    msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 } // namespace moho
 
 using namespace moho;

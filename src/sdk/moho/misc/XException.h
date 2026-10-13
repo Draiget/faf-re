@@ -53,8 +53,17 @@ namespace moho
     protected:
         XException(const char* message, bool captureCallstack);
 
-        std::array<std::uint32_t, 32> mCallstack{};
+        std::array<std::uintptr_t, 32> mCallstack{};
         std::uint32_t mTopStack{ 0 };
         mutable std::string mMsg{};
     };
+
+    // Exception objects use the SDK's current MSVC CRT/std::string ABI.
+#if defined(_MSC_VER) && _ITERATOR_DEBUG_LEVEL == 0
+#if defined(_WIN64)
+    static_assert(sizeof(XException) == 0x140, "XException size must be 0x140");
+#else
+    static_assert(sizeof(XException) == 0xA8, "XException size must be 0xA8");
+#endif
+#endif
 } // namespace moho

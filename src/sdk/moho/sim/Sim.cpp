@@ -3787,12 +3787,12 @@ namespace
     return moho::console::SimReportCheatsEnabled();
   }
 
-  int GetCallStackFrames(unsigned int* outFrames)
+  int GetCallStackFrames(std::uintptr_t* outFrames)
   {
     return moho::console::PlatformGetCallStack(outFrames, 0x10u);
   }
 
-  void FormatCallStack(msvc8::string* outText, const int frameCount, const unsigned int* frames)
+  void FormatCallStack(msvc8::string* outText, const int frameCount, const std::uintptr_t* frames)
   {
     moho::console::PlatformFormatCallstack(outText, frameCount, frames);
   }
@@ -7608,22 +7608,12 @@ bool Sim::CheatsEnabled()
   }
 
   if (IsSimDebugCheatsEnabled()) {
-    struct CallStackScratch
-    {
-      unsigned int a3[2];
-      unsigned int a4[15];
-    };
-
-    CallStackScratch scratch{};
+    // 0x00747230/0x0074723D refer to the same array after stack-argument pushes.
+    std::uintptr_t frames[16]{};
     msvc8::string callstackText{};
-
-    const int frameCount = GetCallStackFrames(scratch.a3);
-    FormatCallStack(&callstackText, frameCount, scratch.a4);
-    Logf("%s", callstackText.raw_data_unsafe());
-
-    if (callstackText.myRes >= 0x10 && callstackText.bx.ptr) {
-      ::operator delete(callstackText.bx.ptr);
-    }
+    const int frameCount = GetCallStackFrames(frames);
+    FormatCallStack(&callstackText, frameCount, frames);
+    Logf("%s", callstackText.c_str());
   }
 
   if (mCurCommandSource != kInvalidCommandSource) {

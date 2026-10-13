@@ -21,7 +21,7 @@ namespace moho
          * What it does:
          * Builds file-error exception payload and adopts provided callstack snapshot.
          */
-        XFileError(const std::string& message, const std::uint32_t* callstack, std::uint32_t frameCount);
+        XFileError(const std::string& message, const std::uintptr_t* callstack, std::uint32_t frameCount);
 
         /**
          * Address: 0x0040FCB0 (FUN_0040FCB0, Moho::XFileError::XFileError)
@@ -39,4 +39,12 @@ namespace moho
          */
         ~XFileError() noexcept override;
     };
+
+#if defined(_MSC_VER) && _ITERATOR_DEBUG_LEVEL == 0
+#if defined(_WIN64)
+    static_assert(sizeof(XFileError) == 0x140, "XFileError size must be 0x140");
+#else
+    static_assert(sizeof(XFileError) == 0xA8, "XFileError size must be 0xA8");
+#endif
+#endif
 } // namespace moho

@@ -12,7 +12,7 @@ using namespace moho;
  * What it does:
  * Builds file-error exception payload and adopts provided callstack snapshot.
  */
-XFileError::XFileError(const std::string& message, const std::uint32_t* const callstack, const std::uint32_t frameCount)
+XFileError::XFileError(const std::string& message, const std::uintptr_t* const callstack, const std::uint32_t frameCount)
     : XException(message.c_str(), false)
 {
     mTopStack = frameCount;
@@ -20,7 +20,7 @@ XFileError::XFileError(const std::string& message, const std::uint32_t* const ca
     if (mTopStack != 0) {
         const std::uint32_t copyCount =
             std::min<std::uint32_t>(mTopStack, static_cast<std::uint32_t>(mCallstack.size()));
-        // Raw u32 callstack-array blob copy.
+        // Copy native return-address slots.
         std::copy_n(callstack, copyCount, mCallstack.data());
     }
 }

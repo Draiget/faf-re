@@ -33,7 +33,7 @@ namespace moho
       return gSimReportCheats;
     }
 
-    int PlatformGetCallStack(unsigned int* outFrames, unsigned int maxFrames)
+    int PlatformGetCallStack(std::uintptr_t* outFrames, unsigned int maxFrames)
     {
       if (!outFrames || maxFrames == 0u) {
         return 0;
@@ -42,7 +42,7 @@ namespace moho
       return static_cast<int>(moho::PLAT_GetCallStack(nullptr, maxFrames, outFrames));
     }
 
-    void PlatformFormatCallstack(msvc8::string* outText, const int frameCount, const unsigned int* frames)
+    void PlatformFormatCallstack(msvc8::string* outText, const int frameCount, const std::uintptr_t* frames)
     {
       if (!outText || !frames) {
         return;
