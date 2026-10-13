@@ -137,6 +137,28 @@ namespace gpg::diag
 #ifdef _MSC_VER
       ReportLine(sink, "Compiler  : MSVC %d", _MSC_VER);
 #endif
+
+      // PDB identity: the signature GUID + age dbghelp reads from the
+      // executable. With this pair, any module+RVA line in this report and
+      // the .dmp resolve against exactly one archived PDB - no guesswork
+      // about which build crashed.
+      if (DiagSymbolsReady()) {
+        IMAGEHLP_MODULEW64 moduleInfo{};
+        moduleInfo.SizeOfStruct = sizeof(moduleInfo);
+        if (::SymGetModuleInfoW64(::GetCurrentProcess(),
+                                  reinterpret_cast<DWORD64>(GetModuleHandleW(nullptr)), &moduleInfo)
+            != FALSE) {
+          const GUID& sig = moduleInfo.PdbSig70;
+          ReportLine(
+            sink, "PDB       : {%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X} age=%lu",
+            sig.Data1, sig.Data2, sig.Data3, sig.Data4[0], sig.Data4[1], sig.Data4[2], sig.Data4[3],
+            sig.Data4[4], sig.Data4[5], sig.Data4[6], sig.Data4[7], moduleInfo.PdbAge
+          );
+          ReportLine(
+            sink, "PDB file  : %ls", (moduleInfo.LoadedPdbName[0] != L'\0') ? moduleInfo.LoadedPdbName : L"(none)"
+          );
+        }
+      }
     }
 
     void WriteProcessSection(std::FILE* const sink)

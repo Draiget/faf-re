@@ -105,24 +105,25 @@ namespace gpg::diag
   // also beats reading it afterwards: the handler runs on the faulting thread
   // before any unwinding, so the frames above it are the real ones.
   // ---------------------------------------------------------------------
+
+  bool DiagSymbolsReady()
+  {
+    static bool sReady = false;
+    static bool sTried = false;
+    if (!sTried) {
+      sTried = true;
+      (void)::SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_FAIL_CRITICAL_ERRORS);
+      // WinApp.cpp already initialises dbghelp for the crash reporter. A second
+      // call fails with ERROR_INVALID_PARAMETER and that is fine - the handle is
+      // already usable, so treat "already initialised" as success.
+      sReady = ::SymInitialize(::GetCurrentProcess(), nullptr, TRUE) != FALSE
+        || ::GetLastError() == ERROR_INVALID_PARAMETER;
+    }
+    return sReady;
+  }
+
   namespace
   {
-
-    bool DiagSymbolsReady()
-    {
-      static bool sReady = false;
-      static bool sTried = false;
-      if (!sTried) {
-        sTried = true;
-        (void)::SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_FAIL_CRITICAL_ERRORS);
-        // WinApp.cpp already initialises dbghelp for the crash reporter. A second
-        // call fails with ERROR_INVALID_PARAMETER and that is fine - the handle is
-        // already usable, so treat "already initialised" as success.
-        sReady = ::SymInitialize(::GetCurrentProcess(), nullptr, TRUE) != FALSE
-          || ::GetLastError() == ERROR_INVALID_PARAMETER;
-      }
-      return sReady;
-    }
 
   } // namespace
 

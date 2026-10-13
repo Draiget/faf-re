@@ -49,6 +49,9 @@ namespace gpg::diag
    */
   void DiagDescribeAddress(const void* address, char* out, std::size_t outBytes);
 
+  /** True when dbghelp is initialized for this process (lazy, once). */
+  bool DiagSymbolsReady();
+
 } // namespace gpg::diag
 
 #endif // GPG_CORE_DIAGNOSTICS_CRASHHOOKS_H
