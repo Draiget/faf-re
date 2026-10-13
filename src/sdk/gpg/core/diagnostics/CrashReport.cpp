@@ -518,11 +518,21 @@ namespace gpg::diag
     WriteThreadsSection(sink, context);
     WriteModulesSection(sink);
 
+    CrashSectionInfo sectionInfo{};
+    if (context.exceptionInfo != nullptr && context.exceptionInfo->ExceptionRecord != nullptr) {
+      sectionInfo.faultAddress = context.exceptionInfo->ExceptionRecord->ExceptionAddress;
+      if (context.exceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION
+          && context.exceptionInfo->ExceptionRecord->NumberParameters >= 2) {
+        sectionInfo.accessTarget =
+          reinterpret_cast<const void*>(context.exceptionInfo->ExceptionRecord->ExceptionInformation[1]);
+      }
+    }
+
     const SectionRegistry& registry = SectionRegistryInstance();
     for (std::size_t i = 0; i < registry.count; ++i) {
       ReportLine(sink, "");
       ReportLine(sink, "--- %s ---", registry.names[i]);
-      registry.writers[i](sink);
+      registry.writers[i](sink, sectionInfo);
       (void)std::fflush(sink);
     }
 

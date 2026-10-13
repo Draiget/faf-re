@@ -1419,6 +1419,9 @@
     <ClCompile Include="gpg\core\diagnostics\CrashReport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lua\LuaCrashDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\script\CScriptEvent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3160,6 +3163,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\diagnostics\CrashReport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaCrashDump.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\String.h">

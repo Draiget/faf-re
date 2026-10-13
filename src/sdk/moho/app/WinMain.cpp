@@ -32,10 +32,15 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Error.hpp"
 #include "legacy/containers/HashMap.h"
+#include "lua/LuaRuntimeTypes.h"
 #include "WinApp.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
 #include "moho/misc/StartupHelpers.h"
+
+// crashtest lua_table_corrupt builds a raw VM; lua_open is recovered in
+// lua/LuaObject.cpp inside `extern "C"`.
+extern "C" lua_State* lua_open();
 
 namespace
 {
@@ -265,8 +270,10 @@ namespace
    *   intdiv           - integer divide by zero
    *   purecall         - pure virtual call (CRT fatal)
    *   terminate        - std::terminate (uncaught exception)
-   *   lua_table_corrupt- reserved for the Phase 2 Lua section (currently
-   *                      behaves as nullread inside a Lua table helper)
+   *   lua_table_corrupt- opens a Lua VM, builds a table with a
+   *                      nil-key/non-nil-value node (the stray-write
+   *                      signature), then faults reading null: the report's
+   *                      Lua section must show the flagged table
    */
   [[noreturn]]
   void RunCrashTest(const char* const kind)
@@ -287,6 +294,24 @@ namespace
       _purecall();
     } else if (kind != nullptr && std::strcmp(kind, "terminate") == 0) {
       throw std::runtime_error("crashtest: uncaught exception");
+    } else if (kind != nullptr && std::strcmp(kind, "lua_table_corrupt") == 0) {
+      // Build a VM, plant the stray-write signature in its globals table,
+      // then fault: proves the Lua section finds the VM and flags the
+      // corrupt node.
+      lua_State* const state = lua_open();
+      if (state == nullptr) {
+        std::abort();
+      }
+      Table* const globals = static_cast<Table*>(state->_gt.value.p);
+      if (globals != nullptr && globals->node != nullptr) {
+        // nil key with a non-nil value in the first hash node - Lua never
+        // creates this shape; the dumper must flag it.
+        globals->node[0].i_key.tt = LUA_TNIL;
+        globals->node[0].i_key.value.p = nullptr;
+        globals->node[0].i_val.tt = LUA_TBOOLEAN;
+        globals->node[0].i_val.value.b = 1;
+      }
+      (void)*static_cast<volatile const int*>(nullptr);
     } else { // default: nullread
       (void)*static_cast<volatile const int*>(nullptr);
     }

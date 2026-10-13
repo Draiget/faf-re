@@ -8,13 +8,22 @@ struct _EXCEPTION_POINTERS;
 namespace gpg::diag
 {
 
+  /** Fault context handed to crash-section writers. */
+  struct CrashSectionInfo
+  {
+    /** SEH exception address, null on non-SEH fatal paths. */
+    const void* faultAddress = nullptr;
+    /** Access-violation target address (read/write), null otherwise. */
+    const void* accessTarget = nullptr;
+  };
+
   /**
    * Callback that appends one named section to the crash report (sim state,
    * Lua stacks, ...). Registered by engine layers at startup; invoked only on
    * the crash path, with a `std::FILE*` sink already positioned inside the
    * section header.
    */
-  using CrashSectionWriter = void (*)(std::FILE* sink);
+  using CrashSectionWriter = void (*)(std::FILE* sink, const CrashSectionInfo& info);
 
   /** Registers one extra report section (max 8, first-registered order). */
   void AddCrashSection(const char* name, CrashSectionWriter writer);

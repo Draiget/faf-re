@@ -23,6 +23,7 @@
 #include <stdexcept>
 
 #include "LuaAssertion.h"
+#include "LuaCrashDump.h"
 #include "LuaError.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
@@ -387,6 +388,10 @@ extern "C"
 	 */
 	static void close_state(lua_State* const state)
 	{
+		// Crash-report registry (deviation, documented): out first, so the
+		// handler never walks a state that is being freed under it.
+		lua::UnregisterLuaVm(state);
+
 		luaF_close(state, state->stack);
 
 		global_State* const globalState = state->l_G;
@@ -15152,6 +15157,16 @@ extern "C"
 		k = cl->p->k;
 		oldline = -1;
 
+		// Live-pc publication (deviation, documented): keep `ci->pc` pointing
+		// at the address of the interpreter's `pc` variable so a crash handler
+		// can read the *current* instruction of the running frame. savedpc is
+		// stale between calls (it is only written at calls and hooks), and the
+		// alternative - refreshing savedpc on every back-edge - costs a store
+		// per loop iteration. One store per dispatch entry; `pc` itself lives
+		// in this frame for the whole interpreter loop, so the pointer is
+		// stable between refreshes.
+		L->ci->pc = &pc;
+
 		for (;;) {
 			const Instruction i = *pc++;
 
@@ -17186,6 +17201,12 @@ extern "C"
 			close_state(state);
 			throw;
 		}
+
+		// Crash-report registry (deviation, documented): every live VM is
+		// registered so the crash handler can dump its frames. See
+		// LuaCrashDump.cpp; the registry is append-only and never touched on
+		// any hot path.
+		lua::RegisterLuaVm(state);
 
 		return state;
 	}
