@@ -34,6 +34,23 @@ it plays to `GameEnded` with no checksum mismatch, reaches about 4,400 units and
 and the sim runs flat out from about the 30-second mark. The whole game takes about 25 minutes of
 wall time on a fast desktop.
 
+## Playing a replay on the recovered builds
+
+The same conversion feeds the recovered engines. Launch windowed/nosound from the
+build's own folder (`bin_x64` for `main_x64.exe` — its FFmpeg DLL names clash with
+Win32's), with the replay and its id:
+
+```
+main.exe /init init.lua /nobugreport /replay C:\full\path\r.scfareplay /replayid 26935800 /nosound /windowed 1280 720 /log game.log
+```
+
+The engine checks the replay's version string against the running game version
+(`VCR_SetupReplaySession`), so the replay must match `lua/version.lua` of the installed gamedata.
+The `(sim)` half of every `Checksum for beat N mismatched` warning line is the local simulation's
+MD5 at that beat: identical between the x86 and x64 runs means the two builds simulated the same
+history, independent of how both differ from the recorded checksums (the known retail float/RNG
+divergence family).
+
 ## Finding a replay that plays clean
 
 Only a replay recorded on the local game version replays without desync (see the caveats). To find
