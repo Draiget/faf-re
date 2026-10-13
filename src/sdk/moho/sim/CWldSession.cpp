@@ -13295,7 +13295,8 @@ namespace moho
    * active (`sSimDriver`, 0x010C4F50), asks it for its client manager
    * (`ISTIDriver` slot 3) and runs that manager's `Debug` dump (slot 25,
    * tail call, no null test). Registered by the `gCConFunc_wld_ClientDebugDump`
-   * initializer 0x00BE7510 (the address is pushed at 0x00BE7536).
+   * initializer 0x00BE7510 (instruction 0x00BE7530 stores the callback
+   * address in the command object's slot at 0x00F5B770).
    */
   void CON_WLD_ClientDebugDump(const msvc8::vector<msvc8::string>& args)
   {
