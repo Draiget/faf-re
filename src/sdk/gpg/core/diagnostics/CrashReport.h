@@ -25,8 +25,16 @@ namespace gpg::diag
    */
   using CrashSectionWriter = void (*)(std::FILE* sink, const CrashSectionInfo& info);
 
-  /** Registers one extra report section (max 8, first-registered order). */
-  void AddCrashSection(const char* name, CrashSectionWriter writer);
+  /**
+   * Section placement: sections with priority below kAfterModulesPriority run
+   * between Registers and Threads (game context reads better there than
+   * buried under hundreds of stack lines); the rest run after Modules.
+   * Lower priority runs earlier within each group.
+   */
+  constexpr int kAfterModulesPriority = 500;
+
+  /** Registers one extra report section (max 8, priority order). */
+  void AddCrashSection(const char* name, CrashSectionWriter writer, int priority = kAfterModulesPriority);
 
   struct CrashReportContext
   {

@@ -35,6 +35,7 @@ namespace gpg::diag
     {
       const char* names[kMaxSections] = {};
       CrashSectionWriter writers[kMaxSections] = {};
+      int priorities[kMaxSections] = {};
       std::size_t count = 0;
     };
 
@@ -636,7 +637,7 @@ namespace gpg::diag
 
   } // namespace
 
-  void AddCrashSection(const char* const name, const CrashSectionWriter writer)
+  void AddCrashSection(const char* const name, const CrashSectionWriter writer, const int priority)
   {
     SectionRegistry& registry = SectionRegistryInstance();
     if (name == nullptr || writer == nullptr || registry.count >= kMaxSections) {
@@ -644,6 +645,7 @@ namespace gpg::diag
     }
     registry.names[registry.count] = name;
     registry.writers[registry.count] = writer;
+    registry.priorities[registry.count] = priority;
     ++registry.count;
   }
 
@@ -658,14 +660,6 @@ namespace gpg::diag
       return false;
     }
 
-    WriteBuildSection(sink);
-    WriteProcessSection(sink);
-    WriteSystemSection(sink);
-    WriteExceptionSection(sink, context);
-    WriteRegistersSection(sink, context);
-    WriteThreadsSection(sink, context);
-    WriteModulesSection(sink);
-
     CrashSectionInfo sectionInfo{};
     if (context.exceptionInfo != nullptr && context.exceptionInfo->ExceptionRecord != nullptr) {
       sectionInfo.faultAddress = context.exceptionInfo->ExceptionRecord->ExceptionAddress;
@@ -677,12 +671,49 @@ namespace gpg::diag
     }
 
     const SectionRegistry& registry = SectionRegistryInstance();
+    // Index order sorted by priority (stable for the handful of entries);
+    // computed on the stack here, never on the registration path.
+    std::size_t order[kMaxSections] = {};
     for (std::size_t i = 0; i < registry.count; ++i) {
-      ReportLine(sink, "");
-      ReportLine(sink, "--- %s ---", registry.names[i]);
-      registry.writers[i](sink, sectionInfo);
-      (void)std::fflush(sink);
+      order[i] = i;
     }
+    for (std::size_t i = 1; i < registry.count; ++i) {
+      const std::size_t key = order[i];
+      std::size_t j = i;
+      while (j > 0 && registry.priorities[order[j - 1]] > registry.priorities[key]) {
+        order[j] = order[j - 1];
+        --j;
+      }
+      order[j] = key;
+    }
+    const auto runGroup = [&](const bool beforeThreads) {
+      for (std::size_t i = 0; i < registry.count; ++i) {
+        const std::size_t s = order[i];
+        const bool early = registry.priorities[s] < kAfterModulesPriority;
+        if (early != beforeThreads) {
+          continue;
+        }
+        ReportLine(sink, "");
+        ReportLine(sink, "--- %s ---", registry.names[s]);
+        registry.writers[s](sink, sectionInfo);
+        (void)std::fflush(sink);
+      }
+    };
+
+    WriteBuildSection(sink);
+    WriteProcessSection(sink);
+    WriteSystemSection(sink);
+    WriteExceptionSection(sink, context);
+    WriteRegistersSection(sink, context);
+
+    // Game-context sections (map/beat/desync) belong before the wall of
+    // thread stacks - a report reader wants them at first glance.
+    runGroup(true);
+
+    WriteThreadsSection(sink, context);
+    WriteModulesSection(sink);
+
+    runGroup(false);
 
     ReportLine(sink, "");
     ReportLine(sink, "--- Log (recent) ---");

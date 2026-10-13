@@ -2067,7 +2067,7 @@ namespace moho
     }
 
     const bool sSimCrashSectionRegistered =
-      (gpg::diag::AddCrashSection("Sim", &WriteSimCrashSectionAdapter), true);
+      (gpg::diag::AddCrashSection("Sim", &WriteSimCrashSectionAdapter, /*priority=*/100), true);
 
     /**
      * The next session's launch description (0x010C4F58), a `std::auto_ptr`.
