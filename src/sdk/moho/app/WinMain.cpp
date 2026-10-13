@@ -204,6 +204,36 @@ namespace
   }
 
   /**
+   * `faf_crashtest <kind>` console command (deviation, documented): runs one
+   * crash path from inside the live game, where the sim and UI VMs exist -
+   * the report's Lua section then shows real frames instead of the empty
+   * registry a startup-only test produces.
+   */
+  // Delayed /crashtest state (namespace scope so the crash thread function
+  // can reach it).
+  struct DelayedCrashRequest
+  {
+    DWORD seconds = 0;
+    char kind[32] = {};
+  };
+  DelayedCrashRequest gDelayedCrashRequest;
+
+  void RunCrashTest(const char* kind); // defined below, beside its docs
+
+  DWORD WINAPI DelayedCrashThread(LPVOID)
+  {
+    ::Sleep(gDelayedCrashRequest.seconds * 1000ul);
+    RunCrashTest(gDelayedCrashRequest.kind);
+    return 0;
+  }
+
+  void SC_FafCrashTest(const msvc8::vector<msvc8::string>& args)
+  {
+    const msvc8::string* const kindToken = moho::ConCommandArg(args, 1u);
+    RunCrashTest((kindToken != nullptr) ? kindToken->c_str() : "nullread");
+  }
+
+  /**
    * Address: 0x008D42B0 (FUN_008D42B0, sub_8D42B0)
    *
    * What it does:
@@ -240,6 +270,11 @@ namespace
    * Address: 0x00C08F40 (FUN_00C08F40, dynamic atexit destructor for `gCConFunc_SC_StopMemoryLog`)
    */
   moho::CConFunc gCConFunc_SC_StopMemoryLog("SC_StopMemoryLog", kConsoleStartupSCStopMemoryLogDescription, &SC_StopMemoryLog);
+
+  // New engine functionality (documented deviation), registered the same
+  // way as the memory-log pair above.
+  moho::CConFunc gCConFunc_FafCrashTest("faf_crashtest", "Crash the game on purpose to test the crash report",
+                                        &SC_FafCrashTest);
 
   // The binary runs these registrars from the CRT static-initializer array;
   // this file-scope bootstrap object reproduces that, matching the
@@ -425,6 +460,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   // `/crashtest <kind>`: verify one crash path's report before anything
   // else can interfere. The SEH filter is normally installed inside
   // WIN_AppExecute, so install it here first to make the test deterministic.
+  // `/crashtestdelay <seconds>` postpones the fault until the game is up, so
+  // the report's Lua section shows live sim/UI frames.
   if (moho::CFG_GetArgOption("/crashtest", 0, nullptr)) {
     msvc8::vector<msvc8::string> crashTestArgs;
     const char* kind = "nullread";
@@ -433,7 +470,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     moho::PLAT_Init();
     moho::PLAT_CatchStructuredExceptions();
-    RunCrashTest(kind);
+
+    DWORD delaySeconds = 0;
+    msvc8::vector<msvc8::string> delayArgs;
+    if (moho::CFG_GetArgOption("/crashtestdelay", 1, &delayArgs) && !delayArgs.empty()) {
+      delaySeconds = std::strtoul(delayArgs[0].c_str(), nullptr, 10);
+    }
+
+    if (delaySeconds != 0) {
+      gDelayedCrashRequest.seconds = delaySeconds;
+      (void)::strncpy_s(gDelayedCrashRequest.kind, kind, _TRUNCATE);
+      HANDLE thread = ::CreateThread(nullptr, 0, &DelayedCrashThread, nullptr, 0, nullptr);
+      if (thread != nullptr) {
+        (void)::CloseHandle(thread); // fire-and-forget by design
+      }
+    } else {
+      RunCrashTest(kind);
+    }
   }
 
   // FADeepProbe-compatible startup arming: /w <addr[+off][,...]> arms up to

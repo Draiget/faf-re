@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "gpg/core/diagnostics/CrashReport.h"
+#include "gpg/core/diagnostics/CrashHooks.h"
 #include "lua/LuaPrimitives.h"
 #include "lua/LuaRuntimeTypes.h"
 
@@ -66,6 +67,7 @@ namespace
       case LUA_TNUMBER: return "number";
       case LUA_TSTRING: return "string";
       case LUA_TTABLE: return "table";
+      case LUA_CFUNCTION: return "cfunction"; // tag 6 in this fork
       case LUA_TFUNCTION: return "function";
       case LUA_TUSERDATA: return "userdata";
       case LUA_TTHREAD: return "thread";
@@ -220,7 +222,99 @@ namespace
   // One VM
   // ------------------------------------------------------------------
 
+  // Up to 8 register previews for one frame - the values the crashing
+  // line was actually operating on, not just the innermost frame's.
+  void DumpFrameRegisters(std::FILE* const sink, const int index, const std::ptrdiff_t frame,
+                          const CallInfo* const ci)
+  {
+    if (!IsPlausiblePointer(ci->base) || !IsPlausiblePointer(ci->top) || ci->top <= ci->base) {
+      return;
+    }
+    const std::ptrdiff_t slots = ci->top - ci->base;
+    if (slots > 250) {
+      return; // implausible frame width
+    }
+    const std::ptrdiff_t printed = (slots < 8) ? slots : 8;
+
+    char line[512] = {};
+    int written = std::snprintf(line, sizeof(line), "  VM %d frame %lld regs(%lld):", index,
+                                static_cast<long long>(frame), static_cast<long long>(slots));
+    for (std::ptrdiff_t s = 0; s < printed && written > 0; ++s) {
+      char valueText[96] = {};
+      DescribeTObject(ci->base[s], valueText, sizeof(valueText));
+      const int room = static_cast<int>(sizeof(line)) - written - 1;
+      if (room <= 4) {
+        break;
+      }
+      written += std::snprintf(line + written, room, " [%lld]=%s", static_cast<long long>(s), valueText);
+    }
+    DumpLine(sink, "%s", line);
+  }
+
+  // Suspended coroutines do not appear in the registry (only the root VMs
+  // register) nor in lstate (only the running one). Walk both GC root
+  // lanes for LUA_TTHREAD objects and dump each live coroutine's frames.
+  void DescribeVmInternal(std::FILE* sink, lua_State* state, int index, bool followLstate);
+
+  void DumpCoroutines(std::FILE* const sink, const lua_State* const state, const int index)
+  {
+    const global_State* const g = state->l_G;
+    const GCObject* lanes[2] = {g->rootgc, g->rootgc1};
+    int dumped = 0;
+    int scanned = 0;
+
+    for (int lane = 0; lane < 2 && dumped < 8; ++lane) {
+      const GCObject* obj = lanes[lane];
+      while (obj != nullptr && scanned < 4096 && dumped < 8) {
+        ++scanned;
+        if (!IsPlausiblePointer(obj)) {
+          break; // GC chain is corrupt; stop rather than walk garbage
+        }
+        if (obj->gch.tt == LUA_TTHREAD) {
+          const auto* const thread = reinterpret_cast<const lua_State*>(obj);
+          // Same global state, not the root, and not already covered by
+          // the lstate follow in DescribeVm.
+          if (thread != state && thread->l_G == g) {
+            if (thread->ci != nullptr && thread->ci > thread->base_ci
+                && IsPlausiblePointer(thread->stack)) {
+              DumpLine(
+                sink, "  VM %d coroutine %p (%td frame(s)):", index, static_cast<const void*>(thread),
+                static_cast<long long>(thread->ci - thread->base_ci)
+              );
+              // Same frame rendering; lstate follow suppressed - it points
+              // at the currently running thread, already covered.
+              DescribeVmInternal(sink, const_cast<lua_State*>(thread), index, false);
+              ++dumped;
+            }
+          }
+        }
+        obj = obj->gch.next;
+      }
+    }
+    if (scanned >= 4096) {
+      DumpLine(sink, "  VM %d: GC walk stopped at scan bound", index);
+    }
+  }
+
   void DescribeVm(std::FILE* const sink, lua_State* const state, const int index)
+  {
+    if (IsPlausiblePointer(state)) {
+      VmRegistry& registry = VmRegistryInstance();
+      if (index >= 0 && index < kMaxLuaVms && registry.states[index] == static_cast<void*>(state)) {
+        // lstate==root only says the root thread was this VM's last active
+        // one - it is left set after luaV_execute returns - so this is a
+        // hint, not a claim that Lua is executing right now.
+        const bool lastActive = IsPlausiblePointer(state->l_G) && state->l_G->lstate == state;
+        DumpLine(
+          sink, "  VM %d: opened on tid %lu (root was last active: %s)", index, registry.threadIds[index],
+          lastActive ? "yes" : "no - see coroutine below"
+        );
+      }
+    }
+    DescribeVmInternal(sink, state, index, true);
+  }
+
+  void DescribeVmInternal(std::FILE* const sink, lua_State* const state, const int index, const bool followLstate)
   {
     if (!IsPlausiblePointer(state)) {
       DumpLine(sink, "VM %d: <bad pointer>", index);
@@ -241,10 +335,10 @@ namespace
     // as well. It is also the validity signal for the live-pc pointer: once
     // luaV_execute has returned, ci->pc points into a dead frame.
     lua_State* const runningThread = state->l_G->lstate;
-    if (IsPlausiblePointer(runningThread) && runningThread != state
+    if (followLstate && IsPlausiblePointer(runningThread) && runningThread != state
         && runningThread->l_G == state->l_G) {
       DumpLine(sink, "  VM %d: running on coroutine thread %p", index, static_cast<void*>(runningThread));
-      DescribeVm(sink, runningThread, index);
+      DescribeVmInternal(sink, runningThread, index, true);
     }
 
     const bool livePcValid = (runningThread == state);
@@ -308,7 +402,7 @@ namespace
       }
 
       int line = -1;
-      if (pc != nullptr && pc >= proto->code && proto->lineinfo != nullptr) {
+      if (pc != nullptr && pc >= proto->code && IsPlausiblePointer(proto->lineinfo)) {
         const std::ptrdiff_t instructionIndex = pc - proto->code;
         const int sizecode = proto->sizecode;
         if (instructionIndex >= 0 && instructionIndex < sizecode) {
@@ -325,6 +419,7 @@ namespace
           sink, "  VM %d frame %td: %s:%d (lineDefined=%d, %s)", index, static_cast<long long>(f), source, line,
           proto->lineDefined, pcKind
         );
+        DumpFrameRegisters(sink, index, f, ci);
         if (f == 0) {
           DumpTableOperandsInFrame(sink, state, ci);
         }
@@ -353,6 +448,11 @@ namespace
     if (state->_gt.tt == LUA_TTABLE && IsPlausiblePointer(state->_gt.value.p)) {
       DumpLine(sink, "  VM %d globals table:", index);
       DumpSuspectTable(sink, static_cast<const Table*>(state->_gt.value.p));
+    }
+
+    // Suspended coroutines: only reachable through the GC root lists.
+    if (followLstate) {
+      DumpCoroutines(sink, state, index);
     }
   }
 
@@ -395,6 +495,11 @@ namespace lua
     registry.states[count] = state;
     registry.threadIds[count] = ::GetCurrentThreadId();
     ::InterlockedIncrement(&registry.activeCount);
+    // Field-useful: a crash report with "registered VMs: 0" then becomes
+    // checkable against this line - either no VM ever opened on this run
+    // (early crash) or the registry is broken.
+    gpg::diag::DiagLine("[LUA] VM opened: %p (tid %lu, total %d)", state, ::GetCurrentThreadId(),
+                        static_cast<int>(count + 1));
   }
 
   void UnregisterLuaVm(lua_State* const state)
