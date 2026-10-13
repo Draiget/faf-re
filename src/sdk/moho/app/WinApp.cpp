@@ -2221,7 +2221,7 @@ namespace
       return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    gpg::diag::ShowCrashReportDialog(gpg::diag::CrashReportPath());
+    gpg::diag::ShowCrashReportDialog(gpg::diag::CrashLatestReportPath());
     return EXCEPTION_CONTINUE_SEARCH;
   }
 

@@ -85,6 +85,8 @@ namespace gpg::diag
 
   } // namespace
 
+  // Per-crash timestamped path: `<exe dir>\faf_crash_YYYYMMDD_HHMMSS.txt`.
+  // Computed once per process; the re-entry guard means one report per run.
   const char* CrashReportPath()
   {
     static char sPath[MAX_PATH * 2] = {};
@@ -93,12 +95,33 @@ namespace gpg::diag
       sResolved = true;
       char exeDir[MAX_PATH * 2] = {};
       ResolveExeDir(exeDir, sizeof(exeDir));
-      (void)::sprintf_s(sPath, sizeof(sPath), "%sfaf_crash.txt", exeDir);
+      SYSTEMTIME now{};
+      ::GetLocalTime(&now);
+      (void)::sprintf_s(
+        sPath, sizeof(sPath), "%sfaf_crash_%04u%02u%02u_%02u%02u%02u.txt", exeDir, now.wYear, now.wMonth, now.wDay,
+        now.wHour, now.wMinute, now.wSecond
+      );
     }
     return sPath;
   }
 
+  // Dump path pairs with this run's report: same timestamp stem, `.dmp`.
   const char* CrashDumpPath()
+  {
+    static char sPath[MAX_PATH * 2] = {};
+    static bool sResolved = false;
+    if (!sResolved) {
+      sResolved = true;
+      const std::size_t length = std::strlen(CrashReportPath());
+      (void)::strcpy_s(sPath, sizeof(sPath), CrashReportPath());
+      if (length > 4) {
+        (void)::strcpy_s(sPath + length - 4, 5, ".dmp");
+      }
+    }
+    return sPath;
+  }
+
+  const char* CrashLatestReportPath()
   {
     static char sPath[MAX_PATH * 2] = {};
     static bool sResolved = false;
@@ -106,7 +129,7 @@ namespace gpg::diag
       sResolved = true;
       char exeDir[MAX_PATH * 2] = {};
       ResolveExeDir(exeDir, sizeof(exeDir));
-      (void)::sprintf_s(sPath, sizeof(sPath), "%sfaf_crash.dmp", exeDir);
+      (void)::sprintf_s(sPath, sizeof(sPath), "%sfaf_crash_latest.txt", exeDir);
     }
     return sPath;
   }
@@ -510,6 +533,84 @@ namespace gpg::diag
 
   } // namespace
 
+  namespace
+  {
+
+    // Stable copy of the newest report, so "open the crash log" always names
+    // one file no matter how many crashes accumulated.
+    void MirrorReportToLatest()
+    {
+      (void)::CopyFileA(CrashReportPath(), CrashLatestReportPath(), FALSE);
+    }
+
+    // Keep the newest kKeepReports timestamped reports (and their .dmp
+    // siblings); delete older ones so a long-lived install does not
+    // accumulate crash files. Names sort lexicographically by timestamp.
+    void PruneOldReports()
+    {
+      constexpr int kKeepReports = 5;
+
+      char exeDir[MAX_PATH * 2] = {};
+      ResolveExeDir(exeDir, sizeof(exeDir));
+      char pattern[MAX_PATH * 2] = {};
+      (void)::sprintf_s(pattern, sizeof(pattern), "%sfaf_crash_*.txt", exeDir);
+
+      // Fixed buffers: a pathological directory listing beyond this is cut.
+      const char* names[64] = {};
+      int count = 0;
+
+      WIN32_FIND_DATAA found{};
+      HANDLE finder = ::FindFirstFileA(pattern, &found);
+      if (finder == INVALID_HANDLE_VALUE) {
+        return;
+      }
+      do {
+        if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 && count < 64) {
+          names[count] = _strdup(found.cFileName);
+          if (names[count] != nullptr) {
+            ++count;
+          }
+        }
+      } while (::FindNextFileA(finder, &found) != FALSE);
+      (void)::FindClose(finder);
+
+      if (count <= kKeepReports) {
+        for (int i = 0; i < count; ++i) {
+          (void)std::free(const_cast<char*>(names[i]));
+        }
+        return;
+      }
+
+      // Oldest first (timestamp names sort correctly).
+      for (int i = 1; i < count; ++i) {
+        const char* const key = names[i];
+        int j = i - 1;
+        while (j >= 0 && std::strcmp(names[j], key) > 0) {
+          names[j + 1] = names[j];
+          --j;
+        }
+        names[j + 1] = key;
+      }
+
+      for (int i = 0; i < count - kKeepReports; ++i) {
+        char fullText[MAX_PATH * 2] = {};
+        (void)::sprintf_s(fullText, sizeof(fullText), "%s%s", exeDir, names[i]);
+        (void)::DeleteFileA(fullText);
+        // And the matching dump, if any.
+        const std::size_t nameLength = std::strlen(fullText);
+        if (nameLength > 4 && std::strcmp(fullText + nameLength - 4, ".txt") == 0) {
+          (void)::strcpy_s(fullText + nameLength - 4, 5, ".dmp");
+          (void)::DeleteFileA(fullText);
+        }
+        (void)std::free(const_cast<char*>(names[i]));
+      }
+      for (int i = count - kKeepReports; i < count; ++i) {
+        (void)std::free(const_cast<char*>(names[i]));
+      }
+    }
+
+  } // namespace
+
   void AddCrashSection(const char* const name, const CrashSectionWriter writer)
   {
     SectionRegistry& registry = SectionRegistryInstance();
@@ -563,12 +664,19 @@ namespace gpg::diag
     WriteRecentLogTail(sink);
 
     (void)std::fclose(sink);
+
+    MirrorReportToLatest();
+    PruneOldReports();
     return true;
   }
 
   bool WriteCrashMinidump(_EXCEPTION_POINTERS* const exceptionInfo)
   {
-    if (::GetEnvironmentVariableA("FAF_MINIDUMP", nullptr, 0) == 0u) {
+    // FAF_MINIDUMP=0 disables; anything else (including unset) leaves the
+    // dump on. Default-on per operator decision.
+    char overrideValue[8]{};
+    const DWORD overrideLen = ::GetEnvironmentVariableA("FAF_MINIDUMP", overrideValue, sizeof(overrideValue));
+    if (overrideLen != 0u && overrideLen < sizeof(overrideValue) && std::strcmp(overrideValue, "0") == 0) {
       return false;
     }
 
@@ -613,6 +721,15 @@ namespace gpg::diag
     }
 
     (void)::CloseHandle(file);
+    if (written != FALSE) {
+      char latestDump[MAX_PATH * 2] = {};
+      const std::size_t length = std::strlen(CrashLatestReportPath());
+      (void)::strcpy_s(latestDump, sizeof(latestDump), CrashLatestReportPath());
+      if (length > 4) {
+        (void)::strcpy_s(latestDump + length - 4, 5, ".dmp");
+        (void)::CopyFileA(CrashDumpPath(), latestDump, FALSE);
+      }
+    }
     return written != FALSE;
   }
 
@@ -868,7 +985,8 @@ namespace gpg::diag
 
     if (wide == nullptr) {
       ::MessageBoxW(
-        nullptr, L"FAF crashed. The report file is too large or unreadable; find faf_crash.txt beside the game exe.",
+        nullptr,
+        L"FAF crashed. The report file is too large or unreadable; find faf_crash_latest.txt beside the game exe.",
         L"FAF crash", MB_ICONERROR | MB_OK
       );
       return;

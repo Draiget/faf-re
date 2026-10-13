@@ -36,10 +36,13 @@ namespace gpg::diag
     const char* reason = nullptr;
   };
 
-  /** Report file path: `<exe dir>\faf_crash.txt`. */
+  /** Report file path: `<exe dir>\faf_crash_YYYYMMDD_HHMMSS.txt` (per crash). */
   const char* CrashReportPath();
 
-  /** Minidump path: `<exe dir>\faf_crash.dmp` (written only when FAF_MINIDUMP is set). */
+  /** Stable copy of the newest report: `<exe dir>\faf_crash_latest.txt`. */
+  const char* CrashLatestReportPath();
+
+  /** Minidump path: this run's report stem with `.dmp` (mirrored to latest). */
   const char* CrashDumpPath();
 
   /**
@@ -51,9 +54,9 @@ namespace gpg::diag
   bool WriteCrashReport(const CrashReportContext& context);
 
   /**
-   * Writes `<exe dir>\faf_crash.dmp` via MiniDumpWriteDump. Only called when
-   * the FAF_MINIDUMP environment variable is set; returns false (and writes
-   * nothing) otherwise.
+   * Writes `<exe dir>\faf_crash.dmp` via MiniDumpWriteDump. On by default;
+   * set FAF_MINIDUMP=0 to disable. (Operator decision 2026-10-13: the dump
+   * is what answers the questions the text report cannot.)
    */
   bool WriteCrashMinidump(_EXCEPTION_POINTERS* exceptionInfo);
 
