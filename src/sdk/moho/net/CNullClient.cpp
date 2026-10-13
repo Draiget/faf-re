@@ -58,6 +58,6 @@ void CNullClient::Process(
  */
 void CNullClient::Debug()
 {
-  gpg::Logf("    CNullClient 0x%08x:", this);
+  gpg::Logf("    CNullClient %p:", static_cast<const void*>(this));
   CClientBase::Debug();
 }

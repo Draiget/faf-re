@@ -383,7 +383,7 @@ void CReplayClient::ReplayThread()
  */
 void CReplayClient::Debug()
 {
-  gpg::Logf("    CReplayClient 0x%08x:", this);
+  gpg::Logf("    CReplayClient %p:", static_cast<const void*>(this));
   CClientBase::Debug();
   gpg::Logf("      mReplayBeat=%d", mReplayBeat);
 }

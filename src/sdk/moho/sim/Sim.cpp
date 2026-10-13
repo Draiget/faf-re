@@ -10120,7 +10120,7 @@ int Sim::sim_TestFunc(
   (void)focusArmy;
   (void)selectedUnits;
 
-  sim->Printf("sim=0x%08x", sim);
+  sim->Printf("sim=%p", static_cast<const void*>(sim));
   return 0;
 }
 

@@ -1501,7 +1501,7 @@ void CNetUDPConnection::DispatchFromInput()
 void CNetUDPConnection::Debug()
 {
   const auto time = mConnector->GetTime();
-  gpg::Logf("  CNetUDPConnection 0x%08x:", this);
+  gpg::Logf("  CNetUDPConnection %p:", static_cast<const void*>(this));
   const msvc8::string address = NET_GetDottedOctetFromUInt32(mAddr);
   const msvc8::string hostname = NET_GetHostName(mAddr);
   gpg::Logf("    remote addr: %s[%s]:%d", hostname.c_str(), address.c_str(), mPort);

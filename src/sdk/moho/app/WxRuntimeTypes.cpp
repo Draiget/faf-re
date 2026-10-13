@@ -4337,11 +4337,11 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
     if (sCompositeBudget < 5) {
       ++sCompositeBudget;
       gpg::Warnf(
-        "[COMPDIAG] RenderCompositeTerrain head=%d drewNormals=%d target=%08X shadowCtx=%08X",
+        "[COMPDIAG] RenderCompositeTerrain head=%d drewNormals=%d target=%p shadowCtx=%p",
         mHead, static_cast<int>(drewNormals),
-        static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(
-          mPrimaryTargetLocks[mHead].get())),
-        static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(shadowContext)));
+        static_cast<const void*>(
+          mPrimaryTargetLocks[mHead].get()),
+        static_cast<const void*>(shadowContext));
     }
   }
 }

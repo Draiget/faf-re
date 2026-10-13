@@ -690,7 +690,7 @@ void CScriptObject::MemberSerialize(gpg::WriteArchive* const archive)
  */
 msvc8::string CScriptObject::GetErrorDescription()
 {
-  return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<uintptr_t>(this));
+  return gpg::STR_Printf("CScriptObject at %p", static_cast<const void*>(this));
 }
 
 /**

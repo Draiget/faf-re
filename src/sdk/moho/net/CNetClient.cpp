@@ -106,7 +106,7 @@ void CNetClient::Open()
  */
 void CNetClient::Debug()
 {
-  gpg::Logf("    CNetClient 0x%08x:", this);
+  gpg::Logf("    CNetClient %p:", static_cast<const void*>(this));
   CClientBase::Debug();
 }
 

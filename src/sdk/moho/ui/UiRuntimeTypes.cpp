@@ -24803,13 +24803,13 @@ void moho::CMauiFrame::DumpGraph()
  * Address: 0x00796720 (FUN_00796720, Moho::CMauiFrame::Dump)
  *
  * What it does:
- * Logs base control debug state and this frame's event-handler lane id.
+ * Logs base control debug state and this frame's event-handler address.
  */
 void moho::CMauiFrame::Dump()
 {
   CMauiControl::Dump();
   gpg::Logf(
-    "Root Frame, head#d\n", static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(mEventHandler))
+    "Root Frame, head=%p\n", static_cast<const void*>(mEventHandler)
   );
 }
 

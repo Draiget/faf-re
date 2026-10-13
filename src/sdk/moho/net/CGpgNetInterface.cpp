@@ -854,7 +854,7 @@ void CGpgNetInterface::SetTraversalHandler(
 {
   (void)port;
   boost::mutex::scoped_lock lock(mLock);
-  gpg::Logf("GPGNET: setting nat handler to 0x%08x", reinterpret_cast<uintptr_t>(handler->get()));
+  gpg::Logf("GPGNET: setting nat handler to %p", static_cast<const void*>(handler->get()));
   boost::AssignWeakFromShared(mNATHandler, *handler);
 }
 

@@ -3456,7 +3456,7 @@ void CLobby::DebugDump()
     msvc8::string peerState;
     ENetworkPlayerStateToStr(peer->state, peerState);
     const msvc8::string peerLabel = peer->ToString();
-    gpg::Logf("  0x%08x: %s: %s", peer, peerLabel.c_str(), peerState.c_str());
+    gpg::Logf("  %p: %s: %s", static_cast<const void*>(peer), peerLabel.c_str(), peerState.c_str());
   }
 
   connector->Debug();

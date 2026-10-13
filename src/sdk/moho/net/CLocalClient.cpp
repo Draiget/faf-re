@@ -109,6 +109,6 @@ void CLocalClient::Process(
  */
 void CLocalClient::Debug()
 {
-  gpg::Logf("    CLocalClient 0x%08x:", this);
+  gpg::Logf("    CLocalClient %p:", static_cast<const void*>(this));
   CClientBase::Debug();
 }

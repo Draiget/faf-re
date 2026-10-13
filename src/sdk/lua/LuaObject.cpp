@@ -7474,19 +7474,19 @@ namespace
 				static int sBadNameBudget = 0;
 				if (sBadNameBudget < 10) {
 					++sBadNameBudget;
-					char probe[224];
+					char probe[512];
 					sprintf_s(probe, sizeof(probe),
-					          "[LOCVARBAD] proto=%08X locvars=%08X(%d) idx=%d varname=%08X | code=%08X(%d end=%08X) k=%08X(%d) p=%08X(%d) lineinfo=%08X(%d)\n",
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f)),
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->locvars)),
-					          f->sizelocvars, index, static_cast<unsigned>(nameBits),
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->code)),
+					          "[LOCVARBAD] proto=%p locvars=%p(%d) idx=%d varname=%p | code=%p(%d end=%p) k=%p(%d) p=%p(%d) lineinfo=%p(%d)\n",
+					          static_cast<const void*>(f),
+					          static_cast<const void*>(f->locvars),
+					          f->sizelocvars, index, static_cast<const void*>(varname),
+					          static_cast<const void*>(f->code),
 					          f->sizecode,
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->code) +
+					          reinterpret_cast<const void*>(reinterpret_cast<std::uintptr_t>(f->code) +
 					                                sizeof(Instruction) * static_cast<std::size_t>(f->sizecode)),
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->k)), f->sizek,
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->p)), f->sizep,
-					          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->lineinfo)),
+					          static_cast<const void*>(f->k), f->sizek,
+					          static_cast<const void*>(f->p), f->sizep,
+					          static_cast<const void*>(f->lineinfo),
 					          f->sizelineinfo);
 					::OutputDebugStringA(probe);
 				}
@@ -15254,8 +15254,8 @@ extern "C"
 							: -1;
 						char probe[288];
 						sprintf_s(probe, sizeof(probe),
-						          "[LUAUPVAL] GETUPVAL bad: cl=%08X nups=%d B=%d src=%.150s line=%d\n",
-						          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(cl)),
+						          "[LUAUPVAL] GETUPVAL bad: cl=%p nups=%d B=%d src=%.150s line=%d\n",
+						          static_cast<const void*>(cl),
 						          static_cast<int>(cl->nupvalues), upIndex, source, line);
 						::OutputDebugStringA(probe);
 					}
@@ -15313,11 +15313,11 @@ extern "C"
 							: -1;
 						char probe[288];
 						sprintf_s(probe, sizeof(probe),
-						          "[LUAUPVAL] SETUPVAL bad: cl=%08X nups=%d B=%d slot=%08X src=%.150s line=%d\n",
-						          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(cl)),
+						          "[LUAUPVAL] SETUPVAL bad: cl=%p nups=%d B=%d slot=%p src=%.150s line=%d\n",
+						          static_cast<const void*>(cl),
 						          static_cast<int>(cl->nupvalues), upIndex,
-						          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(
-							          upIndex < static_cast<int>(cl->nupvalues) ? cl->upvals[upIndex] : nullptr)),
+						          static_cast<const void*>(
+							          upIndex < static_cast<int>(cl->nupvalues) ? cl->upvals[upIndex] : nullptr),
 						          source, line);
 						::OutputDebugStringA(probe);
 					}

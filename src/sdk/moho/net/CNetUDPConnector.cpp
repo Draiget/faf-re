@@ -422,7 +422,7 @@ void CNetUDPConnector::SelectEvent(const HANDLE ev)
 void CNetUDPConnector::Debug()
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
-  gpg::Logf("CNetUDPConnector 0x%08x:", this);
+  gpg::Logf("CNetUDPConnector %p:", static_cast<const void*>(this));
   gpg::Logf("  local port=%d", GetLocalPort());
   gpg::Logf("  packet pool size=%d", mPacketPoolSize);
   for (auto* connection : mConnections.owners()) {

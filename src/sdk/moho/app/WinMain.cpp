@@ -41,6 +41,7 @@
 // crashtest lua_table_corrupt builds a raw VM; lua_open is recovered in
 // lua/LuaObject.cpp inside `extern "C"`.
 extern "C" lua_State* lua_open();
+extern "C" int __cdecl _purecall();
 
 namespace
 {
@@ -290,8 +291,7 @@ namespace
       // Directly into the CRT purecall handler (the same one CrashHooks
       // installs its logger under); a constructed-dangling-vtable route is
       // UB-shaped and less deterministic than the handler itself.
-      extern void __cdecl _purecall();
-      _purecall();
+      ::_purecall();
     } else if (kind != nullptr && std::strcmp(kind, "terminate") == 0) {
       throw std::runtime_error("crashtest: uncaught exception");
     } else if (kind != nullptr && std::strcmp(kind, "lua_table_corrupt") == 0) {

@@ -217,8 +217,8 @@ namespace
             if (entry.cache == cache) {
                 char probe[160];
                 sprintf_s(probe, sizeof(probe),
-                          "[DUPCACHE] cache=%08X already live on tid=%lu, now handed to tid=%lu\n",
-                          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(cache)),
+                          "[DUPCACHE] cache=%p already live on tid=%lu, now handed to tid=%lu\n",
+                          static_cast<const void*>(cache),
                           entry.tid, tid);
                 ::OutputDebugStringA(probe);
                 break;
@@ -642,19 +642,19 @@ namespace
                     const auto* const nowStamp = reinterpret_cast<const ProbeFreedStamp*>(block);
                     void* firstFrames[8] = {};
                     (void)::RtlCaptureStackBackTrace(2, 4, firstFrames, nullptr);
-                    char probe[320];
+                    char probe[512];
                     sprintf_s(probe, sizeof(probe),
-                              "[DOUBLEFREE] block=%08X alreadyAtStep=%d count=%d freedBy=%08X second=%08X,%08X,%08X,%08X first=%08X,%08X,%08X\n",
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(block)),
+                              "[DOUBLEFREE] block=%p alreadyAtStep=%d count=%d freedBy=%p second=%p,%p,%p,%p first=%p,%p,%p\n",
+                              static_cast<const void*>(block),
                               step, lane.count,
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(freedBy)),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[0])),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[1])),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[2])),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(firstFrames[3])),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(nowStamp->frames[0])),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(nowStamp->frames[1])),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(nowStamp->frames[2])));
+                              static_cast<const void*>(freedBy),
+                              static_cast<const void*>(firstFrames[0]),
+                              static_cast<const void*>(firstFrames[1]),
+                              static_cast<const void*>(firstFrames[2]),
+                              static_cast<const void*>(firstFrames[3]),
+                              static_cast<const void*>(nowStamp->frames[0]),
+                              static_cast<const void*>(nowStamp->frames[1]),
+                              static_cast<const void*>(nowStamp->frames[2]));
                     ::OutputDebugStringA(probe);
                 }
                 return;
@@ -680,8 +680,8 @@ namespace
         ++sArmBudget;
         sLastArmed = lane.head;
         char watch[64];
-        sprintf_s(watch, sizeof(watch), "lane8=%08X\n",
-                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(lane.head)));
+        sprintf_s(watch, sizeof(watch), "lane8=%p\n",
+                  static_cast<const void*>(lane.head));
         ::OutputDebugStringA(watch);
     }
 
@@ -716,11 +716,11 @@ namespace
                     ++sClobberBudget;
                     char probe[224];
                     sprintf_s(probe, sizeof(probe),
-                              "[CLOBBER] %s kind=%u block=%08X next=%08X expected=%08X freedBy=%08X step=%d\n",
-                              where, kind, static_cast<unsigned>(bits),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->next)),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->nextCopy)),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->freedBy)),
+                              "[CLOBBER] %s kind=%u block=%p next=%p expected=%p freedBy=%p step=%d\n",
+                              where, kind, static_cast<const void*>(node),
+                              static_cast<const void*>(stamp->next),
+                              static_cast<const void*>(stamp->nextCopy),
+                              static_cast<const void*>(stamp->freedBy),
                               step);
                     ::OutputDebugStringA(probe);
                 }
@@ -733,13 +733,13 @@ namespace
                     const auto* const prevStamp = reinterpret_cast<const ProbeFreedStamp*>(previous);
                     char probe[256];
                     sprintf_s(probe, sizeof(probe),
-                              "[CHAIN] %s kind=%u step=%d bad=%08X magic=%08X prev=%08X prevFreedBy=%08X count=%d\n",
-                              where, kind, step, static_cast<unsigned>(bits),
+                              "[CHAIN] %s kind=%u step=%d bad=%p magic=%08X prev=%p prevFreedBy=%p count=%d\n",
+                              where, kind, step, static_cast<const void*>(node),
                               plausible ? stamp->magic : 0u,
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(previous)),
+                              static_cast<const void*>(previous),
                               previous != nullptr
-                                ? static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(prevStamp->freedBy))
-                                : 0u,
+                                ? static_cast<const void*>(prevStamp->freedBy)
+                                : nullptr,
                               lane.count);
                     ::OutputDebugStringA(probe);
 
@@ -748,8 +748,8 @@ namespace
                     // clobbered word to catch the next write with a stack.
                     if (previous != nullptr) {
                         char watch[64];
-                        sprintf_s(watch, sizeof(watch), "lane8=%08X\n",
-                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(previous)));
+                        sprintf_s(watch, sizeof(watch), "lane8=%p\n",
+                                  static_cast<const void*>(previous));
                         ::OutputDebugStringA(watch);
                     }
                 }
@@ -786,14 +786,14 @@ namespace
                     ++sWindowBudget;
                     char probe[256];
                     sprintf_s(probe, sizeof(probe),
-                              "[WINDOW] dirty at %s size=%u caller=%08X | prev size=%u caller=%08X | block=%08X next=%08X want=%08X\n",
+                              "[WINDOW] dirty at %s size=%u caller=%p | prev size=%u caller=%p | block=%p next=%p want=%p\n",
                               where, opSize,
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(caller)),
+                              static_cast<const void*>(caller),
                               gProbeLastOp.size,
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(gProbeLastOp.caller)),
-                              static_cast<unsigned>(bits),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->next)),
-                              static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->nextCopy)));
+                              static_cast<const void*>(gProbeLastOp.caller),
+                              static_cast<const void*>(node),
+                              static_cast<const void*>(stamp->next),
+                              static_cast<const void*>(stamp->nextCopy));
                     ::OutputDebugStringA(probe);
                 }
                 stamp->next = stamp->nextCopy;   // repair and keep hunting
@@ -1701,8 +1701,8 @@ namespace
             // the head reads back as 0x178.
             {
                 char probe[128];
-                sprintf_s(probe, sizeof(probe), "[CACHENEW] cache=%08X tid=%lu kind=%u\n",
-                          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(gThreadHeapCache)),
+                sprintf_s(probe, sizeof(probe), "[CACHENEW] cache=%p tid=%lu kind=%u\n",
+                          static_cast<const void*>(gThreadHeapCache),
                           ::GetCurrentThreadId(), kind);
                 ::OutputDebugStringA(probe);
                 ProbeRegisterCache(gThreadHeapCache, ::GetCurrentThreadId());
@@ -1938,10 +1938,10 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 
                         char watch[144];
                         sprintf_s(watch, sizeof(watch),
-                                  "[QUARANTINEWATCH] block=%08X (unlinked, never reissued) count=%d\nlane8=%08X\n",
-                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(quarantined)),
+                                  "[QUARANTINEWATCH] block=%p (unlinked, never reissued) count=%d\nlane8=%p\n",
+                                  static_cast<const void*>(quarantined),
                                   lane.count,
-                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(quarantined)));
+                                  static_cast<const void*>(quarantined));
                         ::OutputDebugStringA(watch);
                     }
                 }
@@ -1974,10 +1974,10 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
                         ++sBadHeadBudget;
                         char probe[192];
                         sprintf_s(probe, sizeof(probe),
-                                  "[LANEBAD] kind=%u blockSize=%u head=%08X count=%d low=%d cache=%08X tid=%lu cachedBytes=%d\n",
-                                  kind, GetBlockSize(kind), static_cast<unsigned>(headBits),
+                                  "[LANEBAD] kind=%u blockSize=%u head=%p count=%d low=%d cache=%p tid=%lu cachedBytes=%d\n",
+                                  kind, GetBlockSize(kind), static_cast<const void*>(lane.head),
                                   lane.count, lane.lowWatermark,
-                                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(threadCache)),
+                                  static_cast<const void*>(threadCache),
                                   ::GetCurrentThreadId(), threadCache->cachedBytes);
                         ::OutputDebugStringA(probe);
                     }
@@ -2052,13 +2052,13 @@ extern "C" void __cdecl free(void* ptr)
                     void* frames[10] = {};
                     const USHORT captured = ::RtlCaptureStackBackTrace(1, 10, frames, nullptr);
                     int written = sprintf_s(probe, sizeof(probe),
-                              "[BADFREE] ptr=%08X base=%08X kind=%u blockSize=%u delta=%d",
-                              static_cast<unsigned>(blockAddr), static_cast<unsigned>(regionBase),
+                              "[BADFREE] ptr=%p base=%p kind=%u blockSize=%u delta=%d",
+                              static_cast<const void*>(ptr), static_cast<const void*>(record->allocation),
                               kind, blockSize, static_cast<int>(blockAddr - regionBase));
                     for (USHORT f = 0; f < captured && written > 0 && written < 200; ++f) {
                         written += sprintf_s(probe + written, sizeof(probe) - static_cast<std::size_t>(written),
-                                             " frame=%08X",
-                                             static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(frames[f])));
+                                             " frame=%p",
+                                             static_cast<const void*>(frames[f]));
                     }
                     if (written > 0 && written < static_cast<int>(sizeof(probe)) - 2) {
                         probe[written] = '\n';

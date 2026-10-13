@@ -3066,9 +3066,9 @@ namespace moho
       const EntId entityId = bestUnit->GetEntityId();
       if (group.mUnitOffsets.find(entityId) != group.mUnitOffsets.end()) {
         gpg::Warnf(
-          "HASH duplicated on %d in formation %d",
-          static_cast<int>(reinterpret_cast<std::uintptr_t>(bestUnit)),
-          static_cast<int>(reinterpret_cast<std::uintptr_t>(this))
+          "HASH duplicated on %p in formation %p",
+          static_cast<const void*>(bestUnit),
+          static_cast<const void*>(this)
         );
       }
 
@@ -3368,10 +3368,10 @@ namespace moho
 
     if (RemoveDeadUnits(unit)) {
       gpg::Warnf(
-        "Attempted to re-add existing unit (%d - %s) to formation (%d)",
-        static_cast<int>(reinterpret_cast<std::uintptr_t>(unit)),
+        "Attempted to re-add existing unit (%p - %s) to formation (%p)",
+        static_cast<const void*>(unit),
         unit->GetBlueprint()->mBlueprintId.c_str(),
-        static_cast<int>(reinterpret_cast<std::uintptr_t>(this))
+        static_cast<const void*>(this)
       );
       return;
     }

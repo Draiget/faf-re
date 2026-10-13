@@ -1167,7 +1167,7 @@ void CClientManagerImpl::Debug()
 {
   std::scoped_lock lock(mLock);
 
-  gpg::Logf("CClientManagerImpl 0x%08x:", this);
+  gpg::Logf("CClientManagerImpl %p:", static_cast<const void*>(this));
   gpg::Logf("  mWeAreReady=%s", mWeAreReady ? "true" : "false");
   gpg::Logf("  mEveryoneIsReady=%s", mEveryoneIsReady ? "true" : "false");
   gpg::Logf("  mDispatchedBeat=%d", mDispatchedBeat);
@@ -1183,7 +1183,7 @@ void CClientManagerImpl::Debug()
   for (size_t index = 0; index < mClients.size(); ++index) {
     CClientBase* const client = mClients[index];
     if (client != nullptr) {
-      gpg::Logf("  mClients[%d]=0x%08x", static_cast<int>(index), client);
+      gpg::Logf("  mClients[%d]=%p", static_cast<int>(index), static_cast<const void*>(client));
       client->Debug();
     }
   }
