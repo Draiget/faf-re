@@ -1307,10 +1307,8 @@ namespace moho
    */
   float CHeightField::GetElevation(const float x, const float z) const
   {
-    if (!data || width <= 0 || height <= 0) {
-      return 0.0f;
-    }
-
+    // 0x0044FB90 floor: x87 frndint (round-half-even) with a -1 adjust when
+    // the value rounded up -- arithmetically std::floor for every input.
     const int fx = static_cast<int>(std::floor(static_cast<double>(x)));
     const int fz = static_cast<int>(std::floor(static_cast<double>(z)));
 
@@ -1325,14 +1323,22 @@ namespace moho
     const int z0 = ClampIndex(fz, hMax);
     const int z1 = ClampIndex(fz + 1, hMax);
 
+    // Sample scaling by 1/128 is exact in every precision, so the float
+    // products match the binary's mixed SSE/x87 scaling bit for bit.
     const float h00 = static_cast<float>(data[x0 + z0 * width]) * 0.0078125f;
     const float h01 = static_cast<float>(data[x0 + z1 * width]) * 0.0078125f;
     const float h10 = static_cast<float>(data[x1 + z0 * width]) * 0.0078125f;
     const float h11 = static_cast<float>(data[x1 + z1 * width]) * 0.0078125f;
 
-    const float h0 = h00 + (h01 - h00) * fracZ;
-    const float h1 = h10 + (h11 - h10) * fracZ;
-    return h0 + (h1 - h0) * fracX;
+    // The binary chains both lerps on the x87 stack in 80-bit precision
+    // (0x0044FCFB..0x0044FD3D) and rounds to float exactly once, at return.
+    // Double intermediates reproduce the 64-bit-mantissa chain; a float32
+    // chain rounds per operation and lands one ULP off on sloped cells
+    // (measured: replay 26935800 beat 50, xsl0001 spawn Y 0x427DAF22 retail
+    // vs 0x427DAF21 float32-chained).
+    const double row0 = static_cast<double>(h00) + (static_cast<double>(h01) - h00) * fracZ;
+    const double row1 = static_cast<double>(h10) + (static_cast<double>(h11) - h10) * fracZ;
+    return static_cast<float>(row0 + (row1 - row0) * fracX);
   }
 
   /**
