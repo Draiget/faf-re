@@ -4543,7 +4543,12 @@ namespace moho
     backLeft.y = SampleSnapElevation(unit, backLeft, *mapData, hoverMotion);
     backRight.y = SampleSnapElevation(unit, backRight, *mapData, hoverMotion);
 
-    snapped.pos_.y = (frontRight.y + frontLeft.y + backLeft.y + backRight.y) * 0.25f;
+    // 0x006C1A39..0x006C1A5E accumulates the four samples in REVERSE call
+    // order (((backRight + backLeft) + frontLeft) + frontRight) before scaling
+    // by 0.25. A forward-order sum rounds differently and lands the rest Y one
+    // ULP off on sloped ground (replay 26935800 beat 50: snap average 0x427DAFC9
+    // retail vs 0x427DAFC8 forward-order, rest Y 0x427DAF22 vs 0x427DAF21).
+    snapped.pos_.y = (((backRight.y + backLeft.y) + frontLeft.y) + frontRight.y) * 0.25f;
 
     Wm3::Vector3f surfaceNormal{};
     if (blueprint->Physics.StandUpright != 0u) {
