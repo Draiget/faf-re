@@ -273,6 +273,17 @@ namespace moho
     [[nodiscard]] float GetRandomMeshScaleVelocity(CRandomStream* randomStream) const;
   };
 
+  /**
+   * Address: 0x0051C510 (FUN_0051C510, func_RandomDirection)
+   *
+   * What it does:
+   * Samples all three blueprint direction axes, consuming one RNG draw per
+   * axis even when its range is zero. Leaves the sampled vector unnormalized.
+   */
+  [[nodiscard]] Wm3::Vector3f* BuildRandomDirectionVector(
+    CRandomStream* randomStream, Wm3::Vector3f* destination, const RProjectileBlueprint* blueprint
+  );
+
   static_assert(sizeof(RProjectileBlueprintDisplay) == 0x38, "RProjectileBlueprintDisplay size must be 0x38");
   static_assert(sizeof(RProjectileBlueprintEconomy) == 0x0C, "RProjectileBlueprintEconomy size must be 0x0C");
   static_assert(sizeof(RProjectileBlueprintPhysics) == 0x8C, "RProjectileBlueprintPhysics size must be 0x8C");

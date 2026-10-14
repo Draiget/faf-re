@@ -1,3 +1,4 @@
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/COGrid.h"
 
@@ -979,31 +980,7 @@ namespace moho
 
   [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(const Wm3::Box3f& box) noexcept
   {
-    const float centerX = box.Center[0];
-    const float centerY = box.Center[1];
-    const float centerZ = box.Center[2];
-
-    const float radiusX =
-      (std::fabs(box.Axis[0][0]) * box.Extent[0]) +
-      (std::fabs(box.Axis[1][0]) * box.Extent[1]) +
-      (std::fabs(box.Axis[2][0]) * box.Extent[2]);
-    const float radiusY =
-      (std::fabs(box.Axis[0][1]) * box.Extent[0]) +
-      (std::fabs(box.Axis[1][1]) * box.Extent[1]) +
-      (std::fabs(box.Axis[2][1]) * box.Extent[2]);
-    const float radiusZ =
-      (std::fabs(box.Axis[0][2]) * box.Extent[0]) +
-      (std::fabs(box.Axis[1][2]) * box.Extent[1]) +
-      (std::fabs(box.Axis[2][2]) * box.Extent[2]);
-
-    Wm3::AxisAlignedBox3f out{};
-    out.Min.x = centerX - radiusX;
-    out.Min.y = centerY - radiusY;
-    out.Min.z = centerZ - radiusZ;
-    out.Max.x = centerX + radiusX;
-    out.Max.y = centerY + radiusY;
-    out.Max.z = centerZ + radiusZ;
-    return out;
+    return moho::AxisAlignedBoundsFromBox(box);
   }
 
   /**
@@ -1131,6 +1108,9 @@ namespace moho
 
     outCollisions.ResetStorageToInline();
 
+    // The original initializes this result once before traversing candidates.
+    // A primitive that leaves a lane unwritten retains the preceding value.
+    CollisionResult collisionResult{};
     for (int index = 0; index < gatheredCount; ++index) {
       Entity* const candidate = gatheredEntities.start_[index];
       if (candidate == nullptr || !AxisAlignedBoundsOverlapEntityBounds(queryBounds, *candidate)) {
@@ -1142,7 +1122,6 @@ namespace moho
         continue;
       }
 
-      CollisionResult collisionResult{};
       if (!collisionPrimitive->CollideBox(&box, &collisionResult)) {
         continue;
       }

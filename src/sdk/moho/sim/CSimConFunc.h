@@ -27,7 +27,7 @@ namespace moho
      * What it does:
      * Constructs one console-function command entry and binds its callback lane.
      */
-    CSimConFunc(bool requiresCheat, const char* name, Callback handler) noexcept;
+    CSimConFunc(bool allowWithoutCheats, const char* name, Callback handler) noexcept;
 
     /**
      * Address: 0x007347F0 (FUN_007347F0, sub_7347F0)

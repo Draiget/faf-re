@@ -1,4 +1,5 @@
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "legacy/math/X87Math.h"
 
 #include <cstddef>
@@ -171,12 +172,13 @@ namespace moho
     const float yawCos = msvc8::cos(halfYaw);
     const float yawSin = msvc8::sin(halfYaw);
 
-    Wm3::Quaternionf orientationOut{};
-    orientationOut.w = (yawCos * pitchCos * rollCos) + (yawSin * pitchSin * rollSin);
-    orientationOut.x = (yawCos * pitchCos * rollSin) - (yawSin * pitchSin * rollCos);
-    orientationOut.y = (pitchSin * yawCos * rollCos) + (yawSin * pitchCos * rollSin);
-    orientationOut.z = (yawSin * pitchCos * rollCos) - (pitchSin * yawCos * rollSin);
-    return orientationOut;
+    // 0x004EB5EF..0x004EB711 composes yaw about Y, pitch about X,
+    // then roll about Z. Preserve the two quaternion products instead of
+    // rearranging their terms into an Euler formula for different axes.
+    const Wm3::Quaternionf yawRotation{yawCos, 0.0f, yawSin, 0.0f};
+    const Wm3::Quaternionf pitchRotation{pitchCos, pitchSin, 0.0f, 0.0f};
+    const Wm3::Quaternionf rollRotation{rollCos, 0.0f, 0.0f, rollSin};
+    return MultiplyQuat(MultiplyQuat(yawRotation, pitchRotation), rollRotation);
   }
 
   /**

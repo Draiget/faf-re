@@ -180,9 +180,9 @@ namespace moho
    * from FUN_007355F0 per the callgraph -- same "no separate source
    * line" rationale as the entries above.
    */
-  CSimConCommand::CSimConCommand(const bool requiresCheat, const char* const name)
+  CSimConCommand::CSimConCommand(const bool allowWithoutCheats, const char* const name)
     : mName(name)
-    , mRequiresCheat(requiresCheat ? 1u : 0u)
+    , mAllowWithoutCheats(allowWithoutCheats ? 1u : 0u)
     , mPad09{0u, 0u, 0u}
   {
     InitSimConList();

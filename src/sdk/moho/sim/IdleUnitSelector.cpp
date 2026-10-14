@@ -1,3 +1,4 @@
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "moho/sim/IdleUnitSelector.h"
 
 #include <cstddef>
@@ -149,7 +150,7 @@ namespace moho
         }
         const Wm3::Box3f orientedBox(*meshBox);
         Wm3::AxisAlignedBox3f frameBox{};
-        orientedBox.ComputeAABB(frameBox.Min, frameBox.Max);
+        frameBox = moho::AxisAlignedBoundsFromBox(orientedBox);
 
         camera->TargetBox(frameBox, 0.0f);
         camera->TargetNothing();

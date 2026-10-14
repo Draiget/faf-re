@@ -6,6 +6,9 @@
 
 namespace msvc8
 {
+  // Inlined block from FUN_006BDEE0: float-to-cell conversion uses the
+  // caller's x87 rounding mode and preserves FISTP's invalid-input result.
+  [[nodiscard]] std::int32_t RoundToInt(float value) noexcept;
   /**
    * `factor * word` exactly as the shipped engine forms it from a Mersenne
    * Twister word under 24-bit x87 precision control (e.g. CRandomStream::FRand,
@@ -15,6 +18,10 @@ namespace msvc8
    * twice (53 bits, then 24) and can land one float away.
    */
   [[nodiscard]] float MulTwisterWord(float factor, std::uint32_t word) noexcept;
+
+  // Terrain interpolation uses the simulation's 24-bit x87 arithmetic.
+  // Inlined block from FUN_0044FB90; preserve the original operation order.
+  [[nodiscard]] float BilinearHeight(float h00, float h01, float h10, float h11, float fracX, float fracZ) noexcept;
 
   /**
    * Single-precision transcendentals as the 2007 toolchain produced them.
@@ -35,9 +42,12 @@ namespace msvc8
   [[nodiscard]] float tanf(float x) noexcept;
   [[nodiscard]] float atanf(float x) noexcept;
   [[nodiscard]] float atan2f(float y, float x) noexcept;
+  // First angle is stored as float; the second stays in x87 through subtraction.
+  [[nodiscard]] float Atan2Difference(float firstY, float firstX, float secondY, float secondX) noexcept;
 
   /**
-   * The remaining float functions go through the CRT's double routine and
+   * Except for the legacy-dispatched acos overload below, these float
+   * functions go through the host CRT's double routine and
    * round once, which is what the x86 CRT's own float overloads do; x64's CRT
    * has separate float implementations that disagree with them. The double
    * routines of the two CRTs differ in the last bit for some inputs, but
@@ -45,6 +55,9 @@ namespace msvc8
    */
   [[nodiscard]] float asinf(float x) noexcept;
   [[nodiscard]] float acosf(float x) noexcept;
+  // Legacy CRT dispatch: the engine's /sse2 option selects the SSE lane;
+  // simulation otherwise uses x87 arithmetic with single precision control.
+  [[nodiscard]] double acos(double x) noexcept;
   [[nodiscard]] float expf(float x) noexcept;
   [[nodiscard]] float logf(float x) noexcept;
   [[nodiscard]] float powf(float x, float y) noexcept;
@@ -52,8 +65,8 @@ namespace msvc8
   /**
    * Drop-in spellings for `std::sin` and friends with the same overload
    * resolution: a `float` argument takes the functions above, anything else
-   * (double, mixed or integral arguments) forwards to `std::` unchanged, so
-   * replacing `std::sin(` with `msvc8::sin(` changes only the float overloads.
+   * (double, mixed or integral arguments) forwards to `std::` unchanged.
+   * The explicit double acos overload also preserves legacy CRT dispatch.
    */
   [[nodiscard]] inline float sin(const float x) noexcept { return sinf(x); }
   [[nodiscard]] inline float cos(const float x) noexcept { return cosf(x); }
@@ -76,7 +89,7 @@ namespace msvc8
   [[nodiscard]] inline auto atan(const T x) noexcept { return std::atan(x); }
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
   [[nodiscard]] inline auto asin(const T x) noexcept { return std::asin(x); }
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
   [[nodiscard]] inline auto acos(const T x) noexcept { return std::acos(x); }
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
   [[nodiscard]] inline auto exp(const T x) noexcept { return std::exp(x); }

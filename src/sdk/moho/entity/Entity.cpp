@@ -401,16 +401,6 @@ namespace
     return fallbackSet;
   }
 
-  [[nodiscard]] float SampleSymmetricRange(moho::CRandomStream* const random, const float range) noexcept
-  {
-    if (random == nullptr || range == 0.0f) {
-      return 0.0f;
-    }
-
-    const float unit = moho::CMersenneTwister::ToUnitFloat(random->twister.NextUInt32());
-    return (-range) + (2.0f * range * unit);
-  }
-
   /**
    * Address: 0x0051C400 (FUN_0051C400)
    *
@@ -423,13 +413,8 @@ namespace
     const moho::RProjectileBlueprint& blueprint
   ) noexcept
   {
-    constexpr double kInvUInt32Range = 2.3283064e-10;
-
     const auto sampleAxis = [&random](const float base, const float range) noexcept -> float {
-      const double min = -static_cast<double>(range);
-      const double span = static_cast<double>(range) - min;
-      const double unit = static_cast<double>(random.twister.NextUInt32()) * kInvUInt32Range;
-      return static_cast<float>(min + (span * unit) + static_cast<double>(base));
+      return random.FRand(-range, range) + base;
     };
 
     Wm3::Vector3f out{};
@@ -530,19 +515,6 @@ namespace
     }
 
     return SampleProjectileSpawnOffset(*random, blueprint);
-  }
-
-  [[nodiscard]] Wm3::Vector3f BuildRandomProjectileDirection(
-    moho::CRandomStream* const random,
-    const moho::RProjectileBlueprint& blueprint
-  ) noexcept
-  {
-    Wm3::Vector3f direction{};
-    direction.x = blueprint.Physics.DirectionX + SampleSymmetricRange(random, blueprint.Physics.DirectionXRange);
-    direction.y = blueprint.Physics.DirectionY + SampleSymmetricRange(random, blueprint.Physics.DirectionYRange);
-    direction.z = blueprint.Physics.DirectionZ + SampleSymmetricRange(random, blueprint.Physics.DirectionZRange);
-    NormalizeInPlace(direction);
-    return direction;
   }
 
   // Ground truth (`FUN_0068A6F0.c`, `cfunc_EntityCreateProjectileAtBoneL`'s
@@ -2735,10 +2707,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679F70 (FUN_00679F70)
-   *
    * What it does:
-   * CTask execution entry point, forwarding to full entity task-tick logic.
+   * CTask execution entry point for FUN_00679C40. The original secondary
+   * vtable invokes TaskTick directly through the CTask subobject.
    */
   int Entity::Execute()
   {
@@ -3101,7 +3072,7 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00679F70 (non-canonical helper lane).
+   * Address: 0x00679F70 (FUN_00679F70)
    *
    * What it does:
    * Advances the active motor when not attached; returns engine task status code.
@@ -4348,7 +4319,7 @@ namespace moho
       }
       launchDirection.z = static_cast<float>(lua_tonumber(rawState, 8));
     } else {
-      launchDirection = BuildRandomProjectileDirection(sim ? sim->mRngState : nullptr, *projectileBlueprint);
+      (void)BuildRandomDirectionVector(sim->mRngState, &launchDirection, projectileBlueprint);
     }
 
     const VTransform sourceTransform = entity->GetBoneWorldTransform(-2);
@@ -4459,16 +4430,16 @@ namespace moho
 
     const VTransform launchTransform = entity->GetBoneWorldTransform(boneIndex);
 
-    CRandomStream* const random = (entity->SimulationRef ? entity->SimulationRef->mRngState : nullptr);
-    Wm3::Vector3f launchDirection = BuildRandomProjectileDirection(random, *projectileBlueprint);
+    CRandomStream* const random = entity->SimulationRef->mRngState;
+    Wm3::Vector3f launchDirection{};
+    (void)BuildRandomDirectionVector(random, &launchDirection, projectileBlueprint);
 
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
     if (launchDirection == zero) {
       launchDirection = ResolveBoneForwardVector(launchTransform);
     }
 
-    const float launchSpeed =
-      projectileBlueprint->Physics.InitialSpeed + SampleSymmetricRange(random, projectileBlueprint->Physics.InitialSpeedRange);
+    const float launchSpeed = projectileBlueprint->GetRandomInitialSpeed(random);
 
     const CAiTarget target = MakeDefaultProjectileTarget();
     const msvc8::string damageTypeName("Normal");

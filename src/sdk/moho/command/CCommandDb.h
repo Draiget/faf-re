@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
@@ -87,7 +88,11 @@ namespace moho
      * FUN_006E2990, `~rb_tree` FUN_006E0A70) rather than on a bespoke tree
      * reimplementation in CCommandDb.cpp.
      */
-    msvc8::map<CmdId, CUnitCommand*> commands;    // +0x0004
+    // Original insert/find compare packed command ids as unsigned values
+    // (0x006E15D0 and 0x006E1955). Script ids have the high bit set and
+    // follow player ids when commands publish events or retire.
+    using CommandMap = msvc8::map<CmdId, CUnitCommand*, std::less<std::uint32_t>>;
+    CommandMap commands;                         // +0x0004
     IdPool pool;                                  // +0x0010
     msvc8::vector<CmdId> pendingReleasedCmdIds;   // +0x0CC0
 

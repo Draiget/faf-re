@@ -3,6 +3,8 @@
 #include <cmath>
 #include <limits>
 
+#include "Wm3ContBox3.h"
+
 #include "gpg/core/utils/Global.h"
 
 // FAF SDK helper recovered from FA at FUN_00472BB0. Lives outside
@@ -10,6 +12,31 @@
 // src/sdk/wm3/AABB.cpp.
 namespace moho
 {
+    /**
+     * Address: 0x004FE2D0 (FUN_004FE2D0, Wm3::AxisAlignedBox3f box constructor)
+     *
+     * What it does:
+     * Adapts the original box constructor missing from vendored WildMagic:
+     * fits all eight vertices, then rebuilds min/max from center and extents.
+     */
+    Wm3::AxisAlignedBox3f AxisAlignedBoundsFromBox(const Wm3::Box3f& box) noexcept
+    {
+        Wm3::Vector3f vertices[8];
+        box.ComputeVertices(vertices);
+        const Wm3::Box3f aligned = Wm3::ContAlignedBox(8, vertices);
+        Wm3::AxisAlignedBox3f bounds{};
+        for (int axis = 0; axis < 3; ++axis) {
+            const float radius =
+                (aligned.Axis[0][axis] * aligned.Extent[0] +
+                 aligned.Axis[1][axis] * aligned.Extent[1]) +
+                 aligned.Axis[2][axis] * aligned.Extent[2];
+            bounds.Min[axis] = aligned.Center[axis] - radius;
+            bounds.Max[axis] = aligned.Center[axis] + radius;
+        }
+        return bounds;
+    }
+
+
     template <class T>
     [[nodiscard]] const T& Empty();
 

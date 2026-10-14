@@ -538,8 +538,18 @@ namespace moho
     // o3*d3` (positive in lane 0), and 0x00697A3F..0x00697A67 gives
     // `o0*d1 + o1*d0 + o2*d3 - o3*d2` - the cross-term signs of
     // `orientation * delta`, with the existing orientation as the LEFT
-    // operand, exactly as `CAniPoseBone::Rotate` (0x0054BC00) composes.
-    mOrientation = MultiplyQuat(mOrientation, deltaOrientation);
+    // operand.
+    // Preserve this integration lane's SSE accumulation order. The generic
+    // product helper groups the same terms differently and changes sim bits.
+    const Wm3::Quaternionf orientation = mOrientation;
+    mOrientation.w = ((orientation.w * deltaOrientation.w - orientation.x * deltaOrientation.x)
+                       - orientation.y * deltaOrientation.y) - orientation.z * deltaOrientation.z;
+    mOrientation.x = ((orientation.y * deltaOrientation.z + orientation.w * deltaOrientation.x)
+                       + orientation.x * deltaOrientation.w) - orientation.z * deltaOrientation.y;
+    mOrientation.y = ((orientation.z * deltaOrientation.x + orientation.w * deltaOrientation.y)
+                       + orientation.y * deltaOrientation.w) - orientation.x * deltaOrientation.z;
+    mOrientation.z = ((orientation.x * deltaOrientation.y + orientation.w * deltaOrientation.z)
+                       + orientation.z * deltaOrientation.w) - orientation.y * deltaOrientation.x;
     NormalizeQuatInPlace(&mOrientation);
   }
 

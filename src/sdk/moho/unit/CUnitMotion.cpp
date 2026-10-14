@@ -1324,7 +1324,8 @@ namespace moho
    */
   void CUnitMotion::MoveTo(VTransform& transform, const float timeStep)
   {
-    transform.orient_.Normalize();
+    // 0x006B92E4 calls the engine normalization lane, also used by physics.
+    NormalizeQuatInPlace(&transform.orient_);
 
     const float pendingVelocityScale = 1.0f / timeStep;
     const float orientationNormDelta = std::fabs(Wm3::Quaternionf::LengthSq(transform.orient_) - 1.0f);
@@ -3092,7 +3093,11 @@ namespace moho
         ? 1.0f
         : -1.0f;
 
-    float turnDelta = msvc8::atan2(selectedPlanarVector.x, selectedPlanarVector.z) - msvc8::atan2(referenceVector.x, referenceVector.z);
+    // 0x006BDB12 spills the first angle; 0x006BDB2A subtracts the second
+    // while it still has x87 precision, before the delta is stored as float.
+    float turnDelta = msvc8::Atan2Difference(
+      selectedPlanarVector.x, selectedPlanarVector.z, referenceVector.x, referenceVector.z
+    );
     if (turnDelta <= 3.1415927f) {
       if (turnDelta < -3.1415927f) {
         turnDelta += 6.2831855f;
@@ -3160,7 +3165,8 @@ namespace moho
 
     if (combatState == kAirCombatStateNormalTurn) {
       const float alignmentSquared = forwardAlignment * forwardAlignment;
-      forwardAlignment = alignmentSquared * alignmentSquared * alignmentSquared * alignmentSquared;
+      const float alignmentFourth = alignmentSquared * alignmentSquared;
+      forwardAlignment = alignmentFourth * alignmentFourth;
       bankFactor = air.BankFactor * 10.0f;
     }
 
@@ -3194,8 +3200,12 @@ namespace moho
       (wingOrientationBias * wingAxis.z) - wingProjection.z,
     };
 
-    Wm3::Vector3f::Normalize(&wingUpVector);
-    outAxes.vY = wingUpVector;
+    // 0x006BDDCD..0x006BDE43 reduces squared lanes as z, y, x and tests
+    // length against zero. The generic normalizer uses x, y, z and 1e-6.
+    const float wingUpLength = std::sqrt(
+      (wingUpVector.z * wingUpVector.z) + (wingUpVector.y * wingUpVector.y) + (wingUpVector.x * wingUpVector.x)
+    );
+    outAxes.vY = wingUpLength > 0.0f ? wingUpVector / wingUpLength : Wm3::Vector3f::Zero();
     outAxes.vZ = rotatedSelectedVector;
 
     if (combatState == kAirCombatStateCombatTurn) {
@@ -3232,13 +3242,11 @@ namespace moho
       }
 
       const float maxElevationOffset = air.CirclingElevationChangeRatio * physics.AttackElevation;
-      mUnknownFloat94 =
-        -maxElevationOffset + ((maxElevationOffset - -maxElevationOffset)
-          * static_cast<double>(randomStream.twister.NextUInt32()) * 2.3283064e-10);
-
-      mUnknownFloat98 = air.CirclingRadiusChangeMinRatio
-        + ((air.CirclingRadiusChangeMaxRatio - air.CirclingRadiusChangeMinRatio)
-          * static_cast<double>(randomStream.twister.NextUInt32()) * 2.3283064e-10);
+      // 0x006BDFB8..0x006BE02D inlines the same x87 range sampling as
+      // CRandomStream::FRand: round the range and word product, scale by
+      // exact 2^-32, then add the lower bound at simulation precision.
+      mUnknownFloat94 = randomStream.FRand(-maxElevationOffset, maxElevationOffset);
+      mUnknownFloat98 = randomStream.FRand(air.CirclingRadiusChangeMinRatio, air.CirclingRadiusChangeMaxRatio);
 
       const auto maxChangeTicks =
         static_cast<std::int32_t>(std::lround(air.CirclingFlightChangeFrequency * 2.0f * 10.0f));
@@ -3300,14 +3308,19 @@ namespace moho
     const float aimX = steerOffset.x + targetX;
     const float aimZ = steerOffset.z + targetZ;
 
+    // 0x006BE340..0x006BE352 rounds the circling point to an integer
+    // height sample in both water modes. The dry-flight path calls the
+    // map's water-clamped integer sampler (0x006BE3AF -> 0x006BC400).
+    const std::int32_t sampleX = msvc8::RoundToInt(aimX);
+    const std::int32_t sampleZ = msvc8::RoundToInt(aimZ);
     float terrainElevation;
     if (air.FlyInWater) {
       STIMap* const mapData = sim->mMapData;
       terrainElevation =
-        static_cast<float>(mapData->GetHeightField()->GetHeightAt(static_cast<std::int32_t>(aimX), static_cast<std::int32_t>(aimZ)))
+        static_cast<float>(mapData->GetHeightField()->GetHeightAt(sampleX, sampleZ))
         * 0.0078125f;
     } else {
-      terrainElevation = sim->mMapData->GetHeightField()->GetElevation(aimX, aimZ);
+      terrainElevation = sim->mMapData->GetElevation(sampleX, sampleZ);
     }
 
     outDesiredVelocity.z = aimZ - position.z;
@@ -3412,8 +3425,25 @@ namespace moho
     // multiplies with the conjugate as the LEFT operand: the scalar term is
     // `D0*c0 - D1*c1 - D2*c2 - D3*c3` and the next lane is
     // `D0*c1 + D1*c0 + D3*c2 - D2*c3`, whose cross-term signs are `c * D`.
-    Wm3::Quaternionf relativeOrientation =
-      MultiplyQuat(ConjugateQuat(body.mOrientation), desiredOrientation);
+    const Wm3::Quaternionf conjugateOrientation = ConjugateQuat(body.mOrientation);
+    Wm3::Quaternionf relativeOrientation{};
+    // 0x006BE916..0x006BEA13 uses this grouping for the relative rotation.
+    relativeOrientation.w = ((conjugateOrientation.w * desiredOrientation.w
+                               - conjugateOrientation.x * desiredOrientation.x)
+                              - conjugateOrientation.y * desiredOrientation.y)
+                             - conjugateOrientation.z * desiredOrientation.z;
+    relativeOrientation.x = ((conjugateOrientation.x * desiredOrientation.w
+                               + conjugateOrientation.w * desiredOrientation.x)
+                              + conjugateOrientation.y * desiredOrientation.z)
+                             - conjugateOrientation.z * desiredOrientation.y;
+    relativeOrientation.y = ((conjugateOrientation.y * desiredOrientation.w
+                               + conjugateOrientation.w * desiredOrientation.y)
+                              + conjugateOrientation.z * desiredOrientation.x)
+                             - conjugateOrientation.x * desiredOrientation.z;
+    relativeOrientation.z = ((conjugateOrientation.z * desiredOrientation.w
+                               + conjugateOrientation.w * desiredOrientation.z)
+                              + conjugateOrientation.x * desiredOrientation.y)
+                             - conjugateOrientation.y * desiredOrientation.x;
     // Shortest-arc hemisphere flip. 0x006BEA17/0x006BEA1A compare zero against
     // the value about to be stored in lane 0 - the scalar - and negate all
     // four lanes when it is below zero.
@@ -3758,6 +3788,10 @@ namespace moho
     Wm3::Vector3f headingVector = VAxes3(outTransform.orient_).vZ;
     headingVector.y = 0.0f;
     Wm3::Vector3f::Normalize(&headingVector);
+
+    // 0x006BEFCF..0x006BF02D inlines SetTransform here on every air tick.
+    // Carry the committed, renormalized orientation back into the cached body.
+    physBody->SetTransform(outTransform);
 
     // 0x006BF20D-0x006BF24A zeroes all six floats of the local SControlOutput
     // before either branch runs, and the shared tail integrates from *this*
@@ -4375,10 +4409,12 @@ namespace moho
       const float forwardZ =
         1.0f - (((body.mOrientation.x * body.mOrientation.x) + (body.mOrientation.y * body.mOrientation.y)) * 2.0f);
 
-      const float forwardLengthSq = (forwardX * forwardX) + (forwardY * forwardY) + (forwardZ * forwardZ);
+      // 0x006BE583..0x006BE5A0 and 0x006BE5B3..0x006BE5CD reduce
+      // both the squared length and projection in z, y, x order.
+      const float forwardLengthSq = (forwardZ * forwardZ) + (forwardY * forwardY) + (forwardX * forwardX);
       if (forwardLengthSq > 0.0f) {
         const float projectionScale =
-          ((forwardX * velocityDelta.x) + (forwardY * velocityDelta.y) + (forwardZ * velocityDelta.z)) /
+          ((forwardZ * velocityDelta.z) + (forwardY * velocityDelta.y) + (forwardX * velocityDelta.x)) /
           forwardLengthSq;
         velocityDelta.x -= forwardX * projectionScale;
         velocityDelta.y -= forwardY * projectionScale;

@@ -31,6 +31,8 @@
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/math/Vector4f.h"
+#include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/render/Cartographic.h"
 #include "moho/render/RCamManager.h"
@@ -95,14 +97,6 @@ namespace
    */
   constexpr int kTerrainRawSheetFormat = 12;
   constexpr int kTerrainMaskSheetFormat = 2;
-
-  struct QuaternionLanes
-  {
-    float w;
-    float x;
-    float y;
-    float z;
-  };
 
   struct TerrainNormalEncodeBlock
   {
@@ -300,103 +294,6 @@ namespace
     (void)device->CreateDynamicTextureSheetFromSource(archiveSheet, sourceSheet, nullptr, formatToken, true);
 
     (void)archiveSheet->SaveToArchive(writer.stream(), true);
-  }
-
-  [[nodiscard]] QuaternionLanes QuaternionFromMatrixRows(const float matrix[3][3]) noexcept
-  {
-    QuaternionLanes out{1.0f, 0.0f, 0.0f, 0.0f};
-
-    const float trace = matrix[0][0] + matrix[1][1] + matrix[2][2];
-    if (trace > 0.0f) {
-      const float s = std::sqrt(trace + 1.0f) * 2.0f;
-      if (s > kQuaternionNormalizeEpsilon) {
-        out.w = 0.25f * s;
-        out.x = (matrix[2][1] - matrix[1][2]) / s;
-        out.y = (matrix[0][2] - matrix[2][0]) / s;
-        out.z = (matrix[1][0] - matrix[0][1]) / s;
-      }
-      return out;
-    }
-
-    if (matrix[0][0] > matrix[1][1] && matrix[0][0] > matrix[2][2]) {
-      const float s = std::sqrt(1.0f + matrix[0][0] - matrix[1][1] - matrix[2][2]) * 2.0f;
-      if (s > kQuaternionNormalizeEpsilon) {
-        out.w = (matrix[2][1] - matrix[1][2]) / s;
-        out.x = 0.25f * s;
-        out.y = (matrix[0][1] + matrix[1][0]) / s;
-        out.z = (matrix[0][2] + matrix[2][0]) / s;
-      }
-      return out;
-    }
-
-    if (matrix[1][1] > matrix[2][2]) {
-      const float s = std::sqrt(1.0f + matrix[1][1] - matrix[0][0] - matrix[2][2]) * 2.0f;
-      if (s > kQuaternionNormalizeEpsilon) {
-        out.w = (matrix[0][2] - matrix[2][0]) / s;
-        out.x = (matrix[0][1] + matrix[1][0]) / s;
-        out.y = 0.25f * s;
-        out.z = (matrix[1][2] + matrix[2][1]) / s;
-      }
-      return out;
-    }
-
-    const float s = std::sqrt(1.0f + matrix[2][2] - matrix[0][0] - matrix[1][1]) * 2.0f;
-    if (s > kQuaternionNormalizeEpsilon) {
-      out.w = (matrix[1][0] - matrix[0][1]) / s;
-      out.x = (matrix[0][2] + matrix[2][0]) / s;
-      out.y = (matrix[1][2] + matrix[2][1]) / s;
-      out.z = 0.25f * s;
-    }
-    return out;
-  }
-
-  void NormalizeQuaternionLanes(QuaternionLanes& q) noexcept
-  {
-    const float magnitude =
-      std::sqrt((q.w * q.w) + (q.x * q.x) + (q.y * q.y) + (q.z * q.z));
-    if (magnitude <= kQuaternionNormalizeEpsilon) {
-      q.w = 0.0f;
-      q.x = 0.0f;
-      q.y = 0.0f;
-      q.z = 0.0f;
-      return;
-    }
-
-    const float inverseMagnitude = 1.0f / magnitude;
-    q.w *= inverseMagnitude;
-    q.x *= inverseMagnitude;
-    q.y *= inverseMagnitude;
-    q.z *= inverseMagnitude;
-  }
-
-  void QuaternionToRotationRows(const QuaternionLanes& q, float matrix[3][3]) noexcept
-  {
-    const float w = q.w;
-    const float x = q.x;
-    const float y = q.y;
-    const float z = q.z;
-
-    const float xx2 = 2.0f * x * x;
-    const float yy2 = 2.0f * y * y;
-    const float zz2 = 2.0f * z * z;
-    const float xy2 = 2.0f * x * y;
-    const float xz2 = 2.0f * x * z;
-    const float yz2 = 2.0f * y * z;
-    const float wx2 = 2.0f * w * x;
-    const float wy2 = 2.0f * w * y;
-    const float wz2 = 2.0f * w * z;
-
-    matrix[0][0] = 1.0f - yy2 - zz2;
-    matrix[0][1] = wz2 + xy2;
-    matrix[0][2] = xz2 - wy2;
-
-    matrix[1][0] = xy2 - wz2;
-    matrix[1][1] = 1.0f - xx2 - zz2;
-    matrix[1][2] = yz2 + wx2;
-
-    matrix[2][0] = wy2 + xz2;
-    matrix[2][1] = yz2 - wx2;
-    matrix[2][2] = 1.0f - xx2 - yy2;
   }
 
   /**
@@ -1217,20 +1114,12 @@ namespace moho
       reader.ReadExact(transform.pos_.y);
       reader.ReadExact(transform.pos_.z);
 
-      float matrix[3][3]{};
-      matrix[0][0] = 1.0f;
-      matrix[1][1] = 1.0f;
-      matrix[2][2] = 1.0f;
-
-      reader.ReadExact(matrix[0][0]);
-      reader.ReadExact(matrix[0][1]);
-      reader.ReadExact(matrix[0][2]);
-      reader.ReadExact(matrix[1][0]);
-      reader.ReadExact(matrix[1][1]);
-      reader.ReadExact(matrix[1][2]);
-      reader.ReadExact(matrix[2][0]);
-      reader.ReadExact(matrix[2][1]);
-      reader.ReadExact(matrix[2][2]);
+      Wm3::Vector3f matrixRows[3]{};
+      for (Wm3::Vector3f& row : matrixRows) {
+        reader.ReadExact(row.x);
+        reader.ReadExact(row.y);
+        reader.ReadExact(row.z);
+      }
 
       float ignoredLane0 = 0.0f;
       float ignoredLane1 = 0.0f;
@@ -1239,9 +1128,22 @@ namespace moho
       reader.ReadExact(ignoredLane1);
       reader.ReadExact(ignoredLane2);
 
-      QuaternionLanes orientation = QuaternionFromMatrixRows(matrix);
-      NormalizeQuaternionLanes(orientation);
-      transform.orient_ = Wm3::Quatf{orientation.w, orientation.x, orientation.y, orientation.z};
+      MatrixToQuat(matrixRows, &transform.orient_);
+      Wm3::Quatf& orientation = transform.orient_;
+      // This map-loader normalization sums z/y/x/w, unlike the shared
+      // NormalizeQuatInPlace path. Keep the original rounding order.
+      const float magnitude = std::sqrt(
+        ((orientation.z * orientation.z + orientation.y * orientation.y) + orientation.x * orientation.x)
+        + orientation.w * orientation.w);
+      if (magnitude > kQuaternionNormalizeEpsilon) {
+        const float inverseMagnitude = 1.0f / magnitude;
+        orientation.w *= inverseMagnitude;
+        orientation.x *= inverseMagnitude;
+        orientation.y *= inverseMagnitude;
+        orientation.z *= inverseMagnitude;
+      } else {
+        orientation = Wm3::Quatf{0.0f, 0.0f, 0.0f, 0.0f};
+      }
 
       PackWldPropEntry(mEntries[index], transform, blueprintPath);
     }
@@ -1269,20 +1171,16 @@ namespace moho
       writer.Write(entry.mTransform.pos_.y);
       writer.Write(entry.mTransform.pos_.z);
 
-      const Wm3::Quatf& orient = entry.mTransform.orient_;
-      const QuaternionLanes orientation{orient.w, orient.x, orient.y, orient.z};
-      float matrix[3][3]{};
-      QuaternionToRotationRows(orientation, matrix);
-
-      writer.Write(matrix[0][0]);
-      writer.Write(matrix[0][1]);
-      writer.Write(matrix[0][2]);
-      writer.Write(matrix[1][0]);
-      writer.Write(matrix[1][1]);
-      writer.Write(matrix[1][2]);
-      writer.Write(matrix[2][0]);
-      writer.Write(matrix[2][1]);
-      writer.Write(matrix[2][2]);
+      const VAxes3 matrix(entry.mTransform.orient_);
+      writer.Write(matrix.vX.x);
+      writer.Write(matrix.vX.y);
+      writer.Write(matrix.vX.z);
+      writer.Write(matrix.vY.x);
+      writer.Write(matrix.vY.y);
+      writer.Write(matrix.vY.z);
+      writer.Write(matrix.vZ.x);
+      writer.Write(matrix.vZ.y);
+      writer.Write(matrix.vZ.z);
 
       constexpr float kScaleIdentity = 1.0f;
       writer.Write(kScaleIdentity);

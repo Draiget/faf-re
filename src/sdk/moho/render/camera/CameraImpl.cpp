@@ -1,3 +1,4 @@
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "moho/render/camera/CameraImpl.h"
 
 #include <Windows.h>
@@ -2555,7 +2556,7 @@ void moho::CameraImpl::TargetEntityBox(UserEntity* const entity, const float sec
 
   const Wm3::Box3f orientedBox(*sourceBox);
   Wm3::AxisAlignedBox3f expandedBox{};
-  orientedBox.ComputeAABB(expandedBox.Min, expandedBox.Max);
+  expandedBox = moho::AxisAlignedBoundsFromBox(orientedBox);
 
   expandedBox.Max.x += cam_EntityBoxExpand;
   expandedBox.Max.z += cam_EntityBoxExpand;

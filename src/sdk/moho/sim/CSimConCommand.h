@@ -30,8 +30,9 @@ namespace moho
      * What it does:
      * Initializes command metadata and registers this command in the
      * case-insensitive global sim-command registry by name.
+     * A true flag permits execution without the simulation's cheat check.
      */
-    CSimConCommand(bool requiresCheat, const char* name);
+    CSimConCommand(bool allowWithoutCheats, const char* name);
 
     /**
      * Address: 0x00734760 (FUN_00734760, ??1CSimConCommand@Moho@@UAE@XZ)
@@ -83,13 +84,13 @@ namespace moho
 
   public:
     const char* mName;           // +0x04
-    std::uint8_t mRequiresCheat; // +0x08
+    std::uint8_t mAllowWithoutCheats; // +0x08; nonzero bypasses CheatsEnabled()
     std::uint8_t mPad09[3];      // +0x09
   };
 
   static_assert(sizeof(CSimConCommand) == 0x0C, "CSimConCommand size must be 0x0C");
   static_assert(offsetof(CSimConCommand, mName) == 0x04, "CSimConCommand::mName offset must be 0x04");
-  static_assert(offsetof(CSimConCommand, mRequiresCheat) == 0x08, "CSimConCommand::mRequiresCheat offset must be 0x08");
+  static_assert(offsetof(CSimConCommand, mAllowWithoutCheats) == 0x08, "CSimConCommand::mAllowWithoutCheats offset must be 0x08");
 
   /**
    * What it does:

@@ -8,8 +8,8 @@ namespace moho
    * What it does:
    * Constructs one console-function command entry and binds its callback lane.
    */
-  CSimConFunc::CSimConFunc(const bool requiresCheat, const char* const name, Callback const handler) noexcept
-    : CSimConCommand(requiresCheat, name)
+  CSimConFunc::CSimConFunc(const bool allowWithoutCheats, const char* const name, Callback const handler) noexcept
+    : CSimConCommand(allowWithoutCheats, name)
     , mHandler(handler)
   {
   }

@@ -74,6 +74,14 @@ namespace moho
 {
   gpg::RType* CIntel::sType = nullptr;
 
+  void IntelHandleDeleter::operator()(CIntelPosHandle* const handle) const noexcept
+  {
+    handle->Destroy(1);
+  }
+
+  CIntel::~CIntel() = default;
+
+
   /**
    * Address: 0x00683170 (FUN_00683170)
    *
@@ -97,15 +105,7 @@ namespace moho
    * `{present,enabled}` toggle-state pairs.
    */
   CIntel::CIntel()
-    : mVisionGrid(nullptr)
-    , mWaterGrid(nullptr)
-    , mRadarGrid(nullptr)
-    , mSonarGrid(nullptr)
-    , mOmniGrid(nullptr)
-    , mRCIGrid(nullptr)
-    , mSCIGrid(nullptr)
-    , mVCIGrid(nullptr)
-    , mReservedGrid(nullptr)
+    : mIntelHandles{}
   {
     for (CIntelToggleState& toggleState : mToggleStates) {
       BoolFieldInit(&toggleState);
@@ -179,7 +179,7 @@ namespace moho
   void CIntel::ForceUpdate(const Wm3::Vec3f& position, const std::int32_t tick)
   {
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      CIntelPosHandle* const handle = mIntelHandles[i];
+      CIntelPosHandle* const handle = mIntelHandles[i].get();
       if (!handle) {
         continue;
       }
@@ -201,7 +201,7 @@ namespace moho
   {
 
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      CIntelPosHandle* const handle = mIntelHandles[i];
+      CIntelPosHandle* const handle = mIntelHandles[i].get();
       if (!handle) {
         continue;
       }
@@ -235,11 +235,7 @@ namespace moho
     for (std::size_t i = 0; i < kHandleCount; ++i) {
       CIntelPosHandle* loaded = nullptr;
       archive->ReadPointerOwned(&loaded, &ownerRef);
-      CIntelPosHandle* const previous = mIntelHandles[i];
-      mIntelHandles[i] = loaded;
-      if (previous) {
-        previous->Destroy(1);
-      }
+      mIntelHandles[i].reset(loaded);
     }
 
     for (CIntelToggleState& toggle : mToggleStates) {
@@ -262,7 +258,7 @@ namespace moho
   void CIntel::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      gpg::WriteRawPointer(archive, MakePosHandleRef(mIntelHandles[i]), gpg::TrackedPointerState::Owned, gpg::RRef{});
+      gpg::WriteRawPointer(archive, MakePosHandleRef(mIntelHandles[i].get()), gpg::TrackedPointerState::Owned, gpg::RRef{});
     }
 
     for (const CIntelToggleState& toggle : mToggleStates) {
@@ -282,67 +278,49 @@ namespace moho
     const std::int32_t intelType, const std::uint32_t radius, CAiReconDBImpl* const reconDB, Sim* const sim
   )
   {
-    auto replacePosHandle = [](CIntelPosHandle*& slot, CIntelPosHandle* const replacement) {
-      CIntelPosHandle* const previous = slot;
-      slot = replacement;
-      if (previous) {
-        previous->Destroy(1);
-      }
-    };
-
-    auto replaceCounterHandle = [](CIntelCounterHandle*& slot, CIntelCounterHandle* const replacement) {
-      CIntelCounterHandle* const previous = slot;
-      slot = replacement;
-      if (previous) {
-        previous->Destroy(1);
-      }
-    };
-
     switch (intelType) {
     case 1: {
       boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetVisionGrid() : boost::SharedPtrRaw<CIntelGrid>{};
-      replacePosHandle(mVisionGrid, new (std::nothrow) CIntelPosHandle(radius, grid));
+      mIntelHandles[INTEL_Vision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.release();
       return;
     }
     case 2: {
       boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetWaterGrid() : boost::SharedPtrRaw<CIntelGrid>{};
-      replacePosHandle(mWaterGrid, new (std::nothrow) CIntelPosHandle(radius, grid));
+      mIntelHandles[INTEL_WaterVision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.release();
       return;
     }
     case 3: {
       boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetRadarGrid() : boost::SharedPtrRaw<CIntelGrid>{};
-      replacePosHandle(mRadarGrid, new (std::nothrow) CIntelPosHandle(radius, grid));
+      mIntelHandles[INTEL_Radar].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.release();
       return;
     }
     case 4: {
       boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetSonarGrid() : boost::SharedPtrRaw<CIntelGrid>{};
-      replacePosHandle(mSonarGrid, new (std::nothrow) CIntelPosHandle(radius, grid));
+      mIntelHandles[INTEL_Sonar].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.release();
       return;
     }
     case 5: {
       boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetOmniGrid() : boost::SharedPtrRaw<CIntelGrid>{};
-      replacePosHandle(mOmniGrid, new (std::nothrow) CIntelPosHandle(radius, grid));
+      mIntelHandles[INTEL_Omni].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.release();
       return;
     }
     case 6:
-      replaceCounterHandle(
-        mRCIGrid,
+      mIntelHandles[INTEL_RadarStealthField].reset(
         new (std::nothrow) CIntelCounterHandle(radius, sim, INTELCOUNTER_RadarStealthField, reconDB)
       );
       return;
     case 7:
-      replaceCounterHandle(
-        mSCIGrid,
+      mIntelHandles[INTEL_SonarStealthField].reset(
         new (std::nothrow) CIntelCounterHandle(radius, sim, INTELCOUNTER_SonarStealthField, reconDB)
       );
       return;
     case 8:
-      replaceCounterHandle(mVCIGrid, new (std::nothrow) CIntelCounterHandle(radius, sim, INTELCOUNTER_CloakField, reconDB));
+      mIntelHandles[INTEL_CloakField].reset(new (std::nothrow) CIntelCounterHandle(radius, sim, INTELCOUNTER_CloakField, reconDB));
       return;
     // 0x0076E3F4 folds every toggle lane into one indexed store,
     // `mov [ebp+ecx*2+12h], 1` for `intelType >= INTEL_Jammer` -- so the lane

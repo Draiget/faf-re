@@ -4,9 +4,19 @@
 // `Wm3::AxisAlignedBox3f` specialization is defined in
 // Wm3AxisAlignedBox3FafExtras.cpp.
 #include "Wm3AxisAlignedBox3.h"
+#include "Wm3Box3.h"
 
 namespace moho
 {
+    /**
+     * Address: 0x004FE2D0 (FUN_004FE2D0, Wm3::AxisAlignedBox3f box constructor)
+     *
+     * What it does:
+     * Adapts the original box constructor missing from vendored WildMagic:
+     * fits all eight vertices, then rebuilds min/max from center and extents.
+     */
+    [[nodiscard]] Wm3::AxisAlignedBox3f AxisAlignedBoundsFromBox(const Wm3::Box3f& box) noexcept;
+
     template <class T>
     [[nodiscard]] const T& Empty();
 

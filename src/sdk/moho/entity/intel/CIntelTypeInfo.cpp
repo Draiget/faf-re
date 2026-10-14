@@ -6,7 +6,6 @@
 #include "moho/entity/intel/CIntel.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
-
 namespace
 {
   /**
@@ -16,20 +15,6 @@ namespace
   {
     static moho::CIntelTypeInfo sInstance;
     return sInstance;
-  }
-
-  void DestroyHandleSlots(moho::CIntel* const intel)
-  {
-    if (!intel) {
-      return;
-    }
-
-    for (std::size_t i = 0; i < moho::CIntel::kHandleCount; ++i) {
-      moho::CIntelPosHandle* const handle = intel->mIntelHandles[i];
-      if (handle) {
-        handle->Destroy(1);
-      }
-    }
   }
 
   [[nodiscard]] gpg::RRef MakeCIntelRef(moho::CIntel* const object)
@@ -113,8 +98,7 @@ namespace moho
       return;
     }
 
-    DestroyHandleSlots(object);
-    ::operator delete(object);
+    delete object;
   }
 
   /**
@@ -122,7 +106,9 @@ namespace moho
    */
   void CIntelTypeInfo::Destruct(void* const objectPtr)
   {
-    DestroyHandleSlots(reinterpret_cast<CIntel*>(objectPtr));
+    if (auto* const object = static_cast<CIntel*>(objectPtr)) {
+      object->~CIntel();
+    }
   }
 
   /**

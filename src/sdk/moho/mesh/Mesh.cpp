@@ -1,3 +1,4 @@
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include <cstdio>
 #include "Mesh.h"
 
@@ -3187,7 +3188,7 @@ namespace moho
     );
 
     Wm3::AxisAlignedBox3f fromOrientedBox{};
-    box.ComputeAABB(fromOrientedBox.Min, fromOrientedBox.Max);
+    fromOrientedBox = moho::AxisAlignedBoundsFromBox(box);
     xMin = fromOrientedBox.Min.x;
     yMin = fromOrientedBox.Min.y;
     zMin = fromOrientedBox.Min.z;
@@ -3302,10 +3303,10 @@ namespace moho
         );
 
         Wm3::AxisAlignedBox3f endBounds{};
-        endOriented.ComputeAABB(endBounds.Min, endBounds.Max);
+        endBounds = moho::AxisAlignedBoundsFromBox(endOriented);
 
         Wm3::AxisAlignedBox3f startBounds{};
-        startOriented.ComputeAABB(startBounds.Min, startBounds.Max);
+        startBounds = moho::AxisAlignedBoundsFromBox(startOriented);
 
         const Wm3::AxisAlignedBox3f sweptBounds = MergeAxisAlignedBounds(endBounds, startBounds);
         self.renderMinX = sweptBounds.Min.x;

@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "moho/collision/CGeomSolid3.h"
+#include "legacy/math/X87Math.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -1330,15 +1331,10 @@ namespace moho
     const float h10 = static_cast<float>(data[x1 + z0 * width]) * 0.0078125f;
     const float h11 = static_cast<float>(data[x1 + z1 * width]) * 0.0078125f;
 
-    // The binary chains both lerps on the x87 stack in 80-bit precision
-    // (0x0044FCFB..0x0044FD3D) and rounds to float exactly once, at return.
-    // Double intermediates reproduce the 64-bit-mantissa chain; a float32
-    // chain rounds per operation and lands one ULP off on sloped cells
-    // (measured: replay 26935800 beat 50, xsl0001 spawn Y 0x427DAF22 retail
-    // vs 0x427DAF21 float32-chained).
-    const double row0 = static_cast<double>(h00) + (static_cast<double>(h01) - h00) * fracZ;
-    const double row1 = static_cast<double>(h10) + (static_cast<double>(h11) - h10) * fracZ;
-    return static_cast<float>(row0 + (row1 - row0) * fracX);
+    // 0x0044FCFB..0x0044FD3D keeps both interpolated rows on the x87 stack.
+    // The simulation sets PC24: double intermediates ignore that control and
+    // produce different heights. Preserve the original arithmetic explicitly.
+    return msvc8::BilinearHeight(h00, h01, h10, h11, fracX, fracZ);
   }
 
   /**

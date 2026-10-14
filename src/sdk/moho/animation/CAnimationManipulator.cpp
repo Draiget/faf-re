@@ -1466,7 +1466,8 @@ namespace moho
     }
 
     mAnimationTime = clip->mDurationSeconds * normalized;
-    UpdateTriggeredState();
+    // Seeking changes playback position only. The original publishes the
+    // completion event on a subsequent update, not from this setter.
   }
 
   /**
@@ -1486,7 +1487,7 @@ namespace moho
       mAnimationTime = std::clamp(timeSeconds, 0.0f, std::max(duration, 0.0f));
     }
 
-    UpdateTriggeredState();
+    // Preserve the pending event until the next animation update.
   }
 
   /**

@@ -61,26 +61,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x0076E770 (FUN_0076E770, boost::shared_ptr_CIntelPosHandle::~shared_ptr_CIntelPosHandle)
-   *
-   * What it does:
-   * Destroys one `CIntelPosHandle*` lane when present via virtual
-   * `CIntelPosHandle::Destroy(1)` dispatch.
-   */
-  [[maybe_unused]] void DestroyIntelPosHandleViaDestroyIfPresent(
-    moho::CIntelPosHandle* const* const handleSlot
-  )
-  {
-    if (handleSlot == nullptr) {
-      return;
-    }
-
-    moho::CIntelPosHandle* const handle = *handleSlot;
-    if (handle != nullptr) {
-      handle->Destroy(1);
-    }
-  }
 } // namespace
 
 namespace moho
@@ -109,7 +89,7 @@ namespace moho
     mRadius = radius;
     mLastTickUpdated = 0;
     mEnabled = 0;
-    mGrid = intelGrid;
+    mGrid.assign_retain(intelGrid);
   }
 
   /**
@@ -152,11 +132,11 @@ namespace moho
       const float dx = newPos.x - mLastPos.x;
       const float dy = newPos.y - mLastPos.y;
       const float dz = newPos.z - mLastPos.z;
-      const float distanceSquared = dx * dx + dy * dy + dz * dz;
-      const float range = static_cast<float>(static_cast<double>(mRadius) * 0.333);
+      const float distanceSquared = dx * dx + dz * dz + dy * dy;
+      const float range = static_cast<float>(mRadius) * 0.333f;
       const float rangeSquared = range * range;
 
-      if (distanceSquared >= rangeSquared || (curTick - mLastTickUpdated) > 30) {
+      if (distanceSquared >= rangeSquared || (curTick - mLastTickUpdated) > 5) {
         mLastTickUpdated = curTick;
         Update(newPos);
       }

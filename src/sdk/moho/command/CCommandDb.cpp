@@ -62,7 +62,7 @@ namespace
    * Dies with a dump of every still-owned command when the command map is
    * destroyed non-empty.
    */
-  void ValidateCommandMapEmptyOrDie(const msvc8::map<moho::CmdId, moho::CUnitCommand*>& commands)
+  void ValidateCommandMapEmptyOrDie(const moho::CCommandDB::CommandMap& commands)
   {
     if (commands.empty()) {
       return;
@@ -178,7 +178,7 @@ namespace moho
      * `rb_decrement`, then link or return the colliding node with `false`.
      * Reached from here and from `MemberDeserialize` (FUN_006E1430) below.)
      */
-    commands.insert(msvc8::map<CmdId, CUnitCommand*>::value_type(command->mConstDat.cmd, command));
+    commands.insert(CommandMap::value_type(command->mConstDat.cmd, command));
     return command;
   }
 
@@ -312,7 +312,7 @@ namespace moho
 
       const CmdId commandId = static_cast<CmdId>(nextLowId | 0x80000000u);
       command->mConstDat.cmd = commandId;
-      commands.insert(msvc8::map<CmdId, CUnitCommand*>::value_type(commandId, command));
+      commands.insert(CommandMap::value_type(commandId, command));
 
       ownerRef.mObj = nullptr;
       ownerRef.mType = nullptr;

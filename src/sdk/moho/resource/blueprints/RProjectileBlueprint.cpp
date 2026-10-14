@@ -16,36 +16,32 @@
 
 namespace moho
 {
+  /**
+   * Address: 0x0051C510 (FUN_0051C510, func_RandomDirection)
+   *
+   * What it does:
+   * Builds one randomized launch direction from blueprint direction lanes
+   * (`DirectionX/Y/Z`) plus symmetric per-axis ranges.
+   */
+  [[nodiscard]] Wm3::Vector3f* BuildRandomDirectionVector(
+    CRandomStream* const randomStream, Wm3::Vector3f* const destination, const RProjectileBlueprint* const blueprint
+  )
+  {
+    const auto sampleSymmetricOffset = [randomStream](const float range) {
+      return randomStream->FRand(-range, range);
+    };
+
+    destination->x = sampleSymmetricOffset(blueprint->Physics.DirectionXRange) + blueprint->Physics.DirectionX;
+    destination->y = sampleSymmetricOffset(blueprint->Physics.DirectionYRange) + blueprint->Physics.DirectionY;
+    destination->z = sampleSymmetricOffset(blueprint->Physics.DirectionZRange) + blueprint->Physics.DirectionZ;
+    return destination;
+  }
+
   namespace
   {
-    /**
-     * Address: 0x0051C510 (FUN_0051C510, func_RandomDirection)
-     *
-     * What it does:
-     * Builds one randomized launch direction from blueprint direction lanes
-     * (`DirectionX/Y/Z`) plus symmetric per-axis ranges.
-     */
-    [[nodiscard]] Wm3::Vector3f* BuildRandomDirectionVector(
-      CRandomStream* const randomStream, Wm3::Vector3f* const destination, const RProjectileBlueprint* const blueprint
-    )
-    {
-      const auto sampleSymmetricOffset = [randomStream](const float range) {
-        const float unit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
-        return (-range) + ((range - (-range)) * unit);
-      };
-
-      destination->x = sampleSymmetricOffset(blueprint->Physics.DirectionXRange) + blueprint->Physics.DirectionX;
-      destination->y = sampleSymmetricOffset(blueprint->Physics.DirectionYRange) + blueprint->Physics.DirectionY;
-      destination->z = sampleSymmetricOffset(blueprint->Physics.DirectionZRange) + blueprint->Physics.DirectionZ;
-      return destination;
-    }
-
     [[nodiscard]] float SampleSymmetricRange(CRandomStream* const randomStream, const float range)
     {
-      const float minValue = -range;
-      const float maxValue = range;
-      const float unit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
-      return minValue + ((maxValue - minValue) * unit);
+      return randomStream->FRand(-range, range);
     }
 
     /**

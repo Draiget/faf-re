@@ -216,8 +216,10 @@ namespace moho
   {
     constexpr float kEps = 1.0e-6f;
 
+    // The binary adds squared lanes in storage order (w, x, y, z).
+    // Changing that order changes the rounded length and simulation rotations.
     const float length = std::sqrt(
-        (quat->x * quat->x) + (quat->y * quat->y) + (quat->z * quat->z) + (quat->w * quat->w));
+        (quat->w * quat->w) + (quat->x * quat->x) + (quat->y * quat->y) + (quat->z * quat->z));
 
     if (length <= kEps) {
       quat->x = 0.0f;
@@ -338,7 +340,10 @@ namespace moho
 
     const int axisB = kCrossShuffle[dominantAxis];
     const int axisC = kCrossShuffle[axisB];
-    const float root = std::sqrt((lane(dominantAxis, dominantAxis) - (lane(axisB, axisB) + lane(axisC, axisC))) + 1.0f);
+    // 0x004F0D91..0x004F0DA0 subtracts the other diagonal lanes separately.
+    const float root = std::sqrt(
+      ((lane(dominantAxis, dominantAxis) - lane(axisB, axisB)) - lane(axisC, axisC)) + 1.0f
+    );
     const float invRoot = 0.5f / root;
 
     float vectorComponents[3] = {0.0f, 0.0f, 0.0f};

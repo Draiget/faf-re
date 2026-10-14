@@ -1,3 +1,4 @@
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/unit/core/Unit.h"
 #include "legacy/math/X87Math.h"
@@ -11456,8 +11457,8 @@ CScrLuaInitForm* moho::func_CreateUnit2_LuaFuncDef()
  * bit-zero quaternion (substituting identity + a warning), resolves the optional
  * layer string, spawns the unit through the sim, and pushes its script object.
  *
- * NOTE: the binary reads position args in swapped order — arg5->vec.x, arg4->vec.y,
- * arg3->vec.z — preserved here verbatim.
+ * Numeric arguments are read right-to-left, while the constructed position
+ * retains the Lua API's x, y, z order.
  */
 int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
 {
@@ -11496,22 +11497,24 @@ int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, "Invalid army index; must be >= 1 and < %d but got %d.", armyCount, armyIndex);
   }
 
-  // Position: the binary reads args 5, 4, 3 into vec.x, vec.y, vec.z respectively.
-  const LuaPlus::LuaStackObject vecXArg(state, 5);
+  // 0x006CF75C/0x006CF79D/0x006CF7DE read z, y, x. After the
+  // outstanding Lua-call arguments are popped, 0x006CFA28..0x006CFA54
+  // copy them to transform +0x10/+0x14/+0x18 as x, y, z.
+  const LuaPlus::LuaStackObject vecZArg(state, 5);
   if (lua_type(rawState, 5) != LUA_TNUMBER) {
-    vecXArg.TypeError("number");
+    vecZArg.TypeError("number");
   }
-  const float vecX = static_cast<float>(lua_tonumber(rawState, 5));
+  const float vecZ = static_cast<float>(lua_tonumber(rawState, 5));
   const LuaPlus::LuaStackObject vecYArg(state, 4);
   if (lua_type(rawState, 4) != LUA_TNUMBER) {
     vecYArg.TypeError("number");
   }
   const float vecY = static_cast<float>(lua_tonumber(rawState, 4));
-  const LuaPlus::LuaStackObject vecZArg(state, 3);
+  const LuaPlus::LuaStackObject vecXArg(state, 3);
   if (lua_type(rawState, 3) != LUA_TNUMBER) {
-    vecZArg.TypeError("number");
+    vecXArg.TypeError("number");
   }
-  const float vecZ = static_cast<float>(lua_tonumber(rawState, 3));
+  const float vecX = static_cast<float>(lua_tonumber(rawState, 3));
 
   // Orientation: the binary reads args 8, 7, 6 (qz, qy, qx) then 9 (qw).
   const LuaPlus::LuaStackObject quatZArg(state, 8);
@@ -12665,33 +12668,9 @@ void Unit::UpdateGuardFormation()
  * and its command queue is empty, issues an `AssistCommander` command to
  * itself; and if a builder sidecar is present, validates its factory queue.
  *
- * @warning **Nothing currently calls this**, so no unit is simulated at all.
- * Measured, not inferred: a counter placed at the top of
- * `HandleResourceManagement` -- which this function reaches unconditionally at
- * the end, with no early return in between -- logged **zero** times across two
- * runs covering more than twenty minutes of game time with nine armies. The
- * `Sim::Logf` line at the top of this body likewise never appears.
- *
- * That single fact explains the economy symptoms without any second cause:
- * production is banked into `CEconomy::mResources` only from here, so the
- * income readout stays at +0 while the original binary shows +1 mass / +20
- * energy on the same map. It is also why the sim can advance its clock and run
- * Lua while units do nothing -- the beat counter is independent of entity
- * ticking.
- *
- * The dispatch chain to restore, upward from here, is entirely virtual and so
- * carries no direct call edges (the only xref to this body is vtable slot 20 of
- * the `Entity` subobject at 0x00E2A5EC):
- *
- *     task scheduler -> Entity::Execute (0x00679F70)
- *                    -> Entity::TaskTick (0x00679C40)
- *                    -> MotionTick  [virtual slot 20]
- *                    -> HandleResourceManagement
- *
- * `Entity::Execute` is the CTask entry point, so entities run as tasks; the
- * missing link is whatever enqueues them into the task stage that
- * `CArmyImpl::OnTick` drives through `CTaskStage::DoFrame`. Start there rather
- * than anywhere in this file -- this body and everything below it is intact.
+ * Entity::StandardInit registers the entity task in the simulation stage.
+ * The task dispatcher reaches Entity::TaskTick (0x00679C40), whose final
+ * virtual call dispatches here through the Entity subobject's slot 20.
  */
 int Unit::MotionTick()
 {
@@ -14074,9 +14053,9 @@ void Unit::HandleTerranEffects()
  * Address: 0x006AB520 (FUN_006AB520, Moho::Unit::UpdateCollision)
  *
  * What it does:
- * Pushes current transform into the active collision primitive, widens
- * box-shape X/Z extents to include blueprint skirt dimensions, and then
- * forwards to `Entity::UpdateCollision` for relink and bounds refresh.
+ * Pushes the current transform into the collision primitive. Uses a widened
+ * temporary box for skirt bucket membership and preserves the primitive
+ * shape when refreshing the cached collision bounds.
  */
 void Unit::UpdateCollision()
 {
@@ -14085,23 +14064,22 @@ void Unit::UpdateCollision()
   }
 
   CollisionExtents->SetTransform(mVarDat.mCurTransform);
-
-  if (const Wm3::Box3f* const existingBox = CollisionExtents->GetBox(); existingBox != nullptr) {
+  if (CollisionExtents->GetBox() != nullptr) {
+    Wm3::Box3f expandedBox(*CollisionExtents->GetBox());
     const RUnitBlueprint* const blueprint = GetBlueprint();
     if (blueprint != nullptr) {
-      Wm3::Box3f expandedBox(*existingBox);
-
       const float skirtExtentX = std::fabs(blueprint->Physics.SkirtOffsetX) + blueprint->Physics.SkirtSizeX;
       const float skirtExtentZ = std::fabs(blueprint->Physics.SkirtOffsetZ) + blueprint->Physics.SkirtSizeZ;
-
       expandedBox.Extent[0] = 0.5f * std::max(blueprint->mSizeX, skirtExtentX);
       expandedBox.Extent[2] = 0.5f * std::max(blueprint->mSizeZ, skirtExtentZ);
-
-      static_cast<CColPrimitive<Wm3::Box3f>*>(CollisionExtents)->mShape = expandedBox;
+      UpdateRect(moho::AxisAlignedBoundsFromBox(expandedBox));
+    } else {
+      UpdateRect(CollisionExtents);
     }
+  } else {
+    UpdateRect(CollisionExtents);
   }
-
-  Entity::UpdateCollision();
+  UpdateAABox();
 }
 
 /**
@@ -14326,7 +14304,8 @@ float Unit::GetArmorMult(const msvc8::string& damageType) const
 float Unit::Materialize(const float delta)
 {
   SimulationRef->Logf(
-    "Unit[0x%08x]->Materialize(%.5f [0x%08x])\n", static_cast<std::uint32_t>(id_), delta, delta
+    "Unit[0x%08x]->Materialize(%.5f [0x%08x])\n", static_cast<std::uint32_t>(id_), delta,
+    std::bit_cast<std::uint32_t>(delta)
   );
 
   // Any non-reversing step restamps the creation tick, so a unit dates from

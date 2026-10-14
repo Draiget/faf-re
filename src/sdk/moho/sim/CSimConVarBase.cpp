@@ -41,8 +41,8 @@ std::uint32_t moho::GetSimConVarIndexCounter() noexcept
  * Initializes one convar definition lane, assigns a unique global convar
  * index, and binds the `CSimConVarBase` vftable.
  */
-CSimConVarBase::CSimConVarBase(const bool requiresCheat, const char* const name)
-  : CSimConCommand(requiresCheat, name)
+CSimConVarBase::CSimConVarBase(const bool allowWithoutCheats, const char* const name)
+  : CSimConCommand(allowWithoutCheats, name)
   , mIndex(AllocateSimConVarIndex())
 {
 }
@@ -108,8 +108,8 @@ CSimConVarInstanceBase* moho::TSimConVar<bool>::CreateInstance()
  * bool payload lane.
  */
 template <>
-moho::TSimConVar<bool>::TSimConVar(const bool requiresCheat, const char* const name, const bool& defaultValue)
-  : CSimConVarBase(requiresCheat, name)
+moho::TSimConVar<bool>::TSimConVar(const bool allowWithoutCheats, const char* const name, const bool& defaultValue)
+  : CSimConVarBase(allowWithoutCheats, name)
   , mDefaultValue(defaultValue)
 {
 }

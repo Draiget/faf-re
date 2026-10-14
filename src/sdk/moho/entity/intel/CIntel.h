@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 #include "Wm3Vector3.h"
 
@@ -21,6 +22,14 @@ namespace moho
   class CIntelPosHandle;
   struct RUnitBlueprintIntel;
   class Sim;
+
+  struct IntelHandleDeleter
+  {
+    void operator()(CIntelPosHandle* handle) const noexcept;
+  };
+
+  using IntelHandle = std::unique_ptr<CIntelPosHandle, IntelHandleDeleter>;
+  static_assert(sizeof(IntelHandle) == sizeof(CIntelPosHandle*), "IntelHandle must occupy one pointer");
 
   struct CIntelToggleState
   {
@@ -70,6 +79,9 @@ namespace moho
      * `{present,enabled}` toggle-state pairs.
      */
     CIntel();
+
+    // Compiler-generated teardown of the nine owning handle slots.
+    ~CIntel();
 
     /**
      * Address: 0x0076DAE0 (FUN_0076DAE0, Moho::CIntel::CIntel)
@@ -140,22 +152,10 @@ namespace moho
     static void BoolFieldInit(CIntelToggleState* toggleState);
 
   public:
-    union
-    {
-      struct
-      {
-        CIntelPosHandle* mVisionGrid;   // +0x00
-        CIntelPosHandle* mWaterGrid;    // +0x04
-        CIntelPosHandle* mRadarGrid;    // +0x08
-        CIntelPosHandle* mSonarGrid;    // +0x0C
-        CIntelPosHandle* mOmniGrid;     // +0x10
-        CIntelCounterHandle* mRCIGrid;  // +0x14
-        CIntelCounterHandle* mSCIGrid;  // +0x18
-        CIntelCounterHandle* mVCIGrid;  // +0x1C
-        CIntelPosHandle* mReservedGrid; // +0x20 (unresolved handle slot in 9-entry handle array)
-      };
-      CIntelPosHandle* mIntelHandles[kHandleCount]; // +0x00
-    };
+    // Indexed by EIntel: slot 0 is unused; Vision through CloakField occupy
+    // slots 1 through 8 (0x0076E096, 0x0068E1D1). Owned handles are destroyed
+    // in reverse array order, as in Entity's teardown at 0x006786E6.
+    IntelHandle mIntelHandles[kHandleCount];
 
     /**
      * The five toggle lanes sit in `EIntel` order starting at `INTEL_Jammer`,
@@ -186,8 +186,7 @@ namespace moho
     };
   };
 
-  static_assert(offsetof(CIntel, mVisionGrid) == 0x00, "CIntel::mVisionGrid offset must be 0x00");
-  static_assert(offsetof(CIntel, mReservedGrid) == 0x20, "CIntel::mReservedGrid offset must be 0x20");
+  static_assert(offsetof(CIntel, mIntelHandles) == 0x00, "CIntel::mIntelHandles offset must be 0x00");
   static_assert(offsetof(CIntel, mJamming) == 0x24, "CIntel::mJamming offset must be 0x24");
   static_assert(offsetof(CIntel, mSpoof) == 0x26, "CIntel::mSpoof offset must be 0x26");
   static_assert(offsetof(CIntel, mCloak) == 0x28, "CIntel::mCloak offset must be 0x28");

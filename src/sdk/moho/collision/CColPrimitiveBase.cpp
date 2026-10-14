@@ -1,3 +1,4 @@
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "moho/collision/CColPrimitiveBase.h"
 
 #include <array>
@@ -56,13 +57,16 @@ namespace
     const Wm3::Vec3f axis1 = BoxAxis(box, 1);
     const Wm3::Vec3f axis2 = BoxAxis(box, 2);
 
-    const float centerProjection = Wm3::Vector3f::Dot(axis, center);
+    const float centerProjection = (axis.y * center.y + axis.z * center.z) + axis.x * center.x;
 
     // Summed third-axis first, then second, then first, because that is the
     // order the binary accumulates in and float addition does not associate.
-    const float radius = (std::fabs(Wm3::Vector3f::Dot(axis, axis2)) * box.Extent[2] +
-                           std::fabs(Wm3::Vector3f::Dot(axis, axis1)) * box.Extent[1]) +
-      std::fabs(Wm3::Vector3f::Dot(axis, axis0)) * box.Extent[0];
+    const float axis0Projection = (axis.z * axis0.z + axis.y * axis0.y) + axis.x * axis0.x;
+    const float axis1Projection = (axis.y * axis1.y + axis.z * axis1.z) + axis.x * axis1.x;
+    const float axis2Projection = (axis.y * axis2.y + axis.z * axis2.z) + axis.x * axis2.x;
+    const float radius = (std::fabs(axis2Projection) * box.Extent[2] +
+                           std::fabs(axis1Projection) * box.Extent[1]) +
+      std::fabs(axis0Projection) * box.Extent[0];
 
     *outMin = centerProjection - radius;
     *outMax = centerProjection + radius;
@@ -87,11 +91,11 @@ namespace
     Wm3::Vec3f support = BuildBoxCenter(box);
     for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
       const Wm3::Vec3f axis = BoxAxis(box, axisIndex);
-      const float projection = Wm3::Vector3f::Dot(direction, axis);
+      const float projection = (axis.y * direction.y + axis.z * direction.z) + axis.x * direction.x;
       const float extent = box.Extent[axisIndex];
       if (projection < -kSupportSelectionEpsilon) {
         support = support + axis * extent;
-      } else if (projection > kSupportSelectionEpsilon) {
+      } else if (axisIndex == 0 ? projection >= kSupportSelectionEpsilon : projection > kSupportSelectionEpsilon) {
         support = support - axis * extent;
       }
     }
@@ -111,13 +115,16 @@ namespace
    * Address: 0x00474830 (FUN_00474830, box-vs-box SAT manifold helper)
    *
    * What it does:
-   * Runs SAT overlap checks for two OBBs and returns witness points, penetration
-   * normal, and depth for the best separating axis candidate.
+   * Runs SAT overlap checks for two OBBs and returns witness points. Face-axis
+   * contacts also fill penetration normal/depth; edge-axis contacts leave
+   * those lanes at zero, as in the original.
    */
   [[nodiscard]] bool ComputeBoxBoxContactManifold(
     const Wm3::Box3f& lhs, const Wm3::Box3f& rhs, BoxBoxContactManifold* outManifold
   ) noexcept
   {
+    outManifold->penetrationNormal = Wm3::Vector3f::ZERO;
+    outManifold->penetrationDepth = 0.0f;
     const Wm3::Vec3f lhsAxes[3] = {BoxAxis(lhs, 0), BoxAxis(lhs, 2), BoxAxis(lhs, 1)};
     const Wm3::Vec3f rhsAxes[3] = {BoxAxis(rhs, 0), BoxAxis(rhs, 2), BoxAxis(rhs, 1)};
 
@@ -150,20 +157,21 @@ namespace
       overlapAlongAxis[axisIndex] = std::fmin(lhsMax, rhsMax) - std::fmax(lhsMin, rhsMin);
     }
 
-    float bestDepth = std::numeric_limits<float>::max();
+    constexpr float kMaximumContactDepth = 1.0e9f;
+    float bestDepth = kMaximumContactDepth;
     Wm3::Vec3f bestAxis{};
     int bestAxisIndex = -1;
     bool hasBestAxis = false;
     for (int axisIndex = 0; axisIndex < axisCount; ++axisIndex) {
       const Wm3::Vec3f axis = candidateAxes[axisIndex];
       const float axisLengthSq = Wm3::Vector3f::LengthSq(axis);
-      if (axisLengthSq < kAxisLengthSqEpsilon) {
+      if (!(axisLengthSq >= kAxisLengthSqEpsilon)) {
         continue;
       }
 
       const float invAxisLength = 1.0f / Wm3::SqrtfBinary(axisLengthSq);
       const float normalizedOverlap = overlapAlongAxis[axisIndex] * invAxisLength;
-      if (!hasBestAxis || normalizedOverlap < bestDepth) {
+      if (normalizedOverlap < bestDepth) {
         bestDepth = normalizedOverlap;
         bestAxis = axis * invAxisLength;
         bestAxisIndex = axisIndex;
@@ -176,14 +184,13 @@ namespace
     }
 
     const Wm3::Vec3f centerDelta = BuildBoxCenter(rhs) - BuildBoxCenter(lhs);
-    if (Wm3::Vector3f::Dot(centerDelta, bestAxis) > 0.0f) {
+    if ((centerDelta.z * bestAxis.z + centerDelta.x * bestAxis.x) + centerDelta.y * bestAxis.y > 0.0f) {
       bestAxis = bestAxis * -1.0f;
     }
 
-    outManifold->penetrationNormal = bestAxis;
-    outManifold->penetrationDepth = bestDepth;
-
     if (bestAxisIndex <= 2) {
+      outManifold->penetrationNormal = bestAxis;
+      outManifold->penetrationDepth = bestDepth;
       const Wm3::Vec3f supportOnA = ComputeSupportPointAgainstDirection(lhs, bestAxis * -1.0f);
       outManifold->pointOnB = supportOnA;
       outManifold->pointOnA = supportOnA - bestAxis * bestDepth;
@@ -191,6 +198,8 @@ namespace
     }
 
     if (bestAxisIndex <= 5) {
+      outManifold->penetrationNormal = bestAxis;
+      outManifold->penetrationDepth = bestDepth;
       const Wm3::Vec3f supportOnA = ComputeSupportPointAgainstDirection(lhs, bestAxis);
       outManifold->pointOnA = supportOnA;
       outManifold->pointOnB = supportOnA + bestAxis * bestDepth;
@@ -198,6 +207,8 @@ namespace
     }
 
     const int edgeAxisIndex = bestAxisIndex - 6;
+    // The original edge/edge branch fills witness points only; its cleared
+    // normal and depth remain zero even though the overlap test succeeds.
     const int lhsEdgeIndex = edgeAxisIndex / 3;
     const int rhsEdgeIndex = edgeAxisIndex % 3;
 
@@ -206,15 +217,18 @@ namespace
 
     const Wm3::Vec3f lineAxisLhs = lhsAxes[lhsEdgeIndex];
     const Wm3::Vec3f lineAxisRhs = rhsAxes[rhsEdgeIndex];
-    const Wm3::Vec3f crossRhsAndNormal = Wm3::Vector3f::Cross(lineAxisRhs, bestAxis);
-    const float denominator = Wm3::Vector3f::Dot(lineAxisLhs, crossRhsAndNormal);
+    const Wm3::Vec3f crossNormalAndRhs = Wm3::Vector3f::Cross(bestAxis, lineAxisRhs);
+    const float denominator = (lineAxisLhs.z * crossNormalAndRhs.z + lineAxisLhs.y * crossNormalAndRhs.y) +
+      lineAxisLhs.x * crossNormalAndRhs.x;
     if (std::fabs(denominator) < kAxisLengthSqEpsilon) {
       return false;
     }
 
-    const float t =
-      (Wm3::Vector3f::Dot(supportOnB, crossRhsAndNormal) - Wm3::Vector3f::Dot(supportOnA, crossRhsAndNormal)) /
-      denominator;
+    const float projectionB = (supportOnB.z * crossNormalAndRhs.z + supportOnB.y * crossNormalAndRhs.y) +
+      crossNormalAndRhs.x * supportOnB.x;
+    const float projectionA = (crossNormalAndRhs.x * supportOnA.x + crossNormalAndRhs.z * supportOnA.z) +
+      supportOnA.y * crossNormalAndRhs.y;
+    const float t = (projectionB - projectionA) / denominator;
     outManifold->pointOnA = supportOnA + lineAxisLhs * t;
     outManifold->pointOnB = outManifold->pointOnA + bestAxis * bestDepth;
     return true;
@@ -254,10 +268,7 @@ namespace moho
    */
   Wm3::AxisAlignedBox3f CColPrimitive<Wm3::Box3f>::GetBoundingBox() const
   {
-    Wm3::Vec3f minimum{};
-    Wm3::Vec3f maximum{};
-    mShape.ComputeAABB(minimum, maximum);
-    return {minimum, maximum};
+    return moho::AxisAlignedBoundsFromBox(mShape);
   }
 
   /**
@@ -387,7 +398,8 @@ namespace moho
    * Address: 0x004FF260 (FUN_004FF260, Moho::CColPrimitive_Box::CollideBox)
    *
    * What it does:
-   * Runs OBB-vs-OBB SAT and returns minimum penetration axis/depth.
+   * Runs OBB-vs-OBB SAT and copies its contact normal/depth, including the
+   * original zero-valued edge-axis contact result.
    */
   bool CColPrimitive<Wm3::Box3f>::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
   {

@@ -557,7 +557,7 @@ namespace
         for (moho::UserEntity* const entity : resultSet) {
           const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(entity));
           Wm3::AxisAlignedBox3f entityBox{};
-          orientedBox.ComputeAABB(entityBox.Min, entityBox.Max);
+          entityBox = moho::AxisAlignedBoundsFromBox(orientedBox);
 
           if (entityBox.Min.x <= combined.Min.x) { combined.Min.x = entityBox.Min.x; }
           if (entityBox.Min.y <= combined.Min.y) { combined.Min.y = entityBox.Min.y; }

@@ -1,6 +1,9 @@
 #include "legacy/math/X87Math.h"
 
 #include <cmath>
+#include <xmmintrin.h>
+
+extern "C" int global_mode_sse2;
 
 #if defined(_M_X64)
 // legacy/math/X87Math64.asm: the same instruction sequences for 64-bit code,
@@ -9,10 +12,61 @@ extern "C" float __cdecl msvc8_x87_sinf(float x);
 extern "C" float __cdecl msvc8_x87_cosf(float x);
 extern "C" float __cdecl msvc8_x87_tanf(float x);
 extern "C" float __cdecl msvc8_x87_atan2f(float y, float x);
+extern "C" double __cdecl msvc8_x87_acos(double x);
+extern "C" unsigned int __cdecl msvc8_x87_control_word();
+extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
+extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
+extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
 #endif
 
 namespace msvc8
 {
+  std::int32_t RoundToInt(const float value) noexcept
+  {
+#if defined(_M_IX86)
+    std::int32_t result;
+    __asm {
+      fld value
+      fistp result
+    }
+    return result;
+#else
+    return msvc8_x87_round_to_int(value);
+#endif
+  }
+
+  float BilinearHeight(const float h00, const float h01, const float h10, const float h11, const float fracX, const float fracZ) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    // Keep both rows on the x87 stack; arithmetic follows the active precision
+    // control, which the original simulation thread sets to 24 bits.
+    __asm {
+      fld h01
+      fld h00
+      fsub st(1), st(0)
+      fld fracZ
+      fmul st(2), st(0)
+      fxch st(2)
+      faddp st(1), st(0)
+      fld h11
+      fld h10
+      fsub st(1), st(0)
+      fxch st(1)
+      fmulp st(3), st(0)
+      faddp st(2), st(0)
+      fsub st(1), st(0)
+      fxch st(1)
+      fmul fracX
+      faddp st(1), st(0)
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_bilinear_height(h00, h01, h10, h11, fracX, fracZ);
+#endif
+  }
+
   float MulTwisterWord(const float factor, const std::uint32_t word) noexcept
   {
     const double wordValue =
@@ -114,6 +168,26 @@ namespace msvc8
     return atan2f(x, 1.0f);
   }
 
+  float Atan2Difference(const float firstY, const float firstX, const float secondY, const float secondX) noexcept
+  {
+#if defined(_M_IX86)
+    const float firstAngle = atan2f(firstY, firstX);
+    float result;
+    // The original float atan2 returns an unspilled x87 result. Round only
+    // the first angle before subtracting the second (CalcWingedOrientation).
+    __asm {
+      fld secondY
+      fld secondX
+      fpatan
+      fsubr firstAngle
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_atan2_difference(firstY, firstX, secondY, secondX);
+#endif
+  }
+
   float asinf(const float x) noexcept
   {
     return static_cast<float>(std::asin(static_cast<double>(x)));
@@ -121,7 +195,45 @@ namespace msvc8
 
   float acosf(const float x) noexcept
   {
-    return static_cast<float>(std::acos(static_cast<double>(x)));
+    return static_cast<float>(acos(static_cast<double>(x)));
+  }
+
+  double acos(const double x) noexcept
+  {
+    unsigned int controlWord;
+#if defined(_M_IX86)
+    unsigned short hardwareControlWord;
+    __asm { fnstcw hardwareControlWord }
+    controlWord = hardwareControlWord;
+#else
+    controlWord = msvc8_x87_control_word();
+#endif
+    if ((global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u
+         && (controlWord & 0x7Fu) == 0x7Fu)
+        || !(x >= -1.0 && x <= 1.0)) {
+      return std::acos(x);
+    }
+
+#if defined(_M_IX86)
+    double result;
+    // Original CRT valid-domain lane: (1+x)*(1-x), sqrt, then atan2.
+    // Each arithmetic instruction uses the caller's x87 precision control.
+    __asm {
+      fld x
+      fld1
+      fadd st(0), st(1)
+      fld1
+      fsub st(0), st(2)
+      fmulp st(1), st(0)
+      fsqrt
+      fxch st(1)
+      fpatan
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_acos(x);
+#endif
   }
 
   float expf(const float x) noexcept

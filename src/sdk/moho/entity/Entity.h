@@ -788,7 +788,7 @@ namespace moho
     int TaskTick();
 
     /**
-       * Address: 0x00679F70 (FUN_00679F70)
+     * Alias of FUN_00679C40 (CTask dispatch adapter).
      * (CTask secondary vtable Execute slot forwards to TaskTick path.)
      */
     int Execute() override;
@@ -1077,7 +1077,9 @@ namespace moho
     /** Address: 0x00679E20 (FUN_00679E20), VFTable SLOT: 19 */
     virtual VTransform GetBoneLocalTransform(int) const;
 
-    /** Alias of FUN_00679F70 (non-canonical helper lane). */
+    /**
+     * Address: 0x00679F70 (FUN_00679F70)
+     */
     virtual int MotionTick();
 
     /**

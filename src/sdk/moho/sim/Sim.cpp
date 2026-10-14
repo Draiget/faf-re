@@ -1167,56 +1167,40 @@ namespace
     moho::CIntel& intelManager, const moho::EIntel intelType
   ) noexcept
   {
-    // `EIntel` numbers the position-handle types from 1 (`INTEL_Vision`) up to
-    // 8 (`INTEL_CloakField`); 9 (`INTEL_Jammer`) and above are the toggle
-    // lanes, which have no handle. `CIntel::InitIntel` stores type N in
-    // `mIntelHandles[N - 1]` -- its `case 1` writes `mVisionGrid`, the union's
-    // slot 0, and binds it to `ReconGetVisionGrid()` -- so the lookup has to
-    // subtract the same one. Indexing straight by the enum returned the next
-    // type's handle to every caller: `EnableIntel('Vision')` enabled the
-    // water-vision handle and left the real vision handle disabled, so
-    // `CIntelPosHandle::UpdatePos` never rastered a unit's vision into the
-    // recon DB's vision grid.
+    // Original InitIntel and Lua bindings index the owning slots by EIntel;
+    // slot 0 is unused and Vision through CloakField occupy slots 1 through 8.
     const int intelIndex = static_cast<int>(intelType);
     if (intelIndex < static_cast<int>(moho::INTEL_Vision)
         || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
       return nullptr;
     }
 
-    const std::size_t handleSlot = static_cast<std::size_t>(intelIndex) - 1u;
+    const std::size_t handleSlot = static_cast<std::size_t>(intelIndex);
     if (handleSlot >= moho::CIntel::kHandleCount) {
       return nullptr;
     }
 
-    return intelManager.mIntelHandles[handleSlot];
+    return intelManager.mIntelHandles[handleSlot].get();
   }
 
   [[nodiscard]] const moho::CIntelPosHandle* ResolveIntelPosHandleForType(
     const moho::CIntel& intelManager, const moho::EIntel intelType
   ) noexcept
   {
-    // `EIntel` numbers the position-handle types from 1 (`INTEL_Vision`) up to
-    // 8 (`INTEL_CloakField`); 9 (`INTEL_Jammer`) and above are the toggle
-    // lanes, which have no handle. `CIntel::InitIntel` stores type N in
-    // `mIntelHandles[N - 1]` -- its `case 1` writes `mVisionGrid`, the union's
-    // slot 0, and binds it to `ReconGetVisionGrid()` -- so the lookup has to
-    // subtract the same one. Indexing straight by the enum returned the next
-    // type's handle to every caller: `EnableIntel('Vision')` enabled the
-    // water-vision handle and left the real vision handle disabled, so
-    // `CIntelPosHandle::UpdatePos` never rastered a unit's vision into the
-    // recon DB's vision grid.
+    // Original InitIntel and Lua bindings index the owning slots by EIntel;
+    // slot 0 is unused and Vision through CloakField occupy slots 1 through 8.
     const int intelIndex = static_cast<int>(intelType);
     if (intelIndex < static_cast<int>(moho::INTEL_Vision)
         || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
       return nullptr;
     }
 
-    const std::size_t handleSlot = static_cast<std::size_t>(intelIndex) - 1u;
+    const std::size_t handleSlot = static_cast<std::size_t>(intelIndex);
     if (handleSlot >= moho::CIntel::kHandleCount) {
       return nullptr;
     }
 
-    return intelManager.mIntelHandles[handleSlot];
+    return intelManager.mIntelHandles[handleSlot].get();
   }
 
   [[nodiscard]] moho::CIntelToggleState* ResolveIntelToggleStateForType(
@@ -7131,7 +7115,7 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
     }
 
     if (CIntel* const intel = entity->mIntelManager; intel != nullptr) {
-      for (CIntelPosHandle* const handle : intel->mIntelHandles) {
+      for (const IntelHandle& handle : intel->mIntelHandles) {
         if (handle) {
           handle->AddViz();
         }
@@ -7598,7 +7582,13 @@ LuaPlus::LuaState* Sim::GetLuaState() const noexcept
   return mLuaState;
 }
 
-// 0x00747180
+/**
+ * Address: 0x00747180 (FUN_00747180, Moho::Sim::CheatsEnabled)
+ *
+ * What it does:
+ * Logs the attempt, tracks its command source, hashes the enabled flag,
+ * and returns whether the current simulation permits cheats.
+ */
 bool Sim::CheatsEnabled()
 {
   if (mCheatsEnabled) {
@@ -10372,16 +10362,17 @@ void Sim::TryParseSimCommand(
     if (!parsedCommand.empty()) {
       CSimConCommand* const simCommand = FindSimConCommand(parsedCommand.front());
       if (!simCommand) {
-        Logf("Unknown sim command '%s' [invoked by %s]\n", parsedCommand.front().c_str(), GetCurrentCommandSourceName());
+        Printf("Unknown sim command '%s' [invoked by %s]", parsedCommand.front().c_str(), GetCurrentCommandSourceName());
       } else {
-        const bool requiresCheat = simCommand->mRequiresCheat != 0;
+        // 0x00734963 skips the check when the stored flag is nonzero.
+        const bool requiresCheat = simCommand->mAllowWithoutCheats == 0;
         if (requiresCheat && !CheatsEnabled()) {
           return;
         }
 
         if (requiresCheat) {
           const std::string commandText = UnparseSimCommand(parsedCommand);
-          Logf("%s: %s\n", GetCurrentCommandSourceName(), commandText.c_str());
+          Printf("%s: %s", GetCurrentCommandSourceName(), commandText.c_str());
         }
 
         try {
@@ -10390,8 +10381,8 @@ void Sim::TryParseSimCommand(
           const char* const errorText = ex.what() ? ex.what() : "<unknown>";
           gpg::Warnf("error running sim console command %s: %s", rawCommandText, errorText);
 
-          if (!requiresCheat) {
-            Logf("error running sim console command %s: %s\n", rawCommandText, errorText);
+          if (requiresCheat) {
+            Printf("error running sim console command %s: %s", rawCommandText, errorText);
           }
         }
       }
@@ -22849,7 +22840,7 @@ int moho::cfunc_EntityInitIntelL(LuaPlus::LuaState* const state)
   const std::int32_t currentTick = sim->mCurTick;
   const Wm3::Vec3f position = entity->GetTransformWm3().pos_;
   for (std::size_t index = 0; index < CIntel::kHandleCount; ++index) {
-    CIntelPosHandle* const handle = intelManager->mIntelHandles[index];
+    CIntelPosHandle* const handle = intelManager->mIntelHandles[index].get();
     if (handle != nullptr) {
       handle->UpdatePos(currentTick, position);
     }

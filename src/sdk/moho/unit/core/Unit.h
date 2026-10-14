@@ -940,9 +940,9 @@ namespace moho
      * Address: 0x006AB520 (FUN_006AB520, Moho::Unit::UpdateCollision)
      *
      * What it does:
-     * Updates base collision transform, expands box-shape X/Z extents to
-     * include blueprint skirt lanes, then forwards relink/bounds refresh to
-     * the base entity collision path.
+     * Updates the collision transform and relinks the grid using a temporary
+     * box expanded to include the blueprint skirt. Refreshes the entity's
+     * bounds from its actual collision primitive.
      */
     void UpdateCollision() override;
 

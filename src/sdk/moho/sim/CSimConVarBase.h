@@ -26,7 +26,7 @@ namespace moho
      * Initializes one convar definition lane, assigns a unique global convar
      * index, and binds the `CSimConVarBase` vftable.
      */
-    CSimConVarBase(bool requiresCheat, const char* name);
+    CSimConVarBase(bool allowWithoutCheats, const char* name);
 
     /**
      * Address: 0x00734820 (FUN_00734820, sub_734820)
@@ -73,15 +73,15 @@ namespace moho
 
   static_assert(sizeof(CSimConVarBase) == 0x10, "CSimConVarBase size must be 0x10");
   static_assert(offsetof(CSimConVarBase, mName) == 0x04, "CSimConVarBase::mName offset must be 0x04");
-  static_assert(offsetof(CSimConVarBase, mRequiresCheat) == 0x08, "CSimConVarBase::mRequiresCheat offset must be 0x08");
+  static_assert(offsetof(CSimConVarBase, mAllowWithoutCheats) == 0x08, "CSimConVarBase::mAllowWithoutCheats offset must be 0x08");
   static_assert(offsetof(CSimConVarBase, mIndex) == 0x0C, "CSimConVarBase::mIndex offset must be 0x0C");
 
   template <typename T>
   class TSimConVar : public CSimConVarBase
   {
   public:
-    TSimConVar(bool requiresCheat, const char* name, const T& defaultValue)
-      : CSimConVarBase(requiresCheat, name)
+    TSimConVar(bool allowWithoutCheats, const char* name, const T& defaultValue)
+      : CSimConVarBase(allowWithoutCheats, name)
       , mDefaultValue(defaultValue)
     {
     }
@@ -140,7 +140,7 @@ namespace moho
    * bool payload lane.
    */
   template <>
-  TSimConVar<bool>::TSimConVar(bool requiresCheat, const char* name, const bool& defaultValue);
+  TSimConVar<bool>::TSimConVar(bool allowWithoutCheats, const char* name, const bool& defaultValue);
 
   /**
    * Address: 0x005D3CE0 (FUN_005D3CE0, Moho::TSimConVar_float::NewInstance)

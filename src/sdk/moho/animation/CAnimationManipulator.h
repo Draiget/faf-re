@@ -116,11 +116,15 @@ namespace moho
 
     /**
      * Address: 0x0063F9E0 (FUN_0063F9E0)
+     *
+     * Changes playback fraction without publishing completion to waiters.
      */
     void SetAnimationFraction(float fraction);
 
     /**
      * Address: 0x0063FA90 (FUN_0063FA90)
+     *
+     * Changes playback time without publishing completion to waiters.
      */
     void SetAnimationTime(float timeSeconds);
 

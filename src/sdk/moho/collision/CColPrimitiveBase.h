@@ -194,8 +194,6 @@ namespace moho
     CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult) const = 0;
 
     /**
-     * Address: 0x004FF260 (FUN_004FF260) / 0x004FE860
-     *
      * Wm3::Box3<float> const*, CollisionResult*
      *
      * What it does:
@@ -328,6 +326,7 @@ namespace moho
 
     /**
      * Address: 0x004FF260 (FUN_004FF260)
+     * Face-axis contacts fill normal/depth; edge-axis contacts keep both zero.
      */
     [[nodiscard]] bool CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const override;
 
