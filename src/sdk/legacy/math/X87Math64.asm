@@ -151,4 +151,31 @@ msvc8_x87_atan2_difference PROC
     ret
 msvc8_x87_atan2_difference ENDP
 
+
+; void msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength)
+; The scale stays in extended precision across all three component multiplies
+; (FUN_005D1E70). rcx=x, rdx=y, r8=z; maxLength arrives on the stack at
+; [rsp+40] (fifth slot counting the home area).
+msvc8_x87_scale_vector_max_length PROC
+    fld     dword ptr [rcx]
+    fmul    st(0), st(0)
+    fld     dword ptr [rdx]
+    fmul    st(0), st(0)
+    faddp   st(1), st(0)
+    fld     dword ptr [r8]
+    fmul    st(0), st(0)
+    faddp   st(1), st(0)
+    fsqrt
+    fdivr   dword ptr [rsp+40]
+    fld     dword ptr [rcx]
+    fmul    st(0), st(1)
+    fstp    dword ptr [rcx]
+    fld     dword ptr [rdx]
+    fmul    st(0), st(1)
+    fstp    dword ptr [rdx]
+    fmul    dword ptr [r8]
+    fstp    dword ptr [r8]
+    ret
+msvc8_x87_scale_vector_max_length ENDP
+
 END

@@ -6,8 +6,10 @@
 
 namespace msvc8
 {
-  // Inlined block from FUN_006BDEE0: float-to-cell conversion uses the
-  // caller's x87 rounding mode and preserves FISTP's invalid-input result.
+  /**
+   * Inlined block from FUN_006BDEE0: float-to-cell conversion uses the
+   * caller's x87 rounding mode and preserves FISTP's invalid-input result.
+   */
   [[nodiscard]] std::int32_t RoundToInt(float value) noexcept;
   /**
    * `factor * word` exactly as the shipped engine forms it from a Mersenne
@@ -18,6 +20,22 @@ namespace msvc8
    * twice (53 bits, then 24) and can land one float away.
    */
   [[nodiscard]] float MulTwisterWord(float factor, std::uint32_t word) noexcept;
+
+  /**
+   * Vector length clamp exactly as the 2007 toolchain computed it.
+   *
+   * The shipped engine clamps a vector by forming the squared length in SSE,
+   * then switching to x87: `fld lenSq; fsqrt; fdivr maxLen` leaves the scale
+   * `maxLen / sqrt(lenSq)` in extended precision (64-bit mantissa), and the
+   * per-component multiplies consume that extended scale and store each
+   * component to float once (FUN_005D1E70, func_VecLimitLengthTo:
+   * 0x005D1ECF..0x005D1EEC; the same inlined shape recurs throughout
+   * CAiPathSpline::Generate, e.g. 0x005B39FD..0x005B3A24). A pure-float
+   * `scale = max / sqrtf(lenSq)` rounds the scale to 24 bits before the
+   * multiplies, so each component can land one ulp away from the engine's
+   * single rounding - enough to drift a lockstep simulation's path nodes.
+   */
+  void ScaleVectorByMaxLengthX87(float& x, float& y, float& z, float maxLength) noexcept;
 
   // Terrain interpolation uses the simulation's 24-bit x87 arithmetic.
   // Inlined block from FUN_0044FB90; preserve the original operation order.

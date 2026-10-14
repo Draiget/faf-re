@@ -28,6 +28,10 @@ namespace moho
    * Clamps a 3D vector in place to at most `maxLength`, preserving direction.
    * The binary compares squared lengths first and returns without touching the
    * vector when it is already short enough, so a zero vector never divides.
+   * The scale `maxLength / sqrt(lengthSq)` and the three component multiplies
+   * all run in x87 extended precision with a single float store per component
+   * (0x005D1ECF..0x005D1EEC); `ScaleVectorByMaxLengthX87` reproduces that
+   * rounding chain so lockstep paths match the shipped binary bit for bit.
    */
   [[nodiscard]] bool VecLimitLengthTo(Wm3::Vector3f* const vector, const float maxLength) noexcept
   {
@@ -40,10 +44,7 @@ namespace moho
       return false;
     }
 
-    const float scale = maxLength / std::sqrt(lengthSq);
-    vector->x *= scale;
-    vector->y *= scale;
-    vector->z *= scale;
+    msvc8::ScaleVectorByMaxLengthX87(vector->x, vector->y, vector->z, maxLength);
     return true;
   }
 

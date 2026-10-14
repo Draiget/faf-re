@@ -1455,6 +1455,15 @@ Unit* CAiNavigatorImpl::GetUnit()
  */
 void CAiNavigatorImpl::AbortMove()
 {
+  // 0x005A3750 logs the entry trace before touching state: the sim log line
+  // replay parity diffs against (`"  0x%08x->CAiNavigatorImpl::NavigatorAbortMove()\n"`),
+  // resolved through mUnit's SimulationRef (mUnit+0x150) and entity id
+  // (mUnit+0x70 in the binary's Unit layout).
+  if (mUnit != nullptr && mUnit->SimulationRef != nullptr) {
+    mUnit->SimulationRef->Logf(
+      "  0x%08x->CAiNavigatorImpl::NavigatorAbortMove()\n", static_cast<std::uint32_t>(mUnit->GetEntityId())
+    );
+  }
   SetSpeedThroughGoal(false);
   if (NavigatorMakeIdle()) {
     BroadcastEvent(AINAVEVENT_Aborted);

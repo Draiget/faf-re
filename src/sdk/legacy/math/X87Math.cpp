@@ -17,6 +17,7 @@ extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
+extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength);
 #endif
 
 namespace msvc8
@@ -32,6 +33,41 @@ namespace msvc8
     return result;
 #else
     return msvc8_x87_round_to_int(value);
+#endif
+  }
+
+  void ScaleVectorByMaxLengthX87(float& x, float& y, float& z, const float maxLength) noexcept
+  {
+    // FUN_005D1E70 shape: squared length formed from the float components,
+    // then `fld lenSq; fsqrt; fdivr maxLength` keeps the scale in extended
+    // precision while each component multiplies against it and stores once.
+    const float lengthSq = (x * x) + (y * y) + (z * z);
+    if ((maxLength * maxLength) >= lengthSq) {
+      return;
+    }
+    float* const px = &x;
+    float* const py = &y;
+    float* const pz = &z;
+#if defined(_M_IX86)
+    __asm {
+      mov eax, px
+      mov edx, py
+      mov ecx, pz
+      fld lengthSq
+      fsqrt
+      fdivr maxLength
+      fld dword ptr [eax]
+      fmul st(0), st(1)
+      fstp dword ptr [eax]
+      fld dword ptr [edx]
+      fmul st(0), st(1)
+      fstp dword ptr [edx]
+      fmul dword ptr [ecx]
+      fstp dword ptr [ecx]
+      fstp st(0)
+    }
+#else
+    msvc8_x87_scale_vector_max_length(px, py, pz, maxLength);
 #endif
   }
 
