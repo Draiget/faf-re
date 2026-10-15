@@ -146,7 +146,7 @@ namespace moho
    * screen as a wall and detours around it, while each T1 treats the commander
    * as passable and walks into it.
    */
-  inline constexpr bool kBumpThroughSpamEnabled = true;
+  inline constexpr bool kBumpThroughSpamEnabled = false;
 
   /**
    * How many times an obstacle's collision mass `mover` must exceed before the

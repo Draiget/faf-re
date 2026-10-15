@@ -3057,9 +3057,12 @@ namespace moho
         }
 
         if (isGuarding && isBelowStartTurnDistance) {
-          float guardScale = limitedSpeed / air.StartTurnDistance;
-          if (guardScale > 0.5f) {
-            guardScale = 0.5f;
+          // 0x006BD9D1..0x006BD9DB: the 0.5 is a FLOOR -- `comiss ratio, 0.5`
+          // keeps 0.5 on `jbe` and takes the ratio only when it is larger.
+          float guardScale = 0.5f;
+          const float startTurnRatio = limitedSpeed / air.StartTurnDistance;
+          if (startTurnRatio > guardScale) {
+            guardScale = startTurnRatio;
           }
 
           if (guardScale <= forceScale) {
@@ -3398,11 +3401,13 @@ namespace moho
         || mUnit->IsUnitState(UNITSTATE_Repairing));
 
     if (wantsHoverFamily) {
-      const bool wantsCircling =
-        ((!air.HoverOverAttack && mUnit->GetFocusEntity() != nullptr
-          && (mUnit->IsUnitState(UNITSTATE_Building) || mUnit->IsUnitState(UNITSTATE_Repairing)
-            || mUnit->IsUnitState(UNITSTATE_Reclaiming) || mUnit->IsUnitState(UNITSTATE_Capturing)))
-          || target.HasTarget());
+      // 0x006BE83D `cmp byte [edi+79h], 0 / jne` sends HoverOverAttack units
+      // straight to the hover branch, ahead of the target test at 0x006BE89D.
+      const bool wantsCircling = !air.HoverOverAttack
+        && ((mUnit->GetFocusEntity() != nullptr
+             && (mUnit->IsUnitState(UNITSTATE_Building) || mUnit->IsUnitState(UNITSTATE_Repairing)
+               || mUnit->IsUnitState(UNITSTATE_Reclaiming) || mUnit->IsUnitState(UNITSTATE_Capturing)))
+            || target.HasTarget());
 
       if (wantsCircling) {
         CalcCirclingOrientation(body, axes, steeringForce, target);
@@ -4573,11 +4578,15 @@ namespace moho
     Wm3::Vector3f backLeft = snapped.pos_ + RotateByQuaternion({-halfSizeX, 0.0f, -halfSizeZ}, snapped.orient_);
     Wm3::Vector3f backRight = snapped.pos_ + RotateByQuaternion({halfSizeX, 0.0f, -halfSizeZ}, snapped.orient_);
 
+    // Each corner adds the height of the raised platform the unit stands on:
+    // 0x006C1840/0x006C18E7.. pass `[this+0x114]` (mRaisedPlatformUnit) as the
+    // DistanceToOccupiedRect owner -- never the moving unit itself, which made
+    // a unit rolling off a factory deck drop straight to the terrain.
     const bool hoverMotion = blueprint->Physics.MotionType == RULEUMT_Hover;
-    frontRight.y = SampleSnapElevation(unit, frontRight, *mapData, hoverMotion);
-    frontLeft.y = SampleSnapElevation(unit, frontLeft, *mapData, hoverMotion);
-    backLeft.y = SampleSnapElevation(unit, backLeft, *mapData, hoverMotion);
-    backRight.y = SampleSnapElevation(unit, backRight, *mapData, hoverMotion);
+    frontRight.y = SampleSnapElevation(mRaisedPlatformUnit.GetObjectPtr(), frontRight, *mapData, hoverMotion);
+    frontLeft.y = SampleSnapElevation(mRaisedPlatformUnit.GetObjectPtr(), frontLeft, *mapData, hoverMotion);
+    backLeft.y = SampleSnapElevation(mRaisedPlatformUnit.GetObjectPtr(), backLeft, *mapData, hoverMotion);
+    backRight.y = SampleSnapElevation(mRaisedPlatformUnit.GetObjectPtr(), backRight, *mapData, hoverMotion);
 
     // 0x006C1A39..0x006C1A5E accumulates the four samples in REVERSE call
     // order (((backRight + backLeft) + frontLeft) + frontRight) before scaling

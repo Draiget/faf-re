@@ -343,6 +343,14 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
 if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <Manifest>
+      <!-- System DPI aware, the same as the HIGHDPIAWARE compatibility flag: Windows does not
+           scale the window, so the engine gets the client size it asks for and the D3D9
+           device matches it. -->
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <!-- ClCompile order is load-bearing: MSVC emits each TU's dynamic
          initializers into .CRT$XCU in object order, so this list defines

@@ -13,6 +13,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/entity/Entity.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/GridTraversalLine.h"
 #include "moho/sim/SFootprint.h"
@@ -1046,6 +1047,30 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
 
   Unit* const unit = GetOwningUnit(*this);
   const std::int32_t incomingCount = path.CountInt();
+
+  // 0x005AEF14..0x005AEF89: trace the delivered path and fold its size and
+  // every cell into the desync checksum before the state machine runs.
+  if (mSim != nullptr && unit != nullptr) {
+    mSim->Logf(
+      "CAiPathNavigator::OnEvent() for 0x%08x: pathSize=%d, state=%d, PSFC=%d, NFDS=%d\n",
+      static_cast<std::uint32_t>(unit->GetEntityId()),
+      incomingCount,
+      static_cast<int>(mState),
+      mPathSearchFailCount,
+      mNoForwardDistanceFailCount
+    );
+    mSim->mContext.Update(&incomingCount, sizeof(incomingCount));
+    for (std::int32_t index = 0; index < incomingCount; ++index) {
+      const SOCellPos& cell = path.start[index];
+      mSim->Logf(
+        "  newpath[%d]=<%d,%d>\n",
+        index,
+        static_cast<int>(static_cast<std::uint16_t>(cell.x)),
+        static_cast<int>(static_cast<std::uint16_t>(cell.z))
+      );
+      mSim->mContext.Update(&cell, sizeof(cell));
+    }
+  }
   if (mState == AIPATHNAVSTATE_PathEvent3) {
     mPath.AssignCopy(path);
     ClearUnitPathingBusyBit(unit);
@@ -1198,6 +1223,12 @@ void CAiPathNavigator::ResetPathState()
   mTargetPos = mCurrentPos;
   ResetPathContent(mPath);
 
+  // 0x005AD9C0 resets exactly this set. It deliberately leaves the repath
+  // threshold/tick (+0x6C/+0x70), the no-progress counter (+0x74), the layer
+  // token (+0x54), the forward-probe flag (+0x93), the last node index, the
+  // blocked cell and the request countdown untouched: a stalled counter
+  // carried into a new order is what makes the next HasPath tick re-advance.
+  mTargetPos = mCurrentPos;
   ListUnlink();
 
   if (mPathFinder) {
@@ -1205,34 +1236,27 @@ void CAiPathNavigator::ResetPathState()
     mPathFinder->mSearchType = AIPATHSEARCH_None;
   }
 
+  mTargetWithinOneCell = 0;
+  Unit* const unit = GetOwningUnit(*this);
+  if (unit) {
+    // 0x005ADA19 / 0x005ADA29: only the path-problem and pathing-busy bits;
+    // the patrol-stall bit survives a reset.
+    unit->mUnitVarDat.mUnitStates &= ~(kUnitPathFlag | kUnitPathingBusyFlag);
+    unit->FootprintDown = false;
+  }
+
   mState = AIPATHNAVSTATE_Idle;
+  mUseExtendedPathProbe = 0;
+  mLeaderTargetPos = Wm3::Vector3f::Zero();
   mPathRetryDelayFrames = 0;
   mPathSearchFailCount = 0;
   mNoForwardDistanceFailCount = 0;
-  mLastPathLayerToken = 0;
-  mLeaderTargetPos = Wm3::Vector3f::Zero();
+  mLastFormationSyncTick = 0;
   mLeaderBusy = 0;
   mHasLeaderTargetPos = 0;
-  mHasForwardProbe = 0;
-  mRepathRequested = 0;
-  mUseExtendedPathProbe = 0;
-  mTargetWithinOneCell = 0;
   mIsInFormation = 0;
-  mPathRequestCountdown = 0;
-  mLastPathNodeIndex = -1;
-  mLastBlockedCell = 0;
-  mRepathDistanceThreshold = std::numeric_limits<float>::infinity();
-  mNoProgressTickCount = 0;
-  mLastRepathTick = 0;
-  mLastFormationSyncTick = 0;
-
   DetachWeakUnit(mLeaderLink);
-
-  Unit* const unit = GetOwningUnit(*this);
-  if (unit) {
-    ClearUnitPathBits(unit);
-    unit->FootprintDown = false;
-  }
+  mRepathRequested = 0;
 }
 
 /**
@@ -1355,6 +1379,21 @@ void CAiPathNavigator::SetCurrentPosition(const Wm3::Vector3f& position)
   }
 
   mCurrentPos = ToCellPos(position, *footprint);
+
+  // 0x005AE29C / 0x005AE2B2 trace the new cell into the sim log, and
+  // 0x005AE2C3 folds it into the desync checksum (`mSim+0x50`, 4 bytes).
+  if (mSim != nullptr) {
+    mSim->Logf(
+      "CAiPathNavigator::SetCurrentPosition() for 0x%08x:\n",
+      static_cast<std::uint32_t>(mPathFinder->mUnit->GetEntityId())
+    );
+    mSim->Logf(
+      "  mCurrentPos=<%d,%d>\n",
+      static_cast<int>(static_cast<std::uint16_t>(mCurrentPos.x)),
+      static_cast<int>(static_cast<std::uint16_t>(mCurrentPos.z))
+    );
+    mSim->mContext.Update(&mCurrentPos, sizeof(mCurrentPos));
+  }
 }
 
 /**
@@ -1371,6 +1410,21 @@ void CAiPathNavigator::SetTargetPoint(const std::int32_t targetIndex)
   mState = AIPATHNAVSTATE_HasPath;
   mPathRetryDelayFrames = 0;
   mTargetWithinOneCell = (ManhattanDistance(mCurrentPos, mTargetPos) <= 1) ? 1u : 0u;
+
+  // 0x005AF72C..0x005AF7B5: trace, fold the new target cell into the desync
+  // checksum, then trace the running digest.
+  if (mSim != nullptr) {
+    mSim->Logf("CAiPathNavigator::SetTargetPoint(%d):\n", targetIndex);
+    mSim->Logf(
+      "  mTargetPos=<%d,%d>\n",
+      static_cast<int>(static_cast<std::uint16_t>(mTargetPos.x)),
+      static_cast<int>(static_cast<std::uint16_t>(mTargetPos.z))
+    );
+    mSim->Logf("  mPath.size()=%d\n", mPath.CountInt());
+    mSim->mContext.Update(&mTargetPos, sizeof(mTargetPos));
+    const gpg::MD5Digest digest = mSim->mContext.Digest();
+    mSim->Logf("checksum=%s\n", digest.ToString().c_str());
+  }
 }
 
 /**
@@ -1477,6 +1531,14 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
  */
 void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
 {
+  // 0x005AE2ED traces the entry and 0x005AE30F folds the owning unit's id
+  // into the desync checksum before the cell is refreshed.
+  if (mSim != nullptr) {
+    const std::uint32_t unitId = static_cast<std::uint32_t>(mPathFinder->mUnit->GetEntityId());
+    mSim->Logf("  in UpdateCurrentPosition() for 0x%08x\n", unitId);
+    mSim->mContext.Update(&unitId, sizeof(unitId));
+  }
+
   SetCurrentPosition(position);
 
   const std::uint32_t currentTick = (mSim != nullptr) ? mSim->mCurTick : 0u;
@@ -1528,18 +1590,65 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
     return;
   }
 
-  if (!TryAdvanceTargetPoint()) {
-    mTargetPos = mPath.start[0];
-  }
   Unit* const unit = GetOwningUnit(*this);
-  if (!unit || mLeaderBusy != 0u) {
-    return;
+
+  // 0x005AE4A6..0x005AE4DA, straight after the path-tail test: only a
+  // RULEUMT_SurfacingSub unit (`[bp+0x278+0x18] == 5`) re-paths when its layer
+  // changes (surfacing/diving). Amphibious units crossing a shoreline do not.
+  if (unit != nullptr && unit->GetBlueprint()->Physics.MotionType == RULEUMT_SurfacingSub) {
+    const std::uint32_t layerToken = ReadUnitLayerToken(unit);
+    if (layerToken != mLastPathLayerToken) {
+      mLastPathLayerToken = layerToken;
+      RequestContinuationPath(2);
+      return;
+    }
   }
 
-  const std::uint32_t layerToken = ReadUnitLayerToken(unit);
-  if (layerToken != mLastPathLayerToken) {
-    mLastPathLayerToken = layerToken;
-    RequestContinuationPath(2);
+  // 0x005AE4E7..0x005AE635: staggered shortcut probe. Each navigator only
+  // probes on its own tick slot (mTickBucket7, or mTickBucket13 while in a
+  // formation). `forceRepath` starts as the pending repath request and is
+  // raised when the probe finds the current target unreachable, or a
+  // reachable shortcut worth re-planning for; `keepFormationTarget` starts as
+  // "no repath pending" and is cleared when the probe fails.
+  bool forceRepath = mRepathRequested != 0u;
+  bool keepFormationTarget = !forceRepath;
+  const float currentTargetDistance = CellDistance(mCurrentPos, mTargetPos);
+  if (unit != nullptr && PackCell(mCurrentPos) != PackCell(mTargetPos) && mLeaderBusy == 0u
+      && mTargetWithinOneCell == 0u && !forceRepath) {
+    const bool onProbeTick = (mIsInFormation != 0u)
+      ? mTickBucket13 == static_cast<std::int32_t>(currentTick % 13u)
+      : mTickBucket7 == static_cast<std::int32_t>(currentTick % 7u);
+    if (onProbeTick && mSim != nullptr && mSim->mOGrid != nullptr
+        && static_cast<std::uint8_t>(OCCUPY_FootprintFits(
+             *mSim->mOGrid, mCurrentPos, unit->GetFootprint(), static_cast<EOccupancyCaps>(0xFFu)
+           )) != 0u) {
+      // FUN_0062A990: probe radius = 4 * max(footprint extent, Physics.MaxSpeed).
+      const SFootprint& footprint = unit->GetFootprint();
+      const RUnitBlueprintPhysics& physics = unit->GetBlueprint()->Physics;
+      const std::uint8_t extent = footprint.mSizeX > footprint.mSizeZ ? footprint.mSizeX : footprint.mSizeZ;
+      float probeRadius = static_cast<float>(extent) * 4.0f;
+      const float speedRadius = physics.MaxSpeed * 4.0f;
+      if (speedRadius > probeRadius) {
+        probeRadius = speedRadius;
+      }
+
+      const SOCellPos candidate = (currentTargetDistance > probeRadius)
+        ? ProjectCellToward(mTargetPos, mCurrentPos, probeRadius)
+        : mTargetPos;
+      if (CanOccupyTargetCell(*this, mCurrentPos, candidate) && CanPathCellTransition(*this, mCurrentPos, candidate)) {
+        if (physics.TurnRadius > physics.TurnRate
+            && currentTick > static_cast<std::uint32_t>(mLastRepathTick) + 10u) {
+          forceRepath = true;
+        }
+      } else {
+        keepFormationTarget = false;
+        forceRepath = true;
+      }
+    }
+  }
+  (void)keepFormationTarget; // consumed by the formation-leader block at 0x005AE63A
+
+  if (!unit || mLeaderBusy != 0u) {
     return;
   }
 
@@ -1565,9 +1674,13 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
     mNoProgressTickCount = 0;
   }
 
-  const float currentTargetDistance = CellDistance(mCurrentPos, mTargetPos);
-  if (mRepathDistanceThreshold < currentTargetDistance || mRepathRequested != 0u || mNoProgressTickCount > 30) {
+  // 0x005AEB27..0x005AEB3E: `comiss threshold, distance / jae` -- re-plan once
+  // the unit is within the threshold (half the distance at the last advance;
+  // +inf straight after a new path), using the distance measured before the
+  // probe. NaN fails the test, as `jae` does on an unordered compare.
+  if (mRepathDistanceThreshold >= currentTargetDistance || forceRepath || mNoProgressTickCount > 30) {
     mLastRepathTick = static_cast<std::int32_t>(currentTick);
+    const SOCellPos previousTarget = mTargetPos; // 0x005AEB53 saves it for the goal test below
 
     if (TryAdvanceTargetPoint()) {
       mHasLeaderTargetPos = 0;
@@ -1577,11 +1690,11 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
       return;
     }
 
+    // 0x005AEBB9..0x005AEBD1: go idle in place; the path itself is kept.
     if (mNoProgressTickCount > 30) {
-      ResetPathContent(mPath);
       mState = AIPATHNAVSTATE_Idle;
-      mPathRetryDelayFrames = 0;
       mTargetPos = mCurrentPos;
+      mPathRetryDelayFrames = 0;
       return;
     }
 
@@ -1595,12 +1708,15 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
     // being asked to repath means the destination itself is occupied, so back
     // off for a while instead of burning a request per tick. A unit waiting for
     // a transport is exempt - it is expected to be sitting still on its goal.
-    if (PackCell(mCurrentPos) == PackCell(mPath.finish[-1])
+    // 0x005AEBF5 compares the path tail with the target saved before the
+    // advance attempt (edi), and 0x005AEC1A..0x005AEC3B build the probe
+    // position from that same cell -- not from mCurrentPos.
+    if (PackCell(previousTarget) == PackCell(mPath.finish[-1])
         && !unit->IsUnitState(UNITSTATE_WaitingForTransport)) {
       const Wm3::Vector3f goalWorldPos{
-        static_cast<float>(static_cast<std::uint16_t>(mCurrentPos.x)),
+        static_cast<float>(static_cast<std::uint16_t>(previousTarget.x)),
         0.0f,
-        static_cast<float>(static_cast<std::uint16_t>(mCurrentPos.z)),
+        static_cast<float>(static_cast<std::uint16_t>(previousTarget.z)),
       };
       if (UnitIsBlockedAt(goalWorldPos, unit, 1)) {
         mPathRetryDelayFrames = 10;
@@ -1631,16 +1747,42 @@ bool CAiPathNavigator::IsCellInGoal(const SOCellPos& cellPos) const
  */
 Wm3::Vector3f CAiPathNavigator::GetTargetPos() const
 {
+  Unit* const unit = GetOwningUnit(*this);
+
+  // Both arms trace and fold their result into the desync checksum
+  // (0x005AD90D/0x005AD91E: 12-byte leader position; 0x005AD958/0x005AD96C:
+  // 4-byte target cell).
   if (mHasLeaderTargetPos != 0u && HasVectorValue(mLeaderTargetPos)) {
+    if (mSim != nullptr && unit != nullptr) {
+      mSim->Logf(
+        "CAiPathNavigator::GetTargetPos() for 0x%08x: following leader: <%.5f,%.5f,%.5f>\n",
+        static_cast<std::uint32_t>(unit->GetEntityId()),
+        static_cast<double>(mLeaderTargetPos.x),
+        static_cast<double>(mLeaderTargetPos.y),
+        static_cast<double>(mLeaderTargetPos.z)
+      );
+      mSim->mContext.Update(&mLeaderTargetPos, sizeof(mLeaderTargetPos));
+    }
     return mLeaderTargetPos;
   }
 
-  Unit* const unit = GetOwningUnit(*this);
-  const SFootprint* const footprint = GetActiveFootprint(*this);
-  if (!unit || !footprint) {
+  if (mSim != nullptr && unit != nullptr) {
+    mSim->Logf(
+      "CAiPathNavigator::GetTargetPos() for 0x%08x:\n  mTargetPos=<%d,%d>\n",
+      static_cast<std::uint32_t>(unit->GetEntityId()),
+      static_cast<int>(static_cast<std::uint16_t>(mTargetPos.x)),
+      static_cast<int>(static_cast<std::uint16_t>(mTargetPos.z))
+    );
+    mSim->mContext.Update(&mTargetPos, sizeof(mTargetPos));
+  }
+
+  // 0x005AD979..0x005AD9A9: the cell centre is placed on the map surface via
+  // COORDS_ToWorldPos(map, cell, footprint) with the unit's own footprint
+  // (Entity::GetFootprint, 0x00678880) -- not lifted to the unit's height.
+  if (!unit || mSim == nullptr) {
     return Wm3::Vector3f::Zero();
   }
-  return ToWorldPos(mTargetPos, *unit, *footprint);
+  return COORDS_ToWorldPos(mSim->mMapData, mTargetPos, unit->GetFootprint());
 }
 
 /**

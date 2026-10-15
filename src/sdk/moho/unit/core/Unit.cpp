@@ -16469,10 +16469,13 @@ void Unit::SetConsumptionActive(const bool isActive)
   }
 
   if (!ConsumptionActive) {
+    // 0x006AA9DF..0x006AAA23: the unspent grant goes back into the army's
+    // production pool (`GetEconomy() + 8` = mResources), so it is banked as
+    // income on the next economy tick -- not straight into mStored.
     if (mConsumptionData != nullptr && ArmyRef != nullptr) {
       if (CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy(); economyInfo != nullptr) {
-        economyInfo->economy.mStored.ENERGY += mConsumptionData->mGranted.energy;
-        economyInfo->economy.mStored.MASS += mConsumptionData->mGranted.mass;
+        economyInfo->mResources.ENERGY += mConsumptionData->mGranted.energy;
+        economyInfo->mResources.MASS += mConsumptionData->mGranted.mass;
       }
     }
 

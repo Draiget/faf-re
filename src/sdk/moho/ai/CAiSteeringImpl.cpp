@@ -1163,10 +1163,21 @@ CUnitMotion* CAiSteeringImpl::SetWaypoints(const Wm3::Vector3f* const waypoints,
 {
   const int clampedCount = (waypoints != nullptr) ? std::clamp(waypointCount, 0, 4) : 0;
   mWaypointCount = clampedCount;
-  mCurrentWaypointIndex = 0;
 
+  // 0x005D29EA / 0x005D2A40 / 0x005D2A73: sim-log trace of the waypoint list.
+  Sim* const sim = (mOwnerUnit != nullptr) ? mOwnerUnit->SimulationRef : nullptr;
+  if (sim != nullptr) {
+    sim->Logf("  0x%08x->SetWaypoints(%d", static_cast<std::uint32_t>(mOwnerUnit->GetEntityId()), waypointCount);
+  }
   for (int i = 0; i < clampedCount; ++i) {
     mWaypoints[i] = waypoints[i];
+    if (sim != nullptr) {
+      sim->Logf(", <%f,%f>", static_cast<double>(waypoints[i].x), static_cast<double>(waypoints[i].z));
+    }
+  }
+  mCurrentWaypointIndex = 0;
+  if (sim != nullptr) {
+    sim->Logf(")\n");
   }
 
   if (clampedCount > 0) {

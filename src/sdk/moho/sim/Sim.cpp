@@ -2962,7 +2962,12 @@ namespace
       return false;
     }
 
-    if (unit->IsBeingBuilt() && !unit->IsInCategory("FACTORY")) {
+    // FAF hot-patch: 0x006EFAC9 jumps to 0x0128D975 in .exxt, which tests
+    // "FACTORY" (0x00E19824) and then "CQUEMOV" (string at 0x01293160, via the
+    // pointer at 0x0129315C) before falling back to the original reject at
+    // 0x006EFACE. CQUEMOV units (e.g. mass extractors) accept orders - such as
+    // a queued upgrade - while still being built.
+    if (unit->IsBeingBuilt() && !unit->IsInCategory("FACTORY") && !unit->IsInCategory("CQUEMOV")) {
       return false;
     }
 
@@ -25039,8 +25044,13 @@ int moho::cfunc_SetArmyEconomyL(LuaPlus::LuaState* const state)
   }
   const float energyDelta = static_cast<float>(lua_tonumber(state->m_state, 3));
 
-  economyInfo->economy.mStored.MASS += massDelta;
-  economyInfo->economy.mStored.ENERGY += energyDelta;
+  // 0x00708CAE `add edi, 8`: both deltas land in the production pool at
+  // `GetEconomy() + 8` (mResources) as {0, mass} then {energy, 0} pairs, so the
+  // economy tick banks them as income -- they never touch mStored directly.
+  economyInfo->mResources.ENERGY += 0.0f;
+  economyInfo->mResources.MASS += massDelta;
+  economyInfo->mResources.ENERGY += energyDelta;
+  economyInfo->mResources.MASS += 0.0f;
   return 0;
 }
 

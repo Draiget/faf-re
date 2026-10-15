@@ -1,5 +1,7 @@
 #include "CSimResources.h"
 
+#include "legacy/math/X87Math.h"
+
 #include <cmath>
 #include <limits>
 #include <new>
@@ -8,10 +10,22 @@
 
 namespace
 {
+  /**
+   * Shared inlined corner conversion of 0x00545E80 / 0x00545FD0 / 0x005465C0:
+   * `fld` + `fistp` (round-to-nearest under the caller's x87 control word, not
+   * truncation) into a 16-bit cell lane (`movsx reg, word ptr`). A Mass marker
+   * at x = 875.4999 lands its 1x1 deposit on cell 875, which truncation put on
+   * cell 874 -- and an extractor on cell 875 then failed DepositIsInArea.
+   */
+  [[nodiscard]] std::int16_t DepositCornerCell(const float centre, const int extent) noexcept
+  {
+    return static_cast<std::int16_t>(msvc8::RoundToInt(centre - static_cast<float>(extent) * 0.5f));
+  }
+
   [[nodiscard]] gpg::Rect2i BuildRectFromPointAndSize(const Wm3::Vec3f& point, const Wm3::Vec2i& size) noexcept
   {
-    const int x0 = static_cast<int>(point.x - static_cast<float>(size.x) * 0.5f);
-    const int z0 = static_cast<int>(point.z - static_cast<float>(size.y) * 0.5f);
+    const int x0 = DepositCornerCell(point.x, size.x);
+    const int z0 = DepositCornerCell(point.z, size.y);
     return {x0, z0, x0 + size.x, z0 + size.y};
   }
 

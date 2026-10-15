@@ -529,6 +529,17 @@ int CAiNavigatorLand::Execute()
   mPathNavigator->UpdateCurrentPosition(mUnit->GetPosition());
   const Wm3::Vector3f targetPos = mPathNavigator->GetTargetPos();
 
+  // 0x005A4314 / 0x005A4332: sim-log traces of the two XZ positions.
+  {
+    const Wm3::Vec3f& unitPos = mUnit->GetPosition();
+    mUnit->SimulationRef->Logf(
+      "  currentpos=<%f,%f>\n", static_cast<double>(unitPos.x), static_cast<double>(unitPos.z)
+    );
+    mUnit->SimulationRef->Logf(
+      "  targetPos=<%f,%f>\n", static_cast<double>(targetPos.x), static_cast<double>(targetPos.z)
+    );
+  }
+
   if (mPathNavigator->mState != AIPATHNAVSTATE_Thinking) {
     const Wm3::Vector3f currentWaypoint = steering->GetWaypoint();
     if (targetPos != currentWaypoint) {
