@@ -1526,15 +1526,22 @@ void CUnitCommand::DecreaseCount(const int amount)
  * Address: 0x006E8820 (FUN_006E8820, Moho::CUnitCommand::SetTarget)
  *
  * What it does:
- * Replaces command target payload, republishes serialized target data, emits
- * one command-event broadcast, and marks command state dirty.
+ * Replaces command target payload, republishes serialized target data, marks
+ * command state dirty, recentres the command's formation on the new target
+ * (0x006E887D..0x006E88BF), then emits one command-event broadcast.
  */
 void CUnitCommand::SetTarget(const CAiTarget& target)
 {
   mTarget = target;
   mTarget.EncodeToSSTITarget(mVarDat.mTarget1);
-  BroadcastEvent(static_cast<ECommandEvent>(0));
   mNeedsUpdate = true;
+
+  if (mFormationInstance != nullptr) {
+    const Wm3::Vec3f targetPos = mTarget.GetTargetPosGun(false);
+    mFormationInstance->SetCoords(SCoordsVec2{targetPos.x, targetPos.z});
+  }
+
+  BroadcastEvent(static_cast<ECommandEvent>(0));
 }
 
 /**

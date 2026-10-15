@@ -1,4 +1,5 @@
 #include "moho/projectile/ProjectileStartupRegistrations.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -2383,11 +2384,16 @@ namespace moho
       return 0;
     }
 
+    // 0x006A3DD8..0x006A3E3F: each lane is `fild` word (+2^32) times a float
+    // scale under 24-bit x87 precision -- 2^-32 (0x00E4F7B0) for x/z, and
+    // 0.95 * 2^-32 (0x00E4F800) plus 0.05 (0x00E4F7FC) for y.
+    constexpr float kInvTwoTo32 = 2.3283064365386963e-10f;
+    constexpr float kUpScale = 2.2118911e-10f; // 0x2F733333
+    constexpr float kUpBias = 0.05f;           // 0x3D4CCCCD
     Wm3::Vector3f randomDirection{};
-    randomDirection.x = static_cast<float>(static_cast<double>(random->twister.NextUInt32()) * 2.3283064e-10);
-    randomDirection.y =
-      static_cast<float>(static_cast<double>(random->twister.NextUInt32()) * 2.2118911e-10 + 0.050000001);
-    randomDirection.z = static_cast<float>(static_cast<double>(random->twister.NextUInt32()) * 2.3283064e-10);
+    randomDirection.x = msvc8::MulTwisterWord(kInvTwoTo32, random->twister.NextUInt32());
+    randomDirection.y = msvc8::MulTwisterWord(kUpScale, random->twister.NextUInt32()) + kUpBias;
+    randomDirection.z = msvc8::MulTwisterWord(kInvTwoTo32, random->twister.NextUInt32());
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);

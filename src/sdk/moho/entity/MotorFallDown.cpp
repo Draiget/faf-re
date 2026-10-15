@@ -32,7 +32,6 @@ namespace
   constexpr float kHalfPi = 1.5707964f;
   constexpr float kQuarterPi = 0.78539819f;
   constexpr float kFourOverPi = 1.2732395f;
-  constexpr float kTwoPi = 6.2831855f;
   constexpr float kQuatUpdateThreshold = 0.0001f;
 
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorFallDownIndex = 0;
@@ -104,18 +103,6 @@ namespace
     return *static_cast<float*>(valueStorage);
   }
 
-  [[nodiscard]] float NormalizeAnglePositive(const float angleRadians) noexcept
-  {
-    float normalized = angleRadians;
-    while (normalized < 0.0f) {
-      normalized += kTwoPi;
-    }
-    while (normalized >= kTwoPi) {
-      normalized -= kTwoPi;
-    }
-    return normalized;
-  }
-
   [[nodiscard]] Wm3::Vec3f BuildCurrentFallAxis(const Wm3::Quatf& orientation) noexcept
   {
     return Wm3::Vec3f{
@@ -126,31 +113,6 @@ namespace
       1.0f - ((orientation.z * orientation.z + orientation.x * orientation.x) * 2.0f),
       ((orientation.z * orientation.y) + (orientation.w * orientation.x)) * 2.0f,
     };
-  }
-
-  [[nodiscard]] Wm3::Quatf BuildRotationDeltaFromAxes(const Wm3::Vec3f& targetAxisRaw, const Wm3::Vec3f& currentAxisRaw)
-  {
-    Wm3::Vec3f targetAxis = targetAxisRaw;
-    Wm3::Vec3f currentAxis = currentAxisRaw;
-
-    if (Wm3::Vec3f::Normalize(&targetAxis) <= 1.0e-6f || Wm3::Vec3f::Normalize(&currentAxis) <= 1.0e-6f) {
-      return Wm3::Quatf::Identity();
-    }
-
-    const float dot = Wm3::Vec3f::Dot(currentAxis, targetAxis);
-    if (dot < -0.9999f) {
-      Wm3::Vec3f fallbackAxis = Wm3::Vec3f::Cross(currentAxis, Wm3::Vec3f{1.0f, 0.0f, 0.0f});
-      if (Wm3::Vec3f::LengthSq(fallbackAxis) <= 1.0e-6f) {
-        fallbackAxis = Wm3::Vec3f::Cross(currentAxis, Wm3::Vec3f{0.0f, 0.0f, 1.0f});
-      }
-      Wm3::Vec3f::Normalize(&fallbackAxis);
-      return Wm3::Quatf(0.0f, fallbackAxis.x, fallbackAxis.y, fallbackAxis.z);
-    }
-
-    const Wm3::Vec3f cross = Wm3::Vec3f::Cross(currentAxis, targetAxis);
-    Wm3::Quatf delta{1.0f + dot, cross.x, cross.y, cross.z};
-    delta.Normalize();
-    return delta;
   }
 
   /**
@@ -278,12 +240,10 @@ namespace moho
   /**
    * Address: 0x00695180 (FUN_00695180, update lane)
    *
-   * Ground truth (`FUN_00695180.c`) confirms `delta` (whose own scalar lane
-   * is `.w`, per `BuildRotationDeltaFromAxes`'s `Quaternion(1+dot, cross.x,
-   * cross.y, cross.z)` construction) is composed onto the existing `.x`-
-   * scalar `pendingTransform.orient_` via the same mixed-convention product
-   * as `Entity.cpp`'s tilt-delta sites (`ComposeWScalarDeltaOntoOrientation`),
-   * not the generic `Wm3::Quatf::Multiply` (`.w`-scalar on both operands).
+   * What it does:
+   * Advances the fall/spring angle, aims the entity's up axis at the fall
+   * direction through the shortest-arc delta (0x0050CB50), uproots past 45
+   * degrees, and composes `delta * orientation` into the pending transform.
    */
   void MotorFallDown::Update(Entity* const entity)
   {
@@ -312,7 +272,7 @@ namespace moho
     if (mFallAngleRadians < 0.0f) {
       mFallAngleRadians *= -1.0f;
       mFallDepth *= -1.0f;
-      mFallDirectionRadians = NormalizeAnglePositive(mFallDirectionRadians + kPi);
+      mFallDirectionRadians = NormalizeAngleSignedRadians(mFallDirectionRadians + kPi);
     }
 
     if (mFallAngleRadians > kHalfPi) {
@@ -320,18 +280,20 @@ namespace moho
       mFallDepth = 0.0f;
     }
 
+    // 0x006952A9..0x006953B1: the horizontal lanes multiply the unrounded
+    // fsin/fcos results; only -sin(elevation) is stored straight.
     const float elevationAngle = mFallAngleRadians - kHalfPi;
-    const float sinTilt = msvc8::cos(elevationAngle);
     const Wm3::Vec3f targetAxis{
-      msvc8::sin(mFallDirectionRadians) * sinTilt,
+      msvc8::SinTimesCos(mFallDirectionRadians, elevationAngle),
       -msvc8::sin(elevationAngle),
-      msvc8::cos(mFallDirectionRadians) * sinTilt,
+      msvc8::CosTimesCos(mFallDirectionRadians, elevationAngle),
     };
 
     VTransform pendingTransform = entity->mVarDat.mCurTransform;
 
     const Wm3::Vec3f currentAxis = BuildCurrentFallAxis(pendingTransform.orient_);
-    Wm3::Quatf delta = BuildRotationDeltaFromAxes(targetAxis, currentAxis);
+    Wm3::Quatf delta{};
+    (void)BuildTiltShortestArcDelta(targetAxis, &delta, currentAxis);
 
     const float quatDeltaMagnitude = std::fabs(std::fabs(delta.w) - 1.0f);
     if (quatDeltaMagnitude <= kQuatUpdateThreshold) {
@@ -351,8 +313,10 @@ namespace moho
       }
     }
 
+    // 0x0069546A..0x00695556: `delta * orientation`, the same lane grouping
+    // as CAniPoseBone::Rotate's product.
     pendingTransform.orient_ = MultiplyQuat(delta, pendingTransform.orient_);
-    pendingTransform.orient_.Normalize();
+    NormalizeQuatInPlace(&pendingTransform.orient_);
     entity->SetPendingTransform(pendingTransform, 1.0f);
   }
 

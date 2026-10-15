@@ -50,7 +50,9 @@ namespace moho
     result.w = ((a.w * b.w - a.x * b.x) - a.y * b.y) - a.z * b.z;
     result.x = ((a.x * b.w + a.y * b.z) + a.w * b.x) - a.z * b.y;
     result.y = ((a.z * b.x + a.y * b.w) + a.w * b.y) - a.x * b.z;
-    result.z = ((a.x * b.y + a.w * b.z) + a.z * b.w) - a.y * b.x;
+    // 0x0054BCDC..0x0054BD16: `a.z*b.w` joins the first sum and `a.w*b.z`
+    // comes third (also the compose at 0x006954E7..0x00695534).
+    result.z = ((a.x * b.y + a.z * b.w) + a.w * b.z) - a.y * b.x;
     return result;
   }
 
@@ -739,74 +741,37 @@ namespace moho
       return nullptr;
     }
 
-    // Lane copies in binary order: [0]=x, [1]=y, [2]=z, [3]=w.
-    const float current[4] = {
-      currentOrientation.x, currentOrientation.y, currentOrientation.z, currentOrientation.w,
-    };
-    const float targetConjugate[4] = {
-      targetOrientation.x,
-      -targetOrientation.y,
-      -targetOrientation.z,
-      -targetOrientation.w,
-    };
+    // Scalar-first lanes, as stored: [0]=w, [1]=x, [2]=y, [3]=z
+    // (0x004EB83F..0x004EB885 read `current` at ebx+0..0xC and `target` at
+    // ebp+0..0xC; the conjugate keeps lane 0 and forms lanes 1-3 as `-0.0 - t`).
+    const Wm3::Quaternionf& c = currentOrientation;
+    const Wm3::Quaternionf& t = targetOrientation;
+    const float tcx = -t.x;
+    const float tcy = -t.y;
+    const float tcz = -t.z;
 
-    // delta = current * conjugate(target) — Hamilton product (binary lane order).
-    float delta[4]{};
-    delta[0] = (((current[0] * targetConjugate[0]) - (current[1] * targetConjugate[1])) -
-                (current[2] * targetConjugate[2])) -
-               (current[3] * targetConjugate[3]);
-    delta[1] = (((current[3] * targetConjugate[2]) + (current[1] * targetConjugate[0])) +
-                (current[0] * targetConjugate[1])) -
-               (current[2] * targetConjugate[3]);
-    delta[2] = (((current[2] * targetConjugate[0]) + (current[1] * targetConjugate[3])) +
-                (current[0] * targetConjugate[2])) -
-               (current[3] * targetConjugate[1]);
-    delta[3] = (((current[3] * targetConjugate[0]) + (current[1] * targetConjugate[2])) +
-                (current[0] * targetConjugate[3])) -
-               (current[2] * targetConjugate[1]);
+    // delta = current * conj(target), 0x004EB865..0x004EB942.
+    Wm3::Quaternionf delta{};
+    delta.w = ((c.w * t.w - c.x * tcx) - c.y * tcy) - c.z * tcz;
+    delta.x = ((c.z * tcy + c.x * t.w) + c.w * tcx) - c.y * tcz;
+    delta.y = ((c.y * t.w + c.x * tcz) + c.w * tcy) - c.z * tcx;
+    delta.z = ((c.z * t.w + c.y * tcx) + c.w * tcz) - c.x * tcy;
 
-    Wm3::Quaternionf deltaQuat{};
-    deltaQuat.x = delta[0];
-    deltaQuat.y = delta[1];
-    deltaQuat.z = delta[2];
-    deltaQuat.w = delta[3];
-
-    if (!moho::RotateQuatByAngle(&deltaQuat, turnStepRadians)) {
-      // Clamp rejected — snap to current and signal "no step taken".
-      outOrientation->x = currentOrientation.x;
-      outOrientation->y = currentOrientation.y;
-      outOrientation->z = currentOrientation.z;
-      outOrientation->w = currentOrientation.w;
+    if (!moho::RotateQuatByAngle(&delta, turnStepRadians)) {
+      // 0x004EBA55: clamp rejected - keep the current orientation.
+      *outOrientation = currentOrientation;
       if (outNoStep != nullptr) {
         *outNoStep = true;
       }
       return outOrientation;
     }
 
-    const float target[4] = {
-      targetOrientation.x, targetOrientation.y, targetOrientation.z, targetOrientation.w,
-    };
-    const float deltaLanes[4] = {deltaQuat.x, deltaQuat.y, deltaQuat.z, deltaQuat.w};
-
-    // out = target * clampedDelta — Hamilton product (binary lane order).
-    float result[4]{};
-    result[0] = (((target[0] * deltaLanes[0]) - (target[1] * deltaLanes[1])) -
-                 (target[2] * deltaLanes[2])) -
-                (target[3] * deltaLanes[3]);
-    result[1] = (((target[2] * deltaLanes[3]) + (target[1] * deltaLanes[0])) +
-                 (target[0] * deltaLanes[1])) -
-                (target[3] * deltaLanes[2]);
-    result[2] = (((target[3] * deltaLanes[1]) + (target[2] * deltaLanes[0])) +
-                 (target[0] * deltaLanes[2])) -
-                (target[1] * deltaLanes[3]);
-    result[3] = (((target[3] * deltaLanes[0]) + (target[1] * deltaLanes[2])) +
-                 (target[0] * deltaLanes[3])) -
-                (target[2] * deltaLanes[1]);
-
-    outOrientation->x = result[0];
-    outOrientation->y = result[1];
-    outOrientation->z = result[2];
-    outOrientation->w = result[3];
+    // out = target * clampedDelta, 0x004EB985..0x004EBA48.
+    const Wm3::Quaternionf& d = delta;
+    outOrientation->w = ((t.w * d.w - t.x * d.x) - t.y * d.y) - t.z * d.z;
+    outOrientation->x = ((t.y * d.z + t.x * d.w) + t.w * d.x) - t.z * d.y;
+    outOrientation->y = ((t.z * d.x + t.y * d.w) + t.w * d.y) - t.x * d.z;
+    outOrientation->z = ((t.z * d.w + t.x * d.y) + t.w * d.z) - t.y * d.x;
     if (outNoStep != nullptr) {
       *outNoStep = false;
     }
@@ -1000,7 +965,9 @@ namespace moho
     };
     (void)Wm3::Vector3f::Normalize(&halfAxis);
 
-    const float scalar = (currentUp.x * halfAxis.x) + (currentUp.y * halfAxis.y) + (currentUp.z * halfAxis.z);
+    // 0x0050CBC4..0x0050CBDA sums the dot as `(z*z' + x*x') + y*y'`; float
+    // addition does not associate, so the x-first order lands an ULP away.
+    const float scalar = ((currentUp.z * halfAxis.z) + (currentUp.x * halfAxis.x)) + (currentUp.y * halfAxis.y);
     outDelta->w = scalar;
     if (scalar == 0.0f) {
       // Exactly opposed: the half-vector is degenerate, so pick an axis

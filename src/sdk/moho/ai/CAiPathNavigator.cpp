@@ -12,8 +12,10 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/CAiPathFinder.h"
+#include "moho/ai/IAiNavigator.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/GridTraversalLine.h"
 #include "moho/sim/SFootprint.h"
@@ -1144,7 +1146,8 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
   if (!mergedWithFront) {
     if (mPath.CountInt() > 0 && incomingCount <= 2) {
       const SOCellPos firstCell = mPath.start[0];
-      const bool canStayOnFirstCell = CanPathCellTransition(*this, firstCell, firstCell) &&
+      // 0x005AF0F5 (FUN_005AF4E0) then 0x005AF114 (FUN_005AF670).
+      const bool canStayOnFirstCell = CanOccupyTargetCell(*this, firstCell, firstCell) &&
         CanPathCellTransition(*this, firstCell, firstCell);
       if (canStayOnFirstCell) {
         const std::uint32_t packedFirstCell = PackCell(firstCell);
@@ -1178,12 +1181,13 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
     mPathFinder->mSearchType = AIPATHSEARCH_None;
   }
 
+  // 0x005AF071..0x005AF0C2 (merged) and 0x005AF142..0x005AF1BD (prepended):
+  // the index advances by the incoming path's own length, less the shared
+  // first cell when merged; with no index yet it starts from zero, not from
+  // the merged path's length.
   const std::int32_t mergeAdjust = mergedWithFront ? 1 : 0;
-  if (mLastPathNodeIndex < 0) {
-    mLastPathNodeIndex = mPath.CountInt() - 1;
-  } else {
-    mLastPathNodeIndex += incomingCount - mergeAdjust;
-  }
+  const std::int32_t baseIndex = (mLastPathNodeIndex < 0) ? 0 : mLastPathNodeIndex;
+  mLastPathNodeIndex = baseIndex + incomingCount - mergeAdjust;
 
   mState = AIPATHNAVSTATE_HasPath;
 }
@@ -1328,10 +1332,17 @@ void CAiPathNavigator::RequestContinuationPath(std::int32_t requestMode)
     }
   }
 
+  // 0x005AECB1..0x005AED4A: drop leading cells the unit cannot use -- one it
+  // cannot occupy (CanOccupyTargetCell), one whose cell is blocked by a mobile
+  // unit (CanPathCellTransition), or one within a single step of where it
+  // stands -- and stop at the first free cell further out. The search below is
+  // aimed at that cell. Stopping on a *blocked* cell instead (and never
+  // testing occupancy) aimed the continuation search at an unreachable goal,
+  // which failed silently (replay 26935800 beat 670).
   while (mPath.CountInt() > 1) {
     const SOCellPos firstCell = mPath.start[0];
-    const bool canTraverseFirst = CanPathCellTransition(*this, firstCell, firstCell);
-    if (!canTraverseFirst || ManhattanDistance(firstCell, mCurrentPos) > 1) {
+    if (CanOccupyTargetCell(*this, firstCell, firstCell) && CanPathCellTransition(*this, firstCell, firstCell)
+        && ManhattanDistance(firstCell, mCurrentPos) > 1) {
       break;
     }
     (void)ConsumePathPrefix(*this, 1);
@@ -1511,15 +1522,22 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
     return false;
   }
 
+  // 0x005AFA08..0x005AFA1C measures from the unit to the first path cell
+  // (`eax = mPath.start`, `ecx = &mCurrentPos`), not to the current target.
   if (selectedIndex == 0 && furthestCandidateIndex > firstReachableIndex && mPath.CountInt() > 1 &&
-      !CanPathCellTransition(*this, mPath.start[0], mPath.start[1]) && CellDistance(mCurrentPos, mTargetPos) < 10.0f) {
+      !CanPathCellTransition(*this, mPath.start[0], mPath.start[1]) && CellDistance(mCurrentPos, mPath.start[0]) < 10.0f) {
     (void)ConsumePathPrefix(*this, 1);
     return false;
   }
 
+  // 0x005AFA3B..0x005AFA42: advancing clears the extended-probe flag (+0x95),
+  // which drops the transition tests back to blocker mode 1. Clearing
+  // mTargetWithinOneCell (+0x96) here instead left the permissive mode-2
+  // probe armed, so the next advance skipped further along the path than the
+  // engine does (replay 26935800 beat 659: index 7 vs 3).
   if (mNoProgressTickCount <= 30 || selectedIndex > 0) {
     SetTargetPoint(selectedIndex);
-    mTargetWithinOneCell = 0;
+    mUseExtendedPathProbe = 0;
     return true;
   }
 
@@ -1646,7 +1664,99 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
       }
     }
   }
-  (void)keepFormationTarget; // consumed by the formation-leader block at 0x005AE63A
+  // 0x005AE63A..0x005AEADB: formation-leader sync, at most once every 100
+  // ticks and only while no repath is pending. The navigator re-reads the
+  // formation leader, waits while that leader is still planning, and otherwise
+  // steers straight for the unit's formation slot when the way there is clear.
+  if (unit != nullptr && mIsInFormation != 0u && keepFormationTarget
+      && currentTick > static_cast<std::uint32_t>(mLastFormationSyncTick) + 100u) {
+    if (unit->GetFormation() == nullptr) {
+      mIsInFormation = 0;
+      DetachWeakUnit(mLeaderLink);
+      mHasLeaderTargetPos = 0;
+      mLeaderTargetPos = Wm3::Vector3f::Zero();
+    } else {
+      Unit* const formationLeader = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
+      const bool leaderChanged = formationLeader != mLeaderLink.GetObjectPtr();
+      mLeaderLink.Set(formationLeader);
+
+      Unit* const leader = mLeaderLink.GetObjectPtr();
+      if (leader != nullptr && leader != unit) {
+        // 0x005AE744: a leader whose navigator is still thinking holds the
+        // whole formation in place.
+        if (leader->AiNavigator != nullptr && leader->AiNavigator->GetStatus() == AINAVSTATUS_Thinking) {
+          mTargetPos = mCurrentPos;
+          mLeaderBusy = 1;
+          return;
+        }
+        mLeaderBusy = 0;
+
+        const Wm3::Vector3f slotPos = unit->mInfoCache.mFormationHeadingHint;
+        const SOCellPos slotCell = unit->GetFootprint().ToCellPos(slotPos);
+
+        // 0x005AE7B8: off this navigator's 13-tick slot, a slot target that is
+        // already set is left alone.
+        if (mTickBucket13 != static_cast<std::int32_t>(currentTick % 13u)
+            && mLeaderTargetPos != Wm3::Vector3f::Zero()) {
+          return;
+        }
+
+        if (PackCell(mTargetPos) == PackCell(slotCell)) {
+          mLeaderTargetPos = slotPos;
+          return;
+        }
+
+        // 0x005AE80F `fcomip / jbe`: 10 unless the slot is strictly closer.
+        float probeRadius = CellDistance(mCurrentPos, slotCell);
+        if (!(10.0f > probeRadius)) {
+          probeRadius = 10.0f;
+        }
+        const SOCellPos candidate = ProjectCellToward(slotCell, mCurrentPos, probeRadius);
+        CArmyImpl* const army = unit->ArmyRef;
+        if (CanOccupyTargetCell(*this, mCurrentPos, candidate) && CanReachCellFromCurrent(*this, candidate)
+            && unit->SimulationRef->mMapData->IsWithin(slotPos, 1.0f, army->UseWholeMap())) {
+          mRepathDistanceThreshold = CellDistance(mCurrentPos, slotCell) * 0.5f;
+          mTargetPos = slotCell;
+          mHasLeaderTargetPos = 1;
+          mLeaderTargetPos = slotPos;
+          mState = AIPATHNAVSTATE_FollowingLeader;
+          if (CountPathCellsIfAllocated(mPath) > 1) {
+            ResetPathContent(mPath);
+            AppendPathCellFast(mPath, GoalAnchorCell(mGoal));
+          }
+          return;
+        }
+
+        // 0x005AE943: the slot is out of reach; fall back to the real path.
+        mLastFormationSyncTick = static_cast<std::int32_t>(currentTick);
+        if (mHasLeaderTargetPos != 0u || CountPathCellsIfAllocated(mPath) == 1) {
+          mLeaderTargetPos = Wm3::Vector3f::Zero();
+          mHasLeaderTargetPos = 0;
+          ResetPathContent(mPath);
+          RequestPath(0);
+          return;
+        }
+      } else if (leaderChanged && leader == unit) {
+        // 0x005AEA05: this unit has just become the formation leader, so it
+        // plans its own path from scratch.
+        if (CountPathCellsIfAllocated(mPath) != 0) {
+          ResetPathContent(mPath);
+          mPathRetryDelayFrames = 0;
+        }
+        mLeaderTargetPos = Wm3::Vector3f::Zero();
+        mHasLeaderTargetPos = 0;
+        mLeaderBusy = 0;
+        RequestPath(0);
+        return;
+      } else {
+        // 0x005AEA78: no leader (or still leading): leave the formation.
+        mLeaderTargetPos = Wm3::Vector3f::Zero();
+        mHasLeaderTargetPos = 0;
+        DetachWeakUnit(mLeaderLink);
+        mIsInFormation = 0;
+      }
+    }
+  }
 
   if (!unit || mLeaderBusy != 0u) {
     return;

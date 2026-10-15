@@ -12261,7 +12261,10 @@ int moho::cfunc_RandomSimL(LuaPlus::LuaState* const state)
   }
 
   if (argumentCount == 0) {
-    const double value = static_cast<double>(sim->mRngState->twister.NextUInt32()) * 2.3283064e-10;
+    // 0x00759150..0x00759165: `fild` word (+2^32), `fmul` 2^-32 (0x00E4F7B0)
+    // under 24-bit x87 precision, stored as a float lua_Number.
+    constexpr float kInvTwoTo32 = 2.3283064365386963e-10f;
+    const float value = msvc8::MulTwisterWord(kInvTwoTo32, sim->mRngState->twister.NextUInt32());
     lua_pushnumber(rawState, value);
     return 1;
   }
@@ -26418,9 +26421,11 @@ void Sim::DoCollisionsFor(
     return;
   }
 
-  // Owner mass proxy + a per-owner approach-speed factor: the larger of
+  // Owner mass proxy + a per-owner approach-speed factor: the smaller of
   // (blueprint MaxSpeed * 0.1) and the current velocity magnitude
-  // (asm 0x597D33-0x597DDA). MaxSpeed lives at blueprint Physics.MaxSpeed.
+  // (asm 0x597D33-0x597DDA: `comiss share, speed; jbe` keeps `share` only
+  // when it does not exceed `speed`). MaxSpeed lives at blueprint
+  // Physics.MaxSpeed.
   const RUnitBlueprint* const ownerBlueprint = owner->GetBlueprint();
   const float ownerMass = BlueprintCollisionMass(*ownerBlueprint);
 
@@ -26429,7 +26434,7 @@ void Sim::DoCollisionsFor(
     std::sqrt((ownerVelocity.x * ownerVelocity.x) + (ownerVelocity.y * ownerVelocity.y) +
       (ownerVelocity.z * ownerVelocity.z));
   const float maxSpeedShare = ownerBlueprint->Physics.MaxSpeed * kMaxSpeedFactor;
-  const float approachSpeed = (maxSpeedShare > ownerSpeed) ? maxSpeedShare : ownerSpeed;
+  const float approachSpeed = (maxSpeedShare > ownerSpeed) ? ownerSpeed : maxSpeedShare;
 
   for (const CollisionResult& hit : *collisions) {
     // Skip shallow contacts and empty records (asm 0x597E2D-0x597E4A).
@@ -26725,12 +26730,14 @@ namespace
     const float z1 = blockerZ + 0.5f;  // blocker
     const float z2 = farZ + 0.5f;      // far
 
+    // FUN_0040D860: each axis runs blocker -> far, mirrored (and masked) when
+    // the far end lies below the blocker.
     const int dirMaskX = (x1 < x2) ? -1 : 0;
     const float p0x = (dirMaskX != 0) ? -x2 : x2;  // cursorX origin (blocker)
     const float p0z = (dirMaskX != 0) ? -x1 : x1;  // xLimit (far)
-    const int dirMaskZ = (z1 < z2) ? -1 : 0;
-    const float p0y = (dirMaskZ != 0) ? -z2 : z2;  // cursorZ origin (far)
-    const float p1x = (dirMaskZ != 0) ? -z1 : z1;  // zLimit (blocker)
+    const int dirMaskZ = (z2 < z1) ? -1 : 0;
+    const float p0y = (dirMaskZ != 0) ? -z1 : z1;  // cursorZ origin (blocker)
+    const float p1x = (dirMaskZ != 0) ? -z2 : z2;  // zLimit (far)
 
     const float extentX = p0z - p0x;
     const float extentZ = p1x - p0y;
@@ -26869,8 +26876,10 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
         unitDirX = 0.0f;
         unitDirZ = 0.0f;
       } else {
-        unitDirX = dirX / len;
-        unitDirZ = dirZ / len;
+        // 0x0062E0A9..0x0062E0D8: one reciprocal, multiplied into each lane.
+        const float inverseLength = 1.0f / len;
+        unitDirX = dirX * inverseLength;
+        unitDirZ = dirZ * inverseLength;
       }
     }
     const float farX = blockerPos.x + (unitDirX * pushExtent) * 3.0f;

@@ -1000,7 +1000,7 @@ void moho::WWinLogWindow::RebuildVisibleLinesFromControls()
   // The binary scrolls through the edit control directly: SB_THUMBTRACK to
   // the last position (0x004F5A4F .. 0x004F5A79).
   ::SendMessageW(
-    reinterpret_cast<HWND>(mOutputTextControl->GetHWND()),
+    reinterpret_cast<HWND>(static_cast<std::uintptr_t>(mOutputTextControl->GetHWND())),
     WM_VSCROLL,
     MAKEWPARAM(SB_THUMBTRACK, static_cast<WORD>(mOutputTextControl->GetLastPosition())),
     0
@@ -1189,7 +1189,7 @@ namespace
       context.GetHeadCount() == 1 && head.mWindowed && moho::OPTIONS_GetInt(kSupComFrameCursorLockPreferenceKey) == 1 &&
       moho::sMainWindow != nullptr
     ) {
-      const HWND mainWindowHandle = reinterpret_cast<HWND>(moho::sMainWindow->GetHandle());
+      const HWND mainWindowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
       if (mainWindowHandle != nullptr) {
         ::GetWindowRect(mainWindowHandle, &clipRect);
         clipRectPtr = &clipRect;
@@ -3823,7 +3823,17 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   const SWorldViewInfo* const end = worldViews.end();
 
   for (const SWorldViewInfo* worldView = begin; worldView != end; ++worldView) {
-    if (worldView->mHead != head || worldView->mView == nullptr) {
+    if (worldView->mView == nullptr) {
+      continue;
+    }
+
+    // 0x007F92A0..0x007F92FB: a view is skipped when its slot-9 query answers
+    // true, when slot 12 does (CUIWorldView::CanShake 0x0086DC60 returns the
+    // orthographic flag, so every minimap is left to the cartographic pass and
+    // never gets the 3D world/fog pass), when it belongs to another head, and,
+    // under `ren_HideSecondary` (0x010A6421), when it is not the first view.
+    if (worldView->mView->Func2() || worldView->mView->CanShake() || worldView->mHead != head
+        || (moho::ren_HideSecondary && worldView != begin)) {
       continue;
     }
 
@@ -4052,17 +4062,16 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     //   0x007F9589  call func_ren_FogOfWar         ; 0x0081C660, __thiscall
     //               ecx = mSession; args (&mVisionRenderer, head, <local>,
     //               sDeltaFrame)
-    //   0x007F958E  <stencil clear through device slot +0x98>
-    //
-    //   0x007F958E  <stencil clear through device slot +0x98>
-    //
-    // The stencil clear that follows the call is still unwired.
+    //   0x007F958E  Clear(false, false, true, 0xFFFFFFFF, 1.0f, 0) through
+    //               device slot +0x98: wipe the vision stencil again so it
+    //               does not mask anything drawn after the fog pass.
     if (moho::ren_FogOfWar && renderSession != nullptr &&
         renderSession->FocusArmy != -1) {
       moho::RenderFogOfWar(
         *renderSession, mVisionRenderer, static_cast<unsigned int>(head),
         *mCam, moho::REN_GetSimDeltaSeconds()
       );
+      gpg::gal::Device::GetInstance()->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
     }
 
     RenderRefractingEffects();

@@ -62,6 +62,14 @@ namespace msvc8
   [[nodiscard]] float atan2f(float y, float x) noexcept;
   // First angle is stored as float; the second stays in x87 through subtraction.
   [[nodiscard]] float Atan2Difference(float firstY, float firstX, float secondY, float secondX) noexcept;
+  // Inlined `fsin`/`fcos` results stay unrounded on the x87 stack and only
+  // their product rounds, under 24-bit precision control (FUN_00695180's fall
+  // axis): sin(sinArg) * cos(cosArg) and cos(firstArg) * cos(secondArg).
+  // `fpatan` result added to `addend` before any rounding (CAimManipulator's
+  // heading lane, 0x00630AB2..0x00630AB7): round24(atan2(y, x) + addend).
+  [[nodiscard]] float Atan2Plus(float y, float x, float addend) noexcept;
+  [[nodiscard]] float SinTimesCos(float sinArg, float cosArg) noexcept;
+  [[nodiscard]] float CosTimesCos(float firstArg, float secondArg) noexcept;
 
   /**
    * Except for the legacy-dispatched acos overload below, these float

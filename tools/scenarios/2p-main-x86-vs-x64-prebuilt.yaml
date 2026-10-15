@@ -18,7 +18,7 @@ game:
 
 players:
   - { uid: 1, name: MainX86 }
-  - { uid: 2, name: MainX64, exe: '%ProgramData%\FAForever\bin\main_x64.exe' }
+  - { uid: 2, name: MainX64, exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe' }
 
 steps:
   - start: all

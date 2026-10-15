@@ -819,9 +819,9 @@ namespace moho
       return 0.0f;
     }
 
-    if (SimulationRef && ListIsSingleton()) {
-      ListLinkBefore(&SimulationRef->mCoordEntities);
-    }
+    // 0x006FA1A8..0x006FA1D7: unlink and re-append to the dirty list on every
+    // reclaim tick, so a prop reclaimed twice in one tick moves to the tail.
+    ListLinkBefore(&SimulationRef->mCoordEntities);
 
     const float previous = mVarDat.mFractionComplete;
     if (reclaimDelta <= 0.0f) {

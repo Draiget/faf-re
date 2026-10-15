@@ -29,8 +29,25 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "Wm3Box2.h"
+#include "Wm3IntrBox2Box2.h"
 
 using namespace moho;
+
+namespace moho
+{
+  /**
+   * Address: 0x0062B200 (FUN_0062B200, func_TryBuildStructureAt)
+   *
+   * What it does:
+   * Footprint placement check; defined in CUnitCallTeleport.cpp, declared
+   * here with the same shape as CAiBrain.cpp's declaration.
+   */
+  [[nodiscard]] bool TryBuildStructureAt(
+    SCoordsVec2* const tryPos, const RUnitBlueprint* const blueprint, Sim* const sim,
+    const int border, const bool wholeMap, const bool doCoerce, const bool useSkirt);
+} // namespace moho
 
 namespace
 {
@@ -84,21 +101,32 @@ namespace
     return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
   }
 
-  // Ground truth (`FUN_00596F30.c`, `func_ResolvePossibleCollision`, the sole
-  // reachability path for every caller of this helper) computes the
-  // collision-unit forward vector via the engine scalar-first rotation matrix
-  // (confirmed term-by-term: `2*(w*z-x*y)`, `2*(x*z+w*y)`, `1-2*(z*z+y*y)`
-  // match `Moho::QuatToMatrix`'s column exactly), not the generic
-  // `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar `ToMat3()`) this
-  // replaces. The owner-side forward vector this helper also computes uses
-  // the identical operation on a different unit within the same function.
-  [[nodiscard]] Wm3::Vector3f FlattenedForward(const Unit& unit) noexcept
+  /**
+   * Address: 0x0044F7E0 (FUN_0044F7E0)
+   *
+   * What it does:
+   * Writes `source / |source|` into `dest`, or zero when the float length is
+   * not positive; the reciprocal is formed once and multiplied into each lane.
+   */
+  Wm3::Vector3f* NormalizeVectorInto(Wm3::Vector3f* const dest, const Wm3::Vector3f& source) noexcept
   {
-    const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
-    Wm3::Vector3f forward{};
-    MultQuadVec(&forward, &forwardAxis, &unit.GetTransform().orient_);
-    forward.y = 0.0f;
-    return Wm3::Vector3f::NormalizeOrZero(forward);
+    const float length = std::sqrt((source.x * source.x) + (source.y * source.y) + (source.z * source.z));
+    if (length > 0.0f) {
+      const float inverse = 1.0f / length;
+      dest->x = source.x * inverse;
+      dest->y = inverse * source.y;
+      dest->z = inverse * source.z;
+    } else {
+      *dest = Wm3::Vector3f::Zero();
+    }
+    return dest;
+  }
+
+  [[nodiscard]] Wm3::Vector3f NormalizedOrZero(const Wm3::Vector3f& source) noexcept
+  {
+    Wm3::Vector3f out{};
+    (void)NormalizeVectorInto(&out, source);
+    return out;
   }
 
   [[nodiscard]] float ReadSimConVarFloat(Sim* const sim, CSimConVarBase* const conVar, const float fallback) noexcept
@@ -210,73 +238,37 @@ namespace
     return (speed * speed) / (physics.MaxAcceleration * 2.0f);
   }
 
-  struct CollisionObb2D
-  {
-    Wm3::Vector2f center;
-    Wm3::Vector2f axis0;
-    Wm3::Vector2f axis1;
-    float extent0;
-    float extent1;
-  };
-
-  [[nodiscard]] CollisionObb2D BuildCollisionObb2D(
+  /**
+   * Box half of `func_UnitsWillCollide` (0x00596B4C..0x00596D9A).
+   *
+   * What it does:
+   * Builds the unit's XZ footprint box pushed forward by its braking lead:
+   * axis 0 is the orientation's right column and axis 1 its forward column,
+   * both flattened to XZ and used at their projected length (no
+   * renormalisation), with half-extents (sizeX + sizeZ) / 4 and length / 2.
+   */
+  [[nodiscard]] Wm3::Box2f BuildCollisionBox2(
     const Unit& unit, const Wm3::Vector3f& position, const float leadDistance, const float inflatedLength
   ) noexcept
   {
     const RUnitBlueprint* const blueprint = unit.GetBlueprint();
-    const float sizeX = blueprint ? blueprint->mSizeX : 0.0f;
-    const float sizeZ = blueprint ? blueprint->mSizeZ : 0.0f;
-    const float lateralExtent = (sizeX + sizeZ) * 0.25f;
-    const float forwardExtent = inflatedLength * 0.5f;
-
-    // The rotation matrix's third and first columns, flattened to the XZ plane.
-    // These four locals used to be named qx/qy/qz/qw while holding, in order,
-    // w/x/y/z -- the orientation lane was typed `moho::Vector4f` over
-    // `Wm3::Quatf` bytes. The arithmetic was right; only the names were not.
     const Wm3::Quatf& q = unit.mVarDat.mCurTransform.orient_;
 
-    const Wm3::Vector2f forward = Wm3::Vector2f::NormalizeOrZero({
-      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
-      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
-    });
-    const Wm3::Vector2f right = Wm3::Vector2f::NormalizeOrZero({
-      1.0f - (((q.y * q.y) + (q.z * q.z)) * 2.0f),
+    const Wm3::Vector2f forward{
+      ((q.w * q.y) + (q.z * q.x)) * 2.0f,
+      1.0f - (((q.y * q.y) + (q.x * q.x)) * 2.0f),
+    };
+    const Wm3::Vector2f right{
+      1.0f - (((q.z * q.z) + (q.y * q.y)) * 2.0f),
       ((q.z * q.x) - (q.w * q.y)) * 2.0f,
-    });
-
-    CollisionObb2D out{};
-    out.center = {position.x + (forward.x * leadDistance), position.z + (forward.y * leadDistance)};
-    out.axis0 = right;
-    out.axis1 = forward;
-    out.extent0 = lateralExtent;
-    out.extent1 = forwardExtent;
-    return out;
-  }
-
-  [[nodiscard]] bool
-  OverlapsOnAxis(const CollisionObb2D& lhs, const CollisionObb2D& rhs, const Wm3::Vector2f& axis) noexcept
-  {
-    const float axisLenSq = Wm3::Vector2f::Dot(axis, axis);
-    if (axisLenSq <= 1.0e-8f) {
-      return true;
-    }
-
-    const Wm3::Vector2f n = Wm3::Vector2f::NormalizeOrZero(axis);
-    const Wm3::Vector2f delta = {rhs.center.x - lhs.center.x, rhs.center.y - lhs.center.y};
-    const float distance = std::fabs(Wm3::Vector2f::Dot(delta, n));
-    const float lhsProjection =
-      std::fabs(Wm3::Vector2f::Dot(lhs.axis0, n)) * lhs.extent0 + std::fabs(Wm3::Vector2f::Dot(lhs.axis1, n)) *
-      lhs.extent1;
-    const float rhsProjection =
-      std::fabs(Wm3::Vector2f::Dot(rhs.axis0, n)) * rhs.extent0 + std::fabs(Wm3::Vector2f::Dot(rhs.axis1, n)) *
-      rhs.extent1;
-    return distance <= (lhsProjection + rhsProjection);
-  }
-
-  [[nodiscard]] bool OBB2DIntersects(const CollisionObb2D& lhs, const CollisionObb2D& rhs) noexcept
-  {
-    return OverlapsOnAxis(lhs, rhs, lhs.axis0) && OverlapsOnAxis(lhs, rhs, lhs.axis1) &&
-      OverlapsOnAxis(lhs, rhs, rhs.axis0) && OverlapsOnAxis(lhs, rhs, rhs.axis1);
+    };
+    const Wm3::Vector2f center{
+      position.x + (forward.x * leadDistance),
+      (forward.y * leadDistance) + position.z,
+    };
+    return Wm3::Box2f(
+      center, right, forward, (blueprint->mSizeX + blueprint->mSizeZ) * 0.25f, inflatedLength * 0.5f
+    );
   }
 
   /**
@@ -309,10 +301,11 @@ namespace
       return false;
     }
 
-    const CollisionObb2D primaryObb = BuildCollisionObb2D(primaryUnit, primaryPos, primaryLead, primaryInflatedLength);
-    const CollisionObb2D secondaryObb =
-      BuildCollisionObb2D(secondaryUnit, secondaryPos, secondaryLead, secondaryInflatedLength);
-    return OBB2DIntersects(primaryObb, secondaryObb);
+    // 0x00596DA2..0x00596DC3: WildMagic's separating-axis test on the two boxes.
+    const Wm3::Box2f primaryBox = BuildCollisionBox2(primaryUnit, primaryPos, primaryLead, primaryInflatedLength);
+    const Wm3::Box2f secondaryBox =
+      BuildCollisionBox2(secondaryUnit, secondaryPos, secondaryLead, secondaryInflatedLength);
+    return Wm3::IntrBox2Box2f(primaryBox, secondaryBox).Test();
   }
 
   // moho::func_IsSourceUnit (FUN_0062EEA0) is defined at namespace-moho file
@@ -367,11 +360,6 @@ namespace
     return node ? node->mPosition : fallbackPosition;
   }
 
-  [[nodiscard]] bool InSameFormationLayer(const Unit& first, const Unit& second) noexcept
-  {
-    return first.mInfoCache.mFormationLayer != nullptr && first.mInfoCache.mFormationLayer == second.mInfoCache.mFormationLayer;
-  }
-
   [[nodiscard]] float ComputeCollisionSeparationDistance(const Unit& first, const Unit& second) noexcept
   {
     const RUnitBlueprint* const firstBlueprint = first.GetBlueprint();
@@ -405,13 +393,19 @@ namespace
       return false;
     }
 
-    const Wm3::Vector3f velocityDelta = ownerVelocity - collisionVelocity;
-    if (Wm3::Vector3f::LengthSq(velocityDelta) <= 1.0e-6f) {
+    // 0x00596E68..0x00596F0A: closing velocity and live offset, both summed
+    // z, x, y.
+    const Wm3::Vector3f velocityDelta = collisionVelocity - ownerVelocity;
+    const float deltaLengthSq =
+      ((velocityDelta.z * velocityDelta.z) + (velocityDelta.x * velocityDelta.x)) + (velocityDelta.y * velocityDelta.y);
+    if (!(deltaLengthSq > 1.0e-6f)) {
       return false;
     }
 
-    const Wm3::Vector3f relativePosition = owner.GetPosition() - collisionUnit.GetPosition();
-    return Wm3::Vector3f::Dot(relativePosition, velocityDelta) < 0.0f;
+    const Wm3::Vector3f relativePosition = collisionUnit.GetPosition() - owner.GetPosition();
+    const float approach = ((relativePosition.z * velocityDelta.z) + (relativePosition.x * velocityDelta.x)) +
+      (relativePosition.y * velocityDelta.y);
+    return approach < 0.0f;
   }
 
   void MarkSecondarySteeringForRepath(const Unit& owner, Unit& collisionUnit, const bool sameFormation)
@@ -436,49 +430,6 @@ namespace
     if (!collisionIgnoresStructures || ownerIgnoresStructures) {
       collisionSteering->SetCol(COLLISIONTYPE_5, collisionUnit.GetPosition());
     }
-  }
-
-  [[nodiscard]] Wm3::Vector3f ComputeAvoidanceDirection(
-    const Unit& owner,
-    const Wm3::Vector3f& ownerToCollision,
-    const Wm3::Vector3f& collisionHeading,
-    const bool ownerHasVelocity,
-    const bool sameFormation
-  ) noexcept
-  {
-    Wm3::Vector3f ownerHeading = ownerHasVelocity ? Wm3::Vector3f::NormalizeOrZero(owner.GetVelocity()) : FlattenedForward(owner);
-    if (Wm3::Vector3f::LengthSq(ownerHeading) <= 1.0e-6f) {
-      ownerHeading = FlattenedForward(owner);
-    }
-
-    constexpr float kForwardAlign = 0.70700002f;
-    Wm3::Vector3f avoidBase = collisionHeading;
-    if (ownerHasVelocity && Wm3::Vector3f::Dot(ownerHeading, collisionHeading) > kForwardAlign) {
-      avoidBase = Wm3::Vector3f::NormalizeOrZero(collisionHeading + ownerHeading);
-    }
-
-    if (Wm3::Vector3f::LengthSq(avoidBase) <= 1.0e-6f) {
-      avoidBase = collisionHeading;
-    }
-
-    Wm3::Vector3f lateral = Wm3::Vector3f::NormalizeOrZero({-avoidBase.z, 0.0f, avoidBase.x});
-    if (Wm3::Vector3f::LengthSq(lateral) <= 1.0e-6f) {
-      lateral = Wm3::Vector3f::NormalizeOrZero({-ownerToCollision.z, 0.0f, ownerToCollision.x});
-    }
-
-    const float crossY = (ownerToCollision.x * avoidBase.z) - (ownerToCollision.z * avoidBase.x);
-    if (crossY > 0.0f) {
-      lateral = lateral * -1.0f;
-    }
-    if (sameFormation) {
-      lateral = lateral * -1.0f;
-    }
-
-    Wm3::Vector3f avoidDirection = Wm3::Vector3f::NormalizeOrZero(avoidBase + lateral);
-    if (Wm3::Vector3f::LengthSq(avoidDirection) <= 1.0e-6f) {
-      avoidDirection = Wm3::Vector3f::NormalizeOrZero(ownerToCollision * -1.0f);
-    }
-    return avoidDirection;
   }
 
   /**
@@ -513,12 +464,25 @@ namespace
     const std::int32_t tickBase =
       (primaryUnit->SimulationRef != nullptr) ? static_cast<std::int32_t>(primaryUnit->SimulationRef->mCurTick) : 0;
 
+    // `secondarySteering` owns the collision record and its path walks
+    // `primaryUnit` (esi, positions at [esp+0x10]); `primarySteering`'s path
+    // walks `secondaryUnit` (edi, [esp+0x24]), the unit being recorded. Each
+    // walk starts from its own unit's live position (0x00597814..0x005978B0),
+    // which is what a unit without a path keeps for the whole scan.
     Wm3::Vector3f primaryPos = primaryUnit->GetPosition();
     Wm3::Vector3f secondaryPos = secondaryUnit->GetPosition();
     Wm3::Vector3f prevPrimaryPos = primaryPos;
     Wm3::Vector3f prevSecondaryPos = secondaryPos;
     Wm3::Vector3f primaryVelocity = Wm3::Vector3f::Zero();
     Wm3::Vector3f secondaryVelocity = Wm3::Vector3f::Zero();
+
+    // 0x00597C04..0x00597C25 and 0x00597C55..0x00597C7A sum the squared lanes z, y, x.
+    const auto distanceSq = [](const Wm3::Vector3f& lhs, const Wm3::Vector3f& rhs) noexcept {
+      const float dx = lhs.x - rhs.x;
+      const float dy = lhs.y - rhs.y;
+      const float dz = lhs.z - rhs.z;
+      return ((dz * dz) + (dy * dy)) + (dx * dx);
+    };
 
     std::int32_t pathStep = 0;
     while (true) {
@@ -537,9 +501,9 @@ namespace
           return;
         }
 
-        secondaryPos = node->mPosition;
-        secondaryVelocity = (pathStep == 0) ? primaryUnit->GetVelocity() : (secondaryPos - prevSecondaryPos);
-        prevSecondaryPos = secondaryPos;
+        primaryPos = node->mPosition;
+        primaryVelocity = (pathStep == 0) ? primaryUnit->GetVelocity() : (primaryPos - prevPrimaryPos);
+        prevPrimaryPos = primaryPos;
       }
 
       if (primaryPath) {
@@ -553,21 +517,21 @@ namespace
           return;
         }
 
-        primaryPos = node->mPosition;
-        primaryVelocity = (pathStep == 0) ? secondaryUnit->GetVelocity() : (primaryPos - prevPrimaryPos);
-        prevPrimaryPos = primaryPos;
+        secondaryPos = node->mPosition;
+        secondaryVelocity = (pathStep == 0) ? secondaryUnit->GetVelocity() : (secondaryPos - prevSecondaryPos);
+        prevSecondaryPos = secondaryPos;
       }
 
       if (UnitsWillCollide(
-            secondaryVelocity, *secondaryUnit, *primaryUnit, secondaryPos, primaryPos, primaryVelocity, ignoreBraking
+            primaryVelocity, *secondaryUnit, *primaryUnit, primaryPos, secondaryPos, secondaryVelocity, ignoreBraking
           )) {
         const float existingCollisionDistSq = collisionInfo->mUnit.GetObjectPtr() != nullptr
-          ? Wm3::Vector3f::DistanceSq3D(secondaryPos, collisionInfo->mPos)
+          ? distanceSq(primaryPos, collisionInfo->mPos)
           : 9999.0f;
-        const float newCollisionDistSq = Wm3::Vector3f::DistanceSq3D(secondaryPos, primaryPos);
+        const float newCollisionDistSq = distanceSq(primaryPos, secondaryPos);
         if (existingCollisionDistSq > newCollisionDistSq) {
           collisionInfo->mCollisionType = COLLISIONTYPE_1;
-          collisionInfo->mPos = primaryPos;
+          collisionInfo->mPos = secondaryPos;
           collisionInfo->mUnit.Set(secondaryUnit);
           collisionInfo->mTickGate = pathStep + tickBase;
           return;
@@ -668,86 +632,140 @@ namespace
       return;
     }
 
-    const Wm3::Vector3f ownerPosition = owner->GetPosition();
-    Wm3::Vector3f ownerProbePosition = ResolvePathProbePosition(owner->AiSteering, ownerPosition);
-    Wm3::Vector3f collisionProbePosition = ResolvePathProbePosition(collisionUnit->AiSteering, collisionUnit->GetPosition());
+    // 0x00596F73..0x00597011: live positions and the owner's motion flag.
+    Wm3::Vector3f ownerPosition = owner->GetPosition();
+    Wm3::Vector3f collisionPosition = collisionUnit->GetPosition();
+    const bool ownerMoving = Wm3::Vector3f::LengthSq(owner->GetVelocity()) > 0.0f;
 
-    const Wm3::Vector3f ownerVelocity = owner->GetVelocity();
-    const Wm3::Vector3f collisionVelocity = collisionUnit->GetVelocity();
-    const bool ownerHasVelocity = Wm3::Vector3f::LengthSq(ownerVelocity) > 0.0f;
-
+    // 0x00597016..0x005970B7: a flying collider is told to hold position when
+    // it is a real threat; the owner's own collision state clears.
     const RUnitBlueprint* const collisionBlueprint = collisionUnit->GetBlueprint();
-    if (collisionBlueprint && collisionBlueprint->Air.CanFly && collisionUnit->UnitMotion) {
+    if (collisionBlueprint->Air.CanFly && collisionUnit->UnitMotion) {
       if (!collisionUnit->AiTransport &&
           IsCollisionApproachThreat(
-            *owner, *collisionUnit, ownerProbePosition, collisionProbePosition, ownerVelocity, collisionVelocity
+            *owner, *collisionUnit, ownerPosition, collisionPosition, owner->GetVelocity(), collisionUnit->GetVelocity()
           )) {
         MotionSetTarget(collisionUnit->UnitMotion, collisionUnit->GetPosition(), Wm3::Vector3f::Zero(), LAYER_Air);
       }
 
-      steering.SetCol(COLLISIONTYPE_None, ownerPosition);
+      steering.SetCol(COLLISIONTYPE_None, owner->GetPosition());
       return;
     }
+
+    // 0x005970C1..0x00597149: each side is judged at its current path node.
+    ownerPosition = ResolvePathProbePosition(owner->AiSteering, ownerPosition);
+    collisionPosition = ResolvePathProbePosition(collisionUnit->AiSteering, collisionPosition);
 
     Sim* const sim = owner->SimulationRef;
-    if (sim) {
-      sim->Logf(
-        "  ResolvePossibleCollision(0x%08x @ <%.2f,%.2f,%2.f>, 0x%08x @ <%.2f,%.2f,%2.f>)\n",
-        static_cast<std::uint32_t>(owner->GetEntityId()),
-        ownerProbePosition.x,
-        ownerProbePosition.y,
-        ownerProbePosition.z,
-        static_cast<std::uint32_t>(collisionUnit->GetEntityId()),
-        collisionProbePosition.x,
-        collisionProbePosition.y,
-        collisionProbePosition.z
-      );
-    }
+    sim->Logf(
+      "  ResolvePossibleCollision(0x%08x @ <%.2f,%.2f,%2.f>, 0x%08x @ <%.2f,%.2f,%2.f>)\n",
+      static_cast<std::uint32_t>(owner->GetEntityId()),
+      ownerPosition.x,
+      ownerPosition.y,
+      ownerPosition.z,
+      static_cast<std::uint32_t>(collisionUnit->GetEntityId()),
+      collisionPosition.x,
+      collisionPosition.y,
+      collisionPosition.z
+    );
 
-    if (Wm3::Vector3f::LengthSq(collisionVelocity) <= 0.0f ||
+    if (!(std::sqrt(Wm3::Vector3f::LengthSq(collisionUnit->GetVelocity())) > 0.0f) ||
         !IsCollisionApproachThreat(
-          *owner, *collisionUnit, ownerProbePosition, collisionProbePosition, ownerVelocity, collisionVelocity
+          *owner, *collisionUnit, ownerPosition, collisionPosition, owner->GetVelocity(), collisionUnit->GetVelocity()
         )) {
-      steering.SetCol(COLLISIONTYPE_None, ownerPosition);
+      steering.SetCol(COLLISIONTYPE_None, owner->GetPosition());
       return;
     }
 
-    if (sim) {
-      sim->Logf("    collide.\n");
-    }
-
-    const Wm3::Vector3f ownerToCollision = Wm3::Vector3f::NormalizeOrZero(collisionProbePosition - ownerProbePosition);
-    Wm3::Vector3f collisionHeading = Wm3::Vector3f::NormalizeOrZero(collisionVelocity);
-    if (Wm3::Vector3f::LengthSq(collisionHeading) <= 1.0e-6f) {
-      collisionHeading = FlattenedForward(*collisionUnit);
-    }
-
-    constexpr float kCollisionConeCos = 0.70700002f;
-    if (Wm3::Vector3f::Dot(ownerToCollision, collisionHeading) <= kCollisionConeCos) {
-      if (sim) {
-        sim->Logf("    not within cone.\n");
-      }
-      steering.SetCol(COLLISIONTYPE_4, ownerPosition);
-      return;
-    }
-
-    if (sim) {
-      sim->Logf("    within cone.\n");
-    }
-
-    const bool sameFormation = InSameFormationLayer(*owner, *collisionUnit);
-    MarkSecondarySteeringForRepath(*owner, *collisionUnit, sameFormation);
+    sim->Logf("    collide.\n");
 
     const float separationDistance = ComputeCollisionSeparationDistance(*owner, *collisionUnit);
-    const Wm3::Vector3f avoidDirection =
-      ComputeAvoidanceDirection(*owner, ownerToCollision, collisionHeading, ownerHasVelocity, sameFormation);
-    if (Wm3::Vector3f::LengthSq(avoidDirection) <= 1.0e-6f) {
-      steering.SetCol(COLLISIONTYPE_None, ownerPosition);
+    const bool sameFormation = owner->IsSameFormationLayerWith(collisionUnit);
+
+    // 0x005972A1..0x00597329: the owner's forward axis, scalar-first.
+    const Wm3::Quaternionf& ownerOrient = owner->GetTransform().orient_;
+    const Wm3::Vector3f ownerForward{
+      ((ownerOrient.w * ownerOrient.y) + (ownerOrient.z * ownerOrient.x)) * 2.0f,
+      ((ownerOrient.z * ownerOrient.y) - (ownerOrient.w * ownerOrient.x)) * 2.0f,
+      1.0f - (((ownerOrient.y * ownerOrient.y) + (ownerOrient.x * ownerOrient.x)) * 2.0f),
+    };
+
+    // 0x00597331..0x0059738E: unit direction from the collider to the owner
+    // (live positions) and the collider's heading.
+    const Wm3::Vector3f collisionToOwner = owner->GetPosition() - collisionUnit->GetPosition();
+    const Wm3::Vector3f awayFromCollider = NormalizedOrZero(collisionToOwner);
+    const Wm3::Vector3f collisionHeading = NormalizedOrZero(collisionUnit->GetVelocity());
+
+    // Dot products in this function sum y, z, then x.
+    const auto dotYZX = [](const Wm3::Vector3f& lhs, const Wm3::Vector3f& rhs) noexcept {
+      return ((lhs.y * rhs.y) + (lhs.z * rhs.z)) + (lhs.x * rhs.x);
+    };
+
+    constexpr float kConeCos = 0.70700002f;
+    if (!(dotYZX(awayFromCollider, collisionHeading) > kConeCos)) {
+      sim->Logf("    not within cone.\n");
+      steering.SetCol(COLLISIONTYPE_4, owner->GetPosition());
       return;
     }
 
-    steering.mCollisionAvoidTarget = ownerProbePosition + (avoidDirection * separationDistance);
-    steering.SetCol(COLLISIONTYPE_2, steering.mCollisionAvoidTarget);
+    sim->Logf("    within cone.\n");
+    MarkSecondarySteeringForRepath(*owner, *collisionUnit, sameFormation);
+
+    Wm3::Vector3f basePosition = ownerPosition;
+    Wm3::Vector3f avoidDirection{};
+    const bool ownerFacesCollider = dotYZX(awayFromCollider, ownerForward) < 0.0f;
+    if (ownerMoving && ownerFacesCollider) {
+      // 0x0059749F..0x005976C1: steer by the collider's right axis, picked to
+      // point at the owner's side.
+      const Wm3::Vector3f ownerHeading = NormalizedOrZero(owner->GetVelocity());
+      const Wm3::Quaternionf& colliderOrient = collisionUnit->GetTransform().orient_;
+      Wm3::Vector3f side{
+        1.0f - (((colliderOrient.z * colliderOrient.z) + (colliderOrient.y * colliderOrient.y)) * 2.0f),
+        ((colliderOrient.w * colliderOrient.z) + (colliderOrient.y * colliderOrient.x)) * 2.0f,
+        ((colliderOrient.z * colliderOrient.x) - (colliderOrient.w * colliderOrient.y)) * 2.0f,
+      };
+      const float headingAlignment = dotYZX(ownerHeading, collisionHeading);
+      const float sideFacing = ((side.y * awayFromCollider.y) + (side.z * awayFromCollider.z)) +
+        (side.x * awayFromCollider.x);
+      if (!(sideFacing > 0.0f)) {
+        side = {-0.0f - side.x, -0.0f - side.y, -0.0f - side.z};
+      }
+
+      if (headingAlignment > kConeCos) {
+        avoidDirection = NormalizedOrZero(awayFromCollider + side);
+      } else if (-kConeCos > headingAlignment) {
+        // Head-on: sidestep straight from the owner's live position.
+        avoidDirection = side;
+        basePosition = owner->GetPosition();
+      } else {
+        avoidDirection = NormalizedOrZero(ownerHeading + awayFromCollider);
+      }
+    } else {
+      // 0x005976C3..0x0059771C: turn the collider's heading by a fixed yaw,
+      // toward the owner's side; formation mates turn half as far.
+      const float crossY = (collisionToOwner.z * collisionHeading.x) - (collisionHeading.z * collisionToOwner.x);
+      const Wm3::Quaternionf* turn = nullptr;
+      if (crossY > 0.0f) {
+        turn = sameFormation ? &kQuatYawNeg45 : &kQuatYawNeg90;
+      } else {
+        turn = sameFormation ? &kQuatYawPos45 : &kQuatYawPos90;
+      }
+      (void)MultQuadVec(&avoidDirection, &collisionHeading, turn);
+    }
+
+    // 0x0059772F..0x005977B2: the avoid point is accepted only where the
+    // owner's footprint fits.
+    const Wm3::Vector3f avoidTarget{
+      (avoidDirection.x * separationDistance) + basePosition.x,
+      (avoidDirection.y * separationDistance) + basePosition.y,
+      (avoidDirection.z * separationDistance) + basePosition.z,
+    };
+    SCoordsVec2 placement{avoidTarget.x, avoidTarget.z};
+    if (!TryBuildStructureAt(&placement, owner->GetBlueprint(), sim, 1, false, false, false)) {
+      return;
+    }
+
+    steering.SetCol(COLLISIONTYPE_2, avoidTarget);
   }
 
   [[nodiscard]] Wm3::Vector3f DebugUpAxis() noexcept
@@ -937,7 +955,13 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
     return true;
   }
 
-  return candidate->IsHigherPriorityThan(&owner);
+  // 0x0062F00E..0x0062F012: `ecx = owner, eax = candidate` into
+  // Unit::IsHigherPriorityThan (0x006A8D80), whose `this` is ecx -- the
+  // candidate is ignored when the OWNER outranks it. The operands were
+  // swapped, so a mover ignored exactly the units that outrank it and planned
+  // around the ones it should push past (replay 26935800 beat 659: an engineer
+  // in the swept lane was skipped and the navigator advanced 4 cells too far).
+  return owner.IsHigherPriorityThan(candidate);
 }
 
 gpg::RType* CAiSteeringImpl::sType = nullptr;
@@ -1248,11 +1272,15 @@ SCollisionInfo* CAiSteeringImpl::GetColInfo()
 
 /**
  * Address: 0x005D3B40 (FUN_005D3B40)
+ *
+ * What it does:
+ * Stores the collision response type and its target point (+0x84); the
+ * predicted contact point in `mCollisionInfo.mPos` is left untouched.
  */
 void CAiSteeringImpl::SetCol(const ECollisionType type, const Wm3::Vector3f& position)
 {
   mCollisionInfo.mCollisionType = type;
-  mCollisionInfo.mPos = position;
+  mCollisionAvoidTarget = position;
 }
 
 /**

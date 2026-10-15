@@ -669,7 +669,7 @@ gpg::RType* CAiPathFinder::sType = nullptr;
  */
 CAiPathFinder::CAiPathFinder()
   : IPathTraveler()
-  , mIsGoalBoundaryBlocked(0)
+  , mGoalBoundaryFits(0)
   , mIsQueuedOnPathQueue(0)
   , mUseGoalBoundaryProbe(0)
   , mPad17(0)
@@ -755,16 +755,23 @@ void CAiPathFinder::SetUnit(Unit* const unit)
 void CAiPathFinder::SetGoal(const SAiNavigatorGoal& goal)
 {
   mGoal = goal;
-  mIsGoalBoundaryBlocked = 0;
 
-  const gpg::Rect2i rect = GoalOuterRect(goal);
-  if (!IsStrictRect(rect)) {
-    return;
+  // 0x005AA134..0x005AA215: walk the goal rectangle's border cells (bounds
+  // inclusive, a degenerate one-cell-wide goal included) and record whether
+  // the unit's footprint fits on any of them -- the same occupancy test
+  // CanTraverseCell applies, with the structure-ignoring copy in probe mode.
+  // The previous body tested the playable-rect bound (IsInBounds) instead and
+  // stored the answer inverted, which changed when the search may stop on a
+  // reachable border cell (replay 26935800 beat 533: one cell too far).
+  SFootprint footprint = mUnit->GetFootprint();
+  if (mUseGoalBoundaryProbe != 0u) {
+    footprint.mFlags = static_cast<EFootprintFlags>(
+      static_cast<std::uint8_t>(footprint.mFlags) | static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures));
   }
 
-  for (std::int32_t x = rect.x0; x <= rect.x1; ++x) {
-    for (std::int32_t z = rect.z0; z <= rect.z1; ++z) {
-      const bool edge = (x == rect.x0) || (x == rect.x1) || (z == rect.z0) || (z == rect.z1);
+  for (std::int32_t x = goal.minX; x <= goal.maxX; ++x) {
+    for (std::int32_t z = goal.minZ; z <= goal.maxZ; ++z) {
+      const bool edge = (x == goal.minX) || (x == goal.maxX) || (z == goal.minZ) || (z == goal.maxZ);
       if (!edge) {
         continue;
       }
@@ -773,13 +780,19 @@ void CAiPathFinder::SetGoal(const SAiNavigatorGoal& goal)
         static_cast<std::int16_t>(x),
         static_cast<std::int16_t>(z),
       };
-      float boundaryEdgeCost = 0.0f;
-      if (!IsInBounds(cell, cell, &boundaryEdgeCost)) {
-        mIsGoalBoundaryBlocked = 1;
+      EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *mOGrid->sim->mMapData, cell);
+      if (mUnit->mVarDat.mLayerMask == LAYER_Water) {
+        caps = static_cast<EOccupancyCaps>(
+          static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
+      }
+      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) != 0u) {
+        mGoalBoundaryFits = 1;
         return;
       }
     }
   }
+
+  mGoalBoundaryFits = 0;
 }
 
 /**
@@ -787,7 +800,7 @@ void CAiPathFinder::SetGoal(const SAiNavigatorGoal& goal)
  */
 bool CAiPathFinder::RunDirectProbe()
 {
-  if (mIsGoalBoundaryBlocked == 0u) {
+  if (mGoalBoundaryFits == 0u) {
     return false;
   }
 
@@ -1115,7 +1128,7 @@ std::int32_t CAiPathFinder::GetPathcap() const
     return 0;
   }
 
-  if (mIsGoalBoundaryBlocked == 0u) {
+  if (mGoalBoundaryFits == 0u) {
     return ownerUnit->ArmyRef->GetPathcapBoth();
   }
 
@@ -1156,7 +1169,7 @@ void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int
 
   bool boolValue = false;
   archive->ReadBool(&boolValue);
-  mIsGoalBoundaryBlocked = boolValue ? 1u : 0u;
+  mGoalBoundaryFits = boolValue ? 1u : 0u;
   archive->ReadBool(&boolValue);
   mIsQueuedOnPathQueue = boolValue ? 1u : 0u;
   archive->ReadBool(&boolValue);
@@ -1230,7 +1243,7 @@ void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
     archive->Write(broadcasterType, static_cast<const Broadcaster<const SNavPath&>*>(this), owner);
   }
 
-  archive->WriteBool(mIsGoalBoundaryBlocked != 0u);
+  archive->WriteBool(mGoalBoundaryFits != 0u);
   archive->WriteBool(ReadPathFinderQueuedFlag(*this) != 0u);
   archive->WriteBool(mUseWholeMap != 0u);
   archive->WriteBool(mUseGoalBoundaryProbe != 0u);

@@ -1328,8 +1328,10 @@ namespace moho
           const VTransform& transform = unit->GetTransform();
           const float forwardX = ((transform.orient_.w * transform.orient_.y) + (transform.orient_.z * transform.orient_.x))
             * 2.0f;
+          // Forward-axis z is `1 - (y*y + x*x) * 2` (same column as
+          // Entity:GetHeading, 0x0068F968); z*z + y*y is the X axis' x.
           const float forwardZ =
-            1.0f - (((transform.orient_.z * transform.orient_.z) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+            1.0f - (((transform.orient_.y * transform.orient_.y) + (transform.orient_.x * transform.orient_.x)) * 2.0f);
 
           Wm3::Vector3f toTarget = mTarget.GetTargetPosGun(false) - unit->GetPosition();
           (void)Wm3::Vector3f::Normalize(&toTarget);

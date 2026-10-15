@@ -15375,8 +15375,12 @@ bool Unit::PrepareMove(
   const float halfSizeX = static_cast<float>(footprint.mSizeX) * 0.5f;
   const float halfSizeZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
 
-  const int rawStartX = static_cast<int>(inOutPos->x - halfSizeX);
-  const int rawStartZ = static_cast<int>(inOutPos->z - halfSizeZ);
+  // 0x0062B941/0x0062B975: both origin coordinates go through x87 `fistp`
+  // (round to nearest), not truncation. A destination at a whole world unit
+  // with an odd footprint lands on .5 here, and truncating it started the ring
+  // search one cell to the side (replay 26935800 beat 532: goal cell 95 vs 96).
+  const int rawStartX = msvc8::RoundToInt(inOutPos->x - halfSizeX);
+  const int rawStartZ = msvc8::RoundToInt(inOutPos->z - halfSizeZ);
   SOCellPos startCell{
     static_cast<std::int16_t>(rawStartX),
     static_cast<std::int16_t>(rawStartZ),

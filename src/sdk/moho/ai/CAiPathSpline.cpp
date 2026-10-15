@@ -1168,13 +1168,18 @@ namespace
   /**
    * Forward axis of a unit orientation. A unit pitched almost straight up or
    * down (|forward.y| > 0.99) has no usable heading and falls back to +Z.
+   *
+   * 0x005B30E3..0x005B3150: `y = (z*y - w*x) * 2`, `x = (w*y + z*x) * 2`,
+   * `z = 1 - (y*y + x*x) * 2` -- the unit's local +Z column. A level,
+   * yaw-only orientation hides a wrong y/z lane (both forms agree when
+   * x = z = 0); a tilted hover unit does not (replay 26935800 beat 513).
    */
   [[nodiscard]] Wm3::Vector3f HeadingFromOrientation(const Wm3::Quatf& orient) noexcept
   {
     Wm3::Vector3f forward{};
-    forward.x = ((orient.x * orient.z) + (orient.w * orient.y)) * 2.0f;
-    forward.y = ((orient.w * orient.z) - (orient.x * orient.y)) * 2.0f;
-    forward.z = 1.0f - (((orient.z * orient.z) + (orient.y * orient.y)) * 2.0f);
+    forward.x = ((orient.w * orient.y) + (orient.z * orient.x)) * 2.0f;
+    forward.y = ((orient.z * orient.y) - (orient.w * orient.x)) * 2.0f;
+    forward.z = 1.0f - (((orient.y * orient.y) + (orient.x * orient.x)) * 2.0f);
     if (std::fabs(forward.y) > 0.99000001f) {
       forward = Wm3::Vector3f{0.0f, 0.0f, 1.0f};
     }
@@ -1406,7 +1411,7 @@ void CAiPathSpline::Generate(
     float sideZ = velocityZ - alongHeading.y;
     const float sideLenSq = (sideX * sideX) + (sideZ * sideZ);
     if (sideLenSq > (params.mMaxSteer * params.mMaxSteer)) {
-      const float scale = static_cast<float>(params.mMaxSteer / std::sqrt(static_cast<double>(sideLenSq)));
+      const float scale = params.mMaxSteer / std::sqrt(sideLenSq); // x87 PC24 fsqrt/fdivr (0x005B39FD)
       sideX = sideX * scale;
       sideZ = scale * sideZ;
     }
@@ -1454,7 +1459,7 @@ void CAiPathSpline::Generate(
       float blendZ = driveHeading.y;
       if (driveHeadingLenSq != 0.0f) {
         const float driveLen = std::sqrt((driveX * driveX) + (driveZ * driveZ));
-        const float ratio = static_cast<float>(driveLen / std::sqrt(static_cast<double>(driveHeadingLenSq)));
+        const float ratio = driveLen / std::sqrt(driveHeadingLenSq); // x87 PC24 fsqrt/fdivp (0x005B3C16)
         blendX = driveHeading.x * ratio;
         blendZ = ratio * driveHeading.y;
       }
@@ -1469,7 +1474,7 @@ void CAiPathSpline::Generate(
       (((accelX * driveX) + (accelZ * driveZ)) <= 0.0f) ? params.mMaxBrake : params.mMaxAcceleration;
     const float accelLenSq = (accelX * accelX) + (accelZ * accelZ);
     if (accelLenSq > (accelLimit * accelLimit)) {
-      const float scale = static_cast<float>(accelLimit / std::sqrt(static_cast<double>(accelLenSq)));
+      const float scale = accelLimit / std::sqrt(accelLenSq); // x87 PC24 fsqrt/fdivr (0x005B3D31)
       accelX = accelX * scale;
       accelZ = scale * accelZ;
     }
@@ -1479,7 +1484,7 @@ void CAiPathSpline::Generate(
       (state == PPS_5 || state == PPS_6 || state == PPS_2) ? params.mMaxReverseSpeed : params.mMaxSpeed;
     const float moveLenSq = (moveX * moveX) + (moveZ * moveZ);
     if (moveLenSq > (moveCap * moveCap)) {
-      const float scale = static_cast<float>(moveCap / std::sqrt(static_cast<double>(moveLenSq)));
+      const float scale = moveCap / std::sqrt(moveLenSq); // x87 PC24 fsqrt/fdivr (0x005B3DCB/0x005B3E0D)
       moveX = moveX * scale;
       moveZ = scale * moveZ;
     }

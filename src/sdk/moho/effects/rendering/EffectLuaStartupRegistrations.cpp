@@ -230,8 +230,10 @@ namespace
     Wm3::Vec3f rotation{};
     const float headingNumerator =
       2.0f * ((transform.orient_.x * transform.orient_.z) + (transform.orient_.w * transform.orient_.y));
+    // Forward-axis z is `1 - (y*y + x*x) * 2`, the same column
+    // Entity:GetHeading reads (0x0068F968); z*z + y*y is the X axis' x.
     const float headingDenominator =
-      1.0f - (2.0f * ((transform.orient_.z * transform.orient_.z) + (transform.orient_.y * transform.orient_.y)));
+      1.0f - (2.0f * ((transform.orient_.y * transform.orient_.y) + (transform.orient_.x * transform.orient_.x)));
     rotation.y = -std::atan2(headingNumerator, headingDenominator);
 
     const moho::SDecalInfo info(

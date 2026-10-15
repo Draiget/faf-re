@@ -486,6 +486,13 @@ SNavPath* CAiNavigatorLand::GetNavPath() const
  */
 bool CAiNavigatorLand::NavigatorMakeIdle()
 {
+  // 0x005A3E03..0x005A3E15: sim-log trace of the owning unit's id.
+  if (mUnit && mUnit->SimulationRef) {
+    mUnit->SimulationRef->Logf(
+      "  0x%08x->CAiNavigatorLand::NavigatorMakeIdle()\n", static_cast<std::uint32_t>(mUnit->GetEntityId())
+    );
+  }
+
   if (mStatus != AINAVSTATUS_Idle) {
     mStatus = AINAVSTATUS_Idle;
   }

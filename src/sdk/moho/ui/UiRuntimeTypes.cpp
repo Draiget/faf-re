@@ -9427,7 +9427,7 @@ static std::uint8_t func_SetMouseCapture(
       sMouseIsCaptured = 0;
     }
     if (shouldCapture) {
-      const HWND capturedWindow = ::SetCapture(reinterpret_cast<HWND>(eventMapper->mWindow->GetHWND()));
+      const HWND capturedWindow = ::SetCapture(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(eventMapper->mWindow->GetHWND())));
       result = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(capturedWindow));
       sMouseIsCaptured = 1;
     }

@@ -1305,7 +1305,8 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   float* currentAngleLane = nullptr;
   if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
     currentAngleLane = &this->mHeading;
-    desiredAngle = msvc8::atan2(transformedTarget.x, transformedTarget.z) + this->mHeadingOffset;
+    // 0x00630AB2..0x00630AB7: the offset is added to the unrounded `fpatan`.
+    desiredAngle = msvc8::Atan2Plus(transformedTarget.x, transformedTarget.z, this->mHeadingOffset);
   } else {
     const float halfCenter = minAngleCenter * kHalfScale;
     // The four consecutive stack floats handed to `MultQuadVec` as the

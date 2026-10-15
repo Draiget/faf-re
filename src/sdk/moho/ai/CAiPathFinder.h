@@ -297,7 +297,7 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    std::uint8_t mIsGoalBoundaryBlocked; // +0x14
+    std::uint8_t mGoalBoundaryFits; // +0x14
     std::uint8_t mIsQueuedOnPathQueue;   // +0x15
     std::uint8_t mUseGoalBoundaryProbe;  // +0x16
     std::uint8_t mPad17;                 // +0x17
@@ -327,8 +327,8 @@ namespace moho
   static_assert(sizeof(HPathCell) == 0x04, "HPathCell size must be 0x04");
   static_assert(sizeof(CAiPathFinder) == 0x7C, "CAiPathFinder size must be 0x7C");
   static_assert(
-    offsetof(CAiPathFinder, mIsGoalBoundaryBlocked) == 0x14,
-    "CAiPathFinder::mIsGoalBoundaryBlocked offset must be 0x14"
+    offsetof(CAiPathFinder, mGoalBoundaryFits) == 0x14,
+    "CAiPathFinder::mGoalBoundaryFits offset must be 0x14"
   );
   static_assert(offsetof(CAiPathFinder, mUnit) == 0x18, "CAiPathFinder::mUnit offset must be 0x18");
   static_assert(offsetof(CAiPathFinder, mFootprint) == 0x1C, "CAiPathFinder::mFootprint offset must be 0x1C");

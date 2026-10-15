@@ -1253,11 +1253,18 @@ namespace
     const float childY = childLocalTransform.orient_.y;
     const float childZ = childLocalTransform.orient_.z;
 
-    // parent * conj(child).
-    const float outW = (parentW * childW) + (parentX * childX) + (parentY * childY) + (parentZ * childZ);
-    const float outX = (parentX * childW) - (parentW * childX) + (parentZ * childY) - (parentY * childZ);
-    const float outY = (parentY * childW) - (parentZ * childX) + (parentX * childZ) - (parentW * childY);
-    const float outZ = (parentZ * childW) + (parentY * childX) - (parentX * childY) - (parentW * childZ);
+    // parent * conj(child), accumulated in the binary's order
+    // (0x006768B2..0x006769B9): the conjugate lanes are formed as `-0.0 - c`
+    // and each lane starts from the two negated products. Float addition does
+    // not associate; a near-cancelling lane (a factory-held unit's yaw/tilt
+    // residual) otherwise lands on a different tiny value.
+    const float negChildX = -childX;
+    const float negChildY = -childY;
+    const float negChildZ = -childZ;
+    const float outW = (((parentW * childW) + (parentX * childX)) + (parentY * childY)) + (parentZ * childZ);
+    const float outX = (((parentY * negChildZ) + (parentW * negChildX)) + (parentX * childW)) + (parentZ * childY);
+    const float outY = (((parentZ * negChildX) + (parentW * negChildY)) + (parentY * childW)) + (parentX * childZ);
+    const float outZ = (((parentX * negChildY) + (parentW * negChildZ)) + (parentZ * childW)) + (parentY * childX);
 
     out.orient_.w = outW;
     out.orient_.x = outX;
@@ -6466,10 +6473,15 @@ namespace moho
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
 
+    // 0x0068F968..0x0068F9D5: the forward axis' x/z components --
+    // `(z*x + w*y) * 2` over `1 - (y*y + x*x) * 2` -- into a float `fpatan`
+    // (0x004E9DF0) stored as float. The denominator summed z*z + y*y, which
+    // agrees only for a level orientation; a structure on a slope reported a
+    // heading off by ~1e-4 rad (replay 26935800 beat 618, UEF build effect).
     const Wm3::Quatf& orientation = entity->mVarDat.mCurTransform.orient_;
-    const float numerator = 2.0f * ((orientation.w * orientation.y) + (orientation.x * orientation.z));
-    const float denominator = 1.0f - (2.0f * ((orientation.z * orientation.z) + (orientation.y * orientation.y)));
-    const double heading = msvc8::atan2(static_cast<double>(numerator), static_cast<double>(denominator));
+    const float numerator = ((orientation.z * orientation.x) + (orientation.w * orientation.y)) * 2.0f;
+    const float denominator = 1.0f - (((orientation.y * orientation.y) + (orientation.x * orientation.x)) * 2.0f);
+    const float heading = msvc8::atan2f(numerator, denominator);
     lua_pushnumber(rawState, heading);
     return 1;
   }
@@ -7892,7 +7904,19 @@ namespace moho
 
     Wm3::Quaternionf tiltDelta{};
     (void)BuildTiltShortestArcDelta(surfaceNormal, &tiltDelta, currentUp);
-    *orientation = MultiplyQuat(tiltDelta, oldOrientation);
+
+    // 0x0050B8DA..0x0050B9C4 inlines `tiltDelta * oldOrientation` with its own
+    // accumulation order, which differs from `MultiplyQuat`'s
+    // (CAniPoseBone::Rotate's emission) in the x and z lanes. Float addition
+    // does not associate, so the grouping is kept exactly.
+    const Wm3::Quaternionf& d = tiltDelta;
+    const Wm3::Quaternionf& q = oldOrientation;
+    Wm3::Quaternionf tilted{};
+    tilted.w = ((q.w * d.w - q.x * d.x) - q.y * d.y) - q.z * d.z;
+    tilted.x = ((q.z * d.y + q.x * d.w) + q.w * d.x) - q.y * d.z;
+    tilted.y = ((q.w * d.y + q.x * d.z) + q.y * d.w) - q.z * d.x;
+    tilted.z = ((q.w * d.z + q.z * d.w) + q.y * d.x) - q.x * d.y;
+    *orientation = tilted;
   }
 
   /**
@@ -7949,13 +7973,16 @@ namespace moho
    * What it does:
    * Computes the axis-aligned integer grid rectangle that a footprint of
    * dimensions `sizeX × sizeZ` occupies when centered at world coordinates
-   * `centerXZ`. The result corner coordinates are truncated to `int16`
-   * range (mirroring the binary's `WORD` cast).
+   * `centerXZ`. The corners are rounded to nearest by `fistp`
+   * (0x0050AFC6/0x0050AFE6), then narrowed to `int16` (the binary's `WORD`
+   * cast).
    */
   gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* const result, const SCoordsVec2& centerXZ, const int sizeX, const int sizeZ)
   {
-    const std::int16_t halfSizeX = static_cast<std::int16_t>(static_cast<int>(centerXZ.x - (static_cast<float>(sizeX) * 0.5f)));
-    const std::int16_t halfSizeZ = static_cast<std::int16_t>(static_cast<int>(centerXZ.z - (static_cast<float>(sizeZ) * 0.5f)));
+    const std::int16_t halfSizeX =
+      static_cast<std::int16_t>(msvc8::RoundToInt(centerXZ.x - (static_cast<float>(sizeX) * 0.5f)));
+    const std::int16_t halfSizeZ =
+      static_cast<std::int16_t>(msvc8::RoundToInt(centerXZ.z - (static_cast<float>(sizeZ) * 0.5f)));
     result->x0 = halfSizeX;
     result->z0 = halfSizeZ;
     result->x1 = sizeX + halfSizeX;

@@ -1410,8 +1410,8 @@ bool CScApp::CreateAppFrame(
       moho::sMainWindow, title.c_str(), viewportSize, hasSecondHead
     );
 
-    primaryHead.mHandle = reinterpret_cast<void*>(viewport->GetParent()->GetHandle());
-    primaryHead.mWindow = reinterpret_cast<void*>(viewport->GetHandle());
+    primaryHead.mHandle = reinterpret_cast<void*>(static_cast<std::uintptr_t>(viewport->GetParent()->GetHandle()));
+    primaryHead.mWindow = reinterpret_cast<void*>(static_cast<std::uintptr_t>(viewport->GetHandle()));
 
     if (hasSecondHead) {
       gpg::gal::Head& secondaryHead = context.GetHead(1);
@@ -1423,7 +1423,7 @@ bool CScApp::CreateAppFrame(
       frame = new WSupComFrame(title.c_str(), position, secondarySize, frameStyle);
       frame->Show(!secondaryHead.mWindowed);
       secondaryHead.mHandle = primaryHead.mHandle;
-      secondaryHead.mWindow = reinterpret_cast<void*>(frame->GetHandle());
+      secondaryHead.mWindow = reinterpret_cast<void*>(static_cast<std::uintptr_t>(frame->GetHandle()));
     }
 
     // A stack wxPaintEvent handed straight to the handler (0x008CFB95).

@@ -526,7 +526,8 @@ namespace moho
         Wm3::Vector3f toTarget{targetPos.x - builderPos.x, 0.0f, targetPos.z - builderPos.z};
         (void)toTarget.Normalize();
 
-        const float dot = (forward.x * toTarget.x) + (forward.y * toTarget.y) + (forward.z * toTarget.z);
+        // 0x005F9AD0..0x005F9AF8 sums the dot as `(z*z' + y*y') + x*x'`.
+        const float dot = ((forward.z * toTarget.z) + (forward.y * toTarget.y)) + (forward.x * toTarget.x);
         if (dot > 0.94999999f) {
           mUnit->UnitMotion->SetFacing(Wm3::Vector3f::Zero());
           mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);

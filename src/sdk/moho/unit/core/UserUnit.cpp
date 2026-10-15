@@ -16,6 +16,7 @@
 #include "legacy/containers/String.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/command/CommandIssueHelper.h"
+#include "moho/console/CVarAccess.h"
 #include "moho/sim/BuildQueueCommandDecrement.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
@@ -2416,6 +2417,11 @@ void UserUnit::Tick(const std::int32_t seqNo)
       }
     }
     mQueueEmptyCached = isQueueEmpty;
+  }
+
+  // 0x008C0B9C: with fog of war off the vision handle is left untouched.
+  if (!console::RenderFogOfWarEnabled()) {
+    return;
   }
 
   CWldSession* const session = WLD_GetActiveSession();

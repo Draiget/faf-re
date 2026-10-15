@@ -69,13 +69,12 @@ namespace
   // ArchiveSerialization audit) already call `CBuilderArmManipulator::
   // MemberDeserialize`/`MemberSerialize` directly.
 
-  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const ownerActor, const std::int32_t boneIndex) noexcept
+  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniPose* const pose, const std::int32_t boneIndex) noexcept
   {
-    if (ownerActor == nullptr || ownerActor->mPose.get() == nullptr || boneIndex < 0) {
+    if (pose == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    moho::CAniPose* const pose = ownerActor->mPose.get();
     moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
     moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
@@ -98,7 +97,10 @@ namespace
       return nullptr;
     }
 
-    return ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones[watchSlot].mBoneIndex);
+    // 0x00635FE9..0x00635FEE: watch bones live in the pose being built this
+    // frame (`[actor+0]`, CAniActor::mPose).
+    moho::CAniActor* const actor = manipulator->mOwnerActor;
+    return ResolvePoseBone(actor != nullptr ? actor->mPose.get() : nullptr, manipulator->mWatchBones[watchSlot].mBoneIndex);
   }
 
   [[nodiscard]] float WrapSignedRadians(const float angle) noexcept
@@ -350,7 +352,13 @@ namespace moho
     Wm3::Vector3f* const outDirection, const Wm3::Vector3f& targetPoint
   ) const
   {
-    const CAniPoseBone* const referenceBone = ResolvePoseBone(mOwnerActor, mReferenceBoneIdx);
+    // 0x006366F0..0x006366F7 reads the reference bone from `[actor+8]`,
+    // CAniActor::mPriorPose -- last frame's pose, retired by UpdateManipulators
+    // before the manipulators run. Reading the fresh `mPose` aimed the arm
+    // from where the unit is this tick, one tick ahead of the engine, and
+    // shifted when a builder first reports on-target (replay 26935800 beat 516).
+    const CAniPoseBone* const referenceBone =
+      ResolvePoseBone(mOwnerActor != nullptr ? mOwnerActor->mPriorPose.get() : nullptr, mReferenceBoneIdx);
     if (referenceBone == nullptr) {
       outDirection->x = 0.0f;
       outDirection->y = 0.0f;
@@ -363,7 +371,8 @@ namespace moho
     const float deltaY = targetPoint.y - compositeTransform.pos_.y;
     const float deltaZ = targetPoint.z - compositeTransform.pos_.z;
 
-    const float length = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+    // 0x00636756..0x0063677C sums the squared lanes z, x, y.
+    const float length = std::sqrt(((deltaZ * deltaZ) + (deltaX * deltaX)) + (deltaY * deltaY));
     if (length <= 0.0f) {
       outDirection->x = 0.0f;
       outDirection->y = 0.0f;

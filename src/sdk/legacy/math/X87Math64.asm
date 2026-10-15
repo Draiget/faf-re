@@ -152,6 +152,71 @@ msvc8_x87_atan2_difference PROC
 msvc8_x87_atan2_difference ENDP
 
 
+; float msvc8_x87_atan2_plus(float y, float x, float addend)
+; fpatan result added before rounding, under PC24 (FUN_006309F0 heading lane).
+msvc8_x87_atan2_plus PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    movss   dword ptr [rsp+16], xmm2
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fld     dword ptr [rsp+12]
+    fpatan
+    fadd    dword ptr [rsp+16]
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_atan2_plus ENDP
+
+
+; float msvc8_x87_sin_times_cos(float sinArg, float cosArg)
+; fsin/fcos stay unrounded; the product rounds once under PC24 (FUN_00695180).
+msvc8_x87_sin_times_cos PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+12]
+    fcos
+    fld     dword ptr [rsp+8]
+    fsin
+    fmulp   st(1), st(0)
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_sin_times_cos ENDP
+
+
+; float msvc8_x87_cos_times_cos(float firstArg, float secondArg)
+msvc8_x87_cos_times_cos PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+12]
+    fcos
+    fld     dword ptr [rsp+8]
+    fcos
+    fmulp   st(1), st(0)
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_cos_times_cos ENDP
+
+
 ; void msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength)
 ; The scale stays in extended precision across all three component multiplies
 ; (FUN_005D1E70). rcx=x, rdx=y, r8=z; maxLength arrives on the stack at

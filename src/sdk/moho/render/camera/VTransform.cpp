@@ -304,7 +304,17 @@ namespace moho
   {
     VTransform out{};
 
-    out.orient_ = MultiplyQuat(rhs.orient_, lhs.orient_);
+    // `rhs.orient_ * lhs.orient_` in the accumulation order 0x00549C7B..
+    // 0x00549D5C emits. The z lane pairs `l.w*r.z` (not `r.w*l.z`) into its
+    // first sum, so it is not `MultiplyQuat`'s (CAniPoseBone::Rotate's)
+    // grouping; on a near-cancelling lane (a factory-held unit's yaw residual,
+    // replay 26935800 beat 453) the two land on different tiny values.
+    const Wm3::Quaternionf& l = lhs.orient_;
+    const Wm3::Quaternionf& r = rhs.orient_;
+    out.orient_.w = ((l.w * r.w - l.x * r.x) - l.y * r.y) - l.z * r.z;
+    out.orient_.x = ((l.z * r.y + l.w * r.x) + l.x * r.w) - l.y * r.z;
+    out.orient_.y = ((l.x * r.z + l.w * r.y) + l.y * r.w) - l.z * r.x;
+    out.orient_.z = ((l.y * r.x + l.w * r.z) + l.z * r.w) - l.x * r.y;
 
     Wm3::Vec3f rotatedPosition{};
     MultQuadVec(&rotatedPosition, &lhs.pos_, &rhs.orient_);

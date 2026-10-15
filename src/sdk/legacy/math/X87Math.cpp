@@ -15,6 +15,9 @@ extern "C" float __cdecl msvc8_x87_atan2f(float y, float x);
 extern "C" double __cdecl msvc8_x87_acos(double x);
 extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
+extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
+extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
+extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
 extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength);
@@ -221,6 +224,61 @@ namespace msvc8
     return result;
 #else
     return msvc8_x87_atan2_difference(firstY, firstX, secondY, secondX);
+#endif
+  }
+
+  float Atan2Plus(const float y, const float x, const float addend) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld y
+      fld x
+      fpatan
+      fadd addend
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_atan2_plus(y, x, addend);
+#endif
+  }
+
+  float SinTimesCos(const float sinArg, const float cosArg) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    // Simulation thread runs with 24-bit precision control; fsin/fcos ignore
+    // it, so only the fmul rounds (0x00695397..0x006953B1).
+    __asm {
+      fld cosArg
+      fcos
+      fld sinArg
+      fsin
+      fmulp st(1), st(0)
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_sin_times_cos(sinArg, cosArg);
+#endif
+  }
+
+  float CosTimesCos(const float firstArg, const float secondArg) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld secondArg
+      fcos
+      fld firstArg
+      fcos
+      fmulp st(1), st(0)
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_cos_times_cos(firstArg, secondArg);
 #endif
   }
 

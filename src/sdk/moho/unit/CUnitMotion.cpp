@@ -93,13 +93,16 @@ namespace moho
 
   /**
    * Uniform sample in `[lower, upper)` drawn straight from the simulation's
-   * Mersenne twister, matching the binary's `IRand() * 2^-32` scaling (which is
-   * what keeps hover wobble deterministic across a replay).
+   * Mersenne twister, as CalcMoveHover inlines it under 24-bit x87 precision
+   * (0x006C2D02..0x006C2D39): `fild` the word (+2^32 when it loads negative),
+   * `(upper - lower) * word` rounded to single once, times 2^-32, plus
+   * `lower`. Forming it in double with an inexact 2^-32 literal lands one float
+   * away often enough to drift a hovering unit's wobble within a few ticks.
    */
   [[nodiscard]] float RandomInRange(moho::CMersenneTwister& twister, const float lower, const float upper) noexcept
   {
-    constexpr double kUInt32ToUnit = 2.3283064e-10;
-    return static_cast<float>(lower + ((upper - lower) * static_cast<double>(twister.NextUInt32()) * kUInt32ToUnit));
+    constexpr float kInvTwoTo32 = 2.3283064365386963e-10f; // 0x2F800000 at 0x00E4F7B0
+    return lower + msvc8::MulTwisterWord(upper - lower, twister.NextUInt32()) * kInvTwoTo32;
   }
 
   // Water surface used on maps that have no water at all: far enough below any
@@ -2856,7 +2859,21 @@ namespace moho
             waypoint->mPosition.z + waypoint->mDirection.z,
           };
         }
-        (void)RotateCommonMoveTransformTowardDestination(unit, transform, steeringTarget, true);
+        // 0x006C222A..0x006C2289: a hovering unit on a waypoint always turns
+        // toward the steering target at its facing rate. Unlike the
+        // waypoint-less branch there is no "already aligned" early-out, so a
+        // fraction-of-a-degree correction still lands on the first tick.
+        const SteeringParams params = BuildSteeringParamsFromTransform(unit, transform, steeringTarget);
+        Wm3::Vector2f direction{};
+        (void)RotateDirectionTowardTargetLimited(
+          &direction,
+          params.mTurnFacingRate,
+          params.mForwardXZ.x,
+          params.mForwardXZ.y,
+          params.mDeltaX,
+          params.mDeltaZ
+        );
+        (void)BuildHeadingQuaternionFromDirection2D(&direction, &transform.orient_);
       } else {
         transform.orient_ = COORDS_Orient(waypoint->mDirection);
       }
@@ -4630,9 +4647,13 @@ namespace moho
       snapped.pos_.y += unit->GetAttributes().spawnElevationOffset;
       CUnitMotion* const unitMotion = unit->UnitMotion;
       if (unitMotion != nullptr) {
-        surfaceNormal.x += unitMotion->mBodyTiltOffset.x + unitMotion->mWobbleOffset.x;
-        surfaceNormal.y += unitMotion->mBodyTiltOffset.y + unitMotion->mWobbleOffset.y;
-        surfaceNormal.z += unitMotion->mBodyTiltOffset.z + unitMotion->mWobbleOffset.z;
+        // 0x006C1C15..0x006C1C5F: the tilt offset is added to the normal first
+        // and the wobble offset to that sum -- `(tilt + n) + wobble`. Summing
+        // the two offsets first rounds differently and drifts a hovering
+        // unit's orientation by an ULP (replay 26935800 beat 500, ual0105).
+        surfaceNormal.x = (unitMotion->mBodyTiltOffset.x + surfaceNormal.x) + unitMotion->mWobbleOffset.x;
+        surfaceNormal.y = (unitMotion->mBodyTiltOffset.y + surfaceNormal.y) + unitMotion->mWobbleOffset.y;
+        surfaceNormal.z = (unitMotion->mBodyTiltOffset.z + surfaceNormal.z) + unitMotion->mWobbleOffset.z;
       }
     }
 
