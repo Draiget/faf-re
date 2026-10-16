@@ -236,7 +236,10 @@ int CFireWeaponTask::Execute()
     return 1;
   }
 
-  if (mFireClock == 0 && unit->mUnitVarDat.mFireState != kHoldFireState && WeaponHasTarget(weapon)) {
+  // 0x006D3E13..0x006D3E19: the first gate is `CAiTarget::HasTarget`
+  // (0x005E2A10) -- a live unit, blip or ground target -- not a bare
+  // target-type test.
+  if (mFireClock == 0 && unit->mUnitVarDat.mFireState != kHoldFireState && weapon->mTarget.HasTarget()) {
     // 0x006D3DC0 nests the gate as CanAttackTarget, then
     // `CanFire && CheckSilo && !TargetIsTooClose`. The `CanFire` term was
     // missing here, and for every non-winged unit that call reduces to

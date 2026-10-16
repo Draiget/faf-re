@@ -23,24 +23,33 @@ namespace
 
   static_assert(sizeof(BoxVertex) == 0x0C, "BoxVertex size must be 0x0C");
 
+  // .rdata 0x00DFEA50, copied into the vertex buffer by 0x007D05D0
+  // (`rep movsd`, 0x18 dwords, at 0x007D072B).
   constexpr std::array<BoxVertex, 8> kUnitBoxVertices = {{
     {-1.0f, -1.0f, -1.0f},
     {1.0f, -1.0f, -1.0f},
-    {1.0f, 1.0f, -1.0f},
-    {-1.0f, 1.0f, -1.0f},
-    {-1.0f, -1.0f, 1.0f},
     {1.0f, -1.0f, 1.0f},
+    {-1.0f, -1.0f, 1.0f},
+    {-1.0f, 1.0f, -1.0f},
+    {1.0f, 1.0f, -1.0f},
     {1.0f, 1.0f, 1.0f},
     {-1.0f, 1.0f, 1.0f},
   }};
 
+  // .rdata 0x00DFEAB0, copied into the index buffer by 0x007D05D0
+  // (`rep movsd`, 0x12 dwords, at 0x007D07F2). The winding matters:
+  // CastBoundaryCW/CCW select faces by cull mode, while vision.fx and range.fx
+  // leave D3DRS_TWOSIDEDSTENCILMODE on (BeginTechnique, 0x00946260, never
+  // resets it). The reversed winding this table used to have sent the box's
+  // far faces through the leaked CCW stencil ops, so the Boundary pass blacked
+  // out the whole playable area once fog of war had drawn a frame.
   constexpr std::array<std::uint16_t, 36> kUnitBoxIndices = {{
-    0, 1, 2, 0, 2, 3,
-    4, 6, 5, 4, 7, 6,
-    0, 4, 5, 0, 5, 1,
-    3, 2, 6, 3, 6, 7,
-    1, 5, 6, 1, 6, 2,
-    0, 3, 7, 0, 7, 4,
+    4, 1, 0, 1, 4, 5,
+    5, 2, 1, 2, 5, 6,
+    6, 3, 2, 3, 6, 7,
+    0, 3, 7, 7, 4, 0,
+    7, 5, 4, 7, 6, 5,
+    0, 2, 3, 0, 1, 2,
   }};
 }
 

@@ -5526,10 +5526,17 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // because `Entity::Sync` unlinks the node it was reached through.
   std::int32_t syncedEntityCount = 0;
   if (focusArmyChanged) {
-    ForEachAllArmyUnit(this, [&](Unit* const unit) {
-      unit->Sync(outSyncData);
-      ++syncedEntityCount;
-    });
+    // 0x007478AA..0x0074791A walks the entity DB's whole id map -- every
+    // entity, not only units -- and dispatches Sync on each node's value.
+    // That also drains the dirty list for props, projectiles and script
+    // entities; walking units only left those linked into the next beat, so a
+    // replay viewer switching focus army changed the sim checksum.
+    for (const auto& idAndEntity : mEntityDB->mAllUnits) {
+      if (Entity* const entity = idAndEntity.second; entity != nullptr) {
+        entity->Sync(outSyncData);
+        ++syncedEntityCount;
+      }
+    }
   } else {
     auto dirtyEntities = mCoordEntities.owners();
     for (auto it = dirtyEntities.begin(); it != dirtyEntities.end();) {
@@ -6150,7 +6157,8 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
     return dest;
   }
 
-  dest->w = (add.x * v1.x) + (add.y * v1.y) + (add.z * v1.z);
+  // 0x0044F920..0x0044F952 sums the dot as (z + y) + x.
+  dest->w = ((add.z * v1.z) + (v1.y * add.y)) + (add.x * v1.x);
   dest->x = (add.z * v1.y) - (v1.z * add.y);
   dest->y = (v1.z * add.x) - (add.z * v1.x);
   dest->z = (add.y * v1.x) - (v1.y * add.x);

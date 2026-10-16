@@ -72,6 +72,19 @@ namespace moho
   ) noexcept;
 
   /**
+   * Address: 0x0044F7E0 (FUN_0044F7E0)
+   *
+   * IDA signature:
+   * Wm3::Vector3f *__usercall NormalizeVectorInto@<eax>(Wm3::Vector3f *dest@<esi>,
+   *   const Wm3::Vector3f *source@<edi>);
+   *
+   * What it does:
+   * Writes `source / |source|` into `dest`, or zero when the length is not
+   * positive; the reciprocal is formed once and multiplied into each lane.
+   */
+  Wm3::Vector3f* NormalizeVectorInto(Wm3::Vector3f* dest, const Wm3::Vector3f& source) noexcept;
+
+  /**
    * Address: 0x005657F0 (FUN_005657F0, Moho::IsValid_Vector3f)
    *
    * What it does:

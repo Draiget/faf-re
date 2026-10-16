@@ -16,6 +16,7 @@
 #include "moho/console/CVarAccess.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector2f.h"
+#include "moho/math/Vector3f.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -101,31 +102,11 @@ namespace
     return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
   }
 
-  /**
-   * Address: 0x0044F7E0 (FUN_0044F7E0)
-   *
-   * What it does:
-   * Writes `source / |source|` into `dest`, or zero when the float length is
-   * not positive; the reciprocal is formed once and multiplied into each lane.
-   */
-  Wm3::Vector3f* NormalizeVectorInto(Wm3::Vector3f* const dest, const Wm3::Vector3f& source) noexcept
-  {
-    const float length = std::sqrt((source.x * source.x) + (source.y * source.y) + (source.z * source.z));
-    if (length > 0.0f) {
-      const float inverse = 1.0f / length;
-      dest->x = source.x * inverse;
-      dest->y = inverse * source.y;
-      dest->z = inverse * source.z;
-    } else {
-      *dest = Wm3::Vector3f::Zero();
-    }
-    return dest;
-  }
-
+  // `moho::NormalizeVectorInto` (0x0044F7E0) by value.
   [[nodiscard]] Wm3::Vector3f NormalizedOrZero(const Wm3::Vector3f& source) noexcept
   {
     Wm3::Vector3f out{};
-    (void)NormalizeVectorInto(&out, source);
+    (void)moho::NormalizeVectorInto(&out, source);
     return out;
   }
 

@@ -256,36 +256,6 @@ namespace
     return false;
   }
 
-  // Ray/water-plane crossing used by CheckCollision Branch A2 (asm
-  // 0x0069D336-0x0069D4D7). The binary builds a downward-ish GeomLine3 from the
-  // current position and calls the file-static Moho::CColHitResult::PlaneIntersection
-  // (FUN_00577540, not cross-TU linkable). This re-derivation reproduces the same
-  // horizontal-plane (constant y == waterElevation) crossing: it parametrizes the
-  // swept segment curPos->nextPos and solves for the point where y == plane.
-  // Returns false (leaving `outHit` untouched) when the segment does not cross the
-  // plane within [curPos, nextPos] (parallel or the plane is outside the span).
-  [[nodiscard]] bool WaterPlaneIntersection(
-    Wm3::Vector3f& outHit,
-    const Wm3::Vector3f& curPos,
-    const Wm3::Vector3f& nextPos,
-    const float waterElevation
-  ) noexcept
-  {
-    const float dy = nextPos.y - curPos.y;
-    if (dy == 0.0f) {
-      // Segment runs parallel to the water plane: no single crossing point.
-      return false;
-    }
-    const float t = (waterElevation - curPos.y) / dy;
-    if (t < 0.0f || t > 1.0f) {
-      return false;
-    }
-    outHit.x = curPos.x + (nextPos.x - curPos.x) * t;
-    outHit.y = waterElevation;
-    outHit.z = curPos.z + (nextPos.z - curPos.z) * t;
-    return true;
-  }
-
 } // namespace
 
 namespace moho
@@ -463,13 +433,14 @@ namespace moho
 
     mIsChildProjectile = isChildProjectile;
 
-    // Lifetime end tick = curTick + int((Physics.Lifetime + rand(±LifetimeRange)) * 10).
+    // Lifetime end tick = curTick + round((Physics.Lifetime + rand(±LifetimeRange)) * 10):
+    // 0x0069B4BB converts with `fistp`, round-to-nearest, not a truncating cast.
     {
       const float lifetimeSeconds =
         RandomSymmetricAround(rng, blueprint->Physics.Lifetime, blueprint->Physics.LifetimeRange);
       const std::uint32_t curTick = SimulationRef->mCurTick;
       mLifetimeEnd =
-        curTick + static_cast<std::uint32_t>(static_cast<std::int32_t>(lifetimeSeconds * 10.0f));
+        curTick + static_cast<std::uint32_t>(std::lrintf(lifetimeSeconds * 10.0f));
     }
 
     // Resolve the launcher: chase through a projectile source to its own launcher.
@@ -784,11 +755,12 @@ namespace moho
    * Address: 0x0069DE80 (FUN_0069DE80, Moho::Projectile::SetLifetime)
    *
    * What it does:
-   * Sets the projectile expiration tick to `mCurTick + int(seconds * 10.0f)`.
+   * Sets the projectile expiration tick to `mCurTick + round(seconds * 10.0f)`;
+   * 0x0069DEA1 converts with `fistp` (round-to-nearest), not truncation.
    */
   void Projectile::SetLifetime(const float lifetimeSeconds)
   {
-    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(static_cast<std::int32_t>(lifetimeSeconds * 10.0f));
+    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(std::lrintf(lifetimeSeconds * 10.0f));
     mLifetimeEnd = SimulationRef->mCurTick + lifetimeTicks;
   }
 
@@ -1364,12 +1336,16 @@ namespace moho
    *
    * What it does:
    * Per-tick collision pass over the segment swept from the current world position
-   * (Position) to the pending position (mPendingTransform.pos_). Handles water-surface
-   * crossing / layer change, tests the water plane for surface-colliding ordnance,
-   * samples the terrain surface, then (mDoCollision) the explicit homing target
-   * and the entity sweep, and finally the terrain height field. The earliest hit
-   * stamps mImpactInterpolation, mImpactPosition, the collided-entity weak link,
-   * and mImpactType.
+   * (Position) to the pending position (mPendingTransform.pos_). Tests the water
+   * plane on a surface crossing, samples the terrain surface, then applies the
+   * layer change unless the ground came first; next (mDoCollision) the explicit
+   * homing target and the entity sweep, and finally the detonate-height band.
+   * The earliest hit stamps mImpactInterpolation, mImpactPosition, the
+   * collided-entity weak link, and mImpactType.
+   *
+   * The executable that recorded FAF replays carries FAF's binary patch of this
+   * body (0x0069D258..0x0069D627, 0x0069DA6A, 0x0069DB3E..0x0069DBA7); the IDA
+   * export of this function predates it, so those ranges follow the PE bytes.
    */
   void Projectile::CheckCollision()
   {
@@ -1385,72 +1361,70 @@ namespace moho
     const float distMoved = segment.Extent * 2.0f;
 
     STIMap* const mapData = SimulationRef->mMapData;
-    const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
-    bool wentUnderwater = false;
+    float waterElevation = -10000.0f;
 
-    // --- Branch A: water-surface crossing / layer change ---
+    // --- Surface pass: water crossing, terrain hit, then the layer change ---
+    // The shipped executable carries FAF's rewrite of this block (0x0069D258..
+    // 0x0069D627, continued at 0x0069DB46..0x0069DBA7); the stock Moho body it
+    // replaced changed layer first and only tested the water plane on entry.
+    // A projectile with CollideSurface=false never reaches it, which keeps the
+    // scripted build/nuke-effect dummy projectiles (UEFBuild01,
+    // UEFNukeFlavorPlume01, ...) alive while they skim or lift off the ground.
     if (mCollideSurface) {
-      const float nextY = nextPos.y;
-      if (mBelowWater) {
-        // Currently underwater: rising above the surface exits the water.
-        if (nextY > waterElevation) {
-          this->SetCurrentLayer(LAYER_Air);
-          this->CallbackStr("OnExitWater");
-          mBelowWater = false;
-        }
-      } else {
-        // Currently in air: dropping below the surface enters the water.
-        if (waterElevation > nextY) {
-          this->SetCurrentLayer(LAYER_Water);
-          this->CallbackStr("OnEnterWater");
-          if (!mBelowWater) {
-            wentUnderwater = true;
+      enum class EWaterCrossing : std::uint8_t
+      {
+        None,
+        Enter,
+        Exit,
+      };
+      EWaterCrossing crossing = EWaterCrossing::None;
+      // Along-line distance to the water crossing; stays 0 when the plane test
+      // misses, and is what a terrain hit must beat to cancel the layer change.
+      float waterCrossingDistance = 0.0f;
+
+      if (mapData->mWaterEnabled) {
+        waterElevation = mapData->mWaterElevation;
+        if (mBelowWater) {
+          if (nextPos.y > waterElevation) {
+            crossing = EWaterCrossing::Exit;
           }
-          mBelowWater = true;
+        } else if (waterElevation > nextPos.y) {
+          crossing = EWaterCrossing::Enter;
         }
       }
-    }
 
-    // --- Branch A2: water-plane detonation for surface-destroy ordnance ---
-    if (mDestroyOnWater && wentUnderwater) {
-      Wm3::Vector3f planeHit{};
-      if (WaterPlaneIntersection(planeHit, curPos, nextPos, waterElevation) &&
-          IsValidVector3f(planeHit)) {
-        // Fraction of the segment consumed before the water hit.
-        const float hitDist = std::sqrt(
-          ((planeHit.x - curPos.x) * (planeHit.x - curPos.x)) +
-          ((planeHit.y - curPos.y) * (planeHit.y - curPos.y)) +
-          ((planeHit.z - curPos.z) * (planeHit.z - curPos.z)));
-        mImpactPosition = planeHit;
-        mImpactInterpolation = (distMoved != 0.0f) ? (hitDist / distMoved) : 0.0f;
-        mImpactType = IMPACT_Water;
-      } else {
-        mImpactPosition = curPos;
-        mImpactInterpolation = 0.0f;
+      if (crossing != EWaterCrossing::None) {
+        // 0x0069D2E2..0x0069D3FB: an unbounded line from curPos along the
+        // normalized step against the y == waterElevation plane.
+        Wm3::Vector3f stepDirection{};
+        const Wm3::Vector3f step{nextPos.x - curPos.x, nextPos.y - curPos.y, nextPos.z - curPos.z};
+        (void)NormalizeVectorInto(&stepDirection, step);
+        const GeomLine3 waterLine{
+          Wm3::Vec3f(curPos.x, curPos.y, curPos.z),
+          Wm3::Vec3f(stepDirection.x, stepDirection.y, stepDirection.z),
+          gpg::nInf,
+          gpg::pInf,
+        };
+        const VecDist waterPlane{Wm3::Vec3f(0.0f, 1.0f, 0.0f), waterElevation};
+        CGeomHitResult waterHit{gpg::NaN, 0.0f};
+        const Wm3::Vec3f planeHit = PlaneIntersection(waterLine, waterPlane, &waterHit);
+        if (IsValidVector3f(Wm3::Vector3f{planeHit.x, planeHit.y, planeHit.z})) {
+          waterCrossingDistance = waterHit.distance;
+          if (mDestroyOnWater) {
+            mImpactPosition = Wm3::Vector3f{planeHit.x, planeHit.y, planeHit.z};
+            mImpactInterpolation = waterHit.distance / (segment.Extent * 2.0f);
+            mImpactType = IMPACT_Water;
+          }
+        } else if (mDestroyOnWater) {
+          mImpactPosition = curPos;
+          mImpactInterpolation = 0.0f;
+          mImpactType = IMPACT_Water;
+        }
       }
-      // asm 0x0069D336-0x0069D4D7: the binary parametrizes the swept segment and
-      // solves the y == waterElevation crossing via the file-static
-      // CColHitResult::PlaneIntersection (FUN_00577540). Because the crossing point
-      // lies on the segment, the along-segment hit distance equals the euclidean
-      // distance from curPos to the crossing, so the fraction is that distance
-      // divided by distMoved (asm 0x0069D48A-0x0069D496). mImpactType stamped
-      // IMPACT_Water (2) per asm 0x0069D4CD.
-    }
 
-    // --- Branch B: terrain-surface intersection ---
-    // Gated by mCollideSurface in the binary: the branch lives inside the same
-    // `cmp byte [this+0x2A8], 0; je 0x0069D627` block as the water branches
-    // (asm 0x0069D281-0x0069D28D jumps past it to the mDoCollision test at
-    // 0x0069D627). A projectile with CollideSurface=false never tests terrain,
-    // which is what keeps the scripted build/nuke-effect dummy projectiles
-    // (UEFBuild01, UEFNukeFlavorPlume01, ...) alive while they skim or lift
-    // off the ground. Running it ungated made those projectiles detonate on
-    // their first tick near terrain, killing the ACU/engineer build beams and
-    // the nuke plume effect scripts.
-    if (mCollideSurface) {
-      // asm 0x0069D4F1-0x0069D560: the line starts at the segment's own first
-      // endpoint, Origin - Direction*Extent, rebuilt from the midpoint form --
-      // not at curPos, which differs from it in the low bits.
+      // 0x0069D4A8..0x0069D589: the terrain line starts at the segment's own
+      // first endpoint, Origin - Direction*Extent, rebuilt from the midpoint
+      // form -- not at curPos, which differs from it in the low bits.
       const GeomLine3 terrainLine{
         Wm3::Vec3f(
           segment.Origin.x - (segment.Direction.x * segment.Extent),
@@ -1461,19 +1435,34 @@ namespace moho
         0.0f,
         distMoved,
       };
-      CGeomHitResult terrainHit{};
+      CGeomHitResult terrainHit{gpg::NaN, gpg::NaN};
       CHeightField* const heightField = mapData->mHeightField.get();
       const Wm3::Vec3f hitPoint = heightField->Intersection(terrainLine, &terrainHit);
+
+      bool terrainBeforeWater = false;
       if (IsValidVector3f(Wm3::Vector3f{hitPoint.x, hitPoint.y, hitPoint.z})) {
-        // Earliest-hit predicate (asm 0x0069D5C4-0x0069D5E3): record when there is
-        // no hit yet (mImpactInterpolation < 0) OR when this terrain hit is closer
-        // than the stored one — i.e. mImpactInterpolation*distMoved > terrainHit.distance.
-        if (mImpactInterpolation < 0.0f ||
-            (mImpactInterpolation * distMoved) > terrainHit.distance) {
-          const float hitFraction = (distMoved != 0.0f) ? (terrainHit.distance / distMoved) : 0.0f;
-          mImpactInterpolation = hitFraction;
+        // 0x0069D5BF..0x0069D5E2: record when there is no hit yet or this one
+        // is closer than the stored one.
+        if (mImpactInterpolation < 0.0f || (mImpactInterpolation * distMoved) > terrainHit.distance) {
+          mImpactInterpolation = terrainHit.distance / distMoved;
           mImpactPosition = Wm3::Vector3f{hitPoint.x, hitPoint.y, hitPoint.z};
           mImpactType = IMPACT_Terrain;
+          // 0x0069DB50: ground reached no later than the water surface.
+          terrainBeforeWater = terrainHit.distance <= waterCrossingDistance;
+        }
+      }
+
+      // 0x0069DB59..0x0069DBA2: the layer change runs last, and not at all when
+      // the projectile struck the ground before reaching the water.
+      if (crossing != EWaterCrossing::None && !terrainBeforeWater) {
+        if (crossing == EWaterCrossing::Enter) {
+          this->SetCurrentLayer(LAYER_Water);
+          mBelowWater = true;
+          this->CallbackStr("OnEnterWater");
+        } else {
+          this->SetCurrentLayer(LAYER_Air);
+          mBelowWater = false;
+          this->CallbackStr("OnExitWater");
         }
       }
     }
@@ -1580,21 +1569,23 @@ namespace moho
           }
         }
       } else {
-        // Long move: line sweep over the segment extended 10% at each end
-        // (asm 0x0069DA4F-0x0069DAE7; dbl_E4F710+4 == 0.1). Records the earliest
-        // confirmed hit across all results (no early-out).
+        // Long move: line sweep over the segment extended 1% at each end
+        // (0x0069DA4F..0x0069DAE7; the factor at 0x0069DA6A is the 0.01 at
+        // 0x00E4F950 -- FAF's patch, stock Moho read 0.1 from 0x00E4F714).
+        // Records the earliest confirmed hit across all results (no early-out).
+        // 0x3C23D70B, one ulp above the float nearest 0.01.
+        constexpr float kLineSweepExtension = 0x1.47ae16p-7f;
         const Wm3::Vector3f delta{nextPos.x - curPos.x, nextPos.y - curPos.y, nextPos.z - curPos.z};
         const Wm3::Vec3f lineStart(
-          curPos.x - delta.x * kProjectileTickSeconds,
-          curPos.y - delta.y * kProjectileTickSeconds,
-          curPos.z - delta.z * kProjectileTickSeconds);
+          curPos.x - delta.x * kLineSweepExtension,
+          curPos.y - delta.y * kLineSweepExtension,
+          curPos.z - delta.z * kLineSweepExtension);
         const Wm3::Vec3f lineEnd(
-          nextPos.x + delta.x * kProjectileTickSeconds,
-          nextPos.y + delta.y * kProjectileTickSeconds,
-          nextPos.z + delta.z * kProjectileTickSeconds);
+          nextPos.x + delta.x * kLineSweepExtension,
+          nextPos.y + delta.y * kLineSweepExtension,
+          nextPos.z + delta.z * kLineSweepExtension);
 
         Entity* const homingTarget = mTargetPosData.GetEntity();
-        Entity* const collidedEntity = mCollidedEntityWeak.GetObjectPtr();
         CArmyImpl* const projectileArmy = ArmyRef;
 
         gpg::core::FastVectorN<EntityLineCollision, 10> results{};
@@ -1603,17 +1594,11 @@ namespace moho
         for (const EntityLineCollision& result : results) {
           Entity* const candidate = result.entity;
 
-          // Filter B decides whether the friendly-air weapon gate (Filter E) is
-          // applied; the homing target is always allowed to be hit.
-          const bool isHomingTarget = (candidate == homingTarget);
-          if (!isHomingTarget) {
-            // Filter A (asm 0x0069DB3E-0x0069DBA5): once we have collided with a
-            // Unit, skip that unit's own shield bubble.
-            if (collidedEntity != nullptr && collidedEntity->IsUnit() != nullptr &&
-                candidate->IsShield() != nullptr &&
-                candidate->mAttachInfo.GetAttachTargetEntity() == collidedEntity) {
-              continue;
-            }
+          // The homing target goes straight to the earliest-hit test
+          // (0x0069DBAB..0x0069DBB1). FAF's patch jumps from 0x0069DB3E over the
+          // stock filter that, once something had been hit, let only the
+          // collided unit's own shield through.
+          if (candidate != homingTarget) {
             // Filter C (asm 0x0069DBB7-0x0069DBED): skip the launcher unit. The
             // binary only runs this test when the launcher weak resolves to a live
             // entity (asm 0x0069DBBD-0x0069DBC4 short-circuits past it otherwise).
@@ -1632,11 +1617,6 @@ namespace moho
               if (!projectileArmy->IsEnemy(static_cast<std::uint32_t>(candidate->GetArmyIndex()))) {
                 continue;
               }
-            }
-          } else {
-            // Filter D still applies to the homing target path.
-            if (candidate == this) {
-              continue;
             }
           }
 

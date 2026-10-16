@@ -24,6 +24,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/math/Angle.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
@@ -385,7 +386,8 @@ namespace
     const float distanceX = muzzlePosition.x - targetPosition.x;
     const float distanceY = muzzlePosition.y - targetPosition.y;
     const float distanceZ = muzzlePosition.z - targetPosition.z;
-    const float distanceToMuzzle = std::sqrt((distanceX * distanceX) + (distanceY * distanceY) + (distanceZ * distanceZ));
+    // 0x0063135B..0x0063137B sums the squares as (y^2 + z^2) + x^2.
+    const float distanceToMuzzle = std::sqrt(((distanceY * distanceY) + (distanceZ * distanceZ)) + (distanceX * distanceX));
     if ((distanceToMuzzle * distanceToMuzzle) < kAimDistanceSqEpsilon) {
       *outIntercept = targetPosition;
       return outIntercept;
@@ -400,10 +402,13 @@ namespace
       targetVelocity.z * invVelocity,
     };
 
+    // 0x00631465..0x00631485: half pi (the image's pi float times 0.5) minus
+    // the cosine, summed as (z + x) + y -- the first-order arccos of the angle
+    // between the target's heading and the line back to the muzzle.
     const float alignment =
-      2.0f -
-      ((normalizedVelocity.x * normalizedDistance.x) + (normalizedVelocity.y * normalizedDistance.y) +
-       (normalizedVelocity.z * normalizedDistance.z));
+      moho::kHalfPi -
+      (((normalizedVelocity.z * normalizedDistance.z) + (normalizedVelocity.x * normalizedDistance.x)) +
+       (normalizedVelocity.y * normalizedDistance.y));
     const float speedDelta = (velocityMagnitude * velocityMagnitude) - (projectileSpeed * projectileSpeed);
     if ((speedDelta * speedDelta) < kAimDistanceSqEpsilon) {
       *outIntercept = targetPosition;
@@ -958,7 +963,8 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   }
 
   this->EventSetSignaled(false);
-  return false;
+
+  return false;
 }
 
 /**

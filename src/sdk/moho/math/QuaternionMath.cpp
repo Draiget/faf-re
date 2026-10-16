@@ -638,9 +638,11 @@ namespace moho
     const float oy = quat->y;
     const float oz = quat->z;
 
+    // 0x0069AB1A..0x0069AC05: each lane keeps the binary's summation order;
+    // the x and y lanes start from the cross term, not the scalar product.
     quat->w = (dw * ow) - (dx * ox) - (dy * oy) - (dz * oz);
-    quat->x = (dw * ox) + (dx * ow) + (dy * oz) - (dz * oy);
-    quat->y = (dw * oy) + (dy * ow) + (dz * ox) - (dx * oz);
+    quat->x = (((dy * oz) + (dw * ox)) + (dx * ow)) - (dz * oy);
+    quat->y = (((dy * ow) + (dz * ox)) + (dw * oy)) - (dx * oz);
     quat->z = (dw * oz) + (dz * ow) + (dx * oy) - (dy * ox);
   }
 

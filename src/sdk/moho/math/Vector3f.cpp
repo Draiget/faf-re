@@ -22,6 +22,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x0044F7E0 (FUN_0044F7E0)
+   *
+   * What it does:
+   * Writes `source / |source|` into `dest`, or zero when the length is not
+   * positive; the reciprocal is formed once and multiplied into each lane.
+   */
+  Wm3::Vector3f* NormalizeVectorInto(Wm3::Vector3f* const dest, const Wm3::Vector3f& source) noexcept
+  {
+    const float length = std::sqrt((source.x * source.x) + (source.y * source.y) + (source.z * source.z));
+    if (length > 0.0f) {
+      const float inverse = 1.0f / length;
+      dest->x = source.x * inverse;
+      dest->y = inverse * source.y;
+      dest->z = inverse * source.z;
+    } else {
+      *dest = Wm3::Vector3f::Zero();
+    }
+    return dest;
+  }
+
+  /**
    * Address: 0x005D1E70 (FUN_005D1E70, func_VecLimitLengthTo)
    *
    * What it does:
