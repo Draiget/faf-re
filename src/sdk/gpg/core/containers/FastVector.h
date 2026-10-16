@@ -14,6 +14,44 @@ namespace gpg::core
   namespace detail
   {
     /**
+     * Inline-window capacity sentinel, written into the first bytes of a
+     * `fastvector_n` inline window while its elements live on the heap, and
+     * read back when the vector returns to the window.
+     *
+     * x86 stores the capacity pointer itself, 4 bytes, as the binary does
+     * (`if (start == origin) *origin = capacity;`). On x64 a pointer takes 8
+     * bytes: more than a one-slot window of a 4-byte element holds, and for
+     * wider windows it overwrote the second slot, whose stale contents the
+     * simulation reads (FAF's guard-scan gate in Unit::UpdateBlipsInRange
+     * tests the head command's second inline ent-id slot, 0x0128C956). x64
+     * therefore stores the window's capacity as a 32-bit element count in the
+     * same first 4 bytes, so every other byte of the window keeps exactly what
+     * it holds on x86.
+     */
+    template <class T>
+    inline void StoreInlineCapacitySentinel(T* const inlineOrigin, T* const capacityEnd) noexcept
+    {
+#if defined(_M_IX86)
+      *reinterpret_cast<T**>(inlineOrigin) = capacityEnd;
+#else
+      const std::uint32_t inlineCount = static_cast<std::uint32_t>(capacityEnd - inlineOrigin);
+      std::memcpy(static_cast<void*>(inlineOrigin), &inlineCount, sizeof(inlineCount));
+#endif
+    }
+
+    template <class T>
+    [[nodiscard]] inline T* LoadInlineCapacitySentinel(T* const inlineOrigin) noexcept
+    {
+#if defined(_M_IX86)
+      return *reinterpret_cast<T* const*>(inlineOrigin);
+#else
+      std::uint32_t inlineCount = 0;
+      std::memcpy(&inlineCount, static_cast<const void*>(inlineOrigin), sizeof(inlineCount));
+      return inlineOrigin + inlineCount;
+#endif
+    }
+
+    /**
      * Address: 0x00581270 (FUN_00581270, gpg::fastvector_Entity copy helper lane)
      * Address: 0x00822990 (FUN_00822990, gpg::fastvector_UserUnit copy helper lane)
      *
@@ -929,7 +967,7 @@ namespace gpg::core
       if (!originalVec_) {
         return;
       }
-      *reinterpret_cast<T**>(originalVec_) = this->capacity_;
+      StoreInlineCapacitySentinel_(this->capacity_);
     }
 
     T* InlineCapacityFromHeader_() const noexcept
@@ -937,7 +975,30 @@ namespace gpg::core
       if (!originalVec_) {
         return nullptr;
       }
-      return *reinterpret_cast<T* const*>(originalVec_);
+      return LoadInlineCapacitySentinel_();
+    }
+
+    /**
+     * The inline window's capacity sentinel, kept in the window's first bytes
+     * while the elements live on the heap.
+     *
+     * x86 stores the capacity pointer itself, 4 bytes, as the binary does. On
+     * x64 a pointer takes 8 bytes: more than a one-slot window of a 4-byte
+     * element holds, and for wider windows it overwrote the second slot, whose
+     * stale contents the simulation reads (FAF's guard-scan gate in
+     * Unit::UpdateBlipsInRange tests the second inline ent-id slot of the head
+     * command, 0x0128C956). x64 therefore stores the inline capacity as a
+     * 32-bit element count in the same first 4 bytes, so the window's other
+     * bytes keep exactly what they hold on x86.
+     */
+    void StoreInlineCapacitySentinel_(T* const capacityEnd) noexcept
+    {
+      detail::StoreInlineCapacitySentinel(originalVec_, capacityEnd);
+    }
+
+    [[nodiscard]] T* LoadInlineCapacitySentinel_() const noexcept
+    {
+      return detail::LoadInlineCapacitySentinel(originalVec_);
     }
 
     /**
@@ -998,7 +1059,7 @@ namespace gpg::core
       detail::DestroyRange(oldBegin, oldEnd);
       if (oldBegin == originalVec_) {
         if (originalVec_) {
-          *reinterpret_cast<T**>(originalVec_) = oldCapacityEnd;
+          StoreInlineCapacitySentinel_(oldCapacityEnd);
         }
       } else {
         detail::FreeElements(oldBegin);
@@ -2903,7 +2964,7 @@ namespace gpg::core
       cursor = CopyRangeForward(cursor, splitPos, vec.end_);
 
       if (inlineOrigin && vec.start_ == inlineOrigin) {
-        *reinterpret_cast<T**>(inlineOrigin) = vec.capacity_;
+        detail::StoreInlineCapacitySentinel(inlineOrigin, vec.capacity_);
       } else if (vec.start_) {
         detail::FreeElements(vec.start_);
       }
