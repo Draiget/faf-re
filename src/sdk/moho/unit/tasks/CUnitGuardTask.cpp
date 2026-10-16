@@ -1269,9 +1269,11 @@ namespace moho
         continue;
       }
 
+      // 0x006129C6..0x006129D8 and 0x00612A76..0x00612A88: the repeat-queue
+      // flag is the guarded factory's (mSecondaryUnit, +0x2A2), not this unit's.
       const bool canDispatchSlot =
         index > 0u || command->mVarDat.mCount > 1
-        || (guardedCommandCount <= 1u && mUnit->mUnitVarDat.mRepeatQueue);
+        || (guardedCommandCount <= 1u && guardedUnit->mUnitVarDat.mRepeatQueue);
       if (!canDispatchSlot) {
         continue;
       }
@@ -1283,7 +1285,7 @@ namespace moho
 
       if (command->mVarDat.mCount > 1) {
         command->DecreaseCount(1);
-      } else if (mUnit->mUnitVarDat.mRepeatQueue) {
+      } else if (guardedUnit->mUnitVarDat.mRepeatQueue) {
         command->mVarDat.mCount = command->mVarDat.mMaxCount;
         command->mNeedsUpdate = true;
         (void)guardedQueue->MoveCommandToBackOfQueue(command);

@@ -510,9 +510,12 @@ namespace moho
         mVelocity.z += (steerHorizontal.z - mVelocity.z);
       }
 
-      // Lateral jitter driven by the entity's collision-bounds Z extent
-      // (Entity+0x248 == mAABox.Min.z): if positive, jitter X and Z.
-      const float jitter = mAABox.Min.z;
+      // 0x0069B7D0..0x0069B854: the lateral jitter reads the blueprint, not this
+      // projectile -- esi is the blueprint here (it also feeds the scale draws
+      // at +0x1B4/+0x1B8), and +0x248 is Physics.RotationalVelocityRange, the
+      // same field GetAngularVelocity samples at 0x0051C8EC. Positive: jitter
+      // X then Z.
+      const float jitter = blueprint->Physics.RotationalVelocityRange;
       if (jitter > 0.0f) {
         mVelocity.x += rng->FRand(-jitter, jitter);
         mVelocity.z += rng->FRand(-jitter, jitter);

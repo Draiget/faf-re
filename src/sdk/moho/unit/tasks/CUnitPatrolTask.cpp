@@ -861,7 +861,9 @@ namespace moho
 
       CAiTarget attackTarget{};
       attackTarget.UpdateTarget(enemy);
-      (void)CAttackTargetTask::Create(mDispatch, &attackTarget, nullptr);
+      // 0x0061C232..0x0061C23A: the respect-formation factory (0x005F2750),
+      // no formation, overcharge off.
+      (void)CAttackTargetTask::CreateRespectFormation(mDispatch, &attackTarget, nullptr, false);
       mMoving = false;
       return 7;
     }

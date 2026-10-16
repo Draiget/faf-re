@@ -377,17 +377,21 @@ namespace
         return;
       }
 
+      // 0x0060A40C jump table: UNITCOMMAND_Attack (slot 9) lands on 0x00609639,
+      // which calls 0x005F2750 (CreateRespectFormation, overcharge off), and
+      // UNITCOMMAND_FormAttack (slot 10) lands on 0x00609668, which calls
+      // 0x005F27D0 (Create).
       case EUnitCommandType::UNITCOMMAND_Attack: {
         CUnitCommand::Move(unit, command);
         CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        CAttackTargetTask::Create(dispatch, &command->mTarget, formation);
+        CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, formation, false);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_FormAttack: {
         CUnitCommand::Move(unit, command);
         CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, formation, false);
+        CAttackTargetTask::Create(dispatch, &command->mTarget, formation);
         return;
       }
 

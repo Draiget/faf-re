@@ -751,7 +751,10 @@ moho::CAimManipulator::CAimManipulator(
         + weaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       this->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;
 
-      if (std::fabs(((ori.w * ori.z) - (ori.y * ori.x)) * 2.0f) > 0.70700002f) {
+      // 0x0063061F..0x00630637 forms (z*y - x*w) * 2 from the rest
+      // orientation (+0x30*+0x2C minus +0x28*+0x24). With the flag set and
+      // both watch bones equal, Track runs its pitch pass before heading.
+      if (std::fabs(((ori.z * ori.y) - (ori.x * ori.w)) * 2.0f) > 0.70700002f) {
         this->mUnknownBoolE1 = true;
       }
     }

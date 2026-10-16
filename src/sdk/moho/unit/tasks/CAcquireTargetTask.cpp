@@ -205,11 +205,10 @@ namespace
     clearedTarget.targetIsMobile = false;
     clearedTarget.PickTargetPoint();
 
-    weapon.mTarget = clearedTarget;
-    weapon.PickNewTargetAimSpot();
-    weapon.mUnknown170 = 0;
-    weapon.mUnknown174 = 1u;
-    weapon.mShotsAtTarget = 0;
+    // 0x005D97AD..0x005D97BD: the cleared target goes through
+    // UnitWeapon::SetTarget, which also runs the target scripts, the shooter
+    // sets, the target-blip lane, the re-aim and the fire-task restage.
+    weapon.SetTarget(&clearedTarget);
   }
 
   /**
