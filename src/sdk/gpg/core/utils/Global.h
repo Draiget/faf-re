@@ -83,9 +83,9 @@ namespace gpg
 
 #if defined(_M_X64)
 	/**
-	 * x64 port test mode (not in the binary): logs what `FAF_HIGHMEM=1` reserved
-	 * below 4 GB before the CRT started, or why it was skipped. No-op when the
-	 * mode was not requested.
+	 * x64 port (not in the binary): logs the image base (and whether it is below
+	 * 4 GB), then what `FAF_HIGHMEM=1` reserved below 4 GB before the CRT
+	 * started, or why it was skipped.
 	 */
 	void LogHighMemoryReservation();
 #endif

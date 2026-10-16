@@ -1806,6 +1806,14 @@ extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1
 #if defined(_M_X64)
 void gpg::LogHighMemoryReservation()
 {
+    // Plan 7.1: Stage A keeps the image below 4 GB (static addresses still
+    // fit 32 bits) while the heap may go above; say where the image landed.
+    const auto* const imageBase = static_cast<const void*>(::GetModuleHandleW(nullptr));
+    gpg::Logf(
+        "x64 image base %p (%s 4 GB)", imageBase,
+        (reinterpret_cast<std::uintptr_t>(imageBase) < 0x100000000ull) ? "below" : "above"
+    );
+
     if (!gHighMemoryReservation.requested) {
         return;
     }
