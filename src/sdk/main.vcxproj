@@ -2514,7 +2514,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\core\SUnitConstructionParams.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="moho\app\MohoResources.rc" />
+    <ResourceCompile Include="moho\app\MohoResources.rc">
+      <!-- MohoResources.rc includes wx/msw/wx.rc (wx's cursors, bitmaps, menus). -->
+      <AdditionalIncludeDirectories Condition="'$(Platform)'=='x64'">$(FafWxX64Root)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Platform)'!='x64'">$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="moho\app\res\faicon.ico" />
