@@ -919,14 +919,22 @@ namespace
     return index;
   }
 
+  // The terrain-triangle tests (0x004778F0 / 0x00477B80) sum every dot with the
+  // normal as (z + y) + x -- e.g. 0x00477A64..0x00477AAB.
   [[nodiscard]] float Dot3(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
   {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+    return ((a.z * b.z) + (a.y * b.y)) + (a.x * b.x);
   }
 
   [[nodiscard]] float PlaneSide(const Wm3::Vec3f& point, const Wm3::Vec3f& normal, const float planeDistance) noexcept
   {
     return Dot3(point, normal) - planeDistance;
+  }
+
+  // The triangle's plane offset is summed (z + x) + y (0x00477A69..0x00477A8E).
+  [[nodiscard]] float TrianglePlaneDistance(const Wm3::Vec3f& normal, const Wm3::Vec3f& basePoint) noexcept
+  {
+    return ((normal.z * basePoint.z) + (normal.x * basePoint.x)) + (normal.y * basePoint.y);
   }
 
   /**
@@ -2009,7 +2017,7 @@ namespace moho
     Wm3::Vector3f::Normalize(&normal);
 
     const Wm3::Vec3f basePoint{static_cast<float>(x), y00, static_cast<float>(z)};
-    const float planeDistance = Dot3(normal, basePoint);
+    const float planeDistance = TrianglePlaneDistance(normal, basePoint);
 
     const float sideP1 = PlaneSide(p1, normal, planeDistance);
     if (sideP1 < 0.0f) {
@@ -2067,7 +2075,7 @@ namespace moho
     Wm3::Vector3f::Normalize(&normal);
 
     const Wm3::Vec3f basePoint{static_cast<float>(x), y00, static_cast<float>(z)};
-    const float planeDistance = Dot3(normal, basePoint);
+    const float planeDistance = TrianglePlaneDistance(normal, basePoint);
 
     const float sideP1 = PlaneSide(p1, normal, planeDistance);
     if (sideP1 < 0.0f) {

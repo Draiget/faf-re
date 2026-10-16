@@ -2045,7 +2045,9 @@ namespace moho
    */
   void CUnitMotion::CalcMoveBallistic(VTransform& transform, float* const outMoveDistance)
   {
-    constexpr float kGravityTickScale = 0.01f;
+    // 0x006C02F0 loads 0x00E4F950 = 0x3C23D70B, one ulp above the float
+    // nearest 0.01.
+    constexpr float kGravityTickScale = 0x1.47ae16p-7f;
     constexpr float kSpinIntegrationDt = 0.1f;
     constexpr float kUprightMinCosine = 0.667f;
     constexpr float kFootprintHalfExtentScale = 0.5f;
@@ -4192,9 +4194,12 @@ namespace moho
         unit->CallbackStr("OnMotionStateChange", &newStateName, &oldStateName);
       }
 
-      // Random per-axis torque impulse, clamped to [0.25, 4.0] against
-      // 1/mInvInertiaTensor, rotated by the current orientation, and stashed
-      // as mTorque for CalcMoveBallistic's later impulse step.
+      // Random per-axis torque impulse: a uniform draw in +-h, h being the
+      // axis' inverse inertia clamped to [0.25, 4.0], divided back by that
+      // inverse inertia, rotated by the current orientation, and stashed as
+      // mTorque for CalcMoveBallistic's later impulse step. 0x006BF2AD..
+      // 0x006BF389 inlines `CRandomStream::FRand(-h, h)` (0x0051B5C0) once
+      // per axis, x first.
       CRandomStream& randomStream = *sim->mRngState;
       const auto clampAxis = [](const float invInertia) {
         return std::clamp(std::min(invInertia, 4.0f), 0.25f, 4.0f);
@@ -4203,12 +4208,9 @@ namespace moho
       const float halfRangeY = clampAxis(physBody->mInvInertiaTensor.y);
       const float halfRangeZ = clampAxis(physBody->mInvInertiaTensor.z);
       const Wm3::Vector3f randomAngularAccel{
-        RandomUniformIntRange(static_cast<int>(-halfRangeX * 1000.0f), static_cast<int>(halfRangeX * 1000.0f), randomStream)
-          / (1000.0f * physBody->mInvInertiaTensor.x),
-        RandomUniformIntRange(static_cast<int>(-halfRangeY * 1000.0f), static_cast<int>(halfRangeY * 1000.0f), randomStream)
-          / (1000.0f * physBody->mInvInertiaTensor.y),
-        RandomUniformIntRange(static_cast<int>(-halfRangeZ * 1000.0f), static_cast<int>(halfRangeZ * 1000.0f), randomStream)
-          / (1000.0f * physBody->mInvInertiaTensor.z),
+        randomStream.FRand(-halfRangeX, halfRangeX) / physBody->mInvInertiaTensor.x,
+        randomStream.FRand(-halfRangeY, halfRangeY) / physBody->mInvInertiaTensor.y,
+        randomStream.FRand(-halfRangeZ, halfRangeZ) / physBody->mInvInertiaTensor.z,
       };
       MultQuadVec(&mTorque, &randomAngularAccel, &physBody->mOrientation);
     }

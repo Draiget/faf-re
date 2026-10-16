@@ -376,11 +376,11 @@ namespace moho
   static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C");
 
   /**
-   * Address: 0x0128E638 (FUN_0128E638, SimGetCommandQueueInsert)
+   * Address: 0x0129173D (FAF patch section; called from 0x006CE3BA)
    *
    * What it does:
-   * Serializes one command record into a Lua table row and appends it to the
-   * destination command-queue Lua array.
+   * Writes the command's queue fields into its own script object and appends
+   * that object to the destination command-queue Lua array.
    */
-  void SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, const CUnitCommand& command);
+  void SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, CUnitCommand& command);
 } // namespace moho

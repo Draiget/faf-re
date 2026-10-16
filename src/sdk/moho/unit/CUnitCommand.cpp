@@ -197,12 +197,6 @@ namespace
   }
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
-  constexpr const char* kCommandTypeKey = "CommandType";
-  constexpr const char* kXKey = "X";
-  constexpr const char* kYKey = "Y";
-  constexpr const char* kZKey = "Z";
-  constexpr const char* kTargetIdKey = "TargetId";
-  constexpr const char* kBlueprintIdKey = "BlueprintId";
 
   template <class TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType()
@@ -700,38 +694,6 @@ namespace
   )
   {
     packets.push_back(packet);
-  }
-
-  template <typename TValue>
-  void SetCommandQueueField(LuaPlus::LuaObject& row, const char* key, const TValue& value);
-
-  template <>
-  void SetCommandQueueField<std::int32_t>(LuaPlus::LuaObject& row, const char* const key, const std::int32_t& value)
-  {
-    row.SetInteger(key, value);
-  }
-
-  template <>
-  void SetCommandQueueField<float>(LuaPlus::LuaObject& row, const char* const key, const float& value)
-  {
-    row.SetNumber(key, value);
-  }
-
-  template <>
-  void SetCommandQueueField<const char*>(LuaPlus::LuaObject& row, const char* const key, const char* const& value)
-  {
-    row.SetString(key, value ? value : "");
-  }
-
-  [[nodiscard]] const char* ResolveBlueprintId(const CUnitCommand& command) noexcept
-  {
-    const REntityBlueprint* const blueprint = command.mConstDat.blueprint;
-    if (!blueprint) {
-      return nullptr;
-    }
-
-    const char* const blueprintId = blueprint->mBlueprintId.c_str();
-    return (blueprintId && blueprintId[0] != '\0') ? blueprintId : nullptr;
   }
 
   void ReleaseIntrusiveRefcountedObject(CountedObject*& object)
@@ -1747,39 +1709,39 @@ void CUnitCommand::CoordinateWith(CUnitCommand* const other)
 }
 
 /**
- * Address: 0x0128E638 (FUN_0128E638, SimGetCommandQueueInsert)
+ * Address: 0x0129173D (FAF patch section; called from 0x006CE3BA)
  *
  * What it does:
- * Builds one command-queue Lua row from `command` and appends it to
- * `queueArray`.
+ * Writes the command's type, first-target position, target entity id and
+ * blueprint id into the command's own script object and appends that object
+ * to `queueArray`.
+ *
+ * The row is `command.mLuaObj` itself (the callsite passes command + 0x20),
+ * not a fresh table, and the keys are lower-case: FAF's sim Lua reads
+ * `commandType`/`x`/`y`/`z` (e.g. `Callbacks.AttackMove`), so the earlier
+ * capitalised keys made every such script see nil and skip its order.
+ * The blueprint id is written whenever the command has a blueprint.
  */
-void moho::SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, const CUnitCommand& command)
+void moho::SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, CUnitCommand& command)
 {
-  LuaPlus::LuaState* const state = queueArray.GetActiveState();
-  if (!state) {
-    return;
-  }
-
-  LuaPlus::LuaObject row(state);
-  row.AssignNewTable(state, 0, 0);
-
-  SetCommandQueueField<std::int32_t>(row, kCommandTypeKey, static_cast<std::int32_t>(command.mVarDat.mCmdType));
-  SetCommandQueueField<float>(row, kXKey, command.mVarDat.mTarget1.mPos.x);
-  SetCommandQueueField<float>(row, kYKey, command.mVarDat.mTarget1.mPos.y);
-  SetCommandQueueField<float>(row, kZKey, command.mVarDat.mTarget1.mPos.z);
+  LuaPlus::LuaObject& row = command.mLuaObj;
+  row.SetInteger("commandType", static_cast<std::int32_t>(command.mVarDat.mCmdType));
+  row.SetNumber("x", command.mVarDat.mTarget1.mPos.x);
+  row.SetNumber("y", command.mVarDat.mTarget1.mPos.y);
+  row.SetNumber("z", command.mVarDat.mTarget1.mPos.z);
 
   const std::uint32_t targetEntityId = command.mVarDat.mTarget1.mEntityId;
   if (targetEntityId != kNoTargetEntityId) {
-    char targetIdText[0x10] = {};
+    char targetIdText[0x10];
     std::snprintf(targetIdText, sizeof(targetIdText), "%d", static_cast<std::int32_t>(targetEntityId));
-    SetCommandQueueField<const char*>(row, kTargetIdKey, targetIdText);
+    row.SetString("targetId", targetIdText);
   }
 
-  if (const char* const blueprintId = ResolveBlueprintId(command)) {
-    SetCommandQueueField<const char*>(row, kBlueprintIdKey, blueprintId);
+  if (const REntityBlueprint* const blueprint = command.mConstDat.blueprint) {
+    row.SetString("blueprintId", blueprint->mBlueprintId.c_str());
   }
 
-  queueArray.SetObject(queueArray.GetN() + 1, row);
+  queueArray.Insert(row);
 }
 
 namespace moho
