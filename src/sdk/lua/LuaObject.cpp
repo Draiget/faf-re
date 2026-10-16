@@ -26,6 +26,7 @@
 #include "LuaCrashDump.h"
 #include "LuaError.h"
 #include "LuaGcEventLog.h"
+#include "LuaMemAccounting.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
@@ -221,9 +222,7 @@ extern "C"
 	Closure* luaF_newCclosure(lua_State* L, int nelems);
 	lua_State* luaE_newthread(lua_State* L);
 	void luaD_growstack(lua_State* L, int n);
-	void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
 	void luaS_freeall(lua_State* L);
-	void* luaM_growaux(lua_State* L, void* block, int* size, int sizeElem, int limit, const char* what);
 	const char* luaO_pushvfstring(lua_State* L, const char* fmt, va_list argp);
 	int _errorfb(lua_State* L, int level);
 	void luaG_runerror(lua_State* L, const char* format, ...);
@@ -313,7 +312,7 @@ extern "C"
 	static void luaC_checkGC(lua_State* const state)
 	{
 		global_State* const globalState = state->l_G;
-		if (globalState->nblocks >= globalState->GCthreshold && globalState->gcTraversalLockDepth == 0) {
+		if (LuaGcThresholdReached(globalState) && globalState->gcTraversalLockDepth == 0) {
 			luaC_collectgarbage(state);
 		}
 	}
@@ -344,23 +343,13 @@ extern "C"
 		constexpr int kInitialCallInfoSlots = 8;
 		constexpr int kInitialCallFrameTopSpan = 20;
 
-		TObject* const stackBase = static_cast<TObject*>(luaM_realloc(
-			allocatorState,
-			nullptr,
-			0u,
-			static_cast<lu_mem>(sizeof(TObject) * kInitialStackSlots)
-		));
+		TObject* const stackBase = luaM_newvector<TObject>(allocatorState, kInitialStackSlots);
 		threadState->stack = stackBase;
 		threadState->top = stackBase;
 		threadState->stacksize = kInitialStackSlots;
 		threadState->stack_last = stackBase + (kInitialStackSlots - kStackGuardTailSlots);
 
-		CallInfo* const callInfoBase = static_cast<CallInfo*>(luaM_realloc(
-			allocatorState,
-			nullptr,
-			0u,
-			static_cast<lu_mem>(sizeof(CallInfo) * kInitialCallInfoSlots)
-		));
+		CallInfo* const callInfoBase = luaM_newvector<CallInfo>(allocatorState, kInitialCallInfoSlots);
 		threadState->ci = callInfoBase;
 		threadState->base_ci = callInfoBase;
 		callInfoBase->state = 5;
@@ -407,34 +396,19 @@ extern "C"
 		if (globalState != nullptr) {
 			(void)luaC_sweep(state, 1);
 			luaS_freeall(state);
-			globalState->buff.buffer = static_cast<char*>(luaM_realloc(
-				state,
-				globalState->buff.buffer,
-				static_cast<lu_mem>(globalState->buff.buffsize),
-				0u
-			));
+			globalState->buff.buffer = luaM_reallocvector<char>(state, globalState->buff.buffer, globalState->buff.buffsize, 0u);
 			globalState->buff.buffsize = 0u;
 		}
 
-		(void)luaM_realloc(
-			state,
-			state->base_ci,
-			static_cast<lu_mem>(sizeof(CallInfo) * state->size_ci),
-			0u
-		);
-		(void)luaM_realloc(
-			state,
-			state->stack,
-			static_cast<lu_mem>(sizeof(TObject) * state->stacksize),
-			0u
-		);
+		luaM_freearray<CallInfo>(state, state->base_ci, static_cast<lu_mem>(state->size_ci));
+		luaM_freearray<TObject>(state, state->stack, static_cast<lu_mem>(state->stacksize));
 
 		if (globalState != nullptr) {
 			// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
 			lua::GcEventLogUnregisterState(globalState);
-			(void)luaM_realloc(&allocatorState, globalState, static_cast<lu_mem>(0x160u), 0u);
+			luaM_freelem<global_State>(&allocatorState, globalState);
 		}
-		(void)luaM_realloc(&allocatorState, state, static_cast<lu_mem>(0x48u), 0u);
+		luaM_freelem<lua_State>(&allocatorState, state);
 	}
 
 	/**
@@ -2040,9 +2014,7 @@ extern "C"
 	 */
 	void luaS_resize(lua_State* const state, const int newsize)
 	{
-		GCObject** const newHash = static_cast<GCObject**>(
-			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(GCObject*) * newsize))
-		);
+		GCObject** const newHash = luaM_newvector<GCObject*>(state, static_cast<lu_mem>(newsize));
 		global_State* const globalState = state->l_G;
 		if (newsize > 0) {
 			std::memset(newHash, 0, static_cast<std::size_t>(sizeof(GCObject*) * newsize));
@@ -2059,12 +2031,7 @@ extern "C"
 			}
 		}
 
-		luaM_realloc(
-			state,
-			globalState->strt.hash,
-			static_cast<lu_mem>(sizeof(GCObject*) * globalState->strt.size),
-			0u
-		);
+		luaM_freearray<GCObject*>(state, globalState->strt.hash, static_cast<lu_mem>(globalState->strt.size));
 		globalState->strt.hash = newHash;
 		globalState->strt.size = newsize;
 	}
@@ -2084,12 +2051,9 @@ extern "C"
 		const std::size_t length
 	)
 	{
-		constexpr std::size_t kTStringHeaderWithTerminator = offsetof(TString, str) + 1u;
 		constexpr int kLuaStringTableMaxGrowth = 0x3FFFFFFE;
 
-		GCObject* const object = static_cast<GCObject*>(
-			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(length + kTStringHeaderWithTerminator))
-		);
+		GCObject* const object = static_cast<GCObject*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizestring(length)));
 		TString* const stringObject = &object->ts;
 		stringObject->len = length;
 		stringObject->hash = hashValue;
@@ -3219,16 +3183,9 @@ extern "C"
 		}
 
 		Proto* const functionProto = functionState->f;
-		if (functionState->nk + 1 > functionProto->sizek) {
-			functionProto->k = static_cast<TObject*>(luaM_growaux(
-				functionState->L,
-				functionProto->k,
-				&functionProto->sizek,
-				static_cast<int>(sizeof(TObject)),
-				0x3FFFF,
-				"constant table overflow"
-			));
-		}
+		luaM_growvector<TObject>(
+			functionState->L, functionProto->k, functionState->nk, functionProto->sizek, 0x3FFFF, "constant table overflow"
+		);
 
 		functionProto->k[functionState->nk] = *valueObject;
 
@@ -3573,9 +3530,9 @@ extern "C"
 	 */
 	int setarrayvector(const int size, Table* const table, lua_State* const state)
 	{
-		const lu_mem oldBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(table->sizearray);
-		const lu_mem newBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(size);
-		table->array = static_cast<TObject*>(luaM_realloc(state, table->array, oldBytes, newBytes));
+		table->array = luaM_reallocvector<TObject>(
+			state, table->array, static_cast<lu_mem>(table->sizearray), static_cast<lu_mem>(size)
+		);
 
 		int index = table->sizearray;
 		while (index < size) {
@@ -3603,8 +3560,7 @@ extern "C"
 
 		const int size = 1 << lsize;
 		if (lsize != 0) {
-			const lu_mem nodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(size);
-			table->node = static_cast<Node*>(luaM_realloc(state, nullptr, 0u, nodeBytes));
+			table->node = luaM_newvector<Node>(state, static_cast<lu_mem>(size));
 
 			for (int index = 0; index < size; ++index) {
 				Node& node = table->node[index];
@@ -3662,7 +3618,7 @@ extern "C"
 	 */
 	Table* luaH_new(lua_State* const state, const int narray, const int lnhash)
 	{
-		Table* const table = static_cast<Table*>(luaM_realloc(state, nullptr, 0u, sizeof(Table)));
+		Table* const table = luaM_new<Table>(state);
 		luaC_link(state, reinterpret_cast<GCObject*>(table), LUA_TTABLE);
 
 		global_State* const globalState = state->l_G;
@@ -3693,13 +3649,11 @@ extern "C"
 	void luaH_free(lua_State* const state, Table* const table)
 	{
 		if (table->lsizenode != 0) {
-			const lu_mem nodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(1u << table->lsizenode);
-			(void)luaM_realloc(state, table->node, nodeBytes, 0u);
+			luaM_freearray<Node>(state, table->node, lu_mem{1u} << table->lsizenode);
 		}
 
-		const lu_mem arrayBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(table->sizearray);
-		(void)luaM_realloc(state, table->array, arrayBytes, 0u);
-		(void)luaM_realloc(state, table, static_cast<lu_mem>(sizeof(Table)), 0u);
+		luaM_freearray<TObject>(state, table->array, static_cast<lu_mem>(table->sizearray));
+		luaM_freelem<Table>(state, table);
 	}
 
 	/**
@@ -3745,9 +3699,9 @@ extern "C"
 				*destinationSlot = *arraySlot;
 			}
 
-			const lu_mem oldArrayBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(oldArraySize);
-			const lu_mem newArrayBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(newArraySize);
-			table->array = static_cast<TObject*>(luaM_realloc(state, table->array, oldArrayBytes, newArrayBytes));
+			table->array = luaM_reallocvector<TObject>(
+				state, table->array, static_cast<lu_mem>(oldArraySize), static_cast<lu_mem>(newArraySize)
+			);
 		}
 
 		const int oldNodeCount = 1 << oldHashBits;
@@ -3762,8 +3716,7 @@ extern "C"
 		}
 
 		if (oldHashBits != 0) {
-			const lu_mem oldNodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(oldNodeCount);
-			(void)luaM_realloc(state, oldNodeArray, oldNodeBytes, 0u);
+			luaM_freearray<Node>(state, oldNodeArray, static_cast<lu_mem>(oldNodeCount));
 			return 0; // The allocator always returns nullptr after freeing a block.
 		}
 
@@ -3990,7 +3943,6 @@ extern "C"
 	int indexupvalue(FuncState* const fs, expdesc* const value, TString* const name)
 	{
 		constexpr int kLuaIntMaxMinusTwo = 0x7FFFFFFD;
-		constexpr int kUpvalueNameEntrySizeBytes = static_cast<int>(sizeof(TString*));
 
 		Proto* const proto = fs->f;
 
@@ -4006,18 +3958,7 @@ extern "C"
 
 		luaX_checklimit(fs->ls, existingUpvalueCount + 1, MAXUPVALUES, "upvalues");
 		int& upvalueCapacity = proto->sizeupvalues;
-		if (existingUpvalueCount + 1 > upvalueCapacity) {
-			proto->upvalues = static_cast<TString**>(
-				luaM_growaux(
-					fs->L,
-					proto->upvalues,
-					&upvalueCapacity,
-					kUpvalueNameEntrySizeBytes,
-					kLuaIntMaxMinusTwo,
-					"upvalues"
-				)
-			);
-		}
+		luaM_growvector<TString*>(fs->L, proto->upvalues, existingUpvalueCount, upvalueCapacity, kLuaIntMaxMinusTwo, "upvalues");
 
 		proto->upvalues[existingUpvalueCount] = name;
 		fs->upvalues[existingUpvalueCount] = *value;
@@ -4064,7 +4005,6 @@ namespace
 		void luaD_reallocCI(lua_State* L, int newsize);
 		void luaD_growstack(lua_State* L, int n);
 		StkId luaV_execute(lua_State* L);
-		void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
 		void correctstack(lua_State* L, TObject* oldstack);
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
@@ -4099,7 +4039,7 @@ namespace
 		if (type != nullptr) {
 			userdata = luaS_newudata(state, type);
 		} else {
-			userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, sizeof(Udata)));
+			userdata = static_cast<Udata*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeudata(nullptr)));
 			userdata->len = 0u;
 			userdata->tt = LUA_TUSERDATA;
 			userdata->marked = 0u;
@@ -4136,14 +4076,14 @@ extern "C" Udata* luaS_newudata(lua_State* const state, gpg::RType* const type)
 		luaG_runerror(state, "type %s is not default constructible", type->GetName());
 	}
 
-	const std::size_t userdataSize = sizeof(Udata) + static_cast<std::size_t>(type->size_);
-	Udata* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
+	const LuaBlockSize userdataSize = sizeudata(type);
+	Udata* const userdata = static_cast<Udata*>(luaM_reallocblock(state, nullptr, {0u, 0u}, userdataSize));
 
 	try {
 		void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
 		(void)type->ctorRefFunc_(payload);
 	} catch (...) {
-		(void)luaM_realloc(state, userdata, userdataSize, 0u);
+		(void)luaM_reallocblock(state, userdata, userdataSize, {0u, 0u});
 		throw;
 	}
 
@@ -4174,14 +4114,14 @@ namespace
 			luaG_runerror(state, "type %s is not copy constructible", sourceType->GetName());
 		}
 
-		const std::size_t userdataSize = sizeof(Udata) + static_cast<std::size_t>(sourceType->size_);
-		Udata* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
+		const LuaBlockSize userdataSize = sizeudata(sourceType);
+		Udata* const userdata = static_cast<Udata*>(luaM_reallocblock(state, nullptr, {0u, 0u}, userdataSize));
 
 		try {
 			void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
 			(void)sourceType->movRefFunc_(payload, sourceRef);
 		} catch (...) {
-			(void)luaM_realloc(state, userdata, userdataSize, 0u);
+			(void)luaM_reallocblock(state, userdata, userdataSize, {0u, 0u});
 			throw;
 		}
 
@@ -4959,12 +4899,9 @@ namespace
 		TObject* const oldStackBase = state->stack;
 		const int newStackSize =
 			(n > currentStackSize) ? (currentStackSize + n + kLuaExtraStackSlots) : (currentStackSize * 2);
-		TObject* const newStackBase = static_cast<TObject*>(luaM_realloc(
-			state,
-			oldStackBase,
-			static_cast<lu_mem>(sizeof(TObject) * currentStackSize),
-			static_cast<lu_mem>(sizeof(TObject) * newStackSize)
-		));
+		TObject* const newStackBase = luaM_reallocvector<TObject>(
+			state, oldStackBase, static_cast<lu_mem>(currentStackSize), static_cast<lu_mem>(newStackSize)
+		);
 		state->stack = newStackBase;
 		state->stacksize = newStackSize;
 		state->stack_last = &newStackBase[newStackSize - 6];
@@ -5201,12 +5138,9 @@ namespace
 				newStackSize = currentStackSize + 6;
 			}
 
-			TObject* const newStackBase = static_cast<TObject*>(luaM_realloc(
-				state,
-				oldStackBase,
-				static_cast<lu_mem>(sizeof(TObject) * currentStackSize),
-				static_cast<lu_mem>(sizeof(TObject) * newStackSize)
-			));
+			TObject* const newStackBase = luaM_reallocvector<TObject>(
+				state, oldStackBase, static_cast<lu_mem>(currentStackSize), static_cast<lu_mem>(newStackSize)
+			);
 			state->stack = newStackBase;
 			state->stack_last = &newStackBase[newStackSize - 6];
 			state->stacksize = newStackSize;
@@ -7081,7 +7015,7 @@ namespace
 			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
 		}
 
-		proto->code = static_cast<Instruction*>(luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * count)));
+		proto->code = luaM_newvector<Instruction>(loadState->state, static_cast<lu_mem>(count));
 		proto->sizecode = count;
 		LuaLoadElementArray(reinterpret_cast<char*>(proto->code), loadState, count, 4);
 	}
@@ -7101,7 +7035,7 @@ namespace
 			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
 		}
 
-		proto->lineinfo = static_cast<int*>(luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * count)));
+		proto->lineinfo = luaM_newvector<int>(loadState->state, static_cast<lu_mem>(count));
 		proto->sizelineinfo = count;
 		LuaLoadElementArray(reinterpret_cast<char*>(proto->lineinfo), loadState, count, 4);
 	}
@@ -7156,9 +7090,7 @@ namespace
 			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
 		}
 
-		proto->locvars = static_cast<LocVar*>(
-			luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(static_cast<int>(sizeof(LocVar)) * count))
-		);
+		proto->locvars = luaM_newvector<LocVar>(loadState->state, static_cast<lu_mem>(count));
 		proto->sizelocvars = count;
 
 		if (count <= 0) {
@@ -7210,9 +7142,7 @@ namespace
 			);
 		}
 
-		proto->upvalues = static_cast<TString**>(
-			luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * count))
-		);
+		proto->upvalues = luaM_newvector<TString*>(loadState->state, static_cast<lu_mem>(count));
 		proto->sizeupvalues = count;
 
 		for (int index = 0; index < count; ++index) {
@@ -7238,9 +7168,7 @@ namespace
 			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
 		}
 
-		proto->k = static_cast<LuaPlus::TObject*>(
-			luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(8 * constantCount))
-		);
+		proto->k = luaM_newvector<LuaPlus::TObject>(loadState->state, static_cast<lu_mem>(constantCount));
 		proto->sizek = constantCount;
 
 		for (int index = 0; index < constantCount; ++index) {
@@ -7277,7 +7205,7 @@ namespace
 			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
 		}
 
-		proto->p = static_cast<Proto**>(luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * childCount)));
+		proto->p = luaM_newvector<Proto*>(loadState->state, static_cast<lu_mem>(childCount));
 		proto->sizep = childCount;
 
 		for (int index = 0; index < childCount; ++index) {
@@ -7727,7 +7655,7 @@ namespace
 				luaF_freeclosure(state, reinterpret_cast<Closure*>(object));
 				break;
 			case LUA_TUPVALUE:
-				(void)luaM_realloc(state, object, static_cast<lu_mem>(sizeof(UpVal)), 0u);
+				luaM_freelem<UpVal>(state, reinterpret_cast<UpVal*>(object));
 				break;
 			case LUA_TTABLE:
 				luaH_free(state, reinterpret_cast<Table*>(object));
@@ -7744,9 +7672,7 @@ namespace
 				// the true total - eventually underflowing and leaving the
 				// collector running against a bogus threshold.
 				const auto* const ts = reinterpret_cast<const TString*>(object);
-				const lu_mem stringByteSize =
-					static_cast<lu_mem>(offsetof(TString, str) + (ts->len + 1u) * sizeof(char));
-				(void)luaM_realloc(state, object, stringByteSize, 0u);
+				(void)luaM_reallocblock(state, object, sizestring(ts->len), {0u, 0u});
 				break;
 			}
 			case LUA_TUSERDATA: {
@@ -7759,8 +7685,7 @@ namespace
 				// `luaS_newudata` exactly.
 				const auto* const ud = reinterpret_cast<const Udata*>(object);
 				const auto* const type = reinterpret_cast<const gpg::RType*>(ud->len);
-				const lu_mem udataByteSize = static_cast<lu_mem>(sizeof(Udata) + type->size_);
-				(void)luaM_realloc(state, object, udataByteSize, 0u);
+				(void)luaM_reallocblock(state, object, sizeudata(type), {0u, 0u});
 				break;
 			}
 			default:
@@ -7847,8 +7772,7 @@ namespace
 		if (globalState->buff.buffsize > 64u) {
 			const lu_mem oldBufferSize = globalState->buff.buffsize;
 			const lu_mem newBufferSize = oldBufferSize >> 1;
-			globalState->buff.buffer =
-				static_cast<char*>(luaM_realloc(state, globalState->buff.buffer, oldBufferSize, newBufferSize));
+			globalState->buff.buffer = luaM_reallocvector<char>(state, globalState->buff.buffer, oldBufferSize, newBufferSize);
 			globalState->buff.buffsize = newBufferSize;
 		}
 
@@ -12781,11 +12705,18 @@ extern "C"
 	 * allocated-byte counter is adjusted by the same delta. Note the counter
 	 * update runs even on the error paths - that is the binary's behaviour,
 	 * not an oversight here.
+	 *
+	 * x64 port: the counter moves by `accountedOldSize`/`accountedSize`, the
+	 * sizes the x86 binary allocated, so collections run at the same points on
+	 * every build (LuaMemAccounting.h); on x86 they equal `oldsize`/`size`.
 	 */
 	// noexcept(false) is load-bearing: /EHc makes the compiler assume an
 	// extern "C" function cannot throw, and this one does - the binary raises
 	// lua_MemError through _CxxThrowException on allocation failure.
-	void* luaM_realloc(lua_State* const state, void* const block, const lu_mem oldsize, const lu_mem size)
+	void* luaM_realloc(
+		lua_State* const state, void* const block, const lu_mem oldsize, const lu_mem size,
+		const lu_mem accountedOldSize, const lu_mem accountedSize
+	)
 	{
 		// The largest block the allocator will attempt; anything at or above
 		// this is reported rather than passed on ("cmp ebx, 0FFFFFFFDh").
@@ -12820,8 +12751,8 @@ extern "C"
 		}
 
 		if (state != nullptr) {
-			state->l_G->nblocks -= oldsize;
-			state->l_G->nblocks += size;
+			state->l_G->nblocks -= accountedOldSize;
+			state->l_G->nblocks += accountedSize;
 			// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
 			lua::GcEventLogCountRealloc(state->l_G);
 		}
@@ -12842,10 +12773,13 @@ extern "C"
 	 * to `limit` itself; if it is already at `limit - MINSIZEARRAY` or beyond,
 	 * growing further would not make room for a useful batch of new elements, so
 	 * it reports `what` as a fixed overflow message instead of growing.
+	 *
+	 * `accountedSizeElems` (x64 port) is the element's x86 size, which is
+	 * what the byte counter is charged; see luaM_realloc.
 	 */
 	void* luaM_growaux(
-		lua_State* const state, void* const block, int* const size, const int sizeElems, const int limit,
-		const char* const what
+		lua_State* const state, void* const block, int* const size, const int sizeElems,
+		const int accountedSizeElems, const int limit, const char* const what
 	)
 	{
 		constexpr int kMinSizeArray = 4;
@@ -12861,7 +12795,8 @@ extern "C"
 		}
 
 		void* const newBlock = luaM_realloc(
-			state, block, static_cast<lu_mem>(sizeElems * *size), static_cast<lu_mem>(sizeElems * newSize)
+			state, block, static_cast<lu_mem>(sizeElems * *size), static_cast<lu_mem>(sizeElems * newSize),
+			static_cast<lu_mem>(accountedSizeElems * *size), static_cast<lu_mem>(accountedSizeElems * newSize)
 		);
 		*size = newSize;
 		return newBlock;
@@ -13706,9 +13641,7 @@ extern "C"
 	 */
 	lua_State* luaE_newthread(lua_State* const state)
 	{
-		auto* const thread = static_cast<lua_State*>(
-			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(lua_State)))
-		);
+		auto* const thread = luaM_new<lua_State>(state);
 
 		thread->next = state->l_G->rootgc1;
 		state->l_G->rootgc1 = reinterpret_cast<GCObject*>(thread);
@@ -13758,9 +13691,9 @@ extern "C"
 		}
 
 		luaF_close(thread, thread->stack);
-		(void)luaM_realloc(state, thread->base_ci, sizeof(CallInfo) * thread->size_ci, 0u);
-		(void)luaM_realloc(state, thread->stack, sizeof(TObject) * thread->stacksize, 0u);
-		(void)luaM_realloc(state, thread, static_cast<lu_mem>(sizeof(lua_State)), 0u);
+		luaM_freearray<CallInfo>(state, thread->base_ci, static_cast<lu_mem>(thread->size_ci));
+		luaM_freearray<TObject>(state, thread->stack, static_cast<lu_mem>(thread->stacksize));
+		luaM_freelem<lua_State>(state, thread);
 	}
 
 	/**
@@ -14219,12 +14152,7 @@ extern "C"
 	 */
 	Closure* luaF_newLclosure(lua_State* const state, const int nelems, const TObject* const environment)
 	{
-		auto* const closure = static_cast<Closure*>(luaM_realloc(
-			state,
-			nullptr,
-			0u,
-			static_cast<lu_mem>(offsetof(LClosure, upvals) + sizeof(UpVal*) * nelems)
-		));
+		auto* const closure = static_cast<Closure*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeLclosure(nelems)));
 
 		luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_TFUNCTION);
 
@@ -14243,7 +14171,7 @@ extern "C"
 	 */
 	UpVal* luaF_newupval(lua_State* const state)
 	{
-		auto* const upvalue = static_cast<UpVal*>(luaM_realloc(state, nullptr, 0u, sizeof(UpVal)));
+		auto* const upvalue = luaM_new<UpVal>(state);
 		upvalue->v = &upvalue->value;
 		luaC_link(state, reinterpret_cast<GCObject*>(upvalue), LUA_TUPVALUE);
 		return upvalue;
@@ -14265,12 +14193,9 @@ extern "C"
 		constexpr int kStackHeadroom = 6;
 
 		StkId const oldStack = state->stack;
-		auto* const newStack = static_cast<StkId>(luaM_realloc(
-			state,
-			oldStack,
-			static_cast<lu_mem>(sizeof(TObject) * state->stacksize),
-			static_cast<lu_mem>(sizeof(TObject) * newsize)
-		));
+		auto* const newStack = luaM_reallocvector<TObject>(
+			state, oldStack, static_cast<lu_mem>(state->stacksize), static_cast<lu_mem>(newsize)
+		);
 
 		state->stack_last = &newStack[newsize - kStackHeadroom];
 		state->stack = newStack;
@@ -14294,12 +14219,9 @@ extern "C"
 		CallInfo* const oldBase = state->base_ci;
 		const ptrdiff_t activeFrame = state->ci - oldBase;
 
-		auto* const newBase = static_cast<CallInfo*>(luaM_realloc(
-			state,
-			oldBase,
-			static_cast<lu_mem>(sizeof(CallInfo) * state->size_ci),
-			static_cast<lu_mem>(sizeof(CallInfo) * newsize)
-		));
+		auto* const newBase = luaM_reallocvector<CallInfo>(
+			state, oldBase, static_cast<lu_mem>(state->size_ci), static_cast<lu_mem>(newsize)
+		);
 
 		state->ci = &newBase[activeFrame];
 		state->size_ci = static_cast<std::uint16_t>(newsize);
@@ -14445,13 +14367,13 @@ extern "C"
 	 */
 	void luaF_freeproto(lua_State* const state, Proto* const proto)
 	{
-		(void)luaM_realloc(state, proto->code, sizeof(Instruction) * proto->sizecode, 0u);
-		(void)luaM_realloc(state, proto->p, sizeof(Proto*) * proto->sizep, 0u);
-		(void)luaM_realloc(state, proto->k, sizeof(TObject) * proto->sizek, 0u);
-		(void)luaM_realloc(state, proto->lineinfo, sizeof(int) * proto->sizelineinfo, 0u);
-		(void)luaM_realloc(state, proto->locvars, sizeof(LocVar) * proto->sizelocvars, 0u);
-		(void)luaM_realloc(state, proto->upvalues, sizeof(TString*) * proto->sizeupvalues, 0u);
-		(void)luaM_realloc(state, proto, static_cast<lu_mem>(sizeof(Proto)), 0u);
+		luaM_freearray<Instruction>(state, proto->code, static_cast<lu_mem>(proto->sizecode));
+		luaM_freearray<Proto*>(state, proto->p, static_cast<lu_mem>(proto->sizep));
+		luaM_freearray<TObject>(state, proto->k, static_cast<lu_mem>(proto->sizek));
+		luaM_freearray<int>(state, proto->lineinfo, static_cast<lu_mem>(proto->sizelineinfo));
+		luaM_freearray<LocVar>(state, proto->locvars, static_cast<lu_mem>(proto->sizelocvars));
+		luaM_freearray<TString*>(state, proto->upvalues, static_cast<lu_mem>(proto->sizeupvalues));
+		luaM_freelem<Proto>(state, proto);
 	}
 
 	/**
@@ -14682,9 +14604,7 @@ extern "C"
 	 */
 	Proto* luaF_newproto(lua_State* const state)
 	{
-		auto* const proto = static_cast<Proto*>(
-			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(Proto)))
-		);
+		auto* const proto = luaM_new<Proto>(state);
 		luaC_link(state, reinterpret_cast<GCObject*>(proto), LUA_TPROTO);
 
 		proto->k = nullptr;
@@ -14729,14 +14649,11 @@ extern "C"
 	 */
 	void luaF_freeclosure(lua_State* const state, Closure* const closure)
 	{
-		constexpr size_t kClosureHeaderSize = 28u;
-
-		(void)luaM_realloc(
-			state,
-			closure,
-			static_cast<lu_mem>(kClosureHeaderSize + 4u * closure->c.nupvalues),
-			0u
-		);
+		// The real size only reaches the free hook, which ignores it; the
+		// counter is charged the binary's Lua-closure formula
+		// (kLuaX86LClosureHeader = 28, 4 per upvalue) for either kind.
+		const LuaBlockSize lClosureSize = sizeLclosure(closure->c.nupvalues);
+		(void)luaM_realloc(state, closure, lClosureSize.real, 0u, lClosureSize.accounted, 0u);
 	}
 
 	/**
@@ -14767,9 +14684,7 @@ extern "C"
 			link = &candidate->gch.next;
 		}
 
-		auto* const upvalue = static_cast<UpVal*>(
-			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(UpVal)))
-		);
+		auto* const upvalue = luaM_new<UpVal>(state);
 		upvalue->tt = LUA_TUPVALUE;
 		upvalue->marked = 1;
 		upvalue->v = level;
@@ -16391,7 +16306,8 @@ extern "C"
 				continue;
 			}
 
-			deadmem += static_cast<size_t>(reinterpret_cast<gpg::RType*>(current->u.len)->size_);
+			// The payload's x86 size: deadmem is charged against nblocks (x64 port, LuaMemAccounting.h).
+			deadmem += static_cast<size_t>(LuaX86PayloadSize(reinterpret_cast<gpg::RType*>(current->u.len)));
 			*survivor = current->gch.next;
 			current->gch.next = nullptr;
 			*lastCollected = current;
@@ -16805,12 +16721,7 @@ extern "C"
 	 */
 	Closure* luaF_newCclosure(lua_State* const state, const int nelems)
 	{
-		auto* const closure = static_cast<Closure*>(luaM_realloc(
-			state,
-			nullptr,
-			0u,
-			static_cast<lu_mem>(offsetof(CClosure, upvalue) + sizeof(LuaPlus::TObject) * nelems)
-		));
+		auto* const closure = static_cast<Closure*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeCclosure(nelems)));
 
 		luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_CFUNCTION);
 
@@ -16852,8 +16763,8 @@ extern "C"
 
 			const unsigned int savedAllocFlags = state->allocFlags;
 			state->allocFlags = 1u;
-			buff->buffer = static_cast<char*>(
-				luaM_realloc(state, buff->buffer, static_cast<lu_mem>(buff->buffsize), static_cast<lu_mem>(newSize))
+			buff->buffer = luaM_reallocvector<char>(
+				state, buff->buffer, static_cast<lu_mem>(buff->buffsize), static_cast<lu_mem>(newSize)
 			);
 			state->allocFlags = savedAllocFlags;
 
@@ -16988,12 +16899,7 @@ extern "C"
 	void luaS_freeall(lua_State* const state)
 	{
 		global_State* const globalState = state->l_G;
-		(void)luaM_realloc(
-			state,
-			globalState->strt.hash,
-			static_cast<lu_mem>(sizeof(GCObject*) * globalState->strt.size),
-			0u
-		);
+		luaM_freearray<GCObject*>(state, globalState->strt.hash, static_cast<lu_mem>(globalState->strt.size));
 	}
 
 	/**
@@ -17079,11 +16985,9 @@ extern "C"
 		bootstrapGlobals.reallocFunc = luaHelper_Realloc;
 		bootstrapGlobals.freeFunc = luaHelper_Free;
 		bootstrapGlobals.memData = luaHelper_memData;
-		bootstrapGlobals.nblocks = static_cast<lu_mem>(sizeof(lua_State) + sizeof(global_State));
+		bootstrapGlobals.nblocks = kLuaX86Size<lua_State> + kLuaX86Size<global_State>;
 
-		auto* const globalState = static_cast<global_State*>(
-			luaM_realloc(&bootstrapState, nullptr, 0u, static_cast<lu_mem>(sizeof(global_State)))
-		);
+		auto* const globalState = luaM_new<global_State>(&bootstrapState);
 		if (globalState == nullptr) {
 			throw lua_MemError(lua::lua_Error(state, LUA_ERRMEM, "out of memory"));
 		}
@@ -17103,7 +17007,7 @@ extern "C"
 		globalState->buff.buffsize = 0u;
 		globalState->GCthreshold = 0u;
 		globalState->gcTraversalLockDepth = 0;
-		globalState->nblocks = static_cast<lu_mem>(sizeof(lua_State) + sizeof(global_State));
+		globalState->nblocks = kLuaX86Size<lua_State> + kLuaX86Size<global_State>;
 		globalState->_defaultmeta.tt = LUA_TNIL;
 		globalState->_registry.tt = LUA_TNIL;
 		globalState->mainthread = state;
@@ -17194,11 +17098,9 @@ extern "C"
 		bootstrapGlobals.reallocFunc = luaHelper_Realloc;
 		bootstrapGlobals.freeFunc = luaHelper_Free;
 		bootstrapGlobals.memData = luaHelper_memData;
-		bootstrapGlobals.nblocks = static_cast<lu_mem>(sizeof(lua_State) + sizeof(global_State));
+		bootstrapGlobals.nblocks = kLuaX86Size<lua_State> + kLuaX86Size<global_State>;
 
-		auto* const state = static_cast<lua_State*>(
-			luaM_realloc(&bootstrapState, nullptr, 0u, static_cast<lu_mem>(sizeof(lua_State)))
-		);
+		auto* const state = luaM_new<lua_State>(&bootstrapState);
 		if (state == nullptr) {
 			return nullptr;
 		}
@@ -18249,65 +18151,35 @@ void Proto::MemberDeserialize(gpg::ReadArchive* const archive, const int, const 
 	const gpg::RRef& owner = ownerRef;
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 
-	k = static_cast<TObject*>(luaM_realloc(
-		ownerState,
-		nullptr,
-		0u,
-		static_cast<lu_mem>(sizeof(TObject) * static_cast<std::size_t>(sizek))
-	));
+	k = luaM_newvector<TObject>(ownerState, static_cast<lu_mem>(sizek));
 	for (int index = 0; index < sizek; ++index) {
 		archive->Read(tObjectType, &k[index], owner);
 	}
 
-	code = static_cast<Instruction*>(luaM_realloc(
-		ownerState,
-		nullptr,
-		0u,
-		static_cast<lu_mem>(sizeof(Instruction) * static_cast<std::size_t>(sizecode))
-	));
+	code = luaM_newvector<Instruction>(ownerState, static_cast<lu_mem>(sizecode));
 	archive->ReadBytes(
 		reinterpret_cast<char*>(code),
 		sizeof(Instruction) * static_cast<std::size_t>(sizecode)
 	);
 
-	p = static_cast<Proto**>(luaM_realloc(
-		ownerState,
-		nullptr,
-		0u,
-		static_cast<lu_mem>(sizeof(Proto*) * static_cast<std::size_t>(sizep))
-	));
+	p = luaM_newvector<Proto*>(ownerState, static_cast<lu_mem>(sizep));
 	for (int index = 0; index < sizep; ++index) {
 		archive->ReadPointer(&p[index], &ownerRef);
 	}
 
-	lineinfo = static_cast<int*>(luaM_realloc(
-		ownerState,
-		nullptr,
-		0u,
-		static_cast<lu_mem>(sizeof(int) * static_cast<std::size_t>(sizelineinfo))
-	));
+	lineinfo = luaM_newvector<int>(ownerState, static_cast<lu_mem>(sizelineinfo));
 	for (int index = 0; index < sizelineinfo; ++index) {
 		archive->ReadInt(&lineinfo[index]);
 	}
 
-	locvars = static_cast<LocVar*>(luaM_realloc(
-		ownerState,
-		nullptr,
-		0u,
-		static_cast<lu_mem>(sizeof(LocVar) * static_cast<std::size_t>(sizelocvars))
-	));
+	locvars = luaM_newvector<LocVar>(ownerState, static_cast<lu_mem>(sizelocvars));
 	for (int index = 0; index < sizelocvars; ++index) {
 		archive->ReadPointer(&locvars[index].varname, &ownerRef);
 		archive->ReadInt(&locvars[index].startpc);
 		archive->ReadInt(&locvars[index].endpc);
 	}
 
-	upvalues = static_cast<TString**>(luaM_realloc(
-		ownerState,
-		nullptr,
-		0u,
-		static_cast<lu_mem>(sizeof(TString*) * static_cast<std::size_t>(nups))
-	));
+	upvalues = luaM_newvector<TString*>(ownerState, static_cast<lu_mem>(nups));
 	for (int index = 0; index < nups; ++index) {
 		archive->ReadPointer(&upvalues[index], &ownerRef);
 	}
