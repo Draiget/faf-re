@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -549,24 +550,6 @@ namespace
         return ProbeHeapModeSelected() != ProbeHeapMode::Engine;
     }
 
-    [[nodiscard]] void* ProbeSystemHeapAlloc(const std::size_t size) noexcept
-    {
-        const std::size_t bytes = (size != 0u) ? size : 1u;
-        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
-            return ::_malloc_dbg(bytes, _NORMAL_BLOCK, "engine", 0);
-        }
-        return ::HeapAlloc(EngineSystemHeap(), 0, bytes);
-    }
-
-    void ProbeSystemHeapFree(void* const ptr) noexcept
-    {
-        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
-            ::_free_dbg(ptr, _NORMAL_BLOCK);
-            return;
-        }
-        (void)::HeapFree(EngineSystemHeap(), 0, ptr);
-    }
-
     [[nodiscard]] std::size_t ProbeSystemHeapSize(void* const ptr) noexcept
     {
         if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
@@ -574,6 +557,68 @@ namespace
         }
         const SIZE_T heapSize = ::HeapSize(EngineSystemHeap(), 0, ptr);
         return (heapSize == static_cast<SIZE_T>(-1)) ? 0u : static_cast<std::size_t>(heapSize);
+    }
+
+    // Not in the binary (x64 port, plan 3a). While a system heap serves every
+    // engine block the engine allocator never starts, so its counters stay
+    // zero and the `Heap_*` engine stats would read 0B. The bytes of the live
+    // engine blocks are counted here instead, at the size the heap actually
+    // handed out (`HeapSize`/`_msize_dbg`), so a block adds and removes the
+    // same amount.
+    std::atomic<std::size_t> gSystemHeapBytesInUse{0u};
+
+    [[nodiscard]] void* ProbeSystemHeapAlloc(const std::size_t size) noexcept
+    {
+        const std::size_t bytes = (size != 0u) ? size : 1u;
+        void* const block = (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap)
+            ? ::_malloc_dbg(bytes, _NORMAL_BLOCK, "engine", 0)
+            : ::HeapAlloc(EngineSystemHeap(), 0, bytes);
+        if (block != nullptr) {
+            gSystemHeapBytesInUse.fetch_add(ProbeSystemHeapSize(block), std::memory_order_relaxed);
+        }
+        return block;
+    }
+
+    void ProbeSystemHeapFree(void* const ptr) noexcept
+    {
+        gSystemHeapBytesInUse.fetch_sub(ProbeSystemHeapSize(ptr), std::memory_order_relaxed);
+        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
+            ::_free_dbg(ptr, _NORMAL_BLOCK);
+            return;
+        }
+        (void)::HeapFree(EngineSystemHeap(), 0, ptr);
+    }
+
+    /// `gpg::GetHeapInfo` for the system-heap path (not in the binary). `inUse`
+    /// is the engine's own live bytes. The heap-wide figures come from
+    /// `HeapSummary`, so they include whatever else shares that heap (the CRT
+    /// uses the process heap too): `committed`/`total` are its committed bytes
+    /// and `inSmallBlocks` the committed bytes not held by engine blocks, which
+    /// keeps `Heap_TotalCheck` (`inSmallBlocks + inUse`) equal to `total`, as it
+    /// is for the engine allocator. The debug CRT heap has no summary; there
+    /// every figure is the engine's live bytes.
+    void FillSystemHeapStats(gpg::HeapStats& stats) noexcept
+    {
+        const std::size_t inUse = gSystemHeapBytesInUse.load(std::memory_order_relaxed);
+        stats = {};
+        stats.reserved = inUse;
+        stats.committed = inUse;
+        stats.total = inUse;
+        stats.inUse = inUse;
+        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
+            return;
+        }
+
+        HEAP_SUMMARY summary{};
+        summary.cb = sizeof(summary);
+        if (::HeapSummary(EngineSystemHeap(), 0, &summary) == FALSE) {
+            return;
+        }
+        const std::size_t committed = (summary.cbCommitted > inUse) ? summary.cbCommitted : inUse;
+        stats.reserved = (summary.cbReserved > committed) ? summary.cbReserved : committed;
+        stats.committed = committed;
+        stats.total = committed;
+        stats.inSmallBlocks = committed - inUse;
     }
     // Victim block address observed by [CLOBBER]; heap layout is deterministic.
     constexpr std::uintptr_t kProbeVictimBlock = 0x5C803E00u;
@@ -2429,9 +2474,10 @@ void gpg::GetHeapInfo(HeapStats* const outStats)
     }
 
     // On a system heap the engine allocator never starts, and must not be
-    // started here just to read its (empty) counters.
+    // started here just to read its (empty) counters; report the system
+    // heap's own figures instead.
     if (ProbeUseSystemHeap()) {
-        *outStats = {};
+        FillSystemHeapStats(*outStats);
         return;
     }
 

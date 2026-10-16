@@ -121,15 +121,18 @@ namespace
    * What it does:
    * Formats byte counts as `B/K/M/G` with precision rules based on magnitude.
    */
-  [[nodiscard]] msvc8::string FormatByteSize(const std::uint32_t valueBytes)
+  [[nodiscard]] msvc8::string FormatByteSize(const std::size_t valueBytes)
   {
-    const int scaled = static_cast<int>(valueBytes);
+    // x86: `std::size_t`/`std::intptr_t` are the binary's `unsigned int`/`int`,
+    // including its signed view of counts above 2 GB. x64 keeps 64 bits, so a
+    // heap past 4 GB still prints as gigabytes.
+    const std::intptr_t scaled = static_cast<std::intptr_t>(valueBytes);
     if (valueBytes + 0x400u <= 0x800u) {
-      return gpg::STR_Printf("%dB", scaled);
+      return gpg::STR_Printf("%dB", static_cast<int>(scaled));
     }
 
     const char* suffix = "KMG";
-    int shifted = scaled;
+    std::intptr_t shifted = scaled;
     while (shifted >= 0x100000 || shifted <= -0x100000) {
       ++suffix;
       shifted >>= 10;
@@ -147,7 +150,7 @@ namespace
   }
 
   void PublishEngineStringStat(
-    moho::StatItem*& slot, const char* const statPath, const std::uint32_t valueBytes
+    moho::StatItem*& slot, const char* const statPath, const std::size_t valueBytes
   )
   {
     EnsureEngineStringStatItem(slot, statPath);
