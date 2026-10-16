@@ -5178,8 +5178,10 @@ CScrLuaInitForm* moho::func_CAiBrainGiveResource_LuaFuncDef()
  * Address: 0x00588270 (FUN_00588270, cfunc_CAiBrainGiveResourceL)
  *
  * What it does:
- * Reads `(brain, resourceType, amount)` and adds `amount` into the selected
- * stored economy-resource lane.
+ * Reads `(brain, resourceType, amount)` and banks `amount` into the selected
+ * lane of the economy's per-tick resources. 0x005883A4 adds to
+ * `GetEconomy() + 0x08` (`mResources`), so the gift is reported as income by
+ * the next economy tick and reaches storage through it.
  */
 int moho::cfunc_CAiBrainGiveResourceL(LuaPlus::LuaState* const state)
 {
@@ -5211,9 +5213,9 @@ int moho::cfunc_CAiBrainGiveResourceL(LuaPlus::LuaState* const state)
   SelectResourceLane(valueToAdd, resource) = amount;
 
   CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
-  SEconPair& stored = economyInfo->economy.mStored;
-  stored.ENERGY += valueToAdd.ENERGY;
-  stored.MASS += valueToAdd.MASS;
+  SEconPair& banked = economyInfo->mResources;
+  banked.ENERGY += valueToAdd.ENERGY;
+  banked.MASS += valueToAdd.MASS;
   return 0;
 }
 
