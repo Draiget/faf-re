@@ -357,8 +357,9 @@ namespace moho
 
     const std::uint8_t sizeX = mBlueprint->mFootprint.mSizeX;
     const std::uint8_t sizeZ = mBlueprint->mFootprint.mSizeZ;
-    const int minX = static_cast<int>(mBuildPosition.x - static_cast<float>(sizeX) * 0.5f);
-    const int minZ = static_cast<int>(mBuildPosition.z - static_cast<float>(sizeZ) * 0.5f);
+    // 0x005F6F1E..0x005F6F51: `fistp` (round to nearest) narrowed to a short.
+    const int minX = static_cast<std::int16_t>(std::lrintf(mBuildPosition.x - static_cast<float>(sizeX) * 0.5f));
+    const int minZ = static_cast<std::int16_t>(std::lrintf(mBuildPosition.z - static_cast<float>(sizeZ) * 0.5f));
     const int maxX = minX + static_cast<int>(sizeX);
     const int maxZ = minZ + static_cast<int>(sizeZ);
 
@@ -422,7 +423,9 @@ namespace moho
       const LuaPlus::LuaObject e2{};
       const LuaPlus::LuaObject e3{};
       const LuaPlus::LuaObject e4{};
-      if (!nearest->RunScriptMultiRet("GetRebuildBonus", results, bpLua, e1, e2, e3, e4) ||
+      // 0x005F7311..0x005F732B: the script runs on the builder (`mUnit`), which
+      // is the class that defines GetRebuildBonus -- the wreck has no such method.
+      if (!mUnit->RunScriptMultiRet("GetRebuildBonus", results, bpLua, e1, e2, e3, e4) ||
           (results.end() - results.begin()) != 1) {
         gpg::Warnf("Failed to get valid rebuild bonus from the script");
         return nullptr;

@@ -14297,10 +14297,10 @@ float Unit::GetArmorMult(const msvc8::string& damageType) const
  * Advances construction by `delta` and scales health to match. See the header
  * for the completion side effects.
  *
- * The declared float result is never produced: the epilogue at 0x006AA2F2
- * loads a frame slot the body never writes, and every call site discards it.
- * `Entity` declares this slot as returning float so the signature keeps it;
- * 0.0f is returned to keep the function well-defined.
+ * Returns the change actually applied to the build fraction: 0x006AA03E..
+ * 0x006AA042 stores (new fraction - old fraction) into the frame slot the
+ * epilogue at 0x006AA2F2 loads, on every path past the zero-delta exit.
+ * CUnitReclaimTask credits reclaimed resources in proportion to it.
  */
 float Unit::Materialize(const float delta)
 {
@@ -14319,7 +14319,8 @@ float Unit::Materialize(const float delta)
     return 0.0f;
   }
 
-  const float stepped = mVarDat.mFractionComplete + delta;
+  const float previousFraction = mVarDat.mFractionComplete;
+  const float stepped = previousFraction + delta;
   if (delta <= 0.0f) {
     mVarDat.mFractionComplete = std::clamp(stepped, 0.0f, 1.0f);
   } else {
@@ -14333,10 +14334,11 @@ float Unit::Materialize(const float delta)
     mVarDat.mFractionComplete = (healthRatio > progressed) ? healthRatio : progressed;
   }
 
+  const float appliedFraction = mVarDat.mFractionComplete - previousFraction;
   AdjustHealth(nullptr, mVarDat.mMaxHealth * delta);
 
   if (mVarDat.mIsBeingBuilt == 0u || mVarDat.mFractionComplete != 1.0f) {
-    return 0.0f;
+    return appliedFraction;
   }
 
   VarDat().mUnitStates &= ~(1ull << UNITSTATE_BeingBuilt);
@@ -14382,7 +14384,7 @@ float Unit::Materialize(const float delta)
     }
   }
 
-  return 0.0f;
+  return appliedFraction;
 }
 
 /**
