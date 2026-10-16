@@ -273,17 +273,6 @@ namespace
     return EvaluateWeaponTargetSolutionStatusGun(weapon, targetPos, nullptr);
   }
 
-  [[nodiscard]] bool CanWeaponPickEntityTarget(UnitWeapon* const weapon, Entity* const targetEntity)
-  {
-    if (weapon == nullptr || targetEntity == nullptr) {
-      return false;
-    }
-
-    CAiTarget target{};
-    target.UpdateTarget(targetEntity);
-    return UnitWeapon::CanAttackTarget(&target, weapon);
-  }
-
   [[nodiscard]] CAiTarget BuildClearedTarget()
   {
     CAiTarget target{};
@@ -855,8 +844,10 @@ bool CAiAttackerImpl::PickTarget(Entity* const targetEntity)
     return false;
   }
 
+  // 0x005D6F7E tests the entity itself through `func_PickTargetPoint`
+  // (0x006D5590); no `CAiTarget` is built, so no target point is drawn.
   for (UnitWeapon* const weapon : view->mWeapons) {
-    if (CanWeaponPickEntityTarget(weapon, targetEntity)) {
+    if (WeaponCanAttackEntityTarget(targetEntity, weapon)) {
       return true;
     }
   }
@@ -1043,7 +1034,10 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       }
     }
 
-    if (!CanWeaponPickEntityTarget(weapon, candidate)) {
+    // 0x005D7D58: the candidate goes straight to `func_PickTargetPoint`
+    // (0x006D5590). Wrapping it in a `CAiTarget` first would pick a random
+    // target point and spend a sim RNG draw per candidate.
+    if (!WeaponCanAttackEntityTarget(candidate, weapon)) {
       continue;
     }
 
