@@ -585,6 +585,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\core\diagnostics\CrashReport.cpp" />
     <ClCompile Include="gpg\core\diagnostics\ProbeWatch.cpp" />
     <ClCompile Include="lua\LuaCrashDump.cpp" />
+    <ClCompile Include="lua\LuaGcEventLog.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBaseTypeInfo.cpp" />
     <ClCompile Include="moho\serialization\CPrefetchSetSerializer.cpp" />

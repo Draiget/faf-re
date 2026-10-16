@@ -25,6 +25,7 @@
 #include "LuaAssertion.h"
 #include "LuaCrashDump.h"
 #include "LuaError.h"
+#include "LuaGcEventLog.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
@@ -429,6 +430,8 @@ extern "C"
 		);
 
 		if (globalState != nullptr) {
+			// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
+			lua::GcEventLogUnregisterState(globalState);
 			(void)luaM_realloc(&allocatorState, globalState, static_cast<lu_mem>(0x160u), 0u);
 		}
 		(void)luaM_realloc(&allocatorState, state, static_cast<lu_mem>(0x48u), 0u);
@@ -12819,6 +12822,8 @@ extern "C"
 		if (state != nullptr) {
 			state->l_G->nblocks -= oldsize;
 			state->l_G->nblocks += size;
+			// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
+			lua::GcEventLogCountRealloc(state->l_G);
 		}
 
 		return result;
@@ -16507,6 +16512,9 @@ extern "C"
 	 */
 	void luaC_collectgarbage(lua_State* const state)
 	{
+		// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
+		lua::GcEventLogCollection(state->l_G, state->l_G->nblocks, state->l_G->GCthreshold);
+
 		const size_t deadmem = mark(state);
 
 		(void)sweeplist(&state->l_G->rootudata, nullptr, state, 0);
@@ -17081,6 +17089,8 @@ extern "C"
 		}
 
 		state->l_G = globalState;
+		// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
+		lua::GcEventLogRegisterState(globalState);
 
 		globalState->strt.hash = nullptr;
 		globalState->strt.nuse = 0;
