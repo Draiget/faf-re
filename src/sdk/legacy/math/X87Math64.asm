@@ -217,21 +217,24 @@ msvc8_x87_cos_times_cos PROC
 msvc8_x87_cos_times_cos ENDP
 
 
-; void msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength)
-; The scale stays in extended precision across all three component multiplies
-; (FUN_005D1E70). rcx=x, rdx=y, r8=z; maxLength arrives on the stack at
-; [rsp+40] (fifth slot counting the home area).
+; void msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength, float lengthSq)
+; The x86 inline block in X87Math.cpp, under simulation PC24 (FUN_005D1E70,
+; 0x005D1ECF..0x005D1EEC): `fld lengthSq; fsqrt; fdivr maxLength`, then each
+; component multiplies against the unstored scale and stores once.
+; rcx=x, rdx=y, r8=z, xmm3=maxLength (the fourth argument travels in xmm3,
+; not on the stack); lengthSq is the fifth argument, at [rsp+40]. It is the
+; float squared length the C++ caller formed, exactly as on x86, not one
+; recomputed here in extended precision.
 msvc8_x87_scale_vector_max_length PROC
-    fld     dword ptr [rcx]
-    fmul    st(0), st(0)
-    fld     dword ptr [rdx]
-    fmul    st(0), st(0)
-    faddp   st(1), st(0)
-    fld     dword ptr [r8]
-    fmul    st(0), st(0)
-    faddp   st(1), st(0)
+    movss   dword ptr [rsp+32], xmm3
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+40]
     fsqrt
-    fdivr   dword ptr [rsp+40]
+    fdivr   dword ptr [rsp+32]
     fld     dword ptr [rcx]
     fmul    st(0), st(1)
     fstp    dword ptr [rcx]
@@ -240,6 +243,7 @@ msvc8_x87_scale_vector_max_length PROC
     fstp    dword ptr [rdx]
     fmul    dword ptr [r8]
     fstp    dword ptr [r8]
+    fldcw   word ptr [rsp+24]
     ret
 msvc8_x87_scale_vector_max_length ENDP
 

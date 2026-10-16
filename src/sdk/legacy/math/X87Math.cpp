@@ -20,7 +20,7 @@ extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
 extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
-extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength);
+extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength, float lengthSq);
 #endif
 
 namespace msvc8
@@ -67,10 +67,11 @@ namespace msvc8
       fstp dword ptr [edx]
       fmul dword ptr [ecx]
       fstp dword ptr [ecx]
-      fstp st(0)
     }
 #else
-    msvc8_x87_scale_vector_max_length(px, py, pz, maxLength);
+    // The x64 routine runs the same block under the simulation's PC24 and
+    // starts from this same float `lengthSq`.
+    msvc8_x87_scale_vector_max_length(px, py, pz, maxLength, lengthSq);
 #endif
   }
 
