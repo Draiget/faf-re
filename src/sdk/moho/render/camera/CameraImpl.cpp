@@ -32,6 +32,7 @@
 #include "moho/math/Vector3f.h"
 #include "gpg/core/time/Timer.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Angle.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/camera/CameraTrackingListener.h"
@@ -321,7 +322,7 @@ namespace
       pitchCarrier *
         ((pitchCarrier * ((pitchCarrier * -0.018729299f) + 0.074261002f)) - 0.21211439f) +
       1.5707288f;
-    return 1.5707963f - (sqrtTerm * poly);
+    return moho::kHalfPi - (sqrtTerm * poly);
   }
 
   /**

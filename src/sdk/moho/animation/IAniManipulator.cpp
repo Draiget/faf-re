@@ -22,6 +22,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/Angle.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
@@ -73,13 +74,13 @@ namespace
    * Address: 0x0050CCF0 (FUN_0050CCF0, sub_50CCF0)
    *
    * What it does:
-   * Evaluates one x87 polynomial lane used by foot-plant solve code to
-   * approximate an arccos-shaped angle from one normalized input scalar,
-   * mirrored about a fixed offset so the caller's swing rotates the other way.
+   * Evaluates the foot-plant solve's fast arcsine: half pi minus the
+   * polynomial arccos approximation of one normalized input scalar.
    */
   [[nodiscard]] float ApproximateFootPlantAcosLane(const float value) noexcept
   {
-    return 2.0f - ApproximateFootPlantAcos(value);
+    // 0x0050CD23: `fsubr [0x00FB7914]`, the half-pi float.
+    return moho::kHalfPi - ApproximateFootPlantAcos(value);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()

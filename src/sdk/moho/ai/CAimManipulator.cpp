@@ -1005,7 +1005,11 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
   Wm3::Quaternionf muzzleOrientation = muzzleTransform.orient_;
   Wm3::Vector3f muzzlePosition = muzzleTransform.pos_;
   if (unit != nullptr && unit->IsMobile()) {
-    const Wm3::Vector3f unitVelocity = unit->Entity::GetVelocity();
+    // 0x006319B3..0x006319C1: a virtual call through slot +0x3C of the Entity
+    // subobject, the same slot the target velocity uses below -- so this is
+    // `Unit::GetVelocity` (0x006A9C90, the motion velocity for ground units),
+    // not the base position-delta `Entity::GetVelocity`.
+    const Wm3::Vector3f unitVelocity = unit->GetVelocity();
     muzzlePosition.x += unitVelocity.x;
     muzzlePosition.y += unitVelocity.y;
     muzzlePosition.z += unitVelocity.z;

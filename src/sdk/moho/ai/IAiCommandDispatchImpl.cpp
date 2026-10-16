@@ -994,8 +994,11 @@ int IAiCommandDispatchImpl::Execute()
       return static_cast<ETaskStatus>(1);
     }
 
+    // 0x00598EC3..0x00598ED9: Attack (0xA), Patrol (0x10) and FormPatrol
+    // (0x12) rotate to the back; everything else is dropped.
     const EUnitCommandType commandType = currentCommand->mVarDat.mCmdType;
-    if (commandType == EUnitCommandType::UNITCOMMAND_Patrol || commandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
+    if (commandType == EUnitCommandType::UNITCOMMAND_Attack || commandType == EUnitCommandType::UNITCOMMAND_Patrol ||
+        commandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
       commandQueue->MoveFirstCommandToBackOfQueue();
     } else {
       commandQueue->RemoveFirstCommandFromQueue();
@@ -1037,6 +1040,9 @@ int IAiCommandDispatchImpl::Execute()
     return tryDispatchHead();
   }
 
+  // 0x00598FED..0x00599023: a finished patrol leg (or ground attack) rotates or
+  // drops the command and ends the tick with status 1; the next leg is
+  // dispatched on the following tick, not this one.
   if (commandQueue->GetNextCommand() != nullptr) {
     CUnitCommand::FormRemoveUnit(mUnit, currentCommand);
     commandQueue->MoveFirstCommandToBackOfQueue();
@@ -1044,7 +1050,7 @@ int IAiCommandDispatchImpl::Execute()
     commandQueue->RemoveFirstCommandFromQueue();
   }
 
-  return tryDispatchHead();
+  return static_cast<ETaskStatus>(1);
 }
 
 /**

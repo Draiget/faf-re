@@ -3091,11 +3091,15 @@ namespace moho
         outForce.y *= forceScale;
         outForce.z *= forceScale;
       }
+
+      // 0x006BDA00..0x006BDA22: only this arm replaces the vertical force with
+      // the wing lift.
+      outForce.y = CalcWingedLift(controlVector.y, currentOrientationY);
     } else {
+      // 0x006BD8FE..0x006BD922 jumps straight to 0x006BDA2D: the force keeps
+      // the caller's steering vector untouched, vertical lane included.
       selectedVector = fallbackVector;
     }
-
-    outForce.y = CalcWingedLift(controlVector.y, currentOrientationY);
 
     Wm3::Vector3f selectedPlanarVector{};
     const float selectedPlanarLength = std::sqrt((selectedVector.z * selectedVector.z) + (selectedVector.x * selectedVector.x));
@@ -3811,6 +3815,13 @@ namespace moho
     headingVector.y = 0.0f;
     Wm3::Vector3f::Normalize(&headingVector);
 
+    // 0x006BEF75..0x006BEFC5: the planar length of the entity's per-tick
+    // velocity, taken before anything moves this tick. It is what the
+    // horizontal motion event compares against the formation top speed.
+    Wm3::Vector3f entityVelocity = unit->GetVelocity();
+    entityVelocity.y = 0.0f;
+    const float groundSpeed = std::sqrt((entityVelocity.x * entityVelocity.x) + (entityVelocity.z * entityVelocity.z));
+
     // 0x006BEFCF..0x006BF02D inlines SetTransform here on every air tick.
     // Carry the committed, renormalized orientation back into the cached body.
     physBody->SetTransform(outTransform);
@@ -4132,8 +4143,6 @@ namespace moho
         // 0x006BFF2C skips it just as it skips the out-of-line body.
         SetMotionTurnEvent(UMTE_Straight);
       }
-
-      const float groundSpeed = std::sqrt((physBody->mVelocity.x * physBody->mVelocity.x) + (physBody->mVelocity.z * physBody->mVelocity.z));
 
       if (unit->IsUnitState(UNITSTATE_MovingDown)) {
         SetMotionVertEvent(UMVE_Down);

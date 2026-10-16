@@ -8,8 +8,10 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/IAiSteering.h"
+#include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/IUnit.h"
@@ -22,21 +24,8 @@ namespace
 {
   [[nodiscard]] std::int16_t GridCellCoord(const float worldCoord, const std::uint8_t footprintAxisSize) noexcept
   {
-    return static_cast<std::int16_t>(std::lround(worldCoord - (static_cast<float>(footprintAxisSize) * 0.5f)));
-  }
-
-  [[nodiscard]] Wm3::Vector3f CellToWorldPos(
-    const std::int32_t cellX,
-    const std::int32_t cellZ,
-    const SFootprint& footprint,
-    const float worldY
-  ) noexcept
-  {
-    return {
-      static_cast<float>(cellX) + (static_cast<float>(footprint.mSizeX) * 0.5f),
-      worldY,
-      static_cast<float>(cellZ) + (static_cast<float>(footprint.mSizeZ) * 0.5f),
-    };
+    // Bare fistp (0x005A4B49 / 0x005A4B6E): round to nearest, ties to even.
+    return static_cast<std::int16_t>(std::lrintf(worldCoord - (static_cast<float>(footprintAxisSize) * 0.5f)));
   }
 
   [[nodiscard]] bool IsUnitIdleState(const Unit& unit) noexcept
@@ -232,7 +221,10 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
   mTrackFormationTarget = 0;
   mDestinationEntity.ResetFromObject(nullptr);
 
-  mGoalPos = BuildGoalWorldPos(goal);
+  // 0x005A4CB7..0x005A4D29: the chosen cell's centre at terrain/water
+  // height (COORDS_ToWorldPos), not at the aircraft's own altitude.
+  const SOCellPos goalCell = BuildGoalCell(goal);
+  mGoalPos = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, goalCell, mUnit->GetFootprint());
   mCurrentTargetPos = mGoalPos;
 
   if (mUnit->UnitMotion) {
@@ -479,10 +471,10 @@ int CAiNavigatorAir::Execute()
 /**
  * Address: 0x005A4B00 (FUN_005A4B00, helper used by FUN_005A4C60)
  */
-Wm3::Vector3f CAiNavigatorAir::BuildGoalWorldPos(const SAiNavigatorGoal& goal) const
+SOCellPos CAiNavigatorAir::BuildGoalCell(const SAiNavigatorGoal& goal) const
 {
   if (!mUnit) {
-    return Wm3::Vector3f::Zero();
+    return SOCellPos{};
   }
 
   const SFootprint& footprint = mUnit->GetFootprint();
@@ -496,7 +488,7 @@ Wm3::Vector3f CAiNavigatorAir::BuildGoalWorldPos(const SAiNavigatorGoal& goal) c
   const std::int32_t maxX = goal.maxX;
   const std::int32_t maxZ = goal.maxZ;
   if (minX == (maxX - 1) && minZ == (maxZ - 1)) {
-    return CellToWorldPos(minX, minZ, footprint, unitPos.y);
+    return SOCellPos{static_cast<std::int16_t>(minX), static_cast<std::int16_t>(minZ)};
   }
 
   std::int32_t bestX = minX;
@@ -522,7 +514,7 @@ Wm3::Vector3f CAiNavigatorAir::BuildGoalWorldPos(const SAiNavigatorGoal& goal) c
     }
   }
 
-  return CellToWorldPos(bestX, bestZ, footprint, unitPos.y);
+  return SOCellPos{static_cast<std::int16_t>(bestX), static_cast<std::int16_t>(bestZ)};
 }
 
 /**

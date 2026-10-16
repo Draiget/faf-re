@@ -734,9 +734,10 @@ namespace
       if (headingAlignment > kConeCos) {
         avoidDirection = NormalizedOrZero(awayFromCollider + side);
       } else if (-kConeCos > headingAlignment) {
-        // Head-on: sidestep straight from the owner's live position.
+        // Head-on: sidestep from the collider's live position (0x00597642
+        // calls GetPosition on ebx, the collider, not on the owner in ebp).
         avoidDirection = side;
-        basePosition = owner->GetPosition();
+        basePosition = collisionUnit->GetPosition();
       } else {
         avoidDirection = NormalizedOrZero(ownerHeading + awayFromCollider);
       }

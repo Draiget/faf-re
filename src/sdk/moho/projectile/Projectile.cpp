@@ -1448,8 +1448,15 @@ namespace moho
     // their first tick near terrain, killing the ACU/engineer build beams and
     // the nuke plume effect scripts.
     if (mCollideSurface) {
+      // asm 0x0069D4F1-0x0069D560: the line starts at the segment's own first
+      // endpoint, Origin - Direction*Extent, rebuilt from the midpoint form --
+      // not at curPos, which differs from it in the low bits.
       const GeomLine3 terrainLine{
-        Wm3::Vec3f(curPos.x, curPos.y, curPos.z),
+        Wm3::Vec3f(
+          segment.Origin.x - (segment.Direction.x * segment.Extent),
+          segment.Origin.y - (segment.Direction.y * segment.Extent),
+          segment.Origin.z - (segment.Direction.z * segment.Extent)
+        ),
         Wm3::Vec3f(segment.Direction.x, segment.Direction.y, segment.Direction.z),
         0.0f,
         distMoved,

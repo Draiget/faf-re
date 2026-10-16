@@ -970,7 +970,8 @@ namespace moho
           return mUnit->mInfoCache.mFormationHeadingHint;
         }
 
-        if (guardedUnit->IsIdleState()) {
+        // 0x0061232F: IUnit slot 12 (`IsMobile`) on the guarded unit.
+        if (guardedUnit->IsMobile()) {
           return mUnit->GetPosition();
         }
       }
@@ -1157,9 +1158,12 @@ namespace moho
       return;
     }
 
+    // 0x006140D2..0x00614102: a mobile guarded unit is re-followed whatever the
+    // navigator is doing (IUnit slot 12, `IsMobile`); otherwise only an idle
+    // navigator takes a new goal.
     const Unit* const currentGuardedUnit = mSecondaryUnit.GetObjectPtr();
-    const bool guardedUnitIdle = currentGuardedUnit != nullptr && currentGuardedUnit->IsIdleState();
-    if (!guardedUnitIdle && navigatorStatus != AINAVSTATUS_Idle) {
+    const bool guardedUnitMobile = currentGuardedUnit != nullptr && currentGuardedUnit->IsMobile();
+    if (!guardedUnitMobile && navigatorStatus != AINAVSTATUS_Idle) {
       return;
     }
 

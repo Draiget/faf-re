@@ -7,12 +7,31 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/IAiSteering.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "moho/entity/Entity.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
 
+#include <algorithm>
+
 using namespace moho;
+
+namespace moho
+{
+  /**
+   * Address: 0x0062B200 (FUN_0062B200, func_TryBuildStructureAt)
+   *
+   * What it does:
+   * Footprint placement search; defined in CUnitCallTeleport.cpp, declared
+   * here with the same shape as CAiBrain.cpp's declaration.
+   */
+  [[nodiscard]] bool TryBuildStructureAt(
+    SCoordsVec2* const tryPos, const RUnitBlueprint* const blueprint, Sim* const sim,
+    const int border, const bool wholeMap, const bool doCoerce, const bool useSkirt);
+} // namespace moho
 
 namespace
 {
@@ -72,18 +91,29 @@ namespace
   }
 
   /**
-   * Address: 0x0051E380 (FUN_0051E380)
-   *
    * What it does:
    * Converts one world-space center position into the lower-left goal-cell
-   * coordinate for the provided footprint dimensions.
+   * coordinate for the provided footprint dimensions (inlined in `Execute`).
    */
   [[nodiscard]] SOCellPos TargetWorldToCell(const Wm3::Vector3f& worldPos, const SFootprint& footprint) noexcept
   {
-    // FUN_0051E380 converts both coordinates with bare fistp and never calls
-    // __ftol, so this rounds to nearest rather than truncating. This is the
-    // same computation as SFootprint::ToCellPos (FUN_00579300).
+    // Bare fistp, never __ftol: this rounds to nearest rather than truncating.
+    // Same computation as SFootprint::ToCellPos (FUN_00579300).
     return footprint.ToCellPos(Wm3::Vec3f{worldPos.x, worldPos.y, worldPos.z});
+  }
+
+  /**
+   * Address: 0x0051E380 (FUN_0051E380)
+   *
+   * What it does:
+   * Converts a resolved XZ placement centre back into the lower-left cell of
+   * the footprint standing there. Only `CAiNavigatorLand::SetGoal` calls it.
+   */
+  [[nodiscard]] SOCellPos PlacementToGoalCell(const SCoordsVec2& placement, const SFootprint& footprint) noexcept
+  {
+    // Both coordinates go through bare fistp (round to nearest), as in
+    // SFootprint::ToCellPos.
+    return footprint.ToCellPos(Wm3::Vec3f{placement.x, 0.0f, placement.z});
   }
 
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
@@ -313,10 +343,24 @@ void CAiNavigatorLand::SetGoal(const SAiNavigatorGoal& goal)
 
   SAiNavigatorGoal finalGoal = goal;
   if (IsSingleCellGoal(goal)) {
-    finalGoal = BuildSingleCellGoal(goal.minX, goal.minZ);
-    if (mStatus == AINAVSTATUS_Thinking && finalGoal.minX == mGoal.minX && finalGoal.minZ == mGoal.minZ) {
+    // 0x005A3F6B..0x005A404C: a single-cell goal is moved to the nearest spot
+    // the unit's footprint actually fits, searched outward from the cell's
+    // centre in steps of the footprint's larger side.
+    SOCellPos cell{static_cast<std::int16_t>(goal.minX), static_cast<std::int16_t>(goal.minZ)};
+    const SFootprint& footprint = mUnit->GetFootprint();
+    const Wm3::Vector3f center = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, cell, footprint);
+    SCoordsVec2 placement{center.x, center.z};
+    const int border = static_cast<int>(std::max(footprint.mSizeX, footprint.mSizeZ));
+    if (TryBuildStructureAt(
+          &placement, mUnit->GetBlueprint(), mUnit->SimulationRef, border, mUnit->ArmyRef->UseWholeMap(), false, false
+        )) {
+      cell = PlacementToGoalCell(placement, footprint);
+    }
+
+    if (mStatus == AINAVSTATUS_Thinking && cell.x == mGoal.minX && cell.z == mGoal.minZ) {
       return;
     }
+    finalGoal = BuildSingleCellGoal(cell.x, cell.z);
   }
 
   ApplyGoalAndStartPathing(finalGoal);

@@ -12380,13 +12380,8 @@ namespace
   {
     CEconStorage* const oldStorage = storage;
     storage = nullptr;
-    if (oldStorage == nullptr) {
-      return;
-    }
-
-    if (oldStorage->mEconomy != nullptr) {
-      (void)oldStorage->Chng(-1);
-    }
+    // 0x006AD759..0x006AD768 is `delete` with ~CEconStorage inlined: the
+    // destructor alone withdraws the contribution, exactly once.
     delete oldStorage;
   }
 
@@ -13558,7 +13553,10 @@ VTransform Unit::GetBoneWorldTransform(const int boneIndex) const
     }
   }
 
-  return VTransform::Compose(GetTransform(), localAnchor);
+  // 0x006AA692..0x006AA6ED: the anchor composes onto the pending transform
+  // (Entity+0x150) -- where motion has already placed the unit this tick --
+  // not the current one, which still holds last beat's position.
+  return VTransform::Compose(mPendingTransform, localAnchor);
 }
 
 /**
@@ -16095,7 +16093,9 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
     excessDamageRatio = 10.0f;
   }
 
-  if (IsBeingBuilt() && mUnitVarDat.mWorkProgress < 0.5f) {
+  // 0x006A82BF..0x006A82D7: the half-built test compares 0.5 against the
+  // entity build fraction (`this+0xD8`), not the unit's own work progress.
+  if (IsBeingBuilt() && mVarDat.mFractionComplete < 0.5f) {
     excessDamageRatio = 10.0f;
   }
 
@@ -16130,8 +16130,8 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
   float massValue = (blueprint != nullptr) ? blueprint->Economy.BuildCostMass : 0.0f;
   float energyValue = (blueprint != nullptr) ? blueprint->Economy.BuildCostEnergy : 0.0f;
   if (IsBeingBuilt()) {
-    massValue *= mUnitVarDat.mWorkProgress;
-    energyValue *= mUnitVarDat.mWorkProgress;
+    massValue *= mVarDat.mFractionComplete;
+    energyValue *= mVarDat.mFractionComplete;
   }
 
   if (ArmyRef != nullptr) {

@@ -5,6 +5,7 @@
 
 #include "moho/ai/CAiNavigatorImpl.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/sim/SOCellPos.h"
 
 namespace gpg
 {
@@ -171,10 +172,11 @@ namespace moho
      * Address: 0x005A4B00 (FUN_005A4B00, helper used by FUN_005A4C60)
      *
      * What it does:
-     * Chooses best perimeter cell in goal rectangle and converts to world target.
+     * Chooses the goal rectangle's perimeter cell nearest the unit (the
+     * rectangle's only cell for a single-cell goal).
      */
     [[nodiscard]]
-    Wm3::Vector3f BuildGoalWorldPos(const SAiNavigatorGoal& goal) const;
+    SOCellPos BuildGoalCell(const SAiNavigatorGoal& goal) const;
 
     /**
      * Address: 0x005A4A90 (FUN_005A4A90, helper chain)

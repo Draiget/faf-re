@@ -1295,11 +1295,9 @@ void CAiPathFinder::ClearRectHistory()
  */
 void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
 {
-  if (!IsStrictRect(rect)) {
-    return;
-  }
-
-  // Original +0x70 test removes the oldest entry before pushing at the front.
+  // Original +0x70 test removes the oldest entry before pushing at the front;
+  // 0x005AA4E0..0x005AA531 push the window unconditionally, empty or not
+  // (`RectHistoryIntersects` rejects empty entries when they are read).
   if (mRecentSearchRects.size() > 2) {
     mRecentSearchRects.pop_back();
   }
@@ -1325,11 +1323,18 @@ void CAiPathFinder::UpdatePlayableRectGate()
 
 /**
  * Inlined block from FUN_005AA860: test the recent search rectangles.
+ *
+ * 0x005AA886..0x005AA8A5 skip an entry only when one rect lies wholly past
+ * the other's far edge (`history.x1 < rect.x0`, ...), so rects that merely
+ * share an edge still count. Both rects must then be non-empty
+ * (0x005AA8A7..0x005AA8B6, `FUN_00416F40` = `Rect2i::IsEmpty` on the entry).
  */
 bool CAiPathFinder::RectHistoryIntersects(const gpg::Rect2i& rect) const
 {
   for (const gpg::Rect2i& historyRect : mRecentSearchRects) {
-    if (RectsOverlapStrict(rect, historyRect)) {
+    const bool touches = rect.x0 <= historyRect.x1 && historyRect.x0 <= rect.x1 &&
+                         rect.z0 <= historyRect.z1 && historyRect.z0 <= rect.z1;
+    if (touches && IsStrictRect(rect) && IsStrictRect(historyRect)) {
       return true;
     }
   }

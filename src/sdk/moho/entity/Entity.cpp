@@ -59,6 +59,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Angle.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/misc/StatItem.h"
 #include "moho/sim/COGrid.h"
@@ -7843,7 +7844,7 @@ namespace moho
     const float rootTerm = std::sqrt(1.0f - normalizedY);
     const float polynomial =
       normalizedY * (((normalizedY * -0.018729299f) + 0.074261002f) * normalizedY - 0.21211439f) + 1.5707288f;
-    return (rootTerm * polynomial) - 1.5707963f;
+    return (rootTerm * polynomial) - kHalfPi;
   }
 
   /**
@@ -7867,7 +7868,7 @@ namespace moho
     const float rootTerm = std::sqrt(1.0f - clamped);
     const float polynomial =
       clamped * (((clamped * -0.018729299f) + 0.074261002f) * clamped - 0.21211439f) + 1.5707288f;
-    return 1.5707963f - (rootTerm * polynomial);
+    return kHalfPi - (rootTerm * polynomial);
   }
 
   /**

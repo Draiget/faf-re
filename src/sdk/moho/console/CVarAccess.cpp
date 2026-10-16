@@ -6,6 +6,8 @@
 
 namespace moho
 {
+  extern bool ren_FogOfWar;
+
   namespace console
   {
     namespace
@@ -14,9 +16,6 @@ namespace moho
       // false in the shipped image.
       bool gSimDebugCheats = false;
       bool gSimReportCheats = false;
-
-      // 0x00F57DC3, a .data byte whose stored value is 1.
-      bool gRenderFogOfWar = true;
     } // namespace
 
     // 0x010A63EC and 0x010A63ED are two adjacent single bytes, so they are
@@ -57,9 +56,12 @@ namespace moho
       outText->assign_owned(formatted.c_str());
     }
 
+    // 0x00F57DC3 is the one `ren_FogOfWar` byte: `CWldSession::DoBeat` writes
+    // it every beat, and the renderer, `UserUnit::Tick` (0x008C0B9C) and
+    // `UserArmy::CanSeePoint` (0x008B22BA) all read that same byte.
     bool RenderFogOfWarEnabled()
     {
-      return gRenderFogOfWar;
+      return moho::ren_FogOfWar;
     }
   } // namespace console
 } // namespace moho
