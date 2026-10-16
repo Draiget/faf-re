@@ -190,9 +190,11 @@ namespace moho
       }
     } else {
       if (upgradedUnit != nullptr) {
-        // Non-1:1 lane: 0x006A7AB0 (`Unit::ReleaseOccupyGround`) is still
-        // pending symbolic lift; use recovered occupancy-release helper.
-        upgradedUnit->FreeOgridRect();
+        // 0x005F85D5 releases the cancelled unit's ground occupancy right here,
+        // before the owner re-occupies the same cells below. Leaving it to the
+        // unit's destructor (run at the next entity purge) cleared those cells
+        // after the owner had marked them, so the owner vanished from the grid.
+        upgradedUnit->ReleaseOccupyGround();
         upgradedUnit->Destroy();
       }
 
