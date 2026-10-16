@@ -1473,14 +1473,17 @@ bool CAiSteeringImpl::ProcessSplineMovement()
 
     if ((maxSpeed * 0.01f) > velocityLen) {
       motion->mIsBeingPushed = 0;
+      // 0x005D2CD2..0x005D2D1F: the path refresh toward the stored destination
+      // belongs to clearing a state-transition pause; a plain push that settles
+      // leaves the steering without a path (the motion then holds position).
       if (motion->mInStateTransition != 0) {
         motion->mInStateTransition = 0;
         NotifyNavigatorPathRefresh(mOwnerUnit);
-      }
 
-      if (!Wm3::Vector3f::IsInvalid(mDestination)) {
-        doPathRefresh = true;
-        allowContinuation = true;
+        if (!Wm3::Vector3f::IsInvalid(mDestination)) {
+          doPathRefresh = true;
+          allowContinuation = true;
+        }
       }
     }
   } else {

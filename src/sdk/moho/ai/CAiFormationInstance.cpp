@@ -2905,10 +2905,11 @@ namespace moho
    *     `mExtent = max(2.0f, span)`, `mCenter = mean unit XZ` and
    *     `mSlotCenter = mean slot offset`.
    *  6. Builds one `SFormationRunScriptCandidate` per script slot (rotated
-   *     offset, category, weight) and sorts them ascending by squared
-   *     distance from the formation mean.
-   *  7. Greedily assigns each sorted candidate's nearest still-free
-   *     category-matching unit, storing one `SUnitOffsetInfo` per
+   *     offset, category, weight) and sorts them by decreasing squared
+   *     distance of the raw slot offset from an anchor the larger group
+   *     extent beyond the first slot.
+   *  7. Greedily assigns each sorted candidate's nearest (world-XZ distance)
+   *     still-free category-matching unit, storing one `SUnitOffsetInfo` per
    *     assignment in the new group's `mUnitOffsets` (`operator[]`,
    *     0x0056AAF0, at 0x00567E06/0x00567F9A; leader priority counting from
    *     1), warns on duplicate assignment, calls `RemoveUnit` for anything
@@ -3010,13 +3011,18 @@ namespace moho
     group.mSpeed = groupSpeed;
 
     // Phase 6 (0x00567A40-0x00567C71): one candidate per script slot,
-    // sorted by decreasing squared distance from the formation mean.
+    // sorted by decreasing squared distance from an anchor that sits the
+    // larger group extent beyond the first slot along z (0x00567B3C-0x00567BA2):
+    // `anchorDelta` is the slot's raw (unrotated) offset relative to
+    // `(slot0.x, slot0.z + maxExtent)`, so the far slots are claimed first.
     // `gpg::fastvector_n<Cand72,16>` is the local's real binary shape, per
     // the escalation doc's funclet table (0x00BADE47, D=0x364); `push_back`'s
     // grow lane is FUN_0056C940 / FUN_0056E620 / FUN_0056FAB0 / FUN_0056FB90 /
     // FUN_00573000, cited on FastVector.h's push_back/InsertAt/
     // GrowInsertDeepCopy/UninitializedCopyForward/CopyBackwardAssign for
     // this element type.
+    const SCoordsVec2& firstSlotOffset = scriptResult.mObjs.front().mOffset;
+    const float maxExtent = (group.mExtent.z > group.mExtent.x) ? group.mExtent.z : group.mExtent.x;
     gpg::fastvector_n<SFormationRunScriptCandidate, 16> candidates;
     for (const SFormationScriptSlot& slot : scriptResult.mObjs) {
       SCoordsVec2 rotatedOffset{};
@@ -3024,8 +3030,10 @@ namespace moho
 
       SFormationRunScriptCandidate candidate{};
       candidate.position = Wm3::Vec3f{rotatedOffset.x, 0.0f, rotatedOffset.z};
-      candidate.anchorDelta = candidate.position;
-      candidate.distanceSq = rotatedOffset.x * rotatedOffset.x + rotatedOffset.z * rotatedOffset.z;
+      const float anchorDx = slot.mOffset.x - firstSlotOffset.x;
+      const float anchorDz = slot.mOffset.z - (maxExtent + firstSlotOffset.z);
+      candidate.anchorDelta = Wm3::Vec3f{anchorDx, 0.0f, anchorDz};
+      candidate.distanceSq = anchorDx * anchorDx + anchorDz * anchorDz;
       candidate.weight = slot.mWeight;
       candidate.category = slot.mCategory;
       candidates.push_back(candidate);
@@ -3037,10 +3045,16 @@ namespace moho
     // 0x00567EED-0x00567FA3: the unit, the running priority, the slot
     // offset, a zero target, an unset (+inf) heading, zero distances and the
     // script weight.
+    // Distances are measured in world XZ (0x00567C90-0x00567D6E): the slot at
+    // `mean + rotatedOffset - slotCenter`, the unit at `mean + relativeRotated`,
+    // compared as true distances (`sqrt(dz*dz + dx*dx)`, 0x00567D57).
     std::int32_t leaderPriority = 0;
     for (const SFormationRunScriptCandidate& candidate : candidates) {
+      const float slotX = (meanX + candidate.position.x) - group.mSlotCenter.x;
+      const float slotZ = (meanZ + candidate.position.z) - group.mSlotCenter.z;
+
       auto bestIt = unitDescs.end();
-      float bestDistSq = gpg::pInf;
+      float bestDist = gpg::pInf;
       for (auto it = unitDescs.begin(); it != unitDescs.end(); ++it) {
         if (it->unit == nullptr) {
           continue;
@@ -3049,11 +3063,11 @@ namespace moho
           continue;
         }
 
-        const float dx = candidate.anchorDelta.x - it->relativeRotated.x;
-        const float dz = candidate.anchorDelta.z - it->relativeRotated.z;
-        const float distSq = dx * dx + dz * dz;
-        if (distSq < bestDistSq) {
-          bestDistSq = distSq;
+        const float dx = slotX - (meanX + it->relativeRotated.x);
+        const float dz = slotZ - (it->relativeRotated.z + meanZ);
+        const float dist = std::sqrt(dz * dz + dx * dx);
+        if (dist < bestDist) {
+          bestDist = dist;
           bestIt = it;
         }
       }

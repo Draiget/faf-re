@@ -2980,8 +2980,10 @@ namespace moho
       ownerPosition.y + offsetFromUnit.y,
       ownerPosition.z + offsetFromUnit.z,
     };
-    const std::int32_t sampleX = static_cast<std::int32_t>(samplePosition.x);
-    const std::int32_t sampleZ = static_cast<std::int32_t>(samplePosition.z);
+    // 0x006BCBFA / 0x006BCC08 convert the sample point with `fistp`
+    // (round-to-nearest), not a truncating cast.
+    const std::int32_t sampleX = static_cast<std::int32_t>(std::lrintf(samplePosition.x));
+    const std::int32_t sampleZ = static_cast<std::int32_t>(std::lrintf(samplePosition.z));
 
     const float sampledElevation = (ownerBlueprint->Air.FlyInWater != 0u)
                                      ? (static_cast<float>(heightField->GetHeightAt(sampleX, sampleZ)) * kHeightWordScale)
@@ -3733,7 +3735,9 @@ namespace moho
         float speedLimit = maxAirSpeed;
         if (mCombatState == ACS_NormalTurn && CAiTargetEntityIsAirLayer(target)) {
           Entity* const rawEntity2 = target.targetEntity.GetObjectPtr();
-          if (rawEntity2->mVarDat.mCurTransform.pos_ == rawEntity2->mVarDat.mLastTransform.pos_) {
+          // 0x006BD5F2..0x006BD5F9: `Vector3::Compare` answers non-zero when the
+          // positions DIFFER, so a moving air target is chased at up to its range.
+          if (rawEntity2->mVarDat.mCurTransform.pos_ != rawEntity2->mVarDat.mLastTransform.pos_) {
             speedLimit = (air.MinAirspeed > targetDist) ? air.MinAirspeed : targetDist;
           }
         }

@@ -13,6 +13,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/ai/IAiNavigator.h"
+#include "moho/ai/IFormationInstance.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
@@ -1198,24 +1199,32 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
 void CAiPathNavigator::ConfigureGoal(const SAiNavigatorGoal& goal, const bool ignoreFormation)
 {
   mGoal = goal;
-  mLastPathLayerToken = 0;
-  mLeaderTargetPos = Wm3::Vector3f::Zero();
+  mLastFormationSyncTick = 0;
+  DetachWeakUnit(mLeaderLink);
   mLeaderBusy = 0;
   mHasLeaderTargetPos = 0;
-  mUseExtendedPathProbe = 0;
-  mTargetWithinOneCell = 0;
-  DetachWeakUnit(mLeaderLink);
+  mLeaderTargetPos = Wm3::Vector3f::Zero();
 
-  Unit* const unit = GetOwningUnit(*this);
-  if (unit) {
-    unit->mUnitVarDat.mUnitStates &= ~kUnitPathFlag;
+  Unit* const unit = mPathFinder->mUnit;
+  unit->mUnitVarDat.mUnitStates &= ~kUnitPathFlag;
+
+  // 0x005AD77A..0x005AD7EA: a unit moving under a Form* command joins its
+  // formation (the flag is left as it was when formation is ignored), links the
+  // formation leader, and -- unless it leads -- holds until the leader paths.
+  if (ignoreFormation) {
+    return;
   }
 
-  mIsInFormation = 0;
-  if (!ignoreFormation) {
-    // Formation leader chain (`Unit::GetFormation` / `IUnit::AddToChain`) is still
-    // pending typed recovery in this pass.
-    mIsInFormation = 0;
+  IFormationInstance* const formation = unit->GetFormation();
+  mIsInFormation = (formation != nullptr && formation->CommandIsForm()) ? 1u : 0u;
+  if (mIsInFormation == 0u) {
+    return;
+  }
+
+  mLeaderLink.Set(unit->mInfoCache.mFormationLeadRef.GetObjectPtr());
+  Unit* const leader = mLeaderLink.GetObjectPtr();
+  if (leader != nullptr && leader != unit) {
+    mLeaderBusy = 1;
   }
 }
 
@@ -1271,6 +1280,19 @@ void CAiPathNavigator::BeginThinking()
   mState = AIPATHNAVSTATE_Thinking;
   mPathRequestMode = 0;
   mPathRequestCountdown = 1;
+
+  // 0x005ADBBF..0x005ADC0C: a unit moving in formation (and not loading onto
+  // or waiting for a transport) holds its path request back by its formation
+  // priority, so a formation's members ask for paths staggered over ticks.
+  Unit* const unit = mPathFinder->mUnit;
+  if (unit == nullptr || unit->IsUnitState(UNITSTATE_TransportLoading) || unit->IsUnitState(UNITSTATE_WaitForFerry)) {
+    return;
+  }
+
+  IFormationInstance* const formation = unit->GetFormation();
+  if (formation != nullptr && formation->Contains(unit, false)) {
+    mPathRequestCountdown = formation->GetPriority(unit, nullptr);
+  }
 }
 
 /**

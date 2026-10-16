@@ -1007,8 +1007,9 @@ namespace moho
    * Address: 0x006D83A0 (FUN_006D83A0, cfunc_UnitWeaponResetTargetL)
    *
    * What it does:
-   * Resolves one weapon from Lua and clears its target payload to the default
-   * `AITARGET_None` state.
+   * Resolves one weapon from Lua and retargets it to an empty `AITARGET_None`
+   * target through `UnitWeapon::SetTarget` (0x006D844C), so losing the target
+   * runs `OnLostTarget`, the shooter/blip bookkeeping and the aim-spot pick.
    */
   int cfunc_UnitWeaponResetTargetL(LuaPlus::LuaState* const state)
   {
@@ -1028,7 +1029,7 @@ namespace moho
     clearedTarget.targetPoint = -1;
     clearedTarget.targetIsMobile = false;
 
-    weapon->mTarget = clearedTarget;
+    weapon->SetTarget(&clearedTarget);
     return 0;
   }
 

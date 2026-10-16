@@ -378,13 +378,17 @@ namespace moho
     const Wm3::Vec3f& basisY = axes.vY;
     const Wm3::Vec3f& basisZ = axes.vZ;
 
-    const float impulseX = mInvInertiaTensor.x * Wm3::Vec3f::Dot(mWorldImpulse, basisX);
-    const float impulseY = mInvInertiaTensor.y * Wm3::Vec3f::Dot(mWorldImpulse, basisY);
-    const float impulseZ = mInvInertiaTensor.z * Wm3::Vec3f::Dot(mWorldImpulse, basisZ);
+    // Summation order follows 0x00697E99..0x00697F68: the X projection adds
+    // x, y, z; the Y and Z projections add z, y, x; and every output lane
+    // adds the Z, Y, then X basis terms.
+    const Wm3::Vec3f& w = mWorldImpulse;
+    const float impulseX = mInvInertiaTensor.x * (((w.x * basisX.x) + (w.y * basisX.y)) + (w.z * basisX.z));
+    const float impulseY = mInvInertiaTensor.y * (((w.z * basisY.z) + (w.y * basisY.y)) + (w.x * basisY.x));
+    const float impulseZ = mInvInertiaTensor.z * (((w.z * basisZ.z) + (w.y * basisZ.y)) + (w.x * basisZ.x));
 
-    out->x = (basisX.x * impulseX) + (basisY.x * impulseY) + (basisZ.x * impulseZ);
-    out->y = (basisX.y * impulseX) + (basisY.y * impulseY) + (basisZ.y * impulseZ);
-    out->z = (basisX.z * impulseX) + (basisY.z * impulseY) + (basisZ.z * impulseZ);
+    out->x = ((basisZ.x * impulseZ) + (basisY.x * impulseY)) + (basisX.x * impulseX);
+    out->y = ((basisZ.y * impulseZ) + (basisY.y * impulseY)) + (basisX.y * impulseX);
+    out->z = ((basisZ.z * impulseZ) + (basisY.z * impulseY)) + (basisX.z * impulseX);
     return out;
   }
 

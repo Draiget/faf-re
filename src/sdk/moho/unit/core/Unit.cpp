@@ -14176,7 +14176,9 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
   Wm3::Vec3f impulse = Wm3::Vec3f::Zero();
   physBody->GetImpulse(&impulse);
 
-  Wm3::Vec3f velocity = Entity::GetVelocity();
+  // 0x0062CDDE: a virtual call through the entity vtable (+0x3C), so a unit
+  // off the air layer predicts from its motion velocity (Unit::GetVelocity).
+  Wm3::Vec3f velocity = GetVelocity();
   const Wm3::Vec3f upAxis(0.0f, 1.0f, 0.0f);
   Wm3::Quaternionf rollRotation{};
   (void)EulerRollToQuat(&upAxis, &rollRotation, impulse.y * 0.1f);
@@ -14212,7 +14214,8 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
  */
 Wm3::Vec3f* Unit::CalcBombDrop(Wm3::Vec3f* const out, const Wm3::Vec3f& targetPosition) const
 {
-  Wm3::Vec3f velocity = Entity::GetVelocity();
+  // 0x006D3A67: virtual, like PredictAheadBomb.
+  Wm3::Vec3f velocity = GetVelocity();
   velocity.x *= 10.0f;
   velocity.y *= 10.0f;
   velocity.z *= 10.0f;

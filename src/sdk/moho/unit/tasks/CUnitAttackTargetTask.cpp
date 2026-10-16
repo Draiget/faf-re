@@ -639,7 +639,8 @@ namespace moho
    * Address: 0x005F3370 (FUN_005F3370, CUnitAttackTargetTask::RefreshNavigationGoal helper)
    *
    * What it does:
-   * Refreshes navigation destination from current target/formation context.
+   * Refreshes the navigation destination: the formation-adjusted target cell
+   * when the task has a formation, otherwise the target entity itself.
    */
   void CUnitAttackTargetTask::RefreshNavigationGoal()
   {
@@ -660,9 +661,12 @@ namespace moho
       return;
     }
 
-    if (mWeapon != nullptr) {
-      if (Unit* const unit = static_cast<moho::CCommandTask*>(this)->mUnit; unit != nullptr && unit->AiAttacker != nullptr) {
-        (void)unit->AiAttacker->TargetIsWithinWeaponAttackRange(mWeapon, &mTarget);
+    // 0x005F33E0..0x005F340D: with no formation, an entity target becomes the
+    // navigator's destination unit. The raw weak link is read, so a recon blip
+    // is handed over as itself.
+    if (Entity* const targetEntity = mTarget.targetEntity.GetObjectPtr(); targetEntity != nullptr) {
+      if (IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator; navigator != nullptr) {
+        navigator->SetDestUnit(targetEntity);
       }
     }
   }
