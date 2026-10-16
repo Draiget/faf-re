@@ -124,6 +124,12 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 		if localHost == "" {
 			localHost = turnsrv.FirstPrivateIPv4().String()
 		}
+	} else if cfg.Advertise != "" {
+		// An explicit -advertise also replaces the loopback address of an
+		// all-local run: on a host where UDP to 127.0.0.1 fails (sendto
+		// returns WSAEADDRNOTAVAIL), the games can still reach each other
+		// through one of the machine's own interface addresses.
+		localHost = cfg.Advertise
 	}
 	l := &Launcher{cfg: cfg, j: j, job: job, players: make(map[int]*Player), gone: make(chan struct{})}
 	for _, pc := range cfg.Players {
