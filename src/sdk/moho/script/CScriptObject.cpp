@@ -2556,7 +2556,9 @@ void CScriptObject::RunScriptOnBeingBuiltProgress(
  * Address: 0x00602CA0 (FUN_00602CA0, Moho::CScriptObject::StartTransportBeamUp)
  *
  * What it does:
- * Invokes `OnStartTransportBeamUp(self, attachBone, sourceUnit)` callback when present.
+ * Invokes `OnStartTransportBeamUp(self, transport, attachBone)` callback when present.
+ * The call helper at 0x00603080 pushes self, the weak-linked unit's Lua
+ * object (nil when the link is dead) and then the bone number.
  */
 void CScriptObject::StartTransportBeamUp(const WeakPtr<Unit>& sourceUnitLink, const int attachBone)
 {
@@ -2573,7 +2575,7 @@ void CScriptObject::StartTransportBeamUp(const WeakPtr<Unit>& sourceUnitLink, co
   try {
     LuaPlus::LuaFunction<void> fn{script};
     const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
-    fn(mLuaObj, attachBone, sourceUnitObject);
+    fn(mLuaObj, sourceUnitObject, attachBone);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.GetObjectPtr(), kOnStartTransportBeamUp, ex.what());
   } catch (...) {

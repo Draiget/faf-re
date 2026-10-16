@@ -3487,21 +3487,15 @@ namespace moho
    * Walks only the 1-cell-wider perimeter of `rect` (the horizontal bands at
    * `z0-1` and `z1+1`, then the vertical bands at `x0-1` and `x1+1`), finds
    * min/max elevation along the edge, and checks whether the largest one-sided
-   * deviation from `ceil(lastSample)` fits within
+   * deviation from `ceil(minHeight)` fits within
    * `blueprint.Physics.MaxGroundVariation`. Used for `FlattenSkirt` blueprints,
    * which level the ground at placement time: the pivot is the integer height
    * the skirt gets flattened to, so the test asks whether the existing edge can
    * be pulled to it within the blueprint's tolerance.
    *
-   * `lastSample` is the second elevation read in the last perimeter iteration
-   * that ran -- the binary keeps it in xmm0 and computes `ceil` on that same
-   * register at 0x005650D6. IDA's `__usercall` prototype turned that register
-   * into a `pivotArg` parameter because the both-loops-skipped path reads it
-   * before writing it; the mangled symbol has no float parameters at all. This
-   * recovery had taken the invented parameter at face value and pivoted on the
-   * caller's `0.0f`, so the deviation came out as the site's full elevation
-   * (18.68 on SCMP_009) and every `FlattenSkirt` structure -- which is every
-   * ordinary building -- failed its placement check on flat ground.
+   * Both loops keep the running minimum in xmm3 and the maximum in xmm2, spill
+   * them to the frame at 0x0056516D/0x00565173, and 0x00565179 reloads the
+   * minimum for the `ceil` call at 0x00565183.
    */
   bool OCCUPY_CheckEdgeFlatness(
     const gpg::Rect2f& rect,
@@ -3519,36 +3513,32 @@ namespace moho
     float minHeight = std::numeric_limits<float>::max();
     float maxHeight = -std::numeric_limits<float>::max();
 
-    // The elevation sampled last. Zero when neither band runs, matching the
-    // register the binary reads on that path.
-    float lastSample = 0.0f;
-
     const CHeightField* const field = map.mHeightField.get();
 
     // Horizontal perimeter bands at (z0 - 1) and (z1 + 1), walked from
     // (x0 - 1) through (x1 + 1).
     for (int cellX = x0 - 1; cellX <= x1 + 1; ++cellX) {
       const float topSample = SampleClampedElevation(*field, cellX, z0 - 1);
-      lastSample = SampleClampedElevation(*field, cellX, z1 + 1);
-      minHeight = std::min({minHeight, topSample, lastSample});
-      maxHeight = std::max({maxHeight, topSample, lastSample});
+      const float bottomSample = SampleClampedElevation(*field, cellX, z1 + 1);
+      minHeight = std::min({minHeight, topSample, bottomSample});
+      maxHeight = std::max({maxHeight, topSample, bottomSample});
     }
 
     // Vertical perimeter bands at (x0 - 1) and (x1 + 1), walked from z0
     // through z1 (inclusive).
     for (int cellZ = z0; cellZ <= z1; ++cellZ) {
       const float leftSample = SampleClampedElevation(*field, x0 - 1, cellZ);
-      lastSample = SampleClampedElevation(*field, x1 + 1, cellZ);
-      minHeight = std::min({minHeight, leftSample, lastSample});
-      maxHeight = std::max({maxHeight, leftSample, lastSample});
+      const float rightSample = SampleClampedElevation(*field, x1 + 1, cellZ);
+      minHeight = std::min({minHeight, leftSample, rightSample});
+      maxHeight = std::max({maxHeight, leftSample, rightSample});
     }
 
     *outMinHeight = minHeight;
     *outMaxHeight = maxHeight;
 
-    // 0x005650D6: `ceil` runs on the same register the loop last stored a
-    // sample into -- the height the skirt will be flattened to.
-    const float pivot = std::ceil(lastSample);
+    // 0x00565179..0x00565183: the skirt is flattened up to the next whole
+    // height above the lowest edge sample.
+    const float pivot = std::ceil(minHeight);
     const float deviationFromPivot = std::max(maxHeight - pivot, pivot - minHeight);
     return blueprint.Physics.MaxGroundVariation >= deviationFromPivot;
   }
