@@ -239,6 +239,12 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <!-- /EHs, not /EHsc: Lua errors are C++ exceptions (lua_Error/lua_MemError,
+           as in the binary) that unwind through the extern "C" VM functions
+           (luaD_call, luaV_execute, lua_error, ...). Under /EHsc the optimizer
+           assumes those cannot throw and drops their unwind data, so the first
+           script error in a Release build ended in std::terminate. -->
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -338,6 +344,12 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <!-- /EHs, not /EHsc: Lua errors are C++ exceptions (lua_Error/lua_MemError,
+           as in the binary) that unwind through the extern "C" VM functions
+           (luaD_call, luaV_execute, lua_error, ...). Under /EHsc the optimizer
+           assumes those cannot throw and drops their unwind data, so the first
+           script error in a Release build ended in std::terminate. -->
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
