@@ -589,14 +589,13 @@ namespace
         (void)::HeapFree(EngineSystemHeap(), 0, ptr);
     }
 
-    /// `gpg::GetHeapInfo` for the system-heap path (not in the binary). `inUse`
-    /// is the engine's own live bytes. The heap-wide figures come from
-    /// `HeapSummary`, so they include whatever else shares that heap (the CRT
-    /// uses the process heap too): `committed`/`total` are its committed bytes
-    /// and `inSmallBlocks` the committed bytes not held by engine blocks, which
-    /// keeps `Heap_TotalCheck` (`inSmallBlocks + inUse`) equal to `total`, as it
-    /// is for the engine allocator. The debug CRT heap has no summary; there
-    /// every figure is the engine's live bytes.
+    /// `gpg::GetHeapInfo` for the system-heap path (not in the binary). Every
+    /// figure is the engine's own live bytes; `inSmallBlocks` is 0, so
+    /// `Heap_TotalCheck` (`inSmallBlocks + inUse`) still equals `Heap_Total`.
+    /// `CScApp::Main` publishes these stats every frame, so this must stay a
+    /// counter read: `HeapSummary` walks every block of the heap under its
+    /// lock (about 260 ms for a 500 MB heap of small blocks), which stalled
+    /// the main thread and every allocating thread once per frame.
     void FillSystemHeapStats(gpg::HeapStats& stats) noexcept
     {
         const std::size_t inUse = gSystemHeapBytesInUse.load(std::memory_order_relaxed);
@@ -605,20 +604,6 @@ namespace
         stats.committed = inUse;
         stats.total = inUse;
         stats.inUse = inUse;
-        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
-            return;
-        }
-
-        HEAP_SUMMARY summary{};
-        summary.cb = sizeof(summary);
-        if (::HeapSummary(EngineSystemHeap(), 0, &summary) == FALSE) {
-            return;
-        }
-        const std::size_t committed = (summary.cbCommitted > inUse) ? summary.cbCommitted : inUse;
-        stats.reserved = (summary.cbReserved > committed) ? summary.cbReserved : committed;
-        stats.committed = committed;
-        stats.total = committed;
-        stats.inSmallBlocks = committed - inUse;
     }
     // Victim block address observed by [CLOBBER]; heap layout is deterministic.
     constexpr std::uintptr_t kProbeVictimBlock = 0x5C803E00u;
