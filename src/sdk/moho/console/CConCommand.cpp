@@ -1990,18 +1990,6 @@ void moho::UI_DumpControlsUnderCursor(const msvc8::vector<msvc8::string>& args)
 }
 
 /**
- * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
-  * Alias of FUN_004F2400 (non-canonical helper lane).
- *
- * What it does:
- * Requests application main-loop exit through the active wx app object.
- */
-void moho::WIN_AppRequestExit()
-{
-  wxTheApp->ExitMainLoop();
-}
-
-/**
  * Address: 0x004F3C30 (FUN_004F3C30, Moho::WIN_ToggleLogDialog)
  *
  * What it does:

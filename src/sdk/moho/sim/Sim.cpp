@@ -15131,7 +15131,7 @@ int moho::cfunc_SetAutoMode(lua_State* const luaContext)
  * What it does:
  * Publishes the global user-Lua binder for `SetAutoMode`.
  */
-moho::CScrLuaInitForm* moho::func_UnitSetAutoMode_LuaFuncDef()
+moho::CScrLuaInitForm* moho::func_SetAutoMode_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     UserLuaInitSet(),
@@ -27028,6 +27028,7 @@ namespace
       (void)::moho::func_RegisterBeamBlueprint_LuaFuncDef();
       (void)::moho::func_ExecLuaInSim_LuaFuncDef();
       (void)::moho::func_SimCallback_LuaFuncDef();
+      (void)::moho::func_SetAutoMode_LuaFuncDef();
       (void)::moho::func_SetAutoSurfaceMode_LuaFuncDef();
       (void)::moho::func_ToggleScriptBit_LuaFuncDef();
       (void)::moho::func_SetPaused_LuaFuncDef();

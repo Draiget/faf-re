@@ -308,4 +308,28 @@ namespace moho
   void register_CollisionBeamEntityTypeInfo();
 
   static_assert(sizeof(CollisionBeamEntityTypeInfo) == 0x64, "CollisionBeamEntityTypeInfo size must be 0x64");
+
+  /**
+   * Metatable factory for `CollisionBeamEntity`. Declared beside the type so
+   * every translation unit naming `CScrLuaMetatableFactory<CollisionBeamEntity>`
+   * uses this specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<CollisionBeamEntity> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CollisionBeamEntity>) == 0x08,
+    "CScrLuaMetatableFactory<CollisionBeamEntity> size must be 0x8"
+  );
 } // namespace moho

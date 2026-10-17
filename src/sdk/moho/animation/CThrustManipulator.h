@@ -8,6 +8,7 @@
 #include "legacy/containers/String.h"
 #include "moho/animation/IAniManipulator.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 namespace gpg
 {
@@ -233,4 +234,28 @@ namespace moho
     "CThrustManipulator::mOrientation offset must be 0xD8"
   );
   static_assert(sizeof(CThrustManipulator) == 0xE8, "CThrustManipulator size must be 0xE8");
+  /**
+   * Metatable factory for `CThrustManipulator`. Declared beside the type so every
+   * translation unit naming `CScrLuaMetatableFactory<CThrustManipulator>` uses this
+   * specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<CThrustManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CThrustManipulator>) == 0x08,
+    "CScrLuaMetatableFactory<CThrustManipulator> size must be 0x8"
+  );
+
 } // namespace moho

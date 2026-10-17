@@ -3626,7 +3626,7 @@ namespace moho
    * What it does:
    * Publishes the user-lane Lua binder definition for `SetAutoMode`.
    */
-  CScrLuaInitForm* func_UnitSetAutoMode_LuaFuncDef();
+  CScrLuaInitForm* func_SetAutoMode_LuaFuncDef();
 
   /**
    * Address: 0x008BB2E0 (FUN_008BB2E0, cfunc_SetAutoSurfaceMode)

@@ -26,6 +26,7 @@
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/WeakPtr.h"
 #include "Wm3Vector3.h"
 
@@ -4939,5 +4940,28 @@ namespace moho
    * CAiSteeringImpl.cpp.
    */
   [[nodiscard]] bool func_IsSourceUnit(int mode, const Unit& owner, Unit* candidate) noexcept;
+
+  /**
+   * Unit metatable factory. The specialization lives beside `Unit` so every
+   * translation unit that names `CScrLuaMetatableFactory<Unit>` sees it;
+   * a unit that did not would instantiate the primary template instead and
+   * build a second factory object with its own cache index.
+   */
+  template <>
+  class CScrLuaMetatableFactory<Unit> final : public CScrLuaObjectFactory
+  {
+  public:
+    CScrLuaMetatableFactory();
+
+    [[nodiscard]] static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(sizeof(CScrLuaMetatableFactory<Unit>) == 0x08, "CScrLuaMetatableFactory<Unit> size must be 0x08");
 
 } // namespace moho

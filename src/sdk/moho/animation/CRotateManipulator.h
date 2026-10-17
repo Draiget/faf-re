@@ -6,6 +6,7 @@
 #include "moho/animation/IAniManipulator.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "Wm3Vector3.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 struct lua_State;
 
@@ -384,6 +385,30 @@ namespace moho
    * radians, applies current-angle lane, and raises Lua error on failure.
    */
   int cfunc_CRotateManipulatorSetCurrentAngleL(LuaPlus::LuaState* state);
+  /**
+   * Metatable factory for `CRotateManipulator`. Declared beside the type so every
+   * translation unit naming `CScrLuaMetatableFactory<CRotateManipulator>` uses this
+   * specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<CRotateManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CRotateManipulator>) == 0x08,
+    "CScrLuaMetatableFactory<CRotateManipulator> size must be 0x8"
+  );
+
 } // namespace moho
 
 namespace gpg

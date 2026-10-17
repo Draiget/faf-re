@@ -534,10 +534,11 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00695740 (non-canonical helper lane).
+   * Address: 0x00695740 (FUN_00695740, func_MotorFallDownWhack_LuaFuncDef)
    *
    * What it does:
-   * Publishes `MotorFallDown:Whack()` into the sim Lua init set.
+   * Publishes the `MotorFallDown:Whack(nx,ny,nz,f,dobreak)` Lua binder into
+   * the sim Lua init set.
    */
   CScrLuaInitForm* func_MotorFallDownWhack_LuaFuncDef()
   {

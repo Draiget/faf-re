@@ -144,7 +144,6 @@ namespace
   constexpr const char* kEntityKillName = "Kill";
   constexpr const char* kEntityPushOverName = "PushOver";
   constexpr const char* kEntityFallDownName = "FallDown";
-  constexpr const char* kMotorFallDownWhackName = "Whack";
   constexpr const char* kEntitySinkAwayName = "SinkAway";
   constexpr const char* kEntitySetCollisionShapeHelpText =
     "Entity:SetCollisionShape(['Box'|'Sphere'|'None'], centerX, Y, Z, size) -- size is radius for sphere, x,y,z extent for box";
@@ -166,7 +165,6 @@ namespace
   constexpr const char* kEntityKillHelpText = "Entity:Kill(instigator,type,excessDamageRatio)";
   constexpr const char* kEntityPushOverHelpText = "Entity:PushOver(nx, ny, nz, depth)";
   constexpr const char* kEntityFallDownHelpText = "Entity:FallDown(dx,dy,dz,force) -- start falling down";
-  constexpr const char* kMotorFallDownWhackHelpText = "MotorFallDown:Whack(nx,ny,nz,f,dobreak)";
   constexpr const char* kEntitySinkAwayHelpText = "Entity:SinkAway(vy) -- sink into the ground";
   constexpr const char* kEntityGetEntityIdName = "GetEntityId";
   constexpr const char* kEntityDetachAllName = "DetachAll";
@@ -1209,7 +1207,6 @@ namespace moho
   int cfunc_EntityPushOverL(LuaPlus::LuaState* state);
   int cfunc_EntityFallDown(lua_State* luaContext);
   int cfunc_EntityFallDownL(LuaPlus::LuaState* state);
-  int cfunc_MotorFallDownWhack(lua_State* luaContext);
   int cfunc_EntitySinkAway(lua_State* luaContext);
   int cfunc_EntitySinkAwayL(LuaPlus::LuaState* state);
 
@@ -7376,25 +7373,6 @@ namespace moho
       &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityFallDownHelpText
-    );
-    return &binder;
-  }
-
-  /**
-   * Address: 0x00695740 (FUN_00695740, func_MotorFallDownWhack_LuaFuncDef)
-   *
-   * What it does:
-   * Publishes the `MotorFallDown:Whack(nx,ny,nz,f,dobreak)` Lua binder.
-   */
-  CScrLuaInitForm* func_MotorFallDownWhack_LuaFuncDef()
-  {
-    static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      kMotorFallDownWhackName,
-      &cfunc_MotorFallDownWhack,
-      &CScrLuaMetatableFactory<MotorFallDown>::Instance(),
-      "MotorFallDown",
-      kMotorFallDownWhackHelpText
     );
     return &binder;
   }

@@ -874,23 +874,6 @@ namespace moho
    * Resolves one unit stat path and returns the stat node as a Lua table.
    */
   int cfunc_UnitGetStatL(LuaPlus::LuaState* state);
-
-  template <>
-  class CScrLuaMetatableFactory<Unit> final : public CScrLuaObjectFactory
-  {
-  public:
-    CScrLuaMetatableFactory();
-
-    [[nodiscard]] static CScrLuaMetatableFactory& Instance();
-
-  protected:
-    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
-
-  private:
-    static CScrLuaMetatableFactory sInstance;
-  };
-
-  static_assert(sizeof(CScrLuaMetatableFactory<Unit>) == 0x08, "CScrLuaMetatableFactory<Unit> size must be 0x08");
 } // namespace moho
 
 namespace

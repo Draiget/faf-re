@@ -21,6 +21,7 @@
 #include "legacy/containers/List.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
+#include "moho/audio/HSound.h"
 #include "moho/audio/SParamKey.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaBinder.h"

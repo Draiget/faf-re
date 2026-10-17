@@ -6,6 +6,7 @@
 #include "moho/animation/IAniManipulator.h"
 #include "moho/misc/WeakPtr.h"
 #include "Wm3Vector3.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 namespace moho
 {
@@ -210,4 +211,28 @@ namespace moho
     "CBuilderArmManipulator::mOnTarget offset must be 0xB0"
   );
   static_assert(sizeof(CBuilderArmManipulator) == 0xB8, "CBuilderArmManipulator size must be 0xB8");
+  /**
+   * Metatable factory for `CBuilderArmManipulator`. Declared beside the type so every
+   * translation unit naming `CScrLuaMetatableFactory<CBuilderArmManipulator>` uses this
+   * specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<CBuilderArmManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CBuilderArmManipulator>) == 0x08,
+    "CScrLuaMetatableFactory<CBuilderArmManipulator> size must be 0x8"
+  );
+
 } // namespace moho

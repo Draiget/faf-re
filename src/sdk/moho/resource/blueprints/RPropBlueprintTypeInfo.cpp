@@ -6,6 +6,8 @@
 
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
+#include "moho/resource/blueprints/RPropBlueprintDefenseTypeInfo.h"
+#include "moho/resource/blueprints/RPropBlueprintEconomyTypeInfo.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -44,64 +46,6 @@ namespace
 
 namespace moho
 {
-  class RPropBlueprintDefenseTypeInfo final : public gpg::RType
-  {
-  public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "RPropBlueprintDefense";
-    }
-
-    void Init() override
-    {
-      size_ = sizeof(RPropBlueprintDefense);
-      gpg::RType::Init();
-      Finish();
-    }
-  };
-
-  class RPropBlueprintEconomyTypeInfo final : public gpg::RType
-  {
-  public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "RPropBlueprintEconomy";
-    }
-
-    void Init() override
-    {
-      size_ = sizeof(RPropBlueprintEconomy);
-      gpg::RType::Init();
-      Finish();
-    }
-  };
-
-  /**
-   * Address: 0x0051D5F0 (FUN_0051D5F0, preregister_RPropBlueprintDefenseTypeInfo)
-   *
-   * What it does:
-   * Constructs/preregisters reflection metadata for `RPropBlueprintDefense`.
-   */
-  [[nodiscard]] gpg::RType* preregister_RPropBlueprintDefenseTypeInfo()
-  {
-    static RPropBlueprintDefenseTypeInfo typeInfo;
-    gpg::PreRegisterRType(typeid(RPropBlueprintDefense), &typeInfo);
-    return &typeInfo;
-  }
-
-  /**
-   * Address: 0x0051D7A0 (FUN_0051D7A0, preregister_RPropBlueprintEconomyTypeInfo)
-   *
-   * What it does:
-   * Constructs/preregisters reflection metadata for `RPropBlueprintEconomy`.
-   */
-  [[nodiscard]] gpg::RType* preregister_RPropBlueprintEconomyTypeInfo()
-  {
-    static RPropBlueprintEconomyTypeInfo typeInfo;
-    gpg::PreRegisterRType(typeid(RPropBlueprintEconomy), &typeInfo);
-    return &typeInfo;
-  }
-
   /**
    * Address: 0x0051D950 (FUN_0051D950, Moho::RPropBlueprintTypeInfo::RPropBlueprintTypeInfo)
    */
@@ -168,8 +112,8 @@ namespace moho
    */
   void register_RPropBlueprintTypeInfo()
   {
-    (void)preregister_RPropBlueprintDefenseTypeInfo();
-    (void)preregister_RPropBlueprintEconomyTypeInfo();
+    register_RPropBlueprintDefenseTypeInfo();
+    register_RPropBlueprintEconomyTypeInfo();
     (void)AcquireRPropBlueprintTypeInfo();
   }
 } // namespace moho
@@ -177,6 +121,3 @@ namespace moho
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_RPropBlueprintTypeInfo_460a53, moho::register_RPropBlueprintTypeInfo)
-
-GPG_PREREGISTER_INIT(preregister_RPropBlueprintDefenseTypeInfo_460a53, moho::preregister_RPropBlueprintDefenseTypeInfo)
-GPG_PREREGISTER_INIT(preregister_RPropBlueprintEconomyTypeInfo_460a53, moho::preregister_RPropBlueprintEconomyTypeInfo)

@@ -9,6 +9,7 @@
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 struct lua_State;
 
@@ -798,4 +799,52 @@ namespace moho
    * compiler-generated `gpg::SerSaveLoadHelper<IAniManipulator>` members.
    */
   void register_IAniManipulatorSerializer();
+  /**
+   * Metatable factory for `CBoneEntityManipulator`. Declared beside the type so every
+   * translation unit naming `CScrLuaMetatableFactory<CBoneEntityManipulator>` uses this
+   * specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<CBoneEntityManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CBoneEntityManipulator>) == 0x08,
+    "CScrLuaMetatableFactory<CBoneEntityManipulator> size must be 0x8"
+  );
+
+  /**
+   * Metatable factory for `CFootPlantManipulator`. Declared beside the type so every
+   * translation unit naming `CScrLuaMetatableFactory<CFootPlantManipulator>` uses this
+   * specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<CFootPlantManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CFootPlantManipulator>) == 0x08,
+    "CScrLuaMetatableFactory<CFootPlantManipulator> size must be 0x8"
+  );
+
 } // namespace moho

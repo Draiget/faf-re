@@ -14,6 +14,13 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAimManipulator.h"
 #include "moho/ai/CAimManipulatorTypeInfo.h"
+#include "moho/ai/CBuilderArmManipulator.h"
+#include "moho/animation/CAnimationManipulator.h"
+#include "moho/animation/CRotateManipulator.h"
+#include "moho/animation/CSlaveManipulator.h"
+#include "moho/animation/CThrustManipulator.h"
+#include "moho/animation/IAniManipulator.h"
+#include "moho/collision/CCollisionManipulator.h"
 #include "moho/animation/CSlideManipulator.h"
 #include "moho/animation/CStorageManipulator.h"
 #include "moho/console/CConCommand.h"
@@ -512,7 +519,7 @@ namespace
 
 namespace moho
 {
-  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
+  [[nodiscard]] static CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
   {
     if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
       return *set;

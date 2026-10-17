@@ -990,8 +990,6 @@ RType* CachedRBlueprintType()
   gpg::RType* gCFootPlantManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gCFootPlantManipulatorRRefCache{false, {}};
   thread_local TypeInfoCache3 gCAnimationManipulatorRRefCache{false, {}};
-  gpg::RType* gCRotateManipulatorRRefType = nullptr;
-  thread_local TypeInfoCache3 gCRotateManipulatorRRefCache{false, {}};
   gpg::RType* gCStorageManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gCStorageManipulatorRRefCache{false, {}};
   gpg::RType* gCThrustManipulatorRRefType = nullptr;
@@ -4184,25 +4182,6 @@ gpg::RRef* RRef_CAnimationManipulator(RRef* const out, moho::CAnimationManipulat
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006456F0 (FUN_006456F0, gpg::RRef_CRotateManipulator)
- *
- * What it does:
- * Builds a reflection reference for `moho::CRotateManipulator` using the
- * manipulator runtime type cache and base-offset normalization.
- */
-gpg::RRef* RRef_CRotateManipulator(RRef* const out, moho::CRotateManipulator* const value)
-{
-  return BuildNamedPolymorphicRefWithCache(
-    out,
-    value,
-    "CRotateManipulator",
-    "Moho::CRotateManipulator",
-    gCRotateManipulatorRRefType,
-    gCRotateManipulatorRRefCache
-  );
 }
 
 /**

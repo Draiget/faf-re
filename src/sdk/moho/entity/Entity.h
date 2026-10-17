@@ -31,6 +31,7 @@
 #include "Wm3Sphere3.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 struct lua_State;
 
@@ -2824,5 +2825,26 @@ namespace moho
   static_assert(offsetof(Entity, mAABox) == 0x240, "Entity::mAABox offset must be 0x240");
   static_assert(offsetof(Entity, mLuaPositionCache) == 0x258, "Entity::mLuaPositionCache offset must be 0x258");
   static_assert(offsetof(Entity, mMotor) == 0x26C, "Entity::mMotor offset must be 0x26C");
+
+  /**
+   * Metatable factory for `Entity`. Declared beside the type so every
+   * translation unit naming `CScrLuaMetatableFactory<Entity>` uses this
+   * specialization rather than instantiating the primary template.
+   */
+  template <>
+  class CScrLuaMetatableFactory<Entity> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(sizeof(CScrLuaMetatableFactory<Entity>) == 0x08, "CScrLuaMetatableFactory<Entity> size must be 0x8");
 
 } // namespace moho

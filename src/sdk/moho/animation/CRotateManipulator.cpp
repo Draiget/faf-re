@@ -1170,7 +1170,7 @@ void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const
 }
 
 /**
-  * Alias of FUN_006456F0 (non-canonical helper lane).
+ * Address: 0x006456F0 (FUN_006456F0, gpg::RRef_CRotateManipulator)
  *
  * What it does:
  * Builds one typed reflection reference for `moho::CRotateManipulator*`,

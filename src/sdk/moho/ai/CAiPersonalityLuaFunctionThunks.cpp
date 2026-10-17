@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "moho/lua/CScrLuaClassBinder.h"
+#include "moho/ai/CAiPersonality.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
@@ -77,7 +78,7 @@ namespace moho
 {
   class CAiPersonality;
 
-  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
+  [[nodiscard]] static CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
   {
     if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
       return *set;

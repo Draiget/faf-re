@@ -233,6 +233,14 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- Float parity with Debug: both configurations take the v143 defaults
+           /fp:precise and /arch:SSE2 (neither sets FloatingPointModel or
+           EnableEnhancedInstructionSet), and /fp:precise does not contract
+           to FMA. The one difference that changes results is /O2's implied
+           /Oi turning sqrt(double) into an SSE2 sqrtsd that ignores the sim's
+           _PC_24 x87 control word; this header keeps sqrt a CRT call. See the
+           header for the measured comparison. -->
+      <ForcedIncludeFiles>platform\X87SqrtCall.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

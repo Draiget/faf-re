@@ -832,7 +832,7 @@ namespace moho
     return ForwardAiBrainLuaRegistrationThunk<&func_CAiBrainGetNoRushTicks_LuaFuncDef>();
   }
 
-  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
+  [[nodiscard]] static CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
   {
     if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
       return *set;

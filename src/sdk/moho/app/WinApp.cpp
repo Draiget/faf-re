@@ -2375,9 +2375,11 @@ void moho::WIN_SetWakeupTimer(float milliseconds)
 
 /**
  * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
+ * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
  *
  * What it does:
- * Requests immediate exit from the active wx app main loop.
+ * Requests immediate exit from the active wx app main loop. The two
+ * addresses are byte-identical bodies of this one definition.
  */
 void moho::WIN_AppRequestExit()
 {
