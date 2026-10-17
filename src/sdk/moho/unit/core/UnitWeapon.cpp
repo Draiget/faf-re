@@ -286,16 +286,11 @@ namespace
    * `FUN_006D5B40`), which itself calls this via `UnitWeapon::TargetIsTooClose`
    * (0x006D5D80) / `TargetSolutionStatusGun`'s own public overload.
    *
-   * Ground truth (`FUN_006D5B40.c`) resolves the unit heading via
-   * `Wm3::Quaternion::ToAngle(&this->mUnit->mVarDat.mCurTransform.orient)`
-   * (a distinct, not-yet-recovered function) rather than rotating a forward
-   * vector and taking `atan2` of it -- but `ToAngle`'s own formula,
-   * `atan2(2*(w*y+x*z), 1-2*(z*z+y*y))`, is exactly `atan2(forward.x,
-   * forward.z)` for `forward = Rotate((0,0,1))` under this engine's
-   * scalar-first convention, algebraically fused into one function. The
-   * `.Rotate()`-based computation below matched ground truth in *shape* but
-   * used the wrong (`.w`-scalar, upstream WildMagic) convention; fixed to
-   * `Moho::MultQuadVec`, which makes it numerically identical to `ToAngle`.
+   * The unit heading is `ToAngle` (0x00565A30) on the current orientation:
+   * `fpatan` of `(z*x + w*y)*2` over `1 - (y*y + x*x)*2`, left unrounded and
+   * subtracted from the stored float target heading (0x006D5CD4). Rotating
+   * (0,0,1) and taking `atan2` of the result is the same angle algebraically
+   * but rounds the heading to float first and can flip the sign of zero.
    */
   [[nodiscard]] moho::ESolutionStatus EvaluateTargetSolutionStatusGun(
     moho::UnitWeapon* const weapon,
@@ -348,17 +343,22 @@ namespace
         muzzlePosition = weapon->mUnit->GetBoneWorldTransform(weapon->mBone).pos_;
       }
 
-      const float targetHeading = msvc8::atan2(targetPosition.x - muzzlePosition.x, targetPosition.z - muzzlePosition.z);
-      const Wm3::Quaternionf unitOrientation = weapon->mUnit->GetTransform().orient_;
-      const Wm3::Vec3f forwardAxis{0.0f, 0.0f, 1.0f};
-      Wm3::Vec3f forward{};
-      moho::MultQuadVec(&forward, &forwardAxis, &unitOrientation);
-      const float unitHeading = msvc8::atan2(forward.x, forward.z);
+      // 0x006D5CBB..0x006D5CD4: the target heading is stored as float; the
+      // unit heading comes from ToAngle (0x00565A30), whose own quaternion
+      // operands go straight into `fpatan`, and is subtracted while still on
+      // the x87 stack.
+      const Wm3::Quaternionf& unitOrientation = weapon->mUnit->GetTransform().orient_;
+      const float headingY = ((unitOrientation.z * unitOrientation.x) + (unitOrientation.w * unitOrientation.y)) * 2.0f;
+      const float headingX =
+        1.0f - (((unitOrientation.y * unitOrientation.y) + (unitOrientation.x * unitOrientation.x)) * 2.0f);
+      const float headingToTarget = msvc8::Atan2Difference(
+        targetPosition.x - muzzlePosition.x, targetPosition.z - muzzlePosition.z, headingY, headingX
+      );
 
       constexpr float kDegreesToRadians = 0.017453292f;
       const float headingArcCenter = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       const float headingArcRange = weapon->mWeaponBlueprint->HeadingArcRange * kDegreesToRadians;
-      const float headingDelta = moho::NormalizeAngleSignedRadians(targetHeading - unitHeading - headingArcCenter);
+      const float headingDelta = moho::NormalizeAngleSignedRadians(headingToTarget - headingArcCenter);
       if (std::fabs(headingDelta) > headingArcRange) {
         return moho::ESolutionStatus::TRS_NoSolution;
       }
@@ -3171,10 +3171,14 @@ namespace moho
     Wm3::Vec3f targetPosition = targetData->GetTargetPosGun(false);
     if (unitBlueprint->Air.PredictAheadForBombDrop > 0.0f && targetData->targetIsMobile) {
       if (Entity* const targetEntity = targetData->GetEntity(); targetEntity != nullptr) {
+        // 0x006D4EF3..0x006D4EFA hand `IsUnit()` to PredictAheadBomb unchecked;
+        // for a non-unit it answers the shared zero vector (0x0062CD50).
         if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
           Wm3::Vec3f predictedTargetPosition{};
           targetUnit->PredictAheadBomb(&predictedTargetPosition, unitBlueprint->Air.PredictAheadForBombDrop);
           targetPosition = predictedTargetPosition;
+        } else {
+          targetPosition = Wm3::Vector3f::ZERO;
         }
       }
     }
@@ -3389,12 +3393,10 @@ namespace moho
         const Wm3::Vec3f& ownerPosition = mUnit->GetPosition();
         const float ownerHalfSizeX = static_cast<float>(ownerFootprint.mSizeX) * 0.5f;
         const float ownerHalfSizeZ = static_cast<float>(ownerFootprint.mSizeZ) * 0.5f;
-        const std::int16_t ownerGridMinX = static_cast<std::int16_t>(
-          static_cast<std::int32_t>(ownerPosition.x - ownerHalfSizeX)
-        );
-        const std::int16_t ownerGridMinZ = static_cast<std::int16_t>(
-          static_cast<std::int32_t>(ownerPosition.z - ownerHalfSizeZ)
-        );
+        // 0x006D58B0 / 0x006D58D5: `fld; fistp` (round to nearest), then the
+        // low 16 bits (`movsx word`).
+        const std::int16_t ownerGridMinX = static_cast<std::int16_t>(msvc8::RoundToInt(ownerPosition.x - ownerHalfSizeX));
+        const std::int16_t ownerGridMinZ = static_cast<std::int16_t>(msvc8::RoundToInt(ownerPosition.z - ownerHalfSizeZ));
 
         const Wm3::Vec3f probeCenter{
           static_cast<float>(ownerGridMinX) + ownerHalfSizeX,
@@ -3965,6 +3967,8 @@ namespace moho
       const RUnitBlueprint* const unitBlueprint = (mUnit != nullptr) ? mUnit->GetBlueprint() : nullptr;
       const char* const unitName = (unitBlueprint != nullptr) ? unitBlueprint->mBlueprintId.c_str() : "UnknownUnit";
       gpg::Logf("%s:%s:CreateProjectile: no projectile blueprint, doing instahit instead.", unitName, weaponName);
+      // 0x006D6538..0x006D6592: width 0.1, lifetime 1, no texture, glow 1 / blue 0.25.
+      DoInstaHit(Wm3::Quaternionf{1.0f, 0.0f, 0.0f, 0.25f}, muzzleBoneIndex, 0.1f, 1.0f, {});
       return nullptr;
     }
 
@@ -3978,10 +3982,11 @@ namespace moho
     } else if (mWeaponBlueprint != nullptr && mWeaponBlueprint->UseFiringSolutionInsteadOfAimBone != 0u) {
       const Wm3::Vector3f& invalidAimingVector = GetRecoveredInvalidAimingVector();
       if (mAimingAt != invalidAimingVector) {
-        Wm3::Vector3f recoveredAimDirection = mAimingAt;
-        if (Wm3::Vector3f::Normalize(&recoveredAimDirection) > 0.0f) {
-          launchTransform.orient_ = COORDS_Orient(recoveredAimDirection);
-        }
+        // 0x006D6626 / 0x006D662F: NormalizeVectorInto (zero at length <= 0),
+        // then COORDS_Orient unconditionally.
+        Wm3::Vector3f aimDirection{};
+        (void)NormalizeVectorInto(&aimDirection, mAimingAt);
+        launchTransform.orient_ = COORDS_Orient(aimDirection);
       }
     }
 
@@ -4029,7 +4034,8 @@ namespace moho
       const float deltaX = launchTransform.pos_.x - targetPosition.x;
       const float deltaY = launchTransform.pos_.y - targetPosition.y;
       const float deltaZ = launchTransform.pos_.z - targetPosition.z;
-      const float targetDistance = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+      // 0x006D68D4..0x006D68EE: (z*z + y*y) + x*x.
+      const float targetDistance = std::sqrt(((deltaZ * deltaZ) + (deltaY * deltaY)) + (deltaX * deltaX));
 
       const float muzzleVelocity = mWeaponBlueprint->GetMuzzleVelocity(targetDistance, mSim->mRngState);
       Wm3::Vector3f& projectileVelocity = projectile->mVelocity;
@@ -4043,8 +4049,8 @@ namespace moho
       projectile->SetLifetime(mWeaponBlueprint->ProjectileLifetime);
     }
 
-    if (mWeaponBlueprint != nullptr && mWeaponBlueprint->ProjectileLifetimeUsesMultiplier > 0.0f
-        && mWeaponBlueprint->MuzzleVelocity > 0.0f) {
+    // 0x006D6983 gates on the multiplier alone; MuzzleVelocity is divided by unchecked.
+    if (mWeaponBlueprint != nullptr && mWeaponBlueprint->ProjectileLifetimeUsesMultiplier > 0.0f) {
       const float scaledLifetimeSeconds =
         (mWeaponBlueprint->MaxRadius / mWeaponBlueprint->MuzzleVelocity) * mWeaponBlueprint->ProjectileLifetimeUsesMultiplier;
       projectile->SetLifetime(scaledLifetimeSeconds);
@@ -4091,13 +4097,14 @@ namespace moho
     outHelper->mBeamLength = maxBeamLength;
     outHelper->mImpactType = IMPACT_Invalid;
 
-    // Forward axis of the firing bone (same construction as GetForwardVector).
+    // Forward (Z) axis of the firing bone, 0x006D6C39..0x006D6CA0, in the
+    // binary's operand order.
     const VTransform boneTransform = mUnit->GetBoneWorldTransform(bone);
     const Wm3::Quaternionf& q = boneTransform.orient_;
     Wm3::Vector3f forward{
-      ((q.w * q.y) + (q.z * q.x)) * 2.0f,
-      ((q.w * q.z) - (q.y * q.x)) * 2.0f,
-      1.0f - (((q.y * q.y) + (q.z * q.z)) * 2.0f),
+      ((q.z * q.x) + (q.y * q.w)) * 2.0f,
+      ((q.z * q.y) - (q.x * q.w)) * 2.0f,
+      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
     };
 
     const Wm3::Vec3f beamStart = boneTransform.pos_;
