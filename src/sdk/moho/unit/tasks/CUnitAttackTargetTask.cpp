@@ -1276,7 +1276,8 @@ namespace moho
             const float deltaX = mTargetPosition.x - targetPosition.x;
             const float deltaY = mTargetPosition.y - targetPosition.y;
             const float deltaZ = mTargetPosition.z - targetPosition.z;
-            const float distance = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+            // 0x005F3B14: sums (dz*dz + dy*dy) + dx*dx.
+            const float distance = std::sqrt(((deltaZ * deltaZ) + (deltaY * deltaY)) + (deltaX * deltaX));
             const float threshold = (blueprint != nullptr && blueprint->Air.CanFly != 0u) ? 2.0f : 10.0f;
 
             if (distance > threshold) {
@@ -1365,7 +1366,8 @@ namespace moho
           return 10;
         }
 
-        if (HasEntityMoved(*unit) && unit->IsMobile() && mWeapon->mCanFire == 0u) {
+        // 0x005F3E09: `cmp byte ptr [weapon+0x174],0` -- the aim-reachable flag (SetAimReachable), not mCanFire.
+        if (HasEntityMoved(*unit) && unit->IsMobile() && mWeapon->mUnknown174 == 0u) {
           Update();
           commandTask->mTaskState = TASKSTATE_Processing;
           return 1;

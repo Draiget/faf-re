@@ -58,8 +58,10 @@ namespace moho
      * What it does:
      * Builds the repair-task command/listener subobjects, initializes the shared
      * build helper, binds the target weak lane, and primes the repair mode flags.
+     * `parentTask` is any command task (the dispatch, or the guard task at
+     * 0x00613C1F): it only seeds the CCommandTask base and supplies `mUnit`.
      */
-    CUnitRepairTask(IAiCommandDispatchImpl* dispatchTask, Unit* targetUnit, bool isSiloBuild);
+    CUnitRepairTask(CCommandTask* parentTask, Unit* targetUnit, bool isSiloBuild);
 
     /**
      * Address: 0x005F9E50 (FUN_005F9E50, Moho::CUnitRepairTask::operator new)
@@ -70,7 +72,7 @@ namespace moho
      * this allocate-then-construct sequence across all five creation sites, so
      * it is recovered as a named factory rather than open-coded `new`.
      */
-    static CUnitRepairTask* Allocate(IAiCommandDispatchImpl* dispatchTask, Unit* targetUnit, bool isSiloBuild);
+    static CUnitRepairTask* Allocate(CCommandTask* parentTask, Unit* targetUnit, bool isSiloBuild);
 
     /**
      * Address: 0x005F8E20 (FUN_005F8E20, ??1CUnitRepairTask@Moho@@QAE@@Z body)

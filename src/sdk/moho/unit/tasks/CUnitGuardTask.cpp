@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <new>
@@ -244,9 +243,14 @@ namespace
     return static_cast<const moho::RUnitBlueprint*>(command->mConstDat.blueprint);
   }
 
-  [[nodiscard]] bool IsShieldFocusDamaged(moho::Unit* const unit)
+  /**
+   * What it does:
+   * SHIELD-category unit whose focus entity is below max health
+   * (0x006132FD..0x00613391 and 0x00613708..0x0061376A, inlined).
+   */
+  [[nodiscard]] bool IsShieldWithDamagedFocus(moho::Unit* const unit)
   {
-    if (unit == nullptr || !unit->RunScriptBool("ShieldIsOn") || !unit->IsInCategory("SHIELD")) {
+    if (!unit->IsInCategory("SHIELD")) {
       return false;
     }
 
@@ -254,57 +258,13 @@ namespace
     return shieldEntity != nullptr && shieldEntity->mVarDat.mHealth < shieldEntity->mVarDat.mMaxHealth;
   }
 
-  [[nodiscard]] bool NeedsAssistOrRepairDispatch(moho::Unit* const unit)
-  {
-    if (unit == nullptr) {
-      return false;
-    }
-
-    if (unit->IsBeingBuilt() || unit->mVarDat.mHealth < unit->mVarDat.mMaxHealth) {
-      return true;
-    }
-
-    if (IsShieldFocusDamaged(unit)) {
-      return true;
-    }
-
-    if (!unit->mUnitVarDat.mIsPaused && unit->IsUnitState(moho::UNITSTATE_Enhancing)) {
-      return true;
-    }
-
-    return !unit->mUnitVarDat.mIsPaused && unit->AiSiloBuild != nullptr && unit->IsUnitState(moho::UNITSTATE_SiloBuildingAmmo);
-  }
-
-  [[nodiscard]] moho::Unit* ResolveGuardFocusAssistTarget(moho::Unit* const unit, const moho::Unit* const ownerUnit)
-  {
-    if (unit == nullptr || ownerUnit == nullptr) {
-      return nullptr;
-    }
-
-    moho::Entity* const focusEntity = unit->GetFocusEntity();
-    if (focusEntity == nullptr || unit->IsUnitState(moho::UNITSTATE_Reclaiming)) {
-      return nullptr;
-    }
-
-    moho::Unit* const focusUnit = focusEntity->IsUnit();
-    if (focusUnit == nullptr) {
-      return nullptr;
-    }
-
-    const bool enemyFocus = focusUnit->ArmyRef != ownerUnit->ArmyRef;
-    if (enemyFocus || NeedsAssistOrRepairDispatch(focusUnit)) {
-      return focusUnit;
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] float DistanceSquared(const Wm3::Vector3f& lhs, const Wm3::Vector3f& rhs)
   {
     const float deltaX = lhs.x - rhs.x;
     const float deltaY = lhs.y - rhs.y;
     const float deltaZ = lhs.z - rhs.z;
-    return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+    // 0x00613872..0x00613887: sums (dz*dz + dy*dy) + dx*dx.
+    return ((deltaZ * deltaZ) + (deltaY * deltaY)) + (deltaX * deltaX);
   }
 
   void UpdateQueuedCommandTarget(
@@ -719,7 +679,8 @@ namespace moho
     if (Entity* const targetEntity = mTarget.GetEntity(); targetEntity != nullptr) {
       if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
         bool shouldBindGuardedUnit = true;
-        if (!targetUnit->IsDead() && mUnit != nullptr && mUnit->IsInCategory("REBUILDER")) {
+        // 0x00611A8E: IUnit slot 12 (`IsMobile`); immobile targets are not bound for REBUILDER owners.
+        if (!targetUnit->IsMobile() && mUnit != nullptr && mUnit->IsInCategory("REBUILDER")) {
           shouldBindGuardedUnit = false;
         }
 
@@ -850,8 +811,9 @@ namespace moho
         const float reserveZ0f = mGuardMoveAnchorPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f;
 
         gpg::Rect2i reserveRect{};
-        reserveRect.x0 = static_cast<std::int16_t>(static_cast<int>(reserveX0f));
-        reserveRect.z0 = static_cast<std::int16_t>(static_cast<int>(reserveZ0f));
+        // 0x00611EB3/0x00611ED7: x87 `fistp` (round-to-nearest), not truncation.
+        reserveRect.x0 = static_cast<std::int16_t>(static_cast<int>(std::lrintf(reserveX0f)));
+        reserveRect.z0 = static_cast<std::int16_t>(static_cast<int>(std::lrintf(reserveZ0f)));
         reserveRect.x1 = reserveRect.x0 + static_cast<int>(footprint.mSizeX);
         reserveRect.z1 = reserveRect.z0 + static_cast<int>(footprint.mSizeZ);
         mUnit->ReserveOgridRect(reserveRect);
@@ -910,8 +872,9 @@ namespace moho
         const float reserveX0 = mGuardMoveAnchorPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f;
         const float reserveZ0 = mGuardMoveAnchorPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f;
         gpg::Rect2i reserveRect{};
-        reserveRect.x0 = static_cast<std::int16_t>(static_cast<int>(reserveX0));
-        reserveRect.z0 = static_cast<std::int16_t>(static_cast<int>(reserveZ0));
+        // 0x00612155/0x00612179: x87 `fistp` (round-to-nearest), not truncation.
+        reserveRect.x0 = static_cast<std::int16_t>(static_cast<int>(std::lrintf(reserveX0)));
+        reserveRect.z0 = static_cast<std::int16_t>(static_cast<int>(std::lrintf(reserveZ0)));
         reserveRect.x1 = reserveRect.x0 + static_cast<int>(footprint.mSizeX);
         reserveRect.z1 = reserveRect.z0 + static_cast<int>(footprint.mSizeZ);
         mUnit->ReserveOgridRect(reserveRect);
@@ -1005,7 +968,8 @@ namespace moho
     const float deltaX = ownerPosition.x - guardReferencePosition.x;
     const float deltaY = ownerPosition.y - guardReferencePosition.y;
     const float deltaZ = ownerPosition.z - guardReferencePosition.z;
-    const float distance = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+    // 0x00612506: sums (dx*dx + dz*dz) + dy*dy.
+    const float distance = std::sqrt(((deltaX * deltaX) + (deltaZ * deltaZ)) + (deltaY * deltaY));
     return distance > guardedExtentThreshold + extraRange;
   }
 
@@ -1410,38 +1374,62 @@ namespace moho
       return nullptr;
     }
 
-    if (mTrackGuardedUnit) {
-      Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
-      if (guardedUnit == nullptr) {
+    // 0x00613215..0x0061322C: a tracked lane whose guarded unit is gone drops
+    // into the area-scan lane below.
+    if (Unit* const guardedUnit = mTrackGuardedUnit ? mSecondaryUnit.GetObjectPtr() : nullptr; guardedUnit != nullptr) {
+      if (guardedUnit->mVarDat.mCurTransform.pos_ != guardedUnit->mVarDat.mLastTransform.pos_) {
         return nullptr;
       }
 
-      if (guardedUnit->mVarDat.mCurTransform.pos_ == guardedUnit->mVarDat.mLastTransform.pos_) {
-        if (guardedUnit->mVarDat.mHealth < guardedUnit->mVarDat.mMaxHealth) {
-          return guardedUnit;
+      // 0x00613268: the Lua query runs unconditionally, before the health test.
+      const bool shieldIsOn = guardedUnit->RunScriptBool("ShieldIsOn");
+
+      if (guardedUnit->mVarDat.mHealth < guardedUnit->mVarDat.mMaxHealth) {
+        return guardedUnit;
+      }
+
+      const RUnitBlueprint* const guardedBlueprint = guardedUnit->GetBlueprint();
+      if (guardedBlueprint != nullptr && guardedBlueprint->Physics.FuelUseTime > 1.0f && guardedUnit->mUnitVarDat.mFuelRatio < 1.0f) {
+        return guardedUnit;
+      }
+
+      if (shieldIsOn && IsShieldWithDamagedFocus(guardedUnit)) {
+        return guardedUnit;
+      }
+
+      if (!guardedUnit->mUnitVarDat.mIsPaused && guardedUnit->IsUnitState(UNITSTATE_Enhancing)) {
+        return guardedUnit;
+      }
+
+      // 0x006133FC..0x006134B8: assist whatever the guarded unit is working on
+      // (unless it is reclaiming); a non-unit focus ends the search.
+      Unit* siloAssistUnit = guardedUnit;
+      if (Entity* const focusEntity = guardedUnit->GetFocusEntity();
+          focusEntity != nullptr && !guardedUnit->IsUnitState(UNITSTATE_Reclaiming)) {
+        Unit* const focusUnit = focusEntity->IsUnit();
+        if (focusUnit == nullptr) {
+          return nullptr;
         }
 
-        const RUnitBlueprint* const guardedBlueprint = guardedUnit->GetBlueprint();
-        if (guardedBlueprint != nullptr && guardedBlueprint->Physics.FuelUseTime > 1.0f && guardedUnit->mUnitVarDat.mFuelRatio < 1.0f) {
-          return guardedUnit;
+        if (focusUnit->ArmyRef != mUnit->ArmyRef || focusUnit->mVarDat.mHealth < focusUnit->mVarDat.mMaxHealth) {
+          return focusUnit;
         }
 
-        if (IsShieldFocusDamaged(guardedUnit)) {
-          return guardedUnit;
+        if (focusUnit->mUnitVarDat.mIsPaused) {
+          return nullptr;
         }
 
-        if (!guardedUnit->mUnitVarDat.mIsPaused && guardedUnit->IsUnitState(UNITSTATE_Enhancing)) {
-          return guardedUnit;
+        if (focusUnit->IsUnitState(UNITSTATE_Enhancing)) {
+          return focusUnit;
         }
 
-        if (Unit* const focusAssistTarget = ResolveGuardFocusAssistTarget(guardedUnit, mUnit); focusAssistTarget != nullptr) {
-          return focusAssistTarget;
-        }
+        siloAssistUnit = focusUnit;
+      }
 
-        if (!guardedUnit->mUnitVarDat.mIsPaused && guardedUnit->AiSiloBuild != nullptr
-            && guardedUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
-          return guardedUnit;
-        }
+      // 0x0061348C / 0x006134CD: unpaused silo-ammo build.
+      if (!siloAssistUnit->mUnitVarDat.mIsPaused && siloAssistUnit->AiSiloBuild != nullptr
+          && siloAssistUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+        return siloAssistUnit;
       }
 
       return nullptr;
@@ -1460,30 +1448,18 @@ namespace moho
       return nullptr;
     }
 
-    const float scanRadius = ownerBlueprint->AI.GuardScanRadius;
-    const gpg::Rect2f scanRect{
-      mGuardDirection.x - scanRadius,
-      mGuardDirection.z - scanRadius,
-      mGuardDirection.x + scanRadius,
-      mGuardDirection.z + scanRadius
-    };
-
-    CollisionDBRect queryRect{};
-    (void)func_Rect2fToInt16(&queryRect, scanRect);
-
-    gpg::core::FastVectorN<Entity*, 20> nearbyEntities{};
-    (void)mUnit->SimulationRef->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
-      nearbyEntities,
-      queryRect,
-      ENTITYTYPE_Unit
-    );
+    // 0x0061353B..0x006135D7: sphere {mGuardDirection, GuardScanRadius}, unit
+    // mask 0x100, through COGrid::ForAllEntitiesIterator (0x00721FB0). The
+    // binary's hit buffer is a fastvector_n of 20; the recovered signature takes 10.
+    const Wm3::Sphere3f scanSphere{mGuardDirection, ownerBlueprint->AI.GuardScanRadius};
+    gpg::core::FastVectorN<CollisionResult, 10> scanHits{};
+    mUnit->SimulationRef->mOGrid->ForAllEntitiesIterator(scanHits, ENTITYTYPE_Unit, scanSphere);
 
     Unit* bestCandidate = nullptr;
     float bestDistanceSquared = gpg::pInf;
-    const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
-    for (Entity* const nearbyEntity : nearbyEntities) {
-      Unit* const candidate = (nearbyEntity != nullptr) ? nearbyEntity->IsUnit() : nullptr;
-      if (candidate == nullptr || candidate == mUnit || candidate->IsDead()) {
+    for (const CollisionResult& hit : scanHits) {
+      Unit* const candidate = (hit.sourceEntity != nullptr) ? hit.sourceEntity->IsUnit() : nullptr;
+      if (candidate == nullptr || candidate->IsDead() || candidate == mUnit) {
         continue;
       }
 
@@ -1519,19 +1495,26 @@ namespace moho
         }
       }
 
-      Unit* distanceTarget = nullptr;
-      if (Entity* const focusEntity = candidate->GetFocusEntity(); focusEntity != nullptr) {
-        distanceTarget = focusEntity->IsUnit();
-      }
-
-      if (distanceTarget == nullptr) {
-        if (!NeedsAssistOrRepairDispatch(candidate)) {
+      // 0x006136DE..0x006137E7 / 0x006137CB..0x006137E7: an unfinished or
+      // damaged candidate (or, for rebuilders, a SHIELD whose focus is
+      // damaged) is itself the target -- no pause/silo gates, no Lua query.
+      Unit* distanceTarget = candidate;
+      const bool candidateNeedsWork =
+        candidate->IsBeingBuilt()
+        || candidate->mVarDat.mHealth < candidate->mVarDat.mMaxHealth
+        || (isRebuilder && IsShieldWithDamagedFocus(candidate));
+      if (!candidateNeedsWork) {
+        // 0x006137E9..0x00613838: otherwise the unit it is working on, then
+        // its own enhancement or silo-ammo build.
+        Entity* const focusEntity = candidate->GetFocusEntity();
+        if (Unit* const focusUnit = (focusEntity != nullptr) ? focusEntity->IsUnit() : nullptr; focusUnit != nullptr) {
+          distanceTarget = focusUnit;
+        } else if (!candidate->IsUnitState(UNITSTATE_Enhancing) && !candidate->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
           continue;
         }
-        distanceTarget = candidate;
       }
 
-      const float candidateDistanceSquared = DistanceSquared(ownerPosition, distanceTarget->GetPosition());
+      const float candidateDistanceSquared = DistanceSquared(mUnit->GetPosition(), distanceTarget->GetPosition());
       if (candidateDistanceSquared < bestDistanceSquared) {
         bestDistanceSquared = candidateDistanceSquared;
         bestCandidate = distanceTarget;
@@ -1550,11 +1533,12 @@ namespace moho
    */
   void CUnitGuardTask::DispatchAssistOrCaptureTask(Unit* const targetUnit)
   {
-    if (targetUnit == nullptr || mUnit == nullptr || mCommandTask == nullptr) {
+    if (targetUnit == nullptr || mUnit == nullptr) {
       return;
     }
 
-    IAiCommandDispatchImpl* const dispatchTask = static_cast<IAiCommandDispatchImpl*>(mCommandTask);
+    // 0x00613AA0: the Lua query runs first, for capture targets too.
+    const bool shieldIsOn = targetUnit->RunScriptBool("ShieldIsOn");
 
     const bool isAlliedTarget =
       mUnit->ArmyRef != nullptr
@@ -1564,54 +1548,25 @@ namespace moho
     if (isAlliedTarget) {
       bool shouldIssueRepairTask = true;
       if (targetUnit->mVarDat.mMaxHealth <= targetUnit->mVarDat.mHealth && !targetUnit->IsUnitState(UNITSTATE_Enhancing)) {
-        bool focusNeedsRepair = false;
-        if (targetUnit->RunScriptBool("ShieldIsOn") && targetUnit->IsInCategory("SHIELD")) {
-          if (Entity* const focusEntity = targetUnit->GetFocusEntity(); focusEntity != nullptr) {
-            focusNeedsRepair = focusEntity->mVarDat.mMaxHealth > focusEntity->mVarDat.mHealth;
-          }
-        }
-        if (!focusNeedsRepair) {
-          shouldIssueRepairTask = false;
-        }
+        shouldIssueRepairTask = shieldIsOn && IsShieldWithDamagedFocus(targetUnit);
       }
 
+      // 0x00613C1D..0x00613C1F: children are parented to the guard task itself (push esi = this).
       if (shouldIssueRepairTask) {
-        (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, false);
+        (void)moho::CUnitRepairTask::Allocate(this, targetUnit, false);
       } else if (targetUnit->AiSiloBuild != nullptr && targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
         // Binary 0x00613C03 tests [target+0x558] (AiSiloBuild), not AiBuilder
         // (+0x554): a strategic launcher owns a silo-build impl but no builder
         // impl, so testing AiBuilder made hive silo-assist never dispatch.
-        (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, true);
-      }
-
-      // TEMPORARY PROBE -- silo-assist triage: whether dispatch actually
-      // allocates the silo-assist repair task and what the owner's request
-      // lane looks like. Delete when resolved.
-      {
-        static int sProbeDispatch = 0;
-        if ((++sProbeDispatch % 10) == 1) {
-          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-            std::fprintf(
-              sink,
-              "[SILODISPATCH] n=%d owner=%p target=%p siloBuild=%d state=%d repair=%d req=%p\n",
-              sProbeDispatch,
-              static_cast<void*>(mUnit),
-              static_cast<void*>(targetUnit),
-              static_cast<int>(targetUnit->AiSiloBuild != nullptr),
-              static_cast<int>(targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)),
-              static_cast<int>(shouldIssueRepairTask),
-              static_cast<void*>(mUnit->mConsumptionData)
-            );
-            std::fclose(sink);
-          }
-        }
+        (void)moho::CUnitRepairTask::Allocate(this, targetUnit, true);
       }
       return;
     }
 
     CAiTarget targetPayload{};
     (void)targetPayload.UpdateTarget(static_cast<Entity*>(targetUnit));
-    (void)CUnitCaptureTask::Create(mCommandTask, &targetPayload);
+    // 0x00613AF2: capture is parented to the guard task itself (esi = this).
+    (void)CUnitCaptureTask::Create(this, &targetPayload);
   }
 
   /**
@@ -1623,13 +1578,14 @@ namespace moho
    */
   void CUnitGuardTask::SetEnemy(Entity* const enemy)
   {
-    if (enemy == nullptr || mCommandTask == nullptr) {
+    if (enemy == nullptr) {
       return;
     }
 
     CAiTarget targetPayload{};
     (void)targetPayload.UpdateTarget(enemy);
-    (void)CAttackTargetTask::CreateRespectFormation(mCommandTask, &targetPayload, nullptr, false);
+    // 0x006146AA: the parent is the guard task itself (esi = this), not the dispatch.
+    (void)CAttackTargetTask::CreateRespectFormation(this, &targetPayload, nullptr, false);
   }
 
   /**
@@ -1641,13 +1597,14 @@ namespace moho
    */
   void CUnitGuardTask::IssueReclaimTaskForEntity(Entity* const targetEntity)
   {
-    if (targetEntity == nullptr || mCommandTask == nullptr) {
+    if (targetEntity == nullptr) {
       return;
     }
 
     CAiTarget targetPayload{};
     (void)targetPayload.UpdateTarget(targetEntity);
-    IssueReclaimTask(mCommandTask, targetPayload);
+    // 0x00614726: the parent is the guard task itself (push ebp = this), not the dispatch.
+    IssueReclaimTask(this, targetPayload);
   }
 
   /**
@@ -1790,7 +1747,10 @@ namespace moho
 
     if (mRefreshGuardedUnitFromNearby) {
       EntitySetTemplate<Unit> visitedUnits{};
-      mSecondaryUnit.Set(ResolveGuardCommandSourceUnit(mSecondaryUnit.GetObjectPtr(), visitedUnits));
+      // 0x00614452..0x00614456: the chain walk (0x00611CD0) starts from the
+      // owner unit (`[task+1Ch]`), so an assisting factory with its own build
+      // orders resolves to itself and the guard target flips back each tick.
+      mSecondaryUnit.Set(ResolveGuardCommandSourceUnit(mUnit, visitedUnits));
     }
 
     if (mTrackGuardedUnit) {

@@ -140,8 +140,8 @@ namespace moho
    * Builds the repair-task command/listener subobjects, initializes the shared
    * build helper, binds the target weak lane, and primes the repair mode flags.
    */
-  CUnitRepairTask::CUnitRepairTask(IAiCommandDispatchImpl* const dispatchTask, Unit* const targetUnit, const bool isSiloBuild)
-    : CCommandTask(static_cast<CCommandTask*>(dispatchTask))
+  CUnitRepairTask::CUnitRepairTask(CCommandTask* const parentTask, Unit* const targetUnit, const bool isSiloBuild)
+    : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mBuildHelper("Repair", mUnit)
     , mCommand(nullptr)
@@ -153,8 +153,8 @@ namespace moho
     , mInheritingWork(false)
   {
 
-    if (dispatchTask != nullptr && dispatchTask->mUnit != nullptr && dispatchTask->mUnit->CommandQueue != nullptr) {
-      mCommand = dispatchTask->mUnit->CommandQueue->GetCurrentCommand();
+    if (parentTask != nullptr && parentTask->mUnit != nullptr && parentTask->mUnit->CommandQueue != nullptr) {
+      mCommand = parentTask->mUnit->CommandQueue->GetCurrentCommand();
       if (mCommand != nullptr) {
         mCommand->AddListener(this);
       }
@@ -189,7 +189,7 @@ namespace moho
    * on the result. All five creation sites share this one out-of-line copy.
    */
   CUnitRepairTask* CUnitRepairTask::Allocate(
-    IAiCommandDispatchImpl* const dispatchTask,
+    CCommandTask* const parentTask,
     Unit* const targetUnit,
     const bool isSiloBuild
   )
@@ -199,7 +199,7 @@ namespace moho
       return nullptr;
     }
 
-    return ::new (storage) CUnitRepairTask(dispatchTask, targetUnit, isSiloBuild);
+    return ::new (storage) CUnitRepairTask(parentTask, targetUnit, isSiloBuild);
   }
 
   /**
