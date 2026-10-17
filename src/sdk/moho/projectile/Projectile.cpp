@@ -174,8 +174,10 @@ namespace
   constexpr float kProjectileTickSeconds = 0.1f;
   // Blend fraction for the 0.05f half-tick position advance (ds:dword_E4F7FC).
   constexpr float kProjectileHalfTickBlend = 0.05f;
-  // Degrees->radians (ds:dword_E4F768 == 0.017453292f).
-  constexpr float kProjectileDegToRad = 0.017453292f;
+  // Turn rate (degrees/second) -> radians per 0.1s tick
+  // (ds:dword_E4F768 == 0.0017453292f; read by MotionTick 0x0069C126 and
+  // UpdateTracking 0x0069CF6F).
+  constexpr float kProjectileTurnDegToRadPerTick = 0.0017453292f;
   // Terrain-bounce velocity retention on each ground hit (ds:dword_E4F99C == 0.95f).
   constexpr float kProjectileBounceInterpDamp = 0.94999999f;
 
@@ -197,11 +199,13 @@ namespace
   ) noexcept
   {
     const float axisLengthSq = (axis.x * axis.x) + (axis.y * axis.y) + (axis.z * axis.z);
-    if (axisLengthSq <= 0.0f) {
+    // 0x0069A2CE: `comiss lenSq, 0; jbe -> zero`, so NaN also yields zero.
+    if (!(axisLengthSq > 0.0f)) {
       return {};
     }
+    // 0x0069A2E4..0x0069A2FD: dot summed (y + z) + x.
     const float scale =
-      ((vector.x * axis.x) + (vector.y * axis.y) + (vector.z * axis.z)) / axisLengthSq;
+      (((vector.y * axis.y) + (vector.z * axis.z)) + (vector.x * axis.x)) / axisLengthSq;
     return Wm3::Vector3f{axis.x * scale, axis.y * scale, axis.z * scale};
   }
 
@@ -314,14 +318,14 @@ namespace moho
   namespace
   {
     // Randomized physics scalar: base + symmetric random in [-range, +range].
-    // The binary inlines the (-range) + ((range - (-range)) * u32 * 2^-32) form
-    // for turn-rate / max-speed / acceleration / lifetime / draw-scale /
-    // scale-velocity; keep the exact arithmetic instead of calling the blueprint
-    // GetRandom* helpers (the binary does not call them here).
+    // The binary inlines CRandomStream::FRand(-range, range) (the FUN_0051B5C0
+    // x87 sequence: fild word, (range - (-range)) * word * 2^-32 + (-range))
+    // and then adds the base, at 0x0069B170 / 0x0069B1CF / 0x0069B22E /
+    // 0x0069B455 / 0x0069B952 / 0x0069BA1D. The twister word is never rounded
+    // to float on its own (the blueprint GetRandom* helpers are not called).
     [[nodiscard]] float RandomSymmetricAround(CRandomStream* const rng, const float base, const float range) noexcept
     {
-      const float randomBits = static_cast<float>(rng->twister.NextUInt32());
-      return (-range) + ((range - (-range)) * randomBits * 2.3283064e-10f) + base;
+      return rng->FRand(-range, range) + base;
     }
   } // namespace
 
@@ -481,7 +485,9 @@ namespace moho
         Wm3::Vec3f aimPoint = mTargetPosData.GetTargetPosGun(false);
 
         Unit* const launcherUnit = launcherEntity->IsUnit();
-        if (launcherUnit->GetBlueprint()->Air.PredictAheadForBombDrop > 0.0f && target.targetIsMobile) {
+        // 0x0069B66A: calls CAiTarget::IsMobile (FUN_005E2D90) on the caller's
+        // target -- raw weak entity non-null && targetIsMobile.
+        if (launcherUnit->GetBlueprint()->Air.PredictAheadForBombDrop > 0.0f && target.IsMobile()) {
           Unit* const predictUnit = launcherEntity->IsUnit();
           const float precision = predictUnit->GetBlueprint()->Air.PredictAheadForBombDrop;
           Entity* const targetEntity = mTargetPosData.GetEntity();
@@ -618,7 +624,9 @@ namespace moho
       const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
       const ELayer previousLayer = mVarDat.mLayerMask;
 
-      if (waterElevation <= currentHeight) {
+      // 0x0069BC49: `comiss water, posY; jbe` -> Air, so an unordered (NaN)
+      // compare also selects Air.
+      if (!(waterElevation > currentHeight)) {
         mVarDat.mLayerMask = LAYER_Air;
         if (previousLayer != LAYER_Air) {
           const char* newLayerName = Entity::LayerToString(LAYER_Air);
@@ -842,7 +850,8 @@ namespace moho
       mVelocity.z += forwardX * accel;
 
       if (mVelocityAlign) {
-        moho::QuatFromVecRot(&tran.orient_, &mVelocity, mTurnRateDegrees * kProjectileDegToRad);
+        // 0x0069C126: mulss by [0xE4F768] == 0.0017453292 (deg -> rad per tick).
+        moho::QuatFromVecRot(&tran.orient_, &mVelocity, mTurnRateDegrees * kProjectileTurnDegToRadPerTick);
       }
     } else {
       // --- Homing steering ---
@@ -932,7 +941,9 @@ namespace moho
       STIMap* const mapData = SimulationRef->mMapData;
       const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
       const float clampY = waterElevation - 0.0099999998f;
-      if (clampY <= tran.pos_.y) {
+      // 0x0069C4E2: `comiss clampY, posY; ja skip` -- an unordered (NaN)
+      // compare also clamps.
+      if (!(clampY > tran.pos_.y)) {
         tran.pos_.y = clampY;
       }
     }
@@ -979,8 +990,9 @@ namespace moho
             mVelocity.y * damp,
             mVelocity.z * damp,
           };
+          // 0x0069C692..0x0069C6B5: summed (y + z) + x, then doubled.
           const float twoDot =
-            ((normal.x * damped.x) + (normal.y * damped.y) + (normal.z * damped.z)) * 2.0f;
+            (((normal.y * damped.y) + (normal.z * damped.z)) + (normal.x * damped.x)) * 2.0f;
           mGroundDirection.x = damped.x - (normal.x * twoDot);
           mGroundDirection.y = damped.y - (normal.y * twoDot);
           mGroundDirection.z = damped.z - (normal.z * twoDot);
@@ -988,7 +1000,8 @@ namespace moho
           // Nudge the impact position along the reflected (negated) velocity.
           const Wm3::Vector3f awayDir{-mVelocity.x, -mVelocity.y, -mVelocity.z};
           Wm3::Vector3f awayNorm{};
-          Wm3::Vector3f::NormalizeInto(awayDir, &awayNorm);
+          // 0x0069C723: FUN_0044F7E0 (zero unless the length is positive).
+          (void)moho::NormalizeVectorInto(&awayNorm, awayDir);
           mImpactPosition.x += awayNorm.x * kProjectileHalfTickBlend;
           mImpactPosition.y += awayNorm.y * kProjectileHalfTickBlend;
           mImpactPosition.z += awayNorm.z * kProjectileHalfTickBlend;
@@ -999,7 +1012,8 @@ namespace moho
         }
       }
 
-      const float pendingScale = (interp <= 0.001f) ? 1000.0f : (1.0f / interp);
+      // 0x0069C7A7: `comiss interp, 0.001; jbe -> 1000`, so NaN also yields 1000.
+      const float pendingScale = (interp > 0.001f) ? (1.0f / interp) : 1000.0f;
       Wm3::Quaternionf lerped;
       // Both lanes are `Wm3::Quatf`; these used to be rebuilt lane by lane
       // against the old `moho::Vector4f` spelling of the same words.
@@ -1085,7 +1099,9 @@ namespace moho
     this->LuaPCall("OnImpact", impactArgs, &impactObject);
 
     // Target/army accounting: only when the projectile had a real target entity.
-    Entity* const targetEntity = mTargetPosData.GetEntity();
+    // 0x0069DF7A..0x0069DF8D: the gate reads the raw weak slot (+0x2F0), not
+    // GetEntity(), so a recon-blip target counts even without a source unit.
+    Entity* const targetEntity = mTargetPosData.targetEntity.GetObjectPtr();
     if (targetEntity != nullptr) {
       // Launcher shots-hit / shots-missed realtime-stat accounting.
       if (launcherEntity != nullptr && launcherEntity->RealtimeStatsEnabled) {
@@ -1170,30 +1186,32 @@ namespace moho
     // the intercept lead-time: both lead terms project from the ORIGINAL aim; only
     // the time-of-flight estimate is refined (t1 -> t2).
     if (mLeadTarget && mMaxSpeed > 0.0f && mTargetPosData.HasTarget()) {
-      Entity* const targetEntity = mTargetPosData.GetEntity();
+      // 0x0069C9C4..0x0069C9D7: the raw weak slot (+0x2F0), not GetEntity(), is
+      // the object whose GetVelocity (vtable +0x3C) is read.
+      Entity* const targetEntity = mTargetPosData.targetEntity.GetObjectPtr();
       if (targetEntity != nullptr) {
-        const float perTickSpeed = mMaxSpeed * kProjectileTickSeconds; // mMaxSpeed * 0.1
-        if (perTickSpeed > 0.0f) {
-          const Wm3::Vec3f targetVelocity = targetEntity->GetVelocity(); // vtable slot 15 (+0x3C)
-          const Wm3::Vector3f aim0 = aim;
-          const Wm3::Vector3f& projectilePos = trn.pos_;
+        const Wm3::Vec3f targetVelocity = targetEntity->GetVelocity(); // vtable slot 15 (+0x3C)
+        // 0x0069CA03..0x0069CA0B: the reciprocal of the per-tick speed is formed
+        // once and multiplied in; there is no separate positive-speed guard.
+        const float inversePerTickSpeed = 1.0f / (mMaxSpeed * kProjectileTickSeconds);
+        const Wm3::Vector3f aim0 = aim;
+        const Wm3::Vector3f& projectilePos = trn.pos_;
 
-          const auto leadAt = [&](const Wm3::Vector3f& fromPoint) {
-            const float dist = std::sqrt(
-              ((projectilePos.x - fromPoint.x) * (projectilePos.x - fromPoint.x)) +
-              ((projectilePos.y - fromPoint.y) * (projectilePos.y - fromPoint.y)) +
-              ((projectilePos.z - fromPoint.z) * (projectilePos.z - fromPoint.z)));
-            const float t = dist / perTickSpeed;
-            return Wm3::Vector3f{
-              aim0.x + targetVelocity.x * t,
-              aim0.y + targetVelocity.y * t,
-              aim0.z + targetVelocity.z * t,
-            };
+        const auto leadAt = [&](const Wm3::Vector3f& fromPoint) {
+          const float dx = projectilePos.x - fromPoint.x;
+          const float dy = projectilePos.y - fromPoint.y;
+          const float dz = projectilePos.z - fromPoint.z;
+          // 0x0069CA38..0x0069CA52 / 0x0069CAB9..0x0069CAD2: (dx² + dz²) + dy².
+          const float t = std::sqrt(((dx * dx) + (dz * dz)) + (dy * dy)) * inversePerTickSpeed;
+          return Wm3::Vector3f{
+            aim0.x + targetVelocity.x * t,
+            aim0.y + targetVelocity.y * t,
+            aim0.z + targetVelocity.z * t,
           };
+        };
 
-          const Wm3::Vector3f predicted = leadAt(aim0); // t1 = |P - aim0| / speed
-          aim = leadAt(predicted);                      // t2 = |P - predicted| / speed
-        }
+        const Wm3::Vector3f predicted = leadAt(aim0); // t1 = |P - aim0| / speed
+        aim = leadAt(predicted);                      // t2 = |P - predicted| / speed
       }
     }
 
@@ -1201,7 +1219,8 @@ namespace moho
     if (mStayUnderwater) {
       const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
       const float clampY = waterElevation - 0.25f;
-      if (clampY <= aim.y) {
+      // 0x0069CB7B: `comiss clampY, aim.y; ja skip` -- NaN also clamps.
+      if (!(clampY > aim.y)) {
         aim.y = clampY;
       }
     }
@@ -1212,6 +1231,19 @@ namespace moho
       aim.y - trn.pos_.y,
       aim.z - trn.pos_.z,
     };
+
+    // 0x0069CBB8..0x0069CC50: while held underwater, a steer pointing behind the
+    // current forward axis loses its vertical component.
+    if (mStayUnderwater && mBelowWater) {
+      const Wm3::Quatf& q = trn.orient_;
+      const float forwardX = ((q.w * q.y) + (q.z * q.x)) * 2.0f;
+      const float forwardY = ((q.z * q.y) - (q.w * q.x)) * 2.0f;
+      const float forwardZ = 1.0f - (((q.y * q.y) + (q.x * q.x)) * 2.0f);
+      const float facing = ((forwardX * steer.x) + (forwardZ * steer.z)) + (forwardY * steer.y);
+      if (0.0f > facing) {
+        steer.y = 0.0f;
+      }
+    }
 
     // Zig-zag jitter (asm 0x0069CC56-0x0069CF65): only when attributes enable it.
     // A negative attribute value means "inherit from the blueprint".
@@ -1228,7 +1260,8 @@ namespace moho
         // Re-roll the random offset every FloorSecondsToTicks(frequency) ticks
         // (asm 0x0069CCAA-0x0069CD71).
         const std::uint32_t curTick = SimulationRef->mCurTick;
-        if (static_cast<std::uint32_t>(mZigZagNextTick) <= curTick) {
+        // 0x0069CCAA: `cmp nextTick, curTick; jg skip` is a signed compare.
+        if (mZigZagNextTick <= static_cast<std::int32_t>(curTick)) {
           CRandomStream* const rng = SimulationRef->mRngState;
           mZigZagRandomOffset.x = rng->FRand(-maxZigZag, maxZigZag);
           mZigZagRandomOffset.y = rng->FRand(-maxZigZag, maxZigZag);
@@ -1238,7 +1271,13 @@ namespace moho
         }
 
         // Blend factor from the distance still to travel (asm 0x0069CD77-0x0069CDFE).
-        const float distToAim = std::sqrt((steer.x * steer.x) + (steer.y * steer.y) + (steer.z * steer.z));
+        // 0x0069CD77..0x0069CDAA: |aim - pos| is recomputed from the aim point
+        // (not from `steer`, whose Y the underwater block above may have
+        // zeroed), summed (dx² + dz²) + dy².
+        const float aimDx = aim.x - trn.pos_.x;
+        const float aimDy = aim.y - trn.pos_.y;
+        const float aimDz = aim.z - trn.pos_.z;
+        const float distToAim = std::sqrt(((aimDx * aimDx) + (aimDz * aimDz)) + (aimDy * aimDy));
         float blend = distToAim / maxZigZag;
         if (blend >= 1.0f) {
           blend = 1.0f;
@@ -1248,7 +1287,8 @@ namespace moho
         // with the vertical clamped above terrain (+0.5) and, unless underwater,
         // above the water surface (+0.5) (asm 0x0069CDFE-0x0069CF65).
         Wm3::Vector3f steerDir{};
-        Wm3::Vector3f::NormalizeInto(steer, &steerDir);
+        // 0x0069CE14: FUN_0044F7E0 (zero unless the length is positive).
+        (void)moho::NormalizeVectorInto(&steerDir, steer);
 
         const float jitteredX = (trn.pos_.x + steerDir.x * mMaxSpeed) + mZigZagRandomOffset.x * blend;
         const float jitteredZ = (trn.pos_.z + steerDir.z * mMaxSpeed) + mZigZagRandomOffset.z * blend;
@@ -1257,7 +1297,10 @@ namespace moho
 
         CHeightField* const heightField = mapData->mHeightField.get();
         const float groundLimit = heightField->GetElevation(jitteredX, jitteredZ) + 0.5f;
-        const float groundClampedBase = (baseY <= groundLimit) ? groundLimit : baseY;
+        // 0x0069CECF..0x0069CEE1: `fcompi baseY, groundLimit; jbe -> baseY`, so
+        // the floor is min(baseY, groundLimit) (NaN keeps baseY): the jitter
+        // may not push below the ground unless the base already is.
+        const float groundClampedBase = (baseY > groundLimit) ? groundLimit : baseY;
         if (jitteredY < groundClampedBase) {
           jitteredY = groundClampedBase;
         }
@@ -1278,7 +1321,7 @@ namespace moho
 
     // Turn the transform orientation toward the steering direction, at most
     // mTurnRateDegrees per tick.
-    moho::QuatFromVecRot(&trn.orient_, &steer, mTurnRateDegrees * 0.0017453292f);
+    moho::QuatFromVecRot(&trn.orient_, &steer, mTurnRateDegrees * kProjectileTurnDegToRadPerTick);
 
     // Underwater orientation flatten (asm 0x0069CF8A-0x0069D10F): when ascending
     // toward the surface, clip the forward vector so it only rises up to the water
@@ -1301,15 +1344,24 @@ namespace moho
         // Only when the surface is reached within one forward unit (asm 0x0069D047: t < 1.0).
         if (t < 1.0f) {
           Wm3::Vector3f clippedForward{forwardX, forwardY * t, forwardZ};
+          // 0x0069D054..0x0069D073: summed (z² + y²) + x².
           const float lenSq =
-            (clippedForward.x * clippedForward.x) + (clippedForward.y * clippedForward.y) +
-            (clippedForward.z * clippedForward.z);
-          // Degenerate clipped forward is normalized before re-orienting
-          // (asm 0x0069D077-0x0069D0F3: threshold flt_DFFBE8 == 1e-6).
-          if (lenSq < 1.0e-6f) {
-            Wm3::Vector3f::NormalizeInto(clippedForward, &clippedForward);
+            ((clippedForward.z * clippedForward.z) + (clippedForward.y * clippedForward.y)) +
+            (clippedForward.x * clippedForward.x);
+          // 0x0069D077..0x0069D082: `comiss 1e-6, lenSq; jbe` (flt_DFFBE8).
+          if (!(1.0e-6f > lenSq)) {
+            // 0x0069D0EF..0x0069D102: normalize the clipped forward in place
+            // (FUN_00452AF0, Wm3::Vector3f::Normalize) and orient along it.
+            (void)clippedForward.Normalize();
+            trn.orient_ = moho::COORDS_Orient(clippedForward);
+          } else {
+            // 0x0069D084..0x0069D0E9: degenerate clipped forward -- orient
+            // along the current orientation's up axis (rotation column 1).
+            const float upX = ((qy * qx) - (qz * qw)) * 2.0f;
+            const float upY = 1.0f - (((qz * qz) + (qx * qx)) * 2.0f);
+            const float upZ = ((qy * qz) + (qw * qx)) * 2.0f;
+            trn.orient_ = moho::COORDS_Orient(Wm3::Vector3f{upX, upY, upZ});
           }
-          trn.orient_ = moho::COORDS_Orient(clippedForward);
         }
       }
     }
@@ -1450,8 +1502,9 @@ namespace moho
           mImpactInterpolation = terrainHit.distance / distMoved;
           mImpactPosition = Wm3::Vector3f{hitPoint.x, hitPoint.y, hitPoint.z};
           mImpactType = IMPACT_Terrain;
-          // 0x0069DB50: ground reached no later than the water surface.
-          terrainBeforeWater = terrainHit.distance <= waterCrossingDistance;
+          // 0x0069DB50: ground reached no later than the water surface
+          // (`comiss terrain, water; jbe` -- an unordered compare also counts).
+          terrainBeforeWater = !(terrainHit.distance > waterCrossingDistance);
         }
       }
 
@@ -1508,18 +1561,25 @@ namespace moho
             ((nextPos.y - curPos.y) * (nextPos.y - curPos.y)) +
             ((nextPos.z - curPos.z) * (nextPos.z - curPos.z));
           float fraction = std::sqrt(toClosestSq / spanSq);
-          if (fraction >= 1.0f) {
-            fraction = 1.0f;
-          }
+          // 0x0069D7CE..0x0069D7DE: `fld1; fcomip; jbe -> 1.0`, so NaN -> 1.0.
+          fraction = (1.0f > fraction) ? fraction : 1.0f;
           if (fraction < 0.0f) {
             fraction = 0.0f;
           }
 
-          mImpactPosition = closestOnSegment;
+          // 0x0069D72B / 0x0069D756 / 0x0069D79F..0x0069D7B6: the impact
+          // position is the pending position; the closest point only feeds
+          // the fraction.
+          mImpactPosition = nextPos;
           mCollidedEntityWeak.Set(target);
           mImpactInterpolation = fraction;
           mImpactType = IMPACT_Projectile;
         }
+
+        // 0x0069D6E1 / 0x0069D6F9 / 0x0069D803..0x0069D82E: every exit of the
+        // homing-target test (miss, script veto, hit) leaves CheckCollision;
+        // neither the entity sweep nor the detonate-height band runs.
+        return;
       }
     }
 
@@ -1558,17 +1618,19 @@ namespace moho
             continue;
           }
           // Skip once an earlier hit has already been recorded this pass
-          // (asm 0x0069D936-0x0069D940: 0.0 <= mImpactInterpolation).
-          if (mImpactInterpolation >= 0.0f) {
+          // (asm 0x0069D936-0x0069D940: `comiss 0, interp; jbe skip`, so a NaN
+          // interpolation also skips).
+          if (!(0.0f > mImpactInterpolation)) {
             continue;
           }
           if (RunProjectileOnCollisionCheckScript(candidate, this)) {
-            // asm 0x0069D984-0x0069D9D0: record and return.
+            // asm 0x0069D984-0x0069D9EF: record and return (ret 4) -- the
+            // detonate-height band does not run.
             mImpactInterpolation = 0.0f;
             mImpactPosition = curPos;
             mCollidedEntityWeak.Set(candidate);
             mImpactType = ENT_GetImpactType(SimulationRef, candidate, curPos);
-            break;
+            return;
           }
         }
       } else {
@@ -1576,6 +1638,9 @@ namespace moho
         // (0x0069DA4F..0x0069DAE7; the factor at 0x0069DA6A is the 0.01 at
         // 0x00E4F950 -- FAF's patch, stock Moho read 0.1 from 0x00E4F714).
         // Records the earliest confirmed hit across all results (no early-out).
+        // 0x0069D9F2..0x0069DA16: the collided-entity weak link is unlinked and
+        // zeroed before the sweep.
+        mCollidedEntityWeak.UnlinkFromOwnerChain();
         // 0x3C23D70B, one ulp above the float nearest 0.01.
         constexpr float kLineSweepExtension = 0x1.47ae16p-7f;
         const Wm3::Vector3f delta{nextPos.x - curPos.x, nextPos.y - curPos.y, nextPos.z - curPos.z};
@@ -1624,9 +1689,10 @@ namespace moho
           }
 
           // Earliest-hit guard (asm 0x0069DC33-0x0069DC4D): proceed when there is
-          // no hit yet, or this candidate is closer along the swept line.
-          if (mImpactInterpolation >= 0.0f &&
-              (mImpactInterpolation * distMoved) <= result.distanceFromLineStart) {
+          // no hit yet, or this candidate is closer along the swept line. Both
+          // compares are `ja`-style, so a NaN interpolation skips.
+          if (!(0.0f > mImpactInterpolation) &&
+              !((mImpactInterpolation * distMoved) > result.distanceFromLineStart)) {
             continue;
           }
 
@@ -1689,9 +1755,9 @@ namespace moho
         // Clamp the crossing fraction into [0.1, 1.0]: the band-crossing solve
         // saturates at 1.0 (asm 0x0069DDE9/0x0069DD9E vs ds:a7 == 1.0) and is then
         // floored at one tick (asm 0x0069DDF1: max(fraction, dbl_E4F710+4 == 0.1)).
-        if (fraction >= 1.0f) {
-          fraction = 1.0f;
-        }
+        // 0x0069DD9E / 0x0069DDE9: `comiss 1.0, fraction` keeps the fraction
+        // only when ordered and below 1.0, so NaN -> 1.0.
+        fraction = (1.0f > fraction) ? fraction : 1.0f;
         if (fraction < kProjectileTickSeconds) {
           fraction = kProjectileTickSeconds;
         }

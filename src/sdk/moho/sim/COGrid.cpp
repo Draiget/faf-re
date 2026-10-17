@@ -35,8 +35,15 @@ namespace
   using moho::InitGridTraversalLine;
   using moho::IsGridTraversalBeyondEnd;
 
+  // The binary's inlined floor (0x0040D908, 0x004FCBFD): `frndint; fcompi;
+  // cmovb eax,-1; fistp; add`. For every non-NaN input that equals the
+  // truncated floor below; a NaN compares unordered (cmovb takes -1) and fistp
+  // stores the integer indefinite 0x80000000, so the sum is 0x7FFFFFFF.
   [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
   {
+    if (std::isnan(value)) {
+      return 0x7FFFFFFF;
+    }
     return static_cast<std::int32_t>(std::floor(value));
   }
 
@@ -77,7 +84,8 @@ void moho::InitGridTraversalLine(
   {
     line.step = step;
 
-    if (xEnd < xStart) {
+    // 0x0040D873: `comiss xEnd, xStart; jb flip` -- unordered also flips.
+    if (!(xEnd >= xStart)) {
       line.x0 = -xStart;
       line.x1 = -xEnd;
       line.xMask = -step;
@@ -88,7 +96,8 @@ void moho::InitGridTraversalLine(
     }
 
     std::int32_t zMask = 0;
-    if (zEnd < zStart) {
+    // 0x0040D8B0: `comiss zEnd, zStart; jb flip` -- unordered also flips.
+    if (!(zEnd >= zStart)) {
       line.z0 = -zStart;
       line.z1 = -zEnd;
       zMask = -step;
@@ -123,10 +132,12 @@ void moho::AdvanceGridTraversalEdge(GridTraversalLine& line) noexcept
 
   const float xMetric = (static_cast<float>(nextXEdge) - line.x1) * line.dz;
   const float zMetric = (static_cast<float>(nextZEdge) - line.z1) * line.dx;
-  if (zMetric <= xMetric) {
-    line.zEdge = nextZEdge;
-  } else {
+  // 0x00475FFA (and the inlined copy at 0x004FD3A1): `comiss zMetric, xMetric;
+  // jbe -> advance z`, so an unordered compare advances z.
+  if (zMetric > xMetric) {
     line.xEdge = nextXEdge;
+  } else {
+    line.zEdge = nextZEdge;
   }
 }
 

@@ -244,12 +244,14 @@ namespace moho
     {
       const float axisLengthSquared =
         (axis.x * axis.x) + (axis.y * axis.y) + (axis.z * axis.z);
-      if (axisLengthSquared <= 0.0f) {
+      // 0x0069A2CE: `comiss lenSq, 0; jbe -> zero`, so NaN also yields zero.
+      if (!(axisLengthSquared > 0.0f)) {
         return {};
       }
 
+      // 0x0069A2E4..0x0069A2FD: dot summed (y + z) + x.
       const float scale =
-        ((vector.x * axis.x) + (vector.y * axis.y) + (vector.z * axis.z))
+        (((vector.y * axis.y) + (vector.z * axis.z)) + (vector.x * axis.x))
         / axisLengthSquared;
       return Wm3::Vector3f{axis.x * scale, axis.y * scale, axis.z * scale};
     }

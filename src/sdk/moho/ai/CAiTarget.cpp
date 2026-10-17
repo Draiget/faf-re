@@ -374,6 +374,19 @@ bool CAiTarget::HasSameTargetEntity(const CAiTarget& other) const
 }
 
 /**
+ * Address: 0x005E2D90 (FUN_005E2D90)
+ *
+ * What it does:
+ * Returns `targetIsMobile` when the raw weak target-entity lane resolves to an
+ * object, false otherwise. Caller: `Projectile::Projectile` launch ctor
+ * (0x0069B66A, bomb-drop prediction gate).
+ */
+bool CAiTarget::IsMobile() const
+{
+  return targetEntity.GetObjectPtr() != nullptr && targetIsMobile;
+}
+
+/**
  * Address: 0x005E2DB0 (FUN_005E2DB0, Moho::CAiTarget::NoTarget)
  *
  * What it does:
