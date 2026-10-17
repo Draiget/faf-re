@@ -25,8 +25,11 @@ namespace moho
   {
     ENTITYTYPE_Unit = 0x0100,
     ENTITYTYPE_Prop = 0x0200,
-    ENTITYTYPE_Entity = 0x0400,
-    ENTITYTYPE_Projectile = 0x0800,
+    // `Projectile::Projectile` (0x0069AFE0) passes 0x400 to the Entity ctor and
+    // `CAiAttackerImpl::TrackToTarget` (0x005D8154) gathers projectiles with
+    // 0x400; the script-created `Entity(LuaObject, ...)` ctor registers 0x800.
+    ENTITYTYPE_Projectile = 0x0400,
+    ENTITYTYPE_Entity = 0x0800,
   };
 
   struct EntityLineCollision

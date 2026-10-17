@@ -12154,7 +12154,8 @@ namespace moho
     // the heap-backed lane is behaviourally identical for a scratch list.
     gpg::fastvector<UserEntity*> visibleEntities{};
     auto* const spatialStorage = GetEntitySpatialDbStorage();
-    (void)spatialStorage->CollectInView(const_cast<GeomCamera3*>(&view), visibleEntities, ENTITYTYPE_Entity);
+    // 0x008623E1: `push 0x400`, the projectile bucket.
+    (void)spatialStorage->CollectInView(const_cast<GeomCamera3*>(&view), visibleEntities, ENTITYTYPE_Projectile);
 
     for (UserEntity* const entity : visibleEntities) {
       if (entity == nullptr || entity->mVariableData.mIsDead) {
