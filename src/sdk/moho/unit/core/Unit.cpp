@@ -14526,7 +14526,8 @@ Unit* Unit::FindPlatform()
       needsService = *static_cast<const float*>(needRefuel->GetValueStorage()) > fuelRatio;
     }
   }
-  // Need repair: threshold ratio exceeds (maxHealth / health).
+  // Need repair: threshold ratio exceeds the health fraction. 0x0062F10F
+  // loads health (+0x98) and 0x0062F14A divides it by max health (+0x9C).
   if (!needsService) {
     const float health = mVarDat.mHealth;
     const float maxHealth = mVarDat.mMaxHealth;
@@ -14534,7 +14535,7 @@ Unit* Unit::FindPlatform()
         needRepairDef != nullptr) {
       if (CSimConVarInstanceBase* const needRepair = SimulationRef->GetSimVar(needRepairDef);
           needRepair != nullptr) {
-        needsService = *static_cast<const float*>(needRepair->GetValueStorage()) > (maxHealth / health);
+        needsService = *static_cast<const float*>(needRepair->GetValueStorage()) > (health / maxHealth);
       }
     }
   }
