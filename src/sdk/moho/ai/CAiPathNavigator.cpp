@@ -177,7 +177,7 @@ namespace
    * What it does:
    * Writes one `(x, z)` word pair into a packed path-cell payload.
    */
-  [[maybe_unused]] [[nodiscard]] HPathCell* WritePackedPathCellWordPair(
+  [[nodiscard]] HPathCell* WritePackedPathCellWordPair(
     HPathCell* const outCell,
     const std::uint16_t x,
     const std::uint16_t z
@@ -217,11 +217,6 @@ namespace
     return vec != zero;
   }
 
-  [[nodiscard]] bool HasGoalArea(const SAiNavigatorGoal& goal) noexcept
-  {
-    return goal.minX < goal.maxX && goal.minZ < goal.maxZ;
-  }
-
   [[nodiscard]] SOCellPos ToCellPos(const Wm3::Vector3f& position, const SFootprint& footprint) noexcept
   {
     SOCellPos cell{};
@@ -230,15 +225,6 @@ namespace
     return cell;
   }
 
-  [[nodiscard]] Wm3::Vector3f ToWorldPos(const SOCellPos& cellPos, const Unit& unit, const SFootprint& footprint) noexcept
-  {
-    const Wm3::Vector3f unitPos = unit.GetPosition();
-    return {
-      static_cast<float>(cellPos.x) + (static_cast<float>(footprint.mSizeX) * 0.5f),
-      unitPos.y,
-      static_cast<float>(cellPos.z) + (static_cast<float>(footprint.mSizeZ) * 0.5f),
-    };
-  }
 
   [[nodiscard]] SOCellPos GoalAnchorCell(const SAiNavigatorGoal& goal) noexcept
   {
@@ -767,7 +753,12 @@ namespace
       return false;
     }
 
-    const bool canOccupyCurrent = CanOccupyTargetCell(navigator, navigator.mCurrentPos, navigator.mCurrentPos);
+    // 0x005AE10D / 0x005AED6F: `push -1` into OCCUPY_FootprintFits -- OC_ANY,
+    // with no water-layer OC_SUB masking.
+    const COGrid* const grid = GetPathingGrid(navigator);
+    const bool canOccupyCurrent = grid != nullptr && navigator.mPathFinder->mUnit != nullptr
+      && OCCUPY_FootprintFits(*grid, navigator.mCurrentPos, navigator.mPathFinder->mUnit->GetFootprint(), EOccupancyCaps::OC_ANY)
+           != static_cast<EOccupancyCaps>(0u);
     const bool canReachForward = CanReachCellFromCurrent(navigator, navigator.mCurrentPos);
     navigator.mHasForwardProbe = (canOccupyCurrent && canReachForward) ? 1u : 0u;
     return navigator.mHasForwardProbe != 0u;
@@ -1092,12 +1083,13 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
     if (!IsCellInGoal(tailCell)) {
       SetUnitPathBits(unit, kUnitPathFlag);
       const SOCellPos centerCell = GoalCenterCell(mGoal);
-      if (CanPathCellTransition(*this, centerCell, centerCell)) {
+      // 0x005AF304: `call 0x005AF4E0` -- the occupancy test, not the transition.
+      if (CanOccupyTargetCell(*this, centerCell, centerCell)) {
         AppendPathCellFast(mPath, centerCell);
       }
     }
 
-    mPathSearchFailCount = 0;
+    // The state-3 tail never resets PSFC (+0x60).
     mPathRetryDelayFrames = 0;
     mRepathDistanceThreshold = gpg::pInf;
     mState = AIPATHNAVSTATE_HasPath;
@@ -1175,7 +1167,7 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
     mPath.PrependCells(path.start, path.finish);
   }
 
-  mNoForwardDistanceFailCount = 0;
+  // 0x005AF319..0x005AF335: NFDS (+0x68) survives; only ResetPathState clears it.
   mPathRetryDelayFrames = 0;
   mRepathDistanceThreshold = gpg::pInf;
   if (mPathFinder) {
@@ -1233,9 +1225,6 @@ void CAiPathNavigator::ConfigureGoal(const SAiNavigatorGoal& goal, const bool ig
  */
 void CAiPathNavigator::ResetPathState()
 {
-  mTargetPos = mCurrentPos;
-  ResetPathContent(mPath);
-
   // 0x005AD9C0 resets exactly this set. It deliberately leaves the repath
   // threshold/tick (+0x6C/+0x70), the no-progress counter (+0x74), the layer
   // token (+0x54), the forward-probe flag (+0x93), the last node index, the
@@ -1244,9 +1233,15 @@ void CAiPathNavigator::ResetPathState()
   mTargetPos = mCurrentPos;
   ListUnlink();
 
+  // 0x005AD9E4..0x005ADA08: a search still queued on the army path queue is
+  // pulled off it, and the recently-searched rect history is cleared. The
+  // path itself (+0x14..+0x20) and the finder's search type are left alone.
   if (mPathFinder) {
-    mPathFinder->OnPathSearchCancelled();
-    mPathFinder->mSearchType = AIPATHSEARCH_None;
+    if (mPathFinder->mIsQueuedOnPathQueue != 0u) {
+      mPathFinder->mIsQueuedOnPathQueue = 0;
+      mPathFinder->IPathTraveler::ListUnlink();
+    }
+    mPathFinder->ClearRectHistory();
   }
 
   mTargetWithinOneCell = 0;
@@ -1625,7 +1620,7 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
 
   const SOCellPos pathTail = mPath.finish[-1];
   if (PackCell(mCurrentPos) == PackCell(pathTail)) {
-    ResetPathContent(mPath);
+    // 0x005AE485..0x005AE4A3: arrival leaves the path itself in place.
     mState = AIPATHNAVSTATE_Idle;
     mPathRetryDelayFrames = 0;
     mTargetPos = mCurrentPos;
@@ -1924,24 +1919,24 @@ Wm3::Vector3f CAiPathNavigator::GetTargetPos() const
  */
 bool CAiPathNavigator::CanPathTo(const SAiNavigatorGoal& goal, Wm3::Vector3f* const outTargetPos) const
 {
-  if (!HasGoalArea(goal)) {
-    return false;
-  }
+  // 0x005ADADC..0x005ADB90: a synchronous search from the current cell.
+  // The finder probes the goal boundary for the duration of the call, the
+  // reached cell is placed on the map surface, and the probe flag is dropped.
+  CAiPathFinder* const pathFinder = mPathFinder;
+  pathFinder->mUseGoalBoundaryProbe = 1;
+  (void)WritePackedPathCellWordPair(
+    &pathFinder->mAnchorCell, static_cast<std::uint16_t>(mCurrentPos.x), static_cast<std::uint16_t>(mCurrentPos.z)
+  );
+  pathFinder->SetGoal(goal);
+  const bool reachable = pathFinder->RunDirectProbe();
 
-  if (!outTargetPos) {
-    return true;
-  }
+  HPathCell resultCell{};
+  pathFinder->GetResultCell(&resultCell);
+  const SOCellPos cell{static_cast<std::int16_t>(resultCell.x), static_cast<std::int16_t>(resultCell.z)};
+  *outTargetPos = COORDS_ToWorldPos(pathFinder->mUnit->SimulationRef->mMapData, cell, pathFinder->mUnit->GetFootprint());
 
-  Unit* const unit = GetOwningUnit(*this);
-  const SFootprint* const footprint = GetActiveFootprint(*this);
-  if (!unit || !footprint) {
-    *outTargetPos = Wm3::Vector3f::Zero();
-    return true;
-  }
-
-  const SOCellPos anchor = GoalAnchorCell(goal);
-  *outTargetPos = ToWorldPos(anchor, *unit, *footprint);
-  return true;
+  pathFinder->mUseGoalBoundaryProbe = 0;
+  return reachable;
 }
 
 /**

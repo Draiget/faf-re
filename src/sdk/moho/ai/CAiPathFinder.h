@@ -281,8 +281,14 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive, int version);
 
-  private:
+    /**
+     * Clears the recently-searched rect history (`mRecentSearchRects`, +0x68).
+     * Inlined into QueueSearch; called out of line on `this+68h` by
+     * CAiPathNavigator::ResetPathState (0x005ADA08 -> 0x005AAF60).
+     */
     void ClearRectHistory();
+
+  private:
     void PushRectHistory(const gpg::Rect2i& rect);
     void UpdatePlayableRectGate();
     [[nodiscard]] bool RectHistoryIntersects(const gpg::Rect2i& rect) const;

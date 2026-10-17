@@ -53,20 +53,18 @@ namespace
     return lhs.x0 < rhs.x1 && rhs.x0 < lhs.x1 && lhs.z0 < rhs.z1 && rhs.z0 < lhs.z1;
   }
 
+  // 0x005A3C31 / 0x005A3C56: `fistp` (round to nearest), then `movsx word`.
   [[nodiscard]] std::int32_t GridCoordFromWorldCenter(const float worldCoord, const std::uint8_t footprintSize) noexcept
   {
-    return static_cast<std::int32_t>(worldCoord - (static_cast<float>(footprintSize) * 0.5f));
+    return static_cast<std::int16_t>(std::lrintf(worldCoord - (static_cast<float>(footprintSize) * 0.5f)));
   }
 
-  [[nodiscard]] Wm3::Vector3f GoalCellToWorldPos(const Unit& unit, const SAiNavigatorGoal& goal) noexcept
+  // 0x005A3DAB..0x005A3DEC: the goal anchor cell placed on the map surface by
+  // COORDS_ToWorldPos (terrain, or the water plane for non-seabed footprints).
+  [[nodiscard]] Wm3::Vector3f GoalCellToWorldPos(const Unit& unit, const SAiNavigatorGoal& goal)
   {
-    const SFootprint& footprint = unit.GetFootprint();
-    const Wm3::Vector3f unitPos = unit.GetPosition();
-    return {
-      static_cast<float>(goal.minX) + (static_cast<float>(footprint.mSizeX) * 0.5f),
-      unitPos.y,
-      static_cast<float>(goal.minZ) + (static_cast<float>(footprint.mSizeZ) * 0.5f),
-    };
+    const SOCellPos cell{static_cast<std::int16_t>(goal.minX), static_cast<std::int16_t>(goal.minZ)};
+    return COORDS_ToWorldPos(unit.SimulationRef->mMapData, cell, unit.GetFootprint());
   }
 
   [[nodiscard]] bool GoalMatchForSetGoalDedup(const SAiNavigatorGoal& lhs, const SAiNavigatorGoal& rhs) noexcept
@@ -612,10 +610,11 @@ int CAiNavigatorLand::Execute()
 
   if (mPathNavigator->mState <= AIPATHNAVSTATE_Failed) {
     steering->Stop();
-    NavigatorMakeIdle();
-
+    // 0x005A43EB..0x005A43FB: the outcome is read before NavigatorMakeIdle,
+    // whose ResetPathState forces the path state back to Idle.
     const EAiNavigatorEvent eventCode =
       (mPathNavigator->mState == AIPATHNAVSTATE_Idle) ? AINAVEVENT_Succeeded : AINAVEVENT_Failed;
+    NavigatorMakeIdle();
     BroadcastEvent(eventCode);
   }
 
