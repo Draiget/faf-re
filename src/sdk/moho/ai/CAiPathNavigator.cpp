@@ -198,7 +198,7 @@ namespace
    * What it does:
    * Stores one alt-footprint mode flag byte on a unit/entity object.
    */
-  [[maybe_unused]] [[nodiscard]] Unit* WriteUnitAltFootprintFlag(
+  [[nodiscard]] Unit* WriteUnitAltFootprintFlag(
     Unit* const unit,
     const std::uint8_t enabled
   ) noexcept
@@ -1255,7 +1255,9 @@ void CAiPathNavigator::ResetPathState()
     // 0x005ADA19 / 0x005ADA29: only the path-problem and pathing-busy bits;
     // the patrol-stall bit survives a reset.
     unit->mUnitVarDat.mUnitStates &= ~(kUnitPathFlag | kUnitPathingBusyFlag);
-    unit->FootprintDown = false;
+    // 0x005ADA33: `mov byte [unit+124h], bl` -- the Entity alt-footprint
+    // byte (Entity +11Ch behind the 8-byte IUnit head), not FootprintDown.
+    (void)WriteUnitAltFootprintFlag(unit, 0u);
   }
 
   mState = AIPATHNAVSTATE_Idle;
