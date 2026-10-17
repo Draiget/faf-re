@@ -17,6 +17,10 @@ extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
 extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
 extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
+extern "C" float __cdecl msvc8_x87_sin_times(float sinArg, float factor);
+extern "C" float __cdecl msvc8_x87_intrinsic_exp(float x);
+extern "C" float __cdecl msvc8_x87_intrinsic_ln(float x);
+extern "C" float __cdecl msvc8_x87_intrinsic_log10(float x);
 extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
@@ -261,6 +265,81 @@ namespace msvc8
     return result;
 #else
     return msvc8_x87_sin_times_cos(sinArg, cosArg);
+#endif
+  }
+
+  float SinTimes(const float sinArg, const float factor) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld sinArg
+      fsin
+      fmul factor
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_sin_times(sinArg, factor);
+#endif
+  }
+
+  float IntrinsicExp(const float x) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld x
+      fldl2e
+      fmulp st(1), st(0)
+      fld st(0)
+      frndint
+      fxch st(1)
+      fsub st(0), st(1)
+      f2xm1
+      fld1
+      faddp st(1), st(0)
+      fscale
+      fstp st(1)
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_intrinsic_exp(x);
+#endif
+  }
+
+  float IntrinsicLn(const float x) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld x
+      fldln2
+      fxch st(1)
+      fyl2x
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_intrinsic_ln(x);
+#endif
+  }
+
+  float IntrinsicLog10(const float x) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld x
+      fldlg2
+      fxch st(1)
+      fyl2x
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_intrinsic_log10(x);
 #endif
   }
 

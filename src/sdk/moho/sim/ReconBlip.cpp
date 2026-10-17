@@ -14,11 +14,13 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/math/Vector3f.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
@@ -176,15 +178,26 @@ namespace
     auto& rng = *sim->mRngState;
     const std::uint32_t minRadius = blueprint->Intel.JamRadius.min;
     const std::uint32_t maxRadius = blueprint->Intel.JamRadius.max;
-    const std::uint32_t range = maxRadius > minRadius ? (maxRadius - minRadius) : 0u;
+    // 0x005BEA1A: `sub edi,min` with no clamp -- the span wraps when max < min.
+    const std::uint32_t range = maxRadius - minRadius;
     const std::uint32_t radiusWord = rng.twister.NextUInt32();
     const std::uint32_t radiusStep = static_cast<std::uint32_t>((static_cast<std::uint64_t>(range) * radiusWord) >> 32u);
-    const float radius = static_cast<float>(minRadius + radiusStep);
+    // 0x005BEA2B: `cvtsi2ss` -- the sum converts as a signed int.
+    const float radius = static_cast<float>(static_cast<std::int32_t>(minRadius + radiusStep));
 
-    Wm3::Vec3f direction{rng.FRandGaussian(), 0.0f, rng.FRandGaussian()};
-    Wm3::Vec3f::Normalize(direction);
+    // 0x005BEA35..0x005BEA54: the first gaussian draw lands in z ([esp+24h]),
+    // the second in x ([esp+1Ch]) -- MSVC evaluated the original
+    // `Vector3f(FRandGaussian(), 0, FRandGaussian())` arguments right to left.
+    const float zGaussian = rng.FRandGaussian();
+    const float xGaussian = rng.FRandGaussian();
+    const Wm3::Vec3f spread{xGaussian, 0.0f, zGaussian};
 
     const float randomScale = CMersenneTwister::ToUnitFloat(rng.twister.NextUInt32()) * radius;
+
+    // 0x005BEA95: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0,
+    // not WildMagic's 1e-6 tolerance.
+    Wm3::Vec3f direction{};
+    (void)NormalizeVectorInto(&direction, spread);
     return {direction.x * randomScale, direction.y * randomScale, direction.z * randomScale};
   }
 
@@ -772,6 +785,14 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
 
   mQueueRelinkBlocked = 1u;
 
+  // 0x005BE8BE..0x005BE9D8: when the source unit has an animation actor, the
+  // blip shares its poses -- prior pose first (0x005BDD70), then the current
+  // pose (0x005BDD50) -- for both real and jammer blips.
+  if (sourceUnit && sourceUnit->AniActor) {
+    mUnitVarDat.mPriorSharedPose = sourceUnit->AniActor->GetPriorPoseShared();
+    mUnitVarDat.mSharedPose = sourceUnit->AniActor->GetPoseShared();
+  }
+
   if (fake) {
     mJamOffset = ComputeJamOffset(sourceUnit, sim);
   } else {
@@ -942,7 +963,9 @@ bool ReconBlip::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
   outTargetPoint = -1;
   const STIMap* const mapData = SimulationRef->mMapData;
   const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
-  return GetPositionWm3().y <= waterElevation;
+  // 0x005BF5D6: `comiss y,water` / `jbe` -> true, so an unordered (NaN) height
+  // reads as below water.
+  return !(GetPositionWm3().y > waterElevation);
 }
 
 /**
@@ -1001,7 +1024,9 @@ void ReconBlip::Refresh()
 void ReconBlip::DestroyIfUnused()
 {
   Unit* const sourceUnit = GetSourceUnit();
-  if (sourceUnit && !sourceUnit->DestroyQueued() && !IsFake()) {
+  // 0x005BF716..0x005BF71B: IUnit slot +0x28 (vftable 0x00E2A574 -> 0x006A49F0),
+  // i.e. `IsDead()`, not the `DestroyQueued()` (+0x2C) that `Refresh` asks.
+  if (sourceUnit && !sourceUnit->IsDead() && !IsFake()) {
     return;
   }
 

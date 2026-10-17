@@ -537,14 +537,17 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
     }
   }
 
-  const float accelStep = std::fabs(mAccel);
   if (mSpinDown != 0u && mAccel != 0.0f) {
     const float spinDownTargetSpeed = mTargetSpeed * kSpinDownTargetScale;
     if (mSpeed > spinDownTargetSpeed) {
-      if (std::fabs(mSpeed) > accelStep) {
-        mSpeed += std::copysign(accelStep, -mSpeed);
-      } else {
+      // 0x00643987..0x006439C3 compares the signed `mAccel` (not its
+      // magnitude) against `|speed|`: only an ordered `accel > |speed|` snaps
+      // to the spin-down speed; equality, a negative accel, or NaN steps by
+      // `_copysign(accel, -speed)`.
+      if (mAccel > std::fabs(mSpeed)) {
         mSpeed = spinDownTargetSpeed;
+      } else {
+        mSpeed += std::copysign(mAccel, -mSpeed);
       }
       mCurrentAngle = moho::NormalizeAngleSignedRadians(mCurrentAngle + mSpeed);
       EventSetSignaled(false);
@@ -567,11 +570,13 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
     }
   } else {
     if (mAccel != 0.0f && mSpeed != mTargetSpeed) {
+      // 0x00643B14..0x00643B52: same signed-accel test as the spin-down lane;
+      // only an ordered `accel > |diff|` snaps to the target speed.
       const float diff = mTargetSpeed - mSpeed;
-      if (std::fabs(diff) > accelStep) {
-        mSpeed += std::copysign(accelStep, diff);
-      } else {
+      if (mAccel > std::fabs(diff)) {
         mSpeed = mTargetSpeed;
+      } else {
+        mSpeed += std::copysign(mAccel, diff);
       }
     }
 

@@ -16,6 +16,7 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/collision/CColPrimitiveBase.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/path/PathTables.h"
@@ -1305,9 +1306,10 @@ namespace moho
       return false;
     }
 
-    Wm3::Vector3f segment{toCenter.x - fromCenter.x, 0.0f, toCenter.z - fromCenter.z};
-    Wm3::Vector3f direction = segment;
-    (void)direction.Normalize();
+    // 0x0072173D: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0.
+    const Wm3::Vector3f segment{toCenter.x - fromCenter.x, 0.0f, toCenter.z - fromCenter.z};
+    Wm3::Vector3f direction{};
+    (void)NormalizeVectorInto(&direction, segment);
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
     const Wm3::Vector3f center{
@@ -1405,7 +1407,8 @@ namespace moho
     outCollisions.ResetStorageToInline();
 
     CollisionResult collisionResult{};
-    if (sphere.Radius <= 3.0f) {
+    // 0x007220CD: `comiss radius, 3.0; jbe small` -- an unordered radius takes the small path.
+    if (!(sphere.Radius > 3.0f)) {
       for (int index = 0; index < gatheredCount; ++index) {
         Entity* const candidate = gatheredEntities.start_[index];
         if (candidate == nullptr) {
@@ -1657,8 +1660,8 @@ namespace moho
 
       if (unitSkirtRect.x1 > rect.x0 && rect.x1 > unitSkirtRect.x0 &&
           unitSkirtRect.z1 > rect.z0 && rect.z1 > unitSkirtRect.z0 &&
-          rect.x1 > rect.x0 && rect.z0 < rect.z1 &&
-          unitSkirtRect.x1 > unitSkirtRect.x0 && unitSkirtRect.z0 < unitSkirtRect.z1) {
+          rect.x1 > rect.x0 && !(rect.z0 >= rect.z1) && // 0x007208B6: jae rejects, NaN passes
+          unitSkirtRect.x1 > unitSkirtRect.x0 && !(unitSkirtRect.z0 >= unitSkirtRect.z1)) { // 0x007208C3: jb accepts NaN
         return true;
       }
     }
@@ -1715,7 +1718,8 @@ namespace moho
     for (Entity* const entity : gatheredEntities) {
       const float deltaX = entity->mVarDat.mCurTransform.pos_.x - center.x;
       const float deltaZ = entity->mVarDat.mCurTransform.pos_.z - center.z;
-      if (radiusSquared <= (deltaX * deltaX) + (deltaZ * deltaZ)) {
+      // 0x007224B5: `comiss r*r, d*d; jbe skip` -- an unordered distance is skipped.
+      if (!(radiusSquared > (deltaX * deltaX) + (deltaZ * deltaZ))) {
         continue;
       }
 

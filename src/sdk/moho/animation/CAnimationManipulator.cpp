@@ -171,8 +171,10 @@ namespace
       return 0.0f;
     }
 
+    // 0x00422940: the remainder is shifted by `range` when its sign differs
+    // from the range's (`0 > r` versus `0 > range`), not merely when negative.
     float wrapped = std::fmod(value, range);
-    if (wrapped < 0.0f) {
+    if ((0.0f > wrapped) != (0.0f > range)) {
       wrapped += range;
     }
     return wrapped;
@@ -776,7 +778,9 @@ namespace moho
     }
 
     float fraction = static_cast<float>(lua_tonumber(rawState, 2));
-    fraction = std::clamp(fraction, 0.0f, 1.0f);
+    // 0x00640E55..0x00640E84: `f > 1 ? 1 : f`, then `f > 0 ? f : 0` (NaN -> 0).
+    fraction = (fraction > 1.0f) ? 1.0f : fraction;
+    fraction = (fraction > 0.0f) ? fraction : 0.0f;
     manipulator->SetAnimationFraction(fraction);
     return 1;
   }
@@ -1315,7 +1319,8 @@ namespace moho
       const float forwardX = 2.0f * (q.x * q.z + q.w * q.y);
       const float forwardY = 2.0f * (q.y * q.z - q.w * q.x);
       const float forwardZ = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
-      if (velocity.x * forwardX + velocity.y * forwardY + velocity.z * forwardZ < 0.0f) {
+      // 0x0063FEC4..0x0063FEE8 sums the dot product as (y + z) + x.
+      if (0.0f > (((velocity.y * forwardY) + (velocity.z * forwardZ)) + (velocity.x * forwardX))) {
         rate = -mRate;
       }
     }
@@ -1333,10 +1338,13 @@ namespace moho
         const float speedFraction = speed / unit->GetBlueprint()->Physics.MaxSpeed;
         const Wm3::Quatf& orientation = unit->mVarDat.mCurTransform.orient_;
         const Wm3::Quatf& prevOrientation = unit->mVarDat.mLastTransform.orient_;
-        const bool turning = orientation.x != prevOrientation.x || orientation.y != prevOrientation.y
-                          || orientation.z != prevOrientation.z || orientation.w != prevOrientation.w;
+        // 0x0063FFDE: `0x004F0B40` is a 16-byte memcmp, so this is bitwise
+        // inequality (a -0/+0 lane flip counts as turning), which is exactly
+        // Wm3 `Quaternion::operator==`.
+        const bool turning = !(orientation == prevOrientation);
         float motionScale = speedFraction * 10.0f;
-        if (turning && motionScale <= 0.25f) {
+        // 0x0063FFF5 `comiss scale, 0.25; jbe`: `scale > 0.25 ? scale : 0.25`.
+        if (turning && !(motionScale > 0.25f)) {
           motionScale = 0.25f;
         }
         mAnimationTime += (motionScale * rate) * 0.1f;
@@ -1396,8 +1404,10 @@ namespace moho
       const SScaAnimKey& key0 = keys0[track];
       const SScaAnimKey& key1 = keys1[track];
       VTransform keyTransform{};
-      if (frac >= 0.001f) {
-        if (invFrac >= 0.001f) {
+      // 0x00640265 / 0x00640291: `0.001 > frac` takes key 0, then
+      // `0.001 > 1 - frac` takes key 1; anything else (NaN included) lerps.
+      if (!(0.001f > frac)) {
+        if (!(0.001f > invFrac)) {
           keyTransform.pos_.x = key0.position[0] + (key1.position[0] - key0.position[0]) * frac;
           keyTransform.pos_.y = key0.position[1] + (key1.position[1] - key0.position[1]) * frac;
           keyTransform.pos_.z = key0.position[2] + (key1.position[2] - key0.position[2]) * frac;
@@ -1462,7 +1472,9 @@ namespace moho
     if (mLooping) {
       normalized = normalized - std::floor(normalized);
     } else {
-      normalized = std::clamp(normalized, 0.0f, 1.0f);
+      // 0x0063FA1F..0x0063FA3D: `1 > f ? f : 1`, then `0 > f ? 0 : f`.
+      normalized = (1.0f > normalized) ? normalized : 1.0f;
+      normalized = (0.0f > normalized) ? 0.0f : normalized;
     }
 
     mAnimationTime = clip->mDurationSeconds * normalized;
@@ -1484,7 +1496,10 @@ namespace moho
     if (mLooping) {
       mAnimationTime = WrapToRange(timeSeconds, duration);
     } else {
-      mAnimationTime = std::clamp(timeSeconds, 0.0f, std::max(duration, 0.0f));
+      // 0x0063FAE8..0x0063FAFE: `duration > t ? t : duration`, then
+      // `0 > t ? 0 : t`.
+      const float capped = (duration > timeSeconds) ? timeSeconds : duration;
+      mAnimationTime = (0.0f > capped) ? 0.0f : capped;
     }
 
     // Preserve the pending event until the next animation update.
@@ -1595,7 +1610,8 @@ namespace moho
   float CAnimationManipulator::GetAnimationFraction() const
   {
     const float duration = GetAnimationDuration();
-    if (duration <= 0.0f) {
+    // 0x00640CC8 `comiss duration, 0; jbe`: only an ordered positive duration divides.
+    if (!(duration > 0.0f)) {
       return 0.0f;
     }
     return mAnimationTime / duration;

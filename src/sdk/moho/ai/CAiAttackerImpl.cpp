@@ -14,6 +14,7 @@
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
 #include "moho/misc/Listener.h"
 #include "moho/projectile/Projectile.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -210,35 +211,44 @@ namespace
     return *static_cast<const bool*>(valueStorage);
   }
 
-  [[nodiscard]] bool SegmentIntersectsTerrain(
-    const STIMap* const mapData,
-    const Wm3::Vector3f& startPosition,
-    const Wm3::Vector3f& endPosition
+  /**
+   * What it does:
+   * One terrain line test of `AI_TestForTerrainBlockage` (0x005D6490 inlines
+   * it per segment, 0x005D65A1..0x005D66E9 and 0x005D67F6..0x005D6950).
+   * The line is built from the `Segment3f` of `start -> end` (0x004FE130):
+   * it starts at `Origin - Direction * Extent` and runs `Extent * 2` along
+   * `Direction`. The height-field hit (0x00476F30) tags `hit.hitKind = 1`
+   * when valid (the inlined body of 0x005776D0, 0x005D68BB). The test then
+   * passes when the hit is valid and the separately measured endpoint span
+   * `sqrtf((dz*dz + dy*dy) + dx*dx)` is `>=` the hit distance (`fcomip` +
+   * `jb`/`jae`, so a NaN distance never blocks). `hit` is the caller's one
+   * record, reused across every segment of the arc.
+   */
+  [[nodiscard]] bool TerrainBlocksSegment(
+    const CHeightField& heightField,
+    const Wm3::Vector3f& start,
+    const Wm3::Vector3f& end,
+    CColHitResult& hit
   )
   {
-    if (mapData == nullptr || mapData->mHeightField == nullptr) {
-      return false;
-    }
-
-    Wm3::Vector3f direction{
-      endPosition.x - startPosition.x,
-      endPosition.y - startPosition.y,
-      endPosition.z - startPosition.z,
-    };
-    const float length = Wm3::Vector3f::Normalize(&direction);
-    if (length <= 0.0f) {
-      return false;
-    }
+    const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(start, end);
 
     GeomLine3 line{};
-    line.pos = startPosition;
-    line.dir = direction;
+    line.pos.x = segment.Origin.x - (segment.Direction.x * segment.Extent);
+    line.pos.y = segment.Origin.y - (segment.Direction.y * segment.Extent);
+    line.pos.z = segment.Origin.z - (segment.Direction.z * segment.Extent);
+    line.dir = segment.Direction;
     line.closest = 0.0f;
-    line.farthest = length;
+    line.farthest = segment.Extent * 2.0f;
 
-    CGeomHitResult hit{};
-    const Wm3::Vector3f intersection = mapData->mHeightField->Intersection(line, &hit);
-    return Wm3::Vector3fIsntNaN(&intersection) && hit.distance <= length;
+    const Wm3::Vector3f hitPoint = heightField.Intersection(line, &hit);
+    if (IsValidVector3f(hitPoint)) {
+      hit.hitKind = 1;
+    }
+
+    const Wm3::Vector3f span{start.x - end.x, start.y - end.y, start.z - end.z};
+    return IsValidVector3f(hitPoint)
+        && std::sqrt(((span.z * span.z) + (span.y * span.y)) + (span.x * span.x)) >= hit.distance;
   }
 
   /**
@@ -756,6 +766,11 @@ bool CAiAttackerImpl::PickTarget(Entity* const targetEntity)
  * What it does:
  * Tests direct or ballistic quarter-segment lanes from the firing unit to
  * `targetPosition` against terrain-heightfield intersections.
+ *
+ * Retail (0x005D6490) has no null guards: it reads the layer, the unit's
+ * position and blueprint, and `Sim->mMapData->mHeightField` unconditionally.
+ * One hit record `{NaN, NaN, 0}` (gpg::NaN, 0x010A7CB0) is seeded before
+ * anything else and reused by every line test.
  */
 bool moho::AI_TestForTerrainBlockage(
   const Unit* const unit,
@@ -763,25 +778,24 @@ bool moho::AI_TestForTerrainBlockage(
   const ERuleBPUnitWeaponBallisticArc ballisticArc
 )
 {
-  if (unit == nullptr || unit->mVarDat.mLayerMask == LAYER_Air || unit->SimulationRef == nullptr) {
+  if (unit->mVarDat.mLayerMask == LAYER_Air) {
     return false;
   }
 
-  const STIMap* const mapData = unit->SimulationRef->mMapData;
-  if (mapData == nullptr || mapData->mHeightField == nullptr) {
-    return false;
-  }
+  CColHitResult hit{};
+  hit.distance = gpg::NaN;
+  hit.v1 = gpg::NaN;
+  hit.hitKind = 0;
 
   Wm3::Vector3f unitTop = unit->GetPosition();
-  const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-  const float sizeZ = (blueprint != nullptr) ? blueprint->mSizeZ : 0.0f;
-  unitTop.y = (sizeZ * 2.0f) + unitTop.y;
-
   Wm3::Vector3f adjustedTarget = targetPosition;
+  unitTop.y = (unit->GetBlueprint()->mSizeZ * 2.0f) + unitTop.y;
   adjustedTarget.y += 0.25f;
 
+  const CHeightField& heightField = *unit->SimulationRef->mMapData->mHeightField;
+
   if (ballisticArc == RULEUBA_None) {
-    return SegmentIntersectsTerrain(mapData, unitTop, adjustedTarget);
+    return TerrainBlocksSegment(heightField, unitTop, adjustedTarget, hit);
   }
 
   const Wm3::Vector3f quarterDelta{
@@ -789,21 +803,23 @@ bool moho::AI_TestForTerrainBlockage(
     (adjustedTarget.y - unitTop.y) * 0.25f,
     (adjustedTarget.z - unitTop.z) * 0.25f,
   };
+  // 0x005D6723..0x005D6758: summed (z*z + y*y) + x*x.
+  const float quarterDistance = std::sqrt(
+    ((quarterDelta.z * quarterDelta.z) + (quarterDelta.y * quarterDelta.y)) + (quarterDelta.x * quarterDelta.x)
+  );
 
-  const float quarterDistance = Wm3::Vector3f::Length(quarterDelta);
   Wm3::Vector3f previousPos = unitTop;
-
   for (const float arcFactor : kBallisticArcHeightFactors) {
-    Wm3::Vector3f currentPos{
+    // 0x005D67BD..0x005D67E0: (factor * quarterDistance) * scale, with the
+    // low arc (== 1) scaled by 0.5 and every other arc by 2.0.
+    const float arcScale = (ballisticArc == RULEUBA_LowArc) ? 0.5f : 2.0f;
+    const Wm3::Vector3f currentPos{
       previousPos.x + quarterDelta.x,
-      previousPos.y + quarterDelta.y,
+      (arcFactor * quarterDistance * arcScale) + (previousPos.y + quarterDelta.y),
       previousPos.z + quarterDelta.z,
     };
 
-    const float arcScale = (ballisticArc == RULEUBA_LowArc) ? 0.5f : 2.0f;
-    currentPos.y += arcFactor * quarterDistance * arcScale;
-
-    if (SegmentIntersectsTerrain(mapData, previousPos, currentPos)) {
+    if (TerrainBlocksSegment(heightField, previousPos, currentPos, hit)) {
       return true;
     }
 
@@ -1007,8 +1023,11 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       if (bestCategory > closestSeenCategory) {
         shouldSetBest = true;
       } else if (currentTarget != nullptr) {
+        // 0x005D7F7D `comiss best, used; ja` takes the candidate only on an
+        // ordered `best > used`; an unordered compare falls to the
+        // current-target test, so spell the distance gate as a negated `>`.
         const bool shouldSkip =
-          currentTarget == bestEntity || (bestDistance <= usedDistance && currentTarget != candidate);
+          currentTarget == bestEntity || (!(bestDistance > usedDistance) && currentTarget != candidate);
         shouldSetBest = !shouldSkip;
       } else {
         shouldSetBest = bestDistance > usedDistance;
@@ -1134,7 +1153,8 @@ bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
     weapon->mAttributes.mMaxRadiusSq = weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
   }
 
-  return distSq <= weapon->mAttributes.mMaxRadiusSq;
+  // 0x005D71FA `comiss distSq, maxSq; ja -> false`: unordered compares report in range.
+  return !(distSq > weapon->mAttributes.mMaxRadiusSq);
 }
 
 /**
@@ -1603,8 +1623,10 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
     const float projectileZ = projectile->mVarDat.mCurTransform.pos_.z;
 
     // Layer/height caps: bit 0x08 permits below-water, bit 0x10 permits above-water.
-    const bool belowWaterOk = (layerCaps & 8) != 0 || waterElevation < projectileY;
-    const bool aboveWaterOk = (layerCaps & 0x10) != 0 || projectileY <= waterElevation;
+    // 0x005D8218 `comiss water, y; jae` and 0x005D8221 `comiss y, water; ja`
+    // reject only on ordered compares, so a NaN height passes both gates.
+    const bool belowWaterOk = (layerCaps & 8) != 0 || !(waterElevation >= projectileY);
+    const bool aboveWaterOk = (layerCaps & 0x10) != 0 || !(projectileY > waterElevation);
     if (!belowWaterOk || !aboveWaterOk) {
       continue;
     }

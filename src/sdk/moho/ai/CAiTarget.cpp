@@ -553,15 +553,13 @@ bool CAiTarget::ImpactDidHitEntity(Entity* const entity, const EImpactType impac
 void CAiTarget::UpdateTargetIsMobile(Sim* const sim)
 {
   Entity* const entity = targetEntity.GetObjectPtr();
-  if (!entity || !entity->BluePrint || !sim || !sim->mRules) {
+  if (!entity || !entity->BluePrint) {
     return;
   }
 
+  // 0x005E2880..0x005E28E1: the MOBILE set is looked up and bit-tested with
+  // no further guards; an index outside the set's words stores false.
   const EntityCategorySet* const mobileRange = sim->mRules->GetEntityCategory("MOBILE");
-  if (!mobileRange || mobileRange->Empty()) {
-    return;
-  }
-
   targetIsMobile = mobileRange->ContainsBit(entity->BluePrint->mCategoryBitIndex);
 }
 

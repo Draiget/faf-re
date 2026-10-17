@@ -143,18 +143,6 @@ namespace
     return moho::CScrLuaMetatableFactory<moho::UnitWeapon>::Instance().Get(state);
   }
 
-  void AttachTaskToStage(moho::CTask* const task, moho::CTaskStage* const stage)
-  {
-    if (task == nullptr || stage == nullptr) {
-      return;
-    }
-
-    auto* const thread = new moho::CTaskThread(stage);
-    task->mOwnerThread = thread;
-    task->mSubtask = thread->mTaskTop;
-    thread->mTaskTop = task;
-  }
-
   /**
    * Address: 0x006DEAE0 (FUN_006DEAE0)
    *
@@ -312,17 +300,19 @@ namespace
       distanceSq = (dx * dx) + (dz * dz);
     }
 
-    if (const moho::RUnitBlueprintWeapon* const blueprint = weapon->mAttributes.mBlueprint; blueprint != nullptr) {
-      if (weapon->mAttributes.mMaxRadiusSq < 0.0f) {
-        weapon->mAttributes.mMaxRadiusSq = blueprint->MaxRadius * blueprint->MaxRadius;
-      }
-      if (weapon->mAttributes.mMinRadiusSq < 0.0f) {
-        weapon->mAttributes.mMinRadiusSq = blueprint->MinRadius * blueprint->MinRadius;
-      }
+    // 0x006D5B8E..0x006D5BB6: the max-radius lane is lazily squared and tested
+    // first; the min-radius lane (0x006D5BC4..0x006D5BDA) is only squared once
+    // the target is known to be inside max range.
+    const moho::RUnitBlueprintWeapon* const blueprint = weapon->mAttributes.mBlueprint;
+    if (blueprint != nullptr && weapon->mAttributes.mMaxRadiusSq < 0.0f) {
+      weapon->mAttributes.mMaxRadiusSq = blueprint->MaxRadius * blueprint->MaxRadius;
     }
-
     if (distanceSq > weapon->mAttributes.mMaxRadiusSq) {
       return moho::ESolutionStatus::TRS_OutsideMaxRange;
+    }
+
+    if (blueprint != nullptr && weapon->mAttributes.mMinRadiusSq < 0.0f) {
+      weapon->mAttributes.mMinRadiusSq = blueprint->MinRadius * blueprint->MinRadius;
     }
     if (distanceSq <= weapon->mAttributes.mMinRadiusSq) {
       return moho::ESolutionStatus::TRS_InsideMinRange;
@@ -1197,7 +1187,7 @@ namespace moho
     // Beam lifetime = seconds * 10 (ticks), floored at 1 tick (binary FUN_006D8690
     // 0x006D8975 mulss *10.0, 0x006D8980 comiss vs 1.0).
     const float scaledLifetime = static_cast<float>(lua_tonumber(rawState, 9)) * 10.0f;
-    const float beamLifetime = (scaledLifetime <= 1.0f) ? 1.0f : scaledLifetime;
+    const float beamLifetime = (scaledLifetime > 1.0f) ? scaledLifetime : 1.0f;
 
     weapon->DoInstaHit(colorAndGlow, boneIndex, beamWidth, beamLifetime, textureSheet);
     return 0;
@@ -1982,7 +1972,10 @@ namespace moho
    * Address: 0x006DAD00 (FUN_006DAD00, cfunc_UnitWeaponTransferTargetL)
    *
    * What it does:
-   * Copies one weapon target payload onto another weapon.
+   * Retargets the second weapon onto the first weapon's current target
+   * through `UnitWeapon::SetTarget` (0x006DADCE), so the full transition runs:
+   * same-target no-op, blacklist aging / `OnLostTarget` / `OnGotTarget`,
+   * shooter-set and target-blip upkeep, aim-spot pick and fire-task restage.
    */
   int cfunc_UnitWeaponTransferTargetL(LuaPlus::LuaState* const state)
   {
@@ -1998,9 +1991,7 @@ namespace moho
     const LuaPlus::LuaObject destinationWeaponObject(LuaPlus::LuaStackObject(state, 2));
     UnitWeapon* const destinationWeapon = SCR_FromLua_UnitWeapon(destinationWeaponObject, state);
 
-    destinationWeapon->mTarget = sourceWeapon->mTarget;
-    destinationWeapon->PickNewTargetAimSpot();
-    destinationWeapon->mShotsAtTarget = 0;
+    destinationWeapon->SetTarget(&sourceWeapon->mTarget);
     return 0;
   }
 
@@ -2944,7 +2935,8 @@ namespace moho
     }
 
     mFireWeaponTask = new CFireWeaponTask(this);
-    AttachTaskToStage(mFireWeaponTask, attackerImpl->GetTaskStage());
+    // 0x006D45E2: `CTask::CreateTaskThread(task, stage, false)` (0x00409A40).
+    (void)CTask::CreateTaskThread(mFireWeaponTask, attackerImpl->GetTaskStage(), false);
 
     CreateInstance();
     (void)ResetBlacklistRangeToBegin(mBlacklist);
@@ -3205,7 +3197,9 @@ namespace moho
     if (bombDropDistance >= bombDropThreshold * 2.0f) {
       return false;
     }
-    if (bombDropDistance < bombDropThreshold) {
+    // 0x006D50A2 `comiss dist, threshold; jb` also takes the inner-window
+    // exit when the compare is unordered (NaN), so test the negated `>=`.
+    if (!(bombDropDistance >= bombDropThreshold)) {
       return weapon->mCanFire != 0u;
     }
 
@@ -4082,7 +4076,9 @@ namespace moho
     // Resolve the beam reach: weapon blueprint override, else the (clamped)
     // attribute max radius, else the blueprint max radius.
     float beamReach = mWeaponBlueprint->MaximumBeamLength;
-    if (beamReach <= 0.0f) {
+    // 0x006D6B63 `comiss len, 0; ja` keeps the override only when it is
+    // strictly positive and ordered; NaN falls back like a non-positive value.
+    if (!(beamReach > 0.0f)) {
       beamReach = mAttributes.mMaxRadius;
       if (beamReach < 0.0f) {
         beamReach = mAttributes.mBlueprint->MaxRadius;
@@ -4121,7 +4117,8 @@ namespace moho
     const float planarLength = std::sqrt((planarDx * planarDx) + (planarDz * planarDz));
 
     float reachScale;
-    if (planarLength <= 0.001f) {
+    // 0x006D6D1B `fcomip; jbe` picks the unit scale for an unordered compare too.
+    if (!(planarLength > 0.001f)) {
       reachScale = 1.0f;
     } else {
       reachScale = maxBeamLength / planarLength;

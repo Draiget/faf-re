@@ -69,6 +69,21 @@ namespace msvc8
   // heading lane, 0x00630AB2..0x00630AB7): round24(atan2(y, x) + addend).
   [[nodiscard]] float Atan2Plus(float y, float x, float addend) noexcept;
   [[nodiscard]] float SinTimesCos(float sinArg, float cosArg) noexcept;
+  // `fld arg; fsin; fmul factor; fstp`: the sine stays unrounded and only the
+  // product rounds (CUnitMotion::HandleDivingAndSurfacing, 0x006C337A..0x006C3380).
+  [[nodiscard]] float SinTimes(float sinArg, float factor) noexcept;
+
+  /**
+   * MSVC8's /Oi intrinsic expansions of `exp`, `log` and `log10`, as the
+   * engine's Lua math library inlines them (math_exp 0x00919D5D..0x00919D76,
+   * math_log 0x00919CFD..0x00919D06, math_log10 0x00919D2D..0x00919D36).
+   * `fyl2x`/`f2xm1` ignore precision control, but the `fmul`/`fadd` steps of
+   * the exp sequence round under the simulation's 24-bit control, so these
+   * are not the correctly rounded functions and must not go through a CRT.
+   */
+  [[nodiscard]] float IntrinsicExp(float x) noexcept;
+  [[nodiscard]] float IntrinsicLn(float x) noexcept;
+  [[nodiscard]] float IntrinsicLog10(float x) noexcept;
   [[nodiscard]] float CosTimesCos(float firstArg, float secondArg) noexcept;
 
   /**

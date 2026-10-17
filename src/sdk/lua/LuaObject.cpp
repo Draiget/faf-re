@@ -10566,8 +10566,11 @@ namespace
 	 * `msvc8::sinf` and friends (legacy/math/X87Math.h). The CRT's software
 	 * routines would be vendor independent, but they are not the binary's, and
 	 * the x86 and x64 CRTs disagree with each other in the last bit, which would
-	 * split an x86 client from an x64 one. asin/acos/exp/log/pow compute in
-	 * double and round once, which the two CRTs agree on after the rounding.
+	 * split an x86 client from an x64 one. exp/log/log10 are inline x87
+	 * expansions in the binary too (`msvc8::IntrinsicExp` and friends; exp's
+	 * fmul/fadd steps round at 24 bits, so a correctly rounded exp differs).
+	 * asin/acos/pow go through the CRT, whose SSE2 lane the simulation's
+	 * exception masks select; those compute in double and round once.
 	 */
 	int math_sin(lua_State* const state)
 	{
@@ -10614,7 +10617,7 @@ namespace
 	int math_acos(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::acos(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::acos(static_cast<double>(value)))); // _CIacos lane dispatch
 		return 1;
 	}
 
@@ -10735,7 +10738,7 @@ namespace
 	int math_log(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::log(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::IntrinsicLn(value))); // fldln2; fyl2x
 		return 1;
 	}
 
@@ -10748,7 +10751,7 @@ namespace
 	int math_log10(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::log10(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::IntrinsicLog10(value))); // fldlg2; fyl2x
 		return 1;
 	}
 
@@ -10761,7 +10764,7 @@ namespace
 	int math_exp(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::exp(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::IntrinsicExp(value))); // f2xm1/fscale expansion
 		return 1;
 	}
 

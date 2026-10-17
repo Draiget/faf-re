@@ -196,6 +196,92 @@ msvc8_x87_sin_times_cos PROC
 msvc8_x87_sin_times_cos ENDP
 
 
+; float msvc8_x87_sin_times(float sinArg, float factor)
+; fsin stays unrounded; the product rounds once under PC24 (FUN_006C3220).
+msvc8_x87_sin_times PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fsin
+    fmul    dword ptr [rsp+12]
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_sin_times ENDP
+
+
+; float msvc8_x87_intrinsic_exp(float x)
+; MSVC8 /Oi exp expansion (math_exp 0x00919D5D); fmul/fadd round under PC24.
+msvc8_x87_intrinsic_exp PROC
+    movss   dword ptr [rsp+8], xmm0
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fldl2e
+    fmulp   st(1), st(0)
+    fld     st(0)
+    frndint
+    fxch    st(1)
+    fsub    st(0), st(1)
+    f2xm1
+    fld1
+    faddp   st(1), st(0)
+    fscale
+    fstp    st(1)
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_intrinsic_exp ENDP
+
+
+; float msvc8_x87_intrinsic_ln(float x)
+msvc8_x87_intrinsic_ln PROC
+    movss   dword ptr [rsp+8], xmm0
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fldln2
+    fxch    st(1)
+    fyl2x
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_intrinsic_ln ENDP
+
+
+; float msvc8_x87_intrinsic_log10(float x)
+msvc8_x87_intrinsic_log10 PROC
+    movss   dword ptr [rsp+8], xmm0
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fldlg2
+    fxch    st(1)
+    fyl2x
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_intrinsic_log10 ENDP
+
+
 ; float msvc8_x87_cos_times_cos(float firstArg, float secondArg)
 msvc8_x87_cos_times_cos PROC
     movss   dword ptr [rsp+8], xmm0

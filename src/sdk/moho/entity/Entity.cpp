@@ -335,14 +335,6 @@ namespace
 #endif
   }
 
-  [[nodiscard]] int ResolveEntityArmyIndexOneBased(const Entity* const entity) noexcept
-  {
-    if (entity == nullptr || entity->ArmyRef == nullptr) {
-      return -1;
-    }
-    return entity->ArmyRef->mConstDat.mArmyIndex + 1;
-  }
-
   [[nodiscard]] const char* ResolveEntityBlueprintId(const Entity* const entity) noexcept
   {
     if (entity == nullptr || entity->BluePrint == nullptr || entity->BluePrint->mBlueprintId.empty()) {
@@ -381,14 +373,14 @@ namespace
     // entity's own `RealtimeStatsEnabled` byte (+0x1F8) before its ArmyRef.
     if (victim->IsRealtimeStatsEnabled() && victim->ArmyRef != nullptr) {
       msvc8::string statPath = msvc8::string(kEntityRealtimeStatsPrefix) + victim->GetUniqueName();
-      statPath += gpg::STR_Printf("_KilledBy_Army%d_", ResolveEntityArmyIndexOneBased(instigator));
+      statPath += gpg::STR_Printf("_KilledBy_Army%d_", instigator->GetArmyIndex()); // 0x006920E6: 0-based
       statPath += ResolveEntityBlueprintId(instigator);
       AccumulateArmyRealtimeStat(victim->ArmyRef, statPath, 1L);
     }
 
     if (instigator->IsRealtimeStatsEnabled() && instigator->ArmyRef != nullptr) {
       msvc8::string statPath = msvc8::string(kEntityRealtimeStatsPrefix) + instigator->GetUniqueName();
-      statPath += gpg::STR_Printf("_Kills_Army%d_", ResolveEntityArmyIndexOneBased(victim));
+      statPath += gpg::STR_Printf("_Kills_Army%d_", victim->GetArmyIndex()); // 0x006921E6: 0-based
       statPath += ResolveEntityBlueprintId(victim);
       AccumulateArmyRealtimeStat(instigator->ArmyRef, statPath, 1L);
     }

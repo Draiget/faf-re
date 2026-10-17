@@ -174,23 +174,23 @@ namespace moho
    *
    * IDA signature:
    * float *__usercall sub_4EB830@<eax>(
-   *   float *currentOrientation@<ebx>, float *outOrientation@<edi>,
-   *   float *targetOrientation, float turnStepRadians, char *outNoStep);
+   *   float *goalOrientation@<ebx>, float *outOrientation@<edi>,
+   *   float *currentOrientation, float turnStepRadians, char *outNoStep);
    *
    * What it does:
    * Performs one axis-angle interpolation step from `currentOrientation` toward
-   * `targetOrientation` by at most `turnStepRadians`. Computes the relative
-   * `delta = currentOrientation * conjugate(targetOrientation)`, clamps `delta`
-   * via `RotateQuatByAngle`, and writes `outOrientation = targetOrientation *
+   * `goalOrientation` by at most `turnStepRadians`. Computes the relative
+   * `delta = goalOrientation * conjugate(currentOrientation)`, clamps `delta`
+   * via `RotateQuatByAngle`, and writes `outOrientation = currentOrientation *
    * clampedDelta`. If `RotateQuatByAngle` rejects the input (half-angle exceeds
-   * pi/2 or the axis lanes are too short), copies `currentOrientation` into
+   * pi/2 or the axis lanes are too short), snaps to `goalOrientation` by copying it into
    * `outOrientation` and sets `*outNoStep = 1`; otherwise sets `*outNoStep = 0`.
    * Used by `CSlaveManipulator::ManipulatorUpdate` and
    * `CThrustManipulator::MoveManipulator` for max-rate-limited reorientation.
    */
   Wm3::Quaternionf* BlendOrientationDeltaByMaxAngle(
+    const Wm3::Quaternionf& goalOrientation,
     const Wm3::Quaternionf& currentOrientation,
-    const Wm3::Quaternionf& targetOrientation,
     float turnStepRadians,
     bool* outNoStep,
     Wm3::Quaternionf* outOrientation

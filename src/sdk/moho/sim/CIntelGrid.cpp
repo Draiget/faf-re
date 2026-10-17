@@ -59,15 +59,18 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] std::int32_t FloorDivToGridCell(const std::int32_t value, const std::int32_t gridSize) noexcept
+  // 0x005BE081..0x005BE0A7: the binary forms `1.0f / gridSize` once (divss)
+  // and multiplies every coordinate by that reciprocal (mulss); it never
+  // divides the coordinate itself, so the scaled value rounds like `v * (1/g)`.
+  [[nodiscard]] std::int32_t FloorScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    const float scaled = static_cast<float>(value) / static_cast<float>(gridSize);
+    const float scaled = static_cast<float>(value) * reciprocal;
     return static_cast<std::int32_t>(std::floor(scaled));
   }
 
-  [[nodiscard]] std::int32_t CeilDivToGridCell(const std::int32_t value, const std::int32_t gridSize) noexcept
+  [[nodiscard]] std::int32_t CeilScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    const float scaled = static_cast<float>(value) / static_cast<float>(gridSize);
+    const float scaled = static_cast<float>(value) * reciprocal;
     return static_cast<std::int32_t>(std::ceil(scaled));
   }
 
@@ -88,11 +91,12 @@ namespace
    */
   [[nodiscard]] gpg::Rect2i RectToGridCellBounds(const gpg::Rect2<int>& rect, const std::int32_t gridSize) noexcept
   {
+    const float reciprocal = 1.0f / static_cast<float>(gridSize);
     gpg::Rect2i out{};
-    out.x0 = FloorDivToGridCell(rect.x0, gridSize);
-    out.z0 = FloorDivToGridCell(rect.z0, gridSize);
-    out.x1 = CeilDivToGridCell(rect.x1, gridSize);
-    out.z1 = CeilDivToGridCell(rect.z1, gridSize);
+    out.x0 = FloorScaledToGridCell(rect.x0, reciprocal);
+    out.z0 = FloorScaledToGridCell(rect.z0, reciprocal);
+    out.x1 = CeilScaledToGridCell(rect.x1, reciprocal);
+    out.z1 = CeilScaledToGridCell(rect.z1, reciprocal);
     return out;
   }
 

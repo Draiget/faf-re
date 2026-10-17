@@ -1982,13 +1982,15 @@ namespace moho
     const std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* const sourceBlueprint
   )
   {
+    // 0x00715F4C..0x00715F58: a blip with no cell record is left alone -- the
+    // update never inserts. Only `InsertEntry` (from `GenerateNewBlips`) adds
+    // one, so an entry that `Update` decayed away stays gone.
     const std::int32_t* const knownCell = FindBlipCell(blipId);
-    const std::int32_t newCellIndex = VectorToCoords(position);
-
     if (!knownCell) {
-      InsertEntry(blipId, position, sourceBlueprint);
       return;
     }
+
+    const std::int32_t newCellIndex = VectorToCoords(position);
 
     const std::int32_t oldCellIndex = *knownCell;
     if (oldCellIndex == newCellIndex && oldCellIndex >= 0 && oldCellIndex < mTotal) {
@@ -2268,29 +2270,42 @@ namespace moho
           continue;
         }
 
-        if (!IsAlliedOrSameArmy(mArmy, entry.sourceArmy) && sim && sim->mEntityDB) {
+        // 0x0071661A..0x00716622: `GetAllianceWith == 1` (same army or ally)
+        // skips the whole threat contribution; only the checksum below runs.
+        if (IsAlliedOrSameArmy(mArmy, entry.sourceArmy)) {
+          if (sim) {
+            sim->mContext.Update(&entry.threatStrength, sizeof(entry.threatStrength));
+          }
+          ++it;
+          continue;
+        }
+
+        ReconBlip* blip = nullptr;
+        if (sim && sim->mEntityDB) {
+          // 0x00716648..0x0071666E: the layer is copied from any entity found
+          // under the id, blip or not.
           Entity* const entity = sim->mEntityDB->FindEntityById(static_cast<std::uint32_t>(entry.entityId));
           if (entity) {
-            if (ReconBlip* const blip = entity->IsReconBlip()) {
-              entry.sourceLayer = static_cast<std::int32_t>(entity->mVarDat.mLayerMask);
-
-              const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->mConstDat.mArmyIndex : -1;
-              if (sourceArmyIndex >= 0) {
-                const SPerArmyReconInfo* const sourceArmyRecon = blip->GetPerArmyReconInfo(sourceArmyIndex);
-                if (sourceArmyRecon) {
-                  const std::uint32_t flags = sourceArmyRecon->mReconFlags;
-                  if ((flags & RECON_KnownFake) != 0u) {
-                    entry.threatStrength = 0.0f;
-                  } else if ((flags & RECON_Omni) != 0u || (flags & RECON_LOSEver) != 0u) {
-                    entry.isDetailed = 1u;
-                  }
-                }
-              }
-            }
+            blip = entity->IsReconBlip();
+            entry.sourceLayer = static_cast<std::int32_t>(entity->mVarDat.mLayerMask);
           }
         }
 
         const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->mConstDat.mArmyIndex : -1;
+        if (sourceArmyIndex >= 0 && blip != nullptr && mArmy != nullptr) {
+          // 0x00716683..0x0071669A: the blip's recon record is read for the
+          // VIEWING army (this map's owner), not for the blip's source army.
+          const SPerArmyReconInfo* const viewerRecon = blip->GetPerArmyReconInfo(mArmy->mConstDat.mArmyIndex);
+          if (viewerRecon) {
+            const std::uint32_t flags = viewerRecon->mReconFlags;
+            if ((flags & RECON_KnownFake) != 0u) {
+              entry.threatStrength = 0.0f;
+            } else if ((flags & RECON_Omni) != 0u || (flags & RECON_LOSEver) != 0u) {
+              entry.isDetailed = 1u;
+            }
+          }
+        }
+
         if (
           sourceArmyIndex >= 0 && static_cast<std::size_t>(sourceArmyIndex) < cell->threats.size()
           && entry.sourceBlueprint != nullptr
@@ -2302,7 +2317,8 @@ namespace moho
           const float antiSurface = entry.sourceBlueprint->Defense.SurfaceThreatLevel * strength;
           const float antiSub = entry.sourceBlueprint->Defense.SubThreatLevel * strength;
           const float economy = entry.sourceBlueprint->Defense.EconomyThreatLevel * strength;
-          const float total = antiAir + antiSurface + antiSub + economy;
+          // 0x0071672F..0x00716741: summed economy first, then sub, surface, air.
+          const float total = ((economy + antiSub) + antiSurface) + antiAir;
           armyThreat.overallInfluence += total;
 
           if (!entry.sourceBlueprint->IsMobile()) {
@@ -2313,10 +2329,13 @@ namespace moho
               armyThreat.influenceStructuresNotMex += total;
             }
           } else {
+            // 0x00716776..0x00716793: a flier lands in the +0x14 lane and a
+            // land-layer unit in the +0x10 lane -- the opposite of the names
+            // `SThreat` gives those two words. Kept as the binary has it.
             if (entry.sourceBlueprint->Air.CanFly != 0u) {
-              armyThreat.airInfluence += total;
-            } else if (entry.sourceLayer == LAYER_Land) {
               armyThreat.landInfluence += total;
+            } else if (entry.sourceLayer == LAYER_Land) {
+              armyThreat.airInfluence += total;
             } else if (entry.sourceLayer == LAYER_Water || entry.sourceLayer == LAYER_Seabed || entry.sourceLayer == LAYER_Sub) {
               armyThreat.navalInfluence += total;
             }

@@ -287,16 +287,18 @@ namespace moho
      *
      * What it does:
      * Applies one world-space impulse into body linear velocity using inverse
-     * mass scaling; zero-mass lanes use `FLT_MAX` scaling to match binary.
+     * mass scaling. A zero mass does not scale the impulse by `FLT_MAX`: the
+     * inlined `VecScaleByReciprocalOrSetMax` (0x006B701A) replaces all three
+     * lanes with `FLT_MAX`, and those are what get added to the velocity.
      */
     void ApplyImpulseToBodyVelocity(SPhysBody& body, const Wm3::Vector3f& impulse) noexcept
     {
-      const float inverseMass =
-        (body.mMass == 0.0f) ? std::numeric_limits<float>::max() : (1.0f / body.mMass);
+      Wm3::Vector3f velocityDelta = impulse;
+      (void)VecScaleByReciprocalOrSetMax(&velocityDelta, body.mMass);
 
-      body.mVelocity.x += impulse.x * inverseMass;
-      body.mVelocity.y += impulse.y * inverseMass;
-      body.mVelocity.z += impulse.z * inverseMass;
+      body.mVelocity.x += velocityDelta.x;
+      body.mVelocity.y += velocityDelta.y;
+      body.mVelocity.z += velocityDelta.z;
     }
 
     [[nodiscard]] float ClampBallisticAngularRange(const float inverseInertiaAxis) noexcept
@@ -304,7 +306,9 @@ namespace moho
       constexpr float kBallisticAngularRangeScale = 0.2f;
       constexpr float kBallisticAngularRangeMax = 2.0f;
       const float range = inverseInertiaAxis * kBallisticAngularRangeScale;
-      return (range <= kBallisticAngularRangeMax) ? range : kBallisticAngularRangeMax;
+      // 0x006B8C65/0x006B8C81/0x006B8C9D: `comiss range, 2.0; jbe keep` -- a
+      // NaN range is kept, not replaced by the cap.
+      return (range > kBallisticAngularRangeMax) ? kBallisticAngularRangeMax : range;
     }
 
     /**
@@ -410,7 +414,9 @@ namespace moho
 
       const float alignment =
         (params.mForwardXZ.y * targetZ) + (params.mForwardXZ.x * targetX);
-      return alignment >= kCommonMoveHeadingAlignedDot;
+      // 0x006C2568 `comiss 0.9999, dot / jbe skip`: only a dot strictly below
+      // the threshold turns, so an unordered (NaN) dot counts as aligned.
+      return !(kCommonMoveHeadingAlignedDot > alignment);
     }
 
     [[nodiscard]] bool RotateCommonMoveTransformTowardDestination(
@@ -1144,8 +1150,10 @@ namespace moho
     } else if (mAlwaysUseTopSpeed == 0u) {
       mTargetPosition = unit->GetPosition();
     } else {
+      // 0x006B84D7 calls NormalizeVectorInto (0x0044F7E0), which only zeroes
+      // a zero-length velocity -- not Wm3's 1e-6 tolerance.
       Wm3::Vector3f normalizedVelocity{};
-      Wm3::Vector3f::NormalizeInto(mVelocity, &normalizedVelocity);
+      (void)NormalizeVectorInto(&normalizedVelocity, mVelocity);
       mTargetPosition = unit->GetPosition() + (normalizedVelocity * kStopLookAheadDistance);
     }
 
@@ -1922,10 +1930,12 @@ namespace moho
     // acceleration lane scaled by how much bank the blueprint asks for per
     // unit of thrust; the y lane is deliberately driven to zero, so a hovering
     // hull pitches and rolls but never bobs from this term.
+    // The y lane is not a literal zero: 0x006C2C55 forms it as
+    // `bankPerAcceleration * 0.0f`, which keeps its sign (and a NaN).
     const float bankPerAcceleration = physics.BankingSlope / physics.MaxAcceleration;
     const Wm3::Vec3f bankTarget{
       mVector44.x * kHoverTiltLeadTicks * bankPerAcceleration,
-      0.0f,
+      bankPerAcceleration * 0.0f,
       mVector44.z * kHoverTiltLeadTicks * bankPerAcceleration
     };
     mBodyTiltOffset.x = (mBodyTiltOffset.x * kHoverTiltRetain) + (bankTarget.x * kHoverTiltBlend);
@@ -2564,8 +2574,12 @@ namespace moho
     }
 
     const float minDiveSpeed = baseDiveSpeed * kDiveSpeedMinFactor;
-    const float curveDiveSpeed = msvc8::sin(depthPhase * kPi) * baseDiveSpeed;
-    mDivingSpeed = std::max(minDiveSpeed, curveDiveSpeed);
+    // 0x006C336C..0x006C3380: `fld phase; fmul pi; fsin; fmul base; fst` --
+    // the sine is never stored, so only the product rounds to float.
+    const float curveDiveSpeed = msvc8::SinTimes(depthPhase * kPi, baseDiveSpeed);
+    // 0x006C3384..0x006C338F: `comiss min, curve; ja` keeps the minimum only
+    // when it is strictly greater, so a NaN curve speed is taken.
+    mDivingSpeed = (minDiveSpeed > curveDiveSpeed) ? minDiveSpeed : curveDiveSpeed;
 
     if (movingUp) {
       float newSubElevation = mSubElevation + mDivingSpeed;
@@ -2627,7 +2641,9 @@ namespace moho
       waterSurface += physics.LayerChangeOffsetHeight;
     }
 
-    if (groundElevation <= waterSurface) {
+    // 0x006C36AF: `comiss ground, water; jbe under-water`, so an unordered
+    // (NaN) elevation takes the under-water path.
+    if (!(groundElevation > waterSurface)) {
       // Now under water. Only a land unit needs reclassifying.
       if (waterSurface > groundElevation && currentLayer == LAYER_Land) {
         if (motionType == RULEUMT_Amphibious || motionType == RULEUMT_Land) {
@@ -3086,10 +3102,11 @@ namespace moho
       outForce.z = referenceVector.z * limitedSpeed;
 
       if (combatState <= kAirCombatStateNormalTurn) {
+        // 0x006BD998..0x006BD9AC sums the dot as (y + z) + x.
         const float alignment =
-          (primaryVector.x * referenceVector.x) +
-          (primaryVector.y * referenceVector.y) +
-          (primaryVector.z * referenceVector.z);
+          ((primaryVector.y * referenceVector.y) +
+           (primaryVector.z * referenceVector.z)) +
+          (primaryVector.x * referenceVector.x);
 
         float forceScale = 0.5f;
         if (alignment > 0.5f) {
@@ -3166,13 +3183,17 @@ namespace moho
     // and then halved (flt_E4F724), so this is the half-angle of a ten-times
     // exaggerated yaw. 0x006BDBE3 stores cos into lane 0 and 0x006BDBF6 stores
     // sin into lane 2, with lanes 1 and 3 zeroed at 0x006BDC06/0x006BDC0C --
-    // the same {w, 0, y, 0} shape as `quat_45deg2`.
+    // the same {w, 0, y, 0} shape as `quat_45deg2`. The "zero" lanes are not
+    // literals: 0x006BDBE7 forms them as `sin * 0.0f`, so they carry the sign
+    // of the sine (-0.0f for a turn to the other side).
     const float halfTurnAngle = (turnDelta * 10.0f) * 0.5f;
+    const float sinHalfTurn = msvc8::sin(halfTurnAngle);
+    const float signedZeroLane = sinHalfTurn * 0.0f;
     const Wm3::Quaternionf turnQuaternion{
       msvc8::cos(halfTurnAngle),
-      0.0f,
-      msvc8::sin(halfTurnAngle),
-      0.0f,
+      signedZeroLane,
+      sinHalfTurn,
+      signedZeroLane,
     };
 
     // 0x006BDBFA/0x006BDC02 hand the rotate `[esp+0x2c]` and the fresh turn
@@ -3225,7 +3246,11 @@ namespace moho
     const float elevationScale =
       unit->IsUnitState(UNITSTATE_MovingDown) ? (mCurElevation / physics.Elevation) : 1.0f;
     const float wingOrientationBias = ((elevationScale * wingBlend) * bankFactor) * turnScale * turnSign;
-    const float wingProjectionScale = rotatedSelectedVector.y * turnScale;
+    // 0x006BDD34..0x006BDD4E: the vertical component is taken as a dot with
+    // world up, folded to `(z + x) * 0 + y` -- not a bare `.y` read.
+    const float rotatedUpComponent =
+      ((rotatedSelectedVector.z + rotatedSelectedVector.x) * 0.0f) + rotatedSelectedVector.y;
+    const float wingProjectionScale = rotatedUpComponent * turnScale;
 
     const Wm3::Vector3f wingProjection{
       selectedPlanarVector.x * wingProjectionScale,
@@ -3295,10 +3320,13 @@ namespace moho
       mUnknownFloat94 = randomStream.FRand(-maxElevationOffset, maxElevationOffset);
       mUnknownFloat98 = randomStream.FRand(air.CirclingRadiusChangeMinRatio, air.CirclingRadiusChangeMaxRatio);
 
+      // 0x006BE02F..0x006BE08F: `(freq * 2) * 10` and `freq * 10`, each
+      // through the frndint + `cmovb -1` floor lane (FloorSecondsToTicks's
+      // shape), not round-half-away.
       const auto maxChangeTicks =
-        static_cast<std::int32_t>(std::lround(air.CirclingFlightChangeFrequency * 2.0f * 10.0f));
+        static_cast<std::int32_t>(FloorSecondsToTicks(air.CirclingFlightChangeFrequency * 2.0f));
       const auto minChangeTicks =
-        static_cast<std::int32_t>(std::lround(air.CirclingFlightChangeFrequency * 10.0f));
+        static_cast<std::int32_t>(FloorSecondsToTicks(air.CirclingFlightChangeFrequency));
       mCombatStateTimeoutTick = curTick + minChangeTicks
         + static_cast<std::int32_t>(ScaleRandomUInt32ToRange(
             static_cast<std::uint32_t>(maxChangeTicks - minChangeTicks), randomStream));
@@ -3638,8 +3666,9 @@ namespace moho
     Wm3::Vector3f horzTargetDirNorm{};
     bool isHeadingAlignedWithTarget = false;
     if (!skipDecision) {
+      // 0x006BD06F: NormalizeVectorInto (0x0044F7E0), zero only at length 0.
       const Wm3::Vector3f horzTargetDirDenorm{targetDirNorm.x, 0.0f, targetDirNorm.z};
-      Wm3::Vector3f::NormalizeInto(horzTargetDirDenorm, &horzTargetDirNorm);
+      (void)NormalizeVectorInto(&horzTargetDirNorm, horzTargetDirDenorm);
 
       const float horzHeadingDot = (horzTargetDirNorm.x * currentHeading.x) + (horzTargetDirNorm.z * currentHeading.z)
         + (horzTargetDirNorm.y * currentHeading.y);
@@ -3836,9 +3865,13 @@ namespace moho
     // Horizontal (Y=0) forward heading extracted from the incoming
     // orientation - used both as the phase-1 fallback formation vector and
     // as the "current heading" reference for combat tactics / turn events.
+    //
+    // 0x006BEED6..0x006BEF6F normalizes it inline with a `len > 0` test
+    // (`fldz` / `fcomip`), the NormalizeVectorInto (0x0044F7E0) shape -- not
+    // Wm3's 1e-6 tolerance, which would zero a nearly vertical nose.
     Wm3::Vector3f headingVector = VAxes3(outTransform.orient_).vZ;
     headingVector.y = 0.0f;
-    Wm3::Vector3f::Normalize(&headingVector);
+    (void)NormalizeVectorInto(&headingVector, headingVector);
 
     // 0x006BEF75..0x006BEFC5: the planar length of the entity's per-tick
     // velocity, taken before anything moves this tick. It is what the
@@ -3950,8 +3983,9 @@ namespace moho
           mFormationVec = fallbackVector;
         } else if (mFormationVec != Wm3::Vector3f::ZERO) {
           // 0x006BF6ED normalizes into a scratch (esi) from the member (edi);
-          // `mFormationVec` itself is left alone.
-          Wm3::Vector3f::NormalizeInto(mFormationVec, &fallbackVector);
+          // `mFormationVec` itself is left alone. The callee is
+          // NormalizeVectorInto (0x0044F7E0): zero only at length 0.
+          (void)NormalizeVectorInto(&fallbackVector, mFormationVec);
         } else {
           fallbackVector = headingVector;
         }
@@ -4125,7 +4159,13 @@ namespace moho
       // aircraft already pointed where it wanted to: `selectedVector` came back
       // as the current heading, `vZ` with it, the turn delta collapsed to zero,
       // and nothing ever asked the airframe to rotate.
-      const Wm3::Vector3f desiredVelocityNorm = Wm3::Vector3f::NormalizeOrZero(desiredVelocity);
+      //
+      // 0x006BFE03 forms the normalization with NormalizeVectorInto
+      // (0x0044F7E0), which normalizes any non-zero length. Wm3's
+      // `NormalizeOrZero` zeroed everything up to |v| = 0.001, so a flier
+      // settled almost on its goal steered with no primary direction at all.
+      Wm3::Vector3f desiredVelocityNorm{};
+      (void)NormalizeVectorInto(&desiredVelocityNorm, desiredVelocity);
       ComputeAirControl(
         *physBody, fallbackVector, desiredVelocity, desiredVelocityNorm, headingVector, &control, combatTarget
       );
@@ -4149,8 +4189,9 @@ namespace moho
       // reported "SharpTurn" for an aircraft flying straight at its goal and
       // "Straight" for one pointing away from it.
       if (horizontalDistance > air.StartTurnDistance) {
+        // 0x006BFE5E: NormalizeVectorInto (0x0044F7E0), zero only at length 0.
         Wm3::Vector3f flatDesired{desiredVelocity.x, 0.0f, desiredVelocity.z};
-        Wm3::Vector3f::Normalize(&flatDesired);
+        (void)NormalizeVectorInto(&flatDesired, flatDesired);
         if (Wm3::Vector3f::LengthSq(headingVector) > 0.000001f && Wm3::Vector3f::LengthSq(flatDesired) > 0.000001f) {
           const float turnDot = (headingVector.x * flatDesired.x) + (headingVector.z * flatDesired.z) + (headingVector.y * flatDesired.y);
           if (turnDot < 0.5f) {
@@ -4224,8 +4265,12 @@ namespace moho
       // 0x006BF389 inlines `CRandomStream::FRand(-h, h)` (0x0051B5C0) once
       // per axis, x first.
       CRandomStream& randomStream = *sim->mRngState;
+      // 0x006BF23E..0x006BF2A7 (z, y, x): `comiss v, 4.0; jbe keep` then
+      // `comiss t, 0.25; jbe floor` -- a NaN inverse inertia passes the cap
+      // and is then floored to 0.25.
       const auto clampAxis = [](const float invInertia) {
-        return std::clamp(std::min(invInertia, 4.0f), 0.25f, 4.0f);
+        const float capped = (invInertia > 4.0f) ? 4.0f : invInertia;
+        return (capped > 0.25f) ? capped : 0.25f;
       };
       const float halfRangeX = clampAxis(physBody->mInvInertiaTensor.x);
       const float halfRangeY = clampAxis(physBody->mInvInertiaTensor.y);
@@ -4588,7 +4633,9 @@ namespace moho
     snapped.pos_.y = snappedElevation;
 
     if (mSubElevation < 0.0f) {
-      const float clampedElevation = (snappedElevation <= waterElevation) ? snappedElevation : waterElevation;
+      // 0x006C1DC6: `comiss snapped, water; jbe keep-snapped` -- NaN keeps
+      // the snapped elevation.
+      const float clampedElevation = (snappedElevation > waterElevation) ? waterElevation : snappedElevation;
       snapped.pos_.y = clampedElevation;
       mSubElevation = clampedElevation - waterElevation;
     }
@@ -4667,12 +4714,16 @@ namespace moho
       const float centerElevation =
         heightField ? heightField->GetElevation(snapped.pos_.x, snapped.pos_.z) : snapped.pos_.y;
 
+      // 0x006C1B69..0x006C1BC2: every pick is `comiss a, b` + `ja`/`jbe`,
+      // which on a tie or NaN keeps the operand std::min/std::max return
+      // for their FIRST argument -- hence the argument order below. The
+      // final min keeps the centre sample, the final max the corner max.
       float minElevation = std::min(backRight.y, backLeft.y);
       minElevation = std::min(minElevation, std::min(frontLeft.y, frontRight.y));
-      minElevation = std::min(minElevation, centerElevation);
+      minElevation = std::min(centerElevation, minElevation);
 
-      float maxElevation = std::max(backRight.y, backLeft.y);
-      maxElevation = std::max(maxElevation, std::max(frontLeft.y, frontRight.y));
+      float maxElevation = std::max(backLeft.y, backRight.y);
+      maxElevation = std::max(std::max(frontRight.y, frontLeft.y), maxElevation);
       maxElevation = std::max(maxElevation, centerElevation);
 
       snapped.pos_.y -= (maxElevation - minElevation) * 0.25f;

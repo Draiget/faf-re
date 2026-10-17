@@ -716,25 +716,25 @@ namespace moho
    *
    * IDA signature:
    * float *__usercall sub_4EB830@<eax>(
-   *   float *currentOrientation@<ebx>, float *outOrientation@<edi>,
-   *   float *targetOrientation, float turnStepRadians, char *outNoStep);
+   *   float *goalOrientation@<ebx>, float *outOrientation@<edi>,
+   *   float *currentOrientation, float turnStepRadians, char *outNoStep);
    *
    * What it does:
    * Computes the relative
-   *   `delta = currentOrientation * conjugate(targetOrientation)`,
+   *   `delta = goalOrientation * conjugate(currentOrientation)`,
    * clamps `delta` to a maximum half-rotation of `turnStepRadians` via
    * `RotateQuatByAngle`, and writes
-   *   `outOrientation = targetOrientation * clampedDelta`.
+   *   `outOrientation = currentOrientation * clampedDelta`.
    * If `RotateQuatByAngle` rejects the input (half-angle exceeds pi/2 or the
-   * axis lanes are too short to scale), copies `currentOrientation` into
+   * axis lanes are too short to scale), copies `goalOrientation` into
    * `outOrientation` and sets `*outNoStep = true`; otherwise sets
    * `*outNoStep = false`. Reproduces the binary's `[w,x,y,z]` Hamilton-product
    * lane order exactly. Shared by `CSlaveManipulator::ManipulatorUpdate` and
    * `CThrustManipulator::MoveManipulator` for max-rate-limited reorientation.
    */
   Wm3::Quaternionf* BlendOrientationDeltaByMaxAngle(
+    const Wm3::Quaternionf& goalOrientation,
     const Wm3::Quaternionf& currentOrientation,
-    const Wm3::Quaternionf& targetOrientation,
     const float turnStepRadians,
     bool* const outNoStep,
     Wm3::Quaternionf* const outOrientation
@@ -747,8 +747,8 @@ namespace moho
     // Scalar-first lanes, as stored: [0]=w, [1]=x, [2]=y, [3]=z
     // (0x004EB83F..0x004EB885 read `current` at ebx+0..0xC and `target` at
     // ebp+0..0xC; the conjugate keeps lane 0 and forms lanes 1-3 as `-0.0 - t`).
-    const Wm3::Quaternionf& c = currentOrientation;
-    const Wm3::Quaternionf& t = targetOrientation;
+    const Wm3::Quaternionf& c = goalOrientation;
+    const Wm3::Quaternionf& t = currentOrientation;
     const float tcx = -t.x;
     const float tcy = -t.y;
     const float tcz = -t.z;
@@ -761,8 +761,8 @@ namespace moho
     delta.z = ((c.z * t.w + c.y * tcx) + c.w * tcz) - c.x * tcy;
 
     if (!moho::RotateQuatByAngle(&delta, turnStepRadians)) {
-      // 0x004EBA55: clamp rejected - keep the current orientation.
-      *outOrientation = currentOrientation;
+      // 0x004EBA55: clamp rejected - snap to the goal orientation.
+      *outOrientation = goalOrientation;
       if (outNoStep != nullptr) {
         *outNoStep = true;
       }

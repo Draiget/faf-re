@@ -12,6 +12,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/math/X87Math.h"
 #include "lua/LuaPrimitives.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/EAiTargetType.h"
@@ -544,18 +545,15 @@ int moho::cfunc_LUnitMoveL(LuaPlus::LuaState* const state)
   const SFootprint& footprint = task->mUnit->GetFootprint();
   const Wm3::Vec3f targetPos = target.GetTargetPosGun(false);
 
-  // Binary writes the low 16 bits of the float-truncation as a `word`, then
-  // sign-extends it back to 32-bit when the Rect2i field is read. Preserve
-  // that exact truncation so out-of-range targets fold the same way as in
-  // the shipped engine.
+  // 0x00623822/0x00623847: each `pos - size * 0.5` is stored as a float and
+  // converted with a bare x87 `fld`/`fistp` (round to nearest, ties to even
+  // -- not `__ftol` truncation). The low 16 bits are then written as a `word`
+  // and sign-extended back when the Rect2i field is read, so out-of-range
+  // targets fold the same way as in the shipped engine.
   const float halfFootprintX = static_cast<float>(footprint.mSizeX) * 0.5f;
   const float halfFootprintZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
-  const int originX = static_cast<int>(
-    static_cast<std::int16_t>(static_cast<int>(targetPos.x - halfFootprintX))
-  );
-  const int originZ = static_cast<int>(
-    static_cast<std::int16_t>(static_cast<int>(targetPos.z - halfFootprintZ))
-  );
+  const int originX = static_cast<int>(static_cast<std::int16_t>(msvc8::RoundToInt(targetPos.x - halfFootprintX)));
+  const int originZ = static_cast<int>(static_cast<std::int16_t>(msvc8::RoundToInt(targetPos.z - halfFootprintZ)));
 
   SNavGoal goal{};
   goal.mPos1 = gpg::Rect2i{originX, originZ, originX + 1, originZ + 1};
@@ -631,10 +629,12 @@ namespace
         return moho::COORDS_ToGridRect(out, centerXZ, entity->GetFootprint());
       }
     } else if (target->targetType == moho::EAiTargetType::AITARGET_Ground) {
-      // Binary stores each corner as a word (int16), then sign-extends on read;
-      // preserve that truncation so out-of-range ground targets fold the same.
-      const auto originX = static_cast<std::int16_t>(static_cast<int>(target->position.x - 0.5f));
-      const auto originZ = static_cast<std::int16_t>(static_cast<int>(target->position.z - 0.5f));
+      // 0x005E2C35/0x005E2C4B: each `pos - 0.5` is converted with a bare x87
+      // `fld`/`fistp` (round to nearest, ties to even -- not `__ftol`
+      // truncation), then read back through `movsx word` so out-of-range
+      // ground targets fold to int16 the same way.
+      const auto originX = static_cast<std::int16_t>(msvc8::RoundToInt(target->position.x - 0.5f));
+      const auto originZ = static_cast<std::int16_t>(msvc8::RoundToInt(target->position.z - 0.5f));
       out->x0 = originX;
       out->z0 = originZ;
       out->x1 = originX + 1;

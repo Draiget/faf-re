@@ -119,7 +119,10 @@ namespace
 
   void UpdateMotionPathPointers(CAiSteeringImpl& steering)
   {
-    if (!steering.mUnitMotion) {
+    // 0x005D2F7B..0x005D2F83: without a path the inlined block is skipped
+    // outright, so whatever spline lanes the motion already holds are left
+    // in place rather than cleared.
+    if (!steering.mUnitMotion || !steering.mPath) {
       return;
     }
 
@@ -1331,7 +1334,9 @@ Wm3::Vector3f CAiSteeringImpl::TrySnapPosToWaypoint(
 void CAiSteeringImpl::Stop()
 {
   if (mPath) {
-    const bool hadRemaining = mPath->mCurrentNodeIndex < mPath->mNodeCount;
+    // 0x005D35F4..0x005D3614 measures "remaining" against the node storage
+    // size, `(end - begin) / sizeof(CPathPoint)`, not `mNodeCount`.
+    const bool hadRemaining = mPath->mCurrentNodeIndex < mPath->nodes.size();
     delete mPath;
     mPath = nullptr;
 
@@ -1524,8 +1529,9 @@ bool CAiSteeringImpl::ProcessSplineMovement()
       case COLLISIONTYPE_3:
         NotifyNavigatorPathRefresh(mOwnerUnit);
         break;
+      // The jump table at 0x005D2FEC covers types 0..4 only; anything above 4
+      // takes `ja 0x005D2F7B` and does nothing here.
       case COLLISIONTYPE_4:
-      case COLLISIONTYPE_5:
         UpdatePath(4, mDestination, true);
         break;
       default:

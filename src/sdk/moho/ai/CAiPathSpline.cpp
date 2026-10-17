@@ -95,14 +95,17 @@ SteeringParams::SteeringParams(
   const float speedMult = attributes.moveSpeedMult;
   const float accMult = attributes.accelerationMult;
 
+  // 0x006991DF / 0x0069920B: `comiss speedLimit, cap; ja keep-cap` -- the
+  // limit replaces the cap unless it is (ordered) greater, so a NaN limit
+  // wins, as it does in retail.
   float maxSpeed = physics.MaxSpeed;
-  if (speedLimit <= maxSpeed) {
+  if (!(speedLimit > maxSpeed)) {
     maxSpeed = speedLimit;
   }
   mMaxSpeed = (maxSpeed * speedMult) * kSpeedScalePerTick;
 
   float maxReverseSpeed = physics.MaxSpeedReverse;
-  if (speedLimit <= maxReverseSpeed) {
+  if (!(speedLimit > maxReverseSpeed)) {
     maxReverseSpeed = speedLimit;
   }
   mMaxReverseSpeed = (maxReverseSpeed * speedMult) * kSpeedScalePerTick;

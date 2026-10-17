@@ -266,8 +266,11 @@ namespace moho
       }
     }
 
+    // 0x0064A820..0x0064A829: the only early-out is `IsDead` (Unit vtable
+    // +0x28, the same slot CAimManipulator's 0x00630E42 tests), not
+    // `IsBeingBuilt` (+0x34).
     Unit* const unit = mUnit.GetObjectPtr();
-    if (unit == nullptr || unit->IsBeingBuilt()) {
+    if (unit == nullptr || unit->IsDead()) {
       return false;
     }
 
@@ -310,10 +313,15 @@ namespace moho
     // lowers to `mCapMax` as two independent comparisons per lane
     // (0x0064AA2F and 0x0064AA74 for x), which keeps defined behaviour if a
     // Lua caller ever passes an inverted pair. `std::clamp` with `lo > hi` is
-    // undefined.
-    localDesired.x = std::min(mCapMax.x, std::max(mCapMin.x, localDesired.x));
-    localDesired.y = std::min(mCapMax.y, std::max(mCapMin.y, localDesired.y));
-    localDesired.z = std::min(mCapMax.z, std::max(mCapMin.z, localDesired.z));
+    // undefined. Not `std::max` either: the raise is `min > v ? min : v`, so a
+    // NaN or a `-0` lane equal to a `+0` cap keeps its own value.
+    const auto capLane = [](const float value, const float capMin, const float capMax) noexcept {
+      const float raised = (capMin > value) ? capMin : value;
+      return (capMax > raised) ? raised : capMax;
+    };
+    localDesired.x = capLane(localDesired.x, mCapMin.x, mCapMax.x);
+    localDesired.y = capLane(localDesired.y, mCapMin.y, mCapMax.y);
+    localDesired.z = capLane(localDesired.z, mCapMin.z, mCapMax.z);
     (void)Wm3::Vector3f::Normalize(&localDesired);
 
     // TEMPORARY PROBE -- thrust-nozzle triage, stage 2: the aim lanes after
@@ -352,7 +360,12 @@ namespace moho
     (void)BuildTiltShortestArcDelta(localDesired, &targetOrientation, mRestDirection);
 
     Wm3::Quaternionf blendedOrientation{};
-    (void)BlendOrientationDeltaByMaxAngle(mOrientation, targetOrientation, mTurnSpeed, nullptr, &blendedOrientation);
+    // 0x0064AAD8..0x0064AAF4: the freshly built tilt goes in `ebx` (the
+    // helper's first operand) and `&mOrientation` is the stack operand, so the
+    // step is `mOrientation * clamp(goal * conj(mOrientation))`, and a rejected
+    // clamp snaps to the goal rather than freezing at `mOrientation`.
+    bool noStep = false;
+    (void)BlendOrientationDeltaByMaxAngle(targetOrientation, mOrientation, mTurnSpeed, &noStep, &blendedOrientation);
 
     watchedBone->Rotate(blendedOrientation);
     mOrientation = blendedOrientation;

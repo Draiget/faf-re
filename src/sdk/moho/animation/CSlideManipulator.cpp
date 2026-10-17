@@ -174,11 +174,15 @@ namespace
       manipulator.mGoal.y - manipulator.mCurrentPosition.y,
       manipulator.mGoal.z - manipulator.mCurrentPosition.z
     };
-    const float remainingDistance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+    // 0x00647281..0x0064729B sums the squares as (x^2 + z^2) + y^2.
+    const float remainingDistance = std::sqrt(((delta.x * delta.x) + (delta.z * delta.z)) + (delta.y * delta.y));
 
+    // 0x006472D3 `comiss decelRate, 0; jbe`: only an ordered positive rate
+    // computes a braking distance.
     const float decelRate = manipulator.mDeceleration * 10.0f;
-    const float brakingDistance =
-      decelRate <= 0.0f ? 0.0f : ((manipulator.mCurrentSpeed * 10.0f) * (manipulator.mCurrentSpeed * 10.0f)) / (decelRate * 2.0f);
+    const float brakingDistance = (decelRate > 0.0f)
+      ? ((manipulator.mCurrentSpeed * 10.0f) * (manipulator.mCurrentSpeed * 10.0f)) / (decelRate * 2.0f)
+      : 0.0f;
     return brakingDistance > remainingDistance;
   }
 
@@ -360,7 +364,8 @@ namespace
     const float requestedSpeed
   ) noexcept
   {
-    if (requestedSpeed <= 0.0f) {
+    // 0x006475C3 `comiss speed, 0; jbe`: NaN takes the disabled lane too.
+    if (!(requestedSpeed > 0.0f)) {
       manipulator->mSpeed = -1.0f;
       manipulator->mCurrentSpeed = 0.0f;
       return manipulator;
@@ -549,26 +554,19 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
     return false;
   }
 
+  // 0x00647370..0x006473B0: `max > v ? v : max`, then `0 > v ? 0 : v`, so an
+  // unordered speed lands on `max`.
+  const auto clampStepSpeed = [](const float speed, const float maxSpeed) noexcept {
+    const float capped = (maxSpeed > speed) ? speed : maxSpeed;
+    return (0.0f > capped) ? 0.0f : capped;
+  };
+
   const float maxSpeed = mSpeed;
   if (maxSpeed > 0.0f) {
     if (mDeceleration > 0.0f && ShouldDecelerateBeforeGoal(*this)) {
-      float nextSpeed = mCurrentSpeed - (mDeceleration * kSlideRateScale);
-      if (nextSpeed > maxSpeed) {
-        nextSpeed = maxSpeed;
-      }
-      if (nextSpeed < 0.0f) {
-        nextSpeed = 0.0f;
-      }
-      mCurrentSpeed = nextSpeed;
+      mCurrentSpeed = clampStepSpeed(mCurrentSpeed - (mDeceleration * kSlideRateScale), maxSpeed);
     } else if (mAcceleration > 0.0f) {
-      float nextSpeed = mCurrentSpeed + (mAcceleration * kSlideRateScale);
-      if (nextSpeed > maxSpeed) {
-        nextSpeed = maxSpeed;
-      }
-      if (nextSpeed < 0.0f) {
-        nextSpeed = 0.0f;
-      }
-      mCurrentSpeed = nextSpeed;
+      mCurrentSpeed = clampStepSpeed((mAcceleration * kSlideRateScale) + mCurrentSpeed, maxSpeed);
     } else {
       mCurrentSpeed = maxSpeed;
     }
@@ -601,7 +599,9 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
   watchedBone->mLocalTransform.pos_.x += rotatedOffset.x;
   watchedBone->mLocalTransform.pos_.y += rotatedOffset.y;
   watchedBone->mLocalTransform.pos_.z += rotatedOffset.z;
-  watchedBone->mCompositeDirty = 1;
+  // 0x006474F4..0x006474FA: `CAniPose::MarkBoneDirty` (0x0054B990), which also
+  // dirties every child bone below the slid one -- not just this bone's flag.
+  watchedBone->mPose->MarkBoneDirty(watchedBone->mIdx);
   if (mSpeed < 0.0f) {
     watchedBone->mSkipNextInterp = 1;
   }

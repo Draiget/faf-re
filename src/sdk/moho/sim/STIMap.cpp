@@ -2319,9 +2319,12 @@ namespace moho
    * returned vector is valid.
    */
   [[nodiscard]] Wm3::Vec3f
-  IntersectHeightFieldAndMarkTerrainHit(const CHeightField& field, const GeomLine3& line, CGeomHitResult* res)
+  IntersectHeightFieldAndMarkTerrainHit(const CHeightField& field, const GeomLine3& line, CColHitResult* res)
   {
     const Wm3::Vec3f hitPoint = field.Intersection(line, res);
+    if (res != nullptr && IsValidVector3f(hitPoint)) {
+      res->hitKind = 1;
+    }
     return hitPoint;
   }
 
@@ -2518,20 +2521,26 @@ namespace moho
     const float maxX = position.x + border;
     const float maxZ = position.z + border;
 
+    // Every test only rejects on an ordered compare (comiss/ja, fcomip/jae),
+    // and the last whole-map test accepts on `jb`, so NaN bounds count as
+    // inside (0x0062CA85..0x0062CAEC, 0x0062CB1D..0x0062CB4F).
     if (wholeMap) {
-      if (minX < 0.0f || minZ < 0.0f) {
+      if (0.0f > minX || 0.0f > minZ) {
         return false;
       }
 
       const float mapMaxX = static_cast<float>(field->width - 1);
       const float mapMaxZ = static_cast<float>(field->height - 1);
-      return maxX < mapMaxX && maxZ < mapMaxZ;
+      if (maxX >= mapMaxX) {
+        return false;
+      }
+      return !(maxZ >= mapMaxZ);
     }
 
-    return static_cast<float>(mPlayableRect.x0) <= minX &&
-           static_cast<float>(mPlayableRect.z0) <= minZ &&
-           maxX <= static_cast<float>(mPlayableRect.x1) &&
-           maxZ <= static_cast<float>(mPlayableRect.z1);
+    return !(static_cast<float>(mPlayableRect.x0) > minX) &&
+           !(static_cast<float>(mPlayableRect.z0) > minZ) &&
+           !(maxX > static_cast<float>(mPlayableRect.x1)) &&
+           !(maxZ > static_cast<float>(mPlayableRect.z1));
   }
 
   /**
@@ -2848,7 +2857,7 @@ namespace moho
         field->mGrids.begin() ? static_cast<std::int32_t>(field->mGrids.end() - field->mGrids.begin()) : 0;
       const Wm3::AxisAlignedBox3f terrainBounds = field->GetTierBox(0, 0, tierCount);
       const Wm3::Vec3f terrainHit =
-        IntersectHeightFieldAndMarkTerrainHit(*field, line, reinterpret_cast<CGeomHitResult*>(res));
+        IntersectHeightFieldAndMarkTerrainHit(*field, line, res);
 
       if (Wm3::Vec3f::IsntNaN(terrainHit) && terrainHit.y > terrainBounds.Min.y) {
         return terrainHit;
@@ -2876,7 +2885,7 @@ namespace moho
     }
 
     const Wm3::Vec3f terrainHit =
-      IntersectHeightFieldAndMarkTerrainHit(*field, line, reinterpret_cast<CGeomHitResult*>(res));
+      IntersectHeightFieldAndMarkTerrainHit(*field, line, res);
 
     if (terrainHit.y < mWaterElevation || !Wm3::Vec3f::IsntNaN(terrainHit)) {
       VecDist plane{};
@@ -3034,13 +3043,15 @@ namespace moho
       return (mWaterElevation > terrainElevation) ? mWaterElevation : terrainElevation;
     }
 
-    const int mapTierInput = std::min(field->height - 1, field->width - 1) - 1;
-    const int maxMapTier =
-      static_cast<int>(std::bit_width(static_cast<unsigned int>(std::max(mapTierInput, 0))));
+    // 0x0062D68D..0x0062D6DB: the smaller extent is picked with an unsigned
+    // compare, and each tier is `bsr + 1` with the destination preset to -1,
+    // i.e. the bit width of the raw 32-bit value (0 for 0, 32 for a negative).
+    const unsigned int mapTierInput =
+      std::min(static_cast<unsigned int>(field->height - 1), static_cast<unsigned int>(field->width - 1)) - 1u;
+    const int maxMapTier = static_cast<int>(std::bit_width(mapTierInput));
 
     const int lookaheadTierInput = static_cast<int>(std::lrintf(lookahead * 0.5f));
-    const int lookaheadTier =
-      static_cast<int>(std::bit_width(static_cast<unsigned int>(std::max(lookaheadTierInput, 0))));
+    const int lookaheadTier = static_cast<int>(std::bit_width(static_cast<unsigned int>(lookaheadTierInput)));
 
     int sampleTier = std::min(maxMapTier, lookaheadTier);
     if (sampleTier < 1) {

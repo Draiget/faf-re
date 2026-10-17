@@ -1835,11 +1835,6 @@ namespace
     return UpcastUnitFromRef(sourceRef);
   }
 
-  [[nodiscard]] Unit* ResolveUnitBridge(UserUnit* const userUnit) noexcept
-  {
-    return userUnit ? reinterpret_cast<Unit*>(static_cast<IUnit*>(userUnit)) : nullptr;
-  }
-
   /**
    * `Unit::ArmorMultipliers`'s red-black tree mechanics (lower-bound descent,
    * hinted/unique insert, node buy/link/rebalance, subtree teardown) are no
@@ -3639,8 +3634,8 @@ int moho::cfunc_GetIsPausedL(LuaPlus::LuaState* const state)
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
       const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-      Unit* const unit = ResolveUnitBridge(userUnit);
-      if (userUnit != nullptr && unit != nullptr && !unit->IsDead() && userUnit->mUnitVarDat.mIsPaused) {
+      // 0x008BAB2D: IUnit slot 10 (`IsDead`), then `mUnitVarDat.mIsPaused` at +0x1B0.
+      if (userUnit != nullptr && !userUnit->IsDead() && userUnit->mUnitVarDat.mIsPaused) {
         lua_pushboolean(rawState, 1);
         (void)lua_gettop(rawState);
         return 1;
@@ -3700,16 +3695,14 @@ int moho::cfunc_GetIsAutoModeL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitsObject(LuaPlus::LuaStackObject(state, 1));
   if (unitsObject.IsTable()) {
     const int unitCount = unitsObject.GetCount();
-    if (unitCount >= 1) {
-      for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
-        const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
-        UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-        Unit* const unit = ResolveUnitBridge(userUnit);
-        if (userUnit != nullptr && unit != nullptr && !unit->IsDead() && !userUnit->GetAutoMode()) {
-          lua_pushboolean(rawState, 0);
-          (void)lua_gettop(rawState);
-          return 1;
-        }
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
+      UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
+      // 0x008BACDD: IUnit slot 10 (`IsDead`), then primary slot 20 (`GetAutoMode`).
+      if (userUnit != nullptr && !userUnit->IsDead() && !userUnit->GetAutoMode()) {
+        lua_pushboolean(rawState, 0);
+        (void)lua_gettop(rawState);
+        return 1;
       }
     }
   }
@@ -3768,13 +3761,13 @@ int moho::cfunc_GetIsSubmergedL(LuaPlus::LuaState* const state)
 
   std::int32_t submergedState = 0;
   if (unitsObject.IsTable()) {
-    const int unitCount = unitsObject.GetCount();
-    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+    // The bound is re-read every iteration (`GetCount` again at 0x008BB0C5).
+    for (int unitIndex = 1; unitIndex <= unitsObject.GetCount(); ++unitIndex) {
       const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-      Unit* const unit = ResolveUnitBridge(userUnit);
-      const std::int32_t unitState =
-        (unit != nullptr && unit->mVarDat.mLayerMask == LAYER_Sub) ? static_cast<std::int32_t>(-1) : static_cast<std::int32_t>(1);
+      // 0x008BB09B: no null or death test; reads `mVariableData.mLayerMask`
+      // (+0xF0) directly and maps Sub -> -1, anything else -> 1.
+      const std::int32_t unitState = userUnit->mVariableData.mLayerMask != LAYER_Sub ? 1 : -1;
 
       if (unitIndex == 1) {
         submergedState = unitState;
@@ -3786,6 +3779,7 @@ int moho::cfunc_GetIsSubmergedL(LuaPlus::LuaState* const state)
   }
 
   lua_pushnumber(rawState, static_cast<float>(submergedState));
+  (void)lua_gettop(rawState);
   return 1;
 }
 
@@ -3836,16 +3830,14 @@ int moho::cfunc_GetIsAutoSurfaceModeL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitsObject(LuaPlus::LuaStackObject(state, 1));
   if (unitsObject.IsTable()) {
     const int unitCount = unitsObject.GetCount();
-    if (unitCount >= 1) {
-      for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
-        const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
-        UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-        Unit* const unit = ResolveUnitBridge(userUnit);
-        if (userUnit != nullptr && unit != nullptr && !unit->IsDead() && !userUnit->IsAutoSurfaceMode()) {
-          lua_pushboolean(rawState, 0);
-          (void)lua_gettop(rawState);
-          return 1;
-        }
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
+      UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
+      // 0x008BB25D: IUnit slot 10 (`IsDead`), then primary slot 21 (`IsAutoSurfaceMode`).
+      if (userUnit != nullptr && !userUnit->IsDead() && !userUnit->IsAutoSurfaceMode()) {
+        lua_pushboolean(rawState, 0);
+        (void)lua_gettop(rawState);
+        return 1;
       }
     }
   }
@@ -3878,25 +3870,20 @@ int moho::cfunc_SetFireStateL(LuaPlus::LuaState* const state)
   for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
     LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
     UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-    Unit* const unit = ResolveUnitBridge(userUnit);
-    if (unit == nullptr || unit->IsDead()) {
+    if (userUnit == nullptr || userUnit->IsDead()) {
       continue;
     }
 
+    // 0x008BBAEB: the driver is loaded without a null test.
+    ISTIDriver* const activeDriver = WLD_GetDriver();
     const LuaPlus::LuaStackObject fireStateArg(state, 2);
-    const char* fireStateValue = lua_tostring(rawState, 2);
+    const char* const fireStateValue = lua_tostring(rawState, 2);
     if (fireStateValue == nullptr) {
       fireStateArg.TypeError("string");
-      fireStateValue = "";
     }
 
-    if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
-      activeDriver->ProcessInfoPair(
-        unit->GetEntityId(),
-        kSetFireStateName,
-        fireStateValue
-      );
-    }
+    // 0x008BBB30: entity id straight from `mParams.mEntityId` (+0x44).
+    activeDriver->ProcessInfoPair(userUnit->mParams.mEntityId, kSetFireStateName, fireStateValue);
   }
 
   return 0;
@@ -3955,16 +3942,12 @@ int moho::cfunc_GetFireStateL(LuaPlus::LuaState* const state)
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
       LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-      if (!userUnit) {
+      if (userUnit == nullptr || userUnit->IsDead()) {
         continue;
       }
 
-      Unit* const unit = ResolveUnitBridge(userUnit);
-      if (!unit || unit->IsDead()) {
-        continue;
-      }
-
-      if ((unit->GetAttributes().commandCapsMask & static_cast<std::uint32_t>(RULEUCC_RetaliateToggle)) == 0u) {
+      // 0x008BB648: IUnit slot 16 (`GetAttributes`), `test byte [eax+60h], 20h`.
+      if ((userUnit->GetAttributes().commandCapsMask & static_cast<std::uint32_t>(RULEUCC_RetaliateToggle)) == 0u) {
         continue;
       }
 
@@ -3981,6 +3964,7 @@ int moho::cfunc_GetFireStateL(LuaPlus::LuaState* const state)
   }
 
   lua_pushnumber(rawState, static_cast<float>(fireState));
+  (void)lua_gettop(rawState);
   return 1;
 }
 
@@ -4069,23 +4053,23 @@ int moho::cfunc_ToggleFireStateL(LuaPlus::LuaState* const state)
   const std::int32_t currentFireState = static_cast<std::int32_t>(lua_tonumber(rawState, 2));
   EFireState nextFireState = static_cast<EFireState>((currentFireState + 1) % 3);
 
-  gpg::RRef nextFireStateRef{};
-  nextFireStateRef = gpg::MakeRRef<moho::EFireState>(&nextFireState);
-  const msvc8::string nextFireStateLexical = nextFireStateRef.GetLexical();
-
   if (unitsObject.IsTable()) {
     const int unitCount = unitsObject.GetCount();
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
       LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-      Unit* const unit = ResolveUnitBridge(userUnit);
-      if (unit == nullptr || unit->IsDead()) {
+      if (userUnit == nullptr || userUnit->IsDead()) {
         continue;
       }
 
-      if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
-        activeDriver->ProcessInfoPair(unit->GetEntityId(), kSetFireStateName, nextFireStateLexical.c_str());
-      }
+      // 0x008BB8A4..0x008BB916: per unit, the driver is loaded without a null
+      // test, the state's lexical name is rebuilt into a temporary, and the
+      // entity id comes straight from `mParams.mEntityId` (+0x44).
+      ISTIDriver* const activeDriver = WLD_GetDriver();
+      const gpg::RRef nextFireStateRef = gpg::MakeRRef<moho::EFireState>(&nextFireState);
+      activeDriver->ProcessInfoPair(
+        userUnit->mParams.mEntityId, kSetFireStateName, nextFireStateRef.GetLexical().c_str()
+      );
     }
   }
 
@@ -5310,18 +5294,23 @@ int moho::cfunc_GetScriptBitL(LuaPlus::LuaState* const state)
     for (int unitIndex = 1; unitIndex <= count; ++unitIndex) {
       LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
-      Unit* const unit = ResolveUnitBridge(userUnit);
-      if (unit == nullptr || unit->IsDead()) {
+      if (userUnit == nullptr || userUnit->IsDead()) {
         continue;
       }
 
+      // 0x008BBD4A: IUnit slot 16 (`GetAttributes`); `shl edx, cl` masks the
+      // count to five bits.
       const std::uint32_t toggleMask = 1u << (static_cast<std::uint32_t>(bitIndex) & 0x1Fu);
-      if ((unit->GetAttributes().toggleCapsMask & toggleMask) == 0u) {
+      if ((userUnit->GetAttributes().toggleCapsMask & toggleMask) == 0u) {
         continue;
       }
 
-      const std::uint32_t bitShift = static_cast<std::uint32_t>(bitIndex);
-      const std::int64_t scriptBits = static_cast<std::int64_t>(static_cast<std::int32_t>(unit->mUnitVarDat.mScriptbits));
+      // 0x008BBD63: `mUnitVarDat.mScriptbits` (+0x3A8) sign-extended (`cdq`)
+      // and tested against `__allshl(1, cl)`, which reads only the low byte
+      // of the count and yields 0 once it reaches 64.
+      const std::uint8_t bitShift = static_cast<std::uint8_t>(bitIndex);
+      const std::int64_t scriptBits =
+        static_cast<std::int64_t>(static_cast<std::int32_t>(userUnit->mUnitVarDat.mScriptbits));
       const std::int64_t scriptBitMask = bitShift < 64u ? static_cast<std::int64_t>(1ull << bitShift) : 0;
       if ((scriptBits & scriptBitMask) != 0) {
         hasBitSet = true;
@@ -7092,8 +7081,9 @@ int moho::cfunc_UnitSetProductionActiveL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitSetProductionActiveHelpText, 2, argumentCount);
   }
 
+  // 0x006C6381: the unit comes from the non-raising optional conversion.
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
-  Unit* const unit = SCR_FromLua_Unit(unitObject);
+  Unit* const unit = GetUnitOptional(unitObject);
 
   const LuaPlus::LuaStackObject activeArg(state, 2);
   const bool isActive = activeArg.GetBoolean();

@@ -373,7 +373,8 @@ namespace moho
 
     // 0x00636756..0x0063677C sums the squared lanes z, x, y.
     const float length = std::sqrt(((deltaZ * deltaZ) + (deltaX * deltaX)) + (deltaY * deltaY));
-    if (length <= 0.0f) {
+    // 0x0063679D `fcomip; jbe`: only an ordered positive length normalizes.
+    if (!(length > 0.0f)) {
       outDirection->x = 0.0f;
       outDirection->y = 0.0f;
       outDirection->z = 0.0f;
@@ -460,9 +461,12 @@ namespace moho
     float laneDelta = 0.0f;
     if (angleHalfArc < kClampAngleLimit) {
       float constrained = NormalizeAngleSignedRadians(desiredAngle - angleCenter);
-      if (constrained > angleHalfArc) {
+      // 0x00636393..0x006363A4: two independent clamps, `arc > x ? x : arc`
+      // then `-arc > x ? -arc : x`, so an unordered (NaN) angle takes `arc`.
+      if (!(angleHalfArc > constrained)) {
         constrained = angleHalfArc;
-      } else if (constrained < -angleHalfArc) {
+      }
+      if (-angleHalfArc > constrained) {
         constrained = -angleHalfArc;
       }
       laneDelta = (constrained + angleCenter) - currentAngle;
@@ -595,7 +599,9 @@ namespace moho
     }
 
     const Wm3::Vector3f aimTarget = unit->AiBuilder->BuilderGetAimTarget();
-    if (aimTarget.x != 0.0f || aimTarget.y != 0.0f || aimTarget.z != 0.0f) {
+    // 0x00636616..0x00636626: a 12-byte memcmp against `Vector3<float>::ZERO`
+    // (0x00F3D21C) -- Wm3 `operator==` -- so a `-0` lane counts as a target.
+    if (!(aimTarget == Wm3::Vector3f::ZERO)) {
       Wm3::Vector3f direction{};
       (void)ComputeDirectionToReferenceBone(&direction, aimTarget);
       mOnTarget = TrackAimDirection(direction, 0u, false);

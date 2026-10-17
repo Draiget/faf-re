@@ -9,6 +9,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Vector3f.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/math/Wm3Segment3FafExtras.h"
 #include "Wm3ContBox3.h"
@@ -165,7 +166,8 @@ namespace
     for (int axisIndex = 0; axisIndex < axisCount; ++axisIndex) {
       const Wm3::Vec3f axis = candidateAxes[axisIndex];
       const float axisLengthSq = Wm3::Vector3f::LengthSq(axis);
-      if (!(axisLengthSq >= kAxisLengthSqEpsilon)) {
+      // 0x00474EA0: `comiss eps, lengthSq; ja skip` -- an unordered compare is kept.
+      if (kAxisLengthSqEpsilon > axisLengthSq) {
         continue;
       }
 
@@ -385,8 +387,9 @@ namespace moho
       return false;
     }
 
+    // 0x004FF36E: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0.
     Wm3::Vec3f direction{};
-    Wm3::Vector3f::NormalizeInto(BuildBoxCenter(mShape) - intersection.GetPoint(0), &direction);
+    NormalizeVectorInto(&direction, BuildBoxCenter(mShape) - intersection.GetPoint(0));
     outResult->direction = direction;
     outResult->distanceFromLineStart =
       Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(intersection.GetPoint(0) - *lineStart));
@@ -426,14 +429,15 @@ namespace moho
   {
     Wm3::DistVector3Box3f distance(sphere->Center, mShape);
     const float squaredDistance = distance.GetSquared();
-    if (sphere->Radius * sphere->Radius <= squaredDistance) {
+    // 0x004FF1A3: `comiss r*r, squared; jbe miss` -- an unordered compare misses.
+    if (!(sphere->Radius * sphere->Radius > squaredDistance)) {
       return false;
     }
 
     const Wm3::Vec3f center = BuildBoxCenter(mShape);
     const Wm3::Vec3f sphereToBox = sphere->Center - center;
     Wm3::Vec3f direction{};
-    Wm3::Vector3f::NormalizeInto(sphereToBox, &direction);
+    NormalizeVectorInto(&direction, sphereToBox);
 
     outResult->direction = direction;
     outResult->penetrationDepth = sphere->Radius - Wm3::SqrtfBinary(squaredDistance);
@@ -576,8 +580,9 @@ namespace moho
       return false;
     }
 
+    // 0x004FEA75: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0.
     Wm3::Vec3f direction{};
-    Wm3::Vector3f::NormalizeInto(mShape.Center - intersection.GetPoint(0), &direction);
+    NormalizeVectorInto(&direction, mShape.Center - intersection.GetPoint(0));
     outResult->direction = direction;
     outResult->distanceFromLineStart =
       Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(intersection.GetPoint(0) - *lineStart));
@@ -608,7 +613,7 @@ namespace moho
     const Wm3::Vec3f boxCenter{box->Center[0], box->Center[1], box->Center[2]};
     const Wm3::Vec3f boxToSphere = boxCenter - mShape.Center;
     Wm3::Vec3f direction{};
-    Wm3::Vector3f::NormalizeInto(boxToSphere, &direction);
+    NormalizeVectorInto(&direction, boxToSphere);
     outResult->direction = direction;
 
     if (intersection.Find(gpg::pInf, Wm3::Vector3f::ZERO, Wm3::Vector3f::ZERO)) {
@@ -628,13 +633,15 @@ namespace moho
   {
     const Wm3::Vec3f delta = sphere->Center - mShape.Center;
     const float combinedRadius = sphere->Radius + mShape.Radius;
-    const float squaredDistance = Wm3::Vector3f::LengthSq(delta);
-    if (combinedRadius * combinedRadius <= squaredDistance) {
+    // 0x004FE7C9..0x004FE7EB: summed `z*z + x*x`, then `+ y*y`.
+    const float squaredDistance = (delta.z * delta.z + delta.x * delta.x) + delta.y * delta.y;
+    // 0x004FE807: `comiss r*r, squared; jbe miss` -- an unordered compare misses.
+    if (!(combinedRadius * combinedRadius > squaredDistance)) {
       return false;
     }
 
     Wm3::Vec3f direction{};
-    Wm3::Vector3f::NormalizeInto(delta, &direction);
+    NormalizeVectorInto(&direction, delta);
     outResult->direction = direction;
     outResult->penetrationDepth = combinedRadius - Wm3::SqrtfBinary(squaredDistance);
     return true;
@@ -649,7 +656,9 @@ namespace moho
   bool CColPrimitive<Wm3::Sphere3f>::PointInShape(const Wm3::Vec3f* point) const
   {
     const Wm3::Vec3f delta = *point - mShape.Center;
-    return mShape.Radius * mShape.Radius > Wm3::Vector3f::LengthSq(delta);
+    // 0x004FEB86..0x004FEB9F: summed `x*x + z*z`, then `+ y*y`.
+    const float squaredDistance = (delta.x * delta.x + delta.z * delta.z) + delta.y * delta.y;
+    return mShape.Radius * mShape.Radius > squaredDistance;
   }
 
   /**

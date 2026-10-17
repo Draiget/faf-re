@@ -58,10 +58,12 @@ namespace
     return owner->mBlipMap.equal_range(MakeReconProbeKey(GetSourceEntityId(sourceUnit)));
   }
 
+  // 0x005C05D5..0x005C0602: four `comiss`/`ja` rejections, so a coordinate
+  // that compares unordered (NaN) counts as inside.
   [[nodiscard]] bool IsInsideRectXZ(const moho::Rect2<int>& rect, const Wm3::Vec3f& pos) noexcept
   {
-    return pos.x >= static_cast<float>(rect.x0) && pos.x <= static_cast<float>(rect.x1) &&
-      pos.z >= static_cast<float>(rect.z0) && pos.z <= static_cast<float>(rect.z1);
+    return !(static_cast<float>(rect.x0) > pos.x) && !(pos.x > static_cast<float>(rect.x1)) &&
+      !(static_cast<float>(rect.z0) > pos.z) && !(pos.z > static_cast<float>(rect.z1));
   }
 
   [[nodiscard]] bool IsInsideRadiusXZ(const Wm3::Vec3f& center, const float radius, const Wm3::Vec3f& pos) noexcept
@@ -85,42 +87,6 @@ namespace
   [[nodiscard]] bool IsGridVisibleAtPoint(const CIntelGrid* const grid, const Wm3::Vec3f& pos)
   {
     return grid && grid->IsVisible(pos);
-  }
-
-  [[nodiscard]] bool IsWithinPlayableMapRadius(
-    const STIMap* const map,
-    const Wm3::Vec3f& pos,
-    const float radius,
-    const bool ignorePlayableRect
-  ) noexcept
-  {
-    if (!map) {
-      return true;
-    }
-
-    float minX = 0.0f;
-    float minZ = 0.0f;
-    float maxX = std::numeric_limits<float>::infinity();
-    float maxZ = std::numeric_limits<float>::infinity();
-
-    const CHeightField* const heightField = map->mHeightField.get();
-    if (heightField) {
-      maxX = static_cast<float>(heightField->width);
-      maxZ = static_cast<float>(heightField->height);
-    }
-
-    if (!ignorePlayableRect) {
-      minX = std::max(minX, static_cast<float>(map->mPlayableRect.x0));
-      minZ = std::max(minZ, static_cast<float>(map->mPlayableRect.z0));
-      maxX = std::min(maxX, static_cast<float>(map->mPlayableRect.x1));
-      maxZ = std::min(maxZ, static_cast<float>(map->mPlayableRect.z1));
-    }
-
-    if (maxX < minX || maxZ < minZ) {
-      return false;
-    }
-
-    return pos.x >= minX + radius && pos.x <= maxX - radius && pos.z >= minZ + radius && pos.z <= maxZ - radius;
   }
 
   [[nodiscard]] EReconFlags SetFlag(const EReconFlags value, const EReconFlags bit) noexcept
@@ -294,19 +260,6 @@ namespace
     return collision->CollideBox(&box, &overlap);
   }
 
-  void SeedReconMapFromBlipList(CAiReconDBImpl* const owner)
-  {
-    if (!owner || !owner->mBlipMap.empty()) {
-      return;
-    }
-
-    for (ReconBlip* const blip : owner->mBblips) {
-      if (!blip) {
-        continue;
-      }
-      (void)owner->mBlipMap.insert({MakeReconMapKey(DecodeBlipSourceUnit(blip)), blip});
-    }
-  }
 
   void RebuildBlipListFromMapAndOrphans(CAiReconDBImpl* const owner)
   {
@@ -333,17 +286,6 @@ namespace
     }
 
     owner->mBblips.resize(writeIndex, nullptr);
-  }
-
-  void AppendUniqueBlip(msvc8::vector<ReconBlip*>& values, ReconBlip* const blip)
-  {
-    if (!blip) {
-      return;
-    }
-    if (std::find(values.begin(), values.end(), blip) != values.end()) {
-      return;
-    }
-    values.push_back(blip);
   }
 
   void ClearPerArmyRecon(
@@ -643,6 +585,10 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     Entity* const source = node->first.sourceEntity.GetObjectPtr();
 
     if (!source || source->DestroyQueuedFlag != 0u) {
+      // 0x005C0E8C..0x005C0E96: the dead entry leaves the map (0x005C4580)
+      // before any intel event or blip teardown below runs.
+      (void)mBlipMap.erase(node);
+
       // 0x005C0E9B `cmp byte ptr [edi+278h], 0` -- `mDeleteWhenStale`, which the
       // constructor sets to `sourceUnit->IsMobile()` (ReconBlip.cpp:1071). So a
       // MOBILE source drops its blip outright, and a STRUCTURE keeps it as a
@@ -672,11 +618,11 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
           if (recon) {
             recon->mReconFlags |= static_cast<std::uint32_t>(RECON_MaybeDead);
           }
-          AppendUniqueBlip(mTempBlips, blip);
+          // 0x005C0FD9..0x005C101E: a plain `push_back` onto the orphan list --
+          // no membership scan.
+          mTempBlips.push_back(blip);
         }
       }
-
-      (void)mBlipMap.erase(node);
       continue;
     }
   }
@@ -1080,7 +1026,9 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
       const float maxFootprint = static_cast<float>(std::max(footprint.mSizeX, footprint.mSizeZ));
       STIMap* const map = sourceUnit->SimulationRef ? sourceUnit->SimulationRef->mMapData : nullptr;
       const bool useWholeMap = mArmy->UseWholeMap();
-      if (!IsWithinPlayableMapRadius(map, blip->mVarDat.mCurTransform.pos_, maxFootprint, useWholeMap)) {
+      // 0x005C1EC3: `STIMap::IsWithin` (0x0062CA60) -- whole-map bounds are
+      // `width-1`/`height-1` with strict `<`, the playable rect is used alone.
+      if (map && !map->IsWithin(blip->mVarDat.mCurTransform.pos_, maxFootprint, useWholeMap)) {
         markKnownFake = true;
       }
     }
@@ -1156,8 +1104,10 @@ void CAiReconDBImpl::UpdateBlips(
 
     if (IsFakeBlip(blip)) {
       if (refreshedFakeBlips >= requiredFakeBlips) {
-        DeleteBlip(blip);
+        // 0x005C2001: the surplus jammer entry leaves the map first; the intel
+        // events and blip teardown (0x005C2021..0x005C202E) follow.
         (void)mBlipMap.erase(node);
+        DeleteBlip(blip);
         continue;
       }
 
@@ -1217,16 +1167,15 @@ void CAiReconDBImpl::DeleteBlips(Unit* const sourceUnit)
     return;
   }
 
-  auto [it, end] = FindReconBlipRange(this, sourceUnit);
-  while (it != end) {
-    const auto node = it++;
-
-    ReconBlip* const blip = node->second;
-    if (blip) {
+  // 0x005C2250..0x005C22D7 tears every blip in the range down while the range
+  // is still mapped; only then does 0x005C22EC erase the whole range at once.
+  const auto [first, last] = FindReconBlipRange(this, sourceUnit);
+  for (auto it = first; it != last; ++it) {
+    if (ReconBlip* const blip = it->second; blip != nullptr) {
       DeleteBlip(blip);
     }
-    (void)mBlipMap.erase(node);
   }
+  (void)mBlipMap.erase(first, last);
 }
 
 /**
@@ -1574,7 +1523,8 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
 
   if (mMapData && mArmy) {
     const bool useWholeMap = mArmy->UseWholeMap();
-    if (!IsWithinPlayableMapRadius(mMapData, pos, 0.0f, useWholeMap)) {
+    // 0x005C1916: `STIMap::IsWithin(pos, 0.0f, UseWholeMap())` (0x0062CA60).
+    if (!mMapData->IsWithin(pos, 0.0f, useWholeMap)) {
       ++sOutside;
       if ((sCalls % 4000u) == 0u) {
         gpg::Warnf(
@@ -1653,12 +1603,14 @@ bool CAiReconDBImpl::IntelConfirmDead(ReconBlip* const blip)
     return false;
   }
 
-  auto* const entity = reinterpret_cast<Entity*>(blip);
-  if (IsAlliedOrSameArmy(mArmy, entity->ArmyRef)) {
+  // 0x005C1815..0x005C1826: the VIEWER's index tested against the BLIP army's
+  // ally set (0x005BD630 on `blip->ArmyRef + 8`), the ReconTick direction.
+  if (BlipArmyTreatsViewerAsAlly(this, blip)) {
     return true;
   }
 
-  return ReconCanDetect(entity, entity->GetPositionWm3(), RECON_LOSNow) != RECON_None;
+  // 0x005C1837: the LOS probe sits at the pending position (`blip+0x160`).
+  return ReconCanDetect(blip, BlipProbePosition(blip), RECON_LOSNow) != RECON_None;
 }
 
 /**
@@ -1713,13 +1665,14 @@ void CAiReconDBImpl::ReconGetBlips(
     if (!blip) {
       continue;
     }
-    auto* const entity = reinterpret_cast<Entity*>(blip);
-    const Wm3::Vec3f& pos = entity->GetPositionWm3();
+    // 0x005C1683: the probe is the blip's PENDING position (`blip+0x160`), and
+    // the squared distance sums x, z, then y (0x005C16AE..0x005C16C7).
+    const Wm3::Vec3f pos = BlipProbePosition(blip);
     const float dx = pos.x - center.x;
-    const float dy = pos.y - center.y;
     const float dz = pos.z - center.z;
-    if ((dx * dx) + (dy * dy) + (dz * dz) <= radiusSquared) {
-      outBlips->PushBack(entity);
+    const float dy = pos.y - center.y;
+    if (((dx * dx) + (dz * dz)) + (dy * dy) <= radiusSquared) {
+      outBlips->PushBack(static_cast<Entity*>(blip));
     }
   }
 }
@@ -1893,35 +1846,34 @@ EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
  */
 void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
 {
-  SeedReconMapFromBlipList(this);
-
+  // No map re-seed: 0x005C05A0 walks the orphan list straight away.
+  //
+  // Orphans (0x005C05C0..0x005C0637): one inside the rect leaves the list
+  // first, then goes through `DeleteBlip` (0x005C21F0) -- intel-loss events,
+  // record cleared, and `DestroyIfUnused`.
   for (auto it = mTempBlips.begin(); it != mTempBlips.end();) {
     ReconBlip* const blip = *it;
-    auto* const entity = reinterpret_cast<Entity*>(blip);
-    if (entity && IsInsideRectXZ(rect, entity->GetPositionWm3())) {
-      ClearPerArmyRecon(this, blip, true);
+    if (blip && IsInsideRectXZ(rect, blip->GetPositionWm3())) {
       it = mTempBlips.erase(it);
+      DeleteBlip(blip);
     } else {
       ++it;
     }
   }
 
+  // Mapped blips (0x005C064D..0x005C06CD): inside the rect AND still holding a
+  // live source unit (`mCreator`, 0x005C068E) -- no layer test. The entry
+  // leaves the map (0x005C4580) before `DeleteBlip` runs.
   for (auto it = mBlipMap.begin(); it != mBlipMap.end();) {
     const auto node = it++;
 
     ReconBlip* const blip = node->second;
-    auto* const entity = reinterpret_cast<Entity*>(blip);
-    if (!entity || !IsInsideRectXZ(rect, entity->GetPositionWm3())) {
+    if (!blip || !IsInsideRectXZ(rect, blip->GetPositionWm3()) || blip->GetSourceUnit() == nullptr) {
       continue;
     }
 
-    const ELayer layer = entity->mVarDat.mLayerMask;
-    if (layer == LAYER_None || layer == LAYER_Sub) {
-      continue;
-    }
-
-    ClearPerArmyRecon(this, blip, true);
     (void)mBlipMap.erase(node);
+    DeleteBlip(blip);
   }
 
   RebuildBlipListFromMapAndOrphans(this);

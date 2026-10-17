@@ -5,6 +5,7 @@
 #include <cstring>
 #include <new>
 
+#include "gpg/core/containers/String.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/console/CConAlias.h"
 #include "moho/entity/EntityCategoryReflection.h"
@@ -476,15 +477,19 @@ namespace moho
       initialUnitName = "";
     }
 
+    // 0x00709431/0x00709449: the name is copied into a string and canonized
+    // through `STR_CopyFilename` (lowercase, `/` -> `\`) into the `RResId`
+    // before the rules lookup; the error reports the raw, uncanonized name.
+    const msvc8::string initialUnitBlueprintName(initialUnitName);
     RResId blueprintId{};
-    blueprintId.name.assign_owned(initialUnitName);
+    (void)gpg::STR_CopyFilename(&blueprintId.name, &initialUnitBlueprintName);
 
     RUnitBlueprint* blueprint = nullptr;
     if (sim && sim->mRules) {
       blueprint = sim->mRules->GetUnitBlueprint(blueprintId);
     }
     if (!blueprint) {
-      LuaPlus::LuaState::Error(state, "Unknown initial unit: %s", blueprintId.name.c_str());
+      LuaPlus::LuaState::Error(state, "Unknown initial unit: %s", initialUnitBlueprintName.c_str());
     }
 
     Wm3::Vector2f startPosition{};

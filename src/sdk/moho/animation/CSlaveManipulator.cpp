@@ -11,9 +11,11 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
@@ -38,33 +40,28 @@ namespace
   /**
    * Address: 0x00645AD0 (FUN_00645AD0)
    *
+   * IDA signature:
+   * float *__usercall sub_645AD0@<eax>(float *out@<eax>, float *rhs@<ecx>, float *lhs@<edx>);
+   *
    * What it does:
-   * Computes one row-major 3x3 matrix product (`out = lhs * rhs`) used by the
-   * slave-manipulator motion pipeline.
+   * Forms `lhs * transpose(rhs)`: every lane is the dot product of one `lhs`
+   * row with one `rhs` row. The binary sums column 0 as `(x + y) + z` and
+   * columns 1 and 2 as `(y + z) + x` (e.g. 0x00645AF5..0x00645B12 versus
+   * 0x00645B0E..0x00645B31), so both groupings are kept.
    */
-  [[maybe_unused]] float* MultiplyMatrix3x3RowMajor(
-    float* const out,
-    const float* const lhs,
-    const float* const rhs
-  ) noexcept
+  [[nodiscard]] moho::VAxes3 MultiplyAxesByTranspose(const moho::VAxes3& lhs, const moho::VAxes3& rhs) noexcept
   {
-    const float row2col0 = (lhs[6] * rhs[0]) + (lhs[7] * rhs[1]) + (lhs[8] * rhs[2]);
-    const float row2col1 = (lhs[6] * rhs[3]) + (lhs[7] * rhs[4]) + (lhs[8] * rhs[5]);
-    const float row2col2 = (lhs[6] * rhs[6]) + (lhs[7] * rhs[7]) + (lhs[8] * rhs[8]);
+    const auto firstColumn = [](const Wm3::Vector3f& row, const Wm3::Vector3f& column) noexcept {
+      return ((row.x * column.x) + (row.y * column.y)) + (row.z * column.z);
+    };
+    const auto laterColumn = [](const Wm3::Vector3f& row, const Wm3::Vector3f& column) noexcept {
+      return ((row.y * column.y) + (row.z * column.z)) + (row.x * column.x);
+    };
 
-    const float row1col0 = (lhs[3] * rhs[0]) + (lhs[4] * rhs[1]) + (lhs[5] * rhs[2]);
-    const float row1col1 = (lhs[3] * rhs[3]) + (lhs[4] * rhs[4]) + (lhs[5] * rhs[5]);
-    const float row1col2 = (lhs[3] * rhs[6]) + (lhs[4] * rhs[7]) + (lhs[5] * rhs[8]);
-
-    out[0] = (lhs[0] * rhs[0]) + (lhs[1] * rhs[1]) + (lhs[2] * rhs[2]);
-    out[1] = (lhs[0] * rhs[3]) + (lhs[1] * rhs[4]) + (lhs[2] * rhs[5]);
-    out[2] = (lhs[0] * rhs[6]) + (lhs[1] * rhs[7]) + (lhs[2] * rhs[8]);
-    out[3] = row1col0;
-    out[4] = row1col1;
-    out[5] = row1col2;
-    out[6] = row2col0;
-    out[7] = row2col1;
-    out[8] = row2col2;
+    moho::VAxes3 out{};
+    out.vX = Wm3::Vector3f{firstColumn(lhs.vX, rhs.vX), laterColumn(lhs.vX, rhs.vY), laterColumn(lhs.vX, rhs.vZ)};
+    out.vY = Wm3::Vector3f{firstColumn(lhs.vY, rhs.vX), laterColumn(lhs.vY, rhs.vY), laterColumn(lhs.vY, rhs.vZ)};
+    out.vZ = Wm3::Vector3f{firstColumn(lhs.vZ, rhs.vX), laterColumn(lhs.vZ, rhs.vY), laterColumn(lhs.vZ, rhs.vZ)};
     return out;
   }
 
@@ -169,13 +166,12 @@ namespace
     return fallbackSet;
   }
 
-  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
+  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniPose* const pose, const int boneIndex) noexcept
   {
-    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
+    if (pose == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    moho::CAniPose* const pose = actor->mPose.get();
     moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
     moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
@@ -367,12 +363,19 @@ void moho::CSlaveManipulator::MemberSerialize(gpg::WriteArchive* const archive) 
  * Address: 0x00646140 (FUN_00646140, Moho::CSlaveManipulator::MoveManipulator)
  *
  * What it does:
- * Updates the destination bone orientation from the configured source bone and
- * marks task-event completion when no smoothing step remains. When `mMaxRate`
- * is non-negative, the new orientation is interpolated toward the target by at
- * most `mMaxRate` radians using `BlendOrientationDeltaByMaxAngle`
- * (the FUN_004EB830 axis-angle clamped-step helper); otherwise it snaps
- * directly to the target.
+ * Copies the source bone's motion onto the destination bone and marks
+ * task-event completion when no smoothing step remains.
+ *
+ * The motion copied is the source bone's rotation relative to its skeleton
+ * rest orientation, read from the actor's PRIOR pose (`[actor+0x08]`,
+ * 0x00646161..0x0064619B): both orientations are expanded with `VAxes3`
+ * (0x004EC590), combined as `posed * transpose(rest)` (0x00645AD0) and turned
+ * back into a quaternion (0x004F0AE0). When `mMaxRate` is non-negative the
+ * kept rotation steps toward that goal through 0x004EB830 with the goal as the
+ * helper's first operand and `&mCurrentRotation` as the second; otherwise it
+ * snaps. The result is composed onto the destination bone with
+ * `CAniPoseBone::Rotate` (0x00646289), which multiplies it into the bone's
+ * local orientation and propagates the dirty flag to child bones.
  */
 bool moho::CSlaveManipulator::ManipulatorUpdate()
 {
@@ -381,32 +384,41 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
     return false;
   }
 
-  CAniPoseBone* const sourceBone = ResolvePoseBone(mOwnerActor, mSourceBoneIndex);
-  CAniPoseBone* const destinationBone = ResolvePoseBone(mOwnerActor, watchedBinding->mBoneIndex);
-  if (sourceBone == nullptr || destinationBone == nullptr) {
+  CAniPoseBone* const sourceBone = ResolvePoseBone(mOwnerActor->mPriorPose.get(), mSourceBoneIndex);
+  if (sourceBone == nullptr) {
+    return false;
+  }
+  const SAniSkelBone* const restBone = sourceBone->ResolveSkeletonBone();
+  if (restBone == nullptr) {
     return false;
   }
 
-  const Wm3::Quaternionf targetRotation = sourceBone->mLocalTransform.orient_;
+  const VAxes3 restAxes{restBone->mLocalTransform.orient_};
+  const VAxes3 posedAxes{sourceBone->mLocalTransform.orient_};
+  const VAxes3 relativeAxes = MultiplyAxesByTranspose(posedAxes, restAxes);
+  Wm3::Quaternionf targetRotation{};
+  (void)MatrixColumnsToQuatCanonical(&relativeAxes.vX, &targetRotation);
+
+  // 0x00646186: the signal flag starts set; the blend overwrites it.
   bool reachedTarget = true;
   if (mMaxRate >= 0.0f) {
-    bool noStep = false;
     Wm3::Quaternionf steppedRotation{};
     (void)moho::BlendOrientationDeltaByMaxAngle(
-      mCurrentRotation,
       targetRotation,
+      mCurrentRotation,
       mMaxRate,
-      &noStep,
+      &reachedTarget,
       &steppedRotation
     );
     mCurrentRotation = steppedRotation;
-    reachedTarget = noStep;
   } else {
     mCurrentRotation = targetRotation;
   }
 
-  destinationBone->mLocalTransform.orient_ = mCurrentRotation;
-  destinationBone->mCompositeDirty = 1;
+  if (CAniPoseBone* const destinationBone = ResolvePoseBone(mOwnerActor->mPose.get(), watchedBinding->mBoneIndex);
+      destinationBone != nullptr) {
+    destinationBone->Rotate(mCurrentRotation);
+  }
   EventSetSignaled(reachedTarget);
   return true;
 }

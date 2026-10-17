@@ -809,10 +809,12 @@ namespace moho
     // reclaim tick, so a prop reclaimed twice in one tick moves to the tail.
     ListLinkBefore(&SimulationRef->mCoordEntities);
 
+    // 0x006FA1F6 / 0x006FA228: `comiss 1.0, next` keeps `next` only when it is
+    // below 1.0, so an unordered sum clamps to 1.0.
     const float previous = mVarDat.mFractionComplete;
-    if (reclaimDelta <= 0.0f) {
+    if (!(reclaimDelta > 0.0f)) {
       float next = previous + reclaimDelta;
-      if (next > 1.0f) {
+      if (!(1.0f > next)) {
         next = 1.0f;
       }
       if (next < 0.0f) {
@@ -821,7 +823,7 @@ namespace moho
       mVarDat.mFractionComplete = next;
     } else {
       float next = previous + reclaimDelta;
-      if (next > 1.0f) {
+      if (!(1.0f > next)) {
         next = 1.0f;
       }
       if (next < 0.0f) {

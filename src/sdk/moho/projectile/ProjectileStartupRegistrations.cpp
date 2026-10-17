@@ -1660,7 +1660,9 @@ namespace moho
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
     const Wm3::Vector3f velocity = projectile->GetVelocity();
-    const float speed = std::sqrt((velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
+    // 0x006A2846..0x006A285F: x87 under 24-bit precision sums the squares as
+    // (z^2 + y^2) + x^2 before `fsqrt`; the order changes the low bit.
+    const float speed = std::sqrt(((velocity.z * velocity.z) + (velocity.y * velocity.y)) + (velocity.x * velocity.x));
     lua_pushnumber(rawState, speed);
     (void)lua_gettop(rawState);
     return 1;

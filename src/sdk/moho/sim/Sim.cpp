@@ -1106,13 +1106,18 @@ namespace
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaInvalidBoolWarning = "%s\n  invalid argument %d, use as boolean";
   constexpr std::size_t kDiscardClientSlotCount = 17u;
-  // FAF-patch global (BSS byte at 0x011FD23F in the shipped exe, read by
-  // cfunc_SimCallbackL 0x008BA770 and cfunc_SetPausedL 0x008BC100). It is a
-  // latch the patch region raises to stop UI Lua from marshalling sim
-  // callbacks once the session is over; zero-initialised, so callbacks flow
-  // by default. Modelled as a real global -- it used to be read through the
-  // original image's address, which in this process is unmapped memory.
-  bool gLuaSimCallbackDispatchBlocked = false;
+  // FAF-patch global (dword at 0x011FD23F in the shipped exe). The patch
+  // region steps it through session states; cfunc_SimCallbackL (0x008BA770)
+  // and cfunc_SetPausedL (0x008BC100) refuse to marshal while it equals
+  // exactly 1 (`cmp dword ptr [0x011FD23F],1`). EndGame stores 0x0B
+  // (0x0128F267). Zero-initialised, so callbacks flow by default.
+  std::int32_t gLuaSimCallbackDispatchState = 0;
+  constexpr std::int32_t kLuaSimCallbackDispatchBlockedState = 1;
+  constexpr std::int32_t kLuaSimCallbackDispatchGameEndedState = 0x0B;
+
+  // FAF-patch global (byte at 0x01293478): set by EndGame (0x0128F260) and
+  // read by SessionEndGame (0x0128F9AE) to skip its wait path.
+  bool gSimEndGameRequested = false;
 
   /**
    * `EEntityAttribute` lane of one `EIntel` value: the binary computes it as
@@ -1301,7 +1306,7 @@ namespace
 
   [[nodiscard]] bool IsLuaCallbackDispatchBlocked() noexcept
   {
-    return gLuaSimCallbackDispatchBlocked;
+    return gLuaSimCallbackDispatchState == kLuaSimCallbackDispatchBlockedState;
   }
 
   [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
@@ -12709,7 +12714,7 @@ int moho::cfunc_EntityCategoryContainsSimL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
 
   Sim* const sim = ResolveGlobalSim(rawState);
   RRuleGameRulesImpl* const rules = sim ? static_cast<RRuleGameRulesImpl*>(sim->mRules) : nullptr;
@@ -12820,7 +12825,7 @@ int moho::cfunc_EntityCategoryFilterDownSimL(LuaPlus::LuaState* const state)
     const LuaPlus::LuaObject valueObject = sourceListObject[sourceIndex];
     const REntityBlueprint* const blueprint = ResolveEntityCategoryCountBlueprint(valueObject, rules);
     if (categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
-      resultObject.Insert(resultIndex, valueObject);
+      resultObject.SetObject(resultIndex, valueObject); // 0x00759E53: plain table set, not table.insert
       ++resultIndex;
     }
   }
@@ -12849,7 +12854,7 @@ int moho::cfunc_EntityCategoryCountL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
   const LuaPlus::LuaObject sourceListObject(LuaPlus::LuaStackObject(state, 2));
   if (!sourceListObject.IsTable()) {
     LuaPlus::LuaState::Error(state, kEntityCategoryCountInvalidTableText);
@@ -14683,7 +14688,7 @@ int moho::cfunc_EntityCategoryContainsUserL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
 
   const LuaPlus::LuaObject valueObject(LuaPlus::LuaStackObject(state, 2));
   const RUnitBlueprint* const blueprint = ResolveEntityCategoryFilterBlueprint(valueObject, session, state);
@@ -14753,7 +14758,7 @@ int moho::cfunc_EntityCategoryFilterDownUserL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
   if (!categorySet) {
     LuaPlus::LuaState::Error(state, kEntityCategoryFilterDownUserInvalidCategoryText);
   }
@@ -14772,7 +14777,7 @@ int moho::cfunc_EntityCategoryFilterDownUserL(LuaPlus::LuaState* const state)
     }
 
     if (categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
-      resultObject.Insert(resultIndex, valueObject);
+      resultObject.SetObject(resultIndex, valueObject); // 0x008BA177: plain table set
       ++resultIndex;
     }
   }
@@ -14836,7 +14841,7 @@ int moho::cfunc_EntityCategoryFilterOutL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
   if (!categorySet) {
     LuaPlus::LuaState::Error(state, kEntityCategoryFilterOutInvalidCategoryText);
   }
@@ -14856,7 +14861,7 @@ int moho::cfunc_EntityCategoryFilterOutL(LuaPlus::LuaState* const state)
     }
 
     if (!categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
-      resultObject.Insert(resultIndex, valueObject);
+      resultObject.SetObject(resultIndex, valueObject); // 0x008BA4A9: plain table set
       ++resultIndex;
     }
   }
@@ -20084,13 +20089,18 @@ int moho::cfunc_GetCurrentCommandSourceL(LuaPlus::LuaState* const state)
 }
 
 /**
- * Address: 0x0128C8F0 (FUN_0128C8F0, cfunc_EndGameL)
+ * Address: 0x0128F260 (FUN_0128F260, cfunc_EndGameL)
  *
  * What it does:
- * Validates Lua argument count and forwards to `Sim::EndGame()`.
+ * Marks the session as ending (end-game flag set, callback-dispatch latch
+ * moved to its game-ended state) before validating the Lua argument count,
+ * then forwards to `Sim::EndGame()`.
  */
 int moho::cfunc_EndGameL(LuaPlus::LuaState* const state)
 {
+  gSimEndGameRequested = true;                                          // 0x0128F260
+  gLuaSimCallbackDispatchState = kLuaSimCallbackDispatchGameEndedState; // 0x0128F267
+
   if (!state || !state->m_state) {
     return 0;
   }
@@ -21083,7 +21093,7 @@ int moho::cfunc_GetTerrainTypeL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, 1) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&xArg, "integer");
   }
-  const std::uint32_t x = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+  const std::uint32_t x = static_cast<std::uint32_t>(static_cast<std::int64_t>(lua_tonumber(rawState, 1)));
 
   LuaPlus::LuaStackObject zArg{};
   zArg.m_state = state;
@@ -21091,7 +21101,7 @@ int moho::cfunc_GetTerrainTypeL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, 2) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&zArg, "integer");
   }
-  const std::uint32_t z = static_cast<std::uint32_t>(lua_tonumber(rawState, 2));
+  const std::uint32_t z = static_cast<std::uint32_t>(static_cast<std::int64_t>(lua_tonumber(rawState, 2)));
 
   Sim* const sim = lua_getglobaluserdata(rawState);
   STIMap* const map = sim ? sim->mMapData : nullptr;
@@ -21165,7 +21175,7 @@ int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, 1) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&xArg, "integer");
   }
-  const std::uint32_t x = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+  const std::uint32_t x = static_cast<std::uint32_t>(static_cast<std::int64_t>(lua_tonumber(rawState, 1)));
 
   LuaPlus::LuaStackObject zArg{};
   zArg.m_state = state;
@@ -21173,7 +21183,7 @@ int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, 2) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&zArg, "integer");
   }
-  const std::uint32_t z = static_cast<std::uint32_t>(lua_tonumber(rawState, 2));
+  const std::uint32_t z = static_cast<std::uint32_t>(static_cast<std::int64_t>(lua_tonumber(rawState, 2)));
 
   lua_pushstring(rawState, "TypeCode");
   lua_gettable(rawState, 3);
@@ -21185,7 +21195,7 @@ int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, typeCodeIndex) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&typeCodeArg, "integer");
   }
-  const std::uint8_t terrainType = static_cast<std::uint8_t>(lua_tonumber(rawState, typeCodeIndex));
+  const std::uint8_t terrainType = static_cast<std::uint8_t>(static_cast<std::int32_t>(lua_tonumber(rawState, typeCodeIndex)));
 
   map->SetTerrainType(x, z, terrainType);
   return 0;
@@ -23970,7 +23980,12 @@ int moho::cfunc_GetArmyBrainL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-  army->GetArmyBrain()->mLuaObj.PushStack(state);
+  CAiBrain* const brain = army->GetArmyBrain();
+  // 0x00708409..0x0070841F: the binary builds and discards an empty table
+  // here, which the Lua allocator and collector both see.
+  LuaPlus::LuaObject scratch(state);
+  scratch.AssignNewTable(state, 0, 0u);
+  brain->mLuaObj.PushStack(state);
   return 1;
 }
 

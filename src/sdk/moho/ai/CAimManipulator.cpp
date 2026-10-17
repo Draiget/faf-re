@@ -25,6 +25,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/math/Angle.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
@@ -456,7 +457,9 @@ namespace
                                     (horizontalProjection * horizontalProjection)
                                   ) *
                                   projectileSpeed;
-    if (horizontalSpeed <= kAimVectorEpsilon) {
+    // 0x00631605 `fcomi; jbe`: anything but an ordered `speed > 0.001`
+    // (including NaN) returns the target unchanged.
+    if (!(horizontalSpeed > kAimVectorEpsilon)) {
       *outIntercept = targetPosition;
       return outIntercept;
     }
@@ -477,7 +480,9 @@ namespace
                         ((muzzlePosition.z - predictedZ) * (muzzlePosition.z - predictedZ))
                       ) *
                       invHorizontalSpeed;
-      if (std::fabs(interceptTime - previousTime) <= kInterceptIterationDeltaEpsilon) {
+      // 0x0063171C `fcomip; ja`: iterate again only on an ordered
+      // `|delta| > 0.1`; a NaN delta stops the refinement.
+      if (!(std::fabs(interceptTime - previousTime) > kInterceptIterationDeltaEpsilon)) {
         break;
       }
     }
@@ -506,9 +511,12 @@ namespace
   {
     const float dz = targetPosition.z - muzzlePosition.z;
     const float horizontalDistance = std::sqrt((dz * dz) + ((targetPosition.x - muzzlePosition.x) * (targetPosition.x - muzzlePosition.x)));
-    const float pitchScalar = (0.0f - ((horizontalDistance * horizontalDistance) * physConstants.mGravity.y)) /
+    // 0x005D6355..0x005D637A negate by subtracting from the -0.0f constant at
+    // 0x00E4F748, so a zero distance or gravity yields -0 (and a vertical shot
+    // divides by -0 below, not +0).
+    const float pitchScalar = (-0.0f - ((horizontalDistance * horizontalDistance) * physConstants.mGravity.y)) /
                               ((muzzleVelocity * muzzleVelocity) * 2.0f);
-    const float negDistance = 0.0f - horizontalDistance;
+    const float negDistance = -0.0f - horizontalDistance;
     const float discriminant =
       (negDistance * negDistance) - ((((targetPosition.y - muzzlePosition.y) + pitchScalar) * pitchScalar) * 4.0f);
     if (discriminant < 0.0f) {
@@ -517,11 +525,12 @@ namespace
 
     const float discriminantRoot = std::sqrt(discriminant);
     const float denominator = pitchScalar * 2.0f;
+    // 0x005D6407..0x005D640B / 0x005D641E..0x005D6422: `fld1; fpatan; fchs`.
     if (highArc != nullptr) {
-      *highArc = -std::atan2((discriminantRoot - negDistance) / denominator, 1.0f);
+      *highArc = -msvc8::atan2((discriminantRoot - negDistance) / denominator, 1.0f);
     }
     if (lowArc != nullptr) {
-      *lowArc = -std::atan2(((-negDistance) - discriminantRoot) / denominator, 1.0f);
+      *lowArc = -msvc8::atan2(((-negDistance) - discriminantRoot) / denominator, 1.0f);
     }
 
     return true;
@@ -534,45 +543,15 @@ namespace
    * Builds one normalized firing direction vector from start/end points and
    * selected ballistic pitch.
    *
-   * DETERMINISM NOTE -- deliberate divergence from the binary, shared by every
-   * `std::sin`/`std::cos`/`std::atan2` in this file's sim paths
-   * (`CalculateFiringPitch` 0x005D6310, `CheckTracking` 0x006309F0,
-   * `RotateHeadingBone` 0x00631190, `RotatePitchBone` 0x00631220).
-   *
-   * The binary computes these with the x87 transcendental instructions -- this
-   * function is `fcos` at 0x005D644F and `fsin` at 0x005D647E, and the
-   * `CAimManipulator` rotations are the same pair. Those instructions are NOT
-   * exactly specified by IEEE 754: their low-order bits are implementation
-   * defined, and AMD and Intel genuinely disagree (Intel's `fsin` argument
-   * reduction uses a 66-bit pi and is badly wrong near multiples of pi, where
-   * AMD's is not). The engine's `_controlfp(_PC_24, _MCW_PC)` rounds results to
-   * a 24-bit mantissa, which hides almost all of that -- which is exactly why a
-   * lockstep match normally survives for hours before anything shows.
-   *
-   * MEASURED, AND IT IS NOT A LIVE DESYNC VECTOR -- recorded here because it
-   * looks like one and will be re-proposed otherwise. Under `_PC_24`, x87
-   * `fsin`/`fcos` were compared against the correctly-rounded reference over
-   * ~1.4M *distinct* float values: 320,008 consecutive floats spanning 1*pi
-   * through 8*pi (where Intel's reduction is worst), 917,504 sampled
-   * exhaustively across exponent bands 2^0..2^7, and 160,004 around odd
-   * multiples of pi/2 for `cos`. Deviation was **zero ulp everywhere**. At
-   * 24-bit precision these instructions are correctly rounded, so any CPU
-   * accurate to better than half a float-ulp produces the identical `float` and
-   * the vendor difference cannot be observed. Note the earlier sweep that
-   * "confirmed" a difference was bogus: it stepped a `double` by 1e-8 and cast
-   * to `float`, so millions of samples collapsed onto a handful of distinct
-   * floats.
-   *
-   * So `_PC_24` is doing real work -- it is what makes the x87 transcendentals
-   * safe for lockstep, not merely tidy. That is the reason to keep it.
-   *
-   * `std::sin`/`std::cos` here do NOT lower to `fsin`/`fcos`; on the modern
-   * toolchain they call the CRT's SSE2 software implementations, which are
-   * vendor independent. So this recovery is deterministic across CPUs where the
-   * binary was not -- but it is correspondingly NOT bit-identical to the binary
-   * for these calls. That trade is intentional: the two properties cannot both
-   * hold, and a lockstep simulation is worth more than matching a defect. Do
-   * not "restore fidelity" by reaching for `fsin`/`fcos` inline asm.
+   * DETERMINISM NOTE -- the trig in this file's sim paths (`CalculateFiringPitch`
+   * 0x005D6310, `CheckTracking` 0x006309F0, `RotateHeadingBone` 0x00631190,
+   * `RotatePitchBone` 0x00631220, and this function: `fcos` at 0x005D644F, `fsin`
+   * at 0x005D647E) goes through the `msvc8::` x87 helpers, i.e. the same
+   * `fsin`/`fcos`/`fpatan` instructions the binary runs. Under the simulation
+   * thread's `_PC_24` precision control those were measured correctly rounded
+   * over ~1.4M distinct float inputs (zero ulp deviation, including near
+   * multiples of pi where Intel and AMD argument reduction differ), so matching
+   * the binary bit for bit and staying deterministic across CPUs both hold.
    */
   Wm3::Vector3f* CalculateFiringDirection(
     Wm3::Vector3f* const outDirection,
@@ -743,12 +722,13 @@ moho::CAimManipulator::CAimManipulator(
       const Wm3::Quaternionf& ori = bone.mBoneTransform.orient_;
 
       const RUnitBlueprintWeapon* const weaponBlueprint = this->mUnitWepBlueprint;
-      this->mMinHeading =
-        msvc8::atan2(
-          ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
-          1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
-        )
-        + weaponBlueprint->HeadingArcCenter * kDegreesToRadians;
+      // 0x006305F1..0x00630604: the unrounded `fpatan` result is `faddp`ed to
+      // the rounded `HeadingArcCenter * pi/180` and rounded once on the store.
+      this->mMinHeading = msvc8::Atan2Plus(
+        ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
+        1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f),
+        weaponBlueprint->HeadingArcCenter * kDegreesToRadians
+      );
       this->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;
 
       // 0x0063061F..0x00630637 forms (z*y - x*w) * 2 from the rest
@@ -915,7 +895,10 @@ bool moho::CAimManipulator::ManipulatorUpdate()
       if (this->mResetPoseTime <= 0) {
         std::int32_t resetTime = 1;
         if (weapon->mWeaponBlueprint != nullptr) {
-          resetTime = static_cast<std::int32_t>(std::lround(weapon->mWeaponBlueprint->TargetCheckInterval * 10.0f));
+          // 0x00630F3E..0x00630F60: `mulss` by 10.0f, then 0x00425110 -- `frndint`
+          // bumped by one when the input is above the rounded value, i.e. a
+          // float ceil -- clamped to at least one tick. Not round-to-nearest.
+          resetTime = static_cast<std::int32_t>(std::ceil(weapon->mWeaponBlueprint->TargetCheckInterval * 10.0f));
           if (resetTime < 1) {
             resetTime = 1;
           }
@@ -1049,11 +1032,13 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
 
   float projectileSpeed = 0.0f;
   if (weaponBlueprint != nullptr) {
-    if (weaponBlueprint->MuzzleVelocityReduceDistance <= horizontalDistance) {
-      projectileSpeed = weaponBlueprint->MuzzleVelocity;
-    } else {
+    // 0x00631AF0 `comiss reduceDistance, distance; jbe`: only an ordered
+    // `reduceDistance > distance` takes the reduced speed.
+    if (weaponBlueprint->MuzzleVelocityReduceDistance > horizontalDistance) {
       projectileSpeed = std::sqrt(horizontalDistance / weaponBlueprint->MuzzleVelocityReduceDistance) *
                         weaponBlueprint->MuzzleVelocity;
+    } else {
+      projectileSpeed = weaponBlueprint->MuzzleVelocity;
     }
   }
 
@@ -1138,8 +1123,9 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
       predictedImpact.y - muzzlePosition.y,
       predictedImpact.z - muzzlePosition.z,
     };
-    aimDirection = directionToTarget;
-    (void)Wm3::Vector3f::Normalize(&aimDirection);
+    // 0x00631EC7: `NormalizeVectorInto` (0x0044F7E0) -- zero only when the
+    // length is not positive, with no 1e-6 epsilon.
+    (void)NormalizeVectorInto(&aimDirection, directionToTarget);
   }
 
   *outDirection = aimDirection;
@@ -1348,9 +1334,12 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   float laneDelta = 0.0f;
   if (maxAngleHalfRange < kAngleNormalizationClamp) {
     float constrained = NormalizeAngleRadians(desiredAngle - minAngleCenter);
-    if (constrained > maxAngleHalfRange) {
+    // 0x00630B69..0x00630B7A: two independent clamps, `max > x ? x : max`
+    // then `-max > x ? -max : x`, so an unordered (NaN) angle takes `max`.
+    if (!(maxAngleHalfRange > constrained)) {
       constrained = maxAngleHalfRange;
-    } else if (constrained < -maxAngleHalfRange) {
+    }
+    if (-maxAngleHalfRange > constrained) {
       constrained = -maxAngleHalfRange;
     }
     laneDelta = (constrained + minAngleCenter) - currentAngle;
@@ -1596,7 +1585,10 @@ int moho::cfunc_CAimManipulatorSetResetPoseTimeL(LuaPlus::LuaState* const state)
     resetTimeArg.TypeError("number");
   }
 
-  manipulator->SetResetPoseTime(static_cast<std::int32_t>(lua_tonumber(rawState, 2) * 10.0));
+  // 0x00632485..0x0063248E: `fmul` by the 10.0f constant under 24-bit
+  // precision control (a float product), then `_ftol2` truncation. A double
+  // product truncates 0.3 * 10 to 2 where the engine gets 3.
+  manipulator->SetResetPoseTime(static_cast<std::int32_t>(static_cast<float>(lua_tonumber(rawState, 2)) * 10.0f));
   return 0;
 }
 

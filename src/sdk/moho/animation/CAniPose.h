@@ -416,6 +416,7 @@ namespace moho
 
     friend class CAniPoseBone;
     friend class CBoneEntityManipulator;
+    friend class CSlideManipulator;
 
   private:
     /**

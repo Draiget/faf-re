@@ -1662,7 +1662,7 @@ namespace moho
   int cfunc_EndGame(lua_State* luaContext);
 
   /**
-   * Address: 0x0128C8F0 (FUN_0128C8F0, cfunc_EndGameL)
+   * Address: 0x0128F260 (FUN_0128F260, cfunc_EndGameL)
    *
    * LuaPlus::LuaState *
    *

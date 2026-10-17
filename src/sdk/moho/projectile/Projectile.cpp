@@ -570,9 +570,10 @@ namespace moho
       mVarDat.mScale.z = scale;
     }
 
-    // Splice the coord node into Sim::mCoordEntities at the FRONT: the binary
-    // self-inits the node to a singleton then inserts it immediately after the
-    // list sentinel (ListLinkAfter unlinks-first, matching that exactly).
+    // Splice the coord node into Sim::mCoordEntities at the TAIL: the binary
+    // self-inits the node to a singleton then inserts it immediately before the
+    // list sentinel (0x0069B9C4..0x0069B9E8; ListLinkBefore unlinks first,
+    // matching that exactly).
     ListLinkBefore(&sim->mCoordEntities);
 
     // Scale velocity = Display.MeshScaleVelocity + rand(±Display.MeshScaleVelocityRange).
@@ -823,9 +824,10 @@ namespace moho
     mVarDat.mScale.y += mScaleVelocity.y * kProjectileTickSeconds;
     mVarDat.mScale.z += mScaleVelocity.z * kProjectileTickSeconds;
 
-    // Relink the coord node at the FRONT of the Sim coord list: the binary
-    // unlinks then inserts immediately after the sentinel (node.prev=sentinel,
-    // node.next=sentinel.next, sentinel.next=node), asm 0x0069BF3B-0069BF5D.
+    // Relink the coord node at the TAIL of the Sim coord list: the binary
+    // unlinks then inserts immediately before the sentinel (node.prev =
+    // sentinel.prev, node.next = sentinel, sentinel.prev = node), asm
+    // 0x0069BF3B-0069BF5D -- word 0 of a TDatListItem is mPrev.
     ListLinkBefore(&SimulationRef->mCoordEntities);
 
     if (!mTrackTarget) {
@@ -842,12 +844,12 @@ namespace moho
       const float qz = tran.orient_.z;
       const float qw = tran.orient_.w;
       const float accel = mAcceleration * kProjectileTickSeconds;
-      const float forwardX = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
+      const float forwardX = ((qz * qx) + (qw * qy)) * 2.0f;
       const float forwardY = ((qy * qz) - (qw * qx)) * 2.0f;
-      const float forwardZ = ((qz * qx) + (qw * qy)) * 2.0f;
-      mVelocity.x += forwardZ * accel;
+      const float forwardZ = 1.0f - (((qx * qx) + (qy * qy)) * 2.0f);
+      mVelocity.x += forwardX * accel;
       mVelocity.y += forwardY * accel;
-      mVelocity.z += forwardX * accel;
+      mVelocity.z += forwardZ * accel;
 
       if (mVelocityAlign) {
         // 0x0069C126: mulss by [0xE4F768] == 0.0017453292 (deg -> rad per tick).

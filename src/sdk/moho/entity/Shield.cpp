@@ -73,8 +73,8 @@ namespace
 
   [[nodiscard]] std::uint32_t BuildShieldFamilySourceBits(const std::uint32_t armySourceIndex) noexcept
   {
-    const std::uint32_t clampedSourceIndex = armySourceIndex & 0xFFu;
-    return (clampedSourceIndex | kShieldFamilyMaskSourceBits) << moho::kEntityIdSourceShift;
+    // 0x007764B2..0x007764B7: `(index | 0x400) << 20`, no masking.
+    return (armySourceIndex | kShieldFamilyMaskSourceBits) << moho::kEntityIdSourceShift;
   }
 
   /**
@@ -149,14 +149,10 @@ namespace moho
     : Entity(
         luaObject,
         sim,
-        static_cast<EntId>(sim != nullptr && sim->mEntityDB != nullptr
-                             ? sim->mEntityDB->DoReserveId(BuildShieldFamilySourceBits(armySourceIndex))
-                             : BuildShieldFamilySourceBits(kInvalidArmySourceIndex) | 1u)
+        static_cast<EntId>(sim->mEntityDB->DoReserveId(BuildShieldFamilySourceBits(armySourceIndex)))
       )
   {
-    if (SimulationRef != nullptr) {
-      SimulationRef->mShields.push_back(this);
-    }
+    SimulationRef->mShields.push_back(this);
   }
 
   /**
@@ -313,8 +309,10 @@ namespace moho
       if (lua_type(rawState, ownerStackIndex) != LUA_TNIL) {
         const LuaPlus::LuaObject ownerObject(LuaPlus::LuaStackObject(state, ownerStackIndex));
         Entity* const ownerEntity = SCR_FromLua_EntityOpt(ownerObject);
-        if (ownerEntity != nullptr && ownerEntity->ArmyRef != nullptr) {
-          armySourceIndex = static_cast<std::uint32_t>(ownerEntity->ArmyRef->mConstDat.mArmyIndex) & 0xFFu;
+        // 0x00776B86..0x00776B90: the owner's army index, read without a
+        // null check on the army and without masking.
+        if (ownerEntity != nullptr) {
+          armySourceIndex = static_cast<std::uint32_t>(ownerEntity->ArmyRef->mConstDat.mArmyIndex);
         }
       }
     }
