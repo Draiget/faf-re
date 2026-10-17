@@ -342,7 +342,10 @@ bool CAiNavigatorAir::HasGoodPath() const
  */
 bool CAiNavigatorAir::FollowingLeader() const
 {
-  if (!mUnit || mTrackFormationTarget == 0u) {
+  // 0x005A4E64..0x005A4E6E gates on the unit belonging to a formation
+  // (`Unit::GetFormation`, 0x006A9720), not on the navigator's own
+  // formation-tracking flag.
+  if (!mUnit || mUnit->GetFormation() == nullptr) {
     return false;
   }
 
