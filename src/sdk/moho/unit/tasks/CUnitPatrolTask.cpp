@@ -172,12 +172,6 @@ namespace
 
 namespace moho
 {
-  // Forward declaration mirroring the file-local decl in QuaternionMath.cpp
-  // (0x0062FA80, Moho::MultQuadVec): rotate `vec` by conjugate(`quat`) into
-  // `dest`. Not published in a header yet, so declared here for the patrol
-  // search-box builder that invokes it by name.
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
-
   gpg::RType* CUnitPatrolTask::sType = nullptr;
 
   /**

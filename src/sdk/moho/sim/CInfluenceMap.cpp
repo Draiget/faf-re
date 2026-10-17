@@ -22,6 +22,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimConVarBase.h"
+#include "moho/sim/GridTraversalLine.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/STIMap.h"
@@ -1502,11 +1503,11 @@ namespace moho
   void SThreat::Clear() noexcept
   {
     overallInfluence = 0.0f;
-    influenceStructuresNotMex = 0.0f;
     influenceStructures = 0.0f;
+    influenceStructuresNotMex = 0.0f;
     navalInfluence = 0.0f;
-    airInfluence = 0.0f;
     landInfluence = 0.0f;
+    airInfluence = 0.0f;
     experimentalInfluence = 0.0f;
     commanderInfluence = 0.0f;
     artilleryInfluence = 0.0f;
@@ -1519,18 +1520,20 @@ namespace moho
 
   void SThreat::RecomputeOverall() noexcept
   {
-    overallInfluence = antiSurfaceInfluence + experimentalInfluence + influenceStructures + antiSubInfluence
-      + commanderInfluence + navalInfluence + economyInfluence + artilleryInfluence + airInfluence + unknownInfluence
-      + antiAirInfluence + landInfluence + influenceStructuresNotMex;
+    // 0x0071539F..0x007153DB: lanes +0x28,+0x18,+0x08,+0x2C,+0x1C,+0x0C,+0x30,
+    // +0x20,+0x10,+0x34,+0x24,+0x14,+0x04 summed left to right.
+    overallInfluence = antiSurfaceInfluence + experimentalInfluence + influenceStructuresNotMex + antiSubInfluence
+      + commanderInfluence + navalInfluence + economyInfluence + artilleryInfluence + landInfluence + unknownInfluence
+      + antiAirInfluence + airInfluence + influenceStructures;
   }
 
   void SThreat::DecayBy(const SThreat& decayRate) noexcept
   {
-    influenceStructuresNotMex = DecayThreatLane(influenceStructuresNotMex, decayRate.influenceStructuresNotMex);
     influenceStructures = DecayThreatLane(influenceStructures, decayRate.influenceStructures);
+    influenceStructuresNotMex = DecayThreatLane(influenceStructuresNotMex, decayRate.influenceStructuresNotMex);
     navalInfluence = DecayThreatLane(navalInfluence, decayRate.navalInfluence);
-    airInfluence = DecayThreatLane(airInfluence, decayRate.airInfluence);
     landInfluence = DecayThreatLane(landInfluence, decayRate.landInfluence);
+    airInfluence = DecayThreatLane(airInfluence, decayRate.airInfluence);
     experimentalInfluence = DecayThreatLane(experimentalInfluence, decayRate.experimentalInfluence);
     commanderInfluence = DecayThreatLane(commanderInfluence, decayRate.commanderInfluence);
     artilleryInfluence = DecayThreatLane(artilleryInfluence, decayRate.artilleryInfluence);
@@ -1544,6 +1547,7 @@ namespace moho
 
   [[nodiscard]] float SThreat::ValueByType(const EThreatType threatType) const noexcept
   {
+    // GetThreat's jump table (0x00715B80): type N >= 2 reads lane +(N-1)*4.
     switch (threatType) {
       case THREATTYPE_Overall:
       case THREATTYPE_OverallNotAssigned:
@@ -1609,11 +1613,11 @@ namespace moho
     }
 
     archive->WriteFloat(threat.overallInfluence);
-    archive->WriteFloat(threat.influenceStructuresNotMex);
     archive->WriteFloat(threat.influenceStructures);
+    archive->WriteFloat(threat.influenceStructuresNotMex);
     archive->WriteFloat(threat.navalInfluence);
-    archive->WriteFloat(threat.airInfluence);
     archive->WriteFloat(threat.landInfluence);
+    archive->WriteFloat(threat.airInfluence);
     archive->WriteFloat(threat.experimentalInfluence);
     archive->WriteFloat(threat.commanderInfluence);
     archive->WriteFloat(threat.artilleryInfluence);
@@ -2079,37 +2083,31 @@ namespace moho
       return 0.0f;
     }
 
+    // 0x00716E75..0x00716F03: both endpoints are snapped to their clamped
+    // cells (VectorToCoords' math, inlined), then offset to the cell centre.
     const std::int32_t index0 = VectorToCoords(pos1);
     const std::int32_t index1 = VectorToCoords(pos2);
+    constexpr float kCellCentre = 0.5f;
+    const float startX = static_cast<float>(index0 % mWidth) + kCellCentre;
+    const float startZ = static_cast<float>(index0 / mWidth) + kCellCentre;
+    const float endX = static_cast<float>(index1 % mWidth) + kCellCentre;
+    const float endZ = static_cast<float>(index1 / mWidth) + kCellCentre;
 
-    int x0 = index0 % mWidth;
-    int z0 = index0 / mWidth;
-    const int x1 = index1 % mWidth;
-    const int z1 = index1 / mWidth;
-
-    const int dx = std::abs(x1 - x0);
-    const int dz = std::abs(z1 - z0);
-    const int sx = (x0 < x1) ? 1 : -1;
-    const int sz = (z0 < z1) ? 1 : -1;
+    // 0x00716F20: a unit-step `struct_Line` walk between the two centres; the
+    // loop (0x00716F31..0x00716FAA) is a do-while that samples the current
+    // cell, steps one axis (4-connected, not Bresenham), and stops once
+    // either edge passes its end.
+    GridTraversalLine line{};
+    InitGridTraversalLine(line, 1, endX, startX, startZ, endZ);
 
     float totalThreat = 0.0f;
-    int err = dx - dz;
-    while (true) {
-      totalThreat += GetThreatRect(x0, z0, 0, ring, threatType, armyIndex);
-      if (x0 == x1 && z0 == z1) {
-        break;
-      }
-
-      const int err2 = err * 2;
-      if (err2 > -dz) {
-        err -= dz;
-        x0 += sx;
-      }
-      if (err2 < dx) {
-        err += dx;
-        z0 += sz;
-      }
-    }
+    do {
+      std::int32_t cellX = 0;
+      std::int32_t cellZ = 0;
+      GetGridTraversalCell(line, cellX, cellZ);
+      totalThreat += GetThreatRect(cellX, cellZ, 0, ring, threatType, armyIndex);
+      AdvanceGridTraversalEdge(line);
+    } while (!IsGridTraversalBeyondEnd(line));
 
     return totalThreat;
   }
@@ -2187,7 +2185,8 @@ namespace moho
 
         const std::int32_t cellIndex = x + z * mWidth;
         const float threat = mMapEntries[static_cast<std::size_t>(cellIndex)].GetThreat(threatType, armyIndex);
-        if (threat <= 0.0f) {
+        // 0x007172F4: `comiss threat, 0; jbe skip` -- NaN is skipped too.
+        if (!(threat > 0.0f)) {
           continue;
         }
 
@@ -2253,9 +2252,8 @@ namespace moho
       for (auto it = cell->entries.begin(); it != cell->entries.end();) {
         InfluenceMapEntry& entry = it->second;
 
-        if (entry.decayTicks > 0) {
-          --entry.decayTicks;
-        }
+        // 0x007165B3..0x007165C2: `ticks = max(ticks - 1, 0)` (cmovg).
+        entry.decayTicks = std::max(entry.decayTicks - 1, 0);
         if (entry.decayTicks == 0) {
           entry.threatStrength = DecayThreatLane(entry.threatStrength, entry.threatDecay);
         }
@@ -2322,20 +2320,21 @@ namespace moho
           armyThreat.overallInfluence += total;
 
           if (!entry.sourceBlueprint->IsMobile()) {
+            // 0x007167F8..0x00716841: a mex adds to +0x04 only; any other
+            // structure adds to +0x08 first, then +0x04.
             if (IsInCategory(massExtractorCategory, entry.sourceBlueprint->mCategoryBitIndex)) {
-              armyThreat.influenceStructuresNotMex += total;
-            } else {
               armyThreat.influenceStructures += total;
+            } else {
               armyThreat.influenceStructuresNotMex += total;
+              armyThreat.influenceStructures += total;
             }
           } else {
-            // 0x00716776..0x00716793: a flier lands in the +0x14 lane and a
-            // land-layer unit in the +0x10 lane -- the opposite of the names
-            // `SThreat` gives those two words. Kept as the binary has it.
+            // 0x00716776..0x00716793: a flier lands in the +0x14 (air) lane
+            // and a land-layer unit in the +0x10 (land) lane.
             if (entry.sourceBlueprint->Air.CanFly != 0u) {
-              armyThreat.landInfluence += total;
-            } else if (entry.sourceLayer == LAYER_Land) {
               armyThreat.airInfluence += total;
+            } else if (entry.sourceLayer == LAYER_Land) {
+              armyThreat.landInfluence += total;
             } else if (entry.sourceLayer == LAYER_Water || entry.sourceLayer == LAYER_Seabed || entry.sourceLayer == LAYER_Sub) {
               armyThreat.navalInfluence += total;
             }
@@ -2589,8 +2588,8 @@ namespace moho
    * into `outThreat` and the chosen cell's world-space center
    * (with `y = 0`) is written into `outPosition`.
    *
-   * Initial threat seed is `-200.0f` (binary's `nInf_200` constant)
-   * so any positive sample wins.
+   * Initial threat and distance seed is -infinity (the binary's file-static
+   * negative-infinity float), so any non-NaN sample wins.
    */
   Wm3::Vec3f* CInfluenceMap::GetHighestThreatPosition(
     Wm3::Vec3f* const outPosition,
@@ -2601,7 +2600,10 @@ namespace moho
     const int armyIndex
   )
   {
-    constexpr float kInitialThreat = -200.0f;
+    // 0x00716FC3 loads the file-static seed at 0x010B9200, which the dynamic
+    // initializer 0x00BDA330 sets to `-0.0f - pInf` where 0x00BDA310 copies
+    // +infinity (0x00F3F7D0) into pInf: the seed is -infinity, not -200.
+    constexpr float kInitialThreat = -std::numeric_limits<float>::infinity();
 
     Wm3::Vector2f armyStart{};
     mArmy->GetArmyStartPos(armyStart);

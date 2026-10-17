@@ -6138,13 +6138,21 @@ void CDebugCanvas::AddWorldText(const SDebugWorldText& text)
  * Self-check: v1 == v2 gives add == v1, dot == 1 and a zero cross, i.e. the
  * identity {1,0,0,0}. Under the shifted form it gave {0,1,0,0}, a
  * half-turn about X for two identical vectors.
+ *
+ * Degenerate half-vector (v1 and v2 opposed): `fcompi` + `jbe` at 0x0044F8E1
+ * takes the fallback when `!(Normalize(add) > 0)`, so NaN takes it too. The
+ * fallback (0x0044F970..0x0044F9A3) is a half turn about a CALLER-SUPPLIED
+ * axis, passed in `edi`: `NormalizeVectorInto(&v1copy, *edi)`, then
+ * `{w = 0, x/y/z = that normalised axis}`. It is not a half turn about v1.
+ * Callers and their asm-proven fallback axes: `QuatFromVecRot` (0x0069AAF3,
+ * (0,1,0)); `CDebugCanvas::AddWireCircle` (0x00450050),
+ * `CDebugCanvas::AddWireSphere` (0x00450139), `DRAW_WireCircle`
+ * (0x00453EF0) and `DRAW_Circle` (0x00456220), all (1,0,0).
  */
-Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2)
+Wm3::Quaternionf* moho::QuatCrossAdd(
+  Wm3::Quaternionf* const dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis
+)
 {
-  if (!dest) {
-    return nullptr;
-  }
-
   Wm3::Vector3f::Normalize(&v1);
   Wm3::Vector3f::Normalize(&v2);
 
@@ -6154,14 +6162,14 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
     v1.z + v2.z,
   };
 
-  if (Wm3::Vector3f::Normalize(&add) <= 0.0f) {
-    // Antiparallel: a half turn about v1 itself - scalar 0, axis in the
-    // imaginary lanes.
-    Wm3::Vector3f::Normalize(&v1);
-    dest->w = 0.0f;
+  if (!(Wm3::Vector3f::Normalize(&add) > 0.0f)) {
+    // Opposed inputs: a half turn about the caller's fallback axis - scalar 0,
+    // the normalised axis in the imaginary lanes.
+    (void)NormalizeVectorInto(&v1, fallbackAxis);
     dest->x = v1.x;
     dest->y = v1.y;
     dest->z = v1.z;
+    dest->w = 0.0f;
     return dest;
   }
 
@@ -6185,7 +6193,9 @@ void CDebugCanvas::AddWireCircle(
 )
 {
   Wm3::Quaternionf orientation{};
-  QuatCrossAdd(&orientation, {0.0f, 1.0f, 0.0f}, normal);
+  // 0x00450043..0x00450083: v1 = +Z (0,0,1), v2 = `normal`, fallback axis
+  // `edi` = +X (1,0,0).
+  QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal, {1.0f, 0.0f, 0.0f});
 
   Wm3::Vector3f axis2Input{0.0f, radius, 0.0f};
   Wm3::Vector3f axis2{};
@@ -6300,7 +6310,9 @@ void CDebugCanvas::AddWireSphere(
   (void)unused2;
 
   Wm3::Quaternionf orientation{};
-  QuatCrossAdd(&orientation, {0.0f, 1.0f, 0.0f}, upAxis);
+  // 0x0045012C..0x0045016C: v1 = +Z (0,0,1), v2 = `upAxis`, fallback axis
+  // `edi` = +X (1,0,0).
+  QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, upAxis, {1.0f, 0.0f, 0.0f});
 
   Wm3::Vector3f basisX{};
   const Wm3::Vector3f unitX{1.0f, 0.0f, 0.0f};
@@ -13052,16 +13064,10 @@ int moho::cfunc_WarpL(LuaPlus::LuaState* const state)
 
   lua_settop(rawState, 3);
   if (lua_type(rawState, 3) != LUA_TNIL) {
+    // 0x0075BB1F: retail converts arg#3 through SCR_FromLuaCopy<Quaternionf>
+    // (0x004CFBD0) rather than reading the four slots inline.
     const LuaPlus::LuaObject orientationObject(LuaPlus::LuaStackObject(state, 3));
-    const LuaPlus::LuaObject xObject = orientationObject[1];
-    const LuaPlus::LuaObject yObject = orientationObject[2];
-    const LuaPlus::LuaObject zObject = orientationObject[3];
-    const LuaPlus::LuaObject wObject = orientationObject[4];
-
-    transform.orient_.x = static_cast<float>(xObject.GetNumber());
-    transform.orient_.y = static_cast<float>(yObject.GetNumber());
-    transform.orient_.z = static_cast<float>(zObject.GetNumber());
-    transform.orient_.w = static_cast<float>(wObject.GetNumber());
+    transform.orient_ = SCR_FromLuaCopy<Wm3::Quaternion<float>>(orientationObject);
   }
 
   entity->Warp(transform);
@@ -21311,12 +21317,10 @@ int moho::cfunc_SetTerrainTypeRectL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  LuaPlus::LuaObject rectObject(LuaPlus::LuaStackObject(state, 1));
-  gpg::Rect2i rect{};
-  rect.x0 = static_cast<std::int32_t>(rectObject.GetByName("x0").GetNumber());
-  rect.z0 = static_cast<std::int32_t>(rectObject.GetByName("y0").GetNumber());
-  rect.x1 = static_cast<std::int32_t>(rectObject.GetByName("x1").GetNumber());
-  rect.z1 = static_cast<std::int32_t>(rectObject.GetByName("y1").GetNumber());
+  // 0x0075C6DA: arg#1 converts through SCR_FromLuaCopy<gpg::Rect2<int>>
+  // (0x004D0B60).
+  const LuaPlus::LuaObject rectObject(LuaPlus::LuaStackObject(state, 1));
+  const gpg::Rect2i rect = SCR_FromLuaCopy<gpg::Rect2<int>>(rectObject);
 
   lua_pushstring(rawState, "TypeCode");
   lua_gettable(rawState, 2);

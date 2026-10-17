@@ -1379,17 +1379,6 @@ namespace
     );
   }
 
-  /// The unit-forward vector (third rotation-matrix column) of `q`, the
-  /// formula `SetOrientation` (0x0056A520) and the constructor share.
-  [[nodiscard]] Wm3::Vec3f ForwardOf(const Wm3::Quatf& q) noexcept
-  {
-    return Wm3::Vec3f{
-      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
-      ((q.y * q.z) - (q.w * q.x)) * 2.0f,
-      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
-    };
-  }
-
   /// Rotation about the Y axis by `angle`, stored scalar-first: the shape
   /// `UpdateFormation` writes into `mOrientationChange` and `Update` builds
   /// for each unit's heading correction.
@@ -2648,7 +2637,7 @@ namespace moho
     }
 
     if (mOrientation != kZeroQuaternion) {
-      mForwardVector = ForwardOf(mOrientation);
+      mForwardVector = moho::QuatForwardAxis(mOrientation);
     }
 
     ClearSlotCaches();
@@ -3170,7 +3159,7 @@ namespace moho
 
       units.push_back(WeakPtr<IUnit>(unit));
 
-      const Wm3::Vec3f forward = ForwardOf(unit->GetTransform().orient_);
+      const Wm3::Vec3f forward = moho::QuatForwardAxis(unit->GetTransform().orient_);
       forwardXSum += forward.x;
       forwardZSum += forward.z;
 
@@ -3601,7 +3590,7 @@ namespace moho
     if (mOrientation == kZeroQuaternion || mCommandType == EUnitCommandType::UNITCOMMAND_Move) {
       mForwardVector = Wm3::Vec3f::ZERO;
     } else {
-      mForwardVector = ForwardOf(mOrientation);
+      mForwardVector = moho::QuatForwardAxis(mOrientation);
     }
     mPlanUpdate = 1u;
   }

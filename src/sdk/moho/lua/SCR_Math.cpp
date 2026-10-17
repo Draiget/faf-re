@@ -8,6 +8,7 @@
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 
 namespace
 {
@@ -247,7 +248,9 @@ int moho::cfunc_MinLerpL(LuaPlus::LuaState* const state)
   Wm3::Quatf right{};
   SCR_FromLuaCopy<Wm3::Quaternion<float>>(&rightObject, &right);
 
-  const Wm3::Quatf interpolated = Wm3::Quatf::Nlerp(left, right, alpha);
+  // 0x0050D8D1..0x0050D8E3: func_QuatLERP(q1@eax = R, q2@ecx = L, out@ebx, alpha).
+  Wm3::Quatf interpolated{};
+  (void)moho::QuatLERP(&right, &left, &interpolated, alpha);
   LuaPlus::LuaObject luaOrientation = SCR_ToLua<Wm3::Quaternion<float>>(state, interpolated);
   luaOrientation.PushStack(state);
   return 1;
@@ -324,7 +327,9 @@ int moho::cfunc_MinSlerpL(LuaPlus::LuaState* const state)
   Wm3::Quatf right{};
   SCR_FromLuaCopy<Wm3::Quaternion<float>>(&rightObject, &right);
 
-  const Wm3::Quatf interpolated = Wm3::Quatf::Slerp(left, right, alpha);
+  // 0x0050DAF1..0x0050DB03: Moho::SLERP(q2@eax = R, q1@ecx = L, out@ebx, alpha).
+  Wm3::Quatf interpolated{};
+  (void)moho::SLERP(&right, &left, &interpolated, alpha);
   LuaPlus::LuaObject luaOrientation = SCR_ToLua<Wm3::Quaternion<float>>(state, interpolated);
   luaOrientation.PushStack(state);
   return 1;
@@ -1021,7 +1026,10 @@ int moho::cfunc_VDotL(LuaPlus::LuaState* const state)
   Wm3::Vec3f left{};
   SCR_FromLuaCopy<Wm3::Vector3<float>>(&leftObject, &left);
 
-  lua_pushnumber(state->m_state, (left.x * right.x) + (left.y * right.y) + (left.z * right.z));
+  // 0x004D1776..0x004D178C sums on x87 (24-bit precision control) from the
+  // z lane down: ((z*z' + y*y') + x*x'). Summing x first rounds differently.
+  const float dot = ((left.z * right.z) + (left.y * right.y)) + (left.x * right.x);
+  lua_pushnumber(state->m_state, dot);
   (void)lua_gettop(state->m_state);
   return 1;
 }

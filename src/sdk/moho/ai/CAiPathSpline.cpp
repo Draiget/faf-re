@@ -1179,10 +1179,7 @@ namespace
    */
   [[nodiscard]] Wm3::Vector3f HeadingFromOrientation(const Wm3::Quatf& orient) noexcept
   {
-    Wm3::Vector3f forward{};
-    forward.x = ((orient.w * orient.y) + (orient.z * orient.x)) * 2.0f;
-    forward.y = ((orient.z * orient.y) - (orient.w * orient.x)) * 2.0f;
-    forward.z = 1.0f - (((orient.y * orient.y) + (orient.x * orient.x)) * 2.0f);
+    Wm3::Vector3f forward = moho::QuatForwardAxis(orient);
     if (std::fabs(forward.y) > 0.99000001f) {
       forward = Wm3::Vector3f{0.0f, 0.0f, 1.0f};
     }

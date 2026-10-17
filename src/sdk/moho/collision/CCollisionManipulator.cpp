@@ -28,11 +28,6 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace moho
-{
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
-}
-
 namespace
 {
   constexpr const char* kCollisionManipulatorLuaClassName = "CCollisionManipulator";

@@ -29,12 +29,6 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 
-namespace moho
-{
-  // Defined in QuaternionMath.cpp (no shared header); rotate a vector by a quaternion.
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
-}
-
 namespace
 {
   constexpr const char* kPropLuaClassName = "Prop";

@@ -18,6 +18,7 @@ extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, 
 extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
 extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
 extern "C" float __cdecl msvc8_x87_sin_times(float sinArg, float factor);
+extern "C" float __cdecl msvc8_x87_sin_reciprocal(float sinArg);
 extern "C" float __cdecl msvc8_x87_intrinsic_exp(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_ln(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_log10(float x);
@@ -281,6 +282,23 @@ namespace msvc8
     return result;
 #else
     return msvc8_x87_sin_times(sinArg, factor);
+#endif
+  }
+
+  float SinReciprocal(const float sinArg) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld sinArg
+      fsin
+      fld1
+      fdivrp st(1), st(0)
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_sin_reciprocal(sinArg);
 #endif
   }
 

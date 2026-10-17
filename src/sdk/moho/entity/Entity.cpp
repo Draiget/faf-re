@@ -419,33 +419,6 @@ namespace
     return out;
   }
 
-  [[nodiscard]] float VectorLength(const Wm3::Vector3f& value) noexcept
-  {
-    return std::sqrt((value.x * value.x) + (value.y * value.y) + (value.z * value.z));
-  }
-
-  void NormalizeInPlace(Wm3::Vector3f& value) noexcept
-  {
-    const float length = VectorLength(value);
-    if (length <= 1.0e-6f) {
-      value = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
-      return;
-    }
-
-    const float invLength = 1.0f / length;
-    value.x *= invLength;
-    value.y *= invLength;
-    value.z *= invLength;
-  }
-
-  void SetVectorLengthIfNonZero(Wm3::Vector3f& value, const float targetLength) noexcept
-  {
-    NormalizeInPlace(value);
-    value.x *= targetLength;
-    value.y *= targetLength;
-    value.z *= targetLength;
-  }
-
   /**
    * Inlined in `cfunc_EntitySetCollisionShapeL` (0x0068F2D5-0x0068F301).
    *
@@ -6577,19 +6550,21 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+    // 0x006901F6..0x00690382 type-checks and reads all six numbers before the
+    // 0x006903A1 body null test, so a bad argument errors even without a body.
+    const Wm3::Vector3f localImpulse{
+      ReadLuaNumberArgument(state, 2),
+      ReadLuaNumberArgument(state, 3),
+      ReadLuaNumberArgument(state, 4),
+    };
+    const Wm3::Vector3f localPoint{
+      ReadLuaNumberArgument(state, 5),
+      ReadLuaNumberArgument(state, 6),
+      ReadLuaNumberArgument(state, 7),
+    };
+
     moho::SPhysBody* const body = entity->mPhysBody;
     if (body != nullptr) {
-      const Wm3::Vector3f localImpulse{
-        ReadLuaNumberArgument(state, 2),
-        ReadLuaNumberArgument(state, 3),
-        ReadLuaNumberArgument(state, 4),
-      };
-      const Wm3::Vector3f localPoint{
-        ReadLuaNumberArgument(state, 5),
-        ReadLuaNumberArgument(state, 6),
-        ReadLuaNumberArgument(state, 7),
-      };
-
       body->AddLocalImpulse(localImpulse, localPoint);
     }
 

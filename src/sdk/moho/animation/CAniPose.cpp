@@ -16,11 +16,6 @@
 #include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
 
-namespace moho
-{
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
-}
-
 namespace
 {
   [[nodiscard]] gpg::RType* CachedVTransformType()

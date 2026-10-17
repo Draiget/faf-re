@@ -354,23 +354,33 @@ namespace
     return categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
   }
 
-  [[nodiscard]] float ResolveBlueprintThreatValue(
+  /**
+   * Adds one blueprint's threat to the running platoon total.
+   *
+   * The "all threat types" lane folds each level into the running total in
+   * turn -- `(((air + total) + surface) + sub) + economy` -- rather than
+   * summing the four levels first (0x007327DD-0x007327FB in
+   * CalculatePlatoonThreat, 0x00732D3A-0x00732D58 in ...AroundPosition).
+   */
+  [[nodiscard]] float AddBlueprintThreat(
+    const float totalThreat,
     const moho::RUnitBlueprint& blueprint,
     const PlatoonThreatType threatType
   ) noexcept
   {
     switch (threatType) {
       case PlatoonThreatType::Air:
-        return blueprint.Defense.AirThreatLevel;
+        return blueprint.Defense.AirThreatLevel + totalThreat;
       case PlatoonThreatType::Surface:
-        return blueprint.Defense.SurfaceThreatLevel;
+        return blueprint.Defense.SurfaceThreatLevel + totalThreat;
       case PlatoonThreatType::Sub:
-        return blueprint.Defense.SubThreatLevel;
+        return blueprint.Defense.SubThreatLevel + totalThreat;
       case PlatoonThreatType::Economy:
-        return blueprint.Defense.EconomyThreatLevel;
+        return blueprint.Defense.EconomyThreatLevel + totalThreat;
       case PlatoonThreatType::Unknown:
       default:
-        return blueprint.Defense.AirThreatLevel + blueprint.Defense.SurfaceThreatLevel + blueprint.Defense.SubThreatLevel
+        return (((blueprint.Defense.AirThreatLevel + totalThreat) + blueprint.Defense.SurfaceThreatLevel)
+                + blueprint.Defense.SubThreatLevel)
           + blueprint.Defense.EconomyThreatLevel;
     }
   }
@@ -6025,7 +6035,7 @@ namespace moho
         continue;
       }
 
-      totalThreat += ResolveBlueprintThreatValue(*unitBlueprint, threatType);
+      totalThreat = AddBlueprintThreat(totalThreat, *unitBlueprint, threatType);
     }
 
     lua_pushnumber(state->m_state, totalThreat);
@@ -6125,7 +6135,7 @@ namespace moho
         continue;
       }
 
-      totalThreat += ResolveBlueprintThreatValue(*unitBlueprint, threatType);
+      totalThreat = AddBlueprintThreat(totalThreat, *unitBlueprint, threatType);
     }
 
     lua_pushnumber(state->m_state, totalThreat);

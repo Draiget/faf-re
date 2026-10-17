@@ -147,6 +147,25 @@ namespace moho
   void QuatFromVecRot(Wm3::Quaternionf* quat, const Wm3::Vector3f* refAxis, float rads);
 
   /**
+   * Address: 0x0044F880 (FUN_0044F880, Moho::QuatCrossAdd)
+   *
+   * IDA signature:
+   * Wm3::Quaternionf *__usercall Moho::QuatCrossAdd@<eax>(
+   *   Wm3::Quaternionf *dest@<ebx>, Wm3::Vector3f *fallbackAxis@<edi>,
+   *   Wm3::Vector3f v1, Wm3::Vector3f v2);
+   *
+   * What it does:
+   * Writes the scalar-first shortest-arc quaternion rotating normalised `v1`
+   * onto normalised `v2` (half-vector construction). When the half-vector
+   * degenerates (opposed inputs, or NaN) it writes a half turn about the
+   * normalised `fallbackAxis` instead. Defined in `Sim.cpp`, next to its
+   * `CDebugCanvas` callers.
+   */
+  Wm3::Quaternionf* QuatCrossAdd(
+    Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis
+  );
+
+  /**
    * Address: 0x006C1070 (FUN_006C1070)
    *
    * What it does:
@@ -224,6 +243,27 @@ namespace moho
    * consecutive `Wm3::Vector3f` rows. Returns `outMatrix`.
    */
   Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* quat, Wm3::Vector3f* outMatrix) noexcept;
+
+  /**
+   * The orientation's local +Z (forward) axis: the third column of the matrix
+   * `QuatToMatrix` (0x00452FD0) expands, the same lanes `VAxes3::vZ`
+   * (0x004EC590) holds:
+   *   x = 2(xz + wy),  y = 2(yz - wx),  z = 1 - 2(xx + yy)
+   *
+   * The binary inlines this at its sites (e.g. `CUnitMotion::NotifyDetached`
+   * 0x006B95A1..0x006B95EF, `CAiPathSpline` 0x005B30E3..0x005B3150, the
+   * `CThrustManipulator` constructor 0x0064A683..0x0064A706). Every copy
+   * pairs the same two products per lane and only scales by 2, which is
+   * exact, so the operand order the copies differ in does not change a bit.
+   */
+  [[nodiscard]] inline Wm3::Vector3f QuatForwardAxis(const Wm3::Quaternionf& q) noexcept
+  {
+    return Wm3::Vector3f{
+      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
+      ((q.y * q.z) - (q.w * q.x)) * 2.0f,
+      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
+    };
+  }
 
   /**
    * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)

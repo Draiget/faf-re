@@ -27,12 +27,15 @@
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
 
-// Forward declaration of QuatCrossAdd (defined in Sim.cpp at global scope).
-Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2);
-
 namespace moho
 {
+  // Declared in moho/math/QuaternionMath.h; that header is not included here
+  // because its header-scope yaw constants would add dynamic initializers to
+  // this translation unit.
   Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+  Wm3::Quaternionf* QuatCrossAdd(
+    Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis
+  );
 }
 
 namespace
@@ -1168,8 +1171,9 @@ namespace moho
     const std::uint32_t precision
   )
   {
+    // 0x00453EE3..0x00453F23: v1 = +Z, v2 = `normal`, fallback axis `edi` = +X.
     Wm3::Quaternionf orientation{};
-    ::QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal);
+    (void)QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal, {1.0f, 0.0f, 0.0f});
 
     const Vector3f axisSin = RotateByQuaternion({0.0f, radius, 0.0f}, orientation);
     const Vector3f axisCos = RotateByQuaternion({radius, 0.0f, 0.0f}, orientation);
@@ -1491,8 +1495,9 @@ namespace moho
       return;
     }
 
+    // 0x00456213..0x00456253: v1 = +Z, v2 = `normal`, fallback axis `edi` = +X.
     Wm3::Quaternionf orientation{};
-    ::QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal);
+    (void)QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal, {1.0f, 0.0f, 0.0f});
 
     const float innerRadius = radius - kOvalBandHalfWidth;
     const float outerRadius = radius + kOvalBandHalfWidth;

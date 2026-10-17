@@ -252,8 +252,9 @@ namespace moho
      * fit at (`CSquad::FitsAt`) and, when a `scoreScript`/`scoreFunc` Lua
      * callback is supplied, only those the callback approves. The comparison
      * mode selects the winning vector (Closest/Furthest to the best
-     * category-excluded entity, HighestValue of nearby units, or count of
-     * nearby units). When value/count scoring finds nothing it retries once in
+     * category-excluded entity, HighestValue of units within 32 of the
+     * candidate point, or LeastDefended = smallest non-zero unit count within
+     * 32 of it). When value/count scoring finds nothing it retries once in
      * `COMPARE_Closest`. The winning attack vector's `origin`/`direction` is
      * written into `outResult` (as `SPointVector::point`/`vector`); a
      * degenerate squad/brain state yields a zero result. Returns `outResult`.

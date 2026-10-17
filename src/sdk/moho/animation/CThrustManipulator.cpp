@@ -31,11 +31,6 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 
-namespace moho
-{
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
-}
-
 namespace
 {
   /// The four constructor defaults, read straight out of the constant pool:
@@ -130,20 +125,6 @@ namespace
     return &pose->mBones.begin()[boneIndex];
   }
 
-  /**
-   * The bone-local +Z axis of `orientation`, i.e. the third column of the
-   * rotation matrix it expands to. Written out by hand in both the
-   * constructor (0x0064A683-0x0064A706) and nowhere else, so it stays a local
-   * helper rather than joining `QuaternionMath`.
-   */
-  [[nodiscard]] Wm3::Vector3f ForwardAxisOf(const Wm3::Quaternionf& orientation) noexcept
-  {
-    return Wm3::Vector3f{
-      ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f,
-      ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f,
-      1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f),
-    };
-  }
 } // namespace
 
 namespace moho
@@ -197,7 +178,7 @@ namespace moho
       return;
     }
 
-    mRestDirection = ForwardAxisOf(watchedBone->mLocalTransform.orient_);
+    mRestDirection = moho::QuatForwardAxis(watchedBone->mLocalTransform.orient_);
     (void)BuildTiltShortestArcDelta(kWorldUp, &mOrientation, mRestDirection);
   }
 

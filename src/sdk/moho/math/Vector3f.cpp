@@ -93,7 +93,8 @@ namespace moho
     const float dx = to.x - from.x;
     const float dy = to.y - from.y;
     const float dz = to.z - from.z;
-    return (dx * dx) + (dy * dy) + (dz * dz);
+    // 0x004CC97C..0x004CC995 sums x, then z, then y.
+    return ((dx * dx) + (dz * dz)) + (dy * dy);
   }
 
   /**
@@ -123,11 +124,13 @@ namespace moho
     const bool yDominatesX = std::fabs(value.y) > std::fabs(value.x);
     const int dominantAxis = yDominatesX ? 1 : 0;
     const float* const lanes = &value.x;
-    if (std::fabs(value.z) <= std::fabs(lanes[dominantAxis])) {
-      return dominantAxis;
+    // `fcompi` + `ja` at 0x0053830F..0x00538313: only an ordered `|z| >`
+    // picks z, so a NaN z keeps the x/y winner.
+    if (std::fabs(value.z) > std::fabs(lanes[dominantAxis])) {
+      return 2;
     }
 
-    return 2;
+    return dominantAxis;
   }
 
   /**
@@ -154,7 +157,8 @@ namespace moho
   {
     const float x = vector->x;
     const float lengthSq = (x * x) + (vector->y * vector->y) + (vector->z * vector->z);
-    if (lengthSq <= 0.0f) {
+    // `comiss` + `jbe` at 0x005B1CC1..0x005B1CCD: a NaN length returns false.
+    if (!(lengthSq > 0.0f)) {
       return false;
     }
 
@@ -209,7 +213,8 @@ namespace moho
     const float sourceX = sourceVector->x;
     const float sourceLengthSq =
       (sourceX * sourceX) + (sourceVector->y * sourceVector->y) + (sourceVector->z * sourceVector->z);
-    if (sourceLengthSq <= 0.0f) {
+    // `comiss` + `jbe` at 0x0069A397..0x0069A3A3: a NaN length copies too.
+    if (!(sourceLengthSq > 0.0f)) {
       *destination = *targetLengthVector;
       return destination;
     }

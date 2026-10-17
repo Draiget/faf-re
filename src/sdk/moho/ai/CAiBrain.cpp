@@ -1588,23 +1588,14 @@ namespace moho
 
     CAiReconDBImpl* const reconDb = brain->mArmy->GetReconDB();
 
-    const gpg::Rect2f queryRect{
-      position.x - dist,
-      position.z - dist,
-      position.x + dist,
-      position.z + dist
-    };
-    CollisionDBRect collisionRect{};
-    (void)func_Rect2fToInt16(&collisionRect, queryRect);
+    // 0x0057B2F4..0x0057B343: the same circular `EntitiesAroundPoint` gather
+    // (radius in xmm0, ENTITYTYPE_Unit) as the counting twin 0x0057B480 --
+    // not a square rect gather, so corner units outside `dist` are excluded.
+    gpg::core::FastVectorN<CollisionResult, 10> gatheredEntities{};
+    EntitiesAroundPoint(gatheredEntities, dist, *brain->mSim->mOGrid, ENTITYTYPE_Unit, position);
 
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
-    (void)brain->mSim->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
-      gatheredEntities,
-      collisionRect,
-      ENTITYTYPE_Unit
-    );
-
-    for (Entity* const candidateEntity : gatheredEntities) {
+    for (const CollisionResult& hit : gatheredEntities) {
+      Entity* const candidateEntity = hit.sourceEntity;
       if (candidateEntity == nullptr || candidateEntity->mVarDat.mIsDead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
         continue;
       }
@@ -1726,14 +1717,28 @@ namespace moho
     }
 
     /**
-     * Squared XYZ distance between two positions.
+     * Squared XYZ distance between two positions, summed z-first as
+     * `(dz*dz + dy*dy) + dx*dx` -- the order of the Closest/Furthest lanes
+     * (0x0057B81A..0x0057B839, 0x0057C53D..0x0057C562, 0x0057C586..0x0057C5BF).
      */
     [[nodiscard]] float DistanceSquared(const Wm3::Vector3f& a, const Wm3::Vector3f& b) noexcept
     {
       const float dx = a.x - b.x;
       const float dy = a.y - b.y;
       const float dz = a.z - b.z;
-      return (dx * dx) + (dy * dy) + (dz * dz);
+      return ((dz * dz) + (dy * dy)) + (dx * dx);
+    }
+
+    /**
+     * Squared XYZ distance summed x-first as `(dx*dx + dy*dy) + dz*dz` -- the
+     * order of the HighestValue tie-break (0x0057C776..0x0057C7EE).
+     */
+    [[nodiscard]] float DistanceSquaredXFirst(const Wm3::Vector3f& a, const Wm3::Vector3f& b) noexcept
+    {
+      const float dx = a.x - b.x;
+      const float dy = a.y - b.y;
+      const float dz = a.z - b.z;
+      return ((dx * dx) + (dy * dy)) + (dz * dz);
     }
   } // namespace
 
@@ -1746,11 +1751,10 @@ namespace moho
    *
    * What it does:
    * Gathers candidate entities and returns the single best-scored one relative
-   * to `referencePosition`, ranked by `compareType`. When `alliance ==
-   * ALLIANCE_Ally` the ally set is filled from `mArmy->GetUnits(category)`; that
-   * ally set is the one actually scored. A recon-blip set is also built (each
-   * live blip creator), matching the binary — the shipped code populates it but
-   * never scores it, so it is preserved as a faithful, if inert, side effect.
+   * to `referencePosition`, ranked by `compareType`. One id-sorted candidate
+   * set is scored: when `alliance == ALLIANCE_Ally` it starts as
+   * `mArmy->GetUnits(category)`, then every live recon-blip creator is added
+   * into the same set (0x0057B70E..0x0057B74D).
    *
    * Each scored candidate must be allied per `IArmy::GetAllianceWith` and must
    * NOT be a member of `category` (the binary's category test is an exclusion
@@ -1768,10 +1772,7 @@ namespace moho
     const EntityCategorySet* const category,
     const Wm3::Vector3f& referencePosition)
   {
-    // Recon-blip candidate set (populated for parity with the binary; the
-    // shipped function never scores it — see the ally set below).
-    EntitySetTemplate<Unit> reconCandidates{};
-    // Ally candidate set — this is the set actually iterated for scoring.
+    // The one candidate set this function scores (`[esp+0x24]`).
     EntitySetTemplate<Unit> allyCandidates{};
 
     if (alliance == ALLIANCE_Ally) {
@@ -1780,11 +1781,13 @@ namespace moho
       allyCandidates.mVec.AddAll(&armyUnits.mVec);
     }
 
+    // 0x0057B70E..0x0057B74D: live recon-blip creators are `Add`ed (0x0057DDD0,
+    // id-sorted, de-duplicated) into the SAME set that is scored below.
     CAiReconDBImpl* const reconDb = brain->mArmy->GetReconDB();
     for (ReconBlip* const blip : reconDb->ReconGetBlips()) {
       Unit* const creator = blip ? blip->GetCreator() : nullptr;
       if (creator != nullptr && !creator->IsDead()) {
-        (void)reconCandidates.Add(creator);
+        (void)allyCandidates.Add(creator);
       }
     }
 
@@ -1966,9 +1969,10 @@ namespace moho
 
       switch (compareType) {
         case COMPARE_Closest: {
+          // 0x0057C53D / 0x0057C586: squared distances summed z-first.
           float score;
           if (category->Empty()) {
-            score = DistanceSquared(squadCenter, candidatePoint);
+            score = DistanceSquared(candidatePoint, squadCenter);
           } else {
             Entity* const bestEntity =
               CollectAttackCandidateEntities(this, COMPARE_Closest, alliance, category, squadCenter);
@@ -1984,9 +1988,10 @@ namespace moho
           break;
         }
         case COMPARE_Furthest: {
+          // 0x0057C60F / 0x0057C658: squared distances summed z-first.
           float score;
           if (category->Empty()) {
-            score = DistanceSquared(squadCenter, candidatePoint);
+            score = DistanceSquared(candidatePoint, squadCenter);
           } else {
             Entity* const bestEntity =
               CollectAttackCandidateEntities(this, COMPARE_Furthest, alliance, category, squadCenter);
@@ -2002,8 +2007,12 @@ namespace moho
           break;
         }
         case COMPARE_HighestValue: {
+          // 0x0057C6D6..0x0057C6FC: gather around the CANDIDATE point with
+          // radius 32.0 (`flt_E4F92C`), not around the squad centre.
           EntitySetTemplate<Unit> nearbyUnits{};
-          CollectUnitsAroundPointFiltered(this, &nearbyUnits, category, squadCenter, 0.0f, alliance);
+          CollectUnitsAroundPointFiltered(
+            this, &nearbyUnits, category, candidatePoint, kLeastDefendedScanRadius, alliance
+          );
 
           float score = 0.0f;
           for (Entity* const nearbyEntity : nearbyUnits.mVec) {
@@ -2011,18 +2020,19 @@ namespace moho
             score += UnitBuildValue(nearbyUnit != nullptr ? nearbyUnit->GetBlueprint() : nullptr);
           }
 
+          // 0x0057C758..0x0057C7F5: enter when `score >= best` (ordered) or
+          // `best < 0`; then keep unless `score == best`, in which case the
+          // tie-break prefers the candidate point closer to the squad centre
+          // than the kept vector's origin.
           bool keep = false;
-          if (score > bestScore) {
-            keep = true;
-          } else if (bestScore < 0.0f) {
-            keep = true;
-          } else if (score == bestScore) {
-            // Tie-break (asm 0x57C776): on equal value, prefer the vector whose
-            // candidate point is closer to the squad center than the kept
-            // vector's origin is.
-            const float keptOriginDist = DistanceSquared(bestVector.point, squadCenter);
-            const float candidateDist = DistanceSquared(candidatePoint, squadCenter);
-            keep = keptOriginDist > candidateDist;
+          if (score >= bestScore || bestScore < 0.0f) {
+            if (score != bestScore) {
+              keep = true;
+            } else {
+              const float keptOriginDist = DistanceSquaredXFirst(bestVector.point, squadCenter);
+              const float candidateDist = DistanceSquaredXFirst(candidatePoint, squadCenter);
+              keep = keptOriginDist > candidateDist;
+            }
           }
           if (keep) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
@@ -2032,13 +2042,18 @@ namespace moho
           break;
         }
         case COMPARE_LeastDefended: {
+          // 0x0057C826..0x0057C844: gather around the CANDIDATE point, radius 32.0.
           EntitySetTemplate<Unit> nearbyUnits{};
-          CollectUnitsAroundPointFiltered(this, &nearbyUnits, category, squadCenter, kLeastDefendedScanRadius, alliance);
+          CollectUnitsAroundPointFiltered(
+            this, &nearbyUnits, category, candidatePoint, kLeastDefendedScanRadius, alliance
+          );
 
           const float score =
             static_cast<float>((nearbyUnits.mVec.end() - nearbyUnits.mVec.begin()));
 
-          if (score > bestScore || bestScore < 0.0f) {
+          // 0x0057C85D..0x0057C893: take the smallest NON-ZERO count -- replace
+          // when `count > 0` and (`best > count` or `best == 0`), or when `best < 0`.
+          if (((bestScore > score || bestScore == 0.0f) && score > 0.0f) || bestScore < 0.0f) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
             bestVector = attackVector;
             bestScore = score;
@@ -4079,11 +4094,14 @@ int moho::cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* const state)
 
   Wm3::Vector2f startPosition;
   army->GetArmyStartPos(startPosition);
+  // 0x00589BAF-0x00589C45: each corner converts the start coordinate with
+  // `fld; fistp` (current x87 rounding mode, round-to-nearest), not a
+  // truncating `_ftol`, so an `x.5` army start rounds rather than truncates.
   gpg::Rect2i occupyRect{};
-  occupyRect.x0 = static_cast<int>(startPosition.x) - 5;
-  occupyRect.x1 = static_cast<int>(startPosition.x) + 5;
-  occupyRect.z0 = static_cast<int>(startPosition.y) - 5;
-  occupyRect.z1 = static_cast<int>(startPosition.y) + 5;
+  occupyRect.x0 = msvc8::RoundToInt(startPosition.x) - 5;
+  occupyRect.x1 = msvc8::RoundToInt(startPosition.x) + 5;
+  occupyRect.z0 = msvc8::RoundToInt(startPosition.y) - 5;
+  occupyRect.z1 = msvc8::RoundToInt(startPosition.y) + 5;
 
   const EOccupancyCaps occupancyCaps = blueprint->mFootprint.mOccupancyCaps;
   grid->ExecuteOccupy(occupancyCaps, occupyRect);
@@ -4572,7 +4590,9 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       const float ddx = worldX - targetPos.x;
       const float ddz = worldZ - targetPos.z;
       const float curDist = (ddx * ddx) + (ddz * ddz) + dy2;
-      if (closestDist <= curDist) {
+      // 0x0058B081: `comiss closest, cur; jbe skip` -- an unordered (NaN)
+      // distance is skipped too, so this is `!(closest > cur)`.
+      if (!(closestDist > curDist)) {
         continue;
       }
 
@@ -4600,21 +4620,23 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
         }
       }
 
-      // Threat gate. (Preserves the binary's double-divide clamp exactly.)
+      // Threat gate. 0x0058B1EA-0x0058B22A divides each truncated world
+      // coordinate by mGridSize once (`idiv edi`) and clamps that quotient
+      // directly against `width-1` / `height-1` -- there is no second divide.
       bool unthreatened = true;
       if (optIgnoreThreatOver > 0) {
         CInfluenceMap* const igrid = mArmy->GetIGrid();
         const int mGridSize = igrid->mGridSize;
         const int gridWidth = igrid->mWidth;
         int xCell = static_cast<int>(worldX) / mGridSize;
-        if (xCell / mGridSize >= gridWidth - 1) {
+        if (xCell >= gridWidth - 1) {
           xCell = gridWidth - 1;
         }
         if (xCell < 0) {
           xCell = 0;
         }
         int zCell = static_cast<int>(worldZ) / mGridSize;
-        if (zCell / mGridSize >= igrid->mHeight - 1) {
+        if (zCell >= igrid->mHeight - 1) {
           zCell = igrid->mHeight - 1;
         }
         if (zCell < 0) {
@@ -5133,9 +5155,12 @@ int moho::cfunc_CAiBrainGetEconomyStoredRatioL(LuaPlus::LuaState* const state)
   float ratio = 0.0f;
   CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    const double maxStorage = static_cast<double>(SelectResourceLane(economyInfo->economy.mMaxStorage, resource));
-    if (maxStorage > 0.0) {
-      ratio = static_cast<float>(static_cast<double>(SelectResourceLane(economyInfo->economy.mStored, resource)) / maxStorage);
+    // 0x0058F6A4-0x0058F6F7: the u64 max-storage lane is converted to float
+    // (fild/fchs/faddp at PC24, then `fst dword`), compared `> 0`, and the
+    // ratio is a float `divss stored, maxStorage` -- not a double division.
+    const float maxStorage = static_cast<float>(SelectResourceLane(economyInfo->economy.mMaxStorage, resource));
+    if (maxStorage > 0.0f) {
+      ratio = SelectResourceLane(economyInfo->economy.mStored, resource) / maxStorage;
     }
   }
 
@@ -6657,11 +6682,12 @@ int moho::cfunc_CAiBrainAssignThreatAtPositionL(LuaPlus::LuaState* const state)
     if (lua_type(rawState, 4) != LUA_TNUMBER) {
       decayStackObject.TypeError("number");
     }
+    // 0x00590182-0x005901AC: `fld1; fcompi; jbe` keeps the argument only
+    // when `1.0 > decay` (a NaN decay therefore becomes 1.0), then
+    // `comiss 0, decay; jbe` clamps to 0 only when `0 > decay`.
     float rawDecay = static_cast<float>(lua_tonumber(rawState, 4));
-    if (rawDecay >= 1.0f) {
-      rawDecay = 1.0f;
-    }
-    if (rawDecay < 0.0f) {
+    rawDecay = (1.0f > rawDecay) ? rawDecay : 1.0f;
+    if (0.0f > rawDecay) {
       rawDecay = 0.0f;
     }
     decayRate = rawDecay;
@@ -7858,7 +7884,8 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
     const float dx = searchPosition.x - unitPosition.x;
     const float dy = searchPosition.y - unitPosition.y;
     const float dz = searchPosition.z - unitPosition.z;
-    const float distanceSq = (dx * dx) + (dy * dy) + (dz * dz);
+    // 0x0058EA9D-0x0058EAB9 sums `(dz*dz + dy*dy) + dx*dx` (z first).
+    const float distanceSq = ((dz * dz) + (dy * dy)) + (dx * dx);
     if (distanceSq < closestDistance) {
       closestDistance = distanceSq;
       closestArmy = sourceArmy;
@@ -8158,7 +8185,7 @@ int moho::cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* const state)
   // falls within the segment span. `hitResult.distance` is seeded to NaN so a
   // segment with no recorded distance never reports blockage.
   const auto segmentBlocked =
-    [&](const Wm3::Vector3f& segStart, const Wm3::Vector3f& segEnd) -> bool {
+    [&](const Wm3::Vector3f& segStart, const Wm3::Vector3f& segEnd, const bool straightSegment) -> bool {
       const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(segStart, segEnd);
 
       GeomLine3 line{};
@@ -8177,8 +8204,13 @@ int moho::cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* const state)
       const float spanDx = segStart.x - segEnd.x;
       const float spanDy = segStart.y - segEnd.y;
       const float spanDz = segStart.z - segEnd.z;
-      const float segmentLength =
-        std::sqrt((spanDx * spanDx) + (spanDz * spanDz) + (spanDy * spanDy));
+      // The two binary paths sum the span length in different orders:
+      // straight (0x00591445-0x0059147A) is `(dz*dz + dy*dy) + dx*dx`, the
+      // arc loop (0x0059170F-0x0059174D) is `(dx*dx + dz*dz) + dy*dy`.
+      const float segmentLengthSq = straightSegment
+        ? ((spanDz * spanDz) + (spanDy * spanDy)) + (spanDx * spanDx)
+        : ((spanDx * spanDx) + (spanDz * spanDz)) + (spanDy * spanDy);
+      const float segmentLength = std::sqrt(segmentLengthSq);
 
       return IsValidVector3f(hitPoint) && segmentLength >= hitResult.distance;
     };
@@ -8207,7 +8239,7 @@ int moho::cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* const state)
       currentPoint.z += quarterStep.z;
       currentPoint.y += (stepMultiplier * quarterLength) * arcScale;
 
-      if (segmentBlocked(previousPoint, currentPoint)) {
+      if (segmentBlocked(previousPoint, currentPoint, false)) {
         blocked = true;
         break;
       }
@@ -8216,7 +8248,7 @@ int moho::cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* const state)
     }
   } else {
     // Straight mode: a single segment from start to end.
-    blocked = segmentBlocked(startPosition, endPosition);
+    blocked = segmentBlocked(startPosition, endPosition, true);
   }
 
   lua_pushboolean(rawState, blocked ? 1 : 0);

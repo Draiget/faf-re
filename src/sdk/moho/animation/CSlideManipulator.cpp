@@ -144,17 +144,6 @@ namespace
   }
 
   /**
-   * Address: 0x005D1E70 (FUN_005D1E70, func_VecLimitLengthTo)
-   *
-   * Canonical body lives in moho/math/Vector3f.cpp; this alias keeps the
-   * slide-manipulator call sites reading the same as the binary's.
-   */
-  [[nodiscard]] bool LimitVectorLengthTo(Wm3::Vector3f* const vector, const float maxLength)
-  {
-    return moho::VecLimitLengthTo(vector, maxLength);
-  }
-
-  /**
    * Address: 0x00647250 (FUN_00647250)
    *
    * IDA signature:
@@ -578,7 +567,7 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
     mGoal.z - mCurrentPosition.z
   };
 
-  if (maxSpeed > 0.0f && LimitVectorLengthTo(&delta, mCurrentSpeed)) {
+  if (maxSpeed > 0.0f && VecLimitLengthTo(&delta, mCurrentSpeed)) {
     mCurrentPosition.x += delta.x;
     mCurrentPosition.y += delta.y;
     mCurrentPosition.z += delta.z;

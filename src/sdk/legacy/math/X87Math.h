@@ -72,6 +72,10 @@ namespace msvc8
   // `fld arg; fsin; fmul factor; fstp`: the sine stays unrounded and only the
   // product rounds (CUnitMotion::HandleDivingAndSurfacing, 0x006C337A..0x006C3380).
   [[nodiscard]] float SinTimes(float sinArg, float factor) noexcept;
+  // `fld arg; fld st0; fsin; fld1; fdivrp st(1)`: one over the unrounded sine,
+  // rounded once by the division under 24-bit control (Moho::SLERP's weight
+  // denominator, 0x004EBD9B..0x004EBDA1).
+  [[nodiscard]] float SinReciprocal(float sinArg) noexcept;
 
   /**
    * MSVC8's /Oi intrinsic expansions of `exp`, `log` and `log10`, as the

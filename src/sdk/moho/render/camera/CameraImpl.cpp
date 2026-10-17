@@ -2320,21 +2320,6 @@ namespace
     return orient;
   }
 
-  /**
-   * Third column of the rotation matrix a unit quaternion expands to - the
-   * axis `UpdateCoords` walks the eye back along from the camera target.
-   *
-   * Same terms `QuatToMatrix` writes to `[eax+08]`, `[eax+14h]` and
-   * `[eax+20h]`.
-   */
-  [[nodiscard]] Wm3::Vector3f QuaternionForwardColumn(const Wm3::Quaternionf& q) noexcept
-  {
-    return Wm3::Vector3f{
-      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
-      ((q.y * q.z) - (q.w * q.x)) * 2.0f,
-      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
-    };
-  }
 } // namespace
 
 /**
@@ -2391,7 +2376,7 @@ void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const fl
     const Wm3::Quaternionf look = moho::COORDS_Orient(kPi, kHalfPi);
     viewTransform.orient_ = ViewOrientFromLook(look);
 
-    const Wm3::Vector3f eyeAxis = QuaternionForwardColumn(viewTransform.orient_);
+    const Wm3::Vector3f eyeAxis = moho::QuatForwardAxis(viewTransform.orient_);
     viewTransform.pos_.x = mOffset.x + (eyeAxis.x * eyeDistance);
     viewTransform.pos_.y = mOffset.y + (eyeAxis.y * eyeDistance);
     viewTransform.pos_.z = mOffset.z + (eyeAxis.z * eyeDistance);
@@ -2420,7 +2405,7 @@ void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const fl
 
     // Eye position = offset + rotated forward axis (from the quaternion) scaled
     // by the eye distance, before shake.
-    const Wm3::Vector3f eyeAxis = QuaternionForwardColumn(viewTransform.orient_);
+    const Wm3::Vector3f eyeAxis = moho::QuatForwardAxis(viewTransform.orient_);
     const float eyeX = mOffset.x + (eyeAxis.x * eyeDistance);
     const float eyeY = mOffset.y + (eyeAxis.y * eyeDistance);
     const float eyeZ = mOffset.z + (eyeAxis.z * eyeDistance);

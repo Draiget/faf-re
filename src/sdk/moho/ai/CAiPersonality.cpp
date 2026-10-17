@@ -18,6 +18,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/math/X87Math.h"
 
 using namespace moho;
 
@@ -358,7 +359,9 @@ int moho::cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* const state)
   const int spread = static_cast<int>(lua_tonumber(state->m_state, 3));
 
   const float scaledAdjustment = (1.0f - personality->mDifficulty) * static_cast<float>(delay * spread);
-  const int adjustedDelay = delay + static_cast<int>(scaledAdjustment);
+  // 0x005BAAFB-0x005BAAFF: the adjustment goes through a bare `fld`/`fistp`
+  // (round to nearest, ties to even), not the `__ftol` truncation a cast gives.
+  const int adjustedDelay = delay + msvc8::RoundToInt(scaledAdjustment);
   lua_pushnumber(state->m_state, static_cast<float>(adjustedDelay));
   return 1;
 }

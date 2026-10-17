@@ -32,7 +32,6 @@
 namespace moho
 {
   extern bool ren_Beams;
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
 }
 
 namespace

@@ -13,6 +13,14 @@
 #include "legacy/containers/Vector.h"
 #include "moho/sim/STIMap.h"
 
+namespace moho
+{
+  // Declared in moho/math/QuaternionMath.h; that header is not included here
+  // because its header-scope yaw constants would add dynamic initializers to
+  // this translation unit.
+  Wm3::Quaternionf* MatrixColumnsToQuatCanonical(const Wm3::Vector3f* matrixColumns, Wm3::Quaternionf* out) noexcept;
+}
+
 namespace
 {
   constexpr std::uint32_t kFrustumPlaneCount = 6;
@@ -268,51 +276,6 @@ namespace
     matrix.r[2] = {forward.x, forward.y, forward.z, 0.0f};
     matrix.r[3] = {eye.x, eye.y, eye.z, 1.0f};
     return matrix;
-  }
-
-  [[nodiscard]] Wm3::Quatf
-  QuaternionFromBasisColumns(const Wm3::Vector3f& right, const Wm3::Vector3f& up, const Wm3::Vector3f& forward) noexcept
-  {
-    const float m00 = right.x;
-    const float m01 = up.x;
-    const float m02 = forward.x;
-    const float m10 = right.y;
-    const float m11 = up.y;
-    const float m12 = forward.y;
-    const float m20 = right.z;
-    const float m21 = up.z;
-    const float m22 = forward.z;
-    const float trace = m00 + m11 + m22;
-
-    Wm3::Quatf out{};
-    if (trace > 0.0f) {
-      const float s = std::sqrt(trace + 1.0f) * 2.0f;
-      out.w = 0.25f * s;
-      out.x = (m21 - m12) / s;
-      out.y = (m02 - m20) / s;
-      out.z = (m10 - m01) / s;
-    } else if (m00 > m11 && m00 > m22) {
-      const float s = std::sqrt(1.0f + m00 - m11 - m22) * 2.0f;
-      out.w = (m21 - m12) / s;
-      out.x = 0.25f * s;
-      out.y = (m01 + m10) / s;
-      out.z = (m02 + m20) / s;
-    } else if (m11 > m22) {
-      const float s = std::sqrt(1.0f + m11 - m00 - m22) * 2.0f;
-      out.w = (m02 - m20) / s;
-      out.x = (m01 + m10) / s;
-      out.y = 0.25f * s;
-      out.z = (m12 + m21) / s;
-    } else {
-      const float s = std::sqrt(1.0f + m22 - m00 - m11) * 2.0f;
-      out.w = (m10 - m01) / s;
-      out.x = (m02 + m20) / s;
-      out.y = (m12 + m21) / s;
-      out.z = 0.25f * s;
-    }
-
-    out.Normalize();
-    return out;
   }
 
   [[nodiscard]] moho::VMatrix4 BuildD3DProjectionMatrixFov(
@@ -781,12 +744,16 @@ namespace moho
   {
     const VMatrix4 lookAtMatrix = BuildLookAtMatrix(eye, target, up);
 
+    // 0x00471559..0x004715C9: the three basis rows are copied into a 3x3 and
+    // handed to `MatrixColumnsToQuatCanonical` (0x004F0AE0), which transposes
+    // them and runs the shared trace/dominant-axis conversion (0x004F0CB0).
     VTransform viewTransform{};
-    viewTransform.orient_ = QuaternionFromBasisColumns(
+    const Wm3::Vector3f basis[3] = {
       {lookAtMatrix.r[0].x, lookAtMatrix.r[0].y, lookAtMatrix.r[0].z},
       {lookAtMatrix.r[1].x, lookAtMatrix.r[1].y, lookAtMatrix.r[1].z},
-      {lookAtMatrix.r[2].x, lookAtMatrix.r[2].y, lookAtMatrix.r[2].z}
-    );
+      {lookAtMatrix.r[2].x, lookAtMatrix.r[2].y, lookAtMatrix.r[2].z},
+    };
+    (void)MatrixColumnsToQuatCanonical(basis, &viewTransform.orient_);
     viewTransform.pos_ = {lookAtMatrix.r[3].x, lookAtMatrix.r[3].y, lookAtMatrix.r[3].z};
 
     Init(viewTransform, projection);

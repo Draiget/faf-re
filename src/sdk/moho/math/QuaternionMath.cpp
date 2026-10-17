@@ -4,9 +4,6 @@
 #include <cstddef>
 #include <cmath>
 
-// Forward declaration of QuatCrossAdd (defined in Sim.cpp at global scope)
-Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2);
-
 namespace moho
 {
   /**
@@ -223,7 +220,8 @@ namespace moho
     const float length = std::sqrt(
         (quat->w * quat->w) + (quat->x * quat->x) + (quat->y * quat->y) + (quat->z * quat->z));
 
-    if (length <= kEps) {
+    // `fcompi` + `jbe` at 0x004EDAF6..0x004EDAFA: a NaN length zeroes too.
+    if (!(length > kEps)) {
       quat->x = 0.0f;
       quat->y = 0.0f;
       quat->z = 0.0f;
@@ -417,7 +415,9 @@ namespace moho
       return out;
     }
 
-    if (amount >= 1.0f) {
+    // `comiss 1.0, amount` + `ja keep` at 0x004EBABE..0x004EBAC1: anything
+    // not ordered-below 1 (NaN included) clamps to 1.
+    if (!(amount < 1.0f)) {
       amount = 1.0f;
     }
     if (amount < 0.0f) {
@@ -479,9 +479,10 @@ namespace moho
       return out;
     }
 
-    // Clamp t into [0, 1] (binary order: clamp high then low).
+    // Clamp t into [0, 1] (binary order: clamp high then low). `comiss 1.0, t`
+    // + `ja keep` at 0x004EBC43..0x004EBC46: a NaN `t` clamps to 1.
     float tClamped = t;
-    if (tClamped >= 1.0f) {
+    if (!(tClamped < 1.0f)) {
       tClamped = 1.0f;
     }
     if (tClamped < 0.0f) {
@@ -489,7 +490,8 @@ namespace moho
     }
 
     Wm3::Quaternionf rhs{q2->w, q2->x, q2->y, q2->z};
-    float dot = (q1->x * q2->x) + (q1->y * q2->y) + (q1->z * q2->z) + (q1->w * q2->w);
+    // 0x004EBC80..0x004EBCA6 sums the dot in storage order, w first.
+    float dot = (((q1->w * q2->w) + (q1->x * q2->x)) + (q1->y * q2->y)) + (q1->z * q2->z);
 
     // Take the shortest arc.
     if (dot < 0.0f) {
@@ -502,23 +504,27 @@ namespace moho
 
     const float oneMinusT = 1.0f - tClamped;
 
-    // Use the spherical formula only when the endpoints are sufficiently apart
-    // and the resulting sin is finite; otherwise fall through to the lerp+normalize path.
-    if ((1.0f - dot) > 0.001f) {
-      const float angle = msvc8::acos(dot);
-      constexpr float kPi = 3.1415927f;
-      if ((kPi - angle) >= 0.001f) {
-        const float sinAngle = msvc8::sin(angle);
-        if (std::isfinite(sinAngle) && sinAngle != 0.0f) {
-          const float invSin = 1.0f / sinAngle;
-          const float w1 = msvc8::sin(oneMinusT * angle) * invSin;
-          const float w2 = msvc8::sin(tClamped * angle) * invSin;
-          out->x = (q1->x * w1) + (rhs.x * w2);
-          out->y = (q1->y * w1) + (rhs.y * w2);
-          out->z = (q1->z * w1) + (rhs.z * w2);
-          out->w = (q1->w * w1) + (rhs.w * w2);
-          return out;
-        }
+    // Spherical path gates (0x004EBD34..0x004EBD93), each falling back to the
+    // lerp+normalize path: `1 - dot > 0.001`; the unrounded `acos(dot)` is
+    // `>= 0.001` (`fcomi` + `jb`); `pi - (float)angle >= 0.001`; and
+    // `_finite(angle)`. All three compares reject NaN.
+    constexpr float kSpreadEpsilon = 0.001f;
+    constexpr float kPi = 3.1415927f;
+    if ((1.0f - dot) > kSpreadEpsilon) {
+      const double angleExact = msvc8::acos(static_cast<double>(dot));
+      const float angle = static_cast<float>(angleExact);
+      if (angleExact >= static_cast<double>(kSpreadEpsilon) && (kPi - angle) >= kSpreadEpsilon
+          && std::isfinite(angleExact)) {
+        // 0x004EBD95..0x004EBDB7: the three sines stay unrounded on the x87
+        // stack; only `1/sin(angle)` and the two weight products round.
+        const float invSin = msvc8::SinReciprocal(angle);
+        const float w1 = msvc8::SinTimes(angle * oneMinusT, invSin);
+        const float w2 = msvc8::SinTimes(angle * tClamped, invSin);
+        out->w = (q1->w * w1) + (rhs.w * w2);
+        out->x = (q1->x * w1) + (rhs.x * w2);
+        out->y = (q1->y * w1) + (rhs.y * w2);
+        out->z = (q1->z * w1) + (rhs.z * w2);
+        return out;
       }
     }
 
@@ -561,7 +567,8 @@ namespace moho
 
     float sinHalf = msvc8::sinf(halfAngle);
     const float axisLenSq = (qz * qz) + (qx * qx) + (qy * qy);
-    if (axisLenSq <= (sinHalf * sinHalf)) {
+    // `comiss` + `jbe` at 0x004EB7C2: unordered (NaN) lanes reject too.
+    if (!(axisLenSq > (sinHalf * sinHalf))) {
       return false;
     }
 
@@ -622,12 +629,15 @@ namespace moho
     forwardAxis.y = ((quat->y * quat->z) - (quat->w * quat->x)) * 2.0f;
     forwardAxis.z = 1.0f - ((quat->x * quat->x) + (quat->y * quat->y)) * 2.0f;
 
-    // Build a delta quaternion that rotates forwardAxis toward refVec
+    // Build a delta quaternion that rotates forwardAxis toward refVec; the
+    // fallback axis for opposed inputs is +Y (0x0069AA6F/0x0069AA78/0x0069AA87
+    // store (0,1,0) at the slot `edi` points to at 0x0069AAF3).
     Wm3::Quaternionf delta;
-    ::QuatCrossAdd(&delta, forwardAxis, refVec);
+    (void)QuatCrossAdd(&delta, forwardAxis, refVec, {0.0f, 1.0f, 0.0f});
 
-    // Apply partial rotation to the delta quaternion
-    RotateQuatByAngle(&delta, rads);
+    // Apply partial rotation to the delta quaternion; 0x0069AB15 ignores the
+    // returned flag, so a rejected step multiplies in the unclamped delta.
+    (void)RotateQuatByAngle(&delta, rads);
 
     const float dw = delta.w;
     const float dx = delta.x;
@@ -669,7 +679,8 @@ namespace moho
     const float axisLengthSquared =
       (quaternion.x * quaternion.x) + (quaternion.y * quaternion.y) + (quaternion.z * quaternion.z);
 
-    if (axisLengthSquared <= kAxisEpsilon) {
+    // `comiss` + `jbe` at 0x006C10A2..0x006C10AF: NaN takes this branch too.
+    if (!(axisLengthSquared > kAxisEpsilon)) {
       axisOut->x = 1.0f;
       axisOut->y = 0.0f;
       axisOut->z = 0.0f;
@@ -677,8 +688,10 @@ namespace moho
       return;
     }
 
+    // 0x006C10B5..0x006C10CE: `!(w > -1)` (NaN included) is a half turn,
+    // only an ordered `w < 1` reaches the acos.
     float halfAngle = 0.0f;
-    if (quaternion.w <= -1.0f) {
+    if (!(quaternion.w > -1.0f)) {
       halfAngle = kPi;
     } else if (quaternion.w < 1.0f) {
       halfAngle = static_cast<float>(msvc8::acos(static_cast<double>(quaternion.w)));
@@ -795,10 +808,19 @@ namespace moho
     Wm3::Vector3f* const result, const Wm3::Vector3f* const a, const Wm3::Vector3f* const b
   ) noexcept
   {
+    // 0x006D26D2..0x006D26FA: each element starts from a `+0.0` accumulator
+    // and adds `product + acc` term by term, so three `-0` products sum to
+    // `+0` (a bare `p0 + p1 + p2` would keep `-0`).
     for (int row = 0; row < 3; ++row) {
-      result[row].x = (a[row].x * b[0].x) + (a[row].y * b[1].x) + (a[row].z * b[2].x);
-      result[row].y = (a[row].x * b[0].y) + (a[row].y * b[1].y) + (a[row].z * b[2].y);
-      result[row].z = (a[row].x * b[0].z) + (a[row].y * b[1].z) + (a[row].z * b[2].z);
+      const float* const lhs = &a[row].x;
+      float* const out = &result[row].x;
+      for (int column = 0; column < 3; ++column) {
+        float sum = 0.0f;
+        for (int k = 0; k < 3; ++k) {
+          sum = (lhs[k] * (&b[k].x)[column]) + sum;
+        }
+        out[column] = sum;
+      }
     }
     return result;
   }
@@ -926,12 +948,14 @@ namespace moho
      * Address: 0x0050D150 (FUN_0050D150, inv_sqrt)
      *
      * What it does:
-     * Returns one reciprocal-square-root lane through the scalar math path.
-     * Same single caller as `CoordsAbsFloat`.
+     * Returns one reciprocal-square-root lane through the scalar math path:
+     * `fld; fsqrt; fld1; fdivrp`. Both the square root and the division round
+     * under the simulation's 24-bit precision control, so this is the float
+     * `1 / sqrtf(v)`, not a double one. Same single caller as `CoordsAbsFloat`.
      */
-    [[nodiscard]] double CoordsInvSqrt(const float value) noexcept
+    [[nodiscard]] float CoordsInvSqrt(const float value) noexcept
     {
-      return 1.0 / std::sqrt(static_cast<double>(value));
+      return 1.0f / std::sqrt(value);
     }
   } // namespace
 
@@ -949,9 +973,10 @@ namespace moho
    * the same value set, one field out. Two callers in two files means one
    * definition, here.
    *
-   * The `double` promotions in the degenerate branch are the binary's: the
-   * reciprocal square root and the two magnitude comparisons run at x87
-   * precision before the result is narrowed back to `float`.
+   * The degenerate branch runs on the x87 stack (0x0050CC3F..0x0050CCE7),
+   * but under the simulation's 24-bit precision control every `fsqrt`,
+   * `fdivrp` and `fmul` there rounds to float, so it is written in float: a
+   * double chain rounds once at the end and can land one ulp away.
    */
   Wm3::Quaternionf* BuildTiltShortestArcDelta(
     const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp
@@ -977,16 +1002,18 @@ namespace moho
       // perpendicular to whichever of the x/y lanes is shorter.
       const double upAbsX = CoordsAbsFloat(currentUp.x);
       const double upAbsY = CoordsAbsFloat(currentUp.y);
-      if (upAbsX < upAbsY) {
-        const double inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
+      // `fcompi st0=|x|, st1=|y|` + `jb` at 0x0050CC65..0x0050CC6A: an
+      // unordered (NaN) pair takes the x = 0 branch too.
+      if (!(upAbsX >= upAbsY)) {
+        const float inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
         outDelta->x = 0.0f;
-        outDelta->y = static_cast<float>(inverseLength * static_cast<double>(currentUp.z));
-        outDelta->z = static_cast<float>(-inverseLength * static_cast<double>(currentUp.y));
+        outDelta->y = inverseLength * currentUp.z;
+        outDelta->z = -(inverseLength * currentUp.y);
       } else {
-        const double inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
+        const float inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
         outDelta->y = 0.0f;
-        outDelta->x = static_cast<float>(-inverseLength * static_cast<double>(currentUp.z));
-        outDelta->z = static_cast<float>(inverseLength * static_cast<double>(currentUp.x));
+        outDelta->x = -(inverseLength * currentUp.z);
+        outDelta->z = inverseLength * currentUp.x;
       }
       return outDelta;
     }

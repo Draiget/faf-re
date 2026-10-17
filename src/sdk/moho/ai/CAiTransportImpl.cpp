@@ -316,15 +316,6 @@ namespace
     return lhs;
   }
 
-  [[nodiscard]] Wm3::Vec3f ForwardFromOrientation(const Wm3::Quatf& orient) noexcept
-  {
-    return Wm3::Vec3f(
-      ((orient.x * orient.z) + (orient.w * orient.y)) * 2.0f,
-      ((orient.y * orient.z) - (orient.w * orient.x)) * 2.0f,
-      1.0f - (((orient.x * orient.x) + (orient.y * orient.y)) * 2.0f)
-    );
-  }
-
   [[nodiscard]] Wm3::Vec3f NormalizeXZ(const Wm3::Vec3f& vec) noexcept
   {
     // 0x005E6361-0x005E63E9: `sqrtf(dz*dz + dx*dx)` (0x00452FC0) compared
@@ -711,7 +702,7 @@ void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& un
   if (mAttachpoints == 1 && units.Size() == 1u) {
     Unit* const onlyUnit = *units.begin();
     if (onlyUnit) {
-      pickupFacing = ForwardFromOrientation(onlyUnit->GetTransform().orient_);
+      pickupFacing = moho::QuatForwardAxis(onlyUnit->GetTransform().orient_);
     }
   } else {
     const Wm3::Vec3f& transportPos = mUnit->GetPosition();
@@ -1856,7 +1847,7 @@ int CAiTransportImpl::TransportReserveStorage(
   const SAttachPoint& point = mGenericAttachPoints[index];
   const VTransform world = mUnit->GetBoneWorldTransform(static_cast<int>(point.index));
   outPos = world.pos_;
-  outFacing = ForwardFromOrientation(world.orient_);
+  outFacing = moho::QuatForwardAxis(world.orient_);
   outDropDist = world.pos_.y - mUnit->GetPosition().y;
 
   const int count = static_cast<int>(mGenericAttachPoints.size());

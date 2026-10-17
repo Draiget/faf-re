@@ -72,12 +72,17 @@ namespace moho
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
+    // Lane order is `EThreatType - 1` (Overall/OverallNotAssigned share +0x00):
+    // GetThreat (0x00715750) and AssignThreatAtPosition (0x00716B00) jump
+    // tables index type 2 -> +0x04, 3 -> +0x08, 5 -> +0x10, 6 -> +0x14, and
+    // Update (0x00716776..0x0071682A) writes every structure into +0x04,
+    // non-mex structures also into +0x08, land units into +0x10, fliers +0x14.
     float overallInfluence;            // +0x00
-    float influenceStructuresNotMex;   // +0x04
-    float influenceStructures;         // +0x08
+    float influenceStructures;         // +0x04
+    float influenceStructuresNotMex;   // +0x08
     float navalInfluence;              // +0x0C
-    float airInfluence;                // +0x10
-    float landInfluence;               // +0x14
+    float landInfluence;               // +0x10
+    float airInfluence;                // +0x14
     float experimentalInfluence;       // +0x18
     float commanderInfluence;          // +0x1C
     float artilleryInfluence;          // +0x20

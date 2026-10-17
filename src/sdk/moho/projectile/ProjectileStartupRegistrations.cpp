@@ -17,6 +17,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/math/Vector3f.h"
 #include "moho/projectile/Projectile.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
@@ -273,19 +274,6 @@ namespace
     }
 
     return blueprint->Physics.MaxSpeed;
-  }
-
-  void SetVectorLengthIfNonZero(Wm3::Vector3f& value, const float length) noexcept
-  {
-    const float magnitudeSquared = (value.x * value.x) + (value.y * value.y) + (value.z * value.z);
-    if (magnitudeSquared <= 0.0f) {
-      return;
-    }
-
-    const float scale = length / std::sqrt(magnitudeSquared);
-    value.x *= scale;
-    value.y *= scale;
-    value.z *= scale;
   }
 
   [[nodiscard]] gpg::RType* CachedRProjectileBlueprintType()
@@ -2569,7 +2557,8 @@ namespace moho
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
-    SetVectorLengthIfNonZero(randomDirection, ReadProjectileRandomUpSpeed(*projectile));
+    // 0x006A3EAD: the shared func_VecSetLengthS (0x005B1C90).
+    (void)VecSetLength(&randomDirection, ReadProjectileRandomUpSpeed(*projectile));
     projectile->mVelocity = randomDirection;
     return 0;
   }

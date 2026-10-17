@@ -216,6 +216,27 @@ msvc8_x87_sin_times PROC
 msvc8_x87_sin_times ENDP
 
 
+; float msvc8_x87_sin_reciprocal(float sinArg)
+; 1 / fsin(x): the sine stays unrounded, the division rounds once under PC24
+; (Moho::SLERP 0x004EBD9B..0x004EBDA1).
+msvc8_x87_sin_reciprocal PROC
+    movss   dword ptr [rsp+8], xmm0
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fsin
+    fld1
+    fdivrp  st(1), st(0)
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_sin_reciprocal ENDP
+
+
 ; float msvc8_x87_intrinsic_exp(float x)
 ; MSVC8 /Oi exp expansion (math_exp 0x00919D5D); fmul/fadd round under PC24.
 msvc8_x87_intrinsic_exp PROC

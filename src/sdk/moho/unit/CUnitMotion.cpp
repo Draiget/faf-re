@@ -257,32 +257,6 @@ namespace moho
     }
 
     /**
-     * The third column of the rotation matrix `q` describes, i.e. the direction
-     * the entity faces.
-     *
-     * This took a `moho::Vector4f` while the storage it was handed is a
-     * `Wm3::Quatf`, whose words are (w, x, y, z) rather than (x, y, z, w). Two
-     * of the three lanes were wrong as a result: against
-     * `CUnitMotion::NotifyDetached` (0x006B9570), which computes this inline
-     * over the four words at `Entity` +0x9C..+0xA8,
-     *
-     *   0x006B95A1  out.x = 2 * (word0*word2 + word3*word1)   = 2 * (wy + zx)
-     *   0x006B95AD  out.y = 2 * (word3*word2 - word0*word1)   = 2 * (yz - wx)
-     *   0x006B95EF  out.z = 1 - 2 * (word2*word2 + word1*word1)
-     *
-     * only `out.x` matched; `out.y` read `2 * (x*y - z*w)` and `out.z`
-     * subtracted `w*w` where the binary subtracts `y*y`.
-     */
-    [[nodiscard]] Wm3::Vector3f ForwardVectorFromOrientation(const Wm3::Quatf& q) noexcept
-    {
-      Wm3::Vector3f out{};
-      out.x = ((q.x * q.z) + (q.w * q.y)) * 2.0f;
-      out.y = ((q.y * q.z) - (q.w * q.x)) * 2.0f;
-      out.z = 1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f);
-      return out;
-    }
-
-    /**
      * Address: 0x006B6FE0 (FUN_006B6FE0, sub_6B6FE0)
      *
      * What it does:
@@ -393,15 +367,6 @@ namespace moho
       return std::memcmp(&value, &kZeroVector, sizeof(Wm3::Vector3f)) == 0;
     }
 
-    [[nodiscard]] Wm3::Vector3f ForwardVectorFromQuaternion(const Wm3::Quaternionf& orientation) noexcept
-    {
-      Wm3::Vector3f out{};
-      out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-      out.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
-      out.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
-      return out;
-    }
-
     [[nodiscard]] bool IsCommonMoveSteeringAligned(const SteeringParams& params) noexcept
     {
       float targetX = std::numeric_limits<float>::max();
@@ -460,7 +425,7 @@ namespace moho
       Wm3::Vector3f normalizedTarget{};
       (void)NormalizeVectorInto(&normalizedTarget, toTarget); // FUN_0044F7E0
 
-      const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
+      const Wm3::Vector3f forward = moho::QuatForwardAxis(unit->GetTransform().orient_);
       const float signedRadians =
         ((normalizedTarget.z * forward.x) - (forward.z * normalizedTarget.x)) <= 0.0f
           ? attackAngleDegrees * -kCommonMoveSlavedArcEnterRadians
@@ -1661,7 +1626,7 @@ namespace moho
    */
   void CUnitMotion::NotifyDetached(Entity* const detachedFromEntity, const bool skipBallistic)
   {
-    const Wm3::Vector3f detachForward = ForwardVectorFromOrientation(detachedFromEntity->mVarDat.mCurTransform.orient_);
+    const Wm3::Vector3f detachForward = moho::QuatForwardAxis(detachedFromEntity->mVarDat.mCurTransform.orient_);
 
     Unit* const unit = mUnit;
     const Wm3::Vector3f unitPosition = unit->GetPosition();
@@ -2766,7 +2731,7 @@ namespace moho
         const float headingDelta = NormalizeAngleSignedRadians(msvc8::Atan2Difference(
           targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z, headingY, headingX
         ));
-        const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
+        const Wm3::Vector3f forward = moho::QuatForwardAxis(unit->GetTransform().orient_);
         const float absHeadingDelta = std::fabs(headingDelta);
         const float slavedArcRange = slavedWeapon->mWeaponBlueprint->SlavedToBodyArcRange;
 

@@ -2782,7 +2782,12 @@ namespace moho
   {
     float value = 0.0f;
 
-    LuaPlus::LuaObject terrainType = GetTerrainType(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(z));
+    // 0x00758EA8..0x00758F04: both coordinates go through x87 `fistp qword`
+    // with truncation and keep the low dword, so a negative coordinate wraps to
+    // a huge unsigned index (and falls back to type 1) instead of saturating.
+    LuaPlus::LuaObject terrainType = GetTerrainType(
+      static_cast<std::uint32_t>(static_cast<std::int64_t>(x)), static_cast<std::uint32_t>(static_cast<std::int64_t>(z))
+    );
     if (terrainType.IsTable()) {
       LuaPlus::LuaState* const state = terrainType.GetActiveState();
       LuaPlus::LuaObject heightOffset = moho::SCR_GetLuaTableField(state, terrainType, "HeightOffset");
