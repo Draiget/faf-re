@@ -8,6 +8,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/IAiSteering.h"
+#include "moho/ai/IFormationInstance.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SFootprint.h"
@@ -242,9 +243,11 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
 
   mStatus = AINAVSTATUS_Steering;
 
+  // 0x005A4D38..0x005A4D6F: track the formation target while the unit belongs
+  // to a formation running a Form* command.
   if (mIgnoreFormation == 0u) {
-    mTrackFormationTarget =
-      static_cast<std::uint8_t>(mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr() != nullptr);
+    IFormationInstance* const formation = mUnit->GetFormation();
+    mTrackFormationTarget = static_cast<std::uint8_t>(formation != nullptr && formation->CommandIsForm());
   }
 }
 
@@ -567,15 +570,24 @@ void CAiNavigatorAir::UpdateCurrentTargetFromFormation()
     return;
   }
 
-  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr();
-  if (leaderUnit && leaderUnit != mUnit && leaderUnit->AiNavigator && leaderUnit->AiNavigator->HasGoodPath()) {
-    mCurrentTargetPos = mUnit->mInfoCache.mFormationHeadingHint;
+  // 0x005A4DAD..0x005A4DDB: only a unit still in a formation, with a leader
+  // other than itself, keeps tracking; anything else falls back to the goal.
+  Unit* const leaderUnit =
+    (mUnit->GetFormation() != nullptr) ? mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr() : nullptr;
+  if (leaderUnit == nullptr || leaderUnit == mUnit) {
+    mTrackFormationTarget = 0;
+    mCurrentTargetPos = mGoalPos;
     ApplyCurrentTargetToMotion();
     return;
   }
 
-  mTrackFormationTarget = 0;
-  mCurrentTargetPos = mGoalPos;
+  // 0x005A4DDD..0x005A4DF2: a leader without a navigator, or one that is not
+  // steering, leaves the current target alone for this tick.
+  if (leaderUnit->AiNavigator == nullptr || !leaderUnit->AiNavigator->HasGoodPath()) {
+    return;
+  }
+
+  mCurrentTargetPos = mUnit->mInfoCache.mFormationHeadingHint;
   ApplyCurrentTargetToMotion();
 }
 
