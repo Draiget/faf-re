@@ -307,29 +307,6 @@ namespace
     return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
   }
 
-  [[nodiscard]] moho::Unit* ResolveRefuelPlatform(moho::Unit* const unit)
-  {
-    if (unit == nullptr) {
-      return nullptr;
-    }
-
-    if (moho::Unit* const stagingPlatform = unit->GetStagingPlatform(); stagingPlatform != nullptr) {
-      return stagingPlatform;
-    }
-
-    moho::Unit* const assignedTransport = unit->AssignedTransportRef.GetObjectPtr();
-    if (assignedTransport == nullptr || assignedTransport->IsDead() || assignedTransport->DestroyQueued()) {
-      return nullptr;
-    }
-
-    const moho::IAiTransport* const transport = assignedTransport->AiTransport;
-    if (transport == nullptr || !transport->TransportIsAirStagingPlatform()) {
-      return nullptr;
-    }
-
-    return assignedTransport;
-  }
-
   void UpdateQueuedCommandTarget(
     moho::CUnitCommandQueue* const commandQueue,
     const int commandIndex,
@@ -1848,7 +1825,9 @@ namespace moho
         break;
 
       case TASKSTATE_Processing: {
-        if (Unit* const platform = ResolveRefuelPlatform(mUnit); platform != nullptr) {
+        // 0x006145A1: the same refuel/repair platform search the patrol task
+        // runs (`Unit::FindPlatform`), not just an already-assigned platform.
+        if (Unit* const platform = mUnit->FindPlatform(); platform != nullptr) {
           if (IAiTransport* const transport = platform->AiTransport; transport != nullptr) {
             transport->TransportResetReservation();
           }
