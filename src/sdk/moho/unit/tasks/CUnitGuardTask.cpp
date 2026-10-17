@@ -1696,9 +1696,11 @@ namespace moho
       return nullptr;
     }
 
+    // 0x00612B52..0x00612B91: a new enemy drops the reserved guard-move anchor
+    // (+0x90) and its ogrid reservation, so the next follow move re-anchors.
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-    if (mGuardDirection != zero) {
-      mGuardDirection = zero;
+    if (mGuardMoveAnchorPosition != zero) {
+      mGuardMoveAnchorPosition = zero;
       unit->FreeOgridRect();
     }
     return bestEnemy;
