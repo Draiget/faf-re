@@ -10,6 +10,8 @@
 #include "moho/unit/Broadcaster.h"
 #include "Wm3Vector3.h"
 
+struct lua_State;
+
 namespace moho
 {
   class CAiPathFinder;
@@ -275,4 +277,22 @@ namespace moho
   );
   static_assert(offsetof(CAiPathNavigator, mTickBucket7) == 0xA0, "CAiPathNavigator::mTickBucket7 offset must be 0xA0");
   static_assert(offsetof(CAiPathNavigator, mTickBucket13) == 0xA4, "CAiPathNavigator::mTickBucket13 offset must be 0xA4");
+
+  class CScrLuaInitForm;
+
+  /**
+   * Address: 0x0128CDA7 (FAF patch, cfunc_SetNavigatorPersonalPosMaxDistance)
+   *
+   * What it does:
+   * FAF extension: stores `luaL_optnumber(L, 1, 50)` as the farthest a path
+   * node may lie from the unit and still become its next target point.
+   */
+  int cfunc_SetNavigatorPersonalPosMaxDistance(lua_State* luaContext);
+
+  /**
+   * What it does:
+   * Publishes the FAF global `SetNavigatorPersonalPosMaxDistance(distance)`
+   * Lua binder definition.
+   */
+  CScrLuaInitForm* func_SetNavigatorPersonalPosMaxDistance_LuaFuncDef();
 } // namespace moho

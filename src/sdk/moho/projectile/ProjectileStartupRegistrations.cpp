@@ -76,6 +76,15 @@ namespace
   constexpr const char* kGetCurrentTargetPositionHelpText = "Projectile:GetCurrentTargetPosition()";
   constexpr const char* kSetNewTargetHelpText = "Projectile:SetNewTarget( entity )";
   constexpr const char* kSetNewTargetGroundHelpText = "Projectile:SetNewTargetGround( location )";
+  constexpr const char* kProjectileLuaClassName = "Projectile";
+  constexpr const char* kGetMaxZigZagName = "GetMaxZigZag";
+  constexpr const char* kGetMaxZigZagHelpText = "zigzag = Projectile:GetMaxZigZag()";
+  constexpr const char* kGetZigZagFrequencyName = "GetZigZagFrequency";
+  constexpr const char* kGetZigZagFrequencyHelpText = "frequency = Projectile:GetZigZagFrequency()";
+  constexpr const char* kGetCurrentTargetPositionXYZName = "GetCurrentTargetPositionXYZ";
+  constexpr const char* kGetCurrentTargetPositionXYZHelpText = "x, y, z = Projectile:GetCurrentTargetPositionXYZ";
+  constexpr const char* kSetNewTargetGroundXYZName = "SetNewTargetGroundXYZ";
+  constexpr const char* kSetNewTargetGroundXYZHelpText = "Projectile:SetNewTargetGroundXYZ(x, y, z)";
   constexpr const char* kSetLifetimeHelpText = "Projectile:SetLifetime(seconds)";
   constexpr const char* kSetMaxSpeedHelpText = "Projectile:SetMaxSpeed(speed)";
   constexpr const char* kSetAccelerationHelpText = "Projectile:SetAcceleration(accel)";
@@ -976,6 +985,166 @@ namespace moho
       &CScrLuaMetatableFactory<Projectile>::Instance(),
       "Projectile",
       kSetNewTargetGroundHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x01291DA8 (FAF patch, cfunc_ProjectileGetMaxZigZag)
+   *
+   * What it does:
+   * FAF extension: pushes `mAttributes.mMaxZigZag` (`[proj+36Ch]`).
+   */
+  int cfunc_ProjectileGetMaxZigZag(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
+    const Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
+    lua_pushnumber(luaContext, projectile->mAttributes.mMaxZigZag);
+    return 1;
+  }
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:GetMaxZigZag()` Lua binder definition
+   * (`.exxt` static initializer 0x012926B3..0x01292726, sim init set).
+   */
+  CScrLuaInitForm* func_ProjectileGetMaxZigZag_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kGetMaxZigZagName,
+      &moho::cfunc_ProjectileGetMaxZigZag,
+      &CScrLuaMetatableFactory<Projectile>::Instance(),
+      kProjectileLuaClassName,
+      kGetMaxZigZagHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x01291E02 (FAF patch, cfunc_ProjectileGetZigZagFrequency)
+   *
+   * What it does:
+   * FAF extension: pushes `mAttributes.mZigZagFrequency` (`[proj+370h]`).
+   */
+  int cfunc_ProjectileGetZigZagFrequency(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
+    const Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
+    lua_pushnumber(luaContext, projectile->mAttributes.mZigZagFrequency);
+    return 1;
+  }
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:GetZigZagFrequency()` Lua binder definition
+   * (`.exxt` static initializer 0x01292730..0x0129276E, sim init set).
+   */
+  CScrLuaInitForm* func_ProjectileGetZigZagFrequency_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kGetZigZagFrequencyName,
+      &moho::cfunc_ProjectileGetZigZagFrequency,
+      &CScrLuaMetatableFactory<Projectile>::Instance(),
+      kProjectileLuaClassName,
+      kGetZigZagFrequencyHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x01291E5C (FAF patch, cfunc_ProjectileGetCurrentTargetPositionXYZ)
+   *
+   * What it does:
+   * FAF extension: pushes the target position as `x, y, z`. A projectile with
+   * no target (`targetType == AITARGET_None`) reports the origin; otherwise
+   * the position comes from `GetTargetPosGun(false)`, as for
+   * `GetCurrentTargetPosition`.
+   */
+  int cfunc_ProjectileGetCurrentTargetPositionXYZ(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
+    Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
+
+    Wm3::Vector3f targetPosition(0.0f, 0.0f, 0.0f);
+    if (projectile->mTargetPosData.targetType != EAiTargetType::AITARGET_None) {
+      targetPosition = projectile->mTargetPosData.GetTargetPosGun(false);
+    }
+
+    lua_pushnumber(luaContext, targetPosition.x);
+    lua_pushnumber(luaContext, targetPosition.y);
+    lua_pushnumber(luaContext, targetPosition.z);
+    return 3;
+  }
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:GetCurrentTargetPositionXYZ()` Lua binder
+   * definition (`.exxt` static initializer 0x01292778..0x012927AA, sim init set).
+   */
+  CScrLuaInitForm* func_ProjectileGetCurrentTargetPositionXYZ_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kGetCurrentTargetPositionXYZName,
+      &moho::cfunc_ProjectileGetCurrentTargetPositionXYZ,
+      &CScrLuaMetatableFactory<Projectile>::Instance(),
+      kProjectileLuaClassName,
+      kGetCurrentTargetPositionXYZHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x01291F07 (FAF patch, cfunc_ProjectileSetNewTargetGroundXYZ)
+   *
+   * What it does:
+   * FAF extension: reads `(projectile, x, y, z)` and assigns a ground target
+   * at that point (`CAiTarget::operator=`, 0x005D5670), the same payload
+   * `SetNewTargetGround` builds from a vector table.
+   */
+  int cfunc_ProjectileSetNewTargetGroundXYZ(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    const int argumentCount = lua_gettop(luaContext);
+    if (argumentCount != 4) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetNewTargetGroundXYZName, 4, argumentCount);
+    }
+
+    const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
+    Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
+
+    CAiTarget newTarget{};
+    newTarget.targetType = EAiTargetType::AITARGET_Ground;
+    newTarget.targetEntity.ClearLinkState();
+    newTarget.position.x = static_cast<float>(lua_tonumber(luaContext, 2));
+    newTarget.position.y = static_cast<float>(lua_tonumber(luaContext, 3));
+    newTarget.position.z = static_cast<float>(lua_tonumber(luaContext, 4));
+    newTarget.targetPoint = -1;
+    newTarget.targetIsMobile = false;
+
+    projectile->mTargetPosData = newTarget;
+    return 0;
+  }
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:SetNewTargetGroundXYZ(x, y, z)` Lua binder
+   * definition (`.exxt` static initializer 0x012927B4..0x012927E6, sim init set).
+   */
+  CScrLuaInitForm* func_ProjectileSetNewTargetGroundXYZ_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kSetNewTargetGroundXYZName,
+      &moho::cfunc_ProjectileSetNewTargetGroundXYZ,
+      &CScrLuaMetatableFactory<Projectile>::Instance(),
+      kProjectileLuaClassName,
+      kSetNewTargetGroundXYZHelpText
     );
     return &binder;
   }
@@ -2854,6 +3023,10 @@ namespace
       (void)::moho::func_ProjectileGetCurrentTargetPosition_LuaFuncDef();
       (void)::moho::func_ProjectileSetNewTarget_LuaFuncDef();
       (void)::moho::func_ProjectileSetNewTargetGround_LuaFuncDef();
+      (void)::moho::func_ProjectileGetMaxZigZag_LuaFuncDef();
+      (void)::moho::func_ProjectileGetZigZagFrequency_LuaFuncDef();
+      (void)::moho::func_ProjectileGetCurrentTargetPositionXYZ_LuaFuncDef();
+      (void)::moho::func_ProjectileSetNewTargetGroundXYZ_LuaFuncDef();
       (void)::moho::func_ProjectileSetLifetime_LuaFuncDef();
       (void)::moho::func_ProjectileSetDamage_LuaFuncDef();
       (void)::moho::func_ProjectileSetMaxSpeed_LuaFuncDef();

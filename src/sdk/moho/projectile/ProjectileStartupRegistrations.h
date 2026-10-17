@@ -127,6 +127,64 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetNewTargetGround_LuaFuncDef();
 
   /**
+   * Address: 0x01291DA8 (FAF patch, cfunc_ProjectileGetMaxZigZag)
+   *
+   * What it does:
+   * FAF extension: pushes the projectile's `mAttributes.mMaxZigZag`.
+   */
+  int cfunc_ProjectileGetMaxZigZag(lua_State* luaContext);
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:GetMaxZigZag()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_ProjectileGetMaxZigZag_LuaFuncDef();
+
+  /**
+   * Address: 0x01291E02 (FAF patch, cfunc_ProjectileGetZigZagFrequency)
+   *
+   * What it does:
+   * FAF extension: pushes the projectile's `mAttributes.mZigZagFrequency`.
+   */
+  int cfunc_ProjectileGetZigZagFrequency(lua_State* luaContext);
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:GetZigZagFrequency()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_ProjectileGetZigZagFrequency_LuaFuncDef();
+
+  /**
+   * Address: 0x01291E5C (FAF patch, cfunc_ProjectileGetCurrentTargetPositionXYZ)
+   *
+   * What it does:
+   * FAF extension: pushes the current target position as three numbers.
+   */
+  int cfunc_ProjectileGetCurrentTargetPositionXYZ(lua_State* luaContext);
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:GetCurrentTargetPositionXYZ()` Lua binder
+   * definition.
+   */
+  CScrLuaInitForm* func_ProjectileGetCurrentTargetPositionXYZ_LuaFuncDef();
+
+  /**
+   * Address: 0x01291F07 (FAF patch, cfunc_ProjectileSetNewTargetGroundXYZ)
+   *
+   * What it does:
+   * FAF extension: retargets the projectile at the ground point `(x, y, z)`.
+   */
+  int cfunc_ProjectileSetNewTargetGroundXYZ(lua_State* luaContext);
+
+  /**
+   * What it does:
+   * Publishes the FAF `Projectile:SetNewTargetGroundXYZ(x, y, z)` Lua binder
+   * definition.
+   */
+  CScrLuaInitForm* func_ProjectileSetNewTargetGroundXYZ_LuaFuncDef();
+
+  /**
    * Address: 0x006A1B90 (FUN_006A1B90, cfunc_ProjectileSetLifetime)
    *
    * What it does:

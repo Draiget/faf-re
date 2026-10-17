@@ -14,6 +14,8 @@
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IFormationInstance.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
@@ -27,6 +29,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "lua/LuaPrimitives.h"
 
 using namespace moho;
 
@@ -35,6 +38,12 @@ namespace
   constexpr std::uint64_t kUnitPathFlag = 0x1000000ull;
   constexpr std::uint64_t kUnitPathingBusyFlag = 0x800000ull;
   constexpr std::uint64_t kUnitPatrolStallFlag = 0x2000000ull;
+
+  // Address: 0x01292AB4 -- FAF patch data, initialised to 50.0f. The farthest
+  // a path node may lie from the unit's cell and still be taken as the next
+  // target point (`TryAdvanceTargetPoint`); Lua sets it through
+  // `SetNavigatorPersonalPosMaxDistance`.
+  float gNavigatorPersonalPosMaxDistance = 50.0f;
 
   gpg::RType* gNavigatorStateType = nullptr;
   gpg::RType* gPathFinderType = nullptr;
@@ -1479,7 +1488,9 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
   std::int32_t selectedIndex = -1;
   for (std::int32_t idx = furthestCandidateIndex; idx >= firstReachableIndex; --idx) {
     const SOCellPos candidate = mPath.start[idx];
-    if (idx != firstReachableIndex && CellDistance(mCurrentPos, candidate) >= 50.0f) {
+    // 0x005AF8D5: FAF patched the original 50-cell constant into a load of
+    // the Lua-settable global.
+    if (idx != firstReachableIndex && CellDistance(mCurrentPos, candidate) >= gNavigatorPersonalPosMaxDistance) {
       continue;
     }
 
@@ -2091,4 +2102,69 @@ namespace
 {
   // Address: 0x010AEF44 -- process-global `CAiPathNavigatorSerializer` singleton.
   moho::CAiPathNavigatorSerializer gCAiPathNavigatorSerializer;
+} // namespace
+
+namespace
+{
+  constexpr const char* kSetNavigatorPersonalPosMaxDistanceName = "SetNavigatorPersonalPosMaxDistance";
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("Sim");
+    return fallbackSet;
+  }
+} // namespace
+
+/**
+ * Address: 0x0128CDA7 (FAF patch, cfunc_SetNavigatorPersonalPosMaxDistance)
+ *
+ * What it does:
+ * FAF extension: stores `luaL_optnumber(L, 1, 50)` into the global that
+ * `TryAdvanceTargetPoint` compares path-node distances against.
+ */
+int moho::cfunc_SetNavigatorPersonalPosMaxDistance(lua_State* const luaContext)
+{
+  gNavigatorPersonalPosMaxDistance = static_cast<float>(luaL_optnumber(luaContext, 1, 50.0f));
+  return 0;
+}
+
+/**
+ * What it does:
+ * Publishes the FAF global `SetNavigatorPersonalPosMaxDistance(distance)` Lua
+ * binder definition (`.exxt` static initializer 0x0129268B..0x0129262F:
+ * class `<global>`, empty help text, no metatable factory, sim init set).
+ */
+moho::CScrLuaInitForm* moho::func_SetNavigatorPersonalPosMaxDistance_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kSetNavigatorPersonalPosMaxDistanceName,
+    &moho::cfunc_SetNavigatorPersonalPosMaxDistance,
+    nullptr,
+    "<global>",
+    ""
+  );
+  return &binder;
+}
+
+namespace
+{
+  /**
+   * Runs the FAF binder registration above at static-init time, as the
+   * patched exe's `.exxt` initializer does; without it the global is absent
+   * from every sim Lua state.
+   */
+  struct CAiPathNavigatorLuaFuncDefBootstrap
+  {
+    CAiPathNavigatorLuaFuncDefBootstrap()
+    {
+      (void)moho::func_SetNavigatorPersonalPosMaxDistance_LuaFuncDef();
+    }
+  };
+
+  CAiPathNavigatorLuaFuncDefBootstrap gCAiPathNavigatorLuaFuncDefBootstrap;
 } // namespace
