@@ -68,20 +68,6 @@ namespace
     return cache;
   }
 
-  void QueuePropReclaimDelete(moho::Prop& prop)
-  {
-    if (prop.DestroyQueuedFlag != 0u) {
-      return;
-    }
-
-    prop.DestroyQueuedFlag = 1u;
-    prop.SimulationRef->mEntityDB->mEntList.push_back(&prop);
-
-    if (prop.SimulationRef) {
-      prop.ListLinkBefore(&prop.SimulationRef->mCoordEntities);
-    }
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     // Every file that wants this set must resolve the one that already
@@ -842,11 +828,10 @@ namespace moho
         next = 0.0f;
       }
 
-      if (mVarDat.mMaxHealth > 0.0f) {
-        const float minFractionFromHealth = mVarDat.mHealth / mVarDat.mMaxHealth;
-        if (next < minFractionFromHealth) {
-          next = minFractionFromHealth;
-        }
+      // 0x006FA206..0x006FA21B: the health ratio is divided unguarded.
+      const float minFractionFromHealth = mVarDat.mHealth / mVarDat.mMaxHealth;
+      if (minFractionFromHealth > next) {
+        next = minFractionFromHealth;
       }
       mVarDat.mFractionComplete = next;
     }
@@ -857,7 +842,9 @@ namespace moho
     if (mVarDat.mFractionComplete == 0.0f && reclaimDelta < 0.0f) {
       CallbackStr("OnReclaimed");
       mReclaimTerminated = true;
-      QueuePropReclaimDelete(*this);
+      // 0x006FA28D: `Entity::Destroy` (0x00679AF0) -- the Sim deletion queue,
+      // with its "queued for delete" log line.
+      Destroy();
     }
 
     return applied;
@@ -868,7 +855,10 @@ namespace moho
    */
   void Prop::Kill(Entity* killer, gpg::StrArg reason, const float overkillRatio)
   {
-    Entity::Kill(killer, reason, overkillRatio);
+    // 0x006FA164: a prop does not take the Entity kill path; it hands the
+    // kill straight to its script's OnKilled (RunScript_PropOnKilled), which
+    // in FAF's Prop.lua destroys the prop.
+    RunScriptPropOnKilled(killer, reason, overkillRatio);
     mReclaimTerminated = true;
   }
 

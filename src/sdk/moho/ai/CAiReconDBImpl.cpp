@@ -888,8 +888,9 @@ void CAiReconDBImpl::CheckIntelEvents(ReconBlip* const blip, const int oldFlags,
  * msvc8::vector<SNewBlip> const &
  *
  * What it does:
- * Materializes pending blips, updates per-army blip state, and inserts them
- * into the recon blip map.
+ * Materializes pending blips, updates per-army blip state, inserts them into
+ * the recon blip map and the influence map, and fires `OnDetectedBy` on each
+ * detected unit.
  */
 void CAiReconDBImpl::GenerateNewBlips(const msvc8::vector<SNewBlip>& pending)
 {
@@ -901,6 +902,18 @@ void CAiReconDBImpl::GenerateNewBlips(const msvc8::vector<SNewBlip>& pending)
 
     UpdateBlip(blip, candidate.sourceUnit, static_cast<std::uint32_t>(candidate.detectedFlags));
     (void)mBlipMap.insert({MakeReconMapKey(candidate.sourceUnit), blip});
+
+    // 0x005C0BB3..0x005C0BD0: register the new blip in the army's influence
+    // map at its current position (`blip+0xAC`) with its blueprint (vslot 0x9C).
+    if (mIMap) {
+      mIMap->InsertEntry(static_cast<std::uint32_t>(blip->id_), blip->mVarDat.mCurTransform.pos_, blip->GetBlueprint());
+    }
+
+    // 0x005C0BD5..0x005C0BF9: tell the detected unit which army spotted it
+    // (`RunScript_Int` 0x005C9480 with `mArmy->index + 1`).
+    if (Unit* const sourceUnit = candidate.sourceUnit; sourceUnit != nullptr) {
+      sourceUnit->RunScriptInt("OnDetectedBy", mArmy->mConstDat.mArmyIndex + 1);
+    }
   }
 }
 

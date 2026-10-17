@@ -303,13 +303,10 @@ int CUnitUpgradeTask::TaskTick()
     params.mFixElevation = 0;
     params.mComplete = ReadInstaBuildFlag(mSim) ? 1u : 0u;
 
-    Unit* upgradedUnit = nullptr;
-    if (mSim != nullptr && mToBlueprint != nullptr) {
-      // Non-1:1 lane: binary path constructs `Unit` directly via ctor
-      // 0x006A53F0. Current source routes through `Sim::CreateUnit()` while
-      // that constructor body remains under recovery.
-      upgradedUnit = mSim->CreateUnitForScript(params, false);
-    }
+    // 0x005F8A16..0x005F8A39: `operator new(0x6A8)` + `Unit::Unit(params)`
+    // (0x006A53F0) directly -- no `Sim::CreateUnit` unit-cap gate, so an
+    // upgrade always proceeds even when the army is at its cap.
+    Unit* const upgradedUnit = new Unit(params);
 
     mUpgradedUnit.ResetFromObject(upgradedUnit);
     if (upgradedUnit == nullptr) {

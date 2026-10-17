@@ -362,8 +362,8 @@ namespace moho
    * Runs one beam collision pass: resolves the launcher weapon's beam-impact
    * result for the attach bone, broadcasts the corresponding hit/miss/irrelevant
    * event to the bound listener, optionally draws a debug line, pushes the beam
-   * length into the active effect, and fires the `OnImpact` script for terrain or
-   * water impacts.
+   * length into the active effect, and fires `OnImpact(type, target)` for any
+   * valid impact, passing the hit entity's script object (or nil).
    */
   void CollisionBeamEntity::CheckCollision()
   {
@@ -424,8 +424,20 @@ namespace moho
     }
 
     if (beam.mImpactType != IMPACT_Invalid) {
-      const char* const impactTypeString = ENT_GetImpactTypeString(beam.mImpactType);
-      (void)RunScript("OnImpact", impactTypeString);
+      // 0x006734F2..0x00673523: the target argument is the hit entity's own
+      // script object (`lea ecx,[eax+20h]` = `mLuaObj`), or a nil LuaObject
+      // built on this beam's Lua state (0x00908970) when nothing was hit.
+      LuaPlus::LuaObject targetObject;
+      if (Entity* const hitEntity = beam.mEntity.GetObjectPtr(); hitEntity != nullptr) {
+        targetObject = hitEntity->mLuaObj;
+      } else if (LuaPlus::LuaState* const scriptState = mLuaObj.GetActiveState(); scriptState != nullptr) {
+        targetObject = LuaPlus::LuaObject(scriptState);
+      }
+
+      // 0x0067352C..0x0067353D: `LuaPCall("OnImpact", {typeString}, &target)`
+      // so the script receives (self, impactType, target).
+      const char* impactArgs[] = {ENT_GetImpactTypeString(beam.mImpactType)};
+      this->LuaPCall("OnImpact", impactArgs, &targetObject);
     }
   }
 

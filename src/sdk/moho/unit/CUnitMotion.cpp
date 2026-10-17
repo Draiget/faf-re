@@ -451,8 +451,8 @@ namespace moho
         targetPosition.y - unitPosition.y,
         targetPosition.z - unitPosition.z,
       };
-      Wm3::Vector3f normalizedTarget = toTarget;
-      (void)Wm3::Vector3f::Normalize(&normalizedTarget);
+      Wm3::Vector3f normalizedTarget{};
+      (void)NormalizeVectorInto(&normalizedTarget, toTarget); // FUN_0044F7E0
 
       const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
       const float signedRadians =
@@ -2028,10 +2028,13 @@ namespace moho
       }
     }
 
+    // 0x006C3527..0x006C3553: the settling test reads the roll-hack vector
+    // (+0x68), not the velocity, so a stopped hull keeps snapping while its
+    // roll still settles.
     const float speedSq =
-      (mVelocity.x * mVelocity.x) +
-      (mVelocity.y * mVelocity.y) +
-      (mVelocity.z * mVelocity.z);
+      (mVector68.x * mVector68.x) +
+      (mVector68.y * mVector68.y) +
+      (mVector68.z * mVector68.z);
     if (moveSucceeded || transitionUpdated || speedSq > 0.000001f) {
       transform = SnapToWater(transform);
     }
@@ -2176,8 +2179,9 @@ namespace moho
       if (!unit->IsDead()) {
         const SFootprint& footprint = unit->GetFootprint();
         SOCellPos cellPos{};
-        cellPos.x = static_cast<std::int16_t>(currentPos.x - (footprint.mSizeX * kFootprintHalfExtentScale));
-        cellPos.z = static_cast<std::int16_t>(currentPos.z - (footprint.mSizeZ * kFootprintHalfExtentScale));
+        // 0x006C09EB / 0x006C0A11: `fld; fistp` -- rounded, then the low word.
+        cellPos.x = static_cast<std::int16_t>(msvc8::RoundToInt(currentPos.x - (footprint.mSizeX * kFootprintHalfExtentScale)));
+        cellPos.z = static_cast<std::int16_t>(msvc8::RoundToInt(currentPos.z - (footprint.mSizeZ * kFootprintHalfExtentScale)));
 
         COGrid* const oGrid = unit->SimulationRef->mOGrid;
         EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(footprint, *mapData, cellPos);
@@ -2251,10 +2255,9 @@ namespace moho
     }
 
     Unit* const unit = mUnit;
+    // 0x006C2A98..0x006C2AC3: (z*z + y*y) + x*x.
     const float speed = std::sqrt(
-      (mVelocity.x * mVelocity.x) +
-      (mVelocity.y * mVelocity.y) +
-      (mVelocity.z * mVelocity.z)
+      ((mVelocity.z * mVelocity.z) + (mVelocity.y * mVelocity.y)) + (mVelocity.x * mVelocity.x)
     );
 
     if (speed > unit->mInfoCache.mFormationTopSpeed * kCommonMoveNearStopSpeedScale) {
@@ -2312,8 +2315,10 @@ namespace moho
         continue;
       }
 
+      // 0x006C2FAA: `call [vtbl+30h]` (IsMobile) -- mobile candidates are
+      // skipped; a dying structure still counts.
       Unit* const platformUnit = candidateEntity->IsUnit();
-      if (platformUnit == nullptr || platformUnit->IsDead()) {
+      if (platformUnit == nullptr || platformUnit->IsMobile()) {
         continue;
       }
 
@@ -2326,7 +2331,8 @@ namespace moho
       const float deltaX = ownerPosition.x - platformPosition.x;
       const float deltaY = ownerPosition.y - platformPosition.y;
       const float deltaZ = ownerPosition.z - platformPosition.z;
-      const float distanceSq = (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+      // 0x006C3012..0x006C3027: (x*x + z*z) + y*y.
+      const float distanceSq = ((deltaX * deltaX) + (deltaZ * deltaZ)) + (deltaY * deltaY);
       if (distanceSq < nearestDistanceSq) {
         nearestDistanceSq = distanceSq;
         mRaisedPlatformUnit.ResetFromObject(platformUnit);
@@ -2685,7 +2691,9 @@ namespace moho
     transform.pos_.x = mLastTrans.pos_.x + ((mCurTrans.pos_.x - mLastTrans.pos_.x) * transitionProgress);
     transform.pos_.y = mLastTrans.pos_.y + ((mCurTrans.pos_.y - mLastTrans.pos_.y) * transitionProgress);
     transform.pos_.z = mLastTrans.pos_.z + ((mCurTrans.pos_.z - mLastTrans.pos_.z) * transitionProgress);
-    transform.orient_ = Wm3::Quaternionf::Nlerp(mLastTrans.orient_, mCurTrans.orient_, transitionProgress);
+    // 0x006C3120: QuatLERP (0x004EBA80) with q1 = mCurTrans (eax, +0x13C) and
+    // q2 = mLastTrans (ecx, +0x120), i.e. last -> current.
+    (void)QuatLERP(&mCurTrans.orient_, &mLastTrans.orient_, &transform.orient_, transitionProgress);
 
     mLayerTransitionTicks += 1.0f;
     mProcessSurfaceCollision = false;
@@ -2733,11 +2741,16 @@ namespace moho
       ) {
         const Wm3::Vector3f unitPosition = unit->GetPosition();
         const Wm3::Vector3f targetPosition = slavedTarget->GetTargetPosGun(false);
-        const float targetHeading =
-          msvc8::atan2(targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z);
+        // 0x006C1F59..0x006C1F74: the unit heading is ToAngle (0x00565A30) on
+        // its orientation, left on the x87 stack and subtracted from the
+        // stored float target heading.
+        const Wm3::Quaternionf& orientation = unit->mVarDat.mCurTransform.orient_;
+        const float headingY = ((orientation.z * orientation.x) + (orientation.w * orientation.y)) * 2.0f;
+        const float headingX = 1.0f - (((orientation.y * orientation.y) + (orientation.x * orientation.x)) * 2.0f);
+        const float headingDelta = NormalizeAngleSignedRadians(msvc8::Atan2Difference(
+          targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z, headingY, headingX
+        ));
         const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
-        const float unitHeading = msvc8::atan2(forward.x, forward.z);
-        const float headingDelta = NormalizeAngleSignedRadians(targetHeading - unitHeading);
         const float absHeadingDelta = std::fabs(headingDelta);
         const float slavedArcRange = slavedWeapon->mWeaponBlueprint->SlavedToBodyArcRange;
 
@@ -2815,10 +2828,10 @@ namespace moho
 
       mVector44 = {};
       Wm3::Vector3f currentVelocity = unit->GetVelocity();
+      // 0x006C27A8..0x006C27DB: (y*y + z*z) + x*x.
       const float currentSpeedSq =
-        (currentVelocity.x * currentVelocity.x) +
-        (currentVelocity.y * currentVelocity.y) +
-        (currentVelocity.z * currentVelocity.z);
+        ((currentVelocity.y * currentVelocity.y) + (currentVelocity.z * currentVelocity.z)) +
+        (currentVelocity.x * currentVelocity.x);
       if (!rotated && currentSpeedSq < kCommonMoveVelocityStopThresholdSq) {
         mPos = transform.pos_;
         mVelocity = {};
@@ -2840,7 +2853,7 @@ namespace moho
       currentVelocity.x = -currentVelocity.x;
       currentVelocity.y = -currentVelocity.y;
       currentVelocity.z = -currentVelocity.z;
-      currentVelocity.LimitLengthTo(brake);
+      (void)VecLimitLengthTo(&currentVelocity, brake); // 0x006C28D7 -> 0x005D1E70
 
       mVelocity = Wm3::Vector3f{
         currentVelocity.x + dampedVelocity.x,
@@ -4509,18 +4522,19 @@ namespace moho
     float rollTargetY = 0.0f;
     float rollTargetZ = 0.0f;
 
-    if (mUnit->IsUnitState(UNITSTATE_MovingDown)) {
+    // 0x006C1474: MovingUp (state 11) is tested first and pitches against the
+    // nose, `(-0.0 - vZ) * diving * 4` (0x006C14A2..0x006C14E0, the y lane is
+    // -0.0 * diving * 4); MovingDown (state 10, 0x006C14F2) pitches along it.
+    if (mUnit->IsUnitState(UNITSTATE_MovingUp)) {
       const VAxes3 axes(mUnit->mVarDat.mCurTransform.orient_);
-      const float rollScale = mDivingSpeed * kRollHackAxisScale;
-      rollTargetX = -axes.vZ.x * rollScale;
-      rollTargetY = 0.0f;
-      rollTargetZ = -axes.vZ.z * rollScale;
-    } else if (mUnit->IsUnitState(UNITSTATE_MovingUp)) {
+      rollTargetX = ((-0.0f - axes.vZ.x) * mDivingSpeed) * kRollHackAxisScale;
+      rollTargetY = (mDivingSpeed * -0.0f) * kRollHackAxisScale;
+      rollTargetZ = ((-0.0f - axes.vZ.z) * mDivingSpeed) * kRollHackAxisScale;
+    } else if (mUnit->IsUnitState(UNITSTATE_MovingDown)) {
       const VAxes3 axes(mUnit->mVarDat.mCurTransform.orient_);
-      const float rollScale = mDivingSpeed * kRollHackAxisScale;
-      rollTargetX = axes.vZ.x * rollScale;
-      rollTargetY = 0.0f;
-      rollTargetZ = axes.vZ.z * rollScale;
+      rollTargetX = (axes.vZ.x * mDivingSpeed) * kRollHackAxisScale;
+      rollTargetY = (mDivingSpeed * 0.0f) * kRollHackAxisScale;
+      rollTargetZ = (axes.vZ.z * mDivingSpeed) * kRollHackAxisScale;
     }
 
     mVector68.x = (rollTargetX * kRollHackBlend) + (mVector68.x * kRollHackRetention);

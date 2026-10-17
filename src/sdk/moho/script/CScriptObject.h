@@ -593,7 +593,7 @@ namespace moho
      * Address: 0x00602CA0 (FUN_00602CA0, Moho::CScriptObject::StartTransportBeamUp)
      *
      * What it does:
-     * Invokes `OnStartTransportBeamUp(self, attachBone, sourceUnit)` callback when present.
+     * Invokes `OnStartTransportBeamUp(self, sourceUnit, attachBone)` callback when present.
      */
     void StartTransportBeamUp(const WeakPtr<Unit>& sourceUnitLink, int attachBone);
 
@@ -645,9 +645,10 @@ namespace moho
      * Address: 0x006FAC00 (FUN_006FAC00, Moho::CScriptObject::RunScript_PropOnKilled)
      *
      * What it does:
-     * Invokes `OnKilled(self, sourceProp, reason, value)` callback for prop-owned scripts.
+     * Invokes `OnKilled(self, instigator, reason, value)` for a prop's script;
+     * the instigator rides along as its script object, or nil.
      */
-    void RunScriptPropOnKilled(Prop* sourceProp, const char* reason, float value);
+    void RunScriptPropOnKilled(Entity* instigator, const char* reason, float value);
 
     /**
      * Address: 0x007CB940

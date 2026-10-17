@@ -13168,8 +13168,19 @@ Unit::Unit(const SUnitConstructionParams& params)
   // --- being-built vs finished -------------------------------------------
   CArmyStats* const armyStats = ArmyRef->GetArmyStats();
   const char* const layerName = LayerToString(mVarDat.mLayerMask);
-  const LuaPlus::LuaObject creatorObject =
-    params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->GetLuaObject() : GetLuaObject();
+  // 0x006A6563..0x006A6584 / 0x006A67E5..0x006A6806: with no creator the
+  // binary passes a nil LuaObject built on this unit's Lua state (0x00908970),
+  // not the unit's own script object.
+  const auto makeCreatorObject = [this](Unit* const creator) -> LuaPlus::LuaObject {
+    if (creator != nullptr) {
+      return creator->GetLuaObject();
+    }
+    LuaPlus::LuaObject nilObject;
+    if (LuaPlus::LuaState* const scriptState = mLuaObj.GetActiveState(); scriptState != nullptr) {
+      nilObject = LuaPlus::LuaObject(scriptState);
+    }
+    return nilObject;
+  };
 
   if (params.mComplete == 0) {
     mUnitVarDat.mUnitStates |= kUnitStateBeingBuilt;
@@ -13177,7 +13188,9 @@ Unit::Unit(const SUnitConstructionParams& params)
     if (armyStats != nullptr) {
       IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", &blueprint, 1.0f);
     }
-    RunScript("OnStartBeingBuilt", creatorObject, layerName);
+    // 0x006A67B3..0x006A6830: creator read from `params.mLinkSourceUnit`
+    // (+0x2C), fired through `RunScript_ObjStr` (0x006B07D0).
+    RunScriptObjectString("OnStartBeingBuilt", makeCreatorObject(params.mLinkSourceUnit), layerName);
   } else {
     if (UnitMotion == nullptr) {
       EntitySetTemplate<Unit> overlapping{};
@@ -13187,12 +13200,17 @@ Unit::Unit(const SUnitConstructionParams& params)
         if (neighbour == nullptr) {
           continue;
         }
-        RunScript("OnAdjacentTo", neighbour, this);
-        neighbour->RunScript("OnAdjacentTo", this, neighbour);
+        // 0x006A64A3..0x006A64C9: `RunScript_OnAdjacentTo` (0x006B0660) as
+        // this->(neighbour, this), then neighbour->(this, this) -- both
+        // arguments of the second call are this unit.
+        RunScriptOnAdjacentTo(neighbour, this);
+        neighbour->RunScriptOnAdjacentTo(this, this);
       }
     }
 
-    RunScript("OnStopBeingBuilt", creatorObject, layerName);
+    // 0x006A6522..0x006A65AB: creator read from the `CreatorRef` weak link
+    // (+0x4B8), fired through `RunScript_ObjStr` (0x006B07D0).
+    RunScriptObjectString("OnStopBeingBuilt", makeCreatorObject(CreatorRef.GetObjectPtr()), layerName);
 
     if (blueprint.General.CapCost > 0.0f && armyStats != nullptr) {
       IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", &blueprint, 1.0f);
@@ -16991,8 +17009,13 @@ void Unit::ToggleScriptBit(const int bitIndex)
     return;
   }
 
-  if (IsUnitState(kTransportScriptBitGuardState) && IsInCategory("TRANSPORTATION")) {
-    return;
+  // 0x006A74DC..0x006A751B: the TRANSPORTATION test is on the attach parent
+  // (`mAttachInfo` target at unit+0x194), not on this unit.
+  if (IsUnitState(kTransportScriptBitGuardState)) {
+    if (Entity* const attachParent = mAttachInfo.GetAttachTargetEntity();
+        attachParent != nullptr && attachParent->IsInCategory("TRANSPORTATION")) {
+      return;
+    }
   }
 
   if ((mUnitVarDat.mScriptbits & mask) != 0u) {

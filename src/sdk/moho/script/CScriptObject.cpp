@@ -162,18 +162,16 @@ namespace
     return out;
   }
 
+  /**
+   * Lua truthiness of one script result, as every bool-returning RunScript_*
+   * reads it: their inner calls (0x005F4BD3, 0x005ED922, 0x006DE762,
+   * 0x007957D3, 0x00795965) all use `lua_toboolean` (0x0090CA40), so only
+   * nil and `false` are false -- `0`, strings and tables are true.
+   * `LuaObject::operator bool` (0x00907440) applies the same rule.
+   */
   [[nodiscard]] bool LuaValueToBool(const LuaPlus::LuaObject& value) noexcept
   {
-    if (!value) {
-      return false;
-    }
-    if (value.IsBoolean()) {
-      return value.GetBoolean();
-    }
-    if (value.IsNumber()) {
-      return value.GetNumber() != 0.0;
-    }
-    return false;
+    return static_cast<bool>(value);
   }
 
   [[nodiscard]] float LuaValueToFloat(const LuaPlus::LuaObject& value) noexcept
@@ -2741,9 +2739,10 @@ bool CScriptObject::RunScriptOnCollisionCheckWeapon(UnitWeapon* const weapon)
  * Address: 0x006FAC00 (FUN_006FAC00, Moho::CScriptObject::RunScript_PropOnKilled)
  *
  * What it does:
- * Invokes `OnKilled(self, sourceProp, reason, value)` callback for prop-owned scripts.
+ * Invokes `OnKilled(self, instigator, reason, value)` for a prop's script.
+ * FUN_006FAE50 pushes the instigator's script object (`entity+20h`), or nil.
  */
-void CScriptObject::RunScriptPropOnKilled(Prop* const sourceProp, const char* const reason, const float value)
+void CScriptObject::RunScriptPropOnKilled(Entity* const instigator, const char* const reason, const float value)
 {
   constexpr const char* kOnKilled = "OnKilled";
 
@@ -2757,7 +2756,9 @@ void CScriptObject::RunScriptPropOnKilled(Prop* const sourceProp, const char* co
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    fn(mLuaObj, sourceProp, reason, value);
+    const LuaPlus::LuaObject instigatorObject =
+      (instigator != nullptr) ? instigator->mLuaObj : MakeNilLuaObject(mLuaObj);
+    fn(mLuaObj, instigatorObject, reason, value);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.GetObjectPtr(), kOnKilled, ex.what());
   } catch (...) {

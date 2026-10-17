@@ -13,7 +13,10 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/animation/CAniActor.h"
+#include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/entity/Entity.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/script/CScriptObject.h"
@@ -44,9 +47,13 @@ namespace
   constexpr const char* kCollisionManipulatorWatchBoneHelpText =
     "CollisionDetector:WatchBone(bone) -- add the given bone to those watched by this manipulator";
   constexpr std::uint32_t kWatchBoneActiveMask = 0x8000u;
-  constexpr std::uint32_t kAnimCollisionNotifiedMask = 0x0001u;
-  constexpr std::uint32_t kTerrainCollisionNotifiedMask = 0x0002u;
-  constexpr float kOrientationCollisionThreshold = 0.1f;
+  // The notified bits live in the binding's high flag word: 0x00637D8D /
+  // 0x00637F0C read `word [binding+6]` bits 0/1, and DisableCollisionCallbacks
+  // (0x006384A0) clears `word [binding+6]` bit 0.
+  constexpr std::uint32_t kAnimCollisionNotifiedMask = 0x00010000u;
+  constexpr std::uint32_t kTerrainCollisionNotifiedMask = 0x00020000u;
+  // 0x00637EFD: `comiss [0xE4F714] (0.1f), localBone.y`.
+  constexpr float kAnimCollisionLocalHeight = 0.1f;
   constexpr int kCollisionManipulatorPrecedence = 99;
 
   // Address: 0x00BD2720 (dynamic initializer for the global
@@ -296,28 +303,26 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
-  [[nodiscard]] float GetOrientationAlignment(const moho::VTransform& owner, const moho::VTransform& bone)
+  /**
+   * Fires one collision callback on the owner unit as
+   * `(self, boneName, x, y, z)` through `RunScript_StrNum3` (0x00638970), the
+   * call all three sites in `ManipulatorUpdate` make on `ownerUnit + 8`.
+   */
+  void DispatchOwnerScriptCallback(
+    moho::Unit* const ownerUnit, const char* const callbackName, const char* const boneName, const Wm3::Vector3f& pos
+  )
   {
-    return std::abs(Wm3::Quatf::Dot(owner.orient_, bone.orient_));
-  }
-
-  void DispatchOwnerScriptCallback(moho::Unit* ownerUnit, const char* callbackName)
-  {
-    if (!ownerUnit || !callbackName) {
-      return;
-    }
-
     auto* const ownerEntity = static_cast<moho::Entity*>(ownerUnit);
     auto* const scriptObject = static_cast<moho::CScriptObject*>(ownerEntity);
-    scriptObject->CallbackStr(callbackName);
+    scriptObject->RunScriptStringNum3(callbackName, boneName, pos.x, pos.y, pos.z);
   }
 
-  [[nodiscard]] float SampleTerrainSurfaceY(const moho::Sim* sim, const moho::VTransform& transform)
+  [[nodiscard]] float SampleTerrainSurfaceY(const moho::Sim* sim, const Wm3::Vector3f& pos)
   {
     if (!sim || !sim->mMapData) {
-      return transform.pos_.y;
+      return pos.y;
     }
-    return sim->mMapData->GetSurface(transform.pos_);
+    return sim->mMapData->GetSurface(pos);
   }
 
   /**
@@ -785,6 +790,13 @@ namespace moho
 
   /**
    * Address: 0x00637C90 (FUN_00637C90)
+   *
+   * What it does:
+   * For each active watched pose bone, either tracks the bone's world
+   * position against the terrain/water surface (`OnAnimTerrainCollision` /
+   * `OnNotAnimTerrainCollision`) or, without the terrain check, fires
+   * `OnAnimCollision` once the bone drops below 0.1 in the unit's local
+   * frame. Every callback receives `(boneName, x, y, z)`.
    */
   bool CCollisionManipulator::ManipulatorUpdate()
   {
@@ -792,58 +804,82 @@ namespace moho
       return false;
     }
 
-    auto* const ownerEntity = static_cast<Entity*>(mOwnerUnit);
-    if (!ownerEntity) {
-      return false;
-    }
+    // 0x00637CB0..0x00637D08: watched bones are read from the owner actor's
+    // pose (`mOwnerActor->mPose->mBones[idx]`, stride 0x4C), and the bone name
+    // for every callback comes from the actor's skeleton (0x005E3CF0 ->
+    // `CAniSkel::GetBone` 0x00549E20 -> `mBoneName`).
+    CAniPose* const pose = mOwnerActor->mPose.get();
+    const auto lookupBoneName = [this](const int boneIndex) -> const char* {
+      const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+      return skeleton->GetBone(static_cast<std::uint32_t>(boneIndex))->mBoneName;
+    };
 
-    const int boneCount = ownerEntity->GetBoneCount();
-    const VTransform& ownerTransform = mOwnerUnit->GetTransform();
-    bool raisedCallback = false;
-
+    // The flags are written straight back to the binding at the same points as
+    // the binary, since a callback may itself touch the watch-bone flags.
     for (auto* watchBone = mWatchBones.begin(); watchBone != mWatchBones.end(); ++watchBone) {
-      std::uint32_t flags = static_cast<std::uint32_t>(watchBone->mFlags);
-      if ((flags & kWatchBoneActiveMask) == 0u) {
+      if ((static_cast<std::uint32_t>(watchBone->mFlags) & kWatchBoneActiveMask) == 0u) {
         continue;
       }
 
+      // The binary turns an out-of-range index into a null pose bone and then
+      // dereferences it; skip it instead.
       const int boneIndex = watchBone->mBoneIndex;
-      if (boneIndex < 0 || boneIndex >= boneCount) {
+      if (static_cast<std::uint32_t>(boneIndex) >= pose->mBones.size()) {
+        continue;
+      }
+      const CAniPoseBone& poseBone = pose->mBones[static_cast<std::size_t>(boneIndex)];
+
+      if (mTerrainCollisionCheckEnabled) {
+        // 0x00637D17..0x00637D8D: world bone position against max(terrain,
+        // water) at its x/z; `below` is `surface > bone.y`.
+        const Wm3::Vector3f bonePos = poseBone.GetCompositeTransform().pos_;
+        const float surfaceY = SampleTerrainSurfaceY(mOwnerSim, bonePos);
+        const bool below = surfaceY > bonePos.y;
+
+        const std::uint32_t flags = static_cast<std::uint32_t>(watchBone->mFlags);
+        if ((flags & kTerrainCollisionNotifiedMask) != 0u) {
+          if (below) {
+            continue;
+          }
+          // 0x00637DA2..0x00637DF4: clear first, then fire with the world position.
+          watchBone->mFlags = static_cast<int>(flags & ~kTerrainCollisionNotifiedMask);
+          DispatchOwnerScriptCallback(mOwnerUnit, "OnNotAnimTerrainCollision", lookupBoneName(boneIndex), bonePos);
+        } else if (below) {
+          // 0x00637E0A..0x00637E5C: set first, then fire with the world position.
+          watchBone->mFlags = static_cast<int>(flags | kTerrainCollisionNotifiedMask);
+          DispatchOwnerScriptCallback(mOwnerUnit, "OnAnimTerrainCollision", lookupBoneName(boneIndex), bonePos);
+        }
         continue;
       }
 
-      const VTransform boneTransform = ownerEntity->GetBoneWorldTransform(boneIndex);
-      if (!mTerrainCollisionCheckEnabled) {
-        const float alignment = GetOrientationAlignment(ownerTransform, boneTransform);
-        if (alignment >= kOrientationCollisionThreshold) {
-          flags &= ~kAnimCollisionNotifiedMask;
-        } else if ((flags & kAnimCollisionNotifiedMask) == 0u) {
-          DispatchOwnerScriptCallback(mOwnerUnit, "OnAnimCollision");
-          flags |= kAnimCollisionNotifiedMask;
-          raisedCallback = true;
+      // 0x00637E6A..0x00637EF8: bone position in the unit's local frame --
+      // `(bone - unitPos)` rotated by the conjugate of the unit orientation
+      // (`-0.0f - lane` at 0xE4F748) through `MultQuadVec` (0x00452D40).
+      const VTransform& ownerTransform = mOwnerUnit->GetTransform();
+      const Wm3::Vector3f& bonePos = poseBone.GetCompositeTransform().pos_;
+      const Wm3::Vector3f offset{
+        bonePos.x - ownerTransform.pos_.x,
+        bonePos.y - ownerTransform.pos_.y,
+        bonePos.z - ownerTransform.pos_.z,
+      };
+      const Wm3::Quaternionf inverseOrient = ConjugateQuat(ownerTransform.orient_);
+      Wm3::Vector3f localPos{};
+      MultQuadVec(&localPos, &offset, &inverseOrient);
+
+      if (kAnimCollisionLocalHeight > localPos.y) {
+        if ((static_cast<std::uint32_t>(watchBone->mFlags) & kAnimCollisionNotifiedMask) == 0u) {
+          // 0x00637F16..0x00637F64: fire with the local position, then set the bit.
+          DispatchOwnerScriptCallback(mOwnerUnit, "OnAnimCollision", lookupBoneName(boneIndex), localPos);
+          watchBone->mFlags = static_cast<int>(static_cast<std::uint32_t>(watchBone->mFlags) | kAnimCollisionNotifiedMask);
         }
-
-        watchBone->mFlags = static_cast<int>(flags);
-        continue;
+      } else {
+        // 0x00637F6F..0x00637F7A
+        watchBone->mFlags = static_cast<int>(static_cast<std::uint32_t>(watchBone->mFlags) & ~kAnimCollisionNotifiedMask);
       }
-
-      const float terrainSurfaceY = SampleTerrainSurfaceY(mOwnerSim, boneTransform);
-      if ((flags & kTerrainCollisionNotifiedMask) == 0u) {
-        if (boneTransform.pos_.y < terrainSurfaceY) {
-          flags |= kTerrainCollisionNotifiedMask;
-          DispatchOwnerScriptCallback(mOwnerUnit, "OnAnimTerrainCollision");
-          raisedCallback = true;
-        }
-      } else if (terrainSurfaceY <= boneTransform.pos_.y) {
-        flags &= ~kTerrainCollisionNotifiedMask;
-        DispatchOwnerScriptCallback(mOwnerUnit, "OnNotAnimTerrainCollision");
-        raisedCallback = true;
-      }
-
-      watchBone->mFlags = static_cast<int>(flags);
     }
 
-    return raisedCallback;
+    // The binary leaves no meaningful return value; the caller discards it.
+    return false;
   }
 
   /**

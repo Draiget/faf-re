@@ -412,15 +412,20 @@ namespace moho
     void UpsertBlipCell(std::uint32_t blipId, std::int32_t cellIndex);
     void RemoveBlipCell(std::uint32_t blipId);
 
+  public:
     /**
      * Address: 0x00715D10 (FUN_00715D10, Moho::CInfluenceMap::InsertEntry)
      *
      * What it does:
      * Builds one per-blip influence entry at `position`, inserts/updates it in
      * the owning cell lane, and stores the blip-to-cell lookup mapping.
+     *
+     * Public because `CAiReconDBImpl::GenerateNewBlips` calls it directly on
+     * the recon DB's `mIMap` (0x005C0BD0).
      */
     void InsertEntry(std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* sourceBlueprint);
 
+  private:
     [[nodiscard]] static bool IsInCategory(const EntityCategorySet* category, std::uint32_t categoryBitIndex);
 
   public:

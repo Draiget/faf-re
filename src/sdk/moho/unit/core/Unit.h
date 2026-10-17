@@ -711,6 +711,9 @@ namespace moho
     // this same private constructor - `operator new(0x6A8)` followed by a
     // direct call at 0x006E87C5, not through Sim::CreateUnit.
     friend class CUnitCommand;
+    // CUnitUpgradeTask (0x005F8A16..0x005F8A39) does the same for the
+    // upgraded unit, bypassing Sim::CreateUnit's unit-cap gate.
+    friend class CUnitUpgradeTask;
 
   public:
 

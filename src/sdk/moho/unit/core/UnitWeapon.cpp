@@ -1373,7 +1373,7 @@ namespace moho
    * Address: 0x006D8F30 (FUN_006D8F30, cfunc_UnitWeaponFireWeaponL)
    *
    * What it does:
-   * Resolves one weapon from Lua and dispatches one manual fire script lane.
+   * Resolves one weapon from Lua and fires it through `UnitWeapon::Fire`.
    */
   int cfunc_UnitWeaponFireWeaponL(LuaPlus::LuaState* const state)
   {
@@ -1385,10 +1385,9 @@ namespace moho
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
-    if (weapon != nullptr) {
-      (void)weapon->RunScript("OnFire");
-      ++weapon->mShotsAtTarget;
-    }
+    // 0x006D8FB9: `UnitWeapon::Fire` (0x006D61F0), which skips a stunned
+    // unit and records the realtime fire stats before `OnFire`.
+    weapon->Fire();
     return 0;
   }
 

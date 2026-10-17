@@ -1,4 +1,5 @@
 #include "moho/ai/CAiSteeringImpl.h"
+#include "moho/sim/SimConVarAccess.h"
 
 #include <algorithm>
 #include <cmath>
@@ -110,30 +111,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] float ReadSimConVarFloat(Sim* const sim, CSimConVarBase* const conVar, const float fallback) noexcept
+  // 0x005D3230..0x005D3247: the con-var instance's value, read raw.
+  [[nodiscard]] float ReadSteeringAirTolerance(Sim* const sim)
   {
-    if (!sim || !conVar) {
-      return fallback;
-    }
-
-    CSimConVarInstanceBase* const instance = sim->GetSimVar(conVar);
-    void* const storage = instance ? instance->GetValueStorage() : nullptr;
-    if (!storage) {
-      return fallback;
-    }
-
-    const float value = *static_cast<const float*>(storage);
-    if (!std::isfinite(value) || value <= 0.0f) {
-      return fallback;
-    }
-
-    return value;
-  }
-
-  [[nodiscard]] float ReadSteeringAirTolerance(Sim* const sim) noexcept
-  {
-    constexpr float kFallbackTolerance = 1.0f;
-    return ReadSimConVarFloat(sim, &moho::gSimConVar_ai_SteeringAirTolerance, kFallbackTolerance);
+    return moho::ReadSimConVar(sim, moho::gSimConVar_ai_SteeringAirTolerance);
   }
 
   void UpdateMotionPathPointers(CAiSteeringImpl& steering)
@@ -1340,7 +1321,7 @@ Wm3::Vector3f CAiSteeringImpl::TrySnapPosToWaypoint(
   }
 
   Wm3::Vector3f delta = steering.mWaypoints[index + 1] - waypoint;
-  delta.LimitLengthTo(tolerance - dist);
+  (void)moho::VecLimitLengthTo(&delta, tolerance - dist); // 0x005D2626 -> 0x005D1E70
   return waypoint + delta;
 }
 
@@ -1624,12 +1605,14 @@ bool CAiSteeringImpl::FlyToNextWaypoint()
     return true;
   }
 
-  mDestination = snapped;
   MotionSetTarget(mUnitMotion, snapped, Wm3::Vector3f::Zero(), LAYER_None);
 
+  // 0x005D3249..0x005D3281: arrival is horizontal and strict,
+  // `tol*tol > dz*dz + dx*dx`, against the raw con-var value.
   const float airTolerance = ReadSteeringAirTolerance(mOwnerUnit->SimulationRef);
-  const Wm3::Vector3f delta = snapped - currentPos;
-  return Wm3::Vector3f::LengthSq(delta) <= (airTolerance * airTolerance);
+  const float dz = snapped.z - currentPos.z;
+  const float dx = snapped.x - currentPos.x;
+  return (airTolerance * airTolerance) > ((dz * dz) + (dx * dx));
 }
 
 /**

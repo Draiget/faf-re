@@ -429,7 +429,8 @@ namespace moho
     float q1z = q1->z;
     float q1w = q1->w;
     const float oneMinusAmount = 1.0f - amount;
-    const float dot = (q2->x * q1x) + (q2->y * q1y) + (q2->z * q1z) + (q2->w * q1w);
+    // 0x004EBAD1..0x004EBB0F: summed in member order, w first.
+    const float dot = (((q2->w * q1w) + (q2->x * q1x)) + (q2->y * q1y)) + (q2->z * q1z);
     if (dot < 0.0f) {
       q1x = -q1x;
       q1y = -q1y;

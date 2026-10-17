@@ -70,8 +70,8 @@ namespace moho
      * VFTable SLOT: 1 (primary IAniManipulator/CTaskEvent view)
      *
      * What it does:
-     * Evaluates watched bones, raising script callbacks for orientation/terrain
-     * collision state transitions.
+     * Evaluates watched pose bones, raising `(boneName, x, y, z)` script
+     * callbacks for local-height (anim) / terrain collision state transitions.
      */
     bool ManipulatorUpdate() override;
 
