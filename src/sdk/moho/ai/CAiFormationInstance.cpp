@@ -1413,9 +1413,11 @@ namespace
    *
    * What it does:
    * For every non-guard formation, pairs each ground group against every
-   * group of both layers and, where their overlap boxes intersect, gives
-   * both the ground group's centre, the larger extent (floored at 10 on
-   * each axis) and the slower speed, so overlapping groups move as one.
+   * air group and, where their overlap boxes intersect, gives both the
+   * ground group's centre, the larger extent (floored at 10 on each axis)
+   * and the slower speed, so overlapping groups move as one. The inner walk
+   * covers only the air layer (0x005689B4..0x005689BE: `this+0xFC`, one
+   * pass), so a ground group is never merged with itself.
    */
   void MergeOverlappingOffsetInfos(moho::CFormationInstance& formation)
   {
@@ -1425,28 +1427,26 @@ namespace
 
     constexpr float kMinMergedExtent = 10.0f;
     for (moho::SOffsetInfo& ground : formation.mOffsetInfo[kGroundFormationLayer]) {
-      for (std::int32_t layer = 0; layer < kFormationLayerCount; ++layer) {
-        for (moho::SOffsetInfo& other : formation.mOffsetInfo[layer]) {
-          if (!other.Overlaps(ground)) {
-            continue;
-          }
-
-          float extentZ = std::max(ground.mExtent.z, other.mExtent.z);
-          if (extentZ < kMinMergedExtent) {
-            extentZ = kMinMergedExtent;
-          }
-          float extentX = std::max(ground.mExtent.x, other.mExtent.x);
-          if (extentX < kMinMergedExtent) {
-            extentX = kMinMergedExtent;
-          }
-          const float speed = std::min(ground.mSpeed, other.mSpeed);
-
-          other.mCenter = ground.mCenter;
-          other.mExtent = moho::SCoordsVec2{extentX, extentZ};
-          other.mSpeed = speed;
-          ground.mExtent = moho::SCoordsVec2{extentX, extentZ};
-          ground.mSpeed = speed;
+      for (moho::SOffsetInfo& other : formation.mOffsetInfo[kAirFormationLayer]) {
+        if (!other.Overlaps(ground)) {
+          continue;
         }
+
+        float extentZ = std::max(ground.mExtent.z, other.mExtent.z);
+        if (extentZ < kMinMergedExtent) {
+          extentZ = kMinMergedExtent;
+        }
+        float extentX = std::max(ground.mExtent.x, other.mExtent.x);
+        if (extentX < kMinMergedExtent) {
+          extentX = kMinMergedExtent;
+        }
+        const float speed = std::min(ground.mSpeed, other.mSpeed);
+
+        other.mCenter = ground.mCenter;
+        other.mExtent = moho::SCoordsVec2{extentX, extentZ};
+        other.mSpeed = speed;
+        ground.mExtent = moho::SCoordsVec2{extentX, extentZ};
+        ground.mSpeed = speed;
       }
     }
   }
@@ -1680,14 +1680,21 @@ namespace moho
    */
   bool SOffsetInfo::Overlaps(const SOffsetInfo& other) const noexcept
   {
-    const bool overlapX = (mCenter.x - mExtent.x) <= (other.mExtent.x + other.mCenter.x)
-      && (other.mCenter.x - other.mExtent.x) <= (mExtent.x + mCenter.x);
-    if (!overlapX) {
+    // Each test only rejects on an ordered `lo > hi` (comiss/ja at 0x00568917,
+    // 0x0056892C, 0x00568957, 0x00568964), so a NaN bound counts as overlap.
+    if ((mCenter.x - mExtent.x) > (other.mExtent.x + other.mCenter.x)) {
       return false;
     }
-
-    return (mCenter.z - mExtent.z) <= (other.mExtent.z + other.mCenter.z)
-      && (other.mCenter.z - other.mExtent.z) <= (mExtent.z + mCenter.z);
+    if ((other.mCenter.x - other.mExtent.x) > (mExtent.x + mCenter.x)) {
+      return false;
+    }
+    if ((mCenter.z - mExtent.z) > (other.mExtent.z + other.mCenter.z)) {
+      return false;
+    }
+    if ((other.mCenter.z - other.mExtent.z) > (mExtent.z + mCenter.z)) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -2961,7 +2968,10 @@ namespace moho
     // D=0x154). Left un-reserved: the binary never reserves it either,
     // relying on the 16 inline slots plus `push_back`'s own grow.
     gpg::fastvector_n<SFormationRunScriptUnitDesc, 16> unitDescs;
-    float groupSpeed = std::numeric_limits<float>::max();
+    // The minimum lives in the stack group's `mSpeed`, which the SOffsetInfo
+    // constructor (0x00565AB0) starts at +inf; a speed is taken whenever it
+    // is not greater (0x00567795 / 0x005677B0), so +inf and NaN propagate.
+    float groupSpeed = gpg::pInf;
     for (WeakPtr<IUnit>& link : units) {
       Unit* const unit = UnitOf(link);
       const Wm3::Vec3f& pos = unit->GetPosition();
@@ -2982,7 +2992,9 @@ namespace moho
       const float unitSpeed = (blueprint->Air.CanFly != 0u)
         ? (blueprint->Air.MaxAirspeed * 0.85f) / unit->CalcTransportLoadFactor()
         : blueprint->Physics.MaxSpeed * 0.85f;
-      groupSpeed = std::min(groupSpeed, unitSpeed);
+      if (!(unitSpeed > groupSpeed)) {
+        groupSpeed = unitSpeed;
+      }
     }
 
     // Phase 5 (0x005677E4-0x005679D4): slot-table span/mean statistics.
@@ -3702,7 +3714,7 @@ namespace moho
       if (const SUnitOffsetInfo* const unitInfo = info->mUnitOffsets.try_get(unit->GetEntityId())) {
         const float distFactor = (unit->GetBlueprint()->Air.CanFly != 0u) ? 1.5f : 4.0f;
         float delta = (unitInfo->mDistToTarget - info->mAvgDistToTarget) * distFactor;
-        if (delta >= 20.0f) {
+        if (!(20.0f > delta)) { // 0x0059A747: NaN clamps to 20
           delta = 20.0f;
         }
         if (delta < -5.0f) {
@@ -3950,9 +3962,11 @@ namespace moho
 
           SCoordsVec2 offsetPos{};
           GetOffsetPosition(&offsetPos, unit, &group);
-          const double dx = static_cast<double>(groupCenter.x) - static_cast<double>(offsetPos.x);
-          const double dz = static_cast<double>(groupCenter.z) - static_cast<double>(offsetPos.z);
-          unitInfo.mDistFromLeader = static_cast<float>(std::sqrt(dx * dx + dz * dz));
+          // 0x0059B940..0x0059B961: x87 under 24-bit precision control, so
+          // every step rounds like float arithmetic.
+          const float dx = groupCenter.x - offsetPos.x;
+          const float dz = groupCenter.z - offsetPos.z;
+          unitInfo.mDistFromLeader = std::sqrt(dx * dx + dz * dz);
         }
 
         group.mAvgDistToTarget = (maxDistToTarget + minDistToTarget) * 0.5f;

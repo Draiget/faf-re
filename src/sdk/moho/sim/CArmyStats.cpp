@@ -45,13 +45,6 @@ namespace
 {
   constexpr const char* kOnStatsTriggerScriptName = "OnStatsTrigger";
 
-  [[nodiscard]] bool CategorySetHasAnyBits(const moho::EntityCategorySet& categorySet)
-  {
-    const moho::BVIntSet& bits = categorySet.Bits();
-    const unsigned int sentinel = bits.Max();
-    return bits.GetNext(std::numeric_limits<unsigned int>::max()) != sentinel;
-  }
-
   [[nodiscard]] float ResolveConditionValue(const moho::SCondition& condition)
   {
     moho::CArmyStatItem* const item = condition.mItem;
@@ -59,7 +52,9 @@ namespace
       return 0.0f;
     }
 
-    if (CategorySetHasAnyBits(condition.mCat)) {
+    // 0x0070BF4B: a condition counts by category whenever its set is bound to
+    // a rules universe, whether or not any category bit is set.
+    if (condition.mCat.mUniverse.mRules != nullptr) {
       return item->SumCategory(&condition.mCat);
     }
 
@@ -77,7 +72,11 @@ namespace
     }
   }
 
-  [[nodiscard]] bool EvaluateCondition(const moho::SCondition& condition, const float value)
+  /**
+   * Inlined block from 0x0070BFFA..0x0070C03F: an unknown operator keeps the
+   * result of the previous condition (false for the first one).
+   */
+  [[nodiscard]] bool EvaluateCondition(const moho::SCondition& condition, const float value, const bool previous)
   {
     switch (condition.mOp) {
       case moho::TRIGGER_GreaterThan:
@@ -89,7 +88,7 @@ namespace
       case moho::TRIGGER_LessThanOrEqual:
         return value <= condition.mVal;
       default:
-        return false;
+        return previous;
     }
   }
 
@@ -1071,8 +1070,8 @@ namespace moho
    */
   std::int32_t CArmyStats::SetUnitStat(const char* const statPath, const std::int32_t* const value)
   {
-    CArmyStatItem* const item = GetItem(statPath);
-    item->SynchronizeAsInt();
+    CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(this, statPath); // 0x00594720
+    item->SynchronizeAsFloat();                                                // 0x00415370
 
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
     for (;;) {
@@ -1252,38 +1251,39 @@ namespace moho
    * Address: 0x0070BEA0 (FUN_0070BEA0, Moho::CArmyStats::Update)
    *
    * What it does:
-   * Evaluates all trigger condition vectors and dispatches one
-   * `OnStatsTrigger` script callback per trigger when all conditions pass.
+   * Evaluates every trigger's conditions. A trigger whose conditions all
+   * pass is moved out of `mTriggers` into a local fired list (it fires once),
+   * and only after the walk does each fired trigger get its
+   * `OnStatsTrigger` script callback, in firing order (0x0070C0E8..0x0070C119).
    */
   void CArmyStats::Update()
   {
-    if (mOwnerArmy == nullptr) {
-      return;
-    }
-
-    for (const boost::shared_ptr<STrigger>& trigger : mTriggers) {
-      if (trigger == nullptr) {
-        continue;
-      }
-
+    ArmyTriggerList fired;
+    for (ArmyTriggerList::iterator it = mTriggers.begin(); it != mTriggers.end();) {
+      const boost::shared_ptr<STrigger> trigger = *it;
       const auto& conditions = trigger->mConditions;
       if (conditions.Empty()) {
+        ++it;
         continue;
       }
 
-      bool allConditionsSatisfied = true;
+      bool passed = false;
       for (const SCondition& condition : conditions) {
-        const float conditionValue = ResolveConditionValue(condition);
-        if (!EvaluateCondition(condition, conditionValue)) {
-          allConditionsSatisfied = false;
+        passed = EvaluateCondition(condition, ResolveConditionValue(condition), passed);
+        if (!passed) {
           break;
         }
       }
 
-      if (!allConditionsSatisfied) {
-        continue;
+      if (passed) {
+        fired.push_back(trigger);
+        it = mTriggers.erase(it);
+      } else {
+        ++it;
       }
+    }
 
+    for (const boost::shared_ptr<STrigger>& trigger : fired) {
       (void)mOwnerArmy->RunScript(kOnStatsTriggerScriptName, trigger->mName.c_str());
     }
   }

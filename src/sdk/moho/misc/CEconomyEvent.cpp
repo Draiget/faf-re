@@ -528,7 +528,7 @@ namespace moho
     , mRequested(perSecond)
     , mGranted{}
   {
-    mNode.ListLinkAfter(&economy->mConsumptionData);
+    mNode.ListLinkBefore(&economy->mConsumptionData);
   }
 
   /**
