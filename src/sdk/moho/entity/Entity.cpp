@@ -3318,33 +3318,41 @@ namespace moho
   /**
    * Address: 0x006797E0 (FUN_006797E0)
    */
-  void Entity::AttachedEntityDestroyed(Entity*)
+  void Entity::AttachedEntityDestroyed(Entity* const attached)
   {
-    CallbackStr("OnAttachedDestroyed");
+    // 0x006797E0: `lea eax, [esp+4]; push eax` -- the entity rides along as the
+    // script's argument (RunScript_Ent, 0x0067F180).
+    RunScriptEntity("OnAttachedDestroyed", attached);
   }
 
   /**
    * Address: 0x00679800 (FUN_00679800)
    */
-  void Entity::AttachedEntityKilled(Entity*)
+  void Entity::AttachedEntityKilled(Entity* const attached)
   {
-    CallbackStr("OnAttachedKilled");
+    // 0x00679800: `lea eax, [esp+4]; push eax` -- the entity rides along as the
+    // script's argument (RunScript_Ent, 0x0067F180).
+    RunScriptEntity("OnAttachedKilled", attached);
   }
 
   /**
    * Address: 0x00679820 (FUN_00679820)
    */
-  void Entity::ParentEntityDestroyed(Entity*)
+  void Entity::ParentEntityDestroyed(Entity* const parent)
   {
-    CallbackStr("OnParentDestroyed");
+    // 0x00679820: `lea eax, [esp+4]; push eax` -- the entity rides along as the
+    // script's argument (RunScript_Ent, 0x0067F180).
+    RunScriptEntity("OnParentDestroyed", parent);
   }
 
   /**
    * Address: 0x00679840 (FUN_00679840)
    */
-  void Entity::ParentEntityKilled(Entity*)
+  void Entity::ParentEntityKilled(Entity* const parent)
   {
-    CallbackStr("OnParentKilled");
+    // 0x00679840: `lea eax, [esp+4]; push eax` -- the entity rides along as the
+    // script's argument (RunScript_Ent, 0x0067F180).
+    RunScriptEntity("OnParentKilled", parent);
   }
 
   /**

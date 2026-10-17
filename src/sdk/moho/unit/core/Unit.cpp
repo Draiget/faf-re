@@ -471,6 +471,8 @@ namespace moho
   int cfunc_UnitHasMeleeSpaceAroundTargetL(LuaPlus::LuaState* state);
   int cfunc_UnitHasMeleeSpaceAroundTarget(lua_State* luaContext);
   CScrLuaInitForm* func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef();
+  int cfunc_UnitForceAltFootprint(lua_State* luaContext);
+  CScrLuaInitForm* func_UnitForceAltFootprint_LuaFuncDef();
   int cfunc_UnitMeleeWarpAdjacentToTargetL(LuaPlus::LuaState* state);
   int cfunc_UnitMeleeWarpAdjacentToTarget(lua_State* luaContext);
   CScrLuaInitForm* func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef();
@@ -988,6 +990,7 @@ namespace
   constexpr const char* kUnitMeleeWarpAdjacentToTargetHelpText = "Unit:MeleeWarpAdjacentToTarget(target)";
   constexpr const char* kUnitHasMeleeSpaceAroundTargetName = "HasMeleeSpaceAroundTarget";
   constexpr const char* kUnitHasMeleeSpaceAroundTargetHelpText = "Unit:HasMeleeSpaceAroundTarget(target)";
+  constexpr const char* kUnitForceAltFootprintName = "ForceAltFootprint";
   constexpr const char* kUnitAddUnitToStorageName = "AddUnitToStorage";
   constexpr const char* kUnitAddUnitToStorageHelpText = "Unit:AddUnitToStorage( storedUnit )";
   constexpr const char* kUnitAddUnitToStorageNoRoomWarning = "No more room available in carrier for unit to be stored";
@@ -4489,6 +4492,48 @@ int moho::cfunc_UnitHasMeleeSpaceAroundTargetL(LuaPlus::LuaState* const state)
 int moho::cfunc_UnitHasMeleeSpaceAroundTarget(lua_State* const luaContext)
 {
   return cfunc_UnitHasMeleeSpaceAroundTargetL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * What it does:
+ * Publishes the FAF `Unit:ForceAltFootprint(flag)` Lua binder definition
+ * (`.exxt` static initializer 0x01292454..0x0129247C: name, class `Unit`,
+ * empty help text, function slot 0x0128DB0F, sim init set).
+ */
+CScrLuaInitForm* moho::func_UnitForceAltFootprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kUnitForceAltFootprintName,
+    &moho::cfunc_UnitForceAltFootprint,
+    &CScrLuaMetatableFactory<Unit>::Instance(),
+    kUnitLuaClassName,
+    ""
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0128DB0F (FAF patch, cfunc_UnitForceAltFootprint)
+ *
+ * What it does:
+ * FAF extension: reads `(unit, flag)` and stores `flag` into the unit's
+ * secondary alt-footprint byte (`[unit+125h]`, Entity `+11Dh`), which
+ * `Entity::GetFootprint` ORs with the primary one to pick `AltFootprint`.
+ * Amphibious hulls such as URS0201 flip it from `OnScriptBitSet`.
+ */
+int moho::cfunc_UnitForceAltFootprint(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
+  const int argumentCount = lua_gettop(luaContext);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitForceAltFootprintName, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+  Unit* const unit = SCR_FromLua_Unit(unitObject);
+  unit->mVarDat.mUsingAltFootprintSecondary = static_cast<std::uint8_t>(lua_toboolean(luaContext, 2));
+  return 0;
 }
 
 /**
@@ -17441,6 +17486,7 @@ namespace
       (void)::moho::func_UnitGetGuardedUnit_LuaFuncDef();
       (void)::moho::func_UnitHasValidTeleportDest_LuaFuncDef();
       (void)::moho::func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef();
+      (void)::moho::func_UnitForceAltFootprint_LuaFuncDef();
       (void)::moho::func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef();
       (void)::moho::func_UnitAddUnitToStorage_LuaFuncDef();
       (void)::moho::func_UnitGetCurrentMoveLocation_LuaFuncDef();

@@ -1887,7 +1887,10 @@ void CScriptObject::RunScriptEntity(const char* const scriptName, Entity* const 
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    fn(mLuaObj, entityArg);
+    // FUN_006803D0 pushes the entity's own script object (`entity+20h`), or
+    // nil for a null entity.
+    const LuaPlus::LuaObject entityObject = (entityArg != nullptr) ? entityArg->mLuaObj : MakeNilLuaObject(mLuaObj);
+    fn(mLuaObj, entityObject);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
