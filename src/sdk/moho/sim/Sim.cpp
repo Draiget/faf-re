@@ -3384,10 +3384,12 @@ namespace
       return nullptr;
     }
 
-    RetargetReverseLoadUnits(commandIssueData, sim, selectedUnits);
+    // 0x006F12FC copies the selection (0x0057D3F0) and works on the copy from
+    // here on, so the reverse-load retarget never edits the caller's set.
+    EntitySetTemplate<Unit> issueUnits(selectedUnits);
+    RetargetReverseLoadUnits(commandIssueData, sim, issueUnits);
 
     CUnitCommand* issuedCommand = nullptr;
-    bool queuedAtLeastOnce = false;
     // 0x006F12C0: the append-vs-insert decision reads the issue data's +0x08
     // lane (`mIndex`, the id of the queued command to insert before; -1 =
     // append), not the freshly allocated id at +0x00. Reading +0x00 here made
@@ -3396,14 +3398,17 @@ namespace
     const std::uint32_t insertBeforeTopByte = static_cast<std::uint32_t>(commandIssueData.mIndex) & 0xFF000000u;
     const bool appendByDefault = insertBeforeTopByte == 0xFF000000u;
 
-    for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+    for (Entity* const* it = issueUnits.mVec.begin(); it != issueUnits.mVec.end(); ++it) {
       Unit* const unit = static_cast<Unit*>(*it);
-      CUnitCommandQueue* const queue = (unit != nullptr) ? unit->CommandQueue : nullptr;
-      if (queue == nullptr) {
+
+      // 0x006F1392 runs the per-unit check first; only then does 0x006F13A2
+      // skip a unit without a command queue.
+      if (!ProcessIssuedUnitCommand(sim, commandIssueData, unit, clearQueue, issueUnits)) {
         continue;
       }
 
-      if (!ProcessIssuedUnitCommand(sim, commandIssueData, unit, clearQueue, selectedUnits)) {
+      CUnitCommandQueue* const queue = unit->CommandQueue;
+      if (queue == nullptr) {
         continue;
       }
 
@@ -3426,24 +3431,22 @@ namespace
 
       if (appendByDefault) {
         queue->AddCommandToQueue(issuedCommand);
-        queuedAtLeastOnce = true;
         continue;
       }
 
       const int insertIndex = queue->FindCommandIndex(static_cast<CmdId>(commandIssueData.mIndex));
       if (insertIndex >= 0) {
         queue->InsertCommandToQueue(issuedCommand, insertIndex);
-        queuedAtLeastOnce = true;
       }
     }
 
-    // TEMPORARY PROBE -- transport-load triage, delete when resolved.
-    // Covers the half the dispatch probe cannot see: whether the order was
-    if (issuedCommand == nullptr || !queuedAtLeastOnce) {
+    // 0x006F145A..0x006F1481: the id is handed back only when no command was
+    // created; a created command is returned even if no queue took it.
+    if (issuedCommand == nullptr) {
       ReleaseCommandIdIfUnconsumed(sim->mCommandDB, commandIssueData.nextCommandId);
     }
 
-    return queuedAtLeastOnce ? issuedCommand : nullptr;
+    return issuedCommand;
   }
 
   // 0x00748AA0 resolves unit blueprints from RResId via RRuleGameRules::GetUnitBlueprint.
@@ -8049,33 +8052,36 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
       Unit* const transferred = TransferUnit(storedUnit, newArmy);
       transferredCargo.push_back(transferred);
     }
-  }
 
-  // --- Phase B: capture mobile attached child units and their attach bones ---
-  const msvc8::vector<Entity*>& attached = unit->GetAttachedEntities();
-  for (Entity* const attachedEntity : attached) {
-    if (!attachedEntity) {
-      continue;
+    // 0x007469C0 jumps straight to the replacement unit (0x00746CC2) when
+    // there is no transport, so the attached-child capture, detach and
+    // transfer below run only for units that have one.
+    // --- Phase B: capture mobile attached child units and their attach bones ---
+    const msvc8::vector<Entity*>& attached = unit->GetAttachedEntities();
+    for (Entity* const attachedEntity : attached) {
+      if (!attachedEntity) {
+        continue;
+      }
+      Unit* const child = attachedEntity->IsUnit();
+      if (!child || !attachedEntity->IsMobile() || attachedEntity->mVarDat.mIsDead || attachedEntity->DestroyQueuedFlag) {
+        continue;
+      }
+      detachedChildren.push_back(attachedEntity->IsUnit());
+      childChildBones.push_back(attachedEntity->mAttachInfo.mChildBoneIndex);
+      childParentBones.push_back(attachedEntity->mAttachInfo.mParentBoneIndex);
     }
-    Unit* const child = attachedEntity->IsUnit();
-    if (!child || !attachedEntity->IsMobile() || attachedEntity->mVarDat.mIsDead || attachedEntity->DestroyQueuedFlag) {
-      continue;
+
+    // --- Phase C: detach each captured child and unlink its transport weak-ref ---
+    for (Unit* const child : detachedChildren) {
+      child->DetachFrom(unit, true);
+      child->TransportedByRef.UnlinkFromOwnerChain();
     }
-    detachedChildren.push_back(attachedEntity->IsUnit());
-    childChildBones.push_back(attachedEntity->mAttachInfo.mChildBoneIndex);
-    childParentBones.push_back(attachedEntity->mAttachInfo.mParentBoneIndex);
-  }
 
-  // --- Phase C: detach each captured child and unlink its transport weak-ref ---
-  for (Unit* const child : detachedChildren) {
-    child->DetachFrom(unit, true);
-    child->TransportedByRef.UnlinkFromOwnerChain();
-  }
-
-  // --- Phase D: recursively transfer the detached children ---
-  for (Unit* const child : detachedChildren) {
-    Unit* const transferred = TransferUnit(child, newArmy);
-    transferredChildren.push_back(transferred);
+    // --- Phase D: recursively transfer the detached children ---
+    for (Unit* const child : detachedChildren) {
+      Unit* const transferred = TransferUnit(child, newArmy);
+      transferredChildren.push_back(transferred);
+    }
   }
 
   // --- Phase F: construct the replacement unit under the new army ---
@@ -8420,38 +8426,6 @@ void Sim::IssueCommand(
     return;
   }
 
-  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
-  {
-    static int sProbeSimIssue = 0;
-    if ((++sProbeSimIssue % 5) == 1) {
-      std::size_t resolvedCount = 0;
-      unsigned int firstRaw = 0xDEAD;
-      entities.ForEachValue([this, &resolvedCount, &firstRaw](const unsigned int value) {
-        if (firstRaw == 0xDEAD) {
-          firstRaw = value;
-        }
-        Entity* entity = FindEntityById(mEntityDB, static_cast<EntId>(value));
-        if (entity != nullptr && OkayToMessWith(entity)) {
-          ++resolvedCount;
-        }
-      });
-      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-        std::fprintf(
-          sink,
-          "[BEATPIPE] simIssue n=%d type=%u cmdId=0x%08x bits=%u first=0x%08x resolved=%u curSrc=%d\n",
-          sProbeSimIssue,
-          static_cast<unsigned>(static_cast<std::uint32_t>(commandIssueData.mCommandType)),
-          static_cast<unsigned>(commandIssueData.nextCommandId),
-          static_cast<unsigned>(entities.Bits().Count()),
-          firstRaw,
-          static_cast<unsigned>(resolvedCount),
-          static_cast<int>(mCurCommandSource)
-        );
-        std::fclose(sink);
-      }
-    }
-  }
-
   EntitySetTemplate<Unit> selectedUnits{};
 
   auto collectUnit = [this, &selectedUnits](const EntId entId) {
@@ -8500,24 +8474,34 @@ void Sim::IssueFactoryCommand(
     return;
   }
 
+  // 0x00749593 / 0x007495E8: unlike `IssueCommand`, an entity this command
+  // source may not control (out-of-game army, or unauthorised without cheats)
+  // abandons the whole order -- straight to the epilogue, nothing issued and
+  // no id released. A missing entity or a non-unit is only skipped.
   EntitySetTemplate<Unit> selectedFactories{};
-  auto collectFactory = [this, &selectedFactories](const EntId entId) {
-    Entity* entity = FindEntityById(mEntityDB, entId);
-    if (!entity || !OkayToMessWith(entity)) {
+  bool rejected = false;
+  entities.ForEachValue([this, &selectedFactories, &rejected](const unsigned int value) {
+    if (rejected) {
       return;
     }
 
-    Unit* unit = entity->IsUnit();
-    if (!unit) {
+    Entity* const entity = FindEntityById(mEntityDB, static_cast<EntId>(value));
+    if (!entity) {
+      return;
+    }
+    if (!OkayToMessWith(entity)) {
+      rejected = true;
       return;
     }
 
-    (void)selectedFactories.Add(unit);
-  };
-
-  entities.ForEachValue([&collectFactory](const unsigned int value) {
-    collectFactory(static_cast<EntId>(value));
+    if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+      (void)selectedFactories.Add(unit);
+    }
   });
+
+  if (rejected) {
+    return;
+  }
 
   if (selectedFactories.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
@@ -8610,30 +8594,19 @@ void Sim::SetCommandCells(
  */
 void Sim::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId unitId)
 {
-  CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
+  // 0x0074997B..0x007499F9: the unit comes from the sim's entity DB (not from
+  // the command's own unit set), and the checks run entity, entity
+  // permission, command, command permission -- in that order.
+  Entity* const entity = FindEntityById(mEntityDB, unitId);
+  CUnitCommand* const command = FindCommandById(mCommandDB, cmdId);
+  if (!entity || !OkayToMessWith(entity)) {
+    return;
+  }
   if (!command || !OkayToMessWith(command)) {
     return;
   }
 
-  Entity* matchedEntity = nullptr;
-  for (Entity* const entry : command->mUnitSet.mVec) {
-    Unit* const unit = static_cast<Unit*>(entry);
-    if (unit == nullptr) {
-      continue;
-    }
-
-    Entity* entity = unit;
-    if (entity->id_ == unitId) {
-      matchedEntity = entity;
-      break;
-    }
-  }
-
-  if (!matchedEntity || !OkayToMessWith(matchedEntity)) {
-    return;
-  }
-
-  Unit* unit = matchedEntity->IsUnit();
+  Unit* const unit = entity->IsUnit();
   if (!unit || unit->IsDead()) {
     return;
   }
@@ -20234,14 +20207,17 @@ int moho::cfunc_GenerateRandomOrientationL(LuaPlus::LuaState* const state)
   Sim* const sim = lua_getglobaluserdata(rawState);
   CRandomStream* const random = sim->mRngState;
 
+  // 0x0075A657..0x0075A677: the four draws fill x, y, z and then w
+  // (`[esp+10h]`, `[+14h]`, `[+18h]`, `[+0Ch]` of a {w,x,y,z} quaternion),
+  // and 0x0075A67B..0x0075A696 sums the squares z, y, x, then w.
   Wm3::Quaternionf orientation{};
+  orientation.x = random->FRandGaussian();
   orientation.y = random->FRandGaussian();
   orientation.z = random->FRandGaussian();
   orientation.w = random->FRandGaussian();
-  orientation.x = random->FRandGaussian();
 
   const float magnitude = std::sqrt(
-    (orientation.x * orientation.x) + (orientation.y * orientation.y) + (orientation.z * orientation.z) +
+    (((orientation.z * orientation.z) + (orientation.y * orientation.y)) + (orientation.x * orientation.x)) +
     (orientation.w * orientation.w)
   );
   if (magnitude <= 1.0e-6f) {
@@ -26793,8 +26769,10 @@ namespace
         const int colStep = (row == -radius || row == radius) ? 1 : (2 * radius);
         for (int col = -radius; col <= radius; col += colStep) {
           ++cellsTested;
-          const float cellX = pos.x + static_cast<float>(col * ringStep);
-          const float cellZ = pos.z + static_cast<float>(row * ringStep);
+          // 0x0062E5A1..0x0062E626: the outer (row) offset moves along X and
+          // the inner (column) offset along Z.
+          const float cellX = pos.x + static_cast<float>(row * ringStep);
+          const float cellZ = static_cast<float>(col * ringStep) + pos.z;
           if (TryDisplacementCell(sim, oGrid, blocker, footprint, buildRect, cellX, cellZ, outRect)) {
             return true;
           }
@@ -26915,6 +26893,12 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
       const SNavGoal goal{goalCell};
       navigator->SetGoal(goal);
     }
+  }
+
+  // 0x0062EA31..0x0062EA4F: every collected blocker -- placed or not -- then
+  // gives its reserved rect back; only the navigator goals remain.
+  for (Unit* const blocker : blockers) {
+    blocker->FreeOgridRect();
   }
 }
 } // namespace moho

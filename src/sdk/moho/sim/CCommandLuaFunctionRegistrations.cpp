@@ -409,19 +409,6 @@ namespace
     return static_cast<int>(lua_tonumber(rawState, countObject.m_stackIndex));
   }
 
-  [[nodiscard]] moho::BVSet<moho::EntId, moho::EntIdUniverse> BuildSelectedEntitySetFromUnits(const moho::UnitSet& units)
-  {
-    moho::BVSet<moho::EntId, moho::EntIdUniverse> selectedUnits{};
-    for (moho::Unit* const unit : units) {
-      if (unit == nullptr) {
-        continue;
-      }
-
-      (void)selectedUnits.mBits.Add(static_cast<unsigned int>(unit->id_));
-    }
-    return selectedUnits;
-  }
-
   // ---- UISelectionByCategory support (FUN_008662B0) ----
 
   [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
@@ -911,13 +898,14 @@ namespace
       return;
     }
 
-    const moho::BVSet<moho::EntId, moho::EntIdUniverse> selectedUnits = BuildSelectedEntitySetFromUnits(units);
-    if (selectedUnits.mBits.Count() == 0) {
-      return;
-    }
-
+    // 0x006F1B4E..0x006F1B59 (IssueStop; same in IssuePause, IssueKillSelf and
+    // IssueDestroySelf): the unit list goes straight to `UNIT_IssueCommand`
+    // (0x006F12C0), not through `Sim::IssueCommand`. That path validates a
+    // player command id, which a sim-issued order never has (`nextCommandId`
+    // is -1), so routing through it dropped every one of these orders.
+    moho::EntitySetTemplate<moho::Unit> selectedUnits(units);
     moho::SSTICommandIssueData commandIssueData(commandType);
-    sim->IssueCommand(selectedUnits, commandIssueData, false);
+    (void)moho::IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
   }
 
   [[nodiscard]] int ResolveFormationScriptIndex(
@@ -942,20 +930,13 @@ namespace
     const Wm3::Quatf& orientation
   )
   {
-    const auto* const orientationLanes = reinterpret_cast<const float*>(&orientation);
-
-    // FUN_006F2CE0 / FUN_006F5430 write the first three lanes at +0x24:
-    // formation index + first two quaternion lanes.
-    commandIssueData.mTarget2.mType = static_cast<moho::EAiTargetType>(formationScriptIndex);
-    commandIssueData.mTarget2.mEntityId = std::bit_cast<std::uint32_t>(orientationLanes[0]);
-    commandIssueData.mTarget2.mPos.x = orientationLanes[1];
-
-    // The same binaries then overwrite the first three lanes at +0x3C:
-    // remaining two quaternion lanes plus literal 1.0f.
-    auto* const commandOriLanes = reinterpret_cast<float*>(&commandIssueData.mOri);
-    commandOriLanes[0] = orientationLanes[2];
-    commandOriLanes[1] = orientationLanes[3];
-    commandOriLanes[2] = 1.0f;
+    // 0x006F2FE5..0x006F3016 (IssueFormMove; the same in IssueFormAttack,
+    // IssueFormPatrol and IssueFormAggressiveMove): the formation script index
+    // goes to +0x38, the whole orientation quaternion to +0x3C..+0x48 and 1.0f
+    // to +0x4C. `mTarget2` keeps its default.
+    commandIssueData.unk38 = formationScriptIndex;
+    commandIssueData.mOri = orientation;
+    commandIssueData.unk4C = 1.0f;
   }
 
   int IssueFormCommandWithFormation(
@@ -980,12 +961,12 @@ namespace
     LuaPlus::LuaStackObject unitListArg(state, 1);
     CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, helpText);
 
+    // 0x006F2D9D keeps the validation result and acts on it only after the
+    // formation name, script index and roll argument have been read
+    // (0x006F2EE1), so a list with no eligible units still raises those
+    // argument errors.
     moho::UnitSet filteredUnits{};
-    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, requiredCaps)) {
-      lua_pushnil(rawState);
-      (void)lua_gettop(rawState);
-      return 1;
-    }
+    const bool hasEligibleUnits = ValidateIssueCommandUnits(sourceUnits, filteredUnits, requiredCaps);
 
     moho::Sim* const sim = lua_getglobaluserdata(rawState);
     if (sim == nullptr || sim->mFormationDB == nullptr) {
@@ -1014,6 +995,12 @@ namespace
     constexpr Wm3::Vector3f kYawAxis{0.0f, 1.0f, 0.0f};
     Wm3::Quatf orientation{};
     (void)moho::EulerRollToQuat(&kYawAxis, &orientation, rollRadians);
+
+    if (!hasEligibleUnits) {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+      return 1;
+    }
 
     moho::CAiTarget target{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, "IssueFactoryRallyPoint", arg)` -- the
@@ -1067,10 +1054,10 @@ namespace
     LuaPlus::LuaStackObject unitListArg(state, 1);
     CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, helpText);
 
+    // As in `IssueFormCommandWithFormation`: the validation result is acted
+    // on only after the formation and roll arguments have been read.
     moho::UnitSet filteredUnits{};
-    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, requiredCaps)) {
-      return 0;
-    }
+    const bool hasEligibleUnits = ValidateIssueCommandUnits(sourceUnits, filteredUnits, requiredCaps);
 
     moho::Sim* const sim = lua_getglobaluserdata(rawState);
     if (sim == nullptr || sim->mFormationDB == nullptr) {
@@ -1099,6 +1086,10 @@ namespace
     constexpr Wm3::Vector3f kYawAxis{0.0f, 1.0f, 0.0f};
     Wm3::Quatf orientation{};
     (void)moho::EulerRollToQuat(&kYawAxis, &orientation, rollRadians);
+
+    if (!hasEligibleUnits) {
+      return 0;
+    }
 
     moho::CAiTarget target{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, "IssueGuard", arg)` -- the
@@ -5893,8 +5884,9 @@ namespace moho
       const float dy = unitPos.y - targetPos.y;
       const float dz = unitPos.z - targetPos.z;
       const float candidateDistSq = dx * dx + dy * dy + dz * dz;
+      // 0x006F5E41..0x006F5E6C: the stored delta is summed z, y, then x.
       const float closestDistSq =
-        closestDelta.x * closestDelta.x + closestDelta.y * closestDelta.y + closestDelta.z * closestDelta.z;
+        (closestDelta.z * closestDelta.z + closestDelta.y * closestDelta.y) + closestDelta.x * closestDelta.x;
 
       if (buildable && IsValidVector3f(unitPos)
           && (!IsValidVector3f(closestDelta) || candidateDistSq < closestDistSq)) {
@@ -6759,22 +6751,18 @@ namespace moho
     LuaPlus::LuaStackObject unitListArg(state, 1);
     CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueTransportLoadHelpText);
 
-    UnitSet transportUnits{};
-    if (!ValidateIssueCommandUnits(sourceUnits, transportUnits, RULEUCC_Transport)) {
-      return 0;
-    }
-
+    // 0x006F7350..0x006F73A0: every listed unit is taken as-is -- there is no
+    // command-cap validation here. A unit that is attached to something
+    // (`mAttachInfo.mAttachTargetWeak`, 0x006F735D) or already carried
+    // (`TransportedByRef`, 0x006F736C) raises the Lua error instead.
     EntitySetTemplate<Unit> commandUnits{};
-    for (Unit* const unit : transportUnits) {
-      if (unit == nullptr) {
-        continue;
-      }
-
-      if (unit->IsUnitState(UNITSTATE_Attached) || unit->GetTransportedBy() != nullptr) {
+    for (Unit* const unit : sourceUnits) {
+      if (unit->mAttachInfo.mAttachTargetWeak.GetObjectPtr() != nullptr
+          || unit->TransportedByRef.GetObjectPtr() != nullptr) {
         LuaPlus::LuaState::Error(state, kIssueTransportLoadAttachedError);
+      } else {
+        (void)commandUnits.Add(unit);
       }
-
-      (void)commandUnits.Add(unit);
     }
 
     if (commandUnits.Empty()) {

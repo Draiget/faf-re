@@ -815,7 +815,8 @@ namespace moho
     }
 
     SIM_MetaImpactArea(sim, damage);
-    return 1;
+    // 0x00739A25: MetaImpact returns no values.
+    return 0;
   }
 } // namespace moho
 

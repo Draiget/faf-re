@@ -588,10 +588,18 @@ namespace moho
 
   [[nodiscard]] bool PointInsideSphere(const Wm3::Vec3f& point, const Wm3::Sphere3f& sphere) noexcept
   {
+    // 0x00A49DB0: the deltas are rounded to float, their squares summed
+    // (x + y) + z on the x87 stack and stored as a float, the square root is
+    // stored as a float again, and the point is inside when the radius is not
+    // below that length (`fcompp` C0 clear; a NaN length counts as outside).
     const float dx = point.x - sphere.Center.x;
     const float dy = point.y - sphere.Center.y;
     const float dz = point.z - sphere.Center.z;
-    return (dx * dx + dy * dy + dz * dz) <= sphere.Radius * sphere.Radius;
+    const float lengthSq = static_cast<float>(
+      (static_cast<double>(dx) * dx + static_cast<double>(dy) * dy) + static_cast<double>(dz) * dz
+    );
+    const float length = static_cast<float>(std::sqrt(static_cast<double>(lengthSq)));
+    return sphere.Radius >= length;
   }
 
   // One shield the damage sphere intersects, paired with the amount that shield
