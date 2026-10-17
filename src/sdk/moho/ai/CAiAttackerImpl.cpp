@@ -13,6 +13,7 @@
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Vector3f.h"
 #include "moho/misc/Listener.h"
 #include "moho/projectile/Projectile.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -151,7 +152,6 @@ namespace
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
   constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
-  constexpr EAiAttackerEvent kAiAttackerEventCannotTarget = static_cast<EAiAttackerEvent>(0x8);
   constexpr EAiAttackerEvent kAiAttackerEventCanTarget = static_cast<EAiAttackerEvent>(0x9);
   constexpr const char* kEngineerCategoryName = "ENGINEER";
   constexpr const char* kWeaponTerrainBlockageConVarName = "WeaponTerrainBlockageTest";
@@ -161,117 +161,9 @@ namespace
     -0.29300001f,
     -0.70700002f,
   };
-  constexpr float kDegreesToRadians = 0.017453292f;
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiAttackerImplIndex = 0;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
-
-  enum class WeaponTargetRangeStatus : std::int32_t
-  {
-    Available = 0,
-    InsideMinRange = 1,
-    NoSolution = 2,
-    OutsideMaxRange = 3,
-  };
-
-  [[nodiscard]] float NormalizeAngleRadians(float angleRadians) noexcept
-  {
-    constexpr float kPi = 3.14159265358979323846f;
-    constexpr float kTwoPi = 6.28318530717958647692f;
-
-    float normalized = std::fmod(angleRadians + kPi, kTwoPi);
-    if (normalized < 0.0f) {
-      normalized += kTwoPi;
-    }
-    return normalized - kPi;
-  }
-
-  // NOTE: this free helper duplicates moho::EvaluateTargetSolutionStatusGun
-  // (UnitWeapon.cpp), which is the one genuinely reachable from ground truth
-  // (UnitWeapon::TargetSolutionStatusGun, FUN_006D5B40) -- see that
-  // function's own doc comment for the full ground-truth citation
-  // (FUN_006D5B40.c calls Wm3::Quaternion::ToAngle, algebraically identical
-  // to atan2(MultQuadVec(quat,(0,0,1)).x, .z) under this engine's scalar-first
-  // convention). This copy's own reachability is a separate, pre-existing
-  // concern; the quaternion fix below is the same either way.
-  [[nodiscard]] WeaponTargetRangeStatus EvaluateWeaponTargetSolutionStatusGun(
-    UnitWeapon* const weapon, const Wm3::Vector3f& targetPos, float* const inOutDistanceSq
-  )
-  {
-    if (weapon == nullptr || weapon->mUnit == nullptr) {
-      return WeaponTargetRangeStatus::NoSolution;
-    }
-
-    float distSq = 0.0f;
-    if (inOutDistanceSq != nullptr && *inOutDistanceSq > 0.0f) {
-      distSq = *inOutDistanceSq;
-    } else {
-      const Wm3::Vector3f& unitPos = weapon->mUnit->GetPosition();
-      const float dx = targetPos.x - unitPos.x;
-      const float dz = targetPos.z - unitPos.z;
-      distSq = (dx * dx) + (dz * dz);
-    }
-
-    if (const RUnitBlueprintWeapon* const blueprint = weapon->mAttributes.mBlueprint; blueprint != nullptr) {
-      if (weapon->mAttributes.mMaxRadiusSq < 0.0f) {
-        weapon->mAttributes.mMaxRadiusSq = blueprint->MaxRadius * blueprint->MaxRadius;
-      }
-      if (weapon->mAttributes.mMinRadiusSq < 0.0f) {
-        weapon->mAttributes.mMinRadiusSq = blueprint->MinRadius * blueprint->MinRadius;
-      }
-    }
-
-    if (distSq > weapon->mAttributes.mMaxRadiusSq) {
-      return WeaponTargetRangeStatus::OutsideMaxRange;
-    }
-    if (weapon->mAttributes.mMinRadiusSq >= distSq) {
-      return WeaponTargetRangeStatus::InsideMinRange;
-    }
-
-    float maxHeightDiff = weapon->mAttributes.mMaxHeightDiff;
-    if (maxHeightDiff < 0.0f && weapon->mAttributes.mBlueprint != nullptr) {
-      maxHeightDiff = weapon->mAttributes.mBlueprint->MaxHeightDiff;
-    }
-    if (std::fabs(targetPos.y - weapon->mUnit->GetPosition().y) > maxHeightDiff) {
-      return WeaponTargetRangeStatus::OutsideMaxRange;
-    }
-
-    if (weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->HeadingArcRange < 180.0f) {
-      Wm3::Vector3f muzzlePos = weapon->mUnit->GetPosition();
-      if (weapon->mBone >= 0) {
-        muzzlePos = weapon->mUnit->GetBoneWorldTransform(weapon->mBone).pos_;
-      }
-
-      const float targetHeading = msvc8::atan2(targetPos.x - muzzlePos.x, targetPos.z - muzzlePos.z);
-      const Wm3::Quaternionf unitOrientation = weapon->mUnit->GetTransform().orient_;
-      const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
-      Wm3::Vector3f unitForward{};
-      MultQuadVec(&unitForward, &forwardAxis, &unitOrientation);
-      const float unitHeading = msvc8::atan2(unitForward.x, unitForward.z);
-      const float arcCenterRadians = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
-      const float arcRangeRadians = weapon->mWeaponBlueprint->HeadingArcRange * kDegreesToRadians;
-      const float headingDelta = NormalizeAngleRadians(targetHeading - unitHeading - arcCenterRadians);
-
-      if (std::fabs(headingDelta) > arcRangeRadians) {
-        return WeaponTargetRangeStatus::NoSolution;
-      }
-    }
-
-    if (inOutDistanceSq != nullptr) {
-      *inOutDistanceSq = distSq;
-    }
-    return WeaponTargetRangeStatus::Available;
-  }
-
-  [[nodiscard]] WeaponTargetRangeStatus ResolveWeaponTargetRangeStatus(UnitWeapon* const weapon, CAiTarget* const target)
-  {
-    if (weapon == nullptr || target == nullptr) {
-      return WeaponTargetRangeStatus::OutsideMaxRange;
-    }
-
-    const Wm3::Vector3f targetPos = target->GetTargetPosGun(true);
-    return EvaluateWeaponTargetSolutionStatusGun(weapon, targetPos, nullptr);
-  }
 
   [[nodiscard]] CAiTarget BuildClearedTarget()
   {
@@ -775,9 +667,12 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
     RefreshAcquireTargetTaskScheduling(task);
   }
 
-  if (view->mReportingState != static_cast<EAiAttackerEvent>(0)) {
-    view->mReportingState = kAiAttackerEventCannotTarget;
-    BroadcastEvent(kAiAttackerEventCannotTarget);
+  // 0x005D76A6..0x005D76BB inline `SetState(AAS_CannotTarget)`: store 0 and
+  // broadcast 0 (`xor edi, edi` ahead of the broadcast call).
+  constexpr auto cannotTarget = static_cast<EAiAttackerEvent>(State::AAS_CannotTarget);
+  if (view->mReportingState != cannotTarget) {
+    view->mReportingState = cannotTarget;
+    BroadcastEvent(cannotTarget);
   }
 }
 
@@ -955,7 +850,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
 
   Entity* bestEntity = nullptr;
   float bestDistance = gpg::pInf;
-  WeaponTargetRangeStatus bestSolution = WeaponTargetRangeStatus::OutsideMaxRange;
+  ESolutionStatus bestSolution = ESolutionStatus::TRS_OutsideMaxRange;
   std::uint32_t bestCategory = 9999u;
 
   for (const WeakPtr<Entity>& blip : *entities) {
@@ -1041,9 +936,9 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       continue;
     }
 
-    const WeaponTargetRangeStatus solutionStatus =
-      EvaluateWeaponTargetSolutionStatusGun(weapon, candidatePosition, &distanceSq);
-    if ((solutionStatus == WeaponTargetRangeStatus::InsideMinRange || solutionStatus == WeaponTargetRangeStatus::NoSolution)
+    // 0x005D7D71: `UnitWeapon::TargetSolutionStatusGun` (0x006D5B40).
+    const ESolutionStatus solutionStatus = weapon->TargetSolutionStatusGun(&candidatePosition, &distanceSq);
+    if ((solutionStatus == ESolutionStatus::TRS_InsideMinRange || solutionStatus == ESolutionStatus::TRS_NoSolution)
         && (!unit->IsMobile()
             || weapon->mWeaponBlueprint == nullptr
             || (weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u
@@ -1058,7 +953,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
 
     if (const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
         unitBlueprint != nullptr && unitBlueprint->AI.NeedUnpack != 0u
-        && solutionStatus != WeaponTargetRangeStatus::Available) {
+        && solutionStatus != ESolutionStatus::TRS_Available) {
       continue;
     }
 
@@ -1069,11 +964,15 @@ Entity* CAiAttackerImpl::FindBestEnemy(
         unitPosition.y - candidatePosition.y,
         zDistance,
       };
-      Wm3::Vector3f::Normalize(&toTarget);
-      usedDistance = Wm3::Vector3f::Dot(toTarget, weaponForward);
+      // 0x005D7E4E..0x005D7E88: `NormalizeVectorInto` (zero only at length
+      // <= 0), then the dot summed as (y*y' + z*z') + x*x'.
+      Wm3::Vector3f toTargetDir{};
+      (void)NormalizeVectorInto(&toTargetDir, toTarget);
+      usedDistance = ((toTargetDir.y * weaponForward.y) + (toTargetDir.z * weaponForward.z))
+        + (toTargetDir.x * weaponForward.x);
     }
 
-    if (solutionStatus != WeaponTargetRangeStatus::Available
+    if (solutionStatus != ESolutionStatus::TRS_Available
         && weapon->mWeaponBlueprint != nullptr
         && weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
       if (use3DDistance) {
@@ -1321,7 +1220,7 @@ bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
     }
 
     if (UnitWeapon::CanAttackTarget(target, weapon)
-        && ResolveWeaponTargetRangeStatus(weapon, target) == WeaponTargetRangeStatus::Available) {
+        && weapon->TargetIsTooClose(target) == ESolutionStatus::TRS_Available) {
       return true;
     }
   }
@@ -1349,12 +1248,13 @@ bool CAiAttackerImpl::IsTooClose(CAiTarget* const target)
       continue;
     }
 
-    const WeaponTargetRangeStatus status = ResolveWeaponTargetRangeStatus(weapon, target);
-    if (status == WeaponTargetRangeStatus::Available) {
+    // 0x005D726D: `UnitWeapon::TargetIsTooClose` (0x006D5D80), melee path included.
+    const ESolutionStatus status = weapon->TargetIsTooClose(target);
+    if (status == ESolutionStatus::TRS_Available) {
       if (weapon->mEnabled != 0u) {
         return false;
       }
-    } else if (status == WeaponTargetRangeStatus::InsideMinRange) {
+    } else if (status == ESolutionStatus::TRS_InsideMinRange) {
       isTooClose = true;
     }
   }
@@ -1391,7 +1291,10 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
         continue;
       }
 
-      if (command->mTarget.GetEntity() == target) {
+      // 0x005D73C2..0x005D73EE: the raw weak slot first, then the resolved
+      // entity -- a command on a recon blip exempts the blip itself as well
+      // as its source unit.
+      if (command->mTarget.targetEntity.GetObjectPtr() == target || command->mTarget.GetEntity() == target) {
         return true;
       }
     }
@@ -1473,8 +1376,8 @@ void CAiAttackerImpl::ResetReportingState()
  *
  * What it does:
  * Points the projectile's impact broadcaster at the acquire-target task that
- * drives `weapon`, so the task hears where that shot lands. Unbinds it when no
- * task owns the weapon.
+ * drives `weapon`, so the task hears where that shot lands. Leaves it alone when
+ * no task owns the weapon.
  *
  * The binary's `lea ecx,[edx+18h]` and `add eax,270h` (0x005D7840-0x005D7848)
  * are the two implicit subobject adjustments this reads as: the task's
@@ -1488,7 +1391,8 @@ void CAiAttackerImpl::ResetReportingState()
 void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Projectile* const projectile)
 {
   CAcquireTargetTask* const task = FindAcquireTaskForWeapon(this->mTasks, weapon);
-  if (projectile == nullptr) {
+  // 0x005D781E: no task drives this weapon -> the broadcaster is left alone.
+  if (task == nullptr || projectile == nullptr) {
     return;
   }
 
@@ -1500,14 +1404,15 @@ void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Pr
  *
  * What it does:
  * The collision-beam twin of `TransmitProjectileImpactEvent` above: points the
- * beam's broadcaster at the acquire-target task driving `weapon`, or unbinds it
- * when there is none. The task's `ManyToOneListener<ECollisionBeamEvent>` base
+ * beam's broadcaster at the acquire-target task driving `weapon`; it is left
+ * alone when there is none. The task's `ManyToOneListener<ECollisionBeamEvent>` base
  * sits at mdisp=32, its second listener subobject.
  */
 void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, CollisionBeamEntity* const beam)
 {
   CAcquireTargetTask* const task = FindAcquireTaskForWeapon(this->mTasks, weapon);
-  if (beam == nullptr) {
+  // 0x005D781E: no task drives this weapon -> the broadcaster is left alone.
+  if (task == nullptr || beam == nullptr) {
     return;
   }
 

@@ -702,7 +702,8 @@ namespace moho
     if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr) {
       return event;
     }
-    if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+    // 0x005D97F9 / 0x005D9839: `cmp byte [bp+13Fh], 0` -- ReTargetOnMiss.
+    if (mWeapon->mWeaponBlueprint->ReTargetOnMiss == 0u) {
       return event;
     }
 
@@ -727,7 +728,8 @@ namespace moho
     if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr) {
       return event;
     }
-    if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+    // 0x005D97F9 / 0x005D9839: `cmp byte [bp+13Fh], 0` -- ReTargetOnMiss.
+    if (mWeapon->mWeaponBlueprint->ReTargetOnMiss == 0u) {
       return event;
     }
 
@@ -879,7 +881,10 @@ namespace moho
       {
         CAiTarget commandTarget{};
         CopyLinkedTargetFromPointer(&commandTarget, &currentCommand->mTarget);
-        Entity* const focusEntity = commandTarget.GetEntity();
+        // 0x005D8CC6 reads the command target's raw weak slot (FUN_005D5980,
+        // `[cmd+120h] - 4`), not `GetEntity`: a recon blip is tested for
+        // death itself, never resolved to its source unit.
+        Entity* const focusEntity = commandTarget.targetEntity.GetObjectPtr();
         if (
           commandTarget.targetType == EAiTargetType::AITARGET_Entity
           && (focusEntity == nullptr || focusEntity->mVarDat.mIsDead != 0u || focusEntity->DestroyQueuedFlag != 0u)
