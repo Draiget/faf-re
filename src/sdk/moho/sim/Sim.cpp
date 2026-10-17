@@ -26535,9 +26535,12 @@ void Sim::DoCollisionsFor(
     if (ownerBlueprint->mSizeZ > maxFootprintDim) {
       maxFootprintDim = ownerBlueprint->mSizeZ;
     }
-    float pushMagnitude = maxFootprintDim * kHalfExtentScale;
-    if (hit.penetrationDepth > pushMagnitude) {
-      pushMagnitude = hit.penetrationDepth;
+    // 0x0059800A-0x0059801B: `comiss half, depth` / `jbe` keeps the depth, so
+    // an unordered depth (not rejected by the 0.001 gate above) survives.
+    const float halfFootprint = maxFootprintDim * kHalfExtentScale;
+    float pushMagnitude = hit.penetrationDepth;
+    if (halfFootprint > pushMagnitude) {
+      pushMagnitude = halfFootprint;
     }
     pushMagnitude += approachSpeed;
 

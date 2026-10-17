@@ -17,6 +17,7 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/Vector3f.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
@@ -518,8 +519,11 @@ namespace moho
 
         const VTransform& transform = mUnit->GetTransform();
         const VAxes3 axes{transform.orient_};
-        Wm3::Vector3f forward{axes.vZ.x, 0.0f, axes.vZ.z};
-        (void)forward.Normalize();
+        // 0x005F9A82: the flattened forward goes through `NormalizeVectorInto`
+        // (0x0044F7E0, zero only at length 0), not Wm3 `Normalize`.
+        const Wm3::Vector3f flatForward{axes.vZ.x, 0.0f, axes.vZ.z};
+        Wm3::Vector3f forward{};
+        (void)NormalizeVectorInto(&forward, flatForward);
 
         const Wm3::Vec3f& builderPos = mUnit->GetPosition();
         const Wm3::Vec3f& targetPos = target->GetPosition();

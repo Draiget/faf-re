@@ -16838,7 +16838,9 @@ float Unit::DistanceToOccupiedRect(const Wm3::Vector3f* const samplePoint)
     const float z2 = platform.Vertex2Z + unitPosition.z;
     const float z3 = platform.Vertex3Z + unitPosition.z;
 
-    if (sampleX <= x3 && x0 <= sampleX && sampleZ <= z3 && z0 <= sampleZ) {
+    // 0x0062B0B4-0x0062B0D3: four `comiss` + `ja` rejections, so an unordered
+    // lane counts as inside.
+    if (!(sampleX > x3) && !(x0 > sampleX) && !(sampleZ > z3) && !(z0 > sampleZ)) {
       const float zBlend = (sampleZ - z0) / (z2 - z0);
       const float yOnLeftEdge = ((platform.Vertex2Y - platform.Vertex0Y) * zBlend) + platform.Vertex0Y;
       const float yOnRightEdge = ((platform.Vertex3Y - platform.Vertex1Y) * zBlend) + platform.Vertex1Y;

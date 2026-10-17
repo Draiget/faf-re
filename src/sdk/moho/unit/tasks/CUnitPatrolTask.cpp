@@ -780,7 +780,9 @@ namespace moho
     // is always 0*0) and takes the sqrt; below 0.001 the direction degenerates
     // to the fixed `+Z` fallback, otherwise it is normalized in place.
     const float legLength = std::sqrt((direction.z * direction.z) + (0.0f * 0.0f) + (direction.x * direction.x));
-    if (legLength >= kPatrolLegMinLength) {
+    // 0x0061B4AF-0x0061B4BC: `fcompi 0.001, len` / `jbe` normalizes, so an
+    // unordered length also takes the normalize path.
+    if (!(kPatrolLegMinLength > legLength)) {
       Wm3::Vector3f::Normalize(&direction);
     } else {
       direction.x = 0.0f;

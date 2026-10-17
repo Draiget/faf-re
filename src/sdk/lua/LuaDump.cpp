@@ -28,7 +28,8 @@
 // `lua_Number` is 4 bytes here (this fork builds with `LUA_NUMBER=float`),
 // which the header self-test at 0x00914E1E confirms twice over: it declares
 // `sizeof(lua_Number)` as 4 and then writes the probe value with a single
-// `movss`.
+// `movss`. This build does not define LUA_NUMBER, so the number lane below is
+// spelled `float` explicitly rather than `lua_Number`.
 
 namespace LuaPlus
 {
@@ -77,7 +78,13 @@ namespace LuaPlus
 		/// mismatch cannot survive the round trip. Held at 0x00D45B80 and
 		/// loaded with `movss` at 0x00914E1E; as a `float` it lands exactly on
 		/// 31415926, which is the integer the loader compares against.
-		constexpr lua_Number kLuaNumberFormatProbe = static_cast<lua_Number>(3.14159265358979323846e7);
+		///
+		/// Spelled `float`, not `lua_Number`: src/sdk/main.vcxproj does not
+		/// define LUA_NUMBER, so `lua_Number` is still `double` in this build,
+		/// and a `lua_Number`-typed dump wrote 8-byte numbers under a size byte
+		/// of 8 - which `LuaLoadChunkHeader` (it demands 4) rejects, so
+		/// `string.dump` output did not even load back into this engine.
+		constexpr float kLuaNumberFormatProbe = static_cast<float>(3.14159265358979323846e7);
 
 		/**
 		 * Upstream's `DumpBlock`. Inlined at every use in this build, so no
@@ -120,7 +127,7 @@ namespace LuaPlus
 
 		/// Upstream's `DumpNumber`; inlined as a `movss` into the scratch slot
 		/// followed by a 4-byte block write (0x00914B5F, 0x00914E34).
-		void LuaDumpNumber(const lua_Number value, DumpState* const dumpState)
+		void LuaDumpNumber(const float value, DumpState* const dumpState)
 		{
 			LuaDumpBlock(&value, sizeof(value), dumpState);
 		}
@@ -374,7 +381,7 @@ namespace LuaPlus
 			LuaDumpByte(kLuaInstructionSizeA, dumpState);
 			LuaDumpByte(kLuaInstructionSizeB, dumpState);
 			LuaDumpByte(kLuaInstructionSizeC, dumpState);
-			LuaDumpByte(static_cast<int>(sizeof(lua_Number)), dumpState);
+			LuaDumpByte(static_cast<int>(sizeof(float)), dumpState); // the fork's 4-byte number
 			LuaDumpNumber(kLuaNumberFormatProbe, dumpState);
 		}
 	}

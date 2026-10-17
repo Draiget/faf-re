@@ -582,7 +582,9 @@ void CAiBuilderImpl::BuilderClearFactoryCommandQueue()
 void CAiBuilderImpl::BuilderSetAimTarget(const Wm3::Vector3f target)
 {
   mAimTarget = target;
-  if (mOwnerUnit && Wm3::Vector3f::LengthSq(target) > 0.0f) {
+  // 0x0059F62D: `Vector3::CompareArrays` (0x004F0A50, a memcmp) against the
+  // zero vector -- a bitwise "differs from zero" test, not a length test.
+  if (mOwnerUnit && target != Wm3::Vector3f::Zero()) {
     mOwnerUnit->RunScript("OnPrepareArmToBuild");
   }
 }
@@ -676,9 +678,11 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
     const float dx = centerX - unitPos.x;
     const float dy = centerY - unitPos.y;
     const float dz = centerZ - unitPos.z;
-    const float distSq = (dx * dx) + (dy * dy) + (dz * dz);
+    // 0x0059F87C-0x0059F8A5: summed `(dz*dz + dy*dy) + dx*dx`; `comiss best,
+    // dist` / `jbe` also skips an unordered distance.
+    const float distSq = ((dz * dz) + (dy * dy)) + (dx * dx);
 
-    if (distSq >= bestDist) {
+    if (!(bestDist > distSq)) {
       continue;
     }
 

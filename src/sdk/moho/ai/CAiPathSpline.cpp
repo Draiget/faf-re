@@ -283,7 +283,9 @@ float ComputeSteeringSpeedCapFromParams(
 
   const float radiusLimit = params->mInvTurnRadius;
   const float absTurnScale = std::fabs(turnScale);
-  if (absTurnScale < radiusLimit) {
+  // 0x0069985F: `comiss abs, limit` / `jb` -- an unordered compare also takes
+  // the turn-rate branch.
+  if (!(absTurnScale >= radiusLimit)) {
     if (absTurnScale == 0.0f) {
       return params->mMaxSpeed;
     }
@@ -312,7 +314,9 @@ Wm3::Vector2f* RotateDirectionTowardTargetLimited(
   const float targetZ
 ) noexcept
 {
-  if (maxTurnRadians >= 3.1415927f) {
+  // 0x006992D1: `comiss pi, maxTurn` / `ja` keeps it; an unordered value is
+  // clamped to pi.
+  if (!(3.1415927f > maxTurnRadians)) {
     maxTurnRadians = 3.1415927f;
   }
 
@@ -339,7 +343,9 @@ Wm3::Vector2f* RotateDirectionTowardTargetLimited(
   const float maxTurnSq = maxTurnRadians * maxTurnRadians;
   float turnSin =
     (((maxTurnSq * kTurnSinePolyA) - kTurnSinePolyB) * maxTurnSq + 1.0f) * maxTurnRadians;
-  if (cross < 0.0f) {
+  // 0x006993D1: `comiss cross, 0` / `jb` -> an unordered cross also takes
+  // the negated (`-0.0f - poly`) sine.
+  if (!(cross >= 0.0f)) {
     turnSin = -turnSin;
   }
 

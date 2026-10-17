@@ -389,8 +389,15 @@ namespace moho
 
       // Keep flying until the pod is on the bone (or has settled onto land).
       const Wm3::Vec3f& unitPos = unit->GetPosition();
-      const float distanceToBone = std::sqrt(DistanceSquared(attachPos, unitPos));
-      if (distanceToBone >= kAttachContactDistance && unit->mVarDat.mLayerMask != LAYER_Land) {
+      // 0x0061E39C-0x0061E3F1: this inline sums `(dz*dz + dy*dy) + dx*dx`
+      // (unlike `DistanceSquared`'s x-first emission), and `fcompi 0.5, d` /
+      // `ja` only finishes on a strictly closer pod -- an unordered distance
+      // keeps flying.
+      const float dx = attachPos.x - unitPos.x;
+      const float dy = attachPos.y - unitPos.y;
+      const float dz = attachPos.z - unitPos.z;
+      const float distanceToBone = std::sqrt(((dz * dz) + (dy * dy)) + (dx * dx));
+      if (!(kAttachContactDistance > distanceToBone) && unit->mVarDat.mLayerMask != LAYER_Land) {
         return 1;
       }
 

@@ -592,13 +592,14 @@ namespace moho
     // (x + y) + z on the x87 stack and stored as a float, the square root is
     // stored as a float again, and the point is inside when the radius is not
     // below that length (`fcompp` C0 clear; a NaN length counts as outside).
+    // 0x00A49DE4-0x00A49DF2 run under the sim's `_PC_24` control word, so every
+    // fmul/fadd rounds to single -- plain float math, not a double
+    // intermediate (which would double-round the sum).
     const float dx = point.x - sphere.Center.x;
     const float dy = point.y - sphere.Center.y;
     const float dz = point.z - sphere.Center.z;
-    const float lengthSq = static_cast<float>(
-      (static_cast<double>(dx) * dx + static_cast<double>(dy) * dy) + static_cast<double>(dz) * dz
-    );
-    const float length = static_cast<float>(std::sqrt(static_cast<double>(lengthSq)));
+    const float lengthSq = ((dx * dx) + (dy * dy)) + (dz * dz);
+    const float length = std::sqrt(lengthSq);
     return sphere.Radius >= length;
   }
 

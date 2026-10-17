@@ -1291,7 +1291,8 @@ namespace moho
               const float dx = mTargetPosition.x - targetPos.x;
               const float dy = mTargetPosition.y - targetPos.y;
               const float dz = mTargetPosition.z - targetPos.z;
-              if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) > 10.0f) {
+              // 0x00616E8E-0x00616ECB: summed `(dz*dz + dy*dy) + dx*dx`.
+              if (std::sqrt(((dz * dz) + (dy * dy)) + (dx * dx)) > 10.0f) {
                 UpdateTarget();
                 UpdatePosition();
               }

@@ -620,14 +620,18 @@ namespace
   [[nodiscard]] Wm3::Vec3f
   PlaneIntersection(const moho::GeomLine3& line, const moho::VecDist& plane, moho::CGeomHitResult* outHit)
   {
-    const float dotDen = line.dir.x * plane.dir.x + line.dir.y * plane.dir.y + line.dir.z * plane.dir.z;
+    // 0x00577540-0x0057756C: the denominator sums `(y + z) + x`; the
+    // numerator dot (0x0057757D-0x00577593) sums `(x + y) + z`.
+    const float dotDen = ((line.dir.y * plane.dir.y) + (line.dir.z * plane.dir.z)) + (line.dir.x * plane.dir.x);
     if (dotDen == 0.0f) {
       return Wm3::Vec3f::NaN();
     }
 
     const float dotPos = line.pos.x * plane.dir.x + line.pos.y * plane.dir.y + line.pos.z * plane.dir.z;
     const float t = (plane.dist - dotPos) / dotDen;
-    if (t < line.closest || line.farthest < t) {
+    // 0x005775A4 / 0x005775AF: both range tests are `comiss` + `jb`, so an
+    // unordered `t` is rejected.
+    if (!(t >= line.closest) || !(line.farthest >= t)) {
       return Wm3::Vec3f::NaN();
     }
 
@@ -727,7 +731,8 @@ namespace
     (void)NormalizeCrossProduct(edge1, normal, edge2);
 
     outPlane.dir = normal;
-    outPlane.dist = normal.x * p0.x + normal.y * p0.y + normal.z * p0.z;
+    // 0x00478F8C-0x00478FA6: summed `(z + x) + y`.
+    outPlane.dist = ((normal.z * p0.z) + (normal.x * p0.x)) + (normal.y * p0.y);
     return &outPlane;
   }
 
@@ -1090,14 +1095,16 @@ namespace moho
    */
   Wm3::Vec3f PlaneIntersection(const GeomLine3& line, const VecDist& plane, CGeomHitResult* const outHit)
   {
-    const float dotDen = line.dir.x * plane.dir.x + line.dir.y * plane.dir.y + line.dir.z * plane.dir.z;
+    // Same emission as the file-private copy: `(y + z) + x` denominator,
+    // unordered `t` rejected (0x0057754A-0x005775B2).
+    const float dotDen = ((line.dir.y * plane.dir.y) + (line.dir.z * plane.dir.z)) + (line.dir.x * plane.dir.x);
     if (dotDen == 0.0f) {
       return Wm3::Vec3f::NaN();
     }
 
     const float dotPos = line.pos.x * plane.dir.x + line.pos.y * plane.dir.y + line.pos.z * plane.dir.z;
     const float t = (plane.dist - dotPos) / dotDen;
-    if (t < line.closest || line.farthest < t) {
+    if (!(t >= line.closest) || !(line.farthest >= t)) {
       return Wm3::Vec3f::NaN();
     }
 

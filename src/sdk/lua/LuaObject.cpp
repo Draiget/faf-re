@@ -10879,7 +10879,10 @@ namespace
 	 */
 	int math_randomseed(lua_State* const state)
 	{
-		const auto seed = static_cast<unsigned int>(luaL_checknumber(state, 1));
+		// 0x0091A0F5: `fistp qword` (truncating), low dword kept - so negative and
+		// >= 2^32 seeds wrap modulo 2^32 rather than hitting a float-to-unsigned
+		// conversion that is undefined for them.
+		const auto seed = static_cast<unsigned int>(static_cast<std::int64_t>(luaL_checknumber(state, 1)));
 		std::srand(seed);
 		return 0;
 	}
@@ -10919,6 +10922,16 @@ namespace
 	 * an integer in [l,u]. The sample is drawn once up front, before the
 	 * argument count is even read, so the RNG advances on every call regardless
 	 * of form.
+	 *
+	 * The range forms scale on the x87 (0x0091A089 `fild upper; fmul dword
+	 * sample`, 0x0091A02E likewise for `upper - lower + 1`), and the sim runs
+	 * under `_PC_24`, so the product is rounded to single precision BEFORE
+	 * `floor` sees it. Flooring the unrounded double product instead returns
+	 * one less whenever the exact product sits just under an integer that the
+	 * float rounding reaches. The int-to-double widening is exact and the
+	 * double product of a 24-bit sample and a 31-bit span is exact up to 2^29,
+	 * so narrowing it once is the binary's single rounding. The trailing
+	 * `fadd 1.0f` / `fiadd lower` is one more single-rounded op.
 	 */
 	int math_random(lua_State* const state)
 	{
@@ -10935,9 +10948,9 @@ namespace
 			if (upper < 1) {
 				luaL_argerror(state, 1, "interval is empty");
 			}
-			lua_pushnumber(
-				state, static_cast<lua_Number>(std::floor(sample * static_cast<double>(upper)) + 1.0)
-			);
+			const float scaled = static_cast<float>(static_cast<double>(upper) * sample);
+			const float picked = std::floor(scaled);
+			lua_pushnumber(state, picked + 1.0f);
 			return 1;
 		}
 
@@ -10950,12 +10963,10 @@ namespace
 		if (lower > upper) {
 			luaL_argerror(state, 2, "interval is empty");
 		}
-		lua_pushnumber(
-			state,
-			static_cast<lua_Number>(
-				std::floor(sample * static_cast<double>(upper - lower + 1)) + static_cast<double>(lower)
-			)
-		);
+		const float scaled = static_cast<float>(static_cast<double>(upper - lower + 1) * sample);
+		const float picked = std::floor(scaled);
+		// `fiadd lower` adds the exact integer and rounds once to single.
+		lua_pushnumber(state, static_cast<float>(static_cast<double>(picked) + static_cast<double>(lower)));
 		return 1;
 	}
 
@@ -15109,18 +15120,26 @@ extern "C"
 	// hand the result back as a number. A negative result is re-read as
 	// unsigned first, so `-1 >> 0` is 4294967295 rather than -1 - the binary
 	// adds 2^32 (the constant at 0x00E4F710) whenever the sign bit is set.
+	//
+	// 0x0092A897..0x0092A8A9: `fild` loads the integer exactly, the `fadd`
+	// rounds once under `_PC_24`, and `fstp dword` is then exact - one rounding
+	// of the exact unsigned value. Rounding the int32 to float first and then
+	// adding 2^32 rounds twice and lands one float (256) away for operands such
+	// as -2147307649 (2147659520 in the binary, 2147659776 when double-rounded).
 	[[nodiscard]] static inline float LuaBitwiseResult(const std::int32_t value) noexcept
 	{
-		float result = static_cast<float>(value);
-		if (value < 0) {
-			result += 4294967296.0f;
-		}
-		return result;
+		const std::uint32_t unsignedValue = static_cast<std::uint32_t>(value);
+		return static_cast<float>(static_cast<double>(unsignedValue)); // exact widen, one rounding
 	}
 
+	// 0x0092A847..0x0092A864: `fistp qword` under round-toward-zero, keeping the
+	// low dword. Results of the operators above are unsigned and reach 2^32, so
+	// operands at or past 2^31 are the normal case: the binary wraps them
+	// (4294967040 -> 0xFFFFFF00), where a direct float-to-int32 cast yields the
+	// 0x80000000 "integer indefinite" instead.
 	[[nodiscard]] static inline std::int32_t LuaToBitwiseOperand(const float value) noexcept
 	{
-		return static_cast<std::int32_t>(value);
+		return static_cast<std::int32_t>(static_cast<std::int64_t>(value));
 	}
 
 	/**

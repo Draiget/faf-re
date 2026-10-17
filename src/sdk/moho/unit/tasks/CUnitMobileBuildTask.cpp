@@ -26,6 +26,7 @@
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/Vector3f.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
@@ -414,7 +415,9 @@ namespace moho
       const Wm3::Vec3f& propPos = nearest->GetPositionWm3();
       const float cdx = mBuildPosition.x - propPos.x;
       const float cdz = mBuildPosition.z - propPos.z;
-      if ((cdx * cdx + cdz * cdz) >= 0.000001f) {
+      // 0x005F7255-0x005F7260: `comiss 1e-6, distSq` / `jbe` also breaks out
+      // on an unordered distance.
+      if (!(0.000001f > (cdx * cdx + cdz * cdz))) {
         break;
       }
 
@@ -565,12 +568,17 @@ namespace moho
         // sideways axis against the direction to the site: the dot product was
         // near zero whenever the unit was actually facing the spot, and the
         // task kept re-issuing a facing turn instead of starting work.
-        Wm3::Vector3f forward{axes.vZ.x, 0.0f, axes.vZ.z};
-        (void)forward.Normalize();
+        // 0x005F7948: the flattened forward goes through `NormalizeVectorInto`
+        // (0x0044F7E0, zero only at length 0); the direction to the site
+        // through Wm3 `Normalize` (0x00452AF0) at 0x005F7989.
+        const Wm3::Vector3f flatForward{axes.vZ.x, 0.0f, axes.vZ.z};
+        Wm3::Vector3f forward{};
+        (void)NormalizeVectorInto(&forward, flatForward);
         const Wm3::Vec3f& builderPos = mUnit->GetPosition();
         Wm3::Vector3f toTarget{mBuildPosition.x - builderPos.x, 0.0f, mBuildPosition.z - builderPos.z};
         (void)toTarget.Normalize();
-        const float dot = forward.x * toTarget.x + forward.y * toTarget.y + forward.z * toTarget.z;
+        // 0x005F7990-0x005F79B8: summed `(z + y) + x`.
+        const float dot = ((forward.z * toTarget.z) + (forward.y * toTarget.y)) + (forward.x * toTarget.x);
         const Wm3::Vector3f zeroFacing{0.0f, 0.0f, 0.0f};
         if (dot > 0.94999999f) {
           mUnit->UnitMotion->SetFacing(zeroFacing);

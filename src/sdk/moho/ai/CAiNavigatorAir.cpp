@@ -270,23 +270,26 @@ void CAiNavigatorAir::AbortMove()
     if (blueprint && blueprint->Air.CanFly != 0u) {
       const Wm3::Vector3f stopPos = EstimateAirAbortStopPosition(*mUnit);
       mUnit->UnitMotion->Stop(&stopPos);
-    } else if (blueprint && blueprint->Physics.MaxAcceleration > 0.0f) {
-      const Wm3::Vector3f velocity = mUnit->GetVelocity();
-      const float velocityLenSq = Wm3::Vector3f::LengthSq(velocity);
-      if (velocityLenSq > 0.0f) {
-        const float speedTimesTen = std::sqrt(velocityLenSq) * 10.0f;
-        const float brakingDistance =
-          (speedTimesTen * speedTimesTen) / (blueprint->Physics.MaxAcceleration * 2.0f);
+    } else if (blueprint) {
+      // 0x005A4F54-0x005A5064: no acceleration or zero-speed gate. The speed
+      // sums `(vz*vz + vy*vy) + vx*vx`, the braking distance is
+      // `(10*speed)^2 / (MaxAcceleration*2)`, the velocity is turned into a
+      // direction by Wm3 `Normalize` (0x00452AF0, zero below 1e-6), and the
+      // unit is always stopped at `position + dir * braking`.
+      Wm3::Vector3f direction = mUnit->GetVelocity();
+      const float speedTimesTen =
+        std::sqrt(((direction.z * direction.z) + (direction.y * direction.y)) + (direction.x * direction.x)) * 10.0f;
+      const float brakingDistance =
+        (speedTimesTen * speedTimesTen) / (blueprint->Physics.MaxAcceleration * 2.0f);
+      (void)Wm3::Vector3f::Normalize(&direction);
 
-        const float invVelocityLen = 1.0f / std::sqrt(velocityLenSq);
-        Wm3::Vector3f stopPos = mUnit->GetPosition();
-        stopPos.x += (velocity.x * invVelocityLen) * brakingDistance;
-        stopPos.y += (velocity.y * invVelocityLen) * brakingDistance;
-        stopPos.z += (velocity.z * invVelocityLen) * brakingDistance;
-        mUnit->UnitMotion->Stop(&stopPos);
-      } else {
-        mUnit->UnitMotion->Stop(nullptr);
-      }
+      const Wm3::Vec3f& position = mUnit->GetPosition();
+      const Wm3::Vector3f stopPos{
+        position.x + (direction.x * brakingDistance),
+        position.y + (direction.y * brakingDistance),
+        position.z + (direction.z * brakingDistance),
+      };
+      mUnit->UnitMotion->Stop(&stopPos);
     } else {
       mUnit->UnitMotion->Stop(nullptr);
     }
