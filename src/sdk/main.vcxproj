@@ -310,12 +310,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <!-- Plan 0.3 (x64 port): pointer truncation (C4311/C4302/C4312) is a build
-           error. wx 2.4.2's own headers still keep tree/list item pointers in
-           `long` (treebase.h/listbase.h, 32 bits on Win64) and hash pointers
-           through `unsigned long` (hashmap.h); that is the wx port (Phase 6),
-           so until then its include folder is compiled as external headers
-           with their warnings off. -->
-      <AdditionalOptions>/MP4 /FS /external:I"$(FafWxX64Root)\include" %(AdditionalOptions)</AdditionalOptions>
+           error, wx 2.4.2's headers included: they carry
+           wxwindows_2_4_2_faf_x64_pointers.patch, so they are compiled as
+           ordinary headers and checked like the engine's. -->
+      <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatSpecificWarningsAsErrors>4311;4302;4312;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
@@ -356,12 +354,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <!-- Plan 0.3 (x64 port): pointer truncation (C4311/C4302/C4312) is a build
-           error. wx 2.4.2's own headers still keep tree/list item pointers in
-           `long` (treebase.h/listbase.h, 32 bits on Win64) and hash pointers
-           through `unsigned long` (hashmap.h); that is the wx port (Phase 6),
-           so until then its include folder is compiled as external headers
-           with their warnings off. -->
-      <AdditionalOptions>/MP4 /FS /external:I"$(FafWxX64Root)\include" %(AdditionalOptions)</AdditionalOptions>
+           error, wx 2.4.2's headers included: they carry
+           wxwindows_2_4_2_faf_x64_pointers.patch, so they are compiled as
+           ordinary headers and checked like the engine's. -->
+      <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatSpecificWarningsAsErrors>4311;4302;4312;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>

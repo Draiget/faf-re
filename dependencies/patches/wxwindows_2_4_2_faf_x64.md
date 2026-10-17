@@ -78,7 +78,13 @@ and the libraries must come from the same tree, because `WXLPARAM`,
 ## Build
 
 From the wx root, in a copy of the tree (the build writes `lib\*.lib` and would
-overwrite the Win32 libraries):
+overwrite the Win32 libraries). A copy of a tree that has already been built
+for Win32 must be cleaned first: delete its `lib\*.lib` and every `Release*`
+object folder (the root's, `src\{common,generic,html,msw,msw\ole}`'s and
+`src\{png,jpeg,tiff,regex,zlib}`'s). Otherwise nmake treats the Win32
+`png`/`jpeg`/`tiff`/`regex`/`zlib` libraries as up to date and the copy ends up
+with Win32 support libraries next to an x64 `wxmswu.lib`. `dumpbin /headers`
+shows `machine (x64)` for each library that is good to use:
 
 ```bat
 call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
