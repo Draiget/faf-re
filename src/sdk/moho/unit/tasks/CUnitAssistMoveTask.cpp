@@ -268,7 +268,6 @@ namespace moho
     EntitySetTemplate<Unit> allMobileLandUnits{};
     (void)mUnit->ArmyRef->GetUnits(&allMobileLandUnits, &mobileLandCategory);
 
-    EntitySetTemplate<Unit> pickupCandidates{};
     Wm3::Vector3f maxDistancePosition{0.0f, 0.0f, 0.0f};
     float maxDistanceScore = 0.0f;
 
@@ -322,7 +321,9 @@ namespace moho
         continue;
       }
 
-      (void)pickupCandidates.Add(candidate);
+      // 0x005F12C1..0x005F12CA: the "add" goes back into the set being
+      // walked (the one `GetUnits` filled), so it never changes anything.
+      (void)allMobileLandUnits.Add(candidate);
 
       const Wm3::Vector3f& candidatePosition = candidate->GetPosition();
       const Wm3::Vector3f candidateGoalPosition = candidateNavigator->GetGoalPos();
@@ -344,11 +345,10 @@ namespace moho
     }
 
     if (!IsZeroVector(maxDistancePosition)) {
-      for (Entity* const unitEntry : pickupCandidates.mVec) {
+      // 0x005F13CE..0x005F148B walks the whole army mobile-land set again --
+      // not only the units that passed the pickup filters above.
+      for (Entity* const unitEntry : allMobileLandUnits.mVec) {
         Unit* const candidate = static_cast<Unit*>(unitEntry);
-        if (candidate == nullptr) {
-          continue;
-        }
 
         const Wm3::Vector3f& candidatePosition = candidate->GetPosition();
         const float dx = maxDistancePosition.x - candidatePosition.x;

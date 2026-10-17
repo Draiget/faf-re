@@ -445,15 +445,14 @@ namespace moho
         // and never reaches Complete for the destructor to report success with.
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
 
-        // Walk the guard chain to the terminal guarded unit.
+        // Walk the guard chain to the terminal guarded unit. 0x005FA9EF-0x005FAA0E
+        // stops only on a null link or on a link back to the factory itself.
         Unit* terminalGuarded = mUnit;
-        Unit* previousGuarded = nullptr;
         for (;;) {
           Unit* const next = terminalGuarded->GetGuardedUnit();
-          if (next == nullptr || next == mUnit || next == previousGuarded) {
+          if (next == nullptr || next == mUnit) {
             break;
           }
-          previousGuarded = terminalGuarded;
           terminalGuarded = next;
         }
 
@@ -461,8 +460,9 @@ namespace moho
         // not currently moving; stop at the first stationary transport.
         Unit* selectedTransport = nullptr;
         for (Entity* const entry : terminalGuarded->GuardedByList.mVec) {
+          // 0x005FAA86 -> 0x005FAAD3: a null entry skips to the next one.
           if (entry == nullptr) {
-            break;
+            continue;
           }
           Unit* const guardUnit = static_cast<Unit*>(entry);
           if (guardUnit == nullptr) {
@@ -479,12 +479,15 @@ namespace moho
           }
         }
 
+        // 0x005FAB3B: the selected transport is only null-tested. The load order
+        // goes to the freshly built unit (0x005FAB73/0x005FAB77 push [esp+18h])
+        // targeting the end of the guard chain ([esp+20h] + 8 -> UpdateTarget).
         if (selectedTransport != nullptr) {
           EntitySetTemplate<Unit> dispatchSet{};
-          (void)dispatchSet.Add(selectedTransport);
+          (void)dispatchSet.Add(newUnit);
 
           CAiTarget aiTarget{};
-          aiTarget.UpdateTarget(selectedTransport);
+          aiTarget.UpdateTarget(terminalGuarded);
           SSTITarget encodedTarget{};
           aiTarget.EncodeToSSTITarget(encodedTarget);
 

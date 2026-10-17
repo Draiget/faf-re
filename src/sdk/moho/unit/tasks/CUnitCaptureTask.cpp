@@ -304,10 +304,9 @@ namespace moho
     }
 
     const float distance = HorizontalDistanceToCaptureContact(*mUnit, *targetEntity);
-    if (
-      targetEntity->mMotor != nullptr && targetUnit != nullptr && targetUnit->IsUnitState(UNITSTATE_BeingCaptured)
-      && distance > 10.0f
-    ) {
+    // 0x0060457D..0x006045DB: only the weak target is null-tested before
+    // IsUnit / IsUnitState(BeingCaptured) / `dist > 10` -- no motor check.
+    if (targetUnit != nullptr && targetUnit->IsUnitState(UNITSTATE_BeingCaptured) && distance > 10.0f) {
       *mDispatchResult = static_cast<EAiResult>(2);
       return -1;
     }
@@ -392,7 +391,11 @@ namespace moho
           return -1;
         }
 
-        mCaptureTime += static_cast<int>(std::max(1.0f, static_cast<float>(captureCostResults[0].ToNumber() * 10.0)));
+        // 0x006049FF..0x00604A0C: `cvttss2si((float)mCaptureTime + max(1, t))`.
+        mCaptureTime = static_cast<int>(
+          static_cast<float>(mCaptureTime)
+          + std::max(1.0f, static_cast<float>(captureCostResults[0].ToNumber() * 10.0))
+        );
         float energyCost = captureCostResults[1].ToNumber();
         float massCost = captureCostResults[2].ToNumber();
 
@@ -431,7 +434,10 @@ namespace moho
             continue;
           }
 
-          mCaptureTime += static_cast<int>(std::max(1.0f, static_cast<float>(attachedCaptureCosts[0].ToNumber() * 10.0)));
+          mCaptureTime = static_cast<int>(
+            static_cast<float>(mCaptureTime)
+            + std::max(1.0f, static_cast<float>(attachedCaptureCosts[0].ToNumber() * 10.0))
+          );
           energyCost += attachedCaptureCosts[1].ToNumber();
           massCost += attachedCaptureCosts[2].ToNumber();
         }
@@ -645,7 +651,8 @@ namespace moho
       return;
     }
 
-    if (targetUnit->IsBeingBuilt() || targetUnit->DestroyQueued()) {
+    // 0x00604EDD / 0x00604EF7: `mIsDead` (+0x99), then DestroyQueued.
+    if (targetUnit->IsDead() || targetUnit->DestroyQueued()) {
       return;
     }
 

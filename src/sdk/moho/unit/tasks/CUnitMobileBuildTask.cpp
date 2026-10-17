@@ -161,8 +161,9 @@ namespace
 
     const float halfSizeX = static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f;
     const float halfSizeZ = static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f;
-    buildCell.x = static_cast<std::int16_t>(static_cast<int>(targetPosition.x - halfSizeX));
-    buildCell.z = static_cast<std::int16_t>(static_cast<int>(targetPosition.z - halfSizeZ));
+    // 0x005F66DA / 0x005F6707: `fld; fistp` (round to nearest), narrowed to a short.
+    buildCell.x = static_cast<std::int16_t>(std::lrintf(targetPosition.x - halfSizeX));
+    buildCell.z = static_cast<std::int16_t>(std::lrintf(targetPosition.z - halfSizeZ));
     return buildCell;
   }
 
@@ -432,7 +433,9 @@ namespace moho
       }
       const float fractionComplete = nearest->mVarDat.mFractionComplete;
       const float rebuildBonus = static_cast<float>(results.begin()->ToNumber());
-      mBuildHelper.mUnknown18 = rebuildBonus * fractionComplete;
+      // 0x005F736B/0x005F7377: fstp [task+0x5C] = mBuildHelper (+0x40) .mDelta (+0x1C),
+      // the rebuild head-start SetFocus feeds to Materialize.
+      mBuildHelper.mDelta = rebuildBonus * fractionComplete;
       mPendingBuildEntity.Set(nearest);
       return nullptr;
     }
@@ -657,8 +660,10 @@ namespace moho
           mPendingBuildEntity.Set(nullptr);
         }
         if (!mBlueprint->General.SeedUnit.name.empty()) {
-          const char* seedName = mBlueprint->General.SeedUnit.name.c_str();
-          spawned->CallbackStr("OnSeedUnitBuilt", &seedName);
+          // 0x005F7D39-0x005F7D47: the callback argument is the *target*
+          // blueprint id (RBlueprint+0x08), not the seed unit id.
+          const char* blueprintId = mBlueprint->mBlueprintId.c_str();
+          spawned->CallbackStr("OnSeedUnitBuilt", &blueprintId);
         }
         mBuildHelper.SetFocus(spawned);
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
@@ -695,7 +700,8 @@ namespace moho
           moveData.mTarget.mType = EAiTargetType::AITARGET_Ground;
           moveData.mTarget.mEnt = -268435456;
           moveData.mTarget.mPos = rallyPos;
-          (void)IssueCommandToSelectedUnits(mSim, dispatchSet, moveData, true);
+          // 0x005F7FF0-0x005F8002: `push 1; push set; push sim; call UNIT_IssueFactoryCommand`.
+          (void)IssueFactoryCommandToSelectedUnits(mSim, dispatchSet, moveData, true);
         }
         if (builtUnit != nullptr) {
           builtUnit->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;

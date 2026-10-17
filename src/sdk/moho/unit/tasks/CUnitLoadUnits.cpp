@@ -14,6 +14,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/algorithms/Sort.h"
+#include "moho/ai/CAiBrain.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/command/CmdDefs.h"
@@ -415,7 +416,10 @@ namespace moho
         mPickupCenter.z += pos.z;
 
         (void)unitsToPickup.Add(candidate);
-        (void)mRequestedUnits.Contains(candidate);
+        // 0x0062540C-0x0062540F: `lea ebx,[ebp+0x40]` + `call 0x005E8960`
+        // (EntitySetTemplate<Unit>::Remove) -- an assigned unit leaves the
+        // requested set.
+        (void)mRequestedUnits.Remove(candidate);
         ++mReadyUnitCount;
 
         if (transport->TransportGetWaitingFormation() != nullptr) {
@@ -438,7 +442,10 @@ namespace moho
       && !mUnit->IsUnitState(UNITSTATE_Ferrying)
       && !mUnit->IsUnitState(UNITSTATE_Guarding)
     ) {
-      RunUnitScript(mUnit, "OnTransportFull");
+      // 0x0062555B-0x0062556F: `[unit+0x154]` ArmyRef, vtable +0x1C
+      // GetArmyBrain, then CScriptObject::RunScript (0x00581AA0) on the brain,
+      // not on the unit.
+      (void)mUnit->ArmyRef->GetArmyBrain()->RunScript("OnTransportFull");
     }
 
     if (mReadyUnitCount > 0) {
@@ -649,8 +656,9 @@ namespace moho
           return 1;
         }
 
-        const EntitySetTemplate<Unit> waitingForPickup = transport->TransportGetUnitsWaitingForPickup();
-        mRequestedUnits.AddRange(waitingForPickup.mVec.begin(), waitingForPickup.mVec.end());
+        // 0x00625D4F/0x00625D5A: `fastvector::AddAll` (0x0057EB00) onto
+        // `[ebp+0x48]` replaces the requested set's contents -- assignment.
+        mRequestedUnits = transport->TransportGetUnitsWaitingForPickup();
 
         if (!mRequestedUnits.Empty() && mIsTeleporter) {
           mTaskState = TASKSTATE_Preparing;
@@ -672,8 +680,9 @@ namespace moho
           return 10;
         }
 
-        const EntitySetTemplate<Unit> waitingForPickup = transport->TransportGetUnitsWaitingForPickup();
-        mRequestedUnits.AddRange(waitingForPickup.mVec.begin(), waitingForPickup.mVec.end());
+        // 0x00625E13/0x00625E22: `fastvector::AddAll` (0x0057EB00) --
+        // assignment, as in TASKSTATE_Processing.
+        mRequestedUnits = transport->TransportGetUnitsWaitingForPickup();
 
         if (!mRequestedUnits.Empty()) {
           mTaskState = TASKSTATE_Preparing;

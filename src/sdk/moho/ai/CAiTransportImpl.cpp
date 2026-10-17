@@ -25,6 +25,7 @@
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CMersenneTwister.h"
 #include "moho/sim/CRandomStream.h"
@@ -324,29 +325,17 @@ namespace
     );
   }
 
-  [[nodiscard]] Wm3::Vec3f NormalizeXZ(Wm3::Vec3f vec) noexcept
+  [[nodiscard]] Wm3::Vec3f NormalizeXZ(const Wm3::Vec3f& vec) noexcept
   {
-    vec.y = 0.0f;
-    const float lenSq = (vec.x * vec.x) + (vec.z * vec.z);
-    if (lenSq <= 1.0e-6f) {
+    // 0x005E6361-0x005E63E9: `sqrtf(dz*dz + dx*dx)` (0x00452FC0) compared
+    // against 1e-6f with `jbe` -- the length, not the squared length, is
+    // tested -- then each lane scaled by `1.0f / len`.
+    const float len = std::sqrt((vec.z * vec.z) + (vec.x * vec.x));
+    if (!(len > 1.0e-6f)) {
       return Wm3::Vec3f(0.0f, 0.0f, 0.0f);
     }
-    const float invLen = 1.0f / std::sqrt(lenSq);
-    vec.x *= invLen;
-    vec.z *= invLen;
-    return vec;
-  }
-
-  [[nodiscard]] Wm3::Quatf OrientationFromForward(const Wm3::Vec3f& forward) noexcept
-  {
-    const float lenSq = (forward.x * forward.x) + (forward.y * forward.y) + (forward.z * forward.z);
-    if (lenSq <= 1.0e-6f) {
-      return Wm3::Quatf(0.0f, 0.0f, 0.0f, 0.0f);
-    }
-
-    const float yaw = msvc8::atan2(forward.x, forward.z);
-    const float halfYaw = yaw * 0.5f;
-    return Wm3::Quatf(msvc8::cos(halfYaw), 0.0f, msvc8::sin(halfYaw), 0.0f);
+    const float invLen = 1.0f / len;
+    return Wm3::Vec3f(vec.x * invLen, 0.0f, vec.z * invLen);
   }
 
   [[nodiscard]] SOCellPos InvalidCellPos() noexcept
@@ -732,7 +721,8 @@ void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& un
   mPickupFacing = pickupFacing;
   mPickupInfo.mFallbackPos = fallbackPos;
   mPickupInfo.mPos = Wm3::Vec3f(fallbackPos.x, mUnit->GetPosition().y, fallbackPos.z);
-  mPickupInfo.mOri = OrientationFromForward(pickupFacing);
+  // 0x005E6446: COORDS_Orient (0x0050B480) on the facing, for both branches.
+  mPickupInfo.mOri = COORDS_Orient(pickupFacing);
   mPickupInfo.mUnits = units;
   mPickupInfo.mHasSpace = 0;
 }
@@ -1333,19 +1323,21 @@ void CAiTransportImpl::ReserveBone(
   msvc8::vector<int> boneIndices
 )
 {
-  if (boneIndices.empty()) {
-    return;
+  // 0x005E4FC4/0x005E5073: one reservation per entry of `boneIndices` (the
+  // counter lives in the first argument slot), each inserted at
+  // `mReservedBones.begin()` -- `_Insert_n` (0x005EA590) with
+  // `where = [esi+0xAC]` (_Myfirst) and count 1.
+  for (int index = 0; index < static_cast<int>(boneIndices.size()); ++index) {
+    SAiReservedTransportBone reservation{};
+    (void)InitReservedTransportBoneEntry(
+      transportBoneIndex,
+      bestAttachBoneIndex,
+      &reservation,
+      unit,
+      boneIndices
+    );
+    (void)mReservedBones.insert(mReservedBones.begin(), reservation);
   }
-
-  SAiReservedTransportBone reservation{};
-  (void)InitReservedTransportBoneEntry(
-    transportBoneIndex,
-    bestAttachBoneIndex,
-    &reservation,
-    unit,
-    boneIndices
-  );
-  mReservedBones.push_back(reservation);
 }
 
 /**
@@ -1595,14 +1587,20 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
     }
 
     if (clearReservations) {
+      // 0x005E75E6-0x005E7602: `fild` (+2^32 when negative), `fmul 2^-32`,
+      // `fcompi` against 0.99f, kill-check taken when 0.99f > roll. Under the
+      // engine's _PC_24 control word the fadd/fmul round to single, which is
+      // exactly ToUnitFloat's single rounding of the exact product.
       const float roll = random ? CMersenneTwister::ToUnitFloat(random->twister.NextUInt32()) : 1.0f;
       if (roll < 0.99f) {
-        if (unit->RunScriptUnitBool("CheckCanBeKilled", mUnit)) {
+        // 0x005E7608 / 0x005E7697: both scripts receive `&[esp+0x18]`, the
+        // passenger itself, not the transport.
+        if (unit->RunScriptUnitBool("CheckCanBeKilled", unit)) {
           unit->Kill(static_cast<Entity*>(mUnit), "Damage", 0.0f);
           continue;
         }
 
-        if (unit->IsInCategory("COMMAND") && unit->RunScriptUnitBool("CheckCanTakeDamage", mUnit)) {
+        if (unit->IsInCategory("COMMAND") && unit->RunScriptUnitBool("CheckCanTakeDamage", unit)) {
           unit->RunScriptUnitOnDamage(mUnit, 10000, false);
           continue;
         }
@@ -1734,7 +1732,11 @@ Wm3::Vec3f CAiTransportImpl::TransportGetAttachFacing(Unit* const unit) const
   const Wm3::Quaternionf unitOrientation = mUnit->GetTransform().orient_;
   Wm3::Vec3f worldForward{};
   MultQuadVec(&worldForward, &localForward, &unitOrientation);
-  return Wm3::Vec3f::NormalizeOrZero(worldForward);
+  // 0x005E7B6C: NormalizeVectorInto (0x0044F7E0) into the return slot -- zero
+  // only when the length is not positive, no 1e-6 squared-length threshold.
+  Wm3::Vec3f facing{};
+  (void)NormalizeVectorInto(&facing, worldForward);
+  return facing;
 }
 
 /**
@@ -1935,7 +1937,9 @@ bool CAiTransportImpl::TransportIsTeleportBeaconReady() const
   if (beacon->IsDead() || beacon->DestroyQueued()) {
     return false;
   }
-  return beacon->IsNavigatorIdle();
+  // 0x005E821C: tail-jumps to Unit::IsIdleState (0x006A7D60), the
+  // command-queue test, not the navigator's.
+  return beacon->IsIdleState();
 }
 
 namespace moho

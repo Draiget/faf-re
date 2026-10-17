@@ -600,7 +600,8 @@ namespace moho
     if (mTaskState != TASKSTATE_Preparing) {
       if (mTaskState == TASKSTATE_Waiting) {
         Unit* const beaconUnit = mTeleportBeaconUnit.GetObjectPtr();
-        if (beaconUnit != nullptr && !beaconUnit->IsDead() && !beaconUnit->IsBeingBuilt()) {
+        // 0x0060AC7A: the second test is IUnit slot 11 (`DestroyQueued`).
+        if (beaconUnit != nullptr && !beaconUnit->IsDead() && !beaconUnit->DestroyQueued()) {
           const bool readyForFinalize =
             (mUnit == beaconUnit)
             || (beaconUnit->AiTransport == nullptr)

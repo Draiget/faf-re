@@ -48,41 +48,6 @@ namespace
     return std::sqrt((dx * dx) + (dz * dz));
   }
 
-  [[nodiscard]]
-  Wm3::Quaternionf QuatLerpShortestPathNormalized(const Wm3::Quaternionf& target, const Wm3::Quaternionf& source, const float alpha)
-    noexcept
-  {
-    float clamped = alpha;
-    if (clamped > 1.0f) {
-      clamped = 1.0f;
-    } else if (clamped < 0.0f) {
-      clamped = 0.0f;
-    }
-
-    if (moho::QuatsNearEqual(source, target)) {
-      return source;
-    }
-
-    Wm3::Quaternionf signedTarget = target;
-    const float dot =
-      (source.x * target.x) + (source.y * target.y) + (source.z * target.z) + (source.w * target.w);
-    if (dot < 0.0f) {
-      signedTarget.x = -signedTarget.x;
-      signedTarget.y = -signedTarget.y;
-      signedTarget.z = -signedTarget.z;
-      signedTarget.w = -signedTarget.w;
-    }
-
-    const float inverse = 1.0f - clamped;
-    Wm3::Quaternionf blend{};
-    blend.x = (source.x * inverse) + (signedTarget.x * clamped);
-    blend.y = (source.y * inverse) + (signedTarget.y * clamped);
-    blend.z = (source.z * inverse) + (signedTarget.z * clamped);
-    blend.w = (source.w * inverse) + (signedTarget.w * clamped);
-    moho::NormalizeQuatInPlace(&blend);
-    return blend;
-  }
-
   [[nodiscard]] const char* BlueprintIdOrUnknown(const moho::Unit* const unit) noexcept
   {
     if (!unit) {
@@ -322,8 +287,10 @@ namespace moho
           mSourceTransform.pos_.y + ((mDestinationTransform.pos_.y - mSourceTransform.pos_.y) * blend);
         interpolated.pos_.z =
           mSourceTransform.pos_.z + ((mDestinationTransform.pos_.z - mSourceTransform.pos_.z) * blend);
-        interpolated.orient_ =
-          QuatLerpShortestPathNormalized(mDestinationTransform.orient_, mSourceTransform.orient_, blend);
+        // 0x006000DC-0x00600171: func_QuatLERP (0x004EBA80) with
+        // q1@eax = &mDestinationTransform (+0x5C), q2@ecx = &mSourceTransform
+        // (+0x40), out@ebx = the local transform's orientation.
+        (void)QuatLERP(&mDestinationTransform.orient_, &mSourceTransform.orient_, &interpolated.orient_, blend);
 
         mUnit->SetPendingTransform(interpolated, 1.0f);
         mUnit->AdvanceCoords();

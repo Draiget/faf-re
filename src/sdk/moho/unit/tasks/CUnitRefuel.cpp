@@ -53,7 +53,8 @@ namespace
 
   [[nodiscard]] float DotProduct(const Wm3::Vec3f& lhs, const Wm3::Vec3f& rhs) noexcept
   {
-    return (lhs.x * rhs.x) + (lhs.y * rhs.y) + (lhs.z * rhs.z);
+    // 0x00621D22..0x00621D42: summed z, y, then x.
+    return ((lhs.z * rhs.z) + (lhs.y * rhs.y)) + (lhs.x * rhs.x);
   }
 
   /**

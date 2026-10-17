@@ -14,10 +14,10 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/command/SSTICommandIssueData.h"
-#include "moho/containers/BVSet.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
@@ -92,21 +92,6 @@ namespace
   // (including gCUnitUnloadUnitsSerializer's ctor), which already forward
   // into `CUnitUnloadUnits::MemberDeserialize`/`MemberSerialize` via the
   // template body.
-
-  [[nodiscard]]
-  moho::BVSet<moho::EntId, moho::EntIdUniverse> BuildSelectedEntitySetFromUnits(
-    const moho::EntitySetTemplate<moho::Unit>& units
-  )
-  {
-    moho::BVSet<moho::EntId, moho::EntIdUniverse> selected{};
-    for (moho::Unit* const unit : units) {
-      if (!IsUsableDetachedUnit(unit)) {
-        continue;
-      }
-      (void)selected.mBits.Add(static_cast<unsigned int>(unit->id_));
-    }
-    return selected;
-  }
 } // namespace
 
 namespace moho
@@ -143,7 +128,9 @@ namespace moho
   {
     if (mUnit != nullptr) {
       mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTransportUnloading;
-      mUnit->NeedSyncGameData = true;
+      // 0x00626098: `mov byte ptr [unit+0xA2], 1` -- Entity base at +0x08,
+      // mVarDat at +0x78, mRequestRefreshUI at +0x22.
+      mUnit->mVarDat.mRequestRefreshUI = 1;
     }
 
     mOwnerCommandLinkLane.UnlinkFromOwnerChain();
@@ -416,11 +403,16 @@ namespace moho
           commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
           commandIssueData.mTarget.mEntityId = kGroundTargetEntityIdTag;
           commandIssueData.mTarget.mPos = unloadWorldPos;
+          // 0x006269A3-0x006269E6: unk38 = 0, mOri = the zero quaternion
+          // (lazy static at 0x010C7A58), unk4C = 1.0f.
+          commandIssueData.unk38 = 0;
+          commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
+          commandIssueData.unk4C = 1.0f;
 
-          const BVSet<EntId, EntIdUniverse> selectedUnits = BuildSelectedEntitySetFromUnits(detachedUnits);
-          if (selectedUnits.mBits.Count() != 0u) {
-            mUnit->SimulationRef->IssueCommand(selectedUnits, commandIssueData, true);
-          }
+          // 0x006269EB-0x006269FC: UNIT_IssueCommand (0x006F12C0) on the
+          // detached set itself with clearQueue = 1, unconditionally -- no
+          // empty-selection guard and no Sim::IssueCommand round trip.
+          (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, detachedUnits, commandIssueData, true);
         }
 
         mTaskState = NextTaskState(mTaskState);

@@ -314,10 +314,13 @@ namespace moho
    */
   void CUnitFormAndMoveTask::OnEvent(const EAiNavigatorEvent event)
   {
+    // 0x0061969F / 0x00619694: the result goes to the parent's slot through
+    // `mDispatchResult` (`[ecx-0Ch]` from the listener subobject = this+0x28),
+    // 2 for Failed/Aborted and 1 for Succeeded, as in CUnitMoveTask.
     if (event == AINAVEVENT_Failed || event == AINAVEVENT_Aborted) {
-      mTaskState = TASKSTATE_Starting;
+      *mDispatchResult = static_cast<EAiResult>(2);
     } else if (event == AINAVEVENT_Succeeded) {
-      mTaskState = TASKSTATE_Waiting;
+      *mDispatchResult = static_cast<EAiResult>(1);
     }
 
     ResumeOwnerThreadNow();

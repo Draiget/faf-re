@@ -653,9 +653,11 @@ namespace moho
         }
 
         ReclaimCostInfo reclaimCosts{};
+        // 0x0061FBC9 / 0x0061FBED -> 0x0061FAA8: a failed cost query only
+        // warns and ends the task; `OnReclaimed` belongs to the
+        // invalid-costs path below.
         if (!QueryReclaimCosts(mUnit, targetEntity, reclaimCosts)) {
           gpg::Warnf(kFailedReclaimCostWarning);
-          targetEntity->RunScriptUnit(kOnReclaimedScript, mUnit);
           return -1;
         }
 
@@ -857,7 +859,9 @@ namespace moho
    */
   void IssueReclaimTask(CCommandTask* const parentTask, const CAiTarget& target)
   {
-    Entity* const targetEntity = target.GetEntity();
+    // 0x0061EF7E reads the raw weak target (no recon-blip resolution); a
+    // blip stays the target until the task's Waiting state resolves it.
+    Entity* const targetEntity = target.targetEntity.GetObjectPtr();
     if (targetEntity == nullptr) {
       if (parentTask != nullptr) {
         parentTask->mLinkResult = static_cast<EAiResult>(2);

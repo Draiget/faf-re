@@ -200,10 +200,14 @@ namespace moho
 
       if (mUnit != nullptr) {
         mUnit->ExecuteOccupyGround();
-        mUnit->mUnitVarDat.mSelectionInheritorId = static_cast<EntId>(ToRaw(EEntityIdSentinel::Invalid));
       }
 
+      // 0x005F85FE OnStopBuild(false) runs before 0x005F8606 resets the
+      // selection inheritor to 0xF0000000.
       mBuildHelper.OnStopBuild(false);
+      if (mUnit != nullptr) {
+        mUnit->mUnitVarDat.mSelectionInheritorId = static_cast<EntId>(ToRaw(EEntityIdSentinel::Invalid));
+      }
       if (mDispatchResult != nullptr) {
         *mDispatchResult = static_cast<EAiResult>(2);
       }
@@ -299,9 +303,9 @@ int CUnitUpgradeTask::TaskTick()
       mUnit,
       ReadInstaBuildFlag(mSim)
     );
-    params.mUseLayerOverride = 0;
-    params.mFixElevation = 0;
-    params.mComplete = ReadInstaBuildFlag(mSim) ? 1u : 0u;
+    // 0x005F8A11-0x005F8A39: nothing touches `params` between the ctor
+    // (mUseLayerOverride = 0, mFixElevation = layer != 0, mComplete = insta
+    // build) and Unit::Unit, so the ctor's own values stand.
 
     // 0x005F8A16..0x005F8A39: `operator new(0x6A8)` + `Unit::Unit(params)`
     // (0x006A53F0) directly -- no `Sim::CreateUnit` unit-cap gate, so an
@@ -322,7 +326,8 @@ int CUnitUpgradeTask::TaskTick()
 
     if (upgradedUnit->mUnitVarDat.mFireState != mUnit->mUnitVarDat.mFireState) {
       upgradedUnit->mUnitVarDat.mFireState = mUnit->mUnitVarDat.mFireState;
-      upgradedUnit->NeedSyncGameData = true;
+      // 0x005F8AC0: `mov byte [unit+0xA2], 1` = Entity(+8).mVarDat(+0x78).mRequestRefreshUI(+0x22).
+      upgradedUnit->mVarDat.mRequestRefreshUI = 1;
     }
 
     upgradedUnit->mUnitVarDat.mUnitStates |= kUpgradeTargetHighMask;

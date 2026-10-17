@@ -71,31 +71,16 @@ namespace
       || (previous < kThreeQuarterProgress && current >= kThreeQuarterProgress);
   }
 
+  // 0x005F5F24-0x005F5F4F: 1.0 / (BuildTime / buildRate) * consumed * 0.1,
+  // unguarded (the binary has no BuildTime/buildRate <= 0 checks; the caller
+  // only skips this when ResourceConsumed == 0).
   [[nodiscard]] float ComputeBuildProgressDelta(
     const moho::RUnitBlueprint* const blueprint,
     const moho::UnitAttributes& builderAttributes,
     const float resourceConsumed
   ) noexcept
   {
-    if (blueprint == nullptr || resourceConsumed == kFloatZero) {
-      return kFloatZero;
-    }
-
-    const float buildRate = builderAttributes.buildRate;
-    if (buildRate <= kFloatZero) {
-      return kFloatZero;
-    }
-
-    const float buildTime = blueprint->Economy.BuildTime;
-    if (buildTime <= kFloatZero) {
-      return kFloatZero;
-    }
-
-    const float timeToBuild = buildTime / buildRate;
-    if (timeToBuild <= kFloatZero) {
-      return kFloatZero;
-    }
-
+    const float timeToBuild = blueprint->Economy.BuildTime / builderAttributes.buildRate;
     return ((kFloatOne / timeToBuild) * resourceConsumed) * kTickBuildScale;
   }
 } // namespace
@@ -295,8 +280,14 @@ namespace moho
         return true;
       }
 
-      if (!focusUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo) || focusUnit->AiSiloBuild == nullptr) {
+      // 0x005F5D15: not SiloBuildingAmmo -> done (true).
+      if (!focusUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
         return true;
+      }
+
+      // 0x005F5D29: no AiSiloBuild -> result byte still 0 from 0x005F5CA6 (false).
+      if (focusUnit->AiSiloBuild == nullptr) {
+        return false;
       }
 
       SEconValue perSecond{};
@@ -305,37 +296,6 @@ namespace moho
       }
       perSecond.energy *= resourceConsumed;
       perSecond.mass *= resourceConsumed;
-
-      // TEMPORARY PROBE -- silo assist triage: confirms the guard task
-      // dispatches the silo-assist repair task and what per-second value it
-      // contributes. Delete when resolved.
-      {
-        static int sProbeSiloSeen = 0;
-        ++sProbeSiloSeen;
-        if ((sProbeSiloSeen % 200) == 0) {
-          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-            const float reqE = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mRequested.energy : -1.0f;
-            const float reqM = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mRequested.mass : -1.0f;
-            const float grantE = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mGranted.energy : -1.0f;
-            const float grantM = ownerUnit->mConsumptionData ? ownerUnit->mConsumptionData->mGranted.mass : -1.0f;
-            std::fprintf(
-              sink,
-              "[SILOASSIST] owner=%p focus=%p e=%.2f m=%.2f consumed=%.3f reqE=%.2f reqM=%.2f grE=%.2f grM=%.2f paused=%d\n",
-              static_cast<void*>(ownerUnit),
-              static_cast<void*>(focusUnit),
-              perSecond.energy,
-              perSecond.mass,
-              resourceConsumed,
-              reqE,
-              reqM,
-              grantE,
-              grantM,
-              static_cast<int>(ownerUnit->mUnitVarDat.mIsPaused)
-            );
-            std::fclose(sink);
-          }
-        }
-      }
 
       focusUnit->AiSiloBuild->SiloAssistWithResource(perSecond);
       ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mUnitVarDat.mWorkProgress;
@@ -350,13 +310,14 @@ namespace moho
       float workProgress = focusUnit->GetLuaValue("WorkProgress");
       if (workProgress < 1.0f) {
         if (resourceConsumed != 0.0f) {
+          // 0x005F5E6A-0x005F5ECE: 1/(wibt/rate)*rc*0.1 + progress, clamped to
+          // 1.0 (`> 1.0` keeps the sum otherwise), always written back.
           const float workItemBuildTime = focusUnit->GetLuaValue("WorkItemBuildTime");
           const float buildRate = ownerUnit->GetAttributes().buildRate;
-          if (workItemBuildTime > 0.0f && buildRate > 0.0f) {
-            const float tickDelta = ((1.0f / (workItemBuildTime / buildRate)) * resourceConsumed) * 0.1f;
-            workProgress = std::min(1.0f, workProgress + tickDelta);
-            focusUnit->SetLuaValue("WorkProgress", workProgress);
-          }
+          const float tickDelta = ((1.0f / (workItemBuildTime / buildRate)) * resourceConsumed) * kTickBuildScale;
+          const float advanced = tickDelta + workProgress;
+          workProgress = (advanced > kFloatOne) ? kFloatOne : advanced;
+          focusUnit->SetLuaValue("WorkProgress", workProgress);
         }
 
         ownerUnit->mUnitVarDat.mWorkProgress = workProgress;
@@ -371,49 +332,54 @@ namespace moho
       return false;
     }
 
-    float buildProgressDelta = ComputeBuildProgressDelta(focusBlueprint, ownerUnit->GetAttributes(), resourceConsumed);
-    const bool focusUnitIsDamaged = focusUnit->mVarDat.mMaxHealth > focusUnit->mVarDat.mHealth;
+    // 0x005F5EFD-0x005F5F14: ResourceConsumed == 0 jumps straight to
+    // 0x005F6190 (fldz -> Materialize(0)); the progress delta, damage flag,
+    // SHIELD regen assist and fuel refill only run when something was consumed.
+    float buildProgressDelta = kFloatZero;
+    if (resourceConsumed != kFloatZero) {
+      buildProgressDelta = ComputeBuildProgressDelta(focusBlueprint, ownerUnit->GetAttributes(), resourceConsumed);
+      const bool focusUnitIsDamaged = focusUnit->mVarDat.mMaxHealth > focusUnit->mVarDat.mHealth;
 
-    if (focusUnit->IsInCategory("SHIELD")) {
-      Entity* const shieldEntity = focusUnit->GetFocusEntity();
-      if (shieldEntity != nullptr) {
-        if (!focusUnitIsDamaged && !focusUnit->RunScriptBool("ShieldIsOn")) {
-          return true;
-        }
+      if (focusUnit->IsInCategory("SHIELD")) {
+        Entity* const shieldEntity = focusUnit->GetFocusEntity();
+        if (shieldEntity != nullptr) {
+          if (!focusUnitIsDamaged && !focusUnit->RunScriptBool("ShieldIsOn")) {
+            return true;
+          }
 
-        if (shieldEntity->mVarDat.mMaxHealth > shieldEntity->mVarDat.mHealth) {
-          const float buildRate = ownerUnit->GetAttributes().buildRate;
-          const float regenRate = shieldEntity->GetLuaValue("RegenRate") * kTickBuildScale;
-          float regenAssistMult = focusBlueprint->Defense.Shield.RegenAssistMult;
-          if (regenAssistMult != 0.0f) {
-            if (focusUnitIsDamaged) {
-              regenAssistMult *= 2.0f;
-              buildProgressDelta *= 0.5f;
+          if (shieldEntity->mVarDat.mMaxHealth > shieldEntity->mVarDat.mHealth) {
+            const float buildRate = ownerUnit->GetAttributes().buildRate;
+            const float regenRate = shieldEntity->GetLuaValue("RegenRate") * kTickBuildScale;
+            float regenAssistMult = focusBlueprint->Defense.Shield.RegenAssistMult;
+            if (regenAssistMult != 0.0f) {
+              if (focusUnitIsDamaged) {
+                regenAssistMult *= 2.0f;
+                buildProgressDelta *= 0.5f;
+              }
+              shieldEntity->AdjustHealth(nullptr, (regenRate * buildRate) / regenAssistMult);
             }
-            shieldEntity->AdjustHealth(nullptr, (regenRate * buildRate) / regenAssistMult);
           }
         }
       }
-    }
 
-    if (focusBlueprint->Physics.FuelUseTime > 0.0f && focusUnit->mUnitVarDat.mFuelRatio < 1.0f) {
-      float fuelTickDelta = (focusBlueprint->Physics.FuelRechargeRate / focusBlueprint->Physics.FuelUseTime) * kTickBuildScale;
-      if (focusUnitIsDamaged) {
-        fuelTickDelta *= 0.5f;
-        buildProgressDelta *= 0.5f;
+      if (focusBlueprint->Physics.FuelUseTime > 0.0f && focusUnit->mUnitVarDat.mFuelRatio < 1.0f) {
+        float fuelTickDelta = (focusBlueprint->Physics.FuelRechargeRate / focusBlueprint->Physics.FuelUseTime) * kTickBuildScale;
+        if (focusUnitIsDamaged) {
+          buildProgressDelta *= 0.5f;
+          fuelTickDelta *= 0.5f;
+        }
+        // 0x005F6158-0x005F6171: sum, then `> 1.0` clamps to 1.0.
+        const float refilled = fuelTickDelta + focusUnit->mUnitVarDat.mFuelRatio;
+        focusUnit->mUnitVarDat.mFuelRatio = (refilled > kFloatOne) ? kFloatOne : refilled;
       }
-      focusUnit->mUnitVarDat.mFuelRatio = std::min(1.0f, focusUnit->mUnitVarDat.mFuelRatio + fuelTickDelta);
     }
 
-    focusUnit->Materialize((resourceConsumed != 0.0f) ? buildProgressDelta : 0.0f);
+    focusUnit->Materialize(buildProgressDelta);
 
     const bool isRepairAction = mActionName.equals_no_case("Repair");
     if (isRepairAction && !focusUnit->IsBeingBuilt()) {
-      if (focusUnit->mVarDat.mMaxHealth > 0.0f) {
-        ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mVarDat.mHealth / focusUnit->mVarDat.mMaxHealth;
-      } else {
-        ownerUnit->mUnitVarDat.mWorkProgress = 1.0f;
-      }
+      // 0x005F621E: health / maxHealth, no zero guard.
+      ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mVarDat.mHealth / focusUnit->mVarDat.mMaxHealth;
 
       if (ownerUnit->mUnitVarDat.mWorkProgress != 1.0f) {
         return false;

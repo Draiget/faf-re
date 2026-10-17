@@ -127,12 +127,15 @@ namespace
     ownerUnit->RunScript(kOnFerryPointSetScriptName);
   }
 
-  [[nodiscard]] bool IsLiveFactoryWithBuilder(const moho::Unit* const unit)
+  // 0x0060E0A5-0x0060E0DE: IsInCategory("FACTORY"), `[unit+0x554]` AiBuilder
+  // non-null, then vtable +0x30 IsMobile -- the flag is set only when it
+  // returns false (`je 0x60E0E4` keeps the 1).
+  [[nodiscard]] bool IsStationaryFactoryWithBuilder(const moho::Unit* const unit)
   {
-    return unit != nullptr && unit->IsInCategory(kFactoryCategoryName) && unit->AiBuilder != nullptr && !unit->IsDead();
+    return unit != nullptr && unit->IsInCategory(kFactoryCategoryName) && unit->AiBuilder != nullptr && !unit->IsMobile();
   }
 
-  void ResolveFactoryTransportOwner(moho::WeakPtr<moho::Unit>& ferryUnitRef)
+  void ResolveGuardedFactoryOwner(moho::WeakPtr<moho::Unit>& ferryUnitRef)
   {
     while (true) {
       moho::Unit* const ferryUnit = ferryUnitRef.GetObjectPtr();
@@ -144,7 +147,9 @@ namespace
         return;
       }
 
-      ferryUnitRef.Set(ferryUnit->GetTransportedBy());
+      // 0x0060E1DF: the walk reads `[unit+0x4E0]` = GuardedUnitRef, not the
+      // transported-by slot at +0x4C0.
+      ferryUnitRef.Set(ferryUnit->GuardedUnitRef.GetObjectPtr());
     }
   }
 
@@ -163,28 +168,6 @@ namespace
     ScopedRouteCommandVector& operator=(const ScopedRouteCommandVector&) = delete;
 
   };
-
-  /**
-   * Address: 0x005FB910 (FUN_005FB910, std::vector_WeakPtr_CUnitCommand::move)
-   *
-   * What it does:
-   * Route-command replacement lane used by `CUnitFerryTask::GetUnitCommands`.
-   * The binary's vector-assign body replaces `destination` with a relinked
-   * copy of `source` — but only when `source` is non-empty and distinct;
-   * an empty (or self) source leaves the destination payload untouched, which
-   * is the fallback GetUnitCommands relies on to keep the owner-queue copy.
-   */
-  void ReplaceWithRouteCommandsIfAny(
-    msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>& destination,
-    const msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>& source
-  )
-  {
-    if (&destination == &source || source.empty()) {
-      return;
-    }
-
-    destination = source;
-  }
 
 
   /**
@@ -296,12 +279,12 @@ namespace moho
     mRouteUnit.Set(targetUnit);
     MarkOwnerFerryTaskAssigned(mUnit);
 
-    if (IsLiveFactoryWithBuilder(targetUnit)) {
+    if (IsStationaryFactoryWithBuilder(targetUnit)) {
       mFerryUnit.Set(targetUnit);
-    } else if (targetUnit != nullptr && targetUnit->IsUnitState(UNITSTATE_Attached)) {
+    } else if (targetUnit != nullptr && targetUnit->IsUnitState(UNITSTATE_Ferrying)) { // 0x0060E12A: push 0x14
       mFollowsExistingRoute = true;
       mFerryUnit.Set(targetUnit);
-      ResolveFactoryTransportOwner(mFerryUnit);
+      ResolveGuardedFactoryOwner(mFerryUnit);
     } else if (targetUnit != nullptr && targetUnit->IsInCategory(kFerryBeaconCategoryName)) {
       mFollowsExistingRoute = true;
       mBeacon.Set(targetUnit);
@@ -656,7 +639,10 @@ namespace moho
       // The binary reads the builder queue without a null guard right after
       // the HasValue test; ferry units always carry a builder here.
       Unit* const ferryUnit = mFerryUnit.GetObjectPtr();
-      ReplaceWithRouteCommandsIfAny(outCommands, ferryUnit->AiBuilder->BuilderGetFactoryCommandQueue());
+      // 0x0060ED48-0x0060ED4B: `vector::operator=` (0x005FB910) -- an empty
+      // source erases the destination (0x005FBF60), it does not keep the
+      // owner-queue copy.
+      outCommands = ferryUnit->AiBuilder->BuilderGetFactoryCommandQueue();
       return;
     }
 
@@ -668,7 +654,7 @@ namespace moho
     if (!mBeacon.HasValue() || routeUnit != mBeacon.GetObjectPtr()) {
       // Route defined by the clicked unit's own queue (unguarded queue decode
       // in the binary — the route unit was bound at construction).
-      ReplaceWithRouteCommandsIfAny(outCommands, routeUnit->CommandQueue->mCommandVec);
+      outCommands = routeUnit->CommandQueue->mCommandVec; // 0x0060ED4B, vector::operator=
       return;
     }
 
@@ -700,7 +686,7 @@ namespace moho
         continue;
       }
 
-      ReplaceWithRouteCommandsIfAny(outCommands, candidate->CommandQueue->mCommandVec);
+      outCommands = candidate->CommandQueue->mCommandVec; // 0x0060ED0A, vector::operator=
       break;
     }
   }
