@@ -13,6 +13,7 @@ namespace moho
   extern TSimConVar<bool> gSimConVar_AI_RenderBombDropZone;
   extern TSimConVar<float> gSimConVar_RandomElevationOffset;
   extern TSimConVar<float> gSimConVar_AirLookAheadMult;
+  extern TSimConVar<int> gSimConVar_path_UnreachableTimeoutSearchSteps;
 
   class CScrLuaInitForm;
 

@@ -22,6 +22,7 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimStartupRegistrations.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -1120,25 +1121,34 @@ void CAiPathFinder::OnPathRejected(const SNavPath& path)
 
 /**
  * Address: 0x005AAA30 (FUN_005AAA30)
+ *
+ * What it does:
+ * The expansion cap `PathQueue` gives this traveler. A goal whose border the
+ * footprint cannot occupy anywhere is unreachable, so its search is capped by
+ * `path_UnreachableTimeoutSearchSteps` (default 1000) and then hands back the
+ * closest approach; a reachable goal uses the army's per-layer pathcap.
  */
 std::int32_t CAiPathFinder::GetPathcap() const
 {
-  Unit* const ownerUnit = ReadPathFinderOwnerUnit(const_cast<CAiPathFinder*>(this));
-  if (!ownerUnit || !ownerUnit->ArmyRef) {
-    return 0;
-  }
-
+  // 0x005AAA30..0x005AAA34 / 0x005AAA7C..0x005AAA9A: `mGoalBoundaryFits == 0`
+  // reads the sim con-var at 0x010AEDCC (`path_UnreachableTimeoutSearchSteps`,
+  // registered by 0x00BCCCA0). This used to return the army's
+  // `GetPathcapBoth()` instead, so an unreachable search ran far past the
+  // binary's 1000 expansions and its partial path (OnPathRejected) was never
+  // delivered on the retail tick (replay 26935800 beat 6531, unit 0x0050000e).
   if (mGoalBoundaryFits == 0u) {
-    return ownerUnit->ArmyRef->GetPathcapBoth();
+    return ReadSimConVar(mSim, gSimConVar_path_UnreachableTimeoutSearchSteps);
   }
 
+  // 0x005AAA36..0x005AAA7A: tail calls through the army's vtable
+  // (+0xD0 land, +0xD4 sea, +0xD8 both), keyed on the motion type.
   if (mPathLayerSelector == 1) {
-    return ownerUnit->ArmyRef->GetPathcapLand();
+    return mUnit->ArmyRef->GetPathcapLand();
   }
   if (mPathLayerSelector == 3) {
-    return ownerUnit->ArmyRef->GetPathcapSea();
+    return mUnit->ArmyRef->GetPathcapSea();
   }
-  return ownerUnit->ArmyRef->GetPathcapBoth();
+  return mUnit->ArmyRef->GetPathcapBoth();
 }
 
 /**
