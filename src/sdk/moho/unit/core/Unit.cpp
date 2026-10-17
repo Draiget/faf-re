@@ -59,6 +59,7 @@
 #include "moho/resource/RResId.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Vector3f.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/ai/CAiSteeringImpl.h"
@@ -104,7 +105,6 @@
 #include "moho/unit/core/UserUnit.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "moho/misc/DiagnosticBudget.h"
 
 namespace gpg
 {
@@ -1213,55 +1213,11 @@ namespace
   constexpr const char* kUnitSetStatHelpText = "SetStat(Name, Value)";
   constexpr const char* kUnitGetWorkProgressName = "GetWorkProgress";
   constexpr const char* kUnitGetWorkProgressHelpText = "GetWorkProgress()";
-  constexpr std::uint8_t kUnitGetStatHoverOccupancyCaps = static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER) |
-    static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND);
-  constexpr std::uint8_t kUnitGetStatWaterOccupancyCaps = static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER);
-  constexpr float kUnitGetStatWaterOnlyMaxWaterDepth = 1.5f;
-  REntityBlueprint* gUnitGetStatOriginalBlueprint = nullptr;
-  RUnitBlueprint gUnitGetStatBlueprint(nullptr, RResId{});
   constexpr const char* kUnitGetCargoTransportOnlyText = "Unit:GetCargo only valid for transport units";
   constexpr const char* kUnitOnProductionActiveScript = "OnProductionActive";
   constexpr const char* kUnitOnProductionInactiveScript = "OnProductionInActive";
   constexpr const char* kUnitLuaClassName = "Unit";
   constexpr const char* kGlobalLuaClassName = "<global>";
-
-  [[nodiscard]] bool BlueprintHasOccupancyCaps(const REntityBlueprint* const blueprint, const std::uint8_t caps) noexcept
-  {
-    return blueprint != nullptr && static_cast<std::uint8_t>(blueprint->mFootprint.mOccupancyCaps) == caps;
-  }
-
-  void RefreshUnitGetStatBlueprintSnapshot(Unit& unit)
-  {
-    gUnitGetStatOriginalBlueprint = unit.BluePrint;
-
-    if (const RUnitBlueprint* const unitBlueprint = unit.BluePrint->IsUnitBlueprint(); unitBlueprint != nullptr) {
-      gUnitGetStatBlueprint = *unitBlueprint;
-    } else {
-      static_cast<REntityBlueprint&>(gUnitGetStatBlueprint) = *unit.BluePrint;
-    }
-
-    gUnitGetStatBlueprint.mFootprint.mOccupancyCaps = EOccupancyCaps::OC_WATER;
-    gUnitGetStatBlueprint.mFootprint.mFlags = EFootprintFlags::FPFLAG_None;
-    gUnitGetStatBlueprint.mFootprint.mMaxWaterDepth = kUnitGetStatWaterOnlyMaxWaterDepth;
-  }
-
-  void ApplyUnitGetStatH1BlueprintOverride(Unit& unit, const int defaultValue)
-  {
-    if (!BlueprintHasOccupancyCaps(gUnitGetStatOriginalBlueprint, kUnitGetStatHoverOccupancyCaps)) {
-      RefreshUnitGetStatBlueprintSnapshot(unit);
-    }
-
-    if (defaultValue != 0) {
-      if (!BlueprintHasOccupancyCaps(unit.BluePrint, kUnitGetStatHoverOccupancyCaps)) {
-        unit.BluePrint = gUnitGetStatOriginalBlueprint;
-      }
-      return;
-    }
-
-    if (!BlueprintHasOccupancyCaps(unit.BluePrint, kUnitGetStatWaterOccupancyCaps)) {
-      unit.BluePrint = &gUnitGetStatBlueprint;
-    }
-  }
 
   [[nodiscard]] const char* UnitCommandTypeDebugName(const EUnitCommandType commandType) noexcept
   {
@@ -1930,12 +1886,18 @@ namespace
   // constructor fix this depends on) -- numerically the same as
   // `Moho::MultQuadVec` against `(0,0,1)` would give, once `VAxes3`'s own
   // constructor is correct.
+  //
+  // The flattened `(vZ.x, 0, vZ.z)` is normalised by `NormalizeVectorInto`
+  // (0x0044F7E0, called at 0x006A8CF3; inlined with the same length-> 0
+  // threshold and reciprocal multiply at 0x0062EAD8-0x0062EB4B). There is
+  // no near-zero tolerance: any positive length normalises.
   [[nodiscard]] Wm3::Vector3f ForwardXZ(const Unit& unit) noexcept
   {
     const moho::VAxes3 axes(unit.GetTransform().orient_);
-    Wm3::Vector3f forward = axes.vZ;
-    forward.y = 0.0f;
-    return Wm3::Vector3f::NormalizeOrZero(forward);
+    const Wm3::Vector3f flattened{axes.vZ.x, 0.0f, axes.vZ.z};
+    Wm3::Vector3f forward{};
+    (void)moho::NormalizeVectorInto(&forward, flattened);
+    return forward;
   }
 
   [[nodiscard]] const Wm3::Vector3f& InvalidBombDropSolutionLane() noexcept
@@ -1969,40 +1931,47 @@ namespace
   {
     const float gravityMagnitude = std::sqrt((gravity.x * gravity.x) + (gravity.y * gravity.y) + (gravity.z * gravity.z));
 
+    // 0x0062CF38-0x0062CF83: `-0.0f - g` per lane, then Wm3 `Normalize`
+    // (0x00452AF0).
     Wm3::Vector3f oppositeGravityDirection{
       -gravity.x,
       -gravity.y,
       -gravity.z,
     };
     Wm3::Vector3f::Normalize(&oppositeGravityDirection);
+    const Wm3::Vector3f& n = oppositeGravityDirection;
 
-    const float velocityAlongGravity = (velocity.x * oppositeGravityDirection.x) +
-      (velocity.y * oppositeGravityDirection.y) + (velocity.z * oppositeGravityDirection.z);
+    // Every dot product and squared length below accumulates z first, then
+    // x (or y for the squared lengths), then the remaining lane, exactly as
+    // the SSE chains at 0x0062CF8A-0x0062D0E6 do.
+    const float velocityAlongGravity = ((velocity.z * n.z) + (velocity.x * n.x)) + (velocity.y * n.y);
+    const float projectedSpeedX = n.x * velocityAlongGravity;
+    const float projectedSpeedY = velocityAlongGravity * n.y;
+    const float projectedSpeedZ = n.z * velocityAlongGravity;
     const float projectedSpeedMagnitude = std::sqrt(
-      (oppositeGravityDirection.x * velocityAlongGravity) * (oppositeGravityDirection.x * velocityAlongGravity) +
-      (oppositeGravityDirection.y * velocityAlongGravity) * (oppositeGravityDirection.y * velocityAlongGravity) +
-      (oppositeGravityDirection.z * velocityAlongGravity) * (oppositeGravityDirection.z * velocityAlongGravity)
+      ((projectedSpeedZ * projectedSpeedZ) + (projectedSpeedY * projectedSpeedY)) + (projectedSpeedX * projectedSpeedX)
     );
 
-    const float targetDeltaAlongGravity = ((currentPosition.x - targetPosition.x) * oppositeGravityDirection.x) +
-      ((currentPosition.y - targetPosition.y) * oppositeGravityDirection.y) +
-      ((currentPosition.z - targetPosition.z) * oppositeGravityDirection.z);
+    const float deltaX = currentPosition.x - targetPosition.x;
+    const float deltaY = currentPosition.y - targetPosition.y;
+    const float deltaZ = currentPosition.z - targetPosition.z;
+    const float targetDeltaAlongGravity = ((deltaZ * n.z) + (deltaX * n.x)) + (deltaY * n.y);
 
-    const float projectedDistanceX = oppositeGravityDirection.x * targetDeltaAlongGravity;
-    const float projectedDistanceY = oppositeGravityDirection.y * targetDeltaAlongGravity;
-    const float projectedDistanceZ = oppositeGravityDirection.z * targetDeltaAlongGravity;
+    const float projectedDistanceX = n.x * targetDeltaAlongGravity;
+    const float projectedDistanceY = targetDeltaAlongGravity * n.y;
+    const float projectedDistanceZ = n.z * targetDeltaAlongGravity;
     const float projectedDistanceMagnitude = std::sqrt(
-      (projectedDistanceX * projectedDistanceX) + (projectedDistanceY * projectedDistanceY) +
-      (projectedDistanceZ * projectedDistanceZ)
+      ((projectedDistanceZ * projectedDistanceZ) + (projectedDistanceY * projectedDistanceY)) +
+      (projectedDistanceX * projectedDistanceX)
     );
 
-    const float signedScale = (((projectedDistanceX * oppositeGravityDirection.x) +
-                                 (projectedDistanceY * oppositeGravityDirection.y) +
-                                 (projectedDistanceZ * oppositeGravityDirection.z)) >= 0.0f)
-      ? 2.0f
-      : -2.0f;
+    // 0x0062D0F0: `comiss 0, dot` / `jbe` -> +2 unless the dot is strictly
+    // negative (an unordered dot picks +2).
+    const float projectedDistanceDot =
+      ((projectedDistanceZ * n.z) + (projectedDistanceX * n.x)) + (projectedDistanceY * n.y);
+    const float signedScale = (0.0f > projectedDistanceDot) ? -2.0f : 2.0f;
 
-    const float rootDiscriminant = (signedScale * projectedDistanceMagnitude * gravityMagnitude) +
+    const float rootDiscriminant = ((signedScale * projectedDistanceMagnitude) * gravityMagnitude) +
       (projectedSpeedMagnitude * projectedSpeedMagnitude);
 
     if (rootDiscriminant < 0.0f) {
@@ -2013,19 +1982,22 @@ namespace
     const float root = std::sqrt(rootDiscriminant);
     const float inverseGravityMagnitude = 1.0f / gravityMagnitude;
     float travelTime = -((root - projectedSpeedMagnitude) * inverseGravityMagnitude);
-    if (travelTime < 0.0f) {
+    // 0x0062D1C8 `jb` / 0x0062D28C `jae`: an unordered time counts as
+    // negative at both tests.
+    if (!(travelTime >= 0.0f)) {
       travelTime = -(((-projectedSpeedMagnitude) - root) * inverseGravityMagnitude);
     }
 
-    if (travelTime < 0.0f) {
+    if (!(travelTime >= 0.0f)) {
       *out = InvalidBombDropSolutionLane();
       return out;
     }
 
-    const float halfTravelTimeSquared = 0.5f * travelTime * travelTime;
-    out->x = targetPosition.x - ((gravity.x * halfTravelTimeSquared) + (velocity.x * travelTime));
-    out->y = targetPosition.y - ((gravity.y * halfTravelTimeSquared) + (velocity.y * travelTime));
-    out->z = targetPosition.z - ((gravity.z * halfTravelTimeSquared) + (velocity.z * travelTime));
+    // 0x0062D20C-0x0062D231: each gravity lane is `((g * 0.5f) * t) * t`,
+    // multiplied left to right, then the `v * t` lane is added to it.
+    out->x = targetPosition.x - ((((gravity.x * 0.5f) * travelTime) * travelTime) + (velocity.x * travelTime));
+    out->y = targetPosition.y - ((((gravity.y * 0.5f) * travelTime) * travelTime) + (velocity.y * travelTime));
+    out->z = targetPosition.z - ((((gravity.z * 0.5f) * travelTime) * travelTime) + (velocity.z * travelTime));
     return out;
   }
 
@@ -2241,17 +2213,36 @@ namespace
       return nullptr;
     }
 
+    // 0x0062EC3C / 0x0062ED0B: the inlined direction normalise sums the
+    // squared lanes as `(dz*dz + dy*dy) + dx*dx`, then multiplies by
+    // `1/len` when `len > 0` (zero vector otherwise).
+    const auto directionTo = [](const Wm3::Vec3f& from, const Wm3::Vec3f& to) noexcept {
+      const Wm3::Vector3f delta{to.x - from.x, to.y - from.y, to.z - from.z};
+      const float length = std::sqrt(((delta.z * delta.z) + (delta.y * delta.y)) + (delta.x * delta.x));
+      if (!(length > 0.0f)) {
+        return Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+      }
+      const float inverse = 1.0f / length;
+      return Wm3::Vector3f{inverse * delta.x, delta.y * inverse, delta.z * inverse};
+    };
+
     const Wm3::Vector3f a2Forward = ForwardXZ(*a2);
     const Wm3::Vector3f a1Forward = ForwardXZ(*a1);
-    const Wm3::Vector3f a2ToA1 = Wm3::Vector3f::NormalizeOrZero(a1->GetPosition() - a2->GetPosition());
-    const Wm3::Vector3f a1ToA2 = Wm3::Vector3f::NormalizeOrZero(a2->GetPosition() - a1->GetPosition());
+    const Wm3::Vector3f a2ToA1 = directionTo(a2->GetPosition(), a1->GetPosition());
+    const Wm3::Vector3f a1ToA2 = directionTo(a1->GetPosition(), a2->GetPosition());
 
-    const float a2Alignment = Wm3::Vector3f::Dot(a2ToA1, a2Forward);
-    const float a1Alignment = Wm3::Vector3f::Dot(a1ToA2, a1Forward);
+    // 0x0062ED8F-0x0062EDD4: dot products accumulate `(y + z) + x` for the
+    // first and `(z + y) + x` for the second.
+    const float a2Alignment =
+      ((a2ToA1.y * a2Forward.y) + (a2ToA1.z * a2Forward.z)) + (a2ToA1.x * a2Forward.x);
+    const float a1Alignment =
+      ((a1ToA2.z * a1Forward.z) + (a1ToA2.y * a1Forward.y)) + (a1ToA2.x * a1Forward.x);
     if (a2Alignment <= 0.0f && a1Alignment <= 0.0f) {
       return nullptr;
     }
-    return (a2Alignment <= a1Alignment) ? a2 : a1;
+    // 0x0062EDE6: `comiss a2Alignment, a1Alignment` / `ja` picks a1; an
+    // unordered compare falls through to a2.
+    return (a2Alignment > a1Alignment) ? a1 : a2;
   }
 
 } // namespace
@@ -4600,12 +4591,15 @@ int moho::cfunc_UnitMeleeWarpAdjacentToTargetL(LuaPlus::LuaState* const state)
     );
 
     const Wm3::Vec3f& warpTargetPosition = target->GetPosition();
-    Wm3::Vec3f facingDirection{
+    const Wm3::Vec3f toTarget{
       warpTargetPosition.x - worldPosition.x,
       warpTargetPosition.y - worldPosition.y,
       warpTargetPosition.z - worldPosition.z,
     };
-    Wm3::Vector3f::Normalize(&facingDirection);
+    // 0x006CE175: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0,
+    // no Wm3 1e-6 tolerance.
+    Wm3::Vector3f facingDirection{};
+    (void)moho::NormalizeVectorInto(&facingDirection, toTarget);
 
     const Wm3::Quaternionf orientation = COORDS_Orient(facingDirection);
     const VTransform warpTransform(worldPosition, orientation);
@@ -4917,7 +4911,10 @@ int moho::cfunc_UnitGiveNukeSiloAmmoL(LuaPlus::LuaState* const state)
       const LuaPlus::LuaStackObject amountObject(state, 2);
       const int amount = amountObject.GetInteger();
       if (setSegmentAmount) {
-        siloBuild->mCurSegments = amount;
+        // FAF patch 0x0128E97B: `cvtsi2ss xmm0, eax` / `movss [ebx+48h], xmm0`
+        // -- the amount is converted to float and its bit pattern is stored
+        // into the int `mCurSegments`. Reproduced as shipped.
+        siloBuild->mCurSegments = std::bit_cast<std::int32_t>(static_cast<float>(amount));
       } else {
         siloBuild->SiloAdjustStorageCount(SILOTYPE_Nuke, amount);
       }
@@ -7785,7 +7782,10 @@ int moho::cfunc_UnitSetStunnedL(LuaPlus::LuaState* const state)
     timeArg.TypeError("number");
   }
 
-  unit->mUnitVarDat.mStunTicks = static_cast<std::int32_t>(lua_tonumber(rawState, 2) * 10.0);
+  // 0x006C69A0-0x006C69AE: `fmul dword [10.0f]` on the float lua_Number,
+  // rounded to single precision by the sim's `_PC_24` control word, then
+  // truncated by `_ftol2`.
+  unit->mUnitVarDat.mStunTicks = static_cast<std::int32_t>(static_cast<float>(lua_tonumber(rawState, 2)) * 10.0f);
   return 0;
 }
 
@@ -8850,7 +8850,8 @@ CScrLuaInitForm* moho::func_UnitRestoreToggleCaps_LuaFuncDef()
  * blueprint capability bit is present.
  *
  * Note:
- * Binary lane tests `RUnitBlueprintGeneral::ToggleCaps` at +0x180.
+ * Binary lane tests `RUnitBlueprintGeneral::CommandCaps` at bp+0x17C
+ * (`test [eax+17Ch], ecx` at 0x006C8B48).
  */
 int moho::cfunc_UnitTestCommandCapsL(LuaPlus::LuaState* const state)
 {
@@ -8874,7 +8875,7 @@ int moho::cfunc_UnitTestCommandCapsL(LuaPlus::LuaState* const state)
 
   const RUnitBlueprint* const blueprint = unit->GetBlueprint();
   const bool hasCapability =
-    (static_cast<std::uint32_t>(blueprint->General.ToggleCaps) & static_cast<std::uint32_t>(commandCap)) != 0u;
+    (static_cast<std::uint32_t>(blueprint->General.CommandCaps) & static_cast<std::uint32_t>(commandCap)) != 0u;
   lua_pushboolean(rawState, hasCapability ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
@@ -10673,10 +10674,6 @@ int moho::cfunc_UnitGetStatL(LuaPlus::LuaState* const state)
 
     const LuaPlus::LuaStackObject statNameArg(state, 2);
     const char* const statName = lua_tostring(rawState, 2);
-    if (statName != nullptr && statName[0] == 'h' && statName[1] == '1') {
-      ApplyUnitGetStatH1BlueprintOverride(*unit, defaultValue);
-    }
-
     if (statName == nullptr) {
       statNameArg.TypeError("string");
     }
@@ -11440,11 +11437,17 @@ int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
   if (lua_type(rawState, 6) != LUA_TNUMBER) {
     headingArg.TypeError("number");
   }
-  const float halfAngle = static_cast<float>(lua_tonumber(rawState, 6) * 0.017453292 * 0.5);
+  // 0x006D0349-0x006D0358: `fmul 0.017453292f` then `fmul 0.5f` on the float
+  // lua_Number, single-precision under the sim's `_PC_24` word.
+  const float halfAngle = (static_cast<float>(lua_tonumber(rawState, 6)) * 0.017453292f) * 0.5f;
+  const float sinHalfAngle = msvc8::sin(halfAngle);
+  const float cosHalfAngle = msvc8::cos(halfAngle);
 
+  // 0x006D0381-0x006D03A1: the x and z lanes are `sinH * 0.0f`, not literal
+  // zeros, so a negative heading leaves them -0.0f.
   const VTransform transform(
     Wm3::Vector3f(posX, 0.0f, posZ),
-    Wm3::Quatf(msvc8::cos(halfAngle), 0.0f, msvc8::sin(halfAngle), 0.0f)
+    Wm3::Quatf(cosHalfAngle, sinHalfAngle * 0.0f, sinHalfAngle, sinHalfAngle * 0.0f)
   );
 
   // The binary sets the payload fields inline (an inlined SUnitConstructionParams
@@ -11740,25 +11743,6 @@ int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
   Unit* const unit = sim->CreateUnitForScript(params, true);
   if (!unit) {
     LuaPlus::LuaState::Error(state, "CreateUnitHPR(%s) failed", blueprintName.c_str());
-  }
-
-  // TEMPORARY PROBE -- replay beat-pipeline triage: map blueprint -> real
-  // wire EntId so injected replay orders can target these units. Delete when
-  // resolved.
-  {
-    static int sProbeSpawn = 0;
-    if ((++sProbeSpawn % 1) == 0) {
-      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-        std::fprintf(
-          sink,
-          "[SCENSPAWN] n=%d bp=%s entId=0x%08x\n",
-          sProbeSpawn,
-          blueprintName.c_str(),
-          static_cast<unsigned>(unit->id_)
-        );
-        std::fclose(sink);
-      }
-    }
   }
 
   unit->mLuaObj.PushStack(state);
@@ -13549,7 +13533,8 @@ bool Unit::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
     return false;
   }
 
-  return GetPosition().y <= waterElevation;
+  // 0x006AB31D: `comiss water, pos.y` / `ja` -- strictly below the surface.
+  return GetPosition().y < waterElevation;
 }
 
 /**
@@ -13908,62 +13893,19 @@ void Unit::SetTargetBlipEntity(Entity* const blipEntity)
  * Address: 0x006A8B30 (FUN_006A8B30, ?CalcTransportLoadFactor@Unit@Moho@@UBEMXZ)
  *
  * What it does:
- * Returns cached transport load-factor for carried units; when the cache is
- * invalid (`< 0`), recomputes it from own mass and attached-unit masses.
+ * FAF build: always returns 1.0f.
+ *
+ * The FAF-patched ForgedAlliance.exe overwrites the entry of this function
+ * with `fld1; ret` (bytes `D9 E8 C3` at 0x006A8B30), so every caller --
+ * `CUnitMotion::ComputeAirControl`, `Unit::GetTopSpeed` -- sees a load factor
+ * of exactly 1.0 and the retail mass-ratio body that follows (the
+ * `AiTransport`/`mAttachedEntities` sum cached in `TransportLoadFactor`) is
+ * dead code: it is never reached and never writes the cache.
  */
 float Unit::CalcTransportLoadFactor() const
 {
-  // 0x006A8B36: `cmp dword ptr [edi+55Ch], 0` / `jz loc_6A8C17` (`fld1`;
-  // return 1.0f). `[this+0x55C]` is `AiTransport`, the transport subsystem a
-  // CARRIER owns -- not `TransportedByRef`, the link to whatever is carrying
-  // this unit. The two are opposite ends of the same relationship, and the
-  // body below is written from the carrier's side: it sums
-  // `mAttachedEntities` ([this+0x188]..[this+0x18C] at 0x006A8B8F) and stores
-  // `(carried + own) / own` into `TransportLoadFactor` ([this+0x564] at
-  // 0x006A8C03).
-  //
-  // Testing the wrong end inverted the function. A loaded transport -- which
-  // owns an AiTransport and is carried by nothing -- returned 1.0f here and
-  // never computed its load at all, so `CUnitMotion::ComputeAirControl`
-  // divided its turn, roll and lift gains by 1.0 and flew it as though it
-  // were empty, and `GetTopSpeed` never scaled its airspeed down. A carried
-  // unit, whose `mAttachedEntities` is empty, fell into the computation
-  // instead; that path also returns the negative recompute sentinel
-  // unchanged whenever `thisMass <= 0`, and `ComputeAirControl` takes
-  // `1.0f / loadFactor` of it.
-  if (AiTransport == nullptr) {
-    return 1.0f;
-  }
-
-  if (TransportLoadFactor < 0.0f) {
-    const RUnitBlueprint* const thisBlueprint = GetBlueprint();
-    const float thisMass = thisBlueprint != nullptr
-      ? (thisBlueprint->mAverageDensity * thisBlueprint->mSizeZ) * thisBlueprint->mSizeY * thisBlueprint->mSizeX
-      : 0.0f;
-
-    float attachedMass = 0.0f;
-    if (thisMass > 0.0f) {
-      for (Entity* const attachedEntity : mAttachedEntities) {
-        Unit* const attachedUnit = attachedEntity != nullptr ? attachedEntity->IsUnit() : nullptr;
-        if (attachedUnit == nullptr) {
-          continue;
-        }
-
-        const RUnitBlueprint* const attachedBlueprint = attachedUnit->GetBlueprint();
-        if (attachedBlueprint == nullptr) {
-          continue;
-        }
-
-        attachedMass +=
-          (attachedBlueprint->mAverageDensity * attachedBlueprint->mSizeZ) * attachedBlueprint->mSizeY *
-          attachedBlueprint->mSizeX;
-      }
-
-      const_cast<Unit*>(this)->TransportLoadFactor = (attachedMass + thisMass) / thisMass;
-    }
-  }
-
-  return TransportLoadFactor;
+  // 0x006A8B30: `fld1` / `ret` (FAF patch).
+  return 1.0f;
 }
 
 // 0x006A49F0
@@ -14510,19 +14452,24 @@ bool Unit::NeedsPickup(const CUnitAssistMoveTask* const task) const
   const Wm3::Vector3f goalPosition = navigator->GetGoalPos();
   const float goalDx = goalPosition.x - selfPosition.x;
   const float goalDz = goalPosition.z - selfPosition.z;
-  const float goalDistance = std::sqrt((goalDx * goalDx) + (goalDz * goalDz));
-  const float goalTime = goalDistance / selfMaxSpeed;
+  const float goalDistance = std::sqrt((goalDz * goalDz) + (goalDx * goalDx));
+  // 0x005F0F79-0x005F0F92: `1.0f / selfSpeed` is formed once and multiplied
+  // in -- here and again in the near-pickup branch below (0x005F1018).
+  const float selfInvSpeed = 1.0f / selfMaxSpeed;
+  const float goalTime = selfInvSpeed * goalDistance;
 
   const Wm3::Vec3f& assistedPosition = assistedUnit->GetPosition();
   const float taskDx = assistedPosition.x - selfPosition.x;
   const float taskDz = assistedPosition.z - selfPosition.z;
   const float taskDistance = std::sqrt((taskDx * taskDx) + (taskDz * taskDz));
 
+  // 0x005F0FE0-0x005F0FFF: x87 `fadd`/`fdiv`/`fadd 5.0` under the sim
+  // thread's `_PC_24` control word, i.e. single-precision rounding per step.
   float pickupEta = ((taskDistance + goalDistance) / assistedMaxSpeed) + 5.0f;
   if (assistedUnit->mVarDat.mLayerMask == LAYER_Air || taskDistance > selfBlueprint->AI.GuardScanRadius) {
     pickupEta += 4.0f;
   } else {
-    pickupEta += taskDistance / selfMaxSpeed;
+    pickupEta = (selfInvSpeed * taskDistance) + pickupEta;
   }
 
   return goalTime > pickupEta;
@@ -14743,6 +14690,9 @@ void Unit::Warp(const VTransform& transform)
   }
 
   SetCurrentLayer(startingLayer);
+  // 0x006AA428: `call Unit::UpdateTerrainType` (0x006A9B50) on the
+  // elevation-adjusted warp position.
+  UpdateTerrainType(warpedTransform.pos_);
 }
 
 // 0x006A7DC0
@@ -15206,9 +15156,12 @@ void Unit::UpdateInfoCache()
   SOffsetInfo* offsetInfo = nullptr;
 
   if (formation != nullptr && formation->CommandIsForm() && formation->Contains(this, false)) {
+    // Virtual-call order as at 0x006A9860-0x006A98DF: GetOffsetInfo,
+    // GetPriority, GetLeader, GetTargetPosition, GetDistFromLeader,
+    // IsInFormation.
     offsetInfo = formation->GetOffsetInfo(this);
     mInfoCache.mFormationLayer = reinterpret_cast<CFormationInstance*>(formation);
-    mInfoCache.mHasFormationSpeedData = formation->IsInFormation(this);
+    mInfoCache.mFormationPriorityOrder = formation->GetPriority(this, offsetInfo);
 
     Unit* const formationLead = formation->GetLeader(this, offsetInfo);
     mInfoCache.mFormationLeadRef.Set(formationLead);
@@ -15217,14 +15170,18 @@ void Unit::UpdateInfoCache()
     formation->GetTargetPosition(&headingHint, this, offsetInfo);
     mInfoCache.mFormationHeadingHint = headingHint;
     mInfoCache.mFormationDistanceMetric = formation->GetDistFromLeader(this, offsetInfo);
-    mInfoCache.mFormationPriorityOrder = formation->GetPriority(this, offsetInfo);
+    // 0x006A98DB: `push 0` -- IsInFormation is asked about a null unit, not
+    // `this`.
+    mInfoCache.mHasFormationSpeedData = formation->IsInFormation(nullptr);
   } else {
+    // 0x006A98E9-0x006A9951: layer = null, priority = 1, lead link cleared,
+    // heading = own position, distance = 0, flag = false.
     mInfoCache.mFormationLayer = nullptr;
-    mInfoCache.mHasFormationSpeedData = true;
+    mInfoCache.mFormationPriorityOrder = 1;
     mInfoCache.mFormationLeadRef.Set(nullptr);
     mInfoCache.mFormationHeadingHint = GetPosition();
     mInfoCache.mFormationDistanceMetric = 0.0f;
-    mInfoCache.mFormationPriorityOrder = 0;
+    mInfoCache.mHasFormationSpeedData = false;
   }
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
@@ -15251,7 +15208,9 @@ void Unit::UpdateInfoCache()
   }
 
   const float scaledSpeed = speedScale * clampedFormationSpeed;
-  if (scaledSpeed <= topSpeed) {
+  // 0x006A9A24: `comiss scaled, top` / `ja` keeps `top`; unordered falls
+  // through to the scaled value.
+  if (!(scaledSpeed > topSpeed)) {
     topSpeed = scaledSpeed;
   }
 
@@ -15789,10 +15748,12 @@ void Unit::ExecuteOccupyGround()
   const Wm3::Vec3f& unitPos = GetPosition();
   for (const RUnitBlueprintOccupyRect& occupyRect : occupyRects) {
     gpg::Rect2i rect{};
-    rect.x0 = RoundOccupyRectEdge(unitPos.x + occupyRect.CenterOffsetX - occupyRect.HalfSizeX);
-    rect.x1 = RoundOccupyRectEdge(unitPos.x + occupyRect.CenterOffsetX + occupyRect.HalfSizeX);
-    rect.z0 = RoundOccupyRectEdge(unitPos.z + occupyRect.CenterOffsetZ - occupyRect.HalfSizeZ);
-    rect.z1 = RoundOccupyRectEdge(unitPos.z + occupyRect.CenterOffsetZ + occupyRect.HalfSizeZ);
+    // 0x006A7819-0x006A78FC: min edges are `(center + pos) - half`, max edges
+    // `(pos + half) + center` -- the add order differs between the two.
+    rect.x0 = RoundOccupyRectEdge((occupyRect.CenterOffsetX + unitPos.x) - occupyRect.HalfSizeX);
+    rect.x1 = RoundOccupyRectEdge((unitPos.x + occupyRect.HalfSizeX) + occupyRect.CenterOffsetX);
+    rect.z0 = RoundOccupyRectEdge((unitPos.z + occupyRect.CenterOffsetZ) - occupyRect.HalfSizeZ);
+    rect.z1 = RoundOccupyRectEdge((unitPos.z + occupyRect.HalfSizeZ) + occupyRect.CenterOffsetZ);
     ogrid->ExecuteOccupy(occupancyCaps, rect);
   }
 }
@@ -15810,7 +15771,9 @@ void Unit::ReleaseOccupyGround()
     return;
   }
 
-  const SFootprint& footprint = GetFootprint();
+  // 0x006A7AC9-0x006A7AF7: the blueprint's main footprint (`bp+0xD8`), not
+  // `GetFootprint()` -- the alternate footprint is never consulted here.
+  const SFootprint& footprint = GetBlueprint()->mFootprint;
   const Wm3::Vec3f& unitPos = GetPosition();
   const SOCellPos origin{
     static_cast<std::int16_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f)),
@@ -15844,10 +15807,15 @@ void Unit::ReserveOgridRect(const gpg::Rect2i& ogridRect)
  */
 void Unit::FreeOgridRect()
 {
+  // 0x006AB7C9: `je` past both the vacate and the zeroing when the reserved
+  // rect quantises to the zero collision rect -- the stored bounds are left
+  // untouched in that case.
   const gpg::Rect2i reservedRect = GetReservedOgridRect(*this);
-  if (!IsCollisionRectEquivalentToZero(reservedRect)) {
-    FillReservedOgridRect(*this, false);
+  if (IsCollisionRectEquivalentToZero(reservedRect)) {
+    return;
   }
+
+  FillReservedOgridRect(*this, false);
 
   ReservedOgridRectMinX = 0;
   ReservedOgridRectMinZ = 0;
@@ -16001,33 +15969,19 @@ EntitySetTemplate<Unit>* Unit::CollectAllOverlapping(EntitySetTemplate<Unit>* co
     return outSet;
   }
 
-  const Wm3::Vec3f& position = unit->GetPosition();
-  gpg::Rect2f queryRect{};
-  queryRect.x0 = position.x - 20.0f;
-  queryRect.z0 = position.z - 20.0f;
-  queryRect.x1 = position.x + 20.0f;
-  queryRect.z1 = position.z + 20.0f;
+  // 0x0062D4C2-0x0062D531: sphere {unit->GetPosition(), 20.0f} (radius at
+  // 0x00DFF25C), unit mask 0x100, through COGrid::ForAllEntitiesIterator
+  // (0x00721FB0) into a fastvector_n<CollisionResult, 10>. The iterator owns
+  // the acceptance test (inner-box containment for radius > 3, otherwise the
+  // collision primitive's sphere test; no primitive -> skipped).
+  const Wm3::Sphere3f querySphere{unit->GetPosition(), 20.0f};
+  gpg::core::FastVectorN<CollisionResult, 10> sphereHits{};
+  unit->SimulationRef->mOGrid->ForAllEntitiesIterator(sphereHits, ENTITYTYPE_Unit, querySphere);
 
-  CollisionDBRect collisionRect{};
-  (void)func_Rect2fToInt16(&collisionRect, queryRect);
-
-  gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
-  (void)unit->SimulationRef->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
-    gatheredEntities,
-    collisionRect,
-    ENTITYTYPE_Unit
-  );
-
-  for (Entity* const entity : gatheredEntities) {
-    Unit* const other = (entity != nullptr) ? entity->IsUnit() : nullptr;
+  for (const CollisionResult& hit : sphereHits) {
+    // 0x0062D561: `hit.sourceEntity->IsUnit()` -- no null check on the entity.
+    Unit* const other = hit.sourceEntity->IsUnit();
     if (other == nullptr) {
-      continue;
-    }
-
-    const Wm3::Vec3f& otherPosition = other->GetPosition();
-    const float deltaX = otherPosition.x - position.x;
-    const float deltaZ = otherPosition.z - position.z;
-    if ((deltaX * deltaX) + (deltaZ * deltaZ) > (20.0f * 20.0f)) {
       continue;
     }
 
@@ -16765,34 +16719,6 @@ void Unit::Sync(SSyncData* const syncData)
 
   VarDat().mSharedPose = AniActor->GetPoseShared();
   VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
-  if (GetBlueprint() != nullptr && std::strstr(GetBlueprint()->mBlueprintId.c_str(), "uel0001") != nullptr) {
-    static DiagnosticBudget sSyncCount;
-    if (const int syncCount = sSyncCount.Next() + 1; (syncCount - 1) % 20 == 0) {
-      auto countVisible = [](const CAniPose* pose) {
-        int n = 0;
-        if (pose != nullptr) {
-          for (const CAniPoseBone& b : pose->mBones) {
-            n += b.mVisible != 0u ? 1 : 0;
-          }
-        }
-        return n;
-      };
-      const CAniPose* const cur = VarDat().mSharedPose.get();
-      const CAniPose* const prior = VarDat().mPriorSharedPose.get();
-      char rootFlags[40] = {};
-      if (cur != nullptr) {
-        int w = 0;
-        for (const CAniPoseBone& b : cur->mBones) {
-          if (w < 30) {
-            rootFlags[w++] = b.mVisible != 0u ? '1' : '0';
-          }
-        }
-      }
-      gpg::Warnf("[POSEDIAG] Sync unit=%p cur=%p visible=%d prior=%p visible=%d bones=%s n=%d", static_cast<void*>(this),
-                 static_cast<const void*>(cur), countVisible(cur), static_cast<const void*>(prior), countVisible(prior), rootFlags,
-                 syncCount);
-    }
-  }
 
   Entity::Sync(syncData);
 }

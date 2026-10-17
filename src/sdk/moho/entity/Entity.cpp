@@ -377,14 +377,16 @@ namespace
       return;
     }
 
-    if (victim->ArmyRef != nullptr) {
+    // 0x00692080 / 0x00692181 (cfunc_EntityKillL): each lane is gated on that
+    // entity's own `RealtimeStatsEnabled` byte (+0x1F8) before its ArmyRef.
+    if (victim->IsRealtimeStatsEnabled() && victim->ArmyRef != nullptr) {
       msvc8::string statPath = msvc8::string(kEntityRealtimeStatsPrefix) + victim->GetUniqueName();
       statPath += gpg::STR_Printf("_KilledBy_Army%d_", ResolveEntityArmyIndexOneBased(instigator));
       statPath += ResolveEntityBlueprintId(instigator);
       AccumulateArmyRealtimeStat(victim->ArmyRef, statPath, 1L);
     }
 
-    if (instigator->ArmyRef != nullptr) {
+    if (instigator->IsRealtimeStatsEnabled() && instigator->ArmyRef != nullptr) {
       msvc8::string statPath = msvc8::string(kEntityRealtimeStatsPrefix) + instigator->GetUniqueName();
       statPath += gpg::STR_Printf("_Kills_Army%d_", ResolveEntityArmyIndexOneBased(victim));
       statPath += ResolveEntityBlueprintId(victim);
@@ -452,28 +454,28 @@ namespace
     value.z *= targetLength;
   }
 
+  /**
+   * Inlined in `cfunc_EntitySetCollisionShapeL` (0x0068F2D5-0x0068F301).
+   *
+   * What it does:
+   * Resolves the shape name through the reflected `ECollisionShape` enum
+   * (`IsEnumType()->GetEnumValue`, 0x008D9FD0), whose option match is a CRT
+   * `_stricmp` -- "box", "SPHERE" etc. are accepted exactly as in retail.
+   */
   [[nodiscard]] bool TryParseCollisionShapeName(
     const char* const shapeName,
     moho::ECollisionShape* const outShape
-  ) noexcept
+  )
   {
-    if (shapeName == nullptr || outShape == nullptr) {
-      return false;
+    static gpg::RType* sCollisionShapeType = nullptr;
+    if (sCollisionShapeType == nullptr) {
+      sCollisionShapeType = gpg::LookupRType(typeid(moho::ECollisionShape));
     }
 
-    if (std::strcmp(shapeName, "None") == 0) {
-      *outShape = moho::COLSHAPE_None;
-      return true;
-    }
-    if (std::strcmp(shapeName, "Box") == 0) {
-      *outShape = moho::COLSHAPE_Box;
-      return true;
-    }
-    if (std::strcmp(shapeName, "Sphere") == 0) {
-      *outShape = moho::COLSHAPE_Sphere;
-      return true;
-    }
-    return false;
+    int shapeValue = static_cast<int>(*outShape);
+    const bool found = sCollisionShapeType->IsEnumType()->GetEnumValue(shapeName, &shapeValue);
+    *outShape = static_cast<moho::ECollisionShape>(shapeValue);
+    return found;
   }
 
   [[nodiscard]] Wm3::Box3f BuildAxisAlignedCollisionBox(
@@ -518,30 +520,28 @@ namespace
     return SampleProjectileSpawnOffset(*random, blueprint);
   }
 
-  // Ground truth (`FUN_0068A6F0.c`, `cfunc_EntityCreateProjectileAtBoneL`'s
-  // only caller of this helper) rotates via the engine's scalar-first rotation
-  // matrix, not the generic `Quaternion::Rotate` (upstream WildMagic,
-  // `.w`-scalar `ToMat3()`) this replaces -- same convention mismatch as
-  // `cfunc_EntityGetBoneDirectionL` below, whose own ground truth
-  // (`FUN_0068B3F0.c`) confirms the identical "forward = MultQuadVec(quat,
-  // (0,0,1))" operation unambiguously via a directly-typed call.
-  //
-  // `FUN_0068A6F0.c` itself reads as `v29.orient.x`/`v29.pos.x/.y/.z` (a
-  // `struct_VecQuat` IDA split at the wrong byte boundary -- 4 bytes into the
-  // 16-byte `orient_`, not at its real 16-byte end), so those four reads are
-  // actually `orient_.w/.x/.y/.z` in that order, not `orient_.x` plus a real
-  // position. Once corrected for that split, all three of `v22.x/.y/.z`'s
-  // terms match `MultQuadVec(out, {0,0,1}, orient_)`'s expected row-2-dotted
-  // form exactly (`2*(wy+xz)`, `2*(wz-xy)`, `1-2*(z^2+y^2)`) -- full 3/3
-  // term match, not just the 2/3 an earlier pass here reported before
-  // resolving the split.
+  /**
+   * Inlined in `cfunc_EntityCreateProjectileAtBoneL` (0x0068A8EF-0x0068A96C).
+   *
+   * What it does:
+   * Returns the bone's local +Z axis rotated by `orient_` (w,x,y,z), exactly
+   * as the binary computes it in SSE single precision and WITHOUT
+   * normalising it:
+   *   x = (z*x + y*w) * 2
+   *   y = (z*y - x*w) * 2
+   *   z = 1 - (y*y + x*x) * 2
+   */
   [[nodiscard]] Wm3::Vector3f ResolveBoneForwardVector(const moho::VTransform& transform) noexcept
   {
-    const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
-    Wm3::Vector3f out{};
-    moho::MultQuadVec(&out, &forwardAxis, &transform.orient_);
-    NormalizeInPlace(out);
-    return out;
+    const float qw = transform.orient_.w;
+    const float qx = transform.orient_.x;
+    const float qy = transform.orient_.y;
+    const float qz = transform.orient_.z;
+    return Wm3::Vector3f{
+      ((qz * qx) + (qy * qw)) * 2.0f,
+      ((qz * qy) - (qx * qw)) * 2.0f,
+      1.0f - (((qy * qy) + (qx * qx)) * 2.0f),
+    };
   }
 
   [[nodiscard]] moho::CAiTarget MakeDefaultProjectileTarget() noexcept
@@ -1015,56 +1015,6 @@ namespace
     // off `COGrid::mEntityOccupationManager`; the old `+ 0x04` view here put
     // the chunk vector's capacity word on `COGrid::terrainOccupation.ptr`.
     return &sim->mOGrid->mEntityOccupationManager;
-  }
-
-  [[nodiscard]] std::uint8_t ComputeFootprintOccupancyMask(
-    const moho::Entity* entity, const moho::SFootprint& footprint, const Wm3::Vec3f&
-  ) noexcept
-  {
-    (void)entity;
-    // 0x007209E0 (`Moho::OCCUPY_FootprintFits`) also considers dynamic map blockers;
-    // current typed recovery keeps the capability mask for layer bootstrap.
-    return static_cast<std::uint8_t>(footprint.mOccupancyCaps);
-  }
-
-  [[nodiscard]] float SampleHeightFieldBilinear(const moho::CHeightField* field, const float x, const float z) noexcept
-  {
-    if (!field || !field->data || field->width <= 0 || field->height <= 0) {
-      return 0.0f;
-    }
-
-    const int width = field->width;
-    const int height = field->height;
-
-    const int baseX = static_cast<int>(std::floor(static_cast<double>(x)));
-    const int baseZ = static_cast<int>(std::floor(static_cast<double>(z)));
-    const float fracX = x - static_cast<float>(baseX);
-    const float fracZ = z - static_cast<float>(baseZ);
-
-    auto sample = [&](int sx, int sz) -> float {
-      if (sx < 0) {
-        sx = 0;
-      } else if (sx >= width) {
-        sx = width - 1;
-      }
-      if (sz < 0) {
-        sz = 0;
-      } else if (sz >= height) {
-        sz = height - 1;
-      }
-
-      const std::uint16_t packed = field->data[sz * width + sx];
-      return static_cast<float>(packed) * 0.0078125f;
-    };
-
-    const float h00 = sample(baseX, baseZ);
-    const float h10 = sample(baseX + 1, baseZ);
-    const float h01 = sample(baseX, baseZ + 1);
-    const float h11 = sample(baseX + 1, baseZ + 1);
-
-    const float h0 = h00 + (h10 - h00) * fracX;
-    const float h1 = h01 + (h11 - h01) * fracX;
-    return h0 + (h1 - h0) * fracZ;
   }
 
   [[nodiscard]] Wm3::Vector3f RotateVectorByQuaternion(const Wm3::Quatf& quaternion, const Wm3::Vector3f& v) noexcept
@@ -2285,6 +2235,20 @@ namespace moho
     if (SimulationRef) {
       ListLinkBefore(&SimulationRef->mCoordEntities);
     }
+
+    // 0x006784B5-0x00678570: unique name = blueprint id, then "(%s)" of the
+    // blueprint label (+0x24) when it is non-empty, then "-%d" of the entity
+    // id's low 16 bits (`movzx ecx, word ptr [id]`). No blueprint -> "".
+    if (BluePrint != nullptr) {
+      const char* const blueprintId = BluePrint->mBlueprintId.c_str();
+      mUniqueName.assign(blueprintId, std::strlen(blueprintId));
+      if (!BluePrint->mBlueprintLabel.empty()) {
+        mUniqueName += gpg::STR_Printf("(%s)", BluePrint->mBlueprintLabel.c_str());
+      }
+      mUniqueName += gpg::STR_Printf("-%d", static_cast<int>(static_cast<std::uint16_t>(static_cast<std::uint32_t>(entityId))));
+    } else {
+      mUniqueName.assign("", 0);
+    }
   }
 
   /**
@@ -2297,7 +2261,16 @@ namespace moho
   ELayer Entity::GetStartingLayer(const Wm3::Vec3f& worldPos, const ELayer desiredLayer) const
   {
     const SFootprint& footprint = GetFootprint();
-    const std::uint8_t occupancyMask = ComputeFootprintOccupancyMask(this, footprint, worldPos);
+
+    // 0x0062AD56-0x0062ADCA: origin cell = fistp-rounded
+    // `(pos.x - SizeX*0.5, pos.z - SizeZ*0.5)` (the `SFootprint::ToCellPos`
+    // computation, inlined), then `OCCUPY_FootprintFits(*sim->mOGrid, cell,
+    // footprint, -1)` -- the live occupancy test against the terrain/water
+    // bit arrays, not the footprint's static caps.
+    const SOCellPos originCell = footprint.ToCellPos(worldPos);
+    const std::uint8_t occupancyMask = static_cast<std::uint8_t>(
+      OCCUPY_FootprintFits(*SimulationRef->mOGrid, originCell, footprint, EOccupancyCaps::OC_ANY)
+    );
 
     const bool isExperimental = IsInCategory("EXPERIMENTAL");
     const bool isBeacon = IsInCategory("FERRYBEACON");
@@ -2311,12 +2284,14 @@ namespace moho
       return isExperimental ? LAYER_Land : LAYER_Air;
     }
 
-    const STIMap* const mapData = (SimulationRef ? SimulationRef->mMapData : nullptr);
-    const float waterElevation = (mapData && mapData->IsWaterEnabled()) ? mapData->GetWaterElevation() : -10000.0f;
-    const float terrainElevation =
-      SampleHeightFieldBilinear((mapData ? mapData->GetHeightField() : nullptr), worldPos.x, worldPos.z);
+    const STIMap* const mapData = SimulationRef->mMapData;
+    const float waterElevation = mapData->IsWaterEnabled() ? mapData->GetWaterElevation() : -10000.0f;
+    // 0x0062AEE8: `CHeightField::GetElevation(x, z)` (0x0044FB90) on the map's
+    // height field.
+    const float terrainElevation = mapData->GetHeightField()->GetElevation(worldPos.x, worldPos.z);
 
-    if (waterElevation <= terrainElevation) {
+    // 0x0062AEF1: `fcompi` + `jbe` -- unordered also takes the Land exit.
+    if (!(waterElevation > terrainElevation)) {
       return LAYER_Land;
     }
 
@@ -3391,12 +3366,15 @@ namespace moho
     float nextFraction = previousFraction + delta;
     float healthFloor = 0.0f;
 
-    if (delta <= 0.0f) {
-      if (nextFraction >= 1.0f) {
+    // 0x00678E3B `comiss delta, 0` / `jbe`: an unordered delta takes the
+    // non-positive branch. Both max clamps (0x00678E48, 0x00678E6A) are
+    // `comiss 1.0, next` / `ja` -- keep `next` only when strictly below 1.0.
+    if (!(delta > 0.0f)) {
+      if (!(1.0f > nextFraction)) {
         nextFraction = 1.0f;
       }
     } else {
-      if (nextFraction >= 1.0f) {
+      if (!(1.0f > nextFraction)) {
         nextFraction = 1.0f;
       }
       if (nextFraction < 0.0f) {
@@ -3466,9 +3444,10 @@ namespace moho
       static_cast<std::uint32_t>(id_),
       delta);
 
-    // The binary does NOT special-case NaN: a NaN delta is neither == 0 nor
-    // caught by the clamps below, so it flows through to SetHealth(NaN), matching
-    // retail. Only an exact-zero delta short-circuits (0x00679893).
+    // Only an exact-zero delta short-circuits (0x00679893, `ucomiss`/`jnp`); a
+    // NaN delta passes. It does not reach SetHealth as NaN, though: the max
+    // clamp below (0x006798F4 `comiss max, next` / `ja`) treats an unordered
+    // compare as "not below max" and writes MaxHealth.
     if (delta == 0.0f) {
       return;
     }
@@ -3483,7 +3462,8 @@ namespace moho
     }
 
     float next = mVarDat.mHealth + delta;
-    if (next > mVarDat.mMaxHealth) {
+    // 0x006798F4: keep `next` only when strictly below max (NaN -> max).
+    if (!(mVarDat.mMaxHealth > next)) {
       next = mVarDat.mMaxHealth;
     }
     if (next < 0.0f) {
@@ -7615,7 +7595,15 @@ namespace moho
       Wm3::Quaternionf tiltDelta{};
       BuildTiltShortestArcDelta(pushedUp, &tiltDelta, currentUp);
 
-      tran.orient_ = MultiplyQuat(tiltDelta, o);
+      // 0x006FCE1D-0x006FCF08: `tiltDelta * o`, scalar-first, inlined with
+      // its own add grouping -- the `delta.w` term joins the first sum and
+      // the `o.w` term comes third, which is NOT the grouping `MultiplyQuat`
+      // carries for 0x0054BC00, so the lanes are spelled here as emitted.
+      const Wm3::Quaternionf& d = tiltDelta;
+      tran.orient_.w = (((d.w * o.w) - (d.x * o.x)) - (d.y * o.y)) - (d.z * o.z);
+      tran.orient_.x = (((d.y * o.z) + (d.w * o.x)) + (d.x * o.w)) - (d.z * o.y);
+      tran.orient_.y = (((d.z * o.x) + (d.w * o.y)) + (d.y * o.w)) - (d.x * o.z);
+      tran.orient_.z = (((d.x * o.y) + (d.w * o.z)) + (d.z * o.w)) - (d.y * o.x);
       NormalizeQuatInPlace(&tran.orient_);
       entity->SetPendingTransform(tran, 1.0f);
     }
@@ -7900,7 +7888,9 @@ namespace moho
       return;
     }
 
-    if (Wm3::Vector3f::Normalize(&surfaceNormal) <= 0.0f) {
+    // 0x0050B829: Wm3 `Vector3::Normalize` (0x00452AF0); 0x0050B836 `jbe`
+    // exits on `len <= 0` AND on an unordered (NaN) length.
+    if (!(Wm3::Vector3f::Normalize(&surfaceNormal) > 0.0f)) {
       return;
     }
 
