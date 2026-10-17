@@ -2835,15 +2835,25 @@ namespace moho
    * Mangled: ?RemoveShooter@Entity@Moho@@QAEXPAV12@@Z
    *
    * What it does:
-   * Removes this entity from one target entity's shooter ownership set.
+   * Removes `shooter` from this entity's shooter set -- the mirror of
+   * `AddShooter`.
+   *
+   * 0x0067A160..0x0067A16E: `test eax,eax` (the shooter), then
+   * `edi = ecx + 0x218` (this->mShooters) and `push eax; call 0x67BCE0`. The
+   * set that shrinks is `this`'s. The previous body removed `this` from the
+   * argument's set instead, so `UnitWeapon::SetTarget` (whose inlined copy at
+   * 0x006D5FB6 removes the unit from the *old target's* set) left every
+   * retargeting unit listed as a shooter of its old target forever. Projectiles
+   * then reached `mDesiredShooterCap` early and `CAiAttackerImpl::TrackToTarget`
+   * (0x005D8253 `cmp shooters, cap; jge skip`) rejected them.
    */
-  void Entity::RemoveShooter(Entity* const target)
+  void Entity::RemoveShooter(Entity* const shooter)
   {
-    if (target == nullptr) {
+    if (shooter == nullptr) {
       return;
     }
 
-    (void)target->mShooters.Remove(this);
+    (void)mShooters.Remove(shooter);
   }
 
   /**

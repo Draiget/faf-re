@@ -1030,9 +1030,10 @@ namespace moho
      * Mangled: ?RemoveShooter@Entity@Moho@@QAEXPAV12@@Z
      *
      * What it does:
-     * Removes this entity from `target->mShooters` when `target` is non-null.
+     * Removes `shooter` from this entity's shooter set when `shooter` is
+     * non-null (0x0067A160: `edi = this + 0x218`, push shooter, FUN_0067BCE0).
      */
-    void RemoveShooter(Entity* target);
+    void RemoveShooter(Entity* shooter);
 
     /**
      * Address: 0x0067A180 (FUN_0067A180, Moho::Entity::GetNumShooters)

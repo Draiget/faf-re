@@ -3740,7 +3740,8 @@ namespace moho
       AgeBlacklist();
     }
 
-    // Drop this unit from the previous target entity's shooter set.
+    // Drop this unit from the previous target entity's shooter set
+    // (0x006D5F89..0x006D5FBC: `prev->mShooters.Remove(unit + 8)`).
     if (Entity* const previousTargetEntity = mTarget.GetEntity(); previousTargetEntity != nullptr) {
       if (previousTargetEntity->mVarDat.mIsDead == 0u && previousTargetEntity->DestroyQueuedFlag == 0u) {
         if (mUnit != nullptr) {

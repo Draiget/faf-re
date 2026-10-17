@@ -549,8 +549,10 @@ namespace moho
       (instanceMaxRadius < 0.0f) ? mWeapon->mAttributes.mBlueprint->MaxRadius : instanceMaxRadius;
     const float scaledRadius =
       (instanceMaxRadius < 0.0f) ? mWeapon->mAttributes.mBlueprint->MaxRadius : instanceMaxRadius;
+    // 0x005D933D..0x005D9351: `comiss tracked, floor; jbe keep-floor` -- the
+    // product is taken only on an ordered `tracked > floor`; NaN keeps the floor.
     float searchRadius = weaponBlueprint->TrackingRadius * scaledRadius;
-    if (searchRadius <= floorRadius) {
+    if (!(searchRadius > floorRadius)) {
       searchRadius = floorRadius;
     }
     const bool use3DDistance = weaponBlueprint->Turreted != 0u || weaponBlueprint->SlavedToBody != 0u;
