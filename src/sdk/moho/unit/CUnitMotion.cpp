@@ -2991,8 +2991,12 @@ namespace moho
 
     if (Entity* const targetEntity = target.GetEntity();
         targetEntity != nullptr && targetEntity->mVarDat.mLayerMask == LAYER_Air) {
+      // 0x006BCC99..0x006BCCAC ask the raw `targetEntity` slot, not the
+      // resolved entity, whether it is a unit. A target seen through a recon
+      // blip therefore takes the gun-position arm even though `GetEntity`
+      // resolved it to the blip's source unit for the layer test above.
       float targetElevation = 0.0f;
-      if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
+      if (Unit* const targetUnit = target.targetEntity.GetObjectPtr()->IsUnit(); targetUnit != nullptr) {
         targetElevation = targetUnit->GetBlueprint()->Physics.Elevation + sampledElevation;
       } else {
         targetElevation = const_cast<CAiTarget&>(target).GetTargetPosGun(false).y;
