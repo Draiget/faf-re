@@ -47,9 +47,15 @@ namespace
       );
     }
 
-    const unsigned int overlapStart = std::max(lhsRange.mStartWord, rhsRange.mStartWord);
-    const unsigned int overlapEnd = std::min(lhsRange.mEndWord, rhsRange.mEndWord);
-    for (unsigned int wordIndex = overlapStart; wordIndex < overlapEnd; ++wordIndex) {
+    // rhs is folded over every word the output spans, not just the words
+    // inside lhs's range. Union and xor size the output to cover both ranges
+    // (zero outside lhs), so a disjoint rhs word lands on a zero and survives;
+    // folding only the overlap dropped it, e.g. `categories.ual0309 +
+    // categories.ual0001` (words 120 and 119) kept only the left-hand
+    // blueprint. Subtract sizes the output to lhs, where this is the overlap.
+    const unsigned int foldStart = std::max(rhsRange.mStartWord, outStartWord);
+    const unsigned int foldEnd = std::min(rhsRange.mEndWord, outStartWord + outWordCount);
+    for (unsigned int wordIndex = foldStart; wordIndex < foldEnd; ++wordIndex) {
       op(out->mWords[wordIndex - outStartWord], rhs.mWords[wordIndex - rhsRange.mStartWord]);
     }
 
