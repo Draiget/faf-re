@@ -188,6 +188,322 @@ namespace difffuzz
       std::memcpy(out, &r, 4);
     }
 
+    // ---- Lua math library (src\sdk\lua\LuaObject.cpp math_*) -----------------
+    // Retail: every math_X takes a float from luaL_checknumber in st(0), runs
+    // an inline x87 sequence or a CRT entry, and stores the result with
+    // `fstp dword` before lua_pushnumber. "Ours" mirrors the exact expression
+    // of each math_X (that TU does not compile standalone); keep in sync.
+    constexpr u32 kRetailAsin = 0x00A8DE20;   // _CIasin
+    constexpr u32 kRetailAcos = 0x00A8DCD0;   // _CIacos
+    constexpr u32 kRetailFmod = 0x00A8E06A;   // _CIfmod
+    constexpr u32 kRetailCeil = 0x00A840A0;   // ceil
+    constexpr u32 kRetailFloor = 0x00A8DF30;  // floor
+    constexpr u32 kRetailTan = 0x00919A40;    // fld; fptan; fstp st(0)
+    constexpr u32 kRetailLog10 = 0x00919980;  // fld; fldlg2; fxch; fyl2x
+    constexpr u32 kRetailExp = 0x009199D0;    // the /Oi exp expansion
+    constexpr u32 kRetailLn = 0x0040EAD0;     // fld; fldln2; fxch; fyl2x
+    constexpr u32 kRetailDegrees = 0x00D46340; // 57.29578f
+    constexpr u32 kRetailRadians = 0x00D46344; // 0.017453292f
+
+    // Any float, NaN and inf included: the inline x87 lanes have no error path.
+    void GenLuaAny(Rng& rng, u32* in)
+    {
+      const u32 mode = rng.Below(100);
+      in[0] = Bits(mode < 40 ? GenPlain(rng, 10.0f) : mode < 50 ? GenAngle(rng) : GenFloat(rng));
+    }
+    // [-1, 1]: asin/acos outside it take the CRT's errno path (trapped import).
+    void GenLuaUnit(Rng& rng, u32* in)
+    {
+      float x;
+      const u32 mode = rng.Below(100);
+      if (mode < 50) {
+        x = static_cast<float>(rng.Range(-1.0, 1.0));
+      } else if (mode < 65) {
+        x = FromBits(0x3F800000u - rng.Below(4096));
+      } else if (mode < 75) {
+        x = rng.Chance(50) ? 1.0f : 0.0f;
+      } else {
+        x = GenFloat(rng);
+        if (!(std::fabs(x) <= 1.0f)) {
+          x = static_cast<float>(rng.Range(0.0, 1.0)) * FromBits(0x3F800000u - (rng.Below(64) << 23));
+        }
+      }
+      in[0] = Bits(rng.Chance(50) ? x : -x);
+    }
+    // Finite or infinite, never NaN: ceil/floor/ldexp send NaN to the CRT's
+    // error handler.
+    void GenLuaNotNan(Rng& rng, u32* in)
+    {
+      GenLuaAny(rng, in);
+      if (std::isnan(FromBits(in[0]))) {
+        in[0] = Bits(-0.0f);
+      }
+    }
+    void GenLuaFinite(Rng& rng, u32* in)
+    {
+      GenLuaAny(rng, in);
+      if (!std::isfinite(FromBits(in[0]))) {
+        in[0] = Bits(rng.Chance(50) ? 0.0f : -0.0f);
+      }
+    }
+
+    void LuaAbsRetail(const u32* in, u32* out) { Put(out, 0, retail::Fabsf(F(in, 0))); } // math_abs: inline fabs
+    void LuaAbsOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(std::fabs(static_cast<double>(F(in, 0)))));
+    }
+    void LuaTanRetail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailTan, F(in, 0))); }
+    void LuaTanOurs(const u32* in, u32* out) { Put(out, 0, msvc8::tanf(F(in, 0))); }
+    // math_atan: `fld1; fpatan` == the float atan2 leaf with x = 1.
+    void LuaAtanRetail(const u32* in, u32* out) { Put(out, 0, retail::Atan2f(F(in, 0), 1.0f)); }
+    void LuaAtanOurs(const u32* in, u32* out) { Put(out, 0, msvc8::atanf(F(in, 0))); }
+    void LuaSqrtRetail(const u32* in, u32* out) { Put(out, 0, retail::Sqrtf(F(in, 0))); } // math_sqrt: inline fsqrt
+    void LuaSqrtOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(std::sqrt(static_cast<double>(F(in, 0)))));
+    }
+    void LuaLogRetail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailLn, F(in, 0))); }
+    void LuaLogOurs(const u32* in, u32* out) { Put(out, 0, msvc8::IntrinsicLn(F(in, 0))); }
+    void LuaLog10Retail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailLog10, F(in, 0))); }
+    void LuaLog10Ours(const u32* in, u32* out) { Put(out, 0, msvc8::IntrinsicLog10(F(in, 0))); }
+    void LuaExpRetail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailExp, F(in, 0))); }
+    void LuaExpOurs(const u32* in, u32* out) { Put(out, 0, msvc8::IntrinsicExp(F(in, 0))); }
+    void LuaDegRetail(const u32* in, u32* out) { Put(out, 0, retail::MulImageConstant(F(in, 0), kRetailDegrees)); }
+    void LuaDegOurs(const u32* in, u32* out) { Put(out, 0, msvc8::MultiplyX87(F(in, 0), 57.29578f)); }
+    void LuaRadRetail(const u32* in, u32* out) { Put(out, 0, retail::MulImageConstant(F(in, 0), kRetailRadians)); }
+    void LuaRadOurs(const u32* in, u32* out) { Put(out, 0, msvc8::MultiplyX87(F(in, 0), 0.017453292f)); }
+
+    void LuaAsinRetail(const u32* in, u32* out)
+    {
+      float r;
+      retail::CrtStackUnaryF(kRetailAsin, F(in, 0), &r);
+      Put(out, 0, r);
+    }
+    void LuaAsinOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(msvc8::asin(static_cast<double>(F(in, 0)))));
+    }
+    void LuaAcosRetail(const u32* in, u32* out)
+    {
+      float r;
+      retail::CrtStackUnaryF(kRetailAcos, F(in, 0), &r);
+      Put(out, 0, r);
+    }
+    void LuaAcosOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(msvc8::acos(static_cast<double>(F(in, 0)))));
+    }
+    void LuaCeilRetail(const u32* in, u32* out)
+    {
+      float r;
+      retail::CrtDoubleArgF(kRetailCeil, F(in, 0), &r);
+      Put(out, 0, r);
+    }
+    void LuaCeilOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(std::ceil(static_cast<double>(F(in, 0))))); // LuaCeilBridge
+    }
+    void LuaFloorRetail(const u32* in, u32* out)
+    {
+      float r;
+      retail::CrtDoubleArgF(kRetailFloor, F(in, 0), &r);
+      Put(out, 0, r);
+    }
+    void LuaFloorOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(std::floor(static_cast<double>(F(in, 0)))));
+    }
+
+    // math.mod: finite operands, non-zero divisor (anything else is the
+    // CRT's errno path).
+    void GenLuaMod(Rng& rng, u32* in)
+    {
+      float x = rng.Chance(70) ? GenPlain(rng, 1000.0f) : GenFloat(rng);
+      if (!std::isfinite(x)) {
+        x = rng.Chance(50) ? 0.0f : -0.0f;
+      }
+      float y = rng.Chance(60) ? GenPlain(rng, 20.0f) : GenFloat(rng);
+      if (!std::isfinite(y) || y == 0.0f) {
+        y = 360.0f;
+      }
+      if (rng.Chance(10)) {
+        const float multiple = y * static_cast<float>(static_cast<int>(rng.Below(9)) - 4);
+        if (std::isfinite(multiple)) {
+          x = multiple;
+        }
+      }
+      in[0] = Bits(x);
+      in[1] = Bits(y);
+    }
+    void LuaModRetail(const u32* in, u32* out)
+    {
+      float r;
+      retail::CrtStackBinaryF(kRetailFmod, F(in, 0), F(in, 1), &r);
+      Put(out, 0, r);
+    }
+    void LuaModOurs(const u32* in, u32* out)
+    {
+      Put(out, 0, static_cast<float>(msvc8::fmod(static_cast<double>(F(in, 0)), static_cast<double>(F(in, 1)))));
+    }
+
+    void LuaFrexpRetail(const u32* in, u32* out)
+    {
+      float mantissa = FromBits(kCanary);
+      int exponent = 0x7EADBEEF;
+      retail::FrexpF(F(in, 0), &mantissa, &exponent);
+      Put(out, 0, mantissa);
+      Put(out, 1, static_cast<float>(exponent)); // cvtsi2ss (0x00919E1D)
+    }
+    void LuaFrexpOurs(const u32* in, u32* out)
+    {
+      int exponent = 0;
+      const float mantissa = static_cast<float>(msvc8::frexp(static_cast<double>(F(in, 0)), &exponent));
+      Put(out, 0, mantissa);
+      Put(out, 1, static_cast<float>(exponent));
+    }
+
+    // math.ldexp(x, n): n is truncated by _ftol2; keep |exponent(x) + n|
+    // inside double's normal range (beyond it the CRT raises through errno).
+    void GenLuaLdexp(Rng& rng, u32* in)
+    {
+      GenLuaNotNan(rng, in); // an infinity returns itself (class 1/2, 0x00A8DB43)
+      const u32 mode = rng.Below(100);
+      float n;
+      if (mode < 50) {
+        n = static_cast<float>(static_cast<int>(rng.Below(81)) - 40);
+      } else if (mode < 80) {
+        n = static_cast<float>(rng.Range(-800.0, 800.0));
+      } else {
+        n = static_cast<float>(static_cast<int>(rng.Below(321)) - 160) + (rng.Chance(50) ? 0.5f : -0.75f);
+      }
+      in[1] = Bits(n);
+    }
+    void LuaLdexpRetail(const u32* in, u32* out)
+    {
+      float r;
+      retail::LdexpF(F(in, 0), F(in, 1), &r);
+      Put(out, 0, r);
+    }
+    void LuaLdexpOurs(const u32* in, u32* out)
+    {
+      const int exponent = static_cast<int>(F(in, 1));
+      Put(out, 0, static_cast<float>(std::ldexp(static_cast<double>(F(in, 0)), exponent)));
+    }
+
+    // math.random: in[0] = rand() value, in[1] = argument count (0..2),
+    // in[2]/in[3] = the integer arguments (already through _ftol2).
+    int GenRandomInt(Rng& rng)
+    {
+      const u32 mode = rng.Below(100);
+      if (mode < 40) {
+        return static_cast<int>(rng.Below(200)) - 20;
+      }
+      if (mode < 60) {
+        return static_cast<int>(rng.Below(1u << 20));
+      }
+      if (mode < 80) {
+        return static_cast<int>(rng.U32() >> 1);
+      }
+      return static_cast<int>(rng.U32());
+    }
+    constexpr float kLuaRandomScale = 3.0518509447574615e-05f;
+
+    // A span whose exact product with the sample has the 55-bit pattern
+    // [24 bits, last one even][1][28 zeros][01 or 10]: a double multiply
+    // rounds it onto a float tie and round-half-even then picks the wrong
+    // side. Needs an odd sample mantissa m: span = c * m^-1 (mod 2^32).
+    bool GenRandomTie(Rng& rng, u32* in)
+    {
+      for (int attempt = 0; attempt < 64; ++attempt) {
+        const u32 randValue = 1u + rng.Below(0x7FFEu);
+        const float sample = static_cast<float>(static_cast<int>(randValue)) * kLuaRandomScale;
+        const u32 mantissa = (Bits(sample) & 0x007FFFFFu) | 0x00800000u;
+        if ((mantissa & 1u) == 0) {
+          continue;
+        }
+        u32 inverse = mantissa; // Newton: each step doubles the correct low bits
+        for (int i = 0; i < 5; ++i) {
+          inverse *= 2u - mantissa * inverse;
+        }
+        const u32 span = ((1u << 30) + (rng.Chance(50) ? 1u : 2u)) * inverse;
+        if (span < (1u << 29) || span >= (1u << 31)) {
+          continue;
+        }
+        in[0] = randValue;
+        if (rng.Chance(50)) {
+          in[1] = 1;
+          in[2] = span;
+          in[3] = 0;
+        } else {
+          in[1] = 2;
+          in[2] = 0u - rng.Below(1000); // lower; upper - lower + 1 == span
+          in[3] = in[2] + span - 1u;
+        }
+        return true;
+      }
+      return false;
+    }
+    void GenLuaRandom(Rng& rng, u32* in)
+    {
+      if (rng.Chance(10) && GenRandomTie(rng, in)) {
+        return;
+      }
+      in[0] = rng.Chance(5) ? 0x7FFFu - rng.Below(3) : rng.Below(0x8000u);
+      const u32 argumentCount = rng.Below(3);
+      int a = GenRandomInt(rng);
+      int b = GenRandomInt(rng);
+      if (argumentCount == 1 && a < 1) {
+        a = 1 - a / 2; // an upper bound below 1 raises luaL_argerror
+      }
+      if (argumentCount == 2 && a > b) {
+        const int t = a; // lower > upper raises luaL_argerror
+        a = b;
+        b = t;
+      }
+      in[1] = argumentCount;
+      in[2] = static_cast<u32>(a);
+      in[3] = static_cast<u32>(b);
+    }
+    void LuaRandomRetail(const u32* in, u32* out)
+    {
+      const float sample = retail::RandomSample(static_cast<int>(in[0]));
+      float r = sample;
+      if (in[1] == 1) {
+        retail::RandomPickUpTo(static_cast<int>(in[2]), sample, &r);
+      } else if (in[1] == 2) {
+        const int count = static_cast<int>(in[3] - in[2] + 1u); // sub esi, ebx; add esi, 1
+        retail::RandomPickRange(count, sample, static_cast<int>(in[2]), &r);
+      }
+      Put(out, 0, r);
+    }
+    // math_random (LuaObject.cpp): sample, then the one- or two-argument lane.
+    void LuaRandomOurs(const u32* in, u32* out)
+    {
+      const float sample = static_cast<float>(static_cast<int>(in[0]) % 0x7FFF) * kLuaRandomScale;
+      float r = sample;
+      if (in[1] == 1) {
+        const int upper = static_cast<int>(in[2]);
+        const float scaled = msvc8::MultiplyIntegerX87(upper, sample);
+        const float picked = std::floor(scaled);
+        r = picked + 1.0f;
+      } else if (in[1] == 2) {
+        const int lower = static_cast<int>(in[2]);
+        const int upper = static_cast<int>(in[3]);
+        const auto span =
+          static_cast<std::int32_t>(static_cast<std::uint32_t>(upper) - static_cast<std::uint32_t>(lower) + 1u);
+        const float scaled = msvc8::MultiplyIntegerX87(span, sample);
+        const float picked = std::floor(scaled);
+        r = static_cast<float>(static_cast<double>(picked) + static_cast<double>(lower));
+      }
+      Put(out, 0, r);
+    }
+
+    void LuaSeedRetail(const u32* in, u32* out) { out[0] = retail::RandomSeedWord(F(in, 0)); }
+    void LuaSeedOurs(const u32* in, u32* out)
+    {
+      out[0] = static_cast<unsigned int>(static_cast<std::int64_t>(F(in, 0)));
+    }
+
     // ---- Wm3::Vector3<float>::Normalize 0x00452AF0 --------------------------
     void GenV3(Rng& rng, u32* in)
     {
@@ -1139,6 +1455,29 @@ namespace difffuzz
       {"AimCheckTrackingHeading", 0x006309F0, "moho/ai/CAimManipulator.cpp CheckTracking (mirrored, flags 5)", 9, 3, "target[3] center range slew heading tol offset", "ret heading pitch", GenTrack, AimTrackRetail<kTrackHeading>, AimTrackOurs<kTrackHeading>},
       {"AimCheckTrackingPitch", 0x006309F0, "moho/ai/CAimManipulator.cpp CheckTracking (mirrored, flags 6)", 9, 3, "target[3] center range slew pitch tol offset", "ret heading pitch", GenTrack, AimTrackRetail<kTrackPitch>, AimTrackOurs<kTrackPitch>},
       {"WrapPositiveModulo", 0x00422940, "moho/animation/CAnimTexture.cpp WrapPositiveModulo (mirrored)", 2, 1, "value range", "r", GenWrap, WrapRetail, WrapOurs},
+      // Lua math library, one row per `math.*` entry (--filter lua_).
+      {"lua_abs", 0x00919A50, "lua/LuaObject.cpp math_abs (inline fabs; retail leaf 0x0040DAB0)", 1, 1, "x", "r", GenLuaAny, LuaAbsRetail, LuaAbsOurs},
+      {"lua_sin", 0x00919A80, "lua/LuaObject.cpp math_sin -> msvc8::sinf (retail leaf 0x005734E0)", 2, 1, "x _", "r", GenTrig, SinRetail, SinOurs},
+      {"lua_cos", 0x00919AB0, "lua/LuaObject.cpp math_cos -> msvc8::cosf (retail leaf 0x005734D0)", 2, 1, "x _", "r", GenTrig, CosRetail, CosOurs},
+      {"lua_tan", 0x00919AE0, "lua/LuaObject.cpp math_tan -> msvc8::tanf (retail leaf 0x00919A40)", 1, 1, "x", "r", GenLuaAny, LuaTanRetail, LuaTanOurs},
+      {"lua_asin", 0x00A8DE20, "lua/LuaObject.cpp math_asin (_CIasin)", 1, 1, "x", "r", GenLuaUnit, LuaAsinRetail, LuaAsinOurs},
+      {"lua_acos", 0x00A8DCD0, "lua/LuaObject.cpp math_acos -> msvc8::acos (_CIacos)", 1, 1, "x", "r", GenLuaUnit, LuaAcosRetail, LuaAcosOurs},
+      {"lua_atan", 0x00919B70, "lua/LuaObject.cpp math_atan -> msvc8::atanf (fld1; fpatan via leaf 0x004E9DF0)", 1, 1, "x", "r", GenLuaAny, LuaAtanRetail, LuaAtanOurs},
+      {"lua_atan2", 0x00919BA0, "lua/LuaObject.cpp math_atan2 -> msvc8::atan2f (retail leaf 0x004E9DF0)", 2, 1, "y x", "r", GenTrig, Atan2Retail, Atan2Ours},
+      {"lua_ceil", 0x00A840A0, "lua/LuaObject.cpp math_ceil (CRT ceil)", 1, 1, "x", "r", GenLuaNotNan, LuaCeilRetail, LuaCeilOurs},
+      {"lua_floor", 0x00A8DF30, "lua/LuaObject.cpp math_floor (CRT floor)", 1, 1, "x", "r", GenLuaNotNan, LuaFloorRetail, LuaFloorOurs},
+      {"lua_mod", 0x00A8E06A, "lua/LuaObject.cpp math_mod -> msvc8::fmod (_CIfmod)", 2, 1, "x y", "r", GenLuaMod, LuaModRetail, LuaModOurs},
+      {"lua_frexp", 0x00A8DA05, "lua/LuaObject.cpp math_frexp (CRT frexp)", 1, 2, "x", "mantissa exponent", GenLuaFinite, LuaFrexpRetail, LuaFrexpOurs},
+      {"lua_ldexp", 0x00A8DADF, "lua/LuaObject.cpp math_ldexp (_ftol2 + CRT ldexp)", 2, 1, "x n", "r", GenLuaLdexp, LuaLdexpRetail, LuaLdexpOurs},
+      {"lua_sqrt", 0x00919C80, "lua/LuaObject.cpp math_sqrt (inline fsqrt; retail leaf 0x00452FC0)", 1, 1, "x", "r", GenLuaAny, LuaSqrtRetail, LuaSqrtOurs},
+      {"lua_pow", 0x00A8E0E0, "lua/LuaObject.cpp math_pow -> msvc8::pow (_CIpow)", 2, 1, "x y", "r", GenPow, PowRetail, PowOurs},
+      {"lua_log", 0x00919CF0, "lua/LuaObject.cpp math_log -> msvc8::IntrinsicLn (retail leaf 0x0040EAD0)", 1, 1, "x", "r", GenLuaAny, LuaLogRetail, LuaLogOurs},
+      {"lua_log10", 0x00919D20, "lua/LuaObject.cpp math_log10 -> msvc8::IntrinsicLog10 (retail leaf 0x00919980)", 1, 1, "x", "r", GenLuaAny, LuaLog10Retail, LuaLog10Ours},
+      {"lua_exp", 0x00919D50, "lua/LuaObject.cpp math_exp -> msvc8::IntrinsicExp (retail leaf 0x009199D0)", 1, 1, "x", "r", GenLuaAny, LuaExpRetail, LuaExpOurs},
+      {"lua_deg", 0x00919D90, "lua/LuaObject.cpp math_deg (fmul dword [0x00D46340])", 1, 1, "x", "r", GenLuaAny, LuaDegRetail, LuaDegOurs},
+      {"lua_rad", 0x00919DC0, "lua/LuaObject.cpp math_rad (fmul dword [0x00D46344])", 1, 1, "x", "r", GenLuaAny, LuaRadRetail, LuaRadOurs},
+      {"lua_random", 0x00919F90, "lua/LuaObject.cpp math_random arithmetic (retail floor 0x00A8DF30)", 4, 1, "rand argc a b", "r", GenLuaRandom, LuaRandomRetail, LuaRandomOurs},
+      {"lua_randomseed", 0x0091A0D0, "lua/LuaObject.cpp math_randomseed seed conversion", 1, 1, "x", "seed", GenLuaAny, LuaSeedRetail, LuaSeedOurs},
     };
   } // namespace
 

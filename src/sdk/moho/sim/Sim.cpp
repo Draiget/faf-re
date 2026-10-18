@@ -9563,7 +9563,8 @@ int Sim::AddImpulse(
 
   ForEachSelectedUnit(selectedUnits, [&impulse](Unit& unit) {
     if (unit.UnitMotion != nullptr) {
-      unit.UnitMotion->AddRecoilImpulse(impulse);
+      // 0x0064BFF3: `push 0; push &impulse; call CUnitMotion::AddImpulse`.
+      unit.UnitMotion->AddImpulse(impulse, false);
     }
     unit.SetCurrentLayer(LAYER_Air);
   });
@@ -15484,7 +15485,8 @@ int moho::cfunc_GetAttachedUnitsListL(LuaPlus::LuaState* const state)
         }
 
         LuaPlus::LuaObject attachedUnitObject = attachedUnitBridge->GetLuaObject();
-        resultObject.SetObject(resultIndex, attachedUnitObject);
+        // 0x008BC4C9: `LuaObject::Insert(i, obj)` (Lua `table.insert`), not a raw store.
+        resultObject.Insert(resultIndex, attachedUnitObject);
         ++resultIndex;
       }
     }
@@ -15523,7 +15525,6 @@ int moho::cfunc_ValidateUnitsListL(LuaPlus::LuaState* const state)
 
   if (unitListObject.IsTable()) {
     const int unitCount = unitListObject.GetCount();
-    int resultIndex = 1;
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
       LuaPlus::LuaObject unitObject = unitListObject[unitIndex];
       UserUnit* const userUnit = ResolveUserUnitOptional(unitObject, state);
@@ -15533,8 +15534,8 @@ int moho::cfunc_ValidateUnitsListL(LuaPlus::LuaState* const state)
       }
 
       LuaPlus::LuaObject unitLuaObject = iunitBridge->GetLuaObject();
-      resultObject.SetObject(resultIndex, unitLuaObject);
-      ++resultIndex;
+      // 0x008BC72C: `LuaObject::Insert(obj)` -- the Lua `table.insert(t, v)` append.
+      resultObject.Insert(unitLuaObject);
     }
   }
 
@@ -15645,7 +15646,6 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
   }
 
   std::set<UserUnit*> emittedUnits{};
-  std::int32_t resultIndex = 1;
 
   const int sourceCount = sourceUnitsObject.GetCount();
   for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
@@ -15701,8 +15701,8 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
       }
 
       LuaPlus::LuaObject unitObject = candidateBridge->GetLuaObject();
-      resultTable.SetObject(resultIndex, unitObject);
-      ++resultIndex;
+      // 0x008BCB3E: `LuaObject::Insert(obj)` -- the Lua `table.insert(t, v)` append.
+      resultTable.Insert(unitObject);
     }
   }
 
@@ -20660,12 +20660,8 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
     ++luaIndex;
   }
 
-  if (luaIndex <= 1) {
-    lua_pushnil(rawState);
-    (void)lua_gettop(rawState);
-    return 1;
-  }
-
+  // 0x0075B198: once anything was gathered retail pushes the table even when
+  // no entry turned out to be a unit (no second nil path).
   resultTable.PushStack(state);
   return 1;
 }

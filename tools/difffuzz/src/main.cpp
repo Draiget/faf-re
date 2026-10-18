@@ -31,6 +31,11 @@ namespace
   // Retail `global_mode_sse2` (written by register_sseCompatMode 0x00A8ECBF,
   // which never runs here).
   constexpr u32 kRetailGlobalModeSse2 = 0x01107030u;
+  // Retail `__sse2_available` (CPUID result written by the CRT init entry
+  // 0x00AAA8C5): 1 on any machine that runs the game, independent of
+  // _set_SSE2_enable. _ftol2 (0x00A89CC0) takes `cvttsd2si` when it is set and
+  // an x87 `fistp qword` lane (which wraps instead of saturating) otherwise.
+  constexpr u32 kRetailSse2Available = 0x01107034u;
 
   // Retail static initializers run once after mapping (see README):
   //   0x00BEDC30  `fld1; atan; fmul 4.0; fstp [0x00FB78FC]` - the float pi
@@ -275,6 +280,7 @@ int main(int argc, char** argv)
     return 3;
   }
   image.PokeDword(kRetailGlobalModeSse2, gGlobalModeSse2);
+  image.PokeDword(kRetailSse2Available, 1u);
   // Our copy (sdk_mirror.cpp) follows, so both sides take the same CRT lane.
   global_mode_sse2 = static_cast<int>(gGlobalModeSse2);
 

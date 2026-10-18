@@ -69,6 +69,32 @@ namespace msvc8
   [[nodiscard]] double fmod(double x, double y) noexcept;
 
   /**
+   * The MSVC8 CRT's `frexp` (0x00A8DA05, the C body behind `_decomp`
+   * 0x00A99F05). A zero of either sign returns +0 with exponent 0 (`_decomp`
+   * answers zero with the `fldz` it compared against), where the modern CRT
+   * keeps -0. Infinities and NaNs store exponent -1 (0x00A8DA5A) and leave
+   * through the errno handler with the x87 indefinite (0x00F3ED68) for an
+   * infinity, the NaN itself otherwise. Finite non-zero inputs are exact in
+   * both CRTs.
+   */
+  [[nodiscard]] double frexp(double x, int* exponent) noexcept;
+
+  /**
+   * `fld a; fmul b; fstp dword` (math_deg 0x00919D9D, math_rad 0x00919DCD)
+   * and `fild integer; fmul factor` (math_random 0x0091A02E / 0x0091A089)
+   * under the simulation's 24-bit precision control: the exact product rounds
+   * to a 24-bit mantissa without the float exponent limits, so a product in
+   * the denormal range rounds twice (to 24 bits, then onto the denormal grid
+   * by the store) where one SSE multiply rounds once. For the integer form
+   * the exact product needs up to 55 bits, so a double multiply would round
+   * first and can hand float conversion a false tie (math.random(2028178766)
+   * with rand() % 0x7FFF == 279: 0x4B83C107 retail, 0x4B83C106 from double).
+   * Computed in software, so x86 and x64 give the same bits.
+   */
+  [[nodiscard]] float MultiplyX87(float a, float b) noexcept;
+  [[nodiscard]] float MultiplyIntegerX87(std::int32_t integer, float factor) noexcept;
+
+  /**
    * `(a + b) * 0.5f` and `fabs(a - b) * 0.5f` as the 2007 build formed them
    * on the x87 stack: `fld a; fadd b; fmul 0.5` (CAimManipulator::SetFiringArc
    * 0x00630CB9..0x00630CBF / 0x00630D01..0x00630D24, CBuilderArmManipulator::
@@ -186,6 +212,15 @@ namespace msvc8
   // simulation otherwise uses x87 arithmetic with single precision control.
   [[nodiscard]] double acos(double x) noexcept;
   /**
+   * The MSVC8 CRT's `asin` (`_CIasin`, 0x00A8DE20) under the same dispatch as
+   * `acos`. With the SSE2 lane off (the game's setting) |x| <= 1 takes the
+   * x87 body at 0x00A8DE93: atan2(x, sqrt((1 + x) * (1 - x))), whose adds,
+   * multiply and square root round under the caller's precision control.
+   * Under the simulation's _PC_24 that is not the correctly rounded asin:
+   * asin(0x3F052EAA) is 0x3F0C1118 there and 0x3F0C1117 from a modern CRT.
+   */
+  [[nodiscard]] double asin(double x) noexcept;
+  /**
    * The MSVC8 CRT's `pow` (`_CIpow`, 0x00A8E0E0) under the same dispatch as
    * `acos`. With the SSE2 lane off (the engine's default) a positive finite
    * base takes the x87 body: `fyl2x`, then `frndint`/`f2xm1`/`fscale`
@@ -202,7 +237,7 @@ namespace msvc8
    * Drop-in spellings for `std::sin` and friends with the same overload
    * resolution: a `float` argument takes the functions above, anything else
    * (double, mixed or integral arguments) forwards to `std::` unchanged.
-   * The explicit double acos overload also preserves legacy CRT dispatch.
+   * The explicit double acos/asin overloads also preserve legacy CRT dispatch.
    */
   [[nodiscard]] inline float sin(const float x) noexcept { return sinf(x); }
   [[nodiscard]] inline float cos(const float x) noexcept { return cosf(x); }
@@ -223,7 +258,7 @@ namespace msvc8
   [[nodiscard]] inline auto tan(const T x) noexcept { return std::tan(x); }
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
   [[nodiscard]] inline auto atan(const T x) noexcept { return std::atan(x); }
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
   [[nodiscard]] inline auto asin(const T x) noexcept { return std::asin(x); }
   template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
   [[nodiscard]] inline auto acos(const T x) noexcept { return std::acos(x); }

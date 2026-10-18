@@ -430,9 +430,16 @@ namespace
     LuaPlus::LuaObject resultTable;
     resultTable.AssignNewTable(state, static_cast<int>(values.size()), 0);
 
+    // 0x005BBF68/0x005BBF7A (and 0x005BCB4A): each entry is a temporary
+    // `LuaObject::AssignString` handed to `LuaObject::Insert(i, obj)`, i.e. the
+    // Lua-level `table.insert(t, i, v)`, which records the length through
+    // `luaL_setn` (the weak sizes table) -- a raw indexed store does not, and
+    // `table.getn` then disagrees once script code appends by index.
     int luaIndex = 1;
     for (const msvc8::string& value : values) {
-      resultTable.SetString(luaIndex++, value.c_str());
+      LuaPlus::LuaObject entry;
+      entry.AssignString(state, value.c_str());
+      resultTable.Insert(luaIndex++, entry);
     }
 
     resultTable.PushStack(state);

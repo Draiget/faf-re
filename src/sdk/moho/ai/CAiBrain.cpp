@@ -793,30 +793,6 @@ namespace
     return true;
   }
 
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
   [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
   {
     static gpg::RType* sType = nullptr;
@@ -826,37 +802,6 @@ namespace
     return sType;
   }
 
-  [[nodiscard]] moho::EntityCategorySet* ResolveEntityCategorySetFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    if (gpg::RType* const expectedType = CachedEntityCategorySetType(); expectedType != nullptr) {
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, expectedType);
-      if (upcast.mObj != nullptr) {
-        return static_cast<moho::EntityCategorySet*>(upcast.mObj);
-      }
-    }
-
-    const char* const typeName = userDataRef.GetTypeName();
-    if (typeName != nullptr
-        && (std::strstr(typeName, "EntityCategory") != nullptr || std::strstr(typeName, "BVSet") != nullptr)) {
-      return static_cast<moho::EntityCategorySet*>(userDataRef.mObj);
-    }
-
-    return nullptr;
-  }
 
   [[nodiscard]] bool CategoryContainsBlueprint(
     const moho::EntityCategorySet* const categorySet,
@@ -3571,7 +3516,7 @@ int moho::cfunc_CAiBrainGetBlueprintStatL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 3));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   float result = 0.0f;
   if (CArmyStats* const armyStats = ResolveArmyStats(brain); armyStats != nullptr) {
@@ -3637,7 +3582,7 @@ int moho::cfunc_CAiBrainGetCurrentUnitsL(LuaPlus::LuaState* const state)
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   float unitCount = 0.0f;
   if (CArmyStats* const armyStats = ResolveArmyStats(brain); armyStats != nullptr) {
@@ -3743,7 +3688,7 @@ int moho::cfunc_CAiBrainSetArmyStatsTriggerL(LuaPlus::LuaState* const state)
   EntityCategorySet categorySet{};
   if (argumentCount > 5 && lua_type(rawState, 6) != LUA_TNIL) {
     const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 6));
-    if (EntityCategorySet* const parsedCategorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+    if (EntityCategorySet* const parsedCategorySet = func_GetCObj_EntityCategory(categoryObject);
         parsedCategorySet != nullptr) {
       categorySet = *parsedCategorySet;
     }
@@ -3885,7 +3830,7 @@ int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   const bool needToBeIdle = LuaPlus::LuaStackObject(state, 3).GetBoolean();
   bool requireBuilt = true;
@@ -3896,7 +3841,11 @@ int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
   EntitySetTemplate<Unit> categoryUnits{};
   brain->mArmy->GetUnits(&categoryUnits, categorySet);
 
-  EntitySetTemplate<Unit> filteredUnits{};
+  // Retail (0x00587A30..0x00587A98) adds the units passing the filter back
+  // into the SAME set it iterates (`Add` at 0x0057DDD0 with this = the
+  // GetUnits output at [esp+0x60]); every unit is already present, so the
+  // filter is a no-op and the returned table holds every category unit,
+  // dead/destroy-queued/being-built/busy ones included. Kept bug-for-bug.
   for (Entity* const* it = categoryUnits.mVec.begin(); it != categoryUnits.mVec.end(); ++it) {
     Unit* const unit = static_cast<Unit*>(*it);
     if (unit == nullptr) {
@@ -3907,19 +3856,24 @@ int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    if (requireBuilt && unit->IsBeingBuilt()) {
+    if (unit->IsBeingBuilt() && requireBuilt) {
       continue;
     }
 
-    if (needToBeIdle && UnitHasHeadCommand(unit)) {
+    if (needToBeIdle && !unit->IsIdleState()) {
       continue;
     }
 
-    (void)filteredUnits.Add(unit);
+    (void)categoryUnits.Add(unit);
   }
 
+  // Retail builds the table inline: AssignNewTable(size, 0) then the append
+  // `Insert(obj)` (0x00909AF0) of each unit's `GetLuaObject()`.
   LuaPlus::LuaObject outUnits{};
-  (void)FillLuaTableWithEntities(filteredUnits, &outUnits, state);
+  outUnits.AssignNewTable(brain->mLuaObj.m_state, static_cast<std::int32_t>(categoryUnits.mVec.Size()), 0);
+  for (Entity* const* it = categoryUnits.mVec.begin(); it != categoryUnits.mVec.end(); ++it) {
+    outUnits.Insert(static_cast<Unit*>(*it)->GetLuaObject());
+  }
 
   outUnits.PushStack(state);
   return 1;
@@ -5452,7 +5406,7 @@ int moho::cfunc_CAiBrainFindUnitL(LuaPlus::LuaState* const state)
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   const bool needToBeIdle = LuaPlus::LuaStackObject(state, 3).GetBoolean();
 
@@ -6983,10 +6937,10 @@ int moho::cfunc_CAiBrainNumCurrentlyBuildingL(LuaPlus::LuaState* const state)
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
   const LuaPlus::LuaObject buildeeCategoryObject(LuaPlus::LuaStackObject(state, 2));
-  EntityCategorySet* const buildeeCategory = ResolveEntityCategorySetFromLuaObject(buildeeCategoryObject);
+  EntityCategorySet* const buildeeCategory = func_GetCObj_EntityCategory(buildeeCategoryObject);
 
   const LuaPlus::LuaObject builderCategoryObject(LuaPlus::LuaStackObject(state, 3));
-  EntityCategorySet* const builderCategory = ResolveEntityCategorySetFromLuaObject(builderCategoryObject);
+  EntityCategorySet* const builderCategory = func_GetCObj_EntityCategory(builderCategoryObject);
 
   std::int32_t count = 0;
   if (brain != nullptr && brain->mArmy != nullptr) {
@@ -7118,7 +7072,7 @@ int moho::cfunc_CAiBrainIsAnyEngineerBuildingL(LuaPlus::LuaState* const state)
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   bool foundMatch = false;
   if (brain != nullptr && brain->mArmy != nullptr && brain->mSim != nullptr && brain->mSim->mRules != nullptr) {
@@ -7137,7 +7091,14 @@ int moho::cfunc_CAiBrainIsAnyEngineerBuildingL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      if (CategoryContainsBlueprint(categorySet, unit->GetBlueprint())) {
+      // 0x0058CBD9..0x0058CC17: the category is tested against the FOCUS
+      // entity's blueprint (the structure being built), not the engineer's.
+      const Entity* const focusEntity = unit->FocusEntityRef.GetObjectPtr();
+      if (focusEntity == nullptr || focusEntity->BluePrint == nullptr) {
+        continue;
+      }
+
+      if (EntityCategory::HasBlueprint(focusEntity->BluePrint, categorySet)) {
         foundMatch = true;
         break;
       }

@@ -1,5 +1,6 @@
 #include "legacy/math/X87Math.h"
 
+#include <bit>
 #include <cmath>
 #include <xmmintrin.h>
 
@@ -13,6 +14,7 @@ extern "C" float __cdecl msvc8_x87_cosf(float x);
 extern "C" float __cdecl msvc8_x87_tanf(float x);
 extern "C" float __cdecl msvc8_x87_atan2f(float y, float x);
 extern "C" double __cdecl msvc8_x87_acos(double x);
+extern "C" double __cdecl msvc8_x87_asin(double x);
 extern "C" double __cdecl msvc8_x87_pow(double x, double y);
 extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
@@ -41,6 +43,74 @@ extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
 
 namespace msvc8
 {
+  namespace
+  {
+    [[nodiscard]] unsigned int CurrentControlWord() noexcept
+    {
+#if defined(_M_IX86)
+      unsigned short hardwareControlWord;
+      __asm { fnstcw hardwareControlWord }
+      return hardwareControlWord;
+#else
+      return msvc8_x87_control_word();
+#endif
+    }
+
+    /**
+     * The `_CI*` entries' shared prologue (`_CIacos` 0x00A8DCD0, `_CIasin`
+     * 0x00A8DE20, `_CIpow` 0x00A8E0E0): the SSE2 body runs only with
+     * `global_mode_sse2` set, MXCSR masks at their default and the x87 control
+     * word's low byte at 0x7F. The game clears `global_mode_sse2` through
+     * _set_SSE2_enable(0), so in game every entry takes its x87 body.
+     */
+    [[nodiscard]] bool TakesSse2Lane(const unsigned int controlWord) noexcept
+    {
+      return global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u && (controlWord & 0x7Fu) == 0x7Fu;
+    }
+
+    /**
+     * Rounds the exact product `a * b` to float once, for operands whose
+     * product needs more than double's 53 bits (a 31-bit integer times a
+     * float). The exact product is `product + residual`; `fma` recovers the
+     * part the double multiply rounded off.
+     */
+    [[nodiscard]] float RoundExactProductToFloat(const double a, const double b) noexcept
+    {
+      const double product = a * b;
+      const double residual = std::fma(a, b, -product);
+
+      float rounded = static_cast<float>(product);
+      if (residual != 0.0 && static_cast<double>(rounded) != product) {
+        // Rounding `product` to float matches rounding the exact value unless
+        // `product` sits exactly halfway between two floats; there the
+        // residual, not round-half-even, picks the side.
+        const float other = std::nextafter(rounded, product > static_cast<double>(rounded) ? HUGE_VALF : -HUGE_VALF);
+        const double midpoint = (static_cast<double>(rounded) + static_cast<double>(other)) * 0.5;
+        if (product == midpoint && ((residual > 0.0) == (other > rounded))) {
+          rounded = other;
+        }
+      }
+      return rounded;
+    }
+
+    /**
+     * An x87 `fmul` under _PC_24 followed by `fstp dword`: the exact product
+     * rounds to a 24-bit mantissa with the extended exponent range, then the
+     * store rounds once more if that lands below FLT_MIN.
+     */
+    [[nodiscard]] float RoundProductX87(const double a, const double b) noexcept
+    {
+      const double product = a * b;
+      if (product != 0.0 && std::fabs(product) < 0x1p-126) {
+        // Scaling by 2^172 (exact) moves every such product (>= 2^-298) into
+        // float's normal range, where float rounding is the 24-bit rounding.
+        const float mantissa = RoundExactProductToFloat(a * 0x1p172, b);
+        return static_cast<float>(static_cast<double>(mantissa) * 0x1p-172);
+      }
+      return RoundExactProductToFloat(a, b);
+    }
+  } // namespace
+
   std::int32_t RoundToInt(const float value) noexcept
   {
 #if defined(_M_IX86)
@@ -150,6 +220,36 @@ namespace msvc8
     return std::fmod(x, y);
   }
 
+  /**
+   * Address: 0x00A8DA05 (frexp)
+   */
+  double frexp(const double x, int* const exponent) noexcept
+  {
+    if (!std::isfinite(x)) {
+      // 0x00A8DA5A `or dword ptr [edi], -1`, then _except1 hands back the
+      // x87 indefinite for an infinity (0x00A8DA8E) or _handle_qnan1 the NaN.
+      *exponent = -1;
+      return std::isnan(x) ? x : std::bit_cast<double>(0xFFF8000000000000ull);
+    }
+    if (x == 0.0) {
+      // _decomp 0x00A99F08: `fldz; fcom x` and the equal branch returns the
+      // +0 it loaded, so frexp(-0) is +0 (the host CRT keeps -0).
+      *exponent = 0;
+      return 0.0;
+    }
+    return std::frexp(x, exponent);
+  }
+
+  float MultiplyX87(const float a, const float b) noexcept
+  {
+    return RoundProductX87(static_cast<double>(a), static_cast<double>(b));
+  }
+
+  float MultiplyIntegerX87(const std::int32_t integer, const float factor) noexcept
+  {
+    return RoundProductX87(static_cast<double>(integer), static_cast<double>(factor));
+  }
+
   double HalfSumX87(const float a, const float b) noexcept
   {
     // `fadd` rounds the sum to a 24-bit mantissa without the float exponent
@@ -239,25 +339,7 @@ namespace msvc8
   {
     const double wordValue =
       word < 0x80000000u ? static_cast<double>(word) : static_cast<double>(static_cast<float>(word));
-    const double product = static_cast<double>(factor) * wordValue;
-    // The exact product is product + residual; fma recovers the part the
-    // double multiply rounded off.
-    const double residual = std::fma(static_cast<double>(factor), wordValue, -product);
-
-    float rounded = static_cast<float>(product);
-    if (residual != 0.0 && static_cast<double>(rounded) != product) {
-      // Rounding `product` to float matches rounding the exact value unless
-      // `product` sits exactly halfway between two floats; there the residual,
-      // not round-half-even, picks the side.
-      const float other = std::nextafter(
-        rounded, product > static_cast<double>(rounded) ? HUGE_VALF : -HUGE_VALF
-      );
-      const double midpoint = (static_cast<double>(rounded) + static_cast<double>(other)) * 0.5;
-      if (product == midpoint && ((residual > 0.0) == (other > rounded))) {
-        rounded = other;
-      }
-    }
-    return rounded;
+    return RoundExactProductToFloat(static_cast<double>(factor), wordValue);
   }
 
   /**
@@ -575,17 +657,7 @@ namespace msvc8
 
   double acos(const double x) noexcept
   {
-    unsigned int controlWord;
-#if defined(_M_IX86)
-    unsigned short hardwareControlWord;
-    __asm { fnstcw hardwareControlWord }
-    controlWord = hardwareControlWord;
-#else
-    controlWord = msvc8_x87_control_word();
-#endif
-    if ((global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u
-         && (controlWord & 0x7Fu) == 0x7Fu)
-        || !(x >= -1.0 && x <= 1.0)) {
+    if (TakesSse2Lane(CurrentControlWord()) || !(x >= -1.0 && x <= 1.0)) {
       return std::acos(x);
     }
 
@@ -611,23 +683,54 @@ namespace msvc8
 #endif
   }
 
+  /**
+   * Address: 0x00A8DE20 (_CIasin)
+   */
+  double asin(const double x) noexcept
+  {
+    const unsigned int controlWord = CurrentControlWord();
+    // NaN, infinities and |x| > 1 take the CRT's errno lane; the host CRT
+    // returns the same NaN.
+    if (TakesSse2Lane(controlWord) || !(x >= -1.0 && x <= 1.0)) {
+      return std::asin(x);
+    }
+
+#if defined(_M_IX86)
+    double result;
+    // 0x00AA7BD5: the body runs with (caller CW & precision) | 0x7F.
+    const unsigned short bodyControlWord = static_cast<unsigned short>((controlWord & 0x300u) | 0x7Fu);
+    const unsigned short savedControlWord = static_cast<unsigned short>(controlWord);
+    // 0x00A8DE93..0x00A8DE9F: (1 + x) * (1 - x), fsqrt, fpatan. |x| == 1
+    // loads pi/2 at 0x00A8DED9 instead, which fpatan(+-1, 0) also gives.
+    // The result leaves through the qword spill at 0x00AA7B80 (the game's
+    // sticky inexact flag always takes it), hence the double store.
+    __asm {
+      fldcw bodyControlWord
+      fld x
+      fld1
+      fadd st(0), st(1)
+      fld1
+      fsub st(0), st(2)
+      fmulp st(1), st(0)
+      fsqrt
+      fpatan
+      fstp result
+      fldcw savedControlWord
+    }
+    return result;
+#else
+    return msvc8_x87_asin(x);
+#endif
+  }
+
   // 0x00A8E18A..0x00A8E194 + 0x00AA7BC0: `fyl2x` then 2^t through
   // frndint/f2xm1/fscale, under (caller CW & precision) | 0x7F.
   static double PowPositiveBase(unsigned int controlWord, double x, double y) noexcept;
 
   double pow(const double x, const double y) noexcept
   {
-    unsigned int controlWord;
-#if defined(_M_IX86)
-    unsigned short hardwareControlWord;
-    __asm { fnstcw hardwareControlWord }
-    controlWord = hardwareControlWord;
-#else
-    controlWord = msvc8_x87_control_word();
-#endif
-    // 0x00A8E0E0: the SSE2 lane runs only with `global_mode_sse2` set, MXCSR
-    // masks at their default and the x87 control word's low byte at 0x7F.
-    if (global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u && (controlWord & 0x7Fu) == 0x7Fu) {
+    const unsigned int controlWord = CurrentControlWord();
+    if (TakesSse2Lane(controlWord)) {
       return std::pow(x, y);
     }
     // Zero, infinite and NaN operands, and a negative base with a fractional

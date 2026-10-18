@@ -125,6 +125,29 @@ msvc8_x87_acos PROC
     ret
 msvc8_x87_acos ENDP
 
+; double msvc8_x87_asin(double x), the CRT's x87 asin body (_CIasin 0x00A8DE93:
+; atan2(x, sqrt((1 + x) * (1 - x)))) at PC24 like the acos lane above.
+msvc8_x87_asin PROC
+    movsd   qword ptr [rsp+8], xmm0
+    fnstcw  word ptr [rsp+16]
+    movzx   eax, word ptr [rsp+16]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+18], ax
+    fldcw   word ptr [rsp+18]
+    fld     qword ptr [rsp+8]
+    fld1
+    fadd    st(0), st(1)
+    fld1
+    fsub    st(0), st(2)
+    fmulp   st(1), st(0)
+    fsqrt
+    fpatan
+    fstp    qword ptr [rsp+8]
+    fldcw   word ptr [rsp+16]
+    movsd   xmm0, qword ptr [rsp+8]
+    ret
+msvc8_x87_asin ENDP
+
 ; double msvc8_x87_pow(double x, double y), the CRT's x87 pow body (0x00A8E18A
 ; fyl2x, then the 0x00AA7BC0 frndint/f2xm1/fscale exp2) at PC24 like the
 ; other simulation lanes here.

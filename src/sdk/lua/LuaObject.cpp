@@ -10651,6 +10651,10 @@ namespace
 	 * What it does:
 	 * Bridges one Lua numeric value into `frexp` mantissa/exponent extraction
 	 * and returns the mantissa lane as `double`.
+	 *
+	 * The binary's frexp is the MSVC8 CRT's (0x00A8DA05), which answers -0
+	 * with +0 where the current CRT keeps -0 (difffuzz `lua_frexp`), so this
+	 * goes through `msvc8::frexp`.
 	 */
 	double LuaFrexpMantissaBridgeA(const lua_Number value, int* const exponentOut)
 	{
@@ -10659,7 +10663,7 @@ namespace
 			return 0.0;
 		}
 
-		return std::frexp(static_cast<double>(value), exponentOut);
+		return msvc8::frexp(static_cast<double>(value), exponentOut);
 	}
 
 	/**
@@ -10751,8 +10755,11 @@ namespace
 	 * split an x86 client from an x64 one. exp/log/log10 are inline x87
 	 * expansions in the binary too (`msvc8::IntrinsicExp` and friends; exp's
 	 * fmul/fadd steps round at 24 bits, so a correctly rounded exp differs).
-	 * asin/acos/pow go through the CRT, whose SSE2 lane the simulation's
-	 * exception masks select; those compute in double and round once.
+	 * asin/acos/pow/mod go through the MSVC8 CRT's `_CI*` entries. The game
+	 * calls _set_SSE2_enable(0), so those take their x87 bodies, whose
+	 * arithmetic rounds under the simulation's _PC_24 and is not correctly
+	 * rounded; `msvc8::asin`/`acos`/`pow`/`fmod` reproduce them. Every
+	 * `math.*` entry has a difffuzz row (`--filter lua_`).
 	 */
 	int math_sin(lua_State* const state)
 	{
@@ -10961,7 +10968,9 @@ namespace
 	int math_deg(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, value * static_cast<lua_Number>(57.29578f));
+		// 0x00919D9D `fmul dword ptr [0x00D46340]` on the x87 stack: a product in
+		// the denormal range rounds twice, unlike one SSE multiply.
+		lua_pushnumber(state, msvc8::MultiplyX87(value, 57.29578f));
 		return 1;
 	}
 
@@ -10974,7 +10983,8 @@ namespace
 	int math_rad(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, value * static_cast<lua_Number>(0.017453292f));
+		// 0x00919DCD `fmul dword ptr [0x00D46344]`, as in math_deg.
+		lua_pushnumber(state, msvc8::MultiplyX87(value, 0.017453292f));
 		return 1;
 	}
 
@@ -11081,7 +11091,8 @@ namespace
 	int math_asin(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::asin(static_cast<double>(value))));
+		// 0x00919B20: `_CIasin` (0x00A8DE20) with the float on the x87 stack.
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::asin(static_cast<double>(value))));
 		return 1;
 	}
 
@@ -11112,10 +11123,12 @@ namespace
 	 * under `_PC_24`, so the product is rounded to single precision BEFORE
 	 * `floor` sees it. Flooring the unrounded double product instead returns
 	 * one less whenever the exact product sits just under an integer that the
-	 * float rounding reaches. The int-to-double widening is exact and the
-	 * double product of a 24-bit sample and a 31-bit span is exact up to 2^29,
-	 * so narrowing it once is the binary's single rounding. The trailing
-	 * `fadd 1.0f` / `fiadd lower` is one more single-rounded op.
+	 * float rounding reaches. A 24-bit sample times a 31-bit span needs up to
+	 * 55 bits, so a double multiply can round first and hand the float
+	 * conversion a false tie (spans above 2^29); `msvc8::MultiplyIntegerX87`
+	 * rounds the exact product once. The trailing `fadd 1.0f` /
+	 * `fiadd lower` is one more single-rounded op. The span
+	 * `upper - lower + 1` is the binary's wrapping `sub esi, ebx; add esi, 1`.
 	 */
 	int math_random(lua_State* const state)
 	{
@@ -11132,7 +11145,7 @@ namespace
 			if (upper < 1) {
 				luaL_argerror(state, 1, "interval is empty");
 			}
-			const float scaled = static_cast<float>(static_cast<double>(upper) * sample);
+			const float scaled = msvc8::MultiplyIntegerX87(upper, sample);
 			const float picked = std::floor(scaled);
 			lua_pushnumber(state, picked + 1.0f);
 			return 1;
@@ -11147,7 +11160,9 @@ namespace
 		if (lower > upper) {
 			luaL_argerror(state, 2, "interval is empty");
 		}
-		const float scaled = static_cast<float>(static_cast<double>(upper - lower + 1) * sample);
+		const auto span =
+			static_cast<std::int32_t>(static_cast<std::uint32_t>(upper) - static_cast<std::uint32_t>(lower) + 1u);
+		const float scaled = msvc8::MultiplyIntegerX87(span, sample);
 		const float picked = std::floor(scaled);
 		// `fiadd lower` adds the exact integer and rounds once to single.
 		lua_pushnumber(state, static_cast<float>(static_cast<double>(picked) + static_cast<double>(lower)));

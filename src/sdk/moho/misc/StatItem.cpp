@@ -1356,7 +1356,6 @@ namespace moho
     LuaPlus::LuaObject children(state);
     children.AssignNewTable(state, 0, 0);
 
-    std::int32_t childIndex = 1;
     for (StatIntrusiveNode* node = childHead->next; node != nullptr && node != childHead;) {
       StatIntrusiveNode* const next = node->next;
       StatItem* const child = node->owner;
@@ -1366,8 +1365,9 @@ namespace moho
 
       LuaPlus::LuaObject childObject(state);
       STAT_GetLuaTable(state, child, childObject);
-      children.SetObject(childIndex, childObject);
-      ++childIndex;
+      // 0x0041B453: `children.Insert(childObject)` -- the Lua `table.insert(t, v)`
+      // append, which also records the length via `luaL_setn`.
+      children.Insert(childObject);
 
       node = next;
     }

@@ -28,6 +28,19 @@ namespace retail
   void __cdecl PowF(float x, float y, float* out); // 0x00A8E0E0 _CIpow as math.pow (0x00919CD3) uses it: st(1)=x, st(0)=y, fstp dword   // 0x00A8E06A  _CIfmod: st(1)=x, st(0)=y, result in st(0)
   void __cdecl RunStaticInit(unsigned va);   // call a retail void(void) C-init entry (e.g. 0x00BEDC30)
 
+  // --- Lua math library (0x00919930..0x0091A110) -----------------------------
+  float __cdecl UnaryFloatLeaf(unsigned va, float x);                   // cdecl float(float) leaf, ret st0
+  void __cdecl CrtStackUnaryF(unsigned va, float x, float* out);        // _CI* entry: fld dword; call; fstp dword
+  void __cdecl CrtStackBinaryF(unsigned va, float x, float y, float* out); // _CI* entry: st1=x st0=y; fstp dword
+  void __cdecl CrtDoubleArgF(unsigned va, float x, float* out);         // cdecl double(double) CRT entry; fstp dword
+  void __cdecl FrexpF(float x, float* mantissa, int* exponent);         // frexp 0x00A8DA05 as math_frexp calls it
+  void __cdecl LdexpF(float x, float exponent, float* out);             // _ftol2 0x00A89CC0 + ldexp 0x00A8DADF
+  float __cdecl MulImageConstant(float x, unsigned constantVa);         // `fld x; fmul dword [va]` (math_deg/rad)
+  float __cdecl RandomSample(int randValue);                            // math_random's [0,1) sample
+  void __cdecl RandomPickUpTo(int upper, float sample, float* out);     // math_random(u) arithmetic
+  void __cdecl RandomPickRange(int count, float sample, int lower, float* out); // math_random(l, u) arithmetic
+  unsigned __cdecl RandomSeedWord(float seed);                          // math_randomseed's fistp low dword
+
   // --- custom register conventions ----------------------------------------
   float __cdecl Wm3Normalize(void* v);                                     // 0x00452AF0 ecx=v, ret st0
   void* __cdecl NormalizeVectorInto(void* dest, const void* src);          // 0x0044F7E0 esi=dest edi=src

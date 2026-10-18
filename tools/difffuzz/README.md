@@ -52,7 +52,18 @@ Exit code: 0 when every selected target passes, 1 otherwise, 3 on a setup failur
   `unresolved import DLL!name (called from retail 0x...)` and raises an SEH
   exception. The harness then reports `[CRASH]` for that target and moves on.
 * **Retail state the CRT would have set.** `global_mode_sse2` (0x01107030)
-  is poked to 1, as `register_sseCompatMode` sets it on any SSE2 machine.
+  is poked to the `--sse2` value (default 0: the game calls
+  `_set_SSE2_enable(0)`, so the `_CI*` math entries take their x87 bodies).
+  `__sse2_available` (0x01107034, read by `_ftol2`) is poked to 1, as the CRT
+  init sets it on any SSE2 machine.
+* **Lua math library.** `--filter lua_` runs one row per `math.*` entry.
+  Each feeds a float in the way the retail `math_X` does (operand on the x87
+  stack or widened to a double argument, result stored with `fstp dword`) to
+  the CRT entry or a standalone retail leaf with the same inline sequence.
+  `math.deg`/`rad`, `random` and `randomseed` have no standalone leaf, so
+  their thunks replay the instruction sequence with the image's constants and
+  its `floor`. `min`/`max` are only an `fcomip` compare of stored floats and
+  have no row.
   `kRetailStaticInits` in `main.cpp` lists pure C-init entries that are run
   once under the default CW 0x027F. Today that is only 0x00BEDC30, which
   writes the float π at 0x00FB78FC that QuatToAxisAndAngle reads. When a

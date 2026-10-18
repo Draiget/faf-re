@@ -2555,7 +2555,8 @@ int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
       for (int index = 0; index < cappedCount; ++index) {
         LuaPlus::LuaObject value(state);
         value.AssignString(state, optionValues[static_cast<std::size_t>(index)].c_str());
-        result.SetObject(index + 1, value);
+        // 0x0041B998: `LuaObject::Insert(i, value)` (Lua `table.insert`), not a raw store.
+        result.Insert(index + 1, value);
       }
     }
   } else {

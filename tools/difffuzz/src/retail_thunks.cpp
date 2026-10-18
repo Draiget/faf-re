@@ -195,6 +195,287 @@ namespace retail
     }
   }
 
+  // ---- Lua math library (0x00919930..0x0091A110) ---------------------------
+
+  // A `float __cdecl f(float)` leaf whose result is left in st(0):
+  // 0x00919A40 (fptan), 0x00919980 (fldlg2; fyl2x), 0x009199D0 (the /Oi exp
+  // expansion), 0x0040EAD0 (fldln2; fyl2x).
+  __declspec(naked) float __cdecl UnaryFloatLeaf(unsigned, float)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      mov eax, [esp + 20]
+      push dword ptr [esp + 24]
+      call eax
+      add esp, 4
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // A CRT `_CI*` entry with its operand on the x87 stack, as math_asin
+  // (0x00919B20) and math_acos (0x00919B50) call it: the float from
+  // luaL_checknumber in st(0), the result stored with `fstp dword`.
+  __declspec(naked) void __cdecl CrtStackUnaryF(unsigned, float, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fld dword ptr [esp + 24]
+      mov eax, [esp + 20]
+      call eax
+      mov eax, [esp + 28]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // A two-operand `_CI*` entry (st(1) = x, st(0) = y), as math_mod
+  // (0x00919C63) calls `_CIfmod`.
+  __declspec(naked) void __cdecl CrtStackBinaryF(unsigned, float, float, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fld dword ptr [esp + 24]
+      fld dword ptr [esp + 28]
+      mov eax, [esp + 20]
+      call eax
+      mov eax, [esp + 32]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // A cdecl `double f(double)` CRT entry fed a widened float and stored back
+  // to float, as math_ceil (0x00919BF0) and math_floor (0x00919C20) call
+  // ceil 0x00A840A0 / floor 0x00A8DF30.
+  __declspec(naked) void __cdecl CrtDoubleArgF(unsigned, float, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fld dword ptr [esp + 24]
+      sub esp, 8
+      fstp qword ptr [esp]
+      mov eax, [esp + 28]
+      call eax
+      add esp, 8
+      mov eax, [esp + 28]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_frexp 0x00919E01..0x00919E14: frexp 0x00A8DA05(double, int*).
+  __declspec(naked) void __cdecl FrexpF(float, float*, int*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      push dword ptr [esp + 28]
+      sub esp, 8
+      fld dword ptr [esp + 32]
+      fstp qword ptr [esp]
+      mov eax, 0x00A8DA05
+      call eax
+      add esp, 12
+      mov eax, [esp + 24]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_ldexp 0x00919E4E..0x00919E6F: _ftol2 0x00A89CC0 on the exponent,
+  // then ldexp 0x00A8DADF(double, int).
+  __declspec(naked) void __cdecl LdexpF(float, float, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fld dword ptr [esp + 24]
+      mov eax, 0x00A89CC0
+      call eax
+      push eax
+      sub esp, 8
+      fld dword ptr [esp + 32]
+      fstp qword ptr [esp]
+      mov eax, 0x00A8DADF
+      call eax
+      add esp, 12
+      mov eax, [esp + 28]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_deg 0x00919D9D / math_rad 0x00919DCD: `fmul dword ptr [const]` on
+  // the float argument; the constant is read from the mapped image.
+  __declspec(naked) float __cdecl MulImageConstant(float, unsigned)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      mov eax, [esp + 24]
+      fld dword ptr [esp + 20]
+      fmul dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_random 0x00919F99..0x00919FB2: `rand() % 0x7FFF`, cvtsi2ss, mulss
+  // by the scale at 0x00D46378.
+  __declspec(naked) float __cdecl RandomSample(int)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      mov eax, [esp + 20]
+      cdq
+      mov ecx, 0x7FFF
+      idiv ecx
+      cvtsi2ss xmm0, edx
+      mov eax, 0x00D46378
+      mulss xmm0, dword ptr [eax]
+      sub esp, 4
+      movss dword ptr [esp], xmm0
+      fld dword ptr [esp]
+      add esp, 4
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_random's one-argument lane 0x0091A089..0x0091A0AC: fild upper,
+  // fmul sample, floor 0x00A8DF30, fadd 1.0f (0x00D41424), fstp dword.
+  __declspec(naked) void __cdecl RandomPickUpTo(int, float, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fild dword ptr [esp + 20]
+      sub esp, 8
+      fmul dword ptr [esp + 32]
+      fstp qword ptr [esp]
+      mov eax, 0x00A8DF30
+      call eax
+      mov eax, 0x00D41424
+      fadd dword ptr [eax]
+      add esp, 8
+      mov eax, [esp + 28]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_random's two-argument lane 0x0091A02E..0x0091A048: fild count,
+  // fmul sample, floor 0x00A8DF30, fiadd lower, fstp dword.
+  __declspec(naked) void __cdecl RandomPickRange(int, float, int, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fild dword ptr [esp + 20]
+      sub esp, 8
+      fmul dword ptr [esp + 32]
+      fstp qword ptr [esp]
+      mov eax, 0x00A8DF30
+      call eax
+      fiadd dword ptr [esp + 36]
+      add esp, 8
+      mov eax, [esp + 32]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
+  // math_randomseed 0x0091A0DF..0x0091A0FE: truncating `fistp qword` under
+  // a temporary round-toward-zero control word; the low dword is the seed.
+  __declspec(naked) unsigned __cdecl RandomSeedWord(float)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      sub esp, 12
+      fld dword ptr [esp + 32]
+      fnstcw word ptr [esp + 2]
+      movzx eax, word ptr [esp + 2]
+      or eax, 0x0C00
+      mov dword ptr [esp + 4], eax
+      fldcw word ptr [esp + 4]
+      fistp qword ptr [esp + 4]
+      mov eax, dword ptr [esp + 4]
+      fldcw word ptr [esp + 2]
+      add esp, 12
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
   __declspec(naked) void __cdecl RunStaticInit(unsigned)
   {
     __asm {

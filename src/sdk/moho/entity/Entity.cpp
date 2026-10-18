@@ -7081,7 +7081,9 @@ namespace moho
     }
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
-    Entity* const entity = SCR_FromLuaNoError_Entity(entityObject);
+    // 0x00691AF0: retail resolves through the raising `SCR_FromLua_EntityOpt`
+    // (non-game-object / wrong type -> Lua error; destroyed -> nullptr).
+    Entity* const entity = SCR_FromLua_EntityOpt(entityObject);
     if (entity != nullptr) {
       if (entity->SimulationRef != nullptr) {
         entity->SimulationRef->Logf("Entity:Destroy() called from script, id=0x%08x.\n", static_cast<unsigned int>(entity->id_));
@@ -7137,7 +7139,8 @@ namespace moho
     }
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
-    Entity* const entity = SCR_FromLuaNoError_Entity(entityObject);
+    // 0x00691C30: retail resolves through the raising `SCR_FromLua_EntityOpt`.
+    Entity* const entity = SCR_FromLua_EntityOpt(entityObject);
     const bool beenDestroyed = (entity == nullptr) || (entity->DestroyQueuedFlag != 0u);
     lua_pushboolean(rawState, beenDestroyed ? 1 : 0);
     return 1;
