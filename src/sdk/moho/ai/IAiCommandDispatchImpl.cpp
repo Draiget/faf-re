@@ -323,7 +323,10 @@ namespace
         const SFootprint& footprint = unit->GetFootprint();
         const SOCellPos cell = footprint.ToCellPos(unit->GetPosition());
         SNavGoal goal(cell);
-        goal.aux0 = 4 * (layer == LAYER_Sub) + 4;
+        // 0x0060975C stores `(layer == Sub) * 4 + 4` at goal+0x20 (`[esp+74h]`
+        // with the goal at `[esp+54h]`), the layer slot SetNewTargetLayer
+        // reads: a submerged unit surfaces, anything else dives.
+        goal.mLayer = (layer == LAYER_Sub) ? LAYER_Water : LAYER_Sub;
         dispatch->SetNewTargetLayer(goal);
         return;
       }
