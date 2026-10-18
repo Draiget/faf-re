@@ -125,6 +125,36 @@ msvc8_x87_acos PROC
     ret
 msvc8_x87_acos ENDP
 
+; double msvc8_x87_pow(double x, double y), the CRT's x87 pow body (0x00A8E18A
+; fyl2x, then the 0x00AA7BC0 frndint/f2xm1/fscale exp2) at PC24 like the
+; other simulation lanes here.
+msvc8_x87_pow PROC
+    movsd   qword ptr [rsp+8], xmm0
+    movsd   qword ptr [rsp+16], xmm1
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     qword ptr [rsp+16]
+    fld     qword ptr [rsp+8]
+    fyl2x
+    fld     st(0)
+    frndint
+    fsubr   st(1), st(0)
+    fxch    st(1)
+    fchs
+    f2xm1
+    fld1
+    faddp   st(1), st(0)
+    fscale
+    fstp    st(1)
+    fstp    qword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movsd   xmm0, qword ptr [rsp+8]
+    ret
+msvc8_x87_pow ENDP
+
 ; float msvc8_x87_atan2_difference(float firstY, float firstX,
 ;                                float secondY, float secondX)
 msvc8_x87_atan2_difference PROC

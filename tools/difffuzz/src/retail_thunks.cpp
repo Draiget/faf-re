@@ -172,6 +172,29 @@ namespace retail
     }
   }
 
+  // 0x00A8E0E0 (_CIpow), called by Lua math.pow at 0x00919CD3 with both
+  // operands loaded from floats and the result stored straight to a float.
+  __declspec(naked) void __cdecl PowF(float, float, float*)
+  {
+    __asm {
+      push ebx
+      push esi
+      push edi
+      push ebp
+      fld dword ptr [esp + 20]
+      fld dword ptr [esp + 24]
+      mov eax, 0x00A8E0E0
+      call eax
+      mov eax, dword ptr [esp + 28]
+      fstp dword ptr [eax]
+      pop ebp
+      pop edi
+      pop esi
+      pop ebx
+      ret
+    }
+  }
+
   __declspec(naked) void __cdecl RunStaticInit(unsigned)
   {
     __asm {

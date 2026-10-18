@@ -145,6 +145,49 @@ namespace difffuzz
       std::memcpy(out, &r, 8);
     }
 
+    // ---- pow 0x00A8E0E0 (_CIpow) as Lua math.pow uses it (0x00919CB0) -------
+    void GenPow(Rng& rng, u32* in)
+    {
+      float x = rng.Chance(70) ? GenPlain(rng, 100.0f) : GenFloat(rng);
+      if (!std::isfinite(x)) {
+        x = 2.0f;
+      }
+      if (x < 0.0f && rng.Chance(70)) {
+        x = -x;
+      }
+      const std::uint32_t pick = rng.Below(4);
+      const float y = pick == 0 ? 2.0f
+        : pick == 1 ? static_cast<float>(rng.Below(7))
+        : pick == 2 ? 0.5f
+        : GenPlain(rng, 4.0f);
+      // Stay inside the domain: a negative base with a fractional exponent, or
+      // a zero base with a negative one, takes the CRT error path (errno).
+      if (x < 0.0f && y != std::floor(y)) {
+        x = -x;
+      }
+      if (x == 0.0f) {
+        x = 1.5f;
+      }
+      std::memcpy(in, &x, 4);
+      std::memcpy(in + 1, &y, 4);
+    }
+    void PowRetail(const u32* in, u32* out)
+    {
+      float x, y, r;
+      std::memcpy(&x, in, 4);
+      std::memcpy(&y, in + 1, 4);
+      retail::PowF(x, y, &r);
+      std::memcpy(out, &r, 4);
+    }
+    void PowOurs(const u32* in, u32* out)
+    {
+      float x, y;
+      std::memcpy(&x, in, 4);
+      std::memcpy(&y, in + 1, 4);
+      const float r = static_cast<float>(msvc8::pow(static_cast<double>(x), static_cast<double>(y)));
+      std::memcpy(out, &r, 4);
+    }
+
     // ---- Wm3::Vector3<float>::Normalize 0x00452AF0 --------------------------
     void GenV3(Rng& rng, u32* in)
     {
@@ -1053,6 +1096,7 @@ namespace difffuzz
       {"cosf", 0x005734D0, "legacy/math/X87Math.cpp msvc8::cosf", 2, 1, "x _", "r", GenTrig, CosRetail, CosOurs},
       {"atan2f", 0x004E9DF0, "legacy/math/X87Math.cpp msvc8::atan2f", 2, 1, "y x", "r", GenTrig, Atan2Retail, Atan2Ours},
       {"acos", 0x00A8DCD0, "legacy/math/X87Math.cpp msvc8::acos(double)", 2, 2, "x(f64)", "r(f64)", GenAcos, AcosRetail, AcosOurs},
+      {"pow", 0x00A8E0E0, "legacy/math/X87Math.cpp msvc8::pow (Lua math.pow)", 2, 1, "x y", "r", GenPow, PowRetail, PowOurs},
       {"fmod", 0x00A8E06A, "legacy/math/X87Math.cpp msvc8::fmod", 4, 2, "x(f64) y(f64)", "r(f64)", GenFmod, FmodRetail, FmodOurs},
       {"Wm3Normalize", 0x00452AF0, "Wm3Vector3.h Vector3::Normalize(Vector3*)", 3, 4, "v[3]", "v[3] len", GenV3, NormalizeRetail, NormalizeOurs},
       {"NormalizeVectorInto", 0x0044F7E0, "moho/math/Vector3f.cpp NormalizeVectorInto", 3, 7, "src[3]", "dest[3] ret src[3]", GenV3, NormIntoRetail, NormIntoOurs},

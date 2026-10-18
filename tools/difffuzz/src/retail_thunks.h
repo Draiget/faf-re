@@ -24,7 +24,8 @@ namespace retail
   float __cdecl Cosf(float x);               // 0x005734D0  fld; fcos
   float __cdecl Atan2f(float y, float x);    // 0x004E9DF0  fld y; fld x; fpatan
   double __cdecl Acos(double x);             // 0x00A8DCD0  _CIacos: arg and result in st(0)
-  double __cdecl Fmod(double x, double y);   // 0x00A8E06A  _CIfmod: st(1)=x, st(0)=y, result in st(0)
+  double __cdecl Fmod(double x, double y);
+  void __cdecl PowF(float x, float y, float* out); // 0x00A8E0E0 _CIpow as math.pow (0x00919CD3) uses it: st(1)=x, st(0)=y, fstp dword   // 0x00A8E06A  _CIfmod: st(1)=x, st(0)=y, result in st(0)
   void __cdecl RunStaticInit(unsigned va);   // call a retail void(void) C-init entry (e.g. 0x00BEDC30)
 
   // --- custom register conventions ----------------------------------------

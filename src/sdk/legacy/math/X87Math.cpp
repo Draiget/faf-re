@@ -13,6 +13,7 @@ extern "C" float __cdecl msvc8_x87_cosf(float x);
 extern "C" float __cdecl msvc8_x87_tanf(float x);
 extern "C" float __cdecl msvc8_x87_atan2f(float y, float x);
 extern "C" double __cdecl msvc8_x87_acos(double x);
+extern "C" double __cdecl msvc8_x87_pow(double x, double y);
 extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
 extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
@@ -607,6 +608,74 @@ namespace msvc8
     return result;
 #else
     return msvc8_x87_acos(x);
+#endif
+  }
+
+  // 0x00A8E18A..0x00A8E194 + 0x00AA7BC0: `fyl2x` then 2^t through
+  // frndint/f2xm1/fscale, under (caller CW & precision) | 0x7F.
+  static double PowPositiveBase(unsigned int controlWord, double x, double y) noexcept;
+
+  double pow(const double x, const double y) noexcept
+  {
+    unsigned int controlWord;
+#if defined(_M_IX86)
+    unsigned short hardwareControlWord;
+    __asm { fnstcw hardwareControlWord }
+    controlWord = hardwareControlWord;
+#else
+    controlWord = msvc8_x87_control_word();
+#endif
+    // 0x00A8E0E0: the SSE2 lane runs only with `global_mode_sse2` set, MXCSR
+    // masks at their default and the x87 control word's low byte at 0x7F.
+    if (global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u && (controlWord & 0x7Fu) == 0x7Fu) {
+      return std::pow(x, y);
+    }
+    // Zero, infinite and NaN operands, and a negative base with a fractional
+    // exponent (the domain-error lane), are left to the host CRT.
+    if (!std::isfinite(x) || !std::isfinite(y) || x == 0.0) {
+      return std::pow(x, y);
+    }
+    if (x < 0.0) {
+      // 0x00A8E2DD: classify the exponent (0x00A8E302: integer, then whether
+      // y * 0.5 is too), run the positive lane on -x and negate for odd y.
+      if (y != std::floor(y)) {
+        return std::pow(x, y);
+      }
+      const bool oddExponent = (y * 0.5) != std::floor(y * 0.5);
+      const double magnitude = PowPositiveBase(controlWord, -x, y);
+      return oddExponent ? -magnitude : magnitude;
+    }
+    return PowPositiveBase(controlWord, x, y);
+  }
+
+  static double PowPositiveBase(const unsigned int controlWord, const double x, const double y) noexcept
+  {
+#if defined(_M_IX86)
+    double result;
+    // 0x00AA7BD5: the body runs with (caller CW & precision) | 0x7F.
+    const unsigned short bodyControlWord = static_cast<unsigned short>((controlWord & 0x300u) | 0x7Fu);
+    const unsigned short savedControlWord = static_cast<unsigned short>(controlWord);
+    __asm {
+      fldcw bodyControlWord
+      fld y
+      fld x
+      fyl2x
+      fld st(0)
+      frndint
+      fsubr st(1), st(0)
+      fxch st(1)
+      fchs
+      f2xm1
+      fld1
+      faddp st(1), st(0)
+      fscale
+      fstp st(1)
+      fstp result
+      fldcw savedControlWord
+    }
+    return result;
+#else
+    return msvc8_x87_pow(x, y);
 #endif
   }
 

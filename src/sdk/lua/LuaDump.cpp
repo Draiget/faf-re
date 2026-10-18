@@ -79,11 +79,11 @@ namespace LuaPlus
 		/// loaded with `movss` at 0x00914E1E; as a `float` it lands exactly on
 		/// 31415926, which is the integer the loader compares against.
 		///
-		/// Spelled `float`, not `lua_Number`: src/sdk/main.vcxproj does not
-		/// define LUA_NUMBER, so `lua_Number` is still `double` in this build,
-		/// and a `lua_Number`-typed dump wrote 8-byte numbers under a size byte
-		/// of 8 - which `LuaLoadChunkHeader` (it demands 4) rejects, so
-		/// `string.dump` output did not even load back into this engine.
+		/// Spelled `float` explicitly: the dump format is 4-byte numbers no
+		/// matter how `lua_Number` is configured (main.vcxproj defines
+		/// LUA_NUMBER=float, as the shipped engine was built), and a
+		/// `lua_Number`-typed dump under a double build wrote 8-byte numbers
+		/// that `LuaLoadChunkHeader` (it demands 4) rejects.
 		constexpr float kLuaNumberFormatProbe = static_cast<float>(3.14159265358979323846e7);
 
 		/**

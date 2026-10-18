@@ -179,7 +179,7 @@
            this wrong silently - MSVC records the level per object and the
            linker rejects a mismatch with LNK2038, naming Wm3System.obj,
            Wm3Math.obj and Wm3Vector3.obj. -->
-      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -226,7 +226,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -293,7 +293,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <SupportJustMyCode>false</SupportJustMyCode>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -325,7 +325,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>

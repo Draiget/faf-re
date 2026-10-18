@@ -185,6 +185,15 @@ namespace msvc8
   // Legacy CRT dispatch: the engine's /sse2 option selects the SSE lane;
   // simulation otherwise uses x87 arithmetic with single precision control.
   [[nodiscard]] double acos(double x) noexcept;
+  /**
+   * The MSVC8 CRT's `pow` (`_CIpow`, 0x00A8E0E0) under the same dispatch as
+   * `acos`. With the SSE2 lane off (the engine's default) a positive finite
+   * base takes the x87 body: `fyl2x`, then `frndint`/`f2xm1`/`fscale`
+   * (0x00AA7BC0), all at the caller's precision control. Under the
+   * simulation's _PC_24 that is not correctly rounded: pow(0x41AB54C2, 2) is
+   * 0x43E554AF where the exact square rounds to 0x43E554AE.
+   */
+  [[nodiscard]] double pow(double x, double y) noexcept;
   [[nodiscard]] float expf(float x) noexcept;
   [[nodiscard]] float logf(float x) noexcept;
   [[nodiscard]] float powf(float x, float y) noexcept;

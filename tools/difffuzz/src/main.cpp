@@ -19,6 +19,8 @@
 #include <cstring>
 #include <string>
 
+extern "C" int global_mode_sse2;
+
 namespace
 {
   using difffuzz::kCanary;
@@ -41,7 +43,13 @@ namespace
   // the Windows default (round-nearest, every exception masked) gives x87
   // control word 0x007F; MXCSR stays at its 0x1F80 default.
   u32 gControlWord = 0x007Fu;
-  constexpr u32 kMxcsr = 0x1F80u;
+  // In game the sticky exception flags are usually already set (0x1FBF at
+  // math.pow, beat 8678); SSE2 libm bodies can branch on them.
+  u32 gMxcsr = 0x1FBFu;
+  // Value poked into retail `global_mode_sse2`. The game runs with 0: CScApp
+  // calls _set_SSE2_enable(0) unless /sse2 is given, so the CRT math entries
+  // (_CIpow, _CIacos, ...) take their x87 bodies. --sse2 1 tests the SSE2 ones.
+  u32 gGlobalModeSse2 = 0u;
 
   void SetFpEnv() noexcept
   {
@@ -50,7 +58,7 @@ namespace
       fninit
       fldcw cw
     }
-    _mm_setcsr(kMxcsr);
+    _mm_setcsr(gMxcsr);
   }
 
   [[nodiscard]] unsigned short ReadControlWord() noexcept
@@ -217,6 +225,10 @@ int main(int argc, char** argv)
       opt.maxMismatch = std::atoi(next());
     } else if (a == "--image") {
       opt.image = next();
+    } else if (a == "--sse2") {
+      gGlobalModeSse2 = static_cast<u32>(std::strtoul(next(), nullptr, 0));
+    } else if (a == "--mxcsr") {
+      gMxcsr = static_cast<u32>(std::strtoul(next(), nullptr, 0));
     } else if (a == "--cw") {
       gControlWord = static_cast<u32>(std::strtoul(next(), nullptr, 0));
     } else if (a == "--skip-extreme") {
@@ -262,7 +274,9 @@ int main(int argc, char** argv)
     std::fprintf(stderr, "difffuzz: cannot map %s: %s\n", opt.image.c_str(), error.c_str());
     return 3;
   }
-  image.PokeDword(kRetailGlobalModeSse2, 1u);
+  image.PokeDword(kRetailGlobalModeSse2, gGlobalModeSse2);
+  // Our copy (sdk_mirror.cpp) follows, so both sides take the same CRT lane.
+  global_mode_sse2 = static_cast<int>(gGlobalModeSse2);
 
   // Pure retail C-init entries whose BSS results the targets read. They run
   // in the CRT's static-init pass, before any thread sets _PC_24, so under

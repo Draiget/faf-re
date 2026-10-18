@@ -10907,7 +10907,7 @@ namespace
 		const lua_Number exponent = luaL_checknumber(state, 2);
 		lua_pushnumber(
 			state,
-			static_cast<lua_Number>(std::pow(static_cast<double>(base), static_cast<double>(exponent)))
+			static_cast<lua_Number>(msvc8::pow(static_cast<double>(base), static_cast<double>(exponent)))
 		);
 		return 1;
 	}
