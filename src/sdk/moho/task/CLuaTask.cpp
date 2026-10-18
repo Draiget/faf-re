@@ -97,16 +97,6 @@ namespace
     return cached;
   }
 
-  const char* LuaErrorString(LuaPlus::LuaState* const state)
-  {
-    if (!state || !state->m_state) {
-      return "<no lua state>";
-    }
-
-    const char* const text = lua_tostring(state->m_state, -1);
-    return text ? text : "<non-string lua error>";
-  }
-
   /**
    * Address: 0x004CB710 (FUN_004CB710, CLuaTask reflected ref store helper)
    *
@@ -265,6 +255,21 @@ CLuaTask::~CLuaTask()
 
 /**
  * Address: 0x004C9700 (FUN_004C9700, ?Execute@CLuaTask@Moho@@UAEHXZ)
+ *
+ * What it does:
+ * Resumes the coroutine once and turns what it yielded into a task result:
+ * the tick count to sleep, or -1 when the thread finished or failed.
+ *
+ * The only EH region (FuncInfo 0x00EE7748, state 0) is the `lua_resume` call;
+ * its `catch (...)` at 0x004C98DC frees the state if a callee destroyed this
+ * task, clears the destroyed-flag pointer otherwise, and rethrows. Everything
+ * after the resume runs outside it. A script error comes back from
+ * `lua_resume` as a status with the error value on the coroutine stack, and
+ * both warnings read it as `LuaStackObject(state, -1).GetString()` (inlined at
+ * 0x004C9762 / 0x004C97C2): an error value that is not a string (`error()`,
+ * `error({...})`) raises a type error from here, which escapes to
+ * `CTaskThread`'s dispatcher and aborts the whole thread there, exactly as
+ * the binary does.
  */
 int CLuaTask::Execute()
 {
@@ -276,45 +281,9 @@ int CLuaTask::Execute()
   bool destroyedByDtor = false;
   mExecuteDestroyedFlag = &destroyedByDtor;
 
+  int resumeResult = 0;
   try {
-    const int resumeResult = lua_resume(state->m_state, mResumeArgCount);
-
-    if (destroyedByDtor) {
-      if (resumeResult != 0) {
-        gpg::Warnf("Error running lua script from destroyed thread: %s", LuaErrorString(state));
-      }
-
-      delete state;
-      return 1;
-    }
-
-    mExecuteDestroyedFlag = nullptr;
-
-    if (resumeResult != 0) {
-      gpg::Warnf("Error running lua script: %s", LuaErrorString(state));
-      return -1;
-    }
-
-    mResumeArgCount = 0;
-
-    if (lua_type(state->m_state, 1) == LUA_TNONE) {
-      return -1;
-    }
-
-    if (lua_type(state->m_state, 1) == LUA_TNUMBER) {
-      const int ticks = static_cast<int>(lua_tonumber(state->m_state, 1));
-      if (ticks >= 0) {
-        return ticks;
-      }
-
-      const msvc8::string traceback = SCR_Traceback(state, "Invalid args to yield(); tick count must be >=0");
-      gpg::Warnf("%s", traceback.c_str());
-      return -1;
-    }
-
-    const msvc8::string traceback = SCR_Traceback(state, "Invalid args to yield(); expected tick count");
-    gpg::Warnf("%s", traceback.c_str());
-    return -1;
+    resumeResult = lua_resume(state->m_state, mResumeArgCount);
   } catch (...) {
     if (destroyedByDtor) {
       delete state;
@@ -323,6 +292,45 @@ int CLuaTask::Execute()
     }
     throw;
   }
+
+  if (destroyedByDtor) {
+    if (resumeResult != 0) {
+      gpg::Warnf(
+        "Error running lua script from destroyed thread: %s", LuaPlus::LuaStackObject(state, -1).GetString()
+      );
+    }
+
+    delete state;
+    return 1;
+  }
+
+  mExecuteDestroyedFlag = nullptr;
+
+  if (resumeResult != 0) {
+    gpg::Warnf("Error running lua script: %s", LuaPlus::LuaStackObject(state, -1).GetString());
+    return -1;
+  }
+
+  mResumeArgCount = 0;
+
+  if (lua_type(state->m_state, 1) == LUA_TNONE) {
+    return -1;
+  }
+
+  if (lua_type(state->m_state, 1) == LUA_TNUMBER) {
+    const int ticks = LuaPlus::LuaStackObject(state, 1).GetInteger();
+    if (ticks >= 0) {
+      return ticks;
+    }
+
+    const msvc8::string traceback = SCR_Traceback(state, "Invalid args to yield(); tick count must be >=0");
+    gpg::Warnf("%s", traceback.c_str());
+    return -1;
+  }
+
+  const msvc8::string traceback = SCR_Traceback(state, "Invalid args to yield(); expected tick count");
+  gpg::Warnf("%s", traceback.c_str());
+  return -1;
 }
 
 /**

@@ -39,6 +39,26 @@ namespace
   constexpr float kTurnSinePolyB = 0.16605f;
   constexpr float kTurnVectorUnitTolerance = 0.001f;
 
+  /**
+   * `x, z *= length / sqrt(lengthSq)` exactly as the spline integrators inline
+   * it: `fld lengthSq; fsqrt; fdivr length`, then `fld x; fmul; fstp` and
+   * `fmul z; fstp` (CAiPathSpline::Update 0x005B2BB8..0x005B2BD9 /
+   * 0x005B2C27..0x005B2C4B; CAiPathSpline::Generate 0x005B39FD..0x005B3A24,
+   * 0x005B3C16..0x005B3C65, 0x005B3D31..0x005B3D61, 0x005B3DCB..0x005B3E31).
+   * The scale and both
+   * products stay on the x87 stack under the sim's 24-bit precision control:
+   * mantissa rounded like float, exponent not, so a product that lands in the
+   * float denormal range rounds differently from `mulss`. Callers keep the
+   * binary's own `lengthSq > length^2` guard.
+   */
+  void ScalePlanarToLength(float& x, float& z, const float lengthSq, const float length) noexcept
+  {
+    Wm3::Vector3f planar{x, 0.0f, z};
+    msvc8::ScaleVectorToLengthX87(&planar.x, &planar.x, lengthSq, length);
+    x = planar.x;
+    z = planar.z;
+  }
+
 } // namespace
 
 /**
@@ -1079,9 +1099,7 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 
       const float brakeMagnitudeSq = (brakeZ * brakeZ) + (brakeX * brakeX);
       if (brakeMagnitudeSq > (thrustLimit * thrustLimit)) {
-        const float scale = thrustLimit / std::sqrt(brakeMagnitudeSq);
-        brakeX = brakeX * scale;
-        brakeZ = brakeZ * scale;
+        ScalePlanarToLength(brakeX, brakeZ, brakeMagnitudeSq, thrustLimit);
       }
 
       newVelocityX = brakeX + planarX;
@@ -1089,9 +1107,7 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 
       const float newSpeedSq = (newVelocityZ * newVelocityZ) + (newVelocityX * newVelocityX);
       if (newSpeedSq > (steering.mMaxSpeed * steering.mMaxSpeed)) {
-        const float scale = steering.mMaxSpeed / std::sqrt(newSpeedSq);
-        newVelocityX = newVelocityX * scale;
-        newVelocityZ = newVelocityZ * scale;
+        ScalePlanarToLength(newVelocityX, newVelocityZ, newSpeedSq, steering.mMaxSpeed);
       }
 
       if (((newVelocityZ * newVelocityZ) + (newVelocityX * newVelocityX)) <= 1.0e-6f) {
@@ -1415,9 +1431,7 @@ void CAiPathSpline::Generate(
     float sideZ = velocityZ - alongHeading.y;
     const float sideLenSq = (sideX * sideX) + (sideZ * sideZ);
     if (sideLenSq > (params.mMaxSteer * params.mMaxSteer)) {
-      const float scale = params.mMaxSteer / std::sqrt(sideLenSq); // x87 PC24 fsqrt/fdivr (0x005B39FD)
-      sideX = sideX * scale;
-      sideZ = scale * sideZ;
+      ScalePlanarToLength(sideX, sideZ, sideLenSq, params.mMaxSteer); // 0x005B39FD..0x005B3A24
     }
     float driveX = velocityX - sideX;
     float driveZ = velocityZ - sideZ;
@@ -1462,10 +1476,11 @@ void CAiPathSpline::Generate(
       float blendX = driveHeading.x;
       float blendZ = driveHeading.y;
       if (driveHeadingLenSq != 0.0f) {
+        // 0x005B3C11..0x005B3C65: `sqrtf(|drive|^2) / fsqrt(|heading|^2)` and
+        // both heading products stay on the x87 stack (the sqrtf result is a
+        // normal float, so passing it through float is exact).
         const float driveLen = std::sqrt((driveX * driveX) + (driveZ * driveZ));
-        const float ratio = driveLen / std::sqrt(driveHeadingLenSq); // x87 PC24 fsqrt/fdivp (0x005B3C16)
-        blendX = driveHeading.x * ratio;
-        blendZ = ratio * driveHeading.y;
+        ScalePlanarToLength(blendX, blendZ, driveHeadingLenSq, driveLen);
       }
       driveX = (blendX * kHeadingBlendNew) + (driveX * kHeadingBlendOld);
       speedCap = wantSpeed;
@@ -1478,9 +1493,7 @@ void CAiPathSpline::Generate(
       (((accelX * driveX) + (accelZ * driveZ)) <= 0.0f) ? params.mMaxBrake : params.mMaxAcceleration;
     const float accelLenSq = (accelX * accelX) + (accelZ * accelZ);
     if (accelLenSq > (accelLimit * accelLimit)) {
-      const float scale = accelLimit / std::sqrt(accelLenSq); // x87 PC24 fsqrt/fdivr (0x005B3D31)
-      accelX = accelX * scale;
-      accelZ = scale * accelZ;
+      ScalePlanarToLength(accelX, accelZ, accelLenSq, accelLimit); // 0x005B3D31..0x005B3D61
     }
     float moveX = accelX + driveX;
     float moveZ = accelZ + driveZ;
@@ -1488,9 +1501,7 @@ void CAiPathSpline::Generate(
       (state == PPS_5 || state == PPS_6 || state == PPS_2) ? params.mMaxReverseSpeed : params.mMaxSpeed;
     const float moveLenSq = (moveX * moveX) + (moveZ * moveZ);
     if (moveLenSq > (moveCap * moveCap)) {
-      const float scale = moveCap / std::sqrt(moveLenSq); // x87 PC24 fsqrt/fdivr (0x005B3DCB/0x005B3E0D)
-      moveX = moveX * scale;
-      moveZ = scale * moveZ;
+      ScalePlanarToLength(moveX, moveZ, moveLenSq, moveCap); // 0x005B3DCB/0x005B3E0D..0x005B3E31
     }
 
     point.mPosition.x = moveX + point.mPosition.x;

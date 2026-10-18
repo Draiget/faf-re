@@ -209,23 +209,25 @@ namespace moho
       outVector->y = -direction.y;
       outVector->z = -direction.z;
 
+      // 0x0069963D..0x00699657 sums the squared lanes as (z + y) + x.
       const float directionLength = std::sqrt(
-        (direction.x * direction.x) + (direction.y * direction.y) + (direction.z * direction.z)
+        ((direction.z * direction.z) + (direction.y * direction.y)) + (direction.x * direction.x)
       );
+      // 0x00699665..0x006996A1: `fcomip; jbe` caps an (ordered) ratio above 8,
+      // then `comiss; jbe` keeps it only when (ordered) above 1, so NaN ends
+      // up at 1.
       float normalizedScale = directionLength / referenceLength;
       if (normalizedScale > 8.0f) {
         normalizedScale = 8.0f;
       }
-      if (normalizedScale < 1.0f) {
-        normalizedScale = 1.0f;
-      }
+      normalizedScale = (normalizedScale > 1.0f) ? normalizedScale : 1.0f;
 
       (void)Wm3::Vector3f::Normalize(&direction);
-      float directionalProjection =
-        (projectionAxisX * direction.x) + (projectionAxisY * direction.y) + (projectionAxisZ * direction.z);
-      if (directionalProjection < 0.0f) {
-        directionalProjection = 0.0f;
-      }
+      // 0x006996B2..0x006996DA sums the projection as (z + y) + x and keeps it
+      // only when (ordered) positive.
+      const float rawProjection =
+        ((projectionAxisZ * direction.z) + (projectionAxisY * direction.y)) + (projectionAxisX * direction.x);
+      const float directionalProjection = (rawProjection > 0.0f) ? rawProjection : 0.0f;
 
       const float scaledLength =
         ((1.0f - directionalProjection) * normalizedScale) * outputLengthScale;
@@ -429,10 +431,12 @@ namespace moho
       (void)NormalizeVectorInto(&normalizedTarget, toTarget); // FUN_0044F7E0
 
       const Wm3::Vector3f forward = moho::QuatForwardAxis(unit->GetTransform().orient_);
+      // 0x006C2421 `comiss cross, 0; jbe`: only an ordered `cross > 0` takes
+      // the positive arc, so a NaN cross turns the negative way.
       const float signedRadians =
-        ((normalizedTarget.z * forward.x) - (forward.z * normalizedTarget.x)) <= 0.0f
-          ? attackAngleDegrees * -kCommonMoveSlavedArcEnterRadians
-          : attackAngleDegrees * kCommonMoveSlavedArcEnterRadians;
+        ((normalizedTarget.z * forward.x) - (forward.z * normalizedTarget.x)) > 0.0f
+          ? attackAngleDegrees * kCommonMoveSlavedArcEnterRadians
+          : attackAngleDegrees * -kCommonMoveSlavedArcEnterRadians;
 
       const Wm3::Vector3f yawAxis{0.0f, 1.0f, 0.0f};
       Wm3::Quaternionf rotation{};
@@ -3370,12 +3374,12 @@ namespace moho
     outDesiredVelocity.x = aimX - position.x;
     outDesiredVelocity.y = (physics.AttackElevation + mUnknownFloat94 + terrainElevation) - position.y;
 
-    float desiredSpeed = std::sqrt(
+    const float desiredLength = std::sqrt(
       (outDesiredVelocity.z * outDesiredVelocity.z) + (outDesiredVelocity.y * outDesiredVelocity.y)
       + (outDesiredVelocity.x * outDesiredVelocity.x));
-    if (air.MaxAirspeed <= desiredSpeed) {
-      desiredSpeed = air.MaxAirspeed;
-    }
+    // 0x006BE437 `comiss MaxAirspeed, length; jbe`: the length is kept only
+    // when it is (ordered) below the cap, so a NaN length clamps to the cap.
+    const float desiredSpeed = (air.MaxAirspeed > desiredLength) ? desiredLength : air.MaxAirspeed;
     (void)VecSetLength(&outDesiredVelocity, desiredSpeed);
 
     CalcHoverOrientation(body, toTarget, outAxes);

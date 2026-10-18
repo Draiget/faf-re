@@ -904,16 +904,22 @@ namespace
       && waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
       && waitHandleSet->mHandle->GetFileInfo(requestedModule, nullptr);
 
+    // Both modules load through SCR_Import (0x004D3250, called at 0x006776DE
+    // and 0x0067783E): its `catch (const std::runtime_error&)` turns a script
+    // error into an "Error importing" warning and a nil module, so a broken
+    // module degrades to the fallback rather than unwinding into the entity
+    // constructor. The module must be a table (`IsTable`, 0x006776F2) and the
+    // class a raw non-nil field of it (`GetByName` + `IsNil`); every outcome
+    // is reported with Logf, not Warnf (0x00937CB0).
     if (moduleFileExists) {
-      LuaPlus::LuaObject requestedModuleObj = moho::SCR_ImportLuaModule(sim->mLuaState, requestedModule);
-      if (requestedModuleObj) {
-        LuaPlus::LuaObject factoryObj =
-          moho::SCR_GetLuaTableField(sim->mLuaState, requestedModuleObj, requestedClass);
-        if (factoryObj) {
+      const LuaPlus::LuaObject requestedModuleObj = moho::SCR_Import(sim->mLuaState, requestedModule);
+      if (requestedModuleObj.IsTable()) {
+        LuaPlus::LuaObject factoryObj = requestedModuleObj.GetByName(requestedClass);
+        if (!factoryObj.IsNil()) {
           return factoryObj;
         }
 
-        gpg::Warnf(
+        gpg::Logf(
           "Script module '%s' exists but doesn't define '%s'.\nFalling back to '%s' in module '%s'.",
           requestedModule,
           requestedClass,
@@ -921,7 +927,7 @@ namespace
           fallback.module
         );
       } else {
-        gpg::Warnf(
+        gpg::Logf(
           "Problems loading module '%s'.  Falling back to '%s' in '%s'.",
           requestedModule,
           fallback.className,
@@ -930,21 +936,29 @@ namespace
       }
     }
 
-    LuaPlus::LuaObject fallbackModuleObj = moho::SCR_ImportLuaModule(sim->mLuaState, fallback.module);
-    if (fallbackModuleObj) {
-      LuaPlus::LuaObject fallbackFactory =
-        moho::SCR_GetLuaTableField(sim->mLuaState, fallbackModuleObj, fallback.className);
-      if (fallbackFactory) {
+    // 0x006777FD: the fallback module gets the same VFS existence check before
+    // it is imported.
+    const bool fallbackFileExists = waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
+      && waitHandleSet->mHandle->GetFileInfo(fallback.module, nullptr);
+    if (!fallbackFileExists) {
+      gpg::Logf("Can't find module '%s'.  No scripts for you -- one year.", fallback.module);
+      return defaultFactory;
+    }
+
+    const LuaPlus::LuaObject fallbackModuleObj = moho::SCR_Import(sim->mLuaState, fallback.module);
+    if (fallbackModuleObj.IsTable()) {
+      LuaPlus::LuaObject fallbackFactory = fallbackModuleObj.GetByName(fallback.className);
+      if (!fallbackFactory.IsNil()) {
         return fallbackFactory;
       }
 
-      gpg::Warnf(
+      gpg::Logf(
         "Script module '%s' exists but doesn't define '%s'.\nNo scripts for you -- one year.",
         fallback.module,
         fallback.className
       );
     } else {
-      gpg::Warnf("Can't find module '%s'.  No scripts for you -- one year.", fallback.module);
+      gpg::Logf("Problems loading module '%s'.  No scripts for you -- one year.", fallback.module);
     }
 
     return defaultFactory;
@@ -2273,11 +2287,15 @@ namespace moho
    * Address: 0x00678D40 (FUN_00678D40)
    *
    * What it does:
-   * Base error text provider for script/runtime diagnostics.
+   * Names this entity in script-error warnings as `Entity <blueprintId> at
+   * <address>` (format at 0x00E27324, `%08x` of `this`); a blueprint-less
+   * entity prints an empty id. This is the `where` of every
+   * `Error running %s script in %s: %s` line raised for entities, units,
+   * props and projectiles.
    */
   msvc8::string Entity::GetErrorDescription()
   {
-    return {};
+    return gpg::STR_Printf("Entity %s at %08x", GetBlueprintId(), reinterpret_cast<std::uintptr_t>(this));
   }
 
   /**

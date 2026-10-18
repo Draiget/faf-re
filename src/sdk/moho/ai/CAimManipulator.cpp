@@ -541,13 +541,11 @@ namespace
     outDirection->z = from.z - to.z;
     outDirection->y = 0.0f;
 
-    const float cosinePitch = msvc8::cos(pitch);
-    const float horizontalMagnitude = std::sqrt((outDirection->x * outDirection->x) + (outDirection->z * outDirection->z));
-    if (horizontalMagnitude > 0.0f) {
-      const float scale = cosinePitch / horizontalMagnitude;
-      outDirection->x *= scale;
-      outDirection->z *= scale;
-    }
+    // 0x005D6447..0x005D6476: the flattened delta is handed to
+    // func_VecSetLengthS (0x005B1C90) with `cos(pitch)` as the length, so the
+    // scale `cos / sqrt(lenSq)` and the lane products stay on the x87 stack
+    // (VecSetLength skips a non-positive length, leaving the delta as is).
+    (void)moho::VecSetLength(outDirection, msvc8::cos(pitch));
 
     outDirection->y = -msvc8::sin(pitch);
     return outDirection;

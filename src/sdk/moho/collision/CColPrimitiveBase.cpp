@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "gpg/core/utils/Global.h"
+#include "legacy/math/X87Math.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
@@ -175,7 +176,9 @@ namespace
       const float normalizedOverlap = overlapAlongAxis[axisIndex] * invAxisLength;
       if (normalizedOverlap < bestDepth) {
         bestDepth = normalizedOverlap;
-        bestAxis = axis * invAxisLength;
+        // 0x00474ED2..0x00474EF6: each axis lane is scaled by the reciprocal
+        // on the x87 stack (`fld st0; fmul [axis]; fstp`), not by mulss.
+        msvc8::ScaleVectorX87(&bestAxis.x, &axis.x, invAxisLength);
         bestAxisIndex = axisIndex;
         hasBestAxis = true;
       }

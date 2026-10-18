@@ -685,10 +685,14 @@ void CScriptObject::MemberSerialize(gpg::WriteArchive* const archive)
 
 /**
  * Address: 0x004C70A0
+ *
+ * What it does:
+ * Default `where` text for script-error warnings: `CScriptObject at %08x`
+ * (format at 0x00E091C4) of `this` -- lower-case, zero-padded hex, not `%p`.
  */
 msvc8::string CScriptObject::GetErrorDescription()
 {
-  return gpg::STR_Printf("CScriptObject at %p", static_cast<const void*>(this));
+  return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<std::uintptr_t>(this));
 }
 
 /**

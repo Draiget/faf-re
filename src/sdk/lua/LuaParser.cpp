@@ -10,6 +10,7 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <stdexcept>
 #include <utility>
 
 namespace lua
@@ -481,6 +482,7 @@ namespace
     void test_then_block(LexState* ls, expdesc* v);
     void forbody(LexState* ls, int base, int line, int nvars, int isnum);
     TString* luaS_newlstr(lua_State* L, const char* str, std::size_t len);
+    TString* PushLuaStringAtStackSlot(lua_State* L, LuaPlus::StkId slot, const char* source);
     char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
     void luaG_runerror(lua_State* L, const char* format, ...);
     int luaK_exp2anyreg(FuncState* fs, expdesc* e);
@@ -2619,9 +2621,22 @@ namespace
    * int __cdecl luaD_protectedparser(lua_State *L, ZIO *z, int bin);
    *
    * What it does:
-   * Compiles one chunk and releases the scratch buffer afterwards, whether the
-   * parse finished or threw. Lives here rather than with the rest of ldo.c
-   * because SParser and f_parser do.
+   * Compiles one chunk and answers a status instead of throwing: 0 when the
+   * parse finished, otherwise the raised error's code (LUA_ERRSYNTAX for a
+   * syntax error, LUA_ERRMEM for an allocation failure) with its text planted
+   * where the stack top stood on entry. The scratch buffer is released on
+   * both paths. Lives here rather than with the rest of ldo.c because
+   * SParser and f_parser do.
+   *
+   * The body is one EH region (FuncInfo 0x00EA5CAC) around f_parser with two
+   * handlers: `catch (const lua_Error&)` at 0x00913FE8 plants `what()` at the
+   * saved top through 0x00913810 and returns `code` (+0x28), and
+   * `catch (const std::runtime_error&)` at 0x00914019 does the same and
+   * returns 1. luaM_freearray (0x0091A240) then runs on the shared exit.
+   * Without the handlers a syntax error escaped lua_load as a C++ throw, so
+   * `loadstring`/`loadfile` raised instead of answering `nil, message`, and
+   * lua_dofile / lua_dobuffer / SCR_LuaDoFile never saw the status their
+   * error paths are written for.
    */
   extern "C" std::int32_t luaD_protectedparser(lua_State* const L, ZIO* const z, const int bin)
   {
@@ -2631,21 +2646,32 @@ namespace
     parser.buff.buffer = nullptr;
     parser.buff.buffsize = 0;
 
-    // The original frees the buffer from a __finally; the guard is the same
-    // thing said in C++.
-    struct BufferGuard
-    {
-      lua_State* state;
-      Mbuffer* buffer;
+    const std::ptrdiff_t oldTopOffset = reinterpret_cast<char*>(L->top) - reinterpret_cast<char*>(L->stack);
+    const auto plantErrorAtOldTop = [L, oldTopOffset](const char* const message) {
+      const auto oldTop = reinterpret_cast<LuaPlus::StkId>(reinterpret_cast<char*>(L->stack) + oldTopOffset);
+      (void)PushLuaStringAtStackSlot(L, oldTop, message);
+    };
 
-      ~BufferGuard()
-      {
-        (void)luaM_realloc(state, buffer->buffer, static_cast<lu_mem>(buffer->buffsize), 0u);
-      }
-    } const guard{L, &parser.buff};
+    std::int32_t status = 0;
+    try {
+      f_parser(&parser, L);
+    } catch (const lua::lua_Error& error) {
+      plantErrorAtOldTop(error.what());
+      status = error.code;
+    } catch (const msvc8::runtime_error& error) {
+      // MSVC8's `catch (const std::runtime_error&)` is spelled twice: the
+      // msvc8 hierarchy the Lua errors use, and the modern one the rest of
+      // the tree still throws. They share no base below std::exception, and
+      // a logic_error (LuaAssertion) must still pass through as in retail.
+      plantErrorAtOldTop(error.what());
+      status = LUA_ERRRUN;
+    } catch (const std::runtime_error& error) {
+      plantErrorAtOldTop(error.what());
+      status = LUA_ERRRUN;
+    }
 
-    f_parser(&parser, L);
-    return 0;
+    (void)luaM_realloc(L, parser.buff.buffer, static_cast<lu_mem>(parser.buff.buffsize), 0u);
+    return status;
   }
 
   /**

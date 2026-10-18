@@ -1,5 +1,6 @@
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/math/Vector3f.h"
 #include "legacy/math/X87Math.h"
 
 #include <cstddef>
@@ -702,26 +703,38 @@ namespace moho
       forwardZ = forwardInput.z * reciprocalForwardLength;
     }
 
-    float rightX = (up.y * forwardZ) - (up.z * forwardY);
-    float rightY = (up.z * forwardX) - (up.x * forwardZ);
-    float rightZ = (up.x * forwardY) - (up.y * forwardX);
-    const float rightLengthSq = (rightX * rightX) + (rightY * rightY) + (rightZ * rightZ);
-    if (!(rightLengthSq > 0.0f)) {
-      // Match the binary fallback lane when the up vector is collinear with forward.
-      rightX = (forwardZ * forwardZ) - ((-0.0f - forwardX) * forwardY);
-      rightY = ((-0.0f - forwardX) * forwardX) - (forwardY * forwardZ);
-      rightZ = (forwardY * forwardY) - (forwardZ * forwardX);
-    }
-
-    const float rightLength = std::sqrtf((rightX * rightX) + (rightY * rightY) + (rightZ * rightZ));
+    const float rightX = (up.y * forwardZ) - (up.z * forwardY);
+    const float rightY = (up.z * forwardX) - (up.x * forwardZ);
+    const float rightZ = (up.x * forwardY) - (up.y * forwardX);
+    // 0x004ECCA0..0x004ECCB9 sums the squared lanes as (y + z) + x.
+    const float rightLengthSq = ((rightY * rightY) + (rightZ * rightZ)) + (rightX * rightX);
     float basisX = std::numeric_limits<float>::max();
     float basisY = std::numeric_limits<float>::max();
     float basisZ = std::numeric_limits<float>::max();
-    if (rightLength != 0.0f) {
-      const float reciprocalRightLength = 1.0f / rightLength;
-      basisX = rightX * reciprocalRightLength;
-      basisY = rightY * reciprocalRightLength;
-      basisZ = rightZ * reciprocalRightLength;
+    if (rightLengthSq > 0.0f) {
+      // 0x004ECCDE..0x004ECD12: the length is the square root of that same
+      // sum, and the `1/len` reciprocal multiplies each lane.
+      const float rightLength = std::sqrtf(rightLengthSq);
+      if (rightLength != 0.0f) {
+        const float reciprocalRightLength = 1.0f / rightLength;
+        basisX = rightX * reciprocalRightLength;
+        basisY = rightY * reciprocalRightLength;
+        basisZ = rightZ * reciprocalRightLength;
+      }
+    } else {
+      // 0x004ECD2A..0x004ECD85: up collinear with forward. The alternate right
+      // axis goes through NormalizeVectorInto (0x0044F7E0), which sums
+      // (x + y) + z and yields zero (not FLT_MAX) for a zero or NaN length.
+      const Wm3::Vector3f fallbackRight{
+        (forwardZ * forwardZ) - ((-0.0f - forwardX) * forwardY),
+        ((-0.0f - forwardX) * forwardX) - (forwardY * forwardZ),
+        (forwardY * forwardY) - (forwardZ * forwardX),
+      };
+      Wm3::Vector3f basis{};
+      (void)NormalizeVectorInto(&basis, fallbackRight);
+      basisX = basis.x;
+      basisY = basis.y;
+      basisZ = basis.z;
     }
 
     axes->vX.x = basisX;
