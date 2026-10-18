@@ -376,7 +376,10 @@ namespace moho
     transform.pos_.x = posX;
     transform.pos_.y = posY;
     transform.pos_.z = posZ;
-    (void)MatrixToQuat(rotationMatrix, &transform.orient_);
+    // 0x006FC2E3: the canonical row converter (0x004F0CB0), as CreateUnitHPR
+    // uses. `MatrixToQuat` (0x004EB3F0) reads the rows the other way round and
+    // mirrored every script-placed prop's heading.
+    (void)MatrixRowsToQuatCanonical(rotationMatrix, &transform.orient_);
 
     Prop* const prop = PROP_Create(sim, transform, blueprintId.c_str());
     if (prop == nullptr) {
