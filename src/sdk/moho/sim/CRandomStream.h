@@ -34,11 +34,17 @@ namespace moho
   public:
     static gpg::RType* sType;
 
+    /// MT19937 reference seed the default constructor uses (0x1571).
+    static constexpr std::uint32_t kDefaultSeed = 5489u;
+
     /**
+     * Address: 0x0040EA40 (FUN_0040EA40, ??0CRandomStream@Moho@@QAE@XZ)
+     *
      * What it does:
-     * Default-initializes storage; reflection/typeinfo paths seed explicitly.
+     * Seeds the embedded twister with `kDefaultSeed` and clears the cached
+     * gaussian sample state.
      */
-    CRandomStream() = default;
+    CRandomStream() noexcept;
 
     /**
      * Address: 0x0040EA60 (FUN_0040EA60, Moho::CRandomStream::CRandomStream)
@@ -52,14 +58,6 @@ namespace moho
     float marsagliaPair;           // +0x09C4 (mMarsagliaPair)
     bool hasMarsagliaPair;         // +0x09C8 (mHasMarsagliaPair)
     std::uint8_t pad_09C9_09CC[3]; // +0x09C9
-
-    /**
-     * Address: 0x0040EA40 (FUN_0040EA40)
-     *
-     * What it does:
-     * Seeds the embedded twister state and clears cached gaussian sample state.
-     */
-    void Seed(std::uint32_t seed) noexcept;
 
     /**
      * Address: 0x0040EA70 (FUN_0040EA70, Moho::CRandomStream::FRand)

@@ -243,14 +243,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x0040EA40 (FUN_0040EA40)
+   * Address: 0x0040EA40 (FUN_0040EA40, ??0CRandomStream@Moho@@QAE@XZ)
    *
    * What it does:
-   * Seeds twister state and clears cached Marsaglia-pair availability.
+   * Seeds the twister with the MT19937 reference seed 5489 (`mov eax,1571h;
+   * call CMersenneTwister::Seed`) and clears the cached Marsaglia pair. The
+   * reflection NewRef/CtrRef thunks (0x0040F450 / 0x0040F4C0) inline it.
    */
-  void CRandomStream::Seed(const std::uint32_t seed) noexcept
+  CRandomStream::CRandomStream() noexcept
   {
-    twister.Seed(seed);
+    twister.Seed(kDefaultSeed);
     hasMarsagliaPair = 0;
   }
 
@@ -279,7 +281,14 @@ namespace moho
     } while (radiusSquared >= 1.0f);
 
     // Keep the original loop condition (`radiusSquared >= 1.0f`) for binary parity.
-    const float scale = std::sqrt((-2.0f * msvc8::log(radiusSquared)) / radiusSquared);
+    //
+    // 0x0040EFEC calls 0x0040EAD0, a bare `fld; fldln2; fxch; fyl2x` returning
+    // the x87 logarithm unrounded, and 0x0040EFF1 multiplies it by -2.0 under
+    // 24-bit precision control: one rounding of the fyl2x result (the -2 is
+    // exact). The CRT's double `log` rounded to float picks the neighbouring
+    // float whenever the two approximations straddle a float midpoint, so the
+    // log goes through the same `fyl2x` the engine runs.
+    const float scale = std::sqrt((-2.0f * msvc8::IntrinsicLn(radiusSquared)) / radiusSquared);
     hasMarsagliaPair = 1;
     marsagliaPair = y * scale;
     return x * scale;

@@ -7,24 +7,16 @@
 
 namespace
 {
-  void InitializeRandomStream(moho::CRandomStream& stream)
-  {
-    stream.twister.Seed(0x1571u);
-    stream.hasMarsagliaPair = false;
-  }
-
   /**
    * Address: 0x0040F450 (FUN_0040F450)
    *
    * What it does:
-   * Allocates and seeds a new CRandomStream before wrapping it in an RTTI ref.
+   * Allocates a default-constructed (seed 5489) CRandomStream and wraps it in
+   * an RTTI ref; 0x0040F466 is the inlined default constructor.
    */
   [[nodiscard]] gpg::RRef NewRef()
   {
-    auto* const stream = new (std::nothrow) moho::CRandomStream;
-    if (stream) {
-      InitializeRandomStream(*stream);
-    }
+    auto* const stream = new (std::nothrow) moho::CRandomStream();
 
     gpg::RRef ref{};
     gpg::AssignCRandomStreamRef(&ref, stream);
@@ -35,14 +27,12 @@ namespace
    * Address: 0x0040F4C0 (FUN_0040F4C0)
    *
    * What it does:
-   * Seeds an existing CRandomStream storage block before wrapping it in an RTTI ref.
+   * Default-constructs (seed 5489) a CRandomStream in caller storage before
+   * wrapping it in an RTTI ref; 0x0040F4CB is the inlined default constructor.
    */
   [[nodiscard]] gpg::RRef CtrRef(void* const storage)
   {
-    auto* const stream = static_cast<moho::CRandomStream*>(storage);
-    if (stream) {
-      InitializeRandomStream(*stream);
-    }
+    moho::CRandomStream* const stream = storage ? new (storage) moho::CRandomStream() : nullptr;
 
     gpg::RRef ref{};
     gpg::AssignCRandomStreamRef(&ref, stream);
