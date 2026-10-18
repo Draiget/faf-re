@@ -401,11 +401,22 @@ namespace moho
     const Wm3::Vec3f& worldPoint
   )
   {
-    const float inverseMassOrMax = (body->mMass == 0.0f) ? std::numeric_limits<float>::max() : (1.0f / body->mMass);
+    // Inlined Wm3 `worldImpulse / mMass` (0x00697C20..0x00697C65): a zero mass
+    // yields the vector (FLT_MAX, FLT_MAX, FLT_MAX) from 0x00D71C00, not the
+    // impulse scaled by FLT_MAX.
+    float velocityDeltaX = std::numeric_limits<float>::max();
+    float velocityDeltaY = std::numeric_limits<float>::max();
+    float velocityDeltaZ = std::numeric_limits<float>::max();
+    if (body->mMass != 0.0f) {
+      const float inverseMass = 1.0f / body->mMass;
+      velocityDeltaX = worldImpulse.x * inverseMass;
+      velocityDeltaY = worldImpulse.y * inverseMass;
+      velocityDeltaZ = worldImpulse.z * inverseMass;
+    }
 
-    body->mVelocity.x += worldImpulse.x * inverseMassOrMax;
-    body->mVelocity.y += worldImpulse.y * inverseMassOrMax;
-    body->mVelocity.z += worldImpulse.z * inverseMassOrMax;
+    body->mVelocity.x += velocityDeltaX;
+    body->mVelocity.y += velocityDeltaY;
+    body->mVelocity.z += velocityDeltaZ;
 
     const Wm3::Vec3f lever{
       worldPoint.x - body->mPos.x,

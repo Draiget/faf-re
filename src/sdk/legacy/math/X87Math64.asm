@@ -317,6 +317,33 @@ msvc8_x87_intrinsic_ln PROC
 msvc8_x87_intrinsic_ln ENDP
 
 
+; float msvc8_x87_intrinsic_ln_quotient(float x, double base)
+; ln(x) / ln(base) with both logs kept on the x87 stack; only the quotient
+; rounds to float.
+msvc8_x87_intrinsic_ln_quotient PROC
+    movss   dword ptr [rsp+8], xmm0
+    movsd   qword ptr [rsp+16], xmm1
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fldln2
+    fxch    st(1)
+    fyl2x
+    fld     qword ptr [rsp+16]
+    fldln2
+    fxch    st(1)
+    fyl2x
+    fdivp   st(1), st(0)
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_intrinsic_ln_quotient ENDP
+
+
 ; float msvc8_x87_intrinsic_log10(float x)
 msvc8_x87_intrinsic_log10 PROC
     movss   dword ptr [rsp+8], xmm0

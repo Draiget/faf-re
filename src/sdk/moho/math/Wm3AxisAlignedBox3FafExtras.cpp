@@ -74,7 +74,9 @@ namespace moho
             float& tExit
         ) noexcept
         {
-            if (std::fabs(direction) < kRaySlabMinDirMagnitude) {
+            // 0x00473E0D..0x00473E17 `fld FLT_MIN; fcompi; jb skip`: an
+            // unordered (NaN) direction skips the axis as well.
+            if (!(std::fabs(direction) >= kRaySlabMinDirMagnitude)) {
                 return;
             }
 
@@ -82,20 +84,19 @@ namespace moho
             float t0 = (boxMin - origin) * invDir;
             float t1 = (boxMax - origin) * invDir;
 
+            // The exit bound keeps its old value only when the candidate is
+            // strictly greater (0x00473E5A `ja keep`, 0x00473E73 `jbe store`),
+            // so an unordered candidate is stored.
             if (direction <= 0.0f) {
                 if (t1 > tEnter) {
                     tEnter = t1;
                 }
-                if (t0 < tExit) {
-                    tExit = t0;
-                }
+                tExit = (t0 > tExit) ? tExit : t0;
             } else {
                 if (t0 > tEnter) {
                     tEnter = t0;
                 }
-                if (t1 < tExit) {
-                    tExit = t1;
-                }
+                tExit = (t1 > tExit) ? tExit : t1;
             }
         }
     } // namespace

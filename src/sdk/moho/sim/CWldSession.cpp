@@ -13700,8 +13700,10 @@ namespace moho
       return 1.0f;
     }
 
+    // 0x0088D0DA..0x0088D0EB: `fild rate; fmul 0.1f` (float 0x3DCCCCCD at
+    // 0x00E4F714), then the CRT pow with the double 10.0 base.
     const float requestedSimScale =
-      static_cast<float>(std::pow(10.0, static_cast<double>(clientManager->GetSimRate()) * 0.1));
+      static_cast<float>(std::pow(10.0, static_cast<double>(clientManager->GetSimRate() * 0.1f)));
 
     const float skewRateMin = 1.0f / wld_SkewRateAdjustMax;
     const float skewRateSample =

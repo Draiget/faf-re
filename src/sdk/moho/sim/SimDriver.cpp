@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -214,15 +215,25 @@ namespace
 
   /**
    * Address: 0x0055AE10 (FUN_0055AE10)
-   * Maps the floating sim-rate estimate to the integer value consumed by CClientManagerImpl::SetSimRate.
+   * Mangled: ?RATE_GameRateToSpeed@Moho@@YAHM@Z
+   *
+   * What it does:
+   * Converts a game-rate multiplier to the integer speed setting,
+   * `floor(10 * log10(rate))` - the inverse of WLD_GetSimRate's
+   * `pow(10, speed * 0.1f)`.
    */
-  int QuantizeSimRateSample(const float sample)
+  int RATE_GameRateToSpeed(const float rate)
   {
-    if (!std::isfinite(sample)) {
-      return 0;
-    }
+    // 0x0055AE19..0x0055AE36: `log(rate) / log(10.0)` with both logarithms on
+    // the x87 stack, times 10.0f (0x00DFF31C), stored to float.
+    const float speed = msvc8::IntrinsicLnQuotient(rate, 10.0) * 10.0f;
 
-    return static_cast<int>(std::lround(sample));
+    // 0x0055AE3A..0x0055AE53: floor as `frndint`, then -1 when the value is
+    // below (or unordered with) its nearest integer, added to the `fistp`.
+    const float nearest = std::nearbyint(speed);
+    const auto whole = static_cast<std::uint32_t>(msvc8::RoundToInt(nearest));
+    const std::uint32_t borrow = (speed < nearest || std::isunordered(speed, nearest)) ? 1u : 0u;
+    return static_cast<int>(whole - borrow);
   }
 
   /**
@@ -911,7 +922,7 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
 
   const float simRateEstimate = (1000.0f / medianDispatchMs) * 0.1f;
-  const int updatedSimRate = QuantizeSimRateSample(simRateEstimate);
+  const int updatedSimRate = RATE_GameRateToSpeed(simRateEstimate);
   if (updatedSimRate != mCurrentSimRate) {
     mCurrentSimRate = updatedSimRate;
 

@@ -23,6 +23,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "legacy/math/X87Math.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/CAiReconDBImpl.h"
@@ -1548,11 +1549,15 @@ namespace moho
     // feeds this straight into the initial unit's construction transform, so
     // an army whose start is generated rather than authored got its commander
     // built outside the playable area.
-    constexpr float kStartFractionSpan = 0.8f;
+    //
+    // The scale at 0x00E4F7F4 is 0x2F4CCCCC: (0.9f - 0.1f) folded with 2^-32,
+    // one ulp below 0.8f * 2^-32 (0x2F4CCCCD). The word multiplies it directly
+    // (`fild; fadd 2^32; fmul`), a single rounding, not a unit float times 0.8f.
+    constexpr float kStartFractionScale = 0x1.999998p-33f;
     constexpr float kStartFractionMargin = 0.1f;
 
-    const float rx = (CMersenneTwister::ToUnitFloat(rng.NextUInt32()) * kStartFractionSpan) + kStartFractionMargin;
-    const float ry = (CMersenneTwister::ToUnitFloat(rng.NextUInt32()) * kStartFractionSpan) + kStartFractionMargin;
+    const float rx = msvc8::MulTwisterWord(kStartFractionScale, rng.NextUInt32()) + kStartFractionMargin;
+    const float ry = msvc8::MulTwisterWord(kStartFractionScale, rng.NextUInt32()) + kStartFractionMargin;
 
     mVarDat.mArmyStart.x = (width > 0) ? static_cast<float>(width - 1) * rx : 0.0f;
     mVarDat.mArmyStart.y = (height > 0) ? static_cast<float>(height - 1) * ry : 0.0f;

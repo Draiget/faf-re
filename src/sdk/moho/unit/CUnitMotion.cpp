@@ -59,6 +59,9 @@ namespace moho
     constexpr float kWaterSnapSurfaceBias = 0.25f;
     constexpr float kNoWaterElevation = -10000.0f;
     constexpr float kCommonMoveNearStopSpeedScale = 0.080000006f;
+    // Loaded from 0x00E4F9D0 (0x3BA3D70B): one ulp above the float nearest
+    // 0.005, as kCommonMoveNearStopSpeedScale (0x00E4F91C, 0x3DA3D70B) is for 0.08.
+    constexpr float kMotionStoppingSpeedScale = 0x1.47ae16p-8f;
     constexpr float kCommonMoveSlavedArcEnterRadians = 0.017453292f;
     constexpr float kCommonMoveSlavedArcExitRadians = 0.0087266462f;
     constexpr float kCommonMoveHeadingAlignedDot = 0.99989998f;
@@ -4090,7 +4093,7 @@ namespace moho
 
           if (mNewElevation > 0.0f && mCurElevation < mNewElevation * 0.5f) {
             const float bodySpeed = Wm3::Vector3f::Length(physBody->mVelocity);
-            if (unit->mInfoCache.mFormationTopSpeed * 0.08f > bodySpeed) {
+            if (unit->mInfoCache.mFormationTopSpeed * kCommonMoveNearStopSpeedScale > bodySpeed) {
               const float ratio = std::min(mCurElevation / mNewElevation, 1.0f);
               desiredVelocity.x *= ratio;
               desiredVelocity.z *= ratio;
@@ -4188,11 +4191,11 @@ namespace moho
 
       if (horizontalDistance > air.StartTurnDistance || mAlwaysUseTopSpeed) {
         SetMotionHorzEvent(
-          (groundSpeed > unit->mInfoCache.mFormationTopSpeed * 0.08f) ? kUnitMotionHorzEventTopSpeed : kUnitMotionHorzEventCruising
+          (groundSpeed > unit->mInfoCache.mFormationTopSpeed * kCommonMoveNearStopSpeedScale) ? kUnitMotionHorzEventTopSpeed : kUnitMotionHorzEventCruising
         );
       } else if (mCombatState == ACS_None) {
         SetMotionHorzEvent(
-          (unit->mInfoCache.mFormationTopSpeed * 0.005f <= groundSpeed) ? kUnitMotionHorzEventStopping : kUnitMotionHorzEventStopped
+          (unit->mInfoCache.mFormationTopSpeed * kMotionStoppingSpeedScale <= groundSpeed) ? kUnitMotionHorzEventStopping : kUnitMotionHorzEventStopped
         );
       } else {
         SetMotionHorzEvent(kUnitMotionHorzEventCruising);

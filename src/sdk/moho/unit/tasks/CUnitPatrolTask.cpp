@@ -573,9 +573,9 @@ namespace moho
     const CSimArmyEconomyInfo* const economy = army->GetEconomy();
     const SEconTotals& totals = economy->economy;
     const bool energyStorageNearFull =
-      totals.mStored.ENERGY > static_cast<float>(static_cast<double>(totals.mMaxStorage.ENERGY) * 0.75);
+      totals.mStored.ENERGY > static_cast<float>(totals.mMaxStorage.ENERGY) * 0.75f;
     const bool massStorageNearFull =
-      totals.mStored.MASS > static_cast<float>(static_cast<double>(totals.mMaxStorage.MASS) * 0.75);
+      totals.mStored.MASS > static_cast<float>(totals.mMaxStorage.MASS) * 0.75f;
 
     // No-rush zone centre: start position offset by the per-army no-rush offset.
     // X pairs with the candidate's X and Z with its Z -- 0x0061C00A subtracts

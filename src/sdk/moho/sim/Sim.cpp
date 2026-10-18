@@ -14651,7 +14651,10 @@ int moho::cfunc_RandomUserL(LuaPlus::LuaState* const state)
 
   boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
   if (argumentCount == 0) {
-    const double value = static_cast<double>(math_GlobalRandomStream.twister.NextUInt32()) * 2.3283064e-10;
+    // 0x008BEB38..0x008BEB4D: `fild; jge; fadd 2^32; fmul [0x00E4F7B0]`, the
+    // float 2^-32 (0x2F800000), stored to float once.
+    constexpr float kInvTwoTo32 = 0x1p-32f;
+    const float value = msvc8::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
     lua_pushnumber(rawState, value);
     return 1;
   }
@@ -18106,7 +18109,9 @@ int moho::cfunc_GetGameTimeL(LuaPlus::LuaState* const state)
     }
   }
 
-  const int wholeSeconds = static_cast<int>((static_cast<double>(session->mGameTick) + session->mTimeSinceLastTick) * 0.1);
+  // 0x008432C6..0x008432DA: `fild tick; fadd timeSinceLastTick; fmul 0.1f`
+  // (0x00E4F714 holds the float 0x3DCCCCCD), then __ftol2_sse.
+  const int wholeSeconds = static_cast<int>((static_cast<float>(session->mGameTick) + session->mTimeSinceLastTick) * 0.1f);
   const auto signedSeconds = static_cast<long long>(wholeSeconds);
   const bool isNegative = signedSeconds < 0;
   const unsigned long long absoluteSeconds = isNegative

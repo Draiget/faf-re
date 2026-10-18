@@ -162,6 +162,14 @@ namespace msvc8
   [[nodiscard]] float IntrinsicExp(float x) noexcept;
   [[nodiscard]] float IntrinsicLn(float x) noexcept;
   [[nodiscard]] float IntrinsicLog10(float x) noexcept;
+  /**
+   * `log(x) / log(base)` with both /Oi `log` intrinsics inlined (`fldln2;
+   * fxch; fyl2x` twice, then `fdivp`), as RATE_GameRateToSpeed forms it at
+   * 0x0055AE19..0x0055AE2E: neither logarithm rounds before the divide, only
+   * the quotient does. Rounding `IntrinsicLn(x)` to float first can land one
+   * float away.
+   */
+  [[nodiscard]] float IntrinsicLnQuotient(float x, double base) noexcept;
   [[nodiscard]] float CosTimesCos(float firstArg, float secondArg) noexcept;
 
   /**

@@ -10,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/math/X87Math.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
@@ -355,8 +356,9 @@ namespace
     float* const outCos
   ) noexcept
   {
-    *outCos = std::cos(angle);
-    *outSin = std::sin(angle);
+    // 0x00778698 `fsincos`: the x87 results, not the CRT's software sin/cos.
+    *outCos = msvc8::cosf(angle);
+    *outSin = msvc8::sinf(angle);
     return outSin;
   }
 } // namespace
