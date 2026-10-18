@@ -3706,8 +3706,13 @@ namespace moho
               // rebuilt lane by lane, because the lane was declared a plain
               // (x,y,z,w) `moho::Vector4f` over the w-first quaternion words it
               // actually stores; it is a `Wm3::Quatf` now.
+              //
+              // 0x006BD2F4..0x006BD373 expands only the forward axis inline,
+              // pairing the products before the `*2` (`QuatForwardAxis`); no
+              // `VAxes3` (0x004EC590) call, whose pre-doubled products round
+              // differently once one is denormal.
               const Wm3::Quaternionf& targetOrientation = rawTargetEntity->mVarDat.mCurTransform.orient_;
-              const Wm3::Vector3f targetForward = VAxes3(targetOrientation).vZ;
+              const Wm3::Vector3f targetForward = moho::QuatForwardAxis(targetOrientation);
               const float facingDot = (targetForward.x * currentHeading.x) + (targetForward.z * currentHeading.z)
                 + (targetForward.y * currentHeading.y);
               if (facingDot > 0.0f) {

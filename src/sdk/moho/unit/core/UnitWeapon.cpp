@@ -3092,10 +3092,12 @@ namespace moho
    * Evaluates one weapon-owner fire gate lane (state, movement, water level,
    * bomb-drop release timing, and heading constraints) for one target payload.
    *
-   * Ground truth (`FUN_006D4C80.c`) re-derived term-by-term: the forward-axis
-   * extraction (`dir.x/y/z`) matches the engine scalar-first rotation matrix
-   * exactly (`Moho::MultQuadVec`), not the generic `Quaternion::Rotate`
-   * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
+   * The heading test's forward axis is expanded inline at
+   * 0x006D50BB..0x006D5135 -- `(w*y + z*x)*2`, `(z*y - w*x)*2`,
+   * `1 - (y*y + x*x)*2`, each pair summed BEFORE the `*2` (`QuatForwardAxis`).
+   * There is no `MultQuadVec` (0x00452D40) call in this function; that one
+   * pre-doubles a lane of each product (`QuatToMatrix`, 0x00452FD0) and so
+   * rounds differently whenever a product is denormal.
    */
   bool UnitWeapon::CanFire(UnitWeapon* const weapon, CAiTarget* const targetData)
   {
@@ -3203,10 +3205,7 @@ namespace moho
       return weapon->mCanFire != 0u;
     }
 
-    const Wm3::Quaternionf ownerOrientation = ownerUnit->GetTransform().orient_;
-    const Wm3::Vec3f forwardAxis{0.0f, 0.0f, 1.0f};
-    Wm3::Vec3f forward{};
-    MultQuadVec(&forward, &forwardAxis, &ownerOrientation);
+    const Wm3::Vec3f forward = moho::QuatForwardAxis(ownerUnit->GetTransform().orient_);
 
     // In the outer release window, the release point must have been passed
     // while the target remains ahead. FUN_006D4C80 uses release-minus-unit

@@ -181,6 +181,13 @@
            Wm3Math.obj and Wm3Vector3.obj. -->
       <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <!-- /EHs, not the default /EHsc: the Lua fork raises script errors as
+           C++ lua::lua_Error throws out of functions declared extern "C"
+           (luaD_call and its callees). /EHsc lets the optimizer assume those
+           never throw and drop the handlers around them, so luaB_pcall's
+           try/catch vanished in Release and a script error inside pcall
+           aborted the whole coroutine (the original's Lua is C++-linkage). -->
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
@@ -228,6 +235,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <!-- /EHs, not the default /EHsc: the Lua fork raises script errors as
+           C++ lua::lua_Error throws out of functions declared extern "C"
+           (luaD_call and its callees). /EHsc lets the optimizer assume those
+           never throw and drop the handlers around them, so luaB_pcall's
+           try/catch vanished in Release and a script error inside pcall
+           aborted the whole coroutine (the original's Lua is C++-linkage). -->
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
@@ -296,6 +310,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
+      <!-- /EHs, not the default /EHsc: the Lua fork raises script errors as
+           C++ lua::lua_Error throws out of functions declared extern "C"
+           (luaD_call and its callees). /EHsc lets the optimizer assume those
+           never throw and drop the handlers around them, so luaB_pcall's
+           try/catch vanished in Release and a script error inside pcall
+           aborted the whole coroutine (the original's Lua is C++-linkage). -->
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
@@ -328,6 +349,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;LUA_NUMBER=float;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
+      <!-- /EHs, not the default /EHsc: the Lua fork raises script errors as
+           C++ lua::lua_Error throws out of functions declared extern "C"
+           (luaD_call and its callees). /EHsc lets the optimizer assume those
+           never throw and drop the handlers around them, so luaB_pcall's
+           try/catch vanished in Release and a script error inside pcall
+           aborted the whole coroutine (the original's Lua is C++-linkage). -->
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>

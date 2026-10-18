@@ -42,13 +42,23 @@ namespace
 
   /**
    * Local +Z ("forward") of an orientation, in world space. The binary
-   * expands just this column of the rotation matrix inline at 0x00621CC1 and
-   * 0x0062189B; `VAxes3` builds the same basis and is used here so the
-   * expansion is not spelled out a second time.
+   * expands just this column of the rotation matrix inline at
+   * 0x00621CC1..0x00621D30 and 0x0062189B..0x0062191A, pairing each lane's
+   * products before the `*2` (the `QuatForwardAxis` shape), not `VAxes3`
+   * (0x004EC590), whose pre-doubled products round differently once one is
+   * denormal. Spelled out here rather than by including
+   * `moho/math/QuaternionMath.h`: that header's per-TU yaw-quaternion statics
+   * have no copy in this TU (its initializers run 0x00BD1880 Stats,
+   * 0x00BD1890 type info, 0x00BD18B0, with no yaw quaternion between).
    */
   [[nodiscard]] Wm3::Vec3f OrientationForwardAxis(const Wm3::Quatf& orientation) noexcept
   {
-    return moho::VAxes3{orientation}.vZ;
+    const Wm3::Quatf& q = orientation;
+    return Wm3::Vec3f{
+      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
+      ((q.y * q.z) - (q.w * q.x)) * 2.0f,
+      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
+    };
   }
 
   [[nodiscard]] float DotProduct(const Wm3::Vec3f& lhs, const Wm3::Vec3f& rhs) noexcept

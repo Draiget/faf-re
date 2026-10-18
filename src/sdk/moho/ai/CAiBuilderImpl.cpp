@@ -349,10 +349,12 @@ void CAiBuilderImpl::BuilderSetIsFactory(const bool isFactory)
 /**
  * Address: 0x0059EEF0 (FUN_0059EEF0)
  *
- * Ground truth (`FUN_0059EEF0.c`, `Moho::CAiBuilderImpl::IssueRallyPoint`)
- * re-derived term-by-term: the rotation matches the engine scalar-first
- * `Moho::QuatToMatrix` formula exactly, not the generic `Quaternion::Rotate`
- * (upstream WildMagic, `.w`-scalar `ToMat3()`) this replaces.
+ * The rally offset is rotated inline at 0x0059EF1F..0x0059F0D2, not through
+ * `MultQuadVec` (0x00452D40): only the forward (+Z) and right (+X) axes are
+ * expanded, each pair of products summed before the `*2`, and the offset is
+ * `forward*RallyZ + right*RallyX` with no y lane. `QuatToMatrix` pre-doubles
+ * one factor of each product instead, which rounds differently once a
+ * product is denormal.
  */
 void CAiBuilderImpl::BuilderSetUpInitialRally()
 {
@@ -366,9 +368,15 @@ void CAiBuilderImpl::BuilderSetUpInitialRally()
   }
 
   const VTransform& transform = mOwnerUnit->GetTransform();
-  const Wm3::Vector3f localRally{blueprint->Economy.InitialRallyX, 0.0f, blueprint->Economy.InitialRallyZ};
-  Wm3::Vector3f rotatedRally{};
-  MultQuadVec(&rotatedRally, &localRally, &transform.orient_);
+  const Wm3::Quaternionf& q = transform.orient_;
+  const Wm3::Vector3f forward = QuatForwardAxis(q);
+  const Wm3::Vector3f right{
+    1.0f - (((q.z * q.z) + (q.y * q.y)) * 2.0f),
+    ((q.y * q.x) + (q.z * q.w)) * 2.0f,
+    ((q.z * q.x) - (q.y * q.w)) * 2.0f,
+  };
+  const Wm3::Vector3f rotatedRally =
+    (forward * blueprint->Economy.InitialRallyZ) + (right * blueprint->Economy.InitialRallyX);
   const Wm3::Vector3f rallyWorldPos = transform.pos_ + rotatedRally;
 
   // Sim-internal issue, not the ICommandSink one. 0x0059F1D6 calls
