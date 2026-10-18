@@ -1,6 +1,7 @@
 #include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include <cstdio>
 #include "Mesh.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -3929,7 +3930,9 @@ namespace moho
       frameSeconds += 4294967296.0; // 2^32 unsigned fixup (dbl_E4F710)
     }
     frameSeconds += deltaFrame;
-    const float shaderTime = static_cast<float>(std::fmod(frameSeconds, 36000.0)); // flt_F57F08
+    // `fmod(float, float)` (0x00422920 -> _CIfmod): the time is stored to a
+    // float argument before the call.
+    const float shaderTime = static_cast<float>(msvc8::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
     if (sv.time.Exists()) {
       sv.time.SetFloat(shaderTime);
     }
@@ -4242,7 +4245,9 @@ namespace moho
       frameSeconds += 4294967296.0; // 2^32 unsigned fixup (dbl_E4F710)
     }
     frameSeconds += deltaFrame;
-    const float shaderTime = static_cast<float>(std::fmod(frameSeconds, 36000.0)); // flt_F57F08
+    // `fmod(float, float)` (0x00422920 -> _CIfmod): the time is stored to a
+    // float argument before the call.
+    const float shaderTime = static_cast<float>(msvc8::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
     if (sv.time.Exists()) {
       sv.time.SetFloat(shaderTime);
     }
@@ -4450,7 +4455,9 @@ namespace moho
       frameSeconds += 4294967296.0; // 2^32 unsigned fixup
     }
     frameSeconds += deltaFrame;
-    const float shaderTime = static_cast<float>(std::fmod(frameSeconds, 36000.0)); // flt_F57F08
+    // `fmod(float, float)` (0x00422920 -> _CIfmod): the time is stored to a
+    // float argument before the call.
+    const float shaderTime = static_cast<float>(msvc8::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
     if (sv.time.Exists()) {
       sv.time.SetFloat(shaderTime);
     }

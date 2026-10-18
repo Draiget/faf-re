@@ -1,5 +1,7 @@
 #include "CAnimTexture.h"
 
+#include "legacy/math/X87Math.h"
+
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -32,30 +34,32 @@ namespace
     return static_cast<std::int32_t>(std::floor(value));
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x00422940 (FUN_00422940)
    *
    * What it does:
    * Computes `value mod range` with the same positive-wrap behavior used by
    * animation frame sampling paths.
+   *
+   * 0x00422949..0x0042294F: `fld value; fld range; call _CIfmod` -- the MSVC8
+   * CRT, which returns +0 for a zero dividend. 0x00422958..0x00422987 shifts by
+   * `range` when `0 > r` and `0 > range` disagree (both ordered compares). No
+   * zero-range guard: the callers test the range first (0x0063FAB7, 0x0064005D,
+   * and a non-empty frame list in GetFrameAt).
    */
-  [[nodiscard]] float WrapPositiveModulo(const float value, const float range) noexcept
+  float WrapPositiveModulo(const float value, const float range) noexcept
   {
-    if (range == 0.0f) {
-      return 0.0f;
-    }
-
-    float wrapped = std::fmod(value, range);
-    if ((wrapped < 0.0f) != (range < 0.0f)) {
+    float wrapped = static_cast<float>(msvc8::fmod(value, range));
+    if ((0.0f > wrapped) != (0.0f > range)) {
       wrapped += range;
     }
     return wrapped;
   }
 
-} // namespace
-
-namespace moho
-{
   /**
    * Address: 0x00422D20 (FUN_00422D20)
    *

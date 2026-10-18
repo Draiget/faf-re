@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include "MeshBatch.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <bit>
@@ -1190,8 +1191,10 @@ namespace moho
           staging.instanceIndex = static_cast<std::uint8_t>(packedCount);
           staging.color = meshInstance->color;
           staging.meshColor = meshInstance->meshColor;
-          staging.shaderTime =
-            std::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds);
+          // 0x007E8235..0x007E8242: `fmod(float, float)` (0x00422920 -> _CIfmod).
+          staging.shaderTime = static_cast<float>(
+            msvc8::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds)
+          );
           staging.useSecondaryData = mUseSecondaryData;
           staging.parameter = (&meshInstance->parameters)[mParameterAnnotation];
           staging.scroll[0] = meshInstance->scroll1.x

@@ -10689,9 +10689,11 @@ namespace
 	{
 		const lua_Number left = luaL_checknumber(state, 1);
 		const lua_Number right = luaL_checknumber(state, 2);
+		// 0x00919C63: the MSVC8 CRT `fmod` (0x00A8E06A), which returns +0 for a
+		// -0 dividend where the current CRT keeps -0.
 		lua_pushnumber(
 			state,
-			static_cast<lua_Number>(std::fmod(static_cast<double>(left), static_cast<double>(right)))
+			static_cast<lua_Number>(msvc8::fmod(static_cast<double>(left), static_cast<double>(right)))
 		);
 		return 1;
 	}

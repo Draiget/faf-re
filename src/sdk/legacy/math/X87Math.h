@@ -69,6 +69,27 @@ namespace msvc8
   [[nodiscard]] double fmod(double x, double y) noexcept;
 
   /**
+   * `(a + b) * 0.5f` and `fabs(a - b) * 0.5f` as the 2007 build formed them
+   * on the x87 stack: `fld a; fadd b; fmul 0.5` (CAimManipulator::SetFiringArc
+   * 0x00630CB9..0x00630CBF / 0x00630D01..0x00630D24, CBuilderArmManipulator::
+   * SetAimingArc 0x00636499..0x0063649F / 0x006364E1..0x00636504). Under
+   * 24-bit precision control the sum rounds its mantissa to single but keeps
+   * the extended exponent, so it cannot overflow to infinity before the
+   * halving brings it back into float range. A float sum does overflow for
+   * `|a + b| > FLT_MAX`. These form the sum in double (one float rounding of a
+   * double sum of two floats is the single rounding, and halving is exact),
+   * so they give the same bits on x86 and x64.
+   *
+   * `HalfSumX87` returns the value still on the x87 stack, unrounded: the
+   * callers feed it straight into an inlined `_CIfmod`
+   * (`moho::NormalizeAngleSignedRadiansX87`), and a half below float
+   * precision (`-2^-150`) must reach the fmod as non-zero. `HalfAbsDifferenceX87`
+   * returns the float its `fstp` stores.
+   */
+  [[nodiscard]] double HalfSumX87(float a, float b) noexcept;
+  [[nodiscard]] float HalfAbsDifferenceX87(float minuend, float subtrahend) noexcept;
+
+  /**
    * `dest = source * sqrt(|target|^2 / sourceLengthSq)` exactly as
    * func_VecSetLengthTo (FUN_0069A360) forms it at 0x0069A3A5..0x0069A3D3:
    * the target's squared length `(x*x + y*y) + z*z`, the division and the

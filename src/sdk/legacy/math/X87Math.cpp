@@ -148,6 +148,24 @@ namespace msvc8
     return std::fmod(x, y);
   }
 
+  double HalfSumX87(const float a, const float b) noexcept
+  {
+    // `fadd` rounds the sum to a 24-bit mantissa without the float exponent
+    // limits, and `fmul 0.5` is exact. A sum below 2^-125 is a multiple of
+    // 2^-149 that fits 24 bits, so it is already exact; anything larger rounds
+    // like a float once scaled into range (|sum| <= 2 * FLT_MAX).
+    const double half = (static_cast<double>(a) + static_cast<double>(b)) * 0.5;
+    if (std::fabs(half) < 0x1p-126) {
+      return half;
+    }
+    return static_cast<double>(static_cast<float>(half));
+  }
+
+  float HalfAbsDifferenceX87(const float minuend, const float subtrahend) noexcept
+  {
+    return static_cast<float>(std::fabs(static_cast<double>(minuend) - static_cast<double>(subtrahend)) * 0.5);
+  }
+
   void ScaleVectorToLengthOfX87(
     float* const destLanes, const float* const sourceLanes, const float* const targetLanes, const float sourceLengthSq
   ) noexcept

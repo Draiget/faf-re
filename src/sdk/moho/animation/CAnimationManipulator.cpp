@@ -15,6 +15,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/animation/CAnimTexture.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
@@ -163,21 +164,6 @@ namespace
   ) noexcept
   {
     return ScaClipHeader(*resource)->mFrameCount;
-  }
-
-  [[nodiscard]] float WrapToRange(const float value, const float range)
-  {
-    if (range == 0.0f) {
-      return 0.0f;
-    }
-
-    // 0x00422940: the remainder is shifted by `range` when its sign differs
-    // from the range's (`0 > r` versus `0 > range`), not merely when negative.
-    float wrapped = std::fmod(value, range);
-    if ((0.0f > wrapped) != (0.0f > range)) {
-      wrapped += range;
-    }
-    return wrapped;
   }
 
   [[noreturn]] void RaiseLuaErrorWithMessage(lua_State* const rawState, const char* const message)
@@ -1353,7 +1339,7 @@ namespace moho
 
     const float duration = clip->mDurationSeconds;
     if (mLooping) {
-      mAnimationTime = duration != 0.0f ? WrapToRange(mAnimationTime, duration) : 0.0f;
+      mAnimationTime = duration != 0.0f ? WrapPositiveModulo(mAnimationTime, duration) : 0.0f;
     } else {
       float clamped = std::min(duration, mAnimationTime);
       if (clamped < 0.0f) {
@@ -1494,7 +1480,8 @@ namespace moho
 
     const float duration = clip->mDurationSeconds;
     if (mLooping) {
-      mAnimationTime = WrapToRange(timeSeconds, duration);
+      // 0x0063FAB4..0x0063FABE: a zero duration skips the wrap and stores 0.
+      mAnimationTime = duration != 0.0f ? WrapPositiveModulo(timeSeconds, duration) : 0.0f;
     } else {
       // 0x0063FAE8..0x0063FAFE: `duration > t ? t : duration`, then
       // `0 > t ? 0 : t`.

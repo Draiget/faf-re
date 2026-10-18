@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEfxEmitter.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstddef>
@@ -988,7 +989,8 @@ namespace moho
     const float repeatTime = paramsBase[EFFECT_REPEATTIME];
     const float tickFloat = static_cast<float>(tick);
 
-    float ratePhase = std::fmod(paramsBase[EFFECT_TICKCOUNT] - tickFloat, repeatTime);
+    // 0x0065CE51 and 0x0065CF9D below call the MSVC8 CRT `_CIfmod`.
+    float ratePhase = static_cast<float>(msvc8::fmod(paramsBase[EFFECT_TICKCOUNT] - tickFloat, repeatTime));
     if ((ratePhase < 0.0f) != (repeatTime < 0.0f)) {
       ratePhase += repeatTime;
     }
@@ -1019,7 +1021,7 @@ namespace moho
     for (int emitted = 0; ; ++emitted) {
       const float* const params = mParams.start_;
       const float repeat = params[EFFECT_REPEATTIME];
-      float phase = std::fmod(params[EFFECT_TICKCOUNT] - tickFloat + emissionCursor, repeat);
+      float phase = static_cast<float>(msvc8::fmod(params[EFFECT_TICKCOUNT] - tickFloat + emissionCursor, repeat));
       if ((phase < 0.0f) != (repeat < 0.0f)) {
         phase += repeat;
       }

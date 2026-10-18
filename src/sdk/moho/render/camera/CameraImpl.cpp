@@ -1,5 +1,6 @@
 #include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "legacy/math/X87Math.h"
 
 #include <Windows.h>
 
@@ -1399,7 +1400,8 @@ void moho::CameraImpl::TimedMoveInit(const float seconds, const float transition
  */
 [[nodiscard]] static float NormalizeQuadrantRelative(const float angleRadians, const float referenceRadians) noexcept
 {
-  float normalized = static_cast<float>(std::fmod(static_cast<double>(angleRadians), static_cast<double>(kTwoPi)));
+  // 0x007A88A9..0x007A88B2: the MSVC8 CRT `_CIfmod`.
+  float normalized = static_cast<float>(msvc8::fmod(static_cast<double>(angleRadians), static_cast<double>(kTwoPi)));
 
   if (normalized < -kPi) {
     normalized += kTwoPi;

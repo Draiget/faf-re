@@ -25,6 +25,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/math/Angle.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -79,8 +80,6 @@ namespace
   constexpr float kDegreesToRadians = 0.017453292f;
   constexpr float kSlewScale = 0.1f;
   constexpr float kHalfScale = 0.5f;
-  constexpr float kTwoPiRadians = 6.283185482025146f;
-  constexpr float kPiRadians = 3.1415927f;
   constexpr float kAngleNormalizationClamp = 3.1405928f;
   constexpr float kTrackingMotionEpsilon = 0.001f;
   constexpr float kFiringToleranceToRadians = 0.017453292f;
@@ -270,28 +269,6 @@ namespace
 
     static moho::CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
-  }
-
-  [[nodiscard]] float NormalizeCenteredAngle(const float minimum, const float maximum) noexcept
-  {
-    float centered = std::fmod((minimum + maximum) * kHalfScale, kTwoPiRadians);
-    if (centered < -kPiRadians) {
-      centered += kTwoPiRadians;
-    } else if (centered > kPiRadians) {
-      centered -= kTwoPiRadians;
-    }
-    return centered;
-  }
-
-  [[nodiscard]] float NormalizeAngleRadians(float angleRadians) noexcept
-  {
-    angleRadians = std::fmod(angleRadians, kTwoPiRadians);
-    if (angleRadians < -kPiRadians) {
-      angleRadians += kTwoPiRadians;
-    } else if (angleRadians > kPiRadians) {
-      angleRadians -= kTwoPiRadians;
-    }
-    return angleRadians;
   }
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
@@ -1242,17 +1219,22 @@ int moho::cfunc_CAimManipulatorSetFiringArcL(LuaPlus::LuaState* const state)
  * What it does:
  * Stores centered heading/pitch arc lanes and corresponding half-range
  * extents for runtime aiming.
+ *
+ * Both centres are `NormalizeAngleSignedRadians` (0x0062FB50) inlined
+ * (0x00630CC5..0x00630CFD, 0x00630D36..0x00630D6A: `_CIfmod` by 2*pi, then
+ * the +-2*pi fix-up). The sums, differences and halvings run on the x87
+ * stack, so they go through `msvc8::HalfSumX87` / `HalfAbsDifferenceX87`,
+ * and the centre reaches `_CIfmod` unrounded (`NormalizeAngleSignedRadiansX87`).
  */
 void moho::CAimManipulator::SetFiringArc(const CAimFiringArc arc)
 {
-
-  this->mMinHeading = NormalizeCenteredAngle(arc.mMinHeading, arc.mMaxHeading);
+  this->mMinHeading = NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(arc.mMinHeading, arc.mMaxHeading));
   this->mHeadingMaxSlew = arc.mHeadingMaxSlew;
-  this->mMaxHeading = std::fabs(arc.mMaxHeading - arc.mMinHeading) * kHalfScale;
+  this->mMaxHeading = msvc8::HalfAbsDifferenceX87(arc.mMaxHeading, arc.mMinHeading);
 
-  this->mMinPitch = NormalizeCenteredAngle(arc.mMinPitch, arc.mMaxPitch);
+  this->mMinPitch = NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(arc.mMinPitch, arc.mMaxPitch));
   this->mPitchMaxSlew = arc.mPitchMaxSlew;
-  this->mMaxPitch = std::fabs(arc.mMaxPitch - arc.mMinPitch) * kHalfScale;
+  this->mMaxPitch = msvc8::HalfAbsDifferenceX87(arc.mMaxPitch, arc.mMinPitch);
 }
 
 /**
@@ -1331,9 +1313,11 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   }
 
   const float currentAngle = *currentAngleLane;
-  float laneDelta = 0.0f;
-  if (maxAngleHalfRange < kAngleNormalizationClamp) {
-    float constrained = NormalizeAngleRadians(desiredAngle - minAngleCenter);
+  float step = 0.0f;
+  // 0x00630B1B..0x00630B29: `comiss range, 3.1405928; jb` -- an unordered
+  // (NaN) range takes the clamped branch as well.
+  if (!(maxAngleHalfRange >= kAngleNormalizationClamp)) {
+    float constrained = NormalizeAngleSignedRadians(desiredAngle - minAngleCenter);
     // 0x00630B69..0x00630B7A: two independent clamps, `max > x ? x : max`
     // then `-max > x ? -max : x`, so an unordered (NaN) angle takes `max`.
     if (!(maxAngleHalfRange > constrained)) {
@@ -1342,21 +1326,25 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
     if (-maxAngleHalfRange > constrained) {
       constrained = -maxAngleHalfRange;
     }
-    laneDelta = (constrained + minAngleCenter) - currentAngle;
+    step = (constrained + minAngleCenter) - currentAngle;
   } else {
-    laneDelta = NormalizeAngleRadians(desiredAngle - currentAngle);
+    step = NormalizeAngleSignedRadians(desiredAngle - currentAngle);
   }
 
-  float step = laneDelta;
+  // 0x00630B8E..0x00630BB0: `_copysign(slew, step)` is stored back over the
+  // same local, so the heading-motion test below reads the slew-limited step.
   if (std::fabs(step) > maxAngleSlew) {
     step = std::copysign(maxAngleSlew, step);
   }
 
-  const float nextAngle = NormalizeAngleRadians(currentAngle + step);
+  // 0x00630BBB..0x00630BF7: `NormalizeAngleSignedRadians` inlined on the x87
+  // sum. That sum keeps the extended exponent, so it differs from this float
+  // sum only when |step + current| > FLT_MAX.
+  const float nextAngle = NormalizeAngleSignedRadians(step + currentAngle);
   *currentAngleLane = nextAngle;
 
   std::uint8_t trackingResult = 0u;
-  if ((trackingModeFlags & kTrackingModeHeading) != 0u && std::fabs(laneDelta) > kTrackingMotionEpsilon) {
+  if ((trackingModeFlags & kTrackingModeHeading) != 0u && std::fabs(step) > kTrackingMotionEpsilon) {
     trackingResult |= kTrackingResultHeadingMotion;
   }
 
@@ -1366,7 +1354,8 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
     this->mUnitWepBlueprint->YawOnlyOnTarget != 0u;
 
   if (!skipToleranceForPitchOnly) {
-    const float toleranceDelta = NormalizeAngleRadians(nextAngle - desiredAngle);
+    // 0x00630C3E..0x00630C7A: inlined again, on `fld next; fsub desired`.
+    const float toleranceDelta = NormalizeAngleSignedRadians(nextAngle - desiredAngle);
     if (std::fabs(toleranceDelta) > tolerance) {
       trackingResult |= kTrackingResultOutsideTolerance;
     }

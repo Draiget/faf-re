@@ -121,13 +121,27 @@ namespace moho
    */
   float NormalizeAngleSignedRadians(const float angleRadians) noexcept
   {
+    // A float argument is exact in double, and the remainder of two floats is
+    // a float, so the inlined form's extra precision never shows here.
+    return NormalizeAngleSignedRadiansX87(angleRadians);
+  }
+
+  /**
+   * Inlined form of 0x0062FB50 (e.g. 0x00630CC5..0x00630CFD in
+   * CAimManipulator::SetFiringArc), on an argument still on the x87 stack.
+   */
+  float NormalizeAngleSignedRadiansX87(const double angleRadians) noexcept
+  {
     constexpr float kPi = 3.1415927f;
     constexpr float kTwoPi = 6.2831855f;
 
     // 0x0062FB59..0x0062FB67: the MSVC8 CRT `_CIfmod`, which maps a -0 angle
     // to +0 (the host CRT kept -0).
-    const float wrapped = static_cast<float>(msvc8::fmod(angleRadians, static_cast<double>(kTwoPi)));
-    if (wrapped < -kPi) {
+    const double remainder = msvc8::fmod(angleRadians, static_cast<double>(kTwoPi));
+    // 0x0062FB67 `fst` rounds the float copy, but 0x0062FB77 `fcompi` tests
+    // the unrounded remainder against -pi; 0x0062FB89 `comiss` tests the copy.
+    const float wrapped = static_cast<float>(remainder);
+    if (remainder < -kPi) {
       return wrapped + kTwoPi;
     }
     if (wrapped > kPi) {

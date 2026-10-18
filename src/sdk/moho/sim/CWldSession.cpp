@@ -5,6 +5,7 @@
 
 #include "legacy/algorithms/Sort.h"
 #include "legacy/containers/HashMap.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <bit>
@@ -4314,7 +4315,7 @@ namespace moho
       color &= static_cast<std::uint32_t>(static_cast<std::uint8_t>(glow * 255.0f)) << 24;
     }
 
-    const float uStart = 1.0f - std::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+    const float uStart = 1.0f - msvc8::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
     EmitHermiteRibbonSegments(
       batcher, fromPos, toPos, Wm3::Vector3f{fromTangent.x * smoothRadius, fromTangent.y * smoothRadius, fromTangent.z * smoothRadius},
@@ -4639,7 +4640,7 @@ namespace moho
     }
 
     const bool hasArrowhead = node.mArrowheadTexture.px != nullptr;
-    const float uStart = 1.0f - std::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+    const float uStart = 1.0f - msvc8::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
     for (auto it = simplifiedPath.begin(); it != simplifiedPath.end(); ++it) {
       auto next = it;
@@ -11150,7 +11151,7 @@ namespace moho
     [[nodiscard]] float FuelWarningBlinkPhase(const StrategicIconAux& aux)
     {
       const double simTime = static_cast<double>(aux.mSession->mGameTick) + static_cast<double>(aux.mTickFraction);
-      return static_cast<float>(std::fmod(simTime * static_cast<double>(ui_FuelEmptyBlinkRate), 1.0));
+      return static_cast<float>(msvc8::fmod(simTime * static_cast<double>(ui_FuelEmptyBlinkRate), 1.0));
     }
 
     /**

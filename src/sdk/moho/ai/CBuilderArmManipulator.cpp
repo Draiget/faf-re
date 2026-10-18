@@ -26,8 +26,6 @@ namespace
   constexpr float kHalfScale = 0.5f;
   constexpr float kQuarterScale = 0.25f;
   constexpr float kPiRadians = 3.1415927f;
-  constexpr float kNegativePiRadians = -3.1415927f;
-  constexpr float kTwoPiRadians = 6.283185482025146f;
   constexpr float kClampAngleLimit = 3.1405928f;
   constexpr float kHeadingMotionEpsilon = 9.999999747378752e-06f;
   constexpr float kHeadingOnTargetTolerance = 0.2617993950843811f;
@@ -101,17 +99,6 @@ namespace
     // frame (`[actor+0]`, CAniActor::mPose).
     moho::CAniActor* const actor = manipulator->mOwnerActor;
     return ResolvePoseBone(actor != nullptr ? actor->mPose.get() : nullptr, manipulator->mWatchBones[watchSlot].mBoneIndex);
-  }
-
-  [[nodiscard]] float WrapSignedRadians(const float angle) noexcept
-  {
-    float wrapped = static_cast<float>(std::fmod(static_cast<double>(angle), static_cast<double>(kTwoPiRadians)));
-    if (wrapped < kNegativePiRadians) {
-      wrapped += kTwoPiRadians;
-    } else if (wrapped > kPiRadians) {
-      wrapped -= kTwoPiRadians;
-    }
-    return wrapped;
   }
 } // namespace
 
@@ -322,6 +309,13 @@ namespace moho
    * What it does:
    * Stores heading/pitch aim-center, half-arc, and max-slew lanes from
    * radians-domain Lua callback payload.
+   *
+   * Both centres are `NormalizeAngleSignedRadians` (0x0062FB50) inlined
+   * (0x006364A5..0x006364DD, 0x00636516..0x0063654A: `_CIfmod` by 2*pi, then
+   * the +-2*pi fix-up), the same body as `CAimManipulator::SetFiringArc`. The
+   * sums, differences and halvings run on the x87 stack, so they go through
+   * `msvc8::HalfSumX87` / `HalfAbsDifferenceX87`, and the centre reaches
+   * `_CIfmod` unrounded (`NormalizeAngleSignedRadiansX87`).
    */
   void CBuilderArmManipulator::SetAimingArc(
     const float minHeading,
@@ -332,13 +326,13 @@ namespace moho
     const float pitchMaxSlew
   )
   {
-    mHeadingCenter = WrapSignedRadians((minHeading + maxHeading) * kHalfScale);
+    mHeadingCenter = NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(minHeading, maxHeading));
     mHeadingMaxSlew = headingMaxSlew;
-    mHeadingHalfArc = std::fabs(maxHeading - minHeading) * kHalfScale;
+    mHeadingHalfArc = msvc8::HalfAbsDifferenceX87(maxHeading, minHeading);
 
-    mPitchCenter = WrapSignedRadians((minPitch + maxPitch) * kHalfScale);
+    mPitchCenter = NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(minPitch, maxPitch));
     mPitchMaxSlew = pitchMaxSlew;
-    mPitchHalfArc = std::fabs(maxPitch - minPitch) * kHalfScale;
+    mPitchHalfArc = msvc8::HalfAbsDifferenceX87(maxPitch, minPitch);
   }
 
   /**
@@ -413,10 +407,8 @@ namespace moho
     const std::uint8_t trackingModeFlags
   )
   {
-    if (watchBone == nullptr) {
-      return 0u;
-    }
-
+    // No null test on `watchBone` here: both call sites in `TrackAimDirection`
+    // skip the call for a missing bone (0x00636022, 0x006360EB).
     Wm3::Vector3f transformedTarget = targetDirection;
     if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
       const VTransform& compositeTransform = watchBone->GetCompositeTransform();
@@ -458,8 +450,10 @@ namespace moho
     }
 
     const float currentAngle = *currentAngleLane;
-    float laneDelta = 0.0f;
-    if (angleHalfArc < kClampAngleLimit) {
+    float step = 0.0f;
+    // 0x00636345..0x00636353: `comiss halfArc, 3.1405928; jb` -- an unordered
+    // (NaN) arc takes the clamped branch as well.
+    if (!(angleHalfArc >= kClampAngleLimit)) {
       float constrained = NormalizeAngleSignedRadians(desiredAngle - angleCenter);
       // 0x00636393..0x006363A4: two independent clamps, `arc > x ? x : arc`
       // then `-arc > x ? -arc : x`, so an unordered (NaN) angle takes `arc`.
@@ -469,32 +463,30 @@ namespace moho
       if (-angleHalfArc > constrained) {
         constrained = -angleHalfArc;
       }
-      laneDelta = (constrained + angleCenter) - currentAngle;
+      step = (constrained + angleCenter) - currentAngle;
     } else {
-      laneDelta = NormalizeAngleSignedRadians(desiredAngle - currentAngle);
+      step = NormalizeAngleSignedRadians(desiredAngle - currentAngle);
     }
 
-    float step = laneDelta;
+    // 0x006363B8..0x006363DA: `_copysign(slew, step)` is stored back over the
+    // same local, so the heading-motion test below reads the slew-limited step.
     if (std::fabs(step) > maxSlew) {
       step = std::copysign(maxSlew, step);
     }
 
-    float nextAngle = static_cast<float>(std::fmod(static_cast<double>(step + currentAngle), static_cast<double>(kTwoPiRadians)));
-    if (nextAngle >= kNegativePiRadians) {
-      if (nextAngle > kPiRadians) {
-        nextAngle -= kTwoPiRadians;
-      }
-    } else {
-      nextAngle += kTwoPiRadians;
-    }
+    // 0x006363E5..0x00636427: `NormalizeAngleSignedRadians` inlined on the x87
+    // sum. That sum keeps the extended exponent, so it differs from this float
+    // sum only when |step + current| > FLT_MAX.
+    const float nextAngle = NormalizeAngleSignedRadians(step + currentAngle);
     *currentAngleLane = nextAngle;
 
     std::uint8_t trackingResult = 0u;
     if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
-      if (std::fabs(laneDelta) > kHeadingMotionEpsilon) {
+      if (std::fabs(step) > kHeadingMotionEpsilon) {
         trackingResult |= kTrackingResultHeadingMotion;
       }
 
+      // 0x00636446..0x00636452: an out-of-line call on `subss next, desired`.
       const float onTargetDelta = NormalizeAngleSignedRadians(nextAngle - desiredAngle);
       if (std::fabs(onTargetDelta) > kHeadingOnTargetTolerance) {
         trackingResult |= kTrackingResultOutsideTolerance;

@@ -1,4 +1,5 @@
 #include "moho/app/WEmitterWx.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <string>
@@ -1216,7 +1217,7 @@ void moho::WEmitterWx::OnTimeSliderUpdateUI(wxUpdateUIEvent&)
     return;
   }
 
-  int tick = static_cast<int>(std::fmod(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT), mCachedRepeatTime));
+  int tick = static_cast<int>(msvc8::fmod(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT), mCachedRepeatTime));
   if (mCachedRepeatTime >= mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT)) {
     tick = static_cast<int>(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT));
   }

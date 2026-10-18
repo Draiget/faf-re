@@ -1,4 +1,5 @@
 #include "moho/ui/UiRuntimeTypes.h"
+#include "legacy/math/X87Math.h"
 
 #include "moho/sim/BuildQueueCommandDecrement.h"
 #include "platform/BinaryObjectBytes.h"
@@ -14201,7 +14202,7 @@ std::int32_t moho::CMauiItemList::GetItem(
   const std::int32_t rowIndex = mScrollPosition + static_cast<std::int32_t>(localY / rowHeight);
   if (
     itemBase != nullptr && rowIndex >= 0 && static_cast<std::size_t>(rowIndex) < mItems.size() &&
-    font->mHeight > std::fmod(localY, rowHeight)
+    font->mHeight > static_cast<float>(msvc8::fmod(localY, rowHeight)) // 0x0079A126: _CIfmod
   ) {
     return rowIndex;
   }

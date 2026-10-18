@@ -96,4 +96,15 @@ namespace moho
   static_assert(offsetof(CAnimTexture, mFrames) == 0x08, "CAnimTexture::mFrames offset must be 0x08");
   static_assert(offsetof(CAnimTexture, mBaseTextureName) == 0x18, "CAnimTexture::mBaseTextureName offset must be 0x18");
   static_assert(sizeof(CAnimTexture) == 0x34, "CAnimTexture size must be 0x34");
+
+  /**
+   * Address: 0x00422940 (FUN_00422940)
+   *
+   * What it does:
+   * `fmod(value, range)` through the MSVC8 CRT, shifted by `range` when the
+   * remainder's sign differs from the range's. Shared by CAnimTexture frame
+   * sampling and CAnimationManipulator looping time; callers keep `range`
+   * non-zero.
+   */
+  [[nodiscard]] float WrapPositiveModulo(float value, float range) noexcept;
 } // namespace moho

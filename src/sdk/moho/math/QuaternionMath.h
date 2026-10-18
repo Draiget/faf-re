@@ -15,6 +15,17 @@ namespace moho
   [[nodiscard]] float NormalizeAngleSignedRadians(float angleRadians) noexcept;
 
   /**
+   * `NormalizeAngleSignedRadians` as MSVC8 inlined it where the argument was
+   * still on the x87 stack (CAimManipulator::SetFiringArc 0x00630CC5,
+   * CBuilderArmManipulator::SetAimingArc 0x006364A5): `_CIfmod` receives the
+   * unrounded value, and the `< -pi` test reads the unrounded remainder. The
+   * two differ from the float form only when the argument is below float
+   * precision (a `-2^-150` that rounds to `-0` only after the fmod) or above
+   * float range. `angleRadians` is that x87 value, e.g. from `HalfSumX87`.
+   */
+  [[nodiscard]] float NormalizeAngleSignedRadiansX87(double angleRadians) noexcept;
+
+  /**
    * Address: 0x004EB740 (FUN_004EB740, fun_RotateQuat)
    *
    * IDA signature:
