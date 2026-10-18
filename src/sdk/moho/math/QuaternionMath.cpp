@@ -124,7 +124,9 @@ namespace moho
     constexpr float kPi = 3.1415927f;
     constexpr float kTwoPi = 6.2831855f;
 
-    const float wrapped = static_cast<float>(std::fmod(angleRadians, static_cast<double>(kTwoPi)));
+    // 0x0062FB59..0x0062FB67: the MSVC8 CRT `_CIfmod`, which maps a -0 angle
+    // to +0 (the host CRT kept -0).
+    const float wrapped = static_cast<float>(msvc8::fmod(angleRadians, static_cast<double>(kTwoPi)));
     if (wrapped < -kPi) {
       return wrapped + kTwoPi;
     }
@@ -515,15 +517,11 @@ namespace moho
       const float angle = static_cast<float>(angleExact);
       if (angleExact >= static_cast<double>(kSpreadEpsilon) && (kPi - angle) >= kSpreadEpsilon
           && std::isfinite(angleExact)) {
-        // 0x004EBD95..0x004EBDB7: the three sines stay unrounded on the x87
-        // stack; only `1/sin(angle)` and the two weight products round.
-        const float invSin = msvc8::SinReciprocal(angle);
-        const float w1 = msvc8::SinTimes(angle * oneMinusT, invSin);
-        const float w2 = msvc8::SinTimes(angle * tClamped, invSin);
-        out->w = (q1->w * w1) + (rhs.w * w2);
-        out->x = (q1->x * w1) + (rhs.x * w2);
-        out->y = (q1->y * w1) + (rhs.y * w2);
-        out->z = (q1->z * w1) + (rhs.z * w2);
+        // 0x004EBD95..0x004EBDF2: the sines, `1/sin(angle)`, both weights
+        // and every `q1*w1 + rhs*w2` stay on the x87 stack (24-bit mantissa,
+        // extended exponent) until the one float store per lane. Rounding
+        // the weights to float first differed on denormal-range t / lanes.
+        msvc8::SlerpSphericalBlend(&out->w, &q1->w, &rhs.w, angle, oneMinusT, tClamped);
         return out;
       }
     }
@@ -698,10 +696,9 @@ namespace moho
     }
 
     *angleRadiansOut = halfAngle * 2.0f;
-    const float inverseAxisLength = 1.0f / std::sqrt(axisLengthSquared);
-    axisOut->x = quaternion.x * inverseAxisLength;
-    axisOut->y = quaternion.y * inverseAxisLength;
-    axisOut->z = quaternion.z * inverseAxisLength;
+    // 0x006C10EF..0x006C1117: `fsqrt; fld1; fdivrp` keeps 1/|axis| on the x87
+    // stack (extended exponent) across the three multiplies.
+    msvc8::ScaleVectorToLengthX87(&axisOut->x, &quaternion.x, axisLengthSquared, 1.0f);
   }
 
   /**
@@ -718,9 +715,9 @@ namespace moho
     const float sinHalfAngle = msvc8::sinf(halfAngle);
 
     quat->w = msvc8::cosf(halfAngle);
-    quat->x = axisAngle.x * sinHalfAngle;
-    quat->y = axisAngle.y * sinHalfAngle;
-    quat->z = axisAngle.z * sinHalfAngle;
+    // 0x00697393..0x006973AD: `axis * sin` multiplies on the x87 stack, one
+    // float store per lane (differs from SSE only for a denormal product).
+    msvc8::ScaleVectorX87(&quat->x, &axisAngle.x, sinHalfAngle);
     return quat;
   }
 
@@ -948,14 +945,23 @@ namespace moho
      * Address: 0x0050D150 (FUN_0050D150, inv_sqrt)
      *
      * What it does:
-     * Returns one reciprocal-square-root lane through the scalar math path:
-     * `fld; fsqrt; fld1; fdivrp`. Both the square root and the division round
-     * under the simulation's 24-bit precision control, so this is the float
-     * `1 / sqrtf(v)`, not a double one. Same single caller as `CoordsAbsFloat`.
+     * `fld; fsqrt; fld1; fdivrp`: one reciprocal square root, returned in
+     * st(0). Both steps round the mantissa under the simulation's 24-bit
+     * precision control but keep the x87 exponent range, and its only caller
+     * multiplies that st(0) straight into two lanes (`fld st0; fmul; fstp`,
+     * 0x0050CC8C..0x0050CCA5 / 0x0050CCCD..0x0050CCE7). A float return rounds
+     * it to the float range first, which difffuzz caught as one-ulp misses on
+     * denormal outputs, so the reciprocal and both products are formed
+     * together: `outA = a / sqrt(lengthSq)`, `outB = b / sqrt(lengthSq)`.
+     * Same single caller as `CoordsAbsFloat`.
      */
-    [[nodiscard]] float CoordsInvSqrt(const float value) noexcept
+    void CoordsScaleByInvSqrt(const float lengthSq, const float a, const float b, float& outA, float& outB) noexcept
     {
-      return 1.0f / std::sqrt(value);
+      const float lanes[3] = {a, b, 0.0f};
+      float scaled[3];
+      msvc8::ScaleVectorToLengthX87(scaled, lanes, lengthSq, 1.0f);
+      outA = scaled[0];
+      outB = scaled[1];
     }
   } // namespace
 
@@ -973,10 +979,11 @@ namespace moho
    * the same value set, one field out. Two callers in two files means one
    * definition, here.
    *
-   * The degenerate branch runs on the x87 stack (0x0050CC3F..0x0050CCE7),
-   * but under the simulation's 24-bit precision control every `fsqrt`,
-   * `fdivrp` and `fmul` there rounds to float, so it is written in float: a
-   * double chain rounds once at the end and can land one ulp away.
+   * The degenerate branch runs on the x87 stack (0x0050CC3F..0x0050CCE7):
+   * under the simulation's 24-bit precision control every `fsqrt`, `fdivrp`
+   * and `fmul` there rounds its mantissa like float, but the reciprocal is
+   * never stored, so it keeps the x87 exponent range until the lane stores
+   * (see `CoordsScaleByInvSqrt`).
    */
   Wm3::Quaternionf* BuildTiltShortestArcDelta(
     const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp
@@ -1005,15 +1012,23 @@ namespace moho
       // `fcompi st0=|x|, st1=|y|` + `jb` at 0x0050CC65..0x0050CC6A: an
       // unordered (NaN) pair takes the x = 0 branch too.
       if (!(upAbsX >= upAbsY)) {
-        const float inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
+        float yLane = 0.0f;
+        float zLane = 0.0f;
+        CoordsScaleByInvSqrt(
+          (currentUp.y * currentUp.y) + (currentUp.z * currentUp.z), currentUp.z, currentUp.y, yLane, zLane
+        );
         outDelta->x = 0.0f;
-        outDelta->y = inverseLength * currentUp.z;
-        outDelta->z = -(inverseLength * currentUp.y);
+        outDelta->y = yLane;
+        outDelta->z = -zLane;
       } else {
-        const float inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
+        float xLane = 0.0f;
+        float zLane = 0.0f;
+        CoordsScaleByInvSqrt(
+          (currentUp.x * currentUp.x) + (currentUp.z * currentUp.z), currentUp.z, currentUp.x, xLane, zLane
+        );
         outDelta->y = 0.0f;
-        outDelta->x = -(inverseLength * currentUp.z);
-        outDelta->z = inverseLength * currentUp.x;
+        outDelta->x = -xLane;
+        outDelta->z = zLane;
       }
       return outDelta;
     }

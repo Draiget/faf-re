@@ -162,10 +162,10 @@ namespace moho
       return false;
     }
 
-    const float scale = targetLength / std::sqrtf(lengthSq);
-    vector->x = x * scale;
-    vector->y *= scale;
-    vector->z *= scale;
+    // 0x005B1CCF..0x005B1CF7: `targetLength / sqrt(lengthSq)` stays on the
+    // x87 stack (extended exponent) across the three multiplies; a float
+    // scale overflowed / went denormal for far-apart magnitudes (difffuzz).
+    msvc8::ScaleVectorToLengthX87(&vector->x, &vector->x, lengthSq, targetLength);
     return true;
   }
 
@@ -219,13 +219,11 @@ namespace moho
       return destination;
     }
 
-    const float targetLengthSq =
-      (targetLengthVector->x * targetLengthVector->x) + (targetLengthVector->y * targetLengthVector->y) +
-      (targetLengthVector->z * targetLengthVector->z);
-    const float scale = std::sqrtf(targetLengthSq / sourceLengthSq);
-    destination->x = sourceX * scale;
-    destination->y = sourceVector->y * scale;
-    destination->z = sourceVector->z * scale;
+    // 0x0069A3A5..0x0069A3D3: |target|^2, the division by the float source
+    // length and the fsqrt all stay on the x87 stack (extended exponent). In
+    // float the ratio overflowed for a short source and returned infinities
+    // where the engine returns a vector of the target's length (difffuzz).
+    msvc8::ScaleVectorToLengthOfX87(&destination->x, &sourceVector->x, &targetLengthVector->x, sourceLengthSq);
     return destination;
   }
 
@@ -320,9 +318,9 @@ namespace moho
     const float halfRoll = roll * 0.5f;
     const float sinHalfRoll = msvc8::sinf(halfRoll);
     outQuaternion->w = msvc8::cosf(halfRoll);
-    outQuaternion->x = axis->x * sinHalfRoll;
-    outQuaternion->y = axis->y * sinHalfRoll;
-    outQuaternion->z = axis->z * sinHalfRoll;
+    // 0x0057077E..0x00570796: `axis * sin` multiplies on the x87 stack, one
+    // float store per lane (differs from SSE only for a denormal product).
+    msvc8::ScaleVectorX87(&outQuaternion->x, &axis->x, sinHalfRoll);
     return outQuaternion;
   }
 } // namespace moho

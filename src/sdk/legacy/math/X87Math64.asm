@@ -216,25 +216,58 @@ msvc8_x87_sin_times PROC
 msvc8_x87_sin_times ENDP
 
 
-; float msvc8_x87_sin_reciprocal(float sinArg)
-; 1 / fsin(x): the sine stays unrounded, the division rounds once under PC24
-; (Moho::SLERP 0x004EBD9B..0x004EBDA1).
-msvc8_x87_sin_reciprocal PROC
-    movss   dword ptr [rsp+8], xmm0
+; void msvc8_x87_slerp_spherical_blend(float* out, const float* q1, const float* rhs,
+;                                      float angle, float oneMinusT, float t)
+; Moho::SLERP 0x004EBD95..0x004EBDF2: weights and lane products stay on the
+; x87 stack under PC24. rcx=out, rdx=q1, r8=rhs, xmm3=angle; oneMinusT and t
+; are the fifth and sixth arguments at [rsp+40] / [rsp+48].
+msvc8_x87_slerp_spherical_blend PROC
+    movss   dword ptr [rsp+32], xmm3
     fnstcw  word ptr [rsp+24]
     movzx   eax, word ptr [rsp+24]
     and     eax, 0fffffcffh
     mov     word ptr [rsp+26], ax
     fldcw   word ptr [rsp+26]
-    fld     dword ptr [rsp+8]
+    fld     dword ptr [rsp+32]
+    fld     st(0)
     fsin
     fld1
     fdivrp  st(1), st(0)
-    fstp    dword ptr [rsp+8]
+    fld     st(1)
+    fmul    dword ptr [rsp+40]
+    fsin
+    fmul    st(0), st(1)
+    fld     dword ptr [rsp+48]
+    fmulp   st(3), st(0)
+    fxch    st(2)
+    fsin
+    fmulp   st(1), st(0)
+    fld     dword ptr [rdx]
+    fmul    st(0), st(2)
+    fld     dword ptr [r8]
+    fmul    st(0), st(2)
+    faddp   st(1), st(0)
+    fstp    dword ptr [rcx]
+    fld     dword ptr [rdx+4]
+    fmul    st(0), st(2)
+    fld     dword ptr [r8+4]
+    fmul    st(0), st(2)
+    faddp   st(1), st(0)
+    fstp    dword ptr [rcx+4]
+    fld     dword ptr [rdx+8]
+    fmul    st(0), st(2)
+    fld     dword ptr [r8+8]
+    fmul    st(0), st(2)
+    faddp   st(1), st(0)
+    fstp    dword ptr [rcx+8]
+    fld     dword ptr [rdx+12]
+    fmulp   st(2), st(0)
+    fmul    dword ptr [r8+12]
+    faddp   st(1), st(0)
+    fstp    dword ptr [rcx+12]
     fldcw   word ptr [rsp+24]
-    movss   xmm0, dword ptr [rsp+8]
     ret
-msvc8_x87_sin_reciprocal ENDP
+msvc8_x87_slerp_spherical_blend ENDP
 
 
 ; float msvc8_x87_intrinsic_exp(float x)
@@ -349,5 +382,92 @@ msvc8_x87_scale_vector_max_length PROC
     fstp    dword ptr [r8]
     ret
 msvc8_x87_scale_vector_max_length ENDP
+
+
+; void msvc8_x87_scale_vector_to_length(float* dest, const float* source,
+;                                       float lengthSq, float length)
+; func_VecSetLengthS 0x005B1CCF..0x005B1CF7: fsqrt, fdivr length, the scale
+; stays on the x87 stack across the three multiplies. rcx=dest, rdx=source,
+; xmm2=lengthSq, xmm3=length; runs under PC24 like the simulation thread.
+msvc8_x87_scale_vector_to_length PROC
+    movss   dword ptr [rsp+32], xmm2
+    movss   dword ptr [rsp+36], xmm3
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+32]
+    fsqrt
+    fdivr   dword ptr [rsp+36]
+    fld     dword ptr [rdx]
+    fmul    st(0), st(1)
+    fstp    dword ptr [rcx]
+    fld     st(0)
+    fmul    dword ptr [rdx+4]
+    fstp    dword ptr [rcx+4]
+    fmul    dword ptr [rdx+8]
+    fstp    dword ptr [rcx+8]
+    fldcw   word ptr [rsp+24]
+    ret
+msvc8_x87_scale_vector_to_length ENDP
+
+
+; void msvc8_x87_scale_vector(float* dest, const float* source, float scale)
+; dest[i] = source[i] * scale, each product formed on the x87 stack under PC24
+; and stored once. rcx=dest, rdx=source, xmm2=scale.
+msvc8_x87_scale_vector PROC
+    movss   dword ptr [rsp+32], xmm2
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+32]
+    fld     dword ptr [rdx]
+    fmul    st(0), st(1)
+    fstp    dword ptr [rcx]
+    fld     dword ptr [rdx+4]
+    fmul    st(0), st(1)
+    fstp    dword ptr [rcx+4]
+    fmul    dword ptr [rdx+8]
+    fstp    dword ptr [rcx+8]
+    fldcw   word ptr [rsp+24]
+    ret
+msvc8_x87_scale_vector ENDP
+
+
+; void msvc8_x87_scale_vector_to_length_of(float* dest, const float* source,
+;                                          const float* target, float sourceLengthSq)
+; func_VecSetLengthTo 0x0069A3A5..0x0069A3D3. rcx=dest, rdx=source,
+; r8=target, xmm3=sourceLengthSq; runs under PC24 like the simulation thread.
+msvc8_x87_scale_vector_to_length_of PROC
+    movss   dword ptr [rsp+32], xmm3
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [r8]
+    fmul    st(0), st(0)
+    fld     dword ptr [r8+4]
+    fmul    st(0), st(0)
+    faddp   st(1), st(0)
+    fld     dword ptr [r8+8]
+    fmul    st(0), st(0)
+    faddp   st(1), st(0)
+    fdiv    dword ptr [rsp+32]
+    fsqrt
+    fld     dword ptr [rdx]
+    fmul    st(0), st(1)
+    fstp    dword ptr [rcx]
+    fld     st(0)
+    fmul    dword ptr [rdx+4]
+    fstp    dword ptr [rcx+4]
+    fmul    dword ptr [rdx+8]
+    fstp    dword ptr [rcx+8]
+    fldcw   word ptr [rsp+24]
+    ret
+msvc8_x87_scale_vector_to_length_of ENDP
 
 END

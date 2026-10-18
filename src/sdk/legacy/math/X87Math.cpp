@@ -18,7 +18,9 @@ extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, 
 extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
 extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
 extern "C" float __cdecl msvc8_x87_sin_times(float sinArg, float factor);
-extern "C" float __cdecl msvc8_x87_sin_reciprocal(float sinArg);
+extern "C" void __cdecl msvc8_x87_slerp_spherical_blend(
+  float* outLanes, const float* q1Lanes, const float* rhsLanes, float angle, float oneMinusT, float t
+);
 extern "C" float __cdecl msvc8_x87_intrinsic_exp(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_ln(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_log10(float x);
@@ -26,6 +28,13 @@ extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
 extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength);
+extern "C" void __cdecl msvc8_x87_scale_vector_to_length(
+  float* destLanes, const float* sourceLanes, float lengthSq, float length
+);
+extern "C" void __cdecl msvc8_x87_scale_vector(float* destLanes, const float* sourceLanes, float scale);
+extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
+  float* destLanes, const float* sourceLanes, const float* targetLanes, float sourceLengthSq
+);
 #endif
 
 namespace msvc8
@@ -72,10 +81,105 @@ namespace msvc8
       fstp dword ptr [edx]
       fmul dword ptr [ecx]
       fstp dword ptr [ecx]
-      fstp st(0)
+      // 0x005D1EE8..0x005D1EEC: `fmul; fstp` consumes the scale itself. A
+      // trailing `fstp st(0)` here popped an empty stack - a masked invalid
+      // (stack underflow) that left x87 TOP rotated by one (difffuzz).
     }
 #else
     msvc8_x87_scale_vector_max_length(px, py, pz, maxLength);
+#endif
+  }
+
+  void ScaleVectorToLengthX87(
+    float* const destLanes, const float* const sourceLanes, const float lengthSq, const float targetLength
+  ) noexcept
+  {
+#if defined(_M_IX86)
+    // 0x005B1CCF..0x005B1CF7: fld lenSq; fsqrt (FUN_0040EAF0); fdivr length;
+    // x*scale, scale*y, scale*z, one float store each.
+    __asm {
+      mov eax, destLanes
+      mov ecx, sourceLanes
+      fld lengthSq
+      fsqrt
+      fdivr targetLength
+      fld dword ptr [ecx]
+      fmul st(0), st(1)
+      fstp dword ptr [eax]
+      fld st(0)
+      fmul dword ptr [ecx + 4]
+      fstp dword ptr [eax + 4]
+      fmul dword ptr [ecx + 8]
+      fstp dword ptr [eax + 8]
+    }
+#else
+    msvc8_x87_scale_vector_to_length(destLanes, sourceLanes, lengthSq, targetLength);
+#endif
+  }
+
+  void ScaleVectorX87(float* const destLanes, const float* const sourceLanes, const float scale) noexcept
+  {
+#if defined(_M_IX86)
+    __asm {
+      mov eax, destLanes
+      mov ecx, sourceLanes
+      fld scale
+      fld dword ptr [ecx]
+      fmul st(0), st(1)
+      fstp dword ptr [eax]
+      fld dword ptr [ecx + 4]
+      fmul st(0), st(1)
+      fstp dword ptr [eax + 4]
+      fmul dword ptr [ecx + 8]
+      fstp dword ptr [eax + 8]
+    }
+#else
+    msvc8_x87_scale_vector(destLanes, sourceLanes, scale);
+#endif
+  }
+
+  double fmod(const double x, const double y) noexcept
+  {
+    // _CIfmod (0x00A8E06A -> 0x00AA83B0 table dispatch) answers a zero
+    // dividend with +0; the host CRT returns the dividend's -0.
+    if (x == 0.0 && y != 0.0 && std::isfinite(y)) {
+      return 0.0;
+    }
+    return std::fmod(x, y);
+  }
+
+  void ScaleVectorToLengthOfX87(
+    float* const destLanes, const float* const sourceLanes, const float* const targetLanes, const float sourceLengthSq
+  ) noexcept
+  {
+#if defined(_M_IX86)
+    // 0x0069A3A5..0x0069A3D3: ((tx*tx + ty*ty) + tz*tz) / srcLenSq, fsqrt,
+    // then sx*scale, scale*sy, scale*sz with one float store each.
+    __asm {
+      mov eax, destLanes
+      mov ecx, sourceLanes
+      mov edx, targetLanes
+      fld dword ptr [edx]
+      fmul st(0), st(0)
+      fld dword ptr [edx + 4]
+      fmul st(0), st(0)
+      faddp st(1), st(0)
+      fld dword ptr [edx + 8]
+      fmul st(0), st(0)
+      faddp st(1), st(0)
+      fdiv sourceLengthSq
+      fsqrt
+      fld dword ptr [ecx]
+      fmul st(0), st(1)
+      fstp dword ptr [eax]
+      fld st(0)
+      fmul dword ptr [ecx + 4]
+      fstp dword ptr [eax + 4]
+      fmul dword ptr [ecx + 8]
+      fstp dword ptr [eax + 8]
+    }
+#else
+    msvc8_x87_scale_vector_to_length_of(destLanes, sourceLanes, targetLanes, sourceLengthSq);
 #endif
   }
 
@@ -285,20 +389,58 @@ namespace msvc8
 #endif
   }
 
-  float SinReciprocal(const float sinArg) noexcept
+  void SlerpSphericalBlend(
+    float* const outLanes, const float* const q1Lanes, const float* const rhsLanes, const float angle,
+    const float oneMinusT, const float t
+  ) noexcept
   {
 #if defined(_M_IX86)
-    float result;
+    // Instruction for instruction 0x004EBD95..0x004EBDF2 (edi = q1, the
+    // stack copy at [esp+20h] = rhs, ebx = out).
     __asm {
-      fld sinArg
+      mov eax, outLanes
+      mov ecx, q1Lanes
+      mov edx, rhsLanes
+      fld angle
+      fld st(0)
       fsin
       fld1
-      fdivrp st(1), st(0)
-      fstp result
+      fdivrp st(1), st(0)     ; inv, a
+      fld st(1)
+      fmul oneMinusT
+      fsin
+      fmul st(0), st(1)       ; w1, inv, a
+      fld t
+      fmulp st(3), st(0)      ; w1, inv, a*t
+      fxch st(2)
+      fsin
+      fmulp st(1), st(0)      ; w2, w1
+      fld dword ptr [ecx]
+      fmul st(0), st(2)
+      fld dword ptr [edx]
+      fmul st(0), st(2)
+      faddp st(1), st(0)
+      fstp dword ptr [eax]
+      fld dword ptr [ecx + 4]
+      fmul st(0), st(2)
+      fld dword ptr [edx + 4]
+      fmul st(0), st(2)
+      faddp st(1), st(0)
+      fstp dword ptr [eax + 4]
+      fld dword ptr [ecx + 8]
+      fmul st(0), st(2)
+      fld dword ptr [edx + 8]
+      fmul st(0), st(2)
+      faddp st(1), st(0)
+      fstp dword ptr [eax + 8]
+      fld dword ptr [ecx + 12]
+      fmulp st(2), st(0)      ; w2, q1z*w1
+      fmul dword ptr [edx + 12]
+      faddp st(1), st(0)
+      fstp dword ptr [eax + 12]
     }
-    return result;
 #else
-    return msvc8_x87_sin_reciprocal(sinArg);
+    msvc8_x87_slerp_spherical_blend(outLanes, q1Lanes, rhsLanes, angle, oneMinusT, t);
 #endif
   }
 
