@@ -1398,30 +1398,6 @@ namespace
     return enumRef;
   }
 
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
   [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
   {
     static gpg::RType* sType = nullptr;
@@ -1429,34 +1405,6 @@ namespace
       sType = gpg::LookupRType(typeid(EntityCategorySet));
     }
     return sType;
-  }
-
-  [[nodiscard]] EntityCategorySet* ResolveEntityCategorySetFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    if (gpg::RType* const expectedType = CachedEntityCategorySetType(); expectedType != nullptr) {
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, expectedType);
-      if (upcast.mObj != nullptr) {
-        return static_cast<EntityCategorySet*>(upcast.mObj);
-      }
-    }
-
-    const char* const typeName = userDataRef.GetTypeName();
-    if (typeName != nullptr
-        && (std::strstr(typeName, "EntityCategory") != nullptr || std::strstr(typeName, "BVSet") != nullptr)) {
-      return static_cast<EntityCategorySet*>(userDataRef.mObj);
-    }
-
-    return nullptr;
   }
 
   [[nodiscard]] bool ParseFireStateLexical(const char* const lexical, std::int32_t& outFireState)
@@ -7591,7 +7539,7 @@ int moho::cfunc_UnitGetNumBuildOrdersL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   int buildOrderCount = 0;
   if (unit->AiBuilder != nullptr) {
@@ -8345,7 +8293,7 @@ int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   EntityCategorySet& restrictionWords = unit->GetAttributes().restrictionCategory;
   (void)EntityCategory::Add(&restrictionWords, categorySet);
@@ -8403,7 +8351,7 @@ int moho::cfunc_UnitRemoveBuildRestrictionL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
-  const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
+  const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
   EntityCategorySet& restrictionWords = unit->GetAttributes().restrictionCategory;
   AsCategoryWordBitset(restrictionWords).RemoveAllFrom(&categorySet->Bits());

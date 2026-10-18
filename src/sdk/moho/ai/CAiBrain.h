@@ -192,8 +192,8 @@ namespace moho
      * Address: 0x0057A510 (FUN_0057A510, Moho::CAiBrain::CenterOfArmy)
      *
      * What it does:
-     * Computes the average position of all live, non-destroying mobile units
-     * (`MOBILE - STRUCTURE` category) belonging to this brain's army and writes
+     * Computes the average position of all live, non-destroying structures
+     * (`STRUCTURE - MOBILE` category) belonging to this brain's army and writes
      * the result into `outPosition`. When the army has no qualifying units,
      * `outPosition` is left at the zero vector.
      */

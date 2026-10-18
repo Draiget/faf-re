@@ -7617,9 +7617,8 @@ int moho::cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* const state)
  * Address: 0x0057A510 (FUN_0057A510, Moho::CAiBrain::CenterOfArmy)
  *
  * What it does:
- * Iterates the brain's mobile (non-structure) army units, sums their world
- * positions, and writes the average into `outPosition`. Mirrors the
- * recovered ProcessAttackVectors traversal pattern.
+ * Iterates the brain's structure (non-mobile) army units, sums their world
+ * positions, and writes the average into `outPosition`.
  */
 Wm3::Vec3f* moho::CAiBrain::CenterOfArmy(Wm3::Vec3f* const outPosition)
 {
@@ -7635,11 +7634,13 @@ Wm3::Vec3f* moho::CAiBrain::CenterOfArmy(Wm3::Vec3f* const outPosition)
   const EntityCategorySet* const mobileCategory = rules->GetEntityCategory("MOBILE");
   const EntityCategorySet* const structureCategory = rules->GetEntityCategory("STRUCTURE");
 
-  EntityCategorySet mobileMinusStructure{};
-  EntityCategory::Sub(&mobileMinusStructure, mobileCategory, structureCategory);
+  // 0x0057A55C..0x0057A570: STRUCTURE is Sub's `this` (lhs) and MOBILE the
+  // stack operand, so the averaged set is STRUCTURE - MOBILE (the base).
+  EntityCategorySet structureMinusMobile{};
+  EntityCategory::Sub(&structureMinusMobile, structureCategory, mobileCategory);
 
   EntitySetTemplate<Unit> candidateUnits{};
-  mArmy->GetUnits(&candidateUnits, &mobileMinusStructure);
+  mArmy->GetUnits(&candidateUnits, &structureMinusMobile);
 
   std::uint32_t aliveUnitCount = 0u;
   for (Entity* const* unitIt = candidateUnits.mVec.begin(); unitIt != candidateUnits.mVec.end(); ++unitIt) {
@@ -7733,7 +7734,9 @@ int moho::cfunc_CAiBrainSetUpAttackVectorsToArmyL(LuaPlus::LuaState* const state
     const EntityCategorySet* const structureCategory = rules->GetEntityCategory("STRUCTURE");
 
     EntityCategorySet defaultCategory{};
-    EntityCategory::Sub(&defaultCategory, mobileCategory, structureCategory);
+    // 0x0058ECDF..0x0058ECE6: STRUCTURE is the `this` (lhs) of Sub and MOBILE
+    // the stack operand, so the default range is STRUCTURE - MOBILE.
+    EntityCategory::Sub(&defaultCategory, structureCategory, mobileCategory);
     brain->mBuildCategoryRange = defaultCategory;
   }
 

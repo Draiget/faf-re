@@ -979,10 +979,10 @@ const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
  *
  * Returns the number of nodes produced.
  *
- * Ground truth (`FUN_005B26C0.c`) matches the engine scalar-first rotation
- * matrix term-by-term for the initial forward sample, not the generic
- * `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar `ToMat3()`) the
- * previous body here used.
+ * The initial forward sample is the orientation's +Z axis built inline at
+ * 0x005B270F..0x005B2785 with the same products as `QuatForwardAxis`, not a
+ * full `MultQuadVec` matrix expansion: the two round differently once a lane
+ * is denormal (a level hull's y), and the waypoint heading inherits it.
  */
 int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 {
@@ -994,9 +994,7 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 
   // The hull's facing, straight from the orientation - not flattened and not
   // renormalised, so a pitched or rolled hull contributes its real heading.
-  const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
-  Wm3::Vector3f forward{};
-  MultQuadVec(&forward, &forwardAxis, &unit->GetTransform().orient_);
+  const Wm3::Vector3f forward = moho::QuatForwardAxis(unit->GetTransform().orient_);
 
   CPathPoint point{};
   point.mPosition = unit->GetPosition();
