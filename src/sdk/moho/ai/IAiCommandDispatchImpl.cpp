@@ -998,11 +998,12 @@ int IAiCommandDispatchImpl::Execute()
       return static_cast<ETaskStatus>(1);
     }
 
-    // 0x00598EC3..0x00598ED9: Attack (0xA), Patrol (0x10) and FormPatrol
-    // (0x12) rotate to the back; everything else is dropped.
+    // 0x00598EC3..0x00598ED9: Patrol (0x10) and FormPatrol (0x12) rotate to
+    // the back (0x006EDFC0); Attack (0xA) takes `je 0x598F67` to the remove
+    // call (0x006EDE70) with everything else, so a failed attack - such as a
+    // point defense whose target left its range - drops the order.
     const EUnitCommandType commandType = currentCommand->mVarDat.mCmdType;
-    if (commandType == EUnitCommandType::UNITCOMMAND_Attack || commandType == EUnitCommandType::UNITCOMMAND_Patrol ||
-        commandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
+    if (commandType == EUnitCommandType::UNITCOMMAND_Patrol || commandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
       commandQueue->MoveFirstCommandToBackOfQueue();
     } else {
       commandQueue->RemoveFirstCommandFromQueue();
