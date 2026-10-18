@@ -255,6 +255,10 @@ namespace moho
         return false;
       }
 
+      // FAF hot-patch: 0x005F5C21 jumps to 0x01291947 in .exxt, which copies
+      // the focus unit's fraction complete into mFractionComplete (+0x3C) and
+      // the owner's work progress before resuming at 0x005F5C26. Retail does
+      // not null-test the focus here (the null branch above is ours).
       mFractionComplete = focusUnit->mVarDat.mFractionComplete;
       ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mVarDat.mFractionComplete;
 

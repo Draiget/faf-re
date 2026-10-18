@@ -215,7 +215,12 @@ namespace moho
     SEconValue mSegmentCost;      // +0x34
     SEconValue mSegmentSpent;     // +0x3C
     float mSegments;              // +0x44
-    std::int32_t mCurSegments;    // +0x48
+    // +0x48: an int in the 2007 build (`cvtsi2ss [ecx+48h]`, `add [ecx+48h], 1`).
+    // The FAF hot-patches that replace SiloAssistWithResource (0x01291617) and
+    // SiloTick's SBS_Active arm (0x0129155F), plus GiveNukeSiloAmmo's segment
+    // setter (0x0128E97B), all read and write it as a float of fractional
+    // segments. The unpatched serializers still move it with ReadInt/WriteInt.
+    float mCurSegments;           // +0x48
   };
 
   static_assert(sizeof(SSiloBuildInfo) == 0x0C, "SSiloBuildInfo size must be 0x0C");

@@ -3846,6 +3846,8 @@ namespace moho
       throw std::runtime_error("Attempt to get footprint on nameless entity");
     }
 
+    // FAF hot-patch: 0x006788A5 jumps to 0x0128E836 in .exxt, which adds the
+    // +0x11D byte (mUsingAltFootprintSecondary) as a second alt-footprint test.
     const bool useAlt = (mVarDat.mUsingAltFootprint != 0u) || (mVarDat.mUsingAltFootprintSecondary != 0u);
     return useAlt ? BluePrint->mAltFootprint : BluePrint->mFootprint;
   }

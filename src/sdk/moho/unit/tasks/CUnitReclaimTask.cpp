@@ -712,6 +712,10 @@ namespace moho
           reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
         } else if (targetEntity != nullptr) {
           if (Prop* const propTarget = targetEntity->IsProp(); propTarget != nullptr) {
+            // FAF hot-patch: 0x0061FF7B jumps to 0x01291836 in .exxt. With the
+            // reclaimer paused it saves +0x64/+0x68/+0x6C to .exxt globals and
+            // writes 0xB22BCC77 (-1e-8f) and two zeros; 0x00620071 jumps to
+            // 0x0129188F, which restores them on the only exit of this arm.
             if (mUnit->mUnitVarDat.mIsPaused) {
               pausedOverride.active = true;
               pausedOverride.savedReclaimRate = mReclaimRate;

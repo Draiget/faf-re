@@ -1,6 +1,7 @@
 #include "moho/ai/CAiSiloBuildImpl.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <new>
@@ -301,7 +302,7 @@ CAiSiloBuildImpl::CAiSiloBuildImpl()
   , mSegmentCost{}
   , mSegmentSpent{}
   , mSegments(1.0f)
-  , mCurSegments(0)
+  , mCurSegments(0.0f)
 {
   ZeroSiloBuildInfoWords(&mSiloInfo[0]);
   ZeroSiloBuildInfoWords(&mSiloInfo[1]);
@@ -369,7 +370,10 @@ void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->Read(stateType, &mState, owner);
 
   archive->ReadFloat(&mSegments);
-  archive->ReadInt(&mCurSegments);
+  // Still ReadInt in the shipped serializer; the FAF float's bits round-trip.
+  std::int32_t curSegmentsBits = 0;
+  archive->ReadInt(&curSegmentsBits);
+  mCurSegments = std::bit_cast<float>(curSegmentsBits);
 
   gpg::RType* const econValueType = ResolveSEconValueType();
   GPG_ASSERT(econValueType != nullptr);
@@ -406,7 +410,7 @@ void CAiSiloBuildImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(stateType, &mState, owner);
 
   archive->WriteFloat(mSegments);
-  archive->WriteInt(mCurSegments);
+  archive->WriteInt(std::bit_cast<std::int32_t>(mCurSegments));
 
   gpg::RType* const econValueType = ResolveSEconValueType();
   GPG_ASSERT(econValueType != nullptr);
@@ -544,9 +548,20 @@ bool CAiSiloBuildImpl::SiloAddBuild(const ESiloType type)
 
 /**
  * Address: 0x005CF030 (FUN_005CF030, ?SiloAssistWithResource@CAiSiloBuildImpl@Moho@@UAEXABUSEconValue@2@@Z)
+ *
+ * What it does:
+ * Banks an assisting builder's resources and converts them into fractional
+ * build segments, capped at the segments still remaining.
  */
 void CAiSiloBuildImpl::SiloAssistWithResource(const SEconValue& value)
 {
+  // FAF hot-patch: 0x005CF030 jumps to 0x01291617 in .exxt, which replaces the
+  // whole body. The 2007 loop only advanced in whole segments, once both banked
+  // amounts covered a full segment cost. The patch instead advances by the
+  // smaller of the two banked/cost ratios (`minss`), capped at the remaining
+  // segments, charges exactly that fraction of the segment cost, and leaves the
+  // rest banked. Work progress is the *new* segment count over the total. There
+  // is no mUnit null test.
   if (mState == SBS_Idle) {
     return;
   }
@@ -554,25 +569,26 @@ void CAiSiloBuildImpl::SiloAssistWithResource(const SEconValue& value)
   mSegmentSpent.energy += value.energy;
   mSegmentSpent.mass += value.mass;
 
-  while (mSegmentSpent.energy >= mSegmentCost.energy) {
-    if (mSegmentSpent.mass < mSegmentCost.mass) {
-      break;
-    }
+  const float energyRatio = mSegmentSpent.energy / mSegmentCost.energy;
+  const float massRatio = mSegmentSpent.mass / mSegmentCost.mass;
+  const float affordable = (energyRatio < massRatio) ? energyRatio : massRatio;
+  const float remaining = mSegments - mCurSegments;
+  // `comiss remaining, affordable` / `jbe`: unordered also takes `remaining`.
+  const float advance = (remaining > affordable) ? affordable : remaining;
 
-    mSegmentSpent.energy = std::max(0.0f, mSegmentSpent.energy - mSegmentCost.energy);
-    mSegmentSpent.mass = std::max(0.0f, mSegmentSpent.mass - mSegmentCost.mass);
+  const float energyCharged = mSegmentCost.energy * advance;
+  const float massCharged = mSegmentCost.mass * advance;
+  mCurSegments += advance;
 
-    if (mUnit) {
-      mUnit->mUnitVarDat.mResourcesSpent.ENERGY += mSegmentCost.energy;
-      mUnit->mUnitVarDat.mResourcesSpent.MASS += mSegmentCost.mass;
-      mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCurSegments++) / mSegments;
-    } else {
-      ++mCurSegments;
-    }
+  mUnit->mUnitVarDat.mResourcesSpent.ENERGY += energyCharged;
+  mUnit->mUnitVarDat.mResourcesSpent.MASS += massCharged;
+  mUnit->mUnitVarDat.mWorkProgress = mCurSegments / mSegments;
 
-    if (static_cast<float>(mCurSegments) >= mSegments) {
-      mState = SBS_Finish;
-    }
+  mSegmentSpent.energy -= energyCharged;
+  mSegmentSpent.mass -= massCharged;
+
+  if (mCurSegments >= mSegments) {
+    mState = SBS_Finish;
   }
 }
 
@@ -601,7 +617,7 @@ void CAiSiloBuildImpl::SiloStopBuild()
   mUnit->mUnitVarDat.mWorkProgress = 0.0f;
   mState = SBS_Idle;
   mSiloTypes.clear();
-  mCurSegments = 0;
+  mCurSegments = 0.0f;
 }
 
 /**
@@ -678,19 +694,30 @@ void CAiSiloBuildImpl::SiloTick()
   }
 
   case SBS_Active:
-    if (mRequest && mRequest->mGranted.energy >= mSegmentCost.energy && mRequest->mGranted.mass >= mSegmentCost.mass) {
-      const SEconValue granted = TakeGrantedResourcesAndReset(mRequest);
-      mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = mSegmentCost.energy;
-      mUnit->mUnitVarDat.mMaintainenceCost.MASS = mSegmentCost.mass;
-      mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
-      mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
-      mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCurSegments++) / mSegments;
-    }
+  {
+    // FAF hot-patch: 0x005CF430 calls 0x0129155F in .exxt (then jumps to the
+    // epilogue at 0x005CF4CA), replacing this arm. The 2007 arm only took the
+    // grant once it covered a whole segment and then advanced one segment.
+    // The patch always takes whatever was granted and advances by the smaller
+    // of the granted/cost ratios (`minss`), uncapped; work progress is the
+    // *new* segment count over the total. mRequest is not null-tested.
+    const SEconValue granted = TakeGrantedResourcesAndReset(mRequest);
+    const float energyRatio = granted.energy / mSegmentCost.energy;
+    const float massRatio = granted.mass / mSegmentCost.mass;
+    const float advance = (energyRatio < massRatio) ? energyRatio : massRatio;
 
-    if (static_cast<float>(mCurSegments) >= mSegments) {
+    mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = mSegmentCost.energy;
+    mUnit->mUnitVarDat.mMaintainenceCost.MASS = mSegmentCost.mass;
+    mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
+    mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
+    mCurSegments += advance;
+    mUnit->mUnitVarDat.mWorkProgress = mCurSegments / mSegments;
+
+    if (mCurSegments >= mSegments) {
       mState = SBS_Finish;
     }
     return;
+  }
 
   case SBS_Finish:
   {
@@ -709,7 +736,7 @@ void CAiSiloBuildImpl::SiloTick()
 
       SiloAdjustStorageCount(builtType, 1);
       mSiloTypes.pop_front();
-      mCurSegments = 0;
+      mCurSegments = 0.0f;
     }
 
     mState = SBS_Idle;

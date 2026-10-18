@@ -10403,13 +10403,194 @@ namespace
 	};
 
 	/**
+	 * Address: 0x0128BF5A (.exxt, FAF hot-patch; no FUN_ token in the IDA export)
+	 *
+	 * What it does:
+	 * table.getsize(t): counts the non-nil values in the array part and in the
+	 * hash part, pushed as a number; 0 when argument 1 is missing or not a
+	 * table. The hash part is only walked when `lsizenode != 0`, so a table
+	 * whose single hash node holds the only entry reports 0.
+	 */
+	int LuaTableGetSize(lua_State* const state)
+	{
+		lua_Number size = 0.0f;
+		const TObject* const argument = state->base;
+		if (argument < state->top && argument->tt == LUA_TTABLE) {
+			const Table* const table = static_cast<const Table*>(argument->value.p);
+			const auto isPresent = [](const TObject& value) { return value.tt != LUA_TNIL; };
+
+			int count = 0;
+			if (table->lsizenode != 0) {
+				const Node* const nodes = table->node;
+				count += static_cast<int>(std::count_if(
+					nodes, nodes + (1 << table->lsizenode), [&](const Node& node) { return isPresent(node.i_val); }
+				));
+			}
+			count += static_cast<int>(std::count_if(table->array, table->array + table->sizearray, isPresent));
+			size = static_cast<lua_Number>(count);
+		}
+
+		lua_pushnumber(state, size);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0128BFD1 (.exxt, FAF hot-patch; no FUN_ token in the IDA export)
+	 *
+	 * What it does:
+	 * table.empty(t): true unless the hash part (walked only when
+	 * `lsizenode != 0`) or the array part holds a non-nil value; also true when
+	 * argument 1 is missing or not a table.
+	 */
+	int LuaTableEmpty(lua_State* const state)
+	{
+		bool isEmpty = true;
+		const TObject* const argument = state->base;
+		if (argument < state->top && argument->tt == LUA_TTABLE) {
+			const Table* const table = static_cast<const Table*>(argument->value.p);
+			const auto isPresent = [](const TObject& value) { return value.tt != LUA_TNIL; };
+
+			if (table->lsizenode != 0) {
+				const Node* const nodes = table->node;
+				isEmpty = std::none_of(
+					nodes, nodes + (1 << table->lsizenode), [&](const Node& node) { return isPresent(node.i_val); }
+				);
+			}
+			if (isEmpty) {
+				isEmpty = std::none_of(table->array, table->array + table->sizearray, isPresent);
+			}
+		}
+
+		lua_pushboolean(state, isEmpty ? 1 : 0);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0128C055 (.exxt, FAF hot-patch; no FUN_ token in the IDA export)
+	 *
+	 * What it does:
+	 * table.unpack(t [, i [, j]]): pushes t[i]..t[j] raw, i defaulting to 1 and
+	 * j to lua_getn(t) (both truncated from lua_Number), and returns the count;
+	 * nothing when i > j.
+	 */
+	int LuaTableUnpack(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+		const int length = lua_getn(state, 1);
+		int index = static_cast<int>(luaL_optnumber(state, 2, 1.0f));
+		const int last = static_cast<int>(luaL_optnumber(state, 3, static_cast<lua_Number>(length)));
+		if (last < index) {
+			return 0;
+		}
+
+		const int count = last - index + 1;
+		luaL_checkstack(state, count, "too many results to unpack");
+		for (; index <= last; ++index) {
+			lua_rawgeti(state, 1, index);
+		}
+		return count;
+	}
+
+	/**
+	 * Address: 0x0128B4DA (.exxt, FAF hot-patch; no FUN_ token in the IDA export)
+	 *
+	 * What it does:
+	 * Builds a new table presized to `source`'s array size and `1 << lsizenode`,
+	 * records it in `visited` under `source`, then copies every entry in
+	 * iteration order. Keys are shared; a value already in `visited` reuses its
+	 * copy, a table value is copied recursively, anything else is shared. The
+	 * metatable is not copied.
+	 */
+	LuaObject DeepCopyLuaTable(const LuaObject& source, LuaObject& visited)
+	{
+		Ensure(source.m_state != nullptr, "m_state");
+		Ensure(source.IsTable(), "IsTable()");
+
+		const Table* const sourceTable = static_cast<const Table*>(source.m_object.value.p);
+		LuaObject copy;
+		copy.AssignNewTable(
+			source.m_state, sourceTable->sizearray, static_cast<std::uint32_t>(1u << sourceTable->lsizenode)
+		);
+		visited.SetObject(source, copy);
+
+		for (LuaTableIterator it(source, 1); it; it.Next()) {
+			const LuaObject key = it.GetKey();
+			const LuaObject value = it.GetValue();
+
+			const LuaObject alreadyCopied = visited.GetByObject(value);
+			if (!alreadyCopied.IsNil()) {
+				copy.SetObject(key, alreadyCopied);
+				continue;
+			}
+
+			Ensure(value.m_state != nullptr, "m_state");
+			const LuaObject copiedValue = value.IsTable() ? DeepCopyLuaTable(value, visited) : LuaObject(value);
+			copy.SetObject(key, copiedValue);
+		}
+
+		return copy;
+	}
+
+	/**
+	 * Address: 0x0128B402 (.exxt, FAF hot-patch; no FUN_ token in the IDA export)
+	 *
+	 * What it does:
+	 * Deep-copies a table through a fresh `visited` table (so shared and cyclic
+	 * sub-tables keep their topology); any other value is returned as is.
+	 */
+	LuaObject DeepCopyLuaObject(const LuaObject& source)
+	{
+		Ensure(source.m_state != nullptr, "m_state");
+		if (!source.IsTable()) {
+			return source;
+		}
+
+		LuaObject visited;
+		visited.AssignNewTable(source.m_state, 0, 0u);
+		return DeepCopyLuaTable(source, visited);
+	}
+
+	/**
+	 * Address: 0x0128C0F1 (.exxt, FAF hot-patch; no FUN_ token in the IDA export)
+	 *
+	 * What it does:
+	 * table.clone(v): pushes a deep copy of argument 1.
+	 */
+	int LuaTableClone(lua_State* const state)
+	{
+		const LuaObject source(state->stateUserData, 1);
+		const LuaObject copy = DeepCopyLuaObject(source);
+		copy.PushStack(state);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0129366C (.exxt, FAF hot-patch registration array)
+	 *
+	 * The four rows FAF adds to the "table" library, in image order.
+	 */
+	const luaL_reg kFafTableLibraryExtensions[] = {
+		{"getsize", &LuaTableGetSize},
+		{"empty", &LuaTableEmpty},
+		{"unpack", &LuaTableUnpack},
+		{"clone", &LuaTableClone},
+		{nullptr, nullptr}
+	};
+
+	/**
 	 * Address: 0x009283A0 (FUN_009283A0, luaopen_table)
+	 * Address: 0x0128C1DE (.exxt, FAF replacement opener)
 	 *
 	 * IDA signature:
 	 * int __cdecl luaopen_table(lua_State *L);
 	 *
 	 * What it does:
 	 * Opens the "table" library.
+	 *
+	 * FAF hot-patch: LuaState::Init's `call luaopen_table` at 0x0090AB1F now
+	 * calls 0x0128C1DE in .exxt, which opens "table" from the original rows
+	 * (0x00D47418) and then a second time from the FAF rows (0x0129366C),
+	 * returning 1. 0x009283A0 itself is left unreferenced in the shipped image.
 	 *
 	 * Named apart from the binary's symbol for the same reason LuaOpenString is:
 	 * `lualib.h` declares `luaopen_table` inside `extern "C"`, and the rename
@@ -10421,6 +10602,7 @@ namespace
 	int LuaOpenTable(lua_State* const state)
 	{
 		luaL_openlib(state, "table", kLuaTableLibrary, 0);
+		luaL_openlib(state, "table", kFafTableLibraryExtensions, 0);
 		return 1;
 	}
 
@@ -12644,6 +12826,16 @@ namespace
  * LuaPlus lib carries its own `_luaV_settable` built against a different
  * TObject/Table layout, and letting that one win is what corrupted every
  * table written through `luaL_openlib` during startup.
+ *
+ * FAF hot-patch: 0x00929450 jumps to 0x0128C4F4 in .exxt, a full replacement
+ * body. Against the 2007 body it differs in three ways, all modelled here:
+ *  - only LUA_TFUNCTION (7) is invoked; the 2007 `(tt | 1) == 7` test also
+ *    called a LUA_CFUNCTION (6) handler, which the patch re-indexes into
+ *    instead (and the inlined callTM stores the tag as 7);
+ *  - the handler is copied into a frame temporary before re-indexing, so
+ *    later hops read that copy rather than the handler's slot;
+ *  - the hop budget is a `dec ebx`/`jne` count from 100, i.e. 100 lookups,
+ *    where the 2007 `++loop <= 100` allowed 101.
  */
 extern "C" void luaV_settable(
 	lua_State* const state,
@@ -12656,7 +12848,8 @@ extern "C" void luaV_settable(
 	constexpr int kNoNewIndexTagMethodFlag = 1 << kTagMethodNewIndex;
 	constexpr int kMaxTagMethodChain = 100;
 
-	for (int hop = 0; hop <= kMaxTagMethodChain; ++hop) {
+	TObject chainedHandler{};
+	for (int hopsLeft = kMaxTagMethodChain; hopsLeft != 0; --hopsLeft) {
 		const TObject* handler = nullptr;
 
 		if (target->tt == LUA_TTABLE) {
@@ -12686,12 +12879,13 @@ extern "C" void luaV_settable(
 			}
 		}
 
-		if (IsCallableTag(handler->tt)) {
+		if (handler->tt == LUA_TFUNCTION) {
 			callTM(target, key, val, state, handler);
 			return;
 		}
 
-		target = handler;
+		chainedHandler = *handler;
+		target = &chainedHandler;
 	}
 
 	luaG_runerror(state, "loop in settable");
@@ -17779,7 +17973,9 @@ void LuaState::Init(const StandardLibraries initStandardLibrary)
 		// vendored ltablib was compiled with stock tag numbering, where
 		// LUA_TFUNCTION is 6; in this fork 6 is the C-function tag, so its
 		// table.sort turned away every Lua comparator with "cfunction
-		// expected, got function".
+		// expected, got function". FAF hot-patch: this call (0x0090AB1F) goes
+		// to 0x0128C1DE in .exxt, which also registers table.getsize/empty/
+		// unpack/clone - see LuaOpenTable.
 		LuaOpenTable(state);
 		if (initStandardLibrary == LIB_OSIO) {
 			// Ours, not the prebuilt lib's. The vendored liolib walks a

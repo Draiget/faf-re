@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -782,21 +784,35 @@ namespace
     return parsed != 0 ? parsed : 500;
   }
 
+  // FAF hot-patch: 0x006FF3D1 jumps to 0x012916FE in .exxt, which parses the
+  // NoRushOption string as decimal minutes and stores `minutes * 600` ticks
+  // before the original "Off" test at 0x006FF3F7; an in-place `jmp 0x006FF47D`
+  // at 0x006FF40D bypasses the 2007 "5"/"10"/"20" table, so any minute count
+  // is honoured. The parse is 16-bit: each step is `bx = 10 * bx` (`mul ax,bx`)
+  // followed by `add bl, dl` with dl = char - '0', so a carry out of the low
+  // byte is dropped and non-digits fold in the same way; the product is
+  // `mul ax,bx` with ax = 600, zero-extended. An empty string would run the
+  // `loop` 2^32 times in retail; it is not modelled.
   [[nodiscard]] int ResolveNoRushTicks(const char* const noRushOption) noexcept
   {
-    if (noRushOption == nullptr || std::strcmp(noRushOption, "Off") == 0) {
+    if (noRushOption == nullptr) {
       return 0;
     }
-    if (std::strcmp(noRushOption, "5") == 0) {
-      return 3000;
+
+    const std::size_t length = std::strlen(noRushOption);
+    std::uint16_t minutes = 0;
+    for (std::size_t index = 0; index < length; ++index) {
+      minutes = static_cast<std::uint16_t>(minutes * 10u);
+      const auto digit = static_cast<std::uint8_t>(noRushOption[index] - '0');
+      const auto lowByte = static_cast<std::uint8_t>((minutes & 0xFFu) + digit);
+      minutes = static_cast<std::uint16_t>((minutes & 0xFF00u) | lowByte);
     }
-    if (std::strcmp(noRushOption, "10") == 0) {
-      return 6000;
+    const int ticks = static_cast<std::uint16_t>(minutes * 600u);
+
+    if (std::strcmp(noRushOption, "Off") == 0) {
+      return 0;
     }
-    if (std::strcmp(noRushOption, "20") == 0) {
-      return 12000;
-    }
-    return 0;
+    return ticks;
   }
 
   void ApplyNoRushScenarioOptions(

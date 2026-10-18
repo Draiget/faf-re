@@ -4878,10 +4878,12 @@ int moho::cfunc_UnitGiveNukeSiloAmmoL(LuaPlus::LuaState* const state)
       const LuaPlus::LuaStackObject amountObject(state, 2);
       const int amount = amountObject.GetInteger();
       if (setSegmentAmount) {
-        // FAF patch 0x0128E97B: `cvtsi2ss xmm0, eax` / `movss [ebx+48h], xmm0`
-        // -- the amount is converted to float and its bit pattern is stored
-        // into the int `mCurSegments`. Reproduced as shipped.
-        siloBuild->mCurSegments = std::bit_cast<std::int32_t>(static_cast<float>(amount));
+        // FAF hot-patch: 0x006CED74 jumps to 0x0128E955 in .exxt, which accepts
+        // 2 or 3 arguments and latches "3 arguments" in a global (0x012934CC);
+        // 0x006CEDF1 jumps to 0x0128E97B, which on that latch stores
+        // `cvtsi2ss` of the amount into the float `mCurSegments` (+0x48)
+        // instead of adjusting the nuke storage count.
+        siloBuild->mCurSegments = static_cast<float>(amount);
       } else {
         siloBuild->SiloAdjustStorageCount(SILOTYPE_Nuke, amount);
       }
@@ -6906,6 +6908,9 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
   }
 
   StatItem* const statItem = unit->GetStat(statName);
+  // FAF hot-patch: 0x006CCA2A jumps to 0x0129153C in .exxt, which returns
+  // `true` (via 0x0128CC1D -> lua_pushboolean) when GetStat yields no item,
+  // instead of falling into the store with a null stat.
   if (statItem == nullptr) {
     lua_pushboolean(rawState, 1);
     return 1;
