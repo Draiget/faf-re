@@ -1632,9 +1632,13 @@ namespace
     // (sHaStar_dat7, row deltas), 0x00D49458 (sHaStar_dat6, column deltas) and
     // 0x00D49460 (sHaStar_dat5, diagonal prerequisite masks).
     // ------------------------------------------------------------------
+    // The diagonal step is 0x3FB4FDF4 = 1.414f, not sqrt(2) (0x3FB504F3). The
+    // node distance it is quantised against uses the sqrt(2)-1 factor, so a
+    // straight-plus-diagonal route comes out just under its octile distance
+    // and lands in bucket 0 rather than 1.
     constexpr std::array<float, 8> kOctileStepCost = {
       1.0f, 1.0f, 1.0f, 1.0f,
-      1.41421354f, 1.41421354f, 1.41421354f, 1.41421354f
+      1.414f, 1.414f, 1.414f, 1.414f
     };
     constexpr std::array<std::int8_t, 8> kOctileRowDelta = { -1, 0, 1, 0, -1, 1, 1, -1 };
     constexpr std::array<std::int8_t, 8> kOctileColDelta = { 0, -1, 0, 1, -1, -1, 1, 1 };
@@ -2882,19 +2886,21 @@ gpg::Rect2i ClusterMap::ClusterIndexRect(const int worldX, const int worldZ, con
  *
  * What it does:
  * Inverts `QuantizeEdgeCost`. The 32 entries are `exp(q / 6)` for q in 0..31,
- * read from the binary at 0x00E35DA0 and verified against the closed form.
+ * copied bit for bit from the table at 0x00E35DA0. Entries 1, 2, 3, 6 and 7
+ * sit one to three ulps off the correctly rounded `exp(q / 6)`, so they are
+ * written as hex floats rather than decimal approximations.
  */
 float Cluster::DequantizeEdgeCost(const int bucket, const float distance)
 {
     static constexpr float kBucketScale[32] = {
-        1.0f,          1.18136041f,   1.39561241f,   1.64872122f,
-        1.94773400f,   2.30097604f,   2.71828175f,   3.21127081f,
-        3.79366802f,   4.48168898f,   5.29449005f,   6.25470114f,
-        7.38905621f,   8.72913837f,   10.3122587f,   12.1824942f,
-        14.3919163f,   17.0020409f,   20.0855370f,   23.7282581f,
-        28.0316257f,   33.1154518f,   39.1212845f,   46.2163353f,
-        54.5981483f,   64.5000916f,   76.1978607f,   90.0171280f,
-        106.342674f,   125.629028f,   148.413162f,   175.329437f,
+        0x1p+0f, 0x1.2e6d9cp+0f, 0x1.6546d4p+0f, 0x1.a61294p+0f,
+        0x1.f29eb2p+0f, 0x1.268662p+1f, 0x1.5bf0aap+1f, 0x1.9b0aeep+1f,
+        0x1.e596eap+1f, 0x1.1ed3fep+2f, 0x1.52d8ecp+2f, 0x1.904d06p+2f,
+        0x1.d8e64cp+2f, 0x1.17551ap+3f, 0x1.49fe06p+3f, 0x1.85d6fep+3f,
+        0x1.cc8a94p+3f, 0x1.10085cp+4f, 0x1.415e5cp+4f, 0x1.7ba6f2p+4f,
+        0x1.c0818ap+4f, 0x1.08ec72p+5f, 0x1.38f864p+5f, 0x1.71bb0ep+5f,
+        0x1.b4c902p+5f, 0x1.020018p+6f, 0x1.30ca9cp+6f, 0x1.68118ap+6f,
+        0x1.a95ee6p+6f, 0x1.f6842p+6f, 0x1.28d38ap+7f, 0x1.5ea8acp+7f,
     };
 
     return kBucketScale[bucket] * distance;
