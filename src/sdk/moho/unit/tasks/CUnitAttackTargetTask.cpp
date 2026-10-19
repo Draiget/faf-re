@@ -745,13 +745,16 @@ namespace moho
 
       if (mIsGrounded != 0u) {
         if (attacker != nullptr) {
-          UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&mTarget);
-          if (targetWeapon != nullptr) {
+          // 0x005F31F6 tests GetTargetWeapon and 0x005F323A asks again for the
+          // weapon it hands SetWeaponGoal. Each call reaches CanAttackTarget,
+          // whose PickTargetPointAboveWater draws from the sim random stream, so
+          // the second call is one more draw (replay 26876279 tick 3653).
+          if (attacker->GetTargetWeapon(&mTarget) != nullptr) {
             SCoordsVec2 formationPosition{};
             mFormation->GetFormationPosition(&formationPosition, unit, nullptr);
 
             const Wm3::Vector3f weaponGoalPosition{formationPosition.x, 0.0f, formationPosition.z};
-            SetWeaponGoal(weaponGoalPosition, targetWeapon);
+            SetWeaponGoal(weaponGoalPosition, attacker->GetTargetWeapon(&mTarget));
           } else {
             SOCellPos adjustedPosition{};
             mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
@@ -770,13 +773,14 @@ namespace moho
     } else {
       UpdatePos();
 
-      if (mIsGrounded != 0u && attacker != nullptr) {
-        UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&mTarget);
-        if (targetWeapon != nullptr) {
-          SetWeaponGoal(mTarget.GetTargetPosGun(false), targetWeapon);
-          mIsGrounded = 0u;
-          return;
-        }
+      // 0x005F32B6 tests GetTargetWeapon, 0x005F32C4 takes the target position
+      // and 0x005F32D5 asks for the weapon again for SetWeaponGoal (one more
+      // CanAttackTarget random draw, as in the formation branch).
+      if (mIsGrounded != 0u && attacker != nullptr && attacker->GetTargetWeapon(&mTarget) != nullptr) {
+        const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
+        SetWeaponGoal(targetPosition, attacker->GetTargetWeapon(&mTarget));
+        mIsGrounded = 0u;
+        return;
       }
 
       if (mHasMobileTarget == 0u) {

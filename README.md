@@ -12,13 +12,25 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as m
 | Renders | ✅ main menu, cinematic playback, in-game world view |
 | Plays | ✅ native save/load on both architectures |
 | Gameplay testing | ✅ x86 ↔ x64 lockstep multiplayer: hundreds of consecutive checksum-identical beats, no desync |
-| Retail parity | 🔬 under test — first checksum divergence at beat ~50 (float/RNG finalization); being chased |
+| Retail parity | 🟡 FAF vault replays play back checksum-identical to the retail executable for tens of thousands of beats — see [Retail replay parity](#retail-replay-parity) |
 | Source bodies written | ~39,000 functions |
 | Genuinely outstanding | ~430 |
 
-*Snapshot: 13/10/2026.*
+*Snapshot: 19/10/2026.*
 
 Most symbols in the retail engine were never hand-written code — they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, not as hundreds of separate functions, so the function count understates how much is covered.
+
+## Retail replay parity
+
+Real multiplayer games from the FAF replay vault are played back on both the retail `ForgedAlliance.exe` and the rebuilt engine. Both dump the full simulation checksum on every beat (`sim_ChecksumPeriod` 1), and each beat is compared. One differing bit anywhere in the sim state fails the beat.
+
+| Replay | Game | Result |
+|---|---|---|
+| 26935800 | Dual Gap, 12 players, 41 min | Every beat matches from 4 to 22,636 of 24,565. The next divergence is being chased. |
+| 26876279 | Seton's Clutch, 8 players, 37 min | Every gameplay beat matches, 4 to 22,155. The only difference is the final beat, where the engine deliberately keeps the commands that retail drops after a player leaves a replay. |
+| 26957207 | Dual Gap, 12 players, 47 min | Retail reference capture in progress. |
+
+Most of the remaining divergences have come from the 2007 floating-point environment: the sim keeps some intermediate results in x87 registers at 24-bit precision, where SSE rounds every step. The rest came from small call-order differences in the random-number stream.
 
 ## What is and isn't here
 
