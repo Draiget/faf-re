@@ -61,6 +61,18 @@ namespace msvc8
   void ScaleVectorX87(float* destLanes, const float* sourceLanes, float scale) noexcept;
 
   /**
+   * The radius of an oriented box along `axisLanes` (not required to be unit
+   * length): `(|axis.A2|*e2 + |axis.A1|*e1) + |axis.A0|*e0`, each dot summed
+   * (y, z) then x, the whole chain kept on the x87 stack and stored to float
+   * once (`ProjectBoxOntoAxis` 0x0047555E..0x00475602). `boxLanes` is a
+   * `Wm3::Box3f` as center(3), axis0..2(3 each), extent(3). Kept on x87
+   * because the box-vs-box SAT feeds it near-degenerate cross axes whose
+   * products sit in the float denormal range, where per-product SSE rounding
+   * loses the bits that decide the interval overlap.
+   */
+  [[nodiscard]] float BoxRadiusOnAxisX87(const float* boxLanes, const float* axisLanes) noexcept;
+
+  /**
    * The MSVC8 CRT's `fmod` (`_CIfmod`, 0x00A8E06A, x87 table dispatch): a
    * zero dividend returns +0 for a finite non-zero divisor, where the modern
    * CRT keeps the dividend's sign (`fmod(-0, y) == -0`). Every other

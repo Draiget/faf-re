@@ -55,20 +55,16 @@ namespace
   void ProjectBoxOntoAxis(const Wm3::Box3f& box, const Wm3::Vec3f& axis, float* outMin, float* outMax) noexcept
   {
     const Wm3::Vec3f center = BuildBoxCenter(box);
-    const Wm3::Vec3f axis0 = BoxAxis(box, 0);
-    const Wm3::Vec3f axis1 = BoxAxis(box, 1);
-    const Wm3::Vec3f axis2 = BoxAxis(box, 2);
 
+    // 0x00475585..0x004755B9: the centre's projection is SSE, (y, z) then x.
     const float centerProjection = (axis.y * center.y + axis.z * center.z) + axis.x * center.x;
 
-    // Summed third-axis first, then second, then first, because that is the
-    // order the binary accumulates in and float addition does not associate.
-    const float axis0Projection = (axis.z * axis0.z + axis.y * axis0.y) + axis.x * axis0.x;
-    const float axis1Projection = (axis.y * axis1.y + axis.z * axis1.z) + axis.x * axis1.x;
-    const float axis2Projection = (axis.y * axis2.y + axis.z * axis2.z) + axis.x * axis2.x;
-    const float radius = (std::fabs(axis2Projection) * box.Extent[2] +
-                           std::fabs(axis1Projection) * box.Extent[1]) +
-      std::fabs(axis0Projection) * box.Extent[0];
+    // 0x0047555E..0x00475602: the radius is one x87 chain stored once. The
+    // SAT hands this near-degenerate cross axes (two boxes a fraction of a
+    // degree apart) whose products are float denormals; rounding each one
+    // through SSE separated an engineer from a swept path retail found it in
+    // (replay 26935800 beat 14763).
+    const float radius = msvc8::BoxRadiusOnAxisX87(&box.Center.x, &axis.x);
 
     *outMin = centerProjection - radius;
     *outMax = centerProjection + radius;

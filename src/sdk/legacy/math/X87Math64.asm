@@ -550,4 +550,59 @@ msvc8_x87_scale_vector_to_length_of PROC
     ret
 msvc8_x87_scale_vector_to_length_of ENDP
 
+
+; float msvc8_x87_box_radius_on_axis(const float* box, const float* axis)
+; ProjectBoxOntoAxis 0x0047555E..0x00475602: the box radius along the axis,
+; the whole chain on the x87 stack under PC24 and stored to float once.
+; rcx=box (center, axis0..2, extent), rdx=axis; result in xmm0.
+msvc8_x87_box_radius_on_axis PROC
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rcx+28h]
+    fld     dword ptr [rdx+4]
+    fmul    st(1), st(0)
+    fld     dword ptr [rcx+2Ch]
+    fld     dword ptr [rdx+8]
+    fmul    st(1), st(0)
+    fxch    st(3)
+    faddp   st(1), st(0)
+    fld     dword ptr [rcx+24h]
+    fld     dword ptr [rdx]
+    fmul    st(1), st(0)
+    fxch    st(2)
+    faddp   st(1), st(0)
+    fabs
+    fmul    dword ptr [rcx+38h]
+    fld     dword ptr [rcx+1Ch]
+    fmul    st(0), st(3)
+    fld     dword ptr [rcx+20h]
+    fmul    st(0), st(5)
+    faddp   st(1), st(0)
+    fld     dword ptr [rcx+18h]
+    fmul    st(0), st(3)
+    faddp   st(1), st(0)
+    fabs
+    fmul    dword ptr [rcx+34h]
+    faddp   st(1), st(0)
+    fld     dword ptr [rcx+10h]
+    fmulp   st(3), st(0)
+    fld     dword ptr [rcx+14h]
+    fmulp   st(4), st(0)
+    fxch    st(2)
+    faddp   st(3), st(0)
+    fmul    dword ptr [rcx+0Ch]
+    faddp   st(2), st(0)
+    fxch    st(1)
+    fabs
+    fmul    dword ptr [rcx+30h]
+    faddp   st(1), st(0)
+    fstp    dword ptr [rsp+32]
+    movss   xmm0, dword ptr [rsp+32]
+    fldcw   word ptr [rsp+24]
+    ret
+msvc8_x87_box_radius_on_axis ENDP
+
 END

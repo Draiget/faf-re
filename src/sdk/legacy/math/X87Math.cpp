@@ -36,6 +36,7 @@ extern "C" void __cdecl msvc8_x87_scale_vector_to_length(
   float* destLanes, const float* sourceLanes, float lengthSq, float length
 );
 extern "C" void __cdecl msvc8_x87_scale_vector(float* destLanes, const float* sourceLanes, float scale);
+extern "C" float __cdecl msvc8_x87_box_radius_on_axis(const float* boxLanes, const float* axisLanes);
 extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
   float* destLanes, const float* sourceLanes, const float* targetLanes, float sourceLengthSq
 );
@@ -207,6 +208,59 @@ namespace msvc8
     }
 #else
     msvc8_x87_scale_vector(destLanes, sourceLanes, scale);
+#endif
+  }
+
+  float BoxRadiusOnAxisX87(const float* const boxLanes, const float* const axisLanes) noexcept
+  {
+#if defined(_M_IX86)
+    float radius;
+    __asm {
+      mov eax, boxLanes
+      mov ecx, axisLanes
+      fld dword ptr [eax + 28h]
+      fld dword ptr [ecx + 4]
+      fmul st(1), st
+      fld dword ptr [eax + 2Ch]
+      fld dword ptr [ecx + 8]
+      fmul st(1), st
+      fxch st(3)
+      faddp st(1), st
+      fld dword ptr [eax + 24h]
+      fld dword ptr [ecx]
+      fmul st(1), st
+      fxch st(2)
+      faddp st(1), st
+      fabs
+      fmul dword ptr [eax + 38h]
+      fld dword ptr [eax + 1Ch]
+      fmul st, st(3)
+      fld dword ptr [eax + 20h]
+      fmul st, st(5)
+      faddp st(1), st
+      fld dword ptr [eax + 18h]
+      fmul st, st(3)
+      faddp st(1), st
+      fabs
+      fmul dword ptr [eax + 34h]
+      faddp st(1), st
+      fld dword ptr [eax + 10h]
+      fmulp st(3), st
+      fld dword ptr [eax + 14h]
+      fmulp st(4), st
+      fxch st(2)
+      faddp st(3), st
+      fmul dword ptr [eax + 0Ch]
+      faddp st(2), st
+      fxch st(1)
+      fabs
+      fmul dword ptr [eax + 30h]
+      faddp st(1), st
+      fstp radius
+    }
+    return radius;
+#else
+    return msvc8_x87_box_radius_on_axis(boxLanes, axisLanes);
 #endif
   }
 
