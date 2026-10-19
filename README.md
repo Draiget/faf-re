@@ -12,7 +12,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as m
 | Renders | ✅ main menu, cinematic playback, in-game world view |
 | Plays | ✅ native save/load on both architectures |
 | Gameplay testing | ✅ x86 ↔ x64 lockstep multiplayer: hundreds of consecutive checksum-identical beats, no desync |
-| Retail parity | 🟡 All nine FAF vault replays tested play back checksum-identical to the retail executable through every gameplay beat — see [Retail replay parity](#retail-replay-parity) |
+| Retail parity | ✅ 9 of 9 FAF vault replays tested play back checksum-identical to the retail executable on 100% of gameplay beats — see [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md) |
 | Source bodies written | ~39,000 functions |
 | Genuinely outstanding | ~430 |
 
@@ -22,21 +22,7 @@ Most symbols in the retail engine were never hand-written code — they are temp
 
 ## Retail replay parity
 
-Real multiplayer games from the FAF replay vault are played back on the rebuilt engine, and its simulation checksum is compared with the checksums the live players' clients recorded into the replay every 50 beats. When a replay diverges, the window is narrowed beat by beat: the retail `ForgedAlliance.exe` and the rebuilt engine both dump the full simulation state on every beat (`sim_ChecksumPeriod` 1) and are diffed. One differing bit anywhere in the sim state fails the beat.
-
-| Replay | Game | Result |
-|---|---|---|
-| 26935800 | Dual Gap, 12 players, 41 min | Every gameplay beat matches, 4 to 24,563. The only difference is the final beat, the same end-of-replay leave handling as below. |
-| 26876279 | Seton's Clutch, 8 players, 37 min | Every gameplay beat matches, 4 to 22,155. The only difference is the final beat, where the engine deliberately keeps the commands that retail drops after a player leaves a replay. |
-| 26957207 | Dual Gap, 12 players, 35 min | Every one of the 5,069 live-player checksums embedded in the replay matches, start to end. |
-| 26953273 | Seton's Clutch, 8 players, 30 min | Every embedded checksum matches, start to end. |
-| 26917867 | Dual Gap, 12 players, 35 min | Every embedded checksum matches, start to end. |
-| 26897073 | Dual Gap, 12 players, 34 min | Every embedded checksum matches, start to end. |
-| 26954959 | Dual Gap, 12 players, 37 min | Every embedded checksum matches, start to end. |
-| 26994861 | Dual Gap, 12 players, 35 min | Every embedded checksum matches, start to end. |
-| 26898759 | Dual Gap, 12 players, 46 min | Every embedded checksum matches, start to end. |
-
-Most of the remaining divergences have come from the 2007 floating-point environment: the sim keeps some intermediate results in x87 registers at 24-bit precision, where SSE rounds every step. The rest came from small call-order differences in the random-number stream, from order-validation checks that accepted orders retail refuses, such as moving a unit that is riding in a transport, and from float-to-integer conversions that truncate where retail rounds to nearest.
+9 real multiplayer games from the FAF replay vault (Dual Gap and Seton's Clutch, 8–12 players, 30–46 minutes) play back on the rebuilt engine checksum-identical to the retail `ForgedAlliance.exe` on every gameplay beat. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 ## What is and isn't here
 
