@@ -1648,9 +1648,10 @@ namespace moho
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
     const Wm3::Vector3f velocity = projectile->GetVelocity();
-    // 0x006A2846..0x006A285F: x87 under 24-bit precision sums the squares as
-    // (z^2 + y^2) + x^2 before `fsqrt`; the order changes the low bit.
-    const float speed = std::sqrt(((velocity.z * velocity.z) + (velocity.y * velocity.y)) + (velocity.x * velocity.x));
+    // 0x006A2846..0x006A2861: the squares, their (z^2 + y^2) + x^2 sum and the
+    // `fsqrt` stay on the x87 stack and are stored once, so lanes too small
+    // (or too large) to square in float still give retail's speed.
+    const float speed = msvc8::VectorLengthZYXX87(&velocity.x);
     lua_pushnumber(rawState, speed);
     (void)lua_gettop(rawState);
     return 1;

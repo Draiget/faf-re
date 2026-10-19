@@ -262,6 +262,18 @@ namespace msvc8
   [[nodiscard]] inline float atan2(const float y, const float x) noexcept { return atan2f(y, x); }
   [[nodiscard]] inline float pow(const float x, const float y) noexcept { return powf(x, y); }
 
+  /**
+   * `sqrt((z*z + y*y) + x*x)` of `lanes` with the squares, the sum and the
+   * `fsqrt` all on the x87 stack and one float store at the end, as
+   * cfunc_ProjectileGetCurrentSpeedL forms it at 0x006A2846..0x006A2861.
+   * Under the simulation's 24-bit precision control that differs from float
+   * arithmetic exactly when a square leaves the float exponent range: lanes
+   * below ~1e-19 keep a non-zero length (a float square flushes to the
+   * denormal grid or zero; 1e-25 gives 0x15F79688 retail, 0 in float) and
+   * lanes above ~1.8e19 keep a finite one (float squares overflow).
+   */
+  [[nodiscard]] float VectorLengthZYXX87(const float* lanes) noexcept;
+
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
   [[nodiscard]] inline auto sin(const T x) noexcept { return std::sin(x); }
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>

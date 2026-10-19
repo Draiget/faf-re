@@ -605,4 +605,28 @@ msvc8_x87_box_radius_on_axis PROC
     ret
 msvc8_x87_box_radius_on_axis ENDP
 
+; float msvc8_x87_vector_length_zyx(const float* lanes)
+; sqrt((z*z + y*y) + x*x) as cfunc_ProjectileGetCurrentSpeedL forms it
+; (0x006A2846..0x006A2861), under PC24 with one float store.
+msvc8_x87_vector_length_zyx PROC
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rcx+8]
+    fmul    st(0), st(0)
+    fld     dword ptr [rcx+4]
+    fmul    st(0), st(0)
+    faddp   st(1), st(0)
+    fld     dword ptr [rcx]
+    fmul    st(0), st(0)
+    faddp   st(1), st(0)
+    fsqrt
+    fstp    dword ptr [rsp+32]
+    movss   xmm0, dword ptr [rsp+32]
+    fldcw   word ptr [rsp+24]
+    ret
+msvc8_x87_vector_length_zyx ENDP
+
 END

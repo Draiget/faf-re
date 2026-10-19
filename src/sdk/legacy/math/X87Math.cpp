@@ -40,6 +40,7 @@ extern "C" float __cdecl msvc8_x87_box_radius_on_axis(const float* boxLanes, con
 extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
   float* destLanes, const float* sourceLanes, const float* targetLanes, float sourceLengthSq
 );
+extern "C" float __cdecl msvc8_x87_vector_length_zyx(const float* lanes);
 #endif
 
 namespace msvc8
@@ -849,5 +850,30 @@ namespace msvc8
   float powf(const float x, const float y) noexcept
   {
     return static_cast<float>(std::pow(static_cast<double>(x), static_cast<double>(y)));
+  }
+
+  float VectorLengthZYXX87(const float* const lanes) noexcept
+  {
+#if defined(_M_IX86)
+    // `length` is a MASM operator, so the result slot is `vectorLength`.
+    float vectorLength;
+    // 0x006A2846..0x006A2861: z*z, y*y, sum, x*x, sum, fsqrt, one store.
+    __asm {
+      mov eax, lanes
+      fld dword ptr [eax + 8]
+      fmul st(0), st(0)
+      fld dword ptr [eax + 4]
+      fmul st(0), st(0)
+      faddp st(1), st(0)
+      fld dword ptr [eax]
+      fmul st(0), st(0)
+      faddp st(1), st(0)
+      fsqrt
+      fstp vectorLength
+    }
+    return vectorLength;
+#else
+    return msvc8_x87_vector_length_zyx(lanes);
+#endif
   }
 } // namespace msvc8
