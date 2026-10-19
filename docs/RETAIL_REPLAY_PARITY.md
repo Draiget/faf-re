@@ -3,7 +3,7 @@
 Real multiplayer games from the FAF replay vault are played back on the rebuilt
 engine and checked against the original `ForgedAlliance.exe`, bit for bit.
 
-*Snapshot: 19/10/2026 — 9 of 9 replays match on every gameplay beat.*
+*Snapshot: 19/10/2026 — 16 of 16 replays match on every gameplay beat.*
 
 ## Method
 
@@ -30,6 +30,13 @@ engine and checked against the original `ForgedAlliance.exe`, bit for bit.
 | 26954959 | Dual Gap, 12 players, 37 min | Every embedded checksum matches, start to end. |
 | 26994861 | Dual Gap, 12 players, 35 min | Every embedded checksum matches, start to end. |
 | 26898759 | Dual Gap, 12 players, 46 min | Every embedded checksum matches, start to end. |
+| 26928140 | Dual Gap, 12 players, 29 min | Every embedded checksum matches, start to end. |
+| 26982657 | Dual Gap, 12 players, 37 min | Every embedded checksum matches, start to end. |
+| 26954937 | Dual Gap, 12 players, 38 min | Every embedded checksum matches, start to end. |
+| 26905489 | Dual Gap, 12 players, 33 min | Every embedded checksum matches, start to end. |
+| 26968042 | High Noon, 2 players with AI, 34 min | Every embedded checksum matches, start to end. |
+| 26975678 | Fields of Isis, 2 players with AI, 40 min | Every embedded checksum matches, start to end. |
+| 26930624 | Open Palms, 2 players, 14 min | Every embedded checksum matches, start to end. |
 
 **The final-beat difference** is deliberate. When a player leaves, retail drops
 the commands that arrive after the leave within the same batch; the rebuilt
@@ -51,3 +58,11 @@ sources end.
   `fistp` rounds to nearest, such as a unit's footprint cell.
 - **Missing state updates.** For example a carrier that never removed a
   launched unit from its carried set.
+- **Engine functions the AI scripts call.** The Lua AI is not part of the
+  checksum, but the orders it issues are. A wrong return value from
+  `CPlatoon:FormPlatoon` raised a Lua error in our build only, the AI stopped
+  issuing orders retail's AI issued, and the games diverged a few hundred beats
+  later.
+- **Formation orders.** A patrol given to a group in formation must stay tied
+  to that formation. Ours never passed the formation to the patrol task, so each
+  unit's patrol leg ended on its own arrival check instead of the formation's.

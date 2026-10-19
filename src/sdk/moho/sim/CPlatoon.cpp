@@ -2703,11 +2703,13 @@ namespace moho
    * int __cdecl cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState *state)
    *
    * What it does:
-   * Implements `CPlatoon:FormPlatoon(platoonName, squadTemplate, ...)`. Creates a
-   * fresh platoon on the owning army, then for each squad spec gathers unassigned
-   * units matching the filter (optionally distance-filtered nearest-first to a
-   * center/radius), pulls them out of any prior platoon, and assigns them into
-   * the matching squad (created if absent). Returns the new platoon's Lua object.
+   * Implements `CPlatoon:FormPlatoon(template, sizeMultiplier[, center, radius])`.
+   * Creates a fresh platoon on the owning army, then for each squad spec
+   * `{filter, min, max, squadClass, formation}` gathers up to
+   * `floor(sizeMultiplier * max)` of this platoon's unassigned units matching the
+   * filter (optionally distance-filtered nearest-first to a center/radius), pulls
+   * them out of any prior platoon, and assigns them into the matching squad
+   * (created if absent). Returns the new platoon's Lua object.
    */
   int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState* const state)
   {
@@ -2722,6 +2724,7 @@ namespace moho
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
 
     const LuaPlus::LuaObject templatesObject(LuaPlus::LuaStackObject(state, 2));
+    const LuaPlus::LuaObject sizeObject(LuaPlus::LuaStackObject(state, 3));
 
     const int templateCount = templatesObject.GetCount();
     const LuaPlus::LuaObject nameObject = templatesObject[1];
@@ -2741,8 +2744,12 @@ namespace moho
       const LuaPlus::LuaObject baseCountObject = squadSpec[3];
       const int baseCount = baseCountObject.GetInteger();
 
-      const LuaPlus::LuaObject multiplierObject = squadSpec[5];
-      const float scaledSize = static_cast<float>(multiplierObject.GetNumber()) * static_cast<float>(baseCount);
+      // 0x0072DBDC-0x0072DC28: the row's [5] (formation name) is fetched here but
+      // only read as the new squad's name below; the multiplier is the call's
+      // arg 3 (`sizeObject`, 0x0072DC01 GetNumber on [esp+160h]), fimul'd by the
+      // row's [3] count and floored, exactly as CanFormPlatoon scales row [2].
+      const LuaPlus::LuaObject formationObject = squadSpec[5];
+      const float scaledSize = static_cast<float>(sizeObject.GetNumber()) * static_cast<float>(baseCount);
       const int requiredSize = static_cast<int>(std::floor(scaledSize));
 
       ESquadClass squadClass = static_cast<ESquadClass>(0);
@@ -2752,21 +2759,24 @@ namespace moho
       const char* const squadClassName = squadClassNameObject.GetString();
       SCR_GetEnum(state, squadClassName, enumRef);
 
+      // 0x0072DD5B / 0x0072DD8D / 0x0072E015 / 0x0072E044: units are drawn from
+      // the Unassigned squad of the platoon the method was called on (arg 1,
+      // the army pool), never from the freshly made, squadless `newPlatoon`.
       EntitySetTemplate<Unit> ref{};
       if (argumentCount <= 4) {
         if (unitFilter.IsString()) {
-          newPlatoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), requiredSize, ref);
+          platoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), requiredSize, ref);
         } else {
           const EntityCategorySet* const category = func_GetCObj_EntityCategory(unitFilter);
-          newPlatoon->GetUnassignedUnitsInCategory(category, requiredSize, ref);
+          platoon->GetUnassignedUnitsInCategory(category, requiredSize, ref);
         }
       } else {
         EntitySetTemplate<Unit> candidates{};
         if (unitFilter.IsString()) {
-          newPlatoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), 1000, candidates);
+          platoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), 1000, candidates);
         } else {
           const EntityCategorySet* const category = func_GetCObj_EntityCategory(unitFilter);
-          newPlatoon->GetUnassignedUnitsInCategory(category, 1000, candidates);
+          platoon->GetUnassignedUnitsInCategory(category, 1000, candidates);
         }
 
         const LuaPlus::LuaObject centerObject(LuaPlus::LuaStackObject(state, 4));
@@ -2824,14 +2834,18 @@ namespace moho
 
       newPlatoon->mArmy->RemoveUnitsFromPlatoons(&ref);
 
+      // 0x0072E08C-0x0072E0A0: a missing squad is created named after the row's
+      // [5] formation string, not the [4] squad-class string.
       CSquad* squad = newPlatoon->GetSquad(squadClass);
       if (squad == nullptr) {
-        squad = CSquad::AllocateOnPlatoon(newPlatoon, squadClass, squadClassName);
+        squad = CSquad::AllocateOnPlatoon(newPlatoon, squadClass, formationObject.GetString());
       }
       newPlatoon->AppendUnitsToSquad(squad, ref);
     }
 
-    newPlatoon->mLuaUnitList.PushStack(state);
+    // 0x0072E17C-0x0072E18C: returns the new platoon's own script object
+    // (`CScriptObject::mLuaObj`, +0x20), not its cached unit list.
+    newPlatoon->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -3963,11 +3977,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -4176,11 +4192,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -4400,11 +4418,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -4572,11 +4592,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -4698,11 +4720,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -4803,11 +4827,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -4928,11 +4954,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -5047,11 +5075,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -5337,11 +5367,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -5662,11 +5694,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);
@@ -5801,11 +5835,13 @@ namespace moho
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
 
-    int commandIndex = 1;
+    // Appends each command's own script object (`Insert(obj)` 0x00909AF0 on
+    // `command + 0x20`, `CScriptObject::mLuaObj`), as every platoon order
+    // binding does in 0x0072FB60-0x00731E6B; `mArgs` is unbound for
+    // platoon-issued commands and tripped `m_state == obj.m_state`.
     for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
       CUnitCommand* const command = commandLink.GetObjectPtr();
-      commandTable.Insert(commandIndex, command->mArgs);
-      ++commandIndex;
+      commandTable.Insert(command->mLuaObj);
     }
 
     commandTable.PushStack(state);

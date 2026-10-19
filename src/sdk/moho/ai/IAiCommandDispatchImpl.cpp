@@ -12,6 +12,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiTransport.h"
@@ -442,8 +443,12 @@ namespace
         CUnitCommand::Move(unit, command);
         SOCellPos cell;
         const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+        // 0x0060984E-0x0060988F: the formation itself is bound through the `_0`
+        // overload (0x0061C4E0 -> ctor with inFormation=false), never folded into
+        // the plain overload's bool. With no bound formation the patrol task ended
+        // on its own arrival test instead of waiting on the formation.
         CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        CUnitPatrolTask::Create(dispatch, &goal, formation != nullptr);
+        CUnitPatrolTask::CreateWithFormation(dispatch, &goal, formation);
         return;
       }
 
