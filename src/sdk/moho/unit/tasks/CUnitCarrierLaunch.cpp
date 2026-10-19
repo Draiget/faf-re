@@ -15,6 +15,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/math/Vector3f.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitMotion.h"
@@ -194,9 +195,9 @@ namespace moho
    *   TASKSTATE_Starting: pops the first carried unit, removes it from
    *     transport storage (capturing the unloaded transform), pushes the
    *     unloaded transform onto the unit and advances its coordinates
-   *     twice to settle the change, then seeds CUnitMotion with an
-   *     immediate velocity derived from the unloaded orientation scaled
-   *     by the blueprint's maximum-speed field. Transitions to Processing
+   *     twice to settle the change, removes it from the carried set, then
+   *     seeds CUnitMotion with an immediate velocity along the unloaded
+   *     orientation's forward axis scaled by Air.MaxAirspeed. Transitions to Processing
    *     when the carried-unit set is empty. Returns 3.
    *
    *   TASKSTATE_Processing (and the empty-carry shortcut): returns -1 to
@@ -299,22 +300,26 @@ namespace moho
         next->SetPendingTransform(unloadTransform, 1.0f);
         next->AdvanceCoords();
         next->AdvanceCoords();
-        (void)mCarriedUnits.Contains(next); // matches the binary's containment probe
+        // 0x006072FF..0x00607303: `EntitySetTemplate<Unit>::Remove`
+        // (0x005E8960, memmove-compacting erase) -- the launched unit leaves
+        // the carried set, so the next Starting tick launches the next one.
+        (void)mCarriedUnits.Remove(next);
 
-        // Compute initial velocity: (1 - 2*(qx*qx + qz*qz)) * blueprint.maxSpeed
-        // along (qx, qy, qz). The quaternion encodes the spawn-facing
-        // direction; this projects the "forward" axis onto world space.
-        const float qx = unloadTransform.orient_.x;
-        const float qz = unloadTransform.orient_.z;
-        const float scale = 1.0f - ((qx * qx) + (qz * qz)) * 2.0f;
-        const RUnitBlueprint* const blueprint = next->GetBlueprint();
-        const float maxSpeed =
-          *reinterpret_cast<const float*>(reinterpret_cast<const char*>(blueprint) + 880);
+        // 0x00607308..0x006073CE: the unloaded orientation's forward (+Z)
+        // axis -- (2(xz + wy), 2(yz - wx), 1 - 2(x^2 + y^2)) -- scaled by
+        // Air.MaxAirspeed (blueprint +0x370).
+        const Wm3::Quaternionf& q = unloadTransform.orient_;
+        const Wm3::Vector3f forward{
+          ((q.z * q.x) + (q.y * q.w)) * 2.0f,
+          ((q.z * q.y) - (q.x * q.w)) * 2.0f,
+          1.0f - (((q.y * q.y) + (q.x * q.x)) * 2.0f),
+        };
+        const float maxSpeed = next->GetBlueprint()->Air.MaxAirspeed;
 
         Wm3::Vector3f velocity{};
-        velocity.x = scale * maxSpeed;
-        velocity.y = scale * maxSpeed;
-        velocity.z = scale * maxSpeed;
+        velocity.x = forward.x * maxSpeed;
+        velocity.y = forward.y * maxSpeed;
+        velocity.z = forward.z * maxSpeed;
         next->UnitMotion->SetImmediateVelocity(velocity, unloadTransform.orient_);
 
         return 3;

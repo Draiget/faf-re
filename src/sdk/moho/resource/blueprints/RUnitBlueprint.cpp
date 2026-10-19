@@ -869,10 +869,14 @@ namespace moho
     const std::int32_t footprintSizeX = static_cast<std::int32_t>(mFootprint.mSizeX);
     const std::int32_t footprintSizeZ = static_cast<std::int32_t>(mFootprint.mSizeZ);
 
+    // 0x0051EDAB / 0x0051EDD4: `fld; fistp` (round to nearest, ties to even),
+    // and only the low word is kept (`movsx r32, word`) -- not a truncating
+    // cast. A Fatboy's external factory at x 582.998 owns cell 583, not 582
+    // (replay 26935800 beat 22637).
     const std::int32_t x0 =
-      static_cast<std::int32_t>(position.x - (static_cast<float>(footprintSizeX) * 0.5f));
+      static_cast<std::int16_t>(std::lrintf(position.x - (static_cast<float>(footprintSizeX) * 0.5f)));
     const std::int32_t z0 =
-      static_cast<std::int32_t>(position.z - (static_cast<float>(footprintSizeZ) * 0.5f));
+      static_cast<std::int16_t>(std::lrintf(position.z - (static_cast<float>(footprintSizeZ) * 0.5f)));
 
     gpg::Rect2i footprintRect{};
     footprintRect.x0 = x0;
