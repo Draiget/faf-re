@@ -22,15 +22,21 @@ Most symbols in the retail engine were never hand-written code — they are temp
 
 ## Retail replay parity
 
-Real multiplayer games from the FAF replay vault are played back on both the retail `ForgedAlliance.exe` and the rebuilt engine. Both dump the full simulation checksum on every beat (`sim_ChecksumPeriod` 1), and each beat is compared. One differing bit anywhere in the sim state fails the beat.
+Real multiplayer games from the FAF replay vault are played back on the rebuilt engine, and its simulation checksum is compared with the checksums the live players' clients recorded into the replay every 50 beats. When a replay diverges, the window is narrowed beat by beat: the retail `ForgedAlliance.exe` and the rebuilt engine both dump the full simulation state on every beat (`sim_ChecksumPeriod` 1) and are diffed. One differing bit anywhere in the sim state fails the beat.
 
 | Replay | Game | Result |
 |---|---|---|
 | 26935800 | Dual Gap, 12 players, 41 min | Every beat matches from 4 to 22,636 of 24,565. The next divergence is being chased. |
 | 26876279 | Seton's Clutch, 8 players, 37 min | Every gameplay beat matches, 4 to 22,155. The only difference is the final beat, where the engine deliberately keeps the commands that retail drops after a player leaves a replay. |
-| 26957207 | Dual Gap, 12 players, 47 min | Retail reference capture in progress. |
+| 26957207 | Dual Gap, 12 players, 35 min | Every one of the 5,069 live-player checksums embedded in the replay matches, start to end. |
+| 26953273 | Seton's Clutch, 8 players, 30 min | Every embedded checksum matches, start to end. |
+| 26917867 | Dual Gap, 12 players, 35 min | Every embedded checksum matches, start to end. |
+| 26897073 | Dual Gap, 12 players, 34 min | Every embedded checksum matches, start to end. |
+| 26954959 | Dual Gap, 12 players, 37 min | Every embedded checksum matches, start to end. |
+| 26994861 | Dual Gap, 12 players, 35 min | Every beat matches retail through 18,800; the rest of the game is being checked. |
+| 26898759 | Dual Gap, 12 players, 46 min | Every embedded checksum matches through beat 15,750; the divergence before beat 15,800 is being chased. |
 
-Most of the remaining divergences have come from the 2007 floating-point environment: the sim keeps some intermediate results in x87 registers at 24-bit precision, where SSE rounds every step. The rest came from small call-order differences in the random-number stream.
+Most of the remaining divergences have come from the 2007 floating-point environment: the sim keeps some intermediate results in x87 registers at 24-bit precision, where SSE rounds every step. The rest came from small call-order differences in the random-number stream, and from order-validation checks that accepted orders retail refuses, such as moving a unit that is riding in a transport.
 
 ## What is and isn't here
 

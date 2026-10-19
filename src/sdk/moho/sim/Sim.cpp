@@ -2761,45 +2761,6 @@ namespace
     return false;
   }
 
-  [[nodiscard]] bool CommandUnitSetMatchesSelection(
-    const EntitySetTemplate<Unit>& commandUnits,
-    const EntitySetTemplate<Unit>& selectedUnits
-  ) noexcept
-  {
-    std::size_t commandUnitCount = 0;
-    for (const Entity* const entry : commandUnits.mVec) {
-      if (static_cast<const Unit*>(entry) != nullptr) {
-        ++commandUnitCount;
-      }
-    }
-
-    if (commandUnitCount != selectedUnits.mVec.size()) {
-      return false;
-    }
-
-    for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
-      const Unit* const selectedUnit = static_cast<Unit*>(*it);
-      if (selectedUnit == nullptr) {
-        return false;
-      }
-
-      bool found = false;
-      for (const Entity* const entry : commandUnits.mVec) {
-        const Unit* const commandUnit = static_cast<const Unit*>(entry);
-        if (commandUnit == selectedUnit) {
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   [[nodiscard]] Unit* ResolveTargetUnit(Entity* const entity) noexcept
   {
     return entity != nullptr ? entity->IsUnit() : nullptr;
@@ -3006,7 +2967,10 @@ namespace
             break;
         }
 
-        if (sameTarget && CommandUnitSetMatchesSelection(currentCommand->mUnitSet, selectedUnits)) {
+        // 0x006EFE2A..0x006EFE3E: `EntitySetTemplate<Unit>::Same` (0x006EEC40)
+        // -- raw entry counts, then every entry of the command's set looked
+        // up in the selection; null entries are compared like any other.
+        if (sameTarget && currentCommand->mUnitSet.Same(selectedUnits)) {
           return false;
         }
       }
@@ -3040,9 +3004,12 @@ namespace
       case EUnitCommandType::UNITCOMMAND_FormPatrol:
       case EUnitCommandType::UNITCOMMAND_AggressiveMove:
       case EUnitCommandType::UNITCOMMAND_FormAggressiveMove: {
+        // 0x006EFED4..0x006EFF87: a carried unit may only take a move order
+        // when it is a POD or its carrier is a CARRIER; anything riding in an
+        // ordinary transport is refused (replay 26898759 beat 1890).
         Unit* const transportedBy = GetTransportedBy(unit);
         const bool invalidTransportState =
-          transportedBy != nullptr && (unit->IsInCategory("POD") || transportedBy->IsInCategory("CARRIER"));
+          transportedBy != nullptr && !unit->IsInCategory("POD") && !transportedBy->IsInCategory("CARRIER");
         if (invalidTransportState || !unit->IsMobile() || !IsValidTargetPosition(commandIssueData.mTarget.mPos)
             || commandIssueData.mTarget.mType == EAiTargetType::AITARGET_None) {
           return false;
@@ -3062,16 +3029,23 @@ namespace
         if (!unit->IsMobile() && unit->AiAttacker == nullptr) {
           return false;
         }
-        if (targetEntity != nullptr && targetEntity->ArmyRef != nullptr && unit->ArmyRef != nullptr
-            && targetEntity->ArmyRef->GetAllianceWith(unit->ArmyRef) == ALLIANCE_Ally) {
-          return false;
+        // 0x006F003E..0x006F0067: the attacker's army is asked (IArmy::IsAlly,
+        // 0x005BD630, on `unit->ArmyRef + 8`) whether the target's army index
+        // is in its ally set -- not the target army about the attacker.
+        if (targetEntity != nullptr && targetEntity->ArmyRef != nullptr && unit->ArmyRef != nullptr) {
+          const std::uint32_t targetArmyIndex = static_cast<std::uint32_t>(targetEntity->ArmyRef->mConstDat.mArmyIndex);
+          if (targetArmyIndex != 0xFFFFFFFFu && unit->ArmyRef->mVarDat.mAllies.Contains(targetArmyIndex)) {
+            return false;
+          }
         }
         return true;
       case EUnitCommandType::UNITCOMMAND_Teleport:
         return HasCommandCap(unit, RULEUCC_Teleport);
       case EUnitCommandType::UNITCOMMAND_Guard: {
+        // 0x006F08A7..0x006F097C: as for Move, a carried unit is refused unless
+        // its carrier is a CARRIER (tested first) or it is itself a POD.
         Unit* const transportedBy = GetTransportedBy(unit);
-        if ((transportedBy != nullptr && (transportedBy->IsInCategory("CARRIER") || unit->IsInCategory("POD")))
+        if ((transportedBy != nullptr && !transportedBy->IsInCategory("CARRIER") && !unit->IsInCategory("POD"))
             || !HasCommandCap(unit, RULEUCC_Guard)) {
           return false;
         }
@@ -3105,7 +3079,8 @@ namespace
       case EUnitCommandType::UNITCOMMAND_Ferry:
         return GetTransportedBy(unit) == nullptr && unit->IsInCategory("TRANSPORTATION") && unit->AiTransport != nullptr;
       case EUnitCommandType::UNITCOMMAND_Reclaim: {
-        if ((GetTransportedBy(unit) != nullptr && unit->IsInCategory("POD")) || !unit->IsInCategory("RECLAIM")) {
+        // 0x006F059C..0x006F060F: a carried unit is refused unless it is a POD.
+        if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("RECLAIM")) {
           return false;
         }
 
@@ -3124,7 +3099,8 @@ namespace
         return true;
       }
       case EUnitCommandType::UNITCOMMAND_Capture: {
-        if ((GetTransportedBy(unit) != nullptr && unit->IsInCategory("POD")) || !unit->IsInCategory("CAPTURE")) {
+        // 0x006F043C..0x006F04A7: a carried unit is refused unless it is a POD.
+        if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("CAPTURE")) {
           return false;
         }
 
@@ -3134,8 +3110,10 @@ namespace
             return false;
           }
 
-          if ((unit->ArmyRef != nullptr && targetUnit->ArmyRef != nullptr
-               && unit->ArmyRef->GetAllianceWith(targetUnit->ArmyRef) == ALLIANCE_Ally)
+          // 0x006F053F..0x006F0561: the target's army is asked about the
+          // capturer's (`GetAllianceWith(this = target army + 8, unit army + 8
+          // or null)` == Ally); a null capturer army reads as Neutral.
+          if ((targetUnit->ArmyRef != nullptr && targetUnit->ArmyRef->GetAllianceWith(unit->ArmyRef) == ALLIANCE_Ally)
               || targetUnit->IsDead() || targetUnit->IsBeingBuilt()) {
             return false;
           }
@@ -3154,7 +3132,8 @@ namespace
           return false;
         }
 
-        if ((GetTransportedBy(unit) != nullptr && unit->IsInCategory("POD")) || !unit->IsInCategory("REPAIR")) {
+        // 0x006F0766..0x006F07D5: a carried unit is refused unless it is a POD.
+        if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("REPAIR")) {
           return false;
         }
 

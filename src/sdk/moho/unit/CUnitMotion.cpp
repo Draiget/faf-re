@@ -3688,7 +3688,10 @@ namespace moho
           if (timeoutActive || combatState == ACS_NormalTurn) {
             const float fullHeadingDot = (targetDirNorm.x * currentHeading.x) + (currentHeading.z * targetDirNorm.z)
               + (currentHeading.y * targetDirNorm.y);
-            if (fullHeadingDot >= 0.0f) {
+            // 0x006BD3F7..0x006BD3FD: `comiss 0, dot; jbe` re-rolls only on an
+            // ordered `0 > dot`; a NaN dot skips the two draws at 0x006BD425 /
+            // 0x006BD467 rather than falling through to the state-range test.
+            if (!(fullHeadingDot < 0.0f)) {
               rollNewTurn = false;
             } else if (combatState < ACS_NormalTurn || combatState > ACS_Realign) {
               rollNewTurn = false;
