@@ -28,6 +28,8 @@
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimConVarAccess.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/STIMap.h"
 #include "moho/collision/CColPrimitiveBase.h"
@@ -155,7 +157,6 @@ namespace
   constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
   constexpr EAiAttackerEvent kAiAttackerEventCanTarget = static_cast<EAiAttackerEvent>(0x9);
   constexpr const char* kEngineerCategoryName = "ENGINEER";
-  constexpr const char* kWeaponTerrainBlockageConVarName = "WeaponTerrainBlockageTest";
   constexpr std::array<float, 4> kBallisticArcHeightFactors{
     0.70700002f,
     0.29300001f,
@@ -175,40 +176,6 @@ namespace
     target.targetPoint = -1;
     target.targetIsMobile = false;
     return target;
-  }
-
-  [[nodiscard]] CSimConVarBase* FindSimConVarByName(const char* const name)
-  {
-    if (name == nullptr || *name == '\0') {
-      return nullptr;
-    }
-
-    CSimConCommand* const command = moho::FindRegisteredSimConCommand(name);
-    return dynamic_cast<CSimConVarBase*>(command);
-  }
-
-  [[nodiscard]] bool ReadSimConVarBoolByName(Sim* const sim, const char* const name, const bool defaultValue)
-  {
-    if (sim == nullptr) {
-      return defaultValue;
-    }
-
-    CSimConVarBase* const conVar = FindSimConVarByName(name);
-    if (conVar == nullptr) {
-      return defaultValue;
-    }
-
-    CSimConVarInstanceBase* const instance = sim->GetSimVar(conVar);
-    if (instance == nullptr) {
-      return defaultValue;
-    }
-
-    const void* const valueStorage = instance->GetValueStorage();
-    if (valueStorage == nullptr) {
-      return defaultValue;
-    }
-
-    return *static_cast<const bool*>(valueStorage);
   }
 
   /**
@@ -860,8 +827,9 @@ Entity* CAiAttackerImpl::FindBestEnemy(
   const auto* const benignRange = unit->SimulationRef->mRules->GetEntityCategory("BENIGN");
   const auto* const benignCategory = reinterpret_cast<const EntityCategorySet*>(benignRange);
 
-  const bool tryTerrainBlockage =
-    ReadSimConVarBoolByName(unit->SimulationRef, kWeaponTerrainBlockageConVarName, false);
+  // 0x005D7A10: `mov ebx, offset WeaponTerrainBlockageTest; call Sim::GetSimVar`
+  // -- the registered global, never a by-name registry search.
+  const bool tryTerrainBlockage = ReadSimConVar(unit->SimulationRef, gSimConVar_WeaponTerrainBlockageTest);
   const float maxRangeSq = range * range;
 
   Entity* bestEntity = nullptr;

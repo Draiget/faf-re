@@ -344,7 +344,7 @@ namespace moho
      * cheap containment pre-check against each entity cached collision bounds.
      */
     void ForAllEntitiesIterator(
-      gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
+      gpg::core::FastVectorInline<CollisionResult>& outCollisions,
       EEntityType flags,
       const Wm3::Sphere3f& sphere
     );

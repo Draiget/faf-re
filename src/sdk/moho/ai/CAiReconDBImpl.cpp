@@ -629,9 +629,11 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
   msvc8::vector<SNewBlip> pendingNewBlips{};
   if (mSim->mEntityDB) {
-    for (const auto& [entityId, entity] : mSim->mEntityDB->mAllUnits) {
-      Unit* const unit = entity ? entity->IsUnit() : nullptr;
-      if (!unit || unit->DestroyQueued()) {
+    // 0x005C104C: `CUnitIterAllArmies(Sim*)` walks only the unit-family prefix
+    // of `mAllUnits`, in id order; blips, projectiles and props never enter.
+    for (CUnitIterAllArmies iter(mSim); iter.mCur != nullptr; iter.Next()) {
+      Unit* const unit = iter.mCur;
+      if (unit->DestroyQueued()) {
         continue;
       }
       if (!unit->BluePrint) {
@@ -656,7 +658,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
         if (rangeBegin == rangeEnd) {
           AppendPendingNewBlip(pendingNewBlips, unit, 0u, detectFlags);
         } else {
-          UpdateBlips(unit, detectFlags, pendingNewBlips);
+          UpdateBlips(rangeBegin, rangeEnd, unit, detectFlags, pendingNewBlips);
         }
         continue;
       }
@@ -669,9 +671,9 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
         }
 
         if (keepStaticLosBlip) {
-          UpdateBlips(unit, RECON_None, pendingNewBlips);
+          UpdateBlips(rangeBegin, rangeEnd, unit, RECON_None, pendingNewBlips);
         } else {
-          DeleteBlips(unit);
+          DeleteBlips(rangeBegin, rangeEnd);
         }
       }
     }
@@ -1028,7 +1030,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
 /**
  * Address: 0x005C1F80 (FUN_005C1F80, Moho::CAiReconDBImpl::UpdateBlips)
  *
- * Unit *, EReconFlags, msvc8::vector<SNewBlip> &
+ * range-pair, Unit *, EReconFlags, msvc8::vector<SNewBlip> &
  *
  * IDA signature:
  * void __thiscall Moho::CAiReconDBImpl::UpdateBlips(
@@ -1048,15 +1050,16 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
  * evidence (`FUN_005CBC70`'s push_back growth-fill emission).
  */
 void CAiReconDBImpl::UpdateBlips(
-  Unit* const sourceUnit, const EReconFlags detectedFlags, msvc8::vector<CAiReconDBImpl::SNewBlip>& pending
+  ReconBlipMap::iterator it,
+  const ReconBlipMap::iterator end,
+  Unit* const sourceUnit,
+  const EReconFlags detectedFlags,
+  msvc8::vector<CAiReconDBImpl::SNewBlip>& pending
 )
 {
-  if (!sourceUnit) {
-    return;
-  }
-
-  auto [it, end] = FindReconBlipRange(this, sourceUnit);
-  if (it == end) {
+  // ReconTick hands over the range it already looked up; the binary never
+  // calls `equal_range` (0x005C49B0) in here.
+  if (!sourceUnit || it == end) {
     return;
   }
 
@@ -1120,7 +1123,7 @@ void CAiReconDBImpl::DeleteBlip(ReconBlip* const blip)
 /**
  * Address: 0x005C2230 (FUN_005C2230, Moho::CAiReconDBImpl::DeleteBlips)
  *
- * Unit *
+ * range-pair
  *
  * IDA signature:
  * void __thiscall Moho::CAiReconDBImpl::DeleteBlips(
@@ -1131,15 +1134,11 @@ void CAiReconDBImpl::DeleteBlip(ReconBlip* const blip)
  * Clears this army's recon state for all map blips from one source unit and
  * removes that source's range from the typed recon map.
  */
-void CAiReconDBImpl::DeleteBlips(Unit* const sourceUnit)
+void CAiReconDBImpl::DeleteBlips(const ReconBlipMap::iterator first, const ReconBlipMap::iterator last)
 {
-  if (!sourceUnit) {
-    return;
-  }
-
-  // 0x005C2250..0x005C22D7 tears every blip in the range down while the range
-  // is still mapped; only then does 0x005C22EC erase the whole range at once.
-  const auto [first, last] = FindReconBlipRange(this, sourceUnit);
+  // The range comes from ReconTick's lookup (0x005C2230 reads `[ecx]` and
+  // `[ecx+4]`). 0x005C2250..0x005C22D7 tears every blip in it down while the
+  // range is still mapped; only then does 0x005C22EC erase it at once.
   for (auto it = first; it != last; ++it) {
     if (ReconBlip* const blip = it->second; blip != nullptr) {
       DeleteBlip(blip);

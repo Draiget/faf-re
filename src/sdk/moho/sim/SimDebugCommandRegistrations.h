@@ -21,6 +21,7 @@ namespace moho
   extern TSimConVar<int> gSimConVar_path_BackgroundBudget;
   extern TSimConVar<int> gSimConVar_path_TimeoutPreview;
   extern TSimConVar<int> gSimConVar_sim_ChecksumPeriod;
+  extern TSimConVar<bool> gSimConVar_WeaponTerrainBlockageTest;
   extern TSimConVar<std::uint8_t> gSimConVar_sim_TestVarUByte;
   extern TSimConVar<msvc8::string> gSimConVar_sim_TestVarStr;
 } // namespace moho

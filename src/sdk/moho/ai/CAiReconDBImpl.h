@@ -461,13 +461,17 @@ namespace moho
     /**
      * Address: 0x005C1F80 (FUN_005C1F80)
      *
-     * Unit *, EReconFlags, msvc8::vector<SNewBlip> &
+     * range-pair, Unit *, EReconFlags, msvc8::vector<SNewBlip> &
      *
      * What it does:
-     * Updates all map-owned blips for one source unit, prunes excess fake
-     * jammer blips, and appends pending fake-blip creation requests when needed.
+     * Updates the map-owned blips in `[first, last)` (one source unit's
+     * range, found by the caller), prunes excess fake jammer blips, and
+     * appends pending fake-blip creation requests when needed.
      */
-    void UpdateBlips(Unit* sourceUnit, EReconFlags detectedFlags, msvc8::vector<SNewBlip>& pending);
+    void UpdateBlips(
+      ReconBlipMap::iterator first, ReconBlipMap::iterator last, Unit* sourceUnit, EReconFlags detectedFlags,
+      msvc8::vector<SNewBlip>& pending
+    );
 
     /**
      * Address: 0x005C21F0 (FUN_005C21F0)
@@ -482,13 +486,14 @@ namespace moho
     /**
      * Address: 0x005C2230 (FUN_005C2230)
      *
-     * Unit *
+     * range-pair
      *
      * What it does:
-     * Clears this army's recon state for all map-owned blips from `sourceUnit`
-     * and erases those blips from the typed recon map range.
+     * Clears this army's recon state for the map-owned blips in
+     * `[first, last)` (one source unit's range, found by the caller) and
+     * erases that range from the typed recon map.
      */
-    void DeleteBlips(Unit* sourceUnit);
+    void DeleteBlips(ReconBlipMap::iterator first, ReconBlipMap::iterator last);
 
     /**
      * Address: 0x005C9720 (FUN_005C9720, sub_5C9720)

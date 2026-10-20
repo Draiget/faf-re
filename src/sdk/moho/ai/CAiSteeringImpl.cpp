@@ -532,10 +532,10 @@ namespace
 
     // 0x005D38CA..0x005D3921: sphere {owner position, query radius}, unit mask
     // 0x100, through COGrid::ForAllEntitiesIterator (0x00721FB0). The binary's
-    // hit buffer is a fastvector_n of 20; the recovered signature takes 10.
+    // hit buffer is a fastvector_n of 20, so a dense blob stays off the heap.
     const float queryRadius = ComputeCollisionQueryRadius(*owner, steering.mPath);
     const Wm3::Sphere3f querySphere{owner->GetPosition(), queryRadius};
-    gpg::core::FastVectorN<CollisionResult, 10> collisions{};
+    gpg::core::FastVectorN<CollisionResult, 20> collisions{};
     owner->SimulationRef->mOGrid->ForAllEntitiesIterator(collisions, ENTITYTYPE_Unit, querySphere);
 
     // 0x005D395D..0x005D3A29: every hit, in grid order, through the binary's filters.

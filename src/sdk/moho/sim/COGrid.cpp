@@ -1394,7 +1394,7 @@ namespace moho
    * accepts entities whose cached bounds overlap a reduced inner box (0.707r).
    */
   void COGrid::ForAllEntitiesIterator(
-    gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
+    gpg::core::FastVectorInline<CollisionResult>& outCollisions,
     const EEntityType flags,
     const Wm3::Sphere3f& sphere
   )
