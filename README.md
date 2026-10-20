@@ -11,7 +11,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as m
 | Builds | ✅ `main.exe` (x86) and `main_x64.exe` link and run |
 | Renders | ✅ main menu, cinematic playback, in-game world view |
 | Plays | ✅ native save/load on both architectures |
-| Gameplay testing | ✅ x86 ↔ x64 lockstep multiplayer: hundreds of consecutive checksum-identical beats, no desync |
+| Gameplay testing | ✅ Live 3-player game with the retail exe, rebuilt x86 and rebuilt x64 together: 21 min of AI-driven fighting, no desync — see [Live multiplayer](docs/RETAIL_REPLAY_PARITY.md#live-multiplayer-retail-x86-and-x64-in-one-game) |
 | Retail parity | ✅ 76 of 76 FAF vault replays tested play back checksum-identical to the retail executable on 100% of gameplay beats — see [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md) |
 | Source bodies written | ~39,000 functions |
 | Genuinely outstanding | ~430 |

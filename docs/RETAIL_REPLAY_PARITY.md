@@ -115,6 +115,31 @@ engine keeps them (`CClientBase::UpdateState`, marked `[DELIBERATE-FIX]`). In a
 replay this only shows on the last beat, where the remaining players' command
 sources end.
 
+## Live multiplayer: retail, x86 and x64 in one game
+
+A replay checks the rebuilt engine against checksums the players recorded.
+A live game checks it against the original engine running next to it: every
+client computes each beat itself and the clients exchange checksums, so any
+difference between any two of them is a desync.
+
+| Test | Clients | Result |
+|---|---|---|
+| `tools/scenarios/3p-retail-control-ai.yaml` | three retail `ForgedAlliance.exe` | 29 min of game time, no desync |
+| `tools/scenarios/3p-original-x86-x64-ai.yaml` | retail, rebuilt x86, rebuilt x64 | 21 min of game time, no desync |
+
+The game is a three-way free-for-all on a copy of Seton's Clutch whose script
+hands every player's army to FAF's built-in rush AI before the armies are
+created. Each client runs that AI inside its own simulation, so all three
+make the same decisions from the same random stream: expansion, factories,
+armies of several hundred units, fighting. Each client logs a fingerprint of
+every army once a minute (units, factories, engineers, stored mass and
+energy). In the retail, x86 and x64 game all 21 fingerprints are identical
+on all three clients.
+
+The control run, with retail on all three seats, comes first. It shows that
+the AI-driven game is itself lockstep-safe, so a desync in the mixed run could
+only come from the rebuilt engines.
+
 ## Where divergences came from
 
 - **The 2007 floating-point environment.** The sim keeps some intermediate

@@ -1,0 +1,47 @@
+name: 3p-original-x86-x64-ai
+description: >
+  3p-original-x86-x64-ai-synclog without /synclog, for the long run: the
+  shipped ForgedAlliance.exe, our x86 main.exe and our x64 main_x64.exe play
+  one FFA on faf_re_lockstep, where the map script hands every player army to
+  FAF's built-in AI, for as much game time as the slowest client reaches in
+  the wait (the map logs a "faf_re_lockstep: status tick=N ..." fingerprint
+  line every 60 s of game time; compare those across game-*.log). A Desync
+  fails the run; rerun the -synclog variant to find the first diverging beat.
+  Needs init_mpemu_localvault.lua in the FAF bin folder. Do not click into the
+  game windows.
+timeout: 40m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush        # map script option: rush | adaptive | tech | turtle | mixed
+  Victory: demoralization   # commander death defeats the army: covers defeat and game-end paths
+  GameSpeed: fast         # fixed +4 cap; lockstep still runs at the slowest client
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua   # resolved against %ProgramData%\FAForever\bin
+  nosound: true
+  tile: true
+  saveReplays: true       # replay-<uid>.scfareplay: the three command streams, for replaying a desync
+
+players:
+  - { uid: 1, name: Retail, faction: uef }
+  - { uid: 2, name: FafRe-x86,  faction: aeon,   exe: '%ProgramData%\FAForever\bin\main_head.exe' }
+  - { uid: 3, name: FafRe-x64,  faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_x64_head.exe' }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 25m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsAgree:
+    - { uids: all, pattern: 'faf_re_lockstep: (handover .*|handed \d+ armies to the AI)' }
+    - { uids: all, pattern: 'faf_re_lockstep: (army \d+ \S+ brain=\S+ skirmish=\S+ personality=\S+ faction=\d+)' }
