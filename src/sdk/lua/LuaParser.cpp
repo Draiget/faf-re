@@ -2,6 +2,7 @@
 
 #include "lua/LuaError.h"
 #include "lua/LuaParser.h"
+#include "lua/LuaMemAccounting.h"
 #include "lua/LuaUndump.h"
 
 
@@ -426,8 +427,6 @@ namespace
     void luaK_reserveregs(FuncState* fs, int n);
     std::int32_t luaK_stringK(FuncState* fs, TString* stringToken);
     void removevars(LexState* ls, int limit);
-    void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
-    void* luaM_growaux(lua_State* L, void* block, int* size, int sizeElem, int limit, const char* what);
     std::int32_t luaK_codeABC(FuncState* fs, int o, int a, int b, int c);
     std::int32_t luaK_codeABx(FuncState* fs, int o, int a, unsigned int bc);
     void luaK_dischargevars(FuncState* fs, expdesc* e);
@@ -1566,19 +1565,7 @@ namespace
   {
     FuncState* const fs = ls->fs;
     Proto* const parentProto = fs->f;
-    int& parentProtoCapacity = parentProto->sizep;
-    if (fs->np + 1 > parentProtoCapacity) {
-      parentProto->p = static_cast<Proto**>(
-        luaM_growaux(
-          ls->L,
-          parentProto->p,
-          &parentProtoCapacity,
-          static_cast<int>(sizeof(Proto*)),
-          LUA_MAXARG_Bx,
-          "constant table overflow"
-        )
-      );
-    }
+    luaM_growvector<Proto*>(ls->L, parentProto->p, fs->np, parentProto->sizep, LUA_MAXARG_Bx, "constant table overflow");
 
     parentProto->p[fs->np++] = childFunction->f;
 
@@ -1969,28 +1956,10 @@ namespace
     // `pc` will change, so resolve everything still waiting on it first.
     luaK_dischargejpc(fs);
 
-    if (fs->pc + 1 > f->sizecode) {
-      f->code = static_cast<Instruction*>(luaM_growaux(
-        fs->L,
-        f->code,
-        &f->sizecode,
-        static_cast<int>(sizeof(Instruction)),
-        MAX_INT,
-        "code size overflow"
-      ));
-    }
+    luaM_growvector<Instruction>(fs->L, f->code, fs->pc, f->sizecode, MAX_INT, "code size overflow");
     f->code[fs->pc] = i;
 
-    if (fs->pc + 1 > f->sizelineinfo) {
-      f->lineinfo = static_cast<int*>(luaM_growaux(
-        fs->L,
-        f->lineinfo,
-        &f->sizelineinfo,
-        static_cast<int>(sizeof(int)),
-        MAX_INT,
-        "code size overflow"
-      ));
-    }
+    luaM_growvector<int>(fs->L, f->lineinfo, fs->pc, f->sizelineinfo, MAX_INT, "code size overflow");
     f->lineinfo[fs->pc] = line;
 
     return fs->pc++;
@@ -2670,7 +2639,7 @@ namespace
       status = LUA_ERRRUN;
     }
 
-    (void)luaM_realloc(L, parser.buff.buffer, static_cast<lu_mem>(parser.buff.buffsize), 0u);
+    luaM_freearray<char>(L, parser.buff.buffer, static_cast<lu_mem>(parser.buff.buffsize));
     return status;
   }
 
@@ -3286,7 +3255,7 @@ namespace
     // threshold AND no debug traversal holds the GC lock. `jb` makes the
     // first compare unsigned, which is what lu_mem is.
     const global_State* const globalState = state->l_G;
-    if (globalState->nblocks >= globalState->GCthreshold && globalState->gcTraversalLockDepth == 0) {
+    if (LuaGcThresholdReached(globalState) && globalState->gcTraversalLockDepth == 0) {
       luaC_collectgarbage(state);
     }
 
@@ -3446,63 +3415,33 @@ namespace
     removevars(ls, 0);
     luaK_codeABC(fs, OP_RETURN, 0, 1, 0);
 
-    f->code = static_cast<Instruction*>(
-      luaM_realloc(
-        ls->L,
-        f->code,
-        static_cast<lu_mem>(sizeof(Instruction) * f->sizecode),
-        static_cast<lu_mem>(sizeof(Instruction) * fs->pc)
-      )
+    f->code = luaM_reallocvector<Instruction>(
+      ls->L, f->code, static_cast<lu_mem>(f->sizecode), static_cast<lu_mem>(fs->pc)
     );
     f->sizecode = fs->pc;
 
-    f->lineinfo = static_cast<int*>(
-      luaM_realloc(
-        ls->L,
-        f->lineinfo,
-        static_cast<lu_mem>(sizeof(int) * f->sizelineinfo),
-        static_cast<lu_mem>(sizeof(int) * fs->pc)
-      )
+    f->lineinfo = luaM_reallocvector<int>(
+      ls->L, f->lineinfo, static_cast<lu_mem>(f->sizelineinfo), static_cast<lu_mem>(fs->pc)
     );
     f->sizelineinfo = fs->pc;
 
-    f->k = static_cast<LuaPlus::TObject*>(
-      luaM_realloc(
-        ls->L,
-        f->k,
-        static_cast<lu_mem>(sizeof(LuaPlus::TObject) * f->sizek),
-        static_cast<lu_mem>(sizeof(LuaPlus::TObject) * fs->nk)
-      )
+    f->k = luaM_reallocvector<LuaPlus::TObject>(
+      ls->L, f->k, static_cast<lu_mem>(f->sizek), static_cast<lu_mem>(fs->nk)
     );
     f->sizek = fs->nk;
 
-    f->p = static_cast<Proto**>(
-      luaM_realloc(
-        ls->L,
-        f->p,
-        static_cast<lu_mem>(sizeof(Proto*) * f->sizep),
-        static_cast<lu_mem>(sizeof(Proto*) * fs->np)
-      )
+    f->p = luaM_reallocvector<Proto*>(
+      ls->L, f->p, static_cast<lu_mem>(f->sizep), static_cast<lu_mem>(fs->np)
     );
     f->sizep = fs->np;
 
-    f->locvars = static_cast<LocVar*>(
-      luaM_realloc(
-        ls->L,
-        f->locvars,
-        static_cast<lu_mem>(sizeof(LocVar) * f->sizelocvars),
-        static_cast<lu_mem>(sizeof(LocVar) * fs->nlocvars)
-      )
+    f->locvars = luaM_reallocvector<LocVar>(
+      ls->L, f->locvars, static_cast<lu_mem>(f->sizelocvars), static_cast<lu_mem>(fs->nlocvars)
     );
     f->sizelocvars = fs->nlocvars;
 
-    f->upvalues = static_cast<TString**>(
-      luaM_realloc(
-        ls->L,
-        f->upvalues,
-        static_cast<lu_mem>(sizeof(TString*) * f->sizeupvalues),
-        static_cast<lu_mem>(sizeof(TString*) * f->nups)
-      )
+    f->upvalues = luaM_reallocvector<TString*>(
+      ls->L, f->upvalues, static_cast<lu_mem>(f->sizeupvalues), static_cast<lu_mem>(f->nups)
     );
     f->sizeupvalues = f->nups;
 
@@ -3599,10 +3538,7 @@ namespace
     FuncState* const fs = ls->fs;
     Proto* const f = fs->f;
 
-    if (fs->nlocvars + 1 > f->sizelocvars) {
-      f->locvars = static_cast<LocVar*>(luaM_growaux(
-        ls->L, f->locvars, &f->sizelocvars, static_cast<int>(sizeof(LocVar)), MAX_INT, ""));
-    }
+    luaM_growvector<LocVar>(ls->L, f->locvars, fs->nlocvars, f->sizelocvars, MAX_INT, "");
     f->locvars[fs->nlocvars].varname = varname;
     return fs->nlocvars++;
   }

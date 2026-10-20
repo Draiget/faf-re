@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -400,14 +401,28 @@ namespace
         return ::GetProcessHeap();
     }
 
+    // Not in the binary (x64 port, plan 3a). While a system heap serves every
+    // engine block the engine allocator never starts, so its counters stay
+    // zero and the `Heap_*` engine stats would read 0B. The bytes of the live
+    // engine blocks are counted here instead, at the size the heap actually
+    // handed out (`HeapSize`), so a block adds and removes the same amount.
+    std::atomic<std::size_t> gSystemHeapBytesInUse{0u};
+
+    [[nodiscard]] std::size_t SystemHeapSize(void* ptr) noexcept;
+
     [[nodiscard]] void* SystemHeapAlloc(const std::size_t size) noexcept
     {
         const std::size_t bytes = (size != 0u) ? size : 1u;
-        return ::HeapAlloc(EngineSystemHeap(), 0, bytes);
+        void* const block = ::HeapAlloc(EngineSystemHeap(), 0, bytes);
+        if (block != nullptr) {
+            gSystemHeapBytesInUse.fetch_add(SystemHeapSize(block), std::memory_order_relaxed);
+        }
+        return block;
     }
 
     void SystemHeapFree(void* const ptr) noexcept
     {
+        gSystemHeapBytesInUse.fetch_sub(SystemHeapSize(ptr), std::memory_order_relaxed);
         (void)::HeapFree(EngineSystemHeap(), 0, ptr);
     }
 
@@ -415,6 +430,23 @@ namespace
     {
         const SIZE_T heapSize = ::HeapSize(EngineSystemHeap(), 0, ptr);
         return (heapSize == static_cast<SIZE_T>(-1)) ? 0u : static_cast<std::size_t>(heapSize);
+    }
+
+    /// `gpg::GetHeapInfo` for the system-heap path (not in the binary). Every
+    /// figure is the engine's own live bytes; `inSmallBlocks` is 0, so
+    /// `Heap_TotalCheck` (`inSmallBlocks + inUse`) still equals `Heap_Total`.
+    /// `CScApp::Main` publishes these stats every frame, so this must stay a
+    /// counter read: `HeapSummary` walks every block of the heap under its
+    /// lock (about 260 ms for a 500 MB heap of small blocks), which stalled
+    /// the main thread and every allocating thread once per frame.
+    void FillSystemHeapStats(gpg::HeapStats& stats) noexcept
+    {
+        const std::size_t inUse = gSystemHeapBytesInUse.load(std::memory_order_relaxed);
+        stats = {};
+        stats.reserved = inUse;
+        stats.committed = inUse;
+        stats.total = inUse;
+        stats.inUse = inUse;
     }
 #endif
 
@@ -1349,6 +1381,14 @@ extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1
 #if defined(_M_X64)
 void gpg::LogHighMemoryReservation()
 {
+    // Plan 7.1: Stage A keeps the image below 4 GB (static addresses still
+    // fit 32 bits) while the heap may go above; say where the image landed.
+    const auto* const imageBase = static_cast<const void*>(::GetModuleHandleW(nullptr));
+    gpg::Logf(
+        "x64 image base %p (%s 4 GB)", imageBase,
+        (reinterpret_cast<std::uintptr_t>(imageBase) < 0x100000000ull) ? "below" : "above"
+    );
+
     if (!gHighMemoryReservation.requested) {
         return;
     }
@@ -1825,7 +1865,7 @@ void gpg::GetHeapInfo(HeapStats* const outStats)
 #if defined(_M_X64)
     // On the x64 system heap the engine allocator never starts, and must not
     // be started here just to read its (empty) counters.
-    *outStats = {};
+    FillSystemHeapStats(*outStats);
 #else
     if (!gAllocatorSentinelIsCritical) {
         (void)GetOrCreateThreadHeapCache();

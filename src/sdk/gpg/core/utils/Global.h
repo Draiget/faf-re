@@ -15,13 +15,16 @@ namespace gpg
 	using die_handler_t = void (*)(const char*);
 	using mem_hook_t = void (*)(int, int, ...);
 
+	/// Byte counters of the engine heap. `std::size_t` is the binary's 32-bit
+	/// unsigned word on x86, so the layout below is unchanged there; on x64 the
+	/// counters keep all 64 bits, since an x64 heap can pass 4 GB.
 	struct HeapStats
 	{
-		std::uint32_t reserved;      // +0x00
-		std::uint32_t committed;     // +0x04
-		std::uint32_t total;         // +0x08
-		std::uint32_t inSmallBlocks; // +0x0C
-		std::uint32_t inUse;         // +0x10
+		std::size_t reserved;      // +0x00
+		std::size_t committed;     // +0x04
+		std::size_t total;         // +0x08
+		std::size_t inSmallBlocks; // +0x0C
+		std::size_t inUse;         // +0x10
 	};
 	static_assert(offsetof(HeapStats, reserved) == 0x00, "gpg::HeapStats::reserved offset must be 0x00");
 	static_assert(offsetof(HeapStats, committed) == 0x04, "gpg::HeapStats::committed offset must be 0x04");
@@ -80,9 +83,9 @@ namespace gpg
 
 #if defined(_M_X64)
 	/**
-	 * x64 port test mode (not in the binary): logs what `FAF_HIGHMEM=1` reserved
-	 * below 4 GB before the CRT started, or why it was skipped. No-op when the
-	 * mode was not requested.
+	 * x64 port (not in the binary): logs the image base (and whether it is below
+	 * 4 GB), then what `FAF_HIGHMEM=1` reserved below 4 GB before the CRT
+	 * started, or why it was skipped.
 	 */
 	void LogHighMemoryReservation();
 #endif

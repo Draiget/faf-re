@@ -1422,6 +1422,12 @@
     <ClCompile Include="lua\LuaCrashDump.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lua\LuaMemAccounting.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lua\LuaGcEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\core\diagnostics\ProbeWatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3169,6 +3175,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaCrashDump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaMemAccounting.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaGcEventLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\diagnostics\ProbeWatch.h">

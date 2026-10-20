@@ -95,12 +95,25 @@
          separate unless an architecture-specific run directory is requested. -->
     <FafStageToRunDir Condition="'$(FafStageToRunDir)' == '' and '$(Platform)' == 'Win32'">true</FafStageToRunDir>
     <FafStageToRunDir Condition="'$(FafStageToRunDir)' == ''">false</FafStageToRunDir>
+    <!-- wxWindows tree the x64 configurations compile and link against
+         (include, lib\mswu setup.h, lib\x64). Defaults to the shared
+         dependencies tree; point it at a separately patched and built copy
+         with /p:FafWxX64Root=<root> (see dependencies\patches\
+         wxwindows_2_4_2_faf_x64.md). Win32 always uses the shared tree. -->
+    <FafWxX64Root Condition="'$(FafWxX64Root)' == ''">$(FafRepoRoot)dependencies\wxWindows-2.4.2</FafWxX64Root>
+    <!-- True when that tree carries wxwindows_2_4_2_faf_x64_pointers.patch
+         (its defs.h marker): only then may the x64 image use addresses
+         above 2 GB. -->
+    <FafWxX64Pointers Condition="'$(FafWxX64Pointers)' == '' and Exists('$(FafWxX64Root)\include\wx\defs.h')">$([System.IO.File]::ReadAllText('$(FafWxX64Root)\include\wx\defs.h').Contains('FAF x64: WPARAM/LPARAM are pointer-wide'))</FafWxX64Pointers>
     <!-- x64 address-space mode: `none` is the 2 GB image the x64 engine
-         ships as today; `heap` is large-address-aware with the image pinned
-         low (/BASE:0x10000000, no high-entropy ASLR), so only the heap can go
-         above 4 GB; `full` is large-address-aware with high-entropy ASLR.
-         heap/full link main_x64_la.exe so main_x64.exe stays in place.
-         Select with /p:FafX64LargeAddress=heap|full. -->
+         shipped as before the port; `heap` (plan Stage A, the default once
+         the x64 wx tree is pointer-safe) is large-address-aware with the
+         image pinned low (/BASE:0x10000000, no high-entropy ASLR), so only
+         the heap, stacks and DLLs go above 4 GB; `full` (Stage B) is
+         large-address-aware with high-entropy ASLR and links
+         main_x64_la.exe so main_x64.exe stays in place.
+         Select with /p:FafX64LargeAddress=none|heap|full. -->
+    <FafX64LargeAddress Condition="'$(FafX64LargeAddress)' == '' and '$(FafWxX64Pointers)' == 'True'">heap</FafX64LargeAddress>
     <FafX64LargeAddress Condition="'$(FafX64LargeAddress)' == ''">none</FafX64LargeAddress>
     <FafX64LargeAddressAware>false</FafX64LargeAddressAware>
     <FafX64LargeAddressAware Condition="'$(FafX64LargeAddress)' != 'none'">true</FafX64LargeAddressAware>
@@ -108,7 +121,7 @@
     <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'heap'">/HIGHENTROPYVA:NO /BASE:0x10000000</FafX64AddressLinkOptions>
     <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'full'"></FafX64AddressLinkOptions>
     <FafX64TargetName>main_x64</FafX64TargetName>
-    <FafX64TargetName Condition="'$(FafX64LargeAddress)' != 'none'">main_x64_la</FafX64TargetName>
+    <FafX64TargetName Condition="'$(FafX64LargeAddress)' == 'full'">main_x64_la</FafX64TargetName>
     <Wm3FoundationDir>$(FafRepoRoot)dependencies\WildMagic3p8\Foundation</Wm3FoundationDir>
     <Wm3IncludePath>$(Wm3FoundationDir);$(Wm3FoundationDir)\Approximation;$(Wm3FoundationDir)\Collision;$(Wm3FoundationDir)\Containment;$(Wm3FoundationDir)\Controllers;$(Wm3FoundationDir)\Curves;$(Wm3FoundationDir)\Detail;$(Wm3FoundationDir)\Distance;$(Wm3FoundationDir)\Effects;$(Wm3FoundationDir)\ImageAnalysis;$(Wm3FoundationDir)\Interpolation;$(Wm3FoundationDir)\Intersection;$(Wm3FoundationDir)\Math;$(Wm3FoundationDir)\Meshes;$(Wm3FoundationDir)\Miscellaneous;$(Wm3FoundationDir)\Numerics;$(Wm3FoundationDir)\ObjectSystem;$(Wm3FoundationDir)\Physics;$(Wm3FoundationDir)\RationalArithmetic;$(Wm3FoundationDir)\SceneGraph;$(Wm3FoundationDir)\Shaders;$(Wm3FoundationDir)\SharedArrays;$(Wm3FoundationDir)\Sorting;$(Wm3FoundationDir)\Surfaces;$(Wm3FoundationDir)\System;$(Wm3FoundationDir)\Terrain;$(Wm3FoundationDir)\Tessellation;$(FafRepoRoot)dependencies\WildMagic3p8\Renderers\Dx9Renderer;$(FafRepoRoot)dependencies\WildMagic3p8\Applications</Wm3IncludePath>
   </PropertyGroup>
@@ -319,14 +332,20 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <!-- Plan 0.3 (x64 port): pointer truncation (C4311/C4302/C4312) is a build
+           error, wx 2.4.2's headers included: they carry
+           wxwindows_2_4_2_faf_x64_pointers.patch, so they are compiled as
+           ordinary headers and checked like the engine's. -->
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <TreatSpecificWarningsAsErrors>4311;4302;4312;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafWxX64Root)\include;$(FafWxX64Root)\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -358,14 +377,20 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <ExceptionHandling>SyncCThrow</ExceptionHandling>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <!-- Plan 0.3 (x64 port): pointer truncation (C4311/C4302/C4312) is a build
+           error, wx 2.4.2's headers included: they carry
+           wxwindows_2_4_2_faf_x64_pointers.patch, so they are compiled as
+           ordinary headers and checked like the engine's. -->
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <TreatSpecificWarningsAsErrors>4311;4302;4312;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafWxX64Root)\include;$(FafWxX64Root)\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -605,6 +630,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\core\diagnostics\CrashReport.cpp" />
     <ClCompile Include="gpg\core\diagnostics\ProbeWatch.cpp" />
     <ClCompile Include="lua\LuaCrashDump.cpp" />
+    <ClCompile Include="lua\LuaMemAccounting.cpp" />
+    <ClCompile Include="lua\LuaGcEventLog.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBaseTypeInfo.cpp" />
     <ClCompile Include="moho\serialization\CPrefetchSetSerializer.cpp" />
@@ -1381,6 +1408,12 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     </ClCompile>
     <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\once.cpp">
       <ObjectFileName>$(IntDir)boost_thread_once.obj</ObjectFileName>
+      <!-- Plan 0.3: once.cpp's third ice_wrapper overload (the LPVOID-typed
+           InterlockedCompareExchange signature) is never called -
+           compare_exchange calls InterlockedCompareExchange directly - but its
+           inline body still casts LONG to LPVOID and back, so this one boost
+           source keeps those casts as warnings. -->
+      <TreatSpecificWarningsAsErrors Condition="'$(Platform)'=='x64'"></TreatSpecificWarningsAsErrors>
       <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\recursive_mutex.cpp">
@@ -2513,7 +2546,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\core\SUnitConstructionParams.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="moho\app\MohoResources.rc" />
+    <ResourceCompile Include="moho\app\MohoResources.rc">
+      <!-- MohoResources.rc includes wx/msw/wx.rc (wx's cursors, bitmaps, menus). -->
+      <AdditionalIncludeDirectories Condition="'$(Platform)'=='x64'">$(FafWxX64Root)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Platform)'!='x64'">$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="moho\app\res\faicon.ico" />
@@ -2548,6 +2585,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\movie\sfd\SfdMetadata.cpp" />
     <ClInclude Include="moho\movie\sfd\SfdMetadata.h" />
   </ItemGroup>
+  <Target Name="CheckFafWxX64Pointers" BeforeTargets="ClCompile" Condition="'$(Platform)' == 'x64'">
+    <Warning Condition="'$(FafWxX64Pointers)' != 'True' and '$(FafX64LargeAddress)' != 'none'" Text="FafX64LargeAddress=$(FafX64LargeAddress) with a wxWindows tree that lacks wxwindows_2_4_2_faf_x64_pointers.patch ($(FafWxX64Root)): wx truncates window-message pointers above 2 GB." />
+    <Message Importance="high" Condition="'$(FafWxX64Pointers)' != 'True' and '$(FafX64LargeAddress)' == 'none'" Text="x64 links /LARGEADDRESSAWARE:NO: $(FafWxX64Root) lacks wxwindows_2_4_2_faf_x64_pointers.patch." />
+  </Target>
   <Target Name="CheckFafFfmpeg" BeforeTargets="ClCompile">
     <Error Condition="!Exists('$(FafFfmpegRoot)\include\libavcodec\avcodec.h')" Text="FFmpeg development package missing. Set FafFfmpegRoot; see docs/FAF_SFD_COMPATIBILITY.md." />
   </Target>

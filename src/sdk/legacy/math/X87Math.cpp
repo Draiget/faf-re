@@ -32,7 +32,7 @@ extern "C" float __cdecl msvc8_x87_scaled_ln_quotient(float numerator, float den
 extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
-extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength);
+extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength, float lengthSq);
 extern "C" void __cdecl msvc8_x87_scale_vector_to_length(
   float* destLanes, const float* sourceLanes, float lengthSq, float length
 );
@@ -161,7 +161,9 @@ namespace msvc8
       // (stack underflow) that left x87 TOP rotated by one (difffuzz).
     }
 #else
-    msvc8_x87_scale_vector_max_length(px, py, pz, maxLength);
+    // The x64 routine runs the same block under the simulation's PC24 and
+    // starts from this same float `lengthSq`.
+    msvc8_x87_scale_vector_max_length(px, py, pz, maxLength, lengthSq);
 #endif
   }
 

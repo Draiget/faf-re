@@ -15,3 +15,11 @@
 //
 // faicon.ico was rebuilt from that GROUP_ICON and its nine ICON resources.
 IDI_WIN_FAICON ICON "res/faicon.ico"
+
+// wxWindows' own resources. The shipped binary carries them (named resources
+// such as WXBITMAP_STD_COLOURS, WXCURSOR_HAND, WXWINDOWMENU), because every
+// wx application links include/wx/msw/wx.rc; without them wx reports "Can't
+// load bitmap 'wxBITMAP_STD_COLOURS' from resources" as soon as the script
+// debugger (/debug, SC_LuaDebugger) builds its toolbar, and that error box
+// blocks the debugger.
+#include "wx/msw/wx.rc"

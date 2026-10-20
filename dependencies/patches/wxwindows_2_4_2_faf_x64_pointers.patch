@@ -1,0 +1,714 @@
+--- a/include/wx/defs.h
++++ b/include/wx/defs.h
+@@ -1903,7 +1903,11 @@
+ typedef unsigned long   WXHACCEL;
+ typedef void WXFAR  *   WXHINSTANCE;
+ typedef unsigned long   WXHBITMAP;
++#ifdef _WIN64
++typedef unsigned __int64 WXHIMAGELIST; // FAF x64: HIMAGELIST is a pointer
++#else
+ typedef unsigned long   WXHIMAGELIST;
++#endif
+ typedef unsigned long   WXHGLOBAL;
+ typedef unsigned long   WXHDC;
+ typedef unsigned int    WXUINT;
+@@ -1915,7 +1919,11 @@
+ typedef void *          WXMSG;
+ typedef unsigned long   WXHCONV;
+ typedef unsigned long   WXHKEY;
++#ifdef _WIN64
++typedef __int64         WXHTREEITEM; // FAF x64: HTREEITEM is a pointer
++#else
+ typedef unsigned long   WXHTREEITEM;
++#endif
+ 
+ typedef void *          WXDRAWITEMSTRUCT;
+ typedef void *          WXMEASUREITEMSTRUCT;
+@@ -1927,8 +1935,15 @@
+ 
+ 
+ #ifdef __WXMSW__
++#ifdef _WIN64
++// FAF x64: WPARAM/LPARAM are pointer-wide on Win64; messages such as
++// WM_GETTEXT pass buffer addresses through them.
++typedef unsigned __int64 WXWPARAM;
++typedef __int64         WXLPARAM;
++#else
+ typedef unsigned int    WXWPARAM;
+ typedef long            WXLPARAM;
++#endif
+ 
+ #if !defined(__WIN32__) || defined(__GNUWIN32__) || defined(__WXWINE__) || defined(__WXMICROWIN__)
+ typedef int             (*WXFARPROC)();
+--- a/include/wx/dynarray.h
++++ b/include/wx/dynarray.h
+@@ -470,6 +470,10 @@
+ WX_DECLARE_EXPORTED_BASEARRAY(int,          wxBaseArrayInt);
+ WX_DECLARE_EXPORTED_BASEARRAY(long,         wxBaseArrayLong);
+ WX_DECLARE_EXPORTED_BASEARRAY(double,       wxBaseArrayDouble);
++#ifdef _WIN64
++// FAF x64: pointer-wide integers (wxTreeItemId's value on Win64).
++WX_DECLARE_EXPORTED_BASEARRAY(__int64,      wxBaseArrayInt64);
++#endif
+ 
+ // ----------------------------------------------------------------------------
+ // Convenience macros to define arrays from base arrays
+--- a/include/wx/hashmap.h
++++ b/include/wx/hashmap.h
+@@ -447,7 +447,7 @@
+ 
+     // TODO: this might not work well on architectures with 64 bit pointers but
+     //       32 bit longs, we should use % ULONG_MAX there
+-    unsigned long operator()( const void* k ) const { return (unsigned long)k; }
++    unsigned long operator()( const void* k ) const { return (unsigned long)(size_t)k; } // FAF x64: a hash; the low bits suffice
+ 
+     wxPointerHash& operator=(const wxPointerHash&) { return *this; }
+ };
+--- a/include/wx/listbase.h
++++ b/include/wx/listbase.h
+@@ -222,7 +222,12 @@
+     void SetText(const wxString& text) { m_text = text; }
+     void SetImage(int image) { m_image = image; }
+     void SetData(long data) { m_data = data; }
++#ifdef _WIN64
++    // FAF x64: the item data is an application pointer.
++    void SetData(void *data) { m_data = (__int64)data; }
++#else
+     void SetData(void *data) { m_data = (long)data; }
++#endif
+ 
+     void SetWidth(int width) { m_width = width; }
+     void SetAlign(wxListColumnFormat align) { m_format = align; }
+@@ -241,7 +246,11 @@
+     long GetState() const { return m_state & m_stateMask; }
+     const wxString& GetText() const { return m_text; }
+     int GetImage() const { return m_image; }
++#ifdef _WIN64
++    __int64 GetData() const { return m_data; }
++#else
+     long GetData() const { return m_data; }
++#endif
+ 
+     int GetWidth() const { return m_width; }
+     wxListColumnFormat GetAlign() const { return (wxListColumnFormat)m_format; }
+@@ -270,7 +279,11 @@
+     long            m_stateMask;// Which flags of m_state are valid (uses same flags)
+     wxString        m_text;     // The label/header text
+     int             m_image;    // The zero-based index into an image list
++#ifdef _WIN64
++    __int64         m_data;     // App-defined data (FAF x64: pointer-wide)
++#else
+     long            m_data;     // App-defined data
++#endif
+ 
+     // For columns only
+     int             m_format;   // left, right, centre
+@@ -343,7 +356,11 @@
+     const wxString& GetLabel() const { return m_item.m_text; }
+     const wxString& GetText() const { return m_item.m_text; }
+     int GetImage() const { return m_item.m_image; }
++#ifdef _WIN64
++    __int64 GetData() const { return m_item.m_data; }
++#else
+     long GetData() const { return m_item.m_data; }
++#endif
+     long GetMask() const { return m_item.m_mask; }
+     const wxListItem& GetItem() const { return m_item; }
+ 
+--- a/include/wx/msw/treectrl.h
++++ b/include/wx/msw/treectrl.h
+@@ -241,9 +241,9 @@
+         // the same!
+ 
+         // get the first child of this item
+-    wxTreeItemId GetFirstChild(const wxTreeItemId& item, long& _cookie) const;
++    wxTreeItemId GetFirstChild(const wxTreeItemId& item, wxTreeItemIdValue& _cookie) const;
+         // get the next child
+-    wxTreeItemId GetNextChild(const wxTreeItemId& item, long& _cookie) const;
++    wxTreeItemId GetNextChild(const wxTreeItemId& item, wxTreeItemIdValue& _cookie) const;
+         // get the last child of this item - this method doesn't use cookies
+     wxTreeItemId GetLastChild(const wxTreeItemId& item) const;
+ 
+--- a/include/wx/treebase.h
++++ b/include/wx/treebase.h
+@@ -33,7 +33,12 @@
+ // ----------------------------------------------------------------------------
+ 
+ // Using this typedef removes an ambiguity when calling Remove()
++#ifdef _WIN64
++// FAF x64: holds an HTREEITEM (MSW) or a node pointer (generic): pointer-wide.
++typedef __int64 wxTreeItemIdValue;
++#else
+ typedef long wxTreeItemIdValue;
++#endif
+ 
+ class WXDLLEXPORT wxTreeItemId
+ {
+@@ -43,10 +48,13 @@
+     wxTreeItemId() { m_pItem = 0; }
+ 
+         // this one is used in the generic version
+-    wxTreeItemId(void *pItem) { m_pItem = (long) pItem; }
++    wxTreeItemId(void *pItem) { m_pItem = (wxTreeItemIdValue) pItem; }
+ 
+         // and this one under MSW
+     wxTreeItemId(long lItem) { m_pItem = lItem; }
++#ifdef _WIN64
++    wxTreeItemId(wxTreeItemIdValue lItem) { m_pItem = lItem; }
++#endif
+ 
+         // default copy ctor/assignment operator are ok for us
+ 
+@@ -94,7 +102,12 @@
+     wxTreeItemId m_pItem;
+ };
+ 
++#ifdef _WIN64
++// FAF x64: wxTreeItemId is pointer-wide; store it in a 64-bit integer array.
++WX_DEFINE_EXPORTED_TYPEARRAY(wxTreeItemId, wxArrayTreeItemIds, wxBaseArrayInt64);
++#else
+ WX_DEFINE_EXPORTED_ARRAY_LONG(wxTreeItemId, wxArrayTreeItemIds);
++#endif
+ 
+ // ----------------------------------------------------------------------------
+ // constants
+--- a/include/wx/treelistctrl.h
++++ b/include/wx/treelistctrl.h
+@@ -56,7 +56,11 @@
+ // Using this typedef removes an ambiguity when calling Remove()
+ #ifdef __WXMSW__
+ #if !wxCHECK_VERSION(2, 5, 0)
++#ifdef _WIN64
++typedef __int64 wxTreeItemIdValue; // FAF x64: matches wx/treebase.h
++#else
+ typedef long wxTreeItemIdValue;
++#endif
+ #else
+ typedef void *wxTreeItemIdValue;
+ #endif
+--- a/src/common/dynarray.cpp
++++ b/src/common/dynarray.cpp
+@@ -228,8 +228,8 @@
+   while ( lo < hi ) {                                                       \
+     i = (lo + hi)/2;                                                        \
+                                                                             \
+-    res = (*fnCompare)((const void *)(long)lItem,                           \
+-                       (const void *)(long)(m_pItems[i]));                  \
++    res = (*fnCompare)((const void *)(size_t)lItem,                           \
++                       (const void *)(size_t)(m_pItems[i]));                  \
+     if ( res < 0 )                                                          \
+       hi = i;                                                               \
+     else if ( res > 0 )                                                     \
+@@ -249,8 +249,8 @@
+     size_t n = IndexForInsert(lItem, fnCompare);                            \
+                                                                             \
+     return (n >= m_nCount ||                                                \
+-           (*fnCompare)((const void *)(long)lItem,                          \
+-                        ((const void *)(long)m_pItems[n]))) ? wxNOT_FOUND   \
++           (*fnCompare)((const void *)(size_t)lItem,                          \
++                        ((const void *)(size_t)m_pItems[n]))) ? wxNOT_FOUND   \
+                                                             : (int)n;       \
+ }                                                                           \
+                                                                             \
+@@ -321,5 +321,8 @@
+ _WX_DEFINE_BASEARRAY(short,        wxBaseArrayShort)
+ _WX_DEFINE_BASEARRAY(int,          wxBaseArrayInt)
+ _WX_DEFINE_BASEARRAY(long,         wxBaseArrayLong)
++#ifdef _WIN64
++_WX_DEFINE_BASEARRAY(__int64,      wxBaseArrayInt64)
++#endif
+ //_WX_DEFINE_BASEARRAY(double,       wxBaseArrayDouble)
+ 
+--- a/src/common/list.cpp
++++ b/src/common/list.cpp
+@@ -609,7 +609,7 @@
+       s = va_arg(ap, const wxChar *);
+       //    if (s == NULL)
+ #ifdef __WXMSW__
+-      if ((int)(long) s == 0)
++      if (s == NULL) // FAF x64: the old (int)(long) test dropped the upper half
+ #else
+       if ((long) s == 0)
+ #endif
+--- a/src/generic/dirctrlg.cpp
++++ b/src/generic/dirctrlg.cpp
+@@ -766,7 +766,7 @@
+         return;
+ 
+     data->m_isExpanded = FALSE;
+-    long cookie;
++    wxTreeItemIdValue cookie;
+     /* Workaround because DeleteChildren has disapeared (why?) and
+      * CollapseAndReset doesn't work as advertised (deletes parent too) */
+     child = m_treeCtrl->GetFirstChild(parentId, cookie);
+@@ -938,7 +938,7 @@
+     path2.MakeLower();
+ #endif
+ 
+-    long cookie;
++    wxTreeItemIdValue cookie;
+     wxTreeItemId childId = m_treeCtrl->GetFirstChild(parentId, cookie);
+     while (childId.IsOk())
+     {
+@@ -1000,7 +1000,7 @@
+         if ((GetWindowStyle() & wxDIRCTRL_SELECT_FIRST) && data->m_isDir)
+         {
+             // Find the first file in this directory
+-            long cookie;
++            wxTreeItemIdValue cookie;
+             wxTreeItemId childId = m_treeCtrl->GetFirstChild(lastId, cookie);
+             bool selectedChild = FALSE;
+             while (childId.IsOk())
+--- a/src/generic/treectlg.cpp
++++ b/src/generic/treectlg.cpp
+@@ -1348,7 +1348,7 @@
+ 
+     if ( data != NULL )
+     {
+-        data->m_pItem = (long) item;
++        data->m_pItem = (void*) item;
+     }
+ 
+     parent->Insert( item, previous );
+@@ -1368,7 +1368,7 @@
+                                    image, selImage, data);
+     if ( data != NULL )
+     {
+-        data->m_pItem = (long) m_anchor;
++        data->m_pItem = (void*) m_anchor;
+     }
+ 
+     if (HasFlag(wxTR_HIDE_ROOT))
+@@ -1456,7 +1456,7 @@
+ void wxGenericTreeCtrl::SendDeleteEvent(wxGenericTreeItem *item)
+ {
+     wxTreeEvent event( wxEVT_COMMAND_TREE_DELETE_ITEM, GetId() );
+-    event.m_item = (long) item;
++    event.m_item = (void*) item;
+     event.SetEventObject( this );
+     ProcessEvent( event );
+ }
+@@ -1528,7 +1528,7 @@
+         return;
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_EXPANDING, GetId() );
+-    event.m_item = (long) item;
++    event.m_item = (void*) item;
+     event.SetEventObject( this );
+ 
+     if ( ProcessEvent( event ) && !event.IsAllowed() )
+@@ -1576,7 +1576,7 @@
+         return;
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_COLLAPSING, GetId() );
+-    event.m_item = (long) item;
++    event.m_item = (void*) item;
+     event.SetEventObject( this );
+     if ( ProcessEvent( event ) && !event.IsAllowed() )
+     {
+@@ -1762,8 +1762,8 @@
+     }
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_SEL_CHANGING, GetId() );
+-    event.m_item = (long) item;
+-    event.m_itemOld = (long) m_current;
++    event.m_item = (void*) item;
++    event.m_itemOld = (void*) m_current;
+     event.SetEventObject( this );
+     // TODO : Here we don't send any selection mode yet !
+ 
+@@ -2605,7 +2605,7 @@
+             if ( !event.HasModifiers() )
+             {
+                 wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_ACTIVATED, GetId() );
+-                event.m_item = (long) m_current;
++                event.m_item = (void*) m_current;
+                 event.SetEventObject( this );
+                 GetEventHandler()->ProcessEvent( event );
+             }
+@@ -2854,7 +2854,7 @@
+     wxGenericTreeItem *itemEdit = (wxGenericTreeItem *)item.m_pItem;
+ 
+     wxTreeEvent te( wxEVT_COMMAND_TREE_BEGIN_LABEL_EDIT, GetId() );
+-    te.m_item = (long) itemEdit;
++    te.m_item = (void*) itemEdit;
+     te.SetEventObject( this );
+     if ( GetEventHandler()->ProcessEvent( te ) && !te.IsAllowed() )
+     {
+@@ -2885,7 +2885,7 @@
+                                        const wxString& value)
+ {
+     wxTreeEvent le( wxEVT_COMMAND_TREE_END_LABEL_EDIT, GetId() );
+-    le.m_item = (long) item;
++    le.m_item = (void*) item;
+     le.SetEventObject( this );
+     le.m_label = value;
+     le.m_editCancelled = FALSE;
+@@ -2897,7 +2897,7 @@
+ {
+     // let owner know that the edit was cancelled
+     wxTreeEvent le( wxEVT_COMMAND_TREE_END_LABEL_EDIT, GetId() );
+-    le.m_item = (long) item;
++    le.m_item = (void*) item;
+     le.SetEventObject( this );
+     le.m_label = wxEmptyString;
+     le.m_editCancelled = TRUE;
+@@ -2952,7 +2952,7 @@
+                               : wxEVT_COMMAND_TREE_BEGIN_DRAG;
+ 
+         wxTreeEvent nevent( command, GetId() );
+-        nevent.m_item = (long) m_current;
++        nevent.m_item = (void*) m_current;
+         nevent.SetEventObject(this);
+ 
+         // by default the dragging is not supported, the user code must
+@@ -3013,7 +3013,7 @@
+         // generate the drag end event
+         wxTreeEvent event(wxEVT_COMMAND_TREE_END_DRAG, GetId());
+ 
+-        event.m_item = (long) item;
++        event.m_item = (void*) item;
+         event.m_pointDrag = pt;
+         event.SetEventObject(this);
+ 
+@@ -3039,7 +3039,7 @@
+         if ( event.RightDown() )
+         {
+             wxTreeEvent nevent(wxEVT_COMMAND_TREE_ITEM_RIGHT_CLICK, GetId());
+-            nevent.m_item = (long) item;
++            nevent.m_item = (void*) item;
+             nevent.m_pointDrag = CalcScrolledPosition(pt);
+             nevent.SetEventObject(this);
+             GetEventHandler()->ProcessEvent(nevent);
+@@ -3109,7 +3109,7 @@
+ 
+                 // send activate event first
+                 wxTreeEvent nevent( wxEVT_COMMAND_TREE_ITEM_ACTIVATED, GetId() );
+-                nevent.m_item = (long) item;
++                nevent.m_item = (void*) item;
+                 nevent.m_pointDrag = CalcScrolledPosition(pt);
+                 nevent.SetEventObject( this );
+                 if ( !GetEventHandler()->ProcessEvent( nevent ) )
+--- a/src/generic/treelistctrl.cpp
++++ b/src/generic/treelistctrl.cpp
+@@ -2465,7 +2465,7 @@
+ 
+     if ( data != NULL )
+     {
+-        data->SetId((long)item);
++        data->SetId((void*)item);
+     }
+ 
+     parent->Insert( item, previous );
+@@ -2502,7 +2502,7 @@
+ #endif
+     if ( data != NULL )
+     {
+-        data->SetId((long)m_anchor);
++        data->SetId((void*)m_anchor);
+     }
+ 
+     if (!HasFlag(wxTR_MULTIPLE))
+@@ -2577,7 +2577,7 @@
+ void wxTreeListMainWindow::SendDeleteEvent(wxTreeListItem *item)
+ {
+     wxTreeEvent event( wxEVT_COMMAND_TREE_DELETE_ITEM, m_owner->GetId() );
+-    event.SetItem((long) item);
++    event.SetItem((void*) item);
+     event.SetEventObject( /*this*/m_owner );
+     m_owner->ProcessEvent( event );
+     if (m_current == item) m_current = (wxTreeListItem *) NULL;
+@@ -2655,7 +2655,7 @@
+         return;
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_EXPANDING, m_owner->GetId() );
+-    event.SetItem( (long) item );
++    event.SetItem( (void*) item );
+     event.SetEventObject( /*this*/m_owner );
+ 
+     if ( m_owner->ProcessEvent( event ) && !event.IsAllowed() )
+@@ -2701,7 +2701,7 @@
+         return;
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_COLLAPSING, m_owner->GetId() );
+-    event.SetItem( (long) item );
++    event.SetItem( (void*) item );
+     event.SetEventObject( /*this*/m_owner );
+     if ( m_owner->ProcessEvent( event ) && !event.IsAllowed() )
+     {
+@@ -2879,8 +2879,8 @@
+     }
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_SEL_CHANGING, m_owner->GetId() );
+-    event.SetItem( (long) item );
+-    event.SetOldItem( (long) m_current );
++    event.SetItem( (void*) item );
++    event.SetOldItem( (void*) m_current );
+     event.SetEventObject( /*this*/m_owner );
+     // TODO : Here we don't send any selection mode yet !
+ 
+@@ -2939,7 +2939,7 @@
+ 
+     wxTreeEvent event( wxEVT_COMMAND_TREE_SEL_CHANGING, m_owner->GetId() );
+     event.SetItem( GetRootItem() );
+-    event.SetOldItem( (long) m_current );
++    event.SetOldItem( (void*) m_current );
+     event.SetEventObject( /*this*/m_owner );
+     // TODO : Here we don't send any selection mode yet !
+ 
+@@ -3787,7 +3787,7 @@
+             {
+                 wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
+                                    m_owner->GetId() );
+-                event.SetItem( (long) m_current);
++                event.SetItem( (void*) m_current);
+                 event.SetEventObject( /*this*/m_owner );
+                 m_owner->GetEventHandler()->ProcessEvent( event );
+             }
+@@ -4067,7 +4067,7 @@
+     wxString s = m_currentEdit->GetText (column);
+ 
+     wxTreeEvent te( wxEVT_COMMAND_TREE_BEGIN_LABEL_EDIT, m_owner->GetId() );
+-    te.SetItem( (long) m_currentEdit);
++    te.SetItem( (void*) m_currentEdit);
+     te.SetLabel( s );
+     te.SetEventObject( /*this*/m_owner );
+     m_owner->GetEventHandler()->ProcessEvent( te );
+@@ -4139,7 +4139,7 @@
+ {
+     // TODO if the validator fails this causes a crash
+     wxTreeEvent le( wxEVT_COMMAND_TREE_END_LABEL_EDIT, m_owner->GetId() );
+-    le.SetItem( (long) m_currentEdit );
++    le.SetItem( (void*) m_currentEdit );
+     le.SetEventObject( /*this*/m_owner );
+     le.SetLabel( m_renameRes );
+     m_owner->GetEventHandler()->ProcessEvent( le );
+@@ -4199,7 +4199,7 @@
+                               ? wxEVT_COMMAND_TREE_BEGIN_DRAG
+                               : wxEVT_COMMAND_TREE_BEGIN_RDRAG;
+         wxTreeEvent nevent (command, m_owner->GetId());
+-        nevent.SetItem ((long) m_current);
++        nevent.SetItem ((void*) m_current);
+         nevent.SetEventObject (m_owner);
+         m_owner->GetEventHandler()->ProcessEvent (nevent);
+ 
+@@ -4211,7 +4211,7 @@
+ 
+         // send drag end event event
+         wxTreeEvent event (wxEVT_COMMAND_TREE_END_DRAG, m_owner->GetId());
+-        event.SetItem ((long) item);
++        event.SetItem ((void*) item);
+         event.SetPoint (wxPoint(x, y));
+         event.SetEventObject (m_owner);
+         m_owner->GetEventHandler()->ProcessEvent(event);
+@@ -4224,7 +4224,7 @@
+     if (event.RightDown()) {
+         SetFocus();
+         wxTreeEvent nevent (wxEVT_COMMAND_TREE_ITEM_RIGHT_CLICK, m_owner->GetId());
+-        nevent.SetItem ((long) item);
++        nevent.SetItem ((void*) item);
+         int nx, ny;
+         CalcScrolledPosition (x, y, &nx, &ny);
+         nevent.SetPoint (wxPoint(nx, ny));
+@@ -4295,7 +4295,7 @@
+             // send activate event first
+             wxTreeEvent nevent( wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
+                                 m_owner->GetId() );
+-            nevent.SetItem( (long) item );
++            nevent.SetItem( (void*) item );
+             int nx, ny;
+             CalcScrolledPosition(x, y, &nx, &ny);
+             nevent.SetPoint( wxPoint(nx, ny) );
+--- a/src/msw/choice.cpp
++++ b/src/msw/choice.cpp
+@@ -106,7 +106,7 @@
+ 
+ int wxChoice::DoAppend(const wxString& item)
+ {
+-    int n = (int)SendMessage(GetHwnd(), CB_ADDSTRING, 0, (LONG)item.c_str());
++    int n = (int)SendMessage(GetHwnd(), CB_ADDSTRING, 0, (LPARAM)item.c_str());
+     if ( n == CB_ERR )
+     {
+         wxLogLastError(wxT("SendMessage(CB_ADDSTRING)"));
+--- a/src/msw/fontenum.cpp
++++ b/src/msw/fontenum.cpp
+@@ -98,7 +98,7 @@
+ 
+ #ifndef __WXMICROWIN__
+ int CALLBACK wxFontEnumeratorProc(LPLOGFONT lplf, LPTEXTMETRIC lptm,
+-                                  DWORD dwStyle, LONG lParam);
++                                  DWORD dwStyle, LPARAM lParam);
+ #endif
+ 
+ // ============================================================================
+@@ -277,7 +277,7 @@
+ 
+ #ifndef __WXMICROWIN__
+ int CALLBACK wxFontEnumeratorProc(LPLOGFONT lplf, LPTEXTMETRIC lptm,
+-                                  DWORD WXUNUSED(dwStyle), LONG lParam)
++                                  DWORD WXUNUSED(dwStyle), LPARAM lParam)
+ {
+ 
+     // we used to process TrueType fonts only, but there doesn't seem to be any
+--- a/src/msw/listbox.cpp
++++ b/src/msw/listbox.cpp
+@@ -621,7 +621,7 @@
+         int i;
+         for (i = 0; i < m_noItems; i++)
+         {
+-            int len = (int)SendMessage(GetHwnd(), LB_GETTEXT, i, (LONG)wxBuffer);
++            int len = (int)SendMessage(GetHwnd(), LB_GETTEXT, i, (LPARAM)wxBuffer);
+             wxBuffer[len] = 0;
+             SIZE extentXY;
+             ::GetTextExtentPoint(dc, (LPTSTR)wxBuffer, len, &extentXY);
+@@ -768,7 +768,7 @@
+     if ( itemID == (UINT)-1 )
+         return FALSE;
+ 
+-    long data = ListBox_GetItemData(GetHwnd(), pStruct->itemID);
++    LRESULT data = ListBox_GetItemData(GetHwnd(), pStruct->itemID); // FAF x64: a pointer
+ 
+     wxCHECK( data && (data != LB_ERR), FALSE );
+ 
+--- a/src/msw/mdi.cpp
++++ b/src/msw/mdi.cpp
+@@ -720,7 +720,7 @@
+   wxWindowCreationHook hook(this);
+ 
+   m_hWnd = (WXHWND)::SendMessage(GetWinHwnd(parent->GetClientWindow()),
+-                                 WM_MDICREATE, 0, (LONG)(LPSTR)&mcs);
++                                 WM_MDICREATE, 0, (LPARAM)(LPSTR)&mcs);
+ 
+   wxAssociateWinWithHandle((HWND) GetHWND(), this);
+ 
+@@ -1072,7 +1072,7 @@
+ // MDI specific message translation/preprocessing
+ // ---------------------------------------------------------------------------
+ 
+-long wxMDIChildFrame::MSWDefWindowProc(WXUINT message, WXUINT wParam, WXLPARAM lParam)
++long wxMDIChildFrame::MSWDefWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam)
+ {
+     return DefMDIChildProc(GetHwnd(),
+                            (UINT)message, (WPARAM)wParam, (LPARAM)lParam);
+--- a/src/msw/tabctrl.cpp
++++ b/src/msw/tabctrl.cpp
+@@ -299,7 +299,7 @@
+     wxChar buf[256];
+     TC_ITEM tcItem;
+     tcItem.mask = TCIF_PARAM;
+-    tcItem.lParam = (long) data;
++    tcItem.lParam = (LPARAM) data;
+     if (text != wxT(""))
+     {
+         tcItem.mask |= TCIF_TEXT;
+@@ -357,7 +357,7 @@
+ {
+     TC_ITEM tcItem;
+     tcItem.mask = TCIF_PARAM;
+-    tcItem.lParam = (long) data;
++    tcItem.lParam = (LPARAM) data;
+ 
+     return ( TabCtrl_SetItem( (HWND) GetHWND(), item, & tcItem) != 0 );
+ }
+--- a/src/msw/tbar95.cpp
++++ b/src/msw/tbar95.cpp
+@@ -701,7 +701,7 @@
+                     const wxString& label = tool->GetLabel();
+                     if ( !label.empty() )
+                     {
+-                        button.iString = (int)label.c_str();
++                        button.iString = (INT_PTR)label.c_str();
+                     }
+                 }
+ 
+--- a/src/msw/treectrl.cpp
++++ b/src/msw/treectrl.cpp
+@@ -545,7 +545,7 @@
+ 
+ bool wxTreeTraversal::Traverse(const wxTreeItemId& root, bool recursively)
+ {
+-    long cookie;
++    wxTreeItemIdValue cookie;
+     wxTreeItemId child = m_tree->GetFirstChild(root, cookie);
+     while ( child.IsOk() )
+     {
+@@ -1373,20 +1373,20 @@
+ }
+ 
+ wxTreeItemId wxTreeCtrl::GetFirstChild(const wxTreeItemId& item,
+-                                       long& _cookie) const
++                                       wxTreeItemIdValue& _cookie) const
+ {
+     // remember the last child returned in 'cookie'
+-    _cookie = (long)TreeView_GetChild(GetHwnd(), HITEM(item));
++    _cookie = (wxTreeItemIdValue)TreeView_GetChild(GetHwnd(), HITEM(item));
+ 
+     return wxTreeItemId((WXHTREEITEM)_cookie);
+ }
+ 
+ wxTreeItemId wxTreeCtrl::GetNextChild(const wxTreeItemId& WXUNUSED(item),
+-                                      long& _cookie) const
++                                      wxTreeItemIdValue& _cookie) const
+ {
+     wxTreeItemId l = wxTreeItemId((WXHTREEITEM)TreeView_GetNextSibling(GetHwnd(),
+                                    HITEM(_cookie)));
+-    _cookie = (long)l;
++    _cookie = (wxTreeItemIdValue)l;
+ 
+     return l;
+ }
+@@ -1394,7 +1394,7 @@
+ wxTreeItemId wxTreeCtrl::GetLastChild(const wxTreeItemId& item) const
+ {
+     // can this be done more efficiently?
+-    long cookie;
++    wxTreeItemIdValue cookie;
+ 
+     wxTreeItemId childLast,
+     child = GetFirstChild(item, cookie);
+@@ -1600,7 +1600,7 @@
+                                     wxTreeItemData *data)
+ {
+     // find the item from index
+-    long cookie;
++    wxTreeItemIdValue cookie;
+     wxTreeItemId idPrev, idCur = GetFirstChild(parent, cookie);
+     while ( index != 0 && idCur.IsOk() )
+     {
+@@ -1637,13 +1637,13 @@
+ // delete all children (but don't delete the item itself)
+ void wxTreeCtrl::DeleteChildren(const wxTreeItemId& item)
+ {
+-    long cookie;
++    wxTreeItemIdValue cookie;
+ 
+-    wxArrayLong children;
++    wxArrayTreeItemIds children; // FAF x64: holds HTREEITEMs
+     wxTreeItemId child = GetFirstChild(item, cookie);
+     while ( child.IsOk() )
+     {
+-        children.Add((long)(WXHTREEITEM)child);
++        children.Add(child);
+ 
+         child = GetNextChild(item, cookie);
+     }
+@@ -1651,7 +1651,7 @@
+     size_t nCount = children.Count();
+     for ( size_t n = 0; n < nCount; n++ )
+     {
+-        if ( !TreeView_DeleteItem(GetHwnd(), (HTREEITEM)children[n]) )
++        if ( !TreeView_DeleteItem(GetHwnd(), (HTREEITEM)children[n].m_pItem) )
+         {
+             wxLogLastError(wxT("TreeView_DeleteItem"));
+         }
+--- a/src/msw/window.cpp
++++ b/src/msw/window.cpp
+@@ -2385,7 +2385,7 @@
+     union
+     {
+         bool        allow;
+-        long        result;
++        WXLPARAM    result; // FAF x64: an LRESULT, pointer-wide on Win64
+         WXHICON     hIcon;
+         WXHBRUSH    hBrush;
+     } rc;
