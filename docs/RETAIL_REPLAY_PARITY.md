@@ -4,7 +4,7 @@ Real games from the FAF replay vault — multiplayer games and games against the
 built-in AI or M28AI — are played back on the rebuilt engine and checked against
 the original `ForgedAlliance.exe`, bit for bit.
 
-*Snapshot: 20/10/2026 — 51 of 51 replays match on every gameplay beat.*
+*Snapshot: 20/10/2026 — 67 of 67 replays match on every gameplay beat.*
 
 ## Method
 
@@ -78,6 +78,22 @@ with are fetched from the FAF content server.
 | 26946725 | Dual Gap, 12 players, 14 min | Matches the other nine clients on every checksum; one player's own client desynced in the live game at beat 6,700 (see below). |
 | 26989982 | Seton's Clutch, 8 players, 14 min | Every embedded checksum matches, start to end. |
 | 26902315 | The Dark Heart, 3 players, 13 min | Every embedded checksum matches, start to end. |
+| 26896281 | Dual Gap, 12 players, 53 min | Every embedded checksum matches, start to end. |
+| 26993154 | Fudge, 2 players, 54 min | Every embedded checksum matches, start to end. |
+| 26915859 | Dunes of Arracis, 2 players, 50 min | Every embedded checksum matches, start to end. |
+| 26902701 | Esgaroth's Ruins, 2 players, 48 min | Every embedded checksum matches, start to end. |
+| 27029855 | Dual Gap, 12 players, 40 min | Every embedded checksum matches, start to end. |
+| 27009529 | Dual Gap, 12 players, 39 min | Every embedded checksum matches, start to end. |
+| 26928802 | Seton's Clutch, 8 players, 39 min | Every embedded checksum matches, start to end. |
+| 26950767 | Miaziknog, 3 players, 37 min | Every embedded checksum matches, start to end. |
+| 26975290 | Astro 7923542, 4 players with M28AI, 28 min | Every embedded checksum matches, start to end. |
+| 26960818 | Daroza, 2 players, 27 min | Every embedded checksum matches, start to end. |
+| 26976406 | Adaptive Rainy Day, 2 players, 26 min | Every embedded checksum matches, start to end. |
+| 26963960 | Astro Crater Battles 4x4 Rich Huge, 8 players, 22 min | Every embedded checksum matches, start to end. |
+| 26883423 | Dual Gap, 2 players with M28AI, 18 min | Every embedded checksum matches, start to end. |
+| 26952549 | Frithen, 2 players, 15 min | Every embedded checksum matches, start to end. |
+| 26880663 | Dual Gap, 12 players, 12 min | Every embedded checksum matches, start to end. |
+| 26958235 | Desolate Dunes, 2 players, 10 min | Every embedded checksum matches, start to end. |
 
 **A live-game desync is not a playback desync.** Every client records its own
 checksum into the replay. In 26946725 nine clients recorded the same checksum at
