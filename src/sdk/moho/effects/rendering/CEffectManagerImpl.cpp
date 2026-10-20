@@ -1,7 +1,5 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 
-#include <cstdarg>
-#include <cstdio>
 #include <new>
 #include <typeinfo>
 
@@ -29,26 +27,6 @@
 #include "moho/sim/Sim.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 
-
-namespace
-{
-  // TEMPORARY PROBE SINK -- effects triage, delete when resolved.
-  // gpg::Warnf reaches nothing until `/log <name>` installs a target, so the
-  // probes below append here instead. The file lands beside the executable.
-  void DiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc(0x0A, sink);
-    (void)std::fclose(sink);
-  }
-} // namespace
 
 namespace moho
 {
@@ -279,24 +257,6 @@ namespace moho
 
     effect->SetBone(entity, boneIndex);
 
-    // TEMPORARY PROBE -- attach-creation triage: what the weak link resolves
-    // to immediately after SetBone on the CreateAttachedEmitter lane. Delete
-    // when resolved.
-    {
-      static int sProbeCreateAttached = 0;
-      if (sProbeCreateAttached < 20) {
-        ++sProbeCreateAttached;
-        DiagLine(
-          "[FXATTACH] createA n=%d eff=%p ent=%p bone=%d resolved=%p",
-          sProbeCreateAttached,
-          static_cast<void*>(effect),
-          static_cast<void*>(entity),
-          boneIndex,
-          static_cast<void*>(effect->mEntityInfo.GetAttachTargetEntity())
-        );
-      }
-    }
-
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);
     }
@@ -429,24 +389,6 @@ namespace moho
     LinkActiveEffect(mActiveEffects, effect);
 
     effect->SetBone(entity, boneIndex);
-
-    // TEMPORARY PROBE -- attach-creation triage: proves the Lua lane reaches
-    // SetBone, and what the weak link resolves to one call later. Delete when
-    // resolved.
-    {
-      static int sProbeCreate = 0;
-      if (sProbeCreate < 20) {
-        ++sProbeCreate;
-        DiagLine(
-          "[FXATTACH] create n=%d eff=%p ent=%p bone=%d resolved=%p",
-          sProbeCreate,
-          static_cast<void*>(effect),
-          static_cast<void*>(entity),
-          boneIndex,
-          static_cast<void*>(effect->mEntityInfo.GetAttachTargetEntity())
-        );
-      }
-    }
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);

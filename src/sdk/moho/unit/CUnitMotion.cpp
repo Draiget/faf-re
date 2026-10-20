@@ -4273,28 +4273,7 @@ namespace moho
     // `mPreviousVelocity` (+0xB4) every beat, not just on the landing return.
     mPreviousVelocity = physBody->mVelocity;
 
-    const Wm3::Vector3f wImpBeforeIntegrate = physBody->mWorldImpulse;
-
     physBody->IntegrateFreefallStep(control.force, kFixedIntegrationDt, control.torque);
-
-    {
-      const float pre = Wm3::Vector3f::Length(wImpBeforeIntegrate);
-      const float post = Wm3::Vector3f::Length(physBody->mWorldImpulse);
-      if (!std::isfinite(post) || post > 1000.0f || (pre > 1.0f && post > (pre * 1.3f))) {
-        static DiagnosticBudget sSpinCount;
-        if (sSpinCount.Take(40)) {
-          gpg::Warnf(
-            "[AIRSPIN] unit=%p |wImp| pre=%.3f afterIntegrate=%.3f (integrateGain=%.3f) "
-            "torque=(%.1f,%.1f,%.1f) invI=(%.6f,%.6f,%.6f) mass=%.2f curElev=%.2f speed=%.2f",
-            static_cast<void*>(unit), pre, post, (pre > 0.0f) ? (post / pre) : 0.0f,
-            control.torque.x, control.torque.y, control.torque.z,
-            physBody->mInvInertiaTensor.x, physBody->mInvInertiaTensor.y, physBody->mInvInertiaTensor.z,
-            physBody->mMass, mCurElevation, Wm3::Vector3f::Length(physBody->mVelocity)
-          );
-        }
-      }
-    }
-
 
     // No terrain collision for a flier: every FAF build, 2025.7.1 included,
     // hot-patches it out of this tail, and FAF's scripts depend on that.

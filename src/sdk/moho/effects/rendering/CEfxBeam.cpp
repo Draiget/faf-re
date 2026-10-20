@@ -1,7 +1,5 @@
 #include "moho/effects/rendering/CEfxBeam.h"
 
-#include <cstdarg>
-#include <cstdio>
 #include <cmath>
 #include <cstdint>
 #include <typeinfo>
@@ -28,23 +26,6 @@
 #include "moho/ui/SDebugLine.h"
 #include "gpg/core/reflection/Reflection.h"
 
-
-namespace
-{
-  void DiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc(0x0A, sink);
-    (void)std::fclose(sink);
-  }
-} // namespace
 
 namespace moho
 {
@@ -520,43 +501,6 @@ namespace moho
     CAiReconDBImpl* const reconDb = focusArmy->GetReconDB();
     const bool startVisible = reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_LOSNow)) != RECON_None;
     mVisible = startVisible || reconDb->BeamIsVisible(mBeam);
-
-    static int sBeamVisProbe = 0;
-    if (dbg_EfxBeams && !mVisible && (sBeamVisProbe++ % 60) == 0) {
-      // Probe every sense as well: RECON_AnySense == 0 at the same point means
-      // the focus army has no intel there at all (so a culled beam is correct
-      // behaviour and the base only looks lit because terrain stays explored
-      // and blip meshes persist). A non-zero any-sense with LOSNow clear is a
-      // radar/omni-only contact, which also correctly hides the beam.
-      const int anySense =
-        static_cast<int>(reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_AnySense)));
-      // The live run showed most culled beams carry a NaN or wild start
-      // (`start=(-nan,-nan,-nan)`, `start=(157519216.0,...)`), which is not a
-      // vision result at all -- so report where that transform came from:
-      // the source entity's own committed position, its pending position, and
-      // whether it is already dead or queued for destruction. A dead source
-      // with a garbage transform means the weak attachment outlived its owner;
-      // a live source whose committed position is garbage while the pending one
-      // is sane means the beam is reading the transform before AdvanceCoords
-      // commits it.
-      const Entity* const probeSource = ResolveAttachEntity(mEntityInfo);
-      DiagLine(
-        "[EFXDIAG] Beam culled: focusArmy=%d start=(%.1f,%.1f,%.1f) startVis=%d anySense=0x%02X "
-        "src=%p bone=%d dead=%d destroyQ=%d pos=(%.1f,%.1f,%.1f) pending=(%.1f,%.1f,%.1f) fromStart=%d",
-        static_cast<int>(focusArmy->mConstDat.mArmyIndex), mBeam.mCurStart.pos_.x, mBeam.mCurStart.pos_.y,
-        mBeam.mCurStart.pos_.z, startVisible ? 1 : 0, anySense,
-        static_cast<const void*>(probeSource), mEntityInfo.mParentBoneIndex,
-        (probeSource != nullptr) ? static_cast<int>(probeSource->mVarDat.mIsDead) : -1,
-        (probeSource != nullptr) ? static_cast<int>(probeSource->DestroyQueuedFlag) : -1,
-        (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.x : 0.0f,
-        (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.y : 0.0f,
-        (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.z : 0.0f,
-        (probeSource != nullptr) ? probeSource->mPendingTransform.pos_.x : 0.0f,
-        (probeSource != nullptr) ? probeSource->mPendingTransform.pos_.y : 0.0f,
-        (probeSource != nullptr) ? probeSource->mPendingTransform.pos_.z : 0.0f,
-        mBeam.mFromStart ? 1 : 0
-      );
-    }
 
     return mVisible;
   }

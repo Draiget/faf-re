@@ -2,7 +2,6 @@
 
 #include <cstring>
 #include <cstdlib>
-#include <cstdio>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -442,35 +441,6 @@ namespace
     const float time = static_cast<float>(tick) + frameDelta;
     if (moho::shaderVarParticleTime.Exists()) {
       moho::shaderVarParticleTime.mEffectVariable->SetFloat(time);
-    }
-
-    // TEMPORARY PROBE -- particle draw-time constant triage: everything the
-    // sim produces is verified correct (FXTRAIL/FXATTACH/FXPOST), so an
-    // on-screen offset must come from these binds. The trail shader slides
-    // ribbon vertices by (time - age); a frozen time freezes the ribbon end at
-    // its beat position while the mesh interpolates ahead -- lag proportional
-    // to speed, aligning at rest. Strided samples show whether time advances.
-    // Delete when resolved.
-    {
-      static int sProbeBindSeen = 0;
-      ++sProbeBindSeen;
-      if ((sProbeBindSeen % 1000) == 0) {
-        std::FILE* const sink = std::fopen("faf_diag.log", "a");
-        if (sink != nullptr) {
-          std::fprintf(
-            sink,
-            "[FXBIND] tick=%d alpha=%.3f time=%.3f view=%d proj=%d vp=%d invView=%d\n",
-            tick,
-            frameDelta,
-            time,
-            moho::shaderVarParticleViewMatrix.Exists() ? 1 : 0,
-            moho::shaderVarParticleProjection.Exists() ? 1 : 0,
-            moho::shaderVarParticleWorldToProjection.Exists() ? 1 : 0,
-            moho::shaderVarParticleInverseViewMatrix.Exists() ? 1 : 0
-          );
-          std::fclose(sink);
-        }
-      }
     }
   }
 

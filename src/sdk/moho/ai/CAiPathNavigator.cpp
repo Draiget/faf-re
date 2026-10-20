@@ -1483,8 +1483,10 @@ void CAiPathNavigator::SetTargetPoint(const std::int32_t targetIndex)
     );
     mSim->Logf("  mPath.size()=%d\n", mPath.CountInt());
     mSim->mContext.Update(&mTargetPos, sizeof(mTargetPos));
-    const gpg::MD5Digest digest = mSim->mContext.Digest();
-    mSim->Logf("checksum=%s\n", digest.ToString().c_str());
+    if (mSim->mLog) {
+      const gpg::MD5Digest digest = mSim->mContext.Digest();
+      mSim->Logf("checksum=%s\n", digest.ToString().c_str());
+    }
   }
 }
 

@@ -6,7 +6,6 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "gpg/core/utils/Logging.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -123,12 +122,6 @@ int CWaitForTask::Execute()
     mEventLinkRef.ResetFromObject(linkage);
     if (mEventLinkRef.HasValue()) {
       return 0;
-    }
-  } else {
-    static int n = 0;
-    if (n < 20) {
-      ++n;
-      gpg::Warnf("[WAITTASK] no event resolved from lua object");
     }
   }
 

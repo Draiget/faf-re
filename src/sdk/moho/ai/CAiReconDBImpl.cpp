@@ -627,24 +627,16 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
-
-  std::size_t gTotal = 0, gUnit = 0, gBp = 0, gNotOwn = 0, gCat = 0, gDetect = 0;
-  static unsigned sEverDetect = 0, sEverPending = 0, sEverCreated = 0, sTicks = 0;
-  ++sTicks;
-
   msvc8::vector<SNewBlip> pendingNewBlips{};
   if (mSim->mEntityDB) {
     for (const auto& [entityId, entity] : mSim->mEntityDB->mAllUnits) {
-      ++gTotal;
       Unit* const unit = entity ? entity->IsUnit() : nullptr;
       if (!unit || unit->DestroyQueued()) {
         continue;
       }
-      ++gUnit;
       if (!unit->BluePrint) {
         continue;
       }
-      ++gBp;
       // 0x005C107B `cmp eax,[esi+30h]` / `je` -- a POINTER-identity test against
       // this recon DB's own army, not an alliance test. Allied units do get
       // blips: that is how you see an ally's army at all, and `ReconCanDetect`
@@ -654,17 +646,11 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       if (unit->ArmyRef == mArmy) {
         continue;
       }
-      ++gNotOwn;
       if (!mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex)) {
         continue;
       }
-      ++gCat;
 
       const EReconFlags detectFlags = ReconCanDetectEntity(this, unit, unit->GetPositionWm3(), RECON_AnySense);
-      if (detectFlags != RECON_None) {
-        ++gDetect;
-        ++sEverDetect;
-      }
       auto [rangeBegin, rangeEnd] = FindReconBlipRange(this, unit);
       if (detectFlags != RECON_None) {
         if (rangeBegin == rangeEnd) {
@@ -691,10 +677,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
-  sEverPending += static_cast<unsigned>(pendingNewBlips.size());
   GenerateNewBlips(pendingNewBlips);
-  sEverCreated = static_cast<unsigned>(mBlipMap.size()) > sEverCreated
-    ? static_cast<unsigned>(mBlipMap.size()) : sEverCreated;
   RebuildBlipListFromMapAndOrphans(this);
 
   // 0x005C137F: the per-army readout the `recon_debug` convar selects.
@@ -711,24 +694,11 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   // and traces the running digest, before the intel grids advance.
   const std::uint32_t reconTickChecksumTag = 3u;
   mSim->mContext.Update(&reconTickChecksumTag, sizeof(reconTickChecksumTag));
-  mSim->Logf("      %s\n", mSim->mContext.Digest().ToString().c_str());
+  if (mSim->mLog) {
+    mSim->Logf("      %s\n", mSim->mContext.Digest().ToString().c_str());
+  }
 
   TickAllReconGrids(this, dTicks);
-
-  if ((mSim->mCurTick % 301u) == 0u) {
-    gpg::Warnf(
-      "[RECONFUNNEL] army=%d db=%p visionGrid=%p fog=%u ticks=%u unit=%u cat=%u detect=%u | EVER detect=%u pending=%u maxBlipMap=%u",
-      static_cast<int>(mArmy ? mArmy->mConstDat.mArmyIndex : -1),
-      static_cast<const void*>(this),
-      static_cast<const void*>(mVisionGrid.px),
-      static_cast<unsigned>(mFogOfWar),
-      sTicks,
-      static_cast<unsigned>(gUnit),
-      static_cast<unsigned>(gCat),
-      static_cast<unsigned>(gDetect),
-      sEverDetect, sEverPending, sEverCreated
-    );
-  }
 }
 
 /**
@@ -1518,50 +1488,19 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
     return GetReconFlags(nullptr, pos, oldFlags, belowWater);
   }
 
-  static unsigned sCalls = 0, sOutside = 0, sAllied = 0, sGridNone = 0, sGridHit = 0;
-  ++sCalls;
-
   if (mMapData && mArmy) {
-    const bool useWholeMap = mArmy->UseWholeMap();
     // 0x005C1916: `STIMap::IsWithin(pos, 0.0f, UseWholeMap())` (0x0062CA60).
-    if (!mMapData->IsWithin(pos, 0.0f, useWholeMap)) {
-      ++sOutside;
-      if ((sCalls % 4000u) == 0u) {
-        gpg::Warnf(
-          "[RECONDETECT] calls=%u outsideRect=%u allied=%u gridNone=%u gridHit=%u "
-          "pos=(%.1f,%.1f,%.1f) rect=(%d,%d,%d,%d) wholeMap=%d",
-          sCalls, sOutside, sAllied, sGridNone, sGridHit, pos.x, pos.y, pos.z,
-          mMapData->mPlayableRect.x0, mMapData->mPlayableRect.z0,
-          mMapData->mPlayableRect.x1, mMapData->mPlayableRect.z1,
-          useWholeMap ? 1 : 0
-        );
-      }
+    if (!mMapData->IsWithin(pos, 0.0f, mArmy->UseWholeMap())) {
       return RECON_None;
     }
   }
 
   if (IsAlliedOrSameArmy(mArmy, ent->ArmyRef)) {
-    ++sAllied;
     return oldFlags;
   }
 
   const bool belowWater = ent->mVarDat.mLayerMask == LAYER_Seabed || ent->mVarDat.mLayerMask == LAYER_Sub;
-  const EReconFlags resolved = GetReconFlags(ent, pos, oldFlags, belowWater);
-  if (resolved == RECON_None) {
-    ++sGridNone;
-  } else {
-    ++sGridHit;
-  }
-  if ((sCalls % 4000u) == 0u) {
-    gpg::Warnf(
-      "[RECONDETECT] calls=%u outsideRect=%u allied=%u gridNone=%u gridHit=%u "
-      "pos=(%.1f,%.1f,%.1f) rect=(%d,%d,%d,%d)",
-      sCalls, sOutside, sAllied, sGridNone, sGridHit, pos.x, pos.y, pos.z,
-      mMapData ? mMapData->mPlayableRect.x0 : -1, mMapData ? mMapData->mPlayableRect.z0 : -1,
-      mMapData ? mMapData->mPlayableRect.x1 : -1, mMapData ? mMapData->mPlayableRect.z1 : -1
-    );
-  }
-  return resolved;
+  return GetReconFlags(ent, pos, oldFlags, belowWater);
 }
 
 /**

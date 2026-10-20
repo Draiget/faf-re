@@ -970,9 +970,6 @@ namespace
     if (const moho::EntityCategorySet* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
         allUnits != nullptr) {
       army.mVarDat.mCategoryFilterSet = *allUnits;
-
-    } else {
-      gpg::Logf("[ALLUNITS] GetEntityCategory(\"ALLUNITS\") returned null");
     }
   }
 

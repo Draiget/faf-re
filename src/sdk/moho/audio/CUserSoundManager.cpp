@@ -9,9 +9,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include <cstdio>
-
-#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
@@ -39,8 +36,6 @@ namespace moho
   void SND_StopEntityLoop(SoundHandleRecord* record);
   void SND_DestroyEntityLoop(SoundHandleRecord* record);
   const char* func_SoundErrorCodeToMsg(int errorCode);
-
-  bool SndDiagIsRegisteredParams(const void* candidate);
 } // namespace moho
 
 namespace
@@ -380,95 +375,6 @@ namespace
       return ReadSndVarState(value) != 0xFFFFu;
     }
     return value.DoResolve();
-  }
-
-  const char* SndDiagRegionState(const void* const address)
-  {
-    if (address == nullptr) {
-      return "null";
-    }
-
-    MEMORY_BASIC_INFORMATION region{};
-    if (::VirtualQuery(address, &region, sizeof(region)) != sizeof(region)) {
-      return "unqueryable";
-    }
-    switch (region.State) {
-      case MEM_COMMIT:
-        return (region.Protect == 0u || (region.Protect & PAGE_NOACCESS) != 0u) ? "commit-noaccess" : "commit";
-      case MEM_RESERVE:
-        return "reserve";
-      case MEM_FREE:
-        return "free";
-      default:
-        return "unknown";
-    }
-  }
-
-  bool SndDiagParamsLooksLive(
-    const char* const arm, const moho::UserEntity* const entity, const moho::CSndParams* const params
-  )
-  {
-    if (params == nullptr) {
-      return false;
-    }
-
-    const char* const paramsRegion = SndDiagRegionState(params);
-    const bool registered = moho::SndDiagIsRegisteredParams(params);
-    if (!registered || std::strcmp(paramsRegion, "commit") != 0) {
-      char verdict[512] = {};
-      std::snprintf(
-        verdict,
-        sizeof(verdict),
-        "[SNDDIAG] WILD PARAMS POINTER arm=%s entity=%p entityRegion=%.16s params=%p paramsRegion=%.16s "
-        "registered=%d -- the descriptor was never a live CSndParams, so the defect is upstream: the entity "
-        "or its HSndEntityLoop is dangling.",
-        arm,
-        static_cast<const void*>(entity),
-        SndDiagRegionState(entity),
-        static_cast<const void*>(params),
-        paramsRegion,
-        registered ? 1 : 0
-      );
-      gpg::HandleAssertFailure(verdict, __LINE__, __FILE__);
-      return false;
-    }
-
-    // Diagnostic snapshot of Boost's pointer/control pair, without touching
-    // a potentially damaged control block or changing its reference counts.
-    boost::SharedPtrLayout<moho::AudioEngine> engineLane{};
-    static_assert(sizeof(engineLane) == sizeof(params->mEngine), "Audio weak pointer snapshot size mismatch");
-    std::memcpy(&engineLane, &params->mEngine, sizeof(engineLane));
-
-    const std::uint32_t policy = params->mResolvePolicy;
-    const auto* const control = engineLane.pi;
-    const char* const controlRegion = SndDiagRegionState(control);
-    const bool controlUsable = control == nullptr || std::strcmp(controlRegion, "commit") == 0;
-    if (policy <= 4u && controlUsable) {
-      return true;
-    }
-
-    char verdict[512] = {};
-    std::snprintf(
-      verdict,
-      sizeof(verdict),
-      "[SNDDIAG] %s arm=%s entity=%p entityId=%d params=%p bank=%u cue=%u policy=%u px=%p pi=%p "
-      "piRegion=%.16s -- descriptor is registered and mapped, so %s",
-      controlUsable ? "TAIL OVERWRITTEN" : "ENGINE CONTROL BLOCK FREED",
-      arm,
-      static_cast<const void*>(entity),
-      entity != nullptr ? static_cast<int>(entity->mParams.mEntityId) : -1,
-      static_cast<const void*>(params),
-      static_cast<unsigned>(params->mBankId),
-      static_cast<unsigned>(params->mCueId),
-      policy,
-      static_cast<void*>(engineLane.px),
-      static_cast<const void*>(control),
-      controlRegion,
-      controlUsable ? "a stray write hit params+0x40/+0x4C in place."
-                    : "the AudioEngine control block was released while this weak_ptr still referenced it."
-    );
-    gpg::HandleAssertFailure(verdict, __LINE__, __FILE__);
-    return false;
   }
 
   bool ParamsHasResolvedEngine(const moho::CSndParams& params)
@@ -968,12 +874,8 @@ namespace moho
    * entities through `EraseEntityLoopTreeNode` (and release the whole set once
    * the last one goes), ambient loops stop or destroy outright.
    */
-  void SndDiagScanParamsRegistry();
-
   void CUserSoundManager::UpdateSoundRequests(const gpg::fastvector<SAudioRequest>& requests)
   {
-    SndDiagScanParamsRegistry();
-
     EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
     EnsureSoundCounterStat(gEngineStatSoundStartEntityLoop, "Sound_StartEntityLoop");
     EnsureSoundCounterStat(gEngineStatSoundStopEntityLoop, "Sound_StopEntityLoop");
@@ -1225,8 +1127,7 @@ namespace moho
       // Ambient loop: the entity's own inline HSndEntityLoop, started once and
       // then held down by its mLoopIndex leaving -1 (0x008ACA2F..0x008ACAE4).
       CSndParams* const ambientParams = entity->mAmbientLoop.mParams;
-      if (ambientParams != nullptr && SndDiagParamsLooksLive("ambient", entity, ambientParams)
-          && ParamsHasResolvedEngine(*ambientParams)
+      if (ambientParams != nullptr && ParamsHasResolvedEngine(*ambientParams)
           && entity->mAmbientLoop.mLoopIndex == -1) {
         if (FilterSound(ambientParams, layer, &position) == EFilterType::Pass) {
           const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);
@@ -1239,8 +1140,7 @@ namespace moho
       // call at 0x008ACBA6 and cleared by the cull pass above.
       HSndEntityLoop* const rumbleLoop = entity->mRumbleLoopHandle;
       CSndParams* const rumbleParams = rumbleLoop != nullptr ? rumbleLoop->mParams : nullptr;
-      if (rumbleParams != nullptr && SndDiagParamsLooksLive("rumble", entity, rumbleParams)
-          && ParamsHasResolvedEngine(*rumbleParams)
+      if (rumbleParams != nullptr && ParamsHasResolvedEngine(*rumbleParams)
           && entity->mHasInitialUpdate == 0u) {
         if (FilterSound(rumbleParams, layer, &position) == EFilterType::Pass) {
           const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);

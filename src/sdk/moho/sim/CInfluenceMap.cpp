@@ -2214,7 +2214,7 @@ namespace moho
       }
     }
 
-    if (sim) {
+    if (sim && sim->mLog) {
       const gpg::MD5Digest digest = sim->mContext.Digest();
       const msvc8::string checksum = digest.ToString();
       sim->Logf("after GetThreatsAroundPosition checksum=%s\n", checksum.c_str());
@@ -2367,7 +2367,7 @@ namespace moho
       }
     }
 
-    if (sim) {
+    if (sim && sim->mLog) {
       const gpg::MD5Digest digest = sim->mContext.Digest();
       const msvc8::string checksum = digest.ToString();
       sim->Logf("after inf checksum=%s\n", checksum.c_str());

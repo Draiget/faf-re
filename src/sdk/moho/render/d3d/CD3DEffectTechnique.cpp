@@ -82,45 +82,6 @@ namespace moho
       return gpg::gal::SupportsVertexTextureFormat(gpg::gal::kTextureFormatFloat4);
     }
 
-    // TEMPORARY PROBE -- why the FAF bone-texture variant does/doesn't engage
-    // for one effect source. `reason` is null when every gate passes. Delete
-    // when resolved.
-    [[nodiscard]] bool WantsBoneTextureVariantProbe(
-      const gpg::gal::DeviceContext* const deviceContext, const gpg::MemBuffer<const char>& source
-    )
-    {
-      constexpr std::string_view kMacroName = "FAF_BONE_TEXTURE";
-
-      const char* reason = nullptr;
-      if (deviceContext == nullptr) {
-        reason = "null device";
-      } else if (deviceContext->mDeviceType == gpg::gal::DeviceApi::Direct3D10) {
-        reason = "D3D10";
-      } else {
-        const char* const text = source.GetPtr(0U, 0U);
-        if (text == nullptr || std::string_view(text, source.Size()).find(kMacroName) == std::string_view::npos) {
-          reason = "macro not in source";
-        } else if (CFG_GetArgOption("/nobonetexture", 0U, nullptr)) {
-          reason = "/nobonetexture";
-        } else if (!gpg::gal::SupportsVertexTextureFormat(gpg::gal::kTextureFormatFloat4)) {
-          reason = "no vtf support";
-        }
-      }
-
-      static int sProbeCount = 0;
-      if (sProbeCount < 8) {
-        ++sProbeCount;
-        const char* const text = source.GetPtr(0U, 0U);
-        gpg::Warnf(
-          "[BONETEX] want n=%d size=%u reason=%s",
-          sProbeCount,
-          static_cast<unsigned>(source.Size()),
-          reason ? reason : "engaged"
-        );
-      }
-      return reason == nullptr;
-    }
-
     /**
      * A lane counts as defined once it has been given a non-empty name.
      *
@@ -533,7 +494,7 @@ namespace moho
 
       // A bone texture variant that fails to build falls back to the plain
       // effect, which keeps the skinning palette in shader constants.
-      if (WantsBoneTextureVariantProbe(deviceContext, effectSourceBuffer)) {
+      if (WantsBoneTextureVariant(deviceContext, effectSourceBuffer)) {
         try {
           createEffect(true);
         } catch (const std::exception& exception) {

@@ -8,7 +8,6 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/script/CScriptEvent.h"
-#include "gpg/core/utils/Logging.h"
 #include "moho/sim/CDamage.h"
 
 namespace
@@ -165,7 +164,6 @@ namespace moho
     if (!state || !state->m_state) {
       return 0;
     }
-    { static int p=0; if (p++<15) gpg::Warnf("[LUADMG] Damage() args=%d", lua_gettop(state->m_state)); }
 
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount != 5) {
@@ -272,7 +270,6 @@ namespace moho
     if (!state || !state->m_state) {
       return 0;
     }
-    { static int p=0; if (p++<15) gpg::Warnf("[LUADMG] DamageArea() args=%d", lua_gettop(state->m_state)); }
 
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 6 || argumentCount > 7) {

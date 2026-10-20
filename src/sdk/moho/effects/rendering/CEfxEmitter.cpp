@@ -4,8 +4,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
-#include <cstdarg>
 #include <limits>
 #include <typeinfo>
 
@@ -50,23 +48,6 @@ namespace
 {
   // Engine-stat handle for "Render_ActiveEmitters", resolved once on first tick.
   moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
-
-  // TEMPORARY PROBE SINK -- attached-emitter triage, delete when resolved.
-  // gpg::Warnf only reaches an active /log target, so the probes below append
-  // here instead. The file lands beside the executable.
-  void FxAttachDiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc(0x0A, sink);
-    (void)std::fclose(sink);
-  }
 
   /**
    * Reproduces the binary's ceil-of-peak idiom (frndint + underflow correction):
@@ -388,37 +369,6 @@ namespace moho
   {
     Entity* const attachedEntity = effect->mEntityInfo.GetAttachTargetEntity();
 
-    // TEMPORARY PROBE -- attached-emitter triage ("engine flames point up /
-    // trail the transport"). The earlier probe sat below the null early-return
-    // and a full session logged nothing, so this one runs first and reports
-    // the raw link state whether or not the attach resolves. Only counts while
-    // the attached entity is MOVING (pending != cur) so the flight case owns
-    // the sample budget instead of at-rest creation calls. Delete when
-    // resolved.
-    {
-      static int sProbeTop = 0;
-      static int sProbeTopSeen = 0;
-      const bool moving =
-        attachedEntity != nullptr &&
-        (std::fabs(attachedEntity->mPendingTransform.pos_.x - attachedEntity->mVarDat.mCurTransform.pos_.x) > 0.01f ||
-         std::fabs(attachedEntity->mPendingTransform.pos_.y - attachedEntity->mVarDat.mCurTransform.pos_.y) > 0.01f ||
-         std::fabs(attachedEntity->mPendingTransform.pos_.z - attachedEntity->mVarDat.mCurTransform.pos_.z) > 0.01f);
-      ++sProbeTopSeen;
-      if (sProbeTop < 30 && (sProbeTopSeen % 200) == 0 && effect->mEntityInfo.mParentBoneIndex >= 0 && moving) {
-        ++sProbeTop;
-        FxAttachDiagLine(
-          "[FXATTACH] top n=%d eff=%p ent=%p has=%d bone=%d newAtt=%d tick=%d",
-          sProbeTop,
-          static_cast<const void*>(effect),
-          static_cast<void*>(attachedEntity),
-          effect->mEntityInfo.HasAttachTarget() ? 1 : 0,
-          effect->mEntityInfo.mParentBoneIndex,
-          effect->mNewAttachment,
-          tick
-        );
-      }
-    }
-
     if (attachedEntity == nullptr) {
       *outMatrix = effect->mMatrix;
       return true;
@@ -469,44 +419,6 @@ namespace moho
       VMatrix4 composed{};
       (void)gpg::gal::Math::mul(&composed, &boneLocalMatrix, outMatrix);
       *outMatrix = composed;
-    }
-
-    // TEMPORARY PROBE -- the composed matrix the engine actually hands the
-    // particle lane: entity frame + bone local. axis2 = emitter forward row
-    // ("pointing up" shows as ~(0,1,0)). Delete when resolved.
-    {
-      static int sProbeOut = 0;
-      static int sProbeOutSeen = 0;
-      const bool outMoving =
-        std::fabs(attachedEntity->mPendingTransform.pos_.x - attachedEntity->mVarDat.mCurTransform.pos_.x) > 0.01f ||
-        std::fabs(attachedEntity->mPendingTransform.pos_.y - attachedEntity->mVarDat.mCurTransform.pos_.y) > 0.01f ||
-        std::fabs(attachedEntity->mPendingTransform.pos_.z - attachedEntity->mVarDat.mCurTransform.pos_.z) > 0.01f;
-      ++sProbeOutSeen;
-      if (sProbeOut < 30 && (sProbeOutSeen % 200) == 0 && effect->mEntityInfo.mParentBoneIndex >= 0 && outMoving) {
-        ++sProbeOut;
-        FxAttachDiagLine(
-          "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
-          "cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) curQ=(%.2f,%.2f,%.2f,%.2f) velScale=%.3f lv=%.0f ab=%.0f flat=%.0f",
-          sProbeOut,
-          static_cast<void*>(attachedEntity),
-          effect->mEntityInfo.mParentBoneIndex,
-          outMatrix->r[2].x, outMatrix->r[2].y, outMatrix->r[2].z,
-          outMatrix->r[1].x, outMatrix->r[1].y, outMatrix->r[1].z,
-          outMatrix->r[3].x, outMatrix->r[3].y, outMatrix->r[3].z,
-          attachedEntity->mVarDat.mCurTransform.pos_.x, attachedEntity->mVarDat.mCurTransform.pos_.y,
-          attachedEntity->mVarDat.mCurTransform.pos_.z,
-          attachedEntity->mPendingTransform.pos_.x, attachedEntity->mPendingTransform.pos_.y,
-          attachedEntity->mPendingTransform.pos_.z,
-          attachedEntity->mVarDat.mCurTransform.orient_.w,
-          attachedEntity->mVarDat.mCurTransform.orient_.x,
-          attachedEntity->mVarDat.mCurTransform.orient_.y,
-          attachedEntity->mVarDat.mCurTransform.orient_.z,
-          attachedEntity->mPendingVelocityScale,
-          effect->mParams.start_[EFFECT_USE_LOCAL_VELOCITY],
-          effect->mParams.start_[EFFECT_ALIGN_TO_BONE],
-          effect->mParams.start_[EFFECT_FLAT]
-        );
-      }
     }
 
     return true;
@@ -1136,31 +1048,6 @@ namespace moho
         particle.mDir.x *= velocity;
         particle.mDir.y *= velocity;
         particle.mDir.z *= velocity;
-
-        // TEMPORARY PROBE -- exhaust direction triage: the final velocity
-        // vector handed to the particle, with the attach rows it was (or was
-        // not) rotated through. Only counts when local velocity is enabled,
-        // which is the exhaust blueprint's configuration. Delete when
-        // resolved.
-        if (mParams.start_[EFFECT_USE_LOCAL_VELOCITY] > 0.0f) {
-          static int sProbeDir = 0;
-          static int sProbeDirSeen = 0;
-          ++sProbeDirSeen;
-          if (sProbeDir < 30 && (sProbeDirSeen % 400) == 0) {
-            ++sProbeDir;
-            FxAttachDiagLine(
-              "[FXDIR] n=%d dir=(%.2f,%.2f,%.2f) axis0=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) "
-              "axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) tick=%d",
-              sProbeDir,
-              particle.mDir.x, particle.mDir.y, particle.mDir.z,
-              attachMatrix.r[0].x, attachMatrix.r[0].y, attachMatrix.r[0].z,
-              attachMatrix.r[1].x, attachMatrix.r[1].y, attachMatrix.r[1].z,
-              attachMatrix.r[2].x, attachMatrix.r[2].y, attachMatrix.r[2].z,
-              particle.mPos.x, particle.mPos.y, particle.mPos.z,
-              tick
-            );
-          }
-        }
 
         particle.mResistance = mCurves[EMITTER_RESISTANCE_CURVE].GetValue(curvePhase);
         particle.mInterop = emissionCursor - tickFloat;

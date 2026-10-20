@@ -3,9 +3,7 @@
 
 #include <algorithm>
 #include <bit>
-#include <cstdarg>
 #include <cstddef>
-#include <cstdio>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -57,7 +55,6 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CFireWeaponTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "moho/sim/SimStartupRegistrations.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 
@@ -364,25 +361,6 @@ namespace
   constexpr float kBombDropHeadingDotThreshold = 0.866f;
   constexpr std::uint32_t kBombDropInnerCircleDepth = 0xFFFF7F3Fu;
   constexpr std::uint32_t kBombDropOuterCircleDepth = 0xFF7F3F00u;
-
-  void BombDiagLine(const char* const fmt, ...)
-  {
-    static moho::DiagnosticBudget sCount;
-    if (!sCount.Take(400)) {
-      return;
-    }
-
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc(0x0A, sink);
-    (void)std::fclose(sink);
-  }
 
   [[nodiscard]] bool ShouldRenderBombDropZone(moho::Sim* const sim)
   {
@@ -3891,18 +3869,20 @@ namespace moho
   {
     const Entity* const targetEntity = mTarget.targetEntity.GetObjectPtr();
 
-    const char* targetEntityText = "NULL";
-    msvc8::string targetEntityIdText{};
-    if (targetEntity != nullptr) {
-      targetEntityIdText = gpg::STR_Printf("0x%08x", static_cast<std::uint32_t>(targetEntity->id_));
-      targetEntityText = targetEntityIdText.c_str();
-    }
+    if (mSim->mLog) {
+      const char* targetEntityText = "NULL";
+      msvc8::string targetEntityIdText{};
+      if (targetEntity != nullptr) {
+        targetEntityIdText = gpg::STR_Printf("0x%08x", static_cast<std::uint32_t>(targetEntity->id_));
+        targetEntityText = targetEntityIdText.c_str();
+      }
 
-    mSim->Logf(
-      "UnitWeapon::PickNewTargetAimSpot() for 0x%08x, mTarget.mEntity=%s\n",
-      static_cast<std::uint32_t>(mUnit->id_),
-      targetEntityText
-    );
+      mSim->Logf(
+        "UnitWeapon::PickNewTargetAimSpot() for 0x%08x, mTarget.mEntity=%s\n",
+        static_cast<std::uint32_t>(mUnit->id_),
+        targetEntityText
+      );
+    }
 
     const std::int32_t ownerUnitId = mUnit->id_;
     mSim->mContext.Update(&ownerUnitId, 4u);

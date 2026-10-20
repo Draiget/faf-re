@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -451,47 +450,6 @@ namespace moho
       instance->resistance = particle.mResistance;
       instance->inverseResistance = 1.0f / particle.mResistance;
       instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
-    }
-
-    // TEMPORARY PROBE -- attached-emitter triage: the exact instances handed
-    // to the GPU. Gated to particles with a real velocity vector so idle
-    // at-rest smoke does not consume the budget; the in-flight exhaust dir is
-    // the value that decides whether the sim rotated the local velocity
-    // through the attach matrix. Delete when resolved.
-    {
-      static int sProbeUpload = 0;
-      static int sProbeUploadSeen = 0;
-      if (sProbeUpload < 30) {
-        ++sProbeUploadSeen;
-        for (std::size_t probeIdx = 0U; probeIdx < maxUploadCount; ++probeIdx) {
-          const SWorldParticle& candidate = pendingParticles[probeIdx];
-          const float dirLenSq =
-            (candidate.mDir.x * candidate.mDir.x) + (candidate.mDir.y * candidate.mDir.y) +
-            (candidate.mDir.z * candidate.mDir.z);
-          if (dirLenSq <= 0.001f) {
-            continue;
-          }
-          if ((sProbeUploadSeen % 100) != 0) {
-            break;
-          }
-          std::FILE* const sink = std::fopen("faf_diag.log", "a");
-          if (sink != nullptr) {
-            ++sProbeUpload;
-            std::fprintf(
-              sink,
-              "[FXATTACH] upload n=%d tag=%s pos=(%.1f,%.1f,%.1f) dir=(%.2f,%.2f,%.2f) "
-              "interop=%.3f life=%.1f frameDelta=%.3f\n",
-              sProbeUpload,
-              candidate.mTypeTag.c_str(),
-              candidate.mPos.x, candidate.mPos.y, candidate.mPos.z,
-              candidate.mDir.x, candidate.mDir.y, candidate.mDir.z,
-              candidate.mInterop, candidate.mLifetime, frameDelta
-            );
-            std::fclose(sink);
-          }
-          break;
-        }
-      }
     }
 
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);

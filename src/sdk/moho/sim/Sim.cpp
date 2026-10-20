@@ -1,6 +1,5 @@
 #include "Sim.h"
 #include "legacy/math/X87Math.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "SimDriver.h"
@@ -121,7 +120,6 @@
 #include "moho/resource/blueprints/RTrailBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/projectile/Projectile.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -8768,18 +8766,6 @@ void Sim::LuaSimCallback(
     doCallback(callbackName, args, selectedUnits);
     lua_settop(state, oldTop);
   } catch (const lua_RuntimeError& error) {
-    // TEMPORARY PROBE -- lua_RuntimeError storm triage; mirrors the /log-only
-    // warning into faf_diag.log (bounded) so repro sessions without /log keep
-    // the callback name and message.
-    {
-      static DiagnosticBudget sSimCallbackErrorBudget;
-      if (sSimCallbackErrorBudget.Take(200)) {
-        if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-          std::fprintf(sink, "[LUADIAG] sim callback '%s': %s\n", callbackName, error.what());
-          std::fclose(sink);
-        }
-      }
-    }
     gpg::Warnf("Error running sim lua callback function '%s':\n%s", callbackName, error.what());
   }
 }
@@ -10205,21 +10191,7 @@ int Sim::SimLua(
   }
 
   sim->Printf("%s", commandText.c_str());
-
-  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
-  {
-    if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-      std::fprintf(sink, "[BEATPIPE] simLua running len=%u head=%.60s\n", static_cast<unsigned>(commandText.size()), commandText.c_str());
-      std::fclose(sink);
-    }
-  }
-  const int luaResult = SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
-  {
-    if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-      std::fprintf(sink, "[BEATPIPE] simLua result=%d\n", luaResult);
-      std::fclose(sink);
-    }
-  }
+  (void)SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
   clearSelectedUnitGlobal();
   return 0;
 }
@@ -10457,40 +10429,6 @@ void Sim::AdvanceBeat(const int amt)
     lua_sethook(mLuaState->m_state, GetDebugLuaHook(), 4, 0);
   }
 
-  // TEMPORARY PROBE -- delete once resolved. Reports whether the sim body
-  // below (which contains the recon drive) is entered at all, so a "recon never
-  // ticks" reading can be told apart from "the sim is simply paused".
-  {
-    static DiagnosticBudget sProbe;
-    if (sProbe.Take(6)) {
-      gpg::Warnf(
-        "[SIMGATE] tick=%u gameOver=%d pausedBy=%d singleStep=%d armies=%u",
-        mCurTick,
-        static_cast<int>(mGameOver),
-        static_cast<int>(mPausedByCommandSource),
-        static_cast<int>(mSingleStep),
-        static_cast<unsigned>(mArmiesList.size())
-      );
-    }
-  }
-  {
-    static int sProbeBeat = 0;
-    if ((++sProbeBeat % 200) == 0) {
-      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-        std::fprintf(
-          sink,
-          "[BEATPIPE] simAdvanceBeat n=%d beat=%u tick=%u paused=%d singleStep=%d\n",
-          sProbeBeat,
-          mCurBeat,
-          mCurTick,
-          static_cast<int>(mPausedByCommandSource),
-          static_cast<int>(mSingleStep)
-        );
-        std::fclose(sink);
-      }
-    }
-  }
-
   if (!mGameOver && (mPausedByCommandSource == -1 || mSingleStep)) {
     ++mCurTick;
     Logf("  tick number %u\n", mCurTick);
@@ -10524,32 +10462,6 @@ void Sim::AdvanceBeat(const int amt)
     TickTaskStage(&mDiskWatcherTaskStage);
     TickTaskStage(&mTaskStageA);
     RefreshBlips();
-
-    // TEMPORARY PROBE -- delete once resolved.
-    //
-    // ReconTick is measurably never reached (its own probe never fires while
-    // the sim is beating), so recon never runs: no blips, anySense=0x00 on
-    // every probe, and with it the fog, auto-attack, attack-ground and
-    // enemy-click symptoms. This reports which of the two guards below is
-    // dropping out -- an empty army list, or a null recon DB per army.
-    {
-      static DiagnosticBudget sProbe;
-      if (sProbe.Take(4)) {
-        std::size_t nullDb = 0;
-        for (std::size_t i = 0; i < mArmiesList.size(); ++i) {
-          CArmyImpl* const a = mArmiesList[i];
-          if (a == nullptr || a->GetReconDB() == nullptr) {
-            ++nullDb;
-          }
-        }
-        gpg::Warnf(
-          "[RECONDRIVE] tick=%u armies=%u nullReconDb=%u",
-          mCurTick,
-          static_cast<unsigned>(mArmiesList.size()),
-          static_cast<unsigned>(nullDb)
-        );
-      }
-    }
 
     if (!mArmiesList.empty()) {
       const std::size_t armyCount = mArmiesList.size();
@@ -22447,27 +22359,6 @@ int moho::cfunc_EntityEnableIntelL(LuaPlus::LuaState* const state)
   }
 
   if (CIntel* const intelManager = entity->mIntelManager; intelManager != nullptr) {
-    // TEMPORARY PROBE -- delete once resolved. CIntelGrid::AddCircle fires
-    // exactly once per game, so vision is never rastered and every recon probe
-    // reads an empty grid. This is the only runtime path that arms a handle, so
-    // it reports the intel type asked for, whether a handle exists for it, and
-    // whether the arm actually happened -- separating "Lua never asks" from
-    // "the handle was never allocated by InitIntel" (only 2 of 9 slots are
-    // non-null) from "it was already enabled".
-    {
-      static DiagnosticBudget sCalls;
-      CIntelPosHandle* const probeHandle = ResolveIntelPosHandleForType(*intelManager, intelType);
-      if (const unsigned call = static_cast<unsigned>(sCalls.Next()) + 1u; call <= 40u) {
-        gpg::Warnf(
-          "[ENABLEINTEL] call=%u type=%d handle=%p enabled=%u radius=%u grid=%p",
-          call, static_cast<int>(intelType), static_cast<void*>(probeHandle),
-          probeHandle ? static_cast<unsigned>(probeHandle->mEnabled) : 9u,
-          probeHandle ? static_cast<unsigned>(probeHandle->mRadius) : 0u,
-          probeHandle ? static_cast<void*>(probeHandle->mGrid.px) : nullptr
-        );
-      }
-    }
-
     if (CIntelPosHandle* const handle = ResolveIntelPosHandleForType(*intelManager, intelType); handle != nullptr) {
       if (handle->mEnabled == 0u) {
         handle->mEnabled = 1u;

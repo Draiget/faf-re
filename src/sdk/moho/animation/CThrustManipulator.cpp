@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <new>
@@ -214,39 +213,6 @@ namespace moho
    */
   bool CThrustManipulator::ManipulatorUpdate()
   {
-    // TEMPORARY PROBE -- thrust-nozzle triage: the flying transport's exhaust
-    // bones sit ~78 degrees up (the takeoff animation's end pose), which is
-    // exactly what they look like when this override never runs or bails at a
-    // guard. Logs entry and each early-exit, then the aim lanes. Delete when
-    // resolved.
-    {
-      static int sProbeThrust = 0;
-      static int sProbeThrustSeen = 0;
-      ++sProbeThrustSeen;
-      if (sProbeThrust < 40 && (sProbeThrustSeen % 50) == 0) {
-        ++sProbeThrust;
-        Unit* const probeUnit = mUnit.GetObjectPtr();
-        CAniPoseBone* const probeBone = ResolveWatchedThrustBone(this);
-        const char* const probeUnitName = (probeUnit != nullptr) ? "unit" : "null";
-        std::FILE* const sink = std::fopen("faf_diag.log", "a");
-        if (sink != nullptr) {
-          std::fprintf(
-            sink,
-            "[FXTHRUST] n=%d unit=%s built=%d bone=%d motion=%d force=(%.2f,%.2f,%.2f)\n",
-            sProbeThrust,
-            probeUnitName,
-            probeUnit != nullptr ? (probeUnit->IsBeingBuilt() ? 1 : 0) : -1,
-            probeBone != nullptr ? mThrustBoneIndex : -1,
-            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? 1 : 0,
-            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? probeUnit->UnitMotion->mForce.x : 0.0f,
-            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? probeUnit->UnitMotion->mForce.y : 0.0f,
-            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? probeUnit->UnitMotion->mForce.z : 0.0f
-          );
-          std::fclose(sink);
-        }
-      }
-    }
-
     // 0x0064A820..0x0064A829: the only early-out is `IsDead` (Unit vtable
     // +0x28, the same slot CAimManipulator's 0x00630E42 tests), not
     // `IsBeingBuilt` (+0x34).
@@ -305,38 +271,6 @@ namespace moho
     localDesired.z = capLane(localDesired.z, mCapMin.z, mCapMax.z);
     (void)Wm3::Vector3f::Normalize(&localDesired);
 
-    // TEMPORARY PROBE -- thrust-nozzle triage, stage 2: the aim lanes after
-    // the caps, the tilt target, the blended orientation, and the bone's
-    // current local orientation before Rotate. If the tilt target itself is
-    // the 78-degree-up pose the fault is the input (composite/force); if the
-    // target is sane but the bone local diverges, the accumulation diverges.
-    // Delete when resolved.
-    {
-      static int sProbeAim = 0;
-      static int sProbeAimSeen = 0;
-      ++sProbeAimSeen;
-      if (sProbeAim < 30 && (sProbeAimSeen % 20) == 0) {
-        ++sProbeAim;
-        std::FILE* const sink = std::fopen("faf_diag.log", "a");
-        if (sink != nullptr) {
-          std::fprintf(
-            sink,
-            "[FXAIM] n=%d local=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f) mOrient=(%.2f,%.2f,%.2f,%.2f) "
-            "boneLocal=(%.2f,%.2f,%.2f,%.2f)\n",
-            sProbeAim,
-            localDesired.x, localDesired.y, localDesired.z,
-            mRestDirection.x, mRestDirection.y, mRestDirection.z,
-            mOrientation.w, mOrientation.x, mOrientation.y, mOrientation.z,
-            watchedBone->mLocalTransform.orient_.w,
-            watchedBone->mLocalTransform.orient_.x,
-            watchedBone->mLocalTransform.orient_.y,
-            watchedBone->mLocalTransform.orient_.z
-          );
-          std::fclose(sink);
-        }
-      }
-    }
-
     Wm3::Quaternionf targetOrientation{};
     (void)BuildTiltShortestArcDelta(localDesired, &targetOrientation, mRestDirection);
 
@@ -350,42 +284,6 @@ namespace moho
 
     watchedBone->Rotate(blendedOrientation);
     mOrientation = blendedOrientation;
-
-    // TEMPORARY PROBE -- thrust-nozzle triage, stage 3: what the bone
-    // actually holds immediately after this tick's Rotate: the local
-    // orientation and the composite forward axis (row 2 of the expanded
-    // matrix). The exhaust FX attach to CHILD bones of this engine bone, so
-    // if the engine aims down here while the exhaust renders up, the fault is
-    // in the child-composite path (GetBoneLocalTransform/InterpolatePosition
-    // compose), not the aim. Delete when resolved.
-    {
-      static int sProbePost = 0;
-      if (sProbePost < 20) {
-        ++sProbePost;
-        const VTransform& composite = watchedBone->GetCompositeTransform();
-        const float fwdY = (2.0f * ((composite.orient_.y * composite.orient_.z) -
-                                     (composite.orient_.w * composite.orient_.x)));
-        const float fwdZ = 1.0f - (2.0f * ((composite.orient_.x * composite.orient_.x) +
-                                           (composite.orient_.y * composite.orient_.y)));
-        const float fwdX = (2.0f * ((composite.orient_.x * composite.orient_.z) +
-                                     (composite.orient_.w * composite.orient_.y)));
-        std::FILE* const sink = std::fopen("faf_diag.log", "a");
-        if (sink != nullptr) {
-          std::fprintf(
-            sink,
-            "[FXPOST] n=%d localQ=(%.2f,%.2f,%.2f,%.2f) compQ=(%.2f,%.2f,%.2f,%.2f) fwd=(%.2f,%.2f,%.2f)\n",
-            sProbePost,
-            watchedBone->mLocalTransform.orient_.w,
-            watchedBone->mLocalTransform.orient_.x,
-            watchedBone->mLocalTransform.orient_.y,
-            watchedBone->mLocalTransform.orient_.z,
-            composite.orient_.w, composite.orient_.x, composite.orient_.y, composite.orient_.z,
-            fwdX, fwdY, fwdZ
-          );
-          std::fclose(sink);
-        }
-      }
-    }
     return true;
   }
 

@@ -22,13 +22,19 @@ namespace moho
       return mCount.fetch_add(1, std::memory_order_relaxed);
     }
 
-    /// True for the first `limit` calls.
+    /// True for the first `limit` calls. Once the budget is spent this is one relaxed load: no
+    /// further tickets are taken, so a hot-path probe stops paying for the atomic increment and the
+    /// counter can never wrap.
     [[nodiscard]] bool Take(const int limit) noexcept
     {
+      if (Count() >= limit) {
+        return false;
+      }
       return Next() < limit;
     }
 
-    /// Tickets taken so far.
+    /// Tickets taken so far (at most a few past the largest `limit` passed to `Take`, from racing
+    /// callers; `Next` callers take one ticket each).
     [[nodiscard]] int Count() const noexcept
     {
       return mCount.load(std::memory_order_relaxed);

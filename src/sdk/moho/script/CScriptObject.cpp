@@ -1,7 +1,6 @@
 #include "CScriptObject.h"
 
 #include <cstdint>
-#include <cstdio>
 #include <exception>
 #include <string>
 #include <typeinfo>
@@ -15,7 +14,6 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/unit/core/UnitWeapon.h"
@@ -798,23 +796,6 @@ void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, cons
   if (obj) {
     description = obj->GetErrorDescription();
     where = description.c_str();
-  }
-
-  // TEMPORARY PROBE -- lua_RuntimeError storm triage. Without a `/log` target
-  // this warning is formatted and dropped, so sessions that reproduce the
-  // storm ship no evidence at all. Mirror it into faf_diag.log (bounded) so
-  // the failing script name and message survive every session.
-  {
-    static DiagnosticBudget sScriptErrorBudget;
-    if (sScriptErrorBudget.Take(200)) {
-      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-        std::fprintf(
-          sink, "[LUADIAG] Error running %s script in %s: %s\n",
-          which ? which : "<unknown>", where, message ? message : ""
-        );
-        std::fclose(sink);
-      }
-    }
   }
 
   gpg::Warnf("Error running %s script in %s: %s", which ? which : "<unknown>", where, message ? message : "");

@@ -119,23 +119,6 @@
 
 namespace
 {
-  // TEMPORARY PROBE SINK -- unload-subset triage, delete when resolved.
-  // gpg::Warnf reaches nothing unless `/log <name>` installed a target, so the
-  // drag-unload probes append here instead. The file lands beside the exe.
-  void UnloadDragDiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc('\n', sink);
-    (void)std::fclose(sink);
-  }
-
   /**
    * One formation-placement ghost: the preview mesh `MeshRenderer` handed back
    * and the "UnitFormationPreview" material it was shaded with.
@@ -7451,7 +7434,6 @@ namespace moho
    */
   void CWldSession::AddToExtraSelectList(UserEntity* const entity)
   {
-    UnloadDragDiagLine("[XSEL] Add entity=%p sizeBefore=%u", static_cast<void*>(entity), static_cast<unsigned>(mExtraSelection.Size()));
     UICommandModeData commandModeData{};
     commandModeData.mMode = msvc8::string("order", 5u);
     commandModeData.mPayload.AssignNewTable(mState, 0, 0);
@@ -7459,7 +7441,6 @@ namespace moho
     UI_StartCommandMode(commandModeData);
 
     (void)mExtraSelection.Add(entity);
-    UnloadDragDiagLine("[XSEL] Add done sizeAfter=%u", static_cast<unsigned>(mExtraSelection.Size()));
   }
 
   /**
@@ -7471,8 +7452,6 @@ namespace moho
    */
   void CWldSession::RemoveFromExtraSelectList(UserEntity* const entity)
   {
-    UnloadDragDiagLine("[XSEL] Remove entity=%p size=%u", static_cast<void*>(entity), static_cast<unsigned>(mExtraSelection.Size()));
-
     // 0x00896844 `call sub_8676E0` -- the erase's result is pushed nowhere and
     // never tested. The emptiness re-check that follows is unconditional:
     //
@@ -7503,7 +7482,6 @@ namespace moho
    */
   void CWldSession::ClearExtraSelectList()
   {
-    UnloadDragDiagLine("[XSEL] Clear size=%u", static_cast<unsigned>(mExtraSelection.Size()));
     // 0x00896881-0x00896896: `Empty()`, which prunes, so a set holding only
     // dead entries counts as empty. Then the whole-tree erase (0x008968A1..)
     // and the end of command mode. The word after the set (+0xEC) is not
@@ -8201,60 +8179,6 @@ namespace moho
       OrphanEntity(LookupEntityId(erasedId));
     }
 
-    // TEMPORARY PROBE -- input-free attack-order harness, delete when resolved.
-    // The game window is not enumerable from the agent's session, so synthetic
-    // clicks never arrive; this issues the order the test needs from inside the
-    // sim instead, at fixed beats, so the attack path can be measured headlessly.
-    {
-      static int sHarnessBeat = 0;
-      ++sHarnessBeat;
-      if (sHarnessBeat == 150 && std::getenv("FAF_HARNESS") != nullptr) {
-        const STIMap* const playableMap =
-          (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr)
-            ? mWldMap->mTerrainRes->mMap
-            : nullptr;
-        gpg::Warnf("[HARNESS] rect=(%d,%d)-(%d,%d) map=%p",
-                   playableMap != nullptr ? playableMap->mPlayableRect.x0 : -1,
-                   playableMap != nullptr ? playableMap->mPlayableRect.z0 : -1,
-                   playableMap != nullptr ? playableMap->mPlayableRect.x1 : -1,
-                   playableMap != nullptr ? playableMap->mPlayableRect.z1 : -1,
-                   static_cast<const void*>(playableMap));
-
-        gpg::fastvector<UserEntity*> allEntities{};
-        auto* const spatialDb = GetEntitySpatialDbStorage();
-        (void)spatialDb->Collect(allEntities, ENTITYTYPE_Unit);
-
-        UserUnit* ownUnit = nullptr;
-        for (UserEntity* const entity : allEntities) {
-          if (entity == nullptr) {
-            continue;
-          }
-          if (UserUnit* const asUnit = entity->IsUserUnit(); asUnit != nullptr) {
-            ownUnit = asUnit;
-            break;
-          }
-        }
-
-        if (ownUnit != nullptr) {
-          const Wm3::Vec3f unitPos = reinterpret_cast<UserEntity*>(ownUnit)->mVariableData.mCurTransform.pos_;
-          SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Attack);
-          issueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
-          issueData.mTarget.mPos.x = unitPos.x + 12.0f;
-          issueData.mTarget.mPos.y = unitPos.y;
-          issueData.mTarget.mPos.z = unitPos.z;
-
-          gpg::fastvector<UserUnit*> orderUnits{};
-          orderUnits.push_back(ownUnit);
-          gpg::Warnf("[HARNESS] issuing attack-ground unit=%p from=(%.1f,%.1f,%.1f) to=(%.1f,%.1f,%.1f)",
-                     static_cast<void*>(ownUnit), unitPos.x, unitPos.y, unitPos.z,
-                     issueData.mTarget.mPos.x, issueData.mTarget.mPos.y, issueData.mTarget.mPos.z);
-          ISSUE_Command(orderUnits, issueData, true);
-        } else {
-          gpg::Warnf("[HARNESS] no own unit found among %u entities",
-                     static_cast<unsigned>(allEntities.size()));
-        }
-      }
-    }
     for (const SEntityPoseUpdateEntry& poseUpdate : beat.mPoseUpdates) {
       UserEntity* const entity = LookupEntityId(poseUpdate.mEntityId);
       if (entity == nullptr) {
@@ -8277,15 +8201,11 @@ namespace moho
       helper->mVariableDataDirty = 1u;
     }
 
-    { static int c = 0; if ((!beat.mPendingCommandEventRemovals.empty() || !beat.mPendingReleasedCommandIds.empty()) && c++ < 200) gpg::Warnf("[GHOST] DoBeat removals=%u released=%u mCommands=%u", static_cast<unsigned>(beat.mPendingCommandEventRemovals.size()), static_cast<unsigned>(beat.mPendingReleasedCommandIds.size()), static_cast<unsigned>(mCommandManager->mCommands.size())); } // TEMPORARY PROBE (do not commit)
     for (const CmdId removedCommandId : beat.mPendingCommandEventRemovals) {
-      { static int c = 0; if (c++ < 200) gpg::Warnf("[GHOST]   removal id=0x%08X helper=%p", static_cast<unsigned>(removedCommandId), static_cast<void*>(FindCommandIssueHelper(*mCommandManager, removedCommandId))); } // TEMPORARY PROBE (do not commit)
       delete FindCommandIssueHelper(*mCommandManager, removedCommandId);
     }
 
-    { static int c = 0; for (const CmdId rid : beat.mPendingReleasedCommandIds) { if (c++ < 200) gpg::Warnf("[GHOST]   release id=0x%08X helper=%p", static_cast<unsigned>(rid), static_cast<void*>(FindCommandIssueHelper(*mCommandManager, rid))); } } // TEMPORARY PROBE (do not commit)
     DeleteCommandIssueHelpers(*mCommandManager, beat.mPendingReleasedCommandIds);
-    { static int c = 0; if ((!beat.mPendingCommandEventRemovals.empty() || !beat.mPendingReleasedCommandIds.empty()) && c++ < 200) gpg::Warnf("[GHOST] DoBeat after mCommands=%u", static_cast<unsigned>(mCommandManager->mCommands.size())); } // TEMPORARY PROBE (do not commit)
 
     // The command graph only gets marked here (`DirtyCommandGraph`, inlined:
     // the `lock()` at 0x00894F02 and the byte store at 0x00894F17); the mesh
@@ -8394,21 +8314,6 @@ namespace moho
 
       for (std::int32_t i = 0; i < tickerCount; ++i) {
         UserEntity* const ticker = tickers[static_cast<std::size_t>(i)];
-        // TEMPORARY GUARD -- spatial-db triage, delete when resolved: a
-        // collected owner whose vtable is unreadable or whose Tick slot is
-        // null is reported and skipped rather than called.
-        {
-          const void* const* const vtable =
-            ticker != nullptr && ::IsBadReadPtr(ticker, sizeof(void*)) == FALSE
-              ? *reinterpret_cast<const void* const* const*>(ticker) : nullptr;
-          const bool ok = vtable != nullptr && ::IsBadReadPtr(vtable, sizeof(void*) * 4) == FALSE
-            && vtable[0] != nullptr && vtable[1] != nullptr;
-          if (!ok) {
-            gpg::Warnf("[TICKBAD] idx=%d/%d owner=%p vtable=%p", i, tickerCount, static_cast<void*>(ticker),
-                       static_cast<const void*>(vtable));
-            continue;
-          }
-        }
         ticker->Tick(beat.mCurBeat);
       }
     }
@@ -9539,11 +9444,6 @@ namespace moho
         const EUnitCommandType unloadCommand = onlyPods
           ? EUnitCommandType::UNITCOMMAND_Move
           : EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits;
-        // TEMPORARY PROBE -- unload-subset triage, delete when resolved.
-        UnloadDragDiagLine(
-          "[UNLOADDRAG] specific-branch: extraSelectionEmpty=0 onlyPods=%d cmd=%d pos=(%.1f,%.1f)",
-          onlyPods ? 1 : 0, static_cast<int>(unloadCommand), dragWorldPos.x, dragWorldPos.z
-        );
         IssueOrderAtGround(unloadTargets, unloadCommand, dragWorldPos, clearQueue);
       } else {
         WeakSet<UserEntity> airTransports;
@@ -9551,15 +9451,6 @@ namespace moho
         SplitSelectionForFerryCommand(selection, airTransports, landUnits);
 
         if (airTransports.Empty() || landUnits.Empty()) {
-          // TEMPORARY PROBE -- unload-subset triage, delete when resolved. This
-          // is the arm that unloads EVERYTHING; reaching it means the extra
-          // selection (the cargo the player picked) came back empty.
-          UnloadDragDiagLine(
-            "[UNLOADDRAG] unload-ALL branch: extraSelectionEmpty=1 airEmpty=%d landEmpty=%d pos=(%.1f,%.1f) "
-            "cloneSize=%u",
-            airTransports.Empty() ? 1 : 0, landUnits.Empty() ? 1 : 0,
-            dragWorldPos.x, dragWorldPos.z, static_cast<unsigned>(extraSelection.Size())
-          );
           IssueOrderAtGround(
             selection, EUnitCommandType::UNITCOMMAND_TransportUnloadUnits, dragWorldPos, clearQueue
           );
@@ -13090,16 +12981,11 @@ namespace moho
         wldUIProvider->StopLoadingDialog();
       }
 
-      // TEMPORARY PROBE (do not commit). `mOutstandingRequests` stays at 1
-      // forever, which means `clientManager->Cleanup()` below never runs and
-      // the session sits in Waiting. `CreateGameInterface` is the one call
-      // between here and there that can throw (it runs the UI's Lua
-      // `CreateGameInterface`), so bracket it and report which side we reach.
-      ::OutputDebugStringA("[INITDIAG] before CreateGameInterface\n");
       if (wldUIProvider != nullptr) {
-        // TEMPORARY PROBE (do not commit). Confirmed: this call never returns,
-        // so `clientManager->Cleanup()` below is skipped and the session is
-        // stuck in Waiting forever. Catch it just long enough to print what.
+        // Not in the binary: an exception out of the UI's Lua
+        // `CreateGameInterface` used to skip `clientManager->Cleanup()` below
+        // and leave the session stuck in Waiting forever, so it is reported
+        // and the session start carries on. Costs nothing unless it throws.
         try {
           wldUIProvider->CreateGameInterface(gPendingWldSessionInfo != nullptr && gPendingWldSessionInfo->mIsReplay);
         } catch (const std::exception& ex) {
@@ -13110,7 +12996,6 @@ namespace moho
           ::OutputDebugStringA("[INITDIAG] CreateGameInterface THREW non-std exception\n");
         }
       }
-      ::OutputDebugStringA("[INITDIAG] after CreateGameInterface\n");
 
       // The session info existed only to carry launch parameters into the
       // session; the session owns everything it needed by now.
@@ -13123,10 +13008,7 @@ namespace moho
       // `mEveryoneIsReady` - so without this the session sits in Waiting
       // forever showing "waiting for other players", local game or not.
       if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
-        ::OutputDebugStringA("[INITDIAG] declaring ready (Cleanup)\n");  // TEMPORARY PROBE
         clientManager->Cleanup();
-      } else {
-        ::OutputDebugStringA("[INITDIAG] NO client manager - ready never declared\n");  // TEMPORARY PROBE
       }
 
       if (outContinue != nullptr) {

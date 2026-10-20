@@ -2,8 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <cstring>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -869,123 +867,7 @@ namespace moho
    * What it does:
    * Releases one `CSndParams` descriptor's owned string and weak-engine lanes.
    */
-  bool SndDiagIsRegisteredParams(const void* candidate)
-  {
-    if (candidate == nullptr) {
-      return false;
-    }
-
-    std::lock_guard<std::recursive_mutex> lock(gSndParamsRegistryMutex);
-    for (auto entry = gSndParamsRegistry.begin(); entry != gSndParamsRegistry.end(); ++entry) {
-      if (static_cast<const void*>(*entry) == candidate) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void SndDiagScanParamsRegistry()
-  {
-    // The whole 0x50-byte object is snapshotted, not just the tail, so the
-    // report can say how WIDE the damage is. A stray write that clobbers one
-    // dword at +0x48 and a wild write that scribbles over the whole block look
-    // identical from the crash site but point at completely different causes.
-    struct Shadow
-    {
-      std::uint32_t policy;
-      std::uint32_t px;
-      std::uint32_t pi;
-      std::uint8_t image[sizeof(CSndParams)];
-      msvc8::string bank;
-    };
-
-    static std::map<const CSndParams*, Shadow> sShadow;
-    static std::uint32_t sScan = 0u;
-    ++sScan;
-
-    std::lock_guard<std::recursive_mutex> lock(gSndParamsRegistryMutex);
-    for (auto entry = gSndParamsRegistry.begin(); entry != gSndParamsRegistry.end(); ++entry) {
-      CSndParams* const params = *entry;
-      if (params == nullptr) {
-        continue;
-      }
-
-      std::uint32_t lanes[2] = {0u, 0u};
-      // Diagnostic byte-image lane: raw {px, pi} of mEngine for the shadow check.
-      std::memcpy(lanes, &params->mEngine, sizeof(lanes));
-      const std::uint32_t policy = params->mResolvePolicy;
-      const std::uint32_t control = lanes[1];
-      const bool wild = control != 0u && (control < 0x10000u || (control & 3u) != 0u);
-      const bool bad = policy > 4u || wild;
-
-      const auto seen = sShadow.find(params);
-      if (seen == sShadow.end()) {
-        Shadow fresh{policy, lanes[0], control, {}, params->mBank};
-        // Diagnostic byte-image snapshot of the whole object.
-        std::memcpy(fresh.image, params, sizeof(fresh.image));
-        sShadow.emplace(params, std::move(fresh));
-        if (bad) {
-          gpg::Warnf(
-            "[SNDDIAG] BORN BAD scan=%u params=%p bank='%s' policy=%u px=%08X pi=%08X",
-            sScan, static_cast<const void*>(params), params->mBank.c_str(), policy, lanes[0], control
-          );
-        }
-        continue;
-      }
-
-      Shadow& previous = seen->second;
-      if (previous.policy == policy && previous.px == lanes[0] && previous.pi == control) {
-        continue;
-      }
-
-      if (bad) {
-        // Diagnostic byte-image snapshot of the whole object.
-        std::uint8_t current[sizeof(CSndParams)];
-        std::memcpy(current, params, sizeof(current));
-
-        int firstChanged = -1;
-        int lastChanged = -1;
-        for (int offset = 0; offset < static_cast<int>(sizeof(current)); ++offset) {
-          if (current[offset] != previous.image[offset]) {
-            if (firstChanged < 0) {
-              firstChanged = offset;
-            }
-            lastChanged = offset;
-          }
-        }
-
-        gpg::Warnf(
-          "[SNDDIAG] CORRUPTED scan=%u params=%p bank='%s' policy %u->%u px %08X->%08X pi %08X->%08X "
-          "changed=+0x%02X..+0x%02X",
-          sScan,
-          static_cast<const void*>(params),
-          previous.bank.c_str(),
-          previous.policy, policy,
-          previous.px, lanes[0],
-          previous.pi, control,
-          firstChanged < 0 ? 0 : firstChanged,
-          lastChanged < 0 ? 0 : lastChanged
-        );
-      }
-
-      previous.policy = policy;
-      previous.px = lanes[0];
-      previous.pi = control;
-      // Diagnostic byte-image snapshot of the whole object.
-      std::memcpy(previous.image, params, sizeof(previous.image));
-    }
-  }
-
-  CSndParams::~CSndParams()
-  {
-    gpg::Warnf(
-      "[SNDDIAG] ~CSndParams params=%p bank=%u cue=%u policy=%u",
-      static_cast<const void*>(this),
-      static_cast<unsigned>(mBankId),
-      static_cast<unsigned>(mCueId),
-      mResolvePolicy
-    );
-  }
+  CSndParams::~CSndParams() = default;
 
   namespace
   {

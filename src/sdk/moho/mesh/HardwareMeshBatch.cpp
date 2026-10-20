@@ -1,10 +1,7 @@
-#include <cstdio>
-#include <cstdlib>
 #include "MeshBatch.h"
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
-#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -43,30 +40,6 @@
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
-
-namespace
-{
-  // TEMPORARY -- runtime toggle files for the exploded-mesh triage. A toggle is
-  // on while "<FAF_TOGGLE_DIR>/<name>" exists; delete when resolved.
-  bool ToggleFileExists(const char* const name)
-  {
-    static char sDir[512] = {};
-    static bool sDirResolved = false;
-    if (!sDirResolved) {
-      sDirResolved = true;
-      std::size_t length = 0;
-      if (::getenv_s(&length, sDir, sizeof(sDir), "FAF_TOGGLE_DIR") != 0 || length == 0u) {
-        sDir[0] = 0;
-      }
-    }
-    if (sDir[0] == 0) {
-      return false;
-    }
-    char path[640];
-    (void)std::snprintf(path, sizeof(path), "%s\\%s", sDir, name);
-    return ::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
-  }
-}
 
 namespace moho
 {
@@ -137,15 +110,7 @@ namespace moho
         const CAniPoseBone* const poseBone =
           remapIndex < poseBoneCount ? &pose.mBones.begin()[remapIndex] : nullptr;
 
-        // TEMPORARY SWITCH -- FAF_NO_HIDEBONE=1 treats every remapped bone as
-        // visible so hidden-bone parking can be ruled in/out for the wedges.
-        static int sIgnoreHiddenBones = 0;
-        static unsigned sToggleCalls = 0;
-        if ((sToggleCalls++ % 500u) == 0u) {
-          sIgnoreHiddenBones = ToggleFileExists("nohide.on") ? 1 : 0;
-        }
-
-        if (poseBone == nullptr || (poseBone->mVisible == 0 && sIgnoreHiddenBones == 0)) {
+        if (poseBone == nullptr || poseBone->mVisible == 0) {
           transPalette[slot] = SkinPaletteEntry{0.0f, kHiddenBoneDepth, 0.0f, 0.0f};
           rotPalette[slot] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
           continue;
@@ -417,13 +382,6 @@ namespace moho
         mTexture = gpg::gal::Device::GetInstance()->CreateTexture(&context);
         mRows = rows;
         gpg::Logf("Mesh bone palette texture: %ux%u, room for %u bones", kWidth, rows, rows * kBonesPerRow);
-        // Mirror into faf_diag.log (gpg::Logf only reaches an active /log
-        // target): this line is the one-shot proof the FAF_BONE_TEXTURE mesh
-        // effect engaged, which the base-view FPS triage depends on knowing.
-        if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-          std::fprintf(sink, "[BONETEX] engaged: %ux%u, room for %u bones\n", kWidth, rows, rows * kBonesPerRow);
-          std::fclose(sink);
-        }
       }
 
       void Bind()
@@ -717,183 +675,6 @@ namespace moho
     }
 
     mStaticVertexBuffer->Unlock();
-
-    if (mBoneCount > 4) {
-      static int sHistBudget = 0;
-      const boost::shared_ptr<const CAniSkel> gateSkeleton = currentResource->GetSkeleton();
-      const SAniSkelBone* const gateBone = gateSkeleton ? gateSkeleton->GetBone(0u) : nullptr;
-      const char* const gateName = gateBone != nullptr && gateBone->mBoneName != nullptr ? gateBone->mBoneName : "";
-      const bool looksLikeUnit = std::strlen(gateName) == 7 && (gateName[0] == 'U' || gateName[0] == 'X');
-      if (sHistBudget < 12 && looksLikeUnit) {
-        ++sHistBudget;
-        {
-          char remapLine[700];
-          int rw = std::snprintf(remapLine, sizeof(remapLine), "[REMAP] batch=%p unit=%s useRemap=%u ref=%p cur=%p bones=%d:",
-                                 static_cast<const void*>(this), gateName, static_cast<unsigned>(mUseBoneRemap),
-                                 static_cast<const void*>(referenceResource.get()), static_cast<const void*>(currentResource.get()),
-                                 mBoneCount);
-          for (std::int32_t i = 0; i < mBoneCount && rw < static_cast<int>(sizeof(remapLine)) - 12; ++i) {
-            rw += std::snprintf(remapLine + rw, sizeof(remapLine) - static_cast<std::size_t>(rw), " %d", mBoneRemapIndices[static_cast<std::size_t>(i)]);
-          }
-          (void)std::snprintf(remapLine + rw, sizeof(remapLine) - static_cast<std::size_t>(rw), "\n");
-          ::OutputDebugStringA(remapLine);
-        }
-        // Triangles whose three vertices sit on different bones, computed on
-        // the CPU-side SCM data this batch was built from. The shipped files
-        // have zero of these, so any non-zero count here means the in-memory
-        // mesh is already corrupt before it reaches the GPU.
-        {
-          const std::uint16_t* const indices = scm_file::GetIndices(*mesh);
-          unsigned mixed = 0;
-          unsigned badIndex = 0;
-          for (std::int32_t tri = 0; tri < mTriangleCount; ++tri) {
-            const std::uint16_t a = indices[3 * tri];
-            const std::uint16_t b = indices[3 * tri + 1];
-            const std::uint16_t c = indices[3 * tri + 2];
-            if (a >= mVertexCount || b >= mVertexCount || c >= mVertexCount) {
-              ++badIndex;
-              continue;
-            }
-            const unsigned ba = sourceVertices[a].mBoneIndex;
-            const unsigned bb = sourceVertices[b].mBoneIndex;
-            const unsigned bc = sourceVertices[c].mBoneIndex;
-            if (ba != bb || bb != bc) {
-              ++mixed;
-            }
-          }
-          char mixedLine[300];
-          (void)std::snprintf(mixedLine, sizeof(mixedLine),
-                              "[MIXTRI] batch=%p unit=%s tris=%d mixed=%u badIndex=%u idx0..5=%u,%u,%u,%u,%u,%u hdr: vOff=%u vCnt=%u iOff=%u iCnt=%u skin=%u total=%u\n",
-                              static_cast<const void*>(this), gateName, mTriangleCount, mixed, badIndex,
-                              indices[0], indices[1], indices[2], indices[3], indices[4], indices[5],
-                              mesh->mVertexOffset, mesh->mVertexCount, mesh->mIndexDataOffset,
-                              mesh->mIndexCount, mesh->mSkinBoneCount, mesh->mBoneTotalCount);
-          ::OutputDebugStringA(mixedLine);
-        }
-        // GPU-side read-back: decode the first three packed vertices straight
-        // out of the static vertex buffer and the first six indices out of the
-        // index buffer, next to the source values they were packed from.
-        {
-          auto halfToFloat = [](const std::uint16_t h) -> float {
-            const std::uint32_t sign = (h & 0x8000u) ? 0x80000000u : 0u;
-            std::uint32_t exponent = (h >> 10) & 0x1Fu;
-            std::uint32_t mantissa = h & 0x3FFu;
-            std::uint32_t bits;
-            if (exponent == 0u) {
-              if (mantissa == 0u) {
-                bits = sign;
-              } else {
-                exponent = 127u - 15u + 1u;
-                while ((mantissa & 0x400u) == 0u) { mantissa <<= 1; --exponent; }
-                mantissa &= 0x3FFu;
-                bits = sign | (exponent << 23) | (mantissa << 13);
-              }
-            } else if (exponent == 31u) {
-              bits = sign | 0x7F800000u | (mantissa << 13);
-            } else {
-              bits = sign | ((exponent + 127u - 15u) << 23) | (mantissa << 13);
-            }
-            return std::bit_cast<float>(bits);
-          };
-          const std::uint32_t stride = formatter->GetVertexStride(0, 0);
-          const auto* const packed = static_cast<const std::uint8_t*>(
-            mStaticVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::NoOverwrite));
-          char rb[900];
-          int w = std::snprintf(rb, sizeof(rb), "[VBREAD] batch=%p fmt=%u stride=%u decl=%p",
-                                static_cast<const void*>(this),
-                                mVertexFormat ? mVertexFormat->formatCode_ : 0u, stride,
-                                mVertexFormat ? static_cast<gpg::gal::VertexFormatD3D9*>(mVertexFormat.get())->vertexDeclaration_ : nullptr);
-          for (int v = 0; v < 3 && packed != nullptr; ++v) {
-            const std::uint8_t* const rec = packed + static_cast<std::size_t>(v) * stride;
-            std::uint16_t h[4];
-            // Unaligned half-word load from the packed vertex record.
-            std::memcpy(h, rec, sizeof(h));
-            const SScmVertex& src = sourceVertices[v];
-            w += std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w),
-                               " | v%d src=(%.3f,%.3f,%.3f) b=%u gpu=(%.3f,%.3f,%.3f) b=%u,%u,%u,%u",
-                               v, src.mLocalPositionX, src.mLocalPositionY, src.mLocalPositionZ, src.mBoneIndex,
-                               halfToFloat(h[0]), halfToFloat(h[1]), halfToFloat(h[2]),
-                               rec[0x28], rec[0x29], rec[0x2A], rec[0x2B]);
-          }
-          if (packed != nullptr) {
-            // Full-buffer verification: every vertex's position and bone byte
-            // against the source records, plus a sanity bound on the source.
-            unsigned posMismatch = 0;
-            unsigned boneMismatch = 0;
-            unsigned sourceOutOfBounds = 0;
-            int worstVertex = -1;
-            float worstError = 0.0f;
-            for (std::int32_t v = 0; v < mVertexCount; ++v) {
-              const std::uint8_t* const rec = packed + static_cast<std::size_t>(v) * stride;
-              std::uint16_t h[3];
-              // Unaligned half-word load from the packed vertex record.
-              std::memcpy(h, rec, sizeof(h));
-              const SScmVertex& src = sourceVertices[v];
-              const float srcPos[3] = {src.mLocalPositionX, src.mLocalPositionY, src.mLocalPositionZ};
-              float err = 0.0f;
-              for (int k = 0; k < 3; ++k) {
-                const float d = std::fabs(halfToFloat(h[k]) - srcPos[k]);
-                if (d > err) {
-                  err = d;
-                }
-                if (std::fabs(srcPos[k]) > 1000.0f) {
-                  ++sourceOutOfBounds;
-                }
-              }
-              if (err > 0.05f + 0.01f * std::fabs(srcPos[0]) + 0.01f * std::fabs(srcPos[1]) + 0.01f * std::fabs(srcPos[2])) {
-                ++posMismatch;
-              }
-              if (err > worstError) {
-                worstError = err;
-                worstVertex = v;
-              }
-              if (rec[0x28] != src.mBoneIndex) {
-                ++boneMismatch;
-              }
-            }
-            w += std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w),
-                               " | FULL posMismatch=%u boneMismatch=%u srcOOB=%u worst=v%d err=%.4f",
-                               posMismatch, boneMismatch, sourceOutOfBounds, worstVertex, worstError);
-            mStaticVertexBuffer->Unlock();
-          }
-          const std::int16_t* const gpuIndices = mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::NoOverwrite);
-          if (gpuIndices != nullptr) {
-            w += std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w), " | gpuIdx=%d,%d,%d,%d,%d,%d",
-                               gpuIndices[0], gpuIndices[1], gpuIndices[2], gpuIndices[3], gpuIndices[4], gpuIndices[5]);
-            mIndexBuffer->Unlock();
-          }
-          (void)std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w), "\n");
-          ::OutputDebugStringA(rb);
-        }
-        unsigned counts[256] = {};
-        unsigned outOfRange = 0;
-        unsigned maxIndex = 0;
-        for (std::int32_t vertexIndex = 0; vertexIndex < mVertexCount; ++vertexIndex) {
-          const unsigned boneIndex = sourceVertices[vertexIndex].mBoneIndex;
-          ++counts[boneIndex];
-          if (boneIndex > maxIndex) {
-            maxIndex = boneIndex;
-          }
-          if (static_cast<std::int32_t>(boneIndex) >= mBoneCount) {
-            ++outOfRange;
-          }
-        }
-        const boost::shared_ptr<const CAniSkel> skeleton = currentResource->GetSkeleton();
-        char line[1600];
-        int written = std::snprintf(line, sizeof(line), "[VERTHIST] batch=%p verts=%d bones=%d/%u maxIdx=%u outOfRange=%u:",
-                                    static_cast<const void*>(this), mVertexCount, mBoneCount,
-                                    skeleton ? static_cast<unsigned>(skeleton->mBones.size()) : 0u, maxIndex, outOfRange);
-        for (std::int32_t boneIndex = 0; boneIndex < mBoneCount && written < static_cast<int>(sizeof(line)) - 80; ++boneIndex) {
-          const SAniSkelBone* const bone = skeleton ? skeleton->GetBone(static_cast<std::uint32_t>(boneIndex)) : nullptr;
-          const char* const name = bone != nullptr && bone->mBoneName != nullptr ? bone->mBoneName : "?";
-          const int parent = bone != nullptr ? bone->mParentBoneIndex : -9;
-          written += std::snprintf(line + written, sizeof(line) - static_cast<std::size_t>(written),
-                                   " %d:%s(p%d)=%u", boneIndex, name, parent, counts[boneIndex]);
-        }
-        (void)std::snprintf(line + written, sizeof(line) - static_cast<std::size_t>(written), "\n");
-        ::OutputDebugStringA(line);
-      }
-    }
   }
 
   /**
@@ -1174,18 +955,6 @@ namespace moho
         // skipped without consuming a slot in the draw.
         const boost::shared_ptr<const CAniSkel> skeleton =
           pose.get() != nullptr ? pose->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
-
-        if (pose.get() == nullptr || skeleton.get() == nullptr) {
-          static unsigned sSkipCalls = 0;
-          if ((sSkipCalls++ % 300u) == 0u) {
-            char skipLine[200];
-            (void)std::snprintf(skipLine, sizeof(skipLine), "[FILLSKIP] batch=%p bones=%d inst=%p pose=%p skel=%p staticPose=%u\n",
-                                static_cast<const void*>(this), mBoneCount, static_cast<const void*>(meshInstance),
-                                static_cast<const void*>(pose.get()), static_cast<const void*>(skeleton.get()),
-                                static_cast<unsigned>(meshInstance->isStaticPose));
-            ::OutputDebugStringA(skipLine);
-          }
-        }
 
         if (pose.get() != nullptr && skeleton.get() != nullptr) {
           staging.instanceIndex = static_cast<std::uint8_t>(packedCount);
