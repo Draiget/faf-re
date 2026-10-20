@@ -48,16 +48,35 @@ namespace moho
    * - The same job with 0 workers (fully serial) and with N workers produces identical results.
    *   Checking exactly that is the determinism test for any parallel phase.
    *
-   * Worker count: `/simworkers N` on the command line. 0 runs every job inline on the caller.
-   * The default is the process's usable CPUs minus two (the Sim and main threads), capped at 8.
-   * Threads are created on first use.
+   * Worker count: the `sim_Workers` console variable, seeded from `/simworkers N` on the command
+   * line. 0, the default, runs every job inline on the caller, which is the original serial path.
+   * A changed value takes effect at the next dispatch. Threads are created on first use.
    */
+  /**
+   * Engine addition: `sim_Workers`, a user-side (process-local) console variable. It is never sent
+   * to the sim, so clients may differ; parallel phases produce the serial result either way.
+   * -1 until first use, then the `/simworkers` value (0 when absent).
+   */
+  extern int sim_Workers;
+
+  /**
+   * Engine addition: per-phase switches, user-side like `sim_Workers`, so any parallel phase can
+   * be forced back to its serial path for bisection. They only matter while `sim_Workers > 0`.
+   */
+  extern bool sim_ParallelRecon;
+
   class CSimWorkerPool
   {
   public:
     using RangeFunction = void (*)(void* context, std::size_t begin, std::size_t end);
 
     [[nodiscard]] static CSimWorkerPool& Get();
+
+    /**
+     * True when parallel phases should run: `sim_Workers`, resolved from `/simworkers` on first
+     * call, is above 0. Callers test this before taking a phase's parallel path.
+     */
+    [[nodiscard]] static bool ParallelEnabled();
 
     CSimWorkerPool(const CSimWorkerPool&) = delete;
     CSimWorkerPool& operator=(const CSimWorkerPool&) = delete;

@@ -187,6 +187,35 @@ namespace moho
     void ReconRefresh() override;
 
     /**
+     * Engine addition, not in the binary: ReconRefresh's blips whose mesh or pose handles must
+     * change, recorded by RefreshDeferringHandles for ApplyRefreshFixups. Static storage per army,
+     * so a worker never allocates.
+     */
+    struct SRefreshFixups
+    {
+      static constexpr std::size_t kCapacity = 4096u;
+
+      ReconBlip* mBlips[kCapacity];
+      std::size_t mCount;
+      bool mOverflow; // more blips than kCapacity: ApplyRefreshFixups reruns ReconRefresh()
+    };
+
+    /**
+     * Engine addition, not in the binary: the part of ReconRefresh() a CSimWorkerPool worker may
+     * run. It writes only this army's `SPerArmyReconInfo` slots and reads source units nothing
+     * else writes during the refresh phase. A handle reassignment would retain or release a
+     * shared_ptr, and releasing the last owner frees memory, which must happen on the sim thread
+     * in serial order, so those blips are listed in `fixups` instead.
+     */
+    void RefreshDeferringHandles(SRefreshFixups& fixups);
+
+    /**
+     * Engine addition, not in the binary: finishes RefreshDeferringHandles on the sim thread,
+     * assigning the deferred handles in map order. Together the two equal ReconRefresh().
+     */
+    void ApplyRefreshFixups(const SRefreshFixups& fixups);
+
+    /**
      * Address: 0x005C18A0 (FUN_005C18A0, Moho::CAiReconDBImpl::ReconCanDetect)
      *
      * gpg::Rect2<int> const &, float, int

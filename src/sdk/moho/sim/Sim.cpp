@@ -48,6 +48,7 @@
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/animation/CAniActor.h"
@@ -10470,6 +10471,54 @@ void Sim::ExecuteDebugCommand(
   DestroySimDebugEntitySet(selectedUnits);
 }
 
+namespace
+{
+  // Engine addition, not in the binary: the recon phase of AdvanceBeat on CSimWorkerPool.
+  constexpr std::size_t kMaxParallelReconArmies = 32u;
+
+  // One fixup list per army slot; static so that no worker allocates (see SRefreshFixups).
+  CAiReconDBImpl::SRefreshFixups sReconRefreshFixups[kMaxParallelReconArmies];
+
+  /// Refreshes the recon DBs of armies [begin, end) on the pool, then applies their deferred
+  /// handle assignments on this thread in army order, exactly where the serial loop would have.
+  void RefreshReconArmyRange(Sim& sim, const std::size_t begin, const std::size_t end)
+  {
+    if (begin >= end) {
+      return;
+    }
+    CSimWorkerPool::Get().ParallelFor(end - begin, 1u, [&sim, begin](const std::size_t first, const std::size_t last) {
+      for (std::size_t i = begin + first; i < begin + last; ++i) {
+        CArmyImpl* const army = sim.mArmiesList[i];
+        if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
+          reconDb->RefreshDeferringHandles(sReconRefreshFixups[i]);
+        }
+      }
+    });
+    for (std::size_t i = begin; i < end; ++i) {
+      CArmyImpl* const army = sim.mArmiesList[i];
+      if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
+        reconDb->ApplyRefreshFixups(sReconRefreshFixups[i]);
+      }
+    }
+  }
+
+  /// The serial loop refreshes every army except `mCurTick % armyCount`, which runs ReconTick
+  /// instead, in army order. ReconTick calls Lua, so it stays on this thread between the two
+  /// parallel groups: armies before it see the state before it, armies after it the state after.
+  void RunReconPhaseParallel(Sim& sim)
+  {
+    const std::size_t armyCount = sim.mArmiesList.size();
+    const std::size_t reconTickIndex = static_cast<std::size_t>(sim.mCurTick) % armyCount;
+    RefreshReconArmyRange(sim, 0u, reconTickIndex);
+    if (CArmyImpl* const army = sim.mArmiesList[reconTickIndex]; army != nullptr) {
+      if (CAiReconDBImpl* const reconDb = army->GetReconDB(); reconDb != nullptr) {
+        reconDb->ReconTick(static_cast<int>(armyCount));
+      }
+    }
+    RefreshReconArmyRange(sim, reconTickIndex + 1u, armyCount);
+  }
+} // namespace
+
 /**
  * Address: 0x00749F40 (FUN_00749F40)
  *
@@ -10532,7 +10581,10 @@ void Sim::AdvanceBeat(const int amt)
     TickTaskStage(&mTaskStageA);
     RefreshBlips();
 
-    if (!mArmiesList.empty()) {
+    if (!mArmiesList.empty() && sim_ParallelRecon && mArmiesList.size() <= kMaxParallelReconArmies &&
+        CSimWorkerPool::ParallelEnabled()) {
+      RunReconPhaseParallel(*this);
+    } else if (!mArmiesList.empty()) {
       const std::size_t armyCount = mArmiesList.size();
       const std::size_t reconTickIndex = static_cast<std::size_t>(mCurTick) % armyCount;
       for (std::size_t i = 0; i < armyCount; ++i) {

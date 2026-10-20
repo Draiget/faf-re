@@ -1014,6 +1014,111 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
   }
 }
 
+namespace
+{
+  /// True when `target = source` would leave `target` unchanged: the same pointer and the same
+  /// control block (boost 1.34 orders shared_ptrs by owner).
+  template <class T>
+  [[nodiscard]] bool SameHandle(const boost::shared_ptr<T>& target, const boost::shared_ptr<T>& source) noexcept
+  {
+    return target.get() == source.get() && !(target < source) && !(source < target);
+  }
+
+  /// The three handle assignments of RefreshBlip's LOS branch, in its order.
+  void AssignBlipHandles(SPerArmyReconInfo& perArmy, const Unit& sourceUnit)
+  {
+    perArmy.mMesh = sourceUnit.mVarDat.mScmResource;
+    if (const CAniActor* const actor = sourceUnit.AniActor; actor != nullptr) {
+      perArmy.mPriorPose = actor->mPriorPose;
+      perArmy.mPose = actor->mPose;
+    } else {
+      perArmy.mPriorPose.reset();
+      perArmy.mPose.reset();
+    }
+  }
+
+  /// True when AssignBlipHandles would change any of the three handles.
+  [[nodiscard]] bool BlipHandlesDiffer(const SPerArmyReconInfo& perArmy, const Unit& sourceUnit) noexcept
+  {
+    if (!SameHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource)) {
+      return true;
+    }
+    if (const CAniActor* const actor = sourceUnit.AniActor; actor != nullptr) {
+      return !SameHandle(perArmy.mPriorPose, actor->mPriorPose) || !SameHandle(perArmy.mPose, actor->mPose);
+    }
+    // `reset()` changes a handle only when it is not already empty.
+    const boost::shared_ptr<CAniPose> empty;
+    return !SameHandle(perArmy.mPriorPose, empty) || !SameHandle(perArmy.mPose, empty);
+  }
+} // namespace
+
+void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
+{
+  fixups.mCount = 0u;
+  fixups.mOverflow = false;
+  if (!mArmy || mArmy->mConstDat.mArmyIndex < 0) {
+    return;
+  }
+  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
+
+  // ReconRefresh's walk and RefreshBlip's body with the handle assignments held back. Every
+  // other write is a plain field copy into this army's slot, so their order relative to the
+  // deferred assignments is unobservable.
+  for (auto it = mBlipMap.begin(); it != mBlipMap.end(); ++it) {
+    ReconBlip* const blip = it->second;
+    if (!blip) {
+      continue;
+    }
+    Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
+    if (!sourceUnit || sourceUnit->DestroyQueued() || blip->IsFake()) {
+      continue;
+    }
+    SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
+    if (!perArmy) {
+      continue;
+    }
+
+    if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u) {
+      perArmy->mMeshTypeClassId = sourceUnit->mVarDat.mMeshBlueprint;
+      if (BlipHandlesDiffer(*perArmy, *sourceUnit)) {
+        if (fixups.mCount < SRefreshFixups::kCapacity) {
+          fixups.mBlips[fixups.mCount++] = blip;
+        } else {
+          fixups.mOverflow = true;
+        }
+      }
+      perArmy->mHealth = sourceUnit->mVarDat.mHealth;
+      perArmy->mMaxHealth = sourceUnit->mVarDat.mMaxHealth;
+      perArmy->mFractionComplete = sourceUnit->mVarDat.mFractionComplete;
+    }
+
+    if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_AnySense)) != 0u) {
+      perArmy->mMaybeDead = static_cast<std::uint8_t>(sourceUnit->IsDead() ? 1u : 0u);
+    }
+  }
+}
+
+void CAiReconDBImpl::ApplyRefreshFixups(const SRefreshFixups& fixups)
+{
+  if (fixups.mOverflow) {
+    // Some deferred blips were not recorded. RefreshBlip is idempotent over unchanged sources,
+    // so the full serial pass finishes them, releasing handles in the same map order.
+    ReconRefresh();
+    return;
+  }
+  if (fixups.mCount == 0u) {
+    return;
+  }
+  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
+  for (std::size_t i = 0; i < fixups.mCount; ++i) {
+    ReconBlip* const blip = fixups.mBlips[i];
+    Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
+    if (SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex); perArmy && sourceUnit) {
+      AssignBlipHandles(*perArmy, *sourceUnit);
+    }
+  }
+}
+
 /**
  * Address: 0x005C1CF0 (FUN_005C1CF0)
  */

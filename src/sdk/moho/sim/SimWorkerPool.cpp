@@ -15,6 +15,8 @@
 #include <xmmintrin.h>
 
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/StartupHelpers.h"
 
 namespace moho
@@ -25,10 +27,8 @@ namespace moho
     // control half: exception masks, rounding, flush-to-zero, denormals-are-zero.
     constexpr std::uint32_t kMxcsrControlMask = 0xFFC0u;
 
-    // Sim and main threads keep one CPU each; beyond eight workers the sim's parallel phases are
-    // too short for more threads to pay off.
-    constexpr unsigned int kReservedCpus = 2u;
-    constexpr unsigned int kMaxDefaultWorkers = 8u;
+    // More workers than usable CPUs only adds contention.
+    constexpr unsigned int kMaxWorkers = 64u;
 
     // True on a thread while it is inside CSimWorkerPool::Run as the dispatcher, so a job body that
     // calls Run again takes the serial path instead of deadlocking on its own dispatch.
@@ -44,17 +44,42 @@ namespace moho
       return std::max(1u, std::thread::hardware_concurrency());
     }
 
-    /// `/simworkers N` wins; otherwise usable CPUs minus the Sim and main threads, capped.
-    [[nodiscard]] unsigned int ResolveWorkerCount()
+    /// `/simworkers N` on the command line, otherwise 0: serial until a parallel phase is asked for.
+    [[nodiscard]] int CommandLineWorkerCount()
     {
       msvc8::vector<msvc8::string> args;
       if (CFG_GetArgOption("/simworkers", 1u, &args) && !args.empty()) {
-        return static_cast<unsigned int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)));
+        return static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)));
       }
-      const unsigned int cpus = UsableCpuCount();
-      return cpus > kReservedCpus ? std::min(cpus - kReservedCpus, kMaxDefaultWorkers) : 0u;
+      return 0;
+    }
+
+    /// Clamps a requested worker count to [0, min(usable CPUs, kMaxWorkers)].
+    [[nodiscard]] unsigned int ClampWorkerCount(const int requested)
+    {
+      if (requested <= 0) {
+        return 0u;
+      }
+      return std::min({static_cast<unsigned int>(requested), UsableCpuCount(), kMaxWorkers});
     }
   } // namespace
+
+  int sim_Workers = -1;
+
+  bool sim_ParallelRecon = true;
+
+  TConVar<bool> gTConVar_sim_ParallelRecon(
+    "sim_ParallelRecon",
+    "Refresh each army's recon blips on sim workers (when sim_Workers > 0).",
+    &sim_ParallelRecon
+  );
+
+  TConVar<int> gTConVar_sim_Workers(
+    "sim_Workers",
+    "Worker threads for parallel sim phases; 0 runs every phase serially. Results are identical "
+    "either way.",
+    &sim_Workers
+  );
 
   SFpuControlState SFpuControlState::Capture() noexcept
   {
@@ -131,14 +156,15 @@ namespace moho
       }
     }
 
-    void WorkerMain(const unsigned int index)
+    void WorkerMain(const unsigned int index, std::uint64_t seenGeneration)
     {
       tIsSimWorkerThread = true;
       char name[32];
       std::snprintf(name, sizeof(name), "SimWorker %u", index);
       gpg::SetThreadName(0xFFFFFFFFu, name);
 
-      std::uint64_t seenGeneration = 0;
+      // `seenGeneration` is the generation current when this thread was started, so a pool that
+      // was resized wakes it only for jobs dispatched after that.
       for (;;) {
         SFpuControlState jobFpu{};
         {
@@ -170,9 +196,15 @@ namespace moho
     void Start()
     {
       threads.reserve(workerCount);
-      for (unsigned int index = 0; index < workerCount; ++index) {
-        threads.emplace_back([this, index] { WorkerMain(index); });
+      std::uint64_t startGeneration = 0;
+      {
+        const std::lock_guard<std::mutex> lock(mutex);
+        startGeneration = generation;
       }
+      for (unsigned int index = 0; index < workerCount; ++index) {
+        threads.emplace_back([this, index, startGeneration] { WorkerMain(index, startGeneration); });
+      }
+      gpg::Logf("SimWorkerPool: started %u worker threads", workerCount);
     }
 
     void Stop()
@@ -188,18 +220,30 @@ namespace moho
         }
       }
       threads.clear();
+      stopping = false;
     }
   };
 
   CSimWorkerPool::CSimWorkerPool()
     : mImpl(std::make_unique<Impl>())
   {
-    mImpl->workerCount = ResolveWorkerCount();
+    if (sim_Workers < 0) {
+      sim_Workers = CommandLineWorkerCount();
+    }
+    mImpl->workerCount = ClampWorkerCount(sim_Workers);
   }
 
   CSimWorkerPool::~CSimWorkerPool()
   {
     mImpl->Stop();
+  }
+
+  bool CSimWorkerPool::ParallelEnabled()
+  {
+    if (sim_Workers < 0) {
+      sim_Workers = CommandLineWorkerCount();
+    }
+    return sim_Workers > 0;
   }
 
   CSimWorkerPool& CSimWorkerPool::Get()
@@ -223,6 +267,20 @@ namespace moho
     }
 
     Impl& impl = *mImpl;
+
+    // `sim_Workers` changed since the last dispatch: retire the old threads (none is inside a job,
+    // dispatches are serialized and this one has not started), new ones start below on demand.
+    if (!IsSimWorkerThread() && !tIsDispatchingSimJob) {
+      if (sim_Workers < 0) {
+        sim_Workers = CommandLineWorkerCount();
+      }
+      const unsigned int wanted = ClampWorkerCount(sim_Workers);
+      if (wanted != impl.workerCount) {
+        const std::lock_guard<std::mutex> dispatchLock(impl.dispatchMutex);
+        impl.Stop();
+        impl.workerCount = wanted;
+      }
+    }
 
     // Serial path: no workers, a single chunk, a call from a worker, or a nested call from inside a
     // job on the dispatching thread. It walks the same chunk boundaries as the parallel path, so a
