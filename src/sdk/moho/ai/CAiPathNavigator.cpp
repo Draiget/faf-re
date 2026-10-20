@@ -251,13 +251,25 @@ namespace
     };
   }
 
+  /**
+   * Every navigator helper reads a path cell's words with `movzx` (0x005AD370,
+   * 0x005AD3B0, 0x005AE170, 0x005AF360, 0x005AEE0E...); only IsCellInGoal
+   * (0x005AD800) uses `movsx`. A cell just off the top/left map edge is
+   * therefore 65535, not -1, in every distance, delta and projection here.
+   */
+  [[nodiscard]] constexpr std::int32_t UnsignedCellCoord(const std::int16_t coord) noexcept
+  {
+    return static_cast<std::int32_t>(static_cast<std::uint16_t>(coord));
+  }
+
   [[nodiscard]] SAiNavigatorGoal BuildSingleCellGoal(const SOCellPos& cell) noexcept
   {
+    // 0x005AEE0E..0x005AEE2B: `movzx` the words, then `+1` for the max edge.
     SAiNavigatorGoal goal{};
-    goal.minX = static_cast<std::int32_t>(cell.x);
-    goal.minZ = static_cast<std::int32_t>(cell.z);
-    goal.maxX = static_cast<std::int32_t>(cell.x) + 1;
-    goal.maxZ = static_cast<std::int32_t>(cell.z) + 1;
+    goal.minX = UnsignedCellCoord(cell.x);
+    goal.minZ = UnsignedCellCoord(cell.z);
+    goal.maxX = UnsignedCellCoord(cell.x) + 1;
+    goal.maxZ = UnsignedCellCoord(cell.z) + 1;
     return goal;
   }
 
@@ -383,18 +395,26 @@ namespace
    *
    * What it does:
    * Computes Euclidean cell-space distance between two packed path cells.
+   *
+   * 0x005AD379..0x005AD38A load both cells with `movzx`: a target cell at
+   * z = -1 (a formation slot just off the map edge) is 65535 cells away, not
+   * one. Sign-extending made such a target look near, so the shortcut probe in
+   * UpdateCurrentPosition tested the off-map cell itself instead of a
+   * projection, failed, forced a repath and skipped the formation-leader sync
+   * (replay 26954643 beat 19560: SetTargetPoint(0) instead of RequestPath(0)).
    */
   [[nodiscard]] float CellDistance(const SOCellPos a, const SOCellPos b) noexcept
   {
-    const float dx = static_cast<float>(static_cast<std::int32_t>(a.x) - static_cast<std::int32_t>(b.x));
-    const float dz = static_cast<float>(static_cast<std::int32_t>(a.z) - static_cast<std::int32_t>(b.z));
+    const float dx = static_cast<float>(UnsignedCellCoord(a.x) - UnsignedCellCoord(b.x));
+    const float dz = static_cast<float>(UnsignedCellCoord(a.z) - UnsignedCellCoord(b.z));
     return std::sqrt((dx * dx) + (dz * dz));
   }
 
+  // 0x005AD3B0 (and its inlined copies) take the words with `movzx` too.
   [[nodiscard]] std::int32_t ManhattanDistance(const SOCellPos a, const SOCellPos b) noexcept
   {
-    const std::int32_t dx = std::abs(static_cast<std::int32_t>(a.x) - static_cast<std::int32_t>(b.x));
-    const std::int32_t dz = std::abs(static_cast<std::int32_t>(a.z) - static_cast<std::int32_t>(b.z));
+    const std::int32_t dx = std::abs(UnsignedCellCoord(a.x) - UnsignedCellCoord(b.x));
+    const std::int32_t dz = std::abs(UnsignedCellCoord(a.z) - UnsignedCellCoord(b.z));
     return dx + dz;
   }
 
@@ -423,8 +443,9 @@ namespace
   [[maybe_unused]]
   [[nodiscard]] SOCellPos ProjectCellToward(const SOCellPos fromCell, const SOCellPos toCell, const float distance)
   {
-    float deltaX = static_cast<float>(static_cast<std::int32_t>(fromCell.x) - static_cast<std::int32_t>(toCell.x));
-    float deltaZ = static_cast<float>(static_cast<std::int32_t>(fromCell.z) - static_cast<std::int32_t>(toCell.z));
+    // 0x005AE179..0x005AE197: both cells' words are taken with `movzx`.
+    float deltaX = static_cast<float>(UnsignedCellCoord(fromCell.x) - UnsignedCellCoord(toCell.x));
+    float deltaZ = static_cast<float>(UnsignedCellCoord(fromCell.z) - UnsignedCellCoord(toCell.z));
     const float lengthSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
 
     if (lengthSquared != 0.0f) {
@@ -879,9 +900,10 @@ namespace
       return 0;
     }
 
+    // 0x005AF39A..0x005AF3AC and 0x005AF43C..0x005AF440: `movzx` cell words.
     const SOCellPos firstCell = navigator.mPath.start[0];
-    if (std::abs(static_cast<std::int32_t>(firstCell.x) - static_cast<std::int32_t>(navigator.mCurrentPos.x)) > 1 ||
-        std::abs(static_cast<std::int32_t>(firstCell.z) - static_cast<std::int32_t>(navigator.mCurrentPos.z)) > 1 ||
+    if (std::abs(UnsignedCellCoord(firstCell.x) - UnsignedCellCoord(navigator.mCurrentPos.x)) > 1 ||
+        std::abs(UnsignedCellCoord(firstCell.z) - UnsignedCellCoord(navigator.mCurrentPos.z)) > 1 ||
         !CanOccupyTargetCell(navigator, navigator.mCurrentPos, firstCell) ||
         !CanReachCellFromCurrent(navigator, firstCell)) {
       return 0;
@@ -889,16 +911,16 @@ namespace
 
     std::int32_t bestIndex = 0;
     const std::int32_t headingDelta[2] = {
-      static_cast<std::int32_t>(firstCell.x) - static_cast<std::int32_t>(navigator.mCurrentPos.x),
-      static_cast<std::int32_t>(firstCell.z) - static_cast<std::int32_t>(navigator.mCurrentPos.z),
+      UnsignedCellCoord(firstCell.x) - UnsignedCellCoord(navigator.mCurrentPos.x),
+      UnsignedCellCoord(firstCell.z) - UnsignedCellCoord(navigator.mCurrentPos.z),
     };
 
     for (std::int32_t idx = 1; idx < pathSize; ++idx) {
       const SOCellPos prev = navigator.mPath.start[idx - 1];
       const SOCellPos cell = navigator.mPath.start[idx];
       const std::int32_t nextDelta[2] = {
-        static_cast<std::int32_t>(cell.x) - static_cast<std::int32_t>(prev.x),
-        static_cast<std::int32_t>(cell.z) - static_cast<std::int32_t>(prev.z),
+        UnsignedCellCoord(cell.x) - UnsignedCellCoord(prev.x),
+        UnsignedCellCoord(cell.z) - UnsignedCellCoord(prev.z),
       };
 
       if (HeadingDeltaMismatch(nextDelta, headingDelta)) {

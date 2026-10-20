@@ -4,7 +4,7 @@ Real games from the FAF replay vault — multiplayer games and games against the
 built-in AI or M28AI — are played back on the rebuilt engine and checked against
 the original `ForgedAlliance.exe`, bit for bit.
 
-*Snapshot: 20/10/2026 — 29 of 29 replays match on every gameplay beat.*
+*Snapshot: 20/10/2026 — 51 of 51 replays match on every gameplay beat.*
 
 ## Method
 
@@ -56,6 +56,33 @@ with are fetched from the FAF content server.
 | 26955642 | Seton's Clutch, 1 player against AI, 23 min | Every embedded checksum matches, start to end. |
 | 27032784 | Stairs to Heaven, 1 player against AI, 14 min | Every embedded checksum matches, start to end. |
 | 27025965 | Seton's Clutch, 1 player against AI, 9 min | Every embedded checksum matches, start to end. |
+| 26905122 | Cursed Souls, 3 players with M28AI, 83 min | Every embedded checksum matches, start to end. |
+| 26885749 | Dual Gap, 12 players, 54 min | Every embedded checksum matches, start to end. |
+| 26954643 | Astro Crater Battles 3x3 Rich, 3 players with AI, 51 min | Every embedded checksum matches, start to end. |
+| 26997189 | Paradise Bay, 4 players, 50 min | Every embedded checksum matches, start to end. |
+| 27004084 | The Wilderness, 2 players, 48 min | Every embedded checksum matches, start to end. |
+| 26992934 | Lena River, 8 players, 47 min | Every embedded checksum matches, start to end. |
+| 26923388 | Hargreven, 2 players, 45 min | Every embedded checksum matches, start to end. |
+| 26938626 | Adaptive Dark Liver, 2 players, 41 min | Every embedded checksum matches, start to end. |
+| 27023198 | Desolate Dunes, 2 players, 37 min | Every embedded checksum matches, start to end. |
+| 27033400 | Rich 2v2v2v2, 4 players, 35 min | Every embedded checksum matches, start to end. |
+| 26906984 | Dual Gap, 12 players, 34 min | Every embedded checksum matches, start to end. |
+| 26972287 | Adaptive Rainy Day, 2 players, 27 min | Every embedded checksum matches, start to end. |
+| 27019405 | Flooded Strip Mine, 2 players, 26 min | Every embedded checksum matches, start to end. |
+| 26956508 | Dual Gap, 2 players, 25 min | Every embedded checksum matches, start to end. |
+| 26881085 | Fields of Isis, 4 players, 21 min | Every embedded checksum matches, start to end. |
+| 26904089 | Esgaroth's Ruins, 2 players, 19 min | Every embedded checksum matches, start to end. |
+| 26912041 | Skellige, 2 players, 18 min | Every embedded checksum matches, start to end. |
+| 26968288 | Desolate Dunes, 2 players, 16 min | Every embedded checksum matches, start to end. |
+| 26943656 | Mechanoclastic Rush, 6 players with M28AI, 15 min | Every embedded checksum matches, start to end. |
+| 26946725 | Dual Gap, 12 players, 14 min | Matches the other nine clients on every checksum; one player's own client desynced in the live game at beat 6,700 (see below). |
+| 26989982 | Seton's Clutch, 8 players, 14 min | Every embedded checksum matches, start to end. |
+| 26902315 | The Dark Heart, 3 players, 13 min | Every embedded checksum matches, start to end. |
+
+**A live-game desync is not a playback desync.** Every client records its own
+checksum into the replay. In 26946725 nine clients recorded the same checksum at
+beat 6,700 and one recorded another, then left the game; the rebuilt engine's
+checksum is the nine clients' one, at that beat and every later one.
 
 **The final-beat difference** is deliberate. When a player leaves, retail drops
 the commands that arrive after the leave within the same batch; the rebuilt
@@ -91,3 +118,7 @@ sources end.
   logarithm first. Where the product sits at a whole number the bucket moved by
   one and a unit took a different route — seen only in long AI games, which send
   many units across the map.
+- **Signed versus unsigned cells.** The path navigator reads a cell's
+  coordinates as unsigned 16-bit words, so a formation slot just off the map
+  edge (z = -1) is 65,535 cells away; ours sign-extended them, saw the slot as
+  close, probed it, failed and dropped out of the formation one beat early.
