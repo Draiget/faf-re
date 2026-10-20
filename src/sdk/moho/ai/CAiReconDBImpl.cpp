@@ -17,6 +17,7 @@
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/console/CConCommand.h"
 #include "moho/entity/intel/CIntel.h"
+#include "moho/math/GridPos.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CIntelGrid.h"
@@ -71,22 +72,6 @@ namespace
     const float dx = pos.x - center.x;
     const float dz = pos.z - center.z;
     return (dx * dx) + (dz * dz) <= (radius * radius);
-  }
-
-  /**
-   * Point visibility against one intel grid.
-   *
-   * Both point-recon lanes reach the grid through
-   * `?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z` (0x005BE1C0) --
-   * the `Vec3f` overload -- at every one of their seven call sites:
-   * `GetNewReconFor` at 0x005CB3B6, 0x005CB40B, 0x005CB42C and 0x005CB446, and
-   * `ApplyReconCounters` at 0x005CB4A2, 0x005CB4B7 and 0x005CB4D6. That
-   * overload divides the world position by `mGridSize` and tests exactly one
-   * grid cell.
-   */
-  [[nodiscard]] bool IsGridVisibleAtPoint(const CIntelGrid* const grid, const Wm3::Vec3f& pos)
-  {
-    return grid && grid->IsVisible(pos);
   }
 
   [[nodiscard]] EReconFlags SetFlag(const EReconFlags value, const EReconFlags bit) noexcept
@@ -381,6 +366,87 @@ namespace
   }
 } // namespace
 
+namespace moho
+{
+  /**
+   * One `GetReconFlags` point probe: the probed entity and position, plus the
+   * values the binary re-derives from them alone in every per-army
+   * `GetNewReconFor` call and again in `ApplyReconCounters`.
+   *
+   * Every member is a pure function of `(entity, pos)` (`IsUnit` and
+   * `IsReconBlip` return `this` or null, the layer is a field read, and
+   * `GridPos` is arithmetic on `pos`), and nothing a probe runs mutates
+   * either, so computing each once per `GetReconFlags` call gives the binary's
+   * results exactly.
+   */
+  struct SReconPointProbe
+  {
+    SReconPointProbe(Entity* const entity, const Wm3::Vec3f& pos) noexcept
+      : mPos(pos)
+      , mUnit(entity ? entity->IsUnit() : nullptr)
+    {
+      // 0x005CB360: a unit's layer, else a recon blip's, decides whether sonar
+      // may see the probe above the water line.
+      ReconBlip* const blip = (entity && !mUnit) ? entity->IsReconBlip() : nullptr;
+      if (mUnit) {
+        mUsesWaterSenseLane = UsesWaterSenseLane(mUnit->mVarDat.mLayerMask);
+      } else if (blip) {
+        mUsesWaterSenseLane = UsesWaterSenseLane(blip->mVarDat.mLayerMask);
+      }
+    }
+
+    /**
+     * Point visibility against one intel grid.
+     *
+     * Both point-recon lanes reach the grid through
+     * `?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z` (0x005BE1C0) --
+     * the `Vec3f` overload -- at every one of their seven call sites:
+     * `GetNewReconFor` at 0x005CB3B6, 0x005CB40B, 0x005CB42C and 0x005CB446,
+     * and `ApplyReconCounters` at 0x005CB4A2, 0x005CB4B7 and 0x005CB4D6. That
+     * overload builds `GridPos(pos, mGridSize)` and tests exactly one cell.
+     *
+     * A probe meets up to a dozen grids but only two cell sizes (vision 2,
+     * everything else 4), and `GridPos` depends on nothing but the position
+     * and the size -- every grid's cell (0,0) sits at the world origin -- so
+     * the cell is built once per size with the same `GridPos` constructor and
+     * reused; the bounds test stays per grid.
+     */
+    [[nodiscard]] bool IsVisibleIn(const CIntelGrid* const grid) const
+    {
+      if (grid == nullptr) {
+        return false;
+      }
+
+      const std::uint32_t gridSize = grid->mGridSize;
+      for (std::size_t i = 0; i < mCachedCellCount; ++i) {
+        if (mCachedCells[i].mGridSize == gridSize) {
+          return grid->IsVisible(mCachedCells[i].mCell.x, mCachedCells[i].mCell.z);
+        }
+      }
+
+      const GridPos cell(const_cast<Wm3::Vec3f*>(&mPos), static_cast<int>(gridSize));
+      if (mCachedCellCount < mCachedCells.size()) {
+        mCachedCells[mCachedCellCount++] = SCachedCell{gridSize, cell};
+      }
+      return grid->IsVisible(cell.x, cell.z);
+    }
+
+    const Wm3::Vec3f& mPos;
+    Unit* const mUnit;
+    bool mUsesWaterSenseLane = false;
+
+  private:
+    struct SCachedCell
+    {
+      std::uint32_t mGridSize;
+      GridPos mCell;
+    };
+
+    mutable std::array<SCachedCell, 2> mCachedCells{};
+    mutable std::size_t mCachedCellCount = 0;
+  };
+} // namespace moho
+
 gpg::RType* SReconKey::sType = nullptr;
 gpg::RType* CAiReconDBImpl::sType = nullptr;
 
@@ -443,16 +509,16 @@ CAiReconDBImpl::CAiReconDBImpl(SimArmy* const army, const bool fogOfWar) :
 
   }
 
-  boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, 4));
-  boost::ResetSharedPtrRawOwning(mSonarGrid, MakeGrid(mMapData, 4));
-  boost::ResetSharedPtrRawOwning(mOmniGrid, MakeGrid(mMapData, 4));
-  boost::ResetSharedPtrRawOwning(mRCIGrid, MakeGrid(mMapData, 4));
-  boost::ResetSharedPtrRawOwning(mSCIGrid, MakeGrid(mMapData, 4));
-  boost::ResetSharedPtrRawOwning(mVCIGrid, MakeGrid(mMapData, 4));
+  boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, kIntelGridCellSize));
+  boost::ResetSharedPtrRawOwning(mSonarGrid, MakeGrid(mMapData, kIntelGridCellSize));
+  boost::ResetSharedPtrRawOwning(mOmniGrid, MakeGrid(mMapData, kIntelGridCellSize));
+  boost::ResetSharedPtrRawOwning(mRCIGrid, MakeGrid(mMapData, kIntelGridCellSize));
+  boost::ResetSharedPtrRawOwning(mSCIGrid, MakeGrid(mMapData, kIntelGridCellSize));
+  boost::ResetSharedPtrRawOwning(mVCIGrid, MakeGrid(mMapData, kIntelGridCellSize));
 
   if (fogOfWar) {
-    boost::ResetSharedPtrRawOwning(mVisionGrid, MakeGrid(mMapData, 2));
-    boost::ResetSharedPtrRawOwning(mWaterGrid, MakeGrid(mMapData, 4));
+    boost::ResetSharedPtrRawOwning(mVisionGrid, MakeGrid(mMapData, kVisionGridCellSize));
+    boost::ResetSharedPtrRawOwning(mWaterGrid, MakeGrid(mMapData, kIntelGridCellSize));
   }
 }
 
@@ -915,13 +981,24 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     // incoming `mScmResource` is non-null -- so every recon blip arrived with no
     // scm resource and the client drew the unit's footprint and attached
     // effects but never its mesh.
-    perArmy->mMesh = sourceUnit->Entity::GetMesh();
+    //
+    // The three handles are copy-assigned straight from the fields that
+    // `Entity::GetMesh`, `CAniActor::GetPriorPoseShared` and `GetPoseShared`
+    // return copies of, with no by-value temporary in between. boost 1.34's
+    // `shared_count::operator=` only touches reference counts when the control
+    // blocks differ, so a blip whose source still holds the same mesh and
+    // poses -- the common case, every tick, every army -- costs no interlocked
+    // operation. When they differ, the new block is retained and the old one
+    // released inside the assignment exactly as before; the temporary's extra
+    // retain/release pair could never free anything, because the source field
+    // keeps its own reference.
+    perArmy->mMesh = sourceUnit->mVarDat.mScmResource;
 
     // 0x005C1C2F: an animated source unit reseats both pose lanes from its
     // actor; one without an actor drops them instead (0x005C1C95/0x005C1CA0).
-    if (CAniActor* const actor = sourceUnit->AniActor; actor != nullptr) {
-      perArmy->mPriorPose = actor->GetPriorPoseShared();
-      perArmy->mPose = actor->GetPoseShared();
+    if (const CAniActor* const actor = sourceUnit->AniActor; actor != nullptr) {
+      perArmy->mPriorPose = actor->mPriorPose;
+      perArmy->mPose = actor->mPose;
     } else {
       perArmy->mPriorPose.reset();
       perArmy->mPose.reset();
@@ -1165,38 +1242,32 @@ void CAiReconDBImpl::DeleteBlips(const ReconBlipMap::iterator first, const Recon
  * counter-intel suppression.
  */
 EReconFlags CAiReconDBImpl::GetNewReconFor(
-  Entity* const entity, const Wm3::Vec3f& pos, const EReconFlags oldFlags, const bool belowWater
+  const SReconPointProbe& probe, const EReconFlags oldFlags, const bool belowWater
 ) const
 {
-  Unit* const unit = entity ? entity->IsUnit() : nullptr;
-  ReconBlip* const blip = (entity && !unit) ? entity->IsReconBlip() : nullptr;
-
   EReconFlags detected = RECON_None;
   if (mFogOfWar == 0 || mVisionGrid.px == nullptr) {
     detected = RECON_LOSNow;
   } else if (HasFlag(oldFlags, RECON_LOSNow)) {
     const CIntelGrid* const losGrid = belowWater ? mWaterGrid.px : mVisionGrid.px;
-    if (IsGridVisibleAtPoint(losGrid, pos)) {
+    if (probe.IsVisibleIn(losGrid)) {
       detected = RECON_LOSNow;
     }
   }
 
-  bool sonarEligible = belowWater;
-  if (unit) {
-    sonarEligible = sonarEligible || UsesWaterSenseLane(unit->mVarDat.mLayerMask);
-  } else if (blip) {
-    sonarEligible = sonarEligible || UsesWaterSenseLane(blip->mVarDat.mLayerMask);
-  }
+  // The entity's `IsUnit`/`IsReconBlip` identity and layer were read once
+  // into the probe; the binary re-reads them here on every allied army.
+  const bool sonarEligible = belowWater || probe.mUsesWaterSenseLane;
 
-  if (sonarEligible && HasFlag(oldFlags, RECON_Sonar) && IsGridVisibleAtPoint(mSonarGrid.px, pos)) {
+  if (sonarEligible && HasFlag(oldFlags, RECON_Sonar) && probe.IsVisibleIn(mSonarGrid.px)) {
     detected = MergeFlags(detected, RECON_Sonar);
   }
 
-  if (!belowWater && HasFlag(oldFlags, RECON_Radar) && IsGridVisibleAtPoint(mRadarGrid.px, pos)) {
+  if (!belowWater && HasFlag(oldFlags, RECON_Radar) && probe.IsVisibleIn(mRadarGrid.px)) {
     detected = MergeFlags(detected, RECON_Radar);
   }
 
-  if (HasFlag(oldFlags, RECON_Omni) && IsGridVisibleAtPoint(mOmniGrid.px, pos)) {
+  if (HasFlag(oldFlags, RECON_Omni) && probe.IsVisibleIn(mOmniGrid.px)) {
     detected = MergeFlags(detected, RECON_Omni);
   }
 
@@ -1219,9 +1290,9 @@ EReconFlags CAiReconDBImpl::GetNewReconFor(
  * Applies point counter-intel and stealth/counter-stealth suppression to
  * raw recon flags.
  */
-EReconFlags CAiReconDBImpl::ApplyReconCounters(Entity* const entity, const Wm3::Vec3f& pos, EReconFlags flags) const
+EReconFlags CAiReconDBImpl::ApplyReconCounters(const SReconPointProbe& probe, EReconFlags flags) const
 {
-  Unit* const unit = entity ? entity->IsUnit() : nullptr;
+  Unit* const unit = probe.mUnit;
 
   if (HasFlag(flags, RECON_Omni)) {
     return flags;
@@ -1230,14 +1301,14 @@ EReconFlags CAiReconDBImpl::ApplyReconCounters(Entity* const entity, const Wm3::
   const CIntel* const intel = unit ? unit->GetIntelManager() : nullptr;
   const bool activeCloak = intel && intel->mCloak.present != 0u && intel->mCloak.enabled != 0u;
 
-  if (IsGridVisibleAtPoint(mRCIGrid.px, pos)) {
+  if (probe.IsVisibleIn(mRCIGrid.px)) {
     flags = ClearFlag(flags, RECON_Radar);
   }
-  if (IsGridVisibleAtPoint(mSCIGrid.px, pos)) {
+  if (probe.IsVisibleIn(mSCIGrid.px)) {
     flags = ClearFlag(flags, RECON_Sonar);
   }
 
-  if (activeCloak || IsGridVisibleAtPoint(mVCIGrid.px, pos)) {
+  if (activeCloak || probe.IsVisibleIn(mVCIGrid.px)) {
     flags = ClearFlag(flags, RECON_LOSNow);
   }
 
@@ -1274,7 +1345,8 @@ EReconFlags CAiReconDBImpl::GetReconFlags(
   Entity* const entity, const Wm3::Vec3f& pos, const EReconFlags oldFlags, const bool belowWater
 ) const
 {
-  EReconFlags combined = GetNewReconFor(entity, pos, oldFlags, belowWater);
+  const SReconPointProbe probe(entity, pos);
+  EReconFlags combined = GetNewReconFor(probe, oldFlags, belowWater);
 
   if (mSim && mArmy && mArmy->mConstDat.mArmyIndex >= 0) {
     const std::uint32_t viewerArmyId = static_cast<std::uint32_t>(mArmy->mConstDat.mArmyIndex);
@@ -1286,11 +1358,15 @@ EReconFlags CAiReconDBImpl::GetReconFlags(
       }
 
       CAiReconDBImpl* const allyReconDb = allyArmy->GetReconDB();
-      if (!allyReconDb) {
+      // Every army is in its own ally set, so the binary meets this recon DB
+      // a second time here. `GetNewReconFor` is a const read of grids and the
+      // probe (no state, RNG or script), and its result is OR-merged, so the
+      // repeat cannot change `combined`.
+      if (!allyReconDb || allyReconDb == this) {
         continue;
       }
 
-      combined = MergeFlags(combined, allyReconDb->GetNewReconFor(entity, pos, oldFlags, belowWater));
+      combined = MergeFlags(combined, allyReconDb->GetNewReconFor(probe, oldFlags, belowWater));
     }
   }
 
@@ -1298,7 +1374,7 @@ EReconFlags CAiReconDBImpl::GetReconFlags(
     return RECON_None;
   }
 
-  return ApplyReconCounters(entity, pos, combined);
+  return ApplyReconCounters(probe, combined);
 }
 
 /**
@@ -1333,7 +1409,9 @@ EReconFlags CAiReconDBImpl::GetReconFlagsForRect(
       }
 
       CAiReconDBImpl* const allyReconDb = allyArmy->GetReconDB();
-      if (!allyReconDb) {
+      // Skips this recon DB's repeat visit, as in `GetReconFlags`:
+      // `GetDetection` is a const grid read and the result is OR-merged.
+      if (!allyReconDb || allyReconDb == this) {
         continue;
       }
 

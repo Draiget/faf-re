@@ -24,6 +24,7 @@ namespace moho
   class CInfluenceMap;
   class Sim;
   struct SWorldBeam;
+  struct SReconPointProbe;
 
   /**
    * Raw map header used by CAiReconDBImpl for blip lookup tree ownership.
@@ -527,9 +528,14 @@ namespace moho
      * What it does:
      * Computes one-army point recon senses (LOS/radar/sonar/omni) before
      * counter-intel suppression.
+     *
+     * The binary takes `(entity, pos)`; here they arrive bundled in the
+     * `GetReconFlags` probe, which also memoises what the binary re-derives on
+     * every call from them alone (the entity's unit/blip identity and water
+     * lane, and the grid cell of `pos` per grid size).
      */
     [[nodiscard]]
-    EReconFlags GetNewReconFor(Entity* entity, const Wm3::Vec3f& pos, EReconFlags oldFlags, bool belowWater) const;
+    EReconFlags GetNewReconFor(const SReconPointProbe& probe, EReconFlags oldFlags, bool belowWater) const;
 
     /**
      * Address: 0x005CB460 (FUN_005CB460, Moho::CAiReconDBImpl::ApplyReconCounters)
@@ -538,10 +544,11 @@ namespace moho
      *
      * What it does:
      * Applies point counter-intel and stealth/counter-stealth suppression to
-     * raw recon flags.
+     * raw recon flags. `(entity, pos)` arrive in the `GetReconFlags` probe, as
+     * for `GetNewReconFor`.
      */
     [[nodiscard]]
-    EReconFlags ApplyReconCounters(Entity* entity, const Wm3::Vec3f& pos, EReconFlags flags) const;
+    EReconFlags ApplyReconCounters(const SReconPointProbe& probe, EReconFlags flags) const;
 
     /**
      * Address: 0x005CB520 (FUN_005CB520, Moho::CAiReconDBImpl::GetDetection)
@@ -568,6 +575,17 @@ namespace moho
 
   public:
     static gpg::RType* sType;
+
+    /**
+     * World units per cell of the recon grids the constructor builds
+     * (0x005BFF90 passes these sizes to `CIntelGrid::CIntelGrid`): the vision
+     * grid, and
+     * every other one -- water, radar, sonar, omni and the three
+     * counter-intel grids. An archive load rebuilds each grid at its saved
+     * size, so these are the only sizes recon grids ever have.
+     */
+    static constexpr std::uint32_t kVisionGridCellSize = 2u;
+    static constexpr std::uint32_t kIntelGridCellSize = 4u;
 
     ReconBlipMap mBlipMap;      // +0x04
     msvc8::vector<ReconBlip*> mBblips;  // +0x10

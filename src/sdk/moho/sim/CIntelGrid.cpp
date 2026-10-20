@@ -285,26 +285,7 @@ namespace moho
     result.SetUnowned(gridRef, 0u);
   }
 
-  /**
-   * Address: 0x005BE150 (FUN_005BE150, ?IsVisible@CIntelGrid@Moho@@QBE_NHH@Z)
-   * Address: 0x00506EA0 (FUN_00506EA0 -- `mWidth - 1` through a grid pointer slot, the bounds arithmetic this method inlines; zero callers, unreachable. Formerly `ByteRasterMaxXFromSlot` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
-   * Address: 0x00506EB0 (FUN_00506EB0 -- `mHeight - 1`, likewise; formerly `ByteRasterMaxYFromSlot`.)
-   * Address: 0x00507900 (FUN_00507900 -- `mGrid + x + z * mWidth`, the cell address this method inlines; formerly `ByteRasterAddressAt`.)
-   */
-  bool CIntelGrid::IsVisible(const std::int32_t x, const std::int32_t z) const
-  {
-    if (x < 0 || z < 0) {
-      return false;
-    }
-
-    const std::uint32_t ux = static_cast<std::uint32_t>(x);
-    const std::uint32_t uz = static_cast<std::uint32_t>(z);
-    if (ux >= mWidth || uz >= mHeight) {
-      return false;
-    }
-
-    return mGrid[uz * mWidth + ux] != 0;
-  }
+  // `IsVisible(int, int)` (0x005BE150) is defined inline in CIntelGrid.h.
 
   /**
    * Address: 0x005BE180 (FUN_005BE180, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector2@H@Wm3@@@Z)
@@ -501,25 +482,106 @@ namespace moho
     const std::int8_t cellDelta = static_cast<std::int8_t>(doAdd ? 1 : -1);
     std::int32_t xDistance = gridPos.x - x;
 
-    for (; x < xMax; ++x, --xDistance) {
+    // One column's covered rows `[zBegin, zEnd)`: the binary's per-column
+    // computation verbatim. Both traversals below go through it.
+    const auto columnSpan = [&](const std::int32_t columnXDistance, std::int32_t& zBegin, std::int32_t& zEnd) {
       const std::int32_t leg =
-        static_cast<std::int32_t>(std::sqrt(static_cast<float>(radiusSq - xDistance * xDistance)));
+        static_cast<std::int32_t>(std::sqrt(static_cast<float>(radiusSq - columnXDistance * columnXDistance)));
 
-      std::int32_t z = gridPos.z - leg;
-      if (z >= height) {
-        z = height;
+      zBegin = gridPos.z - leg;
+      if (zBegin >= height) {
+        zBegin = height;
       }
-      if (z < 0) {
-        z = 0;
+      if (zBegin < 0) {
+        zBegin = 0;
       }
 
-      std::int32_t zMax = gridPos.z + leg;
-      if (zMax >= height) {
-        zMax = height;
+      zEnd = gridPos.z + leg;
+      if (zEnd >= height) {
+        zEnd = height;
       }
-      if (zMax < 0) {
-        zMax = 0;
+      if (zEnd < 0) {
+        zEnd = 0;
       }
+    };
+
+    // Row-major traversal. The binary walks column by column (outer x, inner
+    // z; the fallback loop at the end), so every write strides `width` bytes
+    // -- a new cache line per cell on the 1024-wide grids of a large map.
+    //
+    // Why the row-major form produces the identical grid:
+    //  - each covered cell receives exactly one `+cellDelta` per call, and
+    //    int8 addition modulo 256 commutes, so only the covered set matters;
+    //  - the covered set is unchanged: pass 1 computes every column's span
+    //    with `columnSpan` over the same `xDistance` sequence (one `sqrt` per
+    //    column on the same operand, as before), and pass 2 writes exactly
+    //    the cells with `zBegin[c] <= z < zEnd[c]`;
+    //  - finding those cells per row by binary search needs that predicate to
+    //    be monotone on each side of the widest column: `leg` is
+    //    non-increasing in `|xDistance|` (int->float, IEEE sqrt and
+    //    truncation are all monotone) and the clamps are monotone, so the
+    //    spans are nested intervals widening towards the centre column.
+    // The guards limit this path to inputs where `gridPos.z +/- leg` cannot
+    // overflow and the per-column buffers fit; anything else runs the
+    // binary's loop. Nothing on the sim thread reads the grid mid-call (the
+    // render thread's fog queries can see a half-applied circle in either
+    // order; the grids are not checksummed -- `UpdateChecksum` is a no-op).
+    constexpr std::int32_t kRowMajorMaxColumns = 1024;
+    constexpr std::int32_t kRowMajorMaxRadius = 1 << 15;
+    constexpr std::int32_t kRowMajorMaxCenter = 1 << 24;
+    const std::int32_t columnCount = xMax - x;
+    if (columnCount <= kRowMajorMaxColumns && radius >= 0 && radius <= kRowMajorMaxRadius &&
+        gridPos.z >= -kRowMajorMaxCenter && gridPos.z <= kRowMajorMaxCenter) {
+      std::int32_t zBegin[kRowMajorMaxColumns];
+      std::int32_t zEnd[kRowMajorMaxColumns];
+      std::int32_t widest = 0;
+      for (std::int32_t column = 0; column < columnCount; ++column, --xDistance) {
+        columnSpan(xDistance, zBegin[column], zEnd[column]);
+        if (zEnd[column] - zBegin[column] > zEnd[widest] - zBegin[widest]) {
+          widest = column;
+        }
+      }
+
+      std::int8_t* const firstColumn = &mGrid[x];
+      for (std::int32_t z = zBegin[widest]; z < zEnd[widest]; ++z) {
+        const auto covers = [&](const std::int32_t column) {
+          return zBegin[column] <= z && z < zEnd[column];
+        };
+
+        // Coverage rises over [0, widest] and falls over [widest, columnCount).
+        std::int32_t first = 0;
+        for (std::int32_t count = widest; count > 0;) {
+          const std::int32_t step = count / 2;
+          if (!covers(first + step)) {
+            first += step + 1;
+            count -= step + 1;
+          } else {
+            count = step;
+          }
+        }
+        std::int32_t last = widest + 1;
+        for (std::int32_t count = columnCount - last; count > 0;) {
+          const std::int32_t step = count / 2;
+          if (covers(last + step)) {
+            last += step + 1;
+            count -= step + 1;
+          } else {
+            count = step;
+          }
+        }
+
+        std::int8_t* const row = firstColumn + z * width;
+        for (std::int32_t column = first; column < last; ++column) {
+          row[column] = static_cast<std::int8_t>(row[column] + cellDelta);
+        }
+      }
+      return;
+    }
+
+    for (; x < xMax; ++x, --xDistance) {
+      std::int32_t z = 0;
+      std::int32_t zMax = 0;
+      columnSpan(xDistance, z, zMax);
 
       for (; z < zMax; ++z) {
         std::int8_t& cell = mGrid[x + z * width];

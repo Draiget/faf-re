@@ -8,6 +8,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/ai/CAiReconDBImpl.h"
+#include "moho/math/GridPos.h"
 #include "moho/sim/CIntelGrid.h"
 
 namespace
@@ -40,20 +42,73 @@ namespace
   }
 
   /**
+   * Whether `CIntelGrid::Raster` covers the same cells for `movedPos` as for
+   * `lastPos` on a grid of `gridSize`. Raster's footprint is a function of
+   * `GridPos(pos, gridSize)`, the cell radius and the grid's dimensions only
+   * (the sub-cell position never enters it), so equal cells mean an equal
+   * footprint. Built with the same `GridPos` constructor Raster uses.
+   */
+  [[nodiscard]] bool RasterCellUnchanged(Wm3::Vec3f lastPos, Wm3::Vec3f movedPos, const std::uint32_t gridSize) noexcept
+  {
+    const moho::GridPos lastCell(&lastPos, static_cast<int>(gridSize));
+    const moho::GridPos movedCell(&movedPos, static_cast<int>(gridSize));
+    return lastCell.x == movedCell.x && lastCell.z == movedCell.z;
+  }
+
+  /**
+   * Whether `SubViz` at `mLastPos` followed by `AddViz` at `newPos`, at an
+   * unchanged radius, leaves every grid exactly as it was.
+   *
+   * Each raster adds -1 then +1 (int8, modulo 256) to the same cells when the
+   * footprints match, which restores every byte; nothing reads the grids in
+   * between. The grids a handle rasters into: a plain `CIntelPosHandle` only
+   * its own `mGrid`; a `CIntelCounterHandle` (whose `mGrid` is always empty)
+   * the other armies' counter-intel grids, which are all
+   * `CAiReconDBImpl::kIntelGridCellSize` cells. Both sizes are checked
+   * whenever they differ, so the test holds for either kind.
+   */
+  [[nodiscard]] bool MoveKeepsRasterFootprint(const moho::CIntelPosHandle& handle, const Wm3::Vec3f& newPos) noexcept
+  {
+    constexpr std::uint32_t kCounterIntelCellSize = moho::CAiReconDBImpl::kIntelGridCellSize;
+    if (const moho::CIntelGrid* const grid = handle.mGrid.px; grid != nullptr) {
+      if (!RasterCellUnchanged(handle.mLastPos, newPos, grid->mGridSize)) {
+        return false;
+      }
+      if (grid->mGridSize == kCounterIntelCellSize) {
+        return true;
+      }
+    }
+    return RasterCellUnchanged(handle.mLastPos, newPos, kCounterIntelCellSize);
+  }
+
+  /**
    * Address: 0x0076D8D0 (FUN_0076D8D0)
    *
    * What it does:
    * Rebuilds one position-watch entry's coverage when the requested position
    * or radius differs from the stored state by calling `SubViz`, updating the
    * cached fields, then calling `AddViz`.
+   *
+   * A move at the same radius that stays in the same grid cell(s) skips the
+   * two rasters -- they would cancel exactly (`MoveKeepsRasterFootprint`) --
+   * and stores the new position, the only field the full path changes.
+   * Slow and hovering units mostly re-raster onto the cells they left. A
+   * skip keeps `mLastPos` in the cell(s) last rastered, so every later
+   * subtraction at `mLastPos` (the next move, a disable, the destructor)
+   * still removes exactly the cells that were added.
    */
   void RebuildEntityPositionWatchCoverage(
-    moho::EntityPositionWatchEntry* const entry,
+    moho::CIntelPosHandle* const entry,
     const Wm3::Vec3f& newPos,
     const std::uint32_t requestedRadius
   )
   {
     if (newPos != entry->mLastPos || requestedRadius != entry->mRadius) {
+      if (requestedRadius == entry->mRadius && MoveKeepsRasterFootprint(*entry, newPos)) {
+        entry->mLastPos = newPos;
+        return;
+      }
+
       entry->SubViz();
       entry->mLastPos = newPos;
       entry->mRadius = requestedRadius;

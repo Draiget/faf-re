@@ -135,12 +135,33 @@ namespace moho
 
     /**
      * Address: 0x005BE150 (FUN_005BE150, ?IsVisible@CIntelGrid@Moho@@QBE_NHH@Z)
+     * Address: 0x00506EA0 (FUN_00506EA0 -- `mWidth - 1` through a grid pointer slot, the bounds arithmetic this method inlines; zero callers, unreachable. Formerly `ByteRasterMaxXFromSlot` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+     * Address: 0x00506EB0 (FUN_00506EB0 -- `mHeight - 1`, likewise; formerly `ByteRasterMaxYFromSlot`.)
+     * Address: 0x00507900 (FUN_00507900 -- `mGrid + x + z * mWidth`, the cell address this method inlines; formerly `ByteRasterAddressAt`.)
      *
      * What it does:
      * Returns true when `(x,z)` is inside the intel grid bounds and the cell
      * visibility byte is non-zero.
+     *
+     * Defined inline here (it was out of line in `CIntelGrid.cpp`) so the
+     * point-recon probes in `CAiReconDBImpl`, which compute a cell once and
+     * test it against up to a dozen grids, do not pay a call per grid. Same
+     * body, same result.
      */
-    [[nodiscard]] bool IsVisible(std::int32_t x, std::int32_t z) const;
+    [[nodiscard]] bool IsVisible(const std::int32_t x, const std::int32_t z) const
+    {
+      if (x < 0 || z < 0) {
+        return false;
+      }
+
+      const std::uint32_t ux = static_cast<std::uint32_t>(x);
+      const std::uint32_t uz = static_cast<std::uint32_t>(z);
+      if (ux >= mWidth || uz >= mHeight) {
+        return false;
+      }
+
+      return mGrid[uz * mWidth + ux] != 0;
+    }
 
     /**
      * Address: 0x005BE180 (FUN_005BE180, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector2@H@Wm3@@@Z)
