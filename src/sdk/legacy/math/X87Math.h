@@ -208,6 +208,16 @@ namespace msvc8
    * float away.
    */
   [[nodiscard]] float IntrinsicLnQuotient(float x, double base) noexcept;
+  /**
+   * `log(numerator / denominator) * scale` with the /Oi `log` intrinsic
+   * inlined, as HaStar's edge-cost quantizer forms it (0x0092D8B0 and the
+   * inlined copy at 0x00954FDF): `fld; fdiv; fldln2; fxch; fyl2x; fmul;
+   * fstp`. The quotient rounds under the simulation's 24-bit control, the
+   * logarithm stays at full x87 precision and only the product rounds to
+   * float. Rounding the logarithm first can land one float away and move a
+   * product sitting at a whole number into the next cost bucket.
+   */
+  [[nodiscard]] float ScaledLnQuotient(float numerator, float denominator, float scale) noexcept;
   [[nodiscard]] float CosTimesCos(float firstArg, float secondArg) noexcept;
 
   /**

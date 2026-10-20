@@ -1,9 +1,10 @@
 # Retail replay parity
 
-Real multiplayer games from the FAF replay vault are played back on the rebuilt
-engine and checked against the original `ForgedAlliance.exe`, bit for bit.
+Real games from the FAF replay vault — multiplayer games and games against the
+built-in AI or M28AI — are played back on the rebuilt engine and checked against
+the original `ForgedAlliance.exe`, bit for bit.
 
-*Snapshot: 19/10/2026 — 16 of 16 replays match on every gameplay beat.*
+*Snapshot: 20/10/2026 — 29 of 29 replays match on every gameplay beat.*
 
 ## Method
 
@@ -16,6 +17,11 @@ engine and checked against the original `ForgedAlliance.exe`, bit for bit.
    diffed. One differing bit anywhere in the sim state fails the beat.
 3. **Regression.** Every fix is re-screened against all replays that already
    matched before it is committed.
+
+Replays are sampled at random from the vault. A game is used when it runs the
+standard FAF game version, is at least ten minutes long, and needs no sim mod
+other than M28AI; custom maps and the exact M28AI version a game was recorded
+with are fetched from the FAF content server.
 
 ## Results
 
@@ -37,6 +43,19 @@ engine and checked against the original `ForgedAlliance.exe`, bit for bit.
 | 26968042 | High Noon, 2 players with AI, 34 min | Every embedded checksum matches, start to end. |
 | 26975678 | Fields of Isis, 2 players with AI, 40 min | Every embedded checksum matches, start to end. |
 | 26930624 | Open Palms, 2 players, 14 min | Every embedded checksum matches, start to end. |
+| 27001706 | Dual Gap, 12 players, 39 min | Every embedded checksum matches, start to end. |
+| 27019665 | Astro Crater Battles 4x4, 8 players, 26 min | Every embedded checksum matches, start to end. |
+| 27037528 | The Great Void, 1 player against AI, 75 min | Every embedded checksum matches, start to end. |
+| 26900602 | Seraphim Glaciers, 1 player against AI, 62 min | Every embedded checksum matches, start to end. |
+| 27010745 | Adaptive Mars – Mangala Fossa, 1 player against AI, 46 min | Every embedded checksum matches, start to end. |
+| 26911139 | Strip Mine, 1 player against M28AI, 35 min | Every embedded checksum matches, start to end. |
+| 26989770 | High Noon, 1 player against AI, 33 min | Every embedded checksum matches, start to end. |
+| 27037222 | Dual Gap, 1 player against AI, 31 min | Every embedded checksum matches, start to end. |
+| 26904914 | Dual Gap, 1 player against AI, 28 min | Every embedded checksum matches, start to end. |
+| 27013791 | Ian's Cross, 1 player against AI, 24 min | Every embedded checksum matches, start to end. |
+| 26955642 | Seton's Clutch, 1 player against AI, 23 min | Every embedded checksum matches, start to end. |
+| 27032784 | Stairs to Heaven, 1 player against AI, 14 min | Every embedded checksum matches, start to end. |
+| 27025965 | Seton's Clutch, 1 player against AI, 9 min | Every embedded checksum matches, start to end. |
 
 **The final-beat difference** is deliberate. When a player leaves, retail drops
 the commands that arrive after the leave within the same batch; the rebuilt
@@ -66,3 +85,9 @@ sources end.
 - **Formation orders.** A patrol given to a group in formation must stay tied
   to that formation. Ours never passed the formation to the patrol task, so each
   unit's patrol leg ended on its own arrival check instead of the formation's.
+- **Pathfinder edge costs.** The hierarchical pathfinder buckets each edge cost
+  as `ceil(ln(cost / distance) * 6)`. Retail takes the logarithm with the x87
+  `fyl2x` instruction and rounds only the product to float; ours rounded the
+  logarithm first. Where the product sits at a whole number the bucket moved by
+  one and a unit took a different route — seen only in long AI games, which send
+  many units across the map.

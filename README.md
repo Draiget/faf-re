@@ -12,17 +12,17 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as m
 | Renders | ✅ main menu, cinematic playback, in-game world view |
 | Plays | ✅ native save/load on both architectures |
 | Gameplay testing | ✅ x86 ↔ x64 lockstep multiplayer: hundreds of consecutive checksum-identical beats, no desync |
-| Retail parity | ✅ 16 of 16 FAF vault replays tested play back checksum-identical to the retail executable on 100% of gameplay beats — see [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md) |
+| Retail parity | ✅ 29 of 29 FAF vault replays tested play back checksum-identical to the retail executable on 100% of gameplay beats — see [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md) |
 | Source bodies written | ~39,000 functions |
 | Genuinely outstanding | ~430 |
 
-*Snapshot: 19/10/2026.*
+*Snapshot: 20/10/2026.*
 
 Most symbols in the retail engine were never hand-written code — they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, not as hundreds of separate functions, so the function count understates how much is covered.
 
 ## Retail replay parity
 
-16 real multiplayer games from the FAF replay vault (Dual Gap, Seton's Clutch and stock maps, 2–12 players including AI opponents, 14–46 minutes) play back on the rebuilt engine checksum-identical to the retail `ForgedAlliance.exe` on every gameplay beat. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
+29 real games from the FAF replay vault (Dual Gap, Seton's Clutch, stock and community maps, 1–12 human players, games against the built-in AI and M28AI, 9–75 minutes) play back on the rebuilt engine checksum-identical to the retail `ForgedAlliance.exe` on every gameplay beat. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 ## What is and isn't here
 

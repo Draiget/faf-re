@@ -2012,7 +2012,9 @@ Cluster::Data Cluster::sDefaultConstructData = { 1, nullptr, 0u, 0u, { { 0u, 0u 
  */
 float Cluster::QuantizeEdgeCost(const float a, const float b)
 {
-    const float scaled = msvc8::log(a / b) * 6.0f;
+    // 0x0092D8B0..0x0092D8C4: `fld a; fdiv b; fldln2; fxch; fyl2x; fmul 6.0f`.
+    // The logarithm is never rounded to float on its own.
+    const float scaled = msvc8::ScaledLnQuotient(a, b, 6.0f);
     int quantized = static_cast<int>(std::ceil(scaled));
     if (quantized > 31) {
         quantized = 31;

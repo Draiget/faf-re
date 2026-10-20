@@ -28,6 +28,7 @@ extern "C" float __cdecl msvc8_x87_intrinsic_exp(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_ln(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_log10(float x);
 extern "C" float __cdecl msvc8_x87_intrinsic_ln_quotient(float x, double base);
+extern "C" float __cdecl msvc8_x87_scaled_ln_quotient(float numerator, float denominator, float scale);
 extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
@@ -679,6 +680,25 @@ namespace msvc8
     return result;
 #else
     return msvc8_x87_intrinsic_ln_quotient(x, base);
+#endif
+  }
+
+  float ScaledLnQuotient(const float numerator, const float denominator, const float scale) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld numerator
+      fdiv denominator
+      fldln2
+      fxch st(1)
+      fyl2x
+      fmul scale
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_scaled_ln_quotient(numerator, denominator, scale);
 #endif
   }
 

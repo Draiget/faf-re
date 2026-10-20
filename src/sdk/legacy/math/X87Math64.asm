@@ -397,6 +397,31 @@ msvc8_x87_intrinsic_ln_quotient PROC
 msvc8_x87_intrinsic_ln_quotient ENDP
 
 
+; float msvc8_x87_scaled_ln_quotient(float numerator, float denominator, float scale)
+; ln(numerator / denominator) * scale: the quotient and the product round under
+; PC24, the logarithm stays on the x87 stack.
+msvc8_x87_scaled_ln_quotient PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    movss   dword ptr [rsp+16], xmm2
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+8]
+    fdiv    dword ptr [rsp+12]
+    fldln2
+    fxch    st(1)
+    fyl2x
+    fmul    dword ptr [rsp+16]
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_scaled_ln_quotient ENDP
+
+
 ; float msvc8_x87_intrinsic_log10(float x)
 msvc8_x87_intrinsic_log10 PROC
     movss   dword ptr [rsp+8], xmm0
