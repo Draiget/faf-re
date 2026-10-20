@@ -4,7 +4,7 @@ Real games from the FAF replay vault — multiplayer games and games against the
 built-in AI or M28AI — are played back on the rebuilt engine and checked against
 the original `ForgedAlliance.exe`, bit for bit.
 
-*Snapshot: 20/10/2026 — 67 of 67 replays match on every gameplay beat.*
+*Snapshot: 20/10/2026 — 76 of 76 replays match on every gameplay beat.*
 
 ## Method
 
@@ -94,6 +94,15 @@ with are fetched from the FAF content server.
 | 26952549 | Frithen, 2 players, 15 min | Every embedded checksum matches, start to end. |
 | 26880663 | Dual Gap, 12 players, 12 min | Every embedded checksum matches, start to end. |
 | 26958235 | Desolate Dunes, 2 players, 10 min | Every embedded checksum matches, start to end. |
+| 26919967 | Dual Gap, 12 players, 46 min | Every embedded checksum matches, start to end. |
+| 26912284 | UK, 3 players with M28AI, 39 min | Every embedded checksum matches, start to end. |
+| 26997230 | Adaptive Mars – Mangala Fossa, 3 players, 37 min | Every embedded checksum matches, start to end. |
+| 27034831 | Astro Crater Battles 3x3 Rich, 6 players, 35 min | Every embedded checksum matches, start to end. |
+| 26928211 | Astro Crater Battles 4x4 Rich Huge, 8 players, 27 min | Every embedded checksum matches, start to end. |
+| 27019199 | Astro Crater Battles 4x4 Overmap, 8 players, 26 min | Every embedded checksum matches, start to end. |
+| 26997072 | Astro Crater Rise Reworked 5x5, 10 players, 23 min | Every embedded checksum matches, start to end. |
+| 27032464 | Astro Crater Battles 4x4 Rich Huge, 8 players, 19 min | Every embedded checksum matches, start to end. |
+| 26919698 | Hargreven, 2 players, 14 min | Every embedded checksum matches, start to end. |
 
 **A live-game desync is not a playback desync.** Every client records its own
 checksum into the replay. In 26946725 nine clients recorded the same checksum at
