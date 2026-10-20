@@ -15,7 +15,9 @@ usage: sampler.py <pid> <outdir> <seconds> [window_seconds]
 
 Tables come from build_symbols.py (env FAF_PERF_TABLES, default %TEMP%/faf_perf).
 The target exe defaults to FAF's ForgedAlliance.exe (env FA_EXE), which must be the
-binary the fa_full_2026_03_26 export was made from.
+binary the fa_full_2026_03_26 export was made from. For a rebuilt main.exe, build the
+tables with build_symbols_pdb.py instead and point FA_EXE at that exe: its meta.json
+supplies the Sim vtable, and addresses are rebased by the exe's load address (ASLR).
 """
 import bisect
 import collections
@@ -33,6 +35,10 @@ SYMMAP = os.path.join(TABLES, "symmap.json")
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CALLGRAPH = os.path.join(REPO, "decomp", "recovery", "disasm", "fa_full_2026_03_26", "_callgraph_index.sqlite")
 SIM_VTABLE = 0x00E34714
+META_PATH = os.path.join(TABLES, "meta.json")
+META = json.load(open(META_PATH)) if os.path.exists(META_PATH) else {}
+if META.get("sim_vtable"):
+    SIM_VTABLE = META["sim_vtable"]
 
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 winmm = ctypes.WinDLL("winmm")
@@ -160,16 +166,20 @@ def func_index(addr):
 def load_call_validation():
     """addr_taken: functions reachable by an indirect call (their address is stored as data).
     tail_dests[f]: functions that f leaves through an E9 jmp (tail call)."""
-    import sqlite3
-    db = sqlite3.connect(CALLGRAPH)
-    tok_index = {r[2]: i for i, r in enumerate(SYM)}
     taken = set()
-    for (tok,) in db.execute("select distinct to_token from data_refs where to_token like 'FUN_%'"):
-        if tok in tok_index:
-            taken.add(tok_index[tok])
-    for (tok,) in db.execute("select distinct target_token from incoming_xrefs where kind='data'"):
-        if tok in tok_index:
-            taken.add(tok_index[tok])
+    taken_path = os.path.join(TABLES, "taken.json")
+    if os.path.exists(taken_path):
+        taken = {START_INDEX[a] for a in json.load(open(taken_path)) if a in START_INDEX}
+    else:
+        import sqlite3
+        db = sqlite3.connect(CALLGRAPH)
+        tok_index = {r[2]: i for i, r in enumerate(SYM)}
+        for (tok,) in db.execute("select distinct to_token from data_refs where to_token like 'FUN_%'"):
+            if tok in tok_index:
+                taken.add(tok_index[tok])
+        for (tok,) in db.execute("select distinct target_token from incoming_xrefs where kind='data'"):
+            if tok in tok_index:
+                taken.add(tok_index[tok])
     tails = collections.defaultdict(set)
     off = 0
     while True:
@@ -290,12 +300,12 @@ def rpm(hp, addr, size):
     return None
 
 
-def find_sim(hp):
+def find_sim(hp, delta=0):
     """Scan committed private RW memory for an object whose first dword is the Sim vtable
     and whose mCurTick / mEntityDB look sane."""
     mbi = MEMORY_BASIC_INFORMATION()
     addr = 0x10000
-    needle = struct.pack("<I", SIM_VTABLE)
+    needle = struct.pack("<I", (SIM_VTABLE + delta) & 0xFFFFFFFF)
     cands = []
     while addr < 0xFFFF0000:
         if not k32.VirtualQueryEx(hp, ctypes.c_void_p(addr), ctypes.byref(mbi), ctypes.sizeof(mbi)):
@@ -378,6 +388,18 @@ def main():
         raise SystemExit("OpenProcess failed %d" % ctypes.get_last_error())
     mods = modules(pid)
     mod_starts = [m[0] for m in mods]
+    # ASLR: symbol tables use the exe's preferred base; rebase samples by its load address.
+    exe_mod = next((m for m in mods if m[2].lower().endswith(".exe")), None)
+    with open(EXE, "rb") as fh:
+        head = fh.read(0x400)
+    preferred = struct.unpack_from("<I", head, struct.unpack_from("<I", head, 0x3C)[0] + 24 + 28)[0]
+    delta = (exe_mod[0] - preferred) if exe_mod else 0
+    exe_lo, exe_hi = (exe_mod[0], exe_mod[1]) if exe_mod else (0, 0x100000000)
+
+    def rebase(addr):
+        """Exe addresses to the tables' preferred base; anything outside the exe maps to 0."""
+        return (addr - delta) & 0xFFFFFFFF if exe_lo <= addr < exe_hi else 0
+    print("exe %s loaded at 0x%08X (delta 0x%X)" % (exe_mod[2] if exe_mod else "?", exe_mod[0] if exe_mod else 0, delta), flush=True)
 
     def module_of(addr):
         i = bisect.bisect_right(mod_starts, addr) - 1
@@ -428,7 +450,7 @@ def main():
             busy = [tid for d, tid in usage[:4] if d > 1_000_000]  # >10% of a core over the last second
             if sim is None and now >= next_sim_scan:
                 next_sim_scan = now + 15.0
-                sim = find_sim(hp)
+                sim = find_sim(hp, delta)
                 if sim:
                     print("Sim object at 0x%08X" % sim, flush=True)
             if win_start_state is None and sim:
@@ -457,9 +479,9 @@ def main():
                 k32.ResumeThread(h)
             if not ok:
                 continue
-            eip = ctx.Eip
-            leaf = func_index(eip)
-            leaf_key = leaf if leaf >= 0 else ("mod:" + module_of(eip))
+            eip = rebase(ctx.Eip)
+            leaf = func_index(eip) if eip else -1
+            leaf_key = leaf if leaf >= 0 else ("mod:" + module_of(ctx.Eip))
             samples[tid] += 1
             flat[(tid, leaf_key)] += 1
             chain = [leaf_key]
@@ -467,6 +489,7 @@ def main():
                 n = len(stack) // 4
                 cur = leaf
                 for (v,) in struct.iter_unpack("<I", stack[: n * 4]):
+                    v = rebase(v)
                     if v in RET_SITES:
                         fi = func_index(v)
                         if fi >= 0 and accepts(v, cur):
