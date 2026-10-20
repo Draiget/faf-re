@@ -1879,6 +1879,15 @@ namespace
   POINT sMouseScrubDelta{};
   bool sInvertMidMouseScrub = false;
   POINT sMouseScrubAnchor{};
+  // Engine addition, not in the binary: where the latest
+  // SetCursorPos(sMouseScrubAnchor) actually put the cursor, re-read after
+  // every warp. Under DPI scaling, or when the anchor falls outside the
+  // window's ClipCursor rect, the cursor lands elsewhere, and not always on
+  // the same spot; measuring against the requested anchor counted that gap as
+  // mouse motion on every warp (a tiny drag spun the camera by hundreds of
+  // pixels). Where the warp lands exactly, this equals the anchor and nothing
+  // changes.
+  POINT sMouseScrubLanded{};
 
   /// The control under the mouse as of the last mouse event (`0x010BDBA0`),
   /// rebound on every MET_MouseEnter / MET_MouseExit in `func_OnMouseMove`.
@@ -9060,9 +9069,10 @@ static void func_ProcessMouseScrubbing()
   // rewriting the instructions at 0x0086E01F / 0x0086E027; carry that choice
   // as a sign instead. See UI_SetInvertMidMouseScrub.
   const LONG scrubSign = sInvertMidMouseScrub ? -1 : 1;
-  sMouseScrubDelta.x += scrubSign * (cursorPoint.x - sMouseScrubAnchor.x);
-  sMouseScrubDelta.y += scrubSign * (cursorPoint.y - sMouseScrubAnchor.y);
+  sMouseScrubDelta.x += scrubSign * (cursorPoint.x - sMouseScrubLanded.x);
+  sMouseScrubDelta.y += scrubSign * (cursorPoint.y - sMouseScrubLanded.y);
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
+  ::GetCursorPos(&sMouseScrubLanded);
 
   auto* const cursor = moho::g_UIManager->GetCursor();
   (void)SetCursorShowingAndMarkDirty(cursor, false);
@@ -9138,6 +9148,7 @@ static void func_StartMouseScrubbing(
   sMouseScrubAnchor.x = static_cast<LONG>(left + static_cast<float>(viewportRect.left) + (width * 0.5f));
   sMouseScrubAnchor.y = scrubY;
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
+  ::GetCursorPos(&sMouseScrubLanded);
 }
 
 /**
