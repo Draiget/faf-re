@@ -308,11 +308,26 @@ namespace moho
         return nullptr;
       }
 
-      if (const auto found = map.find(msvc8::string(resId.name.view())); found != map.end()) {
+      // Exact: `resId.name` already is the map's `key_type` (msvc8::string), so
+      // finding with it runs the same `std::less<msvc8::string>` compares as the
+      // former byte-identical temporary copy - without allocating one.
+      if (const auto found = map.find(resId.name); found != map.end()) {
         return static_cast<TBlueprint*>(found->second);
       }
 
-      msvc8::string slashNormalized(resId.name.view());
+      // Exact: STR_NormalizeFilenameLowerSlash is a per-byte map that only
+      // rewrites 'A'..'Z' and '\\'. With neither present the normalized key
+      // equals `resId.name`, whose search just missed, so the retry would miss
+      // again - return the same nullptr without copying or searching.
+      const std::string_view name = resId.name.view();
+      const bool normalizationChangesName = std::ranges::any_of(name, [](const char ch) noexcept {
+        return (ch >= 'A' && ch <= 'Z') || ch == '\\';
+      });
+      if (!normalizationChangesName) {
+        return nullptr;
+      }
+
+      msvc8::string slashNormalized(name);
       gpg::STR_NormalizeFilenameLowerSlash(slashNormalized);
 
       const auto fallbackFound = map.find(slashNormalized);

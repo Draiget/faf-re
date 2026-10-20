@@ -291,7 +291,7 @@ namespace
    */
   std::int32_t MarchLineAndGatherCollisionSpans(
     moho::EntityOccupationManager& manager,
-    gpg::core::FastVectorN<moho::CollisionShapeBase*, 20>& outSpans,
+    gpg::core::FastVectorInline<moho::CollisionShapeBase*>& outSpans,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
@@ -367,14 +367,16 @@ namespace
    */
   std::int32_t GatherUnmarkedEntitiesInLine(
     moho::EntityOccupationManager& manager,
-    gpg::core::FastVectorN<moho::Entity*, 20>& outEntities,
+    gpg::core::FastVectorInline<moho::Entity*>& outEntities,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
   {
     // The binary gathers into this same buffer: the shape pointers and the
-    // entity pointers share one `FastVectorN<pointer, 20>` object.
-    auto& shapes = reinterpret_cast<gpg::core::FastVectorN<moho::CollisionShapeBase*, 20>&>(outEntities);
+    // entity pointers share one `FastVectorN<pointer, 20>` object. Both views
+    // are the inline-backed head, so the caller's inline window (whatever its
+    // size) is the one the shapes are gathered into.
+    auto& shapes = reinterpret_cast<gpg::core::FastVectorInline<moho::CollisionShapeBase*>&>(outEntities);
 
     const std::int32_t count = MarchLineAndGatherCollisionSpans(manager, shapes, lineStart, lineEnd);
 
@@ -718,7 +720,7 @@ namespace moho
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
   int EntityOccupationManager::GatherUnmarkedUnitsInRect(
-    gpg::core::FastVectorN<CollisionShapeBase*, 20>& outSpans, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorInline<CollisionShapeBase*>& outSpans, const CollisionDBRect& rect, const EEntityType flags
   )
   {
     outSpans.ResetStorageToInline();
@@ -813,12 +815,12 @@ namespace moho
    * Address: 0x00722DF0 (FUN_00722DF0, Moho::EntityOccupationManager::GatherUnmarkedEntities)
    */
   int EntityOccupationManager::GatherUnmarkedEntities(
-    gpg::core::FastVectorN<Entity*, 20>& outEntities, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorInline<Entity*>& outEntities, const CollisionDBRect& rect, const EEntityType flags
   )
   {
     // Same buffer reuse as `GatherUnmarkedEntitiesInLine`: gather shapes into
     // the caller's vector, then rewrite each as its owning entity.
-    auto& shapes = reinterpret_cast<gpg::core::FastVectorN<CollisionShapeBase*, 20>&>(outEntities);
+    auto& shapes = reinterpret_cast<gpg::core::FastVectorInline<CollisionShapeBase*>&>(outEntities);
     const int count = GatherUnmarkedUnitsInRect(shapes, rect, flags);
     for (int index = 0; index < count; ++index) {
       outEntities.start_[index] = CollisionShape<Entity>::OwnerOf(shapes.start_[index]);
@@ -982,13 +984,26 @@ namespace moho
   int COGrid::GatherUnmarkedEntities(
     const Wm3::AxisAlignedBox3f& bounds,
     const EEntityType flags,
-    gpg::core::FastVectorN<Entity*, 20>& outEntities
+    gpg::core::FastVectorInline<Entity*>& outEntities
   )
   {
     CollisionDBRect rect{};
     (void)func_AABoxToRect(&rect, bounds);
     return mEntityOccupationManager.GatherUnmarkedEntities(outEntities, rect, flags);
   }
+
+  namespace
+  {
+    // Inline window of the stack-local gather buffers below. The binary's
+    // locals hold 20 pointers and spill to the heap beyond that, which dense
+    // patrol boxes and unit blobs do on most calls. A gather fills the buffer
+    // in the same order whatever its capacity (the inline/heap choice only
+    // decides where the elements live), so a larger window changes nothing
+    // but the malloc/free pair. These locals are not part of any struct layout.
+    constexpr std::size_t kGatherInlineCapacity = 256u;
+    // `UnitIsBlocked`'s `CollisionResult` buffer (binary: 10 inline slots).
+    constexpr std::size_t kUnitBlockedInlineCapacity = 32u;
+  } // namespace
 
   [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(const Wm3::Box3f& box) noexcept
   {
@@ -1057,7 +1072,7 @@ namespace moho
     CollisionDBRect queryRect{};
     (void)func_AABoxToRect(&queryRect, source->mAABox);
 
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
     const int gatheredCount =
       mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
 
@@ -1115,7 +1130,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
 
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
     outCollisions.ResetStorageToInline();
@@ -1160,10 +1175,10 @@ namespace moho
   void GatherUnmarkedUnitsInBox(
     COGrid& grid,
     const Wm3::AxisAlignedBox3f& box,
-    gpg::core::FastVectorN<CollisionResult, 10>& into
+    gpg::core::FastVectorInline<CollisionResult>& into
   )
   {
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
     const int gatheredCount = grid.GatherUnmarkedEntities(box, ENTITYTYPE_Unit, gatheredEntities);
 
     into.ResetStorageToInline();
@@ -1208,8 +1223,33 @@ namespace moho
     box.Min.z = static_cast<float>(cellPos.z);
     box.Max.z = static_cast<float>(cellPos.z + maxSpan);
 
-    gpg::core::FastVectorN<CollisionResult, 10> nearbyUnits{};
+    gpg::core::FastVectorN<CollisionResult, kUnitBlockedInlineCapacity> nearbyUnits{};
     GatherUnmarkedUnitsInBox(grid, box, nearbyUnits);
+    if (nearbyUnits.empty()) {
+      return false; // the loop below would not run; skip building the query box
+    }
+
+    // Loop-invariant, hoisted (exact): the binary re-derives these per
+    // candidate, but every input is fixed for the whole loop - `box` is local,
+    // and nothing in the loop writes `unit`'s blueprint or alt-footprint flags,
+    // so `unit->GetFootprint()` (a pure read; it already succeeded above)
+    // returns this same `queryFootprint`. The float expressions are unchanged.
+    const bool queryIgnoresStructures =
+      (static_cast<std::uint8_t>(queryFootprint.mFlags) &
+       static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
+
+    // Precise oriented-box intersection using the query unit's footprint
+    // half-extents (X, 1000, Z), centered on the query box XZ midpoint.
+    const Wm3::Vector3f boxCenter{(box.Max.x + box.Min.x) * 0.5f, 0.0f, (box.Max.z + box.Min.z) * 0.5f};
+    const Wm3::Box3f queryBox(
+      boxCenter,
+      Wm3::Vector3f{1.0f, 0.0f, 0.0f},
+      Wm3::Vector3f{0.0f, 1.0f, 0.0f},
+      Wm3::Vector3f{0.0f, 0.0f, 1.0f},
+      static_cast<float>(queryFootprint.mSizeX) * 0.5f,
+      1000.0f,
+      static_cast<float>(queryFootprint.mSizeZ) * 0.5f
+    );
 
     for (const CollisionResult& hit : nearbyUnits) {
       Entity* const source = hit.sourceEntity;
@@ -1222,9 +1262,6 @@ namespace moho
       if (candidateLayer == LAYER_Land) {
         // Land candidate: skip only when the query ignores structures but the
         // candidate does not (asymmetric ignore); otherwise run the pair test.
-        const bool queryIgnoresStructures =
-          (static_cast<std::uint8_t>(unit->GetFootprint().mFlags) &
-           static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
         const bool candidateIgnoresStructures =
           (static_cast<std::uint8_t>(candidate->GetFootprint().mFlags) &
            static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
@@ -1252,19 +1289,6 @@ namespace moho
       if (other->GetMaxFootprintSize() <= 1) {
         return true;
       }
-
-      // Precise oriented-box intersection using the query unit's footprint
-      // half-extents (X, 1000, Z), centered on the query box XZ midpoint.
-      const Wm3::Vector3f boxCenter{(box.Max.x + box.Min.x) * 0.5f, 0.0f, (box.Max.z + box.Min.z) * 0.5f};
-      const Wm3::Box3f queryBox(
-        boxCenter,
-        Wm3::Vector3f{1.0f, 0.0f, 0.0f},
-        Wm3::Vector3f{0.0f, 1.0f, 0.0f},
-        Wm3::Vector3f{0.0f, 0.0f, 1.0f},
-        static_cast<float>(queryFootprint.mSizeX) * 0.5f,
-        1000.0f,
-        static_cast<float>(queryFootprint.mSizeZ) * 0.5f
-      );
 
       CollisionResult pairResult{};
       if (other->Intersects(queryBox, &pairResult)) {
@@ -1401,7 +1425,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
 
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
     outCollisions.ResetStorageToInline();
@@ -1471,7 +1495,7 @@ namespace moho
     const Wm3::Vec3f& lineEnd
   )
   {
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
     const std::int32_t gatheredCount =
       GatherUnmarkedEntitiesInLine(mEntityOccupationManager, gatheredEntities, lineStart, lineEnd);
 
@@ -1631,7 +1655,7 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
 
-    gpg::core::FastVectorN<CollisionShapeBase*, 20> gatheredSpans;
+    gpg::core::FastVectorN<CollisionShapeBase*, kGatherInlineCapacity> gatheredSpans;
     (void)grid.mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, cellRect, ENTITYTYPE_Unit);
 
     // Each gathered shape is the `CollisionShape<Entity>` base of its entity
@@ -1706,7 +1730,7 @@ namespace moho
     CollisionDBRect gatherRect{};
     (void)func_AABoxToRect(&gatherRect, queryBounds);
 
-    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
     grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
 
     // Release any escaped heap storage and rebind to the inline window before

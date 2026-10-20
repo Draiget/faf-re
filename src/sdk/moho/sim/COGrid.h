@@ -133,9 +133,12 @@ namespace moho
      * What it does:
      * Gathers unmarked collision-span owners from selected bucket classes in `rect`,
      * marks while collecting, then clears marks before returning.
+     *
+     * Takes the inline-backed head so callers may size the inline window; the
+     * binary's callers all use `fastvector_n<..., 20>`.
      */
     int GatherUnmarkedUnitsInRect(
-      gpg::core::FastVectorN<CollisionShapeBase*, 20>& outSpans,
+      gpg::core::FastVectorInline<CollisionShapeBase*>& outSpans,
       const CollisionDBRect& rect,
       EEntityType flags
     );
@@ -148,7 +151,7 @@ namespace moho
      * `Entity` (`CollisionShape<Entity>::OwnerOf`, the binary's `-0x4C`).
      */
     int GatherUnmarkedEntities(
-      gpg::core::FastVectorN<Entity*, 20>& outEntities,
+      gpg::core::FastVectorInline<Entity*>& outEntities,
       const CollisionDBRect& rect,
       EEntityType flags
     );
@@ -318,7 +321,7 @@ namespace moho
      * out-of-line copy has no callers.
      */
     int GatherUnmarkedEntities(
-      const Wm3::AxisAlignedBox3f& bounds, EEntityType flags, gpg::core::FastVectorN<Entity*, 20>& outEntities
+      const Wm3::AxisAlignedBox3f& bounds, EEntityType flags, gpg::core::FastVectorInline<Entity*>& outEntities
     );
 
     /**
@@ -443,7 +446,7 @@ namespace moho
    * there is no precise CollideBox test — cached-bounds overlap is the only filter.
    */
   void GatherUnmarkedUnitsInBox(
-    COGrid& grid, const Wm3::AxisAlignedBox3f& box, gpg::core::FastVectorN<CollisionResult, 10>& into
+    COGrid& grid, const Wm3::AxisAlignedBox3f& box, gpg::core::FastVectorInline<CollisionResult>& into
   );
 
   /**

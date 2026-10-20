@@ -169,6 +169,31 @@ namespace
       16384u,
     };
 
+    constexpr std::uint32_t kSmallBlockWordCount = (16384u / 4u) + 1u;
+
+    /**
+     * What it does:
+     * Builds the size-class lookup used by `GetSmallBlockIndex`: entry `w` is
+     * the first class in `kSmallBlockSizes` whose size is `>= 4*w`.
+     */
+    [[nodiscard]] consteval std::array<std::uint8_t, kSmallBlockWordCount> BuildSmallBlockIndexByWord()
+    {
+        std::array<std::uint8_t, kSmallBlockWordCount> table{};
+        std::uint32_t kind = 0;
+        for (std::uint32_t word = 0; word < kSmallBlockWordCount; ++word) {
+            while (kSmallBlockSizes[kind] < word * 4u) {
+                ++kind;
+            }
+            table[word] = static_cast<std::uint8_t>(kind);
+        }
+        return table;
+    }
+
+    constexpr std::array<std::uint8_t, kSmallBlockWordCount> kSmallBlockIndexByWord = BuildSmallBlockIndexByWord();
+    static_assert(kSmallBlockSizes[kSmallBlockClassCount - 1u] == (kSmallBlockWordCount - 1u) * 4u);
+    static_assert(kSmallBlockIndexByWord[0] == 0u && kSmallBlockIndexByWord[1] == 0u && kSmallBlockIndexByWord[2] == 1u);
+    static_assert(kSmallBlockIndexByWord[kSmallBlockWordCount - 1u] == kSmallBlockClassCount - 1u);
+
     ThreadHeapCache* const kThreadCacheDisabled = reinterpret_cast<ThreadHeapCache*>(~std::uintptr_t(0));
 
     gpg::mem_hook_t gMemHook = nullptr;
@@ -501,23 +526,16 @@ namespace
      */
     [[nodiscard]] std::uint32_t GetSmallBlockIndex(const std::uint32_t bytes)
     {
-        std::uint32_t lower = 0;
-        std::uint32_t upper = kSmallBlockClassCount;
-
-        while (lower < upper) {
-            const std::uint32_t middle = (lower + upper) / 2u;
-            const std::uint32_t value = kSmallBlockSizes[middle];
-            if (bytes >= value) {
-                if (bytes <= value) {
-                    return middle;
-                }
-                lower = middle + 1u;
-            } else {
-                upper = middle;
-            }
+        // The binary's body binary-searches `kSmallBlockSizes` for the first
+        // class `>= bytes` (lower bound; 44 for anything above the last class).
+        // Every class size is a multiple of 4, so all sizes in one 4-byte word
+        // `(4w-3 .. 4w]` share the lower bound of `4w`: the table below holds
+        // that lower bound per word and returns the identical index for every
+        // `bytes` (checked exhaustively over all 2^32 inputs against the search).
+        if (bytes > kSmallBlockSizes[kSmallBlockClassCount - 1u]) {
+            return kSmallBlockClassCount;
         }
-
-        return lower;
+        return kSmallBlockIndexByWord[(bytes + 3u) >> 2u];
     }
 
     /**

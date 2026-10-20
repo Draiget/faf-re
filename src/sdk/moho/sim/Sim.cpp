@@ -3557,8 +3557,12 @@ namespace
    * What it does:
    * Updates one MD5 context with a nullable C-string lane, hashing either the
    * source text including terminator or the literal `"<NULL>"` fallback.
+   *
+   * Templated on the byte sink so `Sim::UpdateChecksum` can feed it through
+   * its `MD5UpdateBatch`; the bytes handed to `Update` are unchanged.
    */
-  void UpdateChecksumWithNullableCString(gpg::MD5Context& context, const char* const text)
+  template <class TChecksumSink>
+  void UpdateChecksumWithNullableCString(TChecksumSink& context, const char* const text)
   {
     if (text != nullptr) {
       context.Update(text, std::strlen(text) + 1u);
@@ -5822,6 +5826,61 @@ namespace
   // kAllUnitsMidFamilyBoundaryKey / kAllUnitsShieldFamilyBoundaryKey pair).
   constexpr std::uint32_t kReconBlipFamilyBeginId = 0x30000000u;
   constexpr std::uint32_t kReconBlipFamilyEndId = 0x40000000u;
+
+  /**
+   * What it does:
+   * Collects consecutive checksum byte spans bound for one `gpg::MD5Context`
+   * and hands them to `MD5Context::Update` in large runs.
+   *
+   * Exact: MD5 digests a byte stream, and `MD5Context::Update` carries partial
+   * blocks across calls, so feeding the same bytes in the same order through
+   * fewer, larger `Update` calls leaves the context in the identical state
+   * (`size`, `pos`, block bytes and digest words). `Flush` must run before
+   * anything reads the context (`Digest`) or updates it directly.
+   */
+  class MD5UpdateBatch
+  {
+  public:
+    explicit MD5UpdateBatch(gpg::MD5Context& context) noexcept
+      : mContext(context)
+    {}
+
+    MD5UpdateBatch(const MD5UpdateBatch&) = delete;
+    MD5UpdateBatch& operator=(const MD5UpdateBatch&) = delete;
+
+    ~MD5UpdateBatch()
+    {
+      Flush();
+    }
+
+    void Update(const void* const data, const std::size_t size)
+    {
+      if (size > mBytes.size() - mUsed) {
+        Flush();
+        if (size > mBytes.size()) {
+          mContext.Update(data, size);
+          return;
+        }
+      }
+
+      // Raw hash byte IO: append the span to the pending run.
+      std::memcpy(mBytes.data() + mUsed, data, size);
+      mUsed += size;
+    }
+
+    void Flush()
+    {
+      if (mUsed != 0u) {
+        mContext.Update(mBytes.data(), mUsed);
+        mUsed = 0u;
+      }
+    }
+
+  private:
+    gpg::MD5Context& mContext;
+    std::size_t mUsed = 0u;
+    std::array<std::uint8_t, 1024> mBytes;
+  };
 } // namespace
 
 /**
@@ -5897,29 +5956,36 @@ void Sim::UpdateChecksum()
   }
 
   Logf("Dirty Entities\n");
+  // The per-entity spans go through one batch (see MD5UpdateBatch): the same
+  // bytes in the same order, read from the entity at the same points, reach
+  // mContext in fewer Update calls. Every digest log line flushes first.
+  MD5UpdateBatch entityChecksum(mContext);
   for (Entity* entity : mCoordEntities.owners()) {
     const std::uint32_t entityId = static_cast<std::uint32_t>(entity->id_);
-    mContext.Update(&entityId, sizeof(entityId));
+    entityChecksum.Update(&entityId, sizeof(entityId));
     if (mLog) {
       Logf("  0x%08x\n", entityId);
+      entityChecksum.Flush();
       logChecksumDigest();
     }
 
     const float health = entity->mVarDat.mHealth;
-    mContext.Update(&health, sizeof(health));
+    entityChecksum.Update(&health, sizeof(health));
     if (mLog) {
       Logf("    health: %.1f 0x%08x\n", health, FloatBits(health));
+      entityChecksum.Flush();
       logChecksumDigest();
     }
 
     const char* blueprintId = ResolveBlueprintIdCString(entity);
-    UpdateChecksumWithNullableCString(mContext, blueprintId);
+    UpdateChecksumWithNullableCString(entityChecksum, blueprintId);
     if (mLog) {
       Logf("    bp:%s\n", blueprintId ? blueprintId : "");
+      entityChecksum.Flush();
       logChecksumDigest();
     }
 
-    mContext.Update(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
+    entityChecksum.Update(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
     if (mLog) {
       const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
       const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
@@ -5943,12 +6009,13 @@ void Sim::UpdateChecksum()
         FloatBits(rot[2]),
         FloatBits(rot[3])
       );
+      entityChecksum.Flush();
       logChecksumDigest();
     }
 
     Wm3::Vec3f velocity{};
     ReadEntityVelocity(entity, &velocity);
-    mContext.Update(&velocity, sizeof(velocity));
+    entityChecksum.Update(&velocity, sizeof(velocity));
     if (mLog) {
       Logf(
         "   vel: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n",
@@ -5959,9 +6026,11 @@ void Sim::UpdateChecksum()
         FloatBits(velocity.y),
         FloatBits(velocity.z)
       );
+      entityChecksum.Flush();
       logChecksumDigest();
     }
   }
+  entityChecksum.Flush();
 
   constexpr std::size_t kRngMtBytes = sizeof(CMersenneTwister::StateWords);
   static_assert(kRngMtBytes == 0x9C0u, "Mt19937 payload must remain 0x9C0 bytes");
