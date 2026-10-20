@@ -24,6 +24,22 @@ Most symbols in the retail engine were never hand-written code — they are temp
 
 76 real games from the FAF replay vault (Dual Gap, Seton's Clutch and 35 other stock and community maps, 1–12 human players, games against the built-in AI and M28AI, 9–83 minutes) play back on the rebuilt engine checksum-identical to the retail `ForgedAlliance.exe` on every gameplay beat. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
+## Performance
+
+The simulation thread now costs about 18 % less per tick than at the start of
+profiling, with every change verified against retail replays:
+- hot-path diagnostics removed;
+- redundant recon, intel, allocation and lookup work cut;
+- recon refresh optionally on worker threads (`sim_Workers`, default 0 = the
+  original serial path), which reproduces the serial result byte for byte.
+
+The x64 build ran a stress map past 89,000 units at 3.8 GB, where the 32-bit
+build's simulation runs out of address space at about 60,000.
+
+Next up: main-thread multi-threading (sync apply, culling, icons) and a
+Direct3D 11 renderer backend. Measurements, the threading rules and the
+roadmap: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## What is and isn't here
 
 **Here:** C++ source, build files, and the tooling used to check behaviour against the original.
