@@ -359,6 +359,22 @@ namespace
       moho::CON_Execute("WIN_ShowLogDialog true");
     }
 
+    // Engine addition: `/con name=value;name2=value2` runs console commands at startup, so a
+    // launcher can set user-side console variables (e.g. `/con sim_ReplayLead=0`).
+    if (moho::CFG_GetArgOption("/con", 1, &args) && !args.empty()) {
+      std::string commands = args[0].c_str();
+      std::replace(commands.begin(), commands.end(), '=', ' ');
+      std::size_t begin = 0;
+      while (begin <= commands.size()) {
+        const std::size_t end = std::min(commands.find(';', begin), commands.size());
+        if (end > begin) {
+          moho::CON_Execute(commands.substr(begin, end - begin).c_str());
+        }
+        begin = end + 1;
+      }
+      args.clear();
+    }
+
     if (moho::CFG_GetArgOption("/scenario", 1, &args) || moho::CFG_GetArgOption("/map", 1, &args)) {
       if (!args.empty()) {
         const msvc8::string mapScenario = moho::FindMapScenario(args[0].c_str());

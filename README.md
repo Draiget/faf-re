@@ -36,9 +36,13 @@ profiling, with every change verified against retail replays:
 The x64 build ran a stress map past 89,000 units at 3.8 GB, where the 32-bit
 build's simulation runs out of address space at about 60,000.
 
-Next up: main-thread multi-threading (sync apply, culling, icons) and a
-Direct3D 11 renderer backend. Measurements, the threading rules and the
-roadmap: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+Replays play about 1.8× faster. The sim now computes up to 10 beats ahead of
+the beat on screen, and strategic icons, culling and fog of war run on worker
+threads. Each change has a console variable to restore the original path.
+
+Next up: parallel sync apply, and Direct3D 11, D3D12 and Vulkan renderer
+backends. Measurements, the threading rules and the roadmap:
+[docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## What is and isn't here
 

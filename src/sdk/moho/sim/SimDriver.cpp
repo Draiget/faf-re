@@ -3,6 +3,7 @@
 #include "platform/X87Precision.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
@@ -55,6 +56,14 @@ namespace
   constexpr int kMaxBeatsAheadOfExecuted = 98;
   constexpr int kMaxCatchUpBeats = 99;
   constexpr float kBlockedIssueGraceMs = 250.0f;
+
+  // Engine addition: set by the session before it creates a replay's driver (see
+  // SIM_SetReplaySessionPacing). Read by that driver's issue thread.
+  std::atomic<bool> gDriverPlaysReplay{false};
+
+  // Engine addition: the sim's own speed estimate (game seconds per real second, from the median
+  // beat time) before `RATE_GameRateToSpeed` rounds it down to a whole rate step.
+  std::atomic<float> gReplaySimSpeedEstimate{0.0f};
 
   // Sim bootstrap, from CSimDriver::ThreadCreateSim (0x0073D260).
   constexpr std::uint32_t kSimThreadTimeBarColor = 0xFFFF0000u;
@@ -887,6 +896,8 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
 
   const float simRateEstimate = (1000.0f / medianDispatchMs) * 0.1f;
+  // Engine addition (sim_ReplayLead): the unrounded estimate, for the replay display clock.
+  gReplaySimSpeedEstimate.store(simRateEstimate, std::memory_order_relaxed);
   const int updatedSimRate = RATE_GameRateToSpeed(simRateEstimate);
   if (updatedSimRate != mCurrentSimRate) {
     mCurrentSimRate = updatedSimRate;
@@ -1221,6 +1232,13 @@ void CSimDriver::ThreadRun()
         } else {
           lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
         }
+      } else if (sim_ReplayLead > 0 && gDriverPlaysReplay.load(std::memory_order_relaxed)) {
+        // Engine addition (sim_ReplayLead): a replay keeps `sim_ReplayLead` beats issued past the
+        // last one the main thread dequeued, so the sim works on the next beats while the frame
+        // renders. The replay still plays at the requested speed: the main thread drains the
+        // queue on its own clock, and the queue cap above stops the sim once it is that far ahead.
+        // Each dequeue signals `mConnectionEvent`, which is what wakes this thread to top it up.
+        lastBeatToIssue = std::max(lastBeatToIssue, mLastDequeuedBeat + sim_ReplayLead);
       } else {
         // @note This pacing math is CORRECT and is not why the sim runs about
         // eleven times too fast. Measured on SCMP_009, our build goes from
@@ -2137,4 +2155,30 @@ ISTIDriver* moho::SIM_CreateDriver(
   msvc8::auto_ptr<CClientManagerImpl> clientOwner(clientManager);
   msvc8::auto_ptr<gpg::Stream> streamOwner(stream);
   return new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
+}
+
+int moho::sim_ReplayLead = 10;
+
+namespace
+{
+  TConVar<int> gTConVar_sim_ReplayLead(
+    "sim_ReplayLead",
+    "Replays only: beats the sim may compute ahead of the beat on screen (0 = original pacing, "
+    "which waits for the main thread before issuing each beat).",
+    &moho::sim_ReplayLead
+  );
+} // namespace
+
+void moho::SIM_SetReplaySessionPacing(const bool playsReplay) noexcept
+{
+  gDriverPlaysReplay.store(playsReplay, std::memory_order_relaxed);
+  gReplaySimSpeedEstimate.store(0.0f, std::memory_order_relaxed);
+}
+
+float moho::SIM_GetReplaySimSpeedEstimate() noexcept
+{
+  if (sim_ReplayLead <= 0 || !gDriverPlaysReplay.load(std::memory_order_relaxed)) {
+    return 0.0f;
+  }
+  return gReplaySimSpeedEstimate.load(std::memory_order_relaxed);
 }

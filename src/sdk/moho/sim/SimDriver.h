@@ -987,4 +987,28 @@ namespace moho
     uint32_t commandSourceId
   );
 
+  /**
+   * Engine addition, not recovered from the binary: `sim_ReplayLead`, a user-side console
+   * variable. While a replay plays, the issue thread keeps up to this many beats issued beyond
+   * the last one the main thread has taken off the sync queue, instead of pacing each beat off
+   * the main thread's last dequeue time. The sim then computes the next beats while the main
+   * thread renders. 0 restores the original pacing. A replay issues no commands of its own and
+   * the beats it plays are the recorded ones, so this changes how fast it plays, never what it
+   * computes. Live games always use the original pacing.
+   */
+  extern int sim_ReplayLead;
+
+  /**
+   * Engine addition: tells the driver created next whether its session plays a replay, which is
+   * what makes `sim_ReplayLead` apply. Called by the session right before `SIM_CreateDriver`.
+   */
+  void SIM_SetReplaySessionPacing(bool playsReplay) noexcept;
+
+  /**
+   * Engine addition: while `sim_ReplayLead` paces a replay, the sim's measured speed (game time
+   * per real time, from its median beat cost) before it is rounded down to a whole rate step;
+   * 0 otherwise. The replay display clock follows it so the sim is not held to the rounded rate.
+   */
+  [[nodiscard]] float SIM_GetReplaySimSpeedEstimate() noexcept;
+
 } // namespace moho

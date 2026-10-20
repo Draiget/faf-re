@@ -32,6 +32,35 @@ Every row was checked against retail replays before it was committed. The
 threaded run plays the whole 41-minute benchmark with every embedded
 live-player checksum matching.
 
+## Main thread and replay speed
+
+Profiling the main thread with exact x64 call stacks showed the bigger
+problem was turn-taking, not CPU. In a replay the sim issued each beat only
+after the main thread had taken the previous one, so at the peak of the
+benchmark the main thread was busy only about 60 % of the time. About 40 %
+went to waiting on `Present`, and sim and main were both idle 17 % of the
+time.
+
+| Change | Console variable (0 = original path) |
+|---|---|
+| Replays keep up to 10 beats computed ahead of the beat on screen, and the replay clock follows the sim's measured speed instead of the rounded-down rate step. Live games keep the original pacing. | `sim_ReplayLead` (default 10) |
+| A user-side worker pool, separate from the sim's. The engine heap is thread-safe. | `user_Workers` (default min(CPUs − 2, 6)) |
+| Strategic icons: units are classified on workers, and icons drawn on the main thread in the original order. No reference-count traffic on the textures every unit shares. | `ui_ParallelIcons` |
+| Mesh and decal view queries and fog-of-war circles collected on workers, merged in the original walk order | `ren_ParallelCull` |
+
+Results, x64:
+
+| | Before | After |
+|---|---|---|
+| Benchmark replay, wall time for the whole game | 37:33 | 20:46 (about 1.8× faster) |
+| Main thread ms per tick at 3,900 / 4,370 units | 95 / 108 | 43 / 57 |
+| Stress map, main thread ms per tick at 30,000 / 60,000 units | 570 / 860 | 410 / 800 |
+
+The full benchmark replay matches every recorded checksum on x64 and x86, and
+screenshots of the serial and parallel paths show the same picture. In
+replays the sim is now the limit, busy about 90 % of the time.
+`/con name=value;name2=value2` sets console variables from the command line.
+
 ## Threads without breaking determinism
 
 The original sim is single-threaded, and the checksum covers its results
@@ -74,26 +103,24 @@ next target.
 
 ## Where the time goes next
 
-The biggest remaining costs are on the main thread, not the sim:
+Main-thread work never feeds back into the simulation, so it can be
+multi-threaded and rewritten freely; the checksum cannot move. The plan, in
+order:
 
-- applying each beat's sync packet to the user-side unit copies;
-- visibility culling and mesh batching;
-- strategic icons;
-- D3D9 draw-call overhead.
-
-None of this feeds back into the simulation, so it can be multi-threaded and
-rewritten freely; the checksum cannot move. The plan, in order:
-
-1. **Main-thread parallelism:** sync apply per entity, culling and batching,
-   strategic icons, and letting the sim run several beats ahead of the
-   renderer during replays.
-2. **A Direct3D 11 backend** behind the existing `gpg::gal` layer, which
-   already has a full D3D9 and a partial D3D10 backend. It brings instancing,
-   lower per-draw overhead and multi-threaded command recording. Its main cost
-   is porting the game's effect files to Shader Model 5.
-3. **More sim phases on workers:** sync packet serialization, intel rasters,
+1. **Sync apply per entity** on the user-side workers. It is now the largest
+   main-thread cost in replays, about 26 % at the peak.
+2. **Single-player and skirmish pacing** like the replay lead, kept short so
+   commands don't land late. On the stress map the sim still waits about half
+   the time.
+3. **A zoomed-out level of detail for the minimap and strategic view.** It
+   still costs about a third of the main thread at very high unit counts.
+4. **New renderer backends** behind the existing `gpg::gal` layer, which
+   already has a full D3D9 and a partial D3D10 backend:
+   - Direct3D 11 first, with instancing, lower per-draw overhead and
+     multi-threaded command recording;
+   - then D3D12 and Vulkan, compiled from one shader pipeline. The game's
+     `.fx` effects are translated automatically from your installed copy,
+     never shipped.
+5. **More sim phases on workers:** sync packet serialization, intel rasters,
    then pose and animation (about 14 % of sim time), which needs speculative
    computation published in serial order.
-4. **D3D12 or Vulkan** only if profiling then shows rendering is GPU- or
-   submission-bound. For the planned Linux and macOS builds, Vulkan is the
-   more useful of the two.

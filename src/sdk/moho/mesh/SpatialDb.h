@@ -246,6 +246,13 @@ namespace moho
     void RecalculateBounds();
 
     /**
+     * Engine addition, not recovered from the binary: the leaf half of `RecalculateBounds` - the
+     * aggregate bounds and the refresh counter - without the owner shard's update. A parallel view
+     * query refreshes its leaves this way on workers and updates the owners afterwards, in leaf order.
+     */
+    void RecalculateOwnBounds();
+
+    /**
      * Address: 0x00503BB0 (FUN_00503BB0, Moho::SpatialShardData<T>::Collect)
      *
      * What it does:

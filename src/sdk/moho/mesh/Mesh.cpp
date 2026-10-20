@@ -11,16 +11,20 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 #include <set>
 #include <stdexcept>
+#include <vector>
 
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/app/UserWorkerPool.h"
 #include "moho/audio/AudioEngine.h"
+#include "moho/console/CConCommand.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
@@ -205,6 +209,8 @@ namespace moho
   // moho/mesh/SpatialDb.h, so the owners that embed a SpatialDB<T> by value
   // can see its layout. Their bodies stay in this file.
 } // namespace moho
+
+bool moho::ren_ParallelCull = true;
 
 namespace
 {
@@ -670,6 +676,211 @@ namespace
         destination.push_back(entry.mOwner);
       }
     }
+  }
+
+  /**
+   * The collection half of `SpatialShardData<T>::FindInVolumeFromData`, run once the leaf has
+   * passed its type and bounds tests and had its bounds refreshed.
+   */
+  template <class T>
+  void CollectLeafVolumeCandidates(
+    const moho::Vector4f& fadePlane,
+    const Wm3::Vector3f& supportSelector,
+    const moho::SpatialShardData<T>& data,
+    const moho::EEntityType type,
+    const moho::CGeomSolid3& volume,
+    gpg::fastvector<T*>& destination
+  )
+  {
+    const bool dataBoundsContained = SolidContainsAabb(volume, data.mBounds);
+    const float fadeThreshold = ComputeFadeThresholdForBounds(fadePlane, supportSelector, data.mBounds);
+    const std::uint32_t typeBits = EntityTypeBits(type);
+
+    if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
+      CollectVolumeCandidatesWithFade(data.mMapUnits, volume, dataBoundsContained, fadeThreshold, destination);
+    }
+
+    if ((typeBits & kSpatialEntityTypeProjectile) != 0u) {
+      CollectVolumeCandidatesWithFade(data.mMapProjectiles, volume, dataBoundsContained, fadeThreshold, destination);
+    }
+
+    if ((typeBits & kSpatialEntityTypeProp) != 0u) {
+      CollectVolumeCandidatesWithFade(data.mMapProps, volume, dataBoundsContained, fadeThreshold, destination);
+    }
+
+    if ((typeBits & kSpatialEntityTypeEntity) != 0u) {
+      CollectVolumeCandidatesWithFade(data.mMapEntities, volume, dataBoundsContained, fadeThreshold, destination);
+    }
+  }
+
+  /// The leaf-level type and bounds tests of `SpatialShardData<T>::FindInVolumeFromData`.
+  template <class T>
+  [[nodiscard]] bool VolumeLeafPasses(
+    const moho::SpatialShardData<T>& data, const moho::EEntityType type, const moho::CGeomSolid3& volume
+  )
+  {
+    return !SpatialShardDataHasNoRequestedType(data, type) && IntersectsShardVolumeBounds(volume, data.mBounds);
+  }
+
+  /// The periodic bounds refresh `SpatialShardData<T>::FindInVolumeFromData` runs on a leaf that passed.
+  template <class T>
+  [[nodiscard]] bool VolumeLeafNeedsRefresh(const moho::SpatialShardData<T>& data)
+  {
+    return data.mTimeSinceRecalc > 500;
+  }
+
+  /**
+   * The leaf-level gate of `SpatialShardData<T>::FindInVolumeFromData`: the type and bounds tests,
+   * then the periodic bounds refresh. True when the leaf goes on to collection.
+   */
+  template <class T>
+  [[nodiscard]] bool PrepareVolumeLeaf(
+    moho::SpatialShardData<T>& data, const moho::EEntityType type, const moho::CGeomSolid3& volume
+  )
+  {
+    if (!VolumeLeafPasses(data, type, volume)) {
+      return false;
+    }
+
+    if (VolumeLeafNeedsRefresh(data)) {
+      data.RecalculateBounds();
+    }
+    return true;
+  }
+
+  /// Engine addition (`ren_ParallelCull`): a run of sibling leaves a parallel volume query tests together.
+  template <class T>
+  struct VolumeLeafGroup
+  {
+    moho::SpatialShardData<T>* const* mLeaves;
+    std::int32_t mCount;
+  };
+
+  /**
+   * Engine addition (`ren_ParallelCull`): the serial half of a parallel volume query. Walks the
+   * shard tree exactly as `SpatialShardData<T>::FindInVolume` does - same shard tests, same order -
+   * down to the lowest shards, and records each one's 16 leaves as a group; the leaf tests run in
+   * the parallel half. Leaf bounds refreshes are left to the caller: a refresh only changes that
+   * leaf and its ancestors, and every ancestor's test has already run by the time the walk reaches
+   * the leaf, so no test depends on them.
+   */
+  template <class T>
+  void GatherVolumeLeafGroups(
+    moho::SpatialShard<T>* const shard,
+    const moho::EEntityType type,
+    const moho::CGeomSolid3& volume,
+    std::vector<VolumeLeafGroup<T>>& groups
+  )
+  {
+    if (SpatialShardHasNoRequestedType(*shard, type) || !volume.Intersects(shard->mBounds)) {
+      return;
+    }
+
+    if (shard->mLevel <= 0) {
+      groups.push_back(VolumeLeafGroup<T>{shard->mData.data(), 16});
+      return;
+    }
+
+    for (std::int32_t index = 0; index < 16; ++index) {
+      GatherVolumeLeafGroups(shard->mShards[index], type, volume, groups);
+    }
+  }
+
+  moho::TConVar<bool> gTConVar_ren_ParallelCull(
+    "ren_ParallelCull",
+    "Run large view queries (visible meshes and decals, fog-of-war circles) on user worker threads "
+    "(see user_Workers). Collects exactly what the serial queries collect, in the same order.",
+    &moho::ren_ParallelCull
+  );
+
+  // Below this many leaf groups the query runs on the calling thread.
+  constexpr std::size_t kParallelCullMinGroups = 8u;
+
+  /**
+   * Engine addition (`ren_ParallelCull`): a whole-database volume query, as `SpatialDB<T>::
+   * CollectAllInVolume` / `CollectInView` run it, with the leaf work spread over the user worker
+   * pool. Leaf groups are gathered serially in walk order (the root lane last), tested and
+   * collected in parallel into per-group lists, and appended in group order, so `destination`
+   * ends up exactly as the serial walk leaves it. False (and nothing done) when the query should
+   * run serially instead.
+   */
+  template <class T>
+  [[nodiscard]] bool CollectInVolumeParallel(
+    msvc8::vector<moho::SpatialShard<T>*>& shards,
+    moho::SpatialShardData<T>& rootData,
+    const moho::EEntityType type,
+    moho::CGeomSolid3& volume,
+    const Wm3::Vector3f& supportSelector,
+    const moho::Vector4f& fadePlane,
+    gpg::fastvector<T*>& destination
+  )
+  {
+    if (!moho::ren_ParallelCull || moho::CUserWorkerPool::ConfiguredWorkerCount() == 0u) {
+      return false;
+    }
+
+    std::vector<VolumeLeafGroup<T>> groups;
+    for (moho::SpatialShard<T>* const shard : shards) {
+      if (shard != nullptr) {
+        GatherVolumeLeafGroups(shard, type, volume, groups);
+      }
+    }
+    moho::SpatialShardData<T>* const rootLeaf = &rootData;
+    groups.push_back(VolumeLeafGroup<T>{&rootLeaf, 1});
+
+    if (groups.size() < kParallelCullMinGroups) {
+      for (const VolumeLeafGroup<T>& group : groups) {
+        for (std::int32_t index = 0; index < group.mCount; ++index) {
+          moho::SpatialShardData<T>& leaf = *group.mLeaves[index];
+          if (!VolumeLeafPasses(leaf, type, volume)) {
+            continue;
+          }
+          if (VolumeLeafNeedsRefresh(leaf)) {
+            leaf.RecalculateBounds();
+          }
+          CollectLeafVolumeCandidates(fadePlane, supportSelector, leaf, type, volume, destination);
+        }
+      }
+      return true;
+    }
+
+    // Each worker refreshes its own leaves' bounds before collecting from them; the owner shards,
+    // which several leaves share, are brought up to date afterwards in leaf order. Every owner
+    // ends with the bounds its last refresh computes from its final children - the same final
+    // state the interleaved serial refreshes leave.
+    const std::unique_ptr<gpg::fastvector<T*>[]> parts(new gpg::fastvector<T*>[groups.size()]);
+    std::vector<std::uint32_t> refreshedMasks(groups.size(), 0u);
+    moho::CUserWorkerPool::Get().ParallelFor(groups.size(), 1u, [&](const std::size_t begin, const std::size_t end) {
+      for (std::size_t g = begin; g < end; ++g) {
+        const VolumeLeafGroup<T>& group = groups[g];
+        for (std::int32_t index = 0; index < group.mCount; ++index) {
+          moho::SpatialShardData<T>& leaf = *group.mLeaves[index];
+          if (!VolumeLeafPasses(leaf, type, volume)) {
+            continue;
+          }
+          if (VolumeLeafNeedsRefresh(leaf)) {
+            leaf.RecalculateOwnBounds();
+            refreshedMasks[g] |= 1u << index;
+          }
+          CollectLeafVolumeCandidates(fadePlane, supportSelector, leaf, type, volume, parts[g]);
+        }
+      }
+    });
+
+    for (std::size_t g = 0; g < groups.size(); ++g) {
+      for (std::int32_t index = 0; index < groups[g].mCount; ++index) {
+        if ((refreshedMasks[g] & (1u << index)) != 0u && groups[g].mLeaves[index]->mShard != nullptr) {
+          groups[g].mLeaves[index]->mShard->RecalculateBounds();
+        }
+      }
+    }
+
+    for (std::size_t g = 0; g < groups.size(); ++g) {
+      for (T* const item : parts[g]) {
+        destination.push_back(item);
+      }
+    }
+    return true;
   }
 
   /**
@@ -1178,14 +1389,11 @@ namespace moho
   SpatialShardData<T>::~SpatialShardData() = default;
 
   /**
-   * Address: 0x005023B0 (FUN_005023B0, Moho::SpatialShardData::RecalculateBounds)
-   *
-   * What it does:
-   * Rebuilds aggregate bounds from all leaf-map lanes, then propagates shard
-   * bounds through the owning shard chain.
+   * Engine addition, not recovered from the binary: the leaf half of `RecalculateBounds` (below),
+   * which is the binary's body up to the owner-shard update.
    */
   template <class T>
-  void SpatialShardData<T>::RecalculateBounds()
+  void SpatialShardData<T>::RecalculateOwnBounds()
   {
     Wm3::AxisAlignedBox3f mergedBounds{};
     mergedBounds.Min.x = FLT_MAX;
@@ -1213,11 +1421,24 @@ namespace moho
     accumulateTreeBounds(mMapEntities);
 
     mBounds = mergedBounds;
+    mTimeSinceRecalc = 0;
+  }
+
+  /**
+   * Address: 0x005023B0 (FUN_005023B0, Moho::SpatialShardData::RecalculateBounds)
+   *
+   * What it does:
+   * Rebuilds aggregate bounds from all leaf-map lanes, then propagates shard
+   * bounds through the owning shard chain.
+   */
+  template <class T>
+  void SpatialShardData<T>::RecalculateBounds()
+  {
+    // The owner shard reads this leaf's new bounds; the refresh counter is not part of that.
+    RecalculateOwnBounds();
     if (mShard != nullptr) {
       mShard->RecalculateBounds();
     }
-
-    mTimeSinceRecalc = 0;
   }
 
   /**
@@ -1559,32 +1780,8 @@ namespace moho
     gpg::fastvector<T*>& destination
   )
   {
-    if (SpatialShardDataHasNoRequestedType(*data, type) || !IntersectsShardVolumeBounds(*volume, data->mBounds)) {
-      return;
-    }
-
-    if (data->mTimeSinceRecalc > 500) {
-      data->RecalculateBounds();
-    }
-
-    const bool dataBoundsContained = SolidContainsAabb(*volume, data->mBounds);
-    const float fadeThreshold = ComputeFadeThresholdForBounds(fadePlane, supportSelector, data->mBounds);
-    const std::uint32_t typeBits = EntityTypeBits(type);
-
-    if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
-      CollectVolumeCandidatesWithFade(data->mMapUnits, *volume, dataBoundsContained, fadeThreshold, destination);
-    }
-
-    if ((typeBits & kSpatialEntityTypeProjectile) != 0u) {
-      CollectVolumeCandidatesWithFade(data->mMapProjectiles, *volume, dataBoundsContained, fadeThreshold, destination);
-    }
-
-    if ((typeBits & kSpatialEntityTypeProp) != 0u) {
-      CollectVolumeCandidatesWithFade(data->mMapProps, *volume, dataBoundsContained, fadeThreshold, destination);
-    }
-
-    if ((typeBits & kSpatialEntityTypeEntity) != 0u) {
-      CollectVolumeCandidatesWithFade(data->mMapEntities, *volume, dataBoundsContained, fadeThreshold, destination);
+    if (PrepareVolumeLeaf(*data, type, *volume)) {
+      CollectLeafVolumeCandidates(fadePlane, supportSelector, *data, type, *volume, destination);
     }
   }
 
@@ -2027,6 +2224,10 @@ namespace moho
       kSpatialEntityTypeUnit | kSpatialEntityTypeProjectile | kSpatialEntityTypeProp | kSpatialEntityTypeEntity
     );
 
+    if (CollectInVolumeParallel(mShards, mShardData, kAllRenderableTypes, *volume, supportSelector, fadePlane, destination)) {
+      return static_cast<std::int32_t>(destination.size());
+    }
+
     for (SpatialShard<T>* const shard : mShards) {
       if (shard != nullptr) {
         SpatialShardData<T>::FindInVolume(shard, kAllRenderableTypes, volume, supportSelector, fadePlane, destination);
@@ -2060,6 +2261,11 @@ namespace moho
     const EEntityType type
   )
   {
+    if (CollectInVolumeParallel(
+          mShards, mShardData, type, camera->solid2, BuildViewSupportSelector(*camera), camera->viewport.r[1], destination
+        )) {
+      return static_cast<std::int32_t>(destination.size());
+    }
 
     for (SpatialShard<T>* const shard : mShards) {
       if (shard != nullptr) {

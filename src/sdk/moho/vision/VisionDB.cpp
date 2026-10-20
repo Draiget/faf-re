@@ -2,8 +2,10 @@
 
 #include <cmath>
 #include <span>
+#include <vector>
 
 #include "Wm3IntrBox2Circle2.h"
+#include "moho/app/UserWorkerPool.h"
 
 using namespace moho;
 
@@ -39,6 +41,62 @@ namespace
       ((to.Radius - from.Radius) * t) + from.Radius
     };
   }
+
+  enum class EVisionEntryResult
+  {
+    Outside,
+    Circle,
+    Descend,
+  };
+
+  /**
+   * One step of `VisionDB::TryAdd`: interpolate the entry's circle, test it against `box`, and say
+   * whether it is outside, contributes its circle (real, visible emitter), or hands over to the
+   * entries it contains.
+   */
+  [[nodiscard]] EVisionEntryResult EvaluateVisionEntry(
+    const VisionDB::Entry& entry, const Wm3::Box2f& box, const float interpolant, Wm3::Circle2f& sampled
+  )
+  {
+    sampled = InterpolateCircle(entry.mPrevCircle, entry.mCurCircle, interpolant);
+
+    // `Wm3::IntrBox2Circle2f` keeps references to both operands, so `box` and
+    // `sampled` must outlive it - matching the two stack temporaries the binary
+    // builds at 0x0081B4F2/0x0081B504 before the ctor call at 0x0081B52C.
+    Wm3::IntrBox2Circle2f overlap{box, sampled};
+    if (!overlap.Test()) {
+      return EVisionEntryResult::Outside;
+    }
+    return (entry.mIsReal && entry.mVisible) ? EVisionEntryResult::Circle : EVisionEntryResult::Descend;
+  }
+
+  /// `VisionDB::TryAdd`'s depth-first walk, into any vector-like accumulator.
+  template <class Accumulator>
+  void AccumulateVisibleCircles(
+    Accumulator& accumulator, const VisionDB::Entry* const entry, const Wm3::Box2f& box, const float interpolant
+  )
+  {
+    Wm3::Circle2f sampled{};
+    switch (EvaluateVisionEntry(*entry, box, interpolant, sampled)) {
+      case EVisionEntryResult::Outside:
+        return;
+      case EVisionEntryResult::Circle:
+        accumulator.push_back(sampled);
+        return;
+      case EVisionEntryResult::Descend:
+        for (const VisionDB::Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
+          AccumulateVisibleCircles(accumulator, child, box, interpolant);
+        }
+        return;
+    }
+  }
+
+  // Parallel fog-of-war collection: expand the top of the tree until there are this many
+  // independent subtrees, and run them in chunks of this many.
+  constexpr std::size_t kVisionParallelMinSubtrees = 64u;
+  constexpr std::size_t kVisionParallelTargetSubtrees = 512u;
+  constexpr std::size_t kVisionParallelGrain = 32u;
+  constexpr int kVisionParallelMaxExpandDepth = 8;
 } // namespace
 
 /**
@@ -421,22 +479,87 @@ void VisionDB::TryAdd(
   const float interpolant
 ) const
 {
-  const Wm3::Circle2f sampled = InterpolateCircle(entry->mPrevCircle, entry->mCurCircle, interpolant);
+  AccumulateVisibleCircles(accumulator, entry, box, interpolant);
+}
 
-  // `Wm3::IntrBox2Circle2f` keeps references to both operands, so `box` and
-  // `sampled` must outlive it - matching the two stack temporaries the binary
-  // builds at 0x0081B4F2/0x0081B504 before the ctor call at 0x0081B52C.
-  Wm3::IntrBox2Circle2f overlap{box, sampled};
-  if (!overlap.Test()) {
+void VisionDB::CollectVisibleCircles(
+  gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity>& accumulator,
+  const Wm3::Box2f& box,
+  const float interpolant
+) const
+{
+  if (rootNode_ == nullptr || !ren_ParallelCull || CUserWorkerPool::ConfiguredWorkerCount() == 0u) {
+    TryAdd(accumulator, rootNode_, box, interpolant);
     return;
   }
 
-  if (entry->mIsReal && entry->mVisible) {
-    accumulator.push_back(sampled);
+  // The depth-first order `TryAdd` emits circles in is kept by expanding the walk breadth-first in
+  // place: every task is replaced by its own ordered results, so concatenating the tasks' outputs
+  // in task order is exactly the serial output.
+  struct Task
+  {
+    const Entry* mSubtree; // null: `mCircle` is an already resolved circle
+    Wm3::Circle2f mCircle;
+  };
+
+  std::vector<Task> tasks{Task{rootNode_, {}}};
+  std::vector<Task> expanded;
+  std::size_t subtrees = 1u;
+  for (int depth = 0; depth < kVisionParallelMaxExpandDepth && subtrees != 0u && subtrees < kVisionParallelTargetSubtrees;
+       ++depth) {
+    expanded.clear();
+    subtrees = 0u;
+    for (const Task& task : tasks) {
+      if (task.mSubtree == nullptr) {
+        expanded.push_back(task);
+        continue;
+      }
+
+      Wm3::Circle2f sampled{};
+      switch (EvaluateVisionEntry(*task.mSubtree, box, interpolant, sampled)) {
+        case EVisionEntryResult::Outside:
+          break;
+        case EVisionEntryResult::Circle:
+          expanded.push_back(Task{nullptr, sampled});
+          break;
+        case EVisionEntryResult::Descend:
+          for (const Entry* child = task.mSubtree->mContained; child != nullptr; child = child->mNext) {
+            expanded.push_back(Task{child, {}});
+            ++subtrees;
+          }
+          break;
+      }
+    }
+    tasks.swap(expanded);
+  }
+
+  const auto runTask = [&](auto& output, const Task& task) {
+    if (task.mSubtree == nullptr) {
+      output.push_back(task.mCircle);
+    } else {
+      AccumulateVisibleCircles(output, task.mSubtree, box, interpolant);
+    }
+  };
+
+  if (subtrees < kVisionParallelMinSubtrees) {
+    for (const Task& task : tasks) {
+      runTask(accumulator, task);
+    }
     return;
   }
 
-  for (Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
-    TryAdd(accumulator, child, box, interpolant);
+  const std::size_t chunkCount = (tasks.size() + kVisionParallelGrain - 1u) / kVisionParallelGrain;
+  std::vector<std::vector<Wm3::Circle2f>> parts(chunkCount);
+  CUserWorkerPool::Get().ParallelFor(tasks.size(), kVisionParallelGrain, [&](const std::size_t begin, const std::size_t end) {
+    std::vector<Wm3::Circle2f>& part = parts[begin / kVisionParallelGrain];
+    for (std::size_t i = begin; i < end; ++i) {
+      runTask(part, tasks[i]);
+    }
+  });
+
+  for (const std::vector<Wm3::Circle2f>& part : parts) {
+    for (const Wm3::Circle2f& circle : part) {
+      accumulator.push_back(circle);
+    }
   }
 }

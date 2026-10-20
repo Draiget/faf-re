@@ -719,6 +719,13 @@ namespace moho
       return nullptr;
     }
 
+    // Not in the binary: an unattached entity carries the invalid-id sentinel, which no entity in
+    // the session map has, so the map lookup below would return null anyway. Skipping it saves a
+    // tree walk per unit per frame in the strategic-icon pass.
+    if (mVariableData.mAttachmentParentRef == ToRaw(EEntityIdSentinel::Invalid)) {
+      return nullptr;
+    }
+
     // 0x00838042..0x0083805D: `find` on the session's entity map (0x00898DC0),
     // compare against `end()`, return the mapped `UserEntity*` -- which is what
     // `CWldSession::LookupEntityId` is. This used to walk the tree itself
