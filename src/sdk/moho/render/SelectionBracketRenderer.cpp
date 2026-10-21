@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <vector>
 
 #include "boost/shared_ptr.h"
 #include "moho/collision/CColPrimitiveBox3f.h"
@@ -10,6 +11,8 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/app/UserWorkerPool.h"
+#include "moho/render/SelectionBracketGpuRenderer.h"
 #include "moho/render/SelectionBracketParams.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -120,6 +123,68 @@ namespace
   }
 
   /**
+   * Engine addition (`ren_GpuSelectBrackets`): both sets' brackets - the session selection, then
+   * `sSelectionBrackets`, the order the batcher draws them in - built on workers and drawn with one
+   * instanced draw. Returns false, having drawn nothing, when the GPU path is off or declines.
+   */
+  bool DrawSelectionSetBracketsOnGpu(
+    moho::CWldSession& session,
+    moho::CD3DPrimBatcher& batcher,
+    const moho::GeomCamera3& camera,
+    const float interpolationAlpha,
+    const boost::shared_ptr<moho::CD3DBatchTexture>& texture
+  )
+  {
+    moho::SelectionBracketGpuRenderer& renderer = moho::SelectionBracketGpuRenderer::Get();
+    if (!renderer.IsActive()) {
+      return false;
+    }
+
+    static std::vector<moho::UserEntity*> sEntities;
+    static std::vector<moho::SelectionBracketInstance> sInstances;
+    static std::vector<std::uint8_t> sBuilt;
+    sEntities.clear();
+    for (moho::UserEntity* const entity : session.mSelection) {
+      sEntities.push_back(entity);
+    }
+    for (moho::UserEntity* const entity : moho::sSelectionBrackets) {
+      sEntities.push_back(entity);
+    }
+    const std::size_t count = sEntities.size();
+    sInstances.resize(count);
+    sBuilt.assign(count, 0U);
+    if (count == 0u) {
+      return true;
+    }
+
+    // The first entity on this thread: it runs the one-shot import of the Lua tuning table.
+    sBuilt[0] = moho::BuildSelectionBracketGeometry(sEntities[0], &camera, interpolationAlpha, sInstances[0]) ? 1U : 0U;
+    const auto buildRange = [&](const std::size_t begin, const std::size_t end) {
+      for (std::size_t i = std::max<std::size_t>(begin, 1u); i < end; ++i) {
+        sBuilt[i] = moho::BuildSelectionBracketGeometry(sEntities[i], &camera, interpolationAlpha, sInstances[i]) ? 1U : 0U;
+      }
+    };
+    constexpr std::size_t kParallelBracketMin = 256u;
+    constexpr std::size_t kParallelBracketChunk = 256u;
+    if (count >= kParallelBracketMin && moho::CUserWorkerPool::ConfiguredWorkerCount() != 0u) {
+      moho::CUserWorkerPool::Get().ParallelFor(count, kParallelBracketChunk, buildRange);
+    } else {
+      buildRange(0u, count);
+    }
+
+    // An entity that drew nothing on the batcher has no record.
+    std::size_t kept = 0u;
+    for (std::size_t i = 0; i < count; ++i) {
+      if (sBuilt[i] != 0U) {
+        sInstances[kept++] = sInstances[i];
+      }
+    }
+    return renderer.Draw(
+      batcher, &camera, texture, moho::ren_SelectColor, std::span<const moho::SelectionBracketInstance>(sInstances.data(), kept)
+    );
+  }
+
+  /**
    * Draws one entity's brackets with its own per-army bracket texture, the
    * shape shared by the hover pass (0x007FD74A..0x007FD7BC) and the blinky-box
    * pass (0x007FD91D..0x007FD95C). A blueprint without a bracket texture draws
@@ -204,15 +269,15 @@ namespace moho
    * alpha, read at 0x007FC998 and 0x007FCC31); the entity arrives in `ecx`
    * and the caller cleans the stack (`add esp, 0Ch`).
    */
-  void DrawSelectionBrackets(
+  bool BuildSelectionBracketGeometry(
     UserEntity* const entity,
-    CD3DPrimBatcher* const batcher,
     const GeomCamera3* const camera,
-    const float interpolationAlpha
+    const float interpolationAlpha,
+    SelectionBracketInstance& out
   )
   {
     if (entity == nullptr) {
-      return;
+      return false;
     }
 
     // 0x007FC849..0x007FC899: one-shot latch. The first bracket drawn in the
@@ -318,14 +383,39 @@ namespace moho
       (void)MultQuadVec(&tileCornerOffsets[corner], &localTileCorners[corner], &orientation);
     }
 
-    for (const SelectionBracketCorner& bracket : kSelectionBracketCorners) {
-      const Wm3::Vector3f& boxCorner = boxVertices[bracket.boxVertexIndex];
+    for (std::size_t bracket = 0; bracket < 4u; ++bracket) {
+      const Wm3::Vector3f& boxCorner = boxVertices[kSelectionBracketCorners[bracket].boxVertexIndex];
+      out.mGroundCorners[bracket][0] = boxCorner.x;
+      out.mGroundCorners[bracket][1] = boxCorner.y;
+      out.mGroundCorners[bracket][2] = boxCorner.z;
+      out.mTileOffsets[bracket][0] = tileCornerOffsets[bracket].x;
+      out.mTileOffsets[bracket][1] = tileCornerOffsets[bracket].y;
+      out.mTileOffsets[bracket][2] = tileCornerOffsets[bracket].z;
+    }
+    return true;
+  }
+
+  void DrawSelectionBrackets(
+    UserEntity* const entity,
+    CD3DPrimBatcher* const batcher,
+    const GeomCamera3* const camera,
+    const float interpolationAlpha
+  )
+  {
+    SelectionBracketInstance geometry{};
+    if (!BuildSelectionBracketGeometry(entity, camera, interpolationAlpha, geometry)) {
+      return;
+    }
+
+    for (std::size_t bracketIndex = 0; bracketIndex < 4u; ++bracketIndex) {
+      const SelectionBracketCorner& bracket = kSelectionBracketCorners[bracketIndex];
+      const float* const boxCorner = geometry.mGroundCorners[bracketIndex];
 
       CD3DPrimBatcher::Vertex quad[4]{};
       for (std::size_t corner = 0; corner < 4u; ++corner) {
-        quad[corner].mX = boxCorner.x + tileCornerOffsets[corner].x;
-        quad[corner].mY = boxCorner.y + tileCornerOffsets[corner].y;
-        quad[corner].mZ = boxCorner.z + tileCornerOffsets[corner].z;
+        quad[corner].mX = boxCorner[0] + geometry.mTileOffsets[corner][0];
+        quad[corner].mY = boxCorner[1] + geometry.mTileOffsets[corner][1];
+        quad[corner].mZ = boxCorner[2] + geometry.mTileOffsets[corner][2];
         quad[corner].mColor = ren_SelectColor;
       }
 
@@ -381,8 +471,10 @@ namespace moho
       (void)batcher->Setup(kSelectionBracketTechnique);
       batcher->SetTexture(playerBrackets);
 
-      DrawSelectionSetBrackets(session->mSelection, *batcher, *camera, interpolationAlpha);
-      DrawSelectionSetBrackets(sSelectionBrackets, *batcher, *camera, interpolationAlpha);
+      if (!DrawSelectionSetBracketsOnGpu(*session, *batcher, *camera, interpolationAlpha, playerBrackets)) {
+        DrawSelectionSetBrackets(session->mSelection, *batcher, *camera, interpolationAlpha);
+        DrawSelectionSetBrackets(sSelectionBrackets, *batcher, *camera, interpolationAlpha);
+      }
 
       batcher->Flush();
     }

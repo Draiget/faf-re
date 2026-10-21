@@ -154,6 +154,10 @@ namespace gpg::gal
     GpuCompare depthFunc = GpuCompare::LessEqual;
     bool depthClip = true;               ///< clip to the near/far planes, as D3D9 always does
     GpuStencil stencil{};
+    /// Keep the depth-stencil state already bound instead of the four fields above: the program
+    /// stands in for an effect pass that sets none of its own. D3D12/Vulkan, which bake depth into
+    /// the pipeline, take it from the engine's current depth state at the draw.
+    bool inheritDepthStencil = false;
     bool cullBackFaces = false;
     GpuSampler sampler = GpuSampler::PointClamp;
   };

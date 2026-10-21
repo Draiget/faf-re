@@ -1,5 +1,9 @@
 #include "moho/particles/CWorldParticles.h"
 
+#include <optional>
+
+#include "gpg/gal/RenderProfiler.h"
+
 #include <cstring>
 #include <cstdlib>
 #include <limits>
@@ -1211,6 +1215,7 @@ namespace moho
     if (renderWaterSurface == 0) {
       device->SetColorWriteState(true, true);
 
+      const gpg::gal::RenderProfileScope profileBeams("EffBeams"); // FAF instrumentation
       (void)DrawBeamParticle(mBeams, frameAlpha, suppressTLight != 0);
 
       device->SetColorWriteState(true, false);
@@ -1220,6 +1225,7 @@ namespace moho
     const auto renderAboveSurface = renderWaterSurface == 0;
     const float waterSurface = efx_ParticleWaterSurface;
 
+    std::optional<gpg::gal::RenderProfileScope> profileStep(std::in_place, "EffParticles"); // FAF instrumentation
     for (const auto& [bucketKey, bucket] : mParticleBuckets) {
       if (renderAboveSurface) {
         if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
@@ -1235,6 +1241,8 @@ namespace moho
       }
     }
 
+    profileStep.reset();
+    profileStep.emplace("EffTrails");
     for (const auto& [bucketKey, bucket] : mTrailBuckets) {
       if (renderAboveSurface) {
         if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
