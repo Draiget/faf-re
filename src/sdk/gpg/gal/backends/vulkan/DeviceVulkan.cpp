@@ -1507,7 +1507,10 @@ namespace gpg::gal
       ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
     }
     d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
-      std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U), true
+      std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U), true,
+      // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
+      // and running the translator's copy as well would test twice.
+      std::string_view{}
     );
     std::shared_ptr<effects::EffectProgram> program;
     try {
