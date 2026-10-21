@@ -664,7 +664,18 @@ void CClientBase::UpdateState(
           // Revert by deleting this one line; nothing else in the gating path
           // deviates, so that alone restores bug-compatible playback if a
           // historical desync ever needs reproducing.
-          hasCommandSource = true;
+          //
+          // Source 0xFF means "no command source", exactly as at entry. A
+          // replay's local client is created with it as its only valid source,
+          // and the driver's constructor claims it (`CMarshaller::
+          // SetCommandSource` at SimDriver construction). Re-enabling the gate
+          // for that claim let whatever the viewer's UI sent before the first
+          // beat into the sim with no command source: FAF's `OnFirstUpdate`
+          // renames the focus army's ACU, so a focus army chosen before beat 0
+          // ran a `ProcessInfoPair`, whose `OkayToMessWith` -> `CheatsEnabled`
+          // hashed one byte and desynced the replay at beat 50. The binary,
+          // which never re-enables the gate, drops those payloads; so do we.
+          hasCommandSource = claimedSource != kInvalidCommandSource;
         }
 
         continue;
