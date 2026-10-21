@@ -20,7 +20,9 @@ Each window holds:
   joint [[[busy tids], n]] and cond [[tid, busy, other_tid, nameidx, n]]: what each sampled
   thread was doing while another one was busy or waiting (see joint.py),
   sim_start / sim_end {tick, beat, entities, families} read from the live Sim object (located by
-  its vtable, member offsets from the PDB).
+  its vtable, member offsets from the PDB),
+  frames: rendered frames in the window, counted off MeshInstance::sFrameCounter (a byte the
+  render loop bumps once per frame, read every sample round and unwrapped).
 
 Analyse with prof64.py and joint.py next to this file.
 """
@@ -223,6 +225,10 @@ def main():
         if dbg.SymFromNameW(hp, nm, ctypes.byref(si)):
             sim_vtable = si.Address
     print("Sim vtable", hex(sim_vtable) if sim_vtable else None, flush=True)
+    sym_reset()
+    frame_counter = si.Address if dbg.SymFromNameW(hp, "moho::MeshInstance::sFrameCounter", ctypes.byref(si)) else None
+    frame_last = None
+    frames = 0
 
     def find_sim():
         if not sim_vtable or "mCurTick" not in sim_off:
@@ -399,6 +405,12 @@ def main():
                 win_start = sim_state(sim)
             if k32.WaitForSingleObject(hp, 0) == 0:
                 break
+        if frame_counter:
+            fb = rpm(hp, frame_counter, 1)
+            if fb:
+                if frame_last is not None:
+                    frames += (fb[0] - frame_last) & 0xFF
+                frame_last = fb[0]
         round_chains = {}
         for tid in busy:
             h = handles.get(tid)
@@ -467,6 +479,7 @@ def main():
             state = sim_state(sim) if sim else None
             dump = {
                 "window": win_idx, "window_s": window, "t": time.time() - t0, "sim_start": win_start, "sim_end": state,
+                "frames": frames if frame_counter else None,
                 "cpu_100ns": {str(k): v for k, v in cpu_window.items()},
                 "samples": {str(k): v for k, v in samples.items()},
                 "names": names,
@@ -485,6 +498,7 @@ def main():
             next_dump = time.time() + window
             for c in (flat, incl, samples, chains, cpu_window, joint, cond):
                 c.clear()
+            frames = 0
             win_start = state
     winmm.timeEndPeriod(1)
 

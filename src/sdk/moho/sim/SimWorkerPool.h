@@ -64,6 +64,7 @@ namespace moho
    * be forced back to its serial path for bisection. They only matter while `sim_Workers > 0`.
    */
   extern bool sim_ParallelRecon;
+  extern bool sim_ParallelSync;
 
   class CSimWorkerPool
   {

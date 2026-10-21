@@ -1,4 +1,5 @@
 #include "SimDriver.h"
+#include "moho/core/ThreadPlacement.h"
 #include "legacy/math/X87Math.h"
 #include "platform/X87Precision.h"
 
@@ -1101,6 +1102,7 @@ void CSimDriver::ShutDown()
 void CSimDriver::ThreadCreateSim()
 {
   PinThisThreadToOneNumaNodeIfRequested();
+  PlaceCurrentThread(EThreadRole::Sim);
 
   // The sim runs at reduced x87 precision so its arithmetic is bit-identical
   // on every machine in the game.
@@ -1203,6 +1205,7 @@ void CSimDriver::ThreadCreateSim()
 void CSimDriver::ThreadRun()
 {
   gpg::SetThreadName(kCurrentThreadId, "Issue");
+  PlaceCurrentThread(EThreadRole::Issue);
   (void)SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
   TIME_SetTimeBarColor(kIssueThreadTimeBarColor);
 

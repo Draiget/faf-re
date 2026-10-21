@@ -257,6 +257,9 @@
     </ClCompile>
     <ClCompile Include="moho\sim\SimWorkerPool.cpp">
       <Filter>Source Files</Filter>
+    <ClCompile Include="moho\sim\UnitUpdateFill.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     </ClCompile>
     <ClCompile Include="moho\sim\SSyncFilter.cpp">
       <Filter>Source Files</Filter>
@@ -1271,6 +1274,9 @@
     </ClCompile>
     <ClCompile Include="moho\core\Thread.cpp">
       <Filter>Source Files</Filter>
+    <ClCompile Include="moho\core\ThreadPlacement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     </ClCompile>
     <ClCompile Include="moho\net\CLobby.cpp">
       <Filter>Source Files</Filter>
@@ -2417,6 +2423,9 @@
     </ClInclude>
     <ClInclude Include="moho\sim\SimWorkerPool.h">
       <Filter>Header Files</Filter>
+    <ClInclude Include="moho\sim\UnitUpdateFill.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     </ClInclude>
     <ClInclude Include="moho\sim\ISTIDriver.h">
       <Filter>Header Files</Filter>
@@ -4013,6 +4022,9 @@
     </ClInclude>
     <ClInclude Include="moho\core\Thread.h">
       <Filter>Header Files</Filter>
+    <ClInclude Include="moho\core\ThreadPlacement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     </ClInclude>
     <ClInclude Include="boost\function.h">
       <Filter>Header Files</Filter>
