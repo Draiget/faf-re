@@ -13,6 +13,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
+#include <utility>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
@@ -1168,6 +1170,65 @@ namespace
     }
   }
 
+  /** FAF addition: a gal device API's name for the log. */
+  [[nodiscard]] const char* DeviceApiLogName(const gpg::gal::DeviceApi api) noexcept
+  {
+    switch (api) {
+      case gpg::gal::DeviceApi::Direct3D10:
+        return "Direct3D 10";
+      case gpg::gal::DeviceApi::Direct3D11:
+        return "Direct3D 11";
+      case gpg::gal::DeviceApi::Direct3D12:
+        return "Direct3D 12";
+      case gpg::gal::DeviceApi::Vulkan:
+        return "Vulkan";
+      default:
+        return "Direct3D 9";
+    }
+  }
+
+  /**
+   * FAF addition: the renderers CScApp::CreateDevice tries, in order.
+   *
+   * A command-line switch wins (/D3D10 as shipped; /d3d9, /d3d11, /d3d12,
+   * /vulkan), then the `graphics_api` option (the Video tab's Graphics API
+   * entry, from data/fafengine). An explicit renderer is tried alone, with
+   * Direct3D 9 after it. `auto` - the default, and what an unset or unknown
+   * value means - takes the newest renderer that starts: Direct3D 12, then
+   * Vulkan, then Direct3D 11, then Direct3D 9.
+   */
+  [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder()
+  {
+    using gpg::gal::DeviceApi;
+    const auto explicitApi = [](const DeviceApi api) {
+      return (api == DeviceApi::Direct3D9) ? std::vector<DeviceApi>{api} : std::vector<DeviceApi>{api, DeviceApi::Direct3D9};
+    };
+    if (moho::CFG_GetArgOption("/D3D10", 0, nullptr)) {
+      return {DeviceApi::Direct3D10};
+    }
+    static constexpr std::pair<const char*, DeviceApi> kSwitches[] = {
+      {"/d3d9", DeviceApi::Direct3D9}, {"/d3d11", DeviceApi::Direct3D11}, {"/d3d12", DeviceApi::Direct3D12}, {"/vulkan", DeviceApi::Vulkan},
+    };
+    for (const auto& [name, api] : kSwitches) {
+      if (moho::CFG_GetArgOption(name, 0, nullptr)) {
+        gpg::Logf("renderer: %s from the command line", DeviceApiLogName(api));
+        return explicitApi(api);
+      }
+    }
+
+    const msvc8::string option = moho::OPTIONS_GetString("graphics_api");
+    gpg::Logf("graphics_api option: %s", option.empty() ? "(unset)" : option.c_str());
+    static constexpr std::pair<const char*, DeviceApi> kOptions[] = {
+      {"d3d9", DeviceApi::Direct3D9}, {"d3d11", DeviceApi::Direct3D11}, {"d3d12", DeviceApi::Direct3D12}, {"vulkan", DeviceApi::Vulkan},
+    };
+    for (const auto& [name, api] : kOptions) {
+      if (option == name) {
+        return explicitApi(api);
+      }
+    }
+    return {DeviceApi::Direct3D12, DeviceApi::Vulkan, DeviceApi::Direct3D11, DeviceApi::Direct3D9};
+  }
+
   /**
    * Engine addition: appends the renderer actually created (when it isn't Direct3D 9) and the
    * `/title <label>` command-line label to the top-level window's title, e.g.
@@ -1225,20 +1286,14 @@ bool CScApp::CreateDevice()
   msvc8::vector<msvc8::string> options;
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
 
-  const bool useD3D10 = moho::CFG_GetArgOption("/D3D10", 0, nullptr);
-  // FAF addition: /d3d11, /d3d12 and /vulkan select the newer backends.
-  // None has a hardware cursor, so they take the Windows cursor as /D3D10 does.
-  const bool useD3D11 = !useD3D10 && moho::CFG_GetArgOption("/d3d11", 0, nullptr);
-  const bool useD3D12 = !useD3D10 && !useD3D11 && moho::CFG_GetArgOption("/d3d12", 0, nullptr);
-  const bool useVulkan = !useD3D10 && !useD3D11 && !useD3D12 && moho::CFG_GetArgOption("/vulkan", 0, nullptr);
-  moho::d3d_WindowsCursor = useD3D10 || useD3D11 || useD3D12 || useVulkan;
-
-  const gpg::gal::DeviceApi requestedApi = useD3D10 ? gpg::gal::DeviceApi::Direct3D10
-    : useD3D11                                      ? gpg::gal::DeviceApi::Direct3D11
-    : useD3D12                                      ? gpg::gal::DeviceApi::Direct3D12
-    : useVulkan                                     ? gpg::gal::DeviceApi::Vulkan
-                                                    : gpg::gal::DeviceApi::Direct3D9;
-  gpg::gal::DeviceContext context(requestedApi);
+  // FAF addition: the renderers to try, in order (RendererAttemptOrder). The
+  // context is built for the first; the loop below swaps the API on failure.
+  // Only Direct3D 9 has a hardware cursor; the others take the Windows cursor
+  // as /D3D10 does.
+  const std::vector<gpg::gal::DeviceApi> rendererAttempts = RendererAttemptOrder();
+  const bool useD3D10 = rendererAttempts.front() == gpg::gal::DeviceApi::Direct3D10;
+  moho::d3d_WindowsCursor = rendererAttempts.front() != gpg::gal::DeviceApi::Direct3D9;
+  gpg::gal::DeviceContext context(rendererAttempts.front());
   context.mVSync = moho::OPTIONS_GetInt("vsync") == 1;
   context.AddHead(gpg::gal::Head{});
 
@@ -1365,20 +1420,29 @@ bool CScApp::CreateDevice()
     ApplyPackedAntiAliasing(context.GetHead(1), packedAntiAliasing);
   }
 
-  // FAF addition: a Direct3D 11, Direct3D 12 or Vulkan device that cannot be
-  // created falls back to Direct3D 9 with the same window settings before
-  // the binary's own default-window fallback below.
+  // FAF addition: the renderers are tried in order with the same window
+  // settings. One whose device cannot be created and set up (CreateAppFrame
+  // logs the GAL error) hands over to the next, before the binary's own
+  // default-window fallback below, which runs only when all of them failed.
   const gpg::gal::DeviceContext requestedContext = context;
-  bool created = CreateAppFrame(title, maximized, position, context);
-  if (!created && (useD3D11 || useD3D12 || useVulkan)) {
-    gpg::Warnf(
-      "%s is unavailable; falling back to Direct3D 9",
-      useD3D11 ? "Direct3D 11" : useD3D12 ? "Direct3D 12" : "Vulkan"
-    );
-    context = requestedContext;
-    context.mDeviceType = gpg::gal::DeviceApi::Direct3D9;
-    moho::d3d_WindowsCursor = false;
+  bool created = false;
+  for (std::size_t attempt = 0U; attempt < rendererAttempts.size() && !created; ++attempt) {
+    const gpg::gal::DeviceApi api = rendererAttempts[attempt];
+    if (attempt != 0U) {
+      context = requestedContext;
+      context.mDeviceType = api;
+      moho::d3d_WindowsCursor = api != gpg::gal::DeviceApi::Direct3D9;
+    }
+    if (rendererAttempts.size() > 1U) {
+      gpg::Logf("renderer: trying %s", DeviceApiLogName(api));
+    }
     created = CreateAppFrame(title, maximized, position, context);
+    if (!created && attempt + 1U < rendererAttempts.size()) {
+      gpg::Warnf("%s is unavailable; falling back to %s", DeviceApiLogName(api), DeviceApiLogName(rendererAttempts[attempt + 1U]));
+    }
+  }
+  if (!created) {
+    moho::d3d_WindowsCursor = useD3D10;
   }
 
   if (!created) {

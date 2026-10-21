@@ -125,6 +125,7 @@ namespace gpg::gal
     void DrawPrimitive(const DrawContext* context) override;
     void BeginTechnique() override;
     void EndTechnique() override;
+    bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;

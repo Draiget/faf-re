@@ -788,6 +788,34 @@ namespace
     }
   }
 
+  /**
+   * FAF addition, not in the shipped binary: the engine's own Lua.
+   *
+   * `fafengine` next to the executable (data/fafengine in the repository) is
+   * mounted at /fafengine and registered as a hook directory, so each script
+   * in it is appended to the gamedata script of the same path - today
+   * lua/options/options.lua, which adds the Graphics API option. The engine
+   * does this itself rather than through the init file because the init
+   * files belong to the FAF client. Nothing happens when the folder is absent.
+   */
+  void AppendEngineHookFolder(msvc8::vector<moho::SVFSMountPoint>& mountPoints)
+  {
+    std::array<wchar_t, MAX_PATH> modulePath{};
+    const DWORD length = ::GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
+    if (length == 0U || length >= modulePath.size()) {
+      return;
+    }
+    const std::filesystem::path folder = std::filesystem::path(modulePath.data()).parent_path() / L"fafengine";
+    std::error_code error;
+    if (!std::filesystem::is_directory(folder, error)) {
+      return;
+    }
+    const msvc8::string folderUtf8 = gpg::STR_WideToUtf8(folder.wstring().c_str());
+    mountPoints.push_back(moho::SVFSMountPoint(folderUtf8.c_str(), "/fafengine"));
+    moho::SCR_AddHookDirectory("/fafengine");
+    gpg::Logf("engine hooks: %s mounted at /fafengine", folderUtf8.c_str());
+  }
+
   [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* const state, const char* const modulePath)
   {
     if (state == nullptr || modulePath == nullptr || modulePath[0] == '\0') {
@@ -5795,6 +5823,7 @@ bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const 
     allowedProtocols = CollectAllowedProtocolsFromLua(startupState);
     mountPoints = CollectMountPointsFromLua(startupState);
     ApplyHookDirectoriesFromLua(startupState);
+    AppendEngineHookFolder(mountPoints);
   }
 
   {

@@ -13,6 +13,14 @@ namespace gpg::gal::backend
   /** Throws a `gpg::gal::Error` carrying the HRESULT in hex and as text. */
   [[noreturn]] void ThrowHresult(const char* file, int line, HRESULT result);
 
+  /**
+   * Diagnostics: true when FAF_GAL_FAIL_SETUP asks the backend named `name`
+   * ("d3d12", "vulkan") to fail its device creation - the value `1` (every
+   * backend) or a list naming it ("d3d12,vulkan"). Exercises the renderer
+   * fallback in CScApp::CreateDevice.
+   */
+  [[nodiscard]] bool SetupFailureRequested(const char* name);
+
   /** `ThrowHresult` when `result` failed. */
   inline void CheckHresult(const char* const file, const int line, const HRESULT result)
   {

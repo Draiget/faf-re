@@ -121,6 +121,7 @@ namespace gpg::gal
     void DrawPrimitive(const DrawContext* context) override;
     void BeginTechnique() override;
     void EndTechnique() override;
+    bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -177,6 +178,7 @@ namespace gpg::gal
       VkSwapchainKHR swapchain = VK_NULL_HANDLE;
       VkFormat format = VK_FORMAT_UNDEFINED;
       VkExtent2D extent{};
+      VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
       std::vector<VkImage> images;
       std::vector<VkSemaphore> renderFinished; // one per image
       std::uint32_t acquired = 0;
@@ -261,6 +263,8 @@ namespace gpg::gal
     std::uint64_t mSubmittedSerial = 0;
     bool mAnisotropy = false;
     bool mWireframeSupported = false;
+    bool mMemoryBudget = false; // VK_EXT_memory_budget enabled
+    std::string mDriverName;    // VkPhysicalDeviceDriverProperties driverName + driverInfo
     VkFormat mDepthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
     vulkan::MemoryAllocator mMemory;

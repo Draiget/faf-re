@@ -181,6 +181,16 @@ namespace gpg::gal::effects
     std::size_t end = 0;
   };
 
+  /**
+   * Direct3D 9's alpha test as a pass sets it (D3DRS_ALPHAFUNC, D3DRS_ALPHAREF).
+   * Direct3D 10 and later have none; ModernHlsl emulates it in the pixel shader.
+   */
+  struct AlphaTestDesc
+  {
+    std::uint8_t func = 8; // D3DCMPFUNC: 1 NEVER ... 8 ALWAYS
+    std::uint8_t ref = 0;  // compared with the colour's alpha in 8-bit units
+  };
+
   /** `VertexShader = compile vs_4_1 Function( arguments )`. */
   struct ShaderReference
   {
@@ -199,6 +209,7 @@ namespace gpg::gal::effects
     std::optional<DepthStencilDesc> depthStencil;
     std::uint32_t stencilRef = 0;
     std::optional<RasterizerDesc> rasterizer;
+    std::optional<AlphaTestDesc> alphaTest; // set when the Direct3D 9 pass enables alpha testing
     ShaderReference vertexShader;
     ShaderReference pixelShader;
   };
@@ -217,6 +228,7 @@ namespace gpg::gal::effects
     std::vector<SamplerDesc> samplers;
     std::vector<Technique> techniques;
     std::vector<std::string> notes; // what the parser could not represent
+    bool direct3D9PassStates = false; // ApplyDirect3D9PassStates read the original source
 
     [[nodiscard]] const Parameter* FindParameter(std::string_view name) const noexcept;
     [[nodiscard]] const Technique* FindTechnique(std::string_view name) const noexcept;
@@ -229,4 +241,13 @@ namespace gpg::gal::effects
    * objects). Throws std::runtime_error on input it cannot structure.
    */
   [[nodiscard]] EffectDescription ParseEffect(std::string_view source);
+
+  /**
+   * Reads the Direct3D 9 pass states that the D3D10 dialect drops from the
+   * effect's original source (the `#ifndef DIRECT3D10` blocks the
+   * preprocessor removed) and records them on the matching passes: today the
+   * alpha test, which FAF's effects still rely on (water2's HighFidelityPS
+   * returns the land mask in alpha and lets AlphaFunc = NotEqual discard it).
+   */
+  void ApplyDirect3D9PassStates(std::string_view originalSource, EffectDescription& description);
 } // namespace gpg::gal::effects

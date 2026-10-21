@@ -44,6 +44,27 @@ namespace gpg::gal
   [[nodiscard]] bool WindowIsForeground();
 
   /**
+   * FAF addition, not in the shipped binary: what `ren_Info` reports about
+   * the running backend (Device::GetRuntimeInfo).
+   */
+  struct DeviceRuntimeInfo
+  {
+      msvc8::string api;            // "D3D9", "D3D11", "D3D12", "Vulkan"
+      msvc8::string adapter;        // adapter description
+      msvc8::string driverVersion;  // when the API exposes it
+      msvc8::string featureLevel;   // "11_1", "SM3", Vulkan API version ...
+      std::uint32_t vendorId = 0, deviceId = 0;
+      std::uint64_t dedicatedVideoMemory = 0;   // bytes
+      std::uint64_t sharedSystemMemory = 0;
+      std::uint64_t localBudget = 0, localUsage = 0;        // DXGI QueryVideoMemoryInfo / VK_EXT_memory_budget
+      std::uint64_t nonLocalBudget = 0, nonLocalUsage = 0;
+      std::uint64_t availableTextureMemory = 0; // D3D9 GetAvailableTextureMem
+      msvc8::string swapChain;      // e.g. "1280x720 flip-discard 3 buffers, tearing"
+      bool vsync = false;
+      std::uint32_t gpuDrivenFeatures = 0;
+  };
+
+  /**
    * VFTABLE: 0x00D42224
    * COL:     0x00E5050C
    *
@@ -586,6 +607,15 @@ namespace gpg::gal
      * Ends the active effect technique.
      */
     virtual void EndTechnique() = 0;
+
+    /**
+     * FAF addition, not in the shipped binary: a slot after the binary's 50.
+     *
+     * What it does:
+     * Fills `out` with the backend, adapter, memory and swap-chain facts
+     * `ren_Info` prints. The base answers false (nothing to report).
+     */
+    virtual bool GetRuntimeInfo(DeviceRuntimeInfo& out);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

@@ -423,4 +423,10 @@ namespace gpg::gal
     {
         *outContext = outputContext_;
     }
+
+    // FAF addition: backends that can describe themselves override this.
+    bool Device::GetRuntimeInfo(DeviceRuntimeInfo&)
+    {
+        return false;
+    }
 }
