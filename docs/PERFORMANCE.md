@@ -47,14 +47,18 @@ time.
 | A user-side worker pool, separate from the sim's. The engine heap is thread-safe. | `user_Workers` (default min(CPUs − 2, 6)) |
 | Strategic icons: units are classified on workers, and icons drawn on the main thread in the original order. No reference-count traffic on the textures every unit shares. | `ui_ParallelIcons` |
 | Mesh and decal view queries and fog-of-war circles collected on workers, merged in the original walk order | `ren_ParallelCull` |
+| Each beat's unit and entity updates: pose and data copies on workers. Spatial relinks, selection and sound stay on the main thread in packet order. An update that can run UI Lua is applied serially, so Lua sees the serial state. | `wld_ParallelSync` |
+| Single-player sessions (one local client, no network) keep 2 beats computed ahead. Multiplayer and observers keep the original pacing. | `sim_LocalLead` (default 2) |
+| With 20,000+ entities in view, a camera's in-view unit lists refresh every 2 s instead of every 0.5 s (still 0.2 s after a zoom) | `ren_FrustumCacheLodUnits`, `ren_FrustumCacheLodInterval` |
 
 Results, x64:
 
 | | Before | After |
 |---|---|---|
-| Benchmark replay, wall time for the whole game | 37:33 | 20:46 (about 1.8× faster) |
-| Main thread ms per tick at 3,900 / 4,370 units | 95 / 108 | 43 / 57 |
-| Stress map, main thread ms per tick at 30,000 / 60,000 units | 570 / 860 | 410 / 800 |
+| Benchmark replay, wall time for the whole game | 37:33 | 20:31 (about 1.8× faster) |
+| Main thread ms per tick at 3,900 / 4,370 units | 95 / 108 | 43 / 57 before parallel sync apply, which took about 12 % more off |
+| Stress map, ticks per second at 30,000 / 60,000 units | 1.75 / 0.9 | 2.8 / 1.4 |
+| Stress map, main thread ms per tick at 30,000 / 60,000 units | 570 / 860 | 255 / 494 |
 
 The full benchmark replay matches every recorded checksum on x64 and x86, and
 screenshots of the serial and parallel paths show the same picture. In
@@ -107,13 +111,11 @@ Main-thread work never feeds back into the simulation, so it can be
 multi-threaded and rewritten freely; the checksum cannot move. The plan, in
 order:
 
-1. **Sync apply per entity** on the user-side workers. It is now the largest
-   main-thread cost in replays, about 26 % at the peak.
-2. **Single-player and skirmish pacing** like the replay lead, kept short so
-   commands don't land late. On the stress map the sim still waits about half
-   the time.
-3. **A zoomed-out level of detail for the minimap and strategic view.** It
-   still costs about a third of the main thread at very high unit counts.
+1. **Fog of war.** At 60,000 units, the serial walk of the vision tree costs
+   about 17 % of the main thread.
+2. **Bulk strategic-icon drawing.** The serial quad emit costs about 10 % when
+   zoomed out at 60,000 units.
+3. **Observer pacing for live games**, after a live multiplayer test.
 4. **New renderer backends** behind the existing `gpg::gal` layer, which
    already has a full D3D9 and a partial D3D10 backend:
    - Direct3D 11 first, with instancing, lower per-draw overhead and

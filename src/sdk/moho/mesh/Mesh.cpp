@@ -3196,13 +3196,21 @@ namespace moho
    */
   void MeshInstance::SetStance(const VTransform& startTransformArg, const VTransform& endTransformArg)
   {
+    // Same republish as the pose overload, at 0x007DEA0B..0x007DEA1A.
+    if (ApplyStance(startTransformArg, endTransformArg)) {
+      RepublishStanceBounds();
+    }
+  }
+
+  bool MeshInstance::ApplyStance(const VTransform& startTransformArg, const VTransform& endTransformArg)
+  {
     const bool changed = !Vec3EqualExact(endTransform.pos_, endTransformArg.pos_) ||
       !QuatEqualExact(endTransform.orient_, endTransformArg.orient_) ||
       !Vec3EqualExact(startTransform.pos_, startTransformArg.pos_) ||
       !QuatEqualExact(startTransform.orient_, startTransformArg.orient_);
     if (!changed) {
       hasStanceUpdatePending = 0;
-      return;
+      return false;
     }
 
     hasStanceUpdatePending = 1;
@@ -3211,8 +3219,11 @@ namespace moho
     frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
     boundsValid = 1;
+    return true;
+  }
 
-    // Same republish as the pose overload, at 0x007DEA0B..0x007DEA1A.
+  void MeshInstance::RepublishStanceBounds()
+  {
     db.UpdateBounds(GetSweptAlignedBox());
   }
 
@@ -3259,9 +3270,27 @@ namespace moho
     boost::shared_ptr<CAniPose> endPoseArg
   )
   {
+    // Republish the swept bounds into this instance's spatial-db entry
+    // (0x007DEBD4..0x007DEBE4: set the dirty byte, GetSweptAlignedBox, then
+    // UpdateBounds on `this + 0x0C`, which is `db`). Without it the entry keeps
+    // the NaN box the ctor gave it, `MeshRenderer::Batch`'s
+    // CollectAllInVolume never matches the instance, and the mesh is never
+    // drawn at all.
+    if (ApplyStance(startTransformArg, endTransformArg, forceRefresh, startPoseArg, endPoseArg)) {
+      RepublishStanceBounds();
+    }
+  }
+
+  bool MeshInstance::ApplyStance(
+    const VTransform& startTransformArg,
+    const VTransform& endTransformArg,
+    const bool forceRefresh,
+    const boost::shared_ptr<CAniPose>& startPoseArg,
+    const boost::shared_ptr<CAniPose>& endPoseArg
+  )
+  {
     if (isStaticPose == 0) {
-      SetStance(startTransformArg, endTransformArg);
-      return;
+      return ApplyStance(startTransformArg, endTransformArg);
     }
 
     startPose = startPoseArg;
@@ -3276,20 +3305,13 @@ namespace moho
       !Vec3EqualExact(startTransform.pos_, startTransformArg.pos_) ||
       !QuatEqualExact(startTransform.orient_, startTransformArg.orient_);
     if (!changed && !forceRefresh) {
-      return;
+      return false;
     }
 
     endTransform = endTransformArg;
     startTransform = startTransformArg;
     boundsValid = 1;
-
-    // Republish the swept bounds into this instance's spatial-db entry
-    // (0x007DEBD4..0x007DEBE4: set the dirty byte, GetSweptAlignedBox, then
-    // UpdateBounds on `this + 0x0C`, which is `db`). Without it the entry keeps
-    // the NaN box the ctor gave it, `MeshRenderer::Batch`'s
-    // CollectAllInVolume never matches the instance, and the mesh is never
-    // drawn at all.
-    db.UpdateBounds(GetSweptAlignedBox());
+    return true;
   }
 
   /**

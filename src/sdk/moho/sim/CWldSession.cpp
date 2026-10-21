@@ -8123,6 +8123,170 @@ namespace moho
      * The pruning cursor that sat under it, 0x008955F2..0x00895667, is now
      * `WeakSet<UserEntity>::begin()` over `mOrphans`/`mVizUpdates`.)
      */
+
+    /// Engine addition: `wld_ParallelSync`, user-side. Apply each beat's unit/entity updates with
+    /// their per-entity copies on CUserWorkerPool.
+    bool wld_ParallelSync = true;
+
+    TConVar<bool> gTConVar_wld_ParallelSync(
+      "wld_ParallelSync",
+      "Apply each beat's unit and entity updates with the per-entity copies on user worker threads "
+      "(see user_Workers). Lua, selection and spatial-database work stays on the main thread in "
+      "packet order, so the result is the serial one.",
+      &wld_ParallelSync
+    );
+
+    // Below this many updates a beat applies serially; chunk size for the parallel part.
+    constexpr std::size_t kParallelSyncMinUpdates = 256u;
+    constexpr std::size_t kParallelSyncGrain = 64u;
+
+    [[nodiscard]] bool UseParallelSync(const std::size_t count)
+    {
+      return wld_ParallelSync && count >= kParallelSyncMinUpdates && CUserWorkerPool::ConfiguredWorkerCount() != 0u;
+    }
+
+    /**
+     * Engine addition (`wld_ParallelSync`): resolves the update records' entity ids into
+     * `targets`. False when an id is unknown or names the same entity twice; the caller then
+     * takes the serial loop, which is the binary's.
+     */
+    template <class Entry>
+    [[nodiscard]] bool ResolveSyncTargets(
+      CWldSession& session, const msvc8::vector<Entry>& entries, std::vector<UserEntity*>& targets
+    )
+    {
+      targets.resize(entries.size());
+      CUserWorkerPool::Get().ParallelFor(entries.size(), 1024u, [&](const std::size_t begin, const std::size_t end) {
+        for (std::size_t i = begin; i < end; ++i) {
+          targets[i] = session.LookupEntityId(entries[i].mEntityId);
+        }
+      });
+
+      std::vector<UserEntity*> sorted(targets);
+      std::sort(sorted.begin(), sorted.end());
+      return (sorted.empty() || sorted.front() != nullptr) && std::adjacent_find(sorted.begin(), sorted.end()) == sorted.end();
+    }
+
+    /**
+     * Engine addition (`wld_ParallelSync`): one packet loop applied in segments.
+     *
+     * The binary applies record after record, each one whole. Records that may run UI Lua
+     * (`isBarrier`) still do: each runs whole (`applyWhole`) with every earlier record applied and
+     * every later one untouched, so Lua sees exactly the serial state. Between barriers, the
+     * records `isLocal` accepts have their local part - which writes only that record's own
+     * entity - applied on user workers, then every record of the segment gets its main-thread part
+     * in packet order: `finish` for the local ones, `applyWhole` for the rest. The main-thread
+     * parts (spatial relinks, selection, sound and vision handles) never read another record's
+     * entity, so running them after the segment's local parts gives the serial result.
+     */
+    template <class IsBarrier, class IsLocal, class ApplyLocal, class Finish, class ApplyWhole>
+    void ApplyPacketInSegments(
+      const std::size_t count,
+      const IsBarrier& isBarrier,
+      const IsLocal& isLocal,
+      const ApplyLocal& applyLocal,
+      const Finish& finish,
+      const ApplyWhole& applyWhole
+    )
+    {
+      std::vector<std::uint8_t> local;
+      std::size_t begin = 0;
+      while (begin < count) {
+        std::size_t end = begin;
+        while (end < count && !isBarrier(end)) {
+          ++end;
+        }
+
+        const std::size_t segmentSize = end - begin;
+        if (segmentSize >= kParallelSyncMinUpdates) {
+          local.assign(segmentSize, 0u);
+          for (std::size_t i = 0; i < segmentSize; ++i) {
+            local[i] = isLocal(begin + i) ? 1u : 0u;
+          }
+          CUserWorkerPool::Get().ParallelFor(segmentSize, kParallelSyncGrain, [&](const std::size_t from, const std::size_t to) {
+            for (std::size_t i = from; i < to; ++i) {
+              if (local[i] != 0u) {
+                applyLocal(begin + i);
+              }
+            }
+          });
+          for (std::size_t i = 0; i < segmentSize; ++i) {
+            if (local[i] != 0u) {
+              finish(begin + i);
+            } else {
+              applyWhole(begin + i);
+            }
+          }
+        } else {
+          for (std::size_t i = begin; i < end; ++i) {
+            applyWhole(i);
+          }
+        }
+
+        if (end < count) {
+          applyWhole(end);
+          begin = end + 1u;
+        } else {
+          begin = end;
+        }
+      }
+    }
+
+    /// Engine addition (`wld_ParallelSync`): `DoBeat`'s unit-update loop. False: run the serial loop.
+    [[nodiscard]] bool ApplyUnitUpdatesParallel(CWldSession& session, const msvc8::vector<SUnitVariableUpdateEntry>& updates)
+    {
+      if (!UseParallelSync(updates.size())) {
+        return false;
+      }
+      static std::vector<UserEntity*> sTargets;
+      if (!ResolveSyncTargets(session, updates, sTargets)) {
+        return false;
+      }
+
+      const auto unitAt = [](const std::size_t i) { return static_cast<UserUnit*>(sTargets[i]); };
+      ApplyPacketInSegments(
+        updates.size(),
+        [&](const std::size_t i) { return unitAt(i)->UnitDataUpdateRunsLua(updates[i].mVariableData); },
+        [](std::size_t) { return true; },
+        [&](const std::size_t i) {
+          // Not a barrier, so the unit does not go busy here and no deselect sits between these.
+          (void)unitAt(i)->ApplyUnitPayload(updates[i].mVariableData, updates[i].mReconFlags);
+          unitAt(i)->ApplyUnitPoses();
+        },
+        [&](const std::size_t i) { unitAt(i)->FinishUnitDataLinks(); },
+        [&](const std::size_t i) { unitAt(i)->UpdateUnitData(updates[i].mVariableData, updates[i].mReconFlags); }
+      );
+      return true;
+    }
+
+    /// Engine addition (`wld_ParallelSync`): `DoBeat`'s entity-update loop. False: run the serial loop.
+    [[nodiscard]] bool ApplyEntityUpdatesParallel(
+      CWldSession& session, const msvc8::vector<SEntityVariableUpdateEntry>& updates
+    )
+    {
+      if (!UseParallelSync(updates.size())) {
+        return false;
+      }
+      static std::vector<UserEntity*> sTargets;
+      static std::vector<UserEntity::SEntityDataUpdate> sSteps;
+      if (!ResolveSyncTargets(session, updates, sTargets)) {
+        return false;
+      }
+      sSteps.resize(updates.size());
+
+      ApplyPacketInSegments(
+        updates.size(),
+        [&](const std::size_t i) { return sTargets[i]->EntityDataUpdateRunsLua(updates[i].mVariableData); },
+        [&](const std::size_t i) { return sTargets[i]->EntityDataUpdateIsLocal(updates[i].mVariableData); },
+        [&](const std::size_t i) {
+          sSteps[i] = sTargets[i]->BeginEntityDataUpdate(updates[i].mVariableData);
+          sTargets[i]->ApplyEntityDataUpdate(updates[i].mVariableData, sSteps[i]);
+        },
+        [&](const std::size_t i) { sTargets[i]->FinishEntityDataUpdate(updates[i].mVariableData, sSteps[i]); },
+        [&](const std::size_t i) { sTargets[i]->UpdateEntityData(updates[i].mVariableData); }
+      );
+      return true;
+    }
   } // namespace
 
   /**
@@ -8255,13 +8419,17 @@ namespace moho
       (void)FindOrCreateCommandIssueHelper(*mCommandManager, commandConstantData, 0u, 0);
     }
 
-    for (const SUnitVariableUpdateEntry& unitUpdate : beat.mUnitUpdates) {
-      auto* const unit = static_cast<UserUnit*>(LookupEntityId(unitUpdate.mEntityId));
-      unit->UpdateUnitData(unitUpdate.mVariableData, unitUpdate.mReconFlags);
+    if (!ApplyUnitUpdatesParallel(*this, beat.mUnitUpdates)) {
+      for (const SUnitVariableUpdateEntry& unitUpdate : beat.mUnitUpdates) {
+        auto* const unit = static_cast<UserUnit*>(LookupEntityId(unitUpdate.mEntityId));
+        unit->UpdateUnitData(unitUpdate.mVariableData, unitUpdate.mReconFlags);
+      }
     }
 
-    for (const SEntityVariableUpdateEntry& entityUpdate : beat.mEntityUpdates) {
-      LookupEntityId(entityUpdate.mEntityId)->UpdateEntityData(entityUpdate.mVariableData);
+    if (!ApplyEntityUpdatesParallel(*this, beat.mEntityUpdates)) {
+      for (const SEntityVariableUpdateEntry& entityUpdate : beat.mEntityUpdates) {
+        LookupEntityId(entityUpdate.mEntityId)->UpdateEntityData(entityUpdate.mVariableData);
+      }
     }
 
     // Erase means "the sim is done with this entity but the client may still be
@@ -13009,6 +13177,24 @@ namespace moho
     }
 
     /**
+     * Engine addition: the issue-thread pacing for a new session's driver. A replay gets the
+     * replay lead; a session with exactly one client - the local human - and no network connector
+     * (a single-player skirmish or campaign) gets the local lead; anything with a connector or more
+     * clients (players or observers of a live game) keeps the original pacing.
+     */
+    [[nodiscard]] ESimSessionPacing SelectSessionPacing(const CWldSession& session, IClientManager* const clientManager)
+    {
+      if (session.IsReplay) {
+        return ESimSessionPacing::Replay;
+      }
+      if (session.IsMultiplayer || clientManager == nullptr || clientManager->GetConnector() != nullptr ||
+          clientManager->NumberOfClients() != 1u || clientManager->GetLocalClient() == nullptr) {
+        return ESimSessionPacing::Network;
+      }
+      return ESimSessionPacing::Local;
+    }
+
+    /**
      * Address: 0x0088C000 (FUN_0088C000, func_DoLoading)
      *
      * IDA signature:
@@ -13138,8 +13324,9 @@ namespace moho
       // driver; the session info gives its client manager up here.
       IClientManager* const clientManager = sessionInfo->mClientManager;
       sessionInfo->mClientManager = nullptr;
-      // Engine addition: the new driver paces a replay with `sim_ReplayLead`.
-      SIM_SetReplaySessionPacing(wldSession->IsReplay);
+      // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
+      // `sim_LocalLead`); a session with any network connector keeps the original pacing.
+      SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
       // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
       // driver is stored first, then the previous one is deleted.
       sSimDriver.reset(SIM_CreateDriver(
@@ -13813,10 +14000,10 @@ namespace moho
     float requestedSimScale =
       static_cast<float>(std::pow(10.0, static_cast<double>(clientManager->GetSimRate() * 0.1f)));
 
-    // Engine addition (sim_ReplayLead): a replay's display clock follows the sim's measured speed
+    // Engine addition (sim_ReplayLead / sim_LocalLead): the display clock follows the sim's measured speed
     // rather than the rate step it rounds down to (up to 26% slower), with a little headroom so the
     // display, not the sim, is the one that waits. Never faster than the requested speed.
-    if (const float measuredScale = SIM_GetReplaySimSpeedEstimate(); measuredScale > 0.0f) {
+    if (const float measuredScale = SIM_GetLeadSimSpeedEstimate(); measuredScale > 0.0f) {
       constexpr float kReplayClockHeadroom = 1.05f;
       const float requestedOnly =
         static_cast<float>(std::pow(10.0, static_cast<double>(clientManager->GetSimRateRequested() * 0.1f)));

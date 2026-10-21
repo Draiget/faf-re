@@ -344,12 +344,20 @@ namespace moho
    */
   void UserEntity::UpdateEntityData(const SSTIEntityVariableData& variableData)
   {
-    const bool requiresMeshRebuild =
+    SEntityDataUpdate update = BeginEntityDataUpdate(variableData);
+    ApplyEntityDataUpdate(variableData, update);
+    FinishEntityDataUpdate(variableData, update);
+  }
+
+  UserEntity::SEntityDataUpdate UserEntity::BeginEntityDataUpdate(const SSTIEntityVariableData& variableData)
+  {
+    SEntityDataUpdate update{};
+    update.mRequiresMeshRebuild =
       (mMeshInstance == nullptr && variableData.mMeshBlueprint != nullptr) ||
       (variableData.mMeshBlueprint != mVariableData.mMeshBlueprint) ||
       (variableData.mScmResource.get() != mVariableData.mScmResource.get());
 
-    const bool scaleChanged = mMeshInstance != nullptr && mMeshInstance->isStaticPose == 0u &&
+    update.mScaleChanged = mMeshInstance != nullptr && mMeshInstance->isStaticPose == 0u &&
       mMeshInstance->scale != variableData.mScale;
 
     // 0x008B8F46..0x008B8F98: exact tests throughout -- `CompareArrays` on each
@@ -360,6 +368,23 @@ namespace moho
       variableData.mLastTransform.pos_ != mVariableData.mLastTransform.pos_ ||
       variableData.mLastTransform.orient_ != mVariableData.mLastTransform.orient_ ||
       variableData.mCurImpactValue != mVariableData.mCurImpactValue;
+
+    // 0x008B9351/0x008B9358 test two byte slots: esp+0x13, written only by the
+    // transform comparison at 0x008B8F9A/0x008B8FA4, and esp+0x18, written only
+    // by the mesh-rebuild test at 0x008B8EFF/0x008B8F0D -- the same slot read at
+    // 0x008B9066 to gate the rebuild block itself. The scale flag (esp+0x12) is
+    // not in this gate; it only guards the `mesh->scale` copy at 0x008B9268.
+    //
+    // This matters for structures. A building never moves, so `transformChanged`
+    // is false for every sync after its first, and the mesh instance is created
+    // on a *later* beat than the entity (the SCM resource arrives after the
+    // create record). With `scaleChanged` here, that creation beat did not
+    // refresh the spatial entry, so the entry kept the degenerate
+    // position-only box installed while `mMeshInstance` was still null -- and
+    // nothing ever moved the building to refresh it. `CollectInVolume` then
+    // never returned it, which is why a finished mass extractor could not be
+    // clicked and drew no strategic icon while mobile units picked fine.
+    update.mStanceOrSpatialUpdateNeeded = transformChanged || update.mRequiresMeshRebuild;
 
     if (IsUserUnit() != nullptr && mVariableData.mHealth > variableData.mHealth) {
       if (mArmy != nullptr && mSession != nullptr && mArmy == mSession->GetFocusUserArmy()) {
@@ -377,7 +402,11 @@ namespace moho
         mSession->RemoveFromVizUpdate(this);
       }
     }
+    return update;
+  }
 
+  void UserEntity::ApplyEntityDataUpdate(const SSTIEntityVariableData& variableData, SEntityDataUpdate& update)
+  {
     mVariableData = variableData;
 
     if (mVariableData.mAmbientSound != mAmbientLoop.mParams) {
@@ -388,7 +417,7 @@ namespace moho
     }
 
     bool restoredPrimaryPose = false;
-    if (requiresMeshRebuild) {
+    if (update.mRequiresMeshRebuild) {
       if (mMeshInstance != nullptr && variableData.mMeshBlueprint != nullptr) {
         const boost::shared_ptr<CAniPose> oldPrimaryPose = mPosePrimary;
         const boost::shared_ptr<CAniPose> oldSecondaryPose = mPoseSecondary;
@@ -407,46 +436,39 @@ namespace moho
       }
     }
 
-    // 0x008B9351/0x008B9358 test two byte slots: esp+0x13, written only by the
-    // transform comparison at 0x008B8F9A/0x008B8FA4, and esp+0x18, written only
-    // by the mesh-rebuild test at 0x008B8EFF/0x008B8F0D -- the same slot read at
-    // 0x008B9066 to gate the rebuild block itself. The scale flag (esp+0x12) is
-    // not in this gate; it only guards the `mesh->scale` copy at 0x008B9268.
-    //
-    // This matters for structures. A building never moves, so `transformChanged`
-    // is false for every sync after its first, and the mesh instance is created
-    // on a *later* beat than the entity (the SCM resource arrives after the
-    // create record). With `scaleChanged` here, that creation beat did not
-    // refresh the spatial entry, so the entry kept the degenerate
-    // position-only box installed while `mMeshInstance` was still null -- and
-    // nothing ever moved the building to refresh it. `CollectInVolume` then
-    // never returned it, which is why a finished mass extractor could not be
-    // clicked and drew no strategic icon while mobile units picked fine.
-    const bool stanceOrSpatialUpdateNeeded = transformChanged || requiresMeshRebuild;
     if (mMeshInstance != nullptr) {
-      if (scaleChanged) {
+      if (update.mScaleChanged) {
         mMeshInstance->scale = mVariableData.mScale;
       }
 
       mMeshInstance->scroll1 = variableData.mScrollBeatStart;
       mMeshInstance->scroll2 = variableData.mScrollBeatEnd;
 
+      // `SetStance` minus its bounds republish, which `FinishEntityDataUpdate`
+      // runs first - the next step in the binary's order either way.
       if (mMeshInstance->isStaticPose != 0u) {
-        mMeshInstance->SetStance(
+        update.mMeshBoundsDirty = mMeshInstance->ApplyStance(
           variableData.mCurTransform,
           variableData.mLastTransform,
-          restoredPrimaryPose || stanceOrSpatialUpdateNeeded,
+          restoredPrimaryPose || update.mStanceOrSpatialUpdateNeeded,
           mPosePrimary,
           mPoseSecondary
         );
-      } else if (stanceOrSpatialUpdateNeeded) {
-        mMeshInstance->SetStance(variableData.mCurTransform, variableData.mLastTransform);
+      } else if (update.mStanceOrSpatialUpdateNeeded) {
+        update.mMeshBoundsDirty = mMeshInstance->ApplyStance(variableData.mCurTransform, variableData.mLastTransform);
       }
+    }
+  }
+
+  void UserEntity::FinishEntityDataUpdate(const SSTIEntityVariableData& variableData, const SEntityDataUpdate& update)
+  {
+    if (update.mMeshBoundsDirty && mMeshInstance != nullptr) {
+      mMeshInstance->RepublishStanceBounds();
     }
 
     UpdateVisibility();
 
-    if (stanceOrSpatialUpdateNeeded) {
+    if (update.mStanceOrSpatialUpdateNeeded) {
       mLastInterpAmt = -1.0f;
       // 0x008B92A0..0x008B92E5: the entity spatial entry takes the mesh's swept
       // stance box (start/end stance OBBs over the scaled resource bounds), so
@@ -491,6 +513,30 @@ namespace moho
     const Wm3::Vector2f currentPosition(mVariableData.mCurTransform.pos_.x, mVariableData.mCurTransform.pos_.z);
     const Wm3::Vector2f previousPosition(mVariableData.mLastTransform.pos_.x, mVariableData.mLastTransform.pos_.z);
     mVisionHandle->Update(currentPosition, previousPosition, static_cast<float>(visionRange), alliedVisibility);
+  }
+
+  bool UserEntity::EntityDataUpdateRunsLua(const SSTIEntityVariableData& variableData) const
+  {
+    return IsUserUnit() != nullptr && mVariableData.mHealth > variableData.mHealth && mArmy != nullptr &&
+      mSession != nullptr && mArmy == mSession->GetFocusUserArmy();
+  }
+
+  bool UserEntity::EntityDataUpdateIsLocal(const SSTIEntityVariableData& variableData) const
+  {
+    const bool requiresMeshRebuild = (mMeshInstance == nullptr && variableData.mMeshBlueprint != nullptr) ||
+      (variableData.mMeshBlueprint != mVariableData.mMeshBlueprint) ||
+      (variableData.mScmResource.get() != mVariableData.mScmResource.get());
+    if (requiresMeshRebuild || EntityDataUpdateRunsLua(variableData)) {
+      return false;
+    }
+    if (mSession != nullptr && variableData.mVisibilityMode != mVariableData.mVisibilityMode) {
+      return false;
+    }
+    if (mRumbleLoopHandle == nullptr || variableData.mRumbleSound != mRumbleLoopHandle->mParams) {
+      return false;
+    }
+    // Dropping the last reference to a texture releases a device resource: keep that on this thread.
+    return variableData.mUnderlayTexture.get() == mVariableData.mUnderlayTexture.get();
   }
 
   /**

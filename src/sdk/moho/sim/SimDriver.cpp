@@ -57,13 +57,27 @@ namespace
   constexpr int kMaxCatchUpBeats = 99;
   constexpr float kBlockedIssueGraceMs = 250.0f;
 
-  // Engine addition: set by the session before it creates a replay's driver (see
-  // SIM_SetReplaySessionPacing). Read by that driver's issue thread.
-  std::atomic<bool> gDriverPlaysReplay{false};
+  // Engine addition: set by the session before it creates its driver (see SIM_SetSessionPacing).
+  // Read by that driver's issue thread.
+  std::atomic<ESimSessionPacing> gDriverSessionPacing{ESimSessionPacing::Network};
+
+  /// Engine addition: the beat lead the issue thread keeps for this session, or 0 (original pacing).
+  [[nodiscard]] int SessionLeadBeats() noexcept
+  {
+    switch (gDriverSessionPacing.load(std::memory_order_relaxed)) {
+      case ESimSessionPacing::Replay:
+        return std::max(0, sim_ReplayLead);
+      case ESimSessionPacing::Local:
+        return std::max(0, sim_LocalLead);
+      case ESimSessionPacing::Network:
+        break;
+    }
+    return 0;
+  }
 
   // Engine addition: the sim's own speed estimate (game seconds per real second, from the median
   // beat time) before `RATE_GameRateToSpeed` rounds it down to a whole rate step.
-  std::atomic<float> gReplaySimSpeedEstimate{0.0f};
+  std::atomic<float> gLeadSimSpeedEstimate{0.0f};
 
   // Sim bootstrap, from CSimDriver::ThreadCreateSim (0x0073D260).
   constexpr std::uint32_t kSimThreadTimeBarColor = 0xFFFF0000u;
@@ -896,8 +910,8 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
 
   const float simRateEstimate = (1000.0f / medianDispatchMs) * 0.1f;
-  // Engine addition (sim_ReplayLead): the unrounded estimate, for the replay display clock.
-  gReplaySimSpeedEstimate.store(simRateEstimate, std::memory_order_relaxed);
+  // Engine addition (sim_ReplayLead / sim_LocalLead): the unrounded estimate, for the display clock.
+  gLeadSimSpeedEstimate.store(simRateEstimate, std::memory_order_relaxed);
   const int updatedSimRate = RATE_GameRateToSpeed(simRateEstimate);
   if (updatedSimRate != mCurrentSimRate) {
     mCurrentSimRate = updatedSimRate;
@@ -1232,13 +1246,14 @@ void CSimDriver::ThreadRun()
         } else {
           lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
         }
-      } else if (sim_ReplayLead > 0 && gDriverPlaysReplay.load(std::memory_order_relaxed)) {
-        // Engine addition (sim_ReplayLead): a replay keeps `sim_ReplayLead` beats issued past the
-        // last one the main thread dequeued, so the sim works on the next beats while the frame
-        // renders. The replay still plays at the requested speed: the main thread drains the
-        // queue on its own clock, and the queue cap above stops the sim once it is that far ahead.
-        // Each dequeue signals `mConnectionEvent`, which is what wakes this thread to top it up.
-        lastBeatToIssue = std::max(lastBeatToIssue, mLastDequeuedBeat + sim_ReplayLead);
+      } else if (const int leadBeats = SessionLeadBeats(); leadBeats > 0) {
+        // Engine addition (sim_ReplayLead / sim_LocalLead): outside network sessions, keep
+        // `leadBeats` beats issued past the last one the main thread dequeued, so the sim works on
+        // the next beats while the frame renders. The session still runs at the requested speed:
+        // the main thread drains the queue on its own clock, and the queue cap above stops the sim
+        // once it is that far ahead. Each dequeue signals `mConnectionEvent`, which is what wakes
+        // this thread to top it up.
+        lastBeatToIssue = std::max(lastBeatToIssue, mLastDequeuedBeat + leadBeats);
       } else {
         // @note This pacing math is CORRECT and is not why the sim runs about
         // eleven times too fast. Measured on SCMP_009, our build goes from
@@ -2158,6 +2173,7 @@ ISTIDriver* moho::SIM_CreateDriver(
 }
 
 int moho::sim_ReplayLead = 10;
+int moho::sim_LocalLead = 2;
 
 namespace
 {
@@ -2167,18 +2183,25 @@ namespace
     "which waits for the main thread before issuing each beat).",
     &moho::sim_ReplayLead
   );
+
+  TConVar<int> gTConVar_sim_LocalLead(
+    "sim_LocalLead",
+    "Single player only (one human, no network peers): beats the sim may compute ahead of the beat "
+    "on screen. Orders land up to this many beats later; 0 = original pacing.",
+    &moho::sim_LocalLead
+  );
 } // namespace
 
-void moho::SIM_SetReplaySessionPacing(const bool playsReplay) noexcept
+void moho::SIM_SetSessionPacing(const ESimSessionPacing pacing) noexcept
 {
-  gDriverPlaysReplay.store(playsReplay, std::memory_order_relaxed);
-  gReplaySimSpeedEstimate.store(0.0f, std::memory_order_relaxed);
+  gDriverSessionPacing.store(pacing, std::memory_order_relaxed);
+  gLeadSimSpeedEstimate.store(0.0f, std::memory_order_relaxed);
 }
 
-float moho::SIM_GetReplaySimSpeedEstimate() noexcept
+float moho::SIM_GetLeadSimSpeedEstimate() noexcept
 {
-  if (sim_ReplayLead <= 0 || !gDriverPlaysReplay.load(std::memory_order_relaxed)) {
+  if (SessionLeadBeats() <= 0) {
     return 0.0f;
   }
-  return gReplaySimSpeedEstimate.load(std::memory_order_relaxed);
+  return gLeadSimSpeedEstimate.load(std::memory_order_relaxed);
 }

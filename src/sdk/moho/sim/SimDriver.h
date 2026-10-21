@@ -988,27 +988,41 @@ namespace moho
   );
 
   /**
-   * Engine addition, not recovered from the binary: `sim_ReplayLead`, a user-side console
-   * variable. While a replay plays, the issue thread keeps up to this many beats issued beyond
-   * the last one the main thread has taken off the sync queue, instead of pacing each beat off
-   * the main thread's last dequeue time. The sim then computes the next beats while the main
-   * thread renders. 0 restores the original pacing. A replay issues no commands of its own and
-   * the beats it plays are the recorded ones, so this changes how fast it plays, never what it
-   * computes. Live games always use the original pacing.
+   * Engine addition, not recovered from the binary: how the issue thread of the driver created
+   * next paces beats. Set by the session right before `SIM_CreateDriver`.
+   * - Network: the original pacing, for every session with network peers (players or observers).
+   * - Replay: a replay; `sim_ReplayLead` applies.
+   * - Local: one human client and no network connector (a single-player skirmish or campaign);
+   *   `sim_LocalLead` applies.
+   */
+  enum class ESimSessionPacing : std::uint8_t
+  {
+    Network,
+    Replay,
+    Local,
+  };
+
+  void SIM_SetSessionPacing(ESimSessionPacing pacing) noexcept;
+
+  /**
+   * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
+   * this many beats issued beyond the last one the main thread has taken off the sync queue,
+   * instead of pacing each beat off the main thread's last dequeue time, so the sim computes the
+   * next beats while the frame renders. The requested speed still holds: the main thread drains
+   * the queue on its own clock. 0 restores the original pacing.
+   * - `sim_ReplayLead` (replays, default 10): a replay issues no commands, so the lead only
+   *   changes how fast it plays, never what it computes.
+   * - `sim_LocalLead` (single player, default 2): a command still lands on the next issued beat,
+   *   so a larger lead would delay the player's orders by that many beats; keep it small.
    */
   extern int sim_ReplayLead;
+  extern int sim_LocalLead;
 
   /**
-   * Engine addition: tells the driver created next whether its session plays a replay, which is
-   * what makes `sim_ReplayLead` apply. Called by the session right before `SIM_CreateDriver`.
+   * Engine addition: while a lead paces the session (see above), the sim's measured speed (game
+   * time per real time, from its median beat cost) before it is rounded down to a whole rate step;
+   * 0 otherwise. The display clock follows it so the sim is not held to the rounded rate.
    */
-  void SIM_SetReplaySessionPacing(bool playsReplay) noexcept;
-
-  /**
-   * Engine addition: while `sim_ReplayLead` paces a replay, the sim's measured speed (game time
-   * per real time, from its median beat cost) before it is rounded down to a whole rate step;
-   * 0 otherwise. The replay display clock follows it so the sim is not held to the rounded rate.
-   */
-  [[nodiscard]] float SIM_GetReplaySimSpeedEstimate() noexcept;
+  [[nodiscard]] float SIM_GetLeadSimSpeedEstimate() noexcept;
 
 } // namespace moho

@@ -502,8 +502,16 @@ void VisionDB::CollectVisibleCircles(
     Wm3::Circle2f mCircle;
   };
 
-  std::vector<Task> tasks{Task{rootNode_, {}}};
-  std::vector<Task> expanded;
+  // Scratch kept across frames (the fog pass runs on the main thread every frame), so the large
+  // vectors do not regrow each time.
+  thread_local std::vector<Task> taskScratch;
+  thread_local std::vector<Task> expandedScratch;
+  thread_local std::vector<std::vector<Wm3::Circle2f>> partScratch;
+  // Plain references: the worker lambdas below must reach this thread's scratch, not their own.
+  std::vector<Task>& tasks = taskScratch;
+  std::vector<Task>& expanded = expandedScratch;
+  std::vector<std::vector<Wm3::Circle2f>>& parts = partScratch;
+  tasks.assign(1u, Task{rootNode_, {}});
   std::size_t subtrees = 1u;
   for (int depth = 0; depth < kVisionParallelMaxExpandDepth && subtrees != 0u && subtrees < kVisionParallelTargetSubtrees;
        ++depth) {
@@ -549,16 +557,19 @@ void VisionDB::CollectVisibleCircles(
   }
 
   const std::size_t chunkCount = (tasks.size() + kVisionParallelGrain - 1u) / kVisionParallelGrain;
-  std::vector<std::vector<Wm3::Circle2f>> parts(chunkCount);
+  if (parts.size() < chunkCount) {
+    parts.resize(chunkCount);
+  }
   CUserWorkerPool::Get().ParallelFor(tasks.size(), kVisionParallelGrain, [&](const std::size_t begin, const std::size_t end) {
     std::vector<Wm3::Circle2f>& part = parts[begin / kVisionParallelGrain];
+    part.clear();
     for (std::size_t i = begin; i < end; ++i) {
       runTask(part, tasks[i]);
     }
   });
 
-  for (const std::vector<Wm3::Circle2f>& part : parts) {
-    for (const Wm3::Circle2f& circle : part) {
+  for (std::size_t chunk = 0; chunk < chunkCount; ++chunk) {
+    for (const Wm3::Circle2f& circle : parts[chunk]) {
       accumulator.push_back(circle);
     }
   }

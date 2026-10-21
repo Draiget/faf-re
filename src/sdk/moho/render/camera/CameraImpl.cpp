@@ -26,6 +26,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/COGrid.h"
 #include "moho/task/CTaskEvent.h"
@@ -2215,6 +2216,43 @@ void moho::CameraImpl::CameraPan(const Wm3::Vector2f& panDelta)
   mTargetLocation.z += flattenedForward.z * panY;
 }
 
+namespace
+{
+  /**
+   * Engine addition (M5): `ren_FrustumCacheLodUnits` / `ren_FrustumCacheLodInterval`, user-side.
+   * Rebuilding a camera's in-view unit lists links a weak pointer per unit per list, which at tens
+   * of thousands of units in view (the minimap, a zoomed-out view) costs a large share of a frame.
+   * When the last rebuild held at least `ren_FrustumCacheLodUnits` entities (0 = never), the lists
+   * are rebuilt every `ren_FrustumCacheLodInterval` seconds instead of every 0.5 s. A near-zoom
+   * change still refreshes after 0.2 s; dead units are skipped by every reader in between.
+   */
+  int ren_FrustumCacheLodUnits = 20000;
+  float ren_FrustumCacheLodInterval = 2.0f;
+
+  moho::TConVar<int> gTConVar_ren_FrustumCacheLodUnits(
+    "ren_FrustumCacheLodUnits",
+    "Entities in a camera's view from which its in-view unit lists refresh every "
+    "ren_FrustumCacheLodInterval seconds instead of every 0.5 s (0 = always 0.5 s).",
+    &ren_FrustumCacheLodUnits
+  );
+
+  moho::TConVar<float> gTConVar_ren_FrustumCacheLodInterval(
+    "ren_FrustumCacheLodInterval",
+    "Refresh interval in seconds for ren_FrustumCacheLodUnits.",
+    &ren_FrustumCacheLodInterval
+  );
+
+  /// The binary's 0.5 s, or the M5 interval for a camera whose last rebuild held that many entities.
+  [[nodiscard]] float FrustumCacheRefreshInterval(const std::size_t cachedEntities)
+  {
+    constexpr float kRefreshSeconds = 0.5f;
+    if (ren_FrustumCacheLodUnits > 0 && cachedEntities >= static_cast<std::size_t>(ren_FrustumCacheLodUnits)) {
+      return std::max(kRefreshSeconds, ren_FrustumCacheLodInterval);
+    }
+    return kRefreshSeconds;
+  }
+} // namespace
+
 /**
  * Address: 0x007A75A0 (FUN_007A75A0, Moho::CameraImpl::CacheCameraFrustumUnits)
  * Mangled: ?CacheCameraFrustumUnits@CameraImpl@Moho@@QAEXM@Z
@@ -2250,7 +2288,7 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
   const float elapsed = mFrustumCacheTimer + deltaFrame;
   mFrustumCacheTimer = elapsed;
   const bool nearZoomChanged = (mFrustumCacheZoomMark != mNearZoom);
-  if (!(elapsed > 0.5f || (nearZoomChanged && elapsed > 0.2f))) {
+  if (!(elapsed > FrustumCacheRefreshInterval(mFrustumLaneA.size()) || (nearZoomChanged && elapsed > 0.2f))) {
     return;
   }
 
