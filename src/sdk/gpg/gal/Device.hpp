@@ -45,6 +45,28 @@ namespace gpg::gal
   [[nodiscard]] bool WindowIsForeground();
 
   /**
+   * FAF addition, not in the shipped binary: what `Device::GetRuntimeInfo`
+   * reports about the running backend, its adapter and its memory (`ren_Info`).
+   * Fields an API does not expose stay empty / zero.
+   */
+  struct DeviceRuntimeInfo
+  {
+    msvc8::string api;            // "D3D9", "D3D11", "D3D12", "Vulkan"
+    msvc8::string adapter;        // adapter description
+    msvc8::string driverVersion;  // when the API exposes it
+    msvc8::string featureLevel;   // "11_1", "SM3", Vulkan API version ...
+    std::uint32_t vendorId = 0, deviceId = 0;
+    std::uint64_t dedicatedVideoMemory = 0;   // bytes
+    std::uint64_t sharedSystemMemory = 0;
+    std::uint64_t localBudget = 0, localUsage = 0;        // DXGI QueryVideoMemoryInfo / VK_EXT_memory_budget
+    std::uint64_t nonLocalBudget = 0, nonLocalUsage = 0;
+    std::uint64_t availableTextureMemory = 0; // D3D9 GetAvailableTextureMem
+    msvc8::string swapChain;      // e.g. "1280x720 flip-discard 3 buffers, tearing"
+    bool vsync = false;
+    std::uint32_t gpuDrivenFeatures = 0;
+  };
+
+  /**
    * VFTABLE: 0x00D42224
    * COL:     0x00E5050C
    *
@@ -613,6 +635,8 @@ namespace gpg::gal
      */
     virtual void BeginProfileRegion(std::uint32_t region);
     virtual void EndProfileRegion(std::uint32_t region);
+    /** Fills `out` with the backend, adapter and memory state (`ren_Info`); false here. */
+    virtual bool GetRuntimeInfo(DeviceRuntimeInfo& out);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

@@ -35,6 +35,7 @@
 #include "gpg/gal/DrawContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
+#include "gpg/gal/DxgiAdapterInfo.h"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/Head.hpp"
@@ -2260,5 +2261,37 @@ namespace gpg::gal
     if (mGpuDriven != nullptr) {
       mGpuDriven->EndProfileRegion(region);
     }
+  }
+
+  bool DeviceD3D11::GetRuntimeInfo(DeviceRuntimeInfo& out)
+  {
+    if (mDevice == nullptr) {
+      return false;
+    }
+    out.api = "D3D11";
+    out.featureLevel = FeatureLevelName(mFeatureLevel);
+    if (mAdapterIndex < mFactory.Adapters().size()) {
+      (void)FillDxgiAdapterInfo(mFactory.Adapters()[mAdapterIndex].adapter.Get(), out);
+    }
+
+    std::string chains;
+    for (const std::unique_ptr<dxgi::SwapChain>& chain : mSwapChains) {
+      if (chain == nullptr || chain->Get() == nullptr) {
+        continue;
+      }
+      DXGI_SWAP_CHAIN_DESC desc{};
+      (void)chain->Get()->GetDesc(&desc);
+      char text[128] = {};
+      std::snprintf(
+        text, sizeof(text), "%s%ux%u %s %u buffers%s%s", chains.empty() ? "" : "; ", desc.BufferDesc.Width,
+        desc.BufferDesc.Height, dxgi::SwapModelName(chain->Model()), chain->BufferCount(),
+        chain->AllowsTearing() ? ", tearing" : "", desc.Windowed ? ", windowed" : ", full screen"
+      );
+      chains += text;
+    }
+    out.swapChain = chains.c_str();
+    out.vsync = mDeviceContext.mVSync;
+    out.gpuDrivenFeatures = GetGpuDrivenFeatures();
+    return true;
   }
 } // namespace gpg::gal

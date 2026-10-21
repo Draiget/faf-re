@@ -45,6 +45,22 @@ namespace gpg::gal
     /** One frame ended: `frame` is its draw statistics. Logs every interval. */
     void EndFrame(const DrawStatistics& frame) noexcept;
 
+    /**
+     * What `ren_Info` shows. The last frame's draw statistics and wall time are
+     * kept with or without FAF_GPU_PROFILE; the render CPU and GPU times exist
+     * only with it, as averages over the last completed interval.
+     */
+    struct Summary
+    {
+      std::uint64_t frames = 0U;          // frames ended so far
+      DrawStatistics lastFrame{};
+      double lastFrameWallMilliseconds = 0.0;
+      std::uint32_t intervalFrames = 0U;  // 0: no profiled interval yet
+      double intervalCpuMilliseconds = 0.0; // the outermost pass ("Frame"), per frame
+      double intervalGpuMilliseconds = 0.0; // whole frame, per frame
+    };
+    [[nodiscard]] const Summary& GetSummary() const noexcept { return mSummary; }
+
   private:
     [[nodiscard]] static int ReadInterval() noexcept;
 
@@ -68,6 +84,8 @@ namespace gpg::gal
     std::uint64_t mStateChanges = 0U;
     std::uint64_t mDrawCalls = 0U;
     std::int64_t mIntervalStartTicks = 0;
+    std::int64_t mLastFrameEndTicks = 0;
+    Summary mSummary{};
   };
 
   /** Brackets one render pass (see `RenderProfiler`). `name` must be a string literal. */

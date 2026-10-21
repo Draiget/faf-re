@@ -1386,6 +1386,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\render\Cartographic.cpp" />
     <ClCompile Include="moho\render\GpuArrayStream.cpp" />
     <ClCompile Include="moho\render\StrategicIconRenderer.cpp" />
+    <ClCompile Include="moho\render\RenderInfo.cpp" />
     <ClCompile Include="moho\render\Shadow.cpp" />
     <ClCompile Include="moho\render\SelectionBracketParams.cpp" />
     <ClCompile Include="moho\render\SelectionBracketRenderer.cpp" />
@@ -1547,6 +1548,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="gpg\gal\RenderProfiler.cpp" />
+    <ClCompile Include="gpg\gal\DxgiAdapterInfo.cpp" />
     <ClCompile Include="gpg\gal\Effect.cpp" />
     <ClCompile Include="gpg\gal\GalInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Matrix.cpp" />
@@ -1716,6 +1718,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\DepthStencilTargetContext.hpp" />
     <ClInclude Include="gpg\gal\Device.hpp" />
     <ClInclude Include="gpg\gal\RenderProfiler.h" />
+    <ClInclude Include="gpg\gal\DxgiAdapterInfo.h" />
     <ClInclude Include="gpg\gal\GpuDriven.h" />
     <ClInclude Include="gpg\gal\DeviceContext.hpp" />
     <ClInclude Include="gpg\gal\DrawContext.hpp" />
@@ -2583,6 +2586,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\render\GpuArrayStream.h" />
     <ClInclude Include="moho\render\StrategicIconShader.h" />
     <ClInclude Include="moho\render\StrategicIconRenderer.h" />
+    <ClInclude Include="moho\render\RenderInfo.h" />
     <ClInclude Include="moho\render\Shadow.h" />
     <ClInclude Include="moho\sim\EReconFlagsTypeInfo.h" />
     <ClInclude Include="moho\sim\ESTITargetTypeTypeInfo.h" />

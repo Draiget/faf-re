@@ -19,6 +19,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
+#include "gpg/gal/DxgiAdapterInfo.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
@@ -47,6 +48,7 @@
 #include <cstring>
 #include <new>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -2178,6 +2180,83 @@ namespace gpg::gal
             D3DRTYPE_TEXTURE, static_cast<D3DFORMAT>(FormatGalToD3D(textureFormat))
         );
         return SUCCEEDED(result);
+    }
+
+    bool DeviceD3D9::GetRuntimeInfo(DeviceRuntimeInfo& out)
+    {
+        if (mDirect3D == nullptr || mDevice == nullptr)
+        {
+            return false;
+        }
+
+        out.api = "D3D9";
+        D3DDEVICE_CREATION_PARAMETERS creation{};
+        const UINT adapterOrdinal = SUCCEEDED(mDevice->GetCreationParameters(&creation))
+            ? creation.AdapterOrdinal
+            : static_cast<UINT>(mDeviceContext.mAdapter);
+        D3DADAPTER_IDENTIFIER9 identifier{};
+        if (SUCCEEDED(mDirect3D->GetAdapterIdentifier(adapterOrdinal, 0U, &identifier)))
+        {
+            out.adapter = identifier.Description;
+            out.vendorId = identifier.VendorId;
+            out.deviceId = identifier.DeviceId;
+            char version[48] = {};
+            const std::uint64_t driver = static_cast<std::uint64_t>(identifier.DriverVersion.QuadPart);
+            std::snprintf(
+                version, sizeof(version), "%u.%u.%u.%u", static_cast<unsigned>((driver >> 48) & 0xFFFFU),
+                static_cast<unsigned>((driver >> 32) & 0xFFFFU), static_cast<unsigned>((driver >> 16) & 0xFFFFU),
+                static_cast<unsigned>(driver & 0xFFFFU)
+            );
+            out.driverVersion = version;
+        }
+
+        D3DCAPS9 caps{};
+        if (SUCCEEDED(mDevice->GetDeviceCaps(&caps)))
+        {
+            char model[48] = {};
+            std::snprintf(
+                model, sizeof(model), "VS %u.%u / PS %u.%u", static_cast<unsigned>(D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion)),
+                static_cast<unsigned>(D3DSHADER_VERSION_MINOR(caps.VertexShaderVersion)),
+                static_cast<unsigned>(D3DSHADER_VERSION_MAJOR(caps.PixelShaderVersion)),
+                static_cast<unsigned>(D3DSHADER_VERSION_MINOR(caps.PixelShaderVersion))
+            );
+            out.featureLevel = model;
+        }
+        out.availableTextureMemory = mDevice->GetAvailableTextureMem();
+        // The budget and usage of the same adapter, through DXGI (Windows 10).
+        (void)FillDxgiAdapterMemoryByPciId(out.vendorId, out.deviceId, out);
+
+        std::string chains;
+        const UINT chainCount = mDevice->GetNumberOfSwapChains();
+        for (UINT index = 0U; index < chainCount; ++index)
+        {
+            IDirect3DSwapChain9* chain = nullptr;
+            if (FAILED(mDevice->GetSwapChain(index, &chain)) || chain == nullptr)
+            {
+                continue;
+            }
+            D3DPRESENT_PARAMETERS parameters{};
+            const HRESULT result = chain->GetPresentParameters(&parameters);
+            chain->Release();
+            if (FAILED(result))
+            {
+                continue;
+            }
+            const char* const effect = parameters.SwapEffect == D3DSWAPEFFECT_DISCARD ? "discard"
+                : parameters.SwapEffect == D3DSWAPEFFECT_FLIP                        ? "flip"
+                : parameters.SwapEffect == D3DSWAPEFFECT_COPY                        ? "copy"
+                                                                                     : "other";
+            char text[128] = {};
+            std::snprintf(
+                text, sizeof(text), "%s%ux%u %s %u buffers, %s", chains.empty() ? "" : "; ", parameters.BackBufferWidth,
+                parameters.BackBufferHeight, effect, parameters.BackBufferCount, parameters.Windowed ? "windowed" : "full screen"
+            );
+            chains += text;
+        }
+        out.swapChain = chains.c_str();
+        out.vsync = mDeviceContext.mVSync;
+        out.gpuDrivenFeatures = GetGpuDrivenFeatures();
+        return true;
     }
 
     /**

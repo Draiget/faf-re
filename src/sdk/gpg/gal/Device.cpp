@@ -451,4 +451,5 @@ namespace gpg::gal
     void Device::BeginProfileRegion(std::uint32_t) {}
 
     void Device::EndProfileRegion(std::uint32_t) {}
+    bool Device::GetRuntimeInfo(DeviceRuntimeInfo&) { return false; }
 }

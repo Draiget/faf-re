@@ -477,6 +477,9 @@
     <ClCompile Include="gpg\gal\RenderProfiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\gal\DxgiAdapterInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\gal\Effect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1971,6 +1974,9 @@
     <ClCompile Include="moho\render\StrategicIconRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\RenderInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\Shadow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3409,6 +3415,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\RenderProfiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\gal\DxgiAdapterInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\GpuDriven.h">
@@ -5414,6 +5423,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\StrategicIconRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\RenderInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\Shadow.h"><Filter>Header Files</Filter></ClInclude>

@@ -136,6 +136,7 @@ namespace gpg::gal
     void DispatchGpuProgram(const GpuDispatch& dispatch) override;
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
+    bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
 
     /**
      * Diagnostics: with FAF_GAL_TRACE_START / FAF_GAL_TRACE_FRAMES set, the
