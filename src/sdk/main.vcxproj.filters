@@ -1701,6 +1701,9 @@
     <ClCompile Include="moho\app\CScApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\app\UserWorkerPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\app\CWaitHandleSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4288,6 +4291,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\app\CScApp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\app\UserWorkerPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\app\CWaitHandleSet.h">

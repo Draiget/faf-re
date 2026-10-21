@@ -338,6 +338,17 @@ namespace moho
     ) const;
 
     /**
+     * Engine addition, not recovered from the binary: `TryAdd(accumulator, rootNode_, box,
+     * interpolant)` with the walk spread over CUserWorkerPool when `ren_ParallelCull` is on. The
+     * circles come out in exactly the order the serial walk appends them.
+     */
+    void CollectVisibleCircles(
+      gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity>& accumulator,
+      const Wm3::Box2f& box,
+      float interpolant
+    ) const;
+
+    /**
      * Address: 0x0081AEB0 (FUN_0081AEB0)
      * Address: 0x103E3E30
      * Slot: 0

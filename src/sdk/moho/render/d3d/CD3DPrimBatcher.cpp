@@ -559,6 +559,65 @@ namespace moho
     DrawQuad(topLeftVertex, topRightVertex, bottomRightVertex, bottomLeftVertex);
   }
 
+  void CD3DPrimBatcher::DrawScreenQuads(const ScreenQuad* const quads, const std::size_t quadCount)
+  {
+    auto* const runtime = this;
+    std::size_t done = 0;
+    while (done < quadCount) {
+      // `DrawQuad`'s flush test, run once per block: each block ends where the next single-quad
+      // call would flush, so the batches come out exactly as the per-quad calls make them.
+      if (!runtime->mVertices.empty()) {
+        const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+        const std::uint32_t primitiveCount = static_cast<std::uint32_t>(runtime->mPrimitives.size());
+        if (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType) ||
+            (vertexCount + 4u) > kPrimQueueCapacity ||
+            (primitiveCount + 6u) > kPrimQueueCapacity) {
+          Flush();
+        }
+      }
+      runtime->mMode = static_cast<std::uint32_t>(kTriangleListPrimitiveType);
+
+      const std::size_t vertexCount = runtime->mVertices.size();
+      const std::size_t primitiveCount = runtime->mPrimitives.size();
+      const std::size_t fit = std::min(
+        (kPrimQueueCapacity - std::min<std::size_t>(vertexCount, kPrimQueueCapacity)) / 4u,
+        (kPrimQueueCapacity - std::min<std::size_t>(primitiveCount, kPrimQueueCapacity)) / 6u
+      );
+      const std::size_t block = std::min(std::max<std::size_t>(fit, 1u), quadCount - done);
+
+      // Built in small stack batches and appended with one range insert each, so the queues are
+      // written once per vertex rather than value-filled by a resize first.
+      constexpr std::size_t kStagedQuads = 128u;
+      Vertex stagedVertices[kStagedQuads * 4u];
+      std::int16_t stagedIndices[kStagedQuads * 6u];
+      for (std::size_t first = 0; first < block; first += kStagedQuads) {
+        const std::size_t count = std::min(kStagedQuads, block - first);
+        Vertex* vertices = stagedVertices;
+        std::int16_t* indices = stagedIndices;
+        for (std::size_t i = 0; i < count; ++i, vertices += 4, indices += 6) {
+          const ScreenQuad& quad = quads[done + first + i];
+          vertices[0] = BuildTransformedVertex(*runtime, MakeVertex({quad.mLeft, quad.mTop, 0.0f}, quad.mColor, 0.0f, 0.0f));
+          vertices[1] = BuildTransformedVertex(*runtime, MakeVertex({quad.mRight, quad.mTop, 0.0f}, quad.mColor, 1.0f, 0.0f));
+          vertices[2] =
+            BuildTransformedVertex(*runtime, MakeVertex({quad.mRight, quad.mBottom, 0.0f}, quad.mColor, 1.0f, 1.0f));
+          vertices[3] =
+            BuildTransformedVertex(*runtime, MakeVertex({quad.mLeft, quad.mBottom, 0.0f}, quad.mColor, 0.0f, 1.0f));
+
+          const std::uint16_t base = static_cast<std::uint16_t>(vertexCount + ((first + i) * 4u));
+          indices[0] = static_cast<std::int16_t>(base);
+          indices[1] = static_cast<std::int16_t>(base + 1u);
+          indices[2] = static_cast<std::int16_t>(base + 2u);
+          indices[3] = static_cast<std::int16_t>(base + 2u);
+          indices[4] = static_cast<std::int16_t>(base + 3u);
+          indices[5] = static_cast<std::int16_t>(base);
+        }
+        runtime->mVertices.insert(runtime->mVertices.end(), stagedVertices, stagedVertices + (count * 4u));
+        runtime->mPrimitives.insert(runtime->mPrimitives.end(), stagedIndices, stagedIndices + (count * 6u));
+      }
+      done += block;
+    }
+  }
+
   /**
    * Address: 0x00438EA0 (FUN_00438EA0)
    *

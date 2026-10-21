@@ -657,6 +657,24 @@ namespace moho
     );
 
     /**
+     * Engine addition, not recovered from the binary: the two `SetStance` overloads without their
+     * last step, the republish of the swept bounds into `db`. True when that republish is due;
+     * the caller then runs `RepublishStanceBounds()`. The split lets the sync apply set stances on
+     * user workers and relink the spatial database on the main thread, in packet order.
+     */
+    [[nodiscard]] bool ApplyStance(const VTransform& startTransform, const VTransform& endTransform);
+    [[nodiscard]] bool ApplyStance(
+      const VTransform& startTransform,
+      const VTransform& endTransform,
+      bool forceRefresh,
+      const boost::shared_ptr<CAniPose>& startPoseArg,
+      const boost::shared_ptr<CAniPose>& endPoseArg
+    );
+
+    /// Engine addition: `SetStance`'s last step - republish the swept stance bounds into `db`.
+    void RepublishStanceBounds();
+
+    /**
      * Address: 0x007DEC80 (FUN_007DEC80, ?UpdateInterpolatedFields@MeshInstance@Moho@@ABEXXZ)
      *
      * What it does:

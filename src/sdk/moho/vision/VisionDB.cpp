@@ -1,9 +1,12 @@
 #include "moho/vision/VisionDB.h"
 
+#include <algorithm>
 #include <cmath>
 #include <span>
+#include <vector>
 
 #include "Wm3IntrBox2Circle2.h"
+#include "moho/app/UserWorkerPool.h"
 
 using namespace moho;
 
@@ -39,6 +42,112 @@ namespace
       ((to.Radius - from.Radius) * t) + from.Radius
     };
   }
+
+  enum class EVisionEntryResult
+  {
+    Outside,
+    Circle,
+    Descend,
+  };
+
+  /**
+   * One step of `VisionDB::TryAdd`: interpolate the entry's circle, test it against `box`, and say
+   * whether it is outside, contributes its circle (real, visible emitter), or hands over to the
+   * entries it contains.
+   */
+  [[nodiscard]] EVisionEntryResult EvaluateVisionEntry(
+    const VisionDB::Entry& entry, const Wm3::Box2f& box, const float interpolant, Wm3::Circle2f& sampled
+  )
+  {
+    sampled = InterpolateCircle(entry.mPrevCircle, entry.mCurCircle, interpolant);
+
+    // `Wm3::IntrBox2Circle2f` keeps references to both operands, so `box` and
+    // `sampled` must outlive it - matching the two stack temporaries the binary
+    // builds at 0x0081B4F2/0x0081B504 before the ctor call at 0x0081B52C.
+    Wm3::IntrBox2Circle2f overlap{box, sampled};
+    if (!overlap.Test()) {
+      return EVisionEntryResult::Outside;
+    }
+    return (entry.mIsReal && entry.mVisible) ? EVisionEntryResult::Circle : EVisionEntryResult::Descend;
+  }
+
+  /// `VisionDB::TryAdd`'s depth-first walk, into any vector-like accumulator.
+  template <class Accumulator>
+  void AccumulateVisibleCircles(
+    Accumulator& accumulator, const VisionDB::Entry* const entry, const Wm3::Box2f& box, const float interpolant
+  )
+  {
+    Wm3::Circle2f sampled{};
+    switch (EvaluateVisionEntry(*entry, box, interpolant, sampled)) {
+      case EVisionEntryResult::Outside:
+        return;
+      case EVisionEntryResult::Circle:
+        accumulator.push_back(sampled);
+        return;
+      case EVisionEntryResult::Descend:
+        for (const VisionDB::Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
+          AccumulateVisibleCircles(accumulator, child, box, interpolant);
+        }
+        return;
+    }
+  }
+
+  // Parallel fog-of-war collection: expand the top of the tree until there are this many
+  // independent subtrees, and run them in chunks of this many.
+  constexpr std::size_t kVisionParallelMinSubtrees = 64u;
+  constexpr std::size_t kVisionParallelTargetSubtrees = 512u;
+  constexpr std::size_t kVisionParallelGrain = 32u;
+  constexpr int kVisionParallelMaxExpandDepth = 8;
+
+  /**
+   * Engine addition (`ren_ParallelCull`): counts structural edits of the vision trees - a link
+   * added or removed, an entry freed, a tree built or torn down. The fog pass keeps array copies of
+   * the top chains of the tree while this count is unchanged, so it can hand their entries to the
+   * user workers without walking the linked chains on the main thread every frame.
+   */
+  std::uint64_t gVisionTreeEdits = 0u;
+
+  void NoteVisionTreeEdit() noexcept
+  {
+    ++gVisionTreeEdits;
+  }
+
+  /**
+   * Engine addition (`ren_ParallelCull`): array copies of the chains under a tree's root and under
+   * each of the root's children, in chain order, valid while `gVisionTreeEdits` is unchanged.
+   */
+  struct VisionTopChains
+  {
+    const VisionDB* mDb = nullptr;
+    const VisionDB::Entry* mRoot = nullptr;
+    std::uint64_t mEdits = ~0ull;
+    std::vector<const VisionDB::Entry*> mRootChain;
+    std::vector<std::vector<const VisionDB::Entry*>> mChildChains; // one per mRootChain entry
+
+    void Refresh(const VisionDB& db, const VisionDB::Entry* const root)
+    {
+      if (mDb == &db && mRoot == root && mEdits == gVisionTreeEdits) {
+        return;
+      }
+      mDb = &db;
+      mRoot = root;
+      mEdits = gVisionTreeEdits;
+      mRootChain.clear();
+      for (const VisionDB::Entry* child = root->mContained; child != nullptr; child = child->mNext) {
+        mRootChain.push_back(child);
+      }
+      if (mChildChains.size() < mRootChain.size()) {
+        mChildChains.resize(mRootChain.size());
+      }
+      for (std::size_t i = 0; i < mRootChain.size(); ++i) {
+        std::vector<const VisionDB::Entry*>& chain = mChildChains[i];
+        chain.clear();
+        for (const VisionDB::Entry* child = mRootChain[i]->mContained; child != nullptr; child = child->mNext) {
+          chain.push_back(child);
+        }
+      }
+    }
+  };
 } // namespace
 
 /**
@@ -79,6 +188,7 @@ void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
 
   tail->mNext = entry;
   entry->mParent = tail->mParent;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 void VisionDB::Entry::AddContained(Entry* const entry) noexcept
@@ -92,6 +202,7 @@ void VisionDB::Entry::AddContained(Entry* const entry) noexcept
 
   mContained = entry;
   entry->mParent = this;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 /**
@@ -127,6 +238,7 @@ void VisionDB::Entry::RemoveFromChain(Entry* const entry) noexcept
   entry->mParent = nullptr;
   entry->mContained = nullptr;
   entry->mNext = nullptr;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 void VisionDB::Entry::Remove() noexcept
@@ -239,6 +351,7 @@ void VisionDB::Pool::FreeEntry(Entry* const entry)
   entry->mIsReal = false;
   entry->mVisible = false;
   mFreeEntries.push_back(entry);
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 /**
@@ -299,7 +412,9 @@ void VisionDB::Handle::Update(
 VisionDB::VisionDB()
   : pool_()
   , rootNode_(nullptr)
-{}
+{
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+}
 
 /**
  * Address: 0x0081AF00 (FUN_0081AF00, Moho::VisionDB::Init)
@@ -313,6 +428,7 @@ VisionDB::VisionDB()
 void VisionDB::Init(const float width, const float height)
 {
   rootNode_ = nullptr;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 
   const Wm3::Vector2f halfSize{width * 0.5f, height * 0.5f};
   const float halfDiag = std::sqrt((halfSize.x * halfSize.x) + (halfSize.y * halfSize.y));
@@ -390,6 +506,7 @@ VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::V
 VisionDB::~VisionDB()
 {
   rootNode_ = nullptr;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 /**
@@ -421,22 +538,123 @@ void VisionDB::TryAdd(
   const float interpolant
 ) const
 {
-  const Wm3::Circle2f sampled = InterpolateCircle(entry->mPrevCircle, entry->mCurCircle, interpolant);
+  AccumulateVisibleCircles(accumulator, entry, box, interpolant);
+}
 
-  // `Wm3::IntrBox2Circle2f` keeps references to both operands, so `box` and
-  // `sampled` must outlive it - matching the two stack temporaries the binary
-  // builds at 0x0081B4F2/0x0081B504 before the ctor call at 0x0081B52C.
-  Wm3::IntrBox2Circle2f overlap{box, sampled};
-  if (!overlap.Test()) {
+void VisionDB::CollectVisibleCircles(
+  gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity>& accumulator,
+  const Wm3::Box2f& box,
+  const float interpolant
+) const
+{
+  if (rootNode_ == nullptr || !ren_ParallelCull || CUserWorkerPool::ConfiguredWorkerCount() == 0u) {
+    TryAdd(accumulator, rootNode_, box, interpolant);
     return;
   }
 
-  if (entry->mIsReal && entry->mVisible) {
-    accumulator.push_back(sampled);
+  // The depth-first order `TryAdd` emits circles in is kept by expanding the walk breadth-first in
+  // place: every task is replaced by its own ordered results, so concatenating the tasks' outputs
+  // in task order is exactly the serial output.
+  struct Task
+  {
+    const Entry* mSubtree; // null: `mCircle` is an already resolved circle
+    Wm3::Circle2f mCircle;
+  };
+
+  // Scratch kept across frames (the fog pass runs on the main thread every frame), so the large
+  // vectors do not regrow each time.
+  thread_local std::vector<Task> taskScratch;
+  thread_local std::vector<Task> expandedScratch;
+  thread_local std::vector<std::vector<Wm3::Circle2f>> partScratch;
+  // Plain references: the worker lambdas below must reach this thread's scratch, not their own.
+  std::vector<Task>& tasks = taskScratch;
+  std::vector<Task>& expanded = expandedScratch;
+  std::vector<std::vector<Wm3::Circle2f>>& parts = partScratch;
+  // The chains under the root and under its children are the long ones (the root holds the four
+  // quadrant nodes, which hold most emitters); take them from the array copies.
+  static VisionTopChains sTopChains;
+  sTopChains.Refresh(*this, rootNode_);
+  const auto forEachChild = [&](const Entry* const node, const auto& visit) {
+    if (node == rootNode_) {
+      for (const Entry* const child : sTopChains.mRootChain) {
+        visit(child);
+      }
+      return;
+    }
+    if (node->mParent == rootNode_) {
+      const auto found = std::find(sTopChains.mRootChain.begin(), sTopChains.mRootChain.end(), node);
+      if (found != sTopChains.mRootChain.end()) {
+        for (const Entry* const child : sTopChains.mChildChains[found - sTopChains.mRootChain.begin()]) {
+          visit(child);
+        }
+        return;
+      }
+    }
+    for (const Entry* child = node->mContained; child != nullptr; child = child->mNext) {
+      visit(child);
+    }
+  };
+
+  tasks.assign(1u, Task{rootNode_, {}});
+  std::size_t subtrees = 1u;
+  for (int depth = 0; depth < kVisionParallelMaxExpandDepth && subtrees != 0u && subtrees < kVisionParallelTargetSubtrees;
+       ++depth) {
+    expanded.clear();
+    subtrees = 0u;
+    for (const Task& task : tasks) {
+      if (task.mSubtree == nullptr) {
+        expanded.push_back(task);
+        continue;
+      }
+
+      Wm3::Circle2f sampled{};
+      switch (EvaluateVisionEntry(*task.mSubtree, box, interpolant, sampled)) {
+        case EVisionEntryResult::Outside:
+          break;
+        case EVisionEntryResult::Circle:
+          expanded.push_back(Task{nullptr, sampled});
+          break;
+        case EVisionEntryResult::Descend:
+          forEachChild(task.mSubtree, [&](const Entry* const child) {
+            expanded.push_back(Task{child, {}});
+            ++subtrees;
+          });
+          break;
+      }
+    }
+    tasks.swap(expanded);
+  }
+
+  const auto runTask = [&](auto& output, const Task& task) {
+    if (task.mSubtree == nullptr) {
+      output.push_back(task.mCircle);
+    } else {
+      AccumulateVisibleCircles(output, task.mSubtree, box, interpolant);
+    }
+  };
+
+  if (subtrees < kVisionParallelMinSubtrees) {
+    for (const Task& task : tasks) {
+      runTask(accumulator, task);
+    }
     return;
   }
 
-  for (Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
-    TryAdd(accumulator, child, box, interpolant);
+  const std::size_t chunkCount = (tasks.size() + kVisionParallelGrain - 1u) / kVisionParallelGrain;
+  if (parts.size() < chunkCount) {
+    parts.resize(chunkCount);
+  }
+  CUserWorkerPool::Get().ParallelFor(tasks.size(), kVisionParallelGrain, [&](const std::size_t begin, const std::size_t end) {
+    std::vector<Wm3::Circle2f>& part = parts[begin / kVisionParallelGrain];
+    part.clear();
+    for (std::size_t i = begin; i < end; ++i) {
+      runTask(part, tasks[i]);
+    }
+  });
+
+  for (std::size_t chunk = 0; chunk < chunkCount; ++chunk) {
+    for (const Wm3::Circle2f& circle : parts[chunk]) {
+      accumulator.push_back(circle);
+    }
   }
 }

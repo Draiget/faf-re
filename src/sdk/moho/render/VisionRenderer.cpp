@@ -338,7 +338,7 @@ namespace moho
     footprintBox.Extent[1] = terrainFootprint.Max.z - footprintBox.Center.y;
 
     gpg::fastvector_n<Wm3::Circle2f, VisionDB::kVisibleCircleInlineCapacity> visibleCircles;
-    visionDb.TryAdd(visibleCircles, visionDb.rootNode_, footprintBox, interpolant);
+    visionDb.CollectVisibleCircles(visibleCircles, footprintBox, interpolant);
 
     const auto visibleCircleCount = static_cast<std::int32_t>(visibleCircles.size());
 

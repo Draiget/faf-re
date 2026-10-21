@@ -1439,6 +1439,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</IntrinsicFunctions>
     </ClCompile>
     <ClCompile Include="moho\app\CScApp.cpp" />
+    <ClCompile Include="moho\app\UserWorkerPool.cpp" />
     <ClCompile Include="moho\app\CWaitHandleSet.cpp" />
     <ClCompile Include="moho\app\IWinApp.cpp" />
     <ClCompile Include="moho\app\WEmitterWx.cpp" />
@@ -1743,6 +1744,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\audio\SParamKeyTypeInfo.h" />
     <ClInclude Include="moho\audio\SofdecRuntime.h" />
     <ClInclude Include="moho\app\CScApp.h" />
+    <ClInclude Include="moho\app\UserWorkerPool.h" />
     <ClInclude Include="moho\app\CWaitHandleSet.h" />
     <ClInclude Include="moho\app\IWinApp.h" />
     <ClInclude Include="moho\app\WEmitterWx.h" />

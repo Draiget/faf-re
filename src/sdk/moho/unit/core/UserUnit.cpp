@@ -2089,17 +2089,50 @@ void UserUnit::UpdateVisibility()
  */
 void UserUnit::UpdateUnitData(const SSTIUnitVariableData& payload, const std::uint32_t intelStateFlags)
 {
-  const bool wasBusy = mUnitVarDat.mIsBusy;
-  mUnitVarDat.AssignFrom(payload);
-  mIntelStateFlags = intelStateFlags;
+  const bool wasBusy = ApplyUnitPayload(payload, intelStateFlags);
 
   if (!wasBusy && mUnitVarDat.mIsBusy) {
     DeselectFromSessionSelection(this);
   }
 
+  ApplyUnitPoses();
+  FinishUnitDataLinks();
+}
+
+bool UserUnit::ApplyUnitPayload(const SSTIUnitVariableData& payload, const std::uint32_t intelStateFlags)
+{
+  const bool wasBusy = mUnitVarDat.mIsBusy;
+  mUnitVarDat.AssignFrom(payload);
+  mIntelStateFlags = intelStateFlags;
+  return wasBusy;
+}
+
+void UserUnit::ApplyUnitPoses()
+{
   mPosePrimary = mUnitVarDat.mPriorSharedPose;
   mPoseSecondary = mUnitVarDat.mSharedPose;
+}
 
+bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
+{
+  if (!mUnitVarDat.mIsBusy && payload.mIsBusy) {
+    return true;
+  }
+
+  const EntId replicatedCreator = payload.mCreator;
+  if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {
+    return false;
+  }
+  const UserEntity* const heldCreator = mCreator.GetObjectPtr();
+  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == replicatedCreator) {
+    return false;
+  }
+  const UserEntity* const creator = WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator));
+  return creator != nullptr && creator->IsInCategory(msvc8::string("FACTORY", 7u));
+}
+
+void UserUnit::FinishUnitDataLinks()
+{
   const EntId replicatedCreator = mUnitVarDat.mCreator;
   if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {
     // 0x008C0823: the sentinel id means "no creator"; drop whatever we held.

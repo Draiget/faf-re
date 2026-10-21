@@ -546,6 +546,27 @@ namespace moho
     void UpdateUnitData(const SSTIUnitVariableData& payload, std::uint32_t intelStateFlags);
 
     /**
+     * Engine addition, not recovered from the binary: `UpdateUnitData` in steps, so the sync apply
+     * (`wld_ParallelSync`) can run the per-unit copies on user workers. `UpdateUnitData` is
+     * ApplyUnitPayload, the deselect of a unit that just went busy, ApplyUnitPoses, then
+     * FinishUnitDataLinks.
+     * - ApplyUnitPayload assigns the payload and the intel flags; it returns whether the unit was
+     *   busy before.
+     * - ApplyUnitPoses re-seats both shared poses from the payload.
+     * - FinishUnitDataLinks re-resolves the creator (WeakPtr, selection sets) and resyncs the
+     *   command queues: main thread, packet order.
+     */
+    bool ApplyUnitPayload(const SSTIUnitVariableData& payload, std::uint32_t intelStateFlags);
+    void ApplyUnitPoses();
+    void FinishUnitDataLinks();
+
+    /**
+     * Engine addition: true when `UpdateUnitData(payload)` may run UI Lua - the unit goes busy (and
+     * leaves the selection) or it inherits the selection sets of a newly resolved factory creator.
+     */
+    [[nodiscard]] bool UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const;
+
+    /**
      * Address: 0x008BF190 (FUN_008BF190, Moho::UserUnit::RemoveSelectionSet)
      *
      * What it does:

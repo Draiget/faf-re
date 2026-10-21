@@ -136,6 +136,39 @@ namespace moho
     virtual void UpdateEntityData(const SSTIEntityVariableData& variableData);
 
     /**
+     * Engine addition, not recovered from the binary: `UpdateEntityData` in three steps, so the
+     * sync apply (`wld_ParallelSync`) can run the middle one on user workers. `UpdateEntityData`
+     * is exactly Begin, Apply, Finish in that order.
+     * - Begin works out what changed and does the steps that must precede the assignment: the
+     *   focus-army damage notification (UI Lua) and the session's recon-visibility set.
+     * - Apply assigns the snapshot and updates the mesh instance; for an update that
+     *   `EntityDataUpdateIsLocal` accepts it writes only this entity and its mesh instance.
+     * - Finish republishes the spatial bounds and updates visibility and the vision handle.
+     */
+    struct SEntityDataUpdate
+    {
+      bool mRequiresMeshRebuild = false;
+      bool mScaleChanged = false;
+      bool mStanceOrSpatialUpdateNeeded = false;
+      bool mMeshBoundsDirty = false;
+    };
+
+    [[nodiscard]] SEntityDataUpdate BeginEntityDataUpdate(const SSTIEntityVariableData& variableData);
+    void ApplyEntityDataUpdate(const SSTIEntityVariableData& variableData, SEntityDataUpdate& update);
+    void FinishEntityDataUpdate(const SSTIEntityVariableData& variableData, const SEntityDataUpdate& update);
+
+    /**
+     * Engine addition: true when Begin and Apply for this snapshot touch nothing outside this
+     * entity, its mesh instance and its own pose handles: no mesh rebuild, no change of
+     * recon-visibility mode, sound handle or underlay texture, and no focus-army damage
+     * notification.
+     */
+    [[nodiscard]] bool EntityDataUpdateIsLocal(const SSTIEntityVariableData& variableData) const;
+
+    /// Engine addition: true when Begin would run the focus-army damage notification (UI Lua).
+    [[nodiscard]] bool EntityDataUpdateRunsLua(const SSTIEntityVariableData& variableData) const;
+
+    /**
      * Address: 0x008B9580 (FUN_008B9580, ?UpdateVisibility@UserEntity@Moho@@UAEXXZ)
      *
      * What it does:

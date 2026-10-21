@@ -19,6 +19,21 @@ Findings and method: `decomp/recovery/reports/perf/sim_multithreading_investigat
 | `speedkeys.py` | Posts key presses to the game window (used by `run_game.py`). |
 | `vault_scan.py` | Finds big team games recorded on a given FAF game version in the replay vault. It reads only the first 4 KB of each replay (the JSON header), about 8 requests a second. |
 
+### x64 builds
+
+| file | what |
+|---|---|
+| `sampler64.py` | Profiler for the native x64 `main_x64.exe`: exact call chains through dbghelp's `StackWalk64` and the PDB, plus which thread was busy or waiting in each sampling round. Needs a 64-bit Python. |
+| `prof64.py` | `curve` (sim/main CPU ms per tick), `top`, `under` (split by callee) and `callers` over its windows. |
+| `joint.py` | How the sim and main threads overlap: both busy, one waiting, both idle, and what each did while the other waited. |
+
+```bash
+python scripts/perf/sampler64.py <pid> <dir-with-pdb> out/x64 3600 60
+python scripts/perf/prof64.py curve out/x64
+python scripts/perf/prof64.py under main "moho::CWldSession::DoBeat" out/x64/win_010.json
+python scripts/perf/joint.py out/x64/win_01*.json
+```
+
 ## Typical run
 
 ```bash
