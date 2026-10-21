@@ -59,6 +59,8 @@ namespace gpg::gal
 
     [[nodiscard]] boost::shared_ptr<GpuBuffer> CreateBuffer(const GpuBufferDesc& desc);
     void UpdateBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data);
+    /** Diagnostics: copies elements of `buffer` to `out` through a staging buffer, waiting for the GPU. */
+    bool ReadBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out);
     [[nodiscard]] boost::shared_ptr<GpuProgram> CreateProgram(const GpuProgramDesc& desc);
     void Draw(const GpuDrawCall& call);
     void Dispatch(const GpuDispatch& dispatch);

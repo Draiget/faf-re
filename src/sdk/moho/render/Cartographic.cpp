@@ -7,6 +7,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <optional>
 #include <stdexcept>
 
 #include <d3d9.h>
@@ -35,6 +36,7 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/particles/CWorldParticles.h"
+#include "gpg/gal/RenderProfiler.h"
 #include "moho/render/BoundaryRenderer.h"
 #include "moho/render/IRenderWorldView.h"
 #include "moho/render/RangeRenderer.h"
@@ -2167,18 +2169,25 @@ namespace moho
 
     device->SetViewport(&worldViewViewport);
 
+    std::optional<gpg::gal::RenderProfileScope> profileStep(std::in_place, "CartoTerrain0"); // FAF instrumentation
     RenderTerrainStage0(cameraView, false);
 
     if (session != nullptr) {
       if (rangeRenderer != nullptr && camera != nullptr) {
+        profileStep.reset();
+        profileStep.emplace("CartoRanges");
         rangeRenderer->Render(session, camera, headIndex, deltaFrame);
       }
 
       if (visionRenderer != nullptr) {
+        profileStep.reset();
+        profileStep.emplace("CartoFog");
         RenderFogOfWar(*session, *visionRenderer, headIndex, cameraView, deltaFrame);
       }
 
       if (boundaryRenderer != nullptr) {
+        profileStep.reset();
+        profileStep.emplace("CartoBoundary");
         RenderPlayableBoundary(headIndex, *boundaryRenderer, *session, cameraView);
       }
     }
@@ -2186,15 +2195,23 @@ namespace moho
     device->ClearTarget(&headOutputContext);
     device->SetViewport(&worldViewViewport);
 
+    profileStep.reset();
+    profileStep.emplace("CartoTerrain1");
     RenderTerrainStage1(static_cast<std::int32_t>(headIndex), colorTarget);
+    profileStep.reset();
+    profileStep.emplace("CartoMeshes");
     RenderMeshes(gameTick, deltaFrame, cameraView);
 
     // The shipped body inlines this one-line forwarder at 0x007D1AFB..
     // 0x007D1B20 (`sWorldParticles.RenderEffects(camera, 0, 1, tick, alpha)`),
     // which is why the out-of-line copy at 0x007D2E40 carries no xrefs of its
     // own. Calling it by name keeps both the behaviour and the symbol.
+    profileStep.reset();
+    profileStep.emplace("CartoParticles");
     RenderParticles(gameTick, deltaFrame, cameraView);
 
+    profileStep.reset();
+    profileStep.emplace("CartoBatches");
     const CartographicListNode* const batchSentinel = mListSentinel;
     for (CartographicListNode* node = mListSentinel->mNext; node != batchSentinel; node = node->mNext) {
       node->mBatch.Render(cameraView);
@@ -2214,6 +2231,8 @@ namespace moho
       //   [esp+0x10] a literal `0.0f` (`fldz` at 0x007D1B56) - the cartographic
       //              pass freezes the blinky-box cycle rather than advancing
       //              it, so the world view's own pass stays the only ticker.
+      profileStep.reset();
+      profileStep.emplace("CartoRenUI");
       RenUI(session, &cameraView, primBatcher.get(), deltaFrame, 0.0f);
     }
 
@@ -2244,7 +2263,10 @@ namespace moho
     // left every world-space overlay the view owns unpainted: resource splats,
     // strategic icons, projectile icons and arcs, mesh previews, command
     // splats, the economy readout and the command graph.
+    profileStep.reset();
+    profileStep.emplace("CartoWorldView");
     worldView->Render(primBatcher.get(), static_cast<int>(headIndex), deltaFrame, 0.0f);
+    profileStep.reset();
 
     REN_DebugStuff(primBatcher, static_cast<int>(headIndex));
 

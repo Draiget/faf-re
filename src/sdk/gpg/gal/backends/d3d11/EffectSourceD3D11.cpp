@@ -756,7 +756,10 @@ namespace gpg::gal::d3d11
             // the bound viewport's clip space so the viewport transform puts
             // them back where they were; the backend writes the viewport into
             // faf_ViewportSize before each pass. D3D9 put pixel centres on
-            // integers, D3D10 on halves, hence the + 0.5.
+            // integers, D3D10 on halves, hence the + 0.5. The D3D11 backend's
+            // viewport origin already carries that half pixel (DeviceD3D11::
+            // SetViewport) and faf_ViewportSize reports it, so the two cancel
+            // here and the vertex lands at pixel + 0.5 either way.
             mText.insert(0U,
               "float4 faf_ViewportSize; // (left, top, 1/width, 1/height), set by the D3D11 backend\n"
               "struct faf_FixedFuncVertex { float4 position : POSITION0; float2 texcoord : TEXCOORD0; };\n"

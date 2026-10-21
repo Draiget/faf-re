@@ -137,6 +137,7 @@ namespace gpg::gal
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
     bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
+    bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
 
     /**
      * Diagnostics: with FAF_GAL_TRACE_START / FAF_GAL_TRACE_FRAMES set, the

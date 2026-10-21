@@ -301,6 +301,36 @@ namespace gpg::gal
     RecordUpload(box.right - box.left);
   }
 
+  bool GpuDrivenD3D11::ReadBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, void* const out)
+  {
+    const GpuBufferDesc& desc = buffer.Desc();
+    if (count == 0U || out == nullptr || firstElement >= desc.capacity || count > desc.capacity - firstElement) {
+      return false;
+    }
+    const UINT bytes = count * desc.stride;
+    D3D11_BUFFER_DESC stagingDesc{};
+    stagingDesc.ByteWidth = bytes;
+    stagingDesc.Usage = D3D11_USAGE_STAGING;
+    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    ComPtr<ID3D11Buffer> staging;
+    if (FAILED(mDevice->CreateBuffer(&stagingDesc, nullptr, &staging))) {
+      return false;
+    }
+    D3D11_BOX box{};
+    box.left = firstElement * desc.stride;
+    box.right = box.left + bytes;
+    box.bottom = 1U;
+    box.back = 1U;
+    mImmediate->CopySubresourceRegion(staging.Get(), 0U, 0U, 0U, 0U, static_cast<GpuBufferD3D11&>(buffer).Buffer(), 0U, &box);
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    if (FAILED(mImmediate->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped))) {
+      return false;
+    }
+    std::memcpy(out, mapped.pData, bytes);
+    mImmediate->Unmap(staging.Get(), 0U);
+    return true;
+  }
+
   boost::shared_ptr<GpuProgram> GpuDrivenD3D11::CreateProgram(const GpuProgramDesc& desc)
   {
     if ((mFeatures & kGpuFeatureVertexPulling) == 0U || desc.source == nullptr) {

@@ -29,6 +29,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/RenderProfiler.h"
+#include "moho/render/StrategicIconClassifyShader.h"
 #include "moho/render/StrategicIconRenderer.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/containers/BVIntSet.h"
@@ -2697,7 +2698,20 @@ namespace moho
       std::uint64_t mBeat = ~0ull;
       std::uint64_t mFrustumRebuild = ~0ull;
       const void* mFocusArmy = nullptr;
+      bool mTeamColorMode = false;
       std::vector<StrategicIconSource> mSources;
+
+      // Engine addition (`ren_GpuIconClassify`): the GPU form of `mSources`, and the selection as
+      // one bit per source. Each version changes whenever its array does.
+      std::vector<StrategicIconSourceRecord> mGpuSources;
+      std::uint64_t mGpuSourcesVersion = 0U;
+      std::vector<std::uint32_t> mSelectionBits;
+      std::vector<const UserEntity*> mSelectionSnapshot; // the selection the bits were built from
+      std::uint64_t mSelectionVersion = 0U;
+      std::uint64_t mSelectionBuiltFor = ~0ull;          // `mGpuSourcesVersion` the bits were built for
+      const UserEntity* mHoveredEntity = nullptr;
+      std::uint32_t mHoveredIndex = 0xFFFFFFFFU;
+      std::uint64_t mHoveredBuiltFor = ~0ull;
     };
 
     // Below this many units the serial pass is cheaper than a dispatch.
@@ -12284,6 +12298,72 @@ namespace moho
         gpg::Logf("icon record check: %llu entries compared, %llu differ", sCompared, sMismatches);
       }
     }
+
+    /**
+     * Engine diagnostics (`ren_GpuIconClassify`): with FAF_ICON_GPU_CHECK=<n> in the environment,
+     * every n-th GPU-classified draw of a view also classifies that frame on the CPU, builds the
+     * records the CPU path would draw, reads back what the GPU drew, and compares the two - count
+     * and every record, bit for bit. Returns 0 when off.
+     */
+    [[nodiscard]] std::uint32_t StrategicIconGpuCheckInterval()
+    {
+      static const std::uint32_t sInterval = [] {
+        char value[16] = {};
+        std::size_t length = 0u;
+        if (::getenv_s(&length, value, sizeof(value), "FAF_ICON_GPU_CHECK") != 0 || length == 0u) {
+          return 0u;
+        }
+        return static_cast<std::uint32_t>(std::max(0, std::atoi(value)));
+      }();
+      return sInterval;
+    }
+
+    void CompareClassifiedStrategicIcons(
+      const std::vector<StrategicIconInstance>& expected, const std::vector<StrategicIconInstance>& drawn, const bool miniMap
+    )
+    {
+      static std::uint64_t sChecks = 0u;
+      static std::uint64_t sMiniMapChecks = 0u;
+      static std::uint64_t sRecords = 0u;
+      static std::uint64_t sDiffering = 0u;
+      static std::uint64_t sCountMismatches = 0u;
+      static int sReported = 0;
+      ++sChecks;
+      if (miniMap) {
+        ++sMiniMapChecks;
+      }
+      if (expected.size() != drawn.size()) {
+        ++sCountMismatches;
+      }
+      const std::size_t common = std::min(expected.size(), drawn.size());
+      std::size_t differing = 0u;
+      for (std::size_t i = 0; i < common; ++i) {
+        if (std::memcmp(&expected[i], &drawn[i], sizeof(StrategicIconInstance)) == 0) {
+          continue;
+        }
+        ++differing;
+        if (sReported < 16) {
+          ++sReported;
+          const StrategicIconInstance& a = expected[i];
+          const StrategicIconInstance& b = drawn[i];
+          gpg::Warnf(
+            "icon GPU check (%s): record %zu differs: cpu {pos %08X color %08X layers %08X %08X} gpu {pos %08X color %08X layers %08X %08X}",
+            miniMap ? "minimap" : "view", i, a.mPosition, a.mColor, a.mLayers01, a.mLayers23, b.mPosition, b.mColor, b.mLayers01,
+            b.mLayers23
+          );
+        }
+      }
+      sRecords += common;
+      sDiffering += differing;
+      if (expected.size() != drawn.size() || differing != 0u || sChecks % 20u == 0u) {
+        gpg::Logf(
+          "icon GPU check (%s): %zu records on the CPU, %zu drawn by the GPU, %zu differ; totals: %llu checks (%llu minimap), "
+          "%llu records, %llu differ, %llu count mismatches",
+          miniMap ? "minimap" : "view", expected.size(), drawn.size(), differing, sChecks, sMiniMapChecks, sRecords, sDiffering,
+          sCountMismatches
+        );
+      }
+    }
   } // namespace
 
   /**
@@ -12656,6 +12736,87 @@ namespace moho
       source.mSelectedIcon = &PickUnitStrategicIconTexture(aux, probe, true, selectedVariantEligible, false);
     };
 
+    // Engine addition (`ren_GpuIconClassify`): the GPU form of one record - `describe`'s flags and
+    // endpoints, `PlaceUnitIcon`'s colour up to the blink test, the identified underlay, the focus
+    // damage tick and the atlas slots. `FindSlot` only reads, so workers may call it; a texture
+    // without a slot yet sets `needsSlot` and gets one on this thread afterwards. The selected icon
+    // gets its slot when the unit is first selected.
+    StrategicIconRenderer& gpuIcons = StrategicIconRenderer::Get();
+    const auto describeGpu = [&](const StrategicIconSource& source, StrategicIconSourceRecord& record, std::uint8_t& needsSlot) {
+      record = StrategicIconSourceRecord{};
+      needsSlot = 0U;
+      UserEntity* const entity = source.mEntity;
+      if (entity == nullptr) {
+        return;
+      }
+      using Gpu = StrategicIconSourceRecord;
+      std::uint32_t flags = Gpu::kValid;
+      const auto map = [&](const StrategicIconSource::Flags from, const Gpu::Flags to) {
+        if (source.Has(from)) {
+          flags |= to;
+        }
+      };
+      map(StrategicIconSource::kFriendly, Gpu::kFriendly);
+      map(StrategicIconSource::kStunned, Gpu::kStunned);
+      map(StrategicIconSource::kPaused, Gpu::kPaused);
+      map(StrategicIconSource::kCheckPlayableRect, Gpu::kCheckPlayableRect);
+      map(StrategicIconSource::kBeingBuilt, Gpu::kBeingBuilt);
+      map(StrategicIconSource::kSkipWhenMeshVisible, Gpu::kSkipWhenMeshVisible);
+      map(StrategicIconSource::kHighPriority, Gpu::kHighPriority);
+      map(StrategicIconSource::kAir, Gpu::kAir);
+      if (source.mMesh != nullptr) {
+        flags |= Gpu::kHasMesh;
+        record.mIconFadeInZoom = source.mMesh->mIconFadeInZoom;
+      }
+      record.mFlags = flags;
+      record.mLastPosition[0] = source.mLastPosition.x;
+      record.mLastPosition[1] = source.mLastPosition.y;
+      record.mLastPosition[2] = source.mLastPosition.z;
+      record.mCurrentPosition[0] = source.mCurrentPosition.x;
+      record.mCurrentPosition[1] = source.mCurrentPosition.y;
+      record.mCurrentPosition[2] = source.mCurrentPosition.z;
+      record.mImpact = source.mImpact;
+
+      // `PlaceUnitIcon`'s colour, everything before its blink test.
+      const UserUnit* const asUnit = entity->IsUserUnit();
+      constexpr std::uint32_t kHasBlueprintIconDataMask = 0x10u;
+      constexpr std::uint32_t kDarkenedTintMask = 0x40u;
+      const bool hasIdentifiedOwner = asUnit == nullptr || (asUnit->mIntelStateFlags & kHasBlueprintIconDataMask) != 0u;
+      std::uint32_t iconColor;
+      if (hasIdentifiedOwner) {
+        if (mTeamColorMode && focusArmy != nullptr) {
+          iconColor = teamcolors[static_cast<std::size_t>(entity->mArmy->mArmyIndex)];
+        } else {
+          iconColor = entity->mArmy->mVarDat.mPlayerColorBgra;
+        }
+      } else {
+        iconColor = aux.mUnidentifiedColor;
+      }
+      if (asUnit != nullptr && (asUnit->mIntelStateFlags & kDarkenedTintMask) != 0u) {
+        iconColor = DarkenRgbPreserveAlpha(iconColor);
+      }
+      record.mColor = iconColor;
+      record.mLastFocusDamageTick = entity->mLastFocusDamageGameTick;
+
+      const auto findSlot = [&gpuIcons](const boost::shared_ptr<CD3DBatchTexture>* const texture) -> std::uint32_t {
+        return (texture != nullptr && *texture) ? gpuIcons.FindSlot(texture->get()) : StrategicIconInstance::kNoLayer;
+      };
+      const std::uint32_t iconSlot = findSlot(source.mIcon);
+      if (iconSlot == StrategicIconInstance::kNoLayer && source.mIcon != nullptr && *source.mIcon) {
+        needsSlot = 1U;
+      }
+      record.mIconSlots = iconSlot | (findSlot(source.mSelectedIcon) << 16U);
+      const boost::shared_ptr<CD3DBatchTexture>& underlay = entity->mVariableData.mUnderlayTexture;
+      if (hasIdentifiedOwner && underlay) {
+        const std::uint32_t underlaySlot = gpuIcons.FindSlot(underlay.get());
+        if (underlaySlot == StrategicIconInstance::kNoLayer) {
+          needsSlot = 1U;
+        } else {
+          record.mUnderlaySlotOrNone = static_cast<std::int32_t>(underlaySlot);
+        }
+      }
+    };
+
     const UserEntity* const hoveredEntity = GetHoveredUserEntity();
     const float maxZoomFade = camera->GetMaxZoom() * 0.89f;
     const auto classifySource = [&](const StrategicIconSource& source, auto&& store) {
@@ -12735,6 +12896,9 @@ namespace moho
     };
 
     const StrategicIconSource* iconSources = nullptr;
+    StrategicIconSourceSet* activeSourceSet = nullptr;
+    // Engine addition (`ren_GpuIconClassify`): classify on the GPU, from the records.
+    const bool classifyOnGpu = ui_IconRecords && gpuIcons.IsClassifyActive();
     if (ui_IconRecords) {
       static std::vector<StrategicIconSourceSet> sSourceSets;
       StrategicIconSourceSet* sourceSet = nullptr;
@@ -12749,15 +12913,28 @@ namespace moho
       }
       const std::uint64_t frustumRebuild = CAM_FrustumUnitsRebuildCount();
       if (sourceSet->mSession != this || sourceSet->mBeat != gUserSyncBeats || sourceSet->mFrustumRebuild != frustumRebuild ||
-          sourceSet->mFocusArmy != focusArmy || sourceSet->mSources.size() != frustumUnitCount) {
+          sourceSet->mFocusArmy != focusArmy || sourceSet->mTeamColorMode != mTeamColorMode ||
+          sourceSet->mSources.size() != frustumUnitCount ||
+          (classifyOnGpu && sourceSet->mGpuSources.size() != frustumUnitCount)) {
         sourceSet->mSession = this;
         sourceSet->mBeat = gUserSyncBeats;
         sourceSet->mFrustumRebuild = frustumRebuild;
         sourceSet->mFocusArmy = focusArmy;
+        sourceSet->mTeamColorMode = mTeamColorMode;
         sourceSet->mSources.resize(frustumUnitCount);
+        static std::vector<std::uint8_t> sNeedsSlot;
+        if (classifyOnGpu) {
+          sourceSet->mGpuSources.resize(frustumUnitCount);
+          sNeedsSlot.resize(frustumUnitCount);
+        } else {
+          sourceSet->mGpuSources.clear();
+        }
         const auto describeRange = [&](const std::size_t begin, const std::size_t end) {
           for (std::size_t i = begin; i < end; ++i) {
             describe(frustumUnits[i], sourceSet->mSources[i]);
+            if (classifyOnGpu) {
+              describeGpu(sourceSet->mSources[i], sourceSet->mGpuSources[i], sNeedsSlot[i]);
+            }
           }
         };
         if (UseParallelIcons(frustumUnitCount)) {
@@ -12765,7 +12942,29 @@ namespace moho
         } else {
           describeRange(0u, frustumUnitCount);
         }
+        if (classifyOnGpu) {
+          // Textures seen for the first time get their slot here, on this thread.
+          for (std::size_t i = 0; i < frustumUnitCount; ++i) {
+            if (sNeedsSlot[i] == 0U) {
+              continue;
+            }
+            const StrategicIconSource& source = sourceSet->mSources[i];
+            StrategicIconSourceRecord& record = sourceSet->mGpuSources[i];
+            if (source.mIcon != nullptr && *source.mIcon) {
+              record.mIconSlots = (record.mIconSlots & 0xFFFF0000u) | gpuIcons.AddSlot(*source.mIcon);
+            }
+            const boost::shared_ptr<CD3DBatchTexture>& underlay = source.mEntity->mVariableData.mUnderlayTexture;
+            const UserUnit* const asUnit = source.mEntity->IsUserUnit();
+            constexpr std::uint32_t kHasBlueprintIconDataMask = 0x10u;
+            if (underlay && (asUnit == nullptr || (asUnit->mIntelStateFlags & kHasBlueprintIconDataMask) != 0u)) {
+              const std::uint16_t slot = gpuIcons.AddSlot(underlay);
+              record.mUnderlaySlotOrNone = slot == StrategicIconInstance::kNoLayer ? -1 : static_cast<std::int32_t>(slot);
+            }
+          }
+          ++sourceSet->mGpuSourcesVersion;
+        }
       }
+      activeSourceSet = sourceSet;
       iconSources = sourceSet->mSources.data();
       VerifyStrategicIconSources(frustumUnitCount, [&](const std::size_t i, auto&& store) { classify(frustumUnits[i], store); },
                                  [&](const std::size_t i, auto&& store) { classifySource(iconSources[i], store); });
@@ -12781,171 +12980,358 @@ namespace moho
     std::optional<gpg::gal::RenderProfileScope> profilePhase(std::in_place, "IconClassify"); // FAF instrumentation
     // Main-thread scratch, kept across frames so the chunk lists keep their capacity.
     static std::vector<std::vector<StrategicIconCandidate>> sChunks;
-    // Engine addition (`ren_GpuIcons`): the candidates of the four icon runs in draw order.
-    static std::vector<const StrategicIconCandidate*> sGpuIcons;
-    StrategicIconRenderer& gpuIcons = StrategicIconRenderer::Get();
-    const bool gpuIconsActive = gpuIcons.IsActive();
-    sGpuIcons.clear();
-    if (gpuIconsActive) {
-      // Engine addition (`ren_GpuIcons`): classify into candidates as the parallel path does
-      // (one chunk when the count is small), but keep the icon runs as candidates instead of
-      // copying them into `aux`: the GPU records are built from them directly. Lifebar records
-      // are stored as before, in the same order.
-      const std::size_t chunkCount =
-        std::max<std::size_t>(1u, (frustumUnitCount + kParallelIconChunk - 1u) / kParallelIconChunk);
-      if (sChunks.size() < chunkCount) {
-        sChunks.resize(chunkCount);
+
+    // Engine addition (`ren_GpuIconClassify`): the four icon runs classified, placed and drawn on
+    // the GPU (StrategicIconClassifyShader.h) from the records' GPU form. The CPU keeps the lifebar
+    // run, which exists only zoomed in, and per frame only gathers the selection, the hovered unit
+    // and the constants. If the renderer declines, the CPU path below runs as before.
+    bool drawnByClassifier = false;
+    if (classifyOnGpu && activeSourceSet != nullptr && activeSourceSet->mGpuSources.size() == frustumUnitCount) {
+      StrategicIconSourceSet& sourceSet = *activeSourceSet;
+      if (ui_RenderUnitBars && ui_LifebarLOD > currentZoomValue) {
+        const auto storeLifebar = [&aux](
+                                    const EStrategicIconRun run,
+                                    const UnitIconData& data,
+                                    const boost::shared_ptr<CD3DBatchTexture>* const icon
+                                  ) {
+          if (run == EStrategicIconRun::Lifebar) {
+            StoreStrategicIcon(aux, run, data, icon);
+          }
+        };
+        for (std::size_t i = 0; i < frustumUnitCount; ++i) {
+          classifySource(iconSources[i], storeLifebar);
+        }
       }
-      const auto classifyChunk = [&](const std::size_t begin, const std::size_t end) {
-        std::vector<StrategicIconCandidate>& chunk = sChunks[begin / kParallelIconChunk];
-        chunk.clear();
-        const auto record = [&chunk](
+
+      // The selection as one bit per record, rebuilt when the selection or the records change.
+      static std::vector<const UserEntity*> sSelection;
+      sSelection.clear();
+      for (UserEntity* const selected : mSelection) {
+        sSelection.push_back(selected);
+      }
+      if (sourceSet.mSelectionBuiltFor != sourceSet.mGpuSourcesVersion || sSelection != sourceSet.mSelectionSnapshot) {
+        sourceSet.mSelectionSnapshot = sSelection;
+        ++sourceSet.mSelectionVersion;
+        sourceSet.mSelectionBits.assign((frustumUnitCount + 31u) / 32u, 0u);
+        bool recordsChanged = false;
+        if (!sSelection.empty()) {
+          // The live selected objects, sorted: what `mSelection.Find` finds, searched without
+          // touching the set, so workers can do it. A chunk is a whole number of bit words.
+          static std::vector<const UserEntity*> sSorted;
+          sSorted.assign(sSelection.begin(), sSelection.end());
+          std::sort(sSorted.begin(), sSorted.end());
+          static_assert(kParallelIconChunk % 32u == 0u, "a chunk must own whole selection words");
+          const auto markRange = [&](const std::size_t begin, const std::size_t end) {
+            for (std::size_t i = begin; i < end; ++i) {
+              const UserEntity* const entity = iconSources[i].mEntity;
+              if (entity != nullptr && std::binary_search(sSorted.begin(), sSorted.end(), entity)) {
+                sourceSet.mSelectionBits[i >> 5u] |= 1u << (i & 31u);
+              }
+            }
+          };
+          if (UseParallelIcons(frustumUnitCount)) {
+            CUserWorkerPool::Get().ParallelFor(frustumUnitCount, kParallelIconChunk, markRange);
+          } else {
+            markRange(0u, frustumUnitCount);
+          }
+          // A selected icon gets its atlas slot the first time it is needed.
+          for (std::size_t word = 0; word < sourceSet.mSelectionBits.size(); ++word) {
+            for (std::uint32_t bits = sourceSet.mSelectionBits[word]; bits != 0u; bits &= bits - 1u) {
+              const std::size_t i = word * 32u + static_cast<std::size_t>(std::countr_zero(bits));
+              StrategicIconSourceRecord& record = sourceSet.mGpuSources[i];
+              const boost::shared_ptr<CD3DBatchTexture>* const selectedIcon = iconSources[i].mSelectedIcon;
+              if ((record.mIconSlots >> 16u) == StrategicIconInstance::kNoLayer && selectedIcon != nullptr && *selectedIcon) {
+                record.mIconSlots = (record.mIconSlots & 0xFFFFu) | (static_cast<std::uint32_t>(gpuIcons.AddSlot(*selectedIcon)) << 16u);
+                recordsChanged = true;
+              }
+            }
+          }
+        }
+        if (recordsChanged) {
+          ++sourceSet.mGpuSourcesVersion;
+        }
+        sourceSet.mSelectionBuiltFor = sourceSet.mGpuSourcesVersion;
+      }
+
+      if (sourceSet.mHoveredBuiltFor != sourceSet.mGpuSourcesVersion || sourceSet.mHoveredEntity != hoveredEntity) {
+        sourceSet.mHoveredBuiltFor = sourceSet.mGpuSourcesVersion;
+        sourceSet.mHoveredEntity = hoveredEntity;
+        sourceSet.mHoveredIndex = 0xFFFFFFFFU;
+        for (std::size_t i = 0; hoveredEntity != nullptr && i < frustumUnitCount; ++i) {
+          if (iconSources[i].mEntity == hoveredEntity) {
+            sourceSet.mHoveredIndex = static_cast<std::uint32_t>(i);
+            break;
+          }
+        }
+      }
+
+      using Constants = StrategicIconClassifyConstants;
+      Constants constants{};
+      for (std::size_t row = 0; row < 4u; ++row) {
+        constants.mViewProjection[row * 4u + 0u] = view.viewProjection.r[row].x;
+        constants.mViewProjection[row * 4u + 1u] = view.viewProjection.r[row].y;
+        constants.mViewProjection[row * 4u + 2u] = view.viewProjection.r[row].z;
+        constants.mViewProjection[row * 4u + 3u] = view.viewProjection.r[row].w;
+      }
+      // `PlaceUnitIcon`'s `Project(world, 0, width, height, 0)`.
+      constants.mViewport[0] = 0.0f;
+      constants.mViewport[1] = aux.mViewportWidth;
+      constants.mViewport[2] = aux.mViewportHeight;
+      constants.mViewport[3] = 0.0f;
+      std::uint32_t frameFlags = 0u;
+      if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr && mWldMap->mTerrainRes->mMap != nullptr) {
+        // `CWldTerrainRes::IsInPlayableRect`'s bounds.
+        const gpg::Rect2i& playableRect = mWldMap->mTerrainRes->mMap->mPlayableRect;
+        constants.mPlayableRect[0] = static_cast<float>(playableRect.x0);
+        constants.mPlayableRect[1] = static_cast<float>(playableRect.z0);
+        constants.mPlayableRect[2] = static_cast<float>(playableRect.x1);
+        constants.mPlayableRect[3] = static_cast<float>(playableRect.z1);
+        frameFlags |= Constants::kHasPlayableRect;
+      }
+      constants.mTickFraction = tickFraction;
+      constants.mCurrentZoom = currentZoomValue;
+      constants.mMaxZoomFade = maxZoomFade;
+      // `PlaceUnitIcon`'s blink test: the phase is the same for every unit.
+      constexpr float kBlinkDurationTickScale = 10.0f;
+      constants.mBlinkTicks = ui_StrategicIconBlinkDuration * kBlinkDurationTickScale;
+      const double simTime = static_cast<double>(mGameTick) + static_cast<double>(aux.mTickFraction);
+      if (std::fmod(simTime * static_cast<double>(ui_StrategicIconBlinkRate), 1.0) <= 0.5) {
+        frameFlags |= Constants::kBlinkHidden;
+      }
+      if (ui_NisRenderIcons) {
+        frameFlags |= Constants::kNisRenderIcons;
+      }
+      if (ui_RenderIcons) {
+        frameFlags |= Constants::kRenderIcons;
+      }
+      if (ui_AlwaysRenderStrategicIcons) {
+        frameFlags |= Constants::kAlwaysRenderIcons;
+      }
+      constants.mFlags = frameFlags;
+      constants.mHovered = sourceSet.mHoveredIndex;
+      constants.mGameTick = mGameTick;
+      constants.mPausedSlot = aux.mPauseRestTexture ? gpuIcons.AddSlot(aux.mPauseRestTexture) : StrategicIconInstance::kNoLayer;
+      constants.mStunnedSlot = aux.mStunnedRestTexture ? gpuIcons.AddSlot(aux.mStunnedRestTexture) : StrategicIconInstance::kNoLayer;
+
+      profilePhase.reset();
+      profilePhase.emplace("IconDraw");
+      (void)primBatcher->Setup("TStrategicIcon");
+      drawnByClassifier = gpuIcons.DrawClassified(
+        *primBatcher, camera, std::span<const StrategicIconSourceRecord>(sourceSet.mGpuSources), sourceSet.mGpuSourcesVersion,
+        std::span<const std::uint32_t>(sourceSet.mSelectionBits), sourceSet.mSelectionVersion, constants
+      );
+
+      static std::uint64_t sClassifiedDraws[2] = {}; // per kind of view, so both get checked
+      const std::uint32_t checkInterval = StrategicIconGpuCheckInterval();
+      if (drawnByClassifier && checkInterval != 0u && ++sClassifiedDraws[isMiniMap ? 1 : 0] % checkInterval == 0u) {
+        // What the CPU path would have drawn this frame: classify, runs in draw order, place, build.
+        std::vector<StrategicIconCandidate> candidates;
+        const auto record = [&candidates](
                               const EStrategicIconRun run,
                               const UnitIconData& data,
                               const boost::shared_ptr<CD3DBatchTexture>* const icon
-                            ) { chunk.push_back(StrategicIconCandidate{data, icon, run}); };
-        for (std::size_t i = begin; i < end; ++i) {
-          classifyAt(i, record);
+                            ) {
+          if (run != EStrategicIconRun::Lifebar) {
+            candidates.push_back(StrategicIconCandidate{data, icon, run});
+          }
+        };
+        for (std::size_t i = 0; i < frustumUnitCount; ++i) {
+          classifySource(iconSources[i], record);
         }
-      };
-      if (UseParallelIcons(frustumUnitCount)) {
-        CUserWorkerPool::Get().ParallelFor(frustumUnitCount, kParallelIconChunk, classifyChunk);
-      } else {
-        classifyChunk(0u, frustumUnitCount);
-        for (std::size_t c = 1; c < chunkCount; ++c) {
-          sChunks[c].clear();
-        }
-      }
-      // Runs in draw order (ground, air, high priority, selected), each in classification order.
-      std::size_t runCounts[4] = {};
-      for (std::size_t c = 0; c < chunkCount; ++c) {
-        for (const StrategicIconCandidate& candidate : sChunks[c]) {
-          if (candidate.mRun == EStrategicIconRun::Lifebar) {
-            StoreStrategicIcon(aux, candidate.mRun, candidate.mData, candidate.mIcon);
-          } else {
-            ++runCounts[static_cast<std::size_t>(candidate.mRun)];
+        std::vector<StrategicIconInstance> expected;
+        expected.reserve(candidates.size());
+        const auto findSlot = [&gpuIcons](const boost::shared_ptr<CD3DBatchTexture>& texture) {
+          return gpuIcons.FindSlot(texture.get());
+        };
+        for (const EStrategicIconRun run :
+             {EStrategicIconRun::Ground, EStrategicIconRun::Air, EStrategicIconRun::HighPriority, EStrategicIconRun::Selected}) {
+          for (const StrategicIconCandidate& candidate : candidates) {
+            if (candidate.mRun == run) {
+              (void)BuildStrategicIconRecord(candidate, aux, PlaceUnitIcon(candidate.mData, aux), findSlot, expected.emplace_back());
+            }
           }
         }
-      }
-      std::size_t runCursor[4] = {
-        0u, runCounts[0], runCounts[0] + runCounts[1], runCounts[0] + runCounts[1] + runCounts[2]
-      };
-      sGpuIcons.resize(runCursor[3] + runCounts[3]);
-      for (std::size_t c = 0; c < chunkCount; ++c) {
-        for (const StrategicIconCandidate& candidate : sChunks[c]) {
-          if (candidate.mRun != EStrategicIconRun::Lifebar) {
-            sGpuIcons[runCursor[static_cast<std::size_t>(candidate.mRun)]++] = &candidate;
-          }
+        std::vector<StrategicIconInstance> drawn;
+        if (gpuIcons.ReadBackClassified(drawn)) {
+          CompareClassifiedStrategicIcons(expected, drawn, isMiniMap);
         }
       }
-    } else if (!UseParallelIcons(frustumUnitCount)) {
-      const auto storeInAux = [&aux](
+
+      if (!drawnByClassifier) {
+        // The CPU path classifies again, lifebars included.
+        aux.mLifebarIcons.clear();
+        profilePhase.reset();
+        profilePhase.emplace("IconClassify");
+      }
+    }
+
+    if (!drawnByClassifier) {
+      // Engine addition (`ren_GpuIcons`): the candidates of the four icon runs in draw order.
+      static std::vector<const StrategicIconCandidate*> sGpuIcons;
+      const bool gpuIconsActive = gpuIcons.IsActive();
+      sGpuIcons.clear();
+      if (gpuIconsActive) {
+        // Engine addition (`ren_GpuIcons`): classify into candidates as the parallel path does
+        // (one chunk when the count is small), but keep the icon runs as candidates instead of
+        // copying them into `aux`: the GPU records are built from them directly. Lifebar records
+        // are stored as before, in the same order.
+        const std::size_t chunkCount =
+          std::max<std::size_t>(1u, (frustumUnitCount + kParallelIconChunk - 1u) / kParallelIconChunk);
+        if (sChunks.size() < chunkCount) {
+          sChunks.resize(chunkCount);
+        }
+        const auto classifyChunk = [&](const std::size_t begin, const std::size_t end) {
+          std::vector<StrategicIconCandidate>& chunk = sChunks[begin / kParallelIconChunk];
+          chunk.clear();
+          const auto record = [&chunk](
                                 const EStrategicIconRun run,
                                 const UnitIconData& data,
                                 const boost::shared_ptr<CD3DBatchTexture>* const icon
-                              ) { StoreStrategicIcon(aux, run, data, icon); };
-      for (std::size_t i = 0; i < frustumUnitCount; ++i) {
-        classifyAt(i, storeInAux);
-      }
-    } else {
-      const std::size_t chunkCount = (frustumUnitCount + kParallelIconChunk - 1u) / kParallelIconChunk;
-      if (sChunks.size() < chunkCount) {
-        sChunks.resize(chunkCount);
-      }
-      CUserWorkerPool::Get().ParallelFor(frustumUnitCount, kParallelIconChunk, [&](const std::size_t begin, const std::size_t end) {
-        std::vector<StrategicIconCandidate>& chunk = sChunks[begin / kParallelIconChunk];
-        chunk.clear();
-        const auto record = [&chunk](
-                              const EStrategicIconRun run,
-                              const UnitIconData& data,
-                              const boost::shared_ptr<CD3DBatchTexture>* const icon
-                            ) { chunk.push_back(StrategicIconCandidate{data, icon, run}); };
-        for (std::size_t i = begin; i < end; ++i) {
-          classifyAt(i, record);
+                              ) { chunk.push_back(StrategicIconCandidate{data, icon, run}); };
+          for (std::size_t i = begin; i < end; ++i) {
+            classifyAt(i, record);
+          }
+        };
+        if (UseParallelIcons(frustumUnitCount)) {
+          CUserWorkerPool::Get().ParallelFor(frustumUnitCount, kParallelIconChunk, classifyChunk);
+        } else {
+          classifyChunk(0u, frustumUnitCount);
+          for (std::size_t c = 1; c < chunkCount; ++c) {
+            sChunks[c].clear();
+          }
         }
-      });
-      for (std::size_t c = 0; c < chunkCount; ++c) {
-        for (const StrategicIconCandidate& candidate : sChunks[c]) {
-          StoreStrategicIcon(aux, candidate.mRun, candidate.mData, candidate.mIcon);
+        // Runs in draw order (ground, air, high priority, selected), each in classification order.
+        std::size_t runCounts[4] = {};
+        for (std::size_t c = 0; c < chunkCount; ++c) {
+          for (const StrategicIconCandidate& candidate : sChunks[c]) {
+            if (candidate.mRun == EStrategicIconRun::Lifebar) {
+              StoreStrategicIcon(aux, candidate.mRun, candidate.mData, candidate.mIcon);
+            } else {
+              ++runCounts[static_cast<std::size_t>(candidate.mRun)];
+            }
+          }
         }
-        sChunks[c].clear();
+        std::size_t runCursor[4] = {
+          0u, runCounts[0], runCounts[0] + runCounts[1], runCounts[0] + runCounts[1] + runCounts[2]
+        };
+        sGpuIcons.resize(runCursor[3] + runCounts[3]);
+        for (std::size_t c = 0; c < chunkCount; ++c) {
+          for (const StrategicIconCandidate& candidate : sChunks[c]) {
+            if (candidate.mRun != EStrategicIconRun::Lifebar) {
+              sGpuIcons[runCursor[static_cast<std::size_t>(candidate.mRun)]++] = &candidate;
+            }
+          }
+        }
+      } else if (!UseParallelIcons(frustumUnitCount)) {
+        const auto storeInAux = [&aux](
+                                  const EStrategicIconRun run,
+                                  const UnitIconData& data,
+                                  const boost::shared_ptr<CD3DBatchTexture>* const icon
+                                ) { StoreStrategicIcon(aux, run, data, icon); };
+        for (std::size_t i = 0; i < frustumUnitCount; ++i) {
+          classifyAt(i, storeInAux);
+        }
+      } else {
+        const std::size_t chunkCount = (frustumUnitCount + kParallelIconChunk - 1u) / kParallelIconChunk;
+        if (sChunks.size() < chunkCount) {
+          sChunks.resize(chunkCount);
+        }
+        CUserWorkerPool::Get().ParallelFor(frustumUnitCount, kParallelIconChunk, [&](const std::size_t begin, const std::size_t end) {
+          std::vector<StrategicIconCandidate>& chunk = sChunks[begin / kParallelIconChunk];
+          chunk.clear();
+          const auto record = [&chunk](
+                                const EStrategicIconRun run,
+                                const UnitIconData& data,
+                                const boost::shared_ptr<CD3DBatchTexture>* const icon
+                              ) { chunk.push_back(StrategicIconCandidate{data, icon, run}); };
+          for (std::size_t i = begin; i < end; ++i) {
+            classifyAt(i, record);
+          }
+        });
+        for (std::size_t c = 0; c < chunkCount; ++c) {
+          for (const StrategicIconCandidate& candidate : sChunks[c]) {
+            StoreStrategicIcon(aux, candidate.mRun, candidate.mData, candidate.mIcon);
+          }
+          sChunks[c].clear();
+        }
       }
-    }
 
-    // --- Phase 3.5: draw the classified icon quads -----------------------
-    // The four runs collected above, each drawn through `RenderUnitIcon`
-    // (0x0085D9A0) under its own technique (0x0085B79D..0x0085BCCD in the
-    // binary). This runs before the lifebar pass below, matching the
-    // binary's own SetTexture/DrawQuad-then-Flush ordering (0x0085BBE9..
-    // 0x0085BCCD then Flush at 0x0085BFA9). The single dedicated "hovered
-    // unit" slot and the formation-ghost pass that follow this in the
-    // binary (`v148.playableRectX1` / "TStrategicFormationIcon") are still
-    // deferred - see the function comment.
-    profilePhase.reset();
-    profilePhase.emplace("IconDraw");
-    (void)primBatcher->Setup("TStrategicIcon");
+      // --- Phase 3.5: draw the classified icon quads -----------------------
+      // The four runs collected above, each drawn through `RenderUnitIcon`
+      // (0x0085D9A0) under its own technique (0x0085B79D..0x0085BCCD in the
+      // binary). This runs before the lifebar pass below, matching the
+      // binary's own SetTexture/DrawQuad-then-Flush ordering (0x0085BBE9..
+      // 0x0085BCCD then Flush at 0x0085BFA9). The single dedicated "hovered
+      // unit" slot and the formation-ghost pass that follow this in the
+      // binary (`v148.playableRectX1` / "TStrategicFormationIcon") are still
+      // deferred - see the function comment.
+      profilePhase.reset();
+      profilePhase.emplace("IconDraw");
+      (void)primBatcher->Setup("TStrategicIcon");
 
-    // Engine addition (`ren_GpuIcons`): one instanced draw from per-icon GPU records when the
-    // backend can; the batcher path below otherwise. If the GPU path declines, the candidates go
-    // into the runs exactly as the batcher path stores them.
-    bool drawnOnGpu = false;
-    if (gpuIconsActive) {
-      drawnOnGpu = DrawStrategicIconsOnGpu(gpuIcons, aux, camera, sGpuIcons);
-      if (!drawnOnGpu) {
-        for (const StrategicIconCandidate* const candidate : sGpuIcons) {
-          StoreStrategicIcon(aux, candidate->mRun, candidate->mData, candidate->mIcon);
+      // Engine addition (`ren_GpuIcons`): one instanced draw from per-icon GPU records when the
+      // backend can; the batcher path below otherwise. If the GPU path declines, the candidates go
+      // into the runs exactly as the batcher path stores them.
+      bool drawnOnGpu = false;
+      if (gpuIconsActive) {
+        drawnOnGpu = DrawStrategicIconsOnGpu(gpuIcons, aux, camera, sGpuIcons);
+        if (!drawnOnGpu) {
+          for (const StrategicIconCandidate* const candidate : sGpuIcons) {
+            StoreStrategicIcon(aux, candidate->mRun, candidate->mData, candidate->mIcon);
+          }
         }
       }
-    }
-    const std::size_t drawnIconCount =
-      aux.mGroundIcons.size() + aux.mAirIcons.size() + aux.mHighPriorityIcons.size() + aux.mSelectedIcons.size();
-    if (drawnOnGpu) {
-      // Drawn: nothing left for the batcher.
-    } else if (!UseParallelIcons(drawnIconCount)) {
-      for (UnitIconData& groundIcon : aux.mGroundIcons) {
-        RenderUnitIcon(groundIcon, aux);
-      }
-      for (UnitIconData& airIcon : aux.mAirIcons) {
-        RenderUnitIcon(airIcon, aux);
-      }
-      for (UnitIconData& highPriorityIcon : aux.mHighPriorityIcons) {
-        RenderUnitIcon(highPriorityIcon, aux);
-      }
-      for (UnitIconData& selectedIcon : aux.mSelectedIcons) {
-        RenderUnitIcon(selectedIcon, aux);
-      }
-    } else {
-      // Engine addition (`ui_ParallelIcons`): place every icon of the four runs on workers, then
-      // draw them on this thread in the serial order (ground, air, high priority, selected).
-      const UnitIconData* const runStarts[4] = {
-        aux.mGroundIcons.data(), aux.mAirIcons.data(), aux.mHighPriorityIcons.data(), aux.mSelectedIcons.data()
-      };
-      const std::size_t runEnds[4] = {
-        aux.mGroundIcons.size(),
-        aux.mGroundIcons.size() + aux.mAirIcons.size(),
-        aux.mGroundIcons.size() + aux.mAirIcons.size() + aux.mHighPriorityIcons.size(),
-        drawnIconCount
-      };
-      const auto iconAt = [&](const std::size_t index) -> const UnitIconData& {
-        std::size_t run = 0;
-        while (index >= runEnds[run]) {
-          ++run;
+      const std::size_t drawnIconCount =
+        aux.mGroundIcons.size() + aux.mAirIcons.size() + aux.mHighPriorityIcons.size() + aux.mSelectedIcons.size();
+      if (drawnOnGpu) {
+        // Drawn: nothing left for the batcher.
+      } else if (!UseParallelIcons(drawnIconCount)) {
+        for (UnitIconData& groundIcon : aux.mGroundIcons) {
+          RenderUnitIcon(groundIcon, aux);
         }
-        return runStarts[run][index - (run == 0 ? 0 : runEnds[run - 1])];
-      };
+        for (UnitIconData& airIcon : aux.mAirIcons) {
+          RenderUnitIcon(airIcon, aux);
+        }
+        for (UnitIconData& highPriorityIcon : aux.mHighPriorityIcons) {
+          RenderUnitIcon(highPriorityIcon, aux);
+        }
+        for (UnitIconData& selectedIcon : aux.mSelectedIcons) {
+          RenderUnitIcon(selectedIcon, aux);
+        }
+      } else {
+        // Engine addition (`ui_ParallelIcons`): place every icon of the four runs on workers, then
+        // draw them on this thread in the serial order (ground, air, high priority, selected).
+        const UnitIconData* const runStarts[4] = {
+          aux.mGroundIcons.data(), aux.mAirIcons.data(), aux.mHighPriorityIcons.data(), aux.mSelectedIcons.data()
+        };
+        const std::size_t runEnds[4] = {
+          aux.mGroundIcons.size(),
+          aux.mGroundIcons.size() + aux.mAirIcons.size(),
+          aux.mGroundIcons.size() + aux.mAirIcons.size() + aux.mHighPriorityIcons.size(),
+          drawnIconCount
+        };
+        const auto iconAt = [&](const std::size_t index) -> const UnitIconData& {
+          std::size_t run = 0;
+          while (index >= runEnds[run]) {
+            ++run;
+          }
+          return runStarts[run][index - (run == 0 ? 0 : runEnds[run - 1])];
+        };
 
-      static std::vector<UnitIconPlacement> sPlacements;
-      sPlacements.resize(drawnIconCount);
-      CUserWorkerPool::Get().ParallelFor(drawnIconCount, kParallelIconChunk, [&](const std::size_t begin, const std::size_t end) {
-        for (std::size_t i = begin; i < end; ++i) {
-          sPlacements[i] = PlaceUnitIcon(iconAt(i), aux);
+        static std::vector<UnitIconPlacement> sPlacements;
+        sPlacements.resize(drawnIconCount);
+        CUserWorkerPool::Get().ParallelFor(drawnIconCount, kParallelIconChunk, [&](const std::size_t begin, const std::size_t end) {
+          for (std::size_t i = begin; i < end; ++i) {
+            sPlacements[i] = PlaceUnitIcon(iconAt(i), aux);
+          }
+        });
+        static std::vector<CD3DPrimBatcher::ScreenQuad> sPendingQuads;
+        StrategicIconBulkEmitter emit(*aux.mBatcher, sPendingQuads);
+        for (std::size_t i = 0; i < drawnIconCount; ++i) {
+          EmitUnitIconQuads(iconAt(i), sPlacements[i], emit);
         }
-      });
-      static std::vector<CD3DPrimBatcher::ScreenQuad> sPendingQuads;
-      StrategicIconBulkEmitter emit(*aux.mBatcher, sPendingQuads);
-      for (std::size_t i = 0; i < drawnIconCount; ++i) {
-        EmitUnitIconQuads(iconAt(i), sPlacements[i], emit);
       }
+
     }
 
     primBatcher->Flush();
