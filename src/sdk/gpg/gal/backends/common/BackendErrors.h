@@ -21,6 +21,17 @@ namespace gpg::gal::backend
    */
   [[nodiscard]] bool SetupFailureRequested(const char* name);
 
+  /**
+   * The viewport origin shift that gives Direct3D 9's rasterization rules:
+   * D3D9 puts pixel centres on integer coordinates, Direct3D 10+ and Vulkan
+   * on halves. The engine draws for D3D9 - its UI projection
+   * (CD3DPrimBatcher::SetToViewport) and full-screen passes carry D3D9's
+   * half-pixel offset - so without the shift every UI quad lands half a texel
+   * off and linear filtering pulls in the neighbouring font glyph. 0.5, or 0
+   * with the diagnostic FAF_GAL_D3D10_PIXEL_CENTRES=1.
+   */
+  [[nodiscard]] float Direct3D9PixelCentreShift() noexcept;
+
   /** `ThrowHresult` when `result` failed. */
   inline void CheckHresult(const char* const file, const int line, const HRESULT result)
   {

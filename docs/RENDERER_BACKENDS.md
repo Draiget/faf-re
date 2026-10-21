@@ -141,6 +141,13 @@ newer backends:
   `DestBlendAlpha = ZERO` on every state, which overwrites the frame's alpha,
   and that alpha is the glow mask: the commander's warp-in light then lit its
   whole quad as a hard-edged rectangle.
+- Pixel centres. Direct3D 9 puts them on integer coordinates, Direct3D 10+
+  and Vulkan on halves, and the engine draws for D3D9: the UI projection
+  (`CD3DPrimBatcher::SetToViewport`) shifts quads by -0.5 pixel for texel
+  alignment. Every backend therefore moves the native viewport origin by
+  +0.5 pixel (`Direct3D9PixelCentreShift`); without it UI text sampled between
+  texels and looked doubled. The fixed-function emulation's
+  `faf_ViewportSize` takes the same shift.
 - The alpha test. Effects still set `AlphaTestEnable`, `AlphaFunc` and
   `AlphaRef` in their passes, inside `#ifndef DIRECT3D10`, and FAF's water
   shader relies on it (`HighFidelityPS` returns the land mask in alpha, and
@@ -228,7 +235,7 @@ Both are optional; without them the game falls back to Direct3D 9.
 | `FAF_GAL_SOLID_PS=1` | Direct3D 12: every pass in magenta (geometry check) |
 | `FAF_GAL_CLEAR_TEST=1` | Direct3D 12: clears in green (present-path check) |
 | `FAF_GAL_NAN_CHECK=1` | Direct3D 12, Vulkan: NaN or infinite pixel colours draw in magenta |
-| `FAF_GAL_D3D10_ALPHA_BLEND=1`, `FAF_GAL_D3D10_MATH=1`, `FAF_GAL_D3D10_DEPTH_CLIP=1` | Direct3D 12, Vulkan: keep the D3D10 packs' alpha blend, shader model 6 math, or depth-clip setting instead of the D3D9 behaviour |
+| `FAF_GAL_D3D10_ALPHA_BLEND=1`, `FAF_GAL_D3D10_MATH=1`, `FAF_GAL_D3D10_DEPTH_CLIP=1`, `FAF_GAL_D3D10_PIXEL_CENTRES=1` | Direct3D 12, Vulkan: keep the D3D10 packs' alpha blend, shader model 6 math, depth-clip setting or pixel centres instead of the D3D9 behaviour |
 | `FAF_EFFECT_DUMP_DIR` | Writes each effect's original source, translated source and generated HLSL (local files only) |
 | `FAF_SHADER_PRECOMPILE=1` | Compiles every entry point when an effect loads |
 | `FAF_DRAW_STATS_LOG=N` | Logs the average frame time over N frames |

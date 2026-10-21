@@ -707,6 +707,15 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       const std::string& head = item.head;
       const std::string original(source.substr(item.begin, item.end - item.begin));
 
+      if (item.directive) {
+        // A preprocessor line stays a line of its own.
+        body += original;
+        if (original.empty() || original.back() != '\n') {
+          body += '\n';
+        }
+        continue;
+      }
+
       if (StartsWithWord(head, "technique") || StartsWithWord(head, "technique10") || StartsWithWord(head, "technique11") ||
           StartsWithWord(head, "BlendState") || StartsWithWord(head, "DepthStencilState") || StartsWithWord(head, "RasterizerState") ||
           StartsWithWord(head, "VertexShader") || StartsWithWord(head, "PixelShader") || StartsWithWord(head, "GeometryShader") ||

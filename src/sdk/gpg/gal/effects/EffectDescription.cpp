@@ -549,6 +549,9 @@ namespace gpg::gal::effects
 
     for (const Item& item : items) {
       const std::string& head = item.head;
+      if (item.directive) {
+        continue; // a preprocessor line (ModernHlsl keeps it)
+      }
       if (StartsWithWord(head, "struct")) {
         StructType structType;
         structType.name = Trim(head.substr(6U));

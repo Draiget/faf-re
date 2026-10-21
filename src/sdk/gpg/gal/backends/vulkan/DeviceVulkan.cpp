@@ -2194,6 +2194,7 @@ namespace gpg::gal
 
   void DeviceVulkan::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
   {
+    RecordStateChange();
     mBoundFormat = vertexFormat->formatCode_;
   }
 
@@ -2201,6 +2202,7 @@ namespace gpg::gal
     const std::uint32_t streamSlot, const boost::shared_ptr<VertexBuffer> vertexBuffer, const int streamFrequencyToken, const int startVertex
   )
   {
+    RecordStateChange();
     if (streamSlot >= std::size(mStreams)) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid vertex stream");
     }
@@ -2213,6 +2215,7 @@ namespace gpg::gal
 
   void DeviceVulkan::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
   {
+    RecordStateChange();
     mIndexBuffer = indexBuffer;
   }
 
@@ -2343,6 +2346,7 @@ namespace gpg::gal
 
   void DeviceVulkan::BindPass(effects::EffectProgram& program, const std::uint32_t technique, const std::uint32_t pass)
   {
+    RecordStateChange();
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     const effects::Pass& passDesc = program.Description().techniques[technique].passes[pass];
     if (passDesc.blend.has_value()) {
@@ -2380,8 +2384,11 @@ namespace gpg::gal
     ProgramState& state = StateFor(program);
     effects::ParameterStore& parameters = program.Parameters();
     if (state.viewportParameter >= 0) {
+      // The fixed-function vertex emulation adds the D3D10 half pixel itself,
+      // so the origin takes the viewport's shift too.
+      const float shift = backend::Direct3D9PixelCentreShift();
       const float size[4] = {
-        static_cast<float>(mViewport.X), static_cast<float>(mViewport.Y),
+        static_cast<float>(mViewport.X) + shift, static_cast<float>(mViewport.Y) + shift,
         (mViewport.Width != 0U) ? 1.0f / static_cast<float>(mViewport.Width) : 0.0f,
         (mViewport.Height != 0U) ? 1.0f / static_cast<float>(mViewport.Height) : 0.0f,
       };
@@ -2855,6 +2862,9 @@ namespace gpg::gal
       viewport.width = static_cast<float>(mRenderingWidth);
       viewport.height = static_cast<float>(mRenderingHeight);
     }
+    // Shifted by half a pixel: Direct3D 9's pixel centres (Direct3D9PixelCentreShift).
+    viewport.x += backend::Direct3D9PixelCentreShift();
+    viewport.y += backend::Direct3D9PixelCentreShift();
     Vk().vkCmdSetViewport(mCommands, 0U, 1U, &viewport);
     const std::int32_t right = std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.X + mViewport.Width), static_cast<std::int32_t>(mRenderingWidth));
     const std::int32_t bottom =
