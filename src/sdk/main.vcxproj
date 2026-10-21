@@ -492,6 +492,35 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\gal\backends\d3d11\EffectSourceD3D11.cpp" />
     <ClCompile Include="gpg\gal\backends\common\BackendErrors.cpp" />
     <ClCompile Include="gpg\gal\backends\dxgi\DxgiFormats.cpp" />
+    <ClCompile Include="gpg\gal\effects\EffectText.cpp" />
+    <ClCompile Include="gpg\gal\effects\EffectDescription.cpp" />
+    <ClCompile Include="gpg\gal\effects\ModernHlsl.cpp" />
+    <ClCompile Include="gpg\gal\effects\ShaderCompiler.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\dxc\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\effects\EffectParameters.cpp" />
+    <ClCompile Include="gpg\gal\effects\EffectRuntime.cpp" />
+    <ClCompile Include="gpg\gal\backends\common\ImageCodec.cpp" />
+    <ClCompile Include="gpg\gal\backends\common\WindowsCursor.cpp" />
+    <ClCompile Include="gpg\gal\backends\d3d12\D3D12Core.cpp" />
+    <ClCompile Include="gpg\gal\backends\d3d12\ResourcesD3D12.cpp" />
+    <ClCompile Include="gpg\gal\backends\d3d12\DeviceD3D12.cpp" />
+    <ClCompile Include="gpg\gal\effects\SpirvReflect.cpp" />
+    <ClCompile Include="gpg\gal\backends\vulkan\VulkanLoader.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\vulkan\VulkanSurface.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\vulkan\VulkanCore.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\vulkan\ResourcesVulkan.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\vulkan\DeviceVulkan.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="gpg\gal\backends\dxgi\DxgiFactory.cpp" />
     <ClCompile Include="gpg\gal\backends\dxgi\DxgiSwapChain.cpp" />
     <ClCompile Include="$(FafRepoRoot)dependencies\FX11\d3dxGlobal.cpp">
@@ -1510,7 +1539,9 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="gpg\gal\ContextInterfaces.cpp" />
-    <ClCompile Include="gpg\gal\Device.cpp" />
+    <ClCompile Include="gpg\gal\Device.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\vulkan\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="gpg\gal\Effect.cpp" />
     <ClCompile Include="gpg\gal\GalInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Matrix.cpp" />
@@ -1610,6 +1641,23 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\backends\d3d11\BufferD3D11.h" />
     <ClInclude Include="gpg\gal\backends\common\BackendErrors.h" />
     <ClInclude Include="gpg\gal\backends\dxgi\DxgiFormats.h" />
+    <ClInclude Include="gpg\gal\effects\EffectText.h" />
+    <ClInclude Include="gpg\gal\effects\EffectDescription.h" />
+    <ClInclude Include="gpg\gal\effects\ModernHlsl.h" />
+    <ClInclude Include="gpg\gal\effects\ShaderCompiler.h" />
+    <ClInclude Include="gpg\gal\effects\EffectParameters.h" />
+    <ClInclude Include="gpg\gal\effects\EffectRuntime.h" />
+    <ClInclude Include="gpg\gal\backends\common\ImageCodec.h" />
+    <ClInclude Include="gpg\gal\backends\common\WindowsCursor.h" />
+    <ClInclude Include="gpg\gal\backends\d3d12\D3D12Core.h" />
+    <ClInclude Include="gpg\gal\backends\d3d12\ResourcesD3D12.h" />
+    <ClInclude Include="gpg\gal\backends\d3d12\DeviceD3D12.h" />
+    <ClInclude Include="gpg\gal\effects\SpirvReflect.h" />
+    <ClInclude Include="gpg\gal\backends\vulkan\VulkanLoader.h" />
+    <ClInclude Include="gpg\gal\backends\vulkan\VulkanSurface.h" />
+    <ClInclude Include="gpg\gal\backends\vulkan\VulkanCore.h" />
+    <ClInclude Include="gpg\gal\backends\vulkan\ResourcesVulkan.h" />
+    <ClInclude Include="gpg\gal\backends\vulkan\DeviceVulkan.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\D3D11Common.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\D3D11VertexLayouts.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\DeviceD3D11.h" />

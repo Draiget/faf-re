@@ -1146,6 +1146,60 @@ void CScApp::Destroy()
   ::ClipCursor(nullptr);
 }
 
+namespace
+{
+  /**
+   * Engine addition: short name of a gal device API for the window title, or null for the
+   * original Direct3D 9 path (whose title stays the retail one).
+   */
+  [[nodiscard]] const char* DeviceApiTitleName(const gpg::gal::DeviceApi api) noexcept
+  {
+    switch (api) {
+      case gpg::gal::DeviceApi::Direct3D10:
+        return "D3D10";
+      case gpg::gal::DeviceApi::Direct3D11:
+        return "D3D11";
+      case gpg::gal::DeviceApi::Direct3D12:
+        return "D3D12";
+      case gpg::gal::DeviceApi::Vulkan:
+        return "Vulkan";
+      default:
+        return nullptr;
+    }
+  }
+
+  /**
+   * Engine addition: appends the renderer actually created (when it isn't Direct3D 9) and the
+   * `/title <label>` command-line label to the top-level window's title, e.g.
+   * "Forged Alliance [D3D11] replay-26935800", so side-by-side test windows can be told apart.
+   */
+  void ApplyWindowTitleDetails(const msvc8::string& baseTitle, const gpg::gal::DeviceContext& context)
+  {
+    msvc8::vector<msvc8::string> labelArgs;
+    const bool hasLabel = moho::CFG_GetArgOption("/title", 1, &labelArgs) && !labelArgs.empty();
+    const char* const apiName = DeviceApiTitleName(context.mDeviceType);
+    if ((!hasLabel && apiName == nullptr) || moho::sMainWindow == nullptr) {
+      return;
+    }
+
+    std::string title = baseTitle.c_str();
+    if (apiName != nullptr) {
+      title += " [";
+      title += apiName;
+      title += "]";
+    }
+    if (hasLabel) {
+      title += " ";
+      title += labelArgs[0].c_str();
+    }
+
+    const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+    if (const HWND topLevel = windowHandle != nullptr ? ::GetAncestor(windowHandle, GA_ROOT) : nullptr) {
+      ::SetWindowTextA(topLevel, title.c_str());
+    }
+  }
+} // namespace
+
 /**
  * Address: 0x008D0370 (FUN_008D0370)
  * Mangled: ?CreateDevice@CScApp@@AAE_NXZ
@@ -1172,13 +1226,17 @@ bool CScApp::CreateDevice()
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
 
   const bool useD3D10 = moho::CFG_GetArgOption("/D3D10", 0, nullptr);
-  // FAF addition: /d3d11 selects the Direct3D 11 backend. It has no hardware
-  // cursor either, so it takes the Windows cursor as /D3D10 does.
+  // FAF addition: /d3d11, /d3d12 and /vulkan select the newer backends.
+  // None has a hardware cursor, so they take the Windows cursor as /D3D10 does.
   const bool useD3D11 = !useD3D10 && moho::CFG_GetArgOption("/d3d11", 0, nullptr);
-  moho::d3d_WindowsCursor = useD3D10 || useD3D11;
+  const bool useD3D12 = !useD3D10 && !useD3D11 && moho::CFG_GetArgOption("/d3d12", 0, nullptr);
+  const bool useVulkan = !useD3D10 && !useD3D11 && !useD3D12 && moho::CFG_GetArgOption("/vulkan", 0, nullptr);
+  moho::d3d_WindowsCursor = useD3D10 || useD3D11 || useD3D12 || useVulkan;
 
   const gpg::gal::DeviceApi requestedApi = useD3D10 ? gpg::gal::DeviceApi::Direct3D10
     : useD3D11                                      ? gpg::gal::DeviceApi::Direct3D11
+    : useD3D12                                      ? gpg::gal::DeviceApi::Direct3D12
+    : useVulkan                                     ? gpg::gal::DeviceApi::Vulkan
                                                     : gpg::gal::DeviceApi::Direct3D9;
   gpg::gal::DeviceContext context(requestedApi);
   context.mVSync = moho::OPTIONS_GetInt("vsync") == 1;
@@ -1307,13 +1365,16 @@ bool CScApp::CreateDevice()
     ApplyPackedAntiAliasing(context.GetHead(1), packedAntiAliasing);
   }
 
-  // FAF addition: a Direct3D 11 device that cannot be created falls back to
-  // Direct3D 9 with the same window settings before the binary's own
-  // default-window fallback below.
+  // FAF addition: a Direct3D 11, Direct3D 12 or Vulkan device that cannot be
+  // created falls back to Direct3D 9 with the same window settings before
+  // the binary's own default-window fallback below.
   const gpg::gal::DeviceContext requestedContext = context;
   bool created = CreateAppFrame(title, maximized, position, context);
-  if (!created && requestedApi == gpg::gal::DeviceApi::Direct3D11) {
-    gpg::Warnf("Direct3D 11 is unavailable; falling back to Direct3D 9");
+  if (!created && (useD3D11 || useD3D12 || useVulkan)) {
+    gpg::Warnf(
+      "%s is unavailable; falling back to Direct3D 9",
+      useD3D11 ? "Direct3D 11" : useD3D12 ? "Direct3D 12" : "Vulkan"
+    );
     context = requestedContext;
     context.mDeviceType = gpg::gal::DeviceApi::Direct3D9;
     moho::d3d_WindowsCursor = false;
@@ -1340,7 +1401,9 @@ bool CScApp::CreateDevice()
   moho::SetupBasicMovieManager();
 
   gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  (void)device->GetDeviceContext();
+  if (const gpg::gal::DeviceContext* const createdContext = device->GetDeviceContext()) {
+    ApplyWindowTitleDetails(title, *createdContext);
+  }
   return true;
 }
 

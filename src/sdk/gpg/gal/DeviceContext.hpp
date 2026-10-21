@@ -25,6 +25,10 @@ namespace gpg::gal
         // FAF addition, not in the shipped binary: the Direct3D 11 backend
         // (`DeviceD3D11`, selected with /d3d11).
         Direct3D11 = 3,
+        // FAF additions: the Direct3D 12 (`DeviceD3D12`, /d3d12) and Vulkan
+        // (`DeviceVulkan`, /vulkan) backends.
+        Direct3D12 = 4,
+        Vulkan = 5,
     };
 
     /**
@@ -33,11 +37,13 @@ namespace gpg::gal
      * True for the APIs whose effects are written in the D3D10 dialect -
      * d3d10states.compat, `technique10`, shader model 4 - and whose mesh
      * formatters are the D3D10 ones. Direct3D 11 runs the D3D10 effect path
-     * unchanged, so every engine branch on "is this D3D10" asks this instead.
+     * unchanged, and Direct3D 12 and Vulkan run it through the FAF effect
+     * layer, so every engine branch on "is this D3D10" asks this instead.
      */
     [[nodiscard]] constexpr bool UsesD3D10EffectDialect(const DeviceApi api) noexcept
     {
-        return api == DeviceApi::Direct3D10 || api == DeviceApi::Direct3D11;
+        return api == DeviceApi::Direct3D10 || api == DeviceApi::Direct3D11 || api == DeviceApi::Direct3D12 ||
+            api == DeviceApi::Vulkan;
     }
 
     /**

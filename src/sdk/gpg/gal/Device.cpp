@@ -3,6 +3,8 @@
 #include "Error.hpp"
 // d3d11.h pulls in d3d10_1.h, which refuses to follow d3d10.h: D3D11 first.
 #include "gpg/gal/backends/d3d11/DeviceD3D11.h"
+#include "gpg/gal/backends/d3d12/DeviceD3D12.h"
+#include "gpg/gal/backends/vulkan/DeviceVulkan.h"
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "legacy/containers/AutoPtr.h"
@@ -203,6 +205,38 @@ namespace gpg::gal
             }
             break;
         }
+        case DeviceApi::Vulkan:
+        {
+            // FAF addition, not in the shipped binary: as Direct3D 11 above.
+            DeviceVulkan* const device = new DeviceVulkan();
+            sDeviceD3D.reset(device);
+            try
+            {
+                device->Setup(context);
+            }
+            catch (...)
+            {
+                DestroyInstance();
+                throw;
+            }
+            break;
+        }
+        case DeviceApi::Direct3D12:
+        {
+            // FAF addition, not in the shipped binary: as Direct3D 11 above.
+            DeviceD3D12* const device = new DeviceD3D12();
+            sDeviceD3D.reset(device);
+            try
+            {
+                device->Setup(context);
+            }
+            catch (...)
+            {
+                DestroyInstance();
+                throw;
+            }
+            break;
+        }
         default:
             ThrowDeviceContextError(135, "unknown API requested");
         }
@@ -232,6 +266,10 @@ namespace gpg::gal
             return static_cast<DeviceD3D10*>(device)->SupportsVertexTextureFormat(textureFormat);
         case DeviceApi::Direct3D11:
             return static_cast<DeviceD3D11*>(device)->SupportsVertexTextureFormat(textureFormat);
+        case DeviceApi::Direct3D12:
+            return static_cast<DeviceD3D12*>(device)->SupportsVertexTextureFormat(textureFormat);
+        case DeviceApi::Vulkan:
+            return static_cast<DeviceVulkan*>(device)->SupportsVertexTextureFormat(textureFormat);
         default:
             return false;
         }
