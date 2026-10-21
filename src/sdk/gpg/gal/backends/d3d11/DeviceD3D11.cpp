@@ -139,6 +139,8 @@ namespace gpg::gal
     constexpr const char* kEffectProfile = "fx_5_0";
     // Bump when EffectSourceD3D11's output changes, to retire cached blobs.
     constexpr const char* kTranslatorVersion = "translator 7";
+    // Added to every viewport origin: D3D9 pixel centres in D3D11 (see SetViewport).
+    constexpr float kD3D9PixelCentreOffset = 0.5f;
     constexpr UINT kEffectCompileFlags = D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     constexpr UINT kHelperCompileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 
@@ -1719,9 +1721,16 @@ namespace gpg::gal
     if (mTracing) {
       Trace("SetViewport %lu,%lu %lux%lu z %f..%f", viewport->X, viewport->Y, viewport->Width, viewport->Height, viewport->MinZ, viewport->MaxZ);
     }
+    // D3D9 puts pixel centres on integer coordinates, D3D10 and later on
+    // halves. The engine's 2D paths are written for D3D9: the UI projection
+    // (CD3DPrimBatcher) shifts everything by -0.5 pixel so that texels land on
+    // pixel centres. Moving the whole viewport by +0.5 pixel restores D3D9's
+    // rasterisation for every draw; without it every glyph and UI texel is
+    // sampled half-way between texels (dim, doubled text, neighbouring glyphs
+    // bleeding in).
     D3D11_VIEWPORT native{};
-    native.TopLeftX = static_cast<float>(viewport->X);
-    native.TopLeftY = static_cast<float>(viewport->Y);
+    native.TopLeftX = static_cast<float>(viewport->X) + kD3D9PixelCentreOffset;
+    native.TopLeftY = static_cast<float>(viewport->Y) + kD3D9PixelCentreOffset;
     native.Width = static_cast<float>(viewport->Width);
     native.Height = static_cast<float>(viewport->Height);
     native.MinDepth = viewport->MinZ;
@@ -1734,8 +1743,8 @@ namespace gpg::gal
     UINT count = 1U;
     D3D11_VIEWPORT native{};
     mImmediate->RSGetViewports(&count, &native);
-    outViewport->X = static_cast<DWORD>(native.TopLeftX);
-    outViewport->Y = static_cast<DWORD>(native.TopLeftY);
+    outViewport->X = static_cast<DWORD>(native.TopLeftX - kD3D9PixelCentreOffset);
+    outViewport->Y = static_cast<DWORD>(native.TopLeftY - kD3D9PixelCentreOffset);
     outViewport->Width = static_cast<DWORD>(native.Width);
     outViewport->Height = static_cast<DWORD>(native.Height);
     outViewport->MinZ = native.MinDepth;
@@ -1847,7 +1856,8 @@ namespace gpg::gal
       width = context->width_;
       height = context->height_;
     }
-    return viewport.TopLeftX <= 0.0f && viewport.TopLeftY <= 0.0f && viewport.Width >= static_cast<float>(width) &&
+    return viewport.TopLeftX <= kD3D9PixelCentreOffset && viewport.TopLeftY <= kD3D9PixelCentreOffset &&
+      viewport.Width >= static_cast<float>(width) &&
       viewport.Height >= static_cast<float>(height);
   }
 
