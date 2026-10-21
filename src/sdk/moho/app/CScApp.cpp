@@ -37,6 +37,7 @@
 #include "moho/net/Common.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/app/WinApp.h"
+#include "moho/core/ThreadPlacement.h"
 #include "moho/math/MathReflection.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -376,6 +377,10 @@ namespace
       }
       args.clear();
     }
+
+    // Engine addition: `sys_ThreadPlacement` (`/threadplacement N`) for the main thread; the sim,
+    // issue and worker threads place themselves as they start.
+    moho::PlaceCurrentThread(moho::EThreadRole::Main);
 
     if (moho::CFG_GetArgOption("/scenario", 1, &args) || moho::CFG_GetArgOption("/map", 1, &args)) {
       if (!args.empty()) {

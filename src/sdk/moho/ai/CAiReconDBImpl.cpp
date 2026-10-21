@@ -1024,20 +1024,7 @@ namespace
     return target.get() == source.get() && !(target < source) && !(source < target);
   }
 
-  /// The three handle assignments of RefreshBlip's LOS branch, in its order.
-  void AssignBlipHandles(SPerArmyReconInfo& perArmy, const Unit& sourceUnit)
-  {
-    perArmy.mMesh = sourceUnit.mVarDat.mScmResource;
-    if (const CAniActor* const actor = sourceUnit.AniActor; actor != nullptr) {
-      perArmy.mPriorPose = actor->mPriorPose;
-      perArmy.mPose = actor->mPose;
-    } else {
-      perArmy.mPriorPose.reset();
-      perArmy.mPose.reset();
-    }
-  }
-
-  /// True when AssignBlipHandles would change any of the three handles.
+  /// True when RefreshBlip's LOS branch would change any of the three handles.
   [[nodiscard]] bool BlipHandlesDiffer(const SPerArmyReconInfo& perArmy, const Unit& sourceUnit) noexcept
   {
     if (!SameHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource)) {
@@ -1049,6 +1036,50 @@ namespace
     // `reset()` changes a handle only when it is not already empty.
     const boost::shared_ptr<CAniPose> empty;
     return !SameHandle(perArmy.mPriorPose, empty) || !SameHandle(perArmy.mPose, empty);
+  }
+
+  /// `target = source`, with the displaced handle moved into `released` (empty on entry) rather
+  /// than released, unless `sourceKeepsOld`: then the source unit still owns it, so releasing it
+  /// here cannot free it.
+  template <class T>
+  void ExchangeHandle(
+    boost::shared_ptr<T>& target,
+    const boost::shared_ptr<T>& source,
+    boost::shared_ptr<T>& released,
+    const bool sourceKeepsOld
+  )
+  {
+    if (SameHandle(target, source)) {
+      return;
+    }
+    released.swap(target);
+    target = source;
+    if (sourceKeepsOld) {
+      released.reset();
+    }
+  }
+
+  /// The three handle assignments of RefreshBlip's LOS branch, in its order, keeping every
+  /// displaced handle the source unit does not hold.
+  void ExchangeBlipHandles(
+    SPerArmyReconInfo& perArmy,
+    const Unit& sourceUnit,
+    CAiReconDBImpl::SRefreshFixups::SReleasedHandles& released
+  )
+  {
+    // A replaced mesh is never the one the source holds (that one is the replacement).
+    ExchangeHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource, released.mMesh, false);
+
+    const boost::shared_ptr<CAniPose> noPose;
+    const CAniActor* const actor = sourceUnit.AniActor;
+    const boost::shared_ptr<CAniPose>& priorPose = actor != nullptr ? actor->mPriorPose : noPose;
+    const boost::shared_ptr<CAniPose>& pose = actor != nullptr ? actor->mPose : noPose;
+    const auto sourceHolds = [&](const boost::shared_ptr<CAniPose>& handle) {
+      return actor != nullptr && handle.get() != nullptr &&
+             (SameHandle(handle, priorPose) || SameHandle(handle, pose));
+    };
+    ExchangeHandle(perArmy.mPriorPose, priorPose, released.mPriorPose, sourceHolds(perArmy.mPriorPose));
+    ExchangeHandle(perArmy.mPose, pose, released.mPose, sourceHolds(perArmy.mPose));
   }
 } // namespace
 
@@ -1082,7 +1113,7 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
       perArmy->mMeshTypeClassId = sourceUnit->mVarDat.mMeshBlueprint;
       if (BlipHandlesDiffer(*perArmy, *sourceUnit)) {
         if (fixups.mCount < SRefreshFixups::kCapacity) {
-          fixups.mBlips[fixups.mCount++] = blip;
+          ExchangeBlipHandles(*perArmy, *sourceUnit, fixups.mReleased[fixups.mCount++]);
         } else {
           fixups.mOverflow = true;
         }
@@ -1098,24 +1129,24 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
   }
 }
 
-void CAiReconDBImpl::ApplyRefreshFixups(const SRefreshFixups& fixups)
+void CAiReconDBImpl::ApplyRefreshFixups(SRefreshFixups& fixups)
 {
-  if (fixups.mOverflow) {
-    // Some deferred blips were not recorded. RefreshBlip is idempotent over unchanged sources,
-    // so the full serial pass finishes them, releasing handles in the same map order.
-    ReconRefresh();
-    return;
-  }
-  if (fixups.mCount == 0u) {
-    return;
-  }
-  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
+  // The releases RefreshBlip would have made, in its order: blip by blip in map order, and mesh,
+  // prior pose, pose within a blip.
   for (std::size_t i = 0; i < fixups.mCount; ++i) {
-    ReconBlip* const blip = fixups.mBlips[i];
-    Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
-    if (SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex); perArmy && sourceUnit) {
-      AssignBlipHandles(*perArmy, *sourceUnit);
-    }
+    SRefreshFixups::SReleasedHandles& released = fixups.mReleased[i];
+    released.mMesh.reset();
+    released.mPriorPose.reset();
+    released.mPose.reset();
+  }
+  fixups.mCount = 0u;
+
+  if (fixups.mOverflow) {
+    // The blips past the recorded ones (a map-order suffix) still need their handles. RefreshBlip
+    // is idempotent over unchanged sources, so the full serial pass finishes them, releasing
+    // handles in map order after the ones above.
+    fixups.mOverflow = false;
+    ReconRefresh();
   }
 }
 

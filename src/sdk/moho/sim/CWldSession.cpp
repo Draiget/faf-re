@@ -6192,6 +6192,44 @@ namespace moho
     // through `ResolveCommandIssueHelperCommandType` -- see the no-hover arm
     // of `func_GetRightMouseButtonAction`.
 
+    /// Engine addition: one entity category named once for a whole selection walk. `Contains`
+    /// answers exactly what `UserEntity::IsInCategory(name)` answers, but resolves the name only
+    /// when the entity's resolver differs from the last one, instead of building a string and
+    /// looking the name up for every selected unit.
+    class CNamedCategory
+    {
+    public:
+      explicit CNamedCategory(const char* const name) noexcept
+        : mName(name)
+      {}
+
+      [[nodiscard]] bool Contains(const UserEntity& entity) const
+      {
+        if (entity.mSession == nullptr || entity.mParams.mBlueprint == nullptr) {
+          return false;
+        }
+        const EntityCategoryLookupResolver* const resolver = entity.mSession->GetCategoryLookupResolver();
+        if (resolver == nullptr) {
+          return false;
+        }
+        if (resolver != mResolver) {
+          mResolver = resolver;
+          mCategory = resolver->GetEntityCategory(mName);
+        }
+        if (mCategory == nullptr) {
+          return false;
+        }
+        const std::uint32_t categoryBitIndex = entity.mParams.mBlueprint->mCategoryBitIndex;
+        const auto wordIt = mCategory->FindWord(categoryBitIndex >> 5u);
+        return wordIt != mCategory->WordEnd() && ((*wordIt >> (categoryBitIndex & 0x1Fu)) & 1u) != 0u;
+      }
+
+    private:
+      const char* mName;
+      mutable const EntityCategoryLookupResolver* mResolver = nullptr;
+      mutable const EntityCategorySet* mCategory = nullptr;
+    };
+
     /**
      * Address: 0x0081D080 (FUN_0081D080, sub_81D080)
      *
@@ -6262,6 +6300,29 @@ namespace moho
         return false;
       }
 
+      // The binary re-tests the hovered entity's categories for every selected unit; they
+      // cannot change during the walk, so they are tested once here (engine change: with
+      // thousands of units selected this ran every frame and dominated the frame).
+      //
+      // Group 1: CANTRANSPORTCOMMANDER(hover) or FERRYBEACON(hover) -> never a skip;
+      // otherwise skip iff the selected unit IS the commander, because a transport not
+      // flagged CANTRANSPORTCOMMANDER cannot carry it. The binary spells this as
+      //   if (IsInCategory(hover,"CANTRANSPORTCOMMANDER")) goto accept;
+      //   if (IsInCategory(hover,"FERRYBEACON")
+      //       || (skip = 1, !IsInCategory(selected,"COMMAND"))) { accept: skip = 0; }
+      // so `skip` survives as 1 only when the selected unit IS COMMAND.
+      const bool hoverTakesCommander = hoverEntity->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER")) ||
+                                       hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
+      // Group 2: does the hovered entity want air transport?
+      const bool wantsAir = hoverEntity->IsInCategory(msvc8::string("TRANSPORTATION")) ||
+                            hoverEntity->IsInCategory(msvc8::string("TELEPORTATION")) ||
+                            hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
+      if (!wantsAir && !hoverEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))) {
+        return false; // no selected unit can be accepted
+      }
+      const CNamedCategory command{"COMMAND"};
+      const CNamedCategory cannotUseAirStaging{"CANNOTUSEAIRSTAGING"};
+
       for (UserEntity* const selectedEntity : *selection) {
         UserUnit* const transporter = selectedEntity ? selectedEntity->IsUserUnit() : nullptr;
         if (transporter != nullptr) {
@@ -6270,56 +6331,27 @@ namespace moho
               && !transporter->IsBeingBuilt()                              // v6 vtable slot +0x34
               && !transporterBridge->DestroyQueued())                      // slot +0x2C
           {
-            // Group 1: decide whether to skip this selected unit.
-            // CANTRANSPORTCOMMANDER(hover) or FERRYBEACON(hover) -> never a
-            // skip; otherwise skip iff the selected unit IS the commander,
-            // because a transport not flagged CANTRANSPORTCOMMANDER cannot
-            // carry it.
-            //
-            // The binary spells this as
-            //   if (IsInCategory(hover,"CANTRANSPORTCOMMANDER")) goto accept;
-            //   if (IsInCategory(hover,"FERRYBEACON")
-            //       || (skip = 1, !IsInCategory(selected,"COMMAND"))) { accept: skip = 0; }
-            // so `skip` survives as 1 only when the selected unit IS COMMAND.
-            bool skip;
-            if (hoverEntity->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER"))) {
-              skip = false;
-            } else if (hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"))) {
-              skip = false;
-            } else {
-              skip = reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("COMMAND"));
+            if (!hoverTakesCommander && command.Contains(*transporter)) {
+              continue;
             }
 
-            if (!skip) {
-              // Group 2: does the hovered entity want air transport?
-              bool wantsAir;
-              if (hoverEntity->IsInCategory(msvc8::string("TRANSPORTATION"))) {
-                wantsAir = true;
-              } else if (hoverEntity->IsInCategory(msvc8::string("TELEPORTATION"))) {
-                wantsAir = true;
-              } else {
-                wantsAir = hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
+            if (wantsAir) {
+              // Non-flying transporter for an air-transport request -> accept.
+              // GetBlueprint() on the transporter IUnit subobject (slot +0x1C),
+              // then Air.CanFly (blueprint + 0x368).
+              if (transporterBridge->GetBlueprint()->Air.CanFly == 0u) {
+                return true;
               }
-
-              if (wantsAir) {
-                // Non-flying transporter for an air-transport request -> accept.
-                // GetBlueprint() on the transporter IUnit subobject (slot +0x1C),
-                // then Air.CanFly (blueprint + 0x368).
-                if (transporterBridge->GetBlueprint()->Air.CanFly == 0u) {
-                  return true;
-                }
-              } else if (hoverEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))) {
-                // An air staging platform docks aircraft, so accept only a
-                // selected unit that can fly and is not CANNOTUSEAIRSTAGING.
-                //
-                // Same short-circuit shape as group 1: the binary's
-                //   if (!CanFly || (ok = 1, IsInCategory(sel,"CANNOTUSEAIRSTAGING"))) ok = 0;
-                //   if (ok) return 1;
-                // leaves `ok` set only on the can-fly / not-excluded path.
-                if (transporterBridge->GetBlueprint()->Air.CanFly != 0u
-                    && !reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("CANNOTUSEAIRSTAGING"))) {
-                  return true;
-                }
+            } else {
+              // The hovered entity is an AIRSTAGINGPLATFORM: it docks aircraft, so accept
+              // only a selected unit that can fly and is not CANNOTUSEAIRSTAGING.
+              //
+              // Same short-circuit shape as group 1: the binary's
+              //   if (!CanFly || (ok = 1, IsInCategory(sel,"CANNOTUSEAIRSTAGING"))) ok = 0;
+              //   if (ok) return 1;
+              // leaves `ok` set only on the can-fly / not-excluded path.
+              if (transporterBridge->GetBlueprint()->Air.CanFly != 0u && !cannotUseAirStaging.Contains(*transporter)) {
+                return true;
               }
             }
           }
@@ -6361,53 +6393,45 @@ namespace moho
         return false;
       }
 
+      // As in SelectionHasTransportForTarget, the hovered unit's categories are tested once
+      // rather than once per selected unit (engine change, same answers).
+      //
+      // Group 1: TELEPORTATION(candidate) or EXPERIMENTAL(hover) skips the candidate, so an
+      // experimental hover skips them all.
+      if (reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("EXPERIMENTAL"))) {
+        return false;
+      }
+      const bool hoverIsCommander = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("COMMAND"));
+      const CNamedCategory teleportation{"TELEPORTATION"};
+      const CNamedCategory transportFocus{"TRANSPORTFOCUS"};
+      const CNamedCategory canTransportCommander{"CANTRANSPORTCOMMANDER"};
+      const CNamedCategory transportation{"TRANSPORTATION"};
+      const CNamedCategory ferryBeacon{"FERRYBEACON"};
+      const CNamedCategory airStagingPlatform{"AIRSTAGINGPLATFORM"};
+
       for (UserEntity* const candidate : *selection) {
-        if (candidate != nullptr) {
-          // Group 1: TELEPORTATION(candidate) or EXPERIMENTAL(hover).
-          bool teleOrExperimental;
-          if (candidate->IsInCategory(msvc8::string("TELEPORTATION"))) {
-            teleOrExperimental = true;
-          } else {
-            teleOrExperimental = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("EXPERIMENTAL"));
+        if (candidate == nullptr || teleportation.Contains(*candidate) ||
+            candidate->mVariableData.mLayerMask == static_cast<std::uint32_t>(LAYER_Seabed)) {
+          continue;
+        }
+        // Group 2: TRANSPORTFOCUS(candidate).
+        if (!transportFocus.Contains(*candidate)) {
+          continue;
+        }
+        // Group 3: CANTRANSPORTCOMMANDER(candidate) -> never a skip; otherwise skip iff the
+        // hovered unit IS the commander, which a transport without that flag cannot pick up.
+        if (hoverIsCommander && !canTransportCommander.Contains(*candidate)) {
+          continue;
+        }
+        // Group 4: TRANSPORTATION(candidate) or FERRYBEACON(candidate).
+        if (transportation.Contains(*candidate) || ferryBeacon.Contains(*candidate)) {
+          // Non-flying hover unit for an air-transport request -> accept.
+          if (hoverBridge->GetBlueprint()->Air.CanFly == 0u) {
+            return true;
           }
-
-          if (!teleOrExperimental
-              && candidate->mVariableData.mLayerMask != static_cast<std::uint32_t>(LAYER_Seabed)) {
-            // Group 2: TRANSPORTFOCUS(candidate).
-            if (candidate->IsInCategory(msvc8::string("TRANSPORTFOCUS"))) {
-              // Group 3: CANTRANSPORTCOMMANDER(candidate) -> never a skip;
-              // otherwise skip iff the hovered unit IS the commander, which a
-              // transport without that flag cannot pick up. Same
-              // `|| (skip = 1, !cond)` shape as the two groups above.
-              bool skip;
-              if (candidate->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER"))) {
-                skip = false;
-              } else {
-                skip = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("COMMAND"));
-              }
-
-              if (!skip) {
-                // Group 4: TRANSPORTATION(candidate) or FERRYBEACON(candidate).
-                bool wantsAir;
-                if (candidate->IsInCategory(msvc8::string("TRANSPORTATION"))) {
-                  wantsAir = true;
-                } else {
-                  wantsAir = candidate->IsInCategory(msvc8::string("FERRYBEACON"));
-                }
-
-                if (wantsAir) {
-                  // Non-flying hover unit for an air-transport request -> accept.
-                  if (hoverBridge->GetBlueprint()->Air.CanFly == 0u) {
-                    return true;
-                  }
-                } else if (candidate->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))
-                           && hoverBridge->GetBlueprint()->Air.CanFly != 0u) {
-                  // Air-staging platform docking a flying hover unit -> accept.
-                  return true;
-                }
-              }
-            }
-          }
+        } else if (airStagingPlatform.Contains(*candidate) && hoverBridge->GetBlueprint()->Air.CanFly != 0u) {
+          // Air-staging platform docking a flying hover unit -> accept.
+          return true;
         }
       }
 
@@ -8767,13 +8791,10 @@ namespace moho
   {
     outUnits.clear();
 
+    // The selection is a set, so every unit appears once: no duplicate check (with one, a
+    // selection of n units cost n^2/2 compares, per caller, per frame).
     for (UserEntity* const entity : mSelection) {
-      UserUnit* const userUnit = entity->IsUserUnit();
-      if (!userUnit) {
-        continue;
-      }
-
-      if (std::find(outUnits.begin(), outUnits.end(), userUnit) == outUnits.end()) {
+      if (UserUnit* const userUnit = entity->IsUserUnit(); userUnit != nullptr) {
         outUnits.push_back(userUnit);
       }
     }

@@ -486,6 +486,21 @@ namespace moho
     SSTIUnitVariableData& AssignFrom(const SSTIUnitVariableData& other);
 
     /**
+     * Engine addition, not in the binary: the members `AssignFrom` copies that may allocate (custom
+     * name, command and build-queue snapshots, weapon infos, restriction-category words), in
+     * `AssignFrom`'s order. Followed by `AssignInlineMembersFrom` it equals `AssignFrom`.
+     * `sim_ParallelSync` keeps this half on the sim thread, so the allocations stay serial.
+     */
+    void AssignHeapMembersFrom(const SSTIUnitVariableData& other);
+
+    /**
+     * Engine addition, not in the binary: every other member `AssignFrom` copies: plain fields and
+     * the two pose handles. No allocation; on a destination whose handles are empty it frees
+     * nothing either, so `sim_ParallelSync` runs it on CSimWorkerPool workers.
+     */
+    void AssignInlineMembersFrom(const SSTIUnitVariableData& other);
+
+    /**
      * Address: 0x0055E030 (FUN_0055E030, Moho::SSTIUnitVariableData::MemberDeserialize)
      *
      * What it does:

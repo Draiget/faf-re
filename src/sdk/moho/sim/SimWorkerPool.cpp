@@ -17,6 +17,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/console/CConCommand.h"
+#include "moho/core/ThreadPlacement.h"
 #include "moho/misc/StartupHelpers.h"
 
 namespace moho
@@ -72,6 +73,14 @@ namespace moho
     "sim_ParallelRecon",
     "Refresh each army's recon blips on sim workers (when sim_Workers > 0).",
     &sim_ParallelRecon
+  );
+
+  bool sim_ParallelSync = true;
+
+  TConVar<bool> gTConVar_sim_ParallelSync(
+    "sim_ParallelSync",
+    "Copy the sync packet's unit updates on sim workers (when sim_Workers > 0).",
+    &sim_ParallelSync
   );
 
   TConVar<int> gTConVar_sim_Workers(
@@ -162,6 +171,7 @@ namespace moho
       char name[32];
       std::snprintf(name, sizeof(name), "SimWorker %u", index);
       gpg::SetThreadName(0xFFFFFFFFu, name);
+      PlaceCurrentThread(EThreadRole::SimWorker, index);
 
       // `seenGeneration` is the generation current when this thread was started, so a pool that
       // was resized wakes it only for jobs dispatched after that.

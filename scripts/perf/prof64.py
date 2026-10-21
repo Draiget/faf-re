@@ -4,6 +4,9 @@ usage:
   python scripts/perf/prof64.py curve <prof_dir> [<prof_dir2>]
       sim and main thread CPU ms per sim tick for each window; with two directories, windows are
       matched by tick and the ratio is printed (B/A)
+  python scripts/perf/prof64.py frames <win.json...>
+      rendered frames per second, wall ms per frame and main-thread CPU ms per frame per window
+      (windows recorded by a sampler64.py that found MeshInstance::sFrameCounter)
   python scripts/perf/prof64.py top <thread> <win.json...> [-n N]
       flat (leaf) and inclusive profile of one thread
   python scripts/perf/prof64.py under <thread> <func> <win.json...> [-n N]
@@ -99,6 +102,18 @@ def main():
                 o["main"] / max(r["main"], 1e-9)))
         if tot[0]:
             print("overall sim B/A %.3f, main B/A %.3f" % (tot[1] / tot[0], tot[3] / max(tot[2], 1e-9)))
+        return
+
+    if cmd == "frames":
+        print("window  frames    fps  ms/frame  main cpu ms/frame")
+        for w in load(sys.argv[2:]):
+            frames, secs = w.get("frames"), float(w.get("window_s", 60.0))
+            if not frames:
+                print("%6s  (no frame count)" % w.get("window"))
+                continue
+            cpu = w["cpu_100ns"].get(thread_of(w, "main"), 0) / 1e4
+            print("%6s  %6d  %5.1f  %8.1f  %17.1f" % (w.get("window"), frames, frames / secs, 1000.0 * secs / frames,
+                                                       cpu / frames))
         return
 
     which = sys.argv[2]

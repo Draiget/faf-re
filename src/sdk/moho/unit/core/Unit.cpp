@@ -86,6 +86,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/UnitUpdateFill.h"
 #include "moho/ai/CAiTransportImpl.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/SPhysConstants.h"
@@ -12263,6 +12264,85 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
   return *this;
 }
 
+void SSTIUnitVariableData::AssignHeapMembersFrom(const SSTIUnitVariableData& other)
+{
+  mCustomName = other.mCustomName;
+  CopyUnitCommandSnapshotVector(mCommands, other.mCommands);
+  CopyUnitCommandSnapshotVector(mBuildQueue, other.mBuildQueue);
+  CopyFastVectorN(mWeaponInfo, other.mWeaponInfo);
+  EntityCategorySet& restriction = mAttributes.restrictionCategory;
+  const EntityCategorySet& sourceRestriction = other.mAttributes.restrictionCategory;
+  restriction.mUniverse = sourceRestriction.mUniverse;
+  restriction.mBits.mFirstWordIndex = sourceRestriction.mBits.mFirstWordIndex;
+  restriction.mBits.mWords = sourceRestriction.mBits.mWords;
+}
+
+void SSTIUnitVariableData::AssignInlineMembersFrom(const SSTIUnitVariableData& other)
+{
+  mCreator = other.mCreator;
+  mCreationTick = other.mCreationTick;
+  mAutoMode = other.mAutoMode;
+  mAutoSurfaceMode = other.mAutoSurfaceMode;
+  mIsBusy = other.mIsBusy;
+  mPad00B = other.mPad00B;
+  mFuelRatio = other.mFuelRatio;
+  mShieldRatio = other.mShieldRatio;
+  mStunTicks = other.mStunTicks;
+  mIsPaused = other.mIsPaused;
+  mIsValidTarget = other.mIsValidTarget;
+  mRepeatQueue = other.mRepeatQueue;
+  mPad01B = other.mPad01B;
+  mJobType = other.mJobType;
+  mFireState = other.mFireState;
+  mWorkProgress = other.mWorkProgress;
+  mTacticalSiloBuildCount = other.mTacticalSiloBuildCount;
+  mNukeSiloBuildCount = other.mNukeSiloBuildCount;
+  mTacticalSiloStorageCount = other.mTacticalSiloStorageCount;
+  mNukeSiloStorageCount = other.mNukeSiloStorageCount;
+  mTacticalSiloMaxStorageCount = other.mTacticalSiloMaxStorageCount;
+  mNukeSiloMaxStorageCount = other.mNukeSiloMaxStorageCount;
+  mSelectionInheritorId = other.mSelectionInheritorId;
+  mProduced = other.mProduced;
+  mResourcesSpent = other.mResourcesSpent;
+  mMaintainenceCost = other.mMaintainenceCost;
+  mFocusUnit = other.mFocusUnit;
+  mGuardedUnit = other.mGuardedUnit;
+  mTargetBlip = other.mTargetBlip;
+  mPriorSharedPose = other.mPriorSharedPose;
+  mSharedPose = other.mSharedPose;
+  std::copy_n(other.mPad094_097, std::size(other.mPad094_097), mPad094_097);
+
+  // CopyUnitAttributesSnapshot without the restriction category (AssignHeapMembersFrom's).
+  UnitAttributes& attributes = mAttributes;
+  const UnitAttributes& source = other.mAttributes;
+  attributes.blueprint = source.blueprint;
+  attributes.spawnElevationOffset = source.spawnElevationOffset;
+  attributes.moveSpeedMult = source.moveSpeedMult;
+  attributes.accelerationMult = source.accelerationMult;
+  attributes.turnMult = source.turnMult;
+  attributes.breakOffTriggerMult = source.breakOffTriggerMult;
+  attributes.breakOffDistanceMult = source.breakOffDistanceMult;
+  attributes.consumptionPerSecondEnergy = source.consumptionPerSecondEnergy;
+  attributes.consumptionPerSecondMass = source.consumptionPerSecondMass;
+  attributes.productionPerSecondEnergy = source.productionPerSecondEnergy;
+  attributes.productionPerSecondMass = source.productionPerSecondMass;
+  attributes.buildRate = source.buildRate;
+  attributes.regenRate = source.regenRate;
+  attributes.commandCapsMask = source.commandCapsMask;
+  attributes.toggleCapsMask = source.toggleCapsMask;
+  attributes.mReclaimable = source.mReclaimable;
+  attributes.mCapturable = source.mCapturable;
+  attributes.unknown_006A = source.unknown_006A;
+  attributes.unknown_006B = source.unknown_006B;
+  attributes.unknown_006C = source.unknown_006C;
+
+  mScriptbits = other.mScriptbits;
+  mUnitStates = other.mUnitStates;
+  mDidRefresh = other.mDidRefresh;
+  mOverchargePaused = other.mOverchargePaused;
+  std::copy_n(other.mPad222_227, std::size(other.mPad222_227), mPad222_227);
+}
+
 SSTIUnitVariableData& Unit::VarDat() noexcept
 {
   return mUnitVarDat;
@@ -16713,7 +16793,11 @@ void Unit::SyncInterface(SSyncData* const syncData)
     varData.mDidRefresh = true;
   }
 
-  SUnitVariableUpdateEntry* const entry = QueueUnitVariableUpdate(syncData, id_, varData);
+  // sim_ParallelSync finishes the copy on workers after the walk; otherwise the serial queue.
+  SUnitVariableUpdateEntry* entry = QueueUnitVariableUpdateDeferred(syncData, id_, varData);
+  if (entry == nullptr) {
+    entry = QueueUnitVariableUpdate(syncData, id_, varData);
+  }
   SetUnitUpdateReconFlags(entry, 28);
 
   Entity::SyncInterface(syncData);

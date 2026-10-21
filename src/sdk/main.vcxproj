@@ -805,6 +805,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\ELayerTypeInfo.cpp" />
     <ClCompile Include="moho\containers\SCoordsVec2TypeInfo.cpp" />
     <ClCompile Include="moho\core\Thread.cpp" />
+    <ClCompile Include="moho\core\ThreadPlacement.cpp" />
     <ClCompile Include="moho\math\GridPos.cpp" />
     <ClCompile Include="moho\sim\SOCellPosTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CVFSImpl.cpp" />
@@ -883,6 +884,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\IArmyTypeInfo.cpp" />
     <ClCompile Include="moho\sim\SimDriver.cpp" />
     <ClCompile Include="moho\sim\SimWorkerPool.cpp" />
+    <ClCompile Include="moho\sim\UnitUpdateFill.cpp" />
     <ClCompile Include="moho\sim\SSyncFilter.cpp" />
     <ClCompile Include="moho\sim\SSTIArmyConstantData.cpp" />
     <ClCompile Include="moho\command\EUnitCommandTypeTypeInfo.cpp" />
@@ -2190,6 +2192,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\collision\RDebugCollisionTypeInfo.h" />
     <ClInclude Include="moho\command\ICommandSink.h" />
     <ClInclude Include="moho\core\Thread.h" />
+    <ClInclude Include="moho\core\ThreadPlacement.h" />
     <ClInclude Include="moho\entity\CTextureScroller.h" />
     <ClInclude Include="moho\entity\Entity.h" />
     <ClInclude Include="moho\entity\ELayerTypeInfo.h" />
@@ -2412,6 +2415,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SimDriver.h" />
     <ClInclude Include="moho\sim\SimThreadRole.h" />
     <ClInclude Include="moho\sim\SimWorkerPool.h" />
+    <ClInclude Include="moho\sim\UnitUpdateFill.h" />
     <ClInclude Include="moho\sim\SSyncFilter.h" />
     <ClInclude Include="moho\sim\STIMap.h" />
     <ClInclude Include="moho\sim\STIMapReflection.h" />

@@ -34,6 +34,8 @@ namespace moho
    * - dtor: 0x005C23F0 tears down tree via helper + operator delete(head)
    */
   class ReconBlip;
+  class CAniPose;
+  class RScmResource;
   struct SReconKey;
 
   /**
@@ -187,15 +189,23 @@ namespace moho
     void ReconRefresh() override;
 
     /**
-     * Engine addition, not in the binary: ReconRefresh's blips whose mesh or pose handles must
-     * change, recorded by RefreshDeferringHandles for ApplyRefreshFixups. Static storage per army,
-     * so a worker never allocates.
+     * Engine addition, not in the binary: the mesh and pose handles ReconRefresh's blips gave up,
+     * in map order, recorded by RefreshDeferringHandles for ApplyRefreshFixups to drop. Static
+     * storage per army, so a worker never allocates.
      */
     struct SRefreshFixups
     {
       static constexpr std::size_t kCapacity = 4096u;
 
-      ReconBlip* mBlips[kCapacity];
+      /// One blip's displaced handles; empty where the handle did not change.
+      struct SReleasedHandles
+      {
+        boost::shared_ptr<RScmResource> mMesh;
+        boost::shared_ptr<CAniPose> mPriorPose;
+        boost::shared_ptr<CAniPose> mPose;
+      };
+
+      SReleasedHandles mReleased[kCapacity];
       std::size_t mCount;
       bool mOverflow; // more blips than kCapacity: ApplyRefreshFixups reruns ReconRefresh()
     };
@@ -203,17 +213,18 @@ namespace moho
     /**
      * Engine addition, not in the binary: the part of ReconRefresh() a CSimWorkerPool worker may
      * run. It writes only this army's `SPerArmyReconInfo` slots and reads source units nothing
-     * else writes during the refresh phase. A handle reassignment would retain or release a
-     * shared_ptr, and releasing the last owner frees memory, which must happen on the sim thread
-     * in serial order, so those blips are listed in `fixups` instead.
+     * else writes during the refresh phase. A handle it reassigns is retained here, but the old
+     * one may be its last owner, and freeing must happen on the sim thread in serial order: it is
+     * moved into `fixups` instead of released. Only an old handle the source unit still holds is
+     * released here, because that release cannot be the last.
      */
     void RefreshDeferringHandles(SRefreshFixups& fixups);
 
     /**
      * Engine addition, not in the binary: finishes RefreshDeferringHandles on the sim thread,
-     * assigning the deferred handles in map order. Together the two equal ReconRefresh().
+     * dropping the displaced handles in map order. Together the two equal ReconRefresh().
      */
-    void ApplyRefreshFixups(const SRefreshFixups& fixups);
+    void ApplyRefreshFixups(SRefreshFixups& fixups);
 
     /**
      * Address: 0x005C18A0 (FUN_005C18A0, Moho::CAiReconDBImpl::ReconCanDetect)

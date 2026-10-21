@@ -30,6 +30,7 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/UnitUpdateFill.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/STIMap.h"
@@ -1327,15 +1328,20 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
   }
 
   SSTIUnitVariableData& varData = mUnitVarDat;
-  SUnitVariableUpdateEntry* const entry = QueueUnitVariableUpdate(syncData, id_, varData);
-
   const bool creatorAlive = creator != nullptr;
   const std::int32_t creatorStunTicks =
     creatorAlive ? static_cast<std::int32_t>(creator->mUnitVarDat.mStunTicks != 0) : 0;
-  entry->mVariableData.mSharedPose = reconInfo.mPose;
-  entry->mVariableData.mPriorSharedPose = reconInfo.mPriorPose;
-  if (creatorAlive) {
-    entry->mVariableData.mStunTicks = creatorStunTicks;
+
+  // sim_ParallelSync finishes the copy, and these overrides, on workers after the walk.
+  const SUnitUpdateOverrides overrides{&reconInfo.mPriorPose, &reconInfo.mPose, creatorAlive, creatorStunTicks};
+  SUnitVariableUpdateEntry* entry = QueueUnitVariableUpdateDeferred(syncData, id_, varData, overrides);
+  if (entry == nullptr) {
+    entry = QueueUnitVariableUpdate(syncData, id_, varData);
+    entry->mVariableData.mSharedPose = reconInfo.mPose;
+    entry->mVariableData.mPriorSharedPose = reconInfo.mPriorPose;
+    if (creatorAlive) {
+      entry->mVariableData.mStunTicks = creatorStunTicks;
+    }
   }
   SetUnitUpdateReconFlags(entry, static_cast<std::int32_t>(reconInfo.mReconFlags));
 

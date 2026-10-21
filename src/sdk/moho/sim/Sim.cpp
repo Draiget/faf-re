@@ -49,6 +49,7 @@
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/sim/SimWorkerPool.h"
+#include "moho/sim/UnitUpdateFill.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/animation/CAniActor.h"
@@ -5524,6 +5525,9 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // successor BEFORE dispatching (`mov esi, [esi+4]` precedes the call),
   // because `Entity::Sync` unlinks the node it was reached through.
   std::int32_t syncedEntityCount = 0;
+  // sim_ParallelSync: the walk leaves the allocation-free half of each unit-update copy to
+  // workers, which finish it before anything else touches the packet.
+  CUnitUpdateFills unitUpdateFills(outSyncData);
   if (focusArmyChanged) {
     // 0x007478AA..0x0074791A walks the entity DB's whole id map -- every
     // entity, not only units -- and dispatches Sync on each node's value.
@@ -5547,6 +5551,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       }
     }
   }
+  unitUpdateFills.Finish();
   StoreSyncEntityCountStat(syncedEntityCount);
 
   if (mRequestXMLArmyStatsSubmit) {

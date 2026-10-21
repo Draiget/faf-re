@@ -1,4 +1,5 @@
 #include "moho/app/UserWorkerPool.h"
+#include "moho/core/ThreadPlacement.h"
 
 #include <algorithm>
 #include <atomic>
@@ -104,6 +105,7 @@ namespace moho
       char name[32];
       std::snprintf(name, sizeof(name), "UserWorker %u", index);
       gpg::SetThreadName(0xFFFFFFFFu, name);
+      PlaceCurrentThread(EThreadRole::UserWorker, index);
 
       for (;;) {
         SFpuControlState jobFpu{};

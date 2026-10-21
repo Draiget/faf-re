@@ -1184,10 +1184,13 @@ namespace
    * immediately - `RangeRenderer::Render` batches every accepted unit for one
    * profile into a single `RenderRingBatch` call using
    * `profile.mSelectedRingColor`.
+   *
+   * Engine change: the binary gathers the selection here, once per profile;
+   * the caller now gathers it once per frame and passes it in.
    */
   void RenderSelectedUnitsRange(
-    const moho::CWldSession& session, RangeExtractionPayloadVector& outPayloads,
-    const moho::SRangeRenderProfile& profile, const float alpha
+    const moho::CWldSession& session, const msvc8::vector<moho::UserUnit*>& selectedUnits,
+    RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha
   )
   {
     outPayloads.clear();
@@ -1208,9 +1211,6 @@ namespace
     if (focusArmy == nullptr) {
       return;
     }
-
-    msvc8::vector<moho::UserUnit*> selectedUnits;
-    session.GetSelectionUnits(selectedUnits);
 
     for (moho::UserUnit* const unit : selectedUnits) {
       if (unit == nullptr || unit->mArmy != focusArmy) {
@@ -1570,8 +1570,14 @@ namespace moho
       }
     }
 
+    // The binary gathers the selection again for every profile; it is gathered once here
+    // (engine change: with thousands of units selected the repeated walk cost milliseconds a frame).
+    msvc8::vector<UserUnit*> selectedUnits;
+    if (range_RenderSelected) {
+      worldSession->GetSelectionUnits(selectedUnits);
+    }
     for (const auto& [extractorName, profile] : mRangeProfiles) {
-      RenderSelectedUnitsRange(*worldSession, scratchPayload, profile, alpha);
+      RenderSelectedUnitsRange(*worldSession, selectedUnits, scratchPayload, profile, alpha);
       RenderRingBatch(
         profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mSelectedRingColor,
         profile.mInnerRingParams, scratchPayload
