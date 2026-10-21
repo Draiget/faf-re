@@ -1,5 +1,6 @@
 #include "moho/vision/VisionDB.h"
 
+#include <algorithm>
 #include <cmath>
 #include <span>
 #include <vector>
@@ -97,6 +98,56 @@ namespace
   constexpr std::size_t kVisionParallelTargetSubtrees = 512u;
   constexpr std::size_t kVisionParallelGrain = 32u;
   constexpr int kVisionParallelMaxExpandDepth = 8;
+
+  /**
+   * Engine addition (`ren_ParallelCull`): counts structural edits of the vision trees - a link
+   * added or removed, an entry freed, a tree built or torn down. The fog pass keeps array copies of
+   * the top chains of the tree while this count is unchanged, so it can hand their entries to the
+   * user workers without walking the linked chains on the main thread every frame.
+   */
+  std::uint64_t gVisionTreeEdits = 0u;
+
+  void NoteVisionTreeEdit() noexcept
+  {
+    ++gVisionTreeEdits;
+  }
+
+  /**
+   * Engine addition (`ren_ParallelCull`): array copies of the chains under a tree's root and under
+   * each of the root's children, in chain order, valid while `gVisionTreeEdits` is unchanged.
+   */
+  struct VisionTopChains
+  {
+    const VisionDB* mDb = nullptr;
+    const VisionDB::Entry* mRoot = nullptr;
+    std::uint64_t mEdits = ~0ull;
+    std::vector<const VisionDB::Entry*> mRootChain;
+    std::vector<std::vector<const VisionDB::Entry*>> mChildChains; // one per mRootChain entry
+
+    void Refresh(const VisionDB& db, const VisionDB::Entry* const root)
+    {
+      if (mDb == &db && mRoot == root && mEdits == gVisionTreeEdits) {
+        return;
+      }
+      mDb = &db;
+      mRoot = root;
+      mEdits = gVisionTreeEdits;
+      mRootChain.clear();
+      for (const VisionDB::Entry* child = root->mContained; child != nullptr; child = child->mNext) {
+        mRootChain.push_back(child);
+      }
+      if (mChildChains.size() < mRootChain.size()) {
+        mChildChains.resize(mRootChain.size());
+      }
+      for (std::size_t i = 0; i < mRootChain.size(); ++i) {
+        std::vector<const VisionDB::Entry*>& chain = mChildChains[i];
+        chain.clear();
+        for (const VisionDB::Entry* child = mRootChain[i]->mContained; child != nullptr; child = child->mNext) {
+          chain.push_back(child);
+        }
+      }
+    }
+  };
 } // namespace
 
 /**
@@ -137,6 +188,7 @@ void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
 
   tail->mNext = entry;
   entry->mParent = tail->mParent;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 void VisionDB::Entry::AddContained(Entry* const entry) noexcept
@@ -150,6 +202,7 @@ void VisionDB::Entry::AddContained(Entry* const entry) noexcept
 
   mContained = entry;
   entry->mParent = this;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 /**
@@ -185,6 +238,7 @@ void VisionDB::Entry::RemoveFromChain(Entry* const entry) noexcept
   entry->mParent = nullptr;
   entry->mContained = nullptr;
   entry->mNext = nullptr;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 void VisionDB::Entry::Remove() noexcept
@@ -297,6 +351,7 @@ void VisionDB::Pool::FreeEntry(Entry* const entry)
   entry->mIsReal = false;
   entry->mVisible = false;
   mFreeEntries.push_back(entry);
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 /**
@@ -357,7 +412,9 @@ void VisionDB::Handle::Update(
 VisionDB::VisionDB()
   : pool_()
   , rootNode_(nullptr)
-{}
+{
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+}
 
 /**
  * Address: 0x0081AF00 (FUN_0081AF00, Moho::VisionDB::Init)
@@ -371,6 +428,7 @@ VisionDB::VisionDB()
 void VisionDB::Init(const float width, const float height)
 {
   rootNode_ = nullptr;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 
   const Wm3::Vector2f halfSize{width * 0.5f, height * 0.5f};
   const float halfDiag = std::sqrt((halfSize.x * halfSize.x) + (halfSize.y * halfSize.y));
@@ -448,6 +506,7 @@ VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::V
 VisionDB::~VisionDB()
 {
   rootNode_ = nullptr;
+  NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 }
 
 /**
@@ -511,6 +570,31 @@ void VisionDB::CollectVisibleCircles(
   std::vector<Task>& tasks = taskScratch;
   std::vector<Task>& expanded = expandedScratch;
   std::vector<std::vector<Wm3::Circle2f>>& parts = partScratch;
+  // The chains under the root and under its children are the long ones (the root holds the four
+  // quadrant nodes, which hold most emitters); take them from the array copies.
+  static VisionTopChains sTopChains;
+  sTopChains.Refresh(*this, rootNode_);
+  const auto forEachChild = [&](const Entry* const node, const auto& visit) {
+    if (node == rootNode_) {
+      for (const Entry* const child : sTopChains.mRootChain) {
+        visit(child);
+      }
+      return;
+    }
+    if (node->mParent == rootNode_) {
+      const auto found = std::find(sTopChains.mRootChain.begin(), sTopChains.mRootChain.end(), node);
+      if (found != sTopChains.mRootChain.end()) {
+        for (const Entry* const child : sTopChains.mChildChains[found - sTopChains.mRootChain.begin()]) {
+          visit(child);
+        }
+        return;
+      }
+    }
+    for (const Entry* child = node->mContained; child != nullptr; child = child->mNext) {
+      visit(child);
+    }
+  };
+
   tasks.assign(1u, Task{rootNode_, {}});
   std::size_t subtrees = 1u;
   for (int depth = 0; depth < kVisionParallelMaxExpandDepth && subtrees != 0u && subtrees < kVisionParallelTargetSubtrees;
@@ -531,10 +615,10 @@ void VisionDB::CollectVisibleCircles(
           expanded.push_back(Task{nullptr, sampled});
           break;
         case EVisionEntryResult::Descend:
-          for (const Entry* child = task.mSubtree->mContained; child != nullptr; child = child->mNext) {
+          forEachChild(task.mSubtree, [&](const Entry* const child) {
             expanded.push_back(Task{child, {}});
             ++subtrees;
-          }
+          });
           break;
       }
     }

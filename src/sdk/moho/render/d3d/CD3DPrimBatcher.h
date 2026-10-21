@@ -139,6 +139,24 @@ namespace moho
       std::uint32_t color
     );
 
+    /// Engine addition: one axis-aligned screen quad for `DrawScreenQuads`.
+    struct ScreenQuad
+    {
+      float mLeft;
+      float mTop;
+      float mRight;
+      float mBottom;
+      std::uint32_t mColor;
+    };
+
+    /**
+     * Engine addition, not recovered from the binary: for each quad, exactly what
+     * `DrawQuad({left,top,0}, {right,top,0}, {right,bottom,0}, {left,bottom,0}, color)` does under
+     * the texture set last - the same vertices, indices and flushes - written in blocks instead
+     * of four calls per quad. Strategic icons draw tens of thousands of these per frame.
+     */
+    void DrawScreenQuads(const ScreenQuad* quads, std::size_t quadCount);
+
     /**
      * Address: 0x00438EA0 (FUN_00438EA0)
      *

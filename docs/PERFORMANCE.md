@@ -107,22 +107,19 @@ next target.
 
 ## Where the time goes next
 
-Main-thread work never feeds back into the simulation, so it can be
-multi-threaded and rewritten freely; the checksum cannot move. The plan, in
-order:
+The sim is now the limit, both in replays and on the stress map at
+30,000–60,000 units. The latest main-thread savings, fog of war walked from
+arrays on workers and strategic icons drawn in bulk, give more frames per
+second, not more ticks. The plan, in order:
 
-1. **Fog of war.** At 60,000 units, the serial walk of the vision tree costs
-   about 17 % of the main thread.
-2. **Bulk strategic-icon drawing.** The serial quad emit costs about 10 % when
-   zoomed out at 60,000 units.
-3. **Observer pacing for live games**, after a live multiplayer test.
-4. **New renderer backends** behind the existing `gpg::gal` layer, which
+1. **More sim phases on workers:** sync packet serialization, intel rasters,
+   then pose and animation (about 14 % of sim time). Pose and animation need
+   speculative computation published in serial order.
+2. **Observer pacing for live games**, after a live multiplayer test.
+3. **New renderer backends** behind the existing `gpg::gal` layer, which
    already has a full D3D9 and a partial D3D10 backend:
    - Direct3D 11 first, with instancing, lower per-draw overhead and
      multi-threaded command recording;
    - then D3D12 and Vulkan, compiled from one shader pipeline. The game's
      `.fx` effects are translated automatically from your installed copy,
      never shipped.
-5. **More sim phases on workers:** sync packet serialization, intel rasters,
-   then pose and animation (about 14 % of sim time), which needs speculative
-   computation published in serial order.

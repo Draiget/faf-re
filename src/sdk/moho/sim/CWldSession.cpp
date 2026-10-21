@@ -11876,28 +11876,13 @@ namespace moho
     }
 
     /**
-     * Engine addition: the batcher half of `RenderUnitIcon` - the quad stack it draws at `placement`.
-     * With `lastTexture`, a `SetTexture` that repeats the texture this sequence of emits set last is
-     * skipped: the batcher would look the same texture up again and end in the same state (a flush
-     * keeps the atlas and the UV lanes), so the drawn result is unchanged.
+     * Engine addition: the batcher half of `RenderUnitIcon` - the quad stack it draws at `placement`,
+     * in its order: identified underlay, base icon (tinted), paused overlay, stunned overlay. Each
+     * quad goes to `drawQuad(texture, centerX, centerY, color)`.
      */
-    void EmitUnitIcon(
-      const UnitIconData& icon,
-      const UnitIconPlacement& placement,
-      const StrategicIconAux& aux,
-      const CD3DBatchTexture** const lastTexture = nullptr
-    )
+    template <class DrawQuad>
+    void EmitUnitIconQuads(const UnitIconData& icon, const UnitIconPlacement& placement, DrawQuad&& drawQuad)
     {
-      const auto setTexture = [&](const boost::shared_ptr<CD3DBatchTexture>& texture) {
-        if (lastTexture != nullptr) {
-          if (*lastTexture == texture.get()) {
-            return;
-          }
-          *lastTexture = texture.get();
-        }
-        aux.mBatcher->SetTexture(texture);
-      };
-
       constexpr std::uint32_t kOverlayNoTintColor = 0xFFFFFFFFu;
 
       if (!placement.mVisible) {
@@ -11908,26 +11893,85 @@ namespace moho
       const float screenY = placement.mScreenY;
 
       if (placement.mUnderlay != nullptr) {
-        const boost::shared_ptr<CD3DBatchTexture>& identifiedTexture = *placement.mUnderlay;
-        setTexture(identifiedTexture);
-        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *identifiedTexture, kOverlayNoTintColor);
+        drawQuad(*placement.mUnderlay, screenX, screenY, kOverlayNoTintColor);
       }
 
       if (!icon.mSuppressBaseIcon) {
-        setTexture(icon.mIconTexture);
-        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *icon.mIconTexture, placement.mColor);
+        drawQuad(icon.mIconTexture, screenX, screenY, placement.mColor);
       }
 
       if (icon.mShowPausedOverlay && icon.mPausedTexture) {
-        setTexture(icon.mPausedTexture);
-        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *icon.mPausedTexture, kOverlayNoTintColor);
+        drawQuad(icon.mPausedTexture, screenX, screenY, kOverlayNoTintColor);
       }
 
       if (icon.mShowStunnedOverlay && icon.mStunnedTexture) {
-        setTexture(icon.mStunnedTexture);
-        DrawStrategicIconQuad(*aux.mBatcher, screenX, screenY, *icon.mStunnedTexture, kOverlayNoTintColor);
+        drawQuad(icon.mStunnedTexture, screenX, screenY, kOverlayNoTintColor);
       }
     }
+
+    /// Engine addition: `EmitUnitIconQuads` straight into the batcher, one `SetTexture` per quad.
+    void EmitUnitIcon(const UnitIconData& icon, const UnitIconPlacement& placement, const StrategicIconAux& aux)
+    {
+      EmitUnitIconQuads(icon, placement, [&](const boost::shared_ptr<CD3DBatchTexture>& texture, const float x, const float y, const std::uint32_t color) {
+        aux.mBatcher->SetTexture(texture);
+        DrawStrategicIconQuad(*aux.mBatcher, x, y, *texture, color);
+      });
+    }
+
+    /**
+     * Engine addition (`ui_ParallelIcons`): the icon emit of the parallel path. Quads collect while
+     * the texture stays the same and go to the batcher in one `DrawScreenQuads` call when it
+     * changes. A `SetTexture` that repeats the texture set last is skipped: the batcher would look
+     * the same texture up again and end in the same state (a flush keeps the atlas and the UV
+     * lanes). The batcher receives the same textures, vertices and flushes in the same order as
+     * from one `DrawQuad` per quad.
+     */
+    class StrategicIconBulkEmitter
+    {
+    public:
+      StrategicIconBulkEmitter(CD3DPrimBatcher& batcher, std::vector<CD3DPrimBatcher::ScreenQuad>& pending)
+        : mBatcher(batcher)
+        , mPending(pending)
+      {
+        mPending.clear();
+      }
+
+      ~StrategicIconBulkEmitter()
+      {
+        Submit();
+      }
+
+      void operator()(
+        const boost::shared_ptr<CD3DBatchTexture>& texture, const float centerX, const float centerY, const std::uint32_t color
+      )
+      {
+        if (texture.get() != mLastTexture) {
+          Submit();
+          mBatcher.SetTexture(texture);
+          mLastTexture = texture.get();
+        }
+
+        // `DrawStrategicIconQuad`'s corners.
+        const float halfWidth = static_cast<float>(texture->mWidth >> 1);
+        const float halfHeight = static_cast<float>(texture->mHeight >> 1);
+        mPending.push_back(CD3DPrimBatcher::ScreenQuad{
+          centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight, color
+        });
+      }
+
+    private:
+      void Submit()
+      {
+        if (!mPending.empty()) {
+          mBatcher.DrawScreenQuads(mPending.data(), mPending.size());
+          mPending.clear();
+        }
+      }
+
+      CD3DPrimBatcher& mBatcher;
+      std::vector<CD3DPrimBatcher::ScreenQuad>& mPending;
+      const CD3DBatchTexture* mLastTexture = nullptr;
+    };
 
     /**
      * Address: 0x0085D9A0 (FUN_0085D9A0, RenderUnitIcon)
@@ -12344,9 +12388,10 @@ namespace moho
           sPlacements[i] = PlaceUnitIcon(iconAt(i), aux);
         }
       });
-      const CD3DBatchTexture* lastTexture = nullptr;
+      static std::vector<CD3DPrimBatcher::ScreenQuad> sPendingQuads;
+      StrategicIconBulkEmitter emit(*aux.mBatcher, sPendingQuads);
       for (std::size_t i = 0; i < drawnIconCount; ++i) {
-        EmitUnitIcon(iconAt(i), sPlacements[i], aux, &lastTexture);
+        EmitUnitIconQuads(iconAt(i), sPlacements[i], emit);
       }
     }
 
