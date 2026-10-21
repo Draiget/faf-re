@@ -22,7 +22,11 @@
 //   - a struct named like a technique is renamed (fx_5_0 rejects the clash);
 //   - vs_4_0/ps_4_0 become 4.1 on feature level 10.1+ (32 vertex inputs);
 //   - techniques that use a D3D9 fixed-function vertex shader the effect
-//     never defines (FIXED_FUNC_VS) are dropped.
+//     never defines (FIXED_FUNC_VS) are dropped;
+//   - D3D9 behaviour the D3D10 dialect loses is restored: depth clipping
+//     and D3D9-scaled depth biases, alpha blended with the colour factors,
+//     sqrt/rsqrt/pow on |x|, and each pass's alpha test (applied in its
+//     pixel shader).
 
 #include <string>
 #include <string_view>
@@ -40,7 +44,11 @@ namespace gpg::gal::d3d11
    * Rewrites preprocessed effect source (no `#` directives besides `#line`)
    * as described above. Text the layer does not understand passes through.
    * The shaderModel41 flag raises the compat preamble's vs_4_0/ps_4_0 to 4.1
-   * (feature level 10.1 and up).
+   * (feature level 10.1 and up). `original` is the source before
+   * preprocessing, read for the D3D9 pass states the D3D10 dialect
+   * preprocesses away (the alpha test).
    */
-  [[nodiscard]] TranslatedEffectSource TranslateEffectSource(std::string_view preprocessed, bool shaderModel41);
+  [[nodiscard]] TranslatedEffectSource TranslateEffectSource(
+    std::string_view preprocessed, bool shaderModel41, std::string_view original
+  );
 } // namespace gpg::gal::d3d11

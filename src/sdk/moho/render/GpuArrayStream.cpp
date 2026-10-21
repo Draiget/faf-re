@@ -43,14 +43,18 @@ namespace moho
     const auto* const bytes = static_cast<const std::uint8_t*>(data);
     const std::size_t total = count * mStride;
     const std::size_t known = std::min(mUploaded.size(), total);
+    mUploaded.resize(total);
     std::size_t rangeStart = 0U;
     bool inRange = false;
+    // Uploads [rangeStart, end) and records it in the mirror; unchanged blocks
+    // are already there.
     const auto flush = [&](const std::size_t end) {
       if (inRange) {
         device->UpdateGpuBuffer(
           *mBuffer, static_cast<std::uint32_t>(rangeStart / mStride), static_cast<std::uint32_t>((end - rangeStart) / mStride),
           bytes + rangeStart
         );
+        std::memcpy(mUploaded.data() + rangeStart, bytes + rangeStart, end - rangeStart);
         inRange = false;
       }
     };
@@ -65,7 +69,6 @@ namespace moho
       }
     }
     flush(total);
-    mUploaded.assign(bytes, bytes + total);
     return mBuffer.get();
   }
 } // namespace moho

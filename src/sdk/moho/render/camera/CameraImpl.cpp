@@ -2253,6 +2253,17 @@ namespace
   }
 } // namespace
 
+namespace
+{
+  // Engine addition (`ui_IconRecords`): see CAM_FrustumUnitsRebuildCount. Main thread only.
+  std::uint64_t gFrustumUnitsRebuilds = 0u;
+} // namespace
+
+std::uint64_t moho::CAM_FrustumUnitsRebuildCount() noexcept
+{
+  return gFrustumUnitsRebuilds;
+}
+
 /**
  * Address: 0x007A75A0 (FUN_007A75A0, Moho::CameraImpl::CacheCameraFrustumUnits)
  * Mangled: ?CacheCameraFrustumUnits@CameraImpl@Moho@@QAEXM@Z
@@ -2294,6 +2305,7 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
 
   mFrustumCacheZoomMark = mNearZoom;
   mFrustumCacheTimer = 0.0f;
+  ++gFrustumUnitsRebuilds; // engine addition, see CAM_FrustumUnitsRebuildCount
 
   // Clear all three cached lanes (detaching any still-tracked weak refs and
   // releasing heap-grown storage) before the rebuild.

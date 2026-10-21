@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/gal/Device.hpp"
@@ -34,6 +35,7 @@
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Box2.h"
 #include "Wm3Circle2.h"
+#include "Wm3IntrBox2Circle2.h"
 #include "Wm3Vector2.h"
 
 namespace
@@ -118,12 +120,18 @@ namespace
     return outMapped != nullptr;
   }
 
-  static_assert(sizeof(Wm3::Circle2f) == 12, "vision circles are uploaded as VisionCircle (float2 center, float radius)");
+  static_assert(
+    sizeof(moho::VisionDB::EmitterCircles) == 24,
+    "emitters are uploaded as VisionEmitter (previous center and radius, current center and radius)"
+  );
 
   /**
-   * Engine addition (`ren_GpuFog`): CastVision as one instanced draw of every visible circle
+   * Engine addition (`ren_GpuFog`): CastVision as one instanced draw of every vision emitter
    * from a persistent structured buffer (VisionShader.h), with the pass' own depth/stencil
-   * state. The circle buffer uploads only the blocks that changed since the previous frame.
+   * state. The emitters are collected from the vision tree only when it changed
+   * (`VisionDB::EmitterStateVersion`), and only the blocks of the buffer that differ are
+   * uploaded; the per-frame interpolation and footprint test run in the vertex shader. The CPU
+   * walk this replaces interpolated and box-tested the tree every frame.
    */
   class GpuVisionCaster
   {
@@ -137,10 +145,17 @@ namespace
     /** `ren_GpuFog` is on and the backend can draw this path (built on first use). */
     [[nodiscard]] bool IsActive();
 
-    /** Stencils `circles` as CastVision does. False when nothing could be drawn this way. */
-    [[nodiscard]] bool Cast(
-      moho::VisionRenderer& renderer, const moho::GeomCamera3& camera, const Wm3::Circle2f* circles, std::size_t count
-    );
+    /**
+     * Brings the emitter buffer up to date with `db` (a no-op while its state version is
+     * unchanged). False when this path cannot draw.
+     */
+    [[nodiscard]] bool Prepare(moho::VisionRenderer& renderer, const moho::VisionDB& db);
+
+    /** How many emitters `TryAdd` would emit for `box` and `interpolant` (the `Vision_Total` stat). */
+    [[nodiscard]] std::int32_t CountVisible(const Wm3::Box2f& box, float interpolant) const;
+
+    /** Stencils the prepared emitters as CastVision does. */
+    void Cast(moho::VisionRenderer& renderer, const moho::GeomCamera3& camera, const Wm3::Box2f& box, float interpolant);
 
   private:
     [[nodiscard]] bool RefreshCylinder(moho::VisionRenderer& renderer);
@@ -149,15 +164,23 @@ namespace
     {
       gpg::gal::Matrix view;
       gpg::gal::Matrix projection;
+      float boxCenter[2];
+      float boxExtent[2];
+      float interpolant;
+      float unused[3];
     };
-    static_assert(sizeof(Constants) == 128, "two float4x4");
+    static_assert(sizeof(Constants) == 160, "VisionConstants");
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
     boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
     boost::shared_ptr<gpg::gal::GpuBuffer> mCylinder;
     const gpg::gal::VertexBuffer* mCylinderSource = nullptr;
-    moho::GpuArrayStream mCircles{"VisionCircles", sizeof(Wm3::Circle2f)};
+    const moho::VisionDB* mEmitterSource = nullptr;
+    std::uint64_t mEmitterVersion = ~0ull;
+    std::vector<moho::VisionDB::EmitterCircles> mEmitters;
+    gpg::gal::GpuBuffer* mEmitterBuffer = nullptr;
+    moho::GpuArrayStream mEmitterStream{"VisionEmitters", sizeof(moho::VisionDB::EmitterCircles)};
   };
 }
 
@@ -189,7 +212,10 @@ namespace
       mProgram.reset();
       mCylinder.reset();
       mCylinderSource = nullptr;
-      mCircles.Reset();
+      mEmitterStream.Reset();
+      mEmitterBuffer = nullptr;
+      mEmitterSource = nullptr;
+      mEmitterVersion = ~0ull;
       mSupported = false;
       if ((device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
         gpg::gal::GpuProgramDesc desc{};
@@ -256,33 +282,67 @@ namespace
     return mCylinder != nullptr;
   }
 
-  bool GpuVisionCaster::Cast(
-    moho::VisionRenderer& renderer, const moho::GeomCamera3& camera, const Wm3::Circle2f* const circles, const std::size_t count
-  )
+  bool GpuVisionCaster::Prepare(moho::VisionRenderer& renderer, const moho::VisionDB& db)
   {
     if (!RefreshCylinder(renderer) || renderer.mGeometry.mIndexBuffer == nullptr) {
       return false;
     }
-    if (count == 0U) {
-      return true;
+    const std::uint64_t version = moho::VisionDB::EmitterStateVersion();
+    if (&db != mEmitterSource || version != mEmitterVersion || mEmitterBuffer == nullptr) {
+      db.CollectEmitters(mEmitters);
+      mEmitterBuffer = mEmitterStream.Update(mEmitters.data(), mEmitters.size());
+      mEmitterSource = &db;
+      mEmitterVersion = version;
     }
-    gpg::gal::GpuBuffer* const circleBuffer = mCircles.Update(circles, count);
-    if (circleBuffer == nullptr) {
-      return false;
-    }
+    return mEmitterBuffer != nullptr;
+  }
 
-    const Constants constants{camera.view, camera.projection};
+  std::int32_t GpuVisionCaster::CountVisible(const Wm3::Box2f& box, const float interpolant) const
+  {
+    std::int32_t visible = 0;
+    for (const moho::VisionDB::EmitterCircles& emitter : mEmitters) {
+      // `EvaluateVisionEntry`'s interpolation and test (VisionDB.cpp).
+      const Wm3::Circle2f sampled{
+        Wm3::Vector2f{
+          emitter.mPrevious.Center.x + ((emitter.mCurrent.Center.x - emitter.mPrevious.Center.x) * interpolant),
+          emitter.mPrevious.Center.y + ((emitter.mCurrent.Center.y - emitter.mPrevious.Center.y) * interpolant)
+        },
+        ((emitter.mCurrent.Radius - emitter.mPrevious.Radius) * interpolant) + emitter.mPrevious.Radius
+      };
+      Wm3::IntrBox2Circle2f overlap{box, sampled};
+      if (overlap.Test()) {
+        ++visible;
+      }
+    }
+    return visible;
+  }
+
+  void GpuVisionCaster::Cast(
+    moho::VisionRenderer& renderer, const moho::GeomCamera3& camera, const Wm3::Box2f& box, const float interpolant
+  )
+  {
+    if (mEmitters.empty()) {
+      return;
+    }
+    Constants constants{};
+    constants.view = camera.view;
+    constants.projection = camera.projection;
+    constants.boxCenter[0] = box.Center.x;
+    constants.boxCenter[1] = box.Center.y;
+    constants.boxExtent[0] = box.Extent[0];
+    constants.boxExtent[1] = box.Extent[1];
+    constants.interpolant = interpolant;
+
     gpg::gal::GpuDrawCall call{};
     call.program = mProgram.get();
     call.bindings.constants = &constants;
     call.bindings.constantBytes = sizeof(constants);
     call.bindings.readBuffers[0] = mCylinder.get();
-    call.bindings.readBuffers[1] = circleBuffer;
+    call.bindings.readBuffers[1] = mEmitterBuffer;
     call.indexBuffer = renderer.mGeometry.mIndexBuffer.get();
     call.vertexCountPerInstance = static_cast<std::uint32_t>(renderer.mIndexCount);
-    call.instanceCount = static_cast<std::uint32_t>(count);
+    call.instanceCount = static_cast<std::uint32_t>(mEmitters.size());
     mDevice->DrawGpuProgram(call);
-    return true;
   }
 }
 
@@ -508,10 +568,19 @@ namespace moho
     footprintBox.Extent[0] = terrainFootprint.Max.x - footprintBox.Center.x;
     footprintBox.Extent[1] = terrainFootprint.Max.z - footprintBox.Center.y;
 
-    gpg::fastvector_n<Wm3::Circle2f, VisionDB::kVisibleCircleInlineCapacity> visibleCircles;
-    visionDb.CollectVisibleCircles(visibleCircles, footprintBox, interpolant);
+    // Engine addition (`ren_GpuFog`): with the GPU path the tree is not walked here; the
+    // emitters are kept in a GPU buffer and the shader does the per-frame interpolation and test.
+    GpuVisionCaster& gpuCaster = GpuVisionCaster::Get();
+    const bool castOnGpu = gpuCaster.IsActive() && gpuCaster.Prepare(renderer, visionDb);
 
-    const auto visibleCircleCount = static_cast<std::int32_t>(visibleCircles.size());
+    gpg::fastvector_n<Wm3::Circle2f, VisionDB::kVisibleCircleInlineCapacity> visibleCircles;
+    std::int32_t visibleCircleCount = 0;
+    if (castOnGpu) {
+      visibleCircleCount = gpuCaster.CountVisible(footprintBox, interpolant);
+    } else {
+      visionDb.CollectVisibleCircles(visibleCircles, footprintBox, interpolant);
+      visibleCircleCount = static_cast<std::int32_t>(visibleCircles.size());
+    }
 
     if (sEngineStatVisionTotal == nullptr) {
       EngineStats* const engineStats = GetEngineStats();
@@ -527,11 +596,10 @@ namespace moho
     viewMatrix->SetMatrix4x4(&camera.view);
     projMatrix->SetMatrix4x4(&camera.projection);
 
-    // Engine addition (`ren_GpuFog`): every circle in one instanced draw when the backend can,
-    // then the same composite pass.
-    if (GpuVisionCaster& gpuCaster = GpuVisionCaster::Get();
-        gpuCaster.IsActive() &&
-        gpuCaster.Cast(renderer, camera, visibleCircles.begin(), static_cast<std::size_t>(visibleCircleCount))) {
+    // Engine addition (`ren_GpuFog`): every emitter in one instanced draw, then the same
+    // composite pass.
+    if (castOnGpu) {
+      gpuCaster.Cast(renderer, camera, footprintBox, interpolant);
       const auto width = static_cast<std::int32_t>(head.mWidth);
       const auto height = static_cast<std::int32_t>(head.mHeight);
       renderer.mFrame.InitTransformedVerts(static_cast<float>(width), static_cast<float>(height));

@@ -4,11 +4,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <initializer_list>
 #include <cmath>
 #include <cstdlib>
 #include <map>
 #include <optional>
 #include <regex>
+#include <set>
 #include <utility>
 
 namespace gpg::gal::d3d11
@@ -256,10 +258,12 @@ namespace gpg::gal::d3d11
     class Translator
     {
     public:
-      Translator(std::string text, const bool shaderModel41)
+      Translator(std::string text, const bool shaderModel41, const std::string_view original)
         : mText(std::move(text))
         , mShaderModel41(shaderModel41)
-      {}
+      {
+        CollectAlphaTests(original);
+      }
 
       TranslatedEffectSource Run()
       {
@@ -269,10 +273,16 @@ namespace gpg::gal::d3d11
         CollectStateObjects();
         DropUndefinedFixedFunctionTechniques();
         CollectStructsAndFunctions();
+        DisableAlphaTestD3D10();
         RewritePasses();
         RestoreD3D9RasterizerSemantics();
+        RestoreD3D9AlphaBlending();
+        PrependD3D9IntrinsicDomains();
         if (mWrappers != 0U) {
           mNotes.push_back("pixel shader inputs re-linked through " + std::to_string(mWrappers) + " wrapper(s)");
+        }
+        if (mAlphaTestedPasses != 0U) {
+          mNotes.push_back("D3D9 alpha test applied in the pixel shader of " + std::to_string(mAlphaTestedPasses) + " pass(es)");
         }
         return TranslatedEffectSource{std::move(mText), std::move(mNotes)};
       }
@@ -607,12 +617,11 @@ namespace gpg::gal::d3d11
        */
       void RestoreD3D9RasterizerSemantics()
       {
-        static const std::regex declaration(R"(\bRasterizerState\s+\w+\s*\{)");
         std::size_t searchFrom = 0U;
         std::size_t rewritten = 0U;
-        std::smatch match;
-        while (std::regex_search(mText.cbegin() + static_cast<std::ptrdiff_t>(searchFrom), mText.cend(), match, declaration)) {
-          const std::size_t open = searchFrom + static_cast<std::size_t>(match.position(0) + match.length(0) - 1);
+        std::string name;
+        std::size_t open = std::string::npos;
+        while ((searchFrom = FindBlock(mText, {"RasterizerState"}, searchFrom, name, open)) != std::string::npos) {
           const std::size_t close = MatchingBrace(mText, open);
           if (close == std::string::npos) {
             break;
@@ -650,6 +659,87 @@ namespace gpg::gal::d3d11
         if (rewritten != 0U) {
           mNotes.push_back(std::to_string(rewritten) + " rasterizer state(s) clip depth and use D3D9-scaled depth biases");
         }
+      }
+
+      /**
+       * D3D9 blends alpha with the colour factors unless a pass enables
+       * SEPARATEALPHABLENDENABLE. The compat states pin SrcBlendAlpha = ONE,
+       * DestBlendAlpha = ZERO in every BlendState, so each additive pass
+       * overwrote the frame's alpha, which the game keeps as its glow mask
+       * (the commander's warp-in light drew as a hard-edged square). Every
+       * BlendState, the compat file's and the generated ones, takes its alpha
+       * factors and operation from its colour ones, except a generated state
+       * whose pass enabled separate alpha.
+       */
+      void RestoreD3D9AlphaBlending()
+      {
+        std::size_t searchFrom = 0U;
+        std::size_t rewritten = 0U;
+        std::string name;
+        std::size_t open = std::string::npos;
+        while ((searchFrom = FindBlock(mText, {"BlendState"}, searchFrom, name, open)) != std::string::npos) {
+          const std::size_t close = MatchingBrace(mText, open);
+          if (close == std::string::npos) {
+            break;
+          }
+          if (mSeparateAlphaBlendStates.count(name) != 0U) {
+            searchFrom = close + 1U;
+            continue;
+          }
+          std::string srcBlend = "ONE";
+          std::string destBlend = "ZERO";
+          std::string blendOp = "ADD";
+          Fields fields;
+          for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+            const std::size_t equals = statement.find('=');
+            if (equals == std::string::npos) {
+              continue;
+            }
+            const std::string field = Trim(statement.substr(0U, equals));
+            const std::string value = Trim(statement.substr(equals + 1U));
+            const std::string key = Lower(field);
+            if (key == "srcblendalpha" || key == "destblendalpha" || key == "blendopalpha") {
+              continue;
+            }
+            if (key == "srcblend") {
+              srcBlend = value;
+            } else if (key == "destblend") {
+              destBlend = value;
+            } else if (key == "blendop") {
+              blendOp = value;
+            }
+            fields.emplace_back(field, value);
+          }
+          fields.emplace_back("SrcBlendAlpha", AlphaFactor(srcBlend));
+          fields.emplace_back("DestBlendAlpha", AlphaFactor(destBlend));
+          fields.emplace_back("BlendOpAlpha", blendOp);
+          std::string body = "\n";
+          for (const auto& [field, value] : fields) {
+            body += "    " + field + " = " + value + ";\n";
+          }
+          mText.replace(open + 1U, close - open - 1U, body);
+          searchFrom = open + 1U + body.size() + 1U;
+          ++rewritten;
+        }
+        if (rewritten != 0U) {
+          mNotes.push_back(std::to_string(rewritten) + " blend state(s) blend alpha with their colour factors, as D3D9");
+        }
+      }
+
+      /**
+       * Shader model 2/3 evaluated sqrt, rsqrt and pow on |x|; shader model 4
+       * and later return NaN for negative inputs (warning X3571), which the
+       * effects relied on not happening. pow keeps the sign of a negative base
+       * for an odd integer exponent, as the D3D9 shaders' results show.
+       */
+      void PrependD3D9IntrinsicDomains()
+      {
+        mText.insert(
+          0U,
+          "#define sqrt(x) sqrt(abs(x))\n"
+          "#define rsqrt(x) rsqrt(abs(x))\n"
+          "#define pow(x, y) (pow(abs(x), (y)) * (((x) < 0 && frac((y) * 0.5) == 0.5) ? -1 : 1))\n"
+        );
       }
 
       void DropUndefinedFixedFunctionTechniques()
@@ -708,41 +798,359 @@ namespace gpg::gal::d3d11
         }
       }
 
-      void RewritePasses()
+      /** A pass's D3D9 alpha test: ALPHAFUNC as D3DCMPFUNC (1 Never .. 8 Always) and ALPHAREF. */
+      struct AlphaTest
       {
-        static const std::regex techniqueHead(R"(\btechnique1[01]\s+\w+\s*(<(?:[^>"]|"[^"]*")*>)?\s*\{)");
-        static const std::regex passHead(R"(\bpass\s+\w*\s*(<(?:[^>"]|"[^"]*")*>)?\s*\{)");
+        int function = 8;
+        unsigned reference = 0U;
+      };
 
-        std::size_t searchFrom = 0U;
-        std::smatch technique;
+      /**
+       * D3D9 alpha tests (AlphaTestEnable / AlphaFunc / AlphaRef) sit in the
+       * passes inside `#ifndef DIRECT3D10`, so the D3D10-dialect preprocessing
+       * removes them, and D3D10/11 have no alpha-test state anyway: water2's
+       * HighFidelityPS returns alpha = 1 - landMask and relies on
+       * NotEqual 0 to drop land pixels (grey water polygons over the beaches
+       * without it). They are read here from the source before
+       * preprocessing, comments and directives stripped, keyed by technique
+       * name and pass index, and applied in the pixel shader (see
+       * WrapAlphaTest).
+       */
+      void CollectAlphaTests(const std::string_view original)
+      {
+        const std::string text = StripCommentsAndDirectives(original);
+        static const std::map<std::string, int> kFunctions = {
+          {"never", 1}, {"less", 2}, {"equal", 3}, {"lessequal", 4}, {"greater", 5}, {"notequal", 6}, {"greaterequal", 7}, {"always", 8},
+        };
+
+        std::size_t from = 0U;
         while (true) {
-          const std::string::const_iterator begin = mText.cbegin() + static_cast<std::ptrdiff_t>(searchFrom);
-          if (!std::regex_search(begin, mText.cend(), technique, techniqueHead)) {
+          std::string techniqueName;
+          std::size_t techniqueOpen = std::string::npos;
+          from = FindBlock(text, {"technique", "technique10", "technique11"}, from, techniqueName, techniqueOpen);
+          if (from == std::string::npos) {
             break;
           }
-          const std::size_t techniqueStart = searchFrom + static_cast<std::size_t>(technique.position(0));
-          const std::size_t techniqueOpen = techniqueStart + static_cast<std::size_t>(technique.length(0)) - 1U;
+          const std::size_t techniqueClose = MatchingBrace(text, techniqueOpen);
+          if (techniqueClose == std::string::npos) {
+            break;
+          }
+          std::size_t passFrom = techniqueOpen + 1U;
+          std::size_t passIndex = 0U;
+          while (true) {
+            std::string passName;
+            std::size_t passOpen = std::string::npos;
+            passFrom = FindBlock(text, {"pass"}, passFrom, passName, passOpen);
+            if (passFrom == std::string::npos || passOpen > techniqueClose) {
+              break;
+            }
+            const std::size_t passClose = MatchingBrace(text, passOpen);
+            if (passClose == std::string::npos || passClose > techniqueClose) {
+              break;
+            }
+            bool enabled = false;
+            AlphaTest test{};
+            for (const auto& [field, value] : ParseAssignments(std::string_view(text).substr(passOpen + 1U, passClose - passOpen - 1U))) {
+              const std::string key = Lower(field);
+              if (key == "alphatestenable") {
+                enabled = Translate(kBools, value) == std::optional<std::string>("TRUE");
+              } else if (key == "alphafunc") {
+                if (const auto found = kFunctions.find(Lower(value)); found != kFunctions.end()) {
+                  test.function = found->second;
+                }
+              } else if (key == "alpharef") {
+                test.reference = static_cast<unsigned>(std::strtoul(value.c_str(), nullptr, 0));
+              }
+            }
+            if (enabled) {
+              mAlphaTests[techniqueName + "#" + (!passName.empty() ? passName : std::to_string(passIndex))] = test;
+            }
+            ++passIndex;
+            passFrom = passClose + 1U;
+          }
+          from = techniqueClose + 1U;
+        }
+      }
+
+      [[nodiscard]] static bool IsIdentifierChar(const char c) noexcept
+      {
+        return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+      }
+
+      /** `text` without comments and without `#` lines (line breaks kept). */
+      [[nodiscard]] static std::string StripCommentsAndDirectives(const std::string_view original)
+      {
+        std::string text;
+        text.reserve(original.size());
+        bool lineComment = false;
+        bool blockComment = false;
+        bool lineStart = true;
+        bool directive = false;
+        for (std::size_t index = 0U; index < original.size(); ++index) {
+          const char c = original[index];
+          const char next = index + 1U < original.size() ? original[index + 1U] : '\0';
+          if (blockComment) {
+            if (c == '*' && next == '/') {
+              blockComment = false;
+              ++index;
+            }
+            continue;
+          }
+          if (c == '\n') {
+            lineComment = false;
+            directive = false;
+            lineStart = true;
+            text.push_back('\n');
+            continue;
+          }
+          if (lineComment || directive) {
+            continue;
+          }
+          if (c == '/' && next == '/') {
+            lineComment = true;
+            continue;
+          }
+          if (c == '/' && next == '*') {
+            blockComment = true;
+            ++index;
+            continue;
+          }
+          if (lineStart && c == '#') {
+            directive = true;
+            continue;
+          }
+          if (c != ' ' && c != '\t' && c != '\r') {
+            lineStart = false;
+          }
+          text.push_back(c);
+        }
+        return text;
+      }
+
+      /**
+       * The next `keyword [name] [<annotations>] {` at or after `from`, where
+       * keyword is one of `keywords` as a whole identifier. Returns the
+       * keyword's position (npos when there is none) and sets `name` and
+       * `open` (the brace). A keyword not followed by that shape is skipped.
+       */
+      [[nodiscard]] static std::size_t FindBlock(
+        const std::string& text,
+        const std::initializer_list<std::string_view> keywords,
+        std::size_t from,
+        std::string& name,
+        std::size_t& open
+      )
+      {
+        const auto skipSpace = [&text](std::size_t at) {
+          while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at])) != 0) {
+            ++at;
+          }
+          return at;
+        };
+        for (std::size_t at = from; at < text.size(); ++at) {
+          if (!IsIdentifierChar(text[at]) || (at != 0U && IsIdentifierChar(text[at - 1U]))) {
+            continue;
+          }
+          std::size_t end = at;
+          while (end < text.size() && IsIdentifierChar(text[end])) {
+            ++end;
+          }
+          const std::string_view word(text.data() + at, end - at);
+          if (std::find(keywords.begin(), keywords.end(), word) == keywords.end()) {
+            at = end - 1U;
+            continue;
+          }
+          std::size_t cursor = skipSpace(end);
+          std::size_t nameEnd = cursor;
+          while (nameEnd < text.size() && IsIdentifierChar(text[nameEnd])) {
+            ++nameEnd;
+          }
+          name.assign(text, cursor, nameEnd - cursor);
+          cursor = skipSpace(nameEnd);
+          if (cursor < text.size() && text[cursor] == '<') {
+            bool quoted = false;
+            for (++cursor; cursor < text.size(); ++cursor) {
+              if (text[cursor] == '"') {
+                quoted = !quoted;
+              } else if (text[cursor] == '>' && !quoted) {
+                break;
+              }
+            }
+            cursor = skipSpace(cursor + 1U);
+          }
+          if (cursor < text.size() && text[cursor] == '{') {
+            open = cursor;
+            return at;
+          }
+          at = end - 1U;
+        }
+        return std::string::npos;
+      }
+
+      /** Every `... field = value;` of a block body: the last word before `=` and the trimmed value. */
+      [[nodiscard]] static std::vector<std::pair<std::string, std::string>> ParseAssignments(const std::string_view body)
+      {
+        std::vector<std::pair<std::string, std::string>> assignments;
+        for (const std::string& statement : SplitTopLevel(body, ';')) {
+          const std::size_t equals = statement.find('=');
+          if (equals == std::string::npos) {
+            continue;
+          }
+          std::size_t end = equals;
+          while (end > 0U && !IsIdentifierChar(statement[end - 1U])) {
+            --end;
+          }
+          std::size_t begin = end;
+          while (begin > 0U && IsIdentifierChar(statement[begin - 1U])) {
+            --begin;
+          }
+          if (begin == end) {
+            continue;
+          }
+          assignments.emplace_back(statement.substr(begin, end - begin), Trim(statement.substr(equals + 1U)));
+        }
+        return assignments;
+      }
+
+      /**
+       * The compat preamble's emulation of the alpha test, which a few
+       * shaders call themselves. D3D9 never ran it (the D3D9 build compiles
+       * those calls out), and with the pass's own test now applied as well it
+       * would test twice; water2 passes its mask in the red channel, which
+       * turned the water teal.
+       */
+      void DisableAlphaTestD3D10()
+      {
+        // The definition `void AlphaTestD3D10( ... ) { ... }`, not one of its calls.
+        for (std::size_t at = mText.find("AlphaTestD3D10"); at != std::string::npos; at = mText.find("AlphaTestD3D10", at + 1U)) {
+          std::size_t before = at;
+          while (before > 0U && std::isspace(static_cast<unsigned char>(mText[before - 1U])) != 0) {
+            --before;
+          }
+          if (before < 4U || mText.compare(before - 4U, 4U, "void") != 0) {
+            continue;
+          }
+          const std::size_t close = mText.find(')', at);
+          if (close == std::string::npos) {
+            return;
+          }
+          std::size_t open = close + 1U;
+          while (open < mText.size() && std::isspace(static_cast<unsigned char>(mText[open])) != 0) {
+            ++open;
+          }
+          if (open >= mText.size() || mText[open] != '{') {
+            continue;
+          }
+          const std::size_t end = MatchingBrace(mText, open);
+          if (end != std::string::npos) {
+            mText.replace(open + 1U, end - open - 1U, "\n");
+          }
+          return;
+        }
+      }
+
+      /**
+       * Routes the pixel shader of a pass with a D3D9 alpha test through a
+       * wrapper with the same signature that calls it and discards what the
+       * test would have rejected: the output alpha (the float4 returned, or the
+       * output struct's first float4 member) as the 8-bit value D3D9 compared.
+       * Returns the new PixelShader value, or `pixelValue` when the shader
+       * cannot be wrapped.
+       */
+      std::string WrapAlphaTest(const std::string& pixelValue, const AlphaTest& test, std::string& declarations)
+      {
+        std::string pixelName;
+        std::string pixelArguments;
+        if (!ParseCompile(pixelValue, pixelName, pixelArguments)) {
+          return pixelValue;
+        }
+        const auto pixel = mFunctions.find(pixelName);
+        if (pixel == mFunctions.end()) {
+          return pixelValue;
+        }
+        const Function original = pixel->second;
+        std::string alphaSource;
+        if (original.returnType == "float4") {
+          alphaSource = "faf_result";
+        } else if (const auto members = mStructs.find(original.returnType); members != mStructs.end()) {
+          for (const Variable& member : members->second) {
+            if (member.type == "float4") {
+              alphaSource = "faf_result." + member.name;
+              break;
+            }
+          }
+        }
+        if (alphaSource.empty()) {
+          return pixelValue;
+        }
+
+        const std::string key = pixelName + "|" + std::to_string(test.function) + "|" + std::to_string(test.reference);
+        auto wrapper = mAlphaTestWrappers.find(key);
+        if (wrapper == mAlphaTestWrappers.end()) {
+          const std::string name = "faf_alphatest_" + std::to_string(mAlphaTestWrappers.size());
+          std::string signature = original.returnType + " " + name + "(";
+          std::string call = pixelName + "(";
+          for (std::size_t index = 0U; index < original.parameters.size(); ++index) {
+            const Variable& parameter = original.parameters[index];
+            signature += std::string(index == 0U ? " " : ", ") + (parameter.uniform ? "uniform " : "") + (parameter.out ? "out " : "") +
+              parameter.type + " " + parameter.name + (parameter.semantic.empty() ? "" : " : " + parameter.semantic);
+            call += std::string(index == 0U ? " " : ", ") + parameter.name;
+          }
+          signature += " )";
+          call += " )";
+          if (!original.returnSemantic.empty()) {
+            signature += " : " + original.returnSemantic;
+          }
+          static const char* const kComparisons[9] = {"", "false", "<", "==", "<=", ">", "!=", ">=", "true"};
+          std::string condition;
+          if (test.function == 1 || test.function == 8) {
+            condition = kComparisons[test.function];
+          } else {
+            condition = "faf_alpha " + std::string(kComparisons[test.function]) + " " + std::to_string(test.reference) + "u";
+          }
+          declarations += signature + "\n{\n    " + original.returnType + " faf_result = " + call + ";\n" +
+            "    uint faf_alpha = (uint)round(saturate(" + alphaSource + ".a) * 255.0);\n" +
+            "    if (!(" + condition + "))\n        discard;\n    return faf_result;\n}\n";
+          mFunctions[name] = original;
+          wrapper = mAlphaTestWrappers.emplace(key, name).first;
+        }
+        static const std::regex compileHead(R"(^(\s*compile\s+\w+\s+)\w+)");
+        return std::regex_replace(pixelValue, compileHead, "$1" + wrapper->second, std::regex_constants::format_first_only);
+      }
+
+      void RewritePasses()
+      {
+        std::size_t searchFrom = 0U;
+        while (true) {
+          std::string techniqueName;
+          std::size_t techniqueOpen = std::string::npos;
+          const std::size_t techniqueStart = FindBlock(mText, {"technique10", "technique11"}, searchFrom, techniqueName, techniqueOpen);
+          if (techniqueStart == std::string::npos) {
+            break;
+          }
           std::size_t techniqueClose = MatchingBrace(mText, techniqueOpen);
           if (techniqueClose == std::string::npos) {
             break;
           }
 
           std::string declarations;
+          std::size_t passIndex = 0U;
           std::size_t passFrom = techniqueOpen + 1U;
-          std::smatch pass;
           while (passFrom < techniqueClose) {
-            const std::string::const_iterator passBegin = mText.cbegin() + static_cast<std::ptrdiff_t>(passFrom);
-            const std::string::const_iterator passEnd = mText.cbegin() + static_cast<std::ptrdiff_t>(techniqueClose);
-            if (!std::regex_search(passBegin, passEnd, pass, passHead)) {
+            std::string passName;
+            std::size_t passOpen = std::string::npos;
+            if (FindBlock(mText, {"pass"}, passFrom, passName, passOpen) == std::string::npos || passOpen > techniqueClose) {
               break;
             }
-            const std::size_t passOpen = passFrom + static_cast<std::size_t>(pass.position(0) + pass.length(0)) - 1U;
             const std::size_t passClose = MatchingBrace(mText, passOpen);
             if (passClose == std::string::npos || passClose > techniqueClose) {
               break;
             }
             const std::string body = mText.substr(passOpen + 1U, passClose - passOpen - 1U);
-            const std::string rewritten = RewritePassBody(body, declarations);
+            const auto alphaTest = mAlphaTests.find(techniqueName + "#" + (!passName.empty() ? passName : std::to_string(passIndex)));
+            ++passIndex;
+            const std::string rewritten =
+              RewritePassBody(body, declarations, alphaTest != mAlphaTests.end() ? &alphaTest->second : nullptr);
             mText.replace(passOpen + 1U, passClose - passOpen - 1U, rewritten);
             const std::ptrdiff_t delta = static_cast<std::ptrdiff_t>(rewritten.size()) - static_cast<std::ptrdiff_t>(body.size());
             techniqueClose = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(techniqueClose) + delta);
@@ -757,7 +1165,7 @@ namespace gpg::gal::d3d11
         }
       }
 
-      std::string RewritePassBody(const std::string& body, std::string& declarations)
+      std::string RewritePassBody(const std::string& body, std::string& declarations, const AlphaTest* const alphaTest)
       {
         std::map<std::string, std::string> legacy; // lower-case D3D9 state -> value
         std::vector<std::string> kept;
@@ -802,6 +1210,23 @@ namespace gpg::gal::d3d11
           kept.push_back(statement);
         }
 
+        // The pass's D3D9 alpha test, in its pixel shader (see CollectAlphaTests).
+        bool alphaTested = false;
+        if (alphaTest != nullptr) {
+          for (std::string& statement : kept) {
+            const std::size_t equals = statement.find('=');
+            if (equals != std::string::npos && Lower(Trim(statement.substr(0U, equals))) == "pixelshader") {
+              const std::string pixelValue = Trim(statement.substr(equals + 1U));
+              const std::string wrapped = WrapAlphaTest(pixelValue, *alphaTest, declarations);
+              if (wrapped != pixelValue) {
+                statement = "PixelShader = " + wrapped;
+                alphaTested = true;
+                ++mAlphaTestedPasses;
+              }
+            }
+          }
+        }
+
         // Shader-model-4 stage linkage (see RelinkPixelShader).
         bool relinked = false;
         {
@@ -832,7 +1257,7 @@ namespace gpg::gal::d3d11
           }
         }
 
-        if (legacy.empty() && !relinked) {
+        if (legacy.empty() && !relinked && !alphaTested) {
           // Re-emit unchanged (the Set calls were lifted out above).
           return body;
         }
@@ -986,6 +1411,9 @@ namespace gpg::gal::d3d11
           }
           if (touched) {
             const std::string name = NewName("Blend");
+            if (separateAlpha) {
+              mSeparateAlphaBlendStates.insert(name);
+            }
             declarations += Declare("BlendState", name, fields);
             std::vector<std::string> arguments = {name, "float4(0,0,0,0)", "0xFFFFFFFF"};
             const auto existing = setCalls.find(StateKind::Blend);
@@ -1076,18 +1504,24 @@ namespace gpg::gal::d3d11
       std::string mText;
       std::vector<std::string> mNotes;
       std::map<std::string, StateObject> mStateObjects;
+      std::set<std::string> mSeparateAlphaBlendStates; // generated from passes that enable D3D9 separate alpha
       std::size_t mGenerated = 0U;
       std::size_t mPassesRewritten = 0U;
       std::map<std::string, std::vector<Variable>> mStructs;
       std::map<std::string, Function> mFunctions;
       std::map<std::string, std::string> mWrapperNames; // pixel shader | input struct -> wrapper
       std::size_t mWrappers = 0U;
+      std::map<std::string, AlphaTest> mAlphaTests;           // technique name # pass index -> D3D9 alpha test
+      std::map<std::string, std::string> mAlphaTestWrappers;  // pixel shader | function | reference -> wrapper
+      std::size_t mAlphaTestedPasses = 0U;
       bool mShaderModel41 = false;
     };
   } // namespace
 
-  TranslatedEffectSource TranslateEffectSource(const std::string_view preprocessed, const bool shaderModel41)
+  TranslatedEffectSource TranslateEffectSource(
+    const std::string_view preprocessed, const bool shaderModel41, const std::string_view original
+  )
   {
-    return Translator(StripDirectives(preprocessed), shaderModel41).Run();
+    return Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
   }
 } // namespace gpg::gal::d3d11

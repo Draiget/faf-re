@@ -137,7 +137,7 @@ namespace gpg::gal
     // HLSL flags as DeviceD3D10::CreateEffect.
     constexpr const char* kEffectProfile = "fx_5_0";
     // Bump when EffectSourceD3D11's output changes, to retire cached blobs.
-    constexpr const char* kTranslatorVersion = "translator 4";
+    constexpr const char* kTranslatorVersion = "translator 7";
     constexpr UINT kEffectCompileFlags = D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     constexpr UINT kHelperCompileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 
@@ -519,7 +519,8 @@ namespace gpg::gal
       }
       d3d11::TranslatedEffectSource result = d3d11::TranslateEffectSource(
         std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U),
-        mFeatureLevel >= D3D_FEATURE_LEVEL_10_1
+        mFeatureLevel >= D3D_FEATURE_LEVEL_10_1,
+        std::string_view(source, sourceBytes)
       );
       for (const std::string& note : result.notes) {
         gpg::Logf("D3D11: %s: %s", sourceName, note.c_str());
