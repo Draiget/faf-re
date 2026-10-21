@@ -110,6 +110,11 @@ namespace gpg::gal
 
   void RenderProfiler::EndFrame(const DrawStatistics& frame) noexcept
   {
+    const std::int64_t now = NowTicks();
+    ++mSummary.frames;
+    mSummary.lastFrame = frame;
+    mSummary.lastFrameWallMilliseconds = mLastFrameEndTicks != 0 ? TicksToMilliseconds(now - mLastFrameEndTicks) : 0.0;
+    mLastFrameEndTicks = now;
     if (!Enabled()) {
       return;
     }
@@ -132,8 +137,14 @@ namespace gpg::gal
       static_cast<double>(mDrawCalls) / frames, static_cast<double>(mStateChanges) / frames,
       static_cast<double>(mUploadBytes) / frames / 1024.0
     );
+    mSummary.intervalFrames = mFrames;
+    mSummary.intervalGpuMilliseconds = mGpuFrames != 0U ? mGpuFrameMilliseconds / static_cast<double>(mGpuFrames) : 0.0;
+    mSummary.intervalCpuMilliseconds = 0.0;
     for (std::uint32_t index = 0U; index < mRegionCount; ++index) {
       RegionTotals& totals = mRegions[index];
+      if (std::strcmp(totals.name, "Frame") == 0) {
+        mSummary.intervalCpuMilliseconds = TicksToMilliseconds(totals.cpuTicks) / frames;
+      }
       if (totals.calls != 0U || totals.gpuSamples != 0U) {
         // GPU samples resolve a few frames late, so they are averaged over the
         // frames they cover: one sample set per call.

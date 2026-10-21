@@ -574,6 +574,16 @@ namespace gal {
       virtual void EndTechnique() override;
 
       /**
+       * FAF addition, not in the shipped binary (`ren_Info`).
+       *
+       * What it does:
+       * Reports the adapter identifier, shader model, available texture memory
+       * and presentation state, plus the DXGI budget and usage of the same
+       * adapter when DXGI can see it.
+       */
+      bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
+
+      /**
        * Address: 0x008F3320 (FUN_008F3320)
        *
        * What it does:

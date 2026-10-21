@@ -34,6 +34,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/particles/CWorldParticles.h"
+#include "moho/render/RenderInfo.h"
 #include "moho/render/d3d/CD3DDeviceResources.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/D3DSingletonCleanup.h"
@@ -1199,6 +1200,7 @@ namespace moho
     (void)AddVertexStats(submitted.vertices, false);
     sDrawStatisticsLog.AddFrame(submitted);
     gpg::gal::RenderProfiler::Get().EndFrame(submitted);
+    REN_LogRuntimeInfoOnce(); // FAF: the `ren_Info` block, once the first frame is out
   }
 
   /**
