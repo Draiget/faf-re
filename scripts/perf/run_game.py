@@ -1,7 +1,7 @@
 """Launch the original FA on a replay (or /map skirmish), start the sampler, push sim speed up.
 
 usage: run_game.py <outdir> <seconds> -- <game args...>
-  e.g. run_game.py out/rep 1500 -- /replay C:\path\game.scfareplay /replayid 123 /nomovie
+  e.g. run_game.py tmp/perf/rep 1500 -- /replay C:\path\game.scfareplay /replayid 123 /nomovie
 From Git Bash, set MSYS_NO_PATHCONV=1 so /replay etc. are not rewritten into paths.
 """
 import os

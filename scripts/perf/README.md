@@ -28,10 +28,10 @@ Findings and method: `decomp/recovery/reports/perf/sim_multithreading_investigat
 | `joint.py` | How the sim and main threads overlap: both busy, one waiting, both idle, and what each did while the other waited. |
 
 ```bash
-python scripts/perf/sampler64.py <pid> <dir-with-pdb> out/x64 3600 60
-python scripts/perf/prof64.py curve out/x64
-python scripts/perf/prof64.py under main "moho::CWldSession::DoBeat" out/x64/win_010.json
-python scripts/perf/joint.py out/x64/win_01*.json
+python scripts/perf/sampler64.py <pid> <dir-with-pdb> tmp/perf/x64 3600 60
+python scripts/perf/prof64.py curve tmp/perf/x64
+python scripts/perf/prof64.py under main "moho::CWldSession::DoBeat" tmp/perf/x64/win_010.json
+python scripts/perf/joint.py tmp/perf/x64/win_01*.json
 ```
 
 ## Typical run
@@ -40,8 +40,8 @@ python scripts/perf/joint.py out/x64/win_01*.json
 python scripts/perf/build_symbols.py                       # once; tables go to %TEMP%/faf_perf
 curl -o 26935800.fafreplay https://replay.faforever.com/26935800
 python scripts/perf/convert_replay.py 26935800.fafreplay r.scfareplay
-MSYS_NO_PATHCONV=1 python scripts/perf/run_game.py out/r 1500 -- /replay C:/full/path/r.scfareplay /replayid 26935800 /nomovie
-python scripts/perf/analyze.py out/r/win_010.json out/r/win_011.json
+MSYS_NO_PATHCONV=1 python scripts/perf/run_game.py tmp/perf/r 1500 -- /replay C:/full/path/r.scfareplay /replayid 26935800 /nomovie
+python scripts/perf/analyze.py tmp/perf/r/win_010.json tmp/perf/r/win_011.json
 ```
 
 26935800 is a 12-player Dual Gap game recorded on game version 3835 (40:53 of game time). On 3835
@@ -83,7 +83,7 @@ is roughly 26.90M to 27.05M; 27079166 is already on 3836.
 Seeded AI benchmark with no replay needed, on stock map data. `/noai` + `/noinitialunits` give idle armies for a scripted battle map:
 
 ```bash
-MSYS_NO_PATHCONV=1 python scripts/perf/run_game.py out/sk 2700 -- /map /maps/dualgap_adaptive.v0014/DualGap_Adaptive_scenario.lua /seed 20260924 /faction 1 /nomovie
+MSYS_NO_PATHCONV=1 python scripts/perf/run_game.py tmp/perf/sk 2700 -- /map /maps/dualgap_adaptive.v0014/DualGap_Adaptive_scenario.lua /seed 20260924 /faction 1 /nomovie
 ```
 
 ## How the stack walk stays honest
