@@ -803,7 +803,7 @@ namespace moho
     }
 
     const int passCount = technique->BeginTechnique();
-    if (passCount == 1 && device->GetDeviceContext()->mDeviceType != gpg::gal::DeviceApi::Direct3D10) {
+    if (passCount == 1 && device->GetDeviceContext()->mDeviceType == gpg::gal::DeviceApi::Direct3D9) {
       technique->BeginPass(0);
       try {
         device->DrawIndexedPrimitive(&drawContext);

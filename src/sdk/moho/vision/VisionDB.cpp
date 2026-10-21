@@ -113,6 +113,19 @@ namespace
   }
 
   /**
+   * Engine addition (`ren_GpuFog`): counts changes of an emitter's circles or visibility
+   * (`Handle::Update` with new values). With `gVisionTreeEdits` it tells the GPU fog pass whether
+   * its collected emitters (`VisionDB::CollectEmitters`) are still current. Every writer runs on
+   * the main thread (the serial half of the sync apply).
+   */
+  std::uint64_t gVisionEntryEdits = 0u;
+
+  [[nodiscard]] bool SameCircle(const Wm3::Circle2f& lhs, const Wm3::Circle2f& rhs) noexcept
+  {
+    return lhs.Center.x == rhs.Center.x && lhs.Center.y == rhs.Center.y && lhs.Radius == rhs.Radius;
+  }
+
+  /**
    * Engine addition (`ren_ParallelCull`): array copies of the chains under a tree's root and under
    * each of the root's children, in chain order, valid while `gVisionTreeEdits` is unchanged.
    */
@@ -393,9 +406,17 @@ void VisionDB::Handle::Update(
   const bool visible
 )
 {
+  const Wm3::Circle2f previousCircle{previous, radius};
+  const Wm3::Circle2f currentCircle{next, radius};
+  // Engine addition, see gVisionEntryEdits.
+  if (mEntry->mVisible != visible || !SameCircle(mEntry->mPrevCircle, previousCircle) ||
+      !SameCircle(mEntry->mCurCircle, currentCircle)) {
+    ++gVisionEntryEdits;
+  }
+
   mEntry->mVisible = visible;
-  mEntry->mPrevCircle = Wm3::Circle2f{previous, radius};
-  mEntry->mCurCircle = Wm3::Circle2f{next, radius};
+  mEntry->mPrevCircle = previousCircle;
+  mEntry->mCurCircle = currentCircle;
 
   if (!mEntry->mParent->Contains(*mEntry)) {
     mEntry->Remove();
@@ -657,4 +678,32 @@ void VisionDB::CollectVisibleCircles(
       accumulator.push_back(circle);
     }
   }
+}
+
+void VisionDB::CollectEmitters(std::vector<EmitterCircles>& emitters) const
+{
+  emitters.clear();
+  if (rootNode_ == nullptr) {
+    return;
+  }
+  // `TryAdd`'s walk without the box test: an emitter ends the path, anything else is descended.
+  thread_local std::vector<const Entry*> pending;
+  pending.clear();
+  pending.push_back(rootNode_);
+  while (!pending.empty()) {
+    const Entry* const entry = pending.back();
+    pending.pop_back();
+    if (entry->mIsReal && entry->mVisible) {
+      emitters.push_back(EmitterCircles{entry->mPrevCircle, entry->mCurCircle});
+      continue;
+    }
+    for (const Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
+      pending.push_back(child);
+    }
+  }
+}
+
+std::uint64_t VisionDB::EmitterStateVersion() noexcept
+{
+  return gVisionTreeEdits + gVisionEntryEdits;
 }

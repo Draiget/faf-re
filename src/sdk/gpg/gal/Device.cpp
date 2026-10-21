@@ -1,6 +1,8 @@
 #include "Device.hpp"
 #include "DeviceContext.hpp"
 #include "Error.hpp"
+// d3d11.h pulls in d3d10_1.h, which refuses to follow d3d10.h: D3D11 first.
+#include "gpg/gal/backends/d3d11/DeviceD3D11.h"
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "legacy/containers/AutoPtr.h"
@@ -182,6 +184,25 @@ namespace gpg::gal
             device->Setup(context);
             break;
         }
+        case DeviceApi::Direct3D11:
+        {
+            // FAF addition, not in the shipped binary. A Setup that throws
+            // leaves no half-built device installed: the caller falls back to
+            // Direct3D 9 (CScApp::CreateDevice), and nothing may reach this
+            // one through GetInstance in between.
+            DeviceD3D11* const device = new DeviceD3D11();
+            sDeviceD3D.reset(device);
+            try
+            {
+                device->Setup(context);
+            }
+            catch (...)
+            {
+                DestroyInstance();
+                throw;
+            }
+            break;
+        }
         default:
             ThrowDeviceContextError(135, "unknown API requested");
         }
@@ -209,6 +230,8 @@ namespace gpg::gal
             return static_cast<DeviceD3D9*>(device)->SupportsVertexTextureFormat(textureFormat);
         case DeviceApi::Direct3D10:
             return static_cast<DeviceD3D10*>(device)->SupportsVertexTextureFormat(textureFormat);
+        case DeviceApi::Direct3D11:
+            return static_cast<DeviceD3D11*>(device)->SupportsVertexTextureFormat(textureFormat);
         default:
             return false;
         }
@@ -362,4 +385,32 @@ namespace gpg::gal
     {
         *outContext = outputContext_;
     }
+
+    // FAF additions, not in the shipped binary: the "not supported" bodies of
+    // the GPU-driven slots appended after slot 49 (Device.hpp, GpuDriven.h).
+
+    std::uint32_t Device::GetGpuDrivenFeatures() const
+    {
+        return 0U;
+    }
+
+    boost::shared_ptr<GpuBuffer> Device::CreateGpuBuffer(const GpuBufferDesc&)
+    {
+        return {};
+    }
+
+    void Device::UpdateGpuBuffer(GpuBuffer&, std::uint32_t, std::uint32_t, const void*) {}
+
+    boost::shared_ptr<GpuProgram> Device::CreateGpuProgram(const GpuProgramDesc&)
+    {
+        return {};
+    }
+
+    void Device::DrawGpuProgram(const GpuDrawCall&) {}
+
+    void Device::DispatchGpuProgram(const GpuDispatch&) {}
+
+    void Device::BeginProfileRegion(std::uint32_t) {}
+
+    void Device::EndProfileRegion(std::uint32_t) {}
 }

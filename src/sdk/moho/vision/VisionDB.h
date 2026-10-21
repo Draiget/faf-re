@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "legacy/containers/Vector.h"
 #include "gpg/core/containers/FastVector.h"
@@ -347,6 +348,30 @@ namespace moho
       const Wm3::Box2f& box,
       float interpolant
     ) const;
+
+    /** Engine addition: one emitter as `CollectEmitters` reports it. */
+    struct EmitterCircles
+    {
+      Wm3::Circle2f mPrevious;
+      Wm3::Circle2f mCurrent;
+    };
+
+    /**
+     * Engine addition, not recovered from the binary (`ren_GpuFog`): every entry `TryAdd` could
+     * emit for some query box - real, visible, and with no real visible entry above it (`TryAdd`
+     * stops at the first one on a path) - with both its circles, before interpolation and the
+     * box test. An entry the walk reaches only through such an ancestor is left out, as `TryAdd`
+     * leaves it out. For one box and interpolant, the circles of these entries that overlap the
+     * box are exactly the circles `TryAdd` emits, in a different order.
+     */
+    void CollectEmitters(std::vector<EmitterCircles>& emitters) const;
+
+    /**
+     * Engine addition (`ren_GpuFog`): a count that changes whenever anything `CollectEmitters`
+     * reports may have changed (tree links, an entry's circles or visibility), over every
+     * VisionDB. Equal counts mean an earlier collection is still valid.
+     */
+    [[nodiscard]] static std::uint64_t EmitterStateVersion() noexcept;
 
     /**
      * Address: 0x0081AEB0 (FUN_0081AEB0)

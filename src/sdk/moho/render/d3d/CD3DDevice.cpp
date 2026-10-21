@@ -4,6 +4,7 @@
 #include <d3d9.h>
 
 #include <algorithm>
+#include <chrono>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
+#include "gpg/gal/RenderProfiler.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/OutputContext.hpp"
@@ -214,6 +216,10 @@ namespace
    * frames: figures to compare renderer changes by without driving the UI.
    * An instanced draw counts once, with one instance's primitives.
    */
+  // Seconds spent inside the backend's Present since the last stats line
+  // (FAF instrumentation, see DrawStatisticsLog).
+  double sPresentSeconds = 0.0;
+
   class DrawStatisticsLog
   {
   public:
@@ -225,25 +231,41 @@ namespace
       if (mInterval == 0) {
         return;
       }
+      if (mFrames == 0) {
+        mStart = std::chrono::steady_clock::now();
+        sPresentSeconds = 0.0;
+      }
 
       mDrawCalls += frame.drawCalls;
       mPrimitives += frame.primitives;
       mVertices += frame.vertices;
+      mStateChanges += frame.stateChanges;
+      mUploadBytes += frame.uploadBytes;
       if (++mFrames < mInterval) {
         return;
       }
 
       const double frames = static_cast<double>(mFrames);
       gpg::Logf(
-        "Draw stats over %d frames: %.1f draw calls, %.0f primitives, %.0f vertices per frame",
+        "Draw stats over %d frames: %.1f draw calls, %.0f primitives, %.0f vertices, %.1f state changes, %.1f KB uploaded per frame",
         mFrames, static_cast<double>(mDrawCalls) / frames, static_cast<double>(mPrimitives) / frames,
-        static_cast<double>(mVertices) / frames
+        static_cast<double>(mVertices) / frames, static_cast<double>(mStateChanges) / frames,
+        static_cast<double>(mUploadBytes) / frames / 1024.0
+      );
+      // Wall time per frame, and the part not spent waiting in Present
+      // (vsync), which is what a renderer change moves.
+      const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - mStart).count();
+      gpg::Logf(
+        "Frame time over %d frames: %.2f ms/frame (%.1f fps), %.2f ms/frame outside Present", mFrames,
+        1000.0 * seconds / frames, frames / seconds, 1000.0 * (seconds - sPresentSeconds) / frames
       );
       LogEntityCounts();
       mFrames = 0;
       mDrawCalls = 0;
       mPrimitives = 0;
       mVertices = 0;
+      mStateChanges = 0;
+      mUploadBytes = 0;
     }
 
   private:
@@ -287,9 +309,12 @@ namespace
 
     int mInterval = -1; // -1 until the environment has been read
     int mFrames = 0;
+    std::chrono::steady_clock::time_point mStart{};
     std::uint64_t mDrawCalls = 0;
     std::uint64_t mPrimitives = 0;
     std::uint64_t mVertices = 0;
+    std::uint64_t mStateChanges = 0;
+    std::uint64_t mUploadBytes = 0;
   };
 
   DrawStatisticsLog sDrawStatisticsLog;
@@ -1173,6 +1198,7 @@ namespace moho
     (void)AddPrimStats(submitted.primitives, false);
     (void)AddVertexStats(submitted.vertices, false);
     sDrawStatisticsLog.AddFrame(submitted);
+    gpg::gal::RenderProfiler::Get().EndFrame(submitted);
   }
 
   /**
@@ -1720,7 +1746,9 @@ namespace moho
         (void)InitContext(context);
       }
 
+      const auto presentStart = std::chrono::steady_clock::now();
       device->Present();
+      sPresentSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - presentStart).count();
       (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderPresentCount, "Render_PresentCount"), 1);
 
       if (mClearEnabled != 0) {

@@ -1913,4 +1913,11 @@ namespace moho
    * (camera+0x04) into the process-global camera-tracking-listener registry.
    */
   void func_SetWorldCamera(CameraImpl* camera);
+
+  /**
+   * Engine addition (`ui_IconRecords`): how many times any camera has rebuilt its cached
+   * in-frustum lists (`CameraImpl::CacheCameraFrustumUnits`). Equal counts mean the lists are
+   * unchanged, apart from entities the sync apply has deleted or changed since.
+   */
+  [[nodiscard]] std::uint64_t CAM_FrustumUnitsRebuildCount() noexcept;
 } // namespace moho

@@ -1173,6 +1173,8 @@ namespace
     switch (api) {
       case gpg::gal::DeviceApi::Direct3D10:
         return "D3D10";
+      case gpg::gal::DeviceApi::Direct3D11:
+        return "D3D11";
       default:
         return nullptr;
     }
@@ -1236,9 +1238,15 @@ bool CScApp::CreateDevice()
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
 
   const bool useD3D10 = moho::CFG_GetArgOption("/D3D10", 0, nullptr);
-  moho::d3d_WindowsCursor = useD3D10;
+  // FAF addition: /d3d11 selects the Direct3D 11 backend. It has no hardware
+  // cursor either, so it takes the Windows cursor as /D3D10 does.
+  const bool useD3D11 = !useD3D10 && moho::CFG_GetArgOption("/d3d11", 0, nullptr);
+  moho::d3d_WindowsCursor = useD3D10 || useD3D11;
 
-  gpg::gal::DeviceContext context(useD3D10 ? gpg::gal::DeviceApi::Direct3D10 : gpg::gal::DeviceApi::Direct3D9);
+  const gpg::gal::DeviceApi requestedApi = useD3D10 ? gpg::gal::DeviceApi::Direct3D10
+    : useD3D11                                      ? gpg::gal::DeviceApi::Direct3D11
+                                                    : gpg::gal::DeviceApi::Direct3D9;
+  gpg::gal::DeviceContext context(requestedApi);
   context.mVSync = moho::OPTIONS_GetInt("vsync") == 1;
   context.AddHead(gpg::gal::Head{});
 
@@ -1365,7 +1373,20 @@ bool CScApp::CreateDevice()
     ApplyPackedAntiAliasing(context.GetHead(1), packedAntiAliasing);
   }
 
-  if (!CreateAppFrame(title, maximized, position, context)) {
+  // FAF addition: a Direct3D 11 device that cannot be created falls back to
+  // Direct3D 9 with the same window settings before the binary's own
+  // default-window fallback below.
+  const gpg::gal::DeviceContext requestedContext = context;
+  bool created = CreateAppFrame(title, maximized, position, context);
+  if (!created && requestedApi == gpg::gal::DeviceApi::Direct3D11) {
+    gpg::Warnf("Direct3D 11 is unavailable; falling back to Direct3D 9");
+    context = requestedContext;
+    context.mDeviceType = gpg::gal::DeviceApi::Direct3D9;
+    moho::d3d_WindowsCursor = false;
+    created = CreateAppFrame(title, maximized, position, context);
+  }
+
+  if (!created) {
     gpg::gal::DeviceContext fallbackContext(useD3D10 ? gpg::gal::DeviceApi::Direct3D10 : gpg::gal::DeviceApi::Direct3D9);
     context = fallbackContext;
 
