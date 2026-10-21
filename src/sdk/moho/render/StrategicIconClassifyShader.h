@@ -56,7 +56,8 @@ namespace moho
     std::uint32_t mIconSlots = 0xFFFFFFFFU; ///< atlas slot of the icon (low 16 bits) and the selected icon (high)
     std::int32_t mUnderlaySlotOrNone = -1;  ///< atlas slot of the identified underlay, -1 for none
     std::int32_t mLastFocusDamageTick = 0;  ///< `mLastFocusDamageGameTick`
-    std::uint32_t mUnused[3] = {};
+    std::uint32_t mHoveredIconSlots = 0xFFFFFFFFU; ///< the hovered icon (low 16 bits) and hovered selected icon (high)
+    std::uint32_t mUnused[2] = {};
   };
   static_assert(sizeof(StrategicIconSourceRecord) == 64, "StrategicIconSourceRecord must match IconSource");
 
@@ -92,8 +93,9 @@ namespace moho
   /** Threads per group of `ClassifyIconsCS`, and of the single `CompactIconsCS` group. */
   inline constexpr std::uint32_t kIconClassifyGroupSize = 64U;
   inline constexpr std::uint32_t kIconCompactThreads = 1024U;
-  /** `runOf` value of a source that gets no icon. */
-  inline constexpr std::uint32_t kIconNoRun = 4U;
+  /** `runOf` value of the hovered source (drawn after the four runs) and of a source that gets no icon. */
+  inline constexpr std::uint32_t kIconHoveredRun = 4U;
+  inline constexpr std::uint32_t kIconNoRun = 5U;
 
   inline constexpr char kStrategicIconClassifyShaderSource[] = R"hlsl(
 cbuffer ClassifyConstants : register(b0)
@@ -132,7 +134,8 @@ static const uint kBlinkHidden = 1u << 3;
 static const uint kHasPlayableRect = 1u << 4;
 
 static const uint kNoSlot = 0xFFFFu;
-static const uint kNoRun = 4u;
+static const uint kHoveredRun = 4u;
+static const uint kNoRun = 5u;
 
 struct IconSource
 {
@@ -145,7 +148,8 @@ struct IconSource
     uint iconSlots;     // icon (low), selected icon (high)
     int underlaySlot;   // -1: none
     int lastFocusDamageTick;
-    uint3 unused;
+    uint hoveredIconSlots; // hovered icon (low), hovered selected icon (high)
+    uint2 unused;
 };
 
 struct IconInstance
@@ -257,17 +261,16 @@ void ClassifyIconsCS(uint3 thread : SV_DispatchThreadID)
         }
     }
 
-    if (index == Hovered)
-    {
-        return;
-    }
+    // The hovered unit takes its hovered texture and goes to the one hovered slot, drawn last.
+    bool hovered = index == Hovered;
     bool selected = (SelectionBits[index >> 5] & (1u << (index & 31u))) != 0u;
-    uint iconSlot = selected ? (source.iconSlots >> 16) : (source.iconSlots & 0xFFFFu);
+    uint slots = hovered ? source.hoveredIconSlots : source.iconSlots;
+    uint iconSlot = selected ? (slots >> 16) : (slots & 0xFFFFu);
     if (iconSlot == kNoSlot)
     {
         return;
     }
-    uint run = selected ? 3u : (source.flags & kHighPriority) != 0u ? 2u : (source.flags & kAir) != 0u ? 1u : 0u;
+    uint run = hovered ? kHoveredRun : selected ? 3u : (source.flags & kHighPriority) != 0u ? 2u : (source.flags & kAir) != 0u ? 1u : 0u;
 
     // PlaceUnitIcon and BuildStrategicIconRecord.
     IconInstance record;
@@ -354,8 +357,15 @@ void CompactIconsCS(uint thread : SV_GroupIndex)
 
     if (thread == 0u)
     {
-        // DrawInstanced arguments: 24 vertices per icon, one instance per record.
-        DrawArgs.Store4(0, uint4(24u, totals.x + totals.y + totals.z + totals.w, 0u, 0u));
+        // The hovered slot after the four runs, then the DrawInstanced arguments: 24 vertices per
+        // icon, one instance per record.
+        uint total = totals.x + totals.y + totals.z + totals.w;
+        if (Hovered < Count && RunIn[Hovered] == kHoveredRun)
+        {
+            Output[total] = StagedIn[Hovered];
+            total += 1u;
+        }
+        DrawArgs.Store4(0, uint4(24u, total, 0u, 0u));
     }
 }
 )hlsl";
