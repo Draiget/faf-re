@@ -414,4 +414,5 @@ namespace gpg::gal
 
     void Device::EndProfileRegion(std::uint32_t) {}
     bool Device::GetRuntimeInfo(DeviceRuntimeInfo&) { return false; }
+    bool Device::ReadGpuBuffer(GpuBuffer&, std::uint32_t, std::uint32_t, void*) { return false; }
 }

@@ -5,14 +5,17 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <optional>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/RenderProfiler.h"
 #include "gpg/gal/Texture.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/StrategicIconClassifyShader.h"
 #include "moho/render/StrategicIconShader.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
@@ -21,12 +24,22 @@
 namespace moho
 {
   bool ren_GpuIcons = false;
+  bool ren_GpuIconClassify = false;
 
   TConVar<bool> gTConVar_ren_GpuIcons(
     "ren_GpuIcons",
     "Draw strategic icons with one instanced draw per view from a persistent GPU buffer (Direct3D 11 "
     "and later). 0, the default, draws them through the prim batcher as the original does.",
     &ren_GpuIcons
+  );
+
+  TConVar<bool> gTConVar_ren_GpuIconClassify(
+    "ren_GpuIconClassify",
+    "With ren_GpuIcons and ui_IconRecords: decide which units get a strategic icon, in which run, and "
+    "where, in a compute shader from per-unit records uploaded when a sync beat changes them, then draw "
+    "them with one indirect draw per view. Same icons in the same order as the CPU classification. "
+    "0, the default, classifies on the CPU.",
+    &ren_GpuIconClassify
   );
 
   namespace
@@ -226,6 +239,26 @@ namespace moho
     return stream;
   }
 
+  gpg::gal::Texture* StrategicIconRenderer::PrepareDraw(CD3DPrimBatcher& batcher)
+  {
+    if (!RefreshAtlasSlots(batcher)) {
+      return nullptr;
+    }
+    if (mSlotsDirty) {
+      UploadSlots();
+    }
+    // Anything the batcher still holds was submitted before the icons.
+    batcher.Flush();
+    const boost::shared_ptr<ID3DTextureSheet> sheet = batcher.mTextureBatcher->GetCompositeTexture();
+    if (sheet.get() == nullptr) {
+      return nullptr;
+    }
+    ID3DTextureSheet::TextureHandle atlasTexture;
+    (void)sheet->GetTexture(atlasTexture);
+    // The sheet keeps the texture alive; the handle only borrows it for the draw.
+    return atlasTexture.get();
+  }
+
   bool StrategicIconRenderer::Draw(
     CD3DPrimBatcher& batcher, const void* const viewKey, const std::span<const StrategicIconInstance> instances
   )
@@ -234,25 +267,11 @@ namespace moho
       return false;
     }
     ++mFrame;
-    if (!RefreshAtlasSlots(batcher)) {
-      return false;
-    }
     if (instances.empty()) {
-      return true;
+      return RefreshAtlasSlots(batcher);
     }
-    if (mSlotsDirty) {
-      UploadSlots();
-    }
-
-    // Anything the batcher still holds was submitted before the icons.
-    batcher.Flush();
-    const boost::shared_ptr<ID3DTextureSheet> sheet = batcher.mTextureBatcher->GetCompositeTexture();
-    if (sheet.get() == nullptr) {
-      return false;
-    }
-    ID3DTextureSheet::TextureHandle atlasTexture;
-    (void)sheet->GetTexture(atlasTexture);
-    if (atlasTexture.get() == nullptr) {
+    gpg::gal::Texture* const atlasTexture = PrepareDraw(batcher);
+    if (atlasTexture == nullptr) {
       return false;
     }
 
@@ -272,10 +291,177 @@ namespace moho
     call.bindings.constantBytes = sizeof(constants);
     call.bindings.readBuffers[0] = records;
     call.bindings.readBuffers[1] = mSlotBuffer.get();
-    call.bindings.textures[0] = atlasTexture.get();
+    call.bindings.textures[0] = atlasTexture;
     call.vertexCountPerInstance = kVerticesPerIcon;
     call.instanceCount = static_cast<std::uint32_t>(instances.size());
     gpg::gal::Device::GetInstance()->DrawGpuProgram(call);
     return true;
+  }
+
+  bool StrategicIconRenderer::IsClassifyActive()
+  {
+    if (!ren_GpuIconClassify || !IsActive()) {
+      return false;
+    }
+    if (!mClassifyInitialized) {
+      mClassifyInitialized = true;
+      constexpr std::uint32_t kNeeded = gpg::gal::kGpuFeatureCompute | gpg::gal::kGpuFeatureIndirectDraw;
+      mClassifySupported =
+        (gpg::gal::Device::GetInstance()->GetGpuDrivenFeatures() & kNeeded) == kNeeded && CreateClassifyResources();
+      if (mClassifySupported) {
+        gpg::Logf("Strategic icons: GPU classification (ren_GpuIconClassify)");
+      }
+    }
+    return mClassifySupported;
+  }
+
+  bool StrategicIconRenderer::CreateClassifyResources()
+  {
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    gpg::gal::GpuProgramDesc desc{};
+    desc.source = kStrategicIconClassifyShaderSource;
+    desc.sourceBytes = sizeof(kStrategicIconClassifyShaderSource) - 1U;
+    desc.name = "StrategicIconClassify";
+    desc.computeEntry = "ClassifyIconsCS";
+    mClassifyProgram = device->CreateGpuProgram(desc);
+    desc.name = "StrategicIconCompact";
+    desc.computeEntry = "CompactIconsCS";
+    mCompactProgram = device->CreateGpuProgram(desc);
+
+    gpg::gal::GpuBufferDesc argsDesc{};
+    argsDesc.name = "StrategicIconDrawArgs";
+    argsDesc.kind = gpg::gal::GpuBufferKind::IndirectArgs;
+    argsDesc.stride = 16U;
+    argsDesc.capacity = 1U;
+    argsDesc.shaderWrite = true;
+    mDrawArgs = device->CreateGpuBuffer(argsDesc);
+    return mClassifyProgram != nullptr && mCompactProgram != nullptr && mDrawArgs != nullptr;
+  }
+
+  bool StrategicIconRenderer::EnsureClassifyCapacity(const std::uint32_t count)
+  {
+    if (count <= mClassifyCapacity && mStaged != nullptr) {
+      return true;
+    }
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    const std::uint32_t capacity = std::max<std::uint32_t>(4096U, count + count / 2U);
+    const auto create = [&](const char* const name, const std::uint32_t stride) {
+      gpg::gal::GpuBufferDesc desc{};
+      desc.name = name;
+      desc.stride = stride;
+      desc.capacity = capacity;
+      desc.shaderWrite = true;
+      return device->CreateGpuBuffer(desc);
+    };
+    mStaged = create("StrategicIconStaged", sizeof(StrategicIconInstance));
+    mRunOf = create("StrategicIconRunOf", sizeof(std::uint32_t));
+    mOutput = create("StrategicIconOutput", sizeof(StrategicIconInstance));
+    if (mStaged == nullptr || mRunOf == nullptr || mOutput == nullptr) {
+      mStaged.reset();
+      mClassifyCapacity = 0U;
+      return false;
+    }
+    mClassifyCapacity = capacity;
+    return true;
+  }
+
+  bool StrategicIconRenderer::DrawClassified(
+    CD3DPrimBatcher& batcher,
+    const void* const viewKey,
+    const std::span<const StrategicIconSourceRecord> sources,
+    const std::uint64_t sourcesVersion,
+    const std::span<const std::uint32_t> selectionBits,
+    const std::uint64_t selectionVersion,
+    const StrategicIconClassifyConstants& constants
+  )
+  {
+    if (!mClassifySupported || batcher.mTextureBatcher == nullptr) {
+      return false;
+    }
+    ++mFrame;
+    const auto count = static_cast<std::uint32_t>(sources.size());
+    mLastClassifiedSources = 0U;
+    if (count == 0U) {
+      return RefreshAtlasSlots(batcher);
+    }
+    gpg::gal::Texture* const atlasTexture = PrepareDraw(batcher);
+    if (atlasTexture == nullptr || mSlotBuffer == nullptr || !EnsureClassifyCapacity(count)) {
+      return false;
+    }
+
+    ViewStream& stream = StreamFor(viewKey);
+    if (stream.mSourcesVersion != sourcesVersion || stream.mSources.Buffer() == nullptr) {
+      if (stream.mSources.Update(sources.data(), sources.size()) == nullptr) {
+        return false;
+      }
+      stream.mSourcesVersion = sourcesVersion;
+    }
+    if (stream.mSelectionVersion != selectionVersion || stream.mSelection.Buffer() == nullptr) {
+      // Never empty, so the buffer always exists.
+      static const std::uint32_t kNoSelection = 0U;
+      const bool empty = selectionBits.empty();
+      if (stream.mSelection.Update(empty ? &kNoSelection : selectionBits.data(), empty ? 1U : selectionBits.size()) == nullptr) {
+        return false;
+      }
+      stream.mSelectionVersion = selectionVersion;
+    }
+
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    StrategicIconClassifyConstants frame = constants;
+    frame.mCount = count;
+
+    std::optional<gpg::gal::RenderProfileScope> profileCompute(std::in_place, "IconCompute"); // FAF instrumentation
+    gpg::gal::GpuDispatch classify{};
+    classify.program = mClassifyProgram.get();
+    classify.bindings.constants = &frame;
+    classify.bindings.constantBytes = sizeof(frame);
+    classify.bindings.readBuffers[0] = stream.mSources.Buffer();
+    classify.bindings.readBuffers[1] = stream.mSelection.Buffer();
+    classify.bindings.writeBuffers[0] = mStaged.get();
+    classify.bindings.writeBuffers[1] = mRunOf.get();
+    classify.groupsX = (count + kIconClassifyGroupSize - 1U) / kIconClassifyGroupSize;
+    device->DispatchGpuProgram(classify);
+
+    gpg::gal::GpuDispatch compact{};
+    compact.program = mCompactProgram.get();
+    compact.bindings.constants = &frame;
+    compact.bindings.constantBytes = sizeof(frame);
+    compact.bindings.readBuffers[0] = mStaged.get();
+    compact.bindings.readBuffers[1] = mRunOf.get();
+    compact.bindings.writeBuffers[0] = mOutput.get();
+    compact.bindings.writeBuffers[1] = mDrawArgs.get();
+    compact.groupsX = 1U;
+    device->DispatchGpuProgram(compact);
+    profileCompute.reset();
+
+    DrawConstants drawConstants{};
+    drawConstants.composite = VMatrix4::Multiply(batcher.mViewMatrix, batcher.mProjectionMatrix);
+    gpg::gal::GpuDrawCall call{};
+    call.program = mProgram.get();
+    call.bindings.constants = &drawConstants;
+    call.bindings.constantBytes = sizeof(drawConstants);
+    call.bindings.readBuffers[0] = mOutput.get();
+    call.bindings.readBuffers[1] = mSlotBuffer.get();
+    call.bindings.textures[0] = atlasTexture;
+    call.indirectArgs = mDrawArgs.get();
+    device->DrawGpuProgram(call);
+    mLastClassifiedSources = count;
+    return true;
+  }
+
+  bool StrategicIconRenderer::ReadBackClassified(std::vector<StrategicIconInstance>& out)
+  {
+    out.clear();
+    if (!mClassifySupported || mLastClassifiedSources == 0U) {
+      return mClassifySupported;
+    }
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    std::uint32_t args[4] = {};
+    if (!device->ReadGpuBuffer(*mDrawArgs, 0U, 1U, args)) {
+      return false;
+    }
+    const std::uint32_t drawn = std::min(args[1], mLastClassifiedSources);
+    out.resize(drawn);
+    return drawn == 0U || device->ReadGpuBuffer(*mOutput, 0U, drawn, out.data());
   }
 } // namespace moho

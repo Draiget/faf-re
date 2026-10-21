@@ -31,6 +31,7 @@ namespace gpg::gal
 {
   class GpuBuffer;
   class GpuProgram;
+  class Texture;
 } // namespace gpg::gal
 
 namespace moho
@@ -40,6 +41,11 @@ namespace moho
 
   /// `ren_GpuIcons`: draw strategic icons through StrategicIconRenderer when the backend can.
   extern bool ren_GpuIcons;
+  /// `ren_GpuIconClassify`: also classify them on the GPU (with `ren_GpuIcons` and `ui_IconRecords`).
+  extern bool ren_GpuIconClassify;
+
+  struct StrategicIconSourceRecord;
+  struct StrategicIconClassifyConstants;
 
   /** One icon as the GPU reads it (`IconInstance` in StrategicIconShader.h). */
   struct StrategicIconInstance
@@ -82,6 +88,38 @@ namespace moho
      */
     [[nodiscard]] bool Draw(CD3DPrimBatcher& batcher, const void* viewKey, std::span<const StrategicIconInstance> instances);
 
+    /**
+     * `IsActive()`, `ren_GpuIconClassify` is on and the backend has compute
+     * shaders and indirect draws (creates the classification programs on first use).
+     */
+    [[nodiscard]] bool IsClassifyActive();
+
+    /**
+     * Main thread: classifies `sources` on the GPU (StrategicIconClassifyShader.h)
+     * against `constants` (whose `mCount` is set here) and `selectionBits` (one
+     * bit per source), and draws the records it produces for the view
+     * `viewKey` with one indirect draw. Each array is compared and uploaded
+     * again only when its version differs from the one this view last drew
+     * with. Returns false, having drawn nothing, when the renderer declines;
+     * the caller then classifies on the CPU.
+     */
+    [[nodiscard]] bool DrawClassified(
+      CD3DPrimBatcher& batcher,
+      const void* viewKey,
+      std::span<const StrategicIconSourceRecord> sources,
+      std::uint64_t sourcesVersion,
+      std::span<const std::uint32_t> selectionBits,
+      std::uint64_t selectionVersion,
+      const StrategicIconClassifyConstants& constants
+    );
+
+    /**
+     * Diagnostics (FAF_ICON_GPU_CHECK): the records the last `DrawClassified`
+     * drew, in draw order, read back from the GPU. Waits for the GPU; false when
+     * the backend cannot read buffers back.
+     */
+    [[nodiscard]] bool ReadBackClassified(std::vector<StrategicIconInstance>& out);
+
   private:
     struct Slot
     {
@@ -97,12 +135,22 @@ namespace moho
       const void* mViewKey = nullptr;
       std::uint64_t mLastUsedFrame = 0U;
       GpuArrayStream mRecords{"StrategicIcons", sizeof(StrategicIconInstance)};
+      // `DrawClassified`: the view's sources and selection bits, and the versions they hold.
+      GpuArrayStream mSources{"StrategicIconSources", 64U};
+      GpuArrayStream mSelection{"StrategicIconSelection", sizeof(std::uint32_t)};
+      std::uint64_t mSourcesVersion = ~0ULL;
+      std::uint64_t mSelectionVersion = ~0ULL;
     };
 
     bool CreateResources();
+    bool CreateClassifyResources();
+    /** The classification work buffers, grown to hold `count` sources. */
+    bool EnsureClassifyCapacity(std::uint32_t count);
     /** Re-reads every slot's atlas rectangle; false when the atlas cannot hold them. */
     bool RefreshAtlasSlots(CD3DPrimBatcher& batcher);
     void UploadSlots();
+    /** Everything both draws need first: the atlas slots, the batcher flushed, the atlas texture. */
+    [[nodiscard]] gpg::gal::Texture* PrepareDraw(CD3DPrimBatcher& batcher);
     ViewStream& StreamFor(const void* viewKey);
 
     bool mInitialized = false;
@@ -115,5 +163,16 @@ namespace moho
     std::vector<Slot> mSlots;
     std::unordered_map<const CD3DBatchTexture*, std::uint16_t> mSlotByTexture;
     std::vector<ViewStream> mStreams;
+
+    bool mClassifyInitialized = false;
+    bool mClassifySupported = false;
+    boost::shared_ptr<gpg::gal::GpuProgram> mClassifyProgram;
+    boost::shared_ptr<gpg::gal::GpuProgram> mCompactProgram;
+    std::uint32_t mClassifyCapacity = 0U;
+    boost::shared_ptr<gpg::gal::GpuBuffer> mStaged;  // one record per source
+    boost::shared_ptr<gpg::gal::GpuBuffer> mRunOf;   // one run per source
+    boost::shared_ptr<gpg::gal::GpuBuffer> mOutput;  // the records in draw order
+    boost::shared_ptr<gpg::gal::GpuBuffer> mDrawArgs;
+    std::uint32_t mLastClassifiedSources = 0U;
   };
 } // namespace moho

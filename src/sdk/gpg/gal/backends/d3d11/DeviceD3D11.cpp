@@ -2263,6 +2263,11 @@ namespace gpg::gal
     }
   }
 
+  bool DeviceD3D11::ReadGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, void* const out)
+  {
+    return mGpuDriven != nullptr && mGpuDriven->ReadBuffer(buffer, firstElement, count, out);
+  }
+
   bool DeviceD3D11::GetRuntimeInfo(DeviceRuntimeInfo& out)
   {
     if (mDevice == nullptr) {

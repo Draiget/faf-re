@@ -637,6 +637,12 @@ namespace gpg::gal
     virtual void EndProfileRegion(std::uint32_t region);
     /** Fills `out` with the backend, adapter and memory state (`ren_Info`); false here. */
     virtual bool GetRuntimeInfo(DeviceRuntimeInfo& out);
+    /**
+     * Copies elements [firstElement, firstElement + count) of `buffer` into
+     * `out`, waiting for the GPU to finish writing them. Diagnostics only
+     * (self-checks of GPU-driven passes); false here.
+     */
+    virtual bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

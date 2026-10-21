@@ -5320,6 +5320,9 @@
     <ClInclude Include="moho\render\StrategicIconShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\render\StrategicIconClassifyShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\render\StrategicIconRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
