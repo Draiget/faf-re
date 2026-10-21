@@ -4,6 +4,7 @@
 #include <d3d9.h>
 
 #include <algorithm>
+#include <chrono>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -214,6 +215,10 @@ namespace
    * frames: figures to compare renderer changes by without driving the UI.
    * An instanced draw counts once, with one instance's primitives.
    */
+  // Seconds spent inside the backend's Present since the last stats line
+  // (FAF instrumentation, see DrawStatisticsLog).
+  double sPresentSeconds = 0.0;
+
   class DrawStatisticsLog
   {
   public:
@@ -224,6 +229,10 @@ namespace
       }
       if (mInterval == 0) {
         return;
+      }
+      if (mFrames == 0) {
+        mStart = std::chrono::steady_clock::now();
+        sPresentSeconds = 0.0;
       }
 
       mDrawCalls += frame.drawCalls;
@@ -238,6 +247,13 @@ namespace
         "Draw stats over %d frames: %.1f draw calls, %.0f primitives, %.0f vertices per frame",
         mFrames, static_cast<double>(mDrawCalls) / frames, static_cast<double>(mPrimitives) / frames,
         static_cast<double>(mVertices) / frames
+      );
+      // Wall time per frame, and the part not spent waiting in Present
+      // (vsync), which is what a renderer change moves.
+      const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - mStart).count();
+      gpg::Logf(
+        "Frame time over %d frames: %.2f ms/frame (%.1f fps), %.2f ms/frame outside Present", mFrames,
+        1000.0 * seconds / frames, frames / seconds, 1000.0 * (seconds - sPresentSeconds) / frames
       );
       LogEntityCounts();
       mFrames = 0;
@@ -287,6 +303,7 @@ namespace
 
     int mInterval = -1; // -1 until the environment has been read
     int mFrames = 0;
+    std::chrono::steady_clock::time_point mStart{};
     std::uint64_t mDrawCalls = 0;
     std::uint64_t mPrimitives = 0;
     std::uint64_t mVertices = 0;
@@ -1720,7 +1737,9 @@ namespace moho
         (void)InitContext(context);
       }
 
+      const auto presentStart = std::chrono::steady_clock::now();
       device->Present();
+      sPresentSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - presentStart).count();
       (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderPresentCount, "Render_PresentCount"), 1);
 
       if (mClearEnabled != 0) {

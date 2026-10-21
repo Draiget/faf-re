@@ -84,6 +84,9 @@ namespace gpg::gal
 		case DeviceApi::Direct3D9:
 			return ChooseHardwareVertexFormatter(sHardwareVertexFormattersD3D9);
 		case DeviceApi::Direct3D10:
+		// FAF addition: Direct3D 11 builds the same vertex formats 14/15 as
+		// D3D10 (the formatters only ask the active device for them).
+		case DeviceApi::Direct3D11:
 			return ChooseHardwareVertexFormatter(sHardwareVertexFormattersD3D10);
 		default:
 			throw Error(

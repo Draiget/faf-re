@@ -22,7 +22,23 @@ namespace gpg::gal
         Unset = 0,
         Direct3D9 = 1,
         Direct3D10 = 2,
+        // FAF addition, not in the shipped binary: the Direct3D 11 backend
+        // (`DeviceD3D11`, selected with /d3d11).
+        Direct3D11 = 3,
     };
+
+    /**
+     * FAF addition, not in the shipped binary.
+     *
+     * True for the APIs whose effects are written in the D3D10 dialect -
+     * d3d10states.compat, `technique10`, shader model 4 - and whose mesh
+     * formatters are the D3D10 ones. Direct3D 11 runs the D3D10 effect path
+     * unchanged, so every engine branch on "is this D3D10" asks this instead.
+     */
+    [[nodiscard]] constexpr bool UsesD3D10EffectDialect(const DeviceApi api) noexcept
+    {
+        return api == DeviceApi::Direct3D10 || api == DeviceApi::Direct3D11;
+    }
 
     /**
      * VFTABLE: 0x00D420B4

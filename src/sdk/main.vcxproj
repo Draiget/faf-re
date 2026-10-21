@@ -211,7 +211,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;d3d11.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\d3dcompiler.lib;dxgi.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
@@ -273,7 +273,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;d3d11.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\d3dcompiler.lib;dxgi.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <!-- Mirror of the Debug link, which excludes the release CRT so nothing
            can drag it in beside the debug one. This configuration uses the
@@ -346,7 +346,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;d3d11.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\d3dcompiler.lib;dxgi.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
@@ -391,7 +391,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;d3d11.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\d3dcompiler.lib;dxgi.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
@@ -477,6 +477,71 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     </MASM>
     <ClCompile Include="lua\LuaAssertion.cpp" />
     <ClCompile Include="gpg\gal\backends\d3d10\D3D10Interfaces.cpp" />
+    <ClCompile Include="gpg\gal\backends\d3d11\D3D11Effects.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\d3d11\D3D11Resources.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\d3d11\D3D11VertexLayouts.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\d3d11\DeviceD3D11.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\d3d11\EffectSourceD3D11.cpp" />
+    <ClCompile Include="gpg\gal\backends\common\BackendErrors.cpp" />
+    <ClCompile Include="gpg\gal\backends\dxgi\DxgiFormats.cpp" />
+    <ClCompile Include="gpg\gal\backends\dxgi\DxgiFactory.cpp" />
+    <ClCompile Include="gpg\gal\backends\dxgi\DxgiSwapChain.cpp" />
+    <ClCompile Include="$(FafRepoRoot)dependencies\FX11\d3dxGlobal.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11;$(FafRepoRoot)dependencies\FX11\inc;$(FafRepoRoot)dependencies\FX11\Binary;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)fx11_d3dxGlobal.obj</ObjectFileName>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="$(FafRepoRoot)dependencies\FX11\EffectAPI.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11;$(FafRepoRoot)dependencies\FX11\inc;$(FafRepoRoot)dependencies\FX11\Binary;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)fx11_EffectAPI.obj</ObjectFileName>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="$(FafRepoRoot)dependencies\FX11\EffectLoad.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11;$(FafRepoRoot)dependencies\FX11\inc;$(FafRepoRoot)dependencies\FX11\Binary;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)fx11_EffectLoad.obj</ObjectFileName>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="$(FafRepoRoot)dependencies\FX11\EffectNonRuntime.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11;$(FafRepoRoot)dependencies\FX11\inc;$(FafRepoRoot)dependencies\FX11\Binary;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)fx11_EffectNonRuntime.obj</ObjectFileName>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="$(FafRepoRoot)dependencies\FX11\EffectReflection.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11;$(FafRepoRoot)dependencies\FX11\inc;$(FafRepoRoot)dependencies\FX11\Binary;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)fx11_EffectReflection.obj</ObjectFileName>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="$(FafRepoRoot)dependencies\FX11\EffectRuntime.cpp">
+      <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11;$(FafRepoRoot)dependencies\FX11\inc;$(FafRepoRoot)dependencies\FX11\Binary;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)fx11_EffectRuntime.obj</ObjectFileName>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="gpg\core\reflection\Reflection.cpp" />
     <ClCompile Include="lua\LuaTableIterator.cpp" />
     <ClCompile Include="lua\LuaDump.cpp" />
@@ -1542,6 +1607,19 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\core\utils\Logging.h" />
     <ClInclude Include="gpg\core\utils\Sync.h" />
     <ClInclude Include="gpg\core\utils\Tss.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\BufferD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\common\BackendErrors.h" />
+    <ClInclude Include="gpg\gal\backends\dxgi\DxgiFormats.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\D3D11Common.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\D3D11VertexLayouts.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\DeviceD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\EffectSourceD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\EffectD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\PipelineStateD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\RenderTargetD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\TextureD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\dxgi\DxgiFactory.h" />
+    <ClInclude Include="gpg\gal\backends\dxgi\DxgiSwapChain.h" />
     <ClInclude Include="gpg\gal\backends\d3d10\AdapterD3D10.hpp" />
     <ClInclude Include="gpg\gal\backends\d3d10\CubeRenderTargetD3D10.hpp" />
     <ClInclude Include="gpg\gal\backends\d3d10\CursorD3D10.hpp" />

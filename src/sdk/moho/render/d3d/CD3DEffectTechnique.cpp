@@ -66,7 +66,7 @@ namespace moho
     {
       constexpr std::string_view kMacroName = "FAF_BONE_TEXTURE";
 
-      if (deviceContext == nullptr || deviceContext->mDeviceType == gpg::gal::DeviceApi::Direct3D10) {
+      if (deviceContext == nullptr || gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType)) {
         return false;
       }
 
@@ -434,7 +434,7 @@ namespace moho
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       const gpg::gal::DeviceContext* const deviceContext = (device != nullptr) ? device->GetDeviceContext() : nullptr;
       const char* const compatResourcePath =
-        (deviceContext != nullptr && deviceContext->mDeviceType == gpg::gal::DeviceApi::Direct3D10)
+        (deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType))
           ? "/effects/d3d10states.compat"
           : "/effects/d3d9states.compat";
 
