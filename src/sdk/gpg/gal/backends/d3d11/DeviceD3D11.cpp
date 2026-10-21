@@ -137,7 +137,7 @@ namespace gpg::gal
     // HLSL flags as DeviceD3D10::CreateEffect.
     constexpr const char* kEffectProfile = "fx_5_0";
     // Bump when EffectSourceD3D11's output changes, to retire cached blobs.
-    constexpr const char* kTranslatorVersion = "translator 3";
+    constexpr const char* kTranslatorVersion = "translator 4";
     constexpr UINT kEffectCompileFlags = D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     constexpr UINT kHelperCompileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 
@@ -332,6 +332,7 @@ namespace gpg::gal
     }
     outputContext_ = OutputContext();
     mHeadOutputContexts.clear();
+    mGpuDriven.reset();
     mSwapChains.clear(); // leaves exclusive full screen first
     mShaderInputLayouts.clear();
     for (ComPtr<ID3D11InputLayout>& layout : mInputLayouts) {
@@ -355,6 +356,8 @@ namespace gpg::gal
     mPipelineState.reset();
     mCursor.Destroy();
     mInfoQueue.Reset();
+    mDecodeContext.Reset();
+    mDecodeDevice.Reset();
     mImmediate.Reset();
     mDevice.Reset();
     mD3DX11.reset();
@@ -726,11 +729,13 @@ namespace gpg::gal
 
     CheckAvailableFormats(context);
     CreateRenderTargets();
+    mGpuDriven = std::make_unique<GpuDrivenD3D11>(mDevice.Get(), mImmediate.Get(), mFeatureLevel);
 
     gpg::Logf(
-      "D3D11: ready (%d head(s), effects fx_5_0 via Effects 11, vsync %s)",
+      "D3D11: ready (%d head(s), effects fx_5_0 via Effects 11, vsync %s, GPU-driven features 0x%X)",
       mDeviceContext.GetHeadCount(),
-      mDeviceContext.mVSync ? "on" : "off"
+      mDeviceContext.mVSync ? "on" : "off",
+      mGpuDriven->Features()
     );
   }
 
@@ -1386,6 +1391,20 @@ namespace gpg::gal
 
     // As D3D10 (0x008FCAC0): one level of BC3, read back to the CPU. D3DX11
     // decodes straight into a staging texture.
+    //
+    // The resource prefetch thread calls this while the render thread draws.
+    // Decoding on the render device mapped a staging texture on the shared
+    // immediate context: the map holds the context's multithread lock while
+    // the driver waits for the GPU, and the render thread's next call blocked
+    // on that lock (the stress map hung on load). The decode is a CPU job, so
+    // it runs on a private WARP device with its own context and lock.
+    const std::lock_guard<std::mutex> decodeLock(mDecodeMutex);
+    if (mDecodeDevice == nullptr) {
+      CheckHresult(
+        "DeviceD3D11.cpp", __LINE__,
+        ::D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0U, nullptr, 0U, D3D11_SDK_VERSION, &mDecodeDevice, nullptr, &mDecodeContext)
+      );
+    }
     D3DX11_IMAGE_LOAD_INFO loadInfo;
     loadInfo.MipLevels = 1U;
     loadInfo.Format = DXGI_FORMAT_BC3_UNORM;
@@ -1396,7 +1415,7 @@ namespace gpg::gal
     ComPtr<ID3D11Resource> decoded;
     CheckHresult(
       "DeviceD3D11.cpp", __LINE__,
-      mD3DX11->createTextureFromMemory(mDevice.Get(), sourceData, sourceBytes, &loadInfo, nullptr, &decoded, nullptr)
+      mD3DX11->createTextureFromMemory(mDecodeDevice.Get(), sourceData, sourceBytes, &loadInfo, nullptr, &decoded, nullptr)
     );
     ComPtr<ID3D11Texture2D> staging;
     CheckHresult("DeviceD3D11.cpp", __LINE__, decoded.As(&staging));
@@ -1407,7 +1426,7 @@ namespace gpg::gal
     *outHeight = static_cast<int>(desc.Height);
 
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    CheckHresult("DeviceD3D11.cpp", __LINE__, mImmediate->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped));
+    CheckHresult("DeviceD3D11.cpp", __LINE__, mDecodeContext->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped));
 
     const std::uint32_t rowBytes = 16U * ((desc.Width + 3U) / 4U);
     const std::uint32_t rowCount = (desc.Height + 3U) / 4U;
@@ -1422,7 +1441,7 @@ namespace gpg::gal
                   sourceRows + static_cast<std::size_t>(row) * mapped.RowPitch,
                   rowBytes);
     }
-    mImmediate->Unmap(staging.Get(), 0U);
+    mDecodeContext->Unmap(staging.Get(), 0U);
   }
 
   boost::weak_ptr<void>* DeviceD3D11::Func7(boost::weak_ptr<void>* const outWeakHandle, boost::shared_ptr<void> temporarySharedHandle)
@@ -1644,14 +1663,27 @@ namespace gpg::gal
     }
     DumpBackBufferIfDue();
     LogDebugLayerMessages();
+    if (mGpuDriven != nullptr) {
+      mGpuDriven->EndProfileFrame();
+    }
     const bool vsync = mDeviceContext.mVSync;
     bool flipModel = false;
     for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
       const HRESULT result = swapChain->Present(vsync);
       if (FAILED(result)) {
         if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET) {
+          // Nothing drawn after this reaches the screen, and every later call
+          // fails too: throwing here flooded the log with the same warning
+          // until the session aborted behind a crash dialog. Say why once and
+          // leave with the reason as the exit code, without the dialog or the
+          // exit-time destructors that would touch the dead device.
           const HRESULT reason = mDevice->GetDeviceRemovedReason();
-          gpg::Warnf("D3D11: device removed (reason 0x%08lX)", static_cast<unsigned long>(reason));
+          gpg::Warnf(
+            "D3D11: device removed (reason 0x%08lX); exiting. Run with /d3d11debug for the cause, or without /d3d11 for Direct3D 9.",
+            static_cast<unsigned long>(reason)
+          );
+          LogDebugLayerMessages();
+          ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(reason != S_OK ? reason : result));
         }
         d3d11::ThrowHresult("DeviceD3D11.cpp", __LINE__, result);
       }
@@ -1718,8 +1750,29 @@ namespace gpg::gal
             surface ? surface->width_ : 0U, surface ? surface->height_ : 0U, surface ? surface->format_ : 0U,
             (context != nullptr) ? context->depthStencil.get() : nullptr, depth ? depth->width_ : 0U, depth ? depth->height_ : 0U);
     }
+    const RenderTarget* const previousSurface = outputContext_.surface.get();
     Device::ClearTarget(context);
     BindOutputContext();
+
+    // DeviceD3D9::ClearTarget calls SetRenderTarget when the colour surface
+    // changes, and D3D9 then resets the viewport to the whole new target; the
+    // engine relies on it: it binds the 1024x1024 shadow target and clears it
+    // while the 1280x720 screen viewport is still set, and only then sets its
+    // own viewport. Without the reset the clear covered 1280x720 of it and the
+    // rest kept stale depth (a dark shadow band that moved with the camera, a
+    // darkened build glow). Rebinding the same surface, or changing only the
+    // depth target, keeps the viewport, as in D3D9.
+    if (outputContext_.surface != nullptr && outputContext_.surface.get() != previousSurface) {
+      const RenderTargetContext* const surface = outputContext_.surface->GetContext();
+      D3DVIEWPORT9 viewport{};
+      viewport.X = 0U;
+      viewport.Y = 0U;
+      viewport.Width = surface->width_;
+      viewport.Height = surface->height_;
+      viewport.MinZ = 0.0f;
+      viewport.MaxZ = 1.0f;
+      SetViewport(&viewport);
+    }
   }
 
   void DeviceD3D11::Clear(
@@ -1946,6 +1999,7 @@ namespace gpg::gal
     mImmediate->IASetInputLayout(format->GetInputLayout());
     mBoundFormat = format->formatCode_;
     mInputLayoutDirty = true;
+    RecordStateChange();
   }
 
   void DeviceD3D11::SetPassVertexShader(const void* const bytecode, const SIZE_T length)
@@ -2052,15 +2106,25 @@ namespace gpg::gal
     const UINT stride = context->stride_;
     const UINT offset = static_cast<UINT>(startVertex) * stride;
     mImmediate->IASetVertexBuffers(streamSlot, 1U, &buffer, &stride, &offset);
+    RecordStateChange();
 
-    // As D3D10: slot 0's frequency is the instance count the draws use.
-    mStreamFrequencies[streamSlot] = streamFrequencyToken;
+    // Slot 0's frequency is the instance count the draws use, read the way
+    // DeviceD3D9::SetVertexBuffer reads the token: only a geometry stream
+    // (type 2) repeats per instance, and the D3D9 stream-source flag bits are
+    // not part of the count. RangeRenderer passes
+    // `D3DSTREAMSOURCE_INDEXEDDATA | count`; taken raw, that drew about 2^30
+    // instances and hung the GPU (TDR) as soon as a range ring was on screen.
+    constexpr std::uint32_t kStreamSourceFlagMask = 0xC0000000U; // D3DSTREAMSOURCE_INDEXEDDATA | INSTANCEDATA
+    constexpr std::uint32_t kGeometryStreamType = 2U;
+    const std::uint32_t count = static_cast<std::uint32_t>(streamFrequencyToken) & ~kStreamSourceFlagMask;
+    mStreamFrequencies[streamSlot] = (context->type_ == kGeometryStreamType) ? static_cast<std::int32_t>(count) : 1;
   }
 
   void DeviceD3D11::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
   {
     auto* const buffer = static_cast<IndexBufferD3D11*>(indexBuffer.get());
     mImmediate->IASetIndexBuffer(buffer->GetBuffer(), buffer->GetIndexFormat(), 0U);
+    RecordStateChange();
   }
 
   void DeviceD3D11::SetFogState(const bool, const Matrix* const, const float, const float, const int) {}
@@ -2140,5 +2204,60 @@ namespace gpg::gal
     UINT support = 0U;
     return SUCCEEDED(mDevice->CheckFormatSupport(format, &support)) && (support & D3D11_FORMAT_SUPPORT_TEXTURE2D) != 0U &&
       (support & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) != 0U;
+  }
+
+  // ---------------------------------------------------------------------------
+  // GPU-driven additions (GpuDrivenD3D11)
+
+  std::uint32_t DeviceD3D11::GetGpuDrivenFeatures() const
+  {
+    return mGpuDriven != nullptr ? mGpuDriven->Features() : 0U;
+  }
+
+  boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)
+  {
+    return mGpuDriven != nullptr ? mGpuDriven->CreateBuffer(desc) : boost::shared_ptr<GpuBuffer>();
+  }
+
+  void DeviceD3D11::UpdateGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, const void* const data)
+  {
+    if (mGpuDriven != nullptr) {
+      mGpuDriven->UpdateBuffer(buffer, firstElement, count, data);
+    }
+  }
+
+  boost::shared_ptr<GpuProgram> DeviceD3D11::CreateGpuProgram(const GpuProgramDesc& desc)
+  {
+    return mGpuDriven != nullptr ? mGpuDriven->CreateProgram(desc) : boost::shared_ptr<GpuProgram>();
+  }
+
+  void DeviceD3D11::DrawGpuProgram(const GpuDrawCall& call)
+  {
+    if (mGpuDriven != nullptr) {
+      mGpuDriven->Draw(call);
+      // The draw replaced the input layout; the next engine draw rebuilds it.
+      mInputLayoutDirty = true;
+    }
+  }
+
+  void DeviceD3D11::DispatchGpuProgram(const GpuDispatch& dispatch)
+  {
+    if (mGpuDriven != nullptr) {
+      mGpuDriven->Dispatch(dispatch);
+    }
+  }
+
+  void DeviceD3D11::BeginProfileRegion(const std::uint32_t region)
+  {
+    if (mGpuDriven != nullptr) {
+      mGpuDriven->BeginProfileRegion(region);
+    }
+  }
+
+  void DeviceD3D11::EndProfileRegion(const std::uint32_t region)
+  {
+    if (mGpuDriven != nullptr) {
+      mGpuDriven->EndProfileRegion(region);
+    }
   }
 } // namespace gpg::gal

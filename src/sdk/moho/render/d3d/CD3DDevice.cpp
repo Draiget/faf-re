@@ -20,6 +20,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
+#include "gpg/gal/RenderProfiler.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/OutputContext.hpp"
@@ -238,15 +239,18 @@ namespace
       mDrawCalls += frame.drawCalls;
       mPrimitives += frame.primitives;
       mVertices += frame.vertices;
+      mStateChanges += frame.stateChanges;
+      mUploadBytes += frame.uploadBytes;
       if (++mFrames < mInterval) {
         return;
       }
 
       const double frames = static_cast<double>(mFrames);
       gpg::Logf(
-        "Draw stats over %d frames: %.1f draw calls, %.0f primitives, %.0f vertices per frame",
+        "Draw stats over %d frames: %.1f draw calls, %.0f primitives, %.0f vertices, %.1f state changes, %.1f KB uploaded per frame",
         mFrames, static_cast<double>(mDrawCalls) / frames, static_cast<double>(mPrimitives) / frames,
-        static_cast<double>(mVertices) / frames
+        static_cast<double>(mVertices) / frames, static_cast<double>(mStateChanges) / frames,
+        static_cast<double>(mUploadBytes) / frames / 1024.0
       );
       // Wall time per frame, and the part not spent waiting in Present
       // (vsync), which is what a renderer change moves.
@@ -260,6 +264,8 @@ namespace
       mDrawCalls = 0;
       mPrimitives = 0;
       mVertices = 0;
+      mStateChanges = 0;
+      mUploadBytes = 0;
     }
 
   private:
@@ -307,6 +313,8 @@ namespace
     std::uint64_t mDrawCalls = 0;
     std::uint64_t mPrimitives = 0;
     std::uint64_t mVertices = 0;
+    std::uint64_t mStateChanges = 0;
+    std::uint64_t mUploadBytes = 0;
   };
 
   DrawStatisticsLog sDrawStatisticsLog;
@@ -1190,6 +1198,7 @@ namespace moho
     (void)AddPrimStats(submitted.primitives, false);
     (void)AddVertexStats(submitted.vertices, false);
     sDrawStatisticsLog.AddFrame(submitted);
+    gpg::gal::RenderProfiler::Get().EndFrame(submitted);
   }
 
   /**

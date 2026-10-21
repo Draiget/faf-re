@@ -385,4 +385,32 @@ namespace gpg::gal
     {
         *outContext = outputContext_;
     }
+
+    // FAF additions, not in the shipped binary: the "not supported" bodies of
+    // the GPU-driven slots appended after slot 49 (Device.hpp, GpuDriven.h).
+
+    std::uint32_t Device::GetGpuDrivenFeatures() const
+    {
+        return 0U;
+    }
+
+    boost::shared_ptr<GpuBuffer> Device::CreateGpuBuffer(const GpuBufferDesc&)
+    {
+        return {};
+    }
+
+    void Device::UpdateGpuBuffer(GpuBuffer&, std::uint32_t, std::uint32_t, const void*) {}
+
+    boost::shared_ptr<GpuProgram> Device::CreateGpuProgram(const GpuProgramDesc&)
+    {
+        return {};
+    }
+
+    void Device::DrawGpuProgram(const GpuDrawCall&) {}
+
+    void Device::DispatchGpuProgram(const GpuDispatch&) {}
+
+    void Device::BeginProfileRegion(std::uint32_t) {}
+
+    void Device::EndProfileRegion(std::uint32_t) {}
 }

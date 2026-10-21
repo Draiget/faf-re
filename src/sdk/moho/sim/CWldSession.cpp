@@ -19,6 +19,8 @@
 #include <limits>
 #include <map>
 #include <new>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
@@ -26,6 +28,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/RenderProfiler.h"
+#include "moho/render/StrategicIconRenderer.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/containers/BVSet.h"
@@ -11974,6 +11978,104 @@ namespace moho
     };
 
     /**
+     * Engine addition (`ren_GpuIcons`): the GPU record of one placed icon - its floored screen
+     * point, tint, and the atlas slot of each quad `EmitUnitIconQuads` would draw, in its order
+     * (underlay, base, paused, stunned). `slotOf(texture)` names the slot; a layer whose slot it
+     * cannot name is left empty and the function returns false, so the caller can rebuild that
+     * record once the slot exists.
+     */
+    template <class SlotOf>
+    [[nodiscard]] bool BuildStrategicIconRecord(
+      const StrategicIconCandidate& candidate,
+      const StrategicIconAux& aux,
+      const UnitIconPlacement& placement,
+      SlotOf&& slotOf,
+      StrategicIconInstance& record
+    )
+    {
+      record = StrategicIconInstance{};
+      if (!placement.mVisible) {
+        return true;
+      }
+      record.SetPosition(placement.mScreenX, placement.mScreenY);
+      record.mColor = placement.mColor;
+
+      // The textures `StoreStrategicIcon` would attach: the picked icon, and the paused and
+      // stunned rest textures when the flags ask for them.
+      const UnitIconData& icon = candidate.mData;
+      const boost::shared_ptr<CD3DBatchTexture>* layers[StrategicIconInstance::kLayerCount] = {
+        placement.mUnderlay,
+        icon.mSuppressBaseIcon ? nullptr : candidate.mIcon,
+        (icon.mShowPausedOverlay && aux.mPauseRestTexture) ? &aux.mPauseRestTexture : nullptr,
+        (icon.mShowStunnedOverlay && aux.mStunnedRestTexture) ? &aux.mStunnedRestTexture : nullptr,
+      };
+      bool complete = true;
+      for (std::uint32_t layer = 0U; layer < StrategicIconInstance::kLayerCount; ++layer) {
+        if (layers[layer] == nullptr || !*layers[layer]) {
+          continue;
+        }
+        const std::uint16_t slot = slotOf(*layers[layer]);
+        if (slot == StrategicIconInstance::kNoLayer) {
+          complete = false;
+        }
+        record.SetLayer(layer, slot);
+      }
+      return complete;
+    }
+
+    /**
+     * Engine addition (`ren_GpuIcons`): phase 3.5 through `StrategicIconRenderer` - every icon of
+     * the four runs placed (on workers for large counts) straight from its classification
+     * candidate into its GPU record, records whose textures have no atlas slot yet completed on
+     * this thread, then one instanced draw. `icons` holds the candidates in draw order. Returns
+     * false, having drawn nothing, when the renderer declines (the caller then stores the
+     * candidates and draws through the batcher).
+     */
+    [[nodiscard]] bool DrawStrategicIconsOnGpu(
+      StrategicIconRenderer& renderer,
+      const StrategicIconAux& aux,
+      const void* const viewKey,
+      const std::vector<const StrategicIconCandidate*>& icons
+    )
+    {
+      const std::size_t count = icons.size();
+      static std::vector<StrategicIconInstance> sRecords;
+      static std::vector<UnitIconPlacement> sGpuPlacements;
+      static std::vector<std::uint8_t> sIncomplete;
+      sRecords.resize(count);
+      sGpuPlacements.resize(count);
+      sIncomplete.assign(count, 0U);
+
+      const auto findSlot = [&renderer](const boost::shared_ptr<CD3DBatchTexture>& texture) {
+        return renderer.FindSlot(texture.get());
+      };
+      const auto build = [&](const std::size_t begin, const std::size_t end) {
+        for (std::size_t i = begin; i < end; ++i) {
+          sGpuPlacements[i] = PlaceUnitIcon(icons[i]->mData, aux);
+          if (!BuildStrategicIconRecord(*icons[i], aux, sGpuPlacements[i], findSlot, sRecords[i])) {
+            sIncomplete[i] = 1U;
+          }
+        }
+      };
+      if (UseParallelIcons(count)) {
+        CUserWorkerPool::Get().ParallelFor(count, kParallelIconChunk, build);
+      } else {
+        build(0U, count);
+      }
+
+      // Textures seen for the first time get their slot here, on this thread.
+      const auto addSlot = [&renderer](const boost::shared_ptr<CD3DBatchTexture>& texture) {
+        return renderer.AddSlot(texture);
+      };
+      for (std::size_t i = 0; i < count; ++i) {
+        if (sIncomplete[i] != 0U) {
+          (void)BuildStrategicIconRecord(*icons[i], aux, sGpuPlacements[i], addSlot, sRecords[i]);
+        }
+      }
+      return renderer.Draw(*aux.mBatcher, viewKey, std::span<const StrategicIconInstance>(sRecords.data(), count));
+    }
+
+    /**
      * Address: 0x0085D9A0 (FUN_0085D9A0, RenderUnitIcon)
      *
      * IDA signature:
@@ -12083,6 +12185,7 @@ namespace moho
     // An "attached" unit - one riding a transport or docked - normally has its
     // lifebar suppressed; this option puts it back.
     const bool showAttachedUnitLifebars = OPTIONS_GetBool("show_attached_unit_lifebars");
+    const gpg::gal::RenderProfileScope profileIcons("StrategicIcons"); // FAF instrumentation
 
     // --- Phase 1: lazy singleton build --------------------------------
     if (gStrategicIconAuxiliary == nullptr) {
@@ -12299,7 +12402,67 @@ namespace moho
 
     gpg::core::FastVectorInline<WeakPtr<UserEntity>>& frustumUnits = *camera->GetAllUnitsInFrustum();
     const std::size_t frustumUnitCount = frustumUnits.size();
-    if (!UseParallelIcons(frustumUnitCount)) {
+    std::optional<gpg::gal::RenderProfileScope> profilePhase(std::in_place, "IconClassify"); // FAF instrumentation
+    // Main-thread scratch, kept across frames so the chunk lists keep their capacity.
+    static std::vector<std::vector<StrategicIconCandidate>> sChunks;
+    // Engine addition (`ren_GpuIcons`): the candidates of the four icon runs in draw order.
+    static std::vector<const StrategicIconCandidate*> sGpuIcons;
+    StrategicIconRenderer& gpuIcons = StrategicIconRenderer::Get();
+    const bool gpuIconsActive = gpuIcons.IsActive();
+    sGpuIcons.clear();
+    if (gpuIconsActive) {
+      // Engine addition (`ren_GpuIcons`): classify into candidates as the parallel path does
+      // (one chunk when the count is small), but keep the icon runs as candidates instead of
+      // copying them into `aux`: the GPU records are built from them directly. Lifebar records
+      // are stored as before, in the same order.
+      const std::size_t chunkCount =
+        std::max<std::size_t>(1u, (frustumUnitCount + kParallelIconChunk - 1u) / kParallelIconChunk);
+      if (sChunks.size() < chunkCount) {
+        sChunks.resize(chunkCount);
+      }
+      const auto classifyChunk = [&](const std::size_t begin, const std::size_t end) {
+        std::vector<StrategicIconCandidate>& chunk = sChunks[begin / kParallelIconChunk];
+        chunk.clear();
+        const auto record = [&chunk](
+                              const EStrategicIconRun run,
+                              const UnitIconData& data,
+                              const boost::shared_ptr<CD3DBatchTexture>* const icon
+                            ) { chunk.push_back(StrategicIconCandidate{data, icon, run}); };
+        for (std::size_t i = begin; i < end; ++i) {
+          classify(frustumUnits[i], record);
+        }
+      };
+      if (UseParallelIcons(frustumUnitCount)) {
+        CUserWorkerPool::Get().ParallelFor(frustumUnitCount, kParallelIconChunk, classifyChunk);
+      } else {
+        classifyChunk(0u, frustumUnitCount);
+        for (std::size_t c = 1; c < chunkCount; ++c) {
+          sChunks[c].clear();
+        }
+      }
+      // Runs in draw order (ground, air, high priority, selected), each in classification order.
+      std::size_t runCounts[4] = {};
+      for (std::size_t c = 0; c < chunkCount; ++c) {
+        for (const StrategicIconCandidate& candidate : sChunks[c]) {
+          if (candidate.mRun == EStrategicIconRun::Lifebar) {
+            StoreStrategicIcon(aux, candidate.mRun, candidate.mData, candidate.mIcon);
+          } else {
+            ++runCounts[static_cast<std::size_t>(candidate.mRun)];
+          }
+        }
+      }
+      std::size_t runCursor[4] = {
+        0u, runCounts[0], runCounts[0] + runCounts[1], runCounts[0] + runCounts[1] + runCounts[2]
+      };
+      sGpuIcons.resize(runCursor[3] + runCounts[3]);
+      for (std::size_t c = 0; c < chunkCount; ++c) {
+        for (const StrategicIconCandidate& candidate : sChunks[c]) {
+          if (candidate.mRun != EStrategicIconRun::Lifebar) {
+            sGpuIcons[runCursor[static_cast<std::size_t>(candidate.mRun)]++] = &candidate;
+          }
+        }
+      }
+    } else if (!UseParallelIcons(frustumUnitCount)) {
       const auto storeInAux = [&aux](
                                 const EStrategicIconRun run,
                                 const UnitIconData& data,
@@ -12309,8 +12472,6 @@ namespace moho
         classify(frustumUnits[i], storeInAux);
       }
     } else {
-      // Main-thread scratch, kept across frames so the chunk lists keep their capacity.
-      static std::vector<std::vector<StrategicIconCandidate>> sChunks;
       const std::size_t chunkCount = (frustumUnitCount + kParallelIconChunk - 1u) / kParallelIconChunk;
       if (sChunks.size() < chunkCount) {
         sChunks.resize(chunkCount);
@@ -12344,11 +12505,27 @@ namespace moho
     // unit" slot and the formation-ghost pass that follow this in the
     // binary (`v148.playableRectX1` / "TStrategicFormationIcon") are still
     // deferred - see the function comment.
+    profilePhase.reset();
+    profilePhase.emplace("IconDraw");
     (void)primBatcher->Setup("TStrategicIcon");
 
+    // Engine addition (`ren_GpuIcons`): one instanced draw from per-icon GPU records when the
+    // backend can; the batcher path below otherwise. If the GPU path declines, the candidates go
+    // into the runs exactly as the batcher path stores them.
+    bool drawnOnGpu = false;
+    if (gpuIconsActive) {
+      drawnOnGpu = DrawStrategicIconsOnGpu(gpuIcons, aux, camera, sGpuIcons);
+      if (!drawnOnGpu) {
+        for (const StrategicIconCandidate* const candidate : sGpuIcons) {
+          StoreStrategicIcon(aux, candidate->mRun, candidate->mData, candidate->mIcon);
+        }
+      }
+    }
     const std::size_t drawnIconCount =
       aux.mGroundIcons.size() + aux.mAirIcons.size() + aux.mHighPriorityIcons.size() + aux.mSelectedIcons.size();
-    if (!UseParallelIcons(drawnIconCount)) {
+    if (drawnOnGpu) {
+      // Drawn: nothing left for the batcher.
+    } else if (!UseParallelIcons(drawnIconCount)) {
       for (UnitIconData& groundIcon : aux.mGroundIcons) {
         RenderUnitIcon(groundIcon, aux);
       }
@@ -12396,6 +12573,8 @@ namespace moho
     }
 
     primBatcher->Flush();
+    profilePhase.reset();
+    profilePhase.emplace("Lifebars");
 
     // --- Phase 4: draw the lifebar / label stack ------------------------
     // The icon-quad runs collected above are drawn by phase 3.5's

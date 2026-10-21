@@ -6,6 +6,7 @@
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/Matrix.h"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/Texture.hpp"
@@ -586,6 +587,32 @@ namespace gpg::gal
      * Ends the active effect technique.
      */
     virtual void EndTechnique() = 0;
+
+    // ------------------------------------------------------------------------
+    // FAF additions, not in the shipped binary: appended after the binary's 50
+    // slots, which keep their indices. Each has a base body that reports "not
+    // supported" (GpuDriven.h), so every backend compiles unchanged and a caller
+    // that asks `GetGpuDrivenFeatures()` first keeps its original path.
+
+    /** The `GpuDrivenFeature` bits this backend implements; 0 here. */
+    [[nodiscard]] virtual std::uint32_t GetGpuDrivenFeatures() const;
+    /** A buffer shaders read (and, with `shaderWrite`, compute shaders write); empty here. */
+    virtual boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc);
+    /** Overwrites elements [firstElement, firstElement + count) of `buffer` from `data`. */
+    virtual void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data);
+    /** Compiles an engine-owned HLSL program; empty here and on a compile error. */
+    virtual boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc);
+    /** One vertex-pulling draw (GpuDrivenFeature::kGpuFeatureVertexPulling); no-op here. */
+    virtual void DrawGpuProgram(const GpuDrawCall& call);
+    /** One compute dispatch (GpuDrivenFeature::kGpuFeatureCompute); no-op here. */
+    virtual void DispatchGpuProgram(const GpuDispatch& dispatch);
+    /**
+     * Brackets one `RenderProfiler` region with GPU timestamps
+     * (GpuDrivenFeature::kGpuFeatureTimestamps); the backend reports the times
+     * back to `RenderProfiler::AddGpuTime`. No-ops here.
+     */
+    virtual void BeginProfileRegion(std::uint32_t region);
+    virtual void EndProfileRegion(std::uint32_t region);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

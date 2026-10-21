@@ -1162,6 +1162,56 @@ void CScApp::Destroy()
   ::ClipCursor(nullptr);
 }
 
+namespace
+{
+  /**
+   * Engine addition: short name of a gal device API for the window title, or null for the
+   * original Direct3D 9 path (whose title stays the retail one).
+   */
+  [[nodiscard]] const char* DeviceApiTitleName(const gpg::gal::DeviceApi api) noexcept
+  {
+    switch (api) {
+      case gpg::gal::DeviceApi::Direct3D10:
+        return "D3D10";
+      case gpg::gal::DeviceApi::Direct3D11:
+        return "D3D11";
+      default:
+        return nullptr;
+    }
+  }
+
+  /**
+   * Engine addition: appends the renderer actually created (when it isn't Direct3D 9) and the
+   * `/title <label>` command-line label to the top-level window's title, e.g.
+   * "Forged Alliance [D3D11] replay-26935800", so side-by-side test windows can be told apart.
+   */
+  void ApplyWindowTitleDetails(const msvc8::string& baseTitle, const gpg::gal::DeviceContext& context)
+  {
+    msvc8::vector<msvc8::string> labelArgs;
+    const bool hasLabel = moho::CFG_GetArgOption("/title", 1, &labelArgs) && !labelArgs.empty();
+    const char* const apiName = DeviceApiTitleName(context.mDeviceType);
+    if ((!hasLabel && apiName == nullptr) || moho::sMainWindow == nullptr) {
+      return;
+    }
+
+    std::string title = baseTitle.c_str();
+    if (apiName != nullptr) {
+      title += " [";
+      title += apiName;
+      title += "]";
+    }
+    if (hasLabel) {
+      title += " ";
+      title += labelArgs[0].c_str();
+    }
+
+    const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+    if (const HWND topLevel = windowHandle != nullptr ? ::GetAncestor(windowHandle, GA_ROOT) : nullptr) {
+      ::SetWindowTextA(topLevel, title.c_str());
+    }
+  }
+} // namespace
+
 /**
  * Address: 0x008D0370 (FUN_008D0370)
  * Mangled: ?CreateDevice@CScApp@@AAE_NXZ
@@ -1356,7 +1406,9 @@ bool CScApp::CreateDevice()
   moho::SetupBasicMovieManager();
 
   gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  (void)device->GetDeviceContext();
+  if (const gpg::gal::DeviceContext* const createdContext = device->GetDeviceContext()) {
+    ApplyWindowTitleDetails(title, *createdContext);
+  }
   return true;
 }
 

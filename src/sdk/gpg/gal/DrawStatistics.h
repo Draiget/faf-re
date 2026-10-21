@@ -28,6 +28,12 @@ namespace gpg::gal
     std::uint32_t drawCalls = 0;
     std::uint32_t primitives = 0;
     std::uint32_t vertices = 0;
+    /// Bytes the CPU handed to the GPU: buffer locks/updates and texture uploads
+    /// (backends that count them; effect constant buffers are not included).
+    std::uint64_t uploadBytes = 0;
+    /// Pipeline state changes: effect passes applied, input layouts, vertex and
+    /// index buffers, textures and GPU-driven programs bound.
+    std::uint32_t stateChanges = 0;
   };
 
   [[nodiscard]] inline DrawStatistics& PendingDrawStatistics() noexcept
@@ -43,6 +49,18 @@ namespace gpg::gal
     ++pending.drawCalls;
     pending.primitives += primitiveCount;
     pending.vertices += vertexCount;
+  }
+
+  /** Called by a backend for every upload from the CPU (see `DrawStatistics::uploadBytes`). */
+  inline void RecordUpload(const std::uint64_t bytes) noexcept
+  {
+    PendingDrawStatistics().uploadBytes += bytes;
+  }
+
+  /** Called by a backend for every pipeline state change (see `DrawStatistics::stateChanges`). */
+  inline void RecordStateChange(const std::uint32_t count = 1U) noexcept
+  {
+    PendingDrawStatistics().stateChanges += count;
   }
 
   /** Returns everything recorded since the previous call and starts a new tally. */

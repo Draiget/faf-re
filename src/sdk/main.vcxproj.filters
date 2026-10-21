@@ -474,6 +474,9 @@
     <ClCompile Include="gpg\gal\Device.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\gal\RenderProfiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\gal\Effect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -508,6 +511,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\gal\backends\d3d11\EffectSourceD3D11.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\d3d11\GpuDrivenD3D11.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\gal\backends\common\BackendErrors.cpp">
@@ -1906,6 +1912,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\Cartographic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\GpuArrayStream.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\StrategicIconRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\Shadow.cpp">
@@ -3345,6 +3357,12 @@
     <ClInclude Include="gpg\gal\Device.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gpg\gal\RenderProfiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\gal\GpuDriven.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="gpg\gal\DeviceContext.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3478,6 +3496,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\d3d11\EffectSourceD3D11.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\gal\backends\d3d11\GpuDrivenD3D11.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\d3d11\EffectD3D11.h">
@@ -5281,6 +5302,18 @@
     <ClCompile Include="moho\render\camera\CameraTrackingListener.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\render\camera\CameraTrackingListener.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\render\Cartographic.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="moho\render\VisionShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\GpuArrayStream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\StrategicIconShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\StrategicIconRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\render\Shadow.h"><Filter>Header Files</Filter></ClInclude>
     
     <ClCompile Include="moho\render\MapImager.cpp"><Filter>Source Files</Filter></ClCompile>

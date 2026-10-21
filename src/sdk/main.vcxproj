@@ -490,6 +490,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <AdditionalIncludeDirectories>$(FafRepoRoot)dependencies\FX11\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="gpg\gal\backends\d3d11\EffectSourceD3D11.cpp" />
+    <ClCompile Include="gpg\gal\backends\d3d11\GpuDrivenD3D11.cpp" />
     <ClCompile Include="gpg\gal\backends\common\BackendErrors.cpp" />
     <ClCompile Include="gpg\gal\backends\dxgi\DxgiFormats.cpp" />
     <ClCompile Include="gpg\gal\backends\dxgi\DxgiFactory.cpp" />
@@ -1354,6 +1355,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\effects\rendering\CEffectImpl.cpp" />
     <ClCompile Include="moho\render\RangeRendererStartupRegistrations.cpp" />
     <ClCompile Include="moho\render\Cartographic.cpp" />
+    <ClCompile Include="moho\render\GpuArrayStream.cpp" />
+    <ClCompile Include="moho\render\StrategicIconRenderer.cpp" />
     <ClCompile Include="moho\render\Shadow.cpp" />
     <ClCompile Include="moho\render\SelectionBracketParams.cpp" />
     <ClCompile Include="moho\render\SelectionBracketRenderer.cpp" />
@@ -1512,6 +1515,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     </ClCompile>
     <ClCompile Include="gpg\gal\ContextInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Device.cpp" />
+    <ClCompile Include="gpg\gal\RenderProfiler.cpp" />
     <ClCompile Include="gpg\gal\Effect.cpp" />
     <ClCompile Include="gpg\gal\GalInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Matrix.cpp" />
@@ -1615,6 +1619,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\backends\d3d11\D3D11VertexLayouts.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\DeviceD3D11.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\EffectSourceD3D11.h" />
+    <ClInclude Include="gpg\gal\backends\d3d11\GpuDrivenD3D11.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\EffectD3D11.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\PipelineStateD3D11.h" />
     <ClInclude Include="gpg\gal\backends\d3d11\RenderTargetD3D11.h" />
@@ -1662,6 +1667,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\DepthStencilTarget.hpp" />
     <ClInclude Include="gpg\gal\DepthStencilTargetContext.hpp" />
     <ClInclude Include="gpg\gal\Device.hpp" />
+    <ClInclude Include="gpg\gal\RenderProfiler.h" />
+    <ClInclude Include="gpg\gal\GpuDriven.h" />
     <ClInclude Include="gpg\gal\DeviceContext.hpp" />
     <ClInclude Include="gpg\gal\DrawContext.hpp" />
     <ClInclude Include="gpg\gal\DrawIndexedContext.hpp" />
@@ -2524,6 +2531,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="lua\LuaError.h" />
     <ClInclude Include="moho\entity\EntityCategoryTypeInfo.h" />
     <ClInclude Include="moho\render\Cartographic.h" />
+    <ClInclude Include="moho\render\VisionShader.h" />
+    <ClInclude Include="moho\render\GpuArrayStream.h" />
+    <ClInclude Include="moho\render\StrategicIconShader.h" />
+    <ClInclude Include="moho\render\StrategicIconRenderer.h" />
     <ClInclude Include="moho\render\Shadow.h" />
     <ClInclude Include="moho\sim\EReconFlagsTypeInfo.h" />
     <ClInclude Include="moho\sim\ESTITargetTypeTypeInfo.h" />

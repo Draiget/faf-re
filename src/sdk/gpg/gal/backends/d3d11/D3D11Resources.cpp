@@ -14,6 +14,7 @@
 
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DrawStatistics.h"
 
 namespace gpg::gal
 {
@@ -179,6 +180,7 @@ namespace gpg::gal
       mImmediate->UpdateSubresource(
         mTexture2D.Get(), D3D11CalcSubresource(levelIndex, 0U, mDesc.MipLevels), nullptr, bytes.data(), layout.rowPitch, 0U
       );
+      RecordUpload(bytes.size());
     } else if (!mContentsFromEngine) {
       // A read of a file texture (the cursor icon): the GPU copy stays the
       // authority, so drop the CPU one.
@@ -403,6 +405,9 @@ namespace gpg::gal
       ThrowError(mKind, __LINE__, "buffer lock/unlock mismatch");
     }
 
+    if (mLockWrites) {
+      RecordUpload(mLockSize);
+    }
     if (mDynamic) {
       mImmediate->Unmap(mBuffer.Get(), 0U);
     } else if (mLockWrites && mLockSize != 0U) {
@@ -552,7 +557,8 @@ namespace gpg::gal
       desc.FillMode = D3D11_FILL_SOLID;
       desc.CullMode = cull;
       desc.FrontCounterClockwise = frontCounterClockwise;
-      desc.DepthClipEnable = FALSE;
+      // D3D9 always clips to the near and far planes.
+      desc.DepthClipEnable = TRUE;
       desc.ScissorEnable = FALSE;
       desc.MultisampleEnable = TRUE;
       desc.AntialiasedLineEnable = FALSE;

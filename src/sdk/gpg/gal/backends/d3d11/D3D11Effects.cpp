@@ -15,6 +15,7 @@
 #include "TextureD3D11.h"
 
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Matrix.h"
 
 namespace gpg::gal
@@ -204,6 +205,7 @@ namespace gpg::gal
       __LINE__,
       mTechnique->GetPassByIndex(static_cast<UINT>(pass))->Apply(0U, device.Immediate())
     );
+    RecordStateChange();
     D3DX11_PASS_SHADER_DESC vertexShader{};
     D3DX11_EFFECT_SHADER_DESC shaderDesc{};
     if (SUCCEEDED(mTechnique->GetPassByIndex(static_cast<UINT>(pass))->GetVertexShaderDesc(&vertexShader)) &&
@@ -293,6 +295,7 @@ namespace gpg::gal
     ID3D11ShaderResourceView* const view =
       (renderTarget != nullptr) ? static_cast<RenderTargetD3D11*>(renderTarget.get())->GetShaderResourceView() : nullptr;
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsShaderResource()->SetResource(view));
+    RecordStateChange();
   }
 
   void EffectVariableD3D11::SetTexture(const boost::shared_ptr<Texture> texture)
@@ -303,6 +306,7 @@ namespace gpg::gal
     ID3D11ShaderResourceView* const view =
       (texture != nullptr) ? static_cast<TextureD3D11*>(texture.get())->GetShaderResourceView() : nullptr;
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsShaderResource()->SetResource(view));
+    RecordStateChange();
   }
 
   void EffectVariableD3D11::SetMatrix4x4(const Matrix* const matrix)

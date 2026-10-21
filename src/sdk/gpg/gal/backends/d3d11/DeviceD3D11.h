@@ -13,6 +13,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <vector>
 
@@ -20,6 +21,7 @@
 #include <d3d11sdklayers.h>
 #include <wrl/client.h>
 
+#include "GpuDrivenD3D11.h"
 #include "PipelineStateD3D11.h"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
@@ -124,6 +126,16 @@ namespace gpg::gal
     void DrawPrimitive(const DrawContext* context) override;
     void BeginTechnique() override;
     void EndTechnique() override;
+
+    // GPU-driven additions (gpg/gal/GpuDriven.h), implemented by GpuDrivenD3D11.
+    [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
+    boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
+    void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
+    boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
+    void DrawGpuProgram(const GpuDrawCall& call) override;
+    void DispatchGpuProgram(const GpuDispatch& dispatch) override;
+    void BeginProfileRegion(std::uint32_t region) override;
+    void EndProfileRegion(std::uint32_t region) override;
 
     /**
      * Diagnostics: with FAF_GAL_TRACE_START / FAF_GAL_TRACE_FRAMES set, the
@@ -233,5 +245,10 @@ namespace gpg::gal
     DWORD mLastDumpTick = 0U;
     Microsoft::WRL::ComPtr<ID3D11InfoQueue> mInfoQueue; // with /d3d11debug
     std::set<int> mLoggedDebugMessages;
+    std::unique_ptr<GpuDrivenD3D11> mGpuDriven;
+    // GetTexture2D's decoder: a WARP device of its own (the prefetch thread calls it).
+    std::mutex mDecodeMutex;
+    Microsoft::WRL::ComPtr<ID3D11Device> mDecodeDevice;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> mDecodeContext;
   };
 } // namespace gpg::gal

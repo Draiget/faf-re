@@ -3518,6 +3518,7 @@ namespace gpg::gal
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1082, result);
         }
+        RecordStateChange(); // FAF instrumentation (gpg/gal/DrawStatistics.h); not in the binary.
     }
 
     /**
@@ -3565,6 +3566,7 @@ namespace gpg::gal
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1102, setFrequencyResult);
         }
+        RecordStateChange(); // FAF instrumentation (gpg/gal/DrawStatistics.h); not in the binary.
     }
 
     /**
@@ -3585,6 +3587,7 @@ namespace gpg::gal
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1112, result);
         }
+        RecordStateChange(); // FAF instrumentation (gpg/gal/DrawStatistics.h); not in the binary.
     }
 
     /**
@@ -4663,6 +4666,7 @@ namespace gpg::gal
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 102, result);
         }
+        RecordStateChange(); // FAF instrumentation (gpg/gal/DrawStatistics.h); not in the binary.
     }
 
     /**

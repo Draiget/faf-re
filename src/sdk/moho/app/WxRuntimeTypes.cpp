@@ -19,6 +19,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/RenderProfiler.h"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/effects/rendering/SEfxCurve.h"
@@ -3436,6 +3437,7 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   if (gRenderLock) {
     return;
   }
+  const gpg::gal::RenderProfileScope profileFrame("Frame"); // FAF instrumentation (gpg/gal/RenderProfiler.h)
   gRenderLock = true;
 
   ResetRenderUnitCountStat();
@@ -3758,6 +3760,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     // Batcher read straight out of the viewport at +0x215C, matching the
     // binary's direct field load at 0x007F91C4 (same lane `GetPrimBatcher`
     // returns).
+    const gpg::gal::RenderProfileScope profileUiFrames("UiFrames");
     uiManager->RenderFrames(mHead, mPrimBatcher.get());
   }
 
@@ -3897,6 +3900,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     // dispatches the sky dome pass right after the per-view camera bind,
     // guarded by the ren_SkyDome tuning flag).
     if (moho::ren_SkyDome) {
+      const gpg::gal::RenderProfileScope profileSky("SkyDome");
       RenderSkyDome();
     }
 
@@ -3911,25 +3915,37 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
       // forceRegenerate is the `ren_RegenShore` latch taken on entry (the
       // push at 0x007F939A reads that stack byte). Passing 1 here rebuilt the
       // whole shoreline every frame.
-      terrain->UpdateRenderContext(
-        moho::REN_GetGameTick(),
-        moho::REN_GetSimDeltaSeconds(),
-        mCam,
-        reinterpret_cast<const std::int32_t*>(&mScreenPos),
-        false,
-        regenerateShoreline ? 1 : 0
-      );
+      {
+        const gpg::gal::RenderProfileScope profileTerrainContext("TerrainContext");
+        terrain->UpdateRenderContext(
+          moho::REN_GetGameTick(),
+          moho::REN_GetSimDeltaSeconds(),
+          mCam,
+          reinterpret_cast<const std::int32_t*>(&mScreenPos),
+          false,
+          regenerateShoreline ? 1 : 0
+        );
+      }
 
-      RenderTerrainNormals(terrain);
-      TransformTerrainNormals();
+      {
+        const gpg::gal::RenderProfileScope profileTerrainNormals("TerrainNormals");
+        RenderTerrainNormals(terrain);
+        TransformTerrainNormals();
+      }
 
       // The shadow pass, between the normal transform and the composite
       // (0x007F93DF slot 6 CameraGetTargetZoom, then 0x007F93F1).
-      mShadowRenderer.RenderFrameShadows(
-        terrain, *mCam, worldView->mView->CameraGetTargetZoom());
+      {
+        const gpg::gal::RenderProfileScope profileShadows("Shadows");
+        mShadowRenderer.RenderFrameShadows(
+          terrain, *mCam, worldView->mView->CameraGetTargetZoom());
+      }
 
       FogOn(worldView->mView->CameraGetZoom());
-      RenderCompositeTerrain(terrain);
+      {
+        const gpg::gal::RenderProfileScope profileTerrain("Terrain");
+        RenderCompositeTerrain(terrain);
+      }
     }
 
     // Range-ring pass for the normal (non-cartographic) world view, between the
@@ -3956,6 +3972,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     if (moho::CWldSession* const rangeSession = moho::WLD_GetActiveSession(); rangeSession != nullptr) {
       moho::CameraImpl* const rangeCamera = worldView->mView->GetCamera();
       if (rangeCamera != nullptr && moho::ren_Ranges && moho::ren_Ui) {
+        const gpg::gal::RenderProfileScope profileRanges("Ranges");
         mRangeRenderer.Render(
           rangeSession, rangeCamera, static_cast<unsigned int>(head), moho::REN_GetSimDeltaSeconds()
         );
@@ -3970,20 +3987,36 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     // The Vector4f fade-plane arg is the second row of the camera viewport
     // matrix (mCam + 0x294 = viewport @0x284 + 0x10 = r[1]).
     moho::MeshRenderer* const meshRenderer = moho::MeshRenderer::GetInstance();
-    meshRenderer->Batch(
-      moho::REN_GetGameTick(),
-      moho::REN_GetSimDeltaSeconds(),
-      *mCam,
-      mCam->viewport.r[1]
-    );
+    {
+      const gpg::gal::RenderProfileScope profileMeshBatch("MeshBatch");
+      meshRenderer->Batch(
+        moho::REN_GetGameTick(),
+        moho::REN_GetSimDeltaSeconds(),
+        *mCam,
+        mCam->viewport.r[1]
+      );
+    }
 
-    RenderReflections();
-    RenderMeshes(0x14, false);
-    RenderEffects(true);
-    RenderMeshes(0x18, false);
+    {
+      const gpg::gal::RenderProfileScope profileReflections("Reflections");
+      RenderReflections();
+    }
+    {
+      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+      RenderMeshes(0x14, false);
+    }
+    {
+      const gpg::gal::RenderProfileScope profileEffects("Effects");
+      RenderEffects(true);
+    }
+    {
+      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+      RenderMeshes(0x18, false);
+    }
     FogOff();
 
     if (terrain != nullptr) {
+      const gpg::gal::RenderProfileScope profileWater("Water");
       RenderWaterMask(terrain);
       RenderCopyForRefraction(false);
       // Fog density tracks the camera zoom - the binary dispatches
@@ -4032,6 +4065,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     }
 
     if (moho::ren_Ui) {
+      const gpg::gal::RenderProfileScope profileRenUi("WorldUi");
       moho::RenUI(
         renderSession,
         mCam,
@@ -4041,9 +4075,18 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
       );
     }
 
-    RenderMeshes(0x24, false);
-    RenderEffects(false);
-    RenderMeshes(0x28, false);
+    {
+      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+      RenderMeshes(0x24, false);
+    }
+    {
+      const gpg::gal::RenderProfileScope profileEffects("Effects");
+      RenderEffects(false);
+    }
+    {
+      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+      RenderMeshes(0x28, false);
+    }
 
     // Fog is dropped *before* the refracting-effects pass, not after it. The
     // binary runs FogOff at 0x007F9551, then the fog-of-war block, and only
@@ -4067,6 +4110,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     //               does not mask anything drawn after the fog pass.
     if (moho::ren_FogOfWar && renderSession != nullptr &&
         renderSession->FocusArmy != -1) {
+      const gpg::gal::RenderProfileScope profileFog("FogOfWar");
       moho::RenderFogOfWar(
         *renderSession, mVisionRenderer, static_cast<unsigned int>(head),
         *mCam, moho::REN_GetSimDeltaSeconds()
@@ -4074,7 +4118,10 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
       gpg::gal::Device::GetInstance()->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
     }
 
-    RenderRefractingEffects();
+    {
+      const gpg::gal::RenderProfileScope profileRefraction("Refraction");
+      RenderRefractingEffects();
+    }
 
     // 0x007F95B3..0x007F95EA: the world view's own overlay pass, dispatched
     // through `IRenderWorldView` slot 0 on the `+0x2140` lane this loop seeded
@@ -4087,6 +4134,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     // orthographic flag is set, which is the minimap and whichever view the
     // player has toggled into cartographic mode.
     if (moho::ren_Ui && worldView->mView != nullptr) {
+      const gpg::gal::RenderProfileScope profileViewOverlay("ViewOverlay");
       worldView->mView->Render(
         mPrimBatcher.get(),
         static_cast<int>(moho::REN_GetGameTick()),
@@ -4151,7 +4199,10 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   // body, which orphaned `Moho::Cartographic::Render` (its sole caller).
   // The return value (outline-overlay draw count) is unused by this caller,
   // matching the binary (the pushed result is never read after the call).
-  (void)RenderCartographic(head, worldViews);
+  {
+    const gpg::gal::RenderProfileScope profileCartographic("Cartographic");
+    (void)RenderCartographic(head, worldViews);
+  }
 
   // Draw the UI control tree over the rendered viewport. The binary does this
   // at 0x007F97B7..0x007F97DD, immediately after the coordinate update and
@@ -4171,6 +4222,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   // tree - the entire front end - was never drawn.
   if (moho::ren_Ui) {
     if (moho::IUIManager* const uiManager = moho::UI_GetManager(); uiManager != nullptr) {
+      const gpg::gal::RenderProfileScope profileDrawUi("DrawUi");
       uiManager->DrawUI(mHead, mPrimBatcher.get());
     }
   }
@@ -4202,11 +4254,15 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   if (!moho::ren_Oblivion && moho::ren_Bloom && !moho::ren_ShowNormals) {
     moho::IWldTerrainRes* const bloomTerrainRes = moho::REN_GetTerrainRes();
     const float bloomAmount = bloomTerrainRes != nullptr ? bloomTerrainRes->GetBloom() : 0.0f;
+    const gpg::gal::RenderProfileScope profileBloom("Bloom");
     mBloomRenderers[mHead].DoBloom(bloomAmount);
   }
 
   // UI-overlay + debug-HUD pass (0x007F9845), handed the same world views.
-  RenderUI(worldViews);
+  {
+    const gpg::gal::RenderProfileScope profileRenderUi("RenderUi");
+    RenderUI(worldViews);
+  }
 
   // Close the scene opened before the thumbnail pass. The binary dispatches
   // this through CD3DDevice vtable slot 34 (+0x88) right after RenderUI and

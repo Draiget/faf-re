@@ -270,6 +270,7 @@ namespace gpg::gal::d3d11
         DropUndefinedFixedFunctionTechniques();
         CollectStructsAndFunctions();
         RewritePasses();
+        RestoreD3D9RasterizerSemantics();
         if (mWrappers != 0U) {
           mNotes.push_back("pixel shader inputs re-linked through " + std::to_string(mWrappers) + " wrapper(s)");
         }
@@ -587,6 +588,67 @@ namespace gpg::gal::d3d11
             object.fields.emplace_back(Trim(statement.substr(0U, equals)), Trim(statement.substr(equals + 1U)));
           }
           mStateObjects[match[2].str()] = std::move(object);
+        }
+      }
+
+      /**
+       * Every RasterizerState block, the compat file's and the generated
+       * ones, gets the two D3D9 behaviours the D3D10 dialect loses:
+       *  - depth clipping: D3D9 always clips to the near and far planes, but
+       *    the compat states say `DepthClipEnable = FALSE`, so shadow casters
+       *    beyond the light's depth range were clamped onto the map (a dark
+       *    strip along the west edge at some zoom levels);
+       *  - fractional depth biases: the compat states keep D3D9's values in
+       *    depth units (`Rasterizer_Bias_Decal` -0.00001), which D3D10/11 read
+       *    as an integer count of depth steps and truncate to 0 (acne where
+       *    decals meet the terrain). They become steps of the 24-bit depth
+       *    buffer, as the generated pass states already convert D3D9's
+       *    DEPTHBIAS. Integer values are left alone.
+       */
+      void RestoreD3D9RasterizerSemantics()
+      {
+        static const std::regex declaration(R"(\bRasterizerState\s+\w+\s*\{)");
+        std::size_t searchFrom = 0U;
+        std::size_t rewritten = 0U;
+        std::smatch match;
+        while (std::regex_search(mText.cbegin() + static_cast<std::ptrdiff_t>(searchFrom), mText.cend(), match, declaration)) {
+          const std::size_t open = searchFrom + static_cast<std::size_t>(match.position(0) + match.length(0) - 1);
+          const std::size_t close = MatchingBrace(mText, open);
+          if (close == std::string::npos) {
+            break;
+          }
+          std::string body = "\n";
+          bool hasDepthClip = false;
+          for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+            const std::size_t equals = statement.find('=');
+            if (equals == std::string::npos) {
+              if (!Trim(statement).empty()) {
+                body += "    " + Trim(statement) + ";\n";
+              }
+              continue;
+            }
+            const std::string field = Trim(statement.substr(0U, equals));
+            std::string value = Trim(statement.substr(equals + 1U));
+            const std::string key = Lower(field);
+            if (key == "depthclipenable") {
+              value = "TRUE";
+              hasDepthClip = true;
+            } else if (key == "depthbias") {
+              if (const std::optional<double> number = ParseNumber(value); number && *number != 0.0 && std::fabs(*number) < 1.0) {
+                value = std::to_string(static_cast<long>(std::lround(*number * 16777216.0)));
+              }
+            }
+            body += "    " + field + " = " + value + ";\n";
+          }
+          if (!hasDepthClip) {
+            body += "    DepthClipEnable = TRUE;\n";
+          }
+          mText.replace(open + 1U, close - open - 1U, body);
+          searchFrom = open + 1U + body.size() + 1U;
+          ++rewritten;
+        }
+        if (rewritten != 0U) {
+          mNotes.push_back(std::to_string(rewritten) + " rasterizer state(s) clip depth and use D3D9-scaled depth biases");
         }
       }
 

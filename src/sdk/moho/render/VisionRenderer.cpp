@@ -17,12 +17,16 @@
 #include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
+#include "gpg/gal/GpuDriven.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/GpuArrayStream.h"
+#include "moho/render/VisionShader.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
@@ -112,6 +116,173 @@ namespace
       renderer.mVertexBuffer2->Lock(0u, kCircleStride * circleCount, kVisionRingWrapLock)
     );
     return outMapped != nullptr;
+  }
+
+  static_assert(sizeof(Wm3::Circle2f) == 12, "vision circles are uploaded as VisionCircle (float2 center, float radius)");
+
+  /**
+   * Engine addition (`ren_GpuFog`): CastVision as one instanced draw of every visible circle
+   * from a persistent structured buffer (VisionShader.h), with the pass' own depth/stencil
+   * state. The circle buffer uploads only the blocks that changed since the previous frame.
+   */
+  class GpuVisionCaster
+  {
+  public:
+    [[nodiscard]] static GpuVisionCaster& Get()
+    {
+      static GpuVisionCaster sCaster;
+      return sCaster;
+    }
+
+    /** `ren_GpuFog` is on and the backend can draw this path (built on first use). */
+    [[nodiscard]] bool IsActive();
+
+    /** Stencils `circles` as CastVision does. False when nothing could be drawn this way. */
+    [[nodiscard]] bool Cast(
+      moho::VisionRenderer& renderer, const moho::GeomCamera3& camera, const Wm3::Circle2f* circles, std::size_t count
+    );
+
+  private:
+    [[nodiscard]] bool RefreshCylinder(moho::VisionRenderer& renderer);
+
+    struct Constants
+    {
+      gpg::gal::Matrix view;
+      gpg::gal::Matrix projection;
+    };
+    static_assert(sizeof(Constants) == 128, "two float4x4");
+
+    gpg::gal::Device* mDevice = nullptr;
+    bool mSupported = false;
+    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    boost::shared_ptr<gpg::gal::GpuBuffer> mCylinder;
+    const gpg::gal::VertexBuffer* mCylinderSource = nullptr;
+    moho::GpuArrayStream mCircles{"VisionCircles", sizeof(Wm3::Circle2f)};
+  };
+}
+
+namespace moho
+{
+  bool ren_GpuFog = false;
+
+  TConVar<bool> gTConVar_ren_GpuFog(
+    "ren_GpuFog",
+    "Stencil the fog-of-war vision circles with one instanced draw from a persistent GPU buffer "
+    "(Direct3D 11 and later). 0, the default, draws them through the vision effect as the original does.",
+    &ren_GpuFog
+  );
+}
+
+namespace
+{
+  bool GpuVisionCaster::IsActive()
+  {
+    if (!moho::ren_GpuFog) {
+      return false;
+    }
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    if (device == nullptr) {
+      return false;
+    }
+    if (device != mDevice) {
+      mDevice = device;
+      mProgram.reset();
+      mCylinder.reset();
+      mCylinderSource = nullptr;
+      mCircles.Reset();
+      mSupported = false;
+      if ((device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
+        gpg::gal::GpuProgramDesc desc{};
+        desc.name = "CastVision";
+        desc.source = moho::kVisionShaderSource;
+        desc.sourceBytes = sizeof(moho::kVisionShaderSource) - 1U;
+        desc.vertexEntry = "CastVisionVS";
+        desc.pixelEntry = "CastVisionPS";
+        // CastVision: no colour writes, cull none, depth test less without writes, two-sided
+        // stencil counting z-failures (+1 front, -1 back, wrapping), reference 0, clipped to
+        // near/far as D3D9 always clips.
+        desc.blend = gpg::gal::GpuBlend::Opaque;
+        desc.colorWriteMask = 0x00U;
+        desc.depthTest = true;
+        desc.depthWrite = false;
+        desc.depthFunc = gpg::gal::GpuCompare::Less;
+        desc.depthClip = true;
+        desc.cullBackFaces = false;
+        desc.stencil.enable = true;
+        desc.stencil.readMask = 0xFFU;
+        desc.stencil.writeMask = 0xFFU;
+        desc.stencil.reference = 0U;
+        desc.stencil.front = {
+          gpg::gal::GpuStencilOp::Keep, gpg::gal::GpuStencilOp::Increment, gpg::gal::GpuStencilOp::Keep,
+          gpg::gal::GpuCompare::Always
+        };
+        desc.stencil.back = {
+          gpg::gal::GpuStencilOp::Keep, gpg::gal::GpuStencilOp::Decrement, gpg::gal::GpuStencilOp::Keep,
+          gpg::gal::GpuCompare::Always
+        };
+        mProgram = device->CreateGpuProgram(desc);
+        mSupported = mProgram != nullptr;
+      }
+    }
+    return mSupported;
+  }
+
+  bool GpuVisionCaster::RefreshCylinder(moho::VisionRenderer& renderer)
+  {
+    gpg::gal::VertexBuffer* const source = renderer.mGeometry.mVertexBuffer.get();
+    if (source == nullptr) {
+      return false;
+    }
+    if (source == mCylinderSource && mCylinder != nullptr) {
+      return true;
+    }
+    // The cylinder exactly as `VisionRenderer::Init` wrote it: read back from the buffer the
+    // effect path draws, so it carries the same map heights.
+    const auto vertexCount = static_cast<std::uint32_t>(renderer.mVertexCount);
+    const void* const vertices = source->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::ReadOnly);
+    if (vertices == nullptr) {
+      return false;
+    }
+    gpg::gal::GpuBufferDesc desc{};
+    desc.name = "VisionCylinder";
+    desc.stride = 12U;
+    desc.capacity = vertexCount;
+    mCylinder = mDevice->CreateGpuBuffer(desc);
+    if (mCylinder != nullptr) {
+      mDevice->UpdateGpuBuffer(*mCylinder, 0U, vertexCount, vertices);
+    }
+    source->Unlock();
+    mCylinderSource = source;
+    return mCylinder != nullptr;
+  }
+
+  bool GpuVisionCaster::Cast(
+    moho::VisionRenderer& renderer, const moho::GeomCamera3& camera, const Wm3::Circle2f* const circles, const std::size_t count
+  )
+  {
+    if (!RefreshCylinder(renderer) || renderer.mGeometry.mIndexBuffer == nullptr) {
+      return false;
+    }
+    if (count == 0U) {
+      return true;
+    }
+    gpg::gal::GpuBuffer* const circleBuffer = mCircles.Update(circles, count);
+    if (circleBuffer == nullptr) {
+      return false;
+    }
+
+    const Constants constants{camera.view, camera.projection};
+    gpg::gal::GpuDrawCall call{};
+    call.program = mProgram.get();
+    call.bindings.constants = &constants;
+    call.bindings.constantBytes = sizeof(constants);
+    call.bindings.readBuffers[0] = mCylinder.get();
+    call.bindings.readBuffers[1] = circleBuffer;
+    call.indexBuffer = renderer.mGeometry.mIndexBuffer.get();
+    call.vertexCountPerInstance = static_cast<std::uint32_t>(renderer.mIndexCount);
+    call.instanceCount = static_cast<std::uint32_t>(count);
+    mDevice->DrawGpuProgram(call);
+    return true;
   }
 }
 
@@ -355,6 +526,19 @@ namespace moho
     const boost::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
     viewMatrix->SetMatrix4x4(&camera.view);
     projMatrix->SetMatrix4x4(&camera.projection);
+
+    // Engine addition (`ren_GpuFog`): every circle in one instanced draw when the backend can,
+    // then the same composite pass.
+    if (GpuVisionCaster& gpuCaster = GpuVisionCaster::Get();
+        gpuCaster.IsActive() &&
+        gpuCaster.Cast(renderer, camera, visibleCircles.begin(), static_cast<std::size_t>(visibleCircleCount))) {
+      const auto width = static_cast<std::int32_t>(head.mWidth);
+      const auto height = static_cast<std::int32_t>(head.mHeight);
+      renderer.mFrame.InitTransformedVerts(static_cast<float>(width), static_cast<float>(height));
+      renderer.mFrame.mName = "Vision";
+      renderer.mFrame.Render(width, height);
+      return;
+    }
 
     // Stream 0 carries the shared cylinder geometry, replayed once per circle:
     // its stream frequency is the instance count. Stream 1 is bound per batch
