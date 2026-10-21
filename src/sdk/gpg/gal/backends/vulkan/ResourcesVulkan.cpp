@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "DeviceVulkan.h"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
@@ -144,6 +145,7 @@ namespace gpg::gal
     const auto levelIndex = static_cast<std::uint32_t>(level);
     std::vector<std::uint8_t>& bytes = mLevels[levelIndex];
     if (!HasFlag(static_cast<std::uint32_t>(mLockedFlags), MohoD3DLockFlags::ReadOnly)) {
+      RecordUpload(bytes.size());
       RequireDevice("TextureVulkan.cpp", __LINE__).UploadImageLevel(mImage, mDxgiFormat, levelIndex, 0U, bytes.data());
     } else if (!mContentsFromEngine) {
       std::vector<std::uint8_t>().swap(bytes);
@@ -300,6 +302,7 @@ namespace gpg::gal
     if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly) || mLockSize == 0U) {
       return;
     }
+    RecordUpload(mLockSize);
     DeviceVulkan& device = RequireDevice(mKind, __LINE__);
     const std::lock_guard<std::recursive_mutex> lock(device.Mutex());
     if (!mDynamic) {

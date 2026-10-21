@@ -434,6 +434,33 @@ namespace gpg::gal::effects::text
         buffer.push_back(' ');
         continue;
       }
+      if (c == '#' && itemBegin == std::string_view::npos) {
+        // A preprocessor line the override layer left in (its D3D9 math
+        // #defines): an item of its own, to the end of the line and any
+        // continuation lines, so it never swallows the declaration after it.
+        std::size_t stop = index;
+        while (true) {
+          const std::size_t newline = text.find('\n', stop);
+          if (newline == std::string_view::npos) {
+            stop = text.size();
+            break;
+          }
+          const std::size_t last = text.find_last_not_of(" \t\r", newline == 0U ? 0U : newline - 1U);
+          stop = newline + 1U;
+          if (last == std::string_view::npos || last < index || text[last] != '\\') {
+            break;
+          }
+        }
+        Item item;
+        item.begin = index;
+        item.end = stop;
+        item.head = Trim(text.substr(index, stop - index));
+        item.directive = true;
+        items.push_back(std::move(item));
+        buffer.clear();
+        index = stop;
+        continue;
+      }
       begin(index);
       if (c == '"') {
         const std::size_t close = text.find('"', index + 1U);

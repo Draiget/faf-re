@@ -30,6 +30,15 @@ namespace gpg::gal::backend
     ThrowError(file, line, message);
   }
 
+  float Direct3D9PixelCentreShift() noexcept
+  {
+    static const float shift = [] {
+      const char* const value = std::getenv("FAF_GAL_D3D10_PIXEL_CENTRES");
+      return (value != nullptr && value[0] == '1') ? 0.0f : 0.5f;
+    }();
+    return shift;
+  }
+
   bool SetupFailureRequested(const char* const name)
   {
     const char* const value = std::getenv("FAF_GAL_FAIL_SETUP");

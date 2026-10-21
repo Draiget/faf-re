@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Matrix.h"
@@ -505,6 +506,7 @@ namespace gpg::gal
 
   void ProgramEffectVariable::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
   {
+    RecordStateChange();
     if (mParameter >= 0) {
       mProgram->Parameters().SetRenderTarget(static_cast<std::uint32_t>(mParameter), renderTarget);
     }
@@ -512,6 +514,7 @@ namespace gpg::gal
 
   void ProgramEffectVariable::SetTexture(const boost::shared_ptr<Texture> texture)
   {
+    RecordStateChange();
     if (mParameter >= 0) {
       mProgram->Parameters().SetTexture(static_cast<std::uint32_t>(mParameter), texture);
     }

@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "DeviceD3D12.h"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
@@ -173,6 +174,7 @@ namespace gpg::gal
     const auto levelIndex = static_cast<std::uint32_t>(level);
     std::vector<std::uint8_t>& bytes = mLevels[levelIndex];
     if (!HasFlag(static_cast<std::uint32_t>(mLockedFlags), MohoD3DLockFlags::ReadOnly)) {
+      RecordUpload(bytes.size());
       const dxgi::LevelLayout layout = dxgi::ComputeLevelLayout(
         mDesc.Format, std::max(1U, static_cast<std::uint32_t>(mDesc.Width) >> levelIndex), std::max(1U, mDesc.Height >> levelIndex)
       );
@@ -355,6 +357,7 @@ namespace gpg::gal
     if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly) || mLockSize == 0U) {
       return;
     }
+    RecordUpload(mLockSize);
     DeviceD3D12& device = RequireDevice(mKind, __LINE__);
     const std::lock_guard<std::recursive_mutex> lock(device.Mutex());
     if (!mDynamic) {

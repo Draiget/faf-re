@@ -59,6 +59,7 @@ namespace gpg::gal::effects::text
     std::string head;      // the text before the top-level braces, squeezed (the whole statement when unbraced)
     std::string body;      // inside the braces; empty for a plain statement
     bool braced = false;
+    bool directive = false; // a preprocessor line (`head` is the line), passed through as written
   };
 
   /**
