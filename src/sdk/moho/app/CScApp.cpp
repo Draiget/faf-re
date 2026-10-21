@@ -1215,8 +1215,9 @@ namespace
    * /vulkan), then the `graphics_api` option (the Video tab's Graphics API
    * entry, from data/fafengine). An explicit renderer is tried alone, with
    * Direct3D 9 after it. `auto` - the default, and what an unset or unknown
-   * value means - takes the newest renderer that starts: Direct3D 12, then
-   * Vulkan, then Direct3D 11, then Direct3D 9.
+   * value means - takes the first renderer that starts: Direct3D 11, then
+   * Direct3D 12, then Vulkan, then Direct3D 9. Direct3D 11 leads until the D3D12 and
+   * Vulkan minimap and pixel-centre fixes are verified; then the newest goes first.
    */
   [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder()
   {
@@ -1247,7 +1248,7 @@ namespace
         return explicitApi(api);
       }
     }
-    return {DeviceApi::Direct3D12, DeviceApi::Vulkan, DeviceApi::Direct3D11, DeviceApi::Direct3D9};
+    return {DeviceApi::Direct3D11, DeviceApi::Direct3D12, DeviceApi::Vulkan, DeviceApi::Direct3D9};
   }
 
   /**
