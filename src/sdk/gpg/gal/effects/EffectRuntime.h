@@ -57,9 +57,11 @@ namespace gpg::gal::effects
   public:
     /**
      * Parses `translatedSource` (TranslateEffectSource output) and generates
-     * its HLSL. Throws std::runtime_error when the source cannot be structured.
+     * its HLSL. `originalSource`, the effect as the engine loaded it, supplies
+     * the Direct3D 9 pass states the D3D10 dialect lost (ApplyDirect3D9PassStates).
+     * Throws std::runtime_error when the source cannot be structured.
      */
-    EffectProgram(std::string name, std::string translatedSource, ShaderTarget target);
+    EffectProgram(std::string name, std::string translatedSource, ShaderTarget target, std::string_view originalSource = {});
 
     EffectProgram(const EffectProgram&) = delete;
     EffectProgram& operator=(const EffectProgram&) = delete;

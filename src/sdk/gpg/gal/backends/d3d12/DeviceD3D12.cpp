@@ -30,6 +30,7 @@
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/common/RuntimeInfo.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
@@ -655,7 +656,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
     mLog.clear();
 
-    if (const char* const fail = std::getenv("FAF_GAL_FAIL_SETUP"); fail != nullptr && fail[0] == '1') {
+    if (backend::SetupFailureRequested("d3d12")) {
       ThrowError("DeviceD3D12.cpp", __LINE__, "device creation failed on request (FAF_GAL_FAIL_SETUP)");
     }
     if (!mLibrary.Load()) {
@@ -696,6 +697,88 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       mDeviceContext.GetHeadCount(), compiler.Version().c_str(),
       effects::ShaderCacheDirectory().empty() ? "off" : effects::ShaderCacheDirectory().c_str(), mDeviceContext.mVSync ? "on" : "off"
     );
+    // ren_Info's facts, logged once here until the console command lands.
+    DeviceRuntimeInfo info;
+    if (GetRuntimeInfo(info)) {
+      common::LogRuntimeInfo("D3D12", info);
+    }
+  }
+
+  bool DeviceD3D12::GetRuntimeInfo(DeviceRuntimeInfo& out)
+  {
+    if (mDevice == nullptr || mAdapterIndex >= mFactory.Adapters().size()) {
+      return false;
+    }
+    const dxgi::AdapterInfo& adapter = mFactory.Adapters()[mAdapterIndex];
+    out.api = "D3D12";
+    out.adapter = adapter.Name().c_str();
+    out.vendorId = adapter.desc.VendorId;
+    out.deviceId = adapter.desc.DeviceId;
+    out.dedicatedVideoMemory = adapter.desc.DedicatedVideoMemory;
+    out.sharedSystemMemory = adapter.desc.SharedSystemMemory;
+
+    // The user-mode driver version; DXGI reports it for the IDXGIDevice interface.
+    LARGE_INTEGER driverVersion{};
+    if (SUCCEEDED(adapter.adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driverVersion))) {
+      out.driverVersion = common::FormatWindowsDriverVersion(static_cast<std::uint64_t>(driverVersion.QuadPart)).c_str();
+    }
+
+    static constexpr D3D_FEATURE_LEVEL kLevels[] = {
+      D3D_FEATURE_LEVEL_12_1, D3D_FEATURE_LEVEL_12_0, D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
+    };
+    D3D12_FEATURE_DATA_FEATURE_LEVELS levels{};
+    levels.NumFeatureLevels = static_cast<UINT>(std::size(kLevels));
+    levels.pFeatureLevelsRequested = kLevels;
+    char featureLevel[48] = "11_0";
+    if (SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &levels, sizeof(levels)))) {
+      const unsigned level = static_cast<unsigned>(levels.MaxSupportedFeatureLevel);
+      std::snprintf(featureLevel, sizeof(featureLevel), "%u_%u", (level >> 12U) & 0xFU, (level >> 8U) & 0xFU);
+    }
+    // The query answers the highest model up to the one asked for, and fails
+    // for a model newer than the runtime knows: ask from 6.7 down.
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{};
+    bool shaderModelKnown = false;
+    for (int model = 0x67; model >= 0x60 && !shaderModelKnown; --model) {
+      shaderModel.HighestShaderModel = static_cast<D3D_SHADER_MODEL>(model);
+      shaderModelKnown = SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel)));
+    }
+    if (shaderModelKnown) {
+      const unsigned model = static_cast<unsigned>(shaderModel.HighestShaderModel);
+      char withModel[64]{};
+      std::snprintf(withModel, sizeof(withModel), "%s, SM %u.%u", featureLevel, (model >> 4U) & 0xFU, model & 0xFU);
+      out.featureLevel = withModel;
+    } else {
+      out.featureLevel = featureLevel;
+    }
+
+    ComPtr<IDXGIAdapter3> adapter3;
+    if (SUCCEEDED(adapter.adapter.As(&adapter3))) {
+      DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
+      if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0U, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory))) {
+        out.localBudget = memory.Budget;
+        out.localUsage = memory.CurrentUsage;
+      }
+      if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0U, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &memory))) {
+        out.nonLocalBudget = memory.Budget;
+        out.nonLocalUsage = memory.CurrentUsage;
+      }
+    }
+
+    if (!mSwapChains.empty()) {
+      const dxgi::SwapChain& swapChain = *mSwapChains.front();
+      DXGI_SWAP_CHAIN_DESC desc{};
+      static_cast<void>(swapChain.Get()->GetDesc(&desc));
+      char text[160]{};
+      std::snprintf(
+        text, sizeof(text), "%ux%u %s %u buffers%s%s", desc.BufferDesc.Width, desc.BufferDesc.Height,
+        dxgi::SwapModelName(swapChain.Model()), swapChain.BufferCount(), swapChain.AllowsTearing() ? ", tearing" : "",
+        (mSwapChains.size() > 1U) ? ", more heads" : ""
+      );
+      out.swapChain = text;
+    }
+    out.vsync = mDeviceContext.mVSync;
+    out.gpuDrivenFeatures = 0U; // none until the GpuDriven paths land
+    return true;
   }
 
   void DeviceD3D12::ResetState()
@@ -1177,7 +1260,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
     std::shared_ptr<effects::EffectProgram> program;
     try {
-      program = std::make_shared<effects::EffectProgram>(sourceName, std::move(translated.source), effects::ShaderTarget::Dxil);
+      program = std::make_shared<effects::EffectProgram>(
+        sourceName, std::move(translated.source), effects::ShaderTarget::Dxil, std::string_view(sourceData, sourceBytes)
+      );
     } catch (const std::exception& error) {
       const std::string message = std::string("unable to create effect: ") + sourceName + " reason: " + error.what();
       ThrowError("DeviceD3D12.cpp", __LINE__, message.c_str());

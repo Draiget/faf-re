@@ -502,6 +502,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\gal\effects\EffectParameters.cpp" />
     <ClCompile Include="gpg\gal\effects\EffectRuntime.cpp" />
     <ClCompile Include="gpg\gal\backends\common\ImageCodec.cpp" />
+    <ClCompile Include="gpg\gal\backends\common\RuntimeInfo.cpp" />
     <ClCompile Include="gpg\gal\backends\common\WindowsCursor.cpp" />
     <ClCompile Include="gpg\gal\backends\d3d12\D3D12Core.cpp" />
     <ClCompile Include="gpg\gal\backends\d3d12\ResourcesD3D12.cpp" />
@@ -1655,6 +1656,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\effects\EffectParameters.h" />
     <ClInclude Include="gpg\gal\effects\EffectRuntime.h" />
     <ClInclude Include="gpg\gal\backends\common\ImageCodec.h" />
+    <ClInclude Include="gpg\gal\backends\common\RuntimeInfo.h" />
     <ClInclude Include="gpg\gal\backends\common\WindowsCursor.h" />
     <ClInclude Include="gpg\gal\backends\d3d12\D3D12Core.h" />
     <ClInclude Include="gpg\gal\backends\d3d12\ResourcesD3D12.h" />
@@ -2739,5 +2741,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ItemGroup><FafFfmpegDll Include="$(FafFfmpegRoot)\bin\*.dll" /></ItemGroup>
     <Copy SourceFiles="@(FafFfmpegDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy Condition="'$(FafStageToRunDir)'=='true' and Exists('$(FafRunDir)')" SourceFiles="@(FafFfmpegDll)" DestinationFolder="$(FafRunDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <!-- The engine's own Lua hooks (data/fafengine): the engine mounts the
+       `fafengine` folder next to the executable at /fafengine
+       (DISK_SetupDataAndSearchPaths). See docs/RENDERER_BACKENDS.md. -->
+  <Target Name="StageFafEngineHooks" AfterTargets="Build">
+    <ItemGroup><FafEngineHook Include="$(FafRepoRoot)data\fafengine\**\*" /></ItemGroup>
+    <Copy SourceFiles="@(FafEngineHook)" DestinationFiles="@(FafEngineHook->'$(OutDir)fafengine\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy Condition="'$(FafStageToRunDir)'=='true' and Exists('$(FafRunDir)')" SourceFiles="@(FafEngineHook)" DestinationFiles="@(FafEngineHook->'$(FafRunDir)fafengine\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 </Project>

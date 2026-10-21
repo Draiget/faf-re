@@ -798,4 +798,150 @@ namespace gpg::gal::effects
     }
     return effect;
   }
+
+  namespace
+  {
+    constexpr std::string_view kWhitespace = " \t\r\n";
+
+    /** The source with comments and preprocessor lines (and their continuations) blanked out. */
+    [[nodiscard]] std::string WithoutCommentsAndDirectives(const std::string_view source)
+    {
+      std::string text(source);
+      for (std::size_t index = 0U; index < text.size(); ++index) {
+        if (text[index] == '"') {
+          const std::size_t close = text.find('"', index + 1U);
+          index = (close == std::string::npos) ? text.size() : close;
+        } else if (text.compare(index, 2U, "//") == 0) {
+          for (; index < text.size() && text[index] != '\n'; ++index) {
+            text[index] = ' ';
+          }
+        } else if (text.compare(index, 2U, "/*") == 0) {
+          const std::size_t close = text.find("*/", index + 2U);
+          const std::size_t end = (close == std::string::npos) ? text.size() : close + 2U;
+          for (; index < end; ++index) {
+            if (text[index] != '\n') {
+              text[index] = ' ';
+            }
+          }
+          --index;
+        }
+      }
+      std::size_t line = 0U;
+      bool continued = false;
+      while (line < text.size()) {
+        const std::size_t next = std::min(text.find('\n', line), text.size());
+        const std::size_t first = text.find_first_not_of(" \t", line);
+        if (continued || (first < next && text[first] == '#')) {
+          const std::size_t last = (next == line) ? std::string::npos : text.find_last_not_of(" \t\r", next - 1U);
+          continued = last != std::string::npos && last >= line && text[last] == '\\';
+          std::fill(text.begin() + static_cast<std::ptrdiff_t>(line), text.begin() + static_cast<std::ptrdiff_t>(next), ' ');
+        }
+        line = next + 1U;
+      }
+      return text;
+    }
+
+    /** Each `<keyword> Name [< annotations >] { body }` block in `text`, in order. */
+    [[nodiscard]] std::vector<std::pair<std::string, std::string_view>> NamedBlocks(
+      const std::string_view text, const std::string_view keyword
+    )
+    {
+      std::vector<std::pair<std::string, std::string_view>> blocks;
+      std::size_t at = 0U;
+      while ((at = text.find(keyword, at)) != std::string_view::npos) {
+        const std::size_t after = at + keyword.size();
+        if ((at != 0U && IsIdentifierChar(text[at - 1U])) || (after < text.size() && IsIdentifierChar(text[after]))) {
+          at = after;
+          continue;
+        }
+        std::size_t index = text.find_first_not_of(kWhitespace, after);
+        std::size_t nameEnd = index;
+        while (nameEnd < text.size() && IsIdentifierChar(text[nameEnd])) {
+          ++nameEnd;
+        }
+        std::string name = (index == std::string_view::npos) ? std::string() : std::string(text.substr(index, nameEnd - index));
+        index = text.find_first_not_of(kWhitespace, nameEnd);
+        if (index != std::string_view::npos && text[index] == '<') {
+          const std::size_t close = Matching(text, index);
+          index = (close == std::string_view::npos) ? close : text.find_first_not_of(kWhitespace, close + 1U);
+        }
+        if (index == std::string_view::npos || text[index] != '{') {
+          at = after;
+          continue;
+        }
+        const std::size_t close = Matching(text, index);
+        if (close == std::string_view::npos) {
+          break;
+        }
+        blocks.emplace_back(std::move(name), text.substr(index + 1U, close - index - 1U));
+        at = close + 1U;
+      }
+      return blocks;
+    }
+
+    [[nodiscard]] std::uint8_t ParseDirect3D9Comparison(const std::string& value, const std::uint8_t fallback)
+    {
+      static constexpr std::pair<const char*, std::uint8_t> kNames[] = {
+        {"never", 1}, {"less", 2}, {"equal", 3}, {"lessequal", 4}, {"greater", 5}, {"notequal", 6}, {"greaterequal", 7}, {"always", 8},
+      };
+      const std::string key = Lower(Trim(value));
+      for (const auto& [name, func] : kNames) {
+        if (key == name) {
+          return func;
+        }
+      }
+      const std::uint32_t number = ParseUnsigned(key, fallback);
+      return (number >= 1U && number <= 8U) ? static_cast<std::uint8_t>(number) : fallback;
+    }
+  } // namespace
+
+  void ApplyDirect3D9PassStates(const std::string_view originalSource, EffectDescription& description)
+  {
+    const std::string text = WithoutCommentsAndDirectives(originalSource);
+    description.direct3D9PassStates = true;
+    std::size_t alphaTested = 0U;
+    for (const auto& [techniqueName, techniqueBody] : NamedBlocks(text, "technique")) {
+      const auto technique = std::find_if(description.techniques.begin(), description.techniques.end(), [&](const Technique& candidate) {
+        return candidate.name == techniqueName;
+      });
+      if (technique == description.techniques.end()) {
+        continue;
+      }
+      const auto passes = NamedBlocks(techniqueBody, "pass");
+      for (std::size_t index = 0U; index < passes.size() && index < technique->passes.size(); ++index) {
+        bool enabled = false;
+        AlphaTestDesc alphaTest;
+        for (const std::string& rawStatement : SplitTopLevel(passes[index].second, ';')) {
+          const std::string statement = Trim(rawStatement);
+          const std::size_t equals = statement.find('=');
+          if (equals == std::string::npos) {
+            continue;
+          }
+          // The state macros before an assignment carry no ';' (`AlphaState( ... )
+          // DepthState( ... ) AlphaTestEnable = true`): the field is the last word.
+          const std::string left = Trim(statement.substr(0U, equals));
+          std::size_t word = left.size();
+          while (word > 0U && IsIdentifierChar(left[word - 1U])) {
+            --word;
+          }
+          const std::string field = Lower(left.substr(word));
+          const std::string value = Trim(statement.substr(equals + 1U));
+          if (field == "alphatestenable") {
+            enabled = ParseBool(value, false);
+          } else if (field == "alphafunc") {
+            alphaTest.func = ParseDirect3D9Comparison(value, alphaTest.func);
+          } else if (field == "alpharef") {
+            alphaTest.ref = static_cast<std::uint8_t>(ParseUnsigned(value, 0U) & 0xFFU);
+          }
+        }
+        if (enabled && alphaTest.func != 8U) {
+          technique->passes[index].alphaTest = alphaTest;
+          ++alphaTested;
+        }
+      }
+    }
+    if (alphaTested != 0U) {
+      description.notes.push_back(std::to_string(alphaTested) + " passes take Direct3D 9's alpha test");
+    }
+  }
 } // namespace gpg::gal::effects

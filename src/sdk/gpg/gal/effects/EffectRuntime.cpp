@@ -141,11 +141,16 @@ namespace gpg::gal::effects
     return directory;
   }
 
-  EffectProgram::EffectProgram(std::string name, std::string translatedSource, const ShaderTarget target)
+  EffectProgram::EffectProgram(
+    std::string name, std::string translatedSource, const ShaderTarget target, const std::string_view originalSource
+  )
     : mName(std::move(name))
     , mTarget(target)
   {
     mDescription = ParseEffect(translatedSource);
+    if (!originalSource.empty()) {
+      ApplyDirect3D9PassStates(originalSource, mDescription);
+    }
     mModern = GenerateModernHlsl(translatedSource, mDescription);
     mParameters.Initialize(mDescription, mModern.constants);
     mCompiled.resize(mModern.entries.size());
@@ -182,10 +187,11 @@ namespace gpg::gal::effects
       const std::size_t slash = mName.find_last_of("\\/");
       const std::string base =
         std::string(dumpDirectory) + "\\" + ((slash == std::string::npos) ? mName : mName.substr(slash + 1U));
-      for (const auto& [suffix, text] : {std::pair<const char*, const std::string*>{".translated.fx", &translatedSource},
-                                         std::pair<const char*, const std::string*>{".hlsl", &mModern.hlsl}}) {
+      for (const auto& [suffix, text] : {std::pair<const char*, std::string_view>{".original.fx", originalSource},
+                                         std::pair<const char*, std::string_view>{".translated.fx", translatedSource},
+                                         std::pair<const char*, std::string_view>{".hlsl", mModern.hlsl}}) {
         if (FILE* const file = std::fopen((base + suffix).c_str(), "wb")) {
-          std::fwrite(text->data(), 1U, text->size(), file);
+          std::fwrite(text.data(), 1U, text.size(), file);
           std::fclose(file);
         }
       }

@@ -546,6 +546,9 @@
     <ClCompile Include="gpg\gal\backends\common\ImageCodec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\gal\backends\common\RuntimeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\gal\backends\common\WindowsCursor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3565,6 +3568,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\common\ImageCodec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\gal\backends\common\RuntimeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\common\WindowsCursor.h">

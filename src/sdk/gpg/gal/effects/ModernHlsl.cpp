@@ -779,6 +779,13 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       if (head.find('(') != std::string::npos && !HasTopLevelAssignment(head) && ParseFunctionHead(head, function)) {
         // A function: local copies of the parameters it writes.
         std::string functionBody = item.body;
+        if (description.direct3D9PassStates && function.name == "AlphaTestD3D10") {
+          // The effects' D3D10 stand-in for the alpha test. Direct3D 9 never
+          // ran it (#ifdef DIRECT3D10) and tested the pass state instead, which
+          // the entry wrappers now emulate; some calls also test another value
+          // (water2 passes a float4, so it tests red, not the alpha it returns).
+          functionBody = " ";
+        }
         std::string copies;
         for (const auto& [name, global] : numericParameters) {
           bool shadowed = false;
@@ -816,7 +823,11 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
             continue;
           }
           const std::string arguments = Squeeze(reference->arguments);
-          const auto key = std::make_tuple(stage, reference->function, arguments);
+          // The Direct3D 9 alpha test is part of the pixel entry: one per test.
+          const std::optional<AlphaTestDesc> alphaTest = (stage == ShaderStage::Pixel) ? pass.alphaTest : std::nullopt;
+          const std::string alphaTestKey =
+            alphaTest.has_value() ? "|alphatest " + std::to_string(alphaTest->func) + " " + std::to_string(alphaTest->ref) : std::string();
+          const auto key = std::make_tuple(stage, reference->function, arguments + alphaTestKey);
           const auto known = entryNames.find(key);
           if (known != entryNames.end()) {
             reference->entry = known->second;
@@ -892,31 +903,42 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
               ModernSemantic(returnSemantic, stage == ShaderStage::Vertex ? SemanticRole::VertexOutput : SemanticRole::PixelOutput);
           }
           const bool returnsVoid = (function.returnType == "void");
-          // Diagnostics (FAF_GAL_NAN_CHECK): a struct output is checked on its
-          // first member when that is the float4 colour.
-          std::string checkedMember;
-          if (stage == ShaderStage::Pixel && NanCheckRequested() && function.returnType != "float4") {
+          // The pixel colour the wrapper post-processes: the float4 the
+          // function returns, or the first member of its output struct.
+          std::string colour;
+          if (stage == ShaderStage::Pixel && function.returnType == "float4") {
+            colour = "faf_output";
+          } else if (stage == ShaderStage::Pixel) {
             for (const StructType& type : description.structs) {
               if (type.name == function.returnType && !type.members.empty() && type.members.front().typeName == "float4") {
-                checkedMember = type.members.front().name;
+                colour = "faf_output." + type.members.front().name;
               }
             }
           }
-          if (!checkedMember.empty()) {
-            wrappers += function.returnType + " " + name + "(" + parameters + ")" +
-              (returnSemantic.empty() ? std::string() : " : " + returnSemantic) + "\n{\n    " + function.returnType +
-              " faf_output = " + function.name + "(" + callArguments + ");\n    if (any(isnan(faf_output." + checkedMember +
-              ")) || any(isinf(faf_output." + checkedMember + "))) faf_output." + checkedMember +
-              " = float4(1, 0, 1, 1);\n    return faf_output;\n}\n";
-          } else if (stage == ShaderStage::Pixel && function.returnType == "float4" && NanCheckRequested()) {
+          std::string post;
+          if (!colour.empty() && alphaTest.has_value()) {
+            // D3D9 compares the alpha the blender receives, in 8-bit units.
+            static constexpr const char* kComparisons[] = {
+              "false", "false", "faf_alpha < faf_ref", "faf_alpha == faf_ref", "faf_alpha <= faf_ref",
+              "faf_alpha > faf_ref", "faf_alpha != faf_ref", "faf_alpha >= faf_ref", "true",
+            };
+            post += "    uint faf_alpha = (uint)round(saturate(" + colour + ".a) * 255.0);\n    uint faf_ref = " +
+              std::to_string(alphaTest->ref) + "u;\n    if (!(" + kComparisons[alphaTest->func] + ")) discard;\n";
+          } else if (alphaTest.has_value()) {
+            modern.notes.push_back("technique " + technique.name + ": alpha test on " + function.name + " without a float4 colour");
+          }
+          if (!colour.empty() && NanCheckRequested()) {
             // Diagnostics: a pixel whose colour is NaN or infinite turns magenta.
-            wrappers += function.returnType + " " + name + "(" + parameters + ")" +
-              (returnSemantic.empty() ? std::string() : " : " + returnSemantic) + "\n{\n    float4 faf_colour = " + function.name +
-              "(" + callArguments + ");\n    return (any(isnan(faf_colour)) || any(isinf(faf_colour))) ? float4(1, 0, 1, 1) : faf_colour;\n}\n";
+            post += "    if (any(isnan(" + colour + ")) || any(isinf(" + colour + "))) " + colour + " = float4(1, 0, 1, 1);\n";
+          }
+          const std::string signature = function.returnType + " " + name + "(" + parameters + ")" +
+            (returnSemantic.empty() ? std::string() : " : " + returnSemantic);
+          const std::string call = function.name + "(" + callArguments + ")";
+          if (post.empty()) {
+            wrappers += signature + "\n{\n    " + (returnsVoid ? "" : "return ") + call + ";\n}\n";
           } else {
-            wrappers += function.returnType + " " + name + "(" + parameters + ")" +
-              (returnSemantic.empty() ? std::string() : " : " + returnSemantic) + "\n{\n    " + (returnsVoid ? "" : "return ") +
-              function.name + "(" + callArguments + ");\n}\n";
+            wrappers += signature + "\n{\n    " + function.returnType + " faf_output = " + call + ";\n" + post +
+              "    return faf_output;\n}\n";
           }
 
           modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});

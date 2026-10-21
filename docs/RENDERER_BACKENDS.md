@@ -2,17 +2,78 @@
 
 The engine draws through `gpg::gal`, the GPG abstraction layer. The shipped
 binary had two backends: Direct3D 9 (the default) and Direct3D 10 (`/D3D10`).
-This fork adds Direct3D 11, Direct3D 12 and Vulkan. Direct3D 9 stays the default.
-If one of the newer backends cannot start, the game logs why and falls back to
-Direct3D 9 with the same window settings (`CScApp::CreateDevice`).
+This fork adds Direct3D 11, Direct3D 12 and Vulkan. By default the game takes
+the newest renderer that starts (Direct3D 12, then Vulkan, then Direct3D 11,
+then Direct3D 9; see [Choosing the renderer](#choosing-the-renderer)). A
+renderer that cannot start is logged with the reason, and the next one is
+tried with the same window settings (`CScApp::CreateDevice`).
 
 | Switch | Backend | Effects | Code |
 |---|---|---|---|
-| (none) | Direct3D 9 | D3DX9 effect framework | `src/sdk/gpg/gal/backends/d3d9` |
+| `/d3d9` | Direct3D 9 | D3DX9 effect framework | `src/sdk/gpg/gal/backends/d3d9` |
 | `/D3D10` | Direct3D 10, as shipped | D3DX10 | `src/sdk/gpg/gal/backends/d3d10` |
 | `/d3d11` | Direct3D 11 | Effects 11 (FX11), `fx_5_0` | `src/sdk/gpg/gal/backends/d3d11` |
 | `/d3d12` | Direct3D 12 | FAF effect layer, DXIL via DXC | `src/sdk/gpg/gal/backends/d3d12` |
 | `/vulkan` | Vulkan 1.3 | FAF effect layer, SPIR-V via DXC | `src/sdk/gpg/gal/backends/vulkan` |
+
+## Choosing the renderer
+
+Players pick the renderer under Options, Video, **Graphics API**: Automatic
+(newest available), Direct3D 9, Direct3D 11, Direct3D 12 or Vulkan. The choice
+is stored as the option `graphics_api` (`auto`, `d3d9`, `d3d11`, `d3d12`,
+`vulkan`; default `auto`) in the profile's options, like `vsync`.
+`CScApp::CreateDevice` reads it once with `OPTIONS_GetString`
+(`RendererAttemptOrder`), so changing it raises the options screen's standard
+"requires a restart" dialog (`restart = true`), whose OK saves and exits.
+
+| Choice | Renderers tried, in order |
+|---|---|
+| `auto`, unset, unknown value | Direct3D 12, Vulkan, Direct3D 11, Direct3D 9 |
+| `d3d12` / `vulkan` / `d3d11` | that one, then Direct3D 9 |
+| `d3d9` | Direct3D 9 |
+
+A command-line switch (`/d3d9`, `/d3d11`, `/d3d12`, `/vulkan`, `/D3D10`)
+overrides the option the same way. A renderer counts once its device is
+created and set up. The log shows each step:
+
+```
+graphics_api option: auto
+renderer: trying Direct3D 12
+GAL Exception: ...                      (the reason it failed)
+Direct3D 12 is unavailable; falling back to Vulkan
+renderer: trying Vulkan
+Vulkan: ready (...)
+```
+
+The window title names the renderer in use (`Forged Alliance [Vulkan] ...`;
+no tag for Direct3D 9). `FAF_GAL_FAIL_SETUP` makes chosen backends fail, to
+exercise the chain: `1` fails every newer backend, and a list such as
+`d3d12,vulkan` fails only those (Direct3D 12 and Vulkan read the list,
+Direct3D 11 only `1`).
+
+The options entry comes from the engine's own Lua, never from edits to
+FAF's gamedata:
+
+- `data/fafengine/` in this repository holds engine-owned scripts that
+  extend gamedata scripts. The build copies it next to the executable
+  (`StageFafEngineHooks` in `main.vcxproj`, and into the run folder when
+  `FafStageToRunDir` is on).
+- At start-up the engine mounts `<exe folder>/fafengine` at `/fafengine` and
+  registers `/fafengine` as a hook directory, after the init file's own
+  `path` and `hook` entries (`AppendEngineHookFolder` in
+  `moho/misc/StartupHelpers.cpp`). The engine does this itself because the
+  init files (`init_faf.lua` and the rest) belong to the FAF client.
+- A hook file is appended to the gamedata file of the same path, so
+  `fafengine/lua/options/options.lua` runs at the end of
+  `/lua/options/options.lua` and inserts the entry after Vertical Sync.
+  The log says `engine hooks: ... mounted at /fafengine` and
+  `Hooked /lua/options/options.lua with /fafengine/lua/options/options.lua`.
+
+Switching renderers without a restart is not supported. The engine's
+existing device rebind (`CD3DDevice::InitContext`, used for resolution,
+vertical sync and anti-aliasing changes and for a lost device) resets the
+*same* gal device. It recreates only what a Direct3D 9 reset loses, and
+keeps file textures, static buffers and compiled effects.
 
 The shipped `/D3D10` path crashes at start-up on both x86 and x64.
 `DeviceD3D10::SetupDXGIDevice` copies an `AdapterD3D10` without AddRef, so
@@ -80,6 +141,14 @@ newer backends:
   `DestBlendAlpha = ZERO` on every state, which overwrites the frame's alpha,
   and that alpha is the glow mask: the commander's warp-in light then lit its
   whole quad as a hard-edged rectangle.
+- The alpha test. Effects still set `AlphaTestEnable`, `AlphaFunc` and
+  `AlphaRef` in their passes, inside `#ifndef DIRECT3D10`, and FAF's water
+  shader relies on it (`HighFidelityPS` returns the land mask in alpha, and
+  `NotEqual 0` discards it). The effect layer reads these states from the
+  original source (`ApplyDirect3D9PassStates`) and the pixel entry discards
+  as D3D9 did, on the 8-bit alpha. The effects' own `AlphaTestD3D10` helper,
+  which D3D9 never ran, is emptied. Without the alpha test the water drew
+  over the land as grey polygons when zoomed out.
 - Shader math as shader model 2/3 compiled it: `sqrt`/`rsqrt` of `|x|`, and
   `pow` of `|x|` (sign kept for odd integer exponents). Shader model 6 returns
   NaN for a negative operand, and a NaN blended into a target stores zero.
@@ -136,13 +205,22 @@ Both are optional; without them the game falls back to Direct3D 9.
   keeps Direct3D's packing) and BC textures. It runs windowed or borderless
   only (no exclusive full screen).
 
+## Known issues
+
+- Vulkan on NVIDIA: `PrintWindow(PW_RENDERFULLCONTENT)` on the game window
+  (some capture tools do this) makes `PeekMessage` report a message that
+  `GetMessage` then never returns. The engine's loop (`WIN_AppExecute`, as
+  shipped: `Pending()` then `Dispatch()`) sleeps in `GetMessage` until the
+  next input, so the game stands still until the mouse moves. Any posted
+  message wakes it. The test scripts post `WM_NULL` after each capture.
+
 ## Diagnostics
 
 | Switch / variable | Effect |
 |---|---|
 | `/d3d11debug`, `/d3d12debug`, `/vulkandebug` | API debug or validation layer; its warnings go to the game log |
 | `/d3d11blt` | Direct3D 11: legacy blt-model swap chain |
-| `FAF_GAL_FAIL_SETUP=1` | Device creation fails, which exercises the fallback to D3D9 |
+| `FAF_GAL_FAIL_SETUP=1`, `=d3d12,vulkan` | Device creation fails (every newer backend, or the listed ones), which exercises the renderer fallback |
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |
 | `FAF_GAL_TRACE_START`, `FAF_GAL_TRACE_FRAMES` | Logs every gal call of those frames |
 | `FAF_GAL_TRACE_FILE` | Direct3D 12: traces the frame after that file appears |
@@ -151,6 +229,6 @@ Both are optional; without them the game falls back to Direct3D 9.
 | `FAF_GAL_CLEAR_TEST=1` | Direct3D 12: clears in green (present-path check) |
 | `FAF_GAL_NAN_CHECK=1` | Direct3D 12, Vulkan: NaN or infinite pixel colours draw in magenta |
 | `FAF_GAL_D3D10_ALPHA_BLEND=1`, `FAF_GAL_D3D10_MATH=1`, `FAF_GAL_D3D10_DEPTH_CLIP=1` | Direct3D 12, Vulkan: keep the D3D10 packs' alpha blend, shader model 6 math, or depth-clip setting instead of the D3D9 behaviour |
-| `FAF_EFFECT_DUMP_DIR` | Writes each effect's translated source and generated HLSL (local files only) |
+| `FAF_EFFECT_DUMP_DIR` | Writes each effect's original source, translated source and generated HLSL (local files only) |
 | `FAF_SHADER_PRECOMPILE=1` | Compiles every entry point when an effect loads |
 | `FAF_DRAW_STATS_LOG=N` | Logs the average frame time over N frames |

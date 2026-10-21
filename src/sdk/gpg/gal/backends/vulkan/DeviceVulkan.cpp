@@ -30,6 +30,7 @@
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/common/RuntimeInfo.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
@@ -482,6 +483,16 @@ namespace gpg::gal
       ThrowError("DeviceVulkan.cpp", __LINE__, "no Vulkan 1.3 device can draw to the window");
     }
     Vk().vkGetPhysicalDeviceProperties(mPhysical, &mProperties);
+
+    // The driver's own name and version text (Vulkan 1.2); driverVersion's
+    // encoding is vendor-specific.
+    VkPhysicalDeviceDriverProperties driver{};
+    driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+    VkPhysicalDeviceProperties2 properties2{};
+    properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    properties2.pNext = &driver;
+    Vk().vkGetPhysicalDeviceProperties2(mPhysical, &properties2);
+    mDriverName = std::string(driver.driverName) + " " + driver.driverInfo;
   }
 
   void DeviceVulkan::CreateLogicalDevice()
@@ -532,13 +543,22 @@ namespace gpg::gal
     queue.queueFamilyIndex = mQueueFamily;
     queue.queueCount = 1U;
     queue.pQueuePriorities = &priority;
-    const char* const extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    // VK_EXT_memory_budget is optional: ren_Info reports heap budgets with it,
+    // and only heap sizes without it.
+    std::uint32_t extensionCount = 0U;
+    Vk().vkEnumerateDeviceExtensionProperties(mPhysical, nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> available_extensions(extensionCount);
+    Vk().vkEnumerateDeviceExtensionProperties(mPhysical, nullptr, &extensionCount, available_extensions.data());
+    mMemoryBudget = std::any_of(available_extensions.begin(), available_extensions.end(), [](const VkExtensionProperties& extension) {
+      return std::strcmp(extension.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0;
+    });
+    const char* const extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME};
     VkDeviceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     info.pNext = &features;
     info.queueCreateInfoCount = 1U;
     info.pQueueCreateInfos = &queue;
-    info.enabledExtensionCount = 1U;
+    info.enabledExtensionCount = mMemoryBudget ? 2U : 1U;
     info.ppEnabledExtensionNames = extensions;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDevice(mPhysical, &info, nullptr, &mDevice));
     if (!Vk().LoadDevice(mDevice)) {
@@ -730,6 +750,7 @@ namespace gpg::gal
     swapChain.swapchain = created;
     swapChain.format = chosen.format;
     swapChain.extent = extent;
+    swapChain.presentMode = mode;
     Vk().vkGetSwapchainImagesKHR(mDevice, created, &count, nullptr);
     swapChain.images.resize(count);
     Vk().vkGetSwapchainImagesKHR(mDevice, created, &count, swapChain.images.data());
@@ -889,7 +910,7 @@ namespace gpg::gal
   {
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
     mLog.clear();
-    if (const char* const fail = std::getenv("FAF_GAL_FAIL_SETUP"); fail != nullptr && fail[0] == '1') {
+    if (backend::SetupFailureRequested("vulkan")) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "device creation failed on request (FAF_GAL_FAIL_SETUP)");
     }
     if (!Vk().LoadGlobal()) {
@@ -932,6 +953,61 @@ namespace gpg::gal
       mDeviceContext.GetHeadCount(), compiler.Version().c_str(),
       effects::ShaderCacheDirectory().empty() ? "off" : effects::ShaderCacheDirectory().c_str(), mDeviceContext.mVSync ? "on" : "off"
     );
+    // ren_Info's facts, logged once here until the console command lands.
+    DeviceRuntimeInfo runtimeInfo;
+    if (GetRuntimeInfo(runtimeInfo)) {
+      common::LogRuntimeInfo("Vulkan", runtimeInfo);
+    }
+  }
+
+  bool DeviceVulkan::GetRuntimeInfo(DeviceRuntimeInfo& out)
+  {
+    if (mPhysical == VK_NULL_HANDLE || mDevice == VK_NULL_HANDLE) {
+      return false;
+    }
+    out.api = "Vulkan";
+    out.adapter = mProperties.deviceName;
+    out.vendorId = mProperties.vendorID;
+    out.deviceId = mProperties.deviceID;
+    char text[160]{};
+    std::snprintf(text, sizeof(text), "%s (0x%08X)", mDriverName.c_str(), mProperties.driverVersion);
+    out.driverVersion = text;
+    std::snprintf(
+      text, sizeof(text), "Vulkan %u.%u.%u", VK_API_VERSION_MAJOR(mProperties.apiVersion), VK_API_VERSION_MINOR(mProperties.apiVersion),
+      VK_API_VERSION_PATCH(mProperties.apiVersion)
+    );
+    out.featureLevel = text;
+
+    // Device-local heaps count as video memory, the rest as shared system
+    // memory; the budget extension adds what the driver allows and uses now.
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{};
+    budget.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+    VkPhysicalDeviceMemoryProperties2 memory{};
+    memory.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+    memory.pNext = mMemoryBudget ? &budget : nullptr;
+    Vk().vkGetPhysicalDeviceMemoryProperties2(mPhysical, &memory);
+    for (std::uint32_t heap = 0U; heap < memory.memoryProperties.memoryHeapCount; ++heap) {
+      const bool local = (memory.memoryProperties.memoryHeaps[heap].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0U;
+      (local ? out.dedicatedVideoMemory : out.sharedSystemMemory) += memory.memoryProperties.memoryHeaps[heap].size;
+      if (mMemoryBudget) {
+        (local ? out.localBudget : out.nonLocalBudget) += budget.heapBudget[heap];
+        (local ? out.localUsage : out.nonLocalUsage) += budget.heapUsage[heap];
+      }
+    }
+
+    if (!mSwapChains.empty()) {
+      const SwapChain& swapChain = mSwapChains.front();
+      const VkPresentModeKHR mode = swapChain.presentMode;
+      std::snprintf(
+        text, sizeof(text), "%ux%u %s %u images%s", swapChain.extent.width, swapChain.extent.height,
+        (mode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO" : (mode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate",
+        static_cast<unsigned>(swapChain.images.size()), (mSwapChains.size() > 1U) ? ", more heads" : ""
+      );
+      out.swapChain = text;
+    }
+    out.vsync = mDeviceContext.mVSync;
+    out.gpuDrivenFeatures = 0U; // none until the GpuDriven paths land
+    return true;
   }
 
   void DeviceVulkan::ResetState()
@@ -1435,7 +1511,10 @@ namespace gpg::gal
     );
     std::shared_ptr<effects::EffectProgram> program;
     try {
-      program = std::make_shared<effects::EffectProgram>(sourceName, std::move(translated.source), effects::ShaderTarget::Spirv);
+      program = std::make_shared<effects::EffectProgram>(
+        sourceName, std::move(translated.source), effects::ShaderTarget::Spirv,
+        std::string_view(context.mSourceBuffer.mBegin, sourceBytes)
+      );
     } catch (const std::exception& error) {
       const std::string message = std::string("unable to create effect: ") + sourceName + " reason: " + error.what();
       ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
