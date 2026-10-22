@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "boost/mutex.h"
 #include "boost/shared_ptr.h"
@@ -855,6 +856,30 @@ namespace moho
      */
     void OnMove(wxMoveEvent& event);
 
+    /**
+     * Engine addition: `wxDialog::Show`, writing the output held back while the dialog was
+     * hidden into the output control before it appears.
+     */
+    bool Show(bool show = true) override;
+
+    /**
+     * Engine addition: queues `text` for the output control in the colour of `styleCategory`
+     * (what `SetDefaultStyle` + `AppendText` did per line). Consecutive text of one colour shares
+     * a run, and the runs reach the control only while the dialog is shown: a hidden log costs
+     * no rich-edit work, and opening it writes the same text in the same colours.
+     */
+    void AppendOutput(std::uint32_t styleCategory, const std::wstring& text);
+
+    /// Engine addition: writes the queued output runs into the output control.
+    void FlushPendingOutput();
+
+    /// Engine addition: one colour's worth of output not yet in the output control.
+    struct PendingOutputRun
+    {
+      std::uint32_t styleCategory;
+      std::wstring text;
+    };
+
     bool mIsInitializingControls;                // +0x174
     CWinLogTarget* mOwnerTarget;                 // +0x178
     wxTextCtrl* mOutputTextControl;              // +0x17C
@@ -868,6 +893,7 @@ namespace moho
     wxCheckBox* mCustomCategoryCheckBox;         // +0x1B4
     msvc8::vector<msvc8::string> mBufferedLines; // +0x1B8
     std::uint32_t mFirstVisibleLine;             // +0x1C8
+    std::vector<PendingOutputRun> mPendingOutput; // +0x1CC, engine addition (see AppendOutput)
 
     DECLARE_EVENT_TABLE()
   };
@@ -906,7 +932,11 @@ namespace moho
     offsetof(WWinLogWindow, mFirstVisibleLine) == 0x1C8,
     "moho::WWinLogWindow::mFirstVisibleLine offset must be 0x1C8"
   );
-  static_assert(sizeof(WWinLogWindow) == 0x1CC, "moho::WWinLogWindow size must be 0x1CC");
+  // The binary's object ends at 0x1CC; the engine's pending-output queue follows it.
+  static_assert(
+    offsetof(WWinLogWindow, mPendingOutput) == 0x1CC,
+    "moho::WWinLogWindow::mPendingOutput must follow the binary's 0x1CC-byte object"
+  );
 
   /**
    * A frame the engine keeps a weak reference to in `managedFrames`, so

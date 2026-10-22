@@ -891,8 +891,35 @@ void moho::WWinLogWindow::OnClear(wxCommandEvent& event)
 {
   (void)event;
   mOutputTextControl->Clear();
+  mPendingOutput.clear();
   mFirstVisibleLine = 0;
   mOwnerTarget->ResetCommittedLinesFromReplayBuffer(mBufferedLines);
+}
+
+bool moho::WWinLogWindow::Show(const bool show)
+{
+  if (show) {
+    FlushPendingOutput();
+  }
+  return WWinManagedDialog::Show(show);
+}
+
+void moho::WWinLogWindow::AppendOutput(const std::uint32_t styleCategory, const std::wstring& text)
+{
+  if (!mPendingOutput.empty() && mPendingOutput.back().styleCategory == styleCategory) {
+    mPendingOutput.back().text += text;
+  } else {
+    mPendingOutput.push_back(PendingOutputRun{styleCategory, text});
+  }
+}
+
+void moho::WWinLogWindow::FlushPendingOutput()
+{
+  for (const PendingOutputRun& run : mPendingOutput) {
+    mOutputTextControl->SetDefaultStyle(DefaultTextStyleForCategory(run.styleCategory));
+    mOutputTextControl->AppendText(run.text.c_str());
+  }
+  mPendingOutput.clear();
 }
 
 bool moho::WWinLogWindow::ShouldDisplayCommittedLine(
@@ -986,12 +1013,16 @@ void moho::WWinLogWindow::RebuildVisibleLinesFromControls()
     mOutputTextControl->Show(false);
   }
   mOutputTextControl->Clear();
+  mPendingOutput.clear();
   mFirstVisibleLine = 0;
   mBufferedLines.clear();
 
   const msvc8::vector<CWinLogLine>& committedLines = mOwnerTarget->CommittedLines();
   for (std::size_t index = 0; index < committedLines.size(); ++index) {
     AppendCommittedLine(committedLines[index]);
+  }
+  if (IsShown()) {
+    FlushPendingOutput(); // engine change: queued by AppendCommittedLine, see AppendOutput
   }
 
   if (outputShown) {
@@ -1038,18 +1069,18 @@ void moho::WWinLogWindow::AppendCommittedLine(
     return;
   }
 
+  // Engine change: the binary sets the default style and appends to the output control here;
+  // the text is queued instead and written while the dialog is shown (`AppendOutput`).
   if (mFirstVisibleLine < mBufferedLines.size()) {
-    mOutputTextControl->SetDefaultStyle(DefaultTextStyleForCategory(1u));
     const std::wstring replayText = BuildReplayFlushText(mFirstVisibleLine);
 
     mFirstVisibleLine = static_cast<std::uint32_t>(mBufferedLines.size());
     if (!replayText.empty()) {
-      mOutputTextControl->AppendText(replayText.c_str());
+      AppendOutput(1u, replayText);
     }
   }
 
-  mOutputTextControl->SetDefaultStyle(DefaultTextStyleForCategory(line.categoryMask));
-  mOutputTextControl->AppendText(BuildFormattedCommittedLineText(line).c_str());
+  AppendOutput(line.categoryMask, BuildFormattedCommittedLineText(line));
 
   if (line.categoryMask >= kWarningCategoryValue && moho::CFG_GetArgOption("/edit", 0, nullptr)) {
     Show(true);
@@ -1081,6 +1112,9 @@ void moho::WWinLogWindow::OnTargetPendingLinesChanged(
   while (index < target->CommittedLineCount()) {
     AppendCommittedLine(target->CommittedLines()[index]);
     ++index;
+  }
+  if (IsShown()) {
+    FlushPendingOutput(); // engine change: queued by AppendCommittedLine, see AppendOutput
   }
 }
 

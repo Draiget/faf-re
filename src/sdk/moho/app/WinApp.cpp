@@ -1709,6 +1709,30 @@ namespace
     return static_cast<int>(rounded) + ((value < rounded) ? -1 : 0);
   }
 
+  /**
+   * Engine addition: `wxApp::Dispatch` without its blocking `GetMessage`.
+   *
+   * The loop below asks `wxApp::Pending` (a `PeekMessage` with PM_NOREMOVE) and then dispatches,
+   * and wx dispatches through `GetMessage`, which waits when the queue is empty by then. A message
+   * another program sends us - `PrintWindow`'s WM_PRINT from a capture tool or overlay - runs
+   * inside those calls, and its paint can take the message `Pending` saw; `GetMessage` then slept
+   * until the next input, the frame loop with it. This takes the message without waiting and hands
+   * it to the same `wxApp::DoMessage` filter (accelerators, dialog navigation) the original uses.
+   * wx is built ANSI, hence the A functions.
+   */
+  void DispatchPendingMessage()
+  {
+    MSG message{};
+    if (::PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
+      return;
+    }
+    if (message.message == WM_QUIT) {
+      wxTheApp->ExitMainLoop(); // what wxApp::DoMessage does on WM_QUIT
+      return;
+    }
+    wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
+  }
+
   DWORD ComputeWaitTimeoutMs()
   {
     const float remainingMs = wakeupTimerDur - ProbeWakeTimerMs();
@@ -2485,7 +2509,7 @@ void moho::WIN_AppExecute(IWinApp* const app)
     }
 
     if (wxTheApp->Pending()) {
-      wxTheApp->Dispatch();
+      DispatchPendingMessage(); // engine change: wxTheApp->Dispatch() could block, see there
       success = true;
       continue;
     }
