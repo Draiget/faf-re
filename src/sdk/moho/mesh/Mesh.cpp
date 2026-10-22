@@ -5116,24 +5116,21 @@ namespace moho
 
       instance->UpdateInterpolatedFields();
 
-      // View-depth distance: the binary treats the first sixteen bytes of the
-      // camera transform as a plane (a,b,c,d) and dots the interpolated world
-      // position against it -- 0x007DFB7F..0x007DFBB9 reads [cam+8]*pos.z +
-      // [cam+4]*pos.y + [cam+0]*pos.x + [cam+0Ch], with `orient_` at +0x00.
-      // Those are MEMORY LANES 0..3 of the quaternion, which in Wm3's storage
-      // are (w,x,y,z). The previous body spelled them as the named fields
-      // (.x,.y,.z,.w) -- correct only while lane 0 was called .x; the
-      // scalar-first conversion moved lane 0 to .w, and this site was not
-      // converted with it, so every mesh got a garbage depth and was culled by
-      // ComputeLOD. Index the storage directly so the lane order can no
-      // longer drift with the naming.
+      // View-depth distance: the interpolated world position dotted with
+      // `fadePlane` (a,b,c,d). 0x007DFB78 loads the plane pointer from
+      // [esp+1FCh] right after FUN_007DEC80 (`ret 4`, so esp is restored):
+      // that is the argument after `camera` ([esp+1F8h]), i.e. `fadePlane`,
+      // not the camera. 0x007DFB7F..0x007DFBB9 then computes
+      // (pos.z*c + pos.y*b) + a*pos.x + d in that order. Reading the plane out
+      // of the camera transform's orientation quaternion instead gave a depth
+      // that only looked right for an untilted camera, so tilting or turning
+      // the camera pushed units and props to low LODs or past their cutoff.
       const Wm3::Vec3f& worldPos = instance->interpolatedPosition;
-      const Wm3::Quatf& plane = camera.tranform.orient_;
       const float distance =
-        worldPos.z * plane.m_afTuple[2]
-        + worldPos.y * plane.m_afTuple[1]
-        + plane.m_afTuple[0] * worldPos.x
-        + plane.m_afTuple[3];
+        worldPos.z * fadePlane.z
+        + worldPos.y * fadePlane.y
+        + fadePlane.x * worldPos.x
+        + fadePlane.w;
 
       const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
       const MeshLOD* const lod = mesh->ComputeLOD(distance);
