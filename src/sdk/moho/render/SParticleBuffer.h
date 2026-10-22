@@ -102,6 +102,12 @@ namespace moho
      */
     void Render(int count, int startIndex);
 
+    /**
+     * Engine addition (`ren_ParticleBatch`): `Render`, but with the instance data
+     * read from `instances` (the same layout) instead of this buffer's own.
+     */
+    void RenderInstances(const boost::shared_ptr<gpg::gal::VertexBuffer>& instances, int count, int startIndex);
+
   public:
     int mMaxParticles; // +0x04
     bool mInitialized; // +0x08

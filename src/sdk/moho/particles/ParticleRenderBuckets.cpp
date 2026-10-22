@@ -6,6 +6,7 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <unordered_map>
 
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -20,6 +21,10 @@
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/ID3DVertexStream.h"
 #include "moho/render/SParticleBuffer.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
+#include "gpg/gal/VertexBufferContext.hpp"
+#include "moho/console/CConCommand.h"
 
 namespace
 {
@@ -369,6 +374,9 @@ namespace moho
    * Uploads a bounded batch of pending world particles into one particle
    * work-item instance stream for the current frame.
    */
+  extern bool ren_ParticleBatch;
+  void MirrorUploadedParticles(ParticleBuffer& particleBuffer, std::uint32_t first, std::uint32_t count);
+
   void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
@@ -452,10 +460,15 @@ namespace moho
       instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
     }
 
+    const std::uint32_t uploadFirst = workItem.mRenderStartIndex;
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
     // `erase(first, last)` (0x004956B0, cited on Vector.h): the uploaded prefix goes.
     (void)pendingParticles.erase(pendingParticles.begin(), pendingParticles.begin() + maxUploadCount);
     particleBuffer->UnlockInstanceBuffer();
+    // Engine addition (`ren_ParticleBatch`): keep a GPU-resident copy of what was just uploaded.
+    if (ren_ParticleBatch) {
+      MirrorUploadedParticles(*particleBuffer, uploadFirst, static_cast<std::uint32_t>(maxUploadCount));
+    }
   }
 
   /**
@@ -620,6 +633,225 @@ namespace moho
    * Selects the particle technique, then renders active particle work items in
    * reverse order when the current bucket is allowed to draw.
    */
+  bool ren_ParticleBatch = false;
+
+  TConVar<bool> gTConVar_ren_ParticleBatch(
+    "ren_ParticleBatch",
+    "Draw each particle bucket with one instanced draw: the GPU copies every pooled 200-particle buffer's "
+    "live range, in the original draw order, into one instance buffer first (backends that can copy "
+    "buffers). Same particles, same order, same blending. 0, the default, draws one call per buffer.",
+    &ren_ParticleBatch
+  );
+
+  namespace
+  {
+    /**
+     * Engine addition (`ren_ParticleBatch`): the instance buffer a bucket's pooled
+     * buffers are gathered into before its one draw. A ring: each bucket takes
+     * the next free range, starting over at the front when the rest is too small
+     * (the GPU executes the copies and draws in order, so an older range is no
+     * longer read by the time it is overwritten).
+     */
+    struct ParticleGatherBuffer
+    {
+      gpg::gal::Device* mDevice = nullptr;
+      boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
+      std::uint32_t mCapacity = 0U;
+      std::uint32_t mCursor = 0U;
+
+      /** The first instance of a free range of `count` instances, or -1. */
+      [[nodiscard]] int Reserve(const std::uint32_t count)
+      {
+        gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+        if (device != mDevice) {
+          *this = ParticleGatherBuffer{};
+          mDevice = device;
+        }
+        if (count > mCapacity) {
+          gpg::gal::VertexBufferContext context{};
+          context.type_ = 3U;
+          context.usage_ = 1U; // default usage: written by GPU copies only
+          context.stride_ = sizeof(ParticleBuffer::Instanced);
+          context.vertexCount_ = std::max<std::uint32_t>(16384U, count * 2U);
+          mBuffer = device != nullptr ? device->CreateVertexBuffer(&context) : boost::shared_ptr<gpg::gal::VertexBuffer>();
+          mCapacity = mBuffer != nullptr ? context.vertexCount_ : 0U;
+          mCursor = 0U;
+          if (count > mCapacity) {
+            return -1;
+          }
+        }
+        if (mCursor + count > mCapacity) {
+          mCursor = 0U;
+        }
+        const std::uint32_t first = mCursor;
+        mCursor += count;
+        return static_cast<int>(first);
+      }
+    };
+
+    ParticleGatherBuffer sParticleGather;
+
+    /**
+     * Engine addition (`ren_ParticleBatch`): a GPU-resident (default-usage) copy of
+     * every pooled particle buffer, one fixed slot each. Uploads go to the
+     * pooled dynamic buffers exactly as before and are copied into the slot once,
+     * right after their unlock; the per-frame gather then copies from video
+     * memory instead of reading the dynamic buffers again. A buffer counts as
+     * mirrored from its first upload that starts at instance 0 (a fresh fill).
+     */
+    struct ParticleMirrorStore
+    {
+      static constexpr std::uint32_t kSlots = 512U;
+      static constexpr std::uint32_t kSlotInstances = 256U;
+
+      gpg::gal::Device* mDevice = nullptr;
+      boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
+      std::unordered_map<const ParticleBuffer*, std::uint32_t> mSlotOf;
+      std::unordered_map<const ParticleBuffer*, bool> mMirrored;
+
+      [[nodiscard]] bool Ready()
+      {
+        gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+        if (device != mDevice) {
+          *this = ParticleMirrorStore{};
+          mDevice = device;
+          if (device != nullptr) {
+            gpg::gal::VertexBufferContext context{};
+            context.type_ = 3U;
+            context.usage_ = 1U;
+            context.stride_ = sizeof(ParticleBuffer::Instanced);
+            context.vertexCount_ = kSlots * kSlotInstances;
+            mBuffer = device->CreateVertexBuffer(&context);
+          }
+        }
+        return mBuffer != nullptr;
+      }
+
+      /** The first store instance of `particleBuffer`'s slot, or -1. */
+      [[nodiscard]] int SlotBase(const ParticleBuffer& particleBuffer)
+      {
+        if (particleBuffer.mMaxParticles > static_cast<int>(kSlotInstances)) {
+          return -1;
+        }
+        const auto found = mSlotOf.find(&particleBuffer);
+        if (found != mSlotOf.end()) {
+          return static_cast<int>(found->second * kSlotInstances);
+        }
+        if (mSlotOf.size() >= kSlots) {
+          return -1;
+        }
+        const auto slot = static_cast<std::uint32_t>(mSlotOf.size());
+        mSlotOf.emplace(&particleBuffer, slot);
+        return static_cast<int>(slot * kSlotInstances);
+      }
+    };
+
+    ParticleMirrorStore sParticleMirror;
+
+    /** `RenderParticleBucket`'s drawn range of one work item, with `ParticleBuffer::Render`'s own clamp. */
+    [[nodiscard]] int DrawnParticleCount(const SParticleRenderWorkItem& workItem, const ParticleBuffer& particleBuffer)
+    {
+      const std::uint32_t startIndex = workItem.mIntervalCursor;
+      const std::uint32_t renderCount =
+        (workItem.mRenderStartIndex > startIndex) ? (workItem.mRenderStartIndex - startIndex) : 0U;
+      return std::min(static_cast<int>(renderCount), particleBuffer.mMaxParticles - static_cast<int>(startIndex));
+    }
+
+    /**
+     * Engine addition (`ren_ParticleBatch`): `RenderParticleBucket`'s per-buffer
+     * draws as one. Every work item's drawn range is copied, in the order the
+     * loop there draws them (newest buffer first, each in its own order), into
+     * the gather buffer, and the bucket is drawn once from it. Returns false,
+     * having drawn nothing, when the backend cannot copy buffers.
+     */
+    bool RenderParticleBucketBatched(SParticleRenderBucket& bucket)
+    {
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      if (device == nullptr) {
+        return false;
+      }
+      ParticleBuffer* drawer = nullptr;
+      std::uint32_t total = 0U;
+      for (std::size_t index = bucket.activeWorkItems.size(); index > 0U; --index) {
+        SParticleRenderWorkItem* const workItem = bucket.activeWorkItems[index - 1U];
+        if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
+          continue;
+        }
+        auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem->mParticleBuffer);
+        const int count = DrawnParticleCount(*workItem, *particleBuffer);
+        if (count > 0 && particleBuffer->mInstanceVertexBuffer != nullptr) {
+          total += static_cast<std::uint32_t>(count);
+          drawer = particleBuffer;
+        }
+      }
+      if (total == 0U || drawer == nullptr) {
+        return true;
+      }
+      const int first = sParticleGather.Reserve(total);
+      if (first < 0) {
+        return false;
+      }
+
+      constexpr std::uint32_t kStride = sizeof(ParticleBuffer::Instanced);
+      std::uint32_t written = 0U;
+      for (std::size_t index = bucket.activeWorkItems.size(); index > 0U; --index) {
+        SParticleRenderWorkItem* const workItem = bucket.activeWorkItems[index - 1U];
+        if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
+          continue;
+        }
+        auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem->mParticleBuffer);
+        const int count = DrawnParticleCount(*workItem, *particleBuffer);
+        if (count <= 0 || particleBuffer->mInstanceVertexBuffer == nullptr) {
+          continue;
+        }
+        // From the GPU-resident mirror when it holds this buffer, else from the buffer itself.
+        const auto mirrored = sParticleMirror.mMirrored.find(particleBuffer);
+        const int slotBase = (mirrored != sParticleMirror.mMirrored.end() && mirrored->second && sParticleMirror.Ready())
+          ? sParticleMirror.SlotBase(*particleBuffer)
+          : -1;
+        const bool copied = slotBase >= 0
+          ? device->CopyVertexBufferRegion(
+              *sParticleGather.mBuffer, (static_cast<std::uint32_t>(first) + written) * kStride, *sParticleMirror.mBuffer,
+              (static_cast<std::uint32_t>(slotBase) + workItem->mIntervalCursor) * kStride, static_cast<std::uint32_t>(count) * kStride
+            )
+          : device->CopyVertexBufferRegion(
+              *sParticleGather.mBuffer, (static_cast<std::uint32_t>(first) + written) * kStride,
+              *particleBuffer->mInstanceVertexBuffer, workItem->mIntervalCursor * kStride, static_cast<std::uint32_t>(count) * kStride
+            );
+        if (!copied) {
+          // Nothing drawn yet: the caller draws the buffers one by one.
+          return false;
+        }
+        written += static_cast<std::uint32_t>(count);
+      }
+      drawer->RenderInstances(sParticleGather.mBuffer, static_cast<int>(written), first);
+      return true;
+    }
+  } // namespace
+
+  void MirrorUploadedParticles(ParticleBuffer& particleBuffer, const std::uint32_t first, const std::uint32_t count)
+  {
+    if (count == 0U || particleBuffer.mInstanceVertexBuffer == nullptr || !sParticleMirror.Ready()) {
+      return;
+    }
+    const int slotBase = sParticleMirror.SlotBase(particleBuffer);
+    if (slotBase < 0) {
+      return;
+    }
+    bool& mirrored = sParticleMirror.mMirrored[&particleBuffer];
+    if (first == 0U) {
+      mirrored = true; // a fresh fill: everything the buffer will draw passes through here
+    }
+    if (!mirrored) {
+      return;
+    }
+    constexpr std::uint32_t kStride = sizeof(ParticleBuffer::Instanced);
+    mirrored = gpg::gal::Device::GetInstance()->CopyVertexBufferRegion(
+      *sParticleMirror.mBuffer, (static_cast<std::uint32_t>(slotBase) + first) * kStride, *particleBuffer.mInstanceVertexBuffer,
+      first * kStride, count * kStride
+    );
+  }
+
   bool RenderParticleBucket(SParticleRenderBucket& bucket, const float frameValue, const bool onlyTLight)
   {
     PruneExpiredParticleBucketWorkItems(bucket, frameValue);
@@ -635,6 +867,10 @@ namespace moho
     }
 
     bucket.SelectTechnique();
+
+    if (ren_ParticleBatch && RenderParticleBucketBatched(bucket)) {
+      return true;
+    }
 
     for (std::size_t index = activeWorkItemCount; index > 0U; --index) {
       SParticleRenderWorkItem* const workItem = bucket.activeWorkItems[index - 1U];
