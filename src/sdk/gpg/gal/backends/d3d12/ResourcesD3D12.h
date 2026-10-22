@@ -164,8 +164,19 @@ namespace gpg::gal
     /** The address draws read from, ready for reading. */
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);
     [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
+    [[nodiscard]] bool IsDynamic() const noexcept { return mDynamic; }
+
+    /**
+     * Where a GPU copy reads this buffer: the default-heap resource, moved to
+     * COPY_SOURCE, or a dynamic buffer's current copy in upload memory.
+     */
+    void PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset);
+    /** A static buffer's resource, for a GPU copy into it; nullptr for a dynamic buffer. */
+    [[nodiscard]] d3d12::TrackedResource* CopyDestination() noexcept { return mDynamic ? nullptr : &mResource; }
 
   private:
+    void TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk);
+
     std::uint32_t mByteWidth = 0;
     const char* mKind = nullptr;
     bool mDynamic = false;
@@ -174,6 +185,8 @@ namespace gpg::gal
     d3d12::TrackedResource mResource;    // static buffers
     D3D12_GPU_VIRTUAL_ADDRESS mChunk = 0; // dynamic buffers: the current copy in upload memory
     std::uint8_t* mChunkCpu = nullptr;
+    ID3D12Resource* mChunkResource = nullptr; // the upload page holding that copy, and where in it
+    std::uint64_t mChunkOffset = 0;
     std::uint64_t mChunkSerial = 0;
     bool mLocked = false;
     std::uint32_t mLockOffset = 0;

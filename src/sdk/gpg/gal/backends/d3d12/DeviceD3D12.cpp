@@ -1010,6 +1010,38 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->CopyBufferRegion(destination.resource.Get(), offset, upload.resource, upload.offset, bytes);
   }
 
+  bool DeviceD3D12::CopyVertexBufferRegion(
+    VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
+    const std::uint32_t byteCount
+  )
+  {
+    BufferStorageD3D12& to = static_cast<VertexBufferD3D12&>(destination).Storage();
+    BufferStorageD3D12& from = static_cast<VertexBufferD3D12&>(source).Storage();
+    d3d12::TrackedResource* const target = to.CopyDestination();
+    // A dynamic destination lives in upload memory the CPU rewrites; only
+    // default-heap buffers take GPU copies.
+    if (&to == &from || byteCount == 0U || target == nullptr || static_cast<std::uint64_t>(destinationOffset) + byteCount > to.ByteWidth() ||
+        static_cast<std::uint64_t>(sourceOffset) + byteCount > from.ByteWidth()) {
+      return false;
+    }
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    // The source first: a dynamic buffer may take a new upload copy, and that
+    // allocation can hand the recorded commands to the GPU.
+    ID3D12Resource* sourceResource = nullptr;
+    std::uint64_t sourceBase = 0U;
+    from.PrepareForCopySource(*this, sourceResource, sourceBase);
+    if (sourceResource == nullptr) {
+      return false;
+    }
+    // In command order: earlier draws reading the destination are recorded
+    // before this barrier, and later draws move it back to VERTEX_AND_CONSTANT
+    // in PrepareForDraw.
+    Transition(*target, D3D12_RESOURCE_STATE_COPY_DEST);
+    FlushBarriers();
+    mList->CopyBufferRegion(target->resource.Get(), destinationOffset, sourceResource, sourceBase + sourceOffset, byteCount);
+    return true;
+  }
+
   void DeviceD3D12::UploadSubresource(
     d3d12::TrackedResource& destination, const std::uint32_t subresource, const void* const data, const std::uint32_t rowPitch
   )

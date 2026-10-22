@@ -138,6 +138,9 @@ namespace gpg::gal
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    bool CopyVertexBufferRegion(
+      VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
+    ) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;

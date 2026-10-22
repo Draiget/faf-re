@@ -266,7 +266,11 @@ namespace gpg::gal
     if (mDynamic) {
       return;
     }
-    mBuffer =RequireDevice(mKind, __LINE__).CreateDeviceBuffer(mByteWidth, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    // Transfer both ways: uploads write it, and Device::CopyVertexBufferRegion
+    // copies between static buffers on the GPU.
+    mBuffer = RequireDevice(mKind, __LINE__).CreateDeviceBuffer(
+      mByteWidth, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+    );
   }
 
   BufferStorageVulkan::~BufferStorageVulkan()
@@ -314,12 +318,10 @@ namespace gpg::gal
       std::memcpy(mChunkCpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
     }
+    // The whole buffer, DISCARD too: bytes outside the locked range keep their
+    // last values, as a D3D9 driver's renamed buffer does (see BufferStorageD3D12).
     const vulkan::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-    if (HasFlag(mLockFlags, MohoD3DLockFlags::Discard)) {
-      std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
-    } else {
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
-    }
+    std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
     mChunkBuffer = chunk.buffer;
     mChunkOffset = chunk.offset;
     mChunkCpu = chunk.cpu;
