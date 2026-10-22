@@ -5253,6 +5253,7 @@ void moho::USER_PurgeAppCacheDir()
   if (::SHFileOperationA(&operation) != 0) {
     gpg::Warnf("USER_PurgeAppCacheDir: cache purge failed for \"%s\".", deletePattern.c_str());
   }
+  DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
 }
 
 /**
@@ -5714,6 +5715,7 @@ void moho::DISK_Recycle(const gpg::StrArg sourcePath)
   fileOperation.pFrom = recyclePath.data();
   fileOperation.pTo = nullptr;
   (void)::SHFileOperationW(&fileOperation);
+  DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
 }
 
 /**

@@ -1,4 +1,5 @@
 #include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/sim/CVFSImpl.h"
 
 #include <Windows.h>
 
@@ -136,13 +137,17 @@ namespace
   {
     const std::wstring wideTargetPath = gpg::STR_Utf8ToWide(targetPath.c_str());
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
-    return ::MoveFileExW(wideTempPath.c_str(), wideTargetPath.c_str(), MOVEFILE_REPLACE_EXISTING) != FALSE;
+    const bool moved = ::MoveFileExW(wideTempPath.c_str(), wideTargetPath.c_str(), MOVEFILE_REPLACE_EXISTING) != FALSE;
+    moho::DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
+    return moved;
   }
 
   [[nodiscard]] bool DeleteTempFile(const msvc8::string& tempPath)
   {
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
-    return ::DeleteFileW(wideTempPath.c_str()) != FALSE;
+    const bool deleted = ::DeleteFileW(wideTempPath.c_str()) != FALSE;
+    moho::DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
+    return deleted;
   }
 } // namespace
 

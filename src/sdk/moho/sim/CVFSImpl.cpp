@@ -4,20 +4,136 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <io.h>
+#include <mutex>
 #include <new>
+#include <shared_mutex>
+#include <string>
+#include <unordered_map>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/CZipFile.h"
 #include "moho/misc/CDiskWatch.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
+
+namespace moho
+{
+  bool res_CacheFileLookups = true;
+
+  TConVar<bool> gTConVar_res_CacheFileLookups(
+    "res_CacheFileLookups",
+    "Remember where the mounted file system found each file until the mounts or files change (same results, less work).",
+    &res_CacheFileLookups
+  );
+} // namespace moho
+
+namespace
+{
+  /**
+   * Engine addition (`res_CacheFileLookups`): `CVFSImpl::FindFile`'s answers, by lower-cased
+   * mounted path.
+   *
+   * Each lookup canonicalises the path once per mount point it tries and asks the wait-handle set
+   * about each, so a file in a late mount, or no file at all, costs dozens of canonicalisations.
+   * Textures (every new particle texture), meshes and scripts ask again and again, from the main,
+   * sim and prefetch threads.
+   *
+   * Mount points are fixed for a file system's life and archive contents never change. A file that
+   * was found stays where it was found until the disk watch reports a change, a mount is added, the
+   * file system goes away, or the engine deletes or moves a file itself (`DISK_InvalidateFileLookups`).
+   * "Not found" is kept only when every mount the lookup tried was an archive: a loose directory
+   * (preferences, the vault, saves, screenshots, the replay cache) can gain a file at any time.
+   */
+  class MountedFileLookupCache final : public moho::CDiskWatchListener
+  {
+  public:
+    MountedFileLookupCache()
+      : CDiskWatchListener("*")
+    {}
+
+    void OnDiskWatchEvent(const moho::SDiskWatchEvent& /*event*/) override
+    {
+      Invalidate();
+    }
+
+    void Invalidate()
+    {
+      const std::unique_lock lock(mMutex);
+      mFileSystem = nullptr;
+      mFound.clear();
+      ++mGeneration;
+    }
+
+    /**
+     * The stored answer for `loweredPath` in `fileSystem`, if there is one. `outGeneration` is
+     * what `Store` takes, so an answer worked out across an invalidation is never stored.
+     */
+    [[nodiscard]] bool Find(
+      const moho::CVFSImpl* const fileSystem,
+      const msvc8::string& loweredPath,
+      msvc8::string& outPath,
+      std::uint64_t& outGeneration
+    )
+    {
+      const std::shared_lock lock(mMutex);
+      outGeneration = mGeneration;
+      if (fileSystem != mFileSystem) {
+        return false;
+      }
+      const auto found = mFound.find(std::string(loweredPath.view()));
+      if (found == mFound.end()) {
+        return false;
+      }
+      outPath.assign_owned(found->second);
+      return true;
+    }
+
+    void Store(
+      const moho::CVFSImpl* const fileSystem,
+      const msvc8::string& loweredPath,
+      const msvc8::string& foundPath,
+      const std::uint64_t generation
+    )
+    {
+      const std::unique_lock lock(mMutex);
+      if (generation != mGeneration) {
+        return;
+      }
+      if (fileSystem != mFileSystem) {
+        mFound.clear();
+        mFileSystem = fileSystem;
+      }
+      mFound.insert_or_assign(std::string(loweredPath.view()), std::string(foundPath.view()));
+    }
+
+  private:
+    std::shared_mutex mMutex;
+    const moho::CVFSImpl* mFileSystem = nullptr;
+    std::uint64_t mGeneration = 0;
+    std::unordered_map<std::string, std::string> mFound;
+  };
+
+  /// Never destroyed: the disk watch it registers with may already be gone at exit.
+  [[nodiscard]] MountedFileLookupCache& MountedFileLookups()
+  {
+    static MountedFileLookupCache* const sCache = new MountedFileLookupCache();
+    return *sCache;
+  }
+} // namespace
+
+void moho::DISK_InvalidateFileLookups()
+{
+  MountedFileLookups().Invalidate();
+}
 
 namespace
 {
@@ -574,6 +690,7 @@ namespace moho
    */
   CVFSImpl::~CVFSImpl()
   {
+    MountedFileLookups().Invalidate(); // engine addition, see MountedFileLookupCache
     mMountpoints.clear();
   }
 
@@ -624,6 +741,8 @@ namespace moho
 
     gpg::Logf("DISK: AddSearchPath: '%s', mounted as '%s'", mountedPath.mDir.c_str(), mountedPath.mMountpoint.c_str());
 
+    MountedFileLookups().Invalidate(); // engine addition: the mounts change, see MountedFileLookupCache
+
     if (isDirectory) {
       if (CFG_GetArgOption("/EnableDiskWatch", 0u, nullptr)) {
         (void)DISK_AddWatchDirectory(mountedPath.mDir.c_str());
@@ -657,10 +776,20 @@ namespace moho
     }
 
     const msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    // Engine addition (res_CacheFileLookups): a lookup that wants no file attributes is answered
+    // from MountedFileLookupCache when it can be, and its answer stored there when it cannot.
+    const bool useLookupCache = res_CacheFileLookups && outInfo == nullptr;
+    std::uint64_t lookupGeneration = 0;
+    if (useLookupCache && MountedFileLookups().Find(this, loweredPath, *outPath, lookupGeneration)) {
+      return outPath;
+    }
+
+    bool triedLooseDirectory = false;
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
       if (!gpg::STR_StartsWith(loweredPath.c_str(), mountpoint.mMountpoint.c_str())) {
         continue;
       }
+      triedLooseDirectory = triedLooseDirectory || mountpoint.mZipHandle == nullptr;
 
       const std::size_t mountpointSize = mountpoint.mMountpoint.size();
       const std::size_t suffixStart =
@@ -676,11 +805,17 @@ namespace moho
       if (waitHandleSet != nullptr &&
           waitHandleSet->GetFileInfo(diskPath.c_str(), outInfo, mountpoint.mZipHandle != nullptr)) {
         outPath->assign_owned(diskPath.view());
+        if (useLookupCache) {
+          MountedFileLookups().Store(this, loweredPath, *outPath, lookupGeneration);
+        }
         return outPath;
       }
     }
 
     outPath->clear();
+    if (useLookupCache && !triedLooseDirectory) {
+      MountedFileLookups().Store(this, loweredPath, *outPath, lookupGeneration);
+    }
     return outPath;
   }
 

@@ -189,4 +189,11 @@ namespace moho
 
   static_assert(offsetof(CVFSImpl, mMountpoints) == 0x04, "CVFSImpl::mMountpoints offset must be 0x04");
   static_assert(sizeof(CVFSImpl) == 0x14, "CVFSImpl size must be 0x14");
+
+  /**
+   * Engine addition (`res_CacheFileLookups`): forgets every remembered `CVFSImpl::FindFile`
+   * answer. Called wherever the engine itself deletes or moves files, so a lookup after that
+   * sees the disk as it is.
+   */
+  void DISK_InvalidateFileLookups();
 } // namespace moho
