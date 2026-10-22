@@ -1004,6 +1004,9 @@ namespace moho
 
   void SIM_SetSessionPacing(ESimSessionPacing pacing) noexcept;
 
+  /// Engine addition: the pacing `SIM_SetSessionPacing` last set.
+  [[nodiscard]] ESimSessionPacing SIM_GetSessionPacing() noexcept;
+
   /**
    * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
    * this many beats issued beyond the last one the main thread has taken off the sync queue,
