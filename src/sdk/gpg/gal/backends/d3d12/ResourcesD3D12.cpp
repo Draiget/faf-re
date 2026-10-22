@@ -3,6 +3,7 @@
 #include "ResourcesD3D12.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 
 #include "DeviceD3D12.h"
@@ -99,10 +100,32 @@ namespace gpg::gal
     mLevels.resize(mDesc.MipLevels);
   }
 
+  namespace
+  {
+    std::atomic<std::uint64_t> sTextureCpuCopyBytes{0};
+  }
+
   TextureD3D12::~TextureD3D12()
   {
+    sTextureCpuCopyBytes.fetch_sub(mAccountedBytes);
     RetireResource(mResource.resource);
     RetireView(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mView);
+  }
+
+  std::uint64_t TextureD3D12::CpuCopyBytes() noexcept
+  {
+    return sTextureCpuCopyBytes.load();
+  }
+
+  void TextureD3D12::AccountCpuCopy() noexcept
+  {
+    std::uint64_t bytes = 0U;
+    for (const std::vector<std::uint8_t>& level : mLevels) {
+      bytes += level.capacity();
+    }
+    sTextureCpuCopyBytes.fetch_add(bytes);
+    sTextureCpuCopyBytes.fetch_sub(mAccountedBytes);
+    mAccountedBytes = bytes;
   }
 
   TextureContext* TextureD3D12::GetContext()
@@ -152,6 +175,7 @@ namespace gpg::gal
     mLocked = true;
     mLockedLevel = level;
     mLockedFlags = flags;
+    AccountCpuCopy();
 
     TextureLockRect lock{};
     lock.flags = flags;
@@ -186,6 +210,7 @@ namespace gpg::gal
     mLocked = false;
     mLockedLevel = 0;
     mLockedFlags = 0;
+    AccountCpuCopy();
     return 0;
   }
 
@@ -212,6 +237,7 @@ namespace gpg::gal
       std::vector<std::uint8_t>().swap(level);
     }
     mContentsFromEngine = false;
+    AccountCpuCopy();
   }
 
   // ---------------------------------------------------------------------------
@@ -371,15 +397,23 @@ namespace gpg::gal
       std::memcpy(mChunkCpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
     }
-    // A new copy: earlier draws keep reading the old one.
+    // A new copy: earlier draws keep reading the old one. The whole buffer
+    // goes in, DISCARD too: the bytes outside the locked range keep their
+    // last values, as the renamed buffer a D3D9 driver hands back does. The
+    // engine reads past what it wrote - the vision pass draws its total
+    // circle count from every ring batch - and fresh upload memory there
+    // drew garbage vision volumes into the minimap fog.
     const d3d12::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-    if (HasFlag(mLockFlags, MohoD3DLockFlags::Discard)) {
-      std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
-    } else {
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
-    }
+    std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    TakeChunk(device, chunk);
+  }
+
+  void BufferStorageD3D12::TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk)
+  {
     mChunk = chunk.gpu;
     mChunkCpu = chunk.cpu;
+    mChunkResource = chunk.resource;
+    mChunkOffset = chunk.offset;
     mChunkSerial = device.RecordingSerial();
   }
 
@@ -393,11 +427,23 @@ namespace gpg::gal
       // The copy a previous submission read may be recycled; take a fresh one.
       const d3d12::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
       std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
-      mChunk = chunk.gpu;
-      mChunkCpu = chunk.cpu;
-      mChunkSerial = device.RecordingSerial();
+      TakeChunk(device, chunk);
     }
     return mChunk;
+  }
+
+  void BufferStorageD3D12::PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset)
+  {
+    if (!mDynamic) {
+      device.Transition(mResource, D3D12_RESOURCE_STATE_COPY_SOURCE);
+      resource = mResource.resource.Get();
+      offset = 0U;
+      return;
+    }
+    // Upload memory stays in GENERIC_READ, which includes COPY_SOURCE.
+    static_cast<void>(PrepareForDraw(device));
+    resource = mChunkResource;
+    offset = mChunkOffset;
   }
 
   VertexBufferD3D12::VertexBufferD3D12(const VertexBufferContext& context)

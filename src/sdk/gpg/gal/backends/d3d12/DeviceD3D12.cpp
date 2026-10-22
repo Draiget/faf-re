@@ -13,7 +13,9 @@
 
 #include <d3dcompiler.h>
 #include <dxgi1_6.h>
+#include <psapi.h>
 
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 #include "gpg/gal/CursorContext.hpp"
@@ -381,6 +383,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       if (SUCCEEDED(mLibrary.getDebugInterface(IID_PPV_ARGS(&dred)))) {
         dred->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
         dred->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        mDredEnabled = true;
         gpg::Logf("D3D12: device removed extended data on");
       }
     }
@@ -827,8 +830,25 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
   void DeviceD3D12::CheckDeviceHresult(const int line, const HRESULT result, const char* const during)
   {
-    if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET || result == DXGI_ERROR_DEVICE_HUNG) {
+    if (SUCCEEDED(result)) {
+      return;
+    }
+    // After a removal calls fail with DEVICE_REMOVED, or with plain E_FAIL
+    // (a Close of a list the failed Present never reset): ask the device.
+    const HRESULT reason = (mDevice != nullptr) ? mDevice->GetDeviceRemovedReason() : S_OK;
+    if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET || result == DXGI_ERROR_DEVICE_HUNG || FAILED(reason)) {
       ReportDeviceRemoved(during);
+      // A removed device and everything made on it are gone; nothing more
+      // can be drawn. Stop here with the cause, through the engine's crash
+      // report, rather than failing every later call until something
+      // unrelated gives up.
+      gpg::Die(
+        "The Direct3D 12 device was removed during %s: %s (0x%08lX). The graphics driver reset the GPU, "
+        "so the game cannot continue. The log has the reason%s.",
+        during, ::gpg::D3DErrorToString(static_cast<long>(FAILED(reason) ? reason : result)),
+        static_cast<unsigned long>(FAILED(reason) ? reason : result),
+        mDredEnabled ? " and the GPU's last breadcrumbs" : "; /d3d12dred also records where the GPU stopped"
+      );
     }
     CheckHresult("DeviceD3D12.cpp", line, result);
   }
@@ -918,8 +938,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         static_cast<unsigned long>(reason)
       );
       if (FAILED(reason)) {
-        ReportDeviceRemoved("fence wait");
-        backend::ThrowHresult("DeviceD3D12.cpp", __LINE__, reason);
+        CheckDeviceHresult(__LINE__, reason, "fence wait");
       }
     }
   }
@@ -965,9 +984,16 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     sinceSubmit += mUpload.TakeAllocatedBytes();
     // Never in the middle of preparing a draw: buffers already prepared
     // must stay in the list they were prepared for.
-    if (sinceSubmit > (96ULL << 20U) && !mPreparingDraw) {
+#if defined(_M_IX86)
+    constexpr std::uint64_t kSubmitAfter = 48ULL << 20U;
+    constexpr std::uint64_t kWaitAbove = 128ULL << 20U;
+#else
+    constexpr std::uint64_t kSubmitAfter = 96ULL << 20U;
+    constexpr std::uint64_t kWaitAbove = 384ULL << 20U;
+#endif
+    if (sinceSubmit > kSubmitAfter && !mPreparingDraw) {
       sinceSubmit = 0U;
-      Submit(mUpload.BusyBytes() > (384ULL << 20U));
+      Submit(mUpload.BusyBytes() > kWaitAbove);
     }
     return mUpload.Allocate(bytes, alignment, RecordingSerial());
   }
@@ -1008,6 +1034,38 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     Transition(destination, D3D12_RESOURCE_STATE_COPY_DEST);
     FlushBarriers();
     mList->CopyBufferRegion(destination.resource.Get(), offset, upload.resource, upload.offset, bytes);
+  }
+
+  bool DeviceD3D12::CopyVertexBufferRegion(
+    VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
+    const std::uint32_t byteCount
+  )
+  {
+    BufferStorageD3D12& to = static_cast<VertexBufferD3D12&>(destination).Storage();
+    BufferStorageD3D12& from = static_cast<VertexBufferD3D12&>(source).Storage();
+    d3d12::TrackedResource* const target = to.CopyDestination();
+    // A dynamic destination lives in upload memory the CPU rewrites; only
+    // default-heap buffers take GPU copies.
+    if (&to == &from || byteCount == 0U || target == nullptr || static_cast<std::uint64_t>(destinationOffset) + byteCount > to.ByteWidth() ||
+        static_cast<std::uint64_t>(sourceOffset) + byteCount > from.ByteWidth()) {
+      return false;
+    }
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    // The source first: a dynamic buffer may take a new upload copy, and that
+    // allocation can hand the recorded commands to the GPU.
+    ID3D12Resource* sourceResource = nullptr;
+    std::uint64_t sourceBase = 0U;
+    from.PrepareForCopySource(*this, sourceResource, sourceBase);
+    if (sourceResource == nullptr) {
+      return false;
+    }
+    // In command order: earlier draws reading the destination are recorded
+    // before this barrier, and later draws move it back to VERTEX_AND_CONSTANT
+    // in PrepareForDraw.
+    Transition(*target, D3D12_RESOURCE_STATE_COPY_DEST);
+    FlushBarriers();
+    mList->CopyBufferRegion(target->resource.Get(), destinationOffset, sourceResource, sourceBase + sourceOffset, byteCount);
+    return true;
   }
 
   void DeviceD3D12::UploadSubresource(
@@ -1927,6 +1985,37 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mInfoQueue->ClearStoredMessages();
   }
 
+  void DeviceD3D12::LogMemoryIfDue()
+  {
+    // Diagnostics: with FAF_GAL_MEMORY_LOG=<seconds>, the backend's CPU-side
+    // memory (buffer and texture copies, upload pages) and the process's
+    // private bytes are logged that often.
+    static const DWORD interval = [] {
+      const char* const value = std::getenv("FAF_GAL_MEMORY_LOG");
+      const long seconds = (value != nullptr) ? std::strtol(value, nullptr, 10) : 0L;
+      return static_cast<DWORD>((seconds > 0L) ? seconds * 1000L : 0L);
+    }();
+    static DWORD last = 0U;
+    const DWORD now = ::GetTickCount();
+    if (interval == 0U || (last != 0U && now - last < interval)) {
+      return;
+    }
+    last = now;
+    PROCESS_MEMORY_COUNTERS_EX counters{};
+    counters.cb = sizeof(counters);
+    static_cast<void>(::K32GetProcessMemoryInfo(
+      ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)
+    ));
+    constexpr double kMiB = 1.0 / (1024.0 * 1024.0);
+    gpg::Logf(
+      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), %zu pipelines, %zu retiring; "
+      "process private %.1f MB",
+      static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB, static_cast<double>(TextureD3D12::CpuCopyBytes()) * kMiB,
+      static_cast<double>(mUpload.PageBytes()) * kMiB, mUpload.PageCount(), mPipelines.size(), mGarbage.size(),
+      static_cast<double>(counters.PrivateUsage) * kMiB
+    );
+  }
+
   void DeviceD3D12::DumpBackBufferIfDue()
   {
     // Diagnostics: with FAF_GAL_DUMP_DIR set, head 0's back buffer is written
@@ -1978,6 +2067,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     DumpBackBufferIfDue();
     LogDebugMessages();
+    LogMemoryIfDue();
 
     EndProfileFrame();
     for (OutputContext& output : mHeadOutputContexts) {

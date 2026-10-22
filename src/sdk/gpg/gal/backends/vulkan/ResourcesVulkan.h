@@ -138,6 +138,8 @@ namespace gpg::gal
     /** The buffer and offset draws read from. */
     void PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset);
     [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
+    /** A static buffer, for a GPU copy into it; nullptr for a dynamic buffer (upload memory). */
+    [[nodiscard]] vulkan::TrackedBuffer* CopyDestination() noexcept { return mDynamic ? nullptr : &mBuffer; }
 
   private:
     std::uint32_t mByteWidth = 0;

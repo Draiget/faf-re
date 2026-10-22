@@ -134,6 +134,9 @@ namespace gpg::gal
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    bool CopyVertexBufferRegion(
+      VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
+    ) override;
     /** Destroys a GPU program's modules and pipelines once the GPU is done with them. */
     void RetireProgram(GpuProgramVulkan& program);
 
@@ -247,6 +250,8 @@ namespace gpg::gal
     void EndRendering();
     void BeginRendering();
     void Transition(vulkan::TrackedImage& image, VkImageLayout layout);
+    /** To TRANSFER_DST for a copy into `image`, or a barrier after the transfer write that left it there. */
+    void TransitionForTransferWrite(vulkan::TrackedImage& image);
     void TransitionSampled(const std::vector<effects::TextureBinding>& bindings);
     void TransferBarrier();
 
@@ -338,6 +343,7 @@ namespace gpg::gal
     };
     StreamBinding mStreams[16];
     std::int32_t mStreamFrequencies[16]{};
+    std::uint32_t mDrawInstanceLimit = ~0U; ///< set by PrepareDraw: the instances the bound instance streams hold
     boost::shared_ptr<IndexBuffer> mIndexBuffer;
     bool mPreparingDraw = false;
 

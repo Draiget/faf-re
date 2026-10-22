@@ -1230,6 +1230,53 @@ namespace gpg::gal
     TransferBarrier();
   }
 
+  bool DeviceVulkan::CopyVertexBufferRegion(
+    VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
+    const std::uint32_t byteCount
+  )
+  {
+    BufferStorageVulkan& to = static_cast<VertexBufferVulkan&>(destination).Storage();
+    BufferStorageVulkan& from = static_cast<VertexBufferVulkan&>(source).Storage();
+    vulkan::TrackedBuffer* const target = to.CopyDestination();
+    // A dynamic destination lives in upload memory the CPU rewrites; only
+    // device-local buffers take GPU copies.
+    if (&to == &from || byteCount == 0U || target == nullptr || target->buffer == VK_NULL_HANDLE ||
+        static_cast<std::uint64_t>(destinationOffset) + byteCount > to.ByteWidth() ||
+        static_cast<std::uint64_t>(sourceOffset) + byteCount > from.ByteWidth()) {
+      return false;
+    }
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    // The source first: a dynamic buffer may take a new upload copy.
+    VkBuffer sourceBuffer = VK_NULL_HANDLE;
+    VkDeviceSize sourceBase = 0U;
+    from.PrepareForDraw(*this, sourceBuffer, sourceBase);
+    if (sourceBuffer == VK_NULL_HANDLE) {
+      return false;
+    }
+    // Copies are not allowed inside dynamic rendering; the barriers order the
+    // copy after earlier draws and writes (write-after-read on the
+    // destination, read-after-write on the source) and before later draws.
+    EndRendering();
+    TransferBarrier();
+    const VkBufferCopy region{sourceBase + sourceOffset, destinationOffset, byteCount};
+    Vk().vkCmdCopyBuffer(mCommands, sourceBuffer, target->buffer, 1U, &region);
+    TransferBarrier();
+    return true;
+  }
+
+  void DeviceVulkan::TransitionForTransferWrite(vulkan::TrackedImage& image)
+  {
+    // Already TRANSFER_DST - an upload or copy wrote it earlier and nothing
+    // read it since: Transition records no barrier then, so order the two
+    // transfer writes here (write-after-write).
+    if (image.image != VK_NULL_HANDLE && image.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+      EndRendering();
+      TransferBarrier();
+      return;
+    }
+    Transition(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  }
+
   void DeviceVulkan::Transition(vulkan::TrackedImage& image, const VkImageLayout layout)
   {
     if (image.image == VK_NULL_HANDLE || image.layout == layout) {
@@ -1269,7 +1316,7 @@ namespace gpg::gal
     const vulkan::UploadAllocation upload = AllocateUpload(bytes, 16U);
     std::memcpy(upload.cpu, data, static_cast<std::size_t>(bytes));
     EndRendering();
-    Transition(destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    TransitionForTransferWrite(destination);
     VkBufferImageCopy region{};
     region.bufferOffset = upload.offset;
     region.imageSubresource = {AspectOf(destination.format) & VK_IMAGE_ASPECT_COLOR_BIT, level, layer, 1U};
@@ -1757,7 +1804,7 @@ namespace gpg::gal
   {
     EndRendering();
     Transition(source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    Transition(destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    TransitionForTransferWrite(destination);
     if (!scale) {
       VkImageCopy region{};
       region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
@@ -2820,8 +2867,27 @@ namespace gpg::gal
     std::uint32_t slotCount = 0U;
     const std::span<const D3D11_INPUT_ELEMENT_DESC> elements =
       (mBoundFormat < d3d11::kVertexFormatCount) ? d3d11::VertexLayoutElements(mBoundFormat) : std::span<const D3D11_INPUT_ELEMENT_DESC>{};
+    std::uint32_t instanceSlots = 0U;
     for (const D3D11_INPUT_ELEMENT_DESC& element : elements) {
       slotCount = std::max<std::uint32_t>(slotCount, element.InputSlot + 1U);
+      if (element.InputSlotClass == D3D11_INPUT_PER_INSTANCE_DATA) {
+        instanceSlots |= 1U << element.InputSlot;
+      }
+    }
+    // The instances the per-instance streams hold from their bound offset.
+    // Direct3D 12 binds each stream with its exact size and reads zeros past
+    // it; here a stream runs on to the end of its buffer (an upload page for a
+    // dynamic one), so an instance count larger than the data - the vision
+    // pass replays the total circle count for every ring batch - would read
+    // whatever follows and draw it. Those instances are not drawn instead.
+    mDrawInstanceLimit = ~0U;
+    for (std::uint32_t slot = 0U; slot < slotCount; ++slot) {
+      const StreamBinding& stream = mStreams[slot];
+      if ((instanceSlots & (1U << slot)) == 0U || stream.buffer == nullptr || stream.stride == 0U) {
+        continue;
+      }
+      const std::uint32_t width = static_cast<VertexBufferVulkan*>(stream.buffer.get())->Storage().ByteWidth();
+      mDrawInstanceLimit = std::min(mDrawInstanceLimit, (width > stream.offset) ? (width - stream.offset) / stream.stride : 0U);
     }
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
       vertexBuffers[slot] = mZeroBuffer.buffer;
@@ -2896,12 +2962,11 @@ namespace gpg::gal
     mPreparingDraw = true;
     const bool ready = PrepareDraw(static_cast<std::uint32_t>(context->topology_), true);
     mPreparingDraw = false;
-    if (!ready) {
+    const std::uint32_t instances = std::min(InstanceCount(mStreamFrequencies[0]), mDrawInstanceLimit);
+    if (!ready || instances == 0U) {
       return;
     }
-    Vk().vkCmdDrawIndexed(
-      mCommands, context->indexCount_, InstanceCount(mStreamFrequencies[0]), context->startIndex_, context->baseVertexIndex_, 0U
-    );
+    Vk().vkCmdDrawIndexed(mCommands, context->indexCount_, instances, context->startIndex_, context->baseVertexIndex_, 0U);
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
@@ -2911,10 +2976,11 @@ namespace gpg::gal
     mPreparingDraw = true;
     const bool ready = PrepareDraw(static_cast<std::uint32_t>(context->topology_), false);
     mPreparingDraw = false;
-    if (!ready) {
+    const std::uint32_t instances = std::min(InstanceCount(mStreamFrequencies[0]), mDrawInstanceLimit);
+    if (!ready || instances == 0U) {
       return;
     }
-    Vk().vkCmdDraw(mCommands, context->vertexCount_, InstanceCount(mStreamFrequencies[0]), context->startVertex_, 0U);
+    Vk().vkCmdDraw(mCommands, context->vertexCount_, instances, context->startVertex_, 0U);
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 

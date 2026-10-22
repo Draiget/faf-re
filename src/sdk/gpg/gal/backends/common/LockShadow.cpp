@@ -20,6 +20,7 @@ namespace gpg::gal::backend
     constexpr int kMaxReports = 32;
 
     std::atomic<int> sReports{0};
+    std::atomic<std::uint64_t> sTotalBytes{0};
 
     [[nodiscard]] bool BreakRequested() noexcept
     {
@@ -73,11 +74,29 @@ namespace gpg::gal::backend
     }
   } // namespace
 
+  LockShadow::~LockShadow()
+  {
+    sTotalBytes.fetch_sub(mBytes.capacity());
+  }
+
+  std::uint64_t LockShadow::TotalBytes() noexcept
+  {
+    return sTotalBytes.load();
+  }
+
+  void LockShadow::Account(const std::size_t previousCapacity) noexcept
+  {
+    sTotalBytes.fetch_add(mBytes.capacity());
+    sTotalBytes.fetch_sub(previousCapacity);
+  }
+
   void LockShadow::Reset(const std::uint32_t byteWidth)
   {
+    const std::size_t previous = mBytes.capacity();
     mByteWidth = byteWidth;
     mMappedEnd = byteWidth;
     mBytes.assign(static_cast<std::size_t>(byteWidth) + kGuardBytes, 0U);
+    Account(previous);
     Arm(byteWidth);
   }
 
@@ -97,7 +116,9 @@ namespace gpg::gal::backend
       );
       end = std::max(end, offset);
       if (static_cast<std::size_t>(end) + kGuardBytes > mBytes.size()) {
+        const std::size_t previous = mBytes.capacity();
         mBytes.resize(static_cast<std::size_t>(end) + kGuardBytes, 0U);
+        Account(previous);
       }
     }
     mMappedEnd = std::max(end, mByteWidth);

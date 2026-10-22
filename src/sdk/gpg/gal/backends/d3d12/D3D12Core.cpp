@@ -47,6 +47,11 @@ namespace gpg::gal::d3d12
   namespace
   {
     constexpr std::uint64_t kPageSize = 8ULL << 20U;
+#if defined(_M_IX86)
+    constexpr std::uint64_t kIdlePageReserve = 32ULL << 20U;   // idle pages kept for reuse
+#else
+    constexpr std::uint64_t kIdlePageReserve = 128ULL << 20U;
+#endif
 
     [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint64_t alignment) noexcept
     {
@@ -143,11 +148,25 @@ namespace gpg::gal::d3d12
       mCurrent->busy = false;
       mCurrent->used = 0U;
     }
-    // Oversized pages that sit idle are given back.
+    // Oversized pages that sit idle are given back, and so are the idle
+    // ordinary pages past a reserve: a burst (a loading screen, a terrain
+    // normal-map rebuild) would otherwise leave its peak mapped for the rest
+    // of the session, which a 32-bit process cannot afford.
+    std::uint64_t idleKept = 0U;
     mPages.erase(
-      std::remove_if(mPages.begin(), mPages.end(), [&](const std::unique_ptr<Page>& page) {
-        return !page->busy && page->size > kPageSize && page.get() != mCurrent;
-      }),
+      std::remove_if(
+        mPages.begin(), mPages.end(),
+        [&](const std::unique_ptr<Page>& page) {
+          if (page->busy || page.get() == mCurrent) {
+            return false;
+          }
+          if (page->size > kPageSize || idleKept + page->size > kIdlePageReserve) {
+            return true;
+          }
+          idleKept += page->size;
+          return false;
+        }
+      ),
       mPages.end()
     );
   }
@@ -156,6 +175,15 @@ namespace gpg::gal::d3d12
   {
     const std::uint64_t bytes = mAllocatedBytes;
     mAllocatedBytes = 0U;
+    return bytes;
+  }
+
+  std::uint64_t UploadAllocator::PageBytes() const noexcept
+  {
+    std::uint64_t bytes = 0U;
+    for (const std::unique_ptr<Page>& page : mPages) {
+      bytes += page->size;
+    }
     return bytes;
   }
 

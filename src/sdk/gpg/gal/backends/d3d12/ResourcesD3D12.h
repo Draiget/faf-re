@@ -59,7 +59,12 @@ namespace gpg::gal
     [[nodiscard]] bool IsCube() const noexcept { return mContext.type_ == 2U; }
     [[nodiscard]] bool IsVolume() const noexcept { return mContext.type_ == 3U; }
 
+    /** Bytes held by every texture's CPU copies (memory diagnostics). */
+    [[nodiscard]] static std::uint64_t CpuCopyBytes() noexcept;
+
   private:
+    void AccountCpuCopy() noexcept;
+
     TextureContext mContext;
     d3d12::TrackedResource mResource;
     D3D12_CPU_DESCRIPTOR_HANDLE mView{};
@@ -69,6 +74,7 @@ namespace gpg::gal
     bool mLocked = false;
     int mLockedLevel = 0;
     int mLockedFlags = 0;
+    std::uint64_t mAccountedBytes = 0; // this texture's share of CpuCopyBytes
   };
 
   /**
@@ -164,8 +170,19 @@ namespace gpg::gal
     /** The address draws read from, ready for reading. */
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);
     [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
+    [[nodiscard]] bool IsDynamic() const noexcept { return mDynamic; }
+
+    /**
+     * Where a GPU copy reads this buffer: the default-heap resource, moved to
+     * COPY_SOURCE, or a dynamic buffer's current copy in upload memory.
+     */
+    void PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset);
+    /** A static buffer's resource, for a GPU copy into it; nullptr for a dynamic buffer. */
+    [[nodiscard]] d3d12::TrackedResource* CopyDestination() noexcept { return mDynamic ? nullptr : &mResource; }
 
   private:
+    void TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk);
+
     std::uint32_t mByteWidth = 0;
     const char* mKind = nullptr;
     bool mDynamic = false;
@@ -174,6 +191,8 @@ namespace gpg::gal
     d3d12::TrackedResource mResource;    // static buffers
     D3D12_GPU_VIRTUAL_ADDRESS mChunk = 0; // dynamic buffers: the current copy in upload memory
     std::uint8_t* mChunkCpu = nullptr;
+    ID3D12Resource* mChunkResource = nullptr; // the upload page holding that copy, and where in it
+    std::uint64_t mChunkOffset = 0;
     std::uint64_t mChunkSerial = 0;
     bool mLocked = false;
     std::uint32_t mLockOffset = 0;
