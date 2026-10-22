@@ -77,6 +77,8 @@ namespace gpg::gal
     }
     ++totals.calls;
     totals.startTicks = NowTicks();
+    totals.drawsAtStart = PendingDrawStatistics().drawCalls;
+    totals.uploadAtStart = PendingDrawStatistics().uploadBytes;
     if (Device* const device = Device::GetInstance(); device != nullptr) {
       device->BeginProfileRegion(region);
     }
@@ -92,6 +94,12 @@ namespace gpg::gal
       device->EndProfileRegion(region);
     }
     totals.cpuTicks += NowTicks() - totals.startTicks;
+    // The tally restarts when a frame's statistics are taken; a region open
+    // across that counts from zero.
+    const DrawStatistics& pending = PendingDrawStatistics();
+    totals.draws += pending.drawCalls >= totals.drawsAtStart ? pending.drawCalls - totals.drawsAtStart : pending.drawCalls;
+    totals.uploadBytes +=
+      pending.uploadBytes >= totals.uploadAtStart ? pending.uploadBytes - totals.uploadAtStart : pending.uploadBytes;
   }
 
   void RenderProfiler::AddGpuTime(const std::uint32_t region, const double milliseconds) noexcept
@@ -100,6 +108,27 @@ namespace gpg::gal
       mRegions[region].gpuMilliseconds += milliseconds;
       ++mRegions[region].gpuSamples;
     }
+  }
+
+  void RenderProfiler::AddGpuPipelineStatistics(
+    const std::uint32_t region, const std::uint64_t pixelInvocations, const std::uint64_t primitives
+  ) noexcept
+  {
+    if (region < mRegionCount) {
+      mRegions[region].pixels += pixelInvocations;
+      mRegions[region].primitives += primitives;
+      ++mRegions[region].statisticsSamples;
+    }
+  }
+
+  bool RenderProfiler::PixelStatisticsEnabled() noexcept
+  {
+    static const bool sEnabled = [] {
+      char text[8] = {};
+      std::size_t length = 0;
+      return ::getenv_s(&length, text, sizeof(text), "FAF_GPU_PROFILE_PIXELS") == 0 && length != 0U && text[0] == '1';
+    }();
+    return sEnabled;
   }
 
   void RenderProfiler::AddGpuFrameTime(const double milliseconds) noexcept
@@ -150,15 +179,29 @@ namespace gpg::gal
         // frames they cover: one sample set per call.
         const double gpuPerCall = totals.gpuSamples != 0U ? totals.gpuMilliseconds / totals.gpuSamples : 0.0;
         gpg::Logf(
-          "  pass %-22s %6.2f calls  CPU %7.3f ms  GPU %7.3f ms per frame", totals.name,
+          "  pass %-22s %6.2f calls  CPU %7.3f ms  GPU %7.3f ms per frame, %7.1f draws, %8.1f KB", totals.name,
           static_cast<double>(totals.calls) / frames, TicksToMilliseconds(totals.cpuTicks) / frames,
-          gpuPerCall * static_cast<double>(totals.calls) / frames
+          gpuPerCall * static_cast<double>(totals.calls) / frames, static_cast<double>(totals.draws) / frames,
+          static_cast<double>(totals.uploadBytes) / frames / 1024.0
         );
+        if (totals.statisticsSamples != 0U) {
+          // Averaged over the calls measured, then per frame like the GPU time.
+          const double perCall = static_cast<double>(totals.calls) / frames / static_cast<double>(totals.statisticsSamples);
+          gpg::Logf(
+            "    pixels %-20s %10.3f Mpix  %10.1f kprims per frame", totals.name,
+            static_cast<double>(totals.pixels) * perCall / 1.0e6, static_cast<double>(totals.primitives) * perCall / 1.0e3
+          );
+        }
       }
       totals.cpuTicks = 0;
       totals.calls = 0U;
       totals.gpuMilliseconds = 0.0;
       totals.gpuSamples = 0U;
+      totals.draws = 0U;
+      totals.uploadBytes = 0U;
+      totals.pixels = 0U;
+      totals.primitives = 0U;
+      totals.statisticsSamples = 0U;
     }
     mFrames = 0U;
     mGpuFrameMilliseconds = 0.0;

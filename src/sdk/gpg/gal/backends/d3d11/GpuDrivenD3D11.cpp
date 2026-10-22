@@ -371,6 +371,7 @@ namespace gpg::gal
     depth.FrontFace = ToD3D11(desc.stencil.front);
     depth.BackFace = ToD3D11(desc.stencil.back);
     program->mStencilReference = desc.stencil.reference;
+    program->mInheritDepthStencil = desc.inheritDepthStencil;
     CheckHresult("GpuDrivenD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&depth, &program->mDepthStencil));
 
     // Solid fill, no scissor; depth clipping as the program asks (D3D9 clips).
@@ -438,7 +439,9 @@ namespace gpg::gal
     mImmediate->PSSetShaderResources(0U, static_cast<UINT>(std::size(views)), views);
     mImmediate->PSSetSamplers(0U, 1U, &sampler);
     mImmediate->OMSetBlendState(program->mBlend.Get(), nullptr, 0xFFFFFFFFU);
-    mImmediate->OMSetDepthStencilState(program->mDepthStencil.Get(), program->mStencilReference);
+    if (!program->mInheritDepthStencil) {
+      mImmediate->OMSetDepthStencilState(program->mDepthStencil.Get(), program->mStencilReference);
+    }
     mImmediate->RSSetState(program->mRasterizer.Get());
     RecordStateChange();
 
@@ -514,6 +517,16 @@ namespace gpg::gal
             return;
           }
         }
+        if (RenderProfiler::PixelStatisticsEnabled()) {
+          frame.statistics.resize(kMaxTimedRegionsPerFrame + 1U);
+          D3D11_QUERY_DESC statisticsDesc{D3D11_QUERY_PIPELINE_STATISTICS, 0U};
+          for (ComPtr<ID3D11Query>& query : frame.statistics) {
+            if (FAILED(mDevice->CreateQuery(&statisticsDesc, &query))) {
+              frame.statistics.clear();
+              break;
+            }
+          }
+        }
       }
       frame.open = true;
       frame.usedPairs = 1U;
@@ -528,6 +541,9 @@ namespace gpg::gal
     }
     const std::uint32_t pair = frame.usedPairs++;
     mImmediate->End(frame.timestamps[2U * pair].Get());
+    if (pair < frame.statistics.size()) {
+      mImmediate->Begin(frame.statistics[pair].Get());
+    }
     mOpenRegions.push_back(static_cast<std::uint32_t>(frame.regions.size()));
     frame.regions.push_back(TimedRegion{region, pair});
   }
@@ -542,7 +558,11 @@ namespace gpg::gal
     const std::uint32_t timed = mOpenRegions.back();
     mOpenRegions.pop_back();
     if (timed != 0xFFFFFFFFU) {
-      mImmediate->End(frame.timestamps[2U * frame.regions[timed].queryPair + 1U].Get());
+      const std::uint32_t pair = frame.regions[timed].queryPair;
+      mImmediate->End(frame.timestamps[2U * pair + 1U].Get());
+      if (pair < frame.statistics.size()) {
+        mImmediate->End(frame.statistics[pair].Get());
+      }
     }
   }
 
@@ -592,6 +612,11 @@ namespace gpg::gal
         if (read(frame.timestamps[2U * timed.queryPair].Get(), begin) &&
             read(frame.timestamps[2U * timed.queryPair + 1U].Get(), end) && end >= begin) {
           profiler.AddGpuTime(timed.region, static_cast<double>(end - begin) * toMilliseconds);
+        }
+        D3D11_QUERY_DATA_PIPELINE_STATISTICS statistics{};
+        if (timed.queryPair < frame.statistics.size() &&
+            mImmediate->GetData(frame.statistics[timed.queryPair].Get(), &statistics, sizeof(statistics), flags) == S_OK) {
+          profiler.AddGpuPipelineStatistics(timed.region, statistics.PSInvocations, statistics.CPrimitives);
         }
       }
     }

@@ -100,6 +100,23 @@ namespace moho
     float interpolationAlpha
   );
 
+  struct SelectionBracketInstance;
+
+  /**
+   * Engine addition: the geometry half of `DrawSelectionBrackets` - the four
+   * ground corners of `entity`'s flattened selection box (in drawing order) and
+   * the four rotated tile corner offsets, computed exactly as it computes them.
+   * False, with nothing written, for a null entity. Touches only `entity` (and,
+   * the first time in the process, the Lua tuning table), so workers may build
+   * different entities at once after one call on the main thread.
+   */
+  bool BuildSelectionBracketGeometry(
+    UserEntity* entity,
+    const GeomCamera3* camera,
+    float interpolationAlpha,
+    SelectionBracketInstance& out
+  );
+
   /**
    * Address: 0x007FD490 (FUN_007FD490, func_RenUI)
    *

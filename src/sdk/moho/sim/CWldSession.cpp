@@ -72,6 +72,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/console/CConCommand.h"
+#include "moho/console/CConFunc.h"
 #include "moho/app/UserWorkerPool.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
@@ -2568,6 +2569,8 @@ namespace moho
       HighPriority,
       Selected,
       Lifebar,
+      /// The single hovered-unit slot (see `sHoveredStrategicIcon`), drawn after the four runs.
+      Hovered,
     };
 
     /**
@@ -2576,6 +2579,15 @@ namespace moho
      * record, which carries no textures. These are the same handles, in the same runs and order,
      * that the serial classification stored directly.
      */
+    /**
+     * The binary's hovered-unit slot: a `UnitIconData` local of `RenderStrategicIcons`
+     * ([esp+0xB0], zeroed at 0x0085B9CE). Classification copies the hovered unit's icon data into
+     * it (0x0085C262..0x0085C277, `FUN_0085CB00`) instead of a run - the last hovered entry wins -
+     * and the pass draws it after the four runs (0x0085BCB7..0x0085BCCD), so the hovered icon is on
+     * top, in its `Over` / `SelectedOver` / highlighted generic texture.
+     */
+    UnitIconData sHoveredStrategicIcon{};
+
     void StoreStrategicIcon(
       StrategicIconAux& aux,
       const EStrategicIconRun run,
@@ -2583,6 +2595,19 @@ namespace moho
       const boost::shared_ptr<CD3DBatchTexture>* const icon
     )
     {
+      if (run == EStrategicIconRun::Hovered) {
+        sHoveredStrategicIcon = data;
+        if (icon != nullptr) {
+          sHoveredStrategicIcon.mIconTexture = *icon;
+          if (sHoveredStrategicIcon.mShowPausedOverlay) {
+            sHoveredStrategicIcon.mPausedTexture = aux.mPauseRestTexture;
+          }
+          if (sHoveredStrategicIcon.mShowStunnedOverlay) {
+            sHoveredStrategicIcon.mStunnedTexture = aux.mStunnedRestTexture;
+          }
+        }
+        return;
+      }
       msvc8::vector<UnitIconData>* target = nullptr;
       switch (run) {
         case EStrategicIconRun::Ground:
@@ -2600,6 +2625,8 @@ namespace moho
         case EStrategicIconRun::Lifebar:
           target = &aux.mLifebarIcons;
           break;
+        case EStrategicIconRun::Hovered:
+          return;
       }
 
       target->push_back(data);
@@ -2685,6 +2712,9 @@ namespace moho
       /// The icon `PickUnitStrategicIconTexture` picks for an unhovered unit, unselected and selected.
       const boost::shared_ptr<CD3DBatchTexture>* mIcon = nullptr;
       const boost::shared_ptr<CD3DBatchTexture>* mSelectedIcon = nullptr;
+      /// The same for a hovered unit (`Over` / `SelectedOver`, or the highlighted generic icon).
+      const boost::shared_ptr<CD3DBatchTexture>* mHoveredIcon = nullptr;
+      const boost::shared_ptr<CD3DBatchTexture>* mHoveredSelectedIcon = nullptr;
       std::uint16_t mFlags = 0U;
 
       [[nodiscard]] bool Has(const Flags flag) const noexcept { return (mFlags & flag) != 0U; }
@@ -7214,8 +7244,55 @@ namespace moho
    * `MouseInfo::mUnitHover` is the intrusive `WeakPtr<UserEntity>` the binary
    * stores there, so the decode is `MouseInfo::HoveredEntity()`.
    */
+  namespace
+  {
+    // Engine test hook (`ui_TestHover`): an entity that stands in for the one under the cursor,
+    // so the hovered-unit paths can be exercised without moving the mouse.
+    WeakPtr<UserEntity> sTestHoveredEntity;
+    bool sTestHoverActive = false;
+
+    void UiTestHover(const msvc8::vector<msvc8::string>& args)
+    {
+      const std::string mode = args.size() >= 2U ? std::string(args[1].c_str()) : std::string();
+      if (mode == "off") {
+        sTestHoverActive = false;
+        sTestHoveredEntity.ResetFromObject(nullptr);
+        CON_Printf("ui_TestHover: off");
+        return;
+      }
+      CWldSession* const session = WLD_GetActiveSession();
+      if ((mode != "selected" && mode != "id") || session == nullptr) {
+        CON_Printf("syntax: ui_TestHover selected|id <entity id>|off (hover that unit until 'off')");
+        return;
+      }
+      UserEntity* first = nullptr;
+      if (mode == "id") {
+        first = args.size() >= 3U ? session->LookupEntityId(std::atoi(args[2].c_str())) : nullptr;
+      } else {
+        for (UserEntity* const entity : session->mSelection) {
+          first = entity;
+          break;
+        }
+      }
+      sTestHoveredEntity.ResetFromObject(first);
+      sTestHoverActive = first != nullptr;
+      CON_Printf("ui_TestHover: %s", first != nullptr ? "hovering a unit" : "no such unit");
+      gpg::Logf("ui_TestHover: %s", first != nullptr ? "hovering a unit" : "no such unit");
+    }
+
+    CConFunc gCConFunc_ui_TestHover(
+      "ui_TestHover",
+      "Test hook: 'ui_TestHover selected' makes the first selected unit the hovered one (whatever the "
+      "mouse is over) until 'ui_TestHover off'.",
+      &UiTestHover
+    );
+  } // namespace
+
   UserEntity* CWldSession::GetHoveredUserEntity() const noexcept
   {
+    if (sTestHoverActive) {
+      return sTestHoveredEntity.GetObjectPtr();
+    }
     return GetCursorInfo().HoveredEntity();
   }
 
@@ -12458,6 +12535,7 @@ namespace moho
     // consumes it is wired yet, so it has to be cleared here with the other
     // four. Leaving it out made it grow by every visible unit every frame.
     aux.mLifebarIcons.clear();
+    sHoveredStrategicIcon = UnitIconData{};
 
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
     primBatcher->SetViewMatrix(VMatrix4::Identity());
@@ -12612,11 +12690,9 @@ namespace moho
         return;
       }
 
-      // The single dedicated "hovered unit" slot is part of the deferred
-      // draw pass (see the function comment) - hovered units are excluded
-      // from all four runs here, matching the binary, but nothing consumes
-      // them yet.
+      // 0x0085C262..0x0085C28E: the hovered unit goes to the one hovered slot, not to a run.
       if (isHovered) {
+        store(EStrategicIconRun::Hovered, iconData, &icon);
         return;
       }
 
@@ -12734,6 +12810,8 @@ namespace moho
       probe.mBlueprint = blueprint;
       source.mIcon = &PickUnitStrategicIconTexture(aux, probe, false, selectedVariantEligible, false);
       source.mSelectedIcon = &PickUnitStrategicIconTexture(aux, probe, true, selectedVariantEligible, false);
+      source.mHoveredIcon = &PickUnitStrategicIconTexture(aux, probe, false, selectedVariantEligible, true);
+      source.mHoveredSelectedIcon = &PickUnitStrategicIconTexture(aux, probe, true, selectedVariantEligible, true);
     };
 
     // Engine addition (`ren_GpuIconClassify`): the GPU form of one record - `describe`'s flags and
@@ -12806,6 +12884,8 @@ namespace moho
         needsSlot = 1U;
       }
       record.mIconSlots = iconSlot | (findSlot(source.mSelectedIcon) << 16U);
+      // The hovered textures get their slots when the unit is first hovered.
+      record.mHoveredIconSlots = findSlot(source.mHoveredIcon) | (findSlot(source.mHoveredSelectedIcon) << 16U);
       const boost::shared_ptr<CD3DBatchTexture>& underlay = entity->mVariableData.mUnderlayTexture;
       if (hasIdentifiedOwner && underlay) {
         const std::uint32_t underlaySlot = gpuIcons.FindSlot(underlay.get());
@@ -12876,10 +12956,15 @@ namespace moho
         }
       }
 
+      const bool isSelected = mSelection.Find(entity) != mSelection.end();
       if (entity == hoveredEntity) {
+        const boost::shared_ptr<CD3DBatchTexture>* const hoveredIcon =
+          isSelected ? source.mHoveredSelectedIcon : source.mHoveredIcon;
+        if (hoveredIcon != nullptr && *hoveredIcon) {
+          store(EStrategicIconRun::Hovered, iconData, hoveredIcon);
+        }
         return;
       }
-      const bool isSelected = mSelection.Find(entity) != mSelection.end();
       const boost::shared_ptr<CD3DBatchTexture>* const icon = isSelected ? source.mSelectedIcon : source.mIcon;
       if (icon == nullptr || !*icon) {
         return;
@@ -13060,9 +13145,28 @@ namespace moho
         for (std::size_t i = 0; hoveredEntity != nullptr && i < frustumUnitCount; ++i) {
           if (iconSources[i].mEntity == hoveredEntity) {
             sourceSet.mHoveredIndex = static_cast<std::uint32_t>(i);
-            break;
           }
         }
+        // The hovered unit's textures get their atlas slots the first time they are needed. The
+        // last matching entry is the binary's: its hovered slot keeps the last one stored.
+        if (sourceSet.mHoveredIndex != 0xFFFFFFFFU) {
+          const StrategicIconSource& source = iconSources[sourceSet.mHoveredIndex];
+          StrategicIconSourceRecord& record = sourceSet.mGpuSources[sourceSet.mHoveredIndex];
+          std::uint32_t slots = record.mHoveredIconSlots;
+          const auto ensure = [&gpuIcons](const boost::shared_ptr<CD3DBatchTexture>* const texture, const std::uint32_t slot) {
+            return (slot == StrategicIconInstance::kNoLayer && texture != nullptr && *texture) ? gpuIcons.AddSlot(*texture) : slot;
+          };
+          slots = ensure(source.mHoveredIcon, slots & 0xFFFFu) | (ensure(source.mHoveredSelectedIcon, slots >> 16U) << 16U);
+          if (slots != record.mHoveredIconSlots) {
+            record.mHoveredIconSlots = slots;
+            const bool selectionCurrent = sourceSet.mSelectionBuiltFor == sourceSet.mGpuSourcesVersion;
+            ++sourceSet.mGpuSourcesVersion;
+            if (selectionCurrent) {
+              sourceSet.mSelectionBuiltFor = sourceSet.mGpuSourcesVersion;
+            }
+          }
+        }
+        sourceSet.mHoveredBuiltFor = sourceSet.mGpuSourcesVersion;
       }
 
       using Constants = StrategicIconClassifyConstants;
@@ -13151,6 +13255,13 @@ namespace moho
             }
           }
         }
+        // The hovered slot: the last hovered candidate.
+        for (auto it = candidates.rbegin(); it != candidates.rend(); ++it) {
+          if (it->mRun == EStrategicIconRun::Hovered) {
+            (void)BuildStrategicIconRecord(*it, aux, PlaceUnitIcon(it->mData, aux), findSlot, expected.emplace_back());
+            break;
+          }
+        }
         std::vector<StrategicIconInstance> drawn;
         if (gpuIcons.ReadBackClassified(drawn)) {
           CompareClassifiedStrategicIcons(expected, drawn, isMiniMap);
@@ -13200,12 +13311,16 @@ namespace moho
             sChunks[c].clear();
           }
         }
-        // Runs in draw order (ground, air, high priority, selected), each in classification order.
+        // Runs in draw order (ground, air, high priority, selected), each in classification order,
+        // then the hovered slot (the last hovered candidate, as the binary overwrites its slot).
         std::size_t runCounts[4] = {};
+        const StrategicIconCandidate* hoveredCandidate = nullptr;
         for (std::size_t c = 0; c < chunkCount; ++c) {
           for (const StrategicIconCandidate& candidate : sChunks[c]) {
             if (candidate.mRun == EStrategicIconRun::Lifebar) {
               StoreStrategicIcon(aux, candidate.mRun, candidate.mData, candidate.mIcon);
+            } else if (candidate.mRun == EStrategicIconRun::Hovered) {
+              hoveredCandidate = &candidate;
             } else {
               ++runCounts[static_cast<std::size_t>(candidate.mRun)];
             }
@@ -13217,10 +13332,13 @@ namespace moho
         sGpuIcons.resize(runCursor[3] + runCounts[3]);
         for (std::size_t c = 0; c < chunkCount; ++c) {
           for (const StrategicIconCandidate& candidate : sChunks[c]) {
-            if (candidate.mRun != EStrategicIconRun::Lifebar) {
+            if (candidate.mRun != EStrategicIconRun::Lifebar && candidate.mRun != EStrategicIconRun::Hovered) {
               sGpuIcons[runCursor[static_cast<std::size_t>(candidate.mRun)]++] = &candidate;
             }
           }
+        }
+        if (hoveredCandidate != nullptr) {
+          sGpuIcons.push_back(hoveredCandidate);
         }
       } else if (!UseParallelIcons(frustumUnitCount)) {
         const auto storeInAux = [&aux](
@@ -13298,6 +13416,9 @@ namespace moho
         for (UnitIconData& selectedIcon : aux.mSelectedIcons) {
           RenderUnitIcon(selectedIcon, aux);
         }
+        if (sHoveredStrategicIcon.mUnit != nullptr) {
+          RenderUnitIcon(sHoveredStrategicIcon, aux);
+        }
       } else {
         // Engine addition (`ui_ParallelIcons`): place every icon of the four runs on workers, then
         // draw them on this thread in the serial order (ground, air, high priority, selected).
@@ -13329,6 +13450,9 @@ namespace moho
         StrategicIconBulkEmitter emit(*aux.mBatcher, sPendingQuads);
         for (std::size_t i = 0; i < drawnIconCount; ++i) {
           EmitUnitIconQuads(iconAt(i), sPlacements[i], emit);
+        }
+        if (sHoveredStrategicIcon.mUnit != nullptr) {
+          EmitUnitIconQuads(sHoveredStrategicIcon, PlaceUnitIcon(sHoveredStrategicIcon, aux), emit);
         }
       }
 

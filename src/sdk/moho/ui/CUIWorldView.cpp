@@ -1,4 +1,5 @@
 #include "moho/ui/UiRuntimeTypes.h"
+#include "gpg/gal/RenderProfiler.h"
 
 #include <cmath>
 #include <cstdint>
@@ -75,9 +76,13 @@ namespace moho
       mWldSession->RenderStrategicIcons(mCamera.get(), batcher, tickFraction, IsMiniMap());
     }
 
-    mWldSession->RenderProjectileIcons(mCamera.get(), batcher, tickFraction, frameSeconds);
+    {
+      const gpg::gal::RenderProfileScope profileProjectileIcons("ProjectileIcons"); // FAF instrumentation
+      mWldSession->RenderProjectileIcons(mCamera.get(), batcher, tickFraction, frameSeconds);
+    }
 
     if (UI_RenProjectileArcs) {
+      const gpg::gal::RenderProfileScope profileProjectileArcs("ProjectileArcs"); // FAF instrumentation
       RenderProjectileArcs(mWldSession, const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher, tickFraction);
     }
 
@@ -91,6 +96,7 @@ namespace moho
     (void)mCamera->CameraGetView();
     mWldSession->RenderMeshPreviews();
 
+    const gpg::gal::RenderProfileScope profileCommandOverlays("CommandOverlays"); // FAF instrumentation
     mWldSession->DrawCommandSplats(const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher);
 
     mWldSession->DrawEconomyOverlay(mCamera.get(), batcher, tickFraction);

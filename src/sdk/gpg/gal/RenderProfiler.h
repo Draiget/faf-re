@@ -39,6 +39,13 @@ namespace gpg::gal
 
     /** Backends report resolved GPU times here, possibly frames later. */
     void AddGpuTime(std::uint32_t region, double milliseconds) noexcept;
+    /**
+     * Pixel-shader invocations and rasterised primitives of one region call
+     * (FAF_GPU_PROFILE_PIXELS=1 and a backend that measures them).
+     */
+    void AddGpuPipelineStatistics(std::uint32_t region, std::uint64_t pixelInvocations, std::uint64_t primitives) noexcept;
+    /** FAF_GPU_PROFILE_PIXELS=1: backends also count pixels and primitives per region (read once). */
+    [[nodiscard]] static bool PixelStatisticsEnabled() noexcept;
     /** GPU time of one whole frame (first command to Present), possibly frames later. */
     void AddGpuFrameTime(double milliseconds) noexcept;
 
@@ -73,6 +80,14 @@ namespace gpg::gal
       std::uint32_t depth = 0U;
       double gpuMilliseconds = 0.0;
       std::uint32_t gpuSamples = 0U;
+      // Draw calls and upload bytes submitted inside the region (outermost call only).
+      std::uint32_t drawsAtStart = 0U;
+      std::uint64_t uploadAtStart = 0U;
+      std::uint64_t draws = 0U;
+      std::uint64_t uploadBytes = 0U;
+      std::uint64_t pixels = 0U;
+      std::uint64_t primitives = 0U;
+      std::uint32_t statisticsSamples = 0U;
     };
 
     RegionTotals mRegions[kMaxRegions]{};

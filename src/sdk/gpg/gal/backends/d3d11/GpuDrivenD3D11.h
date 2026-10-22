@@ -45,6 +45,7 @@ namespace gpg::gal
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> mRasterizer;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> mSampler;
     UINT mStencilReference = 0U;
+    bool mInheritDepthStencil = false; // GpuProgramDesc::inheritDepthStencil
   };
 
   class GpuDrivenD3D11
@@ -84,6 +85,7 @@ namespace gpg::gal
     {
       Microsoft::WRL::ComPtr<ID3D11Query> disjoint;
       std::vector<Microsoft::WRL::ComPtr<ID3D11Query>> timestamps; // pairs; pair 0 is the frame itself
+      std::vector<Microsoft::WRL::ComPtr<ID3D11Query>> statistics; // FAF_GPU_PROFILE_PIXELS: one per pair
       std::vector<TimedRegion> regions;
       std::uint32_t usedPairs = 0U;
       bool open = false;
