@@ -76,10 +76,17 @@ namespace gpg::gal::d3d11
       {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 76U, D3D11_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr D3D11_INPUT_ELEMENT_DESC kVertexLayoutElements_Format12[3] = {
+    // The particle-trail vertex (moho::STrailVertex, 52 bytes): D3D9's
+    // declaration ends with a FLOAT4 TEXCOORD2 (size, reserved, texV, emitter
+    // age). Without it the buffers were sized for 36-byte vertices while the
+    // engine writes 52, so every trail upload ran 6400 bytes past a full
+    // 400-vertex buffer - heap corruption on Direct3D 12 and Vulkan, whose
+    // dynamic buffers are CPU copies - and the ribbon read the wrong bytes.
+    constexpr D3D11_INPUT_ELEMENT_DESC kVertexLayoutElements_Format12[4] = {
       {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D11_INPUT_PER_VERTEX_DATA, 0U},
       {"TEXCOORD", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 12U, D3D11_INPUT_PER_VERTEX_DATA, 0U},
       {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 24U, D3D11_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 36U, D3D11_INPUT_PER_VERTEX_DATA, 0U},
     };
 
     constexpr D3D11_INPUT_ELEMENT_DESC kVertexLayoutElements_Format13[4] = {
