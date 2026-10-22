@@ -556,6 +556,54 @@ namespace moho
    * through the `"CastVision"` technique in ring-buffer sized batches, and
    * composites the stencil with the renderer's `"Vision"` frame pass.
    */
+  bool ren_CacheFogFootprint = false;
+
+  TConVar<bool> gTConVar_ren_CacheFogFootprint(
+    "ren_CacheFogFootprint",
+    "Keep the fog pass's terrain footprint of each camera (a walk of the height field) until the camera "
+    "or the terrain changes, instead of recomputing it every frame. 0, the default, recomputes it.",
+    &ren_CacheFogFootprint
+  );
+
+  namespace
+  {
+    /**
+     * Engine change: `CHeightField::ConvexIntersection` of a camera solid, kept for the last few
+     * solids and recomputed only when the solid's planes or the height field change (most frames
+     * the camera has not moved). The walk is the most expensive step of the fog pass.
+     */
+    [[nodiscard]] Wm3::AxisAlignedBox3f TerrainFootprintOf(const CHeightField& field, const CGeomSolid3& solid)
+    {
+      if (!ren_CacheFogFootprint) {
+        return field.ConvexIntersection(solid);
+      }
+      struct Entry
+      {
+        const CHeightField* mField = nullptr;
+        std::uint64_t mRevision = ~0ULL;
+        std::vector<Wm3::Plane3f> mPlanes;
+        Wm3::AxisAlignedBox3f mFootprint{};
+      };
+      static Entry sEntries[4];
+      static std::uint32_t sNext = 0U;
+      const std::uint64_t revision = HeightFieldRevision();
+      const std::size_t planeCount = solid.planes_.size();
+      for (const Entry& entry : sEntries) {
+        if (entry.mField == &field && entry.mRevision == revision && entry.mPlanes.size() == planeCount &&
+            (planeCount == 0U || std::memcmp(entry.mPlanes.data(), &*solid.planes_.begin(), planeCount * sizeof(Wm3::Plane3f)) == 0)) {
+          return entry.mFootprint;
+        }
+      }
+      Entry& entry = sEntries[sNext];
+      sNext = (sNext + 1U) % 4U;
+      entry.mField = &field;
+      entry.mRevision = revision;
+      entry.mPlanes.assign(solid.planes_.begin(), solid.planes_.end());
+      entry.mFootprint = field.ConvexIntersection(solid);
+      return entry.mFootprint;
+    }
+  } // namespace
+
   void RenderFogOfWar(
     CWldSession& session,
     VisionRenderer& renderer,
@@ -577,7 +625,7 @@ namespace moho
     // plane: the box the vision tree is queried with is axis-aligned, so the two
     // axes are the unit basis vectors the shipped body caches in a guarded
     // function-local static (`dword_1104458` guard at 0x0081C731).
-    const Wm3::AxisAlignedBox3f terrainFootprint = heightField->ConvexIntersection(camera.solid2);
+    const Wm3::AxisAlignedBox3f terrainFootprint = TerrainFootprintOf(*heightField, camera.solid2);
 
     static const Wm3::Vector2f kUnitBoxAxes[2] = {Wm3::Vector2f{1.0f, 0.0f}, Wm3::Vector2f{0.0f, 1.0f}};
 

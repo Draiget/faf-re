@@ -107,6 +107,13 @@ namespace moho
    */
   [[nodiscard]] Wm3::Vec3f PlaneIntersection(const GeomLine3& line, const VecDist& plane, CGeomHitResult* outHit);
 
+  /**
+   * Engine addition, not in the shipped binary: a counter every height field
+   * changes when its heights, error or tier bounds change (any field, any
+   * thread), so a renderer can keep a result derived from them until it moves.
+   */
+  [[nodiscard]] std::uint64_t HeightFieldRevision() noexcept;
+
   class CHeightField
   {
   public:
