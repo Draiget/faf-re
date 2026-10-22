@@ -138,6 +138,13 @@ namespace gpg::gal
     void EndProfileRegion(std::uint32_t region) override;
     bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    bool CopyVertexBufferRegion(
+      VertexBuffer& destination,
+      std::uint32_t destinationOffset,
+      VertexBuffer& source,
+      std::uint32_t sourceOffset,
+      std::uint32_t byteCount
+    ) override;
 
     /**
      * Diagnostics: with FAF_GAL_TRACE_START / FAF_GAL_TRACE_FRAMES set, the

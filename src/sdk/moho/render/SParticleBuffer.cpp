@@ -204,6 +204,38 @@ namespace moho
     technique->EndTechnique();
   }
 
+  void ParticleBuffer::RenderInstances(
+    const boost::shared_ptr<gpg::gal::VertexBuffer>& instances, const int count, const int startIndex
+  )
+  {
+    if (count <= 0 || instances == nullptr || !Initialize()) {
+      return;
+    }
+
+    CD3DDevice* const d3dDevice = D3D_GetDevice();
+    auto* const device = gpg::gal::Device::GetInstance();
+    CD3DEffect* const effect = d3dDevice->GetCurEffect();
+
+    device->SetVertexDeclaration(mVertexFormat);
+    device->SetVertexBuffer(0U, mQuadVertexBuffer, count, 0);
+    device->SetVertexBuffer(1U, instances, 1, startIndex);
+    device->SetBufferIndices(mQuadIndexBuffer);
+
+    gpg::gal::DrawIndexedContext drawContext;
+    drawContext.topology_ = gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST;
+    drawContext.vertexCount_ = kParticleQuadVertexCount;
+    drawContext.indexCount_ = kParticleQuadIndexCount;
+
+    gpg::gal::EffectTechnique* const technique = effect->mCurrentTechnique.get();
+    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+      technique->BeginPass(static_cast<int>(passIndex));
+      device->DrawIndexedPrimitive(&drawContext);
+      technique->EndPass();
+    }
+    technique->EndTechnique();
+  }
+
   /**
    * Address: 0x0048E830 (FUN_0048E830)
    * Mangled: ?Initialize@ParticleBuffer@Moho@@AAE_NXZ

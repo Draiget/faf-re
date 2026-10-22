@@ -643,6 +643,20 @@ namespace gpg::gal
      * (self-checks of GPU-driven passes); false here.
      */
     virtual bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out);
+    /**
+     * Copies `byteCount` bytes from `source` at `sourceOffset` to `destination`
+     * at `destinationOffset` on the GPU, in command order (the copy sees every
+     * earlier write to `source`, later draws see the copy). The two buffers must
+     * differ. False here, having copied nothing; a caller then keeps its
+     * original path.
+     */
+    virtual bool CopyVertexBufferRegion(
+      VertexBuffer& destination,
+      std::uint32_t destinationOffset,
+      VertexBuffer& source,
+      std::uint32_t sourceOffset,
+      std::uint32_t byteCount
+    );
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

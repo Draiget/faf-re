@@ -2273,6 +2273,30 @@ namespace gpg::gal
     }
   }
 
+  bool DeviceD3D11::CopyVertexBufferRegion(
+    VertexBuffer& destination,
+    const std::uint32_t destinationOffset,
+    VertexBuffer& source,
+    const std::uint32_t sourceOffset,
+    const std::uint32_t byteCount
+  )
+  {
+    auto& to = static_cast<VertexBufferD3D11&>(destination);
+    auto& from = static_cast<VertexBufferD3D11&>(source);
+    if (&to == &from || byteCount == 0U) {
+      return false;
+    }
+    D3D11_BOX box{};
+    box.left = sourceOffset;
+    box.right = sourceOffset + byteCount;
+    box.top = 0U;
+    box.bottom = 1U;
+    box.front = 0U;
+    box.back = 1U;
+    mImmediate->CopySubresourceRegion(to.GetBuffer(), 0U, destinationOffset, 0U, 0U, from.GetBuffer(), 0U, &box);
+    return true;
+  }
+
   bool DeviceD3D11::ReadGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, void* const out)
   {
     return mGpuDriven != nullptr && mGpuDriven->ReadBuffer(buffer, firstElement, count, out);
