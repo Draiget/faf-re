@@ -105,23 +105,27 @@
          (its defs.h marker): only then may the x64 image use addresses
          above 2 GB. -->
     <FafWxX64Pointers Condition="'$(FafWxX64Pointers)' == '' and Exists('$(FafWxX64Root)\include\wx\defs.h')">$([System.IO.File]::ReadAllText('$(FafWxX64Root)\include\wx\defs.h').Contains('FAF x64: WPARAM/LPARAM are pointer-wide'))</FafWxX64Pointers>
-    <!-- x64 address-space mode: `none` is the 2 GB image the x64 engine
-         shipped as before the port; `heap` (plan Stage A, the default once
-         the x64 wx tree is pointer-safe) is large-address-aware with the
-         image pinned low (/BASE:0x10000000, no high-entropy ASLR), so only
-         the heap, stacks and DLLs go above 4 GB; `full` (Stage B) is
-         large-address-aware with high-entropy ASLR and links
-         main_x64_la.exe so main_x64.exe stays in place.
-         Select with /p:FafX64LargeAddress=none|heap|full. -->
-    <FafX64LargeAddress Condition="'$(FafX64LargeAddress)' == '' and '$(FafWxX64Pointers)' == 'True'">heap</FafX64LargeAddress>
+    <!-- x64 address-space mode, selected with /p:FafX64LargeAddress=none|heap|full:
+           `full` (plan Stage B, the default once the x64 wx tree is
+             pointer-safe): large-address-aware with high-entropy ASLR, so the
+             image, heap, stacks and DLLs may all load above 4 GB;
+           `heap` (plan Stage A): large-address-aware with the image pinned
+             low (/BASE:0x10000000, no high-entropy ASLR), so only the heap,
+             stacks and DLLs go above 4 GB;
+           `none`: the 2 GB image (/LARGEADDRESSAWARE:NO) the x64 engine
+             shipped as before the port, and the fallback when the wx tree
+             still truncates window-message pointers.
+         Every mode links main_x64.exe; pass /p:FafX64TargetName=<name> to
+         keep a second variant beside it. -->
+    <FafX64LargeAddress Condition="'$(FafX64LargeAddress)' == '' and '$(FafWxX64Pointers)' == 'True'">full</FafX64LargeAddress>
     <FafX64LargeAddress Condition="'$(FafX64LargeAddress)' == ''">none</FafX64LargeAddress>
     <FafX64LargeAddressAware>false</FafX64LargeAddressAware>
     <FafX64LargeAddressAware Condition="'$(FafX64LargeAddress)' != 'none'">true</FafX64LargeAddressAware>
     <FafX64AddressLinkOptions>/HIGHENTROPYVA:NO</FafX64AddressLinkOptions>
-    <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'heap'">/HIGHENTROPYVA:NO /BASE:0x10000000</FafX64AddressLinkOptions>
+    <!-- LNK4281 (base below 4 GB hurts ASLR) is the point of `heap` mode, so it is silenced there. -->
+    <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'heap'">/HIGHENTROPYVA:NO /BASE:0x10000000 /IGNORE:4281</FafX64AddressLinkOptions>
     <FafX64AddressLinkOptions Condition="'$(FafX64LargeAddress)' == 'full'"></FafX64AddressLinkOptions>
-    <FafX64TargetName>main_x64</FafX64TargetName>
-    <FafX64TargetName Condition="'$(FafX64LargeAddress)' == 'full'">main_x64_la</FafX64TargetName>
+    <FafX64TargetName Condition="'$(FafX64TargetName)' == ''">main_x64</FafX64TargetName>
     <Wm3FoundationDir>$(FafRepoRoot)dependencies\WildMagic3p8\Foundation</Wm3FoundationDir>
     <Wm3IncludePath>$(Wm3FoundationDir);$(Wm3FoundationDir)\Approximation;$(Wm3FoundationDir)\Collision;$(Wm3FoundationDir)\Containment;$(Wm3FoundationDir)\Controllers;$(Wm3FoundationDir)\Curves;$(Wm3FoundationDir)\Detail;$(Wm3FoundationDir)\Distance;$(Wm3FoundationDir)\Effects;$(Wm3FoundationDir)\ImageAnalysis;$(Wm3FoundationDir)\Interpolation;$(Wm3FoundationDir)\Intersection;$(Wm3FoundationDir)\Math;$(Wm3FoundationDir)\Meshes;$(Wm3FoundationDir)\Miscellaneous;$(Wm3FoundationDir)\Numerics;$(Wm3FoundationDir)\ObjectSystem;$(Wm3FoundationDir)\Physics;$(Wm3FoundationDir)\RationalArithmetic;$(Wm3FoundationDir)\SceneGraph;$(Wm3FoundationDir)\Shaders;$(Wm3FoundationDir)\SharedArrays;$(Wm3FoundationDir)\Sorting;$(Wm3FoundationDir)\Surfaces;$(Wm3FoundationDir)\System;$(Wm3FoundationDir)\Terrain;$(Wm3FoundationDir)\Tessellation;$(FafRepoRoot)dependencies\WildMagic3p8\Renderers\Dx9Renderer;$(FafRepoRoot)dependencies\WildMagic3p8\Applications</Wm3IncludePath>
   </PropertyGroup>
@@ -302,12 +306,12 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
            wxWindows-2.4.2\lib\x64 (the same patched Unicode build, compiled
            for x64). zlib is the real 1.2.3 from dependencies\zlib-1.2.3, which
            is x64-only and is the version the shipped binary carries.
-         - /LARGEADDRESSAWARE:NO keeps every address below 2 GB. The recovered
-           code still stores pointers in 32-bit words in places (reflection
-           serializer callbacks take the object as an int, the allocator's
-           page-owner map covers exactly 4 GB); below 2 GB those round-trip
-           exactly. FafX64LargeAddress=heap|full (above) builds the
-           large-address-aware main_x64_la.exe for finding the rest.
+         - The address-space mode comes from FafX64LargeAddress (above): by
+           default the image is large-address-aware with high-entropy ASLR,
+           so the image and every allocation may sit above 4 GB. Run with
+           FAF_HIGHMEM=1 to reserve everything below 4 GB at startup, which
+           makes any pointer still squeezed through a 32-bit word fault on
+           first use.
          - 4 MB of stack instead of the binary's 2 MB: every frame that
            holds pointers is bigger. -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
