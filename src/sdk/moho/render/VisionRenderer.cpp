@@ -19,6 +19,7 @@
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "moho/app/UserWorkerPool.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StatItem.h"
@@ -299,20 +300,40 @@ namespace
 
   std::int32_t GpuVisionCaster::CountVisible(const Wm3::Box2f& box, const float interpolant) const
   {
-    std::int32_t visible = 0;
-    for (const moho::VisionDB::EmitterCircles& emitter : mEmitters) {
-      // `EvaluateVisionEntry`'s interpolation and test (VisionDB.cpp).
-      const Wm3::Circle2f sampled{
-        Wm3::Vector2f{
-          emitter.mPrevious.Center.x + ((emitter.mCurrent.Center.x - emitter.mPrevious.Center.x) * interpolant),
-          emitter.mPrevious.Center.y + ((emitter.mCurrent.Center.y - emitter.mPrevious.Center.y) * interpolant)
-        },
-        ((emitter.mCurrent.Radius - emitter.mPrevious.Radius) * interpolant) + emitter.mPrevious.Radius
-      };
-      Wm3::IntrBox2Circle2f overlap{box, sampled};
-      if (overlap.Test()) {
-        ++visible;
+    const auto countRange = [&](const std::size_t begin, const std::size_t end) {
+      std::int32_t visible = 0;
+      for (std::size_t index = begin; index < end; ++index) {
+        const moho::VisionDB::EmitterCircles& emitter = mEmitters[index];
+        // `EvaluateVisionEntry`'s interpolation and test (VisionDB.cpp).
+        const Wm3::Circle2f sampled{
+          Wm3::Vector2f{
+            emitter.mPrevious.Center.x + ((emitter.mCurrent.Center.x - emitter.mPrevious.Center.x) * interpolant),
+            emitter.mPrevious.Center.y + ((emitter.mCurrent.Center.y - emitter.mPrevious.Center.y) * interpolant)
+          },
+          ((emitter.mCurrent.Radius - emitter.mPrevious.Radius) * interpolant) + emitter.mPrevious.Radius
+        };
+        Wm3::IntrBox2Circle2f overlap{box, sampled};
+        if (overlap.Test()) {
+          ++visible;
+        }
       }
+      return visible;
+    };
+    // Only a count (the `Vision_Total` stat), so large emitter sets are counted on workers.
+    constexpr std::size_t kParallelMin = 4096U;
+    constexpr std::size_t kChunk = 2048U;
+    const std::size_t count = mEmitters.size();
+    if (count < kParallelMin || moho::CUserWorkerPool::ConfiguredWorkerCount() == 0U) {
+      return countRange(0U, count);
+    }
+    static std::vector<std::int32_t> sPartial;
+    sPartial.assign((count + kChunk - 1U) / kChunk, 0);
+    moho::CUserWorkerPool::Get().ParallelFor(count, kChunk, [&](const std::size_t begin, const std::size_t end) {
+      sPartial[begin / kChunk] = countRange(begin, end);
+    });
+    std::int32_t visible = 0;
+    for (const std::int32_t part : sPartial) {
+      visible += part;
     }
     return visible;
   }
