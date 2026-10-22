@@ -2223,7 +2223,16 @@ namespace gpg::gal
 
   std::uint32_t DeviceD3D11::GetGpuDrivenFeatures() const
   {
-    return mGpuDriven != nullptr ? mGpuDriven->Features() : 0U;
+    // CopyVertexBufferRegion is CopySubresourceRegion, on every feature level.
+    return (mGpuDriven != nullptr ? mGpuDriven->Features() : 0U) | kGpuFeatureBufferCopy;
+  }
+
+  std::uint32_t DeviceD3D11::GetGpuDrivenVerified() const
+  {
+    // Each passed its parity checks on Direct3D 11 (docs/RENDERER_BACKENDS.md, GPU-driven paths).
+    // Not kGpuPathParticleBatch: a paused A/B still shows extra particle specks with it on.
+    return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
+      kGpuPathProjectileIcons;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)

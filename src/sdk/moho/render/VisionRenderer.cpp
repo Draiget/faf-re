@@ -28,6 +28,7 @@
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/GpuArrayStream.h"
+#include "moho/render/GpuPathSettings.h"
 #include "moho/render/VisionShader.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/sim/CWldSession.h"
@@ -56,16 +57,12 @@ namespace
   constexpr std::uint32_t kVisionInstanceRingCapacity = 0x3000u;
 
   /**
-   * Raw GAL lock-flag tokens the shipped ring allocator passes: 4 on the append
-   * path (`push 4` at 0x0081CCCD) and 1 on the wrap path (`push 1` at
-   * 0x0081CD15). `gpg::gal::MohoD3DLockFlags` (gpg/gal/D3D9Utils.h) currently
-   * names 0x4 `ReadOnly` and 0x2 `NoOverwrite`, which cannot be right for a
-   * write-mapped dynamic ring - the append lock has to be NOOVERWRITE. The raw
-   * tokens are reproduced verbatim here; correcting the enum's bit assignment
-   * belongs to the owner of that header.
+   * GAL lock flags the shipped ring allocator passes: 4 = `NoOverwrite` on the
+   * append path (`push 4` at 0x0081CCCD) and 1 = `Discard` on the wrap path
+   * (`push 1` at 0x0081CD15).
    */
-  constexpr auto kVisionRingAppendLock = static_cast<gpg::gal::MohoD3DLockFlags>(4u);
-  constexpr auto kVisionRingWrapLock = static_cast<gpg::gal::MohoD3DLockFlags>(1u);
+  constexpr auto kVisionRingAppendLock = gpg::gal::MohoD3DLockFlags::NoOverwrite;
+  constexpr auto kVisionRingWrapLock = gpg::gal::MohoD3DLockFlags::Discard;
 
   /**
    * Cached `"Vision_Total"` engine-stat slot (`sEngineStat_Vision_Total`,
@@ -187,12 +184,12 @@ namespace
 
 namespace moho
 {
-  bool ren_GpuFog = false;
+  int ren_GpuFog = -1;
 
-  TConVar<bool> gTConVar_ren_GpuFog(
+  TConVar<int> gTConVar_ren_GpuFog(
     "ren_GpuFog",
-    "Stencil the fog-of-war vision circles with one instanced draw from a persistent GPU buffer "
-    "(Direct3D 11 and later). 0, the default, draws them through the vision effect as the original does.",
+    "Stencil the fog-of-war vision circles with one instanced draw from a persistent GPU buffer instead "
+    "of the vision effect. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuFog
   );
 }
@@ -201,7 +198,7 @@ namespace
 {
   bool GpuVisionCaster::IsActive()
   {
-    if (!moho::ren_GpuFog) {
+    if (!moho::GpuPathEnabled(moho::ren_GpuFog, gpg::gal::kGpuPathFogOfWar, gpg::gal::kGpuFeatureVertexPulling)) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -556,12 +553,12 @@ namespace moho
    * through the `"CastVision"` technique in ring-buffer sized batches, and
    * composites the stencil with the renderer's `"Vision"` frame pass.
    */
-  bool ren_CacheFogFootprint = false;
+  bool ren_CacheFogFootprint = true;
 
   TConVar<bool> gTConVar_ren_CacheFogFootprint(
     "ren_CacheFogFootprint",
     "Keep the fog pass's terrain footprint of each camera (a walk of the height field) until the camera "
-    "or the terrain changes, instead of recomputing it every frame. 0, the default, recomputes it.",
+    "or the terrain changes, instead of recomputing it every frame (the default). 0 recomputes it.",
     &ren_CacheFogFootprint
   );
 

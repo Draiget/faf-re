@@ -2666,13 +2666,13 @@ namespace moho
     );
 
     /// Engine addition: `ui_IconRecords`, user-side. Classify strategic icons from per-entity records.
-    bool ui_IconRecords = false;
+    bool ui_IconRecords = true;
 
     TConVar<bool> gTConVar_ui_IconRecords(
       "ui_IconRecords",
       "Classify strategic icons from compact per-unit records refreshed only when a sync beat was "
       "applied or the camera's in-view list was rebuilt, instead of reading every unit each frame. "
-      "Draws exactly what the original pass draws, in the same order. 0, the default, reads the units.",
+      "Draws exactly what the original pass draws, in the same order (the default). 0 reads the units.",
       &ui_IconRecords
     );
 

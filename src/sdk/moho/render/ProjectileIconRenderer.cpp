@@ -10,6 +10,7 @@
 #include "gpg/gal/Texture.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
+#include "moho/render/GpuPathSettings.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
@@ -17,12 +18,12 @@
 
 namespace moho
 {
-  bool ren_GpuProjectileIcons = false;
+  int ren_GpuProjectileIcons = -1;
 
-  TConVar<bool> gTConVar_ren_GpuProjectileIcons(
+  TConVar<int> gTConVar_ren_GpuProjectileIcons(
     "ren_GpuProjectileIcons",
-    "Draw projectile icons with one instanced draw per view (Direct3D 11 and later). Same icons, same "
-    "order, same atlas. 0, the default, draws them through the prim batcher as the original does.",
+    "Draw projectile icons with one instanced draw per view instead of the prim batcher. Same icons, same "
+    "order, same atlas. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuProjectileIcons
   );
 
@@ -52,7 +53,7 @@ namespace moho
 
   bool ProjectileIconRenderer::IsActive()
   {
-    if (!ren_GpuProjectileIcons) {
+    if (!GpuPathEnabled(ren_GpuProjectileIcons, gpg::gal::kGpuPathProjectileIcons, gpg::gal::kGpuFeatureVertexPulling)) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();

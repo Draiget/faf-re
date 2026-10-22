@@ -15,6 +15,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/GpuPathSettings.h"
 #include "moho/render/StrategicIconClassifyShader.h"
 #include "moho/render/StrategicIconShader.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
@@ -23,22 +24,21 @@
 
 namespace moho
 {
-  bool ren_GpuIcons = false;
-  bool ren_GpuIconClassify = false;
+  int ren_GpuIcons = -1;
+  int ren_GpuIconClassify = -1;
 
-  TConVar<bool> gTConVar_ren_GpuIcons(
+  TConVar<int> gTConVar_ren_GpuIcons(
     "ren_GpuIcons",
-    "Draw strategic icons with one instanced draw per view from a persistent GPU buffer (Direct3D 11 "
-    "and later). 0, the default, draws them through the prim batcher as the original does.",
+    "Draw strategic icons with one instanced draw per view from a persistent GPU buffer instead of the "
+    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuIcons
   );
 
-  TConVar<bool> gTConVar_ren_GpuIconClassify(
+  TConVar<int> gTConVar_ren_GpuIconClassify(
     "ren_GpuIconClassify",
     "With ren_GpuIcons and ui_IconRecords: decide which units get a strategic icon, in which run, and "
     "where, in a compute shader from per-unit records uploaded when a sync beat changes them, then draw "
-    "them with one indirect draw per view. Same icons in the same order as the CPU classification. "
-    "0, the default, classifies on the CPU.",
+    "them with one indirect draw per view. Same icons in the same order as the CPU classification. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuIconClassify
   );
 
@@ -91,7 +91,7 @@ namespace moho
 
   bool StrategicIconRenderer::IsActive()
   {
-    if (!ren_GpuIcons) {
+    if (!GpuPathEnabled(ren_GpuIcons, gpg::gal::kGpuPathStrategicIcons, gpg::gal::kGpuFeatureVertexPulling)) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -300,7 +300,9 @@ namespace moho
 
   bool StrategicIconRenderer::IsClassifyActive()
   {
-    if (!ren_GpuIconClassify || !IsActive()) {
+    constexpr std::uint32_t kClassifyFeatures =
+      gpg::gal::kGpuFeatureVertexPulling | gpg::gal::kGpuFeatureCompute | gpg::gal::kGpuFeatureIndirectDraw;
+    if (!GpuPathEnabled(ren_GpuIconClassify, gpg::gal::kGpuPathIconClassify, kClassifyFeatures) || !IsActive()) {
       return false;
     }
     if (!mClassifyInitialized) {

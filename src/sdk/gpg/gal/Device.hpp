@@ -618,6 +618,8 @@ namespace gpg::gal
 
     /** The `GpuDrivenFeature` bits this backend implements; 0 here. */
     [[nodiscard]] virtual std::uint32_t GetGpuDrivenFeatures() const;
+    /** The `GpuDrivenPath` bits this backend has passed parity on (auto turns those on); 0 here. */
+    [[nodiscard]] virtual std::uint32_t GetGpuDrivenVerified() const;
     /** A buffer shaders read (and, with `shaderWrite`, compute shaders write); empty here. */
     virtual boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc);
     /** Overwrites elements [firstElement, firstElement + count) of `buffer` from `data`. */

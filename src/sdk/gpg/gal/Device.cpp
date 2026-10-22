@@ -427,6 +427,11 @@ namespace gpg::gal
     // FAF additions, not in the shipped binary: the "not supported" bodies of
     // the GPU-driven slots appended after slot 49 (Device.hpp, GpuDriven.h).
 
+    std::uint32_t Device::GetGpuDrivenVerified() const
+    {
+      return 0U;
+    }
+
     std::uint32_t Device::GetGpuDrivenFeatures() const
     {
         return 0U;

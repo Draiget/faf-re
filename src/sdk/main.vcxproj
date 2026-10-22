@@ -1396,6 +1396,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\render\StrategicIconRenderer.cpp" />
     <ClCompile Include="moho\render\SelectionBracketGpuRenderer.cpp" />
     <ClCompile Include="moho\render\ProjectileIconRenderer.cpp" />
+    <ClCompile Include="moho\render\GpuPathSettings.cpp" />
     <ClCompile Include="moho\render\RenderInfo.cpp" />
     <ClCompile Include="moho\render\Shadow.cpp" />
     <ClCompile Include="moho\render\SelectionBracketParams.cpp" />
@@ -2607,6 +2608,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\render\StrategicIconRenderer.h" />
     <ClInclude Include="moho\render\SelectionBracketGpuRenderer.h" />
     <ClInclude Include="moho\render\ProjectileIconRenderer.h" />
+    <ClInclude Include="moho\render\GpuPathSettings.h" />
     <ClInclude Include="moho\render\RenderInfo.h" />
     <ClInclude Include="moho\render\Shadow.h" />
     <ClInclude Include="moho\sim\EReconFlagsTypeInfo.h" />

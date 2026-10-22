@@ -32,7 +32,7 @@ namespace moho
   class CD3DPrimBatcher;
 
   /// `ren_GpuProjectileIcons`: draw projectile icons through ProjectileIconRenderer when the backend can.
-  extern bool ren_GpuProjectileIcons;
+  extern int ren_GpuProjectileIcons;
 
   class ProjectileIconRenderer
   {

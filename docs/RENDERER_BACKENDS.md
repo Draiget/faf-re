@@ -181,6 +181,48 @@ GPU timestamps feed `RenderProfiler` (`FAF_GPU_PROFILE=<frames>`).
 `FAF_ICON_GPU_CHECK=<n>` compares every n-th GPU-classified icon frame with the
 CPU path, record by record.
 
+### Turning the paths on: features, verified bits, tri-state cvars
+
+Each GPU-driven path has a console variable with three values:
+
+| Value | Meaning |
+|---|---|
+| `-1` (default) | auto: on only where the backend reports both the features the path needs and the path's verified bit |
+| `0` | off: the original draw path |
+| `1` | force on wherever the features exist (for testing a backend before it is verified) |
+
+Two `gal::Device` queries decide it (`moho/render/GpuPathSettings.cpp`):
+
+- `GetGpuDrivenFeatures()`: what the backend can do (`GpuDrivenFeature` bits:
+  vertex pulling, compute, indirect draws, timestamps, buffer copy).
+- `GetGpuDrivenVerified()`: the `GpuDrivenPath` bits the backend has passed
+  parity on. The base `Device` returns 0, so a backend that does not override
+  it draws everything the original way under auto.
+
+| Console variable | Path bit | Needs |
+|---|---|---|
+| `ren_GpuIcons` | `kGpuPathStrategicIcons` | vertex pulling |
+| `ren_GpuIconClassify` | `kGpuPathIconClassify` | vertex pulling, compute, indirect draws (also needs `ui_IconRecords`) |
+| `ren_GpuFog` | `kGpuPathFogOfWar` | vertex pulling |
+| `ren_GpuSelectBrackets` | `kGpuPathSelectBrackets` | vertex pulling |
+| `ren_ParticleBatch` | `kGpuPathParticleBatch` | buffer copy (`Device::CopyVertexBufferRegion` on the GPU) |
+| `ren_GpuProjectileIcons` | `kGpuPathProjectileIcons` | vertex pulling |
+
+Direct3D 9 reports no features, so every path is off there whatever its
+variable says. Direct3D 11 reports all features and every verified bit but
+`kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of
+`ren_ParticleBatch` is clean at several zooms (one showed extra particle
+specks with it on).
+A backend turns a path on by default by adding its bit to
+`GetGpuDrivenVerified()` once it passes that path's checks (the self-check
+readback where one exists, and a same-process screenshot A/B against the
+variable at 0); no variable or default changes. The resolved state is logged
+once at startup and by `ren_Info`, as
+`GPU-driven paths: ren_GpuIcons=auto:on, ...`.
+
+`ui_IconRecords` and `ren_CacheFogFootprint` are CPU-side and on by default on
+every backend.
+
 ## Toolchain setup
 
 All three live under `dependencies/`, which is git-ignored. Fetch them once

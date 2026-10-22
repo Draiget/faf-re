@@ -40,9 +40,9 @@ namespace moho
   class CD3DPrimBatcher;
 
   /// `ren_GpuIcons`: draw strategic icons through StrategicIconRenderer when the backend can.
-  extern bool ren_GpuIcons;
+  extern int ren_GpuIcons;
   /// `ren_GpuIconClassify`: also classify them on the GPU (with `ren_GpuIcons` and `ui_IconRecords`).
-  extern bool ren_GpuIconClassify;
+  extern int ren_GpuIconClassify;
 
   struct StrategicIconSourceRecord;
   struct StrategicIconClassifyConstants;
