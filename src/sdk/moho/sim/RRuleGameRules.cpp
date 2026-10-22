@@ -1,6 +1,7 @@
 #include "RRuleGameRules.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +12,7 @@
 #include <new>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <typeinfo>
 #include <utility>
 
@@ -842,6 +844,12 @@ namespace moho
    * Initializes rule Lua/runtime storage, runs core Lua init forms, publishes
    * `__active_mods`, executes `/lua/RuleInit.lua`, and rebuilds category caches.
    */
+  namespace
+  {
+    /// Engine addition: changes whenever a rules object is built or destroyed (see BlueprintNameCache).
+    std::atomic<std::uint64_t> gRulesGeneration{0u};
+  } // namespace
+
   RRuleGameRulesImpl::RRuleGameRulesImpl(const msvc8::string& activeMods, CBackgroundTaskControl* const initHandler)
     : mUnknown04(0u)
     , mLockStorage{}
@@ -1007,6 +1015,7 @@ namespace moho
    */
   RRuleGameRulesImpl::~RRuleGameRulesImpl()
   {
+    gRulesGeneration.fetch_add(1u, std::memory_order_relaxed); // engine addition, see BlueprintNameCache
     DestroyBlueprintObjectsFromOrdinalArray(*this);
 
     DestroyEffectBlueprintsInMap(mBeamBlueprints);
@@ -1515,5 +1524,98 @@ namespace moho
 
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
     return static_cast<RRuleGameRules*>(upcast.mObj);
+  }
+} // namespace moho
+
+namespace moho
+{
+  bool sim_BlueprintNameCache = true;
+  TConVar<bool> gTConVar_sim_BlueprintNameCache(
+    "sim_BlueprintNameCache",
+    "Remember which emitter, trail and projectile blueprint each script name resolves to (same blueprints).",
+    &sim_BlueprintNameCache
+  );
+
+  namespace
+  {
+    struct BlueprintNameHash
+    {
+      using is_transparent = void;
+      [[nodiscard]] std::size_t operator()(const std::string_view name) const noexcept
+      {
+        return std::hash<std::string_view>{}(name);
+      }
+    };
+
+    /**
+     * Engine addition (`sim_BlueprintNameCache`): name -> blueprint for one rules object, per
+     * thread and per kind. A rules object never removes or replaces a blueprint before it is
+     * destroyed (reloads update blueprints in place), and destruction moves `gRulesGeneration`.
+     */
+    struct BlueprintNameCache
+    {
+      const RRuleGameRules* mRules = nullptr;
+      std::uint64_t mGeneration = ~0ull;
+      std::unordered_map<std::string, void*, BlueprintNameHash, std::equal_to<>> mFound;
+
+      template <class TBlueprint, class Lookup>
+      [[nodiscard]] TBlueprint* Find(RRuleGameRules* const rules, const char* const name, Lookup&& lookup)
+      {
+        if (!sim_BlueprintNameCache || rules == nullptr || name == nullptr) {
+          return lookup();
+        }
+        const std::uint64_t generation = gRulesGeneration.load(std::memory_order_relaxed);
+        if (rules != mRules || generation != mGeneration) {
+          mFound.clear();
+          mRules = rules;
+          mGeneration = generation;
+        }
+        const std::string_view key(name);
+        if (const auto it = mFound.find(key); it != mFound.end()) {
+          return static_cast<TBlueprint*>(it->second);
+        }
+        TBlueprint* const blueprint = lookup();
+        if (blueprint != nullptr) {
+          mFound.emplace(std::string(key), blueprint);
+        }
+        return blueprint;
+      }
+    };
+
+    template <class TBlueprint, class Get>
+    [[nodiscard]] TBlueprint* LookupByName(RRuleGameRules* const rules, const char* const name, Get get)
+    {
+      if (rules == nullptr) {
+        return nullptr;
+      }
+      RResId id{};
+      gpg::STR_InitFilename(&id.name, name);
+      return (rules->*get)(id);
+    }
+
+    thread_local BlueprintNameCache tEmitterNames;
+    thread_local BlueprintNameCache tTrailNames;
+    thread_local BlueprintNameCache tProjectileNames;
+  } // namespace
+
+  REmitterBlueprint* RULE_FindEmitterBlueprintByName(RRuleGameRules* const rules, const char* const name)
+  {
+    return tEmitterNames.Find<REmitterBlueprint>(rules, name, [&] {
+      return LookupByName<REmitterBlueprint>(rules, name, &RRuleGameRules::GetEmitterBlueprint);
+    });
+  }
+
+  RTrailBlueprint* RULE_FindTrailBlueprintByName(RRuleGameRules* const rules, const char* const name)
+  {
+    return tTrailNames.Find<RTrailBlueprint>(rules, name, [&] {
+      return LookupByName<RTrailBlueprint>(rules, name, &RRuleGameRules::GetTrailBlueprint);
+    });
+  }
+
+  RProjectileBlueprint* RULE_FindProjectileBlueprintByName(RRuleGameRules* const rules, const char* const name)
+  {
+    return tProjectileNames.Find<RProjectileBlueprint>(rules, name, [&] {
+      return LookupByName<RProjectileBlueprint>(rules, name, &RRuleGameRules::GetProjectileBlueprint);
+    });
   }
 } // namespace moho

@@ -65,6 +65,7 @@ namespace moho
    */
   extern bool sim_ParallelRecon;
   extern bool sim_ParallelSync;
+  extern bool sim_ParallelCoords; // Sim.cpp: the coordinate pass on workers
 
   class CSimWorkerPool
   {

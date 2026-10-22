@@ -1,4 +1,5 @@
 #include "moho/sim/CSquad.h"
+#include "moho/console/CConCommand.h"
 #include <cmath>
 
 #include <cstddef>
@@ -46,6 +47,13 @@ namespace moho
       );
     }
   } // namespace
+
+  bool sim_SquadUnitSearch = true;
+  TConVar<bool> gTConVar_sim_SquadUnitSearch(
+    "sim_SquadUnitSearch",
+    "Find a unit in a platoon squad by binary search on its id-sorted set instead of a linear scan (same results).",
+    &sim_SquadUnitSearch
+  );
 
   /**
    * Address: 0x00723E00 (FUN_00723E00, Moho::CSquad::CSquad)
@@ -147,6 +155,11 @@ namespace moho
    */
   bool CSquad::HasUnit(const Unit* const unit) const
   {
+    // Engine change (sim_SquadUnitSearch): the set is kept sorted by entity id, so its own binary
+    // search answers the same question; the binary scans linearly.
+    if (sim_SquadUnitSearch && unit != nullptr) {
+      return mUnits.Contains(unit);
+    }
     for (Entity* const entity : mUnits.mVec) {
       if (static_cast<const Unit*>(entity) == unit) {
         return true;

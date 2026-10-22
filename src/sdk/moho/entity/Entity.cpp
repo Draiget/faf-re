@@ -75,6 +75,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/UnitUpdateFill.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
@@ -3251,7 +3252,10 @@ namespace moho
     // The whole block goes to the client verbatim. It is a plain member now, so
     // this is an ordinary argument rather than the `(char*)this + 0x78` cast the
     // flattened spelling forced.
-    (void)QueueEntityVariableUpdate(syncData, id_, mVarDat);
+    // sim_ParallelEntitySync finishes the copy on workers after the walk; otherwise the serial queue.
+    if (QueueEntityVariableUpdateDeferred(syncData, id_, mVarDat) == nullptr) {
+      (void)QueueEntityVariableUpdate(syncData, id_, mVarDat);
+    }
   }
 
   /**
@@ -4127,6 +4131,47 @@ namespace moho
     }
   }
 
+  void Entity::AdvanceCoordsOwn(CollisionShapeBase::DeferredRelink& relink)
+  {
+    mVarDat.mLastTransform = mVarDat.mCurTransform;
+    mVarDat.mCurTransform = mPendingTransform;
+    mVarDat.mCurImpactValue = mPendingVelocityScale;
+
+    if (mPositionHistory) {
+      mPositionHistory->samples[mPositionHistory->cursor] = mVarDat.mLastTransform;
+      mPositionHistory->cursor = (mPositionHistory->cursor + 1) % PositionHistory::kSampleCount;
+      mPositionHistory->samples[mPositionHistory->cursor] = mVarDat.mCurTransform;
+    }
+
+    relink = CollisionShapeBase::DeferredRelink{};
+    if (CollisionExtents &&
+        (mVarDat.mLastTransform.pos_ != mVarDat.mCurTransform.pos_ ||
+         mVarDat.mLastTransform.orient_ != mVarDat.mCurTransform.orient_)) {
+      CollisionShapeBase::SetDeferredRelinkSlot(&relink);
+      UpdateCollision();
+      CollisionShapeBase::SetDeferredRelinkSlot(nullptr);
+    }
+  }
+
+  void Entity::AdvanceCoordsShared(const CollisionShapeBase::DeferredRelink& relink)
+  {
+    CollisionShapeBase::ApplyDeferredRelink(relink);
+
+    if (mIntelManager && SimulationRef) {
+      const Wm3::Vec3f& position = mVarDat.mCurTransform.pos_;
+      const Wm3::Vec3f probePosition{
+        position.x,
+        position.y + 1.0f,
+        position.z,
+      };
+      mIntelManager->ForceUpdate(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
+    }
+
+    if (SimulationRef && ListIsSingleton()) {
+      ListLinkBefore(&SimulationRef->mCoordEntities);
+    }
+  }
+
   /**
    * Address: 0x00678A70 (FUN_00678A70, Moho::Entity::UpdateVisibility)
    * Mangled: ?UpdateVisibility@Entity@Moho@@MAEXXZ
@@ -4323,11 +4368,9 @@ namespace moho
       projectileBlueprintName = "";
     }
 
-    RResId projectileId{};
-    gpg::STR_InitFilename(&projectileId.name, projectileBlueprintName);
-
+    // STR_InitFilename + GetProjectileBlueprint, remembered per name (sim_BlueprintNameCache).
     RProjectileBlueprint* const projectileBlueprint =
-      (sim && sim->mRules) ? sim->mRules->GetProjectileBlueprint(projectileId) : nullptr;
+      (sim && sim->mRules) ? RULE_FindProjectileBlueprintByName(sim->mRules, projectileBlueprintName) : nullptr;
     if (!projectileBlueprint) {
       LuaPlus::LuaState::Error(state, "CreateProjectile: Invalid blueprint %s", projectileBlueprintName);
     }
@@ -4466,12 +4509,10 @@ namespace moho
       projectileBlueprintName = "";
     }
 
-    RResId projectileId{};
-    gpg::STR_InitFilename(&projectileId.name, projectileBlueprintName);
-
+    // STR_InitFilename + GetProjectileBlueprint, remembered per name (sim_BlueprintNameCache).
     RProjectileBlueprint* const projectileBlueprint =
       (entity && entity->SimulationRef && entity->SimulationRef->mRules)
-        ? entity->SimulationRef->mRules->GetProjectileBlueprint(projectileId)
+        ? RULE_FindProjectileBlueprintByName(entity->SimulationRef->mRules, projectileBlueprintName)
         : nullptr;
     if (!projectileBlueprint) {
       const msvc8::string message = gpg::STR_Printf("CreateProjectileAtBone: Invalid blueprint %s", projectileBlueprintName);

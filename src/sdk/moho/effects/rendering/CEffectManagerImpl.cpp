@@ -93,9 +93,8 @@ namespace moho
         return nullptr;
       }
 
-      RResId emitterId{};
-      gpg::STR_InitFilename(&emitterId.name, blueprintName);
-      return sim->mRules->GetEmitterBlueprint(emitterId);
+      // STR_InitFilename + GetEmitterBlueprint, remembered per name (sim_BlueprintNameCache).
+      return RULE_FindEmitterBlueprintByName(sim->mRules, blueprintName);
     }
 
     [[nodiscard]] RTrailBlueprint* LookupTrailBlueprint(Sim* const sim, const char* const blueprintName)
@@ -104,9 +103,8 @@ namespace moho
         return nullptr;
       }
 
-      RResId trailId{};
-      gpg::STR_InitFilename(&trailId.name, blueprintName);
-      return sim->mRules->GetTrailBlueprint(trailId);
+      // STR_InitFilename + GetTrailBlueprint, remembered per name (sim_BlueprintNameCache).
+      return RULE_FindTrailBlueprintByName(sim->mRules, blueprintName);
     }
 
     /**

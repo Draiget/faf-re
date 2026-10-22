@@ -2443,12 +2443,10 @@ namespace moho
       blueprintText = "";
     }
 
-    RResId projectileId{};
-    gpg::STR_InitFilename(&projectileId.name, blueprintText);
-
+    // STR_InitFilename + GetProjectileBlueprint, remembered per name (sim_BlueprintNameCache).
     Sim* const sim = sourceProjectile ? sourceProjectile->SimulationRef : nullptr;
     RProjectileBlueprint* const blueprint =
-      (sim && sim->mRules) ? sim->mRules->GetProjectileBlueprint(projectileId) : nullptr;
+      (sim && sim->mRules) ? RULE_FindProjectileBlueprintByName(sim->mRules, blueprintText) : nullptr;
     if (!blueprint) {
       LuaPlus::LuaState::Error(state, kMissingProjectileBlueprintError, blueprintText);
       lua_pushnil(rawState);

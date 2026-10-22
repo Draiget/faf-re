@@ -1347,7 +1347,11 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
 
   Entity::SyncInterface(syncData);
 
-  // 0x005BF168..0x005BF1C4: the record `Entity::SyncInterface` just queued.
+  // 0x005BF168..0x005BF1C4: the record `Entity::SyncInterface` just queued (sim_ParallelEntitySync:
+  // the same lanes are written after the deferred copy instead).
+  if (OverrideDeferredEntityUpdateFromRecon(syncData, &reconInfo)) {
+    return;
+  }
   SSTIEntityVariableData& entityData = syncData->mEntityUpdates.back().mVariableData;
   entityData.mMeshBlueprint = reconInfo.mStiMesh;
   entityData.mScmResource = reconInfo.mMesh;

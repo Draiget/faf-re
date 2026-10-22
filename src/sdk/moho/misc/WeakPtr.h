@@ -343,11 +343,13 @@ namespace moho
      * both words of each null. `isLeaving(node)` names them; the walk stops once all `count` are
      * off. The nodes that stay keep their order, so the chain ends exactly as `count` separate
      * unlinks would leave it, at the cost of one walk instead of one per node.
+     *
+     * It touches only this chain (its head and its nodes), so different chains may be spliced on
+     * different threads at once (`sim_ParallelBlipFlush`); one chain must stay on one thread.
      */
     template <class IsLeaving>
     static void SpliceOutOfChain(void* const chainSlot, std::size_t count, IsLeaving&& isLeaving) noexcept
     {
-      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
       WeakPtr<T>** cursor = static_cast<WeakPtr<T>**>(chainSlot);
       while (count != 0 && *cursor != nullptr) {
         WeakPtr<T>* const node = *cursor;

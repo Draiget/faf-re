@@ -116,6 +116,27 @@ namespace moho
      */
     void UpdateRect(const CColPrimitiveBase* primitive);
 
+    /**
+     * Engine addition (`sim_ParallelCoords`): a bucket relink held back for the owner thread.
+     * While a thread has a slot set (`SetDeferredRelinkSlot`), `UpdateRect` stores the rect it
+     * would relink to there and leaves the shared buckets alone; `ApplyDeferredRelink` does the
+     * relink later, with the same changed-rect test.
+     */
+    struct DeferredRelink
+    {
+      CollisionShapeBase* shape = nullptr;
+      CollisionDBRect rect{};
+    };
+
+    static void SetDeferredRelinkSlot(DeferredRelink* slot) noexcept;
+
+    static void ApplyDeferredRelink(const DeferredRelink& relink)
+    {
+      if (relink.shape != nullptr) {
+        relink.shape->RelinkTo(relink.rect);
+      }
+    }
+
   public:
     EntityOccupationManager* mSpatialGrid; // +0x08
     std::uint8_t mMarked;                  // +0x0C

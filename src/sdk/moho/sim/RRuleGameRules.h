@@ -866,4 +866,14 @@ namespace moho
    * Imports `/lua/ui/lobby/lobbyComm.lua` and returns `GetDefaultPlayerOptions()` result.
    */
   [[nodiscard]] LuaPlus::LuaObject RULE_GetDefaultPlayerOptions(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition (`sim_BlueprintNameCache`): the blueprint a script names, as every caller looks
+   * it up (`STR_InitFilename` of the name, then `GetXBlueprint`), remembered per name for the
+   * rules object it came from. Only found blueprints are kept, so a miss runs the lookup (and
+   * whatever error or warning the caller reports) every time, as before.
+   */
+  [[nodiscard]] REmitterBlueprint* RULE_FindEmitterBlueprintByName(RRuleGameRules* rules, const char* name);
+  [[nodiscard]] RTrailBlueprint* RULE_FindTrailBlueprintByName(RRuleGameRules* rules, const char* name);
+  [[nodiscard]] RProjectileBlueprint* RULE_FindProjectileBlueprintByName(RRuleGameRules* rules, const char* name);
 } // namespace moho

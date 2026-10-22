@@ -1418,6 +1418,16 @@ namespace moho
     void AdvanceCoords();
 
     /**
+     * Engine addition (`sim_ParallelCoords`): `AdvanceCoords` in two halves. `AdvanceCoordsOwn`
+     * does the part that touches only this entity (transform copies, position history, collision
+     * primitive and bounds) and holds back the grid relink in `relink`; `AdvanceCoordsShared`
+     * applies that relink, then the intel update and the coordinate-list link, exactly as
+     * `AdvanceCoords` continues. The first may run on a sim worker.
+     */
+    void AdvanceCoordsOwn(CollisionShapeBase::DeferredRelink& relink);
+    void AdvanceCoordsShared(const CollisionShapeBase::DeferredRelink& relink);
+
+    /**
      * Address: 0x00678370 (FUN_00678370)
      *
      * What it does:

@@ -156,6 +156,7 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
+    RECON_DropBlipIndex(this); // engine addition, sim_ReconBlipIndex
     archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
     archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
     archive->ReadPointer(&mArmy, &ownerRef);

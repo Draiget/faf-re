@@ -4599,6 +4599,51 @@ namespace
     entity->AdvanceCoords();
   }
 
+  /**
+   * Engine addition (`sim_ParallelCoords`): the coordinate pass over `mCoordEntities` with each
+   * entity's own half (`Entity::AdvanceCoordsOwn`: transform copies, position history, collision
+   * primitive and bounds) on the sim workers, then the shared half (`AdvanceCoordsShared`: grid
+   * relink, intel rasters, list link) on the sim thread in list order. No entity's own half reads
+   * another entity or anything the shared halves write, so the result is the serial loop's.
+   * Returns false (nothing done) when the serial loop should run.
+   */
+  bool AdvanceCoordsParallel(Sim& sim)
+  {
+    constexpr std::size_t kMinParallelEntities = 256u;
+    constexpr std::size_t kGrain = 64u;
+    if (!sim_ParallelCoords || !CSimWorkerPool::ParallelEnabled()) {
+      return false;
+    }
+
+    static std::vector<Entity*> sEntities;
+    static std::vector<CollisionShapeBase::DeferredRelink> sRelinks;
+    sEntities.clear();
+    for (auto* entity : sim.mCoordEntities.owners()) {
+      sEntities.push_back(entity);
+    }
+    if (sEntities.size() < kMinParallelEntities) {
+      for (Entity* const entity : sEntities) {
+        AdvanceCoords(entity);
+      }
+      return true;
+    }
+
+    sRelinks.resize(sEntities.size());
+    CSimWorkerPool::Get().ParallelFor(sEntities.size(), kGrain, [](const std::size_t begin, const std::size_t end) {
+      for (std::size_t index = begin; index < end; ++index) {
+        if (sEntities[index] != nullptr) {
+          sEntities[index]->AdvanceCoordsOwn(sRelinks[index]);
+        }
+      }
+    });
+    for (std::size_t index = 0; index < sEntities.size(); ++index) {
+      if (sEntities[index] != nullptr) {
+        sEntities[index]->AdvanceCoordsShared(sRelinks[index]);
+      }
+    }
+    return true;
+  }
+
   void RunQueuedDestroy(void* queuedObject)
   {
     if (!queuedObject) {
@@ -5839,6 +5884,13 @@ namespace
 namespace moho
 {
   /// Engine addition: switch for MD5UpdateBatch (batched checksum updates). Live; same digests.
+  bool sim_ParallelCoords = true;
+  TConVar<bool> gTConVar_sim_ParallelCoords(
+    "sim_ParallelCoords",
+    "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial (needs sim_Workers > 0).",
+    &sim_ParallelCoords
+  );
+
   bool sim_ChecksumBatching = true;
   TConVar<bool> gTConVar_sim_ChecksumBatching(
     "sim_ChecksumBatching",
@@ -10653,8 +10705,10 @@ void Sim::AdvanceBeat(const int amt)
       }
     });
 
-    for (auto* entity : mCoordEntities.owners()) {
-      AdvanceCoords(entity);
+    if (!AdvanceCoordsParallel(*this)) {
+      for (auto* entity : mCoordEntities.owners()) {
+        AdvanceCoords(entity);
+      }
     }
 
     // Sync-filter extra-data packing pass. Every id in the outgoing sync

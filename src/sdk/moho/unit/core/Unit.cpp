@@ -86,6 +86,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/UnitUpdateFill.h"
 #include "moho/ai/CAiTransportImpl.h"
@@ -12400,6 +12401,14 @@ namespace moho
     &sim_DeferBlipUnlinks
   );
 
+  bool sim_ParallelBlipFlush = true;
+
+  TConVar<bool> gTConVar_sim_ParallelBlipFlush(
+    "sim_ParallelBlipFlush",
+    "Run sim_DeferBlipUnlinks' bulk unlink on sim workers, one weak chain per job (same chains; needs sim_Workers > 0).",
+    &sim_ParallelBlipFlush
+  );
+
   int sim_DeferBlipUnlinksTicks = 4;
 
   TConVar<int> gTConVar_sim_DeferBlipUnlinksTicks(
@@ -12482,10 +12491,31 @@ namespace
         );
         return after != mBlocks.begin() && node < std::prev(after)->end;
       };
+      mChainRuns.clear();
       for (auto first = mChains.begin(); first != mChains.end();) {
         const auto last = std::upper_bound(first, mChains.end(), *first);
-        moho::WeakPtr<moho::Entity>::SpliceOutOfChain(*first, static_cast<std::size_t>(last - first), isWaiting);
+        mChainRuns.push_back(ChainRun{*first, static_cast<std::size_t>(last - first)});
         first = last;
+      }
+
+      // Engine addition (sim_ParallelBlipFlush): every chain is independent - its head lives in
+      // its owner and each parked node is on exactly one chain - so the walks can run on the sim
+      // workers; each chain ends the same whichever thread walks it.
+      constexpr std::size_t kMinParallelChains = 64u;
+      constexpr std::size_t kChainGrain = 16u;
+      if (moho::sim_ParallelBlipFlush && mChainRuns.size() >= kMinParallelChains && !moho::IsSimWorkerThread()
+          && moho::CSimWorkerPool::ParallelEnabled()) {
+        moho::CSimWorkerPool::Get().ParallelFor(
+          mChainRuns.size(), kChainGrain, [this, &isWaiting](const std::size_t begin, const std::size_t end) {
+            for (std::size_t index = begin; index < end; ++index) {
+              moho::WeakPtr<moho::Entity>::SpliceOutOfChain(mChainRuns[index].head, mChainRuns[index].count, isWaiting);
+            }
+          }
+        );
+      } else {
+        for (const ChainRun& run : mChainRuns) {
+          moho::WeakPtr<moho::Entity>::SpliceOutOfChain(run.head, run.count, isWaiting);
+        }
       }
 
       for (const BlipList::ReleasedBlock& block : mBlocks) {
@@ -12498,8 +12528,15 @@ namespace
   private:
     static constexpr std::size_t kFlushNodeCount = 1u << 20;
 
+    struct ChainRun
+    {
+      void* head;
+      std::size_t count;
+    };
+
     std::vector<BlipList::ReleasedBlock> mBlocks;
     std::vector<void*> mChains;
+    std::vector<ChainRun> mChainRuns;
     std::size_t mNodeCount = 0;
     std::uint32_t mTick = 0;
   };

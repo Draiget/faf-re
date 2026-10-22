@@ -668,4 +668,6 @@ namespace moho
     "CAiReconDBImpl::mVisibleToReconCategory offset must be 0x80"
   );
   static_assert(offsetof(CAiReconDBImpl, mFogOfWar) == 0xA8, "CAiReconDBImpl::mFogOfWar offset must be 0xA8");
+  /// Engine addition (`sim_ReconBlipIndex`): forgets `db`'s blip id index (rebuilt on next use).
+  void RECON_DropBlipIndex(const CAiReconDBImpl* db);
 } // namespace moho

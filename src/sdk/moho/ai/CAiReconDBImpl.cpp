@@ -1,5 +1,7 @@
 #include "moho/ai/CAiReconDBImpl.h"
 
+#include <unordered_map>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -16,6 +18,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/console/CConCommand.h"
+#include "moho/sim/SimThreadRole.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/math/GridPos.h"
 #include "moho/particles/SWorldBeam.h"
@@ -57,6 +60,41 @@ namespace
   FindReconBlipRange(CAiReconDBImpl* const owner, Unit* const sourceUnit)
   {
     return owner->mBlipMap.equal_range(MakeReconProbeKey(GetSourceEntityId(sourceUnit)));
+  }
+
+  /**
+   * Engine addition (`sim_ReconBlipIndex`): for each recon DB, source entity id -> the blip
+   * `ReconGetBlip` returns (the first map entry with that id), so the lookup is one hash probe
+   * instead of a tree walk. Built on first use and kept current by every change to `mBlipMap`
+   * (each insert and erase refreshes its id; a clear, construction, destruction or load drops the
+   * index). Every change and lookup happens on the sim thread.
+   */
+  struct ReconBlipIndex
+  {
+    std::unordered_map<std::uint32_t, ReconBlip*> mFirst;
+  };
+  std::unordered_map<const CAiReconDBImpl*, ReconBlipIndex> gReconBlipIndexes;
+
+  void RefreshReconBlipIndex(CAiReconDBImpl* const owner, const std::uint32_t sourceEntityId)
+  {
+    const auto index = gReconBlipIndexes.find(owner);
+    if (index == gReconBlipIndexes.end()) {
+      return;
+    }
+    const auto found = owner->mBlipMap.find(MakeReconProbeKey(sourceEntityId));
+    if (found == owner->mBlipMap.end()) {
+      index->second.mFirst.erase(sourceEntityId);
+    } else {
+      index->second.mFirst[sourceEntityId] = found->second;
+    }
+  }
+
+  /// `mBlipMap.erase(node)`, keeping the blip index current.
+  void EraseReconBlipNode(CAiReconDBImpl* const owner, const ReconBlipMap::iterator node)
+  {
+    const std::uint32_t sourceEntityId = node->first.sourceEntityId;
+    (void)owner->mBlipMap.erase(node);
+    RefreshReconBlipIndex(owner, sourceEntityId);
   }
 
   // 0x005C05D5..0x005C0602: four `comiss`/`ja` rejections, so a coordinate
@@ -390,6 +428,13 @@ namespace moho
     "Blip refresh copies mesh and pose handles straight from the source fields, without temporaries (same results).",
     &sim_ReconBlipHandleAssign
   );
+  bool sim_ReconBlipIndex = true;
+  TConVar<bool> gTConVar_sim_ReconBlipIndex(
+    "sim_ReconBlipIndex",
+    "Find a unit's recon blip through a per-army id index instead of the blip map's tree (same blips).",
+    &sim_ReconBlipIndex
+  );
+
 
   /**
    * One `GetReconFlags` point probe: the probed entity and position, plus the
@@ -555,8 +600,7 @@ CAiReconDBImpl::CAiReconDBImpl(SimArmy* const army, const bool fogOfWar) :
  */
 CAiReconDBImpl::~CAiReconDBImpl()
 {
-
-
+  RECON_DropBlipIndex(this); // engine addition, sim_ReconBlipIndex
   mBblips.clear();
   mTempBlips.clear();
 
@@ -604,6 +648,7 @@ void CAiReconDBImpl::Flush()
   }
 
   mBlipMap.clear();
+  RECON_DropBlipIndex(this); // engine addition, sim_ReconBlipIndex
   mBblips.clear();
 }
 
@@ -666,7 +711,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
     ReconBlip* const blip = node->second;
     if (!blip) {
-      (void)mBlipMap.erase(node);
+      EraseReconBlipNode(this, node);
       continue;
     }
 
@@ -680,7 +725,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     if (!source || source->DestroyQueuedFlag != 0u) {
       // 0x005C0E8C..0x005C0E96: the dead entry leaves the map (0x005C4580)
       // before any intel event or blip teardown below runs.
-      (void)mBlipMap.erase(node);
+      EraseReconBlipNode(this, node);
 
       // 0x005C0E9B `cmp byte ptr [edi+278h], 0` -- `mDeleteWhenStale`, which the
       // constructor sets to `sourceUnit->IsMobile()` (ReconBlip.cpp:1071). So a
@@ -913,6 +958,7 @@ void CAiReconDBImpl::GenerateNewBlips(const msvc8::vector<SNewBlip>& pending)
 
     UpdateBlip(blip, candidate.sourceUnit, static_cast<std::uint32_t>(candidate.detectedFlags));
     (void)mBlipMap.insert({MakeReconMapKey(candidate.sourceUnit), blip});
+    RefreshReconBlipIndex(this, GetSourceEntityId(candidate.sourceUnit)); // engine addition, sim_ReconBlipIndex
 
     // 0x005C0BB3..0x005C0BD0: register the new blip in the army's influence
     // map at its current position (`blip+0xAC`) with its blueprint (vslot 0x9C).
@@ -1322,7 +1368,7 @@ void CAiReconDBImpl::UpdateBlips(
 
     ReconBlip* const blip = node->second;
     if (!blip) {
-      (void)mBlipMap.erase(node);
+      EraseReconBlipNode(this, node);
       continue;
     }
 
@@ -1330,7 +1376,7 @@ void CAiReconDBImpl::UpdateBlips(
       if (refreshedFakeBlips >= requiredFakeBlips) {
         // 0x005C2001: the surplus jammer entry leaves the map first; the intel
         // events and blip teardown (0x005C2021..0x005C202E) follow.
-        (void)mBlipMap.erase(node);
+        EraseReconBlipNode(this, node);
         DeleteBlip(blip);
         continue;
       }
@@ -1395,7 +1441,12 @@ void CAiReconDBImpl::DeleteBlips(const ReconBlipMap::iterator first, const Recon
       DeleteBlip(blip);
     }
   }
+  const bool erasesAny = first != last;
+  const std::uint32_t sourceEntityId = erasesAny ? first->first.sourceEntityId : 0u;
   (void)mBlipMap.erase(first, last);
+  if (erasesAny) {
+    RefreshReconBlipIndex(this, sourceEntityId);
+  }
 }
 
 /**
@@ -1991,6 +2042,17 @@ ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
   // `find`, not a bare `lower_bound`: for a unit with no blip a lower bound
   // is the next unit's entry, and `Unit::UpdateBlipsInRange` (0x006ACC60)
   // gates its candidate list on this call returning null.
+  // Engine change (sim_ReconBlipIndex): the same answer from the id index, built here on first use.
+  if (sim_ReconBlipIndex && !IsSimWorkerThread()) {
+    auto [index, created] = gReconBlipIndexes.try_emplace(this);
+    if (created) {
+      for (const auto& entry : mBlipMap) {
+        (void)index->second.mFirst.try_emplace(entry.first.sourceEntityId, entry.second);
+      }
+    }
+    const auto indexed = index->second.mFirst.find(GetSourceEntityId(unit));
+    return (indexed != index->second.mFirst.end()) ? indexed->second : nullptr;
+  }
   const auto found = mBlipMap.find(MakeReconProbeKey(GetSourceEntityId(unit)));
   return (found != mBlipMap.end()) ? found->second : nullptr;
 }
@@ -2053,7 +2115,7 @@ void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
       continue;
     }
 
-    (void)mBlipMap.erase(node);
+    EraseReconBlipNode(this, node);
     DeleteBlip(blip);
   }
 
@@ -2094,3 +2156,8 @@ namespace moho
     return lhs.sourceEntityId < rhs.sourceEntityId;
   }
 } // namespace moho
+
+void moho::RECON_DropBlipIndex(const CAiReconDBImpl* const db)
+{
+  gReconBlipIndexes.erase(db);
+}

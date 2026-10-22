@@ -10,9 +10,20 @@ namespace moho
   using EntId = std::int32_t;
 
   class CAniPose;
+  struct SPerArmyReconInfo;
+  struct SSTIEntityVariableData;
   struct SSTIUnitVariableData;
   struct SSyncData;
+  struct SEntityVariableUpdateEntry;
   struct SUnitVariableUpdateEntry;
+
+  /// Engine additions: `sim_ParallelSyncHeap` (unit records' allocating copy half on the fill
+  /// workers too) and `sim_ParallelEntitySync` (entity records' copy on the fill workers). Both
+  /// only act while `sim_ParallelSync` defers unit records. The packet only goes to the client:
+  /// the allocations land on worker threads (the engine allocator is thread-safe) and in a
+  /// different order, and every byte the client reads is the serial one.
+  extern bool sim_ParallelSyncHeap;
+  extern bool sim_ParallelEntitySync;
 
   /**
    * Engine addition, not in the binary: what `ReconBlip::SyncInterface` writes over a unit-update
@@ -63,6 +74,7 @@ namespace moho
 
   private:
     void FillRange(std::size_t begin, std::size_t end) const;
+    void FillEntityRange(std::size_t begin, std::size_t end) const;
 
     SSyncData* mSyncData = nullptr;
   };
@@ -79,4 +91,22 @@ namespace moho
     const SSTIUnitVariableData& variableData,
     const SUnitUpdateOverrides& overrides = {}
   );
+
+  /**
+   * Engine addition (`sim_ParallelEntitySync`): appends `entityId`'s entity-update record the way
+   * `QueueEntityVariableUpdate` does and leaves the payload copy to `CUnitUpdateFills::Finish`.
+   * Returns nullptr when entity records are not being deferred; the caller then queues serially.
+   * The copy takes `variableData` as it is at `Finish`, except `mRequestRefreshUI`, which is
+   * taken now (`Entity::Sync` clears it right after queueing).
+   */
+  [[nodiscard]] SEntityVariableUpdateEntry* QueueEntityVariableUpdateDeferred(
+    SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData
+  );
+
+  /**
+   * Engine addition (`sim_ParallelEntitySync`): when the newest entity-update record of
+   * `syncData` was deferred, has `Finish` overwrite its mesh, health, completion and dead lanes
+   * from `reconInfo` after the copy (what `ReconBlip::SyncInterface` writes) and returns true.
+   */
+  [[nodiscard]] bool OverrideDeferredEntityUpdateFromRecon(SSyncData* syncData, const SPerArmyReconInfo* reconInfo);
 } // namespace moho

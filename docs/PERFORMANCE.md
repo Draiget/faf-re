@@ -153,6 +153,13 @@ thread or session starts.
 | `sim_ReconBlipHandleAssign` | 1 | `/con` | live | Blip refresh copies mesh and pose handles without temporaries (no refcount traffic when unchanged) |
 | `sim_IntelRasterRows` | 1 | `/con` | live | Intel circles rastered row by row instead of column by column |
 | `sim_IntelSameCellMove` | 1 | `/con` | live | An intel source moving inside its grid cell skips the two rasters that would cancel |
+| `sim_BlueprintNameCache` | 1 | `/con` | live | Emitter, trail and projectile blueprint lookups by name remembered per game rules (positive results only) |
+| `sim_SquadUnitSearch` | 1 | `/con` | live | Squad membership test by binary search of the id-sorted unit set |
+| `sim_ParallelCoords` | 1 | `/con` | live | Per-entity half of the coordinate advance (transforms, history, collision shape) on sim workers; grid relinks, intel updates and list links stay serial in list order (needs `sim_Workers` > 0) |
+| `sim_ReconBlipIndex` | 1 | `/con` | live | Recon blip lookup by entity id through a hash index instead of the blip map walk |
+| `sim_ParallelBlipFlush` | 1 | `/con` | live | The bulk blip-unlink pass splices separate weak chains on sim workers (needs `sim_Workers` > 0) |
+| `sim_ParallelSyncHeap` | 1 | `/con` | live | With `sim_ParallelSync`, the allocating members of unit-update records are copied on workers too |
+| `sim_ParallelEntitySync` | 1 | `/con` | live | With `sim_ParallelSync`, entity-update records are copied on workers |
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `mem_SmallBlockIndexTable` | 1 | `/con` | live | x86 allocator: size class by table instead of a binary search |
@@ -178,3 +185,11 @@ thread or session starts.
 | `ren_CacheFogFootprint` | 1 | `/con` | live | The fog pass keeps each camera's terrain footprint until the camera or terrain changes |
 | `ui_IconRecords` | 1 | `/con` | live | Strategic icons classified from per-unit records refreshed only after a sync beat or a view-list rebuild |
 | `sys_ThreadPlacement` | 0 | `/threadplacement N` | next thread start | Thread placement on cores (0 leaves it to Windows) |
+
+## Tried and dropped
+
+| Idea | Why it was dropped |
+|---|---|
+| Reusing a unit's retired pose object each tick instead of allocating a new one | It can never apply: every enemy army that sees the unit holds its prior and current poses through its recon blip (refreshed every tick), and sync and the user side hold copies too, so the two-frame-old pose always has other owners. Measured: the pose copy constructor's cost was unchanged with the switch on. |
+| Keeping a unit's blips-in-range list when a refresh finds the same blips | In a moving fight the list order changes almost every refresh (0.3 % identical, 0.7 % of entries in place), so it never paid off. The deferred bulk unlink (`sim_DeferBlipUnlinks`) took its place. |
+| Running independent per-unit Lua callbacks speculatively in parallel | Measured on 400,000 callbacks in a 2,000 v 2,000 air fight: 77 % allocate (moving the GC trigger), 32 % write tables they did not create, 16 % draw from the sim random stream, 98 % call engine bindings. Only 1.6–6.5 % could run independently. |

@@ -676,8 +676,25 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    /// Engine addition (sim_ParallelCoords): this thread's relink deferral slot, see DeferredRelink.
+    thread_local CollisionShapeBase::DeferredRelink* tDeferredRelink = nullptr;
+  } // namespace
+
+  void CollisionShapeBase::SetDeferredRelinkSlot(DeferredRelink* const slot) noexcept
+  {
+    tDeferredRelink = slot;
+  }
+
   void CollisionShapeBase::RelinkTo(const CollisionDBRect& rect)
   {
+    if (tDeferredRelink != nullptr) {
+      // Engine addition: held back for the owner thread (sim_ParallelCoords).
+      tDeferredRelink->shape = this;
+      tDeferredRelink->rect = rect;
+      return;
+    }
     if (!rect.NotEqual(*this)) {
       return;
     }
