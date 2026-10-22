@@ -68,6 +68,14 @@ namespace
 } // namespace
 
 // `.CRT$XI*` entries run from `_initterm_e`, ahead of every C++ initializer.
+// Nothing references the table entry by name, so whole-program optimization
+// discards it unless the linker is told to keep it (as `Global.cpp` does for
+// its TLS callback entry); without it the Release x86 frame clock froze at 0.
+#if defined(_M_IX86)
+#pragma comment(linker, "/INCLUDE:_gQueryStartupInfoBeforeInitializers")
+#else // x64 C names carry no leading underscore
+#pragma comment(linker, "/INCLUDE:gQueryStartupInfoBeforeInitializers")
+#endif
 #pragma section(".CRT$XIB", read)
 extern "C" __declspec(allocate(".CRT$XIB")) int(__cdecl* const gQueryStartupInfoBeforeInitializers)() =
   &QueryStartupInfoBeforeInitializers;

@@ -90,7 +90,7 @@ shows `machine (x64)` for each library that is good to use:
 call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
 set "WXWIN=<copy root>"
 cd /d "%WXWIN%\src\msw"
-nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD UNICODE=1 "OVERRIDEFLAGS=/DUNICODE /D_UNICODE /EHsc"
+nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD UNICODE=1 NOMAIN=1 "OVERRIDEFLAGS=/DUNICODE /D_UNICODE /EHsc"
 ```
 
 Check `lib\mswu\wx\setup.h` still says `wxUSE_UNICODE 1` afterwards, then copy
