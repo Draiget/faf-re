@@ -1103,6 +1103,7 @@ void CSimDriver::ThreadCreateSim()
 {
   PinThisThreadToOneNumaNodeIfRequested();
   PlaceCurrentThread(EThreadRole::Sim);
+  tIsSimThread = true; // engine addition, see SimThreadRole.h
 
   // The sim runs at reduced x87 precision so its arithmetic is bit-identical
   // on every machine in the game.

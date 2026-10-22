@@ -2,6 +2,10 @@
 #include "legacy/math/X87Math.h"
 #include <Windows.h>
 #include <array>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
 #include <bit>
 #include <algorithm>
 #include <cerrno>
@@ -41,7 +45,10 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/sim/CVFSImpl.h"
 #include "moho/sim/SimThreadRole.h"
+#include "moho/sim/SimWorkerPool.h"
+#include "moho/console/CConCommand.h"
 
 using namespace LuaPlus;
 
@@ -6278,6 +6285,7 @@ namespace
 	{
 		const char* const path = luaL_checklstring(state, 1, nullptr);
 		const int removeResult = std::remove(path);
+		moho::DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
 		return pushresult(path, state, removeResult == 0);
 	}
 
@@ -6293,6 +6301,7 @@ namespace
 		const char* const sourcePath = luaL_checklstring(state, 1, nullptr);
 		const char* const destinationPath = luaL_checklstring(state, 2, nullptr);
 		const int renameResult = std::rename(sourcePath, destinationPath);
+		moho::DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
 		return pushresult(sourcePath, state, renameResult == 0);
 	}
 
@@ -12833,6 +12842,401 @@ extern "C" void luaV_settable(
 	luaG_runerror(state, "loop in settable");
 }
 
+namespace moho
+{
+	/**
+	 * Engine addition: `lua_ParallelMark`, a user-side switch. When set, the mark phase of a sim
+	 * Lua collection propagates on the sim worker pool (see `PropagateMarksForCollection`). Off by
+	 * default.
+	 */
+	bool lua_ParallelMark = false;
+
+	TConVar<bool> gTConVar_lua_ParallelMark(
+		"lua_ParallelMark",
+		"Mark the sim Lua heap on the sim worker threads during a collection (same results).",
+		&lua_ParallelMark
+	);
+} // namespace moho
+
+namespace
+{
+	/**
+	 * Engine addition (`lua_ParallelMark`): the propagation half of a stop-the-world mark, run on
+	 * the sim worker pool while the sim thread waits.
+	 *
+	 * The set of objects marked is reachability, which does not depend on traversal order, so the
+	 * workers reach exactly the objects `propagatemarks` would. What has to come out the same:
+	 * - Mark bits: an object is claimed by a compare-and-swap of its mark byte that mirrors the
+	 *   serial test `(marked & 0x11) == 0`, so each gray object is traversed exactly once, and the
+	 *   bits a traversal leaves are the serial ones.
+	 * - Weak tables: each worker links the weak tables it traverses onto its own lists, which are
+	 *   then appended to the collector's. Their order is never observed (clearing works table by
+	 *   table, and only marks the strings it finds).
+	 * - Threads: `traversestack` clears and may shrink a stack (an allocation) and the LuaPlus GC
+	 *   hook walks the root state's objects, so threads are handed back and traversed on the sim
+	 *   thread, serially, between parallel rounds.
+	 * - Metatable mode lookups record a missing `__mode` in the metatable's `flags` cache, as
+	 *   `luaT_gettm` does; that bit is set atomically here.
+	 * Nothing on a worker allocates, calls Lua, or touches the allocation counters, so memory
+	 * accounting and the collection trigger points are unchanged.
+	 */
+	namespace parallel_mark
+	{
+		constexpr lu_byte kMarkedBit = 0x01u;
+		constexpr lu_byte kReachableMask = 0x11u;
+		constexpr int kLuaTagMethodMode = 2;
+
+		[[nodiscard]] lu_byte LoadMark(lu_byte& marked) noexcept
+		{
+			return std::atomic_ref<lu_byte>(marked).load(std::memory_order_relaxed);
+		}
+
+		/// `if ((marked & 0x11) == 0) marked |= 1;` as one atomic step: true for the one caller that marked it.
+		[[nodiscard]] bool Claim(lu_byte& marked) noexcept
+		{
+			std::atomic_ref<lu_byte> ref(marked);
+			lu_byte value = ref.load(std::memory_order_relaxed);
+			while ((value & kReachableMask) == 0u) {
+				if (ref.compare_exchange_weak(value, static_cast<lu_byte>(value | kMarkedBit), std::memory_order_relaxed)) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		void SetBits(lu_byte& marked, const lu_byte bits) noexcept
+		{
+			(void)std::atomic_ref<lu_byte>(marked).fetch_or(bits, std::memory_order_relaxed);
+		}
+
+		struct WorkerLists
+		{
+			std::vector<GCObject*> gray;     // claimed, not yet traversed
+			std::vector<lua_State*> threads; // claimed threads, traversed later on the sim thread
+			GCObject* wk = nullptr;
+			GCObject* wv = nullptr;
+			GCObject* wkv = nullptr;
+		};
+
+		/// Work shared between the participants: donated gray objects, and how many hold work.
+		struct SharedWork
+		{
+			std::mutex mutex;
+			std::vector<GCObject*> pool;
+			std::atomic<std::size_t> poolSize{0};
+			int busy = 0;
+		};
+
+		struct Round
+		{
+			global_State* g = nullptr;
+			std::vector<WorkerLists> workers;
+			SharedWork shared;
+		};
+
+		/// After a successful claim: queue the object for traversal (reallymarkobject's switch).
+		void QueueClaimed(WorkerLists& lists, GCObject* object)
+		{
+			for (;;) {
+				switch (object->gch.tt) {
+				case LUA_TTABLE:
+				case LUA_CFUNCTION:
+				case LUA_TFUNCTION:
+				case LUA_TPROTO:
+					lists.gray.push_back(object);
+					return;
+				case LUA_TTHREAD:
+					lists.threads.push_back(&object->th);
+					return;
+				case LUA_TUSERDATA: {
+					// A userdata has nothing to traverse but its metatable, marked in place.
+					auto* const metatable = reinterpret_cast<GCObject*>(object->u.metatable);
+					if (metatable == nullptr || !Claim(metatable->gch.marked)) {
+						return;
+					}
+					object = metatable;
+					continue;
+				}
+				default:
+					return;
+				}
+			}
+		}
+
+		void MarkObject(WorkerLists& lists, GCObject* const object)
+		{
+			if (object != nullptr && (LoadMark(object->gch.marked) & kReachableMask) == 0u && Claim(object->gch.marked)) {
+				QueueClaimed(lists, object);
+			}
+		}
+
+		void MarkValue(WorkerLists& lists, const TObject& slot)
+		{
+			if (slot.tt >= LUA_TSTRING) {
+				MarkObject(lists, static_cast<GCObject*>(slot.value.p));
+			}
+		}
+
+		/// `traversetable`.
+		void TraverseTable(Round& round, WorkerLists& lists, Table* const h)
+		{
+			Table* const metatable = h->metatable;
+			MarkObject(lists, reinterpret_cast<GCObject*>(metatable));
+
+			bool weakkey = false;
+			bool weakvalue = false;
+			const auto flags = std::atomic_ref<int8_t>(metatable->flags).load(std::memory_order_relaxed);
+			if ((flags & (1 << kLuaTagMethodMode)) == 0) {
+				const TObject* const mode = luaH_getstr(metatable, round.g->tmname[kLuaTagMethodMode]);
+				if (mode->tt == LUA_TNIL) {
+					// luaT_gettm's miss: cache the absence in the metatable.
+					(void)std::atomic_ref<int8_t>(metatable->flags)
+						.fetch_or(static_cast<int8_t>(1 << kLuaTagMethodMode), std::memory_order_relaxed);
+				} else if (mode->tt == LUA_TSTRING) {
+					const char* const modeText = static_cast<TString*>(mode->value.p)->str;
+					weakkey = std::strchr(modeText, 'k') != nullptr;
+					weakvalue = std::strchr(modeText, 'v') != nullptr;
+				}
+			}
+
+			if (weakkey || weakvalue) {
+				std::atomic_ref<lu_byte> marked(h->marked);
+				(void)marked.fetch_and(static_cast<lu_byte>(~0x6u), std::memory_order_relaxed);
+				(void)marked.fetch_or(
+					static_cast<lu_byte>((weakkey ? 0x2u : 0u) | (weakvalue ? 0x4u : 0u)), std::memory_order_relaxed
+				);
+				GCObject** const weaklist = weakkey ? (weakvalue ? &lists.wkv : &lists.wk) : &lists.wv;
+				h->gclist = *weaklist;
+				*weaklist = reinterpret_cast<GCObject*>(h);
+			}
+
+			if (!weakvalue) {
+				for (int index = h->sizearray; index != 0; --index) {
+					MarkValue(lists, h->array[index - 1]);
+				}
+			}
+
+			for (int index = 1 << h->lsizenode; index != 0; --index) {
+				const Node& node = h->node[index - 1];
+				if (node.i_val.tt != LUA_TNIL) {
+					if (!weakkey) {
+						MarkValue(lists, node.i_key);
+					}
+					if (!weakvalue) {
+						MarkValue(lists, node.i_val);
+					}
+				}
+			}
+		}
+
+		/// `traverseproto`.
+		void TraverseProto(WorkerLists& lists, Proto* const f)
+		{
+			SetBits(f->source->marked, kMarkedBit);
+			for (int index = 0; index < f->sizek; ++index) {
+				const TObject& constant = f->k[index];
+				if (constant.tt == LUA_TSTRING) {
+					SetBits(static_cast<TString*>(constant.value.p)->marked, kMarkedBit);
+				}
+			}
+			for (int index = 0; index < f->sizeupvalues; ++index) {
+				SetBits(f->upvalues[index]->marked, kMarkedBit);
+			}
+			for (int index = 0; index < f->sizep; ++index) {
+				MarkObject(lists, reinterpret_cast<GCObject*>(f->p[index]));
+			}
+			for (int index = 0; index < f->sizelocvars; ++index) {
+				TString* const varname = f->locvars[index].varname;
+				// traverseproto skips the same malformed names (and reports them).
+				const auto nameBits = reinterpret_cast<std::uintptr_t>(varname);
+				if (nameBits < 0x00100000u || (nameBits & 3u) != 0u) {
+					continue;
+				}
+				SetBits(varname->marked, kMarkedBit);
+			}
+		}
+
+		/// `traverselclosure`.
+		void TraverseLuaClosure(WorkerLists& lists, LClosure* const cl)
+		{
+			MarkValue(lists, cl->g);
+			MarkObject(lists, reinterpret_cast<GCObject*>(cl->p));
+			for (int index = 0; index < cl->nupvalues; ++index) {
+				UpVal* const upvalue = cl->upvals[index];
+				if (upvalue == nullptr) {
+					continue;
+				}
+				std::atomic_ref<lu_byte> marked(upvalue->marked);
+				lu_byte expected = 0u;
+				if (marked.load(std::memory_order_relaxed) == 0u
+					&& marked.compare_exchange_strong(expected, static_cast<lu_byte>(1u), std::memory_order_relaxed)) {
+					MarkValue(lists, upvalue->value);
+				}
+			}
+		}
+
+		void Traverse(Round& round, WorkerLists& lists, GCObject* const object)
+		{
+			switch (object->gch.tt) {
+			case LUA_TTABLE:
+				TraverseTable(round, lists, &object->h);
+				break;
+			case LUA_CFUNCTION:
+				for (int index = 0; index < object->cl.c.nupvalues; ++index) {
+					MarkValue(lists, object->cl.c.upvalue[index]);
+				}
+				break;
+			case LUA_TFUNCTION:
+				TraverseLuaClosure(lists, &object->cl.l);
+				break;
+			case LUA_TPROTO:
+				TraverseProto(lists, &object->p);
+				break;
+			default:
+				break;
+			}
+		}
+
+		/// One participant: drain local work, share surplus, take shared work, until none is left anywhere.
+		void Participate(Round& round, WorkerLists& lists)
+		{
+			constexpr std::size_t kShareAbove = 64u;
+			SharedWork& shared = round.shared;
+			bool holdingWork = false;
+			for (;;) {
+				if (lists.gray.empty()) {
+					std::unique_lock lock(shared.mutex);
+					if (holdingWork) {
+						holdingWork = false;
+						--shared.busy;
+					}
+					if (!shared.pool.empty()) {
+						const std::size_t take = std::max<std::size_t>(1u, shared.pool.size() / 2u);
+						lists.gray.assign(shared.pool.end() - static_cast<std::ptrdiff_t>(take), shared.pool.end());
+						shared.pool.resize(shared.pool.size() - take);
+						shared.poolSize.store(shared.pool.size(), std::memory_order_relaxed);
+						++shared.busy;
+						holdingWork = true;
+					} else if (shared.busy == 0) {
+						return;
+					} else {
+						lock.unlock();
+						std::this_thread::yield();
+						continue;
+					}
+				}
+
+				GCObject* const object = lists.gray.back();
+				lists.gray.pop_back();
+				Traverse(round, lists, object);
+
+				if (lists.gray.size() > kShareAbove && shared.poolSize.load(std::memory_order_relaxed) == 0u) {
+					const std::lock_guard lock(shared.mutex);
+					const std::size_t give = lists.gray.size() / 2u;
+					shared.pool.insert(shared.pool.end(), lists.gray.end() - static_cast<std::ptrdiff_t>(give), lists.gray.end());
+					lists.gray.resize(lists.gray.size() - give);
+					shared.poolSize.store(shared.pool.size(), std::memory_order_relaxed);
+				}
+			}
+		}
+
+		/// Puts the weak-table list `list` (linked through gclist) in front of `target`.
+		void PrependList(GCObject*& target, GCObject* const list)
+		{
+			if (list == nullptr) {
+				return;
+			}
+			GCObject* tail = list;
+			while (tail->h.gclist != nullptr) {
+				tail = tail->h.gclist;
+			}
+			tail->h.gclist = target;
+			target = list;
+		}
+
+		/// The gray object after `object` on a serial gray list.
+		[[nodiscard]] GCObject* NextGray(GCObject* const object) noexcept
+		{
+			switch (object->gch.tt) {
+			case LUA_TTABLE:
+				return object->h.gclist;
+			case LUA_CFUNCTION:
+			case LUA_TFUNCTION:
+				return object->cl.c.gclist;
+			case LUA_TTHREAD:
+				return object->th.gclist;
+			case LUA_TPROTO:
+				return object->p.gclist;
+			default:
+				return nullptr;
+			}
+		}
+
+		[[nodiscard]] bool Enabled() noexcept
+		{
+			return moho::lua_ParallelMark && moho::IsSimThread() && !moho::IsSimWorkerThread()
+				&& moho::CSimWorkerPool::ParallelEnabled() && moho::CSimWorkerPool::Get().WorkerCount() > 0u;
+		}
+	} // namespace parallel_mark
+
+	/**
+	 * `propagatemarks`, on the sim worker pool when `lua_ParallelMark` allows (see
+	 * `parallel_mark`); serially otherwise.
+	 */
+	void PropagateMarksForCollection(GCState* const st)
+	{
+		using namespace parallel_mark;
+		if (!Enabled()) {
+			propagatemarks(st);
+			return;
+		}
+
+		moho::CSimWorkerPool& pool = moho::CSimWorkerPool::Get();
+		Round round;
+		round.g = st->g;
+		round.workers.resize(pool.WorkerCount() + 1u);
+
+		while (st->tmark != nullptr) {
+			// The serial gray list (claimed objects linked through gclist) seeds the round.
+			round.shared.pool.clear();
+			for (GCObject* object = st->tmark; object != nullptr;) {
+				GCObject* const next = NextGray(object);
+				if (object->gch.tt == LUA_TTHREAD) {
+					round.workers[0].threads.push_back(&object->th);
+				} else {
+					round.shared.pool.push_back(object);
+				}
+				object = next;
+			}
+			st->tmark = nullptr;
+			round.shared.poolSize.store(round.shared.pool.size(), std::memory_order_relaxed);
+			round.shared.busy = 0;
+
+			pool.ParallelFor(round.workers.size(), 1u, [&round](const std::size_t begin, const std::size_t end) {
+				for (std::size_t index = begin; index < end; ++index) {
+					Participate(round, round.workers[index]);
+				}
+			});
+
+			// Threads, serially, as propagatemarks traverses them; whatever they reach is gray on st.
+			for (WorkerLists& lists : round.workers) {
+				PrependList(st->wk, lists.wk);
+				PrependList(st->wv, lists.wv);
+				PrependList(st->wkv, lists.wkv);
+				lists.wk = lists.wv = lists.wkv = nullptr;
+				for (lua_State* const thread : lists.threads) {
+					traversestack(thread, st);
+					if (thread->l_G->userGCFunction != nullptr) {
+						st->L = thread;
+						thread->l_G->userGCFunction(st);
+					}
+				}
+				lists.threads.clear();
+			}
+		}
+	}
+} // namespace
+
 // ---------------------------------------------------------------------------
 // Lua state construction.
 //
@@ -16621,7 +17025,7 @@ extern "C"
 		st.L = state;
 
 		markroot(&st, state);
-		propagatemarks(&st);
+		PropagateMarksForCollection(&st); // engine change: lua_ParallelMark, see there
 
 		cleartablevalues(st.wkv);
 		cleartablevalues(st.wv);
@@ -16637,7 +17041,7 @@ extern "C"
 			reallymarkobject(&st, udata);
 		}
 
-		propagatemarks(&st);
+		PropagateMarksForCollection(&st); // engine change: lua_ParallelMark, see there
 
 		cleartablekeys(weakKeyValueTables);
 		cleartablekeys(st.wk);

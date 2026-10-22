@@ -25,6 +25,15 @@ namespace moho
   {
     return tIsSimWorkerThread;
   }
+
+  /// Set to true for the lifetime of the sim thread (`CSimDriver::ThreadCreateSim`).
+  inline thread_local bool tIsSimThread = false;
+
+  /// True on the sim thread, the one thread that runs the sim and its Lua state.
+  [[nodiscard]] inline bool IsSimThread() noexcept
+  {
+    return tIsSimThread;
+  }
 } // namespace moho
 
 #if !defined(MOHO_SIM_AFFINITY_CHECKS)
