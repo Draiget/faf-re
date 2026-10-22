@@ -310,7 +310,7 @@ namespace
     // 8-byte free-list link a freed block carries, nor give the 16-byte
     // alignment x64 code expects from `new`, and its record, thread-cache and
     // page-map sizes are x86 byte counts. Every entry point funnels through
-    // `malloc_0`/`free`/`msize`, so bypassing those three keeps allocation and
+    // `malloc_0`/`free_0`/`msize`, so bypassing those three keeps allocation and
     // release on the same heap.
 
     // FAF_HIGHMEM=1 (x64 port test mode). With a large-address-aware image,
@@ -1477,8 +1477,17 @@ extern "C" void* __cdecl malloc_0(std::uint32_t size);
  *
  * What it does:
  * CRT thunk wrapper that forwards directly to `malloc_0`.
+ *
+ * The binary links the CRT statically, so this is `malloc` itself there. This
+ * project links the DLL CRT, whose import library also defines `malloc` (and
+ * `free`): any library that imports either one pulls that definition in, and
+ * a second `malloc` here is a duplicate symbol the link only got past with
+ * `/FORCE`. Every other translation unit already binds to the DLL's
+ * `__imp_malloc` through `<cstdlib>`, so the engine allocator is reached by
+ * name: `operator new` calls this thunk, and `malloc_0`, `realloc_0` and
+ * `free_0` carry the same suffix for the same reason (see `realloc_0`).
  */
-extern "C" void* __cdecl malloc(size_t size)
+extern "C" void* __cdecl malloc_crt(size_t size)
 {
     return malloc_0(static_cast<std::uint32_t>(size));
 }
@@ -1560,8 +1569,12 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
  *
  * What it does:
  * Releases small-block or large allocations and updates allocator counters.
+ *
+ * `free` in the binary; named `free_0` here because the DLL CRT's import
+ * library defines `free` too (see `malloc_crt`). `free_crt` and `realloc_0`
+ * call it by name.
  */
-extern "C" void __cdecl free(void* ptr)
+extern "C" void __cdecl free_0(void* ptr)
 {
     if (ptr == nullptr) {
         return;
@@ -1701,7 +1714,7 @@ extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
     }
 
     if (newsize == 0) {
-        free(pblock);
+        free_0(pblock);
         return nullptr;
     }
 
@@ -1714,7 +1727,7 @@ extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
 
         // Raw realloc-grow blob copy (malloc-backed block move).
         std::memcpy(grown, pblock, previousSize);
-        free(pblock);
+        free_0(pblock);
         return grown;
     }
 
@@ -1726,7 +1739,7 @@ extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
 
         // Raw realloc-shrink blob copy (malloc-backed block move).
         std::memcpy(shrunk, pblock, newsize);
-        free(pblock);
+        free_0(pblock);
         return shrunk;
     }
 
@@ -1746,7 +1759,7 @@ extern "C" void* __cdecl _expand(void* pblock, size_t newsize)
     }
 
     if (newsize == 0) {
-        free(pblock);
+        free_0(pblock);
         return nullptr;
     }
 
@@ -1760,13 +1773,13 @@ extern "C" void* __cdecl _expand(void* pblock, size_t newsize)
  * void __cdecl free_crt(void *ptr);
  *
  * What it does:
- * CRT-lane thunk that forwards to the allocator's `free`. `operator delete`
+ * CRT-lane thunk that forwards to the allocator's `free` (`free_0`). `operator delete`
  * reaches the small-block allocator through this hop rather than calling
  * `free` directly.
  */
 extern "C" void __cdecl free_crt(void* const ptr)
 {
-    free(ptr);
+    free_0(ptr);
 }
 
 /**
@@ -1777,7 +1790,7 @@ extern "C" void __cdecl free_crt(void* const ptr)
  * void *__cdecl operator new(size_t size);
  *
  * What it does:
- * Global `operator new`. Retries `malloc` for as long as the installed
+ * Global `operator new`. Retries `malloc` (`malloc_crt`) for as long as the installed
  * new-handler keeps reporting that it freed memory, and throws `std::bad_alloc`
  * once the handler gives up (or when none is installed).
  *
@@ -1790,7 +1803,7 @@ extern "C" void __cdecl free_crt(void* const ptr)
 void* __cdecl operator new(const std::size_t size)
 {
     for (;;) {
-        if (void* const block = malloc(size)) {
+        if (void* const block = malloc_crt(size)) {
             return block;
         }
 

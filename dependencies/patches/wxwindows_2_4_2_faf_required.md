@@ -113,8 +113,16 @@ cd /d "<your external wxWindows-2.4.2 path>"
 call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_x86.bat"
 set "WXWIN=<your external wxWindows-2.4.2 path>"
 cd /d src\msw
-nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD
+nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD NOMAIN=1
 ```
+
+`NOMAIN=1` (wx's own switch, `src\makevc.env`) leaves `WinMain` out of
+`src\msw\main.cpp`. The engine has its own `WinMain` (0x008D44A0) and calls
+`wxEntry` itself, and `main.obj` is always linked for `wxhInstance`, so a wx
+`WinMain` is a duplicate symbol in the engine link. The shared libraries were
+first built without it; on 2026-10-22 only `main.obj` was recompiled with the
+same flags plus `/DNOMAIN` and swapped into `lib\wxmswu.lib` and
+`lib\x64\wxmswu.lib` (`lib /REMOVE:<member> ...`, then `lib wxmswu.lib main.obj`).
 
 3. Verify output libs exist:
 
