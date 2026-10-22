@@ -13,7 +13,9 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <atomic>
 #include <string>
+#include <unordered_map>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -43,6 +45,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/misc/CDiskWatch.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/misc/StartupHelpers.h"
@@ -78,6 +81,19 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/console/CConCommand.h"
+
+namespace moho
+{
+  /// Engine addition: see CScriptModuleExistenceCache below. Same answers either way.
+  bool sim_CacheScriptModuleLookups = true;
+
+  TConVar<bool> gTConVar_sim_CacheScriptModuleLookups(
+    "sim_CacheScriptModuleLookups",
+    "Remember which blueprint script modules exist instead of asking the file system for every new entity.",
+    &sim_CacheScriptModuleLookups
+  );
+} // namespace moho
 
 namespace gpg
 {
@@ -833,6 +849,56 @@ namespace
   }
 
   /**
+   * Engine addition (`sim_CacheScriptModuleLookups`): whether each blueprint script module exists,
+   * so the VFS stat below (a `GetFileAttributesExW` on loose mounts) runs once per module rather
+   * than once per entity created - every projectile asked again.
+   *
+   * The answer is the VFS's, kept until it can change: any Lua file event the disk watch reports
+   * (hot reload, a mod edited on disk) or a new `Sim` (new mounts) clears it. Only the sim thread
+   * creates entities; the disk watch reports on the main thread, so it only bumps a counter.
+   */
+  class CScriptModuleExistenceCache final : public moho::CDiskWatchListener
+  {
+  public:
+    CScriptModuleExistenceCache()
+      : CDiskWatchListener("*.lua")
+    {}
+
+    void OnDiskWatchEvent(const moho::SDiskWatchEvent& /*event*/) override
+    {
+      mChanges.fetch_add(1u, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] bool Exists(const moho::Sim* const sim, moho::CVirtualFileSystem& vfs, const char* const path)
+    {
+      const std::uint64_t changes = mChanges.load(std::memory_order_relaxed);
+      if (sim != mSim || changes != mSeenChanges) {
+        mSim = sim;
+        mSeenChanges = changes;
+        mExists.clear();
+      }
+      const auto [it, inserted] = mExists.try_emplace(path, false);
+      if (inserted) {
+        it->second = vfs.GetFileInfo(path, nullptr);
+      }
+      return it->second;
+    }
+
+  private:
+    std::atomic<std::uint64_t> mChanges{0u};
+    std::uint64_t mSeenChanges = ~std::uint64_t{0};
+    const moho::Sim* mSim = nullptr;
+    std::unordered_map<std::string, bool> mExists;
+  };
+
+  /// Never destroyed: the disk watch it registers with may already be gone at exit.
+  [[nodiscard]] CScriptModuleExistenceCache& ScriptModuleExistence()
+  {
+    static CScriptModuleExistenceCache* const sCache = new CScriptModuleExistenceCache();
+    return *sCache;
+  }
+
+  /**
    * Address: 0x00677360 (FUN_00677360, func_FindBlueprintScriptModule)
    *
    * What it does:
@@ -902,7 +968,9 @@ namespace
     const moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
     const bool moduleFileExists = requestedModule != nullptr && *requestedModule != '\0'
       && waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
-      && waitHandleSet->mHandle->GetFileInfo(requestedModule, nullptr);
+      && (moho::sim_CacheScriptModuleLookups
+            ? ScriptModuleExistence().Exists(sim, *waitHandleSet->mHandle, requestedModule)
+            : waitHandleSet->mHandle->GetFileInfo(requestedModule, nullptr));
 
     // Both modules load through SCR_Import (0x004D3250, called at 0x006776DE
     // and 0x0067783E): its `catch (const std::runtime_error&)` turns a script

@@ -872,6 +872,39 @@ namespace gpg::core
       ResetInline_();
     }
 
+    /// A heap block `ReleaseHeapStorage` handed over: the block and the end of its live elements.
+    struct ReleasedBlock
+    {
+      T* begin = nullptr;
+      T* end = nullptr;
+    };
+
+    /**
+     * Engine addition: `ResetStorageToInline` for a caller that destroys the elements later.
+     *
+     * When the elements live on the heap, hands that block over with its elements still alive and
+     * rebinds to the empty inline window; the caller ends it with `FreeReleasedBlock`. When they
+     * live in the inline window nothing is handed over (`begin` is null) and nothing changes.
+     */
+    [[nodiscard]] ReleasedBlock ReleaseHeapStorage() noexcept
+    {
+      if (this->start_ == originalVec_) {
+        return {};
+      }
+      const ReleasedBlock released{this->start_, this->end_};
+      this->start_ = originalVec_;
+      this->capacity_ = InlineCapacityFromHeader_();
+      this->end_ = this->start_;
+      return released;
+    }
+
+    /// Destroys the elements of a block `ReleaseHeapStorage` handed over and frees it.
+    static void FreeReleasedBlock(const ReleasedBlock& released) noexcept
+    {
+      detail::DestroyRange(released.begin, released.end);
+      detail::FreeElements(released.begin);
+    }
+
     /**
      * Address: 0x0070FAD0 (FUN_0070FAD0, `gpg::fastvector_SCondition::
      * insert_range` -- the ordered insert `Unit::GuardedByList` and the

@@ -1940,8 +1940,9 @@ void CAiReconDBImpl::UpdateSimChecksum() {}
  * Address: 0x005C15A0 (FUN_005C15A0)
  *
  * What it does:
- * Returns one recon blip entry for `unit` by lower-bound lookup in the typed
- * recon map; returns `nullptr` when lookup resolves to map-end sentinel.
+ * Returns the first recon blip entry keyed by `unit`'s id in the recon map
+ * (`find`, 0x005C4950: lower-bound descent plus the equality test), or
+ * `nullptr` when the unit has none.
  */
 ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
 {
@@ -1949,21 +1950,11 @@ ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
     return nullptr;
   }
 
-  // `lower_bound` answers "the first key not less than this one", which is not
-  // the question. For a unit with no blip it returns the next unit's entry, and
-  // the only rejection here was against `end()` -- so the caller got somebody
-  // else's blip for every unit whose id sorts below some blipped unit's, and a
-  // null only for a unit sorting past the last entry in the map.
-  //
-  // `Unit::UpdateBlipsInRange` (0x006ACC60) gates its candidate list on exactly
-  // this call returning null, so a wrong-but-non-null answer puts the wrong
-  // entity into the attacker's blip list.
-  //
-  // Every other lookup in this file already uses the key-matching form via
-  // `FindReconBlipRange`; this one is now the same.
-  auto* const owner = const_cast<CAiReconDBImpl*>(this);
-  auto [first, last] = FindReconBlipRange(owner, unit);
-  return (first != last) ? first->second : nullptr;
+  // `find`, not a bare `lower_bound`: for a unit with no blip a lower bound
+  // is the next unit's entry, and `Unit::UpdateBlipsInRange` (0x006ACC60)
+  // gates its candidate list on this call returning null.
+  const auto found = mBlipMap.find(MakeReconProbeKey(GetSourceEntityId(unit)));
+  return (found != mBlipMap.end()) ? found->second : nullptr;
 }
 
 /**

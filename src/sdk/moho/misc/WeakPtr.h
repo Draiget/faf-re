@@ -338,6 +338,29 @@ namespace moho
       ResetFromObject(object);
     }
 
+    /**
+     * Engine addition: takes `count` nodes off the chain `chainSlot` heads in one walk, leaving
+     * both words of each null. `isLeaving(node)` names them; the walk stops once all `count` are
+     * off. The nodes that stay keep their order, so the chain ends exactly as `count` separate
+     * unlinks would leave it, at the cost of one walk instead of one per node.
+     */
+    template <class IsLeaving>
+    static void SpliceOutOfChain(void* const chainSlot, std::size_t count, IsLeaving&& isLeaving) noexcept
+    {
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
+      WeakPtr<T>** cursor = static_cast<WeakPtr<T>**>(chainSlot);
+      while (count != 0 && *cursor != nullptr) {
+        WeakPtr<T>* const node = *cursor;
+        if (isLeaving(node)) {
+          *cursor = node->nextInOwner;
+          node->ClearLinkState();
+          --count;
+        } else {
+          cursor = &node->nextInOwner;
+        }
+      }
+    }
+
   private:
     /** The chain `ownerLinkSlot` heads: the owner's `WeakObject`, read as a node pointer. */
     [[nodiscard]] WeakPtr<T>** OwnerChainHead() const noexcept
