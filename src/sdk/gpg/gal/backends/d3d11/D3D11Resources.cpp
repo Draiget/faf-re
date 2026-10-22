@@ -359,7 +359,7 @@ namespace gpg::gal
     CheckHresult(kind, __LINE__, device->CreateBuffer(&desc, nullptr, &mBuffer));
 
     if (!dynamic) {
-      mShadow.assign(mByteWidth, 0U);
+      mShadow.Reset(mByteWidth);
     }
   }
 
@@ -392,7 +392,7 @@ namespace gpg::gal
       CheckHresult(mKind, __LINE__, mImmediate->Map(mBuffer.Get(), 0U, mapType, 0U, &mapped));
       data = static_cast<std::uint8_t*>(mapped.pData) + offset;
     } else {
-      data = mShadow.data() + offset;
+      data = mShadow.Map(offset, size, mKind);
     }
 
     mLocked = true;
@@ -407,6 +407,9 @@ namespace gpg::gal
 
     if (mLockWrites) {
       RecordUpload(mLockSize);
+    }
+    if (!mDynamic) {
+      mShadow.CheckGuard(mKind);
     }
     if (mDynamic) {
       mImmediate->Unmap(mBuffer.Get(), 0U);
