@@ -37,10 +37,19 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <!-- The recovery tree still has unresolved externals, so this project links
-         with /FORCE. That switch is ignored under whole-program optimization,
-         where the linker fails with LNK1120 instead of emitting the image, so
-         WPO stays off here. /O2 is unaffected. -->
+    <!-- Whole-program optimization (/GL + /LTCG) stays off. The link no longer
+         needs /FORCE, so WPO builds and links clean, but Release|Win32 with WPO
+         changes sim results: replay 26935800 diverges from the non-WPO build at
+         beat 528 (first checksum mismatch at 550). The cause is not bisected
+         yet; the likely one is LTCG keeping x87-returned CRT math results on
+         the x87 stack, where the sim's _PC_24 control word rounds the
+         follow-on arithmetic (see platform\X87SqrtCall.h). Until it is found,
+         neither platform turns WPO on; Release|x64 with WPO played the whole
+         replay with 0 mismatches. Measured 2026-10-22 (/m:2): full build
+         10-20% longer, one-file rebuild 50 s instead of 17 s, replay about 5%
+         faster. LTCG also reorders the static initializers inside
+         .CRT$XCL/.CRT$XCU and drops unreferenced section-allocated entries
+         (moho\app\WinMain.cpp /INCLUDEs its .CRT$XIB entry for that reason). -->
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -54,8 +63,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <!-- Off for the same reason as Release|Win32: /FORCE is ignored under
-         whole-program optimization. -->
+    <!-- Off, as for Release|Win32 (see there for why). -->
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
