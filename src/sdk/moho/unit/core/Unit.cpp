@@ -12390,6 +12390,127 @@ gpg::RRef Unit::GetDerivedObjectRef()
   return ref;
 }
 
+namespace moho
+{
+  bool sim_DeferBlipUnlinks = true;
+
+  TConVar<bool> gTConVar_sim_DeferBlipUnlinks(
+    "sim_DeferBlipUnlinks",
+    "Take dropped blips-in-range lists off their weak chains in bulk every few ticks (same results, less work).",
+    &sim_DeferBlipUnlinks
+  );
+
+  int sim_DeferBlipUnlinksTicks = 4;
+
+  TConVar<int> gTConVar_sim_DeferBlipUnlinksTicks(
+    "sim_DeferBlipUnlinksTicks",
+    "Ticks between the bulk unlinks of sim_DeferBlipUnlinks (at least 1).",
+    &sim_DeferBlipUnlinksTicks
+  );
+} // namespace moho
+
+namespace
+{
+  using BlipList = gpg::core::FastVectorN<moho::WeakPtr<moho::Entity>, 20>;
+
+  /**
+   * Engine addition (`sim_DeferBlipUnlinks`): the replaced (or, as a unit dies, dropped) heap
+   * blocks of `Unit::mBlipsInRange`.
+   *
+   * Every refresh drops the old list, and dropping a weak pointer walks its owner's chain from the
+   * head to find it. Every other unit in range linked onto that chain since, ahead of it, so each
+   * drop walks nearly the whole chain - in a large fight, most of `UpdateBlipsInRange`.
+   *
+   * Instead the old heap block is kept, its nodes still on their chains, and every
+   * `sim_DeferBlipUnlinksTicks` ticks (or once enough are waiting) every chain they are on is walked
+   * once and they are all spliced out. Splicing never reorders the nodes that stay, and a new node
+   * always goes in at the head, so each chain holds exactly the live nodes, in exactly the order,
+   * the immediate drops leave. Until then the waiting nodes are referenced by nothing: an owner that
+   * dies meanwhile blanks them with the rest of its chain, and the walk skips them. Sim thread only,
+   * like all chain work.
+   */
+  class DeferredBlipUnlinks
+  {
+  public:
+    /// Takes over `list`'s heap block, if it has one; the list is left empty either way.
+    void Adopt(BlipList& list, const std::uint32_t tick)
+    {
+      const std::uint32_t interval = static_cast<std::uint32_t>(std::max(moho::sim_DeferBlipUnlinksTicks, 1));
+      if (tick - mTick >= interval) {
+        Flush();
+        mTick = tick;
+      }
+      Park(list);
+    }
+
+    /// `Adopt` without the flush check, for a dying unit's list.
+    void Park(BlipList& list)
+    {
+      const BlipList::ReleasedBlock released = list.ReleaseHeapStorage();
+      if (released.begin == nullptr) {
+        list.ResetStorageToInline();
+        return;
+      }
+      mBlocks.push_back(released);
+      mNodeCount += static_cast<std::size_t>(released.end - released.begin);
+      if (mNodeCount >= kFlushNodeCount) {
+        Flush();
+      }
+    }
+
+    /// Splices every waiting node out of its chain and frees the blocks.
+    void Flush()
+    {
+      if (mBlocks.empty()) {
+        return;
+      }
+
+      mChains.clear();
+      for (const BlipList::ReleasedBlock& block : mBlocks) {
+        for (const moho::WeakPtr<moho::Entity>* node = block.begin; node != block.end; ++node) {
+          if (node->ownerLinkSlot != nullptr) {
+            mChains.push_back(node->ownerLinkSlot);
+          }
+        }
+      }
+      std::sort(mChains.begin(), mChains.end());
+      std::sort(mBlocks.begin(), mBlocks.end(), [](const auto& lhs, const auto& rhs) { return lhs.begin < rhs.begin; });
+
+      const auto isWaiting = [this](const moho::WeakPtr<moho::Entity>* const node) {
+        const auto after = std::upper_bound(
+          mBlocks.begin(), mBlocks.end(), node, [](const auto* const value, const auto& block) { return value < block.begin; }
+        );
+        return after != mBlocks.begin() && node < std::prev(after)->end;
+      };
+      for (auto first = mChains.begin(); first != mChains.end();) {
+        const auto last = std::upper_bound(first, mChains.end(), *first);
+        moho::WeakPtr<moho::Entity>::SpliceOutOfChain(*first, static_cast<std::size_t>(last - first), isWaiting);
+        first = last;
+      }
+
+      for (const BlipList::ReleasedBlock& block : mBlocks) {
+        BlipList::FreeReleasedBlock(block);
+      }
+      mBlocks.clear();
+      mNodeCount = 0;
+    }
+
+  private:
+    static constexpr std::size_t kFlushNodeCount = 1u << 20;
+
+    std::vector<BlipList::ReleasedBlock> mBlocks;
+    std::vector<void*> mChains;
+    std::size_t mNodeCount = 0;
+    std::uint32_t mTick = 0;
+  };
+
+  [[nodiscard]] DeferredBlipUnlinks& BlipListUnlinks()
+  {
+    static DeferredBlipUnlinks unlinks;
+    return unlinks;
+  }
+} // namespace
+
 namespace
 {
   template <class T>
@@ -12437,6 +12558,13 @@ namespace
     unit.TargetBlipEntityRef.UnlinkFromOwnerChain();
     unit.GuardedUnitRef.UnlinkFromOwnerChain();
     unit.mInfoCache.mFormationLeadRef.UnlinkFromOwnerChain();
+
+    // Engine change (sim_DeferBlipUnlinks): a heap-held list joins the deferred bulk unlink
+    // instead of walking each blip's chain now; see `DeferredBlipUnlinks`.
+    if (sim_DeferBlipUnlinks && !unit.mBlipsInRange.UsesInlineStorage()) {
+      BlipListUnlinks().Park(unit.mBlipsInRange);
+      return;
+    }
 
     for (WeakPtr<Entity>& blip : unit.mBlipsInRange) {
       blip.UnlinkFromOwnerChain();
@@ -14748,110 +14876,6 @@ gpg::core::FastVectorN<WeakPtr<Entity>, 20>& Unit::GetBlipsInRange(const unsigne
   }
   return mBlipsInRange;
 }
-
-namespace moho
-{
-  bool sim_DeferBlipUnlinks = true;
-
-  TConVar<bool> gTConVar_sim_DeferBlipUnlinks(
-    "sim_DeferBlipUnlinks",
-    "Take replaced blips-in-range lists off their weak chains once per tick, in bulk (same results, less work).",
-    &sim_DeferBlipUnlinks
-  );
-} // namespace moho
-
-namespace
-{
-  using BlipList = gpg::core::FastVectorN<moho::WeakPtr<moho::Entity>, 20>;
-
-  /**
-   * Engine addition (`sim_DeferBlipUnlinks`): the replaced heap blocks of `Unit::mBlipsInRange`.
-   *
-   * Every refresh drops the old list, and dropping a weak pointer walks its owner's chain from the
-   * head to find it. Every other unit in range linked onto that chain since, ahead of it, so each
-   * drop walks nearly the whole chain - in a large fight, most of `UpdateBlipsInRange`.
-   *
-   * Instead the old heap block is kept, its nodes still on their chains, and at the next tick (or
-   * once enough are waiting) every chain they are on is walked once and they are all spliced out.
-   * Splicing never reorders the nodes that stay, and a new node always goes in at the head, so each
-   * chain holds exactly the live nodes, in exactly the order, the immediate drops leave. Until then
-   * the waiting nodes are referenced by nothing: an owner that dies meanwhile blanks them with the
-   * rest of its chain, and the walk skips them. Sim thread only, like all chain work.
-   */
-  class DeferredBlipUnlinks
-  {
-  public:
-    /// Takes over `list`'s heap block, if it has one; the list is left empty either way.
-    void Adopt(BlipList& list, const std::uint32_t tick)
-    {
-      if (tick != mTick) {
-        Flush();
-        mTick = tick;
-      }
-      const BlipList::ReleasedBlock released = list.ReleaseHeapStorage();
-      if (released.begin == nullptr) {
-        list.ResetStorageToInline();
-        return;
-      }
-      mBlocks.push_back(released);
-      mNodeCount += static_cast<std::size_t>(released.end - released.begin);
-      if (mNodeCount >= kFlushNodeCount) {
-        Flush();
-      }
-    }
-
-    /// Splices every waiting node out of its chain and frees the blocks.
-    void Flush()
-    {
-      if (mBlocks.empty()) {
-        return;
-      }
-
-      mChains.clear();
-      for (const BlipList::ReleasedBlock& block : mBlocks) {
-        for (const moho::WeakPtr<moho::Entity>* node = block.begin; node != block.end; ++node) {
-          if (node->ownerLinkSlot != nullptr) {
-            mChains.push_back(node->ownerLinkSlot);
-          }
-        }
-      }
-      std::sort(mChains.begin(), mChains.end());
-      std::sort(mBlocks.begin(), mBlocks.end(), [](const auto& lhs, const auto& rhs) { return lhs.begin < rhs.begin; });
-
-      const auto isWaiting = [this](const moho::WeakPtr<moho::Entity>* const node) {
-        const auto after = std::upper_bound(
-          mBlocks.begin(), mBlocks.end(), node, [](const auto* const value, const auto& block) { return value < block.begin; }
-        );
-        return after != mBlocks.begin() && node < std::prev(after)->end;
-      };
-      for (auto first = mChains.begin(); first != mChains.end();) {
-        const auto last = std::upper_bound(first, mChains.end(), *first);
-        moho::WeakPtr<moho::Entity>::SpliceOutOfChain(*first, static_cast<std::size_t>(last - first), isWaiting);
-        first = last;
-      }
-
-      for (const BlipList::ReleasedBlock& block : mBlocks) {
-        BlipList::FreeReleasedBlock(block);
-      }
-      mBlocks.clear();
-      mNodeCount = 0;
-    }
-
-  private:
-    static constexpr std::size_t kFlushNodeCount = 1u << 20;
-
-    std::vector<BlipList::ReleasedBlock> mBlocks;
-    std::vector<void*> mChains;
-    std::size_t mNodeCount = 0;
-    std::uint32_t mTick = 0;
-  };
-
-  [[nodiscard]] DeferredBlipUnlinks& BlipListUnlinks()
-  {
-    static DeferredBlipUnlinks unlinks;
-    return unlinks;
-  }
-} // namespace
 
 /**
  * Address: 0x006ACC60 (FUN_006ACC60, ?UpdateBlipsInRange@Unit@Moho@@QAEXXZ)

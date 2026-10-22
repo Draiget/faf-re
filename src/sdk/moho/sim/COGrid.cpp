@@ -1737,6 +1737,10 @@ namespace moho
     // repopulating (binary frees the heap buffer and restores the inline
     // start/cap sentinel, then sets end == start).
     outResults.ResetStorageToInline();
+    // Engine change: room for every gathered entity up front, so a dense blob fills one block
+    // instead of growing 10, 20, 40, ... with a copy each time. The results are the same; only
+    // the allocations differ (as with kGatherInlineCapacity).
+    outResults.reserve(gatheredEntities.size());
 
     CollisionResult hit{};
     for (Entity* const entity : gatheredEntities) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstring>
 #include <type_traits>
 
 #include "gpg/core/containers/String.h"
@@ -32,6 +33,13 @@ namespace moho
 
     Wm3::Quatf orient_; // 0x00 (w,x,y,z)
     Wm3::Vec3f pos_;    // 0x10
+
+    /// Byte copies of both lanes (`Wm3::System::Memcpy` copies bytes too, so NaN payloads survive).
+    void CopyLanesFrom(const VTransform& rhs) noexcept
+    {
+      std::memcpy(&orient_, &rhs.orient_, sizeof(orient_));
+      std::memcpy(&pos_, &rhs.pos_, sizeof(pos_));
+    }
 
     /**
      * Address: 0x006770F0 (FUN_006770F0)
@@ -82,16 +90,27 @@ namespace moho
      *
      * What it does:
      * Copy-constructs transform state (equivalent to plain struct copy).
+     *
+     * Inline, byte copies (engine change): `Wm3::Quaternion`'s copy goes through the out-of-line
+     * `Wm3::System::Memcpy` (`memcpy_s`), a call per transform copy on the sim's hottest paths. The
+     * bytes copied are the same.
      */
-    VTransform(const VTransform& rhs) noexcept;
+    VTransform(const VTransform& rhs) noexcept
+    {
+      CopyLanesFrom(rhs);
+    }
 
     /**
      * Address: 0x00470B60 (FUN_00470B60, Moho::VTransform::operator=)
      *
      * What it does:
-     * Copies quaternion + translation lanes from rhs.
+     * Copies quaternion + translation lanes from rhs (inline byte copies, as the copy constructor).
      */
-    VTransform& operator=(const VTransform& rhs) noexcept;
+    VTransform& operator=(const VTransform& rhs) noexcept
+    {
+      CopyLanesFrom(rhs);
+      return *this;
+    }
 
     /**
      * Address: 0x004F04D0 (FUN_004F04D0, ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ)

@@ -131,28 +131,8 @@ namespace moho
     pos_.z = matrix.r[3].z;
   }
 
-  /**
-   * Address: 0x0046FC90 (FUN_0046FC90)
-   *
-   * Moho::VTransform const&
-   *
-   * What it does:
-   * Copy-constructs transform state (equivalent to plain struct copy).
-   */
-  VTransform::VTransform(const VTransform& rhs) noexcept = default;
-
-  /**
-   * Address: 0x00470B60 (FUN_00470B60, Moho::VTransform::operator=)
-   *
-   * What it does:
-   * Copies quaternion + translation lanes from rhs.
-   */
-  VTransform& VTransform::operator=(const VTransform& rhs) noexcept
-  {
-    orient_ = rhs.orient_;
-    pos_ = rhs.pos_;
-    return *this;
-  }
+  // VTransform's copy constructor (0x0046FC90) and copy assignment (0x00470B60) are inline in
+  // VTransform.h.
 
   /**
    * Address: 0x004F04D0 (FUN_004F04D0, ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ)

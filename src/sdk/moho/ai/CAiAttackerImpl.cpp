@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/console/CConCommand.h"
 #include "moho/ai/EAiAttackerEvent.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiTarget.h"
@@ -1250,24 +1251,25 @@ bool CAiAttackerImpl::IsTooClose(CAiTarget* const target)
   return isTooClose;
 }
 
-/**
- * Address: 0x005D7340 (FUN_005D7340, Moho::CAiAttackerImpl::IsTargetExempt)
- *
- * What it does:
- * Exempts targets currently used by reclaim/capture commands or targets in
- * `UNITSTATE_BeingCaptured` that are focused by live engineer units.
- */
-bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
+namespace moho
 {
-  if (target == nullptr) {
-    return false;
-  }
+  bool sim_ExemptCheckInPlace = true;
 
-  const auto* const view = this;
-  Unit* const ownerUnit = view->mUnit;
-  if (ownerUnit != nullptr && ownerUnit->CommandQueue != nullptr) {
-    const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot = ownerUnit->CommandQueue->mCommandVec;
-    for (const WeakPtr<CUnitCommand>& weakCommand : commandSnapshot) {
+  TConVar<bool> gTConVar_sim_ExemptCheckInPlace(
+    "sim_ExemptCheckInPlace",
+    "Check a unit's reclaim/capture commands for target exemption without copying its command queue (same results, less work).",
+    &sim_ExemptCheckInPlace
+  );
+} // namespace moho
+
+namespace
+{
+  /// Whether a reclaim or capture command in `commands` targets `target` (or, through a blip, its source).
+  [[nodiscard]] bool QueuedCommandExemptsTarget(
+    const msvc8::vector<WeakPtr<CUnitCommand>>& commands, const Entity* const target
+  )
+  {
+    for (const WeakPtr<CUnitCommand>& weakCommand : commands) {
       CUnitCommand* const command = weakCommand.GetObjectPtr();
       if (command == nullptr) {
         continue;
@@ -1285,6 +1287,38 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
       if (command->mTarget.targetEntity.GetObjectPtr() == target || command->mTarget.GetEntity() == target) {
         return true;
       }
+    }
+    return false;
+  }
+} // namespace
+
+/**
+ * Address: 0x005D7340 (FUN_005D7340, Moho::CAiAttackerImpl::IsTargetExempt)
+ *
+ * What it does:
+ * Exempts targets currently used by reclaim/capture commands or targets in
+ * `UNITSTATE_BeingCaptured` that are focused by live engineer units.
+ */
+bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
+{
+  if (target == nullptr) {
+    return false;
+  }
+
+  const auto* const view = this;
+  Unit* const ownerUnit = view->mUnit;
+  if (ownerUnit != nullptr && ownerUnit->CommandQueue != nullptr) {
+    // The binary walks a copy of the queue (FUN_005DB610 at 0x005D738A). Engine change
+    // (sim_ExemptCheckInPlace): walk the queue itself. The walk only reads -- weak-pointer
+    // decodes, the command type, and CAiTarget::GetEntity (0x005E2CE0), which decodes the target
+    // and a blip's source unit -- so the queue cannot change under it, and the copy's nodes were
+    // linked at their commands' chain heads and unlinked again, leaving every chain as it was.
+    const msvc8::vector<WeakPtr<CUnitCommand>>& commandQueue = ownerUnit->CommandQueue->mCommandVec;
+    const bool exempted = sim_ExemptCheckInPlace
+      ? QueuedCommandExemptsTarget(commandQueue, target)
+      : QueuedCommandExemptsTarget(msvc8::vector<WeakPtr<CUnitCommand>>(commandQueue), target);
+    if (exempted) {
+      return true;
     }
   }
 
