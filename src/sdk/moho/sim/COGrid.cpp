@@ -1,3 +1,4 @@
+#include "moho/console/CConCommand.h"
 #include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/COGrid.h"
@@ -992,6 +993,20 @@ namespace moho
     return mEntityOccupationManager.GatherUnmarkedEntities(outEntities, rect, flags);
   }
 
+  bool sim_GatherLargeBuffers = true;
+  TConVar<bool> gTConVar_sim_GatherLargeBuffers(
+    "sim_GatherLargeBuffers",
+    "Give grid gathers large stack buffers so dense queries stay off the heap (same results).",
+    &sim_GatherLargeBuffers
+  );
+
+  bool sim_GatherReserve = true;
+  TConVar<bool> gTConVar_sim_GatherReserve(
+    "sim_GatherReserve",
+    "Size EntitiesAroundPoint's result list once for every gathered entity instead of growing it (same results).",
+    &sim_GatherReserve
+  );
+
   namespace
   {
     // Inline window of the stack-local gather buffers below. The binary's
@@ -1003,7 +1018,27 @@ namespace moho
     constexpr std::size_t kGatherInlineCapacity = 256u;
     // `UnitIsBlocked`'s `CollisionResult` buffer (binary: 10 inline slots).
     constexpr std::size_t kUnitBlockedInlineCapacity = 32u;
+
+    /**
+     * A gather's stack buffer: the large inline window, or with `sim_GatherLargeBuffers` off the
+     * binary's (20 pointers, 10 results). Both are built; `Get` hands out the one in use.
+     */
+    template <class T, std::size_t LargeCapacity, std::size_t BinaryCapacity>
+    struct GatherScratch
+    {
+      gpg::core::FastVectorN<T, LargeCapacity> large{};
+      gpg::core::FastVectorN<T, BinaryCapacity> binary{};
+
+      [[nodiscard]] gpg::core::FastVectorInline<T>& Get() noexcept
+      {
+        if (sim_GatherLargeBuffers) {
+          return large;
+        }
+        return binary;
+      }
+    };
   } // namespace
+
 
   [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(const Wm3::Box3f& box) noexcept
   {
@@ -1072,7 +1107,8 @@ namespace moho
     CollisionDBRect queryRect{};
     (void)func_AABoxToRect(&queryRect, source->mAABox);
 
-    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
+    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount =
       mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
 
@@ -1130,7 +1166,8 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
 
-    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
+    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
     outCollisions.ResetStorageToInline();
@@ -1178,7 +1215,8 @@ namespace moho
     gpg::core::FastVectorInline<CollisionResult>& into
   )
   {
-    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
+    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = grid.GatherUnmarkedEntities(box, ENTITYTYPE_Unit, gatheredEntities);
 
     into.ResetStorageToInline();
@@ -1223,7 +1261,8 @@ namespace moho
     box.Min.z = static_cast<float>(cellPos.z);
     box.Max.z = static_cast<float>(cellPos.z + maxSpan);
 
-    gpg::core::FastVectorN<CollisionResult, kUnitBlockedInlineCapacity> nearbyUnits{};
+    GatherScratch<CollisionResult, kUnitBlockedInlineCapacity, 10> nearbyScratch{};
+    gpg::core::FastVectorInline<CollisionResult>& nearbyUnits = nearbyScratch.Get();
     GatherUnmarkedUnitsInBox(grid, box, nearbyUnits);
     if (nearbyUnits.empty()) {
       return false; // the loop below would not run; skip building the query box
@@ -1425,7 +1464,8 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
 
-    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
+    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
     outCollisions.ResetStorageToInline();
@@ -1495,7 +1535,8 @@ namespace moho
     const Wm3::Vec3f& lineEnd
   )
   {
-    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
+    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const std::int32_t gatheredCount =
       GatherUnmarkedEntitiesInLine(mEntityOccupationManager, gatheredEntities, lineStart, lineEnd);
 
@@ -1655,7 +1696,8 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
 
-    gpg::core::FastVectorN<CollisionShapeBase*, kGatherInlineCapacity> gatheredSpans;
+    GatherScratch<CollisionShapeBase*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<CollisionShapeBase*>& gatheredSpans = gatherScratch.Get();
     (void)grid.mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, cellRect, ENTITYTYPE_Unit);
 
     // Each gathered shape is the `CollisionShape<Entity>` base of its entity
@@ -1730,7 +1772,8 @@ namespace moho
     CollisionDBRect gatherRect{};
     (void)func_AABoxToRect(&gatherRect, queryBounds);
 
-    gpg::core::FastVectorN<Entity*, kGatherInlineCapacity> gatheredEntities{};
+    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
 
     // Release any escaped heap storage and rebind to the inline window before
@@ -1740,7 +1783,9 @@ namespace moho
     // Engine change: room for every gathered entity up front, so a dense blob fills one block
     // instead of growing 10, 20, 40, ... with a copy each time. The results are the same; only
     // the allocations differ (as with kGatherInlineCapacity).
-    outResults.reserve(gatheredEntities.size());
+    if (sim_GatherReserve) {
+      outResults.reserve(gatheredEntities.size());
+    }
 
     CollisionResult hit{};
     for (Entity* const entity : gatheredEntities) {

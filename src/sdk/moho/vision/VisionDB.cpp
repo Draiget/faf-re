@@ -8,8 +8,28 @@
 
 #include "Wm3IntrBox2Circle2.h"
 #include "moho/app/UserWorkerPool.h"
+#include "moho/console/CConCommand.h"
 
 using namespace moho;
+
+namespace moho
+{
+  /// Engine addition: switch for the chain tail/predecessor hints (see gChainTails). Live.
+  bool wld_VisionChainHints = true;
+  TConVar<bool> gTConVar_wld_VisionChainHints(
+    "wld_VisionChainHints",
+    "Find vision-tree chain tails and predecessors from checked hints instead of walking the chain (same tree).",
+    &wld_VisionChainHints
+  );
+
+  /// Engine addition: switch for NewHandle's identical-entry shortcut (see gLastNewEntry). Live.
+  bool wld_VisionRepeatInsert = true;
+  TConVar<bool> gTConVar_wld_VisionRepeatInsert(
+    "wld_VisionRepeatInsert",
+    "Insert a vision entry identical to the previous one where the tree walk would put it, without walking (same tree).",
+    &wld_VisionRepeatInsert
+  );
+} // namespace moho
 
 namespace
 {
@@ -163,7 +183,7 @@ namespace
   /// The last node of the chain `parent` contains, from the hint when it is still true.
   [[nodiscard]] VisionDB::Entry* ChainTailHint(const VisionDB::Entry* const parent) noexcept
   {
-    if (parent == nullptr) {
+    if (parent == nullptr || !wld_VisionChainHints) {
       return nullptr;
     }
     const auto it = gChainTails.find(parent);
@@ -176,6 +196,9 @@ namespace
   /// The node of `parent`'s chain that links to `entry`, from the hint when it is still true.
   [[nodiscard]] VisionDB::Entry* ChainPreviousHint(const VisionDB::Entry* const parent, const VisionDB::Entry* const entry) noexcept
   {
+    if (!wld_VisionChainHints) {
+      return nullptr;
+    }
     const auto it = gChainPrevious.find(entry);
     if (it == gChainPrevious.end() || it->second->mNext != entry || it->second->mParent != parent) {
       return nullptr;
@@ -273,6 +296,9 @@ void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
 
   // Engine addition: `entry` may head a run of nodes (`RemoveFromChain` hands over a contained
   // chain), so the new tail is the end of that run.
+  if (!wld_VisionChainHints) {
+    return;
+  }
   gChainPrevious[entry] = tail;
   if (tail->mParent != nullptr) {
     Entry* last = entry;
@@ -297,6 +323,9 @@ void VisionDB::Entry::AddContained(Entry* const entry) noexcept
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
 
   // Engine addition: remember the new chain's tail (see gChainTails).
+  if (!wld_VisionChainHints) {
+    return;
+  }
   Entry* last = entry;
   while (last->mNext != nullptr) {
     last = last->mNext;
@@ -334,7 +363,9 @@ void VisionDB::Entry::RemoveFromChain(Entry* const entry) noexcept
     }
     if (previous != nullptr) {
       previous->mNext = entry->mNext;
-      if (entry->mNext != nullptr) {
+      if (!wld_VisionChainHints) {
+        // the binary's unlink, nothing remembered
+      } else if (entry->mNext != nullptr) {
         gChainPrevious[entry->mNext] = previous;
       } else {
         newTail = previous;
@@ -623,7 +654,7 @@ VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::V
   // Engine addition (see gLastNewEntry): with no edit since the last insertion, an identical
   // entry would walk to that entry and become its first child.
   Entry* const last = gLastNewEntry.mEntry;
-  if (last != nullptr && gLastNewEntry.mDb == this && gLastNewEntry.mTreeEdits == gVisionTreeEdits &&
+  if (wld_VisionRepeatInsert && last != nullptr && gLastNewEntry.mDb == this && gLastNewEntry.mTreeEdits == gVisionTreeEdits &&
       gLastNewEntry.mEntryEdits == gVisionEntryEdits && last->mContained == nullptr &&
       SameCircle(last->mPrevCircle, entry->mPrevCircle) && SameCircle(last->mCurCircle, entry->mCurCircle) &&
       last->Contains(*entry)) {

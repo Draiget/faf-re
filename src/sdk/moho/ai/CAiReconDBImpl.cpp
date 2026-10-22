@@ -368,6 +368,29 @@ namespace
 
 namespace moho
 {
+  /// Engine additions (each live; same recon either way):
+  /// - sim_ReconProbeCellCache: a point probe builds each grid-size cell once (SReconPointProbe).
+  /// - sim_ReconSkipSelfAlly: GetReconFlags/GetDetection skip this army's own DB in the ally loop.
+  /// - sim_ReconBlipHandleAssign: RefreshBlip assigns mesh/pose handles from the fields directly.
+  bool sim_ReconProbeCellCache = true;
+  TConVar<bool> gTConVar_sim_ReconProbeCellCache(
+    "sim_ReconProbeCellCache",
+    "Recon point probes compute each intel-grid cell once per grid size (same results).",
+    &sim_ReconProbeCellCache
+  );
+  bool sim_ReconSkipSelfAlly = true;
+  TConVar<bool> gTConVar_sim_ReconSkipSelfAlly(
+    "sim_ReconSkipSelfAlly",
+    "Recon flag merges skip the army's own recon database on its second, ally-loop visit (same results).",
+    &sim_ReconSkipSelfAlly
+  );
+  bool sim_ReconBlipHandleAssign = true;
+  TConVar<bool> gTConVar_sim_ReconBlipHandleAssign(
+    "sim_ReconBlipHandleAssign",
+    "Blip refresh copies mesh and pose handles straight from the source fields, without temporaries (same results).",
+    &sim_ReconBlipHandleAssign
+  );
+
   /**
    * One `GetReconFlags` point probe: the probed entity and position, plus the
    * values the binary re-derives from them alone in every per-army
@@ -415,6 +438,10 @@ namespace moho
     {
       if (grid == nullptr) {
         return false;
+      }
+
+      if (!sim_ReconProbeCellCache) {
+        return grid->IsVisible(mPos); // the binary's per-grid Vec3f test
       }
 
       const std::uint32_t gridSize = grid->mGridSize;
@@ -992,13 +1019,24 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     // released inside the assignment exactly as before; the temporary's extra
     // retain/release pair could never free anything, because the source field
     // keeps its own reference.
-    perArmy->mMesh = sourceUnit->mVarDat.mScmResource;
+    // Engine change (sim_ReconBlipHandleAssign); off, the binary's getter copies are assigned.
+    const bool assignFromFields = sim_ReconBlipHandleAssign;
+    if (assignFromFields) {
+      perArmy->mMesh = sourceUnit->mVarDat.mScmResource;
+    } else {
+      perArmy->mMesh = sourceUnit->Entity::GetMesh();
+    }
 
     // 0x005C1C2F: an animated source unit reseats both pose lanes from its
     // actor; one without an actor drops them instead (0x005C1C95/0x005C1CA0).
     if (const CAniActor* const actor = sourceUnit->AniActor; actor != nullptr) {
-      perArmy->mPriorPose = actor->mPriorPose;
-      perArmy->mPose = actor->mPose;
+      if (assignFromFields) {
+        perArmy->mPriorPose = actor->mPriorPose;
+        perArmy->mPose = actor->mPose;
+      } else {
+        perArmy->mPriorPose = actor->GetPriorPoseShared();
+        perArmy->mPose = actor->GetPoseShared();
+      }
     } else {
       perArmy->mPriorPose.reset();
       perArmy->mPose.reset();
@@ -1498,7 +1536,7 @@ EReconFlags CAiReconDBImpl::GetReconFlags(
       // a second time here. `GetNewReconFor` is a const read of grids and the
       // probe (no state, RNG or script), and its result is OR-merged, so the
       // repeat cannot change `combined`.
-      if (!allyReconDb || allyReconDb == this) {
+      if (!allyReconDb || (sim_ReconSkipSelfAlly && allyReconDb == this)) {
         continue;
       }
 
@@ -1547,7 +1585,7 @@ EReconFlags CAiReconDBImpl::GetReconFlagsForRect(
       CAiReconDBImpl* const allyReconDb = allyArmy->GetReconDB();
       // Skips this recon DB's repeat visit, as in `GetReconFlags`:
       // `GetDetection` is a const grid read and the result is OR-merged.
-      if (!allyReconDb || allyReconDb == this) {
+      if (!allyReconDb || (sim_ReconSkipSelfAlly && allyReconDb == this)) {
         continue;
       }
 

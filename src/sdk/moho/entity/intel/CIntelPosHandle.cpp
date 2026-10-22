@@ -1,4 +1,5 @@
 #include "CIntelPosHandle.h"
+#include "moho/console/CConCommand.h"
 
 #include <new>
 #include <typeinfo>
@@ -11,6 +12,17 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/CIntelGrid.h"
+
+namespace moho
+{
+  /// Engine addition: a same-radius move within the same raster cell only stores the position. Live.
+  bool sim_IntelSameCellMove = true;
+  TConVar<bool> gTConVar_sim_IntelSameCellMove(
+    "sim_IntelSameCellMove",
+    "Skip the cancelling remove/add rasters when an intel source moves within its grid cell (same grids).",
+    &sim_IntelSameCellMove
+  );
+} // namespace moho
 
 namespace
 {
@@ -104,7 +116,7 @@ namespace
   )
   {
     if (newPos != entry->mLastPos || requestedRadius != entry->mRadius) {
-      if (requestedRadius == entry->mRadius && MoveKeepsRasterFootprint(*entry, newPos)) {
+      if (moho::sim_IntelSameCellMove && requestedRadius == entry->mRadius && MoveKeepsRasterFootprint(*entry, newPos)) {
         entry->mLastPos = newPos;
         return;
       }

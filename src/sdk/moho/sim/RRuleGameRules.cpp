@@ -52,6 +52,18 @@
 namespace moho
 {
   /**
+   * Engine addition: switch for the blueprint lookup shortcuts in `LookupBlueprintByResId` (search
+   * with the id's own string, skip the normalized retry when normalizing cannot change the name).
+   * Live; the same blueprint is found either way.
+   */
+  bool sim_BlueprintLookupFast = true;
+  TConVar<bool> gTConVar_sim_BlueprintLookupFast(
+    "sim_BlueprintLookupFast",
+    "Look blueprints up without copying the id, and skip the normalized retry when it cannot match (same results).",
+    &sim_BlueprintLookupFast
+  );
+
+  /**
    * One blueprint file waiting to be reloaded, linked into
    * `RRuleGameRulesImpl::mPendingBlueprintReloads`. Retiring one is a plain
    * `delete` (0x0052A742..0x0052A77A: the path's destructor, then the unlink).
@@ -311,7 +323,10 @@ namespace moho
       // Exact: `resId.name` already is the map's `key_type` (msvc8::string), so
       // finding with it runs the same `std::less<msvc8::string>` compares as the
       // former byte-identical temporary copy - without allocating one.
-      if (const auto found = map.find(resId.name); found != map.end()) {
+      // Engine change (sim_BlueprintLookupFast); off, the binary's temporary copy is searched.
+      const bool fastLookup = sim_BlueprintLookupFast;
+      if (const auto found = fastLookup ? map.find(resId.name) : map.find(msvc8::string(resId.name.view()));
+          found != map.end()) {
         return static_cast<TBlueprint*>(found->second);
       }
 
@@ -323,7 +338,7 @@ namespace moho
       const bool normalizationChangesName = std::ranges::any_of(name, [](const char ch) noexcept {
         return (ch >= 'A' && ch <= 'Z') || ch == '\\';
       });
-      if (!normalizationChangesName) {
+      if (fastLookup && !normalizationChangesName) {
         return nullptr;
       }
 

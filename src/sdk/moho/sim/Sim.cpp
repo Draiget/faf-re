@@ -1,5 +1,7 @@
 #include "Sim.h"
 #include "legacy/math/X87Math.h"
+#include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "SimDriver.h"
@@ -5832,7 +5834,33 @@ namespace
   // kAllUnitsMidFamilyBoundaryKey / kAllUnitsShieldFamilyBoundaryKey pair).
   constexpr std::uint32_t kReconBlipFamilyBeginId = 0x30000000u;
   constexpr std::uint32_t kReconBlipFamilyEndId = 0x40000000u;
+} // namespace
 
+namespace moho
+{
+  /// Engine addition: switch for MD5UpdateBatch (batched checksum updates). Live; same digests.
+  bool sim_ChecksumBatching = true;
+  TConVar<bool> gTConVar_sim_ChecksumBatching(
+    "sim_ChecksumBatching",
+    "Feed each entity's checksum bytes to MD5 in one run instead of field by field (same digests).",
+    &sim_ChecksumBatching
+  );
+
+  TConVar<bool> gTConVar_sim_MD5Unrolled(
+    "sim_MD5Unrolled",
+    "Run MD5 blocks unrolled instead of as the table-driven loop (same digests).",
+    &gpg::md5_UnrolledBlocks
+  );
+
+  TConVar<bool> gTConVar_mem_SmallBlockIndexTable(
+    "mem_SmallBlockIndexTable",
+    "x86 allocator: find a block's size class by table instead of a binary search (same class).",
+    &gpg::mem_SmallBlockIndexTable
+  );
+} // namespace moho
+
+namespace
+{
   /**
    * What it does:
    * Collects consecutive checksum byte spans bound for one `gpg::MD5Context`
@@ -5861,6 +5889,11 @@ namespace
 
     void Update(const void* const data, const std::size_t size)
     {
+      if (!sim_ChecksumBatching) {
+        Flush();
+        mContext.Update(data, size);
+        return;
+      }
       if (size > mBytes.size() - mUsed) {
         Flush();
         if (size > mBytes.size()) {

@@ -20,6 +20,9 @@ namespace moho
 {
   struct VMatrix4;
 
+  /// Engine addition: VTransform copies as inline byte copies (true) or the Wm3 assignments. Live.
+  extern bool mem_InlineTransformCopy;
+
   class VTransform
   {
   public:
@@ -37,8 +40,13 @@ namespace moho
     /// Byte copies of both lanes (`Wm3::System::Memcpy` copies bytes too, so NaN payloads survive).
     void CopyLanesFrom(const VTransform& rhs) noexcept
     {
-      std::memcpy(&orient_, &rhs.orient_, sizeof(orient_));
-      std::memcpy(&pos_, &rhs.pos_, sizeof(pos_));
+      if (mem_InlineTransformCopy) {
+        std::memcpy(&orient_, &rhs.orient_, sizeof(orient_));
+        std::memcpy(&pos_, &rhs.pos_, sizeof(pos_));
+      } else {
+        orient_ = rhs.orient_; // the binary's Wm3 assignments
+        pos_ = rhs.pos_;
+      }
     }
 
     /**

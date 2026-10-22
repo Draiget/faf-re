@@ -1,4 +1,5 @@
 #include "CIntelGrid.h"
+#include "moho/console/CConCommand.h"
 
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,17 @@
 #include "moho/sim/STIMapReflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
+
+namespace moho
+{
+  /// Engine addition: CIntelGrid::Raster's row-major pass (same grid); off runs the binary's column loop. Live.
+  bool sim_IntelRasterRows = true;
+  TConVar<bool> gTConVar_sim_IntelRasterRows(
+    "sim_IntelRasterRows",
+    "Raster intel circles row by row instead of column by column (same grid).",
+    &sim_IntelRasterRows
+  );
+} // namespace moho
 
 namespace
 {
@@ -530,7 +542,7 @@ namespace moho
     constexpr std::int32_t kRowMajorMaxRadius = 1 << 15;
     constexpr std::int32_t kRowMajorMaxCenter = 1 << 24;
     const std::int32_t columnCount = xMax - x;
-    if (columnCount <= kRowMajorMaxColumns && radius >= 0 && radius <= kRowMajorMaxRadius &&
+    if (sim_IntelRasterRows && columnCount <= kRowMajorMaxColumns && radius >= 0 && radius <= kRowMajorMaxRadius &&
         gridPos.z >= -kRowMajorMaxCenter && gridPos.z <= kRowMajorMaxCenter) {
       std::int32_t zBegin[kRowMajorMaxColumns];
       std::int32_t zEnd[kRowMajorMaxColumns];

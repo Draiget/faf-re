@@ -479,6 +479,21 @@ namespace
     return 0x3FFFFFFFU;
   }
 
+} // namespace
+
+namespace moho
+{
+  /// Engine addition: switch for AddWorldParticle's cached-bucket shortcut (ParticleMatchesBucketKey). Live.
+  bool ren_ParticleKeyShortcut = true;
+  TConVar<bool> gTConVar_ren_ParticleKeyShortcut(
+    "ren_ParticleKeyShortcut",
+    "Reuse the cached particle bucket when the particle's key would match, without building the key (same buckets).",
+    &ren_ParticleKeyShortcut
+  );
+} // namespace moho
+
+namespace
+{
   /// Engine addition: whether `texture`'s already resolved resource is the handle `keyHandle` holds
   /// (the raw pointer `AreParticleBucketKeysEquivalent` compares). An unresolved texture is never a
   /// match, because building the key resolves it.
@@ -1087,7 +1102,7 @@ namespace moho
 
     // Engine addition: the cached bucket's key matches without building a new key (see
     // ParticleMatchesBucketKey); the path below would land in the same bucket.
-    if (static_cast<std::int32_t>(particle.mBlendMode) != 5 && mCachedParticleBucket != nullptr &&
+    if (ren_ParticleKeyShortcut && static_cast<std::int32_t>(particle.mBlendMode) != 5 && mCachedParticleBucket != nullptr &&
         ParticleMatchesBucketKey(mParticleBucketLookupKey, particle)) {
       mCachedParticleBucket->pendingParticles.push_back(particle);
       return;

@@ -257,6 +257,10 @@ namespace gpg
    */
   unsigned int Hash(const std::string& dat, unsigned int salt);
 
+  /// Engine addition: `MD5Context::ProcessBlock` runs unrolled (true) or as the table-driven loop.
+  /// Same digest either way; the `sim_MD5Unrolled` console variable (registered in Sim.cpp).
+  extern bool md5_UnrolledBlocks;
+
   // --- Layout checks (x86/MSVC8 expectations) ---
   static_assert(sizeof(MD5Digest) == 16, "MD5Digest must be 16 bytes");
   static_assert(offsetof(MD5Block, size) == 56, "MD5Block.size must be at +56");

@@ -1,5 +1,7 @@
 #include "VTransform.h"
 
+#include "moho/console/CConCommand.h"
+
 #include <cmath>
 #include <cstdlib>
 #include <cstdint>
@@ -133,6 +135,13 @@ namespace moho
 
   // VTransform's copy constructor (0x0046FC90) and copy assignment (0x00470B60) are inline in
   // VTransform.h.
+
+  bool mem_InlineTransformCopy = true;
+  TConVar<bool> gTConVar_mem_InlineTransformCopy(
+    "mem_InlineTransformCopy",
+    "Copy transforms with inline byte copies instead of Wm3's out-of-line memcpy_s (same bytes).",
+    &mem_InlineTransformCopy
+  );
 
   /**
    * Address: 0x004F04D0 (FUN_004F04D0, ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ)
