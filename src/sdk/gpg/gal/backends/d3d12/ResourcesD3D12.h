@@ -10,6 +10,7 @@
 #include <wrl/client.h>
 
 #include "D3D12Core.h"
+#include "gpg/gal/backends/common/LockShadow.h"
 #include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 #include "gpg/gal/DepthStencilTarget.hpp"
@@ -169,7 +170,7 @@ namespace gpg::gal
     const char* mKind = nullptr;
     bool mDynamic = false;
     D3D12_RESOURCE_STATES mReadState = D3D12_RESOURCE_STATE_GENERIC_READ;
-    std::vector<std::uint8_t> mShadow;
+    backend::LockShadow mShadow;
     d3d12::TrackedResource mResource;    // static buffers
     D3D12_GPU_VIRTUAL_ADDRESS mChunk = 0; // dynamic buffers: the current copy in upload memory
     std::uint8_t* mChunkCpu = nullptr;

@@ -549,6 +549,9 @@
     <ClCompile Include="gpg\gal\backends\common\ImageCodec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\gal\backends\common\LockShadow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\gal\backends\common\RuntimeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -562,6 +565,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\gal\backends\d3d12\DeviceD3D12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\d3d12\GpuDrivenD3D12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\gal\effects\SpirvReflect.cpp">
@@ -580,6 +586,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\gal\backends\vulkan\DeviceVulkan.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\gal\backends\vulkan\GpuDrivenVulkan.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\gal\backends\dxgi\DxgiFactory.cpp">
@@ -3579,6 +3588,9 @@
     <ClInclude Include="gpg\gal\backends\common\ImageCodec.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gpg\gal\backends\common\LockShadow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="gpg\gal\backends\common\RuntimeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3592,6 +3604,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\d3d12\DeviceD3D12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\gal\backends\d3d12\GpuDrivenD3D12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\effects\SpirvReflect.h">
@@ -3610,6 +3625,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\vulkan\DeviceVulkan.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\gal\backends\vulkan\GpuDrivenVulkan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\backends\d3d11\D3D11Common.h">

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "VulkanCore.h"
+#include "gpg/gal/backends/common/LockShadow.h"
 #include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 #include "gpg/gal/DepthStencilTarget.hpp"
@@ -142,7 +143,7 @@ namespace gpg::gal
     std::uint32_t mByteWidth = 0;
     const char* mKind = nullptr;
     bool mDynamic = false;
-    std::vector<std::uint8_t> mShadow;
+    backend::LockShadow mShadow;
     vulkan::TrackedBuffer mBuffer; // static buffers
     VkBuffer mChunkBuffer = VK_NULL_HANDLE;
     VkDeviceSize mChunkOffset = 0;

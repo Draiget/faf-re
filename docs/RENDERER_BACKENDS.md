@@ -162,6 +162,25 @@ newer backends:
 - Vertex-shader inputs that a vertex format lacks read as zero.
 - A pass that samples the target it draws into reads zero, as on D3D10/11.
 
+## GPU-driven paths
+
+The engine's GPU-driven renderers (strategic icons with GPU classification,
+fog of war, instance streams) use the small binding model in
+`gpg/gal/GpuDriven.h`: one constant block, four read buffers, two textures,
+two write buffers and one sampler. Every newer backend implements all of it
+(`Device::GetGpuDrivenFeatures` reports vertex pulling, compute, indirect
+draws and timestamps):
+
+| | Programs | Binding |
+|---|---|---|
+| Direct3D 11 | d3dcompiler `vs/ps/cs_5_0` | registers b0, t0..t5, u0..u1, s0 directly |
+| Direct3D 12 | DXC `vs/ps/cs_6_0` (`ShaderCompiler::CompileRaw`) | one root signature per sampler kind: root CBV b0, SRV table t0..t5, UAV table u0..u1, static sampler s0; `ExecuteIndirect` for indirect draws (`d3d12/GpuDrivenD3D12.cpp`) |
+| Vulkan | DXC SPIR-V with `-fvk-b-shift 0 -fvk-t-shift 1 -fvk-u-shift 7 -fvk-s-shift 9` | one descriptor set, bindings 0..9; `vkCmdDrawIndirect`; compute outside the rendering scope (`vulkan/GpuDrivenVulkan.cpp`) |
+
+GPU timestamps feed `RenderProfiler` (`FAF_GPU_PROFILE=<frames>`).
+`FAF_ICON_GPU_CHECK=<n>` compares every n-th GPU-classified icon frame with the
+CPU path, record by record.
+
 ## Toolchain setup
 
 All three live under `dependencies/`, which is git-ignored. Fetch them once

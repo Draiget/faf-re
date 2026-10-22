@@ -69,6 +69,15 @@ namespace gpg::gal::effects
       std::string_view hlsl, const ShaderEntry& entry, ShaderTarget target, const std::vector<std::wstring>& extraArguments = {}
     ) const;
 
+    /**
+     * Compiles entry `entryName` of engine-owned HLSL (not an effect) as
+     * `profile` ("vs_6_0", "cs_6_0" ...) with only `extraArguments` added:
+     * the GPU-driven programs, which bring their own register layout.
+     */
+    [[nodiscard]] CompiledShader CompileRaw(
+      std::string_view hlsl, std::string_view entryName, const wchar_t* profile, const std::vector<std::wstring>& extraArguments
+    ) const;
+
     /** The input signature of a DXIL shader (empty when it cannot be read). */
     [[nodiscard]] std::vector<ShaderInput> ReflectInputs(const std::vector<std::uint8_t>& dxil) const;
 
@@ -78,6 +87,8 @@ namespace gpg::gal::effects
   private:
     ShaderCompiler();
     ~ShaderCompiler();
+
+    [[nodiscard]] CompiledShader Run(std::string_view hlsl, const std::vector<std::wstring>& arguments) const;
 
     struct Library;
     Library* mLibrary = nullptr;

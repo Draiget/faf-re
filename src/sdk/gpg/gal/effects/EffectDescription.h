@@ -136,6 +136,19 @@ namespace gpg::gal::effects
     std::uint8_t stencilWriteMask = 0xFF;
     StencilFaceDesc front;
     StencilFaceDesc back;
+
+    /** Every field packed into 56 bits (ops and funcs are 1..10 in D3D's numbering): a cache key. */
+    [[nodiscard]] std::uint64_t PackedKey() const noexcept
+    {
+      const auto face = [](const StencilFaceDesc& desc) {
+        return static_cast<std::uint64_t>(desc.failOp & 0x0FU) | (static_cast<std::uint64_t>(desc.depthFailOp & 0x0FU) << 4U) |
+               (static_cast<std::uint64_t>(desc.passOp & 0x0FU) << 8U) | (static_cast<std::uint64_t>(desc.func & 0x0FU) << 12U);
+      };
+      return static_cast<std::uint64_t>(depthEnable ? 1U : 0U) | (static_cast<std::uint64_t>(depthWrite ? 1U : 0U) << 1U) |
+             (static_cast<std::uint64_t>(depthFunc & 0x0FU) << 2U) | (static_cast<std::uint64_t>(stencilEnable ? 1U : 0U) << 6U) |
+             (static_cast<std::uint64_t>(stencilReadMask) << 8U) | (static_cast<std::uint64_t>(stencilWriteMask) << 16U) |
+             (face(front) << 24U) | (face(back) << 40U);
+    }
   };
 
   struct RasterizerDesc

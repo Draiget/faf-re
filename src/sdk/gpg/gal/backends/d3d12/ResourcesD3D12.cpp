@@ -304,7 +304,7 @@ namespace gpg::gal
     , mDynamic(dynamic)
     , mReadState(readState)
   {
-    mShadow.assign(mByteWidth, 0U);
+    mShadow.Reset(mByteWidth);
     if (mDynamic) {
       return;
     }
@@ -345,7 +345,7 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
-    return mShadow.data() + offset;
+    return mShadow.Map(offset, size, mKind);
   }
 
   void BufferStorageD3D12::Unlock()
@@ -354,6 +354,7 @@ namespace gpg::gal
       ThrowError(mKind, __LINE__, "buffer lock/unlock mismatch");
     }
     mLocked = false;
+    mShadow.CheckGuard(mKind);
     if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly) || mLockSize == 0U) {
       return;
     }

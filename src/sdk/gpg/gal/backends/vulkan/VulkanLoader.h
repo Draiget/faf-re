@@ -119,7 +119,15 @@
   X(vkCmdCopyBufferToImage)           \
   X(vkCmdCopyImageToBuffer)           \
   X(vkCmdCopyImage)                   \
-  X(vkCmdBlitImage)
+  X(vkCmdBlitImage)                   \
+  X(vkCreateComputePipelines)         \
+  X(vkCmdDispatch)                    \
+  X(vkCmdDrawIndirect)                \
+  X(vkCreateQueryPool)                \
+  X(vkDestroyQueryPool)               \
+  X(vkCmdResetQueryPool)              \
+  X(vkCmdWriteTimestamp2)             \
+  X(vkGetQueryPoolResults)
 
 namespace gpg::gal::vulkan
 {

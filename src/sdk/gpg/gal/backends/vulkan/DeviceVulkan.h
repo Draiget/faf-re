@@ -29,6 +29,7 @@
 
 #include "ResourcesVulkan.h"
 #include "VulkanCore.h"
+#include "GpuDrivenVulkan.h"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
@@ -123,6 +124,19 @@ namespace gpg::gal
     void EndTechnique() override;
     bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
 
+    // GPU-driven additions (GpuDrivenVulkan.cpp)
+    [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
+    boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
+    void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
+    boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
+    void DrawGpuProgram(const GpuDrawCall& call) override;
+    void DispatchGpuProgram(const GpuDispatch& dispatch) override;
+    void BeginProfileRegion(std::uint32_t region) override;
+    void EndProfileRegion(std::uint32_t region) override;
+    bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    /** Destroys a GPU program's modules and pipelines once the GPU is done with them. */
+    void RetireProgram(GpuProgramVulkan& program);
+
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
     void UnbindPass() override;
@@ -196,6 +210,8 @@ namespace gpg::gal
       std::vector<VkDescriptorPool> descriptorPools;
       std::uint32_t descriptorPool = 0;
       std::vector<VkSemaphore> acquire; // one per swap chain
+      std::vector<VkDescriptorPool> gpuPools; // GPU-driven sets (GpuDrivenVulkan.cpp)
+      std::uint32_t gpuPool = 0;
     };
 
     struct Garbage
@@ -244,6 +260,18 @@ namespace gpg::gal
     [[nodiscard]] VkImageView TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
     void Trace(const char* format, ...);
     void DumpBackBufferIfDue();
+    // ---- GPU-driven programs (GpuDrivenVulkan.cpp) ------------------------------
+    void CreateGpuDrivenObjects();
+    void ReleaseGpuDrivenObjects() noexcept;
+    /** Writes one descriptor set (b0 uploaded, t0..t5, u0..u1, s0) for a GPU-driven call. */
+    [[nodiscard]] VkDescriptorSet PrepareGpuBindings(const GpuBindings& bindings, GpuSampler sampler, bool compute);
+    [[nodiscard]] VkPipeline GpuPipelineFor(GpuProgramVulkan& program);
+    /** A full memory barrier: what the GPU-driven call wrote is visible to everything after it. */
+    void GpuWriteBarrier();
+    /** Closes the frame's timestamps (before the frame's last submission) and collects finished frames. */
+    void EndProfileFrame();
+    void CollectProfileFrames();
+
     void CopyImage(vulkan::TrackedImage& source, vulkan::TrackedImage& destination, const RECT* sourceRect, const RECT* destinationRect, bool scale);
 
     // ---- core objects --------------------------------------------------------
@@ -320,6 +348,34 @@ namespace gpg::gal
     std::uint32_t mRenderingWidth = 0;
     std::uint32_t mRenderingHeight = 0;
     bool mViewportDirty = true;
+
+    // ---- GPU-driven programs -------------------------------------------------
+    std::uint32_t mGpuFeatures = 0U;
+    VkDescriptorSetLayout mGpuSetLayout = VK_NULL_HANDLE;
+    VkPipelineLayout mGpuPipelineLayout = VK_NULL_HANDLE;
+    VkSampler mGpuSamplers[3]{}; // by GpuSampler
+    vulkan::TrackedBuffer mGpuNullBuffer; // unbound t0..t3 and u0..u1
+
+    struct TimedRegion
+    {
+      std::uint32_t region = 0U;
+      std::uint32_t pair = 0U;
+    };
+    struct ProfileFrame
+    {
+      std::vector<TimedRegion> regions;
+      std::uint32_t usedPairs = 0U; // pair 0 is the frame itself
+      std::uint64_t serial = 0U;
+      bool open = false;
+      bool pending = false;
+    };
+    static constexpr std::uint32_t kProfileFrames = 4U;
+    static constexpr std::uint32_t kMaxTimedRegionsPerFrame = 160U;
+    VkQueryPool mTimestampPool = VK_NULL_HANDLE;
+    double mTimestampToMilliseconds = 0.0;
+    ProfileFrame mProfileFrames[kProfileFrames];
+    std::uint32_t mProfileFrame = 0U;
+    std::vector<std::uint32_t> mOpenRegions;
 
     // ---- diagnostics ---------------------------------------------------------
     std::uint32_t mFrameNumber = 0;

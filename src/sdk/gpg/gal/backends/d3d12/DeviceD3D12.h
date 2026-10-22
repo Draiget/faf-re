@@ -31,6 +31,7 @@
 #include <wrl/client.h>
 
 #include "D3D12Core.h"
+#include "GpuDrivenD3D12.h"
 #include "ResourcesD3D12.h"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
@@ -127,6 +128,17 @@ namespace gpg::gal
     void EndTechnique() override;
     bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
 
+    // GPU-driven additions (GpuDrivenD3D12.cpp)
+    [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
+    boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
+    void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
+    boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
+    void DrawGpuProgram(const GpuDrawCall& call) override;
+    void DispatchGpuProgram(const GpuDispatch& dispatch) override;
+    void BeginProfileRegion(std::uint32_t region) override;
+    void EndProfileRegion(std::uint32_t region) override;
+    bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
     void UnbindPass() override;
@@ -211,7 +223,24 @@ namespace gpg::gal
     void ResetState();
     void Trace(const char* format, ...);
     void LogDebugMessages();
+    /** CheckHresult, logging the device-removed reason and breadcrumbs first when the device is gone. */
+    void CheckDeviceHresult(int line, HRESULT result, const char* during);
+    /** Logs why the device was removed, its debug messages and DRED breadcrumbs / page fault (once). */
+    void ReportDeviceRemoved(const char* during);
     void DumpBackBufferIfDue();
+
+    // ---- GPU-driven programs (GpuDrivenD3D12.cpp) ------------------------------
+    void CreateGpuDrivenObjects();
+    void ReleaseGpuDrivenObjects() noexcept;
+    /** Uploads b0 and fills the SRV and UAV tables of one GPU-driven call. */
+    void PrepareGpuBindings(
+      const GpuBindings& bindings, bool compute, D3D12_GPU_VIRTUAL_ADDRESS& constants, D3D12_GPU_DESCRIPTOR_HANDLE& readTable,
+      D3D12_GPU_DESCRIPTOR_HANDLE& writeTable
+    );
+    [[nodiscard]] ID3D12PipelineState* GpuPipelineFor(GpuProgramD3D12& program);
+    /** Closes the frame's timestamps (before Present) and collects finished frames. */
+    void EndProfileFrame();
+    void CollectProfileFrames();
 
     void BlitTexture(
       D3D12_CPU_DESCRIPTOR_HANDLE source,
@@ -308,10 +337,41 @@ namespace gpg::gal
     D3D12_CPU_DESCRIPTOR_HANDLE mBoundDepthStencil{};
     bool mTargetsDirty = true;
 
+    // ---- GPU-driven programs -------------------------------------------------
+    std::uint32_t mGpuFeatures = 0U;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> mGpuRootSignatures[3]; // by GpuSampler
+    Microsoft::WRL::ComPtr<ID3D12CommandSignature> mDrawIndirectSignature;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mGpuNullHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE mNullBufferView{}; // unbound t0..t3
+    D3D12_CPU_DESCRIPTOR_HANDLE mNullWriteView{};  // unbound u0..u1
+
+    struct TimedRegion
+    {
+      std::uint32_t region = 0U;
+      std::uint32_t pair = 0U;
+    };
+    struct ProfileFrame
+    {
+      std::vector<TimedRegion> regions;
+      std::uint32_t usedPairs = 0U; // pair 0 is the frame itself
+      std::uint64_t serial = 0U;    // the submission that resolved it
+      bool open = false;
+      bool pending = false;
+    };
+    static constexpr std::uint32_t kProfileFrames = 4U;
+    static constexpr std::uint32_t kMaxTimedRegionsPerFrame = 160U;
+    Microsoft::WRL::ComPtr<ID3D12QueryHeap> mTimestampHeap;
+    Microsoft::WRL::ComPtr<ID3D12Resource> mTimestampReadback;
+    double mTimestampToMilliseconds = 0.0;
+    ProfileFrame mProfileFrames[kProfileFrames];
+    std::uint32_t mProfileFrame = 0U;
+    std::vector<std::uint32_t> mOpenRegions; // indices into the current frame's regions
+
     // ---- diagnostics ---------------------------------------------------------
     std::uint32_t mFrameNumber = 0;
     bool mTracing = false;
     std::set<int> mLoggedMessages;
+    bool mRemovalReported = false;
     DWORD mFirstDumpTick = 0;
     DWORD mLastDumpTick = 0;
     std::uint32_t mSkippedDraws = 0;

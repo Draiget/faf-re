@@ -174,7 +174,26 @@ namespace gpg::gal::effects
       }
     }
     arguments.insert(arguments.end(), extraArguments.begin(), extraArguments.end());
+    return Run(hlsl, arguments);
+  }
 
+  CompiledShader ShaderCompiler::CompileRaw(
+    const std::string_view hlsl, const std::string_view entryName, const wchar_t* const profile, const std::vector<std::wstring>& extraArguments
+  ) const
+  {
+    if (mLibrary == nullptr) {
+      CompiledShader result;
+      result.messages = mLoadError;
+      return result;
+    }
+    std::vector<std::wstring> arguments{L"-E", Widen(entryName), L"-T", profile, L"-O3"};
+    arguments.insert(arguments.end(), extraArguments.begin(), extraArguments.end());
+    return Run(hlsl, arguments);
+  }
+
+  CompiledShader ShaderCompiler::Run(const std::string_view hlsl, const std::vector<std::wstring>& arguments) const
+  {
+    CompiledShader result;
     std::vector<LPCWSTR> argumentPointers;
     argumentPointers.reserve(arguments.size());
     for (const std::wstring& argument : arguments) {

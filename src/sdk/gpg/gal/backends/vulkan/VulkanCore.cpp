@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 
 namespace gpg::gal::vulkan
@@ -58,6 +59,10 @@ namespace gpg::gal::vulkan
     }
     char message[128]{};
     std::snprintf(message, sizeof(message), "%s (%d)", ResultName(result), static_cast<int>(result));
+    if (result == VK_ERROR_DEVICE_LOST || result == VK_ERROR_OUT_OF_DEVICE_MEMORY || result == VK_ERROR_OUT_OF_HOST_MEMORY) {
+      // Logged here, before the throw: whatever catches it may not get to write anything.
+      gpg::Warnf("Vulkan: %s at %s(%d)", message, (file != nullptr) ? file : "?", line);
+    }
     backend::ThrowError(file, line, message);
   }
 

@@ -267,6 +267,7 @@ namespace gpg::gal
     if (mDevice != VK_NULL_HANDLE) {
       Vk().vkDeviceWaitIdle(mDevice);
     }
+    ReleaseGpuDrivenObjects();
     outputContext_ = OutputContext();
     mHeadOutputContexts.clear();
     mPass = BoundPass{};
@@ -940,6 +941,7 @@ namespace gpg::gal
     BeginCommandBuffer();
     CreateLayouts();
     CreateNullImages();
+    CreateGpuDrivenObjects();
     CreateSwapChains(*context);
     AcquireNextImages();
 
@@ -1006,7 +1008,7 @@ namespace gpg::gal
       out.swapChain = text;
     }
     out.vsync = mDeviceContext.mVSync;
-    out.gpuDrivenFeatures = 0U; // none until the GpuDriven paths land
+    out.gpuDrivenFeatures = GetGpuDrivenFeatures();
     return true;
   }
 
@@ -2043,6 +2045,7 @@ namespace gpg::gal
                    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
       }
     }
+    EndProfileFrame();
     Submit(false, true);
 
     for (std::size_t index = 0U; index < mSwapChains.size(); ++index) {
@@ -2080,6 +2083,10 @@ namespace gpg::gal
       Vk().vkResetDescriptorPool(mDevice, pool, 0U);
     }
     frame.descriptorPool = 0U;
+    for (VkDescriptorPool pool : frame.gpuPools) {
+      Vk().vkResetDescriptorPool(mDevice, pool, 0U);
+    }
+    frame.gpuPool = 0U;
     AcquireNextImages();
     BeginCommandBuffer();
     if (mSkippedDraws != 0U) {

@@ -23,6 +23,7 @@
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
@@ -343,6 +344,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       frame.allocator.Reset();
       frame.views.Release();
     }
+    ReleaseGpuDrivenObjects();
     mRootSignature.Reset();
     mList.Reset();
     mQueue.Reset();
@@ -368,6 +370,18 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         debug->EnableDebugLayer();
       } else {
         gpg::Warnf("D3D12: the debug layer is not installed");
+      }
+    }
+    // Device Removed Extended Data: breadcrumbs of the GPU's progress through
+    // each command list and the allocation a page fault hit, read back by
+    // ReportDeviceRemoved. Costs a few percent, so on with the debug layer or
+    // /d3d12dred only.
+    if ((debugLayer || CommandLineHas("/d3d12dred")) && mLibrary.getDebugInterface != nullptr) {
+      ComPtr<ID3D12DeviceRemovedExtendedDataSettings> dred;
+      if (SUCCEEDED(mLibrary.getDebugInterface(IID_PPV_ARGS(&dred)))) {
+        dred->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        dred->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        gpg::Logf("D3D12: device removed extended data on");
       }
     }
     CheckHresult(
@@ -684,6 +698,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     BeginRecording();
     CreateSwapChains(*context);
     CreateBuiltInPipelines();
+    CreateGpuDrivenObjects();
 
     std::fill(std::begin(mStreamFrequencies), std::end(mStreamFrequencies), 0);
     mPipelineState.reset(new PipelineStateD3D12());
@@ -777,7 +792,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       out.swapChain = text;
     }
     out.vsync = mDeviceContext.mVSync;
-    out.gpuDrivenFeatures = 0U; // none until the GpuDriven paths land
+    out.gpuDrivenFeatures = GetGpuDrivenFeatures();
     return true;
   }
 
@@ -810,14 +825,70 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mFrameStateDirty = true;
   }
 
+  void DeviceD3D12::CheckDeviceHresult(const int line, const HRESULT result, const char* const during)
+  {
+    if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET || result == DXGI_ERROR_DEVICE_HUNG) {
+      ReportDeviceRemoved(during);
+    }
+    CheckHresult("DeviceD3D12.cpp", line, result);
+  }
+
+  void DeviceD3D12::ReportDeviceRemoved(const char* const during)
+  {
+    if (mRemovalReported || mDevice == nullptr) {
+      return;
+    }
+    mRemovalReported = true;
+    const HRESULT reason = mDevice->GetDeviceRemovedReason();
+    gpg::Warnf(
+      "D3D12: device removed during %s, frame %u: reason 0x%08lX (%s)", during, mFrameNumber,
+      static_cast<unsigned long>(reason), ::gpg::D3DErrorToString(static_cast<long>(reason))
+    );
+    LogDebugMessages();
+
+    ComPtr<ID3D12DeviceRemovedExtendedData> dred;
+    if (FAILED(mDevice.As(&dred))) {
+      gpg::Warnf("D3D12: no breadcrumbs - run with /d3d12dred (or /d3d12debug) to record them");
+      return;
+    }
+    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT crumbs{};
+    if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput(&crumbs))) {
+      for (const D3D12_AUTO_BREADCRUMB_NODE* node = crumbs.pHeadAutoBreadcrumbNode; node != nullptr; node = node->pNext) {
+        const UINT32 completed = (node->pLastBreadcrumbValue != nullptr) ? *node->pLastBreadcrumbValue : 0U;
+        if (completed >= node->BreadcrumbCount) {
+          continue; // the GPU finished this list
+        }
+        gpg::Warnf("D3D12 breadcrumbs: a command list stopped after %u of %u operations", completed, node->BreadcrumbCount);
+        const UINT32 first = (completed > 12U) ? completed - 12U : 0U;
+        const UINT32 last = std::min(node->BreadcrumbCount, completed + 4U);
+        for (UINT32 index = first; index < last; ++index) {
+          gpg::Warnf(
+            "  %s #%u: operation %d", (index < completed) ? "done   " : ((index == completed) ? "STOPPED" : "pending"), index,
+            static_cast<int>(node->pCommandHistory[index])
+          );
+        }
+      }
+    }
+    D3D12_DRED_PAGE_FAULT_OUTPUT fault{};
+    if (SUCCEEDED(dred->GetPageFaultAllocationOutput(&fault)) && fault.PageFaultVA != 0U) {
+      gpg::Warnf("D3D12 page fault at GPU address 0x%016llX", static_cast<unsigned long long>(fault.PageFaultVA));
+      for (const D3D12_DRED_ALLOCATION_NODE* node = fault.pHeadExistingAllocationNode; node != nullptr; node = node->pNext) {
+        gpg::Warnf("  live allocation there: %s (type %d)", (node->ObjectNameA != nullptr) ? node->ObjectNameA : "unnamed", static_cast<int>(node->AllocationType));
+      }
+      for (const D3D12_DRED_ALLOCATION_NODE* node = fault.pHeadRecentFreedAllocationNode; node != nullptr; node = node->pNext) {
+        gpg::Warnf("  recently freed there: %s (type %d)", (node->ObjectNameA != nullptr) ? node->ObjectNameA : "unnamed", static_cast<int>(node->AllocationType));
+      }
+    }
+  }
+
   void DeviceD3D12::Submit(const bool wait)
   {
     FlushBarriers();
-    CheckHresult("DeviceD3D12.cpp", __LINE__, mList->Close());
+    CheckDeviceHresult(__LINE__, mList->Close(), "command list close");
     ID3D12CommandList* const lists[1] = {mList.Get()};
     mQueue->ExecuteCommandLists(1U, lists);
     const std::uint64_t serial = ++mSubmittedSerial;
-    CheckHresult("DeviceD3D12.cpp", __LINE__, mQueue->Signal(mFence.Get(), serial));
+    CheckDeviceHresult(__LINE__, mQueue->Signal(mFence.Get(), serial), "queue signal");
     mFrames[mFrameIndex].serial = serial;
     if (wait) {
       WaitForSerial(serial);
@@ -834,8 +905,23 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (serial == 0U || mFence->GetCompletedValue() >= serial) {
       return;
     }
-    CheckHresult("DeviceD3D12.cpp", __LINE__, mFence->SetEventOnCompletion(serial, mFenceEvent));
-    ::WaitForSingleObject(mFenceEvent, INFINITE);
+    CheckDeviceHresult(__LINE__, mFence->SetEventOnCompletion(serial, mFenceEvent), "fence wait");
+    // A removed device signals every fence (the completed value reads as
+    // UINT64_MAX), so this never hangs; a GPU that stops making progress
+    // without being removed is reported every 10 seconds instead of hanging
+    // the game silently.
+    while (::WaitForSingleObject(mFenceEvent, 10000U) == WAIT_TIMEOUT) {
+      const HRESULT reason = mDevice->GetDeviceRemovedReason();
+      gpg::Warnf(
+        "D3D12: still waiting for the GPU after 10 s (fence at %llu, waiting for %llu, device 0x%08lX)",
+        static_cast<unsigned long long>(mFence->GetCompletedValue()), static_cast<unsigned long long>(serial),
+        static_cast<unsigned long>(reason)
+      );
+      if (FAILED(reason)) {
+        ReportDeviceRemoved("fence wait");
+        backend::ThrowHresult("DeviceD3D12.cpp", __LINE__, reason);
+      }
+    }
   }
 
   void DeviceD3D12::CollectCompleted()
@@ -1893,26 +1979,21 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     DumpBackBufferIfDue();
     LogDebugMessages();
 
+    EndProfileFrame();
     for (OutputContext& output : mHeadOutputContexts) {
       Transition(static_cast<RenderTargetD3D12*>(output.surface.get())->Current().resource, D3D12_RESOURCE_STATE_PRESENT);
     }
     FlushBarriers();
-    CheckHresult("DeviceD3D12.cpp", __LINE__, mList->Close());
+    CheckDeviceHresult(__LINE__, mList->Close(), "command list close");
     ID3D12CommandList* const lists[1] = {mList.Get()};
     mQueue->ExecuteCommandLists(1U, lists);
 
     const bool vsync = mDeviceContext.mVSync;
     for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
-      const HRESULT result = swapChain->Present(vsync);
-      if (FAILED(result)) {
-        if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET) {
-          gpg::Warnf("D3D12: device removed (reason 0x%08lX)", static_cast<unsigned long>(mDevice->GetDeviceRemovedReason()));
-        }
-        backend::ThrowHresult("DeviceD3D12.cpp", __LINE__, result);
-      }
+      CheckDeviceHresult(__LINE__, swapChain->Present(vsync), "present");
     }
     const std::uint64_t serial = ++mSubmittedSerial;
-    CheckHresult("DeviceD3D12.cpp", __LINE__, mQueue->Signal(mFence.Get(), serial));
+    CheckDeviceHresult(__LINE__, mQueue->Signal(mFence.Get(), serial), "queue signal");
     mFrames[mFrameIndex].serial = serial;
 
     // The next frame slot: wait for the GPU to finish what it last recorded.
