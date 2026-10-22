@@ -216,7 +216,8 @@ namespace gpg::gal
     }
 
     mGpuNullBuffer = CreateDeviceBuffer(kNullBufferBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw;
+    // CopyVertexBufferRegion is vkCmdCopyBuffer between transfer barriers.
+    mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw | kGpuFeatureBufferCopy;
 
     // Timestamps, when the queue supports them in graphics and compute work.
     if (mProperties.limits.timestampComputeAndGraphics == VK_TRUE && mProperties.limits.timestampPeriod > 0.0f) {
@@ -306,6 +307,18 @@ namespace gpg::gal
   std::uint32_t DeviceVulkan::GetGpuDrivenFeatures() const
   {
     return mGpuFeatures;
+  }
+
+  std::uint32_t DeviceVulkan::GetGpuDrivenVerified() const
+  {
+    // Each passed its parity checks on Vulkan (docs/RENDERER_BACKENDS.md, GPU-driven paths):
+    // FAF_ICON_GPU_CHECK readback with selection changes (also under synchronization validation,
+    // 0 differ), a paused same-process A/B against the path off (world, brackets, icons and minimap
+    // pixel-identical) and the hovered-unit states against Direct3D 11, the last once CompactIconsCS
+    // stopped racing the hovered record; projectile icons by a paused A/B of the 2k air fight at
+    // zooms 160 and 400 (pixel-identical at 400, only UI at 160). Not kGpuPathParticleBatch: the
+    // paused A/B still shows extra particle specks with it on, as on Direct3D 11.
+    return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceVulkan::CreateGpuBuffer(const GpuBufferDesc& desc)

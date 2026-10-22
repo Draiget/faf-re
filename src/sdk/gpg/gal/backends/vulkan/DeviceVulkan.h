@@ -126,6 +126,7 @@ namespace gpg::gal
 
     // GPU-driven additions (GpuDrivenVulkan.cpp)
     [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
+    [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
     boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
     boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
