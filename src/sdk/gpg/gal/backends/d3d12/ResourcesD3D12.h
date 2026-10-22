@@ -59,7 +59,12 @@ namespace gpg::gal
     [[nodiscard]] bool IsCube() const noexcept { return mContext.type_ == 2U; }
     [[nodiscard]] bool IsVolume() const noexcept { return mContext.type_ == 3U; }
 
+    /** Bytes held by every texture's CPU copies (memory diagnostics). */
+    [[nodiscard]] static std::uint64_t CpuCopyBytes() noexcept;
+
   private:
+    void AccountCpuCopy() noexcept;
+
     TextureContext mContext;
     d3d12::TrackedResource mResource;
     D3D12_CPU_DESCRIPTOR_HANDLE mView{};
@@ -69,6 +74,7 @@ namespace gpg::gal
     bool mLocked = false;
     int mLockedLevel = 0;
     int mLockedFlags = 0;
+    std::uint64_t mAccountedBytes = 0; // this texture's share of CpuCopyBytes
   };
 
   /**

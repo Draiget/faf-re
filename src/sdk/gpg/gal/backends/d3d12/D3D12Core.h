@@ -62,6 +62,9 @@ namespace gpg::gal::d3d12
     [[nodiscard]] std::uint64_t TakeAllocatedBytes() noexcept;
     /** Bytes in pages still waiting for the GPU. */
     [[nodiscard]] std::uint64_t BusyBytes() const noexcept;
+    /** Bytes in all pages, and their count (memory diagnostics). */
+    [[nodiscard]] std::uint64_t PageBytes() const noexcept;
+    [[nodiscard]] std::size_t PageCount() const noexcept { return mPages.size(); }
 
   private:
     struct Page

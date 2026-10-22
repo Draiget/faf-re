@@ -29,6 +29,14 @@ namespace gpg::gal::backend
   class LockShadow
   {
   public:
+    LockShadow() = default;
+    ~LockShadow();
+    LockShadow(const LockShadow&) = delete;
+    LockShadow& operator=(const LockShadow&) = delete;
+
+    /** Bytes held by every LockShadow in the process (memory diagnostics). */
+    [[nodiscard]] static std::uint64_t TotalBytes() noexcept;
+
     /** Sizes the copy for `byteWidth` bytes, zeroed, and arms the guard. */
     void Reset(std::uint32_t byteWidth);
 
@@ -46,6 +54,7 @@ namespace gpg::gal::backend
 
   private:
     void Arm(std::size_t from);
+    void Account(std::size_t previousCapacity) noexcept;
 
     std::vector<std::uint8_t> mBytes;
     std::uint32_t mByteWidth = 0;

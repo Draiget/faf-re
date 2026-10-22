@@ -231,6 +231,7 @@ namespace gpg::gal
     /** Logs why the device was removed, its debug messages and DRED breadcrumbs / page fault (once). */
     void ReportDeviceRemoved(const char* during);
     void DumpBackBufferIfDue();
+    void LogMemoryIfDue();
 
     // ---- GPU-driven programs (GpuDrivenD3D12.cpp) ------------------------------
     void CreateGpuDrivenObjects();
@@ -375,6 +376,7 @@ namespace gpg::gal
     bool mTracing = false;
     std::set<int> mLoggedMessages;
     bool mRemovalReported = false;
+    bool mDredEnabled = false;
     DWORD mFirstDumpTick = 0;
     DWORD mLastDumpTick = 0;
     std::uint32_t mSkippedDraws = 0;

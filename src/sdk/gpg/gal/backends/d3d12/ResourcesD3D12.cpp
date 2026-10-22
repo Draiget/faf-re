@@ -3,6 +3,7 @@
 #include "ResourcesD3D12.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 
 #include "DeviceD3D12.h"
@@ -99,10 +100,32 @@ namespace gpg::gal
     mLevels.resize(mDesc.MipLevels);
   }
 
+  namespace
+  {
+    std::atomic<std::uint64_t> sTextureCpuCopyBytes{0};
+  }
+
   TextureD3D12::~TextureD3D12()
   {
+    sTextureCpuCopyBytes.fetch_sub(mAccountedBytes);
     RetireResource(mResource.resource);
     RetireView(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mView);
+  }
+
+  std::uint64_t TextureD3D12::CpuCopyBytes() noexcept
+  {
+    return sTextureCpuCopyBytes.load();
+  }
+
+  void TextureD3D12::AccountCpuCopy() noexcept
+  {
+    std::uint64_t bytes = 0U;
+    for (const std::vector<std::uint8_t>& level : mLevels) {
+      bytes += level.capacity();
+    }
+    sTextureCpuCopyBytes.fetch_add(bytes);
+    sTextureCpuCopyBytes.fetch_sub(mAccountedBytes);
+    mAccountedBytes = bytes;
   }
 
   TextureContext* TextureD3D12::GetContext()
@@ -152,6 +175,7 @@ namespace gpg::gal
     mLocked = true;
     mLockedLevel = level;
     mLockedFlags = flags;
+    AccountCpuCopy();
 
     TextureLockRect lock{};
     lock.flags = flags;
@@ -186,6 +210,7 @@ namespace gpg::gal
     mLocked = false;
     mLockedLevel = 0;
     mLockedFlags = 0;
+    AccountCpuCopy();
     return 0;
   }
 
@@ -212,6 +237,7 @@ namespace gpg::gal
       std::vector<std::uint8_t>().swap(level);
     }
     mContentsFromEngine = false;
+    AccountCpuCopy();
   }
 
   // ---------------------------------------------------------------------------
