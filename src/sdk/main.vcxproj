@@ -216,9 +216,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;d3d11.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\d3dcompiler.lib;dxgi.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <ForceFileOutput>Enabled</ForceFileOutput>
       <!-- Both taken from the shipped binary's PE header, read with
            `dumpbin /HEADERS ForgedAlliance.exe`:
 
@@ -349,9 +347,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FafFfmpegRoot)\lib;$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swscale.lib;swresample.lib;ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;d3d11.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\d3dcompiler.lib;dxgi.lib;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(PlatformTarget)\dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/IGNORE:4006 $(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>$(FafX64AddressLinkOptions) %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <ForceFileOutput>Enabled</ForceFileOutput>
       <LargeAddressAware>$(FafX64LargeAddressAware)</LargeAddressAware>
       <StackReserveSize>4000000</StackReserveSize>
     </Link>
