@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cwchar>
 #include <new>
 
 #include "gpg/core/containers/String.h"
@@ -19,6 +20,10 @@ namespace moho
 {
     [[nodiscard]] std::uint8_t APP_GetAqtimeInstrumentationMode();
 }
+
+/// Engine addition: the x86 allocator finds a size class by table (true) or by the binary's
+/// binary search (false). Same class either way; `mem_SmallBlockIndexTable` (registered in Sim.cpp).
+bool gpg::mem_SmallBlockIndexTable = true;
 
 namespace
 {
@@ -432,6 +437,330 @@ namespace
         return (heapSize == static_cast<SIZE_T>(-1)) ? 0u : static_cast<std::size_t>(heapSize);
     }
 
+    /**
+     * Engine addition (x64 port): a size-class pool in front of the system heap for blocks of up
+     * to 4 KB, the bulk of the engine's allocations (strings, list and tree nodes, small vectors).
+     *
+     * Every system-heap block costs `HeapAlloc`/`HeapFree` plus two `HeapSize` calls for the byte
+     * count, several percent of the sim thread in a large fight. Pooled blocks come from one
+     * reserved address range, carved into 64 KB spans of a single size class each, and move
+     * through per-thread free lists without a lock; whole batches pass through a per-class global
+     * list under a lock. Whether a pointer is pooled is a range check, so blocks from the heap
+     * (larger ones, or any allocated before the pool started) are freed where they came from.
+     * Pooled memory is kept for reuse, never returned to the system. `FAF_SMALLPOOL=0` turns the
+     * pool off, for comparisons.
+     */
+    namespace small_pool
+    {
+        constexpr std::size_t kMaxPooledBytes = 4096u;
+        constexpr std::size_t kSpanBytes = 64u * 1024u;
+        constexpr std::size_t kCommitChunkBytes = 1024u * 1024u;
+        constexpr std::size_t kReserveBytes = std::size_t{64} << 30;
+        constexpr std::size_t kSpanCount = kReserveBytes / kSpanBytes;
+        constexpr std::uint32_t kClassCount = 48u;
+
+        /// Class sizes: 16..256 by 16, then 8 classes each by 32, 64, 128 and 256 up to 4096.
+        [[nodiscard]] constexpr std::uint32_t ClassBytes(const std::uint32_t sizeClass) noexcept
+        {
+            if (sizeClass < 16u) {
+                return (sizeClass + 1u) * 16u;
+            }
+            const std::uint32_t band = (sizeClass - 16u) / 8u; // 0..3
+            const std::uint32_t step = 32u << band;
+            const std::uint32_t bandStart = 256u << band;
+            return bandStart + ((sizeClass - 16u) % 8u + 1u) * step;
+        }
+        static_assert(ClassBytes(0) == 16u && ClassBytes(15) == 256u && ClassBytes(16) == 288u);
+        static_assert(ClassBytes(23) == 512u && ClassBytes(31) == 1024u && ClassBytes(47) == 4096u);
+
+        /// Blocks moved between a thread and the global lists at a time.
+        [[nodiscard]] constexpr std::uint32_t BatchBlocks(const std::uint32_t sizeClass) noexcept
+        {
+            const std::uint32_t blocks = 8192u / ClassBytes(sizeClass);
+            return (blocks < 4u) ? 4u : (blocks > 256u ? 256u : blocks);
+        }
+
+        struct ClassTable
+        {
+            std::uint8_t classOfQuantum[kMaxPooledBytes / 16u + 1u]{};
+            constexpr ClassTable()
+            {
+                std::uint32_t sizeClass = 0;
+                for (std::uint32_t quantum = 0; quantum <= kMaxPooledBytes / 16u; ++quantum) {
+                    while (ClassBytes(sizeClass) < quantum * 16u) {
+                        ++sizeClass;
+                    }
+                    classOfQuantum[quantum] = static_cast<std::uint8_t>(sizeClass);
+                }
+            }
+        };
+        constexpr ClassTable kClassTable{};
+
+        [[nodiscard]] std::uint32_t ClassOf(const std::size_t bytes) noexcept
+        {
+            return kClassTable.classOfQuantum[(bytes + 15u) / 16u];
+        }
+
+        struct FreeBlock
+        {
+            FreeBlock* next;      // next block of the same list or batch
+            FreeBlock* nextBatch; // on a batch's first block in a global list: the next batch
+        };
+
+        struct GlobalClassLists
+        {
+            SRWLOCK lock = SRWLOCK_INIT;
+            FreeBlock* batches = nullptr;   // full batches of BatchBlocks(class) blocks
+            FreeBlock* loose = nullptr;     // blocks of no full batch
+            std::uint32_t looseCount = 0;
+        };
+
+        struct ThreadLists
+        {
+            FreeBlock* head[kClassCount];
+            std::uint32_t count[kClassCount];
+            std::int64_t bytesDelta; // in-use change not yet added to gSystemHeapBytesInUse
+            bool registered;
+            bool retired; // thread is exiting: every block goes through the global lists
+        };
+
+        std::uintptr_t gBase = 0;
+        INIT_ONCE gInitOnce = INIT_ONCE_STATIC_INIT;
+        SRWLOCK gSpanLock = SRWLOCK_INIT;
+        std::size_t gNextSpanOffset = 0;
+        std::size_t gCommittedBytes = 0;
+        std::uint8_t gSpanClass[kSpanCount];
+        GlobalClassLists gGlobal[kClassCount];
+        constinit thread_local ThreadLists tLists{};
+
+        /// `/smallpool 0` on the command line (read here, before anything else runs) or FAF_SMALLPOOL=0.
+        [[nodiscard]] bool TurnedOff() noexcept
+        {
+            char value[4] = {};
+            const DWORD written = ::GetEnvironmentVariableA("FAF_SMALLPOOL", value, static_cast<DWORD>(sizeof(value)));
+            if (written == 1u && value[0] == '0') {
+                return true;
+            }
+            const wchar_t* const commandLine = ::GetCommandLineW();
+            const wchar_t* const flag = (commandLine != nullptr) ? std::wcsstr(commandLine, L"/smallpool") : nullptr;
+            if (flag == nullptr) {
+                return false;
+            }
+            const wchar_t* cursor = flag + std::wcslen(L"/smallpool");
+            while (*cursor == L' ' || *cursor == L'\t' || *cursor == L'=') {
+                ++cursor;
+            }
+            return *cursor == L'0';
+        }
+
+        BOOL CALLBACK Reserve(PINIT_ONCE, PVOID, PVOID*) noexcept
+        {
+            if (TurnedOff()) {
+                return TRUE;
+            }
+            // Top-down keeps the range above 4 GB, like everything else in FAF_HIGHMEM mode.
+            void* const base = ::VirtualAlloc(nullptr, kReserveBytes, MEM_RESERVE | MEM_TOP_DOWN, PAGE_NOACCESS);
+            gBase = reinterpret_cast<std::uintptr_t>(base);
+            return TRUE;
+        }
+
+        [[nodiscard]] bool Enabled() noexcept
+        {
+            (void)::InitOnceExecuteOnce(&gInitOnce, &Reserve, nullptr, nullptr);
+            return gBase != 0;
+        }
+
+        [[nodiscard]] bool Owns(const void* const ptr) noexcept
+        {
+            const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(ptr);
+            return gBase != 0 && address - gBase < kReserveBytes;
+        }
+
+        [[nodiscard]] std::uint32_t ClassOfBlock(const void* const ptr) noexcept
+        {
+            return gSpanClass[(reinterpret_cast<std::uintptr_t>(ptr) - gBase) / kSpanBytes];
+        }
+
+        void AddInUseBytes(ThreadLists& lists, const std::int64_t bytes) noexcept
+        {
+            lists.bytesDelta += bytes;
+            if (lists.bytesDelta > 65536 || lists.bytesDelta < -65536 || lists.retired) {
+                gSystemHeapBytesInUse.fetch_add(static_cast<std::size_t>(lists.bytesDelta), std::memory_order_relaxed);
+                lists.bytesDelta = 0;
+            }
+        }
+
+        /// A new span of `sizeClass` blocks, linked into one list; null when the range is used up.
+        [[nodiscard]] FreeBlock* CarveSpan(const std::uint32_t sizeClass, std::uint32_t& outCount) noexcept
+        {
+            std::uintptr_t span = 0;
+            ::AcquireSRWLockExclusive(&gSpanLock);
+            if (gNextSpanOffset + kSpanBytes <= kReserveBytes) {
+                if (gNextSpanOffset + kSpanBytes > gCommittedBytes) {
+                    const std::size_t commitBytes = (kReserveBytes - gCommittedBytes < kCommitChunkBytes)
+                        ? kReserveBytes - gCommittedBytes
+                        : kCommitChunkBytes;
+                    if (::VirtualAlloc(reinterpret_cast<void*>(gBase + gCommittedBytes), commitBytes, MEM_COMMIT, PAGE_READWRITE)
+                        != nullptr) {
+                        gCommittedBytes += commitBytes;
+                    }
+                }
+                if (gNextSpanOffset + kSpanBytes <= gCommittedBytes) {
+                    span = gBase + gNextSpanOffset;
+                    gSpanClass[gNextSpanOffset / kSpanBytes] = static_cast<std::uint8_t>(sizeClass);
+                    gNextSpanOffset += kSpanBytes;
+                }
+            }
+            ::ReleaseSRWLockExclusive(&gSpanLock);
+            if (span == 0) {
+                return nullptr;
+            }
+
+            const std::size_t blockBytes = ClassBytes(sizeClass);
+            const std::uint32_t blocks = static_cast<std::uint32_t>(kSpanBytes / blockBytes);
+            FreeBlock* head = nullptr;
+            for (std::uint32_t index = blocks; index-- > 0;) {
+                auto* const block = reinterpret_cast<FreeBlock*>(span + index * blockBytes);
+                block->next = head;
+                head = block;
+            }
+            outCount = blocks;
+            return head;
+        }
+
+        /// Takes a batch (or the loose blocks, or a new span) for this thread's empty list.
+        [[nodiscard]] FreeBlock* Refill(const std::uint32_t sizeClass, std::uint32_t& outCount) noexcept
+        {
+            GlobalClassLists& global = gGlobal[sizeClass];
+            ::AcquireSRWLockExclusive(&global.lock);
+            FreeBlock* taken = global.batches;
+            if (taken != nullptr) {
+                global.batches = taken->nextBatch;
+                outCount = BatchBlocks(sizeClass);
+            } else if (global.loose != nullptr) {
+                taken = global.loose;
+                outCount = global.looseCount;
+                global.loose = nullptr;
+                global.looseCount = 0;
+            }
+            ::ReleaseSRWLockExclusive(&global.lock);
+            return (taken != nullptr) ? taken : CarveSpan(sizeClass, outCount);
+        }
+
+        /// Hands the first BatchBlocks(class) blocks of this thread's list to the global lists.
+        void ReturnBatch(ThreadLists& lists, const std::uint32_t sizeClass) noexcept
+        {
+            const std::uint32_t batch = BatchBlocks(sizeClass);
+            FreeBlock* const first = lists.head[sizeClass];
+            FreeBlock* last = first;
+            for (std::uint32_t index = 1; index < batch; ++index) {
+                last = last->next;
+            }
+            lists.head[sizeClass] = last->next;
+            lists.count[sizeClass] -= batch;
+            last->next = nullptr;
+
+            GlobalClassLists& global = gGlobal[sizeClass];
+            ::AcquireSRWLockExclusive(&global.lock);
+            first->nextBatch = global.batches;
+            global.batches = first;
+            ::ReleaseSRWLockExclusive(&global.lock);
+        }
+
+        /// Hands every block of this thread's lists to the global lists (thread exit).
+        void ReturnAll(ThreadLists& lists) noexcept
+        {
+            for (std::uint32_t sizeClass = 0; sizeClass < kClassCount; ++sizeClass) {
+                while (lists.count[sizeClass] >= BatchBlocks(sizeClass)) {
+                    ReturnBatch(lists, sizeClass);
+                }
+                FreeBlock* block = lists.head[sizeClass];
+                if (block == nullptr) {
+                    continue;
+                }
+                GlobalClassLists& global = gGlobal[sizeClass];
+                ::AcquireSRWLockExclusive(&global.lock);
+                while (block != nullptr) {
+                    FreeBlock* const next = block->next;
+                    block->next = global.loose;
+                    global.loose = block;
+                    ++global.looseCount;
+                    block = next;
+                }
+                ::ReleaseSRWLockExclusive(&global.lock);
+                lists.head[sizeClass] = nullptr;
+                lists.count[sizeClass] = 0;
+            }
+        }
+
+        /// Returns the thread's blocks when it exits; frees after that go straight to the global lists.
+        struct ThreadExitGuard
+        {
+            ~ThreadExitGuard()
+            {
+                ThreadLists& lists = tLists;
+                lists.retired = true;
+                ReturnAll(lists);
+                AddInUseBytes(lists, 0);
+            }
+        };
+        thread_local ThreadExitGuard tExitGuard;
+
+        [[nodiscard]] void* Allocate(const std::size_t bytes) noexcept
+        {
+            const std::uint32_t sizeClass = ClassOf(bytes != 0u ? bytes : 1u);
+            ThreadLists& lists = tLists;
+            if (!lists.registered) {
+                lists.registered = true;
+                (void)&tExitGuard; // constructs this thread's guard
+            }
+
+            if (lists.retired) {
+                std::uint32_t count = 0;
+                FreeBlock* const taken = Refill(sizeClass, count);
+                if (taken == nullptr) {
+                    return nullptr;
+                }
+                // Keep one block; the rest go back as loose blocks.
+                lists.head[sizeClass] = taken->next;
+                lists.count[sizeClass] = count - 1u;
+                ReturnAll(lists);
+                AddInUseBytes(lists, ClassBytes(sizeClass));
+                return taken;
+            }
+
+            FreeBlock* block = lists.head[sizeClass];
+            if (block == nullptr) {
+                std::uint32_t count = 0;
+                block = Refill(sizeClass, count);
+                if (block == nullptr) {
+                    return nullptr;
+                }
+                lists.count[sizeClass] = count;
+            }
+            lists.head[sizeClass] = block->next;
+            --lists.count[sizeClass];
+            AddInUseBytes(lists, ClassBytes(sizeClass));
+            return block;
+        }
+
+        void Free(void* const ptr) noexcept
+        {
+            const std::uint32_t sizeClass = ClassOfBlock(ptr);
+            ThreadLists& lists = tLists;
+            auto* const block = static_cast<FreeBlock*>(ptr);
+            block->next = lists.head[sizeClass];
+            lists.head[sizeClass] = block;
+            ++lists.count[sizeClass];
+            AddInUseBytes(lists, -static_cast<std::int64_t>(ClassBytes(sizeClass)));
+            if (lists.retired) {
+                ReturnAll(lists);
+            } else if (lists.count[sizeClass] >= 2u * BatchBlocks(sizeClass)) {
+                ReturnBatch(lists, sizeClass);
+            }
+        }
+    } // namespace small_pool
+
     /// `gpg::GetHeapInfo` for the system-heap path (not in the binary). Every
     /// figure is the engine's own live bytes; `inSmallBlocks` is 0, so
     /// `Heap_TotalCheck` (`inSmallBlocks + inUse`) still equals `Heap_Total`.
@@ -564,6 +893,24 @@ namespace
         // `(4w-3 .. 4w]` share the lower bound of `4w`: the table below holds
         // that lower bound per word and returns the identical index for every
         // `bytes` (checked exhaustively over all 2^32 inputs against the search).
+        if (!gpg::mem_SmallBlockIndexTable) {
+            // The binary's lower-bound binary search.
+            std::uint32_t lower = 0;
+            std::uint32_t upper = kSmallBlockClassCount;
+            while (lower < upper) {
+                const std::uint32_t middle = (lower + upper) / 2u;
+                const std::uint32_t value = kSmallBlockSizes[middle];
+                if (bytes >= value) {
+                    if (bytes <= value) {
+                        return middle;
+                    }
+                    lower = middle + 1u;
+                } else {
+                    upper = middle;
+                }
+            }
+            return lower;
+        }
         if (bytes > kSmallBlockSizes[kSmallBlockClassCount - 1u]) {
             return kSmallBlockClassCount;
         }
@@ -1388,6 +1735,10 @@ void gpg::LogHighMemoryReservation()
         "x64 image base %p (%s 4 GB)", imageBase,
         (reinterpret_cast<std::uintptr_t>(imageBase) < 0x100000000ull) ? "below" : "above"
     );
+    gpg::Logf(
+        "mem: small-block pool %s (blocks up to %u bytes; /smallpool 0 or FAF_SMALLPOOL=0 turns it off)",
+        small_pool::Enabled() ? "on" : "off", static_cast<unsigned int>(small_pool::kMaxPooledBytes)
+    );
 
     if (!gHighMemoryReservation.requested) {
         return;
@@ -1492,7 +1843,10 @@ extern "C" void* __cdecl malloc(size_t size)
 extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 {
 #if defined(_M_X64)
-    void* const block = SystemHeapAlloc(size);
+    void* block = (size <= small_pool::kMaxPooledBytes && small_pool::Enabled()) ? small_pool::Allocate(size) : nullptr;
+    if (block == nullptr) {
+        block = SystemHeapAlloc(size); // larger blocks, no pool, or the pool's range is used up
+    }
     if (gMemHook != nullptr) {
         gMemHook(0, static_cast<int>(size), block);
     }
@@ -1573,6 +1927,10 @@ extern "C" void __cdecl free(void* ptr)
     if (gMemHook != nullptr) {
         gMemHook(1, 0, ptr);
     }
+    if (small_pool::Owns(ptr)) {
+        small_pool::Free(ptr);
+        return;
+    }
     SystemHeapFree(ptr);
 #else
     HeapRecord* const record = GetPageOwner(ptr);
@@ -1637,6 +1995,9 @@ extern "C" size_t __cdecl msize(void* memblock)
 #if defined(_M_X64)
     // `realloc_0` sizes its copy from this, so it has to answer for system-heap
     // blocks; `HeapSize` reports `(SIZE_T)-1` for a pointer it does not own.
+    if (small_pool::Owns(memblock)) {
+        return small_pool::ClassBytes(small_pool::ClassOfBlock(memblock));
+    }
     return SystemHeapSize(memblock);
 #else
     if (gPageOwnerByPage == nullptr) {

@@ -81,6 +81,10 @@ namespace gpg
 	 */
 	void GetHeapInfo(HeapStats* outStats);
 
+	/// Engine addition: the x86 small-block allocator's size-class lookup uses a table (default) or the
+	/// binary's binary search; console variable `mem_SmallBlockIndexTable`.
+	extern bool mem_SmallBlockIndexTable;
+
 #if defined(_M_X64)
 	/**
 	 * x64 port (not in the binary): logs the image base (and whether it is below
