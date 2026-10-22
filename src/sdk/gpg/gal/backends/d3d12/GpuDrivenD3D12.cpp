@@ -262,7 +262,8 @@ namespace gpg::gal
     nullWrite.Buffer.NumElements = 1U;
     mDevice->CreateUnorderedAccessView(nullptr, nullptr, &nullWrite, mNullWriteView);
 
-    mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw;
+    // CopyVertexBufferRegion is CopyBufferRegion on the direct list.
+    mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw | kGpuFeatureBufferCopy;
 
     // Timestamps: two per region (and two for the frame) in each of kProfileFrames frames.
     UINT64 frequency = 0U;
@@ -311,6 +312,18 @@ namespace gpg::gal
   std::uint32_t DeviceD3D12::GetGpuDrivenFeatures() const
   {
     return mGpuFeatures;
+  }
+
+  std::uint32_t DeviceD3D12::GetGpuDrivenVerified() const
+  {
+    // Each passed its parity checks on Direct3D 12 (docs/RENDERER_BACKENDS.md, GPU-driven paths):
+    // FAF_ICON_GPU_CHECK readback with selection changes (30k overview and view, 0 differ), a paused
+    // same-process A/B against the path off (world, brackets, icons and minimap pixel-identical) and
+    // the hovered-unit states against Direct3D 11; projectile icons by a paused A/B of the 2k air
+    // fight at zooms 160 and 400 (only the pause button and chat line differ). Not
+    // kGpuPathParticleBatch: the paused A/B still shows extra particle specks with it on, as on
+    // Direct3D 11.
+    return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(const GpuBufferDesc& desc)

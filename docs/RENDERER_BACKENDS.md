@@ -209,7 +209,7 @@ Two `gal::Device` queries decide it (`moho/render/GpuPathSettings.cpp`):
 | `ren_GpuProjectileIcons` | `kGpuPathProjectileIcons` | vertex pulling |
 
 Direct3D 9 reports no features, so every path is off there whatever its
-variable says. Direct3D 11 reports all features and every verified bit but
+variable says. Direct3D 11, Direct3D 12 and Vulkan report all features and every verified bit but
 `kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of
 `ren_ParticleBatch` is clean at several zooms (one showed extra particle
 specks with it on).
