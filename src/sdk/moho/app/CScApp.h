@@ -48,6 +48,9 @@ public:
      */
     [[nodiscard]]
     float Median() const;
+
+    /// Engine addition (`wld_FrameClock`): the mean of the samples `Median` looks at.
+    [[nodiscard]] float Mean() const;
   };
   static_assert(sizeof(RollingFrameRates) == 0x30, "CScApp::RollingFrameRates size must be 0x30");
   static_assert(offsetof(RollingFrameRates, start) == 0x28, "CScApp::RollingFrameRates::start offset must be 0x28");

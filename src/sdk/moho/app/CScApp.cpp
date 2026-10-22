@@ -862,6 +862,38 @@ float CScApp::RollingFrameRates::Median() const
   return samples[static_cast<std::size_t>(count / 2)];
 }
 
+float CScApp::RollingFrameRates::Mean() const
+{
+  float sum = 0.0f;
+  int count = 0;
+  for (int cursor = start; cursor != end && count < 10; cursor = (cursor + 1) % 10) {
+    sum += vals[cursor];
+    ++count;
+  }
+  return count == 0 ? 0.0f : sum / static_cast<float>(count);
+}
+
+namespace
+{
+  /**
+   * Engine addition: which frame time advances the session clock in replays and single-player
+   * sessions (never in network sessions, which keep the binary's clock).
+   * - 0: the median of the last frames, as the binary does. When one frame per beat is long (the
+   *   one that applies the beat) and the rest are short, the median is a short frame, so the game
+   *   runs slower than real time even though both threads keep up.
+   * - 1: the mean of the same frames, which adds up to real time.
+   * - 2: the frame's own wall time.
+   */
+  int wld_FrameClock = 1;
+
+  moho::TConVar<int> gTConVar_wld_FrameClock(
+    "wld_FrameClock",
+    "Replays and single player: 0 advances the game clock by the median frame time (original), 1 by "
+    "the mean, 2 by each frame's own time.",
+    &wld_FrameClock
+  );
+} // namespace
+
 /**
  * Address: 0x008CE0A0 (FUN_008CE0A0)
  * Mangled context: constructor prologue used by app bootstrap.
@@ -1065,7 +1097,12 @@ void CScApp::Main()
   moho::SND_Frame();
   moho::DISK_UpdateWatcher();
 
-  const float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
+  float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
+  // Engine addition (wld_FrameClock): outside network sessions the clock may follow real time.
+  if (fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
+      moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network) {
+    smoothedFrameSeconds = wld_FrameClock == 2 ? frameSeconds : framerates.Mean();
+  }
   if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {
     wxTheApp->ExitMainLoop();
   }

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include "Wm3IntrBox2Circle2.h"
@@ -120,6 +121,68 @@ namespace
    */
   std::uint64_t gVisionEntryEdits = 0u;
 
+  /**
+   * Engine addition: shortcuts for the two linear walks the chains need. A chain is singly linked
+   * and the binary walks it to the tail on every append (`AddToChain`) and to the predecessor on
+   * every unlink (`RemoveFromChain`), so with thousands of emitters under one node every new
+   * entity paid thousands of steps (a quarter of the main thread in a 2k vs 2k air fight).
+   *
+   * These are hints only. Each is checked before use - a tail must still belong to the same parent
+   * and end its chain, a predecessor must still link to the node - and a stale or missing hint
+   * falls back to the original walk, so the tree comes out exactly as the binary builds it. Only
+   * the main thread edits the tree (the serial half of the sync apply).
+   */
+  std::unordered_map<const VisionDB::Entry*, VisionDB::Entry*> gChainTails; // parent -> last node it contains
+  std::unordered_map<const VisionDB::Entry*, VisionDB::Entry*> gChainPrevious; // node -> node linking to it
+
+  /**
+   * Engine addition: the last entry `NewHandle` put in the tree, and the edit counts right after.
+   * Every new handle starts as two zero circles at the origin, and a fake unit (a recon blip)
+   * gets a fresh one on each data update and drops it again in its tick. So within one sync apply
+   * thousands of identical zero entries pile up, each one nested inside the previous: the walk
+   * from the root was a thousand levels deep. While nothing at all has changed in the trees since
+   * the previous insertion, an identical entry takes exactly the path the previous one took and
+   * then goes into it as its first child, so `NewHandle` puts it there directly.
+   */
+  struct SLastNewEntry
+  {
+    const VisionDB* mDb = nullptr;
+    VisionDB::Entry* mEntry = nullptr;
+    std::uint64_t mTreeEdits = 0u;
+    std::uint64_t mEntryEdits = 0u;
+  };
+  SLastNewEntry gLastNewEntry;
+
+  void ForgetChainHints() noexcept
+  {
+    gChainTails.clear();
+    gChainPrevious.clear();
+    gLastNewEntry = SLastNewEntry{};
+  }
+
+  /// The last node of the chain `parent` contains, from the hint when it is still true.
+  [[nodiscard]] VisionDB::Entry* ChainTailHint(const VisionDB::Entry* const parent) noexcept
+  {
+    if (parent == nullptr) {
+      return nullptr;
+    }
+    const auto it = gChainTails.find(parent);
+    if (it == gChainTails.end() || it->second->mParent != parent || it->second->mNext != nullptr) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+  /// The node of `parent`'s chain that links to `entry`, from the hint when it is still true.
+  [[nodiscard]] VisionDB::Entry* ChainPreviousHint(const VisionDB::Entry* const parent, const VisionDB::Entry* const entry) noexcept
+  {
+    const auto it = gChainPrevious.find(entry);
+    if (it == gChainPrevious.end() || it->second->mNext != entry || it->second->mParent != parent) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
   [[nodiscard]] bool SameCircle(const Wm3::Circle2f& lhs, const Wm3::Circle2f& rhs) noexcept
   {
     return lhs.Center.x == rhs.Center.x && lhs.Center.y == rhs.Center.y && lhs.Radius == rhs.Radius;
@@ -194,7 +257,12 @@ bool VisionDB::Entry::Contains(const Entry& other) const noexcept
  */
 void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
 {
-  Entry* tail = this;
+  // Engine addition: start from the remembered tail (see gChainTails); the walk below then
+  // finishes in one step instead of crossing the whole chain.
+  Entry* tail = ChainTailHint(mParent);
+  if (tail == nullptr) {
+    tail = this;
+  }
   while (tail->mNext != nullptr) {
     tail = tail->mNext;
   }
@@ -202,6 +270,17 @@ void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
   tail->mNext = entry;
   entry->mParent = tail->mParent;
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+
+  // Engine addition: `entry` may head a run of nodes (`RemoveFromChain` hands over a contained
+  // chain), so the new tail is the end of that run.
+  gChainPrevious[entry] = tail;
+  if (tail->mParent != nullptr) {
+    Entry* last = entry;
+    while (last->mNext != nullptr) {
+      last = last->mNext;
+    }
+    gChainTails[tail->mParent] = last;
+  }
 }
 
 void VisionDB::Entry::AddContained(Entry* const entry) noexcept
@@ -216,6 +295,13 @@ void VisionDB::Entry::AddContained(Entry* const entry) noexcept
   mContained = entry;
   entry->mParent = this;
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+
+  // Engine addition: remember the new chain's tail (see gChainTails).
+  Entry* last = entry;
+  while (last->mNext != nullptr) {
+    last = last->mNext;
+  }
+  gChainTails[this] = last;
 }
 
 /**
@@ -230,15 +316,33 @@ void VisionDB::Entry::AddContained(Entry* const entry) noexcept
  */
 void VisionDB::Entry::RemoveFromChain(Entry* const entry) noexcept
 {
+  // Engine addition (see gChainTails): the node linking to `entry`, if it is the tail.
+  Entry* newTail = nullptr;
   if (mContained == entry) {
     mContained = entry->mNext;
   } else {
-    for (Entry* sibling = mContained; sibling != nullptr; sibling = sibling->mNext) {
-      if (sibling->mNext == entry) {
-        sibling->mNext = entry->mNext;
-        break;
+    // Engine addition: the remembered predecessor (see gChainPrevious) replaces the walk when it
+    // still links to `entry`.
+    Entry* previous = ChainPreviousHint(this, entry);
+    if (previous == nullptr) {
+      for (Entry* sibling = mContained; sibling != nullptr; sibling = sibling->mNext) {
+        if (sibling->mNext == entry) {
+          previous = sibling;
+          break;
+        }
       }
     }
+    if (previous != nullptr) {
+      previous->mNext = entry->mNext;
+      if (entry->mNext != nullptr) {
+        gChainPrevious[entry->mNext] = previous;
+      } else {
+        newTail = previous;
+      }
+    }
+  }
+  if (newTail != nullptr) {
+    gChainTails[this] = newTail;
   }
 
   if (entry->mContained != nullptr) {
@@ -435,6 +539,7 @@ VisionDB::VisionDB()
   , rootNode_(nullptr)
 {
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+  ForgetChainHints();   // engine addition, see gChainTails
 }
 
 /**
@@ -450,6 +555,7 @@ void VisionDB::Init(const float width, const float height)
 {
   rootNode_ = nullptr;
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+  ForgetChainHints();   // engine addition, see gChainTails
 
   const Wm3::Vector2f halfSize{width * 0.5f, height * 0.5f};
   const float halfDiag = std::sqrt((halfSize.x * halfSize.x) + (halfSize.y * halfSize.y));
@@ -513,7 +619,20 @@ void VisionDB::GenerateQuadTree(
 VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous)
 {
   Entry* const entry = pool_.NewEntry(Wm3::Circle2f{previous, 0.0f}, Wm3::Circle2f{current, 0.0f}, true);
-  entry->PutInChain(rootNode_);
+
+  // Engine addition (see gLastNewEntry): with no edit since the last insertion, an identical
+  // entry would walk to that entry and become its first child.
+  Entry* const last = gLastNewEntry.mEntry;
+  if (last != nullptr && gLastNewEntry.mDb == this && gLastNewEntry.mTreeEdits == gVisionTreeEdits &&
+      gLastNewEntry.mEntryEdits == gVisionEntryEdits && last->mContained == nullptr &&
+      SameCircle(last->mPrevCircle, entry->mPrevCircle) && SameCircle(last->mCurCircle, entry->mCurCircle) &&
+      last->Contains(*entry)) {
+    last->AddContained(entry);
+  } else {
+    entry->PutInChain(rootNode_);
+  }
+  gLastNewEntry = SLastNewEntry{this, entry, gVisionTreeEdits, gVisionEntryEdits};
+
   return new Handle(this, entry);
 }
 
@@ -528,6 +647,7 @@ VisionDB::~VisionDB()
 {
   rootNode_ = nullptr;
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
+  ForgetChainHints();   // engine addition: the pool's entries are about to go
 }
 
 /**

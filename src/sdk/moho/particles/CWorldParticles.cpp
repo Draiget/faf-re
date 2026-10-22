@@ -479,6 +479,35 @@ namespace
     return 0x3FFFFFFFU;
   }
 
+  /// Engine addition: whether `texture`'s already resolved resource is the handle `keyHandle` holds
+  /// (the raw pointer `AreParticleBucketKeysEquivalent` compares). An unresolved texture is never a
+  /// match, because building the key resolves it.
+  [[nodiscard]] bool ParticleTextureMatchesKey(
+    const moho::CParticleTexture* const texture, const moho::TextureSheetHandle& keyHandle
+  ) noexcept
+  {
+    if (texture == nullptr) {
+      return keyHandle.get() == nullptr;
+    }
+    return texture->mTextureResource && static_cast<const void*>(texture->mTextureResource.get()) ==
+                                          static_cast<const void*>(keyHandle.get());
+  }
+
+  /**
+   * Engine addition: whether the key `InitializeParticleBucketKeyFromWorldParticle` would build for
+   * `particle` is equivalent (`AreParticleBucketKeysEquivalent`) to `key`, without building it - no
+   * texture handle copies, no tag string copy. Consecutive particles of one emitter share all of
+   * these, so most of a beat's particles take the cached bucket this way.
+   */
+  [[nodiscard]] bool ParticleMatchesBucketKey(const moho::SParticleBucketKey& key, const moho::SWorldParticle& particle)
+  {
+    return key.sortScalar == particle.mReserved54 && key.dragEnabled == particle.mDragEnabled &&
+           key.blendMode == static_cast<std::int32_t>(particle.mBlendMode) &&
+           key.zMode == static_cast<std::int32_t>(particle.mZMode) &&
+           ParticleTextureMatchesKey(particle.mTexture.tex, key.texture0) &&
+           ParticleTextureMatchesKey(particle.mRampTexture.tex, key.texture1) && key.tag == particle.mTypeTag;
+  }
+
   [[nodiscard]] moho::SParticleBucketKey* InitializeParticleBucketKeyFromWorldParticle(
     moho::SParticleBucketKey* const key,
     const moho::SWorldParticle& particle
@@ -1053,6 +1082,14 @@ namespace moho
     Init();
     if (bucketCacheSlot != nullptr && *bucketCacheSlot != nullptr) {
       (*bucketCacheSlot)->pendingParticles.push_back(particle);
+      return;
+    }
+
+    // Engine addition: the cached bucket's key matches without building a new key (see
+    // ParticleMatchesBucketKey); the path below would land in the same bucket.
+    if (static_cast<std::int32_t>(particle.mBlendMode) != 5 && mCachedParticleBucket != nullptr &&
+        ParticleMatchesBucketKey(mParticleBucketLookupKey, particle)) {
+      mCachedParticleBucket->pendingParticles.push_back(particle);
       return;
     }
 

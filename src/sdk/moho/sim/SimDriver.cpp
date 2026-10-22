@@ -2201,6 +2201,11 @@ void moho::SIM_SetSessionPacing(const ESimSessionPacing pacing) noexcept
   gLeadSimSpeedEstimate.store(0.0f, std::memory_order_relaxed);
 }
 
+moho::ESimSessionPacing moho::SIM_GetSessionPacing() noexcept
+{
+  return gDriverSessionPacing.load(std::memory_order_relaxed);
+}
+
 float moho::SIM_GetLeadSimSpeedEstimate() noexcept
 {
   if (SessionLeadBeats() <= 0) {
