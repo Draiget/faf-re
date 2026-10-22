@@ -29,6 +29,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/RenderProfiler.h"
+#include "moho/render/ProjectileIconRenderer.h"
 #include "moho/render/StrategicIconClassifyShader.h"
 #include "moho/render/StrategicIconRenderer.h"
 #include "moho/audio/IUserSoundManager.h"
@@ -2665,13 +2666,13 @@ namespace moho
     );
 
     /// Engine addition: `ui_IconRecords`, user-side. Classify strategic icons from per-entity records.
-    bool ui_IconRecords = false;
+    bool ui_IconRecords = true;
 
     TConVar<bool> gTConVar_ui_IconRecords(
       "ui_IconRecords",
       "Classify strategic icons from compact per-unit records refreshed only when a sync beat was "
       "applied or the camera's in-view list was rebuilt, instead of reading every unit each frame. "
-      "Draws exactly what the original pass draws, in the same order. 0, the default, reads the units.",
+      "Draws exactly what the original pass draws, in the same order (the default). 0 reads the units.",
       &ui_IconRecords
     );
 
@@ -13544,6 +13545,23 @@ namespace moho
     const EntityCategorySet* const projectileCategory = mRules->GetEntityCategory("PROJECTILE");
     UserArmy* const focusArmy = GetFocusArmy();
 
+    // Engine addition (`ren_GpuProjectileIcons`): the plain icon quads go to one instanced draw
+    // instead of the batcher, in the same order. A projectile drawn with its glow pass flushes
+    // the instanced icons first and is drawn as before; after one, the batcher is left on the
+    // glow technique, so the rest of the pass stays on the batcher as in the original.
+    ProjectileIconRenderer& gpuIcons = ProjectileIconRenderer::Get();
+    bool iconsOnGpu = gpuIcons.IsActive();
+    if (iconsOnGpu) {
+      gpuIcons.Begin(camera);
+    }
+    // The solid-colour icons this pass has looked up, by colour.
+    std::vector<std::pair<std::uint32_t, boost::shared_ptr<CD3DBatchTexture>>> solidIcons;
+    const auto flushGpuIcons = [&]() {
+      if (iconsOnGpu && !gpuIcons.Flush(*primBatcher)) {
+        gpuIcons.DrawWithBatcher(*primBatcher);
+      }
+    };
+
     // The binary collects into a stack fastvector with a large inline buffer;
     // the heap-backed lane is behaviourally identical for a scratch list.
     gpg::fastvector<UserEntity*> visibleEntities{};
@@ -13551,23 +13569,32 @@ namespace moho
     // 0x008623E1: `push 0x400`, the projectile bucket.
     (void)spatialStorage->CollectInView(const_cast<GeomCamera3*>(&view), visibleEntities, ENTITYTYPE_Projectile);
 
-    for (UserEntity* const entity : visibleEntities) {
+    // The per-projectile tests that read only the entity and the recon grids: whether it gets an
+    // icon at all, and where. Engine addition (`ren_GpuProjectileIcons`): with the GPU path and
+    // many projectiles they run on workers first; the loop below reads their results in order.
+    struct ProjectileIconTest
+    {
+      const RProjectileBlueprint* mBlueprint = nullptr; // null: no icon
+      Wm3::Vec3f mPosition{};
+    };
+    const auto testProjectile = [&](UserEntity* const entity, ProjectileIconTest& out) {
+      out = ProjectileIconTest{};
       if (entity == nullptr || entity->mVariableData.mIsDead) {
-        continue;
+        return;
       }
 
       // Entity ids are family-tagged in their top nibble; only the projectile
       // family gets an icon, which is cheaper than a category test per entity.
       if ((entity->mParams.mEntityId & kEntityFamilyMask) != kEntityFamilyProjectile) {
-        continue;
+        return;
       }
 
       const auto* const blueprint = reinterpret_cast<const RProjectileBlueprint*>(entity->mParams.mBlueprint);
       if (blueprint == nullptr) {
-        continue;
+        return;
       }
       if (projectileCategory == nullptr || !projectileCategory->mBits.Contains(blueprint->mCategoryBitIndex)) {
-        continue;
+        return;
       }
 
       const Wm3::Vec3f worldPosition = entity->GetInterpolatedTransform(tickFraction).pos_;
@@ -13581,8 +13608,41 @@ namespace moho
                (entity->mVariableData.mLayerMask & kLayerUnderwaterMask) != 0 ? UserArmy::EReconGridMask::Fog
                                                                  : UserArmy::EReconGridMask::Explored
              )) {
+        return;
+      }
+      out.mBlueprint = blueprint;
+      out.mPosition = worldPosition;
+    };
+    static std::vector<ProjectileIconTest> sProjectileTests;
+    constexpr std::size_t kParallelProjectileMin = 1024U;
+    constexpr std::size_t kParallelProjectileChunk = 512U;
+    const bool testedAhead = iconsOnGpu && visibleEntities.size() >= kParallelProjectileMin &&
+      CUserWorkerPool::ConfiguredWorkerCount() != 0U;
+    if (testedAhead) {
+      sProjectileTests.resize(visibleEntities.size());
+      CUserWorkerPool::Get().ParallelFor(
+        visibleEntities.size(), kParallelProjectileChunk,
+        [&](const std::size_t begin, const std::size_t end) {
+          for (std::size_t i = begin; i < end; ++i) {
+            testProjectile(visibleEntities[i], sProjectileTests[i]);
+          }
+        }
+      );
+    }
+
+    for (std::size_t entityIndex = 0; entityIndex < visibleEntities.size(); ++entityIndex) {
+      UserEntity* const entity = visibleEntities[entityIndex];
+      ProjectileIconTest tested{};
+      if (testedAhead) {
+        tested = sProjectileTests[entityIndex];
+      } else {
+        testProjectile(entity, tested);
+      }
+      if (tested.mBlueprint == nullptr) {
         continue;
       }
+      const RProjectileBlueprint* const blueprint = tested.mBlueprint;
+      const Wm3::Vec3f worldPosition = tested.mPosition;
 
       boost::shared_ptr<CD3DBatchTexture> icon{};
       float halfWidth = 0.0f;
@@ -13611,14 +13671,35 @@ namespace moho
         if (owningArmy == nullptr) {
           continue;
         }
-        icon = CD3DBatchTexture::FromSolidColor(
-          UI_forceWeaponsToYellow ? kProjectileForcedColor : owningArmy->mVarDat.mPlayerColorBgra
-        );
+        // Engine change: `FromSolidColor` returns the one cached texture of a colour, so the pass
+        // keeps the handles it already asked for instead of asking again per projectile.
+        const std::uint32_t solidColor =
+          UI_forceWeaponsToYellow ? kProjectileForcedColor : owningArmy->mVarDat.mPlayerColorBgra;
+        const auto cached = std::find_if(solidIcons.begin(), solidIcons.end(), [solidColor](const auto& entry) {
+          return entry.first == solidColor;
+        });
+        if (cached != solidIcons.end()) {
+          icon = cached->second;
+        } else {
+          icon = CD3DBatchTexture::FromSolidColor(solidColor);
+          solidIcons.emplace_back(solidColor, icon);
+        }
         if (!icon) {
           continue;
         }
         halfWidth = blueprint->Display.StrategicIconSize * 0.5f;
         halfHeight = halfWidth;
+      }
+
+      const bool drawsGlow = usesIconTexture && UI_RenProjectileGlow;
+      if (iconsOnGpu && !drawsGlow) {
+        const Wm3::Vector2f projected = view.Project(worldPosition, 0.0f, viewportWidth, viewportHeight, 0.0f);
+        gpuIcons.Add(icon, std::floor(projected.x), std::floor(projected.y), halfWidth, halfHeight);
+        continue;
+      }
+      if (iconsOnGpu) {
+        // This one draws through the batcher, after the icons collected so far.
+        flushGpuIcons();
       }
 
       primBatcher->SetTexture(icon);
@@ -13670,8 +13751,11 @@ namespace moho
       const CD3DPrimBatcher::Vertex glowBottomLeft{right, bottom, 1.0f, glowColor, 1.0f, 0.0f};
       primBatcher->DrawQuad(glowTopLeft, glowTopRight, glowBottomRight, glowBottomLeft);
       primBatcher->Flush();
+      // The batcher stays on TCommandGlow for the rest of the pass.
+      iconsOnGpu = false;
     }
 
+    flushGpuIcons();
     primBatcher->Flush();
   }
 

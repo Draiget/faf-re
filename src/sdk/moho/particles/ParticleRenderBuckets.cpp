@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -25,6 +26,8 @@
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "moho/console/CConCommand.h"
+#include "gpg/gal/GpuDriven.h"
+#include "moho/render/GpuPathSettings.h"
 
 namespace
 {
@@ -367,6 +370,9 @@ namespace moho
     return &bucket;
   }
 
+  [[nodiscard]] bool ParticleBatchActive();
+  void MirrorUploadedParticles(ParticleBuffer& particleBuffer, std::uint32_t first, std::uint32_t count);
+
   /**
    * Address: 0x00493210 (FUN_00493210, sub_493210)
    *
@@ -374,8 +380,6 @@ namespace moho
    * Uploads a bounded batch of pending world particles into one particle
    * work-item instance stream for the current frame.
    */
-  extern bool ren_ParticleBatch;
-  void MirrorUploadedParticles(ParticleBuffer& particleBuffer, std::uint32_t first, std::uint32_t count);
 
   void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
@@ -466,9 +470,7 @@ namespace moho
     (void)pendingParticles.erase(pendingParticles.begin(), pendingParticles.begin() + maxUploadCount);
     particleBuffer->UnlockInstanceBuffer();
     // Engine addition (`ren_ParticleBatch`): keep a GPU-resident copy of what was just uploaded.
-    if (ren_ParticleBatch) {
-      MirrorUploadedParticles(*particleBuffer, uploadFirst, static_cast<std::uint32_t>(maxUploadCount));
-    }
+    MirrorUploadedParticles(*particleBuffer, uploadFirst, static_cast<std::uint32_t>(maxUploadCount));
   }
 
   /**
@@ -626,22 +628,20 @@ namespace moho
     return true;
   }
 
-  /**
-   * Address: 0x00493C30 (FUN_00493C30, func_RenderParticle2)
-   *
-   * What it does:
-   * Selects the particle technique, then renders active particle work items in
-   * reverse order when the current bucket is allowed to draw.
-   */
-  bool ren_ParticleBatch = false;
+  int ren_ParticleBatch = -1;
 
-  TConVar<bool> gTConVar_ren_ParticleBatch(
+  TConVar<int> gTConVar_ren_ParticleBatch(
     "ren_ParticleBatch",
     "Draw each particle bucket with one instanced draw: the GPU copies every pooled 200-particle buffer's "
-    "live range, in the original draw order, into one instance buffer first (backends that can copy "
-    "buffers). Same particles, same order, same blending. 0, the default, draws one call per buffer.",
+    "live range, in the original draw order, into one instance buffer first. Same particles, same order, "
+    "same blending. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_ParticleBatch
   );
+
+  bool ParticleBatchActive()
+  {
+    return GpuPathEnabled(ren_ParticleBatch, gpg::gal::kGpuPathParticleBatch, gpg::gal::kGpuFeatureBufferCopy);
+  }
 
   namespace
   {
@@ -748,6 +748,21 @@ namespace moho
 
     ParticleMirrorStore sParticleMirror;
 
+    /**
+     * Engine diagnostics (`ren_ParticleBatch`): FAF_PARTICLE_BATCH_DIAG=1 draws every gathered
+     * work item on its own (same data, the per-buffer draw split), to tell a data difference from a
+     * draw difference. 0 when unset.
+     */
+    [[nodiscard]] int ParticleBatchDiagnosticMode()
+    {
+      static const int sMode = [] {
+        char value[8] = {};
+        std::size_t length = 0U;
+        return (::getenv_s(&length, value, sizeof(value), "FAF_PARTICLE_BATCH_DIAG") == 0 && length != 0U) ? std::atoi(value) : 0;
+      }();
+      return sMode;
+    }
+
     /** `RenderParticleBucket`'s drawn range of one work item, with `ParticleBuffer::Render`'s own clamp. */
     [[nodiscard]] int DrawnParticleCount(const SParticleRenderWorkItem& workItem, const ParticleBuffer& particleBuffer)
     {
@@ -769,6 +784,21 @@ namespace moho
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       if (device == nullptr) {
         return false;
+      }
+      if (ParticleBatchDiagnosticMode() == 2) {
+        // Diagnostics: each item straight from its own buffer through RenderInstances.
+        for (std::size_t index = bucket.activeWorkItems.size(); index > 0U; --index) {
+          SParticleRenderWorkItem* const workItem = bucket.activeWorkItems[index - 1U];
+          if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
+            continue;
+          }
+          auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem->mParticleBuffer);
+          const int count = DrawnParticleCount(*workItem, *particleBuffer);
+          if (count > 0 && particleBuffer->mInstanceVertexBuffer != nullptr) {
+            particleBuffer->RenderInstances(particleBuffer->mInstanceVertexBuffer, count, static_cast<int>(workItem->mIntervalCursor));
+          }
+        }
+        return true;
       }
       ParticleBuffer* drawer = nullptr;
       std::uint32_t total = 0U;
@@ -822,16 +852,35 @@ namespace moho
           // Nothing drawn yet: the caller draws the buffers one by one.
           return false;
         }
+        if (ParticleBatchDiagnosticMode() == 1) {
+          // Diagnostics: the gathered copy of this item, drawn on its own.
+          drawer->RenderInstances(sParticleGather.mBuffer, count, first + static_cast<int>(written));
+        }
         written += static_cast<std::uint32_t>(count);
       }
-      drawer->RenderInstances(sParticleGather.mBuffer, static_cast<int>(written), first);
+      if (ParticleBatchDiagnosticMode() != 1) {
+        drawer->RenderInstances(sParticleGather.mBuffer, static_cast<int>(written), first);
+      }
       return true;
     }
   } // namespace
 
-  void MirrorUploadedParticles(ParticleBuffer& particleBuffer, const std::uint32_t first, const std::uint32_t count)
+  void MirrorUploadedParticles(ParticleBuffer& particleBuffer, const std::uint32_t first, std::uint32_t count)
   {
+    if (!ParticleBatchActive()) {
+      // Not mirrored while the path is off: this upload would leave the slot stale.
+      if (!sParticleMirror.mMirrored.empty()) {
+        sParticleMirror.mMirrored.erase(&particleBuffer);
+      }
+      return;
+    }
     if (count == 0U || particleBuffer.mInstanceVertexBuffer == nullptr || !sParticleMirror.Ready()) {
+      return;
+    }
+    // The lock was clamped to the buffer; a copy box past its end would be dropped whole.
+    const auto bufferCount = static_cast<std::uint32_t>(std::max(particleBuffer.mMaxParticles, 0));
+    count = first < bufferCount ? std::min(count, bufferCount - first) : 0U;
+    if (count == 0U) {
       return;
     }
     const int slotBase = sParticleMirror.SlotBase(particleBuffer);
@@ -852,6 +901,13 @@ namespace moho
     );
   }
 
+  /**
+   * Address: 0x00493C30 (FUN_00493C30, func_RenderParticle2)
+   *
+   * What it does:
+   * Selects the particle technique, then renders active particle work items in
+   * reverse order when the current bucket is allowed to draw.
+   */
   bool RenderParticleBucket(SParticleRenderBucket& bucket, const float frameValue, const bool onlyTLight)
   {
     PruneExpiredParticleBucketWorkItems(bucket, frameValue);
@@ -868,7 +924,7 @@ namespace moho
 
     bucket.SelectTechnique();
 
-    if (ren_ParticleBatch && RenderParticleBucketBatched(bucket)) {
+    if (ParticleBatchActive() && RenderParticleBucketBatched(bucket)) {
       return true;
     }
 

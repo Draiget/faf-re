@@ -18,6 +18,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/render/GpuPathSettings.h"
 
 #pragma comment(lib, "psapi.lib")
 
@@ -54,6 +55,7 @@ namespace moho
       add(gpg::gal::kGpuFeatureCompute, "compute");
       add(gpg::gal::kGpuFeatureIndirectDraw, "indirect draws");
       add(gpg::gal::kGpuFeatureTimestamps, "GPU timestamps");
+      add(gpg::gal::kGpuFeatureBufferCopy, "buffer copy");
       return names.empty() ? std::string("none") : names;
     }
 
@@ -152,6 +154,7 @@ namespace moho
       AppendLine(text, "  swap chain: %s", info.swapChain.empty() ? "unknown" : info.swapChain.c_str());
       AppendLine(text, "  vsync: %s", info.vsync ? "on" : "off");
       AppendLine(text, "  GPU-driven features: %s", GpuDrivenFeatureNames(info.gpuDrivenFeatures).c_str());
+      AppendLine(text, "  GPU-driven paths: %s", DescribeGpuPaths().c_str());
     }
 
     const gpg::gal::RenderProfiler::Summary& summary = gpg::gal::RenderProfiler::Get().GetSummary();

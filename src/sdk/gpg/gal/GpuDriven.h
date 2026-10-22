@@ -45,6 +45,26 @@ namespace gpg::gal
     kGpuFeatureIndirectDraw = 1U << 2U,
     /// `BeginProfileRegion` / `EndProfileRegion` measure GPU time.
     kGpuFeatureTimestamps = 1U << 3U,
+    /// `Device::CopyVertexBufferRegion` copies on the GPU.
+    kGpuFeatureBufferCopy = 1U << 4U,
+  };
+
+  /**
+   * The engine's GPU-driven render paths, as `Device::GetGpuDrivenVerified()`
+   * reports them: each bit says the backend has passed that path's parity
+   * checks (self-check readback, same-process screenshot A/B). A path's
+   * console variable at -1 (auto, the default) turns it on only where the
+   * backend has both the features it needs and its verified bit; 1 forces it
+   * on wherever the features exist, 0 turns it off.
+   */
+  enum GpuDrivenPath : std::uint32_t
+  {
+    kGpuPathStrategicIcons = 1U << 0U,  ///< `ren_GpuIcons`
+    kGpuPathIconClassify = 1U << 1U,    ///< `ren_GpuIconClassify`
+    kGpuPathFogOfWar = 1U << 2U,        ///< `ren_GpuFog`
+    kGpuPathSelectBrackets = 1U << 3U,  ///< `ren_GpuSelectBrackets`
+    kGpuPathParticleBatch = 1U << 4U,   ///< `ren_ParticleBatch`
+    kGpuPathProjectileIcons = 1U << 5U, ///< `ren_GpuProjectileIcons`
   };
 
   enum class GpuBufferKind : std::uint8_t

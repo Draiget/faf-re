@@ -347,7 +347,9 @@ void CompactIconsCS(uint thread : SV_GroupIndex)
     for (uint j = begin; j < end; ++j)
     {
         uint run = RunIn[j];
-        if (run < kNoRun)
+        // Runs 0-3 only: the hovered record (run 4) goes to its slot below, and must not take
+        // (and race for) the selected run's next slot.
+        if (run < kHoveredRun)
         {
             uint slot = run == 0u ? cursor.x : run == 1u ? cursor.y : run == 2u ? cursor.z : cursor.w;
             Output[slot] = StagedIn[j];

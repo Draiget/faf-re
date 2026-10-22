@@ -10,6 +10,7 @@
 #include "gpg/gal/Texture.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
+#include "moho/render/GpuPathSettings.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
@@ -17,12 +18,12 @@
 
 namespace moho
 {
-  bool ren_GpuSelectBrackets = false;
+  int ren_GpuSelectBrackets = -1;
 
-  TConVar<bool> gTConVar_ren_GpuSelectBrackets(
+  TConVar<int> gTConVar_ren_GpuSelectBrackets(
     "ren_GpuSelectBrackets",
-    "Draw selection brackets with one instanced draw per view from a persistent GPU buffer (Direct3D 11 "
-    "and later). 0, the default, draws them through the prim batcher as the original does.",
+    "Draw selection brackets with one instanced draw per view from a persistent GPU buffer instead of the "
+    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuSelectBrackets
   );
 
@@ -52,7 +53,7 @@ namespace moho
 
   bool SelectionBracketGpuRenderer::IsActive()
   {
-    if (!ren_GpuSelectBrackets) {
+    if (!GpuPathEnabled(ren_GpuSelectBrackets, gpg::gal::kGpuPathSelectBrackets, gpg::gal::kGpuFeatureVertexPulling)) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();

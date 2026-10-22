@@ -1,6 +1,7 @@
 #include "STIMap.h"
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <cstddef>
@@ -1236,8 +1237,24 @@ namespace moho
    * What it does:
    * Allocates and zeroes 16-bit base height samples.
    */
+  namespace
+  {
+    std::atomic<std::uint64_t> sHeightFieldRevision{0U};
+
+    void BumpHeightFieldRevision() noexcept
+    {
+      sHeightFieldRevision.fetch_add(1U, std::memory_order_relaxed);
+    }
+  } // namespace
+
+  std::uint64_t HeightFieldRevision() noexcept
+  {
+    return sHeightFieldRevision.load(std::memory_order_relaxed);
+  }
+
   void CHeightField::InitField(const std::int32_t widthArg, const std::int32_t heightArg)
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     width = widthArg;
     height = heightArg;
 
@@ -1572,6 +1589,7 @@ namespace moho
    */
   void CHeightField::UpdateError(gpg::Rect2i rect)
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     std::int32_t x0 = rect.x0;
     if (x0 < 0) {
       x0 = 0;
@@ -1604,6 +1622,7 @@ namespace moho
    */
   void CHeightField::UpdateError(CBackgroundTaskControl& loadControl, gpg::Rect2i rect)
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     std::int32_t x0 = rect.x0;
     if (x0 < 0) {
       x0 = 0;
@@ -1641,6 +1660,7 @@ namespace moho
     const std::int32_t z1
   )
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     UpdateErrorKernel(*this, &loadControl, x0, z0, x1, z1);
   }
 
@@ -1652,6 +1672,7 @@ namespace moho
    */
   void CHeightField::UpdateBounds(gpg::Rect2i rect)
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     std::int32_t x0 = rect.x0;
     if (x0 < 0) {
       x0 = 0;
@@ -1764,6 +1785,7 @@ namespace moho
     const float* const sourceHeights
   )
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     std::int32_t x0 = rect.x0;
     if (x0 < 0) {
       x0 = 0;
@@ -1811,6 +1833,7 @@ namespace moho
     const std::int32_t sourceRowStride
   )
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     std::int32_t x0 = rect.x0;
     if (x0 < 0) {
       x0 = 0;
@@ -1870,6 +1893,7 @@ namespace moho
    */
   void CHeightField::Rescale(const float scale)
   {
+    BumpHeightFieldRevision(); // engine addition, see HeightFieldRevision
     if (!data) {
       return;
     }

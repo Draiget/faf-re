@@ -15,6 +15,7 @@
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/VertexFormat.hpp"
+#include "gpg/gal/backends/common/LockShadow.h"
 
 namespace gpg::gal
 {
@@ -26,7 +27,8 @@ namespace gpg::gal
    * WRITE_NO_OVERWRITE, which is the ring-buffer pattern the engine's vertex
    * streams and particle buffers use. Static buffers are default-usage
    * buffers with a CPU copy; a lock returns the copy and the unlock uploads
-   * the locked range. The D3D10 backend instead mapped a staging buffer and
+   * the locked range. The copy is a `backend::LockShadow`: a lock past the end
+   * or a write past the locked range is logged instead of corrupting the heap. The D3D10 backend instead mapped a staging buffer and
    * copied the whole of it into the GPU buffer on every unlock.
    */
   class BufferStorageD3D11
@@ -51,7 +53,7 @@ namespace gpg::gal
   private:
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> mImmediate;
     Microsoft::WRL::ComPtr<ID3D11Buffer> mBuffer;
-    std::vector<std::uint8_t> mShadow; // static buffers only
+    backend::LockShadow mShadow; // static buffers only
     std::uint32_t mByteWidth = 0;
     std::uint32_t mLockOffset = 0;
     std::uint32_t mLockSize = 0;

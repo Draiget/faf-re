@@ -31,7 +31,7 @@ namespace moho
   class CD3DPrimBatcher;
 
   /// `ren_GpuSelectBrackets`: draw selection brackets through SelectionBracketGpuRenderer when the backend can.
-  extern bool ren_GpuSelectBrackets;
+  extern int ren_GpuSelectBrackets;
 
   class SelectionBracketGpuRenderer
   {

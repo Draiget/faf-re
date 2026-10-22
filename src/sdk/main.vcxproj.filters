@@ -1995,6 +1995,12 @@
     <ClCompile Include="moho\render\SelectionBracketGpuRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\ProjectileIconRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\GpuPathSettings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\RenderInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5464,6 +5470,9 @@
     <ClInclude Include="moho\render\SelectionBracketShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\render\ProjectileIconShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\render\StrategicIconClassifyShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5471,6 +5480,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\SelectionBracketGpuRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\ProjectileIconRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\GpuPathSettings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\RenderInfo.h">

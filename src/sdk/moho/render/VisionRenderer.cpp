@@ -19,6 +19,7 @@
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "moho/app/UserWorkerPool.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StatItem.h"
@@ -27,6 +28,7 @@
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/GpuArrayStream.h"
+#include "moho/render/GpuPathSettings.h"
 #include "moho/render/VisionShader.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/sim/CWldSession.h"
@@ -55,16 +57,12 @@ namespace
   constexpr std::uint32_t kVisionInstanceRingCapacity = 0x3000u;
 
   /**
-   * Raw GAL lock-flag tokens the shipped ring allocator passes: 4 on the append
-   * path (`push 4` at 0x0081CCCD) and 1 on the wrap path (`push 1` at
-   * 0x0081CD15). `gpg::gal::MohoD3DLockFlags` (gpg/gal/D3D9Utils.h) currently
-   * names 0x4 `ReadOnly` and 0x2 `NoOverwrite`, which cannot be right for a
-   * write-mapped dynamic ring - the append lock has to be NOOVERWRITE. The raw
-   * tokens are reproduced verbatim here; correcting the enum's bit assignment
-   * belongs to the owner of that header.
+   * GAL lock flags the shipped ring allocator passes: 4 = `NoOverwrite` on the
+   * append path (`push 4` at 0x0081CCCD) and 1 = `Discard` on the wrap path
+   * (`push 1` at 0x0081CD15).
    */
-  constexpr auto kVisionRingAppendLock = static_cast<gpg::gal::MohoD3DLockFlags>(4u);
-  constexpr auto kVisionRingWrapLock = static_cast<gpg::gal::MohoD3DLockFlags>(1u);
+  constexpr auto kVisionRingAppendLock = gpg::gal::MohoD3DLockFlags::NoOverwrite;
+  constexpr auto kVisionRingWrapLock = gpg::gal::MohoD3DLockFlags::Discard;
 
   /**
    * Cached `"Vision_Total"` engine-stat slot (`sEngineStat_Vision_Total`,
@@ -186,12 +184,12 @@ namespace
 
 namespace moho
 {
-  bool ren_GpuFog = false;
+  int ren_GpuFog = -1;
 
-  TConVar<bool> gTConVar_ren_GpuFog(
+  TConVar<int> gTConVar_ren_GpuFog(
     "ren_GpuFog",
-    "Stencil the fog-of-war vision circles with one instanced draw from a persistent GPU buffer "
-    "(Direct3D 11 and later). 0, the default, draws them through the vision effect as the original does.",
+    "Stencil the fog-of-war vision circles with one instanced draw from a persistent GPU buffer instead "
+    "of the vision effect. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuFog
   );
 }
@@ -200,7 +198,7 @@ namespace
 {
   bool GpuVisionCaster::IsActive()
   {
-    if (!moho::ren_GpuFog) {
+    if (!moho::GpuPathEnabled(moho::ren_GpuFog, gpg::gal::kGpuPathFogOfWar, gpg::gal::kGpuFeatureVertexPulling)) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -299,20 +297,40 @@ namespace
 
   std::int32_t GpuVisionCaster::CountVisible(const Wm3::Box2f& box, const float interpolant) const
   {
-    std::int32_t visible = 0;
-    for (const moho::VisionDB::EmitterCircles& emitter : mEmitters) {
-      // `EvaluateVisionEntry`'s interpolation and test (VisionDB.cpp).
-      const Wm3::Circle2f sampled{
-        Wm3::Vector2f{
-          emitter.mPrevious.Center.x + ((emitter.mCurrent.Center.x - emitter.mPrevious.Center.x) * interpolant),
-          emitter.mPrevious.Center.y + ((emitter.mCurrent.Center.y - emitter.mPrevious.Center.y) * interpolant)
-        },
-        ((emitter.mCurrent.Radius - emitter.mPrevious.Radius) * interpolant) + emitter.mPrevious.Radius
-      };
-      Wm3::IntrBox2Circle2f overlap{box, sampled};
-      if (overlap.Test()) {
-        ++visible;
+    const auto countRange = [&](const std::size_t begin, const std::size_t end) {
+      std::int32_t visible = 0;
+      for (std::size_t index = begin; index < end; ++index) {
+        const moho::VisionDB::EmitterCircles& emitter = mEmitters[index];
+        // `EvaluateVisionEntry`'s interpolation and test (VisionDB.cpp).
+        const Wm3::Circle2f sampled{
+          Wm3::Vector2f{
+            emitter.mPrevious.Center.x + ((emitter.mCurrent.Center.x - emitter.mPrevious.Center.x) * interpolant),
+            emitter.mPrevious.Center.y + ((emitter.mCurrent.Center.y - emitter.mPrevious.Center.y) * interpolant)
+          },
+          ((emitter.mCurrent.Radius - emitter.mPrevious.Radius) * interpolant) + emitter.mPrevious.Radius
+        };
+        Wm3::IntrBox2Circle2f overlap{box, sampled};
+        if (overlap.Test()) {
+          ++visible;
+        }
       }
+      return visible;
+    };
+    // Only a count (the `Vision_Total` stat), so large emitter sets are counted on workers.
+    constexpr std::size_t kParallelMin = 4096U;
+    constexpr std::size_t kChunk = 2048U;
+    const std::size_t count = mEmitters.size();
+    if (count < kParallelMin || moho::CUserWorkerPool::ConfiguredWorkerCount() == 0U) {
+      return countRange(0U, count);
+    }
+    static std::vector<std::int32_t> sPartial;
+    sPartial.assign((count + kChunk - 1U) / kChunk, 0);
+    moho::CUserWorkerPool::Get().ParallelFor(count, kChunk, [&](const std::size_t begin, const std::size_t end) {
+      sPartial[begin / kChunk] = countRange(begin, end);
+    });
+    std::int32_t visible = 0;
+    for (const std::int32_t part : sPartial) {
+      visible += part;
     }
     return visible;
   }
@@ -535,6 +553,54 @@ namespace moho
    * through the `"CastVision"` technique in ring-buffer sized batches, and
    * composites the stencil with the renderer's `"Vision"` frame pass.
    */
+  bool ren_CacheFogFootprint = true;
+
+  TConVar<bool> gTConVar_ren_CacheFogFootprint(
+    "ren_CacheFogFootprint",
+    "Keep the fog pass's terrain footprint of each camera (a walk of the height field) until the camera "
+    "or the terrain changes, instead of recomputing it every frame (the default). 0 recomputes it.",
+    &ren_CacheFogFootprint
+  );
+
+  namespace
+  {
+    /**
+     * Engine change: `CHeightField::ConvexIntersection` of a camera solid, kept for the last few
+     * solids and recomputed only when the solid's planes or the height field change (most frames
+     * the camera has not moved). The walk is the most expensive step of the fog pass.
+     */
+    [[nodiscard]] Wm3::AxisAlignedBox3f TerrainFootprintOf(const CHeightField& field, const CGeomSolid3& solid)
+    {
+      if (!ren_CacheFogFootprint) {
+        return field.ConvexIntersection(solid);
+      }
+      struct Entry
+      {
+        const CHeightField* mField = nullptr;
+        std::uint64_t mRevision = ~0ULL;
+        std::vector<Wm3::Plane3f> mPlanes;
+        Wm3::AxisAlignedBox3f mFootprint{};
+      };
+      static Entry sEntries[4];
+      static std::uint32_t sNext = 0U;
+      const std::uint64_t revision = HeightFieldRevision();
+      const std::size_t planeCount = solid.planes_.size();
+      for (const Entry& entry : sEntries) {
+        if (entry.mField == &field && entry.mRevision == revision && entry.mPlanes.size() == planeCount &&
+            (planeCount == 0U || std::memcmp(entry.mPlanes.data(), &*solid.planes_.begin(), planeCount * sizeof(Wm3::Plane3f)) == 0)) {
+          return entry.mFootprint;
+        }
+      }
+      Entry& entry = sEntries[sNext];
+      sNext = (sNext + 1U) % 4U;
+      entry.mField = &field;
+      entry.mRevision = revision;
+      entry.mPlanes.assign(solid.planes_.begin(), solid.planes_.end());
+      entry.mFootprint = field.ConvexIntersection(solid);
+      return entry.mFootprint;
+    }
+  } // namespace
+
   void RenderFogOfWar(
     CWldSession& session,
     VisionRenderer& renderer,
@@ -556,7 +622,7 @@ namespace moho
     // plane: the box the vision tree is queried with is axis-aligned, so the two
     // axes are the unit basis vectors the shipped body caches in a guarded
     // function-local static (`dword_1104458` guard at 0x0081C731).
-    const Wm3::AxisAlignedBox3f terrainFootprint = heightField->ConvexIntersection(camera.solid2);
+    const Wm3::AxisAlignedBox3f terrainFootprint = TerrainFootprintOf(*heightField, camera.solid2);
 
     static const Wm3::Vector2f kUnitBoxAxes[2] = {Wm3::Vector2f{1.0f, 0.0f}, Wm3::Vector2f{0.0f, 1.0f}};
 
