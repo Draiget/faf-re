@@ -3,7 +3,7 @@
         {
             "name": "x86",
             "includePath": [
-                "${workspaceFolder}/src/sdk",
+                "${workspaceFolder}/src",
                 "${workspaceFolder}/dependencies/zlib-1.2.3/include",
                 "${workspaceFolder}/dependencies/LuaPlus_Build1081/Src/LuaPlus/include",
                 "${workspaceFolder}/**",

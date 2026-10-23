@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """faidx - the FA source index.
 
-One queryable place for "where is FUN_X in src/sdk, what is it, who calls it,
+One queryable place for "where is FUN_X in src, what is it, who calls it,
 what does it call, what is its status", so agents stop re-deriving that join
 with grep fan-outs.
 
 Ground truth stays in the tree: the Doxygen `Address: 0x........` blocks in
-src/sdk are the anchors.  This index is a rebuildable cache over them, joined
+src are the anchors.  This index is a rebuildable cache over them, joined
 at query time onto the IDA callgraph index (attached read-only) and onto an
 import of recovered_progress.json.  Nothing here is hand-maintained; a stale
 index is never worse than `faidx update`.
@@ -41,7 +41,7 @@ import time
 from typing import Iterable
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-SRC_ROOT = "src/sdk"
+SRC_ROOT = "src"
 DB_REL = "decomp/recovery/_source_index.sqlite"
 LOG_REL = "decomp/recovery/_source_index.log"
 NAMESPACE = "fa_full_2026_03_26"
@@ -85,10 +85,10 @@ def norm_rel(path: str) -> str:
     """Normalise a path as recorded in the progress db (absolute, ./, backslashes)."""
     p = (path or "").replace("\\", "/")
     low = p.lower()
-    k = low.find("/src/sdk/")
+    k = low.find("/src/")
     if k >= 0:
         p = p[k + 1:]
-    elif low.startswith("src/sdk/"):
+    elif low.startswith("src/"):
         pass
     elif p.startswith("./"):
         p = p[2:]
@@ -818,7 +818,7 @@ def print_card(card: dict) -> None:
             extra = a["symbol"] or a["label"] or ""
             print(f"  {a['kind']:6s} {loc}  {extra}")
     else:
-        print("  source: NO ANCHOR in src/sdk")
+        print("  source: NO ANCHOR in src")
     if card.get("db_source_paths"):
         anchored = {a["file"] for a in card.get("anchors", [])}
         flag = "" if anchored & set(card["db_source_paths"]) else "  (DISAGREES with anchors)" if anchored else ""
@@ -1002,7 +1002,7 @@ VERIFY_CATEGORIES = {
     "anchor_outside_any_function": "anchor address is not inside any IDA function (data address or bad hex)",
     "anchor_mid_function": "anchor address is inside a function but not at its start",
     "duplicate_definition": "same address has 'def' anchors in two or more files",
-    "recovered_without_anchor": "progress says recovered but no anchor names the address anywhere in src/sdk",
+    "recovered_without_anchor": "progress says recovered but no anchor names the address anywhere in src",
     "source_paths_disagree": "progress source_paths never names the file that holds the anchor",
     "anchored_not_recovered": "an anchor exists but the progress status is not recovered",
     "token_address_mismatch": "the (FUN_) token in the anchor does not match the address",

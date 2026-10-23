@@ -4,7 +4,7 @@ constcheck - cross-check recovered C++ against the retail binary for
 replay-determinism hazards.
 
 Two modes, both keyed on the Doxygen `Address: 0xXXXXXXXX` block that sits
-above every recovered definition in src/sdk:
+above every recovered definition in src:
 
   consts (default)
       For each definition, collect every float/double constant the retail
@@ -12,7 +12,7 @@ above every recovered definition in src/sdk:
       [0xdff0ac]`, `fmul qword ptr [0xe4f7e0]`, `comiss ...`, `fld ...`),
       read its bit pattern from the PE, and compare against the float
       literals the C++ body can produce (direct literals, folded
-      literal-only subexpressions, named constants anywhere in src/sdk,
+      literal-only subexpressions, named constants anywhere in src,
       Wm3::Math constants). Reports:
         NEAR       retail constant with a C++ literal a few ulps away
                    (0.01f = 0x3C23D70A written where retail loads 0x3C23D70B)
@@ -41,8 +41,8 @@ Usage
     --no-unloaded / --no-weak   suppress UNLOADED / INLINED?+MISSING-via-mov noise
 
 Example
-  python tools/constcheck/constcheck.py src/sdk/moho/sim src/sdk/moho/unit
-  python tools/constcheck/constcheck.py --mode math src/sdk/moho/ai
+  python tools/constcheck/constcheck.py src/moho/sim src/moho/unit
+  python tools/constcheck/constcheck.py --mode math src/moho/ai
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ from fractions import Fraction
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_PE = r"C:/ProgramData/FAForever/bin/ForgedAlliance.exe"
 DEFAULT_ASM = os.path.join(REPO, "decomp", "recovery", "disasm", "fa_full_2026_03_26")
-SDK = os.path.join(REPO, "src", "sdk")
+SDK = os.path.join(REPO, "src")
 
 # --------------------------------------------------------------------------
 # IEEE helpers

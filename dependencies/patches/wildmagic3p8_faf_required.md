@@ -25,12 +25,12 @@
 
 This repo uses an external `WildMagic3p8` tree (Geometric Tools' Wild Magic 3.8,
 circa 2006). FAF reuses Wild Magic's `Foundation` math library and `Dx9Renderer`
-helpers, but the SDK consumer code (`src/sdk/**`) was originally hand-recovered
+helpers, but the SDK consumer code (`src/**`) was originally hand-recovered
 against an FA-specific extension of `Wm3::Vector2/3`, `Wm3::Quaternion`,
 `Wm3::AxisAlignedBox3`, `Wm3::Box3`, and `Wm3::Sphere3`. The patch file
 `wildmagic3p8_faf_required.patch` re-applies those extensions on top of pristine
 upstream Wild Magic 3.8 so the SDK can build directly against the upstream tree
-instead of carrying a parallel `src/sdk/wm3/` fork.
+instead of carrying a parallel `src/wm3/` fork.
 
 The patch is also needed for one modern-toolchain fix in the Dx9 renderer: the
 `dxerr9.h` header was renamed to `DxErr.h` in the June 2010 DirectX SDK, and
@@ -94,7 +94,7 @@ helper).
 
 `Vector2`, `Vector3` and `Quaternion` also get `MemberSerialize` /
 `MemberDeserialize` declarations, the hooks `gpg::SerSaveLoadHelper<T>` calls.
-The float specializations are defined in `src/sdk/moho/math/MathReflection.cpp`.
+The float specializations are defined in `src/moho/math/MathReflection.cpp`.
 
 ### IVector2 / IVector3: GPG's integer vectors (new files)
 
@@ -124,7 +124,7 @@ two-vector brace ctor `AxisAlignedBox3(const Vector3<Real>& min, const
 Vector3<Real>& max)` is added so the SDK helpers that build empty/invalid
 sentinels via `{minVec, maxVec}` keep compiling. `MemberSerialize` /
 `MemberDeserialize` are declared as on `Box3`; the float specializations are
-in `src/sdk/moho/math/MathReflection.cpp`.
+in `src/moho/math/MathReflection.cpp`.
 
 ### Box3: helper API for the FAF OBB consumers
 
@@ -138,7 +138,7 @@ Adds the methods the FAF SDK's hand-recovered `Box3.h` exposed:
   box axis and checks `|projection| <= half-extent`
 - `MemberSerialize` / `MemberDeserialize` declarations — the float
   specializations are defined in
-  `src/sdk/moho/collision/CColPrimitiveBox3f.cpp` and use the FAF reflection
+  `src/moho/collision/CColPrimitiveBox3f.cpp` and use the FAF reflection
   archives forward-declared at the top of the header
   (`gpg::ReadArchive` / `gpg::WriteArchive`)
 
@@ -147,7 +147,7 @@ Adds the methods the FAF SDK's hand-recovered `Box3.h` exposed:
 Adds `MemberSerialize` / `MemberDeserialize` declarations on `Wm3::Sphere3<Real>`
 backed by FAF `gpg::ReadArchive` / `gpg::WriteArchive` forward declarations.
 The float specializations live in
-`src/sdk/moho/collision/CColPrimitiveSphere3f.cpp`.
+`src/moho/collision/CColPrimitiveSphere3f.cpp`.
 
 ### Wm3Dx9Utility.h: DxErr.h rename
 

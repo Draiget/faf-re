@@ -3,7 +3,7 @@
 Audit recovered Address-annotated SDK functions against FA callgraph evidence.
 
 What this script checks:
-1) Scans src/sdk C/C++ files for Doxygen blocks with `Address: 0x...` (and FUN_ tokens).
+1) Scans src C/C++ files for Doxygen blocks with `Address: 0x...` (and FUN_ tokens).
 2) Resolves those annotations to FUN_XXXXXXXX tokens.
 3) Queries _callgraph_index.sqlite for call/xref evidence.
 4) Classifies each token for connectivity/usage sanity.
@@ -538,7 +538,7 @@ def build_markdown_report(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit Address-annotated recovered functions against callgraph evidence.")
     parser.add_argument("--repo-root", default=".", help="Repository root (default: current directory).")
-    parser.add_argument("--src-root", default="src/sdk", help="Source root to scan for Address annotations.")
+    parser.add_argument("--src-root", default="src", help="Source root to scan for Address annotations.")
     parser.add_argument(
         "--callgraph-db",
         default="decomp/recovery/disasm/fa_full_2026_03_26/_callgraph_index.sqlite",

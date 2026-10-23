@@ -1,4 +1,4 @@
-// Math leaf targets: retail VA vs the recovered function compiled from src\sdk.
+// Math leaf targets: retail VA vs the recovered function compiled from src.
 //
 // Pattern per target (see README.md "Adding a target"):
 //   gen    - fills the input words (floats as raw bits)
@@ -188,7 +188,7 @@ namespace difffuzz
       std::memcpy(out, &r, 4);
     }
 
-    // ---- Lua math library (src\sdk\lua\LuaObject.cpp math_*) -----------------
+    // ---- Lua math library (src\lua\LuaObject.cpp math_*) -----------------
     // Retail: every math_X takes a float from luaL_checknumber in st(0), runs
     // an inline x87 sequence or a CRT entry, and stores the result with
     // `fstp dword` before lua_pushnumber. "Ours" mirrors the exact expression

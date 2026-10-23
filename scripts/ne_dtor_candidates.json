@@ -18,10 +18,10 @@
     ]
   ],
   "annotations": {
-    "G:\\projects\\faf-main\\src\\sdk\\gpg\\core\\containers\\ReadArchive.cpp:1421": [
+    "G:\\projects\\faf-main\\src\\gpg\\core\\containers\\ReadArchive.cpp:1421": [
       "FUN_00952E40 ReadArchive"
     ],
-    "G:\\projects\\faf-main\\src\\sdk\\gpg\\core\\containers\\WriteArchive.cpp:495": [
+    "G:\\projects\\faf-main\\src\\gpg\\core\\containers\\WriteArchive.cpp:495": [
       "FUN_00953150 WriteArchive"
     ]
   }

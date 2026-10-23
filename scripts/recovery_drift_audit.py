@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Recovery drift audit: find progress-DB tokens marked as completed that have
-NO matching `Address: 0x...` annotation in src/sdk.
+NO matching `Address: 0x...` annotation in src.
 
 These "phantom recoveries" are entries where the JSON bookkeeping claims a
 function is done but no actual recovered source body references its binary
@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--src-root",
         type=Path,
-        default=REPO_ROOT / "src" / "sdk",
+        default=REPO_ROOT / "src",
         help="Source root to scan for Address: 0x... annotations.",
     )
     parser.add_argument(

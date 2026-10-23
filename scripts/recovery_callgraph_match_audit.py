@@ -3,7 +3,7 @@
 Audit recovered source callgraph edges against FA binary callgraph evidence.
 
 This script compares:
-1) Source-restored graph inferred from annotated function definitions in src/sdk
+1) Source-restored graph inferred from annotated function definitions in src
 2) Binary graph from decomp/recovery/disasm/<namespace>/_callgraph_index.sqlite
 
 It focuses on Doxygen-annotated recovered functions (`Address: 0x...`) and
@@ -1016,7 +1016,7 @@ def write_markdown(path: Path, report: dict[str, Any], top: int = 200) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit recovered source callgraph against binary callgraph.")
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Repository root (default: current dir).")
-    parser.add_argument("--src-root", type=Path, default=Path("src/sdk"), help="Source root to scan.")
+    parser.add_argument("--src-root", type=Path, default=Path("src"), help="Source root to scan.")
     parser.add_argument(
         "--callgraph-db",
         type=Path,

@@ -1,6 +1,6 @@
 // difffuzz - differential fuzzing of pure leaf functions: the retail
 // ForgedAlliance.exe (mapped, never run) against the recovered C++ compiled
-// from src\sdk. No replay, no engine startup. See ..\README.md.
+// from src. No replay, no engine startup. See ..\README.md.
 
 #include "fuzz.h"
 #include "pe_image.h"

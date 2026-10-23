@@ -19,7 +19,7 @@ Pipeline:
        - lib_only: Wm3 symbols in Foundation.lib that don't appear in
                    the FA binary (not interesting — Wm3 ships more than
                    FA used)
-       - 73-recovered: Wm3 functions already recovered into src/sdk/wm3
+       - 73-recovered: Wm3 functions already recovered into src/wm3
                        (informational; these become wrappers in the
                        last step)
 
@@ -273,7 +273,7 @@ def main() -> int:
     )
 
     # Wrapper-conversion seed list: FA Wm3 functions that are
-    #   (a) currently `recovered` (manual recovery exists in src/sdk/wm3/), AND
+    #   (a) currently `recovered` (manual recovery exists in src/wm3/), AND
     #   (b) confirmed to exist as a matching symbol in upstream Foundation.lib.
     # These are the highest-confidence wrapper candidates for the next step.
     wrapper_seeds: list[tuple[str, str]] = []

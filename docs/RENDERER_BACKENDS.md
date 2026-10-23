@@ -11,11 +11,11 @@ tried with the same window settings (`CScApp::CreateDevice`).
 
 | Switch | Backend | Effects | Code |
 |---|---|---|---|
-| `/d3d9` | Direct3D 9 | D3DX9 effect framework | `src/sdk/gpg/gal/backends/d3d9` |
-| `/D3D10` | Direct3D 10, as shipped | D3DX10 | `src/sdk/gpg/gal/backends/d3d10` |
-| `/d3d11` | Direct3D 11 | Effects 11 (FX11), `fx_5_0` | `src/sdk/gpg/gal/backends/d3d11` |
-| `/d3d12` | Direct3D 12 | FAF effect layer, DXIL via DXC | `src/sdk/gpg/gal/backends/d3d12` |
-| `/vulkan` | Vulkan 1.3 | FAF effect layer, SPIR-V via DXC | `src/sdk/gpg/gal/backends/vulkan` |
+| `/d3d9` | Direct3D 9 | D3DX9 effect framework | `src/gpg/gal/backends/d3d9` |
+| `/D3D10` | Direct3D 10, as shipped | D3DX10 | `src/gpg/gal/backends/d3d10` |
+| `/d3d11` | Direct3D 11 | Effects 11 (FX11), `fx_5_0` | `src/gpg/gal/backends/d3d11` |
+| `/d3d12` | Direct3D 12 | FAF effect layer, DXIL via DXC | `src/gpg/gal/backends/d3d12` |
+| `/vulkan` | Vulkan 1.3 | FAF effect layer, SPIR-V via DXC | `src/gpg/gal/backends/vulkan` |
 
 ## Choosing the renderer
 
@@ -97,7 +97,7 @@ repository, and the ports below are done on them at load time.
    vertices. Fixes go here, never into the gamedata.
 3. Direct3D 11 compiles the result as `fx_5_0` and loads it into Effects 11.
 4. Direct3D 12 and Vulkan hand it to the **FAF effect layer**
-   (`src/sdk/gpg/gal/effects`):
+   (`src/gpg/gal/effects`):
    - `EffectDescription`: techniques, passes, annotations (constant
      expressions folded), blend, depth-stencil and rasterizer states,
      sampler states, and parameters with their defaults.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Recover needs_evidence tokens whose fully-qualified name already has a
-matching definition in src/sdk. Adds FUN_<addr> annotation and marks recovered.
+matching definition in src. Adds FUN_<addr> annotation and marks recovered.
 
 For each token:
   1. Parse the demangled class::method from the IDA name.
@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROG = ROOT / "decomp" / "recovery" / "recovered_progress.json"
 DISASM = ROOT / "decomp" / "recovery" / "disasm" / "fa_full_2026_03_26"
-SRC = ROOT / "src" / "sdk"
+SRC = ROOT / "src"
 NAME_RE = re.compile(r"^# Function (.+)$", re.MULTILINE)
 
 

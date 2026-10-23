@@ -1,0 +1,1039 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <new>
+
+#include "boost/condition.h"
+#include "boost/mutex.h"
+#include "boost/scoped_ptr.h"
+#include "boost/shared_ptr.h"
+#include "boost/thread.h"
+#include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/Rect2.h"
+#include "gpg/core/streams/Stream.h"
+#include "gpg/core/time/Timer.h"
+#include "ISTIDriver.h"
+#include "legacy/containers/AutoPtr.h"
+#include "legacy/containers/Deque.h"
+#include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
+#include "moho/command/CmdDefs.h"
+#include "moho/command/SSTICommandConstantData.h"
+#include "moho/command/SSTICommandVariableData.h"
+#include "moho/entity/SSTIEntityVariableData.h"
+#include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/audio/SAudioRequest.h"
+#include "moho/net/Common.h"
+#include "platform/Platform.h"
+#include "SSyncFilter.h"
+
+#ifndef FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
+#define FAF_ENFORCE_STRICT_LAYOUT_ASSERTS 0
+#endif
+
+#ifndef FAF_RUNTIME_LAYOUT_ASSERT
+#if FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
+#define FAF_RUNTIME_LAYOUT_ASSERT(...) static_assert(__VA_ARGS__)
+#else
+#define FAF_RUNTIME_LAYOUT_ASSERT(...)
+#endif
+#endif
+namespace moho
+{
+  template <class T>
+  class Stats;
+
+  class LaunchInfoBase;
+  class CMarshaller;
+  class CDecoder;
+  struct REntityBlueprint;
+  class StatItem;
+  class CSimResources;
+  class CDebugCanvas;
+
+
+
+
+  /**
+   * One replicated unit-variable update record queued by the `Unit` /
+   * `ReconBlip` overrides of `SyncInterface` (FUN_006AC3A0 / FUN_005BEFB0) onto
+   * `SSyncData::mUnitUpdates` (+0x158).
+   *
+   * The record embeds a full `SSTIUnitVariableData` payload, so its complete
+   * definition (and that of `QueueUnitVariableUpdate`) lives in SimDriver.cpp,
+   * where `moho/unit/core/Unit.h` is includable. Here it is only forward-declared
+   * and stored behind the pointer-only `msvc8::vector<T>` lane, which does not
+   * require a complete `T` because `SSyncData`'s ctor/dtor are out-of-line.
+   */
+  struct SUnitVariableUpdateEntry;
+  struct SSTIUnitVariableData;
+  struct RMeshBlueprint;
+  struct SSTIArmyConstantData;
+  struct SSTIArmyVariableData;
+  struct SCamShakeParams;
+  struct SDecalInfo;
+  class CDebugCanvas;
+  class CHeightField;
+  class CSimResources;
+  struct SCamFollowParams;
+  struct SDesyncInfo;
+  class CAniPose;
+  struct SExtraUnitData;
+
+  /**
+   * One replicated pose hand-off: `CWldSession::DoBeat` looks the entity up
+   * and passes the shared pose to `UserEntity::SetPose`. The 12-byte stride
+   * comes from the drain loop at 0x00894F1C.
+   */
+  /**
+   * One pending pose-copy request: the destination entity id plus a retained
+   * handle on the source pose to apply.
+   *
+   * This is the single owning definition. `Sim.h` queues these into
+   * `Sim::mPendingPoseCopies` (`+0x09E8`) from `cfunc_TryCopyPoseL`
+   * (0x0075D0E0) and aliases this type as `SPendingPoseCopy`; the two were
+   * separate byte-identical declarations until `Sim::Sync`'s swap at
+   * 0x00747AAA proved they are one struct -- a three-pointer vector swap is
+   * only well-formed between identical types.
+   */
+  struct SEntityPoseUpdateEntry
+  {
+    EntId mEntityId = 0;                  // +0x00
+    boost::shared_ptr<CAniPose> mPose;    // +0x04
+  };
+
+  /**
+   * One pending allied-upgrade notification: the pre-upgrade (source) and
+   * post-upgrade (destination) unit ids. Accumulated into
+   * `Sim::mAllyUpgradeNotifications` (`+0x09D8`) by the `NotifyUpgrade` Lua
+   * binding when the destination army is an ally, and drained into the lane
+   * below by `Sim::Sync` at 0x00747A60.
+   *
+   * Defined here rather than in `Sim.h` for the same reason as the pose entry:
+   * the swap needs both sides to name one type.
+   */
+  struct SUpgradeNotifyPair
+  {
+    std::int32_t mSourceId = 0; // +0x00
+    std::int32_t mDestId = 0;   // +0x04
+  };
+  static_assert(sizeof(SUpgradeNotifyPair) == 0x08, "SUpgradeNotifyPair size must be 0x08");
+
+  struct SSyncPublishedCommandPacket
+  {
+    CmdId commandId = 0;                       // +0x00
+    std::int32_t reserved = 0;                 // +0x04
+    SSTICommandVariableData variableData{};    // +0x08
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncPublishedCommandPacket) == 0x78, "SSyncPublishedCommandPacket size must be 0x78");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncPublishedCommandPacket, variableData) == 0x08,
+    "SSyncPublishedCommandPacket::variableData offset must be 0x08"
+  );
+
+  /**
+   * Unit-create constant payload mirrored into `SSyncData::mNewUnits`.
+   *
+   * Layout evidence:
+   * - Unit/ReconBlip create-interface lanes copy byte + shared root + fake
+   *   from object `SSTIUnitConstantData` into stack payload then push.
+   */
+  struct SCreateUnitConstantData
+  {
+    std::uint8_t mBuildStateTag = 0;                  // +0x00
+    std::uint8_t pad_01_03[0x03]{};                   // +0x01
+    boost::shared_ptr<Stats<StatItem>> mStatsRoot;    // +0x04
+    std::uint8_t mFake = 0;                           // +0x0C
+    std::uint8_t pad_0D_0F[0x03]{};                   // +0x0D
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitConstantData) == 0x10, "SCreateUnitConstantData size must be 0x10");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SCreateUnitConstantData, mStatsRoot) == 0x04,
+    "SCreateUnitConstantData::mStatsRoot offset must be 0x04"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SCreateUnitConstantData, mFake) == 0x0C, "SCreateUnitConstantData::mFake offset must be 0x0C");
+
+  /**
+   * One unit/recon create packet queued by `Entity::CreateInterface` overrides.
+   */
+  struct SCreateUnitParams : SCreateEntityParams
+  {
+    SCreateUnitConstantData mConstDat{};          // +0x0C
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitParams) == 0x1C, "SCreateUnitParams size must be 0x1C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SCreateUnitParams, mConstDat) == 0x0C,
+    "SCreateUnitParams::mConstDat offset must be 0x0C"
+  );
+
+  /**
+   * One replicated entity-variable update record queued by
+   * `Entity::SyncInterface` (FUN_0067A290) onto `SSyncData::mEntityUpdates`.
+   *
+   * Layout evidence (from FUN_0067A290 / SSyncData teardown lane at +0x148):
+   * - `sub ecx, 0D8h` at 0x0067A3A7 anchors the record stride to 0xD8.
+   * - `mov [ecx], edx` at 0x0067A3B3 stores the entity id at record +0x00.
+   * - `lea ebx, [ecx+8]` at 0x0067A3B0 hands `SSTIEntityVariableData::operator=`
+   *   the payload lane at record +0x08 (a 4-byte header word precedes it).
+   * The 0x08 offset and 0xD8 total both hold because `SSTIEntityVariableData`
+   * is 0xD0 bytes (0x08 header + 0xD0 payload).
+   */
+  struct SEntityVariableUpdateEntry
+  {
+    /**
+     * Address: 0x00676AC0 (FUN_00676AC0 -- this record's default constructor,
+     * as emitted out of line for the vector: `mov dword ptr [esi], 0xF0000000`
+     * then `SSTIEntityVariableData::SSTIEntityVariableData` on `esi+8`. Zero
+     * callers; every real use inlines it. Formerly
+     * `ConstructSSTIEntityVariableDataSlotRuntime` over a duplicate
+     * `SSTIEntityVariableDataSlotRuntime` layout in
+     * moho/entity/SSTIEntityVariableData.cpp (RULE ONE), removed 2026-09-22.)
+     */
+    EntId mEntityId = static_cast<EntId>(0xF0000000u); // +0x00, EEntityIdSentinel::Invalid
+    std::uint32_t mReserved04 = 0;             // +0x04
+    SSTIEntityVariableData mVariableData{};    // +0x08
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SEntityVariableUpdateEntry, mVariableData) == 0x08,
+    "SEntityVariableUpdateEntry::mVariableData offset must be 0x08"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(SEntityVariableUpdateEntry) == 0xD8, "SEntityVariableUpdateEntry size must be 0xD8"
+  );
+
+  /**
+   * How many elements the last beat's packet carried in each of its five
+   * large lanes (IDA `struct_SyncSizes`). `Sim` keeps one (`mSyncSizes`,
+   * +0xA70) and pre-sizes the next packet from it.
+   */
+  struct SSyncSizes
+  {
+    std::int32_t mAudioRequests = 0;  // +0x00
+    std::int32_t mArmyUpdates = 0;    // +0x04
+    std::int32_t mEntityUpdates = 0;  // +0x08
+    std::int32_t mUnitUpdates = 0;    // +0x0C
+    std::int32_t mCommandPackets = 0; // +0x10
+  };
+  static_assert(sizeof(SSyncSizes) == 0x14, "SSyncSizes size must be 0x14");
+
+  /**
+   * Sync publication payload exchanged from sim thread to driver consumers.
+   *
+   * Recovered size/layout from FA `SSyncData` usage in publish/remove paths.
+   */
+  struct SSyncData
+  {
+    int32_t mCurBeat = 0;                                   // +0x000
+    int32_t mFocusArmy = -1;                                // +0x004
+    int32_t mCurTick = 0;                                   // +0x008
+    bool mAdvanced = false;                                 // +0x00C
+    std::uint8_t pad_000D_0010[0x03]{};                     // +0x00D
+    gpg::Stream* mStream = nullptr;                         // +0x010
+    std::uint8_t pad_0014_0018[0x04]{};                     // +0x014
+    /// Inline audio-request queue handed straight to
+    /// `IUserSoundManager::UpdateSoundRequests`. 0x10 of vector head plus
+    /// eight inline 0x1C-byte requests is the whole 0xF0.
+    gpg::core::FastVectorN<SAudioRequest, 8> mAudioRequests; // +0x018
+    msvc8::vector<SSTIArmyConstantData> mNewGrids;          // +0x108
+    msvc8::vector<SSTIArmyVariableData> mArmyUpdates;       // +0x118
+    msvc8::vector<SCreateEntityParams> mNewEntities;        // +0x128
+    msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
+    msvc8::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
+    msvc8::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
+    msvc8::vector<EntId> mDeleteIds;                        // +0x168
+    msvc8::vector<EntId> mEraseIds;                         // +0x178
+    /// Consumed by `CWldSession::DoBeat` as the new-command run (60-byte records).
+    msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
+    /// Consumed by `CWldSession::DoBeat` as the command-update run (120-byte records).
+    msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
+    /// Consumed by `CWldSession::DoBeat` as the delete-command id run.
+    msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
+    /// Consumed by `CWldSession::DoBeat` as the erase-command id run.
+    msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
+    boost::shared_ptr<void> mParticleBuffer;                // +0x1C8
+    /// Handed straight to `CDecalManager::AddDecals` / `RemoveDecals` by
+    /// `CWldSession::DoBeat`; the removal run carries decal handles, not
+    /// entity ids.
+    msvc8::vector<SDecalInfo> mAddDecals;                   // +0x1D0
+    msvc8::vector<std::uint32_t> mRemoveDecals;             // +0x1E0
+    msvc8::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
+    msvc8::vector<SCamFollowParams> mFollowCameras;         // +0x200
+    /// Allied-upgrade notifications for this beat. `Sim::Sync` swaps
+    /// `Sim::mAllyUpgradeNotifications` (`Sim+0x09D8`) into this lane at
+    /// 0x00747A60 -- `[ebx+9DCh/9E0h/9E4h]` against `[eax+214h/218h/21Ch]`.
+    /// Previously declared `msvc8::vector<std::byte> mAuxiliaryVector17` and
+    /// described as "untouched by `CWldSession::DoBeat`"; the element type is
+    /// pinned by the swap's source, which is a
+    /// `msvc8::vector<SUpgradeNotifyPair>`.
+    msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // +0x210
+    msvc8::vector<SEntityPoseUpdateEntry> mPoseUpdates;     // +0x220
+    msvc8::vector<gpg::Rect2i> mPlayableRectUpdates;        // +0x230
+    msvc8::vector<SDesyncInfo> mDesyncs;                    // +0x240
+    int32_t mPausedBy = -1;                                 // +0x250
+    msvc8::string mSubmitArmyStats;                         // +0x254
+    bool mGameOver = false;                                 // +0x270
+    bool mFogOfWar = false;                                 // +0x271
+    std::uint8_t pad_0272_0274[0x02]{};                     // +0x272
+    boost::SharedPtrRaw<CHeightField> mTerrainUpdate;       // +0x274
+    boost::SharedPtrRaw<CSimResources> mSimResources;       // +0x27C
+    msvc8::vector<msvc8::string> mPrintField;               // +0x284
+    /// Copied wholesale onto `CWldSession::mSyncExtraUnitData` by
+    /// `CWldSession::DoBeat` via `msvc8::vector<SExtraUnitData>::operator=`
+    /// (0x00895214, FUN_007530C0, `legacy/containers/Vector.h`). Previously
+    /// mistyped `msvc8::vector<SyncInlineVector>`; see the field-level note
+    /// on `CWldSession::mSyncExtraUnitData` (`CWldSession.h`) for the full
+    /// citation-correction evidence.
+    msvc8::vector<SExtraUnitData> mSyncExtraUnitData;  // +0x294
+    boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas;     // +0x2A4
+    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // +0x2AC
+    std::uint8_t pad_02B4_02B8[0x04]{};                     // +0x2B4
+
+    /**
+     * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one sync-packet payload with zeroed scalar lanes and empty
+     * legacy vector containers.
+     */
+    SSyncData();
+
+    /**
+     * Address: 0x0073FC70 (FUN_0073FC70, ??1SSyncData@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Releases every owned sync-packet lane, including hidden publication
+     * vectors, shared debug/terrain handles, the inline audio request queue,
+     * and the owned stream pointer.
+     */
+    ~SSyncData();
+
+    /**
+     * Address: 0x00560940 (FUN_00560940)
+     *
+     * IDA signature:
+     * struct_SyncSizes *__usercall sub_560940@<eax>(Moho::SSyncData *this@<ecx>,
+     *     struct_SyncSizes *out@<edi>);
+     *
+     * What it does:
+     * Returns the element counts of the five large lanes: the audio request
+     * fastvector (+0x18, 0x1C stride) and the army (0x160), entity (0xD8),
+     * unit (0x238) and published command-packet (0x78) vectors. `Sim::Sync`
+     * stores it as the last thing it does (0x00748341).
+     */
+    [[nodiscard]] SSyncSizes GetSizes() const;
+
+    /**
+     * Address: 0x00560A00 (FUN_00560A00, Moho::SSyncData::ReserveSizes)
+     *
+     * IDA signature:
+     * void __stdcall Moho::SSyncData::ReserveSizes(struct_SyncSizes *a1, Moho::SSyncData *a2);
+     *
+     * What it does:
+     * Reserves each of those five lanes to the given counts. `Sim::Sync` calls
+     * it on the fresh packet with the previous beat's sizes (0x00747605).
+     */
+    void ReserveSizes(const SSyncSizes& sizes);
+
+    void QueuePendingCommandEventRemoval(CmdId commandId);
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSTICommandConstantData) == 0x3C, "SSTICommandConstantData size must be 0x3C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSTICommandConstantData, unk2) == 0x20,
+    "SSTICommandConstantData::unk2 offset must be 0x20"
+  );
+  // The SSyncData field map is enforced unconditionally: it was resolved from
+  // the single `ebp` binding in CWldSession::DoBeat (FUN_00894530) and the
+  // whole sim->UI handoff depends on it. See
+  // decomp/recovery/reports/by-source/src/moho/sim/SSyncData.reconstruction.md
+  static_assert(offsetof(SSyncData, mFocusArmy) == 0x004, "SSyncData::mFocusArmy offset must be 0x004");
+  static_assert(offsetof(SSyncData, mCurTick) == 0x008, "SSyncData::mCurTick offset must be 0x008");
+  static_assert(offsetof(SSyncData, mAdvanced) == 0x00C, "SSyncData::mAdvanced offset must be 0x00C");
+  static_assert(offsetof(SSyncData, mStream) == 0x010, "SSyncData::mStream offset must be 0x010");
+  static_assert(offsetof(SSyncData, mAudioRequests) == 0x018, "SSyncData::mAudioRequests offset must be 0x018");
+  static_assert(offsetof(SSyncData, mNewGrids) == 0x108, "SSyncData::mNewGrids offset must be 0x108");
+  static_assert(offsetof(SSyncData, mArmyUpdates) == 0x118, "SSyncData::mArmyUpdates offset must be 0x118");
+  static_assert(offsetof(SSyncData, mNewEntities) == 0x128, "SSyncData::mNewEntities offset must be 0x128");
+  static_assert(offsetof(SSyncData, mNewUnits) == 0x138, "SSyncData::mNewUnits offset must be 0x138");
+  static_assert(offsetof(SSyncData, mEntityUpdates) == 0x148, "SSyncData::mEntityUpdates offset must be 0x148");
+  static_assert(offsetof(SSyncData, mUnitUpdates) == 0x158, "SSyncData::mUnitUpdates offset must be 0x158");
+  static_assert(offsetof(SSyncData, mDeleteIds) == 0x168, "SSyncData::mDeleteIds offset must be 0x168");
+  static_assert(offsetof(SSyncData, mEraseIds) == 0x178, "SSyncData::mEraseIds offset must be 0x178");
+  static_assert(
+    offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
+    "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
+  );
+  static_assert(
+    offsetof(SSyncData, mPublishedCommandPackets) == 0x198,
+    "SSyncData::mPublishedCommandPackets offset must be 0x198"
+  );
+  static_assert(
+    offsetof(SSyncData, mPendingCommandEventRemovals) == 0x1A8,
+    "SSyncData::mPendingCommandEventRemovals offset must be 0x1A8"
+  );
+  static_assert(
+    offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
+    "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
+  );
+  static_assert(
+    offsetof(SSyncData, mParticleBuffer) == 0x1C8, "SSyncData::mParticleBuffer offset must be 0x1C8"
+  );
+  static_assert(offsetof(SSyncData, mAddDecals) == 0x1D0, "SSyncData::mAddDecals offset must be 0x1D0");
+  static_assert(offsetof(SSyncData, mRemoveDecals) == 0x1E0, "SSyncData::mRemoveDecals offset must be 0x1E0");
+  static_assert(
+    offsetof(SSyncData, mCamShakeParams) == 0x1F0, "SSyncData::mCamShakeParams offset must be 0x1F0"
+  );
+  static_assert(
+    offsetof(SSyncData, mFollowCameras) == 0x200, "SSyncData::mFollowCameras offset must be 0x200"
+  );
+  static_assert(offsetof(SSyncData, mPoseUpdates) == 0x220, "SSyncData::mPoseUpdates offset must be 0x220");
+  static_assert(
+    offsetof(SSyncData, mPlayableRectUpdates) == 0x230, "SSyncData::mPlayableRectUpdates offset must be 0x230"
+  );
+  static_assert(offsetof(SSyncData, mDesyncs) == 0x240, "SSyncData::mDesyncs offset must be 0x240");
+  static_assert(offsetof(SSyncData, mPausedBy) == 0x250, "SSyncData::mPausedBy offset must be 0x250");
+  static_assert(
+    offsetof(SSyncData, mSubmitArmyStats) == 0x254, "SSyncData::mSubmitArmyStats offset must be 0x254"
+  );
+  static_assert(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
+  static_assert(offsetof(SSyncData, mFogOfWar) == 0x271, "SSyncData::mFogOfWar offset must be 0x271");
+  static_assert(
+    offsetof(SSyncData, mTerrainUpdate) == 0x274, "SSyncData::mTerrainUpdate offset must be 0x274"
+  );
+  static_assert(
+    offsetof(SSyncData, mSimResources) == 0x27C, "SSyncData::mSimResources offset must be 0x27C"
+  );
+  static_assert(offsetof(SSyncData, mPrintField) == 0x284, "SSyncData::mPrintField offset must be 0x284");
+  static_assert(
+    offsetof(SSyncData, mTickDebugCanvas) == 0x2A4, "SSyncData::mTickDebugCanvas offset must be 0x2A4"
+  );
+  static_assert(
+    offsetof(SSyncData, mBeatDebugCanvas) == 0x2AC, "SSyncData::mBeatDebugCanvas offset must be 0x2AC"
+  );
+  static_assert(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mEntityUpdates) == 0x148,
+    "SSyncData::mEntityUpdates offset must be 0x148"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mUnitUpdates) == 0x158,
+    "SSyncData::mUnitUpdates offset must be 0x158"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mDeleteIds) == 0x168,
+    "SSyncData::mDeleteIds offset must be 0x168"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mEraseIds) == 0x178,
+    "SSyncData::mEraseIds offset must be 0x178"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
+    "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mPublishedCommandPackets) == 0x198,
+    "SSyncData::mPublishedCommandPackets offset must be 0x198"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mPendingCommandEventRemovals) == 0x1A8,
+    "SSyncData::mPendingCommandEventRemovals offset must be 0x1A8"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
+    "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mPausedBy) == 0x250, "SSyncData::mPausedBy offset must be 0x250");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mSubmitArmyStats) == 0x254,
+    "SSyncData::mSubmitArmyStats offset must be 0x254"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
+
+
+  /**
+   * Address: 0x005C38E0 (FUN_005C38E0)
+   *
+   * What it does:
+   * Appends one unit-create sync packet to `syncData->mNewUnits` and returns
+   * a pointer to the stored element.
+   */
+  SCreateUnitParams* QueueCreateUnitParams(SSyncData* syncData, const SCreateUnitParams& params);
+
+  /**
+   * Address: 0x0067A290 (FUN_0067A290) tail (inlined push lane of Moho::Entity::SyncInterface)
+   *
+   * What it does:
+   * Appends one default `SEntityVariableUpdateEntry` to
+   * `syncData->mEntityUpdates`, then overwrites the record's entity id and
+   * assignment-copies the supplied variable payload into it, returning a pointer
+   * to the stored element. Mirrors the binary's push-default / write-id /
+   * `SSTIEntityVariableData::operator=` sequence at 0x0067A35B..0x0067A3B5.
+   */
+  SEntityVariableUpdateEntry* QueueEntityVariableUpdate(
+    SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData);
+
+  /**
+   * Address: 0x005C39A0 (FUN_005C39A0, mUnitUpdates push-default lane) + the
+   *          inlined id/`Assign` tail of the SyncInterface overrides
+   *          (FUN_006AC3A0 0x006AC4DC..0x006AC500 / FUN_005BEFB0 0x005BF071..).
+   *
+   * What it does:
+   * Appends one default `SUnitVariableUpdateEntry` to `syncData->mUnitUpdates`
+   * (header word 0xF0000000 in `mEntityId` + default-constructed
+   * `SSTIUnitVariableData`), then overwrites the entry's entity id and
+   * assignment-copies the supplied variable payload into it, returning a pointer
+   * to the stored element. The per-entry pose / stun / recon-flag fields are set
+   * by the caller afterward, exactly as the binary does. Mirrors
+   * `QueueEntityVariableUpdate`.
+   */
+  SUnitVariableUpdateEntry* QueueUnitVariableUpdate(
+    SSyncData* syncData, EntId entityId, const SSTIUnitVariableData& variableData);
+
+  /**
+   * Sets the trailing recon-flag word (`SUnitVariableUpdateEntry::mReconFlags`,
+   * +0x230) on a queued unit-update record. Kept out-of-line so the entry type
+   * (which embeds the full `SSTIUnitVariableData`) stays defined only in
+   * SimDriver.cpp; callers treat the entry as an opaque handle.
+   *
+   * Binary: `mov dword ptr [edi+230h], 1Ch` (Unit, FUN_006AC3A0 @0x006AC500) /
+   * `mov [esi+230h], edx` (ReconBlip, FUN_005BEFB0 @0x005BF129).
+   */
+  void SetUnitUpdateReconFlags(SUnitVariableUpdateEntry* entry, std::int32_t reconFlags) noexcept;
+
+  /**
+   * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
+   */
+  /**
+   * Paged deque of pending sync-data payload pointers, matching a
+   * `boost::ptr_deque<SSyncData>` binding over `std::deque<SSyncData*>`.
+   *
+   * Field layout is exactly `msvc8::deque<SSyncData*>`'s 0x14-byte ABI
+   * (`_Myproxy`/`_Map`/`_Mapsize`/`_Myoff`/`_Mysize`) -- confirmed by IDA's
+   * own field recovery for `Moho::CSimDriver::mSyncdat` in `FUN_0073B570`
+   * (the ctor zero-inits `mSyncdat._Map/_Mapsize/_Myoff/_Mysize` directly)
+   * and by the paged double-indirection (`pages[block][lane]`) addressing
+   * in `FUN_00741980`/`FUN_007408F0`/`FUN_0073F9C0`. This is NOT a flat
+   * single-array ring buffer; every live element sits behind a `_Map`
+   * page-pointer lookup, exactly like every other `msvc8::deque<T>` user
+   * in this codebase.
+   */
+  struct SSyncDataQueue
+  {
+    msvc8::deque<SSyncData*> mSyncdat; // +0x00, binary field name (IDA: mSyncdat)
+
+    ~SSyncDataQueue();
+
+    bool Empty() const;
+    [[nodiscard]] uint32_t Size() const noexcept { return static_cast<uint32_t>(mSyncdat.size()); }
+    void PushBack(SSyncData* data);
+    SSyncData* PopFront();
+
+    /**
+     * Address: 0x007407F0 (FUN_007407F0, dispatches the inclusive range
+     *          `[head, head + size)` into 0x00741980)
+     * Address: 0x00741980 (FUN_00741980, per-slot payload destroy loop)
+     *
+     * What it does:
+     * Destroys and null-clears every live payload currently queued,
+     * walking the deque's real page/lane storage via its iterators.
+     * Ownership semantics (deleting the pointed-to `SSyncData`) belong to
+     * this ptr_deque-shaped wrapper, not to `msvc8::deque<T>` itself --
+     * the generic container only ever destroys the pointer value, never
+     * the pointee.
+     */
+    void DrainLiveRingBufferRange() noexcept;
+
+    void ClearAndDelete();
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncDataQueue) == 0x14, "SSyncDataQueue size must be 0x14");
+
+  /**
+   * Address: 0x0073F9C0 (FUN_0073F9C0,
+   *                      boost::ptr_sequence_adapter_deque_SSyncData::pop_front)
+   *
+   * IDA signature:
+   * Moho::SSyncData **__userpurge boost::ptr_sequence_adapter_deque_SSyncData::pop_front@<eax>(
+   *     std::deque_SSyncData *this@<ecx>, Moho::SSyncData **a2);
+   *
+   * What it does:
+   * Per-T named free helper that captures the binary's engine-instantiated
+   * body of `boost::ptr_sequence_adapter< std::deque<SSyncData*> >::pop_front`.
+   * Pops the front element off the sync-data queue, transfers ownership to the
+   * caller, and throws `boost::bad_ptr_container_operation` with the message
+   * "'pop_front()' on empty container" when the queue is empty.
+   *
+   * Caller: `Moho::CSimDriver::GetSyncData` (FUN_0073C520) — the sole binary
+   * caller of the ptr_sequence_adapter pop_front emission.
+   */
+  [[nodiscard]] SSyncData* PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue);
+
+  enum class EDriverState : int32_t
+  {
+    Startup = 0,
+    Ready = 1,
+    Dispatching = 2,
+    WaitingForMainThread = 3,
+    Stopped = 4,
+    Failed = 5,
+  };
+
+  /**
+   * Concrete simulation-thread driver.
+   *
+   * VFTABLE: 0x00E3350C
+   * Size:    0x230
+   */
+  class CSimDriver final : public ISTIDriver
+  {
+    friend struct CSimDriverLayoutAssertions;
+
+  public:
+    /**
+     * Address: 0x0073B570 (FUN_0073B570)
+     * Mangled: ??0CSimDriver@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Initializes driver state, synchronization primitives, marshaller, and startup thread state.
+     */
+    CSimDriver(
+      msvc8::auto_ptr<gpg::Stream> stream,
+      msvc8::auto_ptr<CClientManagerImpl> clientManager,
+      const boost::shared_ptr<LaunchInfoBase>& launchInfo,
+      uint32_t commandSourceId
+    );
+
+    /**
+     * Address: 0x0073BA50 (FUN_0073BA50)
+     * Mangled: ??1CSimDriver@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Performs full shutdown and releases all owned resources.
+     */
+    ~CSimDriver() override;
+
+    /**
+     * Address: 0x0073B910 (FUN_0073B910, Moho::CSimDriver::dtr)
+     *
+     * What it does:
+     * Executes full destructor body and conditionally frees object storage
+     * when `deleteFlag & 1` is set.
+     */
+    CSimDriver* DestroyWithDeleteFlag(std::uint8_t deleteFlag);
+
+    // Slot order matches ISTIDriver; addresses here are CSimDriver override entrypoints.
+    /**
+     * Address: 0x0073BBF0 (FUN_0073BBF0)
+     */
+    void DisconnectClients() override;
+    /**
+     * Address: 0x0073BC80 (FUN_0073BC80)
+     */
+    void ShutDown() override;
+    /**
+     * Address: 0x0073B190 (FUN_0073B190)
+     */
+    CClientManagerImpl* GetClientManager() override;
+    /**
+     * Address: 0x0073BDE0 (FUN_0073BDE0)
+     */
+    void NoOp() override;
+    /**
+     * Address: 0x0073C250 (FUN_0073C250)
+     */
+    void Dispatch() override;
+    /**
+     * Address: 0x0073C410 (FUN_0073C410)
+     */
+    void IncrementOutstandingRequests() override;
+    /**
+     * Address: 0x0073C440 (FUN_0073C440)
+     */
+    void DecrementOutstandingRequestsAndSignal() override;
+    /**
+     * Address: 0x0073C4F0 (FUN_0073C4F0)
+     */
+    bool HasSyncData() override;
+    /**
+     * Address: 0x0073C520 (FUN_0073C520)
+     */
+    void GetSyncData(SSyncData*& outSyncData) override;
+    /**
+     * Address: 0x0073B1A0 (FUN_0073B1A0)
+     */
+    HANDLE GetSyncDataAvailableEvent() override;
+    /**
+     * Address: 0x0073C630 (FUN_0073C630)
+     */
+    double GetSimSpeed() override;
+    /**
+     * Address: 0x0073B1B0 (FUN_0073B1B0)
+     */
+    void SetArmyIndex(int armyIndex) override;
+    /**
+     * Address context:
+     * - FAF patch callback `cfunc_SetFocusArmySim` writes this lane directly.
+     *
+     * What it does:
+     * Updates pending focus army without lock/event side effects.
+     */
+    void SetPendingFocusArmyRaw(std::int32_t focusArmy) noexcept;
+    /**
+     * Address: 0x0073B270 (FUN_0073B270)
+     */
+    void SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams) override;
+    /**
+     * Address: 0x0073B3F0 (FUN_0073B3F0)
+     * Retail build: compare-only path for mask A.
+     */
+    void SetSyncFilterMaskA(const SSyncFilterMaskBlock& block) override;
+    /**
+     * Address: 0x0073B4B0 (FUN_0073B4B0)
+     */
+    void SetSyncFilterMaskB(const SSyncFilterMaskBlock& block) override;
+    /**
+     * Address: 0x0073B240 (FUN_0073B240)
+     */
+    void SetSyncFilterOptionFlag(bool value) override;
+    /**
+     * Address: 0x0073C660 (FUN_0073C660)
+     */
+    void RequestPause(std::int32_t* outCommandCookie = nullptr) override;
+    /**
+     * Address: 0x0073C700 (FUN_0073C700)
+     */
+    void Resume(std::int32_t* outCommandCookie = nullptr) override;
+    /**
+     * Address: 0x0073C7A0 (FUN_0073C7A0)
+     */
+    CmdId SingleStep() override;
+    /**
+     * Address: 0x0073C840 (FUN_0073C840)
+     */
+    CmdId CreateUnit(uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, float heading) override;
+    /**
+     * Address: 0x0073C8F0 (FUN_0073C8F0)
+     */
+    CmdId CreateProp(const char* id, const Wm3::Vec3f& loc) override;
+    /**
+     * Address: 0x0073C990 (FUN_0073C990)
+     */
+    CmdId DestroyEntity(EntId entityId) override;
+    /**
+     * Address: 0x0073CA30 (FUN_0073CA30)
+     */
+    CmdId WarpEntity(EntId entityId, const VTransform& transform) override;
+    /**
+     * Address: 0x0073CAD0 (FUN_0073CAD0)
+     */
+    CmdId ProcessInfoPair(EntId entityId, gpg::StrArg key, gpg::StrArg val) override;
+    /**
+     * Address: 0x0073CB70 (FUN_0073CB70)
+     */
+    CmdId
+    IssueCommand(const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear) override;
+    /**
+     * Address: 0x0073CC10 (FUN_0073CC10)
+     */
+    CmdId IssueFactoryCommand(
+      const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear
+    ) override;
+    /**
+     * Address: 0x0073CCB0 (FUN_0073CCB0)
+     */
+    CmdId IncreaseCommandCount(CmdId id, int count) override;
+    /**
+     * Address: 0x0073CD50 (FUN_0073CD50)
+     */
+    CmdId DecreaseCommandCount(CmdId id, int count) override;
+    /**
+     * Address: 0x0073CDF0 (FUN_0073CDF0)
+     */
+    CmdId SetCommandTarget(CmdId id, const SSTITarget& target) override;
+    /**
+     * Address: 0x0073CE90 (FUN_0073CE90)
+     */
+    CmdId SetCommandType(CmdId id, EUnitCommandType type) override;
+    /**
+     * Address: 0x0073CF30 (FUN_0073CF30)
+     */
+    CmdId SetCommandCells(
+      CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target
+    ) override;
+    /**
+     * Address: 0x0073CFD0 (FUN_0073CFD0)
+     */
+    CmdId RemoveCommandFromUnitQueue(CmdId id, EntId unitId) override;
+    /**
+     * Address: 0x0073D070 (FUN_0073D070)
+     */
+    CmdId ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) override;
+    /**
+     * Address: 0x0073D110 (FUN_0073D110)
+     */
+    CmdId LuaSimCallback(
+      const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
+    ) override;
+    /**
+     * Address: 0x0073D1B0 (FUN_0073D1B0)
+     */
+    CmdId ExecuteDebugCommand(
+      const char* command,
+      const Wm3::Vector3<float>& worldPos,
+      uint32_t focusArmy,
+      const BVSet<EntId, EntIdUniverse>& entities
+    ) override;
+    /**
+     * Address: 0x0073DEA0 (FUN_0073DEA0)
+     */
+    Sim* ProcessEvents() override;
+    /**
+     * Address: 0x0073DF50 (FUN_0073DF50)
+     */
+    void ReleaseInterlockRef() override;
+    /**
+     * Address: 0x0073DF60 (FUN_0073DF60)
+     */
+    void RequestSaveGame(CSaveGameRequestImpl* request) override;
+    /**
+     * Address: 0x0073DFE0 (FUN_0073DFE0)
+     */
+    void DrawNetworkStats(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY) override;
+
+    /**
+     * Address: 0x0073F430 (FUN_0073F430)
+     */
+    DWORD PerformNextEvent();
+
+    // ---- diagnostics-only readouts (crash report section; no behaviour) ----
+    [[nodiscard]] int32_t DiagDispatchBeat() const { return mDispatchBeat; }
+    [[nodiscard]] int32_t DiagNextIssueBeat() const { return mNextIssueBeat; }
+    [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
+
+  private:
+    /**
+     * Address: 0x0073D8C0 (FUN_0073D8C0, thunk to FUN_0128FAC0)
+     *
+     * What it does:
+     * Runs one dispatch beat, then executes sync publication and sim-rate sampling.
+     */
+    void ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock);
+    /**
+     * Address: 0x0073DAD0 (FUN_0073DAD0)
+     *
+     * What it does:
+     * Unlocks the driver mutex, runs one `Sim::Sync` publish pass, relocks,
+     * verifies historical checksums when available, and enqueues the sync packet.
+     */
+    void FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock);
+
+    /**
+     * Address: 0x0073BDF0 (FUN_0073BDF0, Moho::CSimDriver::ThreadRun)
+     *
+     * IDA signature:
+     * void __fastcall Moho::CSimDriver::ThreadRun(Moho::CSimDriver *this);
+     *
+     * What it does:
+     * Body of the driver's "Issue" thread. Beats the client manager, works out
+     * how far ahead of the executed beat it may issue - from the negotiated sim
+     * rate, or from what the other clients have queued when the sim is blocked -
+     * hands that many beats to the marshaller, promotes the driver to
+     * Dispatching once a beat is available, and sleeps on the connection event
+     * until the next one is due.
+     */
+    void ThreadRun();
+
+    /**
+     * Address: 0x0073D260 (FUN_0073D260, Moho::CSimDrive::ThreadCreateSim)
+     *
+     * What it does:
+     * Body of the bootstrap thread. Builds the simulation from the launch info,
+     * wires the command stream through a fresh decoder, starts the issue
+     * thread, publishes the opening sync the frame machine waits on, then runs
+     * the dispatch loop until shutdown.
+     */
+    void ThreadCreateSim();
+
+    // Shared tail lifted from FUN_0073B1B0/FUN_0073BBF0 and command wrappers.
+    void MarkFirstConnectionActivityLocked();
+    /**
+     * Address: 0x0073C640 (FUN_0073C640, sub_73C640)
+     *
+     * What it does:
+     * Stamps `mLastSyncCycleTime`, signals the connection event, and writes
+     * the current command-cookie lane to one output pointer.
+     */
+    std::int32_t* SignalConnectionAndWriteCommandCookie(std::int32_t* outCommandCookie);
+    /**
+     * Address: 0x0073C4C0 (FUN_0073C4C0)
+     *
+     * What it does:
+     * Queries the client-manager available beat lane and promotes
+     * `mState` to `Dispatching` when the available beat has reached
+     * `mDispatchBeat`.
+     */
+    void PromoteToDispatchingWhenBeatAvailable(int beatQuerySeed);
+    /**
+     * Address: 0x0073DE90 (FUN_0073DE90)
+     *
+     * What it does:
+     * Stores one driver-state lane and notifies all waiters on `mStateChanged`.
+     */
+    void SetStateAndNotify(EDriverState state);
+    /**
+     * Address: 0x0073DD70 (FUN_0073DD70) + exception-recovery tail 0x0073DDF9..0x0073DE2B
+     */
+    void PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock);
+    // Local source-side adapter for removed out-param command-cookie returns.
+    static void JoinAndDeleteThread(boost::thread*& thread);
+
+  private:
+    // The five owners below are smart pointers, not raw ones. `~CSimDriver`'s
+    // body ends after the two `CloseHandle`s. The binary then destroys the
+    // members in reverse declaration order, each under its own EH state
+    // (0x0073BB24..0x0073BBC6): decoder, marshaller, launch info, stream,
+    // client manager, sim. The constructor's unwind funclets (0x00BBB908..
+    // 0x00BBB945) destroy the same members through their smart-pointer
+    // destructors when a later initialiser throws.
+    boost::scoped_ptr<Sim> mSim;                          // +0x04
+    msvc8::auto_ptr<CClientManagerImpl> mClientManager;   // +0x08
+    msvc8::auto_ptr<gpg::Stream> mStream;                 // +0x0C
+    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;        // +0x10
+    uint32_t mCommandSourceId = 0;                 // +0x18
+    int32_t mLastDequeuedBeat = -1;                // +0x1C
+    int32_t mDispatchBeat = 1;                     // +0x20
+    // The next beat the issue thread will hand to the marshaller. The command
+    // methods hand this same number back to their caller as the "cookie" for
+    // the command they just issued - it is the beat that command lands on.
+    int32_t mNextIssueBeat = 1;                    // +0x24
+    boost::scoped_ptr<CMarshaller> mMarshaller;    // +0x28
+    boost::scoped_ptr<CDecoder> mDecoder;          // +0x2C
+    // Constructed and destroyed in place: `boost::mutex::mutex` at 0x0073B5F0,
+    // `~mutex` at 0x0073BB1A, both on `this+0x30`.
+    boost::mutex mLock;                            // +0x30
+    boost::thread* mSimThread = nullptr;           // +0x38
+    int32_t mOutstandingRequests = 1;              // +0x3C
+    gpg::time::Timer mTimer;                       // +0x40
+    HANDLE mConnectionEvent = nullptr;             // +0x48
+    // +0x4C..+0x4F: compiler-inserted alignment before 8-byte cycle timestamp.
+    int64_t mLastSyncCycleTime = 0; // +0x50
+    bool mStopSimThread = false;    // +0x58
+    // +0x59..+0x5F: compiler-inserted alignment before 8-byte cycle timestamp.
+    int64_t mFirstCommandCycleTime = 0; // +0x60
+    bool mSimBusy = false;              // +0x68
+    // +0x69..+0x6B: compiler-inserted alignment before pointer.
+    boost::thread* mCreateSimThread = nullptr; // +0x6C
+    bool mStopCreateSimThread = false;         // +0x70
+    // +0x71..+0x73: compiler-inserted alignment before boost::condition.
+    boost::condition mStateChanged;              // +0x74
+    EDriverState mState = EDriverState::Startup; // +0x8C
+    SSyncDataQueue mSyncDataQueue;               // +0x90
+    HANDLE mSyncDataAvailableEvent = nullptr;    // +0xA4
+    bool mInterlockedMode = false;               // +0xA8
+    // +0xA9..+0xAB: compiler-inserted alignment before int32.
+    int32_t mInterlockRefCount = 0;                   // +0xAC
+    SSyncFilter mPendingSyncFilter;                   // +0xB0
+    SSyncFilter mActiveSyncFilter;                    // +0x120
+    CSaveGameRequestImpl* mSaveGameRequest = nullptr; // +0x190
+    bool mWantsToSave = false;                        // +0x194
+    // +0x195..+0x197: compiler-inserted alignment before 4-byte aligned flag group.
+    alignas(4) bool mSaveRequestUsesSuggestedName = false; // +0x198
+    // +0x199..+0x19B: compiler-inserted alignment before string.
+    msvc8::string mPendingSaveName; // +0x19C
+    NetSpeeds mSimSpeedSamples;     // +0x1B8
+    int32_t mCurrentSimRate = 10;   // +0x228
+  };
+
+  struct CSimDriverLayoutAssertions
+  {
+    FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CSimDriver) == 0x230, "CSimDriver size must be 0x230");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mClientManager) == 0x8, "mClientManager offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mMarshaller) == 0x28, "mMarshaller offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mLastSyncCycleTime) == 0x50, "mLastSyncCycleTime offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mStopSimThread) == 0x58, "mStopSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mFirstCommandCycleTime) == 0x60, "mFirstCommandCycleTime offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSimBusy) == 0x68, "mSimBusy offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mCreateSimThread) == 0x6C, "mCreateSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mStopCreateSimThread) == 0x70, "mStopCreateSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mState) == 0x8C, "mState offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSyncDataAvailableEvent) == 0xA4, "mSyncDataAvailableEvent offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mInterlockedMode) == 0xA8, "mInterlockedMode offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mInterlockRefCount) == 0xAC, "mInterlockRefCount offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mPendingSyncFilter) == 0xB0, "mPendingSyncFilter offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mActiveSyncFilter) == 0x120, "mActiveSyncFilter offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSaveGameRequest) == 0x190, "mSaveGameRequest offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mWantsToSave) == 0x194, "mWantsToSave offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(
+      offsetof(CSimDriver, mSaveRequestUsesSuggestedName) == 0x198, "mSaveRequestUsesSuggestedName offset mismatch"
+    );
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mPendingSaveName) == 0x19C, "mPendingSaveName offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSimSpeedSamples) == 0x1B8, "mSimSpeedSamples offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mCurrentSimRate) == 0x228, "mCurrentSimRate offset mismatch");
+  };
+
+  /**
+   * Address: 0x0073F4E0 (FUN_0073F4E0)
+   * Mangled:
+   * ?SIM_CreateDriver@Moho@@YAPAVISTIDriver@1@V?$auto_ptr@VIClientManager@Moho@@@std@@V?$auto_ptr@VStream@gpg@@@4@ABV?$shared_ptr@ULaunchInfoBase@Moho@@@boost@@I@Z
+   *
+   * What it does:
+   * Factory that transfers stream/client ownership and returns a new `CSimDriver`.
+   */
+  ISTIDriver* SIM_CreateDriver(
+    CClientManagerImpl* clientManager,
+    gpg::Stream* stream,
+    const boost::shared_ptr<LaunchInfoBase>& launchInfo,
+    uint32_t commandSourceId
+  );
+
+  /**
+   * Engine addition, not recovered from the binary: how the issue thread of the driver created
+   * next paces beats. Set by the session right before `SIM_CreateDriver`.
+   * - Network: the original pacing, for every session with network peers (players or observers).
+   * - Replay: a replay; `sim_ReplayLead` applies.
+   * - Local: one human client and no network connector (a single-player skirmish or campaign);
+   *   `sim_LocalLead` applies.
+   */
+  enum class ESimSessionPacing : std::uint8_t
+  {
+    Network,
+    Replay,
+    Local,
+  };
+
+  void SIM_SetSessionPacing(ESimSessionPacing pacing) noexcept;
+
+  /// Engine addition: the pacing `SIM_SetSessionPacing` last set.
+  [[nodiscard]] ESimSessionPacing SIM_GetSessionPacing() noexcept;
+
+  /**
+   * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
+   * this many beats issued beyond the last one the main thread has taken off the sync queue
+   * (on top of the original rate schedule, see `sim_LeadOnSchedule`), so the sim computes the
+   * next beats while the frame renders. The requested speed still holds: the main thread drains
+   * the queue on its own clock. 0 restores the original pacing.
+   * - `sim_ReplayLead` (replays, default 10): a replay issues no commands, so the lead only
+   *   changes how fast it plays, never what it computes.
+   * - `sim_LocalLead` (single player, default 2): a command still lands on the next issued beat,
+   *   so a larger lead would delay the player's orders by that many beats; keep it small.
+   */
+  extern int sim_ReplayLead;
+  extern int sim_LocalLead;
+
+  /**
+   * Engine addition: user-side console variable, used while a lead applies. 1 (default): the issue
+   * thread keeps the original rate schedule, run that many beats ahead, so beats keep coming at the
+   * requested rate between frames. 0: only the fixed lead past the last dequeued beat, which lets a
+   * frame take at most about that many beats and caps the session at lead x frame rate.
+   */
+  extern int sim_LeadOnSchedule;
+
+  /**
+   * Engine addition: while a lead paces the session (see above), the sim's measured speed (game
+   * time per real time, from its median beat cost) before it is rounded down to a whole rate step;
+   * 0 otherwise. The display clock follows it so the sim is not held to the rounded rate.
+   */
+  [[nodiscard]] float SIM_GetLeadSimSpeedEstimate() noexcept;
+
+} // namespace moho

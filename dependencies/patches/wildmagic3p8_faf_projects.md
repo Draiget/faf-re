@@ -25,7 +25,7 @@ The five modern projects and their filter files were added by FAF:
 | `Renderers/OpenGLRenderer/WglRenderer.vcxproj` (+ `.filters`) | not referenced by the engine build |
 | `Applications/WglApplication.vcxproj` (+ `.filters`) | not referenced by the engine build |
 
-Because the first three are `ProjectReference`s, `msbuild src/sdk/main.vcxproj`
+Because the first three are `ProjectReference`s, `msbuild src/main.vcxproj`
 builds Wild Magic as part of the engine. There is no separate Wild Magic build
 step.
 

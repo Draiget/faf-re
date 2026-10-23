@@ -79,4 +79,4 @@ SkyDome/WaterSurface, CMauiControl, CameraImpl and the virtual-destructor pass.
   displacing every method under it in them and in everything deriving from them
   (commit 57dfcfe4).
 - `gpg::gal::DeviceD3D9` — 19 slots still not overridden; see
-  `decomp/recovery/reports/by-source/src/sdk/gpg/gal/Device.reconstruction.md`.
+  `decomp/recovery/reports/by-source/src/gpg/gal/Device.reconstruction.md`.

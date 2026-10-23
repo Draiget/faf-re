@@ -22,7 +22,7 @@ code path to run.
 
 Usage
 -----
-    msbuild src/sdk/main.vcxproj ... | python scripts/linkcheck.py
+    msbuild src/main.vcxproj ... | python scripts/linkcheck.py
     python scripts/linkcheck.py --log build.log
     python scripts/linkcheck.py --log build.log --update   # re-baseline
 

@@ -1,8 +1,8 @@
 @echo off
 rem ---------------------------------------------------------------------------
 rem difffuzz build: a standalone 32-bit console tool. It never touches
-rem src\sdk\main.vcxproj; it compiles the few recovered math TUs it tests
-rem straight from src\sdk with the same float-relevant switches main.vcxproj
+rem src\main.vcxproj; it compiles the few recovered math TUs it tests
+rem straight from src with the same float-relevant switches main.vcxproj
 rem uses for Win32 (v143 defaults /arch:SSE2 /fp:precise, C++20, and in
 rem Release /O2 + the forced-include platform\X87SqrtCall.h).
 rem
@@ -17,7 +17,7 @@ setlocal EnableDelayedExpansion
 
 set "HERE=%~dp0"
 for %%I in ("%HERE%..\..") do set "REPO=%%~fI"
-set "SDK=%REPO%\src\sdk"
+set "SDK=%REPO%\src"
 set "WM3=%REPO%\dependencies\WildMagic3p8\Foundation"
 set "OUT=%HERE%build"
 
@@ -34,7 +34,7 @@ if "%WHICH%"=="" set "WHICH=all"
 set "INC=/I "%SDK%" /I "%WM3%" /I "%WM3%\Math" /I "%WM3%\System" /I "%WM3%\ObjectSystem" /I "%HERE%src""
 set "COMMON=/nologo /c /std:c++20 /permissive- /Zc:inline /fp:precise /EHsc /W3 /sdl /GS /wd4073 /wd4244 /wd4273 /wd4834 /wd4996 /D WIN32 /D _CONSOLE /D WIN32_LEAN_AND_MEAN /D NOMINMAX /D _CRT_SECURE_NO_WARNINGS /D BOOST_ALL_NO_LIB %INC%"
 
-rem Recovered engine sources under test - compiled from src\sdk, not copied.
+rem Recovered engine sources under test - compiled from src, not copied.
 set "SDK_SRCS="%SDK%\moho\math\QuaternionMath.cpp" "%SDK%\moho\math\Vector3f.cpp" "%SDK%\legacy\math\X87Math.cpp" "%WM3%\System\Wm3System.cpp""
 rem Harness sources.
 set "H_SRCS="%HERE%src\main.cpp" "%HERE%src\pe_image.cpp" "%HERE%src\retail_thunks.cpp" "%HERE%src\targets_math.cpp" "%HERE%src\gen.cpp" "%HERE%src\sdk_mirror.cpp""

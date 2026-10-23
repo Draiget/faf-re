@@ -206,7 +206,7 @@ def main() -> int:
           f'{len(absent)} not compiled yet, {len(excluded)} ExcludedFromBuild')
     if not present:
         print('No objects found -- compile first:')
-        print('  MSBuild src\\sdk\\main.vcxproj -t:ClCompile -p:Configuration=Debug -p:Platform=Win32')
+        print('  MSBuild src\\main.vcxproj -t:ClCompile -p:Configuration=Debug -p:Platform=Win32')
         return 1
 
     defined: set[str] = set()
