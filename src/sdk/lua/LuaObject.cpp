@@ -6,6 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <xmmintrin.h>
 #include <bit>
 #include <algorithm>
 #include <cerrno>
@@ -141,7 +142,89 @@ gpg::RType* lua_State::sType = nullptr;
 
 namespace
 {
+	/**
+	 * Engine addition (`lua_ParallelSweep`, see `parallel_sweep` further down): where the next
+	 * parallel sweep may split each GC list into chunks.
+	 *
+	 * A boundary is an object known to be on its list, in list order. Between two sweeps a list
+	 * only gains objects at its head and loses them only in the sweep (and, for userdata, to
+	 * `luaC_separateudata`), so the boundaries from one sweep, plus every Nth object linked at a
+	 * head since, stay valid until the next sweep. A serial sweep frees boundary objects, so it
+	 * forgets them all (`Forget`).
+	 */
+	namespace sweep_boundaries
+	{
+		enum EList : int
+		{
+			kListUserdata = 0, // rootudata
+			kListThreads = 1,  // rootgc1
+			kListObjects = 2,  // rootgc
+			kListCount = 3
+		};
 
+		constexpr std::size_t kObjectsPerBoundary = 4096u;
+
+		struct HeapBoundaries
+		{
+			// Read by the link sites on any thread (the user Lua state links on the main thread);
+			// every other member is touched only by the thread running the heap this names.
+			std::atomic<const global_State*> g{nullptr};
+			std::array<std::vector<GCObject*>, kListCount> survivors; // from the last sweep, in list order
+			std::array<std::vector<GCObject*>, kListCount> linked;    // linked at the head since, oldest first
+			std::array<std::size_t, kListCount> countdown{kObjectsPerBoundary, kObjectsPerBoundary, kObjectsPerBoundary};
+		};
+
+		HeapBoundaries sBoundaries;
+
+		void Forget(const global_State* const g) noexcept
+		{
+			if (sBoundaries.g.load(std::memory_order_relaxed) != g) {
+				return;
+			}
+			sBoundaries.g.store(nullptr, std::memory_order_relaxed);
+			for (int list = 0; list < kListCount; ++list) {
+				sBoundaries.survivors[list].clear();
+				sBoundaries.linked[list].clear();
+				sBoundaries.countdown[list] = kObjectsPerBoundary;
+			}
+		}
+
+		/// `object` was just linked at the head of `list`: remember every Nth one.
+		void NoteLinked(const global_State* const g, const EList list, GCObject* const object)
+		{
+			if (sBoundaries.g.load(std::memory_order_relaxed) != g) {
+				return;
+			}
+			if (--sBoundaries.countdown[list] == 0u) {
+				sBoundaries.countdown[list] = kObjectsPerBoundary;
+				sBoundaries.linked[list].push_back(object);
+			}
+		}
+	} // namespace sweep_boundaries
+
+	/// FAF_LUAGC_TIMING: charges the time since the previous call to a named sub-phase of the collection.
+	class GcDetailLaps
+	{
+	public:
+		GcDetailLaps() noexcept
+			: mTimer(lua::GcTimer::Current())
+			, mLast(mTimer != nullptr ? lua::GcTimer::Now() : 0)
+		{
+		}
+
+		void operator()(const char* const name) noexcept
+		{
+			if (mTimer != nullptr) {
+				const long long now = lua::GcTimer::Now();
+				mTimer->Detail(name, now - mLast);
+				mLast = now;
+			}
+		}
+
+	private:
+		lua::GcTimer* mTimer;
+		long long mLast;
+	};
 }
 
 namespace
@@ -4055,6 +4138,7 @@ namespace
 			userdata->metatable = DefaultUserdataMetatable(globalState);
 			userdata->next = globalState->rootudata;
 			globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+			sweep_boundaries::NoteLinked(globalState, sweep_boundaries::kListUserdata, reinterpret_cast<GCObject*>(userdata)); // engine addition: lua_ParallelSweep
 		}
 
 		state->top->tt = static_cast<int>(userdata->tt);
@@ -4102,6 +4186,7 @@ extern "C" Udata* luaS_newudata(lua_State* const state, gpg::RType* const type)
 	userdata->metatable = DefaultUserdataMetatable(globalState);
 	userdata->next = globalState->rootudata;
 	globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+	sweep_boundaries::NoteLinked(globalState, sweep_boundaries::kListUserdata, reinterpret_cast<GCObject*>(userdata)); // engine addition: lua_ParallelSweep
 	return userdata;
 }
 
@@ -4140,6 +4225,7 @@ namespace
 		userdata->metatable = DefaultUserdataMetatable(globalState);
 		userdata->next = globalState->rootudata;
 		globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+		sweep_boundaries::NoteLinked(globalState, sweep_boundaries::kListUserdata, reinterpret_cast<GCObject*>(userdata)); // engine addition: lua_ParallelSweep
 		return userdata;
 	}
 
@@ -12846,15 +12932,30 @@ namespace moho
 {
 	/**
 	 * Engine addition: `lua_ParallelMark`, a user-side switch. When set, the mark phase of a sim
-	 * Lua collection propagates on the sim worker pool (see `PropagateMarksForCollection`). Off by
-	 * default.
+	 * Lua collection runs on the sim worker pool: propagation (`PropagateMarksForCollection`), the
+	 * LuaPlus root objects (`MarkRootForCollection`), weak-table clearing (`parallel_weak`) and the
+	 * userdata separation (`parallel_sweep::SeparateUserdata`). On by default; it only acts while
+	 * `sim_Workers` > 0.
 	 */
-	bool lua_ParallelMark = false;
+	bool lua_ParallelMark = true;
 
 	TConVar<bool> gTConVar_lua_ParallelMark(
 		"lua_ParallelMark",
 		"Mark the sim Lua heap on the sim worker threads during a collection (same results).",
 		&lua_ParallelMark
+	);
+
+	/**
+	 * Engine addition: `lua_ParallelSweep`, a user-side switch. When set, the sweep of a sim Lua
+	 * collection classifies the heap on the sim worker pool (see `SweepForCollection`); the frees
+	 * stay on the sim thread, in list order. On by default; it only acts while `sim_Workers` > 0.
+	 */
+	bool lua_ParallelSweep = true;
+
+	TConVar<bool> gTConVar_lua_ParallelSweep(
+		"lua_ParallelSweep",
+		"Sort live from dead objects of the sim Lua heap on the sim worker threads during a sweep (same results).",
+		&lua_ParallelSweep
 	);
 } // namespace moho
 
@@ -12912,11 +13013,37 @@ namespace
 		struct WorkerLists
 		{
 			std::vector<GCObject*> gray;     // claimed, not yet traversed
-			std::vector<lua_State*> threads; // claimed threads, traversed later on the sim thread
+			std::vector<lua_State*> threads; // threads whose stacks were marked; finished later on the sim thread
 			GCObject* wk = nullptr;
 			GCObject* wv = nullptr;
 			GCObject* wkv = nullptr;
+			GCObject* wkTail = nullptr; // the first table linked onto each list, which stays its last
+			GCObject* wvTail = nullptr;
+			GCObject* wkvTail = nullptr;
+			std::vector<Table*> weakTables[3]; // the same tables by list (EWeakList), for the clear
 		};
+
+		enum EWeakList : int
+		{
+			kWeakKeys = 0,   // wk
+			kWeakValues = 1, // wv
+			kWeakBoth = 2    // wkv
+		};
+
+		/// The weak tables of the current collection, by list, gathered from the participants.
+		struct WeakSets
+		{
+			std::vector<Table*> tables[3];
+
+			void Clear() noexcept
+			{
+				for (std::vector<Table*>& list : tables) {
+					list.clear();
+				}
+			}
+		};
+
+		WeakSets sWeakSets;
 
 		/// Work shared between the participants: donated gray objects, and how many hold work.
 		struct SharedWork
@@ -12932,6 +13059,7 @@ namespace
 			global_State* g = nullptr;
 			std::vector<WorkerLists> workers;
 			SharedWork shared;
+			LuaState* rootObjects = nullptr; // first round: the LuaPlus objects of this LuaState are roots too
 		};
 
 		/// After a successful claim: queue the object for traversal (reallymarkobject's switch).
@@ -12946,7 +13074,7 @@ namespace
 					lists.gray.push_back(object);
 					return;
 				case LUA_TTHREAD:
-					lists.threads.push_back(&object->th);
+					lists.gray.push_back(object); // its stack is marked like any gray object
 					return;
 				case LUA_TUSERDATA: {
 					// A userdata has nothing to traverse but its metatable, marked in place.
@@ -13005,9 +13133,15 @@ namespace
 				(void)marked.fetch_or(
 					static_cast<lu_byte>((weakkey ? 0x2u : 0u) | (weakvalue ? 0x4u : 0u)), std::memory_order_relaxed
 				);
-				GCObject** const weaklist = weakkey ? (weakvalue ? &lists.wkv : &lists.wk) : &lists.wv;
+				const EWeakList kind = weakkey ? (weakvalue ? kWeakBoth : kWeakKeys) : kWeakValues;
+				GCObject** const weaklist = kind == kWeakBoth ? &lists.wkv : (kind == kWeakKeys ? &lists.wk : &lists.wv);
+				GCObject** const weaktail = kind == kWeakBoth ? &lists.wkvTail : (kind == kWeakKeys ? &lists.wkTail : &lists.wvTail);
+				if (*weaklist == nullptr) {
+					*weaktail = reinterpret_cast<GCObject*>(h);
+				}
 				h->gclist = *weaklist;
 				*weaklist = reinterpret_cast<GCObject*>(h);
+				lists.weakTables[kind].push_back(h);
 			}
 
 			if (!weakvalue) {
@@ -13075,12 +13209,99 @@ namespace
 			}
 		}
 
+		/// `traversestack`'s marking half: the thread's globals and its live stack slots.
+		void MarkThreadStack(WorkerLists& lists, lua_State* const thread)
+		{
+			MarkValue(lists, thread->_gt);
+			for (const TObject* slot = thread->stack; slot < thread->top; ++slot) {
+				MarkValue(lists, *slot);
+			}
+		}
+
+		/// `traversestack`'s middle: the unused tail of the stack, up to the highest frame top, is cleared to nil.
+		[[nodiscard]] TObject* ClearThreadStackTail(lua_State* const thread)
+		{
+			TObject* lim = thread->top;
+			for (const CallInfo* ci = thread->base_ci; ci <= thread->ci; ++ci) {
+				if (lim < ci->top) {
+					lim = ci->top;
+				}
+			}
+			for (TObject* slot = thread->top; slot <= lim; ++slot) {
+				slot->tt = LUA_TNIL;
+				slot->value.p = nullptr;
+			}
+			return lim;
+		}
+
+		/**
+		 * Whether a marked thread still needs the sim thread: `ShrinkThreadStacksIfSparse` would
+		 * reallocate its call-info array or stack (the same tests), or the GC hook would do anything
+		 * for it (`LuaPlusGCFunction` only acts for the root LuaState; any other hook always runs).
+		 */
+		[[nodiscard]] bool ThreadNeedsSimThread(lua_State* const thread, const TObject* const lim)
+		{
+			const unsigned callInfoCapacity = thread->size_ci;
+			if (4 * (thread->ci - thread->base_ci) < static_cast<std::ptrdiff_t>(callInfoCapacity) && callInfoCapacity > 0x10u) {
+				return true;
+			}
+			if (4 * (lim - thread->stack) < thread->stacksize && thread->stacksize > 90) {
+				return true;
+			}
+			const auto hook = thread->l_G->userGCFunction;
+			if (hook == nullptr) {
+				return false;
+			}
+			if (hook != &LuaPlusGCFunction) {
+				return true;
+			}
+			const auto* const state = static_cast<const LuaState*>(thread->stateUserData);
+			return state != nullptr && state == state->m_rootState;
+		}
+
+		/**
+		 * `traversestack`'s last step, on the sim thread once marking is done: an oversized stack
+		 * is shrunk, which reallocates it, so no worker may be reading it. (The tail clear is
+		 * repeated; it writes nil over nil.)
+		 */
+		void FinishThreadStack(lua_State* const thread)
+		{
+			ShrinkThreadStacksIfSparse(ClearThreadStackTail(thread), thread);
+		}
+
+		/// The LuaPlus GC hook's walk (`LuaPlusGCFunction`): every LuaObject of the root LuaState is a root.
+		void MarkRootObjects(Round& round, WorkerLists& lists, LuaState* const rootState)
+		{
+			constexpr std::size_t kShareAbove = 64u;
+			SharedWork& shared = round.shared;
+			LuaObject* const tail = reinterpret_cast<LuaObject*>(&rootState->m_tailObject);
+			for (LuaObject* node = rootState->m_headObject.m_next; node != tail; node = node->m_next) {
+				MarkValue(lists, node->m_object);
+				if (lists.gray.size() > kShareAbove && shared.poolSize.load(std::memory_order_relaxed) == 0u) {
+					const std::lock_guard lock(shared.mutex);
+					const std::size_t give = lists.gray.size() / 2u;
+					shared.pool.insert(shared.pool.end(), lists.gray.end() - static_cast<std::ptrdiff_t>(give), lists.gray.end());
+					lists.gray.resize(lists.gray.size() - give);
+					shared.poolSize.store(shared.pool.size(), std::memory_order_relaxed);
+				}
+			}
+		}
+
 		void Traverse(Round& round, WorkerLists& lists, GCObject* const object)
 		{
 			switch (object->gch.tt) {
 			case LUA_TTABLE:
 				TraverseTable(round, lists, &object->h);
 				break;
+			case LUA_TTHREAD: {
+				// Marking reads [stack, top) and the clear writes past top: one thread, one participant.
+				lua_State* const thread = &object->th;
+				MarkThreadStack(lists, thread);
+				if (ThreadNeedsSimThread(thread, ClearThreadStackTail(thread))) {
+					lists.threads.push_back(thread);
+				}
+				break;
+			}
 			case LUA_CFUNCTION:
 				for (int index = 0; index < object->cl.c.nupvalues; ++index) {
 					MarkValue(lists, object->cl.c.upvalue[index]);
@@ -13097,12 +13318,15 @@ namespace
 			}
 		}
 
-		/// One participant: drain local work, share surplus, take shared work, until none is left anywhere.
-		void Participate(Round& round, WorkerLists& lists)
+		/**
+		 * One participant: drain local work, share surplus, take shared work, until none is left
+		 * anywhere. `startsBusy`: this participant is already counted in `busy`.
+		 */
+		void Participate(Round& round, WorkerLists& lists, const bool startsBusy = false)
 		{
 			constexpr std::size_t kShareAbove = 64u;
 			SharedWork& shared = round.shared;
-			bool holdingWork = false;
+			bool holdingWork = startsBusy;
 			for (;;) {
 				if (lists.gray.empty()) {
 					std::unique_lock lock(shared.mutex);
@@ -13140,15 +13364,11 @@ namespace
 			}
 		}
 
-		/// Puts the weak-table list `list` (linked through gclist) in front of `target`.
-		void PrependList(GCObject*& target, GCObject* const list)
+		/// Puts the weak-table list `list` (linked through gclist, ending at `tail`) in front of `target`.
+		void PrependList(GCObject*& target, GCObject* const list, GCObject* const tail)
 		{
 			if (list == nullptr) {
 				return;
-			}
-			GCObject* tail = list;
-			while (tail->h.gclist != nullptr) {
-				tail = tail->h.gclist;
 			}
 			tail->h.gclist = target;
 			target = list;
@@ -13183,10 +13403,10 @@ namespace
 	 * `propagatemarks`, on the sim worker pool when `lua_ParallelMark` allows (see
 	 * `parallel_mark`); serially otherwise.
 	 */
-	void PropagateMarksForCollection(GCState* const st)
+	void PropagateMarksForCollection(GCState* const st, const bool parallel, LuaState* rootObjects = nullptr)
 	{
 		using namespace parallel_mark;
-		if (!Enabled()) {
+		if (!parallel) {
 			propagatemarks(st);
 			return;
 		}
@@ -13196,36 +13416,50 @@ namespace
 		round.g = st->g;
 		round.workers.resize(pool.WorkerCount() + 1u);
 
-		while (st->tmark != nullptr) {
+		while (st->tmark != nullptr || rootObjects != nullptr) {
 			// The serial gray list (claimed objects linked through gclist) seeds the round.
 			round.shared.pool.clear();
 			for (GCObject* object = st->tmark; object != nullptr;) {
 				GCObject* const next = NextGray(object);
-				if (object->gch.tt == LUA_TTHREAD) {
-					round.workers[0].threads.push_back(&object->th);
-				} else {
-					round.shared.pool.push_back(object);
-				}
+				round.shared.pool.push_back(object);
 				object = next;
 			}
 			st->tmark = nullptr;
 			round.shared.poolSize.store(round.shared.pool.size(), std::memory_order_relaxed);
-			round.shared.busy = 0;
+			// A participant walking the LuaPlus objects counts as holding work until it is done.
+			round.shared.busy = rootObjects != nullptr ? 1 : 0;
+			round.rootObjects = rootObjects;
+			rootObjects = nullptr;
 
+			GcDetailLaps lap; // FAF_LUAGC_TIMING only
 			pool.ParallelFor(round.workers.size(), 1u, [&round](const std::size_t begin, const std::size_t end) {
 				for (std::size_t index = begin; index < end; ++index) {
-					Participate(round, round.workers[index]);
+					if (index == 0u && round.rootObjects != nullptr) {
+						MarkRootObjects(round, round.workers[index], round.rootObjects);
+						Participate(round, round.workers[index], true);
+					} else {
+						Participate(round, round.workers[index]);
+					}
 				}
 			});
+			round.rootObjects = nullptr;
+			lap("par");
 
-			// Threads, serially, as propagatemarks traverses them; whatever they reach is gray on st.
+			// The rest of the traversal of the threads that need it, serially: stack shrink and the
+			// GC hook. Whatever the hook reaches is gray on st and makes another round.
 			for (WorkerLists& lists : round.workers) {
-				PrependList(st->wk, lists.wk);
-				PrependList(st->wv, lists.wv);
-				PrependList(st->wkv, lists.wkv);
+				PrependList(st->wk, lists.wk, lists.wkTail);
+				PrependList(st->wv, lists.wv, lists.wvTail);
+				PrependList(st->wkv, lists.wkv, lists.wkvTail);
 				lists.wk = lists.wv = lists.wkv = nullptr;
+				lists.wkTail = lists.wvTail = lists.wkvTail = nullptr;
+				for (int kind = 0; kind < 3; ++kind) {
+					std::vector<Table*>& gathered = sWeakSets.tables[kind];
+					gathered.insert(gathered.end(), lists.weakTables[kind].begin(), lists.weakTables[kind].end());
+					lists.weakTables[kind].clear();
+				}
 				for (lua_State* const thread : lists.threads) {
-					traversestack(thread, st);
+					FinishThreadStack(thread);
 					if (thread->l_G->userGCFunction != nullptr) {
 						st->L = thread;
 						thread->l_G->userGCFunction(st);
@@ -13233,7 +13467,604 @@ namespace
 				}
 				lists.threads.clear();
 			}
+			lap("threads");
 		}
+	}
+
+	/**
+	 * Engine addition (`lua_ParallelMark`): `cleartablekeys` / `cleartablevalues` over several weak
+	 * table lists at once, one table per job on the sim worker pool.
+	 *
+	 * Clearing a table writes only that table's own slots and reads other objects' mark bits,
+	 * which nothing changes during the clear except one thing: a string key or value is marked
+	 * (`marked |= 1`) so weak tables never drop strings. That bit is set atomically here, and since
+	 * the clear tests it only after setting it, which table sets it first does not matter. Every
+	 * table is on exactly one weak list, so the jobs never share a table.
+	 */
+	namespace parallel_weak
+	{
+		enum EClear : unsigned
+		{
+			kKeys = 1u,
+			kValues = 2u
+		};
+
+		struct WeakList
+		{
+			const std::vector<Table*>* tables; // as gathered by the parallel mark (parallel_mark::sWeakSets)
+			unsigned clear;                    // EClear bits; with both, keys are cleared first as the serial calls do
+		};
+
+		void MarkStringSlot(const TObject& slot) noexcept
+		{
+			if (slot.tt == LUA_TSTRING && slot.value.p != nullptr) {
+				(void)std::atomic_ref<lu_byte>(static_cast<TString*>(slot.value.p)->marked).fetch_or(1u, std::memory_order_relaxed);
+			}
+		}
+
+		[[nodiscard]] bool IsUnmarkedObject(const TObject& slot) noexcept
+		{
+			if (slot.tt < LUA_TSTRING) {
+				return false;
+			}
+			auto* const object = static_cast<GCObject*>(slot.value.p);
+			return object != nullptr
+				&& (std::atomic_ref<lu_byte>(object->gch.marked).load(std::memory_order_relaxed) & 1u) == 0u;
+		}
+
+		/// `cleartablekeys` for one table.
+		void ClearKeys(Table* const table) noexcept
+		{
+			for (int nodeIndex = 1 << table->lsizenode; nodeIndex != 0; --nodeIndex) {
+				Node& node = table->node[nodeIndex - 1];
+				MarkStringSlot(node.i_key);
+				if (IsUnmarkedObject(node.i_key)) {
+					node.i_val.tt = LUA_TNIL;
+					node.i_key.tt = LUA_TNONE;
+				}
+			}
+		}
+
+		/// `cleartablevalues` for one table.
+		void ClearValues(Table* const table) noexcept
+		{
+			for (int arrayIndex = table->sizearray; arrayIndex != 0; --arrayIndex) {
+				TObject& slot = table->array[arrayIndex - 1];
+				MarkStringSlot(slot);
+				if (IsUnmarkedObject(slot)) {
+					slot.tt = LUA_TNIL;
+				}
+			}
+			for (int nodeIndex = 1 << table->lsizenode; nodeIndex != 0; --nodeIndex) {
+				Node& node = table->node[nodeIndex - 1];
+				MarkStringSlot(node.i_val);
+				if (IsUnmarkedObject(node.i_val)) {
+					const bool hasCollectableKey = node.i_key.tt >= LUA_TSTRING;
+					node.i_val.tt = LUA_TNIL;
+					if (hasCollectableKey) {
+						node.i_key.tt = LUA_TNONE;
+					}
+				}
+			}
+		}
+
+		struct Job
+		{
+			Table* table;
+			unsigned clear;
+		};
+
+		/// Clears every table of `lists`, as the serial calls would in the order given.
+		void Clear(std::initializer_list<WeakList> lists)
+		{
+			std::vector<Job> jobs;
+			for (const WeakList& list : lists) {
+				for (Table* const table : *list.tables) {
+					jobs.push_back(Job{table, list.clear});
+				}
+			}
+			moho::CSimWorkerPool::Get().ParallelFor(jobs.size(), 8u, [&jobs](const std::size_t begin, const std::size_t end) {
+				for (std::size_t index = begin; index < end; ++index) {
+					if ((jobs[index].clear & kKeys) != 0u) {
+						ClearKeys(jobs[index].table);
+					}
+					if ((jobs[index].clear & kValues) != 0u) {
+						ClearValues(jobs[index].table);
+					}
+				}
+			});
+		}
+	} // namespace parallel_weak
+
+	/**
+	 * `markroot`, except that with `lua_ParallelMark` the LuaPlus GC hook's walk over the root
+	 * LuaState's objects is not run here but returned, for `PropagateMarksForCollection` to run
+	 * on a worker alongside the propagation.
+	 */
+	[[nodiscard]] LuaState* MarkRootForCollection(GCState* const st, lua_State* const state, const bool parallel)
+	{
+		global_State* const g = state->l_G;
+		lua_State* const mainthread = st->g->mainthread;
+		auto* const rootState = static_cast<LuaState*>(mainthread->stateUserData);
+		const bool deferHook = parallel && g->userGCFunction == &LuaPlusGCFunction
+			&& rootState != nullptr && rootState == rootState->m_rootState;
+		if (!deferHook) {
+			markroot(st, state);
+			return nullptr;
+		}
+
+		// markroot up to its hook call.
+		const auto markSlot = [st](const TObject& slot) {
+			if (slot.tt >= LUA_TSTRING) {
+				auto* const object = static_cast<GCObject*>(slot.value.p);
+				if ((object->gch.marked & 0x11u) == 0u) {
+					reallymarkobject(st, object);
+				}
+			}
+		};
+		markSlot(g->_defaultmeta);
+		for (const TObject& slot : g->_defaultmetatypes) {
+			markSlot(slot);
+		}
+		markSlot(g->_registry);
+		traversestack(mainthread, st);
+		if (state != mainthread && (state->marked & 0x11u) == 0u) {
+			reallymarkobject(st, reinterpret_cast<GCObject*>(state));
+		}
+		st->L = mainthread;
+		return rootState;
+	}
+
+	/**
+	 * Engine addition (`lua_ParallelSweep`): the sweep of a sim collection with the list walking
+	 * done on the sim worker pool.
+	 *
+	 * `sweeplist` walks a GC list, clears the mark bit of each live object and unlinks and frees
+	 * each dead one. The walk is a pointer chase over every object in the heap; the frees are what
+	 * the result depends on (allocator state, `nblocks`, string-table use), so they stay on the sim
+	 * thread in the original order: userdata list, string buckets 0..size-1, `rootgc1`, `rootgc`,
+	 * each front to back. What moves to the workers:
+	 * - Classification. Each chunk of a list is walked by one participant, which records every
+	 *   dead object together with the last live object before it in the chunk (the link the serial
+	 *   sweep would unlink it through), and every live object.
+	 * - Mark reset. The live objects' mark bits are cleared from those records, in parallel. No
+	 *   free reads another object's mark, so doing this before the frees changes nothing.
+	 * The sim thread then replays the dead records in list order, `*link = dead->next; freeobj`,
+	 * loading the next few dead objects ahead of time since it knows which they are.
+	 *
+	 * Lists are split into chunks at `sweep_boundaries`. A chunk walk that runs off the end of its
+	 * list without meeting the next boundary voids the whole parallel attempt before anything has
+	 * changed, and the serial sweep runs instead.
+	 *
+	 * Objects linked into `rootgc` during the sweep itself (a dead thread freed from `rootgc1`
+	 * closes its open upvalues, `luaF_close` -> `luaC_link`) sit in front of the classified head;
+	 * the replay sweeps that prefix with the serial rule first, as `sweeplist` would.
+	 */
+	namespace parallel_sweep
+	{
+		using namespace sweep_boundaries;
+
+		constexpr lu_byte kMarkedBit = 0x01u;
+		constexpr int kStringBucketsPerChunk = 4096;
+
+		/// One dead object and the link the serial sweep would unlink it through.
+		struct DeadRecord
+		{
+			GCObject* object;
+			GCObject* lastLive;   // last live object before it in the chunk; null: the chunk's entry link
+			GCObject** headLink;  // string buckets: the bucket head; null: the link carried in from the previous chunk
+		};
+
+		/// A stretch of one GC list (or a range of string buckets) classified by one participant.
+		struct Chunk
+		{
+			GCObject* first = nullptr;  // first object of the stretch (list chunks)
+			GCObject* stop = nullptr;   // first object of the next stretch; null: the list end
+			int bucketBegin = 0;        // string chunks: [bucketBegin, bucketEnd)
+			int bucketEnd = 0;
+			bool strings = false;
+			bool reachedStop = true;
+			GCObject* lastLive = nullptr;
+			std::vector<DeadRecord> dead;
+			std::vector<GCObject*> live;
+		};
+
+		/// Where one list's chunks are in the chunk array.
+		struct ListPlan
+		{
+			GCObject** headLink = nullptr;
+			GCObject* classifiedHead = nullptr; // the list head when classification ran
+			std::size_t chunkBegin = 0;
+			std::size_t chunkEnd = 0;
+		};
+
+		/// Kept between collections so the per-chunk records do not reallocate every sweep.
+		std::vector<Chunk> sChunks;
+
+		[[nodiscard]] bool Enabled() noexcept
+		{
+			return moho::lua_ParallelSweep && moho::IsSimThread() && !moho::IsSimWorkerThread()
+				&& moho::CSimWorkerPool::ParallelEnabled() && moho::CSimWorkerPool::Get().WorkerCount() > 0u;
+		}
+
+		/// What a classification pass takes off its list.
+		enum class EPass
+		{
+			kSweep,   // sweeplist: anything not marked above the limit (also records the survivors)
+			kSeparate // luaC_separateudata: unreachable userdata that still want finalising
+		};
+
+		void Classify(Chunk& chunk, const int limit, const stringtable& strings, const EPass pass = EPass::kSweep)
+		{
+			constexpr lu_byte kReachableMask = 0x11u;
+			constexpr lu_byte kWantsFinaliserMask = 0x02u;
+
+			chunk.reachedStop = true;
+			chunk.lastLive = nullptr;
+			chunk.dead.clear();
+			chunk.live.clear();
+
+			const auto visit = [&](GCObject* const object, GCObject** const headLink) {
+				const lu_byte marked = object->gch.marked;
+				const bool remove = pass == EPass::kSweep
+					? static_cast<int>(marked) <= limit
+					: (marked & kReachableMask) == 0u && (marked & kWantsFinaliserMask) != 0u;
+				if (!remove) {
+					if (pass == EPass::kSweep) {
+						chunk.live.push_back(object);
+					}
+					chunk.lastLive = object;
+				} else {
+					chunk.dead.push_back(DeadRecord{object, chunk.lastLive, headLink});
+				}
+			};
+
+			if (chunk.strings) {
+				for (int bucket = chunk.bucketBegin; bucket < chunk.bucketEnd; ++bucket) {
+					chunk.lastLive = nullptr;
+					for (GCObject* object = strings.hash[bucket]; object != nullptr; object = object->gch.next) {
+						visit(object, &strings.hash[bucket]);
+					}
+				}
+				return;
+			}
+
+			for (GCObject* object = chunk.first; object != chunk.stop; object = object->gch.next) {
+				if (object == nullptr) {
+					chunk.reachedStop = false; // the boundaries are not on this list in this order
+					return;
+				}
+				visit(object, nullptr);
+			}
+		}
+
+		[[nodiscard]] Chunk& NextChunk(std::vector<Chunk>& chunks, std::size_t& used)
+		{
+			if (used == chunks.size()) {
+				chunks.emplace_back();
+			}
+			return chunks[used++];
+		}
+
+		/// Splits the list at `headLink` into chunks at `starts` (objects on it, in list order).
+		void AddListChunks(
+			std::vector<Chunk>& chunks, std::size_t& used, ListPlan& plan, GCObject** const headLink,
+			const std::vector<GCObject*>& starts
+		)
+		{
+			plan.headLink = headLink;
+			plan.classifiedHead = *headLink;
+			plan.chunkBegin = used;
+			GCObject* first = *headLink;
+			for (GCObject* const start : starts) {
+				Chunk& chunk = NextChunk(chunks, used);
+				chunk.strings = false;
+				chunk.first = first;
+				chunk.stop = start;
+				first = start;
+			}
+			Chunk& last = NextChunk(chunks, used);
+			last.strings = false;
+			last.first = first;
+			last.stop = nullptr;
+			plan.chunkEnd = used;
+		}
+
+		/// The replay knows which objects it frees next: start loading them (and their links) early.
+		void PrefetchAhead(const std::vector<DeadRecord>& dead, const std::size_t at) noexcept
+		{
+			constexpr std::size_t kPrefetchDistance = 8u;
+			if (at + kPrefetchDistance < dead.size()) {
+				const DeadRecord& ahead = dead[at + kPrefetchDistance];
+				_mm_prefetch(reinterpret_cast<const char*>(ahead.object), _MM_HINT_T0);
+				if (ahead.lastLive != nullptr) {
+					_mm_prefetch(reinterpret_cast<const char*>(ahead.lastLive), _MM_HINT_T0);
+				}
+			}
+		}
+
+		/// Replays one list's dead records in list order; returns the objects freed.
+		int ReplayList(lua_State* const state, const ListPlan& plan, std::vector<Chunk>& chunks, const int limit)
+		{
+			int freed = 0;
+
+			// Objects linked in front of the classified head since classification: the serial rule.
+			GCObject** carry = plan.headLink;
+			for (GCObject* object = *carry; object != plan.classifiedHead; object = *carry) {
+				const lu_byte markByte = object->gch.marked;
+				if (static_cast<int>(markByte) > limit) {
+					object->gch.marked = static_cast<lu_byte>(markByte & 0xFEu);
+					carry = &object->gch.next;
+				} else {
+					*carry = object->gch.next;
+					++freed;
+					freeobj(object, state);
+				}
+			}
+
+			for (std::size_t index = plan.chunkBegin; index < plan.chunkEnd; ++index) {
+				const Chunk& chunk = chunks[index];
+				const std::vector<DeadRecord>& dead = chunk.dead;
+				for (std::size_t at = 0; at < dead.size(); ++at) {
+					PrefetchAhead(dead, at);
+					const DeadRecord& record = dead[at];
+					GCObject** const link = record.lastLive != nullptr ? &record.lastLive->gch.next : carry;
+					*link = record.object->gch.next;
+					++freed;
+					freeobj(record.object, state);
+				}
+				if (chunk.lastLive != nullptr) {
+					carry = &chunk.lastLive->gch.next;
+				}
+			}
+			return freed;
+		}
+
+		/// Replays the string chunks' dead records, bucket by bucket; returns the strings freed.
+		int ReplayStrings(lua_State* const state, const std::vector<Chunk>& chunks, const std::size_t begin, const std::size_t end)
+		{
+			int freed = 0;
+			for (std::size_t index = begin; index < end; ++index) {
+				const std::vector<DeadRecord>& dead = chunks[index].dead;
+				for (std::size_t at = 0; at < dead.size(); ++at) {
+					PrefetchAhead(dead, at);
+					const DeadRecord& record = dead[at];
+					GCObject** const link = record.lastLive != nullptr ? &record.lastLive->gch.next : record.headLink;
+					*link = record.object->gch.next;
+					++freed;
+					freeobj(record.object, state);
+				}
+			}
+			return freed;
+		}
+
+		/**
+		 * The boundaries of `list` in list order: objects linked at its head since the last sweep
+		 * (newest first), then that sweep's survivors. Userdata that `luaC_separateudata` has since
+		 * moved to `tmudata` are no longer on the list and are left out.
+		 */
+		[[nodiscard]] std::vector<GCObject*> ListStarts(const global_State* const g, const EList list)
+		{
+			std::vector<GCObject*> starts;
+			if (sBoundaries.g.load(std::memory_order_relaxed) != g) {
+				return starts;
+			}
+			const std::vector<GCObject*>& linked = sBoundaries.linked[list];
+			const std::vector<GCObject*>& survivors = sBoundaries.survivors[list];
+			starts.reserve(linked.size() + survivors.size());
+			starts.assign(linked.rbegin(), linked.rend());
+			starts.insert(starts.end(), survivors.begin(), survivors.end());
+
+			if (list == kListUserdata && g->tmudata != nullptr && !starts.empty()) {
+				std::vector<GCObject*> separated;
+				for (GCObject* object = g->tmudata; object != nullptr; object = object->gch.next) {
+					separated.push_back(object);
+				}
+				std::sort(separated.begin(), separated.end());
+				std::erase_if(starts, [&separated](GCObject* const start) {
+					return std::binary_search(separated.begin(), separated.end(), start);
+				});
+			}
+			return starts;
+		}
+
+		/// FAF_LUAGC_TIMING detail of one parallel sweep.
+		void ReportSweep(
+			lua::GcTimer& timer, const std::vector<Chunk>& chunks, const std::array<ListPlan, kListCount>& lists,
+			const std::size_t stringBegin, const std::size_t stringEnd, const long long classifyTicks,
+			const long long clearTicks, const long long replayTicks
+		)
+		{
+			std::size_t live = 0;
+			std::size_t dead = 0;
+			const auto describe = [&](const char* const name, const std::size_t begin, const std::size_t end) {
+				std::size_t objects = 0;
+				std::size_t longest = 0;
+				for (std::size_t index = begin; index < end; ++index) {
+					const std::size_t length = chunks[index].live.size() + chunks[index].dead.size();
+					live += chunks[index].live.size();
+					dead += chunks[index].dead.size();
+					objects += length;
+					longest = std::max(longest, length);
+				}
+				gpg::Logf("[LUAGC-T]   %s: chunks=%zu objects=%zu longest=%zu", name, end - begin, objects, longest);
+			};
+			describe("userdata", lists[kListUserdata].chunkBegin, lists[kListUserdata].chunkEnd);
+			describe("strings", stringBegin, stringEnd);
+			describe("threads", lists[kListThreads].chunkBegin, lists[kListThreads].chunkEnd);
+			describe("objects", lists[kListObjects].chunkBegin, lists[kListObjects].chunkEnd);
+			timer.NoteSweep(classifyTicks, clearTicks, replayTicks, live, dead);
+		}
+
+		/**
+		 * The parallel sweep. Returns false, having changed nothing, when it cannot run (the caller
+		 * then sweeps serially).
+		 */
+		[[nodiscard]] bool Sweep(lua_State* const state)
+		{
+			constexpr int kLimit = 0; // luaC_collectgarbage keeps anything with a mark bit set
+			global_State* const g = state->l_G;
+			std::vector<Chunk>& chunks = sChunks;
+			std::size_t used = 0;
+
+			std::array<ListPlan, kListCount> lists{};
+			AddListChunks(chunks, used, lists[kListUserdata], &g->rootudata, ListStarts(g, kListUserdata));
+
+			const std::size_t stringBegin = used;
+			for (int bucket = 0; bucket < g->strt.size; bucket += kStringBucketsPerChunk) {
+				Chunk& chunk = NextChunk(chunks, used);
+				chunk.strings = true;
+				chunk.bucketBegin = bucket;
+				chunk.bucketEnd = std::min(bucket + kStringBucketsPerChunk, g->strt.size);
+			}
+			const std::size_t stringEnd = used;
+
+			AddListChunks(chunks, used, lists[kListThreads], &g->rootgc1, ListStarts(g, kListThreads));
+			AddListChunks(chunks, used, lists[kListObjects], &g->rootgc, ListStarts(g, kListObjects));
+
+			moho::CSimWorkerPool& pool = moho::CSimWorkerPool::Get();
+			const stringtable& strings = g->strt;
+			lua::GcTimer* const timer = lua::GcTimer::Current(); // FAF_LUAGC_TIMING only
+			const long long classifyStart = timer != nullptr ? lua::GcTimer::Now() : 0;
+			try {
+				pool.ParallelFor(used, 1u, [&chunks, &strings](const std::size_t begin, const std::size_t end) {
+					for (std::size_t index = begin; index < end; ++index) {
+						Classify(chunks[index], kLimit, strings);
+					}
+				});
+			} catch (...) { // only the record vectors allocate; nothing has changed yet
+				Forget(g);
+				return false;
+			}
+
+			for (std::size_t index = 0; index < used; ++index) {
+				if (!chunks[index].reachedStop) {
+					gpg::Warnf("lua_ParallelSweep: chunk boundaries out of date, sweeping serially");
+					Forget(g);
+					return false;
+				}
+			}
+
+			const long long clearStart = timer != nullptr ? lua::GcTimer::Now() : 0;
+			pool.ParallelFor(used, 1u, [&chunks](const std::size_t begin, const std::size_t end) {
+				for (std::size_t index = begin; index < end; ++index) {
+					for (GCObject* const object : chunks[index].live) {
+						object->gch.marked = static_cast<lu_byte>(object->gch.marked & ~kMarkedBit);
+					}
+				}
+			});
+
+			const long long replayStart = timer != nullptr ? lua::GcTimer::Now() : 0;
+			(void)ReplayList(state, lists[kListUserdata], chunks, kLimit);
+			g->strt.nuse -= ReplayStrings(state, chunks, stringBegin, stringEnd);
+			(void)ReplayList(state, lists[kListThreads], chunks, kLimit);
+			(void)ReplayList(state, lists[kListObjects], chunks, kLimit);
+
+			if (timer != nullptr) {
+				const long long replayEnd = lua::GcTimer::Now();
+				ReportSweep(
+					*timer, chunks, lists, stringBegin, stringEnd, clearStart - classifyStart, replayStart - clearStart,
+					replayEnd - replayStart
+				);
+			}
+
+			// Boundaries for the next sweep: every Nth survivor of each list, in list order. Whatever
+			// was linked during this sweep is behind or among them already.
+			sBoundaries.g.store(g, std::memory_order_relaxed);
+			for (int list = 0; list < kListCount; ++list) {
+				std::vector<GCObject*>& survivors = sBoundaries.survivors[list];
+				survivors.clear();
+				std::size_t countdown = kObjectsPerBoundary;
+				for (std::size_t index = lists[list].chunkBegin; index < lists[list].chunkEnd; ++index) {
+					for (GCObject* const object : chunks[index].live) {
+						if (--countdown == 0u) {
+							countdown = kObjectsPerBoundary;
+							survivors.push_back(object);
+						}
+					}
+				}
+				sBoundaries.linked[list].clear();
+				sBoundaries.countdown[list] = kObjectsPerBoundary;
+			}
+			return true;
+		}
+
+		/**
+		 * `luaC_separateudata` with the userdata list classified on the sim worker pool
+		 * (`lua_ParallelMark`; it splits the list at the `lua_ParallelSweep` boundaries). The
+		 * userdata are moved to `tmudata` on the sim thread in list order, as the serial loop
+		 * moves them. Returns false, having changed nothing, when it cannot run.
+		 */
+		[[nodiscard]] bool SeparateUserdata(lua_State* const state, size_t& deadmem)
+		{
+			global_State* const g = state->l_G;
+			std::vector<Chunk>& chunks = sChunks;
+			std::size_t used = 0;
+			ListPlan plan{};
+			AddListChunks(chunks, used, plan, &g->rootudata, ListStarts(g, kListUserdata));
+
+			const stringtable& strings = g->strt;
+			try {
+				moho::CSimWorkerPool::Get().ParallelFor(used, 1u, [&chunks, &strings](const std::size_t begin, const std::size_t end) {
+					for (std::size_t index = begin; index < end; ++index) {
+						Classify(chunks[index], 0, strings, EPass::kSeparate);
+					}
+				});
+			} catch (...) { // only the record vectors allocate; nothing has changed yet
+				return false;
+			}
+			for (std::size_t index = 0; index < used; ++index) {
+				if (!chunks[index].reachedStop) {
+					gpg::Warnf("lua_ParallelMark: userdata boundaries out of date, separating serially");
+					Forget(g);
+					return false;
+				}
+			}
+
+			GCObject* collected = nullptr;
+			GCObject** lastCollected = &collected;
+			GCObject** carry = plan.headLink;
+			deadmem = 0;
+			for (std::size_t index = plan.chunkBegin; index < plan.chunkEnd; ++index) {
+				const Chunk& chunk = chunks[index];
+				const std::vector<DeadRecord>& separated = chunk.dead;
+				for (std::size_t at = 0; at < separated.size(); ++at) {
+					PrefetchAhead(separated, at);
+					GCObject* const object = separated[at].object;
+					GCObject** const link = separated[at].lastLive != nullptr ? &separated[at].lastLive->gch.next : carry;
+					// The payload's x86 size: deadmem is charged against nblocks (x64 port, LuaMemAccounting.h).
+					deadmem += static_cast<size_t>(LuaX86PayloadSize(reinterpret_cast<gpg::RType*>(object->u.len)));
+					*link = object->gch.next;
+					object->gch.next = nullptr;
+					*lastCollected = object;
+					lastCollected = &object->gch.next;
+				}
+				if (chunk.lastLive != nullptr) {
+					carry = &chunk.lastLive->gch.next;
+				}
+			}
+
+			*lastCollected = g->tmudata;
+			g->tmudata = collected;
+			return true;
+		}
+	} // namespace parallel_sweep
+
+	/**
+	 * The four `sweeplist` calls of `luaC_collectgarbage`, on the sim worker pool when
+	 * `lua_ParallelSweep` allows (see `parallel_sweep`); serially otherwise.
+	 */
+	void SweepForCollection(lua_State* const state)
+	{
+		if (parallel_sweep::Enabled() && parallel_sweep::Sweep(state)) {
+			return;
+		}
+
+		sweep_boundaries::Forget(state->l_G); // a serial sweep frees boundary objects
+		(void)sweeplist(&state->l_G->rootudata, nullptr, state, 0);
+		sweepstrings(state, 0);
+		(void)sweeplist(&state->l_G->rootgc1, nullptr, state, 0);
+		(void)sweeplist(&state->l_G->rootgc, nullptr, state, 0);
 	}
 } // namespace
 
@@ -14274,6 +15105,7 @@ extern "C"
 
 		thread->next = state->l_G->rootgc1;
 		state->l_G->rootgc1 = reinterpret_cast<GCObject*>(thread);
+		sweep_boundaries::NoteLinked(state->l_G, sweep_boundaries::kListThreads, reinterpret_cast<GCObject*>(thread)); // engine addition: lua_ParallelSweep
 
 		thread->marked = 0;
 		thread->stack = nullptr;
@@ -16987,6 +17819,7 @@ extern "C"
 			state->l_G->tmudata = udata->gch.next;
 			udata->gch.next = state->l_G->rootudata;
 			state->l_G->rootudata = udata;
+			sweep_boundaries::NoteLinked(state->l_G, sweep_boundaries::kListUserdata, udata); // engine addition: lua_ParallelSweep
 
 			TObject* const slot = state->top - 1;
 			slot->value.p = udata;
@@ -17024,30 +17857,66 @@ extern "C"
 		st.g = state->l_G;
 		st.L = state;
 
-		markroot(&st, state);
-		PropagateMarksForCollection(&st); // engine change: lua_ParallelMark, see there
+		// Engine change (lua_ParallelMark): decided once, so a switch flipped mid-collection
+		// cannot mix the paths.
+		const bool parallel = parallel_mark::Enabled();
+		parallel_mark::WeakSets& weakSets = parallel_mark::sWeakSets;
+		weakSets.Clear();
 
-		cleartablevalues(st.wkv);
-		cleartablevalues(st.wv);
+		GcDetailLaps lap; // FAF_LUAGC_TIMING only
+		LuaState* const rootObjects = MarkRootForCollection(&st, state, parallel); // engine change: lua_ParallelMark
+		lap("root");
+		PropagateMarksForCollection(&st, parallel, rootObjects); // engine change: lua_ParallelMark, see there
+		lap("propagate");
+
+		std::vector<Table*> weakKeyValueVector; // engine change: lua_ParallelMark (the wkv tables of the first pass)
+		if (parallel) {
+			using namespace parallel_weak;
+			Clear({{&weakSets.tables[parallel_mark::kWeakBoth], kValues}, {&weakSets.tables[parallel_mark::kWeakValues], kValues}});
+			weakKeyValueVector = std::move(weakSets.tables[parallel_mark::kWeakBoth]);
+			weakSets.tables[parallel_mark::kWeakBoth].clear();
+			weakSets.tables[parallel_mark::kWeakValues].clear();
+		} else {
+			cleartablevalues(st.wkv);
+			cleartablevalues(st.wv);
+		}
 
 		GCObject* const weakKeyValueTables = st.wkv;
 		st.wkv = nullptr;
 		st.wv = nullptr;
+		lap("weak");
 
-		const size_t deadmem = luaC_separateudata(state);
+		size_t deadmem = 0;
+		if (!parallel || !parallel_sweep::SeparateUserdata(state, deadmem)) { // engine change: lua_ParallelMark
+			deadmem = luaC_separateudata(state);
+		}
+		lap("separate");
 
 		for (GCObject* udata = st.g->tmudata; udata != nullptr; udata = udata->gch.next) {
 			udata->gch.marked &= static_cast<lu_byte>(~kMarkedBit);
 			reallymarkobject(&st, udata);
 		}
 
-		PropagateMarksForCollection(&st); // engine change: lua_ParallelMark, see there
+		PropagateMarksForCollection(&st, parallel); // engine change: lua_ParallelMark, see there
+		lap("propagate");
 
-		cleartablekeys(weakKeyValueTables);
-		cleartablekeys(st.wk);
-		cleartablevalues(st.wv);
-		cleartablekeys(st.wkv);
-		cleartablevalues(st.wkv);
+		if (parallel) { // engine change: lua_ParallelMark
+			using namespace parallel_weak;
+			Clear({
+				{&weakKeyValueVector, kKeys},
+				{&weakSets.tables[parallel_mark::kWeakKeys], kKeys},
+				{&weakSets.tables[parallel_mark::kWeakValues], kValues},
+				{&weakSets.tables[parallel_mark::kWeakBoth], kKeys | kValues},
+			});
+			weakSets.Clear();
+		} else {
+			cleartablekeys(weakKeyValueTables);
+			cleartablekeys(st.wk);
+			cleartablevalues(st.wv);
+			cleartablekeys(st.wkv);
+			cleartablevalues(st.wkv);
+		}
+		lap("weak");
 
 		return deadmem;
 	}
@@ -17068,15 +17937,16 @@ extern "C"
 		// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
 		lua::GcEventLogCollection(state->l_G, state->l_G->nblocks, state->l_G->GCthreshold);
 
+		lua::GcTimer timer(state->l_G, state->l_G->nblocks); // engine addition: FAF_LUAGC_TIMING
 		const size_t deadmem = mark(state);
+		timer.Lap(lua::GcTimer::kMark);
 
-		(void)sweeplist(&state->l_G->rootudata, nullptr, state, 0);
-		sweepstrings(state, 0);
-		(void)sweeplist(&state->l_G->rootgc1, nullptr, state, 0);
-		(void)sweeplist(&state->l_G->rootgc, nullptr, state, 0);
+		SweepForCollection(state); // engine change: lua_ParallelSweep, see there
+		timer.Lap(lua::GcTimer::kSweep);
 
 		checkSizes(state, deadmem);
 		luaC_callGCTM(state);
+		timer.Lap(lua::GcTimer::kFinalize);
 	}
 
 	/**
@@ -17343,6 +18213,7 @@ extern "C"
 		globalState->rootgc = object;
 		object->gch.marked = 0;
 		object->gch.tt = static_cast<lu_byte>(typeTag);
+		sweep_boundaries::NoteLinked(globalState, sweep_boundaries::kListObjects, object); // engine addition: lua_ParallelSweep
 	}
 
 	/**
@@ -17557,6 +18428,7 @@ extern "C"
 
 		const int limit = all != 0 ? kSweepEverythingLimit : 0;
 
+		sweep_boundaries::Forget(state->l_G); // engine addition: this frees lua_ParallelSweep boundaries
 		(void)sweeplist(&state->l_G->rootudata, nullptr, state, limit);
 		sweepstrings(state, limit);
 		(void)sweeplist(&state->l_G->rootgc1, nullptr, state, limit);

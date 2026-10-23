@@ -26,7 +26,8 @@ replays and live games against the retail `ForgedAlliance.exe`
 | Diagnostic probes removed from hot paths; recon, target and steering scans walk the way the binary does | about −10 to −20 % at 1,500–3,000 units |
 | Redundant recon and intel-grid work removed (row-major intel raster, one grid cell per probe, no refcount traffic for unchanged blips); allocator, blueprint-lookup, grid-gather and checksum-hashing fixes | about −9 % on top |
 | Recon blip refresh on worker threads (`sim_Workers 8`) | about −7 % overall, up to −13 % at the peak fight |
-| **Total since profiling started** | **about −18 %** |
+| Lua collector mark and sweep on worker threads (`lua_ParallelMark`, `lua_ParallelSweep`); see [Lua](#lua) | about −2 % at the peak (collector 2.2 → 0.5 ms per tick) |
+| **Total since profiling started** | **about −18 %** (before the Lua collector row) |
 
 Every row was checked against retail replays before it was committed. The
 threaded run plays the whole 41-minute benchmark with every embedded
@@ -124,6 +125,59 @@ second, not more ticks. The plan, in order:
      `.fx` effects are translated automatically from your installed copy,
      never shipped.
 
+## Lua
+
+The sim runs LuaPlus Build 1081 (Lua 5.0). Its collector is stop-the-world,
+and a collection has to happen on the same beat, free objects in the same
+order and run finalizers in the same order as the original, so the
+accounting that triggers it (`nblocks`, `GCthreshold`) is untouched.
+`FAF_LUAGC_TIMING=1` logs the phases of every sim collection.
+
+**Collector on the sim workers** (`lua_ParallelMark`, `lua_ParallelSweep`):
+
+- **Mark.** Objects are claimed by an atomic test-and-set of the same mark bit
+  the serial code tests, so each is traversed once and the marked set is the
+  serial one. Thread stacks, the LuaPlus root objects, weak-table clearing and
+  the separation of userdata awaiting finalization run on workers too. Stack
+  shrinks (allocations) and the GC hook stay on the sim thread.
+- **Sweep.** Workers walk the GC lists, sort live from dead objects and reset
+  the live objects' mark bits. The sim thread then frees the dead objects in
+  the original list order. The lists are split at objects known to be on
+  them: every 4,096th survivor of the previous sweep, and every 4,096th object
+  linked at a list head since.
+
+With both switches on, the per-beat checksum log of the benchmark replay is
+identical to the serial run (`/simworkers 0`) at 8 and at 3 workers, on all
+24,565 beats, and the full replay matches every embedded checksum on x64 and
+x86 at `/simworkers 8`.
+
+Benchmark replay, x64, `/simworkers 8`, both runs matching every embedded
+checksum:
+
+| | Switches off | Switches on |
+|---|---|---|
+| Collector time, whole game (356 collections) | 35.9 s (mark 24.3, sweep 11.6) | 9.3 s (mark 6.0, sweep 3.2) |
+| Lua collector, sim ms per tick at the peak (ticks 19,000–22,500) | 2.18 (2.5 % of the sim) | 0.48 (0.6 %) |
+| Lua in total (interpreter, bindings, collector) at the peak | 6.1 % of the sim | 4.5 % |
+
+In the 2,000 v 2,000 air fight a heavy collection drops from 75 ms mark and
+66 ms sweep to 22 ms and 34 ms. What is left of the sweep is the frees, which
+stay serial.
+
+**Single-thread interpreter.** Measured in-process with random A/B assignment
+of interpreter entries, the interpreter costs about 140 cycles per Lua
+instruction excluding the C functions it calls. It is bound by memory latency
+on table lookups, not by dispatch. Two exact fast paths were built and dropped:
+
+| Idea | Why it was dropped |
+|---|---|
+| String-key `__index` chains followed inline in OP_GETTABLE, OP_SELF and OP_GETGLOBAL, skipping `luaV_index` / `luaT_gettm` / `luaH_get` (about 2.5 million chain lookups per 20 million instructions) | 146 against 148 cycles per lookup: both read the same table nodes, and those cache misses are the cost |
+| Interpreter loop with its program counter in a register (no live-pc publication for crash reports) | 140 cycles per instruction either way |
+
+A per-instruction inline cache was not attempted for the same reason: a hit
+still has to read the cached node to validate it, which is the read the
+lookup itself makes.
+
 ## Switches
 
 Every performance change has a switch that brings back the original path, and
@@ -138,7 +192,8 @@ thread or session starts.
 | `sim_Workers` | 0 | `/simworkers N` or `/con sim_Workers=N` | live (next dispatch) | Sim worker threads; 0 runs every phase serially |
 | `sim_ParallelRecon` | 1 | `/con` | live | Recon blip refresh per army on sim workers (needs `sim_Workers` > 0) |
 | `sim_ParallelSync` | 1 | `/con` | live | Sync packet unit updates filled on sim workers (needs `sim_Workers` > 0) |
-| `lua_ParallelMark` | 0 | `/con` | live | Lua GC mark phase on sim workers (needs `sim_Workers` > 0); sweep, finalizers and weak tables stay serial |
+| `lua_ParallelMark` | 1 | `/con` | live (next collection) | Lua GC mark on sim workers (needs `sim_Workers` > 0): propagation, thread stacks, the LuaPlus root objects, weak-table clearing and the userdata separation; stack shrinks, the GC hook and finalizers stay serial |
+| `lua_ParallelSweep` | 1 | `/con` | live (next collection) | Lua GC sweep: live/dead classification and mark reset on sim workers (needs `sim_Workers` > 0); every free stays on the sim thread, in the original list order |
 | `sim_DeferBlipUnlinks` | 1 | `/con` | live | Dropped blips-in-range lists leave their weak chains in one bulk pass instead of one chain walk per blip |
 | `sim_DeferBlipUnlinksTicks` | 4 | `/con` | live | Ticks between those bulk passes |
 | `sim_ExemptCheckInPlace` | 1 | `/con` | live | Target exemption reads the command queue instead of copying it |
