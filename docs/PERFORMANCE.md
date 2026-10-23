@@ -5,7 +5,43 @@ for beat, so every speed-up here is checked the same way the engine itself is:
 replays and live games against the retail `ForgedAlliance.exe`
 ([retail replay parity](RETAIL_REPLAY_PARITY.md)).
 
-*Snapshot: 20/10/2026.*
+*Snapshot: 23/10/2026, master `22a00a44`.*
+
+## Against retail
+
+Retail `ForgedAlliance.exe` (D3D9) against our x64 Release with every switch
+at its default, `/simworkers 8` and the Automatic renderer (D3D12), build
+`f2e650e8`. One game at a time, nothing else running. "Sim" is wall time from
+game 0:00 to the last game second. Every run matched every checksum embedded
+in the replay.
+
+| Replay | Players | Game time | Retail sim | Ours sim | Change | Heaviest stretch (ticks 20,000–22,000) | Peak private memory, retail / ours |
+|---|---|---|---|---|---|---|---|
+| 26935800 | 12 | 40:53 | 1244 s | 1032 s | −17 % | 222 → 170 s | 1470 / 2397 MB |
+| 26919967 | 12 | 46:27 | 1675 s | 1125 s | −33 % | 212 → 132 s | 1475 / 2339 MB |
+| 26928802 | 8 | 38:40 | 1123 s | 855 s | −24 % | 207 → 150 s | 1480 / 2339 MB |
+| 26923388 | 2 | 45:24 | 189 s | 181 s | −4 % | both near the speed cap (14.4× and 15.1× real time) | 718 / 1100 MB |
+| 26997072 | 10 | 22:38 | 180 s | 151 s | −16 % | game ends before tick 22,000 | 967 / 1600 MB |
+
+- **Renderer.** On 26935800 the same build takes 924 s on D3D9 (−26 % against
+  retail) and 1032 s on D3D12. D3D12 costs about 12 % in replay fast-forward.
+- **Without sim workers.** Build `99a47149`, D3D9, 26935800, two runs each:
+  `/simworkers 0` is about −9 % against retail (−16 % in the heaviest
+  stretch), `/simworkers 8` −24 % (−33 %).
+- **Air fight** (`faf_re_stress`, 1,000 and 2,000 aircraft a side, build
+  `99a47149`). In the heaviest part of the fight our x64 is 7–14 % faster
+  than retail without workers and 28–46 % faster at `/simworkers 8`. In the
+  light stretch after the fight our engine stopped at about 104–111 ticks per
+  second where retail runs at 145–160. `sim_LeadOnSchedule` fixed that: 1k
+  116 → 154 ticks/s (retail 156), 2k 113 → 143 (retail 146). The unit counts
+  tick by tick are identical to retail's in every run.
+- **Memory.** Our x64 uses about 0.4–0.9 GB more than retail: 64-bit
+  pointers, plus the D3D12 backend in the table above. Our heap peak on
+  26935800 (D3D9) is 770–779 MB against retail's 704 MB.
+- **Multiplayer.** Retail and our x64 in one lobby (`faf_re_lockstep`, AI on
+  both sides, about 30 minutes of game time) ran without a desync, both
+  without workers and at `/simworkers 8`, on D3D12. All 30 army status lines
+  were identical on both clients.
 
 ## How it is measured
 
@@ -17,9 +53,10 @@ replays and live games against the retail `ForgedAlliance.exe`
   of the same replay. Replay speed alone misleads: the sim and the main thread
   take turns, and the main thread is often the slower of the two.
 - **Benchmark.** FAF vault replay 26935800: Dual Gap, 12 players, 41 minutes,
-  up to about 4,400 units.
+  up to about 4,400 units. The comparison with retail above adds four more
+  vault replays.
 
-## Results so far
+## Sim thread
 
 | Change | Sim thread per tick |
 |---|---|
@@ -50,6 +87,7 @@ time.
 | Mesh and decal view queries and fog-of-war circles collected on workers, merged in the original walk order | `ren_ParallelCull` |
 | Each beat's unit and entity updates: pose and data copies on workers. Spatial relinks, selection and sound stay on the main thread in packet order. An update that can run UI Lua is applied serially, so Lua sees the serial state. | `wld_ParallelSync` |
 | Single-player sessions (one local client, no network) keep 2 beats computed ahead. Multiplayer and observers keep the original pacing. | `sim_LocalLead` (default 2) |
+| With either lead, beats are still issued on the original rate schedule, with the lead on top. A fixed lead alone capped a session at about lead × frame rate. | `sim_LeadOnSchedule` (default 1) |
 | With 20,000+ entities in view, a camera's in-view unit lists refresh every 2 s instead of every 0.5 s (still 0.2 s after a zoom) | `ren_FrustumCacheLodUnits`, `ren_FrustumCacheLodInterval` |
 
 Results, x64:
@@ -87,8 +125,8 @@ can be forced back to serial.
 
 **Determinism check.** The same replay runs at `/simworkers 0` and
 `/simworkers 8` with a per-beat checksum log, and every beat must be
-byte-identical. The recon phase passed on 6,814 consecutive beats of the
-benchmark.
+byte-identical. With every threaded phase on, the benchmark passes on all
+24,565 beats.
 
 ## Scale: x86 against x64
 
@@ -108,22 +146,20 @@ next target.
 
 ## Where the time goes next
 
-The sim is now the limit, both in replays and on the stress map at
-30,000–60,000 units. The latest main-thread savings, fog of war walked from
-arrays on workers and strategic icons drawn in bulk, give more frames per
-second, not more ticks. The plan, in order:
+The sim is the limit, both in replays and on the stress map at
+30,000–60,000 units. Main-thread savings now give more frames per second,
+not more ticks. Open items:
 
-1. **More sim phases on workers:** sync packet serialization, intel rasters,
-   then pose and animation (about 14 % of sim time). Pose and animation need
+1. **Pose and animation on sim workers** (about 14 % of sim time). They need
    speculative computation published in serial order.
-2. **Observer pacing for live games**, after a live multiplayer test.
-3. **New renderer backends** behind the existing `gpg::gal` layer, which
-   already has a full D3D9 and a partial D3D10 backend:
-   - Direct3D 11 first, with instancing, lower per-draw overhead and
-     multi-threaded command recording;
-   - then D3D12 and Vulkan, compiled from one shader pipeline. The game's
-     `.fx` effects are translated automatically from your installed copy,
-     never shipped.
+2. **D3D12 in replay fast-forward**: about 12 % slower than D3D9 on the
+   benchmark.
+3. **Memory**: about 0.4–0.9 GB above retail.
+4. **GPU-driven draws**: on branch `gpu-driven`, not merged.
+5. **Lua interpreter**: bound by memory latency on table lookups (see
+   [Lua](#lua)), so the remaining gain is in calling it less, not in the
+   interpreter loop.
+6. **Observer pacing for live games.** Live games keep the original pacing.
 
 ## Lua
 
