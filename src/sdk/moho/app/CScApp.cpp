@@ -1253,7 +1253,8 @@ namespace
    * entry, from data/fafengine). An explicit renderer is tried alone, with
    * Direct3D 9 after it. `auto` - the default, and what an unset or unknown
    * value means - takes the newest renderer that starts: Direct3D 12, then
-   * Vulkan, then Direct3D 11, then Direct3D 9.
+   * Vulkan, then Direct3D 11, then Direct3D 9 (the 32-bit build: Direct3D 11
+   * first).
    */
   [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder()
   {
@@ -1284,7 +1285,15 @@ namespace
         return explicitApi(api);
       }
     }
+#if defined(_M_IX86)
+    // The 32-bit build starts Direct3D 11 first: Direct3D 12 there faults the
+    // GPU (an SM MMU fault, "device hung") on NVIDIA's 32-bit driver after
+    // minutes of play, which the x64 build of the same code does not. It
+    // stays available with /d3d12 or graphics_api = d3d12.
+    return {DeviceApi::Direct3D11, DeviceApi::Vulkan, DeviceApi::Direct3D12, DeviceApi::Direct3D9};
+#else
     return {DeviceApi::Direct3D12, DeviceApi::Vulkan, DeviceApi::Direct3D11, DeviceApi::Direct3D9};
+#endif
   }
 
   /**

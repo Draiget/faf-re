@@ -185,6 +185,9 @@ namespace gpg::gal
       RenderState state;
       VkDescriptorSet textures = VK_NULL_HANDLE;
       VkDescriptorSet constants = VK_NULL_HANDLE;
+      const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
+      std::uint32_t constantsBytes = 0;
+      std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
       std::shared_ptr<const std::vector<effects::TextureBinding>> sampled;
     };
 
@@ -258,6 +261,15 @@ namespace gpg::gal
 
     [[nodiscard]] ProgramState& StateFor(effects::EffectProgram& program);
     [[nodiscard]] VkDescriptorSet AllocateSet(VkDescriptorSetLayout layout);
+    [[nodiscard]] VkDeviceSize ConstantAlignment() const noexcept;
+    /** A set 1 ($Globals) descriptor set reading `bytes` of `upload`. */
+    [[nodiscard]] VkDescriptorSet ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes);
+    /**
+     * Copies the bound pass's constant snapshot into the submission now being
+     * recorded; called after a submission, before CollectCompleted can hand
+     * out the upload memory the snapshot was taken into.
+     */
+    void CarryBoundPass();
     [[nodiscard]] VkSampler SamplerFor(const effects::SamplerDesc& desc);
     [[nodiscard]] VkShaderModule ModuleFor(const effects::CompiledEntry& entry, const effects::CompiledEntry* vertex);
     [[nodiscard]] const effects::SpirvInterface& InterfaceOf(const effects::CompiledEntry& entry);

@@ -92,6 +92,7 @@ namespace gpg::gal::d3d12
         &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&page->resource)
       )
     );
+    static_cast<void>(page->resource->SetName(L"upload page"));
     const D3D12_RANGE noRead{0U, 0U};
     void* mapped = nullptr;
     backend::CheckHresult("D3D12Core.cpp", __LINE__, page->resource->Map(0U, &noRead, &mapped));

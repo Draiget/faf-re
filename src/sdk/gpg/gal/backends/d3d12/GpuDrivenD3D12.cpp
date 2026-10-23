@@ -609,6 +609,7 @@ namespace gpg::gal
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     mList->OMSetStencilRef(program->mDesc.inheritDepthStencil ? mCurrent.stencilRef : program->mDesc.stencil.reference);
     RecordStateChange();
+    MarkDraw(program->mName.c_str());
 
     if (indices != nullptr) {
       const D3D12_INDEX_BUFFER_VIEW indexView{indexAddress, indices->Storage().ByteWidth(), indices->IndexFormat()};
@@ -625,6 +626,7 @@ namespace gpg::gal
       mList->DrawInstanced(call.vertexCountPerInstance, call.instanceCount, 0U, call.firstInstance);
       RecordDraw((call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount);
     }
+    FinishDraw();
 
     // The effect draws that follow set their pipeline, tables, stencil
     // reference and index buffer each time, but not the root signature.
@@ -649,7 +651,9 @@ namespace gpg::gal
     mList->SetComputeRootConstantBufferView(0U, constants);
     mList->SetComputeRootDescriptorTable(1U, readTable);
     mList->SetComputeRootDescriptorTable(2U, writeTable);
+    MarkDraw(program->mName.c_str());
     mList->Dispatch(dispatch.groupsX, dispatch.groupsY, dispatch.groupsZ);
+    FinishDraw();
     RecordStateChange();
 
     // What the dispatch wrote is complete before anything reads or writes it again.
