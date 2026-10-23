@@ -1101,4 +1101,77 @@ namespace gpg::diag
     sCrashDialogText = nullptr;
     (void)::HeapFree(::GetProcessHeap(), 0, wide);
   }
+
+  void NoteSimLuaError(const char* const message)
+  {
+    struct SDumpOnErrorConfig
+    {
+      int budget = 0;           // FAF_DUMP_ON_SIM_LUA_ERROR: dumps left to write
+      char ignore[1024] = {};   // FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE: ';'-separated substrings
+    };
+    static SDumpOnErrorConfig sConfig = [] {
+      SDumpOnErrorConfig config{};
+      char value[16] = {};
+      const DWORD length = ::GetEnvironmentVariableA("FAF_DUMP_ON_SIM_LUA_ERROR", value, sizeof(value));
+      if (length != 0u && length < sizeof(value)) {
+        config.budget = std::atoi(value);
+      }
+      const DWORD ignoreLength =
+        ::GetEnvironmentVariableA("FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE", config.ignore, sizeof(config.ignore));
+      if (ignoreLength >= sizeof(config.ignore)) {
+        config.ignore[0] = '\0';
+      }
+      return config;
+    }();
+    static int sWritten = 0;
+
+    if (sConfig.budget <= sWritten || message == nullptr) {
+      return;
+    }
+    for (const char* entry = sConfig.ignore; *entry != '\0';) {
+      const char* const separator = std::strchr(entry, ';');
+      const std::size_t length = separator != nullptr ? static_cast<std::size_t>(separator - entry) : std::strlen(entry);
+      if (length != 0u) {
+        char needle[256] = {};
+        (void)::strncpy_s(needle, sizeof(needle), entry, length < sizeof(needle) ? length : sizeof(needle) - 1u);
+        if (std::strstr(message, needle) != nullptr) {
+          return;
+        }
+      }
+      entry += length + (separator != nullptr ? 1u : 0u);
+    }
+    ++sWritten;
+
+    char exeDir[MAX_PATH * 2] = {};
+    ResolveExeDir(exeDir, sizeof(exeDir));
+    SYSTEMTIME now{};
+    ::GetLocalTime(&now);
+    char stem[MAX_PATH * 2] = {};
+    (void)::sprintf_s(
+      stem, sizeof(stem), "%sfaf_luaerr_%04u%02u%02u_%02u%02u%02u_%d", exeDir, now.wYear, now.wMonth, now.wDay,
+      now.wHour, now.wMinute, now.wSecond, sWritten
+    );
+
+    char path[MAX_PATH * 2 + 8] = {};
+    (void)::sprintf_s(path, sizeof(path), "%s.txt", stem);
+    std::FILE* text = nullptr;
+    if (::fopen_s(&text, path, "w") == 0 && text != nullptr) {
+      (void)std::fputs(message, text);
+      (void)std::fputc('\n', text);
+      (void)std::fclose(text);
+    }
+
+    (void)::sprintf_s(path, sizeof(path), "%s.dmp", stem);
+    HANDLE file = ::CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+      return;
+    }
+    const auto type = static_cast<MINIDUMP_TYPE>(
+      MiniDumpWithFullMemory | MiniDumpWithHandleData | MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules
+    );
+    const BOOL written =
+      ::MiniDumpWriteDump(::GetCurrentProcess(), ::GetCurrentProcessId(), file, type, nullptr, nullptr, nullptr);
+    (void)::CloseHandle(file);
+    gpg::Warnf("FAF_DUMP_ON_SIM_LUA_ERROR: %s %s", written != FALSE ? "wrote" : "failed to write", path);
+  }
 } // namespace gpg::diag

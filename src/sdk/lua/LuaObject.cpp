@@ -12957,7 +12957,318 @@ namespace moho
 		"Sort live from dead objects of the sim Lua heap on the sim worker threads during a sweep (same results).",
 		&lua_ParallelSweep
 	);
+
+	/**
+	 * Engine addition, debugging aid: `lua_GcVerify`, a user-side switch, default off. Checks every
+	 * parallel sim collection against a serial one (see `gc_verify`). Slow; for soak and debug runs.
+	 */
+	bool lua_GcVerify = false;
+
+	TConVar<bool> gTConVar_lua_GcVerify(
+		"lua_GcVerify",
+		"Debug: check each parallel sim Lua collection against a serial mark and sweep, logging [GCVERIFY] lines.",
+		&lua_GcVerify
+	);
 } // namespace moho
+
+/**
+ * Engine addition, debugging aid: `lua_GcVerify` (default off). At every sim collection that runs
+ * the parallel collector, the mark is first run serially into a reference (then the mark bytes are
+ * put back), and the parallel mark is compared with it: mark bytes and weak-table lists after both
+ * propagations. After the mark it checks that no marked weak table still refers to an unmarked
+ * object, that no live closure keeps an open upvalue into a dead thread's stack, and that the root
+ * LuaObject list is intact; the parallel sweep's classification is compared with a serial walk.
+ * Findings are logged as `[GCVERIFY]` warnings (at most 400 per process), and every 100th verified
+ * collection as `[GCVERIFY-OK]`. The serial reference shrinks thread stacks as a serial mark would,
+ * so a verified run can collect at slightly different points than an unverified one.
+ */
+namespace
+{
+	namespace gc_verify
+	{
+		[[nodiscard]] bool Enabled() noexcept
+		{
+			return moho::lua_GcVerify;
+		}
+
+		std::atomic<long> sCollection{0};
+		long sReported = 0;
+		constexpr long kReportBudget = 400;
+
+		[[nodiscard]] bool Report() noexcept
+		{
+			return ++sReported <= kReportBudget;
+		}
+
+		void CollectObjects(global_State* const g, std::vector<GCObject*>& out)
+		{
+			out.clear();
+			const auto addList = [&out](GCObject* object) {
+				for (; object != nullptr; object = object->gch.next) {
+					out.push_back(object);
+				}
+			};
+			const auto addOpen = [&out](lua_State* const thread) {
+				for (GCObject* upvalue = thread->openupval; upvalue != nullptr; upvalue = upvalue->gch.next) {
+					out.push_back(upvalue);
+				}
+			};
+			addList(g->rootgc);
+			addList(g->rootgc1);
+			addList(g->rootudata);
+			addList(g->tmudata);
+			for (int bucket = 0; bucket < g->strt.size; ++bucket) {
+				addList(g->strt.hash[bucket]);
+			}
+			out.push_back(reinterpret_cast<GCObject*>(g->mainthread));
+			addOpen(g->mainthread);
+			for (GCObject* thread = g->rootgc1; thread != nullptr; thread = thread->gch.next) {
+				if (thread->gch.tt == LUA_TTHREAD) {
+					addOpen(&thread->th);
+				}
+			}
+		}
+
+		void ReadMarks(const std::vector<GCObject*>& objects, std::vector<lu_byte>& out)
+		{
+			out.resize(objects.size());
+			for (std::size_t index = 0; index < objects.size(); ++index) {
+				out[index] = objects[index]->gch.marked;
+			}
+		}
+
+		void WriteMarks(const std::vector<GCObject*>& objects, const std::vector<lu_byte>& marks)
+		{
+			for (std::size_t index = 0; index < objects.size(); ++index) {
+				objects[index]->gch.marked = marks[index];
+			}
+		}
+
+		void ListToVector(GCObject* list, std::vector<GCObject*>& out)
+		{
+			out.clear();
+			for (; list != nullptr; list = list->h.gclist) {
+				out.push_back(list);
+			}
+			std::sort(out.begin(), out.end());
+		}
+
+		[[nodiscard]] const char* TypeName(const int tt) noexcept
+		{
+			switch (tt) {
+			case LUA_TSTRING: return "string";
+			case LUA_TTABLE: return "table";
+			case LUA_CFUNCTION: return "cfunction";
+			case LUA_TFUNCTION: return "function";
+			case LUA_TUSERDATA: return "userdata";
+			case LUA_TTHREAD: return "thread";
+			case LUA_TPROTO: return "proto";
+			case LUA_TUPVALUE: return "upvalue";
+			default: return "?";
+			}
+		}
+
+		/// The serial reference of one propagation, taken before the parallel one runs.
+		struct MarkReference
+		{
+			std::vector<GCObject*> objects;
+			std::vector<lu_byte> before;
+			std::vector<lu_byte> serial;
+			std::vector<GCObject*> weak[3]; // wk, wv, wkv after the serial propagation, sorted
+			long collection = 0;
+			int pass = 0;
+		};
+
+		MarkReference sReference;
+
+		/**
+		 * Runs `seed` (root marking) and `propagatemarks` serially into the reference, then puts
+		 * every mark byte back, so the parallel path starts from the same heap.
+		 */
+		template <class Seed>
+		void TakeReference(global_State* const g, const int pass, Seed&& seed)
+		{
+			MarkReference& ref = sReference;
+			ref.collection = sCollection.load(std::memory_order_relaxed);
+			ref.pass = pass;
+			CollectObjects(g, ref.objects);
+			ReadMarks(ref.objects, ref.before);
+			GCState st{};
+			seed(st);
+			propagatemarks(&st);
+			ReadMarks(ref.objects, ref.serial);
+			ListToVector(st.wk, ref.weak[0]);
+			ListToVector(st.wv, ref.weak[1]);
+			ListToVector(st.wkv, ref.weak[2]);
+			WriteMarks(ref.objects, ref.before);
+		}
+
+		void CompareWeak(const char* const name, const std::vector<GCObject*>& serial, std::vector<Table*> parallel)
+		{
+			std::sort(parallel.begin(), parallel.end());
+			std::vector<GCObject*> par(parallel.size());
+			for (std::size_t index = 0; index < parallel.size(); ++index) {
+				par[index] = reinterpret_cast<GCObject*>(parallel[index]);
+			}
+			if (par != serial && Report()) {
+				gpg::Warnf(
+					"[GCVERIFY] collection %ld pass %d weak list %s: serial %zu tables, parallel %zu",
+					sReference.collection, sReference.pass, name, serial.size(), par.size()
+				);
+			}
+		}
+
+		/// Compares the parallel propagation's marks (and weak sets) with the reference.
+		void CompareReference(const std::vector<Table*>* const weakSets, const std::size_t weakBase[3])
+		{
+			MarkReference& ref = sReference;
+			std::vector<lu_byte> now;
+			ReadMarks(ref.objects, now);
+			std::size_t differing = 0;
+			for (std::size_t index = 0; index < now.size(); ++index) {
+				if (now[index] == ref.serial[index]) {
+					continue;
+				}
+				++differing;
+				if (differing <= 20u && Report()) {
+					const GCObject* const object = ref.objects[index];
+					gpg::Warnf(
+						"[GCVERIFY] collection %ld pass %d: %s %p before=%02X serial=%02X parallel=%02X",
+						ref.collection, ref.pass, TypeName(object->gch.tt), static_cast<const void*>(object),
+						ref.before[index], ref.serial[index], now[index]
+					);
+				}
+			}
+			if (differing != 0u && Report()) {
+				gpg::Warnf("[GCVERIFY] collection %ld pass %d: %zu mark bytes differ", ref.collection, ref.pass, differing);
+			}
+			const char* const names[3] = {"wk", "wv", "wkv"};
+			for (int kind = 0; kind < 3; ++kind) {
+				const std::size_t base = std::min(weakBase[kind], weakSets[kind].size());
+				std::vector<Table*> added(weakSets[kind].begin() + static_cast<std::ptrdiff_t>(base), weakSets[kind].end());
+				CompareWeak(names[kind], ref.weak[kind], std::move(added));
+			}
+		}
+
+		/// After the whole mark: no marked weak table may still hold an unmarked collectable.
+		void CheckWeakInvariant(global_State* const g)
+		{
+			constexpr int kLuaTagMethodMode = 2;
+			std::size_t bad = 0;
+			for (GCObject* object = g->rootgc; object != nullptr; object = object->gch.next) {
+				if (object->gch.tt != LUA_TTABLE || (object->gch.marked & 1u) == 0u) {
+					continue;
+				}
+				Table* const h = &object->h;
+				const TObject* const mode = luaH_getstr(h->metatable, g->tmname[kLuaTagMethodMode]);
+				if (mode->tt != LUA_TSTRING) {
+					continue;
+				}
+				const char* const modeText = static_cast<TString*>(mode->value.p)->str;
+				const bool weakkey = std::strchr(modeText, 'k') != nullptr;
+				const bool weakvalue = std::strchr(modeText, 'v') != nullptr;
+				const auto dead = [](const TObject& slot) {
+					return slot.tt >= LUA_TSTRING && slot.value.p != nullptr
+						&& (static_cast<GCObject*>(slot.value.p)->gch.marked & 1u) == 0u;
+				};
+				if (weakvalue) {
+					for (int index = 0; index < h->sizearray; ++index) {
+						if (dead(h->array[index])) {
+							++bad;
+							if (Report()) {
+								gpg::Warnf("[GCVERIFY] collection %ld: weak table %p array[%d] holds unmarked %s %p (marked=%02X)",
+									sCollection.load(), static_cast<void*>(h), index, TypeName(h->array[index].tt), h->array[index].value.p,
+									static_cast<GCObject*>(h->array[index].value.p)->gch.marked);
+							}
+						}
+					}
+				}
+				for (int index = 0; index < (1 << h->lsizenode); ++index) {
+					const Node& node = h->node[index];
+					if (node.i_val.tt == LUA_TNIL) {
+						continue;
+					}
+					if ((weakkey && dead(node.i_key)) || (weakvalue && dead(node.i_val))) {
+						++bad;
+						if (Report()) {
+							gpg::Warnf("[GCVERIFY] collection %ld: weak table %p (mode %s, marked=%02X) node %d key %s %p (marked=%02X) value %s",
+								sCollection.load(), static_cast<void*>(h), modeText, h->marked, index, TypeName(node.i_key.tt), node.i_key.value.p,
+								node.i_key.tt >= LUA_TSTRING ? static_cast<GCObject*>(node.i_key.value.p)->gch.marked : 0, TypeName(node.i_val.tt));
+						}
+					}
+				}
+			}
+			if (bad != 0u && Report()) {
+				gpg::Warnf("[GCVERIFY] collection %ld: %zu weak entries left pointing at unmarked objects", sCollection.load(), bad);
+			}
+		}
+
+		/// Live closures holding an open upvalue into the stack of a thread this collection frees.
+		void CheckDeadThreadUpvalues(global_State* const g)
+		{
+			std::vector<std::pair<const TObject*, const TObject*>> deadStacks;
+			for (GCObject* object = g->rootgc1; object != nullptr; object = object->gch.next) {
+				if (object->gch.tt == LUA_TTHREAD && object->gch.marked == 0u && object->th.openupval != nullptr) {
+					deadStacks.emplace_back(object->th.stack, object->th.stack + object->th.stacksize);
+				}
+			}
+			if (deadStacks.empty()) {
+				return;
+			}
+			std::size_t hits = 0;
+			for (GCObject* object = g->rootgc; object != nullptr; object = object->gch.next) {
+				if (object->gch.tt != LUA_TFUNCTION || (object->gch.marked & 1u) == 0u) {
+					continue;
+				}
+				LClosure& closure = object->cl.l;
+				for (int index = 0; index < closure.nupvalues; ++index) {
+					const UpVal* const upvalue = closure.upvals[index];
+					if (upvalue == nullptr || upvalue->v == &upvalue->value) {
+						continue;
+					}
+					for (const auto& [begin, end] : deadStacks) {
+						if (upvalue->v >= begin && upvalue->v < end) {
+							++hits;
+							break;
+						}
+					}
+				}
+			}
+			if (hits != 0u && Report()) {
+				gpg::Warnf("[GCVERIFY] collection %ld: %zu live closure upvalues point into %zu dead thread stacks",
+					sCollection.load(), hits, deadStacks.size());
+			}
+		}
+
+		/// The root state's LuaObject list: every back-link must point at its node.
+		void CheckLuaObjectList(global_State* const g)
+		{
+			auto* const rootState = static_cast<LuaState*>(g->mainthread->stateUserData);
+			if (rootState == nullptr || rootState != rootState->m_rootState) {
+				return;
+			}
+			LuaObject* const tail = reinterpret_cast<LuaObject*>(&rootState->m_tailObject);
+			LuaObject** expectedPrev = &rootState->m_headObject.m_next;
+			std::size_t count = 0;
+			for (LuaObject* node = rootState->m_headObject.m_next; node != tail; node = node->m_next) {
+				if (node == nullptr) {
+					if (Report()) {
+						gpg::Warnf("[GCVERIFY] collection %ld: LuaObject list ends in null after %zu nodes", sCollection.load(), count);
+					}
+					return;
+				}
+				if (node->m_prev != expectedPrev) {
+					if (Report()) {
+						gpg::Warnf("[GCVERIFY] collection %ld: LuaObject %p at %zu has a bad back-link", sCollection.load(), static_cast<void*>(node), count);
+					}
+					return;
+				}
+				expectedPrev = &node->m_next;
+				++count;
+			}
+		}
+	} // namespace gc_verify
+} // namespace
 
 namespace
 {
@@ -13030,20 +13341,17 @@ namespace
 			kWeakBoth = 2    // wkv
 		};
 
-		/// The weak tables of the current collection, by list, gathered from the participants.
+		/**
+		 * The weak tables of one collection, by list, gathered from the participants. Owned by the
+		 * collection (`mark`), never shared: every Lua VM collects on its own thread (the user VM on
+		 * the main thread while the sim VM marks on the sim workers), so a process-wide set would be
+		 * emptied or appended to by another VM's collection mid-mark, and the weak tables it lost
+		 * would keep entries for objects the sweep then frees.
+		 */
 		struct WeakSets
 		{
 			std::vector<Table*> tables[3];
-
-			void Clear() noexcept
-			{
-				for (std::vector<Table*>& list : tables) {
-					list.clear();
-				}
-			}
 		};
-
-		WeakSets sWeakSets;
 
 		/// Work shared between the participants: donated gray objects, and how many hold work.
 		struct SharedWork
@@ -13401,9 +13709,12 @@ namespace
 
 	/**
 	 * `propagatemarks`, on the sim worker pool when `lua_ParallelMark` allows (see
-	 * `parallel_mark`); serially otherwise.
+	 * `parallel_mark`); serially otherwise. The parallel path gathers the weak tables it traverses
+	 * into `weakSets`, the collection's own (see `parallel_mark::WeakSets`).
 	 */
-	void PropagateMarksForCollection(GCState* const st, const bool parallel, LuaState* rootObjects = nullptr)
+	void PropagateMarksForCollection(
+		GCState* const st, const bool parallel, parallel_mark::WeakSets& weakSets, LuaState* rootObjects = nullptr
+	)
 	{
 		using namespace parallel_mark;
 		if (!parallel) {
@@ -13454,7 +13765,7 @@ namespace
 				lists.wk = lists.wv = lists.wkv = nullptr;
 				lists.wkTail = lists.wvTail = lists.wkvTail = nullptr;
 				for (int kind = 0; kind < 3; ++kind) {
-					std::vector<Table*>& gathered = sWeakSets.tables[kind];
+					std::vector<Table*>& gathered = weakSets.tables[kind];
 					gathered.insert(gathered.end(), lists.weakTables[kind].begin(), lists.weakTables[kind].end());
 					lists.weakTables[kind].clear();
 				}
@@ -13491,7 +13802,7 @@ namespace
 
 		struct WeakList
 		{
-			const std::vector<Table*>* tables; // as gathered by the parallel mark (parallel_mark::sWeakSets)
+			const std::vector<Table*>* tables; // as gathered by the parallel mark (parallel_mark::WeakSets)
 			unsigned clear;                    // EClear bits; with both, keys are cleared first as the serial calls do
 		};
 
@@ -13943,6 +14254,46 @@ namespace
 					Forget(g);
 					return false;
 				}
+			}
+
+			if (gc_verify::Enabled()) { // lua_GcVerify: the classification against a serial walk
+				const auto check = [&](const char* const name, std::vector<GCObject*> walked, const std::size_t begin, const std::size_t end) {
+					std::vector<GCObject*> recorded;
+					std::size_t badMark = 0;
+					for (std::size_t index = begin; index < end; ++index) {
+						for (GCObject* const object : chunks[index].live) {
+							recorded.push_back(object);
+							badMark += object->gch.marked == 0u ? 1u : 0u;
+						}
+						for (const DeadRecord& record : chunks[index].dead) {
+							recorded.push_back(record.object);
+							badMark += record.object->gch.marked != 0u ? 1u : 0u;
+						}
+					}
+					std::sort(walked.begin(), walked.end());
+					std::sort(recorded.begin(), recorded.end());
+					if ((walked != recorded || badMark != 0u) && gc_verify::Report()) {
+						gpg::Warnf("[GCVERIFY] collection %ld sweep %s: walked %zu recorded %zu misclassified %zu",
+							gc_verify::sCollection.load(), name, walked.size(), recorded.size(), badMark);
+					}
+				};
+				const auto walk = [](GCObject* object) {
+					std::vector<GCObject*> out;
+					for (; object != nullptr; object = object->gch.next) {
+						out.push_back(object);
+					}
+					return out;
+				};
+				check("userdata", walk(g->rootudata), lists[kListUserdata].chunkBegin, lists[kListUserdata].chunkEnd);
+				check("threads", walk(g->rootgc1), lists[kListThreads].chunkBegin, lists[kListThreads].chunkEnd);
+				check("objects", walk(g->rootgc), lists[kListObjects].chunkBegin, lists[kListObjects].chunkEnd);
+				std::vector<GCObject*> strings;
+				for (int bucket = 0; bucket < g->strt.size; ++bucket) {
+					for (GCObject* object = g->strt.hash[bucket]; object != nullptr; object = object->gch.next) {
+						strings.push_back(object);
+					}
+				}
+				check("strings", std::move(strings), stringBegin, stringEnd);
 			}
 
 			const long long clearStart = timer != nullptr ? lua::GcTimer::Now() : 0;
@@ -17860,14 +18211,35 @@ extern "C"
 		// Engine change (lua_ParallelMark): decided once, so a switch flipped mid-collection
 		// cannot mix the paths.
 		const bool parallel = parallel_mark::Enabled();
-		parallel_mark::WeakSets& weakSets = parallel_mark::sWeakSets;
-		weakSets.Clear();
+		// This collection's weak tables, local to it: the user VM collects on the main thread while
+		// the sim VM marks, so the two cannot share one set (see parallel_mark::WeakSets).
+		parallel_mark::WeakSets weakSets;
 
 		GcDetailLaps lap; // FAF_LUAGC_TIMING only
+
+		// Engine addition (lua_GcVerify, debug only): the serial reference of the first propagation.
+		const bool verify = parallel && gc_verify::Enabled();
+		const std::size_t noWeakBefore[3] = {0u, 0u, 0u};
+		if (verify) {
+			gc_verify::sCollection.fetch_add(1);
+			gc_verify::CheckLuaObjectList(st.g);
+			gc_verify::TakeReference(st.g, 1, [state](GCState& reference) {
+				reference.g = state->l_G;
+				reference.L = state;
+				markroot(&reference, state);
+			});
+		}
+
 		LuaState* const rootObjects = MarkRootForCollection(&st, state, parallel); // engine change: lua_ParallelMark
 		lap("root");
-		PropagateMarksForCollection(&st, parallel, rootObjects); // engine change: lua_ParallelMark, see there
+		PropagateMarksForCollection(&st, parallel, weakSets, rootObjects); // engine change: lua_ParallelMark, see there
 		lap("propagate");
+		if (verify) {
+			gc_verify::CompareReference(weakSets.tables, noWeakBefore);
+			if (gc_verify::sCollection.load() % 100 == 1) {
+				gpg::Logf("[GCVERIFY-OK] collection %ld verified, %zu objects", gc_verify::sCollection.load(), gc_verify::sReference.objects.size());
+			}
+		}
 
 		std::vector<Table*> weakKeyValueVector; // engine change: lua_ParallelMark (the wkv tables of the first pass)
 		if (parallel) {
@@ -17897,8 +18269,38 @@ extern "C"
 			reallymarkobject(&st, udata);
 		}
 
-		PropagateMarksForCollection(&st, parallel); // engine change: lua_ParallelMark, see there
+		// lua_GcVerify: the serial reference of the second propagation, from the same gray chain
+		// (rebuilt afterwards, since the reference consumed it).
+		const std::size_t weakBefore[3] = {weakSets.tables[0].size(), weakSets.tables[1].size(), weakSets.tables[2].size()};
+		if (verify) {
+			std::vector<GCObject*> chain;
+			for (GCObject* object = st.tmark; object != nullptr; object = parallel_mark::NextGray(object)) {
+				chain.push_back(object);
+			}
+			gc_verify::TakeReference(st.g, 2, [&st](GCState& reference) {
+				reference.g = st.g;
+				reference.L = st.L;
+				reference.tmark = st.tmark;
+			});
+			for (std::size_t index = 0; index < chain.size(); ++index) {
+				GCObject* const object = chain[index];
+				GCObject* const next = index + 1u < chain.size() ? chain[index + 1u] : nullptr;
+				switch (object->gch.tt) {
+				case LUA_TTABLE: object->h.gclist = next; break;
+				case LUA_CFUNCTION:
+				case LUA_TFUNCTION: object->cl.c.gclist = next; break;
+				case LUA_TTHREAD: object->th.gclist = next; break;
+				case LUA_TPROTO: object->p.gclist = next; break;
+				default: break;
+				}
+			}
+		}
+
+		PropagateMarksForCollection(&st, parallel, weakSets); // engine change: lua_ParallelMark, see there
 		lap("propagate");
+		if (verify) {
+			gc_verify::CompareReference(weakSets.tables, weakBefore);
+		}
 
 		if (parallel) { // engine change: lua_ParallelMark
 			using namespace parallel_weak;
@@ -17908,7 +18310,6 @@ extern "C"
 				{&weakSets.tables[parallel_mark::kWeakValues], kValues},
 				{&weakSets.tables[parallel_mark::kWeakBoth], kKeys | kValues},
 			});
-			weakSets.Clear();
 		} else {
 			cleartablekeys(weakKeyValueTables);
 			cleartablekeys(st.wk);
@@ -17917,6 +18318,10 @@ extern "C"
 			cleartablevalues(st.wkv);
 		}
 		lap("weak");
+		if (verify) { // lua_GcVerify
+			gc_verify::CheckWeakInvariant(st.g);
+			gc_verify::CheckDeadThreadUpvalues(st.g);
+		}
 
 		return deadmem;
 	}

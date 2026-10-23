@@ -133,6 +133,24 @@ order and run finalizers in the same order as the original, so the
 accounting that triggers it (`nblocks`, `GCthreshold`) is untouched.
 `FAF_LUAGC_TIMING=1` logs the phases of every sim collection.
 
+Two debugging aids, both off by default:
+
+- `lua_GcVerify` (console variable, `/con lua_GcVerify=1`): every parallel sim
+  collection is checked against a serial mark and sweep. It compares mark bytes
+  and weak-table lists after both propagations and the sweep's live/dead
+  classification. After the mark it checks that no marked weak table refers to
+  an unmarked object, that no live closure keeps an open upvalue into a dead
+  thread, and that the LuaObject root list is intact. Findings are `[GCVERIFY]`
+  warnings, and every 100th clean collection logs `[GCVERIFY-OK]`. It roughly
+  doubles collector time and stretches each sim mark, which also widens the
+  window for races between the sim and other threads.
+- `FAF_DUMP_ON_SIM_LUA_ERROR=<n>` (environment): the first n sim Lua script
+  errors each write a full-memory minidump and the error text beside the exe
+  (`faf_luaerr_*.dmp/.txt`), then the game continues.
+  `FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE` lists `;`-separated substrings of errors
+  to skip, for errors a replay always logs (benchmark replay: `SetSpinDown;Failed
+  to attach entity`).
+
 **Collector on the sim workers** (`lua_ParallelMark`, `lua_ParallelSweep`):
 
 - **Mark.** Objects are claimed by an atomic test-and-set of the same mark bit
@@ -145,6 +163,16 @@ accounting that triggers it (`nblocks`, `GCthreshold`) is untouched.
   the original list order. The lists are split at objects known to be on
   them: every 4,096th survivor of the previous sweep, and every 4,096th object
   linked at a list head since.
+
+Everything a collection gathers belongs to that collection. The weak tables
+the workers find used to go into one process-wide set, which every Lua VM's
+collection emptied when it began. The UI VM collects on the main thread, so
+when it started during a sim mark it dropped the sim's weak tables: they were
+never cleared, kept entries for objects the sweep then freed, and later
+lookups found new objects at the old addresses. The `sizes` table that
+`table.insert` and `unpack` use is weak-keyed, so a fresh table could inherit
+a dead table's length, and `unpack` of an orientation came back short. It
+happened about once in five replays at `/simworkers 8` and desynced the game.
 
 With both switches on, the per-beat checksum log of the benchmark replay is
 identical to the serial run (`/simworkers 0`) at 8 and at 3 workers, on all
@@ -194,6 +222,7 @@ thread or session starts.
 | `sim_ParallelSync` | 1 | `/con` | live | Sync packet unit updates filled on sim workers (needs `sim_Workers` > 0) |
 | `lua_ParallelMark` | 1 | `/con` | live (next collection) | Lua GC mark on sim workers (needs `sim_Workers` > 0): propagation, thread stacks, the LuaPlus root objects, weak-table clearing and the userdata separation; stack shrinks, the GC hook and finalizers stay serial |
 | `lua_ParallelSweep` | 1 | `/con` | live (next collection) | Lua GC sweep: live/dead classification and mark reset on sim workers (needs `sim_Workers` > 0); every free stays on the sim thread, in the original list order |
+| `lua_GcVerify` | 0 | `/con` | live (next collection) | Debug only: check each parallel sim collection against a serial one, see [Lua](#lua) |
 | `sim_DeferBlipUnlinks` | 1 | `/con` | live | Dropped blips-in-range lists leave their weak chains in one bulk pass instead of one chain walk per blip |
 | `sim_DeferBlipUnlinksTicks` | 4 | `/con` | live | Ticks between those bulk passes |
 | `sim_ExemptCheckInPlace` | 1 | `/con` | live | Target exemption reads the command queue instead of copying it |
@@ -217,6 +246,7 @@ thread or session starts.
 | `sim_ParallelEntitySync` | 1 | `/con` | live | With `sim_ParallelSync`, entity-update records are copied on workers |
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
+| `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
 | `mem_SmallBlockIndexTable` | 1 | `/con` | live | x86 allocator: size class by table instead of a binary search |
 | `mem_InlineTransformCopy` | 1 | `/con` | live | Transform copies inline instead of through Wm3's out-of-line `memcpy_s` |
 | small-block pool (x64) | on | `/smallpool 0` or `FAF_SMALLPOOL=0` | startup only | Size-class pool for blocks up to 4 KB in front of the system heap; the log says `mem: small-block pool on/off` |

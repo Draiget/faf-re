@@ -1009,8 +1009,8 @@ namespace moho
 
   /**
    * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
-   * this many beats issued beyond the last one the main thread has taken off the sync queue,
-   * instead of pacing each beat off the main thread's last dequeue time, so the sim computes the
+   * this many beats issued beyond the last one the main thread has taken off the sync queue
+   * (on top of the original rate schedule, see `sim_LeadOnSchedule`), so the sim computes the
    * next beats while the frame renders. The requested speed still holds: the main thread drains
    * the queue on its own clock. 0 restores the original pacing.
    * - `sim_ReplayLead` (replays, default 10): a replay issues no commands, so the lead only
@@ -1020,6 +1020,14 @@ namespace moho
    */
   extern int sim_ReplayLead;
   extern int sim_LocalLead;
+
+  /**
+   * Engine addition: user-side console variable, used while a lead applies. 1 (default): the issue
+   * thread keeps the original rate schedule, run that many beats ahead, so beats keep coming at the
+   * requested rate between frames. 0: only the fixed lead past the last dequeued beat, which lets a
+   * frame take at most about that many beats and caps the session at lead x frame rate.
+   */
+  extern int sim_LeadOnSchedule;
 
   /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game

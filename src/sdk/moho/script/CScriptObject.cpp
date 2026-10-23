@@ -6,6 +6,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaError.h"
@@ -18,6 +19,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/SimThreadRole.h"
 #include "moho/entity/Prop.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -799,6 +801,9 @@ void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, cons
   }
 
   gpg::Warnf("Error running %s script in %s: %s", which ? which : "<unknown>", where, message ? message : "");
+  if (IsSimThread()) {
+    gpg::diag::NoteSimLuaError(message); // engine addition: FAF_DUMP_ON_SIM_LUA_ERROR (default off)
+  }
 }
 
 /**
