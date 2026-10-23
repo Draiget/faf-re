@@ -2042,6 +2042,11 @@ extern "C" size_t __cdecl msize(void* memblock)
 #endif
 }
 
+#if defined(_DLL)
+// Only with the DLL runtime (/MD, `_DLL`). A statically linked CRT (/MT)
+// brings its own `_msize` (msize.obj, beside `_msize_base`), which this would
+// collide with. Nothing in the engine calls `_msize` by name, so with /MD the
+// definition is unreferenced too.
 /**
  * Address: 0x00957AE0 (FUN_00957AE0, _msize)
  *
@@ -2052,6 +2057,7 @@ extern "C" size_t __cdecl _msize(void* memblock)
 {
     return msize(memblock);
 }
+#endif // _DLL
 
 /**
  * Address: 0x00957B00 (FUN_00957B00, realloc)
@@ -2107,6 +2113,11 @@ extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
     return pblock;
 }
 
+#if defined(_DLL)
+// Only with the DLL runtime (/MD, `_DLL`). A statically linked CRT (/MT) calls
+// `_expand` from its own `_aligned_realloc` (align.obj) on blocks of its own
+// heap; this definition would take those calls over. Nothing in the engine
+// calls `_expand` by name, so with /MD the definition is unreferenced too.
 /**
  * Address: 0x00957BA0 (FUN_00957BA0, sub_957BA0 / _expand-like)
  *
@@ -2126,6 +2137,7 @@ extern "C" void* __cdecl _expand(void* pblock, size_t newsize)
 
     return (msize(pblock) >= newsize) ? pblock : nullptr;
 }
+#endif // _DLL
 
 /**
  * Address: 0x00957AF0 (FUN_00957AF0, _free_crt)
