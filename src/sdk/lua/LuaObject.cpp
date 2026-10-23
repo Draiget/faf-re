@@ -13030,20 +13030,17 @@ namespace
 			kWeakBoth = 2    // wkv
 		};
 
-		/// The weak tables of the current collection, by list, gathered from the participants.
+		/**
+		 * The weak tables of one collection, by list, gathered from the participants. Owned by the
+		 * collection (`mark`), never shared: every Lua VM collects on its own thread (the user VM on
+		 * the main thread while the sim VM marks on the sim workers), so a process-wide set would be
+		 * emptied or appended to by another VM's collection mid-mark, and the weak tables it lost
+		 * would keep entries for objects the sweep then frees.
+		 */
 		struct WeakSets
 		{
 			std::vector<Table*> tables[3];
-
-			void Clear() noexcept
-			{
-				for (std::vector<Table*>& list : tables) {
-					list.clear();
-				}
-			}
 		};
-
-		WeakSets sWeakSets;
 
 		/// Work shared between the participants: donated gray objects, and how many hold work.
 		struct SharedWork
@@ -13401,9 +13398,12 @@ namespace
 
 	/**
 	 * `propagatemarks`, on the sim worker pool when `lua_ParallelMark` allows (see
-	 * `parallel_mark`); serially otherwise.
+	 * `parallel_mark`); serially otherwise. The parallel path gathers the weak tables it traverses
+	 * into `weakSets`, the collection's own (see `parallel_mark::WeakSets`).
 	 */
-	void PropagateMarksForCollection(GCState* const st, const bool parallel, LuaState* rootObjects = nullptr)
+	void PropagateMarksForCollection(
+		GCState* const st, const bool parallel, parallel_mark::WeakSets& weakSets, LuaState* rootObjects = nullptr
+	)
 	{
 		using namespace parallel_mark;
 		if (!parallel) {
@@ -13454,7 +13454,7 @@ namespace
 				lists.wk = lists.wv = lists.wkv = nullptr;
 				lists.wkTail = lists.wvTail = lists.wkvTail = nullptr;
 				for (int kind = 0; kind < 3; ++kind) {
-					std::vector<Table*>& gathered = sWeakSets.tables[kind];
+					std::vector<Table*>& gathered = weakSets.tables[kind];
 					gathered.insert(gathered.end(), lists.weakTables[kind].begin(), lists.weakTables[kind].end());
 					lists.weakTables[kind].clear();
 				}
@@ -13491,7 +13491,7 @@ namespace
 
 		struct WeakList
 		{
-			const std::vector<Table*>* tables; // as gathered by the parallel mark (parallel_mark::sWeakSets)
+			const std::vector<Table*>* tables; // as gathered by the parallel mark (parallel_mark::WeakSets)
 			unsigned clear;                    // EClear bits; with both, keys are cleared first as the serial calls do
 		};
 
@@ -17860,13 +17860,14 @@ extern "C"
 		// Engine change (lua_ParallelMark): decided once, so a switch flipped mid-collection
 		// cannot mix the paths.
 		const bool parallel = parallel_mark::Enabled();
-		parallel_mark::WeakSets& weakSets = parallel_mark::sWeakSets;
-		weakSets.Clear();
+		// This collection's weak tables, local to it: the user VM collects on the main thread while
+		// the sim VM marks, so the two cannot share one set (see parallel_mark::WeakSets).
+		parallel_mark::WeakSets weakSets;
 
 		GcDetailLaps lap; // FAF_LUAGC_TIMING only
 		LuaState* const rootObjects = MarkRootForCollection(&st, state, parallel); // engine change: lua_ParallelMark
 		lap("root");
-		PropagateMarksForCollection(&st, parallel, rootObjects); // engine change: lua_ParallelMark, see there
+		PropagateMarksForCollection(&st, parallel, weakSets, rootObjects); // engine change: lua_ParallelMark, see there
 		lap("propagate");
 
 		std::vector<Table*> weakKeyValueVector; // engine change: lua_ParallelMark (the wkv tables of the first pass)
@@ -17897,7 +17898,7 @@ extern "C"
 			reallymarkobject(&st, udata);
 		}
 
-		PropagateMarksForCollection(&st, parallel); // engine change: lua_ParallelMark, see there
+		PropagateMarksForCollection(&st, parallel, weakSets); // engine change: lua_ParallelMark, see there
 		lap("propagate");
 
 		if (parallel) { // engine change: lua_ParallelMark
@@ -17908,7 +17909,6 @@ extern "C"
 				{&weakSets.tables[parallel_mark::kWeakValues], kValues},
 				{&weakSets.tables[parallel_mark::kWeakBoth], kKeys | kValues},
 			});
-			weakSets.Clear();
 		} else {
 			cleartablekeys(weakKeyValueTables);
 			cleartablekeys(st.wk);

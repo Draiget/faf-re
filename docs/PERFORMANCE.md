@@ -146,6 +146,16 @@ accounting that triggers it (`nblocks`, `GCthreshold`) is untouched.
   them: every 4,096th survivor of the previous sweep, and every 4,096th object
   linked at a list head since.
 
+Everything a collection gathers belongs to that collection. The weak tables
+the workers find used to go into one process-wide set, which every Lua VM's
+collection emptied when it began. The UI VM collects on the main thread, so
+when it started during a sim mark it dropped the sim's weak tables: they were
+never cleared, kept entries for objects the sweep then freed, and later
+lookups found new objects at the old addresses. The `sizes` table that
+`table.insert` and `unpack` use is weak-keyed, so a fresh table could inherit
+a dead table's length, and `unpack` of an orientation came back short. It
+happened about once in five replays at `/simworkers 8` and desynced the game.
+
 With both switches on, the per-beat checksum log of the benchmark replay is
 identical to the serial run (`/simworkers 0`) at 8 and at 3 workers, on all
 24,565 beats, and the full replay matches every embedded checksum on x64 and
