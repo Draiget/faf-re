@@ -24,7 +24,7 @@ namespace moho
    * behind the polymorphic ones. `CTask` must sit at +0x10 (0x005A7CBB
    * stores 0x10, 0x005A7D1B puts `CScriptObject` at 0x28).
    */
-  class CAiNavigatorImpl : public IAiNavigator,
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT CAiNavigatorImpl : public IAiNavigator,
                            public CTask,
                            public CScriptObject,
                            public InstanceCounter<CAiNavigatorImpl>

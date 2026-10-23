@@ -15,7 +15,7 @@ namespace gpg
 
 namespace moho
 {
-  class CWaitForTask : public CTask, public InstanceCounter<CWaitForTask>
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT CWaitForTask : public CTask, public InstanceCounter<CWaitForTask>
   {
   public:
     /**

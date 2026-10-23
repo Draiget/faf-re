@@ -29,7 +29,7 @@ namespace moho
    */
   void register_ScrDiskWatcherTaskTypeInfo();
 
-  class ScrDiskWatcherTask : public CTask, public InstanceCounter<ScrDiskWatcherTask>
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT ScrDiskWatcherTask : public CTask, public InstanceCounter<ScrDiskWatcherTask>
   {
   public:
     /**

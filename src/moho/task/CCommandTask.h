@@ -12,7 +12,7 @@ namespace moho
   class Unit;
   class Sim;
 
-  class CCommandTask : public CTask, public InstanceCounter<CCommandTask>
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT CCommandTask : public CTask, public InstanceCounter<CCommandTask>
   {
   public:
     /**
