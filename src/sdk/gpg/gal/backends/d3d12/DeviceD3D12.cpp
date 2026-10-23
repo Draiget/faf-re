@@ -131,6 +131,43 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       return commandLine.find(needle) != std::string::npos;
     }
 
+    /** The command a DRED breadcrumb records, for the device-removed report. */
+    [[nodiscard]] const char* BreadcrumbOpName(const D3D12_AUTO_BREADCRUMB_OP op) noexcept
+    {
+      switch (op) {
+      case D3D12_AUTO_BREADCRUMB_OP_SETMARKER:
+        return "SetMarker";
+      case D3D12_AUTO_BREADCRUMB_OP_DRAWINSTANCED:
+        return "DrawInstanced";
+      case D3D12_AUTO_BREADCRUMB_OP_DRAWINDEXEDINSTANCED:
+        return "DrawIndexedInstanced";
+      case D3D12_AUTO_BREADCRUMB_OP_EXECUTEINDIRECT:
+        return "ExecuteIndirect";
+      case D3D12_AUTO_BREADCRUMB_OP_DISPATCH:
+        return "Dispatch";
+      case D3D12_AUTO_BREADCRUMB_OP_COPYBUFFERREGION:
+        return "CopyBufferRegion";
+      case D3D12_AUTO_BREADCRUMB_OP_COPYTEXTUREREGION:
+        return "CopyTextureRegion";
+      case D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE:
+        return "CopyResource";
+      case D3D12_AUTO_BREADCRUMB_OP_CLEARRENDERTARGETVIEW:
+        return "ClearRenderTargetView";
+      case D3D12_AUTO_BREADCRUMB_OP_CLEARDEPTHSTENCILVIEW:
+        return "ClearDepthStencilView";
+      case D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER:
+        return "ResourceBarrier";
+      case D3D12_AUTO_BREADCRUMB_OP_PRESENT:
+        return "Present";
+      case D3D12_AUTO_BREADCRUMB_OP_RESOLVEQUERYDATA:
+        return "ResolveQueryData";
+      case D3D12_AUTO_BREADCRUMB_OP_WRITEBUFFERIMMEDIATE:
+        return "WriteBufferImmediate";
+      default:
+        return "other";
+      }
+    }
+
     [[nodiscard]] bool IsRgbaTexture(Texture& texture)
     {
       const DXGI_FORMAT format = static_cast<TextureD3D12&>(texture).Desc().Format;
@@ -290,6 +327,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::uint64_t constantsVersion = 0;
     std::uint64_t constantsSerial = 0;
     D3D12_GPU_VIRTUAL_ADDRESS constants = 0;
+    const std::uint8_t* constantsCpu = nullptr;
 
     std::uint64_t tableFrame = ~0ULL;
     std::uint64_t tableEpoch = ~0ULL;
@@ -348,6 +386,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     ReleaseGpuDrivenObjects();
     mRootSignature.Reset();
+    mDrawMarkers = nullptr;
+    mDrawMarkerBuffer.Reset();
+    mList2.Reset();
     mList.Reset();
     mQueue.Reset();
     mFence.Reset();
@@ -365,11 +406,19 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   void DeviceD3D12::CreateDevice()
   {
     const dxgi::AdapterInfo& adapter = mFactory.Adapters()[mAdapterIndex];
-    const bool debugLayer = CommandLineHas("/d3d12debug");
+    // /d3d12gbv: the debug layer with GPU-based validation (resource states
+    // and descriptors checked as the GPU uses them; very slow).
+    const bool gpuValidation = CommandLineHas("/d3d12gbv");
+    const bool debugLayer = gpuValidation || CommandLineHas("/d3d12debug");
     if (debugLayer && mLibrary.getDebugInterface != nullptr) {
       ComPtr<ID3D12Debug> debug;
       if (SUCCEEDED(mLibrary.getDebugInterface(IID_PPV_ARGS(&debug)))) {
         debug->EnableDebugLayer();
+        ComPtr<ID3D12Debug1> debug1;
+        if (gpuValidation && SUCCEEDED(debug.As(&debug1))) {
+          debug1->SetEnableGPUBasedValidation(TRUE);
+          gpg::Logf("D3D12: GPU-based validation on");
+        }
       } else {
         gpg::Warnf("D3D12: the debug layer is not installed");
       }
@@ -383,6 +432,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       if (SUCCEEDED(mLibrary.getDebugInterface(IID_PPV_ARGS(&dred)))) {
         dred->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
         dred->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        // Breadcrumb contexts (the marker strings), where the runtime has them.
+        ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dred1;
+        if (SUCCEEDED(dred.As(&dred1))) {
+          dred1->SetBreadcrumbContextEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        }
         mDredEnabled = true;
         gpg::Logf("D3D12: device removed extended data on");
       }
@@ -426,6 +480,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     );
     // Created recording; BeginRecording resets it.
     CheckHresult("DeviceD3D12.cpp", __LINE__, mList->Close());
+    CreateDrawMarkers();
 
     mUpload.Initialize(mDevice.Get());
     mRtvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 256U);
@@ -554,6 +609,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       for (std::uint32_t index = 0U; index < swapChain.BufferCount(); ++index) {
         RenderTargetD3D12::Buffer buffer;
         CheckHresult("DeviceD3D12.cpp", __LINE__, swapChain.GetBuffer(index, buffer.resource.resource.GetAddressOf()));
+        static_cast<void>(buffer.resource.resource->SetName((L"back buffer " + std::to_wstring(index)).c_str()));
         buffer.resource.state = D3D12_RESOURCE_STATE_PRESENT;
         buffer.renderTargetView = mRtvPool.Allocate();
         mDevice->CreateRenderTargetView(buffer.resource.resource.Get(), nullptr, buffer.renderTargetView);
@@ -871,22 +927,63 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       gpg::Warnf("D3D12: no breadcrumbs - run with /d3d12dred (or /d3d12debug) to record them");
       return;
     }
+    // The lists the GPU had started and not finished, by operation (and the
+    // marker string, where the runtime records breadcrumb contexts); the
+    // lists queued behind them (nothing done yet) are only counted. A list
+    // stops at the first barrier after a faulting draw, so the culprit is
+    // usually before the STOPPED line: the draw markers below name it.
+    std::uint32_t queued = 0U;
+    const auto reportList = [&](const UINT32* const last, const UINT32 count, const D3D12_AUTO_BREADCRUMB_OP* const history,
+                                const D3D12_DRED_BREADCRUMB_CONTEXT* const contexts, const UINT contextCount) {
+      const UINT32 completed = (last != nullptr) ? *last : 0U;
+      if (completed >= count) {
+        return; // the GPU finished this list
+      }
+      if (completed == 0U) {
+        ++queued;
+        return;
+      }
+      gpg::Warnf("D3D12 breadcrumbs: a command list stopped after %u of %u operations", completed, count);
+      const UINT32 first = (completed > 12U) ? completed - 12U : 0U;
+      const UINT32 end = std::min(count, completed + 4U);
+      for (UINT32 index = first; index < end; ++index) {
+        const wchar_t* context = nullptr;
+        for (UINT entry = 0U; entry < contextCount; ++entry) {
+          if (contexts[entry].BreadcrumbIndex <= index && contexts[entry].pContextString != nullptr) {
+            context = contexts[entry].pContextString;
+          }
+        }
+        gpg::Warnf(
+          "  %s #%u: %s%s%ls", (index < completed) ? "done   " : ((index == completed) ? "STOPPED" : "pending"), index,
+          BreadcrumbOpName(history[index]), (context != nullptr) ? "  in " : "", (context != nullptr) ? context : L""
+        );
+      }
+    };
+    ComPtr<ID3D12DeviceRemovedExtendedData1> dred1;
+    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 crumbs1{};
     D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT crumbs{};
-    if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput(&crumbs))) {
+    if (SUCCEEDED(mDevice.As(&dred1)) && SUCCEEDED(dred1->GetAutoBreadcrumbsOutput1(&crumbs1))) {
+      for (const D3D12_AUTO_BREADCRUMB_NODE1* node = crumbs1.pHeadAutoBreadcrumbNode; node != nullptr; node = node->pNext) {
+        reportList(node->pLastBreadcrumbValue, node->BreadcrumbCount, node->pCommandHistory, node->pBreadcrumbContexts, node->BreadcrumbContextsCount);
+      }
+    } else if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput(&crumbs))) {
       for (const D3D12_AUTO_BREADCRUMB_NODE* node = crumbs.pHeadAutoBreadcrumbNode; node != nullptr; node = node->pNext) {
-        const UINT32 completed = (node->pLastBreadcrumbValue != nullptr) ? *node->pLastBreadcrumbValue : 0U;
-        if (completed >= node->BreadcrumbCount) {
-          continue; // the GPU finished this list
-        }
-        gpg::Warnf("D3D12 breadcrumbs: a command list stopped after %u of %u operations", completed, node->BreadcrumbCount);
-        const UINT32 first = (completed > 12U) ? completed - 12U : 0U;
-        const UINT32 last = std::min(node->BreadcrumbCount, completed + 4U);
-        for (UINT32 index = first; index < last; ++index) {
-          gpg::Warnf(
-            "  %s #%u: operation %d", (index < completed) ? "done   " : ((index == completed) ? "STOPPED" : "pending"), index,
-            static_cast<int>(node->pCommandHistory[index])
-          );
-        }
+        reportList(node->pLastBreadcrumbValue, node->BreadcrumbCount, node->pCommandHistory, nullptr, 0U);
+      }
+    }
+    gpg::Warnf("D3D12 breadcrumbs: %u more command list(s) queued, not started", queued);
+    // The draw markers: every command after the last one finished was still
+    // running, or waiting, when the GPU stopped; the first of them is the one
+    // that faulted or hung.
+    if (mDrawMarkers != nullptr) {
+      const std::uint32_t reached = mDrawMarkers[0];
+      const std::uint32_t finished = mDrawMarkers[1];
+      gpg::Warnf("D3D12 draw markers: %u recorded, the GPU reached %u and finished %u", mDrawMarkerId, reached, finished);
+      for (std::uint32_t id = finished + 1U; id <= reached && id <= finished + 12U; ++id) {
+        gpg::Warnf("  unfinished #%u: %s", id, mDrawMarkerNames[id % std::size(mDrawMarkerNames)].c_str());
+      }
+      for (std::uint32_t id = (finished > 4U) ? finished - 4U : 1U; id <= finished; ++id) {
+        gpg::Warnf("  finished   #%u: %s", id, mDrawMarkerNames[id % std::size(mDrawMarkerNames)].c_str());
       }
     }
     D3D12_DRED_PAGE_FAULT_OUTPUT fault{};
@@ -901,6 +998,71 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
   }
 
+  void DeviceD3D12::MarkDraw(const char* const name)
+  {
+    if (!mDredEnabled) {
+      return;
+    }
+    wchar_t text[96]{};
+    std::size_t length = 0U;
+    for (const char* c = (name != nullptr) ? name : ""; *c != 0 && length + 1U < std::size(text); ++c) {
+      text[length++] = static_cast<wchar_t>(static_cast<unsigned char>(*c));
+    }
+    // Metadata 0: a UTF-16 string, as PIX writes one.
+    mList->SetMarker(0U, text, static_cast<UINT>((length + 1U) * sizeof(wchar_t)));
+    if (mList2 != nullptr && mDrawMarkers != nullptr) {
+      const std::uint32_t id = ++mDrawMarkerId;
+      mDrawMarkerNames[id % std::size(mDrawMarkerNames)] = (name != nullptr) ? name : "";
+      const D3D12_WRITEBUFFERIMMEDIATE_PARAMETER reached{mDrawMarkerBuffer->GetGPUVirtualAddress(), id};
+      const D3D12_WRITEBUFFERIMMEDIATE_MODE mode = D3D12_WRITEBUFFERIMMEDIATE_MODE_MARKER_IN;
+      mList2->WriteBufferImmediate(1U, &reached, &mode);
+    }
+  }
+
+  void DeviceD3D12::FinishDraw()
+  {
+    if (mList2 == nullptr || mDrawMarkers == nullptr) {
+      return;
+    }
+    const D3D12_WRITEBUFFERIMMEDIATE_PARAMETER finished{
+      mDrawMarkerBuffer->GetGPUVirtualAddress() + sizeof(std::uint32_t), mDrawMarkerId
+    };
+    const D3D12_WRITEBUFFERIMMEDIATE_MODE mode = D3D12_WRITEBUFFERIMMEDIATE_MODE_MARKER_OUT;
+    mList2->WriteBufferImmediate(1U, &finished, &mode);
+  }
+
+  void DeviceD3D12::CreateDrawMarkers()
+  {
+    if (!mDredEnabled || FAILED(mList.As(&mList2))) {
+      return;
+    }
+    // Write-back system memory: still readable after the device is removed.
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_CUSTOM;
+    heap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+    heap.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = 256U;
+    desc.Height = 1U;
+    desc.DepthOrArraySize = 1U;
+    desc.MipLevels = 1U;
+    desc.SampleDesc.Count = 1U;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    void* mapped = nullptr;
+    if (FAILED(mDevice->CreateCommittedResource(
+          &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mDrawMarkerBuffer)
+        )) ||
+        FAILED(mDrawMarkerBuffer->Map(0U, nullptr, &mapped))) {
+      mDrawMarkerBuffer.Reset();
+      return;
+    }
+    static_cast<void>(mDrawMarkerBuffer->SetName(L"draw markers"));
+    mDrawMarkers = static_cast<volatile std::uint32_t*>(mapped);
+    mDrawMarkers[0] = 0U;
+    mDrawMarkers[1] = 0U;
+  }
+
   void DeviceD3D12::Submit(const bool wait)
   {
     FlushBarriers();
@@ -913,11 +1075,61 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (wait) {
       WaitForSerial(serial);
     }
+    // A submission in the middle of a pass (an upload between BeginPass and
+    // the draw) leaves the pass's draws for the next list.
+    if (CarryBoundPass()) {
+      ++mCarriedPasses;
+    }
     CollectCompleted();
     // Recording goes on into the same allocator: it is reset only when this
     // frame slot comes round again and its last submission has completed.
     CheckHresult("DeviceD3D12.cpp", __LINE__, mList->Reset(mFrames[mFrameIndex].allocator.Get(), nullptr));
     BindFrameState();
+  }
+
+  bool DeviceD3D12::CarryBoundPass()
+  {
+    // The pass's $Globals snapshot was uploaded into memory tagged with the
+    // submission it was taken in. Once that submission completes the page is
+    // handed out again (or released, past the idle reserve) while the pass's
+    // remaining draws, now in the next list, still read it. D3D9 keeps the
+    // snapshot BeginPass took for every draw of the pass; so does this copy.
+    if (!mPass.valid || mPass.constantsCpu == nullptr || mPass.constantsSerial == RecordingSerial()) {
+      return false;
+    }
+    const std::uint64_t bytes = (static_cast<std::uint64_t>(mPass.constantsBytes) + 255U) & ~static_cast<std::uint64_t>(255U);
+    const d3d12::UploadAllocation upload = mUpload.Allocate(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, RecordingSerial());
+    std::memcpy(upload.cpu, mPass.constantsCpu, mPass.constantsBytes);
+    // Only the bound pass moves: its effect may be gone by now (the next draw
+    // binds a new pass), and the program's cached snapshot is uploaded again
+    // by its next BindPass in this submission.
+    mPass.constants = upload.gpu;
+    mPass.constantsCpu = upload.cpu;
+    mPass.constantsSerial = RecordingSerial();
+    return true;
+  }
+
+  void DeviceD3D12::RefreshStalePass()
+  {
+    // A texture table lives in its frame's view arena, which the next frame
+    // does not bind and a full arena starts over: a draw with a pass bound
+    // before either would read descriptors that are no longer there.
+    if (!mPass.valid || (mPass.tableFrame == mFrameCount && mPass.tableEpoch == mArenaEpoch)) {
+      return;
+    }
+    static int logged = 0;
+    if (logged++ < 4) {
+      gpg::Logf("D3D12: %s draws with a pass bound before its view arena started over; binding it again", mPass.technique);
+    }
+    const BoundPass previous = mPass;
+    BindPass(*mPass.program, mPass.techniqueIndex, mPass.passIndex);
+    // The constants stay the snapshot BeginPass took (carried into this submission).
+    if (previous.constantsCpu != nullptr && previous.constantsSerial == RecordingSerial()) {
+      mPass.constants = previous.constants;
+      mPass.constantsCpu = previous.constantsCpu;
+      mPass.constantsBytes = previous.constantsBytes;
+      mPass.constantsSerial = previous.constantsSerial;
+    }
   }
 
   void DeviceD3D12::WaitForSerial(const std::uint64_t serial)
@@ -946,6 +1158,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   void DeviceD3D12::CollectCompleted()
   {
     const std::uint64_t completed = mFence->GetCompletedValue();
+    if (completed < mSubmittedSerial) {
+      mMostInFlight = std::max(mMostInFlight, mSubmittedSerial - completed);
+    }
     mUpload.Retire(completed);
     std::size_t kept = 0U;
     for (std::size_t index = 0U; index < mGarbage.size(); ++index) {
@@ -985,14 +1200,23 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // Never in the middle of preparing a draw: buffers already prepared
     // must stay in the list they were prepared for.
 #if defined(_M_IX86)
-    constexpr std::uint64_t kSubmitAfter = 48ULL << 20U;
+    constexpr std::uint64_t kDefaultSubmitAfter = 48ULL << 20U;
     constexpr std::uint64_t kWaitAbove = 128ULL << 20U;
 #else
-    constexpr std::uint64_t kSubmitAfter = 96ULL << 20U;
+    constexpr std::uint64_t kDefaultSubmitAfter = 96ULL << 20U;
     constexpr std::uint64_t kWaitAbove = 384ULL << 20U;
 #endif
+    // Diagnostics: FAF_GAL_UPLOAD_SUBMIT_KB=<n> hands the GPU the recorded
+    // commands after every n KB of uploads instead, which exercises the
+    // mid-frame submission paths.
+    static const std::uint64_t kSubmitAfter = [] {
+      const char* const value = std::getenv("FAF_GAL_UPLOAD_SUBMIT_KB");
+      const long kilobytes = (value != nullptr) ? std::strtol(value, nullptr, 10) : 0L;
+      return (kilobytes > 0L) ? static_cast<std::uint64_t>(kilobytes) << 10U : kDefaultSubmitAfter;
+    }();
     if (sinceSubmit > kSubmitAfter && !mPreparingDraw) {
       sinceSubmit = 0U;
+      ++mUploadSubmits;
       Submit(mUpload.BusyBytes() > kWaitAbove);
     }
     return mUpload.Allocate(bytes, alignment, RecordingSerial());
@@ -1033,7 +1257,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::memcpy(upload.cpu, data, static_cast<std::size_t>(bytes));
     Transition(destination, D3D12_RESOURCE_STATE_COPY_DEST);
     FlushBarriers();
+    MarkDraw("buffer upload");
     mList->CopyBufferRegion(destination.resource.Get(), offset, upload.resource, upload.offset, bytes);
+    FinishDraw();
   }
 
   bool DeviceD3D12::CopyVertexBufferRegion(
@@ -1104,7 +1330,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     origin.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     origin.PlacedFootprint = footprint;
     origin.PlacedFootprint.Offset = upload.offset;
+    MarkDraw("texture upload");
     mList->CopyTextureRegion(&target, 0U, 0U, 0U, &origin, nullptr);
+    FinishDraw();
   }
 
   void DeviceD3D12::ReadSubresource(
@@ -1489,6 +1717,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
                                        IID_PPV_ARGS(&resource.resource))
     );
     resource.state = D3D12_RESOURCE_STATE_COPY_DEST;
+    {
+      const std::string_view location = context->location_.view();
+      const std::wstring name(location.begin(), location.end());
+      static_cast<void>(resource.resource->SetName(name.empty() ? L"engine texture" : name.c_str()));
+    }
 
     for (std::uint32_t index = 0U; index < image.subresources.size(); ++index) {
       const imaging::Image::Subresource& subresource = image.subresources[index];
@@ -1542,6 +1775,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       "DeviceD3D12.cpp", __LINE__,
       mDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, kShaderRead, &clear, IID_PPV_ARGS(&buffer.resource.resource))
     );
+    static_cast<void>(buffer.resource.resource->SetName(
+      (L"render target " + std::to_wstring(desc.Width) + L"x" + std::to_wstring(desc.Height)).c_str()
+    ));
     buffer.resource.state = kShaderRead;
     buffer.renderTargetView = mRtvPool.Allocate();
     mDevice->CreateRenderTargetView(buffer.resource.resource.Get(), nullptr, buffer.renderTargetView);
@@ -1591,6 +1827,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       mDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clear,
                                        IID_PPV_ARGS(&resource.resource))
     );
+    static_cast<void>(resource.resource->SetName(
+      (L"depth stencil " + std::to_wstring(desc.Width) + L"x" + std::to_wstring(desc.Height)).c_str()
+    ));
     resource.state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     D3D12_DEPTH_STENCIL_VIEW_DESC depthDesc{};
@@ -1697,7 +1936,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       }
       const UINT x = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->left) : 0U;
       const UINT y = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->top) : 0U;
+      MarkDraw("StretchRect copy");
       mList->CopyTextureRegion(&target, x, y, 0U, &origin, boxPointer);
+      FinishDraw();
       return;
     }
     BlitTexture(from.shaderResourceView, from.resource, to, destinationTarget->Format(), destinationContext->width_, destinationContext->height_);
@@ -1757,7 +1998,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->SetGraphicsRootDescriptorTable(1U, table);
     mList->SetGraphicsRootDescriptorTable(2U, mBlitSamplers);
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    MarkDraw("StretchRect blit");
     mList->DrawInstanced(3U, 1U, 0U, 0U);
+    FinishDraw();
     mTargetsDirty = true;
   }
 
@@ -1804,7 +2047,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       }
       const UINT x = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->left) : 0U;
       const UINT y = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->top) : 0U;
+      MarkDraw("UpdateSurface copy");
       mList->CopyTextureRegion(&target, x, y, 0U, &origin, boxPointer);
+      FinishDraw();
       destinationTexture->DiscardCpuCopy();
       return;
     }
@@ -2006,14 +2251,34 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     static_cast<void>(::K32GetProcessMemoryInfo(
       ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)
     ));
+    // The address space left, and its largest free block (what a 32-bit
+    // process runs out of first).
+    std::uint64_t freeBytes = 0U;
+    std::uint64_t largestFree = 0U;
+    MEMORY_BASIC_INFORMATION region{};
+    for (const std::uint8_t* address = nullptr; ::VirtualQuery(address, &region, sizeof(region)) == sizeof(region);) {
+      if (region.State == MEM_FREE) {
+        freeBytes += region.RegionSize;
+        largestFree = std::max<std::uint64_t>(largestFree, region.RegionSize);
+      }
+      const std::uint8_t* const next = static_cast<const std::uint8_t*>(region.BaseAddress) + region.RegionSize;
+      if (next <= address) {
+        break;
+      }
+      address = next;
+    }
     constexpr double kMiB = 1.0 / (1024.0 * 1024.0);
     gpg::Logf(
-      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), %zu pipelines, %zu retiring; "
-      "process private %.1f MB",
+      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), %zu pipelines, %zu retiring, "
+      "%llu upload-pressure submissions, %llu passes carried over one, at most %llu submissions in flight; process private "
+      "%.1f MB, address space free %.1f MB (largest block %.1f MB)",
       static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB, static_cast<double>(TextureD3D12::CpuCopyBytes()) * kMiB,
       static_cast<double>(mUpload.PageBytes()) * kMiB, mUpload.PageCount(), mPipelines.size(), mGarbage.size(),
-      static_cast<double>(counters.PrivateUsage) * kMiB
+      static_cast<unsigned long long>(mUploadSubmits), static_cast<unsigned long long>(mCarriedPasses),
+      static_cast<unsigned long long>(mMostInFlight), static_cast<double>(counters.PrivateUsage) * kMiB,
+      static_cast<double>(freeBytes) * kMiB, static_cast<double>(largestFree) * kMiB
     );
+    mMostInFlight = 0U;
   }
 
   void DeviceD3D12::DumpBackBufferIfDue()
@@ -2085,6 +2350,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     const std::uint64_t serial = ++mSubmittedSerial;
     CheckDeviceHresult(__LINE__, mQueue->Signal(mFence.Get(), serial), "queue signal");
     mFrames[mFrameIndex].serial = serial;
+    static_cast<void>(CarryBoundPass());
 
     // The next frame slot: wait for the GPU to finish what it last recorded.
     mFrameIndex = (mFrameIndex + 1U) % d3d12::kFramesInFlight;
@@ -2403,10 +2669,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         const d3d12::UploadAllocation upload = AllocateUpload(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
         std::memcpy(upload.cpu, constants.data(), constants.size());
         state.constants = upload.gpu;
+        state.constantsCpu = upload.cpu;
         state.constantsVersion = parameters.Version();
         state.constantsSerial = RecordingSerial();
       }
       bound.constants = state.constants;
+      bound.constantsCpu = state.constantsCpu;
+      bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
+      bound.constantsSerial = state.constantsSerial;
     }
 
     // The texture table: rebuilt when a binding changed or the frame moved on.
@@ -2471,8 +2741,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       state.tableSurface = outputContext_.surface.get();
     }
     bound.textures = state.table;
+    bound.tableFrame = state.tableFrame;
+    bound.tableEpoch = state.tableEpoch;
     bound.sampled = state.tableBindings;
     bound.samplers = state.samplers;
+    bound.techniqueIndex = technique;
+    bound.passIndex = pass;
     if (mTracing) {
       Trace(
         "BindPass %s technique %s pass %u valid %d vs %d ps %d constants %u textures %u", program.Name().c_str(),
@@ -2699,6 +2973,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->IASetPrimitiveTopology(topology);
     mList->OMSetBlendFactor(mPass.state.blendFactor);
     mList->OMSetStencilRef(mPass.state.stencilRef);
+    if (mDredEnabled) {
+      MarkDraw((mPass.program->Name().substr(mPass.program->Name().find_last_of("\\/") + 1U) + ":" + mPass.technique).c_str());
+    }
     return true;
   }
 
@@ -2708,6 +2985,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (mIndexBuffer == nullptr) {
       return;
     }
+    RefreshStalePass(); // before anything is prepared: binding may submit
     const DrawPreparation preparing(mPreparingDraw);
     auto* const indexBuffer = static_cast<IndexBufferD3D12*>(mIndexBuffer.get());
     const D3D12_GPU_VIRTUAL_ADDRESS indexAddress = indexBuffer->Storage().PrepareForDraw(*this);
@@ -2719,18 +2997,21 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // D3D10 passes base vertex 0 (0x008FD16E); D3D9 passes BaseVertexIndex.
     const UINT instances = InstanceCount(mStreamFrequencies[0]);
     mList->DrawIndexedInstanced(context->indexCount_, instances, context->startIndex_, context->baseVertexIndex_, 0U);
+    FinishDraw();
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
   void DeviceD3D12::DrawPrimitive(const DrawContext* const context)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    RefreshStalePass(); // before anything is prepared: binding may submit
     const DrawPreparation preparing(mPreparingDraw);
     if (!PrepareDraw(static_cast<std::uint32_t>(context->topology_))) {
       return;
     }
     const UINT instances = InstanceCount(mStreamFrequencies[0]);
     mList->DrawInstanced(context->vertexCount_, instances, context->startVertex_, 0U);
+    FinishDraw();
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 

@@ -242,6 +242,7 @@ namespace gpg::gal
     std::uint64_t constantsSerial = 0;
     std::uint64_t constantsFrame = ~0ULL;
     VkDescriptorSet constants = VK_NULL_HANDLE;
+    const std::uint8_t* constantsCpu = nullptr;
 
     std::uint64_t tableFrame = ~0ULL;
     std::uint64_t textureVersion = 0;
@@ -1098,6 +1099,9 @@ namespace gpg::gal
     if (wait) {
       WaitForSerial(serial);
     }
+    // A submission in the middle of a pass (an upload between BeginPass and
+    // the draw) leaves the pass's draws for the next command buffer.
+    CarryBoundPass();
     CollectCompleted();
     if (!present) {
       BeginCommandBuffer();
@@ -2398,6 +2402,43 @@ namespace gpg::gal
     }
   }
 
+  VkDeviceSize DeviceVulkan::ConstantAlignment() const noexcept
+  {
+    return std::max<VkDeviceSize>(mProperties.limits.minUniformBufferOffsetAlignment, 16U);
+  }
+
+  VkDescriptorSet DeviceVulkan::ConstantSet(const vulkan::UploadAllocation& upload, const VkDeviceSize bytes)
+  {
+    const VkDescriptorSet set = AllocateSet(mConstantLayout);
+    VkDescriptorBufferInfo buffer{upload.buffer, upload.offset, bytes};
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set;
+    write.dstBinding = 0U;
+    write.descriptorCount = 1U;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.pBufferInfo = &buffer;
+    Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
+    return set;
+  }
+
+  void DeviceVulkan::CarryBoundPass()
+  {
+    // The pass's $Globals snapshot sits in upload memory tagged with the
+    // submission it was taken in; once that one completes the page is handed
+    // out again, while the pass's remaining draws, now in the next command
+    // buffer, still read it. D3D9 keeps the snapshot BeginPass took for every
+    // draw of the pass; so does this copy (see DeviceD3D12::CarryBoundPass).
+    if (!mPass.valid || mPass.constantsCpu == nullptr || mPass.constantsSerial == RecordingSerial()) {
+      return;
+    }
+    const vulkan::UploadAllocation upload = mUpload.Allocate(mPass.constantsBytes, ConstantAlignment(), RecordingSerial());
+    std::memcpy(upload.cpu, mPass.constantsCpu, mPass.constantsBytes);
+    mPass.constants = ConstantSet(upload, mPass.constantsBytes);
+    mPass.constantsCpu = upload.cpu;
+    mPass.constantsSerial = RecordingSerial();
+  }
+
   void DeviceVulkan::BindPass(effects::EffectProgram& program, const std::uint32_t technique, const std::uint32_t pass)
   {
     RecordStateChange();
@@ -2457,25 +2498,18 @@ namespace gpg::gal
     if (!constants.empty()) {
       if (state.constants == VK_NULL_HANDLE || state.constantsVersion != parameters.Version() ||
           state.constantsSerial != RecordingSerial() || state.constantsFrame != mFrameCount) {
-        const VkDeviceSize alignment = std::max<VkDeviceSize>(mProperties.limits.minUniformBufferOffsetAlignment, 16U);
-        const vulkan::UploadAllocation upload = AllocateUpload(constants.size(), alignment);
+        const vulkan::UploadAllocation upload = AllocateUpload(constants.size(), ConstantAlignment());
         std::memcpy(upload.cpu, constants.data(), constants.size());
-        const VkDescriptorSet set = AllocateSet(mConstantLayout);
-        VkDescriptorBufferInfo buffer{upload.buffer, upload.offset, constants.size()};
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = set;
-        write.dstBinding = 0U;
-        write.descriptorCount = 1U;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.pBufferInfo = &buffer;
-        Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
-        state.constants = set;
+        state.constants = ConstantSet(upload, constants.size());
+        state.constantsCpu = upload.cpu;
         state.constantsVersion = parameters.Version();
         state.constantsSerial = RecordingSerial();
         state.constantsFrame = mFrameCount;
       }
       bound.constants = state.constants;
+      bound.constantsCpu = state.constantsCpu;
+      bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
+      bound.constantsSerial = state.constantsSerial;
     }
 
     // Textures and samplers in set 0, rebuilt when a binding changed or the frame moved on.

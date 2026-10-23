@@ -191,9 +191,16 @@ namespace gpg::gal
       const effects::CompiledEntry* pixelShader = nullptr;
       BlendState state;
       D3D12_GPU_VIRTUAL_ADDRESS constants = 0;
+      const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
+      std::uint32_t constantsBytes = 0;
+      std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
       D3D12_GPU_DESCRIPTOR_HANDLE textures{};
+      std::uint64_t tableFrame = 0;               // the frame's view arena the table is in
+      std::uint64_t tableEpoch = 0;
       D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
       std::shared_ptr<const std::vector<effects::TextureBinding>> sampled; // what the texture table holds
+      std::uint32_t techniqueIndex = 0;
+      std::uint32_t passIndex = 0;
       const char* technique = ""; // diagnostics
     };
 
@@ -216,6 +223,15 @@ namespace gpg::gal
     void WaitForSerial(std::uint64_t serial);
     void CollectCompleted();
     void BindFrameState();
+    /**
+     * Copies the bound pass's constant snapshot into the submission now being
+     * recorded; called after a submission, before CollectCompleted can hand
+     * out or release the upload memory the snapshot was taken into. True when
+     * the pass had constants from an earlier submission.
+     */
+    bool CarryBoundPass();
+    /** Binds the current pass again when its texture table is in a view arena since started over. */
+    void RefreshStalePass();
 
     [[nodiscard]] ProgramState& StateFor(effects::EffectProgram& program);
     [[nodiscard]] ID3D12PipelineState* PipelineFor(const BoundPass& pass, D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType);
@@ -231,6 +247,14 @@ namespace gpg::gal
     void CheckDeviceHresult(int line, HRESULT result, const char* during);
     /** Logs why the device was removed, its debug messages and DRED breadcrumbs / page fault (once). */
     void ReportDeviceRemoved(const char* during);
+    /**
+     * With DRED on: a marker naming the draw, dispatch or copy recorded next
+     * (its breadcrumb context), and a numbered marker the GPU writes as it
+     * reaches that command; FinishDraw writes it again once the command is done.
+     */
+    void MarkDraw(const char* name);
+    void FinishDraw();
+    void CreateDrawMarkers();
     void DumpBackBufferIfDue();
     void LogMemoryIfDue();
 
@@ -378,6 +402,17 @@ namespace gpg::gal
     std::set<int> mLoggedMessages;
     bool mRemovalReported = false;
     bool mDredEnabled = false;
+    // With DRED: numbered markers around each draw, dispatch and copy, written
+    // by the GPU into system memory that survives a device removal (reached
+    // at [0], finished at [1]).
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> mList2;
+    Microsoft::WRL::ComPtr<ID3D12Resource> mDrawMarkerBuffer;
+    volatile std::uint32_t* mDrawMarkers = nullptr;
+    std::uint32_t mDrawMarkerId = 0;
+    std::string mDrawMarkerNames[4096];
+    std::uint64_t mUploadSubmits = 0; // submissions forced by upload pressure (FAF_GAL_MEMORY_LOG)
+    std::uint64_t mCarriedPasses = 0; // bound passes whose constants followed them into the next submission
+    std::uint64_t mMostInFlight = 0;  // submissions the GPU had not finished, at most, since the last memory log
     DWORD mFirstDumpTick = 0;
     DWORD mLastDumpTick = 0;
     std::uint32_t mSkippedDraws = 0;

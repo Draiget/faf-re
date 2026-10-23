@@ -4,7 +4,8 @@ The engine draws through `gpg::gal`, the GPG abstraction layer. The shipped
 binary had two backends: Direct3D 9 (the default) and Direct3D 10 (`/D3D10`).
 This fork adds Direct3D 11, Direct3D 12 and Vulkan. By default the game takes
 the newest renderer that starts (Direct3D 12, then Vulkan, then Direct3D 11,
-then Direct3D 9; see [Choosing the renderer](#choosing-the-renderer)). A
+then Direct3D 9; the 32-bit build starts with Direct3D 11, see
+[Known issues](#known-issues); see [Choosing the renderer](#choosing-the-renderer)). A
 renderer that cannot start is logged with the reason, and the next one is
 tried with the same window settings (`CScApp::CreateDevice`).
 
@@ -28,7 +29,7 @@ is stored as the option `graphics_api` (`auto`, `d3d9`, `d3d11`, `d3d12`,
 
 | Choice | Renderers tried, in order |
 |---|---|
-| `auto`, unset, unknown value | Direct3D 12, Vulkan, Direct3D 11, Direct3D 9 |
+| `auto`, unset, unknown value | Direct3D 12, Vulkan, Direct3D 11, Direct3D 9 (32-bit build: Direct3D 11, Vulkan, Direct3D 12, Direct3D 9) |
 | `d3d12` / `vulkan` / `d3d11` | that one, then Direct3D 9 |
 | `d3d9` | Direct3D 9 |
 
@@ -275,6 +276,19 @@ Both are optional; without them the game falls back to Direct3D 9.
 
 ## Known issues
 
+- Direct3D 12 in the 32-bit build, NVIDIA (seen on a TITAN RTX, driver
+  32.0.15.7270): after minutes of play the GPU takes an SM MMU fault
+  (`Graphics SM Warp Exception ... MMU Fault`, Xid 13 in the System event
+  log) and the device is removed as hung (`0x887A0006`). It shows on any
+  draw or dispatch (the bloom extract `frame.fx:TCopyGlowingStuff` and
+  `StrategicIconClassify` most often), right after a submission split
+  mid-frame by upload pressure, and is much more frequent with
+  `FAF_GAL_UPLOAD_SUBMIT_KB=1024`. The debug layer, GPU-based validation and
+  anything that slows the CPU hide it; the x64 build of the same code runs
+  the same load cleanly. No application error was found (see the
+  investigation notes in the commit), so `auto` starts the 32-bit build with
+  Direct3D 11.
+
 - Vulkan on NVIDIA: `PrintWindow(PW_RENDERFULLCONTENT)` on the game window
   (some capture tools do this) makes `PeekMessage` report a message that
   `GetMessage` then never returns. The engine's loop (`WIN_AppExecute`, as
@@ -287,6 +301,15 @@ Both are optional; without them the game falls back to Direct3D 9.
 | Switch / variable | Effect |
 |---|---|
 | `/d3d11debug`, `/d3d12debug`, `/vulkandebug` | API debug or validation layer; its warnings go to the game log |
+| `/d3d12gbv` | Direct3D 12: the debug layer with GPU-based validation (very slow) |
+| `/d3d12dred` | Direct3D 12: device removed extended data. On a device loss the log shows the breadcrumbs of the lists the GPU had started and numbered markers the GPU writes around every draw, dispatch and copy: the first unfinished one names the command that faulted or hung |
+| `FAF_GAL_MEMORY_LOG=<seconds>` | Direct3D 12: logs the backend's CPU copies, upload pages, upload-pressure submissions, passes carried into the next submission, submissions in flight and the address space left |
+| `FAF_GAL_UPLOAD_SUBMIT_KB=<n>` | Direct3D 12: submits the recorded commands after every n KB of uploads (default 48 MB on x86, 96 MB on x64), which exercises the mid-frame submission paths |
+| `FAF_CRASH_NO_DIALOG=1` | The crash report and minidump are written, but no dialog waits for a click (unattended test runs) |
+| `/d3d12gbv` | Direct3D 12: the debug layer with GPU-based validation (very slow) |
+| `/d3d12dred` | Direct3D 12: device removed extended data. On a device loss the log shows where the GPU stopped (each breadcrumb with the technique or GPU program it belongs to) and the allocation a page fault hit |
+| `FAF_GAL_MEMORY_LOG=<seconds>` | Direct3D 12: logs the backend's CPU copies, upload pages, upload-pressure submissions and passes carried into the next submission |
+| `FAF_GAL_UPLOAD_SUBMIT_KB=<n>` | Direct3D 12: submits the recorded commands after every n KB of uploads (default 48 MB on x86, 96 MB on x64), which exercises the mid-frame submission paths |
 | `/d3d11blt` | Direct3D 11: legacy blt-model swap chain |
 | `FAF_GAL_FAIL_SETUP=1`, `=d3d12,vulkan` | Device creation fails (every newer backend, or the listed ones), which exercises the renderer fallback |
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |

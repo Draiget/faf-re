@@ -1040,6 +1040,11 @@ namespace gpg::diag
 
   void ShowCrashReportDialog(const char* const reportPath)
   {
+    // Unattended runs (test scripts): FAF_CRASH_NO_DIALOG=1 keeps the report
+    // and minidump but lets the process end instead of waiting on the dialog.
+    if (const char* const noDialog = std::getenv("FAF_CRASH_NO_DIALOG"); noDialog != nullptr && noDialog[0] == '1') {
+      return;
+    }
     const char* const path = (reportPath != nullptr) ? reportPath : CrashReportPath();
 
     // Read the report text (bounded) into a wide buffer for the edit control.
