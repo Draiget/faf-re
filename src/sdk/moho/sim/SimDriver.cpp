@@ -1250,15 +1250,24 @@ void CSimDriver::ThreadRun()
         } else {
           lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
         }
-      } else if (const int leadBeats = SessionLeadBeats(); leadBeats > 0) {
+      } else if (const int leadBeats = SessionLeadBeats(); leadBeats > 0 && sim_LeadOnSchedule == 0) {
         // Engine addition (sim_ReplayLead / sim_LocalLead): outside network sessions, keep
         // `leadBeats` beats issued past the last one the main thread dequeued, so the sim works on
         // the next beats while the frame renders. The session still runs at the requested speed:
         // the main thread drains the queue on its own clock, and the queue cap above stops the sim
         // once it is that far ahead. Each dequeue signals `mConnectionEvent`, which is what wakes
         // this thread to top it up.
+        //
+        // Without the rate schedule below, no frame can take more than `leadBeats` beats (plus
+        // whatever the sim finishes during the drain), so at high speed the session runs at about
+        // `leadBeats` x the frame rate rather than the requested rate (`sim_LeadOnSchedule`).
         lastBeatToIssue = std::max(lastBeatToIssue, mLastDequeuedBeat + leadBeats);
       } else {
+        // Engine addition (sim_LeadOnSchedule): with a lead, the original rate schedule below runs
+        // `leadBeats` beats ahead - it paces as if the main thread had already dequeued that many
+        // more - so the sim still issues beats at the requested rate between frames, and the lead
+        // only adds headroom on top. Without a lead `pacedBeat` is `mLastDequeuedBeat`, the original.
+        const int pacedBeat = mLastDequeuedBeat + leadBeats;
         // @note This pacing math is CORRECT and is not why the sim runs about
         // eleven times too fast. Measured on SCMP_009, our build goes from
         // `Game time 00:00:00` at 33 s of session time to 00:01:49 at 43 s --
@@ -1284,7 +1293,7 @@ void CSimDriver::ThreadRun()
         const float simRateScale = msvc8::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
         const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
         const float leadMilliseconds =
-          static_cast<float>(mNextIssueBeat - mLastDequeuedBeat) * millisecondsPerBeat - net_Lag;
+          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - net_Lag;
         const std::int64_t dueAt = mLastSyncCycleTime + gpg::time::MillisecondsToCycles(leadMilliseconds);
 
         if (dueAt >= now) {
@@ -1301,11 +1310,15 @@ void CSimDriver::ThreadRun()
           if (catchUpCeiling > kMaxCatchUpBeats) {
             catchUpCeiling = kMaxCatchUpBeats;
           }
-          if (lastBeatToIssue <= mLastDequeuedBeat + catchUpCeiling) {
+          if (lastBeatToIssue <= pacedBeat + catchUpCeiling) {
             waitMilliseconds = 0;
           } else {
-            lastBeatToIssue = mLastDequeuedBeat + catchUpCeiling;
+            lastBeatToIssue = pacedBeat + catchUpCeiling;
           }
+        }
+
+        if (leadBeats > 0) {
+          lastBeatToIssue = std::max(lastBeatToIssue, pacedBeat);
         }
       }
 
@@ -2178,6 +2191,7 @@ ISTIDriver* moho::SIM_CreateDriver(
 
 int moho::sim_ReplayLead = 10;
 int moho::sim_LocalLead = 2;
+int moho::sim_LeadOnSchedule = 1;
 
 namespace
 {
@@ -2193,6 +2207,13 @@ namespace
     "Single player only (one human, no network peers): beats the sim may compute ahead of the beat "
     "on screen. Orders land up to this many beats later; 0 = original pacing.",
     &moho::sim_LocalLead
+  );
+
+  TConVar<int> gTConVar_sim_LeadOnSchedule(
+    "sim_LeadOnSchedule",
+    "Replays and single player with a lead: 1 issues beats on the original rate schedule with the lead "
+    "on top; 0 keeps only the fixed lead past the beat on screen (at most that many beats per frame).",
+    &moho::sim_LeadOnSchedule
   );
 } // namespace
 
