@@ -29,8 +29,8 @@ Exit code: 0 when every selected target passes, 1 otherwise, 3 on a setup failur
 ## How it works
 
 * **Build** (`build.bat`). This is a standalone 32-bit console exe, built with
-  `cl` from `vcvarsamd64_x86.bat`. It never touches `src\sdk\main.vcxproj`.
-  The engine TUs under test are compiled **from `src\sdk`**
+  `cl` from `vcvarsamd64_x86.bat`. It never touches `src\main.vcxproj`.
+  The engine TUs under test are compiled **from `src`**
   (`moho\math\QuaternionMath.cpp`, `moho\math\Vector3f.cpp`,
   `legacy\math\X87Math.cpp`) with main.vcxproj's float-relevant Win32
   switches: v143 defaults `/arch:SSE2 /fp:precise`, plus `/O2 /Oi` and the
@@ -138,7 +138,7 @@ Exit code: 0 when every selected target passes, 1 otherwise, 3 on a setup failur
    in `build.bat` when it compiles standalone. Otherwise mirror it in
    `sdk_mirror.cpp` with a comment naming the file and line range.
 
-## Mismatch classes found so far (and fixed in src\sdk)
+## Mismatch classes found so far (and fixed in src)
 
 All of them come from the x87-vs-SSE split. The 2007 build ran these chains
 on the x87 stack. Under `_PC_24` every step rounds its *mantissa* the way

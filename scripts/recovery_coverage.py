@@ -4,7 +4,7 @@ Compute FAF reconstruction coverage from source annotations and IDA exports.
 
 Inputs:
 - decomp/recovery/fa_function_names_*.json (function universe + names)
-- src/sdk/** Address: 0xXXXXXXXX annotations (recovered function evidence)
+- src/** Address: 0xXXXXXXXX annotations (recovered function evidence)
 
 Outputs:
 - Human-readable summary (default)
@@ -66,8 +66,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compute FAF reconstruction coverage")
     parser.add_argument(
         "--src-root",
-        default="src/sdk",
-        help="Source root scanned for Address: 0x... annotations (default: src/sdk)",
+        default="src",
+        help="Source root scanned for Address: 0x... annotations (default: src)",
     )
     parser.add_argument(
         "--recovery-dir",

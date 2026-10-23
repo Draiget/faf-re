@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Audit wx functions annotated in src/sdk and summarize de-dup readiness.
+Audit wx functions annotated in src and summarize de-dup readiness.
 
 This script consumes:
-- src/sdk/** Address: 0x... annotations
+- src/** Address: 0x... annotations
 - scripts/wx_verify_readme_scope_symbols.py CSV output
 
 It produces:
@@ -27,7 +27,7 @@ FILE_EXTENSIONS = {".h", ".hpp", ".hh", ".hxx", ".c", ".cpp", ".cc", ".cxx", ".i
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit wx source de-dup readiness.")
     parser.add_argument("--repo-root", default=".", help="Repository root path.")
-    parser.add_argument("--src-root", default="src/sdk", help="Source root scanned for Address annotations.")
+    parser.add_argument("--src-root", default="src", help="Source root scanned for Address annotations.")
     parser.add_argument(
         "--verification-csv",
         default="decomp/recovery/reports/wxwidgets_readme_scope_verification.csv",
@@ -124,7 +124,7 @@ def main() -> int:
         "",
         "## Summary",
         "",
-        f"- wx functions annotated in `src/sdk/**`: `{len(present_rows)}`",
+        f"- wx functions annotated in `src/**`: `{len(present_rows)}`",
         f"- external_dependency + verified in wx lib: `{external_verified}`",
         f"- recovered + unverified in wx lib: `{recovered_unverified}`",
         "- Exact symbol overlap between wrapper objs and `wxmsw.lib` (excluding CRT constants): none",

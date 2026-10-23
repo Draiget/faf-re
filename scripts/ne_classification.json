@@ -2,25 +2,25 @@
   "orphan_trivial_with_src": {},
   "orphan_trivial_no_src": [],
   "needs_work_with_src": {
-    "src/sdk/moho/ai/CAiReconDBImpl.cpp": [
+    "src/moho/ai/CAiReconDBImpl.cpp": [
       "FUN_005C60A0"
     ],
-    "src/sdk/wm3/Vector3.cpp": [
+    "src/wm3/Vector3.cpp": [
       "FUN_00452D40",
       "FUN_00452FC0",
       "FUN_005657F0"
     ],
-    "src/sdk/moho/animation/IAniManipulator.cpp": [
+    "src/moho/animation/IAniManipulator.cpp": [
       "FUN_0063CA20"
     ],
-    "src/sdk/gpg/gal/ContextInterfaces.cpp": [
+    "src/gpg/gal/ContextInterfaces.cpp": [
       "FUN_008E7A00",
       "FUN_0093EFE0"
     ],
-    "src/sdk/moho/audio/SofdecRuntime.h": [
+    "src/moho/audio/SofdecRuntime.h": [
       "FUN_00B14850"
     ],
-    "src/sdk/moho/net/CNetUDPConnector.cpp": [
+    "src/moho/net/CNetUDPConnector.cpp": [
       "FUN_0128C620",
       "FUN_0048C9B0",
       "FUN_0048CD10",
@@ -29,25 +29,25 @@
       "FUN_0048D1A0",
       "FUN_0048D260"
     ],
-    "src/sdk/moho/ai/CAimManipulator.cpp": [
+    "src/moho/ai/CAimManipulator.cpp": [
       "FUN_00425110"
     ],
-    "src/sdk/moho/render/d3d/CD3DEffectTechnique.cpp": [
+    "src/moho/render/d3d/CD3DEffectTechnique.cpp": [
       "FUN_00434500",
       "FUN_00435230",
       "FUN_00436480"
     ],
-    "src/sdk/boost/shared_ptr.h": [
+    "src/boost/shared_ptr.h": [
       "FUN_004303C0",
       "FUN_00430400"
     ],
-    "src/sdk/moho/render/d3d/CD3DPrimBatcher.h": [
+    "src/moho/render/d3d/CD3DPrimBatcher.h": [
       "FUN_00438870"
     ],
-    "src/sdk/moho/render/textures/SBatchTextureData.cpp": [
+    "src/moho/render/textures/SBatchTextureData.cpp": [
       "FUN_0044AEC0"
     ],
-    "src/sdk/gpg/core/utils/BoostWrappers.cpp": [
+    "src/gpg/core/utils/BoostWrappers.cpp": [
       "FUN_0044F1B0",
       "FUN_0044F1E0",
       "FUN_0044F1F0",
@@ -56,104 +56,104 @@
       "FUN_0044F5A0",
       "FUN_0044F5B0"
     ],
-    "src/sdk/moho/sim/CWldSession.cpp": [
+    "src/moho/sim/CWldSession.cpp": [
       "FUN_0044F720",
       "FUN_0088C7C0"
     ],
-    "src/sdk/moho/sim/Sim.cpp": [
+    "src/moho/sim/Sim.cpp": [
       "FUN_004523A0",
       "FUN_00452410",
       "FUN_004531D0",
       "FUN_00844510"
     ],
-    "src/sdk/wm3/Quaternion.h": [
+    "src/wm3/Quaternion.h": [
       "FUN_00452CD0",
       "FUN_00452FD0"
     ],
-    "src/sdk/moho/ui/SDebugScreenText.h": [
+    "src/moho/ui/SDebugScreenText.h": [
       "FUN_004532B0",
       "FUN_00453320"
     ],
-    "src/sdk/moho/ui/SDebugDecal.h": [
+    "src/moho/ui/SDebugDecal.h": [
       "FUN_004533C0"
     ],
-    "src/sdk/moho/sim/CVFSImpl.cpp": [
+    "src/moho/sim/CVFSImpl.cpp": [
       "FUN_00458370"
     ],
-    "src/sdk/moho/misc/FileWaitHandleSet.cpp": [
+    "src/moho/misc/FileWaitHandleSet.cpp": [
       "FUN_0045BAD0",
       "FUN_0045BC90",
       "FUN_0045BD40",
       "FUN_0045BE60",
       "FUN_0045BFD0"
     ],
-    "src/sdk/moho/collision/CGeomSolid3.cpp": [
+    "src/moho/collision/CGeomSolid3.cpp": [
       "FUN_00472430"
     ],
-    "src/sdk/moho/mesh/Mesh.cpp": [
+    "src/moho/mesh/Mesh.cpp": [
       "FUN_00472CF0"
     ],
-    "src/sdk/wm3/Line3.h": [
+    "src/wm3/Line3.h": [
       "FUN_004741F0"
     ],
-    "src/sdk/moho/net/INetNATTraversalProviderWeakPtrReflection.cpp": [
+    "src/moho/net/INetNATTraversalProviderWeakPtrReflection.cpp": [
       "FUN_004822D0",
       "FUN_00482560"
     ],
-    "src/sdk/moho/net/Common.cpp": [
+    "src/moho/net/Common.cpp": [
       "FUN_0048D320"
     ],
-    "src/sdk/moho/render/SParticleBuffer.cpp": [
+    "src/moho/render/SParticleBuffer.cpp": [
       "FUN_0048EBA0"
     ],
-    "src/sdk/moho/misc/ThreadSafeCountedObject.cpp": [
+    "src/moho/misc/ThreadSafeCountedObject.cpp": [
       "FUN_0048EC20"
     ],
-    "src/sdk/moho/entity/Entity.cpp": [
+    "src/moho/entity/Entity.cpp": [
       "FUN_00695A40",
       "FUN_00695AC0",
       "FUN_00678160"
     ],
-    "src/sdk/moho/sim/ManipulatorStartupRegistrations.cpp": [
+    "src/moho/sim/ManipulatorStartupRegistrations.cpp": [
       "FUN_00BD3780",
       "FUN_00BD3640"
     ],
-    "src/sdk/moho/serialization/PrefetchHandleBaseVectorReflection.cpp": [
+    "src/moho/serialization/PrefetchHandleBaseVectorReflection.cpp": [
       "FUN_004A8260",
       "FUN_00BC5A20"
     ],
-    "src/sdk/moho/animation/CAniActor.cpp": [
+    "src/moho/animation/CAniActor.cpp": [
       "FUN_0063A8D0",
       "FUN_0063B160",
       "FUN_0063B1E0"
     ],
-    "src/sdk/moho/console/CConCommand.cpp": [
+    "src/moho/console/CConCommand.cpp": [
       "FUN_00833430"
     ],
-    "src/sdk/moho/resource/RResId.cpp": [
+    "src/moho/resource/RResId.cpp": [
       "FUN_00BC5A60"
     ],
-    "src/sdk/moho/serialization/PrefetchHandleBase.cpp": [
+    "src/moho/serialization/PrefetchHandleBase.cpp": [
       "FUN_00BC5970"
     ],
-    "src/sdk/moho/particles/CWorldParticles.cpp": [
+    "src/moho/particles/CWorldParticles.cpp": [
       "FUN_00BC5800"
     ],
-    "src/sdk/gpg/core/containers/ReadArchive.cpp": [
+    "src/gpg/core/containers/ReadArchive.cpp": [
       "FUN_005375C0",
       "FUN_00952E40"
     ],
-    "src/sdk/moho/ui/UiRuntimeTypes.cpp": [
+    "src/moho/ui/UiRuntimeTypes.cpp": [
       "FUN_0086BE40",
       "FUN_0078DE50"
     ],
-    "src/sdk/moho/unit/CUnitMotion.cpp": [
+    "src/moho/unit/CUnitMotion.cpp": [
       "FUN_0062B160"
     ],
-    "src/sdk/gpg/core/reflection/Reflection.cpp": [
+    "src/gpg/core/reflection/Reflection.cpp": [
       "FUN_00750510"
     ],
-    "src/sdk/moho/sim/ManipulatorLuaFunctionThunks.cpp": [
+    "src/moho/sim/ManipulatorLuaFunctionThunks.cpp": [
       "FUN_00649060"
     ],
     "dependencies/boost_1_34_1/libs/thread/src/thread.cpp": [
@@ -162,39 +162,39 @@
     "dependencies/boost_1_34_1/libs/thread/src/xtime.cpp": [
       "FUN_00AC5650"
     ],
-    "src/sdk/moho/audio/SofdecRuntime.cpp": [
+    "src/moho/audio/SofdecRuntime.cpp": [
       "FUN_00B0FC30"
     ],
-    "src/sdk/moho/misc/CrtRuntimeHelpers.cpp": [
+    "src/moho/misc/CrtRuntimeHelpers.cpp": [
       "FUN_00AA5BAC"
     ],
-    "src/sdk/gpg/core/containers/FastVector.h": [
+    "src/gpg/core/containers/FastVector.h": [
       "FUN_004FDD30"
     ],
-    "src/sdk/moho/sim/CEconomy.cpp": [
+    "src/moho/sim/CEconomy.cpp": [
       "FUN_005641F0"
     ],
-    "src/sdk/moho/app/WinApp.cpp": [
+    "src/moho/app/WinApp.cpp": [
       "FUN_004F2730"
     ],
-    "src/sdk/moho/net/CGpgNetInterface.cpp": [
+    "src/moho/net/CGpgNetInterface.cpp": [
       "FUN_007B9040",
       "FUN_007BC5F0"
     ],
-    "src/sdk/gpg/core/containers/WriteArchive.cpp": [
+    "src/gpg/core/containers/WriteArchive.cpp": [
       "FUN_00953150"
     ],
-    "src/sdk/moho/ai/CAiBrain.cpp": [
+    "src/moho/ai/CAiBrain.cpp": [
       "FUN_00594720",
       "FUN_0057CA20"
     ],
-    "src/sdk/moho/unit/core/Unit.cpp": [
+    "src/moho/unit/core/Unit.cpp": [
       "FUN_00603F10"
     ],
-    "src/sdk/gpg/core/containers/ArchiveSerialization.cpp": [
+    "src/gpg/core/containers/ArchiveSerialization.cpp": [
       "FUN_00950F20"
     ],
-    "src/sdk/moho/mesh/MeshThumbnailRenderer.h": [
+    "src/moho/mesh/MeshThumbnailRenderer.h": [
       "FUN_007FA620"
     ]
   },

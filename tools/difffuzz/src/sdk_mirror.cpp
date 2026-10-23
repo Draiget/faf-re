@@ -1,13 +1,13 @@
 // Definitions the recovered math TUs under test need but which live in
-// src\sdk files too entangled to compile standalone. Each one is a verbatim
+// src files too entangled to compile standalone. Each one is a verbatim
 // copy of the engine source it names; keep them in sync (a stale mirror tests
 // nothing). Everything else the harness exercises is compiled straight from
-// src\sdk (see build.bat: QuaternionMath.cpp, Vector3f.cpp, X87Math.cpp).
+// src (see build.bat: QuaternionMath.cpp, Vector3f.cpp, X87Math.cpp).
 
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 
-// Mirrors src\sdk\moho\math\MathReflection.cpp:1295
+// Mirrors src\moho\math\MathReflection.cpp:1295
 // (`extern "C" int global_mode_sse2 = 1;`). The retail copy lives at
 // 0x01107030 and is set by register_sseCompatMode (0x00A8ECBF) from the
 // CPUID/movapd probe, i.e. 1 on any machine that runs the game; the harness
@@ -15,7 +15,7 @@
 extern "C" int global_mode_sse2 = 1;
 
 /**
- * Mirrors src\sdk\moho\sim\Sim.cpp:6119-6170 (moho::QuatCrossAdd,
+ * Mirrors src\moho\sim\Sim.cpp:6119-6170 (moho::QuatCrossAdd,
  * Address: 0x0044F880). Verbatim body.
  */
 Wm3::Quaternionf* moho::QuatCrossAdd(
@@ -85,7 +85,7 @@ namespace mirror
   } // namespace
 
   /**
-   * Mirrors src\sdk\moho\entity\Entity.cpp:7791-7799 (moho::COORDS_Pitch,
+   * Mirrors src\moho\entity\Entity.cpp:7791-7799 (moho::COORDS_Pitch,
    * Address: 0x0050B710). Verbatim body.
    */
   float COORDS_Pitch(const Wm3::Vector3f& velocity) noexcept
@@ -99,7 +99,7 @@ namespace mirror
     return (rootTerm * polynomial) - kHalfPi;
   }
 
-  /// Mirrors src\sdk\moho\ai\CAimManipulator.cpp moho::CAimManipulator::SetFiringArc (0x00630CB0).
+  /// Mirrors src\moho\ai\CAimManipulator.cpp moho::CAimManipulator::SetFiringArc (0x00630CB0).
   void AimSetFiringArc(AimArcLanes& self, const AimFiringArc arc)
   {
     self.mMinHeading = moho::NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(arc.mMinHeading, arc.mMaxHeading));
@@ -111,7 +111,7 @@ namespace mirror
     self.mMaxPitch = msvc8::HalfAbsDifferenceX87(arc.mMaxPitch, arc.mMinPitch);
   }
 
-  /// Mirrors src\sdk\moho\ai\CBuilderArmManipulator.cpp
+  /// Mirrors src\moho\ai\CBuilderArmManipulator.cpp
   /// moho::CBuilderArmManipulator::SetAimingArc (0x00636490).
   void BuilderArmSetAimingArc(
     BuilderArmArcLanes& self,
@@ -132,7 +132,7 @@ namespace mirror
     self.mPitchHalfArc = msvc8::HalfAbsDifferenceX87(maxPitch, minPitch);
   }
 
-  /// Mirrors src\sdk\moho\ai\CBuilderArmManipulator.cpp
+  /// Mirrors src\moho\ai\CBuilderArmManipulator.cpp
   /// moho::CBuilderArmManipulator::UpdateTrackingAxis (0x00636220), world-space path.
   std::uint8_t BuilderArmUpdateTrackingAxis(
     TrackLanes& self,
@@ -202,7 +202,7 @@ namespace mirror
     return trackingResult;
   }
 
-  /// Mirrors src\sdk\moho\ai\CAimManipulator.cpp moho::CAimManipulator::CheckTracking
+  /// Mirrors src\moho\ai\CAimManipulator.cpp moho::CAimManipulator::CheckTracking
   /// (0x006309F0), world-space path with a null weapon blueprint (so the
   /// pitch-only tolerance skip never applies).
   std::uint8_t AimCheckTracking(
@@ -272,7 +272,7 @@ namespace mirror
     return trackingResult;
   }
 
-  /// Mirrors src\sdk\moho\animation\CAnimTexture.cpp moho::WrapPositiveModulo (0x00422940).
+  /// Mirrors src\moho\animation\CAnimTexture.cpp moho::WrapPositiveModulo (0x00422940).
   float WrapPositiveModulo(const float value, const float range) noexcept
   {
     float wrapped = static_cast<float>(msvc8::fmod(value, range));

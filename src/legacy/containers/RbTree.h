@@ -1,0 +1,9074 @@
+#pragma once
+
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+#include <new>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
+
+/**
+ * \file RbTree.h
+ * \brief Shared owning red-black tree used by `msvc8::set` and `msvc8::map`.
+ *
+ * The MSVC8 (VS2005) Dinkumware `std::_Tree` is the single associative-container
+ * engine behind `std::set`, `std::multiset`, `std::map` and `std::multimap`. The
+ * shipped engine binary contains many per-instantiation emissions of it; every
+ * one of them shares this layout:
+ *
+ *   container (12 bytes, x86)
+ *     +0x00 `_Container_proxy*` allocator/debug proxy word
+ *     +0x04 `_Node*`            header sentinel ("nil") node
+ *     +0x08 `size_type`         element count
+ *   node
+ *     +0x00 `_Node*` _Left
+ *     +0x04 `_Node*` _Parent
+ *     +0x08 `_Node*` _Right
+ *     +0x0C `value_type` _Myval
+ *     +0x0C+sizeof(value_type)     `char` _Color  (0 = red, 1 = black)
+ *     +0x0D+sizeof(value_type)     `char` _Isnil  (1 only for the header)
+ *
+ * Both are confirmed against the binary:
+ *   - the `std::map<gpg::RType*,int>` iterator steps at 0x0094F030/0x0094F090
+ *     read `_Left` at +0x00, `_Parent` at +0x04, `_Right` at +0x08 and `_Isnil`
+ *     at +0x15 (value_type = 8 bytes);
+ *   - `Moho::CCommandDB`'s command-map node is `{l,p,r,key@0x0C,value@0x10,
+ *     color@0x14,isnil@0x15}` (see `CommandDbMapNodeRuntime` in CCommandDb.cpp);
+ *   - `std::map<Moho::MeshBatchKey, std::vector<Moho::MeshInstance*>>` nodes are
+ *     0x30 bytes with `_Color` at +0x2C and `_Isnil` at +0x2D (value_type 0x20).
+ *
+ * The comparator is empty-base-optimised, matching the binary's 12-byte
+ * container footprint: MSVC8 carries the predicate in an empty base of
+ * `_Tree_nod`, so a stateless `std::less` or engine predicate costs nothing.
+ *
+ * Nil handling follows the binary exactly: leaf links point at the header and
+ * are recognised through the `_Isnil` byte, never through a pointer comparison
+ * against a separately carried header pointer. That is what makes the shipped
+ * iterators a single pointer wide.
+ */
+
+#ifndef MSVC8_RBTREE_DISABLE_FREE
+#define MSVC8_RBTREE_DISABLE_FREE 0
+#endif
+
+#pragma pack(push, 4)
+
+namespace msvc8
+{
+#ifndef MSVC8_CONTAINER_PROXY_DEFINED
+#define MSVC8_CONTAINER_PROXY_DEFINED 1
+    struct _Container_proxy
+    {
+        void* _Myfirstiter;
+    };
+#endif
+
+    namespace detail
+    {
+        /** Red-black node colours, matching the MSVC8 `_Redbl` encoding. */
+        inline constexpr std::uint8_t kRbRed = 0;
+        inline constexpr std::uint8_t kRbBlack = 1;
+
+        /**
+         * One MSVC8 `_Tree::_Node`.
+         *
+         * Field order is load bearing: the value payload sits between the link
+         * triplet and the colour/nil bytes, which is why node size grows with
+         * `sizeof(V)` and the colour byte's address is instantiation dependent.
+         */
+        template<class V>
+        struct rb_node
+        {
+            rb_node* left;       // +0x00
+            rb_node* parent;     // +0x04
+            rb_node* right;      // +0x08
+            V value;             // +0x0C
+            std::uint8_t color;  // +0x0C + sizeof(V)
+            std::uint8_t isNil;  // +0x0D + sizeof(V)
+        };
+
+        /** True for the header sentinel (and hence for every "null" child link). */
+        template<class V>
+        [[nodiscard]] constexpr bool rb_is_nil(const rb_node<V>* const n) noexcept
+        {
+            return n->isNil != 0;
+        }
+
+        /**
+         * Address: 0x00899F60 (FUN_00899F60, `_Min`)
+         *
+         * Emitted for the session save-node map - the `map<uint32, string>`
+         * whose nodes carry `_Isnil` at +0x2D. The index reports 20 ICF twins:
+         * `_Min` is a two-instruction walk whose body is identical for every
+         * instantiation that shares this sentinel offset, so the linker folded
+         * them onto this one address.
+         *
+         * IDA signature:
+         * _DWORD *__usercall sub_899F60@<eax>(_DWORD *result@<eax>);
+         *
+         * What it does:
+         * Leftmost (smallest) node of the subtree rooted at `n`.
+         *
+         * The shipped body peels the first `_Left` load before the loop
+         * (`mov ecx,[eax]` / `cmp byte ptr [ecx+2Dh],0`), which is the same walk
+         * this expresses as a plain while loop. Reached from `erase(const_iterator)`
+         * at 0x0089A540 when the erased node was the leftmost one.
+         */
+        template<class V>
+        /**
+         * Address: 0x0077CCB0 (FUN_0077CCB0, the decal bucket set's left-chain
+         * descent)
+         * Address: 0x0077B120 (FUN_0077B120, the start-tick map's)
+         */
+        /**
+         * Address: 0x00592EC0 (FUN_00592EC0, the name-index map's leftmost
+         * descent -- CArmyStats::mNameIndex, isNil@+0x2D, node 0x30.
+         * Reached from the name-index erase helper FUN_00703700.)
+         */
+        /**
+         * Address: 0x007E4E80 (FUN_007E4E80, the mesh-key map's leftmost
+         * descent -- isNil@+0x25, sibling of the erase_node/rotate
+         * instantiations already cited above for this map.)
+         */
+        /**
+         * Address: 0x00592320 (FUN_00592320, the blueprint-stat map's
+         * leftmost descent -- `std::map<const RBlueprint*, float>`, isNil@
+         * +0x15, node 0x18. Reached from the erase-with-rebalance helper
+         * FUN_00592920 cited above.)
+         */
+        /**
+         * Address: 0x00830060 (FUN_00830060, `Moho::UICommandGraph::
+         * mGraph`'s leftmost descent -- `map<shared_ptr<
+         * CD3DBatchTexture>, vector<CommandGraphEdge*>>`, 0x18-byte
+         * value_type (`max_size() - 1 == 0xAAAAAA9` in `erase_node`'s
+         * sibling `insert_at` emission FUN_0082E320, cited below), isNil@
+         * +0x25 -- byte-identical ICF twin of the mesh-key map's leftmost
+         * descent (0x007E4E80 above); confirmed a distinct instantiation
+         * via direct call from `erase_node`'s emission FUN_0082FD50.
+         * `Moho::UICommandGraph::AddCommandQueueToCommandGraph`'s
+         * `mGraph[texture]` lookup/insert is documented in
+         * CWldSession.cpp; that call chain is what reaches this tree.)
+         */
+        /**
+         * Address: 0x006E1F90 (FUN_006E1F90, the command-id map's leftmost
+         * descent -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+         * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
+         * Walks `_Left` (offset 0) while `!_Isnil`, matching this member
+         * exactly. Reached from `erase_node`'s emission FUN_006E1670 (cited
+         * below) to re-seat `head->left` when the erased node was the
+         * tree's leftmost. A prior Sim.cpp recovery pass mis-labelled this
+         * address `TreeMinNode` but had it walk the `right` field -- this
+         * member's real behaviour, confirmed against the disassembly, is
+         * the leftmost (not rightmost) descent.)
+         *
+         * Address: 0x007B4B20 (FUN_007B4B20, sub_7B4B20) -- the ANI_DumpSkeleton
+         * outer per-parent-bone dedup map's leftmost descent, `msvc8::map<
+         * std::uint32_t, msvc8::set<uint32_t>>` (isNil@+0x1D, same tree
+         * cited on `erase_range`/`insert_unique` elsewhere in this file).
+         * Walks `_Left` (offset 0) while `!_Isnil` (offset+0x1D), matching
+         * this member exactly. Reached from `rb_increment`'s `rb_min(n->
+         * right)` call for this same instantiation.
+         *
+         * Address: 0x00946790 (FUN_00946790, sub_946790) -- `gpg::gal::
+         * StateCache<d3d9::RenderState, unsigned int>::tree_`'s leftmost
+         * descent, isNil@+0x15. One of this instantiation's "own distinct
+         * rotate/min/max helper addresses" already named on `erase_node`
+         * (`FUN_00947380` above).
+         * Address: 0x00946810 (FUN_00946810, sub_946810) -- `gpg::gal::
+         * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+         * leftmost descent, isNil@+0x15, byte-identical shape to
+         * `FUN_00946790` above -- sibling `StateCache` specialisation with
+         * its own distinct helper address (`FUN_009478E0`'s `erase_node`
+         * citation above).
+         *
+         * Address: 0x0052D960 (FUN_0052D960, the category-lookup map's
+         * leftmost descent -- `msvc8::map<msvc8::string,
+         * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+         * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+         * mCategoryMap` (RRuleGameRules.h/.cpp). `while (!n->left->isNil) n
+         * = n->left;`, matching this member exactly (confirmed against the
+         * raw decompile: `while (!(*a2)->_Isnil) *a2 = ...`, walking
+         * `_Left`). Sole caller per this pass's xref sweep is `erase_node`'s
+         * emission for this instantiation (FUN_00536010, cited below) via
+         * `rb_min(fix)` when the erased node was the map's leftmost -- the
+         * same "constructor-inlined instantiation, only the erase-rebalance
+         * path keeps a standalone symbol" shape documented throughout this
+         * file. Re-homed here from a hand-rolled
+         * `LeftmostCategoryLookupDescendant` free function in
+         * RRuleGameRules.cpp that walked a deleted overlay*`
+         * reach-in instead of calling it.)
+         */
+        /**
+         * Address: 0x006880F0 (FUN_006880F0, `_Min` for `msvc8::map<
+         * std::uint32_t, moho::IdPool>` -- `EntityDB::mIdPoolTree` in
+         * `EntityDb.h`. Node layout confirmed against `FUN_006881C0`
+         * (`buy_node`, cited above): `IdPool`'s `alignas(8)` (see that
+         * type's own citation in `IdPool.h`) forces a 4-byte pad between
+         * the link triplet (ends at node+0x0C) and `value_type` (`pair<
+         * const uint32_t, IdPool>`), so the pair starts at node+0x10 (key)
+         * / node+0x18 (`IdPool`, `sizeof(IdPool)==0xCB0`), landing colour/
+         * isNil at node+0xCC8/node+0xCC9 -- exactly the raw `+3272`/`+3273`
+         * byte offsets this instantiation's emissions use throughout (`cmp
+         * byte ptr [esi+0CC9h], 0` in `FUN_00688030`'s own asm). Walks
+         * `_Left` (node+0x00) while `!_Isnil` (node+0xCC9), matching this
+         * member exactly. Reached from `erase_node`'s emission for this
+         * instantiation (`FUN_00687CC0`, cited below) via `rb_min(fix)`
+         * when the erased node was the tree's leftmost.
+         */
+        /**
+         */
+        /**
+         * Address: 0x0094EE60 (FUN_0094EE60, sub_94EE60) -- leftmost
+         * descent for the tree at `gpg::WriteArchive+0x10` (`WriteArchive.h`'s
+         * `mObjRefs`), sibling of `rb_max`'s 0x0094F010 citation below.
+         * Walks `_Left` (node+0x00) while `!_Isnil` (node+0x25), matching
+         * this member exactly (confirmed against the `.asm`: `mov ecx,[eax]`
+         * / `cmp byte ptr [ecx+25h],0` loop, no other fields touched). Sole
+         * caller is this instantiation's `erase_node` (`FUN_00951A40`,
+         * cited above on that member) via `rb_min(fix)` when the erased
+         * node was `mObjRefs`'s leftmost -- same dead-in-practice branch as
+         * `FUN_00951A40` itself (`mObjRefs.clear()`, `WriteArchive.cpp:970`,
+         * always erases the full range and never reaches the per-node walk
+         * that would call this). Kept `recovered` rather than `skip`,
+         * matching the `rb_min`'s 0x0052D960 / `rb_max`'s 0x00536AA0
+         * precedent above: the sole caller's single-node path is compiled
+         * but not separately exercised, yet this member itself is exactly
+         * what the compiler emits at this address.
+         *
+         * NOTE (found this pass, not yet corrected): `WriteArchive.h`
+         * currently declares `mObjRefs` as `std::map<const void*,
+         * TrackedPointerRecord>` (0x0C/12-byte value_type), which is
+         * inconsistent both with this member's own isNil@+0x25 (implies a
+         * 0x18/24-byte value_type: 0x0C header + 0x18) and with the real
+         * binary: `WriteArchive::PreCreatedPtr` (0x009523F0) and the free
+         * `gpg::WriteRawPointer` (0x00953320, `ArchiveSerialization.cpp`)
+         * both call `std::map_RRef_TrackedPointer::find`/`::insert` on this
+         * same `this+0x10` field, ordering by the *whole* `RRef` (`mType`
+         * then `mObj`), not a bare pointer -- confirmed against both
+         * functions' own `.c` and `.asm`. `PreCreatedPtr`'s insert-argument
+         * `.asm` lays out `{mType, mObj, mType(dup), mObj(dup), index,
+         * ownership}`, i.e. an 8-byte `RRef` key followed by a 16-byte
+         * mapped value that itself re-stores the `RRef`. The currently
+         * recovered `PreCreatedPtr`/`WriteRawPointer` and a third
+         * `mObjRefs.find(objectRef.mObj)` reach-in in
+         * `ArchiveSerialization.cpp` (~line 2016) all use the wrong
+         * (void*-keyed) type and compile, but don't match the binary at
+         * those addresses. Left uncorrected here -- out of scope for this
+         * pass (RbTree.h `rb_min`/`rb_max`/`rb_decrement` citations only);
+         * needs a dedicated fix spanning `WriteArchive.h`/`WriteArchive.cpp`/
+         * `ArchiveSerialization.cpp`. This member's own `_Left`/isNil
+         * offsets are independently confirmed against the `.asm` and are
+         * unaffected by the key-type question.
+         */
+        /**
+         * Address: 0x007CB130 (FUN_007CB130, sub_7CB130) -- `msvc8::
+         * set<char>`'s `rb_min`, the same `CLobby.cpp` ignore-names
+         * separator-set instantiation cited on `alloc_raw`/`copy_from`/
+         * `~rb_tree`/`erase_range`/`destroy_subtree` above (node 0x10,
+         * colour@0x0D/isNil@0x0E). Register-convention body (`__usercall
+         * sub_7CB130@<eax>(_DWORD *result@<eax>)`): walks `*result`
+         * (offset 0, `_Left`) while `!isNil` (offset+0x0E), matching this
+         * member exactly. Sole caller is this instantiation's `erase_node`
+         * (`FUN_007CAC80`, cited below) via `rb_min(x)` when the erased
+         * node's replacement needs `header()->left` re-seated -- same
+         * "template-instantiated, only the per-node erase-rebalance path
+         * keeps a standalone symbol" shape as the `0x0052D960`/
+         * `0x006880F0`/`0x0094EE60` precedents above. Sibling `rb_max` for
+         * this instantiation is `FUN_007CB110` (already `skip`, walks
+         * `_Right`/offset+8).
+         *
+         * Address: 0x008A87E0 (FUN_008A87E0, sub_8A87E0) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::rb_min` --
+         * `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same
+         * instantiation cited on `insert_hint` above). Walks `->left` from
+         * a candidate node until the nil sentinel, matching this member
+         * exactly. Two real (now-superseded) callers in the deleted
+         * hand-rolled `CWldMap.cpp` implementation: the two-children branch
+         * of the node-erase step (matching `erase_node`'s own `rb_min
+         * (erased->right)` replacement-search below) and a post-erase
+         * `head->left`/`head->right` extrema recompute walking from
+         * `head->parent` -- both now folded into this member's callers
+         * (`erase_node`, `~rb_tree()`) rather than a bespoke
+         * `RecomputeTerrainEnvironmentExtrema` free function.
+         */
+        /**
+         * Address: 0x004DD3F0 (FUN_004DD3F0, sub_4DD3F0) --
+         * `msvc8::set<msvc8::string>::rb_min` -- `Moho::AudioEngineImpl::
+         * mPausedCategoryNames` (`AudioEngine.h`), isNil@+0x29. Plain
+         * `while (!n->left->isNil) n = n->left;` descent, matching this
+         * member exactly. Two real callers: `insert_at`'s emission for this
+         * instantiation (`FUN_004DBE30`, `RbTree.h`'s `insert_at`
+         * citations) re-seating `head->left` when the fresh node lands
+         * leftmost, and `erase_node`'s emission (`FUN_004DC850`, cited
+         * below) doing the same on the single/no-child erase path. Was
+         * previously duplicated as `LeftmostPausedDescendant`
+         * (`AudioEngine.cpp`, deleted by this migration).
+         */
+        /**
+         * Address: 0x004DDB60 (FUN_004DDB60, sub_4DDB60) -- `msvc8::map<
+         * std::uint16_t, float>::rb_min` -- `Moho::AudioEngineImpl::
+         * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Plain `while (!n
+         * ->left->isNil) n = n->left;` descent, matching this member exactly.
+         * Sole real caller is `erase_node`'s emission for this instantiation
+         * (`FUN_004DD510`, cited below), re-seating `head->left` on the
+         * single/no-child erase path when the erased node was the tree's
+         * leftmost -- unlike the `mPausedCategoryNames` sibling above, this
+         * instantiation's `insert_at` emission (`FUN_004DCF90`, cited above)
+         * does not call this member at all: its own `link_and_rebalance`
+         * three-case link already knows the fresh node is the new leftmost
+         * structurally (`where == head_`), so it writes `head_->left = fresh`
+         * directly with no descent needed. Was previously duplicated as
+         * `LeftmostCategoryDescendant` (`AudioEngine.cpp`, deleted by this
+         * migration).
+         * Address: 0x0056CF50 (FUN_0056CF50, sub_56CF50 -- the `_Min` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); reached from that instantiation's `erase_node`/`rb_increment` (CAiFormationInstance.cpp).)
+         * Address: 0x00736470 (FUN_00736470, sub_736470 -- the `_Min` emission for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList`; node 0x30, isNil@+0x2D; walks `_Left` at +0x00); called from that instantiation's `erase_node` (FUN_00735D40 at 0x00735E1E). Formerly `FindPlatoonTreeLeftmostNode` over a padded `PlatoonTreeNodeFlag45Runtime` node overlay in moho/sim/CPlatoon.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00719700 (FUN_00719700 -- the `_Min` emission for `InfluenceGrid::entries` (reflected as `std::map<unsigned int, Moho::InfluenceMapEntry>`; node 0x40, isNil@+0x3D); callers 0x00717EF0. Formerly `FindInfluenceTreeLeftmostNodeFlag61` over a padded `InfluenceNodeFlag61Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00719CC0 (FUN_00719CC0 -- the `_Min` emission for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, isNil@+0x15); callers 0x00718410. Formerly `FindInfluenceTreeLeftmostNodeFlag21` over a padded `InfluenceNodeFlag21Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00504C80 (FUN_00504C80 -- `_Min` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35), walking `_Left` while `!_Isnil`; callers 0x005043B0 (that tree's `erase`).)
+         */
+        [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
+        {
+            while (!rb_is_nil(n->left)) {
+                n = n->left;
+            }
+            return n;
+        }
+
+        /**
+         * Address: 0x0089ABB0 (FUN_0089ABB0, `_Max`)
+         *
+         * Emitted for the session save-node map, and likewise folded across 20
+         * ICF twins.
+         *
+         * IDA signature:
+         * int __usercall sub_89ABB0@<eax>(int result@<eax>);
+         *
+         * What it does:
+         * Rightmost (largest) node of the subtree rooted at `n`.
+         *
+         * Mirror of `rb_min`, stepping `_Right` at +0x08. Reached from
+         * `erase(const_iterator)` at 0x0089A540 when the erased node was the
+         * rightmost one.
+         *
+         * Address: 0x007B4A30 (FUN_007B4A30, sub_7B4A30)
+         *
+         * `msvc8::set<std::uint32_t>` instantiation, `_Isnil` at +0x11
+         * (4-byte value_type) -- the same tree cited on `destroy_subtree`/
+         * `erase_node` above. Walks `_Right` (node+0x08) while `!_Isnil`
+         * (node+0x11), confirmed against the `.asm`. Called from
+         * `erase_node`'s emission for this instantiation (`FUN_007B46A0`,
+         * cited above) to re-seat `head->right` when the erased node was
+         * the tree's rightmost.
+         */
+        template<class V>
+        /**
+         * Address: 0x0077CC90 (FUN_0077CC90, the decal bucket set's right-chain
+         * descent)
+         * Address: 0x0077B100 (FUN_0077B100, the start-tick map's)
+         */
+        /**
+         * Address: 0x00592EA0 (FUN_00592EA0, the name-index map's rightmost
+         * descent -- sibling of `rb_min`'s 0x00592EC0 above, same map.)
+         */
+        /**
+         * Address: 0x007E4E60 (FUN_007E4E60, the mesh-key map's rightmost
+         * descent -- sibling of `rb_min`'s 0x007E4E80 above, same map.)
+         */
+        /**
+         * Address: 0x00592300 (FUN_00592300, the blueprint-stat map's
+         * rightmost descent -- sibling of `rb_min`'s 0x00592320 above,
+         * same map.)
+         */
+        /**
+         * Address: 0x00830920 (FUN_00830920, `Moho::UICommandGraph::
+         * mGraph`'s rightmost descent -- sibling of `rb_min`'s
+         * 0x00830060 above, same map. Byte-identical ICF twin of the
+         * mesh-key map's rightmost descent (0x007E4E60 above); confirmed a
+         * distinct instantiation via direct call from `erase_node`'s
+         * emission FUN_0082FD50.)
+         */
+        /**
+         * Address: 0x006E1F70 (FUN_006E1F70, the command-id map's rightmost
+         * descent -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+         * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
+         * Walks `_Right` (offset +8) while `!_Isnil`, matching this member
+         * exactly. Reached from `erase_node`'s emission FUN_006E1670 (cited
+         * below) to re-seat `head->right` when the erased node was the
+         * tree's rightmost. A prior Sim.cpp recovery pass mis-labelled this
+         * address `TreeMaxNode` but had it walk the `left` field -- this
+         * member's real behaviour, confirmed against the disassembly, is
+         * the rightmost (not leftmost) descent.)
+         *
+         * Address: 0x007B4B00 (FUN_007B4B00, sub_7B4B00) -- the ANI_DumpSkeleton
+         * outer per-parent-bone dedup map's rightmost descent, same
+         * `msvc8::map<std::uint32_t, msvc8::set<uint32_t>>` instantiation
+         * as `rb_min`'s sibling citation `FUN_007B4B20` above (isNil@+0x1D).
+         * Walks `_Right` (offset+8) while `!_Isnil`, matching this member
+         * exactly. Reached from `rb_decrement`'s `rb_max(n->left)` call for
+         * this same instantiation.
+         *
+         * Address: 0x00946770 (FUN_00946770, sub_946770) -- `gpg::gal::
+         * StateCache<d3d9::RenderState, unsigned int>::tree_`'s rightmost
+         * descent, isNil@+0x15. One of this instantiation's "own distinct
+         * rotate/min/max helper addresses" already named on `erase_node`
+         * (`FUN_00947380` above).
+         * Address: 0x009467F0 (FUN_009467F0, sub_9467F0) -- `gpg::gal::
+         * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+         * rightmost descent, isNil@+0x15, byte-identical shape to
+         * `FUN_00946770` above -- sibling `StateCache` specialisation with
+         * its own distinct helper address (`FUN_009478E0`'s `erase_node`
+         * citation above).
+         *
+         * Address: 0x0057F1B0 (FUN_0057F1B0, sub_57F1B0) -- `Moho::
+         * CAiBrain::mBuildStructureMap`'s rightmost descent (isNil@+0x25,
+         * the same `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`
+         * instantiation cited on `erase_node`/`buy_node`/`buy_head`
+         * elsewhere in this file). Reached from `rb_decrement`'s
+         * `rb_max(n->left)` call for this same instantiation.
+         *
+         * Address: 0x00536AA0 (FUN_00536AA0, the category-lookup map's
+         * rightmost descent -- `msvc8::map<msvc8::string,
+         * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+         * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+         * mCategoryMap` (RRuleGameRules.h/.cpp). `while (!n->right->isNil) n
+         * = n->right;`, matching this member exactly. Sole caller per this
+         * pass's xref sweep is `erase_node`'s emission for this
+         * instantiation (FUN_00536010, cited below) via `rb_max(fix)` when
+         * the erased node was the map's rightmost -- sibling of `rb_min`'s
+         * 0x0052D960 citation above, same map. Re-homed here from a
+         * hand-rolled `RightmostCategoryLookupDescendant` free function in
+         * RRuleGameRules.cpp that walked a deleted overlay*`
+         * reach-in instead of calling it.)
+         */
+        /**
+         * Address: 0x00688830 (FUN_00688830, `_Max` for `msvc8::map<
+         * std::uint32_t, moho::IdPool>` -- `EntityDB::mIdPoolTree` in
+         * `EntityDb.h`, sibling of `rb_min`'s 0x006880F0 citation above
+         * (same node layout: colour/isNil at node+0xCC8/node+0xCC9). Walks
+         * `_Right` (node+0x08) while `!_Isnil` (node+0xCC9), matching this
+         * member exactly. Reached from `erase_node`'s emission for this
+         * instantiation (`FUN_00687CC0`, cited below) via `rb_max(fix)`
+         * when the erased node was the tree's rightmost.
+         */
+        /**
+         * Address: 0x0094F010 (FUN_0094F010, sub_94F010) -- rightmost
+         * descent for the tree at `gpg::WriteArchive+0x10` (`WriteArchive.h`'s
+         * `mObjRefs`), sibling of `rb_min`'s 0x0094EE60 citation above.
+         * Walks `_Right` (node+0x08) while `!_Isnil` (node+0x25),
+         * matching this member exactly (confirmed against the `.asm`: `mov
+         * ecx,[eax+8]` / `cmp byte ptr [ecx+25h],0` loop). Sole caller is
+         * this instantiation's `erase_node` (`FUN_00951A40`, cited above on
+         * that member) via `rb_max(fix)` when the erased node was
+         * `mObjRefs`'s rightmost -- same dead-in-practice branch as
+         * `FUN_00951A40` itself (`mObjRefs.clear()`, `WriteArchive.cpp:970`,
+         * always erases the full range and never reaches the per-node walk
+         * that would call this). Kept `recovered` rather than `skip`, same
+         * precedent as `rb_min`'s 0x0094EE60 citation above.
+         *
+         * NOTE: same `mObjRefs` key-type discrepancy documented in full on
+         * `rb_min`'s 0x0094EE60 citation above -- `WriteArchive.h` declares
+         * this tree void*-keyed, the real binary (`PreCreatedPtr`
+         * 0x009523F0, `WriteRawPointer` 0x00953320) is `RRef`-keyed. Not
+         * corrected here; this member's `_Right`/isNil offsets are
+         * independently confirmed and unaffected.
+         *
+         * Address: 0x008A87C0 (FUN_008A87C0, sub_8A87C0) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::rb_max` --
+         * `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same
+         * instantiation cited on `rb_min` above; see that citation for the
+         * two now-superseded callers this sibling shared in the deleted
+         * hand-rolled `CWldMap.cpp` implementation).
+         */
+        /**
+         * Address: 0x004DD3D0 (FUN_004DD3D0, sub_4DD3D0) --
+         * `msvc8::set<msvc8::string>::rb_max` -- `Moho::AudioEngineImpl::
+         * mPausedCategoryNames` (`AudioEngine.h`), isNil@+0x29 (same
+         * instantiation cited on `rb_min` above). Plain `while (!n->right->
+         * isNil) n = n->right;` descent, matching this member exactly. Two
+         * real callers: `insert_at`'s emission for this instantiation
+         * (`FUN_004DBE30`, `RbTree.h`'s `insert_at` citations) re-seating
+         * `head->right` when the fresh node lands rightmost, and
+         * `erase_node`'s emission (`FUN_004DC850`, cited below) doing the
+         * same on the single/no-child erase path, plus `insert_unique`'s
+         * own predecessor lookup on the leftmost-fast-path's sibling branch
+         * (`rb_decrement`, cited below, calls this same `rb_max` under the
+         * hood for the "descend left once then walk max of that subtree"
+         * case). Was previously duplicated as `RightmostPausedDescendant`
+         * (`AudioEngine.cpp`, deleted by this migration).
+         *
+         * Address: 0x004DDB40 (FUN_004DDB40, sub_4DDB40) -- `msvc8::map<
+         * std::uint16_t, float>::rb_max` -- `Moho::AudioEngineImpl::
+         * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15 (same
+         * instantiation cited on `rb_min` above). Plain `while (!n->right->
+         * isNil) n = n->right;` descent, matching this member exactly. Sole
+         * real caller is `erase_node`'s emission for this instantiation
+         * (`FUN_004DD510`, cited below), re-seating `head->right` on the
+         * single/no-child erase path when the erased node was the tree's
+         * rightmost -- same "insert_at doesn't need it, only erase_node
+         * does" shape documented on `rb_min` above for this instantiation
+         * (`rb_decrement`'s own predecessor lookup for this instantiation
+         * calls `rb_max` too, on its non-leftmost branch, cited on
+         * `rb_decrement` above). Was previously duplicated as
+         * `RightmostCategoryDescendant` (`AudioEngine.cpp`, deleted by this
+         * migration).
+         * Address: 0x0056CF30 (FUN_0056CF30, sub_56CF30 -- the `_Max` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); reached from that instantiation's `erase_node`.)
+         * Address: 0x00736450 (FUN_00736450, sub_736450 -- the `_Max` emission for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList`; node 0x30, isNil@+0x2D; walks `_Right` at +0x08); called from that instantiation's `erase_node` (FUN_00735D40 at 0x00735E40). Formerly `FindPlatoonTreeRightmostNode` over a padded `PlatoonTreeNodeFlag45Runtime` node overlay in moho/sim/CPlatoon.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x007196E0 (FUN_007196E0 -- the `_Max` emission for `InfluenceGrid::entries` (node 0x40, isNil@+0x3D); callers 0x00717EF0. Formerly `FindInfluenceTreeRightmostNodeFlag61` over a padded `InfluenceNodeFlag61Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00719CA0 (FUN_00719CA0 -- the `_Max` emission for `CInfluenceMap::mBlipCells` (node 0x18, isNil@+0x15); callers 0x00718410. Formerly `FindInfluenceTreeRightmostNodeFlag21` over a padded `InfluenceNodeFlag21Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00504C60 (FUN_00504C60 -- `_Max` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35), walking `_Right` while `!_Isnil`; callers 0x005043B0 (that tree's `erase`).)
+         */
+        [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
+        {
+            while (!rb_is_nil(n->right)) {
+                n = n->right;
+            }
+            return n;
+        }
+
+        /**
+         * Address: 0x0094F090 (FUN_0094F090, std::map<gpg::RType*,int>::iterator _Inc)
+         * Address: 0x007E42F0 (FUN_007E42F0, `_Inc` for the mesh batch-bucket map)
+         * Address: 0x007B4D90 (FUN_007B4D90, `_Inc` for the
+         * `map<EntId, WeakPtr<UserEntity>>`-shaped weak-entity-set node walk --
+         * reached from `Moho::UICommandGraph`'s edge-travel-time and
+         * draw-node-work-time estimators (CWldSession.cpp) when they iterate a
+         * command's targeted `WeakSet<UserEntity>`/`SSelectionSetUserEntity`)
+         * Address: 0x007B4500 (FUN_007B4500, `operator++()` -- advances via
+         * this member (through `sub_7B4D90`) and returns the same slot,
+         * matching the prefix-increment shape documented on the
+         * `FUN_006E1A90`/`FUN_006E1AB0`/`FUN_007B4570` adapters. DB-integrity
+         * fix: `source_paths=null`, boilerplate batch note, zero real
+         * citations found in a full `src` sweep.)
+         * Address: 0x007B4BC0 (FUN_007B4BC0, byte-identical duplicate
+         * emission of `FUN_007B4500` -- same `operator++()` prefix shape,
+         * same `sub_7B4D90` callee, a distinct per-call-site copy. Same
+         * DB-integrity provenance as `FUN_007B4500`.)
+         * Address: 0x007B4510 (FUN_007B4510, `operator++(int)` -- copies the
+         * old node into the return slot, then advances via this member
+         * (through `sub_7B4D90`), matching the post-increment shape
+         * documented on the `FUN_006E28C0`/`FUN_007B4540` adapters. Same
+         * DB-integrity provenance as `FUN_007B4500`.)
+         *
+         * IDA signature:
+         * _Node *__thiscall operator(_Node **this);
+         *
+         * What it does:
+         * Steps one tree iterator to its in-order successor. With a real right
+         * subtree the successor is that subtree's leftmost node; otherwise it is
+         * the nearest ancestor whose left subtree contains the node. Landing on
+         * the header ends iteration; starting on the header is a no-op.
+         *
+         * The annotated IDB labels 0x0094F090 `operator--`, but the body is the
+         * increment - see `rb_decrement` for the disassembly evidence.
+         */
+        template<class V>
+        /**
+         * Address: 0x0049AD20 (FUN_0049AD20, the in-order successor walk for the
+         * trail-segment owner pool, `std::set<STrailSegmentBuffer*>`)
+         */
+        /**
+         * Address: 0x0077C740 (FUN_0077C740, the decal bucket set's successor walk)
+         * Address: 0x0077CE50 (FUN_0077CE50, the start-tick map's)
+         */
+        /**
+         * Address: 0x0082EC10 (FUN_0082EC10, `Moho::UICommandGraph::
+         * mGraph`'s successor walk -- isNil@+0x25, 0x18-byte
+         * value_type, byte-identical ICF twin of the mesh-key map's
+         * successor walk family. Called at the top of that map's
+         * `erase_node` emission (FUN_0082FD50, cited below on `erase_node`)
+         * to capture the return iterator before unlinking.)
+         */
+        /**
+         * Address: 0x006878C0 (FUN_006878C0, `_Inc` for `msvc8::map<
+         * std::uint32_t, moho::IdPool>` -- `EntityDB::mIdPoolTree` in
+         * `EntityDb.h`. Reached from `EntityDbIdPoolMapTypeInfo::SerSave`'s
+         * (binary: `std::map_IdPool::Serialize`, `FUN_00686B10`) range-for
+         * walk over the map. Its register-shape adapters `FUN_00685FA0`/
+         * `FUN_00686CE0` are sibling emissions of the same walk.)
+         * Address: 0x00685FA0 (FUN_00685FA0, first register-shape adapter described above)
+         * Address: 0x00686CE0 (FUN_00686CE0, second register-shape adapter described above)
+         */
+        /**
+         * Address: 0x006E2220 (FUN_006E2220, `std::map_uint_CUnitCommand::
+         * Iterator::inc`) -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+         * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
+         * Matches this member exactly.
+         * Address: 0x006E1A90 (FUN_006E1A90, first of the two thin adapters described below)
+         * Address: 0x006E1AB0 (FUN_006E1AB0, second of the two thin adapters described below)
+         * `FUN_006E1A90`/`FUN_006E1AB0` are two
+         * thin `_Node**` slot-pointer wrapper adapters around it (advance
+         * `*slot` in place, return `slot`, matching `rb_iterator::
+         * operator++()`'s `node_ = rb_increment(node_)` shape one level up
+         * through an indirection); `FUN_006E28C0` is the copy-then-advance
+         * adapter matching `operator++(int)`'s shape, cited on that member
+         * below. All three, plus this address, have zero incoming xrefs in
+         * this sweep -- re-homed here from bespoke `AdvanceCommandDbIteratorNode`/
+         * `AdvanceCommandDbIteratorSlotLaneA`/`AdvanceCommandDbIteratorSlotLaneB`/
+         * `CopyAndAdvanceCommandDbIteratorSlot` free functions in Sim.cpp
+         * that hand-walked the same successor step over a
+         * `CommandDbMapNodeView` reach-in instead of calling it, matching
+         * the same "no direct caller confirmed in this pass" disclosure
+         * already recorded for this map's `begin`/`empty`/`lower_bound_node`
+         * orphan accessor lanes above.)
+         */
+        /**
+         * Address: 0x007B4C40 (FUN_007B4C40, `_Inc` for an unidentified
+         * `msvc8::map`/`msvc8::set` instantiation with a 16-byte value_type --
+         * isNil@+0x1D (0x0D + 0x10). Same recurse-right-then-climb-parent
+         * shape as this member. Byte-identical ICF twin of FUN_005C7A90
+         * (cited in CAiReconDBImpl.cpp), FUN_0077CE50 (cited on this member
+         * above, CDecalBuffer start-tick table) and FUN_008D6C90 (cited in
+         * SimRecoveryRuntime.cpp) -- those three are unrelated instantiations
+         * that happen to compile to the same bytes; this citation covers a
+         * fourth, distinct 16-byte-value_type instantiation reached from a
+         * genuinely checked-iterator erase lane (FUN_007B4040, which throws
+         * `std::out_of_range("invalid map/set<T> iterator")` on a nil
+         * dereference before calling this). Owning class not yet pinned
+         * down -- reached via the CRT static-init array (`__xc_a`) at depth
+         * 4, source_paths previously misattributed to CrtRuntimeHelpers.cpp
+         * with zero real citation there (DB-integrity fix).
+         * Address: 0x007B4540 (FUN_007B4540, `operator++(int)` -- copies the
+         * old node into the return slot, then advances via this member,
+         * matching the post-increment shape documented on the sibling
+         * `FUN_006E28C0` adapter above)
+         * Address: 0x007B4570 (FUN_007B4570, `operator++()` -- advances via
+         * this member and returns the same slot, matching the prefix-
+         * increment shape documented on the `FUN_006E1A90`/`FUN_006E1AB0`
+         * adapters above)
+         */
+        /**
+         * Address: 0x007B2D40 (FUN_007B2D40, `_Inc` for the
+         * `msvc8::set<std::uint32_t>` instantiation cited on `alloc_raw`/
+         * `free_raw`/`buy_head`/`clear`/`destroy_subtree` throughout this
+         * file (isNil@+0x11). Same recurse-right-then-climb-parent shape as
+         * this member: `if (!isNil(n->right)) return rb_min(n->right);`
+         * else climb `parent` while `n == ancestor->right`. Takes an
+         * `_Node**` out-parameter slot rather than returning by value
+         * (`__fastcall(int, int* slot)`, mutates `*slot` in place and
+         * returns it), matching the `FUN_006E1A90`/`FUN_006E1AB0`
+         * slot-pointer adapter shape one level up through an indirection --
+         * except here the slot mutation is inlined into the walk itself
+         * rather than split into a separate adapter. On `isNil(n)` it
+         * returns without touching `*slot` at all (no `--end()`-style
+         * redirect), matching this member's `if (rb_is_nil(n)) return n;`
+         * no-op exactly. DB-integrity fix: this token was previously
+         * flipped `blocked` citing a `CrtRuntimeHelpers.cpp` source path
+         * the address never appeared in (2026-08-21 citation-audit
+         * revert); this is the real source, evidenced by its two real
+         * callers below (paired bottom-up recovery, same DB-integrity
+         * pass). Owning field not yet pinned to a specific class.
+         * Address: 0x007B4BD0 (FUN_007B4BD0, `operator++(int)` -- copies
+         * the old node into the return slot, then advances via this
+         * member, matching the post-increment shape documented on the
+         * `FUN_006E28C0`/`FUN_007B4540` adapters above. DB-integrity fix:
+         * `source_paths=null`, boilerplate batch note, zero real citations
+         * found in a full `src` sweep.)
+         * Address: 0x007B4DE0 (FUN_007B4DE0, `operator++()` -- advances via
+         * this member and returns the same slot, matching the prefix-
+         * increment shape documented on the `FUN_006E1A90`/`FUN_006E1AB0`/
+         * `FUN_007B4570`/`FUN_007B4500` adapters above. Same DB-integrity
+         * provenance as `FUN_007B4BD0`.)
+         * Address: 0x0052EE50 (FUN_0052EE50, sub_52EE50) -- another
+         * `_Node**` out-parameter-slot instantiation of this member, isNil
+         * at `[node+0x11]`, same recurse-right-then-climb-parent shape and
+         * same "on `isNil(n)` return without touching `*slot`" no-op path
+         * as `FUN_007B2D40` above. Distinct address range from that
+         * instantiation's family (0x0052xxxx vs 0x007Bxxxx) -- a separate
+         * class sharing the same isNil@0x11 4-byte-value shape, not a
+         * sibling emission of it. Three real callers (`FUN_0052D730`,
+         * `FUN_0052F0A0`, `FUN_00530DC4`); owning field/class not yet
+         * pinned down.
+         *
+         * Address: 0x0083C2E0 (FUN_0083C2E0, sub_83C2E0) -- CORRECTED: was
+         * mislabeled `UiKeyActionMap`/`msvc8::map<UiKeyMask,
+         * msvc8::string>` here despite already noting `isNil@+0x15` --
+         * that offset belongs to the *other* UI key map. This is
+         * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s in-order
+         * successor walk (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:
+         * 1395`; `UiKeyActionMap` is isNil@+0x2D, see `FUN_0083A640` cited
+         * on `erase(const_iterator)` above). Two real call sites: this
+         * instantiation's `erase_node` (`FUN_0083AA70`, corrected
+         * alongside this entry, cited on that member below) via the
+         * successor-capture step every `erase_node` emission performs
+         * before unlinking, and `insert_hint`'s emission (`FUN_0083B320`,
+         * cited below) via its successor-straddle check on a miss-hint.
+         *
+         * Address: 0x005A19B0 (FUN_005A19B0, sub_5A19B0) --
+         * `msvc8::map<uint32_t, moho::RUnitBlueprint*>::operator[]`'s
+         * hint-validation increment, isNil@+0x15. Called from the
+         * `operator[]` inner helper `FUN_005A08B0`
+         * (`moho/ai/CAiBuilderImpl.cpp`) to advance an insertion hint and
+         * re-check the key ordering before trusting it. The recovered
+         * `AddOrUpdateRebuildNode` absorbs this whole `operator[]`
+         * emission (including this increment step) into a direct
+         * find-then-insert path -- see the "Absorbs binary helper"
+         * comment on `FUN_005A08B0`'s citation there.
+         *
+         * Address: 0x0052CC30 (FUN_0052CC30, the category-lookup map's
+         * successor walk -- `msvc8::map<msvc8::string,
+         * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+         * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+         * mCategoryMap` (RRuleGameRules.h/.cpp). Matches this member field
+         * for field, confirmed against the raw decompile: real-right-child
+         * case descends to `right->left` while `!isNil`; nil-right-child
+         * case climbs `parent` while `*cursor == parent->right`, landing on
+         * the first ancestor reached from its left subtree. Reached from
+         * `erase_node`'s emission for this instantiation (FUN_00536010,
+         * cited below) as the successor-capture step every `erase_node`
+         * emission performs before unlinking. Re-homed here from a
+         * hand-rolled `AdvanceCategoryLookupNodeSuccessor` free function in
+         * RRuleGameRules.cpp that walked a deleted overlay*`
+         * reach-in instead of calling it -- also reached from that file's
+         * `PublishCategoriesTable` before the migration, now folded into
+         * `mCategoryMap`'s own range-for iteration.)
+         */
+        /**
+         * Address: 0x00946830 (FUN_00946830, sub_946830) -- `gpg::gal::
+         * StateCache<d3d9::RenderState, unsigned int>::tree_`'s `_Inc`,
+         * isNil@+0x15, 8-byte value_type (`msvc8::map<d3d9::RenderState,
+         * unsigned int>`, `StateCache_D3DRENDERSTATETYPE.hpp`). Matches this
+         * member exactly (`.asm`: `cmp byte ptr [eax+15h],0` / `mov
+         * edx,[eax+8]` recurse-right-then-climb-parent shape). Five real
+         * callers (callgraph index `call_edges`): this instantiation's
+         * `erase_node` (`FUN_00947380`, cited above) via the
+         * successor-capture step every `erase_node` emission performs
+         * before unlinking -- itself reached from `erase_range`
+         * (`FUN_00947B90`, cited above), which `StateCache<d3d9::RenderState,
+         * unsigned int>::~StateCache` (0x00948190, `StateCache.cpp`) reaches
+         * through `tree_`'s own implicit `msvc8::map::~map()`, rooting this
+         * whole chain in already-recovered source; an `insert`-with-hint
+         * emission (`FUN_009496E0`, not independently exported in this
+         * pass); two zero-incoming-xref `operator++()` duplicate emissions
+         * (`FUN_00946DC0`/`FUN_00946F60`, cited below); and a third
+         * `operator++(int)` emission (`FUN_00947080`, not independently
+         * exported in this pass). Reachable in the callgraph index's
+         * `reachable` table via `??_7CScApp@@6B@` at depth 9.
+         *
+         * Corrects this token's previous ambiguous "std::map<type_info*,
+         * RType*> / std::map<const char*,RType*>" DB note: neither
+         * `gpg::core::reflection::TypeInfoMap` nor `Reflection.h`'s
+         * `TypeMap` iterate via `_Inc` anywhere in currently-recovered
+         * source (both are used only through `find`/`operator[]`/
+         * `lower_bound`/`insert` -- `Reflection.cpp` lines 3874-13791 --
+         * none of which need a successor walk); this `isNil@+0x15, 8-byte
+         * value` node shape is `gpg::gal::StateCache`'s, a subsystem
+         * unrelated to reflection. Previously `skip`'d ("orphan, 0 source
+         * callers"); corrected to `recovered` now that its real caller
+         * chain down to already-recovered `StateCache::~StateCache` is
+         * established, matching this file's own "recovered as an
+         * additional instantiation, owning class not pinned down further"
+         * precedent for identically-shaped zero-xref siblings elsewhere in
+         * this address neighbourhood (e.g. the 0x00947E00/0x00947E90/
+         * 0x00947F20 `~rb_tree()` trio above, 0x007B4C40, 0x007B2D40).
+         *
+         * Address: 0x00946880 (FUN_00946880, sub_946880) -- byte-identical
+         * sibling emission (same `function_sha256` as 0x00946830 above),
+         * `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::
+         * tree_`'s own `_Inc`. Reached from this instantiation's
+         * `erase_node` (`FUN_00947630`, cited above), itself reached from
+         * `erase_range` (`FUN_00947C50`, cited above) via `StateCache<
+         * _D3DSAMPLERSTATETYPE, unsigned int>::~StateCache` (0x009481E0,
+         * `StateCache.cpp`). Reachable via `??_7CScApp@@6B@` at depth 10.
+         * Same five-caller shape as 0x00946830 above (`FUN_00946DD0`/
+         * `FUN_00946F70` `operator++()` duplicates cited below,
+         * `FUN_009470A0` `operator++(int)` cited below, `FUN_00949850`
+         * insert-with-hint not independently exported in this pass). Same
+         * DB-integrity correction as 0x00946830 above.
+         *
+         * Address: 0x009468D0 (FUN_009468D0, sub_9468D0) -- byte-identical
+         * sibling emission, `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,
+         * unsigned int>::tree_`'s own `_Inc`. Reached from this
+         * instantiation's `erase_node` (`FUN_009478E0`, cited above),
+         * itself reached from `erase_range` (`FUN_00947D10`, cited above)
+         * via `StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::
+         * ~StateCache` (0x00948230, `StateCache.cpp`). Reachable via
+         * `??_7CScApp@@6B@` at depth 10. Same five-caller shape
+         * (`FUN_00946DE0`/`FUN_00946F80` `operator++()` duplicates cited
+         * below, `FUN_009470C0` `operator++(int)` cited below,
+         * `FUN_009499C0` insert-with-hint not independently exported in
+         * this pass). Same DB-integrity correction as 0x00946830 above.
+         *
+         * Address: 0x008A9090 (FUN_008A9090, IDA-inferred name
+         * `std::map_string_Env::Iterator::inc`) -- `msvc8::map<msvc8::string,
+         * moho::TerrainEnvironmentLookupEntry>::rb_increment` --
+         * `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same instantiation
+         * cited on `insert_hint` above). Two real callers: `insert_hint`'s
+         * emission for this instantiation (`FUN_008A8590`, cited above) at
+         * its successor-straddle branch (`std::map_string_Env::Iterator::
+         * inc((std::map_string_Env::_Node**)&a4)`), and
+         * `IWldTerrainRes::EnumerateEnvLookup`/`Save`'s in-order walk
+         * (`CWldMap.cpp`), now expressed as `for (const auto& [key, value]
+         * : mEnvLookup)` over this member's own `iterator::operator++`. Was
+         * re-derived from `insert_hint`'s own callee list during this pass
+         * rather than carried from a stale per-type citation -- the deleted
+         * hand-rolled `IncrementTerrainEnvironmentNode` free function in
+         * `CWldMap.cpp` had no Address: annotation of its own.
+         *
+         * Address: 0x0087CD10 (FUN_0087CD10, sub_87CD10) -- `msvc8::map<
+         * std::uint32_t, Moho::CWldTerrainDecal*>::rb_increment` --
+         * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+         * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (8-byte
+         * `pair<const uint32_t, CWldTerrainDecal*>` value_type, same
+         * instantiation cited on `insert_hint`/`insert_unique`/`insert_at`/
+         * `rb_decrement`/`find_node` elsewhere in this file). Sole caller is
+         * this instantiation's own `insert_hint` emission (`FUN_00879B10`,
+         * cited below) at its successor-straddle branch.
+         * Address: 0x0087CDD0 (FUN_0087CDD0, sub_87CDD0) -- a second
+         * emission of the same member, shared between two different call
+         * sites: this instantiation's `erase(const key_type&)` counting
+         * loop (`FUN_00879510`, cited below, used by both the decal-index
+         * and group-index maps) and the sibling `msvc8::map<std::uint32_t,
+         * Moho::CDecalGroup*>::insert_hint` emission
+         * (`Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+         * `FUN_00879F60`, cited below) at its own successor-straddle
+         * branch -- the two instantiations differ only in `mapped_type`
+         * (both bare 4-byte pointers), which this member's own body never
+         * touches, so the compiler folded both call sites onto one emission
+         * while `rb_increment`'s *other* call site (tree1's `insert_hint`)
+         * kept a separate copy at 0x0087CD10 above -- an ordinary instance
+         * of this file's already-documented partial-ICF-folding pattern.
+         * Both trees were previously a hand-rolled RB-tree pair
+         * (`DecalGroupLookupTree`/`DecalGroupLookupNode` plus
+         * `FindLookupNodeByKey`/`ResolveLookupValueSlotForKey`/
+         * `EraseLookupEntriesByKey` and ~10 more free functions in
+         * `CWldSplat.cpp`) that never called this member at all -- the
+         * hand-rolled insert path linked new nodes straight onto their BST
+         * parent with **no rotation/recolor step whatsoever**, the same
+         * missing-rebalance shape documented on `AudioMap1CategoryNode` in
+         * `.memory/project_audiomap1_missing_rebalance_bug.md`. Migrating
+         * both trees onto this template, and this member's migration onto
+         * it, is that fix.
+         */
+        /**
+         * Address: 0x004DDD30 (FUN_004DDD30, sub_4DDD30) --
+         * `msvc8::set<msvc8::string>::rb_increment` -- `Moho::
+         * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), isNil@
+         * +0x29. Matches this member exactly: nil no-op, `rb_min(n->right)`
+         * when the right child is real, else walk up while `n ==
+         * ancestor->right`. Two real callers: `erase_node`'s emission
+         * (`FUN_004DC850`, cited below) computing `next` before any
+         * mutation, and `erase_range`'s emission (`FUN_004DBD30`, cited
+         * below) inlining the same "advance first, then erase the old
+         * cursor" walk `erase_range`'s own C++ body performs (a second,
+         * separate inlined copy of this member's logic at that call site,
+         * distinct from the out-of-line 0x004DDD30 symbol). Was previously
+         * duplicated as `AdvancePausedCategoryIterator` (`AudioEngine.cpp`,
+         * deleted by this migration) -- that free function's own logic was
+         * correct (plain iterator stepping carries no rebalancing
+         * obligation), it was simply a hand-rolled reimplementation of this
+         * member rather than a call to it.
+         */
+        /**
+         * Address: 0x008497C0 (FUN_008497C0 -- `rb_increment` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from this instantiation's `erase_node` 0x00849900.)
+         * Address: 0x004DDC90 (FUN_004DDC90, sub_4DDC90) -- `msvc8::map<
+         * std::uint16_t, float>::rb_increment` -- `Moho::AudioEngineImpl::
+         * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
+         * member exactly: nil no-op (tested by pointer identity against
+         * `head_`), `rb_min(n->right)` when the right child is real, else
+         * walk up while `n == ancestor->right`. At least three real callers
+         * confirmed by direct register-tracing (the callgraph index reports
+         * five incoming call edges in total): `insert_hint`'s emission for
+         * this instantiation (`FUN_004DC080`, cited above) computing `after`
+         * on its successor-straddle branch, `erase_node`'s emission
+         * (`FUN_004DD510`, cited below) computing `next` before any
+         * mutation, and `erase_range`'s emission (`FUN_004DCEA0`, cited
+         * below) inlining the same "advance first, then erase the old
+         * cursor" walk. Was previously duplicated as `AdvanceCategoryIterator`
+         * (`AudioEngine.cpp`, deleted by this migration) -- like its
+         * `mPausedCategoryNames` sibling, that free function's own iterator-
+         * stepping logic was correct, just a hand-rolled reimplementation
+         * of this member rather than a call to it.
+         * Address: 0x0056D090 (FUN_0056D090, sub_56D090 -- the `_Inc` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); every `for (auto& [id, info] : mUnitOffsets)` walk in CAiFormationInstance.cpp (`SOffsetInfo::GetLeader`, `CAiFormationInstance::Update`, the map serializer) steps with it.)
+         * Address: 0x0045E3A0 (FUN_0045E3A0 -- `_Inc` -- the in-order successor for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045B100, 0x0045BE60, 0x0045CB80; formerly `FileInfoTreeNextNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0045D170 (FUN_0045D170 -- `_Inc` -- the in-order successor for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x00458BC0, 0x0045AC70, 0x0045B412; formerly `ZipTreeNextNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007F2050 (FUN_007F2050 -- `_Inc` -- the in-order successor, written back through the caller's cursor slot for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EEA00, 0x007EEE50, 0x007EF420; formerly `AdvanceRangeProfileTreeIterator` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0046EE50 (FUN_0046EE50 -- `_Inc` -- the in-order successor for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E890, 0x0046EC14, 0x0046EE22; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00465390 (FUN_00465390 -- `_Inc` -- the in-order successor for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004628C0, 0x004629B0, 0x00463A70; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004E9650 (FUN_004E9650 -- `_Inc` -- the successor capture that erase performs before unlinking for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E8FF2, 0x004E9352, 0x004E96A0; formerly `EraseSingleTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00505B40 (FUN_00505B40 -- `_Inc` through the iterator's own slot for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35): every range walk in the spatial database (`SpatialShardData<T>::RecalculateBounds` 0x005023B0, the collect bodies 0x00502780/0x00502950/0x00502C60/0x005030C0/0x00503490/0x00503730) and the hinted insert 0x00504A10. It was booked `external_dependency`; it is engine code, the tree's own iterator step.)
+         * Address: 0x0066ADD0 (FUN_0066ADD0 -- the tree `++` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19); the `WeakSet` iterator's `++` 0x007AE7E0 and every inlined walk of those sets.)
+         * Address: 0x00856860 (FUN_00856860 -- the same body emitted again; callers 0x00853DC0, 0x00855462, 0x00855D82, 0x00856950, 0x00856DD4.)
+         */
+        rb_node<V>* rb_increment(rb_node<V>* n) noexcept
+        {
+            if (rb_is_nil(n)) {
+                return n; // ++end() is a no-op in MSVC8, as in the binary
+            }
+
+            if (!rb_is_nil(n->right)) {
+                return rb_min(n->right);
+            }
+
+            rb_node<V>* ancestor = n->parent;
+            while (!rb_is_nil(ancestor) && n == ancestor->right) {
+                n = ancestor;
+                ancestor = ancestor->parent;
+            }
+            return ancestor;
+        }
+
+        /**
+         * Address: 0x0094F030 (FUN_0094F030, std::map<gpg::RType*,int>::iterator _Dec)
+         * Address: 0x009488D0 (FUN_009488D0, byte-identical sibling `_Dec` emission)
+         * Address: 0x00948930 (FUN_00948930, byte-identical sibling `_Dec` emission)
+         * Address: 0x007E4FA0 (FUN_007E4FA0, `_Dec` for the mesh batch-bucket map)
+         *
+         * IDA signature:
+         * _Node *__thiscall operator(_Node **this);
+         *
+         * What it does:
+         * Steps one tree iterator to its in-order predecessor. From the header
+         * this yields the rightmost element (`--end()`); with a real left subtree
+         * it yields that subtree's rightmost node; otherwise the nearest ancestor
+         * whose right subtree contains the node.
+         *
+         * Evidence for the `_Inc`/`_Dec` name swap in the IDB: 0x0094F030 opens
+         * with `cmp byte ptr [eax+15h],0 / jz` then `mov eax,[eax+8]`, i.e. on the
+         * nil node it moves to `_Right` (rightmost) - only `_Dec` does that - and
+         * it closes with the `if (!_Isnil(_Ptr)) _Ptr = _Pnode;` guard that exists
+         * only in MSVC8's `_Dec`. 0x0094F090 has neither.
+         */
+        template<class V>
+        /**
+         * Address: 0x0077CD80 (FUN_0077CD80, the decal bucket iterator retreat)
+         * Address: 0x0077D160 (FUN_0077D160, the start-tick map's; its two
+         * register-shape adapters are 0x0077C7A0 and 0x0077CE30)
+         * Address: 0x0077C7A0 (FUN_0077C7A0, first register-shape adapter
+         * described above)
+         * Address: 0x0077CE30 (FUN_0077CE30, second register-shape adapter
+         * described above)
+         */
+        /**
+         * Address: 0x005364D0 (FUN_005364D0, the predecessor-lookup half of
+         * `insert_unique` for RRuleGameRulesBlueprintMap =
+         * msvc8::map<msvc8::string,void*>; isNil at +0x2D = 0x0D +
+         * sizeof(pair<msvc8::string(28),void*(4)>)=0x20, confirming the
+         * node type. Reached from FUN_00534030, the Unit-blueprint insert
+         * cited on `insert_unique` above.)
+         * Address: 0x00536410 (FUN_00536410, same instantiation, reached
+         * from FUN_00534470 -- Emitter-blueprint insert)
+         * Address: 0x00536590 (FUN_00536590, reached from FUN_00534250 --
+         * Prop-blueprint insert)
+         * Address: 0x00536530 (FUN_00536530, reached from FUN_00534140 --
+         * Projectile-blueprint insert)
+         * Address: 0x005365F0 (FUN_005365F0, reached from FUN_00534360 --
+         * Mesh-blueprint insert)
+         * Address: 0x00536470 (FUN_00536470, reached from FUN_00534690 --
+         * Trail-blueprint insert)
+         * Address: 0x005363B0 (FUN_005363B0, reached from FUN_00534580 --
+         * Beam-blueprint insert)
+         * Address: 0x00712030 (FUN_00712030, the blueprint-stat map's
+         * predecessor lookup -- isNil@+0x15, node 0x18. Reached from
+         * FUN_0070F6C0/FUN_007108D0, the copy-driver call sites already
+         * cited on the copy constructor above.)
+         * Address: 0x00556E70 (FUN_00556E70, the predecessor-lookup half of
+         * `insert_unique` for the category-lookup map =
+         * `msvc8::map<msvc8::string, moho::CategoryLookupValue>`
+         * (`Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap` --
+         * IDA independently types this tree `std::map_string_EntityCategory`
+         * at the read-side lookups, FUN_005561C0/FUN_00556220/FUN_00556970).
+         * This is the one instantiation in this file whose node does *not*
+         * follow the usual "value starts at node+0x0C" shape: `isNil` sits at
+         * +0x59, but the value itself starts at +0x10 (confirmed from
+         * `buy_node`'s destination address, FUN_005569C0) because
+         * `CategoryLookupValue` (Sim.cpp) is 8-byte aligned -- see the
+         * evidence block on that type. `rb_node<V>` reproduces the same
+         * +0x10/+0x58/+0x59 layout automatically once `V` is
+         * `pair<const msvc8::string, CategoryLookupValue>`, with no template
+         * change needed here. Reached from `FUN_005560B0`, the insert cited
+         * on `insert_unique` below.)
+         */
+        /**
+         * Address: 0x006888E0 (FUN_006888E0, the predecessor-lookup half of
+         * `insert_unique` for `msvc8::map<std::uint32_t, moho::IdPool>` --
+         * `EntityDB::mIdPoolTree` in `EntityDb.h`. Reached from
+         * `insert_unique`'s emission `FUN_006870D0` and `insert_hint`'s
+         * emission `FUN_006864E0`, both cited below.)
+         * Address: 0x006E28D0 (FUN_006E28D0, the command-id map's
+         * predecessor lookup -- `msvc8::map<Moho::CmdId,
+         * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+         * `CCommandDb.h`, isNil@+0x15. This body has three callers total
+         * (`incoming_xrefs` in `_callgraph_index.sqlite`); only one,
+         * `insert_unique`'s emission for this map (FUN_006E15B0, cited
+         * below), is this instantiation's -- the other two belong to
+         * different 8-byte-value_type maps that happen to share this exact
+         * byte-identical body, the same ICF-adjacent sharing documented
+         * throughout this file for `rb_min`/`rb_max`/the rotate family.)
+         * Address: 0x008B6950 (FUN_008B6950, sub_8B6950, the predecessor
+         * lookup half of `insert_unique` for `msvc8::map<Moho::CmdId,
+         * Moho::UserCommandIssueHelper*>` -- `CommandManager::mCommands` in
+         * `CommandManager.h`, isNil@+0x15. Reached from `insert_unique`'s
+         * emission FUN_008B5DF0, cited on that member. Re-homed here from
+         * the same bespoke `InsertCommandNodeFixup` free function in
+         * Sim.cpp cited on `insert_unique`/`insert_at` above.)
+         * Address: 0x008D69D0 (FUN_008D69D0, sub_8D69D0) -- the predecessor
+         * lookup half of `insert_unique` for the local `msvc8::rb_tree<
+         * moho::Resolution>` dedup tree (see the `insert_unique`/
+         * `FUN_008D4F10` and `insert_at`/`FUN_008D5720` citations above),
+         * isNil@+0x1D(29). Standard three-way shape (right-child predecessor
+         * via `rb_max`-equivalent inline walk, ancestor climb, or direct
+         * left-child descent) matching this member exactly.
+         */
+        /**
+         * Address: 0x004E4440 (FUN_004E4440, sub_4E4440)
+         *
+         * `msvc8::map<CSndParams*, HSndEntityLoop*>`, isNil@+0x15 (8-byte
+         * `pair<const CSndParams*, HSndEntityLoop*>` value_type; confirmed
+         * against the `.asm`). A thin `_Node**` slot-pointer wrapper adapter
+         * around this member -- `if(isNil(*slot)) *slot=(*slot)->right; else
+         * if(!isNil((*slot)->left)) *slot=rb_max((*slot)->left); else {
+         * ancestor-walk }` -- advancing `*slot` in place and returning the
+         * new node, matching the `FUN_006E2200`/`FUN_006E27D0` adapter shape
+         * already documented above. Reached from `CSndParams.cpp`'s
+         * `_Insert_lower_bound` (`FUN_004E1890`, the per-T canonical-
+         * template-helper binding for this map), which uses the predecessor
+         * check during hinted/unique insert.
+         */
+        /**
+         * Address: 0x0083C400 (FUN_0083C400, sub_83C400) --
+         * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s predecessor
+         * lookup (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:1395`,
+         * isNil@+0x15). Standard three-way shape (right-child predecessor
+         * via a `rb_max`-equivalent inline right-spine walk, ancestor climb
+         * while descending from a left branch, or direct left-child
+         * descent) matching this member exactly. Reached from
+         * `insert_hint`'s emission (`FUN_0083B320`, cited below) as the
+         * `before = rb_decrement(hint)` straddle check. Currently also
+         * carries a second, generic-templated recovery as
+         * `RetreatTreeIteratorFlag21RuntimeA`/`RetreatRbIteratorRuntime<
+         * RbNodeFlag21Runtime, 0x15u>` in `moho/sim/SimRecoveryRuntime.cpp`
+         * -- a per-offset duplicate of this same member; not consolidated
+         * in this pass (out of scope), flagged for a follow-up template
+         * clean-up.)
+         */
+        /**
+         * Address: 0x00581620 (FUN_00581620, sub_581620) --
+         * `Moho::CAiBrain::mBuildStructureMap`'s predecessor lookup --
+         * `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`, isNil@+0x25
+         * (0x0C node header + sizeof(pair<Vector2i(8), SBuildReserveInfo(0x10)>)
+         * = 0x24), the same instantiation cited on `buy_head`/`buy_node`/
+         * `rb_max` elsewhere in this file (0x00581330/0x00581370/0x0057F1B0).
+         * A thin `_Node**` slot-pointer wrapper adapter around this member,
+         * matching the `FUN_004E4440` shape immediately above byte-for-byte
+         * against the `.asm`: `mov eax,[edx]` loads `*slot`; the nil (header)
+         * case writes `slot->right`; the real-left-subtree case inlines the
+         * `rb_max(n->left)` walk directly instead of calling out, and always
+         * writes; the no-left-subtree case climbs `parent` while
+         * `n == ancestor->left`, writing `*slot` only when the walked-to node
+         * is not nil -- exactly this member's `rb_is_nil(n) ? n : ancestor`
+         * guard. Two real callers, both this map's insert emissions:
+         * `insert_unique`'s emission (`FUN_00580510`, cited below) via its
+         * `probe = rb_decrement(where)` non-leftmost branch, and
+         * `insert_hint`'s emission (`FUN_0057EFF0`, cited below) via its
+         * `before = rb_decrement(at)` straddle check -- confirmed against
+         * both callers' `.asm` (`lea edx,[slot]` immediately before
+         * `call sub_581620`, no other registers/stack args). Both insert
+         * paths are reached from this map's `operator[]`: `moho::func_
+         * ScheduleBuildStructure`'s `brain->mBuildStructureMap[where]`
+         * (`CAiBrain.cpp`, already recovered) and `BuildReserveMapTypeInfo::
+         * SerLoad`'s `(*mapObject)[key]` (`CAiBrain.cpp`, already recovered)
+         * -- the two real `operator[]` use sites for this map. Previously
+         * mis-tracked `blocked`, citing `CrtRuntimeHelpers.cpp` boilerplate
+         * the address never actually appeared in (DB-integrity fix).
+         */
+        /**
+         * Address: 0x0094FD20 (FUN_0094FD20, sub_94FD20) -- predecessor
+         * lookup for the tree at `gpg::WriteArchive+0x10` (`WriteArchive.h`'s
+         * `mObjRefs` -- same isNil@+0x25 instantiation cited on `rb_min`/
+         * `rb_max`/`erase_node` above at 0x0094EE60/0x0094F010/0x00951A40).
+         * Byte-for-byte match of this member against the `.asm`: nil-case
+         * returns `n->right` (0x0094FD22-2D), has-left-subtree case inlines
+         * the `rb_max(n->left)` walk directly (0x0094FD2E-4D), no-left-
+         * subtree case climbs `parent` (offset+4) while `n == ancestor->
+         * left` and keeps the walked-to node when the climb falls off the
+         * front (0x0094FD4E-72) -- instruction-for-instruction match.
+         *
+         * Sole *confirmed* caller is this instantiation's `insert_unique`
+         * emission, `std::map_RRef_TrackedPointer::insert` (`FUN_00951D30`,
+         * IDA FLIRT-named), via its `--_Insnode`/`probe = rb_decrement(
+         * where)` predecessor check -- confirmed against that function's
+         * own `.c`: `sub_94FD20(&a3)` is called immediately after the tree
+         * descent, before the final key comparison that decides insert-vs-
+         * already-present, matching this member's `insert_unique` usage
+         * exactly. `FUN_00951D30` is itself called from `WriteArchive::
+         * PreCreatedPtr` (0x009523F0, already recovered and cited in
+         * `WriteArchive.cpp`, real call site `mObjRefs.insert(...)` at
+         * `WriteArchive.cpp:915`) and from `gpg::WriteRawPointer`
+         * (0x00953320, `ArchiveSerialization.cpp`) -- confirmed via both
+         * callers' own `.asm` (`call std__map_RRef_TrackedPointer__insert`).
+         * The callgraph index also lists 0x009504B3 and 0x00950AF3 as
+         * callers; both are unclassified gap bytes between real functions
+         * (no `.c`/`.asm`/`.meta.json` export; neither address's containing
+         * range appears in the `functions` table -- 0x009504B3 sits in the
+         * 0x950487-0x9504C0 gap after `FUN_00950430`, 0x00950AF3 in the
+         * 0x950AD8-0x950B30 gap after `FUN_00950A80`) -- indexer noise from
+         * scanning raw opcode bytes in inter-function padding, not genuine
+         * call sites.
+         *
+         * Previously mass-mis-attributed to `CrtRuntimeHelpers.cpp` by the
+         * 2026-08-24 DB-integrity bulk pass (address not present in that
+         * file).
+         *
+         * Same `mObjRefs` key-type discrepancy documented in full on
+         * `rb_min`'s 0x0094EE60 citation above applies to the owner
+         * description here too (real tree is `RRef`-keyed, `WriteArchive.h`
+         * currently declares it void*-keyed) -- not corrected in this pass.
+         * This member's own offsets are independently confirmed against the
+         * `.asm` and are unaffected.
+         *
+         * Address: 0x008A9720 (FUN_008A9720, sub_8A9720) -- `msvc8::map<
+         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+         * rb_decrement` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+         * (same instantiation cited on `insert_hint`/`rb_increment` above).
+         * Sole real caller is `insert_hint`'s emission for this
+         * instantiation (`FUN_008A8590`, cited above) at its predecessor-
+         * straddle branch, called with no visible return-value capture in
+         * the decompile (the register-held result feeds directly into the
+         * following `sub_423A00`/`isNil@77` checks, the same argument/
+         * return elision seen throughout this emission family) -- matches
+         * this member's `before = rb_decrement(at)` straddle check exactly.
+         */
+        /**
+         * Address: 0x007E60F0 (FUN_007E60F0, sub_7E60F0) -- `msvc8::map<
+         * MeshKey, boost::weak_ptr<Mesh>>::rb_decrement` for `moho::
+         * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`, isNil@+0x25,
+         * same instantiation cited on `alloc_raw`/`buy_node`/`insert_
+         * unique`/`insert_at` above). Byte-for-byte match of this member:
+         * nil-case (`*(v2+37)` set) returns `v2->right` (`v2[2]`,
+         * offset+8); has-left-subtree case (`*(*v2+37)` clear, i.e.
+         * `v2->left` is not nil) inlines the `rb_max(n->left)` walk
+         * directly (the `for (result=*(v4+8); ...)` loop over `right`
+         * pointers); no-left-subtree case climbs `parent` (offset+4) while
+         * the tracked node is its ancestor's `left` child, keeping the
+         * walked-to node when the climb falls off the front -- matches
+         * this member's `rb_is_nil(n) ? n : ancestor` guard exactly. Sole
+         * caller is `insert_unique`'s emission for this instantiation
+         * (0x007E5B20, cited above), via its `probe = rb_decrement(where)`
+         * non-leftmost branch. `Mesh.cpp` does not yet have a recovered
+         * counterpart for this member -- `MeshCacheTreeInsertUnique`'s
+         * current search algorithm short-circuits on an exact match during
+         * descent instead of confirming uniqueness against the in-order
+         * predecessor afterward, so this member is never reached from
+         * recovered source yet. Not yet routed through this template.
+         *
+         * Address: 0x0087CCB0 (FUN_0087CCB0, sub_87CCB0) -- `msvc8::map<
+         * std::uint32_t, Moho::CWldTerrainDecal*>::rb_decrement` --
+         * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+         * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+         * instantiation cited on `insert_hint`/`insert_unique`/`insert_at`/
+         * `rb_increment`/`find_node` elsewhere in this file). Two real
+         * callers, both this instantiation's own emissions: `insert_unique`
+         * (`FUN_0087AB70`, cited below) at its non-leftmost `probe =
+         * rb_decrement(where)` branch, and `insert_hint` (`FUN_00879B10`,
+         * cited below) at its predecessor-straddle branch.
+         * Address: 0x0087CD70 (FUN_0087CD70, sub_87CD70) -- the sibling
+         * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::rb_decrement`
+         * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`
+         * -- a distinct out-of-line copy for the second tree (unlike
+         * `rb_increment`'s two trees, which share one emission at
+         * 0x0087CDD0, this member got a separate copy per tree). Sole
+         * caller is that tree's own `insert_hint` emission (`FUN_00879F60`,
+         * cited below) at its predecessor-straddle branch.
+         */
+        /**
+         * Address: 0x004DD950 (FUN_004DD950, sub_4DD950) --
+         * `msvc8::set<msvc8::string>::rb_decrement` -- `Moho::
+         * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), isNil@
+         * +0x29. Matches this member exactly: nil case returns `n->right`
+         * (rightmost), `rb_max(n->left)` when the left child is real, else
+         * walk up while `n == ancestor->left`, keeping the walked-to node
+         * when the walk falls off the front. Two real callers:
+         * `insert_unique`'s emission for this instantiation (`FUN_004DB600`,
+         * cited above) at its non-leftmost `probe = rb_decrement(where)`
+         * branch, and this instantiation's own iterator retreat (dual role
+         * with the free function below). Was previously duplicated as
+         * `RetreatPausedCategoryIterator` (`AudioEngine.cpp`, deleted by
+         * this migration) -- like `rb_increment` above, that logic was
+         * correct, just a hand-rolled reimplementation of this member.
+         */
+        /**
+         * Address: 0x004DDC30 (FUN_004DDC30, sub_4DDC30) -- `msvc8::map<
+         * std::uint16_t, float>::rb_decrement` -- `Moho::AudioEngineImpl::
+         * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
+         * member exactly: nil case returns `n->right` (rightmost), `rb_max
+         * (n->left)` when the left child is real, else walk up while `n ==
+         * ancestor->left`. At least two real callers confirmed by direct
+         * register-tracing (the callgraph index reports four incoming call
+         * edges in total): `insert_hint`'s emission for this instantiation
+         * (`FUN_004DC080`, cited above) computing `before` on its
+         * predecessor-straddle branch, and `insert_unique`'s own emission for
+         * this instantiation (`FUN_004DCDE0`, cited above) at its
+         * non-leftmost `probe = rb_decrement(where)` branch. Was previously
+         * duplicated as `RetreatCategoryIterator` (`AudioEngine.cpp`, deleted
+         * by this migration) -- like `rb_increment` above, that logic was
+         * correct, just a hand-rolled reimplementation of this member.
+         * Address: 0x00570530 (FUN_00570530 -- the `_Dec` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), reached from that instantiation's `insert_unique` duplicate check.)
+         * Address: 0x00570640 (FUN_00570640 -- the `_Dec` emission for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), reached from that instantiation's `insert_hint`.)
+         * Address: 0x0045E340 (FUN_0045E340 -- `_Dec` -- the in-order predecessor for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045BE60, 0x0045CA70, 0x0045D1F2; formerly `FileInfoTreePreviousNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0045E080 (FUN_0045E080 -- `_Dec` -- the in-order predecessor for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x0045AB60, 0x0045C1A2, 0x0045D162; formerly `ZipTreePreviousNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0046EC30 (FUN_0046EC30 -- `_Dec` -- the in-order predecessor for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046D840, 0x0046E122, 0x0046E7C2; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00465570 (FUN_00465570 -- `_Dec` -- the in-order predecessor for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463960, 0x00464A42, 0x00465382; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004E9A20 (FUN_004E9A20 -- `_Dec` -- the in-order predecessor the lower-bound path steps through for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E8EB0, 0x004E9342, 0x004E9642; formerly `FindTimeBarTrackLowerBound` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00505F40 (FUN_00505F40 -- `_Dec` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35), `end()` stepping to `_Rmost()`; callers 0x00504A10 (the hinted insert's "before `where`" test); formerly `SpatialMapPrevNode` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+         * Address: 0x00822A50 (FUN_00822A50 -- the tree `--` for the `WeakSet<moho::UserUnit>::Entry` set; callers `insert` 0x00822420 and the hinted insert 0x008B4F50.)
+         * Address: 0x008229B0 (FUN_008229B0 -- a forwarding copy of 0x00822A50 with no caller.)
+         */
+        rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
+        {
+            if (rb_is_nil(n)) {
+                return n->right; // --end() -> rightmost
+            }
+
+            if (!rb_is_nil(n->left)) {
+                return rb_max(n->left);
+            }
+
+            rb_node<V>* ancestor = n->parent;
+            while (!rb_is_nil(ancestor) && n == ancestor->left) {
+                n = ancestor;
+                ancestor = ancestor->parent;
+            }
+            // MSVC8 keeps the walked-to node when the walk fell off the front.
+            return rb_is_nil(n) ? n : ancestor;
+        }
+
+        /**
+         * Empty-base carrier for the key comparator.
+         *
+         * MSVC8 stores the predicate in an empty base of `_Tree_nod`, so a
+         * stateless comparator adds nothing to the 12-byte container footprint.
+         */
+        template<class Compare, bool = std::is_empty_v<Compare> && !std::is_final_v<Compare>>
+        class rb_compare_carrier;
+
+        template<class Compare>
+        // Public inheritance, deliberately: the empty-base optimisation that keeps
+        // the tree at 12 bytes works either way, but a private base makes the
+        // derived-to-base conversion in comp() inaccessible whenever Compare is a
+        // private nested type of the owning class (e.g.
+        // CD3DTextureBatcher::TextureAtlasEntryLess).
+        class rb_compare_carrier<Compare, true> : public Compare
+        {
+        public:
+            rb_compare_carrier() = default;
+            explicit rb_compare_carrier(const Compare& c) : Compare(c) {}
+
+            [[nodiscard]] const Compare& comp() const noexcept { return *this; }
+            [[nodiscard]] Compare& comp() noexcept { return *this; }
+        };
+
+        template<class Compare>
+        class rb_compare_carrier<Compare, false>
+        {
+        public:
+            rb_compare_carrier() = default;
+            explicit rb_compare_carrier(const Compare& c) : comp_(c) {}
+
+            [[nodiscard]] const Compare& comp() const noexcept { return comp_; }
+            [[nodiscard]] Compare& comp() noexcept { return comp_; }
+
+        private:
+            Compare comp_{};
+        };
+
+        /**
+         * Bidirectional iterator over an MSVC8 tree.
+         *
+         * One pointer wide, matching the shipped iterator for every
+         * instantiation this project relies on for engine behavior: the
+         * binary's step routines take `_Node**` as `this` and never consult
+         * a container back-pointer. A minority of instantiations (every one
+         * traced so far is WildMagic/`external_dependency` -- see
+         * `operator++`/`operator--`/`operator!=`/the constructor below)
+         * compile as the real Dinkumware `_SECURE_SCL=1` *checked* iterator
+         * instead: two words wide, `{_Mycont, _Ptr}`, with a
+         * validated-but-inert container back-pointer used only to fail fast
+         * on iterator misuse (see the `proxy_` field's comment on `rb_tree`
+         * below for the general policy this follows). The checked shape's
+         * validation never alters the computed result on any valid input --
+         * proven per-member below, not assumed -- so this one-word member
+         * models both shapes' success-path behavior exactly; only the
+         * fail-fast-on-misuse crash is left unmodeled, matching this
+         * project's fidelity contract (observable behavior on well-formed
+         * usage, not crash-on-misuse).
+         */
+        template<class Traits, bool IsConst>
+        class rb_iterator
+        {
+        public:
+            using iterator_category = std::bidirectional_iterator_tag;
+            using value_type = typename Traits::value_type;
+            using difference_type = std::ptrdiff_t;
+            using node_type = rb_node<value_type>;
+            using reference = std::conditional_t<IsConst, const value_type&, value_type&>;
+            using pointer = std::conditional_t<IsConst, const value_type*, value_type*>;
+
+            /**
+             * Address: 0x005A1290 (FUN_005A1290 -- the default-constructed (null) iterator for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ClearRebuildIteratorNodeLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0077C790 (FUN_0077C790 -- the default-constructed (null) iterator for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `ClearDecalDwordLane` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            rb_iterator() noexcept = default;
+            /**
+             * Address: 0x005A0BB0 (FUN_005A0BB0 -- an iterator built from a node and stored through a caller slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterA` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A0C00 (FUN_005A0C00 -- a second emission of that iterator store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterB` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A1280 (FUN_005A1280 -- a third emission of that iterator store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterC` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A12B0 (FUN_005A12B0 -- a fourth emission of that iterator store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterD` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0042C320 (FUN_0042C320 -- an iterator built from a node and stored through a caller slot -- the `{node, flag}` pair `~rb_tree()` above writes before it drains for `msvc8::set<moho::CD3DEffect::Technique, TechniqueNameLess>` (`CD3DEffect::mTechniques` at +0x04; the whole 0xC8 polymorphic `Technique` is the element and its `mName` the key, so node 0xD8 with the key at node+0x10 -- past the element's vptr -- and colour/nil at +0xD4/+0xD5); zero callers, unreachable; formerly `InitializePointerFlagPair` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0077B910 (FUN_0077B910 -- an iterator written through a caller slot for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `StoreDecalDwordLanePrimary` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0077C720 (FUN_0077C720 -- a second emission of that iterator store for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `StoreDecalDwordLaneSecondary` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0077C7B0 (FUN_0077C7B0 -- a third emission of that iterator store for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `StoreDecalDwordLaneTertiary` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0077C7E0 (FUN_0077C7E0 -- a fourth emission of that iterator store for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `StoreDecalDwordLaneQuaternary` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0077C910 (FUN_0077C910 -- a fifth emission of that iterator store for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `StoreDecalDwordLaneQuinary` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00735880 (FUN_00735880 -- `lower_bound`'s iterator, written through a caller slot for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `StoreSimConLowerBoundIterator` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00736250 (FUN_00736250 -- a second emission of that iterator store for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); callers 0x00735170, 0x00735290, 0x00735300; formerly `StoreSimConLowerBoundIterator` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            explicit rb_iterator(node_type* const n) noexcept : node_(n) {}
+
+            /** Implicit non-const to const conversion, as in the standard containers. */
+            template<bool OtherConst, class = std::enable_if_t<IsConst && !OtherConst>>
+            rb_iterator(const rb_iterator<Traits, OtherConst>& other) noexcept : node_(other.node())
+            {
+            }
+
+            [[nodiscard]] reference operator*() const noexcept
+            {
+                assert(node_ != nullptr && !rb_is_nil(node_) && "msvc8 tree iterator: dereferencing end()");
+                return node_->value;
+            }
+            [[nodiscard]] pointer operator->() const noexcept { return std::addressof(**this); }
+
+            /**
+             * Address: 0x00946DC0 (FUN_00946DC0, sub_946DC0) Address:
+             * 0x00946F60 (FUN_00946F60, sub_946F60) -- two zero-incoming-xref
+             * duplicate emissions of `gpg::gal::StateCache<d3d9::RenderState,
+             * unsigned int>::tree_`'s `iterator::operator++()`: `push esi;
+             * mov esi,ecx; call sub_946830 [rb_increment, cited above]; mov
+             * eax,esi; pop esi; retn` -- advances via this member and
+             * returns the same slot, matching this member's shape exactly.
+             * Callgraph index (`call_edges`/`incoming_xrefs`/`reachable`)
+             * shows zero callers for either address, same "compiled but not
+             * independently exercised" status as this file's other
+             * zero-xref `operator++()` duplicates (0x007B4500/0x007B4BC0
+             * above). Both previously `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path neither address ever
+             * appeared in (2026-08-24 DB-integrity bulk revert); this is
+             * the real source. Owning field not pinned to a named
+             * `StateCache<d3d9::RenderState, unsigned int>` instance.
+             * Address: 0x00946DD0 (FUN_00946DD0, sub_946DD0) Address:
+             * 0x00946F70 (FUN_00946F70, sub_946F70) -- the same duplicate
+             * pair, one `StateCache` specialisation over: `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s
+             * `operator++()`, calling `sub_946880` (`rb_increment`, cited
+             * above) instead of `sub_946830`. Same zero-caller status
+             * (0x00946DD0 was already `skip`'d "zero callers found";
+             * 0x00946F70 was `blocked` citing the same false
+             * `CrtRuntimeHelpers.cpp` path as the 0x00946DC0 pair above).
+             * Address: 0x00946DE0 (FUN_00946DE0, sub_946DE0) Address:
+             * 0x00946F80 (FUN_00946F80, sub_946F80) -- the same duplicate
+             * pair for the third specialisation: `gpg::gal::StateCache<
+             * _D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * `operator++()`, calling `sub_9468D0` (`rb_increment`, cited
+             * above). Same zero-caller status (0x00946DE0 was already
+             * `skip`'d "zero callers found"; 0x00946F80 was `blocked`
+             * citing the same false `CrtRuntimeHelpers.cpp` path).
+             *
+             * All six addresses sit inside the same `StateCache<T, unsigned
+             * int>` address neighbourhood as `rb_increment`'s 0x00946830/
+             * 0x00946880/0x009468D0 citations and this file's existing
+             * 0x00947xxx `erase_range`/`erase_node` citations for the same
+             * three specialisations above; a fourth sibling, `FUN_00947080`
+             * (`d3d9::RenderState`'s `operator++(int)`), is not
+             * independently exported in this pass.
+             */
+            /**
+             *
+             * All four are real two-word checked iterators (`{_Mycont,
+             * _Ptr}`, cited on the constructor above): `this[0]` is the
+             * owning-container pointer, `this[1]` is the node. Full asm
+             * trace of 0x00A52760 (representative; the other three are the
+             * identical shape at a different isNil offset): `cmp dword ptr
+             * [esi],0; jnz +5; call sub_A84A40` -- FALLS THROUGH into the
+             * walk regardless of whether the call returns, so a null
+             * `this[0]` changes nothing about the computed result. The walk
+             * itself is exactly this member's `rb_increment(node_)`: reads
+             * `this[1]->right` (isNil test), then either `rb_min(node->
+             * right)` (descend, take least of the right subtree) or an
+             * ancestor climb while `node==ancestor->right`, writing the
+             * result back into `this[1]`. The only branch that does NOT
+             * fall through is a tail `jmp sub_A84A40` taken when `this[1]`
+             * (the node being stepped from) is *already* nil -- i.e.
+             * `++end()`, undefined behavior for any iterator, checked or
+             * not, so it is not part of the success-path contract this
+             * project's fidelity rules require reproducing (see the
+             * `proxy_` field's comment on `rb_tree` below for the same
+             * "checked-container machinery documented but deliberately
+             * unmodeled" policy; `recovered_progress.json`'s note on
+             * 0x00A65320 records an independent prior pass reaching the
+             * same conclusion for this same class's `erase` path). This
+             * member's plain `node_ = rb_increment(node_); return *this;`
+             * is therefore byte-for-byte behaviorally equivalent to all
+             * four checked emissions on every valid (non-`end()`) input.
+             * Address: 0x007F2640 (FUN_007F2640 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0xB9 (0xA8-byte value); callers 0x007F2210; formerly `AscendLink0ToOffsetB9Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007F2F10 (FUN_007F2F10 -- the right-subtree-leftmost half of `rb_iterator::operator++` for a node whose nil byte sits at +0xB9; callers 0x007F2210; formerly `WalkLink8ToOffsetB9Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007F3000 (FUN_007F3000 -- the right-subtree-leftmost half of `rb_iterator::operator++` for a node whose nil byte sits at +0x2D (0x1C-byte value); callers 0x007F27F0; formerly `WalkLink8ToOffset2DSentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007F3020 (FUN_007F3020 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x2D; callers 0x007F27F0; formerly `AscendLink0ToOffset2DSentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B140 (FUN_0083B140 -- the right-subtree-leftmost half of `rb_iterator::operator++` over the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map); callers 0x0083A640; formerly `WalkLink8ToOffset2DSentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B160 (FUN_0083B160 -- the ascend half of `rb_iterator::operator++` over the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map); callers 0x0083A640; formerly `AscendLink0ToOffset2DSentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B510 (FUN_0083B510 -- the right-subtree-leftmost half of `rb_iterator::operator++` over the file-static map with a 4-byte mapped value at 0x010C3748 (`_Myhead` 0x010C374C, nil byte at node+0x15; UiRuntimeTypes.cpp's key-repeat map); callers 0x0083AA70; formerly `WalkLink8ToOffset15Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B530 (FUN_0083B530 -- the ascend half of `rb_iterator::operator++` over the file-static map with a 4-byte mapped value at 0x010C3748 (`_Myhead` 0x010C374C, nil byte at node+0x15; UiRuntimeTypes.cpp's key-repeat map); callers 0x0083AA70; formerly `AscendLink0ToOffset15Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x00849860 (FUN_00849860 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x15 (4-byte value; caller 0x00898B10); callers 0x00898B10; formerly `AscendLink0ToOffset15SentinelLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x00849BF0 (FUN_00849BF0 -- the ascend half of `rb_iterator::operator++` for a node whose nil byte sits at +0x39 (0x28-byte value; caller 0x00849900); callers 0x00849900; formerly `AscendLink0ToOffset39Sentinel` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x00570410 (FUN_00570410 -- `rb_iterator::operator++` (nil byte at node+0x19); callers 0x0056D790, 0x0056E220, 0x0056FCA2; formerly `AdvanceTreeIteratorFlag25Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x006B02E0 (FUN_006B02E0 -- `rb_iterator::operator++` (nil byte at node+0x2D); callers 0x006AEDD0, 0x006AF390, 0x006AFDC2; formerly `AdvanceTreeIteratorFlag45RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0083C0B0 (FUN_0083C0B0 -- `rb_iterator::operator++` (nil byte at node+0x2D); callers 0x00839DC0, 0x0083A640, 0x0083ADD2; formerly `AdvanceTreeIteratorFlag45RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00899940 (FUN_00899940 -- `rb_iterator::operator++` (nil byte at node+0x2D); callers 0x008958B0, 0x00899042, 0x00899B20; formerly `AdvanceTreeIteratorFlag45RuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CA280 (FUN_007CA280 -- `rb_iterator::operator++` (nil byte at node+0x15); callers 0x007C2950, 0x007C7C10, 0x007C8E30; formerly `AdvanceMapIteratorFlag21RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008495B0 (FUN_008495B0 -- `rb_iterator::operator++` (nil byte at node+0x15, the entity map); callers 0x00840A70, 0x008488C2, 0x00848E02; formerly `AdvanceMapIteratorFlag21RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D99F0 (FUN_008D99F0 -- `rb_iterator::operator++` (nil byte at node+0x15); callers 0x008DA093, 0x008DA7A3, 0x008DA929; formerly `AdvanceMapIteratorFlag21RuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C8E30 (FUN_007C8E30 -- a hidden-result-slot entry into `rb_iterator::operator++` (nil byte at node+0x15); zero callers, unreachable; formerly `AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C9770 (FUN_007C9770 -- a hidden-result-slot entry into `rb_iterator::operator++` (nil byte at node+0x15); zero callers, unreachable; formerly `AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F2CD0 (FUN_007F2CD0 -- `rb_iterator::operator++` (nil byte at node+0x2D, the string map); callers 0x007ED9A0, 0x007F0254, 0x007F0960; formerly `AdvanceRangeExtractorIteratorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CB230 (FUN_007CB230 -- `rb_iterator::operator++` (nil byte at node+0x0E); callers 0x007CAC80, 0x007CAFD4, 0x007CB1E2; formerly `AdvanceTreeIteratorFlag14Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007E5100 (FUN_007E5100 -- `rb_iterator::operator++` (nil byte at node+0x25); callers 0x007E4430, 0x007E4D84, 0x007E5012; formerly `AdvanceTreeIteratorFlag37Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00849D90 (FUN_00849D90 -- the descend-right half of `rb_iterator::operator++` (nil byte at node+0x39); callers 0x00849900; formerly `AdvanceTreeIteratorFlag57Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00861D10 (FUN_00861D10 -- `rb_iterator::operator++` (nil byte at node+0xC49); callers 0x008600E0, 0x00860FB0, 0x008613C2; formerly `AdvanceTreeIteratorFlag3145Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087CEC0 (FUN_0087CEC0 -- `rb_iterator::operator++` (nil byte at node+0x11); callers 0x0087C6B0, 0x0087C9F4, 0x0087CC92; formerly `AdvanceTreeIteratorFlag17RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF6A0 (FUN_008AF6A0 -- `rb_iterator::operator++` (nil byte at node+0x11); callers 0x008AE690, 0x008AE982, 0x008AF262; formerly `AdvanceTreeIteratorFlag17RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6C90 (FUN_008D6C90 -- `rb_iterator::operator++` (nil byte at node+0x1D); callers 0x008D6650, 0x008D69B4, 0x008D6C22; formerly `AdvanceTreeIteratorFlag29RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DC80 (FUN_0049DC80 -- `rb_iterator::operator++` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x00494E10, 0x00495080, 0x004952A0; formerly `MoveParticleBucketIteratorToNext` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DCD0 (FUN_0049DCD0 -- `rb_iterator::operator++` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x004966E2, 0x0049D520, 0x0049D924; formerly `MoveTrailBucketIteratorToNext` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DE80 (FUN_0049DE80 -- `rb_iterator::operator++` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveParticleBucketIteratorToNextDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DE90 (FUN_0049DE90 -- `rb_iterator::operator++` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveTrailBucketIteratorToNextDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049EDF0 (FUN_0049EDF0 -- `rb_iterator::operator++` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveParticleBucketIteratorToNextDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049EE10 (FUN_0049EE10 -- `rb_iterator::operator++` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveTrailBucketIteratorToNextDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A150 (FUN_0049A150 -- `rb_iterator::operator++` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491E40, 0x00495C92, 0x00497AD2; formerly `AdvanceBeamBucketTreeIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEC60 (FUN_004AEC60 -- `rb_iterator::operator++` for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520, 0x004ADBB2, 0x004AE6A2; formerly `AdvanceTreeIterator_004AEC60` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE710 (FUN_004AE710 -- `rb_iterator::operator++` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004ACC02, 0x004ADC72, 0x004AE860; formerly `AdvanceWideTreeIterator_004AE710` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D9340 (FUN_007D9340 -- `rb_iterator::operator++` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7B90, 0x007D8AE0, 0x007D8FA4; formerly `AdvanceRegionKeyIterator` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C7A90 (FUN_005C7A90 -- `rb_iterator::operator++` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C05A0, 0x005C0C40, 0x005C14E0; formerly `MapNext` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C590 (FUN_0071C590 -- `rb_iterator::operator++` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); callers 0x00718410, 0x00719AB0, 0x0071A060; formerly `AdvanceBlipCellIterator` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071BE10 (FUN_0071BE10 -- `rb_iterator::operator++` for `msvc8::set<moho::InfluenceMapEntry>` (`InfluenceGrid::entries`); callers 0x00717EF0, 0x007189D0, 0x00719520; formerly `AdvanceInfluenceEntryIterator` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E36D0 (FUN_004E36D0 -- a second emission of that increment for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DF790, 0x004E1C52, 0x004E2792; formerly `AdvanceSndParamsTreeSuccessorCursor` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E3640 (FUN_004E3640 -- `rb_iterator::operator++` for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DF390, 0x004E1C12, 0x004E2752; formerly `AdvanceSndVarTreeSuccessorCursor` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E48D0 (FUN_004E48D0 -- a third emission of that increment, with the tree passed but unused for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004E4060, 0x004E4434, 0x004E4762; formerly `AdvanceSndVarTreeSuccessorCursorAlt` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0094FB40 (FUN_0094FB40 -- `rb_iterator::operator++` -- the in-order successor step for `msvc8::map<const void*, gpg::WriteArchive::TrackedPointerRecord>` (`WriteArchive::mObjRefs` at +0x10; node 0x28, colour/nil at +0x24/+0x25, `value_type` 0x18 from the insert guard at 0x009512CC); callers 0x00950423, 0x00950AE3, 0x00950B89; formerly `AdvanceTrackedPointerMapIterator` in gpg/core/containers/WriteArchive.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00424910 (FUN_00424910 -- `rb_iterator::operator++` -- the in-order successor walk for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004234E0, 0x00423AD0, 0x00423E12; formerly `AdvanceAnimTextureCacheIterator` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0071BDB0 (FUN_0071BDB0 -- `rb_iterator::operator++()` returning the iterator slot, advancing through the `_Inc` 0x0071C590 (cited above) for `CInfluenceMap::mBlipCells` (node 0x18, isNil@+0x15); zero callers, unreachable; formerly `AdvanceRbIteratorNil21InPlaceLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.)
+             */
+            rb_iterator& operator++() noexcept
+            {
+                node_ = rb_increment(node_);
+                return *this;
+            }
+            /**
+             * Address: 0x006886A0 (FUN_006886A0, postfix `_Inc` for
+             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `EntityDB::
+             * mIdPoolTree` in `EntityDb.h`. Copies the pre-increment cursor
+             * out, advances via prefix `operator++` (`FUN_006878C0`, cited
+             * on `rb_increment` above), returns the copy -- exactly this
+             * member's shape. Sibling of the prefix walk `EntityDbIdPoolMapTypeInfo::
+             * SerSave` performs; reached through the same generic
+             * `msvc8::map`/`rb_tree` iterator API surface, not a distinct
+             * new engine call site.)
+             */
+            /**
+             * Address: 0x006E28C0 (FUN_006E28C0) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. Same copy-then-advance shape as FUN_006886A0
+             * above (a separate instantiation): copies `*sourceSlot` into
+             * `*outSlot`, advances `*sourceSlot` via `FUN_006E2220`
+             * (`rb_increment`, cited above), returns `outSlot`. Zero
+             * incoming xrefs in this sweep. Re-homed here from a bespoke
+             * `CopyAndAdvanceCommandDbIteratorSlot` free function in Sim.cpp
+             * that hand-rolled this same copy-and-advance over a
+             * `CommandDbMapNodeView` reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x009470A0 (FUN_009470A0, sub_9470A0) -- `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s
+             * `operator++(int)`: copies `*this` into `*a2` (the
+             * pre-increment cursor), advances `*this` via `sub_946880`
+             * (`rb_increment`, cited on `rb_increment` above -- the binary
+             * calls the `_Inc` body directly rather than through a real
+             * `operator++()` invocation, matching this member's own
+             * `++*this` shape after inlining), returns `a2` -- matching
+             * this member's copy-then-advance shape exactly. Zero callers
+             * in the callgraph index (`call_edges`/`incoming_xrefs`/
+             * `reachable`). Previously `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path this address never
+             * appeared in (2026-08-24 DB-integrity bulk revert); this is
+             * the real source. Owning field not pinned to a named
+             * `StateCache<_D3DSAMPLERSTATETYPE, unsigned int>` instance.
+             * Address: 0x009470C0 (FUN_009470C0, sub_9470C0) -- the same
+             * shape one `StateCache` specialisation over: `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * `operator++(int)`, advancing via `sub_9468D0` (`rb_increment`,
+             * cited above). Same zero-caller status and same DB-integrity
+             * correction as 0x009470A0 above.
+             *
+             * `d3d9::RenderState`'s sibling emission, `FUN_00947080`, is
+             * not independently exported in this pass.
+             * Address: 0x0071C560 (FUN_0071C560 -- `rb_iterator::operator++(int)`: copies the source slot into the hidden result slot, then advances the source through the `_Inc` 0x0071C590, for `CInfluenceMap::mBlipCells` (isNil@+0x15); zero callers, unreachable; formerly `PostAdvanceRbIteratorNil21CopyLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x0071C5E0 (FUN_0071C5E0 -- the same `operator++(int)` for `InfluenceGrid::entries` (isNil@+0x3D), advancing through the `_Inc` 0x0071BE10; zero callers, unreachable; formerly `PostAdvanceRbIteratorNil61CopyLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x0077C710 (FUN_0077C710 -- the same `operator++(int)` for the decal bucket set, advancing through its successor walk 0x0077C740 (cited on `rb_increment`); zero callers, unreachable; formerly mis-filed as a second address of `PostAdvanceRbIteratorNil21CopyLaneA` in moho/sim/CInfluenceMap.cpp, removed 2026-09-29.)
+             */
+            rb_iterator operator++(int) noexcept
+            {
+                const rb_iterator copy = *this;
+                ++*this;
+                return copy;
+            }
+
+            /**
+             * Address: 0x006E2200 (FUN_006E2200) Address: 0x006E27D0
+             * (FUN_006E27D0, duplicate emission) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. Both are thin `_Node**` slot-pointer wrapper
+             * adapters around `FUN_006E28D0` (`rb_decrement`, cited above),
+             * matching this member's `node_ = rb_decrement(node_)` shape one
+             * level up through an indirection. Zero incoming xrefs in this
+             * sweep. Re-homed here from bespoke
+             * `AdvanceCommandDbIteratorCursorSlotLaneA`/`...LaneB` free
+             * functions in Sim.cpp that hand-rolled this same predecessor
+             * step over a `CommandDbMapNodeView` reach-in instead of calling
+             * it -- those two functions actually called the *increment*
+             * (successor) walk instead of the real decrement one, a latent
+             * mismatch harmless only because neither had a real caller.)
+             */
+            /**
+             *
+             * All four are the two-word checked iterator shape cited on the
+             * constructor above. Full asm trace of 0x00A528A0
+             * (representative): `cmp dword ptr [esi],0; jnz +5; call
+             * sub_A84A40` -- falls through into the walk exactly like
+             * `operator++()` above, so a null `this[0]` changes nothing.
+             * `this[1]` (the node) is then checked for nil *first*: if nil,
+             * this is the `--end()` case and the result is `node->right`
+             * (matching this member's `rb_is_nil(n) ? n->right : ...`
+             * special case) -- UNLESS `node->right` is *also* nil (empty
+             * tree, no valid last element), which tail-`jmp`s into
+             * `sub_A84A40` instead of returning a bogus node: `--end()` on
+             * an empty container, undefined behavior. If `node` is not nil,
+             * the walk matches this member's `rb_max(n->left)`-or-ancestor-
+             * climb-while-`node==ancestor->left` exactly, and a THIRD
+             * `sub_A84A40` tail-call fires only if the ancestor climb walks
+             * all the way to the nil sentinel (`--begin()`, also undefined
+             * behavior). Every reachable success-path input -- valid
+             * non-null container, valid non-`end()`/non-`begin()` node --
+             * produces the identical result this member's plain
+             * `node_ = rb_decrement(node_); return *this;` already computes.
+             * Address: 0x007B4BE0 (FUN_007B4BE0 -- `rb_iterator::operator--` (nil byte at node+0x1D); callers 0x007B2DF0, 0x007B3760, 0x007B3BC0; formerly `RetreatTreeIteratorFlag29RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B3BC0 (FUN_007B3BC0 -- a hidden-result-slot entry into `rb_iterator::operator--` (nil byte at node+0x1D); zero callers, unreachable; formerly `RetreatTreeIteratorFlag29RuntimeASlotAdapter` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B4580 (FUN_007B4580 -- a hidden-result-slot entry into `rb_iterator::operator--` (nil byte at node+0x1D); zero callers, unreachable; formerly `RetreatTreeIteratorFlag29RuntimeASlotAdapter` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F30B0 (FUN_007F30B0 -- `rb_iterator::operator--` (nil byte at node+0x2D); callers 0x007F0960, 0x007F1890, 0x007F1D12; formerly `RetreatTreeIteratorFlag45RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0083C460 (FUN_0083C460 -- `rb_iterator::operator--` (nil byte at node+0x2D); callers 0x0083AF20, 0x0083B850, 0x0083C082; formerly `RetreatTreeIteratorFlag45RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F3110 (FUN_007F3110 -- `rb_iterator::operator--` (nil byte at node+0xB9); callers 0x007F05A0, 0x007F1010, 0x007F20D2; formerly `RetreatTreeIteratorFlag185Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008309D0 (FUN_008309D0 -- `rb_iterator::operator--` (nil byte at node+0x25); callers 0x0082CC80, 0x0082E170, 0x0082EBE2; formerly `RetreatTreeIteratorFlag37Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00861FA0 (FUN_00861FA0 -- `rb_iterator::operator--` (nil byte at node+0xC49); callers 0x00861510, 0x00861930, 0x00861CF2; formerly `RetreatTreeIteratorFlag3145Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008CBEC0 (FUN_008CBEC0 -- `rb_iterator::operator--` (nil byte at node+0x39); callers 0x008CB860, 0x008CBA70, 0x008CBDC2; formerly `RetreatTreeIteratorFlag57Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D8E50 (FUN_008D8E50 -- `rb_iterator::operator--` (nil byte at node+0x15); callers 0x008D9C23, 0x008DA153, 0x008DCE80; formerly `RetreatMapIteratorFlag21RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948870 (FUN_00948870 -- `rb_iterator::operator--` (nil byte at node+0x15); callers 0x00948BA0, 0x00948C90, 0x009494A0; formerly `RetreatMapIteratorFlag21RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948BA0 (FUN_00948BA0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948BB0 (FUN_00948BB0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948BC0 (FUN_00948BC0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948C90 (FUN_00948C90 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948CA0 (FUN_00948CA0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneE` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00948CB0 (FUN_00948CB0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneF` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DA50 (FUN_0049DA50 -- `rb_iterator::operator--` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049A870, 0x0049C9C2, 0x0049D4E2; formerly `GetPreviousParticleBucketTreeNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DB20 (FUN_0049DB20 -- `rb_iterator::operator--` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049AAB0, 0x0049CD72, 0x0049D932; formerly `GetPreviousTrailBucketTreeNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C550 (FUN_0049C550 -- `rb_iterator::operator--` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495AE0, 0x00497AC2, 0x0049A142; formerly `GetPreviousBeamBucketTreeNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEC00 (FUN_004AEC00 -- `rb_iterator::operator--` for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC460, 0x004ADBC2, 0x004AE6B2; formerly `RetreatTreeIterator_004AEC00` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AECE0 (FUN_004AECE0 -- `rb_iterator::operator--` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AC890, 0x004ADC52, 0x004AE702; formerly `RetreatWideTreeIterator_004AECE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C7D0 (FUN_0071C7D0 -- the in-place `_Dec` (iterator slot in edx) for `CInfluenceMap::mBlipCells` (`msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>`; node 0x18, isNil@+0x15); callers 0x00719AB0, 0x0071B360, 0x0071BD70, 0x0071C580; formerly the `InfluenceNodeFlag21Runtime` instantiation of `RetreatRuntimeRbIteratorSlot` in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+             * Address: 0x0071C830 (FUN_0071C830 -- the same `_Dec` for `InfluenceGrid::entries` (node 0x40, isNil@+0x3D); callers 0x00719520, 0x0071A9A0, 0x0071BDD0, 0x0071C600; formerly the `InfluenceNodeFlag61Runtime` instantiation of `RetreatRuntimeRbIteratorSlot` in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+             * Address: 0x0071BD70 (FUN_0071BD70) Address: 0x0071C580 (FUN_0071C580) -- `operator--()` returning the iterator slot, through the `_Dec` 0x0071C7D0, for `CInfluenceMap::mBlipCells`; zero callers, unreachable; formerly `StepRbIteratorNil21BackwardLaneA`/`LaneB` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.
+             * Address: 0x0071BDD0 (FUN_0071BDD0) Address: 0x0071C600 (FUN_0071C600) -- the same `operator--()` for `InfluenceGrid::entries`, through the `_Dec` 0x0071C830; zero callers, unreachable; formerly `StepRbIteratorNil61BackwardLaneA`/`LaneB` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.
+             */
+            rb_iterator& operator--() noexcept
+            {
+                node_ = rb_decrement(node_);
+                return *this;
+            }
+            rb_iterator operator--(int) noexcept
+            {
+                const rb_iterator copy = *this;
+                --*this;
+                return copy;
+            }
+
+            [[nodiscard]] node_type* node() const noexcept { return node_; }
+
+            template<bool OtherConst>
+            [[nodiscard]] bool operator==(const rb_iterator<Traits, OtherConst>& other) const noexcept
+            {
+                return node_ == other.node();
+            }
+            /**
+             *
+             * The `call sub_A84A40` at the top of 0x00A55150 falls through
+             * into the comparison exactly like the constructor/`operator++`/
+             * `operator--` emissions above -- `this[1]!=other[1]` is
+             * computed and returned unconditionally regardless of whether
+             * the container-pointer check passed, so this member's plain
+             * `node_ != other.node()` is exact on every reachable input.
+             */
+            template<bool OtherConst>
+            [[nodiscard]] bool operator!=(const rb_iterator<Traits, OtherConst>& other) const noexcept
+            {
+                return node_ != other.node();
+            }
+
+        private:
+            node_type* node_ = nullptr;
+        };
+
+        /** `msvc8::set` traits: the key is the stored value. */
+        template<class Key, class Less>
+        struct rb_set_traits
+        {
+            using key_type = Key;
+            using value_type = Key;
+            using key_compare = Less;
+
+            [[nodiscard]] static const key_type& key_of(const value_type& v) noexcept { return v; }
+        };
+
+        /** `msvc8::map` traits: the key is `value_type::first`. */
+        template<class Key, class T, class Less>
+        struct rb_map_traits
+        {
+            using key_type = Key;
+            using mapped_type = T;
+            using value_type = std::pair<const Key, T>;
+            using key_compare = Less;
+
+            [[nodiscard]] static const key_type& key_of(const value_type& v) noexcept { return v.first; }
+        };
+
+        /**
+         * Owning red-black tree - the single implementation shared by
+         * `msvc8::set` and `msvc8::map`.
+         *
+         * Layout (x86): `{_Container_proxy*, _Node*, size_type}` = 12 bytes, with
+         * the comparator empty-base-optimised away.
+         */
+        template<class Traits>
+        class rb_tree : private rb_compare_carrier<typename Traits::key_compare>
+        {
+            using carrier = rb_compare_carrier<typename Traits::key_compare>;
+
+        public:
+            using key_type = typename Traits::key_type;
+            using value_type = typename Traits::value_type;
+            using key_compare = typename Traits::key_compare;
+            using size_type = std::uint32_t;
+            using difference_type = std::ptrdiff_t;
+            using node_type = rb_node<value_type>;
+            using iterator = rb_iterator<Traits, false>;
+            using const_iterator = rb_iterator<Traits, true>;
+
+            // ---- lifetime ----------------------------------------------------
+
+            /**
+             * Address: 0x007E2C30 (FUN_007E2C30, batch-bucket map `_Tree::_Init`)
+             *
+             * What it does:
+             * Buys the header sentinel, marks it nil, self-links its three
+             * pointers and zeroes the size.
+             *
+             * The shipped body is exactly this ctor with `buy_head` split out:
+             * `call sub_7E4B80` (the head-node allocator) then
+             * `mov [esi+4], eax` / `mov byte ptr [eax+2Dh], 1` (`_Isnil`) /
+             * `[eax+4] = eax` / `[eax] = eax` / `[eax+8] = eax` /
+             * `mov dword ptr [esi+8], 0`.
+             *
+             * Address: 0x009471A0 (FUN_009471A0) and 0x00947FE0 (FUN_00947FE0,
+             * sibling emission that additionally returns `this` in `eax` --
+             * an MSVC ctor-calling-convention variant of the same source line,
+             * not a behavioural difference) -- another instantiation of this
+             * same allocate/self-link split, isNil@+0x15 (8-byte value_type,
+             * node size 0x18: `0x0C` links + 8 value + color + isNil, rounded).
+             * Address: 0x00947FE0 (FUN_00947FE0, the `this`-returning sibling
+             * emission described above)
+             * Both call a dedicated alloc_raw half (`sub_946F90`/`sub_947030`
+             * respectively -- `operator new(0x18)`, zero the three link dwords,
+             * `color=1`/`isNil=0`) then perform the self-link and `isNil=1`
+             * flag fixup this template's `buy_head()` performs inline, exactly
+             * matching the already-cited `FUN_00A583C0`/`FUN_00A5A000` split
+             * below on `buy_head()` itself. Neither writes `this->proxy_`
+             * (offset +0) -- consistent with `rb_tree()`'s constructor running
+             * against storage the caller already zero-initialised (e.g. a
+             * `new T()` value-initialisation of the owning object), which
+             * makes the redundant `proxy_ = nullptr` store foldable away.
+             * Owning field/class not yet pinned down -- this isNil@+0x15,
+             * 8-byte-value node shape recurs across many Sim-subsystem
+             * containers (see `MapNodeNil21Runtime` and its many instantiation
+             * sites in `moho/sim/SimRecoveryRuntime.cpp`); flagged as an open
+             * item for whoever narrows the specific owner next.
+             */
+            /**
+             * Address: 0x006E1520 (FUN_006E1520) Address: 0x006E1CF0
+             * (FUN_006E1CF0, duplicate emission) Address: 0x006E2390
+             * (FUN_006E2390, duplicate emission) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`, isNil@+0x15. All three call `FUN_006E2840`
+             * (the raw head-node allocator already cited on `CCommandDB`'s
+             * own constructor in `CCommandDb.h` as the `buy_head()` split
+             * half), patch `isNil=1`, self-link `parent`/`left`/`right`, and
+             * zero `size_` -- exactly this constructor's shape -- without
+             * touching `proxy_` at offset 0, matching the "storage already
+             * zero-initialised" pattern documented above. Three compiler
+             * emissions of the same ctor body for different inlining
+             * contexts inside `CCommandDB`'s own methods; zero incoming
+             * xrefs in this sweep for any of the three. Re-homed here from
+             * bespoke `InitializeCommandDbMapHead`/`InitializeCommandDbMapStorageLaneA`/
+             * `...LaneB`/`...LaneC` free functions in Sim.cpp that hand-
+             * rolled this same construction over a `CommandDbMapStorageView`/
+             * `CCommandDb` reach-in instead of relying on the
+             * member's default construction.)
+             * Address: 0x007AE180 (FUN_007AE180 -- `rb_tree()` for the command-mode tree (head sentinel bought, size zeroed); callers 0x0081FCD0, 0x00841C10, 0x00863870; formerly `InitializeCommandModeTreeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049F390 (FUN_0049F390 -- `rb_tree()` -- buy the header sentinel and zero the size for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeWithFreshHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049F3F0 (FUN_0049F3F0 -- `rb_tree()` -- buy the header sentinel and zero the size for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeTrailBucketTreeWithFreshHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A01F0 (FUN_004A01F0 -- `rb_tree()` -- buy the header sentinel and zero the size for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeWithFreshHeadDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0230 (FUN_004A0230 -- `rb_tree()` -- buy the header sentinel and zero the size for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeTrailBucketTreeWithFreshHeadDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0750 (FUN_004A0750 -- `rb_tree()` -- buy the header sentinel and zero the size for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeWithFreshHeadDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0790 (FUN_004A0790 -- `rb_tree()` -- buy the header sentinel and zero the size for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeTrailBucketTreeWithFreshHeadDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A07D0 (FUN_004A07D0 -- `rb_tree()` -- buy the header sentinel and zero the size for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeWithFreshHeadDuplicateC` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0800 (FUN_004A0800 -- `rb_tree()` -- buy the header sentinel and zero the size for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeTrailBucketTreeWithFreshHeadDuplicateC` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0830 (FUN_004A0830 -- `rb_tree()` -- buy the header sentinel and zero the size for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeAndReturnHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0880 (FUN_004A0880 -- `rb_tree()` -- buy the header sentinel and zero the size for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeTrailBucketTreeAndReturnHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00432400 (FUN_00432400 -- `rb_tree()` -- buy the header sentinel, self-link it and zero the size for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `InitializeIntAnnotationTreeStorage` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00736070 (FUN_00736070 -- `rb_tree()` -- buy the header sentinel, self-link it, zero the size for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `InitializeSimConRegistryTreeHeadLane` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007355B0 (FUN_007355B0 -- a second emission of that construction, handing back the head for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `InitializeSimConRegistryTreeHeaderLaneLegacy` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0052CCC0 (FUN_0052CCC0 -- `rb_tree()` for `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` (`msvc8::set<uint32_t>`, 0x14-byte node, isNil@+0x11): `buy_head` (0x0052F370), isNil=1, three self-links, size zero; zero callers. Formerly `InitializeLuaTaskListContainerDefault` over a `LuaTaskList`/`LuaTaskListNode` overlay in moho/sim/RRuleGameRules.cpp (RULE ONE), removed 2026-09-28.)
+             * Address: 0x0052DA80 (FUN_0052DA80 -- a second emission of that construction; zero callers. Formerly `InitializeLuaTaskListContainerHeadLane`, same file, removed 2026-09-28.)
+             * Address: 0x00528200 (FUN_00528200 -- the same construction for the set at +0x04 of a whole `RRuleGameRulesLuaExportBinding`, after storing `mRootState` at +0x00; zero callers, `ExportToLuaState` inlines it at 0x0052A28E. Formerly `InitializeLuaTaskListContainerWithProxy`, same file, removed 2026-09-28.)
+             */
+            rb_tree() : proxy_(nullptr), head_(buy_head()), size_(0) {}
+
+            explicit rb_tree(const key_compare& comp) : carrier(comp), proxy_(nullptr), head_(buy_head()), size_(0) {}
+
+            /**
+             * MSVC8 `_Tree::_Tree(const _Myt&)`: stands a fresh head sentinel up
+             * and then runs `_Copy` over `other`. Observed for
+             * `msvc8::set<msvc8::string>` at 0x008C5B10, whose `_Copy` walk is
+             * FUN_008C5D50.
+             *
+             * `_Copy` clones the source's tree shape node for node; inserting the
+             * source in ascending order lands the same ordered contents through
+             * the rebalancing path already used by every other insert, so no
+             * second tree-building mechanic is introduced here.
+             */
+            /**
+             * Address: 0x0070E320 (FUN_0070E320, the blueprint-stat map's copy
+             * constructor)
+             * Address: 0x0070F810 (FUN_0070F810, the copy driver it calls: clones the
+             * subtree, carries the size across and re-seats the extrema. All four of its
+             * binary callers -- 0x0070C160, 0x0070CC10, 0x0070E320, 0x0070E3A0 -- are
+             * blueprint-stat-map sites.)
+             * Address: 0x0070CC10 (FUN_0070CC10, one of the four blueprint-stat-map
+             * call sites into FUN_0070F810 described above)
+             * Address: 0x0070E3A0 (FUN_0070E3A0, another of the four blueprint-stat-map
+             * call sites into FUN_0070F810 described above)
+             * Address: 0x00710990 (FUN_00710990, the recursive subtree clone underneath
+             * it)
+             */
+            /**
+             * Address: 0x0077C1E0 (FUN_0077C1E0, the decal bucket set's copy construct)
+             * Address: 0x0077D090 (FUN_0077D090, its recursive subtree clone)
+             * Address: 0x0077CBB0 (FUN_0077CBB0, the header-and-extrema copy that
+             * finishes it)
+             * Address: 0x0077C5B0 (FUN_0077C5B0, the head-sentinel build the copy starts
+             * from; emitted again at 0x0077A8B0 and 0x0077B4C0)
+             * Address: 0x0077A8B0 (FUN_0077A8B0, first sibling emission of the
+             * head-sentinel build described above)
+             * Address: 0x0077B4C0 (FUN_0077B4C0, second sibling emission of the
+             * head-sentinel build described above)
+             */
+            /**
+             * Address: 0x0052F020 (FUN_0052F020, the copy constructor for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`, the same instantiation already pinned
+             * by `buy_head`/`erase_range`/`erase_node`/`destroy_subtree`/
+             * `~rb_tree` above. Buys the head sentinel via `sub_52F370`
+             * (`buy_head`, already cited on that member -- the exact same
+             * instantiation already pinned to this tree), then calls
+             * `sub_530EE0` (`copy_from`'s emission for this instantiation,
+             * cited below) to deep-clone `other`'s tree into the freshly
+             * self-linked empty head. Called from `FUN_0052DBE0`'s
+             * (`msvc8::vector<RRuleGameRulesLuaExportBinding>::insert`,
+             * `legacy/containers/Vector.h`) unconditional top-of-function
+             * `const T localValue(value);` step (VC8 copies `_Val` into a
+             * local before touching storage) -- `FUN_0052DBE0` itself
+             * copies `localValue.mRootState = value.mRootState` inline at
+             * the call site (`mov [ebp+a3],ecx` immediately before `call
+             * sub_52F020`, 0x0052DC11/0x0052DC14) and hands this function
+             * only the non-trivial member's construction, matching
+             * `RRuleGameRulesLuaExportBinding`'s implicit member-wise copy
+             * constructor split across an inlined POD-field copy plus one
+             * real call for the tree member. Was previously mis-marked
+             * `external_dependency` in `recovered_progress.json` on the
+             * grounds that its callees were "external runtime" -- both
+             * `sub_52F370` and `sub_52CF10` (its SEH-unwind cleanup path)
+             * are themselves already `recovered` engine code in this same
+             * file, and `sub_530EE0` is corrected to `recovered` engine
+             * code alongside this entry; corrected here.)
+             *
+             * Address: 0x007CC2F0 (FUN_007CC2F0, sub_7CC2F0) -- `msvc8::
+             * set<char>`'s copy constructor for `CLobby.cpp`'s ignore-names
+             * separator set (node 0x10, colour@0x0D/isNil@0x0E -- see
+             * `alloc_raw`/`copy_from` below). Real SEH-protected body:
+             * `buy_head()` inlined at the call site (`call sub_7CC520`
+             * (`alloc_raw`, cited there) then self-link `left=parent=
+             * right=self`/`isNil=1`/`size_=0` inline, matching the split-
+             * instantiation pattern already documented on `buy_head()`
+             * itself) followed by `call sub_7CC3B0` (`copy_from`'s top-
+             * level clone for this instantiation, cited below). Reached
+             * from `func_GetIgnoreNames`/`BuildLobbyIgnoreNameList`
+             * (0x007CBC80, `CLobby.cpp`), which explicitly copy-constructs
+             * a local from its by-value `std::set<char>` parameter before
+             * consuming it -- the real binary's `sub_7CC2F0(&v4.mSet,
+             * &a2)` -- mirrored in the recovered source as an explicit
+             * `const msvc8::set<char> localSeparators(separatorsParam);`
+             * so the copy constructor is actually invoked rather than
+             * elided by return-value/parameter-passing optimisation. Was
+             * mis-marked `external_dependency` in `recovered_progress.json`
+             * ("std::set<char> copy-constructor STL internal") on the
+             * grounds that the recovered `BuildLobbyIgnoreNameList` elided
+             * the whole separator-set mechanism in favour of a hardcoded
+             * comma check; the elision was behaviourally exact for output
+             * but dropped the real call chain the binary performs --
+             * corrected here now that `BuildLobbyIgnoreNameList` genuinely
+             * carries the separator set through.
+             */
+            /**
+             * Address: 0x007B3500 (FUN_007B3500, sub_7B3500) -- the copy
+             * constructor for the same `msvc8::set<std::uint32_t>`
+             * instantiation cited throughout this file (isNil@+0x11) --
+             * `mapped_type` of `msvc8::map<std::uint32_t,
+             * msvc8::set<std::uint32_t>>` (`Map.h`'s `operator[]`,
+             * `FUN_007B27D0`). `this`/`other` both arrive as ordinary stack
+             * args, establishes its own SEH frame (`push offset
+             * SEH_7B3500`), buys the head sentinel (`call sub_7B4A50`,
+             * self-links, `isNil=1`, `size_=0` -- exactly `buy_head()`
+             * inlined), then calls `sub_7B3EC0` (this instantiation's
+             * `_Copy` driver -- currently misclassified `external_dependency`
+             * pending its own dedicated pass; not corrected here) to clone
+             * `other`'s contents into the freshly-bought head. Reached from
+             * `FUN_007B27D0`'s `value_type(k, mapped_type())` construction:
+             * `mapped_type()` materialises a bare temporary first (this
+             * instantiation's default constructor, inlined directly at that
+             * call site, not a separate symbol), then this address
+             * copy-constructs the pair's `.second` from it (C++03 has no
+             * move semantics; `pair(const key_type&, const mapped_type&)`
+             * binds the temporary by const reference and copies it).
+             *
+             * Has its own explicit exception handler -- a second, detached
+             * code chunk inside the same function range (0x007B356E-
+             * 0x007B357F) that the SEH dispatcher enters if `sub_7B3EC0`
+             * throws: it calls `FUN_007B36A0` (`this` in `eax`, the same
+             * unwind-funclet convention as 0x0052CF10/0x00684310/
+             * 0x007B2940/0x007B2970 above) then `_CxxThrowException(0, 0)`
+             * -- a bare rethrow. `head_` is a raw `node_type*` with no
+             * destructor of its own, so unlike this file's other
+             * compiler-generated EH funclets, the *language* cannot supply
+             * this cleanup automatically once the member-initialiser list
+             * has finished -- the source needs an explicit `catch` to
+             * release the just-bought head before rethrowing. That catch
+             * block's cleanup is `FUN_007B36A0`: `erase_range(leftmost(),
+             * header())` + `operator delete(head)` + zero `head_`/`size_` --
+             * this destructor's exact shape, reused for a
+             * partially-constructed object instead of a fully-alive one.
+             * Verified directly against `.asm`: identical `erase_range`/
+             * `operator delete` sequence to `~rb_tree()` above, entered via
+             * `eax` not `ecx`.
+             *
+             * `FUN_007B36A0` was previously modeled as the third of three
+             * bespoke "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneD21Runtime`), carrying the same
+             * fabricated placement-new step as `FUN_007B2940`/`FUN_007B2970`
+             * above; deleted along with the other two now that this citation
+             * and the `try`/`catch` below reproduce its real behavior.
+             * `FUN_007B3500` itself was separately DB-tracked as a bare
+             * "default-ctor emission" with a stale `CrtRuntimeHelpers.cpp`
+             * source path -- both wrong: it is the copy constructor, not the
+             * default constructor, and its real citation is this one.
+             * Address: 0x0056CC50 (FUN_0056CC50 -- the copy constructor for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `SOffsetInfo`'s implicit copy constructor (0x0056CAA0), i.e. `mOffsetInfo[layer].push_back(group)` in `CFormationInstance::RunScript`.)
+             * Address: 0x008AEE40 (FUN_008AEE40 -- the copy constructor for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, colour/nil at +0x10/+0x11): `buy_head` (0x008AFAC0), isNil=1, three self-links, size zero, then `_Copy` 0x008AF580; the catch `_Erase`s what was built (0x008AF1C0) and rethrows. Reached from `SoundHandleRecord`'s implicit copy constructor 0x008AECF0. It was cited on `RefreshTrackedEntitySetAfterRelocation`, which built the empty head and never copied, removed 2026-09-30.)
+             */
+            rb_tree(const rb_tree& other)
+                : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
+            {
+                try {
+                    copy_from(other);
+                } catch (...) {
+                    erase_range(leftmost(), header());
+                    free_raw(head_);
+                    head_ = nullptr;
+                    size_ = 0;
+                    throw;
+                }
+            }
+
+            /**
+             * Address: 0x0077E280 (FUN_0077E280, the decal bucket set's copy assign)
+             * Address: 0x00573390 (FUN_00573390 -- copy assignment for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `SOffsetInfo`'s implicit copy assignment (0x00573270), reached from the `fastvector_n<SOffsetInfo,2>` assign-shift lanes.)
+             * Address: 0x005733C0 (FUN_005733C0 -- a second, byte-identical emission of the same copy assignment the linker kept distinct.)
+             */
+            rb_tree& operator=(const rb_tree& other)
+            {
+                if (this != &other) {
+                    clear();
+                    static_cast<carrier&>(*this) = static_cast<const carrier&>(other);
+                    copy_from(other);
+                }
+                return *this;
+            }
+
+            rb_tree(rb_tree&& other) noexcept
+                : carrier(static_cast<carrier&&>(other)), proxy_(nullptr), head_(nullptr), size_(0)
+            {
+                adopt_from(other);
+            }
+
+            rb_tree& operator=(rb_tree&& other) noexcept
+            {
+                if (this != &other) {
+                    clear();
+                    free_raw(head_);
+                    static_cast<carrier&>(*this) = static_cast<carrier&&>(other);
+                    adopt_from(other);
+                }
+                return *this;
+            }
+
+            /**
+             * Address: 0x007E2B20 (FUN_007E2B20, batch-bucket map `_Tree::_Tidy`)
+             *
+             * What it does:
+             * Erases every element, releases the header sentinel and clears the
+             * header/size lanes.
+             *
+             * Matches the shipped body: `erase(begin, end)` through
+             * `call sub_7E3B70` with `head->left` and `head` pushed as the
+             * range, then `operator delete(head)` and
+             * `[edi+4] = 0` / `[edi+8] = 0`.
+             *
+             * `erase_range(leftmost(), header())` below *is* that call - the two
+             * pushed operands are `head->left` (`begin()`) and `head` (`end()`),
+             * so the range always takes the member's whole-tree fast path. Calling
+             * `clear()` here instead would collapse to the same stores but would
+             * stop the range member from being emitted at all.
+             */
+            /**
+             * Address: 0x00591ED0 (FUN_00591ED0, the blueprint-stat map's
+             * destructor -- `std::map<const RBlueprint*, float>`, node 0x18.
+             * Matches the same shape: erase_range via FUN_00592230
+             * (cited above), then `operator delete` on the head and zeroed
+             * head/size lanes.)
+             * Address: 0x0052A390 (FUN_0052A390, the destructor for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`. Erase-range via `sub_52D9C0`
+             * (`erase_range`, cited below) then `operator delete` on the
+             * head, matching this body exactly -- a plain destructor, with
+             * *no* reconstruction step afterward. Previously recovered as a
+             * bespoke `ReleaseExportBindingPendingOrdinals` helper in
+             * RRuleGameRules.cpp that explicitly destroyed *and
+             * reconstructed* the member in place; that reconstruct step was
+             * an artifact of `RRuleGameRulesImpl::mMaps` being modeled as a
+             * hand-rolled `new RRuleGameRulesLuaExportBinding[N]{}` array at
+             * the time (every capacity slot had to remain a live object for
+             * the eventual `delete[]` to safely re-destroy it), not a real
+             * reflection of this address's own behavior. Now that `mMaps` is
+             * a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`
+             * (RRuleGameRules.h), this destructor is reached implicitly --
+             * `RRuleGameRulesLuaExportBinding`'s own (compiler-emitted,
+             * undeclared) destructor, invoked from `msvc8::vector<T>::
+             * insert`'s local-temporary EH-unwind cleanup and from
+             * `erase(iterator)`'s vacated-slot teardown, both already
+             * modeled generically in `legacy/containers/Vector.h` -- no
+             * bespoke per-element free function needed; see the address
+             * citations on `RRuleGameRulesLuaExportBinding`'s own
+             * declaration in RRuleGameRules.h.)
+             * Address: 0x0052CF10 (FUN_0052CF10, the SEH-unwind-path duplicate
+             * of the same `mPendingBlueprintOrdinals` teardown -- byte-for-byte
+             * the same three steps (`erase_range(leftmost(), header())` via
+             * `sub_52D9C0`, `operator delete(head_)`, then `head_=nullptr`/
+             * `size_=0` at `[this+4]`/`[this+8]`) but entered with `this` handed
+             * in `eax` and moved to `edi` rather than arriving in `ecx`, which
+             * is the unwind-funclet calling convention referenced on
+             * 0x0052A390 above rather than an ordinary thiscall member-function
+             * entry. No separate source line -- this is the compiler-generated
+             * unwind-path clone of the same destructor, not a distinct
+             * function.)
+             */
+            /**
+             * Address: 0x007B2940 (FUN_007B2940)  Address: 0x007B2970 (FUN_007B2970)
+             *
+             * Two more SEH-unwind-path duplicates of this same shape, for the
+             * *other* real instantiation of this exact node (isNil@+0x11,
+             * `msvc8::set<std::uint32_t>`): the `mapped_type` of `msvc8::map<
+             * std::uint32_t, msvc8::set<std::uint32_t>>::operator[]`
+             * (`FUN_007B27D0`, cited on `operator[]` in `Map.h`) --
+             * `CON_ANI_DumpSkeleton`'s per-parent-bone dedup map. That
+             * member's `value_type(k, mapped_type())` construction
+             * materialises two stack temporaries of this type in sequence --
+             * the bare `mapped_type()` prvalue, then the pair's `.second`
+             * copy-constructed from it (`FUN_007B3500`, cited on
+             * `rb_tree(const rb_tree&)` below; C++03 has no move path, so
+             * `pair(const key_type&, const mapped_type&)` genuinely copies
+             * the temporary rather than eliding it). If anything downstream
+             * throws before both are consumed, each is torn down through its
+             * own funclet, `this` arriving in `eax` exactly like 0x0052CF10/
+             * 0x00684310 above, not the plain `ecx` thiscall entry.
+             * `FUN_007B2940` tears down the bare `mapped_type()` temporary
+             * directly. `FUN_007B2970` tears down the pair's embedded
+             * `.second`: it is entered with `eax` pointing at the pair's
+             * `key_type` slot (four bytes ahead of the `mapped_type`
+             * sub-object it actually operates on) and adds 4 to its own
+             * `owner` before touching `head_`/`size_` -- confirmed directly
+             * against `.asm` (`mov eax,[edi+8]` read *before* `add edi,4`,
+             * i.e. this instantiation's `head_`/`size_` live at `owner+8`/
+             * `owner+0xC` from the pair's base, not `+4`/`+8`). Neither has,
+             * or needs, a source-level call site of its own -- compiler-
+             * generated EH scaffolding with no corresponding source line,
+             * citation-only, same as 0x0052CF10/0x00684310.
+             *
+             * Both were previously modeled as two of three bespoke
+             * "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneC21Runtime`/
+             * `ClearEmbeddedSecondaryTreeLaneRuntime`), carrying a trailing
+             * placement-new reconstruction step copied from the same
+             * now-discredited `0x0052A390` precedent described above.
+             * Re-verified directly against each address's own `.asm`: both
+             * are `erase_range` (`call sub_7B3E00`) + `operator
+             * delete(head)` + `head_=nullptr`/`size_=0`, i.e. exactly this
+             * destructor's shape -- no `operator new` call and no
+             * reconstruction anywhere in either body. The two free functions
+             * were deleted; this citation (plus the matching one on the copy
+             * constructor below, for the third, `FUN_007B36A0`) is their
+             * replacement.
+             */
+            /**
+             * Address: 0x006843B0 (FUN_006843B0, `Moho::EntityDB::~EntityDB` --
+             * `msvc8::map<std::uint32_t, moho::IdPool>`, `EntityDB::
+             * mIdPoolTree` in `EntityDb.h`. Recurses `FUN_00688030`
+             * (`destroy_subtree`, cited below) from the tree's actual root
+             * (`head->parent`) then releases the sentinel head -- exactly
+             * this member's `erase_range(leftmost(), header())` whole-tree
+             * fast path followed by `free_raw(head_)`. A prior hand-rolled
+             * version of `EntityDB`'s destructor recursed from
+             * `head->left` (leftmost()) instead of the root, which would
+             * have destroyed at most one node and leaked the rest; this
+             * member does not have that bug. Reached automatically via
+             * member destruction, `EntityDb.h`.)
+             * Address: 0x00684310 (FUN_00684310, sub_684310) -- the same
+             * `mIdPoolTree` instantiation's `~rb_tree()` emission for a
+             * *different* caller: `EntityDB::EntityDB`'s (0x00684230,
+             * `EntityDb.cpp`) SEH unwind funclet, torn down if a
+             * later-constructed member (`mRegisteredEntitySets`/
+             * `mEntityList`/`mAllUnits`, all declared after `mIdPoolTree` in
+             * `EntityDb.h`) throws during construction. Body identical to
+             * 0x006843B0's shape one level up (`erase_range(head->left,
+             * head)` via `sub_687190`, cited on `erase_range` above, then
+             * `operator delete(head)` and zero head/size) -- a compiler-
+             * generated EH-path clone, not a distinct source line, matching
+             * the same pattern already documented for 0x0052A390/0x0052CF10
+             * above. Sole caller confirmed by this pass's xref sweep: a
+             * `type=19` (unwind) edge from 0x00684230. `DestroyEntityListRuntime`
+             * (`EntityDb.cpp`) previously mis-cited this exact address as
+             * `mEntityList`'s node-walk teardown -- corrected there to its
+             * real address (0x006874E0) in the same pass as this citation;
+             * this address does not touch `mEntityList` at all.
+             * Address: 0x006E0A70 (FUN_006E0A70, `Moho::CommandDatabase::
+             * ~CommandDatabase` -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. The tail of that function is exactly this
+             * member: `sub_6E22D0(&mCommands, iter, mCommands._Myhead->
+             * _Left, mCommands._Myhead)` -- `erase_range(leftmost(),
+             * header())`'s emission for this instantiation, cited on that
+             * member below -- then `operator delete(mCommands._Myhead)` and
+             * the `_Myhead=0`/`_Mysize=0` zeroing. `CCommandDB::
+             * ~CCommandDB()`'s own hand-written body is only the
+             * empty-or-die diagnostic dump; this teardown is reached
+             * automatically via member destruction.)
+             */
+            /**
+             * Address: 0x00947E00 (FUN_00947E00)  Address: 0x00947E90
+             * (FUN_00947E90)  Address: 0x00947F20 (FUN_00947F20)
+             *
+             * Three byte-for-byte identical `~rb_tree()` emissions
+             * (`push ecx`/`push esi`, `erase_range(head->left, head)` via
+             * `call sub_947C50`, `operator delete(head)`, zero `head`/`size`
+             * at `[this+4]`/`[this+8]`, `pop esi`/`pop ecx`, `retn`) for the
+             * same isNil@+0x15, 8-byte-value node shape as `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s own
+             * confirmed `erase_range` (0x00947C50, cited above) -- these
+             * three call that exact address, not a sibling emission of it.
+             * Not `StateCache<SamplerState>`'s own destructor bodies (those
+             * are `sub_9480D0`/`sub_9481E0`, already cited on `erase_range`
+             * above, at different addresses with a different prologue); a
+             * distinct class in the same `CScApp`-vtable-neighbourhood
+             * region owns at least three more members of this exact tree
+             * shape. Each of the three differs from its siblings only in
+             * the encoded relative-call displacement to `sub_947C50` (their
+             * own addresses differ, so the `E8` operand differs), which is
+             * exactly why this era's byte-exact `link.exe` `/OPT:ICF` left
+             * them as three separate COMDATs instead of folding them -- the
+             * same effect documented on `erase_range`'s 0x00947B90/
+             * 0x00947C50 pair above. All three have zero incoming
+             * references of any kind anywhere in the binary: `.xrefs.txt`
+             * is empty, `_callgraph_index.sqlite`'s `call_edges`/
+             * `incoming_xrefs`/`reachable` tables have no rows for any of
+             * them, and an exhaustive PE byte-scan (every `E8`/`E9` rel32,
+             * `0F 8x` jcc rel32, `EB`/`7x` rel8 and absolute dword reference
+             * in every section of `bin/external/ForgedAlliance.exe`,
+             * validated against 9 known-called addresses in this same file
+             * before trusting a zero result) found none either. Recovered
+             * here as additional instantiations of this already-well-
+             * evidenced member rather than left as unowned orphans, per the
+             * same "zero incoming xrefs in this sweep" precedent already
+             * used throughout this file (e.g. 0x006E2810 above); owning
+             * class not pinned down.)
+             * Address: 0x00947E30 (FUN_00947E30)  Address: 0x00947EC0
+             * (FUN_00947EC0)  Address: 0x00947F50 (FUN_00947F50)
+             *
+             * The same three-way duplicate pattern as the paragraph above,
+             * one node-shape sibling over: these call `sub_947D10`
+             * (`gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned
+             * int>::tree_`'s confirmed `erase_range`, cited above) instead
+             * of `sub_947C50`. Same zero-incoming-reference status,
+             * confirmed the same way (xrefs file, callgraph index,
+             * exhaustive PE byte-scan). Owning class not pinned down --
+             * plausibly the same class as the three addresses above, given
+             * both trios sit in the identical `CScApp`-neighbourhood address
+             * range and both point at `StateCache`-shaped trees, but nothing
+             * in this pass proves that beyond adjacency.)
+             */
+            /**
+             * Address: 0x006FD8B0 (FUN_006FD8B0) -- `Moho::CArmyStats::mNameIndex`'s
+             * own `~rb_tree()` for `msvc8::map<msvc8::string, CArmyStatItem*>`
+             * (isNil@+0x2D, 0x20-byte value_type, 0x30-byte node -- matches
+             * `moho::ArmyNameIndexNode` in `CArmyStats.h` exactly): `erase_range(
+             * leftmost(), header())` via `sub_702A70` (cited below), `operator
+             * delete(head)`, then zero `head`/`size` -- this member's body
+             * instruction for instruction. Its only caller is
+             * `Moho::CArmyStats::CArmyStats` (0x006FD7C0, confirmed by that
+             * address's own decompiled body: `Moho::CArmyStats *__stdcall
+             * Moho::CArmyStats::CArmyStats(...)`) -- specifically that
+             * constructor's exception-unwind funclet, not its normal body (the
+             * normal path never reaches a member destructor). `~CArmyStats`
+             * itself (0x00704A40, confirmed the same way) does NOT call this
+             * symbol: its own decompiled body inlines `mNameIndex`'s
+             * `erase_range`-then-`delete`-then-zero sequence directly --
+             * `sub_702A70((int)v2, (int)a2->mStats._Myhead->_Left, (int)
+             * a2->mStats._Myhead)` followed by `operator delete(a2->mStats.
+             * _Myhead)` and the zeroing -- rather than calling out to a
+             * separate `~rb_tree()` symbol. `CArmyStats.cpp`'s destructor
+             * previously called an invented `DestroyNameIndexTree()` helper
+             * with no real address behind it (no source line maps to it: this
+             * member's automatic destruction in the destructor's compiler-
+             * generated epilogue, cited here and on `erase_range` below, is
+             * the entire real emission); that call has been removed in favour
+             * of letting `mNameIndex`'s real destructor run implicitly, as
+             * the binary does.
+             * Address: 0x00701570 (FUN_00701570) -- byte-for-byte identical to
+             * 0x006FD8B0 above (same `sub_702A70` call, same tail), zero
+             * incoming references anywhere in the binary (`.xrefs.txt` empty,
+             * `_callgraph_index.sqlite` `call_edges`/`incoming_xrefs` have no
+             * rows), per the same "recovered as an additional zero-xref
+             * instantiation" precedent used throughout this file (e.g.
+             * 0x00947E00/0x00947E90/0x00947F20 above).
+             * Address: 0x00702060 (FUN_00702060) -- a fourth `erase_range`
+             * caller (cited below) of the same address-neighbourhood and
+             * calling shape per the callgraph index; not independently
+             * exported/decompiled in this namespace pass.
+             */
+            /**
+             * Address: 0x0052DF70 / 0x0052E150 / 0x0052E330 / 0x0052E510 /
+             * 0x0052E6E0 / 0x0052E8B0 / 0x0052EA80 -- seven `~rb_tree()`
+             * emissions for `RRuleGameRulesImpl`'s seven `RRuleGameRulesBlueprintMap`
+             * (`msvc8::map<msvc8::string, void*>`) members (`mUnitBlueprints`/
+             * `mProjectileBlueprints`/`mPropBlueprints`/`mMeshBlueprints`/
+             * `mEmitterBlueprints`/`mBeamBlueprints`/`mTrailBlueprints`,
+             * `RRuleGameRules.h:511-517`), each inlined at its own call site in
+             * `~RRuleGameRulesImpl()` (`0x00529700`, `RRuleGameRules.cpp:1949`,
+             * whose own comment already documents "the binary open-codes that
+             * teardown seven times here, in reverse declaration order, which is
+             * what member destruction does anyway"). isNil@+0x2D (45 decimal),
+             * 8-byte `{msvc8::string key; void* value}`-shaped node past the
+             * usual 12-byte link triple.
+             *
+             * Each compiled body is larger than this member's plain
+             * `erase_range(leftmost(),header())` because this project's VS2005
+             * Release build defines `_SECURE_SCL=1` (see this file's opening
+             * `rb_tree` class comment on the `Dbg` field), so every `std::map`/
+             * `msvc8::map` erase compiles with checked-iterator validation
+             * inline: alongside this member's whole-range fast path (`sub_530FA0`
+             * family below, matching `destroy_subtree` exactly), the compiler
+             * also emits a walk-and-checked-erase-per-node branch (`sub_52F3F0`
+             * family below) that validates the iterator against
+             * `out_of_range("invalid map/set<T> iterator")` before erasing.
+             * That branch is provably unreachable from every one of these
+             * seven call sites: `erase_range`'s own fast-path guard
+             * (`first==begin() && last==end()`) is always true for a
+             * destructor's `erase(leftmost(),header())` call, so the checked
+             * per-node path never executes here. This member's plain
+             * `erase_range(leftmost(),header())` -- automatic member
+             * destruction in the recovered `~RRuleGameRulesImpl()`, no
+             * explicit call needed -- reproduces this instantiation's real,
+             * reachable behavior exactly; the checked branch is `_SECURE_SCL`
+             * debug instrumentation that never fires on valid input, the same
+             * "`Dbg` in Release... not used by anything really" pattern this
+             * file's class comment already documents for the checked
+             * *iterator* type. Not modeling it does not change behavior.
+             *
+             * `destroy_subtree` halves (whole-range fast path, matches this
+             * member's shape exactly): `0x00530FA0` (for `0x0052DF70`),
+             * `0x00531130` (`0x0052E150`), `0x005312E0` (`0x0052E330`),
+             * `0x00531490` (`0x0052E510`), `0x00531640` (`0x0052E6E0`),
+             * `0x005317D0` (`0x0052E8B0`), `0x00531960` (`0x0052EA80`).
+             *
+             * Checked-erase-per-node halves (compiled but provably unreached
+             * from these seven call sites, per above -- not modeled by this
+             * member, cited here only so they are not mistaken for orphans):
+             * `0x0052F3F0` (for `0x0052DF70`), `0x0052F7A0` (`0x0052E150`),
+             * `0x0052FB40` (`0x0052E330`), `0x0052FEE0` (`0x0052E510`),
+             * `0x00530280` (`0x0052E6E0`), `0x00530630` (`0x0052E8B0`),
+             * `0x005309E0` (`0x0052EA80`).
+             *
+             * Address: 0x00533E20 (FUN_00533E20, mangles as
+             * `Moho::EntityCategory::~EntityCategory` -- see the
+             * mangled-name note on `EntityCategoryLookupTable`'s
+             * constructor, RRuleGameRules.cpp) -- the category-lookup map's
+             * `~rb_tree()`, `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+             * mCategoryMap`. Matches this member's body field for field:
+             * `erase_range(leftmost(), header())` (`sub_535750`, cited
+             * above) then `operator delete` the head then null head/size.
+             * The raw decompile shows an additional leading block releasing
+             * `mCat.mSet.mUsed`'s heap array (`operator delete[]` when it
+             * differs from the SBO's `originalvec`) ahead of this tail --
+             * that is `EntityCategorySet::~EntityCategorySet()`'s
+             * own body (the `EntityCategoryLookupTable::
+             * mCategoryFallback` member immediately preceding `mCategoryMap`
+             * in declaration order... reversed at destruction, so it runs
+             * first), inlined by the compiler into this same out-of-line
+             * symbol because both members' destructors are called from one
+             * enclosing (implicit) `~EntityCategoryLookupTable`.
+             * Not this member's own work -- `mCategoryMap`'s own share of
+             * FUN_00533E20 is exactly this member's four-statement body, no
+             * more. Reached from `RRuleGameRulesImpl::~RRuleGameRulesImpl`
+             * (FUN_00529700) as `delete mEntityCategoryLookup;`. Re-homed
+             * here from a hand-written
+             * `EntityCategoryLookupTable::
+             * ~EntityCategoryLookupTable()` body in
+             * RRuleGameRules.cpp that reproduced this exact shape by hand
+             * over a deleted overlay*` reach-in; deleted in
+             * favor of the implicit destructor now that `mCategoryMap` is a
+             * real typed member (RULE ONE: member destructors are
+             * compiler-emitted, not hand-written source).
+             *
+             * Address: 0x007CC2B0 (FUN_007CC2B0, sub_7CC2B0) -- `msvc8::
+             * set<char>`'s destructor for `CLobby.cpp`'s ignore-names
+             * separator set (node 0x10, colour@0x0D/isNil@0x0E -- the same
+             * instantiation cited on `alloc_raw`/`copy_from` above and
+             * `erase_range`/`destroy_subtree` below). `this` arrives in
+             * `eax`. Matches this member's body field for field:
+             * `erase_range(leftmost(), header())` (`sub_7CA730`, cited
+             * below) then `operator delete(head_)` then `head_=nullptr`/
+             * `size_=0`. All 11 recorded incoming xrefs are `jmp`s from
+             * cold/EH-funclet chunks of unrelated-looking `sub_7CCxxx`/
+             * `sub_7CFxxx` addresses -- those are the local-unwind cleanup
+             * paths of the `boost::algorithm::split` tokenizer pipeline
+             * `func_GetIgnoreNames` drives for the actual
+             * character-by-character split (fully recovered as of the
+             * `FUN_007CD3A0` dedicated pass -- see `Moho::
+             * BuildLobbyIgnoreNameList`'s Doxygen block in `CLobby.cpp` for
+             * the whole instantiation's address roster), not eleven
+             * separate hand-written callers of this member. Reached in the
+             * recovered tree via `BuildLobbyIgnoreNameList`'s
+             * `localSeparators` local (`CLobby.cpp`) going out of scope --
+             * an ordinary implicit local destructor call, the same
+             * evidentiary pattern as every other implicit `~rb_tree()`
+             * citation in this file.
+             *
+             * Address: 0x007C7640 (FUN_007C7640, sub_7C7640) -- a further
+             * duplicate emission of the same `msvc8::set<char>` instance's
+             * destructor, reached from `FUN_007CCA70`'s (the pipeline's
+             * `is_any_ofF<char>`/`token_finderF` builder, `CLobby.cpp`)
+             * cold/EH-unwind path rather than its own call instruction.
+             * Reads `head_`/`size_` at the same `+0x04`/`+0x08` offsets as
+             * `FUN_007CC2B0` above and performs the identical `erase_range`
+             * + `operator delete(head_)` + zero sequence -- one compiled
+             * body, addressed twice because the compiler placed this
+             * instantiation's unwind path in its own cold section rather
+             * than sharing `FUN_007CC2B0`'s.
+             *
+             * Address: 0x006A5380 (FUN_006A5380, sub_6A5380) -- `msvc8::
+             * map<msvc8::string, float>::~rb_tree()` -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`. `IDA signature:
+             * int __usercall sub_6A5380@<eax>(std::map_string_float
+             * *a1@<eax>);`. Matches this member field for field: the
+             * recursive teardown call (`std::map_string_float::~map_string_
+             * float(a1, &scratch, a1->_Myhead->_Left, a1->_Myhead)` --
+             * `destroy_subtree`'s emission for this instantiation,
+             * `FUN_006AEF60`, cited below) reached via `head_->parent`
+             * (root, matching `erase_range(leftmost(),header())`'s whole-
+             * tree fast path for this instantiation, which resolves to the
+             * same subtree walk), then `operator delete(head_)`, then zero
+             * `head_`/`size_`. Reached automatically via `Unit`'s implicit
+             * member destruction (`Unit::~Unit`, `Unit.cpp`) -- no explicit
+             * call needed once `ArmorMultipliers` is a real typed member.
+             * Re-homed here from a hand-rolled `DestroyArmorMultiplierMap
+             * Storage` free function in `Unit.cpp` that walked a
+             * `SArmorMultiplierMap&`/`SArmorMultiplierMapNode*` reach-in
+             * instead of relying on the member's own destruction.
+             *
+             * Address: 0x008A7700 (FUN_008A7700, sub_8A7700) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * ~rb_tree()` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint` above). Frees every
+             * node reachable from the sentinel head then the head itself,
+             * matching this member's architectural role; not independently
+             * re-verified in this pass against whether its raw instruction
+             * sequence takes this member's recursive `destroy_subtree`
+             * shape or a flat in-order-increment walk (the deleted
+             * hand-rolled `DestroyTerrainEnvironmentLookupMapStorage`/
+             * `DestroyTerrainEnvironmentIteratorRange` pair in `CWldMap.cpp`
+             * used the latter shape; both are behaviorally identical --
+             * every node freed exactly once, head freed last). Reached
+             * automatically via `Moho::CWldTerrainRes::~CWldTerrainRes`'s
+             * (`DestroyTerrainResFields`, `CWldMap.cpp`) implicit member
+             * destruction now that `mEnvLookup` is a real typed
+             * `msvc8::map` member (`view.mEnvLookup.~TerrainEnvironmentLookupMap();`).
+             *
+             * Address: 0x007DF2D0 (FUN_007DF2D0, sub_7DF2D0) -- `msvc8::map<
+             * Moho::MeshKey, boost::weak_ptr<Moho::Mesh>>::~rb_tree()` --
+             * `Moho::MeshRenderer::meshCacheTree` (`Mesh.h`), isNil@+0x25
+             * (same instantiation cited on `buy_node`/`insert_unique`/
+             * `insert_at`/`link_and_rebalance`/`rb_decrement`/
+             * `lower_bound_node`/`find_node` elsewhere in this file). Frees
+             * every node reachable from the sentinel head then the head
+             * itself, matching this member's shape. Confirmed from
+             * `FUN_007DF330.c` (`~MeshRenderer`) to fire LAST -- right
+             * before `mEnvironment`'s inline string cleanup, after all four
+             * texture `shared_ptr` releases -- matching this member's
+             * natural reverse-declaration-order position (`meshCacheTree`
+             * is declared before `dissolveTex`/`meshEnvironmentTex`/
+             * `anisotropiclookupTex`/`insectlookupTex` in `Mesh.h`, so it is
+             * destroyed after all four). The previous recovery called this
+             * explicitly and far too early (right after the instance-list
+             * unlink, before any of the four texture releases) via a
+             * hand-rolled `DestroyMeshCacheTree`/`ReleaseMeshCacheTreeStorage`/
+             * `ResetMeshCacheTree`/`ClearMeshCacheTreeNodes` free-function
+             * chain in `moho/mesh/Mesh.cpp` -- a real destructor-ordering
+             * fidelity bug, not just a duplicate; fixed by deleting the
+             * explicit call and letting `meshCacheTree`'s own destructor run
+             * automatically, which lands it in the correct position with no
+             * source-level call needed at all.
+             *
+             * Address: 0x00878D30 (FUN_00878D30, sub_878D30) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::~rb_tree()` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`
+             * elsewhere in this file). `erase_range(leftmost(),header())`
+             * (`FUN_00879C30`, cited on `erase_range` below) then `operator
+             * delete(head_)` then zero `head_`/`size_`, matching this
+             * member's shape exactly. NOT reached from `CDecalManager::
+             * CDecalManager`/`~CDecalManager`'s (0x00877A60/0x00877B70)
+             * ordinary instruction stream at all -- both `incoming_xrefs`
+             * for this address are the `0x00BAF679` (dtor) and `0x00BAF6D9`
+             * (ctor) entries in each function's own EH-unwind-funclet
+             * dispatch table, reached only if an exception propagates
+             * through a *later*-declared member's construction (ctor) or
+             * through the dtor's own body (dtor) -- the same "no
+             * corresponding source line, compiler-generated only" pattern
+             * already documented on this member's other EH-funclet clones
+             * above (RULE ONE: "EH unwind funclets... are not source at
+             * all"). A prior pass modelled this address as an explicit
+             * `ResetDecalLookupTreePrimary(tree)` free function called from
+             * `~CDecalManager`'s body in `CWldSplat.cpp` -- a genuine
+             * fabricated-callsite bug (the citation was real, the claimed
+             * *caller* was not): deleted, since ordinary reverse-
+             * declaration-order member destruction already reaches this
+             * exact address for real (the un-funcleted, "happy path" copy
+             * is `FUN_00879C30`, called directly from `~CDecalManager`'s
+             * main body -- see `erase_range` below).
+             * Address: 0x00878D60 (FUN_00878D60, sub_878D60) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::~rb_tree()`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * same shape and same EH-funclet-only reachability (`0x00BAF68F`/
+             * `0x00BAF6EF`); its un-funcleted "happy path" copy is
+             * `FUN_0087A080` (cited on `erase_range` below). The matching
+             * `ResetDecalLookupTreeSecondary` free function is deleted for
+             * the same reason.
+             */
+            /**
+             * Address: 0x004DA220 (FUN_004DA220) Address: 0x004DB5D0
+             * (FUN_004DB5D0, duplicate emission) Address: 0x004DBFF0
+             * (FUN_004DBFF0, duplicate emission) -- three compiler emissions
+             * of `msvc8::set<msvc8::string>::~rb_tree()` for `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. All three match this member exactly:
+             * `erase_range(leftmost(), header())` (`FUN_004DBD30`, cited
+             * below), `free_raw(head_)`, null `head_`, zero `size_`. Real
+             * caller (confirmed via the callgraph index): `~AudioEngineImpl`
+             * (`FUN_004DA2A0`), which calls `FUN_004DA220` explicitly from
+             * its own body -- the other two addresses (`FUN_004DB5D0`/
+             * `FUN_004DBFF0`) have zero incoming xrefs in this sweep,
+             * matching the "compiler emits the same body more than once for
+             * different inlining contexts, only one of which is ever
+             * actually reached from a live caller" shape already documented
+             * elsewhere in this file (e.g. `CCommandDB`'s three `rb_tree()`
+             * ctor emissions above).
+             *
+             * `~AudioEngineImpl`'s real instruction stream tears down
+             * `mCategoryVolumes` (the sibling `AudioCategoryVolumeNode` tree,
+             * `mMap2` in the pre-migration field name -- see this member's
+             * own citation for that instantiation below) BEFORE this one --
+             * true reverse-declaration order (`mCategoryVolumes` is declared
+             * after `mPausedCategoryNames` in `AudioEngineImpl`, so it
+             * destructs first). The previously-recovered `~AudioEngineImpl`
+             * body called `ResetMap1(mMap1)` (this member) BEFORE
+             * `ResetCategoryMap(mMap2)` -- backwards from the real call
+             * order. Now that both `mPausedCategoryNames` and
+             * `mCategoryVolumes` are real typed members, this member's
+             * destructor runs implicitly at the true end of
+             * `~AudioEngineImpl`, strictly after `mCategoryVolumes`'s own
+             * implicit destructor, which reproduces the real binary's order
+             * for free with no hand-written call for either tree. Was
+             * previously duplicated as `ResetMap1`/
+             * `ResetPausedCategoryMapStorageAliasA`/
+             * `ResetPausedCategoryMapStorageAliasB`/
+             * `ResetPausedCategoryMapStorageCore` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             */
+            /**
+             * Address: 0x00844510 (FUN_00844510 -- `~rb_tree` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39): `erase_range(begin, end)` then `operator delete(head)`; the local map's destructor at the end of `cfunc_GetSpecialFilesL` 0x00844120.)
+             * Address: 0x004DA250 (FUN_004DA250, sub_4DA250) -- `msvc8::map<
+             * std::uint16_t, float>::~rb_tree()` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
+             * member exactly: `erase_range(leftmost(), header())`
+             * (`FUN_004DCEA0`, cited below), `operator delete(head_)`, null
+             * `head_`, zero `size_`. EH-funclet-only reachability, the same
+             * shape already documented on `CDecalManager`'s two analogous
+             * `~rb_tree()` emissions above: its two real callers (confirmed
+             * via the callgraph index) are both far outside this function's
+             * own address range -- `0x00BA6347` (a `jmp` tail call owned by
+             * `~AudioEngineImpl`'s own EH cleanup, `FUN_004DA2A0`) and
+             * `0x00BA6397` (owned by `AudioEngineImpl::AudioEngineImpl`'s own
+             * EH cleanup, `FUN_004D9FF0`, unwinding this member if a later
+             * constructor step throws) -- both SEH/C++ EH unwind funclets,
+             * not normal in-line callers. The NORMAL (non-exceptional)
+             * teardown path does not call this symbol at all:
+             * `~AudioEngineImpl`'s own instruction stream calls
+             * `erase_range` (`FUN_004DCEA0`, cited below) directly at
+             * `0x004DA409`, inlining this member's three remaining
+             * statements (`operator delete`/null/zero) rather than tail-
+             * calling a shared `~rb_tree()` symbol for the happy path --
+             * unlike `mPausedCategoryNames` above, whose happy path DOES
+             * reach a real out-of-line `~rb_tree()` symbol (`FUN_004DA220`).
+             * This is not a fidelity concern for the migrated source: the
+             * recovered `AudioEngineImpl::~AudioEngineImpl` no longer writes
+             * either tree's teardown by hand, so whichever shape the real
+             * compiler chose for a given tree on a given path, the same
+             * implicit member-destructor call correctly reaches this
+             * member's logic either way.
+             *
+             * Address: 0x004DB870 (FUN_004DB870, sub_4DB870) -- a second,
+             * functionally-identical emission of the same `~rb_tree()` body
+             * for this instantiation (semantically byte-for-byte the same
+             * decompiled shape as `FUN_004DA250` above; the differing raw
+             * `function_sha256` is purely the relative-call-offset encoding
+             * to `erase_range` differing by source address, not a real
+             * behavioral difference). Zero incoming xrefs of any kind
+             * (confirmed via the callgraph index: `callers_count=0`,
+             * `incoming_xrefs_count=0`) -- genuinely unreferenced compiler
+             * output, the same "emits the same body more than once, only
+             * some of which are ever reached" shape documented on
+             * `mPausedCategoryNames`' own `FUN_004DB5D0`/`FUN_004DBFF0`
+             * duplicates above. Was previously kept alive as
+             * `[[maybe_unused]] ResetCategoryMapAlias` (`AudioEngine.cpp`,
+             * deleted by this migration) purely to avoid an unused-function
+             * warning on dead-but-plausible-looking scaffolding; correctly
+             * has no source-level caller now that it has none in the binary
+             * either.
+             * Address: 0x0056AC00 (FUN_0056AC00 -- the destructor for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `~SOffsetInfo` (0x00568360), i.e. every group teardown in `CleanupFormation`/`UpdateFormation`/`~CFormationInstance`.)
+             * Address: 0x00569470 (FUN_00569470, sub_569470 -- the destructor for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), `~CFormationInstance`'s member teardown of both caches.)
+             * Address: 0x007B2560 (FUN_007B2560 -- `~rb_tree` (clear + head freed) for a tree with the nil byte at node+0x11; callers 0x007B22B0; formerly `ClearTreeStorageLaneA17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B2590 (FUN_007B2590 -- `~rb_tree` (clear + head freed) for a map with the nil byte at node+0x11; callers 0x008704B0; formerly `ClearTreeStorageLaneB17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C9010 (FUN_007C9010 -- `~rb_tree` (clear + head freed) of an owner-embedded tree; callers 0x007CD990; formerly `ClearOwnedTreeStorageLaneARuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007C9950 (FUN_007C9950 -- `~rb_tree` (clear + head freed) of an owner-embedded tree; callers 0x007CC2F0; formerly `ClearOwnedTreeStorageLaneBRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CF8C0 (FUN_007CF8C0 -- `~rb_tree` (clear + head freed) of an owner-embedded tree, returning the owner; callers 0x007CF830; formerly `ClearOwnedTreeStorageLaneAndReturnOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004964C0 (FUN_004964C0 -- `end()` -- the header sentinel read for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetParticleBucketTreeHeadNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00496670 (FUN_00496670 -- `end()` -- the header sentinel read for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetTrailBucketTreeHeadNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00496430 (FUN_00496430 -- `~rb_tree` (clear + free the header) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x004925E0, 0x00492780, 0x00493131; formerly `ReleaseParticleBucketTreeStorage` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004965E0 (FUN_004965E0 -- `~rb_tree` (clear + free the header) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x004925E0, 0x00492780, 0x00493141; formerly `ReleaseTrailBucketTreeStorage` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00498360 (FUN_00498360 -- `end()` -- the header sentinel read for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetParticleBucketTreeHeadNodeDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00498610 (FUN_00498610 -- `end()` -- the header sentinel read for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetTrailBucketTreeHeadNodeDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A9B0 (FUN_0049A9B0 -- `end()` -- the header sentinel read for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `ReadParticleBucketTreeHeadNodeFromHeader` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049AC50 (FUN_0049AC50 -- `end()` -- the header sentinel read for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `ReadTrailBucketTreeHeadNodeFromHeader` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004921A0 (FUN_004921A0 -- `~rb_tree()` -- `erase(leftmost(), header())`, free the header, null `head_`/`size_` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `DestroyBeamTextureBucketMap` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D61B0 (FUN_007D61B0 -- the second emission of that same `~rb_tree()` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D61E0; formerly `ClearRegionKeyTreeStorage` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D7A80 (FUN_007D7A80 -- `~rb_tree()` -- erase the range, free the header, null `head_`/`size_` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); zero callers, unreachable; formerly `ClearRegionKeyTreeStorageLaneA` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0042C150 (FUN_0042C150 -- `~rb_tree()` -- erase the range, then free the header for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x0042BB80, 0x0042BC10, 0x0042BCB0; formerly `DestroyIntegerAnnotationTreeStorage` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0042C180 (FUN_0042C180 -- the string map's `~rb_tree()` for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x007DB3A0; formerly `DestroyStringAnnotationTreeStorage` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C2330 (FUN_005C2330 -- `~rb_tree()` -- clear, then free the header for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005BFF90, 0x005C0290, 0x005C23F0; formerly `DestroyReconMapStorage` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007183D0 (FUN_007183D0 -- `~rb_tree()` -- clear, free the header, null `head_`/`size_` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ReleaseBlipCellSetStorageLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00719D50 (FUN_00719D50 -- the second emission of that same `~rb_tree()` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ReleaseBlipCellSetStorageLaneB` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00717EA0 (FUN_00717EA0 -- `~rb_tree()` -- clear, then free the header for `msvc8::set<moho::InfluenceMapEntry>` (`InfluenceGrid::entries`); zero callers, unreachable; formerly `ReleaseInfluenceEntrySetStorage` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007EDE20 (FUN_007EDE20 -- a second emission of that `~rb_tree()` for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EDD60, 0x007EDE50; formerly `ReleaseRangeProfileTreeStorage` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007EFE60 (FUN_007EFE60 -- `~rb_tree()` -- erase the whole range, then free the header for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); zero callers, unreachable; formerly `ReleaseRangeProfileTreeStorageViaEraseRange` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0059FB80 (FUN_0059FB80 -- `~rb_tree()` -- erase the whole range, free the header, null the triple for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F920, 0x0059F9C0, 0x0059FAB0; formerly `DestroyRebuildMap` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E8E60 (FUN_004E8E60 -- `~rb_tree()` -- drain the range, then free the header for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `DestroyTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0042C4B0 (FUN_0042C4B0 -- `~rb_tree()` -- capture `begin()` into an iterator slot, drain the tree, then free the header for `msvc8::set<moho::CD3DEffect::Technique, TechniqueNameLess>` (`CD3DEffect::mTechniques` at +0x04; the whole 0xC8 polymorphic `Technique` is the element and its `mName` the key, so node 0xD8 with the key at node+0x10 -- past the element's vptr -- and colour/nil at +0xD4/+0xD5); callers 0x0042C520; formerly `DestroyTechniqueTreeStorage` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00734720 (FUN_00734720 -- `~rb_tree()` -- drain the whole range, then free the header for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneA` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00735240 (FUN_00735240 -- a second emission of that teardown for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneB` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007358C0 (FUN_007358C0 -- a third emission of that teardown for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneC` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00501760 (FUN_00501760 -- `~_Tree` -- `erase(begin(), end())` through 0x00505200, free the head, zero head and size, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00500F60 (the shard-data constructor's unwind), 0x005017E0, 0x00501E50; formerly `DestroySpatialMapTree` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00504350 (FUN_00504350 -- a second emission of that same `~_Tree` for `moho::SpatialMap<T>`; zero callers, no references, a linker-retained copy nothing runs.)
+             * Address: 0x006E0A40 (FUN_006E0A40 -- `~rb_tree()` for `msvc8::map<moho::CmdId, moho::CUnitCommand*>` (`CCommandDB::commands` at +0x04, node 0x18), `this` in EAX: `erase_range(leftmost(), header())` through 0x006E22D0, free the header, zero `head_`/`size_`; reached only from the EH unwind funclets 0x00B9F0E0 / 0x00BAC860 of `CCommandDB::CCommandDB` (0x006E09C0) and `~CCommandDB` (0x006E0A70); formerly `ReleaseCommandDatabaseNodeBufferRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+             * Address: 0x00715440 (FUN_00715440 -- `~rb_tree()` for `msvc8::set<moho::InfluenceMapEntry, moho::InfluenceMapEntryLess>` (`InfluenceGrid::entries` at +0x00), `this` in EAX: `erase_range(leftmost(), header())` through 0x0071AA60, free the header, zero `head_`/`size_`; reached only from the EH unwind funclets 0x00B9ED80 / 0x00BA4570 of `InfluenceGrid::InfluenceGrid()` (0x00715030) and its copy constructor (0x0071C150); formerly `ResetInfluenceGridEntryStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+             */
+            ~rb_tree()
+            {
+                erase_range(leftmost(), header());
+                free_raw(head_);
+                head_ = nullptr;
+                size_ = 0;
+            }
+
+            // ---- observers ---------------------------------------------------
+
+            [[nodiscard]] const key_compare& key_comp() const noexcept { return this->comp(); }
+
+            /**
+             * Address: 0x0052BB20 (FUN_0052BB20)  Address: 0x0052BC50 (FUN_0052BC50)
+             * Address: 0x0052BFA0 (FUN_0052BFA0)  Address: 0x0052C080 (FUN_0052C080)
+             * Address: 0x0052C160 (FUN_0052C160)  Address: 0x0052C330 (FUN_0052C330)
+             * Address: 0x0052C410 (FUN_0052C410)  Address: 0x0052C4F0 (FUN_0052C4F0)
+             *
+             * The `end()` lane -- the sentinel head itself.
+             */
+            /**
+             * Address: 0x00498060 (FUN_00498060, the trail-segment pool's maximum;
+             * emitted again at 0x0087CC20)
+             * Address: 0x0087CC20 (FUN_0087CC20, sibling emission of FUN_00498060 described above)
+             */
+            /**
+             * Address: 0x0083B4B0 (FUN_0083B4B0)  Address: 0x0083AA60 (FUN_0083AA60)
+             *
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s `end()` lane
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`). Two
+             * calling-convention emissions of the same sentinel-head return,
+             * matching the multi-address `end()` pattern documented
+             * throughout this member's citation catalog: `FUN_0083B4B0`
+             * returns `head_` directly in `eax`; `FUN_0083AA60` stores it
+             * through a caller-supplied out-parameter instead. Both are
+             * currently duplicated as free-function reach-ins
+             * (`ReadSecondaryGlobalPointerValue`/`LoadSecondaryGlobalPointerValue`)
+             * in `moho/containers/LegacyContainerRuntime.cpp`, confirmed to
+             * have zero callers anywhere in `src` -- orphans, not
+             * consolidated in this pass (out of scope; that file also
+             * covers the sibling `UiKeyActionMap` tree and other unrelated
+             * sentinel offsets, a larger clean-up than this task).
+             */
+            [[nodiscard]] node_type* header() const noexcept { return head_; }
+            [[nodiscard]] node_type* root() const noexcept { return head_->parent; }
+            /**
+             * Address: 0x0052BB00 (FUN_0052BB00)  Address: 0x0052BB10 (FUN_0052BB10)
+             * Address: 0x0052BC40 (FUN_0052BC40)  Address: 0x0052BF90 (FUN_0052BF90)
+             * Address: 0x0052C240 (FUN_0052C240)  Address: 0x0052C320 (FUN_0052C320)
+             * Address: 0x0052C400 (FUN_0052C400)  Address: 0x0052C4E0 (FUN_0052C4E0)
+             * Address: 0x0052E140 (FUN_0052E140)  Address: 0x0052E320 (FUN_0052E320)
+             * Address: 0x0052E500 (FUN_0052E500)
+             *
+             * The `head->left` begin lane, emitted once per blueprint table.
+             *
+             * All belong to the seven `std::map<std::string, TBlueprint*>` tables on `RRuleGameRulesImpl` (+0x60 through +0xA8). One emission per table is why the same member carries six or seven addresses.
+             */
+            /**
+             * Address: 0x00498080 (FUN_00498080, the trail-segment pool's minimum;
+             * emitted again at 0x0087CC40)
+             * Address: 0x0087CC40 (FUN_0087CC40, sibling emission of FUN_00498080 described above)
+             */
+            /**
+             * Address: 0x0083BC30 (FUN_0083BC30, sub_83BC30) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s `head_->left`
+             * begin lane -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:
+             * 1395`), out-parameter-store shape like the trail-segment
+             * pool's minimum above. Currently duplicated as a free-function
+             * reach-in (`LoadSecondaryGlobalPointerPointee`) in
+             * `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src`; not consolidated in this pass
+             * (see the `header()` note above for why).
+             * Address: 0x0083A620 (FUN_0083A620 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `begin()` (`_Myhead->_Left` through the hidden iterator slot); zero callers, unreachable; formerly `LoadPrimaryGlobalPointerPointee` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x007B35E0 (FUN_007B35E0 -- `_Min` (descend left to the leftmost node; nil byte at node+0x11); callers 0x007B46A0; formerly `DescendLeftUntilFlag17SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00856810 (FUN_00856810 -- `_Min` (nil byte at node+0x15); callers 0x008B5EB0; formerly `DescendLeftUntilFlag21SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00856D40 (FUN_00856D40 -- `_Min` (nil byte at node+0x19); callers 0x00856950; formerly `DescendLeftUntilFlag25SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008616D0 (FUN_008616D0 -- `_Min` (nil byte at node+0xC49); callers 0x00860FB0; formerly `DescendLeftUntilFlag3145SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C300 (FUN_0087C300 -- `_Min` (nil byte at node+0x15); callers 0x0087AC30; formerly `DescendLeftUntilFlag21SentinelRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C540 (FUN_0087C540 -- `_Min` (nil byte at node+0x15); callers 0x0087B5B0; formerly `DescendLeftUntilFlag21SentinelRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00711EC0 (FUN_00711EC0 -- `_Lmost` / `begin()` (nil byte at node+0x11); callers 0x00711BE0; formerly `FindTreeLeftmostNodeFlag17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004964B0 (FUN_004964B0 -- `_Lmost` / `begin()` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetParticleBucketTreeBeginNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00496660 (FUN_00496660 -- `_Lmost` / `begin()` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetTrailBucketTreeBeginNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00498350 (FUN_00498350 -- `_Lmost` / `begin()` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetParticleBucketTreeBeginNodeDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00498600 (FUN_00498600 -- `_Lmost` / `begin()` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `GetTrailBucketTreeBeginNodeDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DA00 (FUN_0049DA00 -- `_Min` (descend left) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049D0D0; formerly `GetParticleBucketTreeMinimum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DAD0 (FUN_0049DAD0 -- `_Min` (descend left) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049D520; formerly `GetTrailBucketTreeMinimum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C4B0 (FUN_0049C4B0 -- `_Min` (descend left) for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049C1F0; formerly `FindBeamBucketTreeLeftmostDescendant` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AD460 (FUN_004AD460 -- `_Min` (descend left) for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520; formerly `FindLeftmostDescendant` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEB50 (FUN_004AEB50 -- `_Min` (descend left) for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE860; formerly `FindWideTreeLeftmostDescendant_004AEB50` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D90E0 (FUN_007D90E0 -- `_Min` (descend left) for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8AE0; formerly `TreeMinimum` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5CC0 (FUN_005C5CC0 -- `_Min` (descend left) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580; formerly `TreeMin` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6BD0 (FUN_008D6BD0 -- `_Min` (descend left) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x008D6650; formerly `TreeMin` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF130 (FUN_008AF130 -- `_Min` (descend left) for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, the entity id at node+0x0C, colour/nil at +0x10/+0x11); callers 0x008AE690; formerly `EntityLoopTreeMinimum` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E3AD0 (FUN_004E3AD0 -- `_Min` (descend left) for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004E3780; formerly `ResolveLeftmostSndVarTreeNode` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DE90 (FUN_0045DE90 -- `_Min` -- descend left for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CB80; formerly `FileInfoTreeMinimumFrom` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046EDB0 (FUN_0046EDB0 -- `_Min` -- descend left for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E890; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004646A0 (FUN_004646A0 -- `_Min` -- descend left for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463A70; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
+            /**
+             * Address: 0x00856D20 (FUN_00856D20 -- `_Max` (descend right to the rightmost node; nil byte at node+0x19); callers 0x00856950; formerly `DescendRightUntilFlag25SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008616B0 (FUN_008616B0 -- `_Max` (nil byte at node+0xC49); callers 0x00860FB0; formerly `DescendRightUntilFlag3145SentinelRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C2E0 (FUN_0087C2E0 -- `_Max` (nil byte at node+0x15); callers 0x0087AC30; formerly `DescendRightUntilFlag21SentinelRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0087C520 (FUN_0087C520 -- `_Max` (nil byte at node+0x15); callers 0x0087B5B0; formerly `DescendRightUntilFlag21SentinelRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007120D0 (FUN_007120D0 -- `_Rmost` (nil byte at node+0x11); callers 0x00711BE0; formerly `FindTreeRightmostNodeFlag17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D9E0 (FUN_0049D9E0 -- `_Max` (descend right) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049D0D0; formerly `GetParticleBucketTreeMaximum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DAB0 (FUN_0049DAB0 -- `_Max` (descend right) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049D520; formerly `GetTrailBucketTreeMaximum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D030 (FUN_0049D030 -- `_Max` (descend right) for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049C1F0; formerly `GetBeamBucketTreeMaximum` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AD440 (FUN_004AD440 -- `_Max` (descend right) for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520; formerly `FindRightmostDescendant` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00899690 (FUN_00899690 -- `_Max` (descend right) for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x00898B10; formerly `FindRightmostDescendant` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008B6510 (FUN_008B6510 -- `_Max` (descend right) for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x008B5EB0; formerly `FindRightmostDescendant` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEE80 (FUN_004AEE80 -- `_Max` (descend right) for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE860; formerly `FindWideTreeRightmostDescendant_004AEE80` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D90C0 (FUN_007D90C0 -- `_Max` (descend right) for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8AE0; formerly `TreeMaximum` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5CA0 (FUN_005C5CA0 -- `_Max` (descend right) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580; formerly `TreeMax` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6BB0 (FUN_008D6BB0 -- `_Max` (descend right) for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x008D6650; formerly `TreeMax` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF110 (FUN_008AF110 -- `_Max` (descend right) for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, the entity id at node+0x0C, colour/nil at +0x10/+0x11); callers 0x008AE690; formerly `EntityLoopTreeMaximum` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DE70 (FUN_0045DE70 -- `_Max` -- descend right for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CB80; formerly `FileInfoTreeMaximumFrom` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046ED90 (FUN_0046ED90 -- `_Max` -- descend right for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E890; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00464680 (FUN_00464680 -- `_Max` -- descend right for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463A70; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
+
+            /**
+             * Address: 0x0083BC40 (FUN_0083BC40, sub_83BC40) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::size()` --
+             * `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`), direct
+             * `dword_10C3750` return. Currently duplicated as a
+             * free-function reach-in (`ReadSecondaryGlobalScalarValue`) in
+             * `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src`; not consolidated in this pass
+             * (see the `header()` note above for why).
+             * Address: 0x0083B840 (FUN_0083B840 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `size()` (`_Mysize` at 0x010C1AD8); zero callers, unreachable; formerly `ReadPrimaryGlobalScalarValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             */
+            [[nodiscard]] size_type size() const noexcept { return size_; }
+            [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
+
+            /**
+             * MSVC8's `allocator<value_type>::max_size()`.
+             *
+             * The `_Insert` guard in the binary tests `_Mysize >= max_size() - 1`;
+             * 0x007E3F10 compares against 0x07FFFFFE for a 0x20-byte value type,
+             * i.e. 0xFFFFFFFF/0x20 - 1.
+             * Address: 0x00499E40 (FUN_00499E40 -- `max_size()` -- 0xFFFFFFFF/0x24 for this instantiation's 0x24-byte value type for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetLegacyDivisionMagicConstant_0x71C71C7` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C520 (FUN_0049C520 -- `max_size()` -- the second emission of the same 0xFFFFFFFF/0x24 constant for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetLegacyMapMaxElementCount_0x71C71C7` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00424790 (FUN_00424790 -- `max_size()` for the tree -- 0x07FFFFFF, `0xFFFFFFFF / 0x20` for the 0x20 pair for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `MaxAnimTextureCacheNodeCount` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00424A10 (FUN_00424A10 -- a second emission of that `max_size()` for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `MaxAnimTextureCacheNodeCount` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            [[nodiscard]] static constexpr size_type max_size() noexcept
+            {
+                constexpr std::uint32_t count = 0xFFFFFFFFu / sizeof(value_type);
+                return count != 0u ? count : 1u;
+            }
+
+            // ---- lookup ------------------------------------------------------
+
+            /**
+             * Address: 0x007E40C0 (FUN_007E40C0, batch-bucket map `_Lbound`)
+             *
+             * What it does:
+             * Returns the first node whose key does not order before `k`, or the
+             * header when every stored key orders before it.
+             */
+            /**
+             * Address: 0x0052D150 (FUN_0052D150)  Address: 0x0052D1F0 (FUN_0052D1F0)
+             * Address: 0x0052D280 (FUN_0052D280)  Address: 0x0052D310 (FUN_0052D310)
+             * Address: 0x0052D3A0 (FUN_0052D3A0)  Address: 0x0052D440 (FUN_0052D440)
+             * Address: 0x0052D4E0 (FUN_0052D4E0)
+             * Address: 0x0052E060 (FUN_0052E060)  Address: 0x0052E240 (FUN_0052E240)
+             * Address: 0x0052E420 (FUN_0052E420)  Address: 0x0052E600 (FUN_0052E600)
+             * Address: 0x0052E7D0 (FUN_0052E7D0)  Address: 0x0052EB70 (FUN_0052EB70)
+             *
+             * The blueprint-id descent. The 0x0052Exxx six are the walk itself, one
+             * per table; the 0x0052Dxxx seven are the store-result adapters over it.
+             */
+            /**
+             * Address: 0x0077C020 (FUN_0077C020, outer map lower bound)
+             * Address: 0x0077B070 (FUN_0077B070, its store-to-slot adapter)
+             * Address: 0x0077C550 (FUN_0077C550, inner bucket lower bound)
+             * Address: 0x0077C580 (FUN_0077C580, inner bucket upper bound)
+             * Address: 0x0077B5B0 (FUN_0077B5B0, the inner set's equal-range pair)
+             * Address: 0x00556970 (FUN_00556970, the category-lookup map's
+             * lower bound -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `Sim.cpp`'s
+             * `EntityCategoryLookupTableView::mCategoryMap`. Already
+             * recovered as `Moho::EntityCategorySet::Find` /
+             * `FindCategoryLowerBound` in
+             * `moho/entity/EntityCategoryLookupResolver.cpp`'s independent
+             * read-only view of this same tree; shared between that file's
+             * read path and this member's `find_node` (FUN_005561C0, cited
+             * below), confirming both recoveries agree on the node layout.)
+             * Address: 0x006E23C0 (FUN_006E23C0, the command-id map's raw
+             * lower-bound descent) Address: 0x006E1D30 (FUN_006E1D30, its
+             * store-into-hidden-return-pointer adapter) -- `msvc8::map<
+             * Moho::CmdId, Moho::CUnitCommand*>`, `Moho::CCommandDB::commands`
+             * in `CCommandDb.h`. Re-homed here from two bespoke free
+             * functions in `CCommandDb.cpp` (`LowerBoundCommandMapNode`,
+             * `StoreLowerBoundCommandMapNode`) during the
+             * `CommandDbMapNodeRuntime` hand-rolled-tree migration; no
+             * direct caller confirmed in this pass (`incoming_xrefs` empty
+             * in this sweep for both) -- none of `CCommandDB`'s recovered
+             * methods call `lower_bound`/`operator[]` directly, so this
+             * emission's real call site remains unidentified.)
+             */
+            /**
+             * Address: 0x0083B440 (FUN_0083B440, sub_83B440) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s lower-bound
+             * descent (`gUiKeyRepeatMap`, `moho/ui/UiRuntimeTypes.cpp:1395`,
+             * isNil@+0x15), store-into-hidden-return-pointer shape like
+             * `FUN_006E1D30` above. Reached from `operator[]`'s emission
+             * (`FUN_0083A9D0`, cited in `Map.h`) and `find_node`'s emission
+             * (`FUN_0083AD60`, cited below), both real call sites.)
+             */
+            /**
+             * Address: 0x0083B050 (FUN_0083B050, sub_83B050) --
+             * `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>`'s
+             * lower-bound descent (`gUiKeyActionMap`,
+             * `moho/ui/UiRuntimeTypes.cpp:1394`), a sibling instantiation of
+             * the same map keyed on the same `UiKeyMask` but with a 28-byte
+             * `msvc8::string` mapped value instead of `bool`: key at node+0xC
+             * (4 bytes, [0xC,0x10)), value at node+0x10 (28 bytes,
+             * [0x10,0x2C)), color byte at +0x2C, isNil@+0x2D -- 0xC + 4 + 28
+             * = 0x2C for color, +1 for isNil, matching the confirmed asm
+             * read exactly and requiring no padding (matches
+             * `UiKeyActionMapBase`'s node layout exactly).
+             * Store-into-hidden-return-pointer shape like `FUN_006E1D30`/
+             * `FUN_0083B440` above (`*result = candidate; return result;`,
+             * `result`@eax both in and out). Sole confirmed caller in this
+             * sweep is `FUN_0083A950` (`find`'s emission for this
+             * instantiation, cited on `Map.h`'s `find()`), itself called from
+             * `Moho::CUIKeyHandler::OnKeyDown` (FUN_00838D10,
+             * `moho/ui/UiRuntimeTypes.h`/`.cpp`).
+             */
+            /**
+             * Address: 0x006AFBF0 (FUN_006AFBF0, sub_6AFBF0) --
+             * `msvc8::map<msvc8::string, float>::lower_bound_node` --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@
+             * +0x2D (48-byte node: 12-byte link triplet + 28-byte
+             * `msvc8::string` key + 4-byte `float` value + color/isNil).
+             * Plain descent loop comparing the candidate's key lane against
+             * the sought key via `std::operator<<char>`, updating the
+             * candidate on left turns -- matches this member's shape
+             * exactly, no store-into-hidden-pointer adapter (returns the
+             * node directly in eax). Four confirmed callers: `find_node`'s
+             * fused emission for this instantiation (`FUN_006ADD30`, cited
+             * on `Map.h`'s `find()`), `operator[]`'s emission
+             * (`FUN_006ADBF0`, cited on `Map.h`'s `operator[]()`), and two
+             * further calls (0x006AEF40/0x006AEF50) inlined inside
+             * `insert_hint`'s own emission (`FUN_006AEDD0`, cited below) --
+             * hint-validation re-deriving the lower bound on its straddle-
+             * check branches. Re-homed here from a hand-rolled
+             * `LowerBoundStringFloatMapRuntime` free function in
+             * `moho/sim/SimRecoveryRuntime.cpp` that walked a duplicate
+             * `StringFloatMapRuntime`/`StringFloatMapNodeRuntime` struct
+             * pair over the same node shape instead of calling this member
+             * (deleted: zero callers anywhere in `src`, confirmed by a
+             * full-tree grep -- an orphan duplicate, not a second real
+             * instantiation).
+             *
+             * Address: 0x008A8FE0 (FUN_008A8FE0, sub_8A8FE0) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * lower_bound_node` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint`/
+             * `insert_unique` above). Plain descent loop comparing the
+             * candidate's key lane against the sought key, updating the
+             * candidate on non-less turns -- matches this member's shape
+             * exactly (no explicit args rendered in the decompile at its
+             * call site; the tree pointer was already live in the caller's
+             * register set, the same elision seen elsewhere in this
+             * emission family). Sole real caller is `operator[]`'s emission
+             * for this instantiation (`FUN_008A7C80`, cited on `Map.h`'s
+             * `operator[]()`) as its first statement, `iterator where =
+             * lower_bound(k);`. Re-homed here from a hand-rolled
+             * `FindTerrainEnvironmentLowerBound` free function in
+             * `moho/sim/CWldMap.cpp` that walked a duplicate
+             * `TerrainEnvironmentLookupMap`/
+             * a deleted overlay struct pair over the
+             * same node shape instead of calling this member (deleted along
+             * with the whole hand-rolled tree it anchored).
+             *
+             * Address: 0x007E6050 (FUN_007E6050) -- `msvc8::map<Moho::MeshKey,
+             * boost::weak_ptr<Moho::Mesh>>::lower_bound_node` --
+             * `Moho::MeshRenderer::meshCacheTree` (`Mesh.h`), isNil@+0x25 (same
+             * instantiation cited on `buy_node`/`insert_unique`/`insert_at`/
+             * `link_and_rebalance`/`rb_decrement` elsewhere in this file).
+             * Plain descent loop matching this member's shape exactly. Sole
+             * real caller is `find_node`'s fused emission for this
+             * instantiation (cited below). Re-homed here from a hand-rolled
+             * `MeshCacheTreeLowerBound` free function in `moho/mesh/Mesh.cpp`
+             * that walked a duplicate `MeshRendererMeshCacheNode`/`...Tree`
+             * struct pair over the same node shape instead of calling this
+             * member (deleted along with the whole hand-rolled tree it
+             * anchored).
+             *
+             * Address: 0x004DD380 (FUN_004DD380, sub_4DD380) --
+             * `msvc8::set<msvc8::string>::lower_bound_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Plain descent loop matching this member's shape
+             * exactly, using `msvc8::string`'s own less-than compare. Real
+             * out-of-line calls, not inlined at either call site: `erase(
+             * const key_type&)`'s emission (`FUN_004DB710`, cited below)
+             * and `count()`'s emission (`FUN_004DB770`, cited below) both
+             * call this address directly (and `upper_bound_node`'s
+             * 0x004DD410 below) rather than a fused `equal_range` symbol --
+             * this member simply never got its own combined-call emission
+             * for this instantiation. Was previously duplicated as
+             * `LowerBoundPausedCategoryNode` (`AudioEngine.cpp`, deleted by
+             * this migration).
+             *
+             * Address: 0x005808D0 (FUN_005808D0, sub_5808D0) --
+             * `msvc8::map<Wm3::Vector2i, Moho::SBuildReserveInfo>::
+             * lower_bound_node`, isNil@+0x25, `_Myval`@+0x0C, `_Left`@+0x00,
+             * `_Right`@+0x08. `.asm`-confirmed descent matching this member
+             * exactly: seeds `found = head_`, goes right (`[ebp+8]`) when the
+             * node key compares less, otherwise records the node and goes
+             * left (`[ebp+0]`), and returns `head_` untouched when the root
+             * is nil. The key compare is `Wm3::Vector2i`'s lexicographic
+             * two-component loop (`cmp edx, 2`), not a scalar compare. Sole
+             * caller is this instantiation's `operator[]` emission
+             * (`FUN_0057D910`), itself a RULE ONE compiler emission whose
+             * written source is the `map[key]` expression at its call site.
+             * Address: 0x0056B7B0 (FUN_0056B7B0, sub_56B7B0 -- the lower-bound descent for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the `try_get` cache lookups in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
+             * Address: 0x00861C70 (FUN_00861C70 -- `_Lbound` over a file-static tree with 0xC49-byte-offset nil flag (LTCG clone with `this` folded); callers 0x00860E20, 0x00861320, 0x00861640; formerly `FindLowerBoundInGlobalFlag3145TreeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C940 (FUN_0049C940 -- `_Lbound` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x004963E0, 0x004983A0, 0x0049A955; formerly `FindParticleBucketLowerBoundCandidateNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CC90 (FUN_0049CC90 -- `_Lbound` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x00496590, 0x00498650, 0x0049AC00; formerly `FindTrailBucketLowerBoundCandidateNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00499F40 (FUN_00499F40 -- `_Lbound` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495C10, 0x004977F0; formerly `FindBeamBucketLowerBoundCandidateNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6170 (FUN_008D6170 -- `_Lbound` -- the width/height/refresh walk for `msvc8::set<moho::Resolution>` (the adapter-mode dedup tree in moho/misc/StartupHelpers.cpp, node 0x20, element 0x10 at node+0x0C, isNil@+0x1D); callers 0x008D5020, 0x008D5710; formerly `FindAdapterModeSortLowerBoundNode` in moho/misc/StartupHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F1C50 (FUN_007F1C50 -- `_Lbound` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0, 0x007F01D0, 0x007F0AD0; formerly `FindBlueprintExtractorLowerBound` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D8DE0 (FUN_007D8DE0 -- `_Lbound` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7B90, 0x007D7C20, 0x007D8190; formerly `FindLowerBound` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00432450 (FUN_00432450 -- `_Lbound` for `msvc8::map<msvc8::string, std::int32_t>` (`CD3DEffect::Technique::Implementation::mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004317C0; formerly `LowerBoundIntAnnotationNode` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C4950 (FUN_005C4950 -- `_Lbound` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C15A0; formerly `LowerBoundByEntityId` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045D080 (FUN_0045D080 -- `_Lbound` -- the same descent for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045AFE0, 0x0045B100, 0x0045B160; formerly `FileInfoLowerBound` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045C8F0 (FUN_0045C8F0 -- `_Lbound` -- the descent that remembers the last node not less than the key for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x004584B0, 0x0045AF50, 0x0045BAC0; formerly `ZipEntryLowerBound` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F13A0 (FUN_007F13A0 -- `_Lbound` -- the descent that remembers the last node not less than the key for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EE950, 0x007EFD00, 0x007EFEB0; formerly `FindRangeProfileLowerBoundNodeByCategory` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046E5B0 (FUN_0046E5B0 -- `_Lbound` -- the descent that remembers the last node not less than the key for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046D960, 0x0046DEC5; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00465010 (FUN_00465010 -- `_Lbound` -- the descent that remembers the last node not less than the key for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463D50, 0x00464460; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E2030 (FUN_004E2030 -- `_Lbound` -- the descent that remembers the last node not less than the key for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004E1710 (unreached); formerly `LowerBoundSoundParamsCacheByHash` in moho/audio/SoundSubsystemBootstrap.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E8EB0 (FUN_004E8EB0 -- `_Lbound` -- the descent that remembers the last node not less than the key for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E83A0; formerly `FindTimeBarTrackLowerBound` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E94B0 (FUN_004E94B0 -- a second emission of that same descent for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E8F90, 0x004E90F0 (unreached); formerly `WalkLowerBoundTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00434500 (FUN_00434500 -- `_Lbound` -- the descent that remembers the last element not less than the probe, comparing only the names for `msvc8::set<moho::CD3DEffect::Technique, TechniqueNameLess>` (`CD3DEffect::mTechniques` at +0x04; the whole 0xC8 polymorphic `Technique` is the element and its `mName` the key, so node 0xD8 with the key at node+0x10 -- past the element's vptr -- and colour/nil at +0xD4/+0xD5); callers 0x0042C650, 0x00431C60, 0x00432B00; formerly `LowerBoundTechniqueNode` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0094FA20 (FUN_0094FA20 -- `_Lbound` -- the descent that remembers the last node not less than the probe, ordering on `mType` then `mObj` for `msvc8::map<gpg::RRef, gpg::WriteArchive::TrackedPointerRecord, gpg::RRefCompare>` (`WriteArchive::mObjRefs` at +0x10; pair 0x18 -- the 0x08 `RRef` key then the 0x10 record -- node 0x28, colour/nil at +0x24/+0x25); callers 0x009503C5, 0x00950A80; formerly `FindLowerBoundTrackedPointerNode` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
+            {
+                node_type* found = head_;
+                for (node_type* n = root(); !rb_is_nil(n);) {
+                    if (this->comp()(Traits::key_of(n->value), k)) {
+                        n = n->right;
+                    } else {
+                        found = n;
+                        n = n->left;
+                    }
+                }
+                return found;
+            }
+
+            /** First node whose key orders after `k`, or the header. */
+            /**
+             * Address: 0x004DD410 (FUN_004DD410, sub_4DD410) --
+             * `msvc8::set<msvc8::string>::upper_bound_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29 (same instantiation cited on `lower_bound_node`
+             * above; see that citation for why this address is a real
+             * out-of-line call rather than part of a fused `equal_range`
+             * emission). Plain descent loop matching this member's shape
+             * exactly. Two real callers: `erase(const key_type&)`'s
+             * emission (`FUN_004DB710`, cited below) and `count()`'s
+             * emission (`FUN_004DB770`, cited below). Was previously
+             * duplicated as `UpperBoundPausedCategoryNode` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             * Address: 0x007D9100 (FUN_007D9100 -- `_Ubound` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7B90, 0x007D81A6, 0x007D8DA0; formerly `FindUpperBound` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C49B0 (FUN_005C49B0 -- `_Ubound` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C0C40, 0x005C20C0; formerly `UpperBoundByEntityId` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DF10 (FUN_0045DF10 -- `_Ubound` -- the descent that stops on the first key greater than the probe for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045B100, 0x0045C0A6, 0x0045CE90; formerly `FileInfoUpperBound` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E2060 (FUN_004E2060 -- `_Ubound` -- the same descent with the comparison flipped, so it stops on the first key greater than the probe for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004E1710 (unreached); formerly `UpperBoundSoundParamsCacheByHash` in moho/audio/SoundSubsystemBootstrap.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            [[nodiscard]] node_type* upper_bound_node(const key_type& k) const
+            {
+                node_type* found = head_;
+                for (node_type* n = root(); !rb_is_nil(n);) {
+                    if (this->comp()(k, Traits::key_of(n->value))) {
+                        found = n;
+                        n = n->left;
+                    } else {
+                        n = n->right;
+                    }
+                }
+                return found;
+            }
+
+            /**
+             *
+             * What it does:
+             * The shipped body computes the upper bound first, then the lower
+             * bound, each via its own fully inlined descent loop rather than a
+             * call to `lower_bound_node`/`upper_bound_node` -- the same two
+             * descents those members perform, just inlined into one emission
+             * for this instantiation (order is immaterial: the two descents
+             * don't share mutable state). This member is written as the
+             * natural 2007 source line, `{lower_bound(k), upper_bound(k)}`,
+             * which is exactly what Dinkumware's `_Tree::equal_range`
+             * compiles to and what this template's `erase(const key_type&)`
+             * below already relies on -- genuinely useful, cited engine
+             * infrastructure for this project's own `msvc8::set`/`msvc8::map`
+             * (used e.g. by `CCommandDB`/`EntityDb`), independent of the
+             * external addresses that happen to confirm its shape above.
+             *
+             * Address: 0x0087A1A0 (FUN_0087A1A0, sub_87A1A0) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::equal_range` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`/
+             * `~rb_tree()` elsewhere in this file). Caller is this
+             * instantiation's own `erase(const key_type&)` (`FUN_00879510`,
+             * cited below), which this member's shared emission also serves
+             * for the sibling `mDecalGroupLookupBySplatIndex` map (see that
+             * member's own citation for the sharing evidence).
+             * Address: 0x00879D50 (FUN_00879D50, sub_879D50) -- a second
+             * emission of the same member for this same tree: two
+             * independent fully-inlined descent loops (lower bound, then
+             * upper bound), storing the pair result through the hidden
+             * return slot -- matches this member's `{lower_bound_node(k),
+             * upper_bound_node(k)}` field for field, same as 0x0087A1A0
+             * above. Sole caller is this instantiation's *other*
+             * `erase(const key_type&)` emission (`FUN_008791E0`, cited
+             * below, reached from `RemoveDecalFromManagerAndReturnNextSlot`
+             * where the key is already resident in memory as `&decal->
+             * mIndex`, hence the pointer-passing calling convention this
+             * emission and 0x0087A1A0's differ by).
+             * Address: 0x004E17C0 (FUN_004E17C0 -- `equal_range` -- the upper-bound descent then the lower-bound descent, both written back for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DF390; formerly `ResolveSndVarHashEqualRange` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008B62C0 (FUN_008B62C0 -- `equal_range` -- the upper-bound descent then the lower-bound descent, both written back for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x008B61C0 (unreached); formerly `ResolveSndVarHashEqualRange` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E1710 (FUN_004E1710 -- `equal_range` -- the upper-bound descent then the lower-bound descent, both written back for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `EqualRangeSoundParamsCacheByHash` in moho/audio/SoundSubsystemBootstrap.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00867E90 (FUN_00867E90 -- `equal_range` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19); caller `erase(key)` 0x00867AC0.)
+             * Address: 0x008B3130 (FUN_008B3130 -- the same for the `WeakSet<moho::UserUnit>::Entry` set; caller `erase(key)` 0x008B2E70.)
+             */
+            [[nodiscard]] std::pair<node_type*, node_type*> equal_range(const key_type& k) const
+            {
+                return {lower_bound_node(k), upper_bound_node(k)};
+            }
+
+            /**
+             * Address: 0x004DB770 (FUN_004DB770, sub_4DB770) --
+             * `msvc8::set<msvc8::string>::count` -- `Moho::AudioEngineImpl::
+             * mPausedCategoryNames` (`AudioEngine.h`), isNil@+0x29. Matches
+             * the classic Dinkumware `_Tree::count(key)` shape exactly:
+             * `equal_range(k)`'s two calls issued directly (`lower_bound_node`/
+             * `upper_bound_node`, `FUN_004DD410`/`FUN_004DD380`, see the
+             * `lower_bound_node` citation for why this instantiation never
+             * got a fused `equal_range` emission) then a counting loop
+             * advancing via `rb_increment` (`FUN_004DDD30`, cited above) --
+             * no `erase_range` tail call, unlike `erase(const key_type&)`'s
+             * otherwise-identical shape. `msvc8::map`/`msvc8::set`'s own
+             * `count()` wrappers (`Map.h`/`Set.h`) previously used a
+             * `find(k) != end() ? 1u : 0u` shortcut instead -- numerically
+             * identical for these unique-key containers (any `[lower,upper)`
+             * range for an absent key is empty; a present key's range holds
+             * exactly one node either way), but not what the binary actually
+             * runs at this address. Sole real caller is `AudioEngine::
+             * GetPaused` (`AudioEngine.cpp`): `mPausedCategoryNames.count(
+             * category) != 0`. Was previously duplicated as
+             * `CountPausedCategoryMatches` (`AudioEngine.cpp`, deleted by
+             * this migration).
+             */
+            [[nodiscard]] size_type count(const key_type& k) const
+            {
+                const std::pair<node_type*, node_type*> range = equal_range(k);
+                size_type result = 0;
+                for (node_type* n = range.first; n != range.second; n = rb_increment(n)) {
+                    ++result;
+                }
+                return result;
+            }
+
+            /** Node holding `k`, or the header when absent. */
+            /**
+             * Address: 0x00594BD0 (FUN_00594BD0, the by-name lookup for
+             * `CArmyStats::mNameIndex`; the `[this+0x14]` it opens with is that member's
+             * offset in CArmyStats, not a node field)
+             * Address: 0x00595130 (FUN_00595130, the same descent emitted a second time)
+             */
+            /**
+             * Address: 0x0052C420 (FUN_0052C420, already labelled
+             * `std::map_string_RBeamBlueprint::operator[]` -- the lower-bound-then-verify
+             * form `find` compiles to)
+             * Address: 0x0052C260 (FUN_0052C260)  Address: 0x0052C340 (FUN_0052C340)
+             * Address: 0x0052C500 (FUN_0052C500)
+             *
+             * The mesh, emitter and trail lookups respectively.
+             */
+            /**
+             * Address: 0x0077BCD0 (FUN_0077BCD0, the outer map's start-tick lookup)
+             */
+            /**
+             * Address: 0x005561C0 (FUN_005561C0, the category-lookup map's
+             * find -- `msvc8::map<msvc8::string, moho::CategoryLookupValue>`,
+             * `Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap`.
+             * Was previously (and incorrectly) marked `external_dependency`
+             * in `recovered_progress.json` -- that classification only saw
+             * the `std::operator<<char>` (STL string-compare thunk) callee
+             * and missed that the function also calls `FUN_00556970`
+             * (`Moho::EntityCategorySet::Find`, `lower_bound_node`'s
+             * emission for this instantiation, already recovered in
+             * `EntityCategoryLookupResolver.cpp`), which is real engine
+             * code. Matches this member field for field: `_Lbound` for the
+             * candidate, then `rb_is_nil(found) || comp(k, key_of(found))`
+             * -- IDA's own type inference names the tree
+             * `std::map_string_EntityCategory` here and the node's `_Myval`
+             * a `helper` struct whose `.first` is the key string, matching
+             * this instantiation's `pair<const msvc8::string,
+             * CategoryLookupValue>` `value_type`. Reached from
+             * `AddCategoryMemberBit` (FUN_005555C0, Sim.cpp) as
+             * `categoryMap.find(categoryName)`; `FUN_00556220`
+             * (`std::map_string_EntityCategory::find`, also already recovered
+             * in `EntityCategoryLookupResolver.cpp`) is a sibling emission of
+             * this same member reached from the read-only lookup path
+             * instead.)
+             */
+            /**
+             * Address: 0x006E1940 (FUN_006E1940, sub_6E1940 --
+             * `Moho::CCommandDB::RemoveCmd`'s (FUN_006E0EC0, cited below on
+             * `erase_node`) and `Moho::Sim::ValidateNewCommandId`'s
+             * (FUN_007491C0) find call) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`, isNil@+0x15. Same shape as `find_node`'s
+             * generic body with `lower_bound_node`'s descent inlined rather
+             * than called out to a separate emission -- opens with the same
+             * "descend recording the last branch, `>=` comparison walks
+             * left" loop as `lower_bound_node`, then the same
+             * nil-or-key-less rejection this member performs. Re-homed here
+             * from a bespoke `FindCommandNode` free function in Sim.cpp
+             * (four overloads reaching in through `CommandDbMapStorageView`/
+             * `CommandDbMapNodeView`/`CCommandDb`) that hand-
+             * walked the same real member instead of calling it.
+             *
+             * `FUN_006E0E90` is a thin wrapper over this same address:
+             * calls it, then returns the mapped `CUnitCommand*` value
+             * directly (nil-or-absent -> `nullptr`) rather than the node --
+             * the same "find, extract mapped value or null" convenience
+             * `try_get()` provides, just by-value instead of by-pointer.
+             * Zero incoming xrefs in this sweep. Re-homed here from a
+             * bespoke `FindCommandByIdRuntimeMap` free function in Sim.cpp.)
+             * Address: 0x006E0E90 (FUN_006E0E90, the find-and-extract wrapper
+             * described above)
+             */
+            /**
+             * Address: 0x008B6160 (FUN_008B6160, `std::map_uint_
+             * IssueCommandHelper::find`, called from `struct_CommandManager::
+             * FindDataFor`/`NewCommand` FUN_008B5A70, `struct_CommandManager::
+             * DeleteCommands` FUN_008B5C20, and `sub_8B5BB0`) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`, isNil@+0x15.
+             * Same inlined-lower-bound-then-verify shape as FUN_006E1940
+             * above, a separate instantiation (different `T`). Re-homed here
+             * from the same bespoke `FindCommandNode` free-function reach-in
+             * cited above, called through `CommandIssueMapOf` for this
+             * member instead.)
+             */
+            /**
+             * Address: 0x00948D80 (FUN_00948D80, render states)
+             * Address: 0x00948DF0 (FUN_00948DF0, sampler states)
+             * Address: 0x00948E60 (FUN_00948E60, texture-stage states)
+             *
+             * `find` for the three `gpg::gal::StateCache<K, unsigned int>`
+             * maps (`gpg/gal/StateCache.h`, isNil@+0x15, 8-byte value_type),
+             * the first statement of `StateCache::Update` (0x00949C80,
+             * 0x00949CE0, 0x00949D40). Same inlined-lower-bound-then-verify
+             * shape as FUN_006E1940/FUN_008B6160 above, taking an
+             * output-parameter slot (`*outSlot = found`) rather than
+             * returning the node directly -- the store-into-hidden-return-
+             * pointer convention already documented on `lower_bound_node`'s
+             * `FUN_006E1D30` adapter.
+             */
+            /**
+             * Address: 0x0083AD60 (FUN_0083AD60, sub_83AD60) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::find` --
+             * `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Lower-bound-then-verify shape matching this
+             * member exactly: calls `sub_83B440` (`lower_bound_node`,
+             * cited above), then rejects a nil or key-greater candidate
+             * back to `header()`. No confirmed engine caller in this
+             * sweep; `incoming_xrefs` is empty and no recovered
+             * `CUIKeyHandler` method currently calls `find` directly on
+             * this map (`AddUiKeyMapEntries`/`RemoveUiKeyMapEntries` use
+             * `operator[]`/`erase` instead). Kept here as the template's
+             * generic emission for this instantiation, not a per-type
+             * duplicate.)
+             */
+            /**
+             *
+             * Address: 0x008A8150 (FUN_008A8150, sub_8A8150) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * find_node` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint`/`lower_bound_node`
+             * above). Calls `lower_bound_node`'s emission for this
+             * instantiation (`FUN_008A8FE0`, cited above), then the same
+             * nil-or-key-less rejection this member performs, matching field
+             * for field. `FUN_008A80F0` is a thin wrapper over this same
+             * address with no logic of its own (`return sub_8A8150(map,
+             * key);`) -- `IWldTerrainRes::RemoveEnvLookup`'s real erase path
+             * (`CWldMap.cpp`) reaches the map through that wrapper before
+             * erasing the located node. Re-homed here from hand-rolled
+             * `FindTerrainEnvironmentNodeOrHead`/
+             * `FindTerrainEnvironmentNodeOrHeadForErase` free functions in
+             * `moho/sim/CWldMap.cpp` (the second a body-identical forwarder
+             * to the first, matching `FUN_008A80F0`/`FUN_008A8150`'s own
+             * wrapper relationship) that walked a duplicate
+             * `TerrainEnvironmentLookupMap`/
+             * a deleted overlay struct pair instead
+             * of calling this member (deleted along with the whole
+             * hand-rolled tree it anchored). `IWldTerrainRes::GetEnvLookup`
+             * now reaches this member directly as `mEnvLookup.find(key)`.
+             */
+            /**
+             * Address: 0x00879240 (FUN_00879240, sub_879240) -- lower-bound-
+             * then-verify shape matching this member exactly (confirmed via
+             * `.asm`/decompiled `.c`: descend `parentOrRoot`/`left`/`right`
+             * comparing `key >= cursor.key`, then reject back to `header` if
+             * the candidate is the header itself or its key is greater than
+             * the search key), isNil@+0x15. `Moho::EntId`/`Moho::CmdId`-keyed
+             * maps of this shape sharing this exact `function_sha256` in this
+             * binary include `std::map<EntId, Entity>::find`,
+             * `std::map<EntId, UserEntity>::find`, and `std::map<CmdId,
+             * CommandIssueHelper>::find` (the value type does not affect
+             * `find`'s compiled body) -- zero `incoming_xrefs`/callers for
+             * this specific address in this sweep, so the exact instantiation
+             * isn't pinned down; kept here as the template's generic
+             * emission, not a per-type duplicate, matching the 0x0083AD60
+             * entry above.
+             *
+             * This was formerly mis-modeled in
+             * `moho/containers/LegacyContainerFillLanes.cpp` as
+             * `LowerBoundTreeNodeFlag15ToOutputRecoveryA`, calling only this
+             * file's `FindLowerBoundTreeNode` (this member's `lower_bound_
+             * node` half) with NO rejection check -- a real fidelity bug
+             * (would return a lower-bound match instead of "not found" for
+             * an absent key). That duplicate had zero source-level callers
+             * of its own and has been deleted rather than fixed in place,
+             * since the correct fix is this citation.
+             * Address: 0x00879570 (FUN_00879570, ICF twin -- identical
+             * function_sha256. Formerly duplicated in the same file as
+             * `LowerBoundTreeNodeFlag15ToOutputRecoveryB`, a thin forwarder
+             * to the address above; deleted too.)
+             *
+             * Address: 0x007E5C00 (FUN_007E5C00) -- `msvc8::map<Moho::MeshKey,
+             * boost::weak_ptr<Moho::Mesh>>::find_node` -- `Moho::MeshRenderer::
+             * meshCacheTree` (`Mesh.h`), isNil@+0x25 (same instantiation cited
+             * on `lower_bound_node` above and `buy_node`/`insert_unique`/
+             * `insert_at`/`link_and_rebalance`/`rb_decrement` elsewhere in
+             * this file). Lower-bound-then-verify shape matching this member
+             * exactly. Sole real caller is `FindOrCreateMesh`'s lookup half
+             * (`Mesh.cpp`) via `try_get`. Re-homed here from a hand-rolled
+             * `MeshCacheTreeFind`/`FindMeshCacheNodeExactOrHead` free-function
+             * pair in `moho/mesh/Mesh.cpp` that walked a duplicate
+             * `MeshRendererMeshCacheNode`/`...Tree` struct pair over the same
+             * node shape instead of calling this member (deleted along with
+             * the whole hand-rolled tree it anchored).
+             *
+             * Address: 0x008792A0 (FUN_008792A0, sub_8792A0) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::find_node` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Lower-bound-then-verify
+             * shape matching this member exactly. Sole caller is
+             * `CDecalManager::FindDecalByIndex`'s `try_get(decalIndex)`
+             * (`CWldSplat.cpp`); re-homed here from a hand-rolled
+             * `FindLookupNodeByKey` free function that walked a duplicate
+             * `DecalGroupLookupNode`/`...Tree` struct pair instead of
+             * calling this member (deleted along with the whole hand-rolled
+             * tree it anchored).
+             * Address: 0x008795D0 (FUN_008795D0, sub_8795D0) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::find_node`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`.
+             * Sole caller is `CDecalManager::FindGroupBySplatIndex`'s
+             * `try_get(splatIndex)` (`CWldSplat.cpp`), same re-homing.
+             * Address: 0x0056AF80 (FUN_0056AF80 -- `find` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), the `mUnitOffsets.find`/`try_get` of `RemoveUnit`.)
+             * Address: 0x0056AFE0 (FUN_0056AFE0, `std::map_EntId_SUnitOffsetInfo::find` -- the same `find` emission reached from eight further formation call sites: `GetOffsetInfo`, `GetFormationPosition`, `GetOffsetPosition`, `GetTargetPosition`, `Contains`, `CalcFormationSpeed`, `GetDistFromLeader`, `GetPriority` (CAiFormationInstance.cpp).)
+             * Address: 0x00855320 (FUN_00855320 -- `find` (nil byte at node+0x19); callers 0x008534F0; formerly `FindExactMapNodeFlag25RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004963E0 (FUN_004963E0 -- `find` (lower_bound plus the equivalence check) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x00494930; formerly `ResolveParticleBucketCandidateOrHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00496590 (FUN_00496590 -- `find` (lower_bound plus the equivalence check) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x00494C20; formerly `ResolveTrailBucketCandidateOrHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004983A0 (FUN_004983A0 -- `find` (lower_bound plus the equivalence check) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `ResolveParticleBucketCandidateOrHeadDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00498650 (FUN_00498650 -- `find` (lower_bound plus the equivalence check) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `ResolveTrailBucketCandidateOrHeadDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00495C10 (FUN_00495C10 -- `find` (lower_bound plus the equivalence check) for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindBeamBucketEquivalentOrEnd` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045B160 (FUN_0045B160 -- `find` -- that lower bound plus the equivalence check for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00458D30; formerly `FileInfoFind` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045AF50 (FUN_0045AF50 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x00458D30, 0x00459100, 0x00459300; formerly `ZipEntryFind` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00556220 (FUN_00556220 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::EntityCategorySet>` (`EntityCategoryLookupTable::mCategories`; pair 0x48 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x28 category set -- node 0x60, key at node+0x10, set at node+0x30, colour/nil at +0x58/+0x59); callers 0x0052B1E0, 0x00555290, 0x005552C0; formerly `FindCategoryNodeOrHead` in moho/entity/EntityCategoryLookupResolver.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046D960 (FUN_0046D960 -- `find` -- the lower-bound descent plus the `_stricmp` equivalence check, returning the header on a miss for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046D2F0; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00463D50 (FUN_00463D50 -- `find` -- the lower-bound descent plus the equivalence check, returning the header on a miss for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00462AC0, 0x00462DD0; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A0400 (FUN_005A0400 -- `find` -- the lower-bound descent plus the equivalence check, returning the header on a miss for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F6C0; formerly `FindRebuildNodeForEraseOrHead` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E8F90 (FUN_004E8F90 -- `find` -- that lower bound plus the `key < candidate` check, snapping a miss to `end()` for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `FindTimeBarTrackInsertPoint` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007E2E60 (FUN_007E2E60 -- `find` -- the lower-bound descent (0x004DD380) plus the equivalence check, returning the header on a miss for `msvc8::set<msvc8::string>` (`ShaderDictionary::mDeprecatedNames` at +0x04; node 0x2C, the bare 0x1C key at node+0x0C, colour/nil at +0x28/+0x29); callers 0x007DBDB0; formerly `FindLookupNodeAndAppendTextRuntime` in moho/sim/SimRecoveryRuntime.cpp -- a generic function-pointer wrapper that matched nothing in the binary (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004360D0 (FUN_004360D0 -- `find` -- the lower-bound descent (0x004342F0) plus the equivalence check; `ResolveShaderAnnotationName` compares its result against the header for `msvc8::map<msvc8::string, msvc8::string>` (`ShaderDictionary::mRemaps` at +0x10; pair 0x38, node 0x48, key at node+0x0C, mapped name at node+0x28, colour/nil at +0x44/+0x45); callers 0x0042BE00, 0x00435A00, 0x007DBDB0; formerly unrecovered.)
+             * Address: 0x007F00A0 (FUN_007F00A0 -- `find` -- the lower-bound descent plus the equivalence check that `operator[]` runs first for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`; node 0x30, the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; formerly cited on `RegisterExtractor`'s doc block in moho/misc/RangeExtractor.cpp instead of on the member (RULE ONE), moved 2026-09-11.)
+             * Address: 0x007FDFE0 (FUN_007FDFE0 -- `find` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19): lower bound on the address (`jae` at 0x007FDFF8), then the equivalence check; caller `WeakSet<UserEntity>::Find` 0x007FDD50.)
+             * Address: 0x0082E560 (FUN_0082E560 -- the same for the `WeakSet<moho::UserUnit>::Entry` set; caller `WeakSet<UserUnit>::Find` 0x0082CEA0.)
+             */
+            [[nodiscard]] node_type* find_node(const key_type& k) const
+            {
+                node_type* const found = lower_bound_node(k);
+                if (rb_is_nil(found) || this->comp()(k, Traits::key_of(found->value))) {
+                    return head_;
+                }
+                return found;
+            }
+
+            // ---- modifiers ---------------------------------------------------
+
+            /**
+             * Address: 0x007E3CF0 (FUN_007E3CF0, batch-bucket map insert(const value_type&))
+             *
+             * IDA signature:
+             * _Pairib *__userpurge insert@<eax>(_Tree *this@<ebx>, const value_type *val@<esi>, _Pairib *result);
+             *
+             * What it does:
+             * Descends to the insertion parent recording the last branch taken,
+             * then confirms uniqueness by comparing against the in-order
+             * predecessor of the descent result before linking a fresh node.
+             * Returns the existing node with `false` when the key is present.
+             */
+            /**
+             * Address: 0x00594E70 (FUN_00594E70, the name-index map's insert-or-assign,
+             * which is what `mNameIndex[key] = item` compiles to at its four call sites in
+             * CArmyStats)
+             * Address: 0x00594C90 (FUN_00594C90, its descent half)
+             */
+            /**
+             * Address: 0x00496000 (FUN_00496000, the trail-segment pool's find-or-insert
+             * -- what `CWorldParticles::ReleaseTrailSegmentBuffer` compiles to)
+             * Address: 0x00497E50 (FUN_00497E50, its link half)
+             */
+            /**
+             * Address: 0x0077A930 (FUN_0077A930, the bucket set's find-or-insert -- what
+             * `mStartTickBuckets[tick].insert(handle)` compiles to on the inner set)
+             * Address: 0x0077A250 (FUN_0077A250, the outer map's `operator[]`, which the
+             * same expression compiles to on the outer map)
+             */
+            /**
+             * Address: 0x00534030 (FUN_00534030, RRuleGameRulesBlueprintMap insert --
+             * `GetOrCreateRegisteredBlueprint<RUnitBlueprint,...>`'s
+             * `map.insert(RRuleGameRulesBlueprintMap::value_type(normalizedId, blueprint))`
+             * at Sim.cpp; insert_at half is FUN_005349E0, predecessor lookup is FUN_005364D0)
+             * Address: 0x00534140 (FUN_00534140, same map insert, T=RProjectileBlueprint;
+             * insert_at FUN_00534B90, predecessor lookup FUN_00536530)
+             * Address: 0x00534250 (FUN_00534250, same map insert, T=RPropBlueprint;
+             * insert_at FUN_00534D40, predecessor lookup FUN_00536590)
+             * Address: 0x00534360 (FUN_00534360, same map insert, T=RMeshBlueprint;
+             * insert_at FUN_00534EF0, predecessor lookup FUN_005365F0)
+             * Address: 0x00534470 (FUN_00534470, same map insert reached from
+             * `GetOrCreateRegisteredEffectBlueprint<REmitterBlueprint,...>`; insert_at
+             * FUN_005350A0, predecessor lookup FUN_00536410)
+             * Address: 0x00534580 (FUN_00534580, same map insert, T=RBeamBlueprint;
+             * insert_at FUN_00535250, predecessor lookup FUN_005363B0)
+             * Address: 0x00534690 (FUN_00534690, same map insert, T=RTrailBlueprint;
+             * insert_at FUN_00535400, predecessor lookup FUN_00536470)
+             *
+             * All seven are byte-for-byte the same `insert_unique` shape (descend
+             * recording the last branch, confirm uniqueness against the in-order
+             * predecessor when the descent bottomed out on a left branch, link via
+             * `insert_at`) compiled once per `RRuleGameRulesImpl::Get*Blueprint()`
+             * owner even though the map type (`msvc8::map<msvc8::string,void*>`) is
+             * identical across all seven call sites -- the 2007 compiler did not
+             * fold them despite the shared instantiation.
+             */
+            /**
+             * Address: 0x0052BC60 (FUN_0052BC60, func_MapInsert -- the
+             * `msvc8::set<uint32_t>` embedded at `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals`, node 0x14 with `_Isnil` at +0x11
+             * (0x0D + sizeof(uint32_t)), matching the same shape as
+             * `Moho::SPeer::establishedUids` cited on `buy_head` below).
+             * `insert_at` half is FUN_0052CD30, predecessor lookup (`sub_530DD0`)
+             * is `rb_decrement`'s sibling emission for this instantiation.
+             * Called once per existing binding from `func_Add__blueprints`
+             * (0x00529B30, RRuleGameRulesImpl::mMaps loop at
+             * 0x00529BF0-0x00529C0B) -- recovered as
+             * `RegisterBlueprintInCategoryMaps` in Sim.cpp, which walks
+             * `rules->mMaps` and calls `mPendingBlueprintOrdinals.insert(ordinal)`
+             * on each binding.
+             *
+             * The node's value is 4 bytes (just the ordinal -- see the
+             * `buy_node` citation below), not the 8-byte
+             * `pair<const uint32_t, RBlueprint*>` a `msvc8::map` would need,
+             * which is what pins the instantiation to `msvc8::set<uint32_t>`
+             * rather than `msvc8::map<uint32_t, RBlueprint*>`.
+             */
+            /**
+             * Address: 0x0082E170 (FUN_0082E170, `Moho::UICommandGraph::
+             * mGraph`'s plain unique insert -- descends comparing
+             * the owner-based key at `node+4` against the sought key
+             * directly (no separate comparator call for the common case;
+             * `sub_8309D0` is called only on the tie-break branch, matching
+             * the `owner_before`-style `shared_ptr` compare CWldSession.cpp's
+             * `AddCommandQueueToCommandGraph` notes describe for
+             * `mGraph`'s `0x008B8D0` comparator), then confirms
+             * uniqueness and links via `insert_at` (0x0082E320, cited
+             * above). Called from `insert_hint`'s fallback branch,
+             * FUN_0082CC80 (cited below), matching this member's own
+             * `insert_unique(v).first` tail call.)
+             */
+            /**
+             * Address: 0x005560B0 (FUN_005560B0, the category-lookup map's
+             * insert -- `msvc8::map<msvc8::string, moho::CategoryLookupValue>`,
+             * `Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap`. Opens
+             * with the same descend-recording-the-last-branch loop as this
+             * member (`v5[10] < 0x10 ? &buf : ptr` is the msvc8::string SSO
+             * read at the candidate node's key, `[v5+0x59]` its `isNil`),
+             * confirms uniqueness against the in-order predecessor when the
+             * descent bottomed out on a left branch (`v6 == head->left` is
+             * the `where == leftmost()` fast-out; otherwise `rb_decrement`,
+             * FUN_00556E70, cited above), and tail-calls `insert_at`
+             * (FUN_005565D0, cited below) either way. Reached from
+             * `AddCategoryMemberBit` (FUN_005555C0, Sim.cpp) as
+             * `categoryMap.insert(CategoryLookupMap::value_type(categoryName,
+             * freshValue))` when `categoryMap.find(categoryName)` (FUN_005561C0,
+             * cited on `find_node` below) misses.
+             *
+             * The node's value does not start at the usual `node+0x0C` --
+             * see `CategoryLookupValue`'s citation block in Sim.cpp for the
+             * 8-byte-alignment evidence that moves it to `node+0x10` and the
+             * colour/nil pair to `node+0x58`/`node+0x59`.)
+             */
+            /**
+             * Address: 0x006870D0 (FUN_006870D0, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::insert_unique` -- `EntityDB::mIdPoolTree` in
+             * `EntityDb.h`. Matches this member field for field: descends
+             * recording the last branch (`addLeft`), fast-paths when the
+             * descent bottomed out at `leftmost()`, otherwise confirms
+             * uniqueness against the in-order predecessor via
+             * `FUN_006888E0` (`rb_decrement`, cited above) before
+             * tail-calling `insert_at` (`FUN_00687280`, cited above) either
+             * way. Reached from `EntityDbIdPoolMapTypeInfo::SerLoad`'s
+             * per-element `map->insert(value_type(key, std::move(pool)))`
+             * (binary: `std::map_IdPool::Deserialize`'s per-element
+             * `sub_6870D0` call, `FUN_00686990`) -- the map is freshly
+             * cleared immediately before, so every insert is unconditional,
+             * matching this member's unconditional-insert use here.)
+             */
+            /**
+             * Address: 0x006E15B0 (FUN_006E15B0, the command-id map's unique
+             * insert -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`. Matches this
+             * member field for field: descends recording the last branch
+             * (`Parent`/`v7`=`addLeft`), the `where == leftmost()` fast path
+             * tail-calls `insert_at` (FUN_006E1D60, cited below) directly,
+             * otherwise the predecessor check via `rb_decrement`
+             * (FUN_006E28D0, cited above) gates a second `insert_at` call or
+             * returns the colliding node with `false`. Reached from
+             * `AddIssueData` (FUN_006E0DB0) and `MemberDeserialize`
+             * (FUN_006E1430), both as `commands.insert(value_type(cmdId,
+             * command))`, `CCommandDb.cpp`.)
+             */
+            /**
+             * Address: 0x008B5DF0 (FUN_008B5DF0, sub_8B5DF0, called from
+             * `struct_CommandManager::FindDataFor`/`NewCommand` FUN_008B5A70
+             * as `insert(value_type(commandId, helper))`) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`. Same shape
+             * as FUN_006E15B0 above (a separate instantiation): descends
+             * recording the last branch, `where == leftmost()` fast path
+             * tail-calls `insert_at` (FUN_008B6310, cited below) directly,
+             * otherwise a predecessor check via `rb_decrement` (FUN_008B6950,
+             * cited above) gates a second `insert_at` call or returns the
+             * colliding node with `false`. Re-homed here from a bespoke
+             * `InsertCommandNode`/`InsertCommandNodeFixup` free-function pair
+             * in Sim.cpp that hand-rolled unique-insert-plus-fixup over a
+             * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in
+             * instead of calling it.)
+             */
+            /**
+             * Address: 0x007B26B0 (FUN_007B26B0, `msvc8::set<std::uint32_t>::
+             * insert_unique` for the per-parent-bone child-set nested inside
+             * `Map.h`'s `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>::
+             * operator[]` instantiation (cited there as `FUN_007B27D0`) --
+             * confirmed via raw `.asm`: `this`=eax is a direct register
+             * carry-over of that `operator[]` call's return value (a pointer
+             * into the found/created entry's embedded-set control block),
+             * `a2`=ebx is the key read once via `mov edx,[ebx]`. Descend loop
+             * tests isNil at `[node+0x11]` (17 decimal, matching the flat
+             * `msvc8::set<std::uint32_t>` shape already documented throughout
+             * this file's other `msvc8::set<std::uint32_t>` instantiations) and updates
+             * the candidate every iteration with an explicit `addLeft` flag
+             * -- this member's shape, not `lower_bound_node`'s. `where ==
+             * leftmost()` fast path tail-calls `insert_at` (`sub_7B2B30`,
+             * buys via `sub_7B3660` then runs the standard recolor/rotate
+             * climb) directly; otherwise a predecessor check via
+             * `sub_7B3FC0` (`rb_decrement`) gates a second `insert_at` call
+             * or returns the colliding node with `false`. Inserts the
+             * current bone's own pointer (reinterpreted as `uint32_t`) into
+             * its parent's just-obtained child-set, `dedupTree[parentPtr]
+             * .insert(bonePtr)` inside `CON_ANI_DumpSkeleton`'s per-bone walk
+             * loop (CAniSkel.cpp, not yet recovered).)
+             */
+            /**
+             * Address: 0x008D4F10 (FUN_008D4F10, sub_8D4F10) -- local
+             * `msvc8::rb_tree<moho::Resolution>::insert_unique` (dedup tree
+             * for the raw binary's adapter-mode enumeration -- see the
+             * `insert_at`/`FUN_008D5720` citation above for the full
+             * "not yet wired, current recovered source uses a linear-scan
+             * dedup instead" context). Descend loop compares the 3-int
+             * `(width,height,framesPerSecond)` key at node value-offsets
+             * +16/+20/+24 (skipping +12, the `Resolution::vftable` slot)
+             * against the same fields on the candidate `Resolution` being
+             * inserted, isNil test at +0x1D(29) -- confirmed against
+             * `insert_at`'s own repeated recoloring of +0x1C(28) throughout
+             * its rebalance loop (proof this is color, not isNil, matching
+             * the corrected `buy_head`/`FUN_008D6940` citation above).
+             * `where==leftmost()` fast path tail-calls `insert_at` directly;
+             * otherwise a predecessor check via `sub_8D69D0`
+             * (`rb_decrement`, cited below) gates a second `insert_at` call
+             * or returns the colliding node with `false`. Its two real
+             * callers are `FUN_008D21E0`/`FUN_008D26D0`
+             * (`SetupPrimaryAdapterSettings`/`SetupSecondaryAdapterSettings`'s
+             * RAW, un-recovered binary bodies).
+             */
+            /**
+             * Address: 0x0083BC50 (FUN_0083BC50, sub_83BC50) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::insert_unique`
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Descends recording the last branch (`addLeft`),
+             * fast-paths when the descent bottomed out at `leftmost()`
+             * (tail-calls `insert_at`/`FUN_0083BDE0`, cited below, with
+             * `addLeft=true`), otherwise confirms uniqueness against the
+             * candidate directly (no separate `rb_decrement` call in this
+             * emission -- the compiler folded the predecessor check into
+             * the same descent that produced `where`) before tail-calling
+             * `insert_at` either way. Reached from `insert_hint`'s emission
+             * (`FUN_0083B320`, cited below) as its final fallback branch --
+             * the same `insert_unique(v).first` tail call this member's
+             * own C++ source performs. Previously mis-tracked
+             * `external_dependency` ("all-external-callees thunk"); its
+             * sole real callee, `sub_83BDE0`, is engine code (this
+             * template's own `insert_at`), not third-party runtime.)
+             */
+            /**
+             * Address: 0x00580510 (FUN_00580510, sub_580510) --
+             * `Moho::CAiBrain::mBuildStructureMap`'s unique insert --
+             * `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`, isNil@+0x25,
+             * the same instantiation cited on `buy_head`/`buy_node`/
+             * `rb_max`/`rb_decrement` elsewhere in this file
+             * (0x00581330/0x00581370/0x0057F1B0/0x00581620). The descent
+             * loop inlines the two-`int` `Wm3::Vector2i` field-by-field
+             * comparator (x then y, matching `this->comp()` for this key
+             * type) directly into the tree walk instead of calling out,
+             * confirmed against the `.c`: `v11 = node->key[i]; if (key[i] <
+             * v11) less; if (key[i] > v11) greater; else ++i, retry, equal
+             * at i==2`. Non-leftmost branch calls `rb_decrement`
+             * (`FUN_00581620`, cited above) for the `probe` predecessor
+             * check via `lea edx,[local]` / `call sub_581620` (confirmed
+             * against the `.asm`, no other args -- the out-param-slot
+             * calling convention); both branches tail into `insert_at`
+             * (`FUN_00580720`, already recovered) and the final uniqueness
+             * test calls the same comparator (`FUN_00582A10`) on
+             * `probe->value`/`v`. Two real callers: `insert_hint`'s emission
+             * for this instantiation (`FUN_0057EFF0`, cited below) as its
+             * final fallback (`return insert_unique(v).first`), and
+             * `BuildReserveMapTypeInfo::SerLoad` (`CAiBrain.cpp`, already
+             * recovered) directly -- `operator[]`/`insert_hint` are fully
+             * inlined at that particular call site (`(*mapObject)[key]`
+             * inside `SerLoad`'s per-entry loop), leaving only this member
+             * as a real out-of-line call in that emission (confirmed: `.c`
+             * shows `sub_580510(a2, v15, v20)` called directly from
+             * `SerLoad`'s loop body). Previously mis-tracked
+             * `external_dependency` ("all-external-callees thunk"); every
+             * real callee (`sub_580720`/`sub_581620`/`sub_582A10`) is this
+             * template's own engine code, not third-party runtime
+             * (DB-integrity fix).
+             */
+            /**
+             * Address: 0x006AF840 (FUN_006AF840, sub_6AF840) --
+             * `msvc8::map<msvc8::string, float>::insert_unique` --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@
+             * +0x2D (same 48-byte node cited on `lower_bound_node` above).
+             * Full descent recording the last branch, leftmost fast path via
+             * `rb_decrement` (`sub_6B03D0`, ICF twin of the canonical
+             * `FUN_005363B0` `rb_decrement` emission already `skip`'d in
+             * `recovered_progress.json`), final uniqueness compare, then
+             * tail-calls `insert_at` (`FUN_006AFA40`, cited below) either
+             * way -- matches this member field for field. Two real callers:
+             * `insert_hint`'s emission for this instantiation
+             * (`FUN_006AEDD0`, cited below) as its final fallback
+             * (`return insert_unique(v).first`), and `gpg::RMapType_string_
+             * float::SerLoad` (`FUN_006AF250`, already recovered in
+             * `RMapStringFloatTypeInfo.cpp`) directly -- `operator[]` is
+             * fully inlined at that call site (`(*destination)[key] =
+             * value` inside `SerLoad`'s per-entry loop), leaving only this
+             * member as a real out-of-line call in that emission, the same
+             * "operator[]/insert_hint fully inlined, only insert_unique
+             * out-of-line" shape `FUN_00580510` above documents for a
+             * sibling instantiation. Previously `recovered` with no
+             * citation/source/report (`depends_on: [FUN_006AFA40,
+             * FUN_006B03D0]`, both since resolved -- DB-integrity gap, not a
+             * false attribution); this is the real source.
+             *
+             * Address: 0x0070F040 (FUN_0070F040, sub_70F040) -- the same
+             * `moho::CArmyStats`-owned 4-byte-`uint32_t`-value tree's
+             * `insert_unique`: full descent tracking the last branch taken,
+             * final uniqueness compare, tail-calls `insert_at` (`sub_710030`,
+             * cited above) on the accepted leftmost-child branch (`*v3 =
+             * *insert_at(&a3,1,a2); v3[4]=1; return v3;`) -- matches this
+             * member field for field. Real caller is `Moho::CArmyStats::
+             * ArmyXmlStatsNode` (`FUN_0070CC40`, already recovered,
+             * `CArmyStats.cpp`), which calls this token twice while
+             * building its XML stats node. Was `skip` with the note "No
+             * source line can currently be produced" after a DB-integrity
+             * revert -- corrected here now that the real source can be
+             * produced.
+             *
+             * Address: 0x008A8C30 (FUN_008A8C30, sub_8A8C30) --
+             * `msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>
+             * ::insert_unique` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint` above). Sole
+             * real caller is `insert_hint`'s emission for this instantiation
+             * (`FUN_008A8590`, cited above) as its final fallback (`*a3 =
+             * *(_DWORD*)sub_8A8C30(a2,a1); return a3;` -- takes `.first` via
+             * the hidden-return-slot convention, matching `insert_unique(v)
+             * .first`).
+             */
+            /**
+             * Address: 0x007E5B20 (FUN_007E5B20, sub_7E5B20) -- `msvc8::map<
+             * MeshKey, boost::weak_ptr<Mesh>>::insert_unique` for `moho::
+             * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`), isNil@+0x25
+             * (same instantiation cited on `alloc_raw`/`buy_node` above).
+             * Descend loop performs exactly one comparison per level
+             * (`MeshKey`'s field-lexicographic `blueprint` then
+             * `meshMaterial`-pointer-identity ordering, read directly at
+             * node+0x10/node+0x14 rather than through a named comparator
+             * call) and tracks only the last branch taken (`addLeft`) --
+             * matches this member's single-`comp()`-call descent exactly,
+             * not a three-way (less/greater/equal) compare at every level.
+             * `where == leftmost()` fast path (`v5 == **(a2+4)`, i.e.
+             * `where == head->left`) tail-calls `insert_at` directly with
+             * `addLeft=true`; otherwise confirms uniqueness against the
+             * in-order predecessor via `sub_7E60F0` (`rb_decrement`, cited
+             * below) before the final `comp()(key(probe), key(v))` compare
+             * that decides insert-vs-return-existing. Matches this member
+             * field for field. Sole caller not yet identified by direct
+             * xref (mesh-cache lookups are reached through `FindOrCreateMesh`
+             * (0x007E5280) via a level of indirection this pass has not
+             * traced to its literal call site); `Mesh.cpp`'s
+             * `MeshCacheTreeInsertUnique` is the current recovered source
+             * for this shape and needs its search-phase algorithm brought
+             * in line with this member (it currently uses an early-exit
+             * three-way compare per level instead of this member's
+             * single-compare-then-predecessor-check shape -- output-
+             * equivalent for a tree with no pre-existing duplicate keys,
+             * but not a faithful structural match). Not yet routed through
+             * this template.
+             */
+            /**
+             * Address: 0x008CBA70 (FUN_008CBA70, sub_8CBA70) -- `msvc8::map<
+             * msvc8::string, msvc8::vector<msvc8::string>>::insert_unique`
+             * for `USER_GetSpecialFiles`'s `outFilesByProfile` out-param
+             * (`StartupHelpers.cpp`). Full descent tracking the last branch
+             * via `std::operator<<char>` (this instantiation's
+             * `msvc8::string` less-than compare, the shared per-char-type
+             * string-compare emission used by other `msvc8::string`-keyed
+             * trees), leftmost fast path, final
+             * uniqueness compare against the in-order predecessor, then
+             * tail-calls `insert_at` (`FUN_008CBB80`) either way -- matches
+             * this member field for field. Sole real caller is this
+             * instantiation's own `insert_hint` (`FUN_008CB860`, cited
+             * above) as its final fallback, taking `.first` via the
+             * hidden-return-slot convention. DB-integrity fix: was
+             * `blocked` ("owner/dependent lane not yet reconstructed")
+             * despite its caller already being marked `skip` as "the
+             * programmer-written source line... already exists" -- that
+             * claim was premature: the existing source used `std::map`
+             * (wrong ABI), so no line actually instantiated this template
+             * until the retype in this pass (`StartupHelpers.h`/`.cpp`,
+             * `Sim.cpp`).
+             *
+             * Address: 0x0087AB70 (FUN_0087AB70, sub_87AB70) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::insert_unique` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_at`/
+             * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Matches this member
+             * field for field: full descent tracking `where`/`addLeft`,
+             * `where == leftmost()` fast path straight to `insert_at`
+             * (`FUN_0087AF70`, cited below), else `probe = rb_decrement
+             * (where)` (`FUN_0087CCB0`, cited above), then the uniqueness
+             * compare against `probe` deciding between `insert_at` and
+             * `{probe, false}`. Sole real caller is this instantiation's own
+             * `insert_hint` (`FUN_00879B10`, cited below) at its final
+             * fallback. Both maps were previously a hand-rolled RB-tree pair
+             * (`DecalGroupLookupTree`/`DecalGroupLookupNode`,
+             * `CWldSplat.cpp`) whose insert path (`ResolveLookupValueSlotForKey`,
+             * FUN_00879120 -- cited on `Map.h`'s `operator[]` below) linked
+             * a freshly-allocated node straight onto its BST parent with
+             * **no rotation/recolor step at all** -- a plain unbalanced BST
+             * insert, not the real self-balancing algorithm this member (and
+             * `insert_hint`/`insert_at` beneath it) implements; the same
+             * missing-rebalance shape independently documented on
+             * `AudioMap1CategoryNode` in
+             * `.memory/project_audiomap1_missing_rebalance_bug.md`.
+             * Address: 0x0087B4F0 (FUN_0087B4F0, sub_87B4F0) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::insert_unique`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * same shape, called from that tree's own `insert_hint`
+             * (`FUN_00879F60`, cited below) at its final fallback.
+             */
+            /**
+             * Address: 0x004DB600 (FUN_004DB600, sub_4DB600) --
+             * `msvc8::set<msvc8::string>::insert_unique` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), a set
+             * of paused-category names (`value_type == msvc8::string`, no
+             * separate mapped value), isNil@+0x29 (0x0D header + 0x1C
+             * `msvc8::string`). Full descent via `msvc8::string`'s own
+             * less-than compare (`std::operator<<char>`) tracking `where`/
+             * `addLeft`, `where == leftmost()` fast path straight to
+             * `insert_at` (`FUN_004DBE30`, cited below), else `probe =
+             * rb_decrement(where)` (`FUN_004DD950`, cited below) then the
+             * final uniqueness compare deciding between `insert_at` and
+             * `{probe, false}` -- matches this member field for field. Sole
+             * real caller is `AudioEngine::SetPaused`'s
+             * `mPausedCategoryNames.insert(category)` (`AudioEngine.cpp`,
+             * the `paused == true` branch). Previously modelled as a
+             * hand-rolled, hand-walked hunt through a duplicate
+             * `AudioMap1CategoryNode`/`AudioMapStorage` struct pair
+             * (`InsertPausedCategoryName`, `AudioEngine.cpp`) that used this
+             * member's own search shape (three-way `strcmp` descent) but
+             * then linked the new node directly via `ConstructPausedCategoryNode`
+             * with **no rebalancing step at all** -- it never called
+             * `insert_at`/`link_and_rebalance`, so every insert degraded
+             * into a plain unbalanced BST insert. This is the bug
+             * `.memory/project_audiomap1_missing_rebalance_bug.md` diagnosed
+             * and this migration onto the real template fixes; the missing-
+             * rebalance shape is the same class already found on
+             * `CDecalManager`'s `mDecalGroupLookupByDecalIndex`/
+             * `mDecalGroupLookupBySplatIndex` (see the `insert_unique`
+             * citations above) and, at the time this paragraph was first
+             * written, was flagged as suspected on the sibling
+             * `AudioEngineImpl::mMap2` tree (`AudioCategoryVolumeNode`) one
+             * level over in the same file -- see this member's own citation
+             * for that instantiation below, which register-traces the real
+             * `.asm` and finds a related but distinct defect: not a missing-
+             * rebalance real-binary shape, but a previously-recovered
+             * function that was never actually a body of the address it
+             * claimed at all.
+             *
+             * Address: 0x004DCDE0 (FUN_004DCDE0, sub_4DCDE0) -- `msvc8::map<
+             * std::uint16_t, float>::insert_unique` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_at`/`rotate_left`/
+             * `rotate_right`/`rb_decrement`/`rb_increment`/`rb_min`/`rb_max`/
+             * `buy_node`/`destroy_subtree`/`erase_node`/`erase_range`/
+             * `alloc_raw`/`~rb_tree()` elsewhere in this file). Register-
+             * traced field for field: full descent tracking `where`/`addLeft`
+             * via the raw `uint16_t` less-than compare, `where == leftmost()`
+             * fast path straight to `insert_at(true, where, v)` (`FUN_004DCF90`,
+             * cited below) taking its `.first`, else `probe = rb_decrement
+             * (where)` (`FUN_004DDC30`, cited below) when `addLeft`, else
+             * `probe = where` unchanged, then the final uniqueness compare
+             * (`probe->category < *key`) deciding between `insert_at(addLeft,
+             * where, v)` and returning `{probe, false}` unmodified -- matches
+             * this member's `insert_at`/`{probe,false}` branch exactly,
+             * including which operand the returned `.first`/`.second` pair
+             * reads from on each path. Sole real caller is `insert_hint`'s
+             * own emission for this instantiation (`FUN_004DC080`, cited
+             * above) at its final fallback, taking `.first` via the hidden-
+             * return-slot convention -- this member is not reached directly
+             * from any `AudioEngine.cpp` call site, only indirectly through
+             * `insert_hint`, exactly mirroring `FUN_0087AB70`/`FUN_0087B4F0`'s
+             * own "reached only through this tree's own `insert_hint`" role
+             * documented above for the `CDecalManager` instantiations.
+             * Address: 0x0056CCE0 (FUN_0056CCE0 -- `insert` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): the map serializer's `insert(value_type(key, value))` and `operator[]`'s miss path in `RunScript`.)
+             * Address: 0x0056F370 (FUN_0056F370, sub_56F370 -- `insert` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): `operator[]`'s miss path in the position caches.)
+             * Address: 0x00685350 (FUN_00685350 -- `_Insert` unique by `EntId` (the entity db tree); callers 0x00684480, 0x00684AA0; formerly `FindOrInsertEntityNodeByIdRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007108D0 (FUN_007108D0 -- `_Insert` unique by key (the army-stats tree); callers 0x0070F6C0, 0x0070FE00; formerly `FindOrInsertArmyStatsNodeByKeyRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071A9A0 (FUN_0071A9A0 -- `_Insert` unique (influence map, nil byte at node+0x3D); callers 0x00719520, 0x0071A530; formerly `FindOrInsertInfluenceNodeWideRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071B360 (FUN_0071B360 -- `_Insert` unique (influence map, nil byte at node+0x15); callers 0x00719AB0, 0x0071A220; formerly `FindOrInsertInfluenceNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007B3760 (FUN_007B3760 -- `_Insert` unique by `unsigned int` key (nil byte at node+0x1D); callers 0x007B2DF0; formerly `FindOrInsertMapNodeNil29Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007CDED0 (FUN_007CDED0 -- `_Insert` unique for `set<char>`; callers 0x007CD990; formerly `FindOrInsertSetCharNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C7A0 (FUN_0049C7A0 -- `_Insert` unique for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049A870; formerly `InsertParticleBucketTreeEntryAtHint` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CAF0 (FUN_0049CAF0 -- `_Insert` unique for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049AAB0; formerly `InsertTrailBucketTreeEntryAtHint` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A870 (FUN_0049A870 -- `_Insert` unique for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x004981C0; formerly `InsertParticleBucketEntryOrResolveDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049AAB0 (FUN_0049AAB0 -- `_Insert` unique for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x00498470; formerly `InsertTrailBucketEntryOrResolveDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004981C0 (FUN_004981C0 -- `_Insert` unique for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x00494930, 0x004963D5; formerly `InsertOwnedParticleBucketByKey` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00498470 (FUN_00498470 -- `_Insert` unique for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x00494C20, 0x00496585; formerly `InsertOwnedTrailBucketByKey` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             */
+            /**
+             * Address: 0x005C5AF0 (FUN_005C5AF0 -- `insert_equal` for `msvc8::multimap<
+             * moho::SReconKey, moho::ReconBlip*>` (`CAiReconDBImpl::mBlipMap` at +0x04,
+             * node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at
+             * +0x1C/+0x1D). The shipped body descends with the comparator and links at
+             * the leaf without ever testing equivalence, which is what separates a
+             * multimap's insert from a map's; the deserialize path (0x005C6210) calls it
+             * straight after reading a key and a blip, with no lookup in between.
+             * Formerly `InsertMapNodeBySourceEntityId` in moho/ai/CAiReconDBImpl.cpp
+             * (RULE ONE), removed 2026-09-10.)
+             *
+             * Equivalent-key insert: descend to the leaf the comparator picks and link
+             * there. Unlike `insert_unique` there is no equivalence probe, so equal keys
+             * accumulate in insertion order.
+             * Address: 0x005C44F0 (FUN_005C44F0 -- the out-parameter shape of that same `insert_equal` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); zero callers, unreachable; formerly `InsertMapNodeBySourceEntityIdNodeOutAdapter` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E1FD0 (FUN_004E1FD0 -- `insert(value)` -- descends `key < node->key ? left : right` with no equivalence probe, which is what makes this a multimap for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004DF790, 0x004E16B0; formerly `InsertSndParamsCacheEntryLocked`'s body in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E2110 (FUN_004E2110 -- `insert(value)` -- the `if (_Multi)` branch of `_Tree::insert`: descend without probing for an equivalent key, link, and hand back `{node, true}` for `msvc8::multimap<std::uint32_t, moho::CSndVar*>` (`gSndVarNameCache` in moho/audio/CSndVar.cpp; pair 0x08, node 0x18, key at node+0x0C, variable pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004DF390, 0x004E1770; formerly `LocateSndVarCacheLowerBound` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00504990 (FUN_00504990 -- `_Tree::insert(value)`, the `_Multi` descent that hands back `{node, true}` through its out-pair, for `moho::SpatialMap<T>` = `msvc8::multiset<moho::SpatialEntry<T>, moho::SpatialEntryLess<T>>` (moho/mesh/SpatialDb.h; node 0x38, the 0x28 entry at node+0x0C, the fade key at node+0x2C, colour/nil at +0x34/+0x35); callers 0x00502200, 0x00504310, 0x00504A10; formerly `InsertSpatialPayloadByFade` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             */
+            node_type* insert_equal(const value_type& v)
+            {
+                node_type* where = head_;
+                bool addLeft = true;
+                for (node_type* n = root(); !rb_is_nil(n);) {
+                    where = n;
+                    addLeft = this->comp()(Traits::key_of(v), Traits::key_of(n->value));
+                    n = addLeft ? n->left : n->right;
+                }
+
+                return insert_at(addLeft, where, v);
+            }
+
+            /**
+             * Address: 0x0045AB60 (FUN_0045AB60 -- `insert(value)` -- the lower-bound probe, then descend and link for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x004584B0; formerly `ZipMapInsertUniqueEntry` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F1010 (FUN_007F1010 -- `insert(value)`'s hintless descent to the link site for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007F05A0; formerly `ResolveRangeProfileInsertSiteFallback` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046DEE0 (FUN_0046DEE0 -- `_Insert` -- the `0x7FFFFFE` = `0xFFFFFFFF/0x20 - 1` length guard, then buy the node, link it and rebalance for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046D840; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00464470 (FUN_00464470 -- `_Insert` -- the `0x7FFFFFE` length guard, then buy the node, link it and rebalance for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463960; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A0EA0 (FUN_005A0EA0 -- `insert(value)` -- the lower-bound probe, then descend and link for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x005A08B0, 0x005A0C60; formerly `LowerBoundOrInsertRebuildMapNode` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007AEDC0 (FUN_007AEDC0 -- `insert(value)` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19); callers `WeakSet<UserEntity>::Add` 0x007AE1B0, the set range constructor 0x00822C50 and the range inserts 0x00868AF0 / 0x00868A00.)
+             * Address: 0x00822420 (FUN_00822420 -- the same for the `WeakSet<moho::UserUnit>::Entry` set: descend with the unsigned address compare (0x00822440), the `--it` check 0x00822A50, `_Insert` 0x00822670; callers `WeakSet<UserUnit>::Add` 0x00822270 and the range constructor 0x00831310.)
+             */
+            std::pair<node_type*, bool> insert_unique(const value_type& v)
+            {
+                node_type* where = head_;
+                bool addLeft = true;
+                for (node_type* n = root(); !rb_is_nil(n);) {
+                    where = n;
+                    addLeft = this->comp()(Traits::key_of(v), Traits::key_of(n->value));
+                    n = addLeft ? n->left : n->right;
+                }
+
+                node_type* probe = where;
+                if (addLeft) {
+                    if (where == leftmost()) {
+                        return {insert_at(true, where, v), true};
+                    }
+                    probe = rb_decrement(where);
+                }
+
+                if (this->comp()(Traits::key_of(probe->value), Traits::key_of(v))) {
+                    return {insert_at(addLeft, where, v), true};
+                }
+                return {probe, false};
+            }
+
+            /**
+             * Address: 0x007E3340 (FUN_007E3340, batch-bucket map insert(const_iterator, const value_type&))
+             *
+             * IDA signature:
+             * iterator *__userpurge insert@<eax>(_Tree *this@<ecx>, const value_type *val@<eax>,
+             *                                    iterator *result, _Nodeptr hint);
+             * (`retn 8` - the two stack dwords are the sret iterator and the hint
+             * node; the tree arrives in `ecx` and the value in `eax`.)
+             *
+             * Hinted unique insert (MSVC8 `_Tree::insert(const_iterator, const value_type&)`).
+             *
+             * `map::operator[]` passes its `lower_bound` result as the hint, so the
+             * common "fill the gap we just located" case links without a second
+             * descent; a useless hint falls back to the plain unique insert.
+             *
+             * The shipped body matches this one branch for branch:
+             *   0x007E334D  `cmp [tree+8], 0`                  -> empty tree, link at the header
+             *   0x007E3374  `cmp hint, [head]`                 -> hint == leftmost
+             *   0x007E33A3  `cmp hint, head`                    -> hint == end(), compare against rightmost
+             *   0x007E33F3  `_Dec` then `cmp [before->right].isNil` at 0x007E3411
+             *   0x007E344E  `_Inc` then `cmp [at->right].isNil` at 0x007E3477
+             *   0x007E34B1  fall back to `insert_unique` and take `.first`
+             * Every accepted branch tail calls `_Insert` (0x007E3F10 = `insert_at`)
+             * with the `addLeft` flag this function decided.
+             */
+            /**
+             * Address: 0x0070F6C0 (FUN_0070F6C0, the
+             * `std::map<const RBlueprint*, float>` instantiation behind
+             * `CArmyStatItem::mBlueprintStats`. It is the classic three-way hint check --
+             * empty tree, hint == begin, hint == end -- each falling through to the
+             * general insert at 0x00710A40, and it is reached from `operator[]`
+             * (0x0070E2B0), which is where VC8 puts its only hinted-insert call.)
+             */
+            /**
+             * Address: 0x0082CC80 (FUN_0082CC80, `Moho::UICommandGraph::
+             * mGraph`'s hinted insert -- matches this member's
+             * branch structure directly: empty-tree fast path straight to
+             * `insert_at`, `hint == leftmost()` check, `rb_is_nil(hint)`
+             * (== `end()`) check against `rightmost()`, then the
+             * decrement/increment straddle checks, each tailing into
+             * `insert_at` (0x0082E320, cited above) with the decided
+             * `addLeft`, and a final fallback to `insert_unique`
+             * (0x0082E170, cited above) taking its `.first`. This is the
+             * `map::operator[]`-shaped hinted insert CWldSession.cpp's
+             * `AddCommandQueueToCommandGraph` notes already name at this
+             * address, for `mGraph[texture]`'s `lower_bound`
+             * result feeding straight back in as the hint. Its own caller,
+             * the `lower_bound` descent FUN_0082B8B0, remains unrecovered --
+             * `AddCommandQueueToCommandGraph` itself is still blocked on the
+             * separate, much larger `LinkCommandGraphEdge` edge-builder.)
+             */
+            /**
+             * Address: 0x006864E0 (FUN_006864E0, `std::map_uint_IdPool::insert`
+             * -- `msvc8::map<std::uint32_t, moho::IdPool>`'s hinted insert,
+             * `EntityDB::mIdPoolTree` in `EntityDb.h`. Matches this member's
+             * branch structure directly: empty-tree fast path, `hint ==
+             * leftmost()` check, `hint == end()` check against `rightmost()`,
+             * then the decrement/increment straddle checks (via
+             * `FUN_006888E0`, `rb_decrement`, cited above), each falling
+             * through to `insert_at` (`FUN_00687280`, cited above) with the
+             * decided `addLeft`, and a fallback to `insert_unique`
+             * (`FUN_006870D0`, cited above) taking its `.first`. Reached
+             * from `EntityDB::MemberSerialize`'s
+             * `mIdPoolTree[familySourceBits]` (binary: `Moho::EntityDB::
+             * DoReserveId`/`ReleaseId`'s `std::map_uint_IdPool::find2`,
+             * `FUN_00685750`, cited on `msvc8::map::operator[]` in Map.h --
+             * `find2` is this instantiation's `operator[]`: lower-bound then
+             * conditional hinted insert).)
+             * Address: 0x007B2DF0 (FUN_007B2DF0, sub_7B2DF0) -- `msvc8::map<
+             * std::uint32_t, msvc8::set<std::uint32_t>>::insert_hint` for
+             * `CON_ANI_DumpSkeleton`'s per-parent-bone dedup map (isNil@0x1D,
+             * the same outer-map instantiation cited on `operator[]` in
+             * `Map.h` for `FUN_007B27D0`). Matches this member's full branch
+             * structure: empty/leftmost/rightmost checks, predecessor/
+             * successor straddle checks, falls through to `insert_at`
+             * (`sub_7B2B30`, cited on `insert_unique` above) with the
+             * decided `addLeft`, fallback to `insert_unique` taking its
+             * `.first`. Called from `operator[]`'s miss path (`FUN_007B27D0`)
+             * with the just-descended `hint` and a freshly-built
+             * `value_type(parentPtr, mapped_type())` temporary -- exactly
+             * this member's documented role. `Moho::CON_ANI_DumpSkeleton`
+             * itself (CAniSkel.cpp) is not yet recovered.)
+             */
+            /**
+             * Address: 0x008CB860 (FUN_008CB860, sub_8CB860) --
+             * `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>::
+             * insert(hint, value)` for `USER_GetSpecialFiles`'s
+             * `outFilesByProfile` out-param (`StartupHelpers.cpp`). Matches
+             * this member's branch structure: empty-tree fast path straight
+             * to `insert_at` (`FUN_008CBB80`, cited below on
+             * `insert_unique`), `hint == leftmost()` / `hint == end()`
+             * checks (via `sub_423A00`, this instantiation's `msvc8::string`
+             * `operator<`), decrement/increment straddle checks (via
+             * `sub_8497C0`, `rb_decrement`), each tailing into `insert_at`
+             * with the decided `addLeft`, and a final fallback to
+             * `insert_unique` (`FUN_008CBA70`, cited below) taking its
+             * `.first`. Reached from `SubscriptStringToStringVectorMap`'s
+             * `map[key]` (`operator[]`, `StartupHelpers.cpp`, this
+             * instantiation's `Map.h` `operator[]` passing its `lower_bound`
+             * result as the hint) -- DB-integrity fix: the caller chain was
+             * recovered with `std::map`/`std::vector`/`std::string`
+             * (modern STL, wrong ABI), so nothing in the tree instantiated
+             * this template family; retyped to `msvc8::` throughout
+             * (`StartupHelpers.h`/`.cpp`, `Sim.cpp`'s
+             * `cfunc_GetSpecialFilesL`) so the compiler emits it again.
+             */
+            /**
+             * Address: 0x0083B320 (FUN_0083B320, sub_83B320) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::insert_hint`
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Matches this member's full branch structure:
+             * empty-tree fast path straight to `insert_at` (`size_==0`
+             * reads as `!dword_10C3750`), `hint == leftmost()` check,
+             * `hint == end()` check against `rightmost()`, then the
+             * predecessor/successor straddle checks via `sub_83C400`
+             * (`rb_decrement`, cited above) / `sub_83C2E0` (`rb_increment`,
+             * cited above), each falling through to `insert_at`
+             * (`FUN_0083BDE0`, cited below) with the decided `addLeft`,
+             * and a final fallback to `insert_unique` (`FUN_0083BC50`,
+             * cited above) taking its `.first`. Reached from `operator[]`'s
+             * emission (`FUN_0083A9D0`, `msvc8::map<UiKeyMask,bool>::
+             * operator[]`, cited in `Map.h`) passing its own `lower_bound`
+             * result as the hint -- the same "fill the gap we just
+             * located" usage this member's doc comment above describes --
+             * confirmed via `AddUiKeyMapEntries`'s `gUiKeyRepeatMap[keyMask]
+             * = true` (`UiRuntimeTypes.cpp:1442`). Was `recovered` with no
+             * citation or report at all prior to this pass -- a DB-integrity
+             * gap, not a false attribution, but unverifiable either way
+             * without one.)
+             */
+            /**
+             * Address: 0x0057EFF0 (FUN_0057EFF0, sub_57EFF0) --
+             * `Moho::CAiBrain::mBuildStructureMap`'s hinted insert --
+             * `msvc8::map<Wm3::Vector2i, SBuildReserveInfo>`, isNil@+0x25,
+             * the same instantiation cited on `insert_unique`/`rb_decrement`
+             * above (0x00580510/0x00581620). Matches this member's full
+             * branch structure against the `.c`: empty-tree fast path
+             * (`!size_`) straight to `insert_at` (`FUN_00580720`, already
+             * recovered); `at == leftmost()` check with a `comp(v,
+             * at->value)` guard, tail-calling `insert_at(true, ...)`;
+             * `at == head_` (`rb_is_nil(at)`, tested by pointer identity
+             * against the cached head in this emission) with a
+             * `comp(rightmost->value, v)` guard, tail-calling
+             * `insert_at(false, rightmost(), ...)`; a `comp(v, at->value)`
+             * straddle branch calling `rb_decrement` (`FUN_00581620`, cited
+             * above) for `before` and re-testing `comp(before->value, v)`;
+             * an increment straddle branch calling `rb_increment`
+             * (`FUN_00581500`, sibling `rb_increment` instantiation for this
+             * same map, not yet recovered) for `after`; and a final fallback
+             * to `insert_unique` (`FUN_00580510`, cited above) taking its
+             * `.first` when no fast path applies. Reached from `operator[]`'s
+             * emission for this instantiation (`FUN_0057D910`, `skip`'d as a
+             * RULE ONE compiler emission, `Map.h`) passing its own
+             * `lower_bound` result as the hint -- the same "fill the gap we
+             * just located" usage this member's doc comment above describes.
+             * `operator[]`'s real use site for that emission is not yet
+             * pinned to a specific `CAiBrain.cpp` line (unlike
+             * `insert_unique`/`rb_decrement`'s two directly-cited
+             * `operator[]` call sites above, which fully inline this member
+             * instead of calling it out-of-line). Previously `blocked`
+             * ("owner_layout", additional evidence needed); this pass
+             * supplies the full instantiation, calling-convention, and
+             * caller evidence.
+             */
+            /**
+             * Address: 0x006AEDD0 (FUN_006AEDD0, sub_6AEDD0) --
+             * `msvc8::map<msvc8::string, float>::insert_hint` --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@
+             * +0x2D (same instantiation cited on `lower_bound_node`/
+             * `insert_unique` above). Matches this member's branch
+             * structure: empty-tree fast path straight to `insert_at`
+             * (`sub_6AFA40`, cited below); `hint == leftmost()` check;
+             * `hint == head_` (`rb_is_nil`) check; predecessor/successor
+             * straddle checks calling `lower_bound_node`'s emission
+             * (`FUN_006AFBF0`, cited above, at the two owner=<none> call
+             * sites 0x006AEF40/0x006AEF50 inside this same function's own
+             * body -- hint re-validation, not a separate function) and
+             * `rb_decrement` (`sub_6B03D0`, ICF twin of canonical
+             * `FUN_005363B0`); final fallback to `insert_unique`
+             * (`FUN_006AF840`, cited above) taking its `.first`. Sole real
+             * caller is `operator[]`'s emission for this instantiation
+             * (`FUN_006ADBF0`, cited on `Map.h`'s `operator[]()`) passing
+             * its own `lower_bound` result as the hint -- the same "fill
+             * the gap we just located" usage this member's doc comment
+             * above describes, confirmed via `Unit::InitializeArmor`'s
+             * `ArmorMultipliers[damageTypeName] = armorMultiplier` and
+             * `cfunc_UnitAlterArmorL`'s `unit->ArmorMultipliers[armorType
+             * Name] = armorMultiplier` (both `Unit.cpp`). Previously
+             * `blocked` ("owner_layout", additional evidence needed); this
+             * pass supplies the full instantiation, calling-convention, and
+             * caller evidence.
+             *
+             * Address: 0x008A8590 (FUN_008A8590, sub_8A8590) --
+             * `msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>
+             * ::insert_hint` -- `Moho::CWldTerrainRes::mEnvLookup`
+             * (`Terrain`/deleted overlay in
+             * `moho/sim/CWldMap.cpp`), isNil@+0x4D (0x50-byte node: 12-byte
+             * link triplet + 28-byte `msvc8::string` key + 0x24-byte
+             * `TerrainEnvironmentLookupEntry` value + color/isNil).
+             * `a1@<eax>`=`&v` (the pair being inserted, read through its
+             * first-member-aliases-key-at-offset-0 shape for every
+             * `sub_423A00` compare -- `this->comp()`), `a2@<ecx>`=the tree,
+             * `a3@<esi>`=hidden return slot, `a4`=hint node. Matches this
+             * member's full branch structure field for field: empty-tree
+             * fast path (`!*(a2+8)`, i.e. `size_==0`) straight to
+             * `insert_at` (`sub_8A8E30`, cited on `insert_at` below);
+             * `hint == leftmost()` check (`a4 == *(a2+4)`'s dereferenced
+             * head-left, i.e. `a4 == head_->left`); `hint == head_` check
+             * (`(_DWORD*)a4 == v7` where `v7 = head_`, matching
+             * `rb_is_nil(at)` since head_ is its own nil sentinel); a
+             * predecessor straddle check calling `rb_decrement`
+             * (`sub_8A9720`, cited on `rb_decrement` above) then testing
+             * `rb_is_nil(before->right)` at byte offset 77 (0x4D, this
+             * instantiation's `isNil` offset) to pick `insert_at(false,
+             * before, v)` vs `insert_at(true, at, v)`; a successor straddle
+             * check calling `std::map_string_Env::Iterator::inc`
+             * (`sub_8A9090`, this instantiation's `rb_increment`, cited
+             * above) then the same `isNil`-at-77 test to pick `insert_at
+             * (false, at, v)` vs `insert_at(true, after, v)`; and a final
+             * fallback to `insert_unique` (`sub_8A8C30`, cited on
+             * `insert_unique` above) taking `.first` (`*a3 =
+             * *(_DWORD*)sub_8A8C30(a2,a1)`). Sole real caller is
+             * `operator[]`'s emission for this instantiation (`FUN_008A7C80`,
+             * cited on `Map.h`'s `operator[]()`) passing its own
+             * `lower_bound` result as the hint -- the same "fill the gap we
+             * just located" usage this member's doc comment above describes,
+             * confirmed via `IWldTerrainRes::AddEnvLookup`'s
+             * `mEnvLookup[environmentKey] = TerrainEnvironmentLookupEntry(
+             * texturePath, texture)` (`CWldMap.cpp`). Previously uncited --
+             * IDA's decompile rendered this as an anonymous `sub_8A8590`
+             * with no recognized STL shape; `AddEnvLookup`'s existing
+             * recovery instead reached this map through a bespoke, fully
+             * duplicated hand-rolled red-black tree (`InsertTerrainEnvironment
+             * Node` and ~20 sibling free functions in `CWldMap.cpp`, deleted
+             * in this pass) that never called this member at all -- the
+             * RULE-ONE violation this citation, and the migration of
+             * `mEnvLookup` onto this template, resolves.
+             *
+             * Address: 0x00861510 (FUN_00861510, sub_861510) -- `msvc8::
+             * map<std::int32_t, Moho::ProjectileArcTrack>::insert_hint` --
+             * `ProjectileArcTable& ArcTable()`'s function-local static
+             * (`moho/render/ProjectileArcRenderer.cpp`), isNil@3145 decimal
+             * (same instantiation cited on `erase(const_iterator)`,
+             * `FUN_00860FB0`, and `erase_range`, `FUN_008619F0`, elsewhere
+             * in this file). The key lands at `node+16` (`a4[4]`) rather
+             * than `node+12`: `ProjectileArcTrack` is `alignas(8)`, so the
+             * embedded `pair<const int32_t, ProjectileArcTrack>` pads the
+             * 12-byte link header out to the next 8-aligned offset before
+             * the key starts. Matches this member's full branch structure:
+             * empty-tree fast path (`!dword_10C431C`) straight to
+             * `insert_at` (`sub_861AA0`); `hint == leftmost()`
+             * (`a4 == *dword_10C4318`) check; `hint == head_`
+             * (`a4 == dword_10C4318`) check; predecessor straddle calling
+             * `sub_861FA0` (`rb_decrement`) then the `isNil`-at-3145 test on
+             * the candidate's right child to pick `insert_at(true, ...)` vs
+             * `insert_at(false, ...)`; successor straddle calling
+             * `sub_861D10` (`rb_increment`) then the same test; final
+             * fallback to `insert_unique` (`sub_861930`) taking its return
+             * value. Reached from `FUN_00860E20` -- a much larger function
+             * (per-projectile sampling pass, `RenderProjectileArcs`'s pass
+             * one) that calls `sub_861C70` (`lower_bound_node`-shaped) then
+             * this member with that result as the hint, the same "fill the
+             * gap we just located" `operator[]` idiom as every other
+             * instantiation cited on this member; the recovered source
+             * expresses the same net effect via `arcTable.find(key)` then
+             * a separate `arcTable[key]` (`ProjectileArcRenderer.cpp`,
+             * `Map.h`'s `operator[]`), matching this member's own
+             * documented "same net state, different formulation" precedent.
+             *
+             * Address: 0x00879B10 (FUN_00879B10, sub_879B10) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::insert_hint` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_unique`/`insert_at`/
+             * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Matches this member's
+             * full branch structure field for field, register-traced
+             * instruction by instruction against this exact C++ body: empty
+             * tree (`size_==0`) straight to `insert_at(true, head_, v)`
+             * (`FUN_0087AF70`, cited below); `hint == leftmost()` check with
+             * a `comp(v,hint)` guard tailing `insert_at(true, hint, v)`;
+             * `rb_is_nil(hint)` (`hint==head_`, tested by pointer identity)
+             * check with a `comp(rightmost,v)` guard tailing
+             * `insert_at(false, rightmost(), v)`; a `comp(v,hint)` straddle
+             * branch calling `rb_decrement` (`FUN_0087CCB0`, cited above)
+             * for `before`, re-testing `comp(before,v)`, and picking
+             * `insert_at(false,before,v)`/`insert_at(true,hint,v)` on
+             * `rb_is_nil(before->right)`; a `comp(hint,v)` straddle branch
+             * calling `rb_increment` (`FUN_0087CD10`, cited above) for
+             * `after` and picking `insert_at(false,hint,v)`/
+             * `insert_at(true,after,v)` on `rb_is_nil(hint->right)`; and a
+             * final fallback to `insert_unique` (`FUN_0087AB70`, cited
+             * above) taking its `.first` -- the compiler reuses the
+             * successor-straddle guard's own comparison as a "for free"
+             * redirect into the fallback when the predecessor-straddle
+             * guard fails, which is why the predecessor branch's failure
+             * edge jumps into the middle of the successor branch's own test
+             * rather than to a dedicated fallback jump; both land on the
+             * same observable `insert_unique` call the source-level
+             * `else`-chain produces. Sole real caller is `CDecalManager::
+             * LoadDecal`'s `mDecalGroupLookupByDecalIndex[decalIndex] =
+             * loaded;` (`CWldSplat.cpp`, this instantiation's `Map.h`
+             * `operator[]`, cited there, passing its own `lower_bound`
+             * result as the hint). This -- not `insert_unique` alone -- is
+             * the rebalancing step the prior hand-rolled recovery
+             * (`ResolveLookupValueSlotForKey`, `CWldSplat.cpp`) skipped
+             * entirely: it linked a new node onto the BST parent found
+             * during its own descent with no call to anything resembling
+             * `insert_at`'s `link_and_rebalance` tail at all.
+             * Address: 0x00879F60 (FUN_00879F60, sub_879F60) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::insert_hint`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * same branch structure, register-traced the same way, calling
+             * this tree's own `insert_at`/`rb_decrement` (`FUN_0087B8F0`/
+             * `FUN_0087CD70`, cited above) plus the *shared*
+             * `rb_increment` emission (`FUN_0087CDD0`, cited above) and
+             * final fallback to this tree's own `insert_unique`
+             * (`FUN_0087B4F0`, cited above). Sole real caller is
+             * `CDecalManager::LoadDecalGroup`'s
+             * `mDecalGroupLookupBySplatIndex[*group->GetIndex()] = group;`
+             * (`CWldSplat.cpp`).
+             *
+             * Address: 0x004DC080 (FUN_004DC080, sub_4DC080) -- `msvc8::map<
+             * std::uint16_t, float>::insert_hint` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_unique`/`insert_at`/
+             * `rotate_left`/`rotate_right`/`rb_decrement`/`rb_increment`/
+             * `rb_min`/`rb_max`/`buy_node`/`destroy_subtree`/`erase_node`/
+             * `erase_range`/`alloc_raw`/`~rb_tree()` elsewhere in this file).
+             * Register-traced instruction by instruction against this
+             * member's full branch structure and matches exactly: empty tree
+             * (`[edi+8]==0`, `_Mysize`) straight to `insert_at(true, head_,
+             * v)` (`FUN_004DCF90`, cited below, tail-shared with the
+             * predecessor/successor branches' own `insert_at(true, ...)`
+             * calls -- the compiler reuses this fast path's `push key; push
+             * <node>; push 1; push <out>; call insert_at` tail as a shared
+             * landing pad for two of the other branches' identical argument
+             * shape, which is why those branches' disassembly jumps into the
+             * middle of this one instead of duplicating the four pushes);
+             * `hint == leftmost()` (`ebp == head_->left`) guarded by
+             * `comp(v, hint)` tailing `insert_at(true, hint, v)`; `hint ==
+             * head_` (tested by pointer identity, the same `rb_is_nil(hint)`
+             * shortcut documented on `FUN_00879B10` above) guarded by
+             * `comp(rightmost, v)` tailing `insert_at(false, rightmost(),
+             * v)`; a `comp(v, hint)` straddle branch calling `rb_decrement`
+             * (`FUN_004DDC30`, cited below) for `before`, re-testing
+             * `comp(before, v)`, and picking `insert_at(false, before, v)`/
+             * `insert_at(true, hint, v)` on `rb_is_nil(before->right)`; a
+             * `comp(hint, v)` straddle branch calling `rb_increment`
+             * (`FUN_004DDC90`, cited below) for `after` and picking
+             * `insert_at(false, hint, v)`/`insert_at(true, after, v)` on
+             * `rb_is_nil(hint->right)`; and a final fallback to
+             * `insert_unique` (`FUN_004DCDE0`, cited below) taking its
+             * `.first` via the hidden-return-slot convention (`mov ecx,[eax];
+             * mov [esi],ecx`). Sole real caller is `FindOrInsertCategoryVolume`
+             * (`FUN_004DB7E0`, `AudioEngine.cpp`), which performs its own
+             * `lower_bound`-shaped descent first and passes that result in as
+             * the hint -- the same "fill the gap we just located" idiom every
+             * other instantiation of this member documents, just expressed as
+             * a free function rather than inlined into `operator[]`, because
+             * the real binary keeps `FindOrInsertCategoryVolume` as its own
+             * out-of-line symbol reached from both `AudioEngine::SetVolume`
+             * and `AudioEngine::GetVolume`.
+             *
+             * This address is the concrete evidence that the previously-
+             * recovered `FindOrInsertCategoryVolumeNode` (`AudioEngine.cpp`,
+             * deleted by this migration) was not just missing a rebalance
+             * step but was never actually a recovery of this address at all:
+             * its own citation claimed 0x004DC080, but its body was a plain,
+             * unhinted root-to-leaf descent with no hint parameter, no
+             * leftmost/rightmost/straddle branches, and no call to
+             * `insert_at`/`insert_unique` of any kind -- none of which
+             * resembles this member's real, already-confirmed shape. See
+             * `.memory/project_handrolled_rbtrees_are_the_wall.md` and
+             * `.memory/project_audiomap1_missing_rebalance_bug.md` for the
+             * cross-instance pattern this is the seventh (and, per that
+             * file's own tracking, final known) confirmed instance of.
+             * Address: 0x0056D790 (FUN_0056D790, sub_56D790 -- the hinted insert for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19).)
+             * Address: 0x00497840 (FUN_00497840 -- `_Insert(hint, value)` including the `_Xlen` size guard for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495AE0; formerly `InsertBeamBucketMapEntryAtHint` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AD230 (FUN_004AD230 -- `_Insert(hint, value)` with the recolour/rotate fixup for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC460; formerly `InsertTreeNodeAndRebalance` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F05A0 (FUN_007F05A0 -- `insert(hint, value)` -- the hint checks, then the descent for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EFD00; formerly `ResolveRangeProfileInsertSiteWithHint` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A08B0 (FUN_005A08B0 -- `insert_hint` -- the hint validation (increment it, re-compare) and the allocate-and-link that follows for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x005A0040; formerly `AddOrUpdateRebuildNode` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E95A0 (FUN_004E95A0 -- `insert(hint, value)` -- `_Buynode` at the hinted edge, then link for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E9100; formerly `BuynodeTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x009496E0 (FUN_009496E0 -- the hinted insert under `operator[]` for `msvc8::map<_D3DRENDERSTATETYPE, unsigned int>` (`gpg::gal::StateCache`, gpg/gal/StateCache.h; pair 0x08, node 0x18, isNil@+0x15); callers 0x00949B30.)
+             * Address: 0x00949850 (FUN_00949850 -- the same for `msvc8::map<_D3DSAMPLERSTATETYPE, unsigned int>`; callers 0x00949BA0.)
+             * Address: 0x009499C0 (FUN_009499C0 -- the same for `msvc8::map<_D3DTEXTURESTAGESTATETYPE, unsigned int>`; callers 0x00949C10.)
+             * Address: 0x008B4F50 (FUN_008B4F50 -- `insert(hint, value)` for the `WeakSet<moho::UserUnit>::Entry` set; caller 0x008B4D00, the select-edit merge of `GetEntitiesUnderCursor` 0x008B43F0.)
+             */
+            node_type* insert_hint(const_iterator hint, const value_type& v)
+            {
+                if (size_ == 0) {
+                    return insert_at(true, head_, v);
+                }
+
+                node_type* const at = hint.node();
+                if (at == leftmost()) {
+                    if (this->comp()(Traits::key_of(v), Traits::key_of(at->value))) {
+                        return insert_at(true, at, v);
+                    }
+                } else if (rb_is_nil(at)) {
+                    if (this->comp()(Traits::key_of(rightmost()->value), Traits::key_of(v))) {
+                        return insert_at(false, rightmost(), v);
+                    }
+                } else if (this->comp()(Traits::key_of(v), Traits::key_of(at->value))) {
+                    node_type* const before = rb_decrement(at);
+                    if (this->comp()(Traits::key_of(before->value), Traits::key_of(v))) {
+                        return rb_is_nil(before->right) ? insert_at(false, before, v) : insert_at(true, at, v);
+                    }
+                } else if (this->comp()(Traits::key_of(at->value), Traits::key_of(v))) {
+                    node_type* const after = rb_increment(at);
+                    if (rb_is_nil(after) || this->comp()(Traits::key_of(v), Traits::key_of(after->value))) {
+                        return rb_is_nil(at->right) ? insert_at(false, at, v) : insert_at(true, after, v);
+                    }
+                }
+
+                return insert_unique(v).first;
+            }
+
+            /**
+             * VC8's hinted insert for the multi containers -- the `if (this->_Multi)`
+             * branch of `_Tree::insert(iterator _Where, const value_type& _Val)`.
+             *
+             * It differs from `insert_hint` above in exactly the ways equivalent keys
+             * require: every hint test is the non-strict `!comp(a, b)` form, so a
+             * value equal to its neighbours still lands at the hint, and a missed
+             * hint falls back to `insert_equal`, never to `insert_unique` (which would
+             * refuse the duplicate). The four cases are VC8's, in VC8's order: an
+             * empty tree; `where == begin()`; `where == end()`, linked after
+             * `_Rmost()`; and an interior hint, tried first as "before `where`"
+             * against its predecessor and then as "after `where`" against its
+             * successor, each linking under whichever neighbour has the free child.
+             *
+             * Address: 0x00504A10 (FUN_00504A10 -- `insert(where, value)` for `moho::SpatialMap<T>` = `msvc8::multiset<moho::SpatialEntry<T>, moho::SpatialEntryLess<T>>` (moho/mesh/SpatialDb.h; node 0x38, the 0x28 entry at node+0x0C, the fade key at node+0x2C, colour/nil at +0x34/+0x35). Every branch above is in the body: the `size() == 0` link at the head, the `begin()` and `end()` edge tests, `_Dec` 0x00505F40 and `_Inc` 0x00505B40 for the interior neighbours, `_Insert` 0x005052F0 for the link and `insert(value)` 0x00504990 as the fallback; callers 0x00501A80, 0x00501B00, 0x00504330; formerly `InsertSpatialPayloadWithHint` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             */
+            node_type* insert_hint_equal(const_iterator hint, const value_type& v)
+            {
+                if (size_ == 0) {
+                    return insert_at(true, head_, v);
+                }
+
+                node_type* const at = hint.node();
+                if (at == leftmost()) {
+                    if (!this->comp()(Traits::key_of(at->value), Traits::key_of(v))) {
+                        return insert_at(true, at, v);
+                    }
+                } else if (rb_is_nil(at)) {
+                    if (!this->comp()(Traits::key_of(v), Traits::key_of(rightmost()->value))) {
+                        return insert_at(false, rightmost(), v);
+                    }
+                } else {
+                    if (!this->comp()(Traits::key_of(at->value), Traits::key_of(v))) {
+                        node_type* const before = rb_decrement(at);
+                        if (!this->comp()(Traits::key_of(v), Traits::key_of(before->value))) {
+                            return rb_is_nil(before->right) ? insert_at(false, before, v) : insert_at(true, at, v);
+                        }
+                    }
+
+                    if (!this->comp()(Traits::key_of(v), Traits::key_of(at->value))) {
+                        node_type* const after = rb_increment(at);
+                        if (rb_is_nil(after) || !this->comp()(Traits::key_of(after->value), Traits::key_of(v))) {
+                            return rb_is_nil(at->right) ? insert_at(false, at, v) : insert_at(true, after, v);
+                        }
+                    }
+                }
+
+                return insert_equal(v);
+            }
+
+            /**
+             * Unique emplace.
+             *
+             * The value is materialised once into a fresh node before the descent
+             * (its key is only reachable through the constructed value) and the
+             * node is released again when the key turns out to be present. That
+             * ordering is what keeps a forwarded rvalue from being consumed twice.
+             */
+            template<class... Args>
+            std::pair<node_type*, bool> emplace_unique(Args&&... args)
+            {
+                node_type* const fresh = buy_node(std::forward<Args>(args)...);
+                const key_type& k = Traits::key_of(fresh->value);
+
+                node_type* where = head_;
+                bool addLeft = true;
+                for (node_type* n = root(); !rb_is_nil(n);) {
+                    where = n;
+                    addLeft = this->comp()(k, Traits::key_of(n->value));
+                    n = addLeft ? n->left : n->right;
+                }
+
+                const bool linkAtFront = addLeft && where == leftmost();
+                if (!linkAtFront) {
+                    node_type* const probe = addLeft ? rb_decrement(where) : where;
+                    if (!this->comp()(Traits::key_of(probe->value), k)) {
+                        free_node(fresh);
+                        return {probe, false};
+                    }
+                }
+
+                if (max_size() - 1u <= size_) {
+                    free_node(fresh);
+                    throw_too_long();
+                }
+                link_and_rebalance(addLeft, where, fresh);
+                return {fresh, true};
+            }
+
+            /**
+             * Address: 0x0089A540 (FUN_0089A540, `erase(const_iterator)`)
+             * Address: 0x007E4430 (FUN_007E4430, sibling emission)
+             * Address: 0x0083A640 (FUN_0083A640, msvc8::map<UiKeyMask,
+             * msvc8::string>::erase(const_iterator) -- same `map<uint32,
+             * string>` node shape as 0x0089A540 (`_Isnil` at +0x2D). The
+             * compiled body constant-folds `this` to the fixed address of
+             * the sole call-site global (`gUiKeyActionMap`, since this
+             * instantiation has exactly one call site) rather than reading
+             * it from the passed tree pointer -- a compiler optimization,
+             * not a different operation. Reached from `gUiKeyActionMap.
+             * erase(keyMask)`'s inner iterator-erase in
+             * RemoveUiKeyMapEntries, UiRuntimeTypes.cpp.)
+             *
+             * 0x0089A540 is the session save-node map `map<uint32, string>`
+             * (`_Isnil` at +0x2D); 0x007E4430 is the same member for the
+             * mesh-key map (`_Isnil` at +0x25).
+             *
+             * IDA signature:
+             * int *__stdcall sub_89A540(int this, int *result, int where);
+             *
+             * What it does:
+             * Unlinks and destroys `erased`, returning its in-order successor.
+             *
+             * This is MSVC8's `_Tree::erase(const_iterator)` transplant plus
+             * recolour pass: the successor is lifted into the erased node's slot
+             * when both subtrees exist, then the black-height deficit is repaired
+             * from the stitched-up child upwards.
+             *
+             * Both emissions open with the same `_Isnil` guard that throws
+             * `out_of_range("invalid map/set<T> iterator")` - the string is built
+             * in place, handed to `std::logic_error::logic_error`, and the vftable
+             * is then patched to `std::out_of_range` before `_CxxThrowException`.
+             * They close with `if (0 < _Mysize) --_Mysize;`, i.e. the shipped
+             * decrement is guarded rather than unconditional.
+             */
+            /**
+             * Address: 0x00592920 (FUN_00592920, the blueprint-stat map's
+             * erase-with-rebalance; identified by the colour/nil pair it rewrites at
+             * `[node+0x14]` / `[node+0x15]`, which pins it to that map's 0x18 node
+             * rather than the 0x30 name-index node in the same file.)
+             */
+            /**
+             * Address: 0x00703700 (FUN_00703700, the name-index map's erase with
+             * rebalance -- the densest colour/nil traffic in the family, rewriting
+             * `[node+0x2C]`/`[node+0x2D]` across every rebalance branch). Two real
+             * callers, confirmed via the callgraph index and each address's own
+             * decompiled body:
+             *   - 0x00702A70, inside this tree's `erase_range` (cited above) --
+             *     its per-node walk path erases one node and advances via this
+             *     member;
+             *   - 0x0070B980, inside `Moho::CArmyStats::Delete` (`CArmyStats
+             *     vtable slot 0`, cited on that method in `CArmyStats.cpp`) --
+             *     its `for (auto it = mNameIndex.begin(); ...) it =
+             *     mNameIndex.erase(it);` walk calls this member directly through
+             *     `msvc8::map::erase(iterator)`.
+             * DB-integrity fix: this paragraph previously also attributed
+             * 0x006FD7C0 and 0x00704A40 to this member ("the erase-and-advance
+             * wrapper that CArmyStats::Delete's loop drives" / "the same lane
+             * reached from ~CArmyStats"). Both were wrong -- 0x006FD7C0 is
+             * confirmed by its own decompiled signature to be
+             * `Moho::CArmyStats::CArmyStats(CArmyStats*, CAiBrain*)`, the
+             * constructor, not a helper `Delete` calls; and 0x00704A40's own
+             * decompiled body (confirmed `Moho::CArmyStats::~CArmyStats`) never
+             * calls this member at all -- it inlines `mNameIndex`'s whole-tree
+             * `erase_range` directly (cited on `erase_range`/`~rb_tree` above),
+             * which is a different member of this same class entirely. Neither
+             * claim survived checking the primary decompiled evidence.
+             */
+            /**
+             *
+             * Owner identified in a later pass: `Wm3::ConvexHull3<Real>::m_kHull`
+             * (`dependencies/WildMagic3p8/Foundation/Containment/Wm3ConvexHull3.h:89`),
+             * reached from `m_kHull.erase(pkTri)` in `ConvexHull3<Real>::Update`
+             * (`Wm3ConvexHull3.cpp:324`) via the range-erase entry point
+             * (`sub_A65320`/`sub_A65430`, `external_dependency` -- WildMagic vendor
+             * code, not engine source; see those tokens' recovery notes). Both
+             * `sub_A65320` and `sub_A65430` are compiled with checked iterators
+             * (Secure SCL), unlike this codebase's own `msvc8::set`/`msvc8::map`
+             * instantiations, but this member's own isNil-guard-and-throw shape is
+             * identical either way, so the algorithm match alone remains sufficient
+             * evidence for the citation.
+             */
+            /**
+             * Address: 0x0077C270 (FUN_0077C270, inner bucket erase with rebalance)
+             * Address: 0x0077A9F0 (FUN_0077A9F0, its erase-by-key wrapper -- what
+             * `mStartTickBuckets[tick].erase(handle)` compiles to)
+             */
+            /**
+             * Address: 0x0052F0A0 (FUN_0052F0A0, the single-node erase-and-
+             * rebalance for `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals` -- `msvc8::set<uint32_t>`. Called
+             * once per node from `erase_range`'s (`sub_52D9C0`) walk-one-at-
+             * a-time loop, cited below.)
+             */
+            /**
+             * Address: 0x0082FD50 (FUN_0082FD50, `Moho::UICommandGraph::
+             * mGraph`'s erase-with-rebalance -- `map<shared_ptr<
+             * CD3DBatchTexture>, vector<CommandGraphEdge*>>`, isNil@+0x25,
+             * 0x18-byte value_type. Opens with the same `_Isnil` guard
+             * throwing `out_of_range("invalid map/set<T> iterator")` seen on
+             * the other emissions of this member, captures the successor
+             * through `rb_increment` (0x0082EC10, cited above) before
+             * unlinking, and its rebalance loop calls `rotate_left`
+             * (0x00830010) / `rotate_right` (0x00830080), both cited below,
+             * confirming this is the same tree as `insert_at`'s emission
+             * FUN_0082E320. `sub_82BEE0` (cited on `free_node` below) is the
+             * inlined `value_type::~value_type()` call ahead of `operator
+             * delete`. Unique body, no ICF twins -- the node-buy/value-dtor
+             * calls it makes are specific to this value_type, so unlike the
+             * pure-pointer-arithmetic rotate/walk helpers it does not fold
+             * with the mesh-key map's sibling emission.)
+             */
+            /**
+             * Address: 0x007B46A0 (FUN_007B46A0, single-node erase-and-rebalance
+             * for the `msvc8::set<std::uint32_t>` instantiation cited on
+             * `destroy_subtree` above -- isNil@+0x11, opens with the same
+             * `_Isnil` guard throwing `out_of_range("invalid map/set<T>
+             * iterator")` byte-for-byte (same string literal, same
+             * `std::out_of_range` vftable patch, same `_CxxThrowException`
+             * tail) as the other emissions of this member. Called once per
+             * node from `erase_range`'s (`FUN_007B3E00`, cited below)
+             * walk-one-at-a-time loop.)
+             */
+            /**
+             * Address: 0x00860FB0 (FUN_00860FB0, `msvc8::map<std::int32_t,
+             * Moho::ProjectileArcTrack>::erase(const_iterator)` --
+             * `ProjectileArcTrack` is a 0xC30-byte value_type (fixed-size
+             * sample buffer + scalar fields), landing colour/isNil at
+             * `[node+0xC38]`/`[node+0xC39]` (0xC38 = header + 4-byte key +
+             * 0xC30 value, 8-aligned) -- decimal 3144/3145 in the raw
+             * decompile. Same `_Isnil` guard throwing `out_of_range("invalid
+             * map/set<T> iterator")`, same successor-lift-and-rebalance shape
+             * as every other emission of this member; operates on a
+             * function-local `static` tree (`ProjectileArcTable& ArcTable()`
+             * in ProjectileArcRenderer.cpp), which is why the decompile reads
+             * `dword_10C4318`/`dword_10C431C` as fixed globals rather than a
+             * `this`-relative head. Reached from `arcTable.erase(expiredKey)`
+             * in `RenderProjectileArcs` (FUN_008600E0, ProjectileArcRenderer.cpp)
+             * via the erase-by-key overload's inner `erase(find(key))` call.)
+             */
+            /**
+             * Address: 0x006E1670 (FUN_006E1670, sub_6E1670) --
+             * `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
+             * Matches this member exactly: `_Isnil` guard throwing
+             * `out_of_range("invalid map/set<T> iterator")`, captures the
+             * successor via the map's `Iterator::inc` (`rb_increment`) before
+             * unlinking, calls `sub_6E1F90`/`sub_6E1F70` (`rb_min`/`rb_max`,
+             * cited above) to re-seat `head->left`/`head->right` only when the
+             * erased node was an extremum, and `sub_6E1F20`/`sub_6E1FD0`
+             * (`rotate_left`/`rotate_right`, cited above) in the rebalance
+             * loop. Reached from `Moho::CCommandDB::RemoveCmd`
+             * (FUN_006E0EC0) with three further real callers
+             * (`Moho::CUnitCommand::~CUnitCommand`, `Moho::UNIT_IssueCommand`,
+             * `Moho::UNIT_IssueFactoryCommand`). Re-homed here from a bespoke
+             * `EraseCommandNode` free function in Sim.cpp that hand-rolled
+             * this same CLRS-style transplant-and-rescan erase over a
+             * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in --
+             * that hand-rolled version did not match this address's real
+             * disassembly (it recomputed both header extrema unconditionally
+             * via a full-tree rescan instead of this member's targeted
+             * `rb_min`/`rb_max` patch), so it was deleted rather than kept as
+             * an alternate-but-equivalent implementation.)
+             */
+            /**
+             * Address: 0x00947630 (FUN_00947630, sub_947630) --
+             * `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`
+             * (`StateCache_D3DSAMPLERSTATETYPE.hpp`), isNil@+0x15, 8-byte
+             * value_type (4-byte `_D3DSAMPLERSTATETYPE` key + 4-byte
+             * `unsigned int` mapped value). Matches this member exactly:
+             * `_Isnil` guard throwing `std::out_of_range("invalid map/set<T>
+             * iterator")`, captures the successor via `rb_increment`
+             * (`sub_946880`) before unlinking, patches `head->left`/
+             * `head->right` through this instantiation's own `rb_min`/
+             * `rb_max` only when the erased node was an extremum, and
+             * rebalances through `sub_946D20`/`sub_946620`
+             * (`rotate_left`/`rotate_right`). Single confirmed caller: this
+             * instantiation's `erase_range` at 0x00947C50 (`call sub_947630`
+             * at 0x00947CEF, cited below on `erase_range`) -- confirmed both
+             * via the callgraph index and an exhaustive PE byte-scan (every
+             * `E8`/`E9` rel32, `0F 8x` jcc rel32, `EB`/`7x` rel8 and absolute
+             * dword reference in every section of
+             * `bin/external/ForgedAlliance.exe`; exactly one hit). Corrects a
+             * stale `external_dependency` mark that mis-read the leading
+             * `std::out_of_range("invalid map/set<T> iterator")` throw-path
+             * (Dinkumware's own checked-iterator debug string, reproduced
+             * verbatim by every emission of this member -- see 0x006E1670
+             * above) as "genuine Dinkumware STL internal, not engine logic";
+             * the throw is a two-instruction guard inside an otherwise
+             * complete, engine-instantiated single-node erase-with-rebalance
+             * body, not an imported CRT routine.)
+             * Address: 0x009478E0 (FUN_009478E0, sub_9478E0) --
+             * `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned
+             * int>::tree_` (`StateCache_D3DTEXTURESTAGESTATETYPE.hpp`), the
+             * same isNil@+0x15, 8-byte-value_type shape as 0x00947630
+             * immediately above -- a third sibling `StateCache` specialisation
+             * with its own distinct rotate/min/max helper addresses. Single
+             * confirmed caller: this instantiation's `erase_range` at
+             * 0x00947D10 (`call sub_9478E0` at 0x00947DAF, cited below on
+             * `erase_range`; one PE byte-scan hit). Same stale-
+             * `external_dependency` correction as 0x00947630 above.)
+             * Address: 0x00947380 (FUN_00947380, sub_947380) -- the fourth
+             * sibling: `gpg::gal::StateCache<d3d9::RenderState, unsigned
+             * int>::tree_`'s `erase_node`. Same isNil@+0x15, 8-byte-value
+             * shape and same out_of_range-guard/rb_increment/rotate
+             * structure as 0x00947630/0x009478E0 above, with its own
+             * distinct rotate/min/max helper addresses (`sub_946830`,
+             * `sub_946790`, `sub_946770`, `sub_946CD0`, `sub_946590`).
+             * Single confirmed caller: `erase_range` at 0x00947B90 (`call
+             * sub_947380`, already documented on that citation above as
+             * "matching erase_node exactly"). Corrects the same
+             * `CrtRuntimeHelpers.cpp` DB-integrity misfile as 0x009470E0
+             * above.)
+             * Address: 0x007B4040 (FUN_007B4040, sub_7B4040) --
+             * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>::erase_node`
+             * for the outer per-parent-bone dedup map from the
+             * `CON_ANI_DumpSkeleton` cluster (isNil@+0x1D, the same
+             * instantiation cited on `operator[]` in `Map.h` as
+             * `FUN_007B27D0` and on this file's `erase_range` as
+             * `FUN_007B3820`). Single confirmed caller:
+             * `erase_range`/`FUN_007B3820`'s iterative walk-erase path,
+             * already documented there as needing this citation
+             * ("`sub_7B4AA0`/`sub_7B4040` would need their own citations
+             * too... not yet done" -- landed here). `Moho::
+             * CON_ANI_DumpSkeleton` itself (CAniSkel.cpp) remains
+             * unrecovered.)
+             * Address: 0x00951A40 (FUN_00951A40, sub_951A40) --
+             * `gpg::WriteArchive::mObjRefs`'s (`std::map<const void*,
+             * TrackedPointerRecord>`, `WriteArchive.cpp:934`, isNil@+0x25)
+             * checked-erase-per-node half of its `~map()`/`erase(begin(),
+             * end())` emission `FUN_00952300` (already cited above on
+             * `~rb_tree()`/`destroy_subtree`). Sole caller is that same
+             * emission; same `_SECURE_SCL` provably-unreachable-from-a-
+             * full-range-erase situation as the `RRuleGameRulesImpl`
+             * blueprint-map cluster resolved earlier this session
+             * (`mObjRefs.clear()`, `WriteArchive.cpp:970`, always calls with
+             * the full range). Not modeled for the same reason those were
+             * skipped -- compiled into the binary, never exercised by the
+             * one call site that reaches it.
+             *
+             * Address: 0x008D6650 (FUN_008D6650, sub_8D6650) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's `erase_node`
+             * (isNil@+29, color@+28 -- the same instantiation cited on
+             * `insert_unique`/`insert_at`/`buy_head`/`rb_decrement`/
+             * `erase_range`/`destroy_subtree` elsewhere in this file). Full
+             * CLRS transplant-then-fixup shape: throws `std::out_of_range
+             * ("invalid map/set<T> iterator")` on a nil erase target (the
+             * same `_SECURE_SCL` checked-iterator guard documented
+             * throughout this file), captures the successor before
+             * unlinking, patches `head->left`/`head->right` through this
+             * instantiation's own `rb_min`/`rb_max` when the erased node
+             * was an extremum, and rebalances through this instantiation's
+             * own `rotate_left`/`rotate_right` realizations `sub_8D61D0`/
+             * `sub_8D6230` (cited below on those members). Writes
+             * `Resolution::\`vftable'` before `operator delete`, matching
+             * `destroy_subtree`'s same vtable-write tell. Reached from this
+             * instantiation's `erase_range` (`FUN_008D6080`, cited above)
+             * walk path.
+             *
+             * Address: 0x00711BE0 (FUN_00711BE0, sub_711BE0) -- the local
+             * `blueprintKeys` variable's `erase_node` in `Moho::
+             * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
+             * RBlueprint*>`, isNil@+0x11 -- the same
+             * instantiation cited on `erase_range`/`destroy_subtree` above
+             * as `FUN_00711350`/`FUN_00712090`). Same `out_of_range`
+             * checked-iterator guard shape as every other `erase_node`
+             * emission in this file. Reached from that `erase_range`'s
+             * walk path.
+             *
+             * Address: 0x00536010 (FUN_00536010, MSVC8 `_Tree::
+             * erase(const_iterator)`) -- the category-lookup map's
+             * erase-with-rebalance, `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Confirmed field-for-field
+             * against the raw decompile: `isNil` guard at `[a2+89]` (decimal
+             * 89 = 0x59), transplant-then-rebalance shape identical to this
+             * member's body, colour/isNil read/written at `[node+88]`/
+             * `[node+89]` (0x58/0x59) throughout the rebalance loop -- pins
+             * this instantiation's node to the 8-byte-aligned
+             * `pair<const msvc8::string, CategoryLookupValue>` shape
+             * documented on `CategoryLookupValue` (RRuleGameRules.h). Captures
+             * the successor via `rb_increment` (`FUN_0052CC30`, cited above),
+             * re-seats `head->left`/`head->right` through this instantiation's
+             * own `rb_min`/`rb_max` (`FUN_0052D960`/`FUN_00536AA0`, both
+             * cited above) only when the erased node was an extremum, and
+             * rebalances through `rotate_left`/`rotate_right`
+             * (`FUN_00536A50`/`FUN_00536AE0`, both cited above) -- the same
+             * shipped `erase_rebalance` shape this template inlines directly
+             * into this member's body, not a separate symbol. Reached from
+             * this instantiation's `erase_range` (`FUN_00535750`, cited
+             * below) walk-one-at-a-time path; `erase_range` itself is reached
+             * only from `~EntityCategoryLookupTable`'s implicit
+             * destructor with the whole-tree range, so this member's walk
+             * branch is compiled (and reachable -- `insert_at`'s rebalance
+             * loop for this instantiation also calls `rotate_left`/
+             * `rotate_right` directly, so the rotates are exercised at
+             * runtime even where this specific per-node walk branch may not
+             * be) but this member's own single-node path is not separately
+             * exercised by any currently-known call site. Re-homed here from
+             * a hand-rolled `EraseCategoryLookupNode` free function in
+             * RRuleGameRules.cpp that performed this identical
+             * transplant-and-rebalance over a
+             * deleted overlay*`/`EntityCategoryLookupTable&`
+             * reach-in instead of calling it.)
+             *
+             * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) -- CORRECTED:
+             * `Map.h`'s `erase(const key_type&)` citation for this address
+             * previously mislabeled it `UiKeyActionMap`/`msvc8::map<
+             * UiKeyMask, msvc8::string>` despite already noting
+             * `isNil@+0x15` -- that offset is `UiKeyRepeatMap`'s, not
+             * `UiKeyActionMap`'s (see the `rotate_left`/`rotate_right`/
+             * `rb_increment` corrections alongside this one). This is
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::erase_node`
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`).
+             * Full CLRS transplant-then-fixup shape matching this member
+             * exactly: throws `std::out_of_range("invalid map/set<T>
+             * iterator")` on a nil erase target, captures the successor via
+             * `rb_increment` (`FUN_0083C2E0`, corrected and cited above)
+             * before unlinking, re-seats `head->left`/`head->right` through
+             * this instantiation's own `rb_min`/`rb_max`-equivalent walks
+             * (`FUN_0083B530`/`FUN_0083B510`, already `recovered` in
+             * `moho/containers/LegacyContainerRuntime.cpp` and correctly
+             * attributed there) only when the erased node was an extremum,
+             * and rebalances through `rotate_left`/`rotate_right`
+             * (`FUN_0083B4C0`/`FUN_0083B570`, both cited above). Called
+             * with an already-resolved node/iterator, not a raw key --
+             * `RemoveUiKeyMapEntries`'s own binary body (`FUN_00839270`)
+             * performs its own inline lower-bound descent and conditional
+             * call, matching `Map.h`'s `erase(const key_type&)` shape
+             * (`find_node` then conditional `erase_node`) fused into the
+             * caller rather than compiled as a separate `erase(key)`
+             * symbol for this instantiation -- confirmed via
+             * `RemoveUiKeyMapEntries`'s `gUiKeyRepeatMap.erase(keyMask)`,
+             * `UiRuntimeTypes.cpp:1466` (not `:1465`, which is the sibling
+             * `gUiKeyActionMap.erase(keyMask)` call the mislabeled citation
+             * pointed at instead).)
+             */
+            /**
+             * Address: 0x00687CC0 (FUN_00687CC0, `erase(const_iterator)` for
+             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `EntityDB::
+             * mIdPoolTree` in `EntityDb.h`. 251-instruction body, unmistakably
+             * this member: checked-iterator guard throwing `std::out_of_range(
+             * "invalid map/set<T> iterator")` on a nil node (isNil@node+0xCC9,
+             * matching `rb_min`'s 0x006880F0 citation above), successor
+             * capture via `sub_6878C0` (`rb_increment`, cited above as this
+             * instantiation's `_Inc`) before any unlinking, the one-child/
+             * two-child relink split (`fix`/`fixParent` bookkeeping matches
+             * this member field for field), re-seating `head->left`/
+             * `head->right` through this instantiation's own `rb_min`/
+             * `rb_max` (`sub_6880F0`/`sub_688830`, both cited above) only
+             * when the erased node was an extremum, the black-height
+             * rebalance loop calling this instantiation's `_Lrotate`/
+             * `_Rrotate` (`sub_6880A0`/`sub_688120`, both already cited on
+             * those members below) exactly where `erase_rebalance` does, and
+             * finally the node's value teardown before `operator delete`.
+             *
+             * The value teardown is the one place this emission's shape does
+             * not reduce to a bare `n->value.~value_type()` today: `IdPool`/
+             * `SimSubRes2` (`IdPool.h`) currently declare no destructors, so
+             * `~pair<const uint32_t, IdPool>()` would be non-trivial only via
+             * `mReleasedLows`'s implicit `~BVIntSet()` (real `~FastVectorN()`
+             * on `mWords`) -- it would NOT reproduce `mSubRes2`'s teardown,
+             * because `SimSubRes2::mData` is currently modelled as a plain
+             * `SimSubRes3[100]` array, and an implicit `~SimSubRes2()` over
+             * that shape would loop all 100 slots unconditionally. The
+             * shipped body does not: it calls `struct_CyclicBuffer100_
+             * BVIntSet::struct_CyclicBuffer100_BVIntSet` (0x00403E70, already
+             * identified and recovered as `SimSubRes2::Reset()` in
+             * `IdPool.cpp` -- confirmed byte-identical against that address's
+             * own decompile: the bounded `while (mStart != mEnd) PopOldest();`
+             * drain, not a blind 100-element pass) on `node+0x40` (`mSubRes2`,
+             * landing exactly at the end of `rb_min`'s cited node layout:
+             * value starts node+0x10, `IdPool`@node+0x18, `mSubRes2`@
+             * `IdPool`+0x28 = node+0x40, sized 0xC88 to land exactly on
+             * colour@node+0xCC8), then inlines `mReleasedLows.mWords`'s
+             * `~FastVectorN()` release (`node+0x28`..`+0x34`: `if (begin !=
+             * &inline) { delete[] begin; begin = &inline; }`, matching
+             * `FastVectorN.h`'s already-recovered 0x00401DE0 body) before
+             * `operator delete(node)`. `IdPool::IdPool()` (0x00403920)
+             * confirms the same asymmetry from the construction side: it
+             * never touches `mData`, only `mUnused.mStart`/`mEnd` (see
+             * `IdPool.h`'s ctor citation) -- consistent with `mData` being
+             * raw, placement-managed storage in the true 2007 source rather
+             * than an auto-constructed/destructed array, which `IdPool.h`'s
+             * current recovery does not yet model. This citation records the
+             * evidence rather than guessing the fix: retyping `SimSubRes2::
+             * mData` to raw storage (with `AsBitSet`-style typed access, as
+             * `IdPool.cpp` already does for individual slots) would let a
+             * bare `n->value.~value_type()` reproduce this exactly, but that
+             * change ripples into `Sim.cpp` (`pool.mSubRes2.mData[retireIndex]`
+             * as a named `SimSubRes3&`), `CCommandDb.cpp` and
+             * `IdPoolTypeInfo.cpp` (`.mSubRes2.Reset()` call sites) and
+             * deserves its own verified pass rather than a rushed edit here.
+             * The divergence is behaviourally inert either way (a redundant,
+             * always-safe 100x SBO check nothing currently exercises), which
+             * is why it is flagged rather than blocking this recovery.
+             *
+             * Reached from `erase_range`'s emission for this instantiation
+             * (`FUN_00687190`, cited below) via `erase(_First++)` in its
+             * general (non-whole-tree) loop branch -- the same "successor
+             * captured, old cursor erased" pattern documented on
+             * `rb_increment` throughout this file.
+             */
+            // NOTE: 0x00A633D0/0x00A63690 (this template's shape matched against
+            // std::set<HullTriangle3<float/double>*>::erase(const_iterator),
+            // Wm3::ConvexHull3<Real>::m_kHull) are already cited above, on
+            // `destroy_subtree`/`erase_node`'s original citation block --
+            // WildMagic vendor code (CLAUDE.md's named terminal external
+            // category), not this project's own msvc8::set<uint32_t>. An
+            // earlier pass in this session mistakenly re-cited the same
+            // address here as an "unidentified msvc8::set<uint32_t>" -- see
+            // recovered_progress.json's FUN_00A633D0 correction note.
+            /**
+             * Address: 0x007CAC80 (FUN_007CAC80, sub_7CAC80) -- `msvc8::
+             * set<char>`'s `erase_node`, the same `CLobby.cpp` ignore-names
+             * separator-set instantiation cited on `alloc_raw`/`copy_from`/
+             * `~rb_tree`/`erase_range`/`destroy_subtree`/`rb_min`/
+             * `rotate_left`/`rotate_right` above (node 0x10, colour@0x0D/
+             * isNil@0x0E). 233-instruction body, unmistakably this member:
+             * opens with the same `_SECURE_SCL` checked-iterator guard used
+             * throughout this file (`if (erased->isNil) throw std::
+             * out_of_range("invalid map/set<T> iterator")`), calls this
+             * instantiation's successor-find (`sub_7CB230`, already
+             * `recovered`) to pick the physically-spliced node exactly as
+             * CLRS's `y = (z has <=1 child) ? z : TREE-SUCCESSOR(z)`, then
+             * the standard single-child/two-child transplant (matching this
+             * member's `fix`/`fixParent` bookkeeping field for field,
+             * re-seating `header()->left`/`header()->right` through this
+             * instantiation's own `rb_min`/`rb_max` -- `sub_7CB130`/
+             * `sub_7CB110`, both cited above -- only when the erased node
+             * was an extremum), and finally the full black-height
+             * rebalance loop. That loop's four-case structure (mirrored for
+             * "x is left child" vs "x is right child") calls this
+             * instantiation's `rotate_left`/`rotate_right` (`sub_7CB0C0`/
+             * `sub_7CB170`, both cited above) at exactly the six call sites
+             * CLRS's `RB-DELETE-FIXUP` makes -- independently re-derived
+             * against this function's own decompile (register roles: `v8`=
+             * `x`, `v10`=`x->parent`, `v18`=`w`/sibling) rather than
+             * inferred from the rotates' shapes alone. Ends with `operator
+             * delete(erased)` and the tree's size decrement, matching this
+             * member's tail exactly.
+             *
+             * Sole caller is `erase_range`'s emission for this
+             * instantiation (`FUN_007CA730`, cited above) via
+             * `erase(_First++)` in its general (non-whole-tree) loop
+             * branch. That caller's own citation already records that its
+             * one real invocation (`~rb_tree()`'s `FUN_007CC2B0`, cited
+             * above) always takes the fast whole-tree-clear path -- so, per
+             * this file's established "template-instantiated but the
+             * per-node erase-rebalance path is compiled, not separately
+             * runtime-exercised through the currently-traced caller" shape
+             * (the `0x0052D960`/`0x006880F0`/`0x0094EE60` `rb_min`
+             * precedents above), this member and its two rotate/two
+             * extremum helpers are genuine compiled emissions of real
+             * template code, kept `recovered` rather than `skip`.
+             *
+             * Address: 0x00856950 (FUN_00856950, sub_856950) -- `msvc8::
+             * map<CmdId, boost::shared_ptr<MeshInstance>>::erase_node` for
+             * `moho::CBuildDragPreview::mPreviewPositions`
+             * (`UiRuntimeTypes.h:896`, offset `0x28`), the same instantiation
+             * as `erase_range`'s emission cited on that member above
+             * (`FUN_008564E0`). Opens with the identical `_Isnil` check +
+             * `out_of_range("invalid map/set<T> iterator")` throw, transplant/
+             * two-child-successor logic, and `erase_rebalance` call this
+             * member's body has, then tears down the erased node's value
+             * before `operator delete`: reads the node's `boost::shared_ptr`
+             * counted-base pointer, and when present, does the classic
+             * two-phase `sp_counted_base::release()` (atomic-decrement the
+             * use count, dispose via vtable slot 1 if it hits zero;
+             * atomic-decrement the weak count, destroy via vtable slot 2 if
+             * that hits zero) -- matching this project's own established
+             * `release()`-not-`weak_release()` identification of that exact
+             * two-phase shape. That is precisely `~shared_ptr<MeshInstance>()`
+             * running as part of `~pair<const CmdId, shared_ptr<MeshInstance>>()`
+             * inside this member's implicit value teardown -- no bespoke
+             * shared_ptr-release code needed, `free_node` below already
+             * models it generically via the value's own destructor.
+             *
+             * Reached from this instantiation's `erase_range` (`FUN_008564E0`,
+             * cited above) via its general (non-whole-tree) loop branch. That
+             * caller's own citation already records that its one real
+             * invocation (`~CBuildDragPreview()`, `FUN_00852B20`)
+             * always takes the fast whole-tree-clear path -- so, per this
+             * file's established "template-instantiated but the per-node
+             * erase-rebalance path is compiled, not separately runtime-
+             * exercised through the currently-traced caller" shape (the
+             * `FUN_007CAC80`/`FUN_00A3E450` precedents immediately above),
+             * this member is kept `recovered` as a genuine compiled emission
+             * of real template code.
+             *
+             * Address: 0x008A7DE0 (FUN_008A7DE0, sub_8A7DE0) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * erase_node` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint`/`rb_min`/`rb_max`
+             * above). Captures the in-order successor via `rb_increment`
+             * (`FUN_008A9090`, cited above), the classic CLRS transplant with
+             * a `rb_min(erased->right)` replacement search for the
+             * two-children case (`FUN_008A87E0`, cited above), rebalances
+             * when the physically-removed node's original colour was black,
+             * frees the node and decrements size -- matches this member
+             * field for field. Real caller (superseded) was the deleted
+             * hand-rolled `EraseTerrainEnvironmentNode` free function's own
+             * two call sites in `CWldMap.cpp`: the single-node erase path
+             * (now `mEnvLookup.erase(key)`, `RemoveEnvLookup`) and the
+             * whole/partial-range erase walk (now `erase_range`'s slow path
+             * below).
+             *
+             * Address: 0x007E47E0 (FUN_007E47E0, sub_7E47E0) -- `msvc8::map<
+             * Moho::MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>::
+             * erase_node` (`MeshBatchBucketTree`, `MeshBatchKey.h`), isNil@
+             * +0x2D (0x0D header + 0x10 `MeshBatchKey` + 0x10
+             * `MeshBatchInstanceVector` = 0x2D). Same `_Isnil` check +
+             * `out_of_range("invalid map/set<T> iterator")` throw, CLRS
+             * transplant (two-child case captures the in-order successor via
+             * this instantiation's `rb_increment`/`sub_7E42F0`, cited on
+             * `rb_increment` above), `erase_rebalance`-shaped fixup
+             * (`sub_7E4AC0`/`sub_7E4B10`/`sub_7E4B30`, this instantiation's
+             * rotate/min-successor helpers), then the value's implicit
+             * destructor inlined ahead of `operator delete(node)` -- frees
+             * `MeshBatchInstanceVector`'s heap buffer when non-null, matching
+             * `msvc8::vector<MeshInstance*>::~vector()`. Sole caller is this
+             * instantiation's `erase_range` (`FUN_007E3E20`, cited below) via
+             * its per-element loop; real reachability traces through that
+             * member's citation to `MeshRenderer::~MeshRenderer` (implicit
+             * `meshes` member teardown, `Mesh.cpp`) and to `MeshRenderer::
+             * Reset()`/`Shutdown()`'s explicit `meshes.clear()` calls
+             * (`Mesh.cpp`), both of which take `erase_range`'s whole-tree
+             * fast path -- so, per this file's established "template-
+             * instantiated but the per-node erase-rebalance path is
+             * compiled, not separately runtime-exercised through the
+             * currently-traced caller" shape (the `FUN_007CAC80`/
+             * `FUN_00A3E450`/`FUN_00856950` precedents above), this member is
+             * kept `recovered` as a genuine compiled emission of real
+             * template code. `FUN_007E34E0` (this same instantiation's whole-
+             * subtree `destroy_subtree`, IDA-named
+             * `std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`) is
+             * already cited on `destroy_subtree` below.
+             *
+             * Address: 0x0087B5B0 (FUN_0087B5B0, sub_87B5B0) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::erase_node` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`/
+             * `mDecalGroupLookupBySplatIndex` (`moho/terrain/splat/
+             * CWldSplat.h`), isNil@+0x15 (same instantiation cited on
+             * `erase_range`/`erase(const key_type&)` above -- `FUN_0087A080`/
+             * `FUN_00879510`). Register-traced field for field: the `_Isnil`
+             * check + `out_of_range("invalid map/set<T> iterator")` throw
+             * (`0x0087B5CC`-`0x0087B626`), `rb_increment` for the in-order
+             * successor (`call sub_87CDD0` at `0x0087B630`, this
+             * instantiation's own `rb_increment`), the CLRS transplant
+             * (one/two-child relink, `leftmost()`/`rightmost()` header
+             * adjustment via `rb_min`/`rb_max`-equivalents `sub_87C540`/
+             * `sub_87C520`), the black-node rebalance calling this
+             * instantiation's rotates (`sub_87C4D0`/`sub_87C570`), then a
+             * bare `operator delete(void *)` on the erased node with no
+             * value-specific teardown (matches the value type being a raw
+             * `CWldTerrainDecal*`/`CDecalGroup*` pointer, nothing owning to
+             * destroy) and a saturating size decrement (`if (eax > 0)
+             * --eax`, matching this member's `if (size_ > 0) --size_`).
+             * Reached from this instantiation's `erase_range` (`FUN_0087A080`,
+             * cited above) via its general (non-whole-tree) loop branch --
+             * same "template-instantiated, per-node path compiled but not
+             * separately traced through the currently-known caller" shape as
+             * the precedents immediately above; real reachability traces
+             * through `erase_range`'s own citation to
+             * `CDecalManager::DestroyDecalGroup`/
+             * `RemoveDecalFromManagerAndReturnNextSlot` (`CWldSplat.cpp`).
+             */
+            /**
+             * Address: 0x00849900 (FUN_00849900 -- `erase_node` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); calls `rb_increment` 0x008497C0, the two rotations 0x00849D40/0x00849DB0 and the node-value destructor 0x0084A690; reached from `erase_range` 0x00849670.)
+             * Address: 0x004DC850 (FUN_004DC850, sub_4DC850) --
+             * `msvc8::set<msvc8::string>::erase_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Register-traced instruction-by-instruction
+             * against this member's C++ body and matches exactly, including
+             * the "lifted" single/no-child vs two-subtree branch split (no
+             * generic transplant-then-swap-color helper -- direct pointer
+             * surgery on `fixParent->left`/`right`, `head_->parent`/`left`/
+             * `right`), `rb_increment(erased)` computed as `next` before any
+             * mutation (`FUN_004DDD30`, cited above), `rb_min`/`rb_max`
+             * (`FUN_004DD3F0`/`FUN_004DD3D0`, cited above) re-seating
+             * extrema, the `erase_rebalance` fixup loop calling
+             * `rotate_left`/`rotate_right` (`FUN_004DCBE0`/`FUN_004DCC40`,
+             * cited above), and `free_node`'s `msvc8::string` teardown (free
+             * the heap buffer when `_Myres >= 0x10`) plus `operator
+             * delete(erased)` both inlined directly into this emission
+             * rather than calling a separate `free_node` symbol. Sole real
+             * caller is `erase_range`'s emission (`FUN_004DBD30`, cited
+             * below) via its per-element loop.
+             *
+             * Was previously duplicated as `ErasePausedCategoryNodeAndStoreNext`
+             * (`AudioEngine.cpp`, deleted by this migration) -- unlike the
+             * insert side, that free function's rebalancing WAS correct (it
+             * already called a real `FixupPausedCategoryMapAfterErase` that
+             * matched `erase_rebalance`'s CLRS shape), confirmed independently
+             * both by this pass and by the original diagnosis in
+             * `.memory/project_audiomap1_missing_rebalance_bug.md`. It was
+             * still a RULE ONE violation -- a hand-rolled duplicate of this
+             * member's mechanics reached through raw `mLeft`/`mRight`/
+             * `mParent` field access -- and, independently of that, it used
+             * a structurally different shape than the real binary: an
+             * explicit `TransplantPausedCategoryNode` helper modelled after
+             * the CLRS textbook `TRANSPLANT` subroutine, where the real
+             * emission (and this member) instead do the "lift the in-order
+             * successor into the erased slot" surgery directly inline with
+             * no separate transplant step. Both shapes are correct RB-tree
+             * deletions; only this member's is what the compiler actually
+             * emitted at this address.
+             *
+             * Address: 0x004DD510 (FUN_004DD510, sub_4DD510) -- `msvc8::map<
+             * std::uint16_t, float>::erase_node` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Same
+             * `invalid map/set<T> iterator` `out_of_range` guard shape as
+             * `mPausedCategoryNames`' emission above, `rb_increment(erased)`
+             * computed as `next` before any mutation (`FUN_004DDC90`, cited
+             * above), `rb_min`/`rb_max` (`FUN_004DDB60`/`FUN_004DDB40`, cited
+             * above) re-seating extrema on the single/no-child path, the
+             * `erase_rebalance` fixup loop calling `rotate_left`/
+             * `rotate_right` (`FUN_004DD800`/`FUN_004DD860`, cited above),
+             * and `operator delete(erased)` inlined directly (this
+             * instantiation's `float` value carries no destructor to run,
+             * unlike `mPausedCategoryNames`' `msvc8::string`). Sole real
+             * caller is `erase_range`'s emission for this instantiation
+             * (`FUN_004DCEA0`, cited below) via its per-element loop.
+             *
+             * Was previously duplicated as `EraseCategoryVolumeNodeAndStoreNext`
+             * (`AudioEngine.cpp`, deleted by this migration) -- same as the
+             * `mPausedCategoryNames` sibling above, that free function's own
+             * rebalancing WAS correct (it already called a real
+             * `FixupCategoryMapAfterErase` matching `erase_rebalance`'s CLRS
+             * shape) but used the same structurally-different explicit-
+             * `TransplantCategoryNode`-helper shape rather than this member's
+             * real inline-lift surgery; correct output, wrong shape for what
+             * the compiler actually emitted. Confirms this instantiation's
+             * own erase side was never the bug -- exactly mirroring the
+             * `mPausedCategoryNames` finding that the insert side alone was
+             * broken.
+             * Address: 0x0056AC60 (FUN_0056AC60, sub_56AC60 -- `erase(iterator)` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `info.mUnitOffsets.erase(it)` in `CFormationInstance::RemoveUnit`.)
+             * Address: 0x0049D0D0 (FUN_0049D0D0 -- `_Erase` (unlink, lift the successor, free the node) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049C6E0; formerly `EraseParticleBucketTreeKeyNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D520 (FUN_0049D520 -- `_Erase` (unlink, lift the successor, free the node) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049CA30; formerly `EraseTrailBucketTreeKeyNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C6E0 (FUN_0049C6E0 -- `_Erase` (unlink, lift the successor, free the node) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x00496430, 0x00498330, 0x0049A9F0; formerly `EraseParticleBucketTreeNodeRangeAndStoreIterator` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CA30 (FUN_0049CA30 -- `_Erase` (unlink, lift the successor, free the node) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x004965E0, 0x004985E0, 0x0049AC90; formerly `EraseTrailBucketTreeNodeRangeAndStoreIterator` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C1F0 (FUN_0049C1F0 -- `erase(const_iterator)` -- unlink, lift the successor, free the node for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00499E50; formerly `EraseOneBeamBucketIteratorAndExportSuccessor` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE860 (FUN_004AE860 -- `_Erase(node)` -- unlink, lift the successor, recolour, free for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE2B0; formerly `EraseWideTreeNode_004AE860` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D8AE0 (FUN_007D8AE0 -- `_Erase(node)` -- unlink, lift the successor, run the colour fixup, free for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D80D0; formerly `EraseRegionKeyNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C4580 (FUN_005C4580 -- `_Erase(node)` -- unlink, lift the successor, run the colour fixup, free for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C05A0, 0x005C0C40, 0x005C1F80; formerly `EraseMapNode` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AE690 (FUN_008AE690 -- `_Erase(node)` -- unlink, lift the successor, run the colour fixup, free for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, the entity id at node+0x0C, colour/nil at +0x10/+0x11); callers 0x008AC0B0, 0x008AF4C0; formerly `EraseEntityLoopTreeNode` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00717EF0 (FUN_00717EF0 -- `erase(const_iterator)` -- advance a copy, erase the old cursor, return the survivor for `msvc8::set<moho::InfluenceMapEntry>` (`InfluenceGrid::entries`); callers 0x00715EB0, 0x00716480, 0x0071AA60; formerly `EraseInfluenceEntryAndAdvance` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045CB80 (FUN_0045CB80 -- `erase(const_iterator)` -- unlink, rebalance, destroy, return the successor for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045BFD0; formerly `FileInfoMapEraseNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045AC70 (FUN_0045AC70 -- `erase(const_iterator)` for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x00458BC0, 0x0045C800; formerly `ZipMapEraseNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F2210 (FUN_007F2210 -- `erase(const_iterator)` -- unlink, rebalance, destroy, return the successor for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007F1120; formerly `EraseRangeProfileTreeNode` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F2670 (FUN_007F2670 -- `erase(const_iterator)` -- unlink, rebalance, destroy, return the successor for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007F11E0, 0x007F2210; formerly `EraseRangeProfileTreeNode` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046E890 (FUN_0046E890 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, then unlink, rebalance and destroy for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E4C0; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00463A70 (FUN_00463A70 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, then unlink, rebalance and destroy for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00462DD0, 0x00464F20; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E96A0 (FUN_004E96A0 -- `erase(const_iterator)` -- capture the successor, unlink, rebalance, destroy for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E93C0; formerly `EraseSingleTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00735D40 (FUN_00735D40 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, then unlink, rebalance and destroy for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007357C0; formerly cited on `GetSimConCommandRegistry`'s doc block in moho/sim/CSimConCommand.cpp instead of on the member (RULE ONE), moved 2026-09-11.)
+             * Address: 0x005043B0 (FUN_005043B0 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, `_Inc` for the result, unlink with `_Min`/`_Max` 0x00504C80/0x00504C60 for the header extremes, `_Lrotate`/`_Rrotate` 0x00504C10/0x00504CC0 for the fixup, then free, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00501B00, 0x00501BC0, 0x00501C10, 0x00502340, 0x00505200. It was booked `external_dependency`; it is engine code. Formerly `SpatialMapEraseNode`/`SpatialMapEraseFixup` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29 -- the copy whose sentinel test once turned every erase into a no-op (564d7e57d).)
+             * Address: 0x0066A550 (FUN_0066A550 -- `erase(it)` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19): unlink, rebalance, `~Entry` unlinks the node's `WeakPtr`, free, return the successor; callers `WeakSet::SkipDead` 0x0066A330 and the dragger's selectability prune 0x00863EB3.)
+             * Address: 0x007B30D0 (FUN_007B30D0 -- the same for the `WeakSet<moho::UserUnit>::Entry` set; caller `SkipDead` 0x007B29C0.)
+             * Address: 0x0066AC70 (FUN_0066AC70 -- `_Max` (descend right while not nil) for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19), the rightmost repair inside `erase` 0x0066A550.)
+             * Address: 0x007B3CE0 (FUN_007B3CE0 -- `_Max` for the `WeakSet<moho::UserUnit>::Entry` set; caller `erase` 0x007B30D0.)
+             * Address: 0x007B3D00 (FUN_007B3D00 -- `_Min` for the `WeakSet<moho::UserUnit>::Entry` set; caller `erase` 0x007B30D0.)
+             */
+            node_type* erase_node(node_type* const erased)
+            {
+                assert(erased != nullptr && "msvc8 tree: erasing a null node");
+                if (rb_is_nil(erased)) {
+                    throw std::out_of_range("invalid map/set<T> iterator");
+                }
+
+                node_type* const next = rb_increment(erased);
+
+                node_type* lifted = erased;
+                node_type* fix = nullptr;
+                node_type* fixParent = nullptr;
+
+                if (rb_is_nil(erased->left)) {
+                    fix = erased->right;
+                } else if (rb_is_nil(erased->right)) {
+                    fix = erased->left;
+                } else {
+                    lifted = next; // in-order successor of a two-child node
+                    fix = lifted->right;
+                }
+
+                if (lifted == erased) {
+                    // At most one subtree: relink it in place.
+                    fixParent = erased->parent;
+                    if (!rb_is_nil(fix)) {
+                        fix->parent = fixParent;
+                    }
+
+                    if (root() == erased) {
+                        head_->parent = fix;
+                    } else if (fixParent->left == erased) {
+                        fixParent->left = fix;
+                    } else {
+                        fixParent->right = fix;
+                    }
+
+                    if (leftmost() == erased) {
+                        head_->left = rb_is_nil(fix) ? fixParent : rb_min(fix);
+                    }
+                    if (rightmost() == erased) {
+                        head_->right = rb_is_nil(fix) ? fixParent : rb_max(fix);
+                    }
+                } else {
+                    // Two subtrees: `lifted` (the successor) takes the erased slot.
+                    erased->left->parent = lifted;
+                    lifted->left = erased->left;
+
+                    if (lifted == erased->right) {
+                        fixParent = lifted;
+                    } else {
+                        fixParent = lifted->parent;
+                        if (!rb_is_nil(fix)) {
+                            fix->parent = fixParent;
+                        }
+                        fixParent->left = fix;
+                        lifted->right = erased->right;
+                        erased->right->parent = lifted;
+                    }
+
+                    if (root() == erased) {
+                        head_->parent = lifted;
+                    } else if (erased->parent->left == erased) {
+                        erased->parent->left = lifted;
+                    } else {
+                        erased->parent->right = lifted;
+                    }
+
+                    lifted->parent = erased->parent;
+                    std::swap(lifted->color, erased->color);
+                }
+
+                if (erased->color == kRbBlack) {
+                    erase_rebalance(fix, fixParent);
+                }
+
+                free_node(erased);
+                if (size_ > 0) {
+                    --size_;
+                }
+                return next;
+            }
+
+            /**
+             * Address: 0x00899CA0 (FUN_00899CA0, `erase(iterator, iterator)`)
+             * Address: 0x007E3B70 (FUN_007E3B70, sibling emission)
+             *
+             * 0x00899CA0 is the session save-node map `map<uint32, string>`
+             * (`_Isnil` at +0x2D), reached from
+             * `Moho::SSessionSaveDataTypeInfo::Destruct` at 0x0089A450 and eight
+             * other call sites; 0x007E3B70 is the mesh-key map (`_Isnil` at
+             * +0x25), reached from that map's `_Tidy` at 0x007E2B20 - the body
+             * this class's destructor is annotated with.
+             *
+             * IDA signature:
+             * _DWORD *__userpurge sub_899CA0@<eax>(int this@<edi>, _DWORD *result,
+             *                                      _DWORD *first, _DWORD *last);
+             *
+             * What it does:
+             * Erases the half-open node range `[first, last)` and returns a cursor
+             * on the first surviving node.
+             *
+             * MSVC8 splits this in two. When the range is the whole tree it runs
+             * `clear()` inline and answers `begin()`; the shipped bodies show that
+             * inlining directly - `cmp first,[head]` / `cmp last,head`, then the
+             * recursive `_Erase` call (`sub_89A820` / `sub_7E4DD0`) followed by
+             * `head->parent = head`, `_Mysize = 0`, `head->left = head`,
+             * `head->right = head` and a load of `head->left` into the return slot.
+             *
+             * Otherwise it walks one node at a time as `erase(_First++)`: the
+             * post-increment's `_Inc` is inlined ahead of the call (the `+0x2D`
+             * / `+0x25` sentinel probes at 0x00899CF5 and 0x007E3B95), the *old*
+             * cursor is passed to `erase(const_iterator)` and that call's returned
+             * iterator is discarded. Recovering it as `first = erase(first)` would
+             * drop the second `_Inc` the shipped code performs.
+             */
+            /**
+             * Address: 0x0052D9C0 (FUN_0052D9C0, erase-range for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`, `_Isnil` at +0x11. Same two-shape
+             * split as the emissions above: the whole-tree fast path calls
+             * `sub_52CCF0` on the root (`destroy_subtree`, cited below) when
+             * `first == begin() && last == end()`; otherwise it walks
+             * `erase(_First++)` with the successor computed inline and
+             * `sub_52F0A0` (`erase_node`, cited above) erasing the old
+             * cursor each turn. Reached from `FUN_0052A390`
+             * (`~rb_tree`, cited above) with `[leftmost(), header())` --
+             * always the whole-tree fast path in that caller. Also reached
+             * from `FUN_00537420`'s inlined `RRuleGameRulesLuaExportBinding
+             * ::mPendingBlueprintOrdinals` assignment
+             * (`legacy/containers/Vector.h`'s `insert(pos,count,value)`
+             * in-place tail-shift loop, cited there) at 0x00537458 --
+             * erases the DESTINATION slot's own live tree before
+             * `sub_530EE0` (`copy_from`'s emission for this instantiation,
+             * cited below) clones the source slot's tree into it; same
+             * whole-tree-fast-path shape, `[leftmost(), header())` again. A
+             * prior pass on the `Vector.h` citation misread this call as a
+             * "copy-construct helper", which is not what `erase_range`
+             * does anywhere else in this file; corrected there.)
+             * Address: 0x007B3E00 (FUN_007B3E00, erase-range for the sibling
+             * `msvc8::set<std::uint32_t>` instantiation cited on
+             * `destroy_subtree`/`erase_node` above -- `_Isnil` at +0x11. Same
+             * two-shape split: whole-tree fast path calls `sub_7B4D10`
+             * (`destroy_subtree`) on the root when `first == begin() && last
+             * == end()`; otherwise walks `erase(_First++)` via `sub_7B46A0`
+             * (`erase_node`). Reached from three call sites sharing this
+             * instantiation's `~rb_tree()` shape, always with `[leftmost(),
+             * header())` (verified directly against each caller's `.asm` --
+             * `mov ecx,[eax]`/push header pair pushed as `first`/`last`
+             * before `call sub_7B3E00`) -- always the whole-tree fast path:
+             * `FUN_007B2940`/`FUN_007B2970` (this member's own SEH-unwind
+             * funclets for `operator[]`'s two `value_type(k, mapped_type())`
+             * stack temporaries, cited on `~rb_tree()` above) and
+             * `FUN_007B36A0` (the copy constructor's exception-cleanup,
+             * cited on `rb_tree(const rb_tree&)` above), matching
+             * `FUN_0052A390`'s sibling shape. (Previously described as three
+             * bespoke "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`; corrected once their
+             * trailing placement-new step was found to be fabricated -- see
+             * the citations above.)
+             * Also reached from the same tree's copy machinery on the
+             * exception path: `_Copy`'s emission (`FUN_007B4980`) calls this
+             * member's `destroy_subtree` half directly (not through
+             * `erase_range`) to unwind a partially-copied subtree before
+             * rethrowing, and `FUN_007B3EC0` (`_Copy`'s driver, called from
+             * the copy constructor `FUN_007B3500` above) is `_Copy`'s only
+             * caller -- both currently misclassified `external_dependency`
+             * in `recovered_progress.json` pending a dedicated pass on
+             * `copy_from`'s own algorithm (see the note on `copy_from`
+             * below); not corrected here since neither is this batch's
+             * assigned token, flagged for whoever picks up
+             * `FUN_007B4980`/`FUN_007B3EC0` next.)
+             */
+            /**
+             * Address: 0x006E22D0 (FUN_006E22D0, the command-id map's range
+             * erase -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15,
+             * node 0x18. Same two-shape split as the emissions above:
+             * `first == begin() && last == end()` takes the whole-tree fast
+             * path, calling `sub_6E2990` (`destroy_subtree`, cited below);
+             * otherwise walks `erase(_First++)`. Reached from
+             * `~CommandDatabase` (FUN_006E0A70, cited on `~rb_tree` above)
+             * with `[leftmost(), header())` -- always the whole-tree fast
+             * path from that caller. `CCommandDB::MemberDeserialize`
+             * (FUN_006E1430) does *not* call this member -- a prior recovery
+             * pass wired an `erase(begin(), end())` call into that function
+             * that the binary's own disassembly does not contain;
+             * deserialization only ever runs against a freshly constructed,
+             * still-empty map, so removing that fabricated call did not
+             * change behaviour.)
+             *
+             * Address: 0x00947B90 (FUN_00947B90, isNil@+0x15 -- same two-shape
+             * split confirmed against the walked callee bodies: the whole-tree
+             * fast path calls `sub_9470E0` (recursive delete-all with no
+             * rebalancing, matching `destroy_subtree`'s shape exactly) on
+             * `header()->parent` (the root), then resets `header()->parent`,
+             * `_Mysize` and `header()->left`/`header()->right` to `header()`
+             * and returns `leftmost()`; otherwise walks `erase(_First++)` via
+             * `sub_947380`, whose body is a full RB-tree single-node
+             * erase-with-rebalance (out_of_range throw on an already-nil
+             * iterator, unlink, recolour/rotate through sibling helpers,
+             * `operator delete` the node, decrement size) matching
+             * `erase_node` exactly. Reached from
+             * `gpg::gal::StateCache<_D3DRENDERSTATETYPE,unsigned int>::~StateCache`
+             * (FUN_00948190, StateCache.cpp) -- its own disassembly at
+             * 0x009481AC calls `sub_947B90(&tree_, &cursor, *(*(this+8)),
+             * *(this+8))`, i.e. `tree_.erase_range(tree_.begin(), tree_.end())`,
+             * followed by an explicit `operator delete` on the pointer that
+             * was passed as `last`/`header()`. NOTE FOR A FUTURE STATECACHE
+             * PASS: this proves `StateCache<StateT,ValueT>::tree_`'s real
+             * layout is a proper header-pointer-owning RB-tree (the header
+             * node is separately heap-allocated and must be explicitly
+             * freed after the erase), not the currently-modelled
+             * `msvc8::EmbeddedTree<>` (`legacy/containers/Tree.h`, embedded
+             * by-value head, no-arg `clear()`) that
+             * `StateCache_D3DRENDERSTATETYPE.hpp`/`StateCache.cpp` use today
+             * -- `~StateCache`'s recovered body currently calls
+             * `tree_.clear()`, which is a different, narrower operation than
+             * the two-arg `erase_range(begin,end)` + separate header
+             * `delete` this address actually performs. Not corrected here
+             * (would require retyping `tree_` across all three `StateCache`
+             * specialisations, out of scope for this token); flagged for
+             * whoever next touches `StateCache`.)
+             */
+            /**
+             * Address: 0x00947C50 (FUN_00947C50, sub_947C50) -- the
+             * sampler-state cache's own `erase_range`, following up on the
+             * "flagged for whoever next touches `StateCache`" note directly
+             * above: a distinct address from 0x00947B90, not an ICF twin of
+             * it, because this era's `link.exe` folds identical COMDATs by
+             * raw byte comparison, and a body containing a `call` to another
+             * per-instantiation address bakes that instantiation's own
+             * relative displacement into its bytes -- byte-identical
+             * algorithm shapes across sibling node families still occupy
+             * separate addresses.
+             *
+             * Same two-shape split as 0x00947B90: the whole-tree fast path
+             * (`first == leftmost() && last == header()`) calls `sub_947120`
+             * (`destroy_subtree`, cited below) on the root, relinks
+             * `head->parent`/`head->left`/`head->right` to `head` and zeroes
+             * size, then returns `leftmost()`; otherwise walks
+             * `erase(_First++)` via `sub_947630` (`erase_node`, cited
+             * above), computing the in-order successor inline before each
+             * erase exactly like this member's walk loop.
+             *
+             * Five real callers -- confirmed both via the callgraph index and
+             * an exhaustive PE byte-scan (every `E8`/`E9` rel32, `0F 8x` jcc
+             * rel32, `EB`/`7x` rel8 and absolute dword reference in every
+             * section of `bin/external/ForgedAlliance.exe`; no others exist):
+             *   - 0x009480E9, inside `sub_9480D0` --
+             *     `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned
+             *     int>`'s non-deleting destructor lane
+             *     (`RuntimeDestroySamplerStateCacheTreeOnlyLaneA`,
+             *     `StateCache.cpp`);
+             *   - 0x009481FC, inside `sub_9481E0` -- the same class's real
+             *     destructor (`~StateCache<_D3DSAMPLERSTATETYPE, unsigned
+             *     int>`, `StateCache.cpp`). Both inline this member's whole
+             *     `erase_range(begin(), end())` call directly rather than
+             *     going through a separate `~rb_tree()` symbol -- exactly the
+             *     evidence the 0x00947B90 note above says a future
+             *     `StateCache` pass needs: `tree_`'s real layout is a proper
+             *     header-pointer-owning `msvc8::map<_D3DSAMPLERSTATETYPE,
+             *     unsigned int>` (heap-allocated header, explicit `operator
+             *     delete` on it after the erase), not `msvc8::EmbeddedTree<>`
+             *     -- `StateCache_D3DSAMPLERSTATETYPE.hpp` is retyped to
+             *     `msvc8::map` alongside this citation, and both dtors above
+             *     drop their `tree_.clear()` call in favour of `tree_`'s own
+             *     implicit member destruction, which reproduces this exact
+             *     `erase_range` + `free_raw(head_)` sequence;
+             *   - 0x00947E12/0x00947EA2/0x00947F32, inside `sub_947E00`/
+             *     `sub_947E90`/`sub_947F20` -- three byte-for-byte identical
+             *     `~rb_tree()` emissions (this member's `erase_range(
+             *     leftmost(), header())` then `operator delete` the header
+             *     then zero head/size) for this same isNil@+0x15, 8-byte-
+             *     value node shape, cited on `~rb_tree()` below. All three
+             *     have zero incoming references of any kind anywhere in the
+             *     binary (raw IDA xrefs, callgraph index, and the same
+             *     exhaustive PE byte-scan all agree); their owning member is
+             *     a `CScApp`-vtable-neighbourhood class distinct from
+             *     `StateCache` (reachable via `??_7CScApp@@6B@` like every
+             *     other body in this address range, per the callgraph
+             *     index's `reachable` table), not pinned down further in
+             *     this pass.
+             */
+            /**
+             * Address: 0x00702A70 (FUN_00702A70) -- `Moho::CArmyStats::
+             * mNameIndex`'s own `erase_range` for `msvc8::map<msvc8::string,
+             * CArmyStatItem*>` (isNil@+0x2D, 0x20-byte value_type, 0x30-byte
+             * node -- `moho::ArmyNameIndexNode` in `CArmyStats.h`). Four real
+             * callers, all confirmed via the callgraph index:
+             *   - 0x006FD8B0/0x00701570 -- two `~rb_tree()` emissions for this
+             *     tree, cited on `~rb_tree()` above (one reached from
+             *     `CArmyStats::CArmyStats`'s exception-unwind funclet, one a
+             *     zero-incoming-reference duplicate);
+             *   - 0x00702060 -- not independently exported in this pass;
+             *   - 0x00704A40, inside `Moho::CArmyStats::~CArmyStats` itself --
+             *     confirmed by that address's own decompiled body, which calls
+             *     this member directly and inline rather than through a named
+             *     wrapper: `sub_702A70((int)v2, (int)a2->mStats._Myhead->
+             *     _Left, (int)a2->mStats._Myhead)` followed by `operator
+             *     delete(a2->mStats._Myhead)` and zeroing `_Myhead`/`_Mysize`
+             *     -- this member's whole-tree fast path, instruction for
+             *     instruction. `~CArmyStats`'s recovered source previously
+             *     called an invented `DestroyNameIndexTree()` for this; no
+             *     such symbol exists anywhere in the binary; `mNameIndex`'s
+             *     automatic member destruction (which reaches this member
+             *     implicitly) is the entire real emission.
+             */
+            /**
+             * Address: 0x00947D10 (FUN_00947D10, sub_947D10) -- `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>`'s own
+             * `erase_range`: a third, distinct emission alongside 0x00947B90
+             * (`RenderState`) and 0x00947C50 (`SamplerState`) above, for the
+             * same byte-exact-ICF reason. Same two-shape split: whole-tree
+             * fast path calls `sub_947160` (`destroy_subtree`, cited below);
+             * walk path calls `sub_9478E0` (`erase_node`, cited above).
+             *
+             * Five real callers (callgraph index + exhaustive PE byte-scan,
+             * same method as 0x00947C50 above):
+             *   - 0x00948169, inside `sub_948150` --
+             *     `RuntimeDestroyTextureStageStateCacheTreeOnlyLaneA`
+             *     (`StateCache.cpp`);
+             *   - 0x0094824C, inside `sub_948230` -- `~StateCache<
+             *     _D3DTEXTURESTAGESTATETYPE, unsigned int>` (`StateCache.
+             *     cpp`), the same inlined-`erase_range`-plus-explicit-
+             *     `delete`-the-header shape as the Sampler and RenderState
+             *     destructors, and retyped to `msvc8::map` in the same pass;
+             *   - 0x00947E42/0x00947ED2/0x00947F62, inside `sub_947E30`/
+             *     `sub_947EC0`/`sub_947F50` -- three more zero-incoming-
+             *     reference `~rb_tree()` emissions for this same node shape,
+             *     cited on `~rb_tree()` below.
+             */
+            /**
+             * Address: 0x007B3820 (FUN_007B3820, `msvc8::map<std::uint32_t,
+             * msvc8::set<std::uint32_t>>::erase_range` -- the *outer*
+             * per-parent-bone dedup map's own `erase_range` (isNil@+0x1D,
+             * same 32-byte-node instantiation as `Map.h`'s `operator[]`
+             * citation `FUN_007B27D0`). Same two-shape split as the other
+             * instantiations in this file: whole-range fast path
+             * (`first==begin() && last==end()`) calls a `destroy_subtree`-
+             * shaped helper (`sub_7B4AA0`) and resets head/size; walk path
+             * does an iterative successor-walk erase via `sub_7B4040`
+             * (`erase_node`-shaped, single-node erase-and-rebalance).
+             * Reached from `CON_ANI_DumpSkeleton`'s cleanup,
+             * `dedupTree.erase(dedupTree.begin(), dedupTree.end())` right
+             * before `operator delete`-ing the tree header (CAniSkel.cpp,
+             * not yet recovered). `sub_7B4AA0`/`sub_7B4040` would need their
+             * own citations as `destroy_subtree`/`erase_node` for this same
+             * node shape, not yet done.)
+             *
+             * Address: 0x00580600 (FUN_00580600, sub_580600) --
+             * `Moho::CAiBrain::mBuildStructureMap`'s own `erase_range`
+             * (isNil@+0x25, same node instantiation cited on this file's
+             * `erase(const_iterator)` entry, `FUN_0057DA50`, in Map.h).
+             * Same two-shape split as the other instantiations here:
+             * whole-range fast path (`first==leftmost() && last==header()`)
+             * calls the already-cited `destroy_subtree` realization
+             * `sub_5812C0` and resets head/size; walk path does an
+             * iterative successor-walk erase via the already-cited
+             * `erase_node` realization `sub_57DA50`.
+             *
+             * Address: 0x00952240 (FUN_00952240, sub_952240) -- `gpg::
+             * WriteArchive::mRefCounts`'s `erase_range` (`msvc8::map<const
+             * gpg::RType*, int>`, isNil@+0x15, the same instantiation cited
+             * on the sentinel-allocate lane above, WriteArchive.cpp).
+             * Reached from `WriteArchive`'s destructor (`FUN_00953150`,
+             * `~WriteArchive`, WriteArchive.cpp) via `mRefCounts.clear()`.)
+             *
+             * Address: 0x007CA050 (FUN_007CA050, sub_7CA050) -- `Moho::
+             * SPeer::establishedUids`'s `erase_range` (`msvc8::set<
+             * int32_t>`, isNil@+0x11). Reached from `SPeer`'s destructor
+             * (`FUN_007C1340`, SPeer.cpp/.h) teardown of
+             * `establishedUids`.)
+             *
+             * Address: 0x00711350 (FUN_00711350, sub_711350) -- the local
+             * `blueprintKeys` variable's `erase_range` in `Moho::
+             * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
+             * RBlueprint*>`, isNil@+0x11, 4-byte pointer
+             * value_type, CArmyStats.cpp:965). Whole-range fast path calls
+             * `sub_712090` (`destroy_subtree`, this same instantiation,
+             * cited below); walk path erases node-by-node via `sub_711BE0`
+             * (`erase_node`, cited below). Reached from `blueprintKeys`'s
+             * automatic (compiler-generated) end-of-scope destruction at
+             * the close of `ArmyXmlStatsNode`.)
+             *
+             * Reached from
+             * `CAiBrain::~CAiBrain` (`FUN_0057A1E0`, CAiBrain.cpp) via
+             * `DestroyBuildStructureMap` -- confirmed directly from the
+             * destructor's own raw decompile, which calls this address as
+             * its fourth cleanup step (right after the three `CTaskStage`
+             * teardowns `DestroyTaskStageAndDelete` already recovers) with
+             * a 3-pointer-argument shape matching `(outIter, first, last)`,
+             * not the argument-less `tree_::clear()` the source previously
+             * called; IDA mis-typed the `this`/argument registers here as
+             * `Moho::CScriptObject`/`LuaPlus::LuaObject` fields from an
+             * unrelated class, which is why the raw `.c` export reads as
+             * script-object teardown at this call site.)
+             *
+             * Address: 0x008D6080 (FUN_008D6080, sub_8D6080) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's `erase_range`
+             * (isNil@+29, the same instantiation cited on `insert_unique`/
+             * `insert_at`/`buy_head`/`rb_decrement` elsewhere in this file).
+             * Whole-range fast path calls the already-cited-below
+             * `destroy_subtree` realization `sub_8D6B70`; walk path erases
+             * node-by-node via `sub_8D6650` (`erase_node`, cited below).
+             * Five real callers, all in `StartupHelpers.cpp`'s adapter-mode
+             * enumeration family: `FUN_008D21E0` (`SetupPrimaryAdapterSettings`,
+             * already recovered -- though its CURRENT source uses a
+             * simplified `HasMode` linear-scan dedup instead of this tree,
+             * a documented follow-up, see the `insert_unique`/`FUN_008D4F10`
+             * citation above) plus `FUN_008D26A0`/`FUN_008D26D0`/
+             * `FUN_008D4ED0`/`FUN_008D58F0` (sibling adapter-setup
+             * functions using the same local-tree pattern, not yet
+             * individually traced).
+             *
+             * Address: 0x0077BD90 (FUN_0077BD90, sub_77BD90) -- CDecalBuffer's
+             * start-tick outer table's `erase_range` (`std::map<unsigned,
+             * std::set<CDecalHandle*>>`, isNil@+29, 0x20 outer node --
+             * see this file's own note on the CDecalBuffer start-tick family
+             * elsewhere). Whole-range fast path calls `sub_77CFE0`
+             * (`destroy_subtree`, this same instantiation); walk path calls
+             * `sub_77A3C0` -- CORRECTED elsewhere in this file from a
+             * mis-labeled "insert with rebalance" note to its real role,
+             * `erase_node` (see that citation, above the `insert_at`
+             * cluster it was previously filed under).
+             *
+             * Address: 0x00535750 (FUN_00535750, MSVC8 `_Tree::
+             * erase(first, last)`) -- the category-lookup map's
+             * `erase_range`, `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Confirmed against the
+             * raw decompile: whole-range fast path
+             * (`first==head->left && last==head`) calls `sub_5369D0`
+             * (`destroy_subtree`, cited above) on the root, resets the head
+             * self-links and zeroes size, returning the (now-self-linked)
+             * `head->left`; the walk path advances the cursor via the
+             * successor step inlined ahead of each iteration and calls
+             * `sub_536010` (`erase_node`, cited above) on the old cursor --
+             * matching this member's two-shape split exactly. Sole caller:
+             * `~EntityCategoryLookupTable`'s implicit destructor
+             * (via `mCategoryMap`'s own destructor, `~rb_tree()` below),
+             * always with `[leftmost(), header())` -- i.e. always this
+             * member's whole-tree fast path in this instantiation's actual
+             * runtime usage; the walk-path branch that calls `erase_node`
+             * node-by-node is compiled (this member handles both shapes in
+             * one function body) but not separately exercised by any
+             * currently-known call site of this specific map. Re-homed here
+             * from a hand-rolled `EraseCategoryLookupNodeRange` free
+             * function in RRuleGameRules.cpp that performed this identical
+             * two-shape dispatch over a
+             * deleted overlay*`/`EntityCategoryLookupTable&`
+             * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x00687190 (FUN_00687190, `erase(iterator, iterator)`
+             * for `msvc8::map<std::uint32_t, moho::IdPool>` -- `EntityDB::
+             * mIdPoolTree` in `EntityDb.h`. Matches this member's two-shape
+             * split exactly: `cmp [first],[head->left] / cmp [last],[head]`
+             * gates the whole-tree fast path (`sub_688030` = `destroy_
+             * subtree`, cited above, on `head->parent`, then self-link
+             * `head`'s three fields and zero size), else `do { successor =
+             * rb_increment(cursor) via sub_6878C0; erase_node(cursor) via
+             * sub_687CC0; cursor = successor; } while (cursor != last)`
+             * (both cited above).
+             *
+             * Four real callers, all `[leftmost(), header())` -- always the
+             * whole-tree fast path:
+             *   - `0x006843B0` (`Moho::EntityDB::~EntityDB`, cited in full on
+             *     `~rb_tree()` above) -- `mIdPoolTree`'s implicit member
+             *     destruction, inlining `~rb_tree()`'s body but keeping this
+             *     call out-of-line.
+             *   - `0x00684310` (`sub_684310`, cited separately below, right
+             *     after `~rb_tree()`) -- `EntityDB::EntityDB`'s (0x00684230)
+             *     SEH unwind funclet for the already-constructed
+             *     `mIdPoolTree` member, should a later member's construction
+             *     throw. Sole caller confirmed via this pass's xref sweep
+             *     (`type=19` edge from 0x00684230, the same edge-type this
+             *     file already uses elsewhere for constructor-unwind
+             *     callers, e.g. `j_??0struct_sim_subres2@@QAE@@Z_0`'s
+             *     0x00403C50 caller of `SimSubRes2::Reset()`/0x00403E70).
+             *   - `0x00685850`/`0x00686660` -- byte-identical siblings of
+             *     `0x00684310` (same body: `erase_range(head->left, head)`
+             *     then `operator delete(head)` and zero head/size). Both are
+             *     already `skip` in `recovered_progress.json`, backed by an
+             *     exhaustive PE byte-scan (every rel32/rel8/absolute-dword
+             *     reference in `bin/2025.7.1` and `bin/external`) finding
+             *     zero incoming references of any kind -- genuinely
+             *     unreferenced compiler output (TUs built without `/Gy`/
+             *     `/OPT:REF` stripping it), not a source-mapped call site.
+             *     Left uncited/uninvoked here to match that verdict; noted
+             *     only so a future reader does not mistake the silence for
+             *     an unchecked gap.
+             *
+             * Reached in practice via `mIdPoolTree`'s membership in
+             * `EntityDB` (`EntityDb.h`) -- `~EntityDB()`'s implicit member
+             * destruction (`EntityDb.cpp`) is what triggers `~rb_tree()`,
+             * which is what calls this member.
+             *
+             * Address: 0x007CA730 (FUN_007CA730, sub_7CA730) -- `msvc8::
+             * set<char>`'s `erase_range`, the same `CLobby.cpp` ignore-
+             * names separator-set instantiation cited on `alloc_raw`/
+             * `copy_from`/`~rb_tree` above (node 0x10, colour@0x0D/isNil@
+             * 0x0E). `this` in `edi`, matching this member's fast-path
+             * field for field: tests `first == head_->left` (`leftmost()`)
+             * `&& last == head_` (`header()`), and on the fast path calls
+             * `sub_7CB080` (`destroy_subtree`, cited below) on `head_->
+             * parent` (`root()`) then self-links the header and zeroes
+             * size -- exactly `clear()`'s body, which this member's own
+             * fast path delegates to. The non-fast-path walk matches this
+             * member's `erase(_First++)` loop, calling `sub_7CAC80`
+             * (`erase_node`) per element. Sole caller is `FUN_007CC2B0`
+             * (`~rb_tree`, cited above), which always takes the fast path
+             * (`erase_range(leftmost(), header())`). DB-integrity fix:
+             * this token was marked `skip` citing a `CrtRuntimeHelpers.cpp`
+             * source path the address never appeared in; this is the real
+             * source.
+             *
+             * Address: 0x008564E0 (FUN_008564E0, sub_8564E0) --
+             * `msvc8::map<CmdId, boost::shared_ptr<MeshInstance>>::
+             * erase_range` for `moho::CBuildDragPreview::
+             * mPreviewPositions` (`UiRuntimeTypes.h:896`, offset `0x28`).
+             * Fast whole-tree path only (`first==leftmost() && last==
+             * header()`): calls `sub_856F30` (`destroy_subtree`, cited
+             * below), self-links the header, zeroes size -- matches this
+             * member's fast branch exactly. Sole caller is
+             * `~CBuildDragPreview()` (`FUN_00852B20`,
+             * already recovered, "typed vector/material/tree/decal
+             * teardown") via the compiler-generated implicit member
+             * destructor call for `mPreviewPositions` -- no hand-written
+             * call exists or is needed for that half. Was `skip`
+             * ("covered by typed source construct; no standalone SDK
+             * function emitted", confidence 0.35); corrected to
+             * `recovered` after confirming the destructor does perform a
+             * real, distinct out-of-line call here.
+             *
+             * Address: 0x008A8D40 (FUN_008A8D40, sub_8A8D40) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * erase_range` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint`/`erase_node`
+             * above). Whole-tree fast path (`eraseFirst==leftmost() &&
+             * eraseLast==head`) sweeps via `destroy_subtree`
+             * (`FUN_008A8720`, cited below) and rebinds the sentinel to the
+             * empty state; the slow path steps `eraseFirst` toward
+             * `eraseLast` one in-order successor at a time, destroying one
+             * node per iteration through `erase_node` (`FUN_008A7DE0`,
+             * cited above) -- matches this member field for field. Real
+             * caller (superseded) was the deleted hand-rolled
+             * `EraseTerrainEnvironmentNodeRange` free function in
+             * `CWldMap.cpp` -- the `mEnvLookup` map-range erase this member
+             * models had no live `src` caller before this pass. Note
+             * this member's own fast path calls `clear()` below (not the
+             * reverse); `IWldTerrainRes::ClearEnvLookup` now calls
+             * `mEnvLookup.clear()` directly rather than routing through
+             * this member.
+             *
+             * Address: 0x008619F0 (FUN_008619F0, sub_8619F0) -- `msvc8::
+             * map<std::int32_t, Moho::ProjectileArcTrack>::erase_range` --
+             * `ProjectileArcTable& ArcTable()`'s function-local static
+             * (`moho/render/ProjectileArcRenderer.cpp`), isNil@+3145
+             * (0xC38 header+key+0xC30 value, 8-aligned; same instantiation
+             * cited on `erase(const_iterator)`, `FUN_00860FB0`, elsewhere in
+             * this file). Whole-tree fast path (`a2==*(int*)dword_10C4318 &&
+             * a3==dword_10C4318`) calls `sub_861D80` (`clear()`) and returns
+             * the header, matching this member's `first==leftmost() &&
+             * last==header()` branch; the slow path loops `sub_861D10`
+             * (`rb_increment`, advancing the cursor before the node dies)
+             * then `sub_860FB0` (`erase_node`, this same instantiation's
+             * single-node erase) -- matches `while (cursor != stop)
+             * erase_node((cursor++).node())` field for field. `ArcTable()`
+             * reads/writes the tree through fixed globals
+             * (`dword_10C4318`/`dword_10C431C`) because it is a function-
+             * local `static moho::ProjectileArcTable table;`, not a
+             * `this`-relative member.
+             *
+             * Reached automatically: `ArcTable()`'s `static` local has a
+             * non-trivial destructor, so the compiler registers a real
+             * teardown call for it (the magic-static guard's atexit path),
+             * which is exactly this member's own shape
+             * (`erase_range(leftmost(), header())` + `operator
+             * delete(head)` + zero head/size -- the same "no corresponding
+             * source line, citation-only" compiler-generated pattern
+             * already documented on `~rb_tree()`'s own EH-funclet clones
+             * above). Confirmed by disassembling the raw PE bytes directly
+             * (capstone, `bin/external/ForgedAlliance.exe`) since none of
+             * this pattern's three call sites -- 0x008600A0, 0x00860F50,
+             * 0x00861760, byte-identical to each other, differing only in
+             * the encoded rel32 displacement to this address -- were
+             * classified as functions by IDA's batch export (the same
+             * `/OPT:ICF`-left-unfolded phenomenon already documented on the
+             * `FUN_00947E00`/`FUN_00947E90`/`FUN_00947F20` trio above); none
+             * has any entry in `_callgraph_index.sqlite`'s `functions`,
+             * `call_edges`, or `incoming_xrefs` tables.
+             *
+             * Address: 0x007E3E20 (FUN_007E3E20, sub_7E3E20) -- `msvc8::map<
+             * Moho::MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>::
+             * erase_range` (`MeshBatchBucketTree`, `MeshBatchKey.h`). Whole-
+             * tree fast path (`a3==*(int*)(a1+4) && a4==(a1+4)`, i.e.
+             * `first==leftmost() && last==header()`) calls `FUN_007E34E0`
+             * (`std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`, this
+             * instantiation's `destroy_subtree`, already cited below) on the
+             * root and resets head/size, matching this member's `clear()`
+             * branch; the slow path loops an inlined successor-capture (the
+             * `_Isnil`-guarded left/right/parent walk immediately before each
+             * iteration, rather than a separate `rb_increment` call -- MSVC
+             * inlined it here since the cursor only needs advancing, not
+             * returning) then `FUN_007E47E0` (this same instantiation's
+             * `erase_node`, cited above) -- matches `while (cursor != stop)
+             * erase_node((cursor++).node())` field for field. Reached from
+             * `MeshRenderer::Reset()` (0x007E1370) and `::Shutdown()`
+             * (0x007E1510)'s explicit `meshes.clear()` (both `Mesh.cpp`,
+             * already recovered, both taking the whole-tree fast path since
+             * `clear()` compiles to exactly this shape) and from
+             * `MeshRenderer::~MeshRenderer`'s (0x007DF330) implicit teardown
+             * of its `MeshBatchBucketTree meshes` member.
+             *
+             * Address: 0x00879C30 (FUN_00879C30, sub_879C30) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::erase_range` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`/
+             * `equal_range`/`~rb_tree()` elsewhere in this file). Whole-tree
+             * fast path (`first==leftmost() && last==header()`) recursively
+             * destroys every node then re-links the sentinel to the empty
+             * state, matching this member's `clear()` branch; the slow path
+             * erases node-by-node in in-order sequence. Reached directly
+             * (NOT via the EH-funclet table -- ordinary control flow) from
+             * `Moho::CDecalManager::~CDecalManager`'s (0x00877B70) implicit
+             * destruction of this member, now that it is a real typed
+             * `msvc8::map` member -- this is the "happy path" sibling of
+             * this member's EH-unwind-only clone (`FUN_00878D30`, cited on
+             * `~rb_tree()` above).
+             * Address: 0x0087A080 (FUN_0087A080, sub_87A080) -- a second
+             * emission of the same member, shared between three call
+             * sites: this instantiation's own `erase(const key_type&)` tail
+             * call (`FUN_00879510`, cited below, used by both the
+             * decal-index and group-index maps), and the sibling
+             * `mDecalGroupLookupBySplatIndex` tree's implicit destruction
+             * from `~CDecalManager` (the "happy path" sibling of that tree's
+             * EH-unwind-only clone, `FUN_00878D60`, cited on `~rb_tree()`
+             * above). Both trees were previously modelled with a shared
+             * hand-rolled `ClearDecalLookupTree` free function citing this
+             * same address (`CWldSplat.cpp`) -- deleted along with the rest
+             * of the hand-rolled tree pair now that both call sites reach
+             * this member directly.
+             */
+            /**
+             * Address: 0x004DBD30 (FUN_004DBD30, sub_4DBD30) --
+             * `msvc8::set<msvc8::string>::erase_range` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Matches this member exactly: whole-tree fast
+             * path (`first==leftmost() && last==header()`) calls
+             * `destroy_subtree(root())` (`FUN_004DD320`, cited below) then
+             * resets the head's self-links and zeroes `size_`; otherwise
+             * walks `erase(_First++)` -- advance `first` first (an inlined
+             * copy of `rb_increment`'s logic, not a call to the out-of-line
+             * `FUN_004DDD30` symbol), then erase the *old* cursor via
+             * `erase_node` (`FUN_004DC850`, cited above), discarding its
+             * returned iterator. Two real callers: `~rb_tree()`'s three
+             * emissions (`FUN_004DA220`/`FUN_004DB5D0`/`FUN_004DBFF0`, cited
+             * above) via `erase_range(leftmost(), header())`, and
+             * `erase(const key_type&)`'s emission (`FUN_004DB710`, cited
+             * below) via `erase_range(range.first, range.second)`. Was
+             * previously duplicated as `ErasePausedCategoryRangeAndStoreNext`/
+             * `ResetPausedCategoryMapStorageCore` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             */
+            /**
+             * Address: 0x00849670 (FUN_00849670 -- `erase_range` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `~rb_tree` 0x00844510 and from `cfunc_GetSpecialFilesL`'s unwind.)
+             * Address: 0x004DCEA0 (FUN_004DCEA0, sub_4DCEA0) -- `msvc8::map<
+             * std::uint16_t, float>::erase_range` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
+             * member exactly: whole-tree fast path (`first==leftmost() &&
+             * last==header()`) calls `destroy_subtree(root())`
+             * (`FUN_004DDB00`, cited below) then resets the head's self-links
+             * and zeroes `size_`; otherwise walks `erase(_First++)` --
+             * advance `first` first (an inlined copy of `rb_increment`'s
+             * logic), then erase the *old* cursor via `erase_node`
+             * (`FUN_004DD510`, cited above), discarding its returned
+             * iterator. Two genuinely-reachable real callers (the callgraph
+             * index reports four incoming call edges in total, but two --
+             * `FUN_004DB870`'s own body -- are dead code, since `FUN_004DB870`
+             * itself has zero incoming xrefs, see the second `~rb_tree()`
+             * emission cited above): `~rb_tree()`'s EH-unwind-only emission
+             * for this instantiation (`FUN_004DA250`, cited above) via
+             * `erase_range(leftmost(), header())`, and `~AudioEngineImpl`'s
+             * own instruction stream (`FUN_004DA2A0`), which calls this
+             * member directly for the happy-path teardown rather than going
+             * through a shared `~rb_tree()` symbol -- see that member's
+             * citation above for the full EH-funclet-vs-happy-path shape.
+             * Was previously duplicated as `EraseCategoryVolumeRange`
+             * (`AudioEngine.cpp`, deleted by this migration).
+             * Address: 0x0056EB40 (FUN_0056EB40, sub_56EB40 -- `erase(first, last)` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), the whole-range erase of every `~SOffsetInfo`.)
+             * Address: 0x0056F430 (FUN_0056F430, sub_56F430 -- `erase(first, last)` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the whole-range erase of the cache destructors; every reachable caller passes the full range, so the `clear()` fast path is the one taken.)
+             * Address: 0x00499E50 (FUN_00499E50 -- `erase(first, last)` -- the whole-tree `clear()` fast path plus the `erase(_First++)` walk for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004921A0, 0x00493090, 0x00495AA0; formerly `EraseBeamBucketIteratorRange` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE0D0 (FUN_004AE0D0 -- `erase(first, last)` -- the whole-tree `clear()` fast path plus the `erase(_First++)` walk for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`, node 0x18); callers 0x004A9C00, 0x004A9DD0, 0x004AC430; formerly `EraseFactoryRegistrationRange_004AE0D0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D80D0 (FUN_007D80D0 -- `erase(first, last)` -- the whole-tree fast path plus the `erase(_First++)` walk for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D61B0, 0x007D61E0, 0x007D7A80; formerly `EraseRegionKeyNodeRange` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004325C0 (FUN_004325C0 -- `erase(begin(), end())` -- the whole-tree fast path for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x0042BCB0, 0x0042C150, 0x0042C1D0; formerly `ClearIntAnnotationTreeFullRange` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C280 (FUN_0071C280 -- `erase(first, last)`'s `erase(_First++)` walk for `msvc8::set<moho::InfluenceMapEntry>` (`InfluenceGrid::entries`); callers 0x0071A530, 0x0071AA60, 0x0071AB20; formerly `DestroyInfluenceEntryRange` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071B420 (FUN_0071B420 -- `erase(first, last)` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); callers 0x00715C30, 0x007163A0, 0x007183D0; formerly `EraseBlipCellRange` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045C800 (FUN_0045C800 -- `erase(first, last)` -- the whole-tree fast path, else erase one at a time for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x00457FF0, 0x004580C0, 0x0045AB10; formerly `ZipMapEraseRange` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F1120 (FUN_007F1120 -- `erase(first, last)` for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EDE20, 0x007EDE50, 0x007EFE60; formerly `EraseRangeProfileTreeRange` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046E4C0 (FUN_0046E4C0 -- `erase(first, last)` -- the whole-tree fast path, else erase one at a time for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046C570, 0x0046C6E0, 0x0046D800; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00464F20 (FUN_00464F20 -- `erase(first, last)` -- what `clear()` runs; whole-tree fast path, else erase one at a time for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004627C0, 0x004628C0, 0x00463920; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A0F60 (FUN_005A0F60 -- `erase(first, last)` -- whole-tree fast path, else erase one at a time, storing the survivor for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F9C0, 0x0059FB80, 0x005A00B0; formerly `EraseRebuildMapNodeRange` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E93C0 (FUN_004E93C0 -- `erase(first, last)` -- whole-tree fast path, else erase one at a time for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E83A0, 0x004E8DA0, 0x004E8E60; formerly `EraseRangeTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004E9AB0 (FUN_004E9AB0 -- a second emission of that range erase for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E93C0, 0x004E995C; formerly `EraseRangeTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00432910 (FUN_00432910 -- `erase(first, last)` -- what `~rb_tree()` drains through for `msvc8::map<msvc8::string, msvc8::string>` (`ShaderDictionary::mRemaps` at +0x10; pair 0x38, node 0x48, key at node+0x0C, mapped name at node+0x28, colour/nil at +0x44/+0x45); callers 0x0042BCB0, 0x0042C180, 0x0042C1D0; formerly unrecovered.)
+             * Address: 0x007357C0 (FUN_007357C0 -- `erase(first, last)` -- whole-tree fast path through `destroy_subtree`, else erase one at a time for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00734720, 0x00735240, 0x00735290; formerly cited on `GetSimConCommandRegistry`'s doc block in moho/sim/CSimConCommand.cpp instead of on the member (RULE ONE), moved 2026-09-11.)
+             * Address: 0x00505200 (FUN_00505200 -- `erase(first, last)` -- the whole-tree fast path through `_Erase` 0x00505EC0 and the header self-link, else `erase(first++)` one at a time, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00501760, 0x005017E0, 0x00501E50, 0x00504350; formerly `EraseSpatialMapRange` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x007AF740 (FUN_007AF740 -- `erase(first, last)` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19), the whole-tree path taken by `clear`, the assignment and `~WeakSet`; callers include `SetSelection` 0x00896367, `CycleCameraFocus` 0x00865687 and `CheckForNecessaryUIRefresh` 0x00894505.)
+             * Address: 0x007B33B0 (FUN_007B33B0 -- the same for the `WeakSet<moho::UserUnit>::Entry` set; callers `~WeakSet` 0x007B2530 and `~UserCommandIssueLocalEvent` 0x008B4800.)
+             */
+            node_type* erase_range(node_type* const first, node_type* const last)
+            {
+                if (first == leftmost() && last == header()) {
+                    clear();
+                    return leftmost();
+                }
+
+                iterator cursor(first);
+                const iterator stop(last);
+                while (cursor != stop) {
+                    // `erase(_First++)`: advance first, then erase the old cursor.
+                    (void)erase_node((cursor++).node());
+                }
+                return cursor.node();
+            }
+
+            /**
+             *
+             * What it does:
+             * `equal_range(k)` locates `[first,last)`, then the shipped body
+             * calls a checked "how many nodes between these two iterators"
+             * counting helper (`sub_A598A0`, stepping via the `rb_increment`-
+             * equivalent `sub_A52760`) before erasing the range through
+             * `erase_range` (`sub_A65320`, also WildMagic/`external_dependency`
+             * for this same `m_kHull` -- see that token's note) -- exactly the
+             * classic Dinkumware `_Tree::erase(const key_type&)` shape
+             * (necessary because `_Tree` is shared by `set`/`map`/`multiset`/
+             * `multimap` and can't assume at most one match). This member is
+             * written as that natural 2007 source shape -- genuinely useful,
+             * cited engine infrastructure for this project's own
+             * `msvc8::set`/`msvc8::map`, independent of the external address
+             * that happens to confirm it above. The count loop below uses
+             * `rb_increment` (already canonical here) rather than a
+             * separately named helper, matching what `sub_A598A0`/
+             * `sub_A52760` do for the external instantiation.
+             *
+             * Address: 0x00879510 (FUN_00879510, sub_879510) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::erase(const
+             * key_type&)` -- `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `insert_at`/`rb_decrement`/`rb_increment`/`find_node`/
+             * `equal_range`/`~rb_tree()` elsewhere in this file). Matches
+             * this member exactly: `equal_range(k)` (`FUN_0087A1A0`, cited
+             * above), a counting loop advancing via `rb_increment`
+             * (`FUN_0087CDD0`, cited above), then `erase_range(range.first,
+             * range.second)` (`FUN_0087A080`, cited above) and returns the
+             * count. This single emission is shared by BOTH lookup maps --
+             * confirmed directly: `CDecalManager::DestroyDecalGroup`
+             * (0x00878460) calls this exact address on
+             * `mDecalGroupLookupBySplatIndex` (`Moho::CDecalGroup*`-valued),
+             * and `RemoveDecalFromManagerAndReturnNextSlot`/
+             * `~CDecalManager`-adjacent cleanup call it on
+             * `mDecalGroupLookupByDecalIndex` (`Moho::CWldTerrainDecal*`-
+             * valued) -- this member's own body never reads/writes/compares
+             * the `mapped_type` at all, only node pointers and the shared
+             * `uint32_t` key, so the two 4-byte-pointer instantiations fold
+             * onto one address even though `operator[]`/`insert_hint`/
+             * `insert_unique`/`insert_at`/`rb_decrement`/`find_node` above
+             * did not. Real callers: `CDecalManager::DestroyDecalGroup`'s
+             * `mDecalGroupLookupBySplatIndex.erase(*group->GetIndex())` and
+             * `RemoveDecalFromManagerAndReturnNextSlot`'s
+             * `manager.mDecalGroupLookupByDecalIndex.erase(decal->mIndex)`
+             * (both `CWldSplat.cpp`). Re-homed here from a hand-rolled
+             * `EraseLookupEntriesByKey`/`ErasePrimaryDecalLookupEntriesByKey`
+             * pair that walked a duplicate `DecalGroupLookupNode`/`...Tree`
+             * struct instead of calling this member (deleted along with the
+             * whole hand-rolled tree pair).
+             * Address: 0x008791E0 (FUN_008791E0, sub_8791E0) -- a third
+             * emission, structurally identical to 0x00879510 field for
+             * field (`equal_range` via `FUN_00879D50`, cited above; the
+             * counting loop via `rb_increment`'s other emission,
+             * `FUN_0087CD10`, cited above; the tail `erase_range` call via
+             * the SAME `FUN_00879C30` 0x00879510 uses), differing only in
+             * calling convention: the key arrives by pointer rather than by
+             * value, because its sole caller already has the key resident
+             * in memory. That caller is `RemoveDecalFromManagerAndReturnNextSlot`
+             * (`FUN_008779B0`, `moho::CDecalManager::DestroyDecal`'s sibling
+             * cleanup path, `CWldSplat.cpp`): `sub_8779B0` loads `eax =
+             * &decal->mIndex` and passes it straight through, matching the
+             * recovered `manager.mDecalGroupLookupByDecalIndex.erase(
+             * decal->mIndex)` call exactly (the compiler is free to choose
+             * either calling convention for the same source-level `.erase(
+             * key)` call; both compile to this member).
+             */
+            /**
+             * Address: 0x004DB710 (FUN_004DB710, sub_4DB710) --
+             * `msvc8::set<msvc8::string>::erase(const key_type&)` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. Matches this member's general shape exactly, with
+             * `equal_range`'s two calls (`lower_bound_node` then
+             * `upper_bound_node`, `FUN_004DD410`/`FUN_004DD380`, both cited
+             * there) issued directly rather than through a fused
+             * `equal_range` symbol -- this instantiation's `equal_range`
+             * never got its own combined-call emission, see the
+             * `lower_bound_node` citation for the full note. Counting loop
+             * via `rb_increment` (`FUN_004DDD30`, cited above), tail call to
+             * `erase_range` (`FUN_004DBD30`, cited above). Sole real caller
+             * is `AudioEngine::SetPaused`'s `mPausedCategoryNames.erase(
+             * category)` (`AudioEngine.cpp`, the `paused == false` branch).
+             * Was previously duplicated as `ErasePausedCategoryName`
+             * (`AudioEngine.cpp`, deleted by this migration).
+             * Address: 0x0045B100 (FUN_0045B100 -- `erase(key)` -- the equal-range walk, counting what it destroyed for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00459070; formerly `FileInfoMapRemoveByCanonicalPath` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00867AC0 (FUN_00867AC0 -- `erase(key)` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19): `equal_range` 0x00867E90, count the run with the tree `++` 0x0066ADD0, `erase(first, last)` 0x007AF740; caller `WeakSet<UserEntity>::Remove` 0x008676E0.)
+             * Address: 0x008B2E70 (FUN_008B2E70 -- the same for the `WeakSet<moho::UserUnit>::Entry` set; caller `WeakSet<UserUnit>::Remove` 0x008B2890.)
+             */
+            size_type erase(const key_type& k)
+            {
+                const std::pair<node_type*, node_type*> range = equal_range(k);
+                size_type count = 0;
+                for (node_type* n = range.first; n != range.second; n = rb_increment(n)) {
+                    ++count;
+                }
+                (void)erase_range(range.first, range.second);
+                return count;
+            }
+
+            /**
+             * Address: 0x007E2D90 (FUN_007E2D90, batch-bucket map `_Tree::clear`)
+             *
+             * What it does:
+             * Destroys every element and restores the empty header links.
+             *
+             * The shipped body reads the root as `[[esi+4]+4]`, hands it to the
+             * recursive `_Erase` walk (`call sub_7E34E0`) and then relinks
+             * `head->parent = head` / `head->left = head` / `head->right = head`
+             * with `[esi+8] = 0`. It returns nothing.
+             */
+            /**
+             * Address: 0x00592230 (FUN_00592230, the blueprint-stat map's range erase.
+             * `CArmyStatItem::~CArmyStatItem` reaches it at 0x00585C39, which is what
+             * `clear()` compiles to.)
+             * Address: 0x00585BD0 (FUN_00585BD0, the typed teardown wrapper around it)
+             */
+            /**
+             * Address: 0x00704000 (FUN_00704000, the name-index map's teardown)
+             * Address: 0x0070DDC0 (FUN_0070DDC0, its typed wrapper)
+             */
+            /**
+             * Address: 0x00497E10 (FUN_00497E10, the trail-segment pool's subtree destroy)
+             */
+            /**
+             * Address: 0x0077B4F0 (FUN_0077B4F0, inner bucket range erase)
+             * Address: 0x00779B80 (FUN_00779B80, inner bucket storage release)
+             * Address: 0x0077B7D0 (FUN_0077B7D0, its typed wrapper)
+             * Address: 0x00779240 (FUN_00779240, outer map storage release)
+             * Address: 0x0077AC30 (FUN_0077AC30, its typed wrapper)
+             */
+            /**
+             * Address: 0x00687220 (FUN_00687220)
+             * Address: 0x00687B90 (FUN_00687B90, mirror emission)
+             *
+             * `msvc8::map<std::uint32_t, moho::IdPool>::clear` --
+             * `EntityDB::mIdPoolTree` in `EntityDb.h`. Destroys the subtree
+             * from the root (`FUN_00688030`, cited on `destroy_subtree`
+             * above) then rewires the sentinel head back to self-linked
+             * empty form with zero size -- exactly this member's shape.
+             */
+            /**
+             * Address: 0x006E2810 (FUN_006E2810) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. Destroys the subtree from the root via
+             * `FUN_006E2990` (`destroy_subtree`, cited above) then rewires
+             * `head->parent`/`head->left`/`head->right` back to self-linked
+             * empty form with `size=0` -- exactly this member's shape. Zero
+             * incoming xrefs in this sweep. Re-homed here from a bespoke
+             * `ClearCommandDbMapAndResetHead` free function in Sim.cpp that
+             * hand-rolled this same operation over a `CCommandDb`
+             * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x00947290 (FUN_00947290, sub_947290) --
+             * `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE, unsigned int>`'s
+             * tree shape (isNil@+0x15, 8-byte value_type; shares
+             * `destroy_subtree` at 0x00947120 with the confirmed
+             * `StateCache<SamplerState>` cluster cited on `erase_range`/
+             * `erase_node` above). `destroy_subtree(root())` via
+             * `sub_947120` then self-links `head->parent`/`head->left`/
+             * `head->right` to `head` and zeroes `size_` -- matches this
+             * member exactly. Zero incoming references anywhere in the
+             * binary (raw IDA xrefs, callgraph index, and an exhaustive PE
+             * byte-scan covering every `E8`/`E9` rel32, `0F 8x` jcc rel32,
+             * `EB`/`7x` rel8 and absolute dword reference in every section
+             * of `bin/external/ForgedAlliance.exe` all agree). Not reached
+             * from any of `StateCache<SamplerState>`'s own recovered
+             * methods -- those all go through `erase_range` (0x00947C50,
+             * above) -- so its owner is a distinct member of the same
+             * unidentified `CScApp`-neighbourhood class as the zero-
+             * reference `~rb_tree()` emissions cited on `erase_range`
+             * above.)
+             * Address: 0x009472C0 (FUN_009472C0, sub_9472C0) -- the same
+             * shape for `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,
+             * unsigned int>`'s tree family (`destroy_subtree` at
+             * 0x00947160, cited on `erase_range` above). Same zero-
+             * incoming-reference status as 0x00947290.)
+             */
+            /**
+             * Address: 0x007B4950 (FUN_007B4950, `msvc8::set<std::uint32_t>`'s
+             * `clear()` -- isNil@+0x11, the same instantiation cited on
+             * `destroy_subtree`/`alloc_raw`/`free_raw`/`buy_head`/
+             * `rb_increment` throughout this file. Destroys the subtree from
+             * the root via `sub_7B4D10` (`destroy_subtree`, cited above) then
+             * self-links `head->parent`/`head->left`/`head->right` back to
+             * `head` and zeroes `size` -- matches this member's body
+             * instruction for instruction. DB-integrity fix: this token was
+             * marked `recovered` with `source_paths=null` and a
+             * boilerplate "batch 0x007B**** pass" note that cited nothing;
+             * a full `src` sweep found zero real citations anywhere.
+             * Owning field not yet pinned to a specific class -- reached
+             * through the same `msvc8::set<std::uint32_t>` neighbourhood as
+             * `alloc_raw`/`buy_head`/`rb_increment`'s 0x007B**** citations
+             * below, whose only confirmed callers are the three explicit
+             * destroy-and-reconstruct helpers in `moho/sim/
+             * SimRecoveryRuntime.cpp` cited on `destroy_subtree` above.)
+             *
+             * Address: 0x005551F0 (FUN_005551F0, `Moho::EntityCategorySet::
+             * EntityCategorySet`'s tail, 0x0055525A-0x00555276) -- the
+             * category-lookup map's constructor calls this member's exact
+             * body on the tree it just default-constructed a few
+             * instructions earlier: `destroy_subtree(root())` (a no-op on
+             * the fresh, still-empty tree -- cited above) then the same
+             * three-self-link-plus-zero-size reset. Confirmed against the
+             * raw decompile: this is a second, redundant destroy-and-reset
+             * pass over an already-empty tree, distinct from (and following)
+             * the buy_head-equivalent allocate-and-self-link sequence cited
+             * on `buy_head` below. `EntityCategoryLookupTable`'s
+             * constructor (RRuleGameRules.h/.cpp) keeps this as an explicit
+             * `mCategoryMap.clear();` call for exact instruction-sequence
+             * fidelity with FUN_005551F0, rather than silently dropping it
+             * as dead code -- it is behaviorally inert (the tree is already
+             * empty) but genuinely present in the binary's instruction
+             * stream.
+             *
+             * Address: 0x008A1640 (FUN_008A1640,
+             * ?ClearEnvLookup@CWldTerrainRes@Moho@@UAEXXZ) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::clear`
+             * -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D (same
+             * instantiation cited on `insert_hint`/`destroy_subtree` above).
+             * `destroy_subtree(head->parent)` then the three-way
+             * self-link-plus-zero-size reset -- matches this member exactly,
+             * field for field, with no fused/inlined variation. Real
+             * callers: `IWldTerrainRes::ClearEnvLookup` itself (public API,
+             * `moho/sim/CWldMap.cpp`, now `mEnvLookup.clear();` verbatim)
+             * and `Moho::CWldTerrainRes::Reset` (FUN_008A6220), which the
+             * existing `CWldMap.cpp` recovery already documents as
+             * statically inlining this same address rather than emitting a
+             * virtual dispatch. Re-homed here from a hand-rolled
+             * `ClearEnvLookup` body that open-coded this exact sequence
+             * against the deleted `TerrainEnvironmentLookupMap`/
+             * a deleted overlay struct pair instead
+             * of calling this member.
+             * Address: 0x0077C520 (FUN_0077C520 -- `clear()` for a compact tree (`_Erase(root)`, head relinked, size zeroed); zero callers, unreachable; formerly `ResetCompactTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F2AC0 (FUN_007F2AC0 -- `clear()` -- teardown, then the header relinked to itself and the size zeroed for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1990; formerly `ResetBlueprintExtractorTreeStorage` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C4860 (FUN_005C4860 -- `clear()` -- teardown, header relinked, size zeroed for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C2230, 0x005C2330, 0x005C23F0; formerly `ClearMap` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00719790 (FUN_00719790 -- `clear()` for `msvc8::set<moho::InfluenceMapEntry>` (`InfluenceGrid::entries`); callers 0x0071C1F0; formerly `ClearInfluenceGridEntryTree` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C4A0 (FUN_0071C4A0 -- `clear()` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); callers 0x00715BC0, 0x00716140, 0x00718330; formerly `InitializeBlipCellSet` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00715C30 (FUN_00715C30 -- the second emission of that same `clear()` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); callers 0x00715BC0, 0x00716140, 0x007163A0; formerly `ReleaseBlipCellSet` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00432B10 (FUN_00432B10 -- `clear()` -- destroy every element, then relink the header and zero the size for `msvc8::set<moho::CD3DEffect::Technique, TechniqueNameLess>` (`CD3DEffect::mTechniques` at +0x04; the whole 0xC8 polymorphic `Technique` is the element and its `mName` the key, so node 0xD8 with the key at node+0x10 -- past the element's vptr -- and colour/nil at +0xD4/+0xD5); callers 0x0042C650, 0x00431C30, 0x00434440; formerly `ClearTechniqueTreeNodes` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            void clear() noexcept
+            {
+                destroy_subtree(root());
+                head_->parent = head_;
+                head_->left = head_;
+                head_->right = head_;
+                size_ = 0;
+            }
+
+            void swap(rb_tree& other) noexcept
+            {
+                if (this == &other) {
+                    return;
+                }
+                std::swap(static_cast<carrier&>(*this), static_cast<carrier&>(other));
+                std::swap(proxy_, other.proxy_);
+                std::swap(head_, other.head_);
+                std::swap(size_, other.size_);
+            }
+
+        private:
+            // ---- node storage ------------------------------------------------
+
+            [[noreturn]] static void throw_too_long() { throw std::length_error("map/set<T> too long"); }
+
+            /**
+             * Address: 0x007E5740 (FUN_007E5740, batch-bucket map `allocator<_Node>::allocate`)
+             *
+             * What it does:
+             * Allocates storage for `n` nodes, rejecting counts that would
+             * overflow the byte size.
+             *
+             * The shipped body is the MSVC8 allocator: `0xFFFFFFFF / n`
+             * compared against `0x30` (the batch-bucket node size), throwing
+             * `std::bad_alloc` when the count does not fit, then
+             * `lea edx,[ecx+ecx*2] / shl edx,4` (n * 0x30) into `operator new`.
+             * This is a *sizing* helper, not a second `_Buynode` emission.
+             */
+            /**
+             * Address: 0x0071D740 (FUN_0071D740, `map<uint32_t,
+             * InfluenceMapEntry>::allocator<_Node>::allocate` -- same shape,
+             * node size 0x40 (0xFFFFFFFF/n compared against 0x40, then
+             * operator new(n<<6)). Reached from `InfluenceGrid::entries`'s
+             * node-buy path via FUN_0071C2C0, called from
+             * `EraseInfluenceEntryAndAdvance`'s caller chain at
+             * CInfluenceMap.cpp. 0x40 = 0x0C header + 0x04 key + 0x2C
+             * InfluenceMapEntry value + color/isNil, rounded up -- confirms
+             * the map<uint32_t,InfluenceMapEntry> node typing from the
+             * rotate_left/rotate_right citations above.)
+             */
+            /**
+             * Address: 0x00688180 (FUN_00688180, `Mangled: std::map_uint_IdPool
+             * ::_Node allocator` -- `msvc8::map<std::uint32_t, moho::IdPool>`,
+             * `EntityDB::mIdPoolTree` in `EntityDb.h`. Pure raw allocation:
+             * `operator new(sizeof(node_type))` with no field writes of its
+             * own -- the caller (`FUN_006881C0`, `buy_node` below) writes
+             * every link/value/colour field afterward. Node size 0xCD0 =
+             * 0x10 (link triplet + 8-byte-aligned pad, see `IdPool`'s
+             * `alignas(8)` citation in IdPool.h) + 0xCB8 (`pair<const
+             * uint32_t, IdPool>`, itself 8-byte aligned so its `IdPool`
+             * member lands at `node+0x18` rather than `node+0x10`) + 2
+             * (colour/isNil) rounded to the type's own 8-byte alignment.
+             * Reached from `insert_at`'s emission FUN_00687280, cited
+             * below.)
+             */
+            /**
+             * Address: 0x006E28A0 (FUN_006E28A0) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. Thin wrapper over `FUN_006E2D90` (the
+             * `operator new(sizeof(node_type))` call proper, matching
+             * `buy_node`'s own `sub_6E23F0` allocation path's inner shape),
+             * matching this member's role. Zero incoming xrefs in this
+             * sweep. Re-homed here from a bespoke
+             * `AllocateSingleCommandDbMapNodeStorage` free function in
+             * Sim.cpp.)
+             */
+            /**
+             * Address: 0x00946F90 (FUN_00946F90, sub_946F90)
+             *
+             * This instantiation's `alloc_raw` half is a value-initializing
+             * variant the compiler fused with the neutral-node init:
+             * `operator new(0x18)`, zero the three link dwords, `color=1`
+             * (black), `isNil=0` -- one step further than this member's own
+             * plain `operator new`, but the extra stores are exactly what
+             * `buy_head()` needs next. Its caller, `FUN_009471A0` (already
+             * recovered, cited on `buy_head` below), performs the
+             * self-link-to-head and `isNil=1` fixup that finishes the head
+             * sentinel -- the same two-function split documented there for
+             * `FUN_00947FE0`'s sibling `sub_947030`. isNil@+0x15, node 0x18
+             * (8-byte value_type). Owning field/class not yet pinned down,
+             * matching the sibling citation on `buy_head` below.
+             *
+             * Address: 0x007B4410 (FUN_007B4410, sub_7B4410)
+             *
+             * Same value-initializing `alloc_raw` shape: `operator new(0x20)`,
+             * zero the three link dwords, `color=1`/`isNil=0` at
+             * `[eax+0x1C]`/`[eax+0x1D]` (confirmed via `.asm`) -- isNil@+0x1D,
+             * node 0x20 (16-byte value_type). Reached from `Moho::
+             * ANI_DumpSkeleton` (partial, `FUN_007B22B0`, CAniSkel.cpp),
+             * which builds a dedup tree over skeleton bone data while
+             * walking the animation hierarchy.
+             *
+             * Address: 0x0087C990 (FUN_0087C990, sub_87C990)
+             *
+             * Same shape again: `operator new(0x18)`, zero the three link
+             * dwords, `color=1`/`isNil=0` at `[eax+0x10]`/`[eax+0x11]` --
+             * isNil@+0x11, node 0x18 (4-byte value_type, e.g. a dedup
+             * `set<float>`/`set<uint32_t>`). Reached from `Moho::
+             * CDecalManager::RebuildLodHistogram` (CWldSplat.cpp/.h), which
+             * dedups the 10-entry decal-area decile histogram.
+             *
+             * Address: 0x007B4A50 (FUN_007B4A50, sub_7B4A50) -- the
+             * `msvc8::set<std::uint32_t>` instantiation cited on `buy_head`/
+             * `rb_increment`/`clear`/`destroy_subtree` elsewhere in this
+             * file (isNil@+0x11, node 0x14=20 bytes, "12+4+2=18 rounded to
+             * 20" -- the same formula as `FUN_007CAB70`/`FUN_0052F370`
+             * above). `operator new(20)` via `sub_7B4E50` (the shared
+             * checked-20-byte lane, `AllocateChecked20ByteElements` in
+             * `Vector.cpp`), zero the three link dwords, `color=1`/
+             * `isNil=0` at `[eax+0x10]`/`[eax+0x11]` -- matches this member
+             * exactly, with the same "null tests the binary emits after
+             * each derived pointer are compiler artifacts that cannot
+             * fire" caveat already documented on `WeakEntitySetUserEntity::
+             * BuyNode` (WeakEntitySet.h). DB-integrity fix: this token was
+             * previously flipped `blocked` citing a `CrtRuntimeHelpers.cpp`
+             * source path the address never appeared in (2026-08-21
+             * citation-audit revert); this is the real source. Called by
+             * this member's fused `buy_head()` emission `FUN_007B3F30`
+             * (cited there) for header construction; owning field not yet
+             * pinned to a specific class.)
+             * Address: 0x00947030 (FUN_00947030, sub_947030) -- another
+             * instantiation of this member, 8-byte value_type (node 0x18=24
+             * bytes), `color`/`isNil` at `[eax+0x14]`/`[eax+0x15]` --
+             * `operator new(0x18)`, zero the three link dwords, `color=1`/
+             * `isNil=0`, exactly this member's shape. Called by the
+             * `buy_head()`-equivalent ctor emission `FUN_00947FE0` (cited
+             * above on `rb_tree()`, "the `this`-returning sibling emission"
+             * paragraph) as its dedicated `alloc_raw` half; owning
+             * field/class not yet pinned down (isNil@+0x15, 8-byte-value
+             * shape recurs across many Sim-subsystem containers per that
+             * same paragraph).
+             *
+             * Address: 0x007CC520 (FUN_007CC520, sub_7CC520) -- `msvc8::
+             * set<char>` instantiation behind `CLobby.cpp`'s ignore-names
+             * separator set (`Moho::CLobby::ConnectToPeer` ->
+             * `GetIgnoreNamesSeparators`/`BuildLobbyIgnoreNameList`), node
+             * 0x10 (12-byte link triple + 1-byte `char` value, colour/nil
+             * rounded up), colour@0x0D/isNil@0x0E. `operator new(0x10)` via
+             * `sub_7CD150` (the shared checked-16-byte lane,
+             * `AllocateChecked16ByteLane` in
+             * `CheckedArrayAllocationLanes.cpp`), then zeroes the three
+             * link dwords (same pointer-wrap "null tests after each
+             * derived pointer are compiler artifacts" guards seen
+             * elsewhere in this file) and sets `color=1`/`isNil=0` --
+             * matches this member exactly. Called by this instantiation's
+             * inlined `buy_head()` half at the copy constructor
+             * (`FUN_007CC2F0`, cited above) and by the from-range
+             * constructor (`FUN_007CD990`, which performs the self-link/
+             * `isNil=1` fixup itself, the same split-instantiation pattern
+             * already documented above).
+             *
+             * Address: 0x008A9490 (FUN_008A9490, sub_8A9490) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * alloc_raw` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@+0x4D
+             * (same instantiation cited on `insert_hint` above). A thin
+             * one-line forwarder, `sub_8A9490() { return sub_8A9C60(1); }`,
+             * to this instantiation's shared checked-single-node allocator
+             * (`FUN_008A9C60`, `msvc8::vector<T>::allocate_slots_checked`
+             * for `sizeof(node_type)==0x50` reused with `count=1` -- cited
+             * in full on `allocate_slots_checked` in `Vector.h`, the same
+             * cross-container-reuse shape already documented there for the
+             * `SetupPrimaryAdapterSettings` dedup tree). Reached from this
+             * instantiation's `buy_head()` (below) via the C++20 source's
+             * `new (&view.mEnvLookup) TerrainEnvironmentLookupMap();`
+             * placement-construction in the terrain-resource constructor
+             * (`ConstructTerrainResFields`, `CWldMap.cpp`) -- the binary
+             * instead calls `FUN_008A9490` directly at that call site and
+             * performs the self-link/`isNil=1` promotion inline rather than
+             * through a separate `buy_head`-shaped symbol (the same
+             * "checked node-allocate-and-default-init, caller promotes
+             * isNil and self-links" shape already documented on
+             * `gpg::WriteArchive`'s ctor and `CAiFormationInstance.cpp`'s
+             * default formation-lane entry), which this template's shared
+             * `buy_head()` now performs uniformly instead.
+             *
+             * Address: 0x007E56B0 (FUN_007E56B0) -- `msvc8::map<MeshKey,
+             * boost::weak_ptr<Mesh>>::alloc_raw` for `moho::
+             * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`), node 0x28
+             * (`0x0C` link header + `sizeof(MeshRendererMeshCacheEntry)`
+             * ==0x18), isNil@+0x25 -- cited in full on `allocate_slots_
+             * checked` in `Vector.h` (`msvc8::vector<T>::
+             * allocate_slots_checked` for this same 40-byte element, the
+             * shared cross-container-reuse shape already documented there
+             * and on `AllocateChecked40ByteElements` in `Vector.cpp`, which
+             * lists this address among eight ICF-identical instantiations).
+             * `Mesh.cpp`'s `CreateMeshCacheNode` does not yet call through
+             * either shared symbol -- like this member, it uses a plain
+             * `::operator new(sizeof(node))` for its single-node buy, the
+             * same behaviorally-equivalent-for-count==1 simplification this
+             * member itself makes.
+             */
+            /**
+             * Address: 0x004DE060 (FUN_004DE060, `func_NewS11N`) --
+             * `msvc8::set<msvc8::string>`'s checked single-node raw
+             * allocator -- `Moho::AudioEngineImpl::mPausedCategoryNames`
+             * (`AudioEngine.h`). Not this member's minimal `operator
+             * new(sizeof(node_type))` shape directly -- an overflow-checked
+             * "allocate N nodes" primitive (`if (count!=0 && (0xFFFFFFFFu/
+             * count) < sizeof(node_type)) throw bad_alloc; return operator
+             * new(sizeof(node_type)*count);`) always called with `count==1`
+             * by this instantiation's two node-buy call sites below, making
+             * it behaviourally identical to this member's plain form for
+             * every real call this instantiation makes (the overflow branch
+             * is dead code at `count==1`). Two real callers: `buy_node`'s
+             * emission for this instantiation (`FUN_004DCC90`, cited below)
+             * directly, and the `alloc_raw`-half of `buy_head` below
+             * (`FUN_004DD460`, cited there) indirectly through it.
+             * Address: 0x004DD460 (FUN_004DD460, sub_4DD460) -- a second,
+             * higher-level "alloc_raw half" for the same instantiation:
+             * calls `FUN_004DE060` above, then defaults `left`/`parent`/
+             * `right=nullptr`, `color=black`, `isNil=0` -- the same
+             * "dedicated alloc_raw half... `color=1`/`isNil=0`, then the
+             * self-link and `isNil=1` flag fixup this template's `buy_head()`
+             * performs inline" split already documented on `FUN_009471A0`/
+             * `FUN_00947FE0` above. Sole real caller is `AudioEngineImpl::
+             * AudioEngineImpl` (`FUN_004D9FF0`, `AudioEngine.cpp`), which
+             * patches `isNil=1` and self-links the three pointers
+             * immediately after the call -- exactly `buy_head()`'s own
+             * inline body for this instantiation. Both addresses were
+             * previously duplicated as `AllocatePausedCategoryNodeArrayChecked`/
+             * `AllocateSinglePausedCategoryNodeRaw`/
+             * `AllocatePausedCategoryNodeStorage` (`AudioEngine.cpp`,
+             * deleted by this migration).
+             */
+            /**
+             * Address: 0x004DE120 (FUN_004DE120, `func_newS6N`) -- `msvc8::
+             * map<std::uint16_t, float>`'s checked single-node raw allocator
+             * -- `Moho::AudioEngineImpl::mCategoryVolumes` (`AudioEngine.h`).
+             * Not this member's minimal `operator new(sizeof(node_type))`
+             * shape directly -- an overflow-checked "allocate N nodes"
+             * primitive (`if (count!=0 && (0xFFFFFFFFu/count) <
+             * sizeof(node_type)) throw bad_alloc; return operator
+             * new(sizeof(node_type)*count);`) always called with `count==1`
+             * by every real call this instantiation makes, making it
+             * behaviourally identical to this member's plain form (the
+             * overflow branch is dead code at `count==1`) -- same "checked
+             * array-alloc primitive standing in for the plain form" shape
+             * documented on `FUN_004DE060` above. Two genuinely-reachable
+             * real callers: this instantiation's `buy_node` emission
+             * (`FUN_004DD8F0`, cited above) directly, and the `alloc_raw`-
+             * half of `buy_head` below (`FUN_004DD8B0`, cited there)
+             * directly (unlike the `mPausedCategoryNames` sibling above,
+             * this instantiation's `buy_node` calls the checked allocator
+             * itself rather than going through a `buy_node`-specific
+             * two-layer wrapper). A third function, `FUN_004DDBA0`, also
+             * calls this address but is itself unreached (zero incoming
+             * xrefs of any kind per the callgraph index) -- dead code, not a
+             * real call path; the previously-recovered
+             * `AllocateSingleCategoryNodeRaw`/`AllocateCategoryVolumeNodeStorage`
+             * pair (`AudioEngine.cpp`, deleted by this migration) had wired
+             * `buy_node`'s allocation through exactly this dead intermediate
+             * (a chain the real `buy_node` emission does not take at all --
+             * see `buy_node`'s own citation above, which calls this address
+             * directly).
+             *
+             * Address: 0x004DD8B0 (FUN_004DD8B0, sub_4DD8B0) -- a second,
+             * higher-level "alloc_raw half" for the same instantiation: calls
+             * `FUN_004DE120` above, then defaults `left`/`parent`/
+             * `right=nullptr`, `color=black`, `isNil=0` -- the same
+             * "dedicated alloc_raw half... then the self-link and `isNil=1`
+             * flag fixup this template's `buy_head()` performs inline" split
+             * documented on `FUN_004DD460` above. Four real callers per the
+             * callgraph index: `AudioEngineImpl::AudioEngineImpl`
+             * (`FUN_004D9FF0`, `AudioEngine.cpp`), which patches `isNil=1`
+             * and self-links the three pointers immediately after the call
+             * -- exactly `buy_head()`'s own inline body, matching the sole
+             * caller `mPausedCategoryNames`' sibling address documents --
+             * plus three untokenized addresses (`0x004DB7B0`/`0x004DC040`/
+             * `0x004DCF60`, each landing in a gap between two IDA-recognised
+             * functions rather than at a function start of its own) that
+             * this pass did not further resolve; each is consistent in
+             * shape with an additional inlined `buy_head()` bootstrap for
+             * this same instantiation reached from a different construction
+             * context, but that is inference, not confirmed evidence -- left
+             * as an open item rather than asserted. Not a blocker for this
+             * migration: `msvc8::map<std::uint16_t, float>`'s own default
+             * constructor (invoked once, for the single real
+             * `AudioEngineImpl` member) already reproduces the one call path
+             * this recovery needs regardless of how many bootstrap copies
+             * the real compiler emitted for other contexts. Both addresses
+             * were previously duplicated as `AllocateCategoryNodeArrayChecked`/
+             * `AllocateCategoryVolumeNodeStorage` (`AudioEngine.cpp`, deleted
+             * by this migration).
+             * Address: 0x0056FE00 (FUN_0056FE00 -- the 68-byte node allocation for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), through the checked `operator new(68)` at 0x00571780.)
+             * Address: 0x0049EB80 (FUN_0049EB80 -- `allocator<_Node>::allocate` -- the checked `n * 0x34` `operator new` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049A030, 0x0049C4D0, 0x0049C530; formerly `AllocateBeamBucketTreeNodes` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C530 (FUN_0049C530 -- the one-node tail call into the same checked allocator for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `AllocateSingleBeamBucketTreeNodeArray` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE850 (FUN_004AE850 -- `allocator<_Node>::allocate` -- the one-node call into 0x004AF550 for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `AllocateRawTreeNodeStorage_004AE850` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AF550 (FUN_004AF550 -- the checked `n * 0x18` `operator new` for that same map; callers 0x004AE1F0, 0x004AE7F0 (`buy_head`), 0x004AE850; formerly `AllocateChecked24ByteStride_004AF550` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+             * Address: 0x004AEBD0 (FUN_004AEBD0 -- `allocator<_Node>::allocate` -- the one-node call into 0x004AF5C0 for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); zero callers, unreachable; formerly `AllocateRawWideTreeNodeStorage_004AEBD0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AF5C0 (FUN_004AF5C0 -- the checked `n * 0x50` `operator new` for that same set; callers 0x004AE460, 0x004AEB70 (`buy_head`), 0x004AEBD0; formerly `AllocateChecked80ByteStride_004AF5C0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+             * Address: 0x0071D7B0 (FUN_0071D7B0 -- `allocator<_Node>::allocate` -- the checked `n * 0x18` `operator new` for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); callers 0x0071C4A0, 0x0071C4E0, 0x0071C790; formerly `AllocateBlipCellNodeBlock` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C790 (FUN_0071C790 -- the one-node tail call into that same allocator for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `AllocateSingleBlipCellNode` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045F380 (FUN_0045F380 -- `allocator<_Node>::allocate` -- the checked `n * 0x48` `operator new` for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045DF60, 0x0045DFA0, 0x0045E320; formerly `AllocateFileInfoMapNodes` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045E320 (FUN_0045E320 -- the one-node tail call into that allocator for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); zero callers, unreachable; formerly `AllocateOneFileInfoMapNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045DD80 (FUN_0045DD80 -- the one-node tail call into that allocator for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); zero callers, unreachable; formerly `AllocateOneZipEntryMapNodeThunk` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045F260 (FUN_0045F260 -- `allocator<_Node>::allocate` -- the checked `n * 0x34` `operator new` for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x0045C940, 0x0045DD20, 0x0045DD80; formerly `AllocateZipEntryMapNodes` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046F170 (FUN_0046F170 -- `allocator<_Node>::allocate` -- the checked `n * 0x30` `operator new` for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E6D0, 0x0046EBA0, 0x0046EC00; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00465920 (FUN_00465920 -- `allocator<_Node>::allocate` -- the checked `n * 0x30` `operator new` for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00465060, 0x00465480, 0x004654E0; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            [[nodiscard]] static node_type* alloc_raw()
+            {
+                return static_cast<node_type*>(::operator new(sizeof(node_type)));
+            }
+
+            /**
+             * Address: 0x006874A0 (FUN_006874A0)
+             * Address: 0x00687830 (FUN_00687830, mirror emission)
+             *
+             * `msvc8::map<std::uint32_t, moho::IdPool>`'s bare node-storage
+             * release -- `EntityDB::mIdPoolTree` in `EntityDb.h`. Plain
+             * `operator delete(n)`, matching this member exactly.
+             */
+            /**
+             * Address: 0x006E2080 (FUN_006E2080) Address: 0x006E2470
+             * (FUN_006E2470, duplicate emission) -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. Both are plain `::operator delete(n)`
+             * one-liners with no value_type-specific behaviour, matching
+             * this member exactly. Zero incoming xrefs in this sweep.
+             * Re-homed here from bespoke `DeleteCommandDbAllocationLaneA`/
+             * `...LaneB` free functions in Sim.cpp.)
+             */
+            /**
+             * Address: 0x007B3F90 (FUN_007B3F90, sub_7B3F90) -- the
+             * `msvc8::set<std::uint32_t>` instantiation cited on
+             * `alloc_raw`/`buy_head`/`rb_increment`/`clear`/
+             * `destroy_subtree` throughout this file (isNil@+0x11). Plain
+             * `::operator delete(a1)`, matching this member exactly. Zero
+             * incoming xrefs in this sweep. DB-integrity fix: this token
+             * was marked `recovered` with `source_paths=null` and a
+             * boilerplate "batch 0x007B**** pass" note that cited nothing;
+             * a full `src` sweep found zero real citations anywhere.
+             * Owning field not yet pinned to a specific class.)
+             */
+            /**
+             * Address: 0x00946440 (FUN_00946440, sub_946440) Address:
+             * 0x00946520 (FUN_00946520, sub_946520) -- two node-deallocation
+             * shims in the same `gpg::gal::StateCache<T, unsigned int>`
+             * address neighbourhood as `rb_increment`'s 0x00946830/
+             * 0x00946880/0x009468D0 citations and the 0x00947xxx
+             * `erase_range`/`erase_node` citations above: `mov eax,
+             * [esp+arg_0]; push eax; call operator delete(void*); pop ecx;
+             * retn 8` -- plain `::operator delete(a1)`, matching this
+             * member's own behaviour exactly, with one shape difference:
+             * both take a second, entirely unread `int a2` stack argument
+             * (`__stdcall`, `retn 8` pops both), where this member and its
+             * other-instantiation citations above (e.g. 0x007B3F90) take
+             * only the node pointer. The extra discarded operand matches an
+             * allocator-style `deallocate(pointer, size_type)` call left
+             * un-inlined at these two call sites rather than a direct
+             * `free_raw(node_type*)` call; the observable effect --
+             * `operator delete` on the node with nothing else touched -- is
+             * identical either way. Neither address has any caller in the
+             * callgraph index (`call_edges`/`incoming_xrefs`/`reachable`
+             * all empty for both) or any data/vtable reference, and neither
+             * calls into or is called by any of the `rb_increment`/
+             * `operator++`/`erase_node` addresses cited throughout this
+             * neighbourhood, so which specific `StateCache<T, unsigned
+             * int>` specialisation each belongs to (if either belongs to
+             * one of the three already named above, rather than a fourth,
+             * unexported instantiation) is not distinguishable from the
+             * body alone. Both previously `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path neither address ever
+             * appeared in (2026-08-24 DB-integrity bulk revert); this is
+             * the real source. Owning field/class not pinned down.
+             */
+            static void free_raw(node_type* const n) noexcept
+            {
+#if !MSVC8_RBTREE_DISABLE_FREE
+                ::operator delete(n);
+#else
+                (void)n;
+#endif
+            }
+
+            /**
+             * Allocates the header sentinel.
+             *
+             * MSVC8 buys a full node for the header and leaves `_Myval`
+             * unconstructed - the colour/nil bytes live behind the value, so a
+             * short allocation would place them out of bounds.
+             *
+             * Address: 0x00581330 (FUN_00581330, msvc8::map<Wm3::Vector2i,
+             * SBuildReserveInfo>::buy_head -- via alloc_raw's 40-byte lane
+             * FUN_00582460, already cited on AllocateCheckedElementBlock in
+             * Vector.cpp. Node size 12+sizeof(pair<Vector2i(8),
+             * SBuildReserveInfo(16)>)+2 = 38, rounded to 40; isNil@+0x25
+             * matches. Reached from `CAiBrain::mBuildStructureMap{}`'s
+             * default member-init in CAiBrain.cpp.)
+             * Address: 0x007E4B80 (FUN_007E4B80, buy_head for the
+             * `Moho::MeshRenderer::meshes` batch-bucket map -- via
+             * alloc_raw's already-cited FUN_007E5740 ("batch-bucket map
+             * allocator<_Node>::allocate", 0x30=48-byte node). isNil@+0x2D
+             * matches the same batch-bucket node shape documented
+             * throughout this file. Reached from `meshes()`'s default
+             * member-init in `MeshRenderer::MeshRenderer` -- editing that
+             * caller's own citation is deferred to whichever pass lands
+             * the in-flight MeshBatchBucketTree/msvc8::map conversion
+             * currently in progress in Mesh.cpp/MeshBatchKey.*, since this
+             * file is under active concurrent edit.)
+             * Address: 0x007CAB70 (FUN_007CAB70, buy_head for
+             * `Moho::SPeer::establishedUids` -- msvc8::set<int32_t>, node
+             * 12+4+2=18 rounded to 20, isNil@+0x11 matches, via alloc_raw's
+             * already-cited 20-byte lane FUN_007CC1C0. Reached from
+             * `establishedUids()`'s default member-init in SPeer's ctor,
+             * SPeer.cpp.)
+             * Address: 0x007F2BB0 (FUN_007F2BB0, buy_head for the
+             * function-local static `BlueprintExtractorRegistry registry`
+             * -- std::map<std::string,unique_ptr<RangeExtractor>>, node
+             * 12+sizeof(pair<string(28),ptr(4)>)+2 = 46, rounded to 48;
+             * isNil@+0x2D matches the batch-bucket node shape. Reached
+             * from `GetBlueprintExtractorRegistry()`'s lazy first-time
+             * static-local construction, RangeExtractor.cpp.)
+             * Address: 0x0052F370 (FUN_0052F370, buy_head for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`
+             * -- `msvc8::set<uint32_t>`, same 12+4+2=18-rounded-to-20 node
+             * shape as `Moho::SPeer::establishedUids` above, isNil@+0x11.
+             * The binary splits allocation and self-link across the call
+             * site: `ExportToLuaState` (0x0052A28E-0x0052A2AF) calls
+             * `sub_52F370` for the raw node, then self-links
+             * `left=parent=right=self` and sets `isNil=1` inline -- this
+             * template fuses both steps into `buy_head()` itself, matching
+             * every other instantiation's citation style in this file.
+             * Reached from `AddOrGetExportBinding`'s claim of a fresh
+             * binding slot in RRuleGameRules.cpp, via
+             * `msvc8::set<uint32_t>`'s default constructor.)
+             */
+            /**
+             * Address: 0x00684230 (FUN_00684230, `Moho::EntityDB::EntityDB` --
+             * `msvc8::map<std::uint32_t, moho::IdPool>`, `EntityDB::
+             * mIdPoolTree` in `EntityDb.h`. The binary inlines buy_head's
+             * allocate-then-self-link-then-isNil=1/color=black sequence
+             * directly into the owning class's constructor rather than
+             * through a named `buy_head` symbol (the raw allocation is
+             * `FUN_00688180`, cited on `alloc_raw` above) -- this member
+             * fuses those steps into one call, matching every other
+             * constructor-inlined instantiation already cited here. Reached
+             * from `mIdPoolTree`'s default member-initialization, `EntityDb.h`.)
+             */
+            /**
+             * Address: 0x00685720 (FUN_00685720)
+             * Address: 0x006864A0 (FUN_006864A0, sibling emission)
+             * Address: 0x00687250 (FUN_00687250, sibling emission)
+             *
+             * Further `msvc8::map<std::uint32_t, moho::IdPool>` sentinel-head
+             * allocate/self-link/isNil=1 emissions -- `EntityDB::mIdPoolTree`,
+             * `EntityDb.h`. Same fused shape as `FUN_00684230` above, emitted
+             * at other construction call sites (e.g. placement-new via
+             * `EntityDbTypeInfo::CtrRef`/`NewEntityDbTypeLaneRef`, EntityDb.cpp).
+             */
+            /**
+             * Address: 0x0087C3B0 (FUN_0087C3B0, fused allocate/self-link/
+             * isNil=1 buy_head for an unidentified `Moho::CDecalManager` map/
+             * set member -- writes `left=parent=right=0`, then `isNil@+0x14=1`,
+             * `color@+0x15=0`. Sibling FUN_0087C5F0 below is byte-identical
+             * except its `alloc_raw` callee, so the two are distinct
+             * `CDecalManager` map instantiations, not ICF twins. Both reached
+             * from `Moho::CDecalManager::CDecalManager` (0x00877A60); the
+             * owning member names are not yet pinned down.)
+             * Address: 0x0087C5F0 (FUN_0087C5F0, sibling emission described
+             * above -- a second, distinct `CDecalManager` map/set instantiation)
+             */
+            /**
+             * Address: 0x008D6940 (FUN_008D6940, sub_8D6940) -- generic
+             * "buy a blank node" half for a local `msvc8::rb_tree<
+             * moho::Resolution>` (value_type IS the key -- ordered by
+             * `(width,height,framesPerSecond)`, used to dedup adapter
+             * display modes; `Resolution` already recovered,
+             * `StartupHelpers.h:131-180`, `sizeof==0x10`). Writes
+             * `left=parent=right=0`, `color@+0x1C(28)=1`, `isNil@+0x1D(29)=0`
+             * -- CORRECTING an earlier mis-read of this same body that had
+             * these two fields backwards (proven by `insert_at`'s own
+             * rebalance loop, which repeatedly recolors `+28` throughout,
+             * and by `insert_unique`'s loop-termination test on `+29`; see
+             * those citations below). This is a generic blank-node buy, not
+             * head-specific: called directly from `SetupPrimaryAdapterSettings`
+             * (0x008D21E0, the RAW un-recovered binary body -- the CURRENT
+             * recovered `StartupHelpers.cpp` body is a simplified rewrite
+             * that dedups via a linear `HasMode` scan instead of this tree,
+             * see the follow-up note on `insert_unique` below), which
+             * overwrites `isNil=1` immediately after to promote this
+             * specific call's result into the tree's head sentinel; other
+             * call sites (via `insert_at`/`FUN_008D5720`'s `sub_8D6280`)
+             * leave `isNil=0` for genuine data nodes.)
+             */
+            /**
+             * Address: 0x007B3F30 (FUN_007B3F30, sub_7B3F30) -- the
+             * `msvc8::set<std::uint32_t>` instantiation cited on
+             * `alloc_raw`/`free_raw`/`rb_increment`/`clear`/`destroy_subtree`
+             * throughout this file (isNil@+0x11). `alloc_raw`'s work
+             * (buy + link-zero + color=black + isNil=0) is split out into a
+             * separate callee (`sub_7B4A50`, cited on `alloc_raw` above)
+             * exactly like `FUN_0052F370`'s split documented above; this
+             * emission does the rest inline: stores the bought node into the
+             * owning container's head slot (`this+4`), flips `isNil@+0x11`
+             * to 1, self-links `left=parent=right=self`, and zeroes the
+             * owning container's `size` (`this+8`) -- the same
+             * constructor-inlined `buy_head()`-plus-container-field pattern
+             * already documented on `FUN_00684230` above. DB-integrity fix:
+             * this token was marked `recovered` with `source_paths=null`
+             * and a boilerplate "batch 0x007B**** pass" note that cited
+             * nothing; a full `src` sweep found zero real citations
+             * anywhere. Owning field not yet pinned to a specific class.)
+             *
+             * Address: 0x00556DE0 (FUN_00556DE0, sub_556DE0) -- the
+             * category-lookup map's sentinel-head buy, `msvc8::map<
+             * msvc8::string, moho::CategoryLookupValue>`,
+             * `RRuleGameRulesImpl::mEntityCategoryLookup`'s
+             * `EntityCategoryLookupTable::mCategoryMap`
+             * (RRuleGameRules.h/.cpp). A third split shape, distinct from
+             * both patterns above: this function allocates the raw node
+             * (`alloc_raw()`) *and* sets `color=1(black)`/`isNil=0`, but
+             * does NOT self-link `left`/`parent`/`right` -- its sole caller,
+             * the map's constructor (`FUN_005551F0`,
+             * `Moho::EntityCategorySet::EntityCategorySet`, cited on
+             * `clear()` above), does the self-link and overwrites `isNil=1`
+             * itself immediately after the call (confirmed against the raw
+             * decompile: `v2 = sub_556DE0(); this->mMap._Myhead = v2;
+             * v2->_Isnil = 1; ...->_Parent = ...->_Myhead; ...->_Left = ...;
+             * ...->_Right = ...;`). This member fuses all three steps
+             * (allocate, flag-init, self-link) into one call, matching every
+             * other instantiation's citation convention in this file even
+             * though the binary happens to split this one three ways rather
+             * than two. Re-homed here from a hand-rolled
+             * `AllocateCategoryLookupHeadNodeRuntime` free function in
+             * RRuleGameRules.cpp that already fused the same three steps by
+             * hand over a deleted overlay*` reach-in instead
+             * of calling this member -- that helper's own citation already
+             * carried this exact evidence and disclosure; it is preserved
+             * here verbatim now that the real container performs the fusion
+             * instead.)
+             *
+             * Address: 0x0083C220 (FUN_0083C220, sub_83C220) -- `msvc8::map<
+             * UiKeyMask, ...>`-family `gUiKeyRepeatMap`'s (`moho/ui/
+             * UiRuntimeTypes.cpp`) header-node buy: allocates the raw node
+             * (`sub_83C6E0(1)`, the scaled/checked node allocator -- see
+             * `buy_node` below for this same shape used as a node-count
+             * allocator) then zeroes `left`/`parent`/`right` (NOT
+             * self-linked) and sets `color=1`(black)/`isNil=0` at
+             * `node+20`/`node+21` -- the same "third split shape" as
+             * `FUN_00556DE0` above: allocate + flag-init only, no
+             * self-link. Its caller, `gUiKeyRepeatMap`'s real static
+             * constructor `FUN_00BE4810` (writes `dword_10C374C`/
+             * `dword_10C3750` -- the exact globals this file already names
+             * for this tree -- then `atexit(sub_C06720)`), does the
+             * self-link and `isNil=1` overwrite itself immediately after
+             * the call, matching `FUN_00556DE0`'s documented caller pattern
+             * exactly. Three more callers (0x83A990/0x83B2E0/0x83BDB0, all
+             * unowned call sites) sit immediately adjacent to this tree's
+             * already-cited `operator[]`/`insert_hint`/`insert_at` members.
+             *
+             * Address: 0x006B01C0 (FUN_006B01C0, sub_6B01C0) -- `msvc8::
+             * map<msvc8::string, float>::buy_head`'s `alloc_raw()` half --
+             * `Unit::ArmorMultipliers` in `moho/unit/core/Unit.h`. Allocates
+             * one 48-byte node via `sub_6B1420` (the already-recovered
+             * checked 48-byte allocation lane, `CheckedArrayAllocationLanes.
+             * cpp`), then seeds `color=black`/`isNil=0` -- the raw
+             * `alloc_raw()`-plus-flags half of this member; the two
+             * callers (`Unit::Unit(const SUnitConstructionParams&)` and
+             * `Unit::Unit(Sim*, ...)`, both `Unit.cpp`) used to finish the
+             * self-link and `isNil=1` overwrite by hand (matching the
+             * split-instantiation pattern documented throughout this file),
+             * before `ArmorMultipliers` became a real typed member whose
+             * own default construction (this member) now performs the
+             * self-link and `isNil=1` flip in one call. Re-homed here from
+             * a hand-rolled `AllocateArmorMultiplierMapNodeRaw` free
+             * function in `Unit.cpp` that only replicated the raw-alloc
+             * half and left the self-link/isNil flip open-coded at each of
+             * the two call sites.
+             *
+             * Address: 0x0092DC30 (FUN_0092DC30, sub_92DC30) -- a 40-byte
+             * (`0x28`) header-node buy for a not-yet-owner-pinned tree/map
+             * instantiation: `operator new(0x28)` then self-links only the
+             * first two fields (`result[0]=result; result[1]=result;`),
+             * leaving the remaining header fields for the caller to
+             * finish -- a partial split shape (2 of 3 pointer fields, no
+             * colour/isNil flip here), distinct from this member's full
+             * 3-field self-link + `isNil=1` shape but the same family of
+             * "binary splits buy_head's work across the call site"
+             * variants this file documents throughout (e.g. `FUN_00556DE0`/
+             * `FUN_0083C220` above). Two real callers: `FUN_0092E980`
+             * (`this[1]=buy_head(); this[2]=0; return this;`, a plain
+             * tree/map default-ctor) and `FUN_00930790` (IDA-typed
+             * `std::hash_map_unk_unk::hash_map`, corrected below from a
+             * wrong `external_dependency` tag -- initializes `mBool`,
+             * `_List._Myhead` via this token, `_List._Mysize=0`, the bucket
+             * vector via `sub_9300D0`, `_Mask=1`, `_Maxidx=1`; its own
+             * caller `FUN_00930C00` names the field `mHashMap`, independent
+             * confirmation this is a genuine hash_map container field, not
+             * CRT scaffolding).
+             *
+             * Address: 0x007E4770 (FUN_007E4770, sub_7E4770) -- `msvc8::map<
+             * MeshKey, boost::weak_ptr<Mesh>>::buy_head`'s raw-alloc-plus-
+             * flags half for `moho::MeshRendererMeshCacheTree` (`Mesh.h`/
+             * `Mesh.cpp`, isNil@+0x25, same instantiation cited on `alloc_
+             * raw`/`buy_node` above). Allocates via `sub_7E56B0` (this
+             * instantiation's `alloc_raw`), zeroes the three link dwords
+             * (same "null tests after each derived pointer are compiler
+             * artifacts" guards seen elsewhere in this file), sets
+             * `color=1`(black)/`isNil=0` -- NOT self-linked, the same
+             * "binary splits buy_head's work across the call site" family
+             * as `FUN_00556DE0`/`FUN_0083C220`/`FUN_006B01C0` above.
+             * Address: 0x007E2B50 (FUN_007E2B50, sub_7E2B50) -- this split's
+             * self-link-plus-`isNil=1`-promotion half: calls `sub_7E4770`,
+             * stores the result into `tree.head` (`[esi+4]`), overwrites
+             * `isNil` to `1` (`mov byte ptr [eax+25h],1`), self-links
+             * `left`/`parent`/`right` to the head pointer, then zeroes
+             * `tree.size` (`[esi+8]=0`) and tail-calls `sub_7E2B74`
+             * (unrecovered; likely a proxy/allocator hookup finisher, not
+             * part of this member's own shape). Matches this member's
+             * fused single-call shape in final observable state (head ends
+             * up self-linked with `isNil=1`), just split across two real
+             * binary functions instead of fused into one -- the same
+             * "same final state, split across the call site" note already
+             * documented throughout this file (e.g. `FUN_006B01C0` above).
+             * `Mesh.cpp`'s `CreateMeshCacheTreeSentinel` (calling
+             * `CreateMeshCacheNode(sentinelKey, emptyMesh, nullptr,
+             * nullptr, nullptr, kRbNodeBlack, kRbNodeSentinel)` then self-
+             * linking) already recovers this member's fused end state
+             * faithfully and already cites 0x007E4770. 0x007E2B50's own
+             * split-shape counterpart is also already recovered,
+             * `InitializeMeshCacheTreeStorageAdapter` (`Mesh.cpp`, already
+             * cited there) -- currently `[[maybe_unused]]`, since its
+             * owning caller (a second, not-yet-identified
+             * `MeshRendererMeshCacheTree` instance -- `MeshRenderer::
+             * MeshRenderer`'s own tree init at 0x007DF150 builds its
+             * sentinel inline via `CreateMeshCacheTreeSentinel` directly,
+             * confirmed not to route through this function) has not been
+             * traced yet.
+             * Address: 0x00570300 (FUN_00570300 -- the head-sentinel allocation for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), both caches in the `CFormationInstance` constructors.)
+             * Address: 0x00739B50 (FUN_00739B50 -- `_Buynode()` of the head sentinel + `_Mysize = 0` (the `_Init` of a tree); zero callers, unreachable; formerly `InitializeLinearTreeStorageHeadAndSize` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077BE50 (FUN_0077BE50 -- `_Buynode()` of the head sentinel for the decal-buffer tree (nil byte at node+0x1D); zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077A220 (FUN_0077A220 -- the decal-buffer tree's `_Init` (head sentinel + size), returning the tree; zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageAndReturnStorageA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077AEF0 (FUN_0077AEF0 -- the decal-buffer tree's `_Init` (head sentinel + size), returning the tree; zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageAndReturnStorageB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C4D0 (FUN_0049C4D0 -- `_Buynode()` for the header sentinel -- links nulled, colour black, `isNil` cleared for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004914B0, 0x00495A60, 0x004977C0; formerly `AllocateBeamBucketTreeNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE7F0 (FUN_004AE7F0 -- `_Buynode()` for the header sentinel -- links nulled, colour black for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004A9DD0, 0x004AC3F0, 0x004AD1C0; formerly `AllocateBlackTreeNode_004AE7F0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEB70 (FUN_004AEB70 -- `_Buynode()` for the header sentinel -- links nulled, colour black for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004A9DD0, 0x004AC830, 0x004AD5A0; formerly `AllocateBlackWideTreeNode_004AEB70` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D9140 (FUN_007D9140 -- `_Buynode()` for the header sentinel for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D60D0, 0x007D7A50, 0x007D8090; formerly `AllocateRegionKeyNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C8800 (FUN_005C8800 -- `_Buynode()` for the header sentinel for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005BFF90, 0x005C0290, 0x005C44C0; formerly `AllocateReconMapHeadNode` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AFAC0 (FUN_008AFAC0 -- `_Buynode()` for the header sentinel for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, the entity id at node+0x0C, colour/nil at +0x10/+0x11); callers 0x008AA340, 0x008AE540, 0x008AEE10; formerly `CreateEntityLoopTreeSentinel` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071B4E0 (FUN_0071B4E0 -- `_Buynode()` for the header sentinel, self-linked and marked nil for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ConstructBlipCellSetHeaderFromSentinel` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E3FD0 (FUN_004E3FD0 -- a second emission of that header buy for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DFC80, 0x004E1740, 0x004E20E0; formerly `AllocateSndVarAuxCacheHeadRuntimeA` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E4340 (FUN_004E4340 -- a third emission of that header buy for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DFC80, 0x004E1810, 0x004E2250; formerly `AllocateSndVarAuxCacheHeadRuntimeB` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E3B50 (FUN_004E3B50 -- `_Buynode()` for the header sentinel for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DFC80, 0x004E1670, 0x004E1F90; formerly `AllocateSndVarParamsCacheHeadRuntime` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DF60 (FUN_0045DF60 -- `_Buynode()` for the header sentinel for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00457FF0, 0x0045AFB0, 0x0045BE30; formerly `CreateFileInfoMapHeadNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045DD20 (FUN_0045DD20 -- `_Buynode()` for the header sentinel for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x00457FF0, 0x0045BA80, 0x0045C8C0; formerly `CreateZipMapHeadNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046EBA0 (FUN_0046EBA0 -- `_Buynode()` -- one node, links nulled, colour black, not nil for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046BEF0, 0x0046D7D0, 0x0046DE80; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00465480 (FUN_00465480 -- `_Buynode()` -- one node, links nulled, colour black, not nil for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004627C0, 0x00464430, 0x00464FE0; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A1410 (FUN_005A1410 -- `_Buynode()` -- one node, links nulled, colour black, not nil for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F920, 0x0059FAB0, 0x005A0010; formerly `CreateRebuildMapNode` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00505D20 (FUN_00505D20 -- `_Buynode()` -- one 0x38 node through `_Allocate` 0x00506330, links nulled, colour black, not nil, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); callers 0x00500F60 (four times, one per shard-data map), 0x00501D80 (the database's overflow map); formerly `AllocateSpatialMapNodeHeader` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00505F20 (FUN_00505F20 -- `_Allocate(1)` for that 0x38 node -- `mov ecx, 1` then a tail jump into 0x00506330; zero callers, no references, a linker-retained copy nothing runs.)
+             * Address: 0x007B4640 (FUN_007B4640 -- `_Buynode()` for the head of the `WeakSet` entry sets: 0x1C from the checked allocator 0x007B4FA0, links null, colour black; every `WeakSet` constructor.)
+             * Address: 0x007B08D0 (FUN_007B08D0 -- the same body through the second checked-allocator instance 0x007B1420; the `CWldSession` constructor's sets, `IdleUnitSelector`'s, the set range constructors.)
+             * Address: 0x007B3C60 (FUN_007B3C60 -- a `WeakSet` default constructor emission: head bought through 0x007B4640, isNil=1, self-linked, count zero.)
+             */
+            [[nodiscard]] static node_type* buy_head()
+            {
+                node_type* const h = alloc_raw();
+                h->left = h;
+                h->parent = h;
+                h->right = h;
+                h->color = kRbBlack;
+                h->isNil = 1;
+                return h;
+            }
+
+            /**
+             * Address: 0x007E4BC0 (FUN_007E4BC0, batch-bucket map `_Buynode`)
+             *
+             * What it does:
+             * Allocates one node, links both children to the header, marks it red
+             * and non-nil, then copy/emplace-constructs the value payload,
+             * releasing the storage again if that construction throws.
+             *
+             * The shipped body pins the node layout field for field:
+             * `call sub_7E5740` (the node allocator, `alloc_raw` above) then
+             * `[esi] = arg_0` (`_Left`), `[esi+4] = arg_4` (`_Parent`),
+             * `[esi+8] = arg_8` (`_Right`), `lea ecx,[esi+0Ch]` for the payload
+             * copy (`call sub_7E5070`, the `std::pair` copy constructor - see
+             * `MeshBatchBucket` in moho/mesh/MeshBatchKey.h), `[esi+2Ch] = 0`
+             * (`_Color` = red) and `[esi+2Dh] = 0` (`_Isnil`). It cleans four
+             * stack arguments (`retn 10h`).
+             *
+             * 0x007E5070 and 0x007E5740 are *not* sibling `_Buynode` emissions,
+             * as this block used to claim: they are the value copy constructor
+             * and the node allocator this function calls.
+             */
+            template<class... Args>
+            /**
+             * Address: 0x00711B00 (FUN_00711B00, the blueprint-stat map's node buy --
+             * writes the key at `+0x0C`, the float at `+0x10` and the colour/nil pair at
+             * `+0x14`/`+0x15`, matching the 0x18 node exactly.)
+             */
+            /**
+             * Address: 0x0052F740 (FUN_0052F740)  Address: 0x0052FAE0 (FUN_0052FAE0)
+             * Address: 0x0052FE80 (FUN_0052FE80)  Address: 0x00530220 (FUN_00530220)
+             * Address: 0x005305D0 (FUN_005305D0)  Address: 0x00530980 (FUN_00530980)
+             *
+             * The per-table head-sentinel allocators: one `operator new` of the 0x30
+             * node, then self-linked and flagged as the sentinel.
+             */
+            /**
+             * Address: 0x0049A7B0 (FUN_0049A7B0, the trail-segment pool's node allocate
+             * and link)
+             * Address: 0x0049EC00 (FUN_0049EC00, its node-array allocate)
+             */
+            /**
+             * Address: 0x00581370 (FUN_00581370, `msvc8::map<Wm3::Vector2i,
+             * SBuildReserveInfo>::buy_node` -- `CAiBrain::mBuildStructureMap`,
+             * the node-buy sibling of `buy_head` (0x00581330, cited above on
+             * `alloc_raw`). `_Buynode(_Larg, _Parg, _Rarg, value)` shape:
+             * allocates one 40-byte node via the same `alloc_raw` lane
+             * (`sub_582460(1)`, already cited on `AllocateCheckedElementBlock`
+             * in Vector.cpp), writes `left@+0`/`parent@+4`/`right@+8` straight
+             * from its first three arguments (the caller, `_Insert`
+             * FUN_00580720, passes the tree's `head_` for both `left` and
+             * `right` and the insertion-point `where` node for `parent`),
+             * copy-constructs the 24-byte `pair<const Wm3::Vector2i,
+             * SBuildReserveInfo>` value in place at `+0x0C` through
+             * `sub_5816C0` -- the pair's implicit, compiler-generated copy
+             * ctor: copies the 8-byte key, then `SBuildReserveInfo`'s own
+             * implicit memberwise copy of `mUnit`/`mCom` (`WeakPtr<Unit>`/
+             * `WeakPtr<CUnitCommand>`, `SBuildReserveInfo.h`), each relinked
+             * into the new object's storage (`result+2`/`result+4`) rather
+             * than left pointing at the source -- matching `WeakPtr<T>`'s
+             * intrusive-list-node copy semantics. No explicit source line
+             * produces this (neither type declares a copy ctor), per RULE
+             * ONE -- then zeroes `color@+0x24`/`isNil@+0x25` -- matching
+             * `buy_head`'s "38, rounded to 40" node-size note exactly. Reached
+             * from FUN_00580720's `_Insert`, which is not yet recovered
+             * source itself.)
+             */
+            /**
+             * Address: 0x0077CD00 (FUN_0077CD00, inner bucket node allocate)
+             * Address: 0x0077C690 (FUN_0077C690, its clone-from-source form)
+             * Address: 0x0077CAE0 (FUN_0077CAE0, outer map value node; emitted again at
+             * 0x0077DC40)
+             * Address: 0x0077DC40 (FUN_0077DC40, sibling emission of FUN_0077CAE0 described above)
+             */
+            /**
+             * Address: 0x0052DB50 (FUN_0052DB50, the node buy for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`
+             * -- `msvc8::set<uint32_t>`. `_Buynode(_Larg, _Parg, _Rarg,
+             * ordinal, _Color)` shape: allocates via `sub_533620(1)`, writes
+             * `left@+0`/`parent@+4`/`right@+8` from its first three
+             * arguments directly (parent is the caller's `where` node, not
+             * re-parented after the fact the way this template's `buy_node`
+             * + `link_and_rebalance` split it), copies the 4-byte ordinal
+             * value at `+0x0C` -- confirming a `uint32_t` value_type, not an
+             * 8-byte `pair<const uint32_t, RBlueprint*>` -- then writes
+             * `color@+0x10` and `isNil=0@+0x11`. Reached from `insert_at`,
+             * 0x0052CD30.)
+             */
+            /**
+             * Address: 0x00830110 (FUN_00830110, `Moho::UICommandGraph::
+             * mGraph`'s node buy -- allocates one node via
+             * `sub_831D10(1)`, writes `left`/`parent`/`right` from its first
+             * three arguments (the caller passes `where` for both `left` and
+             * `right` initially, matching this template's head-initialised
+             * `n->left = n->parent = n->right = head_` before the value is
+             * constructed), constructs the 0x18-byte value in place through
+             * `sub_830B20` (the `pair<shared_ptr<CD3DBatchTexture>,
+             * vector<CommandGraphEdge*>>` value ctor CWldSession.cpp's
+             * `AddCommandQueueToCommandGraph` notes name 0x0082D330 for --
+             * "retain the texture, default the vector"), then writes
+             * `color=0@+0x24`/`isNil=0@+0x25`. Unique body (no ICF twins);
+             * reached from `insert_at`'s emission FUN_0082E320 above.)
+             */
+            /**
+             * Address: 0x005569C0 (FUN_005569C0, the category-lookup map's
+             * node buy -- `msvc8::map<msvc8::string, moho::CategoryLookupValue>`,
+             * `Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap`.
+             * `recovered_progress.json` already tracks this address `skip`
+             * (RULE ONE: compiler emission, no hand-written body) with the
+             * note "_Myval at +0x10"; this citation is the instantiation that
+             * note refers to. Allocates one 0x60-byte node via `sub_5579D0(1)`
+             * (`operator new(0x60 * count)`), writes `left`/`right` to the
+             * caller's head argument and `parent` to the caller's `where`,
+             * then constructs the value in place at `node+0x10` through
+             * `sub_557310` and zeroes `color`/`isNil` at `node+0x58`/
+             * `node+0x59`. `sub_557310` (FUN_00557310) is `value_type`'s
+             * (`pair<const msvc8::string, CategoryLookupValue>`) implicit
+             * *copy* constructor -- it assigns the key via
+             * `msvc8::string::assign` and copies the three `CategoryLookupValue`
+             * fields (`mUniverse`/`mBits.mFirstWordIndex`/`mBits.mWords`) from
+             * its source argument's +0x20/+0x28/+0x30, i.e. from an
+             * already-fully-formed `value_type&` -- the same `args` this
+             * `buy_node` forwards from `insert_at`'s single `const value_type&`
+             * parameter. It is a compiler/template emission with no
+             * hand-written body of its own (RULE ONE), exactly like this
+             * `buy_node` member; writing `::new (...) value_type(v)` here
+             * (already the case, unmodified) is what makes the compiler emit
+             * it. The `node+0x10` destination -- not the
+             * usual `node+0x0C` -- is the primary evidence for
+             * `CategoryLookupValue`'s 8-byte alignment (Sim.cpp citation
+             * block). Reached from `insert_at`'s emission (FUN_005565D0,
+             * cited above).)
+             */
+            /**
+             * Address: 0x00535CA0 (FUN_00535CA0, the RRuleGameRulesBlueprintMap
+             * (`msvc8::map<msvc8::string, void*>`) node buy for the
+             * RTrailBlueprint instantiation -- same family as the seven
+             * `insert_unique`/predecessor-lookup addresses cited above
+             * (0x00534690 / insert_at FUN_00535400 / predecessor lookup
+             * FUN_00536470). Allocates one node via `sub_533AD0(1)`
+             * (`operator new(count)`), writes `left`/`parent`/`right` from
+             * the caller's `where`/`head` arguments, then constructs
+             * `value_type` (`pair<const msvc8::string, void*>`) in place at
+             * `node+0x0C` from the `const value_type&` argument: the key is
+             * built via `msvc8::string::assign(src, 0, 0xFFFFFFFF)` (full
+             * copy into the SSO buffer at `node+0x10`, `_Mysize`@+0x20,
+             * `_Myres`@+0x24=0xF) and the `void*` value is copied straight
+             * from the source pair's `+0x1C` (`.second`) into `node+0x28`,
+             * matching the `isNil@+0x2D = 0x0D + sizeof(pair<string(28),
+             * void*(4)>)=0x20` node size FUN_005364D0's citation already
+             * established for this map type. This is a compiler/template
+             * emission of `::new (...) value_type(args...)` with no
+             * hand-written body of its own (RULE ONE), exactly like
+             * FUN_005569C0 above -- `recovered_progress.json` tracks it
+             * `skip` for that reason. Reached from `insert_at`'s emission
+             * FUN_00535400, itself reached from `insert_unique`'s emission
+             * FUN_00534690 cited above.)
+             */
+            /**
+             * Four more siblings of the same `RRuleGameRulesBlueprintMap`
+             * (`msvc8::map<msvc8::string, void*>`) node-buy family as
+             * FUN_00535CA0 above -- one per registered blueprint type, each
+             * byte-identical in shape (allocate one node via that type's own
+             * `operator new(1)` wrapper, write left/parent/right from the
+             * caller's where/head arguments, `msvc8::string::assign` the key
+             * at node+0x0C, copy the source pair's `.second` (+0x1C) into
+             * node+0x28, zero color/isNil at +0x2C/+0x2D). Each is reached
+             * from its own `insert_at` bridge, cited in the `insert_unique`
+             * catalog above (0x00534140/0x00534360/0x00534470/0x00534580):
+             *   - Address: 0x005358E0 (FUN_005358E0) -- T=RProjectileBlueprint;
+             *     reached from insert_at FUN_00534B90.
+             *   - Address: 0x00535A60 (FUN_00535A60) -- T=RMeshBlueprint;
+             *     reached from insert_at FUN_00534EF0.
+             *   - Address: 0x00535B20 (FUN_00535B20) -- T=REmitterBlueprint's
+             *     map (`GetOrCreateRegisteredEffectBlueprint`); reached from
+             *     insert_at FUN_005350A0.
+             *   - Address: 0x00535BE0 (FUN_00535BE0) -- T=RBeamBlueprint;
+             *     reached from insert_at FUN_00535250.
+             * Same RULE ONE reasoning as FUN_00535CA0: compiler/template
+             * emission of `::new (...) value_type(args...)` with no
+             * hand-written body of its own -- tracked `skip` in
+             * `recovered_progress.json` for that reason.
+             */
+            /**
+             * Address: 0x00950430 (FUN_00950430, node buy for an unidentified
+             * `msvc8::map<K,V>`/`msvc8::set<T>` instantiation with a 24-byte
+             * `value_type` -- `operator new(0x28)` (40 bytes: 12 link dwords
+             * + 24-byte value + 2 flag bytes, rounded), `_Buynode(_Larg,
+             * _Parg, _Rarg, val, _Color)` shape: `left`/`parent`/`right`
+             * written from its first three arguments (the caller passes the
+             * same `where` node for both `left` and `right`, matching this
+             * template's head-initialised `n->left = n->parent = n->right =
+             * head_`), the 24-byte value block-copied (6 dwords) from a
+             * `const value_type&` fourth argument, then `color` from a
+             * literal-0 fifth argument and `isNil = 0`. Reached from
+             * FUN_009512B0, which matches `insert_at`'s shape precisely:
+             * checks the tree's size against the `0xAAAAAAA9` max_size
+             * bound for a 24-byte-ish node family and throws
+             * `std::length_error("map/set<T> too long")` on overflow (the
+             * exact message this template's own `insert_at`/`_Xlen` overflow
+             * guard uses elsewhere in this file), then calls this node-buy
+             * lane, links the fresh node in as the RB-tree insertion target,
+             * and rebalances via sub_94FA60/sub_94FAB0 (the tree's rotation
+             * helpers). No source-level owner has been pinned down for this
+             * specific `K,V` pair beyond the 24-byte value size; documented
+             * at the same confidence level as the "unidentified
+             * map<int32_t,T> instantiation" family cited on `buy_head`
+             * above.)
+             */
+            /**
+             * Address: 0x006881C0 (FUN_006881C0, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Buynode` -- `EntityDB::mIdPoolTree` in
+             * `EntityDb.h`. Allocates via `FUN_00688180` (`alloc_raw`, cited
+             * above), writes `left`/`right`=head and `parent`=the caller's
+             * `where` (all three from its own arguments rather than a fixed
+             * `head_` reread, a compiler optimisation, not a different
+             * operation), writes the key at `node+0x10`, copy-constructs the
+             * `IdPool` payload at `node+0x18` via `FUN_00686DF0` (already
+             * recovered as `CopyIdPoolPayloadForMapLanes`, `IdPool.cpp`), and
+             * zeroes `color`/`isNil` at `node+0xCC8`/`node+0xCC9`. The
+             * `node+0x18` destination -- not the usual `node+0x0C` -- is the
+             * primary evidence for `IdPool`'s `alignas(8)` (see the citation
+             * block on that type in IdPool.h); this member's plain `V value;`
+             * member declaration reproduces the exact same offset
+             * automatically once `IdPool` carries that alignment, with no
+             * template change needed. Reached from `insert_at`'s emission
+             * FUN_00687280, cited below.)
+             */
+            /**
+             * Address: 0x006E23F0 (FUN_006E23F0, the command-id map's node
+             * buy -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`. Allocates one
+             * 0x18-byte node via `sub_6E2D90(1)`, writes `left`/`parent`/
+             * `right` from its first three arguments, the 8-byte value
+             * (`CmdId` + `CUnitCommand*`) copied from the fourth argument's
+             * two words, then `color=0`/`isNil=0` at `+0x14`/`+0x15`. Its
+             * only incoming xref is a direct `call` from `insert_at`'s
+             * emission FUN_006E1D60, cited below -- a prior recovery pass
+             * mis-cited this address as a 4-scalar-argument
+             * "priority-queue-node" allocator in
+             * `moho/sim/SimRecoveryRuntime.cpp`, which does not match either
+             * this real parameter shape or the real (sole) caller; not
+             * corrected there in this pass since that file is untouched
+             * here, flagged for a follow-up.)
+             */
+            /**
+             * Address: 0x008B67F0 (FUN_008B67F0, sub_8B67F0) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`. Same shape
+             * as FUN_006E23F0 above (a separate instantiation): allocates one
+             * raw node via `sub_8B6AC0(1)` (`alloc_raw`), writes the key/
+             * value pair from its arguments, then `color=0`/`isNil=0`.
+             * Reached from `insert_at`'s emission FUN_008B6310, cited below.
+             * Re-homed here from the same bespoke `AllocateCommandNode`/
+             * `InsertCommandNode` free-function pair in Sim.cpp cited on
+             * `insert_unique` above.)
+             */
+            /**
+             * Address: 0x0083C260 (FUN_0083C260, sub_83C260) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::buy_node` --
+             * `gUiKeyRepeatMap` in `moho/ui/UiRuntimeTypes.cpp:1395`
+             * (`Moho::CUIKeyHandler`'s per-key "repeat enabled" registry,
+             * populated by `AddUiKeyMapEntries`/`FUN_00838FD0` when a Lua
+             * key binding's `keyRepeat` flag is true). Allocates one node
+             * via `sub_83C6E0(1)` (`alloc_raw`), writes `left`/`parent`/
+             * `right` straight from its own arguments (the caller passes
+             * `head_` for both `left` and `right` and the insertion-point
+             * `where` node for `parent`, the same "compiler optimisation,
+             * not a different operation" pattern the IdPool/CommandManager
+             * instantiations above document), copies the 8-byte
+             * `pair<const UiKeyMask, bool>` value from a `const
+             * value_type*` argument (`*a1`/`a1[1]`) to `node+0x0C`/
+             * `node+0x10`, then writes `color=0`(red)/`isNil=0` at
+             * `node+0x14`/`node+0x15` -- the same `nil-0x15` shape already
+             * used to identify this instantiation's rotation helpers
+             * (`FUN_0083B4C0`/`FUN_0083B570`, both cited below). Reached
+             * from `insert_at`'s emission (`FUN_0083BDE0`, cited below),
+             * which calls this member internally rather than receiving an
+             * already-built node -- the binary fuses `buy_node` +
+             * `link_and_rebalance` into one function for this
+             * instantiation, the same fusion `buy_head`'s `FUN_00556DE0`
+             * citation above documents for a sibling map. DB-integrity fix:
+             * this token was reverted from a false `recovered` status
+             * citing `src/moho/misc/CrtRuntimeHelpers.cpp` (address not
+             * present in that file, confirmed by a full-file grep); this
+             * catalog is the real home.)
+             *
+             * Address: 0x004E31F0 (FUN_004E31F0, sub_4E31F0) --
+             * `msvc8::map<Moho::CSndParams*, Moho::HSndEntityLoop*>::buy_node`
+             * -- the sound subsystem's shared-ambient-loop cache
+             * (`gSharedAmbientLoopsByParams` @ 0x010A92A0 in
+             * `moho/audio/CSndParams.cpp`; not `sSndParamsCache`, which is the
+             * `multimap<uint32_t, CSndParams*>` at 0x010A9288). `__userpurge`
+             * with `this`=esi=hidden-left/parent/right triple (its caller
+             * passes `where`/`where`/`where` or `head_`/`where`/`head_`
+             * depending on branch, the same "compiler optimisation, not a
+             * different operation" pattern documented on the IdPool/
+             * CommandManager instantiations above) and a fourth argument
+             * pointing at the 8-byte `pair<CSndParams*, HSndEntityLoop*>`
+             * value to copy into the fresh node, then `isNil=0`/`color`
+             * (byte offsets +20/+21, matching this instantiation's 8-byte
+             * value_type). Reached from `insert_at`'s emission for this
+             * same instantiation (`FUN_004E22B0`, cited below). Neither is
+             * called from the recovered `EnsureSharedAmbientLoopMapEntry`
+             * (`CSndParams.cpp`, `FUN_004E1890`) -- that function's own
+             * note already documents why: its `msvc8::map<CSndParams*,
+             * HSndEntityLoop*>::_Insert` role is fulfilled by the modern
+             * `unordered_map` find/emplace path with RAII via
+             * `unique_ptr` instead, the same elision the run's destructor
+             * group (0x004DF0E0) documents for this tree's erase/clear family. Re-homed here
+             * from the false `CrtRuntimeHelpers.cpp` DB-integrity
+             * contamination; this catalog is the real home.)
+             *
+             * Address: 0x0089A130 (FUN_0089A130, sub_89A130) -- a
+             * `std::map<Moho::EntId, Moho::UserEntity*>::_Buynode`
+             * (IDA-typed real field names `_Myhead`/`_Parent`/`_Isnil`/
+             * `_Myval.id`/`_Left`/`_Right` on the confirmed real caller
+             * chain below), 24-byte node, 8-byte value. Allocates via
+             * `FUN_0089B1A0(1u)` -- the scaled/checked
+             * `allocator<node_type>::allocate(size_t)` shape (`if
+             * (0xFFFFFFFF/n < sizeof(node_type)) throw bad_alloc; return
+             * operator new(sizeof(node_type)*n);`, here always called with
+             * n=1) rather than this member's plain `alloc_raw()` call --
+             * this `std::map` instantiation routes through its own
+             * `_Alnode` allocator instead of a direct `operator new`, an
+             * instantiation-specific compile choice, not a different
+             * operation. Then sets Left/Parent/Right/value/Color(red)/
+             * Isnil(false) exactly as this member does. Chain to solid
+             * ground: `FUN_00898A50` (`std::map<EntId,UserEntity*>::
+             * insert`, IDA-typed) calls `FUN_00899490` (`[[maybe_unused]]`,
+             * `insert_at`-shaped) which calls this token. Owning field not
+             * yet pinned down -- best address-locality lead is
+             * `Moho::CWldSession` (this cluster's addresses, 0x88F000-
+             * 0x89C000, sit inside `CWldSession.cpp`'s own address range,
+             * e.g. `LookupEntityId`@0x894280/`AddEntity`@0x894140), but
+             * `mSaveSourceTreeHead` is already a different, independently
+             * recovered 28-byte `SessionEntityMapNode` tree -- this must be
+             * a second, not-yet-named `EntId->UserEntity*` field.
+             *
+             * Address: 0x00948CC0 (FUN_00948CC0, sub_948CC0) -- a second,
+             * unrelated `<int32, pointer>`-keyed instantiation's
+             * `_Buynode`, 24-byte node, allocated via a direct inline
+             * `operator new(0x18)` (no scaled allocator this time) then
+             * Left/Parent/Right/value/Color/Isnil set the same way. Chain:
+             * `FUN_00948ED0` (`[[maybe_unused]]`, `insert_at`-shaped, length
+             * check + buy + link + red-black rebalance using the byte-at-
+             * +20 Color) calls this token; reached from `FUN_009494A0`
+             * (insert descent) and a 7-call-site cluster inside
+             * `FUN_009496E0`, a much higher call volume than the EntId map
+             * above, suggesting a hot per-entity or per-frame map. Not
+             * `EntityDB::mIdPoolTree` (that instantiation's insert
+             * machinery is already separately cited on `erase_node`/
+             * `buy_node` elsewhere in this file, `EntityDb.h:428-437`).
+             * Owning class not yet pinned down.
+             *
+             * Address: 0x006B0200 (FUN_006B0200, sub_6B0200) -- `msvc8::
+             * map<msvc8::string, float>::buy_node` -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D.
+             * Allocates one 48-byte node via `sub_6B1420` (the already-
+             * recovered checked 48-byte allocation lane), links `left`/
+             * `parent`/`right` directly to the caller-supplied `head`/
+             * `where` values (the binary fuses this member's placeholder
+             * `head_` links with `link_and_rebalance`'s subsequent
+             * `fresh->parent = where` write, the same optimisation
+             * `FUN_0083C260`'s citation above documents -- same final
+             * observable state, no behavioural difference), placement-
+             * constructs the `pair<const msvc8::string, float>` value via
+             * `std::string::assign` for the key and a value slot at
+             * node+0x28 sourced from the caller's `const value_type&`
+             * (IDA mistypes the parameter `std::string*`, reading the
+             * trailing `float` via a same-object offset -- the value_type
+             * pair is one contiguous object, key first), then sets
+             * `color=red(0)`/`isNil=0` at +0x2C/+0x2D. Matches this member
+             * exactly. Sole caller is `insert_at`'s emission for this
+             * instantiation (`FUN_006AFA40`, cited above). Previously
+             * mis-tracked `external_dependency` ("all-external-callees
+             * thunk... no engine references"); this is a real engine-
+             * instantiated `msvc8::map` node buy for `Unit`'s own armor
+             * data, not third-party/generic runtime (DB-integrity fix, the
+             * same correction already applied to `FUN_0083BC50`/
+             * `FUN_00580510` above).
+             *
+             * Address: 0x007114F0 (FUN_007114F0, sub_7114F0) -- a
+             * `moho::CArmyStats`-owned tree's `buy_node` for a 4-byte
+             * `uint32_t` value_type (`CArmyStats.cpp`): allocates via
+             * `sub_712A70(1u)` (the checked scaled node allocator), sets
+             * Left/Parent/Right/value (18 logical bytes, value copied by
+             * dereferencing the caller's pointer arg) then
+             * `color=0`(red)/`isNil=0` at +16/+17. Matches this member
+             * exactly. Sole caller is `insert_at`'s emission for this
+             * instantiation (`FUN_00710030`, cited below).
+             *
+             * Address: 0x007E6090 (FUN_007E6090) -- `msvc8::map<MeshKey,
+             * boost::weak_ptr<Mesh>>::buy_node` for `moho::
+             * MeshRendererMeshCacheTree` (`Mesh.h`/`Mesh.cpp`; the same
+             * instantiation whose `~value_type()` is cited 0x007E5850 on
+             * `free_node` above). Allocates via `alloc_raw()`'s sibling
+             * emission (`sub_7E56B0`, cited above on `alloc_raw`), then
+             * writes Left/Parent/Right directly to the caller-supplied
+             * `head`/`where` values (`a1`/`a2`/`a3`, all three passed in by
+             * its sole caller rather than defaulted to `head_` here -- the
+             * "binary fuses the placeholder link-init with `link_and_
+             * rebalance`'s later overwrite" optimisation is not present in
+             * this emission; final observable state is identical either
+             * way, matching `FUN_006B0200`'s note above for the same
+             * family of variants), copy-constructs the `MeshRendererMesh
+             * CacheEntry` value in place (`sub_7E6180`, matches this
+             * member's `::new (...) value_type(args...)` when `Args` is a
+             * single `const value_type&` -- see `MeshKey::MeshKey(const
+             * MeshKey&)`/`boost::weak_ptr<Mesh>`'s own copy ctors, which
+             * this emission's manual field-copy-plus-refcount-bump fuses
+             * into one out-of-line body instead of calling out to either),
+             * then sets `color=0`(red)/`isNil=0` at +0x24/+0x25. Matches
+             * this member exactly. Sole caller is this instantiation's
+             * `insert_at`/`link_and_rebalance` emission (0x007E5DF0, cited
+             * below), called once from the descent orchestrator
+             * (0x007E5B20, cited on `insert_unique` below).
+             * `Mesh.cpp`'s `CreateMeshCacheNode` is the current recovered
+             * source for this shape -- generalised over this member's own
+             * split-vs-fused difference by taking `left`/`parent`/`right`
+             * and `color`/`isSentinel` as explicit parameters, so the same
+             * function also covers the sentinel-node emission (0x007E4770,
+             * cited on `buy_head` below) rather than needing a second
+             * concrete copy. Not yet routed through this template.
+             */
+            /**
+             * Address: 0x004DCC90 (FUN_004DCC90, sub_4DCC90) --
+             * `msvc8::set<msvc8::string>::buy_node` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`).
+             * Allocates via `alloc_raw`'s emission for this instantiation
+             * (`FUN_004DE060`, cited above), writes `left`/`parent`/`right`
+             * directly to the caller-supplied values (all three passed in
+             * by its sole caller rather than defaulted to `head_` here --
+             * the same "binary fuses the placeholder link-init with `link_
+             * and_rebalance`'s later overwrite" optimisation-not-taken shape
+             * documented on `FUN_007E6090` above), constructs the
+             * `msvc8::string` value via `std::string::assign` from the
+             * caller's `const char*`, then sets `color`/`isNil` from the
+             * caller-supplied values (matching `Args&&...` forwarding a
+             * `(left, parent, right, name, color)` tuple rather than this
+             * member's own `(const value_type&)` single-arg form -- the
+             * source-level call this recovers is `insert_at`'s own
+             * `buy_node(std::forward<Args>(args)...)`, which for
+             * `insert_unique(v)`'s `insert_at(addLeft, where, v)` forwards
+             * just `v`; this emission additionally forwards the resolved
+             * `left`/`parent`/`right`/`color` the caller (`insert_at`) had
+             * already computed, an inlining variant already documented for
+             * other instantiations in this file). Sole caller is this
+             * instantiation's `insert_at` emission (`FUN_004DBE30`, cited
+             * above). Was previously duplicated as `ConstructPausedCategoryNode`
+             * (`AudioEngine.cpp`, deleted by this migration).
+             */
+            /**
+             * Address: 0x004DD8F0 (FUN_004DD8F0, sub_4DD8F0) -- `msvc8::map<
+             * std::uint16_t, float>::buy_node` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Allocates
+             * directly via `func_newS6N(1)` (`FUN_004DE120`, cited on
+             * `alloc_raw` below) rather than through the two-layer
+             * `alloc_raw`-half wrapper `buy_head` uses for this
+             * instantiation's sentinel -- the "different call depth to the
+             * same checked allocator depending on which caller needs it"
+             * shape already documented elsewhere in this file. Writes
+             * `left`/`parent`/`right` directly to the caller-supplied values
+             * (all three passed in by its sole caller, `insert_at`, rather
+             * than defaulted to `head_` here -- same "buy_node-fuses-the-
+             * link" optimisation-not-taken shape documented on
+             * `FUN_007B3660`/`FUN_007E5DF0`/`FUN_004DBE30`'s own `buy_node`
+             * citations above); copies the 8-byte `pair<const uint16_t,
+             * float>` value as one raw dword-pair blob (`result[3]=*a1;
+             * result[4]=a1[1];`, POD copy, no constructor call needed);
+             * `color=0` (red), `isNil=0`. Sole caller is this instantiation's
+             * `insert_at` emission (`FUN_004DCF90`, cited above). Was
+             * previously duplicated as `ConstructCategoryVolumeNode`
+             * (`AudioEngine.cpp`, deleted by this migration).
+             * Address: 0x0056FE40 (FUN_0056FE40 -- `_Buynode` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): allocates the 68-byte node and copy-constructs the `pair<const EntId, SUnitOffsetInfo>` (relinking the value's `mUnit` weak link).)
+             * Address: 0x00686FE0 (FUN_00686FE0 -- `_Buynode` for a 24-byte node (12-byte key/value payload); callers 0x00686190; formerly `AllocatePriorityQueueNode24Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005A1450 (FUN_005A1450 -- `_Buynode` for a 24-byte node (second instantiation); callers 0x005A1050; formerly `AllocatePriorityQueueNode24RuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C300 (FUN_0071C300 -- `_Buynode` + value construction for the influence map node; callers 0x0071AB80, 0x0071C9A0; formerly `AllocateInfluenceNodeAndInitRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00530D30 (FUN_00530D30 -- `_Buynode` with null links for the rule tree node; callers 0x00529120, 0x0052C480, 0x0052D4B0; formerly `AllocateRuleTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00703A10 (FUN_00703A10 -- `_Buynode` with null links for the army-stats tree node; callers 0x006FD7C0, 0x00701540, 0x00702020; formerly `AllocateArmyStatsTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00711EE0 (FUN_00711EE0 -- `_Buynode` with null links for a compact tree node; callers 0x0070CC40, 0x0070EFC0, 0x00710000; formerly `AllocateCompactTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0076A2E0 (FUN_0076A2E0 -- `_Buynode` copying a `{int, int, float[7]}` value; callers 0x007692F0, 0x00769B00, 0x00769E20; formerly `AllocateFloatPayloadNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077CAA0 (FUN_0077CAA0 -- `_Buynode` with null links for the decal-buffer tree node; callers 0x00779170, 0x0077A220, 0x0077AEF0; formerly `AllocateDecalBufferTreeNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049ECD0 (FUN_0049ECD0 -- `_Buynode(value)` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049D430, 0x0049DA30, 0x004A08D0; formerly `AllocateParticleBucketTreeEntryNodeArrayOrThrow` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049ED20 (FUN_0049ED20 -- `_Buynode(value)` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049D880, 0x0049DB00, 0x004A0920; formerly `AllocateTrailBucketTreeEntryNodeArrayOrThrow` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DBC0 (FUN_0049DBC0 -- `_Buynode(value)` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeEntryNodeWithLinksAndPayload` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DBF0 (FUN_0049DBF0 -- `_Buynode(value)` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeTrailBucketTreeEntryNodeWithLinksAndPayload` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D430 (FUN_0049D430 -- `_Buynode(value)` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049C7A0; formerly `AllocateParticleBucketTreeEntryNodeWithLinks` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D880 (FUN_0049D880 -- `_Buynode(value)` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049CAF0; formerly `AllocateTrailBucketTreeEntryNodeWithLinks` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A08D0 (FUN_004A08D0 -- `_Buynode(value)` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x004925E0, 0x004963A0, 0x00498190; formerly `AllocateParticleBucketTreeNodeWithNullLinksBlack` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004A0920 (FUN_004A0920 -- `_Buynode(value)` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x004925E0, 0x00496550, 0x00498440; formerly `AllocateTrailBucketTreeNodeWithNullLinksBlack` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DA30 (FUN_0049DA30 -- `_Buynode`'s raw storage allocation for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `AllocateSingleParticleBucketTreeNodeStorage` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049DB00 (FUN_0049DB00 -- `_Buynode`'s raw storage allocation for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `AllocateSingleTrailBucketTreeNodeStorage` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A030 (FUN_0049A030 -- `_Buynode(left, parent, right)` -- links bound, value default-constructed for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00497840; formerly `AllocateBeamBucketTreeEntryNodeWithLinks` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CFD0 (FUN_0049CFD0 -- the node value's copy construction inside `_Buynode(value)` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049A030, 0x0049CF20; formerly `CopyBeamTextureBucketEntryPayload` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CF20 (FUN_0049CF20 -- `_Buynode(left, parent, right, value)` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamBucketTreeEntryNodeWithEntryCopy` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00495CC0 (FUN_00495CC0 -- the `pair<const Key, mapped_type>` construction inside `_Buynode(value)` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `InitializeBeamTextureBucketEntry` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE460 (FUN_004AE460 -- the allocate-then-construct half of that same `_Buynode` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AD5E0; formerly `AllocatePrefetchRequestTreeNode_004AE460` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE1F0 (FUN_004AE1F0 -- `_Buynode(value)` -- links bound, the key/mapped pair copied in for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AD230; formerly `AllocateTreeNodeFromPair_004AE1F0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AED80 (FUN_004AED80 -- `_Buynode(links, value)` -- the node's `ResourceRecord` built in place from the key for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE460; formerly `InitializePrefetchRequestWideNode_004AED80` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F1890 (FUN_007F1890 -- `_Buynode` for that insert -- descend to the insertion point, then allocate and link the fresh node for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F0960; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
+             * Address: 0x007D8EC0 (FUN_007D8EC0 -- `_Buynode(links, value)` -- the key copied into the fresh node for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8200; formerly `AllocateRegionKeyTreeNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C8840 (FUN_005C8840 -- `_Buynode(links, value)` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C7430; formerly `AllocateMapNode` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF620 (FUN_008AF620 -- `_Buynode(next, prev, value)` for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, the entity id at node+0x0C, colour/nil at +0x10/+0x11); callers 0x008AEF00, 0x008AFA10; formerly `CreateEntityLoopTreeNodeFromLinks` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C4E0 (FUN_0071C4E0 -- `_Buynode(links, value)` -- the cell index copied into the fresh node for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, the 8-byte cell index at node+0x0C, colour/nil at +0x14/+0x15); callers 0x0071B510; formerly `AllocateBlipCellTreeNode` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DFA0 (FUN_0045DFA0 -- the allocate-then-construct half of that `_Buynode`, with the free-on-throw guard for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CED0; formerly `CreateFileInfoMapNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045E420 (FUN_0045E420 -- `_Buynode(left, parent, right, value)` -- links, then the key assigned in place and the record copied for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045DFA0; formerly `InitializeFileInfoMapNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045E1B0 (FUN_0045E1B0 -- `_Buynode(left, parent, right, value)` for the archive index for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x0045C940; formerly `InitializeZipEntryMapNode` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F0DD0 (FUN_007F0DD0 -- the fresh node's `pair<const std::string, SRangeRenderProfile>` copy -- key assigned in place, then the profile for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EFD00; formerly `CopyRangeProfileMapInsertSeed` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046E6D0 (FUN_0046E6D0 -- `_Buynode(left, parent, right, value)` -- the key assigned in place, then the index for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046DEE0; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00465060 (FUN_00465060 -- `_Buynode(left, parent, right, value)` -- the key assigned in place, then the watcher pointer for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00464470; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A0C50 (FUN_005A0C50 -- the fresh node's `pair<const std::uint32_t, RUnitBlueprint*>` build for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `BuildRebuildMapKeyValueLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00505D60 (FUN_00505D60 -- `_Buynode(left, parent, right, value)` -- the 0x38 node through `_Allocate` 0x00506330, the three links, the 0x28 entry copied in, colour red, not nil, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); callers 0x005052F0; formerly `AllocateSpatialMapValueNode` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x0071C8B0 (FUN_0071C8B0 -- the node construction inside 0x0071C300's `_Buynode(left, parent, right, value, color)` for `msvc8::map<unsigned int, moho::InfluenceMapEntry>` (`InfluenceGrid::entries`; the 0x30 `pair<const unsigned int, InfluenceMapEntry>` copied member-wise to node+0x0C, colour@+0x3C, isNil@+0x3D cleared): usercall node=EAX, left=EDX, &value=ECX, parent/right/colour on the stack, `ret 0xC`; sole caller 0x0071C300, reached from `_Copy` 0x0071C9A0; formerly `BuildThreatLaneRecordRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+             * Address: 0x008229E0 (FUN_008229E0 -- `_Buynode(parent, value)` for the `WeakSet<moho::UserUnit>::Entry` set: 0x1C from the checked allocator 0x007B4FA0, then 0x00822AB0; caller `_Insert` 0x00822670.)
+             * Address: 0x00822AB0 (FUN_00822AB0 -- that node's construction: links, the `Entry` copy (its `WeakPtr` pushed onto the unit's chain at 0x00822ACA), colour and nil cleared.)
+             * Address: 0x007B06F0 (FUN_007B06F0 -- `_Buynode` with a copied value for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19); callers the clone walk 0x00867EE0 and 0x007AF800.)
+             * Address: 0x007B09E0 (FUN_007B09E0 -- that node's construction for the clone; caller 0x007B06F0.)
+             */
+            [[nodiscard]] node_type* buy_node(Args&&... args)
+            {
+                node_type* const n = alloc_raw();
+                n->left = head_;
+                n->parent = head_;
+                n->right = head_;
+                n->color = kRbRed;
+                n->isNil = 0;
+                try {
+                    ::new (static_cast<void*>(std::addressof(n->value))) value_type(std::forward<Args>(args)...);
+                } catch (...) {
+                    free_raw(n);
+                    throw;
+                }
+                return n;
+            }
+
+            /**
+             * Address: 0x0077C6F0 (FUN_0077C6F0, the decal tree node delete lane;
+             * emitted again at 0x0077CF50)
+             * Address: 0x0077CF50 (FUN_0077CF50, sibling emission of the decal tree
+             * node delete lane described above)
+             * Address: 0x007E5850 (FUN_007E5850, `value_type::~value_type()` for the
+             * mesh-key map -- `moho::MeshRendererMeshCacheEntry` in
+             * `moho/mesh/Mesh.h`, `_Isnil` at +0x25 (`sizeof(value_type)` == 0x18,
+             * matching `0x0D + 0x18`). Reached from that map's `erase_node`
+             * (0x007E4430) and `destroy_subtree` (0x007E4DD0), both already cited
+             * above as sibling emissions.
+             *
+             * The two members are torn down in reverse declaration order, exactly
+             * matching a plain `~MeshRendererMeshCacheEntry()`:
+             *   - first, the second-declared member's boost control-block pointer
+             *     at value+0x14 (`[esi+0x14]`) is released with a lone
+             *     `weak_count_` decrement (value+0x14+0x08) followed by a single
+             *     dispatch through vtable slot +0x08 (`destroy()`) -- there is no
+             *     `use_count_` touch and no `dispose()` call anywhere in that
+             *     block. That is `boost::detail::sp_counted_base::weak_release()`
+             *     (see `BoostWrappers.h`'s `weak_release()` and the
+             *     0x00446FC0/FUN_004229B0 audit note there), not a shared-owner
+             *     release. `Mesh.h` currently types that member
+             *     `boost::shared_ptr<Mesh>`, which would compile to a two-step
+             *     use_count_-then-weak_count_ release (the shape `~MeshKey`
+             *     itself shows below) -- this emission proves the shipped field is
+             *     `boost::weak_ptr<Mesh>` instead. Retyped
+             *     (`MeshRendererMeshCacheEntry::mesh`, `Mesh.h`); `FindOrCreateMesh`
+             *     (0x007E5280) now locks the weak entry on a cache hit and falls
+             *     through to construct-and-refresh on a miss or an expired lock,
+             *     matching FUN_007E5900's real behavior.
+             *   - second, the first-declared member (`MeshKey`) is released
+             *     in-line with the exact same vtable-restore-plus-shared_ptr-
+             *     release body as `Moho::MeshKey::~MeshKey` (0x007DAF60):
+             *     `this->__vftable = &MeshKey::vftable`, then the two-step
+             *     use_count_/weak_count_ release of `meshMaterial`'s control
+             *     block. MSVC inlines the base's destructor body here rather
+             *     than calling 0x007DAF60, which is why 0x007DAF60 shows only as
+             *     a data ref from this function's SEH unwind funclet
+             *     (`mov ecx,[ebp+4]; jmp ??1MeshKey@Moho@@UAE@XZ`), not as a
+             *     direct call.
+             */
+            /**
+             * Address: 0x0082BEE0 (FUN_0082BEE0, `value_type::~value_type()`
+             * for `Moho::UICommandGraph::mGraph` --
+             * `pair<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`,
+             * isNil@+0x25. Inlined ahead of `operator delete(node)` in the
+             * `erase_node` emission FUN_0082FD50 (cited above) rather than
+             * called out-of-line as a separate `free_node` body -- the
+             * generic `n->value.~value_type()` this member already performs
+             * covers it. Tears the second-declared member (the
+             * `vector<CommandGraphEdge*>`) down first: frees its buffer with
+             * `operator delete` when non-null and zeroes the three
+             * begin/end/capacity words, then releases the first-declared
+             * `shared_ptr<CD3DBatchTexture>`'s control block with the same
+             * interlocked use-count/weak-count decrement and vtable
+             * `dispose()`/`destroy()` dispatch pair documented for
+             * `sp_counted_base::release()` elsewhere in this codebase (see
+             * `BoostWrappers.h`'s `weak_release()`/`release()` note and the
+             * 0x004229B0 audit). Members are torn down in reverse
+             * declaration order, matching a plain compiler-generated
+             * `~pair()` -- there is no hand-written source for this
+             * function; it is the implicit destructor MSVC emits for the
+             * pair once `shared_ptr<T>` and `vector<U*>` are recovered
+             * types, exactly like the mesh-key map's 0x007E5850 sibling
+             * above.)
+             * Address: 0x0049F3C0 (FUN_0049F3C0 -- the node's value destructor before `_Freenode` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `DestroyParticleBucketNodeMappedBucketIfPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049F420 (FUN_0049F420 -- the node's value destructor before `_Freenode` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `DestroyTrailBucketNodeMappedBucketIfPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00492200 (FUN_00492200 -- the node value's destructor (`~vector` plus the two retained texture handles) before `_Freenode` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540, 0x00497800, 0x0049A104; formerly `DestroyBeamTextureBucketEntry` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             */
+            static void free_node(node_type* const n) noexcept
+            {
+                n->value.~value_type();
+                free_raw(n);
+            }
+
+            /**
+             * Address: 0x0089A820 (FUN_0089A820, `_Erase`)
+             * Address: 0x007E4DD0 (FUN_007E4DD0, sibling emission)
+             * Address: 0x007E34E0 (FUN_007E34E0, sibling emission)
+             *
+             * 0x0089A820 is the session save-node map (`_Isnil` at +0x2D),
+             * 0x007E4DD0 the mesh-key map (`_Isnil` at +0x25) and 0x007E34E0 the
+             * batch-bucket map (`_Isnil` at +0x2D) - the annotated IDB names that
+             * last one `std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`,
+             * which is a `_Tree::_Erase`, not a separate container operation.
+             *
+             * IDA signature:
+             * void __stdcall sub_89A820(_Node *rootNode);
+             *
+             * What it does:
+             * Destroys every node of the subtree rooted at `rootNode`.
+             *
+             * MSVC8 recurses on `_Right` only and unrolls the `_Left` descent into
+             * the enclosing loop, destroying the node visited on the *previous*
+             * turn - all three emissions show that exact shape (`call <self>` on
+             * `[node+8]`, `node = [node]`, then the inlined value destructor plus
+             * `operator delete` on the carried-over pointer). Recursing on both
+             * children would destroy the same set of nodes but is not what the
+             * shipped code does, and it doubles the stack depth on left spines.
+             */
+            /**
+             * Address: 0x0052CCF0 (FUN_0052CCF0, the whole-subtree destroy for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`. Reached from `FUN_0052D9C0`
+             * (`erase_range`, cited above) with the root
+             * (`_Myhead->_Parent`) when `erase_range`'s whole-tree fast path
+             * is taken, matching the other three sibling emissions' shape.)
+             * Address: 0x00592C00 (FUN_00592C00, the whole-subtree destroy for
+             * `CArmyStatItem::mBlueprintStats` -- 8-byte value_type, isNil
+             * confirmed at +0x15 (0x0D + 8). Reached from `clear()`
+             * (0x00592230, cited above) via `CArmyStatItem::~CArmyStatItem`
+             * at 0x00585C39.)
+             * Address: 0x00531490 (FUN_00531490, the whole-subtree destroy for
+             * `RRuleGameRulesImpl`'s seven blueprint maps -- `RRuleGameRulesBlueprintMap`
+             * = `msvc8::map<msvc8::string, void*>` (`moho/sim/RRuleGameRules.h`),
+             * isNil confirmed at +0x2D (0x0D + sizeof(pair<string(28), void*(4)>) = 0x2D).
+             * The recursed-into left/right lanes match this shape exactly, and the
+             * per-node teardown additionally frees the key's heap SSO buffer when
+             * `_Myres >= 0x10` before resetting `_Myres=0xF`/`_Mysize=0`/first SSO
+             * byte and `operator delete`-ing the node -- the `msvc8::string`
+             * destructor inlined ahead of `free_node`'s node release, exactly like
+             * the mesh-key map's `value_type::~value_type()` inlining documented on
+             * `free_node` below. Reached from `erase_range`'s (`FUN_0052E510`)
+             * whole-tree fast path, itself reached implicitly: `mUnitBlueprints`,
+             * `mProjectileBlueprints`, `mPropBlueprints`, `mMeshBlueprints`,
+             * `mEmitterBlueprints`, `mBeamBlueprints` and `mTrailBlueprints` are
+             * direct-value members of `RRuleGameRulesImpl` (`RRuleGameRules.h`), so
+             * `~RRuleGameRulesImpl()`'s implicit member teardown -- documented in
+             * that destructor's own comment as "each map's destructor frees its own
+             * nodes and sentinel head... open-coded seven times" -- instantiates
+             * `msvc8::map<msvc8::string, void*>::~map()` for each one, which is
+             * this `clear()`/`destroy_subtree` pair. No hand-written call site is
+             * needed beyond the member declarations already in `RRuleGameRules.h`.)
+             * Address: 0x007B4D10 (FUN_007B4D10, whole-subtree destroy for an
+             * `msvc8::set<std::uint32_t>` instantiation -- isNil@+0x11
+             * (0x0D + sizeof(std::uint32_t) = 0x11), plain 4-byte value with no
+             * heap-owning member, matching a bare `operator delete(node)` release
+             * with no inlined value-dtor work. Owning field not yet pinned to a
+             * specific class (multiple owners share this exact node shape, e.g.
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` at the
+             * unrelated address 0x0052CCF0 above); reached from `erase_range`'s
+             * (`FUN_007B3E00`, cited below) whole-tree fast path, itself called
+             * directly (`call sub_7B3E00`, hardcoded) from three call sites
+             * sharing this instantiation's `~rb_tree()` shape --
+             * `FUN_007B2940`/`FUN_007B2970` (SEH-unwind funclets for
+             * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>::
+             * operator[]`'s `value_type(k, mapped_type())` temporaries,
+             * cited on `~rb_tree()` above) and `FUN_007B36A0` (the copy
+             * constructor's exception-cleanup, cited on `rb_tree(const
+             * rb_tree&)` above).
+             *
+             * RESOLVED: these three were previously modeled as bespoke
+             * "destroy-and-reconstruct" free functions in
+             * `moho/sim/SimRecoveryRuntime.cpp`
+             * (`ClearTreeStorageLaneC21Runtime`/
+             * `ClearEmbeddedSecondaryTreeLaneRuntime`/
+             * `ClearTreeStorageLaneD21Runtime`), each explicitly destroying
+             * then placement-new reconstructing its owner lane -- a shape
+             * copied from `RRuleGameRulesLuaExportBinding::
+             * mPendingBlueprintOrdinals`'s former `ReleaseExportBindingPendingOrdinals`
+             * (RRuleGameRules.cpp) precedent that turned out to be a
+             * mis-model (`FUN_0052A390` is a plain destructor with no
+             * reconstruction step, per its own citation above; the
+             * reconstruct-after-destroy shape was an artifact of a
+             * hand-rolled array owner since migrated to a real
+             * `msvc8::vector<T>`). Re-verified directly against each of
+             * these three addresses' own `.asm`: all three are
+             * `erase_range`+`operator delete(head)`+zero-`head_`/`size_`
+             * only -- no `operator new` call, no reconstruction, in any of
+             * the three bodies. The three free functions were deleted; they
+             * are cited on `~rb_tree()`/`rb_tree(const rb_tree&)` above
+             * instead, which also documents their real callers
+             * (`FUN_007B27D0`'s `operator[]` and `FUN_007B3500`'s copy
+             * constructor respectively) -- they are no longer unwired.)
+             */
+            /**
+             * Address: 0x00688030 (FUN_00688030, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Erase` -- `EntityDB::mIdPoolTree` in
+             * `EntityDb.h`. Reached two ways: from this member's own `clear()`
+             * (cited above) during `EntityDbIdPoolMapTypeInfo::SerLoad`'s
+             * clear-before-repopulate step (binary:
+             * `std::map_IdPool::Deserialize`, FUN_00686990), and from
+             * `~rb_tree()` (cited above) during `EntityDB`'s destructor.
+             * Confirmed the true argument is `head->parent` (root), not
+             * `head->left` (leftmost) -- see the `~rb_tree()` citation's note
+             * on the bug that distinction fixes.)
+             */
+            /**
+             * Address: 0x006E2990 (FUN_006E2990, the command-id map's
+             * subtree destroy -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`, isNil@+0x15. Self-recursive on the right
+             * child (`sub_6E2990(v2[2])`) then loops down the left chain
+             * (`v2 = *v2`) deleting each node as it goes -- exactly this
+             * member's recurse-right/iterate-left shape. Confirmed the
+             * owning instantiation via its sole non-recursive caller:
+             * `erase_range`'s emission for this map (FUN_006E22D0, cited
+             * above) calls it on the whole-tree fast path. Previously
+             * marked `skip` in `recovered_progress.json` pending this
+             * migration -- see `CCommandDb.cpp`'s history for the
+             * hand-rolled `CommandDbMapNodeRuntime` tree this address used
+             * to be (incorrectly) associated with.)
+             * Address: 0x00947120 (FUN_00947120, isNil@+0x15 -- the same
+             * 8-byte value_type node shape as 0x006E2990 above, but reached
+             * from a different subsystem (`CScApp`'s vtable neighbourhood,
+             * not `CCommandDB`), so this is a distinct `map`/`set`
+             * instantiation with a matching layout rather than the same
+             * field. Same recurse-right/iterate-left/`free_node` shape
+             * (`call sub_947120` on `[node+8]`, `node=[node]`, delete the
+             * carried-over pointer). Owner now pinned down: this member's
+             * two non-recursive callers, `sub_947290` (`clear()`, cited
+             * above) and `sub_947C50` (`erase_range`, cited above), are both
+             * recovered as `gpg::gal::StateCache<_D3DSAMPLERSTATETYPE,
+             * unsigned int>::tree_`'s teardown -- `erase_range` reached from
+             * that class's own `~StateCache`/non-deleting-destructor lane in
+             * `StateCache.cpp` (real, confirmed callers), `clear()` from a
+             * still-unidentified sibling member sharing this same node shape
+             * (zero incoming references anywhere in the binary; see the
+             * `clear()` citation above). The tree-algorithm shape, node
+             * size, and the `StateCache<SamplerState>` half of the ownership
+             * are now confirmed; only the `clear()` caller's owning class
+             * remains open, matching the precedent set by the unidentified
+             * 0x00A5xxxx-0x00A67xxx rotate instantiation cited under
+             * `_Lrotate` below.)
+             * Address: 0x00947160 (FUN_00947160, sub_947160) -- the sibling
+             * emission for `gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,
+             * unsigned int>::tree_`, same isNil@+0x15, 8-byte-value shape.
+             * Three real callers (callgraph index + exhaustive PE byte-scan):
+             * itself (recursive, on the right child), `sub_9472C0`
+             * (`clear()`, cited above, unidentified sibling owner) and
+             * `sub_947D10` (`erase_range`, cited above, the confirmed
+             * `StateCache<TextureStageState>` destructor path).)
+             * Address: 0x009470E0 (FUN_009470E0, sub_9470E0) -- the fourth
+             * sibling in this address range: `gpg::gal::StateCache<
+             * d3d9::RenderState, unsigned int>::tree_`'s `destroy_subtree`.
+             * Same isNil@+0x15, 8-byte-value recurse-right/iterate-left/
+             * `operator delete` shape. Two real callers: itself (recursive)
+             * and `sub_947260` (an unidentified `clear()`-shaped sibling,
+             * mirroring `sub_947290`/`sub_9472C0` above but not itself
+             * re-verified in this pass) at 0x00947260, plus `sub_947B90`
+             * (`erase_range`, the confirmed `StateCache<RenderState>`
+             * destructor path -- see that citation above, which already
+             * documents this exact call). Corrects a stale DB-integrity
+             * revert that had flipped this token to `blocked` citing a
+             * `CrtRuntimeHelpers.cpp` source path the address never
+             * appeared in; the real source is this member, exactly as the
+             * existing 0x00947B90 citation already described before this
+             * pass gave the token its own address line.)
+             */
+            /**
+             * Address: 0x00505EC0 (FUN_00505EC0, whole-subtree destroy for an
+             * unidentified `msvc8::map`/`msvc8::set` instantiation with a
+             * 40-byte value_type -- isNil@+0x35 (0x0D + 0x28 = 0x35).
+             * Recurses on the right child (`sub_505EC0(v2[2])`) then
+             * iterates down the left chain (`v2 = *v2`), matching this
+             * method's recurse-right/iterate-left shape exactly; no inlined
+             * value-destructor work precedes `operator delete`, so the
+             * 40-byte value is trivially destructible (same bare-delete
+             * shape as FUN_007B4D10 above). Reached from `FUN_00505200`
+             * (`EraseSpatialMapRange`, `Mesh.cpp`)'s whole-tree fast path
+             * and from an unclassified code chunk at 0x00505CFC; owning
+             * member not yet pinned down.)
+             */
+            /**
+             * Address: 0x005317D0 (FUN_005317D0, whole-subtree destroy for
+             * another `msvc8::map<msvc8::string, void*>` instantiation --
+             * 32-byte value_type (28-byte string key + 4-byte pointer
+             * value), isNil@+0x2D (0x0D + sizeof(pair<string(28),
+             * void*(4)>) = 0x2D), the identical shape and formula to
+             * FUN_00531490's `RRuleGameRulesImpl` blueprint-map citation
+             * above: per node, frees the key's heap SSO buffer when
+             * `_Myres >= 0x10` (`operator delete((void*)v1[4])`), resets
+             * `_Myres=0xF`/`_Mysize=0`/the first SSO byte, then `operator
+             * delete`s the node. Recurses right (`sub_5317D0(i[2])`) and
+             * iterates left (`i = *i`), matching this method's shape
+             * exactly. Distinct COMDAT from FUN_00531490 (a different
+             * address, not ICF-folded), so this is either a coincidentally
+             * identical sibling `map<string, void*>` member elsewhere or a
+             * second instantiation the linker left unfolded; owning member
+             * not yet pinned down. Reached from FUN_0052E8B0 (`erase_range`,
+             * itself blocked pending this token's recovery) and an
+             * unclassified code chunk at 0x0053091C.)
+             * Address: 0x007B4AA0 (FUN_007B4AA0, sub_7B4AA0) -- the outer
+             * per-parent-bone dedup map's own `destroy_subtree`
+             * (`CON_ANI_DumpSkeleton` cluster, isNil@+0x1D, same
+             * instantiation as `erase_node`/`FUN_007B4040` and
+             * `erase_range`/`FUN_007B3820` above), reached from
+             * `FUN_007B3820`'s whole-tree fast path. Per node: recurses
+             * right, iterates left, tears down the embedded per-parent
+             * `msvc8::set<uint32_t>` child-set value via `sub_7B3E00`
+             * (already-cited `erase_range` for that nested instantiation)
+             * before freeing the node -- correcting a prior mis-
+             * classification as `external_dependency` (this is genuine
+             * engine-instantiated tree teardown, not CRT/imported code).
+             * `Moho::CON_ANI_DumpSkeleton` itself (CAniSkel.cpp) remains
+             * unrecovered.)
+             *
+             * Address: 0x008D6B70 (FUN_008D6B70, sub_8D6B70) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's own
+             * `destroy_subtree` (isNil@+29). Per node: recurses right
+             * (`sub_8D6B70(i[2])`), iterates left, writes
+             * `Resolution::\`vftable'` into the node's vtable slot before
+             * `operator delete` -- matching this member's shape exactly and
+             * confirming genuine engine-instantiated teardown (a direct
+             * `Resolution::\`vftable'` reference cannot be CRT code).
+             * Reached from this instantiation's `erase_range`
+             * (`FUN_008D6080`, cited above) whole-range fast path.
+             *
+             * Address: 0x00712090 (FUN_00712090, sub_712090) -- the local
+             * `blueprintKeys` variable's `destroy_subtree` in `Moho::
+             * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
+             * RBlueprint*>`, isNil@+0x11 -- the same
+             * instantiation cited on `erase_range` above as
+             * `FUN_00711350`). Plain `operator delete` per node, no
+             * vtable write (the pointer value_type needs none). Reached
+             * from that `erase_range`'s whole-range fast path.
+             *
+             * Address: 0x0077CFE0 (FUN_0077CFE0, sub_77CFE0) -- CDecalBuffer's
+             * start-tick outer table's `destroy_subtree` (`std::map<
+             * unsigned, std::set<CDecalHandle*>>`, isNil@+29, the same
+             * instantiation cited on `erase_range` above as
+             * `FUN_0077BD90`). Per node: recurses right, iterates left,
+             * tears down the nested `std::set<CDecalHandle*>` value via
+             * `sub_77B4F0` before freeing the node. Reached from that
+             * `erase_range`'s whole-range fast path.
+             *
+             * Address: 0x009470E0 (FUN_009470E0, sub_9470E0) --
+             * `gpg::gal::StateCache<_D3DRENDERSTATETYPE, unsigned int>::
+             * tree_`'s `destroy_subtree`, isNil@+0x15 -- plain
+             * `operator delete` per node (pointer-free value_type, no
+             * vtable/nested-container teardown needed), matching the shape
+             * `erase_range`'s citation above (`FUN_00947B90`) already
+             * described in prose as "recursive delete-all with no
+             * rebalancing" without its own Address block. Reached from
+             * that same `erase_range`'s whole-tree fast path.
+             *
+             * Address: 0x005369D0 (FUN_005369D0, sub_5369D0) -- the
+             * category-lookup map's `destroy_subtree`, `msvc8::map<
+             * msvc8::string, moho::CategoryLookupValue>`,
+             * `RRuleGameRulesImpl::mEntityCategoryLookup`'s
+             * `EntityCategoryLookupTable::mCategoryMap`
+             * (RRuleGameRules.h/.cpp). Recurse-right-then-iterate-left shape
+             * matching this member exactly; per node, tears down the value's
+             * inline-SBO bit-vector (`_Myval.helper.second.mSet.mUsed`,
+             * `EntityCategorySet`'s own heap-release when it grew past
+             * the SBO) and the key's capacity (`_Myval.helper.first`,
+             * `msvc8::string`'s own release) before `operator delete`ing the
+             * node -- both inlined directly by the compiler rather than
+             * calling separate `~EntityCategorySet`/`~string` symbols,
+             * confirmed against the raw decompile (IDA's own `helper`
+             * struct naming is this instantiation's `pair<const
+             * msvc8::string, EntityCategorySet>` value_type, `.first`
+             * the key / `.second` the value). This member's generic
+             * `n->value.~value_type()` in `free_node` (called by
+             * `erase_node` above, not by this member directly -- see that
+             * member's own body) reproduces the identical net effect through
+             * the type system rather than by hand. Called with a sentinel
+             * (`isNil` head) node this is a no-op, which is what this
+             * instantiation's default-constructed `mCategoryMap` (and this
+             * type's constructor, which calls `clear()` on the
+             * freshly-built empty tree -- cited on `clear()` below) relies
+             * on. Reached from this instantiation's `erase_range`
+             * (`FUN_00535750`, cited below) whole-tree fast path. Re-homed
+             * here from a hand-rolled `DestroyCategoryLookupSubtree` free
+             * function in RRuleGameRules.cpp that recursed over a
+             * deleted overlay*` reach-in instead of calling
+             * it.)
+             *
+             * Address: 0x004E45E0 (FUN_004E45E0, sub_4E45E0) -- `destroy_subtree`
+             * for one of the sound subsystem's three rb-tree caches
+             * (`gSndParamsHashCache` @ 0x010A9288 and
+             * `gSharedAmbientLoopsByParams` @ 0x010A92A0 in
+             * `moho/audio/CSndParams.cpp`, `gSndVarNameCache` @ 0x010A9294 in
+             * `moho/audio/CSndVar.cpp`; the exact one of the three is not
+             * pinned down in this pass). `void __stdcall(node)`
+             * recursing right (`sub_4E45E0(node->right)`) then walking left
+             * with `operator delete` per node, matching this member's
+             * recurse-right/iterate-left shape exactly; `isNil` tested at
+             * `+0x15` (matching `FUN_004E31F0`'s `buy_node` citation above,
+             * an 8-byte value_type). Reached from this instantiation's
+             * `erase_range`/`clear` emission (`FUN_004E2C80`), reached in
+             * turn from the run's destructor group (0x004DF0E0), which is
+             * compiler-generated and has no source of its own -- the tree's
+             * definition in `moho/audio/CSndParams.cpp` is what emits it. Cited here so it is not mistaken
+             * for an orphan.
+             * Address: 0x004E4690 (FUN_004E4690, sub_4E4690) -- byte-distinct
+             * sibling emission of the same `destroy_subtree` shape (differs
+             * only in its own embedded self-recursive call target, so not an
+             * ICF twin) for a second one of the three sound-cache trees.
+             * Reached from `FUN_004E3020`, part of the same elided
+             * `TeardownSoundStructs` cluster.)
+             *
+             * Address: 0x007CB080 (FUN_007CB080, sub_7CB080) -- `msvc8::
+             * set<char>`'s `destroy_subtree`, the same `CLobby.cpp`
+             * ignore-names separator-set instantiation cited on
+             * `alloc_raw`/`copy_from`/`~rb_tree`/`erase_range` above (node
+             * 0x10, isNil@0x0E for this 1-byte `char` value_type). Recurses
+             * right (`sub_7CB080(node->right)`) then walks left with
+             * `operator delete` per node, matching this member's recurse-
+             * right/iterate-left shape exactly. Sole caller is
+             * `FUN_007CA730` (`erase_range`, cited above)'s whole-tree
+             * fast path. DB-integrity fix: this token was marked `blocked`
+             * citing a `CrtRuntimeHelpers.cpp` source path the address
+             * never appeared in; this is the real source.
+             *
+             * Address: 0x004E4530 (FUN_004E4530, sub_4E4530) --
+             * `sSndParamsCache`'s (`gSndParamsHashCache` @ 0x010A9288 in
+             * `moho/audio/CSndParams.cpp`) own `destroy_subtree` -- the third of this file's three
+             * sSndParamsCache-family addresses (see 0x004E45E0/0x004E4690
+             * above for the other two sibling caches); confirmed by its
+             * caller `FUN_004E3A30`, which names `sSndParamsCache.
+             * _Myfirstiter`/`._Myhead` directly and calls this token on
+             * `sSndParamsCache._Myfirstiter->_Mynextiter` -- unambiguously
+             * this specific tree's teardown, not one of the other two.
+             * Recurse-right/iterate-left shape matches this member exactly.
+             * Reached the same way as its siblings, through the run's
+             * compiler-generated destructor group (0x004DF0E0) -- cited here
+             * so it is not mistaken for an orphan.
+             *
+             * Address: 0x006AEF60 (FUN_006AEF60, sub_6AEF60) -- `msvc8::
+             * map<msvc8::string, float>::destroy_subtree` -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D.
+             * Recurse-right-then-iterate-left shape matching this member
+             * exactly: `for (i = node; !isNil; i = left) { destroy_subtree
+             * (right); if (key.capacity >= 0x10) operator delete(key.ptr);
+             * operator delete(i); }` -- the leading capacity check/free is
+             * `msvc8::string`'s own non-SSO buffer release for the 28-byte
+             * key at node+0x0C, inlined directly by the compiler rather
+             * than calling a separate `~string()` symbol (the same "value's
+             * own teardown inlined into destroy_subtree" pattern the
+             * category-lookup map's citation above documents for its
+             * `msvc8::string` key half). This member's generic `n->value.
+             * ~value_type()` in `free_node` (called by `erase_node`, not by
+             * this member directly) reproduces the identical net effect
+             * through the type system. Sole caller is `~rb_tree()`'s
+             * emission for this instantiation (`FUN_006A5380`, cited
+             * above) via `head_->parent` (root). Re-homed here from a
+             * hand-rolled `DestroyArmorMultiplierMapSubtree` free function
+             * in `Unit.cpp` that walked a `SArmorMultiplierMapNode*`
+             * reach-in and called `.tidy(true, 0u)` on the key by hand
+             * instead of relying on this member's own recursive teardown.
+             *
+             * Address: 0x00856F30 (FUN_00856F30, sub_856F30) -- the same
+             * `mPreviewPositions` instantiation's `destroy_subtree`:
+             * recurse-right (`sub_856F30(i[2])`) then walk left with
+             * `operator delete` per node, additionally releasing the
+             * `boost::shared_ptr<MeshInstance>` value's dual strong/weak
+             * refcount (`_InterlockedExchangeAdd` on each, virtual
+             * dispose/destroy through the control-block vtable when a
+             * count reaches zero) before the delete -- exactly what this
+             * member's generic `n->value.~value_type()` (via `free_node`)
+             * compiles to for a `shared_ptr` value. Sole caller is
+             * `erase_range`'s fast whole-tree path for this instantiation
+             * (`FUN_008564E0`, cited above).
+             *
+             * Address: 0x008A8720 (FUN_008A8720, sub_8A8720) -- `msvc8::map<
+             * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
+             * destroy_subtree` -- `Moho::CWldTerrainRes::mEnvLookup`, isNil@
+             * +0x4D (same instantiation cited on `insert_hint`/`erase_range`
+             * above). Recursive right-then-iterate-left post-order sweep,
+             * one plain `delete` per node (the `TerrainEnvironmentLookupEntry`
+             * value's `boost::shared_ptr<RD3DTextureResource>` release runs
+             * through the node's implicit destructor, matching this
+             * member's `n->value.~value_type()`/`free_node`) -- matches
+             * field for field. Two real callers (superseded): the deleted
+             * hand-rolled `DeleteTerrainEnvironmentSubtreePostOrder`'s own
+             * two call sites -- `ClearEnvLookup`'s whole-subtree sweep (now
+             * `mEnvLookup.clear()`, which calls this member directly, see
+             * `clear()` below) and `EraseTerrainEnvironmentNodeRange`'s
+             * fast whole-tree path (now `erase_range`'s fast path above,
+             * which reaches this member indirectly through `clear()`).
+             */
+            /**
+             * Address: 0x00849CB0 (FUN_00849CB0 -- `destroy_subtree` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_range` 0x00849670's whole-tree fast path.)
+             * Address: 0x004DD320 (FUN_004DD320, sub_4DD320) --
+             * `msvc8::set<msvc8::string>::destroy_subtree` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`).
+             * Matches this member's iterative-left-spine/recurse-right shape
+             * exactly: `for (n=rootNode; !isNil(n); rootNode=n) { destroy_
+             * subtree(n->right); n=n->left; free_node(rootNode); }`, with
+             * `free_node`'s `msvc8::string` teardown (free the heap buffer
+             * when `_Myres >= 0x10`) plus `operator delete` inlined directly
+             * rather than calling a separate `free_node` symbol -- the same
+             * "value's own teardown inlined into `destroy_subtree`" pattern
+             * documented on `Unit::ArmorMultipliers`' own `msvc8::string`-
+             * keyed instantiation above. Sole real caller is `erase_range`'s
+             * emission (`FUN_004DBD30`, cited above) via its whole-tree fast
+             * path. Was previously duplicated as `DestroyMap1Subtree`
+             * (`AudioEngine.cpp`, deleted by this migration) -- that free
+             * function used a fully dual-recursive shape (`destroy(left);
+             * destroy(right); delete self;`) rather than this member's
+             * iterative-left-spine form; both destroy every node exactly
+             * once and are output-equivalent, but only this member's shape
+             * is what the compiler actually emitted at this address.
+             *
+             * Address: 0x004DDB00 (FUN_004DDB00, sub_4DDB00) -- `msvc8::map<
+             * std::uint16_t, float>::destroy_subtree` -- `Moho::
+             * AudioEngineImpl::mCategoryVolumes` (`AudioEngine.h`), isNil@
+             * +0x15. Matches this member's iterative-left-spine/recurse-right
+             * shape exactly: `for (n=rootNode; !isNil(n); rootNode=n) {
+             * destroy_subtree(n->right); n=n->left; operator delete(rootNode);
+             * }` -- this instantiation's `float` value carries no destructor
+             * to run, so `free_node` degenerates to a plain `operator
+             * delete`, matching the emission exactly. Sole real caller is
+             * `erase_range`'s emission for this instantiation (`FUN_004DCEA0`,
+             * cited above) via its whole-tree fast path. Was previously
+             * duplicated as `DestroyCategoryMapSubtree` (`AudioEngine.cpp`,
+             * deleted by this migration) -- like `mPausedCategoryNames`'s
+             * sibling, that free function used a fully dual-recursive shape
+             * (`destroy(left); destroy(right); delete self;`) rather than
+             * this member's iterative-left-spine form; both destroy every
+             * node exactly once and are output-equivalent, but only this
+             * member's shape is what the compiler actually emitted here too.
+             * Address: 0x0056CE70 (FUN_0056CE70, sub_56CE70 -- `_Erase` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): destroys each node's `SUnitOffsetInfo` (unlinking its `mUnit`) and frees it; reached from `clear()` in `SOffsetInfo::SOffsetInfo` and the map serializer, and from `erase_range`'s full-range path.)
+             * Address: 0x0056D8E0 (FUN_0056D8E0, sub_56D8E0 -- `_Erase` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the `clear()` in `CFormationInstance::ClearSlotCaches`.)
+             * Address: 0x00530FA0 (FUN_00530FA0 -- `_Erase(root)` for the rule tree (each node's string value destroyed); callers 0x0052DF70, 0x0052F6DC, 0x007035F0; formerly `DestroyRuleTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005812C0 (FUN_005812C0 -- `_Erase(root)` for a tree whose nodes hold two weak links (each node's `~WeakPtr` unlinks its chain; nil byte at node+0x25); callers 0x0057F480, 0x00580600, 0x005806CC; formerly `DestroyLinkedTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00703C30 (FUN_00703C30 -- `_Erase(root)` for the army-stats tree (each node's string value destroyed); callers 0x00702A70, 0x007039EC, 0x00710460; formerly `DestroyArmyStatsTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0077CC20 (FUN_0077CC20 -- `_Erase(root)` for a compact tree (nil byte at node+0x1D); callers 0x0077B4F0, 0x0077C520, 0x0077D090; formerly `DestroyCompactTreeNodeRecursiveRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049E150 (FUN_0049E150 -- `_Erase(root)` (the recursive teardown) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x00494E10, 0x00496430, 0x004964DA; formerly `DestroyParticleBucketPayloadRange` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049E290 (FUN_0049E290 -- `_Erase(root)` (the recursive teardown) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x00494E10, 0x004965E0, 0x0049668A; formerly `DestroyTrailBucketPayloadRange` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A970 (FUN_0049A970 -- `_Erase(root)` (the recursive teardown) for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x00494E10, 0x004964E8, 0x0049837C; formerly `DestroyParticleBucketKeyNodeSubtreeOnly` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049AC10 (FUN_0049AC10 -- `_Erase(root)` (the recursive teardown) for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x00494E10, 0x00496698, 0x0049862C; formerly `DestroyTrailBucketKeyNodeSubtreeOnly` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00497800 (FUN_00497800 -- `_Erase(root)` -- the recursive teardown for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049151F, 0x00492E30, 0x00494E10; formerly `DestroyBeamBucketTreeSubtree` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEDE0 (FUN_004AEDE0 -- `_Erase(root)` -- the recursive teardown for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AE0D0, 0x004AE7CC; formerly `DestroyTreeNodeSubtree_004AEDE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AEE40 (FUN_004AEE40 -- `_Erase(root)` -- the recursive teardown for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AE2B0, 0x004AEB2C; formerly `DestroyWideTreeNodeSubtree_004AEE40` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F2FA0 (FUN_007F2FA0 -- `_Erase(root)` -- the recursive teardown, freeing each key string before the node for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F2AC0; formerly `DestroyBlueprintExtractorTreeNodesRecursive` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D81C0 (FUN_007D81C0 -- `_Erase(root)` -- the recursive teardown, each key destroyed before its node for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D63A0, 0x007D7BFC, 0x007D80D0; formerly `DestroyRegionKeySubtree` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5BE0 (FUN_005C5BE0 -- `_Erase(root)` -- the recursive teardown for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C0370, 0x005C4860, 0x005C492C; formerly `DestroyReconMapSubtree` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AEEC0 (FUN_008AEEC0 -- `_Erase(root)` -- the recursive teardown for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, the entity id at node+0x0C, colour/nil at +0x10/+0x11); callers 0x008AA650, 0x008AC0B0, 0x008AE94C; formerly `DestroyEntityLoopTree` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E49A0 (FUN_004E49A0 -- the in-order walk that tears down each node's detached chain before the tree goes for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004DF0E0; formerly `DestroyDetachedSndVarChainsForTreeRange` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DDB0 (FUN_0045DDB0 -- `_Erase` for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045BFD0, 0x0045CE6C; formerly `DestroyFileInfoSubtreeNodes` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0045E280 (FUN_0045E280 -- `_Erase` -- the recursive right/iterative left teardown for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x0045C800, 0x0045DCFC; formerly `DestroyZipSubtreeNodes` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007F2E60 (FUN_007F2E60 -- `_Erase` -- the recursive right/iterative left teardown for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007F1120, 0x007F25CC; formerly `DestroyRangeProfileNodesRecursive` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046ED30 (FUN_0046ED30 -- `_Erase` -- recursive right, iterative left, releasing each key's buffer for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E4C0, 0x0046EB7C; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00465650 (FUN_00465650 -- `_Erase` -- recursive right, iterative left, releasing each key's buffer for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00464F20, 0x0046545C; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x005A0A00 (FUN_005A0A00 -- `_Erase` -- the recursive subtree teardown for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F710, 0x0059F9C0, 0x005A03DC; formerly `DestroyRebuildTree` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00736390 (FUN_00736390 -- `_Erase` -- recursive right, iterative left, releasing each key's buffer for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007357C0, 0x00736020; formerly cited on `GetSimConCommandRegistry`'s doc block in moho/sim/CSimConCommand.cpp instead of on the member (RULE ONE), moved 2026-09-11.)
+             * Address: 0x004249A0 (FUN_004249A0 -- `destroy_subtree` -- the recursive node teardown `clear()` runs, tidying each key string before freeing the node for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004247A0; formerly `ClearAnimTextureCacheNodes` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x007B0870 (FUN_007B0870 -- `_Erase(root)` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19), each node's `~Entry` unlinking its `WeakPtr`; the whole-tree `clear` inlined in `IdleUnitSelector::OnEvent` 0x00865562, `ClearExtraSelectList` 0x008968A1 and the dragger's bracket clears.)
+             * Address: 0x007B45E0 (FUN_007B45E0 -- the same for the `WeakSet<moho::UserUnit>::Entry` set; `CFormation::Reset` 0x008380E0 and `GetEntitiesUnderCursor` 0x008B4427.)
+             */
+            void destroy_subtree(node_type* rootNode) noexcept
+            {
+                for (node_type* n = rootNode; !rb_is_nil(n); rootNode = n) {
+                    destroy_subtree(n->right);
+                    n = n->left;
+                    free_node(rootNode);
+                }
+            }
+
+            /**
+             * MSVC8 `_Tree::_Copy`. Observed for `msvc8::set<msvc8::string>` at
+             * FUN_008C5D50, reached from the copy constructor at 0x008C5B10.
+             *
+             * Walks `other` in ascending key order and re-inserts each value, so
+             * the destination ends up with the same ordered contents. Assumes the
+             * destination is empty, which both callers guarantee.
+             */
+            /**
+             * Address: 0x00530EE0 (FUN_00530EE0, `copy_from`'s emission for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * `msvc8::set<uint32_t>`, the same instantiation already pinned
+             * by `buy_head`/`erase_range`/`erase_node`/`destroy_subtree`/
+             * `~rb_tree`/the copy constructor above. Unlike this template's
+             * own `copy_from` (walk `other` ascending, `insert_unique` each
+             * value -- see the `msvc8::set<msvc8::string>` note above),
+             * this emission is the real MSVC8 `_Tree::_Copy` mechanism:
+             * reads `other`'s head pointer (`other_tree+4`), then that
+             * head's `_Parent` field -- i.e. `other.root()` -- and calls
+             * `sub_531B30` (cited immediately below) to recursively clone
+             * the whole subtree node-for-node, preserving `other`'s exact
+             * tree shape rather than rebuilding it through repeated
+             * inserts. Stores the cloned root at `this->head_->parent`,
+             * copies `_Mysize` across verbatim from `other`, then walks
+             * from the freshly-cloned root down its left-spine to find
+             * `leftmost()` and, separately, down its right-spine to find
+             * `rightmost()`, re-seating `header()->left`/`header()->right`
+             * (self-referential to `header()` in the empty-tree case).
+             * `this` arrives in `eax`; the source tree arrives in `ebx`,
+             * inherited un-set from the caller's own live register rather
+             * than passed as a normal argument -- both `FUN_0052F020`'s
+             * copy-constructor body and `FUN_00537420`'s inlined
+             * `operator=` set up `ebx` before falling into this call (the
+             * same register-heavy internal convention used elsewhere in
+             * this file). Called from `FUN_0052F020` (the copy
+             * constructor, cited above) and from `FUN_00537420`
+             * (`legacy/containers/Vector.h`'s `insert(pos,count,value)`
+             * in-place tail-shift loop, cited there) immediately after
+             * that caller's inlined `erase_range` (`sub_52D9C0`) empties
+             * the destination slot. Was previously mis-marked
+             * `external_dependency` citing a generic "RB-tree-shaped
+             * pointer-chasing helper" description and an (also wrong)
+             * `FUN_0052F020` external classification as justification;
+             * corrected here -- this is genuine, in-binary engine code
+             * with two independently-verified real callers, no
+             * `__imp_*`/CRT symbol anywhere in its body.)
+             * Address: 0x00531B30 (FUN_00531B30, the recursive per-node
+             * subtree clone underneath `FUN_00530EE0` -- MSVC8
+             * `_Tree::_Copy(_Nodeptr _Rootnode, _Nodeptr _Wherenode)`,
+             * `this` in `ecx`. Tests `_Rootnode->_Isnil` (`+0x11`); if nil,
+             * returns `_Wherenode` unchanged. Otherwise calls `sub_52DB50`
+             * (`buy_node`-with-value, already recovered/cited above) to
+             * allocate and copy-construct one new node carrying
+             * `_Rootnode`'s value and color, then recurses on
+             * `_Rootnode->_Left` and `_Rootnode->_Right` in turn (passing
+             * the new node as `_Wherenode`/parent for each), wiring the
+             * results into the new node's `_Left`/`_Right`. On exception
+             * it calls `sub_52CCF0` (`destroy_subtree`, already recovered/
+             * cited above) on the partially-built clone and rethrows --
+             * exactly this file's `destroy_subtree` used as the cleanup
+             * primitive it already is elsewhere. Sole caller is
+             * `FUN_00530EE0` above.)
+             *
+             * Address: 0x007CC3B0 (FUN_007CC3B0, sub_7CC3B0) -- the same
+             * recursive-clone `_Tree::_Copy` mechanism as `FUN_00530EE0`/
+             * `FUN_00531B30` above, for `msvc8::set<char>` (`CLobby.cpp`'s
+             * ignore-names separator set, node 0x10, colour@0x0D/isNil@
+             * 0x0E). `this` arrives in `eax`, the source tree in `ebx` --
+             * the same register-heavy convention already documented above.
+             * Clones `other`'s root via `sub_7CC470` (cited immediately
+             * below), stores it at `head_->parent`, copies `_Mysize`, then
+             * walks the cloned root's left-spine for `leftmost()` and
+             * right-spine for `rightmost()` (self-referential in the
+             * empty-tree case) -- field-for-field identical to this
+             * member's other cited recursive-clone instantiations. Sole
+             * caller is `FUN_007CC2F0` (the copy constructor, cited on
+             * `rb_tree(const rb_tree&)` above).
+             * Address: 0x007CC470 (FUN_007CC470, sub_7CC470) -- the
+             * recursive per-node subtree clone underneath `FUN_007CC3B0`,
+             * matching `FUN_00531B30`'s shape exactly: `this` in `ecx`,
+             * tests `_Rootnode->_Isnil` (`+0x0E` for this 1-byte-value
+             * instantiation), returns `_Wherenode` unchanged when nil,
+             * otherwise calls `sub_7CC580` (`buy_node`-with-value, already
+             * `recovered`) to allocate and copy-construct one new node
+             * carrying `_Rootnode`'s `char` value and colour, then recurses
+             * on `_Rootnode->_Left`/`_Rootnode->_Right` in turn, wiring the
+             * results into the new node's `_Left`/`_Right`. Sole caller is
+             * `FUN_007CC3B0` above (plus its own two self-recursive calls).
+             */
+            /**
+             * FLAGGED, not fixed in this pass: this member's real binary
+             * shape (multiple instantiations -- `FUN_00530EE0`/`FUN_007CC3B0`/
+             * `FUN_007B3EC0` above, each driving a recursive `_Copy(node,
+             * parent)` clone -- `FUN_00531B30`/`FUN_007CC470`/`FUN_007B4980`
+             * -- that allocates and copies each node in one recursive pass,
+             * then re-derives `leftmost()`/`rightmost()` from the cloned
+             * root) does not match the walk-and-`insert_unique` loop below.
+             * The two are behaviorally close (same final elements) but not
+             * identical: `insert_unique` re-runs full compare-and-rebalance
+             * per element instead of cloning the source's exact shape, and
+             * doesn't call through `_Copy` at all, so this body cannot be
+             * cited as a match for any of the three `_Copy`-driven addresses
+             * above. Found while wiring `FUN_007B36A0`'s copy-constructor
+             * caller (`rb_tree(const rb_tree&)` above) into real callers;
+             * out of scope for that task since fixing it properly means
+             * re-verifying `_Copy`'s recursive-clone shape against multiple
+             * separate instantiations first. Left as-is rather than guessed
+             * at; flagged for whoever picks up `FUN_00530EE0`/`FUN_007CC3B0`/
+             * `FUN_007B4980` next.
+             * Address: 0x0056EC00 (FUN_0056EC00 -- the tail of `_Copy` (root/size copied, leftmost/rightmost recomputed; nil byte at node+0x41); callers 0x0056CC50, 0x00573270, 0x00573390; formerly `CopyMapHeaderAndExtremaFlag65Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF580 (FUN_008AF580 -- `_Copy(right)` for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, colour/nil at +0x10/+0x11): the root cloned by the recursive node copy 0x008AFA10, the size taken over, then the leftmost and rightmost walks; caller the copy constructor 0x008AEE40. It was tagged `external_dependency`.)
+             * Address: 0x008AFA10 (FUN_008AFA10 -- the recursive node clone `_Copy(node, parent)` for the same set; caller 0x008AF580. It was tagged `external_dependency`.)
+             * Address: 0x00867B20 (FUN_00867B20 -- `_Copy(right)` for `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` (node 0x1C, the address at +0x0C, the `WeakPtr` at +0x10, isNil@+0x19): the root cloned by 0x00867EE0, the count taken over, leftmost and rightmost found; callers the assignment emissions 0x00865720/0x00865750/0x00867800, `IdleUnitSelector::CycleCameraFocus` 0x00865590, `SelectUnitsByCategory` 0x008662B0 and `CWldSession::SetSelection` 0x00896140.)
+             * Address: 0x00867EE0 (FUN_00867EE0 -- the recursive node clone `_Copy(node, parent)` for the same set; caller 0x00867B20.)
+             */
+            void copy_from(const rb_tree& other)
+            {
+                for (node_type* n = other.leftmost(); !rb_is_nil(n); n = rb_increment(n)) {
+                    (void)insert_unique(n->value);
+                }
+            }
+
+            void adopt_from(rb_tree& other) noexcept
+            {
+                proxy_ = other.proxy_;
+                head_ = other.head_;
+                size_ = other.size_;
+                other.proxy_ = nullptr;
+                other.head_ = buy_head();
+                other.size_ = 0;
+            }
+
+            // ---- structure ---------------------------------------------------
+
+            /**
+             * Address: 0x007E4AC0 (FUN_007E4AC0, batch-bucket map `_Lrotate`)
+             *
+             * What it does:
+             * Rotates `n`'s right child up into `n`'s slot, re-parenting the moved
+             * subtree and patching the header's root link when `n` was the root.
+             */
+            /**
+             * Address: 0x00592E50 (FUN_00592E50, the name-index map's left rotate)
+             *
+             * These belong to `std::map<std::string, CArmyStatItem*>` -- `CArmyStats::mNameIndex` -- whose node is 0x30. The colour/nil pair they rewrite sits at `[node+0x2C]`/`[node+0x2D]`, which is what separates them from the 0x18 blueprint-stat node in the same file.
+             */
+            /**
+             *
+             * An unidentified `map<int32_t, T>` instantiation somewhere in the
+             * 0x00A5xxxx-0x00A67xxx address neighbourhood (node layout: right@0,
+             * parent@+4, left@+8, colour/nil byte@+33, int32 key@+12 -- field
+             * order differs from the batch-bucket/name-index instantiations
+             * above, but the rotate algorithm is byte-identical). Reached from
+             * `insert_at`'s fixup loop (0x00A63950, matches this template's
+             * `link_and_rebalance` shape exactly: same `map/set<T> too long`
+             * throw, same buy-node-then-fixup structure) through a caller chain
+             * (0x00A656A0 -> 0x00A65D00 -> 0x00A66270 -> 0x00A666F0 -> ...) that
+             * was not traced to a named owning class in this pass -- the class
+             * itself is still unidentified, only the tree-algorithm shape is
+             * confirmed.
+             */
+            /**
+             * Address: 0x00498010 (FUN_00498010, the `std::set<STrailSegmentBuffer*>`
+             * instantiation behind `CWorldParticles`' trail-segment owner pool)
+             *
+             * Canonical token of an 8-way ICF group (byte-identical
+             * `function_sha256`, confirmed via `_callgraph_index.sqlite`'s
+             * `function_icf_twins` view): `FUN_0052DAB0`, `FUN_00711440`,
+             * `FUN_0077C5E0`, `FUN_007B3590`, `FUN_007CA140`, `FUN_0087BFB0`,
+             * `FUN_008AF0C0` -- all `skip`-tagged in `recovered_progress.json`
+             * as ICF twins of this token; any two nil@+0x11 rotate_left
+             * emissions with the same `{left,parent,right}` offsets compile
+             * to identical machine code regardless of `value_type`, which is
+             * why a `set<uint32_t>` and a `set<T*>` fold together here.
+             * `FUN_007B3590` is `Moho::ANI_DumpSkeleton`'s dedup-tree inner
+             * `msvc8::set<std::uint32_t>` rotate (`moho/animation/
+             * CAniSkel.cpp`, reached via `insert_at`'s `FUN_007B2B30` cited
+             * on that member below); independently register-traced against
+             * this member's C++ body and confirmed to match branch-for-
+             * branch.
+             */
+            /**
+             *
+             * Left-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
+             * colour/nil instantiations cited on `erase_node` above, reached
+             * from their rebalance-fixup loops (0x00A633D0/0x00A63690).
+             */
+            /**
+             * Address: 0x0077B0B0 (FUN_0077B0B0, the outer start-tick map)
+             * Address: 0x0077C5E0 (FUN_0077C5E0, the inner bucket set)
+             *
+             * CDecalBuffer's start-tick table is `std::map<unsigned, std::set<CDecalHandle*>>`, so each member is emitted twice -- once for the 0x20 outer node (colour/nil at +0x1C/+0x1D) and once for the 0x14 inner node (+0x10/+0x11).
+             */
+            /**
+             * Address: 0x00719690 (FUN_00719690, `InfluenceGrid::entries`'s
+             * left rotate. Reached from `EraseInfluenceEntryAndAdvance`'s
+             * `grid.entries.erase(current)` at CInfluenceMap.cpp via
+             * FUN_00717EF0, whose own IDA type inference names the node
+             * `std::map_uint_InfluenceMapEntry::_Node` -- i.e. the binary's
+             * container is `map<uint32_t, InfluenceMapEntry>` keyed by
+             * entityId, not the `msvc8::set<InfluenceMapEntry,
+             * InfluenceMapEntryLess>` the current `entries` field is typed
+             * as (isNil at +0x3D only lines up with a 4-byte key + 0x2C
+             * value node, 0x0C+4+0x2C=0x3C/0x3D, not a bare 0x2C value node
+             * at 0x38/0x39). The `entries` field type is a follow-up fix;
+             * this rotate citation is unaffected since it targets the real
+             * physical node regardless of the C++ container tag.)
+             */
+            /**
+             * Address: 0x007E4E10 (FUN_007E4E10, the mesh-key map's left
+             * rotate -- `_Isnil` at +0x25, same instantiation as the
+             * `erase_node` sibling emission 0x007E4DD0 cited above.)
+             */
+            /**
+             * Address: 0x0052DAB0 (FUN_0052DAB0, the left rotate for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`
+             * -- `msvc8::set<uint32_t>`, node 0x14, `_Isnil` at +0x11,
+             * standard field order (`left@0`/`parent@+4`/`right@+8`), unlike
+             * the swapped `[node+0x10]`/`[node+0x11]` instantiation cited
+             * above. Reached from `insert_at`'s fixup loop, 0x0052CD30.)
+             */
+            /**
+             * Address: 0x00830010 (FUN_00830010, `Moho::UICommandGraph::
+             * mGraph`'s left rotate -- isNil@+0x25, 0x18-byte
+             * value_type. Byte-identical ICF twin of the mesh-key map's left
+             * rotate (0x007E4E10 above) and of FUN_0044BF90/FUN_0057F160
+             * (unidentified same-layout instantiations, not traced to an
+             * owning class in this pass); this address specifically is
+             * confirmed `mGraph`'s via direct calls from both
+             * `insert_at`'s emission FUN_0082E320 and `erase_node`'s
+             * emission FUN_0082FD50, both cited above/below.)
+             */
+            /**
+             * Address: 0x006880A0 (FUN_006880A0, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Lrotate` -- `EntityDB::mIdPoolTree` in
+             * `EntityDb.h`. Byte-for-byte this member's shape (pivot =
+             * `n->right`; `pivot->left`'s `isNil` probed at its
+             * instantiation-specific offset `+0xCC9`, matching `IdPool`'s
+             * node layout cited on `buy_node` above). Reached from `insert_at`'s
+             * emission FUN_00687280's fixup loop, cited above.)
+             */
+            /**
+             * Address: 0x006E1F20 (FUN_006E1F20, the command-id map's left
+             * rotate -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15,
+             * standard field order. Reached from `insert_at`'s fixup loop
+             * (FUN_006E1D60, cited below) via a direct `call` within that
+             * same function. Byte-identical to `FUN_004AD3F0`
+             * (`recovered_progress.json` previously marked this address
+             * `skip` as an "ICF twin" of that address and stopped there --
+             * ICF folds identical bodies to *one* surviving address at link
+             * time, so two functions at genuinely different addresses, each
+             * with its own real caller, are two distinct emissions to
+             * recover, not one canonical body and a discardable duplicate;
+             * corrected to `recovered` here, matching how every other
+             * byte-identical rotate sibling in this file is handled, e.g.
+             * the mesh-key/`mGraph` pair cited on this member
+             * elsewhere.)
+             */
+            /**
+             * Address: 0x008B64C0 (FUN_008B64C0, `struct_CommandManager::
+             * FindDataFor`'s left rotate -- `msvc8::map<Moho::CmdId,
+             * Moho::UserCommandIssueHelper*>`, `CommandManager::mCommands` in
+             * `CommandManager.h`, isNil@+0x15, standard field order
+             * (`result = this->_Right; this->_Right = result->_Left; ...;
+             * result->_Left = this;`). Reached from `insert_at`'s emission
+             * FUN_008B6310's fixup loop, cited below. Re-homed here from a
+             * bespoke `RotateLeft` free function in Sim.cpp that hand-rolled
+             * this same rotation over a `CommandDbMapStorageView`/
+             * `CommandDbMapNodeView` reach-in instead of calling it.)
+             *
+             * Address: 0x00946D20 (FUN_00946D20, sub_946D20) -- `gpg::gal::
+             * StateCache<_D3DSAMPLERSTATETYPE, unsigned int>::tree_`'s left
+             * rotate, isNil@+0x15. This is the `sub_946D20` this
+             * instantiation's `erase_node` citation (`FUN_00947630` above)
+             * already names as one of its "own" rebalance helpers. Reached
+             * from `insert_at`'s fixup loop for this instantiation.
+             * Address: 0x00946D70 (FUN_00946D70, sub_946D70) -- `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * left rotate, isNil@+0x15, byte-identical shape to
+             * `FUN_00946D20` immediately above -- a sibling `StateCache`
+             * specialisation with its own distinct rotate helper address.
+             * Reached from `insert_at`'s fixup loop for this instantiation
+             * (`FUN_009478E0`'s `erase_node` citation above).
+             *
+             * Address: 0x008D61D0 (FUN_008D61D0, sub_8D61D0) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's left rotate
+             * (isNil@+29). Reached from both `insert_at`'s fixup loop and
+             * `erase_node`'s fixup loop (`FUN_008D6650`, cited above) for
+             * this same instantiation.
+             *
+             * Address: 0x0094FA60 (FUN_0094FA60, sub_94FA60) -- left rotate
+             * for the same "unidentified `msvc8::map<K,V>`/`msvc8::set<T>`
+             * instantiation with a 24-byte value_type" the `buy_node`
+             * catalog above documents at 0x00950430 -- standard
+             * `result=n->right; n->right=result->left; ...` shape, isNil
+             * check at `+37`(0x25). Reached from `insert_at`'s fixup loop
+             * (`FUN_009512B0`, cited on `buy_node` above) via a direct
+             * `call`. Previously reverted to `blocked` in a DB-integrity
+             * sweep after a batch worker mis-cited it against
+             * `CrtRuntimeHelpers.cpp` with a fabricated note; the real,
+             * correct home is this catalog.
+             *
+             * Three left rotates for the `RRuleGameRulesBlueprintMap`
+             * (`msvc8::map<msvc8::string, void*>`) family already
+             * documented on `buy_node` above (FUN_005358E0 and siblings) --
+             * isNil check at `+45`(0x2D), matching that family's node size:
+             *   - Address: 0x00531000 (FUN_00531000) -- reached from the
+             *     base blueprint-map `insert_at` bridge FUN_005349E0 (the
+             *     `map.insert(RRuleGameRulesBlueprintMap::value_type(...))`
+             *     call site in Sim.cpp, cited on `insert_unique` above).
+             *   - Address: 0x00531190 (FUN_00531190) -- T=RProjectileBlueprint;
+             *     reached from insert_at FUN_00534B90 (paired with the right
+             *     rotate FUN_00531220 on `rotate_right` below).
+             *   - Address: 0x005316A0 (FUN_005316A0) -- T=REmitterBlueprint's
+             *     map; reached from insert_at FUN_005350A0 (paired with the
+             *     right rotate FUN_00531710 on `rotate_right` below).
+             *
+             * Address: 0x00536A50 (FUN_00536A50, the category-lookup map's
+             * left rotate -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Matches this member
+             * exactly: `pivot=n->right; n->right=pivot->left; ...;
+             * pivot->left=n; n->parent=pivot;`, IDA's own naming tags it
+             * `_Tree::_Lrotate`. Reached from two independent fixup loops for
+             * this same instantiation -- `insert_at`'s emission (FUN_005565D0,
+             * cited above on that member) on the uncle-red rebalance path,
+             * and `erase_node`'s emission (FUN_00536010, cited below) on its
+             * post-erase black-height repair -- confirming this instantiation
+             * exercises both the insert-side and erase-side rebalance
+             * machinery at runtime, not just the compiled-but-dead erase
+             * path. Re-homed here from a hand-rolled
+             * `RotateCategoryLookupNodeLeft` free function in
+             * RRuleGameRules.cpp that rotated over a
+             * deleted overlay*`/`EntityCategoryLookupTable&`
+             * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x0083B4C0 (FUN_0083B4C0, sub_83B4C0) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s left rotate
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Matches this member exactly: `pivot=n->right;
+             * n->right=pivot->left; ...; pivot->left=n; n->parent=pivot;`.
+             * Reached from `insert_at`'s emission (`FUN_0083BDE0`, cited
+             * below) and `erase_node`'s emission (`FUN_0083AA70`, cited
+             * below), the same insert-side/erase-side dual-caller shape
+             * `rotate_left`'s other instantiations show throughout this
+             * file. Currently duplicated as a free-function template
+             * instantiation (`RotateOffset15TreeLeftViaSecondaryGlobalHead`)
+             * in `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src`; not consolidated in this pass
+             * (see the `header()` note above for why).)
+             */
+            /**
+             * Address: 0x007CB0C0 (FUN_007CB0C0, sub_7CB0C0) -- `msvc8::
+             * set<char>`'s left rotate, the same `CLobby.cpp` ignore-names
+             * separator-set instantiation cited on `alloc_raw`/`copy_from`/
+             * `~rb_tree`/`erase_range`/`destroy_subtree`/`rb_min` above
+             * (node 0x10, colour@0x0D/isNil@0x0E). IDA's own type recovery
+             * already names this instantiation's fields (`std::set_char::
+             * _Node`, `_Left`/`_Right`/`_Parent`/`_Isnil`/`_Myhead`) and the
+             * body is the textbook shape unmodified: `pivot=this->_Right;
+             * this->_Right=pivot->_Left; if(!pivot->_Left->_Isnil) pivot->
+             * _Left->_Parent=this; pivot->_Parent=this->_Parent; ...;
+             * pivot->_Left=this; this->_Parent=pivot;`, matching this
+             * member exactly. `this` (the node to rotate about) arrives in
+             * `ecx` (`__thiscall`); the sole caller's own decompile
+             * (`erase_node`'s `FUN_007CAC80`, cited below) renders the call
+             * as `sub_7CB0C0(a2)` with only the tree pointer visible --
+             * Hex-Rays failed to propagate the implicit `ecx` argument
+             * through the `erase_node` call site's function-pointer-style
+             * cast, but the real target node is unambiguous from the CLRS
+             * `RB-DELETE-FIXUP` shape: called 3x in `erase_node`'s fixup
+             * loop, twice on `parent` (the "x is left child, sibling red"
+             * case and the final rebalancing case) and once on the sibling
+             * `w` (the mirrored "x is right child" branch's case-3) --
+             * exactly the three `LEFT-ROTATE` call sites CLRS's algorithm
+             * makes, confirmed independently against this member's own
+             * unambiguous body, not just the caller's shape.
+             */
+            /**
+             * Address: 0x00849D40 (FUN_00849D40 -- `rotate_left` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_node` 0x00849900.)
+             * Address: 0x004DCBE0 (FUN_004DCBE0, sub_4DCBE0) --
+             * `msvc8::set<msvc8::string>::rotate_left` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29. `pivot=n->right; n->right=pivot->left; if(!pivot
+             * ->left->isNil) pivot->left->parent=n; pivot->parent=n->
+             * parent; if(n==root()) head_->parent=pivot; else if(n==n->
+             * parent->left) parent->left=pivot; else parent->right=pivot;
+             * pivot->left=n; n->parent=pivot;` -- matches this member
+             * exactly, `this` (`n`) arrives in `ecx`. Two real callers, both
+             * this instantiation's own emissions: `insert_at`'s
+             * `link_and_rebalance` fixup loop (`FUN_004DBE30`, cited above)
+             * on its two accepted uncle-black branches, and `erase_node`'s
+             * `erase_rebalance` fixup loop (`FUN_004DC850`, cited below) on
+             * its three CLRS `RB-DELETE-FIXUP` call sites. Was previously
+             * duplicated as `RotatePausedCategoryNodeLeft` (`AudioEngine.cpp`),
+             * a byte-for-byte-correct standalone reimplementation of this
+             * member that a prior pass in this session attempted to wire
+             * directly into a hand-corrected `InsertPausedCategoryName` --
+             * `container_lane_guard.py` correctly denied that fix (per-type
+             * rotate helpers duplicating this member's algorithm are exactly
+             * RULE ONE's forbidden shape); this citation, plus routing
+             * `AudioEngine::SetPaused` through `mPausedCategoryNames.insert()`
+             * (`insert_unique` above), is the real fix.
+             *
+             * Address: 0x004DD800 (FUN_004DD800, sub_4DD800) -- `msvc8::map<
+             * std::uint16_t, float>::rotate_left` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. `pivot=n->
+             * right; n->right=pivot->left; if(!pivot->left->isNil) pivot->
+             * left->parent=n; pivot->parent=n->parent; if(n==root()) head_->
+             * parent=pivot; else if(n==n->parent->left) parent->left=pivot;
+             * else parent->right=pivot; pivot->left=n; n->parent=pivot;` --
+             * matches this member exactly, `this` (`n`) arrives in `ecx`
+             * (`__thiscall`), the map/head pointer in the explicit second
+             * parameter. Two real callers, both this instantiation's own
+             * emissions: `insert_at`'s `link_and_rebalance` fixup loop
+             * (`FUN_004DCF90`, cited above) on its accepted uncle-black
+             * branches, and `erase_node`'s `erase_rebalance` fixup loop
+             * (`FUN_004DD510`, cited below) on its CLRS `RB-DELETE-FIXUP`
+             * call sites. Was previously duplicated as
+             * `RotateCategoryVolumeNodeLeft` (`AudioEngine.cpp`, deleted by
+             * this migration) -- unlike the insert side, that free function's
+             * own rotation logic was byte-for-byte correct (rotations carry
+             * no rebalancing decision of their own to get wrong); it was
+             * still a RULE ONE violation, a hand-rolled duplicate of this
+             * member reached through raw `mLeft`/`mParent`/`mRight` field
+             * access instead of a call to it, only ever invoked from the
+             * erase-fixup path (never from insert, which is the missing-
+             * rebalance bug `insert_hint`'s citation above documents).
+             * Address: 0x0056CEE0 (FUN_0056CEE0, sub_56CEE0 -- `_Lrotate` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
+             * Address: 0x0083B0F0 (FUN_0083B0F0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `rotate_left`; callers 0x0083A640, 0x0083B9E0; formerly `RotateOffset2DTreeLeftViaPrimaryGlobalHead` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0049D390 (FUN_0049D390 -- `_Lrotate` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049C7A0, 0x0049D0D0; formerly `RotateParticleBucketTreeLeft` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D7E0 (FUN_0049D7E0 -- `_Lrotate` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049CAF0, 0x0049D520; formerly `RotateTrailBucketTreeLeft` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00499F90 (FUN_00499F90 -- `_Lrotate` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00497840, 0x0049C1F0; formerly `RotateBeamBucketTreeLeft` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AD3F0 (FUN_004AD3F0 -- `_Lrotate` for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520, 0x004AD230; formerly `RotateSubtreeLeft` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE3B0 (FUN_004AE3B0 -- `_Lrotate` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AD5E0, 0x004AE860; formerly `RotateWideSubtreeLeft_004AE3B0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F2B00 (FUN_007F2B00 -- `_Lrotate` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1A70, 0x007F27F0; formerly `RotateBlueprintExtractorTreeNodeLeft` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D8E20 (FUN_007D8E20 -- `_Lrotate` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8200, 0x007D8AE0; formerly `RotateTreeLeft` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5C50 (FUN_005C5C50 -- `_Lrotate` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580, 0x005C7430; formerly `RotateLeft` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DE20 (FUN_0045DE20 -- `_Lrotate` for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CB80, 0x0045CED0; formerly `FileInfoMapRotateLeft` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046E620 (FUN_0046E620 -- `_Lrotate` for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046DEE0, 0x0046E890; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00464630 (FUN_00464630 -- `_Lrotate` for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463A70, 0x00464470; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00504C10 (FUN_00504C10 -- `_Lrotate` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x005043B0, 0x005052F0; formerly `SpatialMapRotateLeft` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00861660 (FUN_00861660 -- `rotate_left` for `msvc8::map<std::int32_t, moho::ProjectileArcTrack>` (moho/render/ProjectileArcRenderer.h's `ProjectileArcTable`, the function-local static at 0x010C4314: `{proxy, head 0x010C4318, size}`; pair 0xC3C, node 0xC4C, colour/nil at +0xC48/+0xC49); callers 0x008611A1, 0x0086120E, 0x0086128C, 0x00861BAB, 0x00861C24; formerly `RotateStrategicIconScratchTreeLeft` in moho/sim/CWldSession.cpp (RULE ONE), removed 2026-10-03.)
+             */
+            void rotate_left(node_type* const n) noexcept
+            {
+                node_type* const pivot = n->right;
+                n->right = pivot->left;
+                if (!rb_is_nil(pivot->left)) {
+                    pivot->left->parent = n;
+                }
+                pivot->parent = n->parent;
+
+                if (n == root()) {
+                    head_->parent = pivot;
+                } else if (n == n->parent->left) {
+                    n->parent->left = pivot;
+                } else {
+                    n->parent->right = pivot;
+                }
+
+                pivot->left = n;
+                n->parent = pivot;
+            }
+
+            /**
+             * Address: 0x007E4B30 (FUN_007E4B30, batch-bucket map `_Rrotate`)
+             *
+             * What it does:
+             * Mirror of `rotate_left`: lifts `n`'s left child into `n`'s slot.
+             */
+            /**
+             * Address: 0x00592EE0 (FUN_00592EE0, the name-index map's right rotate)
+             */
+            /**
+             * Address: 0x004980C0 (FUN_004980C0, the same set's right rotate)
+             *
+             * Canonical token of the mirrored 8-way ICF group (see
+             * `rotate_left`'s `0x00498010` entry above for the method):
+             * `FUN_0052DB00`, `FUN_007114A0`, `FUN_0077C640`, `FUN_007B3610`,
+             * `FUN_007CA190`, `FUN_0087C010`, `FUN_008AF170`. `FUN_007B3610`
+             * is `Moho::ANI_DumpSkeleton`'s dedup-tree inner `msvc8::
+             * set<std::uint32_t>` right rotate, same instantiation as
+             * `rotate_left`'s `FUN_007B3590` twin above.
+             */
+            /**
+             *
+             * Right-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
+             * colour/nil instantiations cited on `erase_node` above, reached
+             * from their rebalance-fixup loops (0x00A633D0/0x00A63690).
+             */
+            /**
+             * Address: 0x0077B160 (FUN_0077B160, outer map)
+             * Address: 0x0077C640 (FUN_0077C640, inner bucket set)
+             */
+            /**
+             * Address: 0x00719740 (FUN_00719740, `InfluenceGrid::entries`'s
+             * right rotate -- same instantiation as `rotate_left`'s
+             * 0x00719690 above; see that citation for the map<uint32_t,
+             * InfluenceMapEntry> vs. set<InfluenceMapEntry> node-typing note.)
+             */
+            /**
+             * Address: 0x007E4EA0 (FUN_007E4EA0, the mesh-key map's right
+             * rotate -- `_Isnil` at +0x25, sibling of `rotate_left`'s
+             * 0x007E4E10 above.)
+             */
+            /**
+             * Address: 0x0052DB00 (FUN_0052DB00, the right rotate for
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` --
+             * mirror of `rotate_left`'s 0x0052DAB0 above, same instantiation.)
+             */
+            /**
+             * Address: 0x00830080 (FUN_00830080, `Moho::UICommandGraph::
+             * mGraph`'s right rotate -- sibling of `rotate_left`'s
+             * 0x00830010 above, same map. Byte-identical ICF twin of the
+             * mesh-key map's right rotate (0x007E4EA0 above); confirmed via
+             * direct calls from `insert_at`'s emission FUN_0082E320 and
+             * `erase_node`'s emission FUN_0082FD50.)
+             */
+            /**
+             * Address: 0x00688120 (FUN_00688120, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Rrotate` -- `EntityDB::mIdPoolTree` in
+             * `EntityDb.h`. Mirror of `rotate_left`'s FUN_006880A0 above,
+             * same instantiation. Reached from `insert_at`'s emission
+             * FUN_00687280's fixup loop, cited above.)
+             */
+            /**
+             * Address: 0x006E1FD0 (FUN_006E1FD0, the command-id map's right
+             * rotate -- mirror of `rotate_left`'s FUN_006E1F20 above, same
+             * instantiation. Reached from `insert_at`'s fixup loop
+             * (FUN_006E1D60, cited below). Also byte-identical to a
+             * `resource/ResourceManager.cpp` rotate and previously marked
+             * `skip` as its "ICF twin" -- corrected to `recovered` here for
+             * the same reason given on `rotate_left`'s FUN_006E1F20 entry
+             * above: two distinct addresses, each with its own real caller,
+             * are two distinct emissions.)
+             */
+            /**
+             * Address: 0x008B6550 (FUN_008B6550, `struct_CommandManager::
+             * FindDataFor`'s right rotate -- `msvc8::map<Moho::CmdId,
+             * Moho::UserCommandIssueHelper*>`, `CommandManager::mCommands` in
+             * `CommandManager.h`. Mirror of `rotate_left`'s FUN_008B64C0
+             * above, same instantiation (`result = this->_Left; this->_Left =
+             * result->_Right; ...; result->_Right = this;`). Reached from
+             * `insert_at`'s emission FUN_008B6310's fixup loop, cited below.
+             * Re-homed here from a bespoke `RotateRight` free function in
+             * Sim.cpp that hand-rolled this same rotation over a
+             * `CommandDbMapStorageView`/`CommandDbMapNodeView` reach-in
+             * instead of calling it.)
+             *
+             * Address: 0x00946590 (FUN_00946590, sub_946590) -- `gpg::gal::
+             * StateCache<d3d9::RenderState, unsigned int>::tree_`'s right
+             * rotate, isNil@+0x15. One of the "own distinct rotate/min/max
+             * helper addresses" this instantiation's `erase_node` citation
+             * (`FUN_00947380` above) already names. Reached from `insert_at`'s
+             * fixup loop for this same instantiation.
+             * Address: 0x009466B0 (FUN_009466B0, sub_9466B0) -- `gpg::gal::
+             * StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int>::tree_`'s
+             * right rotate, isNil@+0x15, byte-identical shape to
+             * `FUN_00946590` immediately above -- a sibling `StateCache`
+             * specialisation with its own distinct rotate helper address.
+             * Reached from `insert_at`'s fixup loop for this instantiation
+             * (`FUN_009478E0`'s `erase_node` citation above).
+             *
+             * Address: 0x0094FC80 (FUN_0094FC80, sub_94FC80) --
+             * `std::map<const gpg::RType*, int>::tree_`'s right rotate
+             * (`WriteArchive::mRefCounts`, `WriteArchive.h`), isNil@+0x15,
+             * byte-identical shape to `FUN_00946590` above -- a sibling
+             * instantiation, not the same map: node allocation is cited at
+             * 0x00950540 (24 bytes, isNil@+0x15, `WriteArchive.cpp`'s ctor
+             * comment) matching this offset exactly, distinct from the
+             * *other* "24-byte value_type" map's isNil@+0x25 rotates
+             * (FUN_0094FA60/FUN_0094FAB0, cited on `rotate_left` above --
+             * same total node size, different key/value split, confirmed
+             * by the differing isNil offset, not the same instantiation).
+             * Reached from `_Insert`'s (`std::map_RType_int::_Insert`,
+             * 0x009515A0) rebalance fixup loop, itself reached from
+             * `insert`/`insert_0` (0x009525A0/0x00952180), reached from
+             * the real, recovered, source-invoked
+             * `WriteArchive::WriteRefCounts`'s `mRefCounts.insert(...)`
+             * call (`WriteArchive.cpp`). All three insert-path functions
+             * were wrongly marked `external_dependency` ("STL template
+             * instantiation / codec helper - external") -- corrected to
+             * `recovered`; `RType*` is an engine type, so this
+             * engine-instantiated `std::map` body stays in this binary
+             * per CLAUDE.md's non-external-STL-for-engine-types rule.
+             *
+             * Address: 0x008D6230 (FUN_008D6230, sub_8D6230) -- the local
+             * `msvc8::rb_tree<moho::Resolution>` dedup tree's right rotate
+             * (isNil@+29). Reached from both `insert_at`'s fixup loop and
+             * `erase_node`'s fixup loop (`FUN_008D6650`, cited above) for
+             * this same instantiation.
+             *
+             * Address: 0x0094FAB0 (FUN_0094FAB0, sub_94FAB0) -- right
+             * rotate, mirror of `rotate_left`'s FUN_0094FA60 above, same
+             * "unidentified 24-byte value_type" instantiation
+             * (`result=n->left; n->left=result->right; ...`), isNil check
+             * at `+37`. Reached from the same `insert_at` fixup loop
+             * (`FUN_009512B0`). A prior pass marked this `skip` reasoning
+             * that `FUN_009512B0` "does not actually appear anywhere in
+             * src" -- stale: `FUN_009512B0` is cited on the `buy_node`
+             * catalog above (added later in the same session). Corrected
+             * to `recovered` here.
+             *
+             * Four right rotates, same `RRuleGameRulesBlueprintMap` family
+             * as the three left rotates cited on `rotate_left` above,
+             * isNil@+45:
+             *   - Address: 0x00531220 (FUN_00531220) -- T=RProjectileBlueprint;
+             *     reached from insert_at FUN_00534B90 (paired with left
+             *     rotate FUN_00531190 above).
+             *   - Address: 0x005313D0 (FUN_005313D0) -- T=RPropBlueprint;
+             *     reached from insert_at FUN_00534D40.
+             *   - Address: 0x00531580 (FUN_00531580) -- T=RMeshBlueprint;
+             *     reached from insert_at FUN_00534EF0.
+             *   - Address: 0x00531710 (FUN_00531710) -- T=REmitterBlueprint's
+             *     map; reached from insert_at FUN_005350A0 (paired with left
+             *     rotate FUN_005316A0 above).
+             *
+             * Address: 0x00536AE0 (FUN_00536AE0, the category-lookup map's
+             * right rotate -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `RRuleGameRulesImpl::
+             * mEntityCategoryLookup`'s `EntityCategoryLookupTable::
+             * mCategoryMap` (RRuleGameRules.h/.cpp). Mirror of `rotate_left`'s
+             * 0x00536A50 above, same instantiation -- reached from the same
+             * two fixup loops (`insert_at`'s FUN_005565D0 and `erase_node`'s
+             * FUN_00536010, both cited above/below). Re-homed here from a
+             * hand-rolled `RotateCategoryLookupNodeRight` free function in
+             * RRuleGameRules.cpp that rotated over a
+             * deleted overlay*`/`EntityCategoryLookupTable&`
+             * reach-in instead of calling it.)
+             */
+            /**
+             * Address: 0x0083B570 (FUN_0083B570, sub_83B570) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>`'s right rotate
+             * -- `gUiKeyRepeatMap` (`moho/ui/UiRuntimeTypes.cpp:1395`),
+             * isNil@+0x15. Mirror of `rotate_left`'s `FUN_0083B4C0` above,
+             * same instantiation: `pivot=n->left; n->left=pivot->right;
+             * ...; pivot->right=n; n->parent=pivot;`. Reached from the same
+             * two fixup loops as `FUN_0083B4C0` -- `insert_at`'s emission
+             * (`FUN_0083BDE0`, cited below) and `erase_node`'s emission
+             * (`FUN_0083AA70`, cited below). Currently duplicated as a
+             * free-function template instantiation
+             * (`RotateOffset15TreeRightViaSecondaryGlobalHead`) in
+             * `moho/containers/LegacyContainerRuntime.cpp` with zero
+             * callers anywhere in `src`; not consolidated in this pass
+             * (see the `header()` note above for why).)
+             */
+            /**
+             * Address: 0x007CB170 (FUN_007CB170, sub_7CB170) -- `msvc8::
+             * set<char>`'s right rotate, mirror of `rotate_left`'s
+             * `FUN_007CB0C0` above, same `CLobby.cpp` ignore-names
+             * separator-set instantiation (node 0x10, colour@0x0D/isNil@
+             * 0x0E). Same IDA-recovered `std::set_char::_Node` typing as
+             * its mirror; body is the exact textbook mirror shape:
+             * `pivot=this->_Left; this->_Left=pivot->_Right; if(!pivot->
+             * _Right->_Isnil) pivot->_Right->_Parent=this; pivot->_Parent=
+             * this->_Parent; ...; pivot->_Right=this; this->_Parent=
+             * pivot;`, matching this member exactly. `this` arrives in
+             * `ecx`, same call-site rendering caveat as `FUN_007CB0C0`
+             * (`erase_node`'s decompile shows `sub_7CB170(a2)`, implicit
+             * `ecx` not propagated by Hex-Rays). Called 3x in `erase_node`'s
+             * (`FUN_007CAC80`, cited below) fixup loop: once on the sibling
+             * `w` (the "x is left child" branch's case-3) and twice on
+             * `parent` (the mirrored "x is right child, sibling red" case
+             * and its final rebalancing case) -- the exact three
+             * `RIGHT-ROTATE` call sites CLRS's `RB-DELETE-FIXUP` makes,
+             * confirmed independently against this member's own
+             * unambiguous body.
+             */
+            /**
+             * Address: 0x00849DB0 (FUN_00849DB0 -- `rotate_right` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_node` 0x00849900.)
+             * Address: 0x004DCC40 (FUN_004DCC40, sub_4DCC40) --
+             * `msvc8::set<msvc8::string>::rotate_right` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
+             * isNil@+0x29 (mirror of `rotate_left`'s 0x004DCBE0 above).
+             * `pivot=n->left; n->left=pivot->right; if(!pivot->right->isNil)
+             * pivot->right->parent=n; pivot->parent=n->parent; if(n==
+             * root()) head_->parent=pivot; else if(n==n->parent->right)
+             * parent->right=pivot; else parent->left=pivot; pivot->right=n;
+             * n->parent=pivot;` -- matches this member exactly. Same two
+             * real callers as `rotate_left` above: `insert_at`'s
+             * `link_and_rebalance` fixup loop (`FUN_004DBE30`) and
+             * `erase_node`'s `erase_rebalance` fixup loop (`FUN_004DC850`,
+             * cited below). Was previously duplicated as
+             * `RotatePausedCategoryNodeRight` (`AudioEngine.cpp`), the
+             * mirror half of the same denied bespoke-rotate-helpers fix
+             * attempt described on `rotate_left` above.
+             *
+             * Address: 0x004DD860 (FUN_004DD860, sub_4DD860) -- `msvc8::map<
+             * std::uint16_t, float>::rotate_right` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15 (mirror of
+             * `rotate_left`'s 0x004DD800 above). `pivot=n->left; n->left=
+             * pivot->right; if(!pivot->right->isNil) pivot->right->parent=n;
+             * pivot->parent=n->parent; if(n==root()) head_->parent=pivot;
+             * else if(n==n->parent->right) parent->right=pivot; else parent
+             * ->left=pivot; pivot->right=n; n->parent=pivot;` -- matches this
+             * member exactly. Same two real callers as `rotate_left` above:
+             * `insert_at`'s `link_and_rebalance` fixup loop (`FUN_004DCF90`)
+             * and `erase_node`'s `erase_rebalance` fixup loop (`FUN_004DD510`,
+             * cited below). Was previously duplicated as
+             * `RotateCategoryVolumeNodeRight` (`AudioEngine.cpp`, deleted by
+             * this migration), the mirror half of `RotateCategoryVolumeNodeLeft`
+             * described on `rotate_left` above -- also byte-for-byte correct,
+             * also only ever reached from the erase-fixup path.
+             * Address: 0x0056CF90 (FUN_0056CF90, sub_56CF90 -- `_Rrotate` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
+             * Address: 0x0083B1A0 (FUN_0083B1A0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `rotate_right`; callers 0x0083A640, 0x0083B9E0; formerly `RotateOffset2DTreeRightViaPrimaryGlobalHead` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0049D3E0 (FUN_0049D3E0 -- `_Rrotate` for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); callers 0x0049C7A0, 0x0049D0D0; formerly `RotateParticleBucketTreeRight` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D830 (FUN_0049D830 -- `_Rrotate` for `TrailBucketMap` (`msvc8::map<STrailBucketKey, STrailRenderBucket*>`, 0x50-byte node); callers 0x0049CAF0, 0x0049D520; formerly `RotateTrailBucketTreeRight` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00499FE0 (FUN_00499FE0 -- `_Rrotate` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00497840, 0x0049C1F0; formerly `RotateBeamBucketTreeRight` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AD4A0 (FUN_004AD4A0 -- `_Rrotate` for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC520, 0x004AD230; formerly `RotateSubtreeRight` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004AE410 (FUN_004AE410 -- `_Rrotate` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`; value 0x40 -- one `ResourceRecord` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AD5E0, 0x004AE860; formerly `RotateWideSubtreeRight_004AE410` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007F2B60 (FUN_007F2B60 -- `_Rrotate` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1A70, 0x007F27F0; formerly `RotateBlueprintExtractorTreeNodeRight` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x007D8E70 (FUN_007D8E70 -- `_Rrotate` for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D8200, 0x007D8AE0; formerly `RotateTreeRight` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x005C5D00 (FUN_005C5D00 -- `_Rrotate` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C4580, 0x005C7430; formerly `RotateRight` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0045DEC0 (FUN_0045DEC0 -- `_Rrotate` for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CB80, 0x0045CED0; formerly `FileInfoMapRotateRight` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0046E680 (FUN_0046E680 -- `_Rrotate` for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046DEE0, 0x0046E890; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x004646E0 (FUN_004646E0 -- `_Rrotate` for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463A70, 0x00464470; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00504CC0 (FUN_00504CC0 -- `_Rrotate` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x005043B0, 0x005052F0; formerly `SpatialMapRotateRight` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00861710 (FUN_00861710 -- `rotate_right` for `msvc8::map<std::int32_t, moho::ProjectileArcTrack>` (moho/render/ProjectileArcRenderer.h's `ProjectileArcTable`, the function-local static at 0x010C4314: `{proxy, head 0x010C4318, size}`; pair 0xC3C, node 0xC4C, colour/nil at +0xC48/+0xC49); callers 0x008611E9, 0x00861230, 0x008612AF, 0x00861BCC, 0x00861C03; formerly `RotateStrategicIconScratchTreeRight` in moho/sim/CWldSession.cpp (RULE ONE), removed 2026-10-03.)
+             */
+            void rotate_right(node_type* const n) noexcept
+            {
+                node_type* const pivot = n->left;
+                n->left = pivot->right;
+                if (!rb_is_nil(pivot->right)) {
+                    pivot->right->parent = n;
+                }
+                pivot->parent = n->parent;
+
+                if (n == root()) {
+                    head_->parent = pivot;
+                } else if (n == n->parent->right) {
+                    n->parent->right = pivot;
+                } else {
+                    n->parent->left = pivot;
+                }
+
+                pivot->right = n;
+                n->parent = pivot;
+            }
+
+            /**
+             * Address: 0x007E3F10 (FUN_007E3F10, batch-bucket map `_Insert`)
+             *
+             * IDA signature:
+             * _DWORD *__userpurge _Insert@<eax>(_Node *where@<ecx>, _Tree *this@<edi>,
+             *                                   iterator *result, char addLeft, const value_type *val);
+             *
+             * What it does:
+             * Rejects the insert when the tree already holds `max_size() - 1`
+             * elements, buys the node, links it under `where` on the requested
+             * side while maintaining the header's leftmost/rightmost/root links,
+             * then repairs the red-red violation upwards and reblackens the root.
+             */
+            template<class... Args>
+            /**
+             * Address: 0x00594F80 (FUN_00594F80, the name-index map's recolour-and-rotate
+             * fixup after a link -- it writes only the colour byte at `[node+0x2C]`)
+             * Address: 0x00594B10 (FUN_00594B10, the link half that precedes it)
+             */
+            /**
+             * Address: 0x0077B600 (FUN_0077B600, inner bucket link-and-rebalance)
+             * Address: 0x0077BE80 (FUN_0077BE80, outer map link-and-rebalance)
+             * Address: 0x0077AF40 (FUN_0077AF40, the outer map's insert-position resolve)
+             * Address: 0x0077A3C0 (FUN_0077A3C0, the outer map's `erase_node` --
+             * CORRECTED: previously mis-labeled "insert with rebalance" here;
+             * this token's own decompile is unmistakably `erase_node`: throws
+             * `std::out_of_range("invalid map/set<T> iterator")` on a nil
+             * target (the `_SECURE_SCL` checked-iterator guard documented
+             * throughout this file, not `_Xlen`), captures the successor via
+             * `sub_77CE50` (`rb_increment`), CLRS transplant-then-fixup, and
+             * rebalances through the rotates at 0x0077B0B0/0x0077B160 --
+             * cited on `erase_node`'s canonical member below, not `insert_at`.
+             * Reached from this table's `erase_range` (`FUN_0077BD90`, cited
+             * on that member) walk path.)
+             */
+            /**
+             * Address: 0x0052CD30 (FUN_0052CD30, the link-and-rebalance half of
+             * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals`'s
+             * insert -- `msvc8::set<uint32_t>`. Matches this template body
+             * field for field: the `_Mysize >= 0x3FFFFFFE` guard throwing
+             * `std::length_error("map/set<T> too long")`, the `sub_52DB50`
+             * buy-node call, then the red/black fixup loop calling
+             * `sub_52DAB0`/`sub_52DB00` (`rotate_left`/`rotate_right`, cited
+             * below) on the uncle-red vs. uncle-black branches. Reached from
+             * `insert_unique`'s emission at 0x0052BC60, cited above.
+             */
+            /**
+             * Address: 0x0082E320 (FUN_0082E320, `Moho::UICommandGraph::
+             * mGraph`'s combined buy-node/link/rebalance emission
+             * -- `map<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`,
+             * isNil@+0x25. The `_Mysize >= 0xAAAAAA9` guard is exactly this
+             * template's `max_size() - 1u <= size_` for a 0x18-byte
+             * value_type (`0xFFFFFFFF / 0x18 - 1 == 0xAAAAAA9`), throwing
+             * `std::length_error("map/set<T> too long")`. Buys the node
+             * through `sub_830110` (cited on `buy_node` below), links it,
+             * then repairs the red-red violation calling `rotate_left`
+             * (0x00830010) / `rotate_right` (0x00830080), both cited below.
+             * `CWldSession.cpp`'s `AddCommandQueueToCommandGraph` reconstruction
+             * notes already name this address `insert_at`, reached via the
+             * hinted insert at 0x0082CC80 for `mGraph[texture]`
+             * (VC8 `map::operator[]`); that hinted-insert caller itself
+             * remains unrecovered (`AddCommandQueueToCommandGraph` is still
+             * blocked on `LinkCommandGraphEdge`), so this member's
+             * source-level invocation is the same generic `msvc8::map`/
+             * `rb_tree` API surface every other instantiation on this
+             * member already uses, not a new engine call site.)
+             */
+            /**
+             * Address: 0x005565D0 (FUN_005565D0, the link-and-rebalance half
+             * of the category-lookup map's insert -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `Sim.cpp`'s
+             * `EntityCategoryLookupTableView::mCategoryMap`. The
+             * `*(a2+8) >= 0x38E38E2` guard is this member's
+             * `max_size() - 1u <= size_`: `0xFFFFFFFF / 0x48 == 0x38E38E3`
+             * (this template's `max_size()` is defined over `value_type`,
+             * i.e. the 0x48-byte `pair<const msvc8::string,
+             * CategoryLookupValue>`, not the 0x60-byte node including link
+             * pointers and colour/nil), minus one is exactly `0x38E38E2` --
+             * independent confirmation that `sizeof(value_type) == 0x48` for
+             * this instantiation, matching `CategoryLookupValue`'s alignment
+             * evidence in Sim.cpp. Buys the node through `sub_5569C0`
+             * (`buy_node`, cited below), links it under the caller's
+             * `where`/`addLeft`, then repairs the red-red violation with the
+             * same rotate-on-uncle-red/recolour-on-uncle-black shape as
+             * every other `insert_at` emission in this file, writing
+             * colour/nil at `[node+0x58]`/`[node+0x59]` (the offsets that
+             * pin this node to the 8-byte-aligned shape -- see
+             * `CategoryLookupValue`'s citation block in Sim.cpp). Reached
+             * from `insert_unique`'s emission (FUN_005560B0, cited above).)
+             */
+            /**
+             * Address: 0x00687280 (FUN_00687280, `msvc8::map<std::uint32_t,
+             * moho::IdPool>::_Insert` -- `EntityDB::mIdPoolTree` in
+             * `EntityDb.h`. The `_Mysize >= 0x1420B4` guard is this member's
+             * `max_size() - 1u <= size_` for the 0xCB8-byte `pair<const
+             * uint32_t, IdPool>` value_type (`0xFFFFFFFF / 0xCB8 - 1 ==
+             * 0x1420B4` exactly -- independent confirmation of the 8-byte-
+             * aligned `pair` size derived on `buy_node`'s citation above),
+             * throwing `std::length_error("map/set<T> too long")`. Buys the
+             * node through `FUN_006881C0` (`buy_node`, cited above), links
+             * it under the caller's `where`/`addLeft` in the same three-case
+             * shape as `link_and_rebalance` below (`where == head`, `where
+             * == leftmost()`, general case), then repairs the red-red
+             * violation calling `rotate_left`/`rotate_right`
+             * (`FUN_006880A0`/`FUN_00688120`, both cited below). Reached
+             * from `insert_unique`'s emission `FUN_006870D0` (cited below)
+             * and from `insert_hint`'s emission `FUN_006864E0` (cited
+             * below) -- both real paths in this codebase: the former via
+             * `EntityDbIdPoolMapTypeInfo::SerLoad`'s per-element
+             * `map->insert(...)`, the latter via `EntityDB::
+             * MemberDeserialize`'s `mIdPoolTree[familySourceBits]`.)
+             */
+            /**
+             * Address: 0x006E1D60 (FUN_006E1D60, the command-id map's
+             * link-and-rebalance -- `msvc8::map<Moho::CmdId,
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
+             * `CCommandDb.h`. The `_Mysize >= 0x1FFFFFFE` guard is this
+             * member's `max_size() - 1u <= size_` for the 8-byte
+             * `pair<const CmdId, CUnitCommand*>` value_type
+             * (`0xFFFFFFFF/8 - 1 == 0x1FFFFFFE`), throwing
+             * `std::length_error("map/set<T> too long")`. Buys the node
+             * through `sub_6E23F0` (`buy_node`, cited above), links it under
+             * the caller's `where`/`addLeft`, then repairs the red-red
+             * violation calling `sub_6E1F20`/`sub_6E1FD0`
+             * (`rotate_left`/`rotate_right`, cited above) on the
+             * uncle-red/uncle-black branches. Reached from
+             * `insert_unique`'s emission (FUN_006E15B0, cited above), both
+             * call sites.)
+             */
+            /**
+             * Address: 0x008B6310 (FUN_008B6310, sub_8B6310) --
+             * `msvc8::map<Moho::CmdId, Moho::UserCommandIssueHelper*>`,
+             * `CommandManager::mCommands` in `CommandManager.h`. Same shape
+             * as FUN_006E1D60 above (a separate instantiation): the
+             * `_Mysize >= 0x1FFFFFFE` overflow guard throws
+             * `std::length_error("map/set<T> too long")`, buys the node
+             * through `sub_8B67F0` (`buy_node`, cited above), links it under
+             * the caller's `where`/`addLeft`, then repairs the red-red
+             * violation calling `sub_8B64C0`/`sub_8B6550`
+             * (`rotate_left`/`rotate_right`, cited above). Reached from
+             * `insert_unique`'s emission (FUN_008B5DF0, cited above). Re-
+             * homed here from the same bespoke `InsertCommandNodeFixup` free
+             * function in Sim.cpp cited on `insert_unique`/`buy_node` above.)
+             */
+            /**
+             * Address: 0x008D5720 (FUN_008D5720, sub_8D5720) -- local
+             * `msvc8::rb_tree<moho::Resolution>`'s `insert_at` (dedup tree
+             * for `SetupPrimaryAdapterSettings`/`SetupSecondaryAdapterSettings`'s
+             * display-mode enumeration, `StartupHelpers.cpp:6841`/`6891`,
+             * `color@+0x1C`/`isNil@+0x1D` -- see the corrected `buy_head`
+             * citation above, `FUN_008D6940`). `_Mysize >= 0xFFFFFFE`
+             * overflow guard (`0xFFFFFFFF/16 - 1`, matching `Resolution`'s
+             * `sizeof==0x10`), buys the node WITH its value through
+             * `sub_8D6280` (writes `Resolution::vftable` + width/height/fps
+             * at node offsets +12/+16/+20/+24, color=0/isNil=0 for a fresh
+             * data node -- corrects a prior `external_dependency`
+             * mis-classification of `sub_8D6280`; it directly references
+             * the engine `Resolution::vftable`, not third-party runtime),
+             * links under the caller's `where`/`addLeft`, repairs red-red
+             * violations via `sub_8D61D0`/`sub_8D6230`
+             * (`rotate_left`/`rotate_right`-shaped, not yet independently
+             * cited). Reached from `insert_unique`'s emission
+             * (`FUN_008D4F10`, cited below).
+             *
+             * NOT YET WIRED to a source-level caller: the RAW binary's
+             * `SetupPrimaryAdapterSettings` (`FUN_008D21E0`) builds and
+             * queries this tree directly to dedup adapter modes in SORTED
+             * `(width,height,fps)` order, but the CURRENTLY RECOVERED
+             * `StartupHelpers.cpp` body (`CollectAdapterModes`/`HasMode`)
+             * dedups via an O(n) linear scan instead, preserving driver-
+             * enumeration order rather than producing the binary's sorted
+             * order -- same resulting SET of unique modes, different
+             * observable ORDER in the startup options UI. An orphaned,
+             * already-evidenced a deleted-overlay reimplementation of this
+             * same tree already exists (a deleted overlay
+             * family, `StartupHelpers.cpp:~1234-1330`, several
+             * `[[maybe_unused]]`) -- per RULE ONE this should be migrated
+             * to a real `T=Resolution` instantiation of this template
+             * rather than extended; not done in this pass. `sub_8D69D0`
+             * (`rb_decrement`, cited below) and `sub_8D5020` (lower_bound,
+             * currently cited on the orphaned `ResolveAdapterModeSortInsertionAnchor`)
+             * complete this instantiation's primitive set.
+             */
+            /**
+             * Address: 0x0083BDE0 (FUN_0083BDE0, sub_83BDE0) --
+             * `UiKeyRepeatMap`/`msvc8::map<UiKeyMask, bool>::insert_at` --
+             * `gUiKeyRepeatMap` in `moho/ui/UiRuntimeTypes.cpp:1395`. The
+             * `(unsigned)dword_10C3750 >= 0x1FFFFFFE` guard is this
+             * member's `max_size() - 1u <= size_` for the 8-byte
+             * `pair<const UiKeyMask, bool>` value_type (`0xFFFFFFFF/8 - 1
+             * == 0x1FFFFFFE`, the same constant already confirmed for the
+             * 8-byte CmdId maps above -- independent confirmation that
+             * `bool` is padded to a full 4-byte slot in this pair), throwing
+             * `std::length_error("map/set<T> too long")` (built via
+             * `std::logic_error::logic_error` then vftable-patched to
+             * `std::length_error`, the standard shape documented throughout
+             * this file). Buys the node through `sub_83C260` (`buy_node`,
+             * cited above), links it under the caller's `where`/`addLeft`
+             * in the same `where==head_` / `addLeft` / general three-case
+             * shape as `link_and_rebalance` above, then repairs the
+             * red-red violation calling `sub_83B4C0`/`sub_83B570`
+             * (`rotate_left`/`rotate_right`, both cited below) on the
+             * uncle-red/uncle-black branches. Reached from `insert_hint`'s
+             * emission (`FUN_0083B320`, cited above) on every accepted
+             * branch -- itself reached from `operator[]`'s emission
+             * (`FUN_0083A9D0`, cited in `Map.h`) passing its own
+             * `lower_bound` result as the hint, confirmed via
+             * `AddUiKeyMapEntries`'s `gUiKeyRepeatMap[keyMask] = true`
+             * (`UiRuntimeTypes.cpp:1442`). Was `recovered` with no citation,
+             * report, or note of any kind prior to this pass -- neither
+             * proven false nor verifiable; this catalog entry is the first
+             * real evidence trail for it.)
+             *
+             * Address: 0x004E22B0 (FUN_004E22B0, sub_4E22B0) --
+             * `msvc8::map<Moho::CSndParams*, Moho::HSndEntityLoop*>::
+             * insert_at` for the sound subsystem's shared-ambient-loop
+             * cache (`gSharedAmbientLoopsByParams` @ 0x010A92A0 in
+             * `moho/audio/CSndParams.cpp`), sibling of
+             * `buy_node`'s `FUN_004E31F0` citation above (same 8-byte
+             * value_type). `(unsigned)size_ >= 0x1FFFFFFEu` guard is this
+             * member's `max_size() - 1u <= size_` for the 8-byte
+             * `pair<CSndParams*, HSndEntityLoop*>` value_type, throwing
+             * `std::length_error("map/set<T> too long")` via the same
+             * `logic_error`-then-vftable-patch shape documented throughout
+             * this file. Calls `buy_node` (`FUN_004E31F0`) as a separate
+             * step rather than fusing it, links under the caller's
+             * `where`/`addLeft`, then repairs red-red violations via
+             * `sub_4E3140`/`sub_4E31A0` (`rotate_left`/`rotate_right`-shaped,
+             * not yet independently cited). Reached from `EnsureSharedAmbient
+             * LoopMapEntry` (`CSndParams.cpp`, `FUN_004E1890`) only in the
+             * sense that that function's own note documents: its real
+             * `_Insert` role is fulfilled by the modern `unordered_map`
+             * find/emplace path instead, so this binary helper is elided
+             * rather than called by name -- `FUN_004E1890`'s `depends_on`
+             * already lists this token for exactly that reason. Re-homed
+             * here from the false `CrtRuntimeHelpers.cpp` DB-integrity
+             * contamination; this catalog is the real home.)
+             *
+             * Address: 0x006AFA40 (FUN_006AFA40, sub_6AFA40) --
+             * `msvc8::map<msvc8::string, float>::insert_at` (fused with
+             * `link_and_rebalance`, the same one-function fusion documented
+             * on `FUN_0083BDE0`/`FUN_004E22B0` above) -- `Unit::
+             * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D.
+             * `(unsigned)size_ >= 0x7FFFFFEu` guard matches this member's
+             * `max_size() - 1u <= size_` for a 4-byte key / 4-byte value
+             * pair whose *node* max is bounded by the 48-byte node
+             * (`0xFFFFFFFF/48`), throwing `std::length_error("map/set<T>
+             * too long")` via the standard `logic_error`-then-vftable-patch
+             * shape documented throughout this file. Buys the node through
+             * `sub_6B0200` (`buy_node`, cited below), links it under the
+             * caller's `where`/`addLeft`, then repairs red-red violations
+             * calling `sub_6B0120`/`sub_6B0170` (ICF twins of the canonical
+             * `rotate_left`/`rotate_right` emissions, already `skip`'d in
+             * `recovered_progress.json`). Two real callers: `insert_unique`'s
+             * emission (`FUN_006AF840`, cited above) on both its accepted
+             * branches, and `insert_hint`'s emission (`FUN_006AEDD0`, cited
+             * above) on its fast-path branches -- the same
+             * `insert_at(addLeft, where, v)` calls this member's own C++
+             * source performs.
+             *
+             * Address: 0x00710030 (FUN_00710030, sub_710030) -- the same
+             * `moho::CArmyStats`-owned 4-byte-`uint32_t`-value tree's
+             * `insert_at`: throws `std::length_error("map/set<T> too
+             * long")` past the verbatim msvc8 threshold, buys the node via
+             * `sub_7114F0` (`buy_node`, cited above), links under the
+             * caller's hint/side, then rebalances calling `sub_711440`/
+             * `sub_7114A0` (already `skip`-tagged ICF twins of the
+             * canonical `rotate_left`/`rotate_right` emissions in
+             * `ParticleRenderBuckets.cpp`). Sole caller is `insert_unique`'s
+             * emission for this instantiation (`FUN_0070F040`, cited
+             * below). Was previously `recovered` with an entirely empty
+             * `note`/`source_paths` -- a DB-integrity gap (blank metadata,
+             * not a false attribution), corrected here with a real
+             * citation.
+             *
+             * Address: 0x007E5DF0 (FUN_007E5DF0, sub_7E5DF0) -- `msvc8::map<
+             * MeshKey, boost::weak_ptr<Mesh>>::insert_at`/`link_and_
+             * rebalance` for `moho::MeshRendererMeshCacheTree`
+             * (`Mesh.h`/`Mesh.cpp`, same instantiation cited on `alloc_
+             * raw`/`buy_node`/`insert_unique` above). `*(a2+8) >=
+             * 0xAAAAAA9` guard matches `max_size() - 1u <= size_` for this
+             * 40-byte node (`0xFFFFFFFF/40` rounds to this threshold),
+             * throwing `std::length_error("map/set<T> too long")` via the
+             * standard shape. Buys the node through `sub_7E6090` (`buy_
+             * node`, cited above) passing `head`/`where`/`head` as the
+             * fresh node's own initial Left/Parent/Right (this
+             * instantiation does not use this member's `head_`-placeholder-
+             * then-overwrite fusion -- see the note on `buy_node`'s
+             * 0x007E6090 citation), links it under the caller-supplied
+             * `where`/`addLeft` (`a1 == head` / `a4` branches, matching
+             * this member's `where == head_` / `addLeft` branches field for
+             * field, including the `head->left`/`head->right` leftmost/
+             * rightmost promotion checks), then repairs red-red violations
+             * calling `sub_7E4E10`/`sub_7E4EA0` (this instantiation's
+             * `rotate_left`/`rotate_right` emissions) and finishes by
+             * force-painting the root black (`*(head->parent + 0x24) = 1`),
+             * matching this member's trailing `root()->color = kRbBlack`
+             * exactly. Sole caller is `insert_unique`'s emission for this
+             * instantiation (0x007E5B20, cited above), on both its accepted
+             * branches -- the same `insert_at(addLeft, where, v)` calls this
+             * member's own C++ source performs. `Mesh.cpp`'s
+             * `MeshCacheTreeInsertUnique` already recovers this member's
+             * link-and-rebalance portion faithfully (`CreateMeshCacheNode`
+             * + the `parent == head` / `insertLeft` linking branches +
+             * `RebalanceMeshCacheAfterInsert`); only the caller-side
+             * search/uniqueness phase (cited on `insert_unique` above)
+             * still needs its algorithm brought in line. Not yet routed
+             * through this template.
+             *
+             * Address: 0x0087AF70 (FUN_0087AF70, sub_87AF70) -- `msvc8::map<
+             * std::uint32_t, Moho::CWldTerrainDecal*>::insert_at` --
+             * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
+             * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `rb_decrement`/`rb_increment`/`find_node`/`equal_range`/
+             * `~rb_tree()` elsewhere in this file). Two real callers, both
+             * this instantiation's own emissions: `insert_unique`
+             * (`FUN_0087AB70`, cited above, both accepted branches) and
+             * `insert_hint` (`FUN_00879B10`, cited above, all five accepted
+             * branches) -- the same `insert_at(addLeft, where, v)` calls
+             * each member's own C++ source performs.
+             * Address: 0x0087B8F0 (FUN_0087B8F0, sub_87B8F0) -- the sibling
+             * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::insert_at`
+             * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
+             * called from that tree's own `insert_unique`/`insert_hint`
+             * (`FUN_0087B4F0`/`FUN_00879F60`, cited above).
+             *
+             * Address: 0x007B2B30 (FUN_007B2B30, sub_7B2B30) -- `msvc8::
+             * set<std::uint32_t>::insert_at` fused with `link_and_rebalance`
+             * (same one-function fusion documented on `FUN_006AFA40`/
+             * `FUN_007E5DF0` above), isNil@+0x11, 0x14-byte node (same
+             * instantiation cited on `erase_node`'s `FUN_007B46A0` and
+             * `destroy_subtree` above). `cmp dword ptr [edi+8], 3FFFFFFEh`
+             * matches `max_size() - 1u <= size_` for this 4-byte
+             * value_type, throwing `std::length_error("map/set<T> too
+             * long")` via the standard `logic_error`-then-vftable-patch
+             * shape documented throughout this file. Buys the node through
+             * `sub_7B3660` (`buy_node`), passing `head_`/`where`/`head_`
+             * as the fresh node's own initial left/parent/right -- the
+             * same buy_node-fuses-the-link pattern documented on
+             * `FUN_007E5DF0` above, which is why this emission's own body
+             * has no separate `fresh->parent = where` step. Links under
+             * the caller's `where`/`addLeft` in the same three-case
+             * (`where==head_`/`addLeft`/general) shape as this member's
+             * C++ source, then repairs red-red violations calling
+             * `sub_7B3590`/`sub_7B3610` (`rotate_left`/`rotate_right`,
+             * both cited below as ICF twins of this same instantiation's
+             * rotates) on the uncle-red/uncle-black branches --
+             * register-traced instruction-by-instruction against this
+             * member's C++ body and matches exactly, including the
+             * mirrored branch and the trailing `root()->color =
+             * kRbBlack`. Sole caller (confirmed via the callgraph index
+             * `call_edges` table): `insert_unique`'s emission for this
+             * instantiation (`FUN_007B26B0`, recovered as
+             * `FindOrInsertMapNodeNil17Runtime` in
+             * `moho/sim/SimRecoveryRuntime.cpp`), on both its accepted
+             * branches. Reached at the source level from `Moho::
+             * ANI_DumpSkeleton`'s `dedupTree[parentKey].insert(boneKey)`
+             * (`moho/animation/CAniSkel.cpp`), which is what actually
+             * instantiates this specialisation -- no standalone free
+             * function recovers this address; the call site above is the
+             * real recovery, per this project's RULE ONE. Previously
+             * marked `skip` citing "Canonical template home: RbTree.h +
+             * Map.h" with no address actually written here -- this
+             * paragraph closes that gap.
+             */
+            /**
+             * Address: 0x004DBE30 (FUN_004DBE30, sub_4DBE30) --
+             * `msvc8::set<msvc8::string>::insert_at` -- `Moho::
+             * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`), isNil
+             * @+0x29 (same instantiation cited on `insert_unique`/
+             * `rotate_left`/`rotate_right`/`rb_decrement` elsewhere in this
+             * file). The guard constant confirms `value_type ==
+             * msvc8::string` exactly (28 bytes): `cmp [tree+8], 0x9249248`
+             * matches `max_size() - 1u <= size_` for a 28-byte value_type.
+             * Buys the node through `sub_4DCC90` (`buy_node`, cited below),
+             * passing `head_`/`where`/`head_` as the fresh node's own
+             * initial left/parent/right (the same buy_node-fuses-the-link
+             * pattern documented on `FUN_007B3660`/`FUN_007E5DF0` above --
+             * no separate `fresh->parent = where` step in this emission
+             * either). Links under the caller's `where`/`addLeft` in the
+             * same three-case (`where==head_`/`addLeft`/general) shape as
+             * this member's C++ source, then repairs red-red violations
+             * calling `sub_4DCBE0`/`sub_4DCC40` (`rotate_left`/
+             * `rotate_right`, both cited below) on the uncle-red/uncle-black
+             * branches -- register-traced instruction-by-instruction against
+             * this member's C++ body and matches exactly, including the
+             * mirrored branch and the trailing `root()->color = kRbBlack`.
+             * Sole caller (confirmed via the callgraph index): `insert_unique`'s
+             * emission for this instantiation (`FUN_004DB600`, cited above),
+             * on both its accepted branches. This is the concrete evidence
+             * behind `.memory/project_audiomap1_missing_rebalance_bug.md`'s
+             * diagnosis: the previously-recovered `InsertPausedCategoryName`
+             * (`AudioEngine.cpp`) never called this address at all -- it
+             * built and linked nodes itself with no rotation/recolor step,
+             * so this real rebalancing body had zero source-level callers
+             * until this migration wired `AudioEngine::SetPaused` through
+             * `mPausedCategoryNames.insert()` (`insert_unique` above).
+             *
+             * Address: 0x004DCF90 (FUN_004DCF90, sub_4DCF90) -- `msvc8::map<
+             * std::uint16_t, float>::insert_at` -- `Moho::AudioEngineImpl::
+             * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15 (same
+             * instantiation cited on `insert_hint`/`insert_unique`/
+             * `rotate_left`/`rotate_right`/`rb_decrement`/`rb_increment`/
+             * `rb_min`/`rb_max`/`buy_node`/`destroy_subtree`/`erase_node`/
+             * `erase_range`/`alloc_raw`/`~rb_tree()` elsewhere in this file).
+             * The guard constant independently confirms `value_type ==
+             * std::pair<const std::uint16_t, float>` exactly (8 bytes): `cmp
+             * [tree+8], 0x1FFFFFFE` matches `max_size() - 1u <= size_` for
+             * this 8-byte `value_type` (`0xFFFFFFFF / 8 == 0x1FFFFFFF`).
+             * Buys the node through `sub_4DD8F0` (`buy_node`, cited below),
+             * passing `head_`/`where`/`head_` as the fresh node's own initial
+             * left/parent/right (the same buy_node-fuses-the-link pattern
+             * documented throughout this file -- no separate `fresh->parent =
+             * where` step in this emission either). Links under the caller's
+             * `where`/`addLeft` in the same three-case (`where==head_`/
+             * `addLeft`/general) shape as this member's C++ source, then
+             * repairs red-red violations calling `sub_4DD800`/`sub_4DD860`
+             * (`rotate_left`/`rotate_right`, both cited below) on the
+             * uncle-red/uncle-black branches -- register-traced instruction-
+             * by-instruction against this member's C++ body and matches
+             * exactly, including the mirrored branch and the trailing
+             * `root()->color = kRbBlack`. Two real callers (confirmed via the
+             * callgraph index): `insert_hint`'s emission for this
+             * instantiation (`FUN_004DC080`, cited above), on its five
+             * accepted branches, and `insert_unique`'s own emission for this
+             * instantiation (`FUN_004DCDE0`, cited above), on both its
+             * accepted branches.
+             *
+             * This is the concrete evidence that the real binary rebalances
+             * on every insert for this instantiation, same as every other
+             * hand-rolled-tree instance this project has migrated -- see
+             * `insert_hint`'s own citation above for why the previously-
+             * recovered `FindOrInsertCategoryVolumeNode` never reached this
+             * address (or `insert_hint`/`insert_unique` above it) at all.
+             * Address: 0x005C7430 (FUN_005C7430 -- `_Insert(addLeft, where, value)` -- link at the chosen leaf, then the recolour/rotate fixup for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C5AF0; formerly `InsertMapNodeWithHint` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004E2980 (FUN_004E2980 -- `insert_at` -- buy the node, link it under the chosen edge, fix the header extremes and rebalance for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004E1FD0; the link half of that same insert; formerly unrecovered.)
+             * Address: 0x004E2D70 (FUN_004E2D70 -- `_Insert` -- the `0x1FFFFFFE` = `0xFFFFFFFF/0x08 - 1` length guard, then buy the node, link it under the chosen edge and rebalance for `msvc8::multimap<std::uint32_t, moho::CSndVar*>` (`gSndVarNameCache` in moho/audio/CSndVar.cpp; pair 0x08, node 0x18, key at node+0x0C, variable pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004E2110; the link half of that same insert; formerly unrecovered.)
+             * Address: 0x005052F0 (FUN_005052F0 -- `_Insert(addLeft, where, value)` -- the `0x06666665` = `0xFFFFFFFF/0x28 - 1` length guard, `_Buynode` 0x00505D60, the link, the header extremes and the recolour/rotate fixup through 0x00504C10/0x00504CC0, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, the 0x28 entry, colour/nil at +0x34/+0x35); callers 0x00504990, 0x00504A10; formerly `InsertSpatialPayloadAtLink`/`SpatialMapInsertFixup` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00822670 (FUN_00822670 -- `_Insert(addLeft, where, value)` for the `WeakSet<moho::UserUnit>::Entry` set: the `max_size` guard 0x15555554 (0x00822688), `_Buynode` 0x008229E0, link and rebalance; callers `insert` 0x00822420 and the hinted insert 0x008B4F50.)
+             */
+            node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
+            {
+                if (max_size() - 1u <= size_) {
+                    throw_too_long();
+                }
+                node_type* const fresh = buy_node(std::forward<Args>(args)...);
+                link_and_rebalance(addLeft, where, fresh);
+                return fresh;
+            }
+
+            /**
+             * Address: 0x0056ECA0 (FUN_0056ECA0 -- the link-and-rebalance half of `_Insert` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41).)
+             */
+            void link_and_rebalance(const bool addLeft, node_type* const where, node_type* const fresh) noexcept
+            {
+                ++size_;
+
+                if (where == head_) {
+                    head_->parent = fresh;
+                    head_->left = fresh;
+                    head_->right = fresh;
+                } else if (addLeft) {
+                    where->left = fresh;
+                    if (where == leftmost()) {
+                        head_->left = fresh;
+                    }
+                } else {
+                    where->right = fresh;
+                    if (where == rightmost()) {
+                        head_->right = fresh;
+                    }
+                }
+                fresh->parent = where;
+
+                for (node_type* n = fresh; n->parent->color == kRbRed;) {
+                    node_type* const parent = n->parent;
+                    node_type* const grand = parent->parent;
+
+                    if (parent == grand->left) {
+                        node_type* const uncle = grand->right;
+                        if (uncle->color == kRbRed) {
+                            parent->color = kRbBlack;
+                            uncle->color = kRbBlack;
+                            grand->color = kRbRed;
+                            n = grand;
+                        } else {
+                            if (n == parent->right) {
+                                n = parent;
+                                rotate_left(n);
+                            }
+                            n->parent->color = kRbBlack;
+                            n->parent->parent->color = kRbRed;
+                            rotate_right(n->parent->parent);
+                        }
+                    } else {
+                        node_type* const uncle = grand->left;
+                        if (uncle->color == kRbRed) {
+                            parent->color = kRbBlack;
+                            uncle->color = kRbBlack;
+                            grand->color = kRbRed;
+                            n = grand;
+                        } else {
+                            if (n == parent->left) {
+                                n = parent;
+                                rotate_right(n);
+                            }
+                            n->parent->color = kRbBlack;
+                            n->parent->parent->color = kRbRed;
+                            rotate_left(n->parent->parent);
+                        }
+                    }
+                }
+
+                root()->color = kRbBlack;
+            }
+
+            /** MSVC8's post-erase black-height repair. */
+            /**
+             * Address: 0x004E94F0 (FUN_004E94F0 -- the splice-and-rebalance half of that erase, including the header extreme fixups for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E9100, 0x004E96A0; formerly `EraseSingleTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             */
+            void erase_rebalance(node_type* fix, node_type* fixParent) noexcept
+            {
+                for (; fix != root() && fix->color == kRbBlack; fixParent = fix->parent) {
+                    if (fix == fixParent->left) {
+                        node_type* sibling = fixParent->right;
+                        if (sibling->color == kRbRed) {
+                            sibling->color = kRbBlack;
+                            fixParent->color = kRbRed;
+                            rotate_left(fixParent);
+                            sibling = fixParent->right;
+                        }
+
+                        if (rb_is_nil(sibling)) {
+                            fix = fixParent;
+                        } else if (sibling->left->color == kRbBlack && sibling->right->color == kRbBlack) {
+                            sibling->color = kRbRed;
+                            fix = fixParent;
+                        } else {
+                            if (sibling->right->color == kRbBlack) {
+                                sibling->left->color = kRbBlack;
+                                sibling->color = kRbRed;
+                                rotate_right(sibling);
+                                sibling = fixParent->right;
+                            }
+                            sibling->color = fixParent->color;
+                            fixParent->color = kRbBlack;
+                            sibling->right->color = kRbBlack;
+                            rotate_left(fixParent);
+                            return; // black heights match again; root is still black
+                        }
+                    } else {
+                        node_type* sibling = fixParent->left;
+                        if (sibling->color == kRbRed) {
+                            sibling->color = kRbBlack;
+                            fixParent->color = kRbRed;
+                            rotate_right(fixParent);
+                            sibling = fixParent->left;
+                        }
+
+                        if (rb_is_nil(sibling)) {
+                            fix = fixParent;
+                        } else if (sibling->right->color == kRbBlack && sibling->left->color == kRbBlack) {
+                            sibling->color = kRbRed;
+                            fix = fixParent;
+                        } else {
+                            if (sibling->left->color == kRbBlack) {
+                                sibling->right->color = kRbBlack;
+                                sibling->color = kRbRed;
+                                rotate_left(sibling);
+                                sibling = fixParent->left;
+                            }
+                            sibling->color = fixParent->color;
+                            fixParent->color = kRbBlack;
+                            sibling->left->color = kRbBlack;
+                            rotate_right(fixParent);
+                            return;
+                        }
+                    }
+                }
+
+                fix->color = kRbBlack;
+            }
+
+            /**
+             * `proxy_` (+0x00) matches the binary's `_Container_proxy*` debug/
+             * allocator word for layout purposes only. This project's build
+             * targets `_SECURE_SCL=1` (VS2005 default, see this file's opening
+             * comment and the `Dbg`/checked-iterator discussion on `~rb_tree()`
+             * above), under which the real Dinkumware `_Container_proxy` also
+             * anchors a doubly-linked list of every live `_Iterator_base12`
+             * pointing into the container (`_Myfirstiter`/`_Mynextiter`/
+             * `_Mycont`), walked to orphan (invalidate) those iterators when
+             * the container is cleared, destroyed, or reallocated. This
+             * template deliberately does not model that list -- `proxy_`
+             * stays `nullptr` for the object's whole lifetime (see the
+             * constructors below) -- for the same reason the checked-erase-
+             * per-node debug branch documented on `~rb_tree()` above is not
+             * modeled: nothing in this codebase holds a live iterator across
+             * a clear/destroy in a way whose behavior would differ, so not
+             * modeling it does not change observable behavior.
+             *
+             * Address: 0x004E3A30 (FUN_004E3A30, sub_4E3A30) -- the sound
+             * subsystem's `sSndParamsCache` (`gSndParamsHashCache` @
+             * 0x010A9288 in `moho/audio/CSndParams.cpp`) checked-iterator
+             * orphan-all step:
+             * walks `_Myfirstiter`'s linked list of live `_Iterator_base12`
+             * nodes via `sub_4E4530` then self-links the proxy's iterator
+             * list back to empty and clears `_Myhead`. Reached from this
+             * instantiation's `clear()`/dtor emission as the `_SECURE_SCL`
+             * checked-iterator side effect of destroying/clearing the tree --
+             * the same debug-only machinery this field's comment documents
+             * as deliberately unmodeled. The whole erase/clear family for this
+             * tree hangs off the run's compiler-generated destructor group
+             * (0x004DF0E0). Cited here, not modeled as a member, so it is not
+             * mistaken for an orphan.
+             * Address: 0x004E3A80 (FUN_004E3A80, sub_4E3A80) -- the
+             * `_Iterator_base12` list-splice step `FUN_004E3A30` calls
+             * per-iterator (`sub_4E4530`'s inner loop): unlinks one
+             * `_Iterator_base12` node from the proxy's doubly-linked list of
+             * live iterators. Same deliberately-unmodeled `_SECURE_SCL`
+             * checked-iterator category as `FUN_004E3A30` immediately above.
+             */
+            // ---- 12-byte payload (x86); field order is ABI ---------------------
+            _Container_proxy* proxy_; // +0x00
+            /**
+             * Address: 0x0083A630 (FUN_0083A630 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `end()` (`_Myhead` through the hidden iterator slot); zero callers, unreachable; formerly `LoadPrimaryGlobalPointerValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             * Address: 0x0083B0E0 (FUN_0083B0E0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `end()` / the `_Myhead` read the rotations and lower_bound start from; zero callers, unreachable; formerly `ReadPrimaryGlobalPointerValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+             */
+            node_type* head_;         // +0x04
+            size_type size_;          // +0x08
+        };
+
+    } // namespace detail
+} // namespace msvc8
+
+#pragma pack(pop)

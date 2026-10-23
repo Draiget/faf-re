@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find needs_evidence tokens whose address IS already referenced in src/sdk.
+"""Find needs_evidence tokens whose address IS already referenced in src.
 
 These are drift-audit false positives: the address appears in source, but the
 audit didn't find it because of regex or path quirks. They can be safely
@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src" / "sdk"
+SRC = ROOT / "src"
 PROG = ROOT / "decomp" / "recovery" / "recovered_progress.json"
 
 ADDR_RE = re.compile(r"0x([0-9A-Fa-f]{8})\b")
@@ -45,7 +45,7 @@ for tok, info in rec.items():
     if int(m.group(1), 16) in annotated:
         found.append(tok)
 
-print(f"needs_evidence tokens already referenced in src/sdk: {len(found)}")
+print(f"needs_evidence tokens already referenced in src: {len(found)}")
 out = ROOT / "scripts" / "ne_already_annotated.txt"
 out.write_text("\n".join(found) + "\n", encoding="utf-8")
 print(f"wrote {out}")

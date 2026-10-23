@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PROG = ROOT / "decomp" / "recovery" / "recovered_progress.json"
-SRC = ROOT / "src" / "sdk"
+SRC = ROOT / "src"
 
 with open(PROG, encoding="utf-8") as f:
     data = json.load(f)
@@ -57,7 +57,7 @@ print("\nTop existing src files:")
 for p, toks in sorted(existing_src.items(), key=lambda x: -len(x[1]))[:20]:
     print(f"  {len(toks):4d}  {p}")
 
-# For existing files, check if the address is already referenced anywhere in src/sdk
+# For existing files, check if the address is already referenced anywhere in src
 ADDR_RE = re.compile(r"0x([0-9A-Fa-f]{8})\b")
 FUN_REF_RE = re.compile(r"FUN_([0-9A-Fa-f]{8})\b")
 
@@ -74,7 +74,7 @@ for path in SRC.rglob("*"):
     for m in FUN_REF_RE.finditer(txt):
         annotated.add(int(m.group(1), 16))
 
-print(f"\ntotal annotated addresses in src/sdk: {len(annotated)}")
+print(f"\ntotal annotated addresses in src: {len(annotated)}")
 
 already_in_src = 0
 for tok, info in ne:
@@ -82,5 +82,5 @@ for tok, info in ne:
     if m and int(m.group(1), 16) in annotated:
         already_in_src += 1
 
-print(f"needs_evidence tokens whose address IS already in src/sdk: {already_in_src}")
-print(f"needs_evidence tokens truly missing from src/sdk: {len(ne) - already_in_src}")
+print(f"needs_evidence tokens whose address IS already in src: {already_in_src}")
+print(f"needs_evidence tokens truly missing from src: {len(ne) - already_in_src}")

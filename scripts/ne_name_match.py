@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """For each needs_evidence token with an engine/MOHO symbol name, try to
-find the function already defined in src/sdk (maybe missing address
+find the function already defined in src (maybe missing address
 annotation). If found, emit the token for re-promotion.
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DISASM = ROOT / "decomp" / "recovery" / "disasm" / "fa_full_2026_03_26"
-SRC = ROOT / "src" / "sdk"
+SRC = ROOT / "src"
 
 NAME_RE = re.compile(r"^# Function (.+)$", re.MULTILINE)
 
@@ -52,8 +52,8 @@ def main():
     ext = json.load(open(ROOT / "scripts" / "ne_external_scan.json"))
     candidates = ext.get("(engine)", [])
 
-    # Build src index once using grep across src/sdk
-    print(f"searching {len(candidates)} tokens against src/sdk")
+    # Build src index once using grep across src
+    print(f"searching {len(candidates)} tokens against src")
 
     with open(ROOT / "decomp" / "recovery" / "recovered_progress.json", encoding="utf-8") as f:
         data = json.load(f)
@@ -72,7 +72,7 @@ def main():
         short = extract_short_name(raw)
         if not short:
             continue
-        # Search src/sdk for function definition with this name
+        # Search src for function definition with this name
         # Very rough: look for `short\s*\(` in .cpp/.h
         try:
             result = subprocess.run(
@@ -89,7 +89,7 @@ def main():
         except Exception:
             pass
 
-    print(f"matched {len(matches)} tokens to src/sdk")
+    print(f"matched {len(matches)} tokens to src")
     out = ROOT / "scripts" / "ne_name_matches.json"
     out.write_text(json.dumps([
         {"token": t, "name": n, "short": s, "files": f}

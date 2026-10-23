@@ -3,7 +3,7 @@
 Audit partially reconstructed source markers against recovered_progress status.
 
 Goal:
-- If source code under src/sdk still says a function is pending reconstruction,
+- If source code under src still says a function is pending reconstruction,
   make sure that function is not marked as completed in recovered_progress.json.
 """
 
@@ -55,7 +55,7 @@ def addr_to_token(addr_hex: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit pending-reconstruction markers against recovered_progress.")
-    parser.add_argument("--src-root", default="src/sdk", help="Source root to scan (default: src/sdk).")
+    parser.add_argument("--src-root", default="src", help="Source root to scan (default: src).")
     parser.add_argument(
         "--recovered-progress",
         default="decomp/recovery/recovered_progress.json",

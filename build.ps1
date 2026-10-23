@@ -48,7 +48,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
-$project = Join-Path $repo 'src\sdk\main.vcxproj'
+$project = Join-Path $repo 'src\main.vcxproj'
 
 $targets = @{
   x64 = @{ Platform = 'x64';   VcArch = 'x64';       Exe = 'main_x64'; RunDir = 'bin_x64'; DllArch = 'x64' }

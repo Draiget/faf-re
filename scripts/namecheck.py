@@ -47,7 +47,7 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(REPO, "src", "sdk")
+SRC = os.path.join(REPO, "src")
 
 ADDR_RE = re.compile(r"Address:\s*0x([0-9A-Fa-f]{8})")
 DEF_RE = re.compile(

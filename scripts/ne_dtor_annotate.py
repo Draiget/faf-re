@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Auto-annotate defaulted/simple destructors in src/sdk.
+"""Auto-annotate defaulted/simple destructors in src.
 
 For each msvc_mangled dtor token in needs_evidence:
   1. Extract class name from `??1ClassName@...@...@@QAE@@Z`
-  2. Find `ClassName::~ClassName()` in src/sdk
+  2. Find `ClassName::~ClassName()` in src
   3. If found and the definition has no existing FUN_<addr> reference,
      print a candidate annotation to add.
 
@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROG = ROOT / "decomp" / "recovery" / "recovered_progress.json"
 DISASM = ROOT / "decomp" / "recovery" / "disasm" / "fa_full_2026_03_26"
-SRC = ROOT / "src" / "sdk"
+SRC = ROOT / "src"
 NAME_RE = re.compile(r"^# Function (.+)$", re.MULTILINE)
 DTOR_RE = re.compile(r"\?\?1([A-Za-z_][A-Za-z0-9_]*)@")
 
@@ -60,7 +60,7 @@ def main():
     if args.limit:
         candidates = candidates[: args.limit]
 
-    # For each, find `~ClassName() = default;` or `~ClassName()` in src/sdk
+    # For each, find `~ClassName() = default;` or `~ClassName()` in src
     ok_toks = []
     ok_annotations: dict[tuple[Path, int], list[str]] = {}
     for tok, name, cls in candidates:

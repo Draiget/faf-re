@@ -12,13 +12,13 @@ paths, working-tree and staged binary diffs, status.txt, SHA256.json, and a
 verified complete-history Git bundle. Copies were verified again before deletion.
 No build path references the archive.
 
-Removed 30 archived files: the entire 21-file `src/sdk/cri/sofdec/` tree, seven
+Removed 30 archived files: the entire 21-file `src/cri/sofdec/` tree, seven
 `moho/audio/Sofdec{Adx,M2a,Mpa}*Runtime.cpp` implementations, and
 `moho/movie/MPVDecoder.{h,cpp}`. Git retains history; the active source does not
 contain these implementations.
 
 Added the five independent header/implementation pairs under
-`src/sdk/moho/movie/sfd/`: IndependentSfdBackend, SfdHeaderParser, SfdMetadata,
+`src/moho/movie/sfd/`: IndependentSfdBackend, SfdHeaderParser, SfdMetadata,
 FfmpegSfdDecoder and DirectSoundMovieSink. Added this report, the compatibility
 profile, and the `tools/sfd-inspect` CMake diagnostic/test project.
 

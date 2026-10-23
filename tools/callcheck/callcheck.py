@@ -30,8 +30,8 @@ Findings:
               Lower signal (inlining is legal), listed per function.
 
 Usage:
-  python tools/callcheck/callcheck.py src/sdk/moho/sim src/sdk/moho/unit ...
-  python tools/callcheck/callcheck.py --fn FUN_006FC010 src/sdk/moho/entity
+  python tools/callcheck/callcheck.py src/moho/sim src/moho/unit ...
+  python tools/callcheck/callcheck.py --fn FUN_006FC010 src/moho/entity
   python tools/callcheck/callcheck.py --min-score 0.3 --top 80 --missing <paths>
 
 Refresh the anchor index first after edits: `python scripts/faidx.py update`.

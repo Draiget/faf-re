@@ -40,7 +40,7 @@ WHAT = [
     ("allocator", lambda n, p: n in ("malloc_0", "free", "operatornew", "realloc_0", "AllocateSmallBlocksAmount",
                                      "msvc8::detail::allocate_checked", "operator delete", "operatordelete")
      ),
-    ("Lua VM + LuaPlus", lambda n, p: p.startswith("src/sdk/lua/") or n.startswith(("lua", "LuaPlus::"))),
+    ("Lua VM + LuaPlus", lambda n, p: p.startswith("src/lua/") or n.startswith(("lua", "LuaPlus::"))),
     ("spatial query (COGrid)", lambda n, p: any(s in n for s in ("COGrid::", "EntityOccupationManager", "GatherUnmarked",
                                                                   "EntitiesAroundPoint", "CollectEntitiesInBox"))),
     ("collision math", lambda n, p: any(s in n for s in ("CollideBox", "ComputeBoxBoxContactManifold",

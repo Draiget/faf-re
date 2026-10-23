@@ -145,7 +145,7 @@ only come from the rebuilt engines.
 - **The 2007 floating-point environment.** The sim keeps some intermediate
   results in x87 registers at 24-bit precision, where SSE rounds every step —
   box-vs-box separating-axis radii, vector lengths, the Gaussian's logarithm.
-  These are reproduced with x87 helpers in `src/sdk/legacy/math/X87Math*`.
+  These are reproduced with x87 helpers in `src/legacy/math/X87Math*`.
 - **Call order in the random-number stream.** An extra or missing call to a
   function that draws from the sim's random stream shifts every later draw.
 - **Order validation.** Checks that accepted orders retail refuses — for

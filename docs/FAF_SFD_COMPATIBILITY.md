@@ -154,7 +154,7 @@ source/build information; consult [FFmpeg's license checklist](https://ffmpeg.or
 Initialize the Visual Studio developer shell and run:
 
 ```bat
-msbuild src/sdk/main.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
+msbuild src/main.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
 ```
 
 Repeat for Release and x64 as supported by the rest of the engine. See

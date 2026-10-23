@@ -9,7 +9,7 @@
 //	         | 0x01 string         -- SNetCommandArg::NETARG_String
 //	         | 0x02 string         -- SNetCommandArg::NETARG_Data (binary, e.g. NAT packets)
 //
-// The engine side is moho::CGpgNetInterface (src/sdk/moho/net/CGpgNetInterface.cpp).
+// The engine side is moho::CGpgNetInterface (src/moho/net/CGpgNetInterface.cpp).
 package gpgnet
 
 import (

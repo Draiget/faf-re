@@ -2,7 +2,7 @@
   "ok_recover": [
     {
       "token": "FUN_0128C620",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\moho\\net\\CNetUDPConnector.cpp",
+      "file": "G:\\projects\\faf-main\\src\\moho\\net\\CNetUDPConnector.cpp",
       "line": 906,
       "class": "CNetUDPConnector",
       "method": "Entry",
@@ -10,7 +10,7 @@
     },
     {
       "token": "FUN_005375C0",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\gpg\\core\\containers\\ReadArchive.cpp",
+      "file": "G:\\projects\\faf-main\\src\\gpg\\core\\containers\\ReadArchive.cpp",
       "line": 2390,
       "class": "ReadArchive",
       "method": "ReadPointer_RRuleGameRules",
@@ -18,7 +18,7 @@
     },
     {
       "token": "FUN_00654A70",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\moho\\effects\\rendering\\CEfxBeam.cpp",
+      "file": "G:\\projects\\faf-main\\src\\moho\\effects\\rendering\\CEfxBeam.cpp",
       "line": 110,
       "class": "CEfxBeam",
       "method": "ctor",
@@ -26,7 +26,7 @@
     },
     {
       "token": "FUN_006547C0",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\moho\\effects\\rendering\\CEfxBeam.cpp",
+      "file": "G:\\projects\\faf-main\\src\\moho\\effects\\rendering\\CEfxBeam.cpp",
       "line": 110,
       "class": "CEfxBeam",
       "method": "ctor",
@@ -34,7 +34,7 @@
     },
     {
       "token": "FUN_00937B90",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\gpg\\core\\utils\\Logging.cpp",
+      "file": "G:\\projects\\faf-main\\src\\gpg\\core\\utils\\Logging.cpp",
       "line": 443,
       "class": "LogContext",
       "method": "~LogContext",
@@ -42,7 +42,7 @@
     },
     {
       "token": "FUN_004CD460",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\moho\\lua\\CScrLuaClassBinder.cpp",
+      "file": "G:\\projects\\faf-main\\src\\moho\\lua\\CScrLuaClassBinder.cpp",
       "line": 42,
       "class": "CScrLuaClassBinder",
       "method": "Run",
@@ -50,7 +50,7 @@
     },
     {
       "token": "FUN_00501E50",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\moho\\mesh\\Mesh.cpp",
+      "file": "G:\\projects\\faf-main\\src\\moho\\mesh\\Mesh.cpp",
       "line": 842,
       "class": "SpatialDB_MeshInstance",
       "method": "~SpatialDB_MeshInstance",
@@ -58,7 +58,7 @@
     },
     {
       "token": "FUN_00715EB0",
-      "file": "G:\\projects\\faf-main\\src\\sdk\\moho\\ai\\CAiReconDBImpl.cpp",
+      "file": "G:\\projects\\faf-main\\src\\moho\\ai\\CAiReconDBImpl.cpp",
       "line": 1358,
       "class": "CAiReconDBImpl",
       "method": "CheckIntelEvents",
