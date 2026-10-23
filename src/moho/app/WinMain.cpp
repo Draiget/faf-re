@@ -226,7 +226,7 @@ namespace
   };
   DelayedCrashRequest gDelayedCrashRequest;
 
-  void RunCrashTest(const char* kind); // defined below, beside its docs
+  [[noreturn]] void RunCrashTest(const char* kind); // defined below, beside its docs
 
   DWORD WINAPI DelayedCrashThread(LPVOID)
   {

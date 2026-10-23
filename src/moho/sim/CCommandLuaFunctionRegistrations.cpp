@@ -3547,8 +3547,8 @@ namespace moho
       return 0;
     }
 
-    constexpr float kPositiveInfinity = gpg::pInf;
-    constexpr float kNegativeInfinity = gpg::nInf;
+    const float kPositiveInfinity = gpg::pInf;
+    const float kNegativeInfinity = gpg::nInf;
     constexpr float kBoxMargin = 20.0f;
 
     float minX = kPositiveInfinity;

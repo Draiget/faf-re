@@ -179,6 +179,10 @@
 #include "Wm3Vector3.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
+
+// The MSVC runtime's polymorphic typeid entry point (vcruntime). cl declares
+// it implicitly; clang-cl needs the declaration.
+extern "C" void* __cdecl __RTtypeid(void* object);
 using namespace gpg;
 
 

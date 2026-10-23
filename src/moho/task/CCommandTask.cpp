@@ -579,7 +579,7 @@ namespace moho
    * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
    * Address: 0x0060CFC0 (FUN_0060CFC0, shared callback body)
    */
-  void CCommandTask::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& const)
+  void CCommandTask::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -612,7 +612,7 @@ namespace moho
    * Address: 0x00608DF0 (FUN_00608DF0, Moho::CCommandTaskSerializer::Serialize)
    * Address: 0x0060D0C0 (FUN_0060D0C0, shared callback body)
    */
-  void CCommandTask::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& const)
+  void CCommandTask::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&)
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

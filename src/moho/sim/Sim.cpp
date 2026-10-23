@@ -6738,7 +6738,7 @@ void CDebugCanvas::Render(
     primBatcher->DrawLine(start, end);
   }
 
-  constexpr float kNoMaxAdvance = gpg::NaN;
+  const float kNoMaxAdvance = gpg::NaN;
   for (const SDebugScreenText& text : screenText) {
     boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(text.pointSize, "Ariel");
     CD3DFont* const font = rawFont.px;
@@ -26367,7 +26367,7 @@ namespace moho
     // concrete, valid point that violates the focus army's no-rush constraints.
     bool shouldIssue = true;
     if (data.mTarget.mType != EAiTargetType::AITARGET_None) {
-      constexpr float kInvalidLane = gpg::NaN;
+      const float kInvalidLane = gpg::NaN;
       Wm3::Vec3f targetPoint{kInvalidLane, kInvalidLane, kInvalidLane};
 
       if (data.mTarget.mType == EAiTargetType::AITARGET_Entity) {
