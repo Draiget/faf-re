@@ -1198,9 +1198,8 @@ namespace
     moho::WeakPtr<moho::Entity>& dstWeak = dst.TargetWeakLink();
     const moho::WeakPtr<moho::Entity>& srcWeak = src.TargetWeakLink();
 
-    if (dstWeak.ownerLinkSlot != srcWeak.ownerLinkSlot) {
-      dstWeak.ResetFromOwnerLinkSlot(srcWeak.ownerLinkSlot);
-    }
+    // `WeakPtr::operator=`: nothing when both already name one chain.
+    dstWeak = srcWeak;
 
     dst.mParentBoneIndex = src.mParentBoneIndex;
     dst.mChildBoneIndex = src.mChildBoneIndex;

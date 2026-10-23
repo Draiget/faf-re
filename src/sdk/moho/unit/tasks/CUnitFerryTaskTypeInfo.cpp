@@ -32,17 +32,14 @@ namespace
       mCommandIndex = 0;
       mHasResolvedFerryTarget = false;
 
-      mCommandUnit.ownerLinkSlot = nullptr;
-      mCommandUnit.nextInOwner = nullptr;
-      mFerryUnit.ownerLinkSlot = nullptr;
-      mFerryUnit.nextInOwner = nullptr;
+      mCommandUnit.ClearLinkState();
+      mFerryUnit.ClearLinkState();
 
       mPos.x = 0.0f;
       mPos.y = 0.0f;
       mPos.z = 0.0f;
 
-      mBeacon.ownerLinkSlot = nullptr;
-      mBeacon.nextInOwner = nullptr;
+      mBeacon.ClearLinkState();
     }
 
     ~CUnitFerryTaskReflection() override

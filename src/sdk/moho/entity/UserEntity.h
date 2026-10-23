@@ -30,20 +30,10 @@ namespace moho
   class UserEntity : public WeakObject
   {
   public:
-    /**
-     * Weak references use the WeakObject base at +0x08. The canonical inline
-     * attachment vector supplies the original eight-byte alignment, leaving
-     * +0x04 as vfptr padding rather than a second weak-reference head.
-     */
-    [[nodiscard]] static void* WeakLinkHeadOf(UserEntity* const entity) noexcept
-    {
-      return static_cast<WeakObject*>(entity);
-    }
-
-    [[nodiscard]] static UserEntity* FromWeakLinkHead(void* const head) noexcept
-    {
-      return static_cast<UserEntity*>(static_cast<WeakObject*>(head));
-    }
+    // Weak references use the WeakObject base at +0x08, the entity's only one,
+    // so `WeakPtr<UserEntity>` needs no `WeakBase`. The canonical inline
+    // attachment vector supplies the original eight-byte alignment, leaving
+    // +0x04 as vfptr padding rather than a second weak-reference head.
 
     /**
      * Address: 0x008B85E0 (FUN_008B85E0, ??0UserEntity@Moho@@QAE@AAVCWldSession@1@ABUSCreateEntityParams@1@@Z)

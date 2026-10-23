@@ -4,13 +4,21 @@
 
 namespace moho
 {
-  template <class T>
-  struct WeakPtr;
+  struct WeakPtrNode;
 
   /**
    * The head of the chain of `WeakPtr`s aimed at an object. A class that can be
    * weakly referenced derives from this; `WeakPtr<T>` casts to it to find the
    * chain, and each node's `ownerLinkSlot` holds the address of this head.
+   *
+   * The chain is typed by `WeakPtrNode`, the data half every `WeakPtr<T>`
+   * shares, and the slot by `WeakObject*` (type-safe node/owner typing after
+   * 4z0t's `Refaf::WeakObject`, FA-Binary-Patches). Unlike his CRTP
+   * `WeakObject<T>`, this stays one non-template class: nodes hold the address
+   * of a `WeakObject` sub-object, so a derived type references itself through
+   * a base's head (`WeakPtr<Unit>` and `WeakPtr<IUnit>` share `IUnit`'s), and
+   * an owner may carry several (`Unit`, `UserUnit`) or keep one as a member
+   * (`UserArmy::mWeakRefs`).
    */
   class WeakObject
   {
@@ -79,8 +87,8 @@ namespace moho
     ~WeakObject() noexcept;
 
     // The first `WeakPtr` aimed at this object, or null. Every node on the
-    // chain holds this member's address in its `ownerLinkSlot`.
-    WeakPtr<void>* weakLinkHead_;
+    // chain holds this object's address in its `ownerLinkSlot`.
+    WeakPtrNode* weakLinkHead_;
   };
 
   static_assert(sizeof(WeakObject) == sizeof(void*), "WeakObject must be one pointer");

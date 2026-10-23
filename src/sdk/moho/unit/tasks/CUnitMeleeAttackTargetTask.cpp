@@ -382,7 +382,7 @@ namespace moho
     mTarget.targetIsMobile = false;
     if (target != nullptr) {
       mTarget.targetType = target->targetType;
-      mTarget.targetEntity.ResetFromOwnerLinkSlot(target->targetEntity.ownerLinkSlot);
+      mTarget.targetEntity = target->targetEntity;
       mTarget.position = target->position;
       mTarget.targetPoint = target->targetPoint;
       mTarget.targetIsMobile = target->targetIsMobile;

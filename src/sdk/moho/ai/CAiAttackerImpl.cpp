@@ -172,8 +172,7 @@ namespace
   {
     CAiTarget target{};
     target.targetType = EAiTargetType::AITARGET_None;
-    target.targetEntity.ownerLinkSlot = nullptr;
-    target.targetEntity.nextInOwner = nullptr;
+    target.targetEntity.ClearLinkState();
     target.targetPoint = -1;
     target.targetIsMobile = false;
     return target;

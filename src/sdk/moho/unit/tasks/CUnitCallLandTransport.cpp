@@ -298,8 +298,7 @@ namespace moho
   CUnitCallLandTransport::CUnitCallLandTransport()
     : CCommandTask()
   {
-    mTargetTransportUnit.ownerLinkSlot = nullptr;
-    mTargetTransportUnit.nextInOwner = nullptr;
+    mTargetTransportUnit.ClearLinkState();
     mBeamupTime = 0.0f;
     mSourceTransform.orient_ = Wm3::Quatf::Identity();
     mSourceTransform.pos_ = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
