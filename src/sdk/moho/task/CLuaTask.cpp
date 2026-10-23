@@ -9,11 +9,13 @@
 #include "CTaskThread.h"
 #include "CWaitForTask.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StatItem.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/SimThreadRole.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -298,6 +300,9 @@ int CLuaTask::Execute()
       gpg::Warnf(
         "Error running lua script from destroyed thread: %s", LuaPlus::LuaStackObject(state, -1).GetString()
       );
+      if (IsSimThread()) {
+        gpg::diag::NoteSimLuaError(LuaPlus::LuaStackObject(state, -1).GetString()); // engine addition (default off)
+      }
     }
 
     delete state;
@@ -308,6 +313,9 @@ int CLuaTask::Execute()
 
   if (resumeResult != 0) {
     gpg::Warnf("Error running lua script: %s", LuaPlus::LuaStackObject(state, -1).GetString());
+    if (IsSimThread()) {
+      gpg::diag::NoteSimLuaError(LuaPlus::LuaStackObject(state, -1).GetString()); // engine addition (default off)
+    }
     return -1;
   }
 

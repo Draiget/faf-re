@@ -133,6 +133,24 @@ order and run finalizers in the same order as the original, so the
 accounting that triggers it (`nblocks`, `GCthreshold`) is untouched.
 `FAF_LUAGC_TIMING=1` logs the phases of every sim collection.
 
+Two debugging aids, both off by default:
+
+- `lua_GcVerify` (console variable, `/con lua_GcVerify=1`): every parallel sim
+  collection is checked against a serial mark and sweep. It compares mark bytes
+  and weak-table lists after both propagations and the sweep's live/dead
+  classification. After the mark it checks that no marked weak table refers to
+  an unmarked object, that no live closure keeps an open upvalue into a dead
+  thread, and that the LuaObject root list is intact. Findings are `[GCVERIFY]`
+  warnings, and every 100th clean collection logs `[GCVERIFY-OK]`. It roughly
+  doubles collector time and stretches each sim mark, which also widens the
+  window for races between the sim and other threads.
+- `FAF_DUMP_ON_SIM_LUA_ERROR=<n>` (environment): the first n sim Lua script
+  errors each write a full-memory minidump and the error text beside the exe
+  (`faf_luaerr_*.dmp/.txt`), then the game continues.
+  `FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE` lists `;`-separated substrings of errors
+  to skip, for errors a replay always logs (benchmark replay: `SetSpinDown;Failed
+  to attach entity`).
+
 **Collector on the sim workers** (`lua_ParallelMark`, `lua_ParallelSweep`):
 
 - **Mark.** Objects are claimed by an atomic test-and-set of the same mark bit
@@ -204,6 +222,7 @@ thread or session starts.
 | `sim_ParallelSync` | 1 | `/con` | live | Sync packet unit updates filled on sim workers (needs `sim_Workers` > 0) |
 | `lua_ParallelMark` | 1 | `/con` | live (next collection) | Lua GC mark on sim workers (needs `sim_Workers` > 0): propagation, thread stacks, the LuaPlus root objects, weak-table clearing and the userdata separation; stack shrinks, the GC hook and finalizers stay serial |
 | `lua_ParallelSweep` | 1 | `/con` | live (next collection) | Lua GC sweep: live/dead classification and mark reset on sim workers (needs `sim_Workers` > 0); every free stays on the sim thread, in the original list order |
+| `lua_GcVerify` | 0 | `/con` | live (next collection) | Debug only: check each parallel sim collection against a serial one, see [Lua](#lua) |
 | `sim_DeferBlipUnlinks` | 1 | `/con` | live | Dropped blips-in-range lists leave their weak chains in one bulk pass instead of one chain walk per blip |
 | `sim_DeferBlipUnlinksTicks` | 4 | `/con` | live | Ticks between those bulk passes |
 | `sim_ExemptCheckInPlace` | 1 | `/con` | live | Target exemption reads the command queue instead of copying it |

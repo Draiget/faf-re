@@ -78,6 +78,18 @@ namespace gpg::diag
    */
   bool WriteCrashMinidump(_EXCEPTION_POINTERS* exceptionInfo);
 
+  /**
+   * Engine addition, debugging aid (default off): a sim Lua script error was just logged.
+   *
+   * With `FAF_DUMP_ON_SIM_LUA_ERROR=<n>` (n >= 1) the first n errors whose text contains none
+   * of the `;`-separated substrings in `FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE` each write a
+   * full-memory minidump `<exe dir>\faf_luaerr_<time>_<k>.dmp` and the error text (with its
+   * traceback) beside it as `.txt`; the run then continues. The heap at the moment a corrupted
+   * object first surfaces in Lua is usually the best evidence of what corrupted it. Without the
+   * variable this is one cached test.
+   */
+  void NoteSimLuaError(const char* message);
+
   /** Copies the report text to the clipboard (CF_UNICODETEXT, no CRT heap). */
   void CopyCrashReportToClipboard();
 
