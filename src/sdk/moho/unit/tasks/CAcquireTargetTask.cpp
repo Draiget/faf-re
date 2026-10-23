@@ -633,15 +633,11 @@ namespace moho
     }
 
     outTarget->targetType = sourceTarget->targetType;
-    outTarget->targetEntity.ownerLinkSlot = sourceTarget->targetEntity.ownerLinkSlot;
-    if (outTarget->targetEntity.ownerLinkSlot != nullptr) {
-      auto** const ownerHead =
-        reinterpret_cast<WeakPtr<Entity>**>(outTarget->targetEntity.ownerLinkSlot);
-      outTarget->targetEntity.nextInOwner = *ownerHead;
-      *ownerHead = &outTarget->targetEntity;
-    } else {
-      outTarget->targetEntity.nextInOwner = nullptr;
-    }
+    // 0x005D79C0..0x005D79E1 is `WeakPtr`'s copy constructor: the slot is taken
+    // from the source and the node pushed onto that chain's head, with no compare
+    // and no unlink first. Both callers pass a freshly constructed, unlinked
+    // target, so constructing the weak pointer over it is that exact step.
+    ::new (&outTarget->targetEntity) WeakPtr<Entity>(sourceTarget->targetEntity);
 
     outTarget->position = sourceTarget->position;
     outTarget->targetPoint = sourceTarget->targetPoint;

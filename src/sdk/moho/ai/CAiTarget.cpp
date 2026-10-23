@@ -26,28 +26,6 @@ namespace
 {
   constexpr std::uint32_t kMissingTargetEntityId = 0xF0000000u;
 
-  /**
-   * Address: 0x005A6DE0 (FUN_005A6DE0)
-   *
-   * What it does:
-   * Unlinks one weak-entity node from its owner-chain intrusive slot by
-   * replacing the node reference with the stored `nextInOwner` lane.
-   */
-  [[maybe_unused]] WeakPtr<Entity>** UnlinkWeakEntityNodeFromOwnerChain(
-    WeakPtr<Entity>* const node
-  ) noexcept
-  {
-    WeakPtr<Entity>** cursor = reinterpret_cast<WeakPtr<Entity>**>(node->ownerLinkSlot);
-    if (cursor != nullptr) {
-      while (*cursor != node) {
-        cursor = &(*cursor)->nextInOwner;
-      }
-      *cursor = node->nextInOwner;
-    }
-
-    return cursor;
-  }
-
   // `CAiTarget::DecodeFromSSTITarget` (0x005E2620) resolves an id with
   // `std::map<EntId, Entity*>::find` over `EntityDB::mAllUnits`, collapsing a
   // miss onto the head node -- which is exactly `EntityDB::FindEntityById`
@@ -192,9 +170,9 @@ CAiTarget::~CAiTarget()
 void CAiTarget::CopyFromLinkedTarget(const CAiTarget& source)
 {
   targetType = source.targetType;
-  if (targetEntity.ownerLinkSlot != source.targetEntity.ownerLinkSlot) {
-    targetEntity.ResetFromOwnerLinkSlot(source.targetEntity.ownerLinkSlot);
-  }
+  // `WeakPtr::operator=`: nothing when both name one chain, else unlink and
+  // relink (0x005D5677 `cmp [esi+4], edx; jz`).
+  targetEntity = source.targetEntity;
   position = source.position;
   targetPoint = source.targetPoint;
   targetIsMobile = source.targetIsMobile;

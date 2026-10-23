@@ -12485,7 +12485,7 @@ namespace
       std::sort(mChains.begin(), mChains.end());
       std::sort(mBlocks.begin(), mBlocks.end(), [](const auto& lhs, const auto& rhs) { return lhs.begin < rhs.begin; });
 
-      const auto isWaiting = [this](const moho::WeakPtr<moho::Entity>* const node) {
+      const auto isWaiting = [this](const moho::WeakPtrNode* const node) {
         const auto after = std::upper_bound(
           mBlocks.begin(), mBlocks.end(), node, [](const auto* const value, const auto& block) { return value < block.begin; }
         );
@@ -12530,12 +12530,12 @@ namespace
 
     struct ChainRun
     {
-      void* head;
+      moho::WeakObject* head;
       std::size_t count;
     };
 
     std::vector<BlipList::ReleasedBlock> mBlocks;
-    std::vector<void*> mChains;
+    std::vector<moho::WeakObject*> mChains;
     std::vector<ChainRun> mChainRuns;
     std::size_t mNodeCount = 0;
     std::uint32_t mTick = 0;

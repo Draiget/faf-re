@@ -126,8 +126,7 @@ namespace moho
     , mCommand(nullptr)
     , mTargetUnit{}
   {
-    mTargetUnit.ownerLinkSlot = nullptr;
-    mTargetUnit.nextInOwner = nullptr;
+    mTargetUnit.ClearLinkState();
   }
 
   /**

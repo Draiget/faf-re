@@ -77,16 +77,6 @@ namespace moho
       return mAttachTargetWeak;
     }
 
-    [[nodiscard]] SEntAttachInfo*& NextAttachInfo() noexcept
-    {
-      return reinterpret_cast<SEntAttachInfo*&>(mAttachTargetWeak.nextInOwner);
-    }
-
-    [[nodiscard]] const SEntAttachInfo* NextAttachInfo() const noexcept
-    {
-      return reinterpret_cast<const SEntAttachInfo*>(mAttachTargetWeak.nextInOwner);
-    }
-
     [[nodiscard]] bool HasAttachTarget() const noexcept
     {
       return TargetWeakLink().HasValue();

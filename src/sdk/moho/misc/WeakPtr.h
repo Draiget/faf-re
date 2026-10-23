@@ -1,8 +1,10 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <new>
+#include <type_traits>
 
 #include "legacy/containers/Vector.h"
 #include "moho/misc/WeakObject.h"
@@ -27,6 +29,136 @@ namespace moho
   class UserEntity;
   class UserUnit;
 
+  /**
+   * The type-erased half of a `WeakPtr`: one node on the chain a `WeakObject`
+   * heads, whatever `T` the full pointer is declared over.
+   *
+   * A node stores the address of a `WeakObject` sub-object, not the `T*`, and
+   * each `WeakPtr<T>` decodes that address with its own cast; so pointers of
+   * different `T` share a chain whenever they resolve to the same `WeakObject`.
+   * `WeakPtr<Unit>` (0x0057D4F0, `unit + 4`) and `WeakPtr<IUnit>` (0x0056AA00)
+   * both land on the unit's `IUnit` head, while a `WeakPtr<Entity>` aimed at
+   * the same unit lands on the other one, +0x0C through `Entity`'s
+   * `CScriptObject`. The chain is therefore typed by this base, which every
+   * `WeakPtr<T>` shares, and every walk (`WeakPtr`'s link and unlink,
+   * `WeakObject::DetachAllWeakReferences`, `WeakPtr::SpliceOutOfChain`) runs
+   * over `WeakPtrNode`s; only the conversion between the owner and its
+   * `WeakObject` needs `T` (`WeakPtr<T>::EncodeOwnerLinkSlot` /
+   * `DecodeOwnerObject`).
+   *
+   * Type-safe node/owner typing after 4z0t's `Refaf::WeakObject`
+   * (FA-Binary-Patches, include/Refaf/WeakObject.h), which pointed out that the
+   * old `void*` slot and `WeakPtr<void>` head accepted any pointer at all. His
+   * version makes the owner a CRTP `WeakObject<T>`; Moho's is one non-template
+   * `WeakObject`, because a derived type references itself through a base's
+   * `WeakObject` (`WeakPtr<Unit>` through `IUnit`'s) and some owners keep
+   * several, or one as a member (`UserArmy::mWeakRefs`). So here the node is
+   * typed and the owner stays as the binary has it.
+   *
+   * The node is copied only through `WeakPtr`, which relinks; copying the two
+   * words alone would put a node on a chain it was never linked onto.
+   */
+  struct WeakPtrNode
+  {
+    WeakObject* ownerLinkSlot; // the owner's weak-chain head (`EncodeOwnerLinkSlot`), or null
+    WeakPtrNode* nextInOwner;  // intrusive next node in owner chain
+
+    /**
+     * Blanks both words without touching any chain.
+     *
+     * Only correct on a node that is on no chain. The binary does this where a
+     * node is being built in place: `CAiTarget`'s decode from an `SSTITarget`
+     * (0x005E2650) and ground-target paths write `[this+4] = [this+8] = 0` over
+     * fresh storage.
+     */
+    void ClearLinkState() noexcept
+    {
+      ownerLinkSlot = nullptr;
+      nextInOwner = nullptr;
+    }
+
+  protected:
+    WeakPtrNode() noexcept
+      : ownerLinkSlot(nullptr)
+      , nextInOwner(nullptr)
+    {}
+
+    /** Binds the slot only; the caller links the node, which sets `nextInOwner`. */
+    explicit WeakPtrNode(WeakObject* const slot) noexcept
+      : ownerLinkSlot(slot)
+    {}
+
+    WeakPtrNode(const WeakPtrNode&) = delete;
+    WeakPtrNode& operator=(const WeakPtrNode&) = delete;
+    ~WeakPtrNode() = default;
+  };
+
+  /**
+   * The base whose `WeakObject` a `WeakPtr<T>` links onto: `T::WeakBase` when
+   * `T` declares one, otherwise `T` itself, i.e. its one `WeakObject` base.
+   *
+   * A type with more than one `WeakObject` declares which one its weak
+   * references use, without adding storage: `Unit` (`WeakObject`s at +0x04
+   * through `IUnit` and +0x0C through `Entity`'s `CScriptObject`) declares
+   * `using WeakBase = IUnit;`, `UserUnit` (+0x08 through `UserEntity`, +0x14C
+   * through `IUnit`, +0x154 through `CScriptObject`) `using WeakBase =
+   * UserEntity;`. A type derived from one of them inherits the choice, which
+   * is how the binary has it: a derived type references itself through a
+   * base's `WeakObject`. (The declaration is the compile-time half of 4z0t's
+   * CRTP `WeakObject<T>`; a `WeakObject<X>` base per type would add a pointer
+   * of storage each and split chains the binary shares.)
+   */
+  template <class T>
+  struct WeakBaseSelector
+  {
+    using type = T;
+  };
+
+  template <class T>
+    requires requires { typename T::WeakBase; }
+  struct WeakBaseSelector<T>
+  {
+    using type = typename T::WeakBase;
+  };
+
+  template <class T>
+  using WeakBaseOf = typename WeakBaseSelector<T>::type;
+
+  /**
+   * `T` reaches its chain through a base: `T` is (or derives from) its
+   * `WeakBaseOf<T>`, which has exactly one `WeakObject` base.
+   */
+  template <class T>
+  concept ReferencedThroughWeakBase =
+    std::derived_from<T, WeakBaseOf<T>> && std::convertible_to<WeakBaseOf<T>*, WeakObject*>;
+
+  /**
+   * `T` names a chain that is not a base with a pair of static hooks:
+   * `WeakLinkHeadOf(T*) -> WeakObject*` (null for a null object) and its
+   * inverse `FromWeakLinkHead(WeakObject*) -> T*`. `UserArmy` is the one
+   * owner that needs them: its head is the member `mWeakRefs` at +0x1E0.
+   */
+  template <class T>
+  concept HasWeakLinkHeadHooks = requires(T* const object, WeakObject* const head) {
+    { T::WeakLinkHeadOf(object) } -> std::same_as<WeakObject*>;
+    { T::FromWeakLinkHead(head) } -> std::same_as<T*>;
+  };
+
+  /**
+   * What a `WeakPtr<T>` may point at: an object whose chain is a `WeakObject`
+   * base (`ReferencedThroughWeakBase`), or one that says where its chain is
+   * (`HasWeakLinkHeadHooks`).
+   *
+   * `EncodeOwnerLinkSlot` and `DecodeOwnerObject`, the two members every
+   * `T*`-facing operation goes through, assert it in their bodies. It cannot
+   * constrain the class or the member declarations: `WeakPtr<T>` is routinely a
+   * member while `T` is only forward-declared, and a constraint checked there
+   * (an overload set that includes the hidden `operator==`, say) would be
+   * evaluated, and cached as false, before `T` is complete. A body is only
+   * instantiated where `T` is complete, which those two need anyway.
+   */
+  template <class T>
+  concept WeakPtrTarget = HasWeakLinkHeadHooks<T> || ReferencedThroughWeakBase<T>;
 
   /**
    * Moho's intrusive weak pointer: an 8-byte node on a singly linked chain that
@@ -43,18 +175,19 @@ namespace moho
    * `LinkAtOwnerHead` (push-front) and `UnlinkFromOwner` (walk to the node and
    * splice it out). The walk has no null test: a node with a slot is always on
    * the chain that slot heads, so the binary never looks for the end.
+   *
+   * Both words live in the `WeakPtrNode` base; this template adds no data. The
+   * chain operations stay members of the template, not of the base, because
+   * the binary carries a separate emission of each per `T` (the address lists
+   * below).
    */
   template <class T>
-  struct WeakPtr
+  struct WeakPtr : WeakPtrNode
   {
     inline static gpg::RType* sType = nullptr;
 
-    void* ownerLinkSlot;     // the owner's weak-chain head (`EncodeOwnerLinkSlot`), or null
-    WeakPtr<T>* nextInOwner; // intrusive next node in owner chain
-
     WeakPtr() noexcept
-      : ownerLinkSlot(nullptr)
-      , nextInOwner(nullptr)
+      : WeakPtrNode()
     {}
 
     /**
@@ -74,7 +207,7 @@ namespace moho
      * out by hand.
      */
     explicit WeakPtr(T* const object) noexcept
-      : ownerLinkSlot(EncodeOwnerLinkSlot(object))
+      : WeakPtrNode(EncodeOwnerLinkSlot(object))
     {
       LinkAtOwnerHead();
     }
@@ -107,7 +240,7 @@ namespace moho
      * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
     WeakPtr(const WeakPtr<T>& other) noexcept
-      : ownerLinkSlot(other.ownerLinkSlot)
+      : WeakPtrNode(other.ownerLinkSlot)
     {
       LinkAtOwnerHead();
     }
@@ -147,16 +280,21 @@ namespace moho
      * `CMauiControl` (0x0079DB80), `+0x14` for `UnitWeapon`, whose
      * `CScriptObject` sits behind its `CTaskEvent` (0x00632CA0), `+0x170` and
      * `+0x178` for the managed wx dialog and frame. An owner with several
-     * `WeakObject`s, or none, says where its chain is with a static
-     * `WeakLinkHeadOf` of its own.
+     * `WeakObject`s names the base whose one it uses (`WeakBaseOf`; `+0x04`
+     * through `IUnit` for `Unit`, 0x0057D4F0), and one whose chain is not a
+     * base says where it is with static `WeakLinkHeadOf` / `FromWeakLinkHead`
+     * hooks of its own (`HasWeakLinkHeadHooks`).
      */
-    [[nodiscard]] static void* EncodeOwnerLinkSlot(T* const object) noexcept
+    [[nodiscard]] static WeakObject* EncodeOwnerLinkSlot(T* const object) noexcept
     {
-      if constexpr (requires { T::WeakLinkHeadOf(object); }) {
+      static_assert(
+        WeakPtrTarget<T>,
+        "WeakPtr<T>: T needs one WeakObject base, a `using WeakBase` naming the base whose WeakObject it uses, or static WeakLinkHeadOf/FromWeakLinkHead hooks"
+      );
+      if constexpr (HasWeakLinkHeadHooks<T>) {
         return T::WeakLinkHeadOf(object);
       } else {
-        WeakObject* const weak = object;
-        return weak;
+        return static_cast<WeakBaseOf<T>*>(object);
       }
     }
 
@@ -171,12 +309,16 @@ namespace moho
      * anywhere in the image. Formerly `ResolveBackLinkNodeOwner` in
      * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
-    [[nodiscard]] static T* DecodeOwnerObject(void* const slot) noexcept
+    [[nodiscard]] static T* DecodeOwnerObject(WeakObject* const slot) noexcept
     {
-      if constexpr (requires { T::FromWeakLinkHead(slot); }) {
+      static_assert(
+        WeakPtrTarget<T>,
+        "WeakPtr<T>: T needs one WeakObject base, a `using WeakBase` naming the base whose WeakObject it uses, or static WeakLinkHeadOf/FromWeakLinkHead hooks"
+      );
+      if constexpr (HasWeakLinkHeadHooks<T>) {
         return T::FromWeakLinkHead(slot);
       } else {
-        return static_cast<T*>(static_cast<WeakObject*>(slot));
+        return static_cast<T*>(static_cast<WeakBaseOf<T>*>(slot));
       }
     }
 
@@ -232,20 +374,6 @@ namespace moho
     }
 
     /**
-     * Blanks both words without touching any chain.
-     *
-     * Only correct on a node that is on no chain. The binary does this where a
-     * node is being built in place: `CAiTarget`'s decode from an `SSTITarget`
-     * (0x005E2650) and ground-target paths write `[this+4] = [this+8] = 0` over
-     * fresh storage.
-     */
-    void ClearLinkState() noexcept
-    {
-      ownerLinkSlot = nullptr;
-      nextInOwner = nullptr;
-    }
-
-    /**
      * Address: 0x0057D610 (FUN_0057D610)
      * Address: 0x005419A0 (FUN_005419A0)
      * Address: 0x005DB430 (FUN_005DB430)
@@ -263,7 +391,7 @@ namespace moho
      * new one (or `nextInOwner = 0` for a null slot).
      * Address: 0x007A5610 (FUN_007A5610 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` (unlink from the old chain, relink at the requested owner head); callers 0x007A4970; formerly `RebindIntrusiveOwnerSlotNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      */
-    void ResetFromOwnerLinkSlot(void* const newOwnerLinkSlot) noexcept
+    void ResetFromOwnerLinkSlot(WeakObject* const newOwnerLinkSlot) noexcept
     {
       if (newOwnerLinkSlot == ownerLinkSlot) {
         return;
@@ -346,13 +474,14 @@ namespace moho
      *
      * It touches only this chain (its head and its nodes), so different chains may be spliced on
      * different threads at once (`sim_ParallelBlipFlush`); one chain must stay on one thread.
+     * `isLeaving` sees each node as a `WeakPtrNode`: other `WeakPtr` types may share the chain.
      */
     template <class IsLeaving>
-    static void SpliceOutOfChain(void* const chainSlot, std::size_t count, IsLeaving&& isLeaving) noexcept
+    static void SpliceOutOfChain(WeakObject* const chainSlot, std::size_t count, IsLeaving&& isLeaving) noexcept
     {
-      WeakPtr<T>** cursor = static_cast<WeakPtr<T>**>(chainSlot);
+      WeakPtrNode** cursor = &chainSlot->weakLinkHead_;
       while (count != 0 && *cursor != nullptr) {
-        WeakPtr<T>* const node = *cursor;
+        WeakPtrNode* const node = *cursor;
         if (isLeaving(node)) {
           *cursor = node->nextInOwner;
           node->ClearLinkState();
@@ -364,10 +493,14 @@ namespace moho
     }
 
   private:
-    /** The chain `ownerLinkSlot` heads: the owner's `WeakObject`, read as a node pointer. */
-    [[nodiscard]] WeakPtr<T>** OwnerChainHead() const noexcept
+    /**
+     * The chain `ownerLinkSlot` heads: the owner's `WeakObject::weakLinkHead_`.
+     * That member leads the `WeakObject`, so this is the slot address itself, as
+     * the binary uses it (`mov ecx, [slot]`).
+     */
+    [[nodiscard]] WeakPtrNode** OwnerChainHead() const noexcept
     {
-      return static_cast<WeakPtr<T>**>(ownerLinkSlot);
+      return &ownerLinkSlot->weakLinkHead_;
     }
 
     /**
@@ -388,7 +521,7 @@ namespace moho
       }
 
       MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-      WeakPtr<T>** const head = OwnerChainHead();
+      WeakPtrNode** const head = OwnerChainHead();
       nextInOwner = *head;
       *head = this;
     }
@@ -408,7 +541,7 @@ namespace moho
       }
 
       MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-      WeakPtr<T>** cursor = OwnerChainHead();
+      WeakPtrNode** cursor = OwnerChainHead();
       while (*cursor != this) {
         cursor = &(*cursor)->nextInOwner;
       }
@@ -416,15 +549,31 @@ namespace moho
     }
   };
 
-  static_assert(sizeof(WeakPtr<void>) == 0x08, "WeakPtr<T> must be 8 bytes");
-  static_assert(offsetof(WeakPtr<void>, ownerLinkSlot) == 0x00, "WeakPtr<T>::ownerLinkSlot offset must be 0x00");
-  static_assert(offsetof(WeakPtr<void>, nextInOwner) == 0x04, "WeakPtr<T>::nextInOwner offset must be 0x04");
+  // `WeakPtr<WeakObject>` stands for every `WeakPtr<T>`: the template adds no data to the node.
+  static_assert(sizeof(WeakPtr<WeakObject>) == 0x08, "WeakPtr<T> must be 8 bytes");
+  static_assert(offsetof(WeakPtr<WeakObject>, ownerLinkSlot) == 0x00, "WeakPtr<T>::ownerLinkSlot offset must be 0x00");
+  static_assert(offsetof(WeakPtr<WeakObject>, nextInOwner) == 0x04, "WeakPtr<T>::nextInOwner offset must be 0x04");
+
+  // The same layout in pointer units, checked on x64 too: X64LayoutAsserts.h turns `static_assert`
+  // off there for the x86-only numbers, and these hold on both.
+#pragma push_macro("static_assert")
+#undef static_assert
+  static_assert(sizeof(WeakPtrNode) == 2 * sizeof(void*), "WeakPtrNode must be two pointers");
+  static_assert(sizeof(WeakPtr<WeakObject>) == sizeof(WeakPtrNode), "WeakPtr<T> must add no data to WeakPtrNode");
+  static_assert(offsetof(WeakPtr<WeakObject>, ownerLinkSlot) == 0, "WeakPtr<T>::ownerLinkSlot must lead the node");
+  static_assert(
+    offsetof(WeakPtr<WeakObject>, nextInOwner) == sizeof(void*), "WeakPtr<T>::nextInOwner must follow ownerLinkSlot"
+  );
+  static_assert(std::is_standard_layout_v<WeakPtr<WeakObject>>, "WeakPtr<T> must stay standard layout");
+#pragma pop_macro("static_assert")
 
   /**
    * Address: 0x005A6DE0 (FUN_005A6DE0, `WeakPtr<Entity>`'s emission -- the
    * `CDamage` copy-ctor unwind funclets at 0x00BAC2EF / 0x00BAC2FA reach it
    * as `mov ecx,[ebp+4]; add ecx,38h/40h; jmp sub_5A6DE0`, i.e. as the
-   * member destructor of the two weak lanes)
+   * member destructor of the two weak lanes. Also anchored on an uncalled
+   * `UnlinkWeakEntityNodeFromOwnerChain` copy of this walk in
+   * moho/ai/CAiTarget.cpp, removed 2026-10-23.)
    * Address: 0x0056AA50 (FUN_0056AA50, Moho::WeakPtr_IUnit::~WeakPtr_IUnit --
    * the `WeakPtr<IUnit>` emission of this same body)
    * Address: 0x004F7210 (FUN_004F7210 -- the `WeakPtr<WWinManagedDialog>`
@@ -497,7 +646,7 @@ namespace moho
   inline void WeakObject::DetachAllWeakReferences() noexcept
   {
     while (weakLinkHead_ != nullptr) {
-      WeakPtr<void>* const node = weakLinkHead_;
+      WeakPtrNode* const node = weakLinkHead_;
       weakLinkHead_ = node->nextInOwner;
       node->ownerLinkSlot = nullptr;
       node->nextInOwner = nullptr;

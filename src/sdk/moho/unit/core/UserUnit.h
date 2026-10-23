@@ -73,15 +73,7 @@ namespace moho
      * `UserEntity`, +0x14C through `IUnit`, +0x154 through `CScriptObject`);
      * weak references to it use `UserEntity`'s.
      */
-    [[nodiscard]] static void* WeakLinkHeadOf(UserUnit* const unit) noexcept
-    {
-      return WeakPtr<UserEntity>::EncodeOwnerLinkSlot(unit);
-    }
-
-    [[nodiscard]] static UserUnit* FromWeakLinkHead(void* const head) noexcept
-    {
-      return static_cast<UserUnit*>(WeakPtr<UserEntity>::DecodeOwnerObject(head));
-    }
+    using WeakBase = UserEntity;
 
     /**
      * Address: 0x008BF9B0 (FUN_008BF9B0, Moho::UserUnit::~UserUnit)

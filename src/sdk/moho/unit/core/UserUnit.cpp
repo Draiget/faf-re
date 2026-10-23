@@ -5751,7 +5751,7 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
 {
   // 0x00835E17: a null owner-link slot means the argument node never linked, so
   // there is nothing to walk and nothing to unlink.
-  if (factoryLink.ownerLinkSlot == nullptr) {
+  if (!factoryLink.HasValue()) {
     return;
   }
 
@@ -5760,7 +5760,7 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
     UserCommandQueue* const commandQueue = userUnit->GetCommandQueue();
     if (commandQueue != nullptr) {
       // 0x00835ECB republishes the current factory from the incoming link.
-      sCurrentBuildFactory.ResetFromOwnerLinkSlot(factoryLink.ownerLinkSlot);
+      sCurrentBuildFactory = factoryLink;
 
       const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const commandRange = ResolveUserCommandQueueRange(commandQueue);
       if (commandRange != nullptr) {

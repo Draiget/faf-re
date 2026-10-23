@@ -23,8 +23,7 @@ namespace
 
   void InitializeAirStagingState(moho::CUnitCallAirStagingPlatform* const task)
   {
-    task->mPlatform.ownerLinkSlot = nullptr;
-    task->mPlatform.nextInOwner = nullptr;
+    task->mPlatform.ClearLinkState();
     task->mDone = false;
   }
 } // namespace

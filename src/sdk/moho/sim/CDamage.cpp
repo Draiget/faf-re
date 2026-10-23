@@ -207,10 +207,10 @@ namespace moho
    */
   CDamage::CDamage(const CDamage& other)
     : CScriptObject()
+    , mMethod(other.mMethod)
+    , mInstigator(other.mInstigator) // 0x00736C85: `WeakPtr`'s copy constructor, linked at the head
+    , mTarget(other.mTarget)         // 0x00736C9D
   {
-    mMethod = other.mMethod;
-    mInstigator.ResetFromOwnerLinkSlot(other.mInstigator.ownerLinkSlot);
-    mTarget.ResetFromOwnerLinkSlot(other.mTarget.ownerLinkSlot);
     mRadius = other.mRadius;
     mMaxRadius = other.mMaxRadius;
     mOrigin = other.mOrigin;

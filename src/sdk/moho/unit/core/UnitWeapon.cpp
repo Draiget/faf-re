@@ -992,8 +992,7 @@ namespace moho
 
     CAiTarget clearedTarget{};
     clearedTarget.targetType = EAiTargetType::AITARGET_None;
-    clearedTarget.targetEntity.ownerLinkSlot = nullptr;
-    clearedTarget.targetEntity.nextInOwner = nullptr;
+    clearedTarget.targetEntity.ClearLinkState();
     clearedTarget.targetPoint = -1;
     clearedTarget.targetIsMobile = false;
 
@@ -1195,7 +1194,7 @@ namespace moho
         impactProjectile->Impact();
       } else {
         CDamage damage(firingUnit->SimulationRef);
-        damage.mTarget.ResetFromOwnerLinkSlot(helper.mEntity.ownerLinkSlot);
+        damage.mTarget = helper.mEntity;
         damage.mInstigator.Set(static_cast<Entity*>(firingUnit));
         damage.mAmount = weapon.mAttributes.GetDamage();
         damage.mType.assign(weapon.mAttributes.GetName(), 0, msvc8::string::npos);
@@ -2849,8 +2848,7 @@ namespace moho
     , mShotsAtTarget(0)
   {
     mTarget.targetType = EAiTargetType::AITARGET_None;
-    mTarget.targetEntity.ownerLinkSlot = nullptr;
-    mTarget.targetEntity.nextInOwner = nullptr;
+    mTarget.targetEntity.ClearLinkState();
     mTarget.targetPoint = -1;
     mTarget.targetIsMobile = false;
 
@@ -2899,8 +2897,7 @@ namespace moho
     , mShotsAtTarget(0)
   {
     mTarget.targetType = EAiTargetType::AITARGET_None;
-    mTarget.targetEntity.ownerLinkSlot = nullptr;
-    mTarget.targetEntity.nextInOwner = nullptr;
+    mTarget.targetEntity.ClearLinkState();
     mTarget.targetPoint = -1;
     mTarget.targetIsMobile = false;
 

@@ -171,15 +171,16 @@ namespace moho
      * Weak references to an army link into `mWeakRefs`, a member rather than a
      * base, so the army names it for `WeakPtr<UserArmy>`.
      */
-    [[nodiscard]] static void* WeakLinkHeadOf(UserArmy* const army) noexcept
+    [[nodiscard]] static WeakObject* WeakLinkHeadOf(UserArmy* const army) noexcept
     {
-      return army != nullptr ? static_cast<void*>(&army->mWeakRefs) : nullptr;
+      return army != nullptr ? &army->mWeakRefs : nullptr;
     }
 
-    [[nodiscard]] static UserArmy* FromWeakLinkHead(void* const head) noexcept
+    /** The army whose `mWeakRefs` is `head`: the member-to-owner step (`head - 0x1E0` on x86). */
+    [[nodiscard]] static UserArmy* FromWeakLinkHead(WeakObject* const head) noexcept
     {
       return head != nullptr
-        ? reinterpret_cast<UserArmy*>(static_cast<std::byte*>(head) - offsetof(UserArmy, mWeakRefs))
+        ? reinterpret_cast<UserArmy*>(reinterpret_cast<std::byte*>(head) - offsetof(UserArmy, mWeakRefs))
         : nullptr;
     }
 

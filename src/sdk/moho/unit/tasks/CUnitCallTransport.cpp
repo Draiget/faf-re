@@ -313,8 +313,7 @@ namespace moho
   CUnitCallTransport::CUnitCallTransport()
     : CCommandTask()
   {
-    mTargetTransportUnit.ownerLinkSlot = nullptr;
-    mTargetTransportUnit.nextInOwner = nullptr;
+    mTargetTransportUnit.ClearLinkState();
     mHasBeamupDestination = false;
     mBeamupTime = 0.0f;
     mSourceTransform.orient_ = Wm3::Quatf::Identity();

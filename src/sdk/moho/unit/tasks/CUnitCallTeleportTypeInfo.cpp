@@ -23,8 +23,7 @@ namespace
 
   void InitializeTeleportState(moho::CUnitCallTeleport* const task)
   {
-    task->mTargetTransportUnit.ownerLinkSlot = nullptr;
-    task->mTargetTransportUnit.nextInOwner = nullptr;
+    task->mTargetTransportUnit.ClearLinkState();
     task->mCompletedSuccessfully = false;
     task->mIsOccupying = false;
   }
