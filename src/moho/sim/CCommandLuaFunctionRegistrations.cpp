@@ -2581,7 +2581,7 @@ namespace moho
 
     const LuaPlus::LuaObject unitTable(LuaPlus::LuaStackObject(state, 1));
     if (!unitTable.IsTable()) {
-      LuaPlus::LuaState::Error(state, "Expected table of UserEntities but got %s.", unitTable.TypeName());
+      LuaPlus::LuaState::Error(state, "Expected table of UserUnits but got %s.", unitTable.TypeName());
     }
     const int unitCount = unitTable.GetCount();
 
