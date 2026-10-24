@@ -54,10 +54,18 @@ namespace
   constexpr std::uint32_t kRectEdgeSubdivisionCount = 10u;
   constexpr float kRectEdgeSubdivisionStep = 1.0f / 10.0f;
   constexpr float kRectTerrainBias = 0.1f;
-  constexpr std::uint32_t kOvalSegmentCount = 0x14u;
-  constexpr float kOvalAngleStep = 0.31415927f;
+  // FAF FA-Binary-Patches (hooks/HDraw.cpp): 48 segments instead of the shipped 20 (0x00455E53 and
+  // 0x004561E4 `0x14` -> `0x30`), and the angle step 2*pi/48 (0x00455E30 now loads SEGMENT_RAD
+  // instead of the shipped 0.31415927 = 2*pi/20).
+  constexpr std::uint32_t kOvalSegmentCount = moho::kDrawOvalSegmentCount;
+  constexpr float kOvalAngleStep = 0.1308996939f;
+  // FAF FA-Binary-Patches (section/DrawCircleSetColor.cpp, hooks/HDraw.cpp): the colour (shipped
+  // as the immediate at 0x004561A8) and the band half width (shipped as 0.5 at 0x00456264 /
+  // 0x004562CD) became the globals CIRCLE_COLOR and THICKNESS, which UI_DrawCircle overwrites.
+  // They are parameters here; these are the globals' initial values, which the build-assist
+  // circle keeps.
   constexpr std::uint32_t kOvalBandColor = 0xFF00D800u;
-  constexpr float kOvalBandHalfWidth = 0.5f;
+  constexpr float kOvalBandHalfWidth = 0.1f;
   constexpr std::uint16_t kUnmappedIndexedVertex = 0xFFFFu;
 
   static_assert(
@@ -1365,6 +1373,37 @@ namespace moho
   }
 
   /**
+   * The corner computation at the head of `DRAW_Rect` (0x00455480..0x00455907).
+   *
+   * What it does:
+   * Expands the rectangle `topLeft`, `+widthAxis`, `+widthAxis+heightAxis`,
+   * `+heightAxis` by half of `borderWidth` along its two diagonals into an
+   * outer and an inner corner ring (each top-left, top-right, bottom-right,
+   * bottom-left).
+   */
+  DrawRectRing DRAW_RectRing(
+    const float borderWidth, const Vector3f& heightAxis, const Vector3f& widthAxis, const Vector3f& topLeft
+  )
+  {
+    const float halfBorderWidth = borderWidth * 0.5f;
+
+    const Vector3f outerExpansion = NormalizeScaledVector3f(AddVector3f(heightAxis, widthAxis), halfBorderWidth);
+    const Vector3f edgeExpansion = NormalizeScaledVector3f(SubVector3f(heightAxis, widthAxis), halfBorderWidth);
+
+    DrawRectRing ring{};
+    ring.outer[0] = SubVector3f(topLeft, outerExpansion);
+    ring.outer[1] = SubVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
+    ring.outer[2] = AddVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
+    ring.outer[3] = AddVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+
+    ring.inner[0] = AddVector3f(topLeft, outerExpansion);
+    ring.inner[1] = AddVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
+    ring.inner[2] = SubVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
+    ring.inner[3] = SubVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+    return ring;
+  }
+
+  /**
    * Address: 0x00455480 (?DRAW_Rect@Moho@@YAXPAVCD3DPrimBatcher@1@MABV?$Vector3@M@Wm3@@11IPBVCHeightField@1@M@Z)
    *
    * What it does:
@@ -1386,31 +1425,30 @@ namespace moho
       return;
     }
 
-    const float halfBorderWidth = borderWidth * 0.5f;
-
-    const Vector3f outerExpansion = NormalizeScaledVector3f(AddVector3f(heightAxis, widthAxis), halfBorderWidth);
-    const Vector3f edgeExpansion = NormalizeScaledVector3f(SubVector3f(heightAxis, widthAxis), halfBorderWidth);
-
-    const Vector3f topOuterLeft = SubVector3f(topLeft, outerExpansion);
-    const Vector3f topOuterRight = SubVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
-    const Vector3f bottomOuterRight = AddVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
-    const Vector3f bottomOuterLeft = AddVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
-
-    const Vector3f topInnerLeft = AddVector3f(topLeft, outerExpansion);
-    const Vector3f topInnerRight = AddVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
-    const Vector3f bottomInnerRight = SubVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
-    const Vector3f bottomInnerLeft = SubVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+    const DrawRectRing ring = DRAW_RectRing(borderWidth, heightAxis, widthAxis, topLeft);
+    const Vector3f& topOuterLeft = ring.outer[0];
+    const Vector3f& topOuterRight = ring.outer[1];
+    const Vector3f& bottomOuterRight = ring.outer[2];
+    const Vector3f& bottomOuterLeft = ring.outer[3];
+    const Vector3f& topInnerLeft = ring.inner[0];
+    const Vector3f& topInnerRight = ring.inner[1];
+    const Vector3f& bottomInnerRight = ring.inner[2];
+    const Vector3f& bottomInnerLeft = ring.inner[3];
 
     if (heightField == nullptr) {
       primBatcher->DrawQuad(topOuterLeft, topInnerLeft, topInnerRight, topOuterRight, color);
       primBatcher->DrawQuad(topOuterRight, topInnerRight, bottomInnerRight, bottomOuterRight, color);
-      primBatcher->DrawQuad(bottomInnerLeft, bottomOuterRight, bottomOuterLeft, bottomInnerRight, color);
+      // 0x00455DD0..0x00455DEB: stack `bottomInnerLeft`, ecx `bottomOuterLeft`, edx `bottomOuterRight`
+      // (the previous call's esi), esi `bottomInnerRight` - the corner ring BIL, BOL, BOR, BIR. With
+      // the two outer corners swapped the quad folded into a bowtie and the bottom edge drew half
+      // covered and half doubled.
+      primBatcher->DrawQuad(bottomInnerLeft, bottomOuterLeft, bottomOuterRight, bottomInnerRight, color);
       primBatcher->DrawQuad(topOuterLeft, bottomOuterLeft, bottomInnerLeft, topInnerLeft, color);
       return;
     }
 
-    const std::array<Vector3f, 4> outerCorners{topOuterLeft, topOuterRight, bottomOuterRight, bottomOuterLeft};
-    const std::array<Vector3f, 4> innerCorners{topInnerLeft, topInnerRight, bottomInnerRight, bottomInnerLeft};
+    const std::array<Vector3f, 4>& outerCorners = ring.outer;
+    const std::array<Vector3f, 4>& innerCorners = ring.inner;
 
     for (std::size_t sideIndex = 0; sideIndex < outerCorners.size(); ++sideIndex) {
       const std::size_t nextSideIndex = (sideIndex + 1u) % outerCorners.size();
@@ -1462,7 +1500,12 @@ namespace moho
    * Address: 0x00455E20 (?DRAW_Oval@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Vector3@M@Wm3@@1111IIPBVCHeightField@1@_NM@Z)
    *
    * What it does:
-   * Draws one fixed-color filled oval band (20 quads) from inner/outer axis pairs.
+   * Draws one filled oval band (48 quads with FAF's segment patch) from
+   * inner/outer axis pairs, in `color`.
+   *
+   * FAF FA-Binary-Patches (hooks/HDraw.cpp, section/DrawCircleSetColor.cpp):
+   * the colour is the CIRCLE_COLOR global the patch loads at 0x004561A8 in
+   * place of the shipped 0xFF00D800 immediate; it is a parameter here.
    */
   void DRAW_Oval(
     CD3DPrimBatcher* const primBatcher,
@@ -1470,7 +1513,8 @@ namespace moho
     const Vector3f& innerSinAxis,
     const Vector3f& outerCosAxis,
     const Vector3f& outerSinAxis,
-    const Vector3f& innerCosAxis
+    const Vector3f& innerCosAxis,
+    const std::uint32_t color
   )
   {
     if (primBatcher == nullptr) {
@@ -1480,8 +1524,8 @@ namespace moho
     for (std::uint32_t segment = 0; segment < kOvalSegmentCount; ++segment) {
       const std::uint32_t nextSegment = (segment + 1u) % kOvalSegmentCount;
 
-      const float currentAngle = static_cast<float>(segment) * kOvalAngleStep;
-      const float nextAngle = static_cast<float>(nextSegment) * kOvalAngleStep;
+      const float currentAngle = DRAW_OvalSegmentAngle(segment);
+      const float nextAngle = DRAW_OvalSegmentAngle(nextSegment);
 
       const float cosCurrent = std::cos(currentAngle);
       const float sinCurrent = std::sin(currentAngle);
@@ -1509,7 +1553,7 @@ namespace moho
         center.z + (outerCosAxis.z * cosNext) + (outerSinAxis.z * sinNext),
       };
 
-      primBatcher->DrawQuad(innerCurrent, outerCurrent, outerNext, innerNext, kOvalBandColor);
+      primBatcher->DrawQuad(innerCurrent, outerCurrent, outerNext, innerNext, color);
     }
   }
 
@@ -1531,11 +1575,12 @@ namespace moho
    * disassembly never reads them. They are kept in the signature, in mangled-name order,
    * for ABI/name fidelity, and are `[[maybe_unused]]` rather than given invented names.
    *
-   * `normal` is rotated with a hardcoded +Z axis (0,0,1) via the real
-   * `Moho::QuatCrossAdd` (0x0044F880, Sim.cpp), then four points at `radius`
-   * +/- `kOvalBandHalfWidth` along the local X/Y axes are rotated by that
-   * quaternion via `RotateByQuaternion`, i.e. `Moho::MultQuadVec` in the
-   * binary, to form the inner/outer cosine/sine axes handed to `DRAW_Oval`.
+   * The axes come from `DRAW_CircleAxes`. With FAF's patches the band half
+   * width and colour are the THICKNESS / CIRCLE_COLOR globals; the
+   * build-assist circle (the only engine caller) draws with their initial
+   * values 0.1 and 0xFF00D800. The patch never restores them after
+   * UI_DrawCircle, so in the patched exe this circle takes whatever the last
+   * UI_DrawCircle used; that leak is not reproduced.
    */
   void DRAW_Circle(
     CD3DPrimBatcher* const primBatcher,
@@ -1550,23 +1595,71 @@ namespace moho
     const float radius
   )
   {
+    DRAW_Circle(primBatcher, center, normal, radius, kOvalBandHalfWidth, kOvalBandColor);
+  }
+
+  /**
+   * FAF FA-Binary-Patches (hooks/HDraw.cpp, section/DrawFunc.cpp): the body of
+   * `DRAW_Circle` (0x00456200) with the band half width (THICKNESS, read at
+   * 0x00456264 / 0x004562CD) and the colour (CIRCLE_COLOR, 0x004561A8) as
+   * parameters instead of the globals the patch stores before each call.
+   *
+   * What it does:
+   * Draws a `2 * bandHalfWidth` wide ring of `radius` around `center` in the
+   * plane whose normal is `normal`.
+   */
+  void DRAW_Circle(
+    CD3DPrimBatcher* const primBatcher,
+    const Vector3f& center,
+    const Vector3f& normal,
+    const float radius,
+    const float bandHalfWidth,
+    const std::uint32_t color
+  )
+  {
     if (primBatcher == nullptr) {
       return;
     }
 
+    const DrawOvalAxes axes = DRAW_CircleAxes(normal, radius, bandHalfWidth);
+    DRAW_Oval(primBatcher, center, axes.innerSin, axes.outerCos, axes.outerSin, axes.innerCos, color);
+  }
+
+  /**
+   * The axis computation of `DRAW_Circle` (0x00456200).
+   *
+   * What it does:
+   * `normal` is rotated with a hardcoded +Z axis (0,0,1) via the real
+   * `Moho::QuatCrossAdd` (0x0044F880, Sim.cpp), then four points at `radius`
+   * +/- `bandHalfWidth` along the local X/Y axes are rotated by that
+   * quaternion via `RotateByQuaternion`, i.e. `Moho::MultQuadVec` in the
+   * binary, to form the inner/outer cosine/sine axes handed to `DRAW_Oval`.
+   */
+  DrawOvalAxes DRAW_CircleAxes(const Vector3f& normal, const float radius, const float bandHalfWidth)
+  {
     // 0x00456213..0x00456253: v1 = +Z, v2 = `normal`, fallback axis `edi` = +X.
     Wm3::Quaternionf orientation{};
     (void)QuatCrossAdd(&orientation, {0.0f, 0.0f, 1.0f}, normal, {1.0f, 0.0f, 0.0f});
 
-    const float innerRadius = radius - kOvalBandHalfWidth;
-    const float outerRadius = radius + kOvalBandHalfWidth;
+    const float innerRadius = radius - bandHalfWidth;
+    const float outerRadius = radius + bandHalfWidth;
 
-    const Vector3f innerSinAxis = RotateByQuaternion({0.0f, innerRadius, 0.0f}, orientation);
-    const Vector3f innerCosAxis = RotateByQuaternion({innerRadius, 0.0f, 0.0f}, orientation);
-    const Vector3f outerSinAxis = RotateByQuaternion({0.0f, outerRadius, 0.0f}, orientation);
-    const Vector3f outerCosAxis = RotateByQuaternion({outerRadius, 0.0f, 0.0f}, orientation);
+    DrawOvalAxes axes{};
+    axes.innerSin = RotateByQuaternion({0.0f, innerRadius, 0.0f}, orientation);
+    axes.innerCos = RotateByQuaternion({innerRadius, 0.0f, 0.0f}, orientation);
+    axes.outerSin = RotateByQuaternion({0.0f, outerRadius, 0.0f}, orientation);
+    axes.outerCos = RotateByQuaternion({outerRadius, 0.0f, 0.0f}, orientation);
+    return axes;
+  }
 
-    DRAW_Oval(primBatcher, center, innerSinAxis, outerCosAxis, outerSinAxis, innerCosAxis);
+  /**
+   * What it does:
+   * The angle of `DRAW_Oval`'s segment `segment` (0x00455E30: the segment
+   * index times the angle step).
+   */
+  float DRAW_OvalSegmentAngle(const std::uint32_t segment) noexcept
+  {
+    return static_cast<float>(segment) * kOvalAngleStep;
   }
 
   /**

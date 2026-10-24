@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -552,6 +553,25 @@ namespace moho
    */
   void DRAW_WireBox(CD3DPrimBatcher* primBatcher, const Wm3::Box3f& box, std::uint32_t color);
 
+  /** The two corner rings of a `DRAW_Rect` border, each top-left, top-right, bottom-right, bottom-left. */
+  struct DrawRectRing
+  {
+    std::array<Vector3f, 4> outer;
+    std::array<Vector3f, 4> inner;
+  };
+
+  /**
+   * The corner computation at the head of `DRAW_Rect` (0x00455480..0x00455907).
+   *
+   * What it does:
+   * Expands the rectangle spanned from `topLeft` by `widthAxis` and
+   * `heightAxis` into the outer and inner corner rings of a border
+   * `borderWidth` wide.
+   */
+  [[nodiscard]] DrawRectRing DRAW_RectRing(
+    float borderWidth, const Vector3f& heightAxis, const Vector3f& widthAxis, const Vector3f& topLeft
+  );
+
   /**
    * Address: 0x00455480 (?DRAW_Rect@Moho@@YAXPAVCD3DPrimBatcher@1@MABV?$Vector3@M@Wm3@@11IPBVCHeightField@1@M@Z)
    *
@@ -573,7 +593,9 @@ namespace moho
    * Address: 0x00455E20 (?DRAW_Oval@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Vector3@M@Wm3@@1111IIPBVCHeightField@1@_NM@Z)
    *
    * What it does:
-   * Draws one filled oval band segment strip from inner/outer cosine-sine axes.
+   * Draws one filled oval band segment strip from inner/outer cosine-sine axes
+   * in `color` (FAF FA-Binary-Patches (hooks/HDraw.cpp): 48 segments, and the
+   * colour the patch reads from CIRCLE_COLOR).
    */
   void DRAW_Oval(
     CD3DPrimBatcher* primBatcher,
@@ -581,8 +603,37 @@ namespace moho
     const Vector3f& innerSinAxis,
     const Vector3f& outerCosAxis,
     const Vector3f& outerSinAxis,
-    const Vector3f& innerCosAxis
+    const Vector3f& innerCosAxis,
+    std::uint32_t color
   );
+
+  /// `DRAW_Oval`'s segment count: 48 with FAF FA-Binary-Patches (hooks/HDraw.cpp), 20 as shipped.
+  inline constexpr std::uint32_t kDrawOvalSegmentCount = 0x30U;
+
+  /**
+   * What it does:
+   * The angle `DRAW_Oval` takes the cosine and sine of for segment `segment`.
+   */
+  [[nodiscard]] float DRAW_OvalSegmentAngle(std::uint32_t segment) noexcept;
+
+  /** The four axes `DRAW_Circle` hands to `DRAW_Oval`. */
+  struct DrawOvalAxes
+  {
+    Vector3f innerSin;
+    Vector3f outerCos;
+    Vector3f outerSin;
+    Vector3f innerCos;
+  };
+
+  /**
+   * The axis computation of `DRAW_Circle` (0x00456200).
+   *
+   * What it does:
+   * Rotates the inner (`radius - bandHalfWidth`) and outer
+   * (`radius + bandHalfWidth`) X/Y axes into the plane whose normal is
+   * `normal`.
+   */
+  [[nodiscard]] DrawOvalAxes DRAW_CircleAxes(const Vector3f& normal, float radius, float bandHalfWidth);
 
   /**
    * Address: 0x00456200 (?DRAW_Circle@Moho@@YAXPAVCD3DPrimBatcher@1@MABV?$Vector3@M@Wm3@@1MIIPBVCHeightField@1@_NM@Z)
@@ -610,6 +661,24 @@ namespace moho
     [[maybe_unused]] const CHeightField* heightField,
     [[maybe_unused]] bool unusedBool0,
     float radius
+  );
+
+  /**
+   * FAF FA-Binary-Patches (hooks/HDraw.cpp, section/DrawFunc.cpp): `DRAW_Circle`
+   * with the band half width (the patch's THICKNESS global) and the colour
+   * (CIRCLE_COLOR) as parameters.
+   *
+   * What it does:
+   * Draws a ring `2 * bandHalfWidth` wide of `radius` around `center` in the
+   * plane whose normal is `normal`.
+   */
+  void DRAW_Circle(
+    CD3DPrimBatcher* primBatcher,
+    const Vector3f& center,
+    const Vector3f& normal,
+    float radius,
+    float bandHalfWidth,
+    std::uint32_t color
   );
 
   /**
