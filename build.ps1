@@ -122,8 +122,9 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
   $hooks = Join-Path $src 'fafengine'
   if (Test-Path $hooks) { Copy-Item $hooks $destDir -Recurse -Force }
 
-  # The DXC runtime the build staged next to the exe.
-  foreach ($dll in @(Get-ChildItem $src -Filter '*.dll' -File)) {
+  # The DXC runtime the build staged next to the exe (named, so leftovers of older
+  # builds in the same folder are not copied along).
+  foreach ($dll in @('dxcompiler.dll', 'dxil.dll' | ForEach-Object { Get-Item (Join-Path $src $_) -ErrorAction SilentlyContinue })) {
     $target = Join-Path $destDir $dll.Name
     # A DLL a running game holds open is the same file; skip it rather than fail.
     if ((Test-Path $target) -and (Get-Item $target).Length -eq $dll.Length -and
