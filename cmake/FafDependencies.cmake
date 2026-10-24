@@ -13,8 +13,8 @@
 #     stamp file in each tree records the patches (and their hashes) it carries,
 #     so a re-run does nothing and a changed patch re-creates the tree from its
 #     baseline. A tree without a stamp (one made before this script) is adopted
-#     when its last patch is already applied, patched when it is the baseline,
-#     and re-created from the baseline otherwise.
+#     as it is when its last patch is already applied (line endings aside),
+#     patched when it is the baseline, and re-created from the baseline otherwise.
 #   * wxWindows' generated files, which its nmake build used to create.
 #
 #   * The DirectX SDK (June 2010): an installed one, else its headers and libraries
@@ -94,8 +94,10 @@ function(faf_dependency_patches name kind)
     message(STATUS "Dependencies: patches for dependencies/${name} changed, re-creating it from its baseline")
     _faf_rebaseline(${name} ${kind})
   else()
+    # Already patched, whatever its line endings (an older copy may have been
+    # converted to CRLF): the patches are not applied a second time.
     list(GET ARGN -1 _last)
-    _faf_apply_patch("${_dir}" "${_last}" _rc --reverse --check)
+    _faf_apply_patch("${_dir}" "${_last}" _rc --reverse --check --ignore-whitespace)
     if(_rc EQUAL 0)
       message(STATUS "Dependencies: dependencies/${name} already carries its patches")
       file(WRITE "${_stamp}" "${_want}")
