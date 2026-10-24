@@ -75,6 +75,11 @@ namespace moho
     return z;
   }
 
+  Vector3f Vector4f::XYZ() const noexcept
+  {
+    return {x, y, z};
+  }
+
   /**
    * Address: 0x0046FB20 (FUN_0046FB20, Moho::Vector4f::operator=)
    *
