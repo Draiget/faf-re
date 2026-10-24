@@ -157,30 +157,6 @@ namespace
     return transformed;
   }
 
-  [[nodiscard]] moho::Vector3f AddVector3f(const moho::Vector3f& lhs, const moho::Vector3f& rhs) noexcept
-  {
-    return {lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
-  }
-
-  [[nodiscard]] moho::Vector3f SubVector3f(const moho::Vector3f& lhs, const moho::Vector3f& rhs) noexcept
-  {
-    return {lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
-  }
-
-  [[nodiscard]] moho::Vector3f ScaleVector3f(const moho::Vector3f& value, const float scale) noexcept
-  {
-    return {value.x * scale, value.y * scale, value.z * scale};
-  }
-
-  [[nodiscard]] moho::Vector3f NormalizeScaledVector3f(const moho::Vector3f& value, const float scale) noexcept
-  {
-    moho::Vector3f normalized = value;
-    if (Wm3::Vector3f::Normalize(&normalized) <= 0.0f) {
-      return {0.0f, 0.0f, 0.0f};
-    }
-    return ScaleVector3f(normalized, scale);
-  }
-
   [[nodiscard]] float SampleTerrainClampedElevation(
     const moho::CHeightField& heightField,
     const moho::Vector3f& position,
@@ -1387,19 +1363,19 @@ namespace moho
   {
     const float halfBorderWidth = borderWidth * 0.5f;
 
-    const Vector3f outerExpansion = NormalizeScaledVector3f(AddVector3f(heightAxis, widthAxis), halfBorderWidth);
-    const Vector3f edgeExpansion = NormalizeScaledVector3f(SubVector3f(heightAxis, widthAxis), halfBorderWidth);
+    const Vector3f outerExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis + widthAxis) * halfBorderWidth;
+    const Vector3f edgeExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis - widthAxis) * halfBorderWidth;
 
     DrawRectRing ring{};
-    ring.outer[0] = SubVector3f(topLeft, outerExpansion);
-    ring.outer[1] = SubVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
-    ring.outer[2] = AddVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
-    ring.outer[3] = AddVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+    ring.outer[0] = topLeft - outerExpansion;
+    ring.outer[1] = topLeft + widthAxis - edgeExpansion;
+    ring.outer[2] = topLeft + widthAxis + heightAxis + outerExpansion;
+    ring.outer[3] = topLeft + heightAxis + edgeExpansion;
 
-    ring.inner[0] = AddVector3f(topLeft, outerExpansion);
-    ring.inner[1] = AddVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
-    ring.inner[2] = SubVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
-    ring.inner[3] = SubVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+    ring.inner[0] = topLeft + outerExpansion;
+    ring.inner[1] = topLeft + widthAxis + edgeExpansion;
+    ring.inner[2] = topLeft + widthAxis + heightAxis - outerExpansion;
+    ring.inner[3] = topLeft + heightAxis - edgeExpansion;
     return ring;
   }
 
@@ -1482,14 +1458,14 @@ namespace moho
           outerStartY + (outerStep.y * segmentF),
           outerStart.z + (outerStep.z * segmentF),
         };
-        const Vector3f segmentOuterEnd = AddVector3f(segmentOuterStart, outerStep);
+        const Vector3f segmentOuterEnd = segmentOuterStart + outerStep;
 
         const Vector3f segmentInnerStart{
           innerStart.x + (innerStep.x * segmentF),
           innerStartY + (innerStep.y * segmentF),
           innerStart.z + (innerStep.z * segmentF),
         };
-        const Vector3f segmentInnerEnd = AddVector3f(segmentInnerStart, innerStep);
+        const Vector3f segmentInnerEnd = segmentInnerStart + innerStep;
 
         primBatcher->DrawQuad(segmentOuterStart, segmentOuterEnd, segmentInnerEnd, segmentInnerStart, color);
       }
