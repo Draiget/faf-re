@@ -62,6 +62,21 @@ Every performance change has a switch that brings back the original path, and bo
 | XACT process clock | on | `/realtickcount` turns it off | startup only | XACT 2.9 times itself from process start instead of Windows boot, so sound keeps working after 24.8 days of uptime without UptimeFaker; the log says `SND: xactengine2_9.dll clock imports patched` (`FAF_TEST_TICK_OFFSET_DAYS=N` in the environment fakes N more days of uptime, for testing) |
 
 
+## FAF game version
+
+FAF ships its engine fixes ([FA-Binary-Patches](https://github.com/FAForever/FA-Binary-Patches)) as a new exe with a game release, and the FAF client stamps the game version into that exe, so one game version means one set of engine patches. This engine carries those patches up to game version 3840 and applies them per session: a replay plays with the patches of the version in its header (`Supreme Commander v1.50.<version>`, accepted from 3835 to 3840), every other session uses 3840, and the replay it records names the version it ran as. The log says `FAF game version <n> (replay|session), sim fixes 0x..` when a session begins. `GetEngineVersion` reports 1.5.3840.
+
+The switches below are read when a session begins. In a multiplayer game every client must use the same values, so leave them at their defaults there; they are for replays and tests.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `sim_FafGameVersion` | 0 | `/con sim_FafGameVersion=N` | next game | Game version the session runs as; 0 takes the replay's recorded version, or 3840 |
+| `sim_FixAimLeadOncePerTick` | −1 | `/con` | next game | FA-Binary-Patches #143 (from 3836): no one-tick velocity lead on a target that already moved this tick; −1 follows the game version, 0 off, 1 on |
+| `sim_FixTargetPointCollisionCentre` | −1 | `/con` | next game | #145/#157 (from 3836): a unit without target bones is aimed at its collision-box centre |
+| `sim_FixProjectileImpactBelowZero` | −1 | `/con` | next game | #154 (from 3840): a projectile below height 0 impacts |
+| `sim_FixRefuelUndockAboveMaxHealth` | −1 | `/con` | next game | #169 (from 3840): refuelled aircraft undock once health is at least max health |
+| `sim_FixShieldRepair` | −1 | `/con` | next game | #175 (from 3840): shield repair scales with the builder's resources, and a switched-off shield is not repaired |
+
 ## Debugging aids
 
 Off by default.

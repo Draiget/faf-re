@@ -37,6 +37,7 @@
 #include "moho/net/INetTCPSocket.h"
 #include "moho/serialization/SaveGameFileHeader.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
@@ -346,9 +347,10 @@ namespace moho
     constexpr char kReplayFormatBanner[] = "Replay v1.9\r\n";
     constexpr std::size_t kReplayFormatBannerBytes = sizeof(kReplayFormatBanner) - 1u;
     constexpr double kReplayEngineVersion = 1.5;
-    /// The build the replay header advertises: 0xEFB (3835) in the target binary
-    /// (FUN_00875B60 writer, FUN_008765E0 reader, FUN_004D3D30 GetEngineVersion).
-    constexpr int kReplayEngineBuild = 3835;
+    // The build in the replay header is the FAF game version (0xEFB / 3835 in the target binary,
+    // stamped there by the FAF client; FUN_00875B60 writer, FUN_008765E0 reader). The writer now
+    // records the version the session runs as, and the reader accepts every version
+    // `FafGameVersion.h` models -- see `FAF_SetReplayGameVersion`.
     /// Terminates one army's unit-source list; no source index can reach it.
     constexpr std::uint8_t kReplayUnitSourceListEnd = 0xFFu;
   } // namespace
@@ -420,7 +422,9 @@ namespace moho
 
     gpg::Logf("Saving replay to \"%s\"", replayPath.c_str());
 
-    stream->Write(gpg::STR_Printf("Supreme Commander v%1.2f.%4i", kReplayEngineVersion, kReplayEngineBuild));
+    // FAF addition: the build is the game version this session runs as (`FAF_BeginSession` ran
+    // before the sink was opened), so a replay always names the patches it was recorded with.
+    stream->Write(gpg::STR_Printf("Supreme Commander v%1.2f.%4i", kReplayEngineVersion, FAF_GetSessionGameVersion()));
     stream->Write("\r\n");
     stream->Write(kReplayFormatBanner, kReplayFormatBannerBytes);
     stream->Write(sessionInfo->mMapName);
@@ -475,8 +479,10 @@ namespace moho
    *
    * What it does:
    * Loads replay file payload, reconstructs `LaunchInfoNew`, and creates
-   * one replay `SWldSessionInfo` bootstrap object. A header from another
-   * engine version is refused, unless `/noversioncheck` is on the command line.
+   * one replay `SWldSessionInfo` bootstrap object. A header naming a FAF game
+   * version outside `kFafGameVersionOldestSupported..kFafGameVersionLatest` is
+   * refused, unless `/noversioncheck` is on the command line; the recorded
+   * version selects the engine patches the replay plays with.
    */
   msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(const gpg::StrArg filename)
   {
@@ -496,22 +502,36 @@ namespace moho
     }
 
     gpg::BinaryReader replayReader(replayStream.get());
-    const msvc8::string expectedVersion = gpg::STR_Printf("Supreme Commander v%1.2f.%4i", 1.5, kReplayEngineBuild);
     msvc8::string replayVersion{};
     replayReader.ReadString(&replayVersion);
-    if (replayVersion.view() != expectedVersion.view()) {
+
+    // The binary accepts only its own build ("Supreme Commander v1.50.3835"). This engine
+    // plays every FAF game version it models, each with that version's engine patches, so a
+    // replay is accepted when its build lies in that range.
+    int recordedGameVersion = FAF_ParseReplayGameVersion(replayVersion.view());
+    if (recordedGameVersion < kFafGameVersionOldestSupported || recordedGameVersion > kFafGameVersionLatest) {
       // FAF addition, not in the shipped binary: /noversioncheck plays a replay
-      // whose header names another engine version instead of refusing it.
+      // whose header names another engine version instead of refusing it, with
+      // the patches of the nearest version this engine models.
       if (!CFG_GetArgOption("/noversioncheck", 0, nullptr)) {
         return msvc8::auto_ptr<SWldSessionInfo>();
       }
+      const int playedGameVersion =
+        (recordedGameVersion != 0 && recordedGameVersion < kFafGameVersionOldestSupported)
+          ? kFafGameVersionOldestSupported
+          : kFafGameVersionLatest;
       gpg::Warnf(
-        "Replay %s was recorded by \"%s\", this engine is \"%s\"; playing it anyway (/noversioncheck).",
+        "Replay %s was recorded by \"%s\", this engine plays FAF game versions %d..%d; playing it as %d anyway "
+        "(/noversioncheck).",
         filename,
         replayVersion.c_str(),
-        expectedVersion.c_str()
+        kFafGameVersionOldestSupported,
+        kFafGameVersionLatest,
+        playedGameVersion
       );
+      recordedGameVersion = playedGameVersion;
     }
+    FAF_SetReplayGameVersion(recordedGameVersion);
 
     msvc8::string ignoredString{};
     replayReader.ReadString(&ignoredString);

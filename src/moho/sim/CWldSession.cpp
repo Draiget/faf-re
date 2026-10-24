@@ -79,6 +79,7 @@
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/EGenericIconTypeTypeInfo.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/net/CGpgNetInterface.h"
@@ -14449,6 +14450,11 @@ namespace moho
         ReleaseWldGameDataHandles(&gameData);
         return;
       }
+
+      // Engine addition: fix the FAF game version - and with it the engine
+      // patches the sim applies - before the replay sink records it and before
+      // the driver creates the sim.
+      FAF_BeginSession(sessionInfo->mIsReplay);
 
       // The replay sink, when this session records one. A sink that cannot be
       // opened is not fatal - the session simply stops being a recorded one.
