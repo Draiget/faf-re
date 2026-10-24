@@ -1,62 +1,65 @@
 # faf-re
 
-The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as modern, readable, buildable C++20 — so it can be maintained instead of staying frozen in a binary nobody can change. Inspired by, and indebted to, the [Forged Alliance Forever](https://faforever.com) community.
+The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++20 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays about a quarter faster.
 
-> An independent preservation and interoperability effort. Not affiliated with, endorsed by, or supported by the original publisher or developer.
+*Snapshot: 24/10/2026.*
+
+> An independent preservation and interoperability effort, inspired by and indebted to the [Forged Alliance Forever](https://faforever.com) community. Not affiliated with, endorsed by, or supported by the original publisher or developer.
 
 ## Status
 
 | | |
 |---|---|
-| Builds | ✅ `main.exe` (x86) and `main_x64.exe` link and run |
-| Renders | ✅ main menu, cinematic playback, in-game world view |
-| Plays | ✅ native save/load on both architectures |
-| Gameplay testing | ✅ Live 3-player game with the retail exe, rebuilt x86 and rebuilt x64 together: 21 min of AI-driven fighting, no desync — see [Live multiplayer](docs/RETAIL_REPLAY_PARITY.md#live-multiplayer-retail-x86-and-x64-in-one-game) |
-| Retail parity | ✅ 76 of 76 FAF vault replays tested play back checksum-identical to the retail executable on 100% of gameplay beats — see [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md) |
-| Source bodies written | ~39,000 functions |
-| Genuinely outstanding | ~430 |
+| Builds | `main.exe` (x86) and `main_x64.exe` link and run |
+| Renders | Main menu, cinematic playback, in-game world view; Direct3D 9, 11, 12 and Vulkan ([Renderer backends](docs/RENDERER_BACKENDS.md)) |
+| Plays | Native save/load on both architectures |
+| Replay parity | All 75 replays of the current vault test set match every recorded checksum (x64 build of master `22a00a44`, MSVC, `/simworkers 8`, D3D12) ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
+| Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
+| Performance | x64 replays take 19 % less time than retail on average (4 % to 33 %) ([Performance](docs/PERFORMANCE.md)) |
+| Source bodies written | ~39,000 functions (20/10/2026) |
+| Genuinely outstanding | ~430 (20/10/2026) |
 
-*Snapshot: 20/10/2026.*
+Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
 
-Most symbols in the retail engine were never hand-written code — they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, not as hundreds of separate functions, so the function count understates how much is covered.
+## Retail parity
 
-## Retail replay parity
-
-76 real games from the FAF replay vault (Dual Gap, Seton's Clutch and 35 other stock and community maps, 1–12 human players, games against the built-in AI and M28AI, 9–83 minutes) play back on the rebuilt engine checksum-identical to the retail `ForgedAlliance.exe` on every gameplay beat. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
+Real games from the FAF replay vault (stock and community maps, 1–12 human players, games against the built-in AI and M28AI) play back on the rebuilt engine checksum-identical to retail. The earlier snapshot (20/10/2026) had 76 of 76 replays matching. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 ## Performance
 
-The simulation thread now costs about 18 % less per tick than at the start of
-profiling, with every change verified against retail replays:
-- hot-path diagnostics removed;
-- redundant recon, intel, allocation and lookup work cut;
-- recon refresh optionally on worker threads (`sim_Workers`, default 0 = the
-  original serial path), which reproduces the serial result byte for byte.
+- **Against retail**: on five vault replays the x64 build saves 4 % (least), 33 % (most) and 19 % (average) of the time. The bigger the battle, the bigger the gain.
+- **Scale**: x86 runs out of address space at about 60,000 units; x64 was still running at 90,000.
+- **Exact**: sim work runs on worker threads only where the result is provably the same as serial, and every change has a switch that restores the original code ([docs/SWITCHES.md](docs/SWITCHES.md)).
 
-The x64 build ran a stress map past 89,000 units at 3.8 GB, where the 32-bit
-build's simulation runs out of address space at about 60,000.
+Numbers, method and what is next: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
-Replays play about 1.8× faster, and huge maps run 55–60 % more ticks per
-second at 30,000–60,000 units:
-- replays and single-player games compute beats ahead of the one on screen
-  (multiplayer keeps the original pacing);
-- per-beat unit updates, strategic icons, culling and fog of war run on worker
-  threads.
+## Build
 
-Each change has a console variable to restore the original path ([docs/SWITCHES.md](docs/SWITCHES.md)).
+`build.ps1` (or `build.bat`) builds `src/main.vcxproj` with Visual Studio 2022 and copies the result into the FAF run folders, with its `.pdb`, the `fafengine\` hook folder, the FFmpeg DLLs and the DXC DLLs.
 
-Against retail, the x64 build plays replays about a quarter faster. Numbers and what is next:
-[docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+```powershell
+.\build.ps1                    # x64 Release -> C:\ProgramData\FAForever\bin_x64\main_x64.exe
+.\build.ps1 -Arch both         # x64 and x86 (x86 -> C:\ProgramData\FAForever\bin\main.exe)
+.\build.ps1 -Arch x86 -Name main_test   # another exe name, to keep the current build alongside
+.\build.ps1 -NoBuild           # copy the last build only
+```
+
+Other options: `-Configuration Debug`, `-FafDir`, `-Out` (also copy into `out\<arch>\`), `-NoCopy`, `-Rebuild`. Renderer toolchains (FX11, DXC, Vulkan headers) are set up as in [Renderer backends](docs/RENDERER_BACKENDS.md#toolchain-setup); FFmpeg as in [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md).
 
 ## What is and isn't here
 
-**Here:** C++ source, build files, and the tooling used to check behaviour against the original.
+- **Here:** C++ source, build files, and the tooling used to check behaviour against the original.
+- **Not here:** any game binary, executable, asset, map, script or other copyrighted content, and nothing derived from them. `bin/`, `dumps/`, `decomp/`, `output/` and `gamedata/` are excluded by design. **You need your own legitimately obtained copy of the game.** Nothing here distributes, circumvents or replaces it.
 
-**Not here:** any game binary, executable, asset, map, script or other copyrighted content, and nothing derived from them — `bin/`, `dumps/`, `decomp/`, `output/` and `gamedata/` are excluded by design. **You need your own legitimately obtained copy of the game.** Nothing here distributes, circumvents or replaces it.
+## Layout
 
-## Projects
-
-`main` — the engine, and the primary project. `inspect-injector` and `inspect` — a launcher and companion library used to observe the engine while it runs.
+| Path | What |
+|---|---|
+| `src/` | The engine (`moho`, `gpg`, `legacy`, `lua`, `platform`, ...); project `src/main.vcxproj` |
+| `data/fafengine/` | Engine-owned Lua hooks copied next to the exe (for example the Graphics API option) |
+| `tools/` | Go multiplayer test harness (`mpemu`), the `inspect` / `inspect-injector` runtime observer, and checkers; see [tools/README.md](tools/README.md) |
+| `scripts/perf/`, `scripts/layout/` | Sampling profiler and replay helpers; vtable/RTTI comparison against the shipped binary |
+| `docs/` | [Performance](docs/PERFORMANCE.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md) |
 
 ## Libraries the engine uses
 
@@ -66,19 +69,13 @@ Against retail, the x64 build plays replays about a quarter faster. Numbers and 
 - Wild Magic `3.8`
 - [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64)
 - BugSplat
-- CRI Middleware (Sofdec + ADX) in the original; replaced here by FFmpeg/libav* for SFD movie playback.
-- DirectX 9/10 with XACT audio, where the DX10 path was already partial in the original.
+- DirectX 9/10 with XACT audio, as shipped (the D3D10 path was already partial in the original); Direct3D 11, Direct3D 12 and Vulkan are added here.
+- FFmpeg/libav* for SFD movie playback, in place of the original's CRI Middleware (Sofdec + ADX).
+
+## SFD movie playback
+
+The engine does not use or distribute the CRI Sofdec/ADX runtime. `.sfd` support is an independent implementation with FFmpeg and a bounded FAF metadata parser. The legacy `mwPly*`/`ADXM_*` names remain only as a compatibility facade for the recovered call sites. Embedded audio and optional external XACT sound/voice cues stay separate. Profile, dependency setup, validation and unsupported composition modes: [docs/FAF_SFD_COMPATIBILITY.md](docs/FAF_SFD_COMPATIBILITY.md).
 
 ## Credits
 
 Built on many years of engine study by the Forged Alliance Forever community. Particular thanks to [Hdt80bro](https://github.com/Hdt80bro) and [4z0t](https://github.com/4z0t).
-
-## Independent SFD movie playback
-
-The engine does not use or distribute the CRI Sofdec/ADX runtime. `.sfd`
-compatibility is independently implemented with FFmpeg and a bounded FAF metadata
-parser. Legacy `mwPly*`/`ADXM_*` names are retained internally as a compatibility
-facade for recovered Forged Alliance call sites, not the original CRI implementation.
-Embedded audio and optional external XACT sound/voice cues remain separate.
-See [the compatibility profile and dependency setup](docs/FAF_SFD_COMPATIBILITY.md)
-and [validation results](docs/FAF_SFD_VALIDATION.md), including unsupported composition modes.

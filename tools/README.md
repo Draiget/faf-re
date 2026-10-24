@@ -1,13 +1,22 @@
 # tools
 
-One Go module (`faf-main/tools`) for development tools. Shared packages sit at
-the top level; each program is `cmd/<app>`.
+Development tools for the engine. The main one is **mpemu**, a Go multiplayer test harness: it runs real game instances (retail or rebuilt) against an emulated FAF client and lobby server, on one machine or several, and checks what happened. The folder also holds the runtime observer and a few checkers.
 
-| App | What it is |
+## Contents
+
+| Path | What it is |
 |---|---|
-| `cmd/mpemu` | Runs multiplayer sessions (on one machine, or across several through a hub) against an emulated FAF client + lobby server, and checks what happened. `mpemu agent` serves one test PC's players. |
-| `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the control channel between director and agents, and a latching game relay. Runs on a LAN machine or a remote host known by DNS name. |
-| `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP, reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
+| `cmd/mpemu` | Runs multiplayer sessions against an emulated FAF client + lobby server and checks them. `mpemu agent` serves one test PC's players |
+| `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the director–agent control channel and a latching game relay. Deployment: [deploy/README.md](deploy/README.md) |
+| `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP and reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
+| `scenarios/` | YAML scenarios for mpemu |
+| `inspect`, `inspect-injector` | A companion DLL that hooks the running engine, and the launcher that injects it (projects in `faf.sln`) |
+| `callcheck/` | Finds recovered functions that call a different helper than retail |
+| `constcheck/` | Cross-checks recovered C++ against the retail binary for replay-determinism hazards: float constants (`--mode consts`) and libm calls (`--mode math`) |
+| `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered; see [difffuzz/README.md](difffuzz/README.md) |
+| `sfd-inspect/` | Independent SFD diagnostics and parser tests; see [sfd-inspect/README.md](sfd-inspect/README.md) |
+
+The rest of this page covers mpemu. It is one Go module (`faf-main/tools`): shared packages at the top level, each program in `cmd/<app>`.
 
 | Package | Role |
 |---|---|
@@ -28,66 +37,27 @@ the top level; each program is `cmd/<app>`.
 ## Build
 
 ```powershell
-.\build.ps1          # bin\mpemu.exe, bin\mpemu-server.exe, bin\fakegame.exe,
-                     # and bin\faf-adapter.exe from ..\..\faf-pioneer if present
+.\build.ps1          # bin\mpemu.exe, bin\mpemu-server.exe, bin\fakegame.exe, and bin\faf-adapter.exe from ..\..\faf-pioneer if present
 .\build.ps1 -Debug   # no optimisation, for Delve / VS Code / GoLand
 go test ./...
 ```
 
-## Several machines
-
-```
- director (mpemu run/lobby)        agent (mpemu agent)         agent (mpemu agent)
-   local seats                       seats on PC 2                seats on PC 3
-        \                                 |                            /
-         `------------ outbound HTTPS to the hub (mpemu-server) ------'
-                      icebreaker + TURN + control + game relay
-```
-
-Everyone connects *to* the hub, so NAT on any side is fine. Players name the
-agent that runs them (`agent: pc2`; empty = the director's machine). The
-modes then mean:
-
-- `direct`: games talk to each other's LAN addresses (agents advertise theirs).
-- `relay`: every pair goes through the hub's relay, which learns each game's
-  public address from its first packet. Impairment and partitions work as
-  locally.
-- `ice`: the adapters use the hub's icebreaker and TURN.
-
-Hub URL and secret come from the environment, never from committed files:
-
-```powershell
-$env:MPEMU_HUB = 'https://faftest.zontwelg.net:8443'     # internet hub (altair); LAN: https://<lan-hub-host>:8443
-$env:MPEMU_SECRET_FILE = "$env:APPDATA\mpemu\secret"     # same secret everywhere
-.\bin\mpemu.exe selftest -remote                         # check the hub from this PC (fakegame, no windows)
-.\bin\mpemu.exe agent -name pc2                          # on every PC with players
-.\bin\mpemu.exe lobby -n 2 -agents ",pc2" -mode relay    # director; player 1 here, player 2 on pc2
-```
-
-Host names in `JoinGame` and `ConnectToPeer` are resolved by each seat on its
-own machine, so a hub name that resolves differently in the LAN and on the
-internet still works.
-
-The API is TLS under a key derived from the secret, so a hub known only by an
-internal DNS name needs no certificate. `deploy/README.md` covers the
-deployed hubs and how to install another.
+`-Pioneer <path>` points at another faf-pioneer checkout. Without the adapter, mode `ice` needs `-adapter <faf-adapter.exe>`.
 
 ## Network modes
 
 | Mode | Game UDP path | Needs |
 |---|---|---|
-| `direct` | game ↔ game on 127.0.0.1 | nothing |
+| `direct` | game ↔ game on 127.0.0.1 (across machines: each agent's LAN address) | nothing |
 | `relay` | game ↔ mpemu relay ↔ game; links can be impaired or cut | nothing |
 | `ice` | game ↔ faf-pioneer adapter ↔ WebRTC data channel ↔ adapter ↔ game, signalled via mpemu's icebreaker, optionally forced through mpemu's TURN | `bin\faf-adapter.exe` |
 
-No Docker, database, RabbitMQ or eturnal is involved: all of it runs inside
-mpemu.
+No Docker, database, RabbitMQ or eturnal is involved: all of it runs inside mpemu.
 
 ## Use
 
 ```powershell
-# Check the whole stack without the game (no windows): all modes, plus the
-# multi-machine path with a local hub and two agent processes.
+# Check the whole stack without the game (no windows): all modes, plus the multi-machine path with a local hub and two agent processes.
 .\bin\mpemu.exe selftest
 
 # N instances, host + join, then an interactive console (help lists the commands).
@@ -99,7 +69,7 @@ mpemu.
 .\bin\mpemu.exe run scenarios\2p-recovered-vs-original.yaml
 ```
 
-Shipped scenarios (`scenarios/`):
+### Scenarios
 
 | File | Checks |
 |---|---|
@@ -109,7 +79,12 @@ Shipped scenarios (`scenarios/`):
 | `3p-kill-uneven-leaver-data.yaml` | A killed player nobody is told about, after one survivor lost 1.5 s of its data; both survivors eject it through their Connectivity dialogs and must end its command source on the same tick |
 | `3p-kill-eject-race.yaml` | The same with ~1 beat of difference and one survivor ejecting at once: reproduces the retail eject race (game 27869686). Fails whenever the difference is exactly one beat |
 | `2p-recovered-vs-original.yaml` | Recovered `main.exe` against `ForgedAlliance.exe` in one match; divergence shows up as a `Desync` report |
+| `2p-recovered-hosts-original.yaml` | Recovered `main.exe` hosts, retail joins: the host-side lobby path |
+| `2p-main-x86-vs-x64.yaml` | Our x86 `main.exe` against our x64 `main_x64.exe` (`-prebuilt`: with prebuilt bases, so the checksums cover a running economy); `2p-main-x86-vs-x86.yaml` is its baseline |
+| `3p-original-x86-x64-ai.yaml` | Retail, our x86 and our x64 in one AI-driven free-for-all ([live multiplayer parity](../docs/RETAIL_REPLAY_PARITY.md)); `3p-retail-control-ai.yaml` is the all-retail control |
 | `2p-debug-main.yaml` | Player 2 is started by you under the debugger; mpemu prints its command line and waits |
+
+Variants ending in `-synclog` add `/synclog` on every client: one checksum log per beat, so the first diverging input can be found by diffing the same beat's logs.
 
 ### What every game instance gets
 
@@ -118,16 +93,34 @@ Shipped scenarios (`scenarios/`):
 /windowed 1600 1000 /players N /team T /startspot S /nosound /prefs mpemu-p<uid>.prefs /position x y
 ```
 
-- **Always windowed.** `/windowed W H` is always passed (the engine's own flag,
-  0x008D02D0), and any `/fullscreen` in a scenario is rejected when the scenario is loaded. Size: `game.window`.
-- **Private preferences.** The engine resolves `/prefs` as a *file name inside*
-  `%LOCALAPPDATA%\Gas Powered Games\Supreme Commander Forged Alliance`. A path
-  silently gives empty preferences. Each instance gets a copy of `Game.prefs`
-  there as `mpemu-p<uid>.prefs`, moved into the run directory afterwards. Your
-  `Game.prefs` is never written. `prefs: shared` turns this off.
-- **Autolobby** (`lobby: auto`) launches by itself once every player is
-  connected to every other. It indexes players by start spot, so start spots
-  must be 1..N and unique (mpemu assigns them).
+- **Always windowed.** `/windowed W H` is always passed (the engine's own flag, 0x008D02D0), and a scenario with `/fullscreen` is rejected when it loads. Size: `game.window`.
+- **Private preferences.** The engine resolves `/prefs` as a *file name inside* `%LOCALAPPDATA%\Gas Powered Games\Supreme Commander Forged Alliance`; a path silently gives empty preferences. Each instance gets a copy of `Game.prefs` there as `mpemu-p<uid>.prefs`, moved into the run directory afterwards. Your `Game.prefs` is never written. `prefs: shared` turns this off.
+- **Autolobby** (`lobby: auto`) launches by itself once every player is connected to every other. It indexes players by start spot, so start spots must be 1..N and unique (mpemu assigns them).
+
+## Several machines
+
+```
+ director (mpemu run/lobby)        agent (mpemu agent)         agent (mpemu agent)
+   local seats                       seats on PC 2                seats on PC 3
+        \                                 |                            /
+         `------------ outbound HTTPS to the hub (mpemu-server) ------'
+                      icebreaker + TURN + control + game relay
+```
+
+- **Connections:** everyone connects *to* the hub, so NAT on any side is fine. Players name the agent that runs them (`agent: pc2`; empty = the director's machine).
+- **Modes:** `direct` uses the LAN addresses the agents advertise; `relay` sends every pair through the hub's relay, which learns each game's public address from its first packet (impairment and partitions work as locally); `ice` uses the hub's icebreaker and TURN.
+- **Host names** in `JoinGame` and `ConnectToPeer` are resolved by each seat on its own machine, so a hub name that resolves differently in the LAN and on the internet still works.
+- **TLS:** the API is TLS under a key derived from the secret, so a hub known only by an internal DNS name needs no certificate. [deploy/README.md](deploy/README.md) covers the deployed hubs and how to install another.
+
+Hub URL and secret come from the environment, never from committed files:
+
+```powershell
+$env:MPEMU_HUB = 'https://faftest.zontwelg.net:8443'     # internet hub (altair); LAN: https://<lan-hub-host>:8443
+$env:MPEMU_SECRET_FILE = "$env:APPDATA\mpemu\secret"     # same secret everywhere
+.\bin\mpemu.exe selftest -remote                         # check the hub from this PC (fakegame, no windows)
+.\bin\mpemu.exe agent -name pc2                          # on every PC with players
+.\bin\mpemu.exe lobby -n 2 -agents ",pc2" -mode relay    # director; player 1 here, player 2 on pc2
+```
 
 ## Scenario format
 
@@ -177,35 +170,13 @@ expect:
 
 ## Debugging
 
-- **The engine:** set `spawn: false` on a player (see `2p-debug-main.yaml`).
-  mpemu prints the exact working directory and arguments, and also writes
-  `debug-args-<uid>.txt` and `start-game-<uid>.cmd` into the run directory.
-  Run the exe from `%ProgramData%\FAForever\bin`; elsewhere it dies at startup.
-- **The Go side:** everything except the games and adapters runs in the one
-  mpemu process: `dlv debug ./cmd/mpemu -- lobby -n 2`.
-- **The adapter:** `mpemu-server` gives you the icebreaker and TURN on fixed
-  ports and prints ready-made access tokens. Run `faf-adapter` under a debugger
-  against it.
-- **After the fact:** `journal.jsonl` holds the whole run, `result.json` the
-  verdict. In `ice` mode the icebreaker's `GET /debug/state` shows members,
-  pending queue depth and TURN allocations live.
+- **The engine:** set `spawn: false` on a player (see `2p-debug-main.yaml`). mpemu prints the exact working directory and arguments, and writes `debug-args-<uid>.txt` and `start-game-<uid>.cmd` into the run directory. Run the exe from `%ProgramData%\FAForever\bin`; elsewhere it dies at startup.
+- **The Go side:** everything except the games and adapters runs in the one mpemu process: `dlv debug ./cmd/mpemu -- lobby -n 2`.
+- **The adapter:** `mpemu-server` gives you the icebreaker and TURN on fixed ports and prints ready-made access tokens. Run `faf-adapter` under a debugger against it.
+- **After the fact:** `journal.jsonl` holds the whole run, `result.json` the verdict. In `ice` mode the icebreaker's `GET /debug/state` shows members, pending queue depth and TURN allocations live.
 
 ## Known limits
 
-- faf-pioneer restarts a peer whose first WebRTC offer is still unanswered
-  when `ConnectToPeer` arrives. `addPeerIfMissing` treats the peer as
-  inactive, and `scheduleReconnection` only spares peers in the `connecting`
-  state. The other side is never told, so it answers the old offer and the
-  two never agree again ("stable->SetRemote(answer)").
-  - The real game loads for seconds before `Idle`, and ICE usually
-    finishes in that time.
-  - Through a distant TURN server, a game that is ready almost at once hits
-    the race every time. The remote ICE selftest therefore gives fakegame
-    `/loadtime 4s`; drop that to reproduce the bug.
-- faf-pioneer's GPGNet reader (`faf/stream_reader.go`) drops the connection on
-  a message with more than 10 arguments or a string over 64 KiB. End-of-game
-  `JsonStats` exceeds that in larger games, so in `ice` mode the adapter can
-  lose its launcher link exactly at game end. mpemu's own codec has no such
-  limit.
-- Several instances run on one GPU. mpemu keeps them windowed; exclusive
-  fullscreen instances fail to create their D3D9 device.
+- **faf-pioneer offer race:** faf-pioneer restarts a peer whose first WebRTC offer is still unanswered when `ConnectToPeer` arrives (`addPeerIfMissing` treats the peer as inactive, and `scheduleReconnection` only spares peers in the `connecting` state). The other side is never told, so it answers the old offer and the two never agree again ("stable->SetRemote(answer)"). The real game loads for seconds before `Idle`, and ICE usually finishes in that time; through a distant TURN server a game that is ready almost at once hits the race every time. The remote ICE selftest therefore gives fakegame `/loadtime 4s`; drop that to reproduce the bug.
+- **faf-pioneer message limits:** its GPGNet reader (`faf/stream_reader.go`) drops the connection on a message with more than 10 arguments or a string over 64 KiB. End-of-game `JsonStats` exceeds that in larger games, so in `ice` mode the adapter can lose its launcher link exactly at game end. mpemu's own codec has no such limit.
+- **One GPU:** several instances share it, so mpemu keeps them windowed; exclusive fullscreen instances fail to create their D3D9 device.

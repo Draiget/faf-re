@@ -1,7 +1,10 @@
-# Independent SFD diagnostics
+# SFD diagnostics
 
-Run from an initialized Visual Studio developer shell, with the FFmpeg development
-package described in [the compatibility profile](../../docs/FAF_SFD_COMPATIBILITY.md):
+Standalone diagnostics and tests for the independent SFD movie backend and its compatibility API. Setup, format details and validation results are in [FAF SFD movies](../../docs/FAF_SFD_COMPATIBILITY.md).
+
+## Build and test
+
+Run from an initialized Visual Studio developer shell, with the FFmpeg development package described in [the compatibility profile](../../docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build):
 
 ```bat
 cmake -S tools/sfd-inspect -B .tmp/sfd-tests -A Win32 -DFAF_SFD_ASSET_DIR="path/to/game/movies"
@@ -9,16 +12,12 @@ cmake --build .tmp/sfd-tests --config Debug
 ctest --test-dir .tmp/sfd-tests -C Debug --output-on-failure
 ```
 
-Use a separate build directory with `-A x64` for 64-bit diagnostics. Add
-`-DFAF_SFD_ASAN=ON` to instrument backend and test code; run from the developer
-shell so the ASan runtime DLL can be found. Release is supported too.
+- **x64**: use a separate build directory with `-A x64`. Release is supported too.
+- **ASan**: add `-DFAF_SFD_ASAN=ON` to instrument backend and test code; run from the developer shell so the ASan runtime DLL is found.
+- **Assets**: the asset directory is optional. Without it, CTest runs only the synthetic parser tests. No game assets are copied or redistributed.
+- **Sound**: the DirectSound test needs an available audio device. `--play-sound` audibly plays part of the selected movie; `--play` exercises the same player with no sound device.
 
-The asset directory is optional. Without it, CTest runs only synthetic parser
-tests. The DirectSound test requires an available audio device. No game assets
-are copied or redistributed. `--play-sound` audibly plays part of the selected
-movie; `--play` exercises the same player with no sound device.
-
-Examples:
+## Examples
 
 ```bat
 sfd-inspect --metadata main_menu.sfd FMV_loading02.sfd
@@ -27,11 +26,7 @@ sfd-inspect --play Abasi.sfd
 sfd-inspect --play-sound e3_demo_cut.sfd
 ```
 
-These tests validate the independent backend and compatibility API. They do not
-claim to exercise FAF's D3D reset events, VFS resolution, Lua callbacks or XACT
-playback; those require the complete engine.
+## Limits
 
-The observed Windows DirectSound/ASan incompatibility and its standalone
-reproducer are described in the [validation report](../../docs/FAF_SFD_VALIDATION.md).
-Normal Win32/x64 audio tests pass; do not interpret a no-sound sanitizer run as
-validation of the Windows audio implementation.
+- These tests do not exercise FAF's D3D reset events, VFS resolution, Lua callbacks or XACT playback; those need the complete engine.
+- Under ASan, the DirectSound test crashes inside Windows `DSOUND.dll` (standalone reproducer in the [validation results](../../docs/FAF_SFD_COMPATIBILITY.md#backend-tests)). Normal Win32/x64 audio tests pass; a no-sound sanitizer run is not validation of the Windows audio implementation.
