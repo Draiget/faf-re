@@ -5209,6 +5209,24 @@ namespace moho
   int cfunc_GetMouseScreenPosL(LuaPlus::LuaState* state);
 
   /**
+   * FAF FA-Binary-Patches (section/CopyToClipBoard.cpp): `CopyToClipboard(val):bool`.
+   *
+   * What it does:
+   * Copies one string to the Windows clipboard and returns whether it worked.
+   */
+  int cfunc_CopyToClipboard(lua_State* luaContext);
+  CScrLuaInitForm* func_CopyToClipboard_LuaFuncDef();
+
+  /**
+   * FAF FA-Binary-Patches (section/GetHighlightCommand.cpp): `GetHighlightCommand()`.
+   *
+   * What it does:
+   * Returns a table describing the command under the cursor, or nothing.
+   */
+  int cfunc_GetHighlightCommand(lua_State* luaContext);
+  CScrLuaInitForm* func_GetHighlightCommand_LuaFuncDef();
+
+  /**
    * Address: 0x00842E60 (FUN_00842E60, cfunc_SetFocusArmyUser)
    *
    * lua_State *
