@@ -17,6 +17,16 @@ namespace moho
   class CScrLuaInitForm;
 
   /**
+   * Address: 0x004B2B90 (FUN_004B2B90, func_ParseColor)
+   *
+   * What it does:
+   * Resolves one color token as a named color (case-insensitive) or a 6/8-digit
+   * hex payload (6 digits get alpha 0xFF). Returns false, leaving `outColor`
+   * unspecified, for anything else.
+   */
+  [[nodiscard]] bool SCR_ParseColor(const char* colorText, std::uint32_t* outColor);
+
+  /**
    * Address: 0x004B2D20 (FUN_004B2D20, Moho::SCR_DecodeColor)
    *
    * What it does:

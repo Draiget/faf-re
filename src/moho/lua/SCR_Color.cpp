@@ -220,44 +220,45 @@ namespace
     return false;
   }
 
-  /**
-   * Address: 0x004B2B90 (FUN_004B2B90, func_ParseColor)
-   *
-   * What it does:
-   * Resolves one color token as named-color lookup or 6/8-digit hex payload.
-   */
-  [[nodiscard]] bool TryParseColor(const char* const colorText, std::uint32_t* const outColor)
-  {
-    const msvc8::string loweredColor = gpg::STR_ToLower(colorText);
-    const ColorNameMap& colorMap = GetColorNameMap();
-    const auto foundIt = colorMap.find(loweredColor);
-    if (foundIt != colorMap.end()) {
-      *outColor = foundIt->second;
-      return true;
-    }
+} // namespace
 
-    const std::size_t textLength = std::strlen(colorText);
-    if (textLength != 6 && textLength != 8) {
-      return false;
-    }
-
-    std::uint32_t accum = *outColor;
-    for (std::size_t index = 0; index < textLength; ++index) {
-      std::uint32_t nibble = 0;
-      if (!DecodeHexNibble(colorText[index], nibble)) {
-        return false;
-      }
-      accum = nibble | (accum << 4);
-    }
-
-    if (textLength == 6) {
-      accum |= 0xFF000000u;
-    }
-
-    *outColor = accum;
+/**
+ * Address: 0x004B2B90 (FUN_004B2B90, func_ParseColor)
+ *
+ * What it does:
+ * Resolves one color token as named-color lookup or 6/8-digit hex payload.
+ */
+bool moho::SCR_ParseColor(const char* const colorText, std::uint32_t* const outColor)
+{
+  const msvc8::string loweredColor = gpg::STR_ToLower(colorText);
+  const ColorNameMap& colorMap = GetColorNameMap();
+  const auto foundIt = colorMap.find(loweredColor);
+  if (foundIt != colorMap.end()) {
+    *outColor = foundIt->second;
     return true;
   }
-} // namespace
+
+  const std::size_t textLength = std::strlen(colorText);
+  if (textLength != 6 && textLength != 8) {
+    return false;
+  }
+
+  std::uint32_t accum = *outColor;
+  for (std::size_t index = 0; index < textLength; ++index) {
+    std::uint32_t nibble = 0;
+    if (!DecodeHexNibble(colorText[index], nibble)) {
+      return false;
+    }
+    accum = nibble | (accum << 4);
+  }
+
+  if (textLength == 6) {
+    accum |= 0xFF000000u;
+  }
+
+  *outColor = accum;
+  return true;
+}
 
 /**
  * Address: 0x004B2D20 (FUN_004B2D20, Moho::SCR_DecodeColor)
@@ -275,7 +276,7 @@ std::uint32_t moho::SCR_DecodeColor(LuaPlus::LuaState* const state, const LuaPlu
 
   std::uint32_t decodedColor = 0;
   const char* const colorText = colorObject.GetString();
-  if (TryParseColor(colorText, &decodedColor)) {
+  if (SCR_ParseColor(colorText, &decodedColor)) {
     return decodedColor;
   }
 
@@ -293,7 +294,7 @@ std::uint32_t moho::SCR_DecodeColor(LuaPlus::LuaState* const state, const LuaPlu
 std::uint32_t moho::SCR_DecodeColor(const msvc8::string& colorText)
 {
   std::uint32_t decodedColor = 0;
-  if (!TryParseColor(colorText.c_str(), &decodedColor)) {
+  if (!SCR_ParseColor(colorText.c_str(), &decodedColor)) {
     const msvc8::string errorMessage = gpg::STR_Printf(kUnknownColorFmt, colorText.c_str());
     throw XDataError(errorMessage.c_str());
   }
