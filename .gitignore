@@ -32,6 +32,7 @@ dependencies/dxc/
 dependencies/slang/
 dependencies/vulkan/
 dependencies/*.7z
+*.7z
 *.pdb
 *.log
 *.obj
