@@ -1,23 +1,22 @@
 # FAF engine (recovered Forged Alliance / Moho engine).
 #
-# CMake build of src/main.vcxproj's engine executable with clang-cl. The MSVC
-# project stays the reference build; this one reproduces its sources, order,
-# defines and link, with the C/C++ runtime linked statically (/MT) into the
-# engine and every library built here, so the executables import no MSVC
-# runtime DLL.
+# The engine and every library it uses, built from source with clang-cl, with
+# the C/C++ runtime linked statically (/MT), so the executables import no MSVC
+# runtime DLL. Configure fetches and patches dependencies/ (FafDependencies).
 #
 #   cmake --preset clang-x64-release && cmake --build --preset clang-x64-release
 #   cmake --preset clang-x86-release && cmake --build --preset clang-x86-release
 #
-# See CMakePresets.json and cmake/toolchains/ for the toolchain setup.
+# See CMakePresets.json and cmake/toolchains/ for the toolchain setup; build.ps1
+# builds and copies the result into the FAF run folders. Visual Studio 2022
+# (Open Folder) and VS Code (CMake Tools) use the same presets.
 
 cmake_minimum_required(VERSION 3.25)
 
 project(faf_engine LANGUAGES C CXX RC)
 
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-  message(FATAL_ERROR "This build expects clang-cl (use a preset from CMakePresets.json). "
-                      "The MSVC build is src/main.vcxproj.")
+  message(FATAL_ERROR "This build expects clang-cl: use a preset from CMakePresets.json.")
 endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -51,7 +50,7 @@ string(REGEX REPLACE "/EH[a-z-]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-# Release links like the MSVC Release configurations: debug information,
+# Release links like the shipped binary's: debug information,
 # unreferenced code dropped, identical COMDATs folded.
 foreach(_kind EXE SHARED MODULE)
   string(APPEND CMAKE_${_kind}_LINKER_FLAGS_RELEASE " /DEBUG /OPT:REF /OPT:ICF")

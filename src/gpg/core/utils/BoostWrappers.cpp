@@ -156,15 +156,14 @@ namespace boost
   // boost::detail::condition_impl::condition_impl()/~condition_impl() and
   // boost::thread::~thread() are NOT defined in this TU: the vendored
   // dependencies/boost_1_34_1/libs/thread/src/condition.cpp and thread.cpp
-  // are compiled directly into this project (main.vcxproj ->
-  // boost_thread_condition.obj / boost_thread_thread.obj) and already
+  // are compiled directly into the engine (src/sources.cmake) and already
   // provide these symbols. A hand-written duplicate here would be an ODR
   // violation masked only by this project's /FORCE link setting (see
   // project_force_hides_declonly_bridges memory note) -- real address
   // citations for these two now live on the vendored definitions themselves
   // (0x00AC2190/0x00AC2760), with an explanatory note on condition_impl's
   // ctor about the UNICODE/ANSI CreateSemaphore/CreateMutex divergence that
-  // main.vcxproj's condition.cpp ClCompile entry now corrects for.
+  // condition.cpp's per-file settings in src/CMakeLists.txt correct for.
 
   /**
    * Address: 0x00935E30 (FUN_00935E30)

@@ -1,6 +1,4 @@
-# Generated from the ClCompile list of src/main.vcxproj by
-# scripts/cmake_sync_sources.py --write. Edit main.vcxproj, then regenerate;
-# `python scripts/cmake_sync_sources.py` fails when the two differ.
+# Every translation unit of the engine. Add a new .cpp here, in its place.
 #
 # The ORDER IS LOAD-BEARING. Each translation unit's dynamic initialisers go
 # into .CRT$XCU in object order, so this list is the engine's static-init

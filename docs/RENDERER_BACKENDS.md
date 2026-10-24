@@ -44,7 +44,7 @@ Vulkan: ready (...)
 
 The options entry comes from the engine's own Lua, never from edits to FAF's gamedata:
 
-- **Source:** `data/fafengine/` holds engine-owned scripts that extend gamedata scripts. The build copies it next to the executable (`StageFafEngineHooks` in `src/main.vcxproj`, and into the run folder when `FafStageToRunDir` is on).
+- **Source:** `data/fafengine/` holds engine-owned scripts that extend gamedata scripts. The build copies it next to the executable (`src/CMakeLists.txt`), and `build.ps1` copies it into the run folder.
 - **Mount:** at startup the engine mounts `<exe folder>/fafengine` at `/fafengine` and registers it as a hook directory, after the init file's own `path` and `hook` entries (`AppendEngineHookFolder` in `src/moho/misc/StartupHelpers.cpp`). The engine does this itself because the init files (`init_faf.lua` and the rest) belong to the FAF client.
 - **Hook:** a hook file is appended to the gamedata file of the same path, so `fafengine/lua/options/options.lua` runs at the end of `/lua/options/options.lua` and inserts the entry after Vertical Sync. The log says `engine hooks: ... mounted at /fafengine` and `Hooked /lua/options/options.lua with /fafengine/lua/options/options.lua`.
 

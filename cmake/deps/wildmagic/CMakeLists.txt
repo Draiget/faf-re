@@ -1,9 +1,7 @@
 # Wild Magic 3.8: Foundation, Dx9Renderer and Dx9Application static libraries.
 #
-# Mirrors the FAF project files dependencies/WildMagic3p8/{Foundation/
-# Foundation.vcxproj, Renderers/Dx9Renderer/Dx9Renderer.vcxproj,
-# Applications/Dx9Application.vcxproj} (main.vcxproj's ProjectReferences):
-# same sources, WIN32;NDEBUG;_LIB, C++20 without /permissive-, /EHsc. The
+# Foundation, the Dx9 renderer and the Dx9 application layer:
+# WIN32;NDEBUG;_LIB, C++20 without /permissive-, /EHsc. The
 # tree is shared and read-only; the libraries are built here.
 
 set(WM3_ROOT "${FAF_DEPENDENCIES_DIR}/WildMagic3p8")

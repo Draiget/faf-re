@@ -6,7 +6,7 @@
 >
 > Apply from inside the dependency tree with `GIT_CEILING_DIRECTORIES` set to its parent and `git -c core.autocrlf=false apply --unsafe-paths --whitespace=nowarn <patch>`. The `-c core.autocrlf=false` matters: Git for Windows sets `core.autocrlf=true` system-wide, which rewrites the line endings of the files a patch creates, and later patches written against the real endings then fail.
 >
-> The release ships an **ANSI** `wxmsw.lib`; `main.vcxproj` links `wxmswu.lib`, so the Unicode `nmake` build and the `setup.h` stamp that follows it are mandatory.
+> The release's `setup.h` is the ANSI one; the engine needs the Unicode build (`mswu`), whose `setup.h` configure writes.
 
 The engine links wx statically (MSW port, Unicode).
 
@@ -45,12 +45,3 @@ We call the flag `m_labelHitTest`; FA's name is unknown, as are the names of the
 The CMake build (clang-cl) compiles wx from the patched tree itself (`cmake/deps/wxwindows`): there is no `nmake` step and no prebuilt library. Configure also writes the files the wx makefile would generate (`lib/msw*/wx/setup.h` with `wxUSE_UNICODE 1` for `mswu`, `src/common/y_tab.c`, `src/common/lex_yy.c`).
 
 wx's `WinMain` is left out (`NOMAIN`, wx's own switch in `src\makevc.env`): the engine has its own `WinMain` (0x008D44A0) and calls `wxEntry` itself, while `main.obj` is always linked for `wxhInstance`, so a wx `WinMain` would be a duplicate symbol.
-
-`main.vcxproj` (the MSVC build) instead links `nmake`-built static libraries from `lib\` (Win32) and `lib\x64\`:
-
-```bat
-cd /d <wx root>\src\msw
-nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD UNICODE=1 NOMAIN=1 "OVERRIDEFLAGS=/DUNICODE /D_UNICODE /EHsc"
-```
-
-Run it from a Win32 developer shell for `lib\`, and for x64 from an x64 shell in a separate copy of the tree, then copy `wxmswu.lib png.lib jpeg.lib tiff.lib regex.lib zlib.lib` into `lib\x64\` (see `wxwindows_2_4_2_faf_x64.md`).

@@ -1,10 +1,6 @@
-// Application manifest for the CMake (clang-cl) build of the engine.
-//
-// main.vcxproj does not compile this script: MSBuild generates and embeds the
-// same manifest itself (Manifest EnableDpiAwareness=true plus the linker's
-// default UAC fragment). The CMake build links with /MANIFEST:NO and embeds
-// res/main.manifest from here instead, so the result does not depend on the
-// linker's manifest-merging support.
+// Application manifest of the engine (asInvoker, system DPI aware). The build
+// links with /MANIFEST:NO and embeds res/main.manifest from here, so the
+// result does not depend on the linker's manifest-merging support.
 //
 // 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID, 24 = RT_MANIFEST.
 1 24 "res/main.manifest"

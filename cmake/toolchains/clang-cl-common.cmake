@@ -15,8 +15,7 @@
 #   FAF_WINSDK_DIR       Windows 10/11 SDK root. Default: $ENV{WindowsSdkDir},
 #                        else the KitsRoot10 registry value.
 #   FAF_WINSDK_VERSION   SDK version. Default: $ENV{WindowsSDKVersion}, else
-#                        the newest one installed (what main.vcxproj's
-#                        WindowsTargetPlatformVersion 10.0 picks too).
+#                        the newest one installed.
 #
 # clang-cl and lld-link take the last three as /vctoolsdir, /winsdkdir and
 # /winsdkversion and derive the per-architecture include and library paths

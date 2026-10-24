@@ -1,6 +1,6 @@
 # FAF WildMagic 3.8 Patch
 
-> **Baseline (2026-10-24).** The original Geometric Tools release of Wild Magic 3.8 (files dated 2006-01-11), published for this project as `Draiget/wild-magic-3-8`, with `wildmagic3p8_faf_required.patch` (sources) and `wildmagic3p8_faf_projects.patch` (VS2022 projects and helper tools) applied. The result is byte-identical to `dependencies/WildMagic3p8` (2,503 files); the only other file there is the build output `Foundation/vc140.pdb`.
+> **Baseline (2026-10-24).** The original Geometric Tools release of Wild Magic 3.8 (files dated 2006-01-11), published for this project as `Draiget/wild-magic-3-8`, with `wildmagic3p8_faf_required.patch` applied. The CMake build compiles Foundation and the Dx9 renderer from that tree (`cmake/deps/wildmagic`).
 >
 > Regenerated 2026-10-24 from that original. The previous patches were cut against `WildMagic3p8.7z`, a snapshot that already contained most of these changes, and had gone stale: later edits to `Wm3Vector2.h`, `Wm3Vector3.h`, `Wm3Quaternion.h`, `Wm3AxisAlignedBox3.h` and `Foundation.vcxproj`, the new `Wm3IVector2.h`/`Wm3IVector3.h`, and comment-only FAF traceability notes in thirteen sources were in no patch.
 >
@@ -93,5 +93,3 @@ git -c core.autocrlf=false apply --unsafe-paths --whitespace=nowarn <repo>\depen
 ```
 
 Add `--check --reverse` to test whether it is already applied.
-
-Then the same for `wildmagic3p8_faf_projects.patch`. The CMake build compiles Foundation and the Dx9 renderer itself (`cmake/deps/wildmagic`); `main.vcxproj` builds them through the `ProjectReference`s the second patch adds.

@@ -1,6 +1,6 @@
 # FAF wxWindows 2.4.2 x64 Patch
 
-Applies on top of `wxwindows_2_4_2_faf_required.patch`. wx 2.4.2 predates Win64 support (it has no `_WIN64` handling at all); these are the changes that let the static Unicode library build and run as x64 for `main.vcxproj`'s x64 configurations. Every change is a no-op for Win32: the `...Ptr` window-long functions and `GWLP_*` indices are macros for the 32-bit ones there, `UINT_PTR` and `DWORD_PTR` are `UINT`/`DWORD`, and the two header changes are guarded by `_WIN64`.
+Applies on top of `wxwindows_2_4_2_faf_required.patch`. wx 2.4.2 predates Win64 support (it has no `_WIN64` handling at all); these are the changes that let the static Unicode library build and run as x64. Every change is a no-op for Win32: the `...Ptr` window-long functions and `GWLP_*` indices are macros for the 32-bit ones there, `UINT_PTR` and `DWORD_PTR` are `UINT`/`DWORD`, and the two header changes are guarded by `_WIN64`.
 
 Stored with CRLF terminators, like the required patch, and applied after it (see the apply rule in `wxwindows_2_4_2_faf_required.md`).
 
@@ -26,21 +26,10 @@ Applies on top of this patch. Without it, wx 2.4.2 still passes `WPARAM`/`LPARAM
 - `src/msw/{choice,listbox,mdi,tabctrl,tbar95}.cpp`: string, buffer and data pointers go out as `LPARAM`/`INT_PTR`; `listbox.cpp` reads item data back as `LRESULT`; `fontenum.cpp`'s callback takes an `LPARAM`; `window.cpp` keeps the window procedure's result as `WXLPARAM`; `mdi.cpp`'s `wxMDIChildFrame::MSWDefWindowProc` takes a `WXWPARAM`.
 - `src/common/dynarray.cpp`: sorted arrays pass items to the compare callback through `size_t`, not `long`; `src/common/list.cpp` tests a string pointer for null directly; `include/wx/hashmap.h` hashes a pointer through `size_t`.
 
-Left as they are: `HWND`/`HDC`/`HFONT`/... in `unsigned long` (user and GDI handles are 32-bit significant on Win64), `src/msw/treectrl.cpp`'s attribute hash key, and pointer casts in code the engine does not reach (`src/common/cmndata.cpp`, `src/common/cshelp.cpp`, `src/generic/treelay.cpp`, `src/msw/{helpchm,helpwin,dcprint,thread,utils,tooltip}.cpp`, `src/common/variant.cpp`'s pointer print). The build below lists every one of them with `/w14311 /w14302 /w14312` added to `OVERRIDEFLAGS`.
+Left as they are: `HWND`/`HDC`/`HFONT`/... in `unsigned long` (user and GDI handles are 32-bit significant on Win64), `src/msw/treectrl.cpp`'s attribute hash key, and pointer casts in code the engine does not reach (`src/common/cmndata.cpp`, `src/common/cshelp.cpp`, `src/generic/treelay.cpp`, `src/msw/{helpchm,helpwin,dcprint,thread,utils,tooltip}.cpp`, `src/common/variant.cpp`'s pointer print).
 
-`main.vcxproj` compiles and links its x64 configurations against `$(FafWxX64Root)` (default `dependencies\wxWindows-2.4.2`); the patched headers and the libraries must come from the same tree, because `WXLPARAM`, `wxTreeItemId` and `wxListItem` change size.
+The engine and the library must be compiled against the same patched headers, because `WXLPARAM`, `wxTreeItemId` and `wxListItem` change size; the CMake build compiles both from `dependencies/wxWindows-2.4.2`.
 
 ## Building it
 
 The CMake build applies both x64 patches with the required one and compiles the same patched tree for either architecture; nothing else is needed.
-
-For `main.vcxproj`'s x64 configurations, build the libraries in a copy of the tree, so the Win32 `lib\*.lib` are not overwritten. A copy already built for Win32 must be cleaned first (its `lib\*.lib` and every `Release*` object folder), or `nmake` keeps the Win32 support libraries; `dumpbin /headers` shows `machine (x64)` on each good library.
-
-```bat
-call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-set "WXWIN=<copy root>"
-cd /d "%WXWIN%\src\msw"
-nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD UNICODE=1 NOMAIN=1 "OVERRIDEFLAGS=/DUNICODE /D_UNICODE /EHsc"
-```
-
-Check `lib\mswu\wx\setup.h` still says `wxUSE_UNICODE 1`, then copy `wxmswu.lib png.lib jpeg.lib tiff.lib regex.lib zlib.lib` into `dependencies\wxWindows-2.4.2\lib\x64\`, or keep the copy apart and build with `/p:FafWxX64Root=<copy root>`. The makefiles have no header dependencies: after changing a header, delete the `ReleaseUnicode` object folders before rebuilding.

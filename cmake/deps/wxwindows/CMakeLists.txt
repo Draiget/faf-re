@@ -22,7 +22,7 @@ if(NOT EXISTS "${WX_ROOT}/lib/mswu/wx/setup.h")
 endif()
 
 # True when the tree carries wxwindows_2_4_2_faf_x64_pointers.patch: only then
-# may the x64 image use addresses above 2 GB (main.vcxproj FafWxX64Pointers).
+# may the x64 image use addresses above 2 GB.
 file(STRINGS "${WX_ROOT}/include/wx/defs.h" _wx_pointer_marker
      REGEX "FAF x64: WPARAM/LPARAM are pointer-wide" LIMIT_COUNT 1)
 if(_wx_pointer_marker)
@@ -64,7 +64,8 @@ function(faf_wx_library name)
 endfunction()
 
 # --- zlib 1.1.4 (wx's copy) ------------------------------------------------------
-# main.vcxproj links this one on Win32; x64 links zlib 1.2.3 (cmake/deps/zlib).
+# The engine links this one on Win32, as the shipped exe does; x64 links
+# zlib 1.2.3 (cmake/deps/zlib).
 faf_wx_library(wx_zlib
   zlib/adler32.c zlib/compress.c zlib/crc32.c zlib/gzio.c zlib/uncompr.c
   zlib/deflate.c zlib/trees.c zlib/zutil.c zlib/inflate.c zlib/infblock.c
@@ -188,8 +189,7 @@ faf_wx_library(wxmswu
 set_source_files_properties("${WX_SRC}/common/y_tab.c" TARGET_DIRECTORY wxmswu
   PROPERTIES COMPILE_DEFINITIONS "USE_DEFINE;YY_USE_PROTOS")
 
-# What the engine compiles and links against, include directories in
-# main.vcxproj's order.
+# What the engine compiles and links against.
 add_library(faf_wx INTERFACE)
 add_library(faf::wx ALIAS faf_wx)
 target_include_directories(faf_wx INTERFACE "${WX_ROOT}/include" "${WX_ROOT}/lib/mswu")

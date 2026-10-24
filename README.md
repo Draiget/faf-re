@@ -36,20 +36,28 @@ Numbers, method and what is next: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 CMake with clang-cl, for x64 and x86. The C/C++ runtime is linked statically, so the executables need no MSVC runtime DLLs.
 
-Needs Visual Studio 2022 (C++ workload, for the Windows SDK and runtime libraries), LLVM (clang-cl, lld-link), CMake 3.25+ and Ninja, and the DirectX SDK (June 2010).
+Needs Visual Studio 2022 (C++ workload, for the Windows SDK and runtime libraries), LLVM (clang-cl, lld-link) in `C:\Program Files\LLVM` or `LLVM_ROOT`, and Git. CMake 3.25+ and Ninja come with Visual Studio's "C++ CMake tools for Windows" component, or from PATH.
 
 ```powershell
 git clone --recursive https://github.com/Draiget/faf-re.git
+.\build.ps1                    # x64 Release -> C:\ProgramData\FAForever\bin_x64\main_x64.exe
+.\build.ps1 -Arch both         # x64 and x86 (x86 -> C:\ProgramData\FAForever\bin\main.exe)
+.\build.ps1 -Arch x86 -Name main_test   # another exe name, to keep the current build alongside
+.\build.ps1 -NoBuild           # copy the last build only
+```
+
+`build.ps1` configures and builds the presets and copies the exe with its `.pdb`, the `fafengine\` hook folder and the DXC DLLs into the FAF run folders. Other options: `-Configuration Debug`, `-FafDir`, `-Out` (also copy into `out\<arch>\`), `-NoCopy`, `-Rebuild`, `-Jobs`. Without it:
+
+```powershell
 cmake --preset clang-x64-release; cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x64.exe
 cmake --preset clang-x86-release; cmake --build --preset clang-x86-release   # build/clang-x86-release/src/main.exe
 ```
 
-Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers, FFmpeg 7.1.3), then boost 1.34.1, wxWidgets 2.4.2 and DXC, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers, FFmpeg 7.1.3), then boost 1.34.1, wxWidgets 2.4.2 and DXC, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. A missing submodule is cloned, a missing download is fetched, and everything is compiled from source. The DirectX SDK (June 2010) is used when installed; otherwise its headers and libraries are extracted from Microsoft's installer. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+
+**IDEs.** Visual Studio 2022: File → Open → Folder, then pick a preset. VS Code: install the recommended extensions (CMake Tools, C/C++); CMake Tools offers the same presets, and IntelliSense reads the configured preset.
 
 FFmpeg 7.1.3 (the SFD movie player's decoder) is compiled from source with the engine: `dependencies/ffmpeg` is the unmodified FFmpeg release plus a CMake build ([Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror)), and its libraries are linked statically, so there are no FFmpeg DLLs and no prebuilt binaries. Its configuration and licence (LGPL v2.1+): [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build).
-
-The MSVC project `src/main.vcxproj` is kept while it still builds; `build.ps1` builds it and copies the result into the FAF run folders.
-
 ## What is and isn't here
 
 - **Here:** C++ source, build files, and the tooling used to check behaviour against the original.
@@ -59,10 +67,10 @@ The MSVC project `src/main.vcxproj` is kept while it still builds; `build.ps1` b
 
 | Path | What |
 |---|---|
-| `src/` | The engine (`moho`, `gpg`, `legacy`, `lua`, `platform`, ...); project `src/main.vcxproj` |
+| `src/` | The engine (`moho`, `gpg`, `legacy`, `lua`, `platform`, ...); source list `src/sources.cmake` |
 | `data/fafengine/` | Engine-owned Lua hooks copied next to the exe (for example the Graphics API option) |
 | `tools/` | Go multiplayer test harness (`mpemu`) and checkers; see [tools/README.md](tools/README.md) |
-| `scripts/` | Sampling profiler, benchmark and replay helpers (`perf/`), shader and texture checks (`effects/`), the hang stack dumper (`stackdump.cpp`) and the CMake source-list sync |
+| `scripts/` | Sampling profiler, benchmark and replay helpers (`perf/`), shader and texture checks (`effects/`), and the hang stack dumper (`stackdump.cpp`) |
 | `docs/` | [Performance](docs/PERFORMANCE.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md) |
 
 ## Libraries the engine uses

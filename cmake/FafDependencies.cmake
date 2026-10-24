@@ -306,7 +306,7 @@ faf_dependency_download(wxWindows-2.4.2)
 faf_dependency_download(dxc)
 
 faf_dependency_patches(WildMagic3p8 submodule
-  wildmagic3p8_faf_required.patch wildmagic3p8_faf_projects.patch)
+  wildmagic3p8_faf_required.patch)
 faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
 faf_dependency_patches(boost_1_34_1 download

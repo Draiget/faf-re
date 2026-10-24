@@ -3,7 +3,7 @@
 #include <math.h>
 
 /**
- * Force-included into every Release|Win32 translation unit (main.vcxproj).
+ * Force-included into every x86 engine translation unit (src/CMakeLists.txt).
  *
  * The simulation runs with the x87 precision-control field at `_PC_24`
  * (platform::SetX87PrecisionControl). Under that control word the CRT's

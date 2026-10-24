@@ -3,6 +3,7 @@ __pycache__/
 .vscode/*
 !.vscode/settings.json
 !.vscode/c_cpp_properties.json
+!.vscode/extensions.json
 
 # Temporary files of scripts
 scripts/**/*.txt

@@ -80,7 +80,6 @@ The parser scans at most the first 64 KiB (including, but not limited to, bases 
 - **No binaries**: there are no FFmpeg DLLs, import libraries or prebuilt packages; nothing is downloaded or staged next to the executable, and the executables import no FFmpeg DLL.
 - **Generated configuration**: `faf/x64/` and `faf/x86/` hold what FFmpeg's `configure` generated for the configuration below (`config.h`, `config_components.h`, `libavutil/avconfig.h`, the component lists) and `sources.cmake`, the per-library source lists evaluated from FFmpeg's own Makefiles. `faf/generate.sh` in the submodule regenerates them; the mirror's README explains how.
 - **License**: LGPL v2.1 or later; nothing from `--enable-gpl` or `--enable-nonfree` is enabled. The engine links FFmpeg statically, which LGPL v2.1 section 6 allows because faf-re's complete source and the FFmpeg source in the submodule let anyone relink the engine against a modified FFmpeg. Distributing a build requires FFmpeg's notices; see [FFmpeg's license checklist](https://ffmpeg.org/legal.html).
-- **MSVC project**: `src/main.vcxproj` (and `build.ps1`, which builds it) still links a prebuilt shared FFmpeg from `FafFfmpegRoot` and stages its DLLs. Its default, `dependencies/ffmpeg/$(Platform)`, no longer exists, so that project needs `/p:FafFfmpegRoot=...` pointing at such a package; the CMake build needs none.
 
 The configuration (`faf/generate.sh` adds the clang-cl toolchain options, `--target-os=win32`, the architecture and `--disable-debug`):
 

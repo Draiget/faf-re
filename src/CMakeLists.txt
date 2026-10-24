@@ -1,9 +1,7 @@
 # The engine executable: main_x64.exe (x64) / main.exe (x86).
 #
-# Mirrors src/main.vcxproj's Release|x64 and Release|Win32 configurations. The
-# translation units and their order come from sources.cmake (generated from
-# the vcxproj, see scripts/cmake_sync_sources.py); per-file settings are below,
-# each with the vcxproj's reason.
+# The translation units and their order are in sources.cmake; per-file
+# settings are below, each with its reason.
 
 include(sources.cmake)
 
@@ -19,8 +17,8 @@ set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
 
 # --- Resources ------------------------------------------------------------------------
 # MohoResources.rc includes wx/msw/wx.rc (wx's cursors, bitmaps, menus).
-# MohoManifest.rc embeds the manifest main.vcxproj generates (asInvoker,
-# system DPI aware); main.vcxproj does not compile it.
+# MohoManifest.rc embeds the application manifest (asInvoker, system DPI
+# aware).
 target_sources(faf_main PRIVATE moho/app/MohoResources.rc moho/app/MohoManifest.rc)
 set_source_files_properties(moho/app/MohoResources.rc PROPERTIES
   INCLUDE_DIRECTORIES "${FAF_WX_INCLUDE_DIR}")
@@ -64,12 +62,11 @@ set(_faf_main_options
   # /EHsc): the Lua fork raises script errors as C++ lua::lua_Error throws out
   # of functions declared extern "C" (luaD_call and its callees). /EHsc lets the
   # optimizer drop the handlers around them, and luaB_pcall's try/catch then
-  # vanishes (main.vcxproj ExceptionHandling SyncCThrow).
+  # vanishes.
   /EHs
   /permissive-
   /W3
-  # The DirectX SDK (June 2010) goes after the Windows SDK, as main.vcxproj
-  # appends $(DirectXInclude) after $(IncludePath): d3d9.h, dxgi.h and
+  # The DirectX SDK (June 2010) goes after the Windows SDK: d3d9.h, dxgi.h and
   # d3d10.h must resolve to the Windows SDK copies, d3dx9*.h and xact3.h to
   # the DirectX SDK.
   "/clang:-idirafter${FAF_DXSDK_DIR}/Include")
@@ -106,7 +103,7 @@ list(APPEND _faf_main_options
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_main PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 
-# --- Per-file settings (main.vcxproj ClCompile metadata) -----------------------------
+# --- Per-file settings ---------------------------------------------------------------
 set(_fx11 "${FAF_DEPENDENCIES_DIR}/FX11")
 
 set_property(SOURCE
@@ -182,9 +179,8 @@ else()
   set(_faf_zlib wx_zlib)
 endif()
 
-# The DirectX SDK libraries are searched before the Windows SDK's, as
-# main.vcxproj's AdditionalLibraryDirectories are; d3dcompiler.lib and
-# dxguid.lib are taken from the Windows SDK by full path, as there.
+# The DirectX SDK libraries are searched before the Windows SDK's;
+# d3dcompiler.lib and dxguid.lib are taken from the Windows SDK by full path.
 target_link_directories(faf_main PRIVATE "${_faf_dxsdk_lib}")
 target_link_libraries(faf_main PRIVATE
   FFmpeg::FFmpeg
@@ -232,10 +228,10 @@ target_link_libraries(faf_main PRIVATE "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug
 
 if(FAF_TARGET_ARCH STREQUAL "x86")
   # Both from the shipped binary's PE header (characteristics 0x123, stack
-  # reserve 0x1E8480 = /STACK:2000000); see main.vcxproj's Win32 link.
+  # reserve 0x1E8480 = /STACK:2000000).
   target_link_options(faf_main PRIVATE /LARGEADDRESSAWARE /STACK:2000000)
 else()
-  # x64 address-space mode, as main.vcxproj's FafX64LargeAddress:
+  # x64 address-space mode:
   #   full - large-address-aware with high-entropy ASLR (the default when the
   #          wx tree is pointer-safe),
   #   heap - large-address-aware, image pinned low (/BASE:0x10000000),
@@ -267,8 +263,12 @@ endif()
 # --- Staging next to the executable ---------------------------------------------------
 # The engine's own Lua hooks: the engine mounts the `fafengine` folder next to
 # the executable at /fafengine (DISK_SetupDataAndSearchPaths; see
-# docs/RENDERER_BACKENDS.md).
+# docs/RENDERER_BACKENDS.md). And the DXC runtime (dxcompiler.dll, dxil.dll),
+# which Direct3D 12 and Vulkan load to compile their shaders.
+set(_faf_dxc_bin "${FAF_DEPENDENCIES_DIR}/dxc/bin/${_faf_sdk_arch}")
 add_custom_command(TARGET faf_main POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
           "$<TARGET_FILE_DIR:faf_main>/fafengine"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_faf_dxc_bin}/dxcompiler.dll"
+          "${_faf_dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:faf_main>"
   VERBATIM)

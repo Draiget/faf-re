@@ -1,11 +1,16 @@
 <#
 .SYNOPSIS
-  Builds the engine (main.exe / main_x64.exe) and copies it into the FAF run folders.
+  Builds the engine (main.exe / main_x64.exe) with the CMake presets and copies it into the
+  FAF run folders.
 
 .DESCRIPTION
+  Configures (first run, or after a CMake change) and builds the clang-cl preset for each
+  architecture. Configure fetches and patches every dependency (cmake/FafDependencies.cmake),
+  FFmpeg included, so a fresh clone needs nothing else than the tools listed in README.md.
+
   x64 goes to <FafDir>\bin_x64 as main_x64.exe, x86 to <FafDir>\bin as main.exe, each with
-  its .pdb, the fafengine\ hook folder, the FFmpeg DLLs and the DXC DLLs (dxcompiler.dll,
-  dxil.dll) that Direct3D 12 and Vulkan need. Visual Studio 2022 is found with vswhere.
+  its .pdb, the fafengine\ hook folder and the DXC DLLs (dxcompiler.dll, dxil.dll) that
+  Direct3D 12 and Vulkan need. The build output stays in build\<preset>\src.
 
 .EXAMPLE
   .\build.ps1                       # x64 Release, copied to C:\ProgramData\FAForever\bin_x64
@@ -42,64 +47,63 @@ param(
   # Build only; do not copy anything.
   [switch]$NoCopy,
 
-  # Rebuild instead of an incremental build.
-  [switch]$Rebuild
+  # Configure from scratch (cmake --fresh) and rebuild everything.
+  [switch]$Rebuild,
+
+  # Parallel compile jobs (default: CMake's choice, one per logical CPU).
+  [int]$Jobs
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
-$project = Join-Path $repo 'src\main.vcxproj'
 
 $targets = @{
-  x64 = @{ Platform = 'x64';   VcArch = 'x64';       Exe = 'main_x64'; RunDir = 'bin_x64'; DllArch = 'x64' }
-  x86 = @{ Platform = 'Win32'; VcArch = 'amd64_x86'; Exe = 'main';     RunDir = 'bin';     DllArch = 'x86' }
+  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; RunDir = 'bin_x64' }
+  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     RunDir = 'bin' }
 }
 $archs = if ($Arch -eq 'both') { @('x64', 'x86') } else { @($Arch) }
 
-function Find-VcVarsAll {
+# cmake and ninja from PATH, else the copies Visual Studio 2022 ships with its CMake support.
+function Find-CMake {
+  $onPath = Get-Command cmake -ErrorAction SilentlyContinue
+  if ($onPath) { return $onPath.Source }
   $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-  if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found; install Visual Studio 2022 with the C++ desktop workload." }
-  $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-  if (-not $vs) { throw "No Visual Studio with the C++ x86/x64 tools was found." }
-  $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvarsall.bat'
-  if (-not (Test-Path $vcvars)) { throw "vcvarsall.bat not found under $vs." }
-  return $vcvars
+  if (Test-Path $vswhere) {
+    $vs = & $vswhere -latest -products '*' -property installationPath
+    $bundled = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake'
+    $exe = Join-Path $bundled 'CMake\bin\cmake.exe'
+    if ($vs -and (Test-Path $exe)) {
+      if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { $env:PATH = "$(Join-Path $bundled 'Ninja');$env:PATH" }
+      return $exe
+    }
+  }
+  throw "cmake not found: put CMake 3.25+ and Ninja on PATH, or install Visual Studio 2022 with 'C++ CMake tools for Windows'."
 }
 
-# Runs msbuild inside the vcvarsall environment for one architecture, without leaving that
-# environment behind in the calling PowerShell session.
-function Invoke-MsBuild([hashtable]$t) {
-  $saved = Get-ChildItem env: | ForEach-Object { @{ Name = $_.Name; Value = $_.Value } }
-  try {
-    $env:FAF_VCVARS = Find-VcVarsAll
-    $env:FAF_VCARCH = $t.VcArch
-    $vars = cmd /s /c --% ""%FAF_VCVARS%" %FAF_VCARCH% >nul 2>nul && set"
-    if ($LASTEXITCODE -ne 0) { throw "vcvarsall $($t.VcArch) failed." }
-    foreach ($line in $vars) {
-      $eq = $line.IndexOf('=')
-      if ($eq -gt 0) { Set-Item -Path "env:$($line.Substring(0, $eq))" -Value $line.Substring($eq + 1) }
-    }
+function Invoke-CMake([string[]]$cmakeArgs) {
+  & $script:cmake @cmakeArgs
+  if ($LASTEXITCODE -ne 0) { throw "cmake $($cmakeArgs -join ' ') failed (exit $LASTEXITCODE)." }
+}
 
-    $msbuildTarget = if ($Rebuild) { 'Rebuild' } else { 'Build' }
-    $msbuildArgs = @(
-      $project, "/t:$msbuildTarget", "/p:Configuration=$Configuration", "/p:Platform=$($t.Platform)",
-      '/m', '/v:minimal', '/nologo', '/p:FafStageToRunDir=false'
-    )
-    Write-Host "== Building $($t.Exe).exe ($Configuration|$($t.Platform))" -ForegroundColor Cyan
-    & msbuild.exe @msbuildArgs
-    if ($LASTEXITCODE -ne 0) {
-      throw "Build failed for $($t.Platform) (msbuild exit $LASTEXITCODE). If it is LNK1201 (PDB in use), delete output\main\$($t.Platform)\$Configuration\$($t.Exe).pdb and build again."
-    }
+function Invoke-Build([hashtable]$t) {
+  if (-not $script:cmake) { $script:cmake = Find-CMake }
+  Push-Location $repo
+  try {
+    $cache = Join-Path $repo "build\$($t.Preset)\CMakeCache.txt"
+    Write-Host "== Configuring $($t.Preset)" -ForegroundColor Cyan
+    if ($Rebuild) { Invoke-CMake @('--preset', $t.Preset, '--fresh') }
+    elseif (-not (Test-Path $cache)) { Invoke-CMake @('--preset', $t.Preset) }
+
+    Write-Host "== Building $($t.Exe).exe ($($t.Preset))" -ForegroundColor Cyan
+    $buildArgs = @('--build', '--preset', $t.Preset)
+    if ($Jobs -gt 0) { $buildArgs += @('-j', "$Jobs") }
+    Invoke-CMake $buildArgs
   }
-  finally {
-    Get-ChildItem env: | Where-Object { $n = $_.Name; -not ($saved | Where-Object { $_.Name -eq $n }) } |
-      ForEach-Object { Remove-Item "env:$($_.Name)" }
-    foreach ($v in $saved) { Set-Item -Path "env:$($v.Name)" -Value $v.Value }
-  }
+  finally { Pop-Location }
 }
 
 function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
-  $src = Join-Path $repo "output\main\$($t.Platform)\$Configuration"
+  $src = Join-Path $repo "build\$($t.Preset)\src"
   $exe = Join-Path $src "$($t.Exe).exe"
   if (-not (Test-Path $exe)) { throw "$exe not found; build it first (drop -NoBuild)." }
   New-Item -ItemType Directory -Force -Path $destDir | Out-Null
@@ -118,14 +122,8 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
   $hooks = Join-Path $src 'fafengine'
   if (Test-Path $hooks) { Copy-Item $hooks $destDir -Recurse -Force }
 
-  # Runtime DLLs: FFmpeg (staged next to the exe by the build) and DXC for D3D12/Vulkan.
-  $dlls = @(Get-ChildItem $src -Filter '*.dll' -File)
-  $dxc = Join-Path $repo "dependencies\dxc\bin\$($t.DllArch)"
-  foreach ($n in 'dxcompiler.dll', 'dxil.dll') {
-    $p = Join-Path $dxc $n
-    if (Test-Path $p) { $dlls += Get-Item $p } else { Write-Warning "$p is missing; D3D12 and Vulkan will not start." }
-  }
-  foreach ($dll in $dlls) {
+  # The DXC runtime the build staged next to the exe.
+  foreach ($dll in @(Get-ChildItem $src -Filter '*.dll' -File)) {
     $target = Join-Path $destDir $dll.Name
     # A DLL a running game holds open is the same file; skip it rather than fail.
     if ((Test-Path $target) -and (Get-Item $target).Length -eq $dll.Length -and
@@ -137,7 +135,7 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
 
 foreach ($a in $archs) {
   $t = $targets[$a]
-  if (-not $NoBuild) { Invoke-MsBuild $t }
+  if (-not $NoBuild) { Invoke-Build $t }
   if ($NoCopy) { continue }
 
   $exeName = $t.Exe
