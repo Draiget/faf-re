@@ -43,9 +43,10 @@ second at 30,000–60,000 units:
 - per-beat unit updates, strategic icons, culling and fog of war run on worker
   threads.
 
-Each change has a console variable to restore the original path.
+Each change has a console variable to restore the original path
+([docs/SWITCHES.md](docs/SWITCHES.md)).
 
-Next up: Direct3D 11, D3D12 and Vulkan renderer backends. Measurements, the threading rules and the roadmap:
+Against retail, the x64 build plays replays about a quarter faster. Numbers and what is next:
 [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## What is and isn't here
