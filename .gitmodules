@@ -1,0 +1,15 @@
+[submodule "dependencies/WildMagic3p8"]
+	path = dependencies/WildMagic3p8
+	url = https://github.com/Draiget/wild-magic-3-8.git
+	ignore = dirty
+[submodule "dependencies/zlib-1.2.3"]
+	path = dependencies/zlib-1.2.3
+	url = https://github.com/madler/zlib.git
+	ignore = dirty
+[submodule "dependencies/FX11"]
+	path = dependencies/FX11
+	url = https://github.com/microsoft/FX11.git
+[submodule "dependencies/vulkan"]
+	path = dependencies/vulkan
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+	shallow = true

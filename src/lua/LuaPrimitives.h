@@ -5,27 +5,12 @@ extern "C"
 {
 #endif
 
-#if defined(__has_include)
-#if __has_include(<lua.h>)
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-#elif __has_include(<LuaPlus_Build1081/Src/LuaPlus/include/lua.h>)
-#include <LuaPlus_Build1081/Src/LuaPlus/include/lua.h>
-#include <LuaPlus_Build1081/Src/LuaPlus/include/lauxlib.h>
-#include <LuaPlus_Build1081/Src/LuaPlus/include/lualib.h>
-#elif __has_include("../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lua.h")
-#include "../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lua.h"
-#include "../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lauxlib.h"
-#include "../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lualib.h"
-#else
-#error "Lua headers not found. Add dependencies/LuaPlus_Build1081/Src/LuaPlus/include to include paths."
-#endif
-#else
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-#endif
+// The Lua 5.0 C API headers of LuaPlus build 1081, as FAF patched them. The
+// engine implements all of Lua itself; only these declarations come from
+// LuaPlus (src/lua/luaplus/LICENSE).
+#include "lua/luaplus/include/lua.h"
+#include "lua/luaplus/include/lauxlib.h"
+#include "lua/luaplus/include/lualib.h"
 
 #ifdef __cplusplus
 }

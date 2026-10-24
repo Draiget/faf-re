@@ -34,16 +34,19 @@ Numbers, method and what is next: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Build
 
-`build.ps1` (or `build.bat`) builds `src/main.vcxproj` with Visual Studio 2022 and copies the result into the FAF run folders, with its `.pdb`, the `fafengine\` hook folder, the FFmpeg DLLs and the DXC DLLs.
+CMake with clang-cl, for x64 and x86. The C/C++ runtime is linked statically, so the executables need no MSVC runtime DLLs.
+
+Needs Visual Studio 2022 (C++ workload, for the Windows SDK and runtime libraries), LLVM (clang-cl, lld-link), CMake 3.25+ and Ninja, the DirectX SDK (June 2010) and an FFmpeg 7.1 development package per architecture in `dependencies/ffmpeg/<x64|Win32>` (see [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md)).
 
 ```powershell
-.\build.ps1                    # x64 Release -> C:\ProgramData\FAForever\bin_x64\main_x64.exe
-.\build.ps1 -Arch both         # x64 and x86 (x86 -> C:\ProgramData\FAForever\bin\main.exe)
-.\build.ps1 -Arch x86 -Name main_test   # another exe name, to keep the current build alongside
-.\build.ps1 -NoBuild           # copy the last build only
+git clone --recursive https://github.com/Draiget/faf-re.git
+cmake --preset clang-x64-release; cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x64.exe
+cmake --preset clang-x86-release; cmake --build --preset clang-x86-release   # build/clang-x86-release/src/main.exe
 ```
 
-Other options: `-Configuration Debug`, `-FafDir`, `-Out` (also copy into `out\<arch>\`), `-NoCopy`, `-Rebuild`. Renderer toolchains (FX11, DXC, Vulkan headers) are set up as in [Renderer backends](docs/RENDERER_BACKENDS.md#toolchain-setup); FFmpeg as in [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md).
+Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers), then boost 1.34.1, wxWidgets 2.4.2 and DXC, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+
+The MSVC project `src/main.vcxproj` is kept while it still builds; `build.ps1` builds it and copies the result into the FAF run folders.
 
 ## What is and isn't here
 

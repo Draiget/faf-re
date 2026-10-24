@@ -50,9 +50,8 @@ target_compile_definitions(faf_main PRIVATE
 target_include_directories(faf_main PRIVATE
   "${FAF_FFMPEG_ROOT}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${FAF_DEPENDENCIES_DIR}/LuaPlus_Build1081/Src/LuaPlus/include"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
-  "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3/include")
+  "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_main PRIVATE faf_codegen faf::wx Wm3Dx9Application)
 
 set(_faf_main_options
@@ -123,7 +122,7 @@ set_property(SOURCE
     gpg/gal/backends/vulkan/ResourcesVulkan.cpp
     gpg/gal/backends/vulkan/DeviceVulkan.cpp
     gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
-  APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/vulkan/Include")
+  APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/vulkan/include")
 
 # FX11 (Effects 11) compiles into the engine as its own project would build it:
 # C++17, permissive, no two-phase lookup, warnings off.

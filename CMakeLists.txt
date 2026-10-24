@@ -60,6 +60,11 @@ endforeach()
 # --- Locations ------------------------------------------------------------------------
 set(FAF_DEPENDENCIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
+# Submodules, pinned downloads and patches: see cmake/FafDependencies.cmake.
+option(FAF_FETCH_DEPENDENCIES "Fetch and patch dependencies/ at configure time" ON)
+if(FAF_FETCH_DEPENDENCIES)
+  include(FafDependencies)
+endif()
 if(DEFINED ENV{DXSDK_DIR})
   file(TO_CMAKE_PATH "$ENV{DXSDK_DIR}" _faf_dxsdk_default)
 else()

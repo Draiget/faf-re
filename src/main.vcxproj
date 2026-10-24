@@ -141,12 +141,12 @@
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
+    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
+    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <!-- The x64 image is main_x64.exe so it can be staged beside the Win32
        main.exe in $(FafRunDir): the engine finds its data from its own
@@ -156,13 +156,13 @@
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(FafX64TargetName)</TargetName>
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
+    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(FafX64TargetName)</TargetName>
-    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
+    <IncludePath>$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <PropertyGroup>
     <FafFfmpegRoot Condition="'$(FafFfmpegRoot)'==''">$(FafRepoRoot)dependencies\ffmpeg\$(Platform)</FafFfmpegRoot>
@@ -217,7 +217,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -269,7 +269,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <!-- Float parity with Debug: both configurations take the v143 defaults
            /fp:precise and /arch:SSE2 (neither sets FloatingPointModel or
            EnableEnhancedInstructionSet), and /fp:precise does not contract
@@ -348,7 +348,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatSpecificWarningsAsErrors>4311;4302;4312;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafWxX64Root)\include;$(FafWxX64Root)\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\include;$(FafWxX64Root)\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -392,7 +392,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatSpecificWarningsAsErrors>4311;4302;4312;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafWxX64Root)\include;$(FafWxX64Root)\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(FafFfmpegRoot)\include;$(FafRepoRoot)src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafWxX64Root)\include;$(FafWxX64Root)\lib\mswu;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

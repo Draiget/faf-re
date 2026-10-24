@@ -115,17 +115,11 @@ Each path has a console variable with three values: `-1` (default, auto: on only
 
 ## Toolchain setup
 
-All three live under `dependencies/`, which is git-ignored. Fetch them once per machine.
+Configuring the CMake build fetches all three into `dependencies/` (`cmake/FafDependencies.cmake`):
 
-- **FX11 (Direct3D 11):** `git clone https://github.com/microsoft/FX11 dependencies/FX11`. `main.vcxproj` compiles FX11's sources directly (C++17, two-phase lookup off).
-- **DXC (Direct3D 12, Vulkan):** download a [DirectXShaderCompiler release](https://github.com/microsoft/DirectXShaderCompiler/releases) (tested with v1.9.2609) and unpack it so that the files below exist. At run time the game loads `dxcompiler.dll` and `dxil.dll` (the DXIL signer) from its own directory, or from `FAF_DXC_DIR`; copy the DLLs for the right architecture next to the executable (the root `build.ps1` does this).
-- **Vulkan SDK (Vulkan):** install the LunarG Vulkan SDK (tested with 1.4.304.1) and copy its `Include` directory to `dependencies/vulkan/Include`. The game loads `vulkan-1.dll` (installed with the GPU driver) at run time and links no import library, so x86 and x64 both build from the headers alone.
-
-```
-dependencies/dxc/inc/dxcapi.h
-dependencies/dxc/bin/x64/dxcompiler.dll   dependencies/dxc/bin/x64/dxil.dll
-dependencies/dxc/bin/x86/dxcompiler.dll   dependencies/dxc/bin/x86/dxil.dll
-```
+- **FX11 (Direct3D 11):** git submodule `dependencies/FX11`, `microsoft/FX11` at `bec3b8fc`. The engine compiles FX11's sources directly (C++17, two-phase lookup off).
+- **DXC (Direct3D 12, Vulkan):** the [DirectXShaderCompiler release](https://github.com/microsoft/DirectXShaderCompiler/releases) v1.9.2609 (`dxc_2026_09_29.zip`, SHA256-pinned), unpacked to `dependencies/dxc`. At run time the game loads `dxcompiler.dll` and `dxil.dll` (the DXIL signer) from its own directory, or from `FAF_DXC_DIR`; copy the DLLs for the right architecture next to the executable.
+- **Vulkan headers (Vulkan):** git submodule `dependencies/vulkan`, `KhronosGroup/Vulkan-Headers` at `v1.4.304`. The game loads `vulkan-1.dll` (installed with the GPU driver) at run time and links no import library, so x86 and x64 both build from the headers alone.
 
 ### Runtime requirements
 
