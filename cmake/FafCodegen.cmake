@@ -73,6 +73,6 @@ target_compile_options(faf_codegen INTERFACE
   $<$<COMPILE_LANGUAGE:CXX>:/clang:-fno-strict-return>)
 
 # Checked iterators off in Debug as well, for every library: the setting changes
-# the size of every std container, and main.vcxproj's Debug configurations pin
-# it to 0 (see the comment there).
+# the size of every std container, and a mismatch between the engine and a
+# library changes object layout (LNK2038).
 target_compile_definitions(faf_codegen INTERFACE $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)

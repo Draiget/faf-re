@@ -44,7 +44,7 @@ Vulkan: ready (...)
 
 The options entry comes from the engine's own Lua, never from edits to FAF's gamedata:
 
-- **Source:** `data/fafengine/` holds engine-owned scripts that extend gamedata scripts. The build copies it next to the executable (`StageFafEngineHooks` in `src/main.vcxproj`, and into the run folder when `FafStageToRunDir` is on).
+- **Source:** `data/fafengine/` holds engine-owned scripts that extend gamedata scripts. The build copies it next to the executable (`src/CMakeLists.txt`), and `build.ps1` copies it into the run folder.
 - **Mount:** at startup the engine mounts `<exe folder>/fafengine` at `/fafengine` and registers it as a hook directory, after the init file's own `path` and `hook` entries (`AppendEngineHookFolder` in `src/moho/misc/StartupHelpers.cpp`). The engine does this itself because the init files (`init_faf.lua` and the rest) belong to the FAF client.
 - **Hook:** a hook file is appended to the gamedata file of the same path, so `fafengine/lua/options/options.lua` runs at the end of `/lua/options/options.lua` and inserts the entry after Vertical Sync. The log says `engine hooks: ... mounted at /fafengine` and `Hooked /lua/options/options.lua with /fafengine/lua/options/options.lua`.
 
@@ -116,17 +116,11 @@ Each path has a console variable with three values: `-1` (default, auto: on only
 
 ## Toolchain setup
 
-All three live under `dependencies/`, which is git-ignored. Fetch them once per machine.
+Configuring the CMake build fetches all three into `dependencies/` (`cmake/FafDependencies.cmake`):
 
-- **FX11 (Direct3D 11):** `git clone https://github.com/microsoft/FX11 dependencies/FX11`. `main.vcxproj` compiles FX11's sources directly (C++17, two-phase lookup off).
-- **DXC (Direct3D 12, Vulkan):** download a [DirectXShaderCompiler release](https://github.com/microsoft/DirectXShaderCompiler/releases) (tested with v1.9.2609) and unpack it so that the files below exist. At run time the game loads `dxcompiler.dll` and `dxil.dll` (the DXIL signer) from its own directory, or from `FAF_DXC_DIR`; copy the DLLs for the right architecture next to the executable (the root `build.ps1` does this).
-- **Vulkan SDK (Vulkan):** install the LunarG Vulkan SDK (tested with 1.4.304.1) and copy its `Include` directory to `dependencies/vulkan/Include`. The game loads `vulkan-1.dll` (installed with the GPU driver) at run time and links no import library, so x86 and x64 both build from the headers alone.
-
-```
-dependencies/dxc/inc/dxcapi.h
-dependencies/dxc/bin/x64/dxcompiler.dll   dependencies/dxc/bin/x64/dxil.dll
-dependencies/dxc/bin/x86/dxcompiler.dll   dependencies/dxc/bin/x86/dxil.dll
-```
+- **FX11 (Direct3D 11):** git submodule `dependencies/FX11`, `microsoft/FX11` at `bec3b8fc`. The engine compiles FX11's sources directly (C++17, two-phase lookup off).
+- **DXC (Direct3D 12, Vulkan):** the [DirectXShaderCompiler release](https://github.com/microsoft/DirectXShaderCompiler/releases) v1.9.2609 (`dxc_2026_09_29.zip`, SHA256-pinned), unpacked to `dependencies/dxc`. At run time the game loads `dxcompiler.dll` and `dxil.dll` (the DXIL signer) from its own directory, or from `FAF_DXC_DIR`; copy the DLLs for the right architecture next to the executable.
+- **Vulkan headers (Vulkan):** git submodule `dependencies/vulkan`, `KhronosGroup/Vulkan-Headers` at `v1.4.304`. The game loads `vulkan-1.dll` (installed with the GPU driver) at run time and links no import library, so x86 and x64 both build from the headers alone.
 
 ### Runtime requirements
 

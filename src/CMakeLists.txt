@@ -1,18 +1,14 @@
 # The engine executable: main_x64.exe (x64) / main.exe (x86).
 #
-# Mirrors src/main.vcxproj's Release|x64 and Release|Win32 configurations. The
-# translation units and their order come from sources.cmake (generated from
-# the vcxproj, see scripts/cmake_sync_sources.py); per-file settings are below,
-# each with the vcxproj's reason.
+# The translation units and their order are in sources.cmake; per-file
+# settings are below, each with its reason.
 
 include(sources.cmake)
 
 if(FAF_TARGET_ARCH STREQUAL "x64")
   set(_faf_default_name main_x64)
-  set(_faf_platform x64)
 else()
   set(_faf_default_name main)
-  set(_faf_platform Win32)
 endif()
 set(FAF_OUTPUT_NAME "${_faf_default_name}" CACHE STRING "Engine executable name, without .exe")
 
@@ -21,8 +17,8 @@ set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
 
 # --- Resources ------------------------------------------------------------------------
 # MohoResources.rc includes wx/msw/wx.rc (wx's cursors, bitmaps, menus).
-# MohoManifest.rc embeds the manifest main.vcxproj generates (asInvoker,
-# system DPI aware); main.vcxproj does not compile it.
+# MohoManifest.rc embeds the application manifest (asInvoker, system DPI
+# aware).
 target_sources(faf_main PRIVATE moho/app/MohoResources.rc moho/app/MohoManifest.rc)
 set_source_files_properties(moho/app/MohoResources.rc PROPERTIES
   INCLUDE_DIRECTORIES "${FAF_WX_INCLUDE_DIR}")
@@ -32,14 +28,22 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   target_sources(faf_main PRIVATE legacy/math/X87Math64.asm)
 endif()
 
-# --- Compilation ----------------------------------------------------------------------
-set(FAF_FFMPEG_ROOT "${FAF_DEPENDENCIES_DIR}/ffmpeg/${_faf_platform}" CACHE PATH
-    "FFmpeg development package (include/, lib/, bin/) for this architecture")
-if(NOT EXISTS "${FAF_FFMPEG_ROOT}/include/libavcodec/avcodec.h")
-  message(FATAL_ERROR "FFmpeg development package missing (FAF_FFMPEG_ROOT=${FAF_FFMPEG_ROOT}); "
-                      "see docs/FAF_SFD_COMPATIBILITY.md.")
+# --- FFmpeg ---------------------------------------------------------------------------
+# FFmpeg 7.1.3 for the SFD movie player (moho/movie/sfd), compiled here from the
+# dependencies/ffmpeg submodule (Draiget/ffmpeg-mirror: the unmodified release plus its
+# faf/ CMake build) into static libraries and linked into the executable: no DLLs. Its
+# objects get the same code generation rules as every other library (faf_codegen).
+set(_faf_ffmpeg "${FAF_DEPENDENCIES_DIR}/ffmpeg")
+if(NOT EXISTS "${_faf_ffmpeg}/faf/CMakeLists.txt")
+  message(FATAL_ERROR "FFmpeg sources not found in ${_faf_ffmpeg} "
+                      "(git submodule update --init dependencies/ffmpeg); see docs/FAF_SFD_COMPATIBILITY.md.")
 endif()
+add_subdirectory("${_faf_ffmpeg}/faf" "${CMAKE_BINARY_DIR}/dependencies/ffmpeg")
+foreach(_lib IN LISTS FFMPEG_FAF_LIBRARIES)
+  target_link_libraries(${_lib} PRIVATE faf_codegen)
+endforeach()
 
+# --- Compilation ----------------------------------------------------------------------
 target_compile_definitions(faf_main PRIVATE
   WIN32 _WINDOWS WIN32_LEAN_AND_MEAN NOMINMAX
   LUAPLUS_LIB LUA_NUMBER=float
@@ -48,11 +52,9 @@ target_compile_definitions(faf_main PRIVATE
   UNICODE _UNICODE)
 
 target_include_directories(faf_main PRIVATE
-  "${FAF_FFMPEG_ROOT}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${FAF_DEPENDENCIES_DIR}/LuaPlus_Build1081/Src/LuaPlus/include"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
-  "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3/include")
+  "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_main PRIVATE faf_codegen faf::wx Wm3Dx9Application)
 
 set(_faf_main_options
@@ -60,12 +62,11 @@ set(_faf_main_options
   # /EHsc): the Lua fork raises script errors as C++ lua::lua_Error throws out
   # of functions declared extern "C" (luaD_call and its callees). /EHsc lets the
   # optimizer drop the handlers around them, and luaB_pcall's try/catch then
-  # vanishes (main.vcxproj ExceptionHandling SyncCThrow).
+  # vanishes.
   /EHs
   /permissive-
   /W3
-  # The DirectX SDK (June 2010) goes after the Windows SDK, as main.vcxproj
-  # appends $(DirectXInclude) after $(IncludePath): d3d9.h, dxgi.h and
+  # The DirectX SDK (June 2010) goes after the Windows SDK: d3d9.h, dxgi.h and
   # d3d10.h must resolve to the Windows SDK copies, d3dx9*.h and xact3.h to
   # the DirectX SDK.
   "/clang:-idirafter${FAF_DXSDK_DIR}/Include")
@@ -102,7 +103,7 @@ list(APPEND _faf_main_options
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_main PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 
-# --- Per-file settings (main.vcxproj ClCompile metadata) -----------------------------
+# --- Per-file settings ---------------------------------------------------------------
 set(_fx11 "${FAF_DEPENDENCIES_DIR}/FX11")
 
 set_property(SOURCE
@@ -123,7 +124,7 @@ set_property(SOURCE
     gpg/gal/backends/vulkan/ResourcesVulkan.cpp
     gpg/gal/backends/vulkan/DeviceVulkan.cpp
     gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
-  APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/vulkan/Include")
+  APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/vulkan/include")
 
 # FX11 (Effects 11) compiles into the engine as its own project would build it:
 # C++17, permissive, no two-phase lookup, warnings off.
@@ -178,12 +179,11 @@ else()
   set(_faf_zlib wx_zlib)
 endif()
 
-# FFmpeg and the DirectX SDK libraries are searched before the Windows SDK's,
-# as main.vcxproj's AdditionalLibraryDirectories are; d3dcompiler.lib and
-# dxguid.lib are taken from the Windows SDK by full path, as there.
-target_link_directories(faf_main PRIVATE "${FAF_FFMPEG_ROOT}/lib" "${_faf_dxsdk_lib}")
+# The DirectX SDK libraries are searched before the Windows SDK's;
+# d3dcompiler.lib and dxguid.lib are taken from the Windows SDK by full path.
+target_link_directories(faf_main PRIVATE "${_faf_dxsdk_lib}")
 target_link_libraries(faf_main PRIVATE
-  avformat avcodec avutil swscale swresample
+  FFmpeg::FFmpeg
   ws2_32 d3d9 d3dx9 d3d10 d3d11 "${_faf_sdk_um_lib}/d3dcompiler.lib" dxgi
   "${_faf_sdk_um_lib}/dxguid.lib" dsound x3daudio
   legacy_stdio_definitions legacy_stdio_wide_specifiers
@@ -228,10 +228,10 @@ target_link_libraries(faf_main PRIVATE "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug
 
 if(FAF_TARGET_ARCH STREQUAL "x86")
   # Both from the shipped binary's PE header (characteristics 0x123, stack
-  # reserve 0x1E8480 = /STACK:2000000); see main.vcxproj's Win32 link.
+  # reserve 0x1E8480 = /STACK:2000000).
   target_link_options(faf_main PRIVATE /LARGEADDRESSAWARE /STACK:2000000)
 else()
-  # x64 address-space mode, as main.vcxproj's FafX64LargeAddress:
+  # x64 address-space mode:
   #   full - large-address-aware with high-entropy ASLR (the default when the
   #          wx tree is pointer-safe),
   #   heap - large-address-aware, image pinned low (/BASE:0x10000000),
@@ -261,12 +261,14 @@ else()
 endif()
 
 # --- Staging next to the executable ---------------------------------------------------
-# The FFmpeg DLLs, and the engine's own Lua hooks: the engine mounts the
-# `fafengine` folder next to the executable at /fafengine
-# (DISK_SetupDataAndSearchPaths; see docs/RENDERER_BACKENDS.md).
-file(GLOB _faf_ffmpeg_dlls "${FAF_FFMPEG_ROOT}/bin/*.dll")
+# The engine's own Lua hooks: the engine mounts the `fafengine` folder next to
+# the executable at /fafengine (DISK_SetupDataAndSearchPaths; see
+# docs/RENDERER_BACKENDS.md). And the DXC runtime (dxcompiler.dll, dxil.dll),
+# which Direct3D 12 and Vulkan load to compile their shaders.
+set(_faf_dxc_bin "${FAF_DEPENDENCIES_DIR}/dxc/bin/${_faf_sdk_arch}")
 add_custom_command(TARGET faf_main POST_BUILD
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${_faf_ffmpeg_dlls} "$<TARGET_FILE_DIR:faf_main>"
   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
           "$<TARGET_FILE_DIR:faf_main>/fafengine"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_faf_dxc_bin}/dxcompiler.dll"
+          "${_faf_dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:faf_main>"
   VERBATIM)

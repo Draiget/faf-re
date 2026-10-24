@@ -80,7 +80,7 @@ namespace LuaPlus
 		/// 31415926, which is the integer the loader compares against.
 		///
 		/// Spelled `float` explicitly: the dump format is 4-byte numbers no
-		/// matter how `lua_Number` is configured (main.vcxproj defines
+		/// matter how `lua_Number` is configured (src/CMakeLists.txt defines
 		/// LUA_NUMBER=float, as the shipped engine was built), and a
 		/// `lua_Number`-typed dump under a double build wrote 8-byte numbers
 		/// that `LuaLoadChunkHeader` (it demands 4) rejects.

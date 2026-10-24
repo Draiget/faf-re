@@ -965,11 +965,9 @@ extern "C"
 	 * What it does:
 	 * Pushes a number. The binary takes a 4-byte float ("movss xmm0,[esp+n]")
 	 * because this fork's Value::n is float - that is what makes TObject 8
-	 * bytes instead of 12. The parameter stays lua_Number here because
-	 * src/main.vcxproj never defines LUA_NUMBER, so every existing caller
-	 * passes a double; the narrowing on store is what the binary's callers do
-	 * at their own call sites. Defining LUA_NUMBER=float project-wide would
-	 * remove the conversion, and is worth doing separately.
+	 * bytes instead of 12. The parameter is lua_Number, which the build
+	 * defines as float (LUA_NUMBER=float in src/CMakeLists.txt), as the
+	 * shipped engine was built.
 	 */
 	void lua_pushnumber(lua_State* const state, const lua_Number n)
 	{

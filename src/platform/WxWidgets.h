@@ -4,10 +4,9 @@
  * Configures wxWidgets 2.4.2 for the engine. Include this before any wx header,
  * then include the wx headers the file uses.
  *
- * The engine links the real library: `dependencies/wxWindows-2.4.2/lib/wxmswu.lib`,
- * a static Unicode build made with `nmake FINAL=1` (see
- * `docker/scripts/Build-Deps.ps1`). Every class the shipped binary allocates or
- * derives from has the same size in those headers as in the binary: wxFrame
+ * The engine links the real library, a static Unicode build of
+ * `dependencies/wxWindows-2.4.2` (cmake/deps/wxwindows). Every class the
+ * shipped binary allocates or derives from has the same size in those headers as in the binary: wxFrame
  * 0x178 and wxDialog 0x170 (WeakObject sits right after them in
  * WWinManagedFrame / WWinManagedDialog), wxPanel 0x134, wxNotebook 0x148,
  * wxMenu 0x74, wxMenuBar 0x160, wxSplitterWindow 0x1A4, wxEvent 0x20,

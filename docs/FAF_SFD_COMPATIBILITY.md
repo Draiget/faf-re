@@ -75,29 +75,30 @@ The parser scans at most the first 64 KiB (including, but not limited to, bases 
 
 ## FFmpeg dependency and build
 
-- **What to supply**: FFmpeg 7.1-compatible development headers, MSVC import libraries and DLLs for **each** target architecture. Tested version: FFmpeg 7.1.3. Third-party binaries are ignored by Git and not distributed.
-- **Location**: `FafFfmpegRoot` defaults to `dependencies/ffmpeg/$(Platform)`; override with `/p:FafFfmpegRoot=...`. It must contain `include/libav*`, `include/libsw*`, `lib/{avformat,avcodec,avutil,swscale,swresample}.lib`, and the matching DLLs in `bin`.
-- **Staging**: the `StageFafFfmpeg` MSBuild target copies the DLLs to `$(OutDir)` after a successful build, and to the Win32 `$(FafRunDir)` used by the engine's post-build staging. `FafStageToRunDir` defaults to true on Win32 and false on x64, so x64 DLLs stay in the x64 output directory and cannot overwrite the Win32 run directory.
-- **x64 run directory**: to stage an x64 build, set `/p:FafStageToRunDir=true` and `/p:FafRunDir=...` to a separate, existing x64 run directory set up with the game bootstrap/data paths. Never stage both architectures into one directory and never mix x86 and x64 DLLs. When running from another directory, copy the same DLL set next to the executable.
-- **License**: use an LGPL-compatible shared build, without `--enable-gpl` or `--enable-nonfree`. Redistributing the shared libraries requires the applicable FFmpeg notices and corresponding source/build information; see [FFmpeg's license checklist](https://ffmpeg.org/legal.html).
+- **Source**: `dependencies/ffmpeg` is a Git submodule of [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror): the official FFmpeg 7.1.3 release tarball, unmodified, plus a `faf/` folder with a CMake build. `cmake/FafDependencies.cmake` initialises it with the other submodules.
+- **Build**: `src/CMakeLists.txt` adds `dependencies/ffmpeg/faf` and links `FFmpeg::FFmpeg`. avutil, swresample, swscale, avcodec and avformat are compiled with clang-cl for the target architecture as static libraries, with FFmpeg's own flags, the engine's `faf_codegen` rules and the static C runtime, and linked into `main_x64.exe` / `main.exe`.
+- **No binaries**: there are no FFmpeg DLLs, import libraries or prebuilt packages; nothing is downloaded or staged next to the executable, and the executables import no FFmpeg DLL.
+- **Generated configuration**: `faf/x64/` and `faf/x86/` hold what FFmpeg's `configure` generated for the configuration below (`config.h`, `config_components.h`, `libavutil/avconfig.h`, the component lists) and `sources.cmake`, the per-library source lists evaluated from FFmpeg's own Makefiles. `faf/generate.sh` in the submodule regenerates them; the mirror's README explains how.
+- **License**: LGPL v2.1 or later; nothing from `--enable-gpl` or `--enable-nonfree` is enabled. The engine links FFmpeg statically, which LGPL v2.1 section 6 allows because faf-re's complete source and the FFmpeg source in the submodule let anyone relink the engine against a modified FFmpeg. Distributing a build requires FFmpeg's notices; see [FFmpeg's license checklist](https://ffmpeg.org/legal.html).
 
-One minimal upstream configure feature set:
+The configuration (`faf/generate.sh` adds the clang-cl toolchain options, `--target-os=win32`, the architecture and `--disable-debug`):
 
 ```sh
---disable-everything --disable-programs --disable-doc --disable-network \
---enable-shared --disable-static \
---enable-avformat --enable-avcodec --enable-avutil --enable-swscale --enable-swresample \
---enable-decoder=mpeg1video,mpeg2video,adpcm_adx,mp1,mp2,mp3 \
---enable-parser=mpegvideo,mpegaudio,adx \
---enable-demuxer=mpegps,mpegvideo,adx,mp3 --enable-protocol=file
+--disable-x86asm --disable-everything --disable-programs --disable-doc --disable-network
+--enable-static --disable-shared
+--enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample
+--enable-decoder=mpeg1video,mpeg2video,adpcm_adx,mp1,mp2,mp3
+--enable-parser=mpegvideo,mpegaudio,adx
+--enable-demuxer=mpegps,mpegvideo,adx,mp3
+--enable-protocol=file
 ```
 
-The elementary video/audio demuxers are needed for FFmpeg's stream probing even though the player opens the MPEG-PS demuxer. Add the compiler, architecture, Windows target and install prefix options for your toolchain; a Windows resource compiler must target the same architecture. For a MinGW build, generate MSVC import libraries from the installed .def files, e.g. `lib /def:avcodec-61.def /name:avcodec-61.dll /machine:X86 /out:avcodec.lib` (with the matching library/version names; use X64 for x64).
+The elementary video/audio demuxers are needed for FFmpeg's stream probing even though the player opens the MPEG-PS demuxer. The component set is the one the former shared build had, with `--enable-static --disable-shared` in place of `--enable-shared --disable-static`.
 
-Then build from an initialized Visual Studio developer shell, and repeat for Release and x64 as needed:
+Build the engine as described in the [README](../README.md#build):
 
 ```bat
-msbuild src/main.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
+cmake --preset clang-x64-release && cmake --build --preset clang-x64-release
 ```
 
 The diagnostic and test project is [tools/sfd-inspect](../tools/sfd-inspect/README.md): `main.cpp` supports `--metadata`, `--decode`, `--play` and `--play-sound` on one or more files, and `parser-tests.cpp` is a separate executable for malformed-input and fuzz tests. No commercial assets are copied into the repository.

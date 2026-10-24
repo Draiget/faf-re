@@ -1,6 +1,7 @@
 #pragma once
 
-// Force-included by main.vcxproj's x64 configurations, and by nothing else.
+// Force-included into every x64 engine translation unit (src/CMakeLists.txt),
+// and by nothing else.
 //
 // The recovered tree pins the Win32 layout of the 2007 binary with thousands of
 // `static_assert(sizeof(T) == 0xNN)` / `static_assert(offsetof(T, m) == 0xNN)`.
