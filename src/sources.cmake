@@ -766,6 +766,7 @@ set(FAF_ENGINE_SOURCES
   moho/audio/ISoundManagerTypeInfo.cpp
   moho/audio/IUserSoundManager.cpp
   moho/audio/XAudioError.cpp
+  moho/audio/XactClock.cpp
   moho/audio/CSimSoundManagerTypeInfo.cpp
   moho/audio/HSound.cpp
   moho/audio/SAudioRequestFastVectorReflection.cpp
