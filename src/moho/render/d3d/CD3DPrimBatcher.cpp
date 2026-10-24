@@ -81,11 +81,7 @@ namespace
     const float yScale
   ) noexcept
   {
-    return {
-      origin.x + (xAxis.x * xScale) + (yAxis.x * yScale),
-      origin.y + (xAxis.y * xScale) + (yAxis.y * yScale),
-      origin.z + (xAxis.z * xScale) + (yAxis.z * yScale),
-    };
+    return origin + (xAxis * xScale) + (yAxis * yScale);
   }
 
   [[nodiscard]] moho::CD3DPrimBatcher::Vertex MakeVertex(
