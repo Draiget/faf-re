@@ -24,7 +24,7 @@ endif()
 # True when the tree carries wxwindows_2_4_2_faf_x64_pointers.patch: only then
 # may the x64 image use addresses above 2 GB.
 file(STRINGS "${WX_ROOT}/include/wx/defs.h" _wx_pointer_marker
-     REGEX "FAF x64: WPARAM/LPARAM are pointer-wide" LIMIT_COUNT 1)
+     REGEX "^typedef unsigned __int64 WXWPARAM;" LIMIT_COUNT 1)
 if(_wx_pointer_marker)
   set(FAF_WX_X64_POINTERS ON PARENT_SCOPE)
 else()

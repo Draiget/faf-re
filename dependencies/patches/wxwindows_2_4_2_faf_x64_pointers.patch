@@ -25,13 +25,11 @@ diff -ruN a/include/wx/defs.h b/include/wx/defs.h
  
  typedef void *          WXDRAWITEMSTRUCT;
  typedef void *          WXMEASUREITEMSTRUCT;
-@@ -1927,8 +1935,15 @@
+@@ -1927,8 +1935,13 @@
  
  
  #ifdef __WXMSW__
 +#ifdef _WIN64
-+// FAF x64: WPARAM/LPARAM are pointer-wide on Win64; messages such as
-+// WM_GETTEXT pass buffer addresses through them.
 +typedef unsigned __int64 WXWPARAM;
 +typedef __int64         WXLPARAM;
 +#else
@@ -44,12 +42,11 @@ diff -ruN a/include/wx/defs.h b/include/wx/defs.h
 diff -ruN a/include/wx/dynarray.h b/include/wx/dynarray.h
 --- a/include/wx/dynarray.h
 +++ b/include/wx/dynarray.h
-@@ -470,6 +470,10 @@
+@@ -470,6 +470,9 @@
  WX_DECLARE_EXPORTED_BASEARRAY(int,          wxBaseArrayInt);
  WX_DECLARE_EXPORTED_BASEARRAY(long,         wxBaseArrayLong);
  WX_DECLARE_EXPORTED_BASEARRAY(double,       wxBaseArrayDouble);
 +#ifdef _WIN64
-+// FAF x64: pointer-wide integers (wxTreeItemId's value on Win64).
 +WX_DECLARE_EXPORTED_BASEARRAY(__int64,      wxBaseArrayInt64);
 +#endif
  
@@ -70,12 +67,11 @@ diff -ruN a/include/wx/hashmap.h b/include/wx/hashmap.h
 diff -ruN a/include/wx/listbase.h b/include/wx/listbase.h
 --- a/include/wx/listbase.h
 +++ b/include/wx/listbase.h
-@@ -222,7 +222,12 @@
+@@ -222,7 +222,11 @@
      void SetText(const wxString& text) { m_text = text; }
      void SetImage(int image) { m_image = image; }
      void SetData(long data) { m_data = data; }
 +#ifdef _WIN64
-+    // FAF x64: the item data is an application pointer.
 +    void SetData(void *data) { m_data = (__int64)data; }
 +#else
      void SetData(void *data) { m_data = (long)data; }
@@ -83,7 +79,7 @@ diff -ruN a/include/wx/listbase.h b/include/wx/listbase.h
  
      void SetWidth(int width) { m_width = width; }
      void SetAlign(wxListColumnFormat align) { m_format = align; }
-@@ -241,7 +246,11 @@
+@@ -241,7 +245,11 @@
      long GetState() const { return m_state & m_stateMask; }
      const wxString& GetText() const { return m_text; }
      int GetImage() const { return m_image; }
@@ -95,7 +91,7 @@ diff -ruN a/include/wx/listbase.h b/include/wx/listbase.h
  
      int GetWidth() const { return m_width; }
      wxListColumnFormat GetAlign() const { return (wxListColumnFormat)m_format; }
-@@ -270,7 +279,11 @@
+@@ -270,7 +278,11 @@
      long            m_stateMask;// Which flags of m_state are valid (uses same flags)
      wxString        m_text;     // The label/header text
      int             m_image;    // The zero-based index into an image list
@@ -107,7 +103,7 @@ diff -ruN a/include/wx/listbase.h b/include/wx/listbase.h
  
      // For columns only
      int             m_format;   // left, right, centre
-@@ -343,7 +356,11 @@
+@@ -343,7 +355,11 @@
      const wxString& GetLabel() const { return m_item.m_text; }
      const wxString& GetText() const { return m_item.m_text; }
      int GetImage() const { return m_item.m_image; }
@@ -137,12 +133,11 @@ diff -ruN a/include/wx/msw/treectrl.h b/include/wx/msw/treectrl.h
 diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
 --- a/include/wx/treebase.h
 +++ b/include/wx/treebase.h
-@@ -33,7 +33,12 @@
+@@ -33,7 +33,11 @@
  // ----------------------------------------------------------------------------
  
  // Using this typedef removes an ambiguity when calling Remove()
 +#ifdef _WIN64
-+// FAF x64: holds an HTREEITEM (MSW) or a node pointer (generic): pointer-wide.
 +typedef __int64 wxTreeItemIdValue;
 +#else
  typedef long wxTreeItemIdValue;
@@ -150,7 +145,7 @@ diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
  
  class WXDLLEXPORT wxTreeItemId
  {
-@@ -43,10 +48,13 @@
+@@ -43,10 +47,13 @@
      wxTreeItemId() { m_pItem = 0; }
  
          // this one is used in the generic version
@@ -165,12 +160,11 @@ diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
  
          // default copy ctor/assignment operator are ok for us
  
-@@ -94,7 +102,12 @@
+@@ -94,7 +101,11 @@
      wxTreeItemId m_pItem;
  };
  
 +#ifdef _WIN64
-+// FAF x64: wxTreeItemId is pointer-wide; store it in a 64-bit integer array.
 +WX_DEFINE_EXPORTED_TYPEARRAY(wxTreeItemId, wxArrayTreeItemIds, wxBaseArrayInt64);
 +#else
  WX_DEFINE_EXPORTED_ARRAY_LONG(wxTreeItemId, wxArrayTreeItemIds);
@@ -699,10 +693,9 @@ diff -ruN a/src/msw/treectrl.cpp b/src/msw/treectrl.cpp
  void wxTreeCtrl::DeleteChildren(const wxTreeItemId& item)
  {
 -    long cookie;
--
+ 
 -    wxArrayLong children;
 +    wxTreeItemIdValue cookie;
-+
 +    wxArrayTreeItemIds children; // FAF x64: holds HTREEITEMs
      wxTreeItemId child = GetFirstChild(item, cookie);
      while ( child.IsOk() )

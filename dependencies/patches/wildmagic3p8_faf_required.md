@@ -14,19 +14,10 @@ The patch is also needed for one modern-toolchain fix in the Dx9 renderer: the `
 
 Patched files in `wildmagic3p8_faf_required.patch`:
 
-- `Foundation/Approximation/Wm3ApprGaussPointsFit2.cpp`
-- `Foundation/Approximation/Wm3ApprGaussPointsFit3.cpp`
-- `Foundation/Containment/Wm3ContBox2.cpp`
-- `Foundation/Containment/Wm3ContBox3.cpp`
 - `Foundation/Distance/Wm3Distance.cpp`
 - `Foundation/Distance/Wm3Distance.h`
-- `Foundation/Intersection/Wm3IntrLine3Box3.cpp`
-- `Foundation/Intersection/Wm3IntrSegment3Box3.cpp`
-- `Foundation/Intersection/Wm3IntrSegment3Sphere3.cpp`
 - `Foundation/Math/Wm3AxisAlignedBox3.h`
 - `Foundation/Math/Wm3Box3.h`
-- `Foundation/Math/Wm3GMatrix.inl`
-- `Foundation/Math/Wm3GVector.inl`
 - `Foundation/Math/Wm3IVector2.h`
 - `Foundation/Math/Wm3IVector3.h`
 - `Foundation/Math/Wm3Quaternion.h`
@@ -36,13 +27,10 @@ Patched files in `wildmagic3p8_faf_required.patch`:
 - `Foundation/Math/Wm3Vector2.inl`
 - `Foundation/Math/Wm3Vector3.h`
 - `Foundation/Math/Wm3Vector3.inl`
-- `Foundation/Numerics/Wm3Eigen.cpp`
-- `Foundation/RationalArithmetic/Wm3TRational.inl`
-- `Foundation/System/Wm3System.cpp`
 - `Foundation/Terrain/Wm3ClodTerrainPage.cpp`
 - `Renderers/Dx9Renderer/Wm3Dx9Utility.h`
 
-Every modification is fenced by a `// FAF MOD:` comment block in the patched file so the FAF additions can be told apart from upstream Wild Magic source at a glance.
+The patch carries code changes only. Binary-address notes that earlier versions of this patch carried as comments are kept in the recovery archive (`faf-re-archive/dependency-patches-with-provenance/`), not here.
 
 ### Vector2 / Vector3 / Quaternion: constexpr ctors + xyz union
 

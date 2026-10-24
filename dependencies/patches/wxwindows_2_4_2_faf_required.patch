@@ -632,13 +632,11 @@ diff -ruN a/src/common/datetime.cpp b/src/common/datetime.cpp
 diff -ruN a/src/common/intl.cpp b/src/common/intl.cpp
 --- a/src/common/intl.cpp
 +++ b/src/common/intl.cpp
-@@ -771,7 +771,17 @@
+@@ -771,7 +771,15 @@
              int codepage = -1;
              wxUint32 lcid = MAKELCID(MAKELANGID(info->WinLang, info->WinSublang),
                                       SORT_DEFAULT);
 -            SetThreadLocale(lcid);
-+            // SetThreadLocale is deprecated and may be omitted by modern SDK
-+            // headers; call it dynamically when available.
 +            typedef BOOL (WINAPI *wxSetThreadLocaleFn)(LCID);
 +            HMODULE kernel32 = ::GetModuleHandleA("kernel32.dll");
 +            if (kernel32)
@@ -5669,16 +5667,16 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
 diff -ruN a/src/makevc.env b/src/makevc.env
 --- a/src/makevc.env
 +++ b/src/makevc.env
-@@ -6,14 +6,30 @@
+@@ -6,14 +6,27 @@
  #
  #	MSVC++ 32-bit makefile include file
  #
 -!include <ntwin32.mak>
--
+ 
 -!if "$(RM)" == ""
 -RM= erase
 -!endif
--
+ 
 -# read version numbers
 -!include "version.mak"
 +!if exist("ntwin32.mak")
@@ -5686,29 +5684,24 @@ diff -ruN a/src/makevc.env b/src/makevc.env
 +!elseif exist("$(WXWIN)\src\ntwin32.mak")
 +!include "$(WXWIN)\src\ntwin32.mak"
 +!endif
-+
 +!if "$(RM)" == ""
 +RM= erase
 +!endif
-+
 +!if "$(implib)" == ""
 +implib=lib
 +!endif
-+
 +!if "$(link)" == ""
 +link=link
 +!endif
-+
 +!if "$(rc)" == ""
 +rc=rc
 +!endif
-+
 +# read version numbers
 +!include "version.mak"
  WXVERSION=$(wxMAJOR_VERSION)$(wxMINOR_VERSION)$(wxRELEASE_NUMBER_IFUNSTABLE)
  
  # WIN95 means "all systems newer than Win95", i.e. Win9x and NT 4+
-@@ -244,7 +260,7 @@
+@@ -244,7 +257,7 @@
  PCH=wxWindows.pch
  !endif
  
@@ -5717,7 +5710,7 @@ diff -ruN a/src/makevc.env b/src/makevc.env
  MAKEPRECOMP=/YcWX/WXPREC.H
  !endif
  
-@@ -270,13 +286,13 @@
+@@ -270,13 +283,13 @@
  DUMMY=dummy
  !endif
  
@@ -5733,7 +5726,7 @@ diff -ruN a/src/makevc.env b/src/makevc.env
  
  .c.obj:
  	cl @<<
-@@ -289,13 +305,13 @@
+@@ -289,13 +302,13 @@
  <<
  
  #use CPPFLAGS2 so as not to use precompiled headers
@@ -5747,12 +5740,11 @@ diff -ruN a/src/makevc.env b/src/makevc.env
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
--
+ 
 +{}.cpp{$(D)}.obj:
 +	cl @<<
 +$(CPPFLAGS) /Fo$@ /c /Tp $<
 +<<
-+
 diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 --- a/src/msw/makefile.vc
 +++ b/src/msw/makefile.vc
@@ -5764,37 +5756,37 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
--
+ 
 -{$(COMMDIR)}.cpp{$(COMMDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
--
+ 
 -{$(COMMDIR)}.c{$(COMMDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS2) /Fo$@ /c /Tc $<
 -<<
--
+ 
 -{$(MSWDIR)}.cpp{$(MSWDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
--
+ 
 -{$(MSWDIR)}.c{$(MSWDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS2) /Fo$@ /c /Tc $<
 -<<
--
+ 
 -{$(OLEDIR)}.cpp{$(OLEDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
--
+ 
 -{$(HTMLDIR)}.cpp{$(HTMLDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
--
+ 
 -GENERICOBJS= $(GENDIR)\$D\busyinfo.obj \
 -		$(GENDIR)\$D\calctrl.obj \
 -		$(GENDIR)\$D\choicdgg.obj \
@@ -5828,25 +5820,18 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -		$(GENDIR)\$D\wizard.obj
 +{$(GENDIR)}.cpp{$(GENDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
-+
 +{$(COMMDIR)}.cpp{$(COMMDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
-+
 +{$(COMMDIR)}.c{$(COMMDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS2) /Fo$@ /c /Tc $<
-+
 +{$(MSWDIR)}.cpp{$(MSWDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
-+
 +{$(MSWDIR)}.c{$(MSWDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS2) /Fo$@ /c /Tc $<
-+
 +{$(OLEDIR)}.cpp{$(OLEDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
-+
 +{$(HTMLDIR)}.cpp{$(HTMLDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
-+
 +GENERICOBJS= $(GENDIR)\$(D)\busyinfo.obj \
 +		$(GENDIR)\$(D)\calctrl.obj \
 +		$(GENDIR)\$(D)\choicdgg.obj \
@@ -6040,7 +6025,7 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -		$(COMMDIR)\$D\xpmdecod.obj \
 -		$(COMMDIR)\$D\zipstrm.obj \
 -		$(COMMDIR)\$D\zstream.obj
--
+ 
 -MSWOBJS = $(MSWDIR)\$D\accel.obj \
 -		$(MSWDIR)\$D\app.obj \
 -		$(OLEDIR)\$D\automtn.obj \
@@ -6152,7 +6137,7 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -		$(MSWDIR)\$D\volume.obj \
 -		$(MSWDIR)\$D\wave.obj \
 -		$(MSWDIR)\$D\window.obj
--
+ 
 -HTMLOBJS = $(HTMLDIR)\$D\helpctrl.obj \
 -		$(HTMLDIR)\$D\helpdata.obj \
 -		$(HTMLDIR)\$D\helpfrm.obj \
@@ -6305,7 +6290,6 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 +		$(COMMDIR)\$(D)\xpmdecod.obj \
 +		$(COMMDIR)\$(D)\zipstrm.obj \
 +		$(COMMDIR)\$(D)\zstream.obj
-+
 +MSWOBJS = $(MSWDIR)\$(D)\accel.obj \
 +		$(MSWDIR)\$(D)\app.obj \
 +		$(OLEDIR)\$(D)\automtn.obj \
@@ -6417,7 +6401,6 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 +		$(MSWDIR)\$(D)\volume.obj \
 +		$(MSWDIR)\$(D)\wave.obj \
 +		$(MSWDIR)\$(D)\window.obj
-+
 +HTMLOBJS = $(HTMLDIR)\$(D)\helpctrl.obj \
 +		$(HTMLDIR)\$(D)\helpdata.obj \
 +		$(HTMLDIR)\$(D)\helpfrm.obj \
@@ -6453,54 +6436,46 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
  
 -$(COMMDIR)\$D:
 -    mkdir $(COMMDIR)\$D
--
+ 
 -$(MSWDIR)\$D:
 -    mkdir $(MSWDIR)\$D
--
+ 
 -$(GENDIR)\$D:
 -    mkdir $(GENDIR)\$D
--
+ 
 -$(OLEDIR)\$D:
 -    mkdir $(OLEDIR)\$D
--
+ 
 -$(HTMLDIR)\$D:
 -    mkdir $(HTMLDIR)\$D
--
+ 
 -$(JPEGDIR)\$D:
 -    mkdir $(JPEGDIR)\$D
--
+ 
 -$(TIFFDIR)\$D:
 -    mkdir $(TIFFDIR)\$D
--
+ 
 -$(REGEXDIR)\$D:
 -    mkdir $(REGEXDIR)\$D
--
+ 
 -$(WXDIR)\$D:
 -    mkdir $(WXDIR)\$D
 +$(COMMDIR)\$(D):
 +    mkdir $(COMMDIR)\$(D)
-+
 +$(MSWDIR)\$(D):
 +    mkdir $(MSWDIR)\$(D)
-+
 +$(GENDIR)\$(D):
 +    mkdir $(GENDIR)\$(D)
-+
 +$(OLEDIR)\$(D):
 +    mkdir $(OLEDIR)\$(D)
-+
 +$(HTMLDIR)\$(D):
 +    mkdir $(HTMLDIR)\$(D)
-+
 +$(JPEGDIR)\$(D):
 +    mkdir $(JPEGDIR)\$(D)
-+
 +$(TIFFDIR)\$(D):
 +    mkdir $(TIFFDIR)\$(D)
-+
 +$(REGEXDIR)\$(D):
 +    mkdir $(REGEXDIR)\$(D)
-+
 +$(WXDIR)\$(D):
 +    mkdir $(WXDIR)\$(D)
  
@@ -6569,7 +6544,7 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$D\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
 -<<
--
+ 
 -$(COMMDIR)\$D\y_tab.obj:     $(COMMDIR)\y_tab.c $(COMMDIR)\lex_yy.c
 +$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\datetime.obj /c /Tp $(COMMDIR)\datetime.cpp
 +<<
@@ -6630,7 +6605,6 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 +	cl @<<
 +$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$(D)\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
 +<<
-+
 +$(COMMDIR)\$(D)\y_tab.obj:     $(COMMDIR)\y_tab.c $(COMMDIR)\lex_yy.c
          cl @<<
  $(CPPFLAGS2) /c $(COMMDIR)\y_tab.c -DUSE_DEFINE -DYY_USE_PROTOS /Fo$@
@@ -6716,11 +6690,6 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
  
  # Making documents
  docs:   allhlp allhtml allpdfrtf allhtb allhtmlhelp
-@@ -930,3 +917,4 @@
- 	tmake -t $(MFTYPE) wxwin.pro -o makefile.$(MFTYPE)
- 	copy makefile.$(MFTYPE) $(WXWIN)\src\msw
- 
-+
 diff -ruN a/src/zlib/makefile.vc b/src/zlib/makefile.vc
 --- a/src/zlib/makefile.vc
 +++ b/src/zlib/makefile.vc

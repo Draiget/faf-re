@@ -1,13 +1,11 @@
 diff -ruN a/include/wx/platform.h b/include/wx/platform.h
 --- a/include/wx/platform.h
 +++ b/include/wx/platform.h
-@@ -253,7 +253,9 @@
+@@ -253,7 +253,7 @@
  
      /* size_t is the same as unsigned int for all Windows compilers we know, */
      /* so define it if it hadn't been done by configure yet */
 -    #if !defined(wxSIZE_T_IS_UINT) && !defined(wxSIZE_T_IS_ULONG)
-+    /* FAF: except on Win64, where size_t is 64 bits and wxString needs its */
-+    /* operator[](unsigned int) overloads to keep str[0u] unambiguous */
 +    #if !defined(wxSIZE_T_IS_UINT) && !defined(wxSIZE_T_IS_ULONG) && !defined(_WIN64)
          #define wxSIZE_T_IS_UINT
      #endif
@@ -15,13 +13,11 @@ diff -ruN a/include/wx/platform.h b/include/wx/platform.h
 diff -ruN a/include/wx/thread.h b/include/wx/thread.h
 --- a/include/wx/thread.h
 +++ b/include/wx/thread.h
-@@ -250,7 +250,13 @@
+@@ -250,7 +250,11 @@
      // finally, we need this typedef instead of declaring m_buffer directly
      // because otherwise the assert mentioned above wouldn't compile with some
      // compilers (notably CodeWarrior 8)
 +#ifdef _WIN64
-+    // FAF: CRITICAL_SECTION is 40 bytes on Win64 (the union's pointer member
-+    // gives the buffer the 8-byte alignment it needs)
 +    typedef char wxCritSectBuffer[40];
 +#else
      typedef char wxCritSectBuffer[24];
@@ -286,14 +282,12 @@ diff -ruN a/src/msw/window.cpp b/src/msw/window.cpp
              }
  
              m_oldWndProc = NULL;
-@@ -3620,8 +3620,14 @@
+@@ -3620,8 +3620,12 @@
  
          wxCHECK( pMenuItem->IsKindOf(CLASSINFO(wxMenuItem)), FALSE );
  
 -        return pMenuItem->OnMeasureItem(&pMeasureStruct->itemWidth,
 -                                        &pMeasureStruct->itemHeight);
-+        // FAF: MEASUREITEMSTRUCT holds UINTs, OnMeasureItem takes size_t;
-+        // the same type only on Win32
 +        size_t width = pMeasureStruct->itemWidth,
 +               height = pMeasureStruct->itemHeight;
 +        bool ok = pMenuItem->OnMeasureItem(&width, &height);
@@ -303,7 +297,7 @@ diff -ruN a/src/msw/window.cpp b/src/msw/window.cpp
      }
  
      wxWindow *item = FindItem(id);
-@@ -4900,7 +4906,7 @@
+@@ -4900,7 +4904,7 @@
              // do it as well, win would be already non NULL
              if ( ::SendMessage(hwnd, WM_GETDLGCODE, 0, 0) & DLGC_RADIOBUTTON )
              {

@@ -1,6 +1,6 @@
 # FAF Boost 1.34.1 patch
 
-Baseline: the upstream `boost_1_34_1.tar.bz2` from SourceForge, SHA256 `0f866c75b025a4f1340117a106595cc0675f48ba1e5a9b5c221ec7f19e96ec4c`. `cmake/FafDependencies.cmake` downloads it, checks the hash, extracts it to `dependencies/boost_1_34_1` and applies this patch (twelve files, twenty-one hunks).
+Baseline: the upstream `boost_1_34_1.tar.bz2` from SourceForge, SHA256 `0f866c75b025a4f1340117a106595cc0675f48ba1e5a9b5c221ec7f19e96ec4c`. `cmake/FafDependencies.cmake` downloads it, checks the hash, extracts it to `dependencies/boost_1_34_1` and applies this patch (nine files, all code changes).
 
 ## There is no bjam step
 
@@ -25,15 +25,9 @@ thread.cpp   tss.cpp        tss_dll.cpp     tss_hooks.cpp  tss_pe.cpp  xtime.cpp
 | `boost/get_pointer.hpp` | modern-compiler compatibility |
 | `boost/config/compiler/visualc.hpp` | known-version ceiling raised from `1400` (VC8) to `1950`, suppressing the unknown-compiler diagnostic |
 
-**Binary-provenance comments**: no effect on codegen; they record where the shipped binary implements each function.
+Not a patch but related: `src/CMakeLists.txt` compiles `libs/thread/src/condition.cpp` without `UNICODE`/`_UNICODE`, so `CreateSemaphore`/`CreateMutex` resolve to the `…A` entry points the shipped binary uses (0x00AC2190).
 
-| File | Addresses |
-|---|---|
-| `libs/thread/src/condition.cpp` | `0x00AC2190` `condition_impl::condition_impl` |
-| `libs/thread/src/thread.cpp` | `0x00AC32C0` `thread_proxy`, `0x00AC2760` `thread::~thread` |
-| `libs/thread/src/xtime.cpp` | `0x00AC5650` `xtime_get` |
-
-The `condition.cpp` note is the load-bearing one: that file is compiled without `UNICODE`/`_UNICODE`, so `CreateSemaphore`/`CreateMutex` resolve to the `…A` entry points as at `0x00AC2190`. The project-wide Unicode setting would otherwise switch them to `…W`.
+Binary-address notes that earlier versions of this patch carried as comments are kept in the recovery archive (`faf-re-archive/dependency-patches-with-provenance/`), not here.
 
 ## Applying it by hand
 

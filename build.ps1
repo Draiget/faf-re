@@ -81,6 +81,9 @@ function Find-CMake {
 }
 
 function Invoke-CMake([string[]]$cmakeArgs) {
+  # CMake prints warnings on stderr; with 'Stop', Windows PowerShell would turn the first
+  # one into a terminating error when output is redirected. Only the exit code counts.
+  $ErrorActionPreference = 'Continue'
   & $script:cmake @cmakeArgs
   if ($LASTEXITCODE -ne 0) { throw "cmake $($cmakeArgs -join ' ') failed (exit $LASTEXITCODE)." }
 }

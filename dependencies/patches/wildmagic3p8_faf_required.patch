@@ -1,766 +1,8 @@
-diff --git a/Foundation/Approximation/Wm3ApprGaussPointsFit2.cpp b/Foundation/Approximation/Wm3ApprGaussPointsFit2.cpp
-index 8df18a166c492b2b8f6a59245c1042ff5b01f928..950b0423cffa2bfe68ff8fa7433dd4fef863c50f 100644
---- a/Foundation/Approximation/Wm3ApprGaussPointsFit2.cpp
-+++ b/Foundation/Approximation/Wm3ApprGaussPointsFit2.cpp
-@@ -15,6 +15,71 @@
- namespace Wm3
- {
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A7D4C0 (FUN_00A7D4C0) - GaussPointsFit2<float>(int, const Vector2<float>*, const bool*)
-+ * Address: 0x00A7DC10 (FUN_00A7DC10) - GaussPointsFit2<double>(int, const Vector2<double>*, const bool*)
-+ *
-+ * Float instantiation (2026-08-26c, convexhull2-gap pass): `FUN_00A7D4C0`
-+ * was already IDA-tokenized (real `.c`/`.asm`/`.xrefs.txt` exports exist)
-+ * but sat `blocked` (`owner_layout`, depends_on
-+ * `[FUN_00A6D3A0, FUN_00A70820, FUN_00A70D70, FUN_00A719E0]`). Its sole
-+ * caller per `FUN_00A7D4C0.xrefs.txt` is `0x00A68BEC, owner=<none>`, which
-+ * this pass independently re-derived byte-for-byte from a fresh
-+ * positive-control-verified Capstone disassembly of the binary and
-+ * identified as `ContOrientedBox<float>` (untokenized; see the citation in
-+ * `Wm3ContBox2.cpp`) -- the same argument marshaling
-+ * (`resultPtr,iQuantity,akPoint,abValid` -> `esi,ebx,eax,edi`) documented for
-+ * the `<double>` pair (`0x00A699B0 -> 0x00A7DC10`) one call away. Decompiled
-+ * body of `FUN_00A7D4C0` matches this template exactly at `<float>`: same 6
-+ * `flt_F3DBE0.._F3DBF4` constants for `Box2::ZERO/UNIT_X/UNIT_Y` seeding
-+ * `kBox`, masked/unmasked mean-then-covariance double loops, `sub_A719E0(2)`
-+ * = `Eigen<float>(2)` (`FUN_00A719E0`, recovered), 4x `sub_A6D2D0` =
-+ * `kES(r,c)=...` (`FUN_00A6D2D0`, recovered), `sub_A70D70(v74)` =
-+ * `IncrSortEigenStuff2()` (`FUN_00A70D70`, recovered), a 2-iteration loop
-+ * calling `sub_A6CE70(i)` = `GetEigenvalue(i)` (`FUN_00A6CE70`; see the
-+ * corrected citation below -- this call site is exactly what disproves that
-+ * token's earlier "Query2TRational accessor" mislabel) and
-+ * `sub_A6D3A0(v74,i,v25)` = `GetEigenvector(i,kBox.Axis[i])` (`FUN_00A6D3A0`,
-+ * see its citation in this file's `GetEigenvector(int, Vector2<Real>&)`
-+ * section below), then `sub_A70820(v74)` = `~Eigen()` (`FUN_00A70820`,
-+ * recovered). Of the four originally-listed `depends_on` tokens, three
-+ * (`FUN_00A70820`/`FUN_00A70D70`/`FUN_00A719E0`) were already `recovered` by
-+ * the same-day `wm3-gap-sweep` pass before this one started; only
-+ * `FUN_00A6D3A0` (`GetEigenvector<float>`) remained open, and this pass
-+ * recovers it in the same commit (paired bottom-up). Both `FUN_00A7D4C0` and
-+ * `FUN_00A6D3A0` are promoted to `recovered`, citing the untokenized
-+ * `ContOrientedBox<float>` chunk at `0x00A68BD0` as the real (if unminted)
-+ * caller -- the identical acceptance already used for `FUN_00A7DC10` citing
-+ * the untokenized `0x00A699B0` chunk above.
-+ *
-+ * FAF recovery traceability (2026-08-26, discovered while tracing
-+ * GaussPointsFit3<double>'s cluster siblings). Structurally identical to
-+ * GaussPointsFit3<double> one dimension down: mean over up to 2 branches,
-+ * a 2x2 covariance matrix, `Eigen<double>(2)` (FUN_00A71DC0),
-+ * `kES(0,0)=fSumXX; kES(0,1)=fSumXY; kES(1,0)=fSumXY; kES(1,1)=fSumYY;`
-+ * (4 calls to FUN_00A6EDC0), `IncrSortEigenStuff2()` (FUN_00A71420, a sibling
-+ * of the already-recovered FUN_00A71460/IncrSortEigenStuff3 per that
-+ * function's own citation table), then `GetEigenvalue(i)` (FUN_00A6CEA0,
-+ * shared with GaussPointsFit3) / `GetEigenvector(i,Axis[i])` (FUN_00A6EE90,
-+ * the Vector2 overload) for i&lt;2. Confirmed via xrefs.txt: FUN_00A6CEA0's
-+ * two callers are exactly FUN_00A514D0 and FUN_00A7DC10; FUN_00A6EE90's only
-+ * caller is FUN_00A7DC10. Note: this vendored source's masked early-exit
-+ * writes `Extent[0..2]=-1.0` (three elements, apparently copy-pasted from
-+ * the 3D fit) even though `Box2<Real>::Extent` only has two slots; the
-+ * compiled body (confirmed in the decompile) only performs the two
-+ * in-bounds writes, consistent with the compiler eliminating the
-+ * out-of-bounds third store as dead/UB. Caller-side: the sole xref
-+ * (0x00A699CC, `owner=<none>`) was decoded directly from the live IDA
-+ * database and sits inside a prologue at 0x00A699B0 with the same
-+ * (abValid,akPoint,iQuantity,resultPtr) marshaling and the same
-+ * `fld dbl_E4F958(-1.0); fcomp [esi+0x30]` post-call check (`+0x30` = Box2's
-+ * `Extent[0]`) as the 3D case — i.e. the `Box2<double>` overload of
-+ * `ContOrientedBox` in Wm3ContBox2.cpp, also not tokenized by IDA.
-+ *
-+ * What it does:
-+ * 2D sibling of GaussPointsFit3: Center = mean, Axis[0..1] = covariance
-+ * eigenvectors, Extent[0..1] = covariance eigenvalues (increasing order).
-+ */
- template <class Real>
- Box2<Real> GaussPointsFit2 (int iQuantity, const Vector2<Real>* akPoint,
-     const bool* abValid)
-diff --git a/Foundation/Approximation/Wm3ApprGaussPointsFit3.cpp b/Foundation/Approximation/Wm3ApprGaussPointsFit3.cpp
-index 15e1469053b1dfa52f3e98d38b9755e487e8f264..60e6b0eb255c97adca46fafec7b3d150104a25c2 100644
---- a/Foundation/Approximation/Wm3ApprGaussPointsFit3.cpp
-+++ b/Foundation/Approximation/Wm3ApprGaussPointsFit3.cpp
-@@ -15,6 +15,55 @@
- namespace Wm3
- {
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A514D0 (FUN_00A514D0) - GaussPointsFit3<double>(int, const Vector3<double>*, const bool*)
-+ *
-+ * FAF recovery traceability (2026-08-26). Previously tracked as `blocked`
-+ * (owner_layout) with no identified operation. Identified by tracing the
-+ * double-precision arithmetic: mean accumulation over up to two branches
-+ * (unmasked / `abValid`-masked with an `iValidQuantity` counter and an
-+ * `Extent[0..2] = -1.0` early-return sentinel), a 3x3 symmetric covariance
-+ * matrix built from `(point - mean)` cross-products, then 9 calls into
-+ * `Eigen<double>::operator()` (FUN_00A6EDC0, already recovered as
-+ * `ResolveRuntimeRowStride8AddressLane` in
-+ * src/sdk/moho/math/Wm3DistanceFafExtras.cpp), a `Eigen<double>(3)`
-+ * constructor call (FUN_00A71DC0), `IncrSortEigenStuff3()` (FUN_00A71460,
-+ * already recovered here), then a 3-iteration loop calling
-+ * `GetEigenvalue(i)` (FUN_00A6CEA0) and `GetEigenvector(i, Axis[i])`
-+ * (FUN_00A6EE40) before writing the whole result through
-+ * `Box3<double>::operator=` (FUN_00A3A770) on the early-exit path. The
-+ * default-initialised local (`dbl_F3D250..dbl_F3D2A8` = ZERO/UNIT_X/UNIT_Y/
-+ * UNIT_Z, then literal 1.0 extents) matches this function's
-+ * `Box3<Real> kBox(ZERO,UNIT_X,UNIT_Y,UNIT_Z,1,1,1)` opening line exactly,
-+ * and the whole shape (mean -> covariance -> Eigen -> Extent=eigenvalue,
-+ * Axis=eigenvector) matches this body byte-for-byte. Also confirmed from the
-+ * caller side: the sole xref (0x00A3C3AC, `owner=<none>` in the callgraph
-+ * index) was decoded directly from the live IDA database (headless,
-+ * read-only; IDA has not tokenized a function there) and sits inside a
-+ * `push ebp; mov ebp,esp; and esp,-8` prologue at 0x00A3C390 that marshals
-+ * exactly (abValid, akPoint, iQuantity, resultPtr) and, immediately after
-+ * `call sub_A514D0`, does `fld dbl_E4F958(-1.0); fcomp [esi+0x60]` (Box3's
-+ * `Extent[0]` offset) — i.e. `Box3<Real> kBox =
-+ * GaussPointsFit3<Real>(iQuantity,akPoint,abValid); if (kBox.Extent[0] ==
-+ * -1.0) return kBox;`, the opening two lines of `ContOrientedBox<double>`
-+ * in Wm3ContBox3.cpp below (also explicitly instantiated for <double>, also
-+ * not tokenized by IDA). `dbl_E4F958` is confirmed == -1.0 by this same
-+ * "-1 sentinel" pattern recurring identically in `Wm3::ContAlignedBox<
-+ * double>` (starts 0x00A3BCB0, immediately before this same run of
-+ * unrecognized functions) and in the 2D sibling
-+ * `GaussPointsFit2<double>`/`ContOrientedBox<double>(Box2 overload)` pair at
-+ * FUN_00A7DC10 / 0x00A699B0 in Wm3ApprGaussPointsFit2.cpp /
-+ * Wm3ContBox2.cpp. Foundation.vcxproj builds this file cleanly
-+ * (`msbuild dependencies/WildMagic3p8/Foundation/Foundation.vcxproj`,
-+ * 2026-08-26, EXITCODE=0).
-+ *
-+ * What it does:
-+ * Fits points with a Gaussian distribution: Center = mean of the (optionally
-+ * `abValid`-masked) points, Axis[0..2] = eigenvectors of the 3x3 covariance
-+ * matrix, Extent[0..2] = eigenvalues of the covariance matrix in increasing
-+ * order (via IncrSortEigenStuff3). If `abValid` selects zero points, returns
-+ * Center=(0,0,0), Axis=identity, Extent=(-1,-1,-1).
-+ */
- template <class Real>
- Box3<Real> GaussPointsFit3 (int iQuantity, const Vector3<Real>* akPoint,
-     const bool* abValid)
-diff --git a/Foundation/Containment/Wm3ContBox2.cpp b/Foundation/Containment/Wm3ContBox2.cpp
-index 313c41bccd5201dff91ea5e7b6defa8ca92b8101..b2d9efe703ed46ef6206b40b0f765eb5dc32fa32 100644
---- a/Foundation/Containment/Wm3ContBox2.cpp
-+++ b/Foundation/Containment/Wm3ContBox2.cpp
-@@ -102,6 +102,112 @@ Box2<Real> ContAlignedBox (int iQuantity, const Vector2<Real>* akPoint,
-     return kBox;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A699B0 (not tokenized by IDA; owner=<none> for its one known
-+ * code xref at 0x00A699CC) - ContOrientedBox<double>(int, const Vector2<double>*, const bool*)
-+ *
-+ * FAF recovery traceability (2026-08-26). 2D sibling of the 0x00A3C390
-+ * citation in Wm3ContBox3.cpp, found by the same method (headless, read-only
-+ * PE decode; IDA has no function boundary here either). int3 padding ends at
-+ * 0x00A699AF, then the same 4-argument marshaling
-+ * (abValid,akPoint,iQuantity,resultPtr) precedes `call sub_A7DC10` at
-+ * 0x00A699CC, followed immediately by `fld dbl_E4F958; fcomp [esi+0x30]`
-+ * (Box2::Extent[0]) — this function's opening `Box2<Real> kBox =
-+ * GaussPointsFit2<Real>(...); if (kBox.Extent[0]==-1.0) return kBox;`.
-+ * Not promoted to `recovered` in recovered_progress.json in this pass (no
-+ * FUN_ token exists to mark).
-+ *
-+ * Caller-search follow-up (2026-08-26b): as with the 3D sibling in
-+ * `Wm3ContBox3.cpp`, the original pass proved only this function's CALLEE
-+ * relationship (calls `GaussPointsFit2` at `0x00A699CC`). A follow-up
-+ * exhaustively searched for a caller of `0x00A699B0` itself using the same
-+ * four validated methods (IDA `XrefsTo`; a whole-image `E8`/`E9` rel32
-+ * scan across all 8 segments of `ForgedAlliance.exe.read4.i64`, sanity-
-+ * checked against the known-real `0x00A3C3AC -> 0x00A514D0` call in the
-+ * same run; a whole-image raw-4-byte absolute-address scan for
-+ * `B0 99 A6 00`; an IDA name-table scan) -- all four returned zero
-+ * results, identically to the 3D overload.
-+ *
-+ * Source-level candidate audit: `Wm3ApprEllipseFit2.cpp:85`
-+ * (`EllipseFit2<Real>::InitialGuess`) calls the untyped
-+ * `ContOrientedBox(iQuantity,akPoint)` and is genuinely templated over
-+ * `Real`, making it the 2D structural analogue of `EllipsoidFit3`'s
-+ * `InitialGuess` -- the only candidate found in the upstream library, with
-+ * the same caveat: zero binary evidence it is instantiated at `<double>`
-+ * (or at all) in this game. No other in-library caller of the 2D
-+ * `ContOrientedBox` overload exists. Same same-translation-unit-baggage
-+ * hypothesis applies as documented in `Wm3ContBox3.cpp` (this function is
-+ * explicitly instantiated for `<double>` at the bottom of this file,
-+ * alongside `ContMinBox<double>`/`InBox<double>`/`MergeBoxes<double>`,
-+ * unconditionally forcing emission into `Wm3ContBox2.obj` regardless of
-+ * whether this specific overload is ever called). Not independently
-+ * confirmed. No caller evidence exists for the 2D `ContOrientedBox<double>`
-+ * overload by any method checked; documented rather than fabricated, per
-+ * CLAUDE.md.
-+ *
-+ * Float sibling (2026-08-26c, convexhull2-gap pass): `ContOrientedBox<float>`
-+ * lives at `0x00A68BD0`, filling the 2214-byte address-gap
-+ * `0x00A68BCA`-`0x00A69470` between `BuildAxisAlignedBox2fFromPointArray`
-+ * (`FUN_00A685F0` = `ContAlignedBox<float>`, real ends at `0x00A68BCA` per
-+ * its own `.meta.json` `function_code_bytes=1498`) and
-+ * `LegacyCheckPointInsideProjectedWindow2DRuntimeSlot1`
-+ * (`FUN_00A69470` = `InBox<float>`, confirmed by inspection of its own
-+ * recovered body in `WinApiImportThunks.cpp` -- absolute-dot-vs-limit test
-+ * against a `{originX,originY,axis0,axis1,limit0,limit1}` record that is
-+ * byte-for-byte `Box2<float>`). No IDA function boundary exists in this gap
-+ * (6x `int3` at `0x00A68BCA-0x00A68BCF`, one `push ebp`/`and esp,0xFFFFFFF8`
-+ * prologue at `0x00A68BD0`, one `mov esp,ebp`/`pop ebp`/`ret` epilogue at
-+ * `0x00A69462-0x00A6946A`, 5x `int3` at `0x00A6946B-0x00A6946F`, exactly one
-+ * `call` in the whole 2202-byte body). Verified byte-for-byte with a
-+ * Capstone x86-32 disassembly of `bin/2025.7.1/ForgedAlliance.exe` (VA/file
-+ * offset mapping via `pefile`; the decoder was sanity-checked against
-+ * `FUN_00A69470`'s already-exported `.asm` before use -- 47/47 instructions,
-+ * identical addresses, identical bytes -- i.e. a positive control, not a
-+ * blind trust of a fresh linear-disasm tool per the earlier `Wm3DistanceFafExtras`
-+ * megabyte-scan false-negative lesson). Landmarks matched against this exact
-+ * source: `esi`/`ebx`/`eax`/`edi` = `resultPtr`/`iQuantity`/`akPoint`/`abValid`
-+ * pushed unchanged into `call 0x00A7D4C0` at `0x00A68BEC` (`GaussPointsFit2<float>`,
-+ * see its own citation in `Wm3ApprGaussPointsFit2.cpp`); `fld [0xE4F6E8]` (-1.0f)
-+ * `; fcomp [esi+0x18]` (`Box2::Extent[0]`) `; jnp 0x00A69462` = the
-+ * `if (kBox.Extent[0]==-1.0) return kBox;` early-out branching directly to the
-+ * shared epilogue; `test edi,edi; ...; jne 0x00A69002` = the `!abValid`/`abValid`
-+ * dispatch (unmasked branch falls through at `0x00A68C22`, initializes
-+ * `fY0Min=fY0Max=fY1Min=fY1Max` from `akPoint[0]-kBox.Center` dotted against
-+ * `Axis[0]`/`Axis[1]` at `esi+8..0x14`, loop-unrolled x4 for `i=1..iQuantity-1`;
-+ * masked branch at `0x00A69002` re-derives the identical dot products guarded
-+ * by `cmp byte [edi+ecx],0`); tail at `0x00A69440-0x00A6945F` writes
-+ * `kBox.Center.X/Y += 0.5*(...)*Axis[0] + 0.5*(...)*Axis[1]` into `[esi]`/`[esi+4]`
-+ * and `kBox.Extent[0]/[1] = 0.5*(max-min)` into `[esi+0x18]`/`[esi+0x1C]`, then
-+ * `mov eax,esi` (hidden-pointer return convention) before the common
-+ * pop-pop-pop-leave-ret. No FUN_ token exists at `0x00A68BD0` (IDA never
-+ * carved a boundary here, same as the `<double>` sibling); not tokenized in
-+ * this pass (live `.i64` scripting was judged unnecessary risk given the
-+ * `<double>` sibling's precedent below, and address-level citation already
-+ * satisfies the callee's evidence requirement).
-+ *
-+ * Caller search for `0x00A68BD0` (same rigor as the `<double>` sibling):
-+ * (1) whole-image `E8`/`E9` rel32 scan across every byte offset of
-+ * `bin/2025.7.1/ForgedAlliance.exe`, positive-control-verified against the
-+ * known real `0x00A68BEC -> 0x00A7D4C0` call (found, exactly 1 hit, matching
-+ * `FUN_00A7D4C0.xrefs.txt`'s own recorded count) -- zero hits for
-+ * `0x00A68BD0`; (2) whole-image raw 4-byte absolute-address scan for
-+ * `D0 8B A6 00` -- zero hits (the `0x00A7D4C0` control byte-pattern also
-+ * returns zero, confirming this function is never referenced by absolute
-+ * address either, i.e. the scan technique legitimately finds nothing rather
-+ * than silently failing). No IDA session was opened for an `XrefsTo`/name-table
-+ * cross-check in this pass (no live `.i64` was touched). Source-level
-+ * candidate audit: same as the `<double>` case, `Wm3ApprEllipseFit2.cpp`'s
-+ * `EllipseFit2<Real>::InitialGuess` is the only in-library caller of the
-+ * untyped `ContOrientedBox(iQuantity,akPoint)`, with the same unresolved
-+ * caveat about whether it is ever instantiated for either `Real` in this
-+ * game. Conclusion: no caller evidence found for `ContOrientedBox<float>` by
-+ * any method checked here, matching the `<double>` sibling's outcome exactly
-+ * (both are almost certainly dead code kept alive only by this file's
-+ * unconditional `template WM3_ITEM Box2<T> ContOrientedBox<T>` explicit
-+ * instantiations at the bottom of this TU). Documented rather than
-+ * fabricated, per CLAUDE.md; not promoted to `recovered` in
-+ * `recovered_progress.json` (no FUN_ token exists to mark).
-+ */
- template <class Real>
- Box2<Real> ContOrientedBox (int iQuantity, const Vector2<Real>* akPoint,
-     const bool* abValid)
-@@ -231,6 +337,67 @@ static void UpdateBox (const Vector2<Real>& rkLPoint,
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6A000 (FUN_00A6A000) - ContMinBox<float>(int, const
-+ * Vector2<float>*, bool)
-+ * Address: 0x00A6AEB0 (FUN_00A6AEB0) - ContMinBox<double>(int, const
-+ * Vector2<double>*, bool)
-+ *
-+ * FAF recovery traceability (2026-08-26d, ContMinBox/MergeBoxes follow-up
-+ * pass, dispatched to close out the `ConvexHull2<Real>`-anchored search a
-+ * prior pass left open). Both instantiations were already tokenized by IDA;
-+ * `FUN_00A6A000` carried a generic `external_dependency` note from a
-+ * "Transitive-dead-caller sweep" batch pass ("Genuine WildMagic3p8
-+ * geometric-predicate/intersection-test internals (TRational/TInteger exact
-+ * arithmetic...") that did not actually match this function's content, and
-+ * `FUN_00A6AEB0` had a similarly generic classification. This pass identifies
-+ * both precisely from their decompiled `.c` exports
-+ * (`decomp/recovery/disasm/fa_full_2026_03_26/FUN_00A6A000.c` /
-+ * `FUN_00A6AEB0.c`), matching this source line-by-line:
-+ *   - `if (bIsConvexPolygon) { akHPoint = akPoint; goto <shared body>; }`
-+ *     matches the leading `if(a4){v4=a3;goto LABEL_14;}` / `if(a5){_EDI=a4;
-+ *     goto LABEL_15;}` early branch in both bodies.
-+ *   - the non-convex path's `ConvexHull2<Real> kHull(iQuantity,akPoint,
-+ *     0.001f,false,Query::QT_INT64);` matches `sub_A78E30(...)` (float) /
-+ *     `sub_A79220(...)` (double) -- these are the SAME two `ConvexHull2`
-+ *     constructor addresses a prior pass already found via callgraph xref
-+ *     (`FUN_00A78E30` 2 callers, `FUN_00A79220` 2 callers) but had "triaged
-+ *     as unrelated" without checking this function's own decompiled body;
-+ *     this pass's direct read closes that gap.
-+ *   - the three accessor calls right after (`sub_A6BC60/70/80` for float,
-+ *     `sub_A6BD30/40/50` for double) = `kHull.GetDimension()` /
-+ *     `GetSimplexQuantity()` / `GetIndices()`, and the hull destructor call
-+ *     before falling into the shared body (`sub_A74970` float / `sub_A74BA0`
-+ *     double) = `~ConvexHull2<Real>()`.
-+ *   - the shared body's `WM3_NEW Vector2<Real>[iQuantity]` scratch buffers
-+ *     (`akEdge`, `abVisited`), the per-edge `Normalize()` loop with
-+ *     wrap-around handling, the `fXMin/fXMax/fYMin/fYMax` +
-+ *     `iLIndex/iRIndex/iBIndex/iTIndex` extremum scan (with its wrap-around
-+ *     re-checks), and -- decisively -- the rotating-calipers `while` loop's
-+ *     4-way dispatch (`F_BOTTOM/F_RIGHT/F_TOP/F_LEFT`) each calling the SAME
-+ *     helper with the same 4-box-corner-plus-axes argument pattern
-+ *     (`sub_A68390` for float = `UpdateBox<float>`, this file's file-local
-+ *     static helper defined just above; `sub_A68500` for double =
-+ *     `UpdateBox<double>`) are all present and structurally identical to
-+ *     this function's body, matching `UpdateBox(akHPoint[iLIndex],
-+ *     akHPoint[iRIndex],akHPoint[iBIndex],akHPoint[iTIndex],kU,kV,
-+ *     fMinAreaDiv4,kBox);` exactly.
-+ *   - the cleanup triple `operator delete[](abVisited); operator
-+ *     delete[](akEdge); if (!bIsConvexPolygon) operator delete[](akHPoint);`
-+ *     matches the closing `WM3_DELETE[]` sequence exactly, including the
-+ *     conditional guard on the *hidden* `bIsConvexPolygon` parameter.
-+ *
-+ * Each 2D entry point's only discovered caller is the corresponding 3D
-+ * `ContMinBox` in `Wm3ContBox3.cpp` (`0xA3E9C0 -> 0xA6A000` for float,
-+ * `0xA40060 -> 0xA6AEB0` for double, each called twice -- once for the
-+ * `iHDim==2` case with `bIsConvexPolygon=true`, once per triangle face in the
-+ * main loop with `bIsConvexPolygon=false` -- matching the 2 hits each found
-+ * by the whole-image `E8`/`E9` scan below, both inside the 3D caller's own
-+ * address span). See the citation in `Wm3ContBox3.cpp` for that function's
-+ * own (also caller-less) status. Status unchanged for both tokens
-+ * (`external_dependency`, WildMagic terminal category);
-+ * recovered_progress.json notes updated to record the precise identification.
-+ */
- template <class Real>
- Box2<Real> ContMinBox (int iQuantity, const Vector2<Real>* akPoint,
-     bool bIsConvexPolygon)
-@@ -543,6 +710,96 @@ bool InBox (const Vector2<Real>& rkPoint, const Box2<Real>& rkBox)
-     return true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6B9C0 (not tokenized by IDA; no known code xref found in the
-+ * callgraph index) - MergeBoxes<double>(const Box2<double>&, const
-+ * Box2<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26d, ContMinBox/MergeBoxes follow-up
-+ * pass). Found immediately after this file's own `ContMinBox<double>`
-+ * (`FUN_00A6AEB0`, ends at `0x00A6B9AB` per IDA's `end_ea`, which does not
-+ * include ContMinBox<double>'s own 5-entry rotating-calipers jump table
-+ * stored right after its code -- verified by reading the raw bytes at
-+ * `0x00A6B9AB`-`0x00A6B9BF`: 1 pad byte then five little-endian VAs
-+ * `0x00A6B919/0x00A6B88E/0x00A6B776/0x00A6B6EB/0x00A6B7FB`, all of which fall
-+ * inside `FUN_00A6AEB0`'s own address span -- confirming they belong to that
-+ * function's `switch` on the F_NONE/F_LEFT/F_RIGHT/F_TOP/F_BOTTOM case index,
-+ * not a separate function). This function's real body starts immediately
-+ * after that table at `0x00A6B9C0` (`push ebp; mov ebp,esp; and esp,
-+ * 0xFFFFFFF8` prologue) and ends with `ret` at `0x00A6BBBF`, flush against
-+ * the next tokenized neighbor `FUN_00A6BBC0` (no trailing padding). Decoded
-+ * directly from the PE (read-only, pefile VA->file-offset mapping + Capstone
-+ * x86-32, no `.i64` touched) and verified against this exact source
-+ * line-by-line:
-+ *   - three-pointer-arg calling convention (`esi`=hidden result pointer=
-+ *     `[ebp+8]`, `ebx`=`&rkBox0`=`[ebp+0xC]`, `ecx`(saved to a local, used as
-+ *     `&rkBox1`)=`[ebp+0x10]`) matches `Box2<Real> MergeBoxes(const
-+ *     Box2<Real>& rkBox0, const Box2<Real>& rkBox1)`'s hidden-pointer-return
-+ *     + 2 const-ref-arg ABI.
-+ *   - `kBox.Center = 0.5*(rkBox0.Center + rkBox1.Center);` -- `qword`-width
-+ *     (double) loads of `[ebx]`/`[ebx+8]` (Center.x/y of the first box) added
-+ *     to `[ecx]`/`[ecx+8]`, multiplied by `qword_D4DDF8` (0.5), stored to
-+ *     `[esi]`/`[esi+8]` (`Box2<double>::Center`, 16-byte `Vector2<double>`).
-+ *   - `rkBox0.Axis[0].Dot(rkBox1.Axis[0])` computed from `[ebx+0x10/0x18]` x
-+ *     `[ecx+0x10/0x18]` (`Axis[0]` at offset `0x10` in a 64-byte
-+ *     `Box2<double>`: Center@0, Axis[0]@0x10, Axis[1]@0x20, Extent@0x30),
-+ *     compared against `qword_E4F7E0` (0.0) via `fcomp; fnstsw; test ah,1;
-+ *     jne` -- the taken (dot<0) branch subtracts (`kBox.Axis[0] =
-+ *     0.5*(rkBox0.Axis[0]-rkBox1.Axis[0]);`), the fallthrough (dot>=0) branch
-+ *     adds -- exactly the `if (rkBox0.Axis[0].Dot(rkBox1.Axis[0]) >=
-+ *     (Real)0.0) {kBox.Axis[0]=0.5*(rkBox0.Axis[0]+rkBox1.Axis[0]);} else
-+ *     {kBox.Axis[0]=0.5*(rkBox0.Axis[0]-rkBox1.Axis[0]);}` branch, stored to
-+ *     `[edi]`/`[edi+8]` where `edi=esi+0x10=&kBox.Axis[0]`.
-+ *   - `call 0x00A69FB0` immediately after (this file's own small
-+ *     `Vector2<double>::Normalize`-shaped helper, already known from its
-+ *     other caller in this file's `ContMinBox<double>`'s `iHDim==1` branch)
-+ *     matches `kBox.Axis[0].Normalize();`.
-+ *   - three `fchs` negations with `fxch` shuffling then stores to
-+ *     `[esi+0x20]`/`[esi+0x28]` (`kBox.Axis[1]`) match
-+ *     `kBox.Axis[1] = -kBox.Axis[0].Perp();`.
-+ *   - `call 0x00A68310` (`Box2<double>::ComputeVertices`, 2 total callers,
-+ *     both this function) followed by a 4-iteration loop (`mov edx,4`)
-+ *     computing `kDiff=akVertex[i]-kBox.Center` then `fDot=kDiff.Dot(
-+ *     kBox.Axis[j])` for `j=0,1` with min/max tracking -- exactly
-+ *     `rkBox0.ComputeVertices(akVertex); for(i=0;i<4;i++){for(j=0;j<2;j++)
-+ *     {...}}`. Repeated a second time for `rkBox1` (second
-+ *     `call 0x00A68310`).
-+ *   - closing `kBox.Center += kBox.Axis[j]*0.5*(kMax[j]+kMin[j]);
-+ *     kBox.Extent[j] = 0.5*(kMax[j]-kMin[j]);` tail for `j=0,1`, then a clean
-+ *     `pop esi/ebx; mov esp,ebp; pop ebp; ret` epilogue with no further calls.
-+ * No FUN_ token exists at `0x00A6B9C0` (IDA never carved a boundary here);
-+ * not tokenized in this pass (citation-only, matching the
-+ * `ContOrientedBox<float>` precedent in `Wm3ContBox3.cpp` -- live `.i64`
-+ * scripting judged unnecessary given the caller search below already
-+ * returned a definitive answer).
-+ *
-+ * Caller search (exhaustive, 2026-08-26d): no FUN_ token exists so SQL
-+ * `call_edges`/`incoming_xrefs` are structurally silent for this address;
-+ * `data_refs` queried directly by `to_ea=0x00A6B9C0` is empty. A whole-image
-+ * `E8`/`E9` rel32 byte-pattern scan (positive-control-verified in the same
-+ * run against the known-real `0x00A3EA0F -> 0x00A67120` edge, found) returned
-+ * zero hits for `0x00A6B9C0`. A whole-image raw 4-byte absolute-address scan
-+ * for `C0 B9 A6 00` also returned zero hits. `Box2<double>::ComputeVertices`
-+ * (`0xA68310`) and the shared `Normalize`-shaped helper (`0xA69FB0`) were
-+ * both checked and have no callers beyond this function and
-+ * `ContMinBox<double>`. No caller evidence exists for `MergeBoxes<double>`
-+ * (2D) by any method checked; documented rather than fabricated, per
-+ * CLAUDE.md. Same outcome as every other member of this Cont-family /
-+ * MergeBoxes group examined to date -- apparent same-.obj linker baggage with no
-+ * genuinely-called member found in either `Wm3ContBox2.cpp` or
-+ * `Wm3ContBox3.cpp` so far.
-+ *
-+ * `MergeBoxes<float>` (2D) was searched for with the same method (gap-scan
-+ * across the full tokenized-function list in `0x00A3B000`-`0x00A80000`, both
-+ * a >150-byte and a >40-byte gap threshold, with particular attention to the
-+ * immediate neighborhood of `ContAlignedBox<float>`/`ContOrientedBox<float>`/
-+ * `InBox<float>`/`ContMinBox<float>` at `0x00A685F0`-`0x00A6ABA1`) and NOT
-+ * found -- every gap in that neighborhood is either too small or shows no
-+ * `Dot`/`Perp`/`ComputeVertices`-call-bearing FPU content. Left unlocated;
-+ * genuinely absent from this pass's search rather than fabricated. (For
-+ * contrast, the 3D sibling `MergeBoxes<float>` WAS found in this same pass --
-+ * see `Wm3ContBox3.cpp`.)
-+ */
- template <class Real>
- Box2<Real> MergeBoxes (const Box2<Real>& rkBox0, const Box2<Real>& rkBox1)
- {
-diff --git a/Foundation/Containment/Wm3ContBox3.cpp b/Foundation/Containment/Wm3ContBox3.cpp
-index c380c1e3d06c75d84883041e8486b9ed898f7ed4..e52801e276c514de125a4d81d1e9c6f163597a64 100644
---- a/Foundation/Containment/Wm3ContBox3.cpp
-+++ b/Foundation/Containment/Wm3ContBox3.cpp
-@@ -20,6 +20,80 @@
- namespace Wm3
- {
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A3BCB0 (not tokenized by IDA; no known code xref found in the
-+ * callgraph index) - ContAlignedBox<double>(int, const Vector3<double>*, const bool*)
-+ *
-+ * FAF recovery traceability (2026-08-26). Found immediately before the
-+ * 0x00A3C390 ContOrientedBox<double> citation below (int3 padding at
-+ * 0x00A3BCA3-0x00A3BCAF separates it from the preceding recovered function
-+ * FUN_00A3BC10). Decoded directly from the PE (read-only): same default-
-+ * Box3-init prologue (`dbl_F3D250..dbl_F3D2A8` = ZERO/UNIT_X/UNIT_Y/UNIT_Z,
-+ * literal 1.0 extents) as GaussPointsFit3, then an `abValid`-null branch
-+ * split, a masked branch that scans for the first valid point and returns
-+ * early with `Extent[0..2]=dbl_E4F958(-1.0)` when none is found (matching
-+ * this function's `for(i){if(abValid[i]){kMin=kMax=akPoint[i]; break;}} if
-+ * (i==iQuantity) {Extent=-1,-1,-1; return kBox;}` exactly), then paired
-+ * fcom/fnstsw/test-ah min/max updates per coordinate unrolled over 4 points
-+ * at a time (raw-coordinate compares, not dot-product projections — the
-+ * signature that distinguishes this from ContOrientedBox's axis-projection
-+ * phase). No caller was found for this address in the callgraph index or a
-+ * direct xref scan in this pass; not promoted to `recovered` (no FUN_ token
-+ * exists to mark, and the caller-evidence requirement is unmet). Left as a
-+ * breadcrumb only.
-+ *
-+ * Caller-search follow-up (2026-08-26b, exhaustive, all methods negative).
-+ * Four independent, validated searches for a caller of `0x00A3BCB0` itself,
-+ * run read-only against `bin/external/ForgedAlliance.exe.read4.i64`:
-+ *   1. `idautils.XrefsTo(0x00A3BCB0, 0)` (IDA's own xref engine) -> 0 hits.
-+ *   2. Exhaustive raw-byte scan of every `E8`/`E9` (call/jmp rel32) opcode
-+ *      across all 8 mapped segments of the image (`.text` 8,433,664 bytes,
-+ *      `PSFD00`, `.idata`, `.rdata` 3,270,048 bytes, `.data` 3,203,072
-+ *      bytes, `.tls`, `.rsrc`, `.exxt`; ~22.9MB total), decoding the rel32
-+ *      target for literally every such byte regardless of whether IDA had
-+ *      classified that position as code -> 0 hits targeting `0x00A3BCB0`.
-+ *      Methodology sanity-checked in the same run by adding `0x00A514D0`
-+ *      (GaussPointsFit3, whose real caller at `0x00A3C3AC` is already
-+ *      proven) as a control target: the scanner correctly found that one
-+ *      real hit, confirming the scan logic and segment coverage are sound
-+ *      and the negative result for `0x00A3BCB0` is trustworthy, not a
-+ *      scanner defect.
-+ *   3. Exhaustive scan of all 8 segments for the raw 4-byte little-endian
-+ *      value `B0 BC A3 00` appearing anywhere (catches `push offset X`,
-+ *      `mov reg,offset X`, `lea reg,[X]`, and any vtable/jump-table stored
-+ *      pointer to X, none of which produce an `E8`/`E9` and so are not
-+ *      covered by search #2) -> 0 hits anywhere in the image.
-+ *   4. IDA global name-table scan (97,884 names) for
-+ *      "ContAlignedBox"/"ContOrientedBox"/"ContMinBox"/"GaussPointsFit" and
-+ *      the real upstream WildMagic callers found by grepping the vendored
-+ *      source tree -> 0 matches (expected: this is a stripped Release
-+ *      binary, internal statics never carry names; listed for
-+ *      completeness, not as independent evidence).
-+ * Source-level audit: grepping the whole `dependencies/WildMagic3p8` tree
-+ * finds no in-library caller of `ContAlignedBox` at all (unlike
-+ * `ContOrientedBox`, nothing in this vendored library ever calls
-+ * `ContAlignedBox` -- it is a leaf API meant for direct application use).
-+ * Given `Foundation.vcxproj` is a `StaticLibrary`
-+ * (`<ConfigurationType>StaticLibrary</ConfigurationType>`) and `WM3_ITEM`
-+ * expands to nothing in that configuration (`Wm3FoundationLIB.h:25`, no
-+ * `WM3_DLL_EXPORT`/`WM3_DLL_IMPORT` defined), there is no forced-retention
-+ * mechanism (e.g. `dllexport`) either -- ordinary `/OPT:REF` should be able
-+ * to strip this symbol if genuinely unreferenced. The most parsimonious
-+ * explanation consistent with every check above is that this function
-+ * survives in the binary only as same-translation-unit baggage: it is
-+ * explicitly instantiated for `<double>` in this same file (forcing
-+ * unconditional emission into `Wm3ContBox3.obj` regardless of use), and if
-+ * a sibling from this same `.obj` (most plausibly `ContMinBox<double>`, a
-+ * directly useful "compute a tight bounding box" utility) is genuinely
-+ * called elsewhere while this static lib was not built with per-function
-+ * COMDAT stripping granular enough to discard the unused siblings
-+ * individually, the whole object's functions travel together. This is
-+ * offered as a hypothesis, not confirmed evidence -- confirming it would
-+ * require locating `ContMinBox<double>`'s own binary address and callsite,
-+ * which is out of scope for this pass. No caller evidence for
-+ * `ContAlignedBox<double>` exists by any method checked; per CLAUDE.md this
-+ * is documented rather than fabricated.
-+ */
- template <class Real>
- Box3<Real> ContAlignedBox (int iQuantity, const Vector3<Real>* akPoint,
-     const bool* abValid)
-@@ -126,6 +200,81 @@ Box3<Real> ContAlignedBox (int iQuantity, const Vector3<Real>* akPoint,
-     return kBox;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A3C390 (not tokenized by IDA; owner=<none> for its one known
-+ * code xref at 0x00A3C3AC) - ContOrientedBox<double>(int, const Vector3<double>*, const bool*)
-+ *
-+ * FAF recovery traceability (2026-08-26, found while sourcing
-+ * GaussPointsFit3<double>'s only caller for FUN_00A514D0). IDA never carved
-+ * a function boundary here (confirmed live via headless
-+ * `export_function_code_ida9.py --ea 0xA3C3AC` -> "No function found"), so
-+ * there is no FUN_ token / .asm / .meta.json export and this citation is
-+ * address-only. Decoded directly from the PE (read-only, no database
-+ * changes saved): int3 padding ends at 0x00A3C38F, then a standard
-+ * `push ebp; mov ebp,esp; and esp,0xFFFFFFF8` prologue marshals exactly
-+ * (abValid=[ebp+0x14], akPoint=[ebp+0x10], iQuantity=[ebp+0xC],
-+ * resultPtr=[ebp+8]) as (push abValid; push akPoint; push iQuantity;
-+ * push resultPtr; call sub_A514D0) at 0x00A3C3AC, then
-+ * `fld dbl_E4F958; fcomp [esi+0x60]; ...; jnp <continue>` where esi is the
-+ * same resultPtr and +0x60 is Box3::Extent[0] — i.e. exactly this function's
-+ * first two lines: `Box3<Real> kBox = GaussPointsFit3<Real>(...); if
-+ * (kBox.Extent[0] == -1.0) return kBox;`. The remainder of the function
-+ * (not fully mapped instruction-by-instruction) continues with per-axis
-+ * dot-product min/max projection arithmetic against `[esi+0x18..0x5F]`
-+ * (Axis[0..2]), matching this function's min(y)/max(y) extent-adjustment
-+ * loop below. `Wm3::ContAlignedBox<double>` (same shape of evidence) sits
-+ * immediately before this function at 0x00A3BCB0, sharing the same
-+ * `dbl_E4F958`(-1.0) sentinel and default-Box3-init prologue. Not promoted
-+ * to `recovered` in recovered_progress.json in this pass (no FUN_ token
-+ * exists to mark); left here purely as a breadcrumb for whichever pass
-+ * formally tokenizes and recovers this function.
-+ *
-+ * Caller-search follow-up (2026-08-26b): the original pass above proved
-+ * this function's CALLEE relationship (it calls GaussPointsFit3 at
-+ * `0x00A3C3AC`) but explicitly left this function's OWN caller
-+ * unidentified. A dedicated follow-up pass went one level further up and
-+ * searched for a caller of `0x00A3C390` itself, exhaustively and with the
-+ * same four methods used for `ContAlignedBox<double>` above (IDA
-+ * `XrefsTo`, a validated whole-image `E8`/`E9` rel32 scan across all 8
-+ * segments (~22.9MB) sanity-checked against the known-real
-+ * `0x00A3C3AC -> 0x00A514D0` call, a whole-image raw-4-byte
-+ * absolute-address scan for `90 C3 A3 00`, and an IDA name-table scan) --
-+ * all four returned zero results. This contradicts the natural assumption
-+ * that finding this caller would be a simple "one level up" step from the
-+ * already-known GaussPointsFit3 relationship; it is exhaustively absent
-+ * from every direct-call, indirect-call-via-stored-pointer, and named-
-+ * symbol search performed.
-+ *
-+ * Source-level candidate audit (grepping the whole `dependencies/
-+ * WildMagic3p8` tree for other callers of `ContOrientedBox` in the
-+ * upstream library itself): three real call sites exist, but two are
-+ * ruled out and the third is unconfirmed in this binary:
-+ *   - `Wm3BoxBVTree.cpp:54` calls `ContOrientedBox<float>(...)` with an
-+ *     explicit `<float>` argument -- wrong specialization, ruled out.
-+ *   - `Wm3BoxBV.cpp:64` (`BoxBV::ComputeFromData`) is hard-typed to
-+ *     `Vector3fArray`/`Box3f` (i.e. `Box3<float>`), not templated over
-+ *     `Real` at all -- also `<float>`-only, ruled out.
-+ *   - `Wm3ApprEllipsoidFit3.cpp:119`
-+ *     (`EllipsoidFit3<Real>::InitialGuess`) is genuinely templated over
-+ *     `Real` and would call the `<double>` overload if
-+ *     `EllipsoidFit3<double>` is ever instantiated by the game -- the only
-+ *     structurally-possible candidate found, but zero binary evidence
-+ *     (IDA name table has no "EllipsoidFit3"/"MinimizeN" match either,
-+ *     though that is expected either way in a stripped Release binary and
-+ *     is not itself evidence of absence).
-+ * Given `Foundation.vcxproj` is a `StaticLibrary` with `WM3_ITEM`
-+ * expanding to nothing in that configuration (no forced `dllexport`
-+ * retention, see the `ContAlignedBox` note above), the most parsimonious
-+ * explanation is the same same-translation-unit-baggage hypothesis: this
-+ * function is explicitly instantiated for `<double>` in this file
-+ * (unconditional emission into `Wm3ContBox3.obj`), and if a genuinely-used
-+ * sibling from the same `.obj` (e.g. `ContMinBox<double>`) pulled the
-+ * whole object in without per-function COMDAT stripping, this function
-+ * would travel along uncalled. Not independently confirmed -- would
-+ * require locating `ContMinBox<double>`'s own address, out of scope here.
-+ * No caller evidence exists for `ContOrientedBox<double>` (3D) by any
-+ * method checked; documented rather than fabricated, per CLAUDE.md.
-+ */
- template <class Real>
- Box3<Real> ContOrientedBox (int iQuantity, const Vector3<Real>* akPoint,
-     const bool* abValid)
-@@ -257,6 +406,75 @@ Box3<Real> ContOrientedBox (int iQuantity, const Vector3<Real>* akPoint,
-     return kBox;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A3E9C0 (FUN_00A3E9C0) - ContMinBox<float>(int, const Vector3<float>*)
-+ * Address: 0x00A40060 (FUN_00A40060) - ContMinBox<double>(int, const Vector3<double>*)
-+ *
-+ * FAF recovery traceability (2026-08-26d, ContMinBox/MergeBoxes follow-up pass).
-+ * Both instantiations were already tokenized by IDA and carried a generic
-+ * `external_dependency` classification in recovered_progress.json that did not
-+ * precisely name them ("orphan WildMagic3p8/Wm3 geometry intersector helper"
-+ * for FUN_00A3E9C0; a batch "Transitive-dead-caller sweep" note for its 2D
-+ * sibling). This pass identifies both precisely from their decompiled `.c`
-+ * exports (`decomp/recovery/disasm/fa_full_2026_03_26/FUN_00A3E9C0.c` /
-+ * `FUN_00A40060.c`), matching this source almost line-for-line:
-+ *   - `sub_A67120(...)` / `sub_A67840(...)` = the `ConvexHull3<float/double>`
-+ *     constructor call (`ConvexHull3<Real> kHull(iQuantity,akPoint,0.001f,
-+ *     false,Query::QT_INT64);`), already-tokenized `external_dependency`
-+ *     tokens FUN_00A67120 (float ctor) / FUN_00A67840 (double ctor, inferred
-+ *     from this pass's callee-shape match, same role); dtors FUN_00A66440
-+ *     (float) / FUN_00A66500 (double) called at the single shared exit.
-+ *   - three calls in a row immediately after (`sub_A6BC60/70/80` for the
-+ *     float body, `sub_A6BD30/40/50` for the double body) = `kHull.
-+ *     GetDimension()` / `GetSimplexQuantity()` / `GetIndices()`.
-+ *   - the `if(iHDim){ if(iHDim==1){...} else if(iHDim==2){...} else {...} }
-+ *     else {...}` branch cascade matches this function's `iHDim==0/1/2/>=3`
-+ *     structure exactly, including the `iHDim==2` branch's single call into
-+ *     the *2D* `ContMinBox` overload with `bIsConvexPolygon=true` and the
-+ *     main per-triangle-face loop's call into the same 2D overload with
-+ *     `bIsConvexPolygon=false` -- both calls resolve to `sub_A6A000` (float
-+ *     body) / `sub_A6AEB0` (double body), i.e. this file's own 2D
-+ *     `ContMinBox` sibling in `Wm3ContBox2.cpp` (see the citation there,
-+ *     confirmed independently from that function's own decompiled body).
-+ *   - the main branch's `std::set<EdgeKey> kEdges;` local, its
-+ *     `WM3_NEW Vector2<Real>[iHQuantity]` scratch buffer, the per-triangle
-+ *     `kEdges.insert(EdgeKey(...))` x3 (`sub_A3E710`), `UnitCross`
-+ *     (`sub_4791C0`) / `GenerateOrthonormalBasis` calls, and the closing
-+ *     mutually-orthogonal-edge-triple search (three nested
-+ *     `std::set<EdgeKey>::const_iterator` loops via `sub_A3A8D0`/`sub_A84A40`)
-+ *     are present in both decompiled bodies, calling already-recovered/
-+ *     external EdgeKey and rb-tree helpers (FUN_00A3E710/800/950/990 shared
-+ *     by both Real types since `EdgeKey` stores plain `int`s and is not
-+ *     templated; FUN_00A84A40, FUN_00A3A8D0).
-+ * `FUN_00A3E9C0`'s pre-existing `depends_on` list already named
-+ * FUN_00A66440/FUN_00A67120 (ConvexHull3<float> dtor/ctor), independently
-+ * corroborating the float identification. `FUN_00A40060` had no prior
-+ * recovered_progress.json entry; both notes are updated by this pass to
-+ * record the precise identification without changing status.
-+ *
-+ * Caller search (both, exhaustive, 2026-08-26d): SQL callgraph `call_edges` /
-+ * `incoming_xrefs` / `reachable` / `data_refs` are all empty for both
-+ * `0x00A3E9C0` and `0x00A40060`. A whole-image `E8`/`E9` rel32 byte-pattern
-+ * scan (all 8 PE sections of `bin/2025.7.1/ForgedAlliance.exe`, pefile
-+ * VA->file-offset mapping + independent rel32 decode -- not a sequential
-+ * disassembly walk, so immune to the variable-length-instruction desync risk)
-+ * found zero hits for either address; positive-control-verified in the same
-+ * run against the known-real `0x00A3EA0F -> 0x00A67120` edge (found, exactly
-+ * 1 hit) and `FUN_00A78E30`'s 2 known callers (found, exactly 2 hits). A
-+ * whole-image raw 4-byte little-endian absolute-address scan (catches
-+ * `push`/`mov reg,offset`/vtable-slot storage that E8/E9 would miss) also
-+ * found zero hits for both addresses (one coincidental 4-byte match for
-+ * `0x00A3E9C0` at `0x009B9B6A` was checked against real instruction
-+ * boundaries via Capstone and confirmed a false positive spanning the tail of
-+ * an unrelated `movzx`/`jmp` pair, not a genuine reference). Each 3D entry
-+ * point's only discovered caller is its own body calling into its 2D sibling
-+ * (`0xA3E9C0 -> 0xA6A000`, `0xA40060 -> 0xA6AEB0`) -- see `Wm3ContBox2.cpp` --
-+ * and neither 3D function itself has any discovered caller by any method
-+ * checked. Same outcome as `ContOrientedBox<float>/<double>` and
-+ * `ContAlignedBox<double>` above: documented rather than fabricated, per
-+ * CLAUDE.md. Status unchanged (`external_dependency`, WildMagic terminal
-+ * category).
-+ */
- template <class Real>
- Box3<Real> ContMinBox (int iQuantity, const Vector3<Real>* akPoint)
- {
-@@ -542,6 +760,96 @@ bool InBox (const Vector3<Real>& rkPoint, const Box3<Real>& rkBox)
-     return true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A3D870 (not tokenized by IDA; no known code xref found in the
-+ * callgraph index) - MergeBoxes<float>(const Box3<float>&, const Box3<float>&)
-+ *
-+ * FAF recovery traceability (2026-08-26d, ContMinBox/MergeBoxes follow-up
-+ * pass). Found via the gap-scan technique: an untokenized 2537-byte span
-+ * `0x00A3D867`-`0x00A3E250` between already-tokenized neighbors
-+ * `FUN_00A3D810` and `FUN_00A3E250` (9x `int3` padding at
-+ * `0x00A3D867`-`0x00A3D86F`; real body `0x00A3D870`-`0x00A3E219` inclusive of
-+ * its own `ret`; a second, unrelated small function -- a node-constructor
-+ * shape, not part of this recovery -- occupies `0x00A3E220`-`0x00A3E24A`
-+ * before the next tokenized neighbor). Decoded directly from the PE
-+ * (read-only, pefile VA->file-offset mapping + Capstone x86-32, no `.i64`
-+ * touched) and verified against this exact source line-by-line:
-+ *   - three-pointer-arg calling convention (`esi`=hidden result pointer=
-+ *     `[ebp+8]`, `ebx`=`&rkBox0`=`[ebp+0xC]`, `edi`=`&rkBox1`=`[ebp+0x10]`)
-+ *     matches `Box3<Real> MergeBoxes(const Box3<Real>& rkBox0, const
-+ *     Box3<Real>& rkBox1)`'s hidden-pointer-return + 2 const-ref-arg ABI.
-+ *   - `kBox.Center = 0.5*(rkBox0.Center + rkBox1.Center);` -- loads
-+ *     `[ebx]`/`[ebx+4]`/`[ebx+8]` and `[edi]`/`[edi+4]`/`[edi+8]`
-+ *     (`Box3f::Center.xyz`), adds, multiplies by `qword_D4DDF8` (0.5), stores
-+ *     to `[esi]`/`[esi+4]`/`[esi+8]`.
-+ *   - `lea eax,[ebx+0xc]; push eax; ...; call 0x4F0AE0` then
-+ *     `add edi,0xc; push edi; ...; call 0x4F0AE0` -- two calls to the same
-+ *     address (already-tokenized `FUN_004F0AE0` = `Quaternion<float>::
-+ *     FromRotationMatrix`, 9 total callers, 2 of which are these two call
-+ *     sites) with `this` pointing at two distinct local `Quaternion<float>`
-+ *     temporaries and the single pushed arg at `rkBox0.Axis`/`rkBox1.Axis`
-+ *     (offset `0xC`, matching `Box3f::Axis[0..2]`) -- exactly
-+ *     `kQ0.FromRotationMatrix(rkBox0.Axis); kQ1.FromRotationMatrix(
-+ *     rkBox1.Axis);`.
-+ *   - the four-component multiply-accumulate immediately after, compared
-+ *     against `0.0` (`fldz; fcomp; fnstsw; test ah; jne`), whose taken branch
-+ *     negates (`fchs` x4) the second quaternion's components -- matches
-+ *     `if (kQ0.Dot(kQ1) < (Real)0.0) kQ1 = -kQ1;` exactly.
-+ *   - the subsequent component-wise add (`Quaternion<Real> kQ = kQ0 + kQ1;`),
-+ *     self-dot + `call 0x00A91000` + `fld1; fdivrp` reciprocal
-+ *     (`Math<Real>::InvSqrt(kQ.Dot(kQ))`), and `call 0x00A3D540`
-+ *     (already-tokenized `FUN_00A3D540` = `Quaternion<float>::
-+ *     ToRotationMatrix`, 1 total caller = this function) with `this` = the
-+ *     normalized `kQ` and arg = `&kBox.Axis[0]` -- exactly
-+ *     `kQ = fInvLength*kQ; kQ.ToRotationMatrix(kBox.Axis);`.
-+ *   - `mov ecx,ebx; call 0x004FFF00` (already-tokenized `FUN_004FFF00` =
-+ *     `Box3<float>::ComputeVertices`, 4 total callers, 2 of which are this
-+ *     function) followed by an 8-vertex loop computing
-+ *     `kDiff = akVertex[i]-kBox.Center` then `fDot = kDiff.Dot(kBox.Axis[j])`
-+ *     for `j=0,1,2` with min/max tracking into `kMin[j]`/`kMax[j]` -- exactly
-+ *     `rkBox0.ComputeVertices(akVertex); for (i=0;i<8;i++) {for(j=0;j<3;j++)
-+ *     {...}}`. Repeated a second time for `rkBox1` (second
-+ *     `call 0x004FFF00`, `mov ecx,edi`).
-+ *   - closing `kBox.Center += kBox.Axis[j]*0.5*(kMax[j]+kMin[j]);
-+ *     kBox.Extent[j] = 0.5*(kMax[j]-kMin[j]);` tail for `j=0,1,2`, then a
-+ *     clean `pop edi/esi/ebx; mov esp,ebp; pop ebp; ret` epilogue with no
-+ *     further calls.
-+ * No FUN_ token exists at `0x00A3D870` (IDA never carved a boundary here);
-+ * not tokenized in this pass (citation-only, matching the
-+ * `ContOrientedBox<float>` precedent above -- live `.i64` scripting judged
-+ * unnecessary given the caller search below already returned a definitive
-+ * answer).
-+ *
-+ * Caller search (exhaustive, 2026-08-26d): no FUN_ token exists so SQL
-+ * `call_edges`/`incoming_xrefs` are structurally silent for this address;
-+ * `data_refs` queried directly by `to_ea=0x00A3D870` is empty. A whole-image
-+ * `E8`/`E9` rel32 byte-pattern scan (positive-control-verified in the same
-+ * run against the known-real `0x00A3EA0F -> 0x00A67120` edge, found) returned
-+ * zero hits for `0x00A3D870`. A whole-image raw 4-byte absolute-address scan
-+ * for `70 D8 A3 00` also returned zero hits. `Quaternion<float>::
-+ * FromRotationMatrix` (`0x4F0AE0`) has 7 other callers scattered across the
-+ * image (animation/camera/orientation code, unrelated to bounding-box
-+ * merging), so it is not a useful search anchor by itself;
-+ * `Quaternion<float>::ToRotationMatrix` (`0xA3D540`, 1 total caller) and
-+ * `Box3<float>::ComputeVertices` (`0x4FFF00`, 2 of its 4 callers are this
-+ * function, the other 2 are unrelated intersection-test callers elsewhere)
-+ * were both checked and neither has a second caller resembling `MergeBoxes`.
-+ * No caller evidence exists for `MergeBoxes<float>` (3D) by any method
-+ * checked; documented rather than fabricated, per CLAUDE.md. Same outcome as
-+ * `ContOrientedBox`/`ContAlignedBox`/`ContMinBox` above -- this whole
-+ * translation unit's Cont-family / MergeBoxes group appears to be linked into the
-+ * binary as same-.obj baggage without a single genuinely-called member found
-+ * to date.
-+ *
-+ * `MergeBoxes<double>` (3D) was searched for with the same method (gap-scan
-+ * across the full tokenized-function list in `0x00A3B000`-`0x00A80000`, both
-+ * a >150-byte and a >40-byte gap threshold) and NOT found -- no untokenized
-+ * gap in range shows this function's expected shape (paired calls to a
-+ * Quaternion from/to-rotation-matrix pair plus a `ComputeVertices` pair,
-+ * `qword`-width FPU operand pattern). Left unlocated; genuinely absent from
-+ * this pass's search rather than fabricated. (For contrast, the 2D sibling
-+ * `MergeBoxes<double>` WAS found in this same pass -- see `Wm3ContBox2.cpp`.)
-+ */
- template <class Real>
- Box3<Real> MergeBoxes (const Box3<Real>& rkBox0, const Box3<Real>& rkBox1)
- {
 diff --git a/Foundation/Distance/Wm3Distance.cpp b/Foundation/Distance/Wm3Distance.cpp
 index 67a7a621fa9dfddbc3a0f8dad83e82f45f2969f8..8e4165ab0c63ca457889ae5de2df54a03e803599 100644
 --- a/Foundation/Distance/Wm3Distance.cpp
 +++ b/Foundation/Distance/Wm3Distance.cpp
-@@ -14,10 +14,17 @@
+@@ -14,10 +14,10 @@
  namespace Wm3
  {
  //----------------------------------------------------------------------------
@@ -769,13 +11,6 @@ index 67a7a621fa9dfddbc3a0f8dad83e82f45f2969f8..8e4165ab0c63ca457889ae5de2df54a0
 -{
 -    MaximumIterations = 8;
 +template <class Real, class TVector>
-+/**
-+ * Address: 0x00A39FA0 (FUN_00A39FA0, Wm3::Distance3d::Distance3d)
-+ *
-+ * What it does:
-+ * Initializes the distance solver defaults for iteration count, zero threshold,
-+ * contact time, derivative step, and closest-point state.
-+ */
 +Distance<Real,TVector>::Distance ()
 +{
 +    MaximumIterations = 8;
@@ -786,91 +21,29 @@ diff --git a/Foundation/Distance/Wm3Distance.h b/Foundation/Distance/Wm3Distance
 index b1c985942206fdce398d704c8b1ed9d77b56ff86..215950ef7fd3dc02bd78483b9017d517e406481a 100644
 --- a/Foundation/Distance/Wm3Distance.h
 +++ b/Foundation/Distance/Wm3Distance.h
-@@ -73,10 +73,17 @@ public:
+@@ -73,10 +73,10 @@ public:
      bool HasMultipleClosestPoints0 () const;
      bool HasMultipleClosestPoints1 () const;
  
 -protected:
 -    Distance ();
--
+ 
 -    Real m_fContactTime;
 +protected:
-+    /**
-+     * Address: 0x00A39FA0 (FUN_00A39FA0, Wm3::Distance3d::Distance3d)
-+     *
-+     * What it does:
-+     * Initializes the distance solver defaults for iteration count, zero threshold,
-+     * contact time, derivative step, and closest-point state.
-+     */
 +    Distance ();
-+
 +    Real m_fContactTime;
      TVector m_kClosestPoint0;
      TVector m_kClosestPoint1;
      bool m_bHasMultipleClosestPoints0;
-diff --git a/Foundation/Intersection/Wm3IntrLine3Box3.cpp b/Foundation/Intersection/Wm3IntrLine3Box3.cpp
-index 55a8f89e0807403b211c9c83751e945f34f43e74..8a7d458d14c1285d985cb1da7d848ab02976db1b 100644
---- a/Foundation/Intersection/Wm3IntrLine3Box3.cpp
-+++ b/Foundation/Intersection/Wm3IntrLine3Box3.cpp
-@@ -84,6 +84,12 @@ int IntrLine3Box3<Real>::GetQuantity () const
-     return m_iQuantity;
- }
- //----------------------------------------------------------------------------
-+// FAF NOTE (local-only, 2026-08-26): the <float> instantiation of this
-+// accessor is FUN_00A4FCB0 in the shipped binary (raw-offset duplicate
-+// left at src/sdk/moho/math/Wm3DistanceFafExtras.cpp as
-+// ResolveRuntimeEntryOffset24Stride12LaneA -- kept in place, not deleted,
-+// because no caller for either copy could be found anywhere in the
-+// binary; see that function's Doxygen comment for the full evidence).
- template <class Real>
- const Vector3<Real>& IntrLine3Box3<Real>::GetPoint (int i) const
- {
-diff --git a/Foundation/Intersection/Wm3IntrSegment3Box3.cpp b/Foundation/Intersection/Wm3IntrSegment3Box3.cpp
-index 93b0c1a566a14590f5f7ac09c0e1234abcd9d067..3172d585e1ef141617b68fa7787eaaf8281cbbe3 100644
---- a/Foundation/Intersection/Wm3IntrSegment3Box3.cpp
-+++ b/Foundation/Intersection/Wm3IntrSegment3Box3.cpp
-@@ -109,6 +109,13 @@ int IntrSegment3Box3<Real>::GetQuantity () const
-     return m_iQuantity;
- }
- //----------------------------------------------------------------------------
-+// FAF NOTE (local-only, 2026-08-26): the <double> instantiation of this
-+// accessor is FUN_00A46380 / FUN_00A4FD80 in the shipped binary (two
-+// byte-identical, non-ICF-folded raw-offset duplicates left at
-+// src/sdk/moho/math/Wm3DistanceFafExtras.cpp as
-+// ResolveRuntimeEntryOffset40Stride24LaneA/LaneB -- kept in place, not
-+// deleted, because no caller for any copy could be found anywhere in the
-+// binary; see LaneA's Doxygen comment for the full evidence).
- template <class Real>
- const Vector3<Real>& IntrSegment3Box3<Real>::GetPoint (int i) const
- {
-diff --git a/Foundation/Intersection/Wm3IntrSegment3Sphere3.cpp b/Foundation/Intersection/Wm3IntrSegment3Sphere3.cpp
-index 6e71841497748b835c4df4462e5d538f828a4d29..a77e647f0ea09f164516251e98c8be1ef5eaa469 100644
---- a/Foundation/Intersection/Wm3IntrSegment3Sphere3.cpp
-+++ b/Foundation/Intersection/Wm3IntrSegment3Sphere3.cpp
-@@ -225,6 +225,12 @@ int IntrSegment3Sphere3<Real>::GetQuantity () const
-     return m_iQuantity;
- }
- //----------------------------------------------------------------------------
-+// FAF NOTE (local-only, 2026-08-26): the <double> instantiation of this
-+// accessor is FUN_00A46990 in the shipped binary (raw-offset duplicate
-+// left at src/sdk/moho/math/Wm3DistanceFafExtras.cpp as
-+// ResolveRuntimeEntryOffset48Stride24LaneA -- kept in place, not deleted,
-+// because no caller could be found anywhere in the binary; see that
-+// function's Doxygen comment for the full evidence).
- template <class Real>
- const Vector3<Real>& IntrSegment3Sphere3<Real>::GetPoint (int i) const
- {
 diff --git a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlignedBox3.h
 index 7c0105b011e6874b26c3280d9b510be5e7d1e260..2aac30a28079a3e669b250afa200bff35c3d2a24 100644
 --- a/Foundation/Math/Wm3AxisAlignedBox3.h
 +++ b/Foundation/Math/Wm3AxisAlignedBox3.h
-@@ -13,6 +13,14 @@
+@@ -13,6 +13,12 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3System.h"
-+// FAF MOD: needed for the Vector3<Real>-typed Min/Max members below.
 +#include "Wm3Vector3.h"
-+// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
 +namespace gpg
 +{
 +    class ReadArchive;
@@ -879,34 +52,22 @@ index 7c0105b011e6874b26c3280d9b510be5e7d1e260..2aac30a28079a3e669b250afa200bff3
  
  namespace Wm3
  {
-@@ -29,6 +37,11 @@ public:
+@@ -29,6 +35,8 @@ public:
      AxisAlignedBox3 (Real fXMin, Real fXMax, Real fYMin, Real fYMax,
          Real fZMin, Real fZMax);
  
-+    // FAF MOD: brace-init-friendly two-vector constructor for the FAF SDK
-+    // helpers that build empty/invalid sentinels via `{min_vec, max_vec}`.
 +    AxisAlignedBox3 (const Vector3<Real>& rkMin, const Vector3<Real>& rkMax)
 +        : Min(rkMin), Max(rkMax) {}
-+
      // Overlap testing is in the strict sense.  If the two boxes are just
      // touching along a common edge, the boxes are reported as overlapping.
      bool HasXOverlap (const AxisAlignedBox3& rkBox) const;
-@@ -42,7 +55,19 @@ public:
+@@ -42,7 +50,10 @@ public:
      bool FindIntersection (const AxisAlignedBox3& rkBox,
          AxisAlignedBox3& rkIntr) const;
  
 -    Real Min[3], Max[3];
-+    // FAF MOD: store Min/Max as Vector3<Real> instead of Real[3]. Same
-+    // memory layout (Vector3<Real> wraps Real[3] via the union added in
-+    // Wm3Vector3.h), so all the inl methods that do `Min[0]`/`Min[1]` etc.
-+    // continue to work via Vector3<Real>::operator[]. But now the FAF SDK
-+    // consumers can also write `bounds.Min.x` (the field-style access they
-+    // were originally written against).
 +    Vector3<Real> Min;
 +    Vector3<Real> Max;
-+
-+    // FAF MOD: serialize hooks used by the FAF reflection system. The float
-+    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
  };
@@ -916,26 +77,22 @@ diff --git a/Foundation/Math/Wm3Box3.h b/Foundation/Math/Wm3Box3.h
 index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a32e4e6fed 100644
 --- a/Foundation/Math/Wm3Box3.h
 +++ b/Foundation/Math/Wm3Box3.h
-@@ -14,6 +14,13 @@
+@@ -14,6 +14,11 @@
  #include "Wm3FoundationLIB.h"
  #include "Wm3Vector3.h"
  
-+// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
 +namespace gpg
 +{
 +    class ReadArchive;
 +    class WriteArchive;
 +}
-+
  namespace Wm3
  {
  
-@@ -34,11 +41,65 @@ public:
+@@ -34,11 +39,48 @@ public:
          const Vector3<Real>& rkAxis1, const Vector3<Real>& rkAxis2,
          Real fExtent0, Real fExtent1, Real fExtent2);
  
-+    // FAF MOD: 5-arg ctor that takes the three extents packed into a single
-+    // Vector3<Real>, matching the FAF SDK's hand-recovered constructor.
 +    Box3 (const Vector3<Real>& rkCenter,
 +          const Vector3<Real>& rkAxis0,
 +          const Vector3<Real>& rkAxis1,
@@ -950,15 +107,9 @@ index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a3
 +        Extent[1] = rkExtent.y;
 +        Extent[2] = rkExtent.z;
 +    }
-+
      void ComputeVertices (Vector3<Real> akVertex[8]) const;
  
-+    // FAF MOD: alias for the FAF SDK's hand-recovered name. Same body as
-+    // ComputeVertices, just exposes the local API surface.
 +    void GetCorners (Vector3<Real> akVertex[8]) const { ComputeVertices(akVertex); }
-+
-+    // FAF MOD: ComputeAABB — derive a world-space AABB from this OBB. Used
-+    // by EntityCollisionUpdater::GetBoundingBox.
 +    void ComputeAABB (Vector3<Real>& outMin, Vector3<Real>& outMax) const
 +    {
 +        const Vector3<Real> r(
@@ -968,10 +119,6 @@ index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a3
 +        outMin = Vector3<Real>(Center.x - r.x, Center.y - r.y, Center.z - r.z);
 +        outMax = Vector3<Real>(Center.x + r.x, Center.y + r.y, Center.z + r.z);
 +    }
-+
-+    // FAF MOD: Point-in-OBB containment test from the FAF SDK's
-+    // hand-recovered Box3.h. Matches the FA routine semantics — projects
-+    // the point onto each box axis and checks |projection| <= half-extent.
 +    bool ContainsPoint (const Vector3<Real>& point) const
 +    {
 +        const Vector3<Real> delta(point.x - Center.x, point.y - Center.y, point.z - Center.z);
@@ -983,232 +130,14 @@ index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a3
 +        }
 +        return true;
 +    }
-+
      Vector3<Real> Center;
      Vector3<Real> Axis[3];  // must be an orthonormal set of vectors
      Real Extent[3];         // must be nonnegative
-+
-+    // FAF MOD: serialize hooks used by the FAF reflection system. The float
-+    // specializations are defined in
-+    // src/sdk/moho/collision/CColPrimitiveBox3f.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
  };
  
  #include "Wm3Box3.inl"
-diff --git a/Foundation/Math/Wm3GMatrix.inl b/Foundation/Math/Wm3GMatrix.inl
-index 1e40672a740928e523ac313f3351348468be8c96..fc2ce1bed10277c41b75f341d64b8c46e8f85417 100644
---- a/Foundation/Math/Wm3GMatrix.inl
-+++ b/Foundation/Math/Wm3GMatrix.inl
-@@ -9,6 +9,35 @@
- // of that agreement.
- 
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A715E0 (no FUN_ token; IDA never tokenized this region) -
-+ * GMatrix<float>::GMatrix(int,int)
-+ * Address: 0x00A71670 (no FUN_ token) - GMatrix<double>::GMatrix(int,int)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep of
-+ * 0x00A71460-0x00A716A0, decoded directly from
-+ * bin/2025.7.1/ForgedAlliance.exe since IDA carved no function boundary for
-+ * any of the 6 GMatrix<Real> constructors in this range). Byte-exact match:
-+ * zero m_afData/m_aafEntry (this+0xC/+0x10), fetch iRows/iCols off the
-+ * stack, tail-call SetSize (0x00A70760 float / 0x00A707C0 double, both
-+ * already `recovered`). `ret 8` cleans the two int stack args.
-+ *
-+ * Caller status: a whole-.text PE scan (rel32 call/jmp + absolute-dword,
-+ * covering all six constructors in this citation group) found ZERO callers
-+ * for any of them. The likely explanation: every `Eigen<Real>` constructor
-+ * that member-inits a `GMatrix<Real>` submatrix (see
-+ * Wm3Eigen.cpp's Eigen(int)/Eigen(Matrix2/3/4/GMatrix) citations) inlines
-+ * this exact same logic at its own single call site rather than calling out
-+ * to this COMDAT -- matching the orphaned-but-unstripped-COMDAT pattern
-+ * already documented for the sibling Eigen<Real> ctor/dtor family (their
-+ * own citations above note the same zero-caller result) and for the
-+ * tail-chunk phantom-edge issue in the callgraph index generally. Not proof
-+ * of dead code, but no live call site was found; flagged honestly rather
-+ * than fabricated.
-+ *
-+ * What it does:
-+ * Constructs an iRows x iCols matrix by delegating to SetSize.
-+ */
- template <class Real>
- GMatrix<Real>::GMatrix (int iRows, int iCols)
- {
-@@ -17,6 +46,19 @@ GMatrix<Real>::GMatrix (int iRows, int iCols)
-     SetSize(iRows,iCols);
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A715B0 (no FUN_ token) - GMatrix<float>::GMatrix(int,int,const Real*)
-+ * Address: 0x00A71640 (no FUN_ token) - GMatrix<double>::GMatrix(int,int,const Real*)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep, same evidence chain as
-+ * GMatrix(int,int) above). Zeroes m_afData/m_aafEntry, tail-calls SetMatrix
-+ * (0x00A70490 float / 0x00A70630 double, both already `recovered`). `ret 0xc`
-+ * cleans the three stack args (iRows, iCols, afEntry pointer). Zero callers
-+ * found (see GMatrix(int,int)'s citation above).
-+ *
-+ * What it does:
-+ * Constructs an iRows x iCols matrix, copying afEntry's flat data in.
-+ */
- template <class Real>
- GMatrix<Real>::GMatrix (int iRows, int iCols, const Real* afEntry)
- {
-@@ -33,6 +75,22 @@ GMatrix<Real>::GMatrix (int iRows, int iCols, const Real** aafMatrix)
-     SetMatrix(iRows,iCols,aafMatrix);
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A71580 (no FUN_ token) - GMatrix<float>::GMatrix(const GMatrix<float>&)
-+ * Address: 0x00A71610 (no FUN_ token) - GMatrix<double>::GMatrix(const GMatrix<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep, same evidence chain as
-+ * GMatrix(int,int) above). Zeroes all 5 fields (m_iRows/m_iCols/m_iQuantity/
-+ * m_afData/m_aafEntry, this+0x00..+0x10), tail-calls operator= (0x00A70500
-+ * float / 0x00A706A0 double, both already `recovered`). `ret 4` cleans the
-+ * one reference-parameter stack slot. Zero callers found (see
-+ * GMatrix(int,int)'s citation above) -- `Eigen<Real>::Eigen(const GMatrix&)`
-+ * (Wm3Eigen.cpp) is the only plausible source-level use and it inlines this
-+ * exact zero+operator= sequence directly rather than calling out to it.
-+ *
-+ * What it does:
-+ * Copy-constructs from an existing GMatrix.
-+ */
- template <class Real>
- GMatrix<Real>::GMatrix (const GMatrix& rkM)
- {
-@@ -50,6 +108,21 @@ GMatrix<Real>::~GMatrix ()
-     Deallocate();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D190 (FUN_00A6D190) - GMatrix<float>::Allocate(bool)
-+ * Address: 0x00A6D230 (FUN_00A6D230) - GMatrix<double>::Allocate(bool)
-+ *
-+ * FAF recovery traceability. The engine links WildMagic 3.8's Foundation
-+ * library statically; this member is reached from GMatrix<Real>'s
-+ * SetSize/SetMatrix/operator= family, all instantiated for float and
-+ * double in the same call window (0x00A70000-0x00A72000) as the
-+ * Eigen<Real> cluster, since Eigen<Real>::m_kMat is a GMatrix<Real>.
-+ *
-+ * What it does:
-+ * Allocates m_afData as Real[m_iQuantity] (zero-filled when bSetToZero),
-+ * then allocates m_aafEntry as Real*[m_iRows] and points each row entry
-+ * at &m_afData[iRow*m_iCols].
-+ */
- template <class Real>
- void GMatrix<Real>::Allocate (bool bSetToZero)
- {
-@@ -75,6 +148,20 @@ void GMatrix<Real>::Deallocate ()
-     WM3_DELETE[] m_aafEntry;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70760 (FUN_00A70760) - GMatrix<float>::SetSize(int,int)
-+ * Address: 0x00A707C0 (FUN_00A707C0) - GMatrix<double>::SetSize(int,int)
-+ *
-+ * FAF recovery traceability. Verified against the binary: both bodies
-+ * free m_afData/m_aafEntry (Deallocate), zero all 5 fields when either
-+ * dimension is <= 0, else set m_iRows/m_iCols/m_iQuantity and tail-call
-+ * Allocate(true) (0x00A6D190/0x00A6D230 respectively).
-+ *
-+ * What it does:
-+ * Deallocates any existing storage, then either zeroes the matrix (empty
-+ * size) or sets m_iRows/m_iCols/m_iQuantity and reallocates zero-filled
-+ * storage via Allocate(true).
-+ */
- template <class Real>
- void GMatrix<Real>::SetSize (int iRows, int iCols)
- {
-@@ -201,6 +288,21 @@ void GMatrix<Real>::SetColumn (int iCol, const GVector<Real>& rkV)
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70440 (FUN_00A70440) - GMatrix<float>::GetColumn(int) const
-+ * Address: 0x00A705E0 (FUN_00A705E0) - GMatrix<double>::GetColumn(int) const
-+ *
-+ * FAF recovery traceability. Reached (for Real=double) from
-+ * Eigen<double>::GetEigenvector(int) at 0x00A71130, a one-line forwarder
-+ * ("return m_kMat.GetColumn(i);") already present in Wm3Eigen.cpp. Both
-+ * bodies construct the returned GVector<Real> in the caller's hidden
-+ * return slot via GVector<Real>::GVector(int) (0x00A6D050/0x00A6D120)
-+ * sized to m_iRows, then copy column iCol out of each row.
-+ *
-+ * What it does:
-+ * assert-free release build of the source above: builds a GVector<Real>
-+ * of size m_iRows and copies m_aafEntry[iRow][iCol] into it for each row.
-+ */
- template <class Real>
- GVector<Real> GMatrix<Real>::GetColumn (int iCol) const
- {
-@@ -213,6 +315,19 @@ GVector<Real> GMatrix<Real>::GetColumn (int iCol) const
-     return kV;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70490 (FUN_00A70490) - GMatrix<float>::SetMatrix(int,int,const Real*)
-+ * Address: 0x00A70630 (FUN_00A70630) - GMatrix<double>::SetMatrix(int,int,const Real*)
-+ *
-+ * FAF recovery traceability. Verified against the binary: both bodies
-+ * free existing storage, zero all fields for a non-positive size, else
-+ * set dimensions, call Allocate(false) (0x00A6D190/0x00A6D230), then a
-+ * flat System::Memcpy of m_iQuantity*sizeof(Real) bytes from afData.
-+ *
-+ * What it does:
-+ * Deallocates existing storage, sets m_iRows/m_iCols/m_iQuantity,
-+ * reallocates uninitialized storage, and bulk-copies afData into it.
-+ */
- template <class Real>
- void GMatrix<Real>::SetMatrix (int iRows, int iCols, const Real* afData)
- {
-@@ -276,6 +391,19 @@ void GMatrix<Real>::GetColumnMajor (Real* afCMajor) const
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70500 (FUN_00A70500) - GMatrix<float>::operator=(const GMatrix&)
-+ * Address: 0x00A706A0 (FUN_00A706A0) - GMatrix<double>::operator=(const GMatrix&)
-+ *
-+ * FAF recovery traceability. Verified against the binary: both bodies
-+ * check rkM's quantity, reallocate via Deallocate()+Allocate(false)
-+ * (0x00A6D190/0x00A6D230) only when the row/col dimensions differ, and
-+ * always finish with a row-by-row, column-by-column entry copy loop.
-+ *
-+ * What it does:
-+ * Assigns rkM into this, reallocating storage only when the dimensions
-+ * differ from the current ones, then copies every entry.
-+ */
- template <class Real>
- GMatrix<Real>& GMatrix<Real>::operator= (const GMatrix& rkM)
- {
-diff --git a/Foundation/Math/Wm3GVector.inl b/Foundation/Math/Wm3GVector.inl
-index c3131e4a26ccb808e76e2bcffae755fcf1d8777b..197baa4c312299d79694fee333140d58800569f6 100644
---- a/Foundation/Math/Wm3GVector.inl
-+++ b/Foundation/Math/Wm3GVector.inl
-@@ -9,6 +9,20 @@
- // of that agreement.
- 
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D050 (FUN_00A6D050) - GVector<float>::GVector(int)
-+ * Address: 0x00A6D120 (FUN_00A6D120) - GVector<double>::GVector(int)
-+ *
-+ * FAF recovery traceability. The engine links WildMagic 3.8's Foundation
-+ * library statically. GMatrix<Real>::GetColumn() constructs its return
-+ * value in the caller-supplied hidden-return slot via this constructor
-+ * (Wm3GMatrix.inl), which is what produces these out-of-line emissions
-+ * for GVector<float> and GVector<double> in that call window.
-+ *
-+ * What it does:
-+ * iSize <= 0 zero-initializes m_iSize/m_afTuple; otherwise allocates
-+ * m_afTuple as a fresh Real[iSize] and zero-fills it.
-+ */
- template <class Real>
- GVector<Real>::GVector (int iSize)
- {
 diff --git b/Foundation/Math/Wm3IVector2.h b/Foundation/Math/Wm3IVector2.h
 new file mode 100644
 index 0000000000000000000000000000000000000000..4e1ad8808a702f28f337768bcf8d06625fb0652e
@@ -1378,13 +307,11 @@ diff --git a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
 index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586dd187e0f 100644
 --- a/Foundation/Math/Wm3Quaternion.h
 +++ b/Foundation/Math/Wm3Quaternion.h
-@@ -13,6 +13,14 @@
+@@ -13,6 +13,12 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3Matrix3.h"
-+// FAF MOD: needed by the static helpers added below.
 +#include <cmath>
-+// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
 +namespace gpg
 +{
 +    class ReadArchive;
@@ -1393,28 +320,22 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
  
  namespace Wm3
  {
-@@ -25,8 +33,11 @@ public:
+@@ -25,8 +31,9 @@ public:
      // necessarily a unit length vector in 4D.
  
      // construction
 -    Quaternion ();  // uninitialized
 -    Quaternion (Real fW, Real fX, Real fY, Real fZ);
-+    // FAF MOD: see Wm3Vector3.h. Default and (Real, Real, Real, Real) ctors
-+    // are now inline constexpr.
 +    constexpr Quaternion () noexcept : m_afTuple{Real(0), Real(0), Real(0), Real(0)} {}
 +    constexpr Quaternion (Real fW, Real fX, Real fY, Real fZ) noexcept
 +        : m_afTuple{fW, fX, fY, fZ} {}
      Quaternion (const Quaternion& rkQ);
  
      // quaternion for the input rotation matrix
-@@ -138,14 +149,178 @@ public:
+@@ -138,14 +145,155 @@ public:
      WM3_ITEM static const Quaternion IDENTITY;  // the identity rotation
      WM3_ITEM static const Quaternion ZERO;
  
-+    // FAF MOD: see Wm3Vector3.h. Same union trick to expose `w, x, y, z`
-+    // alongside the upstream `m_afTuple[4]` storage. Field order matches
-+    // the upstream constructor and Wm3Quaternion.inl access pattern
-+    // (m_afTuple[0]=w, [1]=x, [2]=y, [3]=z).
 +public:
 +    union
 +    {
@@ -1427,8 +348,6 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +            Real z;
 +        };
 +    };
-+
-+    // FAF MOD: SDK-side static helpers from the hand-recovered Quaternion API.
 +    static Quaternion Identity () noexcept
 +    {
 +        return Quaternion(Real(1), Real(0), Real(0), Real(0));
@@ -1464,10 +383,6 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +            a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
 +            a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w);
 +    }
-+    // Note: upstream has an INSTANCE method `FromAxisAngle(axis, angle)`
-+    // that mutates *this. The FAF SDK consumers call the static form,
-+    // so we expose this as `MakeFromAxisAngle` and migrate the few call
-+    // sites to it (or call upstream's instance method).
 +    static Quaternion MakeFromAxisAngle (const Vector3<Real>& axis, Real angle) noexcept
 +    {
 +        const Real half = angle * Real(0.5);
@@ -1511,15 +426,6 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +        }
 +        return out;
 +    }
-+    // Note: differs from upstream's instance method `Slerp` (which returns
-+    // *this&). This is the FAF SDK static-form returning a fresh Quaternion.
-+    // Note: upstream has an instance `Rotate(const Vector3<Real>&)` already
-+    // (declared in Wm3Quaternion.h, defined in Wm3Quaternion.inl). The FAF
-+    // SDK's hand-recovered Quaternion::Rotate matches that signature, so we
-+    // simply use the upstream one.
-+
-+    // FAF MOD: ToMat3 — fill a raw row-major 3x3 matrix from this quaternion.
-+    // Same shape as the FAF SDK's hand-recovered Quaternion::ToMat3 helper.
 +    void ToMat3 (Real m[3][3]) const
 +    {
 +        const Real xx = x + x, yy = y + y, zz = z + z;
@@ -1536,10 +442,8 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +        m[2][1] = yz + wx;
 +        m[2][2] = Real(1) - (xx2 + yy2);
 +    }
-+
 +    static Quaternion Slerp (const Quaternion& a, const Quaternion& b, Real t, Real eps = Real(1e-5)) noexcept
 +    {
-+        // Normalize copies
 +        Quaternion q1 = a;
 +        Quaternion q2 = b;
 +        {
@@ -1572,34 +476,25 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +        }
 +        return out;
 +    }
-+    // FAF MOD: serialize hooks used by the FAF reflection system. The float
-+    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
-+
  private:
      // support for comparisons
      int CompareArrays (const Quaternion& rkQ) const;
  
      // support for FromRotationMatrix
      static int ms_iNext[3];
--
+ 
 -    Real m_afTuple[4];
  };
  
  template <class Real>
-@@ -155,6 +330,27 @@ Quaternion<Real> operator* (Real fScalar, const Quaternion<Real>& rkQ);
+@@ -155,6 +303,21 @@ Quaternion<Real> operator* (Real fScalar, const Quaternion<Real>& rkQ);
  
  typedef Quaternion<float> Quaternionf;
  typedef Quaternion<double> Quaterniond;
-+// FAF MOD: short alias used by FAF SDK consumers.
 +template <class Real> using Quat = Quaternion<Real>;
 +typedef Quaternion<float> Quatf;
-+
-+// FAF MOD: free function `Wm3::MultiplyQuaternionVector(dest, vec, quat)`
-+// recovered from the FA binary at FUN_00452D40. Converts the quaternion to
-+// a 3x3 basis and rotates the vector through it, writing into *dest. Used
-+// pervasively by FAF SDK code (~10 sites) as a free function.
 +inline Vector3<float>* MultiplyQuaternionVector (
 +    Vector3<float>* dest,
 +    const Vector3<float>& vec,
@@ -1620,17 +515,17 @@ diff --git a/Foundation/Math/Wm3Quaternion.inl b/Foundation/Math/Wm3Quaternion.i
 index 96dfc71008a71f9723bdfb6e6527049b18fb8c4b..2a25496884feee351b29bf5eb936fe16ac9751a8 100644
 --- a/Foundation/Math/Wm3Quaternion.inl
 +++ b/Foundation/Math/Wm3Quaternion.inl
-@@ -8,21 +8,8 @@
+@@ -8,21 +8,9 @@
  // and may not be copied or disclosed except in accordance with the terms
  // of that agreement.
  
--//----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
 -template <class Real>
 -Quaternion<Real>::Quaternion ()
 -{
--    // uninitialized for performance in array construction
+     // uninitialized for performance in array construction
 -}
--//----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
 -template <class Real>
 -Quaternion<Real>::Quaternion (Real fW, Real fX, Real fY, Real fZ)
 -{
@@ -1639,8 +534,6 @@ index 96dfc71008a71f9723bdfb6e6527049b18fb8c4b..2a25496884feee351b29bf5eb936fe16
 -    m_afTuple[2] = fY;
 -    m_afTuple[3] = fZ;
 -}
-+// FAF MOD: default ctor and (Real, Real, Real, Real) ctor moved into
-+// Wm3Quaternion.h as inline constexpr.
  //----------------------------------------------------------------------------
  template <class Real>
  Quaternion<Real>::Quaternion (const Quaternion& rkQ)
@@ -1648,29 +541,22 @@ diff --git a/Foundation/Math/Wm3Sphere3.h b/Foundation/Math/Wm3Sphere3.h
 index 33a62c7f115ff0f3adb261ad74652f43caec15f5..5f6b9c7599d0d29e24e8d90965b3ecc9bb3a4070 100644
 --- a/Foundation/Math/Wm3Sphere3.h
 +++ b/Foundation/Math/Wm3Sphere3.h
-@@ -14,6 +14,14 @@
+@@ -14,6 +14,11 @@
  #include "Wm3FoundationLIB.h"
  #include "Wm3Vector3.h"
  
-+// FAF MOD: forward declarations for the FAF reflection-system serialize hooks
-+// added below.
 +namespace gpg
 +{
 +    class ReadArchive;
 +    class WriteArchive;
 +}
-+
  namespace Wm3
  {
  
-@@ -33,6 +41,12 @@ public:
+@@ -33,6 +38,8 @@ public:
  
      Vector3<Real> Center;
      Real Radius;
-+
-+    // FAF MOD: serialize hooks used by the FAF reflection system. The
-+    // float specializations are defined in
-+    // src/sdk/moho/collision/CColPrimitiveSphere3f.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
  };
@@ -1680,16 +566,12 @@ diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
 index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f173e56aa 100644
 --- a/Foundation/Math/Wm3Vector2.h
 +++ b/Foundation/Math/Wm3Vector2.h
-@@ -13,6 +13,17 @@
+@@ -13,6 +13,13 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3Math.h"
-+// FAF MOD: needed by the static helpers added below.
 +#include <cmath>
-+// FAF MOD: GPG's integer vector, which is what `Vector2i` names.
 +#include "Wm3IVector2.h"
-+
-+// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
 +namespace gpg
 +{
 +    class ReadArchive;
@@ -1698,25 +580,21 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
  
  namespace Wm3
  {
-@@ -22,8 +33,10 @@ class Vector2
+@@ -22,8 +29,8 @@ class Vector2
  {
  public:
      // construction
 -    Vector2 ();  // uninitialized
 -    Vector2 (Real fX, Real fY);
-+    // FAF MOD: see Wm3Vector3.h. Default and (Real, Real) ctors are now
-+    // inline constexpr.
 +    constexpr Vector2 () noexcept : m_afTuple{Real(0), Real(0)} {}
 +    constexpr Vector2 (Real fX, Real fY) noexcept : m_afTuple{fX, fY} {}
      Vector2 (const Real* afTuple);
      Vector2 (const Vector2& rkV);
  
-@@ -102,11 +115,48 @@ public:
+@@ -102,11 +109,42 @@ public:
      WM3_ITEM static const Vector2 UNIT_X;
      WM3_ITEM static const Vector2 UNIT_Y;
  
-+    // FAF MOD: see Wm3Vector3.h for the rationale. Same union trick to
-+    // expose `x, y` alongside the upstream `m_afTuple[2]` storage.
 +public:
 +    union
 +    {
@@ -1727,8 +605,6 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
 +            Real y;
 +        };
 +    };
-+
-+    // FAF MOD: SDK-side static helpers from the hand-recovered Vector2 API.
 +    static Vector2 Zero () noexcept { return Vector2(Real(0), Real(0)); }
 +    static Real Dot (const Vector2& a, const Vector2& b) noexcept
 +    {
@@ -1749,24 +625,20 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
 +        const Real inv = Real(1) / std::sqrt(lenSq);
 +        return Vector2(v.x * inv, v.y * inv);
 +    }
-+    // FAF MOD: serialize hooks used by the FAF reflection system. The float
-+    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
-+
  private:
      // support for comparisons
      int CompareArrays (const Vector2& rkV) const;
--
+ 
 -    Real m_afTuple[2];
  };
  
  // arithmetic operations
-@@ -121,6 +171,9 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector2<Real>& rkV);
+@@ -121,6 +159,8 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector2<Real>& rkV);
  
  typedef Vector2<float> Vector2f;
  typedef Vector2<double> Vector2d;
-+// FAF MOD: aliases used by FAF SDK consumers.
 +template <class Real> using Vec2 = Vector2<Real>;
 +typedef Vector2<float> Vec2f;
  
@@ -1776,25 +648,23 @@ diff --git a/Foundation/Math/Wm3Vector2.inl b/Foundation/Math/Wm3Vector2.inl
 index c425ca8afecf9eebfce9555d7a028072a419244a..81546e811c5941134a251ef850ceaf8ba785d191 100644
 --- a/Foundation/Math/Wm3Vector2.inl
 +++ b/Foundation/Math/Wm3Vector2.inl
-@@ -8,19 +8,8 @@
+@@ -8,19 +8,9 @@
  // and may not be copied or disclosed except in accordance with the terms
  // of that agreement.
  
--//----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
 -template <class Real>
 -Vector2<Real>::Vector2 ()
 -{
--    // uninitialized for performance in array construction
+     // uninitialized for performance in array construction
 -}
--//----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
 -template <class Real>
 -Vector2<Real>::Vector2 (Real fX, Real fY)
 -{
 -    m_afTuple[0] = fX;
 -    m_afTuple[1] = fY;
 -}
-+// FAF MOD: default ctor and (Real, Real) ctor moved into Wm3Vector2.h as
-+// inline constexpr.
  //----------------------------------------------------------------------------
  template <class Real>
  Vector2<Real>::Vector2 (const Real* afTuple)
@@ -1802,17 +672,13 @@ diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
 index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2db8780dc8 100644
 --- a/Foundation/Math/Wm3Vector3.h
 +++ b/Foundation/Math/Wm3Vector3.h
-@@ -13,6 +13,18 @@
+@@ -13,6 +13,14 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3Math.h"
-+// FAF MOD: needed by the static helpers added below.
 +#include <cmath>
 +#include <limits>
-+// FAF MOD: GPG's integer vector, which is what `Vector3i` names.
 +#include "Wm3IVector3.h"
-+
-+// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
 +namespace gpg
 +{
 +    class ReadArchive;
@@ -1821,31 +687,21 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
  
  namespace Wm3
  {
-@@ -22,8 +34,11 @@ class Vector3
+@@ -22,8 +30,8 @@ class Vector3
  {
  public:
      // construction
 -    Vector3 ();  // uninitialized
 -    Vector3 (Real fX, Real fY, Real fZ);
-+    // FAF MOD: default ctor and (Real, Real, Real) ctor are now defined inline
-+    // and `constexpr` so consumer code can write `constexpr Wm3::Vec3f v{...};`.
-+    // The rest of the upstream ctors stay defined in Wm3Vector3.inl.
 +    constexpr Vector3 () noexcept : m_afTuple{Real(0), Real(0), Real(0)} {}
 +    constexpr Vector3 (Real fX, Real fY, Real fZ) noexcept : m_afTuple{fX, fY, fZ} {}
      Vector3 (const Real* afTuple);
      Vector3 (const Vector3& rkV);
  
-@@ -106,11 +121,163 @@ public:
+@@ -106,11 +114,138 @@ public:
      WM3_ITEM static const Vector3 UNIT_Y;
      WM3_ITEM static const Vector3 UNIT_Z;
  
-+    // FAF MOD: expose the underlying storage as both `m_afTuple[3]` (the
-+    // upstream WildMagic name used by every Wm3Vector3.inl method) and as a
-+    // public `x, y, z` struct (used by the FAF SDK consumer code originally
-+    // written against the local hand-recovered Wm3::Vector3 layout). The
-+    // `m_afTuple[3]` and `struct { x, y, z }` overlay the same memory, so
-+    // sizeof and binary layout are unchanged. The union is `public` so
-+    // both names are addressable from outside the class.
 +public:
 +    union
 +    {
@@ -1857,13 +713,6 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
 +            Real z;
 +        };
 +    };
-+
-+    // FAF MOD: SDK-side static helpers from the hand-recovered Vector3 API.
-+    // These mirror the static-method shape consumers expect
-+    // (Vector3f::Zero(), Vector3f::Add(a,b), etc.). They overload — but do
-+    // not collide with — the upstream instance methods (Length, Dot,
-+    // Normalize, Cross) because the static forms take an extra Vector3
-+    // argument.
 +    static constexpr Vector3 Zero () noexcept { return Vector3(Real(0), Real(0), Real(0)); }
 +    static Vector3 NaN () noexcept
 +    {
@@ -1900,12 +749,6 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
 +    {
 +        return std::sqrt(LengthSq(v));
 +    }
-+    // Address: 0x00452AF0 (FUN_00452AF0, Wm3::Vector3<float>::Normalize).
-+    // Same contract as the upstream instance `Normalize` below: the length is
-+    // `fsqrt((x*x + y*y) + z*z)` (FUN_00452FC0), compared `!(len > 1e-6)` by
-+    // `fcomi` + `jbe` at 0x00452B51 so NaN also degenerates; the degenerate
-+    // branch zeroes the vector AND returns 0 (0x00452B92..0x00452B9D reloads
-+    // the stored zero), the normal one forms `1/len` once and multiplies.
 +    static Real Normalize (Vector3& v, Real eps = Real(1e-6)) noexcept
 +    {
 +        const Real len = Length(v);
@@ -1973,8 +816,6 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
 +    {
 +        return !IsntNaN(value);
 +    }
-+    // Returns true when the vectors DIFFER beyond `eps`. Matches the FAF
-+    // SDK's hand-recovered semantics (used as a "not equal" test).
 +    static bool Compare (const Vector3* lhs, const Vector3* rhs, Real eps = Real(1e-5)) noexcept
 +    {
 +        if (lhs == nullptr || rhs == nullptr) return lhs != rhs;
@@ -1987,39 +828,26 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
 +    {
 +        Vector3::LimitLengthTo(*this, maxLen, eps);
 +    }
-+    // FAF MOD: serialize hooks used by the FAF reflection system. The float
-+    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
-+
-+
  private:
      // support for comparisons
      int CompareArrays (const Vector3& rkV) const;
--
+ 
 -    Real m_afTuple[3];
  };
  
  // arithmetic operations
-@@ -125,6 +292,25 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector3<Real>& rkV);
+@@ -125,6 +260,16 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector3<Real>& rkV);
  
  typedef Vector3<float> Vector3f;
  typedef Vector3<double> Vector3d;
-+// FAF MOD: aliases that the FAF SDK's hand-recovered code originally used.
 +template <class Real> using Vec3 = Vector3<Real>;
 +typedef Vector3<float> Vec3f;
-+
-+// FAF MOD: free function helpers from the FAF SDK's hand-recovered Vector3 API.
-+// Preserved here so consumer code calling them as free functions continues
-+// to compile after `src/sdk/wm3/` is removed.
 +inline bool Vector3fIsntNaN (const Vector3<float>* value) noexcept
 +{
 +    return Vector3<float>::IsntNaN(value);
 +}
-+
-+// `Wm3::SqrtfBinary` was a thin std::sqrt wrapper recovered from the FA
-+// binary at FUN_00452FC0. The FAF SDK's hand-recovered code calls it
-+// pervasively as a free function.
 +inline float SqrtfBinary (float value) noexcept
 +{
 +    return std::sqrt(value);
@@ -2031,17 +859,17 @@ diff --git a/Foundation/Math/Wm3Vector3.inl b/Foundation/Math/Wm3Vector3.inl
 index dc77545a201f9f2a49c63ea35a50b4fd6b5e0687..53755b74b8cd71013d621f16165c1ca9c64d0588 100644
 --- a/Foundation/Math/Wm3Vector3.inl
 +++ b/Foundation/Math/Wm3Vector3.inl
-@@ -8,20 +8,8 @@
+@@ -8,20 +8,9 @@
  // and may not be copied or disclosed except in accordance with the terms
  // of that agreement.
  
--//----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
 -template <class Real>
 -Vector3<Real>::Vector3 ()
 -{
--    // uninitialized for performance in array construction
+     // uninitialized for performance in array construction
 -}
--//----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
 -template <class Real>
 -Vector3<Real>::Vector3 (Real fX, Real fY, Real fZ)
 -{
@@ -2049,1252 +877,9 @@ index dc77545a201f9f2a49c63ea35a50b4fd6b5e0687..53755b74b8cd71013d621f16165c1ca9
 -    m_afTuple[1] = fY;
 -    m_afTuple[2] = fZ;
 -}
-+// FAF MOD: default ctor and (Real, Real, Real) ctor moved into Wm3Vector3.h
-+// as inline constexpr so consumers can use them in constant expressions.
  //----------------------------------------------------------------------------
  template <class Real>
  Vector3<Real>::Vector3 (const Real* afTuple)
-@@ -170,6 +158,38 @@ Vector3<Real> Vector3<Real>::operator- (const Vector3& rkV) const
-         m_afTuple[2]-rkV.m_afTuple[2]);
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A3AC80 (no FUN_ token; IDA never tokenized this region) -
-+ * Vector3<double>::operator*(double) const
-+ * Address: 0x00A55CB0 (no FUN_ token) - Vector3<double>::operator*(double) const
-+ * (a second, distinct emission of the same member)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep, decoded
-+ * directly from bin/2025.7.1/ForgedAlliance.exe). Byte-exact match at both
-+ * addresses: three `fld`/`fmul`/`fstp` pairs over 8-byte-stride fields
-+ * (this[0x00]/[0x08]/[0x10], matching `double m_afTuple[3]`) writing through
-+ * the hidden return-value pointer. `0x00A3AC80` sits in the assigned gap
-+ * `0x00A3AC80-0x00A3AD70`; `0x00A55CB0` is an isolated fragment at the tail
-+ * of the assigned gap `0x00A55C00-0x00A55CE0` (the other fragments in that
-+ * second gap -- a red-black-tree-shaped search, a bounds-checked
-+ * cursor-advance pair, a tiny conditional 4-byte copy -- do not match any
-+ * WildMagic source in this repo and are NOT attributed here).
-+ *
-+ * Caller evidence, checked with a raw E8/E9 rel32 byte-pattern scan of the
-+ * whole `.text` section (NOT a linear capstone disassembly of the whole
-+ * section, which desyncs from real instruction boundaries across a region
-+ * this large and silently produces false negatives -- caught and fixed
-+ * mid-sweep): `0x00A3AC80` has four real, live callers, all inside
-+ * already-recovered `Wm3::IntrSegment3Sphere3d::Find`/`::StaticFind`
-+ * (0x00A47B0D/0x00A47B48/0x00A47B97/0x00A47913). `0x00A55CB0` has none found
-+ * -- `Vector3<Real>` is used so pervasively throughout this engine that
-+ * other instantiations of this exact member likely exist elsewhere too;
-+ * this second address is simply an additional orphaned copy, not evidence
-+ * against the first.
-+ *
-+ * What it does:
-+ * Returns this vector scaled by fScalar.
-+ */
- template <class Real>
- Vector3<Real> Vector3<Real>::operator* (Real fScalar) const
- {
-diff --git a/Foundation/Numerics/Wm3Eigen.cpp b/Foundation/Numerics/Wm3Eigen.cpp
-index 860381529b1924570ff8fde327050aaa8d682f5c..1f38bd97a34cfed0f1f6a21f55b94282a4cbf9d0 100644
---- a/Foundation/Numerics/Wm3Eigen.cpp
-+++ b/Foundation/Numerics/Wm3Eigen.cpp
-@@ -14,6 +14,25 @@
- namespace Wm3
- {
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A719E0 (FUN_00A719E0) - Eigen<float>::Eigen(int)
-+ * Address: 0x00A71DC0 (FUN_00A71DC0) - Eigen<double>::Eigen(int)
-+ *
-+ * FAF recovery traceability (2026-08-26, gap-sweep pass following the
-+ * 2026-08-21 Eigen<Real> cluster closure). Both bodies inline the
-+ * `m_kMat(iSize,iSize)` member-init (GMatrix<Real>::GMatrix(int,int), itself
-+ * `m_afData=0; m_aafEntry=0;` inlined + an out-of-line `SetSize(iRows,iCols)`
-+ * call), then set `this->m_iSize`, allocate `m_afDiag`/`m_afSubd` via
-+ * overflow-checked `operator new(m_iSize*sizeof(Real))` (`*4` float / `*8`
-+ * double), and clear `m_bIsRotation`. Real, confirmed production callers:
-+ * `Wm3::GaussPointsFit3<double>` (FUN_00A514D0) and
-+ * `Wm3::GaussPointsFit2<double>` (FUN_00A7DC10) call the double overload
-+ * directly (`Eigen<double> kES(3)`); the float overload's callers
-+ * (FUN_00A509A0, FUN_00A7D4C0) are those routines' float siblings.
-+ *
-+ * What it does:
-+ * Constructs an size-by-size Eigen solver over a freshly allocated GMatrix.
-+ */
- template <class Real>
- Eigen<Real>::Eigen (int iSize)
-     :
-@@ -26,6 +45,23 @@ Eigen<Real>::Eigen (int iSize)
-     m_bIsRotation = false;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A71900 (FUN_00A71900) - Eigen<float>::Eigen(const Matrix2<float>&)
-+ * Address: 0x00A71CE0 (FUN_00A71CE0) - Eigen<double>::Eigen(const Matrix2<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep). `m_kMat(2,2,ptr)` inlines
-+ * GMatrix<Real>'s 3-arg ctor, which itself inlines `SetMatrix`'s Deallocate
-+ * (two `delete[]` of the just-zeroed null `m_afData`/`m_aafEntry`, harmless
-+ * no-ops -- the tell that this is a *constructor* context, unlike the
-+ * `operator=` overloads below which delete genuinely live pointers), an
-+ * out-of-line `Allocate(false)` call (0x00A6D190 float / 0x00A6D230 double)
-+ * and an out-of-line `Wm3::System::Memcpy` of `2*2*sizeof(Real)` bytes. Zero
-+ * callers found in a whole-.text PE scan (rel32 call/jmp + absolute-dword) --
-+ * see cluster note below.
-+ *
-+ * What it does:
-+ * Constructs a 2x2 Eigen solver, copying rkM's entries into m_kMat.
-+ */
- template <class Real>
- Eigen<Real>::Eigen (const Matrix2<Real>& rkM)
-     :
-@@ -37,6 +73,17 @@ Eigen<Real>::Eigen (const Matrix2<Real>& rkM)
-     m_bIsRotation = false;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A71820 (FUN_00A71820) - Eigen<float>::Eigen(const Matrix3<float>&)
-+ * Address: 0x00A71C00 (FUN_00A71C00) - Eigen<double>::Eigen(const Matrix3<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep). Same shape as the
-+ * Matrix2 overload with dims folded to 3,3,9. Zero callers found (see
-+ * cluster note below).
-+ *
-+ * What it does:
-+ * Constructs a 3x3 Eigen solver, copying rkM's entries into m_kMat.
-+ */
- template <class Real>
- Eigen<Real>::Eigen (const Matrix3<Real>& rkM)
-     :
-@@ -48,6 +95,17 @@ Eigen<Real>::Eigen (const Matrix3<Real>& rkM)
-     m_bIsRotation = false;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A71740 (FUN_00A71740) - Eigen<float>::Eigen(const Matrix4<float>&)
-+ * Address: 0x00A71B20 (FUN_00A71B20) - Eigen<double>::Eigen(const Matrix4<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep). Same shape as the
-+ * Matrix2 overload with dims folded to 4,4,16. Zero callers found (see
-+ * cluster note below).
-+ *
-+ * What it does:
-+ * Constructs a 4x4 Eigen solver, copying rkM's entries into m_kMat.
-+ */
- template <class Real>
- Eigen<Real>::Eigen (const Matrix4<Real>& rkM)
-     :
-@@ -59,6 +117,25 @@ Eigen<Real>::Eigen (const Matrix4<Real>& rkM)
-     m_bIsRotation = false;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A716A0 (FUN_00A716A0) - Eigen<float>::Eigen(const GMatrix<float>&)
-+ * Address: 0x00A71A80 (FUN_00A71A80) - Eigen<double>::Eigen(const GMatrix<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep). `m_kMat(rkM)` inlines
-+ * GMatrix<Real>'s copy ctor (zero 5 fields + out-of-line `operator=(rkM)`
-+ * call, 0x00A70500 float / 0x00A706A0 double -- both already `recovered`,
-+ * see Wm3GMatrix.inl.reconstruction.md), then `m_iSize = rkM.GetRows()`
-+ * (`mov eax,[rkM]` -- GetRows() is `return m_iRows;`, GMatrix offset 0),
-+ * overflow-checked `operator new` x2 for m_afDiag/m_afSubd,
-+ * `m_bIsRotation = false`. SEH-framed (`__security_cookie` frame, matching
-+ * a non-trivial local in the caller needing unwind protection). Zero direct
-+ * callers found in a whole-.text scan (see cluster note below) -- read in
-+ * full via raw disassembly and independently confirmed line-for-line against
-+ * this body.
-+ *
-+ * What it does:
-+ * Constructs an Eigen solver by copying an existing GMatrix.
-+ */
- template <class Real>
- Eigen<Real>::Eigen (const GMatrix<Real>& rkM)
-     :
-@@ -71,6 +148,40 @@ Eigen<Real>::Eigen (const GMatrix<Real>& rkM)
-     m_bIsRotation = false;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70820 (FUN_00A70820) - Eigen<float>::~Eigen()
-+ * Address: 0x00A70ED0 (FUN_00A70ED0) - Eigen<double>::~Eigen()
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep, following on from the
-+ * 2026-08-21 Eigen<Real> cluster closure and the 2026-08-25 GMatrix<Real>
-+ * closure, which flagged both addresses as unidentified "four-field
-+ * destructors"). Both bodies delete four pointers in order: `m_afSubd`
-+ * (this+0x1C), `m_afDiag` (this+0x18), `m_kMat.m_afData` (this+0x10),
-+ * `m_kMat.m_aafEntry` (this+0x14) -- the explicit `~Eigen()` body (delete
-+ * m_afSubd, m_afDiag) plus the *implicitly inlined* `~GMatrix()` member-dtor
-+ * call (delete m_afData, m_aafEntry), matching this body plus
-+ * `GMatrix<Real>::~GMatrix() { Deallocate(); }` exactly. Both instantiations
-+ * are byte-identical (deleting a raw pointer is size-independent), which is
-+ * why they were previously indistinguishable; distinguished here by binary
-+ * position (float cluster precedes double cluster throughout this whole
-+ * file, a consistent MSVC emission-order convention observed on every prior
-+ * float/double pair in this TU). CORRECTION (re-checked after fixing a
-+ * scanner bug -- an earlier linear capstone disassembly of the whole
-+ * multi-megabyte `.text` section silently desynced from real instruction
-+ * boundaries and produced a false "zero callers"; a raw E8/E9 rel32
-+ * byte-pattern scan finds the real calls): the float dtor is called from
-+ * `FUN_00A509A0`/`FUN_00A7D4C0` (the float siblings of
-+ * `GaussPointsFit3<double>`/`GaussPointsFit2<double>`); the double dtor from
-+ * `FUN_00A514D0`/`FUN_00A7DC10` (the double originals) -- the same four
-+ * functions that call this pair's constructor sibling `Eigen(int)` (cited
-+ * above). Two additional `jmp` references per dtor originate outside the
-+ * tracked functions table (SEH unwind funclets on the exception-cleanup
-+ * path, consistent with these callers' `__security_cookie` SEH frames).
-+ *
-+ * What it does:
-+ * Releases m_afSubd, m_afDiag, and (via the embedded GMatrix's own
-+ * destructor) m_kMat's row/entry storage.
-+ */
- template <class Real>
- Eigen<Real>::~Eigen ()
- {
-@@ -78,12 +189,46 @@ Eigen<Real>::~Eigen ()
-     WM3_DELETE[] m_afDiag;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D2D0 (FUN_00A6D2D0) - Eigen<float>::operator()(int,int).
-+ * Address: 0x00A6EDC0 (FUN_00A6EDC0) - Eigen<double>::operator()(int,int).
-+ *
-+ * FAF recovery traceability (2026-08-26): confirmed real callers in the
-+ * binary -- Eigen<float>::operator() from FUN_00A509A0 (a GaussPointsFit3
-+ * <float>-shaped ICF sibling, DB status `skip`), Eigen<double>::operator()
-+ * from Wm3::GaussPointsFit3<double> (FUN_00A514D0, 9 confirmed call sites,
-+ * Wm3ApprGaussPointsFit3.cpp). Both addresses were previously modeled as
-+ * raw offset-view free functions (`ResolveRuntimeRowStride4/8AddressLane`)
-+ * in src/sdk/moho/math/Wm3DistanceFafExtras.cpp -- removed from there as
-+ * orphaned/superseded once this canonical template member was identified;
-+ * see that file's removal note for the full evidence trail.
-+ */
- template <class Real>
- Real& Eigen<Real>::operator() (int iRow, int iCol)
- {
-     return m_kMat[iRow][iCol];
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A709D0 (no FUN_ token; IDA never tokenized this region) -
-+ * Eigen<float>::operator=(const Matrix2<float>&)
-+ * Address: 0x00A71080 (no FUN_ token) - Eigen<double>::operator=(const Matrix2<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep of the untokenized address
-+ * range between GMatrix<Real>::SetSize/SetMatrix/operator= and the
-+ * IncrSortEigenStuff2/3 tokens; decoded directly from
-+ * bin/2025.7.1/ForgedAlliance.exe, ImageBase 0x400000, since IDA carved no
-+ * function boundary here). `SetMatrix(2,2,ptr)` is inlined (Deallocate of the
-+ * OLD live m_afData/m_aafEntry -- the tell distinguishing this from the
-+ * constructor overload above, which deletes freshly-zeroed null pointers --
-+ * then dims set to 2,2,4, out-of-line Allocate(false), out-of-line
-+ * Wm3::System::Memcpy of 2*2*sizeof(Real) bytes), `m_iSize=2`, then
-+ * `WM3_DELETE[]`/`WM3_NEW` of m_afDiag and m_afSubd. Bracketed on both sides
-+ * by already-recovered tokens with zero unexplained bytes between them.
-+ *
-+ * What it does:
-+ * Reassigns *this to hold a fresh copy of a 2x2 matrix.
-+ */
- template <class Real>
- Eigen<Real>& Eigen<Real>::operator= (const Matrix2<Real>& rkM)
- {
-@@ -96,6 +241,16 @@ Eigen<Real>& Eigen<Real>::operator= (const Matrix2<Real>& rkM)
-     return *this;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70920 (no FUN_ token) - Eigen<float>::operator=(const Matrix3<float>&)
-+ * Address: 0x00A70FD0 (no FUN_ token) - Eigen<double>::operator=(const Matrix3<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep, same evidence chain as
-+ * the Matrix2 overload immediately above, dims folded to 3,3,9).
-+ *
-+ * What it does:
-+ * Reassigns *this to hold a fresh copy of a 3x3 matrix.
-+ */
- template <class Real>
- Eigen<Real>& Eigen<Real>::operator= (const Matrix3<Real>& rkM)
- {
-@@ -108,6 +263,16 @@ Eigen<Real>& Eigen<Real>::operator= (const Matrix3<Real>& rkM)
-     return *this;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70870 (no FUN_ token) - Eigen<float>::operator=(const Matrix4<float>&)
-+ * Address: 0x00A70F20 (no FUN_ token) - Eigen<double>::operator=(const Matrix4<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep, same evidence chain as
-+ * the Matrix2 overload above, dims folded to 4,4,16).
-+ *
-+ * What it does:
-+ * Reassigns *this to hold a fresh copy of a 4x4 matrix.
-+ */
- template <class Real>
- Eigen<Real>& Eigen<Real>::operator= (const Matrix4<Real>& rkM)
- {
-@@ -120,6 +285,18 @@ Eigen<Real>& Eigen<Real>::operator= (const Matrix4<Real>& rkM)
-     return *this;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70850 (no FUN_ token) - Eigen<float>::operator=(const GMatrix<float>&)
-+ * Address: 0x00A70F00 (no FUN_ token) - Eigen<double>::operator=(const GMatrix<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep). Smallest member in the
-+ * cluster (20 bytes): forwards straight to `m_kMat.operator=(rkM)`
-+ * (0x00A70500 float / 0x00A706A0 double, both already `recovered`) and
-+ * returns `this`. `ret 4` cleans the single reference-parameter stack slot.
-+ *
-+ * What it does:
-+ * Reassigns *this to hold a copy of an existing GMatrix.
-+ */
- template <class Real>
- Eigen<Real>& Eigen<Real>::operator= (const GMatrix<Real>& rkM)
- {
-@@ -127,6 +304,48 @@ Eigen<Real>& Eigen<Real>::operator= (const GMatrix<Real>& rkM)
-     return *this;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6CE70 (FUN_00A6CE70) - Eigen<float>::GetEigenvalue(int)
-+ * Address: 0x00A6CEA0 (FUN_00A6CEA0) - Eigen<double>::GetEigenvalue(int)
-+ *
-+ * FAF recovery traceability (2026-08-26, GaussPointsFit3/GaussPointsFit2
-+ * caller-chain pass). Called from Wm3ApprGaussPointsFit3.cpp's
-+ * GaussPointsFit3<double> (FUN_00A514D0) and Wm3ApprGaussPointsFit2.cpp's
-+ * GaussPointsFit2<double> (FUN_00A7DC10). The decompiled body
-+ * `return *(double*)(*(this+6)+8*a2);` reads `this+0x18` (m_afDiag, DWORD
-+ * slot 6) then indexes by `8*i`, matching `return m_afDiag[i];` exactly under
-+ * the layout proved in the Tridiagonal-family citations above.
-+ *
-+ * Float counterpart correction (2026-08-26c, convexhull2-gap pass):
-+ * `FUN_00A6CE70`'s decompiled body `return *(float*)(*(this+6)+4*a2);` is
-+ * the identical shape one field-width down from `FUN_00A6CEA0` -- same
-+ * `this+6` DWORD slot (`this+0x18` = m_afDiag), same per-element index
-+ * (`4*i` vs `8*i` matching `sizeof(float)` vs `sizeof(double)`); GMatrix<Real>
-+ * stores only ints and `Real*`/`Real**` pointers (never inline `Real`
-+ * values), so its layout -- and Eigen<Real>'s own trailing m_aafEntry/m_afDiag
-+ * slots -- is byte-identical between the `<float>` and `<double>`
-+ * instantiations, which is exactly why both land at `this+0x18`. Confirmed
-+ * via `FUN_00A6CE70.xrefs.txt`: its two callers are
-+ * `0x00A51178 owner=0x00A509A0` (GaussPointsFit3<float>'s `kES.GetEigenvalue(i)`
-+ * loop, `i<3`) and `0x00A7DB8B owner=0x00A7D4C0` (GaussPointsFit2<float>'s
-+ * `kES.GetEigenvalue(i)` loop, `i<2>`; see the call-site walkthrough in that
-+ * file's citation) -- exactly the `GetEigenvalue`-shaped caller pair the
-+ * `<double>` citation above already established for `FUN_00A6CEA0`.
-+ * This corrects a 2026-08-24 mislabel (progress DB token FUN_00A6CE70,
-+ * worker `crt2-batch-3`) that classified this address as a
-+ * "Wm3::Query2TRational<Real> internal float-array element accessor" and
-+ * marked it `external_dependency` -- an address-neighborhood inference
-+ * ("sits between Wm3::IntrLine3Box3 and Wm3::Query2TRationald::* functions")
-+ * that never actually read what the two real call sites pass or do with the
-+ * result. No source under `src/sdk/**` referenced this token (grepped
-+ * clean), so nothing to remove there; only the progress DB status/note was
-+ * wrong. Reclassified `recovered`, source here (matching the `<double>`
-+ * sibling and the rest of this file's WildMagic3p8-provides-the-body
-+ * convention).
-+ *
-+ * What it does:
-+ * Returns the i-th eigenvalue.
-+ */
- template <class Real>
- Real Eigen<Real>::GetEigenvalue (int i) const
- {
-@@ -139,6 +358,40 @@ const Real* Eigen<Real>::GetEigenvalues () const
-     return m_afDiag;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D3A0 (FUN_00A6D3A0) - Eigen<float>::GetEigenvector(int, Vector2<float>&)
-+ * Address: 0x00A6EE90 (FUN_00A6EE90) - Eigen<double>::GetEigenvector(int, Vector2<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26, GaussPointsFit3/GaussPointsFit2
-+ * caller-chain pass). Called from Wm3ApprGaussPointsFit2.cpp's
-+ * GaussPointsFit2<double> (FUN_00A7DC10) only. Decompiled body: when
-+ * `*this == 2` (m_iSize), loops `rkV[iRow] = m_kMat[iRow][i]` via the
-+ * `m_aafEntry` row-pointer table at `this+0x14`; the `else` branch stores
-+ * `dbl_F3DBF8, dbl_F3DC00` (Vector2<double>::ZERO) into `*a3`, matching this
-+ * body exactly.
-+ *
-+ * Float counterpart (2026-08-26c, convexhull2-gap pass): `FUN_00A6D3A0` was
-+ * already IDA-tokenized but sat `blocked` (`owner_layout`, sole depends_on
-+ * `FUN_00A7D4C0`) -- "dependent matrix/table owner layout at +0x14 is not
-+ * recovered in src/sdk yet", now resolved by the `<double>` sibling's own
-+ * citation above (the layout is proved template-wide, not per-instantiation).
-+ * Decompiled body: `if (*this==2) { do { v4 = *(DWORD*)(*(this+5)+4*result);
-+ * a3[result++] = *(float*)(v4+4*a2); } while(result < *this); } else {
-+ * *a3=flt_F3DBE0; a3[1]=flt_F3DBE4; }` -- `this+5` DWORDs = `this+0x14`
-+ * (m_aafEntry, same slot as the `<double>` body one field-width up),
-+ * `flt_F3DBE0`/`flt_F3DBE4` are the same 0.0f/0.0f pair used for
-+ * `Vector2<float>::ZERO` elsewhere in this recovery (e.g. the
-+ * `ContAlignedBox<float>` constant block in `Wm3ContBox2.cpp`'s companion
-+ * `BuildAxisAlignedBox2fFromPointArray`). Exact match to
-+ * `rkV[iRow] = m_kMat[iRow][i]` / `rkV = Vector2<Real>::ZERO;` at `<float>`.
-+ * Sole caller per `FUN_00A6D3A0.xrefs.txt`: `0x00A7DB9A owner=0x00A7D4C0`
-+ * (GaussPointsFit2<float>'s `kES.GetEigenvector(i,kBox.Axis[i])` call, `i<2`)
-+ * -- a real, already-tokenized owner, recovered in the same pass (paired
-+ * bottom-up). Promoted to `recovered`.
-+ *
-+ * What it does:
-+ * Writes the i-th eigenvector (2D case) into rkV, or ZERO when m_iSize != 2.
-+ */
- template <class Real>
- void Eigen<Real>::GetEigenvector (int i, Vector2<Real>& rkV) const
- {
-@@ -154,6 +407,22 @@ void Eigen<Real>::GetEigenvector (int i, Vector2<Real>& rkV) const
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6EE40 (FUN_00A6EE40) - Eigen<double>::GetEigenvector(int, Vector3<double>&)
-+ *
-+ * FAF recovery traceability (2026-08-26, GaussPointsFit3/GaussPointsFit2
-+ * caller-chain pass). Called from Wm3ApprGaussPointsFit3.cpp's
-+ * GaussPointsFit3<double> (FUN_00A514D0) only, at the `kES.GetEigenvector(i,
-+ * kBox.Axis[i])` call sites. Decompiled body: when `*this == 3` (m_iSize),
-+ * loops `rkV[iRow] = m_kMat[iRow][i]`; the `else` branch stores
-+ * `dbl_F3D250, dbl_F3D258, dbl_F3D260` (Vector3<double>::ZERO) into `*a3`,
-+ * matching this body exactly (those are the same three constants
-+ * GaussPointsFit3's default Box3 center uses). The `Eigen<float>`
-+ * counterpart address was not identified in this pass.
-+ *
-+ * What it does:
-+ * Writes the i-th eigenvector (3D case) into rkV, or ZERO when m_iSize != 3.
-+ */
- template <class Real>
- void Eigen<Real>::GetEigenvector (int i, Vector3<Real>& rkV) const
- {
-@@ -188,6 +457,18 @@ void Eigen<Real>::GetEigenvector (int i, Vector4<Real>& rkV) const
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70A80 (FUN_00A70A80) - Eigen<float>::GetEigenvector(int) const
-+ * Address: 0x00A71130 (FUN_00A71130) - Eigen<double>::GetEigenvector(int) const
-+ *
-+ * FAF recovery traceability. Both are `add ecx,4; jmp GMatrix<Real>::GetColumn`
-+ * adjustor thunks (this+4 = &m_kMat), matching `return m_kMat.GetColumn(i);`
-+ * exactly. GetColumn itself: 0x00A70440 float / 0x00A705E0 double (see
-+ * Wm3GMatrix.inl.reconstruction.md).
-+ *
-+ * What it does:
-+ * Returns the i-th eigenvector as a GVector by copying the matching column.
-+ */
- template <class Real>
- GVector<Real> Eigen<Real>::GetEigenvector (int i) const
- {
-@@ -200,6 +481,20 @@ const GMatrix<Real>& Eigen<Real>::GetEigenvectors () const
-     return m_kMat;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D420 (FUN_00A6D420) - Eigen<float>::Tridiagonal2()
-+ * Address: 0x00A6EF10 (FUN_00A6EF10) - Eigen<double>::Tridiagonal2()
-+ *
-+ * FAF recovery traceability. The engine links WildMagic 3.8's Foundation
-+ * library statically, and the explicit instantiations at the bottom of this
-+ * file (Eigen<float>, Eigen<double>) emit one out-of-line body per member per
-+ * element type. Both emitted addresses are cited below.
-+ *
-+ * What it does:
-+ * A 2x2 matrix is already tridiagonal, so this only copies m_kMat's diagonal
-+ * into m_afDiag and m_kMat[0][1] into m_afSubd[0], then resets m_kMat to the
-+ * identity and leaves m_bIsRotation true (no reflection was applied).
-+ */
- template <class Real>
- void Eigen<Real>::Tridiagonal2 ()
- {
-@@ -216,6 +511,16 @@ void Eigen<Real>::Tridiagonal2 ()
-     m_bIsRotation = true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D480 (FUN_00A6D480) - Eigen<float>::Tridiagonal3()
-+ * Address: 0x00A6EF70 (FUN_00A6EF70) - Eigen<double>::Tridiagonal3()
-+ *
-+ * What it does:
-+ * Householder reduction of the 3x3 matrix to tridiagonal form. When m_kMat[0][2]
-+ * is non-zero it normalises (fM01,fM02) through Math<Real>::Sqrt, folds the
-+ * reflection into m_kMat and clears m_bIsRotation; otherwise it copies the
-+ * already-tridiagonal entries through and stores the identity.
-+ */
- template <class Real>
- void Eigen<Real>::Tridiagonal3 ()
- {
-@@ -269,6 +574,13 @@ void Eigen<Real>::Tridiagonal3 ()
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6D680 (FUN_00A6D680) - Eigen<float>::Tridiagonal4()
-+ * Address: 0x00A6F120 (FUN_00A6F120) - Eigen<double>::Tridiagonal4()
-+ *
-+ * What it does:
-+ * Householder reduction of the 4x4 matrix to tridiagonal form.
-+ */
- template <class Real>
- void Eigen<Real>::Tridiagonal4 ()
- {
-@@ -438,6 +750,14 @@ void Eigen<Real>::Tridiagonal4 ()
-     m_bIsRotation = true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6DED0 (FUN_00A6DED0) - Eigen<float>::TridiagonalN()
-+ * Address: 0x00A6F7B0 (FUN_00A6F7B0) - Eigen<double>::TridiagonalN()
-+ *
-+ * What it does:
-+ * General NxN Householder reduction to tridiagonal form; m_bIsRotation ends up
-+ * as ((m_iSize % 2) == 0) because the reduction applies m_iSize-2 reflections.
-+ */
- template <class Real>
- void Eigen<Real>::TridiagonalN ()
- {
-@@ -551,6 +871,16 @@ void Eigen<Real>::TridiagonalN ()
-     m_bIsRotation = ((m_iSize % 2) == 0);
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6E7C0 (FUN_00A6E7C0) - Eigen<float>::QLAlgorithm()
-+ * Address: 0x00A6FF60 (FUN_00A6FF60) - Eigen<double>::QLAlgorithm()
-+ *
-+ * What it does:
-+ * Implicitly shifted QL iteration over the tridiagonal form, capped at
-+ * iMaxIter = 32 sweeps per eigenvalue (the two `cmp eax, 20h` tests in the
-+ * emitted code). Returns false if any eigenvalue fails to converge.
-+ * Calls Math<Real>::Sqrt three times per sweep.
-+ */
- template <class Real>
- bool Eigen<Real>::QLAlgorithm ()
- {
-@@ -632,6 +962,15 @@ bool Eigen<Real>::QLAlgorithm ()
-     return true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6EC40 (FUN_00A6EC40) - Eigen<float>::DecreasingSort()
-+ * Address: 0x00A702C0 (FUN_00A702C0) - Eigen<double>::DecreasingSort()
-+ *
-+ * What it does:
-+ * Selection sort of m_afDiag into decreasing order, swapping the matching
-+ * eigenvector columns of m_kMat and toggling m_bIsRotation once per swapped
-+ * element (each column swap flips the determinant's sign).
-+ */
- template <class Real>
- void Eigen<Real>::DecreasingSort ()
- {
-@@ -669,6 +1008,15 @@ void Eigen<Real>::DecreasingSort ()
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A6ED00 (FUN_00A6ED00) - Eigen<float>::IncreasingSort()
-+ * Address: 0x00A70370 (FUN_00A70370) - Eigen<double>::IncreasingSort()
-+ *
-+ * What it does:
-+ * Selection sort of m_afDiag into increasing order, swapping the matching
-+ * eigenvector columns of m_kMat and toggling m_bIsRotation once per swapped
-+ * element.
-+ */
- template <class Real>
- void Eigen<Real>::IncreasingSort ()
- {
-@@ -719,6 +1067,25 @@ void Eigen<Real>::GuaranteeRotation ()
-     }
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70AB0 (no FUN_ token) - Eigen<float>::EigenStuff2()
-+ * Address: 0x00A71160 (no FUN_ token) - Eigen<double>::EigenStuff2()
-+ *
-+ * FAF recovery traceability (2026-08-26 gap sweep). This whole
-+ * EigenStuff/DecrSortEigenStuff/IncrSortEigenStuff family (15 members x 2
-+ * instantiations = 30 emissions) sits in a dense, regularly-strided block
-+ * IDA tokenized only 4 of (IncrSortEigenStuff2/3 float+double); the other 26
-+ * were decoded directly from the PE by call-target pattern (each member's
-+ * call sequence is a unique, unambiguous fingerprint of Tridiagonal{2,3,4,N}
-+ * / QLAlgorithm / Decreasing|IncreasingSort addresses, plus the trailing
-+ * `cmp byte ptr [reg+20h],0` + negate-column-0 loop that is
-+ * GuaranteeRotation() inlined). See
-+ * Wm3Eigen.cpp.reconstruction.md (2026-08-26 section) for the full 26-entry
-+ * address table and verification method.
-+ *
-+ * What it does:
-+ * Tridiagonal2 -> QLAlgorithm -> GuaranteeRotation.
-+ */
- template <class Real>
- void Eigen<Real>::EigenStuff2 ()
- {
-@@ -727,6 +1094,11 @@ void Eigen<Real>::EigenStuff2 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70AF0 (no FUN_ token) - Eigen<float>::EigenStuff3()
-+ * Address: 0x00A711A0 (no FUN_ token) - Eigen<double>::EigenStuff3()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::EigenStuff3 ()
- {
-@@ -735,6 +1107,11 @@ void Eigen<Real>::EigenStuff3 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70B30 (no FUN_ token) - Eigen<float>::EigenStuff4()
-+ * Address: 0x00A711E0 (no FUN_ token) - Eigen<double>::EigenStuff4()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::EigenStuff4 ()
- {
-@@ -743,6 +1120,11 @@ void Eigen<Real>::EigenStuff4 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70B70 (no FUN_ token) - Eigen<float>::EigenStuffN()
-+ * Address: 0x00A71220 (no FUN_ token) - Eigen<double>::EigenStuffN()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::EigenStuffN ()
- {
-@@ -751,6 +1133,13 @@ void Eigen<Real>::EigenStuffN ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70BB0 (no FUN_ token) - Eigen<float>::EigenStuff()
-+ * Address: 0x00A71260 (no FUN_ token) - Eigen<double>::EigenStuff()
-+ *
-+ * The size-dispatch `switch` member; its four call targets (Tridiagonal2/3/4/N)
-+ * are what pin down the whole family's addresses (see reconstruction report).
-+ */
- template <class Real>
- void Eigen<Real>::EigenStuff ()
- {
-@@ -765,6 +1154,11 @@ void Eigen<Real>::EigenStuff ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70C10 (no FUN_ token) - Eigen<float>::DecrSortEigenStuff2()
-+ * Address: 0x00A712C0 (no FUN_ token) - Eigen<double>::DecrSortEigenStuff2()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::DecrSortEigenStuff2 ()
- {
-@@ -774,6 +1168,11 @@ void Eigen<Real>::DecrSortEigenStuff2 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70C50 (no FUN_ token) - Eigen<float>::DecrSortEigenStuff3()
-+ * Address: 0x00A71300 (no FUN_ token) - Eigen<double>::DecrSortEigenStuff3()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::DecrSortEigenStuff3 ()
- {
-@@ -783,6 +1182,11 @@ void Eigen<Real>::DecrSortEigenStuff3 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70C90 (no FUN_ token) - Eigen<float>::DecrSortEigenStuff4()
-+ * Address: 0x00A71340 (no FUN_ token) - Eigen<double>::DecrSortEigenStuff4()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::DecrSortEigenStuff4 ()
- {
-@@ -792,6 +1196,11 @@ void Eigen<Real>::DecrSortEigenStuff4 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70CD0 (no FUN_ token) - Eigen<float>::DecrSortEigenStuffN()
-+ * Address: 0x00A71380 (no FUN_ token) - Eigen<double>::DecrSortEigenStuffN()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::DecrSortEigenStuffN ()
- {
-@@ -801,6 +1210,11 @@ void Eigen<Real>::DecrSortEigenStuffN ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70D10 (no FUN_ token) - Eigen<float>::DecrSortEigenStuff()
-+ * Address: 0x00A713C0 (no FUN_ token) - Eigen<double>::DecrSortEigenStuff()
-+ * (see EigenStuff's citation above for the size-dispatch shape)
-+ */
- template <class Real>
- void Eigen<Real>::DecrSortEigenStuff ()
- {
-@@ -816,6 +1230,15 @@ void Eigen<Real>::DecrSortEigenStuff ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70D70 (FUN_00A70D70) - Eigen<float>::IncrSortEigenStuff2()
-+ * Address: 0x00A71420 (FUN_00A71420) - Eigen<double>::IncrSortEigenStuff2()
-+ *
-+ * What it does:
-+ * Tridiagonal2 -> QLAlgorithm -> IncreasingSort -> GuaranteeRotation.
-+ * GuaranteeRotation is inlined into the emitted body as the trailing
-+ * `cmp byte ptr [esi+20h], 0` / negate-column-0 loop.
-+ */
- template <class Real>
- void Eigen<Real>::IncrSortEigenStuff2 ()
- {
-@@ -825,6 +1248,14 @@ void Eigen<Real>::IncrSortEigenStuff2 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70DB0 (FUN_00A70DB0) - Eigen<float>::IncrSortEigenStuff3()
-+ * Address: 0x00A71460 (FUN_00A71460) - Eigen<double>::IncrSortEigenStuff3()
-+ *
-+ * What it does:
-+ * Tridiagonal3 -> QLAlgorithm -> IncreasingSort -> GuaranteeRotation, with
-+ * GuaranteeRotation inlined as above.
-+ */
- template <class Real>
- void Eigen<Real>::IncrSortEigenStuff3 ()
- {
-@@ -834,6 +1265,11 @@ void Eigen<Real>::IncrSortEigenStuff3 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70DF0 (no FUN_ token) - Eigen<float>::IncrSortEigenStuff4()
-+ * Address: 0x00A714A0 (no FUN_ token) - Eigen<double>::IncrSortEigenStuff4()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::IncrSortEigenStuff4 ()
- {
-@@ -843,6 +1279,11 @@ void Eigen<Real>::IncrSortEigenStuff4 ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70E30 (no FUN_ token) - Eigen<float>::IncrSortEigenStuffN()
-+ * Address: 0x00A714E0 (no FUN_ token) - Eigen<double>::IncrSortEigenStuffN()
-+ * (see EigenStuff2's citation above for method)
-+ */
- template <class Real>
- void Eigen<Real>::IncrSortEigenStuffN ()
- {
-@@ -852,6 +1293,11 @@ void Eigen<Real>::IncrSortEigenStuffN ()
-     GuaranteeRotation();
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A70E70 (no FUN_ token) - Eigen<float>::IncrSortEigenStuff()
-+ * Address: 0x00A71520 (no FUN_ token) - Eigen<double>::IncrSortEigenStuff()
-+ * (see EigenStuff's citation above for the size-dispatch shape)
-+ */
- template <class Real>
- void Eigen<Real>::IncrSortEigenStuff ()
- {
-diff --git a/Foundation/RationalArithmetic/Wm3TRational.inl b/Foundation/RationalArithmetic/Wm3TRational.inl
-index 966132efc5276a61bfb7e8c1ca59b38398c6a627..b495118d439974e120e90848894cb65c46fdc414 100644
---- a/Foundation/RationalArithmetic/Wm3TRational.inl
-+++ b/Foundation/RationalArithmetic/Wm3TRational.inl
-@@ -26,6 +26,24 @@ TRational<N>::TRational (const TRational& rkR)
- {
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A5A5C0 (`TRational<32>`, no FUN_ token) -
-+ * TRational<32>::TRational(const TInteger<32>&)
-+ * Address: 0x00A77BA0 (`TRational<16>`, no FUN_ token) -
-+ * TRational<16>::TRational(const TInteger<16>&)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). Distinguishing
-+ * shape vs. `TRational(int)` (cited on that overload, further down in this
-+ * file): `m_kNumer` is constructed via a single full-width
-+ * `System::Memcpy(this,TINT_BYTES,rkNumer,TINT_BYTES)` (the inlined
-+ * `TInteger<N>` *copy* ctor -- no `memset`, straight bulk copy) instead of
-+ * the int ctor's `memset`+4-byte-`Memcpy` shape; `m_kDenom` is still
-+ * constructed from the hardcoded literal `1`. Zero callers found (see the
-+ * `TRational(int)` citation below for the shared explanation).
-+ *
-+ * What it does:
-+ * Constructs the rational number rkNumer/1.
-+ */
- template <int N>
- TRational<N>::TRational (const TInteger<N>& rkNumer)
-     :
-@@ -43,6 +61,35 @@ TRational<N>::TRational (const TInteger<N>& rkNumer,
- {
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A5A550 (`TRational<32>`, no FUN_ token; IDA never tokenized
-+ * this region) - TRational<32>::TRational(int)
-+ * Address: 0x00A77B30 (`TRational<16>`, no FUN_ token) -
-+ * TRational<16>::TRational(int)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep, decoded
-+ * directly from bin/2025.7.1/ForgedAlliance.exe). Byte-exact match: inlines
-+ * `TInteger<N>::TInteger(int)` for `m_kNumer` (conditional `memset` fill
-+ * byte 0x00/0xFF by sign, then a 4-byte `System::Memcpy` of the int arg)
-+ * followed by the same shape again at `this+TINT_BYTES` (`m_kDenom`) but
-+ * with a literal `1` instead of a second stack argument -- matching
-+ * `m_kNumer(iNumer), m_kDenom(1)` exactly. `TINT_BYTES` (`push 0x80`/
-+ * `push 0x40`) is what distinguishes the `<32>` (0x80=128) and `<16>`
-+ * (0x40=64) instantiations at the byte level (`TINT_BYTES = 2*N*sizeof(short)`
-+ * per Wm3TInteger.h). Neighbors `Wm3::TInteger32::Compare`/`::operator-` (for
-+ * N=32) and `Wm3::TInteger16::operator-` (for N=16) are real, separately
-+ * tokenized `TInteger<N>` members that happen to sit adjacent in the binary
-+ * -- this constructor family belongs to the enclosing `TRational<N>`, not
-+ * `TInteger<N>`. Two already-tokenized `TRational<32>` ctors exist elsewhere
-+ * with real callers (`FUN_00A576D0`/`FUN_00A5FCD0`, 4 callers each); this one
-+ * and its two siblings immediately below found zero callers in a whole-.text
-+ * PE scan -- consistent with the orphaned-but-unstripped-COMDAT pattern
-+ * documented at length for the sibling `Eigen<Real>`/`GMatrix<Real>` cluster
-+ * (see those reconstruction reports).
-+ *
-+ * What it does:
-+ * Constructs the rational number iNumer/1.
-+ */
- template <int N>
- TRational<N>::TRational (int iNumer)
-     :
-@@ -51,6 +98,20 @@ TRational<N>::TRational (int iNumer)
- {
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A5A4D0 (`TRational<32>`, no FUN_ token) -
-+ * TRational<32>::TRational(int, int)
-+ * Address: 0x00A77AB0 (`TRational<16>`, no FUN_ token) -
-+ * TRational<16>::TRational(int, int)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). Same evidence
-+ * chain as TRational(int) directly above, but both `m_kNumer`/`m_kDenom` are
-+ * constructed from real stack arguments (`ret 8`, two 4-byte int params)
-+ * instead of a hardcoded `1`.
-+ *
-+ * What it does:
-+ * Constructs the rational number iNumer/iDenom.
-+ */
- template <int N>
- TRational<N>::TRational (int iNumer, int iDenom)
-     :
-diff --git a/Foundation/System/Wm3System.cpp b/Foundation/System/Wm3System.cpp
-index cff2e37e426990bc329a32398a33385ffac6e8b5..ac8787cabea0cacc14f7259f9ea55ecc9565ea5c 100644
---- a/Foundation/System/Wm3System.cpp
-+++ b/Foundation/System/Wm3System.cpp
-@@ -91,6 +91,24 @@ void System::EndianCopy (int iSize, int iQuantity, const void* pvSrc,
-     SwapBytes(iSize,iQuantity,pvDst);
- #endif
- }
-+/**
-+ * Address: 0x00A48AB0 (no FUN_ token; IDA never tokenized this region) -
-+ * System::GetTime()
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep, decoded
-+ * directly from bin/2025.7.1/ForgedAlliance.exe since IDA carved no function
-+ * boundary here). Byte-exact match to the `!__APPLE__` branch: a static
-+ * "initialized" byte flag gate, two `ftime()` calls, delta computation with
-+ * the `imul *1000` and negative-microsecond carry fix-up, ending in an
-+ * `fild`+`fmul` by a `0.001` qword constant. A whole-.text PE scan (rel32
-+ * call/jmp + absolute-dword) found zero callers anywhere in the binary --
-+ * see the `System::Sprintf` citation below for the established explanation
-+ * (this whole class's trivial/leaf members are frequently orphaned COMDATs
-+ * in this specific link).
-+ *
-+ * What it does:
-+ * Returns milliseconds elapsed since the first call, as a double.
-+ */
- //----------------------------------------------------------------------------
- double System::GetTime ()
- {
-@@ -195,6 +213,25 @@ bool System::Save (const char* acFilename, const char* acBuffer, int iSize)
-     return true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A491C0 (no FUN_ token; IDA never tokenized this region) -
-+ * System::Append(const char*, char*, int)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep, decoded
-+ * directly from bin/2025.7.1/ForgedAlliance.exe). Byte-exact match:
-+ * `acBuffer`/`iSize` null/non-positive guards, `System::Fopen` inlined
-+ * (fopen_s-shaped errno_t check then a null-pkFile check), `fwrite`, then
-+ * `System::Fclose` inlined as a raw `call fclose`. Mode string confirmed by
-+ * reading the referenced `.rdata` constant directly: `"ab\0"` (append
-+ * binary), distinguishing this from the otherwise-identical `System::Save`
-+ * (which uses `"wb"` and was not found in this gap -- presumably tokenized
-+ * or inlined elsewhere). Zero callers found in a whole-.text PE scan (see
-+ * System::Sprintf's citation, ~700 lines down, for the established
-+ * explanation of this pattern throughout the class).
-+ *
-+ * What it does:
-+ * Appends iSize bytes from acBuffer to the file named acFilename.
-+ */
- bool System::Append (const char* acFilename, char* acBuffer, int iSize)
- {
-     if (!acBuffer || iSize <= 0)
-@@ -221,6 +258,24 @@ bool System::Append (const char* acFilename, char* acBuffer, int iSize)
-     return true;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49230 (no FUN_ token) - System::Read1(const char*, int, void*)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). Byte-exact:
-+ * a single `_memcpy_s(pvData,iQuantity,acBuffer,iQuantity)` call (the
-+ * inlined `Memcpy`), returns `iQuantity` unchanged. Part of a clean 9-member
-+ * run in this gap (Append just above, then this buffer-based Read1/Write1/
-+ * Read2le/Read4le/Read8le/Write2le/Write4le/Write8le octet -- the buffer
-+ * counterpart to the FILE*-based octet cited earlier in this file at
-+ * 0x00A48B50), distinguished by which stack args feed `_memcpy_s`'s dst/src
-+ * slots (Read: dst=pvData,src=acBuffer; Write: dst=acBuffer,src=pvData) and
-+ * by 0/1/2/3 `add esi,esi` doublings before the size arg (x1/x2/x4/x8 element
-+ * width). Zero callers found (see System::Sprintf's citation further down
-+ * for the established explanation).
-+ *
-+ * What it does:
-+ * Copies iQuantity bytes from acBuffer into pvData.
-+ */
- int System::Read1 (const char* acBuffer, int iQuantity, void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -229,6 +284,10 @@ int System::Read1 (const char* acBuffer, int iQuantity, void* pvData)
-     return iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49250 (no FUN_ token) - System::Write1(char*, int, const void*)
-+ * (see Read1(const char*,...)'s citation above for the shared evidence chain)
-+ */
- int System::Write1 (char* acBuffer, int iQuantity, const void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData) ;
-@@ -237,6 +296,24 @@ int System::Write1 (char* acBuffer, int iQuantity, const void* pvData)
-     return iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48B50 (no FUN_ token) - System::Read1(FILE*, int, void*)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). Byte-exact:
-+ * `fread(pvData,1,iQuantity,pkFile); return iQuantity;` (return value is the
-+ * requested count, not fread's actual result, matching this source exactly).
-+ * Part of a clean, contiguous 9-member run (Read1/Write1/Read2le/Read4le/
-+ * Read8le/Write2le/Write4le/Write8le's FILE* overloads, plus GetTime just
-+ * before) distinguished purely by the hardcoded item-size immediate pushed
-+ * before the fread/fwrite call (1, 2, 4, or 8) and the shift used to compute
-+ * the return value (iQuantity, iQuantity*2 via `lea eax,[esi+esi]`,
-+ * iQuantity*4 via `lea eax,[esi*4]`, iQuantity*8 via `lea eax,[esi*8]`).
-+ * Zero callers found in a whole-.text scan (see System::Sprintf's citation
-+ * below).
-+ *
-+ * What it does:
-+ * Reads iQuantity bytes from pkFile into pvData.
-+ */
- int System::Read1 (FILE* pkFile, int iQuantity, void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -244,6 +321,10 @@ int System::Read1 (FILE* pkFile, int iQuantity, void* pvData)
-     return iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48B70 (no FUN_ token) - System::Write1(FILE*, int, const void*)
-+ * (see Read1(FILE*,...)'s citation above for the shared evidence chain)
-+ */
- int System::Write1 (FILE* pkFile, int iQuantity, const void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -251,6 +332,10 @@ int System::Write1 (FILE* pkFile, int iQuantity, const void* pvData)
-     return iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49270 (no FUN_ token) - System::Read2le(const char*, int, void*)
-+ * (see Read1(const char*,...)'s citation above, ~30 lines up)
-+ */
- int System::Read2le (const char* acBuffer, int iQuantity, void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -263,6 +348,10 @@ int System::Read2le (const char* acBuffer, int iQuantity, void* pvData)
-     return iNumBytes;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49290 (no FUN_ token) - System::Read4le(const char*, int, void*)
-+ * (see Read1(const char*,...)'s citation above)
-+ */
- int System::Read4le (const char* acBuffer, int iQuantity, void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -275,6 +364,10 @@ int System::Read4le (const char* acBuffer, int iQuantity, void* pvData)
-     return iNumBytes;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A492C0 (no FUN_ token) - System::Read8le(const char*, int, void*)
-+ * (see Read1(const char*,...)'s citation above)
-+ */
- int System::Read8le (const char* acBuffer, int iQuantity, void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -287,6 +380,10 @@ int System::Read8le (const char* acBuffer, int iQuantity, void* pvData)
-     return iNumBytes;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A492F0 (no FUN_ token) - System::Write2le(char*, int, const void*)
-+ * (see Read1(const char*,...)'s citation above)
-+ */
- int System::Write2le (char* acBuffer, int iQuantity, const void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -299,6 +396,10 @@ int System::Write2le (char* acBuffer, int iQuantity, const void* pvData)
-     return iNumBytes;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49310 (no FUN_ token) - System::Write4le(char*, int, const void*)
-+ * (see Read1(const char*,...)'s citation above)
-+ */
- int System::Write4le (char* acBuffer, int iQuantity, const void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -311,6 +412,10 @@ int System::Write4le (char* acBuffer, int iQuantity, const void* pvData)
-     return iNumBytes;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49340 (no FUN_ token) - System::Write8le(char*, int, const void*)
-+ * (see Read1(const char*,...)'s citation above)
-+ */
- int System::Write8le (char* acBuffer, int iQuantity, const void* pvData)
- {
-     assert(acBuffer && iQuantity > 0 && pvData);
-@@ -343,6 +448,11 @@ int System::Read4le (FILE* pkFile, int iQuantity, void* pvData)
-     return 4*iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48BE0 (no FUN_ token) - System::Read8le(FILE*, int, void*)
-+ * (see Read1(FILE*,...)'s citation above, ~120 lines up, for the shared
-+ * evidence chain)
-+ */
- int System::Read8le (FILE* pkFile, int iQuantity, void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -353,6 +463,12 @@ int System::Read8le (FILE* pkFile, int iQuantity, void* pvData)
-     return 8*iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48C10 (no FUN_ token) - System::Write2le(FILE*, int, const void*)
-+ * (see Read1(FILE*,...)'s citation above for the shared evidence chain --
-+ * on this `!WM3_BIG_ENDIAN` target the `#else` single-shot `fwrite` branch
-+ * is what's emitted, not the per-element loop)
-+ */
- int System::Write2le (FILE* pkFile, int iQuantity, const void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -370,6 +486,10 @@ int System::Write2le (FILE* pkFile, int iQuantity, const void* pvData)
-     return 2*iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48C30 (no FUN_ token) - System::Write4le(FILE*, int, const void*)
-+ * (see Write2le(FILE*,...)'s citation above)
-+ */
- int System::Write4le (FILE* pkFile, int iQuantity, const void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -387,6 +507,10 @@ int System::Write4le (FILE* pkFile, int iQuantity, const void* pvData)
-     return 4*iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48C60 (no FUN_ token) - System::Write8le(FILE*, int, const void*)
-+ * (see Write2le(FILE*,...)'s citation above)
-+ */
- int System::Write8le (FILE* pkFile, int iQuantity, const void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -523,6 +647,22 @@ int System::Write2be (FILE* pkFile, int iQuantity, const void* pvData)
-     return 2*iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48D70 (no FUN_ token) - System::Write4be(FILE*, int, const void*)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). On this
-+ * `!WM3_BIG_ENDIAN` (x86) target the per-element loop branch is what's
-+ * emitted: byte-exact match -- loop `iQuantity` times, each iteration
-+ * byte-swaps one 4-byte element in place (the inlined `SwapBytes(4,&iTemp)`
-+ * shuffle) then `fwrite(&iTemp,4,1,pkFile)`; the early-out (`iQuantity<=0`)
-+ * path still computes and returns `4*iQuantity`. Distinguishing shape vs.
-+ * `Write4le`: a real loop with per-iteration fwrite calls (94 bytes) instead
-+ * of a single bulk fwrite (35 bytes). Zero callers found (see
-+ * System::Sprintf's citation below).
-+ *
-+ * What it does:
-+ * Writes iQuantity 4-byte elements to pkFile in big-endian byte order.
-+ */
- int System::Write4be (FILE* pkFile, int iQuantity, const void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -540,6 +680,12 @@ int System::Write4be (FILE* pkFile, int iQuantity, const void* pvData)
-     return 4*iQuantity;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48DD0 (no FUN_ token) - System::Write8be(FILE*, int, const void*)
-+ * (see Write4be(FILE*,...)'s citation above; 8-byte element version, uses
-+ * `fld`/`fstp qword` to move each double through the FPU before the
-+ * byte-shuffle+fwrite)
-+ */
- int System::Write8be (FILE* pkFile, int iQuantity, const void* pvData)
- {
-     assert(pkFile && iQuantity > 0 && pvData);
-@@ -623,6 +769,19 @@ const char* System::GetPath (const char* acDirectory, const char* acFilename)
-     return 0;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48E80 (no FUN_ token) - System::MakeRGB(unsigned char,
-+ * unsigned char, unsigned char)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). On this
-+ * `!WM3_BIG_ENDIAN` target: byte-exact match to `ucR | (ucG<<8) | (ucB<<16)
-+ * | (0xFF<<24)` -- three byte args loaded via `movzx`, combined through a
-+ * chain of `or`/`shl 8` with the alpha byte hardcoded as `0xFF` up front.
-+ * Zero callers found (see System::Sprintf's citation below).
-+ *
-+ * What it does:
-+ * Packs R/G/B into a 32-bit color with full alpha, hiding endianness.
-+ */
- unsigned int System::MakeRGB (unsigned char ucR, unsigned char ucG,
-     unsigned char ucB)
- {
-@@ -633,6 +792,18 @@ unsigned int System::MakeRGB (unsigned char ucR, unsigned char ucG,
- #endif
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48EA0 (no FUN_ token) - System::MakeRGBA(unsigned char,
-+ * unsigned char, unsigned char, unsigned char)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). Same shape as
-+ * MakeRGB immediately above but the alpha byte comes from the 4th argument
-+ * (loaded into `ah` before the shift chain) instead of a hardcoded `0xFF`.
-+ * Zero callers found (see System::Sprintf's citation below).
-+ *
-+ * What it does:
-+ * Packs R/G/B/A into a 32-bit color, hiding endianness.
-+ */
- unsigned int System::MakeRGBA (unsigned char ucR, unsigned char ucG,
-     unsigned char ucB, unsigned char ucA)
- {
-@@ -718,6 +889,29 @@ void* System::Memcpy (void* pvDst, size_t uiDstSize, const void* pvSrc,
- #endif
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48F60 (no FUN_ token; IDA never tokenized this region) -
-+ * System::Sprintf(char*, size_t, const char*, ...)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep, decoded
-+ * directly from bin/2025.7.1/ForgedAlliance.exe since IDA carved no function
-+ * boundary for this or the four sibling members below). Byte-exact match:
-+ * three null/zero guards (`!acDst`/`uiDstSize==0`/`!acFormat`) each jumping
-+ * to a shared `return -1` tail, then `va_start`-equivalent stack setup and a
-+ * call to an internal `vsprintf_s`-shaped CRT helper. This is the ONLY
-+ * member of this run with the explicit guard-and-early-return shape (the VC80
-+ * branch of the four string members below skips the guards and lets the
-+ * `_s` CRT function validate its own arguments). A whole-.text PE scan found
-+ * zero callers anywhere in the binary for all five members in this run --
-+ * likely more orphaned-but-unstripped COMDATs from this library's usual
-+ * emit-the-whole-class-but-inline-the-one-use-site pattern (see the
-+ * `Eigen<Real>`/`GMatrix<Real>` citations in the sibling Numerics/Math
-+ * reconstruction reports for the fully-worked-out precedent of this same
-+ * phenomenon elsewhere in this static library).
-+ *
-+ * What it does:
-+ * Bounds-checked sprintf; returns -1 on bad arguments.
-+ */
- int System::Sprintf (char* acDst, size_t uiDstSize, const char* acFormat, ...)
- {
-     if (!acDst || uiDstSize == 0 || !acFormat)
-@@ -738,6 +932,19 @@ int System::Sprintf (char* acDst, size_t uiDstSize, const char* acFormat, ...)
-     return iNumWritten;
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48F90 (no FUN_ token) - System::Strcpy(char*, size_t, const char*)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). VC80 branch:
-+ * straight call to `strcpy_s(acDst,uiDstSize,acSrc)` (no null guards --
-+ * those only exist in the non-VC80 `#else` branch), then a branchless
-+ * `neg/sbb/not/and` idiom computing `(uiError==0) ? acDst : 0` in place of
-+ * the source's if/else. Zero callers found (see System::Sprintf's citation
-+ * above).
-+ *
-+ * What it does:
-+ * Bounds-checked strcpy; returns null on failure.
-+ */
- char* System::Strcpy (char* acDst, size_t uiDstSize, const char* acSrc)
- {
- #ifdef WM3_USING_VC80
-@@ -771,6 +978,10 @@ char* System::Strcpy (char* acDst, size_t uiDstSize, const char* acSrc)
- #endif
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48FC0 (no FUN_ token) - System::Strcat(char*, size_t, const char*)
-+ * (see System::Strcpy's citation above -- identical shape, calls `strcat_s`)
-+ */
- char* System::Strcat (char* acDst, size_t uiDstSize, const char* acSrc)
- {
- #ifdef WM3_USING_VC80
-@@ -806,6 +1017,12 @@ char* System::Strcat (char* acDst, size_t uiDstSize, const char* acSrc)
- #endif
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A48FF0 (no FUN_ token) - System::Strncpy(char*, size_t,
-+ * const char*, size_t)
-+ * (see System::Strcpy's citation above -- same shape with a 4th arg, calls
-+ * `strncpy_s`)
-+ */
- char* System::Strncpy (char* acDst, size_t uiDstSize, const char* acSrc,
-     size_t uiSrcSize)
- {
-@@ -838,6 +1055,18 @@ char* System::Strncpy (char* acDst, size_t uiDstSize, const char* acSrc,
- #endif
- }
- //----------------------------------------------------------------------------
-+/**
-+ * Address: 0x00A49020 (no FUN_ token) - System::Strtok(char*, const char*, char*&)
-+ *
-+ * FAF recovery traceability (2026-08-26 WildMagic gap sweep). A bare 5-byte
-+ * `jmp strtok_s` tail-call thunk -- the VC80 branch is a direct pass-through
-+ * (`return strtok_s(...)`) with matching argument layout, so the compiler
-+ * emitted a tail jump instead of a call+ret. Zero callers found (see
-+ * System::Sprintf's citation above).
-+ *
-+ * What it does:
-+ * Bounds-checked strtok.
-+ */
- char* System::Strtok (char* acToken, const char* acDelimiters,
-     char*& racNextToken)
- {
 diff --git a/Foundation/Terrain/Wm3ClodTerrainPage.cpp b/Foundation/Terrain/Wm3ClodTerrainPage.cpp
 index a9156a69e9656e5c98c4c6553eb1d196cb5b6e3a..9d009197d3cd0ce2102e27a42b23876ce5c97d90 100644
 --- a/Foundation/Terrain/Wm3ClodTerrainPage.cpp
@@ -3326,12 +911,11 @@ diff --git a/Renderers/Dx9Renderer/Wm3Dx9Utility.h b/Renderers/Dx9Renderer/Wm3Dx
 index 40f5e45ed18cdf54308f67ba02ba04729681e534..9c795fb63fed2c26c2601a6da2473bc6377d3264 100644
 --- a/Renderers/Dx9Renderer/Wm3Dx9Utility.h
 +++ b/Renderers/Dx9Renderer/Wm3Dx9Utility.h
-@@ -16,7 +16,8 @@
+@@ -16,7 +16,7 @@
  #include <d3d9.h>
  #include <d3dx9math.h>
  #include <d3dx9tex.h>
 -#include <dxerr9.h>
-+// dxerr9.h was renamed to DxErr.h in the June 2010 DirectX SDK.
 +#include <DxErr.h>
  
  namespace Wm3
