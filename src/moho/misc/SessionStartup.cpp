@@ -475,7 +475,8 @@ namespace moho
    *
    * What it does:
    * Loads replay file payload, reconstructs `LaunchInfoNew`, and creates
-   * one replay `SWldSessionInfo` bootstrap object.
+   * one replay `SWldSessionInfo` bootstrap object. A header from another
+   * engine version is refused, unless `/noversioncheck` is on the command line.
    */
   msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(const gpg::StrArg filename)
   {
@@ -499,7 +500,17 @@ namespace moho
     msvc8::string replayVersion{};
     replayReader.ReadString(&replayVersion);
     if (replayVersion.view() != expectedVersion.view()) {
-      return msvc8::auto_ptr<SWldSessionInfo>();
+      // FAF addition, not in the shipped binary: /noversioncheck plays a replay
+      // whose header names another engine version instead of refusing it.
+      if (!CFG_GetArgOption("/noversioncheck", 0, nullptr)) {
+        return msvc8::auto_ptr<SWldSessionInfo>();
+      }
+      gpg::Warnf(
+        "Replay %s was recorded by \"%s\", this engine is \"%s\"; playing it anyway (/noversioncheck).",
+        filename,
+        replayVersion.c_str(),
+        expectedVersion.c_str()
+      );
     }
 
     msvc8::string ignoredString{};
