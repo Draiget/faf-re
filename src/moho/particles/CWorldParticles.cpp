@@ -191,6 +191,11 @@ namespace
   constexpr int kPooledTrailSegmentBufferCount = 100;
   constexpr std::uint32_t kTrailSegmentCapacity = 100U;
 
+  // FAF FA-Binary-Patches #165 (Increase particle and segment render-buffer pool capacities):
+  // the pools `Init` fills, 4096 particle buffers (was 400) and 400 trail-segment buffers (was 100).
+  constexpr int kLargePooledParticleBufferCount = 4096;
+  constexpr int kLargePooledTrailSegmentBufferCount = 400;
+
   constexpr int kTrailVertexFormatToken = 12;
   constexpr std::uint32_t kTrailVertexSheetUsageToken = 1U;
   constexpr int kTrailVertexSheetFrequencyToken = 400;
@@ -483,6 +488,16 @@ namespace
 
 namespace moho
 {
+  /// FAF FA-Binary-Patches #165 switch: 0 brings back the original pool sizes. Read when the pools are filled.
+  bool ren_LargeParticlePools = true;
+  TConVar<bool> gTConVar_ren_LargeParticlePools(
+    "ren_LargeParticlePools",
+    "Pool 4096 particle buffers and 400 trail-segment buffers (the default), so big fights stop running out "
+    "and dropping particles and trail segments. 0 keeps the original 400 and 100. Read once, when the first "
+    "world particle is drawn, so set it at startup (/con ren_LargeParticlePools=0).",
+    &ren_LargeParticlePools
+  );
+
   /// Engine addition: switch for AddWorldParticle's cached-bucket shortcut (ParticleMatchesBucketKey). Live.
   bool ren_ParticleKeyShortcut = true;
   TConVar<bool> gTConVar_ren_ParticleKeyShortcut(
@@ -1356,7 +1371,8 @@ namespace moho
    *
    * What it does:
    * Lazily allocates particle and trail pooled buffers used by world-particle
-   * render bucket upload paths.
+   * render bucket upload paths (4096 and 400 of them since FAF
+   * FA-Binary-Patches #165, 400 and 100 originally).
    */
   void CWorldParticles::Init()
   {
@@ -1370,7 +1386,14 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
     CD3DVertexFormat* const trailVertexFormat = resources->GetVertexFormat(kTrailVertexFormatToken);
 
-    for (int bufferIndex = 0; bufferIndex < kPooledParticleBufferCount; ++bufferIndex) {
+    // FAF FA-Binary-Patches #165: 4096 particle and 400 trail-segment buffers instead of 400 and 100
+    // (the loop counts stored at 0x004928ED / 0x004929B2). The original pools run out in big fights,
+    // which drops particles ("Particle cap exceeded") and trail segments.
+    const int particleBufferCount = ren_LargeParticlePools ? kLargePooledParticleBufferCount : kPooledParticleBufferCount;
+    const int trailSegmentBufferCount =
+      ren_LargeParticlePools ? kLargePooledTrailSegmentBufferCount : kPooledTrailSegmentBufferCount;
+
+    for (int bufferIndex = 0; bufferIndex < particleBufferCount; ++bufferIndex) {
       auto* const particleBuffer = new ParticleBuffer();
       particleBuffer->Shutdown();
       particleBuffer->mMaxParticles = kParticleBufferCapacity;
@@ -1379,7 +1402,7 @@ namespace moho
       mParticleBuffers.push_back(particleBuffer);
     }
 
-    for (int bufferIndex = 0; bufferIndex < kPooledTrailSegmentBufferCount; ++bufferIndex) {
+    for (int bufferIndex = 0; bufferIndex < trailSegmentBufferCount; ++bufferIndex) {
       auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(
         ::operator new(sizeof(STrailSegmentBuffer))
       );

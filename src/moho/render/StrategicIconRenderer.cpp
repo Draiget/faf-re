@@ -24,6 +24,8 @@
 
 namespace moho
 {
+  extern float ui_StrategicIconScale; // FAF FA-Binary-Patches #147 (CWldSession.cpp)
+
   int ren_GpuIcons = -1;
   int ren_GpuIconClassify = -1;
 
@@ -214,7 +216,9 @@ namespace moho
     for (std::uint32_t index = 0U; index < count; ++index) {
       const Slot& slot = mSlots[index];
       std::memcpy(records[index].uv, slot.mUv, sizeof(slot.mUv));
-      std::memcpy(records[index].halfSize, slot.mHalfSize, sizeof(slot.mHalfSize));
+      // FAF FA-Binary-Patches #147: the batcher path's radii times `ui_StrategicIconScale`.
+      records[index].halfSize[0] = slot.mHalfSize[0] * ui_StrategicIconScale;
+      records[index].halfSize[1] = slot.mHalfSize[1] * ui_StrategicIconScale;
       records[index].unused[0] = 0.0f;
       records[index].unused[1] = 0.0f;
     }
@@ -222,6 +226,7 @@ namespace moho
       device->UpdateGpuBuffer(*mSlotBuffer, 0U, count, records.data());
     }
     mSlotsDirty = false;
+    mUploadedIconScale = ui_StrategicIconScale;
   }
 
   StrategicIconRenderer::ViewStream& StrategicIconRenderer::StreamFor(const void* const viewKey)
@@ -244,7 +249,7 @@ namespace moho
     if (!RefreshAtlasSlots(batcher)) {
       return nullptr;
     }
-    if (mSlotsDirty) {
+    if (mSlotsDirty || mUploadedIconScale != ui_StrategicIconScale) {
       UploadSlots();
     }
     // Anything the batcher still holds was submitted before the icons.

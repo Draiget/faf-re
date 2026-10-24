@@ -763,6 +763,29 @@ namespace moho
   bool ui_DrawPathPreview = false;          // 0x010A6443
   bool ui_PathPreview = false;              // 0x010A6448
 
+  // FAF FA-Binary-Patches #147 (Scale projectile/deposit/strategic icons): screen-size multipliers
+  // of the strategic-view icons. `ui_StrategicIconScale` is FAF's older strategic-icon scale (in the
+  // FAF retail exe at 0x01292AC0) that #147 rewrote; the deposit and projectile scales are new in #147.
+  float ui_StrategicIconScale = 1.0f;
+  float ui_DepositIconScale = 1.0f;
+  float ui_ProjectileIconScale = 1.0f;
+
+  TConVar<float> gTConVar_ui_StrategicIconScale(
+    "ui_StrategicIconScale",
+    "Size multiplier of unit strategic icons and their paused, stunned and underlay overlays (1 = the texture's own size).",
+    &ui_StrategicIconScale
+  );
+  TConVar<float> gTConVar_ui_DepositIconScale(
+    "ui_DepositIconScale",
+    "Size multiplier of the mass and hydrocarbon deposit icons of the strategic view (1 = the original size).",
+    &ui_DepositIconScale
+  );
+  TConVar<float> gTConVar_ui_ProjectileIconScale(
+    "ui_ProjectileIconScale",
+    "Size multiplier of projectile icons, textured or the plain squares (1 = the original size).",
+    &ui_ProjectileIconScale
+  );
+
   // Per-army team-color palette, distinct from `StrategicIconAux`'s own
   // Self/Ally/Enemy/Neutral relation colors: `RenderUnitIcon` (0x0085D9A0)
   // indexes this one directly by the icon's owning army's `mArmyIndex`
@@ -11938,7 +11961,8 @@ namespace moho
      * quad-draw sites - 0x0085DC96 (identified underlay), 0x0085DDAA (base
      * icon), 0x0085DEA7 (paused overlay), 0x0085DFA3 (stunned overlay) -
      * each computing `texture->mWidth >> 1` / `mHeight >> 1` then the same
-     * four corners, so it is lifted here once instead of four times.
+     * four corners, so it is lifted here once instead of four times. The
+     * radii are scaled by `ui_StrategicIconScale` (FAF FA-Binary-Patches #147).
      */
     void DrawStrategicIconQuad(
       CD3DPrimBatcher& primBatcher,
@@ -11948,8 +11972,10 @@ namespace moho
       const std::uint32_t color
     )
     {
-      const float halfWidth = static_cast<float>(texture.mWidth >> 1);
-      const float halfHeight = static_cast<float>(texture.mHeight >> 1);
+      // FAF FA-Binary-Patches #147 (Scale projectile/deposit/strategic icons): radii times
+      // `ui_StrategicIconScale` at all four quad sites (0x0085DCA4, 0x0085DDB6, 0x0085DEB3, 0x0085DFAF).
+      const float halfWidth = static_cast<float>(texture.mWidth >> 1) * ui_StrategicIconScale;
+      const float halfHeight = static_cast<float>(texture.mHeight >> 1) * ui_StrategicIconScale;
 
       primBatcher.DrawQuad(
         Wm3::Vector3f(centerX - halfWidth, centerY - halfHeight, 0.0f),
@@ -12137,9 +12163,9 @@ namespace moho
           mLastTexture = texture.get();
         }
 
-        // `DrawStrategicIconQuad`'s corners.
-        const float halfWidth = static_cast<float>(texture->mWidth >> 1);
-        const float halfHeight = static_cast<float>(texture->mHeight >> 1);
+        // `DrawStrategicIconQuad`'s corners, scaled the same way (FAF FA-Binary-Patches #147).
+        const float halfWidth = static_cast<float>(texture->mWidth >> 1) * ui_StrategicIconScale;
+        const float halfHeight = static_cast<float>(texture->mHeight >> 1) * ui_StrategicIconScale;
         mPending.push_back(CD3DPrimBatcher::ScreenQuad{
           centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight, color
         });
@@ -13659,9 +13685,10 @@ namespace moho
           continue;
         }
         // Sized from the texture itself, so an icon is drawn at its authored
-        // pixel size regardless of zoom.
-        halfWidth = static_cast<float>(icon->mWidth >> 1u);
-        halfHeight = static_cast<float>(icon->mHeight >> 1u);
+        // pixel size regardless of zoom, times `ui_ProjectileIconScale` (FAF
+        // FA-Binary-Patches #147, 0x008625A3).
+        halfWidth = static_cast<float>(icon->mWidth >> 1u) * ui_ProjectileIconScale;
+        halfHeight = static_cast<float>(icon->mHeight >> 1u) * ui_ProjectileIconScale;
         usesIconTexture = true;
         if (UI_RenProjectileGlow) {
           primBatcher->Flush();
@@ -13688,7 +13715,8 @@ namespace moho
         if (!icon) {
           continue;
         }
-        halfWidth = blueprint->Display.StrategicIconSize * 0.5f;
+        // FAF FA-Binary-Patches #147: times `ui_ProjectileIconScale` (0x0086269C).
+        halfWidth = blueprint->Display.StrategicIconSize * 0.5f * ui_ProjectileIconScale;
         halfHeight = halfWidth;
       }
 
@@ -13810,8 +13838,12 @@ namespace moho
         return;
       }
 
-      const float halfWidth = static_cast<float>(splat->mWidth >> kResourceSplatHalfExtentShift);
-      const float halfHeight = static_cast<float>(splat->mHeight >> kResourceSplatHalfExtentShift);
+      // FAF FA-Binary-Patches #147 (Scale projectile/deposit/strategic icons): times
+      // `ui_DepositIconScale` (0x008630A0 mass, 0x0086329D hydrocarbon).
+      const float halfWidth =
+        static_cast<float>(splat->mWidth >> kResourceSplatHalfExtentShift) * ui_DepositIconScale;
+      const float halfHeight =
+        static_cast<float>(splat->mHeight >> kResourceSplatHalfExtentShift) * ui_DepositIconScale;
       primBatcher.SetTexture(splat);
 
       for (const Wm3::Vector2f& centre : screenPoints) {

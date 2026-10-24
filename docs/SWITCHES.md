@@ -2,7 +2,7 @@
 
 Reference for the console variables and startup flags behind the [performance work](PERFORMANCE.md).
 
-Every performance change has a switch that brings back the original path, and both paths give the same sim checksums. Console variables can be set in game (`name value` in the console) or at startup with `/con name=value;name2=value2`, which runs on the first frame. "Live" means a change applies from the next use; "next game" means the value is read when a thread or session starts.
+Every performance change has a switch that brings back the original path, and both paths give the same sim checksums. So does every ported FAF FA-Binary-Patches change a player can notice (rows that name a patch number). Console variables can be set in game (`name value` in the console) or at startup with `/con name=value;name2=value2`, which runs on the first frame. "Live" means a change applies from the next use; "next game" means the value is read when a thread or session starts.
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
@@ -58,6 +58,11 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_ParticleBatch` | −1 (auto) | `/con` | live | Each particle bucket drawn as one instanced draw |
 | `ren_CacheFogFootprint` | 1 | `/con` | live | The fog pass keeps each camera's terrain footprint until the camera or terrain changes |
 | `ui_IconRecords` | 1 | `/con` | live | Strategic icons classified from per-unit records refreshed only after a sync beat or a view-list rebuild |
+| `cam_FreeClampFocus` | 0 | `/con` | live | With `cam_Free` on, 1 snaps the camera focus onto the terrain under the view ray again, as before FAF FA-Binary-Patches #170 (the free camera jumped behind hills) |
+| `ren_LargeParticlePools` | 1 | `/con` | first world particle (startup) | Particle and trail-segment render-buffer pools of 4096 and 400 buffers (FAF FA-Binary-Patches #165); 0 keeps the original 400 and 100, which run out in big fights and drop particles ("Particle cap exceeded") and trail segments |
+| `ren_MinimapRanges` | 1 | `/con` | live | Range rings on the minimap; 0 skips that pass (FAF FA-Binary-Patches #158, FAF's own name) |
+| `ren_MinimapDebugOverlays` | 0 | `/con` | live | 1 draws the debug overlays (`ren_ShowFrameTimes`, `ren_ShowNetworkStats`, `ren_ShowBandwidthUsage`, `UI_ShowControlUnderMouse`) into the minimap again, as before FAF FA-Binary-Patches #158 |
+| `ui_StrategicIconScale`, `ui_DepositIconScale`, `ui_ProjectileIconScale` | 1.0 | `/con` | live | Size multipliers of unit strategic icons (with their paused, stunned and underlay overlays), deposit icons and projectile icons (FAF FA-Binary-Patches #147; 1.0 is the original size) |
 | `sys_ThreadPlacement` | 0 | `/threadplacement N` | next thread start | Thread placement on cores (0 leaves it to Windows) |
 | XACT process clock | on | `/realtickcount` turns it off | startup only | XACT 2.9 times itself from process start instead of Windows boot, so sound keeps working after 24.8 days of uptime without UptimeFaker; the log says `SND: xactengine2_9.dll clock imports patched` (`FAF_TEST_TICK_OFFSET_DAYS=N` in the environment fakes N more days of uptime, for testing) |
 
