@@ -3,6 +3,9 @@
 #include <new>
 #include <utility>
 
+namespace msvc8
+{
+
 namespace
 {
 constexpr std::int32_t kUnknownStatusTokenLength = 4;
@@ -1367,3 +1370,4 @@ DNameNode* DNameNode::clone() noexcept
   return new (pointerNodeStorage) DNamePointerNode(nestedNameStorage);
 }
 
+} // namespace msvc8

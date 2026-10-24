@@ -3,6 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
+// The MSVC8 CRT's name undecorator, recovered from the binary (which linked
+// the CRT statically). It lives in `msvc8` so it cannot collide with the
+// toolchain runtime's own undecorator (vcruntime's undname.obj defines the
+// same global `DName` classes) when the engine links that runtime
+// statically (/MT).
+namespace msvc8
+{
+
 class DName;
 
 class DNameNode
@@ -395,3 +403,5 @@ private:
   std::uint32_t statusWord_ = 0; // +0x04
 };
 static_assert(sizeof(DName) == 0x08, "DName size must be 0x08");
+
+} // namespace msvc8

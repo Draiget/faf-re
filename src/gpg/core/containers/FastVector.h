@@ -2781,7 +2781,7 @@ namespace gpg::core
   namespace legacy
   {
     template <class T>
-    [[nodiscard]] inline FastVector<T>& CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin);
+    [[nodiscard]] inline FastVector<T>& CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin = nullptr);
 
     /**
      * Address: 0x00402C20 (FUN_00402C20, fastvector_uint copy-range helper)
@@ -3072,7 +3072,7 @@ namespace gpg::core
      */
     template <class T>
     [[nodiscard]] inline FastVector<T>&
-    CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin = nullptr)
+    CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin)
     {
       static_assert(
         std::is_trivially_copyable_v<T>, "Legacy fastvector ABI helpers require trivially copyable element types."

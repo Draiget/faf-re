@@ -5454,6 +5454,12 @@ namespace gpg
     outValue->reset_from_owner(value);
     return this;
   }
+  // Declared ahead of its definition below: WritePointer names it with
+  // explicit template arguments, so it has to be visible where WritePointer
+  // is defined, not only where it is instantiated.
+  template <class T>
+  [[nodiscard]] RRef MakeRRef(T* value);
+
   /**
    * Per-type emissions with no references in the PE (write state and source
    * -- a value, a slot or an owner field -- folded in per copy):

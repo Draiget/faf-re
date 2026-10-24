@@ -552,24 +552,7 @@ namespace moho
      * needle sorts as id 0.
      */
     template <class Slot>
-    [[nodiscard]] static Slot* LowerBound(const T* const needle, Slot* first, Slot* const last) noexcept
-    {
-      const Entity* const needleEntity = needle;
-      const std::uint32_t key = needleEntity ? static_cast<std::uint32_t>(needleEntity->id_) : 0u;
-      std::ptrdiff_t count = last - first;
-      while (count > 0) {
-        const std::ptrdiff_t step = count / 2;
-        const Entity* const candidate = first[step];
-        const std::uint32_t candidateKey = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
-        if (candidateKey < key) {
-          first += step + 1;
-          count -= step + 1;
-        } else {
-          count = step;
-        }
-      }
-      return first;
-    }
+    [[nodiscard]] static Slot* LowerBound(const T* needle, Slot* first, Slot* last) noexcept;
   };
 
   static_assert(sizeof(EntitySetTemplate<Entity>) == 0x28, "EntitySetTemplate<Entity> size must be 0x28");
@@ -1557,6 +1540,29 @@ namespace moho
     LuaPlus::LuaObject mLuaPositionCache;  // 0x0258 (cached `Entity:GetPosition()` vector table)
     Motor* mMotor;                   // 0x026C
   };
+
+  // Defined here rather than in the class: the body reads `Entity::id_`,
+  // which needs `Entity` complete.
+  template <class T>
+  template <class Slot>
+  Slot* EntitySetTemplate<T>::LowerBound(const T* const needle, Slot* first, Slot* const last) noexcept
+  {
+    const Entity* const needleEntity = needle;
+    const std::uint32_t key = needleEntity ? static_cast<std::uint32_t>(needleEntity->id_) : 0u;
+    std::ptrdiff_t count = last - first;
+    while (count > 0) {
+      const std::ptrdiff_t step = count / 2;
+      const Entity* const candidate = first[step];
+      const std::uint32_t candidateKey = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
+      if (candidateKey < key) {
+        first += step + 1;
+        count -= step + 1;
+      } else {
+        count = step;
+      }
+    }
+    return first;
+  }
 
   /**
    * Address: 0x0068A0B0 (FUN_0068A0B0, func_EntityCreateProjectile_LuaFuncDef)

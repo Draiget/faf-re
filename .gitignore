@@ -16,6 +16,8 @@ bin/
 # Local-only recovery workspace, including decomp/recovery/reports/; never force-add.
 decomp/
 buildstage/
+# CMake binary directories (CMakePresets.json).
+/build/
 dumps/
 out/
 output/

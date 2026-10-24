@@ -1,0 +1,47 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "clang-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "clang-x64-release",
+      "displayName": "clang-cl x64 Release (main_x64.exe)",
+      "inherits": "clang-base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-cl-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "clang-x86-release",
+      "displayName": "clang-cl x86 Release (main.exe)",
+      "inherits": "clang-base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-cl-x86.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "clang-x64-debug",
+      "displayName": "clang-cl x64 Debug",
+      "inherits": "clang-base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-cl-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "clang-x86-debug",
+      "displayName": "clang-cl x86 Debug",
+      "inherits": "clang-base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-cl-x86.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "clang-x64-release", "configurePreset": "clang-x64-release" },
+    { "name": "clang-x86-release", "configurePreset": "clang-x86-release" },
+    { "name": "clang-x64-debug", "configurePreset": "clang-x64-debug" },
+    { "name": "clang-x86-debug", "configurePreset": "clang-x86-debug" }
+  ]
+}

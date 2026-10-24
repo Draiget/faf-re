@@ -18,7 +18,7 @@ namespace moho
    * - Size: 0x20 bytes.
    * - `CAiAttackerImpl*` lane at +0x1C (serializer/runtime evidence).
    */
-  class LAiAttackerImpl : public CTask, public InstanceCounter<LAiAttackerImpl>
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT LAiAttackerImpl : public CTask, public InstanceCounter<LAiAttackerImpl>
   {
   public:
     /**

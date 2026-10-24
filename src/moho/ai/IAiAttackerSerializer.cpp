@@ -29,7 +29,7 @@ namespace moho
   /**
    * Address: 0x005DE8D0 (FUN_005DE8D0, sub_5DE8D0)
    */
-  void IAiAttacker::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& const)
+  void IAiAttacker::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
   {
     if (!archive) {
       return;
@@ -45,7 +45,7 @@ namespace moho
   /**
    * Address: 0x005DE920 (FUN_005DE920, sub_5DE920)
    */
-  void IAiAttacker::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& const) const
+  void IAiAttacker::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
   {
     if (!archive) {
       return;

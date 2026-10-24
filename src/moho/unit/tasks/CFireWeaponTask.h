@@ -11,7 +11,7 @@ namespace moho
   class Unit;
   class UnitWeapon;
 
-  class CFireWeaponTask : public CTask, public InstanceCounter<CFireWeaponTask>
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT CFireWeaponTask : public CTask, public InstanceCounter<CFireWeaponTask>
   {
   public:
     /**

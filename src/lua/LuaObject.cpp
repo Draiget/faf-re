@@ -84,7 +84,10 @@ extern "C" void __cdecl _free_crt(void* const ptr)
  * streams are not functional — callers that actually use them will route
  * through `__iob_func()` above which dispatches to UCRT at runtime.
  */
+#if defined(_DLL)
+// Linked statically (/MT), the CRT's own _file.obj defines `_iob`.
 extern "C" __declspec(selectany) std::FILE _iob[20]{};
+#endif
 
 /**
  * Legacy CRT errno-mapping thunk.

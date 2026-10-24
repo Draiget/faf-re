@@ -98,3 +98,27 @@
 #else
 #define MOHO_EMPTY_BASES
 #endif
+
+/**
+ * Marks a class whose base list is a MOHO_EMPTY_BASES class followed by an
+ * empty base, e.g. `class CCommandTask : public CTask, public
+ * InstanceCounter<CCommandTask>`.
+ *
+ * clang-cl lays such a class out differently from MSVC. MSVC puts the empty
+ * base, and the first member after it, right where the empty_bases class ends.
+ * clang inserts a byte first: it counts the empty bases the empty_bases class
+ * collapsed as zero-sized subobjects, which MSVC does not, so every member
+ * that follows moves up to the next alignment boundary (CCommandTask::
+ * mReserved18 lands at +0x1C instead of +0x18). Declaring the derived class
+ * empty_bases for clang puts its members back where MSVC has them: clang then
+ * places the empty base at offset 0 instead. The empty base has no storage, so
+ * that offset is not observable. MSVC is left exactly as it was.
+ *
+ * Checked with -fdump-record-layouts against /d1reportSingleClassLayout for
+ * x86 and x64, and by the Win32 layout static_asserts.
+ */
+#if defined(__clang__)
+#define MOHO_CLANG_EMPTY_BASE_LAYOUT __declspec(empty_bases)
+#else
+#define MOHO_CLANG_EMPTY_BASE_LAYOUT
+#endif
