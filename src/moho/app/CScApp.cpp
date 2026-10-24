@@ -47,6 +47,7 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/IUIManager.h"
+#include "moho/ui/UiWorldShapes.h"
 
 namespace gpg
 {
@@ -1094,6 +1095,9 @@ void CScApp::Main()
   }
 
   (void)framerates.Push(frameSeconds);
+  // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
+  // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.
+  moho::UI_SetRenderWorldFrameSeconds(frameSeconds);
   moho::SND_Frame();
   moho::DISK_UpdateWatcher();
 

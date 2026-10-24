@@ -2123,7 +2123,10 @@ namespace moho
      * `gamedata/lua/ui/controls/components/worldviewshapecomponent.lua`
      * (`AddShape`/`RemoveShape`/`OnRenderWorld`), which is what this exists
      * to support. Enables or disables the per-frame `OnRenderWorld(delta)`
-     * script callback for this control while it is being drawn.
+     * script callback, which a world view runs at the end of its world-space
+     * overlay pass (`CUIWorldView::RenderWorldShapes`). The patch keeps the flag
+     * in `CUIWorldView` (+0x179) and registers the method on world views; here
+     * every control has it, and only world views read it.
      *
      * What it does:
      * Sets whether this control receives a custom per-frame render callback.
@@ -4364,6 +4367,18 @@ namespace moho
      * command splats and the economy overlay, then the command graph.
      */
     void Render(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
+
+    /**
+     * FAF FA-Binary-Patches (section/DrawFunc.cpp, CustomDraw; hooks/HDraw.cpp
+     * jumps to it from 0x0086EF2B, the tail of `Render`). Defined in
+     * moho/ui/UiWorldShapes.cpp.
+     *
+     * What it does:
+     * With custom rendering on, runs the script's `OnRenderWorld(self, delta)`
+     * with the UI_DrawRect / UI_DrawCircle / UI_DrawLine functions drawing into
+     * `batcher` in this view's world space.
+     */
+    void RenderWorldShapes(CD3DPrimBatcher* batcher);
 
     /**
      * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CUIWorldView::Func1)

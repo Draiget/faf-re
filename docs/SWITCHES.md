@@ -55,6 +55,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_GpuFog` | −1 (auto) | `/con` | live | Fog of war drawn by the GPU |
 | `ren_GpuSelectBrackets` | −1 (auto) | `/con` | live | Selection brackets drawn by the GPU |
 | `ren_GpuProjectileIcons` | −1 (auto) | `/con` | live | Projectile icons drawn by the GPU |
+| `ren_GpuShapes` | −1 (auto) | `/con` | live | FAF's `UI_DrawLine`/`UI_DrawRect`/`UI_DrawCircle` world shapes drawn by the GPU, one instanced draw per run of same-kind shapes (0: the prim batcher, as FA-Binary-Patches draws them) |
 | `ren_ParticleBatch` | −1 (auto) | `/con` | live | Each particle bucket drawn as one instanced draw |
 | `ren_CacheFogFootprint` | 1 | `/con` | live | The fog pass keeps each camera's terrain footprint until the camera or terrain changes |
 | `ui_IconRecords` | 1 | `/con` | live | Strategic icons classified from per-unit records refreshed only after a sync beat or a view-list rebuild |

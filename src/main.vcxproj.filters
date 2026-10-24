@@ -1998,6 +1998,12 @@
     <ClCompile Include="moho\render\SelectionBracketGpuRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\WorldShapeGpuRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ui\UiWorldShapes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\ProjectileIconRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5474,6 +5480,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\SelectionBracketShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\WorldShapeGpuRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\WorldShapeShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ui\UiWorldShapes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\ProjectileIconShader.h">

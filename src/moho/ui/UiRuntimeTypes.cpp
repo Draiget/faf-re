@@ -21968,6 +21968,11 @@ moho::CMauiControl::~CMauiControl()
   // ~CScriptObject would get to it.
   DetachAllWeakReferences();
 
+  // FAF community binary-patch addition: forget this control's custom-render
+  // flag (kept in a side table, see SetCustomRender), so a control allocated
+  // at the same address later does not inherit it.
+  SetCustomRender(false);
+
   // And drop any input-capture entry naming this control. The capture stack is
   // the hit-test root - ResolveTopInputCaptureControl feeds GetTopmostControl -
   // so an entry left behind after the control dies makes the next mouse event
@@ -22757,15 +22762,6 @@ void moho::CMauiControl::Frame(
 )
 {
   RunScriptNum("OnFrame", deltaSeconds);
-
-  // FAF community binary-patch addition, not part of the original 2007
-  // body at 0x00787420 -- see CMauiControl::SetCustomRender. Drives the
-  // WorldViewShapeComponent's OnRenderWorld(delta) callback contract
-  // (gamedata/lua/ui/controls/components/worldviewshapecomponent.lua)
-  // once per frame for any control that opted in.
-  if (GetCustomRender()) {
-    RunScriptNum("OnRenderWorld", deltaSeconds);
-  }
 }
 
 /**
