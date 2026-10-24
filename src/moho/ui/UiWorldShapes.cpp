@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "gpg/core/utils/Logging.h"
@@ -93,13 +94,33 @@ namespace
     return true;
   }
 
-  /** `Moho::TryConvertToColor` (0x004B2B90) on argument `index`, or the engine's "Unknown color" error. */
+  /**
+   * The last colour text that parsed and its value. A painted stroke draws
+   * hundreds of segments with one colour string, and parsing is deterministic,
+   * so a repeat skips the lower-casing and the name lookup.
+   */
+  struct LastParsedColor
+  {
+    std::string mText;
+    std::uint32_t mColor = 0U;
+    bool mValid = false;
+  };
+
+  LastParsedColor sLastParsedColor;
+
+  /** `Moho::TryConvertToColor` (0x004B2B90) on `text`, or the engine's "Unknown color" error. */
   [[nodiscard]] std::uint32_t ParseColorArgument(lua_State* const L, const char* const text)
   {
+    if (sLastParsedColor.mValid && sLastParsedColor.mText == text) {
+      return sLastParsedColor.mColor;
+    }
     std::uint32_t color = 0U;
     if (!moho::SCR_ParseColor(text, &color)) {
       luaL_error(L, kUnknownColorFmt, text);
     }
+    sLastParsedColor.mText = text;
+    sLastParsedColor.mColor = color;
+    sLastParsedColor.mValid = true;
     return color;
   }
 
