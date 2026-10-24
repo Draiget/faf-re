@@ -106,6 +106,7 @@ Each path has a console variable with three values: `-1` (default, auto: on only
 | `ren_GpuSelectBrackets` | `kGpuPathSelectBrackets` | Vertex pulling |
 | `ren_ParticleBatch` | `kGpuPathParticleBatch` | Buffer copy (`Device::CopyVertexBufferRegion` on the GPU) |
 | `ren_GpuProjectileIcons` | `kGpuPathProjectileIcons` | Vertex pulling |
+| `ren_GpuShapes` | `kGpuPathWorldShapes` | Vertex pulling |
 
 - **Direct3D 9** reports no features, so every path is off there whatever its variable says.
 - **Direct3D 11, 12 and Vulkan** report all features and every verified bit except `kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of `ren_ParticleBatch` is clean at several zooms (one showed extra particle specks with it on).

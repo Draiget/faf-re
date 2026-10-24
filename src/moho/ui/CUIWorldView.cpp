@@ -102,6 +102,10 @@ namespace moho
     mWldSession->DrawEconomyOverlay(mCamera.get(), batcher, tickFraction);
 
     RenderCommandGraph(batcher, gameTick, tickFraction, frameSeconds);
+
+    // FAF FA-Binary-Patches (hooks/HDraw.cpp): 0x0086EF2B jumps to CustomDraw
+    // with this view and `batcher` before the epilogue.
+    RenderWorldShapes(batcher);
   }
 
   /**

@@ -2231,8 +2231,10 @@ namespace gpg::gal
   {
     // Each passed its parity checks on Direct3D 11 (docs/RENDERER_BACKENDS.md, GPU-driven paths).
     // Not kGpuPathParticleBatch: a paused A/B still shows extra particle specks with it on.
+    // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
+    // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
-      kGpuPathProjectileIcons;
+      kGpuPathProjectileIcons | kGpuPathWorldShapes;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)

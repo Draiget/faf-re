@@ -13,6 +13,7 @@ namespace moho
   extern int ren_GpuSelectBrackets;
   extern int ren_ParticleBatch;
   extern int ren_GpuProjectileIcons;
+  extern int ren_GpuShapes;
 
   namespace
   {
@@ -33,6 +34,7 @@ namespace moho
       {"ren_ParticleBatch", &ren_ParticleBatch, gpg::gal::kGpuPathParticleBatch, gpg::gal::kGpuFeatureBufferCopy},
       {"ren_GpuProjectileIcons", &ren_GpuProjectileIcons, gpg::gal::kGpuPathProjectileIcons,
        gpg::gal::kGpuFeatureVertexPulling},
+      {"ren_GpuShapes", &ren_GpuShapes, gpg::gal::kGpuPathWorldShapes, gpg::gal::kGpuFeatureVertexPulling},
     };
   } // namespace
 

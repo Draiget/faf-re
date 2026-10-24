@@ -17851,6 +17851,120 @@ int moho::cfunc_GetMouseScreenPosL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * FAF FA-Binary-Patches (section/CopyToClipBoard.cpp, LuaCopyToClipboard):
+ * `CopyToClipboard(val):bool`.
+ *
+ * What it does:
+ * Puts the one argument, as a string read as UTF-8, on the Windows clipboard
+ * through `WIN_CopyToClipboard` (0x004F2730) and returns whether that worked.
+ * Any other argument count raises the engine's "expected 1 args" error under
+ * the patch's own function name.
+ */
+int moho::cfunc_CopyToClipboard(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = SCR_ResolveBindingState(luaContext);
+  const int argumentCount = lua_gettop(luaContext);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, "LuaCopyToClipboard", 1, argumentCount);
+  }
+
+  // The patch converts `lua_tostring` with `wstring(const char*)`, i.e.
+  // `gpg::STR_Utf8ToWide` (0x00938720). A non-string argument (nil) copies
+  // the empty string here instead of handing that conversion a null pointer.
+  const char* const text = lua_tostring(luaContext, 1);
+  const std::wstring wideText = gpg::STR_Utf8ToWide(text != nullptr ? text : "");
+  lua_pushboolean(luaContext, WIN_CopyToClipboard(wideText.c_str()) ? 1 : 0);
+  return 1;
+}
+
+moho::CScrLuaInitForm* moho::func_CopyToClipboard_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "CopyToClipboard",
+    &moho::cfunc_CopyToClipboard,
+    nullptr,
+    "<global>",
+    "CopyToClipboard(val):bool"
+  );
+  return &binder;
+}
+
+/**
+ * FAF FA-Binary-Patches (section/GetHighlightCommand.cpp, UIGetHighlightCommand):
+ * `GetHighlightCommand() - return table of command or nil`.
+ *
+ * What it does:
+ * For the command the cursor highlights (`CWldSession::HighlightCommandId`,
+ * -1 for none), looked up in the session command manager
+ * (`FindCommandIssueHelperInManager`, 0x008B5BB0), returns
+ * `{commandType, x, y, z, commandId, targetId?, blueprintId?}`: the command
+ * type, the target position, the id, the target entity id as a decimal string
+ * unless it is the empty id 0xF0000000, and the build blueprint id when there
+ * is one. Returns nothing otherwise.
+ */
+int moho::cfunc_GetHighlightCommand(lua_State* const luaContext)
+{
+  // The patch reads the session global without a check; without a session
+  // there is nothing to highlight.
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return 0;
+  }
+  const CmdId commandId = session->HighlightCommandId;
+  if (commandId == -1) {
+    return 0;
+  }
+  const UserCommandIssueHelper* const command = FindCommandIssueHelper(session, commandId);
+  if (command == nullptr) {
+    return 0;
+  }
+
+  const auto setNumber = [luaContext](const char* const key, const lua_Number value) {
+    lua_pushstring(luaContext, key);
+    lua_pushnumber(luaContext, value);
+    lua_rawset(luaContext, -3);
+  };
+  const SSTITarget& target = command->mVariableData.mTarget1;
+
+  lua_newtable(luaContext);
+  setNumber("commandType", static_cast<lua_Number>(static_cast<std::int32_t>(command->mVariableData.mCmdType)));
+  setNumber("x", static_cast<lua_Number>(target.mPos.x));
+  setNumber("y", static_cast<lua_Number>(target.mPos.y));
+  setNumber("z", static_cast<lua_Number>(target.mPos.z));
+  setNumber("commandId", static_cast<lua_Number>(commandId));
+
+  constexpr std::uint32_t kNoTargetEntityId = 0xF0000000U;
+  if (target.mEntityId != kNoTargetEntityId) {
+    char targetIdText[16];
+    std::snprintf(targetIdText, sizeof(targetIdText), "%d", static_cast<std::int32_t>(target.mEntityId));
+    lua_pushstring(luaContext, "targetId");
+    lua_pushstring(luaContext, targetIdText);
+    lua_rawset(luaContext, -3);
+  }
+
+  if (const REntityBlueprint* const blueprint = command->mConstantData.blueprint; blueprint != nullptr) {
+    lua_pushstring(luaContext, "blueprintId");
+    lua_pushstring(luaContext, blueprint->mBlueprintId.c_str());
+    lua_rawset(luaContext, -3);
+  }
+  return 1;
+}
+
+moho::CScrLuaInitForm* moho::func_GetHighlightCommand_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetHighlightCommand",
+    &moho::cfunc_GetHighlightCommand,
+    nullptr,
+    "<global>",
+    "GetHighlightCommand() - return table of command or nil"
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x00842E60 (FUN_00842E60, cfunc_SetFocusArmyUser)
  *
  * What it does:
@@ -27064,6 +27178,9 @@ namespace
       (void)::moho::func_SessionEndGame_LuaFuncDef();
       (void)::moho::func_GetMouseWorldPosUser_LuaFuncDef();
       (void)::moho::func_GetMouseScreenPos_LuaFuncDef();
+      // FAF FA-Binary-Patches additions, not in the shipped registration sequence.
+      (void)::moho::func_CopyToClipboard_LuaFuncDef();
+      (void)::moho::func_GetHighlightCommand_LuaFuncDef();
       (void)::moho::func_SetFocusArmyUser_LuaFuncDef();
       (void)::moho::func_SetInvertMidMouseButton_LuaFuncDef();
       (void)::moho::func_GetFocusArmyUser_LuaFuncDef();
