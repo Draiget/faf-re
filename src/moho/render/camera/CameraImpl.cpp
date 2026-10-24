@@ -1531,16 +1531,36 @@ void moho::CameraImpl::ClampTargetPos()
   mTargetLocation.z = targetZ;
 }
 
+namespace moho
+{
+  /// FAF FA-Binary-Patches #170 switch: 1 brings back the terrain snap of the free camera's focus.
+  bool cam_FreeClampFocus = false;
+  TConVar<bool> gTConVar_cam_FreeClampFocus(
+    "cam_FreeClampFocus",
+    "With cam_Free on, still snap the camera focus to the terrain under the view ray, as the original engine "
+    "did (the camera jumps when the ray meets a hill). 0, the default, leaves a free camera where it is.",
+    &cam_FreeClampFocus
+  );
+} // namespace moho
+
 /**
  * Address: 0x007A9470 (FUN_007A9470, Moho::CameraImpl::ClampFocusPos)
  * Mangled: ?ClampFocusPos@CameraImpl@Moho@@QAEXXZ
  *
  * What it does:
  * Projects one heading/pitch ray from current offset and snaps focus to the
- * terrain/water surface hit when valid.
+ * terrain/water surface hit when valid. Leaves a free camera (cam_Free)
+ * alone, per FAF FA-Binary-Patches #170.
  */
 void moho::CameraImpl::ClampFocusPos()
 {
+  // FAF FA-Binary-Patches #170 (Camera Terrain Bounce Fix): a free camera keeps its focus. The
+  // original moved it to wherever the heading/pitch ray first met the terrain, so a free camera
+  // whose ray hit a hill snapped behind the hill (cam_FreeClampFocus 1 restores that).
+  if (cam_Free && !cam_FreeClampFocus) {
+    return;
+  }
+
   STIMap* const stiMap = mTerrainMap;
   if (stiMap == nullptr) {
     return;
