@@ -1508,26 +1508,10 @@ namespace moho
       const float cosNext = std::cos(nextAngle);
       const float sinNext = std::sin(nextAngle);
 
-      const Vector3f innerCurrent{
-        center.x + (innerCosAxis.x * cosCurrent) + (innerSinAxis.x * sinCurrent),
-        center.y + (innerCosAxis.y * cosCurrent) + (innerSinAxis.y * sinCurrent),
-        center.z + (innerCosAxis.z * cosCurrent) + (innerSinAxis.z * sinCurrent),
-      };
-      const Vector3f innerNext{
-        center.x + (innerCosAxis.x * cosNext) + (innerSinAxis.x * sinNext),
-        center.y + (innerCosAxis.y * cosNext) + (innerSinAxis.y * sinNext),
-        center.z + (innerCosAxis.z * cosNext) + (innerSinAxis.z * sinNext),
-      };
-      const Vector3f outerCurrent{
-        center.x + (outerCosAxis.x * cosCurrent) + (outerSinAxis.x * sinCurrent),
-        center.y + (outerCosAxis.y * cosCurrent) + (outerSinAxis.y * sinCurrent),
-        center.z + (outerCosAxis.z * cosCurrent) + (outerSinAxis.z * sinCurrent),
-      };
-      const Vector3f outerNext{
-        center.x + (outerCosAxis.x * cosNext) + (outerSinAxis.x * sinNext),
-        center.y + (outerCosAxis.y * cosNext) + (outerSinAxis.y * sinNext),
-        center.z + (outerCosAxis.z * cosNext) + (outerSinAxis.z * sinNext),
-      };
+      const Vector3f innerCurrent{center + (innerCosAxis * cosCurrent) + (innerSinAxis * sinCurrent)};
+      const Vector3f innerNext{center + (innerCosAxis * cosNext) + (innerSinAxis * sinNext)};
+      const Vector3f outerCurrent{center + (outerCosAxis * cosCurrent) + (outerSinAxis * sinCurrent)};
+      const Vector3f outerNext{center + (outerCosAxis * cosNext) + (outerSinAxis * sinNext)};
 
       primBatcher->DrawQuad(innerCurrent, outerCurrent, outerNext, innerNext, color);
     }
