@@ -10,7 +10,6 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the director–agent control channel and a latching game relay. Deployment: [deploy/README.md](deploy/README.md) |
 | `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP and reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
 | `scenarios/` | YAML scenarios for mpemu |
-| `inspect`, `inspect-injector` | A companion DLL that hooks the running engine, and the launcher that injects it (projects in `faf.sln`) |
 | `callcheck/` | Finds recovered functions that call a different helper than retail |
 | `constcheck/` | Cross-checks recovered C++ against the retail binary for replay-determinism hazards: float constants (`--mode consts`) and libm calls (`--mode math`) |
 | `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered; see [difffuzz/README.md](difffuzz/README.md) |
