@@ -15,6 +15,17 @@ set(FAF_OUTPUT_NAME "${_faf_default_name}" CACHE STRING "Engine executable name,
 add_executable(faf_main WIN32 ${FAF_ENGINE_SOURCES})
 set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
 
+# --- Server mode ----------------------------------------------------------------------
+# The client half of server-authoritative sessions (remote/sources.cmake). Its sources
+# come after the engine's, so the static-init order stays the same. Without
+# `/connectserver` on the command line the client is the lockstep client it is with the
+# option off.
+if(FAF_SERVER_MODE)
+  include(remote/sources.cmake)
+  target_sources(faf_main PRIVATE ${FAF_REMOTE_CLIENT_SOURCES})
+  target_compile_definitions(faf_main PRIVATE FAF_SERVER_MODE=1)
+endif()
+
 # --- Resources ------------------------------------------------------------------------
 # MohoResources.rc includes wx/msw/wx.rc (wx's cursors, bitmaps, menus).
 # MohoManifest.rc embeds the application manifest (asInvoker, system DPI

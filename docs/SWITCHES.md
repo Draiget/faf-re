@@ -83,6 +83,15 @@ The switches below are read when a session begins. In a multiplayer game every c
 | `sim_FixRefuelUndockAboveMaxHealth` | −1 | `/con` | next game | #169 (from 3840): refuelled aircraft undock once health is at least max health |
 | `sim_FixShieldRepair` | −1 | `/con` | next game | #175 (from 3840): shield repair scales with the builder's resources, and a switched-off shield is not repaired |
 
+## Server mode
+
+Server-authoritative sessions are being built: one server runs the only sim, and each player receives only what their army can see. The code is behind the CMake option `FAF_SERVER_MODE` (off by default; the presets `clang-x64-release-server` and `clang-x86-release-server` turn it on). A client built with it is the same lockstep client for every normal game, replay and lobby: the server-mode path runs only when `/connectserver` is on the command line, and it never falls back to a lockstep session.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `/connectserver host:port` | — | command line | startup only | Join the game server at that address (needs `/servertoken`); refused together with `/hostgame`, `/joingame`, `/gpgnet`, `/replay`, `/load`, `/scenario`, `/map` or `/perf`. Not working yet: the client says "This build cannot join server games yet." and exits |
+| `/servertoken token` | — | command line | startup only | The admission token the launcher was given for this match (1 to 1024 printable characters, no spaces) |
+
 ## Debugging aids
 
 Off by default.

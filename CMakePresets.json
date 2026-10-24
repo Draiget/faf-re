@@ -36,12 +36,26 @@
       "inherits": "clang-base",
       "toolchainFile": "${sourceDir}/cmake/toolchains/clang-cl-x86.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "clang-x64-release-server",
+      "displayName": "clang-cl x64 Release with server mode (main_x64.exe)",
+      "inherits": "clang-x64-release",
+      "cacheVariables": { "FAF_SERVER_MODE": "ON" }
+    },
+    {
+      "name": "clang-x86-release-server",
+      "displayName": "clang-cl x86 Release with server mode (main.exe)",
+      "inherits": "clang-x86-release",
+      "cacheVariables": { "FAF_SERVER_MODE": "ON" }
     }
   ],
   "buildPresets": [
     { "name": "clang-x64-release", "configurePreset": "clang-x64-release" },
     { "name": "clang-x86-release", "configurePreset": "clang-x86-release" },
     { "name": "clang-x64-debug", "configurePreset": "clang-x64-debug" },
-    { "name": "clang-x86-debug", "configurePreset": "clang-x86-debug" }
+    { "name": "clang-x86-debug", "configurePreset": "clang-x86-debug" },
+    { "name": "clang-x64-release-server", "configurePreset": "clang-x64-release-server" },
+    { "name": "clang-x86-release-server", "configurePreset": "clang-x86-release-server" }
   ]
 }

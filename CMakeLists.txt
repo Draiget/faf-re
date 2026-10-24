@@ -79,6 +79,10 @@ endif()
 
 include(FafCodegen)
 
+# Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's
+# `/connectserver` path. Off, the build contains none of it.
+option(FAF_SERVER_MODE "Build the client side of server-authoritative sessions (/connectserver)" OFF)
+
 # --- Dependencies (built here, /MT, read-only sources) ----------------------------------
 add_subdirectory(cmake/deps/wxwindows)
 add_subdirectory(cmake/deps/wildmagic)
