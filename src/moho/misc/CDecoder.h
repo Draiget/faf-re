@@ -68,21 +68,12 @@ namespace moho
 
   private:
     /**
-     * Address: 0x006E4150 (FUN_006E4150 thunk) -> 0x0128F810 (FUN_0128F810)
+     * Address: 0x006E4150 (FUN_006E4150)
      *
      * What it does:
      * Builds a read-only message stream view and dispatches command-opcode decode.
      */
     void DecodeMessage(const CMessage& message);
-
-    /**
-     * Address: 0x0128CC00 (FUN_0128CC00, Moho__CDecoder__DecodeMessage)
-     *
-     * What it does:
-     * Patched minimal decode lane that accepts only command opcodes
-     * `CMDST_Advance` and `CMDST_SetCommandSource`.
-     */
-    void DecodeMessagePatched(const CMessage& message);
 
     /**
      * Address: 0x006E4400 (FUN_006E4400)

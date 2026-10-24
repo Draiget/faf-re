@@ -813,7 +813,7 @@ namespace moho
 
   private:
     /**
-     * Address: 0x0073D8C0 (FUN_0073D8C0, thunk to FUN_0128FAC0)
+     * Address: 0x0073D8C0 (FUN_0073D8C0)
      *
      * What it does:
      * Runs one dispatch beat, then executes sync publication and sim-rate sampling.

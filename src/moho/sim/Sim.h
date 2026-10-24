@@ -1662,7 +1662,7 @@ namespace moho
   int cfunc_EndGame(lua_State* luaContext);
 
   /**
-   * Address: 0x0128F260 (FUN_0128F260, cfunc_EndGameL)
+   * Address: 0x0074B8B0 (cfunc_EndGameL)
    *
    * LuaPlus::LuaState *
    *
@@ -2246,31 +2246,6 @@ namespace moho
    * wire-circle "pop" marker just past the line end.
    */
   int cfunc_DrawLinePopL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: 0x0128B140 (FUN_0128B140, func_CallbackPacketRecv)
-   *
-   * What it does:
-   * Emits the patch diagnostics log line used by packet-callback sync exit flow.
-   */
-  void func_CallbackPacketRecv();
-
-  /**
-   * Address: 0x0128B160 (FUN_0128B160, func_CheckDiscard)
-   *
-   * What it does:
-   * Checks whether a candidate client pointer is in the current patch client
-   * list and marks/displays discard diagnostics when matched.
-   */
-  void func_CheckDiscard(const void* clientPointer);
-
-  /**
-   * Address: 0x0128B2C0 (FUN_0128B2C0, func_LogRecv)
-   *
-   * What it does:
-   * Logs the received pointer used by patch packet-debug tracing.
-   */
-  void func_LogRecv(const void* receivedPointer);
 
   /**
    * Address: 0x008D4010 (FUN_008D4010, funcl_SC_CreateEntityDialog)

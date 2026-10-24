@@ -142,10 +142,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x006E4150 (FUN_006E4150 thunk) -> 0x0128F810 (FUN_0128F810)
+   * Address: 0x006E4150 (FUN_006E4150)
    *
    * What it does:
    * Builds a read-only message stream view and dispatches command-opcode decode.
+   *
+   * Game version 3835's exe jumped from here into FAF's old desync fix
+   * (0x0128FA50 in `.exxt`, the same switch plus quit/pause bookkeeping);
+   * FA-Binary-Patches #173 (Remove old desync-fix code, 3840) restored the
+   * original body.
    */
   void CDecoder::DecodeMessage(const CMessage& message)
   {
@@ -248,35 +253,6 @@ namespace moho
     std::int32_t beats = 0;
     reader.ReadExact(beats);
     mSink->AdvanceBeat(beats);
-  }
-
-  /**
-   * Address: 0x0128CC00 (FUN_0128CC00, Moho__CDecoder__DecodeMessage)
-   *
-   * What it does:
-   * Builds a read-only message stream view and dispatches only
-   * `CMDST_Advance` / `CMDST_SetCommandSource`; all other opcodes throw.
-   */
-  void CDecoder::DecodeMessagePatched(const CMessage& message)
-  {
-    CMessageStream stream(const_cast<CMessage*>(&message), CMessageStream::Access::kReadOnly);
-    gpg::BinaryReader reader(&stream);
-
-    const auto opcode = static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(message.mBuff[0]));
-    switch (opcode) {
-    case ECmdStreamOp::CMDST_Advance:
-      DecodeAdvance(reader);
-      return;
-    case ECmdStreamOp::CMDST_SetCommandSource:
-      DecodeSetCommandSource(reader);
-      return;
-    default:
-      break;
-    }
-
-    ThrowDecoderError(
-      gpg::STR_Printf("Unexpected opcode in command stream: 0x%02x", static_cast<std::uint8_t>(opcode))
-    );
   }
 
   /**
