@@ -2,7 +2,7 @@
 
 > **Baseline (2026-10-24).** The official `wxMSW-2.4.2.zip` from the wxWidgets GitHub release `v2.4.2` (SHA256 `081cb30347ed9092a50c39311b46586f4264fb125942652db168851be96ebf33`), with these patches applied in order: `wxwindows_2_4_2_faf_required.patch`, `wxwindows_2_4_2_faf_x64.patch`, `wxwindows_2_4_2_faf_x64_pointers.patch`. The result is byte-identical to `dependencies/wxWindows-2.4.2` (4,912 files); everything else in that folder is build output plus the four files the wx makefile generates (`lib/msw*/wx/setup.h`, `src/common/lex_yy.c`, `src/common/y_tab.c`).
 >
-> Regenerated 2026-10-24: `_required` now also carries the `treelistctrl.obj` position in `src/msw/makefile.vc` and creates `treelistctrl.h/.cpp` with LF endings, as they are in the tree; `_x64_pointers` was re-cut against those LF files. The `v2.4.2` git tag is a different file set (other line endings, all ports) and is not a usable baseline.
+> Regenerated 2026-10-24: the patches carry code changes only. The makefile changes for the retired `nmake` build and the FAF annotation comments are gone (the full versions are in the recovery archive); `treelistctrl.h/.cpp` are created with LF endings. The `v2.4.2` git tag is a different file set (other line endings, all ports) and is not a usable baseline.
 >
 > Apply from inside the dependency tree with `GIT_CEILING_DIRECTORIES` set to its parent and `git -c core.autocrlf=false apply --unsafe-paths --whitespace=nowarn <patch>`. The `-c core.autocrlf=false` matters: Git for Windows sets `core.autocrlf=true` system-wide, which rewrites the line endings of the files a patch creates, and later patches written against the real endings then fail.
 >
@@ -20,9 +20,6 @@ Patched files in `wxwindows_2_4_2_faf_required.patch`:
 - `src/common/datetime.cpp`
 - `src/common/intl.cpp`
 - `src/generic/treelistctrl.cpp` (new, see below)
-- `src/makevc.env`
-- `src/msw/makefile.vc` (also adds `treelistctrl.obj` to `GENERICOBJS`)
-- `src/zlib/makefile.vc`
 
 ## wxTreeListCtrl (added 2026-09-24)
 
@@ -44,4 +41,4 @@ We call the flag `m_labelHitTest`; FA's name is unknown, as are the names of the
 
 The CMake build (clang-cl) compiles wx from the patched tree itself (`cmake/deps/wxwindows`): there is no `nmake` step and no prebuilt library. Configure also writes the files the wx makefile would generate (`lib/msw*/wx/setup.h` with `wxUSE_UNICODE 1` for `mswu`, `src/common/y_tab.c`, `src/common/lex_yy.c`).
 
-wx's `WinMain` is left out (`NOMAIN`, wx's own switch in `src\makevc.env`): the engine has its own `WinMain` (0x008D44A0) and calls `wxEntry` itself, while `main.obj` is always linked for `wxhInstance`, so a wx `WinMain` would be a duplicate symbol.
+wx's `WinMain` is left out (`cmake/deps/wxwindows` defines `NOMAIN`, wx's own switch): the engine has its own `WinMain` (0x008D44A0) and calls `wxEntry` itself, while `main.obj` is always linked for `wxhInstance`, so a wx `WinMain` would be a duplicate symbol.

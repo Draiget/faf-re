@@ -13,35 +13,24 @@ diff -ruN a/include/wx/platform.h b/include/wx/platform.h
 diff -ruN a/include/wx/thread.h b/include/wx/thread.h
 --- a/include/wx/thread.h
 +++ b/include/wx/thread.h
-@@ -250,7 +250,11 @@
-     // finally, we need this typedef instead of declaring m_buffer directly
-     // because otherwise the assert mentioned above wouldn't compile with some
-     // compilers (notably CodeWarrior 8)
+@@ -239,6 +239,9 @@
+ #if wxCRITSECT_IS_MUTEX
+     wxMutex m_mutex;
+ #elif defined(__WXMSW__)
 +#ifdef _WIN64
 +    typedef char wxCritSectBuffer[40];
 +#else
+     // we can't allocate any memory in the ctor, so use placement new -
+     // unfortunately, we have to hardcode the sizeof() here because we can't
+     // include windows.h from this public header and we also have to use the
+@@ -251,6 +254,7 @@
+     // because otherwise the assert mentioned above wouldn't compile with some
+     // compilers (notably CodeWarrior 8)
      typedef char wxCritSectBuffer[24];
 +#endif
      union
      {
          unsigned long m_dummy1;
-diff -ruN a/src/makevc.env b/src/makevc.env
---- a/src/makevc.env
-+++ b/src/makevc.env
-@@ -48,7 +48,13 @@
- !endif
- 
- # On Alpha machines, change to CPU=ALPHA
-+# FAF: follow the developer shell's target (vcvars64 sets VSCMD_ARG_TGT_ARCH=x64),
-+# so the peripheral libraries (png, jpeg, tiff, regex, zlib) are archived for x64 too.
-+!if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
-+CPU=X64
-+!else
- CPU=i386
-+!endif
- 
- # Suffixes
- OBJSUFF=obj
 diff -ruN a/src/msw/colordlg.cpp b/src/msw/colordlg.cpp
 --- a/src/msw/colordlg.cpp
 +++ b/src/msw/colordlg.cpp
@@ -147,10 +136,11 @@ diff -ruN a/src/msw/radiobox.cpp b/src/msw/radiobox.cpp
  
      if ( !s_wndprocRadioBtn )
 -        s_wndprocRadioBtn = (WXFARPROC)::GetWindowLong(hwndBtn, GWL_WNDPROC);
-+        s_wndprocRadioBtn = (WXFARPROC)::GetWindowLongPtr(hwndBtn, GWLP_WNDPROC);
- 
+-
 -    ::SetWindowLong(hwndBtn, GWL_WNDPROC, (long)wxRadioBtnWndProc);
 -    ::SetWindowLong(hwndBtn, GWL_USERDATA, (long)this);
++        s_wndprocRadioBtn = (WXFARPROC)::GetWindowLongPtr(hwndBtn, GWLP_WNDPROC);
++
 +    ::SetWindowLongPtr(hwndBtn, GWLP_WNDPROC, (LONG_PTR)wxRadioBtnWndProc);
 +    ::SetWindowLongPtr(hwndBtn, GWLP_USERDATA, (LONG_PTR)this);
  #endif // __WIN32__

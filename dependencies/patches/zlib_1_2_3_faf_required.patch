@@ -8,11 +8,10 @@ diff -ruN a/zconf.h b/zconf.h
 -#if 0           /* HAVE_UNISTD_H -- this line is updated by ./configure */
 +#if 1           /* HAVE_UNISTD_H -- this line is updated by ./configure */
  #  include <sys/types.h> /* for off_t */
--#  include <unistd.h>    /* for SEEK_* and off_t */
 +#if defined(_WIN32)
 +#include <io.h>
 +#else
-+#include <unistd.h>         /* for SEEK_*, off_t, and _LFS64_LARGEFILE */
+ #  include <unistd.h>    /* for SEEK_* and off_t */
 +#endif
  #  ifdef VMS
  #    include <unixio.h>   /* for off_t */

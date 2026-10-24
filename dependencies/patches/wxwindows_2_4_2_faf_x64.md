@@ -8,7 +8,6 @@ Stored with CRLF terminators, like the required patch, and applied after it (see
 
 - `include/wx/platform.h`: do not define `wxSIZE_T_IS_UINT` on Win64, so `wxString` keeps its `operator[](unsigned int)` overloads and `str[0u]` stays unambiguous.
 - `include/wx/thread.h`: `wxCritSectBuffer` is 40 bytes on Win64 (`sizeof(CRITICAL_SECTION)`); the union's pointer member aligns it.
-- `src/makevc.env`: `CPU` follows the developer shell (`VSCMD_ARG_TGT_ARCH`), so the recursive png/jpeg/tiff/regex/zlib builds archive for x64 too.
 - `src/msw/{combobox,dialup,fdrepdlg,radiobox,spinctrl,tooltip,window}.cpp`: every `Set/GetWindowLong` call on `GWL_WNDPROC` / `GWL_USERDATA` (which Win64 headers do not define) is the `...Ptr` form on `GWLP_*`, and its `(LONG)` casts are `(LONG_PTR)`, so window procedures and `this` pointers are not cut to 32 bits.
 - `src/msw/{colordlg,fdrepdlg}.cpp`: the common-dialog hook procedures return `UINT_PTR`, as `LPCCHOOKPROC` / `LPFRHOOKPROC` require.
 - `src/msw/thread.cpp`: `GetProcessAffinityMask` takes `DWORD_PTR` masks.

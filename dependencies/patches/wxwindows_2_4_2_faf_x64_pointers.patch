@@ -6,7 +6,7 @@ diff -ruN a/include/wx/defs.h b/include/wx/defs.h
  typedef void WXFAR  *   WXHINSTANCE;
  typedef unsigned long   WXHBITMAP;
 +#ifdef _WIN64
-+typedef unsigned __int64 WXHIMAGELIST; // FAF x64: HIMAGELIST is a pointer
++typedef unsigned __int64 WXHIMAGELIST;
 +#else
  typedef unsigned long   WXHIMAGELIST;
 +#endif
@@ -18,7 +18,7 @@ diff -ruN a/include/wx/defs.h b/include/wx/defs.h
  typedef unsigned long   WXHCONV;
  typedef unsigned long   WXHKEY;
 +#ifdef _WIN64
-+typedef __int64         WXHTREEITEM; // FAF x64: HTREEITEM is a pointer
++typedef __int64         WXHTREEITEM;
 +#else
  typedef unsigned long   WXHTREEITEM;
 +#endif
@@ -60,7 +60,7 @@ diff -ruN a/include/wx/hashmap.h b/include/wx/hashmap.h
      // TODO: this might not work well on architectures with 64 bit pointers but
      //       32 bit longs, we should use % ULONG_MAX there
 -    unsigned long operator()( const void* k ) const { return (unsigned long)k; }
-+    unsigned long operator()( const void* k ) const { return (unsigned long)(size_t)k; } // FAF x64: a hash; the low bits suffice
++    unsigned long operator()( const void* k ) const { return (unsigned long)(size_t)k; }
  
      wxPointerHash& operator=(const wxPointerHash&) { return *this; }
  };
@@ -96,7 +96,7 @@ diff -ruN a/include/wx/listbase.h b/include/wx/listbase.h
      wxString        m_text;     // The label/header text
      int             m_image;    // The zero-based index into an image list
 +#ifdef _WIN64
-+    __int64         m_data;     // App-defined data (FAF x64: pointer-wide)
++    __int64         m_data;
 +#else
      long            m_data;     // App-defined data
 +#endif
@@ -133,13 +133,19 @@ diff -ruN a/include/wx/msw/treectrl.h b/include/wx/msw/treectrl.h
 diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
 --- a/include/wx/treebase.h
 +++ b/include/wx/treebase.h
-@@ -33,7 +33,11 @@
- // ----------------------------------------------------------------------------
+@@ -24,6 +24,9 @@
  
- // Using this typedef removes an ambiguity when calling Remove()
+ #include "wx/window.h"  // for wxClientData
+ #include "wx/event.h"
 +#ifdef _WIN64
 +typedef __int64 wxTreeItemIdValue;
 +#else
+ 
+ // ----------------------------------------------------------------------------
+ // wxTreeItemId identifies an element of the tree. In this implementation, it's
+@@ -34,6 +37,7 @@
+ 
+ // Using this typedef removes an ambiguity when calling Remove()
  typedef long wxTreeItemIdValue;
 +#endif
  
@@ -160,13 +166,14 @@ diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
  
          // default copy ctor/assignment operator are ok for us
  
-@@ -94,7 +101,11 @@
+@@ -93,8 +100,12 @@
+ protected:
      wxTreeItemId m_pItem;
  };
- 
 +#ifdef _WIN64
 +WX_DEFINE_EXPORTED_TYPEARRAY(wxTreeItemId, wxArrayTreeItemIds, wxBaseArrayInt64);
 +#else
+ 
  WX_DEFINE_EXPORTED_ARRAY_LONG(wxTreeItemId, wxArrayTreeItemIds);
 +#endif
  
@@ -175,12 +182,12 @@ diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
 diff -ruN a/include/wx/treelistctrl.h b/include/wx/treelistctrl.h
 --- a/include/wx/treelistctrl.h
 +++ b/include/wx/treelistctrl.h
-@@ -56,7 +56,11 @@
+@@ -32,7 +32,11 @@
  // Using this typedef removes an ambiguity when calling Remove()
  #ifdef __WXMSW__
  #if !wxCHECK_VERSION(2, 5, 0)
 +#ifdef _WIN64
-+typedef __int64 wxTreeItemIdValue; // FAF x64: matches wx/treebase.h
++typedef __int64 wxTreeItemIdValue;
 +#else
  typedef long wxTreeItemIdValue;
 +#endif
@@ -229,7 +236,7 @@ diff -ruN a/src/common/list.cpp b/src/common/list.cpp
        //    if (s == NULL)
  #ifdef __WXMSW__
 -      if ((int)(long) s == 0)
-+      if (s == NULL) // FAF x64: the old (int)(long) test dropped the upper half
++      if (s == NULL)
  #else
        if ((long) s == 0)
  #endif
@@ -397,7 +404,7 @@ diff -ruN a/src/generic/treectlg.cpp b/src/generic/treectlg.cpp
 diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
 --- a/src/generic/treelistctrl.cpp
 +++ b/src/generic/treelistctrl.cpp
-@@ -2465,7 +2465,7 @@
+@@ -2435,7 +2435,7 @@
  
      if ( data != NULL )
      {
@@ -406,7 +413,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      }
  
      parent->Insert( item, previous );
-@@ -2502,7 +2502,7 @@
+@@ -2472,7 +2472,7 @@
  #endif
      if ( data != NULL )
      {
@@ -415,7 +422,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      }
  
      if (!HasFlag(wxTR_MULTIPLE))
-@@ -2577,7 +2577,7 @@
+@@ -2547,7 +2547,7 @@
  void wxTreeListMainWindow::SendDeleteEvent(wxTreeListItem *item)
  {
      wxTreeEvent event( wxEVT_COMMAND_TREE_DELETE_ITEM, m_owner->GetId() );
@@ -424,7 +431,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      event.SetEventObject( /*this*/m_owner );
      m_owner->ProcessEvent( event );
      if (m_current == item) m_current = (wxTreeListItem *) NULL;
-@@ -2655,7 +2655,7 @@
+@@ -2625,7 +2625,7 @@
          return;
  
      wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_EXPANDING, m_owner->GetId() );
@@ -433,7 +440,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      event.SetEventObject( /*this*/m_owner );
  
      if ( m_owner->ProcessEvent( event ) && !event.IsAllowed() )
-@@ -2701,7 +2701,7 @@
+@@ -2671,7 +2671,7 @@
          return;
  
      wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_COLLAPSING, m_owner->GetId() );
@@ -442,7 +449,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      event.SetEventObject( /*this*/m_owner );
      if ( m_owner->ProcessEvent( event ) && !event.IsAllowed() )
      {
-@@ -2879,8 +2879,8 @@
+@@ -2849,8 +2849,8 @@
      }
  
      wxTreeEvent event( wxEVT_COMMAND_TREE_SEL_CHANGING, m_owner->GetId() );
@@ -453,7 +460,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      event.SetEventObject( /*this*/m_owner );
      // TODO : Here we don't send any selection mode yet !
  
-@@ -2939,7 +2939,7 @@
+@@ -2909,7 +2909,7 @@
  
      wxTreeEvent event( wxEVT_COMMAND_TREE_SEL_CHANGING, m_owner->GetId() );
      event.SetItem( GetRootItem() );
@@ -462,7 +469,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      event.SetEventObject( /*this*/m_owner );
      // TODO : Here we don't send any selection mode yet !
  
-@@ -3787,7 +3787,7 @@
+@@ -3757,7 +3757,7 @@
              {
                  wxTreeEvent event( wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
                                     m_owner->GetId() );
@@ -471,7 +478,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
                  event.SetEventObject( /*this*/m_owner );
                  m_owner->GetEventHandler()->ProcessEvent( event );
              }
-@@ -4067,7 +4067,7 @@
+@@ -4035,7 +4035,7 @@
      wxString s = m_currentEdit->GetText (column);
  
      wxTreeEvent te( wxEVT_COMMAND_TREE_BEGIN_LABEL_EDIT, m_owner->GetId() );
@@ -480,7 +487,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      te.SetLabel( s );
      te.SetEventObject( /*this*/m_owner );
      m_owner->GetEventHandler()->ProcessEvent( te );
-@@ -4139,7 +4139,7 @@
+@@ -4106,7 +4106,7 @@
  {
      // TODO if the validator fails this causes a crash
      wxTreeEvent le( wxEVT_COMMAND_TREE_END_LABEL_EDIT, m_owner->GetId() );
@@ -489,7 +496,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
      le.SetEventObject( /*this*/m_owner );
      le.SetLabel( m_renameRes );
      m_owner->GetEventHandler()->ProcessEvent( le );
-@@ -4199,7 +4199,7 @@
+@@ -4166,7 +4166,7 @@
                                ? wxEVT_COMMAND_TREE_BEGIN_DRAG
                                : wxEVT_COMMAND_TREE_BEGIN_RDRAG;
          wxTreeEvent nevent (command, m_owner->GetId());
@@ -498,7 +505,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
          nevent.SetEventObject (m_owner);
          m_owner->GetEventHandler()->ProcessEvent (nevent);
  
-@@ -4211,7 +4211,7 @@
+@@ -4178,7 +4178,7 @@
  
          // send drag end event event
          wxTreeEvent event (wxEVT_COMMAND_TREE_END_DRAG, m_owner->GetId());
@@ -507,7 +514,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
          event.SetPoint (wxPoint(x, y));
          event.SetEventObject (m_owner);
          m_owner->GetEventHandler()->ProcessEvent(event);
-@@ -4224,7 +4224,7 @@
+@@ -4191,7 +4191,7 @@
      if (event.RightDown()) {
          SetFocus();
          wxTreeEvent nevent (wxEVT_COMMAND_TREE_ITEM_RIGHT_CLICK, m_owner->GetId());
@@ -516,7 +523,7 @@ diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
          int nx, ny;
          CalcScrolledPosition (x, y, &nx, &ny);
          nevent.SetPoint (wxPoint(nx, ny));
-@@ -4295,7 +4295,7 @@
+@@ -4262,7 +4262,7 @@
              // send activate event first
              wxTreeEvent nevent( wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
                                  m_owner->GetId() );
@@ -575,7 +582,7 @@ diff -ruN a/src/msw/listbox.cpp b/src/msw/listbox.cpp
          return FALSE;
  
 -    long data = ListBox_GetItemData(GetHwnd(), pStruct->itemID);
-+    LRESULT data = ListBox_GetItemData(GetHwnd(), pStruct->itemID); // FAF x64: a pointer
++    LRESULT data = ListBox_GetItemData(GetHwnd(), pStruct->itemID);
  
      wxCHECK( data && (data != LB_ERR), FALSE );
  
@@ -693,10 +700,11 @@ diff -ruN a/src/msw/treectrl.cpp b/src/msw/treectrl.cpp
  void wxTreeCtrl::DeleteChildren(const wxTreeItemId& item)
  {
 -    long cookie;
- 
+-
 -    wxArrayLong children;
 +    wxTreeItemIdValue cookie;
-+    wxArrayTreeItemIds children; // FAF x64: holds HTREEITEMs
++
++    wxArrayTreeItemIds children;
      wxTreeItemId child = GetFirstChild(item, cookie);
      while ( child.IsOk() )
      {
@@ -722,7 +730,7 @@ diff -ruN a/src/msw/window.cpp b/src/msw/window.cpp
      {
          bool        allow;
 -        long        result;
-+        WXLPARAM    result; // FAF x64: an LRESULT, pointer-wide on Win64
++        WXLPARAM    result;
          WXHICON     hIcon;
          WXHBRUSH    hBrush;
      } rc;

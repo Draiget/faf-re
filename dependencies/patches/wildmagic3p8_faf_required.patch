@@ -1,42 +1,4 @@
-diff --git a/Foundation/Distance/Wm3Distance.cpp b/Foundation/Distance/Wm3Distance.cpp
-index 67a7a621fa9dfddbc3a0f8dad83e82f45f2969f8..8e4165ab0c63ca457889ae5de2df54a03e803599 100644
---- a/Foundation/Distance/Wm3Distance.cpp
-+++ b/Foundation/Distance/Wm3Distance.cpp
-@@ -14,10 +14,10 @@
- namespace Wm3
- {
- //----------------------------------------------------------------------------
--template <class Real, class TVector>
--Distance<Real,TVector>::Distance ()
--{
--    MaximumIterations = 8;
-+template <class Real, class TVector>
-+Distance<Real,TVector>::Distance ()
-+{
-+    MaximumIterations = 8;
-     ZeroThreshold = Math<Real>::ZERO_TOLERANCE;
-     SetDifferenceStep((Real)1e-03);
- 
-diff --git a/Foundation/Distance/Wm3Distance.h b/Foundation/Distance/Wm3Distance.h
-index b1c985942206fdce398d704c8b1ed9d77b56ff86..215950ef7fd3dc02bd78483b9017d517e406481a 100644
---- a/Foundation/Distance/Wm3Distance.h
-+++ b/Foundation/Distance/Wm3Distance.h
-@@ -73,10 +73,10 @@ public:
-     bool HasMultipleClosestPoints0 () const;
-     bool HasMultipleClosestPoints1 () const;
- 
--protected:
--    Distance ();
- 
--    Real m_fContactTime;
-+protected:
-+    Distance ();
-+    Real m_fContactTime;
-     TVector m_kClosestPoint0;
-     TVector m_kClosestPoint1;
-     bool m_bHasMultipleClosestPoints0;
-diff --git a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlignedBox3.h
-index 7c0105b011e6874b26c3280d9b510be5e7d1e260..2aac30a28079a3e669b250afa200bff35c3d2a24 100644
+diff -ruN a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlignedBox3.h
 --- a/Foundation/Math/Wm3AxisAlignedBox3.h
 +++ b/Foundation/Math/Wm3AxisAlignedBox3.h
 @@ -13,6 +13,12 @@
@@ -52,16 +14,16 @@ index 7c0105b011e6874b26c3280d9b510be5e7d1e260..2aac30a28079a3e669b250afa200bff3
  
  namespace Wm3
  {
-@@ -29,6 +35,8 @@ public:
+@@ -28,6 +34,8 @@
+     // class will not check for validity of the input.
      AxisAlignedBox3 (Real fXMin, Real fXMax, Real fYMin, Real fYMax,
          Real fZMin, Real fZMax);
- 
 +    AxisAlignedBox3 (const Vector3<Real>& rkMin, const Vector3<Real>& rkMax)
 +        : Min(rkMin), Max(rkMax) {}
+ 
      // Overlap testing is in the strict sense.  If the two boxes are just
      // touching along a common edge, the boxes are reported as overlapping.
-     bool HasXOverlap (const AxisAlignedBox3& rkBox) const;
-@@ -42,7 +50,10 @@ public:
+@@ -42,7 +50,10 @@
      bool FindIntersection (const AxisAlignedBox3& rkBox,
          AxisAlignedBox3& rkIntr) const;
  
@@ -73,26 +35,25 @@ index 7c0105b011e6874b26c3280d9b510be5e7d1e260..2aac30a28079a3e669b250afa200bff3
  };
  
  #include "Wm3AxisAlignedBox3.inl"
-diff --git a/Foundation/Math/Wm3Box3.h b/Foundation/Math/Wm3Box3.h
-index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a32e4e6fed 100644
+diff -ruN a/Foundation/Math/Wm3Box3.h b/Foundation/Math/Wm3Box3.h
 --- a/Foundation/Math/Wm3Box3.h
 +++ b/Foundation/Math/Wm3Box3.h
-@@ -14,6 +14,11 @@
+@@ -13,6 +13,11 @@
+ 
  #include "Wm3FoundationLIB.h"
  #include "Wm3Vector3.h"
- 
 +namespace gpg
 +{
 +    class ReadArchive;
 +    class WriteArchive;
 +}
+ 
  namespace Wm3
  {
- 
-@@ -34,11 +39,48 @@ public:
+@@ -33,12 +38,49 @@
+     Box3 (const Vector3<Real>& rkCenter, const Vector3<Real>& rkAxis0,
          const Vector3<Real>& rkAxis1, const Vector3<Real>& rkAxis2,
          Real fExtent0, Real fExtent1, Real fExtent2);
- 
 +    Box3 (const Vector3<Real>& rkCenter,
 +          const Vector3<Real>& rkAxis0,
 +          const Vector3<Real>& rkAxis1,
@@ -107,8 +68,8 @@ index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a3
 +        Extent[1] = rkExtent.y;
 +        Extent[2] = rkExtent.z;
 +    }
-     void ComputeVertices (Vector3<Real> akVertex[8]) const;
  
+     void ComputeVertices (Vector3<Real> akVertex[8]) const;
 +    void GetCorners (Vector3<Real> akVertex[8]) const { ComputeVertices(akVertex); }
 +    void ComputeAABB (Vector3<Real>& outMin, Vector3<Real>& outMax) const
 +    {
@@ -130,6 +91,7 @@ index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a3
 +        }
 +        return true;
 +    }
+ 
      Vector3<Real> Center;
      Vector3<Real> Axis[3];  // must be an orthonormal set of vectors
      Real Extent[3];         // must be nonnegative
@@ -138,17 +100,10 @@ index 2a2bfeec7e43a0b0293269ee2fcd692a84f6bf85..875ac507d677c7e147b1c94d60ab46a3
  };
  
  #include "Wm3Box3.inl"
-diff --git b/Foundation/Math/Wm3IVector2.h b/Foundation/Math/Wm3IVector2.h
-new file mode 100644
-index 0000000000000000000000000000000000000000..4e1ad8808a702f28f337768bcf8d06625fb0652e
+diff -ruN a/Foundation/Math/Wm3IVector2.h b/Foundation/Math/Wm3IVector2.h
 --- /dev/null
 +++ b/Foundation/Math/Wm3IVector2.h
-@@ -0,0 +1,85 @@
-+// FAF MOD: GPG's integer 2-vector. Not part of upstream Wild Magic 3.8; the
-+// FA binary's RTTI names it `Wm3::IVector2<int>` (the key of
-+// CAiBrain::mBuildStructureMap, gpg::SerSaveLoadHelper<Wm3::IVector2<int>>,
-+// the return type of RD3DTextureResource::SheetGetOriginalTextureDimensions).
-+// There is no `Wm3::Vector2<int>` anywhere in the binary.
+@@ -0,0 +1,75 @@
 +
 +#ifndef WM3IVECTOR2_H
 +#define WM3IVECTOR2_H
@@ -188,9 +143,6 @@ index 0000000000000000000000000000000000000000..4e1ad8808a702f28f337768bcf8d0662
 +        return !(*this == rkV);
 +    }
 +
-+    // Lexicographic, component by component, signed. The build-structure
-+    // map's lower-bound walk (0x005808D0) inlines it as a two-iteration
-+    // `jl`/`jg` loop.
 +    bool operator< (const IVector2& rkV) const
 +    {
 +        for (int i = 0; i < 2; ++i)
@@ -207,8 +159,6 @@ index 0000000000000000000000000000000000000000..4e1ad8808a702f28f337768bcf8d0662
 +        return false;
 +    }
 +
-+    // Serialize hooks used by the FAF reflection system. The int
-+    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
 +
@@ -229,16 +179,10 @@ index 0000000000000000000000000000000000000000..4e1ad8808a702f28f337768bcf8d0662
 +}
 +
 +#endif
-diff --git b/Foundation/Math/Wm3IVector3.h b/Foundation/Math/Wm3IVector3.h
-new file mode 100644
-index 0000000000000000000000000000000000000000..d0e13633064b3d02eea0c962ca5e4ef46de2f4f4
+diff -ruN a/Foundation/Math/Wm3IVector3.h b/Foundation/Math/Wm3IVector3.h
 --- /dev/null
 +++ b/Foundation/Math/Wm3IVector3.h
-@@ -0,0 +1,68 @@
-+// FAF MOD: GPG's integer 3-vector. Not part of upstream Wild Magic 3.8; the
-+// FA binary's RTTI names it `Wm3::IVector3<int>`
-+// (gpg::SerSaveLoadHelper<Wm3::IVector3<int>>). There is no
-+// `Wm3::Vector3<int>` anywhere in the binary.
+@@ -0,0 +1,62 @@
 +
 +#ifndef WM3IVECTOR3_H
 +#define WM3IVECTOR3_H
@@ -280,8 +224,6 @@ index 0000000000000000000000000000000000000000..d0e13633064b3d02eea0c962ca5e4ef4
 +        return !(*this == rkV);
 +    }
 +
-+    // Serialize hooks used by the FAF reflection system. The int
-+    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
 +
@@ -303,8 +245,7 @@ index 0000000000000000000000000000000000000000..d0e13633064b3d02eea0c962ca5e4ef4
 +}
 +
 +#endif
-diff --git a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
-index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586dd187e0f 100644
+diff -ruN a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
 --- a/Foundation/Math/Wm3Quaternion.h
 +++ b/Foundation/Math/Wm3Quaternion.h
 @@ -13,6 +13,12 @@
@@ -320,7 +261,7 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
  
  namespace Wm3
  {
-@@ -25,8 +31,9 @@ public:
+@@ -25,8 +31,9 @@
      // necessarily a unit length vector in 4D.
  
      // construction
@@ -332,10 +273,10 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
      Quaternion (const Quaternion& rkQ);
  
      // quaternion for the input rotation matrix
-@@ -138,14 +145,155 @@ public:
+@@ -137,6 +144,148 @@
+     // special values
      WM3_ITEM static const Quaternion IDENTITY;  // the identity rotation
      WM3_ITEM static const Quaternion ZERO;
- 
 +public:
 +    union
 +    {
@@ -478,10 +419,10 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +    }
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
+ 
  private:
      // support for comparisons
-     int CompareArrays (const Quaternion& rkQ) const;
- 
+@@ -145,7 +294,6 @@
      // support for FromRotationMatrix
      static int ms_iNext[3];
  
@@ -489,10 +430,11 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
  };
  
  template <class Real>
-@@ -155,6 +303,21 @@ Quaternion<Real> operator* (Real fScalar, const Quaternion<Real>& rkQ);
+@@ -155,8 +303,23 @@
  
  typedef Quaternion<float> Quaternionf;
  typedef Quaternion<double> Quaterniond;
+-
 +template <class Real> using Quat = Quaternion<Real>;
 +typedef Quaternion<float> Quatf;
 +inline Vector3<float>* MultiplyQuaternionVector (
@@ -507,25 +449,25 @@ index e5b6e993b75f733b93e7288a5447ea8c63ae6ac7..e975cf9271f7d327beed83c38ca84586
 +    dest->y = vec.x * matrix[1][0] + vec.y * matrix[1][1] + vec.z * matrix[1][2];
 +    dest->z = vec.x * matrix[2][0] + vec.y * matrix[2][1] + vec.z * matrix[2][2];
 +    return dest;
-+}
- 
  }
  
-diff --git a/Foundation/Math/Wm3Quaternion.inl b/Foundation/Math/Wm3Quaternion.inl
-index 96dfc71008a71f9723bdfb6e6527049b18fb8c4b..2a25496884feee351b29bf5eb936fe16ac9751a8 100644
++}
++
+ #endif
+ 
+diff -ruN a/Foundation/Math/Wm3Quaternion.inl b/Foundation/Math/Wm3Quaternion.inl
 --- a/Foundation/Math/Wm3Quaternion.inl
 +++ b/Foundation/Math/Wm3Quaternion.inl
-@@ -8,21 +8,9 @@
- // and may not be copied or disclosed except in accordance with the terms
+@@ -9,20 +9,6 @@
  // of that agreement.
  
  //----------------------------------------------------------------------------
 -template <class Real>
 -Quaternion<Real>::Quaternion ()
 -{
-     // uninitialized for performance in array construction
+-    // uninitialized for performance in array construction
 -}
- //----------------------------------------------------------------------------
+-//----------------------------------------------------------------------------
 -template <class Real>
 -Quaternion<Real>::Quaternion (Real fW, Real fX, Real fY, Real fZ)
 -{
@@ -537,23 +479,22 @@ index 96dfc71008a71f9723bdfb6e6527049b18fb8c4b..2a25496884feee351b29bf5eb936fe16
  //----------------------------------------------------------------------------
  template <class Real>
  Quaternion<Real>::Quaternion (const Quaternion& rkQ)
-diff --git a/Foundation/Math/Wm3Sphere3.h b/Foundation/Math/Wm3Sphere3.h
-index 33a62c7f115ff0f3adb261ad74652f43caec15f5..5f6b9c7599d0d29e24e8d90965b3ecc9bb3a4070 100644
+diff -ruN a/Foundation/Math/Wm3Sphere3.h b/Foundation/Math/Wm3Sphere3.h
 --- a/Foundation/Math/Wm3Sphere3.h
 +++ b/Foundation/Math/Wm3Sphere3.h
-@@ -14,6 +14,11 @@
+@@ -13,6 +13,11 @@
+ 
  #include "Wm3FoundationLIB.h"
  #include "Wm3Vector3.h"
- 
 +namespace gpg
 +{
 +    class ReadArchive;
 +    class WriteArchive;
 +}
+ 
  namespace Wm3
  {
- 
-@@ -33,6 +38,8 @@ public:
+@@ -33,6 +38,8 @@
  
      Vector3<Real> Center;
      Real Radius;
@@ -562,8 +503,7 @@ index 33a62c7f115ff0f3adb261ad74652f43caec15f5..5f6b9c7599d0d29e24e8d90965b3ecc9
  };
  
  #include "Wm3Sphere3.inl"
-diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
-index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f173e56aa 100644
+diff -ruN a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
 --- a/Foundation/Math/Wm3Vector2.h
 +++ b/Foundation/Math/Wm3Vector2.h
 @@ -13,6 +13,13 @@
@@ -580,7 +520,7 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
  
  namespace Wm3
  {
-@@ -22,8 +29,8 @@ class Vector2
+@@ -22,8 +29,8 @@
  {
  public:
      // construction
@@ -591,10 +531,10 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
      Vector2 (const Real* afTuple);
      Vector2 (const Vector2& rkV);
  
-@@ -102,11 +109,42 @@ public:
+@@ -101,12 +108,43 @@
+     WM3_ITEM static const Vector2 ZERO;
      WM3_ITEM static const Vector2 UNIT_X;
      WM3_ITEM static const Vector2 UNIT_Y;
- 
 +public:
 +    union
 +    {
@@ -627,6 +567,7 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
 +    }
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
+ 
  private:
      // support for comparisons
      int CompareArrays (const Vector2& rkV) const;
@@ -635,7 +576,7 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
  };
  
  // arithmetic operations
-@@ -121,6 +159,8 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector2<Real>& rkV);
+@@ -121,6 +159,8 @@
  
  typedef Vector2<float> Vector2f;
  typedef Vector2<double> Vector2d;
@@ -644,21 +585,19 @@ index 1c092e4f5ab10e523006c8c646b0ffbbbae72265..94ce6d12714d369e4e8e273926cd0d2f
  
  }
  
-diff --git a/Foundation/Math/Wm3Vector2.inl b/Foundation/Math/Wm3Vector2.inl
-index c425ca8afecf9eebfce9555d7a028072a419244a..81546e811c5941134a251ef850ceaf8ba785d191 100644
+diff -ruN a/Foundation/Math/Wm3Vector2.inl b/Foundation/Math/Wm3Vector2.inl
 --- a/Foundation/Math/Wm3Vector2.inl
 +++ b/Foundation/Math/Wm3Vector2.inl
-@@ -8,19 +8,9 @@
- // and may not be copied or disclosed except in accordance with the terms
+@@ -9,18 +9,6 @@
  // of that agreement.
  
  //----------------------------------------------------------------------------
 -template <class Real>
 -Vector2<Real>::Vector2 ()
 -{
-     // uninitialized for performance in array construction
+-    // uninitialized for performance in array construction
 -}
- //----------------------------------------------------------------------------
+-//----------------------------------------------------------------------------
 -template <class Real>
 -Vector2<Real>::Vector2 (Real fX, Real fY)
 -{
@@ -668,8 +607,7 @@ index c425ca8afecf9eebfce9555d7a028072a419244a..81546e811c5941134a251ef850ceaf8b
  //----------------------------------------------------------------------------
  template <class Real>
  Vector2<Real>::Vector2 (const Real* afTuple)
-diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
-index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2db8780dc8 100644
+diff -ruN a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
 --- a/Foundation/Math/Wm3Vector3.h
 +++ b/Foundation/Math/Wm3Vector3.h
 @@ -13,6 +13,14 @@
@@ -687,7 +625,7 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
  
  namespace Wm3
  {
-@@ -22,8 +30,8 @@ class Vector3
+@@ -22,8 +30,8 @@
  {
  public:
      // construction
@@ -698,10 +636,10 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
      Vector3 (const Real* afTuple);
      Vector3 (const Vector3& rkV);
  
-@@ -106,11 +114,138 @@ public:
+@@ -105,12 +113,139 @@
+     WM3_ITEM static const Vector3 UNIT_X;
      WM3_ITEM static const Vector3 UNIT_Y;
      WM3_ITEM static const Vector3 UNIT_Z;
- 
 +public:
 +    union
 +    {
@@ -830,6 +768,7 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
 +    }
 +    void MemberDeserialize (gpg::ReadArchive* archive);
 +    void MemberSerialize (gpg::WriteArchive* archive) const;
+ 
  private:
      // support for comparisons
      int CompareArrays (const Vector3& rkV) const;
@@ -838,7 +777,7 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
  };
  
  // arithmetic operations
-@@ -125,6 +260,16 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector3<Real>& rkV);
+@@ -125,6 +260,16 @@
  
  typedef Vector3<float> Vector3f;
  typedef Vector3<double> Vector3d;
@@ -855,21 +794,19 @@ index 9df766da8649ec2194b46cc0eb3ada42dd2baefd..e159bf08c0ac7fdf30804948c899eb2d
  
  }
  
-diff --git a/Foundation/Math/Wm3Vector3.inl b/Foundation/Math/Wm3Vector3.inl
-index dc77545a201f9f2a49c63ea35a50b4fd6b5e0687..53755b74b8cd71013d621f16165c1ca9c64d0588 100644
+diff -ruN a/Foundation/Math/Wm3Vector3.inl b/Foundation/Math/Wm3Vector3.inl
 --- a/Foundation/Math/Wm3Vector3.inl
 +++ b/Foundation/Math/Wm3Vector3.inl
-@@ -8,20 +8,9 @@
- // and may not be copied or disclosed except in accordance with the terms
+@@ -9,19 +9,6 @@
  // of that agreement.
  
  //----------------------------------------------------------------------------
 -template <class Real>
 -Vector3<Real>::Vector3 ()
 -{
-     // uninitialized for performance in array construction
+-    // uninitialized for performance in array construction
 -}
- //----------------------------------------------------------------------------
+-//----------------------------------------------------------------------------
 -template <class Real>
 -Vector3<Real>::Vector3 (Real fX, Real fY, Real fZ)
 -{
@@ -880,35 +817,25 @@ index dc77545a201f9f2a49c63ea35a50b4fd6b5e0687..53755b74b8cd71013d621f16165c1ca9
  //----------------------------------------------------------------------------
  template <class Real>
  Vector3<Real>::Vector3 (const Real* afTuple)
-diff --git a/Foundation/Terrain/Wm3ClodTerrainPage.cpp b/Foundation/Terrain/Wm3ClodTerrainPage.cpp
-index a9156a69e9656e5c98c4c6553eb1d196cb5b6e3a..9d009197d3cd0ce2102e27a42b23876ce5c97d90 100644
+diff -ruN a/Foundation/Terrain/Wm3ClodTerrainPage.cpp b/Foundation/Terrain/Wm3ClodTerrainPage.cpp
 --- a/Foundation/Terrain/Wm3ClodTerrainPage.cpp
 +++ b/Foundation/Terrain/Wm3ClodTerrainPage.cpp
-@@ -508,14 +508,14 @@ void ClodTerrainPage::Render (ClodTerrainBlock& rkBlock)
-     unsigned short usOrigin = rkBlock.GetX() + m_usSize*rkBlock.GetY();
-     unsigned short usTwoStride = 2*rkBlock.GetStride();
-     unsigned short usTwoStrideTimesSize = usTwoStride*m_usSize;
--    unsigned short usIndex[5] =
--    {
--        usOrigin,
+@@ -511,10 +511,10 @@
+     unsigned short usIndex[5] =
+     {
+         usOrigin,
 -        usOrigin + usTwoStride,
 -        usOrigin + rkBlock.GetStride()*(m_usSize + 1),
 -        usOrigin + usTwoStrideTimesSize,
 -        usOrigin + usTwoStrideTimesSize + usTwoStride
--    };
-+    unsigned short usIndex[5] =
-+    {
-+        usOrigin,
 +        static_cast<unsigned short>(usOrigin + usTwoStride),
 +        static_cast<unsigned short>(usOrigin + rkBlock.GetStride()*(m_usSize + 1)),
 +        static_cast<unsigned short>(usOrigin + usTwoStrideTimesSize),
 +        static_cast<unsigned short>(usOrigin + usTwoStrideTimesSize + usTwoStride)
-+    };
+     };
  
      if (rkBlock.GetEven())
-     {
-diff --git a/Renderers/Dx9Renderer/Wm3Dx9Utility.h b/Renderers/Dx9Renderer/Wm3Dx9Utility.h
-index 40f5e45ed18cdf54308f67ba02ba04729681e534..9c795fb63fed2c26c2601a6da2473bc6377d3264 100644
+diff -ruN a/Renderers/Dx9Renderer/Wm3Dx9Utility.h b/Renderers/Dx9Renderer/Wm3Dx9Utility.h
 --- a/Renderers/Dx9Renderer/Wm3Dx9Utility.h
 +++ b/Renderers/Dx9Renderer/Wm3Dx9Utility.h
 @@ -16,7 +16,7 @@

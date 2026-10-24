@@ -14,8 +14,6 @@ The patch is also needed for one modern-toolchain fix in the Dx9 renderer: the `
 
 Patched files in `wildmagic3p8_faf_required.patch`:
 
-- `Foundation/Distance/Wm3Distance.cpp`
-- `Foundation/Distance/Wm3Distance.h`
 - `Foundation/Math/Wm3AxisAlignedBox3.h`
 - `Foundation/Math/Wm3Box3.h`
 - `Foundation/Math/Wm3IVector2.h`
