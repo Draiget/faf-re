@@ -193,5 +193,7 @@ set_source_files_properties("${WX_SRC}/common/y_tab.c" TARGET_DIRECTORY wxmswu
 add_library(faf_wx INTERFACE)
 add_library(faf::wx ALIAS faf_wx)
 target_include_directories(faf_wx INTERFACE "${WX_ROOT}/include" "${WX_ROOT}/lib/mswu")
-target_link_libraries(faf_wx INTERFACE wxmswu wx_regex wx_png wx_jpeg wx_tiff)
+target_link_libraries(faf_wx INTERFACE wxmswu wx_regex wx_png wx_jpeg wx_tiff
+  # makevc.env WINLIBS: the system libraries wx itself calls into.
+  comctl32 comdlg32 winspool winmm shell32 ole32 oleaut32 uuid rpcrt4 advapi32 wsock32 odbc32)
 set(FAF_WX_INCLUDE_DIR "${WX_ROOT}/include" PARENT_SCOPE)

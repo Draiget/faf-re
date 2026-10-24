@@ -45,8 +45,7 @@ target_compile_definitions(faf_main PRIVATE
   LUAPLUS_LIB LUA_NUMBER=float
   BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR
   _CRT_SECURE_NO_WARNINGS
-  UNICODE _UNICODE
-  $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)
+  UNICODE _UNICODE)
 
 target_include_directories(faf_main PRIVATE
   "${FAF_FFMPEG_ROOT}/include"
@@ -222,8 +221,10 @@ if(NOT FAF_UCRT_LIB_VERSION STREQUAL "10.0.22000.0")
   message(WARNING "Linking the UCRT of SDK ${FAF_UCRT_LIB_VERSION}: install the Windows 10.0.22000 SDK "
                   "for the C runtime math the simulation's replay parity was established with.")
 endif()
-target_link_options(faf_main PRIVATE /NODEFAULTLIB:libucrt.lib)
-target_link_libraries(faf_main PRIVATE "${_faf_libucrt}")
+# Debug links the debug flavour (libucrtd.lib) from the same SDK.
+set(_faf_ucrt_dir "${FAF_WINSDK_DIR}/Lib/${FAF_UCRT_LIB_VERSION}/ucrt/${_faf_sdk_arch}")
+target_link_options(faf_main PRIVATE "/NODEFAULTLIB:libucrt$<$<CONFIG:Debug>:d>.lib")
+target_link_libraries(faf_main PRIVATE "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
 
 if(FAF_TARGET_ARCH STREQUAL "x86")
   # Both from the shipped binary's PE header (characteristics 0x123, stack
