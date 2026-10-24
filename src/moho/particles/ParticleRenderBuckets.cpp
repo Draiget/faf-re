@@ -8,6 +8,7 @@
 #include <new>
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -372,6 +373,7 @@ namespace moho
 
   [[nodiscard]] bool ParticleBatchActive();
   void MirrorUploadedParticles(ParticleBuffer& particleBuffer, std::uint32_t first, std::uint32_t count);
+  void ForgetMirroredParticles(const ParticleBuffer& particleBuffer);
 
   /**
    * Address: 0x00493210 (FUN_00493210, sub_493210)
@@ -486,6 +488,7 @@ namespace moho
       if (workItem == nullptr) {
         continue;
       }
+      ForgetMirroredParticles(*static_cast<const ParticleBuffer*>(workItem->mParticleBuffer)); // engine addition
       bucket.owner->ReleaseParticleBuffer(static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
       (void)DestroyParticleRenderWorkItem(workItem);
     }
@@ -575,6 +578,7 @@ namespace moho
       }
 
       if (AdvanceParticleRenderWorkItemCursorToFrame(*workItem, frameValue)) {
+        ForgetMirroredParticles(*static_cast<const ParticleBuffer*>(workItem->mParticleBuffer)); // engine addition
         bucket.owner->ReleaseParticleBuffer(static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
         (void)DestroyParticleRenderWorkItem(workItem);
         continue;
@@ -698,6 +702,12 @@ namespace moho
      * right after their unlock; the per-frame gather then copies from video
      * memory instead of reading the dynamic buffers again. A buffer counts as
      * mirrored from its first upload that starts at instance 0 (a fresh fill).
+     *
+     * A buffer holds its slot while it is in use and gives it back when it
+     * returns to the pool (`ForgetMirroredParticles`), so the store covers the
+     * buffers in use at once rather than every buffer the pool has. With FAF
+     * FA-Binary-Patches #165 the pool has 4096 buffers, far more than kSlots;
+     * buffers in use beyond kSlots are copied from their own dynamic buffer.
      */
     struct ParticleMirrorStore
     {
@@ -708,6 +718,8 @@ namespace moho
       boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
       std::unordered_map<const ParticleBuffer*, std::uint32_t> mSlotOf;
       std::unordered_map<const ParticleBuffer*, bool> mMirrored;
+      std::vector<std::uint32_t> mFreeSlots; // slots given back by buffers returned to the pool
+      std::uint32_t mSlotsUsed = 0U;         // slots handed out so far (the rest were never used)
 
       [[nodiscard]] bool Ready()
       {
@@ -737,12 +749,28 @@ namespace moho
         if (found != mSlotOf.end()) {
           return static_cast<int>(found->second * kSlotInstances);
         }
-        if (mSlotOf.size() >= kSlots) {
+        std::uint32_t slot = 0U;
+        if (!mFreeSlots.empty()) {
+          slot = mFreeSlots.back();
+          mFreeSlots.pop_back();
+        } else if (mSlotsUsed < kSlots) {
+          slot = mSlotsUsed++;
+        } else {
           return -1;
         }
-        const auto slot = static_cast<std::uint32_t>(mSlotOf.size());
         mSlotOf.emplace(&particleBuffer, slot);
         return static_cast<int>(slot * kSlotInstances);
+      }
+
+      /** `particleBuffer` went back to the pool: its slot is free and its next fill starts unmirrored. */
+      void Release(const ParticleBuffer& particleBuffer)
+      {
+        const auto found = mSlotOf.find(&particleBuffer);
+        if (found != mSlotOf.end()) {
+          mFreeSlots.push_back(found->second);
+          mSlotOf.erase(found);
+        }
+        mMirrored.erase(&particleBuffer);
       }
     };
 
@@ -864,6 +892,17 @@ namespace moho
       return true;
     }
   } // namespace
+
+  /**
+   * Engine addition (`ren_ParticleBatch`): `particleBuffer` is about to go back to the pool, so its
+   * mirror slot can serve the next buffer in use (see `ParticleMirrorStore`).
+   */
+  void ForgetMirroredParticles(const ParticleBuffer& particleBuffer)
+  {
+    if (!sParticleMirror.mSlotOf.empty() || !sParticleMirror.mMirrored.empty()) {
+      sParticleMirror.Release(particleBuffer);
+    }
+  }
 
   void MirrorUploadedParticles(ParticleBuffer& particleBuffer, const std::uint32_t first, std::uint32_t count)
   {
