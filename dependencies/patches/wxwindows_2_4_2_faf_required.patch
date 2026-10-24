@@ -1,5 +1,5 @@
 diff -ruN a/include/wx/treelistctrl.h b/include/wx/treelistctrl.h
---- a/include/wx/treelistctrl.h
+--- /dev/null
 +++ b/include/wx/treelistctrl.h
 @@ -0,0 +1,613 @@
 +// FAF: wxCode treelistctrl as Forged Alliance linked it. Base: wxCode SVN
@@ -652,7 +652,7 @@ diff -ruN a/src/common/intl.cpp b/src/common/intl.cpp
              //     because SetThreadLocale does not modify change the
              //     interpretation of setlocale(LC_ALL, "") call:
 diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
---- a/src/generic/treelistctrl.cpp
+--- /dev/null
 +++ b/src/generic/treelistctrl.cpp
 @@ -0,0 +1,5011 @@
 +// FAF: wxCode treelistctrl as Forged Alliance linked it. Base: wxCode SVN
@@ -5747,11 +5747,12 @@ diff -ruN a/src/makevc.env b/src/makevc.env
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
+-
 +{}.cpp{$(D)}.obj:
 +	cl @<<
 +$(CPPFLAGS) /Fo$@ /c /Tp $<
 +<<
- 
++
 diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 --- a/src/msw/makefile.vc
 +++ b/src/msw/makefile.vc
@@ -5763,23 +5764,17 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
-+{$(GENDIR)}.cpp{$(GENDIR)\$(D)}.obj:
-+	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
- 
+-
 -{$(COMMDIR)}.cpp{$(COMMDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
 -<<
-+{$(COMMDIR)}.cpp{$(COMMDIR)\$(D)}.obj:
-+	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
- 
+-
 -{$(COMMDIR)}.c{$(COMMDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS2) /Fo$@ /c /Tc $<
 -<<
-+{$(COMMDIR)}.c{$(COMMDIR)\$(D)}.obj:
-+	cl $(CPPFLAGS2) /Fo$@ /c /Tc $<
- 
+-
 -{$(MSWDIR)}.cpp{$(MSWDIR)\$D}.obj:
 -	cl @<<
 -$(CPPFLAGS) /Fo$@ /c /Tp $<
@@ -5831,6 +5826,15 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 -		$(GENDIR)\$D\treectlg.obj \
 -		$(GENDIR)\$D\treelay.obj \
 -		$(GENDIR)\$D\wizard.obj
++{$(GENDIR)}.cpp{$(GENDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++{$(COMMDIR)}.cpp{$(COMMDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++{$(COMMDIR)}.c{$(COMMDIR)\$(D)}.obj:
++	cl $(CPPFLAGS2) /Fo$@ /c /Tc $<
++
 +{$(MSWDIR)}.cpp{$(MSWDIR)\$(D)}.obj:
 +	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
 +
@@ -5871,9 +5875,9 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
 +		$(GENDIR)\$(D)\textdlgg.obj \
 +		$(GENDIR)\$(D)\tipdlg.obj \
 +		$(GENDIR)\$(D)\tipwin.obj \
++		$(GENDIR)\$(D)\treelistctrl.obj \
 +		$(GENDIR)\$(D)\treectlg.obj \
 +		$(GENDIR)\$(D)\treelay.obj \
-+		$(GENDIR)\$(D)\treelistctrl.obj \
 +		$(GENDIR)\$(D)\wizard.obj
  
  # These are generic things that don't need to be compiled on MSW,
@@ -6449,46 +6453,54 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
  
 -$(COMMDIR)\$D:
 -    mkdir $(COMMDIR)\$D
-+$(COMMDIR)\$(D):
-+    mkdir $(COMMDIR)\$(D)
- 
+-
 -$(MSWDIR)\$D:
 -    mkdir $(MSWDIR)\$D
-+$(MSWDIR)\$(D):
-+    mkdir $(MSWDIR)\$(D)
- 
+-
 -$(GENDIR)\$D:
 -    mkdir $(GENDIR)\$D
-+$(GENDIR)\$(D):
-+    mkdir $(GENDIR)\$(D)
- 
+-
 -$(OLEDIR)\$D:
 -    mkdir $(OLEDIR)\$D
-+$(OLEDIR)\$(D):
-+    mkdir $(OLEDIR)\$(D)
- 
+-
 -$(HTMLDIR)\$D:
 -    mkdir $(HTMLDIR)\$D
-+$(HTMLDIR)\$(D):
-+    mkdir $(HTMLDIR)\$(D)
- 
+-
 -$(JPEGDIR)\$D:
 -    mkdir $(JPEGDIR)\$D
-+$(JPEGDIR)\$(D):
-+    mkdir $(JPEGDIR)\$(D)
- 
+-
 -$(TIFFDIR)\$D:
 -    mkdir $(TIFFDIR)\$D
-+$(TIFFDIR)\$(D):
-+    mkdir $(TIFFDIR)\$(D)
- 
+-
 -$(REGEXDIR)\$D:
 -    mkdir $(REGEXDIR)\$D
-+$(REGEXDIR)\$(D):
-+    mkdir $(REGEXDIR)\$(D)
- 
+-
 -$(WXDIR)\$D:
 -    mkdir $(WXDIR)\$D
++$(COMMDIR)\$(D):
++    mkdir $(COMMDIR)\$(D)
++
++$(MSWDIR)\$(D):
++    mkdir $(MSWDIR)\$(D)
++
++$(GENDIR)\$(D):
++    mkdir $(GENDIR)\$(D)
++
++$(OLEDIR)\$(D):
++    mkdir $(OLEDIR)\$(D)
++
++$(HTMLDIR)\$(D):
++    mkdir $(HTMLDIR)\$(D)
++
++$(JPEGDIR)\$(D):
++    mkdir $(JPEGDIR)\$(D)
++
++$(TIFFDIR)\$(D):
++    mkdir $(TIFFDIR)\$(D)
++
++$(REGEXDIR)\$(D):
++    mkdir $(REGEXDIR)\$(D)
++
 +$(WXDIR)\$(D):
 +    mkdir $(WXDIR)\$(D)
  
@@ -6499,86 +6511,126 @@ diff -ruN a/src/msw/makefile.vc b/src/msw/makefile.vc
  noopt:
  	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\datetime.obj /c /Tp $(COMMDIR)\datetime.cpp
-+$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\datetime.obj /c /Tp $(COMMDIR)\datetime.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\encconv.obj /c /Tp $(COMMDIR)\encconv.cpp
-+$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\encconv.obj /c /Tp $(COMMDIR)\encconv.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\fileconf.obj /c /Tp $(COMMDIR)\fileconf.cpp
-+$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\fileconf.obj /c /Tp $(COMMDIR)\fileconf.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\hash.obj /c /Tp $(COMMDIR)\hash.cpp
-+$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\hash.obj /c /Tp $(COMMDIR)\hash.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\resource.obj /c /Tp $(COMMDIR)\resource.cpp
-+$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\resource.obj /c /Tp $(COMMDIR)\resource.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\textfile.obj /c /Tp $(COMMDIR)\textfile.cpp
-+$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\textfile.obj /c /Tp $(COMMDIR)\textfile.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\choicdgg.obj /c /Tp $(GENDIR)\choicdgg.cpp
-+$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\choicdgg.obj /c /Tp $(GENDIR)\choicdgg.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\grid.obj /c /Tp $(GENDIR)\grid.cpp
-+$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\grid.obj /c /Tp $(GENDIR)\grid.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\gridsel.obj /c /Tp $(GENDIR)\gridsel.cpp
-+$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\gridsel.obj /c /Tp $(GENDIR)\gridsel.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\logg.obj /c /Tp $(GENDIR)\logg.cpp
-+$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\logg.obj /c /Tp $(GENDIR)\logg.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\proplist.obj /c /Tp $(GENDIR)\proplist.cpp
-+$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\proplist.obj /c /Tp $(GENDIR)\proplist.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\clipbrd.obj /c /Tp $(MSWDIR)\clipbrd.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\clipbrd.obj /c /Tp $(MSWDIR)\clipbrd.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\control.obj /c /Tp $(MSWDIR)\control.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\control.obj /c /Tp $(MSWDIR)\control.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\listbox.obj /c /Tp $(MSWDIR)\listbox.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\listbox.obj /c /Tp $(MSWDIR)\listbox.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\mdi.obj /c /Tp $(MSWDIR)\mdi.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\mdi.obj /c /Tp $(MSWDIR)\mdi.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\menu.obj /c /Tp $(MSWDIR)\menu.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\menu.obj /c /Tp $(MSWDIR)\menu.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\notebook.obj /c /Tp $(MSWDIR)\notebook.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\notebook.obj /c /Tp $(MSWDIR)\notebook.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\tbar95.obj /c /Tp $(MSWDIR)\tbar95.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\tbar95.obj /c /Tp $(MSWDIR)\tbar95.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\treectrl.obj /c /Tp $(MSWDIR)\treectrl.cpp
-+$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\treectrl.obj /c /Tp $(MSWDIR)\treectrl.cpp
- <<
- 	cl @<<
+-<<
+-	cl @<<
 -$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$D\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
-+$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$(D)\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
- <<
- 
+-<<
+-
 -$(COMMDIR)\$D\y_tab.obj:     $(COMMDIR)\y_tab.c $(COMMDIR)\lex_yy.c
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\datetime.obj /c /Tp $(COMMDIR)\datetime.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\encconv.obj /c /Tp $(COMMDIR)\encconv.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\fileconf.obj /c /Tp $(COMMDIR)\fileconf.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\hash.obj /c /Tp $(COMMDIR)\hash.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\resource.obj /c /Tp $(COMMDIR)\resource.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\textfile.obj /c /Tp $(COMMDIR)\textfile.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\choicdgg.obj /c /Tp $(GENDIR)\choicdgg.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\grid.obj /c /Tp $(GENDIR)\grid.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\gridsel.obj /c /Tp $(GENDIR)\gridsel.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\logg.obj /c /Tp $(GENDIR)\logg.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\proplist.obj /c /Tp $(GENDIR)\proplist.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\clipbrd.obj /c /Tp $(MSWDIR)\clipbrd.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\control.obj /c /Tp $(MSWDIR)\control.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\listbox.obj /c /Tp $(MSWDIR)\listbox.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\mdi.obj /c /Tp $(MSWDIR)\mdi.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\menu.obj /c /Tp $(MSWDIR)\menu.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\notebook.obj /c /Tp $(MSWDIR)\notebook.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\tbar95.obj /c /Tp $(MSWDIR)\tbar95.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\treectrl.obj /c /Tp $(MSWDIR)\treectrl.cpp
++<<
++	cl @<<
++$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$(D)\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
++<<
++
 +$(COMMDIR)\$(D)\y_tab.obj:     $(COMMDIR)\y_tab.c $(COMMDIR)\lex_yy.c
          cl @<<
  $(CPPFLAGS2) /c $(COMMDIR)\y_tab.c -DUSE_DEFINE -DYY_USE_PROTOS /Fo$@

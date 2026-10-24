@@ -1,5 +1,7 @@
-diff -ruN a/Applications/Dx9Application.vcxproj b/Applications/Dx9Application.vcxproj
---- a/Applications/Dx9Application.vcxproj
+diff --git b/Applications/Dx9Application.vcxproj b/Applications/Dx9Application.vcxproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..6345983b48c9d54634fcd9975b790e8e22ef18f1
+--- /dev/null
 +++ b/Applications/Dx9Application.vcxproj
 @@ -0,0 +1,187 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -189,8 +191,10 @@ diff -ruN a/Applications/Dx9Application.vcxproj b/Applications/Dx9Application.vc
 +  <ImportGroup Label="ExtensionTargets">
 +  </ImportGroup>
 +</Project>
-diff -ruN a/Applications/Dx9Application.vcxproj.filters b/Applications/Dx9Application.vcxproj.filters
---- a/Applications/Dx9Application.vcxproj.filters
+diff --git b/Applications/Dx9Application.vcxproj.filters b/Applications/Dx9Application.vcxproj.filters
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d78ff735092d517b5df51a7cdf0c891055c4639
+--- /dev/null
 +++ b/Applications/Dx9Application.vcxproj.filters
 @@ -0,0 +1,25 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -218,8 +222,10 @@ diff -ruN a/Applications/Dx9Application.vcxproj.filters b/Applications/Dx9Applic
 +    <ClInclude Include="Wm3WindowApplication3.h" />
 +  </ItemGroup>
 +</Project>
-diff -ruN a/Applications/WglApplication.vcxproj b/Applications/WglApplication.vcxproj
---- a/Applications/WglApplication.vcxproj
+diff --git b/Applications/WglApplication.vcxproj b/Applications/WglApplication.vcxproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..18a1510075988af1466725d96a24d562957d673c
+--- /dev/null
 +++ b/Applications/WglApplication.vcxproj
 @@ -0,0 +1,187 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -409,8 +415,10 @@ diff -ruN a/Applications/WglApplication.vcxproj b/Applications/WglApplication.vc
 +  <ImportGroup Label="ExtensionTargets">
 +  </ImportGroup>
 +</Project>
-diff -ruN a/Applications/WglApplication.vcxproj.filters b/Applications/WglApplication.vcxproj.filters
---- a/Applications/WglApplication.vcxproj.filters
+diff --git b/Applications/WglApplication.vcxproj.filters b/Applications/WglApplication.vcxproj.filters
+new file mode 100644
+index 0000000000000000000000000000000000000000..6bd5692d740c94866d49b09cded736c072bd9940
+--- /dev/null
 +++ b/Applications/WglApplication.vcxproj.filters
 @@ -0,0 +1,25 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -438,8 +446,10 @@ diff -ruN a/Applications/WglApplication.vcxproj.filters b/Applications/WglApplic
 +    <ClInclude Include="Wm3WindowApplication3.h" />
 +  </ItemGroup>
 +</Project>
-diff -ruN a/Foundation/Foundation.vcxproj b/Foundation/Foundation.vcxproj
---- a/Foundation/Foundation.vcxproj
+diff --git b/Foundation/Foundation.vcxproj b/Foundation/Foundation.vcxproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..148c1813aa925cb062016ba4fd403cb61e4d66ae
+--- /dev/null
 +++ b/Foundation/Foundation.vcxproj
 @@ -0,0 +1,1184 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -1626,8 +1636,10 @@ diff -ruN a/Foundation/Foundation.vcxproj b/Foundation/Foundation.vcxproj
 +  <ImportGroup Label="ExtensionTargets">
 +  </ImportGroup>
 +</Project>
-diff -ruN a/Foundation/Foundation.vcxproj.filters b/Foundation/Foundation.vcxproj.filters
---- a/Foundation/Foundation.vcxproj.filters
+diff --git b/Foundation/Foundation.vcxproj.filters b/Foundation/Foundation.vcxproj.filters
+new file mode 100644
+index 0000000000000000000000000000000000000000..13300f366a543f7520956f316be6d198a8ca698e
+--- /dev/null
 +++ b/Foundation/Foundation.vcxproj.filters
 @@ -0,0 +1,3099 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -4729,8 +4741,10 @@ diff -ruN a/Foundation/Foundation.vcxproj.filters b/Foundation/Foundation.vcxpro
 +    <ClInclude Include="Wm3FoundationPCH.h" />
 +  </ItemGroup>
 +</Project>
-diff -ruN a/Renderers/Dx9Renderer/Dx9Renderer.vcxproj b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj
---- a/Renderers/Dx9Renderer/Dx9Renderer.vcxproj
+diff --git b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..5cdab79d547eafb2cd78fe5e83c55150ea711519
+--- /dev/null
 +++ b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj
 @@ -0,0 +1,197 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -4930,8 +4944,10 @@ diff -ruN a/Renderers/Dx9Renderer/Dx9Renderer.vcxproj b/Renderers/Dx9Renderer/Dx
 +  <ImportGroup Label="ExtensionTargets">
 +  </ImportGroup>
 +</Project>
-diff -ruN a/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters
---- a/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters
+diff --git b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters
+new file mode 100644
+index 0000000000000000000000000000000000000000..24d437317afc1f2d8ea248495eeab944d498352a
+--- /dev/null
 +++ b/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters
 @@ -0,0 +1,35 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -4969,8 +4985,10 @@ diff -ruN a/Renderers/Dx9Renderer/Dx9Renderer.vcxproj.filters b/Renderers/Dx9Ren
 +    <ClInclude Include="Wm3Dx9Utility.h" />
 +  </ItemGroup>
 +</Project>
-diff -ruN a/Renderers/OpenGLRenderer/WglRenderer.vcxproj b/Renderers/OpenGLRenderer/WglRenderer.vcxproj
---- a/Renderers/OpenGLRenderer/WglRenderer.vcxproj
+diff --git b/Renderers/OpenGLRenderer/WglRenderer.vcxproj b/Renderers/OpenGLRenderer/WglRenderer.vcxproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..63f376313bfde359d7a3b802044d4683542c7e6d
+--- /dev/null
 +++ b/Renderers/OpenGLRenderer/WglRenderer.vcxproj
 @@ -0,0 +1,197 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -5170,8 +5188,10 @@ diff -ruN a/Renderers/OpenGLRenderer/WglRenderer.vcxproj b/Renderers/OpenGLRende
 +  <ImportGroup Label="ExtensionTargets">
 +  </ImportGroup>
 +</Project>
-diff -ruN a/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters b/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters
---- a/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters
+diff --git b/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters b/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters
+new file mode 100644
+index 0000000000000000000000000000000000000000..54ebdd72f4ec16d86d0ee352bb0b0825ec70bfcb
+--- /dev/null
 +++ b/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters
 @@ -0,0 +1,35 @@
 +<?xml version="1.0" encoding="utf-8"?>
@@ -5209,3 +5229,450 @@ diff -ruN a/Renderers/OpenGLRenderer/WglRenderer.vcxproj.filters b/Renderers/Ope
 +    <ClInclude Include="Wm3WglRenderer.h" />
 +  </ItemGroup>
 +</Project>
+diff --git b/Tools/build_wm3.bat b/Tools/build_wm3.bat
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc10a061e30b2fa39e37ce8bae9a9316b79fc0fa
+--- /dev/null
++++ b/Tools/build_wm3.bat
+@@ -0,0 +1,21 @@
++@echo off
++REM Build a WildMagic3p8 sublibrary using msbuild via VS2022 dev shell.
++REM Usage: build_wm3.bat <vcxproj-path> [Configuration] [Platform]
++setlocal
++set "VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_x86.bat"
++if not exist "%VCVARS%" (
++    echo vcvars not found at %VCVARS%
++    exit /b 2
++)
++call "%VCVARS%" >NUL
++if errorlevel 1 (
++    echo vcvars failed
++    exit /b 3
++)
++set "PROJ=%~1"
++set "CFG=%~2"
++set "PLAT=%~3"
++if "%CFG%"=="" set "CFG=Debug"
++if "%PLAT%"=="" set "PLAT=Win32"
++msbuild "%PROJ%" /t:Build /p:Configuration=%CFG% /p:Platform=%PLAT% /m /nologo /v:minimal
++exit /b %ERRORLEVEL%
+diff --git b/Tools/dumpbin_symbols.bat b/Tools/dumpbin_symbols.bat
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c0418c802474234951a2c85a769e22ae6078a2e
+--- /dev/null
++++ b/Tools/dumpbin_symbols.bat
+@@ -0,0 +1,24 @@
++@echo off
++REM Run dumpbin /symbols on a .lib via the VS2022 dev shell.
++REM Usage: dumpbin_symbols.bat <lib-path> <out-file>
++setlocal
++set "VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_x86.bat"
++if not exist "%VCVARS%" (
++    echo vcvars not found at %VCVARS%
++    exit /b 2
++)
++call "%VCVARS%" >NUL
++if errorlevel 1 (
++    echo vcvars failed
++    exit /b 3
++)
++if "%~1"=="" (
++    echo usage: dumpbin_symbols.bat ^<lib-path^> ^<out-file^>
++    exit /b 1
++)
++if "%~2"=="" (
++    echo usage: dumpbin_symbols.bat ^<lib-path^> ^<out-file^>
++    exit /b 1
++)
++dumpbin /symbols "%~1" > "%~2" 2>&1
++exit /b %ERRORLEVEL%
+diff --git b/Tools/gen_vcxproj.py b/Tools/gen_vcxproj.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c86eb1b26ca6aa928994765fe036a05ac8a74250
+--- /dev/null
++++ b/Tools/gen_vcxproj.py
+@@ -0,0 +1,384 @@
++"""Generate a fresh MSBuild .vcxproj for a WildMagic3p8 sublibrary.
++
++The original WildMagic3p8 ships VS2005 (.vcproj) projects with PCH and
++six configuration variants (Static/Dynamic x Debug/Release/Memory). For the
++FAF/Moho recovery effort we want a single static-library .vcxproj per
++sublibrary that matches sdk.vcxproj conventions:
++
++  - PlatformToolset v143
++  - C++20, MultiByte/Unicode irrelevant for static libs
++  - Configurations: Debug|Win32, Release|Win32, Debug|x64, Release|x64
++  - Output and intermediate dirs under <repo>/output and <repo>/buildstage
++  - PCH disabled (Wm3*PCH.h is fully gated by WM3_USE_PRECOMPILED_HEADERS)
++
++Run this script from the repo root, e.g.:
++
++    python dependencies/WildMagic3p8/tools/gen_vcxproj.py Foundation
++    python dependencies/WildMagic3p8/tools/gen_vcxproj.py Renderers/Dx9Renderer
++    python dependencies/WildMagic3p8/tools/gen_vcxproj.py Applications
++
++The output .vcxproj is written next to the existing _VC80.vcproj (or in the
++sublibrary root if none exists) and uses a stable GUID derived from the path.
++"""
++
++from __future__ import annotations
++
++import argparse
++import hashlib
++import os
++import sys
++import uuid
++from pathlib import Path
++from xml.sax.saxutils import escape
++
++REPO_ROOT = Path(__file__).resolve().parents[3]
++WM3_ROOT = REPO_ROOT / "dependencies" / "WildMagic3p8"
++
++CONFIGS = [
++    ("Debug", "Win32"),
++    ("Release", "Win32"),
++    ("Debug", "x64"),
++    ("Release", "x64"),
++]
++
++
++def stable_guid(name: str) -> str:
++    h = hashlib.sha1(("wm3:" + name).encode()).digest()
++    return str(uuid.UUID(bytes=h[:16])).upper()
++
++
++def collect_sources(
++    sublib_dir: Path,
++    exclude_prefixes: tuple[str, ...] = (),
++) -> tuple[list[Path], list[Path], list[Path]]:
++    """Return (cpp_files, header_files, include_dirs) relative to sublib_dir.
++
++    Files whose basename starts with any of `exclude_prefixes` are skipped
++    (e.g. "Wm3Glx", "Wm3Agl" to drop X11 / Apple backends from WglRenderer).
++    """
++    cpp_files: list[Path] = []
++    header_files: list[Path] = []
++    dirs_with_code: set[Path] = set()
++
++    for root, dirnames, filenames in os.walk(sublib_dir):
++        # Skip xcodeproj and any backup/extra dirs
++        dirnames[:] = [d for d in dirnames if not d.endswith(".xcodeproj")]
++        rel_root = Path(root).relative_to(sublib_dir)
++        for f in filenames:
++            if exclude_prefixes and any(f.startswith(p) for p in exclude_prefixes):
++                continue
++            ext = f.lower()
++            if ext.endswith(".cpp"):
++                # Skip the PCH source — we don't use PCH
++                if f.endswith("PCH.cpp"):
++                    continue
++                cpp_files.append(rel_root / f)
++                dirs_with_code.add(rel_root)
++            elif ext.endswith(".h") or ext.endswith(".inl"):
++                header_files.append(rel_root / f)
++                dirs_with_code.add(rel_root)
++
++    cpp_files.sort()
++    header_files.sort()
++    include_dirs = sorted(dirs_with_code)
++    return cpp_files, header_files, include_dirs
++
++
++def make_vcxproj_xml(
++    project_name: str,
++    project_guid: str,
++    sublib_rel_to_repo: Path,
++    cpp_files: list[Path],
++    header_files: list[Path],
++    extra_include_dirs: list[str],
++    include_dirs: list[Path],
++    use_dxsdk: bool = False,
++) -> str:
++    sub_rel = str(sublib_rel_to_repo).replace("/", "\\")
++    # Number of `..\` segments to go from the .vcxproj dir to the repo root.
++    repo_up_depth = len(sublib_rel_to_repo.parts)
++    repo_up = "\\".join([".."] * repo_up_depth) + "\\"
++
++    # Build include path string. All Wm3 sublib include dirs are relative to
++    # the sublib root, plus repo-relative extras (e.g. ../../Foundation/* for
++    # Renderer projects).
++    include_parts: list[str] = []
++    for d in include_dirs:
++        s = str(d) if str(d) != "." else "."
++        include_parts.append(s.replace("/", "\\"))
++    include_parts.extend(extra_include_dirs)
++    if use_dxsdk:
++        include_parts.append("$(DXSDK_DIR)Include")
++    include_str = ";".join(include_parts) + ";%(AdditionalIncludeDirectories)"
++
++    pp_debug = "WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)"
++    pp_release = "WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)"
++
++    cfg_xml: list[str] = []
++    for cfg, plat in CONFIGS:
++        cfg_xml.append(
++            f'    <ProjectConfiguration Include="{cfg}|{plat}">\n'
++            f'      <Configuration>{cfg}</Configuration>\n'
++            f'      <Platform>{plat}</Platform>\n'
++            f'    </ProjectConfiguration>'
++        )
++
++    label_props: list[str] = []
++    for cfg, plat in CONFIGS:
++        debug_libs = "true" if cfg == "Debug" else "false"
++        wpo = "    <WholeProgramOptimization>true</WholeProgramOptimization>\n" if cfg == "Release" else ""
++        label_props.append(
++            f'  <PropertyGroup Condition="\'$(Configuration)|$(Platform)\'==\'{cfg}|{plat}\'" Label="Configuration">\n'
++            f'    <ConfigurationType>StaticLibrary</ConfigurationType>\n'
++            f'    <UseDebugLibraries>{debug_libs}</UseDebugLibraries>\n'
++            f'    <PlatformToolset>v143</PlatformToolset>\n'
++            f'{wpo}'
++            f'    <CharacterSet>MultiByte</CharacterSet>\n'
++            f'  </PropertyGroup>'
++        )
++
++    sheet_imports: list[str] = []
++    for cfg, plat in CONFIGS:
++        sheet_imports.append(
++            f'  <ImportGroup Label="PropertySheets" Condition="\'$(Configuration)|$(Platform)\'==\'{cfg}|{plat}\'">\n'
++            f'    <Import Project="$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props" Condition="exists(\'$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props\')" Label="LocalAppDataPlatform" />\n'
++            f'  </ImportGroup>'
++        )
++
++    out_props: list[str] = []
++    for cfg, plat in CONFIGS:
++        out_props.append(
++            f'  <PropertyGroup Condition="\'$(Configuration)|$(Platform)\'==\'{cfg}|{plat}\'">\n'
++            f'    <OutDir>$(FafRepoRoot)output\\$(ProjectName)\\$(Platform)\\$(Configuration)\\</OutDir>\n'
++            f'    <IntDir>$(FafRepoRoot)buildstage\\$(ProjectName)\\$(Platform)\\$(Configuration)\\</IntDir>\n'
++            f'  </PropertyGroup>'
++        )
++
++    item_def_groups: list[str] = []
++    for cfg, plat in CONFIGS:
++        pp = pp_debug if cfg == "Debug" else pp_release
++        opt_extra = ""
++        if cfg == "Release":
++            opt_extra = (
++                "      <FunctionLevelLinking>true</FunctionLevelLinking>\n"
++                "      <IntrinsicFunctions>true</IntrinsicFunctions>\n"
++            )
++        item_def_groups.append(
++            f'  <ItemDefinitionGroup Condition="\'$(Configuration)|$(Platform)\'==\'{cfg}|{plat}\'">\n'
++            f'    <ClCompile>\n'
++            f'      <WarningLevel>Level3</WarningLevel>\n'
++            f'      <SDLCheck>false</SDLCheck>\n'
++            f'      <PreprocessorDefinitions>{pp}</PreprocessorDefinitions>\n'
++            f'      <ConformanceMode>false</ConformanceMode>\n'
++            f'      <LanguageStandard>stdcpp20</LanguageStandard>\n'
++            f'      <LanguageStandard_C>stdc17</LanguageStandard_C>\n'
++            f'      <AdditionalOptions>/MP4 /FS /wd4267 /wd4244 /wd4305 /wd4018 /wd4146 /wd4800 /wd4996 %(AdditionalOptions)</AdditionalOptions>\n'
++            f'      <AdditionalIncludeDirectories>{include_str}</AdditionalIncludeDirectories>\n'
++            f'      <DisableSpecificWarnings>4267;4244;4305;4018;4146;4800;4996</DisableSpecificWarnings>\n'
++            f'{opt_extra}'
++            f'      <PrecompiledHeader>NotUsing</PrecompiledHeader>\n'
++            f'    </ClCompile>\n'
++            f'    <Lib>\n'
++            f'      <TargetMachine>{"MachineX86" if plat == "Win32" else "MachineX64"}</TargetMachine>\n'
++            f'    </Lib>\n'
++            f'  </ItemDefinitionGroup>'
++        )
++
++    cpp_items: list[str] = []
++    for f in cpp_files:
++        s = str(f).replace("/", "\\")
++        cpp_items.append(f'    <ClCompile Include="{escape(s)}" />')
++    cpp_group = "  <ItemGroup>\n" + "\n".join(cpp_items) + "\n  </ItemGroup>"
++
++    h_items: list[str] = []
++    for f in header_files:
++        s = str(f).replace("/", "\\")
++        h_items.append(f'    <ClInclude Include="{escape(s)}" />')
++    h_group = "  <ItemGroup>\n" + "\n".join(h_items) + "\n  </ItemGroup>"
++
++    return (
++        '<?xml version="1.0" encoding="utf-8"?>\n'
++        '<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">\n'
++        '  <ItemGroup Label="ProjectConfigurations">\n'
++        + "\n".join(cfg_xml) + "\n"
++        '  </ItemGroup>\n'
++        '  <PropertyGroup Label="Globals">\n'
++        '    <VCProjectVersion>17.0</VCProjectVersion>\n'
++        '    <Keyword>Win32Proj</Keyword>\n'
++        f'    <ProjectGuid>{{{project_guid}}}</ProjectGuid>\n'
++        f'    <RootNamespace>{project_name}</RootNamespace>\n'
++        '    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>\n'
++        '  </PropertyGroup>\n'
++        '  <Import Project="$(VCTargetsPath)\\Microsoft.Cpp.Default.props" />\n'
++        + "\n".join(label_props) + "\n"
++        '  <Import Project="$(VCTargetsPath)\\Microsoft.Cpp.props" />\n'
++        '  <ImportGroup Label="ExtensionSettings">\n'
++        '  </ImportGroup>\n'
++        '  <ImportGroup Label="Shared">\n'
++        '  </ImportGroup>\n'
++        + "\n".join(sheet_imports) + "\n"
++        '  <PropertyGroup Label="UserMacros" />\n'
++        '  <PropertyGroup>\n'
++        '    <FafRepoRoot Condition="\'$(SolutionPath)\' != \'\'">$(SolutionDir)</FafRepoRoot>\n'
++        f'    <FafRepoRoot Condition="\'$(SolutionPath)\' == \'\'">$(MSBuildProjectDirectory)\\{repo_up}</FafRepoRoot>\n'
++        '  </PropertyGroup>\n'
++        + "\n".join(out_props) + "\n"
++        + "\n".join(item_def_groups) + "\n"
++        + cpp_group + "\n"
++        + h_group + "\n"
++        '  <Import Project="$(VCTargetsPath)\\Microsoft.Cpp.targets" />\n'
++        '  <ImportGroup Label="ExtensionTargets">\n'
++        '  </ImportGroup>\n'
++        '</Project>\n'
++    )
++
++
++def make_filters_xml(
++    cpp_files: list[Path],
++    header_files: list[Path],
++) -> str:
++    """Generate a .vcxproj.filters file mirroring on-disk subfolder layout."""
++    filter_dirs: set[str] = set()
++    for f in list(cpp_files) + list(header_files):
++        parts = f.parts[:-1]
++        for i in range(1, len(parts) + 1):
++            filter_dirs.add("\\".join(parts[:i]))
++
++    filter_items: list[str] = []
++    for d in sorted(filter_dirs):
++        if not d:
++            continue
++        filter_items.append(
++            f'    <Filter Include="{escape(d)}">\n'
++            f'      <UniqueIdentifier>{{{stable_guid("filter:" + d)}}}</UniqueIdentifier>\n'
++            f'    </Filter>'
++        )
++    filters_group = "  <ItemGroup>\n" + "\n".join(filter_items) + "\n  </ItemGroup>"
++
++    cpp_items: list[str] = []
++    for f in cpp_files:
++        s = str(f).replace("/", "\\")
++        parts = f.parts[:-1]
++        flt = "\\".join(parts) if parts else ""
++        if flt:
++            cpp_items.append(
++                f'    <ClCompile Include="{escape(s)}">\n'
++                f'      <Filter>{escape(flt)}</Filter>\n'
++                f'    </ClCompile>'
++            )
++        else:
++            cpp_items.append(f'    <ClCompile Include="{escape(s)}" />')
++    cpp_group = "  <ItemGroup>\n" + "\n".join(cpp_items) + "\n  </ItemGroup>"
++
++    h_items: list[str] = []
++    for f in header_files:
++        s = str(f).replace("/", "\\")
++        parts = f.parts[:-1]
++        flt = "\\".join(parts) if parts else ""
++        if flt:
++            h_items.append(
++                f'    <ClInclude Include="{escape(s)}">\n'
++                f'      <Filter>{escape(flt)}</Filter>\n'
++                f'    </ClInclude>'
++            )
++        else:
++            h_items.append(f'    <ClInclude Include="{escape(s)}" />')
++    h_group = "  <ItemGroup>\n" + "\n".join(h_items) + "\n  </ItemGroup>"
++
++    return (
++        '<?xml version="1.0" encoding="utf-8"?>\n'
++        '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">\n'
++        + filters_group + "\n"
++        + cpp_group + "\n"
++        + h_group + "\n"
++        '</Project>\n'
++    )
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument(
++        "sublib",
++        help="Sublibrary path relative to dependencies/WildMagic3p8 (e.g. Foundation, Renderers/Dx9Renderer, Applications)",
++    )
++    parser.add_argument(
++        "--name",
++        default=None,
++        help="Project name to use (defaults to the leaf directory name).",
++    )
++    parser.add_argument(
++        "--extra-include",
++        action="append",
++        default=[],
++        help="Additional include directory (relative to the sublib dir, e.g. ..\\..\\Foundation\\Math).",
++    )
++    parser.add_argument(
++        "--depends-on-foundation",
++        action="store_true",
++        help="Add ../../Foundation/<all-subdirs> as include paths (for Renderers/Applications).",
++    )
++    parser.add_argument(
++        "--use-dxsdk",
++        action="store_true",
++        help="Add legacy DirectX SDK include and lib dirs ($(DXSDK_DIR)) for Dx9-based projects.",
++    )
++    parser.add_argument(
++        "--exclude-prefix",
++        action="append",
++        default=[],
++        help="Skip files whose basename starts with this prefix (repeatable). E.g. Wm3Glx, Wm3Agl.",
++    )
++    args = parser.parse_args()
++
++    sublib_rel = Path(args.sublib)
++    sublib_dir = WM3_ROOT / sublib_rel
++    if not sublib_dir.exists():
++        print(f"Sublibrary not found: {sublib_dir}", file=sys.stderr)
++        return 2
++
++    project_name = args.name or sublib_dir.name
++    project_guid = stable_guid(project_name)
++    cpp_files, header_files, include_dirs = collect_sources(
++        sublib_dir, exclude_prefixes=tuple(args.exclude_prefix)
++    )
++
++    if not cpp_files:
++        print(f"No .cpp files found under {sublib_dir}", file=sys.stderr)
++        return 1
++
++    extra_includes: list[str] = list(args.extra_include)
++    if args.depends_on_foundation:
++        foundation = WM3_ROOT / "Foundation"
++        for sub in sorted(p for p in foundation.iterdir() if p.is_dir() and not p.name.endswith(".xcodeproj")):
++            rel = os.path.relpath(sub, sublib_dir).replace("/", "\\")
++            extra_includes.append(rel)
++        # Foundation root itself
++        rel = os.path.relpath(foundation, sublib_dir).replace("/", "\\")
++        extra_includes.append(rel)
++
++    sub_rel_to_repo = Path("dependencies") / "WildMagic3p8" / sublib_rel
++    xml = make_vcxproj_xml(
++        project_name=project_name,
++        project_guid=project_guid,
++        sublib_rel_to_repo=sub_rel_to_repo,
++        cpp_files=cpp_files,
++        header_files=header_files,
++        extra_include_dirs=extra_includes,
++        include_dirs=include_dirs,
++        use_dxsdk=args.use_dxsdk,
++    )
++
++    out_path = sublib_dir / f"{project_name}.vcxproj"
++    out_path.write_text(xml, encoding="utf-8")
++    print(f"Wrote {out_path} ({len(cpp_files)} sources, {len(header_files)} headers)")
++
++    filters_xml = make_filters_xml(cpp_files, header_files)
++    filters_path = sublib_dir / f"{project_name}.vcxproj.filters"
++    filters_path.write_text(filters_xml, encoding="utf-8")
++    print(f"Wrote {filters_path}")
++
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

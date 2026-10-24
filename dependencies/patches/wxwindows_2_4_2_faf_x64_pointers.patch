@@ -1,3 +1,4 @@
+diff -ruN a/include/wx/defs.h b/include/wx/defs.h
 --- a/include/wx/defs.h
 +++ b/include/wx/defs.h
 @@ -1903,7 +1903,11 @@
@@ -40,6 +41,7 @@
  
  #if !defined(__WIN32__) || defined(__GNUWIN32__) || defined(__WXWINE__) || defined(__WXMICROWIN__)
  typedef int             (*WXFARPROC)();
+diff -ruN a/include/wx/dynarray.h b/include/wx/dynarray.h
 --- a/include/wx/dynarray.h
 +++ b/include/wx/dynarray.h
 @@ -470,6 +470,10 @@
@@ -53,6 +55,7 @@
  
  // ----------------------------------------------------------------------------
  // Convenience macros to define arrays from base arrays
+diff -ruN a/include/wx/hashmap.h b/include/wx/hashmap.h
 --- a/include/wx/hashmap.h
 +++ b/include/wx/hashmap.h
 @@ -447,7 +447,7 @@
@@ -64,6 +67,7 @@
  
      wxPointerHash& operator=(const wxPointerHash&) { return *this; }
  };
+diff -ruN a/include/wx/listbase.h b/include/wx/listbase.h
 --- a/include/wx/listbase.h
 +++ b/include/wx/listbase.h
 @@ -222,7 +222,12 @@
@@ -115,6 +119,7 @@
      long GetMask() const { return m_item.m_mask; }
      const wxListItem& GetItem() const { return m_item; }
  
+diff -ruN a/include/wx/msw/treectrl.h b/include/wx/msw/treectrl.h
 --- a/include/wx/msw/treectrl.h
 +++ b/include/wx/msw/treectrl.h
 @@ -241,9 +241,9 @@
@@ -129,6 +134,7 @@
          // get the last child of this item - this method doesn't use cookies
      wxTreeItemId GetLastChild(const wxTreeItemId& item) const;
  
+diff -ruN a/include/wx/treebase.h b/include/wx/treebase.h
 --- a/include/wx/treebase.h
 +++ b/include/wx/treebase.h
 @@ -33,7 +33,12 @@
@@ -172,6 +178,7 @@
  
  // ----------------------------------------------------------------------------
  // constants
+diff -ruN a/include/wx/treelistctrl.h b/include/wx/treelistctrl.h
 --- a/include/wx/treelistctrl.h
 +++ b/include/wx/treelistctrl.h
 @@ -56,7 +56,11 @@
@@ -186,6 +193,7 @@
  #else
  typedef void *wxTreeItemIdValue;
  #endif
+diff -ruN a/src/common/dynarray.cpp b/src/common/dynarray.cpp
 --- a/src/common/dynarray.cpp
 +++ b/src/common/dynarray.cpp
 @@ -228,8 +228,8 @@
@@ -219,6 +227,7 @@
 +#endif
  //_WX_DEFINE_BASEARRAY(double,       wxBaseArrayDouble)
  
+diff -ruN a/src/common/list.cpp b/src/common/list.cpp
 --- a/src/common/list.cpp
 +++ b/src/common/list.cpp
 @@ -609,7 +609,7 @@
@@ -230,6 +239,7 @@
  #else
        if ((long) s == 0)
  #endif
+diff -ruN a/src/generic/dirctrlg.cpp b/src/generic/dirctrlg.cpp
 --- a/src/generic/dirctrlg.cpp
 +++ b/src/generic/dirctrlg.cpp
 @@ -766,7 +766,7 @@
@@ -259,6 +269,7 @@
              wxTreeItemId childId = m_treeCtrl->GetFirstChild(lastId, cookie);
              bool selectedChild = FALSE;
              while (childId.IsOk())
+diff -ruN a/src/generic/treectlg.cpp b/src/generic/treectlg.cpp
 --- a/src/generic/treectlg.cpp
 +++ b/src/generic/treectlg.cpp
 @@ -1348,7 +1348,7 @@
@@ -389,6 +400,7 @@
                  nevent.m_pointDrag = CalcScrolledPosition(pt);
                  nevent.SetEventObject( this );
                  if ( !GetEventHandler()->ProcessEvent( nevent ) )
+diff -ruN a/src/generic/treelistctrl.cpp b/src/generic/treelistctrl.cpp
 --- a/src/generic/treelistctrl.cpp
 +++ b/src/generic/treelistctrl.cpp
 @@ -2465,7 +2465,7 @@
@@ -519,6 +531,7 @@
              int nx, ny;
              CalcScrolledPosition(x, y, &nx, &ny);
              nevent.SetPoint( wxPoint(nx, ny) );
+diff -ruN a/src/msw/choice.cpp b/src/msw/choice.cpp
 --- a/src/msw/choice.cpp
 +++ b/src/msw/choice.cpp
 @@ -106,7 +106,7 @@
@@ -530,6 +543,7 @@
      if ( n == CB_ERR )
      {
          wxLogLastError(wxT("SendMessage(CB_ADDSTRING)"));
+diff -ruN a/src/msw/fontenum.cpp b/src/msw/fontenum.cpp
 --- a/src/msw/fontenum.cpp
 +++ b/src/msw/fontenum.cpp
 @@ -98,7 +98,7 @@
@@ -550,6 +564,7 @@
  {
  
      // we used to process TrueType fonts only, but there doesn't seem to be any
+diff -ruN a/src/msw/listbox.cpp b/src/msw/listbox.cpp
 --- a/src/msw/listbox.cpp
 +++ b/src/msw/listbox.cpp
 @@ -621,7 +621,7 @@
@@ -570,6 +585,7 @@
  
      wxCHECK( data && (data != LB_ERR), FALSE );
  
+diff -ruN a/src/msw/mdi.cpp b/src/msw/mdi.cpp
 --- a/src/msw/mdi.cpp
 +++ b/src/msw/mdi.cpp
 @@ -720,7 +720,7 @@
@@ -590,6 +606,7 @@
  {
      return DefMDIChildProc(GetHwnd(),
                             (UINT)message, (WPARAM)wParam, (LPARAM)lParam);
+diff -ruN a/src/msw/tabctrl.cpp b/src/msw/tabctrl.cpp
 --- a/src/msw/tabctrl.cpp
 +++ b/src/msw/tabctrl.cpp
 @@ -299,7 +299,7 @@
@@ -610,6 +627,7 @@
  
      return ( TabCtrl_SetItem( (HWND) GetHWND(), item, & tcItem) != 0 );
  }
+diff -ruN a/src/msw/tbar95.cpp b/src/msw/tbar95.cpp
 --- a/src/msw/tbar95.cpp
 +++ b/src/msw/tbar95.cpp
 @@ -701,7 +701,7 @@
@@ -621,6 +639,7 @@
                      }
                  }
  
+diff -ruN a/src/msw/treectrl.cpp b/src/msw/treectrl.cpp
 --- a/src/msw/treectrl.cpp
 +++ b/src/msw/treectrl.cpp
 @@ -545,7 +545,7 @@
@@ -680,9 +699,10 @@
  void wxTreeCtrl::DeleteChildren(const wxTreeItemId& item)
  {
 -    long cookie;
-+    wxTreeItemIdValue cookie;
- 
+-
 -    wxArrayLong children;
++    wxTreeItemIdValue cookie;
++
 +    wxArrayTreeItemIds children; // FAF x64: holds HTREEITEMs
      wxTreeItemId child = GetFirstChild(item, cookie);
      while ( child.IsOk() )
@@ -701,6 +721,7 @@
          {
              wxLogLastError(wxT("TreeView_DeleteItem"));
          }
+diff -ruN a/src/msw/window.cpp b/src/msw/window.cpp
 --- a/src/msw/window.cpp
 +++ b/src/msw/window.cpp
 @@ -2385,7 +2385,7 @@

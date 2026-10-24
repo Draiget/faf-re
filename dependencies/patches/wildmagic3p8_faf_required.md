@@ -1,26 +1,11 @@
 # FAF WildMagic 3.8 Patch
 
-> **Baseline note (2026-09-23).** The container build takes Wild Magic from the
-> vendored archive `WildMagic3p8.7z` (SHA256 `94567f10…`), which is a
-> *post-patch* snapshot — every change below is already present in it, so
-> nothing is applied at build time. `docker/scripts/Apply-Patches.ps1` verifies
-> it by content instead (358 added lines, all confirmed present).
+> **Baseline (2026-10-24).** The original Geometric Tools release of Wild Magic 3.8 (files dated 2006-01-11), published for this project as `Draiget/wild-magic-3-8`, with `wildmagic3p8_faf_required.patch` (sources) and `wildmagic3p8_faf_projects.patch` (VS2022 projects and helper tools) applied. The result is byte-identical to `dependencies/WildMagic3p8` (2,503 files); the only other file there is the build output `Foundation/vc140.pdb`.
 >
-> **The archive predates three later additions (2026-10-01)**: the
-> `Wm3::IVector2<Int>` / `Wm3::IVector3<Int>` headers, the serialize-hook
-> declarations on `Vector2`, `Vector3`, `Quaternion` and `AxisAlignedBox3`,
-> and the removal of the `Vector2<int>`/`Vector3<int>` typedefs. Until the
-> archive is re-cut from a tree with this patch applied, `Apply-Patches.ps1`
-> reports those lines missing, and the SDK does not compile against it.
+> Regenerated 2026-10-24 from that original. The previous patches were cut against `WildMagic3p8.7z`, a snapshot that already contained most of these changes, and had gone stale: later edits to `Wm3Vector2.h`, `Wm3Vector3.h`, `Wm3Quaternion.h`, `Wm3AxisAlignedBox3.h` and `Foundation.vcxproj`, the new `Wm3IVector2.h`/`Wm3IVector3.h`, and comment-only FAF traceability notes in thirteen sources were in no patch.
 >
-> The archive also carries two things this patch does **not** cover, and which
-> would be lost if the tree were rebuilt from a vendor release:
->   * the `.vcxproj` files (`Foundation`, `Dx9Renderer`, `Dx9Application`),
->     which `main.vcxproj` consumes as `ProjectReference`s;
->   * `_ITERATOR_DEBUG_LEVEL=0` on `Foundation.vcxproj`'s Debug|Win32
->     configuration, which must match `main.vcxproj`. A mismatch is not silent —
->     the linker rejects it with LNK2038, naming `Wm3System.obj`, `Wm3Math.obj`
->     and `Wm3Vector3.obj`.
+> Apply from inside the dependency tree with `GIT_CEILING_DIRECTORIES` set to its parent and `git -c core.autocrlf=false apply --unsafe-paths --whitespace=nowarn <patch>`. The `-c core.autocrlf=false` matters: Git for Windows sets `core.autocrlf=true` system-wide, which rewrites the line endings of the files a patch creates, and later patches written against the real endings then fail.
+
 
 
 This repo uses an external `WildMagic3p8` tree (Geometric Tools' Wild Magic 3.8,
@@ -41,10 +26,21 @@ install.
 
 Patched files in `wildmagic3p8_faf_required.patch`:
 
+- `Foundation/Approximation/Wm3ApprGaussPointsFit2.cpp`
+- `Foundation/Approximation/Wm3ApprGaussPointsFit3.cpp`
+- `Foundation/Containment/Wm3ContBox2.cpp`
+- `Foundation/Containment/Wm3ContBox3.cpp`
+- `Foundation/Distance/Wm3Distance.cpp`
+- `Foundation/Distance/Wm3Distance.h`
+- `Foundation/Intersection/Wm3IntrLine3Box3.cpp`
+- `Foundation/Intersection/Wm3IntrSegment3Box3.cpp`
+- `Foundation/Intersection/Wm3IntrSegment3Sphere3.cpp`
 - `Foundation/Math/Wm3AxisAlignedBox3.h`
 - `Foundation/Math/Wm3Box3.h`
-- `Foundation/Math/Wm3IVector2.h` (new file)
-- `Foundation/Math/Wm3IVector3.h` (new file)
+- `Foundation/Math/Wm3GMatrix.inl`
+- `Foundation/Math/Wm3GVector.inl`
+- `Foundation/Math/Wm3IVector2.h`
+- `Foundation/Math/Wm3IVector3.h`
 - `Foundation/Math/Wm3Quaternion.h`
 - `Foundation/Math/Wm3Quaternion.inl`
 - `Foundation/Math/Wm3Sphere3.h`
@@ -52,6 +48,10 @@ Patched files in `wildmagic3p8_faf_required.patch`:
 - `Foundation/Math/Wm3Vector2.inl`
 - `Foundation/Math/Wm3Vector3.h`
 - `Foundation/Math/Wm3Vector3.inl`
+- `Foundation/Numerics/Wm3Eigen.cpp`
+- `Foundation/RationalArithmetic/Wm3TRational.inl`
+- `Foundation/System/Wm3System.cpp`
+- `Foundation/Terrain/Wm3ClodTerrainPage.cpp`
 - `Renderers/Dx9Renderer/Wm3Dx9Utility.h`
 
 Every modification is fenced by a `// FAF MOD:` comment block in the patched

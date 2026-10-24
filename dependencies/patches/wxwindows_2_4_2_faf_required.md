@@ -1,20 +1,12 @@
 # FAF wxWindows 2.4.2 Patch + Bootstrap
 
-> **Baseline note (2026-09-23).** The container build takes wxWindows from the
-> vendored archive `wxWindows-2.4.2.7z` (SHA256 `c76a4502…`), which is a
-> *post-patch* snapshot — every change below is already present in it, so
-> nothing is applied at build time. `docker/scripts/Apply-Patches.ps1` verifies
-> it by content instead (430 added lines, all confirmed present).
+> **Baseline (2026-10-24).** The official `wxMSW-2.4.2.zip` from the wxWidgets GitHub release `v2.4.2` (SHA256 `081cb30347ed9092a50c39311b46586f4264fb125942652db168851be96ebf33`), with these patches applied in order: `wxwindows_2_4_2_faf_required.patch`, `wxwindows_2_4_2_faf_x64.patch`, `wxwindows_2_4_2_faf_x64_pointers.patch`. The result is byte-identical to `dependencies/wxWindows-2.4.2` (4,912 files); everything else in that folder is build output plus the four files the wx makefile generates (`lib/msw*/wx/setup.h`, `src/common/lex_yy.c`, `src/common/y_tab.c`).
 >
-> Do not try to `git apply` this patch outside a git work tree: it is stored
-> with CRLF terminators, so git strips the CR as a line terminator and then
-> fails to match the CRLF source files. Inside this repository
-> `core.autocrlf=true` hides that.
+> Regenerated 2026-10-24: `_required` now also carries the `treelistctrl.obj` position in `src/msw/makefile.vc` and creates `treelistctrl.h/.cpp` with LF endings, as they are in the tree; `_x64_pointers` was re-cut against those LF files. The `v2.4.2` git tag is a different file set (other line endings, all ports) and is not a usable baseline.
 >
-> The archive ships an **ANSI** `wxmsw.lib`; `main.vcxproj` links `wxmswu.lib`,
-> so the Unicode `nmake` build and the `setup.h` stamp that follows it are
-> mandatory — `docker/scripts/Build-Deps.ps1` does both.
-
+> Apply from inside the dependency tree with `GIT_CEILING_DIRECTORIES` set to its parent and `git -c core.autocrlf=false apply --unsafe-paths --whitespace=nowarn <patch>`. The `-c core.autocrlf=false` matters: Git for Windows sets `core.autocrlf=true` system-wide, which rewrites the line endings of the files a patch creates, and later patches written against the real endings then fail.
+>
+> The release ships an **ANSI** `wxmsw.lib`; `main.vcxproj` links `wxmswu.lib`, so the Unicode `nmake` build and the `setup.h` stamp that follows it are mandatory.
 
 This repo uses an external `wxWindows-2.4.2` tree and links against the static MSW build.
 

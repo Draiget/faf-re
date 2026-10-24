@@ -1,15 +1,6 @@
 # FAF Wild Magic 3.8 project files
 
-Baseline: **vendored** `WildMagic3p8.7z`, SHA256
-`94567f10b2570b646a99179494779042ab0d9c9716e09f0a38bcaa5922186daa`.
-Pinned in [`docker/deps.lock.json`](../../docker/deps.lock.json).
-
-Role: **baked-in** — the files are already in the vendored archive. The patch
-is the record that they are FAF additions rather than upstream content, and is
-verified by reverse-check on every build.
-
-Companion to [`wildmagic3p8_faf_required.md`](wildmagic3p8_faf_required.md),
-which covers the source changes.
+Baseline: the original Wild Magic 3.8 release (`Draiget/wild-magic-3-8`), after `wildmagic3p8_faf_required.patch`. Regenerated 2026-10-24 against that original; it now also adds `Tools/build_wm3.bat`, `Tools/dumpbin_symbols.bat` and `Tools/gen_vcxproj.py` (the generator the `.vcxproj` files came from). See `wildmagic3p8_faf_required.md` for how to apply.
 
 ## Scope — ten added files
 
