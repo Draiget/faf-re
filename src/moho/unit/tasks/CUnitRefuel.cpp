@@ -17,6 +17,7 @@
 #include "moho/path/SNavGoal.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -38,6 +39,23 @@ namespace
   [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
+  }
+
+  /**
+   * The health half of the undock test, shared by the carrier `TASKSTATE_Waiting` (0x006217F1)
+   * and the air staging `TASKSTATE_Processing` (0x00621DEA) branches: `ucomiss health, maxHealth`.
+   *
+   * FAF FA-Binary-Patches #169 (Fix aircraft never undocking when stored health exceeds max
+   * health): the binary's exact `health == maxHealth` never holds once stored health is above max
+   * health (a Seraphim Restoration Field does that), so the aircraft stayed docked forever; the
+   * patch's `jb` makes it `health >= maxHealth`.
+   */
+  [[nodiscard]] bool IsRepairedForUndock(const moho::Unit& unit) noexcept
+  {
+    if (moho::FAF_IsSimFixActive(moho::EFafSimFix::RefuelUndockAboveMaxHealth)) {
+      return unit.mVarDat.mHealth >= unit.mVarDat.mMaxHealth;
+    }
+    return unit.mVarDat.mHealth == unit.mVarDat.mMaxHealth;
   }
 
   /**
@@ -408,7 +426,7 @@ namespace moho
           return -1;
         }
 
-        if (unit->mUnitVarDat.mFuelRatio <= kRefuelCompleteFuelRatio || unit->mVarDat.mHealth != unit->mVarDat.mMaxHealth) {
+        if (unit->mUnitVarDat.mFuelRatio <= kRefuelCompleteFuelRatio || !IsRepairedForUndock(*unit)) {
           return 10;
         }
 
@@ -536,7 +554,7 @@ namespace moho
       // Docked and refuelling. This is the only place the engine undocks a
       // repaired, refuelled aircraft: once both conditions hold the pad
       // detaches it and a move task lifts it back into the air layer.
-      if (unit->mUnitVarDat.mFuelRatio > kRefuelCompleteFuelRatio && unit->mVarDat.mHealth == unit->mVarDat.mMaxHealth) {
+      if (unit->mUnitVarDat.mFuelRatio > kRefuelCompleteFuelRatio && IsRepairedForUndock(*unit)) {
         if (transport != nullptr) {
           transport->TransportDetachUnit(unit);
         }
