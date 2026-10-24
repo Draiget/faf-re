@@ -36,7 +36,7 @@ Numbers, method and what is next: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 CMake with clang-cl, for x64 and x86. The C/C++ runtime is linked statically, so the executables need no MSVC runtime DLLs.
 
-Needs Visual Studio 2022 (C++ workload, for the Windows SDK and runtime libraries), LLVM (clang-cl, lld-link), CMake 3.25+ and Ninja, the DirectX SDK (June 2010) and an FFmpeg 7.1 development package per architecture in `dependencies/ffmpeg/<x64|Win32>` (see [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md)).
+Needs Visual Studio 2022 (C++ workload, for the Windows SDK and runtime libraries), LLVM (clang-cl, lld-link), CMake 3.25+ and Ninja, and the DirectX SDK (June 2010).
 
 ```powershell
 git clone --recursive https://github.com/Draiget/faf-re.git
@@ -44,7 +44,9 @@ cmake --preset clang-x64-release; cmake --build --preset clang-x64-release   # b
 cmake --preset clang-x86-release; cmake --build --preset clang-x86-release   # build/clang-x86-release/src/main.exe
 ```
 
-Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers), then boost 1.34.1, wxWidgets 2.4.2 and DXC, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers, FFmpeg 7.1.3), then boost 1.34.1, wxWidgets 2.4.2 and DXC, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+
+FFmpeg 7.1.3 (the SFD movie player's decoder) is compiled from source with the engine: `dependencies/ffmpeg` is the unmodified FFmpeg release plus a CMake build ([Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror)), and its libraries are linked statically, so there are no FFmpeg DLLs and no prebuilt binaries. Its configuration and licence (LGPL v2.1+): [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build).
 
 The MSVC project `src/main.vcxproj` is kept while it still builds; `build.ps1` builds it and copies the result into the FAF run folders.
 

@@ -13,3 +13,6 @@
 	path = dependencies/vulkan
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
 	shallow = true
+[submodule "dependencies/ffmpeg"]
+	path = dependencies/ffmpeg
+	url = https://github.com/Draiget/ffmpeg-mirror.git

@@ -9,10 +9,8 @@ include(sources.cmake)
 
 if(FAF_TARGET_ARCH STREQUAL "x64")
   set(_faf_default_name main_x64)
-  set(_faf_platform x64)
 else()
   set(_faf_default_name main)
-  set(_faf_platform Win32)
 endif()
 set(FAF_OUTPUT_NAME "${_faf_default_name}" CACHE STRING "Engine executable name, without .exe")
 
@@ -32,14 +30,22 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   target_sources(faf_main PRIVATE legacy/math/X87Math64.asm)
 endif()
 
-# --- Compilation ----------------------------------------------------------------------
-set(FAF_FFMPEG_ROOT "${FAF_DEPENDENCIES_DIR}/ffmpeg/${_faf_platform}" CACHE PATH
-    "FFmpeg development package (include/, lib/, bin/) for this architecture")
-if(NOT EXISTS "${FAF_FFMPEG_ROOT}/include/libavcodec/avcodec.h")
-  message(FATAL_ERROR "FFmpeg development package missing (FAF_FFMPEG_ROOT=${FAF_FFMPEG_ROOT}); "
-                      "see docs/FAF_SFD_COMPATIBILITY.md.")
+# --- FFmpeg ---------------------------------------------------------------------------
+# FFmpeg 7.1.3 for the SFD movie player (moho/movie/sfd), compiled here from the
+# dependencies/ffmpeg submodule (Draiget/ffmpeg-mirror: the unmodified release plus its
+# faf/ CMake build) into static libraries and linked into the executable: no DLLs. Its
+# objects get the same code generation rules as every other library (faf_codegen).
+set(_faf_ffmpeg "${FAF_DEPENDENCIES_DIR}/ffmpeg")
+if(NOT EXISTS "${_faf_ffmpeg}/faf/CMakeLists.txt")
+  message(FATAL_ERROR "FFmpeg sources not found in ${_faf_ffmpeg} "
+                      "(git submodule update --init dependencies/ffmpeg); see docs/FAF_SFD_COMPATIBILITY.md.")
 endif()
+add_subdirectory("${_faf_ffmpeg}/faf" "${CMAKE_BINARY_DIR}/dependencies/ffmpeg")
+foreach(_lib IN LISTS FFMPEG_FAF_LIBRARIES)
+  target_link_libraries(${_lib} PRIVATE faf_codegen)
+endforeach()
 
+# --- Compilation ----------------------------------------------------------------------
 target_compile_definitions(faf_main PRIVATE
   WIN32 _WINDOWS WIN32_LEAN_AND_MEAN NOMINMAX
   LUAPLUS_LIB LUA_NUMBER=float
@@ -48,7 +54,6 @@ target_compile_definitions(faf_main PRIVATE
   UNICODE _UNICODE)
 
 target_include_directories(faf_main PRIVATE
-  "${FAF_FFMPEG_ROOT}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
@@ -177,12 +182,12 @@ else()
   set(_faf_zlib wx_zlib)
 endif()
 
-# FFmpeg and the DirectX SDK libraries are searched before the Windows SDK's,
-# as main.vcxproj's AdditionalLibraryDirectories are; d3dcompiler.lib and
+# The DirectX SDK libraries are searched before the Windows SDK's, as
+# main.vcxproj's AdditionalLibraryDirectories are; d3dcompiler.lib and
 # dxguid.lib are taken from the Windows SDK by full path, as there.
-target_link_directories(faf_main PRIVATE "${FAF_FFMPEG_ROOT}/lib" "${_faf_dxsdk_lib}")
+target_link_directories(faf_main PRIVATE "${_faf_dxsdk_lib}")
 target_link_libraries(faf_main PRIVATE
-  avformat avcodec avutil swscale swresample
+  FFmpeg::FFmpeg
   ws2_32 d3d9 d3dx9 d3d10 d3d11 "${_faf_sdk_um_lib}/d3dcompiler.lib" dxgi
   "${_faf_sdk_um_lib}/dxguid.lib" dsound x3daudio
   legacy_stdio_definitions legacy_stdio_wide_specifiers
@@ -260,12 +265,10 @@ else()
 endif()
 
 # --- Staging next to the executable ---------------------------------------------------
-# The FFmpeg DLLs, and the engine's own Lua hooks: the engine mounts the
-# `fafengine` folder next to the executable at /fafengine
-# (DISK_SetupDataAndSearchPaths; see docs/RENDERER_BACKENDS.md).
-file(GLOB _faf_ffmpeg_dlls "${FAF_FFMPEG_ROOT}/bin/*.dll")
+# The engine's own Lua hooks: the engine mounts the `fafengine` folder next to
+# the executable at /fafengine (DISK_SetupDataAndSearchPaths; see
+# docs/RENDERER_BACKENDS.md).
 add_custom_command(TARGET faf_main POST_BUILD
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${_faf_ffmpeg_dlls} "$<TARGET_FILE_DIR:faf_main>"
   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
           "$<TARGET_FILE_DIR:faf_main>/fafengine"
   VERBATIM)

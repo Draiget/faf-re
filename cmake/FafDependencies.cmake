@@ -3,7 +3,7 @@
 # Runs at configure time (the top-level CMakeLists.txt includes it) and on its own:
 #   cmake -P cmake/FafDependencies.cmake
 #
-#   * Git submodules (WildMagic3p8, zlib-1.2.3, FX11, vulkan): initialised when
+#   * Git submodules (WildMagic3p8, zlib-1.2.3, FX11, vulkan, ffmpeg): initialised when
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
@@ -16,8 +16,12 @@
 #     when its last patch is already applied.
 #   * wxWindows' generated files, which its nmake build used to create.
 #
-# Not handled here: the DirectX SDK (June 2010, FAF_DXSDK_DIR) and FFmpeg 7.1
-# (FAF_FFMPEG_ROOT); see docs/RENDERER_BACKENDS.md and docs/FAF_SFD_COMPATIBILITY.md.
+#   * The DirectX SDK (June 2010): an installed one, else its headers and libraries
+#     extracted from Microsoft's installer (see faf_dependency_dxsdk).
+#
+# FFmpeg (dependencies/ffmpeg, Draiget/ffmpeg-mirror) is the unmodified 7.1.3 source
+# with a faf/ CMake build; src/CMakeLists.txt compiles it into static libraries
+# (see docs/FAF_SFD_COMPATIBILITY.md).
 
 if(CMAKE_SCRIPT_MODE_FILE)
   cmake_minimum_required(VERSION 3.25)  # standalone (cmake -P): no project policies yet
@@ -152,17 +156,6 @@ set(_faf_download_wxWindows-2.4.2
 set(_faf_download_dxc
     "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip"
     "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1"
-    "")
-
-# FFmpeg 7.1.3, faf-re's minimal LGPL build (Draiget/ffmpeg-mirror: recipe, licence
-# and the source tarball it was built from).
-set(_faf_download_ffmpeg/x64
-    "https://github.com/Draiget/ffmpeg-mirror/releases/download/n7.1.3-faf1/ffmpeg-7.1.3-faf-x64.zip"
-    "7ff990f804fb08c5ca1ebc22d67007e247409c27dcad38adb2ee30d3152cdee8"
-    "")
-set(_faf_download_ffmpeg/Win32
-    "https://github.com/Draiget/ffmpeg-mirror/releases/download/n7.1.3-faf1/ffmpeg-7.1.3-faf-Win32.zip"
-    "6e5a5b5a89f7a5c684fd01221604fd39eaf09b2cec5cc18108d10fe70d96f49b"
     "")
 
 function(_faf_download_tree name)
@@ -307,11 +300,10 @@ faf_dependency_submodule(WildMagic3p8)
 faf_dependency_submodule(zlib-1.2.3)
 faf_dependency_submodule(FX11)
 faf_dependency_submodule(vulkan)
+faf_dependency_submodule(ffmpeg)
 faf_dependency_download(boost_1_34_1)
 faf_dependency_download(wxWindows-2.4.2)
 faf_dependency_download(dxc)
-faf_dependency_download(ffmpeg/x64)
-faf_dependency_download(ffmpeg/Win32)
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch wildmagic3p8_faf_projects.patch)
