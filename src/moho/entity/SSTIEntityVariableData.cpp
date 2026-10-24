@@ -579,6 +579,12 @@ namespace moho
     mVisibilityMode = rhs.mVisibilityMode;
     mLayerMask = rhs.mLayerMask;
     mUsingAltFootprint = rhs.mUsingAltFootprint;
+    // FAF FA-Binary-Patches #134: the copy at 0x0067A526 moves the whole
+    // 0xA4..0xA7 word, so FAF's forced-alt-footprint byte (and the pad) reach
+    // the copy too; the binary copied the first byte only.
+    mUsingAltFootprintSecondary = rhs.mUsingAltFootprintSecondary;
+    pad_00A6_00A7[0] = rhs.pad_00A6_00A7[0];
+    pad_00A6_00A7[1] = rhs.pad_00A6_00A7[1];
     mUnderlayTexture = rhs.mUnderlayTexture;
     mIntelAttributes = rhs.mIntelAttributes;
     return *this;
@@ -687,7 +693,17 @@ namespace moho
     GPG_ASSERT(layerType != nullptr);
     archive->Read(layerType, &mLayerMask, ownerRef);
 
-    ReadBoolByte(archive, mUsingAltFootprint);
+    // FAF FA-Binary-Patches #134 (Serialize add patched entity var dat fields):
+    // the footprint flags are one `int` (0x00559DAE `ReadBool` -> `ReadInt`),
+    // read over the whole 0xA4..0xA7 word -- the alt-footprint byte, FAF's
+    // forced-alt-footprint byte and the two pad bytes, low byte first.
+    int footprintFlags = 0;
+    archive->ReadInt(&footprintFlags);
+    const auto footprintWord = static_cast<std::uint32_t>(footprintFlags);
+    mUsingAltFootprint = static_cast<std::uint8_t>(footprintWord);
+    mUsingAltFootprintSecondary = static_cast<std::uint8_t>(footprintWord >> 8);
+    pad_00A6_00A7[0] = static_cast<std::uint8_t>(footprintWord >> 16);
+    pad_00A6_00A7[1] = static_cast<std::uint8_t>(footprintWord >> 24);
 
     gpg::RType* const attributesType = ResolveEntityAttributesType();
     GPG_ASSERT(attributesType != nullptr);
@@ -760,7 +776,11 @@ namespace moho
     GPG_ASSERT(layerType != nullptr);
     archive->Write(layerType, &mLayerMask, ownerRef);
 
-    archive->WriteBool(mUsingAltFootprint != 0u);
+    // FAF FA-Binary-Patches #134 (Serialize add patched entity var dat fields):
+    // written with `WriteInt` (0x0055A11D) instead of `WriteBool`. The patch
+    // only swapped the call, so the value is still the zero-extended
+    // alt-footprint byte (`movzx ecx, byte ptr [edi+0A4h]`).
+    archive->WriteInt(static_cast<int>(mUsingAltFootprint));
 
     gpg::RType* const attributesType = ResolveEntityAttributesType();
     GPG_ASSERT(attributesType != nullptr);
