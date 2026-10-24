@@ -229,11 +229,16 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    EAiTargetType targetType;
+    // The binary's inline default constructor clears the type and the mobile
+    // flag (and empties the weak link): CAiAttackerImpl's constructor 0x005D69A0
+    // writes 0 to +0x80 and +0x9C of its mDesiredTarget, UnitWeapon's 0x006D4310
+    // to +0xCC and +0xE8 of its mTarget. `position` is left as it comes, as
+    // there; `targetPoint` is set by the owners that need it.
+    EAiTargetType targetType = EAiTargetType::AITARGET_None;
     WeakPtr<Entity> targetEntity;
     Wm3::Vec3f position;
     std::int32_t targetPoint;
-    bool targetIsMobile;
+    bool targetIsMobile = false;
   };
 
   static_assert(offsetof(CAiTarget, targetType) == 0x00, "CAiTarget::targetType offset must be 0x00");
