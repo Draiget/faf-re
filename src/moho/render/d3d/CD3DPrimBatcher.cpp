@@ -1339,8 +1339,8 @@ namespace moho
   {
     const float halfBorderWidth = borderWidth * 0.5f;
 
-    const Vector3f outerExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis + widthAxis) * halfBorderWidth;
-    const Vector3f edgeExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis - widthAxis) * halfBorderWidth;
+    const Vector3f outerExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis + widthAxis, 0.0f) * halfBorderWidth;
+    const Vector3f edgeExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis - widthAxis, 0.0f) * halfBorderWidth;
 
     DrawRectRing ring{};
     ring.outer[0] = topLeft - outerExpansion;
