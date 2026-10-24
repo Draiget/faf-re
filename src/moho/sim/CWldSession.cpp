@@ -9660,6 +9660,11 @@ namespace moho
         WeakSet<UserEntity> nonRebuilders;
         WeakSet<UserEntity> rebuilders;
         SplitSelectionByRebuilderCategory(selection, nonRebuilders, rebuilders);
+        if (hovered != nullptr)
+        {
+          nonRebuilders.Remove(hovered);
+          rebuilders.Remove(hovered);
+        }
 
         {
           SSTICommandIssueData commandData(guardCommand);
