@@ -1172,22 +1172,14 @@ namespace moho
     }
 
     const float stepAngle = kTau / static_cast<float>(precision);
-    Vector3f previous{
-      center.x + axisCos.x,
-      center.y + axisCos.y,
-      center.z + axisCos.z,
-    };
+    Vector3f previous = center + axisCos;
 
     for (std::uint32_t index = 1; index <= precision; ++index) {
       const float angle = stepAngle * static_cast<float>(index);
       const float cosAngle = std::cos(angle);
       const float sinAngle = std::sin(angle);
 
-      const Vector3f current{
-        center.x + (axisCos.x * cosAngle) + (axisSin.x * sinAngle),
-        center.y + (axisCos.y * cosAngle) + (axisSin.y * sinAngle),
-        center.z + (axisCos.z * cosAngle) + (axisSin.z * sinAngle),
-      };
+      const Vector3f current{center + (axisCos * cosAngle) + (axisSin * sinAngle)};
 
       DrawLine(primBatcher, previous, current, color);
       previous = current;
@@ -1247,19 +1239,19 @@ namespace moho
     DrawLine(
       primBatcher,
       origin,
-      {origin.x + xOffset.x, origin.y + xOffset.y, origin.z + xOffset.z},
+      origin + xOffset,
       kAxisColorX
     );
     DrawLine(
       primBatcher,
       origin,
-      {origin.x + yOffset.x, origin.y + yOffset.y, origin.z + yOffset.z},
+      origin + yOffset,
       kAxisColorY
     );
     DrawLine(
       primBatcher,
       origin,
-      {origin.x + zOffset.x, origin.y + zOffset.y, origin.z + zOffset.z},
+      origin + zOffset,
       kAxisColorZ
     );
   }
@@ -1276,39 +1268,27 @@ namespace moho
       return;
     }
 
-    const Vector3f origin{transform.r[3].x, transform.r[3].y, transform.r[3].z};
-    const Vector3f axisX{transform.r[0].x, transform.r[0].y, transform.r[0].z};
-    const Vector3f axisY{transform.r[1].x, transform.r[1].y, transform.r[1].z};
-    const Vector3f axisZ{transform.r[2].x, transform.r[2].y, transform.r[2].z};
+    const Vector3f origin{transform.r[3].XYZ()};
+    const Vector3f axisX{transform.r[0].XYZ()};
+    const Vector3f axisY{transform.r[1].XYZ()};
+    const Vector3f axisZ{transform.r[2].XYZ()};
 
     DrawLine(
       primBatcher,
       origin,
-      {
-        origin.x + (axisX.x * axisLength),
-        origin.y + (axisX.y * axisLength),
-        origin.z + (axisX.z * axisLength),
-      },
+      origin + axisX * axisLength,
       kAxisColorX
     );
     DrawLine(
       primBatcher,
       origin,
-      {
-        origin.x + (axisY.x * axisLength),
-        origin.y + (axisY.y * axisLength),
-        origin.z + (axisY.z * axisLength),
-      },
+      origin + axisY * axisLength,
       kAxisColorY
     );
     DrawLine(
       primBatcher,
       origin,
-      {
-        origin.x + (axisZ.x * axisLength),
-        origin.y + (axisZ.y * axisLength),
-        origin.z + (axisZ.z * axisLength),
-      },
+      origin + axisZ * axisLength,
       kAxisColorZ
     );
   }
