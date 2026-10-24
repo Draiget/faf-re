@@ -2,6 +2,10 @@
 #
 # The translation units and their order are in sources.cmake; per-file
 # settings are below, each with its reason.
+#
+# They compile once, into the object library faf_engine, which carries every
+# compile and link setting the engine needs. faf_main links those objects in
+# the same order; so do the engine tests (tests/), against the same code.
 
 include(sources.cmake)
 
@@ -12,8 +16,11 @@ else()
 endif()
 set(FAF_OUTPUT_NAME "${_faf_default_name}" CACHE STRING "Engine executable name, without .exe")
 
-add_executable(faf_main WIN32 ${FAF_ENGINE_SOURCES})
+add_library(faf_engine OBJECT ${FAF_ENGINE_SOURCES})
+
+add_executable(faf_main WIN32)
 set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
+target_link_libraries(faf_main PRIVATE faf_engine)
 
 # --- Server mode ----------------------------------------------------------------------
 # The client half of server-authoritative sessions (remote/sources.cmake). Its sources
@@ -22,8 +29,8 @@ set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
 # option off.
 if(FAF_SERVER_MODE)
   include(remote/sources.cmake)
-  target_sources(faf_main PRIVATE ${FAF_REMOTE_CLIENT_SOURCES})
-  target_compile_definitions(faf_main PRIVATE FAF_SERVER_MODE=1)
+  target_sources(faf_engine PRIVATE ${FAF_REMOTE_CLIENT_SOURCES})
+  target_compile_definitions(faf_engine PRIVATE FAF_SERVER_MODE=1)
 endif()
 
 # --- Resources ------------------------------------------------------------------------
@@ -36,7 +43,7 @@ set_source_files_properties(moho/app/MohoResources.rc PROPERTIES
 
 # The x64 half of legacy/math/X87Math.cpp: x64 has no inline assembly.
 if(FAF_TARGET_ARCH STREQUAL "x64")
-  target_sources(faf_main PRIVATE legacy/math/X87Math64.asm)
+  target_sources(faf_engine PRIVATE legacy/math/X87Math64.asm)
 endif()
 
 # --- FFmpeg ---------------------------------------------------------------------------
@@ -55,18 +62,18 @@ foreach(_lib IN LISTS FFMPEG_FAF_LIBRARIES)
 endforeach()
 
 # --- Compilation ----------------------------------------------------------------------
-target_compile_definitions(faf_main PRIVATE
+target_compile_definitions(faf_engine PUBLIC
   WIN32 _WINDOWS WIN32_LEAN_AND_MEAN NOMINMAX
   LUAPLUS_LIB LUA_NUMBER=float
   BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR
   _CRT_SECURE_NO_WARNINGS
   UNICODE _UNICODE)
 
-target_include_directories(faf_main PRIVATE
+target_include_directories(faf_engine PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
-target_link_libraries(faf_main PRIVATE faf_codegen faf::wx Wm3Dx9Application)
+target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Dx9Application)
 
 set(_faf_main_options
   # C++ exceptions with extern "C" functions allowed to throw (/EHs, not
@@ -112,7 +119,7 @@ list(APPEND _faf_main_options
   -Wno-mismatched-tags -Wno-extra-qualification)
 
 # C and C++ only (not the x64 MASM file).
-target_compile_options(faf_main PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
+target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 
 # --- Per-file settings ---------------------------------------------------------------
 set(_fx11 "${FAF_DEPENDENCIES_DIR}/FX11")
@@ -192,8 +199,8 @@ endif()
 
 # The DirectX SDK libraries are searched before the Windows SDK's;
 # d3dcompiler.lib and dxguid.lib are taken from the Windows SDK by full path.
-target_link_directories(faf_main PRIVATE "${_faf_dxsdk_lib}")
-target_link_libraries(faf_main PRIVATE
+target_link_directories(faf_engine INTERFACE "${_faf_dxsdk_lib}")
+target_link_libraries(faf_engine PUBLIC
   FFmpeg::FFmpeg
   ws2_32 d3d9 d3dx9 d3d10 d3d11 "${_faf_sdk_um_lib}/d3dcompiler.lib" dxgi
   "${_faf_sdk_um_lib}/dxguid.lib" dsound x3daudio
@@ -203,12 +210,12 @@ target_link_libraries(faf_main PRIVATE
   # Visual Studio's default AdditionalDependencies beyond CMake's defaults.
   odbc32 odbccp32)
 
-target_link_options(faf_main PRIVATE
+target_link_options(faf_engine INTERFACE
   # Nothing may pull in the DLL runtime beside the static one.
   /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:msvcprt.lib /NODEFAULTLIB:msvcrtd.lib /NODEFAULTLIB:msvcprtd.lib
-  /NODEFAULTLIB:ucrt.lib /NODEFAULTLIB:vcruntime.lib
-  # The manifest comes from MohoManifest.rc.
-  /MANIFEST:NO)
+  /NODEFAULTLIB:ucrt.lib /NODEFAULTLIB:vcruntime.lib)
+# The manifest comes from MohoManifest.rc.
+target_link_options(faf_main PRIVATE /MANIFEST:NO)
 
 # The static UCRT is the C runtime's math library, so its release decides
 # results the simulation depends on. UCRT 10.0.26100's x64 asin, acos, atan,
@@ -234,13 +241,13 @@ if(NOT FAF_UCRT_LIB_VERSION STREQUAL "10.0.22000.0")
 endif()
 # Debug links the debug flavour (libucrtd.lib) from the same SDK.
 set(_faf_ucrt_dir "${FAF_WINSDK_DIR}/Lib/${FAF_UCRT_LIB_VERSION}/ucrt/${_faf_sdk_arch}")
-target_link_options(faf_main PRIVATE "/NODEFAULTLIB:libucrt$<$<CONFIG:Debug>:d>.lib")
-target_link_libraries(faf_main PRIVATE "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
+target_link_options(faf_engine INTERFACE "/NODEFAULTLIB:libucrt$<$<CONFIG:Debug>:d>.lib")
+target_link_libraries(faf_engine PUBLIC "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
 
 if(FAF_TARGET_ARCH STREQUAL "x86")
   # Both from the shipped binary's PE header (characteristics 0x123, stack
   # reserve 0x1E8480 = /STACK:2000000).
-  target_link_options(faf_main PRIVATE /LARGEADDRESSAWARE /STACK:2000000)
+  target_link_options(faf_engine INTERFACE /LARGEADDRESSAWARE /STACK:2000000)
 else()
   # x64 address-space mode:
   #   full - large-address-aware with high-entropy ASLR (the default when the
@@ -260,15 +267,15 @@ else()
       message(WARNING "FAF_X64_LARGE_ADDRESS=full with a wxWindows tree that lacks "
                       "wxwindows_2_4_2_faf_x64_pointers.patch: wx truncates window-message pointers above 2 GB.")
     endif()
-    target_link_options(faf_main PRIVATE /LARGEADDRESSAWARE)
+    target_link_options(faf_engine INTERFACE /LARGEADDRESSAWARE)
   elseif(FAF_X64_LARGE_ADDRESS STREQUAL "heap")
-    target_link_options(faf_main PRIVATE /LARGEADDRESSAWARE /HIGHENTROPYVA:NO /BASE:0x10000000)
+    target_link_options(faf_engine INTERFACE /LARGEADDRESSAWARE /HIGHENTROPYVA:NO /BASE:0x10000000)
   else()
-    target_link_options(faf_main PRIVATE /LARGEADDRESSAWARE:NO /HIGHENTROPYVA:NO)
+    target_link_options(faf_engine INTERFACE /LARGEADDRESSAWARE:NO /HIGHENTROPYVA:NO)
   endif()
   # 4 MB of stack instead of the binary's 2 MB: every frame that holds pointers
   # is bigger.
-  target_link_options(faf_main PRIVATE /STACK:4000000)
+  target_link_options(faf_engine INTERFACE /STACK:4000000)
 endif()
 
 # --- Staging next to the executable ---------------------------------------------------
