@@ -75,14 +75,21 @@ FFmpeg 7.1.3 (the SFD movie player's decoder) is compiled from source with the e
 
 ## Libraries the engine uses
 
-- Boost `1.34.1`
-- LuaPlus `5.0` build `1081`
-- wxWidgets `2.4.2` (MSW)
-- Wild Magic `3.8`
-- [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64)
-- BugSplat
-- DirectX 9/10 with XACT audio, as shipped (the D3D10 path was already partial in the original); Direct3D 11, Direct3D 12 and Vulkan are added here.
-- FFmpeg/libav* for SFD movie playback, in place of the original's CRI Middleware (Sofdec + ADX).
+All of them are fetched by CMake configure at the exact version below, patched with `dependencies/patches/` where noted, and compiled from source for x86 and x64. Nothing prebuilt is needed.
+
+| Library | Version | Source | FAF patch |
+|---|---|---|---|
+| Wild Magic | 3.8 (original 2006 release) | [Draiget/wild-magic-3-8](https://github.com/Draiget/wild-magic-3-8) (submodule) | `wildmagic3p8_faf_required` |
+| wxWidgets (MSW) | 2.4.2 | [wxMSW-2.4.2.zip](https://github.com/wxWidgets/wxWidgets/releases/download/v2.4.2/wxMSW-2.4.2.zip) | `wxwindows_2_4_2_faf_required`, `_x64`, `_x64_pointers` |
+| Boost | 1.34.1 | [boost_1_34_1.tar.bz2](https://downloads.sourceforge.net/project/boost/boost/1.34.1/boost_1_34_1.tar.bz2) | `boost_1_34_1_faf_required` |
+| zlib | 1.2.3 | [madler/zlib](https://github.com/madler/zlib/tree/v1.2.3) (submodule) | `zlib_1_2_3_faf_required` |
+| FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX |
+| FX11 | bec3b8fc | [microsoft/FX11](https://github.com/microsoft/FX11) (submodule) | none |
+| Vulkan headers | 1.4.304 | [KhronosGroup/Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) (submodule) | none |
+| DirectX Shader Compiler | 1.9.2609 | [DXC release](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.9.2609) | none |
+| DirectX SDK | June 2010 | an installed SDK, else extracted from [Microsoft's installer](https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe) | none |
+
+Lua is part of the engine source: it carries the Lua 5.0 C API headers of LuaPlus build 1081 (`src/lua/luaplus/`), not the LuaPlus library. The original's BugSplat crash reporter is not used. Graphics: Direct3D 9 and 10 as shipped, plus Direct3D 11, Direct3D 12 and Vulkan added here.
 
 ## SFD movie playback
 
