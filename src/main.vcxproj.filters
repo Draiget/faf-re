@@ -5572,6 +5572,9 @@
     <ClCompile Include="moho\audio\XAudioError.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\audio\XactClock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\entity\MotorSinkAway.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5693,6 +5696,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\audio\XAudioError.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\audio\XactClock.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\console\TConVarString.h">

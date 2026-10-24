@@ -26,6 +26,7 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/XAudioError.h"
+#include "moho/audio/XactClock.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/CVirtualFileSystem.h"
@@ -1403,6 +1404,12 @@ namespace moho
       const msvc8::string fullMessage =
         gpg::STR_Printf("SND: Error retrieving XACT COM interface. %s", errorMessage ? errorMessage : "Unknown XACT Error");
       throw XAudioError(fullMessage.c_str());
+    }
+
+    // FAF addition, not in the shipped binary: XACT 2.9 stops working after
+    // 24.86 days of Windows uptime; give it a clock that starts with the game.
+    if (impl->mInstance != nullptr) {
+      SND_InstallXactClock(*impl->mInstance);
     }
   }
 
