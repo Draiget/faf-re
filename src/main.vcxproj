@@ -1289,6 +1289,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\audio\ISoundManagerTypeInfo.cpp" />
     <ClCompile Include="moho\audio\IUserSoundManager.cpp" />
     <ClCompile Include="moho\audio\XAudioError.cpp" />
+    <ClCompile Include="moho\audio\XactClock.cpp" />
     <ClCompile Include="moho\audio\CSimSoundManagerTypeInfo.cpp" />
     <ClCompile Include="moho\audio\HSound.cpp" />
     <ClCompile Include="moho\audio\SAudioRequestFastVectorReflection.cpp" />
@@ -2655,6 +2656,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h" />
     <ClInclude Include="moho\audio\ISoundManagerTypeInfo.h" />
     <ClInclude Include="moho\audio\XAudioError.h" />
+    <ClInclude Include="moho\audio\XactClock.h" />
     <ClInclude Include="moho\console\TConVarString.h" />
     <ClInclude Include="moho\console\TConVarUInt32.h" />
     <ClInclude Include="moho\console\TConVarUInt8.h" />

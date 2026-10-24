@@ -58,6 +58,11 @@ namespace
    * `gpg::time::GetCycle`'s never-backwards clamp ahead of every later reading,
    * so the frame clock stops and the intro movie never starts. Asking first, as
    * the old CRT did, keeps every sample on one timeline.
+   *
+   * UptimeFaker is no longer needed for sound: the 24.8-day bug it worked
+   * around is XACT 2.9's clock, which `SND_InstallXactClock`
+   * (moho/audio/XactClock.cpp) now runs from process start. This stays for
+   * installs that still load it.
    */
   int __cdecl QueryStartupInfoBeforeInitializers()
   {
