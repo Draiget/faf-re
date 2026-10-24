@@ -1,14 +1,8 @@
 # Switches
 
-Reference for the console variables and startup flags behind the
-[performance work](PERFORMANCE.md).
+Reference for the console variables and startup flags behind the [performance work](PERFORMANCE.md).
 
-Every performance change has a switch that brings back the original path, and
-both paths give the same sim checksums. Console variables can be set in game
-(`name value` in the console) or at startup with
-`/con name=value;name2=value2`, which runs on the first frame. "Live" means a
-change applies from the next use; "next game" means the value is read when a
-thread or session starts.
+Every performance change has a switch that brings back the original path, and both paths give the same sim checksums. Console variables can be set in game (`name value` in the console) or at startup with `/con name=value;name2=value2`, which runs on the first frame. "Live" means a change applies from the next use; "next game" means the value is read when a thread or session starts.
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
@@ -72,17 +66,5 @@ thread or session starts.
 Off by default.
 
 - `FAF_LUAGC_TIMING=1` (environment) logs the phases of every sim Lua collection.
-  and weak-table lists after both propagations and the sweep's live/dead
-  classification. After the mark it checks that no marked weak table refers to
-  an unmarked object, that no live closure keeps an open upvalue into a dead
-  thread, and that the LuaObject root list is intact. Findings are `[GCVERIFY]`
-  warnings, and every 100th clean collection logs `[GCVERIFY-OK]`. It roughly
-  doubles collector time and stretches each sim mark, which also widens the
-  window for races between the sim and other threads.
-- `FAF_DUMP_ON_SIM_LUA_ERROR=<n>` (environment): the first n sim Lua script
-  errors each write a full-memory minidump and the error text beside the exe
-  (`faf_luaerr_*.dmp/.txt`), then the game continues.
-  `FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE` lists `;`-separated substrings of errors
-  to skip, for errors a replay always logs (benchmark replay: `SetSpinDown;Failed
-  to attach entity`).
-
+- `lua_GcVerify` (console variable, `/con lua_GcVerify=1`): every parallel sim collection is checked against a serial mark and sweep. It compares mark bytes and weak-table lists after both propagations and the sweep's live/dead classification. After the mark it checks that no marked weak table refers to an unmarked object, that no live closure keeps an open upvalue into a dead thread, and that the LuaObject root list is intact. Findings are `[GCVERIFY]` warnings, and every 100th clean collection logs `[GCVERIFY-OK]`. It roughly doubles collector time and stretches each sim mark, which also widens the window for races between the sim and other threads.
+- `FAF_DUMP_ON_SIM_LUA_ERROR=<n>` (environment): the first n sim Lua script errors each write a full-memory minidump and the error text beside the exe (`faf_luaerr_*.dmp/.txt`), then the game continues. `FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE` lists `;`-separated substrings of errors to skip, for errors a replay always logs (benchmark replay: `SetSpinDown;Failed to attach entity`).
