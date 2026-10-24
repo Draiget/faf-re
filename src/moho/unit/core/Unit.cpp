@@ -74,6 +74,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/CEconStorage.h"
@@ -13719,6 +13720,16 @@ bool Unit::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
  */
 Wm3::Vec3f Unit::GetTargetPoint(std::int32_t targetPoint) const
 {
+  // FAF FA-Binary-Patches #145/#157 (Account for collision offset when picking
+  // target point of unit with no target bones): a unit without target bones is
+  // aimed at its collision-box centre -- the base `Entity::GetBoneWorldTransform`
+  // root anchor, which adds the blueprint's CollisionOffsetX/Y/Z -- instead of
+  // `Unit::GetBoneWorldTransform`'s SizeY/2 above the pending position. Only
+  // this negative-index entry (0x006AB34D) changes.
+  if (targetPoint < 0 && FAF_IsSimFixActive(EFafSimFix::TargetPointCollisionCentre)) {
+    return Entity::GetBoneWorldTransform(-1).pos_;
+  }
+
   const RUnitBlueprint* const blueprint = GetBlueprint();
   if (targetPoint >= 0 && blueprint != nullptr) {
     const msvc8::vector<msvc8::string>& targetBones = blueprint->AI.TargetBones;

@@ -31,6 +31,8 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/FafGameVersion.h"
+#include "moho/sim/ReconBlip.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
@@ -323,6 +325,32 @@ namespace
   [[nodiscard]] bool IsAimVectorValid(const Wm3::Vector3f& value) noexcept
   {
     return Wm3::Vector3f::IsntNaN(value);
+  }
+
+  /**
+   * FAF FA-Binary-Patches #143 (Fix weapons aim one tick ahead), `CheckNeedAddEntityVelocity`
+   * in its `section/Aim/Aim.cxx`.
+   *
+   * Whether the target's motion still has to run this tick, so that aiming at it needs the
+   * one-tick velocity lead. A manually ordered target is a recon blip; its creator unit is the
+   * one that moves. False when the target entity, or a blip's creator, is gone.
+   */
+  [[nodiscard]] bool IsTargetStillToMoveThisTick(const moho::CAiTarget& target)
+  {
+    moho::Entity* entity = target.targetEntity.GetObjectPtr();
+    if (entity == nullptr) {
+      return false;
+    }
+
+    if (moho::ReconBlip* const blip = entity->IsReconBlip(); blip != nullptr) {
+      moho::Unit* const creator = blip->GetCreator();
+      if (creator == nullptr) {
+        return false;
+      }
+      entity = creator;
+    }
+
+    return entity->mLastTickProcessed != entity->SimulationRef->mCurTick;
   }
 
   [[nodiscard]] Wm3::Vector3f ComputeUnitForwardDirection(const moho::Unit& unit) noexcept
@@ -994,11 +1022,18 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
     targetPosition = target->GetTargetPosGun(false);
   }
 
-  Wm3::Vector3f predictedImpact{
-    targetPosition.x + targetVelocity.x,
-    targetPosition.y + targetVelocity.y,
-    targetPosition.z + targetVelocity.z,
-  };
+  // FAF FA-Binary-Patches #143 (Fix weapons aim one tick ahead): the one-tick
+  // velocity lead is only added while the target has not moved yet this tick.
+  // A target whose motion already ran this tick (one constructed before the
+  // shooter, so earlier in the entity list) is already where the lead would
+  // put it, and leading it again aimed a tick ahead of it.
+  Wm3::Vector3f predictedImpact = targetPosition;
+  if (target != nullptr &&
+      (!FAF_IsSimFixActive(EFafSimFix::AimLeadOncePerTick) || IsTargetStillToMoveThisTick(*target))) {
+    predictedImpact.x += targetVelocity.x;
+    predictedImpact.y += targetVelocity.y;
+    predictedImpact.z += targetVelocity.z;
+  }
 
   const float horizontalDistance = std::sqrt(
     ((muzzlePosition.x - predictedImpact.x) * (muzzlePosition.x - predictedImpact.x)) +

@@ -33,6 +33,7 @@
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/particles/CWorldParticles.h"
@@ -2078,6 +2079,25 @@ namespace moho
     technique->EndTechnique();
   }
 
+  /// FAF FA-Binary-Patches #158 (Minimap performance improvements): `ren_MinimapRanges`, FAF's own name.
+  bool ren_MinimapRanges = true;
+  TConVar<bool> gTConVar_ren_MinimapRanges(
+    "ren_MinimapRanges",
+    "Draw weapon and intel range rings on the minimap (1, the default). 0 skips that pass and its cost, "
+    "which grows with the units under the active range overlays.",
+    &ren_MinimapRanges
+  );
+
+  /// FAF FA-Binary-Patches #158 switch: 1 brings back the debug overlays drawn into the minimap.
+  bool ren_MinimapDebugOverlays = false;
+  TConVar<bool> gTConVar_ren_MinimapDebugOverlays(
+    "ren_MinimapDebugOverlays",
+    "Also draw the debug overlays (ren_ShowFrameTimes, ren_ShowNetworkStats, ren_ShowBandwidthUsage, "
+    "UI_ShowControlUnderMouse) into the minimap, as the original engine did. 0, the default, draws them on the "
+    "screen only.",
+    &ren_MinimapDebugOverlays
+  );
+
   /**
    * Address: 0x007D17C0 (FUN_007D17C0)
    * Mangled: ?Render@Cartographic@Moho@@QAEXV?$shared_ptr@VRenderTarget@gal@gpg@@@boost@@
@@ -2111,6 +2131,9 @@ namespace moho
    *   - clears the head to opaque white with depth+stencil only, runs the world
    *     view's own render callback and the debug overlay, and finally restores
    *     the head's full viewport.
+   *
+   * FAF FA-Binary-Patches #158 made the range rings optional (`ren_MinimapRanges`)
+   * and dropped the debug overlay (`ren_MinimapDebugOverlays` brings it back).
    *
    * See the declaration for the shipped stack layout: link-time code generation
    * moved `this` onto the stack, hoisted the three renderer lanes out of the
@@ -2173,7 +2196,9 @@ namespace moho
     RenderTerrainStage0(cameraView, false);
 
     if (session != nullptr) {
-      if (rangeRenderer != nullptr && camera != nullptr) {
+      // FAF FA-Binary-Patches #158 (Minimap performance improvements): the range rings can be turned
+      // off (`ren_MinimapRanges`, 0x007D19FF), with their cost, which grows with the overlaid units.
+      if (ren_MinimapRanges && rangeRenderer != nullptr && camera != nullptr) {
         profileStep.reset();
         profileStep.emplace("CartoRanges");
         rangeRenderer->Render(session, camera, headIndex, deltaFrame);
@@ -2268,7 +2293,14 @@ namespace moho
     worldView->Render(primBatcher.get(), static_cast<int>(headIndex), deltaFrame, 0.0f);
     profileStep.reset();
 
-    REN_DebugStuff(primBatcher, static_cast<int>(headIndex));
+    // FAF FA-Binary-Patches #158 (Minimap performance improvements): the debug overlays (frame times,
+    // network stats, bandwidth, control under mouse) are not drawn into the minimap any more
+    // (0x007D1BD9); they belong on the screen, where WRenViewport::RenderUI draws them anyway. The
+    // binary patch NOPs the call after the batcher handle was copied for it, leaking one reference
+    // per minimap frame; here the call is simply not made.
+    if (ren_MinimapDebugOverlays) {
+      REN_DebugStuff(primBatcher, static_cast<int>(headIndex));
+    }
 
     device->SetViewport(&fullHeadViewport);
 

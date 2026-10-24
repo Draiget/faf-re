@@ -1280,6 +1280,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\CPlatoonTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CPlatoon.cpp" />
     <ClCompile Include="moho\sim\CSquad.cpp" />
+    <ClCompile Include="moho\sim\FafGameVersion.cpp" />
     <ClCompile Include="moho\console\CConAlias.cpp" />
     <ClCompile Include="moho\console\CConFunc.cpp" />
     <ClCompile Include="moho\sim\CDamage.cpp" />
@@ -2379,6 +2380,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CDamageLuaFunctionRegistrations.h" />
     <ClInclude Include="moho\sim\CPlatoon.h" />
     <ClInclude Include="moho\sim\CSquad.h" />
+    <ClInclude Include="moho\sim\FafGameVersion.h" />
     <ClInclude Include="moho\sim\CCommandLuaFunctionRegistrations.h" />
     <ClInclude Include="moho\sim\ManipulatorLuaFunctionThunks.h" />
     <ClInclude Include="moho\sim\SimDebugCommandRegistrations.h" />

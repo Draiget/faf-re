@@ -36,6 +36,7 @@
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/EImpactTypeTypeInfo.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
@@ -796,6 +797,14 @@ namespace moho
    */
   int Projectile::MotionTick()
   {
+    // FAF FA-Binary-Patches #154 (Fix projectiles falling below zero): a
+    // projectile whose current position is below height 0 -- off the map, where
+    // there is no terrain to hit -- impacts now. `comiss y, 0.0; jb` at the
+    // 0x0069BDDA hook: a NaN height impacts too.
+    if (FAF_IsSimFixActive(EFafSimFix::ProjectileImpactBelowZero) && !(mVarDat.mCurTransform.pos_.y >= 0.0f)) {
+      this->Impact();
+      return 1;
+    }
 
     // Already impacting: detonate this tick and continue.
     if (mImpactInterpolation >= 0.0f) {

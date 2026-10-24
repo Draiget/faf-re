@@ -880,10 +880,15 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 }
 
 /**
- * Address: 0x0073D8C0 (FUN_0073D8C0, thunk to FUN_0128FAC0)
+ * Address: 0x0073D8C0 (FUN_0073D8C0)
  *
  * What it does:
  * Runs one dispatch beat, then executes sync publication and sim-rate sampling.
+ *
+ * Game version 3835's exe jumped from here into FAF's old desync fix
+ * (0x0128FD00 in `.exxt`, the same body plus tick bookkeeping for its quit
+ * handshake); FA-Binary-Patches #173 (Remove old desync-fix code, 3840)
+ * restored the original.
  */
 void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
 {

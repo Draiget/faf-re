@@ -160,6 +160,7 @@ namespace moho
     boost::shared_ptr<gpg::gal::GpuBuffer> mSlotBuffer;
     std::uint32_t mSlotCapacity = 0U;
     bool mSlotsDirty = false;
+    float mUploadedIconScale = 1.0f; // `ui_StrategicIconScale` the slot buffer was built with
     std::vector<Slot> mSlots;
     std::unordered_map<const CD3DBatchTexture*, std::uint16_t> mSlotByTexture;
     std::vector<ViewStream> mStreams;

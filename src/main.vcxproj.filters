@@ -417,6 +417,9 @@
     <ClCompile Include="moho\sim\CSquad.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\FafGameVersion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CCommandLuaFunctionRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2686,6 +2689,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CSquad.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\FafGameVersion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CCommandLuaFunctionRegistrations.h">

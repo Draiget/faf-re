@@ -17,6 +17,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
@@ -347,11 +348,27 @@ namespace moho
       if (focusUnit->IsInCategory("SHIELD")) {
         Entity* const shieldEntity = focusUnit->GetFocusEntity();
         if (shieldEntity != nullptr) {
-          if (!focusUnitIsDamaged && !focusUnit->RunScriptBool("ShieldIsOn")) {
+          // FAF FA-Binary-Patches #175 (Fix free shield repair and repairing
+          // disabled shields), for game versions that carry it.
+          const bool shieldRepairFix = FAF_IsSimFixActive(EFafSimFix::ShieldRepair);
+
+          // The binary asks `ShieldIsOn` only for an undamaged unit, so
+          // repairing a damaged unit regenerated its shield while the shield
+          // was off. #175 always asks: an off shield still ends the repair of
+          // an undamaged unit, and for a damaged one skips the shield regen.
+          bool regenerateShield = true;
+          if (shieldRepairFix) {
+            if (!focusUnit->RunScriptBool("ShieldIsOn")) {
+              if (!focusUnitIsDamaged) {
+                return true;
+              }
+              regenerateShield = false;
+            }
+          } else if (!focusUnitIsDamaged && !focusUnit->RunScriptBool("ShieldIsOn")) {
             return true;
           }
 
-          if (shieldEntity->mVarDat.mMaxHealth > shieldEntity->mVarDat.mHealth) {
+          if (regenerateShield && shieldEntity->mVarDat.mMaxHealth > shieldEntity->mVarDat.mHealth) {
             const float buildRate = ownerUnit->GetAttributes().buildRate;
             const float regenRate = shieldEntity->GetLuaValue("RegenRate") * kTickBuildScale;
             float regenAssistMult = focusBlueprint->Defense.Shield.RegenAssistMult;
@@ -360,7 +377,14 @@ namespace moho
                 regenAssistMult *= 2.0f;
                 buildProgressDelta *= 0.5f;
               }
-              shieldEntity->AdjustHealth(nullptr, (regenRate * buildRate) / regenAssistMult);
+              // #175: the binary repaired `regenRate * buildRate / mult` however
+              // little of its requested resources the builder got; the patch
+              // scales it by `ResourceConsumed`, as build progress is.
+              float shieldRepair = regenRate * buildRate;
+              if (shieldRepairFix) {
+                shieldRepair *= ownerUnit->ResourceConsumed;
+              }
+              shieldEntity->AdjustHealth(nullptr, shieldRepair / regenAssistMult);
             }
           }
         }

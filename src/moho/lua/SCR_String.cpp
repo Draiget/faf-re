@@ -6,6 +6,7 @@
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/sim/FafGameVersion.h"
 
 namespace
 {
@@ -384,11 +385,11 @@ moho::CScrLuaInitForm* moho::register_STR_GetTokens_LuaFuncDef()
  */
 msvc8::string moho::GetEngineVersion()
 {
-  /// The build the engine reports (0xEFB / 3835 in the target binary;
-  /// see FUN_004D3D30 asm `push 0xefb` under `%1.1f.%i`).
-  constexpr int kEngineBuild = 3835;
-
-  return gpg::STR_Printf("%1.1f.%i", 1.5, kEngineBuild);
+  // The build the engine reports is the FAF game version the FAF client stamps
+  // into the exe (0xEFB / 3835 in the target binary; FUN_004D3D30 asm
+  // `push 0xefb` under `%1.1f.%i`). This engine carries the engine patches up to
+  // `kFafGameVersionLatest`, so it reports that.
+  return gpg::STR_Printf("%1.1f.%i", 1.5, kFafGameVersionLatest);
 }
 
 /**
