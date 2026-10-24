@@ -16,8 +16,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 | Replay parity | All 75 replays of the current vault test set match every recorded checksum (x64 build of master `22a00a44`, MSVC, `/simworkers 8`, D3D12) ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
 | Performance | x64 replays take 19 % less time than retail on average (4 % to 33 %) ([Performance](docs/PERFORMANCE.md)) |
-| Source bodies written | ~39,000 functions (20/10/2026) |
-| Genuinely outstanding | ~430 (20/10/2026) |
+| Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code we link from source (wxWidgets, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding |
 
 Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
 
@@ -75,6 +74,10 @@ Other options: `-Configuration Debug`, `-FafDir`, `-Out` (also copy into `out\<a
 ## SFD movie playback
 
 The engine does not use or distribute the CRI Sofdec/ADX runtime. `.sfd` support is an independent implementation with FFmpeg and a bounded FAF metadata parser. The legacy `mwPly*`/`ADXM_*` names remain only as a compatibility facade for the recovered call sites. Embedded audio and optional external XACT sound/voice cues stay separate. Profile, dependency setup, validation and unsupported composition modes: [docs/FAF_SFD_COMPATIBILITY.md](docs/FAF_SFD_COMPATIBILITY.md).
+
+## Support
+
+This rebuild took a lot of time and paid AI compute. If it is useful to you, donations in ETH are welcome: `0x8f614802906dF231b8fbC9a6f11C6728D2A13DDF`
 
 ## Credits
 
