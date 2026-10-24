@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <cmath>
 
+#include "Vector3f.h"
+
 // --- Feature switches ---
 #ifndef MOHO_USE_SSE2
 #if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2) || defined(_M_X64)
@@ -84,6 +86,8 @@ namespace moho
      * Returns z lane.
      */
     [[nodiscard]] float Z() const noexcept;
+
+    [[nodiscard]] Vector3f XYZ() const noexcept;
 
     /**
      * Address: 0x0046FB20 (FUN_0046FB20, Moho::Vector4f::operator=)

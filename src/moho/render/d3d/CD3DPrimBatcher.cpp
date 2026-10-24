@@ -81,11 +81,7 @@ namespace
     const float yScale
   ) noexcept
   {
-    return {
-      origin.x + (xAxis.x * xScale) + (yAxis.x * yScale),
-      origin.y + (xAxis.y * xScale) + (yAxis.y * yScale),
-      origin.z + (xAxis.z * xScale) + (yAxis.z * yScale),
-    };
+    return origin + (xAxis * xScale) + (yAxis * yScale);
   }
 
   [[nodiscard]] moho::CD3DPrimBatcher::Vertex MakeVertex(
@@ -155,30 +151,6 @@ namespace
     transformed.mU = runtime.mP2x + (runtime.mP1x * source.mU);
     transformed.mV = runtime.mP2y + (runtime.mP1y * source.mV);
     return transformed;
-  }
-
-  [[nodiscard]] moho::Vector3f AddVector3f(const moho::Vector3f& lhs, const moho::Vector3f& rhs) noexcept
-  {
-    return {lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
-  }
-
-  [[nodiscard]] moho::Vector3f SubVector3f(const moho::Vector3f& lhs, const moho::Vector3f& rhs) noexcept
-  {
-    return {lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
-  }
-
-  [[nodiscard]] moho::Vector3f ScaleVector3f(const moho::Vector3f& value, const float scale) noexcept
-  {
-    return {value.x * scale, value.y * scale, value.z * scale};
-  }
-
-  [[nodiscard]] moho::Vector3f NormalizeScaledVector3f(const moho::Vector3f& value, const float scale) noexcept
-  {
-    moho::Vector3f normalized = value;
-    if (Wm3::Vector3f::Normalize(&normalized) <= 0.0f) {
-      return {0.0f, 0.0f, 0.0f};
-    }
-    return ScaleVector3f(normalized, scale);
   }
 
   [[nodiscard]] float SampleTerrainClampedElevation(
@@ -1196,22 +1168,14 @@ namespace moho
     }
 
     const float stepAngle = kTau / static_cast<float>(precision);
-    Vector3f previous{
-      center.x + axisCos.x,
-      center.y + axisCos.y,
-      center.z + axisCos.z,
-    };
+    Vector3f previous = center + axisCos;
 
     for (std::uint32_t index = 1; index <= precision; ++index) {
       const float angle = stepAngle * static_cast<float>(index);
       const float cosAngle = std::cos(angle);
       const float sinAngle = std::sin(angle);
 
-      const Vector3f current{
-        center.x + (axisCos.x * cosAngle) + (axisSin.x * sinAngle),
-        center.y + (axisCos.y * cosAngle) + (axisSin.y * sinAngle),
-        center.z + (axisCos.z * cosAngle) + (axisSin.z * sinAngle),
-      };
+      const Vector3f current{center + (axisCos * cosAngle) + (axisSin * sinAngle)};
 
       DrawLine(primBatcher, previous, current, color);
       previous = current;
@@ -1271,19 +1235,19 @@ namespace moho
     DrawLine(
       primBatcher,
       origin,
-      {origin.x + xOffset.x, origin.y + xOffset.y, origin.z + xOffset.z},
+      origin + xOffset,
       kAxisColorX
     );
     DrawLine(
       primBatcher,
       origin,
-      {origin.x + yOffset.x, origin.y + yOffset.y, origin.z + yOffset.z},
+      origin + yOffset,
       kAxisColorY
     );
     DrawLine(
       primBatcher,
       origin,
-      {origin.x + zOffset.x, origin.y + zOffset.y, origin.z + zOffset.z},
+      origin + zOffset,
       kAxisColorZ
     );
   }
@@ -1300,39 +1264,27 @@ namespace moho
       return;
     }
 
-    const Vector3f origin{transform.r[3].x, transform.r[3].y, transform.r[3].z};
-    const Vector3f axisX{transform.r[0].x, transform.r[0].y, transform.r[0].z};
-    const Vector3f axisY{transform.r[1].x, transform.r[1].y, transform.r[1].z};
-    const Vector3f axisZ{transform.r[2].x, transform.r[2].y, transform.r[2].z};
+    const Vector3f origin{transform.r[3].XYZ()};
+    const Vector3f axisX{transform.r[0].XYZ()};
+    const Vector3f axisY{transform.r[1].XYZ()};
+    const Vector3f axisZ{transform.r[2].XYZ()};
 
     DrawLine(
       primBatcher,
       origin,
-      {
-        origin.x + (axisX.x * axisLength),
-        origin.y + (axisX.y * axisLength),
-        origin.z + (axisX.z * axisLength),
-      },
+      origin + axisX * axisLength,
       kAxisColorX
     );
     DrawLine(
       primBatcher,
       origin,
-      {
-        origin.x + (axisY.x * axisLength),
-        origin.y + (axisY.y * axisLength),
-        origin.z + (axisY.z * axisLength),
-      },
+      origin + axisY * axisLength,
       kAxisColorY
     );
     DrawLine(
       primBatcher,
       origin,
-      {
-        origin.x + (axisZ.x * axisLength),
-        origin.y + (axisZ.y * axisLength),
-        origin.z + (axisZ.z * axisLength),
-      },
+      origin + axisZ * axisLength,
       kAxisColorZ
     );
   }
@@ -1387,19 +1339,19 @@ namespace moho
   {
     const float halfBorderWidth = borderWidth * 0.5f;
 
-    const Vector3f outerExpansion = NormalizeScaledVector3f(AddVector3f(heightAxis, widthAxis), halfBorderWidth);
-    const Vector3f edgeExpansion = NormalizeScaledVector3f(SubVector3f(heightAxis, widthAxis), halfBorderWidth);
+    const Vector3f outerExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis + widthAxis, 0.0f) * halfBorderWidth;
+    const Vector3f edgeExpansion = Wm3::Vector3f::NormalizeOrZero(heightAxis - widthAxis, 0.0f) * halfBorderWidth;
 
     DrawRectRing ring{};
-    ring.outer[0] = SubVector3f(topLeft, outerExpansion);
-    ring.outer[1] = SubVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
-    ring.outer[2] = AddVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
-    ring.outer[3] = AddVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+    ring.outer[0] = topLeft - outerExpansion;
+    ring.outer[1] = topLeft + widthAxis - edgeExpansion;
+    ring.outer[2] = topLeft + widthAxis + heightAxis + outerExpansion;
+    ring.outer[3] = topLeft + heightAxis + edgeExpansion;
 
-    ring.inner[0] = AddVector3f(topLeft, outerExpansion);
-    ring.inner[1] = AddVector3f(AddVector3f(topLeft, widthAxis), edgeExpansion);
-    ring.inner[2] = SubVector3f(AddVector3f(AddVector3f(topLeft, widthAxis), heightAxis), outerExpansion);
-    ring.inner[3] = SubVector3f(AddVector3f(topLeft, heightAxis), edgeExpansion);
+    ring.inner[0] = topLeft + outerExpansion;
+    ring.inner[1] = topLeft + widthAxis + edgeExpansion;
+    ring.inner[2] = topLeft + widthAxis + heightAxis - outerExpansion;
+    ring.inner[3] = topLeft + heightAxis - edgeExpansion;
     return ring;
   }
 
@@ -1482,14 +1434,14 @@ namespace moho
           outerStartY + (outerStep.y * segmentF),
           outerStart.z + (outerStep.z * segmentF),
         };
-        const Vector3f segmentOuterEnd = AddVector3f(segmentOuterStart, outerStep);
+        const Vector3f segmentOuterEnd = segmentOuterStart + outerStep;
 
         const Vector3f segmentInnerStart{
           innerStart.x + (innerStep.x * segmentF),
           innerStartY + (innerStep.y * segmentF),
           innerStart.z + (innerStep.z * segmentF),
         };
-        const Vector3f segmentInnerEnd = AddVector3f(segmentInnerStart, innerStep);
+        const Vector3f segmentInnerEnd = segmentInnerStart + innerStep;
 
         primBatcher->DrawQuad(segmentOuterStart, segmentOuterEnd, segmentInnerEnd, segmentInnerStart, color);
       }
@@ -1532,26 +1484,10 @@ namespace moho
       const float cosNext = std::cos(nextAngle);
       const float sinNext = std::sin(nextAngle);
 
-      const Vector3f innerCurrent{
-        center.x + (innerCosAxis.x * cosCurrent) + (innerSinAxis.x * sinCurrent),
-        center.y + (innerCosAxis.y * cosCurrent) + (innerSinAxis.y * sinCurrent),
-        center.z + (innerCosAxis.z * cosCurrent) + (innerSinAxis.z * sinCurrent),
-      };
-      const Vector3f innerNext{
-        center.x + (innerCosAxis.x * cosNext) + (innerSinAxis.x * sinNext),
-        center.y + (innerCosAxis.y * cosNext) + (innerSinAxis.y * sinNext),
-        center.z + (innerCosAxis.z * cosNext) + (innerSinAxis.z * sinNext),
-      };
-      const Vector3f outerCurrent{
-        center.x + (outerCosAxis.x * cosCurrent) + (outerSinAxis.x * sinCurrent),
-        center.y + (outerCosAxis.y * cosCurrent) + (outerSinAxis.y * sinCurrent),
-        center.z + (outerCosAxis.z * cosCurrent) + (outerSinAxis.z * sinCurrent),
-      };
-      const Vector3f outerNext{
-        center.x + (outerCosAxis.x * cosNext) + (outerSinAxis.x * sinNext),
-        center.y + (outerCosAxis.y * cosNext) + (outerSinAxis.y * sinNext),
-        center.z + (outerCosAxis.z * cosNext) + (outerSinAxis.z * sinNext),
-      };
+      const Vector3f innerCurrent{center + (innerCosAxis * cosCurrent) + (innerSinAxis * sinCurrent)};
+      const Vector3f innerNext{center + (innerCosAxis * cosNext) + (innerSinAxis * sinNext)};
+      const Vector3f outerCurrent{center + (outerCosAxis * cosCurrent) + (outerSinAxis * sinCurrent)};
+      const Vector3f outerNext{center + (outerCosAxis * cosNext) + (outerSinAxis * sinNext)};
 
       primBatcher->DrawQuad(innerCurrent, outerCurrent, outerNext, innerNext, color);
     }
