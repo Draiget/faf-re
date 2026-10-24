@@ -757,6 +757,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/CPlatoonTypeInfo.cpp
   moho/sim/CPlatoon.cpp
   moho/sim/CSquad.cpp
+  moho/sim/FafGameVersion.cpp
   moho/console/CConAlias.cpp
   moho/console/CConFunc.cpp
   moho/sim/CDamage.cpp

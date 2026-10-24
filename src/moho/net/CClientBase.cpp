@@ -661,6 +661,18 @@ void CClientBase::UpdateState(
           // ever restoring the gate flag. We restore it on purpose, because
           // not restoring it is an engine defect that loses commands.
           //
+          // FAF FA-Binary-Patches #172 (Fix Replay Desync after
+          // CommandSourceTerminated, game version 3840) is the upstream form of
+          // the same fix: at 0x0053C71E it stores 1 into this flag's stack slot
+          // ([esp+0x16]) and jumps to 0x0053C7D7, which is the same
+          // stream-release-and-continue tail as 0x0053C71E..0x0053C72E (the
+          // `ebx` it stores there is already 0 from 0x0053C719) -- i.e. exactly
+          // "restore the flag, take the next message", as here. One difference
+          // stays on purpose: #172 sets the flag for every authorized claim,
+          // and we leave it clear for a claim of 0xFF (see below), which only
+          // a replay's local viewer makes. Live sessions never take this
+          // branch after a terminate, so it needs no game-version gate.
+          //
           // Revert by deleting this one line; nothing else in the gating path
           // deviates, so that alone restores bug-compatible playback if a
           // historical desync ever needs reproducing.

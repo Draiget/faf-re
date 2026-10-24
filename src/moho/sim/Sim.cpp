@@ -872,9 +872,6 @@ namespace
     "ClearFrame(int head) - destroy all controls in frame, nil head will clear all frames";
   constexpr const char* kGetNumRootFramesHelpText =
     "int GetNumRootFrames() - returns the current number of root frames (typically one per head";
-  constexpr const char* kCallbackPacketMessage = "Callback packet received, exit sync is over";
-  constexpr const char* kDiscardedPointerMessage = "Discarded: %p";
-  constexpr const char* kRecvPointerMessage = "recv Ptr: %p";
   constexpr const char* kGetSimTicksPerSecondHelpText = "int GetSimTicksPerSecond()";
   constexpr const char* kSessionRequestPauseHelpText = "Pause the world simulation.";
   constexpr const char* kSessionResumeHelpText = "Resume the world simulation.";
@@ -1107,19 +1104,6 @@ namespace
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaInvalidBoolWarning = "%s\n  invalid argument %d, use as boolean";
-  constexpr std::size_t kDiscardClientSlotCount = 17u;
-  // FAF-patch global (dword at 0x011FD23F in the shipped exe). The patch
-  // region steps it through session states; cfunc_SimCallbackL (0x008BA770)
-  // and cfunc_SetPausedL (0x008BC100) refuse to marshal while it equals
-  // exactly 1 (`cmp dword ptr [0x011FD23F],1`). EndGame stores 0x0B
-  // (0x0128F267). Zero-initialised, so callbacks flow by default.
-  std::int32_t gLuaSimCallbackDispatchState = 0;
-  constexpr std::int32_t kLuaSimCallbackDispatchBlockedState = 1;
-  constexpr std::int32_t kLuaSimCallbackDispatchGameEndedState = 0x0B;
-
-  // FAF-patch global (byte at 0x01293478): set by EndGame (0x0128F260) and
-  // read by SessionEndGame (0x0128F9AE) to skip its wait path.
-  bool gSimEndGameRequested = false;
 
   /**
    * `EEntityAttribute` lane of one `EIntel` value: the binary computes it as
@@ -1271,44 +1255,6 @@ namespace
       sType = gpg::LookupRType(typeid(moho::EUnitCommandType));
     }
     return sType;
-  }
-
-  struct DiscardPatchState
-  {
-    std::array<const void*, kDiscardClientSlotCount> clientPointers{};
-    std::uint32_t currentClientCount = 0;
-    std::uint32_t didDiscard = 0;
-  };
-
-  DiscardPatchState gDiscardPatchState{};
-
-  template <std::size_t N>
-  [[nodiscard]] bool ContainsPointer(
-    const std::array<const void*, N>& candidates,
-    const std::size_t count,
-    const void* const value
-  ) noexcept
-  {
-    const std::size_t boundedCount = std::min(count, N);
-    for (std::size_t index = 0; index < boundedCount; ++index) {
-      if (candidates[index] == value) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  [[nodiscard]] std::size_t ResolveDiscardScanCount(const std::uint32_t currentClientCount) noexcept
-  {
-    if (currentClientCount <= 1u || currentClientCount > kDiscardClientSlotCount) {
-      return kDiscardClientSlotCount;
-    }
-    return static_cast<std::size_t>(currentClientCount - 1u);
-  }
-
-  [[nodiscard]] bool IsLuaCallbackDispatchBlocked() noexcept
-  {
-    return gLuaSimCallbackDispatchState == kLuaSimCallbackDispatchBlockedState;
   }
 
   [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
@@ -10877,52 +10823,6 @@ int Sim::ArmyCount() const
 }
 
 /**
- * Address: 0x0128B140 (FUN_0128B140, func_CallbackPacketRecv)
- *
- * What it does:
- * Emits the callback-packet patch diagnostics line.
- */
-void moho::func_CallbackPacketRecv()
-{
-  gpg::Logf(kCallbackPacketMessage);
-}
-
-/**
- * Address: 0x0128B160 (FUN_0128B160, func_CheckDiscard)
- *
- * What it does:
- * Clears discard status, scans the patch client list for a pointer match,
- * and logs/marks discard when matched.
- */
-void moho::func_CheckDiscard(const void* const clientPointer)
-{
-  gDiscardPatchState.didDiscard = 0;
-
-  if (gDiscardPatchState.currentClientCount == 1u) {
-    return;
-  }
-
-  const std::size_t scanCount = ResolveDiscardScanCount(gDiscardPatchState.currentClientCount);
-  if (!ContainsPointer(gDiscardPatchState.clientPointers, scanCount, clientPointer)) {
-    return;
-  }
-
-  gpg::Logf(kDiscardedPointerMessage, clientPointer);
-  gDiscardPatchState.didDiscard = 1;
-}
-
-/**
- * Address: 0x0128B2C0 (FUN_0128B2C0, func_LogRecv)
- *
- * What it does:
- * Logs the received packet pointer.
- */
-void moho::func_LogRecv(const void* const receivedPointer)
-{
-  gpg::Logf(kRecvPointerMessage, receivedPointer);
-}
-
-/**
  * Address: 0x008D4010 (FUN_008D4010, funcl_SC_CreateEntityDialog)
  *
  * What it does:
@@ -15094,7 +14994,7 @@ int moho::cfunc_ExecLuaInSimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
 {
-  if (IsLuaCallbackDispatchBlocked() || !state || !state->m_state) {
+  if (!state || !state->m_state) {
     return 0;
   }
 
@@ -15439,10 +15339,6 @@ moho::CScrLuaInitForm* moho::func_ToggleScriptBit_LuaFuncDef()
  */
 int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
 {
-  if (IsLuaCallbackDispatchBlocked()) {
-    return 0;
-  }
-
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount != 2) {
@@ -17798,13 +17694,14 @@ moho::CScrLuaInitForm* moho::func_SessionEndGame_LuaFuncDef()
  * driver. The world session is deliberately left alive - the help text spells
  * this out: play freezes, it is not torn down.
  *
- * FAF's patcher has overwritten the first nine bytes at 0x008984B0 with
- * `jmp 0x0128CB50` + four `nop`s, so IDA shows only the `.exxt` replacement -
- * which wraps this same logic in FAF's own connectivity bookkeeping (a
- * `WaitForSingleObject` on the client handshake, and 0x0128B450 zeroing a
- * 0x40-byte `client_ptr` table). None of that is Moho source. The engine's
- * own body is still present in the image directly behind the patch, and it is
- * what this recovery follows:
+ * In game version 3835's exe FAF's old desync fix has overwritten the first
+ * nine bytes at 0x008984B0 with a `jmp` into `.exxt` (0x0128F9A0) + four
+ * `nop`s, so IDA shows only the replacement - which wraps this same logic in
+ * a quit handshake (a `WaitForSingleObject` of up to 9.5 s for the other
+ * clients' acknowledgement, then zeroing its client table). FA-Binary-Patches
+ * #173 (Remove old desync-fix code, 3840) removed it. The engine's own body is
+ * still present in the image directly behind the patch, and it is what this
+ * recovery follows:
  *
  *   0x008984B9  push eax / call lua_gettop / test eax,eax / jz 0x008984D8
  *   0x008984C6  push eax, 0, esi(help), "%s\n  expected %d args, but got %d",
@@ -20213,18 +20110,18 @@ int moho::cfunc_GetCurrentCommandSourceL(LuaPlus::LuaState* const state)
 }
 
 /**
- * Address: 0x0128F260 (FUN_0128F260, cfunc_EndGameL)
+ * Address: 0x0074B8B0 (cfunc_EndGameL)
  *
  * What it does:
- * Marks the session as ending (end-game flag set, callback-dispatch latch
- * moved to its game-ended state) before validating the Lua argument count,
- * then forwards to `Sim::EndGame()`.
+ * Validates the Lua argument count, then forwards to `Sim::EndGame()`.
+ *
+ * Game version 3835's exe replaced this body with FAF's old desync fix
+ * (0x0128F260 in `.exxt`), which first set an end-game flag and its input
+ * block latch; FA-Binary-Patches #173 (Remove old desync-fix code, game
+ * version 3840) restored the original, which is this.
  */
 int moho::cfunc_EndGameL(LuaPlus::LuaState* const state)
 {
-  gSimEndGameRequested = true;                                          // 0x0128F260
-  gLuaSimCallbackDispatchState = kLuaSimCallbackDispatchGameEndedState; // 0x0128F267
-
   if (!state || !state->m_state) {
     return 0;
   }
