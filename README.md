@@ -57,7 +57,7 @@ Other options: `-Configuration Debug`, `-FafDir`, `-Out` (also copy into `out\<a
 | `src/` | The engine (`moho`, `gpg`, `legacy`, `lua`, `platform`, ...); project `src/main.vcxproj` |
 | `data/fafengine/` | Engine-owned Lua hooks copied next to the exe (for example the Graphics API option) |
 | `tools/` | Go multiplayer test harness (`mpemu`) and checkers; see [tools/README.md](tools/README.md) |
-| `scripts/perf/`, `scripts/layout/` | Sampling profiler and replay helpers; vtable/RTTI comparison against the shipped binary |
+| `scripts/` | Sampling profiler, benchmark and replay helpers (`perf/`), shader and texture checks (`effects/`), the hang stack dumper (`stackdump.cpp`) and the CMake source-list sync |
 | `docs/` | [Performance](docs/PERFORMANCE.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md) |
 
 ## Libraries the engine uses

@@ -19,10 +19,7 @@ thread.cpp   tss.cpp        tss_dll.cpp     tss_hooks.cpp  tss_pe.cpp  xtime.cpp
 ```
 
 Everything else boost provides here is header-only. So resolving this
-dependency is extract-and-patch; nothing is staged, and
-`scripts/bootstrap_boost_1_34_1_required.ps1` — which builds
-`libboost_thread` / `libboost_filesystem` with bjam — is dead code for the
-current build.
+dependency is extract-and-patch; nothing is staged and no bjam build is needed (the old bjam bootstrap script is archived in faf-re-archive).
 
 Because those twelve `.cpp` files compile straight into `main.exe`, a change to
 any of them is a change to the engine, not to a support library.
