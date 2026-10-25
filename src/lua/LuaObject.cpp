@@ -22883,10 +22883,14 @@ namespace
 	constexpr int8_t kScrTagTableBegin = 4;
 	constexpr int8_t kScrTagTableEnd = 5;
 
-	// Deepest table nesting the decoder accepts. Each nested table is one
+	// Deepest table nesting the decoder rebuilds. Each nested table is one
 	// recursion, and a 64 KB lobby message or sim callback holds 65535
 	// table-begin tags, enough to overflow any thread's stack. Nothing the
 	// engine or the game's Lua sends nests within an order of magnitude of it.
+	// Tables below this depth are skipped, not refused: FAF's lobby relays what
+	// a player sent a few levels deeper (a joiner's player options end up in
+	// the host's Launch message), so refusing would let one player's deep table
+	// stop everyone else's launch.
 	constexpr int kScrMaxTableDepth = 256;
 
 	// The stream comes off the network (lobby data, sim callbacks, chat), so a
@@ -22897,7 +22901,7 @@ namespace
 		throw std::runtime_error(std::string("Malformed lua byte stream: ") + reason);
 	}
 
-	void ReadScrValue(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader, int tablesLeft);
+	bool ReadScrValue(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader, int tablesLeft);
 } // namespace
 
 /**
@@ -22907,10 +22911,11 @@ namespace
  * Deserializes one tagged Lua payload from a binary stream and recursively
  * rebuilds nested table key/value pairs.
  *
- * A malformed stream (truncated, nested deeper than kScrMaxTableDepth, or a
- * table entry whose key or value is nil or whose key is NaN) throws a
- * std::runtime_error; the shipped body called gpg::Die for a nil key or
- * value and recursed without bound, so any peer could end the process.
+ * A malformed stream (truncated, or a table entry whose key or value is nil
+ * or whose key is NaN) throws a std::runtime_error; the shipped body called
+ * gpg::Die for a nil key or value and recursed without bound, so any peer
+ * could end the process. A table entry whose key or value nests deeper than
+ * kScrMaxTableDepth is skipped without recursion and left out.
  */
 void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader)
 {
@@ -22937,10 +22942,50 @@ namespace
 {
 	/**
 	 * What it does:
+	 * Consumes the rest of a table whose begin tag has been read, nested
+	 * tables included, with a counter instead of recursion.
+	 */
+	void SkipScrTable(const gpg::BinaryReader* const reader)
+	{
+		std::size_t openTables = 1;
+		while (openTables != 0) {
+			int8_t luaType = 0;
+			reader->ReadExact(luaType);
+			switch (luaType) {
+				case kScrTagNumber: {
+					float number = 0.0f;
+					reader->ReadExact(number);
+					break;
+				}
+				case kScrTagString: {
+					msvc8::string string;
+					reader->ReadString(&string);
+					break;
+				}
+				case kScrTagBoolean: {
+					int8_t byteValue = 0;
+					reader->ReadExact(byteValue);
+					break;
+				}
+				case kScrTagTableBegin:
+					++openTables;
+					break;
+				case kScrTagTableEnd:
+					--openTables;
+					break;
+				default:
+					break;
+			}
+		}
+	}
+
+	/**
+	 * What it does:
 	 * The body of SCR_FromByteStream, one tagged value at a time;
 	 * `tablesLeft` is how many more levels of table nesting may be opened.
+	 * Returns false for a table past that depth, which is skipped instead.
 	 */
-	void ReadScrValue(LuaObject& out, LuaState* const state, const gpg::BinaryReader* const reader, const int tablesLeft)
+	bool ReadScrValue(LuaObject& out, LuaState* const state, const gpg::BinaryReader* const reader, const int tablesLeft)
 	{
 		LuaObject result;
 		int8_t luaType = 0;
@@ -22970,7 +23015,8 @@ namespace
 			}
 			case kScrTagTableBegin: {
 				if (tablesLeft <= 0) {
-					ThrowMalformedScrStream("tables nested too deeply");
+					SkipScrTable(reader);
+					return false;
 				}
 				result.AssignNewTable(state, 0, 0);
 
@@ -22981,23 +23027,26 @@ namespace
 				gpg::Stream& stream = *const_cast<gpg::Stream*>(reader->stream());
 				while (stream.CheckByte() != kScrTagTableEnd) {
 					LuaObject key;
-					ReadScrValue(key, state, reader, tablesLeft - 1);
-					if (key.IsNil()) {
+					const bool haveKey = ReadScrValue(key, state, reader, tablesLeft - 1);
+					if (haveKey && key.IsNil()) {
 						ThrowMalformedScrStream("nil table key");
 					}
 					// A NaN key makes luaH_set raise a Lua error, which unwinds with
 					// the error message still pushed on the Lua stack.
-					if (key.IsNumber() && key.GetNumber() != key.GetNumber()) {
+					if (haveKey && key.IsNumber() && key.GetNumber() != key.GetNumber()) {
 						ThrowMalformedScrStream("NaN table key");
 					}
 
 					LuaObject value;
-					ReadScrValue(value, state, reader, tablesLeft - 1);
-					if (value.IsNil()) {
+					const bool haveValue = ReadScrValue(value, state, reader, tablesLeft - 1);
+					if (haveValue && value.IsNil()) {
 						ThrowMalformedScrStream("nil table value");
 					}
 
-					result.SetObject(key, value);
+					// An entry with a key or value nested too deeply is left out.
+					if (haveKey && haveValue) {
+						result.SetObject(key, value);
+					}
 				}
 
 				// Consume the end-of-table tag the peek left in place.
@@ -23015,6 +23064,7 @@ namespace
 		}
 
 		out = result;
+		return true;
 	}
 } // namespace
 
