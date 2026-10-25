@@ -126,6 +126,7 @@ namespace
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
+      "  --loopback [--loopback-dr <steps>]  every packet through the wire format and the client's rebuild\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -180,6 +181,8 @@ int main(int argc, char** argv)
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
+  options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
+  (void)ReadIntOption("--loopback-dr", options.loopbackDeadReckoning, bad);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
@@ -244,6 +247,13 @@ int main(int argc, char** argv)
   if (!result.wireSummary.empty()) {
     std::printf("[%s] %s\n", label, result.wireSummary.c_str());
   }
+  if (!result.loopbackSummary.empty()) {
+    std::string summary = result.loopbackSummary;
+    for (std::size_t at = 0; (at = summary.find('\n', at)) != std::string::npos; at += 2 + gLabel.size() + 1) {
+      summary.replace(at, 1, "\n[" + gLabel + "] ");
+    }
+    std::printf("[%s] %s\n", label, summary.c_str());
+  }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
@@ -291,7 +301,7 @@ int main(int argc, char** argv)
     exitCode = kExitBadInput;
   } else if (result.crashed) {
     exitCode = kExitCrash;
-  } else if (recordedChecksumsComparable && result.mismatches > 0) {
+  } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

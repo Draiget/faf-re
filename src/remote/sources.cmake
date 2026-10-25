@@ -18,6 +18,7 @@ set(FAF_REMOTE_SOURCES
 )
 
 set(FAF_REMOTE_CLIENT_SOURCES
+  remote/client/LoopbackLink.cpp
   remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp
   remote/client/SessionSummary.cpp

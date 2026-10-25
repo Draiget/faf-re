@@ -1,5 +1,7 @@
 #include "replay/ReplayRunner.h"
 
+#include "remote/client/LoopbackLink.h"
+
 #include <Windows.h>
 
 #include <atomic>
@@ -491,6 +493,21 @@ namespace faf::replay
       }
     }
 
+    // `--loopback`: every packet through the wire format and the client's rebuild, after the
+    // consumers above have seen the sim's own packet.
+    std::unique_ptr<faf::remote::client::CLoopbackLink> loopback;
+    if (options.loopback) {
+      faf::remote::client::SLoopbackOptions loopbackOptions{};
+      loopbackOptions.deadReckoningTolerance = static_cast<std::uint32_t>(options.loopbackDeadReckoning);
+      loopback = std::make_unique<faf::remote::client::CLoopbackLink>(
+        *rules,
+        faf::remote::client::MakeLoopbackCodec(
+          mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, loopbackOptions
+        ),
+        loopbackOptions
+      );
+    }
+
     LuaPlus::LuaState* const syncState = moho::USER_GetLuaState();
     std::map<std::string, SSyncKeySeen> syncKeys;
     const Clock::time_point playStart = Clock::now();
@@ -577,6 +594,9 @@ namespace faf::replay
         if (packet->mGameOver) {
           result.gameOver = true;
         }
+        if (loopback) {
+          loopback->Pass(*packet);
+        }
 
         if (!result.started) {
           // `WLD_DoInitializing`: the first beat is applied, then this client declares itself
@@ -620,6 +640,10 @@ namespace faf::replay
     }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
+    }
+    if (loopback) {
+      result.loopbackSummary = loopback->Summary("end");
+      result.loopbackFailures = loopback->CheckFailures();
     }
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;

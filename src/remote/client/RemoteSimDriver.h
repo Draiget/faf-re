@@ -5,10 +5,7 @@
 
 #include "moho/sim/ISTIDriver.h"
 #include "Wm3AxisAlignedBox3.h"
-#include "remote/FrameBuilder.h"
-#include "remote/client/SyncRebuilder.h"
-#include "remote/wire/EntityFrame.h"
-#include "remote/wire/OrdinalTable.h"
+#include "remote/client/LoopbackLink.h"
 
 // Engine addition, server mode (plan WP11): the client's remote driver, in its first,
 // in-process loopback form. It owns the session's lockstep driver as its "server": each sync
@@ -28,12 +25,6 @@ namespace moho
 
 namespace faf::remote::client
 {
-  struct SLoopbackOptions
-  {
-    /** Dead-reckoning tolerance in quantiser steps (1/64 unit); 0: off. */
-    std::uint32_t deadReckoningTolerance = 0;
-  };
-
   class CRemoteSimDriver final : public moho::ISTIDriver
   {
   public:
@@ -102,18 +93,7 @@ namespace faf::remote::client
     void LogSummary(const char* when) const;
 
     std::unique_ptr<moho::ISTIDriver> mServer;
-    wire::SContentTables mTables;
-    wire::SFrameCodec mCodec;
-    CViewFrameBuilder mBuilder;
-    std::optional<CDeadReckoner> mReckoner;
-    wire::SViewFrame mLastSent;
-    bool mHasSent = false;
-    std::uint64_t mEncodeFailures = 0;
-    std::uint64_t mRebuildFailures = 0;
-    double mServerSeconds = 0.0; // building and encoding frames
-    double mClientSeconds = 0.0; // decoding and rebuilding packets
-    double mMaxBeatSeconds = 0.0;
-    CSyncRebuilder mRebuilder;
+    CLoopbackLink mLink;
   };
 
   /**

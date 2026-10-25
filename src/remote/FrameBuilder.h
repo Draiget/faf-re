@@ -41,6 +41,15 @@ namespace faf::remote
   /** The reverse of `PackEntityFlags`, into `data` (the orphan bit is not entity data). */
   void UnpackEntityFlags(std::uint16_t flags, moho::SSTIEntityVariableData& data) noexcept;
 
+  /** Hidden, alt footprint, alt footprint 2, destroyed by a kill, refresh UI: `SAppearance::visualFlags`. */
+  [[nodiscard]] std::uint8_t PackVisualFlags(const moho::SSTIEntityVariableData& data) noexcept;
+
+  /**
+   * A frame's appearance block, written into entity data: everything but the mesh (the caller
+   * resolves the ordinal), the sounds and the underlay texture.
+   */
+  void UnpackAppearance(const wire::SAppearance& look, moho::SSTIEntityVariableData& data);
+
   /** A frame's unit block, written into a unit update's data. */
   void UnpackUnitFields(const wire::SUnitFields& unit, moho::SSTIUnitVariableData& data) noexcept;
 

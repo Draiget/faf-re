@@ -1,6 +1,7 @@
 #include "remote/wire/EntityFrame.h"
 
 #include <bit>
+#include <utility>
 
 #include "remote/wire/WireVersion.h"
 
@@ -9,7 +10,8 @@
 // Wire layout (entities lane):
 //   u16 lane version, u32 frame id, u32 baseline id, u32 beat,
 //   removed:  varuint count, then per id varuint gap
-//   created:  varuint count, then per entity varuint gap + every field (unit block for units)
+//   created:  varuint count, then per entity varuint gap + varuint field mask + those fields
+//             (the basic fields and the kind always; appearance fields that are not default)
 //   changed:  varuint count, then per entity varuint gap + varuint field mask + those fields
 // A gap is the id minus the previous id of the same section minus one (the first: the id),
 // so ids are strictly ascending by construction. Within a record the kind bit comes first
@@ -25,6 +27,8 @@ namespace faf::remote::wire
     constexpr int kSiloBits = 16;
     constexpr int kYawBits = 16;
     constexpr int kMinBitsPerItem = 8; // the smallest gap varint
+    constexpr int kVisualFlagBits = 5;
+    constexpr std::uint32_t kCreationRequired = kEntityFields | kFieldKind;
 
     [[nodiscard]] std::uint32_t Bits(const float value) noexcept
     {
@@ -44,6 +48,10 @@ namespace faf::remote::wire
     /** `beat` is the frame's: a dead-reckoned anchor cannot lie in its future. */
     [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec, const std::uint32_t beat) noexcept
     {
+      if (record.farPosition) {
+        return record.position == QuantizedPosition{} && record.velocity == std::array<std::int32_t, 3>{}
+            && record.anchorBeat == 0u && (!record.yawOnly || record.orientation <= 0xFFFFu);
+      }
       const bool motionFits = codec.deadReckoning
                                 ? record.anchorBeat <= beat
                                 : (record.anchorBeat == 0u && record.velocity == std::array<std::int32_t, 3>{});
@@ -60,8 +68,46 @@ namespace faf::remote::wire
           && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags;
     }
 
+    [[nodiscard]] bool SameFloats(const float* a, const float* b, const std::size_t count) noexcept
+    {
+      for (std::size_t i = 0; i < count; ++i) {
+        if (Bits(a[i]) != Bits(b[i])) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /** The appearance fields in which two blocks differ. */
+    [[nodiscard]] std::uint32_t AppearanceChanges(const SAppearance& b, const SAppearance& a) noexcept
+    {
+      std::uint32_t fields = 0;
+      if (b.mesh != a.mesh) {
+        fields |= kFieldMesh;
+      }
+      if (!SameFloats(b.scale.data(), a.scale.data(), b.scale.size())) {
+        fields |= kFieldScale;
+      }
+      if (b.attachParent != a.attachParent || b.attachments != a.attachments) {
+        fields |= kFieldAttachment;
+      }
+      if (b.visualFlags != a.visualFlags) {
+        fields |= kFieldVisualFlags;
+      }
+      if (Bits(b.impact) != Bits(a.impact)) {
+        fields |= kFieldImpact;
+      }
+      if (!SameFloats(b.scroll.data(), a.scroll.data(), b.scroll.size())) {
+        fields |= kFieldScroll;
+      }
+      if (b.intel != a.intel) {
+        fields |= kFieldIntel;
+      }
+      return fields;
+    }
+
     void WriteFields(
-      BitWriter& writer, const SEntityRecord& record, const std::uint16_t fields, const SFrameCodec& codec,
+      BitWriter& writer, const SEntityRecord& record, const std::uint32_t fields, const SFrameCodec& codec,
       const std::uint32_t beat
     )
     {
@@ -69,6 +115,13 @@ namespace faf::remote::wire
         writer.WriteBool(record.isUnit);
       }
       if ((fields & kFieldPosition) != 0u) {
+        writer.WriteBool(record.farPosition);
+      }
+      if ((fields & kFieldPosition) != 0u && record.farPosition) {
+        for (const float value : record.farValue) {
+          writer.WriteFloatExact(value);
+        }
+      } else if ((fields & kFieldPosition) != 0u) {
         writer.WriteBits(record.position[0], codec.position.x.bits);
         writer.WriteBits(record.position[1], codec.position.y.bits);
         writer.WriteBits(record.position[2], codec.position.z.bits);
@@ -126,14 +179,43 @@ namespace faf::remote::wire
       if ((fields & kFieldUnitFlags) != 0u) {
         writer.WriteBits(unit.unitFlags, kUnitFlagBits);
       }
+      const SAppearance& look = record.appearance;
+      if ((fields & kFieldMesh) != 0u) {
+        writer.WriteVarUint(look.mesh);
+      }
+      if ((fields & kFieldScale) != 0u) {
+        for (const float value : look.scale) {
+          writer.WriteFloatExact(value);
+        }
+      }
+      if ((fields & kFieldAttachment) != 0u) {
+        writer.WriteBits(look.attachParent, 32);
+        writer.WriteVarUint(static_cast<std::uint32_t>(look.attachments.size()));
+        for (const std::uint32_t id : look.attachments) {
+          writer.WriteBits(id, 32);
+        }
+      }
+      if ((fields & kFieldVisualFlags) != 0u) {
+        writer.WriteBits(look.visualFlags, kVisualFlagBits);
+      }
+      if ((fields & kFieldImpact) != 0u) {
+        writer.WriteFloatExact(look.impact);
+      }
+      if ((fields & kFieldScroll) != 0u) {
+        for (const float value : look.scroll) {
+          writer.WriteFloatExact(value);
+        }
+      }
+      if ((fields & kFieldIntel) != 0u) {
+        for (const std::uint32_t radius : look.intel) {
+          writer.WriteVarUint(radius);
+        }
+      }
     }
 
-    /**
-     * Reads `fields` into `record`. A creation reads the unit block only when the record turns
-     * out to be a unit; a change naming unit fields for a non-unit is refused.
-     */
+    /** Reads `fields` into `record`. Unit fields for a record that is not a unit are refused. */
     [[nodiscard]] bool ReadFields(
-      BitReader& reader, SEntityRecord& record, std::uint16_t fields, const SFrameCodec& codec, const bool creation,
+      BitReader& reader, SEntityRecord& record, const std::uint32_t fields, const SFrameCodec& codec,
       const std::uint32_t beat
     )
     {
@@ -141,13 +223,21 @@ namespace faf::remote::wire
         record.isUnit = reader.ReadBool();
       }
       if ((fields & kUnitFields) != 0u && !record.isUnit) {
-        if (!creation) {
-          reader.Fail();
-          return false;
-        }
-        fields = static_cast<std::uint16_t>(fields & ~kUnitFields);
+        reader.Fail();
+        return false;
       }
       if ((fields & kFieldPosition) != 0u) {
+        record.farPosition = reader.ReadBool();
+      }
+      if ((fields & kFieldPosition) != 0u && record.farPosition) {
+        for (float& value : record.farValue) {
+          value = reader.ReadFloatExact();
+        }
+        record.position = {};
+        record.velocity = {};
+        record.anchorBeat = 0;
+      } else if ((fields & kFieldPosition) != 0u) {
+        record.farValue = {};
         record.position[0] = reader.ReadBits(codec.position.x.bits);
         record.position[1] = reader.ReadBits(codec.position.y.bits);
         record.position[2] = reader.ReadBits(codec.position.z.bits);
@@ -211,6 +301,44 @@ namespace faf::remote::wire
       if ((fields & kFieldUnitFlags) != 0u) {
         unit.unitFlags = static_cast<std::uint8_t>(reader.ReadBits(kUnitFlagBits));
       }
+      SAppearance& look = record.appearance;
+      if ((fields & kFieldMesh) != 0u) {
+        look.mesh = reader.ReadVarUint();
+      }
+      if ((fields & kFieldScale) != 0u) {
+        for (float& value : look.scale) {
+          value = reader.ReadFloatExact();
+        }
+      }
+      if ((fields & kFieldAttachment) != 0u) {
+        look.attachParent = reader.ReadBits(32);
+        const std::uint32_t count = reader.ReadVarUint();
+        if (!reader.Ok() || count > SAppearance::kMaxAttachments
+            || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()) {
+          reader.Fail();
+          return false;
+        }
+        look.attachments.resize(count);
+        for (std::uint32_t& id : look.attachments) {
+          id = reader.ReadBits(32);
+        }
+      }
+      if ((fields & kFieldVisualFlags) != 0u) {
+        look.visualFlags = static_cast<std::uint8_t>(reader.ReadBits(kVisualFlagBits));
+      }
+      if ((fields & kFieldImpact) != 0u) {
+        look.impact = reader.ReadFloatExact();
+      }
+      if ((fields & kFieldScroll) != 0u) {
+        for (float& value : look.scroll) {
+          value = reader.ReadFloatExact();
+        }
+      }
+      if ((fields & kFieldIntel) != 0u) {
+        for (std::uint32_t& radius : look.intel) {
+          radius = reader.ReadVarUint();
+        }
+      }
       return reader.Ok();
     }
 
@@ -257,24 +385,34 @@ namespace faf::remote::wire
     }
   } // namespace
 
+  bool SAppearance::operator==(const SAppearance& other) const noexcept
+  {
+    return AppearanceChanges(*this, other) == 0u;
+  }
+
   bool SEntityRecord::operator==(const SEntityRecord& other) const noexcept
   {
     return id == other.id && blueprint == other.blueprint && army == other.army && position == other.position
+        && farPosition == other.farPosition && SameFloats(farValue.data(), other.farValue.data(), farValue.size())
         && velocity == other.velocity && anchorBeat == other.anchorBeat
         && orientation == other.orientation && yawOnly == other.yawOnly && Bits(health) == Bits(other.health)
         && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
-        && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit));
+        && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit))
+        && appearance == other.appearance;
   }
 
-  std::uint16_t CreationFields(const SEntityRecord& record) noexcept
+  std::uint32_t CreationFields(const SEntityRecord& record) noexcept
   {
-    return static_cast<std::uint16_t>(kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u));
+    return kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u)
+         | AppearanceChanges(SAppearance{}, record.appearance);
   }
 
-  std::uint16_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
+  std::uint32_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
   {
-    std::uint16_t fields = 0;
-    if (before.position != after.position || before.velocity != after.velocity || before.anchorBeat != after.anchorBeat) {
+    std::uint32_t fields = AppearanceChanges(before.appearance, after.appearance);
+    if (before.position != after.position || before.velocity != after.velocity || before.anchorBeat != after.anchorBeat
+        || before.farPosition != after.farPosition
+        || !SameFloats(before.farValue.data(), after.farValue.data(), before.farValue.size())) {
       fields |= kFieldPosition;
     }
     if (before.orientation != after.orientation || before.yawOnly != after.yawOnly) {
@@ -399,7 +537,7 @@ namespace faf::remote::wire
         delta.created.push_back(after[a]);
         ++a;
       } else {
-        if (const std::uint16_t fields = ChangedFields(before[b], after[a]); fields != 0u) {
+        if (const std::uint32_t fields = ChangedFields(before[b], after[a]); fields != 0u) {
           delta.changed.push_back({fields, after[a]});
         }
         ++a;
@@ -438,7 +576,9 @@ namespace faf::remote::wire
     writer.WriteVarUint(static_cast<std::uint32_t>(delta.created.size()));
     for (const SEntityRecord& record : delta.created) {
       WriteGap(writer, first, previous, record.id);
-      WriteFields(writer, record, CreationFields(record), codec, frame.beat);
+      const std::uint32_t fields = CreationFields(record);
+      writer.WriteVarUint(fields);
+      WriteFields(writer, record, fields, codec, frame.beat);
     }
 
     first = true;
@@ -520,7 +660,11 @@ namespace faf::remote::wire
         if (!cursor.Next(reader, record.id)) {
           return false;
         }
-        if (!ReadFields(reader, record, static_cast<std::uint16_t>(kEntityFields | kFieldKind | kUnitFields), codec, true, beat)) {
+        const std::uint32_t fields = reader.ReadVarUint();
+        if (!reader.Ok() || (fields & kCreationRequired) != kCreationRequired || (fields & ~kAllFields) != 0u) {
+          return false;
+        }
+        if (!ReadFields(reader, record, fields, codec, beat)) {
           return false;
         }
         created.push_back(record);
@@ -535,16 +679,16 @@ namespace faf::remote::wire
       std::size_t c = 0;
       while (k < kept.size() || c < created.size()) {
         if (c == created.size() || (k < kept.size() && kept[k].id < created[c].id)) {
-          merged.push_back(kept[k++]);
+          merged.push_back(std::move(kept[k++]));
         } else if (k == kept.size() || created[c].id < kept[k].id) {
-          merged.push_back(created[c++]);
+          merged.push_back(std::move(created[c++])); // ids stay readable below
         } else {
           return false;
         }
       }
     }
 
-    // Changes: ids must be kept (not created in this frame), the mask non-empty and 16 bits.
+    // Changes: ids must be kept (not created in this frame), the mask non-empty and known.
     std::uint32_t changedCount = 0;
     if (!ReadCount(reader, codec, changedCount)) {
       return false;
@@ -559,7 +703,7 @@ namespace faf::remote::wire
           return false;
         }
         const std::uint32_t fields = reader.ReadVarUint();
-        if (!reader.Ok() || fields == 0u || fields > 0xFFFFu) {
+        if (!reader.Ok() || fields == 0u || (fields & ~kAllFields) != 0u) {
           return false;
         }
         while (m < merged.size() && merged[m].id < id) {
@@ -571,7 +715,7 @@ namespace faf::remote::wire
         if (m == merged.size() || merged[m].id != id || (c < created.size() && created[c].id == id)) {
           return false;
         }
-        if (!ReadFields(reader, merged[m], static_cast<std::uint16_t>(fields), codec, false, beat)) {
+        if (!ReadFields(reader, merged[m], fields, codec, beat)) {
           return false;
         }
       }

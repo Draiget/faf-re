@@ -32,6 +32,28 @@ namespace faf::remote::wire
     std::uint8_t unitFlags = 0;     // paused, auto mode, auto surface, busy, repeat queue, ...
   };
 
+  /**
+   * How an entity is drawn and what its UI shows beyond the basics: the client resolves the
+   * mesh (and its resource) from the ordinal, the rest is the sim's data as is. Defaults are
+   * the sim's (`SSTIEntityVariableData`'s constructor); a creation sends only what differs.
+   */
+  struct SAppearance
+  {
+    static constexpr std::uint32_t kNoAttachParent = 0xF0000000u; // the sim's invalid entity id
+    static constexpr std::size_t kMaxAttachments = 64;
+
+    std::uint32_t mesh = COrdinalTable::kNone;      // ordinal into SContentTables::meshes
+    std::array<float, 3> scale{1.0f, 1.0f, 1.0f};
+    std::uint32_t attachParent = kNoAttachParent;
+    std::vector<std::uint32_t> attachments;          // the entities attached to this one
+    float impact = 1.0f;
+    std::array<float, 4> scroll{};                   // texture scroll: beat start x, y, beat end x, y
+    std::uint8_t visualFlags = 0;                    // hidden, alt footprint, alt footprint 2, killed, refresh UI
+    std::array<std::uint32_t, 8> intel{};            // vision, water vision, radar, sonar, omni, radar/sonar stealth, cloak
+
+    [[nodiscard]] bool operator==(const SAppearance& other) const noexcept;
+  };
+
   /** One entity's state in a view frame. Floats the UI shows as numbers are exact. */
   struct SEntityRecord
   {
@@ -39,6 +61,12 @@ namespace faf::remote::wire
     std::uint32_t blueprint = COrdinalTable::kNone; // ordinal into SContentTables::blueprints
     std::uint8_t army = 0xFFu;                      // 0xFF: no army
     QuantizedPosition position{};                    // with dead reckoning: the anchor position
+    /**
+     * A position outside the quantiser's range (an effect projectile drifting off the map, say)
+     * goes as exact floats instead: `position`, `velocity` and `anchorBeat` are then zero.
+     */
+    bool farPosition = false;
+    std::array<float, 3> farValue{};
     /** Dead reckoning (WP7.5): quantiser steps per beat since `anchorBeat`; zero without it. */
     std::array<std::int32_t, 3> velocity{};
     std::uint32_t anchorBeat = 0;
@@ -50,6 +78,7 @@ namespace faf::remote::wire
     std::uint16_t flags = 0;
     bool isUnit = false;                            // `unit` is meaningful
     SUnitFields unit{};
+    SAppearance appearance{};
 
     /**
      * Bitwise: two NaNs with one bit pattern are equal, 0.0 and -0.0 are not. A non-unit's
@@ -63,7 +92,7 @@ namespace faf::remote::wire
    * fields that change every tick come first and a typical change costs one mask byte.
    * `kFieldKind` carries `isUnit`; the unit bits are only valid for a unit.
    */
-  enum EEntityField : std::uint16_t
+  enum EEntityField : std::uint32_t
   {
     kFieldPosition = 1u << 0,
     kFieldOrientation = 1u << 1,
@@ -81,15 +110,28 @@ namespace faf::remote::wire
     kFieldUnitSilos = 1u << 13,
     kFieldUnitFlags = 1u << 14,
     kFieldKind = 1u << 15,
+    kFieldMesh = 1u << 16,
+    kFieldScale = 1u << 17,
+    kFieldAttachment = 1u << 18,
+    kFieldVisualFlags = 1u << 19,
+    kFieldImpact = 1u << 20,
+    kFieldScroll = 1u << 21,
+    kFieldIntel = 1u << 22,
   };
 
-  inline constexpr std::uint16_t kEntityFields = 0x00FFu;
-  inline constexpr std::uint16_t kUnitFields = 0x7F00u;
-  /** What a creation writes: everything, the unit block only for a unit. */
-  [[nodiscard]] std::uint16_t CreationFields(const SEntityRecord& record) noexcept;
+  inline constexpr std::uint32_t kEntityFields = 0x00FFu;
+  inline constexpr std::uint32_t kUnitFields = 0x7F00u;
+  inline constexpr std::uint32_t kAppearanceFields = 0x7F0000u;
+  inline constexpr std::uint32_t kAllFields = kEntityFields | kUnitFields | kFieldKind | kAppearanceFields;
+
+  /**
+   * What a creation writes: the basic fields and the kind always, the unit block for a unit,
+   * the appearance fields that differ from their defaults.
+   */
+  [[nodiscard]] std::uint32_t CreationFields(const SEntityRecord& record) noexcept;
 
   /** The fields in which two records of one entity differ. */
-  [[nodiscard]] std::uint16_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept;
+  [[nodiscard]] std::uint32_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept;
 
   struct SViewFrame
   {
@@ -110,7 +152,7 @@ namespace faf::remote::wire
     std::vector<SEntityRecord> created;      // ascending ids
     struct SChange
     {
-      std::uint16_t fields = 0;
+      std::uint32_t fields = 0;
       SEntityRecord record;                   // the new state (only `fields` differ)
     };
     std::vector<SChange> changed;            // ascending ids

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -78,10 +79,13 @@ namespace faf::replay
       std::uint64_t scalars = 0;    // health, max health, build progress
       std::uint64_t flags = 0;      // entity flags, kind, blueprint, army
       std::uint64_t unit = 0;       // unit block
+      /** Appearance block: mesh, scale, attachments, visual flags, impact, scroll, intel radii. */
+      std::array<std::uint64_t, 7> appearance{};
       std::uint64_t overhead = 0;   // id gaps and masks of changed records
       std::uint64_t creations = 0;  // whole created records with their ids
       std::uint64_t removals = 0;   // removed ids
     } mFieldBits;
+    std::array<std::uint64_t, 7> mCreationAppearanceBits{}; // the appearance part of `creations`
     bool mHavePrevious = false;
 
     std::uint64_t mBeats = 0;

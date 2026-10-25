@@ -1,8 +1,10 @@
 #include "remote/FrameBuilder.h"
 
 #include <array>
+#include <cmath>
 
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 
@@ -12,13 +14,51 @@ namespace faf::remote
 {
   namespace
   {
-    void ApplyVariableData(
-      wire::SEntityRecord& record, const moho::SSTIEntityVariableData& data, const wire::SFrameCodec& codec
+    void ApplyAppearance(
+      wire::SAppearance& look, const moho::SSTIEntityVariableData& data, const wire::SContentTables& tables
     )
     {
+      look.mesh = data.mMeshBlueprint != nullptr ? tables.meshes.Ordinal(data.mMeshBlueprint->mBlueprintId.c_str())
+                                                 : wire::COrdinalTable::kNone;
+      look.scale = {data.mScale.x, data.mScale.y, data.mScale.z};
+      look.attachParent = data.mAttachmentParentRef;
+      look.attachments.clear();
+      for (const moho::SSTIEntityAttachInfo& attached : data.mAuxValueVector) {
+        if (look.attachments.size() < wire::SAppearance::kMaxAttachments) {
+          look.attachments.push_back(static_cast<std::uint32_t>(attached.mAttachedEntityId));
+        }
+      }
+      look.visualFlags = PackVisualFlags(data);
+      look.impact = data.mCurImpactValue;
+      look.scroll = {data.mScrollBeatStart.x, data.mScrollBeatStart.y, data.mScrollBeatEnd.x, data.mScrollBeatEnd.y};
+      const moho::SSTIIntelAttributes& intel = data.mIntelAttributes;
+      look.intel = {intel.vision, intel.waterVision, intel.radar, intel.sonar,
+                    intel.omni, intel.radarStealth, intel.sonarStealth, intel.cloak};
+    }
+
+    void ApplyVariableData(
+      wire::SEntityRecord& record, const moho::SSTIEntityVariableData& data, const wire::SFrameCodec& codec,
+      const wire::SContentTables& tables
+    )
+    {
+      ApplyAppearance(record.appearance, data, tables);
       const auto& pos = data.mCurTransform.pos_;
       const auto& orient = data.mCurTransform.orient_;
       record.position = {codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)};
+      // Outside the quantiser's range (or not a number): exact floats instead.
+      const auto off = [](const wire::SAxisQuantizer& axis, const std::uint32_t q, const float value) {
+        return !(std::fabs(axis.Decode(q) - value) <= axis.step);
+      };
+      record.farPosition = off(codec.position.x, record.position[0], pos.x) || off(codec.position.y, record.position[1], pos.y)
+                        || off(codec.position.z, record.position[2], pos.z);
+      if (record.farPosition) {
+        record.farValue = {pos.x, pos.y, pos.z};
+        record.position = {};
+        record.velocity = {};
+        record.anchorBeat = 0;
+      } else {
+        record.farValue = {};
+      }
       const std::array<float, 4> quaternion{orient.x, orient.y, orient.z, orient.w};
       record.yawOnly = wire::IsYawOnly(quaternion);
       record.orientation = record.yawOnly ? wire::QuantizeYaw(quaternion) : wire::PackQuaternion(quaternion);
@@ -68,6 +108,44 @@ namespace faf::remote
     data.mIsDead = (flags & 2u) != 0u ? 1u : 0u;
     data.mVisibilityMode = static_cast<moho::EUserEntityVisibilityMode>((flags >> 2) & 7u);
     data.mLayerMask = static_cast<moho::ELayer>((flags >> 5) & 0x7Fu);
+  }
+
+  std::uint8_t PackVisualFlags(const moho::SSTIEntityVariableData& data) noexcept
+  {
+    return static_cast<std::uint8_t>(
+      (data.mVisibilityHidden != 0u ? 1u : 0u) | (data.mUsingAltFootprint != 0u ? 2u : 0u)
+      | (data.mUsingAltFootprintSecondary != 0u ? 4u : 0u) | (data.mDestroyedByKill != 0u ? 8u : 0u)
+      | (data.mRequestRefreshUI != 0u ? 16u : 0u)
+    );
+  }
+
+  void UnpackAppearance(const wire::SAppearance& look, moho::SSTIEntityVariableData& data)
+  {
+    data.mScale = Wm3::Vec3f(look.scale[0], look.scale[1], look.scale[2]);
+    data.mAttachmentParentRef = look.attachParent;
+    data.mAuxValueVector.clear();
+    for (const std::uint32_t id : look.attachments) {
+      moho::SSTIEntityAttachInfo attached{};
+      attached.mAttachedEntityId = static_cast<std::int32_t>(id);
+      data.mAuxValueVector.push_back(attached);
+    }
+    data.mVisibilityHidden = (look.visualFlags & 1u) != 0u ? 1u : 0u;
+    data.mUsingAltFootprint = (look.visualFlags & 2u) != 0u ? 1u : 0u;
+    data.mUsingAltFootprintSecondary = (look.visualFlags & 4u) != 0u ? 1u : 0u;
+    data.mDestroyedByKill = (look.visualFlags & 8u) != 0u ? 1u : 0u;
+    data.mRequestRefreshUI = (look.visualFlags & 16u) != 0u ? 1u : 0u;
+    data.mCurImpactValue = look.impact;
+    data.mScrollBeatStart = Wm3::Vector2f(look.scroll[0], look.scroll[1]);
+    data.mScrollBeatEnd = Wm3::Vector2f(look.scroll[2], look.scroll[3]);
+    moho::SSTIIntelAttributes& intel = data.mIntelAttributes;
+    intel.vision = look.intel[0];
+    intel.waterVision = look.intel[1];
+    intel.radar = look.intel[2];
+    intel.sonar = look.intel[3];
+    intel.omni = look.intel[4];
+    intel.radarStealth = look.intel[5];
+    intel.sonarStealth = look.intel[6];
+    intel.cloak = look.intel[7];
   }
 
   void UnpackUnitFields(const wire::SUnitFields& unit, moho::SSTIUnitVariableData& data) noexcept
@@ -134,7 +212,7 @@ namespace faf::remote
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
       const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
       if (it != mWorld.end()) {
-        ApplyVariableData(it->second, update.mVariableData, mCodec);
+        ApplyVariableData(it->second, update.mVariableData, mCodec, mTables);
       }
     }
     for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
@@ -173,6 +251,10 @@ namespace faf::remote
     std::map<std::uint32_t, SSent> next;
     for (wire::SEntityRecord& record : frame.entities) {
       const wire::QuantizedPosition actual = record.position;
+      if (record.farPosition) {
+        // Exact floats, never reckoned; the view re-anchors when it comes back in range.
+        continue;
+      }
       if (const auto found = mSent.find(record.id); found == mSent.end()) {
         record.anchorBeat = frame.beat; // anchored where it is created, at rest
       } else {

@@ -25,11 +25,18 @@ namespace moho
 {
   class RRuleGameRules;
   struct REntityBlueprint;
+  struct RMeshBlueprint;
+  class RScmResource;
   struct SSyncData;
 }
 
 namespace faf::remote::client
 {
+  /** The client's mesh blueprint for each ordinal of the meshes table (null: not in its rules). */
+  [[nodiscard]] std::vector<moho::RMeshBlueprint*> ResolveMeshes(
+    moho::RRuleGameRules& rules, const wire::SContentTables& tables
+  );
+
   /** The client's blueprint for each ordinal of the blueprints table (null: not in its rules). */
   [[nodiscard]] std::vector<const moho::REntityBlueprint*> ResolveBlueprints(
     moho::RRuleGameRules& rules, const wire::SContentTables& tables
@@ -54,15 +61,24 @@ namespace faf::remote::client
     std::uint64_t deleteMismatches = 0;
     std::uint64_t packetUpdatesDropped = 0; // entity or unit updates for ids the client does not hold
     std::uint64_t unitChangesWithoutUpdate = 0;
-    std::uint64_t entityDataBorrowed = 0;  // updates based on the packet's entity data
+    std::uint64_t entityDataBorrowed = 0;  // updates taking the sounds and underlay from the packet
+    std::uint64_t meshMismatches = 0;      // client's mesh blueprint versus the packet's
+    std::uint64_t meshResourceMismatches = 0;
     std::uint64_t unitConstantsMissing = 0;
-    double maxPositionError = 0.0;         // shown versus packet, world units, any axis
+    std::uint64_t positionsOutOfRange = 0;  // shown more than a unit from the sim: clamped by the quantiser
+    double maxPositionError = 0.0;
+    double decodeSeconds = 0.0;            // DecodeFrame
+    double deltaSeconds = 0.0;             // ComputeFrameDelta against the frame shown
+    double rebuildSeconds = 0.0;           // the packet's entity lanes         // shown versus packet, world units, any axis
   };
 
   class CSyncRebuilder
   {
   public:
-    CSyncRebuilder(const wire::SFrameCodec& codec, std::vector<const moho::REntityBlueprint*> blueprints);
+    CSyncRebuilder(
+      const wire::SFrameCodec& codec, std::vector<const moho::REntityBlueprint*> blueprints,
+      std::vector<moho::RMeshBlueprint*> meshes
+    );
 
     /**
      * Decodes one entities-lane frame and rewrites `packet`'s entity lanes from it. False,
@@ -81,10 +97,21 @@ namespace faf::remote::client
       moho::SSTIEntityVariableData data{};
     };
 
+    struct SMeshResource
+    {
+      bool resolved = false;
+      boost::shared_ptr<moho::RScmResource> resource;
+    };
+
+    /** Mesh blueprint and resource for a meshes-table ordinal, as `Entity::SetMesh` sets them. */
+    void ResolveMesh(std::uint32_t ordinal, moho::SSTIEntityVariableData& data);
+
     [[nodiscard]] moho::VTransform ShownTransform(const wire::SEntityRecord& record, std::uint32_t beat) const;
 
     wire::SFrameCodec mCodec;
     std::vector<const moho::REntityBlueprint*> mBlueprints;
+    std::vector<moho::RMeshBlueprint*> mMeshes;
+    std::vector<SMeshResource> mMeshResources;
     wire::SViewFrame mShown;
     bool mHasShown = false;
     std::unordered_map<std::uint32_t, SHeldEntity> mHeld;

@@ -382,6 +382,14 @@ namespace
         }
         record.anchorBeat = mBeat;
       }
+      if (mRng() % 16u == 0u) {
+        // Off the quantiser's range: exact floats, no motion.
+        record.farPosition = true;
+        record.farValue = {RandomFloat(), RandomFloat(), RandomFloat()};
+        record.position = {};
+        record.velocity = {};
+        record.anchorBeat = 0;
+      }
       record.yawOnly = (mRng() & 1u) != 0u;
       record.orientation = record.yawOnly ? (mRng() & 0xFFFFu) : static_cast<std::uint32_t>(mRng());
       record.health = RandomFloat();
@@ -400,7 +408,32 @@ namespace
         }
         record.unit.unitFlags = static_cast<std::uint8_t>(mRng());
       }
+      // Appearance: mostly defaults (a creation then sends none of it), sometimes anything.
+      if (mRng() % 3u == 0u) {
+        RandomAppearance(record.appearance, mRng());
+      }
       return record;
+    }
+
+    void RandomAppearance(SAppearance& look, const std::uint32_t fields)
+    {
+      if ((fields & 1u) != 0u) look.mesh = mRng() % 4u == 0u ? COrdinalTable::kNone : mRng() % 3000u;
+      if ((fields & 2u) != 0u) look.scale = {RandomFloat(), RandomFloat(), RandomFloat()};
+      if ((fields & 4u) != 0u) {
+        look.attachParent = mRng() % 2u == 0u ? SAppearance::kNoAttachParent : static_cast<std::uint32_t>(mRng());
+        look.attachments.resize(mRng() % 4u == 0u ? mRng() % (SAppearance::kMaxAttachments + 1u) : 0u);
+        for (std::uint32_t& id : look.attachments) {
+          id = static_cast<std::uint32_t>(mRng());
+        }
+      }
+      if ((fields & 8u) != 0u) look.visualFlags = static_cast<std::uint8_t>(mRng() & 0x1Fu);
+      if ((fields & 16u) != 0u) look.impact = RandomFloat();
+      if ((fields & 32u) != 0u) look.scroll = {RandomFloat(), RandomFloat(), RandomFloat(), RandomFloat()};
+      if ((fields & 64u) != 0u) {
+        for (std::uint32_t& radius : look.intel) {
+          radius = mRng() % 2u == 0u ? 0u : static_cast<std::uint32_t>(mRng());
+        }
+      }
     }
 
     void Mutate(SEntityRecord& record)
@@ -413,6 +446,8 @@ namespace
         record.position = fresh.position;
         record.velocity = fresh.velocity;
         record.anchorBeat = fresh.anchorBeat;
+        record.farPosition = fresh.farPosition;
+        record.farValue = fresh.farValue;
       }
       if ((fields & kFieldOrientation) != 0u) {
         record.orientation = fresh.orientation;
@@ -422,6 +457,9 @@ namespace
       if ((fields & kFieldMaxHealth) != 0u) record.maxHealth = fresh.maxHealth;
       if ((fields & kFieldFraction) != 0u) record.fractionComplete = fresh.fractionComplete;
       if ((fields & kFieldFlags) != 0u) record.flags = fresh.flags;
+      if (mRng() % 4u == 0u) {
+        RandomAppearance(record.appearance, mRng());
+      }
       // A kind change is rare in the sim (an entity is a unit for life); flip it now and then.
       if ((fields & kFieldKind) != 0u && mRng() % 8u == 0u) {
         record.isUnit = fresh.isUnit;
@@ -602,6 +640,67 @@ namespace
     CHECK(clamped[0] == 0u && clamped[1] == 0u && clamped[2] == codec.position.z.MaxQuantized());
   }
 
+  void TestFrameAppearance()
+  {
+    // A creation with the default appearance sends none of it; each non-default field costs
+    // its own bytes and comes back exactly.
+    SViewFrame plain{};
+    plain.frameId = 1;
+    plain.entities.resize(1);
+    plain.entities[0].id = 7;
+    CHECK(CreationFields(plain.entities[0]) == (kEntityFields | kFieldKind));
+    const std::vector<std::uint8_t> plainBytes = Encode(plain, nullptr);
+
+    SViewFrame dressed = plain;
+    SAppearance& look = dressed.entities[0].appearance;
+    look.mesh = 1234;
+    look.scale = {2.0f, 0.5f, -0.0f};
+    look.attachParent = 0x00100005u;
+    look.attachments = {0x00100006u, 0x00100009u};
+    look.visualFlags = 0x15u;
+    look.impact = 0.25f;
+    look.scroll = {0.0f, 1.0f, 2.0f, 3.0f};
+    look.intel = {20, 0, 60, 0, 0, 0, 0, 1};
+    CHECK(CreationFields(dressed.entities[0]) == (kEntityFields | kFieldKind | kAppearanceFields));
+    const std::vector<std::uint8_t> dressedBytes = Encode(dressed, nullptr);
+    CHECK(dressedBytes.size() > plainBytes.size() + 40u);
+    SViewFrame decoded{};
+    CHECK(Decode(dressedBytes, nullptr, decoded) && decoded == dressed);
+
+    // A change of one appearance field sends that field alone.
+    SViewFrame moved = dressed;
+    moved.frameId = 2;
+    moved.entities[0].appearance.scale[0] = 3.0f;
+    CHECK(ChangedFields(dressed.entities[0], moved.entities[0]) == kFieldScale);
+    const std::vector<std::uint8_t> movedBytes = Encode(moved, &dressed);
+    CHECK(Decode(movedBytes, &dressed, decoded) && decoded == moved);
+
+    // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
+    for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
+      BitWriter writer;
+      writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
+      writer.WriteBits(1u, 32);
+      writer.WriteBits(kNoBaseline, 32);
+      writer.WriteBits(0u, 32);
+      writer.WriteVarUint(0u);
+      writer.WriteVarUint(1u);
+      writer.WriteVarUint(7u);
+      writer.WriteVarUint(mask);
+      writer.WriteBool(false); // not a unit
+      for (int i = 0; i < 40; ++i) {
+        writer.WriteBits(0u, 32);
+      }
+      CHECK(!Decode(Bytes(writer), nullptr, decoded));
+    }
+
+    // Too many attachments are refused.
+    SViewFrame crowded = plain;
+    crowded.entities[0].appearance.attachments.resize(SAppearance::kMaxAttachments + 1u);
+    BitWriter crowdedWriter;
+    CHECK(EncodeFrame(crowded, nullptr, kCodec, crowdedWriter));
+    CHECK(!Decode(Bytes(crowdedWriter), nullptr, decoded));
+  }
+
   void TestFrameUnchangedIsSmall()
   {
     CFrameGenerator generator(42u);
@@ -773,9 +872,11 @@ namespace
     dup.WriteVarUint(0u);
     dup.WriteVarUint(1u);
     dup.WriteVarUint(10u);
-    // every field of a non-unit, in the encoder's order: kind, position, orientation,
+    dup.WriteVarUint(kEntityFields | kFieldKind); // a creation's mask: no unit block, default appearance
+    // every field of a non-unit, in the encoder's order: kind, position (far bit first), orientation,
     // health, fraction, flags, max health, blueprint, army
     dup.WriteBool(false);
+    dup.WriteBool(false); // position in the quantiser's range
     dup.WriteBits(0u, kCodec.position.x.bits);
     dup.WriteBits(0u, kCodec.position.y.bits);
     dup.WriteBits(0u, kCodec.position.z.bits);
@@ -922,6 +1023,7 @@ namespace
     {"frame: truncation", &TestDecoderTruncation},
     {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
     {"frame: hostile counts and ids", &TestDecoderHostileCounts},
+    {"frame: appearance block", &TestFrameAppearance},
   };
 } // namespace
 

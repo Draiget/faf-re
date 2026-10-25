@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <string>
 #include <utility>
 
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
-#include "remote/ContentTables.h"
 
 // Engine addition, server mode: see RemoteSimDriver.h.
 
@@ -25,18 +25,12 @@ namespace faf::remote::client
     const SLoopbackOptions& options
   )
     : mServer(std::move(server))
-    , mTables(BuildContentTables(rules))
-    , mCodec(codec)
-    , mBuilder(mTables, codec)
-    , mRebuilder(codec, ResolveBlueprints(rules, mTables))
+    , mLink(rules, codec, options)
   {
-    if (options.deadReckoningTolerance != 0u && mCodec.deadReckoning) {
-      mReckoner.emplace(options.deadReckoningTolerance);
-    }
     gpg::Logf(
       "loopback: remote driver on, %u blueprints, content hash %016llx, dead reckoning %s (%u steps)",
-      mTables.blueprints.Size(), static_cast<unsigned long long>(mTables.Hash()), mReckoner ? "on" : "off",
-      options.deadReckoningTolerance
+      mLink.Tables().blueprints.Size(), static_cast<unsigned long long>(mLink.Tables().Hash()),
+      mLink.DeadReckoning() ? "on" : "off", options.deadReckoningTolerance
     );
   }
 
@@ -47,63 +41,18 @@ namespace faf::remote::client
 
   void CRemoteSimDriver::LogSummary(const char* const when) const
   {
-    const SRebuildStats& s = mRebuilder.Stats();
-    gpg::Logf(
-      "loopback %s: frames %llu, %.1f KB/s, encode failures %llu, decode failures %llu, rebuild failures %llu, "
-      "created %llu, erased %llu, deleted %llu, entity updates %llu (settle %llu, packet data %llu), "
-      "max position error %.5f, time per beat %.2f ms server + %.2f ms client (max %.1f ms)",
-      when, static_cast<unsigned long long>(s.frames),
-      s.frames != 0u ? static_cast<double>(s.frameBytes) / static_cast<double>(s.frames) * 10.0 / 1024.0 : 0.0,
-      static_cast<unsigned long long>(mEncodeFailures), static_cast<unsigned long long>(s.decodeFailures),
-      static_cast<unsigned long long>(mRebuildFailures), static_cast<unsigned long long>(s.created),
-      static_cast<unsigned long long>(s.erased), static_cast<unsigned long long>(s.deleted),
-      static_cast<unsigned long long>(s.entityUpdates), static_cast<unsigned long long>(s.settleUpdates),
-      static_cast<unsigned long long>(s.entityDataBorrowed), s.maxPositionError,
-      s.frames != 0u ? mServerSeconds * 1000.0 / static_cast<double>(s.frames) : 0.0,
-      s.frames != 0u ? mClientSeconds * 1000.0 / static_cast<double>(s.frames) : 0.0, mMaxBeatSeconds * 1000.0
-    );
-    gpg::Logf(
-      "loopback %s checks: created not in packet %llu, packet creations not rebuilt %llu, blueprint mismatches %llu, "
-      "creations without blueprint %llu, erase mismatches %llu, delete mismatches %llu, packet updates dropped %llu, "
-      "unit changes without update %llu, unit constants missing %llu",
-      when, static_cast<unsigned long long>(s.createdNotInPacket),
-      static_cast<unsigned long long>(s.packetCreatedNotRebuilt), static_cast<unsigned long long>(s.blueprintMismatches),
-      static_cast<unsigned long long>(s.noBlueprint), static_cast<unsigned long long>(s.eraseMismatches),
-      static_cast<unsigned long long>(s.deleteMismatches), static_cast<unsigned long long>(s.packetUpdatesDropped),
-      static_cast<unsigned long long>(s.unitChangesWithoutUpdate), static_cast<unsigned long long>(s.unitConstantsMissing)
-    );
+    const std::string summary = mLink.Summary(when);
+    const std::size_t split = summary.find('\n');
+    gpg::Logf("%s", summary.substr(0, split).c_str());
+    if (split != std::string::npos) {
+      gpg::Logf("%s", summary.substr(split + 1).c_str());
+    }
   }
 
   void CRemoteSimDriver::PassThroughWire(moho::SSyncData& packet)
   {
-    // Server: the frame of this beat, against the frame sent last (in loopback every frame
-    // arrives, so the last one sent is always acknowledged).
-    using Clock = std::chrono::steady_clock;
-    const Clock::time_point start = Clock::now();
-    mBuilder.Apply(packet);
-    wire::SViewFrame frame = mBuilder.Build(static_cast<std::uint32_t>(packet.mCurBeat));
-    if (mReckoner) {
-      mReckoner->Apply(frame, mCodec);
-    }
-    wire::BitWriter writer;
-    if (!wire::EncodeFrame(frame, mHasSent ? &mLastSent : nullptr, mCodec, writer)) {
-      // Nothing usable to send: the client keeps the packet as the sim made it this beat.
-      ++mEncodeFailures;
-      return;
-    }
-    mLastSent = std::move(frame);
-    mHasSent = true;
-    const Clock::time_point encoded = Clock::now();
-
-    // Client.
-    if (!mRebuilder.Apply(writer.Bytes(), packet)) {
-      ++mRebuildFailures;
-    }
-    const Clock::time_point rebuilt = Clock::now();
-    mServerSeconds += std::chrono::duration<double>(encoded - start).count();
-    mClientSeconds += std::chrono::duration<double>(rebuilt - encoded).count();
-    mMaxBeatSeconds = std::max(mMaxBeatSeconds, std::chrono::duration<double>(rebuilt - start).count());
-    if (mRebuilder.Stats().frames % kSummaryEveryBeats == 0u) {
+    mLink.Pass(packet);
+    if (mLink.Stats().frames % kSummaryEveryBeats == 0u) {
       LogSummary("so far");
     }
   }
@@ -341,11 +290,8 @@ namespace faf::remote::client
     if (moho::CFG_GetArgOption("/loopbackdr", 1, &args) && !args.empty()) {
       options.deadReckoningTolerance = static_cast<std::uint32_t>(std::strtoul(args[0].c_str(), nullptr, 10));
     }
-    wire::SFrameCodec codec{};
-    codec.position =
-      wire::SPositionQuantizer::ForMap(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z);
-    codec.maxEntities = 1u << 20;
-    codec.deadReckoning = options.deadReckoningTolerance != 0u;
+    const wire::SFrameCodec codec =
+      MakeLoopbackCodec(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options);
     return new CRemoteSimDriver(std::unique_ptr<moho::ISTIDriver>(driver), rules, codec, options);
   }
 } // namespace faf::remote::client

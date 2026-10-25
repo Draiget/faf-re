@@ -33,8 +33,10 @@ namespace faf::remote::wire
   /**
    * This build's schema version of each lane. Entities 2: flag bit 12 marks an orphaned
    * record (an erased entity the client keeps until its view sees the spot, WP7.7).
+   * Entities 3: 32-bit field masks with the appearance block, a mask on creations too, and
+   * positions outside the quantiser's range as exact floats.
    */
-  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{2, 1, 1, 1, 1, 1};
+  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{3, 1, 1, 1, 1, 1};
 
   [[nodiscard]] const char* LaneName(ELane lane) noexcept;
 

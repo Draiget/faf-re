@@ -1,12 +1,15 @@
 #include "remote/client/SyncRebuilder.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <string>
 #include <unordered_set>
 #include <utility>
 
+#include "gpg/core/utils/Logging.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
@@ -77,12 +80,47 @@ namespace faf::remote::client
     return blueprints;
   }
 
+  std::vector<moho::RMeshBlueprint*> ResolveMeshes(moho::RRuleGameRules& rules, const wire::SContentTables& tables)
+  {
+    std::vector<moho::RMeshBlueprint*> meshes(tables.meshes.Size(), nullptr);
+    for (const auto& [id, blueprint] : rules.GetMeshBlueprints()) {
+      if (blueprint == nullptr) {
+        continue;
+      }
+      const std::uint32_t ordinal = tables.meshes.Ordinal(id.c_str());
+      if (ordinal < meshes.size()) {
+        meshes[ordinal] = static_cast<moho::RMeshBlueprint*>(blueprint);
+      }
+    }
+    return meshes;
+  }
+
   CSyncRebuilder::CSyncRebuilder(
-    const wire::SFrameCodec& codec, std::vector<const moho::REntityBlueprint*> blueprints
+    const wire::SFrameCodec& codec, std::vector<const moho::REntityBlueprint*> blueprints,
+    std::vector<moho::RMeshBlueprint*> meshes
   )
     : mCodec(codec)
     , mBlueprints(std::move(blueprints))
+    , mMeshes(std::move(meshes))
+    , mMeshResources(mMeshes.size())
   {}
+
+  void CSyncRebuilder::ResolveMesh(const std::uint32_t ordinal, moho::SSTIEntityVariableData& data)
+  {
+    // As `Entity::SetMesh`: the blueprint and its LOD-resolved mesh, looked up once per mesh.
+    if (ordinal >= mMeshes.size() || mMeshes[ordinal] == nullptr) {
+      data.mMeshBlueprint = nullptr;
+      data.mScmResource.reset();
+      return;
+    }
+    SMeshResource& cached = mMeshResources[ordinal];
+    if (!cached.resolved) {
+      cached.resource = mMeshes[ordinal]->GetMesh();
+      cached.resolved = true;
+    }
+    data.mMeshBlueprint = mMeshes[ordinal];
+    data.mScmResource = cached.resource;
+  }
 
   moho::VTransform CSyncRebuilder::ShownTransform(const wire::SEntityRecord& record, const std::uint32_t beat) const
   {
@@ -92,15 +130,19 @@ namespace faf::remote::client
       record.yawOnly ? wire::YawToQuaternion(record.orientation) : wire::UnpackQuaternion(record.orientation);
     moho::VTransform transform{};
     transform.orient_ = Wm3::Quatf(q[3], q[0], q[1], q[2]);
-    transform.pos_ = Wm3::Vec3f(
-      mCodec.position.x.Decode(position[0]), mCodec.position.y.Decode(position[1]),
-      mCodec.position.z.Decode(position[2])
-    );
+    transform.pos_ = record.farPosition
+                       ? Wm3::Vec3f(record.farValue[0], record.farValue[1], record.farValue[2])
+                       : Wm3::Vec3f(
+                           mCodec.position.x.Decode(position[0]), mCodec.position.y.Decode(position[1]),
+                           mCodec.position.z.Decode(position[2])
+                         );
     return transform;
   }
 
   bool CSyncRebuilder::Apply(const std::span<const std::uint8_t> frameBytes, moho::SSyncData& packet)
   {
+    using Clock = std::chrono::steady_clock;
+    const Clock::time_point start = Clock::now();
     // The frame, against the one decoded last (the only baseline this client keeps).
     const std::uint32_t baselineId = wire::PeekFrameBaseline(frameBytes);
     const wire::SViewFrame* baseline = nullptr;
@@ -120,7 +162,9 @@ namespace faf::remote::client
     ++mStats.frames;
     mStats.frameBytes += frameBytes.size();
 
+    const Clock::time_point decoded = Clock::now();
     const wire::SFrameDelta delta = wire::ComputeFrameDelta(mHasShown ? &mShown : nullptr, frame);
+    const Clock::time_point compared = Clock::now();
     const std::uint32_t beat = frame.beat;
 
     // What the handed packet says, for what the wire does not carry and for the checks.
@@ -231,42 +275,49 @@ namespace faf::remote::client
     // Entity updates: every live entity whose frame record changed, that the packet updates
     // (data the frame has no field for), or whose last transform has not caught up with its
     // current one (the UI interpolates between them).
-    std::unordered_set<std::uint32_t> changedNow;
-    for (const wire::SFrameDelta::SChange& change : delta.changed) {
-      changedNow.insert(change.record.id);
-    }
     const auto updatable = [&](const std::uint32_t id) {
       const auto it = mHeld.find(id);
       return it != mHeld.end() && (it->second.live || erasedNow.count(id) != 0u);
     };
     msvc8::vector<moho::SEntityVariableUpdateEntry> entityUpdates;
+    entityUpdates.reserve(packet.mEntityUpdates.size() + delta.changed.size() + delta.created.size());
+    // `frame.entities` and the delta's changes are both in id order: one cursor walks the changes.
+    auto changeCursor = delta.changed.begin();
     for (const wire::SEntityRecord& record : frame.entities) {
-      if (!updatable(record.id)) {
+      while (changeCursor != delta.changed.end() && changeCursor->record.id < record.id) {
+        ++changeCursor;
+      }
+      const bool changed = changeCursor != delta.changed.end() && changeCursor->record.id == record.id;
+      const auto heldIt = mHeld.find(record.id);
+      if (heldIt == mHeld.end() || (!heldIt->second.live && erasedNow.count(record.id) == 0u)) {
         continue;
       }
-      const auto heldIt = mHeld.find(record.id);
       SHeldEntity& held = heldIt->second;
       const bool created = createdNow.count(record.id) != 0u;
       const auto packetIt = packetEntityUpdates.find(record.id);
       const bool fromPacket = packetIt != packetEntityUpdates.end();
       const bool moving = mCodec.deadReckoning && record.velocity != std::array<std::int32_t, 3>{};
       const bool settling = !created && !SameTransform(held.data.mCurTransform, held.data.mLastTransform);
-      if (!created && !fromPacket && !moving && !settling && changedNow.count(record.id) == 0u) {
+      if (!created && !fromPacket && !moving && !settling && !changed) {
         continue;
       }
 
       moho::SEntityVariableUpdateEntry entry{};
       entry.mEntityId = static_cast<moho::EntId>(record.id);
-      entry.mVariableData = fromPacket ? packetIt->second->mVariableData : held.data;
-      if (fromPacket) {
-        entry.mReserved04 = packetIt->second->mReserved04;
-        ++mStats.entityDataBorrowed;
-      } else {
-        // A one-beat request the sim clears once it has synced it; the copy kept here must
-        // not repeat it.
-        entry.mVariableData.mRequestRefreshUI = 0u;
-      }
+      // The client's own copy, the frame's fields over it; only the sounds and the underlay
+      // texture still come from the packet.
+      entry.mVariableData = held.data;
       moho::SSTIEntityVariableData& data = entry.mVariableData;
+      if (fromPacket) {
+        const moho::SSTIEntityVariableData& sim = packetIt->second->mVariableData;
+        entry.mReserved04 = packetIt->second->mReserved04;
+        data.mAmbientSound = sim.mAmbientSound;
+        data.mRumbleSound = sim.mRumbleSound;
+        data.mUnderlayTexture = sim.mUnderlayTexture;
+        ++mStats.entityDataBorrowed;
+      }
+      UnpackAppearance(record.appearance, data);
+      ResolveMesh(record.appearance.mesh, data);
       const moho::VTransform shown = ShownTransform(record, beat);
       data.mLastTransform = created ? shown : held.data.mCurTransform;
       data.mCurTransform = shown;
@@ -275,13 +326,27 @@ namespace faf::remote::client
       data.mFractionComplete = record.fractionComplete;
       UnpackEntityFlags(record.flags, data);
       if (fromPacket) {
-        const Wm3::Vec3f& actual = packetIt->second->mVariableData.mCurTransform.pos_;
-        mStats.maxPositionError = std::max(
-          {mStats.maxPositionError, std::fabs(static_cast<double>(actual.x - shown.pos_.x)),
-           std::fabs(static_cast<double>(actual.y - shown.pos_.y)),
+        const moho::SSTIEntityVariableData& sim = packetIt->second->mVariableData;
+        mStats.meshMismatches += data.mMeshBlueprint != sim.mMeshBlueprint ? 1u : 0u;
+        mStats.meshResourceMismatches += data.mScmResource.get() != sim.mScmResource.get() ? 1u : 0u;
+        const Wm3::Vec3f& actual = sim.mCurTransform.pos_;
+        const double error = std::max(
+          {std::fabs(static_cast<double>(actual.x - shown.pos_.x)), std::fabs(static_cast<double>(actual.y - shown.pos_.y)),
            std::fabs(static_cast<double>(actual.z - shown.pos_.z))}
         );
-      } else if (settling && changedNow.count(record.id) == 0u && !moving) {
+        mStats.maxPositionError = std::max(mStats.maxPositionError, error);
+        if (!mCodec.deadReckoning && error > 1.0) {
+          // Outside the quantiser's range (clamped): the first few are logged to size the range.
+          if (++mStats.positionsOutOfRange <= 10u) {
+            const moho::REntityBlueprint* const blueprint =
+              record.blueprint < mBlueprints.size() ? mBlueprints[record.blueprint] : nullptr;
+            gpg::Logf(
+              "loopback: entity 0x%08x (%s) at (%.1f, %.1f, %.1f) is outside the position quantiser", record.id,
+              blueprint != nullptr ? blueprint->mBlueprintId.c_str() : "no blueprint", actual.x, actual.y, actual.z
+            );
+          }
+        }
+      } else if (settling && !changed && !moving) {
         ++mStats.settleUpdates;
       }
       held.data = data;
@@ -292,24 +357,40 @@ namespace faf::remote::client
       mStats.packetUpdatesDropped += updatable(id) ? 0u : 1u;
     }
 
-    // Unit updates: the packet's, for units the client holds, with the frame's unit block.
-    msvc8::vector<moho::SUnitVariableUpdateEntry> unitUpdates;
+    // Unit updates: the packet's, for units the client holds, with the frame's unit block. The
+    // records are in id order, so a binary search finds each one; the packet's list is kept in
+    // place unless an update has to go (copying a unit update is not cheap).
+    const auto findRecord = [&frame](const std::uint32_t id) -> const wire::SEntityRecord* {
+      const auto it = std::lower_bound(
+        frame.entities.begin(), frame.entities.end(), id,
+        [](const wire::SEntityRecord& record, const std::uint32_t key) { return record.id < key; }
+      );
+      return it != frame.entities.end() && it->id == id ? &*it : nullptr;
+    };
     std::unordered_set<std::uint32_t> unitUpdated;
-    std::unordered_map<std::uint32_t, const wire::SEntityRecord*> records;
-    records.reserve(frame.entities.size());
-    for (const wire::SEntityRecord& record : frame.entities) {
-      records[record.id] = &record;
-    }
-    for (moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
+    std::vector<bool> keepUnitUpdate(packet.mUnitUpdates.size(), false);
+    bool dropAny = false;
+    for (std::size_t i = 0; i < packet.mUnitUpdates.size(); ++i) {
+      moho::SUnitVariableUpdateEntry& update = packet.mUnitUpdates[i];
       const auto id = static_cast<std::uint32_t>(update.mEntityId);
-      const auto recordIt = records.find(id);
-      if (!updatable(id) || recordIt == records.end() || !recordIt->second->isUnit) {
+      const wire::SEntityRecord* const record = findRecord(id);
+      if (!updatable(id) || record == nullptr || !record->isUnit) {
         ++mStats.packetUpdatesDropped;
+        dropAny = true;
         continue;
       }
-      UnpackUnitFields(recordIt->second->unit, update.mVariableData);
+      UnpackUnitFields(record->unit, update.mVariableData);
       unitUpdated.insert(id);
-      unitUpdates.push_back(std::move(update));
+      keepUnitUpdate[i] = true;
+    }
+    if (dropAny) {
+      msvc8::vector<moho::SUnitVariableUpdateEntry> kept;
+      for (std::size_t i = 0; i < packet.mUnitUpdates.size(); ++i) {
+        if (keepUnitUpdate[i]) {
+          kept.push_back(packet.mUnitUpdates[i]);
+        }
+      }
+      packet.mUnitUpdates.swap(kept);
     }
     for (const wire::SFrameDelta::SChange& change : delta.changed) {
       if ((change.fields & wire::kUnitFields) != 0u && unitUpdated.count(change.record.id) == 0u) {
@@ -320,11 +401,14 @@ namespace faf::remote::client
     packet.mNewEntities.swap(newEntities);
     packet.mNewUnits.swap(newUnits);
     packet.mEntityUpdates.swap(entityUpdates);
-    packet.mUnitUpdates.swap(unitUpdates);
     packet.mEraseIds.swap(eraseIds);
     packet.mDeleteIds.swap(deleteIds);
 
     mShown = std::move(frame);
+    const Clock::time_point rebuilt = Clock::now();
+    mStats.decodeSeconds += std::chrono::duration<double>(decoded - start).count();
+    mStats.deltaSeconds += std::chrono::duration<double>(compared - decoded).count();
+    mStats.rebuildSeconds += std::chrono::duration<double>(rebuilt - compared).count();
     mHasShown = true;
     return true;
   }
