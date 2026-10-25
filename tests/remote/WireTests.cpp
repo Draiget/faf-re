@@ -318,8 +318,9 @@ namespace
   class CFrameGenerator
   {
   public:
-    explicit CFrameGenerator(const std::uint32_t seed)
+    explicit CFrameGenerator(const std::uint32_t seed, const bool deadReckoning = false)
       : mRng(seed)
+      , mDeadReckoning(deadReckoning)
     {}
 
     SViewFrame Next()
@@ -327,6 +328,7 @@ namespace
       SViewFrame frame{};
       frame.frameId = ++mFrameId;
       frame.beat = mFrameId * 3u;
+      mBeat = frame.beat;
       std::vector<SEntityRecord> next;
       for (SEntityRecord record : mLive) {
         if (Chance(0.05)) {
@@ -373,6 +375,13 @@ namespace
       record.blueprint = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 5000u;
       record.army = static_cast<std::uint8_t>(mRng() % 17u == 16u ? 0xFFu : mRng() % 16u);
       record.position = {Axis(kCodec.position.x), Axis(kCodec.position.y), Axis(kCodec.position.z)};
+      if (mDeadReckoning) {
+        // Anchored this frame, moving or still, sometimes fast (projectiles).
+        for (std::int32_t& component : record.velocity) {
+          component = mRng() % 3u == 0u ? 0 : static_cast<std::int32_t>(mRng() % 2001u) - 1000;
+        }
+        record.anchorBeat = mBeat;
+      }
       record.yawOnly = (mRng() & 1u) != 0u;
       record.orientation = record.yawOnly ? (mRng() & 0xFFFFu) : static_cast<std::uint32_t>(mRng());
       record.health = RandomFloat();
@@ -400,7 +409,11 @@ namespace
       const std::uint32_t fields = mRng() & 0xFFFFu;
       if ((fields & kFieldBlueprint) != 0u) record.blueprint = fresh.blueprint;
       if ((fields & kFieldArmy) != 0u) record.army = fresh.army;
-      if ((fields & kFieldPosition) != 0u) record.position = fresh.position;
+      if ((fields & kFieldPosition) != 0u) {
+        record.position = fresh.position;
+        record.velocity = fresh.velocity;
+        record.anchorBeat = fresh.anchorBeat;
+      }
       if ((fields & kFieldOrientation) != 0u) {
         record.orientation = fresh.orientation;
         record.yawOnly = fresh.yawOnly;
@@ -437,23 +450,32 @@ namespace
     }
 
     std::mt19937 mRng;
+    bool mDeadReckoning = false;
+    std::uint32_t mBeat = 0;
     std::uint32_t mFrameId = 100;
     std::uint32_t mNextId = 0;
     std::vector<SEntityRecord> mLive;
   };
 
-  [[nodiscard]] std::vector<std::uint8_t> Encode(const SViewFrame& frame, const SViewFrame* baseline)
+  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true};
+
+  [[nodiscard]] std::vector<std::uint8_t> Encode(
+    const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec = kCodec
+  )
   {
     BitWriter writer;
-    const bool encoded = EncodeFrame(frame, baseline, kCodec, writer);
+    const bool encoded = EncodeFrame(frame, baseline, codec, writer);
     CHECK(encoded);
     return Bytes(writer);
   }
 
-  [[nodiscard]] bool Decode(const std::vector<std::uint8_t>& bytes, const SViewFrame* baseline, SViewFrame& out)
+  [[nodiscard]] bool Decode(
+    const std::vector<std::uint8_t>& bytes, const SViewFrame* baseline, SViewFrame& out,
+    const SFrameCodec& codec = kCodec
+  )
   {
     BitReader reader(bytes);
-    return DecodeFrame(reader, baseline, kCodec, out);
+    return DecodeFrame(reader, baseline, codec, out);
   }
 
   /** What the client does with consecutive decoded frames (WPR.38). */
@@ -504,6 +526,80 @@ namespace
         history.push_back(frame);
       }
     }
+  }
+
+  void TestFrameRoundTripDeadReckoning()
+  {
+    for (std::uint32_t seed = 11; seed <= 14; ++seed) {
+      CFrameGenerator generator(seed, true);
+      std::vector<SViewFrame> history;
+      for (int step = 0; step < 120; ++step) {
+        const SViewFrame frame = generator.Next();
+        SViewFrame full{};
+        CHECK(Decode(Encode(frame, nullptr, kDeadReckoningCodec), nullptr, full, kDeadReckoningCodec) && full == frame);
+        for (std::size_t back = 1; back <= 5 && back <= history.size(); back += 2) {
+          const SViewFrame& baseline = history[history.size() - back];
+          SViewFrame decoded{};
+          CHECK(
+            Decode(Encode(frame, &baseline, kDeadReckoningCodec), &baseline, decoded, kDeadReckoningCodec)
+            && decoded == frame
+          );
+        }
+        history.push_back(frame);
+      }
+    }
+
+    // Without dead reckoning a record must not carry motion; with it, an anchor must not lie
+    // ahead of the frame.
+    SViewFrame moving{};
+    moving.beat = 50;
+    moving.entities.resize(1);
+    moving.entities[0].velocity = {1, 0, 0};
+    BitWriter writer;
+    CHECK(!EncodeFrame(moving, nullptr, kCodec, writer));
+    CHECK(EncodeFrame(moving, nullptr, kDeadReckoningCodec, writer));
+    SViewFrame future = moving;
+    future.entities[0].anchorBeat = 51;
+    BitWriter futureWriter;
+    CHECK(!EncodeFrame(future, nullptr, kDeadReckoningCodec, futureWriter));
+  }
+
+  void TestDeadReckoningRules()
+  {
+    const SFrameCodec& codec = kDeadReckoningCodec;
+    constexpr std::uint32_t kTolerance = 2;
+    SEntityRecord sent{};
+    sent.position = {1000, 500, 1000};
+    sent.anchorBeat = 0;
+    QuantizedPosition previous = sent.position;
+
+    // Starts moving at 5 steps per beat on x: one re-anchor, then the prediction holds.
+    int anchors = 0;
+    for (std::uint32_t beat = 1; beat <= 20; ++beat) {
+      const QuantizedPosition actual{1000 + 5 * beat, 500, 1000};
+      anchors += ApplyDeadReckoning(sent, actual, previous, beat, kTolerance, codec) ? 1 : 0;
+      CHECK(PredictPosition(sent, beat, codec) == actual);
+      previous = actual;
+    }
+    CHECK(anchors == 1);
+    CHECK(sent.velocity == (std::array<std::int32_t, 3>{5, 0, 0}) && sent.anchorBeat == 1u);
+
+    // Stops: the prediction runs ahead, the next beat re-anchors with zero velocity.
+    const QuantizedPosition stopped{1100, 500, 1000};
+    CHECK(ApplyDeadReckoning(sent, stopped, previous, 21, kTolerance, codec));
+    CHECK(sent.velocity == (std::array<std::int32_t, 3>{0, 0, 0}) && sent.position == stopped);
+    CHECK(!ApplyDeadReckoning(sent, stopped, stopped, 22, kTolerance, codec));
+
+    // Small drift within the tolerance does not re-anchor.
+    const QuantizedPosition drift{1102, 498, 1001};
+    CHECK(!ApplyDeadReckoning(sent, drift, stopped, 23, kTolerance, codec));
+
+    // Predictions clamp to the axes.
+    SEntityRecord edge{};
+    edge.position = {3, 0, codec.position.z.MaxQuantized() - 1};
+    edge.velocity = {-10, -10, 10};
+    const QuantizedPosition clamped = PredictPosition(edge, 5, codec);
+    CHECK(clamped[0] == 0u && clamped[1] == 0u && clamped[2] == codec.position.z.MaxQuantized());
   }
 
   void TestFrameUnchangedIsSmall()
@@ -818,6 +914,8 @@ namespace
     {"ordinals: table and hash", &TestOrdinalTable},
     {"hello: versions", &TestHello},
     {"frame: decode(encode(f, b), b) == f", &TestFrameRoundTripProperty},
+    {"frame: dead reckoning round trip", &TestFrameRoundTripDeadReckoning},
+    {"frame: dead reckoning rules", &TestDeadReckoningRules},
     {"frame: unchanged costs the header", &TestFrameUnchangedIsSmall},
     {"frame: baseline checks", &TestFrameBaselineChecks},
     {"frame: encoder refuses bad frames", &TestEncodeRejects},

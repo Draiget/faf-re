@@ -59,6 +59,18 @@ namespace faf::replay
     std::uint64_t mDeltaBytesNoUnits = 0;
     std::uint64_t mYawOnlyRecords = 0;
     std::uint64_t mUnitRecords = 0;
+    /** The same frames dead-reckoned (WP7.5) at one tolerance, with their own state and baseline. */
+    struct SDeadReckoningVariant
+    {
+      std::uint32_t tolerance = 0;
+      std::map<std::uint32_t, std::pair<faf::remote::wire::SEntityRecord, faf::remote::wire::QuantizedPosition>> sent;
+      faf::remote::wire::SViewFrame previous;
+      std::uint64_t bytes = 0;
+      std::uint64_t reanchors = 0;
+    };
+    SDeadReckoningVariant mDeadReckoning[2];
+    faf::remote::wire::SFrameCodec mDeadReckoningCodec;
+
     /** Bits of changed records by field class, summed over the run (creations and ids apart). */
     struct SFieldBits
     {

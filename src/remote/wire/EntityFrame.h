@@ -38,7 +38,10 @@ namespace faf::remote::wire
     std::uint32_t id = 0;
     std::uint32_t blueprint = COrdinalTable::kNone; // ordinal into SContentTables::blueprints
     std::uint8_t army = 0xFFu;                      // 0xFF: no army
-    QuantizedPosition position{};
+    QuantizedPosition position{};                    // with dead reckoning: the anchor position
+    /** Dead reckoning (WP7.5): quantiser steps per beat since `anchorBeat`; zero without it. */
+    std::array<std::int32_t, 3> velocity{};
+    std::uint32_t anchorBeat = 0;
     std::uint32_t orientation = 0;                  // yawOnly ? QuantizeYaw : PackQuaternion
     bool yawOnly = false;                           // a rotation about the vertical axis only
     float health = 0.0f;
@@ -121,7 +124,30 @@ namespace faf::remote::wire
   {
     SPositionQuantizer position = SPositionQuantizer::ForMap(1024.0f, 1024.0f);
     std::uint32_t maxEntities = 1u << 16;
+    /**
+     * Dead reckoning (WP7.5): a position travels with its anchor beat and a velocity, and the
+     * client shows `PredictPosition`. Without it both are zero and not sent.
+     */
+    bool deadReckoning = false;
   };
+
+  /** Where the client shows a dead-reckoned record at `beat`: integer steps, clamped to the axes. */
+  [[nodiscard]] QuantizedPosition PredictPosition(
+    const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec
+  ) noexcept;
+
+  /**
+   * The server side of dead reckoning for one view and entity: `sent` is the record the view
+   * holds, `actual` the sim's quantised position this beat and `previousActual` last beat's.
+   * When the prediction is more than `tolerance` steps off on any axis, re-anchors `sent` at
+   * `actual` with the last beat's motion as velocity (a new record is anchored where it is
+   * created, with zero velocity, by its builder); otherwise
+   * leaves the position fields alone. Returns whether it re-anchored.
+   */
+  bool ApplyDeadReckoning(
+    SEntityRecord& sent, const QuantizedPosition& actual, const QuantizedPosition& previousActual, std::uint32_t beat,
+    std::uint32_t tolerance, const SFrameCodec& codec
+  ) noexcept;
 
   /**
    * Writes `frame` relative to `baseline` (null: a full frame). False, with nothing useful

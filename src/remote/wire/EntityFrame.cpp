@@ -31,9 +31,24 @@ namespace faf::remote::wire
       return std::bit_cast<std::uint32_t>(value);
     }
 
-    [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec) noexcept
+    [[nodiscard]] std::uint32_t ZigZag(const std::int32_t value) noexcept
     {
-      return (!record.yawOnly || record.orientation <= 0xFFFFu) && record.position[0] <= codec.position.x.MaxQuantized()
+      return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
+    }
+
+    [[nodiscard]] std::int32_t UnZigZag(const std::uint32_t value) noexcept
+    {
+      return static_cast<std::int32_t>(value >> 1) ^ -static_cast<std::int32_t>(value & 1u);
+    }
+
+    /** `beat` is the frame's: a dead-reckoned anchor cannot lie in its future. */
+    [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec, const std::uint32_t beat) noexcept
+    {
+      const bool motionFits = codec.deadReckoning
+                                ? record.anchorBeat <= beat
+                                : (record.anchorBeat == 0u && record.velocity == std::array<std::int32_t, 3>{});
+      return motionFits && (!record.yawOnly || record.orientation <= 0xFFFFu)
+          && record.position[0] <= codec.position.x.MaxQuantized()
           && record.position[1] <= codec.position.y.MaxQuantized()
           && record.position[2] <= codec.position.z.MaxQuantized();
     }
@@ -45,7 +60,10 @@ namespace faf::remote::wire
           && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags;
     }
 
-    void WriteFields(BitWriter& writer, const SEntityRecord& record, const std::uint16_t fields, const SFrameCodec& codec)
+    void WriteFields(
+      BitWriter& writer, const SEntityRecord& record, const std::uint16_t fields, const SFrameCodec& codec,
+      const std::uint32_t beat
+    )
     {
       if ((fields & kFieldKind) != 0u) {
         writer.WriteBool(record.isUnit);
@@ -54,6 +72,12 @@ namespace faf::remote::wire
         writer.WriteBits(record.position[0], codec.position.x.bits);
         writer.WriteBits(record.position[1], codec.position.y.bits);
         writer.WriteBits(record.position[2], codec.position.z.bits);
+        if (codec.deadReckoning) {
+          writer.WriteVarUint(beat - record.anchorBeat);
+          for (const std::int32_t component : record.velocity) {
+            writer.WriteVarUint(ZigZag(component));
+          }
+        }
       }
       if ((fields & kFieldOrientation) != 0u) {
         writer.WriteBool(record.yawOnly);
@@ -109,7 +133,8 @@ namespace faf::remote::wire
      * out to be a unit; a change naming unit fields for a non-unit is refused.
      */
     [[nodiscard]] bool ReadFields(
-      BitReader& reader, SEntityRecord& record, std::uint16_t fields, const SFrameCodec& codec, const bool creation
+      BitReader& reader, SEntityRecord& record, std::uint16_t fields, const SFrameCodec& codec, const bool creation,
+      const std::uint32_t beat
     )
     {
       if ((fields & kFieldKind) != 0u) {
@@ -126,6 +151,17 @@ namespace faf::remote::wire
         record.position[0] = reader.ReadBits(codec.position.x.bits);
         record.position[1] = reader.ReadBits(codec.position.y.bits);
         record.position[2] = reader.ReadBits(codec.position.z.bits);
+        if (codec.deadReckoning) {
+          const std::uint32_t age = reader.ReadVarUint();
+          if (!reader.Ok() || age > beat) {
+            reader.Fail();
+            return false;
+          }
+          record.anchorBeat = beat - age;
+          for (std::int32_t& component : record.velocity) {
+            component = UnZigZag(reader.ReadVarUint());
+          }
+        }
       }
       if ((fields & kFieldOrientation) != 0u) {
         record.yawOnly = reader.ReadBool();
@@ -224,6 +260,7 @@ namespace faf::remote::wire
   bool SEntityRecord::operator==(const SEntityRecord& other) const noexcept
   {
     return id == other.id && blueprint == other.blueprint && army == other.army && position == other.position
+        && velocity == other.velocity && anchorBeat == other.anchorBeat
         && orientation == other.orientation && yawOnly == other.yawOnly && Bits(health) == Bits(other.health)
         && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
         && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit));
@@ -237,7 +274,7 @@ namespace faf::remote::wire
   std::uint16_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
   {
     std::uint16_t fields = 0;
-    if (before.position != after.position) {
+    if (before.position != after.position || before.velocity != after.velocity || before.anchorBeat != after.anchorBeat) {
       fields |= kFieldPosition;
     }
     if (before.orientation != after.orientation || before.yawOnly != after.yawOnly) {
@@ -297,6 +334,45 @@ namespace faf::remote::wire
     return fields;
   }
 
+  QuantizedPosition PredictPosition(const SEntityRecord& record, const std::uint32_t beat, const SFrameCodec& codec) noexcept
+  {
+    const std::int64_t elapsed = static_cast<std::int64_t>(beat) - static_cast<std::int64_t>(record.anchorBeat);
+    const std::uint32_t limits[3] = {
+      codec.position.x.MaxQuantized(), codec.position.y.MaxQuantized(), codec.position.z.MaxQuantized()
+    };
+    QuantizedPosition predicted{};
+    for (int axis = 0; axis < 3; ++axis) {
+      const std::int64_t value = static_cast<std::int64_t>(record.position[axis]) + record.velocity[axis] * elapsed;
+      predicted[axis] = value < 0 ? 0u : (value > limits[axis] ? limits[axis] : static_cast<std::uint32_t>(value));
+    }
+    return predicted;
+  }
+
+  bool ApplyDeadReckoning(
+    SEntityRecord& sent, const QuantizedPosition& actual, const QuantizedPosition& previousActual,
+    const std::uint32_t beat, const std::uint32_t tolerance, const SFrameCodec& codec
+  ) noexcept
+  {
+    const QuantizedPosition predicted = PredictPosition(sent, beat, codec);
+    bool within = true;
+    for (int axis = 0; axis < 3; ++axis) {
+      const std::int64_t error = static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(predicted[axis]);
+      if (error > tolerance || -error > tolerance) {
+        within = false;
+      }
+    }
+    if (within) {
+      return false;
+    }
+    sent.position = actual;
+    for (int axis = 0; axis < 3; ++axis) {
+      sent.velocity[axis] =
+        static_cast<std::int32_t>(static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(previousActual[axis]));
+    }
+    sent.anchorBeat = beat;
+    return true;
+  }
+
   bool SViewFrame::IsWellFormed() const noexcept
   {
     for (std::size_t i = 1; i < entities.size(); ++i) {
@@ -340,7 +416,7 @@ namespace faf::remote::wire
       return false;
     }
     for (const SEntityRecord& record : frame.entities) {
-      if (!FitsCodec(record, codec)) {
+      if (!FitsCodec(record, codec, frame.beat)) {
         return false;
       }
     }
@@ -362,7 +438,7 @@ namespace faf::remote::wire
     writer.WriteVarUint(static_cast<std::uint32_t>(delta.created.size()));
     for (const SEntityRecord& record : delta.created) {
       WriteGap(writer, first, previous, record.id);
-      WriteFields(writer, record, CreationFields(record), codec);
+      WriteFields(writer, record, CreationFields(record), codec, frame.beat);
     }
 
     first = true;
@@ -370,7 +446,7 @@ namespace faf::remote::wire
     for (const SFrameDelta::SChange& change : delta.changed) {
       WriteGap(writer, first, previous, change.record.id);
       writer.WriteVarUint(change.fields);
-      WriteFields(writer, change.record, change.fields, codec);
+      WriteFields(writer, change.record, change.fields, codec, frame.beat);
     }
     return true;
   }
@@ -444,7 +520,7 @@ namespace faf::remote::wire
         if (!cursor.Next(reader, record.id)) {
           return false;
         }
-        if (!ReadFields(reader, record, static_cast<std::uint16_t>(kEntityFields | kFieldKind | kUnitFields), codec, true)) {
+        if (!ReadFields(reader, record, static_cast<std::uint16_t>(kEntityFields | kFieldKind | kUnitFields), codec, true, beat)) {
           return false;
         }
         created.push_back(record);
@@ -495,14 +571,14 @@ namespace faf::remote::wire
         if (m == merged.size() || merged[m].id != id || (c < created.size() && created[c].id == id)) {
           return false;
         }
-        if (!ReadFields(reader, merged[m], static_cast<std::uint16_t>(fields), codec, false)) {
+        if (!ReadFields(reader, merged[m], static_cast<std::uint16_t>(fields), codec, false, beat)) {
           return false;
         }
       }
     }
 
     for (const SEntityRecord& record : merged) {
-      if (!FitsCodec(record, codec)) {
+      if (!FitsCodec(record, codec, beat)) {
         return false;
       }
     }

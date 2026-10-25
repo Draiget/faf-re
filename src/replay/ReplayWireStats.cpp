@@ -75,6 +75,10 @@ namespace faf::replay
   {
     mCodec.position = wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
     mCodec.maxEntities = 1u << 20;
+    mDeadReckoningCodec = mCodec;
+    mDeadReckoningCodec.deadReckoning = true;
+    mDeadReckoning[0].tolerance = 4;  // 1/16 world unit
+    mDeadReckoning[1].tolerance = 16; // 1/4 world unit
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -198,6 +202,39 @@ namespace faf::replay
     mPreviousNoYaw = std::move(noYaw);
     mPreviousNoUnits = std::move(noUnits);
 
+    // Dead-reckoned variants: each view record keeps its anchor while the client's prediction
+    // stays within the tolerance of the sim's position.
+    for (SDeadReckoningVariant& variant : mDeadReckoning) {
+      wire::SViewFrame reckoned = frame;
+      std::map<std::uint32_t, std::pair<wire::SEntityRecord, wire::QuantizedPosition>> next;
+      for (wire::SEntityRecord& record : reckoned.entities) {
+        const wire::QuantizedPosition actual = record.position;
+        auto found = variant.sent.find(record.id);
+        if (found == variant.sent.end()) {
+          record.anchorBeat = beat; // anchored where it is created, at rest
+        } else {
+          wire::SEntityRecord anchored = found->second.first;
+          if (wire::ApplyDeadReckoning(
+                anchored, actual, found->second.second, beat, variant.tolerance, mDeadReckoningCodec
+              )) {
+            ++variant.reanchors;
+          }
+          record.position = anchored.position;
+          record.velocity = anchored.velocity;
+          record.anchorBeat = anchored.anchorBeat;
+        }
+        next.emplace(record.id, std::make_pair(record, actual));
+      }
+      variant.sent = std::move(next);
+      wire::BitWriter variantWriter;
+      if (wire::EncodeFrame(
+            reckoned, mHavePrevious ? &variant.previous : nullptr, mDeadReckoningCodec, variantWriter
+          )) {
+        variant.bytes += variantWriter.Bytes().size();
+      }
+      variant.previous = std::move(reckoned);
+    }
+
     ++mBeats;
     mDeltaBytes += deltaBytes;
     mDeltaSizes.push_back(deltaBytes);
@@ -289,7 +326,8 @@ namespace faf::replay
       "(%.1f KB/s at 10 beats/s), full frame mean %.0f bytes, round-trip failures %llu, encode failures %llu, "
       "unknown blueprints %llu; without the yaw form %.1f KB/s (yaw-only records %.0f%%), without the unit block "
       "%.1f KB/s; by field (KB/s): transforms %.1f, scalars %.1f, flags %.1f, unit block %.1f, ids and masks %.1f, "
-      "creations %.1f, removals %.1f",
+      "creations %.1f, removals %.1f; dead reckoning (WP7.5) at 4 steps %.1f KB/s (%.2f re-anchors per entity-beat), "
+      "at 16 steps %.1f KB/s (%.2f)",
       static_cast<unsigned long long>(mBeats), mBeats != 0 ? static_cast<double>(mEntitySum) / mBeats : 0.0,
       mMaxEntities, mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats : 0.0, percentile(0.5), percentile(0.95),
       sizes.empty() ? 0u : sizes.back(), mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats * 10.0 / 1000.0 : 0.0,
@@ -300,7 +338,10 @@ namespace faf::replay
       mEntitySum != 0 ? 100.0 * static_cast<double>(mYawOnlyRecords) / static_cast<double>(mEntitySum) : 0.0,
       mBeats != 0 ? static_cast<double>(mDeltaBytesNoUnits) / mBeats * 10.0 / 1000.0 : 0.0, rate(mFieldBits.transform),
       rate(mFieldBits.scalars), rate(mFieldBits.flags), rate(mFieldBits.unit), rate(mFieldBits.overhead),
-      rate(mFieldBits.creations), rate(mFieldBits.removals)
+      rate(mFieldBits.creations), rate(mFieldBits.removals), rate(mDeadReckoning[0].bytes * 8u),
+      mEntitySum != 0 ? static_cast<double>(mDeadReckoning[0].reanchors) / static_cast<double>(mEntitySum) : 0.0,
+      rate(mDeadReckoning[1].bytes * 8u),
+      mEntitySum != 0 ? static_cast<double>(mDeadReckoning[1].reanchors) / static_cast<double>(mEntitySum) : 0.0
     );
     return text;
   }
