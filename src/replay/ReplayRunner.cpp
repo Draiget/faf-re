@@ -35,6 +35,7 @@
 #include "moho/ui/UiRuntimeTypes.h"
 #include "remote/ContentTables.h"
 #include "replay/ReplayBoneStats.h"
+#include "replay/ReplayFpuReport.h"
 #include "replay/ReplayWireStats.h"
 
 namespace faf::replay
@@ -566,6 +567,9 @@ namespace faf::replay
         }
         if (wireStats) {
           wireStats->OnPacket(*packet);
+        }
+        if (options.fpuReport && result.fpuReport.empty() && packet->mCurBeat >= 1) {
+          result.fpuReport = ReportThreadFloatingPointState(40, 25);
         }
         if (boneStats) {
           boneStats->OnPacket(*packet);

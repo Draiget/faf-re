@@ -18,6 +18,7 @@ namespace faf::replay
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;  // when set: the entities lane of the wire format, per beat (CSV)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
+    bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end
     std::string laneSizesPath;  // when set: per-beat element counts and bytes of every sync lane (CSV)
     int checksumPeriod = 0;     // when > 0: `sim_ChecksumPeriod` for this run (0 = the default)
@@ -42,6 +43,7 @@ namespace faf::replay
     std::string error;          // why the run could not start or finish
     std::string wireSummary;    // with `wireStatsPath`: one summary line
     std::string boneSummary;    // with `boneStatsPath`: one summary line
+    std::string fpuReport;      // with `fpuReport`: one line per thread
   };
 
   /**

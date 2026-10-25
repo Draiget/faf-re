@@ -121,7 +121,8 @@ namespace
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
-      "  --bone-stats <file>       write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
+      "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
+      "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
@@ -176,6 +177,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
+  options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
@@ -229,6 +231,9 @@ int main(int argc, char** argv)
   }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
+  }
+  if (!result.fpuReport.empty()) {
+    std::printf("[%s] floating-point state at beat 1, busiest thread first:\n%s", label, result.fpuReport.c_str());
   }
   std::printf(
     "[%s] beats=%d last-beat=%d game-over=%s desync-reports=%d digests=%llu load=%.1fs play=%.1fs\n",

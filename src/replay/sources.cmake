@@ -5,6 +5,7 @@
 
 set(FAF_REPLAY_SOURCES
   replay/ReplayBoneStats.cpp
+  replay/ReplayFpuReport.cpp
   replay/ReplayMain.cpp
   replay/ReplayRunner.cpp
   replay/ReplayWireStats.cpp
