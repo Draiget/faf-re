@@ -1,0 +1,40 @@
+name: 1p-faf-patches
+description: >
+  Engine checks of the FA-Binary-Patches ports that Lua can see (ForkThread, VDist3, weak-table
+  collection, GetDepositsAroundPoint, GetMouseWorldPos, GetTimeForProfile, type-error text,
+  SetCustomRender, ProjectMultiple, SetColorMask, SetAlpha, TeamColorMode, GetInterpolatedAlignedBox,
+  UserUnit methods, SelectUnits, ObserverFix, CQUEMOV selection while built), one player alone.
+  Every check logs a "PATCHTEST PASS|FAIL" line; the sim and UI scripts end with
+  "PATCHTEST RESULT <state> failures=<n>". Setup: the map is tools/scenarios/faf-patches/map
+  copied into the vault as maps/faf_re_patchtest, with the faf_re_lockstep scmap and save
+  copied or hard-linked in as faf_re_patchtest.scmap / faf_re_patchtest_save.lua; copy
+  tools/scenarios/faf-patches/init_patchtest.lua into C:\ProgramData\FAForever\bin. Run with
+  -advertise 192.168.42.77 on the isolated account. Do not click into the game window.
+timeout: 6m
+
+mode: direct
+lobby: auto
+map: faf_re_patchtest
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe'
+  init: init_patchtest.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: PatchTest, faction: uef, args: ['/title', 'faf-patches'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 75s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'PATCHTEST RESULT sim failures=0$' }
+    - { uids: all, pattern: 'PATCHTEST RESULT ui failures=0$' }

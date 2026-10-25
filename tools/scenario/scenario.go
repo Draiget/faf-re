@@ -160,6 +160,9 @@ type Expect struct {
 	RelayOnly bool `yaml:"relayOnly"`
 	// LogsAgree: the listed players' game logs hold the same matching lines.
 	LogsAgree []LogsAgree `yaml:"logsAgree"`
+	// LogsContain: every listed player's game log has a line matching the
+	// pattern (any number of players, one included).
+	LogsContain []LogsAgree `yaml:"logsContain"`
 }
 
 // LogsAgree requires every listed player's game log (<run>/game-<uid>.log,
