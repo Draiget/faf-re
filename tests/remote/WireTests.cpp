@@ -23,6 +23,7 @@
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/Quantize.h"
+#include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
 
 using namespace faf::remote::wire;
@@ -712,7 +713,102 @@ namespace
     CHECK(!Decode(Bytes(empty), &baseline, out));
   }
 
+  // --- Sound table ------------------------------------------------------------------------
+
+  void TestSoundTable()
+  {
+    CSoundTableWriter writer;
+    const SSoundEntry a{"UEL_Weapon", "UEL0101_MachineGun", ""};
+    const SSoundEntry b{"UEL_Weapon", "UEL0101_MachineGun", "Weapon_LodCutoff"};
+    const SSoundEntry c{"Explosions", "Explosion_Large", ""};
+    const auto ia = writer.Intern(a);
+    const auto ib = writer.Intern(b);
+    const auto ia2 = writer.Intern(a);
+    const auto ic = writer.Intern(c);
+    CHECK(ia.isNew && ia.id == 0u);
+    CHECK(ib.isNew && ib.id == 1u); // the LOD cutoff is part of the key
+    CHECK(!ia2.isNew && ia2.id == 0u);
+    CHECK(ic.isNew && ic.id == 2u);
+    CHECK(writer.Size() == 3u);
+
+    BitWriter stream;
+    for (std::uint32_t id = 0; id < writer.Size(); ++id) {
+      writer.WriteEntry(id, stream);
+    }
+    const std::vector<std::uint8_t> bytes = Bytes(stream);
+    CSoundTableReader reader;
+    BitReader in(bytes);
+    CHECK(reader.ReadEntry(in) && reader.ReadEntry(in) && reader.ReadEntry(in));
+    CHECK(reader.Size() == 3u);
+    CHECK(reader.Find(0) != nullptr && *reader.Find(0) == a);
+    CHECK(reader.Find(1) != nullptr && *reader.Find(1) == b);
+    CHECK(reader.Find(2) != nullptr && *reader.Find(2) == c);
+    CHECK(reader.Find(3) == nullptr);
+
+    // Out of order: entry 1 before entry 0, and a repeat of entry 0.
+    BitWriter skipped;
+    writer.WriteEntry(1, skipped);
+    CSoundTableReader fresh;
+    const std::vector<std::uint8_t> skippedBytes = Bytes(skipped);
+    BitReader skippedIn(skippedBytes);
+    CHECK(!fresh.ReadEntry(skippedIn) && fresh.Size() == 0u);
+    BitWriter twice;
+    writer.WriteEntry(0, twice);
+    writer.WriteEntry(0, twice);
+    CSoundTableReader once;
+    const std::vector<std::uint8_t> twiceBytes = Bytes(twice);
+    BitReader twiceIn(twiceBytes);
+    CHECK(once.ReadEntry(twiceIn) && !once.ReadEntry(twiceIn) && once.Size() == 1u);
+
+    // Truncation at every byte of one entry, and an oversized name.
+    BitWriter one;
+    writer.WriteEntry(0, one);
+    const std::vector<std::uint8_t> oneBytes = Bytes(one);
+    for (std::size_t length = 0; length < oneBytes.size(); ++length) {
+      CSoundTableReader cut;
+      BitReader cutIn(std::span<const std::uint8_t>(oneBytes.data(), length));
+      CHECK(!cut.ReadEntry(cutIn) && cut.Size() == 0u);
+    }
+    BitWriter big;
+    big.WriteVarUint(0u);
+    big.WriteVarUint(static_cast<std::uint32_t>(CSoundTableReader::kMaxNameBytes + 1u));
+    for (std::size_t i = 0; i <= CSoundTableReader::kMaxNameBytes; ++i) {
+      big.WriteBits('x', 8);
+    }
+    big.WriteVarUint(0u);
+    big.WriteVarUint(0u);
+    CSoundTableReader bigReader;
+    const std::vector<std::uint8_t> bigBytes = Bytes(big);
+    BitReader bigIn(bigBytes);
+    CHECK(!bigReader.ReadEntry(bigIn));
+    // A length the remaining bytes cannot hold is refused before reading.
+    BitWriter lie;
+    lie.WriteVarUint(0u);
+    lie.WriteVarUint(200u);
+    CSoundTableReader lieReader;
+    const std::vector<std::uint8_t> lieBytes = Bytes(lie);
+    BitReader lieIn(lieBytes);
+    CHECK(!lieReader.ReadEntry(lieIn));
+
+    // The table's own limit.
+    CSoundTableReader full;
+    CSoundTableWriter many;
+    BitWriter all;
+    for (std::uint32_t i = 0; i <= CSoundTableReader::kMaxEntries; ++i) {
+      const auto interned = many.Intern({"b", std::to_string(i), ""});
+      many.WriteEntry(interned.id, all);
+    }
+    const std::vector<std::uint8_t> allBytes = Bytes(all);
+    BitReader allIn(allBytes);
+    std::uint32_t accepted = 0;
+    while (full.ReadEntry(allIn)) {
+      ++accepted;
+    }
+    CHECK(accepted == CSoundTableReader::kMaxEntries && full.Size() == CSoundTableReader::kMaxEntries);
+  }
+
   const TestCase kTests[] = {
+    {"sounds: session table", &TestSoundTable},
     {"bits: round trip", &TestBitStreamRoundTrip},
     {"bits: overrun", &TestBitStreamOverrun},
     {"bits: malformed varuint", &TestBitStreamMalformedVarUint},

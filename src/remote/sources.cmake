@@ -12,6 +12,7 @@ set(FAF_REMOTE_SOURCES
   remote/wire/EntityFrame.cpp
   remote/wire/OrdinalTable.cpp
   remote/wire/Quantize.cpp
+  remote/wire/SoundTable.cpp
   remote/wire/WireVersion.cpp
 )
 
