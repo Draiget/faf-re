@@ -5968,6 +5968,14 @@ namespace moho
   int cfunc_GetDepositsAroundPoint(lua_State* luaContext);
 
   /**
+   * Address: 0x0128B884 (FUN_0128B884; the same body registered in the user set)
+   *
+   * What it does:
+   * The user-state `GetDepositsAroundPoint`, reading the active session's deposits.
+   */
+  int cfunc_GetDepositsAroundPointUser(lua_State* luaContext);
+
+  /**
    * Address: 0x0128BB27 (FUN_0128BB27, cfunc_SessionIsReplaySim)
    *
    * lua_State *
@@ -6017,6 +6025,14 @@ namespace moho
    * slot 0x0128B884).
    */
   CScrLuaInitForm* func_GetDepositsAroundPoint_LuaFuncDef();
+
+  /**
+   * What it does:
+   * Publishes the user-lane Lua binder definition for global
+   * `GetDepositsAroundPoint` (section/SimGetDepositsAroundPoint.cpp registers
+   * the body in both sets).
+   */
+  CScrLuaInitForm* func_GetDepositsAroundPointUser_LuaFuncDef();
 
   /**
    * What it does:

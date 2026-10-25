@@ -23552,12 +23552,58 @@ moho::CScrLuaInitForm* moho::func_CreateResourceDeposit_LuaFuncDef()
   return &binder;
 }
 
+namespace
+{
+  /**
+   * The shared body of section/SimGetDepositsAroundPoint.cpp: reads `(x, z,
+   * radius, type)` and returns an array of `{ X1, Z1, X2, Z2, Type, Dist }`
+   * (the key spelling of the string block at 0x012938C3) from `resources`.
+   */
+  int PushDepositsAroundPoint(lua_State* const luaContext, moho::CSimResources* const resources)
+  {
+    const float x = static_cast<float>(lua_tonumber(luaContext, 1));
+    const float z = static_cast<float>(lua_tonumber(luaContext, 2));
+    const float radius = static_cast<float>(lua_tonumber(luaContext, 3));
+    const float nanGuard = x + z + radius;
+    if (nanGuard != nanGuard) {
+      return 0;
+    }
+
+    const auto type = static_cast<moho::EDepositType>(static_cast<int>(lua_tonumber(luaContext, 4)));
+
+    lua_newtable(luaContext);
+    if (!resources) {
+      return 1;
+    }
+
+    gpg::fastvector<moho::ResourceDepositDistance> nearbyDeposits{};
+    resources->GetDepositsAroundPoint(x, z, radius, type, &nearbyDeposits);
+
+    for (std::size_t i = 0; i < nearbyDeposits.size(); ++i) {
+      const moho::ResourceDepositDistance& hit = nearbyDeposits[i];
+      const moho::ResourceDeposit& deposit = hit.deposit;
+
+      lua_pushnumber(luaContext, static_cast<lua_Number>(i + 1u));
+      lua_newtable(luaContext);
+      LuaPushNumberField(luaContext, "X1", deposit.footprintRect.x0);
+      LuaPushNumberField(luaContext, "Z1", deposit.footprintRect.z0);
+      LuaPushNumberField(luaContext, "X2", deposit.footprintRect.x1);
+      LuaPushNumberField(luaContext, "Z2", deposit.footprintRect.z1);
+      LuaPushNumberField(luaContext, "Type", static_cast<int>(deposit.depositType));
+      LuaPushNumberField(luaContext, "Dist", hit.centerDistance);
+      lua_settable(luaContext, -3);
+    }
+
+    return 1;
+  }
+} // namespace
+
 /**
  * Address: 0x0128B884 (FUN_0128B884, cfunc_GetDepositsAroundPoint)
  *
  * What it does:
  * Reads `(x, z, radius, type)` from Lua and returns an array of deposits:
- * `{ x1, z1, x2, z2, type, dist }`.
+ * `{ X1, Z1, X2, Z2, Type, Dist }`, from the sim's resources.
  */
 int moho::cfunc_GetDepositsAroundPoint(lua_State* const luaContext)
 {
@@ -23565,43 +23611,27 @@ int moho::cfunc_GetDepositsAroundPoint(lua_State* const luaContext)
     return 0;
   }
 
-  const float x = static_cast<float>(lua_tonumber(luaContext, 1));
-  const float z = static_cast<float>(lua_tonumber(luaContext, 2));
-  const float radius = static_cast<float>(lua_tonumber(luaContext, 3));
-  const float nanGuard = x + z + radius;
-  if (nanGuard != nanGuard) {
+  Sim* const sim = ResolveGlobalSim(luaContext);
+  return PushDepositsAroundPoint(luaContext, sim ? sim->mSimResources.px : nullptr);
+}
+
+/**
+ * Address: 0x0128B884 (FUN_0128B884; the same body registered in the user set)
+ *
+ * What it does:
+ * The user-state `GetDepositsAroundPoint`. The patch reads the process's sim
+ * (`g_Sim`, 0x010A63F0) from the user state too; this reads the same deposit
+ * list through the active session's resources, which the UI already uses for
+ * extractor snapping, so the user state never touches the sim.
+ */
+int moho::cfunc_GetDepositsAroundPointUser(lua_State* const luaContext)
+{
+  if (!luaContext) {
     return 0;
   }
 
-  const auto type = static_cast<EDepositType>(static_cast<int>(lua_tonumber(luaContext, 4)));
-
-  lua_newtable(luaContext);
-
-  Sim* const sim = ResolveGlobalSim(luaContext);
-  CSimResources* const resources = sim ? sim->mSimResources.px : nullptr;
-  if (!resources) {
-    return 1;
-  }
-
-  gpg::fastvector<ResourceDepositDistance> nearbyDeposits{};
-  resources->GetDepositsAroundPoint(x, z, radius, type, &nearbyDeposits);
-
-  for (std::size_t i = 0; i < nearbyDeposits.size(); ++i) {
-    const ResourceDepositDistance& hit = nearbyDeposits[i];
-    const ResourceDeposit& deposit = hit.deposit;
-
-    lua_pushnumber(luaContext, static_cast<lua_Number>(i + 1u));
-    lua_newtable(luaContext);
-    LuaPushNumberField(luaContext, "x1", deposit.footprintRect.x0);
-    LuaPushNumberField(luaContext, "z1", deposit.footprintRect.z0);
-    LuaPushNumberField(luaContext, "x2", deposit.footprintRect.x1);
-    LuaPushNumberField(luaContext, "z2", deposit.footprintRect.z1);
-    LuaPushNumberField(luaContext, "type", static_cast<int>(deposit.depositType));
-    LuaPushNumberField(luaContext, "dist", hit.centerDistance);
-    lua_settable(luaContext, -3);
-  }
-
-  return 1;
+  CWldSession* const session = WLD_GetActiveSession();
+  return PushDepositsAroundPoint(luaContext, session ? session->mSimResources.px : nullptr);
 }
 
 /**
@@ -23739,6 +23769,25 @@ moho::CScrLuaInitForm* moho::func_GetDepositsAroundPoint_LuaFuncDef()
     SimLuaInitSet(),
     "GetDepositsAroundPoint",
     &moho::cfunc_GetDepositsAroundPoint,
+    nullptr,
+    "<global>",
+    kGetDepositsAroundPointHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
+ * Publishes the user-lane Lua binder definition for global
+ * `GetDepositsAroundPoint` (section/SimGetDepositsAroundPoint.cpp `UIRegFunc
+ * SGDAPRegDesc`).
+ */
+moho::CScrLuaInitForm* moho::func_GetDepositsAroundPointUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetDepositsAroundPoint",
+    &moho::cfunc_GetDepositsAroundPointUser,
     nullptr,
     "<global>",
     kGetDepositsAroundPointHelpText
@@ -27264,6 +27313,7 @@ namespace
       // FAF FA-Binary-Patches additions, not in the shipped registration sequence.
       (void)::moho::func_CopyToClipboard_LuaFuncDef();
       (void)::moho::func_GetTimeForProfileUser_LuaFuncDef();
+      (void)::moho::func_GetDepositsAroundPointUser_LuaFuncDef();
       (void)::moho::func_GetHighlightCommand_LuaFuncDef();
       (void)::moho::func_SetFocusArmyUser_LuaFuncDef();
       (void)::moho::func_SetInvertMidMouseButton_LuaFuncDef();
