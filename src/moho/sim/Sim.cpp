@@ -17812,6 +17812,27 @@ moho::CScrLuaInitForm* moho::func_GetMouseWorldPosUser_LuaFuncDef()
 }
 
 /**
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global `GetMouseWorldPos`:
+ * FA-Binary-Patches section/SimGetMouseWorldPos.cpp registers the stock user
+ * body (0x00842BB0) in the sim set too (.exxt block 0x0129287D..0x012928A5). It
+ * reads the local session's cursor, so it is not deterministic in the sim, as in
+ * the FAF exe.
+ */
+moho::CScrLuaInitForm* moho::func_GetMouseWorldPosSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetMouseWorldPos",
+    &moho::cfunc_GetMouseWorldPos,
+    nullptr,
+    "<global>",
+    kGetMouseWorldPosUserHelpText
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x00842C30 (FUN_00842C30, cfunc_GetMouseWorldPosL)
  *
  * What it does:
@@ -27299,6 +27320,7 @@ namespace
       (void)::moho::func_SessionIsReplaySim_LuaFuncDef();
       (void)::moho::func_SetFocusArmySim_LuaFuncDef();
       (void)::moho::func_GetTimeForProfileSim_LuaFuncDef();
+      (void)::moho::func_GetMouseWorldPosSim_LuaFuncDef();
       (void)::moho::func_GetDepositsAroundPoint_LuaFuncDef();
       (void)::moho::func_SetCommandSourceSim_LuaFuncDef();
       (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();

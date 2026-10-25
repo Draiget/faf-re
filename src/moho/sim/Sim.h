@@ -5171,6 +5171,13 @@ namespace moho
   CScrLuaInitForm* func_GetMouseWorldPosUser_LuaFuncDef();
 
   /**
+   * What it does:
+   * Publishes the sim-lane binder for `GetMouseWorldPos` (FA-Binary-Patches
+   * section/SimGetMouseWorldPos.cpp registers the user body in the sim set too).
+   */
+  CScrLuaInitForm* func_GetMouseWorldPosSim_LuaFuncDef();
+
+  /**
    * Address: 0x00842C30 (FUN_00842C30, cfunc_GetMouseWorldPosL)
    *
    * LuaPlus::LuaState *
