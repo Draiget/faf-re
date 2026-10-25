@@ -30,7 +30,8 @@ usage:
   --vault DIR         the vault the init file mounts; its mods/M28AI is swapped per replay
   --modcache DIR      holds m28ai.vNNNN/M28AI for every version
   --markers DIR       a folder of "version in use" files that other runners share; runs of
-                      different versions never overlap (default: none)
+                      different versions never overlap; repeatable, this gate's own files go
+                      to the first (default: none)
 """
 import argparse
 import os
@@ -60,7 +61,7 @@ def parse_args():
     p.add_argument("--m28-versions")
     p.add_argument("--vault")
     p.add_argument("--modcache")
-    p.add_argument("--markers")
+    p.add_argument("--markers", action="append", default=[])
     return p.parse_args()
 
 
@@ -125,12 +126,14 @@ class VaultGuard:
     def _others_busy(self, version):
         if any(v != 0 and v != version for v in self.running.values()):
             return True
-        if self.markers and os.path.isdir(self.markers):
-            for name in os.listdir(self.markers):
+        for folder in self.markers:
+            if not os.path.isdir(folder):
+                continue
+            for name in os.listdir(folder):
                 if name.startswith("fg_self_"):
                     continue
                 try:
-                    with open(os.path.join(self.markers, name)) as f:
+                    with open(os.path.join(folder, name)) as f:
                         v = int(f.read().strip() or "0")
                 except (OSError, ValueError):
                     continue
@@ -161,8 +164,8 @@ class VaultGuard:
                             f.write("%d\n" % version)
             self.running[label] = version
             if self.markers:
-                os.makedirs(self.markers, exist_ok=True)
-                with open(os.path.join(self.markers, "fg_self_" + label), "w") as f:
+                os.makedirs(self.markers[0], exist_ok=True)
+                with open(os.path.join(self.markers[0], "fg_self_" + label), "w") as f:
                     f.write("%d\n" % version)
             return True
 
@@ -171,7 +174,7 @@ class VaultGuard:
             self.running.pop(label, None)
             if self.markers:
                 try:
-                    os.remove(os.path.join(self.markers, "fg_self_" + label))
+                    os.remove(os.path.join(self.markers[0], "fg_self_" + label))
                 except OSError:
                     pass
 

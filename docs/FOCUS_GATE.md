@@ -32,7 +32,7 @@ Without replay ids it plays the core set of the [PR replay check](PR_REPLAY_CHEC
 | `--timeout MIN` | 180 | Per run |
 | `--label TAG` | fg | Prefix of every run's label and file names |
 | `--m28-versions F` | — | Lines `<id> <version>`: the M28AI version each replay was recorded with (0: none). With `--vault DIR` (the vault the init file mounts) and `--modcache DIR` (holding `m28ai.vNNNN/M28AI`), the vault's `mods/M28AI` is swapped before each M28AI replay, and runs of different versions never overlap |
-| `--markers DIR` | — | A folder of "version in use" files shared with other replay runners on the machine; the gate waits while another runner uses a different M28AI version, and writes its own |
+| `--markers DIR` | — | A folder of "version in use" files shared with other replay runners on the machine (repeatable); the gate waits while another runner uses a different M28AI version, and writes its own files to the first folder |
 
 ## Reading the result
 
