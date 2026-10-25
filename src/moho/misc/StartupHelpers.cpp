@@ -76,13 +76,9 @@ namespace
   moho::SAppIdentity gAppIdentity{};
   std::uint8_t gAqtimeInstrumentationMode = 1;
   std::once_flag gAppIdentityInitOnce;
-  /**
-   * The one `CMovieManager` (0x010C4AF0). `SetupBasicMovieManager` is its
-   * `reset(new CMovieManager)` and `DestroyMovieManagerSingleton` its
-   * `reset()`; the CRT destroys it at exit through the `atexit` destructor
-   * 0x00BE6C80 registers.
-   */
-  msvc8::auto_ptr<moho::CMovieManager> sMovieManager;
+  // The one `CMovieManager` (0x010C4AF0) is the client's
+  // (moho/app/StartupClientHelpers.cpp); MOV_GetDuration asks
+  // moho::sMovieManagerPresent for it.
   /**
    * The loaded preferences (0x010C6258). `USER_LoadPreferences` assigns its
    * local `auto_ptr` into it and `USER_GetPreferences` `reset`s it with
@@ -1762,6 +1758,7 @@ namespace moho
 // Engine addition (dedicated-server plan WPL.4): set by the client before main
 // (moho/app/StartupClientHelpers.cpp); null in a headless build.
 moho::SimCreatedRenderHook moho::sSimCreatedRenderHook = nullptr;
+moho::MovieManagerPresentHook moho::sMovieManagerPresent = nullptr;
 
 /**
  * Address: 0x0128E4AC (FUN_0128E4AC, Moho::Sim::Create_exxt)
@@ -5274,7 +5271,10 @@ msvc8::string moho::OPTIONS_GetCurrentProfileName()
  */
 float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
 {
-  if (sMovieManager.get() == nullptr) {
+  // Engine addition (dedicated-server plan WPL.4): `sMovieManager.get() ==
+  // nullptr`, asked through the client's hook; without a client there is no
+  // movie component.
+  if (sMovieManagerPresent == nullptr || !sMovieManagerPresent()) {
     gpg::Warnf("Movie component not initialized.");
     return 0.0f;
   }

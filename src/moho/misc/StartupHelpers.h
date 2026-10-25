@@ -98,6 +98,15 @@ namespace moho
   using SimCreatedRenderHook = void (*)(Sim& sim);
   extern SimCreatedRenderHook sSimCreatedRenderHook;
 
+  /**
+   * Engine addition (dedicated-server plan WPL.4): whether the client's movie
+   * manager (`sMovieManager`, moho/app/StartupClientHelpers.cpp) exists, for
+   * MOV_GetDuration. Set by the client during static initialisation; null in a
+   * headless build, where the movie component never exists.
+   */
+  using MovieManagerPresentHook = bool (*)();
+  extern MovieManagerPresentHook sMovieManagerPresent;
+
   bool CFG_GetArgOptionComposedAliases(
     const CfgAliasSet& leftAliases,
     const CfgAliasSet& rightAliases,

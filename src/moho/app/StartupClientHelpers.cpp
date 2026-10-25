@@ -1577,6 +1577,14 @@ namespace
   }
 
   [[maybe_unused]] const bool gSimCreatedRenderHookSet = (moho::sSimCreatedRenderHook = &InitRenderersForCreatedSim, true);
+
+  /** MOV_GetDuration's `sMovieManager.get() != nullptr` (StartupHelpers.cpp). */
+  bool MovieManagerPresent()
+  {
+    return sMovieManager.get() != nullptr;
+  }
+
+  [[maybe_unused]] const bool gMovieManagerPresentSet = (moho::sMovieManagerPresent = &MovieManagerPresent, true);
 } // namespace
 
 namespace
