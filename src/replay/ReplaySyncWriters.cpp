@@ -26,24 +26,42 @@ namespace faf::replay
     LuaPlus::LuaState* gSimState = nullptr; // set by the init form, in the sim thread
     std::string gInstallError;
 
-    // Runs once in the sim's Lua state. `rec(key)` is the C recorder; level 2 of its stack is
-    // the function that wrote (`__newindex`'s caller, or `table.insert`'s).
+    // Runs once in the sim's Lua state. `rec(key, level)` is the C recorder; `level` is the
+    // writer's stack level seen from it (3 through `__newindex` and its handler, 2 through the
+    // `table.insert` wrapper). Every table in the
+    // sim shares one default metatable (empty in the game's Lua); a recorded table gets a copy
+    // of it plus a `__newindex`. Writes of nil (the engine clears `PausedBy` every beat) are not
+    // counted.
     constexpr const char* kInstallScript = R"lua(
 local rec = __faf_sync_record
 local setmetatable, getmetatable, rawset, type, unpack = setmetatable, getmetatable, rawset, type, unpack
+local defaultmt = getmetatable({})
 local watched = setmetatable({}, { __mode = "k" })
+local function recorded(t, onwrite)
+  local mt = {}
+  local old = getmetatable(t)
+  if old then for name, value in old do mt[name] = value end end
+  local prior = mt.__newindex
+  mt.__newindex = function(s, k, v)
+    onwrite(k, v)
+    if type(prior) == "function" then prior(s, k, v)
+    elseif type(prior) == "table" then prior[k] = v
+    else rawset(s, k, v) end
+  end
+  setmetatable(t, mt)
+end
 local function watch(t, key)
-  if type(t) == "table" and getmetatable(t) == nil and watched[t] == nil then
+  if type(t) == "table" and watched[t] == nil and getmetatable(t) == defaultmt then
     watched[t] = key
-    setmetatable(t, { __newindex = function(s, k, v) rec(key) rawset(s, k, v) end })
+    recorded(t, function(k, v) if v ~= nil then rec(key, 3) end end)
   end
 end
 for k, v in Sync do watch(v, k) end
-setmetatable(Sync, { __newindex = function(s, k, v) rec(k) rawset(s, k, v) watch(v, k) end })
+recorded(Sync, function(k, v) if v ~= nil then rec(k, 3) watch(v, k) end end)
 local insert = table.insert
 table.insert = function(t, ...)
   local key = watched[t]
-  if key ~= nil then rec(key) end
+  if key ~= nil then rec(key, 2) end
   return insert(t, unpack(arg))
 end
 )lua";
@@ -81,11 +99,12 @@ end
 
     int RecordSyncWrite(lua_State* const state)
     {
-      // Level 0 is this function, 1 the metamethod or wrapper, 2 the writer; none there means
-      // the metamethod was called from C++.
+      // The writer's level comes as argument 2; no frame there means the metamethod was called
+      // from C++.
+      const int level = lua_type(state, 2) == LUA_TNUMBER ? static_cast<int>(lua_tonumber(state, 2)) : 2;
       std::string site = "C++ (no Lua caller)";
       lua_Debug frame{};
-      if (lua_getstack(state, 2, &frame) != 0 && lua_getinfo(state, "Sl", &frame) != 0) {
+      if (lua_getstack(state, level, &frame) != 0 && lua_getinfo(state, "Sl", &frame) != 0) {
         site = frame.currentline >= 0 ? gpg::STR_Printf("%s:%d", SourceName(frame).c_str(), frame.currentline).c_str()
                                       : gpg::STR_Printf("%s (C function)", SourceName(frame).c_str()).c_str();
       }

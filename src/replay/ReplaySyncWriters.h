@@ -11,7 +11,8 @@
 // (the persistent `AIBrainData`, `UnitData`, `ReleaseIds`, `Reclaim` and each beat's new ones),
 // and a `table.insert` wrapper for appends to those tables (which bypass metamethods). Each one
 // records the key and its caller's `source:line`; a write made from C++ (no Lua caller) is
-// recorded as such. They are installed inside the sim thread, before the sim's scripts run: an
+// recorded as such, and writes of nil are not counted. Every table in the sim shares a default
+// metatable (empty in the game's Lua); a recorded table gets a copy of it with the `__newindex`. They are installed inside the sim thread, before the sim's scripts run: an
 // init form in the engine's "Sim" set (run on the sim's new Lua state) sets a call hook
 // (`lua_sethook`, the WPR.26 mechanism), and the hook installs them at the first call after
 // `lua/SimSync.lua` has created `Sync`, then removes itself. A write that overwrites an existing
