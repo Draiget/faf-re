@@ -691,6 +691,13 @@ namespace moho
      */
     virtual ~Entity();
 
+    [[nodiscard]] static void* operator new(std::size_t size);
+    static void* operator new(std::size_t, void* ptr) noexcept { return ptr; }
+    static void* operator new(std::size_t size, const std::nothrow_t&) noexcept;
+    static void operator delete(void* ptr, std::size_t size) noexcept;
+    static void operator delete(void*, void*) noexcept {}
+    static void operator delete(void* ptr, const std::nothrow_t&) noexcept;
+
     /**
      * Address: 0x006779E0 (FUN_006779E0)
      *

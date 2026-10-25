@@ -1,4 +1,5 @@
-﻿#include "Entity.h"
+#include "Entity.h"
+#include "moho/entity/EntityMemoryManager.h"
 
 #include <utility>
 #include "legacy/math/X87Math.h"
@@ -1919,6 +1920,30 @@ namespace moho
    * attach helper lanes, and unlinks local intrusive nodes before base/member
    * destructor lanes run.
    */
+  void* Entity::operator new(const std::size_t size)
+  {
+    return EntityMemoryManager::Instance().Allocate(size);
+  }
+
+  void* Entity::operator new(const std::size_t size, const std::nothrow_t&) noexcept
+  {
+    try {
+      return EntityMemoryManager::Instance().Allocate(size);
+    } catch (...) {
+      return nullptr;
+    }
+  }
+
+  void Entity::operator delete(void* const ptr, const std::size_t size) noexcept
+  {
+    EntityMemoryManager::Instance().Deallocate(ptr, size);
+  }
+
+  void Entity::operator delete(void* const ptr, const std::nothrow_t&) noexcept
+  {
+    EntityMemoryManager::Instance().Deallocate(ptr, 0);
+  }
+
   Entity::~Entity()
   {
     if (SimulationRef != nullptr && SimulationRef->mEntityDB != nullptr) {

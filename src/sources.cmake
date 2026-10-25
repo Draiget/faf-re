@@ -385,6 +385,8 @@ set(FAF_ENGINE_SOURCES
   moho/command/SSTICommandVariableData.cpp
   moho/entity/EntityCategoryTypeInfo.cpp
   moho/entity/CTextureScroller.cpp
+  moho/entity/FixedSlabPool.cpp
+  moho/entity/EntityMemoryManager.cpp
   moho/entity/Entity.cpp
   moho/command/SSTITarget.cpp
   moho/entity/SSTIEntityConstantData.cpp

@@ -33,6 +33,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ParallelBlipFlush` | 1 | `/con` | live | The bulk blip-unlink pass splices separate weak chains on sim workers (needs `sim_Workers` > 0) |
 | `sim_ParallelSyncHeap` | 1 | `/con` | live | With `sim_ParallelSync`, the allocating members of unit-update records are copied on workers too |
 | `sim_ParallelEntitySync` | 1 | `/con` | live | With `sim_ParallelSync`, entity-update records are copied on workers |
+| `sim_EntityPools` | 1 | `/con` | live | 64-KB slab memory pools for Unit, Projectile, and all Entity-derived instances with empty slab reclamation |
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
