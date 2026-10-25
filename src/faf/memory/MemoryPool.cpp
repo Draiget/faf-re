@@ -1,6 +1,5 @@
 
 #include "MemoryPool.h"
-#include <stdexcept>
 
 namespace faf
 {
@@ -8,13 +7,24 @@ namespace faf
     std::size_t blockSize,
     std::size_t nextCapacity
   )
+    : MemoryPool{blockSize, nextCapacity, 0}
+  {}
+
+  faf::MemoryPool::MemoryPool(
+    std::size_t blockSize,
+    std::size_t nextCapacity,
+    std::size_t initialCapacity
+  )
     : m_blockSize{blockSize}
     , m_nextCapacity{nextCapacity}
     , m_freeList{nullptr}
-    , m_chunks{}
-  {}
+  {
+    if (initialCapacity != 0) {
+      AllocateChunk(initialCapacity);
+    }
+  }
 
-  MemoryPool::MemoryPool(
+  inline MemoryPool::MemoryPool(
     MemoryPool&& other
   ) noexcept
     : m_blockSize(other.m_blockSize)
@@ -27,7 +37,7 @@ namespace faf
     other.m_nextCapacity = 0;
   }
 
-  MemoryPool& MemoryPool::operator=(
+  inline MemoryPool& MemoryPool::operator=(
     MemoryPool&& other
   ) noexcept
   {
@@ -53,13 +63,11 @@ namespace faf
       std::free(p);
     }
   }
-
-  size_t MemoryPool::GetBlockSize() const
+  inline size_t MemoryPool::GetBlockSize() const
   {
     return m_blockSize;
   }
-
-  void* MemoryPool::Allocate()
+  inline void* MemoryPool::Allocate()
   {
     if (m_freeList == nullptr) {
       if (AllocateChunk(m_nextCapacity) == nullptr) {
@@ -70,9 +78,9 @@ namespace faf
     m_freeList = node->next;
     return static_cast<void*>(node);
   }
-  void MemoryPool::Deallocate(
+  inline void MemoryPool::Deallocate(
     void* ptr
-  ) noexcept
+  )
   {
     if (ptr == nullptr) {
       return;
@@ -81,7 +89,7 @@ namespace faf
     node->next = m_freeList;
     m_freeList = node;
   }
-  void* MemoryPool::AllocateChunk(
+  inline void* MemoryPool::AllocateChunk(
     size_t capacity
   )
   {
@@ -100,12 +108,5 @@ namespace faf
     }
 
     return chunk;
-  }
-
-  MultiMemoryPool::MultiMemoryPool(
-    std::size_t intialCapacity
-  )
-  {
-    m_pools.reserve(intialCapacity);
   }
 } // namespace faf
