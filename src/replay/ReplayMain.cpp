@@ -26,6 +26,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "platform/X87Precision.h"
+#include "replay/ReplayLaunchCheck.h"
 #include "replay/ReplayRunner.h"
 
 namespace
@@ -125,6 +126,7 @@ namespace
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
+      "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -218,6 +220,19 @@ int main(int argc, char** argv)
   // `InitializeSessionFromCommandLine`, up to the `/replay` path.
   RunStartupConsoleCommands();
   moho::PlaceCurrentThread(moho::EThreadRole::Main);
+
+  if (moho::CFG_GetArgOption("--launch-check", 0, nullptr)) {
+    // Plan WP2.10: the header against `BuildLaunchInfo`; plays nothing.
+    const faf::replay::SLaunchCheckResult check = faf::replay::RunLaunchCheck(options.replayPath);
+    if (!check.ran) {
+      std::printf("[%s] LAUNCHCHECK error: %s\n", gLabel.c_str(), check.error.c_str());
+      std::fflush(stdout);
+      EndProcess(kExitBadInput);
+    }
+    std::printf("[%s] %s\n", gLabel.c_str(), check.report.c_str());
+    std::fflush(stdout);
+    EndProcess(check.differences == 0 ? 0 : 1);
+  }
 
   faf::replay::InstallChecksumWatch(gLabel);
   const faf::replay::SReplayResult result = faf::replay::RunReplay(options);

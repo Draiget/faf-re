@@ -848,6 +848,7 @@ set(FAF_ENGINE_SOURCES
   moho/net/IClientMgrUIInterface.cpp
   moho/net/CHostManager.cpp
   moho/net/CLobby.cpp
+  moho/net/LaunchInfoBuilder.cpp
   moho/net/CDiscoveryServiceTypeInfo.cpp
   moho/net/SPeer.cpp
   moho/net/CMessage.cpp
