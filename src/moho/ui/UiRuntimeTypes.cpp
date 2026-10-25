@@ -21103,7 +21103,11 @@ void moho::CUIWorldView::UpdateSelection(
   gpg::fastvector_n<SBuildTemplateInfo, 16> activeTemplate{};
   (void)mWldSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
 
-  if (activeTemplate.Empty()) {
+  // FAF hot-patch (FA-Binary-Patches BuildTemplateSnap): the stock binary skipped the whole
+  // extractor snap while a build template was active (`jnz 0x008701E1`, NOPed at 0x0086FFF0).
+  // The mass-extractor snap now always runs; the hydrocarbon snap still needs an empty
+  // template (HookHydroCondition, jumped to from 0x00870044).
+  {
     CommandModeData leftMouseMode{};
     (void)mWldSession->GetLeftMouseButtonAction(&leftMouseMode, &mWldSession->CursorInfo(), 0);
 
@@ -21112,7 +21116,7 @@ void moho::CUIWorldView::UpdateSelection(
       EDepositType depositType = kNone;
       if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnMassDeposit) {
         depositType = kMass;
-      } else if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnHydrocarbonDeposit) {
+      } else if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnHydrocarbonDeposit && activeTemplate.Empty()) {
         depositType = kHydrocarbon;
       }
 
