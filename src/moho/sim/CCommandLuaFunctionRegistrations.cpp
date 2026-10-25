@@ -22,7 +22,6 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/ai/IAiBuilder.h"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/app/WxUrl.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"

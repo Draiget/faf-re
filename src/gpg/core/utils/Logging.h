@@ -8,7 +8,7 @@
 #include <span>
 #include <streambuf>
 
-#include "boost/Mutex.h"
+#include "boost/mutex.h"
 #include "gpg/core/containers/DList.h"
 #include "Sync.h"
 #include "Tss.h"

@@ -2,7 +2,7 @@
 
 #include "Stream.h"
 #include "boost/condition.h"
-#include "boost/Mutex.h"
+#include "boost/mutex.h"
 #include "gpg/core/containers/DList.h"
 
 namespace gpg

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #if defined(_MSC_VER)
 #include <intrin.h>
 #endif
@@ -7,6 +7,7 @@
 #include "legacy/containers/String.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
+#include "platform/Interlocked.h"
 
 namespace moho
 {
@@ -51,7 +52,7 @@ namespace moho
     InstanceCounter() noexcept
     {
       (void)::_InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&GetStatItem()->mPrimaryValueBits), 1L);
+        reinterpret_cast<volatile platform::InterlockedLong*>(&GetStatItem()->mPrimaryValueBits), 1L);
     }
 
     /**
@@ -75,7 +76,7 @@ namespace moho
     ~InstanceCounter() noexcept
     {
       (void)::_InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&GetStatItem()->mPrimaryValueBits), -1L);
+        reinterpret_cast<volatile platform::InterlockedLong*>(&GetStatItem()->mPrimaryValueBits), -1L);
     }
 
     /**

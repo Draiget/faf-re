@@ -25,7 +25,6 @@
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/animation/CAniSkel.h"
-#include "moho/app/WEmitterWx.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/audio/CUserSoundManager.h"

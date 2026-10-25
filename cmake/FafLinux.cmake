@@ -90,6 +90,8 @@ endforeach()
 list(LENGTH _faf_sim_files _faf_sim_count)
 message(STATUS "faf_sim: ${_faf_sim_count} translation units")
 
+file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/windows.h" "#pragma once\n#include <Windows.h>\n")
+
 add_library(faf_sim OBJECT ${_faf_sim_files})
 # Its compile and link settings, which targets built from a few sim sources
 # (tests/sim_math) share without depending on every faf_sim object.
@@ -100,6 +102,10 @@ target_link_libraries(faf_sim PUBLIC faf_sim_settings)
 # Windows build assembles X87Math64.asm, plan WPL.10).
 enable_language(ASM)
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
+# gpg::gal::Math without D3DX (Windows' faf_main uses gpg/gal/Matrix.cpp, plan WPR.12).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
+# The Win32 calls the shared code makes, on POSIX (plan WPL.5).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
 
 # The Windows build's engine definitions without the Win32 ones (WIN32,
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
@@ -108,6 +114,10 @@ target_compile_definitions(faf_sim_settings INTERFACE
   BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR)
 target_include_directories(faf_sim_settings INTERFACE
   "${PROJECT_SOURCE_DIR}/src"
+  # <Windows.h> and <intrin.h> for the shared code (plan WPL.5), and <windows.h>, the
+  # spelling some files use (the file system is case-sensitive here).
+  "${PROJECT_SOURCE_DIR}/src/platform/posix/win32"
+  "${CMAKE_BINARY_DIR}/win32-alias"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
@@ -117,6 +127,8 @@ set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
   # header).
   "SHELL:-include platform/X64LayoutAsserts.h"
+  # The Windows names the shared code uses (plan WPL.5).
+  "SHELL:-include platform/PosixCompat.h"
   ${FAF_LINUX_MS_DIALECT}
   # boost.thread checks for the compiler's threading mode (_REENTRANT).
   -pthread

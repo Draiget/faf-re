@@ -293,11 +293,86 @@ add_custom_command(TARGET faf_main POST_BUILD
 
 # --- faf-replay (server mode) ---------------------------------------------------------
 # The headless replay runner (replay/sources.cmake, docs/SWITCHES.md "faf-replay"): a
-# console program that links every engine object plus its own entry point and plays a
-# replay with no window, render device or audio engine.
+# console program that plays a replay with no window, render device or audio engine.
+#
+# faf-replay (plan WPR.12) links only the simulation's objects: faf_engine's objects for
+# the translation units in sim_sources.cmake, in faf_engine's order (the same static-init
+# order as faf_main), with no wx, Direct3D, D3DX, XACT, DirectSound or FFmpeg library.
+# gpg::gal::Math is gpg/gal/MatrixPortable.cpp there instead of D3DX (gpg/gal/Matrix.cpp).
+# The objects are taken from faf_engine, not compiled again: each client translation unit's
+# object is filtered out of $<TARGET_OBJECTS:faf_engine>.
+#
+# faf-replay-full (not built by default) is faf-replay as it was before: every engine
+# object, wx's application object and the user Lua state. It is the reference faf-replay
+# is compared against, and the build that can run `--terrain-check`.
 if(FAF_SERVER_MODE)
   include(replay/sources.cmake)
-  add_executable(faf-replay ${FAF_REPLAY_SOURCES})
-  target_link_libraries(faf-replay PRIVATE faf_engine)
-  target_compile_definitions(faf-replay PRIVATE FAF_SERVER_MODE=1)
+  include(sim_sources.cmake)
+
+  set(_faf_client_sources ${FAF_ENGINE_SOURCES})
+  list(REMOVE_ITEM _faf_client_sources ${FAF_SIM_SOURCES})
+  set(_faf_sim_objects "$<TARGET_OBJECTS:faf_engine>")
+  set(_faf_client_regex "")
+  set(_faf_client_count 0)
+  foreach(_src IN LISTS _faf_client_sources)
+    # An object is faf_engine.dir/<source>.obj, after a "./" segment; an out-of-tree
+    # source's path has its drive colon dropped (G:/x/y.cpp -> faf_engine.dir/./G_/x/y.cpp.obj),
+    # so those match on the path after the drive.
+    string(REGEX REPLACE "^[A-Za-z]:" "" _tail "${_src}")
+    string(REGEX REPLACE "([.+*?^$()|\\[\\]\\\\])" "\\\\\\1" _tail "${_tail}")
+    if(NOT IS_ABSOLUTE "${_src}")
+      set(_tail "faf_engine\\.dir/(\\./)?${_tail}")
+    endif()
+    if(_faf_client_regex STREQUAL "")
+      set(_faf_client_regex "${_tail}\\.obj$")
+    else()
+      string(APPEND _faf_client_regex "|${_tail}\\.obj$")
+    endif()
+    math(EXPR _faf_client_count "${_faf_client_count} + 1")
+    # A few dozen alternatives per filter keeps each regular expression small.
+    if(_faf_client_count EQUAL 24)
+      set(_faf_sim_objects "$<FILTER:${_faf_sim_objects},EXCLUDE,${_faf_client_regex}>")
+      set(_faf_client_regex "")
+      set(_faf_client_count 0)
+    endif()
+  endforeach()
+  if(NOT _faf_client_regex STREQUAL "")
+    set(_faf_sim_objects "$<FILTER:${_faf_sim_objects},EXCLUDE,${_faf_client_regex}>")
+  endif()
+
+  # faf_engine's compile settings for the replay's own sources, without its libraries.
+  add_library(faf_replay_settings INTERFACE)
+  target_compile_definitions(faf_replay_settings INTERFACE
+    $<TARGET_PROPERTY:faf_engine,INTERFACE_COMPILE_DEFINITIONS> FAF_SERVER_MODE=1)
+  target_include_directories(faf_replay_settings INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
+    "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
+  target_compile_options(faf_replay_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
+  target_link_libraries(faf_replay_settings INTERFACE faf_codegen)
+
+  add_executable(faf-replay ${FAF_REPLAY_SOURCES} gpg/gal/MatrixPortable.cpp ${_faf_sim_objects})
+  add_dependencies(faf-replay faf_engine)
+  target_compile_definitions(faf-replay PRIVATE FAF_REPLAY_SIM_ONLY=1)
+  target_link_libraries(faf-replay PRIVATE
+    faf_replay_settings Wm3Foundation
+    ws2_32 legacy_stdio_definitions legacy_stdio_wide_specifiers
+    dbghelp winmm version shlwapi faultrep
+    ${_faf_zlib}
+    "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
+  target_link_options(faf-replay PRIVATE
+    $<TARGET_PROPERTY:faf_engine,INTERFACE_LINK_OPTIONS>)
+
+  # The registration dump (tests/registry) of the objects faf-replay links: its Sim and
+  # Core sets must equal faf_main's (tests/registry/RegistrationDump.cpp).
+  add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp" gpg/gal/MatrixPortable.cpp ${_faf_sim_objects})
+  add_dependencies(faf_registration_dump_sim faf_engine)
+  target_link_libraries(faf_registration_dump_sim PRIVATE faf_replay_settings Wm3Foundation
+    ws2_32 legacy_stdio_definitions legacy_stdio_wide_specifiers dbghelp winmm version shlwapi faultrep
+    ${_faf_zlib} "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
+  target_link_options(faf_registration_dump_sim PRIVATE $<TARGET_PROPERTY:faf_engine,INTERFACE_LINK_OPTIONS>)
+
+  add_executable(faf-replay-full EXCLUDE_FROM_ALL ${FAF_REPLAY_SOURCES})
+  target_link_libraries(faf-replay-full PRIVATE faf_engine)
+  target_compile_definitions(faf-replay-full PRIVATE FAF_SERVER_MODE=1)
 endif()

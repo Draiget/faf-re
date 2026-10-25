@@ -127,6 +127,10 @@ namespace faf::replay
   STerrainCheckResult RunTerrainCheck(const std::string& listPath)
   {
     STerrainCheckResult result{};
+    if (moho::sTerrainResFactory == nullptr) {
+      result.error = "this build has no client terrain resource to compare with (run faf-replay-full)";
+      return result;
+    }
     std::ifstream list(listPath);
     if (!list) {
       result.error = "cannot read " + listPath;

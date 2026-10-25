@@ -1,4 +1,5 @@
 #include "replay/ReplayLaunchCheck.h"
+#include "replay/ReplayLuaState.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -18,7 +19,6 @@
 #include "moho/net/LaunchInfoBuilder.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/WldSessionInfo.h"
-#include "moho/ui/UiRuntimeTypes.h"
 
 // Engine addition, server mode: see ReplayLaunchCheck.h.
 
@@ -290,7 +290,7 @@ namespace faf::replay
       return result;
     }
     const moho::LaunchInfoNew& recorded = *sessionInfo->mLaunchInfo->GetNew();
-    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    LuaPlus::LuaState* const state = ReplayLuaState();
     try {
       // The lobby's order (command-source order, the order peers were assigned), then the
       // reverse, as another roster would list them: the launch must not depend on it.

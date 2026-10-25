@@ -1,4 +1,5 @@
 #include "replay/ReplayRunner.h"
+#include "replay/ReplayLuaState.h"
 
 #include <Windows.h>
 
@@ -26,13 +27,15 @@
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/SSTIArmyConstantData.h"
+#include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/unit/core/Unit.h"
-#include "moho/ui/UiRuntimeTypes.h"
 #include "remote/ContentTables.h"
 #include "replay/ReplayBoneStats.h"
 #include "replay/ReplayFpuReport.h"
@@ -491,7 +494,7 @@ namespace faf::replay
       }
     }
 
-    LuaPlus::LuaState* const syncState = moho::USER_GetLuaState();
+    LuaPlus::LuaState* const syncState = ReplayLuaState();
     std::map<std::string, SSyncKeySeen> syncKeys;
     const Clock::time_point playStart = Clock::now();
     const double timeLimit = 60.0 * options.timeoutMinutes;

@@ -18,13 +18,15 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/app/IWinApp.h"
 #include "moho/app/WinApp.h"
+#if !FAF_REPLAY_SIM_ONLY
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/ui/UiRuntimeTypes.h"
+#endif
 #include "moho/console/CConCommand.h"
 #include "moho/core/ThreadPlacement.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
 #include "moho/misc/StartupHelpers.h"
-#include "moho/ui/UiRuntimeTypes.h"
 #include "platform/X87Precision.h"
 #include "replay/ReplayLaunchCheck.h"
 #include "replay/ReplayRunner.h"
@@ -128,8 +130,8 @@ namespace
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
-      "  --terrain-check <list>    load each .scmap in <list> with the client's and the headless terrain\n"
-      "                            resource and compare (plays nothing; --replay still required)\n"
+      "  --terrain-check <list>    faf-replay-full: load each .scmap in <list> with the client's and the\n"
+      "                            headless terrain resource and compare (plays nothing; --replay required)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -196,9 +198,12 @@ int main(int argc, char** argv)
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();
 
+#if !FAF_REPLAY_SIM_ONLY
   // `WIN_AppExecute`: wx builds the application object without a window or a message loop.
-  // Engine code reaches `wxTheApp` without a null check (the driver's event wait among them).
+  // The client's event pump (WinApp.cpp, reached from the driver's event wait) uses
+  // `wxTheApp` without a null check. faf-replay links only the simulation and has neither.
   wxEntry(reinterpret_cast<WXHINSTANCE>(::GetModuleHandleW(nullptr)), nullptr, nullptr, 0, false);
+#endif
   (void)::CoInitialize(nullptr);
   moho::PLAT_Init();
 
@@ -215,7 +220,10 @@ int main(int argc, char** argv)
   } else {
     moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
   }
+#if !FAF_REPLAY_SIM_ONLY
+  // The user Lua state's init. faf-replay has no user state (replay/ReplayLuaState.h).
   (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+#endif
 
   // `WIN_AppExecute`, before its frame loop.
   platform::SetX87PrecisionControl(_PC_24);
