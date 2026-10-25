@@ -40,3 +40,98 @@ include(FafCodegen)
 # library is linked statically.
 add_executable(faf-linux-toolchain-check "${PROJECT_SOURCE_DIR}/tests/linux/ToolchainCheck.cpp")
 target_link_libraries(faf-linux-toolchain-check PRIVATE faf_codegen)
+
+# --- Language dialect ---------------------------------------------------------------------
+# clang-cl compiles the Windows build with -fms-extensions -fms-compatibility
+# -fms-compatibility-version=19.33 -fms-volatile, also under /permissive-
+# (`clang-cl -### /permissive-`). Linux takes the Microsoft keywords and
+# intrinsics (-fms-extensions) and volatile semantics (-fms-volatile), not
+# -fms-compatibility: without a Windows target it stops defining __GNUC__,
+# __STDC__, __EXCEPTIONS and __GXX_RTTI, which glibc, libc++ and boost read.
+# Code that relies on Microsoft lookup rules (unqualified names from dependent
+# bases) is fixed in the source instead. clang defines no _MSC_VER or _WIN32
+# here, so platform code takes its POSIX branches.
+set(FAF_LINUX_MS_DIALECT -fms-extensions -fms-volatile)
+
+# --- Dependencies -----------------------------------------------------------------------
+# Wild Magic Foundation (the sim's math) and zlib 1.2.3, with the Windows
+# builds' source lists.
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/wildmagic" "${CMAKE_BINARY_DIR}/deps/wildmagic")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/deps/zlib")
+
+# --- faf_sim ----------------------------------------------------------------------------
+# The simulation's translation units (src/sim_sources.cmake), in the engine's
+# order, as an object library: every object is linked, so every static
+# initialiser runs, as in the Windows executable.
+include("${PROJECT_SOURCE_DIR}/src/sources.cmake")
+include("${PROJECT_SOURCE_DIR}/src/sim_sources.cmake")
+
+# boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/tss_(dll|hooks|pe)\\.cpp$")
+
+set(_faf_sim_files "")
+foreach(_src IN LISTS FAF_SIM_SOURCES)
+  if(IS_ABSOLUTE "${_src}")
+    list(APPEND _faf_sim_files "${_src}")
+  else()
+    list(APPEND _faf_sim_files "${PROJECT_SOURCE_DIR}/src/${_src}")
+  endif()
+endforeach()
+list(LENGTH _faf_sim_files _faf_sim_count)
+message(STATUS "faf_sim: ${_faf_sim_count} translation units")
+
+add_library(faf_sim OBJECT ${_faf_sim_files})
+
+# The Windows build's engine definitions without the Win32 ones (WIN32,
+# _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
+target_compile_definitions(faf_sim PUBLIC
+  LUAPLUS_LIB LUA_NUMBER=float
+  BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR)
+target_include_directories(faf_sim PUBLIC
+  "${PROJECT_SOURCE_DIR}/src"
+  "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
+  "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
+target_link_libraries(faf_sim PUBLIC faf_codegen Wm3Foundation zlib123)
+
+set(_faf_sim_options
+  # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
+  # header).
+  "SHELL:-include platform/X64LayoutAsserts.h"
+  ${FAF_LINUX_MS_DIALECT}
+  # boost.thread checks for the compiler's threading mode (_REENTRANT).
+  -pthread
+  # The Windows build's diagnostics settings (src/CMakeLists.txt).
+  -Wno-microsoft
+  -Wno-unused-parameter -Wno-unused-variable -Wno-unused-private-field
+  -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-but-set-variable
+  -Wno-unused-lambda-capture -Wno-unused-value -Wno-unused-command-line-argument
+  -Wno-missing-field-initializers -Wno-sign-compare -Wno-switch
+  -Wno-invalid-offsetof -Wno-keyword-macro -Wno-unknown-pragmas
+  -Wno-ignored-pragma-intrinsic -Wno-pragma-pack -Wno-ignored-attributes
+  -Wno-deprecated-declarations -Wno-deprecated-enum-enum-conversion
+  -Wno-nonportable-include-path -Wno-reorder-ctor
+  -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual
+  -Wno-inconsistent-missing-override -Wno-missing-braces -Wno-braced-scalar-init
+  -Wno-char-subscripts -Wno-parentheses -Wno-dangling-else
+  -Wno-tautological-constant-out-of-range-compare
+  -Wno-tautological-undefined-compare -Wno-undefined-var-template
+  -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
+  -Wno-mismatched-tags -Wno-extra-qualification)
+target_compile_options(faf_sim PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
+
+# boost.thread's own sources, as on Windows (src/CMakeLists.txt).
+foreach(_src IN LISTS _faf_sim_files)
+  if(_src MATCHES "/libs/thread/src/")
+    set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1)
+    set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
+  endif()
+endforeach()
+
+# --- faf-sim-link -----------------------------------------------------------------------
+# Every faf_sim object linked into one executable with no entry point of its
+# own, to list what the simulation references outside itself (plan WPL.3):
+# `cmake --build ... --target faf-sim-link` fails with that list until it is
+# empty.
+add_executable(faf-sim-link "${PROJECT_SOURCE_DIR}/tests/linux/SimLinkMain.cpp")
+target_link_libraries(faf-sim-link PRIVATE faf_sim)
+target_link_options(faf-sim-link PRIVATE -Wl,--error-limit=0)
