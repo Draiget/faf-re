@@ -370,6 +370,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mIndexBuffer.reset();
     mSwapChains.clear();
     mGarbage.clear();
+    mPipelineCache.Close();
     mPipelines.clear();
     mBlitPipelines.clear();
     mPipelineState.reset();
@@ -758,6 +759,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     CreateDevice();
     CreateQueueAndFrames();
     CreateRootSignature();
+    mPipelineCache.Open(mDevice.Get(), effects::ShaderCacheDirectory());
     BeginRecording();
     CreateSwapChains(*context);
     CreateBuiltInPipelines();
@@ -2317,6 +2319,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     ++mFrameNumber;
+    mPipelineCache.OnFrame();
     {
       static const long start = [] {
         const char* const value = std::getenv("FAF_GAL_TRACE_START");
@@ -2904,8 +2907,18 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     desc.DSVFormat = depthFormat;
     desc.SampleDesc.Count = 1U;
 
-    ComPtr<ID3D12PipelineState> pipeline;
+    // Engine addition (gPipelineDiskCache): a pipeline an earlier session created comes from the
+    // pipeline library on disk instead of a driver compile in this frame.
+    effects::Fnv1a64 cacheKey;
+    cacheKey.Add(key.Key().data(), key.Key().size());
+    ComPtr<ID3D12PipelineState> pipeline = mPipelineCache.Load(cacheKey.Value(), desc);
+    if (pipeline != nullptr) {
+      return mPipelines.emplace(std::move(key.Key()), pipeline).first->second.Get();
+    }
     const HRESULT result = mDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline));
+    if (SUCCEEDED(result)) {
+      mPipelineCache.Store(cacheKey.Value(), pipeline.Get());
+    }
     if (FAILED(result)) {
       static int logged = 0;
       if (logged++ < 16) {

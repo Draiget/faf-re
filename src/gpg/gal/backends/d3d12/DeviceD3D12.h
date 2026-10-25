@@ -32,6 +32,7 @@
 
 #include "D3D12Core.h"
 #include "GpuDrivenD3D12.h"
+#include "PipelineCacheD3D12.h"
 #include "ResourcesD3D12.h"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
@@ -334,6 +335,7 @@ namespace gpg::gal
 
     // ---- pipeline state ------------------------------------------------------
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPipelines;
+    d3d12::PipelineCache mPipelineCache; // engine addition: mPipelines' entries kept on disk across sessions
     std::map<std::string, D3D12_GPU_DESCRIPTOR_HANDLE> mSamplerTables; // by content
     std::uint64_t mArenaEpoch = 0; // bumped when a frame's view arena is emptied mid-frame
     BlendState mCurrent;      // what passes leave behind (D3D9's persistent render states)

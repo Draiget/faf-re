@@ -4,9 +4,44 @@
 
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/PipelineDiskCache.h"
+#include "gpg/gal/backends/common/ImageCodec.h"
+#include "moho/console/CConCommand.h"
 
 namespace moho
 {
+  namespace
+  {
+    /**
+     * Engine addition: `d3d_PipelineCache` switches the on-disk pipeline cache (see
+     * gpg/gal/PipelineDiskCache.h). Off, pipelines are neither loaded from nor added to it;
+     * `/nopipelinecache` also keeps the file from being opened at device creation.
+     */
+    TConVar<bool> gTConVar_d3d_PipelineCache(
+      "d3d_PipelineCache",
+      "Keep Direct3D 12 pipeline states on disk across sessions, so they are not compiled again in the frame that "
+      "first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it off at startup.",
+      &gpg::gal::gPipelineDiskCache
+    );
+
+    /** Engine addition: `ren_DdsDirectLoad` (see gpg/gal/backends/common/ImageCodec.h). */
+    TConVar<bool> gTConVar_ren_DdsDirectLoad(
+      "ren_DdsDirectLoad",
+      "Direct3D 12 / Vulkan: read DXT1/3/5 DDS textures straight from the file (1, the default) instead of decoding "
+      "every texture through D3DX11 on a software device (0), which takes 25-45 ms per 1024x1024 texture.",
+      &gpg::gal::imaging::gDdsDirectLoad
+    );
+
+    /** Engine addition: `ren_TextureDecodeCache` (see gpg/gal/backends/common/ImageCodec.h). */
+    TConVar<bool> gTConVar_ren_TextureDecodeCache(
+      "ren_TextureDecodeCache",
+      "Direct3D 12 / Vulkan: keep textures that took D3DX11 more than 8 ms to decode (the original game's textures "
+      "without mip levels) in the shader cache directory and read them back in later sessions (1, the default), or "
+      "decode every time (0).",
+      &gpg::gal::imaging::gTextureDecodeCache
+    );
+  } // namespace
+
   extern int ren_GpuIcons;
   extern int ren_GpuIconClassify;
   extern int ren_GpuFog;

@@ -67,6 +67,27 @@ namespace gpg::gal::imaging
     Dds = 4,
   };
 
+  /**
+   * Engine addition: DDS files holding BC1/BC2/BC3 (DXT1/3/5) data with a full mip chain, 2D
+   * or cube, are read straight into the image instead of through D3DX11 on the WARP device,
+   * which took 25-45 ms for each 1024x1024 unit texture and serialised every load behind one
+   * lock. The result has the same format, shape and bytes, except in the levels under 4x4,
+   * where D3DX11's round trip changes a few bytes and this keeps the file's
+   * (`FAF_IMAGECODEC_VERIFY=1` decodes both ways and logs any other difference). Console
+   * variable `ren_DdsDirectLoad`; 0 sends every file through D3DX11.
+   */
+  extern bool gDdsDirectLoad;
+
+  /**
+   * Engine addition: a texture D3DX11 took more than 8 ms to decode (mostly the original
+   * game's textures without mip levels, whose chain D3DX11 builds and BC-compresses again on
+   * the CPU, 30-40 ms each) is kept in the shader cache directory under a hash of the file's
+   * bytes and the decode options, and the next session reads it back instead. The cached
+   * image is D3DX11's own output, so the texels are the same. Console variable
+   * `ren_TextureDecodeCache`; 0 decodes every time.
+   */
+  extern bool gTextureDecodeCache;
+
   class ImageCodec
   {
   public:
@@ -90,6 +111,7 @@ namespace gpg::gal::imaging
   private:
     ImageCodec() = default;
     [[nodiscard]] bool Load();
+    HRESULT DecodeWithD3dx(const void* data, std::size_t bytes, const DecodeOptions& options, Image& outImage);
 
     struct State;
     std::unique_ptr<State> mState;
