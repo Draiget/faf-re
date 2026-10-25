@@ -399,7 +399,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mInfoQueue.Reset();
     mDevice.Reset();
     mFactory.Release();
-    mLibrary.Unload();
+    // d3d12.dll stays loaded: objects created on this device can outlive it.
+    // The engine's static shader variables keep their effect variables, and
+    // with them bound render targets, until the C runtime destroys them at
+    // exit; releasing those after the runtime was unloaded faulted inside
+    // D3D12Core.dll on every exit from the front end.
     mDeviceContext = DeviceContext(DeviceApi::Unset);
   }
 
