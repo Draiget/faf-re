@@ -9,6 +9,7 @@
 #include "remote/wire/BitStream.h"
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/Quantize.h"
+#include "remote/wire/SharedValue.h"
 
 // Engine addition, server mode: the entities lane of a view frame (plan §7.1, WP7.3, WP7.4,
 // WPR.38).
@@ -126,10 +127,10 @@ namespace faf::remote::wire
     std::uint32_t scriptBits = 0;   // the toggle buttons' bits
     std::array<std::uint16_t, 4> siloCounts{}; // tactical build, nuke build, tactical stored, nuke stored
     std::uint8_t unitFlags = 0;     // paused, auto mode, auto surface, busy, repeat queue, ...
-    std::vector<SUnitStat> stats;   // ascending names; sent whole when any item changes
+    TSharedValue<std::vector<SUnitStat>> stats; // ascending names; sent whole when any item changes
     std::uint8_t buildStateTag = 0; // creation constants (SCreateUnitConstantData)
     std::uint8_t fake = 0;
-    SUnitDetail detail;
+    TSharedValue<SUnitDetail> detail; // shared with the frames before until it changes
   };
 
   /**
@@ -161,6 +162,12 @@ namespace faf::remote::wire
   struct SEntityRecord
   {
     std::uint32_t id = 0;
+    /**
+     * The sim's creation tick (`SCreateEntityParams::mTickCreated`): sent with a creation only,
+     * never changes. Usually the beat's tick; a recon blip carries its own and an entity built
+     * by a constructor without a sim has 0.
+     */
+    std::uint32_t tickCreated = 0;
     std::uint32_t blueprint = COrdinalTable::kNone; // ordinal into SContentTables::blueprints
     std::uint8_t army = 0xFFu;                      // 0xFF: no army
     QuantizedPosition position{};                    // with dead reckoning: the anchor position

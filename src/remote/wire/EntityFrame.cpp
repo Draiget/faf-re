@@ -249,8 +249,8 @@ namespace faf::remote::wire
         writer.WriteBits(unit.unitFlags, kUnitFlagBits);
       }
       if ((fields & kFieldUnitStats) != 0u) {
-        writer.WriteVarUint(static_cast<std::uint32_t>(unit.stats.size()));
-        for (const SUnitStat& stat : unit.stats) {
+        writer.WriteVarUint(static_cast<std::uint32_t>(unit.stats->size()));
+        for (const SUnitStat& stat : *unit.stats) {
           writer.WriteVarUint(stat.name);
           writer.WriteBits(stat.type, 2);
           writer.WriteBool(stat.realtime);
@@ -265,7 +265,7 @@ namespace faf::remote::wire
         writer.WriteBits(unit.buildStateTag, 8);
         writer.WriteBits(unit.fake, 8);
       }
-      const SUnitDetail& detail = unit.detail;
+      const SUnitDetail& detail = *unit.detail;
       if ((fields & kFieldUnitDetail) != 0u) {
         writer.WriteVarUint(detail.creator);
         WriteInt(writer, detail.creationTick);
@@ -475,8 +475,9 @@ namespace faf::remote::wire
           reader.Fail();
           return false;
         }
-        unit.stats.resize(count);
-        for (SUnitStat& stat : unit.stats) {
+        std::vector<SUnitStat>& stats = unit.stats.Edit();
+        stats.resize(count);
+        for (SUnitStat& stat : stats) {
           stat.name = reader.ReadVarUint();
           stat.type = static_cast<std::uint8_t>(reader.ReadBits(2));
           stat.realtime = reader.ReadBool();
@@ -488,8 +489,8 @@ namespace faf::remote::wire
             stat.text = SUnitStat{}.text;
           }
         }
-        for (std::size_t i = 1; i < unit.stats.size(); ++i) {
-          if (unit.stats[i - 1].name >= unit.stats[i].name) {
+        for (std::size_t i = 1; i < stats.size(); ++i) {
+          if (stats[i - 1].name >= stats[i].name) {
             reader.Fail(); // names ascending and unique
             return false;
           }
@@ -499,76 +500,80 @@ namespace faf::remote::wire
         unit.buildStateTag = static_cast<std::uint8_t>(reader.ReadBits(8));
         unit.fake = static_cast<std::uint8_t>(reader.ReadBits(8));
       }
-      SUnitDetail& detail = unit.detail;
-      if ((fields & kFieldUnitDetail) != 0u) {
-        detail.creator = reader.ReadVarUint();
-        detail.creationTick = ReadInt(reader);
-        detail.stunTicks = ReadInt(reader);
-        detail.jobType = ReadInt(reader);
-        detail.fireState = ReadInt(reader);
-        detail.siloMaxStorage[0] = ReadInt(reader);
-        detail.siloMaxStorage[1] = ReadInt(reader);
-        detail.selectionInheritor = reader.ReadVarUint();
-        detail.customName = reader.ReadVarUint() - 1u;
-        detail.focusUnit = reader.ReadVarUint();
-        detail.guardedUnit = reader.ReadVarUint();
-        detail.targetBlip = reader.ReadVarUint();
-        detail.didRefresh = static_cast<std::uint8_t>(reader.ReadBits(8));
-        detail.reconFlags = ReadInt(reader);
-      }
-      if ((fields & kFieldUnitEconomy) != 0u) {
-        for (float& value : detail.economy) {
-          value = reader.ReadFloatExact();
+      constexpr std::uint32_t kDetailFields =
+        kFieldUnitDetail | kFieldUnitEconomy | kFieldUnitQueues | kFieldUnitWeapons | kFieldUnitAttributes;
+      if ((fields & kDetailFields) != 0u) {
+        SUnitDetail& detail = unit.detail.Edit();
+        if ((fields & kFieldUnitDetail) != 0u) {
+          detail.creator = reader.ReadVarUint();
+          detail.creationTick = ReadInt(reader);
+          detail.stunTicks = ReadInt(reader);
+          detail.jobType = ReadInt(reader);
+          detail.fireState = ReadInt(reader);
+          detail.siloMaxStorage[0] = ReadInt(reader);
+          detail.siloMaxStorage[1] = ReadInt(reader);
+          detail.selectionInheritor = reader.ReadVarUint();
+          detail.customName = reader.ReadVarUint() - 1u;
+          detail.focusUnit = reader.ReadVarUint();
+          detail.guardedUnit = reader.ReadVarUint();
+          detail.targetBlip = reader.ReadVarUint();
+          detail.didRefresh = static_cast<std::uint8_t>(reader.ReadBits(8));
+          detail.reconFlags = ReadInt(reader);
         }
-      }
-      if ((fields & kFieldUnitQueues) != 0u) {
-        for (std::vector<std::int32_t>* const queue : {&detail.commands, &detail.buildQueue}) {
+        if ((fields & kFieldUnitEconomy) != 0u) {
+          for (float& value : detail.economy) {
+            value = reader.ReadFloatExact();
+          }
+        }
+        if ((fields & kFieldUnitQueues) != 0u) {
+          for (std::vector<std::int32_t>* const queue : {&detail.commands, &detail.buildQueue}) {
+            const std::uint32_t count = reader.ReadVarUint();
+            if (!reader.Ok() || count > SUnitDetail::kMaxQueue || static_cast<std::uint64_t>(count) * 8u > reader.BitsLeft()) {
+              reader.Fail();
+              return false;
+            }
+            queue->resize(count);
+            for (std::int32_t& id : *queue) {
+              id = ReadInt(reader);
+            }
+          }
+        }
+        if ((fields & kFieldUnitWeapons) != 0u) {
           const std::uint32_t count = reader.ReadVarUint();
-          if (!reader.Ok() || count > SUnitDetail::kMaxQueue || static_cast<std::uint64_t>(count) * 8u > reader.BitsLeft()) {
+          if (!reader.Ok() || count > SUnitDetail::kMaxWeapons || static_cast<std::uint64_t>(count) * 120u > reader.BitsLeft()) {
             reader.Fail();
             return false;
           }
-          queue->resize(count);
-          for (std::int32_t& id : *queue) {
-            id = ReadInt(reader);
+          detail.weapons.resize(count);
+          for (SUnitWeapon& weapon : detail.weapons) {
+            if (!ReadCategories(reader, weapon.targets) || !ReadCategories(reader, weapon.secondary)) {
+              return false;
+            }
+            weapon.layer = reader.ReadVarUint();
+            weapon.minRadius = reader.ReadFloatExact();
+            weapon.maxRadius = reader.ReadFloatExact();
+            weapon.effectiveRadius = reader.ReadFloatExact();
+            weapon.minRangeVisual = reader.ReadVarUint() - 1u;
+            weapon.maxRangeVisual = reader.ReadVarUint() - 1u;
           }
         }
-      }
-      if ((fields & kFieldUnitWeapons) != 0u) {
-        const std::uint32_t count = reader.ReadVarUint();
-        if (!reader.Ok() || count > SUnitDetail::kMaxWeapons || static_cast<std::uint64_t>(count) * 120u > reader.BitsLeft()) {
-          reader.Fail();
-          return false;
-        }
-        detail.weapons.resize(count);
-        for (SUnitWeapon& weapon : detail.weapons) {
-          if (!ReadCategories(reader, weapon.targets) || !ReadCategories(reader, weapon.secondary)) {
+        if ((fields & kFieldUnitAttributes) != 0u) {
+          SUnitAttributes& attributes = detail.attributes;
+          attributes.blueprint = reader.ReadVarUint() - 1u;
+          attributes.reserved04 = reader.ReadBits(32);
+          if (!ReadCategories(reader, attributes.restriction)) {
             return false;
           }
-          weapon.layer = reader.ReadVarUint();
-          weapon.minRadius = reader.ReadFloatExact();
-          weapon.maxRadius = reader.ReadFloatExact();
-          weapon.effectiveRadius = reader.ReadFloatExact();
-          weapon.minRangeVisual = reader.ReadVarUint() - 1u;
-          weapon.maxRangeVisual = reader.ReadVarUint() - 1u;
+          for (float& value : attributes.scalars) {
+            value = reader.ReadFloatExact();
+          }
+          attributes.commandCaps = reader.ReadBits(32);
+          attributes.toggleCaps = reader.ReadBits(32);
+          for (std::uint8_t& flag : attributes.flags) {
+            flag = static_cast<std::uint8_t>(reader.ReadBits(8));
+          }
+          attributes.reserved6C = reader.ReadBits(32);
         }
-      }
-      if ((fields & kFieldUnitAttributes) != 0u) {
-        SUnitAttributes& attributes = detail.attributes;
-        attributes.blueprint = reader.ReadVarUint() - 1u;
-        attributes.reserved04 = reader.ReadBits(32);
-        if (!ReadCategories(reader, attributes.restriction)) {
-          return false;
-        }
-        for (float& value : attributes.scalars) {
-          value = reader.ReadFloatExact();
-        }
-        attributes.commandCaps = reader.ReadBits(32);
-        attributes.toggleCaps = reader.ReadBits(32);
-        for (std::uint8_t& flag : attributes.flags) {
-          flag = static_cast<std::uint8_t>(reader.ReadBits(8));
-        }
-        attributes.reserved6C = reader.ReadBits(32);
       }
       SAppearance& look = record.appearance;
       if ((fields & kFieldMesh) != 0u) {
@@ -696,7 +701,7 @@ namespace faf::remote::wire
 
   bool SEntityRecord::operator==(const SEntityRecord& other) const noexcept
   {
-    return id == other.id && blueprint == other.blueprint && army == other.army && position == other.position
+    return id == other.id && tickCreated == other.tickCreated && blueprint == other.blueprint && army == other.army && position == other.position
         && farPosition == other.farPosition && SameFloats(farValue.data(), other.farValue.data(), farValue.size())
         && velocity == other.velocity && verticalAcceleration == other.verticalAcceleration
         && anchorBeat == other.anchorBeat
@@ -776,26 +781,30 @@ namespace faf::remote::wire
       if (b.unitFlags != a.unitFlags) {
         fields |= kFieldUnitFlags;
       }
-      if (b.stats != a.stats) {
+      if (!(b.stats == a.stats)) {
         fields |= kFieldUnitStats;
       }
       if (b.buildStateTag != a.buildStateTag || b.fake != a.fake) {
         fields |= kFieldUnitConstants;
       }
-      if (!SameDetailScalars(b.detail, a.detail)) {
-        fields |= kFieldUnitDetail;
-      }
-      if (!SameFloats(b.detail.economy.data(), a.detail.economy.data(), a.detail.economy.size())) {
-        fields |= kFieldUnitEconomy;
-      }
-      if (b.detail.commands != a.detail.commands || b.detail.buildQueue != a.detail.buildQueue) {
-        fields |= kFieldUnitQueues;
-      }
-      if (b.detail.weapons != a.detail.weapons) {
-        fields |= kFieldUnitWeapons;
-      }
-      if (!(b.detail.attributes == a.detail.attributes)) {
-        fields |= kFieldUnitAttributes;
+      if (!(b.detail == a.detail)) { // shared: one pointer comparison
+        const SUnitDetail& bd = *b.detail;
+        const SUnitDetail& ad = *a.detail;
+        if (!SameDetailScalars(bd, ad)) {
+          fields |= kFieldUnitDetail;
+        }
+        if (!SameFloats(bd.economy.data(), ad.economy.data(), ad.economy.size())) {
+          fields |= kFieldUnitEconomy;
+        }
+        if (bd.commands != ad.commands || bd.buildQueue != ad.buildQueue) {
+          fields |= kFieldUnitQueues;
+        }
+        if (bd.weapons != ad.weapons) {
+          fields |= kFieldUnitWeapons;
+        }
+        if (!(bd.attributes == ad.attributes)) {
+          fields |= kFieldUnitAttributes;
+        }
       }
     }
     return fields;
@@ -1052,6 +1061,7 @@ namespace faf::remote::wire
       WriteGap(writer, first, previous, record.id);
       const std::uint32_t fields = CreationFields(record);
       writer.WriteVarUint(fields);
+      writer.WriteVarUint(record.tickCreated);
       WriteFields(writer, record, fields, codec, frame.beat, nullptr);
     }
 
@@ -1143,6 +1153,7 @@ namespace faf::remote::wire
         if (!reader.Ok() || (fields & kCreationRequired) != kCreationRequired || (fields & ~kAllFields) != 0u) {
           return false;
         }
+        record.tickCreated = reader.ReadVarUint();
         if (!ReadFields(reader, record, fields, codec, beat)) {
           return false;
         }

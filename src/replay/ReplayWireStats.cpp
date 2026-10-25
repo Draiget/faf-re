@@ -209,14 +209,14 @@ namespace faf::replay
         };
         const wire::SUnitFields& unit = record.unit;
         if ((fields & wire::kFieldUnitStats) != 0u) {
-          std::uint64_t bits = varintBits(static_cast<std::uint32_t>(unit.stats.size()));
-          for (const wire::SUnitStat& stat : unit.stats) {
+          std::uint64_t bits = varintBits(static_cast<std::uint32_t>(unit.stats->size()));
+          for (const wire::SUnitStat& stat : *unit.stats) {
             bits += varintBits(stat.name) + 3u + (stat.type == wire::SUnitStat::kString ? varintBits(stat.text + 1u) : 32u);
           }
           into.unitParts[0] += bits;
         }
         if ((fields & wire::kFieldUnitConstants) != 0u) into.unitParts[1] += 16;
-        const wire::SUnitDetail& d = unit.detail;
+        const wire::SUnitDetail& d = *unit.detail;
         if ((fields & wire::kFieldUnitDetail) != 0u) {
           into.unitParts[2] += varintBits(d.creator) + zz(d.creationTick) + zz(d.stunTicks) + zz(d.jobType)
                              + zz(d.fireState) + zz(d.siloMaxStorage[0]) + zz(d.siloMaxStorage[1])
@@ -302,7 +302,7 @@ namespace faf::replay
       SFieldBits created{};
       fieldBits(record, wire::CreationFields(record), created);
       const std::uint32_t fields = wire::CreationFields(record);
-      mFieldBits.creations += gap(first, previous, record.id) + varintBits(fields) + sum(created);
+      mFieldBits.creations += gap(first, previous, record.id) + varintBits(fields) + varintBits(record.tickCreated) + sum(created);
       for (std::size_t i = 0; i < created.appearance.size(); ++i) {
         mCreationAppearanceBits[i] += created.appearance[i];
       }

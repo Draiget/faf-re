@@ -16,6 +16,8 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/UnitAttributes.h"
 #include "moho/misc/Stats.h"
+#include "moho/resource/CSimResources.h"
+#include "moho/sim/STIMap.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -308,6 +310,110 @@ namespace faf::remote::client
     }
   }
 
+  void CSyncRebuilder::ApplyDeposits(moho::SSyncData& packet)
+  {
+    if (mSession == nullptr || packet.mSimResources.px == nullptr) {
+      return; // no session record, or a beat without the sim's deposits: the packet's stays
+    }
+    if (!mResources) {
+      mResources.reset(new moho::CSimResources());
+    }
+    const std::vector<wire::SDeposit>& deposits = mSession->Deposits();
+    for (; mDepositsApplied < deposits.size(); ++mDepositsApplied) {
+      const wire::SDeposit& deposit = deposits[mDepositsApplied];
+      gpg::Rect2i footprint{};
+      footprint.x0 = deposit.x0;
+      footprint.z0 = deposit.z0;
+      footprint.x1 = deposit.x1;
+      footprint.z1 = deposit.z1;
+      mResources->AddDeposit(static_cast<moho::EDepositType>(deposit.type), &footprint);
+    }
+    {
+      // Check: the client's deposits are the sim's, in order.
+      moho::CSimResources& sim = *packet.mSimResources.px;
+      boost::mutex::scoped_lock simLock(sim.lock_);
+      boost::mutex::scoped_lock ownLock(mResources->lock_);
+      bool same = sim.deposits_.size() == mResources->deposits_.size();
+      for (std::size_t i = 0; same && i < sim.deposits_.size(); ++i) {
+        const moho::ResourceDeposit& a = sim.deposits_[i];
+        const moho::ResourceDeposit& b = mResources->deposits_[i];
+        same = a.depositType == b.depositType && a.footprintRect.x0 == b.footprintRect.x0
+            && a.footprintRect.z0 == b.footprintRect.z0 && a.footprintRect.x1 == b.footprintRect.x1
+            && a.footprintRect.z1 == b.footprintRect.z1;
+      }
+      mStats.depositMismatches += same ? 0u : 1u;
+    }
+    packet.mSimResources.reset_from_owner(mResources);
+  }
+
+  CSyncRebuilder::~CSyncRebuilder()
+  {
+    mSimTerrain.release();
+  }
+
+  std::uint64_t CSyncRebuilder::TerrainCellsDiffering() const noexcept
+  {
+    const moho::CHeightField* const sim = mSimTerrain.px;
+    if (sim == nullptr || !mTerrain) {
+      return 0u;
+    }
+    if (sim->width != mTerrain->width || sim->height != mTerrain->height) {
+      return static_cast<std::uint64_t>(sim->width) * static_cast<std::uint64_t>(sim->height);
+    }
+    const std::size_t cells = static_cast<std::size_t>(sim->width) * static_cast<std::size_t>(sim->height);
+    std::uint64_t differing = 0;
+    for (std::size_t i = 0; i < cells; ++i) {
+      differing += sim->data[i] != mTerrain->data[i] ? 1u : 0u;
+    }
+    return differing;
+  }
+
+  void CSyncRebuilder::ApplyTerrain(moho::SSyncData& packet)
+  {
+    const moho::CHeightField* const sim = packet.mTerrainUpdate.px;
+    if (mSession == nullptr || sim == nullptr) {
+      return; // no session record, or a beat without the sim's field: the packet's stays
+    }
+    if (!mTerrain) {
+      // The heights as the map loads them. A networked client loads them from the map file
+      // (WP12); in loopback the first beat's field is that, before any edit.
+      mTerrain.reset(new moho::CHeightField(sim->width - 1, sim->height - 1));
+      std::copy_n(sim->data, static_cast<std::size_t>(sim->width) * static_cast<std::size_t>(sim->height), mTerrain->data);
+    }
+    const std::vector<wire::STerrainEdit> edits = mSession->TakeTerrainEdits();
+    msvc8::vector<gpg::Rect2i> rects;
+    for (const wire::STerrainEdit& edit : edits) {
+      gpg::Rect2i rect{};
+      rect.x0 = edit.dirty.x0;
+      rect.z0 = edit.dirty.z0;
+      rect.x1 = edit.dirty.x1;
+      rect.z1 = edit.dirty.z1;
+      rects.push_back(rect);
+      if (edit.cells.x0 > edit.cells.x1 || edit.cells.x0 < 0 || edit.cells.z0 < 0 || edit.cells.x1 >= mTerrain->width
+          || edit.cells.z1 >= mTerrain->height) {
+        continue; // outside this field: nothing to write
+      }
+      const std::ptrdiff_t rowCells = edit.cells.x1 - edit.cells.x0 + 1;
+      auto height = edit.heights.begin();
+      for (std::int32_t z = edit.cells.z0; z <= edit.cells.z1; ++z, height += rowCells) {
+        std::uint16_t* const row = mTerrain->data + static_cast<std::ptrdiff_t>(z) * mTerrain->width;
+        std::copy_n(height, rowCells, row + edit.cells.x0);
+      }
+      ++mStats.terrainEdits;
+    }
+    // Checks: the same rectangles as the sim's, and the same heights everywhere after an edit.
+    bool sameRects = rects.size() == packet.mPlayableRectUpdates.size();
+    for (std::size_t i = 0; sameRects && i < rects.size(); ++i) {
+      const gpg::Rect2i& a = rects[i];
+      const gpg::Rect2i& b = packet.mPlayableRectUpdates[i];
+      sameRects = a.x0 == b.x0 && a.z0 == b.z0 && a.x1 == b.x1 && a.z1 == b.z1;
+    }
+    mStats.terrainRectMismatches += sameRects ? 0u : 1u;
+    mSimTerrain.reset_from(packet.mTerrainUpdate); // for `TerrainCellsDiffering`
+    packet.mPlayableRectUpdates.swap(rects);
+    packet.mTerrainUpdate.reset_from_owner(mTerrain);
+  }
+
   moho::CSndParams* CSyncRebuilder::ResolveSound(const std::uint32_t id)
   {
     if (id == wire::COrdinalTable::kNone || mSession == nullptr) {
@@ -446,7 +552,7 @@ namespace faf::remote::client
         moho::SCreateUnitParams params{};
         params.mEntityId = record.id;
         params.mBlueprint = blueprint;
-        params.mTickCreated = static_cast<std::uint32_t>(packet.mCurTick);
+        params.mTickCreated = record.tickCreated;
         params.mConstDat.mBuildStateTag = record.unit.buildStateTag;
         params.mConstDat.mFake = record.unit.fake;
         params.mConstDat.mStatsRoot = held.stats;
@@ -465,7 +571,7 @@ namespace faf::remote::client
         moho::SCreateEntityParams params{};
         params.mEntityId = record.id;
         params.mBlueprint = blueprint;
-        params.mTickCreated = static_cast<std::uint32_t>(packet.mCurTick);
+        params.mTickCreated = record.tickCreated;
         if (const auto it = packetEntities.find(record.id); it != packetEntities.end()) {
           mStats.blueprintMismatches += it->second->mBlueprint != blueprint ? 1u : 0u;
           mStats.tickMismatches += it->second->mTickCreated != params.mTickCreated ? 1u : 0u;
@@ -665,8 +771,8 @@ namespace faf::remote::client
         entry.mVariableData = *held.unit;
         moho::SSTIUnitVariableData& data = entry.mVariableData;
         UnpackUnitFields(record.unit, data);
-        UnpackUnitDetail(record.unit.detail, data);
-        entry.mReconFlags = record.unit.detail.reconFlags;
+        UnpackUnitDetail(*record.unit.detail, data);
+        entry.mReconFlags = record.unit.detail->reconFlags;
         if (fromPacket) {
           const moho::SSTIUnitVariableData& sim = packetIt->second->mVariableData;
           data.mPriorSharedPose = sim.mPriorSharedPose;
@@ -699,10 +805,13 @@ namespace faf::remote::client
         }
         const auto heldIt = mHeld.find(record.id);
         if (heldIt != mHeld.end() && heldIt->second.stats) {
-          ApplyUnitStats(record.unit.stats, *heldIt->second.stats);
+          ApplyUnitStats(*record.unit.stats, *heldIt->second.stats);
         }
       }
     }
+
+    ApplyDeposits(packet);
+    ApplyTerrain(packet);
 
     packet.mNewEntities.swap(newEntities);
     packet.mNewUnits.swap(newUnits);

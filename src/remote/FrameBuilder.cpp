@@ -11,6 +11,8 @@
 #include "moho/unit/core/UnitAttributes.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/misc/Stats.h"
+#include "moho/resource/CSimResources.h"
+#include "moho/sim/STIMap.h"
 #include "moho/render/textures/CD3DFileBatchTexture.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/SimDriver.h"
@@ -313,6 +315,52 @@ namespace faf::remote
 
   void CViewFrameBuilder::Apply(const moho::SSyncData& packet)
   {
+    // Resource deposits the sim added since the last beat go on the session record (the sim
+    // only ever appends them).
+    if (mSession != nullptr && packet.mSimResources.px != nullptr) {
+      moho::CSimResources& resources = *packet.mSimResources.px;
+      boost::mutex::scoped_lock lock(resources.lock_);
+      for (std::size_t i = mSession->DepositCount(); i < resources.deposits_.size(); ++i) {
+        const moho::ResourceDeposit& source = resources.deposits_[i];
+        const wire::SDeposit deposit{
+          static_cast<std::uint8_t>(source.depositType), source.footprintRect.x0, source.footprintRect.z0,
+          source.footprintRect.x1, source.footprintRect.z1
+        };
+        if (!mSession->Deposit(deposit)) {
+          ++mDepositOverflows;
+          break;
+        }
+      }
+    }
+    // Terrain edits: each changed rectangle with the heights the sim's field now holds there.
+    if (mSession != nullptr) {
+      const moho::CHeightField* const field = packet.mTerrainUpdate.px;
+      for (const gpg::Rect2i& rect : packet.mPlayableRectUpdates) {
+        wire::STerrainEdit edit{};
+        edit.dirty = {rect.x0, rect.z0, rect.x1, rect.z1};
+        edit.cells = {0, 0, -1, -1};
+        if (field != nullptr) {
+          const wire::SCellRect clipped{
+            std::max(rect.x0, 0), std::max(rect.z0, 0), std::min(rect.x1, field->width - 1),
+            std::min(rect.z1, field->height - 1)
+          };
+          if (clipped.x0 <= clipped.x1 && clipped.z0 <= clipped.z1) {
+            edit.cells = clipped;
+            edit.heights.reserve(
+              static_cast<std::size_t>(clipped.x1 - clipped.x0 + 1) * static_cast<std::size_t>(clipped.z1 - clipped.z0 + 1)
+            );
+            for (std::int32_t z = clipped.z0; z <= clipped.z1; ++z) {
+              const std::uint16_t* const row = field->data + static_cast<std::ptrdiff_t>(z) * field->width;
+              edit.heights.insert(edit.heights.end(), row + clipped.x0, row + clipped.x1 + 1);
+            }
+          }
+        }
+        if (!mSession->TerrainEdit(std::move(edit))) {
+          ++mTerrainEditOverflows;
+        }
+      }
+    }
+
     // Orphaned records whose window has passed leave the frame (as a delete would; the
     // client has orphaned their entities already).
     const auto beat = static_cast<std::uint32_t>(packet.mCurBeat);
@@ -330,6 +378,7 @@ namespace faf::remote
     const auto create = [&](const moho::SCreateEntityParams& params) -> wire::SEntityRecord& {
       wire::SEntityRecord record{};
       record.id = params.mEntityId;
+      record.tickCreated = params.mTickCreated;
       if (params.mBlueprint != nullptr) {
         record.blueprint = mTables.blueprints.Ordinal(params.mBlueprint->mBlueprintId.c_str());
         if (record.blueprint == wire::COrdinalTable::kNone) {
@@ -363,7 +412,9 @@ namespace faf::remote
       const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
       if (it != mWorld.end() && it->second.isUnit) {
         ApplyUnitData(it->second.unit, update.mVariableData);
-        ApplyUnitDetail(it->second.unit.detail, update.mVariableData, update.mReconFlags, mTables, mSession);
+        // Built aside and kept shared with the frames before unless it changed.
+        ApplyUnitDetail(mDetailScratch, update.mVariableData, update.mReconFlags, mTables, mSession);
+        it->second.unit.detail.Assign(mDetailScratch);
       }
     }
     for (const moho::EntId id : packet.mEraseIds) {
@@ -390,7 +441,8 @@ namespace faf::remote
     if (mSession != nullptr) {
       for (const auto& [id, stats] : mUnitStats) {
         if (const auto it = mWorld.find(id); it != mWorld.end()) {
-          ReadUnitStats(*stats, *mSession, it->second.unit.stats);
+          ReadUnitStats(*stats, *mSession, mStatsScratch);
+          it->second.unit.stats.Assign(mStatsScratch);
         }
       }
     }

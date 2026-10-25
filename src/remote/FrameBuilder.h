@@ -93,6 +93,10 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept { return mUnknownBlueprints; }
     /** Underlay textures that are not plain file textures (should stay 0). */
     [[nodiscard]] std::uint64_t UnknownUnderlays() const noexcept { return mUnknownUnderlays; }
+    /** Beats with more resource deposits than the session record may carry (should stay 0). */
+    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mDepositOverflows; }
+    /** Terrain edits the session record could not carry (should stay 0). */
+    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
 
   private:
     const wire::SContentTables& mTables;
@@ -104,6 +108,10 @@ namespace faf::remote
     std::uint32_t mNextFrameId = 1;
     std::uint64_t mUnknownBlueprints = 0;
     std::uint64_t mUnknownUnderlays = 0;
+    std::uint64_t mDepositOverflows = 0;
+    std::uint64_t mTerrainEditOverflows = 0;
+    wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared
+    std::vector<wire::SUnitStat> mStatsScratch;  // a unit's stats, likewise
     wire::CSessionTableWriters* mSession = nullptr;
   };
 

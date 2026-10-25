@@ -374,6 +374,7 @@ namespace
     {
       SEntityRecord record{};
       record.id = id;
+      record.tickCreated = mRng() % 4u == 0u ? 0u : mRng() % 100000u;
       record.blueprint = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 5000u;
       record.army = static_cast<std::uint8_t>(mRng() % 17u == 16u ? 0xFFu : mRng() % 16u);
       record.position = {Axis(kCodec.position.x), Axis(kCodec.position.y), Axis(kCodec.position.z)};
@@ -418,9 +419,9 @@ namespace
         record.unit.unitFlags = static_cast<std::uint8_t>(mRng());
         record.unit.buildStateTag = static_cast<std::uint8_t>(mRng());
         record.unit.fake = static_cast<std::uint8_t>(mRng() & 1u);
-        record.unit.stats = RandomStats();
+        record.unit.stats = TSharedValue<std::vector<SUnitStat>>(RandomStats());
         if (mRng() % 2u == 0u) {
-          record.unit.detail = RandomDetail();
+          record.unit.detail = TSharedValue<SUnitDetail>(RandomDetail());
         }
       }
       // Appearance: mostly defaults (a creation then sends none of it), sometimes anything.
@@ -502,10 +503,10 @@ namespace
         if (mRng() % 4u == 0u) {
           const SUnitDetail fresh = RandomDetail();
           switch (mRng() % 4u) {
-          case 0: unit.detail.commands = fresh.commands; break;
-          case 1: unit.detail.weapons = fresh.weapons; break;
-          case 2: unit.detail.attributes = fresh.attributes; break;
-          default: unit.detail.focusUnit = fresh.focusUnit; unit.detail.economy = fresh.economy; break;
+          case 0: unit.detail.Edit().commands = fresh.commands; break;
+          case 1: unit.detail.Edit().weapons = fresh.weapons; break;
+          case 2: unit.detail.Edit().attributes = fresh.attributes; break;
+          default: unit.detail.Edit().focusUnit = fresh.focusUnit; unit.detail.Edit().economy = fresh.economy; break;
           }
         }
       }
@@ -1202,7 +1203,7 @@ namespace
     CHECK(client.Sounds().Size() == 2u && client.Sounds().Find(0) != nullptr && *client.Sounds().Find(0) == loop);
     CHECK(client.Names().Size() == 1u && *client.Names().Find(0) == "/textures/ui/common/game/strategicicons/icon_land_rest.dds");
 
-    // A second batch adds only what is new; an empty batch is two zero counts.
+    // A second batch adds only what is new; an empty batch is four zero counts.
     CHECK(server.Name("/textures/ui/common/game/strategicicons/icon_land_rest.dds") == 0u);
     CHECK(server.Name("/a.dds") == 1u);
     BitWriter second;
@@ -1212,7 +1213,101 @@ namespace
     CHECK(client.Read(secondIn) && client.Names().Size() == 2u && client.Sounds().Size() == 2u);
     BitWriter empty;
     server.WritePending(empty);
-    CHECK(Bytes(empty).size() == 2u);
+    CHECK(Bytes(empty).size() == 4u);
+
+    // Resource deposits: each one once, in order, across records; negative cells survive.
+    const SDeposit mass{1, 10, 12, 12, 14};
+    const SDeposit hydro{2, -3, 500, 1, 504};
+    CHECK(server.Deposit(mass) && server.Deposit(hydro) && server.DepositCount() == 2u && server.HasPending());
+    BitWriter third;
+    server.WritePending(third);
+    const std::vector<std::uint8_t> thirdBytes = Bytes(third);
+    BitReader thirdIn(thirdBytes);
+    CHECK(client.Read(thirdIn) && client.Deposits() == (std::vector<SDeposit>{mass, hydro}));
+    CHECK(server.Deposit(mass) && server.DepositCount() == 3u);
+    BitWriter fourth;
+    server.WritePending(fourth);
+    const std::vector<std::uint8_t> fourthBytes = Bytes(fourth);
+    BitReader fourthIn(fourthBytes);
+    CHECK(client.Read(fourthIn) && client.Deposits().size() == 3u && client.Deposits()[2] == mass);
+    for (std::size_t length = 0; length < thirdBytes.size(); ++length) {
+      CSessionTableReaders cut;
+      BitReader cutIn(std::span<const std::uint8_t>(thirdBytes.data(), length));
+      CHECK(!cut.Read(cutIn));
+    }
+    // More deposits than a session may have are refused before any is read.
+    BitWriter flood;
+    flood.WriteVarUint(0u);
+    flood.WriteVarUint(0u);
+    flood.WriteVarUint(CSessionTableWriters::kMaxDeposits + 1u);
+    const std::vector<std::uint8_t> floodBytes = Bytes(flood);
+    CSessionTableReaders flooded;
+    BitReader floodIn(floodBytes);
+    CHECK(!flooded.Read(floodIn) && flooded.Deposits().empty());
+
+    // Terrain edits: rectangles and heights come back exactly, once; a flat edit costs about a
+    // byte a cell; an edit outside the field carries its rectangle alone.
+    STerrainEdit flat{};
+    flat.dirty = {9, 19, 13, 23};
+    flat.cells = {10, 20, 13, 23};
+    flat.heights.assign(16, 4321);
+    flat.heights[5] = 65535;
+    STerrainEdit outside{};
+    outside.dirty = {2000, 2000, 2004, 2004};
+    outside.cells = {0, 0, -1, -1};
+    CHECK(server.TerrainEdit(flat) && server.TerrainEdit(outside));
+    STerrainEdit wrong = flat;
+    wrong.heights.pop_back();
+    CHECK(!server.TerrainEdit(wrong));
+    BitWriter fifth;
+    server.WritePending(fifth);
+    const std::vector<std::uint8_t> fifthBytes = Bytes(fifth);
+    CHECK(fifthBytes.size() < 60u);
+    BitReader fifthIn(fifthBytes);
+    CHECK(client.Read(fifthIn));
+    const std::vector<STerrainEdit> taken = client.TakeTerrainEdits();
+    CHECK(taken.size() == 2u && taken[0] == flat && taken[1] == outside);
+    CHECK(client.TakeTerrainEdits().empty());
+    for (std::size_t length = 0; length < fifthBytes.size(); ++length) {
+      CSessionTableReaders cut;
+      BitReader cutIn(std::span<const std::uint8_t>(fifthBytes.data(), length));
+      CHECK(!cut.Read(cutIn));
+    }
+    // A height out of range and an edit larger than allowed are refused.
+    BitWriter tall;
+    tall.WriteVarUint(0u);
+    tall.WriteVarUint(0u);
+    tall.WriteVarUint(0u);
+    tall.WriteVarUint(1u);
+    for (int i = 0; i < 4; ++i) {
+      tall.WriteVarUint(0u);
+    }
+    tall.WriteBool(true);
+    for (int i = 0; i < 4; ++i) {
+      tall.WriteVarUint(0u);
+    }
+    tall.WriteVarUint(2u * 70000u); // zig-zag of 70000
+    CSessionTableReaders tallReader;
+    const std::vector<std::uint8_t> tallBytes = Bytes(tall);
+    BitReader tallIn(tallBytes);
+    CHECK(!tallReader.Read(tallIn));
+    BitWriter huge;
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(1u);
+    for (int i = 0; i < 4; ++i) {
+      huge.WriteVarUint(0u);
+    }
+    huge.WriteBool(true);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(2u * 4000u);
+    huge.WriteVarUint(2u * 4000u);
+    CSessionTableReaders hugeReader;
+    const std::vector<std::uint8_t> hugeBytes = Bytes(huge);
+    BitReader hugeIn(hugeBytes);
+    CHECK(!hugeReader.Read(hugeIn));
 
     // The same record twice is refused (ids out of order); truncation everywhere is refused.
     CSessionTableReaders again;

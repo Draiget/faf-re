@@ -113,7 +113,9 @@ namespace faf::remote::client
          + s.underlayMismatches + s.unknownTableIds + mBuilder.UnknownUnderlays() + s.createdNotInPacket + s.packetCreatedNotRebuilt
          + s.blueprintMismatches + s.eraseMismatches + s.deleteMismatches + s.packetUpdatesDropped
          + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
-         + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches;
+         + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches + s.depositMismatches
+         + mBuilder.DepositOverflows() + s.terrainRectMismatches + mRebuilder.TerrainCellsDiffering()
+         + mBuilder.TerrainEditOverflows();
   }
 
   std::string CLoopbackLink::Summary(const char* const when) const
@@ -141,13 +143,16 @@ namespace faf::remote::client
       "mismatches %llu, positions out of range %llu, sound mismatches %llu, underlay mismatches %llu, unknown "
       "underlays %llu, unknown table ids %llu, table failures %llu (table records %.2f KB in all), creation tick "
       "mismatches %llu, unit stat items applied %llu, unit updates %llu (with the packet's poses %llu), unit data "
-      "mismatches %llu",
+      "mismatches %llu, resource deposits %zu (mismatches %llu, overflows %llu), terrain edits %llu (rectangle "
+      "mismatches %llu, height cells differing from the sim's now %llu, overflows %llu)",
       when, u(s.createdNotInPacket), u(s.packetCreatedNotRebuilt), u(s.blueprintMismatches), u(s.noBlueprint),
       u(s.eraseMismatches), u(s.deleteMismatches), u(s.packetUpdatesDropped), u(s.unitChangesWithoutUpdate),
       u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange),
       u(s.soundMismatches), u(s.underlayMismatches), u(mBuilder.UnknownUnderlays()), u(s.unknownTableIds),
       u(mTableFailures), static_cast<double>(mTableBytes) / 1024.0, u(s.tickMismatches), u(s.statsApplied),
-      u(s.unitUpdates), u(s.unitPosesBorrowed), u(s.unitDataMismatches)
+      u(s.unitUpdates), u(s.unitPosesBorrowed), u(s.unitDataMismatches), mClientTables.Deposits().size(),
+      u(s.depositMismatches), u(mBuilder.DepositOverflows()), u(s.terrainEdits), u(s.terrainRectMismatches),
+      u(mRebuilder.TerrainCellsDiffering()), u(mBuilder.TerrainEditOverflows())
     ).c_str();
     return text;
   }
