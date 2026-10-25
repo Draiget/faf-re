@@ -20478,8 +20478,10 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedAlignedBoxL(
   alignedBoxObject.SetNumber("yMin", yMin);
   alignedBoxObject.SetNumber("zMin", zMin);
   alignedBoxObject.SetNumber("xMax", xMax);
-  alignedBoxObject.SetNumber("xMax", yMax);
-  alignedBoxObject.SetNumber("xMax", zMax);
+  // FAF hot-patch (FA-Binary-Patches FixGetInterpolatedAlignedBox): 0x0086D2C0 and 0x0086D2D6
+  // push "yMax" and "zMax"; the stock binary wrote all three maxima under "xMax".
+  alignedBoxObject.SetNumber("yMax", yMax);
+  alignedBoxObject.SetNumber("zMax", zMax);
   alignedBoxObject.PushStack(state);
   return 1;
 }
