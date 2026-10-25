@@ -14397,18 +14397,17 @@ namespace moho
       if (loader != nullptr && pendingSession != nullptr) {
         LaunchInfoBase* const launchInfo = pendingSession->mLaunchInfo.get();
         if (launchInfo != nullptr) {
-          // Binary slot 2 dispatch on `IWldSessionLoader` is
-          // `GetScenarioInfo(mapName, &mGameMods, setGameData)`. The retail
-          // call site at 0x0088BF52 only pushes 2 args; the third dword
-          // consumed by the callee's `retn 0Ch` is whatever stale stack
-          // value sits at `[esp+8]`. Recover as a 3-arg invocation with the
-          // setGameData lane wired to the prefetch-then-mark semantics the
-          // preload action needs (mark the requested scenario as the active
-          // game-data target before the `Loading` action begins iterating
-          // on it).
-          (void)loader->GetScenarioInfo(
-            pendingSession->mMapName.raw_data_unsafe(), &launchInfo->mGameMods, true
-          );
+          // Slot 2 of the loader's vtable (0x0088BF71 `call [edx+8]` with the
+          // map name and &mGameMods pushed): `CreateScenarioInfo`, which is
+          // 0x00885920 in ??_7CWldSessionLoaderImpl (0x00E49FC4) and returns
+          // with `ret 8`. It marks the load as requested (`mLoaded`), so
+          // `Update` unloads any other prefetched scenario. This called
+          // `GetScenarioInfo` (slot 1, the Lua PrefetchSession path) instead,
+          // which clears that mark: a launch whose mods differ from the last
+          // prefetch (the autolobby prefetches with none) kept the stale
+          // scenario, `IsLoaded` never became true, and the client sat in the
+          // loading screen while the others waited for it.
+          (void)loader->CreateScenarioInfo(pendingSession->mMapName.raw_data_unsafe(), &launchInfo->mGameMods);
         }
       }
 
