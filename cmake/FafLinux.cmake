@@ -27,6 +27,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Release optimises as the Windows builds' /O2 does: CMake appends its GNU
+# default (-O3 -DNDEBUG) after the toolchain's -O2, so the later -O3 would win.
+foreach(_lang C CXX ASM)
+  string(REPLACE "-O3" "-O2" CMAKE_${_lang}_FLAGS_RELEASE "${CMAKE_${_lang}_FLAGS_RELEASE}")
+  string(REPLACE "-O2 -DNDEBUG -O2 -DNDEBUG" "-O2 -DNDEBUG" CMAKE_${_lang}_FLAGS_RELEASE "${CMAKE_${_lang}_FLAGS_RELEASE}")
+endforeach()
+
 # --- Locations ------------------------------------------------------------------------
 set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
@@ -81,17 +88,27 @@ list(LENGTH _faf_sim_files _faf_sim_count)
 message(STATUS "faf_sim: ${_faf_sim_count} translation units")
 
 add_library(faf_sim OBJECT ${_faf_sim_files})
+# Its compile and link settings, which targets built from a few sim sources
+# (tests/sim_math) share without depending on every faf_sim object.
+add_library(faf_sim_settings INTERFACE)
+target_link_libraries(faf_sim PUBLIC faf_sim_settings)
+
+# The x64 half of legacy/math/X87Math.cpp, in GNU syntax for System V (the
+# Windows build assembles X87Math64.asm, plan WPL.10).
+enable_language(ASM)
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
 
 # The Windows build's engine definitions without the Win32 ones (WIN32,
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
-target_compile_definitions(faf_sim PUBLIC
+target_compile_definitions(faf_sim_settings INTERFACE
   LUAPLUS_LIB LUA_NUMBER=float
   BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR)
-target_include_directories(faf_sim PUBLIC
+target_include_directories(faf_sim_settings INTERFACE
   "${PROJECT_SOURCE_DIR}/src"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
-target_link_libraries(faf_sim PUBLIC faf_codegen Wm3Foundation zlib123)
+target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
+target_link_libraries(faf_sim PUBLIC Wm3Foundation zlib123)
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
@@ -116,8 +133,10 @@ set(_faf_sim_options
   -Wno-tautological-constant-out-of-range-compare
   -Wno-tautological-undefined-compare -Wno-undefined-var-template
   -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
-  -Wno-mismatched-tags -Wno-extra-qualification)
-target_compile_options(faf_sim PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
+  -Wno-mismatched-tags -Wno-extra-qualification
+  # Options clang 18 does not know yet (the Windows build uses a newer clang).
+  -Wno-unknown-warning-option)
+target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
 
 # boost.thread's own sources, as on Windows (src/CMakeLists.txt).
 foreach(_src IN LISTS _faf_sim_files)
@@ -126,6 +145,26 @@ foreach(_src IN LISTS _faf_sim_files)
     set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
   endif()
 endforeach()
+
+# --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
+# The golden sim-math tests (tests/sim_math), compiled with faf_sim's settings.
+# Until every faf_sim object compiles and links, the Linux run covers the parts
+# whose code builds here (FAF_SIM_MATH_SUBSET: the X87Math helpers, sqrt and the
+# navigator's cell arithmetic) and reports the golden cases it skipped.
+add_executable(faf_sim_math_tests
+  "${PROJECT_SOURCE_DIR}/tests/sim_math/SimMathTests.cpp"
+  "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math.cpp"
+  "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
+target_link_libraries(faf_sim_math_tests PRIVATE faf_sim_settings)
+target_compile_definitions(faf_sim_math_tests PRIVATE FAF_SIM_MATH_SUBSET=1)
+set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
+if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
+  list(APPEND _faf_sim_math_args --known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
+endif()
+add_custom_command(TARGET faf_sim_math_tests POST_BUILD
+  COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
+  COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
+  VERBATIM)
 
 # --- faf-sim-link -----------------------------------------------------------------------
 # Every faf_sim object linked into one executable with no entry point of its

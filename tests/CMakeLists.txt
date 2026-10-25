@@ -9,6 +9,29 @@ target_link_libraries(faf_net_tests PRIVATE faf_engine)
 
 add_test(NAME net_robustness COMMAND faf_net_tests)
 
+# Engine addition (dedicated-server plan WPL.23): golden sim-math tests
+# (tests/sim_math). Built with every build, and run right after it: a change
+# that moves one result of the simulation's parity-sensitive arithmetic fails
+# the build. `faf_sim_math_tests --generate <file>` rewrites the golden file
+# (only on Windows x64, see the source).
+add_executable(faf_sim_math_tests sim_math/SimMathTests.cpp)
+target_link_libraries(faf_sim_math_tests PRIVATE faf_engine)
+set(_faf_sim_math_golden "${CMAKE_CURRENT_SOURCE_DIR}/sim_math/golden.txt")
+# The x86 build's recorded differences from the x64 golden (the file's header
+# gives the reason).
+set(_faf_sim_math_known "${CMAKE_CURRENT_SOURCE_DIR}/sim_math/known_windows-${FAF_TARGET_ARCH}.txt")
+set(_faf_sim_math_args "${_faf_sim_math_golden}")
+if(EXISTS "${_faf_sim_math_known}")
+  list(APPEND _faf_sim_math_args --known "${_faf_sim_math_known}")
+endif()
+if(EXISTS "${_faf_sim_math_golden}")
+  add_custom_command(TARGET faf_sim_math_tests POST_BUILD
+    COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
+    COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
+    VERBATIM)
+  add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
+endif()
+
 # Engine addition (dedicated-server plan WPL.4, WPR.11): what the static
 # initialisers of faf_main's objects registered (tests/registry).
 add_executable(faf_registration_dump EXCLUDE_FROM_ALL registry/RegistrationDump.cpp)

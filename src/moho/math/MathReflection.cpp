@@ -1305,22 +1305,9 @@ namespace
   [[maybe_unused]] MathReflectionBootstrap gMathReflectionBootstrap;
 } // namespace
 
-extern "C" int global_mode_sse2 = 1;
-extern "C" int global_compat_flag = 1;
-
-/**
- * Address: 0x00A8ECD3 (FUN_00A8ECD3, func_SetSSE2)
- *
- * What it does:
- * Enables/disables the SSE2 runtime lane by masking with the startup
- * compatibility flag, then publishes and returns the resulting mode value.
- */
-extern "C" int __cdecl SetSse2Mode(const int enableSse2)
-{
-  const int mode = (enableSse2 != 0) ? global_compat_flag : 0;
-  global_mode_sse2 = mode;
-  return mode;
-}
+// global_mode_sse2, global_compat_flag and SetSse2Mode (func_SetSSE2,
+// 0x00A8ECD3) are defined in legacy/math/X87Math.cpp, next to the helpers that
+// read the lane.
 
 // CRT `ceil` (0x00A840A0) and its x87 fallback (0x00A9AC84) are recovered in
 // moho/misc/CrtRuntimeHelpers.cpp with the rest of the statically linked CRT;

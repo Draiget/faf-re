@@ -4,9 +4,28 @@
 #include <cmath>
 #include <xmmintrin.h>
 
-extern "C" int global_mode_sse2;
+// Moved here unchanged from moho/math/MathReflection.cpp (dedicated-server plan
+// WPL.23): the lane state belongs with the helpers that read it, and the
+// simulation's math tests link this file without the reflection code.
+extern "C" int global_mode_sse2 = 1;
+extern "C" int global_compat_flag = 1;
 
-#if defined(_M_X64)
+/**
+ * Address: 0x00A8ECD3 (FUN_00A8ECD3, func_SetSSE2)
+ *
+ * What it does:
+ * Enables/disables the SSE2 runtime lane by masking with the startup
+ * compatibility flag, then publishes and returns the resulting mode value.
+ */
+extern "C" int __cdecl SetSse2Mode(const int enableSse2)
+{
+  const int mode = (enableSse2 != 0) ? global_compat_flag : 0;
+  global_mode_sse2 = mode;
+  return mode;
+}
+
+// x64 (Windows x64 and System V): legacy/math/X87Math64.asm / X87Math64.S.
+#if defined(_M_X64) || defined(__x86_64__)
 // legacy/math/X87Math64.asm: the same instruction sequences for 64-bit code,
 // which has no inline assembly.
 extern "C" float __cdecl msvc8_x87_sinf(float x);
