@@ -426,8 +426,11 @@ int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
     LuaPlus::LuaState::Error(curState, "ForkThread: missing FUNCTION argument");
   }
 
+  // FAF hot-patch (FA-Binary-Patches ForkThreadFix): 0x004C9DE1 calls 0x0128B021, which
+  // tests `Type() == LUA_TFUNCTION` instead of LuaObject::IsFunction, so a C function is
+  // refused as well (the stock test also accepted LUA_CFUNCTION).
   const LuaPlus::LuaObject functionObject(LuaPlus::LuaStackObject(curState, 1));
-  if (!functionObject.IsFunction()) {
+  if (functionObject.Type() != LUA_TFUNCTION) {
     LuaPlus::LuaState::Error(curState, "ForkThread: first argument isn't a function");
   }
 
