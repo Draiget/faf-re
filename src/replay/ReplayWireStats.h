@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "remote/FrameBuilder.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
 
@@ -50,7 +51,7 @@ namespace faf::replay
     std::FILE* mFile = nullptr;
     const faf::remote::wire::SContentTables& mTables;
     faf::remote::wire::SFrameCodec mCodec;
-    std::map<std::uint32_t, faf::remote::wire::SEntityRecord> mWorld;
+    faf::remote::CViewFrameBuilder mBuilder;
     faf::remote::wire::SViewFrame mPrevious;
     // The same frames without the yaw form and without the unit block, for comparison.
     faf::remote::wire::SViewFrame mPreviousNoYaw;
@@ -62,13 +63,11 @@ namespace faf::replay
     /** The same frames dead-reckoned (WP7.5) at one tolerance, with their own state and baseline. */
     struct SDeadReckoningVariant
     {
-      std::uint32_t tolerance = 0;
-      std::map<std::uint32_t, std::pair<faf::remote::wire::SEntityRecord, faf::remote::wire::QuantizedPosition>> sent;
+      faf::remote::CDeadReckoner reckoner;
       faf::remote::wire::SViewFrame previous;
       std::uint64_t bytes = 0;
-      std::uint64_t reanchors = 0;
     };
-    SDeadReckoningVariant mDeadReckoning[2];
+    SDeadReckoningVariant mDeadReckoning[2]{{faf::remote::CDeadReckoner(4)}, {faf::remote::CDeadReckoner(16)}}; // 1/16, 1/4 unit
     faf::remote::wire::SFrameCodec mDeadReckoningCodec;
 
     /** Bits of changed records by field class, summed over the run (creations and ids apart). */
@@ -84,13 +83,11 @@ namespace faf::replay
       std::uint64_t removals = 0;   // removed ids
     } mFieldBits;
     bool mHavePrevious = false;
-    std::uint32_t mNextFrameId = 1;
 
     std::uint64_t mBeats = 0;
     std::uint64_t mDeltaBytes = 0;
     std::uint64_t mEntitySum = 0;
     std::uint32_t mMaxEntities = 0;
-    std::uint64_t mUnknownBlueprints = 0;
     std::uint64_t mRoundTripFailures = 0;
     std::uint64_t mEncodeFailures = 0;
     std::vector<std::uint32_t> mDeltaSizes;

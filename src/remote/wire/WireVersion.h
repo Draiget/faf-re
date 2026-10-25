@@ -30,8 +30,11 @@ namespace faf::remote::wire
 
   inline constexpr std::size_t kLaneCount = static_cast<std::size_t>(ELane::Count);
 
-  /** This build's schema version of each lane. */
-  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{1, 1, 1, 1, 1, 1};
+  /**
+   * This build's schema version of each lane. Entities 2: flag bit 12 marks an orphaned
+   * record (an erased entity the client keeps until its view sees the spot, WP7.7).
+   */
+  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{2, 1, 1, 1, 1, 1};
 
   [[nodiscard]] const char* LaneName(ELane lane) noexcept;
 

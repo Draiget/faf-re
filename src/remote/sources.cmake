@@ -7,6 +7,7 @@
 # FAF_REMOTE_CLIENT_SOURCES: the client half.
 
 set(FAF_REMOTE_SOURCES
+  remote/FrameBuilder.cpp
   remote/ContentTables.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
@@ -17,5 +18,8 @@ set(FAF_REMOTE_SOURCES
 )
 
 set(FAF_REMOTE_CLIENT_SOURCES
+  remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp
+  remote/client/SessionSummary.cpp
+  remote/client/SyncRebuilder.cpp
 )

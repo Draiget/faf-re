@@ -125,6 +125,10 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "moho/sim/Sim.h"
+#if FAF_SERVER_MODE
+#include "remote/client/RemoteSimDriver.h"
+#include "remote/client/SessionSummary.h"
+#endif
 
 namespace
 {
@@ -8748,6 +8752,11 @@ namespace moho
       UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
     }
 
+#if FAF_SERVER_MODE
+    // Engine addition, server mode: `/sessionsummary` (WP11.6 check). Without it, nothing.
+    faf::remote::client::NoteSessionBeat(*this, beat);
+#endif
+
     if (beat.mGameOver && IsGameOver == 0u) {
       IsGameOver = 1u;
       UI_NoteGameOver();
@@ -14568,12 +14577,21 @@ namespace moho
       SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
       // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
       // driver is stored first, then the previous one is deleted.
-      sSimDriver.reset(SIM_CreateDriver(
+      ISTIDriver* driver = SIM_CreateDriver(
         static_cast<CClientManagerImpl*>(clientManager),
         replayStream.release(),
         sessionInfo->mLaunchInfo,
         sessionInfo->mSourceId
-      ));
+      );
+#if FAF_SERVER_MODE
+      // Engine addition, server mode: `/loopback` runs the session through the remote
+      // driver, the lockstep driver standing in for its server (replays and single-player
+      // sessions only). Without it, unchanged.
+      driver = faf::remote::client::WrapForLoopback(
+        driver, *wldSession->mRules, launchMap->GetBounds3D(), wldSession->IsMultiplayer != 0
+      );
+#endif
+      sSimDriver.reset(driver);
 
       gWldFrameAction = EWldFrameAction::Initialize;
       if (outContinue != nullptr) {

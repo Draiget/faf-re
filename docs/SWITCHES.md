@@ -85,12 +85,15 @@ The switches below are read when a session begins. In a multiplayer game every c
 
 ## Server mode
 
-Server-authoritative sessions are being built: one server runs the only sim, and each player receives only what their army can see. The code is behind the CMake option `FAF_SERVER_MODE` (off by default; the presets `clang-x64-release-server` and `clang-x86-release-server` turn it on). A client built with it is the same lockstep client for every normal game, replay and lobby: the server-mode path runs only when `/connectserver` is on the command line, and it never falls back to a lockstep session.
+Server-authoritative sessions are being built: one server runs the only sim, and each player receives only what their army can see. The code is behind the CMake option `FAF_SERVER_MODE` (off by default; the presets `clang-x64-release-server` and `clang-x86-release-server` turn it on). A client built with it is the same lockstep client for every normal game, replay and lobby: the server-mode path runs only when `/connectserver` is on the command line, and it never falls back to a lockstep session. The test switches `/loopback` and `/sessionsummary` below change nothing unless given.
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
 | `/connectserver host:port` | — | command line | startup only | Join the game server at that address (needs `/servertoken`); refused together with `/hostgame`, `/joingame`, `/gpgnet`, `/replay`, `/load`, `/scenario`, `/map` or `/perf`. Not working yet: the client says "This build cannot join server games yet." and exits |
 | `/servertoken token` | — | command line | startup only | The admission token the launcher was given for this match (1 to 1024 printable characters, no spaces) |
+| `/loopback` | off | command line | each session | Test of the remote driver: the session's own sim stands in for the game server, and every beat's entity state goes through the wire format (encoded, decoded, rebuilt into the beat the UI applies) before the UI sees it. Entity positions are then quantised to 1/64 unit. Lanes the wire format does not carry yet pass through. Logs `loopback so far:` and `checks:` lines every 600 beats and at the end; every check count should stay 0. `EjectSessionClient` reports "no active session" while it is on. Replays and single-player sessions only: in a multiplayer session it is refused (logged as `loopback: refused`) and the session runs as without it |
+| `/loopbackdr steps` | 0 | command line | each session | With `/loopback`: dead reckoning, re-anchoring a position once the client's prediction is more than `steps` 1/64-unit steps off; 0 is off |
+| `/sessionsummary` | off | command line | each session | Logs `session summary beat N:` once a minute of game time and at game over: the session's entities, units per army, orphaned entities and the units' summed health, to compare a `/loopback` run with a normal one |
 
 ### faf-replay
 
