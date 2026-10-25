@@ -7679,7 +7679,10 @@ namespace moho
         continue;
       }
 
-      if (army->mVarDat.mValidCommandSources.Contains(localCommandSource) && army->mVarDat.mIsOutOfGame == 0u) {
+      // FAF hot-patch (FA-Binary-Patches ObserverFix): 0x0089671A `jz` became `jmp`, so any army
+      // the local source commands refuses the switch; the stock binary refused only while that
+      // army was still in the game (`cmp byte ptr [edx+1B8h], 0`, now unused).
+      if (army->mVarDat.mValidCommandSources.Contains(localCommandSource)) {
         return false;
       }
     }
