@@ -142,6 +142,59 @@ namespace
     return sourcePath != nullptr ? sourcePath : "";
   }
 
+  /**
+   * Engine addition: resolves the `..` segments of a mounted path and refuses
+   * one that climbs above the root. The binary joins the path onto a mount's
+   * directory as given, so `/../../Users/x` named a file outside every mount,
+   * and Lua (`doscript`, `import`, `DiskGetFileInfo`, ...) from a lobby's map
+   * or mod could read or probe any file. A path with no `..` segment is left
+   * exactly as it was.
+   */
+  [[nodiscard]] bool ConfineMountedPath(msvc8::string& path)
+  {
+    const std::string_view text = path.view();
+    const auto isSeparator = [](const char c) { return c == '/' || c == '\\'; };
+
+    std::vector<std::string_view> segments;
+    bool climbs = false;
+    for (std::size_t start = 0; start <= text.size();) {
+      std::size_t end = start;
+      while (end < text.size() && !isSeparator(text[end])) {
+        ++end;
+      }
+      const std::string_view segment = text.substr(start, end - start);
+      if (segment == "..") {
+        climbs = true;
+        if (segments.empty()) {
+          return false;
+        }
+        segments.pop_back();
+      } else if (!segment.empty() && segment != ".") {
+        segments.push_back(segment);
+      }
+      start = end + 1;
+    }
+    if (!climbs) {
+      return true;
+    }
+
+    std::string resolved;
+    if (!text.empty() && isSeparator(text.front())) {
+      resolved.push_back('/');
+    }
+    for (std::size_t index = 0; index < segments.size(); ++index) {
+      if (index > 0) {
+        resolved.push_back('/');
+      }
+      resolved.append(segments[index]);
+    }
+    if (!segments.empty() && isSeparator(text.back())) {
+      resolved.push_back('/');
+    }
+    path.assign_owned(std::string_view(resolved));
+    return true;
+  }
+
   [[nodiscard]] bool ContainsWildcardCharacters(const msvc8::string& pathPattern)
   {
     return pathPattern.find('*') != msvc8::string::npos || pathPattern.find('?') != msvc8::string::npos;
@@ -775,7 +828,11 @@ namespace moho
       return nullptr;
     }
 
-    const msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    if (!ConfineMountedPath(loweredPath)) {
+      outPath->clear();
+      return outPath;
+    }
     // Engine addition (res_CacheFileLookups): a lookup that wants no file attributes is answered
     // from MountedFileLookupCache when it can be, and its answer stored there when it cannot.
     const bool useLookupCache = res_CacheFileLookups && outInfo == nullptr;
@@ -868,7 +925,10 @@ namespace moho
    */
   bool CVFSImpl::GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo)
   {
-    const msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    if (!ConfineMountedPath(loweredPath)) {
+      return false;
+    }
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
       if (!gpg::STR_StartsWith(loweredPath.c_str(), mountpoint.mMountpoint.c_str())) {
         continue;
@@ -910,10 +970,16 @@ namespace moho
     }
 
     msvc8::string normalizedPrefix = gpg::STR_ToLower(SafePathArg(mountPrefix));
+    if (!ConfineMountedPath(normalizedPrefix)) {
+      return;
+    }
     if (normalizedPrefix.empty() || normalizedPrefix[normalizedPrefix.size() - 1u] != '/') {
       (void)normalizedPrefix.push_back('/');
     }
-    const msvc8::string wildcardPattern = gpg::STR_ToLower(SafePathArg(queryPath));
+    msvc8::string wildcardPattern = gpg::STR_ToLower(SafePathArg(queryPath));
+    if (!ConfineMountedPath(wildcardPattern)) {
+      return;
+    }
 
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
       const bool prefixContainsMount =
@@ -975,6 +1041,9 @@ namespace moho
     }
 
     msvc8::string normalizedPrefix = gpg::STR_ToLower(SafePathArg(mountPrefix));
+    if (!ConfineMountedPath(normalizedPrefix)) {
+      return;
+    }
     if (normalizedPrefix.empty() || normalizedPrefix[normalizedPrefix.size() - 1u] != '/') {
       (void)normalizedPrefix.push_back('/');
     }

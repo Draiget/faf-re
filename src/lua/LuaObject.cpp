@@ -46,6 +46,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
@@ -11607,6 +11608,66 @@ namespace
 	}
 
 	/**
+	 * Engine addition: loads `path` from the mounted file system, as `doscript`
+	 * and `import` find scripts, and pushes the chunk or the error message.
+	 * Returns `lua_load`'s status.
+	 */
+	int LoadMountedFile(lua_State* const state, const char* const path)
+	{
+		msvc8::string diskPath{};
+		moho::FILE_EnsureWaitHandleSet();
+		moho::FWaitHandleSet* const files = moho::FILE_GetWaitHandleSet();
+		if (files != nullptr && files->mHandle != nullptr) {
+			(void)files->mHandle->FindFile(&diskPath, path, nullptr);
+		}
+		if (diskPath.empty()) {
+			lua_pushfstring(state, "cannot find %s in the game's files", path);
+			return LUA_ERRFILE;
+		}
+
+		const gpg::MemBuffer<const char> contents = moho::DISK_MemoryMapFile(diskPath.c_str());
+		if (contents.mBegin == nullptr) {
+			lua_pushfstring(state, "cannot read %s", path);
+			return LUA_ERRFILE;
+		}
+		const msvc8::string chunkName = gpg::STR_Printf("@%s", path);
+		return ::luaL_loadbuffer(
+			state, contents.mBegin, static_cast<size_t>(contents.mEnd - contents.mBegin), chunkName.c_str()
+		);
+	}
+
+	/**
+	 * Engine addition: `loadfile` in states opened without `io` - every game
+	 * state (sim, user interface, blueprints, session). Stock `loadfile` hands
+	 * the path to fopen, so a lobby's map or mod could read any file on a
+	 * joiner's disk; this one looks only in the game's mounted files.
+	 */
+	int luaB_loadfile_mounted(lua_State* const state)
+	{
+		const char* const fileName = luaL_checklstring(state, 1, nullptr);
+		if (LoadMountedFile(state, fileName) == 0) {
+			return 1;
+		}
+
+		lua_pushnil(state);
+		lua_insert(state, -2);
+		return 2;
+	}
+
+	/** Engine addition: `dofile` beside `luaB_loadfile_mounted`. */
+	int luaB_dofile_mounted(lua_State* const state)
+	{
+		const char* const fileName = luaL_checklstring(state, 1, nullptr);
+		const int baseTop = lua_gettop(state);
+		if (LoadMountedFile(state, fileName) != 0) {
+			lua_error(state);
+		}
+
+		lua_call(state, 0, LUA_MULTRET);
+		return lua_gettop(state) - baseTop;
+	}
+
+	/**
 	 * Address: 0x0090F560 (FUN_0090F560, luaB_unpack)
 	 *
 	 * What it does:
@@ -12190,24 +12251,6 @@ namespace
 	}
 
 	/**
-	 * Address: 0x0090AF50 (FUN_0090AF50)
-	 *
-	 * What it does:
-	 * Writes one dumped Lua chunk block into an output FILE stream and reports
-	 * boolean success expected by this build's `lua_dump` path.
-	 */
-	int LS_dump_FileChunkWriter(
-		lua_State* const,
-		const void* const buffer,
-		const size_t elementSize,
-		void* const streamUserData
-	)
-	{
-		std::FILE* const output = static_cast<std::FILE*>(streamUserData);
-		return (output != nullptr && std::fwrite(buffer, elementSize, 1u, output) == 1u) ? 1 : 0;
-	}
-
-	/**
 	 * Address: 0x0090AF80 (FUN_0090AF80, LS_import)
 	 *
 	 * What it does:
@@ -12226,64 +12269,24 @@ namespace
 	}
 
 	/**
-	 * Address: 0x0090AFB0 (FUN_0090AFB0, LS_dump)
-	 *
-	 * What it does:
-	 * Loads one Lua source file, dumps the compiled chunk to output file path,
-	 * and returns success/failure boolean on the Lua stack.
-	 */
-	int LS_dump(lua_State* const state)
-	{
-		Ensure(state != nullptr, "state");
-		Ensure(state->stateUserData != nullptr, "state->stateUserData");
-
-		LuaState* const luaState = state->stateUserData;
-		lua_State* const cstate = luaState->m_state;
-
-		LuaStackObject sourcePathArg(luaState, 1);
-		const char* const sourcePath = lua_tostring(cstate, 1);
-		if (sourcePath == nullptr) {
-			LuaStackObject::TypeError(&sourcePathArg, "string");
-		}
-
-		LuaStackObject outputPathArg(luaState, 2);
-		const char* const outputPath = lua_tostring(cstate, 2);
-		if (outputPath == nullptr) {
-			LuaStackObject::TypeError(&outputPathArg, "string");
-		}
-
-		if (luaL_loadfile(cstate, sourcePath) != 0) {
-			lua_pushboolean(cstate, 0);
-			(void)lua_gettop(cstate);
-			return 1;
-		}
-
-		std::FILE* const output = std::fopen(outputPath, "wb");
-		if (output != nullptr) {
-			(void)lua_dump(cstate, LS_dump_FileChunkWriter, output);
-			std::fclose(output);
-			lua_pushboolean(cstate, 1);
-			(void)lua_gettop(cstate);
-		} else {
-			lua_pushboolean(cstate, 0);
-			(void)lua_gettop(cstate);
-		}
-		return 1;
-	}
-
-	/**
 	 * Address: 0x0090B0D0 (FUN_0090B0D0, ScriptFunctionsRegister)
 	 *
 	 * What it does:
-	 * Registers script-global helper lanes (`import`, `LuaDumpBinary`) on the
-	 * active Lua globals table.
+	 * Registers the script-global `import` fallback on the active Lua globals
+	 * table.
+	 *
+	 * The binary also registers `LuaDumpBinary` here (`LS_dump`, 0x0090AFB0):
+	 * compile any file on disk and write the chunk to any path, with raw
+	 * fopen. Every state got it, including the blueprint state that runs
+	 * host-chosen mods' .bp files before FAF's globalInit.lua (which sets it to
+	 * nil) could, so a lobby's mod could write files anywhere on every
+	 * joiner's disk. The engine leaves it out; nothing in FAF calls it.
 	 */
 	void ScriptFunctionsRegister(LuaState* const state)
 	{
 		Ensure(state != nullptr, "state");
 		LuaObject globals = state->GetGlobals();
 		globals.Register("import", LS_import, 0);
-		globals.Register("LuaDumpBinary", LS_dump, 0);
 	}
 
 	unsigned int HashLuaString(const char* key, const unsigned int length)
@@ -12931,6 +12934,21 @@ extern "C" void luaV_settable(
 
 namespace moho
 {
+	/**
+	 * Engine addition: `lua_AllowPrecompiledChunks`. Off by default: `lua_load`
+	 * (and so `doscript`, `import`, `loadstring`, `dofile`) refuses compiled
+	 * Lua chunks and takes source only. A crafted chunk can get past
+	 * `luaG_checkcode` and run native code, and a lobby's map or mod would run
+	 * it on every joiner; no FAF, retail or vault file checked ships one.
+	 */
+	bool lua_AllowPrecompiledChunks = false;
+
+	TConVar<bool> gTConVar_lua_AllowPrecompiledChunks(
+		"lua_AllowPrecompiledChunks",
+		"Load compiled Lua chunks as well as source (off: a map or mod could run native code through one).",
+		&lua_AllowPrecompiledChunks
+	);
+
 	/**
 	 * Engine addition: `lua_ParallelMark`, a user-side switch. When set, the mark phase of a sim
 	 * Lua collection runs on the sim worker pool: propagation (`PropagateMarksForCollection`), the
@@ -19604,6 +19622,14 @@ void LuaState::Init(const StandardLibraries initStandardLibrary)
 		}
 
 		ScriptFunctionsRegister(this);
+		if (initStandardLibrary != LIB_OSIO) {
+			// Engine addition: game states read files through the mounted file
+			// system only (luaB_loadfile_mounted). The start-up state, which runs
+			// the user's own init file with real paths, keeps the stock ones.
+			LuaObject globals = GetGlobals();
+			globals.Register("loadfile", luaB_loadfile_mounted, 0);
+			globals.Register("dofile", luaB_dofile_mounted, 0);
+		}
 		lua_settop(state, previousTop);
 	}
 

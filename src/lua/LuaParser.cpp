@@ -3259,6 +3259,11 @@ namespace
       luaC_collectgarbage(state);
     }
 
+    // Engine addition: compiled chunks only when asked for (LuaObject.cpp).
+    if (parser->bin != 0 && !moho::lua_AllowPrecompiledChunks) {
+      luaG_runerror(state, "compiled Lua chunks are not loaded (source only; see lua_AllowPrecompiledChunks)");
+    }
+
     Proto* const parsedProto = (parser->bin != 0)
       ? luaU_undump(state, parser->z, &parser->buff)
       : luaY_parser(state, parser->z, &parser->buff);

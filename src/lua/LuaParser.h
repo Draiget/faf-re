@@ -39,6 +39,12 @@
  * 0x38 + 32*0x14 = 0x2B8, and 0x2B8 + 200*4 = 0x5D8.
  */
 
+namespace moho
+{
+  /// Engine addition (LuaObject.cpp): whether `f_parser` loads compiled chunks.
+  extern bool lua_AllowPrecompiledChunks;
+} // namespace moho
+
 /// Locals per function (upstream `MAXVARS`). Sets `FuncState::actvar`.
 constexpr std::int32_t MAXVARS = 0xC8;
 
