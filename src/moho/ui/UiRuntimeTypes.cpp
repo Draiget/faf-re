@@ -7346,18 +7346,24 @@ int moho::cfunc_CMauiControlSetAlphaL(
     gpg::Warnf(kCMauiControlAboveOneAlphaWarning, static_cast<int>(alpha), debugName.c_str());
   }
 
-  if (lua_type(state->m_state, 3) != LUA_TNIL) {
-    CMauiControl* traversalCursor = control;
-    if (traversalCursor != nullptr) {
-      const std::uint32_t vertexAlpha = PackVertexAlphaFromScalar(alpha);
-      do {
-        traversalCursor->mAlpha = alpha;
-        traversalCursor->mVertexAlpha = vertexAlpha;
-        traversalCursor = traversalCursor->DepthFirstSuccessor(control);
-      } while (traversalCursor != nullptr);
+  // FAF hot-patch (FA-Binary-Patches SetAlpha): 0x00789972 tests arg 3 with lua_toboolean
+  // instead of "not nil", so SetAlpha(a, false) no longer recurses; 0x00789988 / 0x00789999
+  // call _SetAlpha / _SetAlphaChildren, which replace only the vertex colour's alpha byte
+  // (keeping each control's RGB, e.g. a SetColorMask colour) and cap it at 0xFF.
+  const float scaledAlpha = 255.0f * alpha;
+  const std::uint32_t alphaByte = scaledAlpha >= 255.0f ? 0xFFu : static_cast<std::uint32_t>(scaledAlpha);
+  const auto applyAlpha = [alpha, alphaByte](CMauiControl& target) {
+    target.mAlpha = alpha;
+    target.mVertexAlpha = (target.mVertexAlpha & 0x00FFFFFFu) | (alphaByte << 24);
+  };
+
+  if (lua_toboolean(state->m_state, 3) != 0) {
+    for (CMauiControl* traversalCursor = control; traversalCursor != nullptr;
+         traversalCursor = traversalCursor->DepthFirstSuccessor(control)) {
+      applyAlpha(*traversalCursor);
     }
   } else {
-    control->SetAlpha(alpha);
+    applyAlpha(*control);
   }
 
   lua_settop(state->m_state, 1);
