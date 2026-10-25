@@ -23666,6 +23666,26 @@ moho::CScrLuaInitForm* moho::func_GetTimeForProfileSim_LuaFuncDef()
 
 /**
  * What it does:
+ * Publishes the user-lane Lua binder definition for global
+ * `GetTimeForProfile`, the same body as the sim one (section/GetTimeForProfile.cpp
+ * registers both; the name string 0x01293D36 is referenced from 0x012924BE and
+ * 0x0129251D).
+ */
+moho::CScrLuaInitForm* moho::func_GetTimeForProfileUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetTimeForProfile",
+    &moho::cfunc_GetTimeForProfileSim,
+    nullptr,
+    "<global>",
+    kGetTimeForProfileSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
  * Publishes the sim-lane Lua binder definition for global
  * `GetDepositsAroundPoint` (`.exxt` def chain node 0x0128EA8C, function
  * slot 0x0128B884).
@@ -27200,6 +27220,7 @@ namespace
       (void)::moho::func_GetMouseScreenPos_LuaFuncDef();
       // FAF FA-Binary-Patches additions, not in the shipped registration sequence.
       (void)::moho::func_CopyToClipboard_LuaFuncDef();
+      (void)::moho::func_GetTimeForProfileUser_LuaFuncDef();
       (void)::moho::func_GetHighlightCommand_LuaFuncDef();
       (void)::moho::func_SetFocusArmyUser_LuaFuncDef();
       (void)::moho::func_SetInvertMidMouseButton_LuaFuncDef();

@@ -6003,6 +6003,15 @@ namespace moho
 
   /**
    * What it does:
+   * Publishes the user-lane Lua binder definition for global
+   * `GetTimeForProfile`: section/GetTimeForProfile.cpp registers the same
+   * body in both states (the name string 0x01293D36 is referenced from the
+   * records at 0x012924BE and 0x0129251D).
+   */
+  CScrLuaInitForm* func_GetTimeForProfileUser_LuaFuncDef();
+
+  /**
+   * What it does:
    * Publishes the sim-lane Lua binder definition for global
    * `GetDepositsAroundPoint` (`.exxt` def chain node 0x0128EA8C, function
    * slot 0x0128B884).
