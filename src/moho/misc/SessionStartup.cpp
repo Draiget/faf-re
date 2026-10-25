@@ -39,9 +39,53 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/UserArmy.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "lua/LuaTableIterator.h"
+
+// Engine addition: helpers shared with the file these functions came from.
+namespace
+{
+  [[nodiscard]] moho::SSavedGameHeader BuildSavedGameHeader(const moho::CWldSession* const session)
+  {
+    moho::SSavedGameHeader header{};
+    if (!session) {
+      return header;
+    }
+
+    header.mMapName = session->mMapName;
+    header.mFocusArmy = session->FocusArmy;
+
+    header.mArmyInfo.resize(session->userArmies.size());
+    for (std::size_t armyIndex = 0; armyIndex < session->userArmies.size(); ++armyIndex) {
+      const moho::UserArmy* const userArmy = session->userArmies[armyIndex];
+      if (userArmy != nullptr) {
+        header.mArmyInfo[armyIndex].mPlayerName = userArmy->mPlayerName;
+      }
+    }
+
+    header.mScenarioInfoText = moho::SCR_ToString(session->GetScenarioInfo());
+
+    header.mLaunchInfo = boost::SharedPtrRawFromSharedRetained(session->mLaunchInfo);
+    return header;
+  }
+  [[nodiscard]] msvc8::string MakeTempSavePath(const msvc8::string& basePath)
+  {
+    return basePath + ".NEW";
+  }
+  [[nodiscard]] bool WriteExact(std::FILE* const file, const void* const data, const std::size_t byteCount)
+  {
+    if (!file) {
+      return false;
+    }
+    if (byteCount == 0) {
+      return true;
+    }
+    return std::fwrite(data, byteCount, 1, file) == 1;
+  }
+} // namespace
+
 
 namespace
 {
@@ -173,27 +217,6 @@ namespace
     return current;
   }
 
-  /**
-   * Address: 0x007CB8E0 (FUN_007CB8E0, func_CopyLaunchInfoBasePtr)
-   *
-   * What it does:
-   * Copies one `shared_ptr<LaunchInfoNew>` lane into a
-   * `shared_ptr<LaunchInfoBase>` output slot through swap-based temporary
-   * ownership transfer.
-   */
-  boost::shared_ptr<moho::LaunchInfoBase>* CopyLaunchInfoBasePtr(
-    boost::shared_ptr<moho::LaunchInfoBase>* const outBase,
-    const boost::shared_ptr<moho::LaunchInfoNew>& source
-  )
-  {
-    if (outBase == nullptr) {
-      return nullptr;
-    }
-
-    boost::shared_ptr<moho::LaunchInfoBase> temp(source);
-    temp.swap(*outBase);
-    return outBase;
-  }
 
   /**
    * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
@@ -472,153 +495,6 @@ namespace moho
     return msvc8::auto_ptr<gpg::Stream>(replayStream.release());
   }
 
-  /**
-   * Address: 0x008765E0 (FUN_008765E0)
-   * Mangled:
-   * ?VCR_SetupReplaySession@Moho@@YA?AV?$auto_ptr@USWldSessionInfo@Moho@@@std@@VStrArg@gpg@@@Z
-   *
-   * What it does:
-   * Loads replay file payload, reconstructs `LaunchInfoNew`, and creates
-   * one replay `SWldSessionInfo` bootstrap object. A header naming a FAF game
-   * version outside `kFafGameVersionOldestSupported..kFafGameVersionLatest` is
-   * refused, unless `/noversioncheck` is on the command line; the recorded
-   * version selects the engine patches the replay plays with.
-   */
-  msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(const gpg::StrArg filename)
-  {
-    if (filename == nullptr || filename[0] == '\0') {
-      return msvc8::auto_ptr<SWldSessionInfo>();
-    }
-
-    std::unique_ptr<gpg::Stream> replayStream{};
-    try {
-      replayStream = OpenGPGNetURI(filename, EGpgNetOpenMode::Read);
-    } catch (...) {
-      return msvc8::auto_ptr<SWldSessionInfo>();
-    }
-
-    if (replayStream == nullptr) {
-      return msvc8::auto_ptr<SWldSessionInfo>();
-    }
-
-    gpg::BinaryReader replayReader(replayStream.get());
-    msvc8::string replayVersion{};
-    replayReader.ReadString(&replayVersion);
-
-    // The binary accepts only its own build ("Supreme Commander v1.50.3835"). This engine
-    // plays every FAF game version it models, each with that version's engine patches, so a
-    // replay is accepted when its build lies in that range.
-    int recordedGameVersion = FAF_ParseReplayGameVersion(replayVersion.view());
-    if (recordedGameVersion < kFafGameVersionOldestSupported || recordedGameVersion > kFafGameVersionLatest) {
-      // FAF addition, not in the shipped binary: /noversioncheck plays a replay
-      // whose header names another engine version instead of refusing it, with
-      // the patches of the nearest version this engine models.
-      if (!CFG_GetArgOption("/noversioncheck", 0, nullptr)) {
-        return msvc8::auto_ptr<SWldSessionInfo>();
-      }
-      const int playedGameVersion =
-        (recordedGameVersion != 0 && recordedGameVersion < kFafGameVersionOldestSupported)
-          ? kFafGameVersionOldestSupported
-          : kFafGameVersionLatest;
-      gpg::Warnf(
-        "Replay %s was recorded by \"%s\", this engine plays FAF game versions %d..%d; playing it as %d anyway "
-        "(/noversioncheck).",
-        filename,
-        replayVersion.c_str(),
-        kFafGameVersionOldestSupported,
-        kFafGameVersionLatest,
-        playedGameVersion
-      );
-      recordedGameVersion = playedGameVersion;
-    }
-    FAF_SetReplayGameVersion(recordedGameVersion);
-
-    msvc8::string ignoredString{};
-    replayReader.ReadString(&ignoredString);
-
-    std::array<char, 14> replaySignature{};
-    replayReader.Read(replaySignature.data(), 13);
-
-    msvc8::string replayMapName{};
-    replayReader.ReadString(&replayMapName);
-    replayReader.ReadString(&ignoredString);
-
-    if (std::strcmp(replaySignature.data(), "Replay v1.9\r\n") != 0) {
-      return msvc8::auto_ptr<SWldSessionInfo>();
-    }
-
-    boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
-    replayReader.ReadLengthPrefixedString(&launchInfo->mGameMods);
-    replayReader.ReadLengthPrefixedString(&launchInfo->mScenarioInfo);
-
-    std::uint8_t commandSourceCount = 0;
-    replayReader.ReadExact(commandSourceCount);
-
-    launchInfo->mCommandSources.mSrcs.clear();
-    launchInfo->mCommandSources.mSrcs.reserve(commandSourceCount);
-
-    BVIntSet replayCommandSources{};
-    for (std::uint32_t sourceIndex = 0; sourceIndex < commandSourceCount; ++sourceIndex) {
-      SSTICommandSource source{};
-      source.mIndex = sourceIndex;
-      replayReader.ReadString(&source.mName);
-      replayReader.ReadExact(source.mTimeouts);
-      moho::AppendSSTICommandSource(launchInfo->mCommandSources.mSrcs, source);
-      (void)replayCommandSources.Add(sourceIndex);
-    }
-
-    std::uint8_t cheatsEnabled = 0;
-    replayReader.ReadExact(cheatsEnabled);
-    launchInfo->mCheatsEnabled = cheatsEnabled != 0;
-
-    std::uint8_t armyCount = 0;
-    replayReader.ReadExact(armyCount);
-
-    launchInfo->mArmyLaunchInfo.clear();
-    launchInfo->mArmyLaunchInfo.resize(armyCount, moho::ArmyLaunchInfo{});
-    launchInfo->mStrVec.clear();
-    launchInfo->mStrVec.reserve(armyCount);
-
-    for (std::uint32_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
-      msvc8::string armyLabel{};
-      replayReader.ReadLengthPrefixedString(&armyLabel);
-      launchInfo->mStrVec.push_back(armyLabel);
-
-      while (true) {
-        std::uint8_t sourceIndex = kInvalidSourceIndex;
-        replayReader.ReadExact(sourceIndex);
-        if (sourceIndex == kInvalidSourceIndex) {
-          break;
-        }
-        (void)launchInfo->mArmyLaunchInfo[armyIndex].mUnitSources.Add(sourceIndex);
-      }
-    }
-
-    replayReader.ReadExact(launchInfo->mInitSeed);
-    launchInfo->mCommandSources.mOriginalSource = -1;
-
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
-    sessionInfo->mMapName = replayMapName;
-    (void)CopyLaunchInfoBasePtr(&sessionInfo->mLaunchInfo, launchInfo);
-    sessionInfo->mIsBeingRecorded = false;
-    sessionInfo->mIsReplay = true;
-    sessionInfo->mIsMultiplayer = false;
-    sessionInfo->mClientManager = CLIENT_CreateClientManager(2u, nullptr, 0, true);
-    sessionInfo->mSourceId = kInvalidSourceIndex;
-
-    if (sessionInfo->mClientManager != nullptr) {
-      gpg::Stream* replayStreamOwnership = replayStream.release();
-      sessionInfo->mClientManager->CreateReplayClient(&replayStreamOwnership, &replayCommandSources);
-      if (replayStreamOwnership != nullptr) {
-        delete replayStreamOwnership;
-      }
-
-      const msvc8::string localName = Loc(USER_GetLuaState(), "<LOC Engine0031>Local");
-      sessionInfo->mClientManager->CreateLocalClient(localName.c_str(), 1, 1, kInvalidSourceIndex);
-    }
-
-    return sessionInfo;
-  }
 
   /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)
@@ -1444,6 +1320,23 @@ namespace moho
 
 namespace
 {
+  /// Engine addition (plan WPL.4): the localised local-client name
+  /// VCR_SetupReplaySession (moho/misc/ReplaySessionSetup.cpp) asks for.
+  [[nodiscard]] msvc8::string LocalizedReplayLocalClientName()
+  {
+    return moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0031>Local");
+  }
+
+  struct ReplayLocalClientNameRegistrar
+  {
+    ReplayLocalClientNameRegistrar()
+    {
+      moho::sReplayLocalClientName = &LocalizedReplayLocalClientName;
+    }
+  };
+
+  const ReplayLocalClientNameRegistrar gReplayLocalClientNameRegistrar{};
+
   /**
    * Drives this file's Lua binder definitions.
    *
@@ -1476,3 +1369,51 @@ namespace
 
   const SessionStartupLuaFuncDefBootstrap gSessionStartupLuaFuncDefBootstrap{};
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00880F00 (FUN_00880F00)
+   *
+   * gpg::StrArg,gpg::StrArg,LuaPlus::LuaObject const &
+   *
+   * What it does:
+   * Initializes one save request object, opens `<savePath>.NEW`, writes the
+   * placeholder file header block, and serializes `SSavedGameHeader`.
+   */
+  CSaveGameRequestImpl::CSaveGameRequestImpl(
+    const gpg::StrArg savePath, const gpg::StrArg sessionName, const LuaPlus::LuaObject& completionCallback
+  )
+    : mSavePath(savePath != nullptr ? savePath : "")
+    , mSessionName(sessionName != nullptr ? sessionName : "")
+    , mCompletionCallback(completionCallback)
+    , mFile()
+    , mArchive(nullptr)
+  {
+    const SSavedGameHeader header = BuildSavedGameHeader(WLD_GetActiveSession());
+    const msvc8::string tempPath = MakeTempSavePath(mSavePath);
+    const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
+    std::FILE* file = nullptr;
+    if (_wfopen_s(&file, wideTempPath.c_str(), L"wb") != 0) {
+      file = nullptr;
+    }
+    mFile.reset(file, moho::SFileStarCloser{});
+
+    if (!file) {
+      const msvc8::string message = gpg::STR_Printf("Error opening %s for write", tempPath.c_str());
+      throw gpg::SerializationError(message.c_str());
+    }
+
+    std::array<std::uint8_t, moho::kSaveGameFileHeaderSize> blankHeader{};
+    if (!WriteExact(file, blankHeader.data(), blankHeader.size())) {
+      throw gpg::SerializationError("Error writing savegame header.");
+    }
+
+    std::unique_ptr<gpg::WriteArchive> archive(gpg::CreateBinaryWriteArchive(mFile));
+    const gpg::RRef ownerRef{nullptr, nullptr};
+    archive->Write(SSavedGameHeader::StaticGetClass(), &header, ownerRef);
+    archive->EndSection(false);
+    mArchive = archive.release();
+  }
+
+} // namespace moho

@@ -30,7 +30,10 @@
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "legacy/containers/Map.h"
+#include "legacy/containers/Set.h"
 #include "moho/app/WEmitterWx.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
@@ -90,6 +93,9 @@ using namespace moho;
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
+  constexpr const char* kConsoleStartupShowArmyStatsDescription = "Show engine statistics";
+  constexpr const char* kConsoleStartupShowStatsDescription = "Show engine statistics";
+
   constexpr const char* kConsoleStartupConFindUnitDescription =
     "Find a unit by a (case insensitive) string contained in its description.";
   constexpr const char* kConsoleStartupSCLuaDebuggerDescription = "Open Lua debugger window";
@@ -3987,3 +3993,250 @@ namespace
   CConFunc gCConFunc_SC_LuaDebugger("SC_LuaDebugger", kConsoleStartupSCLuaDebuggerDescription, &moho::SC_LuaDebugger);
 
 } // namespace
+
+// Moved from moho/animation/CAniSkel.cpp and CConCommand.cpp (plan WPL.4): the
+// ANI_DumpSkeleton console command, which prints the user selection's skeleton.
+namespace
+{
+  /**
+   * Address: 0x007B2050 (FUN_007B2050, sub_7B2050)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl sub_7B2050(int arg0, unsigned int a2, int a3);
+   *
+   * What it does:
+   * Recursive, indented bone-hierarchy printer for `ANI_DumpSkeleton`. Walks
+   * `children` in order; for each stored bone pointer, formats
+   * "<indent><name><pad>p=<x,y,z> q=<x,y,z,w>" (name right-padded so the
+   * `p=` column lands at ~50 characters, clamped to at least 2 spaces) via
+   * `gpg::STR_Printf`, emits it through both `Moho::CON_Printf` and
+   * `gpg::Logf`, then recurses into that bone's own children
+   * (`dedupTree[boneKey]`) with `indent + 2`.
+   *
+   * `dedupTree` is threaded through explicitly - it is the binary's third
+   * parameter, proven via raw `.asm` at 0x007B2233-0x007B224E to be the
+   * outer map pointer loaded into `ecx` as `this` for the recursive
+   * `operator[]` call, not an inert/unused context value (the top-level
+   * decompiler pseudocode's `(int)&v18._Myend` naming for this argument at
+   * the initial call site does not survive a register-level check either;
+   * the pushed value is `&a2._Myval`, the same outer-map local the per-bone
+   * loop already builds).
+   */
+  void PrintAniSkeletonBoneHierarchy(
+    const msvc8::set<const moho::SAniSkelBone*>& children,
+    const std::uint32_t indent,
+    msvc8::map<const moho::SAniSkelBone*, msvc8::set<const moho::SAniSkelBone*>>& dedupTree
+  )
+  {
+    for (const moho::SAniSkelBone* const bone : children) {
+      const moho::VTransform& transform = bone->mLocalTransform;
+
+      const std::size_t nameLength = std::strlen(bone->mBoneName);
+      const int rawPadWidth = 50 - static_cast<int>(nameLength) - static_cast<int>(indent);
+      const std::size_t namePadWidth = static_cast<std::size_t>(rawPadWidth > 2 ? rawPadWidth : 2);
+
+      msvc8::string indentPad;
+      (void)indentPad.assign(static_cast<std::size_t>(indent), ' ');
+      msvc8::string namePad;
+      (void)namePad.assign(namePadWidth, ' ');
+
+      const msvc8::string line = gpg::STR_Printf(
+        "%s%s%sp=<%5.2f,%5.2f,%5.2f> q=<%5.2f,%5.2f,%5.2f,%5.2f>",
+        indentPad.c_str(),
+        bone->mBoneName,
+        namePad.c_str(),
+        transform.pos_.x,
+        transform.pos_.y,
+        transform.pos_.z,
+        transform.orient_.x,
+        transform.orient_.y,
+        transform.orient_.z,
+        transform.orient_.w
+      );
+
+      moho::CON_Printf("%s", line.c_str());
+      gpg::Logf("%s", line.c_str());
+
+      PrintAniSkeletonBoneHierarchy(dedupTree[bone], indent + 2u, dedupTree);
+    }
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * The active world session (`Moho::sWldSession`, 0x010A6470). The global
+   * has no owning header in this tree yet, so it is declared here where it
+   * is used, matching the established pattern (Cartographic.cpp,
+   * WxRuntimeTypes.cpp).
+   */
+  extern CWldSession* sWldSession;
+
+  /**
+   * Address: 0x007B22B0 (FUN_007B22B0, Moho::ANI_DumpSkeleton)
+   *
+   * IDA signature:
+   * void __cdecl Moho::ANI_DumpSkeleton();
+   *
+   * What it does:
+   * The `ANI_DumpSkeleton` console command. Resolves the current selection's
+   * first live unit, prints its animation skeleton's bone hierarchy
+   * (indented, parent-then-children) through both the console and the log,
+   * then releases the transient selection snapshot and per-parent dedup
+   * tree it built to reconstruct that hierarchy from the skeleton's flat,
+   * parent-index-only bone array. Prints "There is no selected unit." when
+   * the selection is empty or has no live entries. The binary reads
+   * `mPoseSecondary` (+0x24) unconditionally once a live entity is found,
+   * with no null check on the resulting `CAniPose*` before calling
+   * `GetSkeleton()` - reproduced as-is.
+   *
+   * The dedup map (`dedupTree`) and its nested per-parent sets, and the
+   * transient selection snapshot (`selectionGuard`), are released by their
+   * own destructors at scope exit - the binary's `erase_range` +
+   * `operator delete` on both.
+   */
+  void ANI_DumpSkeleton()
+  {
+    WeakSet<UserUnit> selection;
+    // 0x007B22FD/0x007B2308: reads the global session and calls straight
+    // through with no null check - reproduced as-is.
+    WLD_GetActiveSession()->GetSelectionUnits(selection);
+
+    // 0x007B2372-0x007B2385: the first live unit, if any.
+    UserEntity* selectedEntity = nullptr;
+    if (!selection.Empty()) {
+      selectedEntity = *selection.begin();
+    }
+
+    if (selectedEntity == nullptr) {
+      CON_Printf("There is no selected unit.");
+      return;
+    }
+
+    CAniPose* const pose = selectedEntity->mPoseSecondary.get();
+
+    // The binary extracts the raw skeleton pointer and releases the
+    // temporary `shared_ptr<const CAniSkel>` handle immediately
+    // (`Moho::WeakPtr_CAniSkel_D::release`, 0x00538320) rather than holding
+    // it for the whole function - matched here with a tight scope instead of
+    // keeping the shared_ptr alive across the walk below.
+    const CAniSkel* skel;
+    {
+      const boost::shared_ptr<const CAniSkel> skelHandle = pose->GetSkeleton();
+      skel = skelHandle.get();
+    }
+
+    msvc8::map<const SAniSkelBone*, msvc8::set<const SAniSkelBone*>> dedupTree;
+    for (const SAniSkelBone& bone : skel->mBones) {
+      const SAniSkelBone* const parentBone = skel->GetBone(static_cast<std::uint32_t>(bone.mParentBoneIndex));
+      (void)dedupTree[parentBone].insert(&bone);
+    }
+
+    PrintAniSkeletonBoneHierarchy(dedupTree[nullptr], 0u, dedupTree);
+  }
+} // namespace moho
+
+namespace
+{
+  /// 0x00E3C758, the `.data` initializer of `Moho::CConFunc_ANI_DumpSkeleton` (+0x08).
+  constexpr const char* kConsoleStartupConAniDumpSkeletonDescription = "Dump the skeleton for the selected entity";
+
+  /**
+   * Address: 0x00BDF8D0 (FUN_00BDF8D0, dynamic initializer for `gCConFunc_ANI_DumpSkeleton`)
+   * Address: 0x00C036D0 (FUN_00C036D0, dynamic atexit destructor for `gCConFunc_ANI_DumpSkeleton`)
+   */
+  CConFunc gCConFunc_ANI_DumpSkeleton("ANI_DumpSkeleton", kConsoleStartupConAniDumpSkeletonDescription, reinterpret_cast<CConFunc::Callback>(&moho::ANI_DumpSkeleton));
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
+   */
+  void ShowStats(const msvc8::vector<msvc8::string>& args)
+  {
+    CUIManager* const uiManager = g_UIManager;
+    if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
+      return;
+    }
+
+    LuaPlus::LuaState* const state = uiManager->mLuaState;
+    LuaPlus::LuaObject moduleObject = SCR_Import(state, "/lua/debug/EngineStats.lua");
+    if (!moduleObject.IsTable()) {
+      LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/EngineStats.lua\" module");
+    }
+
+    msvc8::string mode = "all";
+    if (args.size() > 1u) {
+      if (const msvc8::string* const requestedMode = ConCommandArg(args, 1u); requestedMode != nullptr) {
+        mode.assign(*requestedMode, 0, msvc8::string::npos);
+      }
+    }
+
+    LuaPlus::LuaObject toggleFunction = moduleObject.GetByName("Toggle");
+    LuaPlus::LuaFunction<void> toggleCallable(toggleFunction);
+    toggleCallable(mode.c_str());
+  }
+
+  /**
+   * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
+   */
+  void ShowArmyStats(const msvc8::vector<msvc8::string>& args)
+  {
+    CUIManager* const uiManager = g_UIManager;
+    if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
+      return;
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (!session) {
+      return;
+    }
+
+    UserArmy* const focusArmy = session->GetFocusUserArmy();
+    if (!focusArmy) {
+      return;
+    }
+
+    LuaPlus::LuaState* const state = uiManager->mLuaState;
+    LuaPlus::LuaObject moduleObject = SCR_Import(state, "/lua/debug/ArmyStats.lua");
+    if (!moduleObject.IsTable()) {
+      LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/ArmyStats.lua\" module");
+    }
+
+    int armyIndex = static_cast<int>(focusArmy->mArmyIndex);
+    if (args.size() > 1u) {
+      if (const msvc8::string* const requestedArmy = ConCommandArg(args, 1u); requestedArmy != nullptr) {
+        armyIndex = std::atoi(requestedArmy->c_str());
+      }
+    }
+
+    msvc8::string mode = "all";
+    if (args.size() > 2u) {
+      if (const msvc8::string* const requestedMode = ConCommandArg(args, 2u); requestedMode != nullptr) {
+        mode.assign(*requestedMode, 0, msvc8::string::npos);
+      }
+    }
+
+    LuaPlus::LuaObject showFunction = moduleObject.GetByName("Show");
+    LuaPlus::LuaFunction<void> showCallable(showFunction);
+    showCallable(armyIndex, mode.c_str());
+  }
+
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * Address: 0x00BE4470 (FUN_00BE4470, dynamic initializer for `gCConFunc_ShowArmyStats`)
+   * Address: 0x00C064C0 (FUN_00C064C0, dynamic atexit destructor for `gCConFunc_ShowArmyStats`)
+   */
+  CConFunc gCConFunc_ShowArmyStats("ShowArmyStats", kConsoleStartupShowArmyStatsDescription, &moho::ShowArmyStats);
+
+  /**
+   * Address: 0x00BE4430 (FUN_00BE4430, dynamic initializer for `gCConFunc_ShowStats`)
+   * Address: 0x00C06490 (FUN_00C06490, dynamic atexit destructor for `gCConFunc_ShowStats`)
+   */
+  CConFunc gCConFunc_ShowStats("ShowStats", kConsoleStartupShowStatsDescription, &moho::ShowStats);
+
+} // namespace moho

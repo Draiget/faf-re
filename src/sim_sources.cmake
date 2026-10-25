@@ -33,7 +33,11 @@ set(_faf_client_only_patterns
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
-  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue|UserCommandLuaFunctions)\\.cpp$"
+  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
+  # The user's formation preview (drag orientation, preview instances).
+  "^moho/sim/CFormation\\.cpp$"
+  # The range-ring extractors (user entities' ranges for moho/render/RangeRenderer).
+  "^moho/(misc|collision|ai|unit/core)/(Miscellaneous|Omni|Radar|CounterIntel|Intel|CombinedMilitary|Countermeasure|AirPlatform|Weapon|Range|Sonar)Extractor\\.cpp$"
   "^moho/entity/UserEntity\\.cpp$"
   "^moho/unit/core/UserUnit\\.cpp$"
   # The client's console commands and variables (CConCommand.cpp keeps the console).
@@ -42,7 +46,14 @@ set(_faf_client_only_patterns
   "^moho/vision/VisionDB\\.cpp$"
   # The lobby, GPGNet and LAN discovery (the game connection and the
   # replay stream stay).
-  "^moho/net/(CLobby|CLobbyTypeInfo|CGpgNetInterface|CDiscoveryService|CDiscoveryServiceTypeInfo|CHostManager)\\.cpp$")
+  "^moho/net/(CLobby|CLobbyTypeInfo|CGpgNetInterface|CDiscoveryService|CDiscoveryServiceTypeInfo)\\.cpp$"
+  # The user world's client-manager UI callbacks (the interface's defaults stay).
+  "^moho/net/CWldUiInterface\\.cpp$"
+  # The user session's listeners (idle units, pause, selection) and its save data.
+  "^moho/sim/(IdleUnitSelector|PauseListener|SelectionListener|SSessionSaveDataTypeInfo)\\.cpp$"
+  # The front end's session launch, saves and replay recording (replay
+  # playback setup is moho/misc/ReplaySessionSetup.cpp).
+  "^moho/misc/SessionStartup\\.cpp$")
 
 set(_faf_sim_patterns
   # Decals the sim creates and expires (CDecalBuffer::CleanupTick runs on

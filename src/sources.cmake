@@ -216,6 +216,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/CountermeasureExtractor.cpp
   moho/particles/CWorldParticles.cpp
   moho/app/WinApp.cpp
+  moho/misc/WinPlatform.cpp
   gpg/core/diagnostics/CrashHooks.cpp
   gpg/core/diagnostics/CrashReport.cpp
   gpg/core/diagnostics/ProbeWatch.cpp
@@ -340,6 +341,7 @@ set(FAF_ENGINE_SOURCES
   moho/resource/blueprints/RUnitBlueprintWeaponVectorReflection.cpp
   moho/script/CUnitScriptTask.cpp
   moho/sim/SimStartupRegistrations.cpp
+  moho/sim/UserStartupRegistrations.cpp
   moho/sim/Sim.cpp
   moho/sim/UserLuaFunctions.cpp
   moho/app/WRefEditDialog.cpp
@@ -854,6 +856,7 @@ set(FAF_ENGINE_SOURCES
   moho/debug/CPathDebugger.cpp
   moho/net/CGpgNetInterface.cpp
   moho/net/IClientMgrUIInterface.cpp
+  moho/net/CWldUiInterface.cpp
   moho/net/CHostManager.cpp
   moho/net/CLobby.cpp
   moho/net/LaunchInfoBuilder.cpp
@@ -905,6 +908,7 @@ set(FAF_ENGINE_SOURCES
   moho/ui/SelectionDragger.cpp
   moho/ui/UiRuntimeTypeUpcastBridges.cpp
   moho/misc/SessionStartup.cpp
+  moho/misc/ReplaySessionSetup.cpp
   moho/misc/CSaveGameRequestImpl.cpp
   moho/script/ScriptedDecalTypeInfo.cpp
   moho/script/ScriptedDecal.cpp
@@ -924,6 +928,8 @@ set(FAF_ENGINE_SOURCES
   moho/sim/ISTIDriver.cpp
   moho/sim/ReconBlip.cpp
   moho/sim/CWldSession.cpp
+  moho/sim/WldSessionState.cpp
+  moho/sim/WldScenarioInfo.cpp
   moho/sim/BlueprintLoaderContext.cpp
   moho/sim/CWldSessionLoaderImpl.cpp
   moho/render/CWldTerrainDecalTYPETypeInfo.cpp

@@ -3347,6 +3347,13 @@ namespace gpg
   }
 } // namespace gpg
 
+// Engine addition (dedicated-server plan WPL.4): `moho::sUIState` is defined
+// here, in the file whose gpg::RRef::CurrentUIState the simulation reads it
+// through, rather than in moho/ui/UiRuntimeTypes.cpp (user interface), so the
+// simulation's objects link without the user interface. Constant-initialised;
+// the user interface writes it as before.
+moho::EUIState moho::sUIState = moho::UIS_none;
+
 /**
  * Address: 0x005DE010 (FUN_005DE010, preregister_CAcquireTargetTaskPointerTypeStartup)
  *

@@ -196,9 +196,6 @@ namespace
   }
 
 
-
-
-
   void PrintLocalizedConsoleLine(const char* const locToken)
   {
     const msvc8::string localizedText = Loc(USER_GetLuaState(), locToken != nullptr ? locToken : "");
@@ -238,7 +235,6 @@ namespace
 
 
   static_assert(sizeof(Wm3::Vector2f) == 0x8, "Wm3::Vector2f size must be 0x8");
-
 
 
   [[nodiscard]]
@@ -1341,54 +1337,11 @@ void moho::CON_p4_IsOpenedForEdit(const msvc8::vector<msvc8::string>& args)
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 namespace
 {
 
 
 } // namespace
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 /**
@@ -1412,8 +1365,6 @@ void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const msvc8::vector<msv
 
   CON_Executef("d3d_AntiAliasingSamples %s", sampleToken->c_str());
 }
-
-
 
 
 namespace
@@ -1760,8 +1711,6 @@ namespace
     "Paranoid mode for RULE system, print all error messages.";
   constexpr const char* kConsoleStartupRuleBlueprintReloadDelayDescription =
     "seconds to delay before reloading a blueprint once we notice that it has changed.";
-  /// 0x00E3C758, the `.data` initializer of `Moho::CConFunc_ANI_DumpSkeleton` (+0x08).
-  constexpr const char* kConsoleStartupConAniDumpSkeletonDescription = "Dump the skeleton for the selected entity";
 
   /**
    * Address: 0x00BC3910 (FUN_00BC3910, dynamic initializer for `gCConFunc_CON_Echo`)
@@ -1806,12 +1755,6 @@ namespace
   CConFunc gCConFunc_LUADOC("LUADOC", kConsoleStartupConLuaDocDescription, &moho::CON_LUADOC);
 
 
-
-
-
-
-
-
   /**
    * Address: 0x00BC6630 (FUN_00BC6630, dynamic initializer for `gCConFunc_GetVersion`)
    * Address: 0x00BF0D10 (FUN_00BF0D10, dynamic atexit destructor for `gCConFunc_GetVersion`)
@@ -1823,14 +1766,6 @@ namespace
    * Address: 0x00BEEC70 (FUN_00BEEC70, dynamic atexit destructor for `gCConFunc_CON_ExecuteLastCommand`)
    */
   CConFunc gCConFunc_CON_ExecuteLastCommand("CON_ExecuteLastCommand", kConsoleStartupConExecuteLastCommandDescription, reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand));
-
-  /**
-   * Address: 0x00BDF8D0 (FUN_00BDF8D0, dynamic initializer for `gCConFunc_ANI_DumpSkeleton`)
-   * Address: 0x00C036D0 (FUN_00C036D0, dynamic atexit destructor for `gCConFunc_ANI_DumpSkeleton`)
-   */
-  CConFunc gCConFunc_ANI_DumpSkeleton("ANI_DumpSkeleton", kConsoleStartupConAniDumpSkeletonDescription, reinterpret_cast<CConFunc::Callback>(&moho::ANI_DumpSkeleton));
-
-
 
 
   /**
@@ -1870,29 +1805,6 @@ namespace
   CConFunc gCConFunc_Debug_Throw("Debug_Throw", kConsoleStartupConDebugThrowDescription, &CON_Debug_Throw);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00BC76F0 (FUN_00BC76F0, dynamic initializer for `gCConFunc_p4_Edit`)
    * Address: 0x00BF1C20 (FUN_00BF1C20, dynamic atexit destructor for `gCConFunc_p4_Edit`)
@@ -1904,9 +1816,6 @@ namespace
    * Address: 0x00BF1C50 (FUN_00BF1C50, dynamic atexit destructor for `gCConFunc_p4_IsOpenedForEdit`)
    */
   CConFunc gCConFunc_p4_IsOpenedForEdit("p4_IsOpenedForEdit", kConsoleStartupConP4IsOpenedForEditDescription, &moho::CON_p4_IsOpenedForEdit);
-
-
-
 
 
   /**
@@ -1970,14 +1879,6 @@ namespace
     kConsoleStartupRuleBlueprintReloadDelayDescription,
     &moho::rule_BlueprintReloadDelay
   );
-
-
-
-
-
-
-
-
 
 
   /**
@@ -2726,11 +2627,6 @@ namespace moho
   );
 
 
-
-
-
-
-
 } // namespace moho
 
 
@@ -2753,17 +2649,6 @@ namespace moho
   extern bool UI_ShowControlUnderMouse;
 
 
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00BE19D0 (FUN_00BE19D0, dynamic initializer for `gTConVar_UI_ShowControlUnderMouse`)
    * Address: 0x00C04960 (FUN_00C04960, dynamic atexit destructor for `gTConVar_UI_ShowControlUnderMouse`)
@@ -2773,9 +2658,6 @@ namespace moho
     kConsoleStartupUIShowControlUnderMouseDescription,
     &moho::UI_ShowControlUnderMouse
   );
-
-
-
 
 
   /**
@@ -2797,54 +2679,6 @@ namespace moho
     kConsoleStartupUiCommandClickScaleDescription,
     &moho::ui_CommandClickScale
   );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   /**
@@ -3042,7 +2876,6 @@ namespace moho
     kConsoleStartupRenBloomBlurCountDescription,
     &moho::ren_BloomBlurCount
   );
-
 
 
   /**
@@ -3247,9 +3080,6 @@ namespace moho
   );
 
 
-
-
-
   /**
    * Address: 0x00BE24D0 (FUN_00BE24D0, dynamic initializer for `gTConVar_ren_NewFogUpdate`)
    * Address: 0x00C05120 (FUN_00C05120, dynamic atexit destructor for `gTConVar_ren_NewFogUpdate`)
@@ -3361,11 +3191,6 @@ namespace moho
   );
 
 
-
-
-
-
-
   /**
    * Address: 0x00BE1850 (FUN_00BE1850, dynamic initializer for `gTConVar_ren_ShadowBlur`)
    * Address: 0x00C04840 (FUN_00C04840, dynamic atexit destructor for `gTConVar_ren_ShadowBlur`)
@@ -3425,7 +3250,6 @@ namespace moho
     kConsoleStartupRenShoreErrorCoeffDescription,
     &moho::ren_ShoreErrorCoeff
   );
-
 
 
   /**
@@ -3670,50 +3494,16 @@ namespace moho
 {
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 } // namespace moho
 
 
 namespace
 {
-  constexpr const char* kConsoleStartupShowArmyStatsDescription = "Show engine statistics";
-  constexpr const char* kConsoleStartupShowStatsDescription = "Show engine statistics";
   constexpr const char* kConsoleStartupSCAntiAliasingSamplesDescription = "";
 } // namespace
 
 namespace moho
 {
-
-  /**
-   * Address: 0x00BE4470 (FUN_00BE4470, dynamic initializer for `gCConFunc_ShowArmyStats`)
-   * Address: 0x00C064C0 (FUN_00C064C0, dynamic atexit destructor for `gCConFunc_ShowArmyStats`)
-   */
-  CConFunc gCConFunc_ShowArmyStats("ShowArmyStats", kConsoleStartupShowArmyStatsDescription, &moho::ShowArmyStats);
-
-  /**
-   * Address: 0x00BE4430 (FUN_00BE4430, dynamic initializer for `gCConFunc_ShowStats`)
-   * Address: 0x00C06490 (FUN_00C06490, dynamic atexit destructor for `gCConFunc_ShowStats`)
-   */
-  CConFunc gCConFunc_ShowStats("ShowStats", kConsoleStartupShowStatsDescription, &moho::ShowStats);
-
-
-
-
 
 
   /**
@@ -3721,9 +3511,6 @@ namespace moho
    * Address: 0x00C08D90 (FUN_00C08D90, dynamic atexit destructor for `gCConFunc_SC_AntiAliasingSamples`)
    */
   CConFunc gCConFunc_SC_AntiAliasingSamples("SC_AntiAliasingSamples", kConsoleStartupSCAntiAliasingSamplesDescription, &moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken);
-
-
-
 
 
 } // namespace moho

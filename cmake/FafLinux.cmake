@@ -75,6 +75,9 @@ include("${PROJECT_SOURCE_DIR}/src/sim_sources.cmake")
 
 # boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/tss_(dll|hooks|pe)\\.cpp$")
+# The Windows platform services (call stacks, crash-report paths, message
+# boxes); the POSIX implementation of the same functions is plan WPL.5.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/misc/WinPlatform\\.cpp$")
 
 set(_faf_sim_files "")
 foreach(_src IN LISTS FAF_SIM_SOURCES)

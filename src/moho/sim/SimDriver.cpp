@@ -19,8 +19,7 @@
 #include <boost/ptr_container/exception.hpp>
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
-#include "platform/WxWidgets.h"
-#include <wx/app.h>
+#include "moho/app/WinApp.h"
 #include "moho/net/CClientBase.h"
 #include "moho/net/IClient.h"
 #include "moho/render/d3d/CD3DFont.h"
@@ -2156,19 +2155,10 @@ DWORD CSimDriver::PerformNextEvent()
     mClientManager->DoBeat();
   }
 
-  bool keepIdle = true;
-  for (;;) {
-    if (wxTheApp->Pending()) {
-      wxTheApp->Dispatch();
-      keepIdle = true;
-      continue;
-    }
-
-    if (!keepIdle) {
-      break;
-    }
-
-    keepIdle = wxTheApp->ProcessIdle();
+  // Engine addition (dedicated-server plan WPL.4): the wx pending/idle pump is
+  // the client's (WinApp.h sAppPumpEvents); without a client there is none.
+  if (sAppPumpEvents != nullptr) {
+    sAppPumpEvents();
   }
 
   return SleepEx(100, TRUE);
