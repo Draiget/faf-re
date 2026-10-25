@@ -279,6 +279,82 @@ namespace
     }
   }
 
+  // --- Lua encoding ------------------------------------------------------------------------
+
+  // Runs `script` in the test state and returns global `name`.
+  LuaPlus::LuaObject LuaGlobal(const char* const script, const char* const name)
+  {
+    LuaPlus::LuaState& state = TestLuaState();
+    (void)lua_dostring(state.GetCState(), script);
+    return state.GetGlobal(name);
+  }
+
+  std::string Encode(LuaPlus::LuaObject value, bool& encoded)
+  {
+    gpg::MemBufferStream stream(256u);
+    encoded = value.ToByteStream(stream);
+    return std::string(stream.mWriteStart, stream.BytesWritten());
+  }
+
+  void TestLuaEncoderLeavesOutWhatItCannotCarry()
+  {
+    bool encoded = true;
+    const std::string bytes =
+      Encode(LuaGlobal("faf_test_t = { a = 1, f = print, b = 'x', [print] = 2 }", "faf_test_t"), encoded);
+    CHECK(!encoded);
+
+    // The binary wrote nil for the function, which no decoder accepts.
+    LuaPlus::LuaObject out;
+    CHECK(Decode(bytes, out) && out.IsTable());
+    CHECK(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
+    CHECK(out["b"].IsString());
+    CHECK(out["f"].IsNil());
+  }
+
+  void TestLuaEncoderStopsAtCycles()
+  {
+    bool encoded = true;
+    const std::string bytes = Encode(
+      LuaGlobal("faf_test_c = { n = 1 } faf_test_c.self = faf_test_c faf_test_c.sub = { up = faf_test_c, v = 2 }", "faf_test_c"),
+      encoded
+    );
+    CHECK(!encoded);
+
+    LuaPlus::LuaObject out;
+    CHECK(Decode(bytes, out) && out.IsTable());
+    CHECK(out["n"].IsNumber());
+    CHECK(out["self"].IsNil());
+    CHECK(out["sub"]["v"].IsNumber() && out["sub"]["up"].IsNil());
+  }
+
+  void TestLuaEncoderDepthLimit()
+  {
+    bool encoded = true;
+    const std::string bytes = Encode(
+      LuaGlobal("local t = {} faf_test_d = t for i = 1, 1500 do local n = {} t.k = n t = n end", "faf_test_d"), encoded
+    );
+    CHECK(!encoded);
+
+    LuaPlus::LuaObject out;
+    CHECK(Decode(bytes, out, DecodeMode::Local) && out.IsTable());
+    CHECK(Descend(out, 1023).IsTable());
+    CHECK(Descend(out, 1024).IsNil());
+  }
+
+  void TestLuaEncoderValidDataUnchanged()
+  {
+    // What the encoder could always write is written byte for byte as before.
+    LuaPlus::LuaObject value;
+    CHECK(Decode(LuaNested(300), value, DecodeMode::Local));
+    bool encoded = false;
+    CHECK(Encode(value, encoded) == LuaNested(300));
+    CHECK(encoded);
+
+    const std::string flat = LuaTable(LuaString("k") + LuaNumber(2.5f));
+    CHECK(Decode(flat, value));
+    CHECK(Encode(value, encoded) == flat && encoded);
+  }
+
   // --- Message framing ---------------------------------------------------------------------
 
   void TestMessageFraming()
@@ -816,6 +892,10 @@ namespace
     {"lua: lobby relay depth", &TestLuaLobbyRelayDepth},
     {"lua: local decode has no nesting limit", &TestLuaLocalDecodeHasNoNestingLimit},
     {"lua: malformed tables", &TestLuaMalformedTables},
+    {"lua encode: leaves out what it cannot carry", &TestLuaEncoderLeavesOutWhatItCannotCarry},
+    {"lua encode: stops at cycles", &TestLuaEncoderStopsAtCycles},
+    {"lua encode: depth limit", &TestLuaEncoderDepthLimit},
+    {"lua encode: valid data unchanged", &TestLuaEncoderValidDataUnchanged},
     {"message: framing", &TestMessageFraming},
     {"decoder: empty payloads", &TestDecoderEmptyPayloads},
     {"decoder: truncation", &TestDecoderTruncation},

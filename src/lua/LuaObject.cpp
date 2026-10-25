@@ -23359,101 +23359,167 @@ int32_t LuaObject::GetInteger() const
 	return static_cast<int32_t>(m_object.value.n);
 }
 
+namespace
+{
+	// Deepest table nesting the encoder writes; past it an entry is left out.
+	// Each level is one recursion on the calling thread (the sim's for Sync),
+	// and a table that contains itself would otherwise recurse until the stack
+	// ran out. Well above anything real: remote data arrives capped at 256
+	// levels (kScrMaxTableDepth) and the sim adds a few on top.
+	constexpr std::size_t kScrMaxEncodeDepth = 1024;
+
+	// Values the SCR format carries inside a table.
+	[[nodiscard]] bool IsScrEncodable(const LuaObject& value) noexcept
+	{
+		return value.IsBoolean() || value.IsNumber() || value.IsString() || value.IsTable();
+	}
+
+	bool WriteScrValue(LuaObject& value, gpg::Stream& stream, std::vector<const void*>& openTables);
+} // namespace
+
 /**
  * Address: 0x004D2C80 (FUN_004D2C80, ?SCR_ToByteStream@Moho@@YA_NABVLuaObject@LuaPlus@@AAVStream@gpg@@@Z)
  *
  * What it does:
  * Encodes one LuaObject value into the SCR tagged stream format and recursively
  * serializes table keys/values while warning on userdata/unsupported lanes.
+ *
+ * Engine addition: inside a table, an entry the format cannot carry (a
+ * function or userdata key or value), a table already being written (a
+ * cycle) or one nested past kScrMaxEncodeDepth is left out instead of being
+ * written as nil or recursed into, and the call returns false as before. The
+ * binary wrote nil there, which every decoder refuses as a table value, so the
+ * whole stream became unreadable; and it recursed into cycles until the stack
+ * overflowed.
  */
 bool LuaObject::ToByteStream(gpg::Stream& stream)
 {
-	char typeTag;
-	bool success = true;
+	std::vector<const void*> openTables;
+	return WriteScrValue(*this, stream, openTables);
+}
 
-	if (!m_state || IsNil()) {
-		typeTag = 2;
-		if (stream.mWriteEnd != stream.mWriteHead) {
-			*stream.mWriteHead = typeTag;
-			++stream.mWriteHead;
-		} else {
-			stream.VirtWrite(&typeTag, 1);
+namespace
+{
+	/**
+	 * What it does:
+	 * The body of LuaObject::ToByteStream; `openTables` holds the tables
+	 * enclosing `value`, outermost first.
+	 */
+	bool WriteScrValue(LuaObject& value, gpg::Stream& stream, std::vector<const void*>& openTables)
+	{
+		char typeTag;
+		bool success = true;
+
+		const auto skipEntry = [&openTables](const LuaObject& entry) {
+			if (!IsScrEncodable(entry)) {
+				gpg::Warnf(
+					entry.IsUserData() ? "Attempt to serialize lua user data." : "Attempt to serialize unsupported lua value."
+				);
+				return true;
+			}
+			if (entry.IsTable()) {
+				const void* const table = entry.m_object.value.p;
+				if (std::find(openTables.begin(), openTables.end(), table) != openTables.end()) {
+					gpg::Warnf("Attempt to serialize a lua table that contains itself.");
+					return true;
+				}
+				if (openTables.size() >= kScrMaxEncodeDepth) {
+					gpg::Warnf("Attempt to serialize lua tables nested more than %u deep.", static_cast<unsigned>(kScrMaxEncodeDepth));
+					return true;
+				}
+			}
+			return false;
+		};
+
+		if (!value.m_state || value.IsNil()) {
+			typeTag = 2;
+			if (stream.mWriteEnd != stream.mWriteHead) {
+				*stream.mWriteHead = typeTag;
+				++stream.mWriteHead;
+			} else {
+				stream.VirtWrite(&typeTag, 1);
+			}
+			return true;
 		}
-		return true;
-	}
 
-	if (IsBoolean()) {
-		typeTag = 3;
-		if (stream.mWriteEnd != stream.mWriteHead) {
-			*stream.mWriteHead = typeTag;
-			++stream.mWriteHead;
-		} else {
-			stream.VirtWrite(&typeTag, 1);
-		}
-
-		const bool boolValue = GetBoolean();
-		typeTag = boolValue ? 1 : 0;
-		if (stream.mWriteEnd != stream.mWriteHead) {
-			*stream.mWriteHead = typeTag;
-			++stream.mWriteHead;
-		} else {
-			stream.VirtWrite(&typeTag, 1);
-		}
-		return true;
-	}
-
-	if (IsNumber()) {
-		typeTag = 0;
-		stream.Write(typeTag);
-		const float number = static_cast<float>(GetNumber());
-		stream.Write(number);
-		return true;
-	}
-
-	if (IsString()) {
-		typeTag = 1;
-		stream.Write(typeTag);
-		const char* str = GetString();
-		stream.Write(str ? str : "");
-		return true;
-	}
-
-	if (IsTable()) {
-		typeTag = 4;
-		stream.Write(typeTag);
-
-		LuaTableIterator iter(*this, 1);
-		while (!iter.m_isDone) {
-			LuaObject key = iter.GetKey();
-			if (!key.ToByteStream(stream)) {
-				success = false;
+		if (value.IsBoolean()) {
+			typeTag = 3;
+			if (stream.mWriteEnd != stream.mWriteHead) {
+				*stream.mWriteHead = typeTag;
+				++stream.mWriteHead;
+			} else {
+				stream.VirtWrite(&typeTag, 1);
 			}
 
-			LuaObject value = iter.GetValue();
-			if (!value.ToByteStream(stream)) {
-				success = false;
+			const bool boolValue = value.GetBoolean();
+			typeTag = boolValue ? 1 : 0;
+			if (stream.mWriteEnd != stream.mWriteHead) {
+				*stream.mWriteHead = typeTag;
+				++stream.mWriteHead;
+			} else {
+				stream.VirtWrite(&typeTag, 1);
 			}
-
-			iter.Next();
+			return true;
 		}
 
-		typeTag = 5;
-		stream.Write(typeTag);
-		return success;
-	}
+		if (value.IsNumber()) {
+			typeTag = 0;
+			stream.Write(typeTag);
+			const float number = static_cast<float>(value.GetNumber());
+			stream.Write(number);
+			return true;
+		}
 
-	if (IsUserData()) {
-		gpg::Warnf("Attempt to serialize lua user data.");
+		if (value.IsString()) {
+			typeTag = 1;
+			stream.Write(typeTag);
+			const char* str = value.GetString();
+			stream.Write(str ? str : "");
+			return true;
+		}
+
+		if (value.IsTable()) {
+			typeTag = 4;
+			stream.Write(typeTag);
+
+			openTables.push_back(value.m_object.value.p);
+			LuaTableIterator iter(value, 1);
+			while (!iter.m_isDone) {
+				LuaObject entryKey = iter.GetKey();
+				LuaObject entryValue = iter.GetValue();
+				if (skipEntry(entryKey) || skipEntry(entryValue)) {
+					success = false;
+				} else {
+					if (!WriteScrValue(entryKey, stream, openTables)) {
+						success = false;
+					}
+					if (!WriteScrValue(entryValue, stream, openTables)) {
+						success = false;
+					}
+				}
+
+				iter.Next();
+			}
+			openTables.pop_back();
+
+			typeTag = 5;
+			stream.Write(typeTag);
+			return success;
+		}
+
+		if (value.IsUserData()) {
+			gpg::Warnf("Attempt to serialize lua user data.");
+			typeTag = 2;
+			stream.Write(typeTag);
+			return false;
+		}
+
+		gpg::Warnf("Attempt to serialize unsupported lua value.");
 		typeTag = 2;
 		stream.Write(typeTag);
 		return false;
 	}
-
-	gpg::Warnf("Attempt to serialize unsupported lua value.");
-	typeTag = 2;
-	stream.Write(typeTag);
-	return false;
-}
+} // namespace
 
 namespace gpg
 {
