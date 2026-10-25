@@ -8,6 +8,8 @@
 #include "moho/audio/CSndVar.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/StatItem.h"
+#include "moho/unit/core/UnitAttributes.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/textures/CD3DFileBatchTexture.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
@@ -104,6 +106,82 @@ namespace faf::remote
     [[nodiscard]] std::uint16_t SiloCount(const std::int32_t count) noexcept
     {
       return static_cast<std::uint16_t>(count < 0 ? 0 : (count > 0xFFFF ? 0xFFFF : count));
+    }
+
+    void ReadCategories(wire::SCategoryBits& bits, const moho::EntityCategorySet& set)
+    {
+      bits.firstWord = set.mBits.mFirstWordIndex;
+      bits.words.assign(set.mBits.mWords.begin(), set.mBits.mWords.end());
+      if (bits.words.size() > wire::SCategoryBits::kMaxWords) {
+        bits.words.resize(wire::SCategoryBits::kMaxWords);
+      }
+    }
+
+    [[nodiscard]] std::uint32_t NameId(const msvc8::string& name, wire::CSessionTableWriters* const session)
+    {
+      return session != nullptr ? session->Name(name.c_str()) : wire::COrdinalTable::kNone;
+    }
+
+    void ApplyUnitDetail(
+      wire::SUnitDetail& detail, const moho::SSTIUnitVariableData& data, const std::int32_t reconFlags,
+      const wire::SContentTables& tables, wire::CSessionTableWriters* const session
+    )
+    {
+      detail.creator = static_cast<std::uint32_t>(data.mCreator);
+      detail.creationTick = data.mCreationTick;
+      detail.stunTicks = data.mStunTicks;
+      detail.jobType = data.mJobType;
+      detail.fireState = data.mFireState;
+      detail.siloMaxStorage = {data.mTacticalSiloMaxStorageCount, data.mNukeSiloMaxStorageCount};
+      detail.selectionInheritor = static_cast<std::uint32_t>(data.mSelectionInheritorId);
+      detail.customName = NameId(data.mCustomName, session);
+      detail.focusUnit = static_cast<std::uint32_t>(data.mFocusUnit);
+      detail.guardedUnit = static_cast<std::uint32_t>(data.mGuardedUnit);
+      detail.targetBlip = static_cast<std::uint32_t>(data.mTargetBlip);
+      detail.didRefresh = data.mDidRefresh ? 1u : 0u;
+      detail.reconFlags = reconFlags;
+      detail.economy = {data.mProduced.ENERGY,       data.mProduced.MASS,       data.mResourcesSpent.ENERGY,
+                        data.mResourcesSpent.MASS,   data.mMaintainenceCost.ENERGY, data.mMaintainenceCost.MASS};
+      detail.commands.assign(data.mCommands.begin(), data.mCommands.end());
+      detail.buildQueue.assign(data.mBuildQueue.begin(), data.mBuildQueue.end());
+      if (detail.commands.size() > wire::SUnitDetail::kMaxQueue) {
+        detail.commands.resize(wire::SUnitDetail::kMaxQueue);
+      }
+      if (detail.buildQueue.size() > wire::SUnitDetail::kMaxQueue) {
+        detail.buildQueue.resize(wire::SUnitDetail::kMaxQueue);
+      }
+      detail.weapons.clear();
+      for (const moho::UnitWeaponInfo& info : data.mWeaponInfo) {
+        if (detail.weapons.size() == wire::SUnitDetail::kMaxWeapons) {
+          break;
+        }
+        wire::SUnitWeapon weapon;
+        ReadCategories(weapon.targets, info.mCat1);
+        ReadCategories(weapon.secondary, info.mCat2);
+        weapon.layer = static_cast<std::uint32_t>(info.mLayer);
+        weapon.minRadius = info.mMinRadius;
+        weapon.maxRadius = info.mMaxRadius;
+        weapon.effectiveRadius = info.mEffectiveRadius;
+        weapon.minRangeVisual = NameId(info.mUIMinRangeVisualId, session);
+        weapon.maxRangeVisual = NameId(info.mUIMaxRangeVisualId, session);
+        detail.weapons.push_back(std::move(weapon));
+      }
+      const moho::UnitAttributes& source = data.mAttributes;
+      wire::SUnitAttributes& attributes = detail.attributes;
+      attributes.blueprint = source.blueprint != nullptr ? tables.blueprints.Ordinal(source.blueprint->mBlueprintId.c_str())
+                                                         : wire::COrdinalTable::kNone;
+      attributes.reserved04 = source.unknown_0004;
+      ReadCategories(attributes.restriction, source.restrictionCategory);
+      attributes.scalars = {source.spawnElevationOffset, source.moveSpeedMult, source.accelerationMult, source.turnMult,
+                            source.breakOffTriggerMult, source.breakOffDistanceMult, source.consumptionPerSecondEnergy,
+                            source.consumptionPerSecondMass, source.productionPerSecondEnergy,
+                            source.productionPerSecondMass, source.buildRate, source.regenRate};
+      attributes.commandCaps = source.commandCapsMask;
+      attributes.toggleCaps = source.toggleCapsMask;
+      attributes.flags = {static_cast<std::uint8_t>(source.mReclaimable ? 1u : 0u),
+                          static_cast<std::uint8_t>(source.mCapturable ? 1u : 0u), source.unknown_006A,
+                          source.unknown_006B};
+      attributes.reserved6C = source.unknown_006C;
     }
 
     void ApplyUnitData(wire::SUnitFields& unit, const moho::SSTIUnitVariableData& data)
@@ -285,6 +363,7 @@ namespace faf::remote
       const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
       if (it != mWorld.end() && it->second.isUnit) {
         ApplyUnitData(it->second.unit, update.mVariableData);
+        ApplyUnitDetail(it->second.unit.detail, update.mVariableData, update.mReconFlags, mTables, mSession);
       }
     }
     for (const moho::EntId id : packet.mEraseIds) {

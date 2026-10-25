@@ -1,11 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <unordered_map>
 #include <vector>
 
 #include "moho/entity/SSTIEntityVariableData.h"
+#include "moho/unit/core/Unit.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/SessionTables.h"
 
@@ -76,6 +78,9 @@ namespace faf::remote::client
     std::uint64_t unitConstantsMissing = 0;   // creation constants that differ from the packet's
     std::uint64_t tickMismatches = 0;         // creation tick (the beat's) versus the packet's
     std::uint64_t statsApplied = 0;           // unit stat items written into client trees
+    std::uint64_t unitUpdates = 0;            // unit updates built by the client
+    std::uint64_t unitPosesBorrowed = 0;      // of them, with the packet's poses (the pose lane is WP8)
+    std::uint64_t unitDataMismatches = 0;     // client-built unit data versus the packet's, poses aside
     std::uint64_t positionsOutOfRange = 0;  // shown more than a unit from the sim: clamped by the quantiser
     double maxPositionError = 0.0;
     double decodeSeconds = 0.0;            // DecodeFrame
@@ -107,7 +112,14 @@ namespace faf::remote::client
       bool live = false; // in the session's id map (not orphaned)
       moho::SSTIEntityVariableData data{};
       boost::shared_ptr<moho::Stats<moho::StatItem>> stats; // a unit's stats tree (the client's own)
+      std::unique_ptr<moho::SSTIUnitVariableData> unit;     // a unit's data as last given to the session
     };
+
+    /** A frame's unit detail into a unit's data, with the client's own blueprints and names. */
+    void UnpackUnitDetail(const wire::SUnitDetail& detail, moho::SSTIUnitVariableData& data);
+
+    /** Every field but the poses (checks against the packet). */
+    [[nodiscard]] bool SameUnitData(const moho::SSTIUnitVariableData& a, const moho::SSTIUnitVariableData& b) const;
 
     /** Writes a frame's unit stats into the client's tree of that unit. */
     void ApplyUnitStats(const std::vector<wire::SUnitStat>& stats, moho::Stats<moho::StatItem>& tree);
@@ -121,6 +133,8 @@ namespace faf::remote::client
     /** The session tables the frames' sound and name ids refer to (WP7.2). */
   public:
     void SetSessionTables(const wire::CSessionTableReaders* session) noexcept { mSession = session; }
+    /** The client's rules (the category universe of unit category sets). */
+    void SetRules(moho::RRuleGameRules* rules) noexcept { mRules = rules; }
 
   private:
     struct SUnderlay
@@ -142,6 +156,7 @@ namespace faf::remote::client
     std::vector<moho::RMeshBlueprint*> mMeshes;
     std::vector<SMeshResource> mMeshResources;
     const wire::CSessionTableReaders* mSession = nullptr;
+    moho::RRuleGameRules* mRules = nullptr;
     std::vector<moho::CSndParams*> mSounds;   // by sound id, resolved on first use
     std::vector<SUnderlay> mUnderlays;        // by name id
     wire::SViewFrame mShown;

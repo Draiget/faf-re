@@ -184,6 +184,48 @@ namespace faf::replay
         if ((fields & wire::kFieldUnitScriptBits) != 0u) into.unit += 32;
         if ((fields & wire::kFieldUnitSilos) != 0u) into.unit += 64;
         if ((fields & wire::kFieldUnitFlags) != 0u) into.unit += 8;
+        const auto zz = [&](const std::int32_t value) {
+          return varintBits((static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31));
+        };
+        const auto categories = [&](const wire::SCategoryBits& bits) {
+          return varintBits(bits.firstWord) + varintBits(static_cast<std::uint32_t>(bits.words.size())) + 32u * bits.words.size();
+        };
+        const wire::SUnitFields& unit = record.unit;
+        if ((fields & wire::kFieldUnitStats) != 0u) {
+          std::uint64_t bits = varintBits(static_cast<std::uint32_t>(unit.stats.size()));
+          for (const wire::SUnitStat& stat : unit.stats) {
+            bits += varintBits(stat.name) + 3u + (stat.type == wire::SUnitStat::kString ? varintBits(stat.text + 1u) : 32u);
+          }
+          into.unitParts[0] += bits;
+        }
+        if ((fields & wire::kFieldUnitConstants) != 0u) into.unitParts[1] += 16;
+        const wire::SUnitDetail& d = unit.detail;
+        if ((fields & wire::kFieldUnitDetail) != 0u) {
+          into.unitParts[2] += varintBits(d.creator) + zz(d.creationTick) + zz(d.stunTicks) + zz(d.jobType)
+                             + zz(d.fireState) + zz(d.siloMaxStorage[0]) + zz(d.siloMaxStorage[1])
+                             + varintBits(d.selectionInheritor) + varintBits(d.customName + 1u) + varintBits(d.focusUnit)
+                             + varintBits(d.guardedUnit) + varintBits(d.targetBlip) + 8u + zz(d.reconFlags);
+        }
+        if ((fields & wire::kFieldUnitEconomy) != 0u) into.unitParts[3] += 192;
+        if ((fields & wire::kFieldUnitQueues) != 0u) {
+          std::uint64_t bits = varintBits(static_cast<std::uint32_t>(d.commands.size()))
+                             + varintBits(static_cast<std::uint32_t>(d.buildQueue.size()));
+          for (const std::int32_t id : d.commands) bits += zz(id);
+          for (const std::int32_t id : d.buildQueue) bits += zz(id);
+          into.unitParts[4] += bits;
+        }
+        if ((fields & wire::kFieldUnitWeapons) != 0u) {
+          std::uint64_t bits = varintBits(static_cast<std::uint32_t>(d.weapons.size()));
+          for (const wire::SUnitWeapon& w : d.weapons) {
+            bits += categories(w.targets) + categories(w.secondary) + varintBits(w.layer) + 96u
+                  + varintBits(w.minRangeVisual + 1u) + varintBits(w.maxRangeVisual + 1u);
+          }
+          into.unitParts[5] += bits;
+        }
+        if ((fields & wire::kFieldUnitAttributes) != 0u) {
+          into.unitParts[6] += varintBits(d.attributes.blueprint + 1u) + 32u + categories(d.attributes.restriction) + 384u
+                             + 64u + 32u + 32u;
+        }
       }
       const wire::SAppearance& look = record.appearance;
       if ((fields & wire::kFieldMesh) != 0u) into.appearance[0] += varintBits(look.mesh);
@@ -203,6 +245,9 @@ namespace faf::replay
     const auto sum = [](const SFieldBits& bits) {
       std::uint64_t total = bits.transform + bits.scalars + bits.flags + bits.unit;
       for (const std::uint64_t part : bits.appearance) {
+        total += part;
+      }
+      for (const std::uint64_t part : bits.unitParts) {
         total += part;
       }
       return total;
@@ -246,7 +291,7 @@ namespace faf::replay
     const auto rate = [&](const std::uint64_t bits) -> double {
       return mBeats != 0 ? static_cast<double>(bits) / 8.0 / static_cast<double>(mBeats) * 10.0 / 1000.0 : 0.0;
     };
-    char text[2048];
+    char text[3072];
     std::snprintf(
       text, sizeof(text),
       "wire entities lane: %llu beats, entities mean %.0f max %u, delta bytes/beat mean %.0f p50 %u p95 %u max %u "
@@ -256,7 +301,8 @@ namespace faf::replay
       "creations %.1f, removals %.1f; dead reckoning (WP7.5) at 4 steps %.1f KB/s (%.2f re-anchors per entity-beat), "
       "at 16 steps %.1f KB/s (%.2f); appearance changes (KB/s) mesh %.2f scale %.2f attachments %.2f visual %.2f "
       "impact %.2f scroll %.2f intel %.2f; appearance in creations (KB/s) mesh %.2f scale %.2f attachments %.2f "
-      "visual %.2f impact %.2f scroll %.2f intel %.2f",
+      "visual %.2f impact %.2f scroll %.2f intel %.2f; unit block parts in changes (KB/s) stats %.2f constants %.2f "
+      "detail %.2f economy %.2f queues %.2f weapons %.2f attributes %.2f",
       static_cast<unsigned long long>(mBeats), mBeats != 0 ? static_cast<double>(mEntitySum) / mBeats : 0.0,
       mMaxEntities, mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats : 0.0, percentile(0.5), percentile(0.95),
       sizes.empty() ? 0u : sizes.back(), mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats * 10.0 / 1000.0 : 0.0,
@@ -276,7 +322,9 @@ namespace faf::replay
       rate(mFieldBits.appearance[3]), rate(mFieldBits.appearance[4]), rate(mFieldBits.appearance[5]),
       rate(mFieldBits.appearance[6]), rate(mCreationAppearanceBits[0]), rate(mCreationAppearanceBits[1]),
       rate(mCreationAppearanceBits[2]), rate(mCreationAppearanceBits[3]), rate(mCreationAppearanceBits[4]),
-      rate(mCreationAppearanceBits[5]), rate(mCreationAppearanceBits[6])
+      rate(mCreationAppearanceBits[5]), rate(mCreationAppearanceBits[6]), rate(mFieldBits.unitParts[0]),
+      rate(mFieldBits.unitParts[1]), rate(mFieldBits.unitParts[2]), rate(mFieldBits.unitParts[3]),
+      rate(mFieldBits.unitParts[4]), rate(mFieldBits.unitParts[5]), rate(mFieldBits.unitParts[6])
     );
     return text;
   }

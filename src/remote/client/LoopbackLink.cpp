@@ -35,6 +35,7 @@ namespace faf::remote::client
     }
     mBuilder.SetSessionTables(&mServerTables);
     mRebuilder.SetSessionTables(&mClientTables);
+    mRebuilder.SetRules(&rules);
   }
 
   void CLoopbackLink::Pass(moho::SSyncData& packet)
@@ -85,7 +86,7 @@ namespace faf::remote::client
          + s.underlayMismatches + s.unknownTableIds + mBuilder.UnknownUnderlays() + s.createdNotInPacket + s.packetCreatedNotRebuilt
          + s.blueprintMismatches + s.eraseMismatches + s.deleteMismatches + s.packetUpdatesDropped
          + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
-         + s.positionsOutOfRange + s.tickMismatches;
+         + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches;
   }
 
   std::string CLoopbackLink::Summary(const char* const when) const
@@ -111,12 +112,14 @@ namespace faf::remote::client
       "unit changes without update %llu, unit constants differing %llu, mesh mismatches %llu, mesh resource "
       "mismatches %llu, positions out of range %llu, sound mismatches %llu, underlay mismatches %llu, unknown "
       "underlays %llu, unknown table ids %llu, table failures %llu (table records %.2f KB in all), creation tick "
-      "mismatches %llu, unit stat items applied %llu",
+      "mismatches %llu, unit stat items applied %llu, unit updates %llu (with the packet's poses %llu), unit data "
+      "mismatches %llu",
       when, u(s.createdNotInPacket), u(s.packetCreatedNotRebuilt), u(s.blueprintMismatches), u(s.noBlueprint),
       u(s.eraseMismatches), u(s.deleteMismatches), u(s.packetUpdatesDropped), u(s.unitChangesWithoutUpdate),
       u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange),
       u(s.soundMismatches), u(s.underlayMismatches), u(mBuilder.UnknownUnderlays()), u(s.unknownTableIds),
-      u(mTableFailures), static_cast<double>(mTableBytes) / 1024.0, u(s.tickMismatches), u(s.statsApplied)
+      u(mTableFailures), static_cast<double>(mTableBytes) / 1024.0, u(s.tickMismatches), u(s.statsApplied),
+      u(s.unitUpdates), u(s.unitPosesBorrowed), u(s.unitDataMismatches)
     ).c_str();
     return text;
   }

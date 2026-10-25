@@ -81,6 +81,8 @@ namespace faf::replay
       std::uint64_t unit = 0;       // unit block
       /** Appearance block: mesh, scale, attachments, visual flags, impact, scroll, intel radii. */
       std::array<std::uint64_t, 7> appearance{};
+      /** Unit block beyond the basics: stats tree, constants, detail ids, economy, queues, weapons, attributes. */
+      std::array<std::uint64_t, 7> unitParts{};
       std::uint64_t overhead = 0;   // id gaps and masks of changed records
       std::uint64_t creations = 0;  // whole created records with their ids
       std::uint64_t removals = 0;   // removed ids

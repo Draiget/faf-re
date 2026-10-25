@@ -61,14 +61,6 @@ namespace faf::remote::wire
           && record.position[2] <= codec.position.z.MaxQuantized();
     }
 
-    [[nodiscard]] bool SameUnitFields(const SUnitFields& a, const SUnitFields& b) noexcept
-    {
-      return Bits(a.fuelRatio) == Bits(b.fuelRatio) && Bits(a.shieldRatio) == Bits(b.shieldRatio)
-          && Bits(a.workProgress) == Bits(b.workProgress) && a.unitStates == b.unitStates
-          && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags
-          && a.stats == b.stats && a.buildStateTag == b.buildStateTag && a.fake == b.fake;
-    }
-
     [[nodiscard]] bool SameFloats(const float* a, const float* b, const std::size_t count) noexcept
     {
       for (std::size_t i = 0; i < count; ++i) {
@@ -77,6 +69,57 @@ namespace faf::remote::wire
         }
       }
       return true;
+    }
+
+    void WriteCategories(BitWriter& writer, const SCategoryBits& bits)
+    {
+      writer.WriteVarUint(bits.firstWord);
+      writer.WriteVarUint(static_cast<std::uint32_t>(bits.words.size()));
+      for (const std::uint32_t word : bits.words) {
+        writer.WriteBits(word, 32);
+      }
+    }
+
+    [[nodiscard]] bool ReadCategories(BitReader& reader, SCategoryBits& bits)
+    {
+      bits.firstWord = reader.ReadVarUint();
+      const std::uint32_t count = reader.ReadVarUint();
+      if (!reader.Ok() || count > SCategoryBits::kMaxWords || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()) {
+        reader.Fail();
+        return false;
+      }
+      bits.words.resize(count);
+      for (std::uint32_t& word : bits.words) {
+        word = reader.ReadBits(32);
+      }
+      return reader.Ok();
+    }
+
+    void WriteInt(BitWriter& writer, const std::int32_t value)
+    {
+      writer.WriteVarUint(ZigZag(value));
+    }
+
+    [[nodiscard]] std::int32_t ReadInt(BitReader& reader)
+    {
+      return UnZigZag(reader.ReadVarUint());
+    }
+
+    [[nodiscard]] bool SameUnitFields(const SUnitFields& a, const SUnitFields& b) noexcept
+    {
+      return Bits(a.fuelRatio) == Bits(b.fuelRatio) && Bits(a.shieldRatio) == Bits(b.shieldRatio)
+          && Bits(a.workProgress) == Bits(b.workProgress) && a.unitStates == b.unitStates
+          && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags
+          && a.stats == b.stats && a.buildStateTag == b.buildStateTag && a.fake == b.fake && a.detail == b.detail;
+    }
+
+    [[nodiscard]] bool SameDetailScalars(const SUnitDetail& a, const SUnitDetail& b) noexcept
+    {
+      return a.creator == b.creator && a.creationTick == b.creationTick && a.stunTicks == b.stunTicks
+          && a.jobType == b.jobType && a.fireState == b.fireState && a.siloMaxStorage == b.siloMaxStorage
+          && a.selectionInheritor == b.selectionInheritor && a.customName == b.customName
+          && a.focusUnit == b.focusUnit && a.guardedUnit == b.guardedUnit && a.targetBlip == b.targetBlip
+          && a.didRefresh == b.didRefresh && a.reconFlags == b.reconFlags;
     }
 
     /** The appearance fields in which two blocks differ. */
@@ -202,6 +245,64 @@ namespace faf::remote::wire
       if ((fields & kFieldUnitConstants) != 0u) {
         writer.WriteBits(unit.buildStateTag, 8);
         writer.WriteBits(unit.fake, 8);
+      }
+      const SUnitDetail& detail = unit.detail;
+      if ((fields & kFieldUnitDetail) != 0u) {
+        writer.WriteVarUint(detail.creator);
+        WriteInt(writer, detail.creationTick);
+        WriteInt(writer, detail.stunTicks);
+        WriteInt(writer, detail.jobType);
+        WriteInt(writer, detail.fireState);
+        WriteInt(writer, detail.siloMaxStorage[0]);
+        WriteInt(writer, detail.siloMaxStorage[1]);
+        writer.WriteVarUint(detail.selectionInheritor);
+        writer.WriteVarUint(detail.customName + 1u);
+        writer.WriteVarUint(detail.focusUnit);
+        writer.WriteVarUint(detail.guardedUnit);
+        writer.WriteVarUint(detail.targetBlip);
+        writer.WriteBits(detail.didRefresh, 8);
+        WriteInt(writer, detail.reconFlags);
+      }
+      if ((fields & kFieldUnitEconomy) != 0u) {
+        for (const float value : detail.economy) {
+          writer.WriteFloatExact(value);
+        }
+      }
+      if ((fields & kFieldUnitQueues) != 0u) {
+        for (const std::vector<std::int32_t>* const queue : {&detail.commands, &detail.buildQueue}) {
+          writer.WriteVarUint(static_cast<std::uint32_t>(queue->size()));
+          for (const std::int32_t id : *queue) {
+            WriteInt(writer, id);
+          }
+        }
+      }
+      if ((fields & kFieldUnitWeapons) != 0u) {
+        writer.WriteVarUint(static_cast<std::uint32_t>(detail.weapons.size()));
+        for (const SUnitWeapon& weapon : detail.weapons) {
+          WriteCategories(writer, weapon.targets);
+          WriteCategories(writer, weapon.secondary);
+          writer.WriteVarUint(weapon.layer);
+          writer.WriteFloatExact(weapon.minRadius);
+          writer.WriteFloatExact(weapon.maxRadius);
+          writer.WriteFloatExact(weapon.effectiveRadius);
+          writer.WriteVarUint(weapon.minRangeVisual + 1u);
+          writer.WriteVarUint(weapon.maxRangeVisual + 1u);
+        }
+      }
+      if ((fields & kFieldUnitAttributes) != 0u) {
+        const SUnitAttributes& attributes = detail.attributes;
+        writer.WriteVarUint(attributes.blueprint + 1u);
+        writer.WriteBits(attributes.reserved04, 32);
+        WriteCategories(writer, attributes.restriction);
+        for (const float value : attributes.scalars) {
+          writer.WriteFloatExact(value);
+        }
+        writer.WriteBits(attributes.commandCaps, 32);
+        writer.WriteBits(attributes.toggleCaps, 32);
+        for (const std::uint8_t flag : attributes.flags) {
+          writer.WriteBits(flag, 8);
+        }
+        writer.WriteBits(attributes.reserved6C, 32);
       }
       const SAppearance& look = record.appearance;
       if ((fields & kFieldMesh) != 0u) {
@@ -363,6 +464,77 @@ namespace faf::remote::wire
         unit.buildStateTag = static_cast<std::uint8_t>(reader.ReadBits(8));
         unit.fake = static_cast<std::uint8_t>(reader.ReadBits(8));
       }
+      SUnitDetail& detail = unit.detail;
+      if ((fields & kFieldUnitDetail) != 0u) {
+        detail.creator = reader.ReadVarUint();
+        detail.creationTick = ReadInt(reader);
+        detail.stunTicks = ReadInt(reader);
+        detail.jobType = ReadInt(reader);
+        detail.fireState = ReadInt(reader);
+        detail.siloMaxStorage[0] = ReadInt(reader);
+        detail.siloMaxStorage[1] = ReadInt(reader);
+        detail.selectionInheritor = reader.ReadVarUint();
+        detail.customName = reader.ReadVarUint() - 1u;
+        detail.focusUnit = reader.ReadVarUint();
+        detail.guardedUnit = reader.ReadVarUint();
+        detail.targetBlip = reader.ReadVarUint();
+        detail.didRefresh = static_cast<std::uint8_t>(reader.ReadBits(8));
+        detail.reconFlags = ReadInt(reader);
+      }
+      if ((fields & kFieldUnitEconomy) != 0u) {
+        for (float& value : detail.economy) {
+          value = reader.ReadFloatExact();
+        }
+      }
+      if ((fields & kFieldUnitQueues) != 0u) {
+        for (std::vector<std::int32_t>* const queue : {&detail.commands, &detail.buildQueue}) {
+          const std::uint32_t count = reader.ReadVarUint();
+          if (!reader.Ok() || count > SUnitDetail::kMaxQueue || static_cast<std::uint64_t>(count) * 8u > reader.BitsLeft()) {
+            reader.Fail();
+            return false;
+          }
+          queue->resize(count);
+          for (std::int32_t& id : *queue) {
+            id = ReadInt(reader);
+          }
+        }
+      }
+      if ((fields & kFieldUnitWeapons) != 0u) {
+        const std::uint32_t count = reader.ReadVarUint();
+        if (!reader.Ok() || count > SUnitDetail::kMaxWeapons || static_cast<std::uint64_t>(count) * 120u > reader.BitsLeft()) {
+          reader.Fail();
+          return false;
+        }
+        detail.weapons.resize(count);
+        for (SUnitWeapon& weapon : detail.weapons) {
+          if (!ReadCategories(reader, weapon.targets) || !ReadCategories(reader, weapon.secondary)) {
+            return false;
+          }
+          weapon.layer = reader.ReadVarUint();
+          weapon.minRadius = reader.ReadFloatExact();
+          weapon.maxRadius = reader.ReadFloatExact();
+          weapon.effectiveRadius = reader.ReadFloatExact();
+          weapon.minRangeVisual = reader.ReadVarUint() - 1u;
+          weapon.maxRangeVisual = reader.ReadVarUint() - 1u;
+        }
+      }
+      if ((fields & kFieldUnitAttributes) != 0u) {
+        SUnitAttributes& attributes = detail.attributes;
+        attributes.blueprint = reader.ReadVarUint() - 1u;
+        attributes.reserved04 = reader.ReadBits(32);
+        if (!ReadCategories(reader, attributes.restriction)) {
+          return false;
+        }
+        for (float& value : attributes.scalars) {
+          value = reader.ReadFloatExact();
+        }
+        attributes.commandCaps = reader.ReadBits(32);
+        attributes.toggleCaps = reader.ReadBits(32);
+        for (std::uint8_t& flag : attributes.flags) {
+          flag = static_cast<std::uint8_t>(reader.ReadBits(8));
+        }
+        attributes.reserved6C = reader.ReadBits(32);
+      }
       SAppearance& look = record.appearance;
       if ((fields & kFieldMesh) != 0u) {
         look.mesh = reader.ReadVarUint();
@@ -454,6 +626,28 @@ namespace faf::remote::wire
     }
   } // namespace
 
+  bool SUnitWeapon::operator==(const SUnitWeapon& other) const noexcept
+  {
+    return targets == other.targets && secondary == other.secondary && layer == other.layer
+        && Bits(minRadius) == Bits(other.minRadius) && Bits(maxRadius) == Bits(other.maxRadius)
+        && Bits(effectiveRadius) == Bits(other.effectiveRadius) && minRangeVisual == other.minRangeVisual
+        && maxRangeVisual == other.maxRangeVisual;
+  }
+
+  bool SUnitAttributes::operator==(const SUnitAttributes& other) const noexcept
+  {
+    return blueprint == other.blueprint && reserved04 == other.reserved04 && restriction == other.restriction
+        && SameFloats(scalars.data(), other.scalars.data(), scalars.size()) && commandCaps == other.commandCaps
+        && toggleCaps == other.toggleCaps && flags == other.flags && reserved6C == other.reserved6C;
+  }
+
+  bool SUnitDetail::operator==(const SUnitDetail& other) const noexcept
+  {
+    return SameDetailScalars(*this, other) && SameFloats(economy.data(), other.economy.data(), economy.size())
+        && commands == other.commands && buildQueue == other.buildQueue
+        && weapons == other.weapons && attributes == other.attributes;
+  }
+
   bool SAppearance::operator==(const SAppearance& other) const noexcept
   {
     return AppearanceChanges(*this, other) == 0u;
@@ -542,6 +736,21 @@ namespace faf::remote::wire
       }
       if (b.buildStateTag != a.buildStateTag || b.fake != a.fake) {
         fields |= kFieldUnitConstants;
+      }
+      if (!SameDetailScalars(b.detail, a.detail)) {
+        fields |= kFieldUnitDetail;
+      }
+      if (!SameFloats(b.detail.economy.data(), a.detail.economy.data(), a.detail.economy.size())) {
+        fields |= kFieldUnitEconomy;
+      }
+      if (b.detail.commands != a.detail.commands || b.detail.buildQueue != a.detail.buildQueue) {
+        fields |= kFieldUnitQueues;
+      }
+      if (b.detail.weapons != a.detail.weapons) {
+        fields |= kFieldUnitWeapons;
+      }
+      if (!(b.detail.attributes == a.detail.attributes)) {
+        fields |= kFieldUnitAttributes;
       }
     }
     return fields;

@@ -412,6 +412,9 @@ namespace
         record.unit.buildStateTag = static_cast<std::uint8_t>(mRng());
         record.unit.fake = static_cast<std::uint8_t>(mRng() & 1u);
         record.unit.stats = RandomStats();
+        if (mRng() % 2u == 0u) {
+          record.unit.detail = RandomDetail();
+        }
       }
       // Appearance: mostly defaults (a creation then sends none of it), sometimes anything.
       if (mRng() % 3u == 0u) {
@@ -486,7 +489,78 @@ namespace
         if ((fields & kFieldUnitSilos) != 0u) unit.siloCounts = source.siloCounts;
         if ((fields & kFieldUnitFlags) != 0u) unit.unitFlags = source.unitFlags;
         if (mRng() % 5u == 0u) unit.stats = source.stats;
+        if (mRng() % 4u == 0u) {
+          const SUnitDetail fresh = RandomDetail();
+          switch (mRng() % 4u) {
+          case 0: unit.detail.commands = fresh.commands; break;
+          case 1: unit.detail.weapons = fresh.weapons; break;
+          case 2: unit.detail.attributes = fresh.attributes; break;
+          default: unit.detail.focusUnit = fresh.focusUnit; unit.detail.economy = fresh.economy; break;
+          }
+        }
       }
+    }
+
+    SCategoryBits RandomCategories()
+    {
+      SCategoryBits bits;
+      bits.firstWord = mRng() % 8u;
+      bits.words.resize(mRng() % 5u);
+      for (std::uint32_t& word : bits.words) {
+        word = static_cast<std::uint32_t>(mRng());
+      }
+      return bits;
+    }
+
+    SUnitDetail RandomDetail()
+    {
+      SUnitDetail detail;
+      detail.creator = static_cast<std::uint32_t>(mRng());
+      detail.creationTick = static_cast<std::int32_t>(mRng());
+      detail.stunTicks = static_cast<std::int32_t>(mRng() % 50u) - 10;
+      detail.jobType = static_cast<std::int32_t>(mRng() % 8u);
+      detail.fireState = static_cast<std::int32_t>(mRng() % 3u);
+      detail.siloMaxStorage = {static_cast<std::int32_t>(mRng() % 5u), -1};
+      detail.selectionInheritor = static_cast<std::uint32_t>(mRng());
+      detail.customName = mRng() % 3u == 0u ? 0xFFFFFFFFu : mRng() % 100u;
+      detail.focusUnit = static_cast<std::uint32_t>(mRng());
+      detail.guardedUnit = mRng() % 2u == 0u ? 0xF0000000u : static_cast<std::uint32_t>(mRng());
+      detail.targetBlip = static_cast<std::uint32_t>(mRng());
+      detail.didRefresh = static_cast<std::uint8_t>(mRng() & 1u);
+      detail.reconFlags = static_cast<std::int32_t>(mRng());
+      for (float& value : detail.economy) {
+        value = RandomFloat();
+      }
+      detail.commands.resize(mRng() % 6u);
+      for (std::int32_t& id : detail.commands) {
+        id = static_cast<std::int32_t>(mRng());
+      }
+      detail.buildQueue.resize(mRng() % 4u);
+      for (std::int32_t& id : detail.buildQueue) {
+        id = static_cast<std::int32_t>(mRng() % 1000u);
+      }
+      detail.weapons.resize(mRng() % 3u);
+      for (SUnitWeapon& weapon : detail.weapons) {
+        weapon.targets = RandomCategories();
+        weapon.secondary = RandomCategories();
+        weapon.layer = mRng() % 128u;
+        weapon.minRadius = RandomFloat();
+        weapon.maxRadius = RandomFloat();
+        weapon.effectiveRadius = RandomFloat();
+        weapon.minRangeVisual = mRng() % 3u == 0u ? 0xFFFFFFFFu : mRng() % 50u;
+        weapon.maxRangeVisual = mRng() % 50u;
+      }
+      SUnitAttributes& attributes = detail.attributes;
+      attributes.blueprint = mRng() % 4u == 0u ? 0xFFFFFFFFu : mRng() % 5000u;
+      attributes.reserved04 = mRng() % 2u;
+      attributes.restriction = RandomCategories();
+      for (float& value : attributes.scalars) {
+        value = RandomFloat();
+      }
+      attributes.commandCaps = static_cast<std::uint32_t>(mRng());
+      attributes.toggleCaps = static_cast<std::uint32_t>(mRng());
+      attributes.flags = {static_cast<std::uint8_t>(mRng() & 1u), static_cast<std::uint8_t>(mRng() & 1u), 0, 0};
+      return detail;
     }
 
     std::vector<SUnitStat> RandomStats()

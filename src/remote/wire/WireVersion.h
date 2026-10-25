@@ -36,9 +36,10 @@ namespace faf::remote::wire
    * Entities 3: 32-bit field masks with the appearance block, a mask on creations too, and
    * positions outside the quantiser's range as exact floats. Entities 4: sounds and the
    * strategic underlay in the appearance block, as session-table ids; a unit's stats tree and
-   * creation constants in its unit block.
+   * creation constants in its unit block. Entities 5: the rest of a unit's variable data (ids,
+   * economy, command and build queues, weapons, attributes) in its unit block.
    */
-  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{4, 1, 1, 1, 1, 1};
+  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{5, 1, 1, 1, 1, 1};
 
   [[nodiscard]] const char* LaneName(ELane lane) noexcept;
 

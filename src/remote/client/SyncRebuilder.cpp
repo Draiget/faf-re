@@ -1,6 +1,8 @@
 #include "remote/client/SyncRebuilder.h"
 
 #include <algorithm>
+#include <bit>
+#include <memory>
 #include <chrono>
 #include <cmath>
 #include <string>
@@ -11,6 +13,8 @@
 #include "moho/audio/CSndParams.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/StatItem.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/unit/core/UnitAttributes.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
@@ -108,6 +112,171 @@ namespace faf::remote::client
     , mMeshes(std::move(meshes))
     , mMeshResources(mMeshes.size())
   {}
+
+  namespace
+  {
+    template <class Vector>
+    void AssignAll(Vector& to, const std::vector<std::int32_t>& from)
+    {
+      to.clear();
+      for (const std::int32_t value : from) {
+        to.push_back(value);
+      }
+    }
+
+    void AssignCategories(moho::EntityCategorySet& set, const wire::SCategoryBits& bits, moho::RRuleGameRules* const rules)
+    {
+      set.mUniverse.mRules = rules;
+      set.mBits.mFirstWordIndex = bits.firstWord;
+      set.mBits.mWords.clear();
+      for (const std::uint32_t word : bits.words) {
+        set.mBits.mWords.push_back(word);
+      }
+    }
+
+    [[nodiscard]] bool SameCategories(const moho::EntityCategorySet& a, const moho::EntityCategorySet& b) noexcept
+    {
+      if (a.mBits.mFirstWordIndex != b.mBits.mFirstWordIndex || a.mBits.mWords.size() != b.mBits.mWords.size()) {
+        return false;
+      }
+      return std::equal(a.mBits.mWords.begin(), a.mBits.mWords.end(), b.mBits.mWords.begin());
+    }
+
+    [[nodiscard]] bool SameBits(const float a, const float b) noexcept
+    {
+      return std::bit_cast<std::uint32_t>(a) == std::bit_cast<std::uint32_t>(b);
+    }
+  } // namespace
+
+  bool CSyncRebuilder::SameUnitData(const moho::SSTIUnitVariableData& a, const moho::SSTIUnitVariableData& b) const
+  {
+    // Every field but the poses (still the packet's) and the pad bytes.
+    const moho::UnitAttributes& x = a.mAttributes;
+    const moho::UnitAttributes& y = b.mAttributes;
+    bool same = a.mCreator == b.mCreator && a.mCreationTick == b.mCreationTick && a.mAutoMode == b.mAutoMode
+             && a.mAutoSurfaceMode == b.mAutoSurfaceMode && a.mIsBusy == b.mIsBusy
+             && SameBits(a.mFuelRatio, b.mFuelRatio) && SameBits(a.mShieldRatio, b.mShieldRatio)
+             && a.mStunTicks == b.mStunTicks && a.mIsPaused == b.mIsPaused && a.mIsValidTarget == b.mIsValidTarget
+             && a.mRepeatQueue == b.mRepeatQueue && a.mJobType == b.mJobType && a.mFireState == b.mFireState
+             && SameBits(a.mWorkProgress, b.mWorkProgress) && a.mTacticalSiloBuildCount == b.mTacticalSiloBuildCount
+             && a.mNukeSiloBuildCount == b.mNukeSiloBuildCount
+             && a.mTacticalSiloStorageCount == b.mTacticalSiloStorageCount
+             && a.mNukeSiloStorageCount == b.mNukeSiloStorageCount
+             && a.mTacticalSiloMaxStorageCount == b.mTacticalSiloMaxStorageCount
+             && a.mNukeSiloMaxStorageCount == b.mNukeSiloMaxStorageCount
+             && a.mSelectionInheritorId == b.mSelectionInheritorId && a.mCustomName.view() == b.mCustomName.view()
+             && SameBits(a.mProduced.ENERGY, b.mProduced.ENERGY) && SameBits(a.mProduced.MASS, b.mProduced.MASS)
+             && SameBits(a.mResourcesSpent.ENERGY, b.mResourcesSpent.ENERGY)
+             && SameBits(a.mResourcesSpent.MASS, b.mResourcesSpent.MASS)
+             && SameBits(a.mMaintainenceCost.ENERGY, b.mMaintainenceCost.ENERGY)
+             && SameBits(a.mMaintainenceCost.MASS, b.mMaintainenceCost.MASS) && a.mFocusUnit == b.mFocusUnit
+             && a.mGuardedUnit == b.mGuardedUnit && a.mTargetBlip == b.mTargetBlip
+             && a.mCommands.size() == b.mCommands.size()
+             && std::equal(a.mCommands.begin(), a.mCommands.end(), b.mCommands.begin())
+             && a.mBuildQueue.size() == b.mBuildQueue.size()
+             && std::equal(a.mBuildQueue.begin(), a.mBuildQueue.end(), b.mBuildQueue.begin())
+             && a.mScriptbits == b.mScriptbits && a.mUnitStates == b.mUnitStates && a.mDidRefresh == b.mDidRefresh
+             && a.mOverchargePaused == b.mOverchargePaused && x.blueprint == y.blueprint
+             && x.unknown_0004 == y.unknown_0004 && SameCategories(x.restrictionCategory, y.restrictionCategory)
+             && SameBits(x.spawnElevationOffset, y.spawnElevationOffset) && SameBits(x.moveSpeedMult, y.moveSpeedMult)
+             && SameBits(x.accelerationMult, y.accelerationMult) && SameBits(x.turnMult, y.turnMult)
+             && SameBits(x.breakOffTriggerMult, y.breakOffTriggerMult)
+             && SameBits(x.breakOffDistanceMult, y.breakOffDistanceMult)
+             && SameBits(x.consumptionPerSecondEnergy, y.consumptionPerSecondEnergy)
+             && SameBits(x.consumptionPerSecondMass, y.consumptionPerSecondMass)
+             && SameBits(x.productionPerSecondEnergy, y.productionPerSecondEnergy)
+             && SameBits(x.productionPerSecondMass, y.productionPerSecondMass) && SameBits(x.buildRate, y.buildRate)
+             && SameBits(x.regenRate, y.regenRate) && x.commandCapsMask == y.commandCapsMask
+             && x.toggleCapsMask == y.toggleCapsMask && x.mReclaimable == y.mReclaimable
+             && x.mCapturable == y.mCapturable && x.unknown_006A == y.unknown_006A && x.unknown_006B == y.unknown_006B
+             && x.unknown_006C == y.unknown_006C && a.mWeaponInfo.size() == b.mWeaponInfo.size();
+    if (!same) {
+      return false;
+    }
+    auto bw = b.mWeaponInfo.begin();
+    for (const moho::UnitWeaponInfo& w : a.mWeaponInfo) {
+      const moho::UnitWeaponInfo& v = *bw++;
+      if (!SameCategories(w.mCat1, v.mCat1) || !SameCategories(w.mCat2, v.mCat2) || w.mLayer != v.mLayer
+          || !SameBits(w.mMinRadius, v.mMinRadius) || !SameBits(w.mMaxRadius, v.mMaxRadius)
+          || !SameBits(w.mEffectiveRadius, v.mEffectiveRadius) || w.mUIMinRangeVisualId.view() != v.mUIMinRangeVisualId.view()
+          || w.mUIMaxRangeVisualId.view() != v.mUIMaxRangeVisualId.view()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void CSyncRebuilder::UnpackUnitDetail(const wire::SUnitDetail& detail, moho::SSTIUnitVariableData& data)
+  {
+    const auto name = [&](const std::uint32_t id) -> msvc8::string {
+      if (id == wire::COrdinalTable::kNone) {
+        return msvc8::string();
+      }
+      const std::string* const text = mSession != nullptr ? mSession->Names().Find(id) : nullptr;
+      if (text == nullptr) {
+        ++mStats.unknownTableIds;
+        return msvc8::string();
+      }
+      return msvc8::string(text->c_str());
+    };
+    data.mCreator = static_cast<moho::EntId>(detail.creator);
+    data.mCreationTick = detail.creationTick;
+    data.mStunTicks = detail.stunTicks;
+    data.mJobType = detail.jobType;
+    data.mFireState = detail.fireState;
+    data.mTacticalSiloMaxStorageCount = detail.siloMaxStorage[0];
+    data.mNukeSiloMaxStorageCount = detail.siloMaxStorage[1];
+    data.mSelectionInheritorId = static_cast<moho::EntId>(detail.selectionInheritor);
+    data.mCustomName = name(detail.customName);
+    data.mFocusUnit = static_cast<moho::EntId>(detail.focusUnit);
+    data.mGuardedUnit = static_cast<moho::EntId>(detail.guardedUnit);
+    data.mTargetBlip = static_cast<moho::EntId>(detail.targetBlip);
+    data.mDidRefresh = detail.didRefresh != 0u;
+    data.mProduced = {detail.economy[0], detail.economy[1]};
+    data.mResourcesSpent = {detail.economy[2], detail.economy[3]};
+    data.mMaintainenceCost = {detail.economy[4], detail.economy[5]};
+    AssignAll(data.mCommands, detail.commands);
+    AssignAll(data.mBuildQueue, detail.buildQueue);
+    data.mWeaponInfo.clear();
+    for (const wire::SUnitWeapon& weapon : detail.weapons) {
+      moho::UnitWeaponInfo info;
+      AssignCategories(info.mCat1, weapon.targets, mRules);
+      AssignCategories(info.mCat2, weapon.secondary, mRules);
+      info.mLayer = static_cast<moho::ELayer>(weapon.layer);
+      info.mMinRadius = weapon.minRadius;
+      info.mMaxRadius = weapon.maxRadius;
+      info.mEffectiveRadius = weapon.effectiveRadius;
+      info.mUIMinRangeVisualId = name(weapon.minRangeVisual);
+      info.mUIMaxRangeVisualId = name(weapon.maxRangeVisual);
+      data.mWeaponInfo.push_back(info);
+    }
+    const wire::SUnitAttributes& source = detail.attributes;
+    moho::UnitAttributes& attributes = data.mAttributes;
+    attributes.blueprint = source.blueprint < mBlueprints.size()
+                           ? static_cast<const moho::RUnitBlueprint*>(mBlueprints[source.blueprint])
+                           : nullptr;
+    attributes.unknown_0004 = source.reserved04;
+    AssignCategories(attributes.restrictionCategory, source.restriction, mRules);
+    attributes.spawnElevationOffset = source.scalars[0];
+    attributes.moveSpeedMult = source.scalars[1];
+    attributes.accelerationMult = source.scalars[2];
+    attributes.turnMult = source.scalars[3];
+    attributes.breakOffTriggerMult = source.scalars[4];
+    attributes.breakOffDistanceMult = source.scalars[5];
+    attributes.consumptionPerSecondEnergy = source.scalars[6];
+    attributes.consumptionPerSecondMass = source.scalars[7];
+    attributes.productionPerSecondEnergy = source.scalars[8];
+    attributes.productionPerSecondMass = source.scalars[9];
+    attributes.buildRate = source.scalars[10];
+    attributes.regenRate = source.scalars[11];
+    attributes.commandCapsMask = source.commandCaps;
+    attributes.toggleCapsMask = source.toggleCaps;
+    attributes.mReclaimable = source.flags[0] != 0u;
+    attributes.mCapturable = source.flags[1] != 0u;
+    attributes.unknown_006A = source.flags[2];
+    attributes.unknown_006B = source.flags[3];
+    attributes.unknown_006C = source.reserved6C;
+  }
 
   void CSyncRebuilder::ApplyUnitStats(const std::vector<wire::SUnitStat>& stats, moho::Stats<moho::StatItem>& tree)
   {
@@ -447,46 +616,55 @@ namespace faf::remote::client
       mStats.packetUpdatesDropped += updatable(id) ? 0u : 1u;
     }
 
-    // Unit updates: the packet's, for units the client holds, with the frame's unit block. The
-    // records are in id order, so a binary search finds each one; the packet's list is kept in
-    // place unless an update has to go (copying a unit update is not cheap).
-    const auto findRecord = [&frame](const std::uint32_t id) -> const wire::SEntityRecord* {
-      const auto it = std::lower_bound(
-        frame.entities.begin(), frame.entities.end(), id,
-        [](const wire::SEntityRecord& record, const std::uint32_t key) { return record.id < key; }
-      );
-      return it != frame.entities.end() && it->id == id ? &*it : nullptr;
-    };
-    std::unordered_set<std::uint32_t> unitUpdated;
-    std::vector<bool> keepUnitUpdate(packet.mUnitUpdates.size(), false);
-    bool dropAny = false;
-    for (std::size_t i = 0; i < packet.mUnitUpdates.size(); ++i) {
-      moho::SUnitVariableUpdateEntry& update = packet.mUnitUpdates[i];
-      const auto id = static_cast<std::uint32_t>(update.mEntityId);
-      const wire::SEntityRecord* const record = findRecord(id);
-      if (!updatable(id) || record == nullptr || !record->isUnit) {
-        ++mStats.packetUpdatesDropped;
-        dropAny = true;
-        continue;
-      }
-      UnpackUnitFields(record->unit, update.mVariableData);
-      unitUpdated.insert(id);
-      keepUnitUpdate[i] = true;
-    }
-    if (dropAny) {
-      msvc8::vector<moho::SUnitVariableUpdateEntry> kept;
-      for (std::size_t i = 0; i < packet.mUnitUpdates.size(); ++i) {
-        if (keepUnitUpdate[i]) {
-          kept.push_back(packet.mUnitUpdates[i]);
+    // Unit updates: built from the client's own copy of each unit's data with the frame's unit
+    // block over it, for every unit created now or whose unit block changed. Only the two
+    // animation poses still come from the packet (the pose lane is WP8), so a unit the packet
+    // updates gets an update too, to carry them.
+    const auto packetUnitUpdates = IndexById(packet.mUnitUpdates);
+    msvc8::vector<moho::SUnitVariableUpdateEntry> unitUpdates;
+    unitUpdates.reserve(packet.mUnitUpdates.size() + delta.changed.size());
+    {
+      auto changeIt = delta.changed.begin();
+      for (const wire::SEntityRecord& record : frame.entities) {
+        while (changeIt != delta.changed.end() && changeIt->record.id < record.id) {
+          ++changeIt;
         }
+        const bool unitChanged = changeIt != delta.changed.end() && changeIt->record.id == record.id
+                              && (changeIt->fields & wire::kUnitFields) != 0u;
+        const bool created = createdNow.count(record.id) != 0u;
+        const auto packetIt = packetUnitUpdates.find(record.id);
+        const bool fromPacket = packetIt != packetUnitUpdates.end();
+        if (!record.isUnit || !updatable(record.id) || (!created && !unitChanged && !fromPacket)) {
+          continue;
+        }
+        SHeldEntity& held = mHeld[record.id];
+        if (!held.unit) {
+          held.unit = std::make_unique<moho::SSTIUnitVariableData>();
+        }
+        moho::SUnitVariableUpdateEntry& entry = unitUpdates.emplace_back();
+        entry.mEntityId = static_cast<moho::EntId>(record.id);
+        entry.mVariableData = *held.unit;
+        moho::SSTIUnitVariableData& data = entry.mVariableData;
+        UnpackUnitFields(record.unit, data);
+        UnpackUnitDetail(record.unit.detail, data);
+        entry.mReconFlags = record.unit.detail.reconFlags;
+        if (fromPacket) {
+          const moho::SSTIUnitVariableData& sim = packetIt->second->mVariableData;
+          data.mPriorSharedPose = sim.mPriorSharedPose;
+          data.mSharedPose = sim.mSharedPose;
+          entry.mReserved04 = packetIt->second->mReserved04;
+          entry.mReserved234 = packetIt->second->mReserved234;
+          ++mStats.unitPosesBorrowed;
+          mStats.unitDataMismatches += SameUnitData(data, sim) && entry.mReconFlags == packetIt->second->mReconFlags ? 0u : 1u;
+        }
+        *held.unit = data;
+        ++mStats.unitUpdates;
       }
-      packet.mUnitUpdates.swap(kept);
     }
-    for (const wire::SFrameDelta::SChange& change : delta.changed) {
-      if ((change.fields & wire::kUnitFields) != 0u && unitUpdated.count(change.record.id) == 0u) {
-        ++mStats.unitChangesWithoutUpdate;
-      }
+    for (const auto& [id, entry] : packetUnitUpdates) {
+      mStats.packetUpdatesDropped += updatable(id) ? 0u : 1u;
     }
+    packet.mUnitUpdates.swap(unitUpdates);
 
     // Unit stats: the client's tree of each unit created now or whose stats changed.
     {

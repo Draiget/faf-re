@@ -41,6 +41,77 @@ namespace faf::remote::wire
     [[nodiscard]] bool operator==(const SUnitStat& other) const noexcept = default;
   };
 
+  /** A category set (`EntityCategorySet`): the bits over the rules' category universe. */
+  struct SCategoryBits
+  {
+    static constexpr std::size_t kMaxWords = 256;
+
+    std::uint32_t firstWord = 0;
+    std::vector<std::uint32_t> words;
+
+    [[nodiscard]] bool operator==(const SCategoryBits& other) const noexcept = default;
+  };
+
+  /** One weapon's UI facts (`UnitWeaponInfo`): target categories, layer, ranges, range rings. */
+  struct SUnitWeapon
+  {
+    SCategoryBits targets;
+    SCategoryBits secondary;
+    std::uint32_t layer = 0;
+    float minRadius = 0.0f;
+    float maxRadius = 0.0f;
+    float effectiveRadius = 0.0f;
+    std::uint32_t minRangeVisual = 0xFFFFFFFFu; // name table ids
+    std::uint32_t maxRangeVisual = 0xFFFFFFFFu;
+
+    [[nodiscard]] bool operator==(const SUnitWeapon& other) const noexcept;
+  };
+
+  /** `UnitAttributes` as the UI and the command logic read them. */
+  struct SUnitAttributes
+  {
+    std::uint32_t blueprint = 0xFFFFFFFFu; // blueprints ordinal
+    std::uint32_t reserved04 = 0;
+    SCategoryBits restriction;
+    std::array<float, 12> scalars{}; // spawn elevation, speed, acceleration, turn, break-off trigger
+                                     // and distance, energy and mass consumption and production,
+                                     // build rate, regen rate
+    std::uint32_t commandCaps = 0;
+    std::uint32_t toggleCaps = 0;
+    std::array<std::uint8_t, 4> flags{}; // reclaimable, capturable, two unknown bytes
+    std::uint32_t reserved6C = 0;
+
+    [[nodiscard]] bool operator==(const SUnitAttributes& other) const noexcept;
+  };
+
+  /** The rest of a unit's variable data (`SSTIUnitVariableData`) and its update's recon flags. */
+  struct SUnitDetail
+  {
+    static constexpr std::size_t kMaxQueue = 512;
+    static constexpr std::size_t kMaxWeapons = 64;
+
+    std::uint32_t creator = 0;
+    std::int32_t creationTick = 0;
+    std::int32_t stunTicks = 0;
+    std::int32_t jobType = 0;
+    std::int32_t fireState = 0;
+    std::array<std::int32_t, 2> siloMaxStorage{}; // tactical, nuke
+    std::uint32_t selectionInheritor = 0;
+    std::uint32_t customName = 0xFFFFFFFFu;       // name table id
+    std::uint32_t focusUnit = 0;
+    std::uint32_t guardedUnit = 0;
+    std::uint32_t targetBlip = 0;
+    std::uint8_t didRefresh = 0;
+    std::int32_t reconFlags = 0;
+    std::array<float, 6> economy{};               // produced, spent, maintenance: energy, mass each
+    std::vector<std::int32_t> commands;           // command ids
+    std::vector<std::int32_t> buildQueue;
+    std::vector<SUnitWeapon> weapons;
+    SUnitAttributes attributes;
+
+    [[nodiscard]] bool operator==(const SUnitDetail& other) const noexcept;
+  };
+
   /** A unit's own state, beyond what every entity has. Exact floats (the UI shows them). */
   struct SUnitFields
   {
@@ -56,6 +127,7 @@ namespace faf::remote::wire
     std::vector<SUnitStat> stats;   // ascending names; sent whole when any item changes
     std::uint8_t buildStateTag = 0; // creation constants (SCreateUnitConstantData)
     std::uint8_t fake = 0;
+    SUnitDetail detail;
   };
 
   /**
@@ -150,10 +222,17 @@ namespace faf::remote::wire
     kFieldUnderlay = 1u << 24,
     kFieldUnitStats = 1u << 25,
     kFieldUnitConstants = 1u << 26,
+    kFieldUnitDetail = 1u << 27,     // the scalars and ids of SUnitDetail
+    kFieldUnitQueues = 1u << 28,     // commands and build queue
+    kFieldUnitWeapons = 1u << 29,
+    kFieldUnitAttributes = 1u << 30,
+    kFieldUnitEconomy = 1u << 31,    // produced, spent, maintenance (change often)
   };
 
   inline constexpr std::uint32_t kEntityFields = 0x00FFu;
-  inline constexpr std::uint32_t kUnitFields = 0x7F00u | kFieldUnitStats | kFieldUnitConstants;
+  inline constexpr std::uint32_t kUnitFields = 0x7F00u | kFieldUnitStats | kFieldUnitConstants | kFieldUnitDetail
+                                             | kFieldUnitQueues | kFieldUnitWeapons | kFieldUnitAttributes
+                                             | kFieldUnitEconomy;
   inline constexpr std::uint32_t kAppearanceFields = 0x1FF0000u;
   inline constexpr std::uint32_t kAllFields = kEntityFields | kUnitFields | kFieldKind | kAppearanceFields;
 
