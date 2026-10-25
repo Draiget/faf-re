@@ -40,6 +40,36 @@ add_library(faf::codegen ALIAS faf_codegen)
 set(_faf_libm_calls
   acos asin atan atan2 cos cosh sin sinh tan tanh
   exp exp2 expm1 log log10 log1p log2 logb pow cbrt hypot erf erfc tgamma lgamma)
+
+# Engine addition (dedicated-server plan WPL.2): the same rules for the Linux
+# build (clang with the GNU driver, cmake/toolchains/linux-clang-x64.cmake),
+# spelled for that driver, plus what the GNU driver defaults differently from
+# clang-cl:
+#
+#  - -fno-math-errno: clang-cl's default. With errno semantics clang keeps
+#    sqrt as a call guarded for negative inputs where clang-cl inlines sqrtsd.
+#  - -fsigned-char: plain char signed, as with MSVC (the x86-64 Linux default
+#    too; spelled out so no target can differ).
+#  - Function and data sections, collected at link time: /Gy and /OPT:REF.
+#
+# Never -ffast-math or -Ofast: checked below.
+if(FAF_LINUX)
+  set(_faf_no_builtin "")
+  foreach(_fn IN LISTS _faf_libm_calls)
+    list(APPEND _faf_no_builtin "-fno-builtin-${_fn}" "-fno-builtin-${_fn}f" "-fno-builtin-${_fn}l")
+  endforeach()
+  foreach(_flags IN ITEMS CMAKE_C_FLAGS CMAKE_CXX_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE)
+    if("${${_flags}}" MATCHES "-ffast-math|-Ofast|-ffp-contract=(on|fast)|-march=|-mfma|-mavx")
+      message(FATAL_ERROR "${_flags} contains a flag that changes floating-point results: ${${_flags}}")
+    endif()
+  endforeach()
+  target_compile_options(faf_codegen INTERFACE
+    "$<$<COMPILE_LANGUAGE:C,CXX>:-ffp-model=precise;-ffp-contract=off;-fno-math-errno;${_faf_no_builtin};-fno-strict-aliasing;-fwrapv;-fno-delete-null-pointer-checks;-fno-strict-float-cast-overflow;-fno-finite-loops;-fsigned-char;-ffunction-sections;-fdata-sections;-Wno-overriding-option>"
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-strict-return>)
+  target_link_options(faf_codegen INTERFACE -Wl,--gc-sections)
+  return()
+endif()
+
 set(_faf_no_builtin "")
 foreach(_fn IN LISTS _faf_libm_calls)
   list(APPEND _faf_no_builtin "/clang:-fno-builtin-${_fn}" "/clang:-fno-builtin-${_fn}f" "/clang:-fno-builtin-${_fn}l")
