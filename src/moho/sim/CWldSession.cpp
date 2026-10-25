@@ -10790,9 +10790,9 @@ namespace moho
       return;
     }
 
-    if (hoveredEntity->IsInCategory(msvc8::string("WALL"))) {
-      return;
-    }
+    // FAF hot-patch (FA-Binary-Patches WallSelection): the stock early return for a WALL unit
+    // (`jne 0x00866002` after IsInCategory("WALL")) is NOPed at 0x00865EC2, so double-clicking
+    // a wall selects all walls of that type on screen. The category test itself has no effect.
 
     if (hoveredEntity->mArmy != GetFocusUserArmy()) {
       return;
