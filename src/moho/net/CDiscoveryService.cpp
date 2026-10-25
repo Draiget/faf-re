@@ -1,5 +1,6 @@
 #include "moho/net/CDiscoveryService.h"
 
+#include <cstddef>
 #include <new>
 #include <typeinfo>
 
@@ -33,6 +34,9 @@ namespace
   constexpr std::uint8_t kDiscoveryReplyMagic = 0x0B;
   constexpr std::uint8_t kDiscoveryLobbyProtocolVersion = 0x01;
   constexpr std::uint8_t kDiscoverySupComGameTypeFlag = 0x00;
+
+  // Distinct games tracked at once; far more than any LAN advertises.
+  constexpr std::size_t kMaxDiscoveredGames = 256;
 
   [[nodiscard]] gpg::RType* CachedCDiscoveryServiceTypeBridge()
   {
@@ -472,8 +476,16 @@ void moho::CDiscoveryService::OnDatagram(
   std::uint16_t hostPort = 0;
   reader.ReadExact(hostPort);
 
+  // Malformed or truncated payloads make the decoder throw; the datagram
+  // socket's `Pull` catches that and drops the reply.
   LuaPlus::LuaObject configObject;
   mLuaObj.SCR_FromByteStream(configObject, mLuaObj.m_state, &reader);
+  if (!configObject.IsTable()) {
+    // Anyone can send a reply; the fields below are set on a table.
+    gpg::Logf("LOBBY: Ignoring discovery reply without a game config from %s:%d", NET_GetHostName(address).c_str(),
+      static_cast<unsigned>(port));
+    return;
+  }
 
   configObject.SetString("Hostname", NET_GetHostName(address).c_str());
   configObject.SetString(
@@ -501,6 +513,12 @@ void moho::CDiscoveryService::OnDatagram(
   }
 
   const bool isNewGame = record == nullptr;
+  if (isNewGame && mGames.size() >= kMaxDiscoveredGames) {
+    // Each advertised port of each sender is a new game, and replies need no
+    // request: without a cap one sender can grow the list (and the browser UI
+    // fed by `GameFound`) without bound. Entries age out after 5s of silence.
+    return;
+  }
   if (isNewGame) {
     DiscoveredGameRecord newRecord{};
     newRecord.mProtocol = protocol;

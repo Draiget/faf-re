@@ -20,6 +20,16 @@ namespace moho
 {
   constexpr uint32_t kReceiveUdpPacketPoolSize = 20;
 
+  // Remote-created connections not yet accepted or rejected. A lobby holds at
+  // most 16 players and drains these every frame.
+  constexpr int kMaxPendingUdpConnections = 32;
+
+  // NAT traversal packets queued for the game thread's next `Pull`.
+  constexpr std::size_t kMaxQueuedTraversalPackets = 1024;
+
+  // Datagrams `ReceiveData` takes in one pass of the connector thread.
+  constexpr std::size_t kMaxDatagramsPerReceive = 1024;
+
   struct SReceivePacket
   {
     SNetPacket* mPacket{nullptr};

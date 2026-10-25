@@ -191,7 +191,10 @@ namespace moho
     std::uint8_t mPushFailed{0};                  // +0xD28
     std::uint8_t mPullFailed{0};                  // +0xD29
     std::uint8_t mScheduleDestroy{0};             // +0xD2A
-    std::uint8_t mPad0xD2B[5]{};                  // +0xD2B
+    // Set once the locally injected LOBMSG_ConnMade has been dispatched; the
+    // binary leaves +0xD2B unwritten.
+    std::uint8_t mDispatchedConnMade{0};          // +0xD2B
+    std::uint8_t mPad0xD2C[4]{};                  // +0xD2C
   };
   static_assert(sizeof(CNetTCPConnection) == 0xD30, "CNetTCPConnection size must be 0xD30");
 } // namespace moho

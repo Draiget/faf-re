@@ -127,6 +127,21 @@ namespace moho
     }
 
     /**
+     * Address: <synthetic host-build helper>
+     *
+     * What it does:
+     * Returns whether `Read` has taken in a header whose wire-size is below
+     * the 3-byte header itself. `Read` answers false for such a header on
+     * every later call too, so a stream carrying one can never yield another
+     * message: its framing is corrupt.
+     */
+    [[nodiscard]]
+    bool HasInvalidLength()
+    {
+      return HasReadLength() && GetSize() < 3;
+    }
+
+    /**
      * Address: 0x0047BC80 (FUN_0047BC80)
      *
      * What it does:

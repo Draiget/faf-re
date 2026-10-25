@@ -6,6 +6,7 @@
 #include "CNetTCPConnector.h"
 #include "Common.h"
 #include "ELobbyMsg.h"
+#include "NetMessageRanges.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/WeakPtr.h"
@@ -216,7 +217,8 @@ CNetTCPConnection::CNetTCPConnection(
   , mPushFailed(0)
   , mPullFailed(0)
   , mScheduleDestroy(0)
-  , mPad0xD2B{}
+  , mDispatchedConnMade(0)
+  , mPad0xD2C{}
 {
   // 0x00483737: linked with no null test on the connector.
   mConnector->mConnections.push_back(this);
@@ -343,6 +345,16 @@ void CNetTCPConnection::Pull()
   }
 
   for (; mDatagram.Read(&mInputStream); mDatagram.Clear()) {
+    // Types 200..209 are connection events this side makes up; no peer sends
+    // them. Only the ConnMade injected ahead of the peer's bytes is genuine.
+    const unsigned type = mDatagram.GetType().raw();
+    if (type >= MSGTYPE_LobbyBase && type < MSGTYPE_LobbyEnd) {
+      if (type != static_cast<unsigned>(ELobbyMsg::LOBMSG_ConnMade) || mDispatchedConnMade) {
+        continue;
+      }
+      mDispatchedConnMade = 1;
+    }
+
     auto* const receiver = mReceivers[mDatagram.GetType().raw()];
     if (receiver) {
       receiver->ReceiveMessage(&mDatagram, this);
@@ -358,6 +370,21 @@ void CNetTCPConnection::Pull()
     if (DestroyedByHandler(*this, connector)) {
       return;
     }
+  }
+
+  // A header claiming under 3 bytes stops `Read` for good; the stream behind
+  // it can never be framed, so treat it like a failed receive.
+  if (mDatagram.HasInvalidLength()) {
+    gpg::Logf(
+      "CNetTCPConnection<%s:%d>::Pull(): corrupt message (type %u, size %u), dropping connection.",
+      NET_GetHostName(mAddr).c_str(),
+      mPort,
+      static_cast<unsigned>(mDatagram.GetType().raw()),
+      static_cast<unsigned>(mDatagram.GetSize())
+    );
+    mInputStream.Close(gpg::Stream::ModeSend);
+    mPullFailed = 1;
+    recvFailedWithError = true;
   }
 
   if (recvFailedWithError || mPushFailed) {

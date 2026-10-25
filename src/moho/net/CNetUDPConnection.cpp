@@ -1,7 +1,9 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <exception>
 
 #include "CLobby.h"
 #include "CNetUDPConnector.h"
@@ -11,7 +13,19 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "NetConVars.h"
+#include "NetMessageRanges.h"
 using namespace moho;
+
+namespace
+{
+  // Received bytes waiting for the game thread to dispatch them. The window
+  // bounds what a peer has in flight, not what deflate expands it to, nor how
+  // far ahead of a stalled dispatcher it may run; real traffic stays far below.
+  constexpr std::size_t kMaxBufferedInputBytes = 16u * 1024u * 1024u;
+
+  // "No receiver for message type" warnings logged per connection.
+  constexpr std::uint32_t kMaxUnroutedMessageWarnings = 8;
+} // namespace
 
 /**
  * Address: 0x00485BE0 (FUN_00485BE0)
@@ -302,13 +316,20 @@ CNetUDPConnection::CNetUDPConnection(
   // ASM: uses node at +0x410; do the same in Attach().
   connector.RelinkConnectionToFront(*this);
 
+  // Whoever sends a CONNECT creates a pending connection, on the connector
+  // thread with its lock held. Naming it by reverse DNS would let the sender's
+  // address stall that thread, and the game thread waiting on the lock.
+  const msvc8::string peerName = state == kNetStatePending
+    ? gpg::STR_Printf("%s:%d", NET_GetDottedOctetFromUInt32(address).c_str(), static_cast<int>(port))
+    : CNetUDPConnection::ToString();
+
   // Select SEND compression (controlled by Moho::net_CompressionMethod)
   switch (mOurCompressionMethod) {
   case NETCOMP_None:
-    gpg::Logf("NET: using no compression for sends to %s.", CNetUDPConnection::ToString().c_str());
+    gpg::Logf("NET: using no compression for sends to %s.", peerName.c_str());
     break;
   case NETCOMP_Deflate: {
-    gpg::Logf("NET: using deflate compression for sends to %s.", CNetUDPConnection::ToString().c_str());
+    gpg::Logf("NET: using deflate compression for sends to %s.", peerName.c_str());
 
     // Allocate filter (operator new 0x460 seen in asm).
     // Construct zlib filter for deflate (send path).
@@ -772,10 +793,9 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     return;
   }
 
-  // Queue packet into early set (sorted, unique)
+  // Queue packet into early set (sorted, unique). A duplicate stays in the
+  // connector's receive batch, which recycles it.
   const bool inserted = InsertEarlySorted(packet);
-  // Update last receive time regardless; asm sets mLastRecv = pack->mSentTime at insert path
-  mLastRecv = packet->mSentTime;
 
   if (!inserted) {
     if (net_DebugLevel) {
@@ -789,6 +809,9 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     }
     return;
   }
+
+  // 0x00486F50: only an inserted packet refreshes the receive time.
+  mLastRecv = packet->mSentTime;
 
   // Drain in-order packets from the head
   bool progressed = false;
@@ -890,7 +913,13 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
     mReceivedEndOfInput = true;
 
     if (mFilterStream) {
-      mFilterStream->Close(gpg::Stream::ModeBoth); // VirtClose(2)
+      try {
+        mFilterStream->Close(gpg::Stream::ModeBoth); // VirtClose(2)
+      } catch (const std::exception& e) {
+        // 0x00487401: a GOODBYE before the deflate stream ended.
+        gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
+        mState = kNetStateErrored;
+      }
       const auto* z = mFilterStream;
       mFilterStream = nullptr;
       delete z; // vtable dtr in asm
@@ -1064,7 +1093,8 @@ int CNetUDPConnection::SendData()
         mDestroyed = true;
       } else if (curTime >= mLastKeepAlive + mKeepAliveFreqUs) {
         packet = NewPacket(true, 0, PT_KeepAlive);
-      } else if (mInResponseTo == 0 && curTime >= mSendBy.mTime) {
+      } else if (mInResponseTo != 0 && curTime >= mSendBy.mTime) {
+        // 0x004885D9: a bare ACK only while a received packet is owed one.
         packet = NewPacket(true, 0, PT_Ack);
       }
 
@@ -1072,7 +1102,13 @@ int CNetUDPConnection::SendData()
         SendPacket(packet);
       }
 
-      if (mFlushedOutputData || mPendingOutputData.GetLength() > 0x1F1) {
+      // Zero asks the connector to call again at once. With nothing sent,
+      // flushed data is waiting on a full window: calling again changes
+      // nothing until a timer below is due, and the binary (0x00488610) spun
+      // here holding the connector lock -- the game thread with it -- for as
+      // long as the peer withheld its ACKs. Sleep to the next timer instead;
+      // the peer's ACK wakes the connector through the socket event.
+      if (packet && (mFlushedOutputData || mPendingOutputData.GetLength() > 0x1F1)) {
         return 0;
       }
 
@@ -1081,7 +1117,12 @@ int CNetUDPConnection::SendData()
         const auto sentTime = mUnAckedPayloads.ListGetNext()->mSentTime;
         since = ChooseTimeout(since, TimeSince(sentTime));
       }
-      if (mSendBy.mTime != 0 && (mInResponseTo != 0 || mPendingOutputData.GetLength() != 0 || mOutputFlushPending)) {
+      // Pending data only waits on the send deadline while the window can take
+      // it (`HasPacketWaiting`); behind a full window that deadline is no
+      // reason to wake, and an expired one would spin the same way.
+      const bool windowOpen = static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= 32;
+      if (mSendBy.mTime != 0 &&
+          (mInResponseTo != 0 || (windowOpen && (mPendingOutputData.GetLength() != 0 || mOutputFlushPending)))) {
         since = ChooseTimeout(since, TimeSince(mSendBy.mTime));
       }
       return since;
@@ -1398,7 +1439,18 @@ void CNetUDPConnection::FlushInput()
 {
   if (!mScheduleDestroy && !mReceivedEndOfInput) {
     if (mFilterStream != nullptr) {
-      mFilterStream->VirtFlush();
+      try {
+        mFilterStream->VirtFlush();
+      } catch (const std::exception& e) {
+        // 0x004875F8: the peer's deflate data is corrupt.
+        gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
+        mInputBuffer.Close(gpg::Stream::ModeBoth);
+        mState = kNetStateErrored;
+        mReceivedEndOfInput = true;
+        // The binary went on to flush the input stream it had just closed,
+        // which throws; stop here instead.
+        return;
+      }
     }
     mInputBuffer.VirtFlush();
   }
@@ -1445,6 +1497,18 @@ void CNetUDPConnection::DispatchFromInput()
   while (mMessage.Read(&mInputBuffer)) {
     const ELobbyMsg streamMsg = mMessage.GetType();
     const auto msgType = static_cast<uint8_t>(streamMsg);
+
+    // Types 200..209 are connection events this side makes up; no peer sends
+    // them. The only genuine one in the stream is the ConnMade that
+    // `CreateFilterStream` writes ahead of the peer's first byte.
+    if (msgType >= MSGTYPE_LobbyBase && msgType < MSGTYPE_LobbyEnd) {
+      if (streamMsg != ELobbyMsg::LOBMSG_ConnMade || mDispatchedConnMade) {
+        mMessage.mBuff.Clear();
+        mMessage.mPos = 0;
+        continue;
+      }
+      mDispatchedConnMade = true;
+    }
     if (streamMsg != ELobbyMsg::LOBMSG_ConnMade) {
       const size_t len = mMessage.mBuff.Size();
       mTotalBytesDispatched += len;
@@ -1468,10 +1532,17 @@ void CNetUDPConnection::DispatchFromInput()
 
     const auto receiver = mReceivers[msgType];
     if (receiver == nullptr) {
-      msvc8::string host = NET_GetHostName(mAddr);
-      gpg::Warnf(
-        "No receiver for message type %d received from %s:%d.", static_cast<unsigned>(msgType), host.c_str(), mPort
-      );
+      // A peer can send any type byte; warn about the first few only.
+      if (mUnroutedMessageCount < kMaxUnroutedMessageWarnings) {
+        ++mUnroutedMessageCount;
+        msvc8::string host = NET_GetHostName(mAddr);
+        gpg::Warnf(
+          "No receiver for message type %d received from %s:%d.", static_cast<unsigned>(msgType), host.c_str(), mPort
+        );
+        if (mUnroutedMessageCount == kMaxUnroutedMessageWarnings) {
+          gpg::Warnf("Further messages without a receiver from %s:%d will not be reported.", host.c_str(), mPort);
+        }
+      }
     } else {
       receiver->ReceiveMessage(&mMessage, this);
     }
@@ -1481,13 +1552,34 @@ void CNetUDPConnection::DispatchFromInput()
       return;
     }
   }
+
+  // A header claiming under 3 bytes stops `Read` for good: nothing after it
+  // can be framed, and the input would pile up behind it unread.
+  if (mMessage.HasInvalidLength()) {
+    gpg::Logf(
+      "CNetUDPConnection<%u,%s>::DispatchFromInput(): corrupt message (type %u, size %u), dropping input.",
+      mConnector->GetLocalPort(),
+      ToString().c_str(),
+      static_cast<unsigned>(mMessage.GetType().raw()),
+      static_cast<unsigned>(mMessage.GetSize())
+    );
+    {
+      boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+      AbortInput();
+    }
+    mMessage.mBuff.Clear();
+    mMessage.mPos = 0;
+    mDispatchedEndOfInput = true;
+    CMessage lost{ELobbyMsg::LOBMSG_ConnLostErrored};
+    Dispatch(&lost);
+    return;
+  }
+
   if (!mInputBuffer.CanRead() && mInputBuffer.VirtAtEnd()) {
     mDispatchedEndOfInput = true;
-    if (mState == kNetStateErrored) {
-      Dispatch(new CMessage(ELobbyMsg::LOBMSG_ConnLostErrored));
-    } else {
-      Dispatch(new CMessage(ELobbyMsg::LOBMSG_ConnLostEof));
-    }
+    // 0x00487971: the notice lives on the stack; nothing keeps it.
+    CMessage lost{mState == kNetStateErrored ? ELobbyMsg::LOBMSG_ConnLostErrored : ELobbyMsg::LOBMSG_ConnLostEof};
+    Dispatch(&lost);
   }
 }
 
@@ -1575,6 +1667,27 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
 }
 
 /**
+ * Address: <synthetic helper; inlined in the binary's decompression error
+ *   handler at 0x0048710B>
+ *
+ * What it does:
+ * Drops the inflate filter, closes the input stream and marks the connection
+ * errored: DATA after this is discarded, and dispatch reports
+ * `LOBMSG_ConnLostErrored` once the buffered messages are delivered.
+ */
+void CNetUDPConnection::AbortInput()
+{
+  if (mFilterStream) {
+    const auto* z = mFilterStream;
+    mFilterStream = nullptr;
+    delete z;
+  }
+  mInputBuffer.Close(gpg::Stream::ModeBoth);
+  mState = kNetStateErrored;
+  mReceivedEndOfInput = true;
+}
+
+/**
  * Address: 0x004874C0 (FUN_004874C0)
  *
  * What it does:
@@ -1616,13 +1729,10 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
  */
 bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
 {
-  // Ensure the node is detached. ListUnlink() (not used here) returns the
-  // OLD mNext -- some other node entirely, not packet itself -- so using its
-  // return value here spliced whatever packet used to point to into
-  // mEarlyPackets instead of packet. ListUnlinkSelf() returns `this`.
-  const auto node = packet->ListUnlinkSelf();
-
-  // Walk list to find insertion point (first element with seq > p->seq)
+  // Walk list to find insertion point (first element with seq > p->seq).
+  // 0x00486F0B scans before it unlinks: a duplicate must stay linked in the
+  // connector's receive batch, or nothing ever frees it.
+  SNetPacket* insertBefore = nullptr;
   for (auto* cur : mEarlyPackets.owners()) {
     if (cur->header.mSequenceNumber == packet->header.mSequenceNumber) {
       // Duplicate of a future DATA - ignore insertion
@@ -1630,13 +1740,22 @@ bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
     }
 
     if (static_cast<int16_t>(cur->header.mSequenceNumber - packet->header.mSequenceNumber) > 0) {
-      node->ListLinkBefore(cur);
-      return true;
+      insertBefore = cur;
+      break;
     }
   }
 
-  // Insert at tail (before end sentinel)
-  node->ListLinkBefore(mEarlyPackets.end().node());
+  // Detach from the receive batch. ListUnlink() (not used here) returns the
+  // OLD mNext -- some other node entirely, not packet itself -- so using its
+  // return value here spliced whatever packet used to point to into
+  // mEarlyPackets instead of packet. ListUnlinkSelf() returns `this`.
+  const auto node = packet->ListUnlinkSelf();
+  if (insertBefore != nullptr) {
+    node->ListLinkBefore(insertBefore);
+  } else {
+    // Insert at tail (before end sentinel)
+    node->ListLinkBefore(mEarlyPackets.end().node());
+  }
   return true;
 }
 
@@ -1693,15 +1812,39 @@ void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet)
     mTotalBytesReceivedMD5.Update(payload, payloadLen);
 
     // Write through filter if present
-    if (mFilterStream) {
-      mFilterStream->Write(payload, payloadLen);
-    } else {
-      mInputBuffer.Write(payload, payloadLen);
+    try {
+      if (mFilterStream) {
+        mFilterStream->Write(payload, payloadLen);
+      } else {
+        mInputBuffer.Write(payload, payloadLen);
+      }
+    } catch (const std::exception& e) {
+      // 0x0048710B: the peer's deflate data is corrupt.
+      gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
+      AbortInput();
+    }
+
+    // The game thread has fallen this far behind, or a small deflate stream
+    // has expanded this far: either way the peer is not playing.
+    if (!mReceivedEndOfInput && mInputBuffer.GetLength() > kMaxBufferedInputBytes) {
+      gpg::Logf(
+        "CNetUDPConnection<%u,%s>: over %u bytes received and not yet dispatched, dropping input.",
+        mConnector->GetLocalPort(),
+        ToString().c_str(),
+        static_cast<unsigned>(kMaxBufferedInputBytes)
+      );
+      AbortInput();
     }
   } else {
     // End-of-input marker
     if (mFilterStream) {
-      mFilterStream->Close(gpg::Stream::ModeBoth);
+      try {
+        mFilterStream->Close(gpg::Stream::ModeBoth);
+      } catch (const std::exception& e) {
+        // 0x004871E9: end of input before the deflate stream ended.
+        gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
+        mState = kNetStateErrored;
+      }
       const auto* z = mFilterStream;
       mFilterStream = nullptr;
       delete z;

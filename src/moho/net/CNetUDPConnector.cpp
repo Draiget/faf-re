@@ -241,19 +241,29 @@ CNetUDPConnection* CNetUDPConnector::Connect(const u_long address, const u_short
 
     switch (conn->mState) {
     case kNetStatePending: // 0 -> 2
+      if (conn->IsDestroyScheduled()) {
+        // Rejected by the lobby's accept loop (a peer's CONNECT that beat the
+        // host's word about it): the connector deletes it on its next pass,
+        // so handing it out would leave the caller a dangling pointer.
+        conn->mState = kNetStateErrored;
+        break;
+      }
       conn->mState = kNetStateAnswering;
       return conn;
 
     case kNetStateConnecting:   // 1 -> 5
     case kNetStateAnswering:    // 2 -> 5
     case kNetStateEstablishing: // 3 -> 5
+    case kNetStateTimedOut:     // 4 -> 5
+      // The binary (0x0048B3B6) treats TimedOut as unreachable and dies, but
+      // a link that went quiet for 10s is TimedOut, and the lobby reconnects
+      // to that very endpoint. Replace it like any other live connection.
       conn->mState = kNetStateErrored;
       break;
 
     case kNetStateErrored: // 5 -> keep scanning
       break;
 
-    case kNetStateTimedOut:
     default:
       GPG_UNREACHABLE()
       break;
@@ -489,7 +499,11 @@ void CNetUDPConnector::ReceiveData()
 {
   TDatList<SNetPacket, void> acquiredPackets{};
 
-  while (true) {
+  // Every packet of the batch stays allocated until the batch ends, so a
+  // sender outpacing this loop would grow it without bound. Stop after a
+  // batch: `recvfrom` leaves the socket event armed while data remains, and
+  // `Entry` comes straight back after `SendData`.
+  for (std::size_t datagrams = 0; datagrams < kMaxDatagramsPerReceive; ++datagrams) {
     SNetPacket* packet = NewPacket();
     if (!packet) {
       break;
@@ -543,7 +557,12 @@ void CNetUDPConnector::ReceiveData()
     }
 
     if (n > 0 && packet->header.mType == PT_NATTraversal) {
-      if (CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider).lock()) {
+      // Only `Pull` drains this queue, and the game thread may not call it
+      // for a while (loading); past the cap the packet is recycled unread.
+      if (
+        CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider).lock() &&
+        mInboundTraversalPackets.size() < kMaxQueuedTraversalPackets
+      ) {
         packet->ListUnlink();
         mInboundTraversalPackets.push_back({packet, addrHost, portHost});
 #if defined(_WIN32)
@@ -708,6 +727,7 @@ void CNetUDPConnector::ProcessConnect(const SNetPacket* packet, const u_long add
     return;
   }
 
+  int pendingConnections = 0;
   for (auto* connection : mConnections.owners()) {
     if (
       connection->GetAddr() == address && connection->GetPort() == port && connection->IsBeforeErroredState() &&
@@ -715,9 +735,29 @@ void CNetUDPConnector::ProcessConnect(const SNetPacket* packet, const u_long add
     ) {
       return;
     }
+    if (connection->GetConnectionState() == kNetStatePending && !connection->IsDestroyScheduled()) {
+      ++pendingConnections;
+    }
   }
 
   if (mClosed) {
+    return;
+  }
+
+  // Anyone who can reach the port makes a pending connection per source
+  // address, at ~200KB each with deflate. Only the lobby's accept loop
+  // drains them, and nothing does once the game runs.
+  if (pendingConnections >= kMaxPendingUdpConnections) {
+    if (net_DebugLevel) {
+      const auto host = NET_GetHostName(address);
+      gpg::Logf(
+        "CNetUDPConnector<%hu>::ProcessConnect(): ignoring CONNECT from %s:%d, %d connections already pending",
+        GetLocalPort(),
+        host.c_str(),
+        port,
+        pendingConnections
+      );
+    }
     return;
   }
 

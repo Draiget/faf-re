@@ -9,15 +9,16 @@ namespace moho
   bool net_DebugCrash = false;                     // 0x010A6380
   bool net_LogPackets = false;                     // 0x010A6381
   int32_t net_DebugLevel = 0;                      // 0x010A6384
-  int32_t net_AckDelay = 0;                        // 0x00F58DE0
-  int32_t net_SendDelay = 0;                       // 0x00F58DE4
-  int32_t net_MinResendDelay = 0;                  // 0x00F58DE8
-  int32_t net_MaxResendDelay = 0;                  // 0x00F58DEC
-  int32_t net_MaxSendRate = 1000;                  // 0x00F58DF0
-  int32_t net_MaxBacklog = 0;                      // 0x00F58DF4
+  // Initial values are the .data words at those addresses in the shipped PE.
+  int32_t net_AckDelay = 25;                       // 0x00F58DE0
+  int32_t net_SendDelay = 25;                      // 0x00F58DE4
+  int32_t net_MinResendDelay = 100;                // 0x00F58DE8
+  int32_t net_MaxResendDelay = 1000;               // 0x00F58DEC
+  int32_t net_MaxSendRate = 2048;                  // 0x00F58DF0
+  int32_t net_MaxBacklog = 2048;                   // 0x00F58DF4
   int32_t net_CompressionMethod = NETCOMP_Deflate; // 0x00F58DF8
   float net_ResendPingMultiplier = 1.0f;           // 0x00F58DFC
-  int32_t net_ResendDelayBias = 0;                 // 0x00F58E00
+  int32_t net_ResendDelayBias = 25;                // 0x00F58E00
 
   namespace
   {
