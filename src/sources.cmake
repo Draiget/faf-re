@@ -129,6 +129,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/CRandomStreamTypeInfo.cpp
   moho/sim/CRandomStreamSerializer.cpp
   moho/console/CConCommand.cpp
+  moho/console/ClientConCommands.cpp
   moho/console/CVarAccess.cpp
   moho/entity/EntityCategoryLookupResolver.cpp
   moho/misc/StatItem.cpp

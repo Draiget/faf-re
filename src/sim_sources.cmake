@@ -36,6 +36,8 @@ set(_faf_client_only_patterns
   "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue)\\.cpp$"
   "^moho/entity/UserEntity\\.cpp$"
   "^moho/unit/core/UserUnit\\.cpp$"
+  # The client's console commands and variables (CConCommand.cpp keeps the console).
+  "^moho/console/ClientConCommands\\.cpp$"
   # The user world's vision (what the focus army sees, for drawing).
   "^moho/vision/VisionDB\\.cpp$"
   # The lobby, GPGNet and LAN discovery (the game connection and the
