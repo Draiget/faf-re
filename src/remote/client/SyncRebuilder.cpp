@@ -375,8 +375,8 @@ namespace faf::remote::client
   {
     const wire::QuantizedPosition position =
       mCodec.deadReckoning ? wire::PredictPosition(record, beat, mCodec) : record.position;
-    const std::array<float, 4> q =
-      record.yawOnly ? wire::YawToQuaternion(record.orientation) : wire::UnpackQuaternion(record.orientation);
+    const std::array<float, 4> q = record.yawOnly ? wire::YawToQuaternion(wire::PredictYaw(record, beat, mCodec))
+                                                  : wire::UnpackQuaternion(record.orientation);
     moho::VTransform transform{};
     transform.orient_ = Wm3::Quatf(q[3], q[0], q[1], q[2]);
     transform.pos_ = record.farPosition
@@ -553,7 +553,9 @@ namespace faf::remote::client
       const bool created = createdNow.count(record.id) != 0u;
       const auto packetIt = packetEntityUpdates.find(record.id);
       const bool fromPacket = packetIt != packetEntityUpdates.end();
-      const bool moving = mCodec.deadReckoning && record.velocity != std::array<std::int32_t, 3>{};
+      const bool moving = mCodec.deadReckoning
+                       && (record.velocity != std::array<std::int32_t, 3>{} || record.verticalAcceleration != 0
+                           || record.yawRate != 0);
       const bool settling = !created && !SameTransform(held.data.mCurTransform, held.data.mLastTransform);
       if (!created && !fromPacket && !moving && !settling && !changed) {
         continue;
@@ -594,6 +596,23 @@ namespace faf::remote::client
            std::fabs(static_cast<double>(actual.z - shown.pos_.z))}
         );
         mStats.maxPositionError = std::max(mStats.maxPositionError, error);
+        const moho::VTransform& simTransform = sim.mCurTransform;
+        const double dot = std::fabs(
+          static_cast<double>(simTransform.orient_.w) * shown.orient_.w + static_cast<double>(simTransform.orient_.x) * shown.orient_.x
+          + static_cast<double>(simTransform.orient_.y) * shown.orient_.y
+          + static_cast<double>(simTransform.orient_.z) * shown.orient_.z
+        );
+        const double norms = std::sqrt(
+          (static_cast<double>(simTransform.orient_.w) * simTransform.orient_.w + static_cast<double>(simTransform.orient_.x) * simTransform.orient_.x
+           + static_cast<double>(simTransform.orient_.y) * simTransform.orient_.y
+           + static_cast<double>(simTransform.orient_.z) * simTransform.orient_.z)
+          * (static_cast<double>(shown.orient_.w) * shown.orient_.w + static_cast<double>(shown.orient_.x) * shown.orient_.x
+             + static_cast<double>(shown.orient_.y) * shown.orient_.y + static_cast<double>(shown.orient_.z) * shown.orient_.z)
+        );
+        if (norms > 0.0) {
+          const double degrees = 2.0 * std::acos(std::min(1.0, dot / norms)) * 57.29577951308232;
+          mStats.maxOrientationError = std::max(mStats.maxOrientationError, degrees);
+        }
         if (!mCodec.deadReckoning && error > 1.0) {
           // Outside the quantiser's range (clamped): the first few are logged to size the range.
           if (++mStats.positionsOutOfRange <= 10u) {

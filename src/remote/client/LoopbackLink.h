@@ -26,6 +26,12 @@ namespace faf::remote::client
   {
     /** Dead-reckoning tolerance in quantiser steps (1/64 unit); 0: off. */
     std::uint32_t deadReckoningTolerance = 0;
+    /** With dead reckoning (WP7.8): the fitted window, the bent vertical fit and sub-steps. */
+    std::uint32_t reckoningWindow = 8;
+    bool reckonVerticalAcceleration = true;
+    std::uint32_t velocityFractionBits = 4;
+    /** Orientation reckoning tolerance in 1/65536 turns; 0: off (every change is sent). */
+    std::uint32_t orientationTolerance = 0;
   };
 
   /** The codec for a map of that size, with dead reckoning when the options ask for it. */
@@ -40,6 +46,8 @@ namespace faf::remote::client
     void Pass(moho::SSyncData& packet);
 
     [[nodiscard]] const wire::SContentTables& Tables() const noexcept { return mTables; }
+    /** Why the client refused the server's hello at connect (WP7.2), or empty: then `Pass` does nothing. */
+    [[nodiscard]] const std::string& Refusal() const noexcept { return mRefusal; }
     [[nodiscard]] const SRebuildStats& Stats() const noexcept { return mRebuilder.Stats(); }
     [[nodiscard]] bool DeadReckoning() const noexcept { return mReckoner.has_value(); }
 
@@ -50,7 +58,9 @@ namespace faf::remote::client
     [[nodiscard]] std::uint64_t CheckFailures() const noexcept;
 
   private:
-    wire::SContentTables mTables;
+    wire::SContentTables mTables;       // the server's
+    wire::SContentTables mClientContent; // the client's, built on its own from its rules
+    std::string mRefusal;
     wire::SFrameCodec mCodec;
     wire::CSessionTableWriters mServerTables;
     wire::CSessionTableReaders mClientTables;

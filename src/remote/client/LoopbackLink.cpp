@@ -8,6 +8,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
 #include "remote/ContentTables.h"
+#include "remote/wire/WireVersion.h"
 
 // Engine addition, server mode: see LoopbackLink.h.
 
@@ -19,6 +20,8 @@ namespace faf::remote::client
     codec.position = wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
     codec.maxEntities = 1u << 20;
     codec.deadReckoning = options.deadReckoningTolerance != 0u;
+    codec.velocityFractionBits = codec.deadReckoning ? options.velocityFractionBits : 0u;
+    codec.orientationReckoning = codec.deadReckoning && options.orientationTolerance != 0u;
     return codec;
   }
 
@@ -26,12 +29,33 @@ namespace faf::remote::client
     moho::RRuleGameRules& rules, const wire::SFrameCodec& codec, const SLoopbackOptions& options
   )
     : mTables(BuildContentTables(rules))
+    , mClientContent(BuildContentTables(rules))
     , mCodec(codec)
     , mBuilder(mTables, codec)
-    , mRebuilder(codec, ResolveBlueprints(rules, mTables), ResolveMeshes(rules, mTables))
+    , mRebuilder(codec, ResolveBlueprints(rules, mClientContent), ResolveMeshes(rules, mClientContent))
   {
+    // Connect (WP7.2): the server says hello with its protocol, lane versions and content hash;
+    // the client compares them with its own and refuses to play on a mismatch.
+    wire::SWireHello serverHello{};
+    serverHello.contentHash = mTables.Hash();
+    wire::BitWriter helloWriter;
+    serverHello.Encode(helloWriter);
+    wire::BitReader helloReader(helloWriter.Bytes());
+    const std::optional<wire::SWireHello> received = wire::SWireHello::Decode(helloReader);
+    wire::SWireHello clientHello{};
+    clientHello.contentHash = mClientContent.Hash();
+    if (!received) {
+      mRefusal = "malformed hello";
+    } else if (const std::optional<std::string> why = wire::WireIncompatibility(clientHello, *received); why) {
+      mRefusal = *why;
+    }
     if (options.deadReckoningTolerance != 0u && mCodec.deadReckoning) {
-      mReckoner.emplace(options.deadReckoningTolerance);
+      wire::SReckoningScheme scheme{};
+      scheme.tolerance = options.deadReckoningTolerance;
+      scheme.window = options.reckoningWindow;
+      scheme.verticalAcceleration = options.reckonVerticalAcceleration;
+      scheme.orientationTolerance = options.orientationTolerance;
+      mReckoner.emplace(scheme);
     }
     mBuilder.SetSessionTables(&mServerTables);
     mRebuilder.SetSessionTables(&mClientTables);
@@ -40,6 +64,9 @@ namespace faf::remote::client
 
   void CLoopbackLink::Pass(moho::SSyncData& packet)
   {
+    if (!mRefusal.empty()) {
+      return; // refused at connect: the packet stays the sim's own
+    }
     // Server: the frame of this beat, against the frame sent last (in loopback every frame
     // arrives, so the last one sent is always acknowledged).
     using Clock = std::chrono::steady_clock;
@@ -82,7 +109,7 @@ namespace faf::remote::client
   std::uint64_t CLoopbackLink::CheckFailures() const noexcept
   {
     const SRebuildStats& s = mRebuilder.Stats();
-    return mEncodeFailures + mRebuildFailures + mTableFailures + s.decodeFailures + s.soundMismatches
+    return (mRefusal.empty() ? 0u : 1u) + mEncodeFailures + mRebuildFailures + mTableFailures + s.decodeFailures + s.soundMismatches
          + s.underlayMismatches + s.unknownTableIds + mBuilder.UnknownUnderlays() + s.createdNotInPacket + s.packetCreatedNotRebuilt
          + s.blueprintMismatches + s.eraseMismatches + s.deleteMismatches + s.packetUpdatesDropped
          + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
@@ -94,14 +121,15 @@ namespace faf::remote::client
     const SRebuildStats& s = mRebuilder.Stats();
     const double frames = s.frames != 0u ? static_cast<double>(s.frames) : 1.0;
     const auto u = [](const std::uint64_t value) { return static_cast<unsigned long long>(value); };
-    std::string text = gpg::STR_Printf(
+    std::string text = mRefusal.empty() ? std::string() : "loopback REFUSED at connect: " + mRefusal + "; ";
+    text += gpg::STR_Printf(
       "loopback %s: frames %llu, %.1f KB/s, encode failures %llu, decode failures %llu, rebuild failures %llu, "
       "created %llu, erased %llu, deleted %llu, entity updates %llu (settle %llu, packet data %llu), "
-      "max position error %.5f, time per beat %.2f ms server + %.2f ms client (decode %.2f, delta %.2f, rebuild "
+      "max position error %.5f, max orientation error %.3f deg, time per beat %.2f ms server + %.2f ms client (decode %.2f, delta %.2f, rebuild "
       "%.2f; max %.1f ms)",
       when, u(s.frames), static_cast<double>(s.frameBytes) / frames * 10.0 / 1024.0, u(mEncodeFailures),
       u(s.decodeFailures), u(mRebuildFailures), u(s.created), u(s.erased), u(s.deleted), u(s.entityUpdates),
-      u(s.settleUpdates), u(s.entityDataBorrowed), s.maxPositionError, mServerSeconds * 1000.0 / frames,
+      u(s.settleUpdates), u(s.entityDataBorrowed), s.maxPositionError, s.maxOrientationError, mServerSeconds * 1000.0 / frames,
       mClientSeconds * 1000.0 / frames, s.decodeSeconds * 1000.0 / frames, s.deltaSeconds * 1000.0 / frames,
       s.rebuildSeconds * 1000.0 / frames, mMaxBeatSeconds * 1000.0
     ).c_str();

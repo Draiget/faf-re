@@ -61,15 +61,20 @@ namespace faf::replay
     std::uint64_t mDeltaBytesNoUnits = 0;
     std::uint64_t mYawOnlyRecords = 0;
     std::uint64_t mUnitRecords = 0;
-    /** The same frames dead-reckoned (WP7.5) at one tolerance, with their own state and baseline. */
+    /** The same frames dead-reckoned with one scheme, with their own codec, state and baseline. */
     struct SDeadReckoningVariant
     {
+      const char* name;
+      faf::remote::wire::SFrameCodec codec;
       faf::remote::CDeadReckoner reckoner;
       faf::remote::wire::SViewFrame previous;
       std::uint64_t bytes = 0;
     };
-    SDeadReckoningVariant mDeadReckoning[2]{{faf::remote::CDeadReckoner(4)}, {faf::remote::CDeadReckoner(16)}}; // 1/16, 1/4 unit
-    faf::remote::wire::SFrameCodec mDeadReckoningCodec;
+    /**
+     * WP7.5's at 4 and 16 steps (1/16, 1/4 unit), then WP7.8's fits: sub-steps over a window of
+     * 8 beats, with and without the bent vertical fit.
+     */
+    std::vector<SDeadReckoningVariant> mDeadReckoning;
 
     /** Bits of changed records by field class, summed over the run (creations and ids apart). */
     struct SFieldBits

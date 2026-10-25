@@ -382,6 +382,7 @@ namespace
         for (std::int32_t& component : record.velocity) {
           component = mRng() % 3u == 0u ? 0 : static_cast<std::int32_t>(mRng() % 2001u) - 1000;
         }
+        record.verticalAcceleration = mRng() % 4u == 0u ? static_cast<std::int32_t>(mRng() % 201u) - 100 : 0;
         record.anchorBeat = mBeat;
       }
       if (mRng() % 16u == 0u) {
@@ -390,10 +391,16 @@ namespace
         record.farValue = {RandomFloat(), RandomFloat(), RandomFloat()};
         record.position = {};
         record.velocity = {};
+        record.verticalAcceleration = 0;
         record.anchorBeat = 0;
       }
       record.yawOnly = (mRng() & 1u) != 0u;
       record.orientation = record.yawOnly ? (mRng() & 0xFFFFu) : static_cast<std::uint32_t>(mRng());
+      if (mDeadReckoning && record.yawOnly) {
+        // Turning or not, anchored this frame or earlier.
+        record.yawRate = mRng() % 2u == 0u ? 0 : static_cast<std::int32_t>(mRng() % 4001u) - 2000;
+        record.orientationBeat = mBeat - std::min<std::uint32_t>(mBeat, mRng() % 50u);
+      }
       record.health = RandomFloat();
       record.maxHealth = RandomFloat();
       record.fractionComplete = RandomFloat();
@@ -458,6 +465,7 @@ namespace
       if ((fields & kFieldPosition) != 0u) {
         record.position = fresh.position;
         record.velocity = fresh.velocity;
+        record.verticalAcceleration = fresh.verticalAcceleration;
         record.anchorBeat = fresh.anchorBeat;
         record.farPosition = fresh.farPosition;
         record.farValue = fresh.farValue;
@@ -465,6 +473,8 @@ namespace
       if ((fields & kFieldOrientation) != 0u) {
         record.orientation = fresh.orientation;
         record.yawOnly = fresh.yawOnly;
+        record.yawRate = fresh.yawRate;
+        record.orientationBeat = fresh.orientationBeat;
       }
       if ((fields & kFieldHealth) != 0u) record.health = fresh.health;
       if ((fields & kFieldMaxHealth) != 0u) record.maxHealth = fresh.maxHealth;
@@ -601,7 +611,7 @@ namespace
     std::vector<SEntityRecord> mLive;
   };
 
-  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true};
+  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true, 0, true};
 
   [[nodiscard]] std::vector<std::uint8_t> Encode(
     const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec = kCodec
@@ -706,22 +716,52 @@ namespace
     future.entities[0].anchorBeat = 51;
     BitWriter futureWriter;
     CHECK(!EncodeFrame(future, nullptr, kDeadReckoningCodec, futureWriter));
+    SViewFrame falling{};
+    falling.beat = 50;
+    falling.entities.resize(1);
+    falling.entities[0].verticalAcceleration = -3;
+    BitWriter fallingWriter;
+    CHECK(!EncodeFrame(falling, nullptr, kCodec, fallingWriter));
+    // A turn rate needs orientation reckoning and a yaw-only record; its anchor not in the future.
+    SViewFrame turning{};
+    turning.beat = 50;
+    turning.entities.resize(1);
+    turning.entities[0].yawOnly = true;
+    turning.entities[0].yawRate = 40;
+    turning.entities[0].orientationBeat = 49;
+    BitWriter turningWriter;
+    CHECK(!EncodeFrame(turning, nullptr, kCodec, turningWriter));
+    CHECK(EncodeFrame(turning, nullptr, kDeadReckoningCodec, turningWriter));
+    SViewFrame tumbling = turning;
+    tumbling.entities[0].yawOnly = false;
+    BitWriter tumblingWriter;
+    CHECK(!EncodeFrame(tumbling, nullptr, kDeadReckoningCodec, tumblingWriter));
+    SViewFrame early = turning;
+    early.entities[0].orientationBeat = 51;
+    BitWriter earlyWriter;
+    CHECK(!EncodeFrame(early, nullptr, kDeadReckoningCodec, earlyWriter));
   }
 
   void TestDeadReckoningRules()
   {
     const SFrameCodec& codec = kDeadReckoningCodec;
-    constexpr std::uint32_t kTolerance = 2;
+    SReckoningScheme scheme{};
+    scheme.tolerance = 2;
     SEntityRecord sent{};
     sent.position = {1000, 500, 1000};
     sent.anchorBeat = 0;
     QuantizedPosition previous = sent.position;
+    const auto apply = [&](SEntityRecord& record, const QuantizedPosition& last, const QuantizedPosition& now,
+                           const std::uint32_t beat) {
+      const QuantizedPosition pair[2] = {last, now};
+      return ApplyDeadReckoning(record, pair, beat, scheme, codec);
+    };
 
     // Starts moving at 5 steps per beat on x: one re-anchor, then the prediction holds.
     int anchors = 0;
     for (std::uint32_t beat = 1; beat <= 20; ++beat) {
       const QuantizedPosition actual{1000 + 5 * beat, 500, 1000};
-      anchors += ApplyDeadReckoning(sent, actual, previous, beat, kTolerance, codec) ? 1 : 0;
+      anchors += apply(sent, previous, actual, beat) ? 1 : 0;
       CHECK(PredictPosition(sent, beat, codec) == actual);
       previous = actual;
     }
@@ -730,13 +770,74 @@ namespace
 
     // Stops: the prediction runs ahead, the next beat re-anchors with zero velocity.
     const QuantizedPosition stopped{1100, 500, 1000};
-    CHECK(ApplyDeadReckoning(sent, stopped, previous, 21, kTolerance, codec));
+    CHECK(apply(sent, previous, stopped, 21));
     CHECK(sent.velocity == (std::array<std::int32_t, 3>{0, 0, 0}) && sent.position == stopped);
-    CHECK(!ApplyDeadReckoning(sent, stopped, stopped, 22, kTolerance, codec));
+    CHECK(!apply(sent, stopped, stopped, 22));
 
     // Small drift within the tolerance does not re-anchor.
     const QuantizedPosition drift{1102, 498, 1001};
-    CHECK(!ApplyDeadReckoning(sent, drift, stopped, 23, kTolerance, codec));
+    CHECK(!apply(sent, stopped, drift, 23));
+
+    // WP7.8: a speed between whole steps (0.3 units a beat, 19.2 steps), fitted over 8 beats in
+    // 1/16 steps, re-anchors far less often than the last beat's whole-step motion.
+    SFrameCodec fine = codec;
+    fine.velocityFractionBits = 4;
+    const auto quantised = [](const double x, const double y, const double z) {
+      return QuantizedPosition{
+        static_cast<std::uint32_t>(std::lround(x)), static_cast<std::uint32_t>(std::lround(y)),
+        static_cast<std::uint32_t>(std::lround(z))
+      };
+    };
+    const auto anchorsOver = [&](const SReckoningScheme& use, const SFrameCodec& useCodec, const auto& path) {
+      SEntityRecord record{};
+      record.position = path(0);
+      std::vector<QuantizedPosition> history{path(0)};
+      int count = 0;
+      for (std::uint32_t beat = 1; beat <= 200; ++beat) {
+        history.push_back(path(beat));
+        const std::size_t keep = std::min<std::size_t>(history.size(), kReckoningHistory);
+        count += ApplyDeadReckoning(
+                   record, std::span<const QuantizedPosition>(history.data() + history.size() - keep, keep), beat, use,
+                   useCodec
+                 )
+                 ? 1
+                 : 0;
+        const QuantizedPosition shown = PredictPosition(record, beat, useCodec);
+        for (int axis = 0; axis < 3; ++axis) {
+          const std::int64_t error = static_cast<std::int64_t>(shown[axis]) - static_cast<std::int64_t>(history.back()[axis]);
+          CHECK(error <= use.tolerance && -error <= use.tolerance);
+        }
+      }
+      return count;
+    };
+    const auto cruise = [&](const std::uint32_t beat) { return quantised(1000.0 + 19.2 * beat, 500.0, 2000.0 - 7.7 * beat); };
+    SReckoningScheme fitted = scheme;
+    fitted.window = 8;
+    const int wholeSteps = anchorsOver(scheme, codec, cruise);
+    const int subSteps = anchorsOver(fitted, fine, cruise);
+    CHECK(subSteps * 4 < wholeSteps);
+    std::printf("  dead reckoning anchors over 200 beats: whole %d, fitted %d\n", wholeSteps, subSteps);
+
+    // A ballistic arc (gravity on the vertical axis): the bent fit holds it, a straight one not.
+    const auto arc = [quantised](const std::uint32_t beat) {
+      const double t = beat;
+      return quantised(1000.0 + 30.0 * t, 20000.0 + 150.0 * t - 3.1 * t * t, 3000.0);
+    };
+    SReckoningScheme bent = fitted;
+    bent.verticalAcceleration = true;
+    const int straightArc = anchorsOver(fitted, fine, [&](const std::uint32_t beat) { return arc(beat % 90u); });
+    const int bentArc = anchorsOver(bent, fine, [&](const std::uint32_t beat) { return arc(beat % 90u); });
+    std::printf("  ballistic arc anchors: straight %d, bent %d\n", straightArc, bentArc);
+    CHECK(bentArc * 4 < straightArc);
+
+    // Sub-step predictions round half up, the same on every axis and direction.
+    SEntityRecord back{};
+    back.position = {5000, 5000, 5000};
+    back.velocity = {-24, 24, 0}; // 1.5 steps a beat
+    CHECK(PredictPosition(back, 1, fine) == (QuantizedPosition{4999, 5002, 5000}));
+    CHECK(PredictPosition(back, 2, fine) == (QuantizedPosition{4997, 5003, 5000}));
+    back.verticalAcceleration = -16; // a step a beat squared: 1.5 t - t^2 / 2
+    CHECK(PredictPosition(back, 4, fine) == (QuantizedPosition{4994, 4998, 5000}));
 
     // Predictions clamp to the axes.
     SEntityRecord edge{};
@@ -744,6 +845,52 @@ namespace
     edge.velocity = {-10, -10, 10};
     const QuantizedPosition clamped = PredictPosition(edge, 5, codec);
     CHECK(clamped[0] == 0u && clamped[1] == 0u && clamped[2] == codec.position.z.MaxQuantized());
+
+    // Orientation: a steady turn of 100.3 yaw units a beat through the wrap at a full turn, held
+    // within 64 units (0.35 degrees) by a fitted rate; re-anchored far less than every beat.
+    SReckoningScheme turns = fitted;
+    turns.orientationTolerance = 64;
+    SEntityRecord turner{};
+    turner.yawOnly = true;
+    turner.orientation = 65000;
+    turner.orientationBeat = 0;
+    std::vector<std::uint32_t> yaws{65000};
+    int turnAnchors = 0;
+    for (std::uint32_t beat = 1; beat <= 200; ++beat) {
+      SEntityRecord actual{};
+      actual.yawOnly = true;
+      actual.orientation = static_cast<std::uint32_t>(std::lround(65000.0 + 100.3 * beat)) & 0xFFFFu;
+      yaws.push_back(actual.orientation);
+      const std::size_t keep = std::min<std::size_t>(yaws.size(), kReckoningHistory);
+      turnAnchors += ApplyOrientationReckoning(
+                       turner, actual, std::span<const std::uint32_t>(yaws.data() + yaws.size() - keep, keep), beat, turns,
+                       fine
+                     )
+                     ? 1
+                     : 0;
+      const auto error = static_cast<std::int16_t>(static_cast<std::uint16_t>(actual.orientation - PredictYaw(turner, beat, fine)));
+      CHECK(error <= 64 && error >= -64);
+    }
+    std::printf("  turn anchors over 200 beats: %d\n", turnAnchors);
+    CHECK(turnAnchors <= 10);
+
+    // A quaternion is held while within the tolerance and sent again past it; a change between
+    // yaw-only and not is always sent.
+    SEntityRecord tilted{};
+    tilted.orientation = PackQuaternion({0.1f, 0.0f, 0.0f, 0.995f});
+    SEntityRecord near = tilted;
+    near.orientation = PackQuaternion({0.1003f, 0.0f, 0.0f, 0.99496f});
+    SEntityRecord far = tilted;
+    far.orientation = PackQuaternion({0.2f, 0.0f, 0.0f, 0.9798f});
+    SEntityRecord held = tilted;
+    CHECK(!ApplyOrientationReckoning(held, near, {}, 5, turns, fine) && held.orientation == tilted.orientation);
+    CHECK(ApplyOrientationReckoning(held, far, {}, 6, turns, fine) && held.orientation == far.orientation);
+    SEntityRecord flat{};
+    flat.yawOnly = true;
+    flat.orientation = 1000;
+    const std::uint32_t flatYaw[1] = {1000};
+    CHECK(ApplyOrientationReckoning(held, flat, flatYaw, 7, turns, fine) && held.yawOnly && held.yawRate == 0
+          && held.orientationBeat == 7u);
   }
 
   void TestFrameAppearance()
@@ -783,6 +930,20 @@ namespace
     CHECK(ChangedFields(dressed.entities[0], moved.entities[0]) == kFieldScale);
     const std::vector<std::uint8_t> movedBytes = Encode(moved, &dressed);
     CHECK(Decode(movedBytes, &dressed, decoded) && decoded == moved);
+
+    // A texture scroll that shifts (new start = old end) costs one bit and the end; any other
+    // change of the scroll sends all four floats.
+    SViewFrame shifted = moved;
+    shifted.frameId = 3;
+    shifted.entities[0].appearance.scroll = {moved.entities[0].appearance.scroll[2], moved.entities[0].appearance.scroll[3], 5.0f, 6.0f};
+    SViewFrame jumped = moved;
+    jumped.frameId = 3;
+    jumped.entities[0].appearance.scroll = {7.0f, 8.0f, 5.0f, 6.0f};
+    const std::vector<std::uint8_t> shiftedBytes = Encode(shifted, &moved);
+    const std::vector<std::uint8_t> jumpedBytes = Encode(jumped, &moved);
+    CHECK(shiftedBytes.size() + 8u == jumpedBytes.size());
+    CHECK(Decode(shiftedBytes, &moved, decoded) && decoded == shifted);
+    CHECK(Decode(jumpedBytes, &moved, decoded) && decoded == jumped);
 
     // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
     for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {

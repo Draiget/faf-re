@@ -20,6 +20,7 @@ namespace faf::replay
     std::string syncWritersPath; // when set: every Sync write's Lua call site (ReplaySyncWriters.h)
     bool loopback = false;      // every packet through the wire and the client's rebuild (CLoopbackLink)
     int loopbackDeadReckoning = 0; // with `loopback`: dead-reckoning tolerance in 1/64-unit steps
+    int loopbackTurnTolerance = 0; // with dead reckoning: orientation tolerance in 1/65536 turns (0: off)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end

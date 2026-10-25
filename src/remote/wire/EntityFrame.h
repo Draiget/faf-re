@@ -1,7 +1,9 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "remote/wire/BitStream.h"
@@ -168,11 +170,22 @@ namespace faf::remote::wire
      */
     bool farPosition = false;
     std::array<float, 3> farValue{};
-    /** Dead reckoning (WP7.5): quantiser steps per beat since `anchorBeat`; zero without it. */
+    /**
+     * Dead reckoning (WP7.5, WP7.8): motion since `anchorBeat` in 2^-velocityFractionBits
+     * quantiser steps per beat, and on the vertical axis alone an acceleration in the same
+     * units per beat squared (gravity on a ballistic projectile); zero without it.
+     */
     std::array<std::int32_t, 3> velocity{};
+    std::int32_t verticalAcceleration = 0;
     std::uint32_t anchorBeat = 0;
     std::uint32_t orientation = 0;                  // yawOnly ? QuantizeYaw : PackQuaternion
     bool yawOnly = false;                           // a rotation about the vertical axis only
+    /**
+     * Orientation reckoning (WP7.8), a yaw-only record alone: the turn since `orientationBeat`
+     * in 2^-velocityFractionBits yaw units (1/65536 turn) per beat; zero without it.
+     */
+    std::int32_t yawRate = 0;
+    std::uint32_t orientationBeat = 0;
     float health = 0.0f;
     float maxHealth = 0.0f;
     float fractionComplete = 0.0f;
@@ -283,24 +296,67 @@ namespace faf::remote::wire
      * client shows `PredictPosition`. Without it both are zero and not sent.
      */
     bool deadReckoning = false;
+    /** Fraction bits of a velocity and an acceleration (0: whole steps per beat). */
+    std::uint32_t velocityFractionBits = 0;
+    /**
+     * Orientation reckoning (WP7.8): a yaw-only orientation travels with its anchor beat and a
+     * turn rate, and the client shows `PredictYaw`. Needs `deadReckoning`.
+     */
+    bool orientationReckoning = false;
   };
 
-  /** Where the client shows a dead-reckoned record at `beat`: integer steps, clamped to the axes. */
+  /** How the server fits the motion it sends (the client only predicts). */
+  struct SReckoningScheme
+  {
+    std::uint32_t tolerance = 4; // quantiser steps the prediction may be off before a re-anchor
+    /**
+     * Most beats of history a motion is fitted over: the longest window (a power of two) whose
+     * positions all lie within a step of the fit. 1 is the last beat's motion.
+     */
+    std::uint32_t window = 1;
+    bool verticalAcceleration = false; // a fit may bend on the vertical axis
+    /**
+     * With orientation reckoning: yaw units (1/65536 turn) a shown orientation may be off, a
+     * predicted yaw or a held quaternion, before it is sent again. 0: every change is sent.
+     */
+    std::uint32_t orientationTolerance = 0;
+  };
+
+  /** Beats of position history `ApplyDeadReckoning` can use (a window of 8 and its start). */
+  inline constexpr std::size_t kReckoningHistory = 9;
+
+  /** Where the client shows a dead-reckoned record at `beat`: whole steps, rounded, clamped to the axes. */
   [[nodiscard]] QuantizedPosition PredictPosition(
     const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec
   ) noexcept;
 
   /**
    * The server side of dead reckoning for one view and entity: `sent` is the record the view
-   * holds, `actual` the sim's quantised position this beat and `previousActual` last beat's.
-   * When the prediction is more than `tolerance` steps off on any axis, re-anchors `sent` at
-   * `actual` with the last beat's motion as velocity (a new record is anchored where it is
-   * created, with zero velocity, by its builder); otherwise
-   * leaves the position fields alone. Returns whether it re-anchored.
+   * holds and `history` the sim's quantised positions on consecutive beats, oldest first, the
+   * last one this beat's. When the prediction is more than the scheme's tolerance off on any
+   * axis, re-anchors `sent` at this beat's position with the motion `scheme` fits to the
+   * history (none with one position; a new record is anchored where it is created, at rest,
+   * by its builder); otherwise leaves the position fields alone. Returns whether it re-anchored.
    */
   bool ApplyDeadReckoning(
-    SEntityRecord& sent, const QuantizedPosition& actual, const QuantizedPosition& previousActual, std::uint32_t beat,
-    std::uint32_t tolerance, const SFrameCodec& codec
+    SEntityRecord& sent, std::span<const QuantizedPosition> history, std::uint32_t beat,
+    const SReckoningScheme& scheme, const SFrameCodec& codec
+  ) noexcept;
+
+  /** The yaw the client shows for a reckoned yaw-only record at `beat` (1/65536 turns). */
+  [[nodiscard]] std::uint32_t PredictYaw(const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec) noexcept;
+
+  /**
+   * The server side of orientation reckoning for one view and entity: `sent` is the record the
+   * view holds, `actual` this beat's record and `yawHistory` its yaws on consecutive beats,
+   * oldest first, while it was yaw-only (this beat's last). A yaw-only orientation is
+   * predicted with its turn rate; a quaternion is held. When what the view shows is more than
+   * the scheme's tolerance off, re-anchors (a yaw with the rate fitted to the history).
+   * Returns whether it re-anchored.
+   */
+  bool ApplyOrientationReckoning(
+    SEntityRecord& sent, const SEntityRecord& actual, std::span<const std::uint32_t> yawHistory, std::uint32_t beat,
+    const SReckoningScheme& scheme, const SFrameCodec& codec
   ) noexcept;
 
   /**

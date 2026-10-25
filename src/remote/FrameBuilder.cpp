@@ -403,26 +403,90 @@ namespace faf::remote
 
   void CDeadReckoner::Apply(wire::SViewFrame& frame, const wire::SFrameCodec& codec)
   {
-    std::map<std::uint32_t, SSent> next;
+    // Both are in id order: records the frame no longer has (or has far away) are dropped.
+    auto sent = mSent.begin();
     for (wire::SEntityRecord& record : frame.entities) {
-      const wire::QuantizedPosition actual = record.position;
+      while (sent != mSent.end() && sent->first < record.id) {
+        sent = mSent.erase(sent);
+      }
+      const bool held = sent != mSent.end() && sent->first == record.id;
       if (record.farPosition) {
         // Exact floats, never reckoned; the view re-anchors when it comes back in range.
+        if (held) {
+          sent = mSent.erase(sent);
+        }
         continue;
       }
-      if (const auto found = mSent.find(record.id); found == mSent.end()) {
-        record.anchorBeat = frame.beat; // anchored where it is created, at rest
-      } else {
-        wire::SEntityRecord anchored = found->second.record;
-        if (wire::ApplyDeadReckoning(anchored, actual, found->second.actual, frame.beat, mTolerance, codec)) {
-          ++mReanchors;
+      const wire::QuantizedPosition actual = record.position;
+      if (!held) {
+        // Anchored where it is created, at rest.
+        record.velocity = {};
+        record.verticalAcceleration = 0;
+        record.anchorBeat = frame.beat;
+        SSent fresh{};
+        fresh.anchor.position = actual;
+        fresh.anchor.anchorBeat = frame.beat;
+        fresh.history[0] = actual;
+        fresh.historyCount = 1;
+        fresh.lastBeat = frame.beat;
+        if (codec.orientationReckoning) {
+          record.yawRate = 0;
+          record.orientationBeat = record.yawOnly ? frame.beat : 0u;
+          fresh.anchor.orientation = record.orientation;
+          fresh.anchor.yawOnly = record.yawOnly;
+          fresh.anchor.orientationBeat = record.orientationBeat;
+          if (record.yawOnly) {
+            fresh.yawHistory[0] = record.orientation;
+            fresh.yawCount = 1;
+          }
         }
-        record.position = anchored.position;
-        record.velocity = anchored.velocity;
-        record.anchorBeat = anchored.anchorBeat;
+        sent = std::next(mSent.emplace_hint(sent, record.id, fresh));
+        continue;
       }
-      next.emplace(record.id, SSent{record, actual});
+      SSent& entry = sent->second;
+      if (frame.beat != entry.lastBeat + 1u) {
+        entry.historyCount = 0; // positions and yaws on consecutive beats only
+        entry.yawCount = 0;
+      }
+      if (entry.historyCount == entry.history.size()) {
+        std::move(entry.history.begin() + 1, entry.history.end(), entry.history.begin());
+        --entry.historyCount;
+      }
+      entry.history[entry.historyCount++] = actual;
+      entry.lastBeat = frame.beat;
+      if (wire::ApplyDeadReckoning(
+            entry.anchor, std::span<const wire::QuantizedPosition>(entry.history.data(), entry.historyCount),
+            frame.beat, mScheme, codec
+          )) {
+        ++mReanchors;
+      }
+      record.position = entry.anchor.position;
+      record.velocity = entry.anchor.velocity;
+      record.verticalAcceleration = entry.anchor.verticalAcceleration;
+      record.anchorBeat = entry.anchor.anchorBeat;
+      if (codec.orientationReckoning) {
+        if (!record.yawOnly) {
+          entry.yawCount = 0;
+        } else {
+          if (entry.yawCount == entry.yawHistory.size()) {
+            std::move(entry.yawHistory.begin() + 1, entry.yawHistory.end(), entry.yawHistory.begin());
+            --entry.yawCount;
+          }
+          entry.yawHistory[entry.yawCount++] = record.orientation;
+        }
+        if (wire::ApplyOrientationReckoning(
+              entry.anchor, record, std::span<const std::uint32_t>(entry.yawHistory.data(), entry.yawCount),
+              frame.beat, mScheme, codec
+            )) {
+          ++mOrientationReanchors;
+        }
+        record.orientation = entry.anchor.orientation;
+        record.yawOnly = entry.anchor.yawOnly;
+        record.yawRate = entry.anchor.yawRate;
+        record.orientationBeat = entry.anchor.orientationBeat;
+      }
+      ++sent;
     }
-    mSent = std::move(next);
+    mSent.erase(sent, mSent.end());
   }
 } // namespace faf::remote

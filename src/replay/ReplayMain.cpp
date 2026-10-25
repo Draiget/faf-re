@@ -126,7 +126,8 @@ namespace
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
-      "  --loopback [--loopback-dr <steps>]  every packet through the wire format and the client's rebuild\n"
+      "  --loopback [--loopback-dr <steps> [--loopback-turns <units>]]  every packet through the wire format and the\n"
+      "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -184,6 +185,7 @@ int main(int argc, char** argv)
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
   (void)ReadIntOption("--loopback-dr", options.loopbackDeadReckoning, bad);
+  (void)ReadIntOption("--loopback-turns", options.loopbackTurnTolerance, bad);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);

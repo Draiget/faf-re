@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 
 #include "moho/sim/SimDriver.h"
 
@@ -36,8 +37,26 @@ namespace faf::replay
     , mCodec(MakeCodec(mapSizeX, mapSizeZ))
     , mBuilder(tables, mCodec)
   {
-    mDeadReckoningCodec = mCodec;
-    mDeadReckoningCodec.deadReckoning = true;
+    const auto variant = [&](const char* name, const std::uint32_t tolerance, const std::uint32_t window,
+                             const std::uint32_t fractionBits, const bool bend, const std::uint32_t turnTolerance) {
+      wire::SFrameCodec codec = mCodec;
+      codec.deadReckoning = true;
+      codec.velocityFractionBits = fractionBits;
+      codec.orientationReckoning = turnTolerance != 0u;
+      wire::SReckoningScheme scheme{};
+      scheme.tolerance = tolerance;
+      scheme.window = window;
+      scheme.verticalAcceleration = bend;
+      scheme.orientationTolerance = turnTolerance;
+      mDeadReckoning.push_back(SDeadReckoningVariant{name, codec, faf::remote::CDeadReckoner(scheme), {}, 0});
+    };
+    variant("WP7.5 4 steps", 4, 1, 0, false, 0);
+    variant("WP7.5 16 steps", 16, 1, 0, false, 0);
+    variant("fit 4 steps", 4, 8, 4, false, 0);
+    variant("fit+bend 4 steps", 4, 8, 4, true, 0);
+    variant("fit+bend 16 steps", 16, 8, 4, true, 0);
+    variant("fit+bend 4 steps, turns 0.35 deg", 4, 8, 4, true, 64);
+    variant("fit+bend 4 steps, turns 1 deg", 4, 8, 4, true, 182);
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -123,11 +142,9 @@ namespace faf::replay
     // stays within the tolerance of the sim's position.
     for (SDeadReckoningVariant& variant : mDeadReckoning) {
       wire::SViewFrame reckoned = frame;
-      variant.reckoner.Apply(reckoned, mDeadReckoningCodec);
+      variant.reckoner.Apply(reckoned, variant.codec);
       wire::BitWriter variantWriter;
-      if (wire::EncodeFrame(
-            reckoned, mHavePrevious ? &variant.previous : nullptr, mDeadReckoningCodec, variantWriter
-          )) {
+      if (wire::EncodeFrame(reckoned, mHavePrevious ? &variant.previous : nullptr, variant.codec, variantWriter)) {
         variant.bytes += variantWriter.Bytes().size();
       }
       variant.previous = std::move(reckoned);
@@ -235,7 +252,23 @@ namespace faf::replay
       }
       if ((fields & wire::kFieldVisualFlags) != 0u) into.appearance[3] += 5;
       if ((fields & wire::kFieldImpact) != 0u) into.appearance[4] += 32;
-      if ((fields & wire::kFieldScroll) != 0u) into.appearance[5] += 128;
+      if ((fields & wire::kFieldScroll) != 0u) {
+        // As the encoder: one bit, then the end alone when the start is the baseline's end.
+        const wire::SEntityRecord* before = nullptr;
+        if (mHavePrevious) {
+          const auto it = std::lower_bound(
+            mPrevious.entities.begin(), mPrevious.entities.end(), record.id,
+            [](const wire::SEntityRecord& r, const std::uint32_t id) { return r.id < id; }
+          );
+          if (it != mPrevious.entities.end() && it->id == record.id) {
+            before = &*it;
+          }
+        }
+        const bool shifted = before != nullptr
+                          && std::bit_cast<std::uint32_t>(look.scroll[0]) == std::bit_cast<std::uint32_t>(before->appearance.scroll[2])
+                          && std::bit_cast<std::uint32_t>(look.scroll[1]) == std::bit_cast<std::uint32_t>(before->appearance.scroll[3]);
+        into.appearance[5] += shifted ? 65u : 129u;
+      }
       if ((fields & wire::kFieldIntel) != 0u) {
         for (const std::uint32_t radius : look.intel) {
           into.appearance[6] += varintBits(radius);
@@ -326,6 +359,18 @@ namespace faf::replay
       rate(mFieldBits.unitParts[1]), rate(mFieldBits.unitParts[2]), rate(mFieldBits.unitParts[3]),
       rate(mFieldBits.unitParts[4]), rate(mFieldBits.unitParts[5]), rate(mFieldBits.unitParts[6])
     );
-    return text;
+    std::string summary = text;
+    summary += "; dead reckoning schemes (WP7.8):";
+    for (const SDeadReckoningVariant& variant : mDeadReckoning) {
+      char part[200];
+      const double entityBeats = mEntitySum != 0 ? static_cast<double>(mEntitySum) : 1.0;
+      std::snprintf(
+        part, sizeof(part), " %s %.1f KB/s (%.3f position, %.3f orientation re-anchors per entity-beat);", variant.name,
+        rate(variant.bytes * 8u), static_cast<double>(variant.reckoner.Reanchors()) / entityBeats,
+        static_cast<double>(variant.reckoner.OrientationReanchors()) / entityBeats
+      );
+      summary += part;
+    }
+    return summary;
   }
 } // namespace faf::replay

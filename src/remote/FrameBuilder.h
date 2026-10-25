@@ -108,32 +108,40 @@ namespace faf::remote
   };
 
   /**
-   * Dead reckoning for one view (WP7.5): rewrites each record of a built frame so it keeps the
-   * anchor the view holds while the view's prediction stays within `tolerance` quantiser steps
-   * of the sim's position, and re-anchors it otherwise. Frames go through it in beat order.
+   * Dead reckoning for one view (WP7.5, WP7.8): rewrites each record of a built frame so it
+   * keeps the anchor the view holds while the view's prediction stays within the scheme's
+   * tolerance of the sim's position, and re-anchors it, with the motion the scheme fits to the
+   * last beats' positions, otherwise. Frames go through it in beat order.
    */
   class CDeadReckoner
   {
   public:
-    explicit CDeadReckoner(std::uint32_t tolerance) noexcept
-      : mTolerance(tolerance)
+    explicit CDeadReckoner(const wire::SReckoningScheme& scheme) noexcept
+      : mScheme(scheme)
     {}
 
-    /** `codec.deadReckoning` must be on. */
+    /** `codec.deadReckoning` must be on; orientations are reckoned with `codec.orientationReckoning`. */
     void Apply(wire::SViewFrame& frame, const wire::SFrameCodec& codec);
 
-    [[nodiscard]] std::uint32_t Tolerance() const noexcept { return mTolerance; }
+    [[nodiscard]] const wire::SReckoningScheme& Scheme() const noexcept { return mScheme; }
+    [[nodiscard]] std::uint32_t Tolerance() const noexcept { return mScheme.tolerance; }
     [[nodiscard]] std::uint64_t Reanchors() const noexcept { return mReanchors; }
+    [[nodiscard]] std::uint64_t OrientationReanchors() const noexcept { return mOrientationReanchors; }
 
   private:
     struct SSent
     {
-      wire::SEntityRecord record;        // as the view holds it
-      wire::QuantizedPosition actual{};  // the sim's position that beat
+      wire::SEntityRecord anchor; // the motion fields as the view holds them; the rest unused
+      std::array<wire::QuantizedPosition, wire::kReckoningHistory> history{}; // the sim's, oldest first
+      std::uint32_t historyCount = 0;
+      std::array<std::uint32_t, wire::kReckoningHistory> yawHistory{}; // while yaw-only, oldest first
+      std::uint32_t yawCount = 0;
+      std::uint32_t lastBeat = 0;
     };
 
-    std::uint32_t mTolerance;
+    wire::SReckoningScheme mScheme;
     std::map<std::uint32_t, SSent> mSent;
     std::uint64_t mReanchors = 0;
+    std::uint64_t mOrientationReanchors = 0;
   };
 } // namespace faf::remote

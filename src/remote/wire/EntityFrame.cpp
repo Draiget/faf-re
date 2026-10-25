@@ -1,6 +1,8 @@
 #include "remote/wire/EntityFrame.h"
 
+#include <algorithm>
 #include <bit>
+#include <cmath>
 #include <utility>
 
 #include "remote/wire/WireVersion.h"
@@ -48,13 +50,21 @@ namespace faf::remote::wire
     /** `beat` is the frame's: a dead-reckoned anchor cannot lie in its future. */
     [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec, const std::uint32_t beat) noexcept
     {
+      const bool turnFits = codec.orientationReckoning && record.yawOnly
+                              ? record.orientationBeat <= beat
+                              : (record.orientationBeat == 0u && record.yawRate == 0);
+      if (!turnFits || (codec.orientationReckoning && !codec.deadReckoning)) {
+        return false;
+      }
       if (record.farPosition) {
         return record.position == QuantizedPosition{} && record.velocity == std::array<std::int32_t, 3>{}
-            && record.anchorBeat == 0u && (!record.yawOnly || record.orientation <= 0xFFFFu);
+            && record.verticalAcceleration == 0 && record.anchorBeat == 0u
+            && (!record.yawOnly || record.orientation <= 0xFFFFu);
       }
       const bool motionFits = codec.deadReckoning
                                 ? record.anchorBeat <= beat
-                                : (record.anchorBeat == 0u && record.velocity == std::array<std::int32_t, 3>{});
+                                : (record.anchorBeat == 0u && record.velocity == std::array<std::int32_t, 3>{}
+                                   && record.verticalAcceleration == 0);
       return motionFits && (!record.yawOnly || record.orientation <= 0xFFFFu)
           && record.position[0] <= codec.position.x.MaxQuantized()
           && record.position[1] <= codec.position.y.MaxQuantized()
@@ -156,9 +166,13 @@ namespace faf::remote::wire
       return fields;
     }
 
+    /**
+     * `before`: the record in the baseline (null for a creation); a texture scroll whose new
+     * start is the old end (`Entity::SetAnimScroll` shifts it) is sent as one bit and the end.
+     */
     void WriteFields(
       BitWriter& writer, const SEntityRecord& record, const std::uint32_t fields, const SFrameCodec& codec,
-      const std::uint32_t beat
+      const std::uint32_t beat, const SEntityRecord* const before
     )
     {
       if ((fields & kFieldKind) != 0u) {
@@ -180,11 +194,16 @@ namespace faf::remote::wire
           for (const std::int32_t component : record.velocity) {
             writer.WriteVarUint(ZigZag(component));
           }
+          writer.WriteVarUint(ZigZag(record.verticalAcceleration));
         }
       }
       if ((fields & kFieldOrientation) != 0u) {
         writer.WriteBool(record.yawOnly);
         writer.WriteBits(record.orientation, record.yawOnly ? kYawBits : 32);
+        if (codec.orientationReckoning && record.yawOnly) {
+          writer.WriteVarUint(beat - record.orientationBeat);
+          writer.WriteVarUint(ZigZag(record.yawRate));
+        }
       }
       if ((fields & kFieldHealth) != 0u) {
         writer.WriteFloatExact(record.health);
@@ -327,8 +346,11 @@ namespace faf::remote::wire
         writer.WriteFloatExact(look.impact);
       }
       if ((fields & kFieldScroll) != 0u) {
-        for (const float value : look.scroll) {
-          writer.WriteFloatExact(value);
+        const bool shifted = before != nullptr && Bits(look.scroll[0]) == Bits(before->appearance.scroll[2])
+                          && Bits(look.scroll[1]) == Bits(before->appearance.scroll[3]);
+        writer.WriteBool(shifted);
+        for (std::size_t i = shifted ? 2u : 0u; i < look.scroll.size(); ++i) {
+          writer.WriteFloatExact(look.scroll[i]);
         }
       }
       if ((fields & kFieldIntel) != 0u) {
@@ -368,6 +390,7 @@ namespace faf::remote::wire
         }
         record.position = {};
         record.velocity = {};
+        record.verticalAcceleration = 0;
         record.anchorBeat = 0;
       } else if ((fields & kFieldPosition) != 0u) {
         record.farValue = {};
@@ -384,11 +407,23 @@ namespace faf::remote::wire
           for (std::int32_t& component : record.velocity) {
             component = UnZigZag(reader.ReadVarUint());
           }
+          record.verticalAcceleration = UnZigZag(reader.ReadVarUint());
         }
       }
       if ((fields & kFieldOrientation) != 0u) {
         record.yawOnly = reader.ReadBool();
         record.orientation = reader.ReadBits(record.yawOnly ? kYawBits : 32);
+        record.yawRate = 0;
+        record.orientationBeat = 0;
+        if (codec.orientationReckoning && record.yawOnly) {
+          const std::uint32_t age = reader.ReadVarUint();
+          if (!reader.Ok() || age > beat) {
+            reader.Fail();
+            return false;
+          }
+          record.orientationBeat = beat - age;
+          record.yawRate = UnZigZag(reader.ReadVarUint());
+        }
       }
       if ((fields & kFieldHealth) != 0u) {
         record.health = reader.ReadFloatExact();
@@ -564,8 +599,14 @@ namespace faf::remote::wire
         look.impact = reader.ReadFloatExact();
       }
       if ((fields & kFieldScroll) != 0u) {
-        for (float& value : look.scroll) {
-          value = reader.ReadFloatExact();
+        // `record` holds the baseline's values here (a change) or the defaults (a creation).
+        const bool shifted = reader.ReadBool();
+        if (shifted) {
+          look.scroll[0] = look.scroll[2];
+          look.scroll[1] = look.scroll[3];
+        }
+        for (std::size_t i = shifted ? 2u : 0u; i < look.scroll.size(); ++i) {
+          look.scroll[i] = reader.ReadFloatExact();
         }
       }
       if ((fields & kFieldIntel) != 0u) {
@@ -657,8 +698,10 @@ namespace faf::remote::wire
   {
     return id == other.id && blueprint == other.blueprint && army == other.army && position == other.position
         && farPosition == other.farPosition && SameFloats(farValue.data(), other.farValue.data(), farValue.size())
-        && velocity == other.velocity && anchorBeat == other.anchorBeat
-        && orientation == other.orientation && yawOnly == other.yawOnly && Bits(health) == Bits(other.health)
+        && velocity == other.velocity && verticalAcceleration == other.verticalAcceleration
+        && anchorBeat == other.anchorBeat
+        && orientation == other.orientation && yawOnly == other.yawOnly && yawRate == other.yawRate
+        && orientationBeat == other.orientationBeat && Bits(health) == Bits(other.health)
         && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
         && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit))
         && appearance == other.appearance;
@@ -673,12 +716,14 @@ namespace faf::remote::wire
   std::uint32_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
   {
     std::uint32_t fields = AppearanceChanges(before.appearance, after.appearance);
-    if (before.position != after.position || before.velocity != after.velocity || before.anchorBeat != after.anchorBeat
+    if (before.position != after.position || before.velocity != after.velocity
+        || before.verticalAcceleration != after.verticalAcceleration || before.anchorBeat != after.anchorBeat
         || before.farPosition != after.farPosition
         || !SameFloats(before.farValue.data(), after.farValue.data(), before.farValue.size())) {
       fields |= kFieldPosition;
     }
-    if (before.orientation != after.orientation || before.yawOnly != after.yawOnly) {
+    if (before.orientation != after.orientation || before.yawOnly != after.yawOnly || before.yawRate != after.yawRate
+        || before.orientationBeat != after.orientationBeat) {
       fields |= kFieldOrientation;
     }
     if (Bits(before.health) != Bits(after.health)) {
@@ -756,30 +801,107 @@ namespace faf::remote::wire
     return fields;
   }
 
+  namespace
+  {
+    /** `numerator / denominator` rounded half up; the denominator is positive. */
+    [[nodiscard]] std::int64_t DivideRounded(const std::int64_t numerator, const std::int64_t denominator) noexcept
+    {
+      const std::int64_t shifted = 2 * numerator + denominator;
+      const std::int64_t twice = 2 * denominator;
+      return shifted >= 0 ? shifted / twice : -((-shifted + twice - 1) / twice);
+    }
+
+    /** Twice the motion's offset, in sub-steps, `t` beats from its anchor. */
+    [[nodiscard]] std::int64_t TwiceOffset(const std::int64_t velocity, const std::int64_t acceleration, const std::int64_t t) noexcept
+    {
+      return 2 * velocity * t + acceleration * t * t;
+    }
+
+    struct SAxisMotion
+    {
+      std::int64_t velocity = 0;
+      std::int64_t acceleration = 0;
+    };
+
+    /**
+     * The motion of one axis that fits the most history: `past[k]` is the position `k` beats
+     * ago (`past[0]` now), in whole steps; the result is in `unit` sub-steps per beat. The
+     * longest window, a power of two up to `maxWindow`, whose every position lies within a
+     * step of the motion wins; a straight fit before a bent one at the same window.
+     */
+    [[nodiscard]] SAxisMotion FitAxis(
+      const std::int64_t* const past, const std::size_t count, const std::uint32_t maxWindow, const std::int64_t unit,
+      const bool bend
+    ) noexcept
+    {
+      const auto fits = [&](const SAxisMotion& motion, const std::uint32_t window) {
+        for (std::uint32_t k = 1; k < window; ++k) {
+          const std::int64_t twiceError =
+            2 * (past[0] - past[k]) * unit - TwiceOffset(motion.velocity, -motion.acceleration, static_cast<std::int64_t>(k));
+          if (twiceError > 2 * unit || -twiceError > 2 * unit) {
+            return false;
+          }
+        }
+        return true;
+      };
+      std::uint32_t window = 1;
+      while (window * 2u <= maxWindow && window * 2u < count) {
+        window *= 2u;
+      }
+      for (; window >= 1u; window /= 2u) {
+        if (count <= window) {
+          continue;
+        }
+        const auto w = static_cast<std::int64_t>(window);
+        SAxisMotion straight{DivideRounded((past[0] - past[window]) * unit, w), 0};
+        if (fits(straight, window)) {
+          return straight;
+        }
+        if (bend && window >= 2u) {
+          // Through now, half the window ago and the window's start: p(-t) = p0 - v t + a t^2 / 2.
+          SAxisMotion bent{};
+          bent.acceleration = DivideRounded(4 * (past[0] - 2 * past[window / 2u] + past[window]) * unit, w * w);
+          bent.velocity = DivideRounded(2 * (past[0] - past[window]) * unit + bent.acceleration * w * w, 2 * w);
+          if (fits(bent, window)) {
+            return bent;
+          }
+        }
+      }
+      return {};
+    }
+  } // namespace
+
   QuantizedPosition PredictPosition(const SEntityRecord& record, const std::uint32_t beat, const SFrameCodec& codec) noexcept
   {
     const std::int64_t elapsed = static_cast<std::int64_t>(beat) - static_cast<std::int64_t>(record.anchorBeat);
+    const std::int64_t unit = std::int64_t{1} << codec.velocityFractionBits;
     const std::uint32_t limits[3] = {
       codec.position.x.MaxQuantized(), codec.position.y.MaxQuantized(), codec.position.z.MaxQuantized()
     };
     QuantizedPosition predicted{};
     for (int axis = 0; axis < 3; ++axis) {
-      const std::int64_t value = static_cast<std::int64_t>(record.position[axis]) + record.velocity[axis] * elapsed;
+      const std::int64_t acceleration = axis == 1 ? record.verticalAcceleration : 0;
+      const std::int64_t value = static_cast<std::int64_t>(record.position[axis])
+                               + DivideRounded(TwiceOffset(record.velocity[axis], acceleration, elapsed), 2 * unit);
       predicted[axis] = value < 0 ? 0u : (value > limits[axis] ? limits[axis] : static_cast<std::uint32_t>(value));
     }
     return predicted;
   }
 
   bool ApplyDeadReckoning(
-    SEntityRecord& sent, const QuantizedPosition& actual, const QuantizedPosition& previousActual,
-    const std::uint32_t beat, const std::uint32_t tolerance, const SFrameCodec& codec
+    SEntityRecord& sent, const std::span<const QuantizedPosition> history, const std::uint32_t beat,
+    const SReckoningScheme& scheme, const SFrameCodec& codec
   ) noexcept
   {
+    if (history.empty()) {
+      return false;
+    }
+    const QuantizedPosition& actual = history.back();
     const QuantizedPosition predicted = PredictPosition(sent, beat, codec);
     bool within = true;
     for (int axis = 0; axis < 3; ++axis) {
       const std::int64_t error = static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(predicted[axis]);
-      if (error > tolerance || -error > tolerance) {
+      if (error > scheme.tolerance || -error > scheme.tolerance) {
         within = false;
       }
     }
@@ -787,11 +909,79 @@ namespace faf::remote::wire
       return false;
     }
     sent.position = actual;
+    const std::size_t count = std::min(history.size(), kReckoningHistory);
+    const std::int64_t unit = std::int64_t{1} << codec.velocityFractionBits;
     for (int axis = 0; axis < 3; ++axis) {
-      sent.velocity[axis] =
-        static_cast<std::int32_t>(static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(previousActual[axis]));
+      std::int64_t past[kReckoningHistory]{};
+      for (std::size_t k = 0; k < count; ++k) {
+        past[k] = history[history.size() - 1u - k][axis];
+      }
+      const SAxisMotion motion = FitAxis(past, count, scheme.window, unit, axis == 1 && scheme.verticalAcceleration);
+      sent.velocity[axis] = static_cast<std::int32_t>(motion.velocity);
+      if (axis == 1) {
+        sent.verticalAcceleration = static_cast<std::int32_t>(motion.acceleration);
+      }
     }
     sent.anchorBeat = beat;
+    return true;
+  }
+
+  std::uint32_t PredictYaw(const SEntityRecord& record, const std::uint32_t beat, const SFrameCodec& codec) noexcept
+  {
+    if (!codec.orientationReckoning || !record.yawOnly) {
+      return record.orientation;
+    }
+    const std::int64_t elapsed = static_cast<std::int64_t>(beat) - static_cast<std::int64_t>(record.orientationBeat);
+    const std::int64_t unit = std::int64_t{1} << codec.velocityFractionBits;
+    const std::int64_t turned = DivideRounded(TwiceOffset(record.yawRate, 0, elapsed), 2 * unit);
+    return static_cast<std::uint32_t>(static_cast<std::int64_t>(record.orientation) + turned) & 0xFFFFu;
+  }
+
+  bool ApplyOrientationReckoning(
+    SEntityRecord& sent, const SEntityRecord& actual, const std::span<const std::uint32_t> yawHistory,
+    const std::uint32_t beat, const SReckoningScheme& scheme, const SFrameCodec& codec
+  ) noexcept
+  {
+    // The shortest way round between two yaws, in yaw units.
+    const auto yawDifference = [](const std::uint32_t a, const std::uint32_t b) -> std::int64_t {
+      return static_cast<std::int16_t>(static_cast<std::uint16_t>((a - b) & 0xFFFFu));
+    };
+    const auto tolerance = static_cast<std::int64_t>(scheme.orientationTolerance);
+    bool within = sent.yawOnly == actual.yawOnly;
+    if (within && actual.yawOnly) {
+      const std::int64_t error = yawDifference(actual.orientation, PredictYaw(sent, beat, codec));
+      within = error <= tolerance && -error <= tolerance;
+    } else if (within) {
+      // Held: the angle between the two rotations, 2 acos |q1 . q2|, against the tolerance.
+      const std::array<float, 4> a = UnpackQuaternion(actual.orientation);
+      const std::array<float, 4> b = UnpackQuaternion(sent.orientation);
+      const double dot = std::fabs(
+        static_cast<double>(a[0]) * b[0] + static_cast<double>(a[1]) * b[1] + static_cast<double>(a[2]) * b[2]
+        + static_cast<double>(a[3]) * b[3]
+      );
+      constexpr double kHalfTurnPerUnit = 3.141592653589793 / 65536.0;
+      within = sent.orientation == actual.orientation || dot >= std::cos(kHalfTurnPerUnit * static_cast<double>(tolerance));
+    }
+    if (within) {
+      return false;
+    }
+    sent.yawOnly = actual.yawOnly;
+    sent.orientation = actual.orientation;
+    sent.yawRate = 0;
+    sent.orientationBeat = 0;
+    if (actual.yawOnly) {
+      // Unwrapped onto the line through this beat's yaw, `past[k]` k beats ago.
+      const std::size_t count = std::min(yawHistory.size(), kReckoningHistory);
+      std::int64_t past[kReckoningHistory]{};
+      for (std::size_t k = 1; k < count; ++k) {
+        const std::uint32_t newer = yawHistory[yawHistory.size() - k];
+        const std::uint32_t older = yawHistory[yawHistory.size() - 1u - k];
+        past[k] = past[k - 1] - yawDifference(newer, older);
+      }
+      const std::int64_t unit = std::int64_t{1} << codec.velocityFractionBits;
+      sent.yawRate = static_cast<std::int32_t>(FitAxis(past, count, scheme.window, unit, false).velocity);
+      sent.orientationBeat = beat;
+    }
     return true;
   }
 
@@ -862,7 +1052,7 @@ namespace faf::remote::wire
       WriteGap(writer, first, previous, record.id);
       const std::uint32_t fields = CreationFields(record);
       writer.WriteVarUint(fields);
-      WriteFields(writer, record, fields, codec, frame.beat);
+      WriteFields(writer, record, fields, codec, frame.beat, nullptr);
     }
 
     first = true;
@@ -870,7 +1060,12 @@ namespace faf::remote::wire
     for (const SFrameDelta::SChange& change : delta.changed) {
       WriteGap(writer, first, previous, change.record.id);
       writer.WriteVarUint(change.fields);
-      WriteFields(writer, change.record, change.fields, codec, frame.beat);
+      // A change's id is in the baseline (ComputeFrameDelta); both lists are in id order.
+      const auto before = std::lower_bound(
+        baseline->entities.begin(), baseline->entities.end(), change.record.id,
+        [](const SEntityRecord& record, const std::uint32_t id) { return record.id < id; }
+      );
+      WriteFields(writer, change.record, change.fields, codec, frame.beat, &*before);
     }
     return true;
   }

@@ -28,10 +28,13 @@ namespace faf::remote::client
     , mLink(rules, codec, options)
   {
     gpg::Logf(
-      "loopback: remote driver on, %u blueprints, content hash %016llx, dead reckoning %s (%u steps)",
+      "loopback: remote driver on, %u blueprints, content hash %016llx, dead reckoning %s (%u steps, turns %u)",
       mLink.Tables().blueprints.Size(), static_cast<unsigned long long>(mLink.Tables().Hash()),
-      mLink.DeadReckoning() ? "on" : "off", options.deadReckoningTolerance
+      mLink.DeadReckoning() ? "on" : "off", options.deadReckoningTolerance, options.orientationTolerance
     );
+    if (!mLink.Refusal().empty()) {
+      gpg::Logf("loopback: the client refused the server's hello (%s); the session runs on the sim's packets", mLink.Refusal().c_str());
+    }
   }
 
   CRemoteSimDriver::~CRemoteSimDriver()
@@ -289,6 +292,10 @@ namespace faf::remote::client
     msvc8::vector<msvc8::string> args;
     if (moho::CFG_GetArgOption("/loopbackdr", 1, &args) && !args.empty()) {
       options.deadReckoningTolerance = static_cast<std::uint32_t>(std::strtoul(args[0].c_str(), nullptr, 10));
+    }
+    args.clear();
+    if (moho::CFG_GetArgOption("/loopbackturns", 1, &args) && !args.empty()) {
+      options.orientationTolerance = static_cast<std::uint32_t>(std::strtoul(args[0].c_str(), nullptr, 10));
     }
     const wire::SFrameCodec codec =
       MakeLoopbackCodec(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options);

@@ -507,6 +507,7 @@ namespace faf::replay
     if (options.loopback) {
       faf::remote::client::SLoopbackOptions loopbackOptions{};
       loopbackOptions.deadReckoningTolerance = static_cast<std::uint32_t>(options.loopbackDeadReckoning);
+      loopbackOptions.orientationTolerance = static_cast<std::uint32_t>(options.loopbackTurnTolerance);
       loopback = std::make_unique<faf::remote::client::CLoopbackLink>(
         *rules,
         faf::remote::client::MakeLoopbackCodec(

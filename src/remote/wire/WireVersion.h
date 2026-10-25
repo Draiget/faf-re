@@ -37,9 +37,11 @@ namespace faf::remote::wire
    * positions outside the quantiser's range as exact floats. Entities 4: sounds and the
    * strategic underlay in the appearance block, as session-table ids; a unit's stats tree and
    * creation constants in its unit block. Entities 5: the rest of a unit's variable data (ids,
-   * economy, command and build queues, weapons, attributes) in its unit block.
+   * economy, command and build queues, weapons, attributes) in its unit block. Entities 6: a
+   * texture scroll whose start is the old end goes as one bit and the end. Entities 7: a
+   * dead-reckoned position carries a vertical acceleration after its velocity.
    */
-  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{5, 1, 1, 1, 1, 1};
+  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{7, 1, 1, 1, 1, 1};
 
   [[nodiscard]] const char* LaneName(ELane lane) noexcept;
 

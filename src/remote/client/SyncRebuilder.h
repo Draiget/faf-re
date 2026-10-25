@@ -82,10 +82,11 @@ namespace faf::remote::client
     std::uint64_t unitPosesBorrowed = 0;      // of them, with the packet's poses (the pose lane is WP8)
     std::uint64_t unitDataMismatches = 0;     // client-built unit data versus the packet's, poses aside
     std::uint64_t positionsOutOfRange = 0;  // shown more than a unit from the sim: clamped by the quantiser
-    double maxPositionError = 0.0;
+    double maxPositionError = 0.0;         // shown versus packet, world units, any axis
+    double maxOrientationError = 0.0;      // shown versus packet, degrees between the two rotations
     double decodeSeconds = 0.0;            // DecodeFrame
     double deltaSeconds = 0.0;             // ComputeFrameDelta against the frame shown
-    double rebuildSeconds = 0.0;           // the packet's entity lanes         // shown versus packet, world units, any axis
+    double rebuildSeconds = 0.0;           // the packet's entity lanes
   };
 
   class CSyncRebuilder
