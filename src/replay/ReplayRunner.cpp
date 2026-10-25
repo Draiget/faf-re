@@ -19,6 +19,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/FafGameVersion.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
