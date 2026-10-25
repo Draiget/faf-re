@@ -7873,14 +7873,14 @@ namespace
 			globalState->buff.buffsize = newBufferSize;
 		}
 
-		const int nblocks = static_cast<int>(globalState->nblocks);
-		int thresholdBase = nblocks + nblocks;
-		if (nblocks >= 0x40000000) {
-			thresholdBase = nblocks + 0x10000000;
-		}
+		// FAF hot-patch (FA-Binary-Patches HFix4GB): 0x00915B05 jumps to `add eax, eax; jge`
+		// at 0x00915A92, so the base is twice the heap while that doubling does not overflow a
+		// signed 32-bit value (heap below 2 GB), and heap + 256 MB from there up.
+		const std::uint32_t nblocks = static_cast<std::uint32_t>(globalState->nblocks);
+		const std::uint32_t thresholdBase =
+			static_cast<std::int32_t>(nblocks) >= 0 ? nblocks + nblocks : nblocks + 0x10000000u;
 
-		const std::uint32_t adjustedThreshold =
-			static_cast<std::uint32_t>(thresholdBase) - static_cast<std::uint32_t>(deadmem);
+		const std::uint32_t adjustedThreshold = thresholdBase - static_cast<std::uint32_t>(deadmem);
 		globalState->GCthreshold = static_cast<lu_mem>(adjustedThreshold);
 	}
 
