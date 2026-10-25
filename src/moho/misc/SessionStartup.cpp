@@ -367,25 +367,28 @@ namespace moho
     )
     {
       LuaPlus::LuaState scratch(LuaPlus::LuaState::LIB_NONE);
-      const auto decodes = [&scratch](const msvc8::string& text) {
+      // Each of them is a table where it is used (Sim::Setup writes into the
+      // army setups and the scenario), so anything else is refused too.
+      const auto decodesTo = [&scratch](const msvc8::string& text, const bool nilAllowed) {
         try {
           LuaPlus::LuaObject value;
           (void)SCR_FromString(&value, text, &scratch);
-          return true;
+          return value.IsTable() || (nilAllowed && value.IsNil());
         } catch (const std::exception&) {
           return false;
         }
       };
 
-      // An empty mods string means no mods (RRuleGameRules skips the decode).
-      if (!launchInfo.mGameMods.empty() && !decodes(launchInfo.mGameMods)) {
+      // An empty mods string means no mods (RRuleGameRules skips the decode),
+      // and so does an encoded nil (a launch without a mods table).
+      if (!launchInfo.mGameMods.empty() && !decodesTo(launchInfo.mGameMods, true)) {
         return false;
       }
-      if (!decodes(launchInfo.mScenarioInfo)) {
+      if (!decodesTo(launchInfo.mScenarioInfo, false)) {
         return false;
       }
       for (const msvc8::string& armySetup : armySetups) {
-        if (!decodes(armySetup)) {
+        if (!decodesTo(armySetup, false)) {
           return false;
         }
       }

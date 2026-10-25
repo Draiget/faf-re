@@ -7073,8 +7073,14 @@ void Sim::Setup(LaunchInfoNew* const info)
     armySetup.SetInteger("ArmyIndex", static_cast<std::int32_t>(armyIndex + 1));
     armySetupObjects.push_back(armySetup);
 
-    const char* const armyName = armySetup["ArmyName"].GetString();
-    armySetupTable.SetObject(armyName, armySetup);
+    // Engine addition: the host chose this table. An ArmyName that is not a
+    // string made GetString raise a Lua error out of sim construction; such an
+    // army is named by its slot the way FAF names armies.
+    const LuaPlus::LuaObject armyNameObject = armySetup["ArmyName"];
+    const msvc8::string armyName = armyNameObject.IsString()
+      ? msvc8::string(armyNameObject.GetString())
+      : gpg::STR_Printf("ARMY_%d", static_cast<int>(armyIndex + 1));
+    armySetupTable.SetObject(armyName.c_str(), armySetup);
   }
   scenarioInfo.SetObject("ArmySetup", armySetupTable);
   mLuaState->GetGlobals().SetObject("ScenarioInfo", scenarioInfo);
