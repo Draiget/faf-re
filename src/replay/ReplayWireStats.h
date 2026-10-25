@@ -75,6 +75,7 @@ namespace faf::replay
     struct SFieldBits
     {
       std::uint64_t transform = 0;  // position, orientation
+      std::uint64_t orientation = 0; // the orientation part of `transform`
       std::uint64_t scalars = 0;    // health, max health, build progress
       std::uint64_t flags = 0;      // entity flags, kind, blueprint, army
       std::uint64_t unit = 0;       // unit block

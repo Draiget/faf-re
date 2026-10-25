@@ -265,7 +265,10 @@ namespace faf::replay
                                      + mCodec.position.z.bits;
     const auto fieldBits = [&](const wire::SEntityRecord& record, const std::uint16_t fields, SFieldBits& into) {
       if ((fields & wire::kFieldPosition) != 0u) into.transform += positionBits;
-      if ((fields & wire::kFieldOrientation) != 0u) into.transform += 1u + (record.yawOnly ? 16u : 32u);
+      if ((fields & wire::kFieldOrientation) != 0u) {
+        into.transform += 1u + (record.yawOnly ? 16u : 32u);
+        into.orientation += 1u + (record.yawOnly ? 16u : 32u);
+      }
       if ((fields & wire::kFieldHealth) != 0u) into.scalars += 32;
       if ((fields & wire::kFieldMaxHealth) != 0u) into.scalars += 32;
       if ((fields & wire::kFieldFraction) != 0u) into.scalars += 32;
@@ -325,7 +328,7 @@ namespace faf::replay
       "wire entities lane: %llu beats, entities mean %.0f max %u, delta bytes/beat mean %.0f p50 %u p95 %u max %u "
       "(%.1f KB/s at 10 beats/s), full frame mean %.0f bytes, round-trip failures %llu, encode failures %llu, "
       "unknown blueprints %llu; without the yaw form %.1f KB/s (yaw-only records %.0f%%), without the unit block "
-      "%.1f KB/s; by field (KB/s): transforms %.1f, scalars %.1f, flags %.1f, unit block %.1f, ids and masks %.1f, "
+      "%.1f KB/s; by field (KB/s): transforms %.1f (orientation %.1f), scalars %.1f, flags %.1f, unit block %.1f, ids and masks %.1f, "
       "creations %.1f, removals %.1f; dead reckoning (WP7.5) at 4 steps %.1f KB/s (%.2f re-anchors per entity-beat), "
       "at 16 steps %.1f KB/s (%.2f)",
       static_cast<unsigned long long>(mBeats), mBeats != 0 ? static_cast<double>(mEntitySum) / mBeats : 0.0,
@@ -337,6 +340,7 @@ namespace faf::replay
       mBeats != 0 ? static_cast<double>(mDeltaBytesNoYaw) / mBeats * 10.0 / 1000.0 : 0.0,
       mEntitySum != 0 ? 100.0 * static_cast<double>(mYawOnlyRecords) / static_cast<double>(mEntitySum) : 0.0,
       mBeats != 0 ? static_cast<double>(mDeltaBytesNoUnits) / mBeats * 10.0 / 1000.0 : 0.0, rate(mFieldBits.transform),
+      rate(mFieldBits.orientation),
       rate(mFieldBits.scalars), rate(mFieldBits.flags), rate(mFieldBits.unit), rate(mFieldBits.overhead),
       rate(mFieldBits.creations), rate(mFieldBits.removals), rate(mDeadReckoning[0].bytes * 8u),
       mEntitySum != 0 ? static_cast<double>(mDeadReckoning[0].reanchors) / static_cast<double>(mEntitySum) : 0.0,
