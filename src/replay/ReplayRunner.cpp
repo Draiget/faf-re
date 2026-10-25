@@ -1,4 +1,5 @@
 #include "replay/ReplayRunner.h"
+#include "replay/ReplaySyncWriters.h"
 
 #include "remote/client/LoopbackLink.h"
 
@@ -441,6 +442,13 @@ namespace faf::replay
       moho::sim_ReplayLead = options.replayLead;
     }
 
+    // `--sync-writers`: the Sync write recorder goes in before the sim (and its scripts) exist.
+    CSyncWriters syncWriters;
+    const bool attributeSyncWrites = !options.syncWritersPath.empty();
+    if (attributeSyncWrites) {
+      syncWriters.Enable();
+    }
+
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
     moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Replay);
@@ -640,6 +648,9 @@ namespace faf::replay
     }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
+    }
+    if (attributeSyncWrites) {
+      result.syncWritersSummary = syncWriters.Write(options.syncWritersPath);
     }
     if (loopback) {
       result.loopbackSummary = loopback->Summary("end");

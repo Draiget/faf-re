@@ -17,6 +17,7 @@ namespace faf::replay
     std::string digestPath;     // when set: one "beat digest" line per checksummed beat
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;  // when set: the entities lane of the wire format, per beat (CSV)
+    std::string syncWritersPath; // when set: every Sync write's Lua call site (ReplaySyncWriters.h)
     bool loopback = false;      // every packet through the wire and the client's rebuild (CLoopbackLink)
     int loopbackDeadReckoning = 0; // with `loopback`: dead-reckoning tolerance in 1/64-unit steps
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
@@ -45,6 +46,7 @@ namespace faf::replay
     std::string error;          // why the run could not start or finish
     std::string wireSummary;    // with `wireStatsPath`: one summary line
     std::string loopbackSummary; // with `loopback`: two lines
+    std::string syncWritersSummary; // with `syncWritersPath`: one line
     std::uint64_t loopbackFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line
     std::string fpuReport;      // with `fpuReport`: one line per thread

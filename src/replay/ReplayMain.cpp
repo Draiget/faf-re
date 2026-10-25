@@ -176,6 +176,7 @@ int main(int argc, char** argv)
   (void)ReadIntOption("--focus", options.focusArmy, bad);
   (void)ReadOption("--digests", options.digestPath);
   (void)ReadOption("--sync-keys", options.syncKeysPath);
+  (void)ReadOption("--sync-writers", options.syncWritersPath);
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
@@ -248,6 +249,9 @@ int main(int argc, char** argv)
   }
   if (!result.wireSummary.empty()) {
     std::printf("[%s] %s\n", label, result.wireSummary.c_str());
+  }
+  if (!result.syncWritersSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.syncWritersSummary.c_str());
   }
   if (!result.loopbackSummary.empty()) {
     std::string summary = result.loopbackSummary;
