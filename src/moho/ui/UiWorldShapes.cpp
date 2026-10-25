@@ -318,6 +318,8 @@ int moho::cfunc_UI_DrawCircle(lua_State* const L)
   const float lod = LodMetric(pos);
   const float lodThickness = ThicknessInLodUnits(thickness, lod);
   const DrawOvalAxes axes = DRAW_CircleAxes(normal, radius, lod * lodThickness);
+  // `_DrawCircle` leaves THICKNESS and CIRCLE_COLOR set, which the build-assist circle reads.
+  DRAW_SetCircleStyle(lod * lodThickness, color);
 
   WorldShapeRecord record{};
   record.mKind = WorldShapeKind::Circle;

@@ -682,6 +682,18 @@ namespace moho
   );
 
   /**
+   * FAF FA-Binary-Patches (section/DrawFunc.cpp `_DrawCircle`, DrawCircleSetColor.cpp):
+   * UI_DrawCircle stores its band half width and colour in the THICKNESS and
+   * CIRCLE_COLOR globals (initially 0.1 and 0xFF00D800) and never restores them, so
+   * the engine's own `DRAW_Circle` (the build-assist circle) draws with the values of
+   * the last UI_DrawCircle.
+   *
+   * What it does:
+   * Sets the band half width and colour the 10-parameter `DRAW_Circle` uses.
+   */
+  void DRAW_SetCircleStyle(float bandHalfWidth, std::uint32_t color);
+
+  /**
    * Address: 0x00454E20 (?DRAW_ClippedQuad@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Rect2@M@gpg@@11I@Z)
    *
    * What it does:

@@ -62,10 +62,12 @@ namespace
   // FAF FA-Binary-Patches (section/DrawCircleSetColor.cpp, hooks/HDraw.cpp): the colour (shipped
   // as the immediate at 0x004561A8) and the band half width (shipped as 0.5 at 0x00456264 /
   // 0x004562CD) became the globals CIRCLE_COLOR and THICKNESS, which UI_DrawCircle overwrites.
-  // They are parameters here; these are the globals' initial values, which the build-assist
-  // circle keeps.
+  // These are the globals' initial values; UI_DrawCircle changes them through
+  // DRAW_SetCircleStyle, and the build-assist circle draws with whatever it set last.
   constexpr std::uint32_t kOvalBandColor = 0xFF00D800u;
   constexpr float kOvalBandHalfWidth = 0.1f;
+  std::uint32_t sCircleBandColor = kOvalBandColor;
+  float sCircleBandHalfWidth = kOvalBandHalfWidth;
   constexpr std::uint16_t kUnmappedIndexedVertex = 0xFFFFu;
 
   static_assert(
@@ -1512,11 +1514,11 @@ namespace moho
    * for ABI/name fidelity, and are `[[maybe_unused]]` rather than given invented names.
    *
    * The axes come from `DRAW_CircleAxes`. With FAF's patches the band half
-   * width and colour are the THICKNESS / CIRCLE_COLOR globals; the
-   * build-assist circle (the only engine caller) draws with their initial
-   * values 0.1 and 0xFF00D800. The patch never restores them after
-   * UI_DrawCircle, so in the patched exe this circle takes whatever the last
-   * UI_DrawCircle used; that leak is not reproduced.
+   * width and colour are the THICKNESS / CIRCLE_COLOR globals (read at
+   * 0x00456264 / 0x004562CD and 0x004561A8), initially 0.1 and 0xFF00D800.
+   * UI_DrawCircle overwrites them and never restores them, so this circle
+   * (the build-assist circle, the only engine caller) draws with the last
+   * UI_DrawCircle's values (DRAW_SetCircleStyle).
    */
   void DRAW_Circle(
     CD3DPrimBatcher* const primBatcher,
@@ -1531,7 +1533,13 @@ namespace moho
     const float radius
   )
   {
-    DRAW_Circle(primBatcher, center, normal, radius, kOvalBandHalfWidth, kOvalBandColor);
+    DRAW_Circle(primBatcher, center, normal, radius, sCircleBandHalfWidth, sCircleBandColor);
+  }
+
+  void DRAW_SetCircleStyle(const float bandHalfWidth, const std::uint32_t color)
+  {
+    sCircleBandHalfWidth = bandHalfWidth;
+    sCircleBandColor = color;
   }
 
   /**
