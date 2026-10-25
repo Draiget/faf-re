@@ -1057,6 +1057,41 @@ namespace
   constexpr const char* kRenderOverlayIntelHelpText = "RenderOverlayIntel(bool)";
   constexpr const char* kRenderOverlayEconomyHelpText = "RenderOverlayEconomy(bool)";
   constexpr const char* kTeamColorModeHelpText = "TeamColorMode(bool)";
+
+  /**
+   * FA-Binary-Patches section/TeamColorMode.cpp (`TeamColorMode` stub): reads
+   * hex colours separated by any non-hex character ("ffrrggbb,ffrrggbb,...")
+   * into `teamcolors` from slot 0; slots the text does not reach keep their
+   * values. The stub steps past the terminator after the last colour and keeps
+   * parsing whatever follows the string, and has no slot limit; this stops at
+   * the terminator and after the palette's 32 slots.
+   */
+  void ParseTeamColorPalette(const char* const text)
+  {
+    const char* cursor = text;
+    for (std::size_t slot = 0; *cursor != '\0' && slot < moho::kTeamColorPaletteSize; ++slot) {
+      std::uint32_t color = 0u;
+      for (;; ++cursor) {
+        const char c = *cursor;
+        std::uint32_t digit = 0u;
+        if (c >= '0' && c <= '9') {
+          digit = static_cast<std::uint32_t>(c - '0');
+        } else if (c >= 'A' && c <= 'F') {
+          digit = static_cast<std::uint32_t>(c - 'A' + 10);
+        } else if (c >= 'a' && c <= 'f') {
+          digit = static_cast<std::uint32_t>(c - 'a' + 10);
+        } else {
+          break;
+        }
+        color = (color << 4) + digit;
+      }
+      moho::teamcolors[slot] = color;
+      if (*cursor == '\0') {
+        break;
+      }
+      ++cursor;
+    }
+  }
   constexpr const char* kEjectSessionClientHelpText =
     "EjectSessionClient(int clientIndex) -- eject another client from your session";
   constexpr const char* kNoSessionStartedText = "No session started.";
@@ -19931,7 +19966,10 @@ moho::CScrLuaInitForm* moho::func_TeamColorMode_LuaFuncDef()
  * Address: 0x00847E10 (FUN_00847E10, cfunc_TeamColorModeL)
  *
  * What it does:
- * Validates one Lua bool and updates the active user session team-color mode.
+ * A Lua bool turns the active user session's team-color mode on or off. FAF
+ * hot-patch (FA-Binary-Patches TeamColorMode, 0x00847E51): a string such as
+ * "ffrrggbb,ffrrggbb,..." instead fills the per-army palette `teamcolors` in
+ * army order and leaves the mode alone.
  */
 int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
 {
@@ -19942,7 +19980,12 @@ int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
 
   if (CWldSession* const session = WLD_GetActiveSession()) {
     const LuaPlus::LuaStackObject modeArg(state, 1);
-    if (lua_type(state->m_state, 1) != LUA_TBOOLEAN) {
+    const int argumentType = lua_type(state->m_state, 1);
+    if (argumentType == LUA_TSTRING || argumentType == LUA_TNUMBER) {
+      ParseTeamColorPalette(lua_tostring(state->m_state, 1));
+      return 0;
+    }
+    if (argumentType != LUA_TBOOLEAN) {
       modeArg.TypeError("bool");
     }
     session->mTeamColorMode = modeArg.GetBoolean();

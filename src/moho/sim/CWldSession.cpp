@@ -789,12 +789,10 @@ namespace moho
   // Per-army team-color palette, distinct from `StrategicIconAux`'s own
   // Self/Ally/Enemy/Neutral relation colors: `RenderUnitIcon` (0x0085D9A0)
   // indexes this one directly by the icon's owning army's `mArmyIndex`
-  // (`mov eax, offset teamcolors` / `mov ecx, [eax+ecx*4]`, the cold
-  // out-of-line chunk at 0x0128E837..0x0128E83C). Sized to the original
-  // game's eight-slot army cap; no loader/population site has been
-  // identified yet, so - like the console variables above - it ships
-  // zeroed until one is found.
-  std::uint32_t teamcolors[8]{}; // 0x0128F1C0
+  // (`mov eax, offset teamcolors` / `mov ecx, [eax+ecx*4]`, FA-Binary-Patches
+  // TeamColorModeRenderer). 32 entries, as the patch's `int Colors[32]`
+  // (0x012931E0); `TeamColorMode(string)` fills it (cfunc_TeamColorModeL).
+  std::uint32_t teamcolors[kTeamColorPaletteSize]{};
 
   // Entity ids carry their family in the top nibble; 0x1_______ is a projectile.
   constexpr std::uint32_t kEntityFamilyMask = 0xF0000000u;

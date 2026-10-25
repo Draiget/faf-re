@@ -1927,6 +1927,14 @@ namespace moho
   extern float UI_CurGlowTime;             // 0x010A6460
 
   /**
+   * FAF FA-Binary-Patches (section/TeamColorMode.cpp `Colors`, 0x012931E0): the
+   * per-army team-colour palette the strategic icons use in team-colour mode,
+   * filled by `TeamColorMode("ffrrggbb,ffrrggbb,...")` in army order.
+   */
+  inline constexpr std::size_t kTeamColorPaletteSize = 32;
+  extern std::uint32_t teamcolors[kTeamColorPaletteSize];
+
+  /**
    * Strategic-view LOD cutoff for the mass/hydrocarbon resource splats,
    * compared against the camera viewport matrix's row-1 depth of each deposit
    * centre by `CWldSession::RenderResources` (0x00862E68). Bound to the
