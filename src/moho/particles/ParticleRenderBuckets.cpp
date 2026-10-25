@@ -32,7 +32,6 @@
 
 namespace
 {
-  constexpr const char* kParticleCapExceededLog = "Particle cap exceeded, discarding excess.\n";
   constexpr std::int32_t kTrailVerticesPerSegment = 4;
   constexpr std::int32_t kTrailIndicesPerSegment = 6;
   constexpr std::int32_t kSharedTrailQuadCapacity = 0x4000;
@@ -612,7 +611,8 @@ namespace moho
     while (!bucket.pendingParticles.empty()) {
       ParticleBuffer* const pooledBuffer = bucket.owner->AcquireParticleBuffer();
       if (pooledBuffer == nullptr) {
-        gpg::Logf(kParticleCapExceededLog);
+        // FAF hot-patch (FA-Binary-Patches CameraPerf): the "Particle cap exceeded" log call
+        // at 0x00493A9B is NOPed out; the excess is still discarded.
         bucket.pendingParticles.clear();
         return false;
       }
@@ -1138,7 +1138,8 @@ namespace moho
     while (!bucket.pendingTrails.empty()) {
       STrailSegmentBuffer* const pooledBuffer = bucket.owner->AcquireTrailSegmentBuffer();
       if (pooledBuffer == nullptr) {
-        gpg::Logf("Wow!  Ran out of segment buffers from the pool, discarding segments!\n");
+        // FAF hot-patch (FA-Binary-Patches CameraPerf): the "Ran out of segment buffers" log
+        // call at 0x004946F7 is NOPed out; the segments are still discarded.
         bucket.pendingTrails.clear();
         return false;
       }
