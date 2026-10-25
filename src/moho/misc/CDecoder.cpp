@@ -2,12 +2,15 @@
 
 #include <cstring>
 #include <limits>
+#include <new>
 #include <stdexcept>
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/net/CMessage.h"
 #include "moho/net/CMessageStream.h"
 #include "moho/net/ECmdStreamOp.h"
@@ -85,6 +88,19 @@ namespace
   {
     throw XDecoderMessageError(message);
   }
+
+  /**
+   * Engine addition, not in the binary: payload bytes still unread in the
+   * message being decoded. The decoder reads straight out of one in-memory
+   * `CMessageStream`, so this is everything a count field may still describe.
+   */
+  [[nodiscard]] std::size_t UnreadPayloadBytes(gpg::BinaryReader& reader)
+  {
+    return reader.stream()->BytesRead();
+  }
+
+  moho::DiagnosticBudget sDroppedCommandWarnings;
+  constexpr int kMaxDroppedCommandWarnings = 100;
 } // namespace
 
 namespace moho
@@ -151,6 +167,14 @@ namespace moho
    * (0x0128FA50 in `.exxt`, the same switch plus quit/pause bookkeeping);
    * FA-Binary-Patches #173 (Remove old desync-fix code, 3840) restored the
    * original body.
+   *
+   * Engine addition, not in the binary: a command that fails to decode is
+   * dropped with a warning. The binary let the decode error unwind out of the
+   * beat, which parks the driver in Failed ("Sim crashed hard in DoSimBeat")
+   * -- so one malformed command from any player ended the game for everyone.
+   * Every decode check runs before the sink is called and looks only at the
+   * message bytes and the shared rules, so every client drops the same
+   * commands and the sims stay in step. Well-formed commands are untouched.
    */
   void CDecoder::DecodeMessage(const CMessage& message)
   {
@@ -159,6 +183,25 @@ namespace moho
 
     const auto opcode = static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(message.mBuff[0]));
 
+    try {
+      DecodeOpcode(opcode, reader);
+    } catch (const XDecoderMessageError& error) {
+      if (sDroppedCommandWarnings.Take(kMaxDroppedCommandWarnings)) {
+        gpg::Warnf("CDecoder: dropping malformed command: %s", error.what());
+      }
+    } catch (const gpg::BinaryReader::PrematureEOF&) {
+      if (sDroppedCommandWarnings.Take(kMaxDroppedCommandWarnings)) {
+        gpg::Warnf("CDecoder: dropping truncated command (opcode 0x%02x)", static_cast<unsigned>(opcode));
+      }
+    }
+  }
+
+  /**
+   * Engine addition, not in the binary: the opcode switch of `DecodeMessage`
+   * (0x006E4150), split out so the drop handling there wraps the whole decode.
+   */
+  void CDecoder::DecodeOpcode(const ECmdStreamOp opcode, gpg::BinaryReader& reader)
+  {
     switch (opcode) {
     case ECmdStreamOp::CMDST_Advance:
       DecodeAdvance(reader);
@@ -582,6 +625,13 @@ namespace moho
       return entities;
     }
 
+    // Engine addition, not in the binary: the count must fit in the message.
+    // The binary sized the id buffer from it first, so a forged count asked
+    // for up to 16 GB (and on 32-bit wrapped the byte count).
+    if (count > UnreadPayloadBytes(reader) / sizeof(EntId)) {
+      ThrowDecoderError(gpg::STR_Printf("EntIdSet count %u exceeds the message in DecodeEntIdSet", count));
+    }
+
     // Binary constructs `gpg::fastvector_n2_uint v16` via `sub_6E5720(&v16, count)`
     // (FUN_006E5720): the count-taking ctor that inline-binds the lanes and
     // zero-fills `count` slots through FastVectorInline<T>::ResizeFill_.
@@ -595,7 +645,23 @@ namespace moho
     if (count > 1u) {
       // The ids arrive sorted, so adding the last one second sizes the bit
       // set once. It is also the one `Add` the compiler left out of line
-      // (0x006E4F5F -> 0x006E5660), and it is not type-checked.
+      // (0x006E4F5F -> 0x006E5660), and the binary does not type-check it.
+      //
+      // Engine addition: we do. The bit set spans first..last id, so an
+      // unchecked last id of another type made a two-id set allocate up to
+      // 512 MB; within one type the span is at most 32 MB. A set the engine
+      // writes never mixes types (only units are ever selected), so only a
+      // forged command is refused here.
+      const auto lastEntityId = static_cast<std::uint32_t>(rawIds[static_cast<std::size_t>(count - 1u)]);
+      if ((lastEntityId >> 28) != firstType) {
+        ThrowDecoderError(
+          gpg::STR_Printf(
+            "Attempt to construct EntIdSet with different types of IDs (%d and %d) in DecodeEntIdSet",
+            static_cast<int>(firstType),
+            static_cast<int>(lastEntityId >> 28)
+          )
+        );
+      }
       entities.Add(rawIds[static_cast<std::size_t>(count - 1u)]);
 
       for (std::uint32_t i = 1u; i < (count - 1u); ++i) {
@@ -726,6 +792,12 @@ namespace moho
     std::int32_t count = 0;
     reader.ReadExact(count);
 
+    // Engine addition, not in the binary: a negative count or one larger than
+    // the message would have resized the vector to billions of cells first.
+    if (count < 0 || static_cast<std::size_t>(count) > UnreadPayloadBytes(reader) / sizeof(SOCellPos)) {
+      ThrowDecoderError(gpg::STR_Printf("Invalid cell count %d in DecodeCells", count));
+    }
+
     cells.resize(static_cast<std::size_t>(count));
     if (count != 0) {
       reader.Read(reinterpret_cast<char*>(cells.start_), static_cast<std::size_t>(count) * sizeof(SOCellPos));
@@ -751,6 +823,17 @@ namespace moho
    */
   void CDecoder::DecodeLuaObject(gpg::BinaryReader& reader, LuaPlus::LuaObject& out)
   {
-    out.SCR_FromByteStream(out, mLuaState, &reader);
+    // Engine addition: an error raised while the payload is rebuilt (a short
+    // payload, or Lua refusing a key such as NaN) is a malformed command like
+    // any other decode error, so the command is dropped instead of the beat
+    // failing. Running out of memory is not a property of the command and
+    // still propagates.
+    try {
+      out.SCR_FromByteStream(out, mLuaState, &reader);
+    } catch (const std::bad_alloc&) {
+      throw;
+    } catch (const std::exception& error) {
+      ThrowDecoderError(gpg::STR_Printf("Malformed Lua payload: %s", error.what()));
+    }
   }
 } // namespace moho

@@ -298,12 +298,12 @@ namespace
   {
     Unit* const unit = dispatch->mUnit;
 
-    // Binary does an RTTI-checked upcast (gpg::RRef_REntityBlueprint +
-    // REF_UpcastPtr(RUnitBlueprint::sType2)); build-dispatch blueprints are unit
-    // blueprints (RUnitBlueprint derives from REntityBlueprint), so the checked
-    // cast resolves to a static upcast for the reachable inputs.
-    REntityBlueprint* const entityBlueprint = command->mConstDat.blueprint;
-    const RUnitBlueprint* const unitBlueprint = static_cast<const RUnitBlueprint*>(entityBlueprint);
+    // 0x00608F65: an RTTI-checked cast (REF_UpcastPtr to RUnitBlueprint), null
+    // for anything else. The command's blueprint is whatever the issuer named,
+    // and `CDecoder` resolves ids through GetEntityBlueprint, which also finds
+    // prop and projectile blueprints; the build arms test this result
+    // (0x006093BC, 0x00609431), so those never reach the unit-only build code.
+    const RUnitBlueprint* const unitBlueprint = dynamic_cast<const RUnitBlueprint*>(command->mConstDat.blueprint);
 
     switch (command->mVarDat.mCmdType) {
       case EUnitCommandType::UNITCOMMAND_Stop: {
@@ -347,7 +347,7 @@ namespace
       }
 
       case EUnitCommandType::UNITCOMMAND_BuildFactory: {
-        if (entityBlueprint) {
+        if (unitBlueprint) {
           const LuaPlus::LuaObject blueprintLua =
             unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
           if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
@@ -358,7 +358,7 @@ namespace
       }
 
       case EUnitCommandType::UNITCOMMAND_BuildMobile: {
-        if (entityBlueprint) {
+        if (unitBlueprint) {
           // The binary inlines Unit::CanBuild (army-buildable categories, minus the
           // unit's build restrictions, tested against the blueprint's ordinal bit);
           // the 2007 source called CanBuild and the compiler inlined it here.

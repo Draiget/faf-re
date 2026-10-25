@@ -19,6 +19,7 @@ namespace LuaPlus
 namespace moho
 {
   class RRuleGameRules;
+  enum class ECmdStreamOp : std::uint8_t;
   struct SSTITarget;
   struct SSTICommandIssueData;
   struct SOCellPos;
@@ -74,6 +75,12 @@ namespace moho
      * Builds a read-only message stream view and dispatches command-opcode decode.
      */
     void DecodeMessage(const CMessage& message);
+
+    /**
+     * Engine addition, not in the binary: the opcode switch of
+     * `DecodeMessage`, which drops a command whose decode fails.
+     */
+    void DecodeOpcode(ECmdStreamOp opcode, gpg::BinaryReader& reader);
 
     /**
      * Address: 0x006E4400 (FUN_006E4400)

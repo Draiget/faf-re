@@ -3185,7 +3185,13 @@ namespace
       case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
         return unit->mVarDat.mLayerMask != LAYER_Seabed && (unit->AiTransport != nullptr || GetTransportedBy(unit) != nullptr);
       case EUnitCommandType::UNITCOMMAND_Upgrade: {
-        const RUnitBlueprint* const upgradeBlueprint = commandIssueData.mBlueprint;
+        // Engine addition: a checked downcast. `mBlueprint` holds whatever
+        // `CDecoder::DecodeCommandData` resolved through `GetEntityBlueprint`,
+        // which also finds prop and projectile blueprints; the tests below read
+        // `General`, i.e. past the end of such a blueprint. A non-unit blueprint
+        // is no upgrade target, the same answer as no blueprint at all.
+        const RUnitBlueprint* const upgradeBlueprint =
+          dynamic_cast<const RUnitBlueprint*>(static_cast<const REntityBlueprint*>(commandIssueData.mBlueprint));
         const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
         if (upgradeBlueprint == nullptr || unitBlueprint == nullptr) {
           return false;
@@ -23742,6 +23748,14 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
 
   CArmyImpl* const army = sim->mArmiesList[static_cast<std::size_t>(armyIndex)];
   if (!army || !army->mVarDat.mValidCommandSources.mWords.start_) {
+    return 0;
+  }
+
+  // Engine addition: command sources travel as one byte, 0xFF meaning none
+  // (`CMDST_SetCommandSource`), so no real source is outside [0, 0xFF). The
+  // bit set grows to the index it is given: an index of 2^31 from script
+  // allocated 256 MB in every sim.
+  if (sourceIndex < 0 || sourceIndex >= 0xFF) {
     return 0;
   }
 

@@ -333,7 +333,23 @@ void moho::func_ReceiveChat(const msvc8::string& senderName, const gpg::MemBuffe
   gpg::MemBufferStream stream(data, 0xFFFFFFFFu);
   gpg::BinaryReader reader(&stream);
   LuaPlus::LuaObject payloadObject{};
-  payloadObject.SCR_FromByteStream(payloadObject, state, &reader);
+
+  // Engine addition, not in the binary: the payload is any bytes a peer sent
+  // as chat. The decode throws on a truncated or malformed payload, and here
+  // it ran outside the handler below, on the main thread; such a message is
+  // dropped with a warning instead.
+  try {
+    payloadObject.SCR_FromByteStream(payloadObject, state, &reader);
+  } catch (const std::bad_alloc&) {
+    throw;
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Ignoring malformed chat message from %s: %s",
+      senderName.c_str(),
+      exception.what() != nullptr ? exception.what() : "<unknown>"
+    );
+    return;
+  }
 
   LuaPlus::LuaObject gameMainModule = SCR_Import(state, "/lua/ui/game/gamemain.lua");
   LuaPlus::LuaObject receiveChat = gameMainModule["ReceiveChat"];

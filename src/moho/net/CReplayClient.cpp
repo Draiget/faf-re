@@ -218,12 +218,19 @@ void CReplayClient::Start()
   while (mReplayMessage.Read(mReplayStream)) {
     const std::uint8_t replayType = mReplayMessage.GetType().raw();
     if (replayType == 1u) {
-      CMessageStream stream(mReplayMessage, CMessageStream::Access::kReadOnly);
-      gpg::BinaryReader reader(&stream);
+      // Engine addition, not in the binary: a `CMDST_SetCommandSource` with no
+      // source byte (a damaged replay file or live replay stream) threw
+      // `PrematureEOF` out of `DoBeat` on the issue thread. It allows nothing.
+      if (mReplayMessage.GetMessageSize() < 1) {
+        mCurrentSourceAllowed = false;
+      } else {
+        CMessageStream stream(mReplayMessage, CMessageStream::Access::kReadOnly);
+        gpg::BinaryReader reader(&stream);
 
-      std::uint8_t sourceId = 0;
-      reader.ReadExact(sourceId);
-      mCurrentSourceAllowed = mValidCommandSources.Contains(sourceId);
+        std::uint8_t sourceId = 0;
+        reader.ReadExact(sourceId);
+        mCurrentSourceAllowed = mValidCommandSources.Contains(sourceId);
+      }
     }
 
     if (replayType != static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {

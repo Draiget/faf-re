@@ -4,9 +4,11 @@
 
 #include "CClientManagerImpl.h"
 #include "Common.h"
+#include "ECmdStreamOp.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
 #include "INetConnection.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 using namespace moho;
 
@@ -125,6 +127,20 @@ void CNetClient::ReceiveMessage(
   const auto bytes = static_cast<int>(message->mBuff.Size());
   const auto elapsedUs = gpg::time::CyclesToMicroseconds(mManager->mTimer3.ElapsedCycles());
   mManager->mStampBuffer.Push(1, elapsedUs, bytes);
+
+  // Engine addition, not in the binary: `CMDST_EndGame` is never sent to a
+  // peer -- `CClientManagerImpl::Disconnect` closes every remote connection
+  // before it broadcasts it, so it only ever reaches the local stream. Taken
+  // from the wire it went through `UpdateState` into every sim, where
+  // `Sim::EndGame` froze the game for all players and `CDecoder` closed the
+  // replay recording. It is dropped here, on every receiver alike.
+  if (message->GetType().raw() == static_cast<uint8_t>(ECmdStreamOp::CMDST_EndGame)) {
+    static DiagnosticBudget sEndGameWarnings;
+    if (sEndGameWarnings.Take(20)) {
+      gpg::Warnf("Ignoring end-game command from client %d:%s.", mIndex, mNickname.c_str());
+    }
+    return;
+  }
 
   CClientBase::Process(*message);
 }

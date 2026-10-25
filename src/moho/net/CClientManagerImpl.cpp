@@ -8,6 +8,7 @@
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -63,6 +64,37 @@ namespace
     }
 
     return false;
+  }
+
+  /**
+   * Engine addition, not in the binary: where the binary's
+   * `do { ++beat; } while (ClientNeedsPartiallyQueuedBeatsUntil(beat + 1))`
+   * stops, computed in one pass. It is the furthest beat any non-ejecting
+   * client has queued (at least `beat + 1`, as the loop always steps once).
+   *
+   * The loop stepped one beat per iteration, and `mQueuedBeat` is whatever a
+   * peer's `CMDST_Advance` deltas add up to: one advance of 0x7FFFFFFF beats
+   * kept the issue thread spinning under the manager lock for minutes, and a
+   * peer exactly 2^31 beats ahead of everyone made the wrapping comparison true
+   * for every beat, so it never stopped. For any real beat counts (peers fewer
+   * than 2^31 beats apart) the result is the beat the loop reached.
+   */
+  [[nodiscard]] int FurthestPartiallyQueuedBeat(CClientManagerImpl& manager, const int beat)
+  {
+    std::uint32_t furthestAhead = 1u;
+    for (CClientBase* const client : manager.mClients) {
+      if (client == nullptr || !client->NoEjectionPending()) {
+        continue;
+      }
+
+      // The loop's own wrap-safe test, `(beat - mQueuedBeat) <= 0`.
+      const auto ahead = static_cast<int32_t>(client->mQueuedBeat - static_cast<std::uint32_t>(beat));
+      if (ahead > 0 && static_cast<std::uint32_t>(ahead) > furthestAhead) {
+        furthestAhead = static_cast<std::uint32_t>(ahead);
+      }
+    }
+
+    return static_cast<int>(static_cast<std::uint32_t>(beat) + furthestAhead);
   }
 } // namespace
 
@@ -768,7 +800,17 @@ int CClientManagerImpl::GetSimRate()
     }
   }
 
-  return simRate;
+  // Engine addition, not in the binary: the result is kept to the range the
+  // game-speed controls request (`WLD_DecreaseSimRate` stops at -10,
+  // `WLD_IncreaseSimRate` at 50). Every input here comes off the wire as sent
+  // (`CLIMSG_IntParam`, `CLIMSG_AdjustSimSpeed`), and the issue thread paces
+  // with 10^(rate/10): one peer reporting -1000 made the beat period infinite
+  // and the schedule an out-of-range float-to-integer conversion, so no client
+  // issued another beat, with nobody shown as the bottleneck to eject. Only a
+  // client measuring itself below 0.1x real time reports less than -10.
+  constexpr int kMinSimRate = -10;
+  constexpr int kMaxSimRate = 50;
+  return std::clamp(simRate, kMinSimRate, kMaxSimRate);
 }
 
 /**
@@ -895,9 +937,8 @@ void CClientManagerImpl::DoBeat()
     if (mPartiallyQueuedBeat == mDispatchedBeat) {
       mDispatchedTimer.Reset();
     }
-    do {
-      ++mPartiallyQueuedBeat;
-    } while (ClientNeedsPartiallyQueuedBeatsUntil(*this, mPartiallyQueuedBeat + 1));
+    // The binary steps here one beat at a time; see FurthestPartiallyQueuedBeat.
+    mPartiallyQueuedBeat = FurthestPartiallyQueuedBeat(*this, mPartiallyQueuedBeat);
   }
 
   if (ClientNeedsFullyQueuedBeatsUntil(mFullyQueuedBeat + 1)) {
