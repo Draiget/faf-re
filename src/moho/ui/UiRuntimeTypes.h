@@ -5138,57 +5138,43 @@ namespace moho
   int cfunc_CMauiControlSetRenderPassL(LuaPlus::LuaState* state);
 
   /**
-   * FAF community binary-patch addition (see CMauiControl::SetCustomRender)
-   * -- no `Address:`, not part of the original 2007 binary.
+   * FAF community binary-patch addition (FA-Binary-Patches section/DrawFunc.cpp
+   * `SetCustomRender`) -- no `Address:`, not part of the original 2007 binary.
    *
    * What it does:
    * Unwraps raw Lua callback context and forwards to
-   * `cfunc_CMauiControlSetCustomRenderL`.
+   * `cfunc_CUIWorldViewSetCustomRenderL`.
    */
-  int cfunc_CMauiControlSetCustomRender(lua_State* luaContext);
+  int cfunc_CUIWorldViewSetCustomRender(lua_State* luaContext);
 
   /**
-   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+   * FAF community binary-patch addition (see cfunc_CUIWorldViewSetCustomRender).
    *
    * What it does:
-   * Publishes the `CMauiControl:SetCustomRender(enabled)` Lua binder.
+   * Publishes the `WorldView:SetCustomRender(bool)` Lua binder on CUIWorldView.
    */
-  CScrLuaInitForm* func_CMauiControlSetCustomRender_LuaFuncDef();
+  CScrLuaInitForm* func_CUIWorldViewSetCustomRender_LuaFuncDef();
 
   /**
-   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
+   * FAF community binary-patch addition (see cfunc_CUIWorldViewSetCustomRender).
    *
    * What it does:
-   * Reads one `CMauiControl` plus a boolean from Lua and stores it into the
-   * custom-render side table.
+   * Reads one `CUIWorldView` plus any Lua value (taken by truthiness) and turns
+   * the view's custom rendering on or off; returns nothing.
    */
-  int cfunc_CMauiControlSetCustomRenderL(LuaPlus::LuaState* state);
+  int cfunc_CUIWorldViewSetCustomRenderL(LuaPlus::LuaState* state);
 
   /**
-   * FAF community binary-patch addition (see CMauiControl::SetCustomRender)
+   * FAF community binary-patch addition (FA-Binary-Patches section/WorldView.cpp)
    * -- no `Address:`, not part of the original 2007 binary.
    *
    * What it does:
-   * Unwraps raw Lua callback context and forwards to
-   * `cfunc_CMauiControlGetCustomRenderL`.
+   * `WorldView:ProjectMultiple(vectors)`: projects every vector of a table to
+   * screen space and returns a table with the same keys and {x, y} values.
    */
-  int cfunc_CMauiControlGetCustomRender(lua_State* luaContext);
-
-  /**
-   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
-   *
-   * What it does:
-   * Publishes the `CMauiControl:GetCustomRender()` Lua binder.
-   */
-  CScrLuaInitForm* func_CMauiControlGetCustomRender_LuaFuncDef();
-
-  /**
-   * FAF community binary-patch addition (see CMauiControl::SetCustomRender).
-   *
-   * What it does:
-   * Reads one `CMauiControl` and pushes its custom-render flag to Lua.
-   */
-  int cfunc_CMauiControlGetCustomRenderL(LuaPlus::LuaState* state);
+  int cfunc_CUIWorldViewProjectMultiple(lua_State* luaContext);
+  CScrLuaInitForm* func_CUIWorldViewProjectMultiple_LuaFuncDef();
+  int cfunc_CUIWorldViewProjectMultipleL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00788B90 (FUN_00788B90, cfunc_CMauiControlGetName)
@@ -5973,6 +5959,31 @@ namespace moho
    * into destination bitmap runtime state.
    */
   int cfunc_CMauiBitmapShareTexturesL(LuaPlus::LuaState* state);
+
+  /**
+   * FAF community binary-patch addition (FA-Binary-Patches section/MauiBitmap.cpp)
+   * -- no `Address:`, not part of the original 2007 binary.
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_CMauiBitmapSetColorMaskL`.
+   */
+  int cfunc_CMauiBitmapSetColorMask(lua_State* luaContext);
+
+  /**
+   * FAF community binary-patch addition (see cfunc_CMauiBitmapSetColorMask).
+   *
+   * What it does:
+   * Publishes the `Bitmap:SetColorMask(color)` Lua binder.
+   */
+  CScrLuaInitForm* func_CMauiBitmapSetColorMask_LuaFuncDef();
+
+  /**
+   * FAF community binary-patch addition (see cfunc_CMauiBitmapSetColorMask).
+   *
+   * What it does:
+   * Parses one colour and puts its RGB into the bitmap's vertex colour, keeping the alpha.
+   */
+  int cfunc_CMauiBitmapSetColorMaskL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00785960 (FUN_00785960, cfunc_CMauiBorderSetNewTextures)
