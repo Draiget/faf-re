@@ -138,6 +138,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/XFileError.cpp
   moho/misc/TimeBar.cpp
   moho/misc/StartupHelpers.cpp
+  moho/app/StartupClientHelpers.cpp
   moho/misc/StrSafeRuntime.cpp
   moho/misc/IConOutputHandler.cpp
   moho/misc/MiscellaneousExtractor.cpp
@@ -339,6 +340,10 @@ set(FAF_ENGINE_SOURCES
   moho/script/CUnitScriptTask.cpp
   moho/sim/SimStartupRegistrations.cpp
   moho/sim/Sim.cpp
+  moho/sim/UserLuaFunctions.cpp
+  moho/app/WRefEditDialog.cpp
+  moho/sim/UserCommandIssue.cpp
+  moho/render/CDebugCanvasRender.cpp
   moho/sim/SimArmy.cpp
   moho/sim/RRuleGameRulesTypeInfo.cpp
   moho/sim/RRuleGameRules.cpp
@@ -924,6 +929,7 @@ set(FAF_ENGINE_SOURCES
   moho/audio/CSimSoundManager.cpp
   moho/audio/ISoundManager.cpp
   moho/audio/SofdecRuntime.cpp
+  moho/movie/sfd/SfdHeaderInfo.cpp
   moho/app/CScApp.cpp
   moho/app/UserWorkerPool.cpp
   moho/app/CWaitHandleSet.cpp

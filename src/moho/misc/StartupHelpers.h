@@ -88,6 +88,16 @@ namespace moho
    */
   [[nodiscard]] Sim* Sim_Create_exxt(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo);
 
+  /**
+   * Engine addition (dedicated-server plan WPL.4): what Sim_Create_exxt runs
+   * after building the simulation for the client's renderers (the map height
+   * lanes and the range/vision renderer init). The client sets it during
+   * static initialisation (moho/app/StartupClientHelpers.cpp); a headless
+   * build leaves it null.
+   */
+  using SimCreatedRenderHook = void (*)(Sim& sim);
+  extern SimCreatedRenderHook sSimCreatedRenderHook;
+
   bool CFG_GetArgOptionComposedAliases(
     const CfgAliasSet& leftAliases,
     const CfgAliasSet& rightAliases,

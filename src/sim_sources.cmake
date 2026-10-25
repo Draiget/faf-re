@@ -30,10 +30,10 @@ set(_faf_client_only_patterns
   "^moho/audio/(AudioEngine|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime)\\.cpp$"
   # The wx script debugger's windows.
   "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog)\\.cpp$"
-  # D3D device resources; DirectSound and movie startup.
-  "^moho/misc/(ID3DDeviceResources|StartupHelpers)\\.cpp$"
+  # D3D device resources.
+  "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
-  "^moho/sim/(CWldSession|UserArmy)\\.cpp$"
+  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue)\\.cpp$"
   "^moho/entity/UserEntity\\.cpp$"
   "^moho/unit/core/UserUnit\\.cpp$"
   # The user world's vision (what the focus army sees, for drawing).
@@ -50,7 +50,9 @@ set(_faf_sim_patterns
   "^moho/render/RDebugOverlay\\.cpp$"
   # Transform and camera geometry the sim computes with (entity transforms,
   # effect culling against the sync filter's cameras).
-  "^moho/render/camera/(VTransform|GeomCamera3)\\.cpp$")
+  "^moho/render/camera/(VTransform|GeomCamera3)\\.cpp$"
+  # SFD movie headers (MOV_GetDuration, behind the core Lua set's GetMovieDuration).
+  "^moho/movie/sfd/(SfdHeaderParser|SfdHeaderInfo)\\.cpp$")
 
 set(FAF_SIM_SOURCES "")
 foreach(_src IN LISTS FAF_ENGINE_SOURCES)
