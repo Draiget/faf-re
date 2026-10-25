@@ -2650,7 +2650,8 @@ namespace moho
    * );
    *
    * What it does:
-   * Applies 3D listener/emitter transform to an active cue.
+   * Applies 3D listener/emitter transform to an active cue. A failed apply is
+   * warned about once per process (FAF hot-patch, see the body).
    */
   void AudioEngine::Calculate3D(const Wm3::Vec3f* const worldPos, AudioEngine* const engine, IXACTCue* const cue)
   {
@@ -2682,7 +2683,18 @@ namespace moho
 
     const int applyResult = ApplySettingsToCue(&impl->mSettings, cue);
     if (applyResult < 0) {
-      gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
+      // FAF hot-patch (FA-Binary-Patches xact_3dapply.cpp / section/xact_3d_fix.cpp):
+      // 0x004D9A60 jumps to a copy of this body at 0x01291B52 in which this warning
+      // is guarded by a process-wide byte (0x01292A60, tested at 0x01291C0D and
+      // cleared at 0x01291C24 after the first log), so it is logged once per
+      // process. The error-text lookup (0x004D8A50) still runs before the test.
+      // The XACT3DCalculate warning above keeps logging every time.
+      static bool sApplyFailureLogged = false;
+      const char* const errorText = func_SoundErrorCodeToMsg(applyResult);
+      if (!sApplyFailureLogged) {
+        gpg::Warnf("SND: XACT3DApply failed.\n%s", errorText);
+        sApplyFailureLogged = true;
+      }
     }
   }
 
