@@ -13,9 +13,12 @@ namespace moho
    *
    * FAF ships its engine fixes (FAForever/FA-Binary-Patches) as a new exe with a game release, so
    * one game version always means one set of patches. A replay plays with the patches of the
-   * version that recorded it; a live or single-player game uses the latest version.
+   * version that recorded it; a live or single-player game plays with those of the game data in
+   * use (`/lua/version.lua`), which the FAF client gives every player of a game in the same
+   * version, together with the exe of that version.
    */
   inline constexpr int kFafGameVersionOldestSupported = 3835;
+  /// The newest game version whose engine patches this engine carries.
   inline constexpr int kFafGameVersionLatest = 3840;
 
   /**
@@ -55,11 +58,24 @@ namespace moho
 
   /**
    * Fixes the game version and the active simulation fixes for a session that is about to create
-   * its sim: the recorded version for a replay, `kFafGameVersionLatest` otherwise, unless the
-   * `sim_FafGameVersion` console variable names one. The `sim_Fix*` console variables can force a
-   * single fix on or off. Logs the result.
+   * its sim: the recorded version for a replay, the game data's version otherwise
+   * (`FAF_GetGameDataVersion`), unless the `sim_FafGameVersion` console variable names one. The
+   * `sim_Fix*` console variables can force a single fix on or off. Logs the result.
    */
   void FAF_BeginSession(bool isReplay);
+
+  /**
+   * The game version of the mounted game data: `Version` in `/lua/version.lua`, as FAF's
+   * `GetVersion()` returns it. `kFafGameVersionOldestSupported` when the file is missing or has
+   * no version (the original game's data, which has none of FAF's later patches).
+   */
+  [[nodiscard]] int FAF_GetGameDataVersion();
+
+  /**
+   * Reads `local Version = "3839"` (either quote) out of the text of FAF's `lua/version.lua`;
+   * 0 when there is no such line.
+   */
+  [[nodiscard]] int FAF_ParseLuaVersionFile(std::string_view text) noexcept;
 
   /**
    * Reads the game version out of a replay header string ("Supreme Commander v1.50.3840"); 0 when

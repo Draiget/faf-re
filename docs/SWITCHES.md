@@ -70,13 +70,13 @@ Every performance change has a switch that brings back the original path, and bo
 
 ## FAF game version
 
-FAF ships its engine fixes ([FA-Binary-Patches](https://github.com/FAForever/FA-Binary-Patches)) as a new exe with a game release, and the FAF client stamps the game version into that exe, so one game version means one set of engine patches. This engine carries those patches up to game version 3840 and applies them per session: a replay plays with the patches of the version in its header (`Supreme Commander v1.50.<version>`, accepted from 3835 to 3840), every other session uses 3840, and the replay it records names the version it ran as. The log says `FAF game version <n> (replay|session), sim fixes 0x..` when a session begins. `GetEngineVersion` reports 1.5.3840.
+FAF ships its engine fixes ([FA-Binary-Patches](https://github.com/FAForever/FA-Binary-Patches)) as a new exe with a game release, and the FAF client stamps the game version into that exe, so one game version means one set of engine patches. This engine carries those patches up to game version 3840 and applies them per session: a replay plays with the patches of the version in its header (`Supreme Commander v1.50.<version>`, accepted from 3835 to 3840), and every other session with those of the game data in use, `Version` in `/lua/version.lua` (FAF's `GetVersion()`). The FAF client gives every player of a game the same game data, with the exe of that version, so a game with players on the FAF exe needs no setting; data without that file counts as 3835. The replay a session records names the version it ran as. The log says `FAF game version <n> (replay|game data|sim_FafGameVersion), sim fixes 0x..` when a session begins. `GetEngineVersion` reports 1.5.3840, the newest version whose patches the engine carries.
 
 The switches below are read when a session begins. In a multiplayer game every client must use the same values, so leave them at their defaults there; they are for replays and tests.
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
-| `sim_FafGameVersion` | 0 | `/con sim_FafGameVersion=N` | next game | Game version the session runs as; 0 takes the replay's recorded version, or 3840 |
+| `sim_FafGameVersion` | 0 | `/con sim_FafGameVersion=N` | next game | Game version the session runs as; 0 takes the replay's recorded version, or the game data's |
 | `sim_FixAimLeadOncePerTick` | −1 | `/con` | next game | FA-Binary-Patches #143 (from 3836): no one-tick velocity lead on a target that already moved this tick; −1 follows the game version, 0 off, 1 on |
 | `sim_FixTargetPointCollisionCentre` | −1 | `/con` | next game | #145/#157 (from 3836): a unit without target bones is aimed at its collision-box centre |
 | `sim_FixProjectileImpactBelowZero` | −1 | `/con` | next game | #154 (from 3840): a projectile below height 0 impacts |

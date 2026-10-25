@@ -9,9 +9,9 @@ description: >
   /, whose schook hook launches every client with the vault's M28AI; the
   vault's faf_re_lockstep script must allow the m28ai/m28aicheat
   personalities. Expect all to launch, no desync, no crash,
-  and every client to log the same mod and personalities. Our clients run as
-  game version 3835 to match the shipped exe. Do not click into the game
-  windows.
+  and every client to log the same mod and personalities. Our clients take
+  the game version from the game data, like the shipped exe. Do not click
+  into the game windows.
 timeout: 40m
 
 mode: direct
@@ -34,8 +34,8 @@ game:
 
 players:
   - { uid: 1, name: Retail, faction: uef, args: ['/title', 'm28-retail'] }
-  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'm28-x86', '/con', 'sim_FafGameVersion=3835'] }
-  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'm28-x64', '/con', 'sim_FafGameVersion=3835'] }
+  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'm28-x86'] }
+  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'm28-x64'] }
 
 steps:
   - start: all
@@ -52,3 +52,4 @@ expect:
     - { uids: all, pattern: 'mpemu-m28: launching with sim mod (M28AI v\d+ \S+)' }
     - { uids: all, pattern: 'faf_re_lockstep: (handover .*|handed \d+ armies to the AI)' }
     - { uids: all, pattern: 'faf_re_lockstep: (army \d+ \S+ brain=\S+ skirmish=\S+ personality=\S+ faction=\d+)' }
+    - { uids: [2, 3], pattern: 'FAF game version (\d+) \(game data\)' }

@@ -28,6 +28,7 @@
 #include "lua/LuaPrimitives.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/command/ICommandSink.h"
 #include "moho/command/SSTITarget.h"
 #include "moho/misc/CDecoder.h"
@@ -1246,6 +1247,28 @@ namespace
     CHECK(RunLua(startup, "return dofile('" + secretPath + "')") == "outside");
   }
 
+  void TestGameDataVersion()
+  {
+    // FAF's lua/version.lua as deployed (double quotes) and as in the source tree.
+    const std::string deployed =
+      "local GameType = \"FAF\"  -- The use of `'` instead of `\"` is **intentional**\n"
+      "local Commit = \"2ae081b063aba82df3c679780f0ba8460e06a63e\"\n\n"
+      "local Version = \"3835\"\n---@alias PATCH \"3835\"\n---@alias VERSION \"1.5.3835\"\n";
+    CHECK(FAF_ParseLuaVersionFile(deployed) == 3835);
+    CHECK(FAF_ParseLuaVersionFile("local Version='3839'") == 3839);
+    CHECK(FAF_ParseLuaVersionFile("local Version = \"38x9\"") == 0);
+    CHECK(FAF_ParseLuaVersionFile("local VersionText = \"3839\"") == 0);
+    CHECK(FAF_ParseLuaVersionFile("---@alias VERSION \"1.5.3839\"") == 0);
+    CHECK(FAF_ParseLuaVersionFile("") == 0);
+
+    // Read from the mounted game data; without the file the session gets FAF's oldest patches.
+    MountedFolder folder;
+    CHECK(FAF_GetGameDataVersion() == kFafGameVersionOldestSupported);
+    MountedFolder::WriteText(folder.root / "game" / "lua" / "version.lua", deployed + "local Version = \"9999\"\n");
+    DISK_InvalidateFileLookups();
+    CHECK(FAF_GetGameDataVersion() == 3835);
+  }
+
   void TestLuaCompiledChunksRefused()
   {
     LuaPlus::LuaState& state = TestLuaState();
@@ -1327,6 +1350,7 @@ namespace
     {"files: the mounted file system stays inside its mounts", &TestVfsStaysInsideMounts},
     {"files: game Lua states read only the game's files", &TestLuaFilesComeFromTheGame},
     {"files: compiled Lua chunks are refused", &TestLuaCompiledChunksRefused},
+    {"game version: live sessions follow the game data", &TestGameDataVersion},
     {"lua: nesting limit", &TestLuaNestingLimit},
     {"lua: deep field keeps its siblings", &TestLuaDeepFieldKeepsSiblings},
     {"lua: lobby relay depth", &TestLuaLobbyRelayDepth},

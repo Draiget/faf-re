@@ -25,8 +25,8 @@ game:
 
 players:
   - { uid: 1, name: Retail, faction: uef, args: ['/title', 'cheat-retail'] }
-  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'cheat-x86', '/con', 'sim_FafGameVersion=3835;net_DebugAlterOrdersTo=2'] }
-  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'cheat-x64', '/con', 'sim_FafGameVersion=3835'] }
+  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'cheat-x86', '/con', 'net_DebugAlterOrdersTo=2'] }
+  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'cheat-x64'] }
 
 steps:
   - start: all

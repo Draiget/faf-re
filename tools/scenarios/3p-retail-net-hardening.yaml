@@ -5,9 +5,9 @@ description: >
   one FFA on faf_re_lockstep with every army handed to FAF's built-in AI.
   Valid traffic must behave exactly as before: all launch, no desync, no crash.
   Needs init_mpemu_localvault.lua in the FAF bin folder. Do not click into the
-  game windows. Our clients run as game version 3835 (sim_FafGameVersion):
-  the shipped exe has none of the 3840 sim fixes, so a 3840 session desyncs
-  against it whatever the network code does.
+  game windows. Our clients take the game version from the game data
+  (/lua/version.lua), the same release as the shipped exe, without any
+  setting.
 timeout: 40m
 
 mode: direct
@@ -27,8 +27,8 @@ game:
 
 players:
   - { uid: 1, name: Retail, faction: uef, args: ['/title', 'net-retail'] }
-  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'net-x86', '/con', 'sim_FafGameVersion=3835'] }
-  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'net-x64', '/con', 'sim_FafGameVersion=3835'] }
+  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'net-x86'] }
+  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'net-x64'] }
 
 steps:
   - start: all
@@ -44,3 +44,4 @@ expect:
   logsAgree:
     - { uids: all, pattern: 'faf_re_lockstep: (handover .*|handed \d+ armies to the AI)' }
     - { uids: all, pattern: 'faf_re_lockstep: (army \d+ \S+ brain=\S+ skirmish=\S+ personality=\S+ faction=\d+)' }
+    - { uids: [2, 3], pattern: 'FAF game version (\d+) \(game data\)' }
