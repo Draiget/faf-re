@@ -192,6 +192,9 @@ namespace
 } // namespace
 
 
+// Engine addition (dedicated-server plan WPL.4), declared in AudioEngine.h.
+moho::SoundConfigurationLookupHook moho::sSoundConfigurationLookup = nullptr;
+
 std::uint8_t moho::ren_Steering = 0;
 bool moho::sim_KeepAllLogFiles = false;
 bool moho::sim_ShowDamage = false;
@@ -5846,9 +5849,13 @@ void Sim::Setup(LaunchInfoNew* const info)
 
   // Optional sound manager: only when a non-empty engine list is configured and
   // sound is not disabled.
-  if (sSoundConfiguration && sSoundConfiguration->mEngines.mStart != nullptr &&
-      sSoundConfiguration->mEngines.mFinish != sSoundConfiguration->mEngines.mStart &&
-      sSoundConfiguration->mNoSound == 0) {
+  // Engine addition (plan WPL.4): the configuration is the client's, asked through
+  // sSoundConfigurationLookup (AudioEngine.h).
+  const SoundConfiguration* const soundConfiguration =
+    sSoundConfigurationLookup != nullptr ? sSoundConfigurationLookup() : nullptr;
+  if (soundConfiguration && soundConfiguration->mEngines.mStart != nullptr &&
+      soundConfiguration->mEngines.mFinish != soundConfiguration->mEngines.mStart &&
+      soundConfiguration->mNoSound == 0) {
     auto* const newSoundManager = new CSimSoundManager(this);
     CSimSoundManager* const previousSoundManager = mSoundManager;
     mSoundManager = newSoundManager;

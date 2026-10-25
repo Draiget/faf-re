@@ -2,6 +2,7 @@
 
 #include <typeinfo>
 
+#include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -90,3 +91,41 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_RD3DTextureResourceTypeInfo_5d5a4d, moho::register_RD3DTextureResourceTypeInfo)
+
+// Moved from moho/resource/ResourceReflectionHelpers.cpp (plan WPL.4): the reflected
+// types of the render device's texture resources, which only render code resolves.
+namespace moho::resource_reflection
+{
+  namespace
+  {
+    [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
+    {
+      if (cachedType == nullptr) {
+        cachedType = gpg::LookupRType(typeInfo);
+      }
+      return cachedType;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x004441C0 (FUN_004441C0)
+   *
+   * What it does:
+   * Returns cached `RD3DTextureResource` reflected type, resolving it lazily.
+   */
+  gpg::RType* ResolveRD3DTextureResourceType()
+  {
+    return ResolveCachedType(moho::RD3DTextureResource::sType, typeid(moho::RD3DTextureResource));
+  }
+
+  /**
+   * Address: 0x00444200 (FUN_00444200)
+   *
+   * What it does:
+   * Returns cached `ID3DTextureSheet` reflected type, resolving it lazily.
+   */
+  gpg::RType* ResolveID3DTextureSheetType()
+  {
+    return ResolveCachedType(moho::ID3DTextureSheet::sType, typeid(moho::ID3DTextureSheet));
+  }
+} // namespace moho::resource_reflection

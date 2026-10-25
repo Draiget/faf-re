@@ -4013,7 +4013,10 @@ namespace moho
     underlayPath.append(underlayName, std::strlen(underlayName));
     underlayPath.append("_rest.dds", 9u);
 
-    mVarDat.mUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
+    // Engine addition (plan WPL.4): the texture is the client's
+    // (CD3DBatchTexture.h sBatchTextureFromFile); without a client there is none.
+    mVarDat.mUnderlayTexture =
+      sBatchTextureFromFile != nullptr ? sBatchTextureFromFile(underlayPath.c_str(), 0u) : boost::shared_ptr<CD3DBatchTexture>{};
 
     ListLinkBefore(&SimulationRef->mCoordEntities);
   }

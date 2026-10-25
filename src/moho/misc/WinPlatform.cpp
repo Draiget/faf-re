@@ -372,6 +372,7 @@ namespace
 moho::OkBoxOwnerWindowHook moho::sOkBoxOwnerWindow = nullptr;
 moho::AppExitMainLoopHook moho::sAppExitMainLoop = nullptr;
 moho::AppPumpEventsHook moho::sAppPumpEvents = nullptr;
+moho::AppPumpStepHook moho::sAppPumpStep = nullptr;
 
 /**
  * Address: 0x004A2150 (FUN_004A2150)

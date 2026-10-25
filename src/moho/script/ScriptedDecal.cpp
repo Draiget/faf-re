@@ -27,6 +27,67 @@
 
 using namespace moho;
 
+// Engine addition: helpers shared with the file these functions came from.
+namespace
+{
+  gpg::RType* CachedCScriptObjectPointerType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(CScriptObject*));
+    }
+    return cached;
+  }
+  /**
+   * The reflected reference is assembled from the userdata HEADER, not read out
+   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
+   * value itself starts one header past the allocation, which is exactly what
+   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
+   *
+   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
+   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
+   *
+   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
+   * takes the first eight payload bytes as if they were a reference. For a
+   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
+   * whatever the allocator left, so every upcast failed and each caller reported
+   * "Expected a game object" for a perfectly good object.
+   */
+  gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
+  {
+    if (!userDataObject.IsUserData()) {
+      return gpg::RRef{};
+    }
+
+    return userDataObject.GetUserData();
+  }
+
+  CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
+  {
+    LuaPlus::LuaObject payload(object);
+    if (payload.IsTable()) {
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
+    }
+
+    if (!payload.IsUserData()) {
+      return nullptr;
+    }
+
+    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
+    if (!userDataRef.mObj) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
+    return static_cast<CScriptObject**>(upcast.mObj);
+  }
+  constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
+  constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
+  constexpr const char* kIncorrectGameObjectTypeError =
+    "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
+} // namespace
+
+
 namespace moho
 {
   template <>
@@ -695,3 +756,34 @@ namespace
 
   const ScriptedDecalLuaFuncDefBootstrap gScriptedDecalLuaFuncDefBootstrap{};
 } // namespace
+
+/**
+ * Address: 0x0087FB30 (FUN_0087FB30, Moho::SCR_FromLua_ScriptedDecal)
+ *
+ * What it does:
+ * Converts one Lua `_c_object` payload to `ScriptedDecal*` and raises Lua
+ * errors for missing, destroyed, or type-mismatched game objects.
+ */
+ScriptedDecal* moho::SCR_FromLua_ScriptedDecal(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+{
+  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  if (!scriptObjectSlot) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
+    return nullptr;
+  }
+
+  CScriptObject* const scriptObject = *scriptObjectSlot;
+  if (!scriptObject) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kDestroyedGameObjectError);
+    return nullptr;
+  }
+
+  const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedScriptedDecalType());
+  if (!upcast.mObj) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
+    return nullptr;
+  }
+
+  return static_cast<ScriptedDecal*>(upcast.mObj);
+}

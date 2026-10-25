@@ -160,6 +160,16 @@ namespace moho
 
   extern boost::mutex sResourceLock;
 
+  /**
+   * Engine addition (dedicated-server plan WPL.4): CD3DBatchTexture::FromFile for
+   * simulation code (blueprint strategic icons, entity strategic underlays), whose
+   * textures are the client's. CD3DBatchTexture.cpp sets it during static
+   * initialisation; defined in moho/entity/REntityBlueprint.cpp. Without a client it
+   * is null and the simulation holds no texture.
+   */
+  using BatchTextureFromFileHook = boost::shared_ptr<CD3DBatchTexture> (*)(gpg::StrArg filename, std::uint32_t border);
+  extern BatchTextureFromFileHook sBatchTextureFromFile;
+
   static_assert(offsetof(CD3DBatchTexture, mWidth) == 0x0C, "CD3DBatchTexture::mWidth offset must be 0x0C");
   static_assert(offsetof(CD3DBatchTexture, mHeight) == 0x10, "CD3DBatchTexture::mHeight offset must be 0x10");
   static_assert(offsetof(CD3DBatchTexture, mBorder) == 0x14, "CD3DBatchTexture::mBorder offset must be 0x14");

@@ -173,4 +173,8 @@ namespace
   };
 
   BatchTextureResourceLockBootstrap gBatchTextureResourceLockBootstrap;
+
+  // Engine addition (dedicated-server plan WPL.4): sBatchTextureFromFile (CD3DBatchTexture.h).
+  [[maybe_unused]] const bool gBatchTextureFromFileSet =
+    (moho::sBatchTextureFromFile = &moho::CD3DBatchTexture::FromFile, true);
 } // namespace

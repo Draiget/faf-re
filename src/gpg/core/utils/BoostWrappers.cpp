@@ -1677,34 +1677,6 @@ namespace boost
 
 
   /**
-   * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
-   *
-   * What it does:
-   * Releases one owned `IRenTerrain` pointee through its scalar-deleting
-   * destructor when present.
-   *
-   * The body is `mov ecx,[this+0x0C]; test ecx,ecx; je end; mov eax,[ecx];
-   * mov edx,[eax]; push 1; call edx` -- the pointee's scalar deleting
-   * destructor, vtable slot 0, free flag set. `moho::IRenTerrain` does not
-   * declare that virtual destructor yet (the class carries only static
-   * helpers even though its vftable at 0x00E41994 has fifteen slots), so this
-   * calls `IRenTerrain::DeleteWithFlag` -- the recovered 0x007FF8B0 body for
-   * exactly this operation -- rather than indexing the vtable by hand through
-   * a stand-in struct, which is what it used to do.
-   */
-  void SpCountedImplPDisposeIRenTerrain(
-    SpCountedImplStorage<moho::IRenTerrain>* const countedImpl
-  ) noexcept
-  {
-    if (countedImpl == nullptr || countedImpl->px == nullptr) {
-      return;
-    }
-
-    (void)moho::IRenTerrain::DeleteWithFlag(countedImpl->px, 1u);
-    countedImpl->px = nullptr;
-  }
-
-  /**
    * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
    *
    * What it does:

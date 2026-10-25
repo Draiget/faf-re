@@ -679,6 +679,15 @@ namespace moho
   extern boost::scoped_ptr<SoundConfiguration> sSoundConfiguration;
 
   /**
+   * Engine addition (dedicated-server plan WPL.4): `sSoundConfiguration.get()` for
+   * simulation code (Sim::Sim decides whether to make a sound manager). AudioEngine.cpp
+   * (client) sets it during static initialisation; defined in moho/sim/Sim.cpp.
+   * Without a client it is null: no sound configuration, no sound.
+   */
+  using SoundConfigurationLookupHook = SoundConfiguration* (*)();
+  extern SoundConfigurationLookupHook sSoundConfigurationLookup;
+
+  /**
    * Address: 0x004D9140 (FUN_004D9140, ?SND_FindEngine@Moho@@...)
    *
    * gpg::StrArg

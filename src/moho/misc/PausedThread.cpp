@@ -8,7 +8,7 @@
 #endif
 #include <Windows.h>
 
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/WinApp.h"
 
 namespace moho
 {
@@ -80,14 +80,11 @@ std::uintptr_t moho::PausedMainThread::WaitUntilResumedAndDelete()
 {
   bool processIdle = true;
   while (::WaitForSingleObject(static_cast<HANDLE>(mResumeEvent), 0) != WAIT_OBJECT_0) {
-    if (wxTheApp != nullptr && wxTheApp->Pending()) {
-      wxTheApp->Dispatch();
+    // Engine addition (plan WPL.4): the wx pump is the client's (WinApp.h
+    // sAppPumpStep).
+    if (sAppPumpStep != nullptr && sAppPumpStep(processIdle)) {
       processIdle = true;
       continue;
-    }
-
-    if (processIdle && wxTheApp != nullptr) {
-      processIdle = wxTheApp->ProcessIdle();
     }
   }
 

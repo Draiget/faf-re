@@ -41,6 +41,18 @@
  */
 boost::scoped_ptr<moho::SoundConfiguration> moho::sSoundConfiguration;
 
+namespace
+{
+  // Engine addition (dedicated-server plan WPL.4): sSoundConfigurationLookup (AudioEngine.h).
+  moho::SoundConfiguration* LookupSoundConfiguration()
+  {
+    return moho::sSoundConfiguration.get();
+  }
+
+  [[maybe_unused]] const bool gSoundConfigurationLookupSet =
+    (moho::sSoundConfigurationLookup = &LookupSoundConfiguration, true);
+} // namespace
+
 extern "C" __declspec(dllimport) void __cdecl X3DAudioCalculate(
   const void* instance,
   const moho::Audio3DListener* listener,

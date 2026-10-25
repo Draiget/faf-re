@@ -2801,6 +2801,24 @@ namespace
   }
 
   [[maybe_unused]] const bool gAppPumpEventsSet = (moho::sAppPumpEvents = &AppPumpEvents, true);
+
+  // Engine addition (dedicated-server plan WPL.4): sAppPumpStep, the loop body of
+  // PausedMainThread::WaitUntilResumedAndDelete (moho/misc/PausedThread.cpp,
+  // 0x004B45F0) before the move.
+  bool AppPumpStep(bool& processIdle)
+  {
+    if (wxTheApp != nullptr && wxTheApp->Pending()) {
+      wxTheApp->Dispatch();
+      return true;
+    }
+
+    if (processIdle && wxTheApp != nullptr) {
+      processIdle = wxTheApp->ProcessIdle();
+    }
+    return false;
+  }
+
+  [[maybe_unused]] const bool gAppPumpStepSet = (moho::sAppPumpStep = &AppPumpStep, true);
 } // namespace
 
 /**

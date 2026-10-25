@@ -138,6 +138,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/XDataError.cpp
   moho/misc/XFileError.cpp
   moho/misc/TimeBar.cpp
+  moho/misc/TimeBarRender.cpp
   moho/misc/StartupHelpers.cpp
   moho/app/StartupClientHelpers.cpp
   moho/misc/StrSafeRuntime.cpp
@@ -283,6 +284,7 @@ set(FAF_ENGINE_SOURCES
   moho/audio/CSndVarTypeInfo.cpp
   moho/audio/CSndParamsTypeInfo.cpp
   moho/audio/CSndVar.cpp
+  moho/audio/SoundEngineResolve.cpp
   moho/audio/SAudioRequestTypeInfo.cpp
   moho/audio/SAudioRequestSerializer.cpp
   moho/audio/HSoundTypeInfo.cpp
@@ -355,6 +357,7 @@ set(FAF_ENGINE_SOURCES
   moho/resource/CAniResourceSkelTypeInfo.cpp
   moho/resource/RScmResourceTypeInfo.cpp
   moho/resource/CParticleTexture.cpp
+  moho/resource/CParticleTextureDevice.cpp
   moho/resource/CParticleTextureReflection.cpp
   moho/resource/ResourceFactory.cpp
   moho/resource/RScmResource.cpp
@@ -383,6 +386,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SSTICommandSource.cpp
   moho/sim/IArmyTypeInfo.cpp
   moho/sim/SimDriver.cpp
+  moho/sim/SimDriverNetworkStats.cpp
   moho/sim/SimWorkerPool.cpp
   moho/sim/UnitUpdateFill.cpp
   moho/sim/SSyncFilter.cpp

@@ -892,7 +892,8 @@ namespace
 
 namespace moho
 {
-  float efx_ParticleWaterSurface = 0.0F;
+  // `efx_ParticleWaterSurface` is defined in moho/effects/rendering/CEfxEmitter.cpp
+  // (plan WPL.4: the simulation's emitters read it); its console variable is above.
 
   CWorldParticles sWorldParticles{};
 

@@ -25,15 +25,25 @@ set(_faf_client_only_patterns
   "^moho/terrain/"
   "^moho/mesh/"
   # Particle and beam drawing (the particle buffers the sim fills stay).
-  "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem)\\.cpp$"
+  "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles)\\.cpp$"
   # Audio output (the sim's sound manager and parameters stay).
-  "^moho/audio/(AudioEngine|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime)\\.cpp$"
+  "^moho/audio/(AudioEngine|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime|SoundEngineResolve)\\.cpp$"
   # The wx script debugger's windows.
-  "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog)\\.cpp$"
+  "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog|ScrPauseEvent)\\.cpp$"
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
   "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
+  # The user Lua state's decals (CreateDecal, moho.userDecal_methods).
+  "^moho/script/(ScriptedDecal|ScriptedDecalTypeInfo)\\.cpp$"
+  # Particle textures' render-device half (GetTexture).
+  "^moho/resource/CParticleTextureDevice\\.cpp$"
+  # Animated textures for terrain decals (render device texture cache).
+  "^moho/animation/CAnimTexture\\.cpp$"
+  # The time-bar panel (render device font and batcher).
+  "^moho/misc/TimeBarRender\\.cpp$"
+  # The sim driver's network-statistics HUD (render device font and batcher).
+  "^moho/sim/SimDriverNetworkStats\\.cpp$"
   # The user's formation preview (drag orientation, preview instances).
   "^moho/sim/CFormation\\.cpp$"
   # The range-ring extractors (user entities' ranges for moho/render/RangeRenderer).
@@ -64,6 +74,10 @@ set(_faf_sim_patterns
   # Transform and camera geometry the sim computes with (entity transforms,
   # effect culling against the sync filter's cameras).
   "^moho/render/camera/(VTransform|GeomCamera3)\\.cpp$"
+  # gpg::gal::Math, the D3DX matrix helpers VMatrix4 (MathReflection) and the
+  # effect emitters' bone attachment (CEfxEmitter::InterpolatePosition) use.
+  # Windows links D3DX for them; Linux needs its own implementation.
+  "^gpg/gal/Matrix\\.cpp$"
   # SFD movie headers (MOV_GetDuration, behind the core Lua set's GetMovieDuration).
   "^moho/movie/sfd/(SfdHeaderParser|SfdHeaderInfo)\\.cpp$")
 

@@ -338,6 +338,17 @@ namespace moho
   extern AppPumpEventsHook sAppPumpEvents;
 
   /**
+   * Engine addition (dedicated-server plan WPL.4): one step of the event pump a
+   * Lua thread paused in the script debugger runs (PausedMainThread): when the
+   * client's application object has a pending event, dispatches it and returns
+   * true; otherwise, when `processIdle` is set, runs idle processing and stores
+   * whether it asks for more, and returns false. WinApp.cpp sets it during static
+   * initialisation; defined in moho/misc/WinPlatform.cpp.
+   */
+  using AppPumpStepHook = bool (*)(bool& processIdle);
+  extern AppPumpStepHook sAppPumpStep;
+
+  /**
    * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
    *
    * What it does:

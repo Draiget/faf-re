@@ -1,7 +1,5 @@
 #include "moho/resource/CParticleTexture.h"
 
-#include "moho/misc/ID3DDeviceResources.h"
-#include "moho/render/d3d/CD3DDevice.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -32,32 +30,6 @@ namespace moho
     mTexturePath.tidy(true, 0u);
   }
 
-  /**
-   * Address: 0x0048EEF0 (FUN_0048EEF0, Moho::CParticleTexture::GetTexture)
-   *
-   * boost::shared_ptr<RD3DTextureResource> &
-   *
-   * What it does:
-   * Lazily resolves one texture resource from device resources by path and
-   * returns retained shared ownership.
-   */
-  CParticleTexture::TextureResourceHandle&
-  CParticleTexture::GetTexture(TextureResourceHandle& outTexture)
-  {
-    if (!mTextureResource) {
-      CD3DDevice* const device = D3D_GetDevice();
-      if (device != nullptr) {
-        if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
-          TextureResourceHandle loadedTexture{};
-          resources->GetTexture(loadedTexture, mTexturePath.c_str(), 0, true);
-          mTextureResource = loadedTexture;
-        }
-      }
-    }
-
-    outTexture = mTextureResource;
-    return outTexture;
-  }
 } // namespace moho
 
 namespace moho
