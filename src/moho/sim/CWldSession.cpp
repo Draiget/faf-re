@@ -12704,7 +12704,7 @@ namespace moho
       const RMeshBlueprint* const mesh = entity->mVariableData.mMeshBlueprint;
       if (mesh != nullptr && !ui_AlwaysRenderStrategicIcons) {
         const float fadeThreshold = std::min(mesh->mIconFadeInZoom, camera->GetMaxZoom() * 0.89f);
-        if (fadeThreshold >= currentZoomValue) {
+        if (fadeThreshold > currentZoomValue) {
           if (skipWhenMeshVisible) {
             return;
           }
@@ -12981,7 +12981,7 @@ namespace moho
 
       if (source.mMesh != nullptr && !ui_AlwaysRenderStrategicIcons) {
         const float fadeThreshold = std::min(source.mMesh->mIconFadeInZoom, maxZoomFade);
-        if (fadeThreshold >= currentZoomValue) {
+        if (fadeThreshold > currentZoomValue) {
           if (source.Has(StrategicIconSource::kSkipWhenMeshVisible)) {
             return;
           }
