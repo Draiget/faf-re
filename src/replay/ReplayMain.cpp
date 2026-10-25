@@ -116,6 +116,7 @@ namespace
       "usage: faf-replay --replay <file.scfareplay> /init <init.lua> [options]\n"
       "  --focus <army|-1>         army whose view the sim builds (0-based; -1 observer, default)\n"
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
+      "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -163,6 +164,7 @@ int main(int argc, char** argv)
   }
   (void)ReadIntOption("--focus", options.focusArmy, bad);
   (void)ReadOption("--digests", options.digestPath);
+  (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);

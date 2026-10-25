@@ -6,12 +6,14 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <memory>
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/net/CClientManagerImpl.h"
@@ -87,8 +89,21 @@ namespace faf::replay
       return (digest.vals[0] | digest.vals[1] | digest.vals[2] | digest.vals[3]) == 0u;
     }
 
-    /** Whether this beat's Lua `Sync` table says the game ended, as the UI's `OnSync` sees it. */
-    [[nodiscard]] bool SyncSaysGameEnded(moho::SSyncData& packet, LuaPlus::LuaState* const state)
+    /** When and how often one top-level `Sync` key was present. */
+    struct SSyncKeySeen
+    {
+      int beats = 0;
+      int firstBeat = -1;
+      int lastBeat = -1;
+    };
+
+    /**
+     * Decodes this beat's Lua `Sync` table as the UI's `DoBeat` does, and reports whether it
+     * says the game ended. With `keys` set, every top-level key is counted.
+     */
+    [[nodiscard]] bool InspectSync(
+      moho::SSyncData& packet, LuaPlus::LuaState* const state, std::map<std::string, SSyncKeySeen>* const keys
+    )
     {
       if (packet.mStream == nullptr || state == nullptr) {
         return false;
@@ -98,6 +113,18 @@ namespace faf::replay
       currentSync.SCR_FromByteStream(currentSync, state, &syncReader);
       if (currentSync.IsNil()) {
         return false;
+      }
+      if (keys != nullptr) {
+        for (LuaPlus::LuaTableIterator it(currentSync, 1); !it.m_isDone; it.Next()) {
+          const LuaPlus::LuaObject key = it.GetKey();
+          const char* const text = key.IsString() ? key.GetString() : key.ToString();
+          SSyncKeySeen& seen = (*keys)[text != nullptr ? text : "?"];
+          if (seen.firstBeat < 0) {
+            seen.firstBeat = packet.mCurBeat;
+          }
+          seen.lastBeat = packet.mCurBeat;
+          ++seen.beats;
+        }
       }
       const LuaPlus::LuaObject gameEnded = currentSync["GameEnded"];
       return !gameEnded.IsNil() && (!gameEnded.IsBoolean() || gameEnded.GetBoolean());
@@ -234,6 +261,7 @@ namespace faf::replay
     }
 
     LuaPlus::LuaState* const syncState = moho::USER_GetLuaState();
+    std::map<std::string, SSyncKeySeen> syncKeys;
     const Clock::time_point playStart = Clock::now();
     const double timeLimit = 60.0 * options.timeoutMinutes;
     double lastReport = 0.0;
@@ -290,7 +318,9 @@ namespace faf::replay
           }
         }
 
-        if (!result.gameEnded && SyncSaysGameEnded(*packet, syncState)) {
+        const bool syncSaysEnded =
+          InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
+        if (!result.gameEnded && syncSaysEnded) {
           result.gameEnded = true;
           std::printf("[%s] GAME-ENDED beat %d\n", label, packet->mCurBeat);
           std::fflush(stdout);
@@ -329,6 +359,16 @@ namespace faf::replay
     result.mismatches = ChecksumMismatchCount();
     if (digestFile != nullptr) {
       std::fclose(digestFile);
+    }
+    if (!options.syncKeysPath.empty()) {
+      std::FILE* keysFile = nullptr;
+      if (fopen_s(&keysFile, options.syncKeysPath.c_str(), "w") == 0 && keysFile != nullptr) {
+        std::fprintf(keysFile, "# key beats-present first-beat last-beat (of %d beats)\n", result.beats);
+        for (const auto& [key, seen] : syncKeys) {
+          std::fprintf(keysFile, "%s %d %d %d\n", key.c_str(), seen.beats, seen.firstBeat, seen.lastBeat);
+        }
+        std::fclose(keysFile);
+      }
     }
     // The driver, sim and session objects are left to the process exit: the caller ends the
     // process once the verdict is out, as nothing after it is observed.

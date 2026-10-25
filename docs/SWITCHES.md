@@ -107,6 +107,7 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--replay file` | — | The `.scfareplay` to play (required) |
 | `--focus army` | −1 | The army whose view the sim builds, 0-based; −1 is an observer, as when watching a replay. The sim starts with that focus, as a player's game does with the player's own army |
 | `--digests file` | — | Writes `beat md5` for every beat the sim checksums |
+| `--sync-keys file` | — | Writes every top-level key of the sim's Lua `Sync` table seen during the replay, with the number of beats it was present and its first and last beat |
 | `--checksum-period n` | the game's (50) | `sim_ChecksumPeriod` for this run. With 1 every beat has a digest; other code feeds the checksum between checksum beats, so the recorded checksums then no longer match: use it only to compare runs with each other |
 | `--lead n` | 10 | Beats the sim may compute ahead (`sim_ReplayLead`); faf-replay issues beats without the rate clock (`sim_LeadOnSchedule 0`), so the sim runs flat out |
 | `--timeout minutes` | 180 | Gives up after this long |

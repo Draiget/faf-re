@@ -15,6 +15,7 @@ namespace faf::replay
     std::string label;          // prefix of every line faf-replay prints
     int focusArmy = -1;         // the army whose view `Sim::Sync` builds; -1 = observer
     std::string digestPath;     // when set: one "beat digest" line per checksummed beat
+    std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     int checksumPeriod = 0;     // when > 0: `sim_ChecksumPeriod` for this run (0 = the default)
     int replayLead = -1;        // when >= 0: `sim_ReplayLead` for this run
     int timeoutMinutes = 180;   // wall-clock limit for the whole run
