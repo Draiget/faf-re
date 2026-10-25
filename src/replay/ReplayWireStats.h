@@ -45,6 +45,7 @@ namespace faf::replay
 
   private:
     void Measure(std::uint32_t beat);
+    void AccountFieldBits(const faf::remote::wire::SFrameDelta& delta);
 
     std::FILE* mFile = nullptr;
     const faf::remote::wire::SContentTables& mTables;
@@ -58,6 +59,17 @@ namespace faf::replay
     std::uint64_t mDeltaBytesNoUnits = 0;
     std::uint64_t mYawOnlyRecords = 0;
     std::uint64_t mUnitRecords = 0;
+    /** Bits of changed records by field class, summed over the run (creations and ids apart). */
+    struct SFieldBits
+    {
+      std::uint64_t transform = 0;  // position, orientation
+      std::uint64_t scalars = 0;    // health, max health, build progress
+      std::uint64_t flags = 0;      // entity flags, kind, blueprint, army
+      std::uint64_t unit = 0;       // unit block
+      std::uint64_t overhead = 0;   // id gaps and masks of changed records
+      std::uint64_t creations = 0;  // whole created records with their ids
+      std::uint64_t removals = 0;   // removed ids
+    } mFieldBits;
     bool mHavePrevious = false;
     std::uint32_t mNextFrameId = 1;
 

@@ -156,6 +156,7 @@ namespace faf::replay
     }
 
     const wire::SFrameDelta delta = wire::ComputeFrameDelta(baseline, frame);
+    AccountFieldBits(delta);
     const auto deltaBytes = static_cast<std::uint32_t>(writer.Bytes().size());
     std::uint32_t fullBytes = 0;
     if (beat % kFullFrameEvery == 0u) {
@@ -212,6 +213,65 @@ namespace faf::replay
     mHavePrevious = true;
   }
 
+  void CReplayWireStats::AccountFieldBits(const faf::remote::wire::SFrameDelta& delta)
+  {
+    // The widths the encoder writes (EntityFrame.cpp), so the classes add up to its payload.
+    const auto varintBits = [](std::uint32_t value) -> std::uint64_t {
+      std::uint64_t groups = 1;
+      while (value >= 0x80u) {
+        value >>= 7;
+        ++groups;
+      }
+      return 8u * groups;
+    };
+    const std::uint64_t positionBits = static_cast<std::uint64_t>(mCodec.position.x.bits) + mCodec.position.y.bits
+                                     + mCodec.position.z.bits;
+    const auto fieldBits = [&](const wire::SEntityRecord& record, const std::uint16_t fields, SFieldBits& into) {
+      if ((fields & wire::kFieldPosition) != 0u) into.transform += positionBits;
+      if ((fields & wire::kFieldOrientation) != 0u) into.transform += 1u + (record.yawOnly ? 16u : 32u);
+      if ((fields & wire::kFieldHealth) != 0u) into.scalars += 32;
+      if ((fields & wire::kFieldMaxHealth) != 0u) into.scalars += 32;
+      if ((fields & wire::kFieldFraction) != 0u) into.scalars += 32;
+      if ((fields & wire::kFieldFlags) != 0u) into.flags += 16;
+      if ((fields & wire::kFieldKind) != 0u) into.flags += 1;
+      if ((fields & wire::kFieldBlueprint) != 0u) into.flags += varintBits(record.blueprint);
+      if ((fields & wire::kFieldArmy) != 0u) into.flags += 8;
+      if (record.isUnit) {
+        if ((fields & wire::kFieldUnitFuel) != 0u) into.unit += 32;
+        if ((fields & wire::kFieldUnitShield) != 0u) into.unit += 32;
+        if ((fields & wire::kFieldUnitWork) != 0u) into.unit += 32;
+        if ((fields & wire::kFieldUnitStates) != 0u) into.unit += 64;
+        if ((fields & wire::kFieldUnitScriptBits) != 0u) into.unit += 32;
+        if ((fields & wire::kFieldUnitSilos) != 0u) into.unit += 64;
+        if ((fields & wire::kFieldUnitFlags) != 0u) into.unit += 8;
+      }
+    };
+    const auto gap = [&](bool& first, std::uint32_t& previous, const std::uint32_t id) -> std::uint64_t {
+      const std::uint64_t bits = varintBits(first ? id : id - previous - 1u);
+      first = false;
+      previous = id;
+      return bits;
+    };
+
+    bool first = true;
+    std::uint32_t previous = 0;
+    for (const std::uint32_t id : delta.removed) {
+      mFieldBits.removals += gap(first, previous, id);
+    }
+    first = true;
+    for (const wire::SEntityRecord& record : delta.created) {
+      SFieldBits created{};
+      fieldBits(record, wire::CreationFields(record), created);
+      mFieldBits.creations +=
+        gap(first, previous, record.id) + created.transform + created.scalars + created.flags + created.unit;
+    }
+    first = true;
+    for (const wire::SFrameDelta::SChange& change : delta.changed) {
+      mFieldBits.overhead += gap(first, previous, change.record.id) + varintBits(change.fields);
+      fieldBits(change.record, change.fields, mFieldBits);
+    }
+  }
+
   std::string CReplayWireStats::Summary() const
   {
     std::vector<std::uint32_t> sizes = mDeltaSizes;
@@ -219,13 +279,17 @@ namespace faf::replay
     const auto percentile = [&](const double p) -> std::uint32_t {
       return sizes.empty() ? 0u : sizes[static_cast<std::size_t>(p * static_cast<double>(sizes.size() - 1))];
     };
-    char text[768];
+    const auto rate = [&](const std::uint64_t bits) -> double {
+      return mBeats != 0 ? static_cast<double>(bits) / 8.0 / static_cast<double>(mBeats) * 10.0 / 1000.0 : 0.0;
+    };
+    char text[1024];
     std::snprintf(
       text, sizeof(text),
       "wire entities lane: %llu beats, entities mean %.0f max %u, delta bytes/beat mean %.0f p50 %u p95 %u max %u "
       "(%.1f KB/s at 10 beats/s), full frame mean %.0f bytes, round-trip failures %llu, encode failures %llu, "
       "unknown blueprints %llu; without the yaw form %.1f KB/s (yaw-only records %.0f%%), without the unit block "
-      "%.1f KB/s",
+      "%.1f KB/s; by field (KB/s): transforms %.1f, scalars %.1f, flags %.1f, unit block %.1f, ids and masks %.1f, "
+      "creations %.1f, removals %.1f",
       static_cast<unsigned long long>(mBeats), mBeats != 0 ? static_cast<double>(mEntitySum) / mBeats : 0.0,
       mMaxEntities, mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats : 0.0, percentile(0.5), percentile(0.95),
       sizes.empty() ? 0u : sizes.back(), mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats * 10.0 / 1000.0 : 0.0,
@@ -234,7 +298,9 @@ namespace faf::replay
       static_cast<unsigned long long>(mUnknownBlueprints),
       mBeats != 0 ? static_cast<double>(mDeltaBytesNoYaw) / mBeats * 10.0 / 1000.0 : 0.0,
       mEntitySum != 0 ? 100.0 * static_cast<double>(mYawOnlyRecords) / static_cast<double>(mEntitySum) : 0.0,
-      mBeats != 0 ? static_cast<double>(mDeltaBytesNoUnits) / mBeats * 10.0 / 1000.0 : 0.0
+      mBeats != 0 ? static_cast<double>(mDeltaBytesNoUnits) / mBeats * 10.0 / 1000.0 : 0.0, rate(mFieldBits.transform),
+      rate(mFieldBits.scalars), rate(mFieldBits.flags), rate(mFieldBits.unit), rate(mFieldBits.overhead),
+      rate(mFieldBits.creations), rate(mFieldBits.removals)
     );
     return text;
   }
