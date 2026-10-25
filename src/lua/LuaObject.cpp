@@ -20790,11 +20790,13 @@ bool LuaStackObject::IsNil() const
  * Address: 0x004154B0 (FUN_004154B0, LuaPlus::LuaStackObject::TypeError)
  *
  * What it does:
- * Raises the standard Lua bad-argument error for the current stack slot.
+ * Copies the stack slot into a LuaObject (0x00908A70) and raises its type error
+ * (LuaObject::TypeError, 0x009072D0), e.g. "integer expected but got nil".
  */
 void LuaStackObject::TypeError(const char* const expectedType) const
 {
-	luaL_argerror(m_state->GetCState(), m_stackIndex, expectedType ? expectedType : "value");
+	const LuaObject value(*this);
+	value.TypeError(expectedType);
 }
 
 void LuaStackObject::TypeError(const char* const expectedType, const int32_t) const
@@ -21361,20 +21363,14 @@ bool LuaObject::IsConvertibleToString() const
  * Address: 0x009072D0 (FUN_009072D0, LuaPlus::LuaObject::TypeError)
  *
  * What it does:
- * Raises one Lua-object operation type error for the current tagged value.
+ * Raises one Lua type error for the current tagged value on the active thread:
+ * `luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, operation)`. The
+ * object is never on that thread's stack, so the message is always the plain
+ * "<operation> expected but got <type>" (FA-Binary-Patches LuaMessages wording).
  */
 void LuaObject::TypeError(const char* const operation) const
 {
-	lua_State* const cState = GetActiveCState();
-	const char* const valueType = cState != nullptr ? lua_typename(cState, m_object.tt) : "unknown";
-	const char* const opText = operation != nullptr ? operation : "operate on";
-
-	std::string message("attempt to ");
-	message += opText;
-	message += " a ";
-	message += valueType != nullptr ? valueType : "unknown";
-	message += " value";
-	throw std::runtime_error(message);
+	luaG_typeerror(GetActiveCState(), &m_object, operation != nullptr ? operation : "value");
 }
 
 /**
