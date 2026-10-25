@@ -2660,9 +2660,16 @@ bool UserUnit::IsSelectable() const
     return false;
   }
 
+  // FAF hot-patch: 0x008C05FE jumps to 0x01291439 in .exxt, which tests
+  // "CQUEMOV" (string at 0x01292A9C, via the pointer at 0x01292A98) and goes
+  // straight to the SELECTABLE test at 0x008C062A when it holds, before
+  // falling back to the original "FACTORY" test at 0x008C0603. It is the UI
+  // half of the 0x006EFAC9 patch in `ProcessIssuedUnitCommand` (Sim.cpp):
+  // a CQUEMOV unit can be selected, and so given orders, while being built.
   if (IsBeingBuilt()) {
+    const msvc8::string queueMoveCategory("CQUEMOV", 7u);
     const msvc8::string factoryCategory("FACTORY", 7u);
-    if (!entityView->IsInCategory(factoryCategory)) {
+    if (!entityView->IsInCategory(queueMoveCategory) && !entityView->IsInCategory(factoryCategory)) {
       return false;
     }
   }
