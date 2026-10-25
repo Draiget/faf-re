@@ -108,7 +108,9 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--focus army` | −1 | The army whose view the sim builds, 0-based; −1 is an observer, as when watching a replay. The sim starts with that focus, as a player's game does with the player's own army |
 | `--digests file` | — | Writes `beat md5` for every beat the sim checksums |
 | `--sync-keys file` | — | Writes every top-level key of the sim's Lua `Sync` table seen during the replay, with the number of beats it was present and its first and last beat |
-| `--checksum-period n` | the game's (50) | `sim_ChecksumPeriod` for this run. With 1 every beat has a digest; other code feeds the checksum between checksum beats, so the recorded checksums then no longer match: use it only to compare runs with each other |
+| `--wire-stats file` | — | Runs the server-mode wire format's entities lane on every beat: the entities the sim published to this run's focus become a view frame, encoded against the previous beat's, decoded and compared; writes one CSV line per beat (entities, created, removed, changed, delta bytes, full-frame bytes every 100 beats) and prints a summary |
+| `--checksum-period n` | the game's (50) | `sim_ChecksumPeriod` for this run. With 1 every beat has a digest. Other code feeds the checksum between checksum beats, so a period other than the recorded 50 digests different spans of data: the verdict then says "recorded-checksum check skipped" and mismatches do not count. The period changes only the checksum, never the sim (plan §12, 2026-10-25) |
+| `--state-digests file` | — | Writes `beat digest` of what the sim published each beat (creations, entity and unit updates, deletions, army economy, the Lua `Sync` bytes). Independent of `sim_ChecksumPeriod` and of the sim's checksum, so runs with different periods can be compared |
 | `--lead n` | 10 | Beats the sim may compute ahead (`sim_ReplayLead`); faf-replay issues beats without the rate clock (`sim_LeadOnSchedule 0`), so the sim runs flat out |
 | `--timeout minutes` | 180 | Gives up after this long |
 | `--label text` | `faf-replay` | Prefix of every printed line |

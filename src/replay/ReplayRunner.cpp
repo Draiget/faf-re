@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <type_traits>
 #include <memory>
 
 #include "gpg/core/algorithms/MD5.h"
@@ -14,6 +15,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
+#include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/net/CClientManagerImpl.h"
@@ -27,7 +29,10 @@
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/WldSessionInfo.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/ui/UiRuntimeTypes.h"
+#include "remote/ContentTables.h"
+#include "replay/ReplayWireStats.h"
 
 namespace faf::replay
 {
@@ -131,6 +136,144 @@ namespace faf::replay
     }
 
     /**
+     * A digest of what the sim published in one beat, independent of `sim_ChecksumPeriod` and
+     * never touching the sim's checksum context: creations, every entity and unit update,
+     * deletions, every army's economy, and the Lua `Sync` bytes. Desync reports are left out
+     * (they depend on the checksum period by design). 64-bit FNV-1a, field by field.
+     */
+    class CStateDigest
+    {
+    public:
+      template <typename T>
+      void Add(const T& value) noexcept
+      {
+        static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>);
+        Bytes(&value, sizeof(value));
+      }
+
+      void Bytes(const void* const data, const std::size_t size) noexcept
+      {
+        const auto* const bytes = static_cast<const unsigned char*>(data);
+        for (std::size_t i = 0; i < size; ++i) {
+          mHash ^= bytes[i];
+          mHash *= 0x100000001B3ull;
+        }
+      }
+
+      void Text(const char* const text) noexcept { Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u); }
+
+      [[nodiscard]] std::uint64_t Value() const noexcept { return mHash; }
+
+    private:
+      std::uint64_t mHash = 0xCBF29CE484222325ull;
+    };
+
+    void AddTransform(CStateDigest& digest, const moho::VTransform& transform) noexcept
+    {
+      digest.Add(transform.orient_.x);
+      digest.Add(transform.orient_.y);
+      digest.Add(transform.orient_.z);
+      digest.Add(transform.orient_.w);
+      digest.Add(transform.pos_.x);
+      digest.Add(transform.pos_.y);
+      digest.Add(transform.pos_.z);
+    }
+
+    [[nodiscard]] std::uint64_t DigestPublishedState(const moho::SSyncData& packet)
+    {
+      CStateDigest digest;
+      digest.Add(packet.mCurBeat);
+      digest.Add(packet.mCurTick);
+      for (const moho::SCreateEntityParams& params : packet.mNewEntities) {
+        digest.Add(params.mEntityId);
+        digest.Text(params.mBlueprint != nullptr ? params.mBlueprint->mBlueprintId.c_str() : nullptr);
+      }
+      for (const moho::SCreateUnitParams& params : packet.mNewUnits) {
+        digest.Add(params.mEntityId);
+        digest.Text(params.mBlueprint != nullptr ? params.mBlueprint->mBlueprintId.c_str() : nullptr);
+      }
+      for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
+        const moho::SSTIEntityVariableData& data = update.mVariableData;
+        digest.Add(update.mEntityId);
+        digest.Add(data.mScale.x);
+        digest.Add(data.mScale.y);
+        digest.Add(data.mScale.z);
+        digest.Add(data.mHealth);
+        digest.Add(data.mMaxHealth);
+        digest.Add(data.mIsBeingBuilt);
+        digest.Add(data.mIsDead);
+        digest.Add(data.mDestroyedByKill);
+        AddTransform(digest, data.mCurTransform);
+        AddTransform(digest, data.mLastTransform);
+        digest.Add(data.mCurImpactValue);
+        digest.Add(data.mFractionComplete);
+        digest.Add(data.mAttachmentParentRef);
+        digest.Add(data.mVisibilityHidden);
+        digest.Add(data.mVisibilityMode);
+        digest.Add(data.mLayerMask);
+      }
+      for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
+        const moho::SSTIUnitVariableData& data = update.mVariableData;
+        digest.Add(update.mEntityId);
+        digest.Add(update.mReconFlags);
+        digest.Add(data.mCreator);
+        digest.Add(data.mAutoMode);
+        digest.Add(data.mIsBusy);
+        digest.Add(data.mFuelRatio);
+        digest.Add(data.mShieldRatio);
+        digest.Add(data.mStunTicks);
+        digest.Add(data.mIsPaused);
+        digest.Add(data.mJobType);
+        digest.Add(data.mFireState);
+        digest.Add(data.mWorkProgress);
+        digest.Add(data.mTacticalSiloBuildCount);
+        digest.Add(data.mNukeSiloBuildCount);
+        digest.Add(data.mTacticalSiloStorageCount);
+        digest.Add(data.mNukeSiloStorageCount);
+        digest.Add(data.mProduced.ENERGY);
+        digest.Add(data.mProduced.MASS);
+        digest.Add(data.mResourcesSpent.ENERGY);
+        digest.Add(data.mResourcesSpent.MASS);
+        digest.Add(data.mMaintainenceCost.ENERGY);
+        digest.Add(data.mMaintainenceCost.MASS);
+        digest.Add(data.mFocusUnit);
+        digest.Add(data.mGuardedUnit);
+        digest.Add(data.mTargetBlip);
+        digest.Add(data.mScriptbits);
+        digest.Add(data.mUnitStates);
+      }
+      for (const moho::EntId id : packet.mEraseIds) {
+        digest.Add(id);
+      }
+      for (const moho::EntId id : packet.mDeleteIds) {
+        digest.Add(id);
+      }
+      for (const moho::SSTIArmyVariableData& army : packet.mArmyUpdates) {
+        const moho::SEconTotals& economy = army.mEconomyTotals;
+        for (const auto* pair : {&economy.mStored, &economy.mIncome, &economy.mReclaimed, &economy.mLastUseRequested,
+                                 &economy.mLastUseActual}) {
+          digest.Add(pair->ENERGY);
+          digest.Add(pair->MASS);
+        }
+        digest.Add(economy.mMaxStorage.ENERGY);
+        digest.Add(economy.mMaxStorage.MASS);
+      }
+      // The Lua `Sync` bytes, read whole and rewound for the decode that follows.
+      if (packet.mStream != nullptr) {
+        char buffer[4096];
+        for (;;) {
+          const std::size_t read = packet.mStream->Read(buffer, sizeof(buffer));
+          if (read == 0) {
+            break;
+          }
+          digest.Bytes(buffer, read);
+        }
+        (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+      }
+      return digest.Value();
+    }
+
+    /**
      * The world session's loading steps that the sim needs (`WLD_DoPreload`, `WLD_DoLoading`):
      * the session loader builds rules, session Lua state and map on its worker thread.
      */
@@ -214,10 +357,23 @@ namespace faf::replay
     std::unique_ptr<LuaPlus::LuaState> sessionState(gameData.mState);
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
     std::unique_ptr<moho::CWldMap> wldMap(gameData.mWldMap);
+
+    // The wire format's content tables (plan WP7.2), as a server or client builds them at load.
+    const faf::remote::wire::SContentTables tables = faf::remote::BuildContentTables(*rules);
+    {
+      std::printf(
+        "[%s] content: %u blueprints, %u meshes, hash %016llx\n",
+        label,
+        tables.blueprints.Size(),
+        tables.meshes.Size(),
+        static_cast<unsigned long long>(tables.Hash())
+      );
+    }
     gameData = moho::SWldGameData{};
 
     // The launch info, completed as `WLD_DoLoading` completes it from the world session.
     moho::STIMap* const launchMap = new moho::STIMap(wldMap->mTerrainRes->mMap);
+    const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D(); // the sim takes the map
     launchInfo->mGameRules = rules.get();
     if (launchInfo->mMap != nullptr && launchInfo->mMap != launchMap) {
       delete launchInfo->mMap;
@@ -254,10 +410,27 @@ namespace faf::replay
     std::fflush(stdout);
 
     std::FILE* digestFile = nullptr;
+    std::FILE* stateDigestFile = nullptr;
+    if (!options.stateDigestPath.empty() && fopen_s(&stateDigestFile, options.stateDigestPath.c_str(), "w") != 0) {
+      stateDigestFile = nullptr;
+      result.error = "cannot write " + options.stateDigestPath;
+      return result;
+    }
     if (!options.digestPath.empty() && fopen_s(&digestFile, options.digestPath.c_str(), "w") != 0) {
       digestFile = nullptr;
       result.error = "cannot write " + options.digestPath;
       return result;
+    }
+
+    std::unique_ptr<CReplayWireStats> wireStats;
+    if (!options.wireStatsPath.empty()) {
+      wireStats = std::make_unique<CReplayWireStats>(
+        options.wireStatsPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z
+      );
+      if (!wireStats->IsOpen()) {
+        result.error = "cannot write " + options.wireStatsPath;
+        return result;
+      }
     }
 
     LuaPlus::LuaState* const syncState = moho::USER_GetLuaState();
@@ -318,12 +491,21 @@ namespace faf::replay
           }
         }
 
+        if (stateDigestFile != nullptr) {
+          std::fprintf(
+            stateDigestFile, "%d %016llx\n", packet->mCurBeat,
+            static_cast<unsigned long long>(DigestPublishedState(*packet))
+          );
+        }
         const bool syncSaysEnded =
           InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
         if (!result.gameEnded && syncSaysEnded) {
           result.gameEnded = true;
           std::printf("[%s] GAME-ENDED beat %d\n", label, packet->mCurBeat);
           std::fflush(stdout);
+        }
+        if (wireStats) {
+          wireStats->OnPacket(*packet);
         }
         if (packet->mGameOver) {
           result.gameOver = true;
@@ -359,6 +541,12 @@ namespace faf::replay
     result.mismatches = ChecksumMismatchCount();
     if (digestFile != nullptr) {
       std::fclose(digestFile);
+    }
+    if (stateDigestFile != nullptr) {
+      std::fclose(stateDigestFile);
+    }
+    if (wireStats) {
+      result.wireSummary = wireStats->Summary();
     }
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;

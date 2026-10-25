@@ -7,6 +7,7 @@
 # FAF_REMOTE_CLIENT_SOURCES: the client half.
 
 set(FAF_REMOTE_SOURCES
+  remote/ContentTables.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/OrdinalTable.cpp

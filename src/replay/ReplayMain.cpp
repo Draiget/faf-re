@@ -39,6 +39,9 @@ namespace
   constexpr int kExitCrash = 3;
   constexpr int kExitBadInput = 4;
 
+  /// `sim_ChecksumPeriod` of the players' games, the period the recorded checksums were taken at.
+  constexpr int kRecordedChecksumPeriod = 50;
+
   std::string gLabel = "faf-replay";
 
   [[noreturn]] void EndProcess(const int exitCode)
@@ -117,6 +120,8 @@ namespace
       "  --focus <army|-1>         army whose view the sim builds (0-based; -1 observer, default)\n"
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
+      "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
+      "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -165,6 +170,8 @@ int main(int argc, char** argv)
   (void)ReadIntOption("--focus", options.focusArmy, bad);
   (void)ReadOption("--digests", options.digestPath);
   (void)ReadOption("--sync-keys", options.syncKeysPath);
+  (void)ReadOption("--wire-stats", options.wireStatsPath);
+  (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
@@ -213,6 +220,9 @@ int main(int argc, char** argv)
   if (!result.error.empty()) {
     std::printf("[%s] ERROR %s\n", label, result.error.c_str());
   }
+  if (!result.wireSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.wireSummary.c_str());
+  }
   std::printf(
     "[%s] beats=%d last-beat=%d game-over=%s desync-reports=%d digests=%llu load=%.1fs play=%.1fs\n",
     label,
@@ -224,21 +234,37 @@ int main(int argc, char** argv)
     result.loadSeconds,
     result.playSeconds
   );
-  std::printf(
-    "[%s] VERDICT ended=%s mismatches=%d crash=%s%s\n",
-    label,
-    result.gameEnded ? "True" : "False",
-    result.mismatches,
-    result.crashed ? "True" : "False",
-    result.timedOut ? " timeout=True" : ""
-  );
+  // The players' clients recorded their checksums at the game's period; any other period
+  // digests different spans of hashed data, so those comparisons say nothing.
+  const bool recordedChecksumsComparable =
+    options.checksumPeriod <= 0 || options.checksumPeriod == kRecordedChecksumPeriod;
+  if (recordedChecksumsComparable) {
+    std::printf(
+      "[%s] VERDICT ended=%s mismatches=%d crash=%s%s\n",
+      label,
+      result.gameEnded ? "True" : "False",
+      result.mismatches,
+      result.crashed ? "True" : "False",
+      result.timedOut ? " timeout=True" : ""
+    );
+  } else {
+    std::printf(
+      "[%s] VERDICT ended=%s recorded-checksum check skipped (checksum period %d, recorded at %d) crash=%s%s\n",
+      label,
+      result.gameEnded ? "True" : "False",
+      options.checksumPeriod,
+      kRecordedChecksumPeriod,
+      result.crashed ? "True" : "False",
+      result.timedOut ? " timeout=True" : ""
+    );
+  }
 
   int exitCode = kExitMatched;
   if (!result.started && !result.crashed) {
     exitCode = kExitBadInput;
   } else if (result.crashed) {
     exitCode = kExitCrash;
-  } else if (result.mismatches > 0) {
+  } else if (recordedChecksumsComparable && result.mismatches > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

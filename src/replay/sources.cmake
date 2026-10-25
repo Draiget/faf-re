@@ -6,4 +6,5 @@
 set(FAF_REPLAY_SOURCES
   replay/ReplayMain.cpp
   replay/ReplayRunner.cpp
+  replay/ReplayWireStats.cpp
 )
