@@ -33,6 +33,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/ShaderVar.h"
+#include "moho/render/RangeGpuRenderer.h"
 #include "moho/render/RangeRendererStartupRegistrations.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -331,6 +332,178 @@ namespace
    *   equivalent shader variable before the burn pass
    * - clears the device target/stencil once at the end
    */
+  void BuildEnvelopes(
+    const RangeExtractionPayloadVector& ringEntries,
+    const float outerThickness,
+    const float innerThickness,
+    const bool merge,
+    std::vector<moho::RangeEnvelopeInstance>& outOuter,
+    std::vector<moho::RangeEnvelopeInstance>& outInner
+  )
+  {
+    if (ringEntries.empty()) {
+      return;
+    }
+
+    constexpr std::uint32_t kSegments = 45u;
+    constexpr float kAngleStep = 6.28318530718f / static_cast<float>(kSegments);
+
+    float unitDirs[kSegments][2];
+    for (std::uint32_t k = 0u; k < kSegments; ++k) {
+      const float angle = static_cast<float>(k) * kAngleStep;
+      unitDirs[k][0] = std::cos(angle);
+      unitDirs[k][1] = std::sin(angle);
+    }
+
+    if (!merge) {
+      for (const auto& entry : ringEntries) {
+        if (entry.outerRadius <= 0.0f) {
+          continue;
+        }
+
+        moho::RangeEnvelopeInstance outerInst{};
+        outerInst.thickness = outerThickness;
+        outerInst.isInner = 0.0f;
+        for (std::uint32_t k = 0u; k < kSegments; ++k) {
+          outerInst.points[k][0] = entry.centerX + (entry.outerRadius * unitDirs[k][0]);
+          outerInst.points[k][1] = entry.centerZ + (entry.outerRadius * unitDirs[k][1]);
+        }
+        for (std::uint32_t p = kSegments; p < 48u; ++p) {
+          outerInst.points[p][0] = 0.0f;
+          outerInst.points[p][1] = 0.0f;
+        }
+        outOuter.push_back(outerInst);
+
+        if (entry.innerRadius > 0.0f) {
+          moho::RangeEnvelopeInstance innerInst{};
+          innerInst.thickness = innerThickness;
+          innerInst.isInner = 1.0f;
+          for (std::uint32_t k = 0u; k < kSegments; ++k) {
+            innerInst.points[k][0] = entry.centerX + (entry.innerRadius * unitDirs[k][0]);
+            innerInst.points[k][1] = entry.centerZ + (entry.innerRadius * unitDirs[k][1]);
+          }
+          for (std::uint32_t p = kSegments; p < 48u; ++p) {
+            innerInst.points[p][0] = 0.0f;
+            innerInst.points[p][1] = 0.0f;
+          }
+          outInner.push_back(innerInst);
+        }
+      }
+      return;
+    }
+
+    // Merged: cluster contiguous units and compute boundary envelope per cluster
+    std::vector<std::vector<std::size_t>> clusters;
+    std::vector<bool> visited(ringEntries.size(), false);
+
+    for (std::size_t i = 0; i < ringEntries.size(); ++i) {
+      if (visited[i] || ringEntries[i].outerRadius <= 0.0f) {
+        continue;
+      }
+      std::vector<std::size_t> cluster;
+      std::vector<std::size_t> queue;
+      queue.push_back(i);
+      visited[i] = true;
+
+      while (!queue.empty()) {
+        const std::size_t curr = queue.back();
+        queue.pop_back();
+        cluster.push_back(curr);
+
+        const float currRadius = ringEntries[curr].outerRadius;
+        const float threshold = (currRadius * 2.0f) + 30.0f;
+        const float thresholdSq = threshold * threshold;
+
+        for (std::size_t j = 0; j < ringEntries.size(); ++j) {
+          if (!visited[j] && ringEntries[j].outerRadius > 0.0f) {
+            const float dx = ringEntries[j].centerX - ringEntries[curr].centerX;
+            const float dz = ringEntries[j].centerZ - ringEntries[curr].centerZ;
+            if ((dx * dx + dz * dz) <= thresholdSq) {
+              visited[j] = true;
+              queue.push_back(j);
+            }
+          }
+        }
+      }
+      clusters.push_back(std::move(cluster));
+    }
+
+    for (const auto& cluster : clusters) {
+      if (cluster.empty()) {
+        continue;
+      }
+
+      moho::RangeEnvelopeInstance outerInst{};
+      outerInst.thickness = outerThickness;
+      outerInst.isInner = 0.0f;
+
+      moho::RangeEnvelopeInstance innerInst{};
+      innerInst.thickness = innerThickness;
+      innerInst.isInner = 1.0f;
+      bool hasInnerDeadZone = false;
+
+      for (std::uint32_t k = 0u; k < kSegments; ++k) {
+        const float ux = unitDirs[k][0];
+        const float uz = unitDirs[k][1];
+
+        float maxReach = -1e9f;
+        std::size_t bestOuterIdx = cluster[0];
+
+        for (const std::size_t idx : cluster) {
+          const auto& entry = ringEntries[idx];
+          const float reach = (entry.centerX * ux) + (entry.centerZ * uz) + entry.outerRadius;
+          if (reach > maxReach) {
+            maxReach = reach;
+            bestOuterIdx = idx;
+          }
+        }
+
+        const auto& bestOuter = ringEntries[bestOuterIdx];
+        outerInst.points[k][0] = bestOuter.centerX + (bestOuter.outerRadius * ux);
+        outerInst.points[k][1] = bestOuter.centerZ + (bestOuter.outerRadius * uz);
+
+        float minInnerReach = 1e9f;
+        std::size_t bestInnerIdx = SIZE_MAX;
+
+        for (const std::size_t idx : cluster) {
+          const auto& entry = ringEntries[idx];
+          if (entry.innerRadius > 0.0f) {
+            const float reach = (entry.centerX * ux) + (entry.centerZ * uz) + entry.innerRadius;
+            if (reach < minInnerReach) {
+              minInnerReach = reach;
+              bestInnerIdx = idx;
+            }
+          }
+        }
+
+        if (bestInnerIdx != SIZE_MAX) {
+          const auto& bestInner = ringEntries[bestInnerIdx];
+          const float inX = bestInner.centerX + (bestInner.innerRadius * ux);
+          const float inZ = bestInner.centerZ + (bestInner.innerRadius * uz);
+          if ((inX * ux + inZ * uz) < (outerInst.points[k][0] * ux + outerInst.points[k][1] * uz)) {
+            innerInst.points[k][0] = inX;
+            innerInst.points[k][1] = inZ;
+            hasInnerDeadZone = true;
+          } else {
+            innerInst.points[k][0] = outerInst.points[k][0];
+            innerInst.points[k][1] = outerInst.points[k][1];
+          }
+        } else {
+          innerInst.points[k][0] = 0.0f;
+          innerInst.points[k][1] = 0.0f;
+        }
+      }
+
+      for (std::uint32_t p = kSegments; p < 48u; ++p) {
+        outerInst.points[p][0] = 0.0f;
+        outerInst.points[p][1] = 0.0f;
+      }
+
+      outOuter.push_back(outerInst);
+      // Inner radii are omitted per user request ("Внутренние радиусы можно не отображать")
+    }
+  }
+
   void RenderRingBatch(
     const moho::RangeRingRadiusParams& outerRingParams,
     const moho::CameraImpl& camera,
@@ -375,12 +548,117 @@ namespace
         zoomScale +
       outerRingParams.radius;
 
+    if (moho::RangeGpuRenderer::Get().IsActive()) {
+      std::vector<moho::RangeEnvelopeInstance> outerEnvelopes;
+      std::vector<moho::RangeEnvelopeInstance> innerEnvelopes;
+      const bool shouldMerge = (moho::ren_MergeRanges != 0) && (ringEntries.size() > 1);
+      BuildEnvelopes(
+        ringEntries, outerThicknessOffset, innerThicknessOffset, shouldMerge, outerEnvelopes, innerEnvelopes
+      );
+
+      std::vector<moho::RangeEnvelopeInstance> edgeEnvelopes = std::move(outerEnvelopes);
+      edgeEnvelopes.insert(edgeEnvelopes.end(), innerEnvelopes.begin(), innerEnvelopes.end());
+
+      if (!edgeEnvelopes.empty()) {
+        moho::RangeGpuRenderer::Get().CastEnvelopes(rangeRenderer, cameraView, edgeEnvelopes);
+
+        if (GetFrameRangeColorShaderVar().Exists()) {
+          GetFrameRangeColorShaderVar().mEffectVariable->SetFloatArray(4u, &ringColor.r);
+        }
+
+        rangeRenderer.mFrame.InitTransformedVerts(static_cast<float>(head.mWidth), static_cast<float>(head.mHeight));
+        rangeRenderer.mFrame.mName.assign_owned("RangeBurn");
+        rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+
+        device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
+        return;
+      }
+    }
+
     RangeExtractionPayloadVector fillPayloads;
     RangeExtractionPayloadVector edgePayloads;
+
+    RangeExtractionPayloadVector effectiveEntries;
+    const RangeExtractionPayloadVector* pEntries = &ringEntries;
+
+    if (moho::ren_MergeRanges && ringEntries.size() > 1) {
+      // D3D9 fallback for ren_MergeRanges: cluster contiguous units and emit 1 outer circle per cluster
+      std::vector<std::vector<std::size_t>> clusters;
+      std::vector<bool> visited(ringEntries.size(), false);
+
+      for (std::size_t i = 0; i < ringEntries.size(); ++i) {
+        if (visited[i] || ringEntries[i].outerRadius <= 0.0f) {
+          continue;
+        }
+        std::vector<std::size_t> cluster;
+        std::vector<std::size_t> queue;
+        queue.push_back(i);
+        visited[i] = true;
+
+        while (!queue.empty()) {
+          const std::size_t curr = queue.back();
+          queue.pop_back();
+          cluster.push_back(curr);
+
+          const float currRadius = ringEntries[curr].outerRadius;
+          const float threshold = (currRadius * 2.0f) + 30.0f;
+          const float thresholdSq = threshold * threshold;
+
+          for (std::size_t j = 0; j < ringEntries.size(); ++j) {
+            if (!visited[j] && ringEntries[j].outerRadius > 0.0f) {
+              const float dx = ringEntries[j].centerX - ringEntries[curr].centerX;
+              const float dz = ringEntries[j].centerZ - ringEntries[curr].centerZ;
+              if ((dx * dx + dz * dz) <= thresholdSq) {
+                visited[j] = true;
+                queue.push_back(j);
+              }
+            }
+          }
+        }
+        clusters.push_back(std::move(cluster));
+      }
+
+      for (const auto& cluster : clusters) {
+        if (cluster.empty()) {
+          continue;
+        }
+        float sumX = 0.0f;
+        float sumZ = 0.0f;
+        for (const std::size_t idx : cluster) {
+          sumX += ringEntries[idx].centerX;
+          sumZ += ringEntries[idx].centerZ;
+        }
+        const float cX = sumX / static_cast<float>(cluster.size());
+        const float cZ = sumZ / static_cast<float>(cluster.size());
+
+        float maxReach = 0.0f;
+        for (const std::size_t idx : cluster) {
+          const float dx = ringEntries[idx].centerX - cX;
+          const float dz = ringEntries[idx].centerZ - cZ;
+          const float dist = std::sqrt(dx * dx + dz * dz) + ringEntries[idx].outerRadius;
+          if (dist > maxReach) {
+            maxReach = dist;
+          }
+        }
+
+        moho::SRangeExtractionPayload merged{};
+        merged.centerX = cX;
+        merged.centerZ = cZ;
+        merged.innerRadius = 0.0f;
+        merged.outerRadius = maxReach;
+        effectiveEntries.push_back(merged);
+      }
+      pEntries = &effectiveEntries;
+    }
+
     RangeRingGeometryBuildState buildState{innerThicknessOffset, outerThicknessOffset, &fillPayloads, &edgePayloads};
-    BuildRingPayloadBuffers(buildState, ringEntries.begin(), ringEntries.end());
+    BuildRingPayloadBuffers(buildState, pEntries->begin(), pEntries->end());
 
     const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads) {
+      if (payloads.empty()) {
+        return;
+      }
+
       const std::uint32_t totalCount = static_cast<std::uint32_t>(payloads.size());
       std::uint32_t drawn = 0u;
       while (drawn < totalCount) {

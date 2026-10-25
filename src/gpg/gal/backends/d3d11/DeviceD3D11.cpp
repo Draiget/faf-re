@@ -2234,7 +2234,7 @@ namespace gpg::gal
     // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
-      kGpuPathProjectileIcons | kGpuPathWorldShapes;
+      kGpuPathProjectileIcons | kGpuPathWorldShapes | kGpuPathRanges;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)
