@@ -1788,6 +1788,29 @@ namespace moho
   int cfunc_UserUnitGetWorkProgressL(LuaPlus::LuaState* state);
 
   /**
+   * FAF community binary-patch addition (FA-Binary-Patches section/UserUnit.cpp)
+   * -- no `Address:`, not part of the original 2007 binary.
+   *
+   * What it does:
+   * `UserUnit:GetInterpolatedPosition()`: the mesh's interpolated position as a
+   * plain {x, y, z} array, or nothing without a mesh.
+   */
+  int cfunc_UserUnitGetInterpolatedPosition(lua_State* luaContext);
+  CScrLuaInitForm* func_UserUnitGetInterpolatedPosition_LuaFuncDef();
+  int cfunc_UserUnitGetInterpolatedPositionL(LuaPlus::LuaState* state);
+
+  /**
+   * FAF community binary-patch addition (FA-Binary-Patches section/UserUnit.cpp)
+   * -- no `Address:`, not part of the original 2007 binary.
+   *
+   * What it does:
+   * `UserUnit:GetFractionComplete()`: the unit's synced build fraction.
+   */
+  int cfunc_UserUnitGetFractionComplete(lua_State* luaContext);
+  CScrLuaInitForm* func_UserUnitGetFractionComplete_LuaFuncDef();
+  int cfunc_UserUnitGetFractionCompleteL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x008C30E0 (FUN_008C30E0, cfunc_UserUnitGetStat)
    *
    * What it does:
