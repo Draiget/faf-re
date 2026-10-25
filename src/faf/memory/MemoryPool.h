@@ -41,6 +41,7 @@ namespace faf
   {
   public:
     MultiMemoryPool() = default;
+    MultiMemoryPool(std::size_t intialCapacity);
 
     MultiMemoryPool(MultiMemoryPool&&) = default;
     MultiMemoryPool& operator=(MultiMemoryPool&&) = default;
@@ -78,7 +79,7 @@ namespace faf
       }
 
       for (auto& pool : m_pools) {
-        if (pool.GetBlockSize() >= size) {
+        if (pool.GetBlockSize() == size) {
           pool.Deallocate(ptr);
           return;
         }
