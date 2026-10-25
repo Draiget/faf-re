@@ -4,6 +4,7 @@
 # every faf_engine object (v1: wx, D3D and XACT are linked but never started).
 
 set(FAF_REPLAY_SOURCES
+  replay/ReplayBoneStats.cpp
   replay/ReplayMain.cpp
   replay/ReplayRunner.cpp
   replay/ReplayWireStats.cpp

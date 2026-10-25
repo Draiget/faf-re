@@ -121,7 +121,8 @@ namespace
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
-      "  --lane-sizes <file>       write per-beat element counts and bytes of every sync lane (CSV)\n"
+      "  --bone-stats <file>       write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
+      "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -174,6 +175,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
+  (void)ReadOption("--bone-stats", options.boneStatsPath);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
@@ -224,6 +226,9 @@ int main(int argc, char** argv)
   }
   if (!result.wireSummary.empty()) {
     std::printf("[%s] %s\n", label, result.wireSummary.c_str());
+  }
+  if (!result.boneSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
   std::printf(
     "[%s] beats=%d last-beat=%d game-over=%s desync-reports=%d digests=%llu load=%.1fs play=%.1fs\n",

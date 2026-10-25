@@ -34,6 +34,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "remote/ContentTables.h"
+#include "replay/ReplayBoneStats.h"
 #include "replay/ReplayWireStats.h"
 
 namespace faf::replay
@@ -470,6 +471,14 @@ namespace faf::replay
       return result;
     }
 
+    std::unique_ptr<CReplayBoneStats> boneStats;
+    if (!options.boneStatsPath.empty()) {
+      boneStats = std::make_unique<CReplayBoneStats>(options.boneStatsPath);
+      if (!boneStats->IsOpen()) {
+        result.error = "cannot write " + options.boneStatsPath;
+        return result;
+      }
+    }
     std::unique_ptr<CReplayWireStats> wireStats;
     if (!options.wireStatsPath.empty()) {
       wireStats = std::make_unique<CReplayWireStats>(
@@ -558,6 +567,9 @@ namespace faf::replay
         if (wireStats) {
           wireStats->OnPacket(*packet);
         }
+        if (boneStats) {
+          boneStats->OnPacket(*packet);
+        }
         if (packet->mGameOver) {
           result.gameOver = true;
         }
@@ -601,6 +613,9 @@ namespace faf::replay
     }
     if (wireStats) {
       result.wireSummary = wireStats->Summary();
+    }
+    if (boneStats) {
+      result.boneSummary = boneStats->Finish();
     }
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;
