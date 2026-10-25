@@ -22882,6 +22882,22 @@ namespace
 	constexpr int8_t kScrTagBoolean = 3;
 	constexpr int8_t kScrTagTableBegin = 4;
 	constexpr int8_t kScrTagTableEnd = 5;
+
+	// Deepest table nesting the decoder accepts. Each nested table is one
+	// recursion, and a 64 KB lobby message or sim callback holds 65535
+	// table-begin tags, enough to overflow any thread's stack. Nothing the
+	// engine or the game's Lua sends nests within an order of magnitude of it.
+	constexpr int kScrMaxTableDepth = 256;
+
+	// The stream comes off the network (lobby data, sim callbacks, chat), so a
+	// malformed one is the sender's fault: it fails the decode like a short
+	// read (BinaryReader::PrematureEOF) does, and the caller drops it.
+	[[noreturn]] void ThrowMalformedScrStream(const char* const reason)
+	{
+		throw std::runtime_error(std::string("Malformed lua byte stream: ") + reason);
+	}
+
+	void ReadScrValue(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader, int tablesLeft);
 } // namespace
 
 /**
@@ -22890,78 +22906,117 @@ namespace
  * What it does:
  * Deserializes one tagged Lua payload from a binary stream and recursively
  * rebuilds nested table key/value pairs.
+ *
+ * A malformed stream (truncated, nested deeper than kScrMaxTableDepth, or a
+ * table entry whose key or value is nil or whose key is NaN) throws a
+ * std::runtime_error; the shipped body called gpg::Die for a nil key or
+ * value and recursed without bound, so any peer could end the process.
  */
 void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader)
 {
 	Ensure(state != nullptr, "state");
 	Ensure(reader != nullptr, "reader");
 
-	LuaObject result;
-	int8_t luaType = 0;
-	reader->ReadExact(luaType);
-
-	switch (luaType) {
-		case kScrTagNumber: {
-			float number = 0.0f;
-			reader->ReadExact(number);
-			result.AssignNumber(state, number);
-			break;
-		}
-		case kScrTagString: {
-			msvc8::string string;
-			reader->ReadString(&string);
-			result.AssignString(state, string.c_str());
-			break;
-		}
-		case kScrTagNil:
-			result.AssignNil(state);
-			break;
-		case kScrTagBoolean: {
-			int8_t byteValue = 0;
-			reader->ReadExact(byteValue);
-			result.AssignBoolean(state, byteValue != 0);
-			break;
-		}
-		case kScrTagTableBegin: {
-			result.AssignNewTable(state, 0, 0);
-
-			// Peek the next tag through Stream::CheckByte: it reads one byte and
-			// rewinds the read window by one. Reaching for the virtual unget
-			// directly instead skips that rewind, and MemBufferStream's override
-			// throws unconditionally - which made every table fail to load.
-			gpg::Stream& stream = *const_cast<gpg::Stream*>(reader->stream());
-			while (stream.CheckByte() != kScrTagTableEnd) {
-				LuaObject key;
-				SCR_FromByteStream(key, state, reader);
-				if (key.IsNil()) {
-					gpg::Die("Deserialized nil table key.");
-				}
-
-				LuaObject value;
-				SCR_FromByteStream(value, state, reader);
-				if (value.IsNil()) {
-					gpg::Die("Deserialized nil table value.");
-				}
-
-				result.SetObject(key, value);
-			}
-
-			// Consume the end-of-table tag the peek left in place.
-			(void)reader->ReadChar();
-			break;
-		}
-		case kScrTagTableEnd:
-			gpg::Warnf("Error deseralizing lua object: unexpected end-of-table marker encountered.");
-			result.AssignNil(state);
-			break;
-		default:
-			gpg::Warnf("Attempt to deserialize unknown lua data.");
-			result.AssignNil(state);
-			break;
-	}
-
-	out = result;
+	ReadScrValue(out, state, reader, kScrMaxTableDepth);
 }
+
+/**
+ * Engine addition, not in the binary: see the declaration. The stream was
+ * written by ToByteStream in this process, which recursed as deep as this
+ * decode will, so the nesting cap guards nothing here.
+ */
+void LuaObject::SCR_FromLocalByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader)
+{
+	Ensure(state != nullptr, "state");
+	Ensure(reader != nullptr, "reader");
+
+	ReadScrValue(out, state, reader, std::numeric_limits<int>::max());
+}
+
+namespace
+{
+	/**
+	 * What it does:
+	 * The body of SCR_FromByteStream, one tagged value at a time;
+	 * `tablesLeft` is how many more levels of table nesting may be opened.
+	 */
+	void ReadScrValue(LuaObject& out, LuaState* const state, const gpg::BinaryReader* const reader, const int tablesLeft)
+	{
+		LuaObject result;
+		int8_t luaType = 0;
+		reader->ReadExact(luaType);
+
+		switch (luaType) {
+			case kScrTagNumber: {
+				float number = 0.0f;
+				reader->ReadExact(number);
+				result.AssignNumber(state, number);
+				break;
+			}
+			case kScrTagString: {
+				msvc8::string string;
+				reader->ReadString(&string);
+				result.AssignString(state, string.c_str());
+				break;
+			}
+			case kScrTagNil:
+				result.AssignNil(state);
+				break;
+			case kScrTagBoolean: {
+				int8_t byteValue = 0;
+				reader->ReadExact(byteValue);
+				result.AssignBoolean(state, byteValue != 0);
+				break;
+			}
+			case kScrTagTableBegin: {
+				if (tablesLeft <= 0) {
+					ThrowMalformedScrStream("tables nested too deeply");
+				}
+				result.AssignNewTable(state, 0, 0);
+
+				// Peek the next tag through Stream::CheckByte: it reads one byte and
+				// rewinds the read window by one. Reaching for the virtual unget
+				// directly instead skips that rewind, and MemBufferStream's override
+				// throws unconditionally - which made every table fail to load.
+				gpg::Stream& stream = *const_cast<gpg::Stream*>(reader->stream());
+				while (stream.CheckByte() != kScrTagTableEnd) {
+					LuaObject key;
+					ReadScrValue(key, state, reader, tablesLeft - 1);
+					if (key.IsNil()) {
+						ThrowMalformedScrStream("nil table key");
+					}
+					// A NaN key makes luaH_set raise a Lua error, which unwinds with
+					// the error message still pushed on the Lua stack.
+					if (key.IsNumber() && key.GetNumber() != key.GetNumber()) {
+						ThrowMalformedScrStream("NaN table key");
+					}
+
+					LuaObject value;
+					ReadScrValue(value, state, reader, tablesLeft - 1);
+					if (value.IsNil()) {
+						ThrowMalformedScrStream("nil table value");
+					}
+
+					result.SetObject(key, value);
+				}
+
+				// Consume the end-of-table tag the peek left in place.
+				(void)reader->ReadChar();
+				break;
+			}
+			case kScrTagTableEnd:
+				gpg::Warnf("Error deseralizing lua object: unexpected end-of-table marker encountered.");
+				result.AssignNil(state);
+				break;
+			default:
+				gpg::Warnf("Attempt to deserialize unknown lua data.");
+				result.AssignNil(state);
+				break;
+		}
+
+		out = result;
+	}
+} // namespace
 
 /**
  * Address: 0x00907C90 (FUN_00907C90, LuaPlus::LuaObject::GetBoolean)

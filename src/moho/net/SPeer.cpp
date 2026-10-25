@@ -77,8 +77,10 @@ namespace moho
     out.AssignNewTable(state, 0, 0);
     out.SetString("name", peer->playerName.c_str());
 
+    // `to_chars` does not terminate, and the buffer is reused below: write
+    // the terminator, or a shorter id keeps the previous one's trailing digits.
     char idBuf[kPlayerUidBufSize]{};
-    std::to_chars(idBuf, idBuf + kPlayerUidBufSize, peer->uid);
+    *std::to_chars(idBuf, idBuf + kPlayerUidBufSize - 1, peer->uid).ptr = '\0';
     out.SetString("id", idBuf);
 
     msvc8::string peerStatus;
@@ -92,7 +94,7 @@ namespace moho
     establishedPeersTable.AssignNewTable(state, 0, 0);
     int index = 1;
     for (const int32_t establishedUid : peer->establishedUids) {
-      std::to_chars(idBuf, idBuf + kPlayerUidBufSize, establishedUid);
+      *std::to_chars(idBuf, idBuf + kPlayerUidBufSize - 1, establishedUid).ptr = '\0';
       establishedPeersTable.SetString(index++, idBuf);
     }
 

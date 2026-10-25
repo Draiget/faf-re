@@ -235,6 +235,8 @@ bool CMessage::ReadMessage(gpg::Stream* stream)
  *
  * What it does:
  * Incrementally reads header and payload with non-blocking stream reads.
+ * A header claiming fewer than 3 bytes makes this return false for good;
+ * callers that read remote streams check `HasInvalidLength()` for it.
  */
 bool CMessage::Read(gpg::Stream* stream)
 {

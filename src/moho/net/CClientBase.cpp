@@ -1,5 +1,6 @@
 #include "CClientBase.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -15,6 +16,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "IClientMgrUIInterface.h"
+#include "moho/misc/DiagnosticBudget.h"
 using namespace moho;
 
 namespace
@@ -60,6 +62,41 @@ namespace
     reader->Read(reinterpret_cast<char*>(&value), sizeof(value));
     return value;
   }
+
+  /**
+   * Engine addition, not in the binary: the fewest payload bytes each message
+   * `Process` (and `UpdateState`, for the two command-stream ops it reads)
+   * parses with `ReadExact` needs. The binary read them unchecked, so a
+   * header-only message from a peer threw `PrematureEOF` out of the
+   * connection's dispatch on the issue thread and terminated the process.
+   * Every message the engine writes is at least this long.
+   */
+  [[nodiscard]] std::size_t MinimumPayloadBytes(const uint8_t msgType) noexcept
+  {
+    switch (msgType) {
+    case static_cast<uint8_t>(ECmdStreamOp::CMDST_Advance):
+      return sizeof(int32_t);
+    case static_cast<uint8_t>(ECmdStreamOp::CMDST_SetCommandSource):
+      return sizeof(uint8_t);
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_Ack):
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject):
+      return sizeof(uint8_t) + sizeof(int32_t);
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_Dispatched):
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_Available):
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_IntParam):
+      return sizeof(int32_t);
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_AdjustSimSpeed):
+      return 2 * sizeof(int32_t);
+    case static_cast<uint8_t>(EClientMsg::CLIMSG_ReceiveChat):
+      // An empty chat payload reached the UI's Lua decode and threw there.
+      return 1;
+    default:
+      return 0;
+    }
+  }
+
+  moho::DiagnosticBudget sDroppedMessageWarnings;
+  constexpr int kMaxDroppedMessageWarnings = 100;
 } // namespace
 
 /**
@@ -261,6 +298,22 @@ void CClientBase::Process(CMessage& msg)
   gpg::BinaryReader reader(&stream);
 
   const uint8_t msgType = msg.GetType().raw();
+
+  // Engine addition: a message too short for its fixed fields is dropped. The
+  // decision is made from the bytes alone, so every receiver drops it alike.
+  if (static_cast<std::size_t>(msg.GetMessageSize()) < MinimumPayloadBytes(msgType)) {
+    if (sDroppedMessageWarnings.Take(kMaxDroppedMessageWarnings)) {
+      gpg::Warnf(
+        "CClientBase::Process(): dropping truncated message type %d (%d bytes) from client %d:%s",
+        static_cast<int>(msgType),
+        msg.GetMessageSize(),
+        mIndex,
+        mNickname.c_str()
+      );
+    }
+    return;
+  }
+
   if (msgType < static_cast<uint8_t>(EClientMsg::CLIMSG_Ack)) {
     if (msgType == static_cast<uint8_t>(ECmdStreamOp::CMDST_Advance)) {
       int32_t beatDelta = 0;
@@ -408,7 +461,11 @@ void CClientBase::Process(CMessage& msg)
     return;
 
   default:
-    gpg::Logf("CClientBase::Queue(): Ignoring message type %d", static_cast<int>(msgType));
+    // Engine addition: throttled. A peer can send these types at will (58, 59
+    // and the 200..209 connection-event range are routed here from the wire).
+    if (sDroppedMessageWarnings.Take(kMaxDroppedMessageWarnings)) {
+      gpg::Logf("CClientBase::Queue(): Ignoring message type %d", static_cast<int>(msgType));
+    }
     return;
   }
 }
@@ -457,8 +514,14 @@ void CClientBase::HandleIncomingEjectRequest(const uint8_t targetClientIndex, co
  * Applies inbound adjustable-speed arbitration. Newer clocks win; ties are
  * broken by lower requester index.
  */
-void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const int32_t requestedSimRate)
+void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, int32_t requestedSimRate)
 {
+  // Engine addition, not in the binary: the request is held to the range the
+  // speed controls can produce (`WLD_DecreaseSimRate` stops at -10,
+  // `WLD_IncreaseSimRate` at 50). A peer's -1000 otherwise reached
+  // `GetSimRateRequested`, whose 10^(rate/10) froze the display clock.
+  requestedSimRate = std::clamp(requestedSimRate, -10, 50);
+
   if ((mManager->mGameSpeedClock < speedClock) ||
       ((mManager->mGameSpeedClock == speedClock) &&
        (static_cast<uint32_t>(mIndex) < static_cast<uint32_t>(mManager->mGameSpeedRequester)))) {

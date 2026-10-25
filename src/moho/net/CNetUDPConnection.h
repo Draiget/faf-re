@@ -320,6 +320,18 @@ namespace moho
     void UpdatePingInfoFromPacket(const SNetPacket& packet);
 
     /**
+     * Address: <synthetic helper; the binary inlines this in its decompression
+     *   error handler at 0x0048710B>
+     *
+     * What it does:
+     * Gives up on the receive side after unusable input: drops the inflate
+     * filter, closes the input stream and marks the connection errored, so
+     * dispatch reports `LOBMSG_ConnLostErrored` once the buffered messages run
+     * out. Caller holds the connector lock.
+     */
+    void AbortInput();
+
+    /**
       * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE bool InsertEarlySorted(SNetPacket* packet);
@@ -391,10 +403,15 @@ namespace moho
     bool mReceivedEndOfInput{false};
     bool mDispatchedEndOfInput{false};
     CMessage mMessage;
-    uint32_t mReservedE38{0};
+    // Messages dispatched with no receiver registered; only the first few are
+    // logged, so a peer cannot flood the log (the binary never writes +0xE38).
+    uint32_t mUnroutedMessageCount{0};
     bool mScheduleDestroy{false};
     bool mDestroyed{false};
     bool mClosed{false};
+    // Set once the locally injected LOBMSG_ConnMade has been dispatched (in
+    // the alignment gap the binary leaves before the byte counters).
+    bool mDispatchedConnMade{false};
     int64_t mTotalBytesQueued{0};
     int64_t mTotalBytesSent{0};
     int64_t mTotalBytesReceived{0};

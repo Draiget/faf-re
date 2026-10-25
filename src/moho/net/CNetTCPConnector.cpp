@@ -100,6 +100,14 @@ namespace moho
           return;
         }
 
+        // A header claiming under 3 bytes never completes; without this the
+        // partial would sit on its socket buffering whatever follows.
+        if (mMessage.HasInvalidLength()) {
+          gpg::Logf("SPartialConnection<%s:%d>::Pull(): corrupt handshake.", NET_GetHostName(mAddr).c_str(), mPort);
+          delete this;
+          return;
+        }
+
         received = ::recv(mSocket, buffer, static_cast<int>(sizeof(buffer)), 0);
       }
 

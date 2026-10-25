@@ -1,6 +1,7 @@
 #include "CNetDatagramSocketImpl.h"
 #include <algorithm>
 #include <cstring>
+#include <exception>
 
 #include "CMessage.h"
 #include "Common.h"
@@ -84,6 +85,12 @@ void CNetDatagramSocketImpl::Pull()
   int fromLen = static_cast<int>(sizeof(from));
   int bytesRead = recvfrom(mSocket, recvBuffer, kRecvCapacity, 0, reinterpret_cast<sockaddr*>(&from), &fromLen);
 
+  // The socket is open to anyone on the network. Handling a datagram runs
+  // script, so stop after a batch rather than chase a flood: the rest stays
+  // queued, and the next `recvfrom` re-arms the read event for it.
+  constexpr int kMaxDatagramsPerPull = 64;
+  int datagramsHandled = 0;
+
   if (bytesRead >= 0) {
     CMessage msg{};
     do {
@@ -93,9 +100,34 @@ void CNetDatagramSocketImpl::Pull()
 
       const u_short peerPort = ntohs(from.sin_port);
       const u_long peerAddress = ntohl(from.sin_addr.s_addr);
-      mDatagramHandler->OnDatagram(&msg, this, peerAddress, peerPort);
+
+      // A sender always transmits one whole message, so its header's
+      // wire-size is the datagram length. Handlers read the payload by that
+      // header size: anything else would read past the datagram.
+      if (bytesRead >= 3 && msg.GetSize() == static_cast<unsigned>(bytesRead)) {
+        try {
+          mDatagramHandler->OnDatagram(&msg, this, peerAddress, peerPort);
+        } catch (const std::exception& e) {
+          // A short payload ends in `BinaryReader::PrematureEOF`; unhandled,
+          // it would abort the task thread that owns this socket.
+          static int sMalformedLogged = 0;
+          if (sMalformedLogged < 16) {
+            ++sMalformedLogged;
+            gpg::Logf(
+              "CNetDatagramSocketImpl::Pull: dropping malformed datagram from %s:%d: %s",
+              NET_GetDottedOctetFromUInt32(peerAddress).c_str(),
+              static_cast<int>(peerPort),
+              e.what()
+            );
+          }
+        }
+      }
 
       msg.Clear();
+
+      if (++datagramsHandled >= kMaxDatagramsPerPull) {
+        return;
+      }
 
       std::memset(&from, 0, sizeof(from));
       fromLen = static_cast<int>(sizeof(from));

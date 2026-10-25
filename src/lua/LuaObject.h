@@ -744,6 +744,15 @@ namespace LuaPlus
 		void SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader);
 
 		/**
+		 * Engine addition, not in the binary: SCR_FromByteStream without its
+		 * table-nesting cap, for a stream this process encoded itself (the sim's
+		 * `Sync` table). Sim script copies remote players' callback tables into
+		 * `Sync` a few levels down, so a table the capped decode accepted on the
+		 * way in could exceed the cap on the way out to the UI.
+		 */
+		void SCR_FromLocalByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader);
+
+		/**
 		 * Address: 0x004D2C80 (FUN_004D2C80, ?SCR_ToByteStream@Moho@@YA_NABVLuaObject@LuaPlus@@AAVStream@gpg@@@Z)
 		 *
 		 * What it does:

@@ -3,6 +3,7 @@
 
 #include <boost/bind.hpp>
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <cstdint>
 #include <limits>
@@ -134,6 +135,29 @@ namespace
   )
   {
     gpg::Warnf("GPGNET: Ignoring unknown gpg.net command \"%s\".", commandName.c_str());
+  }
+
+  /**
+   * What it does:
+   * Says whether the next "received nat packet" line may be logged. Anyone
+   * who can reach the game port can send NAT-traversal datagrams, one log
+   * line each, so the lines share a budget that refills every few seconds.
+   */
+  [[nodiscard]] bool ConsumeNatPacketLogBudget() noexcept
+  {
+    using Clock = std::chrono::steady_clock;
+    constexpr int kLinesPerWindow = 16;
+    constexpr auto kWindow = std::chrono::seconds(10);
+
+    static Clock::time_point sWindowStart{};
+    static int sLinesInWindow = 0;
+
+    const Clock::time_point now = Clock::now();
+    if (now - sWindowStart >= kWindow) {
+      sWindowStart = now;
+      sLinesInWindow = 0;
+    }
+    return sLinesInWindow++ < kLinesPerWindow;
   }
 
   /**
@@ -874,7 +898,9 @@ void CGpgNetInterface::ReceivePacket(
 )
 {
   const auto ip = NET_GetDottedOctetFromUInt32(address);
-  gpg::Logf("GPGNET: received nat packet from %s:%d", ip.c_str(), port);
+  if (ConsumeNatPacketLogBudget()) {
+    gpg::Logf("GPGNET: received nat packet from %s:%d", ip.c_str(), port);
+  }
 
   const msvc8::string connStr = gpg::STR_Printf("%s:%d", ip.c_str(), static_cast<int>(port));
   SNetCommandArg argFrom(connStr);
