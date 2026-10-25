@@ -1686,7 +1686,8 @@ void moho::UI_MakeSelectionSet(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  LuaPlus::LuaState* const state = USER_GetLuaState();
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
   if (state == nullptr) {
     return;
   }
