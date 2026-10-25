@@ -280,6 +280,17 @@ long moho::WD3DViewport::MSWWindowProc(
     }
   }
 
+  // FAF hot-patch (FA-Binary-Patches OnWindowMessage): 0x00430C0E calls 0x01291029 instead of
+  // wxWindow::MSWWindowProc, which hands the side mouse buttons to wx as key presses of
+  // VK_XBUTTON1/VK_XBUTTON2, so they can be bound like keys. lParam: repeat count 1, scan
+  // code 0xFF, and for the release the previous-state and transition bits.
+  if (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP) {
+    const bool pressed = message == WM_XBUTTONDOWN;
+    const WXWPARAM virtualKey = static_cast<WXWPARAM>(HIWORD(wParam)) + 4u;
+    const WXLPARAM keyInfo = static_cast<WXLPARAM>(pressed ? 0x00FF0001u : 0xC0FF0001u);
+    return wxWindow::MSWWindowProc(pressed ? WM_KEYDOWN : WM_KEYUP, virtualKey, keyInfo);
+  }
+
   return wxWindow::MSWWindowProc(message, wParam, lParam);
 }
 
