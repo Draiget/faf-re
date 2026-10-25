@@ -1,9 +1,15 @@
 #include "remote/FrameBuilder.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
+#include "moho/audio/CSndParams.h"
+#include "moho/audio/CSndVar.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
+#include "moho/render/textures/CD3DFileBatchTexture.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
@@ -14,8 +20,23 @@ namespace faf::remote
 {
   namespace
   {
+    /** A sound's session-table id: its names, as `Sound{...}` / `RPCSound{...}` were given them. */
+    [[nodiscard]] std::uint32_t SoundId(const moho::CSndParams* const params, wire::CSessionTableWriters* const session)
+    {
+      if (params == nullptr || session == nullptr) {
+        return wire::COrdinalTable::kNone;
+      }
+      wire::SSoundEntry entry;
+      entry.bank = params->mBank.c_str();
+      entry.cue = params->mCue.c_str();
+      entry.lodCutoff = params->mLodCutoff != nullptr ? params->mLodCutoff->mName.c_str() : "";
+      entry.rpcLoop = params->mRpcLoopVariable != nullptr ? params->mRpcLoopVariable->mName.c_str() : "";
+      return session->Sound(entry);
+    }
+
     void ApplyAppearance(
-      wire::SAppearance& look, const moho::SSTIEntityVariableData& data, const wire::SContentTables& tables
+      wire::SAppearance& look, const moho::SSTIEntityVariableData& data, const wire::SContentTables& tables,
+      wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
     )
     {
       look.mesh = data.mMeshBlueprint != nullptr ? tables.meshes.Ordinal(data.mMeshBlueprint->mBlueprintId.c_str())
@@ -34,14 +55,26 @@ namespace faf::remote
       const moho::SSTIIntelAttributes& intel = data.mIntelAttributes;
       look.intel = {intel.vision, intel.waterVision, intel.radar, intel.sonar,
                     intel.omni, intel.radarStealth, intel.sonarStealth, intel.cloak};
+      look.ambientSound = SoundId(data.mAmbientSound, session);
+      look.rumbleSound = SoundId(data.mRumbleSound, session);
+      // The underlay is a file texture (`Entity::SetStrategicUnderlay` loads it by path, no border).
+      look.underlay = wire::COrdinalTable::kNone;
+      if (data.mUnderlayTexture) {
+        const auto* const file = dynamic_cast<const moho::CD3DFileBatchTexture*>(data.mUnderlayTexture.get());
+        if (file != nullptr && file->mBorder == 0u && session != nullptr) {
+          look.underlay = session->Name(file->GetFilename().c_str());
+        } else {
+          ++unknownUnderlays;
+        }
+      }
     }
 
     void ApplyVariableData(
       wire::SEntityRecord& record, const moho::SSTIEntityVariableData& data, const wire::SFrameCodec& codec,
-      const wire::SContentTables& tables
+      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
     )
     {
-      ApplyAppearance(record.appearance, data, tables);
+      ApplyAppearance(record.appearance, data, tables, session, unknownUnderlays);
       const auto& pos = data.mCurTransform.pos_;
       const auto& orient = data.mCurTransform.orient_;
       record.position = {codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)};
@@ -176,6 +209,30 @@ namespace faf::remote
     , mOrphanBeats(orphanBeats)
   {}
 
+  void ReadUnitStats(
+    moho::Stats<moho::StatItem>& stats, wire::CSessionTableWriters& session, std::vector<wire::SUnitStat>& out
+  )
+  {
+    out.clear();
+    moho::STAT_VisitItems(stats, [&](const msvc8::string& path, moho::StatItem& item) {
+      wire::SUnitStat stat{};
+      stat.name = session.Name(path.c_str());
+      stat.type = static_cast<std::uint8_t>(static_cast<std::uint32_t>(item.mType) & 3u);
+      stat.realtime = item.mUseRealtimeSlot == 1;
+      if (stat.type == wire::SUnitStat::kString) {
+        msvc8::string value;
+        (void)item.GetString(stat.realtime, &value);
+        stat.text = session.Name(value.c_str());
+      } else {
+        stat.bits = static_cast<std::uint32_t>(stat.realtime ? item.mRealtimeValueBits : item.mPrimaryValueBits);
+      }
+      if (out.size() < wire::SUnitFields::kMaxStats) {
+        out.push_back(stat);
+      }
+    });
+    std::sort(out.begin(), out.end(), [](const wire::SUnitStat& a, const wire::SUnitStat& b) { return a.name < b.name; });
+  }
+
   void CViewFrameBuilder::Apply(const moho::SSyncData& packet)
   {
     // Orphaned records whose window has passed leave the frame (as a delete would; the
@@ -184,6 +241,7 @@ namespace faf::remote
     for (auto it = mOrphanedAt.begin(); it != mOrphanedAt.end();) {
       if (beat - it->second >= mOrphanBeats) {
         mWorld.erase(it->first);
+        mUnitStats.erase(it->first);
         it = mOrphanedAt.erase(it);
       } else {
         ++it;
@@ -207,12 +265,20 @@ namespace faf::remote
       (void)create(params);
     }
     for (const moho::SCreateUnitParams& params : packet.mNewUnits) {
-      create(params).isUnit = true;
+      wire::SEntityRecord& record = create(params);
+      record.isUnit = true;
+      record.unit.buildStateTag = params.mConstDat.mBuildStateTag;
+      record.unit.fake = params.mConstDat.mFake;
+      if (params.mConstDat.mStatsRoot) {
+        mUnitStats[record.id] = params.mConstDat.mStatsRoot;
+      } else {
+        mUnitStats.erase(record.id);
+      }
     }
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
       const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
       if (it != mWorld.end()) {
-        ApplyVariableData(it->second, update.mVariableData, mCodec, mTables);
+        ApplyVariableData(it->second, update.mVariableData, mCodec, mTables, mSession, mUnknownUnderlays);
       }
     }
     for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
@@ -230,6 +296,7 @@ namespace faf::remote
     }
     for (const moho::EntId id : packet.mDeleteIds) {
       mWorld.erase(static_cast<std::uint32_t>(id));
+      mUnitStats.erase(static_cast<std::uint32_t>(id));
       mOrphanedAt.erase(static_cast<std::uint32_t>(id));
     }
   }
@@ -239,6 +306,15 @@ namespace faf::remote
     wire::SViewFrame frame{};
     frame.frameId = mNextFrameId++;
     frame.beat = beat;
+    // Unit stats are live in the sim (the lockstep UI reads them from the sim's own tree), so
+    // every unit's tree is read again for each frame.
+    if (mSession != nullptr) {
+      for (const auto& [id, stats] : mUnitStats) {
+        if (const auto it = mWorld.find(id); it != mWorld.end()) {
+          ReadUnitStats(*stats, *mSession, it->second.unit.stats);
+        }
+      }
+    }
     frame.entities.reserve(mWorld.size());
     for (const auto& [id, record] : mWorld) {
       frame.entities.push_back(record);

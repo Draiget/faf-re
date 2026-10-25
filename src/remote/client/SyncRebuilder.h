@@ -7,6 +7,7 @@
 
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "remote/wire/EntityFrame.h"
+#include "remote/wire/SessionTables.h"
 
 // Engine addition, server mode (plan WP11.2): the client side of the entities lane. It decodes
 // each beat's view frame against the frame it decoded last, and rewrites the packet's entity
@@ -27,6 +28,11 @@ namespace moho
   struct REntityBlueprint;
   struct RMeshBlueprint;
   class RScmResource;
+  class CSndParams;
+  class StatItem;
+  template <class T>
+  class Stats;
+  class CD3DBatchTexture;
   struct SSyncData;
 }
 
@@ -61,10 +67,15 @@ namespace faf::remote::client
     std::uint64_t deleteMismatches = 0;
     std::uint64_t packetUpdatesDropped = 0; // entity or unit updates for ids the client does not hold
     std::uint64_t unitChangesWithoutUpdate = 0;
-    std::uint64_t entityDataBorrowed = 0;  // updates taking the sounds and underlay from the packet
+    std::uint64_t entityDataBorrowed = 0;  // updates the packet also has (compared, not used)
     std::uint64_t meshMismatches = 0;      // client's mesh blueprint versus the packet's
     std::uint64_t meshResourceMismatches = 0;
-    std::uint64_t unitConstantsMissing = 0;
+    std::uint64_t soundMismatches = 0;     // client's ambient/rumble params versus the packet's
+    std::uint64_t underlayMismatches = 0;
+    std::uint64_t unknownTableIds = 0;     // a sound or name id the session tables do not have
+    std::uint64_t unitConstantsMissing = 0;   // creation constants that differ from the packet's
+    std::uint64_t tickMismatches = 0;         // creation tick (the beat's) versus the packet's
+    std::uint64_t statsApplied = 0;           // unit stat items written into client trees
     std::uint64_t positionsOutOfRange = 0;  // shown more than a unit from the sim: clamped by the quantiser
     double maxPositionError = 0.0;
     double decodeSeconds = 0.0;            // DecodeFrame
@@ -95,13 +106,31 @@ namespace faf::remote::client
     {
       bool live = false; // in the session's id map (not orphaned)
       moho::SSTIEntityVariableData data{};
+      boost::shared_ptr<moho::Stats<moho::StatItem>> stats; // a unit's stats tree (the client's own)
     };
+
+    /** Writes a frame's unit stats into the client's tree of that unit. */
+    void ApplyUnitStats(const std::vector<wire::SUnitStat>& stats, moho::Stats<moho::StatItem>& tree);
 
     struct SMeshResource
     {
       bool resolved = false;
       boost::shared_ptr<moho::RScmResource> resource;
     };
+
+    /** The session tables the frames' sound and name ids refer to (WP7.2). */
+  public:
+    void SetSessionTables(const wire::CSessionTableReaders* session) noexcept { mSession = session; }
+
+  private:
+    struct SUnderlay
+    {
+      bool resolved = false;
+      boost::shared_ptr<moho::CD3DBatchTexture> texture;
+    };
+
+    [[nodiscard]] moho::CSndParams* ResolveSound(std::uint32_t id);
+    [[nodiscard]] boost::shared_ptr<moho::CD3DBatchTexture> ResolveUnderlay(std::uint32_t id);
 
     /** Mesh blueprint and resource for a meshes-table ordinal, as `Entity::SetMesh` sets them. */
     void ResolveMesh(std::uint32_t ordinal, moho::SSTIEntityVariableData& data);
@@ -112,6 +141,9 @@ namespace faf::remote::client
     std::vector<const moho::REntityBlueprint*> mBlueprints;
     std::vector<moho::RMeshBlueprint*> mMeshes;
     std::vector<SMeshResource> mMeshResources;
+    const wire::CSessionTableReaders* mSession = nullptr;
+    std::vector<moho::CSndParams*> mSounds;   // by sound id, resolved on first use
+    std::vector<SUnderlay> mUnderlays;        // by name id
     wire::SViewFrame mShown;
     bool mHasShown = false;
     std::unordered_map<std::uint32_t, SHeldEntity> mHeld;

@@ -65,7 +65,8 @@ namespace faf::remote::wire
     {
       return Bits(a.fuelRatio) == Bits(b.fuelRatio) && Bits(a.shieldRatio) == Bits(b.shieldRatio)
           && Bits(a.workProgress) == Bits(b.workProgress) && a.unitStates == b.unitStates
-          && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags;
+          && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags
+          && a.stats == b.stats && a.buildStateTag == b.buildStateTag && a.fake == b.fake;
     }
 
     [[nodiscard]] bool SameFloats(const float* a, const float* b, const std::size_t count) noexcept
@@ -102,6 +103,12 @@ namespace faf::remote::wire
       }
       if (b.intel != a.intel) {
         fields |= kFieldIntel;
+      }
+      if (b.ambientSound != a.ambientSound || b.rumbleSound != a.rumbleSound) {
+        fields |= kFieldSounds;
+      }
+      if (b.underlay != a.underlay) {
+        fields |= kFieldUnderlay;
       }
       return fields;
     }
@@ -179,6 +186,23 @@ namespace faf::remote::wire
       if ((fields & kFieldUnitFlags) != 0u) {
         writer.WriteBits(unit.unitFlags, kUnitFlagBits);
       }
+      if ((fields & kFieldUnitStats) != 0u) {
+        writer.WriteVarUint(static_cast<std::uint32_t>(unit.stats.size()));
+        for (const SUnitStat& stat : unit.stats) {
+          writer.WriteVarUint(stat.name);
+          writer.WriteBits(stat.type, 2);
+          writer.WriteBool(stat.realtime);
+          if (stat.type == SUnitStat::kString) {
+            writer.WriteVarUint(stat.text + 1u);
+          } else {
+            writer.WriteBits(stat.bits, 32);
+          }
+        }
+      }
+      if ((fields & kFieldUnitConstants) != 0u) {
+        writer.WriteBits(unit.buildStateTag, 8);
+        writer.WriteBits(unit.fake, 8);
+      }
       const SAppearance& look = record.appearance;
       if ((fields & kFieldMesh) != 0u) {
         writer.WriteVarUint(look.mesh);
@@ -210,6 +234,14 @@ namespace faf::remote::wire
         for (const std::uint32_t radius : look.intel) {
           writer.WriteVarUint(radius);
         }
+      }
+      // Table ids go as id + 1, so "none" (kNone) is 0.
+      if ((fields & kFieldSounds) != 0u) {
+        writer.WriteVarUint(look.ambientSound + 1u);
+        writer.WriteVarUint(look.rumbleSound + 1u);
+      }
+      if ((fields & kFieldUnderlay) != 0u) {
+        writer.WriteVarUint(look.underlay + 1u);
       }
     }
 
@@ -301,6 +333,36 @@ namespace faf::remote::wire
       if ((fields & kFieldUnitFlags) != 0u) {
         unit.unitFlags = static_cast<std::uint8_t>(reader.ReadBits(kUnitFlagBits));
       }
+      if ((fields & kFieldUnitStats) != 0u) {
+        const std::uint32_t count = reader.ReadVarUint();
+        if (!reader.Ok() || count > SUnitFields::kMaxStats || static_cast<std::uint64_t>(count) * 11u > reader.BitsLeft()) {
+          reader.Fail();
+          return false;
+        }
+        unit.stats.resize(count);
+        for (SUnitStat& stat : unit.stats) {
+          stat.name = reader.ReadVarUint();
+          stat.type = static_cast<std::uint8_t>(reader.ReadBits(2));
+          stat.realtime = reader.ReadBool();
+          if (stat.type == SUnitStat::kString) {
+            stat.text = reader.ReadVarUint() - 1u;
+            stat.bits = 0;
+          } else {
+            stat.bits = reader.ReadBits(32);
+            stat.text = SUnitStat{}.text;
+          }
+        }
+        for (std::size_t i = 1; i < unit.stats.size(); ++i) {
+          if (unit.stats[i - 1].name >= unit.stats[i].name) {
+            reader.Fail(); // names ascending and unique
+            return false;
+          }
+        }
+      }
+      if ((fields & kFieldUnitConstants) != 0u) {
+        unit.buildStateTag = static_cast<std::uint8_t>(reader.ReadBits(8));
+        unit.fake = static_cast<std::uint8_t>(reader.ReadBits(8));
+      }
       SAppearance& look = record.appearance;
       if ((fields & kFieldMesh) != 0u) {
         look.mesh = reader.ReadVarUint();
@@ -338,6 +400,13 @@ namespace faf::remote::wire
         for (std::uint32_t& radius : look.intel) {
           radius = reader.ReadVarUint();
         }
+      }
+      if ((fields & kFieldSounds) != 0u) {
+        look.ambientSound = reader.ReadVarUint() - 1u;
+        look.rumbleSound = reader.ReadVarUint() - 1u;
+      }
+      if ((fields & kFieldUnderlay) != 0u) {
+        look.underlay = reader.ReadVarUint() - 1u;
       }
       return reader.Ok();
     }
@@ -467,6 +536,12 @@ namespace faf::remote::wire
       }
       if (b.unitFlags != a.unitFlags) {
         fields |= kFieldUnitFlags;
+      }
+      if (b.stats != a.stats) {
+        fields |= kFieldUnitStats;
+      }
+      if (b.buildStateTag != a.buildStateTag || b.fake != a.fake) {
+        fields |= kFieldUnitConstants;
       }
     }
     return fields;

@@ -1272,6 +1272,22 @@ namespace moho
    */
   struct CSndParamsConstruct : gpg::SerConstructHelper<CSndParams>
   {};
+
+  // Engine addition, server mode: see the declaration.
+#if FAF_SERVER_MODE
+  CSndParams* SND_FindOrCreateParams(
+    const msvc8::string& bankName, const msvc8::string& cueName, const msvc8::string& lodCutoffName,
+    const msvc8::string& rpcLoopName
+  )
+  {
+    SParamKey key{};
+    key.mCueName = cueName;
+    key.mBankName = bankName;
+    key.mLodCutoffVariableName = lodCutoffName;
+    key.mRpcLoopVariableName = rpcLoopName;
+    return FindOrCreateSndParamsByKey(key);
+  }
+#endif
 } // namespace moho
 
 namespace

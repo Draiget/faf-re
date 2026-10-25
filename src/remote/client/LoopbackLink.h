@@ -52,12 +52,16 @@ namespace faf::remote::client
   private:
     wire::SContentTables mTables;
     wire::SFrameCodec mCodec;
+    wire::CSessionTableWriters mServerTables;
+    wire::CSessionTableReaders mClientTables;
     CViewFrameBuilder mBuilder;
     std::optional<CDeadReckoner> mReckoner;
     wire::SViewFrame mLastSent;
     bool mHasSent = false;
     std::uint64_t mEncodeFailures = 0;
     std::uint64_t mRebuildFailures = 0;
+    std::uint64_t mTableFailures = 0;
+    std::uint64_t mTableBytes = 0; // session-table records (the reliable stream)
     double mServerSeconds = 0.0; // building and encoding frames
     double mClientSeconds = 0.0; // decoding and rebuilding packets
     double mMaxBeatSeconds = 0.0;

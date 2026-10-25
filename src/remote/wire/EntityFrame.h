@@ -20,9 +20,32 @@
 
 namespace faf::remote::wire
 {
+  /**
+   * One item of a unit's stats tree (`Stats<StatItem>`, what `UserUnit::GetStat` reads: veterancy,
+   * reclaimed mass, regeneration, toggles). `name` is the item's path ("Parent_Child") in the
+   * session's name table; the value is the slot the UI reads (realtime or synchronised).
+   */
+  struct SUnitStat
+  {
+    static constexpr std::uint8_t kNone = 0;
+    static constexpr std::uint8_t kFloat = 1;
+    static constexpr std::uint8_t kInt = 2;
+    static constexpr std::uint8_t kString = 3;
+
+    std::uint32_t name = 0;
+    std::uint8_t type = kNone;
+    bool realtime = false;
+    std::uint32_t bits = 0;                       // int, or float bits (kInt / kFloat)
+    std::uint32_t text = 0xFFFFFFFFu;             // name table id of the string value (kString)
+
+    [[nodiscard]] bool operator==(const SUnitStat& other) const noexcept = default;
+  };
+
   /** A unit's own state, beyond what every entity has. Exact floats (the UI shows them). */
   struct SUnitFields
   {
+    static constexpr std::size_t kMaxStats = 256;
+
     float fuelRatio = 0.0f;
     float shieldRatio = 0.0f;
     float workProgress = 0.0f;
@@ -30,6 +53,9 @@ namespace faf::remote::wire
     std::uint32_t scriptBits = 0;   // the toggle buttons' bits
     std::array<std::uint16_t, 4> siloCounts{}; // tactical build, nuke build, tactical stored, nuke stored
     std::uint8_t unitFlags = 0;     // paused, auto mode, auto surface, busy, repeat queue, ...
+    std::vector<SUnitStat> stats;   // ascending names; sent whole when any item changes
+    std::uint8_t buildStateTag = 0; // creation constants (SCreateUnitConstantData)
+    std::uint8_t fake = 0;
   };
 
   /**
@@ -50,6 +76,9 @@ namespace faf::remote::wire
     std::array<float, 4> scroll{};                   // texture scroll: beat start x, y, beat end x, y
     std::uint8_t visualFlags = 0;                    // hidden, alt footprint, alt footprint 2, killed, refresh UI
     std::array<std::uint32_t, 8> intel{};            // vision, water vision, radar, sonar, omni, radar/sonar stealth, cloak
+    std::uint32_t ambientSound = COrdinalTable::kNone; // id in the session's sound table
+    std::uint32_t rumbleSound = COrdinalTable::kNone;
+    std::uint32_t underlay = COrdinalTable::kNone;     // strategic underlay texture: id in the session's name table
 
     [[nodiscard]] bool operator==(const SAppearance& other) const noexcept;
   };
@@ -117,11 +146,15 @@ namespace faf::remote::wire
     kFieldImpact = 1u << 20,
     kFieldScroll = 1u << 21,
     kFieldIntel = 1u << 22,
+    kFieldSounds = 1u << 23,
+    kFieldUnderlay = 1u << 24,
+    kFieldUnitStats = 1u << 25,
+    kFieldUnitConstants = 1u << 26,
   };
 
   inline constexpr std::uint32_t kEntityFields = 0x00FFu;
-  inline constexpr std::uint32_t kUnitFields = 0x7F00u;
-  inline constexpr std::uint32_t kAppearanceFields = 0x7F0000u;
+  inline constexpr std::uint32_t kUnitFields = 0x7F00u | kFieldUnitStats | kFieldUnitConstants;
+  inline constexpr std::uint32_t kAppearanceFields = 0x1FF0000u;
   inline constexpr std::uint32_t kAllFields = kEntityFields | kUnitFields | kFieldKind | kAppearanceFields;
 
   /**

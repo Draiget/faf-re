@@ -33,6 +33,8 @@ namespace faf::remote::client
     if (options.deadReckoningTolerance != 0u && mCodec.deadReckoning) {
       mReckoner.emplace(options.deadReckoningTolerance);
     }
+    mBuilder.SetSessionTables(&mServerTables);
+    mRebuilder.SetSessionTables(&mClientTables);
   }
 
   void CLoopbackLink::Pass(moho::SSyncData& packet)
@@ -54,6 +56,16 @@ namespace faf::remote::client
     }
     mLastSent = std::move(frame);
     mHasSent = true;
+    // The session-table entries this beat's frame names go first (the reliable stream).
+    if (mServerTables.HasPending()) {
+      wire::BitWriter tables;
+      mServerTables.WritePending(tables);
+      mTableBytes += tables.Bytes().size();
+      wire::BitReader reader(tables.Bytes());
+      if (!mClientTables.Read(reader)) {
+        ++mTableFailures;
+      }
+    }
     const Clock::time_point encoded = Clock::now();
 
     // Client.
@@ -69,10 +81,11 @@ namespace faf::remote::client
   std::uint64_t CLoopbackLink::CheckFailures() const noexcept
   {
     const SRebuildStats& s = mRebuilder.Stats();
-    return mEncodeFailures + mRebuildFailures + s.decodeFailures + s.createdNotInPacket + s.packetCreatedNotRebuilt
+    return mEncodeFailures + mRebuildFailures + mTableFailures + s.decodeFailures + s.soundMismatches
+         + s.underlayMismatches + s.unknownTableIds + mBuilder.UnknownUnderlays() + s.createdNotInPacket + s.packetCreatedNotRebuilt
          + s.blueprintMismatches + s.eraseMismatches + s.deleteMismatches + s.packetUpdatesDropped
          + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
-         + s.positionsOutOfRange;
+         + s.positionsOutOfRange + s.tickMismatches;
   }
 
   std::string CLoopbackLink::Summary(const char* const when) const
@@ -95,11 +108,15 @@ namespace faf::remote::client
     text += gpg::STR_Printf(
       "loopback %s checks: created not in packet %llu, packet creations not rebuilt %llu, blueprint mismatches %llu, "
       "creations without blueprint %llu, erase mismatches %llu, delete mismatches %llu, packet updates dropped %llu, "
-      "unit changes without update %llu, unit constants missing %llu, mesh mismatches %llu, mesh resource "
-      "mismatches %llu, positions out of range %llu",
+      "unit changes without update %llu, unit constants differing %llu, mesh mismatches %llu, mesh resource "
+      "mismatches %llu, positions out of range %llu, sound mismatches %llu, underlay mismatches %llu, unknown "
+      "underlays %llu, unknown table ids %llu, table failures %llu (table records %.2f KB in all), creation tick "
+      "mismatches %llu, unit stat items applied %llu",
       when, u(s.createdNotInPacket), u(s.packetCreatedNotRebuilt), u(s.blueprintMismatches), u(s.noBlueprint),
       u(s.eraseMismatches), u(s.deleteMismatches), u(s.packetUpdatesDropped), u(s.unitChangesWithoutUpdate),
-      u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange)
+      u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange),
+      u(s.soundMismatches), u(s.underlayMismatches), u(mBuilder.UnknownUnderlays()), u(s.unknownTableIds),
+      u(mTableFailures), static_cast<double>(mTableBytes) / 1024.0, u(s.tickMismatches), u(s.statsApplied)
     ).c_str();
     return text;
   }

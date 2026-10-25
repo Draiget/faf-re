@@ -12,9 +12,9 @@
 
 // Engine addition, server mode (plan WP7.2): sound parameters on the wire. Sim Lua makes them
 // at run time (`Sound{Cue, Bank, LodCutoff}`), so unlike blueprints there is no table either
-// side could build at load. The server interns each (bank, cue, LOD cutoff) on first use and
-// sends the new entry on the reliable stream before any event that names it; the client adds
-// entries strictly in id order. Ids are per session and never reused.
+// side could build at load. The server interns each (bank, cue, LOD cutoff, RPC loop variable)
+// on first use and sends the new entry on the reliable stream before any event that names it;
+// the client adds entries strictly in id order. Ids are per session and never reused.
 
 namespace faf::remote::wire
 {
@@ -23,6 +23,7 @@ namespace faf::remote::wire
     std::string bank;
     std::string cue;
     std::string lodCutoff; // the LOD cutoff variable's name, or empty
+    std::string rpcLoop;   // the RPC loop variable's name (RPCSound), or empty
 
     [[nodiscard]] bool operator==(const SSoundEntry& other) const noexcept = default;
   };
@@ -43,7 +44,7 @@ namespace faf::remote::wire
     [[nodiscard]] std::uint32_t Size() const noexcept { return static_cast<std::uint32_t>(mEntries.size()); }
 
   private:
-    std::map<std::tuple<std::string, std::string, std::string>, std::uint32_t> mIds;
+    std::map<std::tuple<std::string, std::string, std::string, std::string>, std::uint32_t> mIds;
     std::vector<SSoundEntry> mEntries;
   };
 

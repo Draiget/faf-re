@@ -22,7 +22,9 @@
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
+#include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
+#include "remote/wire/SessionTables.h"
 #include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
 
@@ -407,6 +409,9 @@ namespace
           count = static_cast<std::uint16_t>(mRng());
         }
         record.unit.unitFlags = static_cast<std::uint8_t>(mRng());
+        record.unit.buildStateTag = static_cast<std::uint8_t>(mRng());
+        record.unit.fake = static_cast<std::uint8_t>(mRng() & 1u);
+        record.unit.stats = RandomStats();
       }
       // Appearance: mostly defaults (a creation then sends none of it), sometimes anything.
       if (mRng() % 3u == 0u) {
@@ -434,6 +439,11 @@ namespace
           radius = mRng() % 2u == 0u ? 0u : static_cast<std::uint32_t>(mRng());
         }
       }
+      if ((fields & 128u) != 0u) {
+        look.ambientSound = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 500u;
+        look.rumbleSound = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 500u;
+      }
+      if ((fields & 256u) != 0u) look.underlay = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 50u;
     }
 
     void Mutate(SEntityRecord& record)
@@ -475,7 +485,29 @@ namespace
         if ((fields & kFieldUnitScriptBits) != 0u) unit.scriptBits = source.scriptBits;
         if ((fields & kFieldUnitSilos) != 0u) unit.siloCounts = source.siloCounts;
         if ((fields & kFieldUnitFlags) != 0u) unit.unitFlags = source.unitFlags;
+        if (mRng() % 5u == 0u) unit.stats = source.stats;
       }
+    }
+
+    std::vector<SUnitStat> RandomStats()
+    {
+      std::vector<SUnitStat> stats;
+      std::uint32_t name = mRng() % 5u;
+      const int count = static_cast<int>(mRng() % 6u);
+      for (int i = 0; i < count; ++i) {
+        SUnitStat stat{};
+        stat.name = name;
+        name += 1u + mRng() % 40u;
+        stat.type = static_cast<std::uint8_t>(mRng() % 4u);
+        stat.realtime = (mRng() & 1u) != 0u;
+        if (stat.type == SUnitStat::kString) {
+          stat.text = mRng() % 4u == 0u ? 0xFFFFFFFFu : mRng() % 100u;
+        } else {
+          stat.bits = static_cast<std::uint32_t>(mRng());
+        }
+        stats.push_back(stat);
+      }
+      return stats;
     }
 
     SUnitFields RandomRecordUnit()
@@ -661,6 +693,9 @@ namespace
     look.impact = 0.25f;
     look.scroll = {0.0f, 1.0f, 2.0f, 3.0f};
     look.intel = {20, 0, 60, 0, 0, 0, 0, 1};
+    look.ambientSound = 0;
+    look.rumbleSound = 7;
+    look.underlay = 3;
     CHECK(CreationFields(dressed.entities[0]) == (kEntityFields | kFieldKind | kAppearanceFields));
     const std::vector<std::uint8_t> dressedBytes = Encode(dressed, nullptr);
     CHECK(dressedBytes.size() > plainBytes.size() + 40u);
@@ -912,6 +947,64 @@ namespace
 
   // --- Sound table ------------------------------------------------------------------------
 
+  void TestSessionTables()
+  {
+    // Sounds (with the RPC loop variable) and names, interned once, written as one record per
+    // batch, read back in order on the other side.
+    CSessionTableWriters server;
+    CSessionTableReaders client;
+    const SSoundEntry loop{"UEL_Unit", "UEL0001_Move_Loop", "UnitMove_LodCutoff", "UEL0001_Move_Loop"};
+    const SSoundEntry plain{"Explosions", "Explosion_Small", "", ""};
+    CHECK(server.Sound(loop) == 0u && server.Sound(plain) == 1u && server.Sound(loop) == 0u);
+    CHECK(server.Name("/textures/ui/common/game/strategicicons/icon_land_rest.dds") == 0u);
+    CHECK(server.HasPending());
+    BitWriter first;
+    server.WritePending(first);
+    CHECK(!server.HasPending());
+    const std::vector<std::uint8_t> firstBytes = Bytes(first);
+    BitReader firstIn(firstBytes);
+    CHECK(client.Read(firstIn));
+    CHECK(client.Sounds().Size() == 2u && client.Sounds().Find(0) != nullptr && *client.Sounds().Find(0) == loop);
+    CHECK(client.Names().Size() == 1u && *client.Names().Find(0) == "/textures/ui/common/game/strategicicons/icon_land_rest.dds");
+
+    // A second batch adds only what is new; an empty batch is two zero counts.
+    CHECK(server.Name("/textures/ui/common/game/strategicicons/icon_land_rest.dds") == 0u);
+    CHECK(server.Name("/a.dds") == 1u);
+    BitWriter second;
+    server.WritePending(second);
+    const std::vector<std::uint8_t> secondBytes = Bytes(second);
+    BitReader secondIn(secondBytes);
+    CHECK(client.Read(secondIn) && client.Names().Size() == 2u && client.Sounds().Size() == 2u);
+    BitWriter empty;
+    server.WritePending(empty);
+    CHECK(Bytes(empty).size() == 2u);
+
+    // The same record twice is refused (ids out of order); truncation everywhere is refused.
+    CSessionTableReaders again;
+    BitReader againIn(firstBytes);
+    CHECK(again.Read(againIn));
+    BitReader repeatIn(firstBytes);
+    CHECK(!again.Read(repeatIn));
+    for (std::size_t length = 0; length < firstBytes.size(); ++length) {
+      CSessionTableReaders cut;
+      BitReader cutIn(std::span<const std::uint8_t>(firstBytes.data(), length));
+      CHECK(!cut.Read(cutIn));
+    }
+    // An oversized name.
+    BitWriter big;
+    big.WriteVarUint(0u);
+    big.WriteVarUint(1u);
+    big.WriteVarUint(0u);
+    big.WriteVarUint(static_cast<std::uint32_t>(CNameTableReader::kMaxNameBytes + 1u));
+    for (std::size_t i = 0; i <= CNameTableReader::kMaxNameBytes; ++i) {
+      big.WriteBits('x', 8);
+    }
+    CSessionTableReaders bigReader;
+    const std::vector<std::uint8_t> bigBytes = Bytes(big);
+    BitReader bigIn(bigBytes);
+    CHECK(!bigReader.Read(bigIn) && bigReader.Names().Size() == 0u);
+  }
+
   void TestSoundTable()
   {
     CSoundTableWriter writer;
@@ -1006,6 +1099,7 @@ namespace
 
   const TestCase kTests[] = {
     {"sounds: session table", &TestSoundTable},
+    {"session tables: sounds and names", &TestSessionTables},
     {"bits: round trip", &TestBitStreamRoundTrip},
     {"bits: overrun", &TestBitStreamOverrun},
     {"bits: malformed varuint", &TestBitStreamMalformedVarUint},

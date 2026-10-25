@@ -2,8 +2,8 @@
 
 // Engine addition, server mode: see SoundTable.h.
 //
-// Entry record: varuint id, then three strings (bank, cue, LOD cutoff), each a varuint byte
-// length and the bytes.
+// Entry record: varuint id, then four strings (bank, cue, LOD cutoff, RPC loop variable), each
+// a varuint byte length and the bytes.
 
 namespace faf::remote::wire
 {
@@ -35,7 +35,7 @@ namespace faf::remote::wire
 
   CSoundTableWriter::SInterned CSoundTableWriter::Intern(const SSoundEntry& entry)
   {
-    const auto key = std::make_tuple(entry.bank, entry.cue, entry.lodCutoff);
+    const auto key = std::make_tuple(entry.bank, entry.cue, entry.lodCutoff, entry.rpcLoop);
     if (const auto it = mIds.find(key); it != mIds.end()) {
       return {it->second, false};
     }
@@ -52,6 +52,7 @@ namespace faf::remote::wire
     WriteString(writer, entry.bank);
     WriteString(writer, entry.cue);
     WriteString(writer, entry.lodCutoff);
+    WriteString(writer, entry.rpcLoop);
   }
 
   bool CSoundTableReader::ReadEntry(BitReader& reader)
@@ -62,7 +63,8 @@ namespace faf::remote::wire
       return false;
     }
     SSoundEntry entry;
-    if (!ReadString(reader, entry.bank) || !ReadString(reader, entry.cue) || !ReadString(reader, entry.lodCutoff)) {
+    if (!ReadString(reader, entry.bank) || !ReadString(reader, entry.cue) || !ReadString(reader, entry.lodCutoff)
+        || !ReadString(reader, entry.rpcLoop)) {
       return false;
     }
     mEntries.push_back(std::move(entry));

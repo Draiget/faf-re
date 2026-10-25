@@ -2,9 +2,13 @@
 
 #include <cstdint>
 #include <map>
+#include <vector>
+
+#include "boost/shared_ptr.h"
 
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
+#include "remote/wire/SessionTables.h"
 
 // Engine addition, server mode: the server side of the entities lane. It follows the entity
 // state a sim publishes in its sync packets (creations, entity and unit updates, erases and
@@ -22,6 +26,9 @@
 
 namespace moho
 {
+  class StatItem;
+  template <class T>
+  class Stats;
   struct SSyncData;
   struct SSTIEntityVariableData;
   struct SSTIUnitVariableData;
@@ -50,6 +57,14 @@ namespace faf::remote
    */
   void UnpackAppearance(const wire::SAppearance& look, moho::SSTIEntityVariableData& data);
 
+  /**
+   * A unit's stats tree as `SUnitFields::stats`: every item's path and value interned in the
+   * session's name table, sorted by name id.
+   */
+  void ReadUnitStats(
+    moho::Stats<moho::StatItem>& stats, wire::CSessionTableWriters& session, std::vector<wire::SUnitStat>& out
+  );
+
   /** A frame's unit block, written into a unit update's data. */
   void UnpackUnitFields(const wire::SUnitFields& unit, moho::SSTIUnitVariableData& data) noexcept;
 
@@ -59,6 +74,12 @@ namespace faf::remote
     CViewFrameBuilder(
       const wire::SContentTables& tables, const wire::SFrameCodec& codec, std::uint32_t orphanBeats = kDefaultOrphanBeats
     );
+
+    /**
+     * The session tables sounds and underlay names are interned into (WP7.2); without them the
+     * frames name no sounds and no underlays.
+     */
+    void SetSessionTables(wire::CSessionTableWriters* session) noexcept { mSession = session; }
 
     /** Applies one packet's entity lanes to the world the frames are built from. */
     void Apply(const moho::SSyncData& packet);
@@ -70,6 +91,8 @@ namespace faf::remote
     [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorld.size(); }
     /** Creations whose blueprint is missing from the content tables (should stay 0). */
     [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept { return mUnknownBlueprints; }
+    /** Underlay textures that are not plain file textures (should stay 0). */
+    [[nodiscard]] std::uint64_t UnknownUnderlays() const noexcept { return mUnknownUnderlays; }
 
   private:
     const wire::SContentTables& mTables;
@@ -77,8 +100,11 @@ namespace faf::remote
     std::uint32_t mOrphanBeats;
     std::map<std::uint32_t, wire::SEntityRecord> mWorld;
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
+    std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     std::uint32_t mNextFrameId = 1;
     std::uint64_t mUnknownBlueprints = 0;
+    std::uint64_t mUnknownUnderlays = 0;
+    wire::CSessionTableWriters* mSession = nullptr;
   };
 
   /**

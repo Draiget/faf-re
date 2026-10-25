@@ -11,8 +11,10 @@ set(FAF_REMOTE_SOURCES
   remote/ContentTables.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
+  remote/wire/NameTable.cpp
   remote/wire/OrdinalTable.cpp
   remote/wire/Quantize.cpp
+  remote/wire/SessionTables.cpp
   remote/wire/SoundTable.cpp
   remote/wire/WireVersion.cpp
 )

@@ -2,6 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#if FAF_SERVER_MODE
+#include <functional>
+#endif
 
 #include "boost/mutex.h"
 #include "boost/scoped_ptr.h"
@@ -97,6 +100,15 @@ namespace moho
   static_assert(offsetof(Stats<StatItem>, mLock) == 0x08, "Stats<StatItem>::mLock offset must be 0x08");
   static_assert(sizeof(Stats<StatItem>) == 0x10, "Stats<StatItem> size must be 0x10");
   using Stats_StatItem = Stats<StatItem>;
+
+#if FAF_SERVER_MODE
+  /**
+   * Engine addition, server mode: visits every item below the root, depth first in child order,
+   * with its path as `GetItem` takes it ("Parent_Child"), holding the tree's lock throughout
+   * (the sim adds items under it). A game server reads a unit's stats this way to send them.
+   */
+  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const msvc8::string& path, StatItem& item)>& visit);
+#endif
 
   /**
    * Complete EngineStats object that extends `Stats<StatItem>` with logging state.

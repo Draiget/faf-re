@@ -8,7 +8,11 @@
 #include <utility>
 
 #include "gpg/core/utils/Logging.h"
+#include "moho/audio/CSndParams.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
@@ -105,6 +109,82 @@ namespace faf::remote::client
     , mMeshResources(mMeshes.size())
   {}
 
+  void CSyncRebuilder::ApplyUnitStats(const std::vector<wire::SUnitStat>& stats, moho::Stats<moho::StatItem>& tree)
+  {
+    for (const wire::SUnitStat& stat : stats) {
+      const std::string* const path = mSession != nullptr ? mSession->Names().Find(stat.name) : nullptr;
+      if (path == nullptr) {
+        ++mStats.unknownTableIds;
+        continue;
+      }
+      moho::StatItem* const item = tree.GetItem(path->c_str(), true);
+      if (item == nullptr) {
+        continue;
+      }
+      item->mType = static_cast<moho::EStatType>(stat.type);
+      item->mUseRealtimeSlot = stat.realtime ? 1 : 0;
+      if (stat.type == wire::SUnitStat::kString) {
+        const std::string* const text = mSession->Names().Find(stat.text);
+        if (text == nullptr) {
+          ++mStats.unknownTableIds;
+          continue;
+        }
+        item->mValue = msvc8::string(text->c_str());
+      } else if (stat.realtime) {
+        item->mRealtimeValueBits = static_cast<std::int32_t>(stat.bits);
+      } else {
+        item->mPrimaryValueBits = static_cast<std::int32_t>(stat.bits);
+      }
+      ++mStats.statsApplied;
+    }
+  }
+
+  moho::CSndParams* CSyncRebuilder::ResolveSound(const std::uint32_t id)
+  {
+    if (id == wire::COrdinalTable::kNone || mSession == nullptr) {
+      return nullptr;
+    }
+    if (id < mSounds.size() && mSounds[id] != nullptr) {
+      return mSounds[id];
+    }
+    const wire::SSoundEntry* const entry = mSession->Sounds().Find(id);
+    if (entry == nullptr) {
+      ++mStats.unknownTableIds;
+      return nullptr;
+    }
+    if (mSounds.size() <= id) {
+      mSounds.resize(id + 1u, nullptr);
+    }
+    // The process's interned params for these names, as `Sound{...}` makes them.
+    mSounds[id] = moho::SND_FindOrCreateParams(
+      msvc8::string(entry->bank.c_str()), msvc8::string(entry->cue.c_str()), msvc8::string(entry->lodCutoff.c_str()),
+      msvc8::string(entry->rpcLoop.c_str())
+    );
+    return mSounds[id];
+  }
+
+  boost::shared_ptr<moho::CD3DBatchTexture> CSyncRebuilder::ResolveUnderlay(const std::uint32_t id)
+  {
+    if (id == wire::COrdinalTable::kNone || mSession == nullptr) {
+      return {};
+    }
+    if (id < mUnderlays.size() && mUnderlays[id].resolved) {
+      return mUnderlays[id].texture;
+    }
+    const std::string* const path = mSession->Names().Find(id);
+    if (path == nullptr) {
+      ++mStats.unknownTableIds;
+      return {};
+    }
+    if (mUnderlays.size() <= id) {
+      mUnderlays.resize(id + 1u);
+    }
+    // As `Entity::SetStrategicUnderlay`: the file texture, no border; kept for the session.
+    mUnderlays[id].texture = moho::CD3DBatchTexture::FromFile(path->c_str(), 0u);
+    mUnderlays[id].resolved = true;
+    return mUnderlays[id].texture;
+  }
+
   void CSyncRebuilder::ResolveMesh(const std::uint32_t ordinal, moho::SSTIEntityVariableData& data)
   {
     // As `Entity::SetMesh`: the blueprint and its LOD-resolved mesh, looked up once per mesh.
@@ -187,18 +267,29 @@ namespace faf::remote::client
       if (blueprint == nullptr) {
         ++mStats.noBlueprint;
       }
+      SHeldEntity& held = mHeld[record.id];
+      held = SHeldEntity{};
+      held.live = true;
       if (record.isUnit) {
+        // The unit's constants from the frame and a stats tree of the client's own, filled from
+        // the frame's stats (below).
+        held.stats.reset(new moho::Stats<moho::StatItem>());
         moho::SCreateUnitParams params{};
         params.mEntityId = record.id;
         params.mBlueprint = blueprint;
         params.mTickCreated = static_cast<std::uint32_t>(packet.mCurTick);
+        params.mConstDat.mBuildStateTag = record.unit.buildStateTag;
+        params.mConstDat.mFake = record.unit.fake;
+        params.mConstDat.mStatsRoot = held.stats;
         if (const auto it = packetUnits.find(record.id); it != packetUnits.end()) {
-          params.mTickCreated = it->second->mTickCreated;
-          params.mConstDat = it->second->mConstDat;
           mStats.blueprintMismatches += it->second->mBlueprint != blueprint ? 1u : 0u;
+          mStats.unitConstantsMissing += it->second->mConstDat.mBuildStateTag != record.unit.buildStateTag
+                                           || it->second->mConstDat.mFake != record.unit.fake
+                                         ? 1u
+                                         : 0u;
+          mStats.tickMismatches += it->second->mTickCreated != params.mTickCreated ? 1u : 0u;
         } else {
           ++mStats.createdNotInPacket;
-          ++mStats.unitConstantsMissing;
         }
         newUnits.push_back(params);
       } else {
@@ -207,8 +298,8 @@ namespace faf::remote::client
         params.mBlueprint = blueprint;
         params.mTickCreated = static_cast<std::uint32_t>(packet.mCurTick);
         if (const auto it = packetEntities.find(record.id); it != packetEntities.end()) {
-          params.mTickCreated = it->second->mTickCreated;
           mStats.blueprintMismatches += it->second->mBlueprint != blueprint ? 1u : 0u;
+          mStats.tickMismatches += it->second->mTickCreated != params.mTickCreated ? 1u : 0u;
         } else {
           ++mStats.createdNotInPacket;
         }
@@ -216,9 +307,6 @@ namespace faf::remote::client
       }
       ++mStats.created;
       createdNow.insert(record.id);
-      SHeldEntity& held = mHeld[record.id];
-      held = SHeldEntity{};
-      held.live = true;
     };
 
     // Removals: a live entity goes (delete); an orphaned record leaving the frame has no
@@ -304,20 +392,19 @@ namespace faf::remote::client
 
       moho::SEntityVariableUpdateEntry entry{};
       entry.mEntityId = static_cast<moho::EntId>(record.id);
-      // The client's own copy, the frame's fields over it; only the sounds and the underlay
-      // texture still come from the packet.
+      // The client's own copy with the frame's fields over it; mesh, sounds and the underlay
+      // texture resolved from the frame's ids.
       entry.mVariableData = held.data;
       moho::SSTIEntityVariableData& data = entry.mVariableData;
       if (fromPacket) {
-        const moho::SSTIEntityVariableData& sim = packetIt->second->mVariableData;
         entry.mReserved04 = packetIt->second->mReserved04;
-        data.mAmbientSound = sim.mAmbientSound;
-        data.mRumbleSound = sim.mRumbleSound;
-        data.mUnderlayTexture = sim.mUnderlayTexture;
         ++mStats.entityDataBorrowed;
       }
       UnpackAppearance(record.appearance, data);
       ResolveMesh(record.appearance.mesh, data);
+      data.mAmbientSound = ResolveSound(record.appearance.ambientSound);
+      data.mRumbleSound = ResolveSound(record.appearance.rumbleSound);
+      data.mUnderlayTexture = ResolveUnderlay(record.appearance.underlay);
       const moho::VTransform shown = ShownTransform(record, beat);
       data.mLastTransform = created ? shown : held.data.mCurTransform;
       data.mCurTransform = shown;
@@ -329,6 +416,9 @@ namespace faf::remote::client
         const moho::SSTIEntityVariableData& sim = packetIt->second->mVariableData;
         mStats.meshMismatches += data.mMeshBlueprint != sim.mMeshBlueprint ? 1u : 0u;
         mStats.meshResourceMismatches += data.mScmResource.get() != sim.mScmResource.get() ? 1u : 0u;
+        mStats.soundMismatches += (data.mAmbientSound != sim.mAmbientSound ? 1u : 0u)
+                                + (data.mRumbleSound != sim.mRumbleSound ? 1u : 0u);
+        mStats.underlayMismatches += data.mUnderlayTexture.get() != sim.mUnderlayTexture.get() ? 1u : 0u;
         const Wm3::Vec3f& actual = sim.mCurTransform.pos_;
         const double error = std::max(
           {std::fabs(static_cast<double>(actual.x - shown.pos_.x)), std::fabs(static_cast<double>(actual.y - shown.pos_.y)),
@@ -395,6 +485,25 @@ namespace faf::remote::client
     for (const wire::SFrameDelta::SChange& change : delta.changed) {
       if ((change.fields & wire::kUnitFields) != 0u && unitUpdated.count(change.record.id) == 0u) {
         ++mStats.unitChangesWithoutUpdate;
+      }
+    }
+
+    // Unit stats: the client's tree of each unit created now or whose stats changed.
+    {
+      auto changeIt = delta.changed.begin();
+      for (const wire::SEntityRecord& record : frame.entities) {
+        while (changeIt != delta.changed.end() && changeIt->record.id < record.id) {
+          ++changeIt;
+        }
+        const bool statsChanged = changeIt != delta.changed.end() && changeIt->record.id == record.id
+                               && (changeIt->fields & wire::kFieldUnitStats) != 0u;
+        if (!record.isUnit || (!statsChanged && createdNow.count(record.id) == 0u)) {
+          continue;
+        }
+        const auto heldIt = mHeld.find(record.id);
+        if (heldIt != mHeld.end() && heldIt->second.stats) {
+          ApplyUnitStats(record.unit.stats, *heldIt->second.stats);
+        }
       }
     }
 

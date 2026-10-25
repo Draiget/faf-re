@@ -2562,6 +2562,29 @@ namespace moho
     }
     return stats->GetStringItem(name);
   }
+#if FAF_SERVER_MODE
+  // Engine addition, server mode: see the declaration.
+  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const msvc8::string& path, StatItem& item)>& visit)
+  {
+    boost::mutex::scoped_lock lock(stats.mLock);
+    const std::function<void(StatItem*, const msvc8::string&)> walk = [&](StatItem* const parent, const msvc8::string& prefix) {
+      for (StatIntrusiveNode* node = AsChildHead(parent)->next; node != nullptr && node != AsChildHead(parent);
+           node = node->next) {
+        StatItem* const child = node->owner;
+        if (child == nullptr) {
+          break;
+        }
+        const msvc8::string path = prefix.empty() ? child->mName : (prefix + "_") + child->mName;
+        visit(path, *child);
+        walk(child, path);
+      }
+    };
+    if (stats.mItem) {
+      walk(stats.mItem.get(), msvc8::string());
+    }
+  }
+#endif
+
 } // namespace moho
 
 namespace
