@@ -226,7 +226,9 @@ int main(int argc, char** argv)
 
   if (moho::CFG_GetArgOption("--launch-check", 0, nullptr)) {
     // Plan WP2.10: the header against `BuildLaunchInfo`; plays nothing.
-    const faf::replay::SLaunchCheckResult check = faf::replay::RunLaunchCheck(options.replayPath);
+    std::string expectPath;
+    (void)ReadOption("--launch-expect", expectPath);
+    const faf::replay::SLaunchCheckResult check = faf::replay::RunLaunchCheck(options.replayPath, expectPath);
     if (!check.ran) {
       std::printf("[%s] LAUNCHCHECK error: %s\n", gLabel.c_str(), check.error.c_str());
       std::fflush(stdout);

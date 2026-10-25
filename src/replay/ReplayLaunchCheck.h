@@ -19,5 +19,9 @@ namespace faf::replay
     std::string report;      // one line per difference, then a summary line
   };
 
-  [[nodiscard]] SLaunchCheckResult RunLaunchCheck(const std::string& replayPath);
+  /**
+   * Rebuilds the config from `replayPath`'s header and compares the launch with `expectPath`'s
+   * header (another client's replay of the same game), or with its own when that is empty.
+   */
+  [[nodiscard]] SLaunchCheckResult RunLaunchCheck(const std::string& replayPath, const std::string& expectPath);
 } // namespace faf::replay
