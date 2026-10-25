@@ -8705,7 +8705,9 @@ namespace moho
       // guard is dead and the unchecked binary shape is restored.
       gpg::BinaryReader syncReader(beat.mStream);
       LuaPlus::LuaObject currentSync;
-      currentSync.SCR_FromByteStream(currentSync, mState, &syncReader);
+      // Engine addition: decoded without the network decode's nesting cap
+      // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
+      currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
       mState->GetGlobals().SetObject("Sync", currentSync);
     }
     (void)SCR_LuaDoString("OnSync()", mState);
