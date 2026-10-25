@@ -33,7 +33,7 @@ set(_faf_client_only_patterns
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
-  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue)\\.cpp$"
+  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue|UserCommandLuaFunctions)\\.cpp$"
   "^moho/entity/UserEntity\\.cpp$"
   "^moho/unit/core/UserUnit\\.cpp$"
   # The client's console commands and variables (CConCommand.cpp keeps the console).

@@ -733,6 +733,7 @@ set(FAF_ENGINE_SOURCES
   moho/math/Wm3AxisAlignedBox3FafExtras.cpp
   moho/unit/CUnitCommandQueueReflection.cpp
   moho/sim/CCommandLuaFunctionRegistrations.cpp
+  moho/sim/UserCommandLuaFunctions.cpp
   moho/entity/PropTypeInfo.cpp
   moho/entity/PropSerializer.cpp
   moho/sim/SimArmyTypeInfo.cpp
@@ -744,6 +745,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/STIMap.cpp
   moho/sim/CArmyStatItemTypeInfo.cpp
   moho/sim/CArmyStats.cpp
+  moho/app/SnapshotDirectoryDialog.cpp
   moho/sim/CArmyStatItemSerializer.cpp
   moho/sim/CArmyStatsTypeInfo.cpp
   moho/sim/CInfluenceMapTypeInfo.cpp
