@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "gpg/core/streams/MemBufferStream.h"
+#include "legacy/containers/String.h"
 
 namespace moho
 {
@@ -87,6 +88,18 @@ namespace moho
      * Slot: 5
      */
     virtual void ReportBottleneckCleared();
+
+    /**
+     * Engine addition, not in the binary (a slot after the binary's six).
+     *
+     * What it does:
+     * Tells the user that `sender`'s orders reached players differently, as
+     * found from `reporter`'s acknowledgement (`selfReport`: the sender's own),
+     * and whether the game has stopped.
+     */
+    virtual void NoteOrdersDiffer(
+      const msvc8::string& sender, const msvc8::string& reporter, bool selfReport, bool stopped
+    );
   };
 
   /**
@@ -138,6 +151,14 @@ namespace moho
      * Slot: 5
      */
     void ReportBottleneckCleared() override;
+
+    /**
+     * Engine addition: shows the notice in the chat as a local system line
+     * and in the console.
+     */
+    void NoteOrdersDiffer(
+      const msvc8::string& sender, const msvc8::string& reporter, bool selfReport, bool stopped
+    ) override;
   };
 
   /**

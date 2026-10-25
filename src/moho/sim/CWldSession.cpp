@@ -8734,18 +8734,34 @@ namespace moho
     }
 
     if (!beat.mDesyncs.empty()) {
-      msvc8::vector<msvc8::string> desyncArmyNames(beat.mDesyncs.size());
+      msvc8::vector<msvc8::string> desyncArmyNames;
+      desyncArmyNames.reserve(beat.mDesyncs.size());
 
-      std::size_t desyncIndex = 0;
+      // Engine addition: a checksum from a player whose orders reached this
+      // client differently from what it acknowledged sending says nothing
+      // about this game (CommandStreamCheck). It is logged, not reported.
+      ISTIDriver* const driver = sSimDriver.get();
+      CClientManagerImpl* const clientManager = driver != nullptr ? driver->GetClientManager() : nullptr;
+
       for (const SDesyncInfo& desync : beat.mDesyncs) {
-        desyncArmyNames[desyncIndex].assign(
-          cmdSources[static_cast<std::size_t>(desync.army)].mName, 0, msvc8::string::npos
-        );
+        const msvc8::string& armyName = cmdSources[static_cast<std::size_t>(desync.army)].mName;
+        if (clientManager != nullptr && clientManager->OrdersAlteredFrom(static_cast<CommandSourceId>(desync.army))) {
+          gpg::Warnf(
+            "Desync with %s at beat %d not reported to FAF: %s's orders reached this client differently from "
+            "what it acknowledged sending (see the NET warning).",
+            armyName.c_str(),
+            desync.beat,
+            armyName.c_str()
+          );
+          continue;
+        }
+        desyncArmyNames.push_back(armyName);
         GPGNET_ReportDesync(desync.beat, desync.army, desync.hash2.ToString(), desync.hash1.ToString());
-        ++desyncIndex;
       }
 
-      UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
+      if (!desyncArmyNames.empty()) {
+        UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
+      }
     }
 
     if (beat.mGameOver && IsGameOver == 0u) {

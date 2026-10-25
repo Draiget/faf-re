@@ -18,4 +18,8 @@ namespace moho
   extern int32_t net_CompressionMethod;  // 0x00F58DF8
   extern float net_ResendPingMultiplier; // 0x00F58DFC
   extern int32_t net_ResendDelayBias;    // 0x00F58E00
+
+  // Engine additions, not in the binary (see NetConVars.cpp).
+  extern int32_t net_CheckOrderStreams;
+  extern int32_t net_DebugAlterOrdersTo;
 } // namespace moho

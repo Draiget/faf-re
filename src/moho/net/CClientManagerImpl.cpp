@@ -19,6 +19,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "INetConnection.h"
 #include "INetConnector.h"
+#include "IClientMgrUIInterface.h"
+#include "NetConVars.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SOCellPos.h"
@@ -153,8 +155,80 @@ CClientManagerImpl::CClientManagerImpl(
   , mInDoBeat(false)
   , mDispatchedTimer()
   , mTimer2()
+  , mStreamCheck(
+      net_CheckOrderStreams > 0 ? std::make_unique<CommandStreamCheck>(clientCount, net_CheckOrderStreams >= 2)
+                                : nullptr
+    )
 {
   mClients.resize(clientCount, nullptr);
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+void CClientManagerImpl::NoteDivergentOrders()
+{
+  const auto nickname = [this](const int index) -> msvc8::string {
+    const bool known = index >= 0 && static_cast<std::size_t>(index) < mClients.size() && mClients[index] != nullptr;
+    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : msvc8::string("?");
+  };
+  const bool stopped = mStreamCheck->StopsOnDivergence();
+
+  for (const CommandStreamCheck::Divergence& divergence : mStreamCheck->TakeFindings()) {
+    const msvc8::string sender = nickname(divergence.sender);
+    const msvc8::string reporter = nickname(divergence.reporter);
+    const bool selfReport = divergence.sender == divergence.reporter;
+
+    if (selfReport) {
+      gpg::Warnf(
+        "NET: %s's orders as received here differ from what %s acknowledged sending at beat %u: %s sent "
+        "different orders to different players, or they were changed on the way to this client. Desyncs "
+        "against %s are logged here and not reported to FAF. %s",
+        sender.c_str(),
+        sender.c_str(),
+        static_cast<unsigned>(divergence.beat),
+        sender.c_str(),
+        sender.c_str(),
+        stopped ? "No further beat will run." : "The game goes on."
+      );
+    } else {
+      gpg::Warnf(
+        "NET: %s's orders at beat %u differ between this client and %s: either %s sent different orders to "
+        "different players or %s misreported them. %s",
+        sender.c_str(),
+        static_cast<unsigned>(divergence.beat),
+        reporter.c_str(),
+        sender.c_str(),
+        reporter.c_str(),
+        stopped ? "No further beat will run." : "The game goes on; a desync may follow."
+      );
+    }
+
+    if (mInterface != nullptr) {
+      mInterface->NoteOrdersDiffer(sender, reporter, selfReport, stopped);
+    }
+  }
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::OrdersAlteredFrom(const CommandSourceId source)
+{
+  std::scoped_lock lock(mLock);
+  if (mStreamCheck == nullptr) {
+    return false;
+  }
+  for (const CClientBase* const client : mClients) {
+    if (client == nullptr || !mStreamCheck->ProvenAltered(client->GetIndex())) {
+      continue;
+    }
+    // A client may only speak for its own sources (CClientBase::UpdateState).
+    if (client->mCommandSourceId == source || client->mValidCommandSources.Contains(source)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -893,6 +967,13 @@ bool CClientManagerImpl::ClientNeedsFullyQueuedBeatsUntil(const int beat)
  */
 bool CClientManagerImpl::EveryoneResponsiveSince(const int beat)
 {
+  // Engine addition: with net_CheckOrderStreams 2, once a stream reached
+  // players differently no further beat runs here (CommandStreamCheck finds
+  // it before any affected beat).
+  if (mStreamCheck != nullptr && mStreamCheck->StopsGame()) {
+    return false;
+  }
+
   const std::size_t count = mClients.size();
   if (count == 0u) {
     return true;

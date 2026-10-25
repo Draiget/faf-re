@@ -83,6 +83,18 @@ The switches below are read when a session begins. In a multiplayer game every c
 | `sim_FixRefuelUndockAboveMaxHealth` | −1 | `/con` | next game | #169 (from 3840): refuelled aircraft undock once health is at least max health |
 | `sim_FixShieldRepair` | −1 | `/con` | next game | #175 (from 3840): shield repair scales with the builder's resources, and a switched-off shield is not repaired |
 
+## Protection against other players
+
+Not performance switches: these guard a game against players who send crafted traffic or host crafted maps and mods. The defaults are the protected ones.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `net_CheckOrderStreams` | 1 | `/con` | next game | Compares every player's orders as each client received them (a hash in the acknowledgements the engine already sends; the shipped exe ignores it). 1 logs and shows in chat who sent players different orders; desyncs against a player whose own acknowledgement contradicts what reached this client are logged instead of reported to FAF. 2 also stops the game; 0 turns the check off |
+| `lua_AllowPrecompiledChunks` | 0 | `/con` | live | 1 lets Lua load compiled chunks as well as source. Off, a map or mod cannot run crafted bytecode, which can get past the loader's checks |
+| `net_DebugAlterOrdersTo` | −1 | `/con` | live | Test only: alters this client's checksum reports to the player with that client index, for `tools/scenarios/3p-retail-orders-cheat.yaml` |
+
+Game Lua states (sim, user interface, blueprints, session) read files through the mounted game folders only: `dofile` and `loadfile` look paths up like `doscript` and `import`, a path that climbs above a mount with `..` is not found, and `LuaDumpBinary` is gone. The start-up state that runs the init file keeps real paths.
+
 ## Debugging aids
 
 Off by default.

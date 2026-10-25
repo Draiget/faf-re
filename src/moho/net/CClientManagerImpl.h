@@ -1,6 +1,8 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+#include <memory>
+
 #include "boost/recursive_mutex.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/time/Timer.h"
@@ -8,6 +10,7 @@
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/command/ICommandSink.h"
+#include "moho/net/CommandStreamCheck.h"
 
 namespace moho
 {
@@ -563,6 +566,27 @@ namespace moho
     bool mInDoBeat{false};
     gpg::time::Timer mDispatchedTimer;
     gpg::time::Timer mTimer2;
+
+    // Engine addition, not in the binary: compares every player's command
+    // stream as each client received it (CommandStreamCheck.h). Null when
+    // net_CheckOrderStreams was off as the game began.
+    std::unique_ptr<CommandStreamCheck> mStreamCheck;
+
+    /**
+     * Engine addition, not in the binary: called when `mStreamCheck` has new
+     * findings (a stream that reached players differently). Logs each and
+     * tells the user. With net_CheckOrderStreams 2 no later beat is made
+     * available.
+     */
+    void NoteDivergentOrders();
+
+    /**
+     * Engine addition, not in the binary: whether `source` belongs to a client
+     * whose own acknowledgement disagreed with the stream this client received
+     * from it (`CommandStreamCheck::ProvenAltered`). A desync against that
+     * source is not evidence about this client's game. Takes `mLock`.
+     */
+    [[nodiscard]] bool OrdersAlteredFrom(CommandSourceId source);
   };
 
   static_assert(offsetof(CClientManagerImpl, mLock) == 0x40C, "CClientManagerImpl::mLock offset must be 0x40C");
@@ -585,7 +609,8 @@ namespace moho
     "CClientManagerImpl::mDispatchedTimer offset must be 0x184C0"
   );
   static_assert(offsetof(CClientManagerImpl, mTimer2) == 0x184C8, "CClientManagerImpl::mTimer2 offset must be 0x184C8");
-  static_assert(sizeof(CClientManagerImpl) == 0x184D0, "CClientManagerImpl size must be 0x184D0");
+  // 0x184D0 in the binary, plus the engine's mStreamCheck.
+  static_assert(sizeof(CClientManagerImpl) == 0x184D8, "CClientManagerImpl size must be 0x184D8");
 
   /**
    * Address: 0x0053FAF0 (FUN_0053FAF0)

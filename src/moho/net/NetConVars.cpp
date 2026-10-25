@@ -20,8 +20,27 @@ namespace moho
   float net_ResendPingMultiplier = 1.0f;           // 0x00F58DFC
   int32_t net_ResendDelayBias = 25;                // 0x00F58E00
 
+  // Engine additions, not in the binary. Read when a game's client manager is
+  // made (`net_CheckOrderStreams`) or for every message sent
+  // (`net_DebugAlterOrdersTo`).
+  int32_t net_CheckOrderStreams = 1;
+  int32_t net_DebugAlterOrdersTo = -1;
+
   namespace
   {
+    TConVar<int32_t> gTConVar_net_CheckOrderStreams(
+      "net_CheckOrderStreams",
+      "Check that each player's orders reached every player alike (CommandStreamCheck): 0 off, 1 report who "
+      "(default), 2 report and stop the game. Next game.",
+      &net_CheckOrderStreams
+    );
+
+    TConVar<int32_t> gTConVar_net_DebugAlterOrdersTo(
+      "net_DebugAlterOrdersTo",
+      "Test only: alter this client's checksum reports sent to the player with this client index (-1 off).",
+      &net_DebugAlterOrdersTo
+    );
+
     /**
      * Address: 0x00BC4E70 (FUN_00BC4E70, dynamic initializer for `gTConVar_net_DebugCrash`)
      * Address: 0x00BEFAF0 (FUN_00BEFAF0, dynamic atexit destructor for `gTConVar_net_DebugCrash`)

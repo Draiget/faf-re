@@ -1,13 +1,19 @@
 #include "moho/net/IClientMgrUIInterface.h"
 
 #include <cstdint>
+#include <exception>
 #include <memory>
+#include <string>
 
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 
+#include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
+#include "lua/LuaObject.h"
 #include "moho/client/Localization.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/console/CConCommand.h"
 #include "moho/core/Thread.h"
 #include "moho/net/CClientBase.h"
@@ -42,6 +48,33 @@ namespace
   {
     const msvc8::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
     moho::CON_Printf(message.c_str(), nickname.c_str());
+  }
+
+  /**
+   * Engine addition, not in the binary: the CommandStreamCheck notice, posted
+   * by CWldUiInterface::NoteOrdersDiffer. It goes to the console and, when the
+   * game's chat offers one (FAF's ChatController), as a local system line in
+   * the chat. The text is passed as a value, never spliced into Lua source:
+   * it holds player names.
+   */
+  void ShowOrdersDifferNotice(const msvc8::string& text)
+  {
+    moho::CON_Printf("%s", text.c_str());
+
+    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    if (state == nullptr) {
+      return;
+    }
+    try {
+      LuaPlus::LuaObject chat = moho::SCR_Import(state, "/lua/ui/game/chat/ChatController.lua");
+      LuaPlus::LuaObject append = chat.IsTable() ? chat["AppendLocalSystemMessage"] : LuaPlus::LuaObject{};
+      if (append.IsFunction()) {
+        LuaPlus::LuaFunction callback(append);
+        callback.Call_String(std::string(text.c_str()));
+      }
+    } catch (const std::exception& error) {
+      gpg::Warnf("Could not show the order-check notice in chat: %s", error.what());
+    }
   }
 } // namespace
 
@@ -125,6 +158,19 @@ namespace moho
    */
   void IClientMgrUIInterface::ReportBottleneckCleared()
   {}
+
+  /**
+   * Engine addition, not in the binary: no-op default (see the header).
+   */
+  void IClientMgrUIInterface::NoteOrdersDiffer(
+    const msvc8::string& sender, const msvc8::string& reporter, const bool selfReport, const bool stopped
+  )
+  {
+    (void)sender;
+    (void)reporter;
+    (void)selfReport;
+    (void)stopped;
+  }
 
   /**
    * Address: 0x0088B810 (FUN_0088B810, Moho::CWldUiInterface::NoteDisconnect)
@@ -396,6 +442,32 @@ namespace moho
   void CWldUiInterface::ReportBottleneckCleared()
   {
     GPGNET_ReportBottleneckCleared();
+  }
+
+  /**
+   * Engine addition, not in the binary: posts the notice to the main thread,
+   * as NoteDisconnect does.
+   */
+  void CWldUiInterface::NoteOrdersDiffer(
+    const msvc8::string& sender, const msvc8::string& reporter, const bool selfReport, const bool stopped
+  )
+  {
+    msvc8::string text = selfReport
+      ? gpg::STR_Printf(
+          "%s's orders reached you differently from what %s says it sent. Its desync reports are only logged.",
+          sender.c_str(),
+          sender.c_str()
+        )
+      : gpg::STR_Printf(
+          "%s's orders reached players differently (seen in %s's acknowledgement). The game log has the details.",
+          sender.c_str(),
+          reporter.c_str()
+        );
+    if (stopped) {
+      text = gpg::STR_Printf("%s The game has stopped to avoid a desync.", text.c_str());
+    }
+    boost::function<void(), std::allocator<void>> callback = boost::bind(&ShowOrdersDifferNotice, text);
+    THREAD_InvokeAsync(callback, 0u);
   }
 
   /**

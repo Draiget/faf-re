@@ -1,0 +1,43 @@
+name: 3p-retail-orders-cheat-nocheck
+description: >
+  Order-stream check under attack: our x86 client sends our x64 client
+  altered checksum reports (net_DebugAlterOrdersTo=2;net_CheckOrderStreams=0, test only) while
+  everyone else gets the real ones. Control: the check is off on our clients (net_CheckOrderStreams=0), so
+  the attack should show as a desync. Do not click into the game
+  windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef, args: ['/title', 'cheat-retail'] }
+  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_net_x86.exe', args: ['/title', 'cheat-x86', '/con', 'sim_FafGameVersion=3835;net_DebugAlterOrdersTo=2;net_CheckOrderStreams=0'] }
+  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_net.exe', args: ['/title', 'cheat-x64', '/con', 'sim_FafGameVersion=3835;net_CheckOrderStreams=0'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 6m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsAgree:
+    - { uids: all, pattern: 'faf_re_lockstep: (handover .*|handed \d+ armies to the AI)' }
+    - { uids: all, pattern: 'faf_re_lockstep: (army \d+ \S+ brain=\S+ skirmish=\S+ personality=\S+ faction=\d+)' }

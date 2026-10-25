@@ -315,6 +315,13 @@ void CClientBase::Process(CMessage& msg)
   }
 
   if (msgType < static_cast<uint8_t>(EClientMsg::CLIMSG_Ack)) {
+    // Engine addition: this client's stream as received here, for the
+    // cross-check (CommandStreamCheck.h).
+    CommandStreamCheck* const streamCheck = mManager->mStreamCheck.get();
+    if (streamCheck != nullptr) {
+      streamCheck->Append(mIndex, msg);
+    }
+
     if (msgType == static_cast<uint8_t>(ECmdStreamOp::CMDST_Advance)) {
       int32_t beatDelta = 0;
       reader.ReadExact(beatDelta);
@@ -325,6 +332,15 @@ void CClientBase::Process(CMessage& msg)
       const auto senderIndex = static_cast<uint8_t>(mIndex);
       ackStream.Write(senderIndex);
       ackStream.Write(mQueuedBeat);
+      if (streamCheck != nullptr) {
+        // Engine addition: the stream's hash at this boundary, after the
+        // binary's two fields.
+        const CommandStreamCheck::AckDigest digest = streamCheck->NoteBoundary(mIndex, mQueuedBeat);
+        ackStream.Write(reinterpret_cast<const char*>(digest.data()), digest.size());
+        if (streamCheck->HasFindings()) {
+          mManager->NoteDivergentOrders();
+        }
+      }
       mManager->ProcessClients(ackMessage);
     }
 
@@ -379,6 +395,21 @@ void CClientBase::Process(CMessage& msg)
         mIndex,
         static_cast<int>(ackClientIndex)
       );
+    }
+
+    // Engine addition: the hash this client reports for that stream, when it
+    // sent one (the shipped engine does not). Our own acks describe our own
+    // copy, so there is nothing to compare.
+    CommandStreamCheck* const streamCheck = mManager->mStreamCheck.get();
+    if (streamCheck != nullptr && this != mManager->mLocalClient &&
+        static_cast<std::size_t>(msg.GetMessageSize()) >=
+          sizeof(uint8_t) + sizeof(int32_t) + CommandStreamCheck::kAckDigestBytes) {
+      CommandStreamCheck::AckDigest digest{};
+      reader.Read(reinterpret_cast<char*>(digest.data()), digest.size());
+      streamCheck->NoteReport(mIndex, ackClientIndex, static_cast<uint32_t>(ackBeat), digest);
+      if (streamCheck->HasFindings()) {
+        mManager->NoteDivergentOrders();
+      }
     }
     return;
   }

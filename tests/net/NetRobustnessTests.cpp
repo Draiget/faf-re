@@ -8,12 +8,15 @@
 // Build: cmake --build --preset clang-x64-release --target faf_net_tests
 // Run:   build\clang-x64-release\tests\faf_net_tests.exe   (exit code = failures)
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <limits>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -21,6 +24,10 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "lua/LuaObject.h"
+#include "lua/LuaParser.h"
+#include "lua/LuaPrimitives.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/sim/CVFSImpl.h"
 #include "moho/command/ICommandSink.h"
 #include "moho/command/SSTITarget.h"
 #include "moho/misc/CDecoder.h"
@@ -32,7 +39,10 @@
 #include "moho/net/EClientMsg.h"
 #include "moho/net/ECmdStreamOp.h"
 #include "moho/net/ELobbyMsg.h"
+#include "gpg/core/algorithms/SHA256.h"
+#include "moho/net/CommandStreamCheck.h"
 #include "moho/net/IClientMgrUIInterface.h"
+#include "moho/net/NetConVars.h"
 #include "moho/net/INetConnection.h"
 #include "moho/net/INetConnector.h"
 #include "moho/net/SPeer.h"
@@ -824,6 +834,433 @@ namespace
     CHECK(f->Peer(20) != nullptr);
   }
 
+  // --- Order stream check ------------------------------------------------------------------
+
+  std::string HexOf(const gpg::SHA256::Digest& digest)
+  {
+    static const char* const kHex = "0123456789abcdef";
+    std::string out;
+    for (const std::uint8_t byte : digest) {
+      out += kHex[byte >> 4];
+      out += kHex[byte & 15];
+    }
+    return out;
+  }
+
+  void TestSha256Vectors()
+  {
+    const auto hashOf = [](const std::string& text) {
+      gpg::SHA256 hash;
+      hash.Update(text.data(), text.size());
+      return HexOf(hash.Snapshot());
+    };
+    CHECK(hashOf("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    CHECK(hashOf("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    const std::string twoBlocks = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    CHECK(hashOf(twoBlocks) == "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+
+    // In pieces, and with a snapshot in between, it is the same hash.
+    gpg::SHA256 pieces;
+    for (const char c : twoBlocks) {
+      pieces.Update(&c, 1);
+      (void)pieces.Snapshot();
+    }
+    CHECK(HexOf(pieces.Snapshot()) == hashOf(twoBlocks));
+  }
+
+  CMessage CommandMessage(const ECmdStreamOp op, const std::string& payload)
+  {
+    return MakeMessage(op, payload);
+  }
+
+  void TestStreamCheckReports()
+  {
+    CommandStreamCheck check(3, false);
+    const CMessage advance = CommandMessage(ECmdStreamOp::CMDST_Advance, Bytes{}.I32(1).data);
+
+    // Stream 0 reaches beats 1 and 2 here; client 1 reports the same hashes.
+    check.Append(0, advance);
+    const auto beat1 = check.NoteBoundary(0, 1);
+    check.Append(0, advance);
+    const auto beat2 = check.NoteBoundary(0, 2);
+    check.NoteReport(1, 0, 1, beat1);
+    check.NoteReport(1, 0, 2, beat2);
+    CHECK(!check.Diverged());
+
+    // A reporter ahead of us waits until we get there, then matches.
+    check.NoteReport(2, 0, 3, beat2); // wrong hash, but not checkable yet
+    CHECK(!check.Diverged());
+    check.Append(0, CommandMessage(ECmdStreamOp::CMDST_DestroyEntity, Bytes{}.I32(5).data));
+    check.Append(0, advance);
+    (void)check.NoteBoundary(0, 3);
+    CHECK(check.Diverged());
+    CHECK(check.FirstDivergence().sender == 0 && check.FirstDivergence().reporter == 2);
+    CHECK(check.FirstDivergence().beat == 3);
+
+    // A beat the stream never stopped at is a different stream too.
+    CommandStreamCheck other(2, false);
+    other.Append(0, CommandMessage(ECmdStreamOp::CMDST_Advance, Bytes{}.I32(2).data));
+    const auto twoBeats = other.NoteBoundary(0, 2);
+    other.NoteReport(1, 0, 1, twoBeats);
+    CHECK(other.Diverged());
+  }
+
+  // Three client managers wired together in memory: player m's manager has its
+  // local client at index m and a CNetClient for each other player, whose
+  // connection hands what it writes to that player's manager.
+  struct Wire
+  {
+    struct Packet
+    {
+      int toManager;
+      int fromIndex;
+      std::string bytes;
+    };
+    std::vector<Packet> queue;
+  };
+
+  class WireConnection final : public INetConnection
+  {
+  public:
+    Wire* wire = nullptr;
+    int toManager = 0;
+    int fromIndex = 0;
+
+    u_long GetAddr() override { return 0x7F000001u; }
+    u_short GetPort() override { return static_cast<u_short>(7000 + toManager); }
+    float GetPing() override { return 0.0f; }
+    float GetTime() override { return 0.0f; }
+    void Write(NetDataSpan* const data) override
+    {
+      wire->queue.push_back({toManager, fromIndex, std::string(reinterpret_cast<const char*>(data->start), data->size())});
+    }
+    void Close() override {}
+    msvc8::string ToString() override { return "wire"; }
+    void ScheduleDestroy() override {}
+  };
+
+  struct ThreePlayerGame
+  {
+    static constexpr int kPlayers = 3;
+    Wire wire;
+    QuietUi ui;
+    WireConnection connections[kPlayers][kPlayers];
+    CClientManagerImpl* managers[kPlayers]{};
+
+    ThreePlayerGame()
+    {
+      for (int m = 0; m < kPlayers; ++m) {
+        managers[m] = CLIENT_CreateClientManager(kPlayers, nullptr, 0, false);
+        managers[m]->mInterface = &ui;
+        managers[m]->CreateLocalClient(gpg::STR_Printf("p%d", m).c_str(), m, m + 1, static_cast<unsigned>(m));
+        for (int p = 0; p < kPlayers; ++p) {
+          if (p == m) {
+            continue;
+          }
+          WireConnection& connection = connections[m][p];
+          connection.wire = &wire;
+          connection.toManager = p;
+          connection.fromIndex = m;
+          managers[m]->CreateNetClient(gpg::STR_Printf("p%d", p).c_str(), p, p + 1, static_cast<unsigned>(p), &connection);
+        }
+      }
+    }
+
+    void Deliver(const int toManager, const int fromIndex, CMessage& msg)
+    {
+      auto* const receiver = static_cast<CNetClient*>(managers[toManager]->mClients[fromIndex]);
+      receiver->ReceiveMessage(&msg, &connections[toManager][fromIndex]);
+    }
+
+    void Deliver(const Wire::Packet& packet)
+    {
+      CMessage msg(static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(packet.bytes[0])));
+      if (packet.bytes.size() > 3) {
+        msg.Append(packet.bytes.data() + 3, packet.bytes.size() - 3);
+      }
+      Deliver(packet.toManager, packet.fromIndex, msg);
+    }
+
+    // Delivers everything sent so far, including what the deliveries send.
+    void Pump()
+    {
+      while (!wire.queue.empty()) {
+        const Wire::Packet packet = wire.queue.front();
+        wire.queue.erase(wire.queue.begin());
+        Deliver(packet);
+      }
+    }
+
+    // Delivers up to `limit` packets as a laggy network would: connections in
+    // a random order, each connection's packets still in order.
+    void PumpShuffled(std::mt19937& random, std::size_t limit)
+    {
+      for (; limit > 0 && !wire.queue.empty(); --limit) {
+        const std::size_t pick = std::uniform_int_distribution<std::size_t>(0, wire.queue.size() - 1)(random);
+        const int toManager = wire.queue[pick].toManager;
+        const int fromIndex = wire.queue[pick].fromIndex;
+        const auto oldest = std::find_if(wire.queue.begin(), wire.queue.end(), [&](const Wire::Packet& packet) {
+          return packet.toManager == toManager && packet.fromIndex == fromIndex;
+        });
+        const Wire::Packet packet = *oldest;
+        wire.queue.erase(oldest);
+        Deliver(packet);
+      }
+    }
+
+    // Player m sends one beat: a checksum report, then an advance.
+    void SendBeat(const int m, const int beat)
+    {
+      const std::string hash(16, static_cast<char>(0x40 + (m * 7 + beat) % 64));
+      CMessage checksum = CommandMessage(ECmdStreamOp::CMDST_VerifyChecksum, Bytes{}.Raw(hash).I32(beat).data);
+      managers[m]->ProcessClients(checksum);
+      CMessage advance = CommandMessage(ECmdStreamOp::CMDST_Advance, Bytes{}.I32(1).data);
+      managers[m]->ProcessClients(advance);
+    }
+
+    bool AnyDiverged() const
+    {
+      for (const CClientManagerImpl* const manager : managers) {
+        if (manager->mStreamCheck->Diverged() || manager->mStreamCheck->HasFindings()) {
+          return true;
+        }
+      }
+      return false;
+    }
+  };
+
+  void TestStreamCheckLagAndReordering()
+  {
+    // Players run at their own pace (player 2 falls far behind, then catches
+    // up) and packets cross the wire in a random order. Nothing may be found.
+    std::mt19937 random(20261025u);
+    ThreePlayerGame* const game = new ThreePlayerGame();
+    constexpr int kBeats = 300;
+    const int pacePercent[ThreePlayerGame::kPlayers] = {90, 60, 25};
+    int sent[ThreePlayerGame::kPlayers] = {};
+    while (sent[0] < kBeats || sent[1] < kBeats || sent[2] < kBeats) {
+      for (int m = 0; m < ThreePlayerGame::kPlayers; ++m) {
+        if (sent[m] < kBeats && static_cast<int>(random() % 100) < pacePercent[m]) {
+          game->SendBeat(m, ++sent[m]);
+        }
+      }
+      game->PumpShuffled(random, random() % 16);
+    }
+    game->Pump();
+
+    CHECK(!game->AnyDiverged());
+    for (const CClientManagerImpl* const manager : game->managers) {
+      for (const CClientBase* const client : manager->mClients) {
+        CHECK(client->mQueuedBeat == static_cast<std::uint32_t>(kBeats));
+      }
+    }
+  }
+
+  void TestStreamCheckFalseReportProvesNothing()
+  {
+    ThreePlayerGame* const game = new ThreePlayerGame();
+    for (int beat = 1; beat <= 5; ++beat) {
+      for (int m = 0; m < ThreePlayerGame::kPlayers; ++m) {
+        game->SendBeat(m, beat);
+      }
+      game->Pump();
+    }
+
+    // Player 2 tells players 0 and 1 that player 0's stream at beat 5 hashed
+    // differently. That is noticed, but cannot pin anything on player 0.
+    for (const int to : {0, 1}) {
+      CMessage fakeAck = MakeMessage(EClientMsg::CLIMSG_Ack, Bytes{}.U8(0).I32(5).Raw(std::string(16, '\x11')).data);
+      game->Deliver(to, 2, fakeAck);
+      CClientManagerImpl* const manager = game->managers[to];
+      CHECK(manager->mStreamCheck->Diverged());
+      CHECK(manager->mStreamCheck->FirstDivergence().sender == 0);
+      CHECK(manager->mStreamCheck->FirstDivergence().reporter == 2);
+      CHECK(!manager->mStreamCheck->ProvenAltered(0));
+      CHECK(!manager->OrdersAlteredFrom(0));
+    }
+  }
+
+  void TestStreamCheckHonestGame()
+  {
+    // Left alive on purpose, as in the client tests.
+    ThreePlayerGame* const game = new ThreePlayerGame();
+    for (int beat = 1; beat <= 20; ++beat) {
+      for (int m = 0; m < ThreePlayerGame::kPlayers; ++m) {
+        game->SendBeat(m, beat);
+      }
+      game->Pump();
+    }
+    CHECK(!game->AnyDiverged());
+    for (const CClientManagerImpl* const manager : game->managers) {
+      for (const CClientBase* const client : manager->mClients) {
+        CHECK(client->mQueuedBeat == 20u);
+      }
+    }
+  }
+
+  void RunDifferentOrdersGame(const int checkMode)
+  {
+    net_CheckOrderStreams = checkMode;
+    ThreePlayerGame* const game = new ThreePlayerGame();
+    net_CheckOrderStreams = 1;
+    for (int beat = 1; beat <= 5; ++beat) {
+      for (int m = 0; m < ThreePlayerGame::kPlayers; ++m) {
+        game->SendBeat(m, beat);
+      }
+      game->Pump();
+    }
+    CHECK(!game->AnyDiverged());
+
+    // Beat 6: player 0's checksum report reaches player 2 altered.
+    net_DebugAlterOrdersTo = 2;
+    game->SendBeat(0, 6);
+    net_DebugAlterOrdersTo = -1;
+    game->SendBeat(1, 6);
+    game->SendBeat(2, 6);
+    game->Pump();
+
+    // Every player notices, and it names player 0's stream at beat 6. Only
+    // mode 2 stops the game; by default a false report must not stop anything.
+    for (CClientManagerImpl* const manager : game->managers) {
+      CHECK(manager->mStreamCheck->Diverged());
+      CHECK(manager->mStreamCheck->FirstDivergence().sender == 0);
+      CHECK(manager->mStreamCheck->FirstDivergence().beat == 6u);
+      CHECK(manager->mStreamCheck->StopsGame() == (checkMode >= 2));
+    }
+
+    // Only player 2, who got the altered report, has player 0's own word
+    // against it: its desyncs against player 0 are withheld, nobody else's.
+    CHECK(game->managers[2]->mStreamCheck->ProvenAltered(0));
+    CHECK(game->managers[2]->OrdersAlteredFrom(0));
+    CHECK(!game->managers[2]->OrdersAlteredFrom(1));
+    for (const int m : {0, 1}) {
+      CHECK(!game->managers[m]->mStreamCheck->ProvenAltered(0));
+      CHECK(!game->managers[m]->OrdersAlteredFrom(0));
+    }
+  }
+
+  void TestStreamCheckReportsDifferentOrders() { RunDifferentOrdersGame(1); }
+
+  void TestStreamCheckStopsOnDifferentOrders() { RunDifferentOrdersGame(2); }
+
+  // --- Lua file access (what a lobby's map or mod can reach) -----------------------------
+
+  // Runs `source` in `state` and returns its first result as a string, or
+  // "error: ..." when it fails to load or run.
+  std::string RunLua(LuaPlus::LuaState& state, const std::string& source)
+  {
+    lua_State* const L = state.GetCState();
+    const int top = lua_gettop(L);
+    std::string result;
+    if (luaL_loadbuffer(L, source.data(), source.size(), "=test") != 0 || LuaCallProtected(L, 0, 1) != 0) {
+      const char* const error = lua_tostring(L, -1);
+      result = std::string("error: ") + (error != nullptr ? error : "?");
+    } else {
+      const char* const text = lua_tostring(L, -1);
+      result = text != nullptr ? text : "(not a string)";
+    }
+    lua_settop(L, top);
+    return result;
+  }
+
+  // A folder mounted at "/" with lua/ok.lua, and a file beside the folder,
+  // outside the mount, that no game path may reach.
+  struct MountedFolder
+  {
+    std::filesystem::path root;
+    std::filesystem::path secret;
+    CVFSImpl* vfs = nullptr;
+    CVirtualFileSystem* previous = nullptr;
+
+    MountedFolder()
+    {
+      root = std::filesystem::temp_directory_path() / ("faf_vfs_test_" + std::to_string(::GetCurrentProcessId()));
+      std::filesystem::create_directories(root / "game" / "lua" / "sub");
+      WriteText(root / "game" / "lua" / "ok.lua", "return 'mounted'");
+      secret = root / "secret.lua";
+      WriteText(secret, "return 'outside'");
+
+      msvc8::vector<SVFSMountPoint> mounts;
+      mounts.push_back(SVFSMountPoint((root / "game").string().c_str(), "/"));
+      vfs = new CVFSImpl(mounts, root);
+      previous = DISK_ExchangeVFS(vfs);
+      DISK_InvalidateFileLookups();
+    }
+
+    ~MountedFolder()
+    {
+      (void)DISK_ExchangeVFS(previous);
+      delete vfs;
+      DISK_InvalidateFileLookups();
+      std::error_code ignored;
+      std::filesystem::remove_all(root, ignored);
+    }
+
+    static void WriteText(const std::filesystem::path& path, const std::string& text)
+    {
+      std::FILE* const file = std::fopen(path.string().c_str(), "wb");
+      if (file != nullptr) {
+        std::fwrite(text.data(), 1, text.size(), file);
+        std::fclose(file);
+      }
+    }
+
+    bool Finds(const char* const path)
+    {
+      msvc8::string found;
+      (void)vfs->FindFile(&found, path, nullptr);
+      return !found.empty();
+    }
+  };
+
+  void TestVfsStaysInsideMounts()
+  {
+    MountedFolder folder;
+    CHECK(folder.Finds("/lua/ok.lua"));
+    CHECK(folder.Finds("/lua/sub/../ok.lua"));
+    CHECK(folder.Finds("/lua/./ok.lua"));
+    CHECK(!folder.Finds("/../secret.lua"));
+    CHECK(!folder.Finds("/lua/../../secret.lua"));
+    CHECK(!folder.Finds("/lua\\..\\..\\secret.lua"));
+    CHECK(!folder.vfs->GetFileInfo("/../secret.lua", nullptr));
+    msvc8::vector<msvc8::string> listed;
+    folder.vfs->EnumerateFiles("/../", "*.lua", false, &listed);
+    CHECK(listed.empty());
+  }
+
+  void TestLuaFilesComeFromTheGame()
+  {
+    MountedFolder folder;
+    std::string secretPath = folder.secret.string();
+    std::replace(secretPath.begin(), secretPath.end(), '\\', '/');
+
+    // A game state (opened without io) reads the mounted files only.
+    LuaPlus::LuaState game(LuaPlus::LuaState::LIB_BASE);
+    CHECK(RunLua(game, "return dofile('/lua/ok.lua')") == "mounted");
+    CHECK(RunLua(game, "return tostring(loadfile('/../secret.lua'))") == "nil");
+    CHECK(RunLua(game, "return tostring(loadfile('" + secretPath + "'))") == "nil");
+    CHECK(RunLua(game, "return tostring(LuaDumpBinary)") == "nil");
+
+    // The start-up state, which runs the user's own init file, keeps real paths.
+    LuaPlus::LuaState startup(LuaPlus::LuaState::LIB_OSIO);
+    CHECK(RunLua(startup, "return dofile('" + secretPath + "')") == "outside");
+  }
+
+  void TestLuaCompiledChunksRefused()
+  {
+    LuaPlus::LuaState& state = TestLuaState();
+    const std::string load =
+      "local f, err = loadstring(string.char(27) .. 'Lua' .. string.rep('x', 32)) return tostring(err)";
+    CHECK(RunLua(state, load).find("compiled Lua chunks are not loaded") != std::string::npos);
+
+    // Switched on, the chunk reaches the undumper (which rejects this junk).
+    lua_AllowPrecompiledChunks = true;
+    const std::string allowed = RunLua(state, load);
+    lua_AllowPrecompiledChunks = false;
+    CHECK(allowed.find("compiled Lua chunks are not loaded") == std::string::npos);
+    CHECK(allowed != "nil");
+  }
+
   // --- Replay files ------------------------------------------------------------------------
 
   void TestReplayDamagedHeaderRefused()
@@ -887,6 +1324,9 @@ namespace
 
   const TestCase kTests[] = {
     {"lua: valid values", &TestLuaValidValues},
+    {"files: the mounted file system stays inside its mounts", &TestVfsStaysInsideMounts},
+    {"files: game Lua states read only the game's files", &TestLuaFilesComeFromTheGame},
+    {"files: compiled Lua chunks are refused", &TestLuaCompiledChunksRefused},
     {"lua: nesting limit", &TestLuaNestingLimit},
     {"lua: deep field keeps its siblings", &TestLuaDeepFieldKeepsSiblings},
     {"lua: lobby relay depth", &TestLuaLobbyRelayDepth},
@@ -911,6 +1351,13 @@ namespace
     {"lobby: script data", &TestLobbyScriptData},
     {"lobby: peer events", &TestLobbyPeerEvents},
     {"replay: damaged header refused", &TestReplayDamagedHeaderRefused},
+    {"order check: sha256 vectors", &TestSha256Vectors},
+    {"order check: reports", &TestStreamCheckReports},
+    {"order check: honest 3-player game", &TestStreamCheckHonestGame},
+    {"order check: lag and reordering find nothing", &TestStreamCheckLagAndReordering},
+    {"order check: a false report proves nothing", &TestStreamCheckFalseReportProvesNothing},
+    {"order check: different orders reported (default)", &TestStreamCheckReportsDifferentOrders},
+    {"order check: different orders stop the game (mode 2)", &TestStreamCheckStopsOnDifferentOrders},
   };
 } // namespace
 

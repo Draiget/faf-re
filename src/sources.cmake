@@ -12,6 +12,7 @@
 set(FAF_ENGINE_SOURCES
   gpg/core/algorithms/Cluster.cpp
   gpg/core/algorithms/MD5.cpp
+  gpg/core/algorithms/SHA256.cpp
   gpg/core/containers/ArchiveSerialization.cpp
   moho/misc/CrtRuntimeExportedHelpers.cpp
   moho/misc/RuntimeTuningGlobals.cpp
@@ -853,6 +854,7 @@ set(FAF_ENGINE_SOURCES
   moho/net/CMessage.cpp
   moho/net/CMessageStream.cpp
   moho/net/CNetClient.cpp
+  moho/net/CommandStreamCheck.cpp
   moho/net/CNetDatagramSocketImpl.cpp
   moho/net/CNetNullConnector.cpp
   moho/net/CNetTCPBuf.cpp
