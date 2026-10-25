@@ -121,6 +121,7 @@ namespace
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
+      "  --lane-sizes <file>       write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -172,6 +173,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
+  (void)ReadOption("--lane-sizes", options.laneSizesPath);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);

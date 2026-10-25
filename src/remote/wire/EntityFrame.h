@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -19,6 +20,18 @@
 
 namespace faf::remote::wire
 {
+  /** A unit's own state, beyond what every entity has. Exact floats (the UI shows them). */
+  struct SUnitFields
+  {
+    float fuelRatio = 0.0f;
+    float shieldRatio = 0.0f;
+    float workProgress = 0.0f;
+    std::uint64_t unitStates = 0;   // EUnitState bits
+    std::uint32_t scriptBits = 0;   // the toggle buttons' bits
+    std::array<std::uint16_t, 4> siloCounts{}; // tactical build, nuke build, tactical stored, nuke stored
+    std::uint8_t unitFlags = 0;     // paused, auto mode, auto surface, busy, repeat queue, ...
+  };
+
   /** One entity's state in a view frame. Floats the UI shows as numbers are exact. */
   struct SEntityRecord
   {
@@ -31,28 +44,48 @@ namespace faf::remote::wire
     float maxHealth = 0.0f;
     float fractionComplete = 0.0f;
     std::uint16_t flags = 0;
+    bool isUnit = false;                            // `unit` is meaningful
+    SUnitFields unit{};
 
-    /** Bitwise: two NaNs with one bit pattern are equal, 0.0 and -0.0 are not. */
+    /**
+     * Bitwise: two NaNs with one bit pattern are equal, 0.0 and -0.0 are not. A non-unit's
+     * `unit` block is not compared (it is never sent).
+     */
     [[nodiscard]] bool operator==(const SEntityRecord& other) const noexcept;
   };
 
-  /** Change-mask bits, one per field after the id (8 bits on the wire). */
-  enum EEntityField : std::uint8_t
+  /**
+   * Change-mask bits, one per field after the id. On the wire the mask is a varint, so the
+   * fields that change every tick come first and a typical change costs one mask byte.
+   * `kFieldKind` carries `isUnit`; the unit bits are only valid for a unit.
+   */
+  enum EEntityField : std::uint16_t
   {
-    kFieldBlueprint = 1u << 0,
-    kFieldArmy = 1u << 1,
-    kFieldPosition = 1u << 2,
-    kFieldOrientation = 1u << 3,
-    kFieldHealth = 1u << 4,
+    kFieldPosition = 1u << 0,
+    kFieldOrientation = 1u << 1,
+    kFieldHealth = 1u << 2,
+    kFieldFraction = 1u << 3,
+    kFieldFlags = 1u << 4,
     kFieldMaxHealth = 1u << 5,
-    kFieldFraction = 1u << 6,
-    kFieldFlags = 1u << 7,
+    kFieldBlueprint = 1u << 6,
+    kFieldArmy = 1u << 7,
+    kFieldUnitFuel = 1u << 8,
+    kFieldUnitShield = 1u << 9,
+    kFieldUnitWork = 1u << 10,
+    kFieldUnitStates = 1u << 11,
+    kFieldUnitScriptBits = 1u << 12,
+    kFieldUnitSilos = 1u << 13,
+    kFieldUnitFlags = 1u << 14,
+    kFieldKind = 1u << 15,
   };
 
-  inline constexpr std::uint8_t kAllEntityFields = 0xFFu;
+  inline constexpr std::uint16_t kEntityFields = 0x00FFu;
+  inline constexpr std::uint16_t kUnitFields = 0x7F00u;
+  /** What a creation writes: everything, the unit block only for a unit. */
+  [[nodiscard]] std::uint16_t CreationFields(const SEntityRecord& record) noexcept;
 
   /** The fields in which two records of one entity differ. */
-  [[nodiscard]] std::uint8_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept;
+  [[nodiscard]] std::uint16_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept;
 
   struct SViewFrame
   {
@@ -73,7 +106,7 @@ namespace faf::remote::wire
     std::vector<SEntityRecord> created;      // ascending ids
     struct SChange
     {
-      std::uint8_t fields = 0;
+      std::uint16_t fields = 0;
       SEntityRecord record;                   // the new state (only `fields` differ)
     };
     std::vector<SChange> changed;            // ascending ids

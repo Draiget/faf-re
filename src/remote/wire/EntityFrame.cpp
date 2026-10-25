@@ -9,10 +9,11 @@
 // Wire layout (entities lane):
 //   u16 lane version, u32 frame id, u32 baseline id, u32 beat,
 //   removed:  varuint count, then per id varuint gap
-//   created:  varuint count, then per entity varuint gap + every field
-//   changed:  varuint count, then per entity varuint gap + u8 field mask + those fields
+//   created:  varuint count, then per entity varuint gap + every field (unit block for units)
+//   changed:  varuint count, then per entity varuint gap + varuint field mask + those fields
 // A gap is the id minus the previous id of the same section minus one (the first: the id),
-// so ids are strictly ascending by construction.
+// so ids are strictly ascending by construction. Within a record the kind bit comes first
+// (it says whether a unit block can follow), then the fields in mask-bit order.
 
 namespace faf::remote::wire
 {
@@ -20,6 +21,8 @@ namespace faf::remote::wire
   {
     constexpr int kArmyBits = 8;
     constexpr int kFlagBits = 16;
+    constexpr int kUnitFlagBits = 8;
+    constexpr int kSiloBits = 16;
     constexpr int kMinBitsPerItem = 8; // the smallest gap varint
 
     [[nodiscard]] std::uint32_t Bits(const float value) noexcept
@@ -34,13 +37,17 @@ namespace faf::remote::wire
           && record.position[2] <= codec.position.z.MaxQuantized();
     }
 
-    void WriteFields(BitWriter& writer, const SEntityRecord& record, const std::uint8_t fields, const SFrameCodec& codec)
+    [[nodiscard]] bool SameUnitFields(const SUnitFields& a, const SUnitFields& b) noexcept
     {
-      if ((fields & kFieldBlueprint) != 0u) {
-        writer.WriteVarUint(record.blueprint);
-      }
-      if ((fields & kFieldArmy) != 0u) {
-        writer.WriteBits(record.army, kArmyBits);
+      return Bits(a.fuelRatio) == Bits(b.fuelRatio) && Bits(a.shieldRatio) == Bits(b.shieldRatio)
+          && Bits(a.workProgress) == Bits(b.workProgress) && a.unitStates == b.unitStates
+          && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags;
+    }
+
+    void WriteFields(BitWriter& writer, const SEntityRecord& record, const std::uint16_t fields, const SFrameCodec& codec)
+    {
+      if ((fields & kFieldKind) != 0u) {
+        writer.WriteBool(record.isUnit);
       }
       if ((fields & kFieldPosition) != 0u) {
         writer.WriteBits(record.position[0], codec.position.x.bits);
@@ -53,24 +60,65 @@ namespace faf::remote::wire
       if ((fields & kFieldHealth) != 0u) {
         writer.WriteFloatExact(record.health);
       }
-      if ((fields & kFieldMaxHealth) != 0u) {
-        writer.WriteFloatExact(record.maxHealth);
-      }
       if ((fields & kFieldFraction) != 0u) {
         writer.WriteFloatExact(record.fractionComplete);
       }
       if ((fields & kFieldFlags) != 0u) {
         writer.WriteBits(record.flags, kFlagBits);
       }
-    }
-
-    void ReadFields(BitReader& reader, SEntityRecord& record, const std::uint8_t fields, const SFrameCodec& codec)
-    {
+      if ((fields & kFieldMaxHealth) != 0u) {
+        writer.WriteFloatExact(record.maxHealth);
+      }
       if ((fields & kFieldBlueprint) != 0u) {
-        record.blueprint = reader.ReadVarUint();
+        writer.WriteVarUint(record.blueprint);
       }
       if ((fields & kFieldArmy) != 0u) {
-        record.army = static_cast<std::uint8_t>(reader.ReadBits(kArmyBits));
+        writer.WriteBits(record.army, kArmyBits);
+      }
+      const SUnitFields& unit = record.unit;
+      if ((fields & kFieldUnitFuel) != 0u) {
+        writer.WriteFloatExact(unit.fuelRatio);
+      }
+      if ((fields & kFieldUnitShield) != 0u) {
+        writer.WriteFloatExact(unit.shieldRatio);
+      }
+      if ((fields & kFieldUnitWork) != 0u) {
+        writer.WriteFloatExact(unit.workProgress);
+      }
+      if ((fields & kFieldUnitStates) != 0u) {
+        writer.WriteBits(static_cast<std::uint32_t>(unit.unitStates), 32);
+        writer.WriteBits(static_cast<std::uint32_t>(unit.unitStates >> 32), 32);
+      }
+      if ((fields & kFieldUnitScriptBits) != 0u) {
+        writer.WriteBits(unit.scriptBits, 32);
+      }
+      if ((fields & kFieldUnitSilos) != 0u) {
+        for (const std::uint16_t count : unit.siloCounts) {
+          writer.WriteBits(count, kSiloBits);
+        }
+      }
+      if ((fields & kFieldUnitFlags) != 0u) {
+        writer.WriteBits(unit.unitFlags, kUnitFlagBits);
+      }
+    }
+
+    /**
+     * Reads `fields` into `record`. A creation reads the unit block only when the record turns
+     * out to be a unit; a change naming unit fields for a non-unit is refused.
+     */
+    [[nodiscard]] bool ReadFields(
+      BitReader& reader, SEntityRecord& record, std::uint16_t fields, const SFrameCodec& codec, const bool creation
+    )
+    {
+      if ((fields & kFieldKind) != 0u) {
+        record.isUnit = reader.ReadBool();
+      }
+      if ((fields & kUnitFields) != 0u && !record.isUnit) {
+        if (!creation) {
+          reader.Fail();
+          return false;
+        }
+        fields = static_cast<std::uint16_t>(fields & ~kUnitFields);
       }
       if ((fields & kFieldPosition) != 0u) {
         record.position[0] = reader.ReadBits(codec.position.x.bits);
@@ -83,15 +131,48 @@ namespace faf::remote::wire
       if ((fields & kFieldHealth) != 0u) {
         record.health = reader.ReadFloatExact();
       }
-      if ((fields & kFieldMaxHealth) != 0u) {
-        record.maxHealth = reader.ReadFloatExact();
-      }
       if ((fields & kFieldFraction) != 0u) {
         record.fractionComplete = reader.ReadFloatExact();
       }
       if ((fields & kFieldFlags) != 0u) {
         record.flags = static_cast<std::uint16_t>(reader.ReadBits(kFlagBits));
       }
+      if ((fields & kFieldMaxHealth) != 0u) {
+        record.maxHealth = reader.ReadFloatExact();
+      }
+      if ((fields & kFieldBlueprint) != 0u) {
+        record.blueprint = reader.ReadVarUint();
+      }
+      if ((fields & kFieldArmy) != 0u) {
+        record.army = static_cast<std::uint8_t>(reader.ReadBits(kArmyBits));
+      }
+      SUnitFields& unit = record.unit;
+      if ((fields & kFieldUnitFuel) != 0u) {
+        unit.fuelRatio = reader.ReadFloatExact();
+      }
+      if ((fields & kFieldUnitShield) != 0u) {
+        unit.shieldRatio = reader.ReadFloatExact();
+      }
+      if ((fields & kFieldUnitWork) != 0u) {
+        unit.workProgress = reader.ReadFloatExact();
+      }
+      if ((fields & kFieldUnitStates) != 0u) {
+        const std::uint64_t low = reader.ReadBits(32);
+        const std::uint64_t high = reader.ReadBits(32);
+        unit.unitStates = low | (high << 32);
+      }
+      if ((fields & kFieldUnitScriptBits) != 0u) {
+        unit.scriptBits = reader.ReadBits(32);
+      }
+      if ((fields & kFieldUnitSilos) != 0u) {
+        for (std::uint16_t& count : unit.siloCounts) {
+          count = static_cast<std::uint16_t>(reader.ReadBits(kSiloBits));
+        }
+      }
+      if ((fields & kFieldUnitFlags) != 0u) {
+        unit.unitFlags = static_cast<std::uint8_t>(reader.ReadBits(kUnitFlagBits));
+      }
+      return reader.Ok();
     }
 
     /** Reads ascending ids by gap; false on overflow. */
@@ -142,18 +223,17 @@ namespace faf::remote::wire
     return id == other.id && blueprint == other.blueprint && army == other.army && position == other.position
         && orientation == other.orientation && Bits(health) == Bits(other.health)
         && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
-        && flags == other.flags;
+        && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit));
   }
 
-  std::uint8_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
+  std::uint16_t CreationFields(const SEntityRecord& record) noexcept
   {
-    std::uint8_t fields = 0;
-    if (before.blueprint != after.blueprint) {
-      fields |= kFieldBlueprint;
-    }
-    if (before.army != after.army) {
-      fields |= kFieldArmy;
-    }
+    return static_cast<std::uint16_t>(kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u));
+  }
+
+  std::uint16_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
+  {
+    std::uint16_t fields = 0;
     if (before.position != after.position) {
       fields |= kFieldPosition;
     }
@@ -163,14 +243,53 @@ namespace faf::remote::wire
     if (Bits(before.health) != Bits(after.health)) {
       fields |= kFieldHealth;
     }
-    if (Bits(before.maxHealth) != Bits(after.maxHealth)) {
-      fields |= kFieldMaxHealth;
-    }
     if (Bits(before.fractionComplete) != Bits(after.fractionComplete)) {
       fields |= kFieldFraction;
     }
     if (before.flags != after.flags) {
       fields |= kFieldFlags;
+    }
+    if (Bits(before.maxHealth) != Bits(after.maxHealth)) {
+      fields |= kFieldMaxHealth;
+    }
+    if (before.blueprint != after.blueprint) {
+      fields |= kFieldBlueprint;
+    }
+    if (before.army != after.army) {
+      fields |= kFieldArmy;
+    }
+    if (before.isUnit != after.isUnit) {
+      // Becoming a unit sends the whole unit block; ceasing to be one sends only the kind.
+      fields |= kFieldKind;
+      if (after.isUnit) {
+        fields |= kUnitFields;
+      }
+      return fields;
+    }
+    if (after.isUnit) {
+      const SUnitFields& b = before.unit;
+      const SUnitFields& a = after.unit;
+      if (Bits(b.fuelRatio) != Bits(a.fuelRatio)) {
+        fields |= kFieldUnitFuel;
+      }
+      if (Bits(b.shieldRatio) != Bits(a.shieldRatio)) {
+        fields |= kFieldUnitShield;
+      }
+      if (Bits(b.workProgress) != Bits(a.workProgress)) {
+        fields |= kFieldUnitWork;
+      }
+      if (b.unitStates != a.unitStates) {
+        fields |= kFieldUnitStates;
+      }
+      if (b.scriptBits != a.scriptBits) {
+        fields |= kFieldUnitScriptBits;
+      }
+      if (b.siloCounts != a.siloCounts) {
+        fields |= kFieldUnitSilos;
+      }
+      if (b.unitFlags != a.unitFlags) {
+        fields |= kFieldUnitFlags;
+      }
     }
     return fields;
   }
@@ -201,7 +320,7 @@ namespace faf::remote::wire
         delta.created.push_back(after[a]);
         ++a;
       } else {
-        if (const std::uint8_t fields = ChangedFields(before[b], after[a]); fields != 0u) {
+        if (const std::uint16_t fields = ChangedFields(before[b], after[a]); fields != 0u) {
           delta.changed.push_back({fields, after[a]});
         }
         ++a;
@@ -240,14 +359,14 @@ namespace faf::remote::wire
     writer.WriteVarUint(static_cast<std::uint32_t>(delta.created.size()));
     for (const SEntityRecord& record : delta.created) {
       WriteGap(writer, first, previous, record.id);
-      WriteFields(writer, record, kAllEntityFields, codec);
+      WriteFields(writer, record, CreationFields(record), codec);
     }
 
     first = true;
     writer.WriteVarUint(static_cast<std::uint32_t>(delta.changed.size()));
     for (const SFrameDelta::SChange& change : delta.changed) {
       WriteGap(writer, first, previous, change.record.id);
-      writer.WriteBits(change.fields, 8);
+      writer.WriteVarUint(change.fields);
       WriteFields(writer, change.record, change.fields, codec);
     }
     return true;
@@ -322,8 +441,7 @@ namespace faf::remote::wire
         if (!cursor.Next(reader, record.id)) {
           return false;
         }
-        ReadFields(reader, record, kAllEntityFields, codec);
-        if (!reader.Ok()) {
+        if (!ReadFields(reader, record, static_cast<std::uint16_t>(kEntityFields | kFieldKind | kUnitFields), codec, true)) {
           return false;
         }
         created.push_back(record);
@@ -347,7 +465,7 @@ namespace faf::remote::wire
       }
     }
 
-    // Changes: ids must be kept (not created in this frame), fields non-empty.
+    // Changes: ids must be kept (not created in this frame), the mask non-empty and 16 bits.
     std::uint32_t changedCount = 0;
     if (!ReadCount(reader, codec, changedCount)) {
       return false;
@@ -361,8 +479,8 @@ namespace faf::remote::wire
         if (!cursor.Next(reader, id)) {
           return false;
         }
-        const auto fields = static_cast<std::uint8_t>(reader.ReadBits(8));
-        if (!reader.Ok() || fields == 0u) {
+        const std::uint32_t fields = reader.ReadVarUint();
+        if (!reader.Ok() || fields == 0u || fields > 0xFFFFu) {
           return false;
         }
         while (m < merged.size() && merged[m].id < id) {
@@ -374,8 +492,7 @@ namespace faf::remote::wire
         if (m == merged.size() || merged[m].id != id || (c < created.size() && created[c].id == id)) {
           return false;
         }
-        ReadFields(reader, merged[m], fields, codec);
-        if (!reader.Ok()) {
+        if (!ReadFields(reader, merged[m], static_cast<std::uint16_t>(fields), codec, false)) {
           return false;
         }
       }

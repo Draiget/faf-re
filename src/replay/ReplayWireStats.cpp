@@ -40,6 +40,28 @@ namespace faf::replay
       record.fractionComplete = data.mFractionComplete;
       record.flags = PackFlags(data);
     }
+    [[nodiscard]] std::uint16_t SiloCount(const std::int32_t count) noexcept
+    {
+      return static_cast<std::uint16_t>(count < 0 ? 0 : (count > 0xFFFF ? 0xFFFF : count));
+    }
+
+    void ApplyUnitData(wire::SUnitFields& unit, const moho::SSTIUnitVariableData& data)
+    {
+      unit.fuelRatio = data.mFuelRatio;
+      unit.shieldRatio = data.mShieldRatio;
+      unit.workProgress = data.mWorkProgress;
+      unit.unitStates = data.mUnitStates;
+      unit.scriptBits = data.mScriptbits;
+      unit.siloCounts = {
+        SiloCount(data.mTacticalSiloBuildCount), SiloCount(data.mNukeSiloBuildCount),
+        SiloCount(data.mTacticalSiloStorageCount), SiloCount(data.mNukeSiloStorageCount)
+      };
+      unit.unitFlags = static_cast<std::uint8_t>(
+        (data.mIsPaused ? 1u : 0u) | (data.mAutoMode ? 2u : 0u) | (data.mAutoSurfaceMode ? 4u : 0u)
+        | (data.mIsBusy ? 8u : 0u) | (data.mRepeatQueue ? 16u : 0u) | (data.mIsValidTarget ? 32u : 0u)
+        | (data.mOverchargePaused ? 64u : 0u)
+      );
+    }
   } // namespace
 
   CReplayWireStats::CReplayWireStats(
@@ -83,11 +105,18 @@ namespace faf::replay
     }
     for (const moho::SCreateUnitParams& params : packet.mNewUnits) {
       create(params);
+      mWorld[params.mEntityId].isUnit = true;
     }
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
       const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
       if (it != mWorld.end()) {
         ApplyVariableData(it->second, update.mVariableData, mCodec);
+      }
+    }
+    for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
+      const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
+      if (it != mWorld.end() && it->second.isUnit) {
+        ApplyUnitData(it->second.unit, update.mVariableData);
       }
     }
     for (const moho::EntId id : packet.mEraseIds) {

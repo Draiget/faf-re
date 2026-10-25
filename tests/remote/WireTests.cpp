@@ -365,13 +365,25 @@ namespace
       record.maxHealth = RandomFloat();
       record.fractionComplete = RandomFloat();
       record.flags = static_cast<std::uint16_t>(mRng());
+      record.isUnit = (mRng() & 1u) != 0u;
+      if (record.isUnit) {
+        record.unit.fuelRatio = RandomFloat();
+        record.unit.shieldRatio = RandomFloat();
+        record.unit.workProgress = RandomFloat();
+        record.unit.unitStates = (static_cast<std::uint64_t>(mRng()) << 32) | mRng();
+        record.unit.scriptBits = static_cast<std::uint32_t>(mRng());
+        for (std::uint16_t& count : record.unit.siloCounts) {
+          count = static_cast<std::uint16_t>(mRng());
+        }
+        record.unit.unitFlags = static_cast<std::uint8_t>(mRng());
+      }
       return record;
     }
 
     void Mutate(SEntityRecord& record)
     {
       const SEntityRecord fresh = RandomRecord(record.id);
-      const std::uint32_t fields = mRng() & 0xFFu;
+      const std::uint32_t fields = mRng() & 0xFFFFu;
       if ((fields & kFieldBlueprint) != 0u) record.blueprint = fresh.blueprint;
       if ((fields & kFieldArmy) != 0u) record.army = fresh.army;
       if ((fields & kFieldPosition) != 0u) record.position = fresh.position;
@@ -380,6 +392,31 @@ namespace
       if ((fields & kFieldMaxHealth) != 0u) record.maxHealth = fresh.maxHealth;
       if ((fields & kFieldFraction) != 0u) record.fractionComplete = fresh.fractionComplete;
       if ((fields & kFieldFlags) != 0u) record.flags = fresh.flags;
+      // A kind change is rare in the sim (an entity is a unit for life); flip it now and then.
+      if ((fields & kFieldKind) != 0u && mRng() % 8u == 0u) {
+        record.isUnit = fresh.isUnit;
+        record.unit = fresh.unit;
+      }
+      if (record.isUnit) {
+        SUnitFields& unit = record.unit;
+        const SUnitFields source = fresh.isUnit ? fresh.unit : RandomRecordUnit();
+        if ((fields & kFieldUnitFuel) != 0u) unit.fuelRatio = source.fuelRatio;
+        if ((fields & kFieldUnitShield) != 0u) unit.shieldRatio = source.shieldRatio;
+        if ((fields & kFieldUnitWork) != 0u) unit.workProgress = source.workProgress;
+        if ((fields & kFieldUnitStates) != 0u) unit.unitStates = source.unitStates;
+        if ((fields & kFieldUnitScriptBits) != 0u) unit.scriptBits = source.scriptBits;
+        if ((fields & kFieldUnitSilos) != 0u) unit.siloCounts = source.siloCounts;
+        if ((fields & kFieldUnitFlags) != 0u) unit.unitFlags = source.unitFlags;
+      }
+    }
+
+    SUnitFields RandomRecordUnit()
+    {
+      SEntityRecord record = RandomRecord(0);
+      while (!record.isUnit) {
+        record = RandomRecord(0);
+      }
+      return record.unit;
     }
 
     std::mt19937 mRng;
@@ -623,21 +660,26 @@ namespace
     dup.WriteVarUint(0u);
     dup.WriteVarUint(1u);
     dup.WriteVarUint(10u);
-    SEntityRecord record{};
-    record.id = 10;
-    // every field, as the encoder writes them
-    dup.WriteVarUint(record.blueprint);
-    dup.WriteBits(record.army, 8);
+    // every field of a non-unit, in the encoder's order: kind, position, orientation,
+    // health, fraction, flags, max health, blueprint, army
+    dup.WriteBool(false);
     dup.WriteBits(0u, kCodec.position.x.bits);
     dup.WriteBits(0u, kCodec.position.y.bits);
     dup.WriteBits(0u, kCodec.position.z.bits);
     dup.WriteBits(0u, 32);
     dup.WriteFloatExact(0.0f);
     dup.WriteFloatExact(0.0f);
-    dup.WriteFloatExact(0.0f);
     dup.WriteBits(0u, 16);
+    dup.WriteFloatExact(0.0f);
+    dup.WriteVarUint(COrdinalTable::kNone);
+    dup.WriteBits(0xFFu, 8);
     dup.WriteVarUint(0u);
     CHECK(!Decode(Bytes(dup), &baseline, out));
+    // The same bytes against a baseline without id 10 are a valid frame: the refusal above is
+    // the duplicate, not the encoding.
+    SViewFrame other = baseline;
+    other.entities[0].id = 20;
+    CHECK(Decode(Bytes(dup), &other, out) && out.entities.size() == 2u && out.entities[0].id == 10u);
 
     // A change with an empty field mask.
     BitWriter empty;

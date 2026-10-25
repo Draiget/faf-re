@@ -18,6 +18,8 @@
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/SessionStartup.h"
+#include "moho/render/CDecalTypes.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/IClientMgrUIInterface.h"
 #include "moho/sim/CWldMap.h"
@@ -273,6 +275,43 @@ namespace faf::replay
       return digest.Value();
     }
 
+    /** The Lua `Sync` payload's size in bytes, leaving the stream at its start. */
+    [[nodiscard]] std::uint64_t SyncStreamBytes(const moho::SSyncData& packet)
+    {
+      if (packet.mStream == nullptr) {
+        return 0;
+      }
+      const std::uint64_t end = packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginEnd, 0);
+      (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+      return end;
+    }
+
+    constexpr const char* kLaneSizesHeader =
+      "beat,new_entities,new_units,entity_updates,unit_updates,delete_ids,erase_ids,army_updates,new_grids,"
+      "command_new,command_updates,command_removed,command_released,decals_add,decals_remove,cam_shakes,"
+      "cam_follows,pose_updates,audio_requests,playable_rects,print_lines,extra_unit_data,desyncs,"
+      "entity_update_bytes,unit_update_bytes,army_update_bytes,lua_sync_bytes\n";
+
+    /** One CSV row of per-lane element counts and the in-memory bytes of the big lanes (M0.2). */
+    void WriteLaneSizes(std::FILE* const file, const moho::SSyncData& packet)
+    {
+      std::fprintf(
+        file,
+        "%d,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%llu\n",
+        packet.mCurBeat, packet.mNewEntities.size(), packet.mNewUnits.size(), packet.mEntityUpdates.size(),
+        packet.mUnitUpdates.size(), packet.mDeleteIds.size(), packet.mEraseIds.size(), packet.mArmyUpdates.size(),
+        packet.mNewGrids.size(), packet.mPublishedCommandDescriptors.size(), packet.mPublishedCommandPackets.size(),
+        packet.mPendingCommandEventRemovals.size(), packet.mPendingReleasedCommandIds.size(), packet.mAddDecals.size(),
+        packet.mRemoveDecals.size(), packet.mCamShakeParams.size(), packet.mFollowCameras.size(),
+        packet.mPoseUpdates.size(), static_cast<std::size_t>(packet.mAudioRequests.end() - packet.mAudioRequests.begin()),
+        packet.mPlayableRectUpdates.size(), packet.mPrintField.size(), packet.mSyncExtraUnitData.size(),
+        packet.mDesyncs.size(), packet.mEntityUpdates.size() * sizeof(moho::SEntityVariableUpdateEntry),
+        packet.mUnitUpdates.size() * sizeof(moho::SUnitVariableUpdateEntry),
+        packet.mArmyUpdates.size() * sizeof(moho::SSTIArmyVariableData),
+        static_cast<unsigned long long>(SyncStreamBytes(packet))
+      );
+    }
+
     /**
      * The world session's loading steps that the sim needs (`WLD_DoPreload`, `WLD_DoLoading`):
      * the session loader builds rules, session Lua state and map on its worker thread.
@@ -411,6 +450,15 @@ namespace faf::replay
 
     std::FILE* digestFile = nullptr;
     std::FILE* stateDigestFile = nullptr;
+    std::FILE* laneSizesFile = nullptr;
+    if (!options.laneSizesPath.empty()) {
+      if (fopen_s(&laneSizesFile, options.laneSizesPath.c_str(), "w") != 0) {
+        laneSizesFile = nullptr;
+        result.error = "cannot write " + options.laneSizesPath;
+        return result;
+      }
+      std::fputs(kLaneSizesHeader, laneSizesFile);
+    }
     if (!options.stateDigestPath.empty() && fopen_s(&stateDigestFile, options.stateDigestPath.c_str(), "w") != 0) {
       stateDigestFile = nullptr;
       result.error = "cannot write " + options.stateDigestPath;
@@ -491,6 +539,9 @@ namespace faf::replay
           }
         }
 
+        if (laneSizesFile != nullptr) {
+          WriteLaneSizes(laneSizesFile, *packet);
+        }
         if (stateDigestFile != nullptr) {
           std::fprintf(
             stateDigestFile, "%d %016llx\n", packet->mCurBeat,
@@ -544,6 +595,9 @@ namespace faf::replay
     }
     if (stateDigestFile != nullptr) {
       std::fclose(stateDigestFile);
+    }
+    if (laneSizesFile != nullptr) {
+      std::fclose(laneSizesFile);
     }
     if (wireStats) {
       result.wireSummary = wireStats->Summary();

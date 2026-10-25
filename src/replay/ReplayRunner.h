@@ -18,6 +18,7 @@ namespace faf::replay
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;  // when set: the entities lane of the wire format, per beat (CSV)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
+    std::string laneSizesPath;  // when set: per-beat element counts and bytes of every sync lane (CSV)
     int checksumPeriod = 0;     // when > 0: `sim_ChecksumPeriod` for this run (0 = the default)
     int replayLead = -1;        // when >= 0: `sim_ReplayLead` for this run
     int timeoutMinutes = 180;   // wall-clock limit for the whole run
