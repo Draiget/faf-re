@@ -251,7 +251,7 @@ void ClassifyIconsCS(uint3 thread : SV_DispatchThreadID)
     {
         // std::min(a, b): b when b < a.
         float fadeThreshold = MaxZoomFade < source.iconFadeInZoom ? MaxZoomFade : source.iconFadeInZoom;
-        if (fadeThreshold <= CurrentZoom)
+        if (fadeThreshold > CurrentZoom)
         {
             if ((source.flags & kSkipWhenMeshVisible) != 0u)
             {
