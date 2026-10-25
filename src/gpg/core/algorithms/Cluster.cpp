@@ -1,4 +1,5 @@
 #include "Cluster.h"
+#include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
@@ -30,8 +31,10 @@ namespace
     struct SharedCountControl
     {
         void** vtable;
-        volatile long useCount;
-        volatile long weakCount;
+        // boost::detail::sp_counted_base's counts: Windows' 32-bit long, a 32-bit int in
+        // boost's gcc/x86 implementation on Linux (platform/Interlocked.h).
+        volatile platform::InterlockedLong useCount;
+        volatile platform::InterlockedLong weakCount;
     };
 
     void RetainSharedCount(void* sharedCount)

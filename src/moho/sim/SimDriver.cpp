@@ -1,4 +1,5 @@
 #include "SimDriver.h"
+#include "platform/Interlocked.h"
 #include "moho/core/ThreadPlacement.h"
 #include "legacy/math/X87Math.h"
 #include "platform/X87Precision.h"
@@ -294,7 +295,7 @@ namespace
     ~ScopedStatTimer()
     {
       (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&mStat->mPrimaryValueBits),
+        reinterpret_cast<volatile platform::InterlockedLong*>(&mStat->mPrimaryValueBits),
         static_cast<long>(gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles()))
       );
     }

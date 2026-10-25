@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEfxEmitter.h"
+#include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
 #include <cmath>
@@ -1150,7 +1151,7 @@ namespace moho
       (void)sEngineStatRenderActiveEmitters->Release(0);
     }
     _InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+      reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
 
     if (!mValid) {
       UpdateCurve();

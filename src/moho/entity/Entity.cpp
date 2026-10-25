@@ -1,4 +1,5 @@
-﻿#include "Entity.h"
+#include "Entity.h"
+#include "platform/Interlocked.h"
 
 #include <utility>
 #include "legacy/math/X87Math.h"
@@ -344,7 +345,7 @@ namespace
       return;
     }
 #if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+    InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif

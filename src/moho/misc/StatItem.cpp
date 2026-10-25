@@ -1,4 +1,5 @@
 #include "StatItem.h"
+#include "platform/Interlocked.h"
 
 #include <algorithm>
 #include <bit>
@@ -473,7 +474,7 @@ namespace
   [[nodiscard]] std::int32_t ReadAtomicI32(volatile std::int32_t* value)
   {
 #if defined(_WIN32)
-    return static_cast<std::int32_t>(InterlockedCompareExchange(reinterpret_cast<volatile long*>(value), 0, 0));
+    return static_cast<std::int32_t>(InterlockedCompareExchange(reinterpret_cast<volatile platform::InterlockedLong*>(value), 0, 0));
 #else
     return *value;
 #endif
@@ -485,7 +486,7 @@ namespace
     for (;;) {
       const std::int32_t observed = ReadAtomicI32(value);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
+        reinterpret_cast<volatile platform::InterlockedLong*>(value), static_cast<long>(wanted), static_cast<long>(observed)
       ));
       if (exchanged == observed) {
         return;
@@ -502,7 +503,7 @@ namespace
     for (;;) {
       const std::int32_t observed = ReadAtomicI32(value);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
+        reinterpret_cast<volatile platform::InterlockedLong*>(value), static_cast<long>(wanted), static_cast<long>(observed)
       ));
       if (exchanged == observed) {
         return exchanged;
@@ -522,7 +523,7 @@ namespace
     for (;;) {
       const std::int32_t observed = ReadAtomicI32(slot);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(slot), static_cast<long>(target), static_cast<long>(observed)
+        reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(target), static_cast<long>(observed)
       ));
       if (exchanged == observed) {
         return exchanged;
@@ -561,7 +562,7 @@ namespace
       const std::int32_t observedRealtime = ReadAtomicI32(&item->mRealtimeValueBits);
       const std::int32_t observedPrimary = ReadAtomicI32(&item->mPrimaryValueBits);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(&item->mRealtimeValueBits),
+        reinterpret_cast<volatile platform::InterlockedLong*>(&item->mRealtimeValueBits),
         static_cast<long>(observedPrimary),
         static_cast<long>(observedRealtime)
       ));
@@ -1550,7 +1551,7 @@ namespace moho
     }
     if (sPrintStatsBoogersSquirt) {
 #if defined(_WIN32)
-      (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1L);
+      (void)InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1L);
 #else
       ++sPrintStatsBoogersSquirt->mPrimaryValueBits;
 #endif
@@ -2133,7 +2134,7 @@ namespace moho
       const float nextValue = currentValue + *delta;
       const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
+        reinterpret_cast<volatile platform::InterlockedLong*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
       ));
       if (exchanged == observedBits) {
         return exchanged;

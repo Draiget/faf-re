@@ -3,6 +3,7 @@
 // (moho/app/SnapshotDirectoryDialog.cpp, through sSnapshotDirectoryPrompt), so
 // this sim translation unit needs no wx.
 #include "platform/X87Precision.h"
+#include "platform/Interlocked.h"
 #include <bit>
 
 #include "CArmyStats.h"
@@ -97,7 +98,7 @@ namespace
   {
 #if defined(_MSC_VER)
     return static_cast<std::int32_t>(
-      _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(slot), static_cast<long>(value))
+      _InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(value))
     );
 #else
     const std::int32_t previous = *slot;
@@ -112,7 +113,7 @@ namespace
 #if defined(_MSC_VER)
     return static_cast<std::int32_t>(
       _InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(slot),
+        reinterpret_cast<volatile platform::InterlockedLong*>(slot),
         static_cast<long>(desired),
         static_cast<long>(expected)
       )

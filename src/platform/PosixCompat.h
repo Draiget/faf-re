@@ -5,7 +5,7 @@
 // build force-includes this header (cmake/FafLinux.cmake); Windows builds never see it.
 // Each name means what it means on Windows.
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && defined(__cplusplus)
 
 #include <cstddef>
 #include <cstdint>
@@ -20,6 +20,9 @@
 // DWORD and FILETIME are used in files that never include <Windows.h> themselves; this
 // build provides them everywhere, as the Windows build effectively does.
 #include <Windows.h>
+
+// std::atomic_ref where the C++ library lacks it (libc++ 18).
+#include "platform/posix/AtomicRefPolyfill.h"
 
 using LONGLONG = std::int64_t;
 using ULONGLONG = std::uint64_t;
@@ -39,4 +42,4 @@ inline int _strnicmp(const char* const lhs, const char* const rhs, const std::si
   return ::strncasecmp(lhs, rhs, count);
 }
 
-#endif // !defined(_WIN32)
+#endif // !defined(_WIN32) && defined(__cplusplus)

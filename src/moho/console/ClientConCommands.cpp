@@ -69,6 +69,9 @@
 #include "moho/sim/CRandomStream.h"
 #include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/sim/COGrid.h"
+#include "moho/sim/IdleUnitSelector.h"
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -93,6 +96,254 @@ using namespace moho;
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
+  /**
+   * Address: 0x00866020 (FUN_00866020, sub_866020)
+   *
+   * Moho::CWldSession *, int
+   *
+   * What it does:
+   * Core of `UI_ExpandCurrentSelection`. Collects every unit in the
+   * session's spatial DB, and for each one that is alive, selectable, and
+   * not in the "WALL" category, checks whether the *current* selection
+   * already contains a unit sharing the same blueprint; if so (and the
+   * candidate is not mid-upgrade - `IUnit::IsUnitState(UNITSTATE_
+   * BeingUpgraded)`, vtable-confirmed via `UserUnit::UserUnit`'s ctor write
+   * of `??_7UserUnit@Moho@@6BIUnit@Moho@@@` at 0x008BF53D), adds it to a
+   * working copy of the selection that starts seeded with the current
+   * selection's own members (both `originalSelection` and
+   * `expandedSelection` below are independent copies of `session->mSelection`
+   * - the binary constructs two, not one, matching `sub_822210`'s citation
+   * as the `WeakEntitySetUserEntity` copy constructor's underlying clone
+   * step). Commits the expanded selection via `CWldSession::SetSelection`.
+   *
+   * The `camera` parameter is only ever null-checked, never dereferenced -
+   * preserved as a real parameter rather than reduced to a bool, since the
+   * binary's caller (`UI_ExpandCurrentSelection` below) always resolves and
+   * passes a real `CameraImpl*` for this exact null-check gate.
+   */
+  void ExpandCurrentSelection(moho::CWldSession* const session, const moho::CameraImpl* const camera)
+  {
+    if (camera == nullptr) {
+      return;
+    }
+
+    gpg::fastvector<moho::UserEntity*> collected{};
+    auto* const spatialDb = session->GetEntitySpatialDbStorage();
+    (void)spatialDb->Collect(collected, moho::ENTITYTYPE_Unit);
+
+    moho::WeakSet<moho::UserEntity> originalSelection(session->mSelection);
+    moho::WeakSet<moho::UserEntity> expandedSelection(session->mSelection);
+
+    const msvc8::string wallCategory("WALL");
+
+    for (moho::UserEntity* const candidateEntity : collected) {
+      moho::UserUnit* const candidate = candidateEntity->IsUserUnit();
+      if (candidate == nullptr || candidate->IsDead() || !session->CanSelectUnit(candidate)) {
+        continue;
+      }
+      if (candidate->IsInCategory(wallCategory)) {
+        continue;
+      }
+
+      bool sharesBlueprintWithSelection = false;
+      for (const moho::UserEntity* const selectedEntity : originalSelection) {
+        if (selectedEntity->mParams.mBlueprint == candidate->mParams.mBlueprint) {
+          sharesBlueprintWithSelection = true;
+          break;
+        }
+      }
+
+      if (sharesBlueprintWithSelection && !candidate->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
+        (void)expandedSelection.Add(candidate);
+      }
+    }
+
+    session->SetSelection(expandedSelection);
+  }
+  // ---- UISelectionByCategory support (FUN_008662B0) ----
+
+  [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
+  {
+    moho::MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
+    if (meshInstance != nullptr) {
+      meshInstance->UpdateInterpolatedFields();
+      return &meshInstance->box;
+    }
+    return &moho::Invalid<Wm3::Box3f>();
+  }
+
+  /**
+   * Address: 0x00866970 (FUN_00866970, sub_866970)
+   *
+   * char*
+   *
+   * What it does:
+   * `UI_ExpandCurrentSelection` console command. Resolves the world camera
+   * and dispatches `ExpandCurrentSelection` above. Prints localized "no
+   * session" feedback when no session is active.
+   *
+   * Registrar: FUN_00BE61C0 (`__xc_a` lane), data-xref
+   * `dword_F5B524 = offset sub_866970` is the callsite evidence. Name is
+   * read from the PE `.data` initializer of `stru_F5B518`
+   * ("UI_ExpandCurrentSelection").
+   */
+  void UI_ExpandCurrentSelection(const msvc8::vector<msvc8::string>& args)
+  {
+    (void)args;
+
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr) {
+      const msvc8::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
+      moho::CON_Printf(noSessionText.c_str());
+      return;
+    }
+
+    moho::RCamManager* const cameraManager = moho::CAM_GetManager();
+    moho::CameraImpl* const camera = cameraManager->GetCamera("WorldCamera");
+
+    ExpandCurrentSelection(session, camera);
+  }
+  /**
+   * Address: 0x008662B0 (FUN_008662B0, sub_8662B0, SelectUnitsByCategory)
+   *
+   * What it does:
+   * Core of UISelectionByCategory. Gathers candidate units (camera frustum or the
+   * spatial DB), filters by selectability / focus-army ownership / optional idle /
+   * category (+ optional engineer/command exclusion), then either replaces or
+   * extends the world selection. Optionally frames the result with the camera.
+   */
+  void SelectUnitsByCategory(
+    moho::CWldSession* const session,
+    moho::CameraImpl* const camera,
+    const char* const categoryExpr,
+    const bool addToSelection,        // a4
+    const bool inViewFrustum,         // a5
+    const bool nearestToMouse,        // a6
+    const bool mustBeIdle,            // a7
+    const bool doCameraTarget,        // a8
+    const bool excludeEngineerCommand // a9
+  )
+  {
+    // ---- Gather candidate entities ----
+    gpg::fastvector<moho::UserEntity*> gathered{};
+    if (inViewFrustum && camera != nullptr) {
+      for (const moho::WeakPtr<moho::UserEntity>& ref : *camera->GetArmyUnitsInFrustum()) {
+        if (moho::UserEntity* const entity = ref.GetObjectPtr(); entity != nullptr) {
+          gathered.push_back(entity);
+        }
+      }
+    } else {
+      auto* const spatialDb = session->GetEntitySpatialDbStorage();
+      (void)spatialDb->Collect(gathered, moho::ENTITYTYPE_Unit);
+    }
+
+    // Parse the category expression once (RRuleGameRules slot 23).
+    const moho::EntityCategorySet parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
+
+    // Result set: start empty, optionally seed with the current selection
+    // (`operator=`, its `_Copy` 0x00867B20).
+    moho::WeakSet<moho::UserEntity> resultSet;
+    if (addToSelection) {
+      resultSet = session->mSelection;
+    }
+
+    // ---- Per-candidate filter ----
+    const moho::UserArmy* const focusArmy = session->GetFocusArmy();
+
+    moho::UserEntity* nearestEntity = nullptr;
+    float nearestDistance = gpg::pInf;
+
+    for (moho::UserEntity* const candidate : gathered) {
+      moho::UserUnit* const unit = candidate->IsUserUnit();
+      if (unit == nullptr) {
+        continue;
+      }
+
+      // Selectable AND (owned by focus army OR cheat-select).
+      if (!unit->IsSelectable()) {
+        continue;
+      }
+      const bool ownedByFocusArmy = (focusArmy == candidate->mArmy);
+      if (!ownedByFocusArmy && !(moho::UI_SelectAnything && session->IsCheatsEnabled)) {
+        continue;
+      }
+
+      // Optional idle filter: not busy AND no queued commands.
+      if (mustBeIdle) {
+        if (unit->mUnitVarDat.mIsBusy) {
+          continue;
+        }
+        if (moho::GetUserUnitManagerQueueSize(unit->mManager) != 0) {
+          continue;
+        }
+      }
+
+      // Category test (open-coded bitset in the binary -> EntityCategory::HasBlueprint).
+      const moho::IUnit* const iunit = moho::GetIUnitBridge(unit);
+      if (!moho::EntityCategory::HasBlueprint(iunit->GetBlueprint(), &parsedCategory)) {
+        continue;
+      }
+
+      // Optional engineer/command exclusion (a9).
+      if (excludeEngineerCommand) {
+        const msvc8::string engineerCategory("ENGINEER");
+        const msvc8::string commandCategory("COMMAND");
+        if (candidate->IsInCategory(engineerCategory) || candidate->IsInCategory(commandCategory)) {
+          continue;
+        }
+      }
+
+      if (nearestToMouse) {
+        // Keep only the single unit nearest the cursor world position.
+        const Wm3::Vec3f& unitPos = iunit->GetPosition();
+        const float dx = unitPos.x - session->CursorWorldPos.x;
+        const float dy = unitPos.y - session->CursorWorldPos.y;
+        const float dz = unitPos.z - session->CursorWorldPos.z;
+        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (nearestDistance > distance) {
+          nearestEntity = candidate;
+          nearestDistance = distance;
+        }
+      } else if (!iunit->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
+        // Add every passing unit (skip units mid-upgrade).
+        (void)resultSet.Add(candidate);
+      }
+    }
+
+    if (nearestToMouse && nearestEntity != nullptr) {
+      (void)resultSet.Add(nearestEntity);
+    }
+
+    // ---- Optional camera framing of the result ----
+    if (!resultSet.Empty() && doCameraTarget && camera != nullptr) {
+      if (mustBeIdle) {
+        moho::IdleUnitSelector::CycleCameraFocus(resultSet, camera);
+      } else if (resultSet.Size() == 1) {
+        camera->TargetEntityBox(*resultSet.begin(), 0.0f);
+      } else {
+        // Combined AABB over all selected entities, then frame it.
+        Wm3::AxisAlignedBox3f combined = moho::Empty<Wm3::AxisAlignedBox3f>();
+        for (moho::UserEntity* const entity : resultSet) {
+          const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(entity));
+          Wm3::AxisAlignedBox3f entityBox{};
+          entityBox = moho::AxisAlignedBoundsFromBox(orientedBox);
+
+          if (entityBox.Min.x <= combined.Min.x) { combined.Min.x = entityBox.Min.x; }
+          if (entityBox.Min.y <= combined.Min.y) { combined.Min.y = entityBox.Min.y; }
+          if (entityBox.Min.z <= combined.Min.z) { combined.Min.z = entityBox.Min.z; }
+          if (entityBox.Max.x >  combined.Max.x) { combined.Max.x = entityBox.Max.x; }
+          if (entityBox.Max.y >  combined.Max.y) { combined.Max.y = entityBox.Max.y; }
+          if (entityBox.Max.z >  combined.Max.z) { combined.Max.z = entityBox.Max.z; }
+        }
+
+        camera->TargetBox(combined, 0.0f);
+        camera->TargetNothing();
+      }
+    }
+
+    session->SetSelection(resultSet);
+  }
+
   constexpr const char* kConsoleStartupShowArmyStatsDescription = "Show engine statistics";
   constexpr const char* kConsoleStartupShowStatsDescription = "Show engine statistics";
 

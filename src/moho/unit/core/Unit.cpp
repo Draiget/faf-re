@@ -1,4 +1,5 @@
 #include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
+#include "platform/Interlocked.h"
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/unit/core/Unit.h"
 #include "legacy/math/X87Math.h"
@@ -1577,7 +1578,7 @@ namespace
       return;
     }
 #if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+    InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
@@ -6821,7 +6822,7 @@ std::int32_t StorePrimaryStatBitsAtomic(
 ) noexcept
 {
 #if defined(_WIN32)
-  volatile long* const slot = reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits);
+  volatile platform::InterlockedLong* const slot = reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits);
   for (;;) {
     const long observed = InterlockedCompareExchange(slot, 0L, 0L);
     const long exchanged = InterlockedCompareExchange(slot, static_cast<long>(*newValueBits), observed);

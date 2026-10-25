@@ -296,7 +296,7 @@ namespace
      * What it does:
      * Reads one 64-bit primitive lane used by this archive vtable slot.
      */
-    void ReadUInt64(unsigned __int64* const value) override
+    void ReadUInt64(std::uint64_t* const value) override
     {
       ReadUInt642(value);
     }
@@ -675,7 +675,7 @@ namespace
      * What it does:
      * Extracts one unsigned 64-bit token from the text stream lane.
      */
-    void ReadUInt64(unsigned __int64* const value) override
+    void ReadUInt64(std::uint64_t* const value) override
     {
       (*mCachedStream) >> *value;
     }

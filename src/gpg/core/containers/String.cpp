@@ -1150,7 +1150,7 @@ msvc8::string gpg::STR_Printf(
  */
 msvc8::string gpg::STR_Va(
   const char*& fmt,
-  const va_list va
+  va_list va
 )
 {
   // Build through msvc8::string's concatenation path, not append().

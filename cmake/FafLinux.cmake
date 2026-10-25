@@ -156,7 +156,8 @@ target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:$
 # boost.thread's own sources, as on Windows (src/CMakeLists.txt).
 foreach(_src IN LISTS _faf_sim_files)
   if(_src MATCHES "/libs/thread/src/")
-    set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1)
+    # Its thread.cpp and tss.cpp use std::auto_ptr, which libc++ keeps behind this opt-in.
+    set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1 _LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1)
     set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
   endif()
 endforeach()

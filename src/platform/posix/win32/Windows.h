@@ -1,21 +1,28 @@
 #pragma once
 
-// Engine addition (dedicated-server plan WPL.5): the subset of <Windows.h> the shared
-// simulation code uses, for the Linux build (cmake/FafLinux.cmake puts this directory on
-// the include path; Windows builds never see it). Types and constants have their Windows
-// sizes and values; the functions are implemented on POSIX in
-// src/platform/posix/Win32Shim.cpp with the Windows semantics the engine relies on
-// (manual/auto-reset events, waits with timeouts, interlocked operations on 32-bit values,
-// the performance counter, the calling thread's id).
+// Engine addition (dedicated-server plan WPL.5): the subset of <Windows.h> (and of the
+// MSVC CRT) that the shared simulation code uses, for the Linux build. cmake/FafLinux.cmake
+// puts this directory on the include path and platform/PosixCompat.h includes it in every
+// translation unit; Windows builds never see it. Types and constants have their Windows
+// sizes and values. The functions are implemented on POSIX in src/platform/posix/Win32Shim.cpp
+// with the Windows semantics the engine relies on: events (manual and auto reset),
+// semaphores, mutexes and waits with timeouts on one kind of handle, files opened by
+// CreateFile, interlocked operations on 32-bit values, the performance counter, the calling
+// thread's id.
 
 #if defined(_WIN32)
 #error "platform/posix/win32/Windows.h is for builds without the Windows SDK"
 #endif
 
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <cwchar>
+#include <cwctype>
+#include <cerrno>
 
 #define WINAPI
 #define CALLBACK
@@ -33,6 +40,7 @@ using UINT = unsigned int;
 using INT = int;
 using LONG = std::int32_t;
 using ULONG = std::uint32_t;
+using HRESULT = std::int32_t;
 using DWORD_PTR = std::uintptr_t;
 using ULONG_PTR = std::uintptr_t;
 using UINT_PTR = std::uintptr_t;
@@ -42,8 +50,10 @@ using SIZE_T = std::size_t;
 using HANDLE = void*;
 using HMODULE = void*;
 using HINSTANCE = void*;
+using HLOCAL = void*;
 using HWND = void*;
 using HDC = void*;
+using HFONT = void*;
 using LPVOID = void*;
 using LPCVOID = const void*;
 using LPSTR = char*;
@@ -51,6 +61,8 @@ using LPCSTR = const char*;
 using LPWSTR = wchar_t*;
 using LPCWSTR = const wchar_t*;
 using DWORD64 = std::uint64_t;
+using ULONGLONG = std::uint64_t;
+using LONGLONG = std::int64_t;
 
 #ifndef TRUE
 #define TRUE 1
@@ -59,6 +71,12 @@ using DWORD64 = std::uint64_t;
 #define FALSE 0
 #endif
 
+#define S_OK (static_cast<HRESULT>(0))
+#define E_FAIL (static_cast<HRESULT>(0x80004005u))
+#define E_INVALIDARG (static_cast<HRESULT>(0x80070057u))
+#define SUCCEEDED(hr) (static_cast<HRESULT>(hr) >= 0)
+#define FAILED(hr) (static_cast<HRESULT>(hr) < 0)
+
 #define INFINITE 0xFFFFFFFFu
 #define WAIT_OBJECT_0 0x00000000u
 #define WAIT_ABANDONED 0x00000080u
@@ -66,6 +84,18 @@ using DWORD64 = std::uint64_t;
 #define WAIT_FAILED 0xFFFFFFFFu
 #define INVALID_HANDLE_VALUE (reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)))
 #define MAX_PATH 260
+
+#define ERROR_SUCCESS 0u
+#define ERROR_FILE_NOT_FOUND 2u
+#define ERROR_PATH_NOT_FOUND 3u
+#define ERROR_ACCESS_DENIED 5u
+#define ERROR_INVALID_HANDLE 6u
+#define ERROR_NOT_SUPPORTED 50u
+#define ERROR_FILE_EXISTS 80u
+#define ERROR_INVALID_PARAMETER 87u
+#define ERROR_INSUFFICIENT_BUFFER 122u
+#define ERROR_ALREADY_EXISTS 183u
+#define ERROR_ENVVAR_NOT_FOUND 203u
 
 struct FILETIME
 {
@@ -83,20 +113,6 @@ union LARGE_INTEGER
   std::int64_t QuadPart;
 };
 
-struct RECT
-{
-  LONG left;
-  LONG top;
-  LONG right;
-  LONG bottom;
-};
-
-struct POINT
-{
-  LONG x;
-  LONG y;
-};
-
 struct SYSTEM_INFO
 {
   WORD wProcessorArchitecture;
@@ -112,12 +128,28 @@ struct SYSTEM_INFO
   WORD wProcessorRevision;
 };
 
-// --- Synchronisation (Win32Shim.cpp) ----------------------------------------------------
+struct OSVERSIONINFOW
+{
+  DWORD dwOSVersionInfoSize;
+  DWORD dwMajorVersion;
+  DWORD dwMinorVersion;
+  DWORD dwBuildNumber;
+  DWORD dwPlatformId;
+  WCHAR szCSDVersion[128];
+};
+#define VER_PLATFORM_WIN32_NT 2u
+BOOL GetVersionExW(OSVERSIONINFOW* info);
+
+// --- Synchronisation ---------------------------------------------------------------------
 HANDLE CreateEventW(void* attributes, BOOL manualReset, BOOL initialState, const wchar_t* name);
 HANDLE CreateEventA(void* attributes, BOOL manualReset, BOOL initialState, const char* name);
 #define CreateEvent CreateEventW
 HANDLE CreateSemaphoreW(void* attributes, LONG initialCount, LONG maximumCount, const wchar_t* name);
 BOOL ReleaseSemaphore(HANDLE semaphore, LONG releaseCount, LONG* previousCount);
+HANDLE CreateMutexW(void* attributes, BOOL initialOwner, const wchar_t* name);
+HANDLE CreateMutexA(void* attributes, BOOL initialOwner, const char* name);
+#define CreateMutex CreateMutexW
+BOOL ReleaseMutex(HANDLE mutex);
 BOOL SetEvent(HANDLE event);
 BOOL ResetEvent(HANDLE event);
 DWORD WaitForSingleObject(HANDLE handle, DWORD milliseconds);
@@ -125,7 +157,20 @@ DWORD WaitForSingleObjectEx(HANDLE handle, DWORD milliseconds, BOOL alertable);
 DWORD WaitForMultipleObjects(DWORD count, const HANDLE* handles, BOOL waitAll, DWORD milliseconds);
 BOOL CloseHandle(HANDLE handle);
 
-// --- Threads and time --------------------------------------------------------------------
+/// A recursive lock, as Windows' critical section.
+struct CRITICAL_SECTION
+{
+  alignas(16) unsigned char storage[64];
+  bool initialized;
+};
+void InitializeCriticalSection(CRITICAL_SECTION* section);
+BOOL InitializeCriticalSectionAndSpinCount(CRITICAL_SECTION* section, DWORD spinCount);
+void EnterCriticalSection(CRITICAL_SECTION* section);
+BOOL TryEnterCriticalSection(CRITICAL_SECTION* section);
+void LeaveCriticalSection(CRITICAL_SECTION* section);
+void DeleteCriticalSection(CRITICAL_SECTION* section);
+
+// --- Threads, processes and time ---------------------------------------------------------
 DWORD GetCurrentThreadId();
 HANDLE GetCurrentThread();
 HANDLE GetCurrentProcess();
@@ -138,6 +183,10 @@ BOOL QueryPerformanceFrequency(LARGE_INTEGER* frequency);
 void GetSystemInfo(SYSTEM_INFO* info);
 DWORD GetLastError();
 void SetLastError(DWORD error);
+BOOL GetProcessAffinityMask(HANDLE process, DWORD_PTR* processMask, DWORD_PTR* systemMask);
+DWORD GetEnvironmentVariableA(const char* name, char* buffer, DWORD size);
+void OutputDebugStringA(const char* text);
+void OutputDebugStringW(const wchar_t* text);
 
 #define THREAD_PRIORITY_LOWEST (-2)
 #define THREAD_PRIORITY_BELOW_NORMAL (-1)
@@ -148,6 +197,22 @@ void SetLastError(DWORD error);
 #define THREAD_PRIORITY_IDLE (-15)
 BOOL SetThreadPriority(HANDLE thread, int priority);
 DWORD_PTR SetThreadAffinityMask(HANDLE thread, DWORD_PTR mask);
+
+enum LOGICAL_PROCESSOR_RELATIONSHIP
+{
+  RelationProcessorCore = 0,
+  RelationNumaNode = 1,
+  RelationCache = 2,
+  RelationProcessorPackage = 3,
+  RelationGroup = 4,
+  RelationAll = 0xFFFF,
+};
+struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+/// Not available here: returns FALSE with ERROR_NOT_SUPPORTED and a length of 0, which the
+/// engine's processor-topology code treats as "no topology information".
+BOOL GetLogicalProcessorInformationEx(
+  LOGICAL_PROCESSOR_RELATIONSHIP relation, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer, DWORD* length
+);
 
 // --- Interlocked operations on 32- and 64-bit values -------------------------------------
 inline LONG InterlockedIncrement(volatile LONG* value) noexcept
@@ -182,11 +247,100 @@ inline std::int64_t InterlockedCompareExchange64(
 // --- Memory ------------------------------------------------------------------------------
 #define MEM_COMMIT 0x00001000u
 #define MEM_RESERVE 0x00002000u
+#define MEM_FREE 0x00010000u
 #define MEM_RELEASE 0x00008000u
-#define PAGE_READWRITE 0x04u
+#define MEM_PRIVATE 0x00020000u
 #define PAGE_NOACCESS 0x01u
+#define PAGE_READONLY 0x02u
+#define PAGE_READWRITE 0x04u
 LPVOID VirtualAlloc(LPVOID address, SIZE_T size, DWORD allocationType, DWORD protect);
 BOOL VirtualFree(LPVOID address, SIZE_T size, DWORD freeType);
+
+struct MEMORY_BASIC_INFORMATION
+{
+  LPVOID BaseAddress;
+  LPVOID AllocationBase;
+  DWORD AllocationProtect;
+  SIZE_T RegionSize;
+  DWORD State;
+  DWORD Protect;
+  DWORD Type;
+};
+/// Describes the page holding `address` from /proc/self/maps: committed private
+/// read-write memory, read-only, or free.
+SIZE_T VirtualQuery(LPCVOID address, MEMORY_BASIC_INFORMATION* info, SIZE_T length);
+
+HLOCAL LocalFree(HLOCAL memory);
+
+// --- Files -------------------------------------------------------------------------------
+#define GENERIC_READ 0x80000000u
+#define GENERIC_WRITE 0x40000000u
+#define FILE_SHARE_READ 0x00000001u
+#define FILE_SHARE_WRITE 0x00000002u
+#define FILE_SHARE_DELETE 0x00000004u
+#define CREATE_NEW 1u
+#define CREATE_ALWAYS 2u
+#define OPEN_EXISTING 3u
+#define OPEN_ALWAYS 4u
+#define TRUNCATE_EXISTING 5u
+#define FILE_ATTRIBUTE_READONLY 0x00000001u
+#define FILE_ATTRIBUTE_HIDDEN 0x00000002u
+#define FILE_ATTRIBUTE_SYSTEM 0x00000004u
+#define FILE_ATTRIBUTE_DIRECTORY 0x00000010u
+#define FILE_ATTRIBUTE_ARCHIVE 0x00000020u
+#define FILE_ATTRIBUTE_NORMAL 0x00000080u
+#define FILE_FLAG_SEQUENTIAL_SCAN 0x08000000u
+#define FILE_FLAG_RANDOM_ACCESS 0x10000000u
+#define FILE_FLAG_OVERLAPPED 0x40000000u
+#define FILE_FLAG_BACKUP_SEMANTICS 0x02000000u
+#define FILE_BEGIN 0u
+#define FILE_CURRENT 1u
+#define FILE_END 2u
+#define INVALID_FILE_SIZE 0xFFFFFFFFu
+#define INVALID_SET_FILE_POINTER 0xFFFFFFFFu
+#define INVALID_FILE_ATTRIBUTES 0xFFFFFFFFu
+#define MOVEFILE_REPLACE_EXISTING 0x00000001u
+#define MOVEFILE_COPY_ALLOWED 0x00000002u
+#define MOVEFILE_WRITE_THROUGH 0x00000008u
+
+HANDLE CreateFileW(
+  const wchar_t* path, DWORD desiredAccess, DWORD shareMode, void* security, DWORD creation, DWORD flags, HANDLE templateFile
+);
+HANDLE CreateFileA(
+  const char* path, DWORD desiredAccess, DWORD shareMode, void* security, DWORD creation, DWORD flags, HANDLE templateFile
+);
+BOOL ReadFile(HANDLE file, void* buffer, DWORD bytesToRead, DWORD* bytesRead, void* overlapped);
+BOOL WriteFile(HANDLE file, const void* buffer, DWORD bytesToWrite, DWORD* bytesWritten, void* overlapped);
+BOOL SetFilePointerEx(HANDLE file, LARGE_INTEGER distance, LARGE_INTEGER* newPosition, DWORD moveMethod);
+DWORD SetFilePointer(HANDLE file, LONG distance, LONG* distanceHigh, DWORD moveMethod);
+BOOL GetFileSizeEx(HANDLE file, LARGE_INTEGER* size);
+DWORD GetFileSize(HANDLE file, DWORD* sizeHigh);
+BOOL FlushFileBuffers(HANDLE file);
+BOOL SetEndOfFile(HANDLE file);
+DWORD GetFileAttributesW(const wchar_t* path);
+DWORD GetFileAttributesA(const char* path);
+BOOL MoveFileExW(const wchar_t* from, const wchar_t* to, DWORD flags);
+BOOL MoveFileW(const wchar_t* from, const wchar_t* to);
+BOOL DeleteFileW(const wchar_t* path);
+BOOL DeleteFileA(const char* path);
+BOOL CreateDirectoryW(const wchar_t* path, void* security);
+BOOL DosDateTimeToFileTime(WORD fatDate, WORD fatTime, FILETIME* fileTime);
+
+// --- Messages ----------------------------------------------------------------------------
+#define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100u
+#define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200u
+#define FORMAT_MESSAGE_FROM_STRING 0x00000400u
+#define FORMAT_MESSAGE_FROM_HMODULE 0x00000800u
+#define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000u
+#define FORMAT_MESSAGE_ARGUMENT_ARRAY 0x00002000u
+#define FORMAT_MESSAGE_MAX_WIDTH_MASK 0x000000FFu
+#define LANG_NEUTRAL 0x00
+#define SUBLANG_DEFAULT 0x01
+#define MAKELANGID(p, s) ((static_cast<WORD>(s) << 10) | static_cast<WORD>(p))
+/// FORMAT_MESSAGE_FROM_SYSTEM: the text of `messageId` read as an errno value (strerror),
+/// the only source the engine formats from.
+DWORD FormatMessageW(DWORD flags, const void* source, DWORD messageId, DWORD languageId, wchar_t* buffer, DWORD size, va_list* arguments);
+DWORD FormatMessageA(DWORD flags, const void* source, DWORD messageId, DWORD languageId, char* buffer, DWORD size, va_list* arguments);
 
 // --- MSVC CRT names ----------------------------------------------------------------------
 using __time64_t = std::int64_t;
@@ -197,6 +351,21 @@ inline __time64_t _time64(__time64_t* out) noexcept
     *out = now;
   }
   return now;
+}
+char* _ctime64(const __time64_t* time) noexcept;
+
+struct __timeb64
+{
+  __time64_t time;
+  unsigned short millitm;
+  short timezone;
+  short dstflag;
+};
+void _ftime64(__timeb64* out) noexcept;
+inline int _ftime64_s(__timeb64* out) noexcept
+{
+  _ftime64(out);
+  return 0;
 }
 
 inline int memcpy_s(void* const dest, const std::size_t destSize, const void* const src, const std::size_t count) noexcept
@@ -221,4 +390,152 @@ inline int memmove_s(void* const dest, const std::size_t destSize, const void* c
   }
   std::memmove(dest, src, count);
   return 0;
+}
+
+int fopen_s(std::FILE** file, const char* path, const char* mode) noexcept;
+int _wfopen_s(std::FILE** file, const wchar_t* path, const wchar_t* mode) noexcept;
+
+int strncpy_s(char* dest, std::size_t destSize, const char* src, std::size_t count) noexcept;
+template <std::size_t N>
+inline int strncpy_s(char (&dest)[N], const char* const src, const std::size_t count) noexcept
+{
+  return strncpy_s(dest, N, src, count);
+}
+int strcpy_s(char* dest, std::size_t destSize, const char* src) noexcept;
+template <std::size_t N>
+inline int strcpy_s(char (&dest)[N], const char* const src) noexcept
+{
+  return strcpy_s(dest, N, src);
+}
+int sprintf_s(char* buffer, std::size_t size, const char* format, ...) noexcept;
+template <std::size_t N, class... Args>
+inline int sprintf_s(char (&buffer)[N], const char* const format, Args... args) noexcept
+{
+  return sprintf_s(buffer, N, format, args...);
+}
+int vsprintf_s(char* buffer, std::size_t size, const char* format, va_list arguments) noexcept;
+#define _TRUNCATE (static_cast<std::size_t>(-1))
+
+int _memicmp(const void* lhs, const void* rhs, std::size_t count) noexcept;
+
+using _locale_t = void*;
+inline wint_t _towlower_l(const wint_t c, _locale_t) noexcept
+{
+  return std::towlower(c);
+}
+
+// x87 control word (float.h on Windows).
+#define _MCW_PC 0x00030000u
+#define _PC_64 0x00000000u
+#define _PC_53 0x00010000u
+#define _PC_24 0x00020000u
+#define _MCW_RC 0x00000300u
+#define _RC_NEAR 0x00000000u
+#define _MCW_EM 0x0008001Fu
+/// The x87 and SSE control state in the CRT's encoding; changes the x87 precision and
+/// rounding fields of the calling thread's control word.
+unsigned int _controlfp(unsigned int newValue, unsigned int mask) noexcept;
+
+// --- More of the same, found by the Linux build ----------------------------------------
+#define PAGE_WRITECOPY 0x08u
+#define PAGE_EXECUTE 0x10u
+#define PAGE_EXECUTE_READ 0x20u
+#define PAGE_EXECUTE_READWRITE 0x40u
+#define PAGE_EXECUTE_WRITECOPY 0x80u
+#define PAGE_GUARD 0x100u
+#define MEM_DECOMMIT 0x00004000u
+#define MEM_MAPPED 0x00040000u
+#define MEM_IMAGE 0x01000000u
+
+#define DLL_PROCESS_DETACH 0
+#define DLL_PROCESS_ATTACH 1
+#define DLL_THREAD_ATTACH 2
+#define DLL_THREAD_DETACH 3
+
+struct SYSTEMTIME
+{
+  WORD wYear;
+  WORD wMonth;
+  WORD wDayOfWeek;
+  WORD wDay;
+  WORD wHour;
+  WORD wMinute;
+  WORD wSecond;
+  WORD wMilliseconds;
+};
+void GetSystemTimeAsFileTime(FILETIME* fileTime);
+BOOL FileTimeToLocalFileTime(const FILETIME* fileTime, FILETIME* localFileTime);
+BOOL FileTimeToSystemTime(const FILETIME* fileTime, SYSTEMTIME* systemTime);
+void GetLocalTime(SYSTEMTIME* systemTime);
+void GetSystemTime(SYSTEMTIME* systemTime);
+
+enum GET_FILEEX_INFO_LEVELS
+{
+  GetFileExInfoStandard = 0,
+  GetFileExMaxInfoLevel = 1,
+};
+struct WIN32_FILE_ATTRIBUTE_DATA
+{
+  DWORD dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD nFileSizeHigh;
+  DWORD nFileSizeLow;
+};
+BOOL GetFileAttributesExW(const wchar_t* path, GET_FILEEX_INFO_LEVELS level, void* information);
+BOOL GetFileAttributesExA(const char* path, GET_FILEEX_INFO_LEVELS level, void* information);
+
+struct GROUP_AFFINITY
+{
+  std::uintptr_t Mask;
+  WORD Group;
+  WORD Reserved[3];
+};
+struct PROCESSOR_NUMBER
+{
+  WORD Group;
+  BYTE Number;
+  BYTE Reserved;
+};
+struct PROCESSOR_RELATIONSHIP
+{
+  BYTE Flags;
+  BYTE EfficiencyClass;
+  BYTE Reserved[20];
+  WORD GroupCount;
+  GROUP_AFFINITY GroupMask[1];
+};
+struct NUMA_NODE_RELATIONSHIP
+{
+  DWORD NodeNumber;
+  BYTE Reserved[18];
+  WORD GroupCount;
+  GROUP_AFFINITY GroupMask;
+};
+struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX
+{
+  LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+  DWORD Size;
+  union
+  {
+    PROCESSOR_RELATIONSHIP Processor;
+    NUMA_NODE_RELATIONSHIP NumaNode;
+  };
+};
+void GetCurrentProcessorNumberEx(PROCESSOR_NUMBER* number);
+BOOL GetNumaProcessorNode(UCHAR processor, UCHAR* nodeNumber);
+BOOL GetNumaNodeProcessorMask(UCHAR node, ULONGLONG* processorMask);
+
+int _vsnprintf(char* buffer, std::size_t count, const char* format, va_list arguments) noexcept;
+int _vsnwprintf(wchar_t* buffer, std::size_t count, const wchar_t* format, va_list arguments) noexcept;
+int _snprintf(char* buffer, std::size_t count, const char* format, ...) noexcept;
+inline std::tm* _localtime64(const __time64_t* const time) noexcept
+{
+  const std::time_t value = static_cast<std::time_t>(*time);
+  return std::localtime(&value);
+}
+inline int* _errno() noexcept
+{
+  return &errno;
 }
