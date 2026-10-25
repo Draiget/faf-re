@@ -74,6 +74,10 @@ set(_faf_sim_patterns
   # Transform and camera geometry the sim computes with (entity transforms,
   # effect culling against the sync filter's cameras).
   "^moho/render/camera/(VTransform|GeomCamera3)\\.cpp$"
+  # The application base (IWinApp): identity strings and the common services
+  # (log file, reflection types, resource manager, data search paths) every
+  # engine program sets up, faf-replay and the game server among them.
+  "^moho/app/IWinApp\\.cpp$"
   # gpg::gal::Math, the D3DX matrix helpers VMatrix4 (MathReflection) and the
   # effect emitters' bone attachment (CEfxEmitter::InterpolatePosition) use.
   # Windows links D3DX for them; Linux needs its own implementation.

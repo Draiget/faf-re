@@ -612,6 +612,8 @@ set(FAF_ENGINE_SOURCES
   moho/sim/CSimConVarBase.cpp
   moho/sim/CSimConVarInstanceBase.cpp
   moho/sim/CWldMap.cpp
+  moho/sim/WldTerrainResHeadless.cpp
+  moho/terrain/CWldTerrainRes.cpp
   moho/collision/RDebugCollision.cpp
   moho/collision/RDebugCollisionTypeInfo.cpp
   moho/client/Localization.cpp

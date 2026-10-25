@@ -1776,6 +1776,18 @@ namespace moho
     return &sDevice;
   }
 
+  namespace
+  {
+    // Engine addition (dedicated-server plan WPL.4): sDeviceTextureLookup
+    // (ID3DDeviceResources.h), the call cfunc_UnitWeaponDoInstaHitL made before the move.
+    void LookupDeviceTexture(ID3DDeviceResources::TextureResourceHandle& outTexture, const char* const name)
+    {
+      D3D_GetDevice()->GetResources()->GetTexture(outTexture, name, 0, true);
+    }
+
+    [[maybe_unused]] const bool gDeviceTextureLookupSet = (sDeviceTextureLookup = &LookupDeviceTexture, true);
+  } // namespace
+
   /**
    * Address: 0x004305F0 (FUN_004305F0, ?REN_Init@Moho@@YAXXZ)
    *

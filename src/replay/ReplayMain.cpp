@@ -28,6 +28,7 @@
 #include "platform/X87Precision.h"
 #include "replay/ReplayLaunchCheck.h"
 #include "replay/ReplayRunner.h"
+#include "replay/ReplayTerrainCheck.h"
 
 namespace
 {
@@ -127,6 +128,8 @@ namespace
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
+      "  --terrain-check <list>    load each .scmap in <list> with the client's and the headless terrain\n"
+      "                            resource and compare (plays nothing; --replay still required)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -220,6 +223,20 @@ int main(int argc, char** argv)
   // `InitializeSessionFromCommandLine`, up to the `/replay` path.
   RunStartupConsoleCommands();
   moho::PlaceCurrentThread(moho::EThreadRole::Main);
+
+  std::string terrainCheckList;
+  if (ReadOption("--terrain-check", terrainCheckList)) {
+    // Plan WPL.4: every listed map through the client's and the headless terrain resource.
+    const faf::replay::STerrainCheckResult check = faf::replay::RunTerrainCheck(terrainCheckList);
+    if (!check.ran) {
+      std::printf("[%s] TERRAINCHECK error: %s\n", gLabel.c_str(), check.error.c_str());
+      std::fflush(stdout);
+      EndProcess(kExitBadInput);
+    }
+    std::printf("%s\n", check.report.c_str());
+    std::fflush(stdout);
+    EndProcess(check.differences == 0 ? 0 : 1);
+  }
 
   if (moho::CFG_GetArgOption("--launch-check", 0, nullptr)) {
     // Plan WP2.10: the header against `BuildLaunchInfo`; plays nothing.

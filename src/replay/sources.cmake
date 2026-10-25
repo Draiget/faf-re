@@ -9,5 +9,6 @@ set(FAF_REPLAY_SOURCES
   replay/ReplayLaunchCheck.cpp
   replay/ReplayMain.cpp
   replay/ReplayRunner.cpp
+  replay/ReplayTerrainCheck.cpp
   replay/ReplayWireStats.cpp
 )

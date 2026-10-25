@@ -635,6 +635,9 @@ namespace
 
 namespace moho
 {
+  // Engine addition (dedicated-server plan WPL.4), declared in ID3DDeviceResources.h.
+  DeviceTextureLookupHook sDeviceTextureLookup = nullptr;
+
   gpg::RType* UnitWeapon::sType = nullptr;
   gpg::RType* UnitWeapon::sPointerType = nullptr;
 
@@ -1145,8 +1148,12 @@ namespace moho
     // D3D_GetDevice()->GetResources()->GetTexture(...allowFallback=true)) owns the
     // handle across the DoInstaHit call. DoInstaHit hardcodes the beam texture and
     // never dereferences the handle -- it just keeps it alive, then releases it.
+    // Engine addition (plan WPL.4): through the client's sDeviceTextureLookup
+    // (ID3DDeviceResources.h); without a client the handle stays empty.
     ID3DDeviceResources::TextureResourceHandle textureSheet{};
-    D3D_GetDevice()->GetResources()->GetTexture(textureSheet, textureName, 0, true);
+    if (sDeviceTextureLookup != nullptr) {
+      sDeviceTextureLookup(textureSheet, textureName);
+    }
 
     LuaPlus::LuaStackObject lifetimeArg(state, 9);
     if (lua_type(rawState, 9) != LUA_TNUMBER) {
