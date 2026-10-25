@@ -7811,13 +7811,16 @@ namespace
 
 		while (current != tail) {
 			const lu_byte markByte = current->gch.marked;
-			// The whole byte, unmasked. Stock 5.0 clears the two weak-table bits
-			// before this comparison, but the shipped sweeplist does not - it is
-			// `mov cl, [eax+5]; movzx edx, cl; cmp edx, limit` at 0x00915A11 with
-			// nothing in between. Carrying stock's mask over (as `& 0xF9`) cleared
-			// bits 1 and 2, so any object marked only in those bits compared equal
-			// to zero and was freed while still live.
-			const int colorClass = static_cast<int>(markByte);
+			// FAF hot-patch (FA-Binary-Patches weakgcmarkerFix, #73): the stock binary
+			// compared the whole byte (`mov cl, [eax+5]; movzx edx, cl; cmp edx, limit`),
+			// so a table that kept only its weak-mode bits (1 and 2, which the sweep
+			// below never clears) compared above 0 and was never collected - weak
+			// tables, and everything they held, lived forever. The FAF exe masks those
+			// two bits first (`and edx, 0FFFFFFF9h` at 0x00915A17), as stock Lua 5.0
+			// does. A userdata's bit 1 ("finaliser pending") is masked too, which is
+			// safe: an unreached userdata with a finaliser has already been moved to
+			// `tmudata` and re-marked by `luaC_separateudata` before the sweep.
+			const int colorClass = static_cast<int>(markByte & 0xF9u);
 
 			if (colorClass > limit) {
 				current->gch.marked = static_cast<lu_byte>(markByte & 0xFEu);
@@ -14036,8 +14039,9 @@ namespace
 
 			const auto visit = [&](GCObject* const object, GCObject** const headLink) {
 				const lu_byte marked = object->gch.marked;
+				// The sweep ignores the weak-mode bits, as sweeplist does (weakgcmarkerFix, 0x00915A17).
 				const bool remove = pass == EPass::kSweep
-					? static_cast<int>(marked) <= limit
+					? static_cast<int>(marked & 0xF9u) <= limit
 					: (marked & kReachableMask) == 0u && (marked & kWantsFinaliserMask) != 0u;
 				if (!remove) {
 					if (pass == EPass::kSweep) {
@@ -14122,7 +14126,7 @@ namespace
 			GCObject** carry = plan.headLink;
 			for (GCObject* object = *carry; object != plan.classifiedHead; object = *carry) {
 				const lu_byte markByte = object->gch.marked;
-				if (static_cast<int>(markByte) > limit) {
+				if (static_cast<int>(markByte & 0xF9u) > limit) { // as sweeplist (weakgcmarkerFix)
 					object->gch.marked = static_cast<lu_byte>(markByte & 0xFEu);
 					carry = &object->gch.next;
 				} else {
@@ -14280,13 +14284,14 @@ namespace
 					std::vector<GCObject*> recorded;
 					std::size_t badMark = 0;
 					for (std::size_t index = begin; index < end; ++index) {
+						// The weak-mode bits do not count (sweeplist masks them, weakgcmarkerFix).
 						for (GCObject* const object : chunks[index].live) {
 							recorded.push_back(object);
-							badMark += object->gch.marked == 0u ? 1u : 0u;
+							badMark += (object->gch.marked & 0xF9u) == 0u ? 1u : 0u;
 						}
 						for (const DeadRecord& record : chunks[index].dead) {
 							recorded.push_back(record.object);
-							badMark += record.object->gch.marked != 0u ? 1u : 0u;
+							badMark += (record.object->gch.marked & 0xF9u) != 0u ? 1u : 0u;
 						}
 					}
 					std::sort(walked.begin(), walked.end());
