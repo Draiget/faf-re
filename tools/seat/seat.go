@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -175,15 +176,41 @@ func (s *Seat) emit(r journal.Record) { s.sink(r) }
 // LobbyPort is the game's UDP lobby port (0 behind an ICE adapter).
 func (s *Seat) LobbyPort() int { return s.lobbyPort }
 
+// Lobby ports come from below Windows' dynamic range (49152-65535) and its
+// Hyper-V/WSL exclusions. A port the OS assigned itself was only free until
+// the probe closed: the OS hands the next sockets the neighbouring ports, so
+// in the seconds before the game bound it another process could take it, and
+// the game's InternalCreateLobby then failed (seen with the shipped exe:
+// "Attempt to set attribute 'LobbyParameters' on nil").
+const (
+	lobbyPortMin = 20000
+	lobbyPortMax = 45000
+)
+
+var (
+	lobbyPortsMu    sync.Mutex
+	lobbyPortsTaken = map[int]bool{}
+)
+
 func freeUDPPort() (int, error) {
-	// Probe on every interface: in a multi-machine run the game is reached on
-	// this machine's LAN address, not only on loopback.
-	c, err := net.ListenUDP("udp4", &net.UDPAddr{})
-	if err != nil {
-		return 0, err
+	lobbyPortsMu.Lock()
+	defer lobbyPortsMu.Unlock()
+	for try := 0; try < 200; try++ {
+		port := lobbyPortMin + rand.Intn(lobbyPortMax-lobbyPortMin)
+		if lobbyPortsTaken[port] {
+			continue
+		}
+		// Probe on every interface: in a multi-machine run the game is reached
+		// on this machine's LAN address, not only on loopback.
+		c, err := net.ListenUDP("udp4", &net.UDPAddr{Port: port})
+		if err != nil {
+			continue
+		}
+		_ = c.Close()
+		lobbyPortsTaken[port] = true
+		return port, nil
 	}
-	defer c.Close()
-	return c.LocalAddr().(*net.UDPAddr).Port, nil
+	return 0, fmt.Errorf("no free UDP lobby port in %d-%d", lobbyPortMin, lobbyPortMax)
 }
 
 func freeTCPPort() (int, error) {

@@ -840,18 +840,18 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
   if (!NET_Init()) {
     return nullptr;
   }
+  // Engine addition: the failures below are logged at any net_DebugLevel (the
+  // binary logs them only above 0, as the TCP connector does always). A game
+  // port that cannot be bound makes InternalCreateLobby return nil, and without
+  // these lines nothing said why the lobby never opened.
   SOCKET sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (sock == INVALID_SOCKET) {
-    if (net_DebugLevel != 0) {
-      gpg::Logf("NET_MakeUDPConnector: socket() failed: %s", NET_GetWinsockErrorString());
-    }
+    gpg::Logf("NET_MakeUDPConnector: socket() failed: %s", NET_GetWinsockErrorString());
     return nullptr;
   }
   u_long argp = 1;
   if (::ioctlsocket(sock, FIONBIO, &argp) == SOCKET_ERROR) {
-    if (net_DebugLevel != 0) {
-      gpg::Logf("NET_MakeUDPConnector: ioctlsocket(FIONBIO) failed: %s", NET_GetWinsockErrorString());
-    }
+    gpg::Logf("NET_MakeUDPConnector: ioctlsocket(FIONBIO) failed: %s", NET_GetWinsockErrorString());
     ::closesocket(sock);
     return nullptr;
   }
@@ -860,9 +860,7 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
   name.sin_port = ::htons(port);
   name.sin_addr.S_un.S_addr = ::htonl(0);
   if (::bind(sock, (SOCKADDR*)&name, sizeof(name)) == SOCKET_ERROR) {
-    if (net_DebugLevel != 0) {
-      gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
-    }
+    gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     ::closesocket(sock);
     return nullptr;
   }
