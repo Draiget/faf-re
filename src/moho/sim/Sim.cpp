@@ -16180,8 +16180,10 @@ moho::CScrLuaInitForm* moho::func_SelectUnits_LuaFuncDef()
  * Address: 0x008BD8F0 (FUN_008BD8F0, cfunc_SelectUnitsL)
  *
  * What it does:
- * Builds one validated selection set from Lua input units, applies it to the
- * world session, and returns a Lua array of accepted unit objects.
+ * Builds one validated selection set from Lua input units and applies it to
+ * the world session. FAF hot-patch (FA-Binary-Patches SelecUnitsTableFix): the
+ * result table's AssignNewTable (0x008BD9BF) and PushStack (0x008BDBA6) are
+ * NOPed and 0x008BDC18 returns 0, so nothing is returned.
  */
 int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
 {
@@ -16201,11 +16203,8 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
-  LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, 0, 0u);
 
   msvc8::vector<UserUnit*> selectionUnits{};
-  std::int32_t resultIndex = 1;
   if (sourceUnitsObject.IsTable()) {
     const int unitCount = sourceUnitsObject.GetCount();
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
@@ -16223,16 +16222,11 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
                  attachmentParent != nullptr) {
         AppendSelectionUnitUnique(selectionUnits, attachmentParent);
       }
-
-      LuaPlus::LuaObject selectedUnitObject = iunitBridge->GetLuaObject();
-      resultTable.SetObject(resultIndex, selectedUnitObject);
-      ++resultIndex;
     }
   }
 
   session->SetSelectionUnits(selectionUnits);
-  resultTable.PushStack(state);
-  return 1;
+  return 0;
 }
 
 /**
