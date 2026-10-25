@@ -3130,22 +3130,15 @@ namespace moho
           StatItem* const killsStat = bridge->GetStat("KILLS", killsDefault);
           out.SetNumber("kills", static_cast<float>(killsStat->GetInt(false)));
 
-          out.SetInteger(
-            "energyConsumed", static_cast<int>(unitData.mResourcesSpent.ENERGY * kRolloverEconomyPerSecondToUiRate)
-          );
-          out.SetInteger(
-            "massConsumed", static_cast<int>(unitData.mResourcesSpent.MASS * kRolloverEconomyPerSecondToUiRate)
-          );
-          out.SetInteger(
-            "energyRequested", static_cast<int>(unitData.mMaintainenceCost.ENERGY * kRolloverEconomyPerSecondToUiRate)
-          );
-          out.SetInteger(
-            "massRequested", static_cast<int>(unitData.mMaintainenceCost.MASS * kRolloverEconomyPerSecondToUiRate)
-          );
-          out.SetInteger(
-            "energyProduced", static_cast<int>(unitData.mProduced.ENERGY * kRolloverEconomyPerSecondToUiRate)
-          );
-          out.SetInteger("massProduced", static_cast<int>(unitData.mProduced.MASS * kRolloverEconomyPerSecondToUiRate));
+          // FAF hot-patch (FA-Binary-Patches GetRolloverInfoFix): 0x008422FD..0x0084240C keep
+          // the six rates as floats (`movd eax, xmm0` + LuaObject::SetNumber at 0x00908320)
+          // instead of truncating them to integers for SetInteger.
+          out.SetNumber("energyConsumed", unitData.mResourcesSpent.ENERGY * kRolloverEconomyPerSecondToUiRate);
+          out.SetNumber("massConsumed", unitData.mResourcesSpent.MASS * kRolloverEconomyPerSecondToUiRate);
+          out.SetNumber("energyRequested", unitData.mMaintainenceCost.ENERGY * kRolloverEconomyPerSecondToUiRate);
+          out.SetNumber("massRequested", unitData.mMaintainenceCost.MASS * kRolloverEconomyPerSecondToUiRate);
+          out.SetNumber("energyProduced", unitData.mProduced.ENERGY * kRolloverEconomyPerSecondToUiRate);
+          out.SetNumber("massProduced", unitData.mProduced.MASS * kRolloverEconomyPerSecondToUiRate);
           out.SetInteger("tacticalSiloBuildCount", unitData.mTacticalSiloBuildCount);
           out.SetInteger("tacticalSiloStorageCount", unitData.mTacticalSiloStorageCount);
           out.SetInteger("tacticalSiloMaxStorageCount", unitData.mTacticalSiloMaxStorageCount);
