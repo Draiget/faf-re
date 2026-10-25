@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -449,6 +451,51 @@ namespace
 
     return false;
   }
+
+  /**
+   * What it does:
+   * Logs one line about lobby traffic that was dropped. A peer can send such
+   * traffic as fast as its link allows, so the lines share a budget that
+   * refills every few seconds; lines past it are only counted, and the count
+   * is reported when the next window opens.
+   */
+  void LogDroppedLobbyMessage(const char* fmt, ...)
+  {
+    using Clock = std::chrono::steady_clock;
+    constexpr int kLinesPerWindow = 8;
+    constexpr auto kWindow = std::chrono::seconds(10);
+
+    static Clock::time_point sWindowStart{};
+    static int sLinesInWindow = 0;
+    static int sSuppressedLines = 0;
+
+    const Clock::time_point now = Clock::now();
+    if (now - sWindowStart >= kWindow) {
+      if (sSuppressedLines != 0) {
+        gpg::Warnf("LOBBY: %d more dropped-message lines suppressed.", sSuppressedLines);
+      }
+      sWindowStart = now;
+      sLinesInWindow = 0;
+      sSuppressedLines = 0;
+    }
+
+    if (sLinesInWindow >= kLinesPerWindow) {
+      ++sSuppressedLines;
+      return;
+    }
+    ++sLinesInWindow;
+
+    va_list va;
+    va_start(va, fmt);
+    const msvc8::string line = gpg::STR_Va(fmt, va);
+    va_end(va);
+    gpg::Warnf("%s", line.c_str());
+  }
+
+  // Client indices (0..255) and command source ids (0..254; 0xFF is "none")
+  // are single bytes on the wire.
+  constexpr int32_t kMaxLaunchClients = 0x100;
+  constexpr std::size_t kMaxLaunchCommandSources = 0xFF;
 } // namespace
 
 namespace moho
@@ -638,45 +685,63 @@ void CLobby::ReceiveMessage(
 {
   // CNetUDPConnection is caller, which have INetConnection `[dispatcher - 4].mReceivers[255]`.
   const auto connection = static_cast<INetConnection*>(dispatcher);
+  const ELobbyMsg type = message->GetType();
 
-  switch (const ELobbyMsg type = message->GetType()) { // NOLINT(clang-diagnostic-switch-enum)
-  case ELobbyMsg::LOBMSG_Join:
-    OnJoin(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_Rejected:
-    if (connection == peerConnection) {
-      OnRejected(message, connection);
+  // Every byte past the type is the sender's. A short read, a malformed script
+  // payload, or a NewPeer naming a uid we already have throws; escaping here,
+  // that aborted the lobby's pull thread and no lobby traffic was processed
+  // again. Now it costs the message. Nothing below touches `this`, which a
+  // script callback may have destroyed (FAF's lobby destroys itself in
+  // `Ejected` and `ConnectionFailed`).
+  try {
+    switch (type) { // NOLINT(clang-diagnostic-switch-enum)
+    case ELobbyMsg::LOBMSG_Join:
+      OnJoin(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_Rejected:
+      if (connection == peerConnection) {
+        OnRejected(message, connection);
+      } else {
+        LogDroppedLobbyMessage("LOBBY: ignoring Rejected message from non-host.");
+      }
+      break;
+    case ELobbyMsg::LOBMSG_Welcome:
+      OnWelcome(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_NewPeer:
+      OnNewPeer(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_DeletePeer:
+      OnDeletePeer(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_EstablishedPeers:
+      OnEstablishedPeers(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_BroadcastScriptData:
+    case ELobbyMsg::LOBMSG_DirectScriptData:
+      OnScriptData(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_ConnFailed:
+      OnConnectionFailed(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_ConnMade:
+      OnConnectionMade(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_ConnLostErrored:
+    case ELobbyMsg::LOBMSG_ConnLostEof:
+      OnConnectionLost(message, connection);
+      break;
+    default:
+      LogDroppedLobbyMessage("LOBBY: Ignoring unrecognized lobby message w/ type %d", static_cast<int32_t>(type));
+      break;
     }
-    break;
-  case ELobbyMsg::LOBMSG_Welcome:
-    OnWelcome(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_NewPeer:
-    OnNewPeer(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_DeletePeer:
-    OnDeletePeer(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_EstablishedPeers:
-    OnEstablishedPeers(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_BroadcastScriptData:
-  case ELobbyMsg::LOBMSG_DirectScriptData:
-    OnScriptData(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_ConnFailed:
-    OnConnectionFailed(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_ConnMade:
-    OnConnectionMade(message, connection);
-    break;
-  case ELobbyMsg::LOBMSG_ConnLostErrored:
-  case ELobbyMsg::LOBMSG_ConnLostEof:
-    OnConnectionLost(message, connection);
-    break;
-  default:
-    gpg::Logf("LOBBY: Ignoring unrecognized lobby message w/ type %d", static_cast<int32_t>(type));
-    break;
+  } catch (const std::exception& ex) {
+    LogDroppedLobbyMessage(
+      "LOBBY: dropping malformed lobby message w/ type %d from conn=%p: %s",
+      static_cast<int32_t>(type),
+      static_cast<const void*>(connection),
+      ex.what()
+    );
   }
 }
 
@@ -707,7 +772,7 @@ void CLobby::OnDatagram(
   const msvc8::string hostName = NET_GetHostName(address);
 
   if (msg->GetType() != ELobbyMsg::LOBMSG_DiscoveryRequest) {
-    gpg::Logf(
+    LogDroppedLobbyMessage(
       "LOBBY: ignoring unexpected message type (%d) from %s:%d",
       static_cast<int>(data[0]),
       hostName.c_str(),
@@ -759,13 +824,13 @@ void CLobby::OnJoin(
   SPeer* player = FindPeerByConnection(connection);
 
   if (player == nullptr) {
-    gpg::Logf("LOBBY: ignoring unexpected join (no player for conn=%p)", connection);
+    LogDroppedLobbyMessage("LOBBY: ignoring unexpected join (no player for conn=%p)", connection);
     return;
   }
 
   if (player->state != ENetworkPlayerState::kWaitingJoin) {
     const msvc8::string who = player->ToString();
-    gpg::Logf(
+    LogDroppedLobbyMessage(
       "LOBBY: ignoring unexpected join (name=\"%s\", uid=%d) from %s", joiningName.c_str(), requestedUid, who.c_str()
     );
     return;
@@ -796,6 +861,10 @@ void CLobby::OnJoin(
 
     connection->Write(lobbyFull);
     connection->ScheduleDestroy();
+    // 0x007C6758: the rejected peer goes with its connection. Kept, it held a
+    // pointer the connector frees, and the next GetPeers (the lobby's ping
+    // display) or launch dereferenced it.
+    delete player;
     return;
   }
 
@@ -864,7 +933,7 @@ void CLobby::OnWelcome(
   SPeer* peer = FindPeerByConnection(connection);
 
   if (peer == nullptr || peer->state != ENetworkPlayerState::kConnected) {
-    gpg::Logf("LOBBY: ignoring unexpected welcome message.");
+    LogDroppedLobbyMessage("LOBBY: ignoring unexpected welcome message.");
     return;
   }
 
@@ -940,7 +1009,7 @@ void CLobby::OnNewPeer(
   if (connection != peerConnection) {
     // If this is not a host.
     const auto connStr = connection->ToString();
-    gpg::Logf("LOBBY: ignoring NewPeer msg from %s.", connStr.c_str());
+    LogDroppedLobbyMessage("LOBBY: ignoring NewPeer msg from %s.", connStr.c_str());
     return;
   }
 
@@ -971,7 +1040,7 @@ void CLobby::OnDeletePeer(
   if (connection != peerConnection) {
     // If this is not a host.
     const auto connStr = connection->ToString();
-    gpg::Logf("LOBBY: ignoring DeletePeer msg from %s.", connStr.c_str());
+    LogDroppedLobbyMessage("LOBBY: ignoring DeletePeer msg from %s.", connStr.c_str());
     return;
   }
 
@@ -980,6 +1049,16 @@ void CLobby::OnDeletePeer(
 
   int32_t uid{0};
   br.ReadExact(uid);
+  gpg::Logf("LOBBY: received LOBMSG_DeletePeer, uid=%d", uid);
+
+  // The host never deletes itself. Acting on it would free the host's peer
+  // and schedule `peerConnection` for destruction while it stays our
+  // "connected to a host" marker, so a later connection allocated at the same
+  // address would pass every host-only check.
+  if (const SPeer* const target = FindPeerByUid(uid); target != nullptr && target->peerConnection == peerConnection) {
+    LogDroppedLobbyMessage("LOBBY: ignoring DeletePeer for the host itself (uid=%d).", uid);
+    return;
+  }
 
   DisconnectFromPeer(uid);
 }
@@ -996,7 +1075,7 @@ void CLobby::OnEstablishedPeers(
 
   if (peer == nullptr) {
     const msvc8::string connStr = connection->ToString();
-    gpg::Logf("LOBBY: ignoring EstablishedPeers message from unknown connection %s.", connStr.c_str());
+    LogDroppedLobbyMessage("LOBBY: ignoring EstablishedPeers message from unknown connection %s.", connStr.c_str());
     return;
   }
 
@@ -1031,7 +1110,9 @@ void CLobby::OnEstablishedPeers(
   int idx = 1;
   char idBuf[kPlayerUidBufSize]{};
   for (const auto uid : peer->establishedUids) {
-    std::to_chars(idBuf, idBuf + kPlayerUidBufSize, uid);
+    // to_chars writes no terminator, and a shorter uid after a longer one
+    // (the sender picks them; "-100" then "5") would keep the old tail.
+    *std::to_chars(idBuf, idBuf + kPlayerUidBufSize - 1, uid).ptr = '\0';
     obj.SetString(idx++, idBuf);
   }
 
@@ -1054,6 +1135,14 @@ void CLobby::OnScriptData(
 
   LuaPlus::LuaObject script;
   mLuaObj.SCR_FromByteStream(script, mLuaObj.m_state, &br);
+
+  // Only a table can carry SenderID/SenderName. On anything else SetString
+  // raises a Lua error with its operands still pushed, leaking Lua stack
+  // slots for every such message a peer sends.
+  if (!script.IsTable()) {
+    LogDroppedLobbyMessage("LOBBY: ignoring script data that is not a table from conn=%p.", connection);
+    return;
+  }
 
   const SPeer* peer = FindPeerByConnection(connection);
 
@@ -1091,6 +1180,17 @@ void CLobby::OnConnectionFailed(
 
   SPeer* peer = FindPeerByConnection(connection);
 
+  // The transport raises ConnFailed only while a connect is outstanding, so
+  // before this connection's ConnMade. The connection-event type bytes are
+  // not reserved on the wire, though: a peer past that point can send one,
+  // and acting on it swapped in a fresh connection under a peer still marked
+  // established, whose own ConnMade then hit the unreachable assert.
+  if (peer == nullptr
+      || (peer->state != ENetworkPlayerState::kConnecting && peer->state != ENetworkPlayerState::kPending)) {
+    LogDroppedLobbyMessage("LOBBY: ignoring unexpected connection-failed event on conn=%p.", connection);
+    return;
+  }
+
   const auto peerStr = peer->ToString();
   gpg::Logf("LOBBY: connection to %s failed, retrying...", peerStr.c_str());
 
@@ -1112,10 +1212,25 @@ void CLobby::OnConnectionMade(
 )
 {
   SPeer* peer = FindPeerByConnection(connection);
+  if (peer == nullptr) {
+    LogDroppedLobbyMessage("LOBBY: ignoring connection-made event on unknown conn=%p.", connection);
+    return;
+  }
 
   msvc8::string peerStateStr;
   ENetworkPlayerStateToStr(peer->state, peerStateStr);
   const msvc8::string who = peer->ToString();
+
+  // The transport injects exactly one ConnMade ahead of a connection's wire
+  // data, while its peer is still connecting or pending. Any later one was
+  // sent by the peer itself (the type byte is not reserved on the wire); the
+  // shipped body asserted on it (0x007C5DB4), so one crafted message from any
+  // connected peer ended the process.
+  if (peer->state != ENetworkPlayerState::kConnecting && peer->state != ENetworkPlayerState::kPending) {
+    LogDroppedLobbyMessage("LOBBY: ignoring connection-made event from %s, status=%s.", who.c_str(), peerStateStr.c_str());
+    return;
+  }
+
   gpg::Logf("LOBBY: connection to %s made, status=%s.", who.c_str(), peerStateStr.c_str());
 
   if (peer->state == ENetworkPlayerState::kConnecting) {
@@ -1130,10 +1245,6 @@ void CLobby::OnConnectionMade(
 
     connection->Write(msg);
   } else {
-    if (peer->state != ENetworkPlayerState::kPending) {
-      GPG_UNREACHABLE("unreachable")
-    }
-
     peer->state = ENetworkPlayerState::kWaitingJoin;
     connection->PushReceiver(MSGTYPE_LobbyMsgStart, MSGTYPE_LobbyMsgEnd, this);
   }
@@ -1253,7 +1364,11 @@ void CLobby::PeerDisconnected(
 
   const char* uidStr = idBuf;
   const char* nameStr = peer->playerName.c_str();
-  CallbackStr("PeerDisconnected", &uidStr, &nameStr);
+  // 0x007C7876 pushes &uid as the last argument and &name before it: the
+  // script sees `PeerDisconnected(self, peerName, peerId)`, the order FAF's
+  // lobby and autolobby are written against. Passing uid first made the host
+  // look the leaver up by name, so the slot was never cleared.
+  CallbackStr("PeerDisconnected", &nameStr, &uidStr);
 
   if (peer->state == ENetworkPlayerState::kEstablished || peer->state == ENetworkPlayerState::kDisconnected) {
     peersDirty = true;
@@ -1263,7 +1378,9 @@ void CLobby::PeerDisconnected(
     CMessage msg(ELobbyMsg::LOBMSG_DeletePeer);
     CMessageStream s(msg, CMessageStream::Access::kReadWrite);
 
-    s.Write(localUid);
+    // 0x007C78F3 writes the departed peer's uid (`[peer+0x24]`). Writing our
+    // own told every client to delete the host's peer instead.
+    s.Write(peer->uid);
 
     BroadcastMessage(msg);
   }
@@ -3007,7 +3124,12 @@ void CLobby::PullTask()
   while (connector->FindNextAddress(address, port)) {
     if (!mHasNAT || peerConnection != nullptr) {
       connector->Reject(address, port);
-      gpg::Logf("LOBBY: rejecting unexpected connection from %s:%d", NET_GetHostName(address).c_str(), port);
+      // Engine addition: the binary names the source by reverse DNS, which
+      // blocks this (the game) thread once per new address, and anyone can
+      // send a CONNECT from as many addresses as they like.
+      LogDroppedLobbyMessage(
+        "LOBBY: rejecting unexpected connection from %s:%d", NET_GetDottedOctetFromUInt32(address).c_str(), port
+      );
     } else {
       INetConnection* acceptedConnection = connector->Accept(address, port);
       gpg::Logf("LOBBY: lan game connection from %s.", acceptedConnection->ToString().c_str());
@@ -3333,47 +3455,75 @@ void CLobby::LaunchGame(
 
   int32_t clientIndex = 0;
   int32_t localClientIndex = -1;
-  for (std::size_t playerIndex = 0; playerIndex < playerOptions.size(); ++playerIndex) {
-    const LuaPlus::LuaObject& option = playerOptions[playerIndex].mOptions;
-    BVIntSet commandSourceSet{};
+  try {
+    for (std::size_t playerIndex = 0; playerIndex < playerOptions.size(); ++playerIndex) {
+      const LuaPlus::LuaObject& option = playerOptions[playerIndex].mOptions;
+      BVIntSet commandSourceSet{};
 
-    const LuaPlus::LuaObject isHumanObject = option["Human"];
-    if (isHumanObject.GetBoolean()) {
-      const LuaPlus::LuaObject ownerIdObject = option["OwnerID"];
-      const int32_t ownerId = ParseOwnerId(ownerIdObject);
-      if (ownerId == localUid) {
-        launchInfo->mCommandSources.mOriginalSource = static_cast<int32_t>(playerIndex);
+      const LuaPlus::LuaObject isHumanObject = option["Human"];
+      if (isHumanObject.GetBoolean()) {
+        const LuaPlus::LuaObject ownerIdObject = option["OwnerID"];
+        const int32_t ownerId = ParseOwnerId(ownerIdObject);
+        if (ownerId == localUid) {
+          launchInfo->mCommandSources.mOriginalSource = static_cast<int32_t>(playerIndex);
+        }
+
+        const LuaPlus::LuaObject playerNameObject = option["PlayerName"];
+        const char* const optionPlayerName = playerNameObject.GetString();
+        AssignClientIndex(clientIndex, ownerId, optionPlayerName ? optionPlayerName : "", localClientIndex);
+
+        const uint32_t sourceId =
+          AssignCommandSource(timeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
+        if (sourceId != 0xFFu) {
+          (void)commandSourceSet.Add(sourceId);
+        }
       }
 
-      const LuaPlus::LuaObject playerNameObject = option["PlayerName"];
-      const char* const optionPlayerName = playerNameObject.GetString();
-      AssignClientIndex(clientIndex, ownerId, optionPlayerName ? optionPlayerName : "", localClientIndex);
-
-      const uint32_t sourceId =
-        AssignCommandSource(timeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
-      if (sourceId != 0xFFu) {
-        (void)commandSourceSet.Add(sourceId);
-      }
+      launchInfo->mStrVec.push_back(SCR_ToString(option));
+      moho::ArmyLaunchInfo armySourceInfo{};
+      armySourceInfo.mUnitSources = commandSourceSet;
+      launchInfo->mArmyLaunchInfo.push_back(armySourceInfo);
     }
 
-    launchInfo->mStrVec.push_back(SCR_ToString(option));
-    moho::ArmyLaunchInfo armySourceInfo{};
-    armySourceInfo.mUnitSources = commandSourceSet;
-    launchInfo->mArmyLaunchInfo.push_back(armySourceInfo);
-  }
+    LuaPlus::LuaObject observersTable = dat["Observers"];
+    LuaPlus::LuaTableIterator observerIt(&observersTable, 1);
+    while (!observerIt.m_isDone) {
+      LuaPlus::LuaObject observer = observerIt.GetValue();
+      const int32_t ownerId = ParseOwnerId(observer["OwnerID"]);
+      const LuaPlus::LuaObject observerNameObject = observer["PlayerName"];
+      const char* const observerName = observerNameObject.GetString();
+      AssignClientIndex(clientIndex, ownerId, observerName ? observerName : "", localClientIndex);
 
-  LuaPlus::LuaObject observersTable = dat["Observers"];
-  LuaPlus::LuaTableIterator observerIt(&observersTable, 1);
-  while (!observerIt.m_isDone) {
-    LuaPlus::LuaObject observer = observerIt.GetValue();
-    const int32_t ownerId = ParseOwnerId(observer["OwnerID"]);
-    const LuaPlus::LuaObject observerNameObject = observer["PlayerName"];
-    const char* const observerName = observerNameObject.GetString();
-    AssignClientIndex(clientIndex, ownerId, observerName ? observerName : "", localClientIndex);
+      const int32_t observerTimeouts = sessionInfo->mIsMultiplayer ? 0 : -1;
+      (void)AssignCommandSource(observerTimeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
+      observerIt.Next();
+    }
 
-    const int32_t observerTimeouts = sessionInfo->mIsMultiplayer ? 0 : -1;
-    (void)AssignCommandSource(observerTimeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
-    observerIt.Next();
+    // Engine addition: the launch info comes from the host. Without us in it
+    // the local client index stays -1, which the client manager uses as an
+    // array index. Client indices and command sources each travel as one byte
+    // (0xFF being "no source"), so more of them would alias.
+    if (localClientIndex == -1) {
+      throw std::runtime_error("LaunchGame: the local player is neither a player nor an observer.");
+    }
+    if (clientIndex > kMaxLaunchClients || launchInfo->mCommandSources.mSrcs.size() > kMaxLaunchCommandSources) {
+      throw std::runtime_error("LaunchGame: too many players and observers.");
+    }
+  } catch (...) {
+    // A client launches from the host's Launch message, so a malformed entry
+    // (an observer that is not a table, say) can throw part-way through. That
+    // left behind the connection-less peers AssignClientIndex had created and
+    // the indices it had handed out: the lobby's next GetPeers dereferenced a
+    // null connection, and a later launch reused the stale indices.
+    for (SPeer* const peer : peers.owners_safe()) {
+      if (peer->peerConnection == nullptr) {
+        delete peer;
+      } else {
+        peer->mClientInd = -1;
+        peer->mCmdSource = 0xFFu;
+      }
+    }
+    throw;
   }
 
   int gameSpeed = 0;
