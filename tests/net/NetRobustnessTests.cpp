@@ -24,6 +24,7 @@
 #include "moho/command/ICommandSink.h"
 #include "moho/command/SSTITarget.h"
 #include "moho/misc/CDecoder.h"
+#include "moho/misc/SessionStartup.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/CLobby.h"
 #include "moho/net/CMessage.h"
@@ -37,6 +38,7 @@
 #include "moho/net/SPeer.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/sim/WldSessionInfo.h"
 
 using namespace moho;
 
@@ -197,14 +199,61 @@ namespace
     CHECK(Decode(std::string(1, '\x09'), out) && out.IsNil());
   }
 
+  // Follows key "k" `steps` times.
+  LuaPlus::LuaObject Descend(LuaPlus::LuaObject table, const int steps)
+  {
+    for (int i = 0; i < steps && table.IsTable(); ++i) {
+      table = table["k"];
+    }
+    return table;
+  }
+
   void TestLuaNestingLimit()
   {
     LuaPlus::LuaObject out;
     CHECK(Decode(LuaNested(256), out) && out.IsTable());
-    CHECK(DecodeFails(LuaNested(257)));
+    CHECK(Descend(out, 255).IsTable());
+
+    // One level more: the table past the limit is left out, the rest stays.
+    CHECK(Decode(LuaNested(257), out) && out.IsTable());
+    CHECK(Descend(out, 255).IsTable());
+    CHECK(Descend(out, 256).IsNil());
 
     // A 64 KB message of table-begin tags: refused, not a stack overflow.
     CHECK(DecodeFails(std::string(65535, '\x04')));
+    CHECK(DecodeFails(std::string(1, '\x04') + LuaString("k") + std::string(60000, '\x04')));
+  }
+
+  void TestLuaDeepFieldKeepsSiblings()
+  {
+    LuaPlus::LuaObject out;
+    const std::string table = LuaTable(LuaString("a") + LuaNumber(1.0f) + LuaString("deep") + LuaNested(300) +
+                                       LuaString("b") + LuaString("kept"));
+    CHECK(Decode(table, out) && out.IsTable());
+    CHECK(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
+    CHECK(out["b"].IsString() && std::strcmp(out["b"].GetString(), "kept") == 0);
+    CHECK(out["deep"].IsTable());
+  }
+
+  void TestLuaLobbyRelayDepth()
+  {
+    // FAF's lobby: a joiner's AddPlayer {Type, PlayerOptions = {...}} reaches
+    // everyone two levels deeper in the host's {Type, GameInfo = {PlayerOptions
+    // = {[slot] = {...}}}} Launch message. A field the host accepted must not
+    // make the Launch undecodable.
+    const std::string field = LuaString("Junk") + LuaNested(254);
+    const std::string addPlayer =
+      LuaTable(LuaString("Type") + LuaString("AddPlayer") + LuaString("PlayerOptions") + LuaTable(field));
+    const std::string launch = LuaTable(
+      LuaString("Type") + LuaString("Launch") + LuaString("GameInfo") +
+      LuaTable(LuaString("PlayerOptions") + LuaTable(LuaNumber(1.0f) + LuaTable(LuaString("PlayerName") + LuaString("p") + field)))
+    );
+
+    LuaPlus::LuaObject out;
+    CHECK(Decode(addPlayer, out) && out.IsTable());
+    CHECK(Decode(launch, out) && out.IsTable());
+    CHECK(std::strcmp(out["Type"].GetString(), "Launch") == 0);
+    CHECK(out["GameInfo"]["PlayerOptions"][1]["PlayerName"].IsString());
   }
 
   void TestLuaLocalDecodeHasNoNestingLimit()
@@ -396,14 +445,15 @@ namespace
     const std::string none = Bytes{}.U32(0).data;
     const float nan = std::numeric_limits<float>::quiet_NaN();
 
-    f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaNested(300)).Raw(none).data);
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNil() + LuaNumber(1))).Raw(none).data);
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNumber(nan) + LuaNumber(1))).Raw(none).data);
     f.Feed(ECmdStreamOp::CMDST_ExecuteLuaInSim, Bytes{}.Str("fn").Raw(std::string(60000, '\x04')).data);
     CHECK(f.sink.total == 0);
 
+    // Deep arguments are cut at the nesting limit, not refused.
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaNested(200)).Raw(none).data);
-    CHECK(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_LuaSimCallback)] == 1);
+    f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaNested(300)).Raw(none).data);
+    CHECK(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_LuaSimCallback)] == 2);
   }
 
   void TestDecoderValidCommand()
@@ -698,9 +748,72 @@ namespace
     CHECK(f->Peer(20) != nullptr);
   }
 
+  // --- Replay files ------------------------------------------------------------------------
+
+  void TestReplayDamagedHeaderRefused()
+  {
+    // A replay header as VCR_CreateReplay writes it, up to the init seed.
+    const auto lengthPrefixed = [](const std::string& s) { return Bytes{}.U32(static_cast<std::uint32_t>(s.size())).Raw(s).data; };
+    const std::string preamble =
+      Bytes{}.Str("Supreme Commander v1.50.3835").Str("\r\n").Raw("Replay v1.9\r\n").Str("/maps/x/x.scmap").Str("\r\n\x1a").data;
+    const auto makeHeader = [&](const std::string& mods, const std::string& scenario, const std::string& army) {
+      return Bytes{}
+        .Raw(preamble)
+        .Raw(lengthPrefixed(mods))
+        .Raw(lengthPrefixed(scenario))
+        .U8(1).Str("player").I32(0)
+        .U8(0)
+        .U8(1).Raw(lengthPrefixed(army)).U8(0).U8(0xFF)
+        .data;
+    };
+    const std::string goodMods = LuaTable(std::string{});
+    const std::string goodScenario = LuaTable(LuaString("name") + LuaString("x"));
+    const std::string goodArmy = LuaTable(LuaString("PlayerName") + LuaString("p"));
+    const std::string header = makeHeader(goodMods, goodScenario, goodArmy);
+
+    char directory[MAX_PATH]{};
+    GetTempPathA(MAX_PATH, directory);
+    const std::string path = std::string(directory) + "faf_net_tests_replay.scfareplay";
+
+    int refused = 0;
+    int tried = 0;
+    const auto tryHeader = [&](const std::string& bytes) {
+      if (FILE* const file = std::fopen(path.c_str(), "wb")) {
+        std::fwrite(bytes.data(), 1, bytes.size(), file);
+        std::fclose(file);
+      }
+      ++tried;
+      // Refused, and with a reason the player can be shown.
+      msvc8::string reason;
+      if (VCR_SetupReplaySession(path.c_str(), &reason).get() == nullptr && !reason.empty()) {
+        ++refused;
+      }
+    };
+
+    // Cut anywhere before the init seed is complete.
+    for (std::size_t length = 0; length < header.size() + 4; ++length) {
+      tryHeader((header + Bytes{}.I32(1234).data).substr(0, length));
+    }
+    // A length prefix that does not fit (negative as the reader takes it).
+    tryHeader(preamble + Bytes{}.U32(0xFFFFFFF0u).data);
+    // A complete header whose game settings do not decode: the session would
+    // fail on them later, where nothing catches it.
+    const std::string seed = Bytes{}.I32(1234).data;
+    const std::string nilValue = LuaTable(LuaString("k") + LuaNil());
+    tryHeader(makeHeader(nilValue, goodScenario, goodArmy) + seed);
+    tryHeader(makeHeader(goodMods, nilValue, goodArmy) + seed);
+    tryHeader(makeHeader(goodMods, goodScenario, nilValue) + seed);
+    tryHeader(makeHeader(goodMods, std::string{}, goodArmy) + seed);
+
+    std::remove(path.c_str());
+    CHECK(tried > 0 && refused == tried);
+  }
+
   const TestCase kTests[] = {
     {"lua: valid values", &TestLuaValidValues},
     {"lua: nesting limit", &TestLuaNestingLimit},
+    {"lua: deep field keeps its siblings", &TestLuaDeepFieldKeepsSiblings},
+    {"lua: lobby relay depth", &TestLuaLobbyRelayDepth},
     {"lua: local decode has no nesting limit", &TestLuaLocalDecodeHasNoNestingLimit},
     {"lua: malformed tables", &TestLuaMalformedTables},
     {"message: framing", &TestMessageFraming},
@@ -717,6 +830,7 @@ namespace
     {"lobby: host messages", &TestLobbyHostMessages},
     {"lobby: script data", &TestLobbyScriptData},
     {"lobby: peer events", &TestLobbyPeerEvents},
+    {"replay: damaged header refused", &TestReplayDamagedHeaderRefused},
   };
 } // namespace
 

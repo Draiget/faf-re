@@ -90,8 +90,12 @@ namespace moho
    * What it does:
    * Loads replay file payload, reconstructs `LaunchInfoNew`, and creates
    * one replay `SWldSessionInfo` bootstrap object.
+   *
+   * Engine addition: when the replay is refused, `failureReason` (if given)
+   * receives a sentence saying why, for the player.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(gpg::StrArg filename);
+  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo>
+  VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr);
 
   /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)

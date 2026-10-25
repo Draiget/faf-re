@@ -398,13 +398,19 @@ namespace
     if (moho::CFG_GetArgOption("/replay", 1, &args)) {
       if (!args.empty()) {
         SetFrontEndReplayFilename(args[0]);
-        msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(args[0].c_str());
+        msvc8::string failureReason;
+        msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo =
+          moho::VCR_SetupReplaySession(args[0].c_str(), &failureReason);
         if (sessionInfo.get() != nullptr) {
           moho::WLD_BeginSession(sessionInfo);
           return;
         }
 
-        const msvc8::string message = gpg::STR_Printf("Unable to load game replay from %s", args[0].c_str());
+        // Engine addition: the second line says why the replay was refused.
+        const msvc8::string message =
+          failureReason.empty()
+            ? gpg::STR_Printf("Unable to load game replay from %s", args[0].c_str())
+            : gpg::STR_Printf("Unable to load game replay from %s\n\n%s", args[0].c_str(), failureReason.c_str());
         moho::WIN_OkBox("Ack!", message.c_str());
       } else {
         gpg::Warnf("InitializeSession: /replay specified without a replay path.");
