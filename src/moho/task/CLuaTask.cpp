@@ -689,7 +689,8 @@ int moho::cfunc_ResumeThreadL(LuaPlus::LuaState* const state)
   LuaPlus::LuaState* const threadState = rawThreadState ? rawThreadState->stateUserData : nullptr;
   if (!threadState) {
     const msvc8::string traceback = SCR_Traceback(state, kResumeThreadKilledTraceback);
-    gpg::Warnf(traceback.c_str());
+    // Logged as data: a traceback quotes script text, '%' included.
+    gpg::Warnf("%s", traceback.c_str());
     return 0;
   }
 

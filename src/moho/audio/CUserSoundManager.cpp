@@ -1329,11 +1329,12 @@ namespace moho
 
       if (record.mPlayingSeconds > 0.0f) {
         const msvc8::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
-        gpg::Logf(stoppingLine.c_str());
+        gpg::Logf("%s", stoppingLine.c_str());
         continue;
       }
 
-      gpg::Logf(baseLine.c_str());
+      // The bank and cue names are data (mods name them), not a format.
+      gpg::Logf("%s", baseLine.c_str());
     }
   }
 
