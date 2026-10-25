@@ -24,7 +24,7 @@ namespace faf
     }
   }
 
-  inline MemoryPool::MemoryPool(
+  MemoryPool::MemoryPool(
     MemoryPool&& other
   ) noexcept
     : m_blockSize(other.m_blockSize)
@@ -37,7 +37,7 @@ namespace faf
     other.m_nextCapacity = 0;
   }
 
-  inline MemoryPool& MemoryPool::operator=(
+  MemoryPool& MemoryPool::operator=(
     MemoryPool&& other
   ) noexcept
   {
@@ -63,11 +63,11 @@ namespace faf
       std::free(p);
     }
   }
-  inline size_t MemoryPool::GetBlockSize() const
+  size_t MemoryPool::GetBlockSize() const
   {
     return m_blockSize;
   }
-  inline void* MemoryPool::Allocate()
+  void* MemoryPool::Allocate()
   {
     if (m_freeList == nullptr) {
       if (AllocateChunk(m_nextCapacity) == nullptr) {
@@ -78,7 +78,7 @@ namespace faf
     m_freeList = node->next;
     return static_cast<void*>(node);
   }
-  inline void MemoryPool::Deallocate(
+  void MemoryPool::Deallocate(
     void* ptr
   )
   {
@@ -89,7 +89,7 @@ namespace faf
     node->next = m_freeList;
     m_freeList = node;
   }
-  inline void* MemoryPool::AllocateChunk(
+  void* MemoryPool::AllocateChunk(
     size_t capacity
   )
   {
@@ -108,5 +108,12 @@ namespace faf
     }
 
     return chunk;
+  }
+
+  MultiMemoryPool::MultiMemoryPool(
+    std::size_t intialCapacity
+  )
+  {
+    m_pools.reserve(intialCapacity);
   }
 } // namespace faf
