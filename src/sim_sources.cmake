@@ -1,15 +1,15 @@
-# Engine addition (dedicated-server plan WPL.3, WPR.11): the simulation's
+# Engine addition (dedicated-server plan WPL.3, WPL.4, WPR.11): the simulation's
 # translation units, FAF_SIM_SOURCES: FAF_ENGINE_SOURCES (sources.cmake, which
 # must be included first) without the ones that exist only for the client
-# (window, render device, UI, audio output, movies, the wx script debugger).
-# The order of what remains is the engine's, so the static-init order is the
-# Windows build's.
+# (window, render device, UI, audio output, movies, the wx script debugger,
+# the user world). The order of what remains is the engine's, so the
+# static-init order is the Windows build's.
 #
-# What the sim still references in the files left out is the WPL.3
-# unresolved-symbol list; those references are cut by splits (WPL.4), not by
-# adding the client files back.
-
-set(FAF_SIM_SOURCES ${FAF_ENGINE_SOURCES})
+# A source is left out when it matches a _faf_client_only_patterns entry and
+# none of the _faf_sim_patterns entries (sim code that lives in a client
+# folder). What the sim still references in the files left out is the
+# WPL.3/WPL.4 work list; those references are cut by splits, not by adding
+# the client files back.
 
 set(_faf_client_only_patterns
   # Render backends, shader tooling and Effects 11.
@@ -32,10 +32,44 @@ set(_faf_client_only_patterns
   "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog)\\.cpp$"
   # D3D device resources; DirectSound and movie startup.
   "^moho/misc/(ID3DDeviceResources|StartupHelpers)\\.cpp$"
-  # The user world: session, user-side armies and entities.
+  # The user world: session, user-side armies, entities and units.
   "^moho/sim/(CWldSession|UserArmy)\\.cpp$"
-  "^moho/entity/UserEntity\\.cpp$")
+  "^moho/entity/UserEntity\\.cpp$"
+  "^moho/unit/core/UserUnit\\.cpp$"
+  # The user world's vision (what the focus army sees, for drawing).
+  "^moho/vision/VisionDB\\.cpp$"
+  # The lobby, GPGNet and LAN discovery (the game connection and the
+  # replay stream stay).
+  "^moho/net/(CLobby|CLobbyTypeInfo|CGpgNetInterface|CDiscoveryService|CDiscoveryServiceTypeInfo|CHostManager)\\.cpp$")
 
-foreach(_pattern IN LISTS _faf_client_only_patterns)
-  list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "${_pattern}")
+set(_faf_sim_patterns
+  # Decals the sim creates and expires (CDecalBuffer::CleanupTick runs on
+  # the sim thread), their reflection and serialisers.
+  "^moho/render/(CDecalBuffer|CDecalBufferSerializer|CDecalBufferTypeInfo|CDecalGroup|CDecalHandle|CDecalHandleSerializer|CDecalHandleTypeInfo|CDecalTypes|IDecalGroup|SDecalInfoTypeInfo)\\.cpp$"
+  # The base of the sim's debug overlays (moho/debug, RDebugCollision, ...).
+  "^moho/render/RDebugOverlay\\.cpp$"
+  # Transform and camera geometry the sim computes with (entity transforms,
+  # effect culling against the sync filter's cameras).
+  "^moho/render/camera/(VTransform|GeomCamera3)\\.cpp$")
+
+set(FAF_SIM_SOURCES "")
+foreach(_src IN LISTS FAF_ENGINE_SOURCES)
+  set(_keep TRUE)
+  foreach(_pattern IN LISTS _faf_client_only_patterns)
+    if(_src MATCHES "${_pattern}")
+      set(_keep FALSE)
+      break()
+    endif()
+  endforeach()
+  if(NOT _keep)
+    foreach(_pattern IN LISTS _faf_sim_patterns)
+      if(_src MATCHES "${_pattern}")
+        set(_keep TRUE)
+        break()
+      endif()
+    endforeach()
+  endif()
+  if(_keep)
+    list(APPEND FAF_SIM_SOURCES "${_src}")
+  endif()
 endforeach()
