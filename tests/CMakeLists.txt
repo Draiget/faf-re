@@ -8,3 +8,4 @@ add_executable(faf_net_tests EXCLUDE_FROM_ALL net/NetRobustnessTests.cpp)
 target_link_libraries(faf_net_tests PRIVATE faf_engine)
 
 add_test(NAME net_robustness COMMAND faf_net_tests)
+add_subdirectory(remote)

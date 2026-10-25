@@ -29,7 +29,7 @@ target_link_libraries(faf_main PRIVATE faf_engine)
 # option off.
 if(FAF_SERVER_MODE)
   include(remote/sources.cmake)
-  target_sources(faf_engine PRIVATE ${FAF_REMOTE_CLIENT_SOURCES})
+  target_sources(faf_engine PRIVATE ${FAF_REMOTE_SOURCES} ${FAF_REMOTE_CLIENT_SOURCES})
   target_compile_definitions(faf_engine PRIVATE FAF_SERVER_MODE=1)
 endif()
 
