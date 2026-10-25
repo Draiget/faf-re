@@ -1,0 +1,245 @@
+// Engine addition, server mode (docs/SWITCHES.md, "faf-replay"): the entry point of
+// `faf-replay`, a console program that plays one replay with no window, render device or
+// audio engine and reports whether every checksum the players recorded matches.
+//
+// It brings up the parts of the game's startup the sim depends on, in the game's order
+// (`WinMain`, `WIN_AppExecute`, `CScApp::Init`, `InitializeSessionFromCommandLine`), and leaves
+// out every window, device, audio and UI step.
+
+#include <Windows.h>
+#include <objbase.h>
+
+#include <algorithm>
+#include <cfloat>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+
+#include "gpg/core/utils/Global.h"
+#include "moho/app/IWinApp.h"
+#include "moho/app/WinApp.h"
+#include "moho/app/WxRuntimeTypes.h"
+#include "moho/console/CConCommand.h"
+#include "moho/core/ThreadPlacement.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/math/MathReflection.h"
+#include "moho/misc/StartupHelpers.h"
+#include "moho/ui/UiRuntimeTypes.h"
+#include "platform/X87Precision.h"
+#include "replay/ReplayRunner.h"
+
+namespace
+{
+  // Exit codes: 0 every recorded checksum matched and the replay reached its end; 1 at least
+  // one mismatch; 2 the replay did not reach its end in time; 3 a crash or fatal error;
+  // 4 bad arguments or the replay could not be loaded.
+  constexpr int kExitMatched = 0;
+  constexpr int kExitMismatch = 1;
+  constexpr int kExitIncomplete = 2;
+  constexpr int kExitCrash = 3;
+  constexpr int kExitBadInput = 4;
+
+  std::string gLabel = "faf-replay";
+
+  [[noreturn]] void EndProcess(const int exitCode)
+  {
+    std::fflush(stdout);
+    std::fflush(stderr);
+    // The sim and loader threads are still running; nothing after the verdict is observed,
+    // so the process ends here instead of tearing them down.
+    ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(exitCode));
+    std::_Exit(exitCode);
+  }
+
+  void ReplayDieHandler(const char* const message)
+  {
+    std::printf("[%s] FATAL %s\n", gLabel.c_str(), message != nullptr ? message : "engine Die()");
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    EndProcess(kExitCrash);
+  }
+
+  LONG WINAPI ReplayCrashFilter(EXCEPTION_POINTERS* const info)
+  {
+    const EXCEPTION_RECORD* const record = info != nullptr ? info->ExceptionRecord : nullptr;
+    std::printf(
+      "[%s] CRASH exception 0x%08lX at %p\n",
+      gLabel.c_str(),
+      record != nullptr ? record->ExceptionCode : 0ul,
+      record != nullptr ? record->ExceptionAddress : nullptr
+    );
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    EndProcess(kExitCrash);
+  }
+
+  /** The common services every engine app sets up (`IWinApp::AppInitCommonServices`). */
+  class ReplayApp final : public moho::IWinApp
+  {
+  public:
+    ReplayApp()
+      : moho::IWinApp("SupCom", "SupremeCommander")
+    {}
+
+    bool Init() override { return AppInitCommonServices(); }
+    void Main() override {}
+    void Destroy() override {}
+  };
+
+  [[nodiscard]] bool ReadOption(const char* const name, std::string& value)
+  {
+    msvc8::vector<msvc8::string> args;
+    if (!moho::CFG_GetArgOption(name, 1, &args) || args.empty()) {
+      return false;
+    }
+    value = args[0].c_str();
+    return true;
+  }
+
+  [[nodiscard]] bool ReadIntOption(const char* const name, int& value, bool& bad)
+  {
+    std::string text;
+    if (!ReadOption(name, text)) {
+      return false;
+    }
+    char* end = nullptr;
+    const long parsed = std::strtol(text.c_str(), &end, 10);
+    if (end == text.c_str() || *end != '\0') {
+      bad = true;
+      return false;
+    }
+    value = static_cast<int>(parsed);
+    return true;
+  }
+
+  void PrintUsage()
+  {
+    std::printf(
+      "usage: faf-replay --replay <file.scfareplay> /init <init.lua> [options]\n"
+      "  --focus <army|-1>         army whose view the sim builds (0-based; -1 observer, default)\n"
+      "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
+      "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
+      "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
+      "  --timeout <minutes>       give up after this long (default 180)\n"
+      "  --label <text>            prefix for every printed line\n"
+      "  engine flags as in the game: /log <file>, /synclog <dir>, /simworkers <n>,\n"
+      "  /con <name=value;...>, /prefs <file>, /sse2, /noversioncheck\n"
+    );
+  }
+
+  /** `/con name=value;name2=value2`, as `InitializeSessionFromCommandLine` runs it. */
+  void RunStartupConsoleCommands()
+  {
+    msvc8::vector<msvc8::string> args;
+    if (!moho::CFG_GetArgOption("/con", 1, &args) || args.empty()) {
+      return;
+    }
+    std::string commands = args[0].c_str();
+    std::replace(commands.begin(), commands.end(), '=', ' ');
+    std::size_t begin = 0;
+    while (begin <= commands.size()) {
+      const std::size_t end = std::min(commands.find(';', begin), commands.size());
+      if (end > begin) {
+        moho::CON_Execute(commands.substr(begin, end - begin).c_str());
+      }
+      begin = end + 1;
+    }
+  }
+} // namespace
+
+int main(int argc, char** argv)
+{
+  (void)argc;
+  (void)argv;
+  ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+  ::SetUnhandledExceptionFilter(&ReplayCrashFilter);
+  gpg::SetDieHandler(&ReplayDieHandler);
+
+  faf::replay::SReplayOptions options{};
+  bool bad = false;
+  (void)ReadOption("--label", gLabel);
+  options.label = gLabel;
+  if (!ReadOption("--replay", options.replayPath) || !moho::CFG_GetArgOption("/init", 1, nullptr)) {
+    PrintUsage();
+    return kExitBadInput;
+  }
+  (void)ReadIntOption("--focus", options.focusArmy, bad);
+  (void)ReadOption("--digests", options.digestPath);
+  (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
+  (void)ReadIntOption("--lead", options.replayLead, bad);
+  (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
+  if (bad) {
+    PrintUsage();
+    return kExitBadInput;
+  }
+  std::printf("[%s] replay %s\n", gLabel.c_str(), options.replayPath.c_str());
+  std::fflush(stdout);
+
+  // `WinMain` / `CScApp::CScApp`.
+  moho::APP_InitializeIdentity();
+
+  // `WIN_AppExecute`: wx builds the application object without a window or a message loop.
+  // Engine code reaches `wxTheApp` without a null check (the driver's event wait among them).
+  wxEntry(reinterpret_cast<WXHINSTANCE>(::GetModuleHandleW(nullptr)), nullptr, nullptr, 0, false);
+  (void)::CoInitialize(nullptr);
+  moho::PLAT_Init();
+
+  // `CScApp::Init`, without the splash, fonts, UI manager and device.
+  (void)SetSse2Mode(moho::CFG_GetArgOption("/sse2", 0, nullptr) ? 1 : 0);
+  ReplayApp app;
+  if (!app.Init()) {
+    std::printf("[%s] VERDICT ended=False mismatches=0 crash=True\n", gLabel.c_str());
+    EndProcess(kExitCrash);
+  }
+  msvc8::vector<msvc8::string> preferenceArgs;
+  if (moho::CFG_GetArgOption("/prefs", 1, &preferenceArgs) && !preferenceArgs.empty()) {
+    moho::USER_LoadPreferences(preferenceArgs[0]);
+  } else {
+    moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
+  }
+  (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+
+  // `WIN_AppExecute`, before its frame loop.
+  platform::SetX87PrecisionControl(_PC_24);
+
+  // `InitializeSessionFromCommandLine`, up to the `/replay` path.
+  RunStartupConsoleCommands();
+  moho::PlaceCurrentThread(moho::EThreadRole::Main);
+
+  faf::replay::InstallChecksumWatch(gLabel);
+  const faf::replay::SReplayResult result = faf::replay::RunReplay(options);
+
+  const char* const label = gLabel.c_str();
+  if (!result.error.empty()) {
+    std::printf("[%s] ERROR %s\n", label, result.error.c_str());
+  }
+  std::printf(
+    "[%s] beats=%d last-beat=%d game-over=%s desync-reports=%d digests=%llu load=%.1fs play=%.1fs\n",
+    label,
+    result.beats,
+    result.lastBeat,
+    result.gameOver ? "True" : "False",
+    result.desyncReports,
+    static_cast<unsigned long long>(result.digestsWritten),
+    result.loadSeconds,
+    result.playSeconds
+  );
+  std::printf(
+    "[%s] VERDICT ended=%s mismatches=%d crash=%s%s\n",
+    label,
+    result.gameEnded ? "True" : "False",
+    result.mismatches,
+    result.crashed ? "True" : "False",
+    result.timedOut ? " timeout=True" : ""
+  );
+
+  int exitCode = kExitMatched;
+  if (!result.started && !result.crashed) {
+    exitCode = kExitBadInput;
+  } else if (result.crashed) {
+    exitCode = kExitCrash;
+  } else if (result.mismatches > 0) {
+    exitCode = kExitMismatch;
+  } else if (!result.gameOver) {
+    exitCode = kExitIncomplete;
+  }
+  EndProcess(exitCode);
+}

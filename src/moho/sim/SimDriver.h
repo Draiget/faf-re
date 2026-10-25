@@ -811,6 +811,13 @@ namespace moho
     [[nodiscard]] int32_t DiagNextIssueBeat() const { return mNextIssueBeat; }
     [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
 
+#if FAF_SERVER_MODE
+    /// Engine addition, server mode (faf-replay): the sim, read-only. faf-replay reads a beat's
+    /// checksum from `Sim::mSimHashes` after taking that beat's packet off the queue; the sim
+    /// wrote it before queueing the packet and rewrites the slot only 128 beats later.
+    [[nodiscard]] const Sim* GetSimForReplayCheck() const noexcept { return mSim.get(); }
+#endif
+
   private:
     /**
      * Address: 0x0073D8C0 (FUN_0073D8C0)

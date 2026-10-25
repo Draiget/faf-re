@@ -92,6 +92,28 @@ Server-authoritative sessions are being built: one server runs the only sim, and
 | `/connectserver host:port` | — | command line | startup only | Join the game server at that address (needs `/servertoken`); refused together with `/hostgame`, `/joingame`, `/gpgnet`, `/replay`, `/load`, `/scenario`, `/map` or `/perf`. Not working yet: the client says "This build cannot join server games yet." and exits |
 | `/servertoken token` | — | command line | startup only | The admission token the launcher was given for this match (1 to 1024 printable characters, no spaces) |
 
+### faf-replay
+
+The server-mode build also produces `faf-replay.exe`, a console program that plays one replay with no window, render device or audio engine and reports whether every checksum the players recorded matches. It runs the game's sim, sim driver and replay client; it does not build the world session the game's UI runs on. Put it in a folder of its own next to the game's `bin` folder (it reads `../Installed.Prefs` and mounts the `fafengine` folder next to itself, as the game does) and give it the game's init file:
+
+```
+faf-replay.exe --replay C:\full\path\26902315.scfareplay /init C:\ProgramData\FAForever\bin_x64\init.lua /nosound /log replay.log
+```
+
+The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<True|False>`, the same verdict `tools/runs/replay_20261013/run_replay.py` prints for the game. `ended` is the sim's Lua `Sync.GameEnded`, which the game reports to FAF; the run itself stops at the sim's game-over beat (a victory, or the end of the recorded commands).
+
+| Switch | Default | What it does |
+|---|---|---|
+| `--replay file` | — | The `.scfareplay` to play (required) |
+| `--focus army` | −1 | The army whose view the sim builds, 0-based; −1 is an observer, as when watching a replay. The sim starts with that focus, as a player's game does with the player's own army |
+| `--digests file` | — | Writes `beat md5` for every beat the sim checksums |
+| `--checksum-period n` | the game's (50) | `sim_ChecksumPeriod` for this run. With 1 every beat has a digest; other code feeds the checksum between checksum beats, so the recorded checksums then no longer match: use it only to compare runs with each other |
+| `--lead n` | 10 | Beats the sim may compute ahead (`sim_ReplayLead`); faf-replay issues beats without the rate clock (`sim_LeadOnSchedule 0`), so the sim runs flat out |
+| `--timeout minutes` | 180 | Gives up after this long |
+| `--label text` | `faf-replay` | Prefix of every printed line |
+
+Engine switches work as in the game: `/init`, `/log`, `/synclog`, `/simworkers`, `/con`, `/prefs`, `/sse2`, `/noversioncheck`. Exit code: 0 every recorded checksum matched and the replay reached its end; 1 a mismatch; 2 the end was not reached in time; 3 a crash or fatal error; 4 bad arguments or a replay that could not be loaded.
+
 ## Debugging aids
 
 Off by default.

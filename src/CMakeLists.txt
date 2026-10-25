@@ -290,3 +290,14 @@ add_custom_command(TARGET faf_main POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_faf_dxc_bin}/dxcompiler.dll"
           "${_faf_dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:faf_main>"
   VERBATIM)
+
+# --- faf-replay (server mode) ---------------------------------------------------------
+# The headless replay runner (replay/sources.cmake, docs/SWITCHES.md "faf-replay"): a
+# console program that links every engine object plus its own entry point and plays a
+# replay with no window, render device or audio engine.
+if(FAF_SERVER_MODE)
+  include(replay/sources.cmake)
+  add_executable(faf-replay ${FAF_REPLAY_SOURCES})
+  target_link_libraries(faf-replay PRIVATE faf_engine)
+  target_compile_definitions(faf-replay PRIVATE FAF_SERVER_MODE=1)
+endif()
