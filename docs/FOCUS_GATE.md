@@ -27,7 +27,9 @@ Without replay ids it plays the core set of the [PR replay check](PR_REPLAY_CHEC
 |---|---|---|
 | `--armies all\|ends\|N,M` | all | Which armies to play besides -1: every army, the first and the last, or a list |
 | `--jobs N` | 2 | faf-replay processes at a time |
+| `--jobs-file F` | — | Read again at every scheduling step; a number in it replaces `--jobs`, so another task can borrow a slot without restarting the gate |
 | `--out DIR` | `focus_gate_out` | Checksums, logs and faf-replay output of every run |
+| `--before-start CMD` | — | A shell command run before each faf-replay start; it may block, for example to keep under a machine-wide limit of game instances |
 | `--simworkers N` | 8 | Passed to faf-replay |
 | `--timeout MIN` | 180 | Per run |
 | `--label TAG` | fg | Prefix of every run's label and file names |

@@ -21,7 +21,11 @@ usage:
                       all (default): every army; ends: the first and the last army;
                       a list: those armies (skipped where a replay has fewer)
   --jobs N            faf-replay processes at a time (default 2)
+  --jobs-file F       re-read on every scheduling step: when it holds a number, that is the limit
+                      (lets other work borrow a slot without restarting the gate)
   --out DIR           digests, logs and outputs (default ./focus_gate_out)
+  --before-start CMD  a command run (through the shell) before each faf-replay start; it may block,
+                      e.g. a machine-wide game-instance limit ("bash game_slots.sh wait 1")
   --simworkers N      passed through (default 8)
   --timeout MIN       per run (default 180)
   --label TAG         prefix of every run's label and file (default fg)
@@ -54,8 +58,10 @@ def parse_args():
     p.add_argument("--ids-file")
     p.add_argument("--armies", default="all")
     p.add_argument("--jobs", type=int, default=2)
+    p.add_argument("--jobs-file")
     p.add_argument("--out", default="focus_gate_out")
     p.add_argument("--simworkers", type=int, default=8)
+    p.add_argument("--before-start")
     p.add_argument("--timeout", type=int, default=180)
     p.add_argument("--label", default="fg")
     p.add_argument("--m28-versions")
@@ -198,6 +204,16 @@ def run_one(args, rid, focus, path):
             "verdict": verdict[-1] if verdict else "VERDICT missing"}
 
 
+def current_jobs(args):
+    if args.jobs_file:
+        try:
+            with open(args.jobs_file) as f:
+                return max(0, int(f.read().strip()))
+        except (OSError, ValueError):
+            pass
+    return args.jobs
+
+
 def pick_armies(spec, count):
     if spec == "all":
         return list(range(count))
@@ -283,7 +299,7 @@ def main():
         with lock:
             active[:] = [t for t in active if t.is_alive()]
             done = not pending and not active
-            if not done and len(active) < args.jobs:
+            if not done and len(active) < current_jobs(args):
                 # Focus runs of a replay whose base has ended go first, then the next base.
                 pending.sort(key=lambda item: (item[1] == -1,))
                 for index, (rid, focus) in enumerate(pending):
@@ -297,6 +313,8 @@ def main():
                     version = versions.get(rid, 0)
                     label = "%s_%s_f%d" % (args.label, rid, focus)
                     if guard.try_acquire(label, version):
+                        if args.before_start:
+                            subprocess.call(args.before_start, shell=True)
                         pending.pop(index)
                         thread = threading.Thread(target=worker, args=(rid, focus, path, version), daemon=True)
                         thread.start()
