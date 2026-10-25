@@ -23,6 +23,7 @@ namespace faf::remote::wire
     constexpr int kFlagBits = 16;
     constexpr int kUnitFlagBits = 8;
     constexpr int kSiloBits = 16;
+    constexpr int kYawBits = 16;
     constexpr int kMinBitsPerItem = 8; // the smallest gap varint
 
     [[nodiscard]] std::uint32_t Bits(const float value) noexcept
@@ -32,7 +33,7 @@ namespace faf::remote::wire
 
     [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec) noexcept
     {
-      return record.position[0] <= codec.position.x.MaxQuantized()
+      return (!record.yawOnly || record.orientation <= 0xFFFFu) && record.position[0] <= codec.position.x.MaxQuantized()
           && record.position[1] <= codec.position.y.MaxQuantized()
           && record.position[2] <= codec.position.z.MaxQuantized();
     }
@@ -55,7 +56,8 @@ namespace faf::remote::wire
         writer.WriteBits(record.position[2], codec.position.z.bits);
       }
       if ((fields & kFieldOrientation) != 0u) {
-        writer.WriteBits(record.orientation, 32);
+        writer.WriteBool(record.yawOnly);
+        writer.WriteBits(record.orientation, record.yawOnly ? kYawBits : 32);
       }
       if ((fields & kFieldHealth) != 0u) {
         writer.WriteFloatExact(record.health);
@@ -126,7 +128,8 @@ namespace faf::remote::wire
         record.position[2] = reader.ReadBits(codec.position.z.bits);
       }
       if ((fields & kFieldOrientation) != 0u) {
-        record.orientation = reader.ReadBits(32);
+        record.yawOnly = reader.ReadBool();
+        record.orientation = reader.ReadBits(record.yawOnly ? kYawBits : 32);
       }
       if ((fields & kFieldHealth) != 0u) {
         record.health = reader.ReadFloatExact();
@@ -221,7 +224,7 @@ namespace faf::remote::wire
   bool SEntityRecord::operator==(const SEntityRecord& other) const noexcept
   {
     return id == other.id && blueprint == other.blueprint && army == other.army && position == other.position
-        && orientation == other.orientation && Bits(health) == Bits(other.health)
+        && orientation == other.orientation && yawOnly == other.yawOnly && Bits(health) == Bits(other.health)
         && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
         && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit));
   }
@@ -237,7 +240,7 @@ namespace faf::remote::wire
     if (before.position != after.position) {
       fields |= kFieldPosition;
     }
-    if (before.orientation != after.orientation) {
+    if (before.orientation != after.orientation || before.yawOnly != after.yawOnly) {
       fields |= kFieldOrientation;
     }
     if (Bits(before.health) != Bits(after.health)) {

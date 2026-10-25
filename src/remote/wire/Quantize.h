@@ -46,4 +46,15 @@ namespace faf::remote::wire
    */
   [[nodiscard]] std::uint32_t PackQuaternion(const std::array<float, 4>& q) noexcept;
   [[nodiscard]] std::array<float, 4> UnpackQuaternion(std::uint32_t packed) noexcept;
+
+  /**
+   * Ground units mostly turn about the vertical axis only: (x, y, z, w) with x and z zero,
+   * y = sin(yaw / 2), w = cos(yaw / 2). Such a rotation travels as a 16-bit yaw (§7.2, 2 bytes).
+   * The server decides once, from the sim's quaternion; the client only turns the yaw back
+   * into a quaternion for display, so no rounding of either step reaches a frame.
+   */
+  [[nodiscard]] bool IsYawOnly(const std::array<float, 4>& q) noexcept;
+  /** The yaw of a yaw-only (x, y, z, w) quaternion in 1/65536 turns. */
+  [[nodiscard]] std::uint32_t QuantizeYaw(const std::array<float, 4>& q) noexcept;
+  [[nodiscard]] std::array<float, 4> YawToQuaternion(std::uint32_t yaw) noexcept;
 } // namespace faf::remote::wire

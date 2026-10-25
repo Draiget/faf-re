@@ -1,6 +1,7 @@
 #include "replay/ReplayWireStats.h"
 
 #include <algorithm>
+#include <array>
 
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/sim/SimDriver.h"
@@ -34,7 +35,9 @@ namespace faf::replay
       const auto& pos = data.mCurTransform.pos_;
       const auto& orient = data.mCurTransform.orient_;
       record.position = {codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)};
-      record.orientation = wire::PackQuaternion({orient.x, orient.y, orient.z, orient.w});
+      const std::array<float, 4> quaternion{orient.x, orient.y, orient.z, orient.w};
+      record.yawOnly = wire::IsYawOnly(quaternion);
+      record.orientation = record.yawOnly ? wire::QuantizeYaw(quaternion) : wire::PackQuaternion(quaternion);
       record.health = data.mHealth;
       record.maxHealth = data.mMaxHealth;
       record.fractionComplete = data.mFractionComplete;
@@ -76,7 +79,9 @@ namespace faf::replay
       mFile = nullptr;
       return;
     }
-    std::fprintf(mFile, "beat,entities,created,removed,changed,delta_bytes,full_bytes\n");
+    std::fprintf(
+      mFile, "beat,entities,created,removed,changed,delta_bytes,full_bytes,delta_bytes_no_yaw,delta_bytes_no_units\n"
+    );
   }
 
   CReplayWireStats::~CReplayWireStats()
@@ -162,6 +167,36 @@ namespace faf::replay
       }
     }
 
+    // Comparison encodings: yaw-only rotations as full quaternions, and no unit block.
+    wire::SViewFrame noYaw = frame;
+    wire::SViewFrame noUnits = frame;
+    for (wire::SEntityRecord& record : noYaw.entities) {
+      if (record.yawOnly) {
+        ++mYawOnlyRecords;
+        record.orientation = wire::PackQuaternion(wire::YawToQuaternion(record.orientation));
+        record.yawOnly = false;
+      }
+    }
+    for (wire::SEntityRecord& record : noUnits.entities) {
+      if (record.isUnit) {
+        ++mUnitRecords;
+        record.isUnit = false;
+        record.unit = {};
+      }
+    }
+    const auto encodedSize = [&](const wire::SViewFrame& variant, const wire::SViewFrame& previous) -> std::uint32_t {
+      wire::BitWriter variantWriter;
+      return wire::EncodeFrame(variant, mHavePrevious ? &previous : nullptr, mCodec, variantWriter)
+               ? static_cast<std::uint32_t>(variantWriter.Bytes().size())
+               : 0u;
+    };
+    const std::uint32_t noYawBytes = encodedSize(noYaw, mPreviousNoYaw);
+    const std::uint32_t noUnitBytes = encodedSize(noUnits, mPreviousNoUnits);
+    mDeltaBytesNoYaw += noYawBytes;
+    mDeltaBytesNoUnits += noUnitBytes;
+    mPreviousNoYaw = std::move(noYaw);
+    mPreviousNoUnits = std::move(noUnits);
+
     ++mBeats;
     mDeltaBytes += deltaBytes;
     mDeltaSizes.push_back(deltaBytes);
@@ -169,8 +204,8 @@ namespace faf::replay
     mMaxEntities = std::max(mMaxEntities, static_cast<std::uint32_t>(frame.entities.size()));
     if (mFile != nullptr) {
       std::fprintf(
-        mFile, "%u,%zu,%zu,%zu,%zu,%u,%u\n", beat, frame.entities.size(), delta.created.size(), delta.removed.size(),
-        delta.changed.size(), deltaBytes, fullBytes
+        mFile, "%u,%zu,%zu,%zu,%zu,%u,%u,%u,%u\n", beat, frame.entities.size(), delta.created.size(),
+        delta.removed.size(), delta.changed.size(), deltaBytes, fullBytes, noYawBytes, noUnitBytes
       );
     }
     mPrevious = std::move(frame);
@@ -184,18 +219,22 @@ namespace faf::replay
     const auto percentile = [&](const double p) -> std::uint32_t {
       return sizes.empty() ? 0u : sizes[static_cast<std::size_t>(p * static_cast<double>(sizes.size() - 1))];
     };
-    char text[512];
+    char text[768];
     std::snprintf(
       text, sizeof(text),
       "wire entities lane: %llu beats, entities mean %.0f max %u, delta bytes/beat mean %.0f p50 %u p95 %u max %u "
       "(%.1f KB/s at 10 beats/s), full frame mean %.0f bytes, round-trip failures %llu, encode failures %llu, "
-      "unknown blueprints %llu",
+      "unknown blueprints %llu; without the yaw form %.1f KB/s (yaw-only records %.0f%%), without the unit block "
+      "%.1f KB/s",
       static_cast<unsigned long long>(mBeats), mBeats != 0 ? static_cast<double>(mEntitySum) / mBeats : 0.0,
       mMaxEntities, mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats : 0.0, percentile(0.5), percentile(0.95),
       sizes.empty() ? 0u : sizes.back(), mBeats != 0 ? static_cast<double>(mDeltaBytes) / mBeats * 10.0 / 1000.0 : 0.0,
       mFullSamples != 0 ? static_cast<double>(mFullBytesSum) / mFullSamples : 0.0,
       static_cast<unsigned long long>(mRoundTripFailures), static_cast<unsigned long long>(mEncodeFailures),
-      static_cast<unsigned long long>(mUnknownBlueprints)
+      static_cast<unsigned long long>(mUnknownBlueprints),
+      mBeats != 0 ? static_cast<double>(mDeltaBytesNoYaw) / mBeats * 10.0 / 1000.0 : 0.0,
+      mEntitySum != 0 ? 100.0 * static_cast<double>(mYawOnlyRecords) / static_cast<double>(mEntitySum) : 0.0,
+      mBeats != 0 ? static_cast<double>(mDeltaBytesNoUnits) / mBeats * 10.0 / 1000.0 : 0.0
     );
     return text;
   }

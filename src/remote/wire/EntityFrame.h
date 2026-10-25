@@ -39,7 +39,8 @@ namespace faf::remote::wire
     std::uint32_t blueprint = COrdinalTable::kNone; // ordinal into SContentTables::blueprints
     std::uint8_t army = 0xFFu;                      // 0xFF: no army
     QuantizedPosition position{};
-    std::uint32_t orientation = 0;                  // PackQuaternion
+    std::uint32_t orientation = 0;                  // yawOnly ? QuantizeYaw : PackQuaternion
+    bool yawOnly = false;                           // a rotation about the vertical axis only
     float health = 0.0f;
     float maxHealth = 0.0f;
     float fractionComplete = 0.0f;

@@ -51,6 +51,13 @@ namespace faf::replay
     faf::remote::wire::SFrameCodec mCodec;
     std::map<std::uint32_t, faf::remote::wire::SEntityRecord> mWorld;
     faf::remote::wire::SViewFrame mPrevious;
+    // The same frames without the yaw form and without the unit block, for comparison.
+    faf::remote::wire::SViewFrame mPreviousNoYaw;
+    faf::remote::wire::SViewFrame mPreviousNoUnits;
+    std::uint64_t mDeltaBytesNoYaw = 0;
+    std::uint64_t mDeltaBytesNoUnits = 0;
+    std::uint64_t mYawOnlyRecords = 0;
+    std::uint64_t mUnitRecords = 0;
     bool mHavePrevious = false;
     std::uint32_t mNextFrameId = 1;
 

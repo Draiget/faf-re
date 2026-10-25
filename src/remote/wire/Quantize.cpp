@@ -101,4 +101,26 @@ namespace faf::remote::wire
     q[largest] = std::sqrt(sumSquares < 1.0f ? 1.0f - sumSquares : 0.0f);
     return q;
   }
+
+  bool IsYawOnly(const std::array<float, 4>& q) noexcept
+  {
+    constexpr float kTilt = 1.0e-4f;
+    return std::fabs(q[0]) < kTilt && std::fabs(q[2]) < kTilt;
+  }
+
+  std::uint32_t QuantizeYaw(const std::array<float, 4>& q) noexcept
+  {
+    constexpr double kTurn = 6.283185307179586;
+    double angle = 2.0 * std::atan2(static_cast<double>(q[1]), static_cast<double>(q[3]));
+    angle -= kTurn * std::floor(angle / kTurn);
+    const auto quantized = static_cast<std::uint32_t>(std::floor(angle / kTurn * 65536.0 + 0.5));
+    return quantized & 0xFFFFu;
+  }
+
+  std::array<float, 4> YawToQuaternion(const std::uint32_t yaw) noexcept
+  {
+    constexpr double kTurn = 6.283185307179586;
+    const double half = 0.5 * kTurn * static_cast<double>(yaw & 0xFFFFu) / 65536.0;
+    return {0.0f, static_cast<float>(std::sin(half)), 0.0f, static_cast<float>(std::cos(half))};
+  }
 } // namespace faf::remote::wire

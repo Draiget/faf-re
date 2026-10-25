@@ -195,6 +195,18 @@ namespace
     // 10 bits over [-0.707, 0.707]: half a step is 0.00069 on the three sent components; the
     // rebuilt one can be off by a little more.
     CHECK(worst < 0.004f);
+    // Yaw-only rotations: detected, quantised to 1/65536 turn, and back within half a step.
+    for (int i = 0; i < 4096; ++i) {
+      const double yaw = 6.283185307179586 * (i + 0.37) / 4096.0;
+      const std::array<float, 4> q{0.0f, static_cast<float>(std::sin(yaw / 2)), 0.0f, static_cast<float>(std::cos(yaw / 2))};
+      CHECK(IsYawOnly(q));
+      const std::array<float, 4> back = YawToQuaternion(QuantizeYaw(q));
+      const float dot = std::fabs(q[1] * back[1] + q[3] * back[3]);
+      CHECK(dot > 0.99999f);
+    }
+    CHECK(!IsYawOnly({0.1f, 0.7f, 0.0f, 0.7f}));
+    CHECK(QuantizeYaw({0.0f, 0.0f, 0.0f, 1.0f}) == 0u);
+    CHECK(QuantizeYaw({0.0f, 0.0f, 0.0f, -1.0f}) == 0u); // -q is the same rotation (a full turn)
     const std::array<float, 4> identity{0.0f, 0.0f, 0.0f, 1.0f};
     const std::array<float, 4> back = UnpackQuaternion(PackQuaternion(identity));
     CHECK(std::fabs(back[3] - 1.0f) < 1e-3f);
@@ -360,7 +372,8 @@ namespace
       record.blueprint = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 5000u;
       record.army = static_cast<std::uint8_t>(mRng() % 17u == 16u ? 0xFFu : mRng() % 16u);
       record.position = {Axis(kCodec.position.x), Axis(kCodec.position.y), Axis(kCodec.position.z)};
-      record.orientation = static_cast<std::uint32_t>(mRng());
+      record.yawOnly = (mRng() & 1u) != 0u;
+      record.orientation = record.yawOnly ? (mRng() & 0xFFFFu) : static_cast<std::uint32_t>(mRng());
       record.health = RandomFloat();
       record.maxHealth = RandomFloat();
       record.fractionComplete = RandomFloat();
@@ -387,7 +400,10 @@ namespace
       if ((fields & kFieldBlueprint) != 0u) record.blueprint = fresh.blueprint;
       if ((fields & kFieldArmy) != 0u) record.army = fresh.army;
       if ((fields & kFieldPosition) != 0u) record.position = fresh.position;
-      if ((fields & kFieldOrientation) != 0u) record.orientation = fresh.orientation;
+      if ((fields & kFieldOrientation) != 0u) {
+        record.orientation = fresh.orientation;
+        record.yawOnly = fresh.yawOnly;
+      }
       if ((fields & kFieldHealth) != 0u) record.health = fresh.health;
       if ((fields & kFieldMaxHealth) != 0u) record.maxHealth = fresh.maxHealth;
       if ((fields & kFieldFraction) != 0u) record.fractionComplete = fresh.fractionComplete;
@@ -666,6 +682,7 @@ namespace
     dup.WriteBits(0u, kCodec.position.x.bits);
     dup.WriteBits(0u, kCodec.position.y.bits);
     dup.WriteBits(0u, kCodec.position.z.bits);
+    dup.WriteBool(false); // smallest-three orientation
     dup.WriteBits(0u, 32);
     dup.WriteFloatExact(0.0f);
     dup.WriteFloatExact(0.0f);
