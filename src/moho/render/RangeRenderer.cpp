@@ -196,6 +196,32 @@ namespace
   constexpr std::uint32_t kDynamicVertexBatchLimit = 1000u;
 
   /**
+   * Batch size under `range_StencilFlush` (FAF FA-Binary-Patches #149, range
+   * ring stencil overflow), for both the fill and the edge loop.
+   *
+   * "Cast" (range.fx) counts ring volumes per pixel with wrapping incr/decr
+   * under `StencilWriteMask = 0x7F`, so the count is kept mod 128. Every
+   * payload is one annulus volume, worth +1 inside it, so 127 is the largest
+   * batch whose covered pixels can never wrap to 0.
+   *
+   * Fill: a pixel under exactly 128 (or 256, ...) fill rings ended at 0 and
+   * "RangeMask" (frame.fx, passes on low bits != 0) left it unmarked, so dense
+   * clusters showed ring outlines inside the merged area. A "RangeMask" pass
+   * after each batch moves the covered pixels to bit 7, which "Cast" skips.
+   *
+   * Edge: the same wrap drops the outline wherever exactly 128 (or 256, ...)
+   * outline bands meet outside every fill - units stacked on one spot share
+   * one band. #149 left this loop alone. Bit 7 cannot hold edge pixels
+   * ("RangeFill" paints every bit-7 pixel), so each edge batch is burned
+   * before its pixels are moved to bit 7; that needs "RangeFill" to run
+   * before the edge loop instead of after it, which draws the same image:
+   * "Cast" writes no colour, "RangeFill" only touches pixels that were bit 7
+   * before the edge loop, and "RangeBurn" overwrites (`one`/`zero`), so a
+   * pixel burned twice is the same as once.
+   */
+  constexpr std::uint32_t kStencilSafeBatchLimit = 127u;
+
+  /**
    * The "frame" effect's shader-variable slot for the fill/burn ring color.
    * Follows the same lazy-register idiom as `CRenFrame.cpp`'s
    * `DEFINE_FRAME_SHADER_VAR_GETTER` family (register-on-first-use static,
@@ -326,6 +352,10 @@ namespace
    * - draws the fill payloads in batches of up to 1000 dynamic vertices, each
    *   batch locked via `ReserveDynamicRingVertexSlice` and drawn via
    *   `DrawRangeRingBatch`, then runs the renderer's "RangeMask" frame pass
+   *   (with `range_StencilFlush`, FAF FA-Binary-Patches #149: batches of 127
+   *   and a "RangeMask" pass after each, see `kStencilSafeBatchLimit`; the
+   *   edge loop below is batched the same way, with "RangeFill" first and a
+   *   "RangeBurn" + "RangeMask" after each edge batch)
    * - draws the edge payloads (2x the fill count, inner+outer edge per source
    *   entry) the same way, then runs "RangeFill" (gated on `range_Fill`) and
    *   "RangeBurn", pushing `ringColor` into the `shaderVarFrameRangeColor`-
@@ -381,12 +411,32 @@ namespace
     RangeRingGeometryBuildState buildState{innerThicknessOffset, outerThicknessOffset, &fillPayloads, &edgePayloads};
     BuildRingPayloadBuffers(buildState, ringEntries.begin(), ringEntries.end());
 
-    const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads) {
+    const auto runFramePass = [&](const std::string_view technique) {
+      rangeRenderer.mFrame.mName.assign_owned(technique);
+      rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+    };
+
+    const auto runRangeMaskPass = [&] {
+      rangeRenderer.mFrame.InitTransformedVerts(static_cast<float>(head.mWidth), static_cast<float>(head.mHeight));
+      runFramePass("RangeMask");
+    };
+
+    const auto setRingColor = [&] {
+      if (GetFrameRangeColorShaderVar().Exists()) {
+        GetFrameRangeColorShaderVar().mEffectVariable->SetFloatArray(4u, &ringColor.r);
+      }
+    };
+
+    // `afterBatch(lastBatch)` runs after every batch, including one whose
+    // reserve failed: FAF #149 hooks the loop tail (0x007EF7EA), which a failed
+    // reserve also reaches.
+    const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads, const std::uint32_t batchLimit,
+                                 auto&& afterBatch) {
       const std::uint32_t totalCount = static_cast<std::uint32_t>(payloads.size());
       std::uint32_t drawn = 0u;
       while (drawn < totalCount) {
         const std::uint32_t remaining = totalCount - drawn;
-        const std::uint32_t batchCount = remaining < kDynamicVertexBatchLimit ? remaining : kDynamicVertexBatchLimit;
+        const std::uint32_t batchCount = remaining < batchLimit ? remaining : batchLimit;
 
         void* lockedWritePtr = nullptr;
         std::uint32_t previousVertexCount = 0u;
@@ -397,28 +447,46 @@ namespace
           DrawRangeRingBatch(cameraView, rangeRenderer, batchCount, static_cast<int>(previousVertexCount));
         }
         drawn += batchCount;
+        afterBatch(drawn >= totalCount);
       }
     };
 
-    drawBatched(fillPayloads);
+    if (moho::range_StencilFlush) {
+      // See `kStencilSafeBatchLimit`. Up to 127 fill and 127 edge payloads
+      // (63 rings) this is one batch each and the original sequence, with
+      // "RangeFill" moved ahead of the edge loop.
+      //
+      // Fill, as FAF FA-Binary-Patches #149: the last batch's "RangeMask" is
+      // the final one, and no fill payloads means no "RangeMask" at all (its
+      // `jle` at 0x007EF76E goes straight to the edge loop).
+      drawBatched(fillPayloads, kStencilSafeBatchLimit, [&](bool) { runRangeMaskPass(); });
 
-    rangeRenderer.mFrame.InitTransformedVerts(static_cast<float>(head.mWidth), static_cast<float>(head.mHeight));
-    rangeRenderer.mFrame.mName.assign_owned("RangeMask");
-    rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+      if (moho::range_Fill) {
+        runFramePass("RangeFill");
+      }
 
-    drawBatched(edgePayloads);
+      setRingColor();
+      // Edge: burn each batch, then move its pixels to bit 7 so later batches
+      // skip them (not needed after the last one; the clear below resets it).
+      drawBatched(edgePayloads, kStencilSafeBatchLimit, [&](const bool lastBatch) {
+        runFramePass("RangeBurn");
+        if (!lastBatch) {
+          runRangeMaskPass();
+        }
+      });
+    } else {
+      drawBatched(fillPayloads, kDynamicVertexBatchLimit, [](bool) {});
+      runRangeMaskPass();
 
-    if (moho::range_Fill) {
-      rangeRenderer.mFrame.mName.assign_owned("RangeFill");
-      rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+      drawBatched(edgePayloads, kDynamicVertexBatchLimit, [](bool) {});
+
+      if (moho::range_Fill) {
+        runFramePass("RangeFill");
+      }
+
+      setRingColor();
+      runFramePass("RangeBurn");
     }
-
-    if (GetFrameRangeColorShaderVar().Exists()) {
-      GetFrameRangeColorShaderVar().mEffectVariable->SetFloatArray(4u, &ringColor.r);
-    }
-
-    rangeRenderer.mFrame.mName.assign_owned("RangeBurn");
-    rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
 
     device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
   }
