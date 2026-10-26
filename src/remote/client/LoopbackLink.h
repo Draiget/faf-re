@@ -32,6 +32,13 @@ namespace faf::remote::client
     std::uint32_t velocityFractionBits = 0;
     /** Orientation reckoning tolerance in 1/65536 turns; 0: off (every change is sent). */
     std::uint32_t orientationTolerance = 0;
+
+    // Session requests as a server takes them (WP11.1). The defaults change nothing.
+    static constexpr int kNoArmyLock = -2;
+    /** The view's army as the server fixes it: a request for another is refused. */
+    int lockedArmy = kNoArmyLock;
+    /** Cameras go to the server at most once in this many milliseconds (0: every frame). */
+    std::uint32_t geomCamsIntervalMs = 0;
   };
 
   /** The codec for a map of that size, with dead reckoning when the options ask for it. */

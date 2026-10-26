@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <optional>
 
@@ -7,6 +8,7 @@
 #include "Wm3AxisAlignedBox3.h"
 #include "legacy/containers/AutoPtr.h"
 #include "moho/misc/CDecoder.h"
+#include "remote/client/LockstepDriver.h"
 #include "remote/client/LoopbackCommands.h"
 #include "remote/client/LoopbackLink.h"
 #include "remote/client/RemoteClientManager.h"
@@ -99,6 +101,9 @@ namespace faf::remote::client
     void DrawNetworkStats(moho::CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY)
       override;
 
+    /** The lockstep driver standing in for the server. */
+    [[nodiscard]] moho::ISTIDriver* Server() const noexcept { return mServer.get(); }
+
   private:
     /** One beat through the wire: server encode, client decode and rebuild. */
     void PassThroughWire(moho::SSyncData& packet);
@@ -118,7 +123,19 @@ namespace faf::remote::client
     moho::CMarshaller mMarshaller;
     std::uint64_t mCommandsSent = 0;
     std::uint64_t mCommandsDropped = 0;
+    // Session requests (WP11.1).
+    /** Sends the cameras held back by the rate limit once their interval has passed. */
+    void FlushGeomCams(bool force);
+    SLoopbackOptions mOptions;
+    std::uint64_t mArmyRequests = 0;
+    std::uint64_t mArmyRefusals = 0;
+    msvc8::vector<moho::GeomCamera3> mPendingCams;
+    bool mHavePendingCams = false;
+    std::chrono::steady_clock::time_point mLastCamsSent{};
+    std::uint64_t mCamsReceived = 0;
+    std::uint64_t mCamsSent = 0;
   };
+
 
   /**
    * `/loopback` on the command line (and `/loopbackdr <steps>` for dead reckoning): wraps a new

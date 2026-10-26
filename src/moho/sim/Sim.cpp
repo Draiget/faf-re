@@ -173,6 +173,9 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "lua/LuaCrashDump.h"
+#if FAF_SERVER_MODE
+#include "remote/client/LockstepDriver.h"
+#endif
 
 using namespace moho;
 using EntId = std::int32_t;
@@ -23713,7 +23716,12 @@ int moho::cfunc_SetFocusArmySim(lua_State* const luaContext)
 
   const int focusArmy = static_cast<int>(lua_tonumber(luaContext, 1));
 
-  if (ISTIDriver* const activeDriver = WLD_GetDriver()) {
+  if (ISTIDriver* activeDriver = WLD_GetDriver()) {
+#if FAF_SERVER_MODE
+    // Engine addition, server mode: under /loopback the session's driver stands in for a
+    // server; the focus belongs to the lockstep driver it wraps.
+    activeDriver = faf::remote::client::LockstepDriverOf(activeDriver);
+#endif
     if (auto* const simDriver = dynamic_cast<CSimDriver*>(activeDriver)) {
       simDriver->SetPendingFocusArmyRaw(focusArmy);
     } else {

@@ -53,6 +53,7 @@ namespace faf::remote::client
         [this](moho::CMessage& message) { mServerDecoder.ReceiveMessage(&message, nullptr); }, mServer->GetClientManager()
       )
     , mMarshaller(&mClientManager)
+    , mOptions(options)
   {
     gpg::Logf(
       "loopback: remote driver on, %u blueprints, content hash %016llx, dead reckoning %s (%u steps, turns %u)",
@@ -78,9 +79,12 @@ namespace faf::remote::client
       gpg::Logf("%s", summary.substr(split + 1).c_str());
     }
     gpg::Logf(
-      "loopback %s commands: %llu sent through CMarshaller and CDecoder, %llu dropped, %llu unexpected messages",
+      "loopback %s commands: %llu sent through CMarshaller and CDecoder, %llu dropped, %llu unexpected messages; "
+      "army requests %llu (refused %llu), cameras %llu of %llu sent",
       when, static_cast<unsigned long long>(mCommandsSent), static_cast<unsigned long long>(mCommandsDropped),
-      static_cast<unsigned long long>(mIntake.Unexpected())
+      static_cast<unsigned long long>(mIntake.Unexpected()), static_cast<unsigned long long>(mArmyRequests),
+      static_cast<unsigned long long>(mArmyRefusals), static_cast<unsigned long long>(mCamsSent),
+      static_cast<unsigned long long>(mCamsReceived)
     );
   }
 
@@ -115,6 +119,7 @@ namespace faf::remote::client
 
   void CRemoteSimDriver::Dispatch()
   {
+    FlushGeomCams(false);
     mServer->Dispatch();
   }
 
@@ -153,12 +158,43 @@ namespace faf::remote::client
 
   void CRemoteSimDriver::SetArmyIndex(const int armyIndex)
   {
+    // A request: the server decides which army a client views (WP11.1, WP6.7).
+    ++mArmyRequests;
+    if (mOptions.lockedArmy != SLoopbackOptions::kNoArmyLock && armyIndex != mOptions.lockedArmy) {
+      ++mArmyRefusals;
+      gpg::Logf("loopback: the server refused the view of army %d (the view is army %d)", armyIndex, mOptions.lockedArmy);
+      return;
+    }
     mServer->SetArmyIndex(armyIndex);
   }
 
   void CRemoteSimDriver::SetGeomCams(const msvc8::vector<moho::GeomCamera3>& geoCams)
   {
-    mServer->SetGeomCams(geoCams);
+    // Every frame hands the cameras over; the server needs them at a low rate only (WP11.1).
+    ++mCamsReceived;
+    if (mOptions.geomCamsIntervalMs == 0u) {
+      ++mCamsSent;
+      mServer->SetGeomCams(geoCams);
+      return;
+    }
+    mPendingCams = geoCams;
+    mHavePendingCams = true;
+    FlushGeomCams(false);
+  }
+
+  void CRemoteSimDriver::FlushGeomCams(const bool force)
+  {
+    if (!mHavePendingCams) {
+      return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (!force && now - mLastCamsSent < std::chrono::milliseconds(mOptions.geomCamsIntervalMs)) {
+      return;
+    }
+    mServer->SetGeomCams(mPendingCams);
+    mHavePendingCams = false;
+    mLastCamsSent = now;
+    ++mCamsSent;
   }
 
   void CRemoteSimDriver::SetSyncFilterMaskA(const moho::SSyncFilterMaskBlock& block)
@@ -336,8 +372,21 @@ namespace faf::remote::client
     if (moho::CFG_GetArgOption("/loopbackturns", 1, &args) && !args.empty()) {
       options.orientationTolerance = static_cast<std::uint32_t>(std::strtoul(args[0].c_str(), nullptr, 10));
     }
+    args.clear();
+    if (moho::CFG_GetArgOption("/loopbackarmy", 1, &args) && !args.empty()) {
+      options.lockedArmy = std::atoi(args[0].c_str());
+    }
+    args.clear();
+    if (moho::CFG_GetArgOption("/loopbackcameras", 1, &args) && !args.empty()) {
+      options.geomCamsIntervalMs = static_cast<std::uint32_t>(std::strtoul(args[0].c_str(), nullptr, 10));
+    }
     const wire::SFrameCodec codec =
       MakeLoopbackCodec(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options);
     return new CRemoteSimDriver(std::unique_ptr<moho::ISTIDriver>(driver), rules, codec, options);
+  }
+  moho::ISTIDriver* LockstepDriverOf(moho::ISTIDriver* const driver) noexcept
+  {
+    auto* const remote = dynamic_cast<CRemoteSimDriver*>(driver);
+    return remote != nullptr ? remote->Server() : driver;
   }
 } // namespace faf::remote::client
