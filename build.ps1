@@ -27,8 +27,11 @@ param(
   [ValidateSet('x64', 'x86', 'both')]
   [string]$Arch = 'x64',
 
-  [ValidateSet('Release', 'Debug')]
+  [ValidateSet('Release', 'Debug', 'Profile')]
   [string]$Configuration = 'Release',
+
+  # Build with Tracy profiler enabled (shortcut for -Configuration Profile).
+  [switch]$Profile,
 
   # Exe name in the run folder, without .exe (default main_x64 / main). Use another name to
   # keep the current build alongside, e.g. -Name main_x64_test. With -Arch both it gets a
@@ -53,6 +56,8 @@ param(
   # Parallel compile jobs (default: CMake's choice, one per logical CPU).
   [int]$Jobs
 )
+
+if ($Profile) { $Configuration = 'Profile' }
 
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
