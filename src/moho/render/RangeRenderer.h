@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
@@ -233,11 +234,15 @@ namespace moho
    * dead/destroy-queued, blueprint present), filters by the profile's
    * category set, and appends successful extractor payloads to the output
    * ring extraction payload vector.
+   *
+   * Engine addition: candidates in `skippedUnits` (sorted; may be null) are
+   * left out; see `RangeRenderer::Render`.
    */
   void func_ExtractRanges(
     const gpg::fastvector<WeakPtr<UserEntity>>& candidatePool,
     float interpolationAlpha,
     const SRangeRenderProfile& profile,
-    SRangeExtractionPayloadVector& outRingPayloadVector
+    SRangeExtractionPayloadVector& outRingPayloadVector,
+    const std::vector<const UserEntity*>* skippedUnits = nullptr
   );
 } // namespace moho

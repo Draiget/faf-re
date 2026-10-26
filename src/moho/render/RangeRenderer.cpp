@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <new>
 #include <stdexcept>
 #include <string_view>
@@ -360,6 +361,12 @@ namespace
    *   "RangeBurn", pushing `ringColor` into the `shaderVarFrameRangeColor`-
    *   equivalent shader variable before the burn pass
    * - clears the device target/stencil once at the end
+   *
+   * Engine addition: with `keepShapeInStencil` the stencil is not cleared at
+   * the end; a last "RangeMask" moves the outline pixels to bit 7 too, so the
+   * stencil holds this batch's whole shape (fill and outline) and the next
+   * batch's "Cast" skips it. `RangeRenderer::Render` uses it to draw a
+   * profile's selected rings before the same profile's overlay (see there).
    */
   void RenderRingBatch(
     const moho::RangeRingRadiusParams& outerRingParams,
@@ -368,7 +375,8 @@ namespace
     const unsigned int headIndex,
     const moho::RangeRingColor& ringColor,
     const moho::RangeRingRadiusParams& innerRingParams,
-    const RangeExtractionPayloadVector& ringEntries
+    const RangeExtractionPayloadVector& ringEntries,
+    const bool keepShapeInStencil = false
   )
   {
     const std::uint32_t ringCount = static_cast<std::uint32_t>(ringEntries.size());
@@ -469,7 +477,7 @@ namespace
       // skip them (not needed after the last one; the clear below resets it).
       drawBatched(edgePayloads, kStencilSafeBatchLimit, [&](const bool lastBatch) {
         runFramePass("RangeBurn");
-        if (!lastBatch) {
+        if (!lastBatch || keepShapeInStencil) {
           runRangeMaskPass();
         }
       });
@@ -485,9 +493,14 @@ namespace
 
       setRingColor();
       runFramePass("RangeBurn");
+      if (keepShapeInStencil) {
+        runRangeMaskPass();
+      }
     }
 
-    device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
+    if (!keepShapeInStencil) {
+      device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
+    }
   }
 
   void WriteRingBandVertex(
@@ -1254,11 +1267,13 @@ namespace
    * `profile.mSelectedRingColor`.
    *
    * Engine change: the binary gathers the selection here, once per profile;
-   * the caller now gathers it once per frame and passes it in.
+   * the caller now gathers it once per frame and passes it in. `outRingUnits`,
+   * when given, receives every unit that got a ring (see `RangeRenderer::Render`).
    */
   void RenderSelectedUnitsRange(
     const moho::CWldSession& session, const msvc8::vector<moho::UserUnit*>& selectedUnits,
-    RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha
+    RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha,
+    std::vector<const moho::UserEntity*>* const outRingUnits = nullptr
   )
   {
     outPayloads.clear();
@@ -1297,6 +1312,9 @@ namespace
       moho::SRangeExtractionPayload payload{};
       if (extractor->Extract(&payload, unit, alpha)) {
         outPayloads.push_back(payload);
+        if (outRingUnits != nullptr) {
+          outRingUnits->push_back(unit);
+        }
       }
     }
   }
@@ -1621,12 +1639,47 @@ namespace moho
       return;
     }
 
-    // FAF FA-Binary-Patches RangeRings.cpp also drops every unit that gets a
-    // selected-unit ring from the visible-profile pass. That is not carried: the
-    // overlay's merged shape then ends at each edge of the selection, and its end
-    // arcs show beside the selection's own as circles inside the overlay. Here,
-    // as in the binary, the overlay draws every unit and the selection's shape is
-    // drawn over it.
+    // The binary gathers the selection again for every profile; it is gathered once here
+    // (engine change: with thousands of units selected the repeated walk cost milliseconds a frame).
+    msvc8::vector<UserUnit*> selectedUnits;
+    if (range_RenderSelected) {
+      worldSession->GetSelectionUnits(selectedUnits);
+    }
+
+    // Every profile's selected-unit rings, and the units that got one.
+    struct SelectedRings
+    {
+      RangeExtractionPayloadVector payloads;
+      std::vector<const UserEntity*> units; // sorted
+      bool drawn = false;
+    };
+    std::vector<SelectedRings> selectedRings(mRangeProfiles.size());
+    {
+      auto rings = selectedRings.begin();
+      for (const auto& [extractorName, profile] : mRangeProfiles) {
+        RenderSelectedUnitsRange(*worldSession, selectedUnits, rings->payloads, profile, alpha, &rings->units);
+        std::ranges::sort(rings->units);
+        ++rings;
+      }
+    }
+
+    // The binary draws the visible-profile pass over every unit, then each
+    // profile's selected rings, so a selected unit's ring is drawn twice: once
+    // into the overlay's merged shape, once into the selection's, drawn over it.
+    // (FAF FA-Binary-Patches RangeRings.cpp drops those units from the overlay
+    // instead; the overlay's shape then ends at each edge of the selection, and
+    // its end arcs show as circles inside the overlay. That is not carried.)
+    //
+    // Engine change, the same image with every ring drawn once: a visible
+    // profile's selected rings are drawn first and their shape is kept in the
+    // stencil (`keepShapeInStencil`); the overlay then draws only the units
+    // without a selected ring, and its "Cast" skips the kept shape, so its
+    // merged shape and outline cover the whole group as before. On 2000
+    // engineers packed one unit apart (tools/scenarios/1p-ringperf-main.yaml,
+    // D3D12) the Ranges pass took 7.4 ms of GPU time with none selected, 13.5
+    // with half and 15.3 with all drawn twice; this way 7.3, 7.3 and 8.0.
+    // Selected rings of profiles not in the overlay are drawn afterwards, as
+    // before.
     if (!mVisibleProfiles.empty()) {
       if (const auto* const frustumList = camera->GetArmyUnitsInFrustum(); frustumList != nullptr) {
         // A copy for the length of the pass (0x007F03D0), unlinked again at
@@ -1634,8 +1687,29 @@ namespace moho
         const gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> candidatePool(*frustumList);
 
         for (SRangeRenderProfile& profile : mVisibleProfiles) {
+          SelectedRings* selected = nullptr;
+          if (const auto match = mRangeProfiles.find(profile.mExtractorName); match != mRangeProfiles.end()) {
+            SelectedRings& rings = selectedRings[std::distance(mRangeProfiles.begin(), match)];
+            if (!rings.payloads.empty() && !rings.drawn) {
+              selected = &rings;
+              const SRangeRenderProfile& registered = match->second;
+              RenderRingBatch(
+                registered.mOuterRingParams, *camera, *this, viewportHeadIndex, registered.mSelectedRingColor,
+                registered.mInnerRingParams, rings.payloads, true
+              );
+              rings.drawn = true;
+            }
+          }
+
           scratchPayload.clear();
-          func_ExtractRanges(candidatePool, alpha, profile, scratchPayload);
+          func_ExtractRanges(
+            candidatePool, alpha, profile, scratchPayload, selected != nullptr ? &selected->units : nullptr
+          );
+          if (selected != nullptr && scratchPayload.empty()) {
+            // Nothing left to draw over the kept selection shape: clear it here.
+            gpg::gal::Device::GetInstance()->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
+            continue;
+          }
           RenderRingBatch(
             profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mBuildRingColor,
             profile.mInnerRingParams, scratchPayload
@@ -1644,18 +1718,17 @@ namespace moho
       }
     }
 
-    // The binary gathers the selection again for every profile; it is gathered once here
-    // (engine change: with thousands of units selected the repeated walk cost milliseconds a frame).
-    msvc8::vector<UserUnit*> selectedUnits;
-    if (range_RenderSelected) {
-      worldSession->GetSelectionUnits(selectedUnits);
-    }
-    for (const auto& [extractorName, profile] : mRangeProfiles) {
-      RenderSelectedUnitsRange(*worldSession, selectedUnits, scratchPayload, profile, alpha);
-      RenderRingBatch(
-        profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mSelectedRingColor,
-        profile.mInnerRingParams, scratchPayload
-      );
+    {
+      auto rings = selectedRings.begin();
+      for (const auto& [extractorName, profile] : mRangeProfiles) {
+        if (!rings->drawn) {
+          RenderRingBatch(
+            profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mSelectedRingColor,
+            profile.mInnerRingParams, rings->payloads
+          );
+        }
+        ++rings;
+      }
     }
 
     RenderHighlightedUnitRange(*worldSession, scratchPayload, *this, *camera, alpha, viewportHeadIndex);
@@ -1750,12 +1823,16 @@ namespace moho
    * candidate by live-unit checks, applies the profile's category filter,
    * invokes the extractor's `Extract` virtual, and appends successful
    * payloads to the output ring extraction payload vector.
+   *
+   * Engine addition: candidates in `skippedUnits` (sorted) are left out; see
+   * `RangeRenderer::Render`.
    */
   void func_ExtractRanges(
     const gpg::fastvector<WeakPtr<UserEntity>>& candidatePool,
     const float interpolationAlpha,
     const SRangeRenderProfile& profile,
-    SRangeExtractionPayloadVector& outRingPayloadVector
+    SRangeExtractionPayloadVector& outRingPayloadVector,
+    const std::vector<const UserEntity*>* const skippedUnits
   )
   {
     // Resolve the extractor for this profile. The binary emits a clear-then-
@@ -1795,6 +1872,10 @@ namespace moho
       }
 
       if (!EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+        continue;
+      }
+
+      if (skippedUnits != nullptr && std::ranges::binary_search(*skippedUnits, userEntity)) {
         continue;
       }
 
