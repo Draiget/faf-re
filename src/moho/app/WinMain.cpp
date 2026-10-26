@@ -462,6 +462,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   (void)lpCmdLine;
   (void)nShowCmd;
 
+  gpg::SetThreadName(0xFFFFFFFFu, "Main");
+
   gpg::time::Timer runTimer{};
 
   gpg::diag::CrtDiagOptions diagOptions{};

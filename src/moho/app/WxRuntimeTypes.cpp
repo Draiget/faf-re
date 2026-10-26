@@ -1,4 +1,5 @@
 #include "WxRuntimeTypes.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
 
@@ -3478,6 +3479,7 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(const bool fullShutdown)
  */
 void moho::WRenViewport::D3DWindowOnDeviceRender()
 {
+  FAF_PROFILE_ZONE_NAMED("Render");
   moho::CTimeBarSection renderSection("Render");
   if (gRenderLock) {
     return;
@@ -4267,6 +4269,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   // tree - the entire front end - was never drawn.
   if (moho::ren_Ui) {
     if (moho::IUIManager* const uiManager = moho::UI_GetManager(); uiManager != nullptr) {
+      FAF_PROFILE_ZONE_NAMED("UI");
       const gpg::gal::RenderProfileScope profileDrawUi("DrawUi");
       uiManager->DrawUI(mHead, mPrimBatcher.get());
     }

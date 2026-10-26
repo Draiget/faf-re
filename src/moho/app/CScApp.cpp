@@ -1,4 +1,5 @@
 #include "CScApp.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
 
@@ -1077,6 +1078,7 @@ bool CScApp::Init()
  */
 void CScApp::Main()
 {
+  FAF_PROFILE_ZONE_NAMED("AppFrame");
   moho::CTimeBarSection appFrameSection("AppFrame");
   PublishAllocatorHeapStats();
   UpdateAddressSpaceMonitor();
@@ -1128,6 +1130,7 @@ void CScApp::Main()
   const float simDeltaSeconds = activeSession != nullptr ? activeSession->mTimeSinceLastTick : 0.0f;
   moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
   if (moho::sUserStage != nullptr) {
+    FAF_PROFILE_ZONE_NAMED("UserStage");
     moho::sUserStage->UserFrame();
   }
   ::ADXM_ExecMain();

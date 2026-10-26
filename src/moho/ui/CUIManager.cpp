@@ -1,4 +1,5 @@
 #include "moho/ui/CUIManager.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
 
@@ -338,6 +339,7 @@ void moho::CUIManager::ClearFrames()
  */
 void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
 {
+  FAF_PROFILE_ZONE_NAMED("UI");
   ReleaseRetiredFrames();
 
   for (std::size_t index = 0; index < mFrames.Size(); ++index) {
@@ -371,6 +373,7 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
  */
 bool moho::CUIManager::DoBeat()
 {
+  FAF_PROFILE_ZONE_NAMED("UI::Beat");
   UI_FactoryCommandQueueHandlerBeat();
   return UI_LuaBeat();
 }
@@ -498,6 +501,7 @@ void moho::CUIManager::RenderFrames(const int head, CD3DPrimBatcher* const primB
  */
 void moho::CUIManager::DrawUI(const int head, CD3DPrimBatcher* const primBatcher)
 {
+  FAF_PROFILE_ZONE_NAMED("UI");
   primBatcher->SetToViewport(head, *this);
 
   CD3DDevice* const device = D3D_GetDevice();
