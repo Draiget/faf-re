@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
-#include <unordered_set>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
@@ -234,16 +233,11 @@ namespace moho
    * dead/destroy-queued, blueprint present), filters by the profile's
    * category set, and appends successful extractor payloads to the output
    * ring extraction payload vector.
-   *
-   * FAF hot-patch (FA-Binary-Patches RangeRings.cpp): candidates in
-   * `selectionRingEntities` (units that got a selected-unit ring) are not
-   * appended; see the definition.
    */
   void func_ExtractRanges(
     const gpg::fastvector<WeakPtr<UserEntity>>& candidatePool,
     float interpolationAlpha,
     const SRangeRenderProfile& profile,
-    SRangeExtractionPayloadVector& outRingPayloadVector,
-    const std::unordered_set<const UserEntity*>& selectionRingEntities
+    SRangeExtractionPayloadVector& outRingPayloadVector
   );
 } // namespace moho

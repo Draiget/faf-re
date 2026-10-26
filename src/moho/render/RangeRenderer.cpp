@@ -8,7 +8,6 @@
 #include <new>
 #include <stdexcept>
 #include <string_view>
-#include <unordered_set>
 
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
@@ -1233,25 +1232,6 @@ namespace
   }
 
   /**
-   * FAF hot-patch (FA-Binary-Patches RangeRings.cpp / section/RangeRings.cpp):
-   * the units that got a selected-unit ring, so the global "show ranges" pass
-   * does not draw a second, build-coloured ring for them.
-   *
-   * The PE keeps this as one process-wide array of weak-link words: its
-   * `SelectionRings` copy of 0x007EF280 adds every selected unit whose
-   * `Extract` succeeded, for any profile, de-duplicated (the array base is
-   * stored at 0x011FD237, the selection count at 0x011FD23B); its
-   * `GlobalRings` copy of `func_ExtractRanges` (0x007EF0B0) skips candidates in
-   * the array; and its `RangeRenderer::Render` copy (entered from the call at
-   * 0x007F944D) zeroes the array after the visible-profile pass, ahead of the
-   * selection pass that refills it. The global pass therefore reads the
-   * previous frame's (or, with several views, the previous view's) selection
-   * rings; one process-wide set reproduces that. Entries are only compared,
-   * never dereferenced, as the PE only compares the words.
-   */
-  std::unordered_set<const moho::UserEntity*> sSelectionRingEntities;
-
-  /**
    * Address: 0x007EF280 (FUN_007EF280, sub_7EF280)
    *
    * IDA signature:
@@ -1275,15 +1255,10 @@ namespace
    *
    * Engine change: the binary gathers the selection here, once per profile;
    * the caller now gathers it once per frame and passes it in.
-   *
-   * FAF hot-patch (FA-Binary-Patches RangeRings.cpp): when `ringEntities` is
-   * non-null (the PE's `SelectionRings` copy, used whenever `mVisibleProfiles`
-   * is non-empty), every unit whose `Extract` succeeds is also added to it.
    */
   void RenderSelectedUnitsRange(
     const moho::CWldSession& session, const msvc8::vector<moho::UserUnit*>& selectedUnits,
-    RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha,
-    std::unordered_set<const moho::UserEntity*>* const ringEntities
+    RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha
   )
   {
     outPayloads.clear();
@@ -1321,9 +1296,6 @@ namespace
 
       moho::SRangeExtractionPayload payload{};
       if (extractor->Extract(&payload, unit, alpha)) {
-        if (ringEntities != nullptr) {
-          ringEntities->insert(unit);
-        }
         outPayloads.push_back(payload);
       }
     }
@@ -1649,6 +1621,12 @@ namespace moho
       return;
     }
 
+    // FAF FA-Binary-Patches RangeRings.cpp also drops every unit that gets a
+    // selected-unit ring from the visible-profile pass. That is not carried: the
+    // overlay's merged shape then ends at each edge of the selection, and its end
+    // arcs show beside the selection's own as circles inside the overlay. Here,
+    // as in the binary, the overlay draws every unit and the selection's shape is
+    // drawn over it.
     if (!mVisibleProfiles.empty()) {
       if (const auto* const frustumList = camera->GetArmyUnitsInFrustum(); frustumList != nullptr) {
         // A copy for the length of the pass (0x007F03D0), unlinked again at
@@ -1657,25 +1635,14 @@ namespace moho
 
         for (SRangeRenderProfile& profile : mVisibleProfiles) {
           scratchPayload.clear();
-          func_ExtractRanges(candidatePool, alpha, profile, scratchPayload, sSelectionRingEntities);
+          func_ExtractRanges(candidatePool, alpha, profile, scratchPayload);
           RenderRingBatch(
             profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mBuildRingColor,
             profile.mInnerRingParams, scratchPayload
           );
         }
       }
-
-      // FAF hot-patch (FA-Binary-Patches RangeRings.cpp): the PE's Render copy
-      // zeroes the selection-ring array here (`std; rep stosd` at 0x012911E5),
-      // after the visible-profile pass and before the selection pass refills it.
-      sSelectionRingEntities.clear();
     }
-
-    // FAF hot-patch (FA-Binary-Patches RangeRings.cpp): with no visible profiles
-    // the PE enters the stock body (0x007EEB55), whose selection pass records
-    // nothing, so the set is filled only on the patched path.
-    std::unordered_set<const UserEntity*>* const selectionRingEntities =
-      mVisibleProfiles.empty() ? nullptr : &sSelectionRingEntities;
 
     // The binary gathers the selection again for every profile; it is gathered once here
     // (engine change: with thousands of units selected the repeated walk cost milliseconds a frame).
@@ -1684,7 +1651,7 @@ namespace moho
       worldSession->GetSelectionUnits(selectedUnits);
     }
     for (const auto& [extractorName, profile] : mRangeProfiles) {
-      RenderSelectedUnitsRange(*worldSession, selectedUnits, scratchPayload, profile, alpha, selectionRingEntities);
+      RenderSelectedUnitsRange(*worldSession, selectedUnits, scratchPayload, profile, alpha);
       RenderRingBatch(
         profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mSelectedRingColor,
         profile.mInnerRingParams, scratchPayload
@@ -1783,20 +1750,12 @@ namespace moho
    * candidate by live-unit checks, applies the profile's category filter,
    * invokes the extractor's `Extract` virtual, and appends successful
    * payloads to the output ring extraction payload vector.
-   *
-   * FAF hot-patch (FA-Binary-Patches RangeRings.cpp / section/RangeRings.cpp
-   * `GlobalRings`): the PE runs a copy of this body from its `Render` copy
-   * (entered at 0x007F944D). After `Extract` succeeds, a candidate whose
-   * weak-link word is in the selection-ring array is not appended, so a unit
-   * that already gets a selected-unit ring gets no build-coloured ring here.
-   * `selectionRingEntities` is that array (see `sSelectionRingEntities`).
    */
   void func_ExtractRanges(
     const gpg::fastvector<WeakPtr<UserEntity>>& candidatePool,
     const float interpolationAlpha,
     const SRangeRenderProfile& profile,
-    SRangeExtractionPayloadVector& outRingPayloadVector,
-    const std::unordered_set<const UserEntity*>& selectionRingEntities
+    SRangeExtractionPayloadVector& outRingPayloadVector
   )
   {
     // Resolve the extractor for this profile. The binary emits a clear-then-
@@ -1841,9 +1800,6 @@ namespace moho
 
       SRangeExtractionPayload payload{};
       if (extractor->Extract(&payload, userEntity, interpolationAlpha)) {
-        if (selectionRingEntities.contains(userEntity)) {
-          continue;
-        }
         outRingPayloadVector.push_back(payload);
       }
     }
