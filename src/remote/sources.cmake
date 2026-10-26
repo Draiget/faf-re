@@ -15,6 +15,7 @@ set(FAF_REMOTE_SOURCES
   remote/wire/NameTable.cpp
   remote/wire/OrdinalTable.cpp
   remote/wire/Quantize.cpp
+  remote/wire/Roster.cpp
   remote/wire/SessionTables.cpp
   remote/wire/SoundTable.cpp
   remote/wire/WireVersion.cpp

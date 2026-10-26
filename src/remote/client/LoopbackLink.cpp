@@ -9,6 +9,7 @@
 #include "moho/sim/SimDriver.h"
 #include "remote/ContentTables.h"
 #include "remote/wire/WireVersion.h"
+#include "moho/net/CClientBase.h"
 
 // Engine addition, server mode: see LoopbackLink.h.
 
@@ -109,6 +110,72 @@ namespace faf::remote::client
     mMaxBeatSeconds = std::max(mMaxBeatSeconds, std::chrono::duration<double>(rebuilt - start).count());
   }
 
+  void CLoopbackLink::PassRoster(moho::IClientManager& standIn, CRemoteClientManager& facade)
+  {
+    if (!mRefusal.empty()) {
+      return;
+    }
+    const moho::IClient* const local = standIn.GetLocalClient();
+    const wire::SRoster roster = ReadRoster(standIn, local != nullptr ? local->GetIndex() : -1);
+    ++mRosterBeat;
+    if (mHaveSentRoster && roster == mSentRoster) {
+      return;
+    }
+    // Who is there, their names, sources and votes go at once; ping and quiet time once a second.
+    const auto withoutTimes = [](wire::SRoster r) {
+      for (wire::SRosterEntry& entry : r.entries) {
+        entry.ping = 0.0f;
+        entry.quiet = 0.0f;
+      }
+      return r;
+    };
+    if (mHaveSentRoster && withoutTimes(roster) == withoutTimes(mSentRoster) && mRosterBeat < 10u) {
+      return;
+    }
+    wire::BitWriter writer;
+    roster.Encode(writer);
+    mRosterBytes += writer.Bytes().size();
+    ++mRostersSent;
+    wire::BitReader reader(writer.Bytes());
+    const std::optional<wire::SRoster> received = wire::SRoster::Decode(reader);
+    if (!received || !(*received == roster)) {
+      ++mRosterFailures;
+      return;
+    }
+    facade.ApplyRoster(*received, [&standIn](const int clientIndex, const gpg::MemBuffer<const char> data) {
+      // The server relays a client's chat to its addressee.
+      if (moho::IClient* const target = standIn.GetClient(clientIndex); target != nullptr) {
+        target->ReceiveChat(data);
+      }
+    });
+    mSentRoster = roster;
+    mHaveSentRoster = true;
+    mRosterBeat = 0;
+
+    // Check: the facade answers the roster questions as the stand-in does.
+    bool same = facade.NumberOfClients() == standIn.NumberOfClients()
+             && (facade.GetLocalClient() == nullptr) == (standIn.GetLocalClient() == nullptr);
+    for (std::size_t i = 0; same && i < standIn.NumberOfClients(); ++i) {
+      auto* const a = static_cast<moho::CClientBase*>(standIn.GetClient(static_cast<int>(i)));
+      auto* const b = static_cast<moho::CClientBase*>(facade.GetClient(static_cast<int>(i)));
+      same = (a == nullptr) == (b == nullptr);
+      if (same && a != nullptr) {
+        same = a->GetNickname().view() == b->GetNickname().view() && a->GetOwnerId() == b->GetOwnerId()
+            && a->mSimRate == b->mSimRate && a->NoEjectionPending() == b->NoEjectionPending()
+            && (a == standIn.GetLocalClient()) == (b == facade.GetLocalClient());
+        const moho::BVIntSet* const sa = a->GetValidCommandSources();
+        const moho::BVIntSet* const sb = b->GetValidCommandSources();
+        for (unsigned int va = sa->GetNext(~0u), vb = sb->GetNext(~0u); same; va = sa->GetNext(va), vb = sb->GetNext(vb)) {
+          same = (va == sa->Max()) == (vb == sb->Max()) && (va == sa->Max() || va == vb);
+          if (va == sa->Max()) {
+            break;
+          }
+        }
+      }
+    }
+    mRosterMismatches += same ? 0u : 1u;
+  }
+
   std::uint64_t CLoopbackLink::CheckFailures() const noexcept
   {
     const SRebuildStats& s = mRebuilder.Stats();
@@ -118,7 +185,7 @@ namespace faf::remote::client
          + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
          + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches + s.depositMismatches
          + mBuilder.DepositOverflows() + s.terrainRectMismatches + mRebuilder.TerrainCellsDiffering()
-         + mBuilder.TerrainEditOverflows();
+         + mBuilder.TerrainEditOverflows() + mRosterFailures + mRosterMismatches;
   }
 
   std::string CLoopbackLink::Summary(const char* const when) const
@@ -147,7 +214,8 @@ namespace faf::remote::client
       "underlays %llu, unknown table ids %llu, table failures %llu (table records %.2f KB in all), creation tick "
       "mismatches %llu, unit stat items applied %llu, unit updates %llu (with the packet's poses %llu), unit data "
       "mismatches %llu, resource deposits %zu (mismatches %llu, overflows %llu), terrain edits %llu (rectangle "
-      "mismatches %llu, height cells differing from the sim's now %llu, overflows %llu)",
+      "mismatches %llu, height cells differing from the sim's now %llu, overflows %llu), rosters %llu (%.2f KB, "
+      "failures %llu, mismatches %llu)",
       when, u(s.createdNotInPacket), u(s.packetCreatedNotRebuilt), u(s.blueprintMismatches), u(s.noBlueprint),
       u(s.eraseMismatches), u(s.deleteMismatches), u(s.packetUpdatesDropped), u(s.unitChangesWithoutUpdate),
       u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange),
@@ -155,7 +223,8 @@ namespace faf::remote::client
       u(mTableFailures), static_cast<double>(mTableBytes) / 1024.0, u(s.tickMismatches), u(s.statsApplied),
       u(s.unitUpdates), u(s.unitPosesBorrowed), u(s.unitDataMismatches), mClientTables.Deposits().size(),
       u(s.depositMismatches), u(mBuilder.DepositOverflows()), u(s.terrainEdits), u(s.terrainRectMismatches),
-      u(mRebuilder.TerrainCellsDiffering()), u(mBuilder.TerrainEditOverflows())
+      u(mRebuilder.TerrainCellsDiffering()), u(mBuilder.TerrainEditOverflows()), u(mRostersSent),
+      static_cast<double>(mRosterBytes) / 1024.0, u(mRosterFailures), u(mRosterMismatches)
     ).c_str();
     return text;
   }

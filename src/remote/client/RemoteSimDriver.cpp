@@ -91,6 +91,9 @@ namespace faf::remote::client
   void CRemoteSimDriver::PassThroughWire(moho::SSyncData& packet)
   {
     mLink.Pass(packet);
+    if (moho::IClientManager* const standIn = mServer->GetClientManager(); standIn != nullptr) {
+      mLink.PassRoster(*standIn, mClientManager);
+    }
     if (mLink.Stats().frames % kSummaryEveryBeats == 0u) {
       LogSummary("so far");
     }

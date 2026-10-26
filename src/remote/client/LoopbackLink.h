@@ -4,7 +4,9 @@
 #include <string>
 
 #include "remote/FrameBuilder.h"
+#include "remote/client/RemoteClientManager.h"
 #include "remote/client/SyncRebuilder.h"
+#include "remote/wire/Roster.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
 
@@ -52,6 +54,14 @@ namespace faf::remote::client
     /** One beat through the wire; `packet` comes out rebuilt. */
     void Pass(moho::SSyncData& packet);
 
+    /**
+     * The roster (WP11.4): the stand-in's clients as the server reads them, sent through the
+     * wire whenever they change (a ping or quiet time at most once a second) into `facade`,
+     * which then answers the roster questions; chat for a client is relayed to the stand-in's.
+     * Once per beat, after `Pass`.
+     */
+    void PassRoster(moho::IClientManager& standIn, CRemoteClientManager& facade);
+
     [[nodiscard]] const wire::SContentTables& Tables() const noexcept { return mTables; }
     /** Why the client refused the server's hello at connect (WP7.2), or empty: then `Pass` does nothing. */
     [[nodiscard]] const std::string& Refusal() const noexcept { return mRefusal; }
@@ -79,6 +89,14 @@ namespace faf::remote::client
     std::uint64_t mRebuildFailures = 0;
     std::uint64_t mTableFailures = 0;
     std::uint64_t mTableBytes = 0; // session-table records (the reliable stream)
+    // The roster (WP11.4).
+    wire::SRoster mSentRoster;
+    bool mHaveSentRoster = false;
+    std::uint32_t mRosterBeat = 0;     // beats since the last roster sent
+    std::uint64_t mRostersSent = 0;
+    std::uint64_t mRosterBytes = 0;
+    std::uint64_t mRosterFailures = 0;   // a roster that did not decode as sent
+    std::uint64_t mRosterMismatches = 0; // the facade answering otherwise than the stand-in
     double mServerSeconds = 0.0; // building and encoding frames
     double mClientSeconds = 0.0; // decoding and rebuilding packets
     double mMaxBeatSeconds = 0.0;

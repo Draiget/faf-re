@@ -515,6 +515,8 @@ namespace faf::replay
     // `--loopback`: every packet through the wire format and the client's rebuild, after the
     // consumers above have seen the sim's own packet.
     std::unique_ptr<faf::remote::client::CLoopbackLink> loopback;
+    // The remote client's client manager, answering from the roster the link sends (WP11.4).
+    std::unique_ptr<faf::remote::client::CRemoteClientManager> rosterFacade;
     if (options.loopback) {
       faf::remote::client::SLoopbackOptions loopbackOptions{};
       loopbackOptions.deadReckoningTolerance = static_cast<std::uint32_t>(options.loopbackDeadReckoning);
@@ -616,6 +618,12 @@ namespace faf::replay
         }
         if (loopback) {
           loopback->Pass(*packet);
+          if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
+            if (!rosterFacade) {
+              rosterFacade = std::make_unique<faf::remote::client::CRemoteClientManager>(nullptr, standIn);
+            }
+            loopback->PassRoster(*standIn, *rosterFacade);
+          }
         }
 
         if (!result.started) {

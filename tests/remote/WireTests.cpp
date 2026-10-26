@@ -24,6 +24,7 @@
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
+#include "remote/wire/Roster.h"
 #include "remote/wire/SessionTables.h"
 #include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
@@ -1365,6 +1366,48 @@ namespace
     CHECK(!bigReader.Read(bigIn) && bigReader.Names().Size() == 0u);
   }
 
+  void TestRoster()
+  {
+    // Every field comes back; truncation anywhere and hostile counts are refused.
+    SRoster roster{};
+    roster.localIndex = 1;
+    SRosterEntry host{};
+    host.index = 0;
+    host.name = "Host";
+    host.ownerId = 12345;
+    host.sources = {0, 2};
+    host.simRate = 3;
+    host.ping = 41.5f;
+    host.quiet = 0.25f;
+    SRosterEntry joiner = host;
+    joiner.index = 1;
+    joiner.name = "Joiner";
+    joiner.ownerId = -7;
+    joiner.sources = {1};
+    joiner.connected = false;
+    joiner.ejectedBy = {0};
+    roster.entries = {host, joiner};
+    BitWriter writer;
+    roster.Encode(writer);
+    const std::vector<std::uint8_t> bytes = Bytes(writer);
+    BitReader reader(bytes);
+    const std::optional<SRoster> back = SRoster::Decode(reader);
+    CHECK(back && *back == roster);
+    for (std::size_t length = 0; length < bytes.size(); ++length) {
+      BitReader cut(std::span<const std::uint8_t>(bytes.data(), length));
+      CHECK(!SRoster::Decode(cut));
+    }
+    BitWriter many;
+    many.WriteVarUint(0u);
+    many.WriteVarUint(static_cast<std::uint32_t>(SRoster::kMaxEntries + 1u));
+    const std::vector<std::uint8_t> manyBytes = Bytes(many);
+    BitReader manyIn(manyBytes);
+    CHECK(!SRoster::Decode(manyIn));
+    SRoster other = roster;
+    other.entries[0].ping = 42.0f;
+    CHECK(!(other == roster));
+  }
+
   void TestSoundTable()
   {
     CSoundTableWriter writer;
@@ -1459,6 +1502,7 @@ namespace
 
   const TestCase kTests[] = {
     {"sounds: session table", &TestSoundTable},
+    {"roster: round trip and refusals", &TestRoster},
     {"session tables: sounds and names", &TestSessionTables},
     {"bits: round trip", &TestBitStreamRoundTrip},
     {"bits: overrun", &TestBitStreamOverrun},
