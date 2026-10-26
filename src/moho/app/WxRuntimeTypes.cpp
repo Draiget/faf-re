@@ -2518,7 +2518,7 @@ namespace
   // graph does not flicker. Both live in engine .data in the shipped binary
   // (dword_F57E8C @0x00F57E8C, ren_bandwidth_time1 @0x010BF070, constructed via
   // CRT static-init) and persist across frames.
-  int gRenBandwidthPeakScale = 0;                 // dword_F57E8C
+  int gRenBandwidthPeakScale = 1024;              // dword_F57E8C (shipped .data: 1024)
   gpg::time::Timer gRenBandwidthPeakScaleTimer;   // ren_bandwidth_time1
 
   // Round-toward-zero + carry helpers matching the binary's frndint/cmov idiom.

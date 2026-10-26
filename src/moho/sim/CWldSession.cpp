@@ -14046,16 +14046,17 @@ namespace moho
     constexpr float kEconOverlayShadowOffset = 1.0f;
 
     // `/lua/ui/game/econoverlayparams.lua` lanes, in the order the import reads
-    // them. Each is left at its previous value when the key is absent.
-    std::uint32_t gEconOverlayPositiveColor = 0;                    // 0x00F57C00
-    std::uint32_t gEconOverlayNegativeColor = 0;                    // 0x00F57BFC
+    // them. Each is left at its previous value when the key is absent, so the
+    // initial values are the ones the shipped .data holds.
+    std::uint32_t gEconOverlayPositiveColor = 0xFF00D800u;          // 0x00F57C00
+    std::uint32_t gEconOverlayNegativeColor = 0xFFD80000u;          // 0x00F57BFC
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayLeftTexture{};  // 0x010C4230
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayRightTexture{}; // 0x010C4238
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayMidTexture{};   // 0x010C4244
     msvc8::string gEconOverlayFontName{};                           // 0x00F5B210
-    std::int32_t gEconOverlayFontSize = 0;                          // 0x00F57C04
+    std::int32_t gEconOverlayFontSize = 12;                         // 0x00F57C04
     float gEconOverlayEnergyTopOffset = 0.0f;                       // 0x010A6458
-    float gEconOverlayMassTopOffset = 0.0f;                         // 0x00F57C08
+    float gEconOverlayMassTopOffset = 14.0f;                        // 0x00F57C08
 
     bool gEconOverlayParamsImported = false;                        // 0x010A6449
     CD3DFont* gEconOverlayFont = nullptr;                           // 0x010C4228
