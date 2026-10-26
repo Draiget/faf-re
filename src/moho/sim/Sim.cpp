@@ -5,6 +5,7 @@
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "SimDriver.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <algorithm>
 #include <array>
@@ -10624,7 +10625,10 @@ void Sim::AdvanceBeat(const int amt)
   (void)amt; // Binary implementation does not consume this parameter at 0x00749F40.
 
   Logf("********** beat %u **********\n", mCurBeat);
-  RulesUpdateLuaState(mRules, mLuaState);
+  {
+    FAF_PROFILE_ZONE_NAMED("Sim::RulesUpdate");
+    RulesUpdateLuaState(mRules, mLuaState);
+  }
 
   if (IsDebugWindowEnabled() && mLuaState && mLuaState->m_state) {
     lua_sethook(mLuaState->m_state, GetDebugLuaHook(), 4, 0);
@@ -10635,6 +10639,7 @@ void Sim::AdvanceBeat(const int amt)
     Logf("  tick number %u\n", mCurTick);
 
     if (ReadSimConVarBool(this, &gSimConVar_path_BackgroundUpdate, false)) {
+      FAF_PROFILE_ZONE_NAMED("Sim::PathUpdate");
       const int pathBudget = ReadSimConVarInt(this, &gSimConVar_path_BackgroundBudget, 0);
       UpdatePaths(mPathTables, pathBudget);
     }
@@ -10647,9 +10652,12 @@ void Sim::AdvanceBeat(const int amt)
       unit->ClearBeatResourceAccumulators();
     });
 
-    for (CArmyImpl* army : mArmiesList) {
-      if (army) {
-        army->OnTick();
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::ArmiesTick");
+      for (CArmyImpl* army : mArmiesList) {
+        if (army) {
+          army->OnTick();
+        }
       }
     }
 
@@ -10659,10 +10667,15 @@ void Sim::AdvanceBeat(const int amt)
     // MotionTick) last, so a goal set by a command task is acted on by motion
     // within the same beat. Ticking A first reversed that and let the air
     // navigator declare arrival from stale state (see IAiCommandDispatchImpl).
-    TickTaskStage(&mTaskStageB);
-    TickTaskStage(&mDiskWatcherTaskStage);
-    TickTaskStage(&mTaskStageA);
-    RefreshBlips();
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::TaskStages");
+      TickTaskStage(&mTaskStageB);
+      TickTaskStage(&mDiskWatcherTaskStage);
+      TickTaskStage(&mTaskStageA);
+    }
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::Recon");
+      RefreshBlips();
 
     if (!mArmiesList.empty() && sim_ParallelRecon && mArmiesList.size() <= kMaxParallelReconArmies &&
         CSimWorkerPool::ParallelEnabled()) {
@@ -10689,6 +10702,8 @@ void Sim::AdvanceBeat(const int amt)
       }
     }
 
+    }
+
     TickEffectManager(mEffectManager);
     UpdateFormationDb(mFormationDB);
 
@@ -10698,9 +10713,12 @@ void Sim::AdvanceBeat(const int amt)
       }
     });
 
-    if (!AdvanceCoordsParallel(*this)) {
-      for (auto* entity : mCoordEntities.owners()) {
-        AdvanceCoords(entity);
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::AdvanceCoords");
+      if (!AdvanceCoordsParallel(*this)) {
+        for (auto* entity : mCoordEntities.owners()) {
+          AdvanceCoords(entity);
+        }
       }
     }
 
@@ -10756,6 +10774,7 @@ void Sim::AdvanceBeat(const int amt)
   }
 
   if (mLuaState && mLuaState->m_state && (mCurTick % 70u) == 0u) {
+    FAF_PROFILE_ZONE_NAMED("Sim::LuaGC");
     lua_setgcthreshold(mLuaState->m_state, 0);
   }
 
