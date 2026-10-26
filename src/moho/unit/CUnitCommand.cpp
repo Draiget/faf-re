@@ -1689,8 +1689,7 @@ Unit* CUnitCommand::CreateFerryBeacon(
   SUnitConstructionParams params(0, Wm3::Vector3f{x, y, z}, army, blueprint, nullptr, true);
   params.mUseLayerOverride = 1u;
 
-  void* const storage = ::operator new(sizeof(Unit), std::nothrow);
-  Unit* const beacon = (storage != nullptr) ? new (storage) Unit(params) : nullptr;
+  Unit* const beacon = new (std::nothrow) Unit(params);
 
   command.mUnit.Set(beacon);
   return command.mUnit.GetObjectPtr();

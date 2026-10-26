@@ -39,6 +39,7 @@
 #include "moho/entity/PositionHistory.h"
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/entity/intel/CIntel.h"
+#include "moho/entity/EntityPool.h"
 #include "moho/projectile/Projectile.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -1513,6 +1514,34 @@ namespace moho
     radarStealth = EncodeIntelRangeLane(blueprint->Intel.RadarStealthFieldRadius);
     sonarStealth = EncodeIntelRangeLane(blueprint->Intel.SonarStealthFieldRadius);
     cloak = EncodeIntelRangeLane(blueprint->Intel.CloakFieldRadius);
+  }
+
+
+  void* Entity::operator new(
+    std::size_t size
+  )
+  {
+    void* p = EntityPool::sInstance->Allocate(size);
+    if (p == nullptr) {
+      throw std::bad_alloc();
+    }
+    return p;
+  }
+
+  void* Entity::operator new(
+      std::size_t size,
+      std::nothrow_t
+  ) noexcept
+  { 
+    return EntityPool::sInstance->Allocate(size);
+  }
+
+  void Entity::operator delete(
+    void* ptr,
+    std::size_t size
+  ) noexcept
+  {
+    EntityPool::sInstance->Dellocate(ptr, size);
   }
 
   /**
@@ -4724,14 +4753,11 @@ namespace moho
       }
     }
 
-    // The binary allocates raw storage, constructs in place, then pushes the owned
-    // Lua object; keep the explicit new/ctor split for 1:1 behavior.
-    auto* const storage = static_cast<Entity*>(::operator new(sizeof(Entity)));
     const LuaPlus::LuaObject entityLuaObject(specObject);
     const EntId reservedId = static_cast<EntId>(
       sim->mEntityDB->DoReserveId((static_cast<std::uint32_t>(armyIndex) | 0x500u) << moho::kEntityIdSourceShift)
     );
-    Entity* const created = new (storage) Entity(entityLuaObject, sim, reservedId);
+    Entity* const created = new Entity(entityLuaObject, sim, reservedId);
 
     created->mLuaObj.PushStack(state);
     return 1;
