@@ -2516,11 +2516,6 @@ namespace gpg
      */
     bool IsDerivedFrom(const RType* baseType, int32_t* outOffset) const;
 
-    bool GetInstSize() const
-    {
-      return size_;
-    }
-
   public:
     bool finished_;
     bool initFinished_;
