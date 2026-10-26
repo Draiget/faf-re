@@ -75,6 +75,12 @@ namespace faf::remote::client
      */
     void ApplyRoster(const wire::SRoster& roster, CRosterClient::ChatRelay relay);
     [[nodiscard]] bool HasRoster() const noexcept { return mHaveRoster; }
+    /** The sim rate the server's frames carry (WP11.5): from now on `GetSimRate` answers it. */
+    void SetServerSimRate(int rate) noexcept
+    {
+      mServerSimRate = rate;
+      mHaveServerSimRate = true;
+    }
     /** The roster client of a session client index, or null. */
     [[nodiscard]] CRosterClient* RosterClient(int index) const noexcept;
 
@@ -110,6 +116,8 @@ namespace faf::remote::client
     CommandHandler mOnCommand;
     moho::IClientManager* mStandIn;
     bool mHaveRoster = false;
+    bool mHaveServerSimRate = false;
+    int mServerSimRate = 0;
     int mLocalIndex = -1;
     std::vector<std::unique_ptr<CRosterClient>> mRoster; // by client index; null where none
   };

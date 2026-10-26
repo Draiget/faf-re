@@ -77,6 +77,10 @@ namespace faf::remote::client
       mRebuilder.SeedTerrain(*sent); // both ends start from one snapshot of the heights
     }
     wire::SViewFrame frame = mBuilder.Build(static_cast<std::uint32_t>(packet.mCurBeat));
+    frame.simRate = mServerSimRate;
+    frame.serverMs = static_cast<std::uint32_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - mStart).count()
+    );
     if (mReckoner) {
       mReckoner->Apply(frame, mCodec);
     }
@@ -103,6 +107,10 @@ namespace faf::remote::client
     // Client.
     if (!mRebuilder.Apply(writer.Bytes(), packet)) {
       ++mRebuildFailures;
+    } else if (const wire::SViewFrame* const shown = mRebuilder.Baseline(); shown != nullptr) {
+      const double now = std::chrono::duration<double>(Clock::now() - mStart).count();
+      mClock.OnFrame(shown->beat, shown->simRate, shown->serverMs, now);
+      mClock.OnShown(shown->beat); // loopback: the session takes this packet now
     }
     const Clock::time_point rebuilt = Clock::now();
     mServerSeconds += std::chrono::duration<double>(encoded - start).count();
@@ -215,7 +223,8 @@ namespace faf::remote::client
       "mismatches %llu, unit stat items applied %llu, unit updates %llu (with the packet's poses %llu), unit data "
       "mismatches %llu, resource deposits %zu (mismatches %llu, overflows %llu), terrain edits %llu (rectangle "
       "mismatches %llu, height cells differing from the sim's now %llu, overflows %llu), rosters %llu (%.2f KB, "
-      "failures %llu, mismatches %llu)",
+      "failures %llu, mismatches %llu); clock: sim rate %d, beats/s expected %.2f, on the server's clock %.2f, "
+      "arriving %.2f, backlog %lld, skew %.2f",
       when, u(s.createdNotInPacket), u(s.packetCreatedNotRebuilt), u(s.blueprintMismatches), u(s.noBlueprint),
       u(s.eraseMismatches), u(s.deleteMismatches), u(s.packetUpdatesDropped), u(s.unitChangesWithoutUpdate),
       u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange),
@@ -224,7 +233,9 @@ namespace faf::remote::client
       u(s.unitUpdates), u(s.unitPosesBorrowed), u(s.unitDataMismatches), mClientTables.Deposits().size(),
       u(s.depositMismatches), u(mBuilder.DepositOverflows()), u(s.terrainEdits), u(s.terrainRectMismatches),
       u(mRebuilder.TerrainCellsDiffering()), u(mBuilder.TerrainEditOverflows()), u(mRostersSent),
-      static_cast<double>(mRosterBytes) / 1024.0, u(mRosterFailures), u(mRosterMismatches)
+      static_cast<double>(mRosterBytes) / 1024.0, u(mRosterFailures), u(mRosterMismatches), mClock.ServerSimRate(),
+      mClock.ExpectedBeatsPerSecond(), mClock.ServerBeatsPerSecond(), mClock.ArrivalBeatsPerSecond(),
+      static_cast<long long>(mClock.Backlog()), mClock.Skew()
     ).c_str();
     return text;
   }

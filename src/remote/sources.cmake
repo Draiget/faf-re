@@ -22,6 +22,7 @@ set(FAF_REMOTE_SOURCES
 )
 
 set(FAF_REMOTE_CLIENT_SOURCES
+  remote/client/BeatClock.cpp
   remote/client/LoopbackCommands.cpp
   remote/client/LoopbackLink.cpp
   remote/client/RemoteClientManager.cpp

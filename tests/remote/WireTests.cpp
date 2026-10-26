@@ -331,6 +331,8 @@ namespace
       SViewFrame frame{};
       frame.frameId = ++mFrameId;
       frame.beat = mFrameId * 3u;
+      frame.simRate = static_cast<std::int32_t>(mRng() % 21u) - 10;
+      frame.serverMs = mFrameId * 100u + mRng() % 50u;
       mBeat = frame.beat;
       std::vector<SEntityRecord> next;
       for (SEntityRecord record : mLive) {
@@ -984,6 +986,8 @@ namespace
       writer.WriteBits(1u, 32);
       writer.WriteBits(kNoBaseline, 32);
       writer.WriteBits(0u, 32);
+      writer.WriteVarUint(0u); // sim rate
+      writer.WriteBits(0u, 32); // server clock
       writer.WriteVarUint(0u);
       writer.WriteVarUint(1u);
       writer.WriteVarUint(7u);
@@ -1013,7 +1017,7 @@ namespace
     SViewFrame same = frame;
     same.frameId += 1;
     const std::vector<std::uint8_t> bytes = Encode(same, &frame);
-    CHECK(bytes.size() == 2u + 4u + 4u + 4u + 3u); // header and three empty sections
+    CHECK(bytes.size() == 2u + 4u + 4u + 4u + 1u + 4u + 3u); // header (with the beat stamps) and three empty sections
     SViewFrame decoded{};
     CHECK(Decode(bytes, &frame, decoded) && decoded == same);
 
@@ -1141,6 +1145,8 @@ namespace
       writer.WriteBits(1u, 32);
       writer.WriteBits(kNoBaseline, 32);
       writer.WriteBits(0u, 32);
+      writer.WriteVarUint(0u); // sim rate
+      writer.WriteBits(0u, 32); // server clock
       writer.WriteVarUint(0u);    // removed
       writer.WriteVarUint(count); // created
       const std::vector<std::uint8_t> bytes = Bytes(writer);
@@ -1158,6 +1164,8 @@ namespace
     writer.WriteBits(10u, 32);
     writer.WriteBits(9u, 32);
     writer.WriteBits(0u, 32);
+    writer.WriteVarUint(0u); // sim rate
+    writer.WriteBits(0u, 32); // server clock
     writer.WriteVarUint(1u);
     writer.WriteVarUint(11u); // id 11: not in the baseline
     writer.WriteVarUint(0u);
@@ -1171,6 +1179,8 @@ namespace
     dup.WriteBits(10u, 32);
     dup.WriteBits(9u, 32);
     dup.WriteBits(0u, 32);
+    dup.WriteVarUint(0u); // sim rate
+    dup.WriteBits(0u, 32); // server clock
     dup.WriteVarUint(0u);
     dup.WriteVarUint(1u);
     dup.WriteVarUint(10u);
@@ -1204,6 +1214,8 @@ namespace
     empty.WriteBits(10u, 32);
     empty.WriteBits(9u, 32);
     empty.WriteBits(0u, 32);
+    empty.WriteVarUint(0u); // sim rate
+    empty.WriteBits(0u, 32); // server clock
     empty.WriteVarUint(0u);
     empty.WriteVarUint(0u);
     empty.WriteVarUint(1u);

@@ -43,9 +43,10 @@ namespace faf::remote::wire
    * yaw-only orientation its anchor age and turn rate. Entities 8: the session record carries
    * the resource deposits the sim adds and the terrain edits; a creation carries the sim's
    * creation tick. Entities 9: with ground following, a dead-reckoned position carries a bit
-   * saying its height is the terrain's.
+   * saying its height is the terrain's. Entities 10: the frame header carries the server's sim
+   * rate and clock.
    */
-  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{9, 1, 1, 1, 1, 1};
+  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{10, 1, 1, 1, 1, 1};
 
   [[nodiscard]] const char* LaneName(ELane lane) noexcept;
 

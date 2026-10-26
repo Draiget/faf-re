@@ -271,6 +271,13 @@ namespace faf::remote::wire
   {
     std::uint32_t frameId = 0;
     std::uint32_t beat = 0;
+    /**
+     * The server's beat stamps (WP11.5): the sim rate it runs at (the client manager's, the
+     * game speed's -10..10 steps) and its clock when the beat was built, in milliseconds since
+     * the session started. The client paces its display by them.
+     */
+    std::int32_t simRate = 0;
+    std::uint32_t serverMs = 0;
     std::vector<SEntityRecord> entities; // ascending, unique ids
 
     [[nodiscard]] bool operator==(const SViewFrame& other) const noexcept = default;

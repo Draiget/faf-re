@@ -617,6 +617,9 @@ namespace faf::replay
           result.gameOver = true;
         }
         if (loopback) {
+          if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
+            loopback->SetServerSimRate(standIn->GetSimRate());
+          }
           loopback->Pass(*packet);
           if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
             if (!rosterFacade) {

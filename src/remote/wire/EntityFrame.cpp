@@ -1084,6 +1084,8 @@ namespace faf::remote::wire
     writer.WriteBits(frame.frameId, 32);
     writer.WriteBits(baseline != nullptr ? baseline->frameId : kNoBaseline, 32);
     writer.WriteBits(frame.beat, 32);
+    writer.WriteVarUint(ZigZag(frame.simRate));
+    writer.WriteBits(frame.serverMs, 32);
 
     bool first = true;
     std::uint32_t previous = 0;
@@ -1132,6 +1134,8 @@ namespace faf::remote::wire
     const std::uint32_t frameId = reader.ReadBits(32);
     const std::uint32_t baselineId = reader.ReadBits(32);
     const std::uint32_t beat = reader.ReadBits(32);
+    const std::int32_t simRate = UnZigZag(reader.ReadVarUint());
+    const std::uint32_t serverMs = reader.ReadBits(32);
     if (!reader.Ok() || laneVersion != kLaneVersions[static_cast<std::size_t>(ELane::Entities)]) {
       return false;
     }
@@ -1256,6 +1260,8 @@ namespace faf::remote::wire
 
     out.frameId = frameId;
     out.beat = beat;
+    out.simRate = simRate;
+    out.serverMs = serverMs;
     out.entities = std::move(merged);
     return true;
   }
