@@ -62,7 +62,7 @@ function OnFirstUpdate()
         end
 
         -- The fill pass too, so holes in the merged fill show, not only stray outlines.
-        ConExecute('range_Fill true')
+        ConExecute('range_Fill 1')
         ConExecute('range_StencilFlush 1')
         Shot(idsA, 30, 'A128-flush1')
         Shot(idsB, 40, 'B200-flush1')
@@ -71,6 +71,55 @@ function OnFirstUpdate()
         Shot(idsB, 40, 'B200-flush0')
         -- Back to the default, so the game shows the fixed rings until mpemu closes it.
         ConExecute('range_StencilFlush 1')
+
+        -- Selection test on row C (200 interceptors) with the Anti-Air overlay: the middle
+        -- third selected, with the selected-unit rings on, and the fill back off (the game's
+        -- default).
+        ConExecute('range_Fill 0')
+        local antiAir = import('/lua/ui/game/rangeoverlayparams.lua').RangeOverlayParams.AntiAir
+        SetOverlayFilter('AntiAir', antiAir.Categories, antiAir.NormalColor, antiAir.SelectColor,
+            antiAir.RolloverColor, antiAir.Inner[1], antiAir.Inner[2], antiAir.Outer[1], antiAir.Outer[2])
+        SetOverlayFilters({'AntiAir'})
+        UISelectionByCategory('AIR', false, false, false, false)
+        local row = {}
+        for _, unit in GetSelectedUnits() or {} do
+            if unit:GetUnitId() == 'uea0102' then
+                table.insert(row, unit)
+            end
+        end
+        SelectUnits(nil)
+        table.sort(row, function(a, b) return a:GetPosition()[1] < b:GetPosition()[1] end)
+        local count = table.getn(row)
+        LOG('RINGTEST row C ' .. count)
+        if count > 0 then
+            local idsC, middle = {}, {}
+            for i, unit in row do
+                table.insert(idsC, unit:GetEntityId())
+                if i > count / 3 and i <= 2 * count / 3 then
+                    table.insert(middle, unit)
+                end
+            end
+            -- Aim at the row's centre directly: tracking left it in a corner of the view.
+            local cx, cy, cz = 0, 0, 0
+            for _, unit in row do
+                local p = unit:GetPosition()
+                cx, cy, cz = cx + p[1], cy + p[2], cz + p[3]
+            end
+            local settings = camera:SaveSettings()
+            local focus = Vector(cx / count, cy / count, cz / count)
+            local function Frame(name)
+                camera:SnapTo(focus, { settings.Heading, settings.Pitch, 0 }, 230)
+                WaitSeconds(3)
+                LOG('RINGTEST SHOT ' .. name)
+                WaitSeconds(3)
+            end
+
+            ConExecute('range_RenderSelected 1')
+            SelectUnits(middle)
+            Frame('C-middle-selected')
+            SelectUnits(nil)
+            Frame('C-none-selected')
+        end
         LOG('RINGTEST DONE (range_StencilFlush back to 1)')
     end)
 end

@@ -54,6 +54,32 @@ local function FindSpot(cx, cz, sx, sz, minFromStart, ox, oz, minFromOther)
     return nil
 end
 
+-- UEF T1 interceptors, shown by the Anti-Air overlay: more than 128 of them, so the overlay's
+-- unselected part alone is more than one stencil batch.
+local RowEngineer = 'uea0102'
+local RowCount = 200
+local RowSpacing = 1.5
+
+-- West end of a row RowCount long, RowSpacing apart along x, inside the map and at least 60
+-- beyond its half-length from the start position and from clusters A and B. Air units need no
+-- land under them.
+local function FindRow(sx, sz, ax, az, bx, bz)
+    local length = (RowCount - 1) * RowSpacing
+    local clearance = 60 + length / 2
+    for r = 40, 640, 8 do
+        for i = 0, 31 do
+            local a = i * math.pi / 16
+            local mx, z = sx + math.cos(a) * r, sz + math.sin(a) * r
+            local x0 = mx - length / 2
+            if x0 >= 64 and x0 + length <= 960 and z >= 64 and z <= 960 and Distance(mx, z, sx, sz) >= clearance and
+                Distance(mx, z, ax, az) >= clearance and Distance(mx, z, bx, bz) >= clearance then
+                return x0, z
+            end
+        end
+    end
+    return nil
+end
+
 function OnPopulate(scenario)
     ScenarioUtils.InitializeArmies()
 end
@@ -91,5 +117,18 @@ function OnStart(self)
             CreateUnitHPR(Engineer, army, x, GetTerrainHeight(x, z), z, 0, 0, 0)
         end
         LOG(string.format('RINGTEST spawned A at (%.0f, %.0f), B at (%.0f, %.0f)', ax, az, bx, bz))
+
+        -- C: a row of interceptors for the selection test with the Anti-Air overlay: the UI
+        -- selects the middle third.
+        local rx, rz = FindRow(sx, sz, ax, az, bx, bz)
+        if rx == nil then
+            LOG('RINGTEST no land for row C')
+            return
+        end
+        for i = 0, RowCount - 1 do
+            local x = rx + i * RowSpacing
+            CreateUnitHPR(RowEngineer, army, x, GetTerrainHeight(x, rz), rz, 0, 0, 0)
+        end
+        LOG(string.format('RINGTEST spawned C from (%.0f, %.0f)', rx, rz))
     end)
 end

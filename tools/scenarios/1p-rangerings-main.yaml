@@ -29,7 +29,7 @@ steps:
   - start: all
   - host: 1
   - waitState: { uids: all, state: Launching, timeout: 3m }
-  - wait: 100s
+  - wait: 130s
 
 expect:
   allLaunched: true
