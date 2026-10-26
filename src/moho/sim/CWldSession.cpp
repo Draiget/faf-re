@@ -752,7 +752,7 @@ namespace moho
   std::uint32_t ui_FuelWarningColor = 0xFFFF0000u; // 0x00F57BB0 (0x0085D135)
   std::uint32_t ui_ShieldBarColor = 0xFF00C3F7u;  // 0x00F57BB4 (0x0085D0DA)
   std::uint32_t ui_ProgressBarColor = 0xFFFF9900u; // 0x00F57BB8 (0x0085D14B)
-  msvc8::string ui_CustomNameFont{};              // 0x00F5B300 (0x0085E124)
+  msvc8::string ui_CustomNameFont("Arial");       // 0x00F5B300 (0x0085E124), built "Arial" by FUN_00BE5720
   bool ui_ForceLifbarsOnEnemy = false;            // 0x010A644A (0x0085C031)
   bool ui_AlwaysRenderStrategicIcons = false;     // 0x010A644B (0x0085C148)
   // Engine addition (`ui_IconRecords`): counts applied sync beats on the user side, so the
@@ -804,10 +804,12 @@ namespace moho
   constexpr std::int32_t kLayerUnderwaterMask = LAYER_Seabed | LAYER_Sub;
 
 
-  float ui_CurveSmoothness = 0.0f;             // 0x00F57CC4
-  float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
-  float ui_MaxTextLOD = 0.0f;                  // 0x00F57CCC
-  std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
+  // Initial values from the shipped .data; commandwaypoint.lua may override the
+  // waypoint/path ones (UICommandGraph::LoadPathParams), missing keys keep these.
+  float ui_CurveSmoothness = 50.0f;            // 0x00F57CC4
+  float ui_PathSmoothness = 2.0f;              // 0x00F57CC8
+  float ui_MaxTextLOD = 80.0f;                 // 0x00F57CCC
+  std::int32_t ui_CommandGraphMaxNodeUnits = 1; // 0x00F57CD0
 
   /**
    * Degenerate-length cutoff `RecomputeDrawNodeOrientation` compares its summed
@@ -816,9 +818,9 @@ namespace moho
    * normalizing noise into an arbitrary direction.
    */
   constexpr float kCommandGraphOrientationEpsilon = 1.0e-6f;
-  float ui_MinWaypointSize = 0.0f;             // 0x00F57CD4
-  float ui_MaxWaypointSize = 0.0f;             // 0x00F57CD8
-  float ui_WaypointLineScale = 0.0f;           // 0x00F57CDC
+  float ui_MinWaypointSize = 7.0f;             // 0x00F57CD4
+  float ui_MaxWaypointSize = 100.0f;           // 0x00F57CD8
+  float ui_WaypointLineScale = 1.0f;           // 0x00F57CDC
 
   struct UICommandGraphNode
   {

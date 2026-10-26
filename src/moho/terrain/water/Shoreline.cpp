@@ -642,7 +642,7 @@ namespace
 namespace moho
 {
   bool ren_Shoreline = false;
-  float ren_ShorelineCutoff = 0.0f;
+  float ren_ShorelineCutoff = 1000.0f; // 0x00F57D64 (shipped .data)
 
   /**
    * Address: 0x008126E0 (FUN_008126E0, ??0ShoreCell@Moho@@QAE@XZ)

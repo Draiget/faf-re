@@ -1999,10 +1999,11 @@ std::int32_t moho::wnd_MinDragHeight = 768;
 std::int32_t moho::wnd_DefaultCreateWidth = 1024;
 std::int32_t moho::wnd_DefaultCreateHeight = 768;
 
-std::int32_t moho::graphics_Fidelity = 1;
-std::int32_t moho::graphics_FidelitySupported = 1;
+// Shipped .data 0x00F58E88..0x00F58E94; device caps and the options apply later.
+std::int32_t moho::graphics_Fidelity = 2;
+std::int32_t moho::graphics_FidelitySupported = 2;
 std::int32_t moho::shadow_Fidelity = 2;
-std::int32_t moho::shadow_FidelitySupported = 2;
+std::int32_t moho::shadow_FidelitySupported = 3;
 bool moho::d3d_UseRefRast = false;
 bool moho::d3d_ForceSoftwareVP = false;
 bool moho::d3d_NoPureDevice = false;

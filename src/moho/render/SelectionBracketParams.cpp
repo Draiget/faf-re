@@ -57,12 +57,13 @@ namespace
 
 namespace moho
 {
-  float ren_SelectionSizeFudge = 0.0f;
-  float ren_SelectionHeightFudge = 0.0f;
-  float ren_UnitSelectionScale = 0.0f;
-  std::uint32_t ren_SelectColor = 0u;
-  float ren_SelectBracketMinPixelSize = 0.0f;
-  float ren_SelectBracketSize = 0.0f;
+  // Shipped .data 0x00F57E1C..0x00F57E30; renderselectparams.lua overrides the keys it defines.
+  float ren_SelectionSizeFudge = 1.85f;
+  float ren_SelectionHeightFudge = 0.12f;
+  float ren_UnitSelectionScale = 0.75f;
+  std::uint32_t ren_SelectColor = 0xFFFFFFFFu;
+  float ren_SelectBracketMinPixelSize = 3.0f;
+  float ren_SelectBracketSize = 0.2f;
 
   /**
    * Address: 0x010BF644 (sSelectionParamsSentinel)

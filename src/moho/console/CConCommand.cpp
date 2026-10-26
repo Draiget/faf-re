@@ -98,18 +98,20 @@ float moho::con_TestVarFloat = 0.0f;
  * Address: 0x00BEED60 (FUN_00BEED60, dynamic atexit destructor for `con_TestVarStr`)
  */
 msvc8::string moho::con_TestVarStr("string");
-bool moho::snd_ExtraDoWorkCalls = false;
+bool moho::snd_ExtraDoWorkCalls = true; // 0x00F58026
 int moho::recon_debug = -1; // 0x00F58AC8 is initialised .data: -1, no army selected
 bool moho::sPathDebuggerEnabled = false;
 int moho::rule_Paranoid = 0;
-float moho::rule_BlueprintReloadDelay = 0.0f;
+float moho::rule_BlueprintReloadDelay = 0.5f; // 0x00F58CC0
 
 // Issue-thread pacing convars, read by `CSimDriver::ThreadRun`. `net_Lag` is
 // subtracted from how far ahead of the last executed beat the thread is
 // willing to run, so raising it issues beats earlier; the debug level gates
 // the thread's running/waiting/exiting trace.
 int moho::sim_IssueThreadDebugLevel = 0;
-float moho::net_Lag = 0.0f;
+// 0x00F58134 holds 500 in the shipped .data (read by `subss` at 0x0073C006).
+// FAF's userInit.lua reports any change to it to moderators, so games run at 500.
+float moho::net_Lag = 500.0f;
 
 // AI economy tuning convars referenced by `moho::CEconomy::Reset`. The
 // console-startup registration (FUN_00BC8DC0 / FUN_00BC8DE0 family) wires
@@ -4378,62 +4380,12 @@ namespace moho
 
 namespace
 {
-  constexpr const char* kConsoleStartupNetAckDelayDescription = "Number of milliseconds to delay before sending ACKs";
-  constexpr const char* kConsoleStartupNetCompressionMethodDescription = "Compression method, 0=none, 1=deflate.  Only takes effect when connections are first established.";
-  constexpr const char* kConsoleStartupNetDebugLevelDescription = "Amount of network debug spew";
   constexpr const char* kConsoleStartupNetLagDescription = "Lag, in milliseconds.";
-  constexpr const char* kConsoleStartupNetLogPacketsDescription = "Log all incomming/outgoing packets.";
-  constexpr const char* kConsoleStartupNetMaxBacklogDescription = "Maximum number of bytes to backlog to any one client.";
-  constexpr const char* kConsoleStartupNetMaxResendDelayDescription = "Maximum number of milliseconds to delay before resending a packet.";
-  constexpr const char* kConsoleStartupNetMaxSendRateDescription = "Maximum number of bytes to send per second to any one client.";
-  constexpr const char* kConsoleStartupNetMinResendDelayDescription = "Minimum number of milliseconds to delay before resending a packet.";
-  constexpr const char* kConsoleStartupNetResendPingMultiplierDescription = "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.";
-  constexpr const char* kConsoleStartupNetSendDelayDescription = "Number of milliseconds to delay before sending Data";
 } // namespace
 
+// The other net_* convars (0x00BC4E70..0x00BC5130) are registered once, in net/NetConVars.cpp.
 namespace moho
 {
-  extern int net_AckDelay;
-  extern int net_CompressionMethod;
-  extern int net_DebugLevel;
-  extern bool net_LogPackets;
-  extern int net_MaxBacklog;
-  extern int net_MaxResendDelay;
-  extern int net_MaxSendRate;
-  extern int net_MinResendDelay;
-  extern float net_ResendPingMultiplier;
-  extern int net_SendDelay;
-
-  /**
-   * Address: 0x00BC4EF0 (FUN_00BC4EF0, dynamic initializer for `gTConVar_net_AckDelay`)
-   * Address: 0x00BEFB50 (FUN_00BEFB50, dynamic atexit destructor for `gTConVar_net_AckDelay`)
-   */
-  TConVar<int> gTConVar_net_AckDelay(
-    "net_AckDelay",
-    kConsoleStartupNetAckDelayDescription,
-    &moho::net_AckDelay
-  );
-
-  /**
-   * Address: 0x00BC50B0 (FUN_00BC50B0, dynamic initializer for `gTConVar_net_CompressionMethod`)
-   * Address: 0x00BEFCA0 (FUN_00BEFCA0, dynamic atexit destructor for `gTConVar_net_CompressionMethod`)
-   */
-  TConVar<int> gTConVar_net_CompressionMethod(
-    "net_CompressionMethod",
-    kConsoleStartupNetCompressionMethodDescription,
-    &moho::net_CompressionMethod
-  );
-
-  /**
-   * Address: 0x00BC4EB0 (FUN_00BC4EB0, dynamic initializer for `gTConVar_net_DebugLevel`)
-   * Address: 0x00BEFB20 (FUN_00BEFB20, dynamic atexit destructor for `gTConVar_net_DebugLevel`)
-   */
-  TConVar<int> gTConVar_net_DebugLevel(
-    "net_DebugLevel",
-    kConsoleStartupNetDebugLevelDescription,
-    &moho::net_DebugLevel
-  );
-
   /**
    * Address: 0x00BDB8E0 (FUN_00BDB8E0, dynamic initializer for `gTConVar_net_Lag`)
    * Address: 0x00C00C00 (FUN_00C00C00, dynamic atexit destructor for `gTConVar_net_Lag`)
@@ -4442,76 +4394,6 @@ namespace moho
     "net_Lag",
     kConsoleStartupNetLagDescription,
     &moho::net_Lag
-  );
-
-  /**
-   * Address: 0x00BC4F70 (FUN_00BC4F70, dynamic initializer for `gTConVar_net_LogPackets`)
-   * Address: 0x00BEFBB0 (FUN_00BEFBB0, dynamic atexit destructor for `gTConVar_net_LogPackets`)
-   */
-  TConVar<bool> gTConVar_net_LogPackets(
-    "net_LogPackets",
-    kConsoleStartupNetLogPacketsDescription,
-    &moho::net_LogPackets
-  );
-
-  /**
-   * Address: 0x00BC5070 (FUN_00BC5070, dynamic initializer for `gTConVar_net_MaxBacklog`)
-   * Address: 0x00BEFC70 (FUN_00BEFC70, dynamic atexit destructor for `gTConVar_net_MaxBacklog`)
-   */
-  TConVar<int> gTConVar_net_MaxBacklog(
-    "net_MaxBacklog",
-    kConsoleStartupNetMaxBacklogDescription,
-    &moho::net_MaxBacklog
-  );
-
-  /**
-   * Address: 0x00BC4FF0 (FUN_00BC4FF0, dynamic initializer for `gTConVar_net_MaxResendDelay`)
-   * Address: 0x00BEFC10 (FUN_00BEFC10, dynamic atexit destructor for `gTConVar_net_MaxResendDelay`)
-   */
-  TConVar<int> gTConVar_net_MaxResendDelay(
-    "net_MaxResendDelay",
-    kConsoleStartupNetMaxResendDelayDescription,
-    &moho::net_MaxResendDelay
-  );
-
-  /**
-   * Address: 0x00BC5030 (FUN_00BC5030, dynamic initializer for `gTConVar_net_MaxSendRate`)
-   * Address: 0x00BEFC40 (FUN_00BEFC40, dynamic atexit destructor for `gTConVar_net_MaxSendRate`)
-   */
-  TConVar<int> gTConVar_net_MaxSendRate(
-    "net_MaxSendRate",
-    kConsoleStartupNetMaxSendRateDescription,
-    &moho::net_MaxSendRate
-  );
-
-  /**
-   * Address: 0x00BC4FB0 (FUN_00BC4FB0, dynamic initializer for `gTConVar_net_MinResendDelay`)
-   * Address: 0x00BEFBE0 (FUN_00BEFBE0, dynamic atexit destructor for `gTConVar_net_MinResendDelay`)
-   */
-  TConVar<int> gTConVar_net_MinResendDelay(
-    "net_MinResendDelay",
-    kConsoleStartupNetMinResendDelayDescription,
-    &moho::net_MinResendDelay
-  );
-
-  /**
-   * Address: 0x00BC50F0 (FUN_00BC50F0, dynamic initializer for `gTConVar_net_ResendPingMultiplier`)
-   * Address: 0x00BEFCD0 (FUN_00BEFCD0, dynamic atexit destructor for `gTConVar_net_ResendPingMultiplier`)
-   */
-  TConVar<float> gTConVar_net_ResendPingMultiplier(
-    "net_ResendPingMultiplier",
-    kConsoleStartupNetResendPingMultiplierDescription,
-    &moho::net_ResendPingMultiplier
-  );
-
-  /**
-   * Address: 0x00BC4F30 (FUN_00BC4F30, dynamic initializer for `gTConVar_net_SendDelay`)
-   * Address: 0x00BEFB80 (FUN_00BEFB80, dynamic atexit destructor for `gTConVar_net_SendDelay`)
-   */
-  TConVar<int> gTConVar_net_SendDelay(
-    "net_SendDelay",
-    kConsoleStartupNetSendDelayDescription,
-    &moho::net_SendDelay
   );
 
 } // namespace moho
