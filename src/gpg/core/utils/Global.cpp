@@ -1,4 +1,5 @@
 #include "Global.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
 
@@ -2327,4 +2328,5 @@ bool gpg::ParseNum(const char* start, const char* end, int* dest) noexcept
  */
 void gpg::SetThreadName([[maybe_unused]] const unsigned int id, [[maybe_unused]] const char* const name)
 {
+  FAF_PROFILE_SET_THREAD_NAME(name);
 }
