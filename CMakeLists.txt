@@ -86,6 +86,27 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()
 
+# --- Profiler (optional Tracy integration) --------------------------------------------
+option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)
+if(FAF_ENABLE_TRACY)
+  include(FetchContent)
+  FetchContent_Declare(
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG        v0.11.1
+    GIT_SHALLOW    TRUE
+  )
+  FetchContent_GetProperties(tracy)
+  if(NOT tracy_POPULATED)
+    FetchContent_Populate(tracy)
+  endif()
+
+  add_library(TracyClient STATIC "${tracy_SOURCE_DIR}/public/TracyClient.cpp")
+  target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE TRACY_ON_DEMAND)
+  target_include_directories(TracyClient PUBLIC "${tracy_SOURCE_DIR}/public")
+  target_link_libraries(TracyClient PUBLIC faf_codegen ws2_32 dbghelp)
+endif()
+
 # --- Engine -----------------------------------------------------------------------------
 add_subdirectory(src)
 
