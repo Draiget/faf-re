@@ -1,4 +1,5 @@
 #include "CNetUDPConnector.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -497,6 +498,7 @@ int32_t CNetUDPConnector::ChooseTimeout(const int32_t current, const int32_t cho
  */
 void CNetUDPConnector::ReceiveData()
 {
+  FAF_PROFILE_ZONE_NAMED("CNetUDPConnector::ReceiveData");
   TDatList<SNetPacket, void> acquiredPackets{};
 
   // Every packet of the batch stays allocated until the batch ends, so a
@@ -1000,6 +1002,7 @@ void CNetUDPConnector::Entry()
  */
 int32_t CNetUDPConnector::SendData()
 {
+  FAF_PROFILE_ZONE_NAMED("CNetUDPConnector::SendData");
   int timeout = -1;
   int64_t curTime = GetTime();
 
