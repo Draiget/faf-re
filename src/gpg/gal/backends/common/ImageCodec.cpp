@@ -4,9 +4,12 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <unordered_set>
 
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -339,8 +342,68 @@ namespace gpg::gal::imaging
       return directory + name;
     }
 
+    /**
+     * The keys of the files in textures\, listed once per session, so a texture that was never
+     * cached costs no file open (each failed CreateFile took about a millisecond: 10% of a 917 ms
+     * zoom frame). Files written this session are added as they are written.
+     */
+    class DecodeCacheIndex
+    {
+    public:
+      static DecodeCacheIndex& Instance()
+      {
+        static DecodeCacheIndex* const index = new DecodeCacheIndex(); // the writer threads may outlive statics
+        return *index;
+      }
+
+      [[nodiscard]] bool Contains(const std::uint64_t key)
+      {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (!mListed) {
+          mListed = true;
+          List();
+        }
+        return mKeys.count(key) != 0U;
+      }
+
+      void Add(const std::uint64_t key)
+      {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        mKeys.insert(key);
+      }
+
+    private:
+      void List()
+      {
+        const std::string& directory = effects::ShaderCacheDirectory();
+        if (directory.empty()) {
+          return;
+        }
+        WIN32_FIND_DATAA found{};
+        HANDLE const search = ::FindFirstFileA((directory + "textures\\*.img").c_str(), &found);
+        if (search == INVALID_HANDLE_VALUE) {
+          return;
+        }
+        do {
+          char* end = nullptr;
+          const unsigned long long key = std::strtoull(found.cFileName, &end, 16);
+          if (end == found.cFileName + 16 && std::strcmp(end, ".img") == 0) {
+            mKeys.insert(static_cast<std::uint64_t>(key));
+          }
+        } while (::FindNextFileA(search, &found) != FALSE);
+        ::FindClose(search);
+      }
+
+      std::mutex mMutex;
+      bool mListed = false;
+      std::unordered_set<std::uint64_t> mKeys;
+    };
+
     [[nodiscard]] bool ReadDecodeCache(const std::string& path, const std::uint64_t key, Image& outImage)
     {
+      if (!DecodeCacheIndex::Instance().Contains(key)) {
+        return false;
+      }
       HANDLE const file = ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
       if (file == INVALID_HANDLE_VALUE) {
         return false;
@@ -404,7 +467,9 @@ namespace gpg::gal::imaging
       ::CloseHandle(file);
       if (!ok || !::MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
         ::DeleteFileA(temporary.c_str());
+        return;
       }
+      DecodeCacheIndex::Instance().Add(key);
     }
 
     [[nodiscard]] bool VerifyRequested()
