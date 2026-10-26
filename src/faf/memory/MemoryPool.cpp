@@ -1,5 +1,6 @@
 
 #include "MemoryPool.h"
+#include <stdexcept>
 
 namespace faf
 {
@@ -7,22 +8,11 @@ namespace faf
     std::size_t blockSize,
     std::size_t nextCapacity
   )
-    : MemoryPool{blockSize, nextCapacity, 0}
-  {}
-
-  faf::MemoryPool::MemoryPool(
-    std::size_t blockSize,
-    std::size_t nextCapacity,
-    std::size_t initialCapacity
-  )
     : m_blockSize{blockSize}
     , m_nextCapacity{nextCapacity}
     , m_freeList{nullptr}
-  {
-    if (initialCapacity != 0) {
-      AllocateChunk(initialCapacity);
-    }
-  }
+    , m_chunks{}
+  {}
 
   MemoryPool::MemoryPool(
     MemoryPool&& other
@@ -63,10 +53,12 @@ namespace faf
       std::free(p);
     }
   }
+
   size_t MemoryPool::GetBlockSize() const
   {
     return m_blockSize;
   }
+
   void* MemoryPool::Allocate()
   {
     if (m_freeList == nullptr) {
@@ -84,6 +76,9 @@ namespace faf
   {
     if (ptr == nullptr) {
       return;
+    }
+    if (!Owns(ptr)) {
+      throw std::runtime_error("Tried to deallocate unowned pointer");
     }
     FreeNode* node = static_cast<FreeNode*>(ptr);
     node->next = m_freeList;
