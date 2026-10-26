@@ -32,6 +32,7 @@
 #include "LuaError.h"
 #include "LuaGcEventLog.h"
 #include "LuaMemAccounting.h"
+#include "LuaNumberText.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
@@ -6482,7 +6483,10 @@ namespace
 			if (lua_type(state, firstArgumentIndex) == LUA_TNUMBER) {
 				if (writeSucceeded != 0) {
 					const double value = lua_tonumber(state, firstArgumentIndex);
-					writeSucceeded = std::fprintf(stream, "%.14g", value) > 0 ? 1 : 0;
+					// Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
+					char rendered[64];
+					(void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", value);
+					writeSucceeded = std::fputs(rendered, stream) >= 0 ? 1 : 0;
 				}
 			} else if (lua_type(state, firstArgumentIndex) == LUA_TSTRING) {
 				std::size_t elementCount = 0u;
@@ -9803,7 +9807,8 @@ namespace
 			case 'f':
 			case 'g':
 			case 'G':
-				std::sprintf(item, form, static_cast<double>(luaL_checknumber(state, argumentIndex)));
+				// Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
+				(void)lua::FormatNumberLikeWindowsCrt(item, form, static_cast<double>(luaL_checknumber(state, argumentIndex)));
 				break;
 
 			case 'q':
@@ -16653,7 +16658,8 @@ extern "C"
 		}
 
 		char rendered[32];
-		std::sprintf(rendered, "%.14g", static_cast<double>(object->value.n));
+		// Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
+		(void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", static_cast<double>(object->value.n));
 
 		TString* const interned = luaS_newlstr(state, rendered, std::strlen(rendered));
 		object->value.p = interned;
@@ -17658,7 +17664,8 @@ extern "C"
 	int luaO_str2d(const char* const s, float* const result)
 	{
 		char* end = nullptr;
-		const float value = static_cast<float>(std::strtod(s, &end));
+		// Plan WPL.17: the Windows CRT's NaN spellings (LuaNumberText.h).
+		const float value = static_cast<float>(lua::ParseNumberLikeWindowsCrt(s, &end));
 		if (end == s) {
 			return 0; // nothing converted
 		}
