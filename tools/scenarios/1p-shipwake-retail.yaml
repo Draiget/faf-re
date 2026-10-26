@@ -1,0 +1,37 @@
+name: 1p-shipwake-retail
+description: >
+  Ship-wake visual comparison, retail FAF exe. Three UEF ships sail through open water on
+  Seton's Clutch while the camera follows them; the UI hook logs "WAKETEST SHOT default" and,
+  after setting efx_ParticleWaterSurface and efx_WaterOffset to 0, "WAKETEST SHOT zeroed".
+  Take window screenshots at those lines (1p-shipwake-main.yaml is the same on main_x64).
+  Setup: tools/scenarios/ship-wake/map copied into the vault as maps/faf_re_shipwake, with the
+  faf_re_lockstep scmap and save copied or hard-linked in as faf_re_shipwake.scmap /
+  faf_re_shipwake_save.lua; copy tools/scenarios/ship-wake/init_shipwake.lua into
+  C:\ProgramData\FAForever\bin. Do not click into the game window.
+timeout: 4m
+
+mode: direct
+lobby: auto
+map: faf_re_shipwake
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_shipwake.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: WakeTest, faction: uef, args: ['/title', 'shipwake-retail'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 90s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'WAKETEST DONE' }

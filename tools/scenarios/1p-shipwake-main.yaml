@@ -1,0 +1,32 @@
+name: 1p-shipwake-main
+description: >
+  Ship-wake visual comparison, recovered x64 engine. Same test as 1p-shipwake-retail.yaml (see
+  there for the setup); the exe is a build copied into bin_x64 as main_x64_wake.exe
+  (.\build.ps1 -NoBuild -Name main_x64_wake). Do not click into the game window.
+timeout: 4m
+
+mode: direct
+lobby: auto
+map: faf_re_shipwake
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64_wake.exe'
+  init: init_shipwake.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: WakeTest, faction: uef, args: ['/title', 'shipwake-main'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 90s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'WAKETEST DONE' }

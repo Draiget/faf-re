@@ -422,7 +422,8 @@ namespace
 
 namespace moho
 {
-  float efx_WaterOffset = 0.0f;
+  // Initial value from the binary's .data (0x00F5850C = 0x3C23D70A).
+  float efx_WaterOffset = 0.01f;
   bool dbg_EfxBeams = false;
   bool dbg_Emitter = false;
   bool dbg_Trail = false;
