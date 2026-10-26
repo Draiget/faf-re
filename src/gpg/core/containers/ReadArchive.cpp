@@ -320,7 +320,12 @@ namespace
      */
     void ReadULong(unsigned long* const value) override
     {
-      ReadULong2(value);
+      // The archive's long is 32 bits (the 2007 x86 format). Read it as such and widen, so an
+      // LP64 `unsigned long` (Linux) gets all of its bytes set (plan WPL.6, C3); on Windows the
+      // two types are the same.
+      std::uint32_t stored = 0;
+      ReadULong2(&stored);
+      *value = static_cast<unsigned long>(stored);
     }
 
     /**
@@ -331,7 +336,10 @@ namespace
      */
     void ReadLong(long* const value) override
     {
-      ReadLong2(value);
+      // 32 bits in the archive, sign-extended into an LP64 `long` (see ReadULong).
+      std::int32_t stored = 0;
+      ReadLong2(&stored);
+      *value = static_cast<long>(stored);
     }
 
     /**

@@ -4,6 +4,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <string>
 #include <array>
 #include <cstdint>
 #include <exception>
@@ -44,12 +45,33 @@ namespace
     return basePath + ".NEW";
   }
 
-  template <std::size_t N>
-  void CopyWideStringTruncated(wchar_t (&outBuffer)[N], const std::wstring& source)
+  /// UTF-16 code units of a wide string: the units themselves where wchar_t is UTF-16
+  /// (Windows), surrogate pairs for code points past U+FFFF where it is UTF-32 (plan WPL.6, C4).
+  [[nodiscard]] std::u16string WideToUtf16(const std::wstring& source)
   {
+    std::u16string out;
+    out.reserve(source.size());
+    for (const wchar_t unit : source) {
+      const auto codePoint = static_cast<std::uint32_t>(unit);
+      if constexpr (sizeof(wchar_t) == 2) {
+        out.push_back(static_cast<char16_t>(codePoint));
+      } else if (codePoint >= 0x10000u && codePoint <= 0x10FFFFu) {
+        out.push_back(static_cast<char16_t>(0xD800u + ((codePoint - 0x10000u) >> 10)));
+        out.push_back(static_cast<char16_t>(0xDC00u + ((codePoint - 0x10000u) & 0x3FFu)));
+      } else {
+        out.push_back(static_cast<char16_t>(codePoint));
+      }
+    }
+    return out;
+  }
+
+  template <std::size_t N>
+  void CopyWideStringTruncated(char16_t (&outBuffer)[N], const std::wstring& wideSource)
+  {
+    const std::u16string source = WideToUtf16(wideSource);
     const std::size_t maxCopy = (std::min)(N - 1, kUtf16HeaderTextCopyLimit);
     const std::size_t charCount = (std::min)(source.size(), maxCopy);
-    std::fill(std::begin(outBuffer), std::end(outBuffer), L'\0');
+    std::fill(std::begin(outBuffer), std::end(outBuffer), u'\0');
     if (charCount != 0) {
       std::copy_n(source.data(), charCount, outBuffer);
     }
