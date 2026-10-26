@@ -1659,6 +1659,48 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     return boost::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
   }
 
+  namespace
+  {
+    [[nodiscard]] std::int64_t TextureTimingNow() noexcept
+    {
+      LARGE_INTEGER now{};
+      ::QueryPerformanceCounter(&now);
+      return now.QuadPart;
+    }
+
+    /**
+     * Diagnostics: FAF_TEXTURE_TIMING=1 logs every file texture whose decode, resource creation
+     * and upload took 4 ms or more together, with the time of each step and how it was decoded.
+     */
+    void LogTextureTiming(
+      const char* const location, const char* const route, const std::int64_t decodeStarted, const std::int64_t decodeEnded,
+      const std::int64_t created, const std::int64_t uploaded, const std::size_t bytes
+    )
+    {
+      static const bool enabled = [] {
+        const char* const value = std::getenv("FAF_TEXTURE_TIMING");
+        return value != nullptr && value[0] == '1';
+      }();
+      if (!enabled) {
+        return;
+      }
+      static const double ticksPerMs = [] {
+        LARGE_INTEGER frequency{};
+        ::QueryPerformanceFrequency(&frequency);
+        return static_cast<double>(frequency.QuadPart) / 1000.0;
+      }();
+      const double total = static_cast<double>(uploaded - decodeStarted) / ticksPerMs;
+      if (total < 4.0) {
+        return;
+      }
+      gpg::Logf(
+        "D3D12: texture %s: %.1f ms (decode %.1f via %s, create %.1f, upload %.1f), %zu bytes", location, total,
+        static_cast<double>(decodeEnded - decodeStarted) / ticksPerMs, route, static_cast<double>(created - decodeEnded) / ticksPerMs,
+        static_cast<double>(uploaded - created) / ticksPerMs, bytes
+      );
+    }
+  } // namespace
+
   boost::shared_ptr<Texture> DeviceD3D12::CreateTexture(const TextureContext* const context)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -1670,6 +1712,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     bool cube = false;
     bool contentsFromEngine = false;
     imaging::Image image;
+    std::int64_t decodeStarted = 0;
+    std::int64_t decodeEnded = 0;
 
     if (context->source_ == 2U) {
       desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -1692,8 +1736,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       // The texture-quality option skips top mip levels (D3D9's
       // D3DX_SKIP_DDS_MIP_LEVELS, `reserved0x44_`).
       options.skipMipLevels = context->reserved0x44_ & 0x1FU;
+      decodeStarted = TextureTimingNow();
       const HRESULT result =
         imaging::ImageCodec::Instance()->Decode(context->dataBuffer_.mBegin, context->DataSizeBytes(), options, image);
+      decodeEnded = TextureTimingNow();
       if (FAILED(result)) {
         char message[640]{};
         std::snprintf(message, sizeof(message), "unable to load texture %s: HRESULT 0x%08lX", context->location_.c_str(),
@@ -1729,9 +1775,15 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       static_cast<void>(resource.resource->SetName(name.empty() ? L"engine texture" : name.c_str()));
     }
 
+    const std::int64_t created = TextureTimingNow();
+
     for (std::uint32_t index = 0U; index < image.subresources.size(); ++index) {
       const imaging::Image::Subresource& subresource = image.subresources[index];
       UploadSubresource(resource, index, image.bytes.data() + subresource.offset, subresource.rowPitch);
+    }
+    if (decodeEnded != 0) {
+      LogTextureTiming(context->location_.c_str(), imaging::ImageCodec::LastDecodeRoute(), decodeStarted, decodeEnded, created,
+                       TextureTimingNow(), image.bytes.size());
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC view{};

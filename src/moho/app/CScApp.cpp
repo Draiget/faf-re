@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/diagnostics/FrameSampler.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -1104,6 +1105,7 @@ void CScApp::Main()
     curTime.Reset();
   }
 
+  gpg::diag::FrameSamplerMark(); // debugging aid, off unless FAF_FRAME_SAMPLER is set
   (void)framerates.Push(frameSeconds);
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.

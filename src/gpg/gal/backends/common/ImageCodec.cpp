@@ -359,8 +359,19 @@ namespace gpg::gal::imaging
     }
   } // namespace
 
+  namespace
+  {
+    thread_local const char* tLastDecodeRoute = "none";
+  }
+
+  const char* ImageCodec::LastDecodeRoute() noexcept
+  {
+    return tLastDecodeRoute;
+  }
+
   HRESULT ImageCodec::Decode(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
   {
+    tLastDecodeRoute = "direct";
     if (gDdsDirectLoad && TryReadBlockCompressedDds(static_cast<const std::uint8_t*>(data), bytes, options, outImage)) {
       if (VerifyRequested()) {
         Image reference;
@@ -413,12 +424,14 @@ namespace gpg::gal::imaging
       return S_OK;
     }
 
+    tLastDecodeRoute = "d3dx";
     if (!gTextureDecodeCache) {
       return DecodeWithD3dx(data, bytes, options, outImage);
     }
     const std::uint64_t key = DecodeCacheKey(data, bytes, options);
     const std::string path = DecodeCachePath(key);
     if (!path.empty() && ReadDecodeCache(path, key, outImage)) {
+      tLastDecodeRoute = "cache";
       return S_OK;
     }
     LARGE_INTEGER start{}, end{}, frequency{};
@@ -428,6 +441,7 @@ namespace gpg::gal::imaging
     ::QueryPerformanceFrequency(&frequency);
     const auto microseconds = static_cast<std::uint64_t>(1000000.0 * static_cast<double>(end.QuadPart - start.QuadPart) / static_cast<double>(frequency.QuadPart));
     if (SUCCEEDED(result) && !path.empty() && microseconds >= kDecodeCacheMinMicroseconds) {
+      tLastDecodeRoute = "d3dx, cached for later sessions";
       // Written on a background thread from a copy, so the frame does not wait for the disk.
       auto copy = std::make_shared<Image>(outImage);
       std::thread([path, key, copy] { WriteDecodeCache(path, key, *copy); }).detach();

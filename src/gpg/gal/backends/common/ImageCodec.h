@@ -101,6 +101,9 @@ namespace gpg::gal::imaging
     /** Decodes a texture file (DDS, PNG, BMP, JPG, TGA ...). */
     HRESULT Decode(const void* data, std::size_t bytes, const DecodeOptions& options, Image& outImage);
 
+    /** How this thread's last Decode got its image (diagnostics: "direct", "cache", "d3dx", ...). */
+    [[nodiscard]] static const char* LastDecodeRoute() noexcept;
+
     /** Encodes `image` (its first array slice) as an image file. */
     HRESULT Encode(const Image& image, FileFormat format, std::vector<std::uint8_t>& outBytes);
     HRESULT EncodeToFile(const Image& image, FileFormat format, const char* path);
