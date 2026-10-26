@@ -93,7 +93,7 @@ if(FAF_ENABLE_TRACY)
   FetchContent_Declare(
     tracy
     GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-    GIT_TAG        v0.11.1
+    GIT_TAG        v0.14.1
     GIT_SHALLOW    TRUE
   )
   FetchContent_GetProperties(tracy)
