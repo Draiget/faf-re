@@ -19,6 +19,11 @@ add_library(zlib123 STATIC
   "${_zlib_src}/trees.c" "${_zlib_src}/uncompr.c" "${_zlib_src}/zutil.c")
 target_include_directories(zlib123 PUBLIC "${_zlib_src}")
 target_compile_definitions(zlib123 PRIVATE _CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_DEPRECATE)
-target_compile_options(zlib123 PRIVATE /W0)
+if(FAF_LINUX)
+  # Engine addition (dedicated-server plan WPL.3): the Linux build's spelling.
+  target_compile_options(zlib123 PRIVATE -w)
+else()
+  target_compile_options(zlib123 PRIVATE /W0)
+endif()
 target_link_libraries(zlib123 PRIVATE faf_codegen)
 set_target_properties(zlib123 PROPERTIES FOLDER "dependencies")

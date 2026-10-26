@@ -14,6 +14,7 @@
 #include "legacy/containers/Map.h"
 #include "moho/containers/TDatList.h"
 #include "moho/misc/CVirtualFileSystem.h"
+#include "platform/Interlocked.h"
 
 struct lua_State;
 
@@ -75,7 +76,7 @@ namespace moho
      */
     ~SFileWaitHandle();
 
-    volatile long mLock = 0;       // +0x08
+    volatile platform::InterlockedLong mLock = 0; // +0x08
     CZipFile* mZipFile = nullptr;  // +0x0C
   };
 

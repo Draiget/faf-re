@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEfxEmitter.h"
+#include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
 #include <cmath>
@@ -41,7 +42,11 @@ namespace moho
   // Debug console flags defined in EffectLuaStartupRegistrations.cpp / CWorldParticles.cpp.
   extern bool dbg_Emitter;
   extern float efx_WaterOffset;
-  extern float efx_ParticleWaterSurface;
+
+  // Engine addition (dedicated-server plan WPL.4): defined here, beside the
+  // emitters that read it, rather than in moho/particles/CWorldParticles.cpp
+  // (particle drawing), which registers its console variable. Constant-initialised.
+  float efx_ParticleWaterSurface = 0.0F;
 } // namespace moho
 
 namespace
@@ -1146,7 +1151,7 @@ namespace moho
       (void)sEngineStatRenderActiveEmitters->Release(0);
     }
     _InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+      reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
 
     if (!mValid) {
       UpdateCurve();

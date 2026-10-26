@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "moho/misc/StartupHelpers.h"
 #include <cstdint>
 #include <string>
 
@@ -23,6 +24,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/ui/UiStateTypes.h"
 #include "Wm3Quaternion.h"
 
 #include "platform/WxWidgets.h"
@@ -311,17 +313,8 @@ namespace moho
   static_assert(offsetof(CLuaWldUIProvider, mPrefetchData) == 0x38, "CLuaWldUIProvider::mPrefetchData offset must be 0x38");
   static_assert(sizeof(CLuaWldUIProvider) == 0x48, "CLuaWldUIProvider size must be 0x48");
 
-  enum EUIState : std::int32_t
-  {
-    UIS_none = 0,
-    UIS_splash = 1,
-    UIS_frontend = 2,
-    UIS_game = 3,
-    UIS_lobby = 4,
-  };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(EUIState) == 0x4, "moho::EUIState size must be 0x4");
 
-  extern EUIState sUIState;
   /**
    * Address: 0x010A645F (?cam_Free@Moho@@3_NA)
    *
@@ -486,21 +479,6 @@ namespace moho
 
   extern IWldUIProvider* sWldUIProvider;
 
-  enum EMauiEventType : std::int32_t
-  {
-    MET_Unknown = 0,
-    MET_MouseMotion = 1,
-    MET_MouseEnter = 2,
-    MET_MouseHover = 3,
-    MET_MouseExit = 4,
-    MET_ButtonPress = 5,
-    MET_ButtonDClick = 6,
-    MET_ButtonRelease = 7,
-    MET_WheelRotation = 8,
-    MET_KeyUp = 9,
-    MET_KeyDown = 10,
-    MET_Char = 11,
-  };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(EMauiEventType) == 0x4, "moho::EMauiEventType size must be 0x4");
 
   enum EMauiEventModifier : std::uint32_t
@@ -4584,15 +4562,6 @@ namespace moho
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::vector<msvc8::string>) == 0x10, "msvc8::vector<msvc8::string> size must be 0x10");
 
-
-  /**
-   * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
-   *
-   * What it does:
-   * Lazily initializes and returns the process user Lua state, wiring the user
-   * task stage, script-disk watcher task, and core/user init-form execution.
-   */
-  [[nodiscard]] LuaPlus::LuaState* USER_GetLuaState();
 
   /**
    * Address: 0x0083CD30 (FUN_0083CD30, Moho::MAUI_StartMainScript)

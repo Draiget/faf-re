@@ -26,6 +26,7 @@ namespace faf::replay
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end
     std::string laneSizesPath;  // when set: per-beat element counts and bytes of every sync lane (CSV)
+    std::string blueprintOrderPath; // when set: every blueprint by ordinal, in load order (plan WPL.16)
     int checksumPeriod = 0;     // when > 0: `sim_ChecksumPeriod` for this run (0 = the default)
     int replayLead = -1;        // when >= 0: `sim_ReplayLead` for this run
     int timeoutMinutes = 180;   // wall-clock limit for the whole run

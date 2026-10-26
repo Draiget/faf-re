@@ -603,14 +603,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedScriptedDecalType()
-  {
-    if (!ScriptedDecal::sType) {
-      ScriptedDecal::sType = gpg::LookupRType(typeid(ScriptedDecal));
-    }
-    return ScriptedDecal::sType;
-  }
-
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
   constexpr const char* kIncorrectGameObjectTypeError =
@@ -2365,36 +2357,6 @@ CMauiCursor* moho::SCR_FromLua_CMauiCursor(const LuaPlus::LuaObject& object, Lua
   return reinterpret_cast<CMauiCursor*>(upcast.mObj);
 }
 
-/**
- * Address: 0x0087FB30 (FUN_0087FB30, Moho::SCR_FromLua_ScriptedDecal)
- *
- * What it does:
- * Converts one Lua `_c_object` payload to `ScriptedDecal*` and raises Lua
- * errors for missing, destroyed, or type-mismatched game objects.
- */
-ScriptedDecal* moho::SCR_FromLua_ScriptedDecal(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
-{
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
-  if (!scriptObjectSlot) {
-    luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
-    return nullptr;
-  }
-
-  CScriptObject* const scriptObject = *scriptObjectSlot;
-  if (!scriptObject) {
-    luaL_error(state ? state->GetActiveCState() : nullptr, kDestroyedGameObjectError);
-    return nullptr;
-  }
-
-  const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedScriptedDecalType());
-  if (!upcast.mObj) {
-    luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
-    return nullptr;
-  }
-
-  return static_cast<ScriptedDecal*>(upcast.mObj);
-}
 
 /**
  * Address: 0x0079C9C0 (FUN_0079C9C0, Moho::SCR_FromLua_CMauiItemList)

@@ -7,7 +7,12 @@
 // out every window, device, audio and UI step.
 
 #include <Windows.h>
+#if defined(_WIN32)
 #include <objbase.h>
+#else
+#include <csignal>
+#include <execinfo.h>
+#endif
 
 #include <algorithm>
 #include <cfloat>
@@ -18,16 +23,19 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/app/IWinApp.h"
 #include "moho/app/WinApp.h"
+#if !FAF_REPLAY_SIM_ONLY
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/ui/UiRuntimeTypes.h"
+#endif
 #include "moho/console/CConCommand.h"
 #include "moho/core/ThreadPlacement.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
 #include "moho/misc/StartupHelpers.h"
-#include "moho/ui/UiRuntimeTypes.h"
 #include "platform/X87Precision.h"
 #include "replay/ReplayLaunchCheck.h"
 #include "replay/ReplayRunner.h"
+#include "replay/ReplayTerrainCheck.h"
 
 namespace
 {
@@ -51,7 +59,9 @@ namespace
     std::fflush(stderr);
     // The sim and loader threads are still running; nothing after the verdict is observed,
     // so the process ends here instead of tearing them down.
+#if defined(_WIN32)
     ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(exitCode));
+#endif
     std::_Exit(exitCode);
   }
 
@@ -62,6 +72,7 @@ namespace
     EndProcess(kExitCrash);
   }
 
+#if defined(_WIN32)
   LONG WINAPI ReplayCrashFilter(EXCEPTION_POINTERS* const info)
   {
     const EXCEPTION_RECORD* const record = info != nullptr ? info->ExceptionRecord : nullptr;
@@ -74,6 +85,20 @@ namespace
     std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
     EndProcess(kExitCrash);
   }
+#else
+  /// The POSIX counterpart of the crash filter: a fatal signal is reported as a crash.
+  void ReplayCrashSignal(const int signalNumber, siginfo_t* const info, void*)
+  {
+    std::printf(
+      "[%s] CRASH signal %d at %p\n", gLabel.c_str(), signalNumber, info != nullptr ? info->si_addr : nullptr
+    );
+    std::fflush(stdout);
+    void* frames[64];
+    ::backtrace_symbols_fd(frames, ::backtrace(frames, 64), 1);
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    EndProcess(kExitCrash);
+  }
+#endif
 
   /** The common services every engine app sets up (`IWinApp::AppInitCommonServices`). */
   class ReplayApp final : public moho::IWinApp
@@ -125,11 +150,14 @@ namespace
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
+      "  --blueprint-order <file> write every blueprint by ordinal, in the rules' load order\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --loopback [--loopback-dr <steps> [--loopback-turns <units>]]  every packet through the wire format and the\n"
       "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
+      "  --terrain-check <list>    faf-replay-full: load each .scmap in <list> with the client's and the\n"
+      "                            headless terrain resource and compare (plays nothing; --replay required)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -163,8 +191,20 @@ int main(int argc, char** argv)
 {
   (void)argc;
   (void)argv;
+#if defined(_WIN32)
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
   ::SetUnhandledExceptionFilter(&ReplayCrashFilter);
+#else
+  {
+    struct sigaction action{};
+    action.sa_sigaction = &ReplayCrashSignal;
+    action.sa_flags = SA_SIGINFO;
+    sigemptyset(&action.sa_mask);
+    for (const int signalNumber : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
+      (void)::sigaction(signalNumber, &action, nullptr);
+    }
+  }
+#endif
   gpg::SetDieHandler(&ReplayDieHandler);
 
   faf::replay::SReplayOptions options{};
@@ -182,6 +222,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
+  (void)ReadOption("--blueprint-order", options.blueprintOrderPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
@@ -201,10 +242,15 @@ int main(int argc, char** argv)
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();
 
+#if !FAF_REPLAY_SIM_ONLY
   // `WIN_AppExecute`: wx builds the application object without a window or a message loop.
-  // Engine code reaches `wxTheApp` without a null check (the driver's event wait among them).
+  // The client's event pump (WinApp.cpp, reached from the driver's event wait) uses
+  // `wxTheApp` without a null check. faf-replay links only the simulation and has neither.
   wxEntry(reinterpret_cast<WXHINSTANCE>(::GetModuleHandleW(nullptr)), nullptr, nullptr, 0, false);
+#endif
+#if defined(_WIN32)
   (void)::CoInitialize(nullptr);
+#endif
   moho::PLAT_Init();
 
   // `CScApp::Init`, without the splash, fonts, UI manager and device.
@@ -220,7 +266,10 @@ int main(int argc, char** argv)
   } else {
     moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
   }
+#if !FAF_REPLAY_SIM_ONLY
+  // The user Lua state's init. faf-replay has no user state (replay/ReplayLuaState.h).
   (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+#endif
 
   // `WIN_AppExecute`, before its frame loop.
   platform::SetX87PrecisionControl(_PC_24);
@@ -228,6 +277,20 @@ int main(int argc, char** argv)
   // `InitializeSessionFromCommandLine`, up to the `/replay` path.
   RunStartupConsoleCommands();
   moho::PlaceCurrentThread(moho::EThreadRole::Main);
+
+  std::string terrainCheckList;
+  if (ReadOption("--terrain-check", terrainCheckList)) {
+    // Plan WPL.4: every listed map through the client's and the headless terrain resource.
+    const faf::replay::STerrainCheckResult check = faf::replay::RunTerrainCheck(terrainCheckList);
+    if (!check.ran) {
+      std::printf("[%s] TERRAINCHECK error: %s\n", gLabel.c_str(), check.error.c_str());
+      std::fflush(stdout);
+      EndProcess(kExitBadInput);
+    }
+    std::printf("%s\n", check.report.c_str());
+    std::fflush(stdout);
+    EndProcess(check.differences == 0 ? 0 : 1);
+  }
 
   if (moho::CFG_GetArgOption("--launch-check", 0, nullptr)) {
     // Plan WP2.10: the header against `BuildLaunchInfo`; plays nothing.

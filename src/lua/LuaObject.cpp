@@ -5834,7 +5834,7 @@ namespace
 	 * Allocates one heap WrapFile storage payload and returns it as reflected
 	 * `gpg::RRef` with close-enabled default state.
 	 */
-	gpg::RRef* NewWrapFileStorageRef(gpg::RRef* const out)
+	gpg::RRef NewWrapFileStorageRef()
 	{
 		auto* const wrapFile = static_cast<WrapFile*>(::operator new(sizeof(WrapFile), std::nothrow));
 		if (wrapFile != nullptr) {
@@ -5842,7 +5842,12 @@ namespace
 			wrapFile->closeEnabled = 1u;
 		}
 
-		return BuildWrapFileRef(out, wrapFile);
+		// Returned by value, as `RType::new_ref_func_t` declares it: each ABI then passes the
+		// result as its callers expect (MSVC through a hidden pointer, System V x64 in
+		// registers); a `RRef*(RRef*)` body cast to that type only matches the first.
+		gpg::RRef out{};
+		(void)BuildWrapFileRef(&out, wrapFile);
+		return out;
 	}
 
 	/**
@@ -5852,17 +5857,18 @@ namespace
 	 * Initializes caller-owned WrapFile storage and returns the reflected
 	 * `gpg::RRef` view of that payload.
 	 */
-	gpg::RRef* ConstructWrapFileStorageRef(
-		gpg::RRef* const out,
-		WrapFile* const wrapFile
-	)
+	gpg::RRef ConstructWrapFileStorageRef(void* const storage)
 	{
+		auto* const wrapFile = static_cast<WrapFile*>(storage);
 		if (wrapFile != nullptr) {
 			wrapFile->stream = nullptr;
 			wrapFile->closeEnabled = 1u;
 		}
 
-		return BuildWrapFileRef(out, wrapFile);
+		// By value, as `RType::ctor_ref_func_t` declares it (see NewWrapFileStorageRef).
+		gpg::RRef out{};
+		(void)BuildWrapFileRef(&out, wrapFile);
+		return out;
 	}
 
 	/**
@@ -5893,8 +5899,8 @@ namespace
 	{
 		size_ = sizeof(WrapFile);
 		gpg::RType::Init();
-		newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		newRefFunc_ = &NewWrapFileStorageRef;
+		ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 		Finish();
@@ -6030,8 +6036,8 @@ namespace
 	 */
 	gpg::RType* ConfigureWrapFileRefCallbacks(gpg::RType* const type)
 	{
-		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->newRefFunc_ = &NewWrapFileStorageRef;
+		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		return type;
 	}
 
@@ -6044,8 +6050,8 @@ namespace
 	 */
 	gpg::RType* ConfigureWrapFileAllCallbacks(gpg::RType* const type)
 	{
-		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->newRefFunc_ = &NewWrapFileStorageRef;
+		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 		return type;
@@ -6060,8 +6066,8 @@ namespace
 	 */
 	void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
 	{
-		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->newRefFunc_ = &NewWrapFileStorageRef;
+		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 	}

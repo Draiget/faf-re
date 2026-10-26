@@ -13,7 +13,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/sim/STIMap.h"
-#include "moho/render/textures/CD3DFileBatchTexture.h"
+#include "remote/UnderlayPaths.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
@@ -39,8 +39,8 @@ namespace faf::remote
     }
 
     void ApplyAppearance(
-      wire::SAppearance& look, const moho::SSTIEntityVariableData& data, const wire::SContentTables& tables,
-      wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
+      wire::SAppearance& look, const std::uint32_t entityId, const moho::SSTIEntityVariableData& data,
+      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
     )
     {
       look.mesh = data.mMeshBlueprint != nullptr ? tables.meshes.Ordinal(data.mMeshBlueprint->mBlueprintId.c_str())
@@ -61,15 +61,13 @@ namespace faf::remote
                     intel.omni, intel.radarStealth, intel.sonarStealth, intel.cloak};
       look.ambientSound = SoundId(data.mAmbientSound, session);
       look.rumbleSound = SoundId(data.mRumbleSound, session);
-      // The underlay is a file texture (`Entity::SetStrategicUnderlay` loads it by path, no border).
+      // The underlay by the path `Entity::SetStrategicUnderlay` recorded: a server without a
+      // client has no texture to read it from.
       look.underlay = wire::COrdinalTable::kNone;
-      if (data.mUnderlayTexture) {
-        const auto* const file = dynamic_cast<const moho::CD3DFileBatchTexture*>(data.mUnderlayTexture.get());
-        if (file != nullptr && file->mBorder == 0u && session != nullptr) {
-          look.underlay = session->Name(file->GetFilename().c_str());
-        } else {
-          ++unknownUnderlays;
-        }
+      if (const std::string path = UnderlayPath(entityId); !path.empty() && session != nullptr) {
+        look.underlay = session->Name(path.c_str());
+      } else if (data.mUnderlayTexture) {
+        ++unknownUnderlays; // a texture whose path was not recorded
       }
     }
 
@@ -78,7 +76,7 @@ namespace faf::remote
       const wire::SContentTables& tables, wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
     )
     {
-      ApplyAppearance(record.appearance, data, tables, session, unknownUnderlays);
+      ApplyAppearance(record.appearance, record.id, data, tables, session, unknownUnderlays);
       const auto& pos = data.mCurTransform.pos_;
       const auto& orient = data.mCurTransform.orient_;
       record.position = {codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)};

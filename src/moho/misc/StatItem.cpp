@@ -1,4 +1,5 @@
 #include "StatItem.h"
+#include "platform/Interlocked.h"
 
 #include <algorithm>
 #include <bit>
@@ -21,15 +22,12 @@
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaBinder.h"
-#include "moho/sim/CWldSession.h"
-#include "moho/sim/UserArmy.h"
-#include "moho/ui/CUIManager.h"
 #include "platform/Platform.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -476,7 +474,7 @@ namespace
   [[nodiscard]] std::int32_t ReadAtomicI32(volatile std::int32_t* value)
   {
 #if defined(_WIN32)
-    return static_cast<std::int32_t>(InterlockedCompareExchange(reinterpret_cast<volatile long*>(value), 0, 0));
+    return static_cast<std::int32_t>(InterlockedCompareExchange(reinterpret_cast<volatile platform::InterlockedLong*>(value), 0, 0));
 #else
     return *value;
 #endif
@@ -488,7 +486,7 @@ namespace
     for (;;) {
       const std::int32_t observed = ReadAtomicI32(value);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
+        reinterpret_cast<volatile platform::InterlockedLong*>(value), static_cast<long>(wanted), static_cast<long>(observed)
       ));
       if (exchanged == observed) {
         return;
@@ -505,7 +503,7 @@ namespace
     for (;;) {
       const std::int32_t observed = ReadAtomicI32(value);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
+        reinterpret_cast<volatile platform::InterlockedLong*>(value), static_cast<long>(wanted), static_cast<long>(observed)
       ));
       if (exchanged == observed) {
         return exchanged;
@@ -525,7 +523,7 @@ namespace
     for (;;) {
       const std::int32_t observed = ReadAtomicI32(slot);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(slot), static_cast<long>(target), static_cast<long>(observed)
+        reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(target), static_cast<long>(observed)
       ));
       if (exchanged == observed) {
         return exchanged;
@@ -564,7 +562,7 @@ namespace
       const std::int32_t observedRealtime = ReadAtomicI32(&item->mRealtimeValueBits);
       const std::int32_t observedPrimary = ReadAtomicI32(&item->mPrimaryValueBits);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(&item->mRealtimeValueBits),
+        reinterpret_cast<volatile platform::InterlockedLong*>(&item->mRealtimeValueBits),
         static_cast<long>(observedPrimary),
         static_cast<long>(observedRealtime)
       ));
@@ -1553,7 +1551,7 @@ namespace moho
     }
     if (sPrintStatsBoogersSquirt) {
 #if defined(_WIN32)
-      (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1L);
+      (void)InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1L);
 #else
       ++sPrintStatsBoogersSquirt->mPrimaryValueBits;
 #endif
@@ -1574,78 +1572,6 @@ namespace moho
     DumpStatsTreeRecursive(engineStats ? engineStats->mItem.get() : nullptr, 0);
   }
 
-  /**
-   * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
-   */
-  void ShowStats(const msvc8::vector<msvc8::string>& args)
-  {
-    CUIManager* const uiManager = g_UIManager;
-    if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
-      return;
-    }
-
-    LuaPlus::LuaState* const state = uiManager->mLuaState;
-    LuaPlus::LuaObject moduleObject = SCR_Import(state, "/lua/debug/EngineStats.lua");
-    if (!moduleObject.IsTable()) {
-      LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/EngineStats.lua\" module");
-    }
-
-    msvc8::string mode = "all";
-    if (args.size() > 1u) {
-      if (const msvc8::string* const requestedMode = ConCommandArg(args, 1u); requestedMode != nullptr) {
-        mode.assign(*requestedMode, 0, msvc8::string::npos);
-      }
-    }
-
-    LuaPlus::LuaObject toggleFunction = moduleObject.GetByName("Toggle");
-    LuaPlus::LuaFunction<void> toggleCallable(toggleFunction);
-    toggleCallable(mode.c_str());
-  }
-
-  /**
-   * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
-   */
-  void ShowArmyStats(const msvc8::vector<msvc8::string>& args)
-  {
-    CUIManager* const uiManager = g_UIManager;
-    if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
-      return;
-    }
-
-    CWldSession* const session = WLD_GetActiveSession();
-    if (!session) {
-      return;
-    }
-
-    UserArmy* const focusArmy = session->GetFocusUserArmy();
-    if (!focusArmy) {
-      return;
-    }
-
-    LuaPlus::LuaState* const state = uiManager->mLuaState;
-    LuaPlus::LuaObject moduleObject = SCR_Import(state, "/lua/debug/ArmyStats.lua");
-    if (!moduleObject.IsTable()) {
-      LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/ArmyStats.lua\" module");
-    }
-
-    int armyIndex = static_cast<int>(focusArmy->mArmyIndex);
-    if (args.size() > 1u) {
-      if (const msvc8::string* const requestedArmy = ConCommandArg(args, 1u); requestedArmy != nullptr) {
-        armyIndex = std::atoi(requestedArmy->c_str());
-      }
-    }
-
-    msvc8::string mode = "all";
-    if (args.size() > 2u) {
-      if (const msvc8::string* const requestedMode = ConCommandArg(args, 2u); requestedMode != nullptr) {
-        mode.assign(*requestedMode, 0, msvc8::string::npos);
-      }
-    }
-
-    LuaPlus::LuaObject showFunction = moduleObject.GetByName("Show");
-    LuaPlus::LuaFunction<void> showCallable(showFunction);
-    showCallable(armyIndex, mode.c_str());
-  }
 
   /**
    * Address: 0x00416480 (FUN_00416480, Moho::CON_EndLoggingStats)
@@ -1797,8 +1723,10 @@ namespace moho
       );
       WIN_OkBox("Complete!", message.c_str());
 
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      // Engine addition (plan WPL.4): `wxTheApp->ExitMainLoop()` when there is
+      // an application object, through the client's hook (WinApp.h).
+      if (sAppExitMainLoop != nullptr) {
+        sAppExitMainLoop();
       }
     }
 
@@ -2206,7 +2134,7 @@ namespace moho
       const float nextValue = currentValue + *delta;
       const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
+        reinterpret_cast<volatile platform::InterlockedLong*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
       ));
       if (exchanged == observedBits) {
         return exchanged;

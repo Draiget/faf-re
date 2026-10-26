@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "gpg/core/containers/String.h"
 #include "moho/task/CTaskThread.h"
@@ -181,6 +182,14 @@ namespace moho
   void PLAT_RegisterFileForErrorReport(const wchar_t* file);
 
   /**
+   * Engine addition (dedicated-server plan WPL.4): the crash-report output
+   * directory PLAT_InitErrorReportOutputDir set (with its trailing `\`), for
+   * the client's crash-report writers; the attachment registry lives with the
+   * platform services (moho/misc/WinPlatform.cpp).
+   */
+  std::wstring PLAT_GetErrorReportOutputDir();
+
+  /**
    * Address: 0x004A1230 (FUN_004A1230)
    * Mangled: ?PLAT_CreateGameLogForReport@Moho@@YAXXZ
    *
@@ -297,6 +306,47 @@ namespace moho
    * when available.
    */
   void WIN_OkBox(gpg::StrArg caption, gpg::StrArg text);
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): the window WIN_OkBox
+   * (moho/misc/WinPlatform.cpp) uses as owner, the client's main window
+   * handle. WinApp.cpp sets it during static initialisation; without it the
+   * box has no owner.
+   */
+  using OkBoxOwnerWindowHook = void* (*)();
+  extern OkBoxOwnerWindowHook sOkBoxOwnerWindow;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): ends the client's main loop
+   * (`wxTheApp->ExitMainLoop()` when there is an application object), for
+   * simulation-side callers such as the core Lua set's EndLoggingStats.
+   * WinApp.cpp sets it during static initialisation; defined in
+   * moho/misc/WinPlatform.cpp. Without a client it is null and nothing exits.
+   */
+  using AppExitMainLoopHook = void (*)();
+  extern AppExitMainLoopHook sAppExitMainLoop;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): dispatches the client's
+   * pending window events, then runs idle processing until it asks for no
+   * more (wxTheApp's Pending/Dispatch/ProcessIdle), for
+   * CSimDriver::PerformNextEvent. WinApp.cpp sets it during static
+   * initialisation; defined in moho/misc/WinPlatform.cpp. Without a client it
+   * is null and there is nothing to pump.
+   */
+  using AppPumpEventsHook = void (*)();
+  extern AppPumpEventsHook sAppPumpEvents;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): one step of the event pump a
+   * Lua thread paused in the script debugger runs (PausedMainThread): when the
+   * client's application object has a pending event, dispatches it and returns
+   * true; otherwise, when `processIdle` is set, runs idle processing and stores
+   * whether it asks for more, and returns false. WinApp.cpp sets it during static
+   * initialisation; defined in moho/misc/WinPlatform.cpp.
+   */
+  using AppPumpStepHook = bool (*)(bool& processIdle);
+  extern AppPumpStepHook sAppPumpStep;
 
   /**
    * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)

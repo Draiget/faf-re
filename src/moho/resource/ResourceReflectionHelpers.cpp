@@ -9,8 +9,6 @@
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/IResources.h"
 #include "moho/resource/ISimResources.h"
-#include "moho/render/d3d/RD3DTextureResource.h"
-#include "moho/render/ID3DTextureSheet.h"
 
 namespace moho::resource_reflection
 {
@@ -55,27 +53,8 @@ namespace moho::resource_reflection
     return ResolveCachedType(moho::IResources::sType, typeid(moho::IResources));
   }
 
-  /**
-   * Address: 0x004441C0 (FUN_004441C0)
-   *
-   * What it does:
-   * Returns cached `RD3DTextureResource` reflected type, resolving it lazily.
-   */
-  gpg::RType* ResolveRD3DTextureResourceType()
-  {
-    return ResolveCachedType(moho::RD3DTextureResource::sType, typeid(moho::RD3DTextureResource));
-  }
-
-  /**
-   * Address: 0x00444200 (FUN_00444200)
-   *
-   * What it does:
-   * Returns cached `ID3DTextureSheet` reflected type, resolving it lazily.
-   */
-  gpg::RType* ResolveID3DTextureSheetType()
-  {
-    return ResolveCachedType(moho::ID3DTextureSheet::sType, typeid(moho::ID3DTextureSheet));
-  }
+  // ResolveRD3DTextureResourceType and ResolveID3DTextureSheetType are defined in
+  // moho/render/d3d/RD3DTextureResourceTypeInfo.cpp (render device, client side).
 
   gpg::RType* ResolveMemBufferConstType()
   {

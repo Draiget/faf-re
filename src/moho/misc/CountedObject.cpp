@@ -1,4 +1,5 @@
 #include "CountedObject.h"
+#include "platform/Interlocked.h"
 
 #include <intrin.h>
 
@@ -31,7 +32,7 @@ namespace moho
 
   void CountedObject::AddReferenceAtomic() noexcept
   {
-    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&mRefCount), 1);
+    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&mRefCount), 1);
   }
 
   [[nodiscard]] bool CountedObject::ReleaseReference() noexcept
@@ -47,7 +48,7 @@ namespace moho
 
   [[nodiscard]] bool CountedObject::ReleaseReferenceAtomic() noexcept
   {
-    const long previous = _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&mRefCount), -1);
+    const long previous = _InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&mRefCount), -1);
     if (previous != 1) {
       return false;
     }

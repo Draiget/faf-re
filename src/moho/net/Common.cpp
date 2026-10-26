@@ -11,13 +11,16 @@
 #include "CHostManager.h"
 #include "CGpgNetInterface.h"
 #include "CNetNullConnector.h"
+#if defined(_WIN32)
 #include "CNetTCPConnector.h"
 #include "CNetUDPConnector.h"
+#else
+#include "INetTCPSocket.h"
+#endif
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "NetConVars.h"
 using namespace moho;
 
@@ -672,61 +675,6 @@ void moho::NET_BuildBandwidthUsageSeries(
   }
 }
 
-/**
- * Address: 0x007F3F20 (FUN_007F3F20, func_ren_BandwidthUsage_Line)
- *
- * What it does:
- * Draws outbound/inbound bandwidth samples as two connected line strips.
- */
-void moho::REN_DrawBandwidthUsageLinePair(
-  CD3DPrimBatcher& primBatcher,
-  const SBandwidthUsageSeries& series,
-  const std::int32_t xOffset,
-  const std::int32_t yBase,
-  const float yScale,
-  const std::uint32_t inboundColor,
-  const std::uint32_t outboundColor
-)
-{
-  const std::uint32_t sampleCount = series.SampleCount();
-  if (sampleCount == 0u) {
-    return;
-  }
-
-  CD3DPrimBatcher::Vertex previousOutbound{};
-  CD3DPrimBatcher::Vertex previousInbound{};
-  bool hasPrevious = false;
-
-  for (std::uint32_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-    const SBandwidthUsageSample& sample = series.samples[sampleIndex];
-    const float x = static_cast<float>(xOffset + static_cast<std::int32_t>(sampleIndex));
-
-    CD3DPrimBatcher::Vertex currentOutbound{};
-    currentOutbound.mX = x;
-    currentOutbound.mY = static_cast<float>(yBase) - (sample.outboundBytesPerSec * yScale);
-    currentOutbound.mZ = 0.0f;
-    currentOutbound.mColor = outboundColor;
-    currentOutbound.mU = 0.0f;
-    currentOutbound.mV = 0.0f;
-
-    CD3DPrimBatcher::Vertex currentInbound{};
-    currentInbound.mX = x;
-    currentInbound.mY = static_cast<float>(yBase) - (sample.inboundBytesPerSec * yScale);
-    currentInbound.mZ = 0.0f;
-    currentInbound.mColor = inboundColor;
-    currentInbound.mU = 0.0f;
-    currentInbound.mV = 0.0f;
-
-    if (hasPrevious) {
-      primBatcher.DrawLine(previousOutbound, currentOutbound);
-      primBatcher.DrawLine(previousInbound, currentInbound);
-    }
-
-    previousOutbound = currentOutbound;
-    previousInbound = currentInbound;
-    hasPrevious = true;
-  }
-}
 
 msvc8::string moho::NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader)
 {
@@ -837,6 +785,7 @@ INetConnector* moho::NET_MakeConnector(
  */
 INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<INetNATTraversalProvider> prov)
 {
+#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -867,6 +816,14 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
     return nullptr;
   }
   return new CNetUDPConnector{sock, prov};
+#else
+  // Engine addition (dedicated-server plan WPL.5): the lockstep transport (the WSAEventSelect
+  // connectors and their sockets) is Windows only; NET_Init fails here, so this fails as the
+  // Windows function does when Winsock cannot start.
+  (void)port;
+  (void)prov;
+  return nullptr;
+#endif
 }
 
 /**
@@ -877,6 +834,7 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
  */
 INetConnector* moho::NET_MakeTCPConnector(const u_short port)
 {
+#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -916,7 +874,26 @@ INetConnector* moho::NET_MakeTCPConnector(const u_short port)
     return nullptr;
   }
   return connector;
+#else
+  // Engine addition (dedicated-server plan WPL.5): see NET_MakeUDPConnector.
+  (void)port;
+  return nullptr;
+#endif
 }
+
+#if !defined(_WIN32)
+/**
+ * Engine addition (dedicated-server plan WPL.5): moho/net/INetTCPSocket.cpp (the Winsock TCP
+ * socket) is Windows only. NET_Init fails here, and NET_TCPConnect fails as the Windows
+ * function does then.
+ */
+moho::INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
+{
+  (void)address;
+  (void)port;
+  return nullptr;
+}
+#endif
 
 /**
  * Address: 0x0047F990 (FUN_0047F990)

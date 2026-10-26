@@ -583,3 +583,32 @@ void moho::ScrDebugWindow::OnCloseWindow(wxCloseEvent& event)
 {
   SCR_DestroyDebugWindow();
 }
+
+namespace
+{
+  // Engine addition (dedicated-server plan WPL.4): the window side of the script
+  // debugger, for moho/misc/ScrDebugHooks.cpp (see ScrDebugHooks.h). The bodies are
+  // what SCR_CreateDebugWindow, SCR_DestroyDebugWindow and the pause path did before
+  // the move.
+  void OpenScrDebugWindow(moho::ScrDebugWindow*& runtimeWindow)
+  {
+    auto* const window = new moho::ScrDebugWindow();
+    runtimeWindow = window;
+    (void)window->Show(true);
+  }
+
+  void DestroyScrDebugWindow(moho::ScrDebugWindow& window)
+  {
+    (void)window.Destroy();
+  }
+
+  void PostScrDebugPause(moho::ScrDebugWindow& window, const msvc8::string& source, const int line)
+  {
+    moho::ScrPauseEvent pauseEvent(source, line);
+    window.AddPendingEvent(pauseEvent);
+  }
+
+  [[maybe_unused]] const bool gScrDebugWindowHooksSet =
+    (moho::sScrDebugWindowOpen = &OpenScrDebugWindow, moho::sScrDebugWindowDestroy = &DestroyScrDebugWindow,
+     moho::sScrDebugWindowPostPause = &PostScrDebugPause, true);
+} // namespace

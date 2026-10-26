@@ -189,7 +189,7 @@ namespace gpg
      * Slot: 4
      * Demangled: _purecall
      */
-    virtual void ReadUInt64(unsigned __int64*) = 0;
+    virtual void ReadUInt64(std::uint64_t*) = 0;
 
     /**
      * Address: 0x00A82547

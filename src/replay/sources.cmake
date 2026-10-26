@@ -8,8 +8,10 @@ set(FAF_REPLAY_SOURCES
   replay/ReplayCommandCheck.cpp
   replay/ReplayFpuReport.cpp
   replay/ReplayLaunchCheck.cpp
+  replay/ReplayLuaState.cpp
   replay/ReplayMain.cpp
   replay/ReplayRunner.cpp
   replay/ReplaySyncWriters.cpp
+  replay/ReplayTerrainCheck.cpp
   replay/ReplayWireStats.cpp
 )

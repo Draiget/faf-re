@@ -16,7 +16,6 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
-#include "moho/audio/AudioEngine.h"
 
 namespace
 {
@@ -231,27 +230,6 @@ namespace moho
     mReserved03 = 0u;
   }
 
-  /**
-   * Address: 0x004E0390 (FUN_004E0390)
-   *
-   * What it does:
-   * Resolves one global XACT variable index by name and caches the result.
-   */
-  bool CSndVar::DoResolve() const
-  {
-    mResolved = 1u;
-    if (SND_GetGlobalVarIndex(mName.c_str(), &mState)) {
-      return true;
-    }
-
-    const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (configuration != nullptr && configuration->mEngines.mStart != nullptr &&
-        configuration->mEngines.mStart != configuration->mEngines.mFinish && configuration->mNoSound == 0u) {
-      gpg::Warnf("SND: Couldn't find variable %s", mName.c_str());
-    }
-
-    return false;
-  }
 
   /**
    * Address: 0x004E0150 (FUN_004E0150, ?SND_GetVariableName@Moho@@...)

@@ -464,7 +464,10 @@ namespace faf::remote::client
       mUnderlays.resize(id + 1u);
     }
     // As `Entity::SetStrategicUnderlay`: the file texture, no border; kept for the session.
-    mUnderlays[id].texture = moho::CD3DBatchTexture::FromFile(path->c_str(), 0u);
+    // Through the client's texture hook (CD3DBatchTexture.h): a build without a client (the
+    // sim-only faf-replay) loads no texture, as its sim holds none.
+    mUnderlays[id].texture = moho::sBatchTextureFromFile != nullptr ? moho::sBatchTextureFromFile(path->c_str(), 0u)
+                                                                     : boost::shared_ptr<moho::CD3DBatchTexture>{};
     mUnderlays[id].resolved = true;
     return mUnderlays[id].texture;
   }
