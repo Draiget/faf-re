@@ -715,8 +715,7 @@ namespace
   constexpr const char* kCMauiControlGetRenderPassHelpText = "int GetRenderPass()";
   constexpr const char* kCMauiControlSetRenderPassHelpText = "int SetRenderPass()";
   // FAF community binary-patch addition (see CMauiControl::SetCustomRender).
-  constexpr const char* kCMauiControlSetCustomRenderHelpText = "SetCustomRender(bool enabled)";
-  constexpr const char* kCMauiControlGetCustomRenderHelpText = "bool GetCustomRender()";
+  constexpr const char* kCUIWorldViewSetCustomRenderHelpText = "WorldView:SetCustomRender(bool)";
   constexpr const char* kCMauiControlGetNameHelpText = "string GetName()";
   constexpr const char* kCMauiControlSetNameHelpText = "SetName(string)";
   constexpr const char* kCMauiControlDumpHelpText = "Dump";
@@ -5790,6 +5789,59 @@ int moho::cfunc_CMauiBitmapShareTexturesL(
   return 1;
 }
 
+// --- FAF community binary-patch addition: Bitmap:SetColorMask. No `Address:`
+// block -- this method never existed in the original 2007 binary; it ships only
+// via FA-Binary-Patches (section/MauiBitmap.cpp, `UIRegFuncT<0x00E37C14,
+// 0x00F8D7DC>` on class "CMauiBitmap").
+
+int moho::cfunc_CMauiBitmapSetColorMask(
+  lua_State* const luaContext
+)
+{
+  return cfunc_CMauiBitmapSetColorMaskL(ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_CMauiBitmapSetColorMask_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetColorMask",
+    &moho::cfunc_CMauiBitmapSetColorMask,
+    &moho::CScrLuaMetatableFactory<moho::CMauiBitmap>::Instance(),
+    "CMauiBitmap",
+    "Bitmap:SetColorMask(color)"
+  );
+  return &binder;
+}
+
+int moho::cfunc_CMauiBitmapSetColorMaskL(
+  LuaPlus::LuaState* const state
+)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, "SetColorMask", 2, argumentCount);
+  }
+
+  LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
+  CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
+  if (bitmap == nullptr) {
+    return 0;
+  }
+
+  // The patch hands `lua_tostring` straight to TryConvertToColor (0x004B2B90); a value
+  // that is not a string reports as an unknown colour here instead of reading null.
+  const char* const colorText = lua_tostring(state->m_state, 2);
+  std::uint32_t color = 0u;
+  if (colorText == nullptr || !SCR_ParseColor(colorText, &color)) {
+    luaL_error(state->m_state, "Unknown color: %s", colorText != nullptr ? colorText : "nil");
+  }
+
+  // The colour replaces the vertex colour's RGB; its alpha (SetAlpha) stays.
+  bitmap->mVertexAlpha = (bitmap->mVertexAlpha & 0xFF000000u) | (color & 0x00FFFFFFu);
+  return 0;
+}
+
 /**
  * Address: 0x00787A50 (FUN_00787A50, cfunc_CMauiControlDestroy)
  *
@@ -6564,89 +6616,129 @@ int moho::cfunc_CMauiControlSetRenderPassL(
   return 1;
 }
 
-// --- FAF community binary-patch addition: CMauiControl:SetCustomRender/
-// GetCustomRender. No `Address:` block on any function in this section --
-// this method never existed in the original 2007 binary; it ships only via
-// FAForever's own binary patches (see CMauiControl::SetCustomRender's
-// declaration comment for the PR references). Modeled on the same
-// cfunc_CMauiControlSetRenderPass/cfunc_CMauiControlGetRenderPass shape as
-// every other CMauiControl accessor pair in this file.
+// --- FAF community binary-patch addition: WorldView:SetCustomRender. No
+// `Address:` block -- this method never existed in the original 2007 binary;
+// it ships only via FA-Binary-Patches (section/DrawFunc.cpp, registered with
+// `UIRegFuncT<0x00E491E8, 0x00F8D88C>` on class "CUIWorldView"). As there: the
+// argument count error names "SetCustomRender", the flag is any Lua value taken
+// by truthiness (`lua_toboolean`), and nothing is returned.
 
-int moho::cfunc_CMauiControlSetCustomRender(
+int moho::cfunc_CUIWorldViewSetCustomRender(
   lua_State* const luaContext
 )
 {
-  return cfunc_CMauiControlSetCustomRenderL(ResolveBindingState(luaContext));
+  return cfunc_CUIWorldViewSetCustomRenderL(ResolveBindingState(luaContext));
 }
 
-moho::CScrLuaInitForm* moho::func_CMauiControlSetCustomRender_LuaFuncDef()
+moho::CScrLuaInitForm* moho::func_CUIWorldViewSetCustomRender_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     UserLuaInitSet(),
     "SetCustomRender",
-    &moho::cfunc_CMauiControlSetCustomRender,
-    &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
-    "CMauiControl",
-    kCMauiControlSetCustomRenderHelpText
+    &moho::cfunc_CUIWorldViewSetCustomRender,
+    &moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance(),
+    "CUIWorldView",
+    kCUIWorldViewSetCustomRenderHelpText
   );
   return &binder;
 }
 
-int moho::cfunc_CMauiControlSetCustomRenderL(
+int moho::cfunc_CUIWorldViewSetCustomRenderL(
   LuaPlus::LuaState* const state
 )
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCMauiControlSetCustomRenderHelpText, 2, argumentCount);
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, "SetCustomRender", 2, argumentCount);
   }
 
-  LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiControl* const control = SCR_FromLua_CMauiControl(controlObject, state);
-
-  LuaPlus::LuaStackObject enabledArg(state, 2);
-  if (lua_type(state->m_state, 2) != LUA_TBOOLEAN) {
-    enabledArg.TypeError("boolean");
+  LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
+  if (worldView == nullptr) {
+    return 0;
   }
 
-  control->SetCustomRender(lua_toboolean(state->m_state, 2) != 0);
-  lua_settop(state->m_state, 1);
-  return 1;
+  worldView->SetCustomRender(lua_toboolean(state->m_state, 2) != 0);
+  return 0;
 }
 
-int moho::cfunc_CMauiControlGetCustomRender(
+// --- FAF community binary-patch addition: WorldView:ProjectMultiple. No `Address:`
+// block -- it ships only via FA-Binary-Patches (section/WorldView.cpp, registered on
+// class "CUIWorldView"). Each vector is read as the patch's `ToVector` does: a
+// non-table is the zero vector, otherwise raw [1], [2], [3] through lua_tonumber.
+
+int moho::cfunc_CUIWorldViewProjectMultiple(
   lua_State* const luaContext
 )
 {
-  return cfunc_CMauiControlGetCustomRenderL(ResolveBindingState(luaContext));
+  return cfunc_CUIWorldViewProjectMultipleL(ResolveBindingState(luaContext));
 }
 
-moho::CScrLuaInitForm* moho::func_CMauiControlGetCustomRender_LuaFuncDef()
+moho::CScrLuaInitForm* moho::func_CUIWorldViewProjectMultiple_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     UserLuaInitSet(),
-    "GetCustomRender",
-    &moho::cfunc_CMauiControlGetCustomRender,
-    &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
-    "CMauiControl",
-    kCMauiControlGetCustomRenderHelpText
+    "ProjectMultiple",
+    &moho::cfunc_CUIWorldViewProjectMultiple,
+    &moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance(),
+    "CUIWorldView",
+    "WorldView:ProjectMultiple(vectors)"
   );
   return &binder;
 }
 
-int moho::cfunc_CMauiControlGetCustomRenderL(
+int moho::cfunc_CUIWorldViewProjectMultipleL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCMauiControlGetCustomRenderHelpText, 1, argumentCount);
+  lua_State* const L = state->m_state;
+  const int argumentCount = lua_gettop(L);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, "ProjectMultiple", 2, argumentCount);
+  }
+  if (!lua_istable(L, 2)) {
+    luaL_argerror(L, 2, "table expected.");
   }
 
-  LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiControl* const control = SCR_FromLua_CMauiControl(controlObject, state);
+  LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
+  if (worldView == nullptr) {
+    return 0;
+  }
+  moho::CameraImpl* const camera = worldView->GetCamera();
+  if (camera == nullptr) {
+    return 0;
+  }
+  const GeomCamera3& view = camera->CameraGetView();
 
-  lua_pushboolean(state->m_state, control->GetCustomRender() ? 1 : 0);
+  const auto readVector = [L](const int index) {
+    Wm3::Vector3f vector{0.0f, 0.0f, 0.0f};
+    if (lua_istable(L, index)) {
+      float* const components[3] = {&vector.x, &vector.y, &vector.z};
+      for (int component = 0; component < 3; ++component) {
+        lua_rawgeti(L, index, component + 1);
+        *components[component] = static_cast<float>(lua_tonumber(L, -1));
+        lua_pop(L, 1);
+      }
+    }
+    return vector;
+  };
+
+  // Every key of the input keeps its key in the result, with a plain {x, y} value.
+  lua_newtable(L);
+  const int resultIndex = lua_gettop(L);
+  lua_pushnil(L);
+  while (lua_next(L, 2) != 0) {
+    const Wm3::Vector2f screen = view.Project(readVector(lua_gettop(L)));
+    lua_pushvalue(L, -2);
+    lua_newtable(L);
+    lua_pushnumber(L, screen.x);
+    lua_rawseti(L, -2, 1);
+    lua_pushnumber(L, screen.y);
+    lua_rawseti(L, -2, 2);
+    lua_rawset(L, resultIndex);
+    lua_pop(L, 1);
+  }
   return 1;
 }
 
@@ -7254,18 +7346,24 @@ int moho::cfunc_CMauiControlSetAlphaL(
     gpg::Warnf(kCMauiControlAboveOneAlphaWarning, static_cast<int>(alpha), debugName.c_str());
   }
 
-  if (lua_type(state->m_state, 3) != LUA_TNIL) {
-    CMauiControl* traversalCursor = control;
-    if (traversalCursor != nullptr) {
-      const std::uint32_t vertexAlpha = PackVertexAlphaFromScalar(alpha);
-      do {
-        traversalCursor->mAlpha = alpha;
-        traversalCursor->mVertexAlpha = vertexAlpha;
-        traversalCursor = traversalCursor->DepthFirstSuccessor(control);
-      } while (traversalCursor != nullptr);
+  // FAF hot-patch (FA-Binary-Patches SetAlpha): 0x00789972 tests arg 3 with lua_toboolean
+  // instead of "not nil", so SetAlpha(a, false) no longer recurses; 0x00789988 / 0x00789999
+  // call _SetAlpha / _SetAlphaChildren, which replace only the vertex colour's alpha byte
+  // (keeping each control's RGB, e.g. a SetColorMask colour) and cap it at 0xFF.
+  const float scaledAlpha = 255.0f * alpha;
+  const std::uint32_t alphaByte = scaledAlpha >= 255.0f ? 0xFFu : static_cast<std::uint32_t>(scaledAlpha);
+  const auto applyAlpha = [alpha, alphaByte](CMauiControl& target) {
+    target.mAlpha = alpha;
+    target.mVertexAlpha = (target.mVertexAlpha & 0x00FFFFFFu) | (alphaByte << 24);
+  };
+
+  if (lua_toboolean(state->m_state, 3) != 0) {
+    for (CMauiControl* traversalCursor = control; traversalCursor != nullptr;
+         traversalCursor = traversalCursor->DepthFirstSuccessor(control)) {
+      applyAlpha(*traversalCursor);
     }
   } else {
-    control->SetAlpha(alpha);
+    applyAlpha(*control);
   }
 
   lua_settop(state->m_state, 1);
@@ -20478,8 +20576,10 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedAlignedBoxL(
   alignedBoxObject.SetNumber("yMin", yMin);
   alignedBoxObject.SetNumber("zMin", zMin);
   alignedBoxObject.SetNumber("xMax", xMax);
-  alignedBoxObject.SetNumber("xMax", yMax);
-  alignedBoxObject.SetNumber("xMax", zMax);
+  // FAF hot-patch (FA-Binary-Patches FixGetInterpolatedAlignedBox): 0x0086D2C0 and 0x0086D2D6
+  // push "yMax" and "zMax"; the stock binary wrote all three maxima under "xMax".
+  alignedBoxObject.SetNumber("yMax", yMax);
+  alignedBoxObject.SetNumber("zMax", zMax);
   alignedBoxObject.PushStack(state);
   return 1;
 }
@@ -21101,7 +21201,11 @@ void moho::CUIWorldView::UpdateSelection(
   gpg::fastvector_n<SBuildTemplateInfo, 16> activeTemplate{};
   (void)mWldSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
 
-  if (activeTemplate.Empty()) {
+  // FAF hot-patch (FA-Binary-Patches BuildTemplateSnap): the stock binary skipped the whole
+  // extractor snap while a build template was active (`jnz 0x008701E1`, NOPed at 0x0086FFF0).
+  // The mass-extractor snap now always runs; the hydrocarbon snap still needs an empty
+  // template (HookHydroCondition, jumped to from 0x00870044).
+  {
     CommandModeData leftMouseMode{};
     (void)mWldSession->GetLeftMouseButtonAction(&leftMouseMode, &mWldSession->CursorInfo(), 0);
 
@@ -21110,7 +21214,7 @@ void moho::CUIWorldView::UpdateSelection(
       EDepositType depositType = kNone;
       if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnMassDeposit) {
         depositType = kMass;
-      } else if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnHydrocarbonDeposit) {
+      } else if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnHydrocarbonDeposit && activeTemplate.Empty()) {
         depositType = kHydrocarbon;
       }
 
@@ -28823,10 +28927,11 @@ namespace
       (void)::moho::func_CMauiControlIsHidden_LuaFuncDef();
       (void)::moho::func_CMauiControlGetRenderPass_LuaFuncDef();
       (void)::moho::func_CMauiControlSetRenderPass_LuaFuncDef();
-      // FAF community binary-patch additions, not part of the original 2007
-      // registration sequence -- see CMauiControl::SetCustomRender.
-      (void)::moho::func_CMauiControlSetCustomRender_LuaFuncDef();
-      (void)::moho::func_CMauiControlGetCustomRender_LuaFuncDef();
+      // FAF community binary-patch addition, not part of the original 2007
+      // registration sequence -- see cfunc_CUIWorldViewSetCustomRender.
+      (void)::moho::func_CUIWorldViewSetCustomRender_LuaFuncDef();
+      (void)::moho::func_CUIWorldViewProjectMultiple_LuaFuncDef();
+      (void)::moho::func_CMauiBitmapSetColorMask_LuaFuncDef();
       (void)::moho::func_CMauiControlGetName_LuaFuncDef();
       (void)::moho::func_CMauiControlSetName_LuaFuncDef();
       (void)::moho::func_CMauiControlDump_LuaFuncDef();

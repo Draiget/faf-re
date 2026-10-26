@@ -12,6 +12,7 @@
 // The backend sees passes through a PassBinder: BeginPass hands it the
 // program and the pass, and it snapshots the parameters and binds the state.
 
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -37,6 +38,7 @@ namespace gpg::gal::effects
   struct CompiledEntry
   {
     bool attempted = false;
+    bool preparing = false; // a thread is reading or compiling it (EffectProgram::Prepare)
     bool succeeded = false;
     std::vector<std::uint8_t> code;
     std::vector<ShaderInput> inputs; // vertex shaders, DXIL only
@@ -72,11 +74,24 @@ namespace gpg::gal::effects
     [[nodiscard]] ParameterStore& Parameters() noexcept { return mParameters; }
     [[nodiscard]] const PassEntries& Entries(std::uint32_t technique, std::uint32_t pass) const;
 
-    /** The compiled entry, compiling (or reading the cache) on first use. Never throws. */
+    /**
+     * The compiled entry, compiling (or reading the cache) on first use; when a background
+     * worker is preparing it, waits for that instead. Never throws.
+     */
     [[nodiscard]] const CompiledEntry& Shader(std::uint32_t entry);
 
     /** Compiles every entry now (FAF_SHADER_PRECOMPILE=1). */
     void CompileAll();
+
+    /**
+     * Engine addition (`ren_BackgroundShaders`): prepares every entry of `program` on the
+     * low-priority shader workers, so a draw neither opens a cache file nor runs the compiler
+     * in the frame that first uses it. Each cache open cost several ms (50% of a 330 ms zoom
+     * frame); a compile 15-300 ms (a 383 ms zoom frame with an empty cache). The workers read
+     * the cached entries first, then compile the rest and add them to the cache. The workers
+     * hold the program only weakly: an effect released meanwhile is skipped.
+     */
+    static void PrepareInBackground(const std::shared_ptr<EffectProgram>& program);
 
     /** Index of a parameter, or -1. */
     [[nodiscard]] std::int32_t FindParameter(std::string_view name) const noexcept;
@@ -88,6 +103,24 @@ namespace gpg::gal::effects
     [[nodiscard]] std::shared_ptr<void>& BackendState() noexcept { return mBackendState; }
 
   private:
+    enum class PrepareMode
+    {
+      CacheOnly,  // a worker's first pass: read the cache, leave a miss for later
+      Background, // a worker's second pass: compile a miss
+      OnUse,      // a draw needs it now
+    };
+
+    [[nodiscard]] std::uint64_t EntryKey(std::uint32_t entry) const;
+
+    /** Marks `entry` preparing when nothing has prepared it or is preparing it yet. */
+    [[nodiscard]] bool Claim(std::uint32_t entry);
+
+    /**
+     * Reads or compiles a claimed entry outside the lock and publishes it. Returns false when
+     * CacheOnly found no cache file; the entry is then released unprepared.
+     */
+    bool Prepare(std::uint32_t entry, PrepareMode mode);
+
     std::string mName;
     ShaderTarget mTarget;
     EffectDescription mDescription;
@@ -99,6 +132,7 @@ namespace gpg::gal::effects
     std::vector<std::int32_t> mTextureSlotParameters;
     std::shared_ptr<void> mBackendState;
     std::mutex mCompileMutex;
+    std::condition_variable mEntryPrepared;
   };
 
   /** What the backend does when a technique or pass begins and ends. */
@@ -110,6 +144,9 @@ namespace gpg::gal::effects
     virtual void BindPass(EffectProgram& program, std::uint32_t technique, std::uint32_t pass) = 0;
     virtual void UnbindPass() = 0;
   };
+
+  /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
+  extern bool gBackgroundShaders;
 
   /** Keys the shader cache: FNV-1a, 64-bit. */
   class Fnv1a64

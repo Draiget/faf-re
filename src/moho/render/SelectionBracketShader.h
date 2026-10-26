@@ -17,8 +17,8 @@
 // from the prim batcher's atlas) times the vertex colour, alpha times the
 // batcher's alpha multiplier, and D3D9's alpha test (AlphaFunc Greater,
 // AlphaRef 0) on the 8-bit alpha. Blend src-alpha/inv-src-alpha into RGB, no
-// culling; the depth state is whatever the frame already has bound, as for the
-// technique, which sets none.
+// culling, and the technique's begin depth state (LESS_EQUAL with writes, no
+// stencil), since its pass sets none.
 //
 // Bindings follow gpg/gal/GpuDriven.h (b0, t0..t1, t4, s0), so DXC builds the
 // same source for D3D12 (DXIL) and Vulkan (SPIR-V).

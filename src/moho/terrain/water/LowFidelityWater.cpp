@@ -184,7 +184,8 @@ namespace moho
    *
    * What it does:
    * Binds `water2/TWater`, updates water shader uniforms from camera/properties,
-   * binds normal and water-map textures, and draws the retained water sheet.
+   * binds the normal maps and the water map (as UtilityTextureC), and draws the
+   * retained water sheet.
    */
   bool LowFidelityWater::RenderWaterSurface(
     const std::int32_t tick,
@@ -240,8 +241,12 @@ namespace moho
     BindTextureShaderVar(GetWater2NormalMap2ShaderVar(), shaderProperties->GetNormalMap(2));
     BindTextureShaderVar(GetWater2NormalMap3ShaderVar(), shaderProperties->GetNormalMap(3));
 
+    // The water map goes to `UtilityTextureC` (shader var 0x010C1350, registered by
+    // FUN_00BE3500): the low/medium water shaders read their depth mask and wave-crest
+    // alpha from UtilitySamplerC. Bound to FresnelLookup, which they never sample, the
+    // water drew transparent and without wave crests.
     IWldTerrainRes* const terrainRes = mTerrainRes;
-    BindTextureShaderVar(GetWater2FresnelLookupShaderVar(), terrainRes->GetWaterMap());
+    BindTextureShaderVar(GetWater2UtilityTextureCShaderVar(), terrainRes->GetWaterMap());
 
     std::int32_t primitiveType = 4;
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);

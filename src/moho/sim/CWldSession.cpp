@@ -752,7 +752,7 @@ namespace moho
   std::uint32_t ui_FuelWarningColor = 0xFFFF0000u; // 0x00F57BB0 (0x0085D135)
   std::uint32_t ui_ShieldBarColor = 0xFF00C3F7u;  // 0x00F57BB4 (0x0085D0DA)
   std::uint32_t ui_ProgressBarColor = 0xFFFF9900u; // 0x00F57BB8 (0x0085D14B)
-  msvc8::string ui_CustomNameFont{};              // 0x00F5B300 (0x0085E124)
+  msvc8::string ui_CustomNameFont("Arial");       // 0x00F5B300 (0x0085E124), built "Arial" by FUN_00BE5720
   bool ui_ForceLifbarsOnEnemy = false;            // 0x010A644A (0x0085C031)
   bool ui_AlwaysRenderStrategicIcons = false;     // 0x010A644B (0x0085C148)
   // Engine addition (`ui_IconRecords`): counts applied sync beats on the user side, so the
@@ -789,12 +789,10 @@ namespace moho
   // Per-army team-color palette, distinct from `StrategicIconAux`'s own
   // Self/Ally/Enemy/Neutral relation colors: `RenderUnitIcon` (0x0085D9A0)
   // indexes this one directly by the icon's owning army's `mArmyIndex`
-  // (`mov eax, offset teamcolors` / `mov ecx, [eax+ecx*4]`, the cold
-  // out-of-line chunk at 0x0128E837..0x0128E83C). Sized to the original
-  // game's eight-slot army cap; no loader/population site has been
-  // identified yet, so - like the console variables above - it ships
-  // zeroed until one is found.
-  std::uint32_t teamcolors[8]{}; // 0x0128F1C0
+  // (`mov eax, offset teamcolors` / `mov ecx, [eax+ecx*4]`, FA-Binary-Patches
+  // TeamColorModeRenderer). 32 entries, as the patch's `int Colors[32]`
+  // (0x012931E0); `TeamColorMode(string)` fills it (cfunc_TeamColorModeL).
+  std::uint32_t teamcolors[kTeamColorPaletteSize]{};
 
   // Entity ids carry their family in the top nibble; 0x1_______ is a projectile.
   constexpr std::uint32_t kEntityFamilyMask = 0xF0000000u;
@@ -806,10 +804,12 @@ namespace moho
   constexpr std::int32_t kLayerUnderwaterMask = LAYER_Seabed | LAYER_Sub;
 
 
-  float ui_CurveSmoothness = 0.0f;             // 0x00F57CC4
-  float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
-  float ui_MaxTextLOD = 0.0f;                  // 0x00F57CCC
-  std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
+  // Initial values from the shipped .data; commandwaypoint.lua may override the
+  // waypoint/path ones (UICommandGraph::LoadPathParams), missing keys keep these.
+  float ui_CurveSmoothness = 50.0f;            // 0x00F57CC4
+  float ui_PathSmoothness = 2.0f;              // 0x00F57CC8
+  float ui_MaxTextLOD = 80.0f;                 // 0x00F57CCC
+  std::int32_t ui_CommandGraphMaxNodeUnits = 1; // 0x00F57CD0
 
   /**
    * Degenerate-length cutoff `RecomputeDrawNodeOrientation` compares its summed
@@ -818,9 +818,9 @@ namespace moho
    * normalizing noise into an arbitrary direction.
    */
   constexpr float kCommandGraphOrientationEpsilon = 1.0e-6f;
-  float ui_MinWaypointSize = 0.0f;             // 0x00F57CD4
-  float ui_MaxWaypointSize = 0.0f;             // 0x00F57CD8
-  float ui_WaypointLineScale = 0.0f;           // 0x00F57CDC
+  float ui_MinWaypointSize = 7.0f;             // 0x00F57CD4
+  float ui_MaxWaypointSize = 100.0f;           // 0x00F57CD8
+  float ui_WaypointLineScale = 1.0f;           // 0x00F57CDC
 
   struct UICommandGraphNode
   {
@@ -7679,7 +7679,10 @@ namespace moho
         continue;
       }
 
-      if (army->mVarDat.mValidCommandSources.Contains(localCommandSource) && army->mVarDat.mIsOutOfGame == 0u) {
+      // FAF hot-patch (FA-Binary-Patches ObserverFix): 0x0089671A `jz` became `jmp`, so any army
+      // the local source commands refuses the switch; the stock binary refused only while that
+      // army was still in the game (`cmp byte ptr [edx+1B8h], 0`, now unused).
+      if (army->mVarDat.mValidCommandSources.Contains(localCommandSource)) {
         return false;
       }
     }
@@ -10789,9 +10792,9 @@ namespace moho
       return;
     }
 
-    if (hoveredEntity->IsInCategory(msvc8::string("WALL"))) {
-      return;
-    }
+    // FAF hot-patch (FA-Binary-Patches WallSelection): the stock early return for a WALL unit
+    // (`jne 0x00866002` after IsInCategory("WALL")) is NOPed at 0x00865EC2, so double-clicking
+    // a wall selects all walls of that type on screen. The category test itself has no effect.
 
     if (hoveredEntity->mArmy != GetFocusUserArmy()) {
       return;
@@ -14043,16 +14046,17 @@ namespace moho
     constexpr float kEconOverlayShadowOffset = 1.0f;
 
     // `/lua/ui/game/econoverlayparams.lua` lanes, in the order the import reads
-    // them. Each is left at its previous value when the key is absent.
-    std::uint32_t gEconOverlayPositiveColor = 0;                    // 0x00F57C00
-    std::uint32_t gEconOverlayNegativeColor = 0;                    // 0x00F57BFC
+    // them. Each is left at its previous value when the key is absent, so the
+    // initial values are the ones the shipped .data holds.
+    std::uint32_t gEconOverlayPositiveColor = 0xFF00D800u;          // 0x00F57C00
+    std::uint32_t gEconOverlayNegativeColor = 0xFFD80000u;          // 0x00F57BFC
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayLeftTexture{};  // 0x010C4230
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayRightTexture{}; // 0x010C4238
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayMidTexture{};   // 0x010C4244
     msvc8::string gEconOverlayFontName{};                           // 0x00F5B210
-    std::int32_t gEconOverlayFontSize = 0;                          // 0x00F57C04
+    std::int32_t gEconOverlayFontSize = 12;                         // 0x00F57C04
     float gEconOverlayEnergyTopOffset = 0.0f;                       // 0x010A6458
-    float gEconOverlayMassTopOffset = 0.0f;                         // 0x00F57C08
+    float gEconOverlayMassTopOffset = 14.0f;                        // 0x00F57C08
 
     bool gEconOverlayParamsImported = false;                        // 0x010A6449
     CD3DFont* gEconOverlayFont = nullptr;                           // 0x010C4228

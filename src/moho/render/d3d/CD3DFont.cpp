@@ -13,6 +13,7 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/console/CConCommand.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/DXTCodec.h"
 
@@ -20,6 +21,53 @@ namespace moho
 {
   namespace
   {
+    /**
+     * Engine addition: `ren_GlyphBitmapRead`. A new character's glyph is read from the
+     * scratch bitmap with one GetBitmapBits call instead of one GetPixel per pixel; the pixels
+     * are the same (checked on the session's first glyph, see GetCharInfo).
+     */
+    bool ren_GlyphBitmapRead = true;
+
+    TConVar<bool> gTConVar_ren_GlyphBitmapRead(
+      "ren_GlyphBitmapRead",
+      "Read a new character's glyph from the font's scratch bitmap in one call (1, the default) instead of one "
+      "GetPixel per pixel (0), which cost tens of ms when a frame met many new characters.",
+      &ren_GlyphBitmapRead
+    );
+
+    /**
+     * The `sampleWidth` x `sampleHeight` corner of the 32-bit scratch bitmap as GetPixel
+     * COLORREFs (0x00BBGGRR); the rest of `out` stays zero, as the GetPixel loop leaves it.
+     */
+    template <std::size_t N>
+    [[nodiscard]] bool ReadGlyphBitmap(
+      HBITMAP const bitmap, const int width, const int height, const int sampleWidth, const int sampleHeight,
+      std::array<COLORREF, N>& out
+    )
+    {
+      if (bitmap == nullptr || static_cast<std::size_t>(width * height) != N) {
+        return false;
+      }
+      BITMAP info{};
+      if (GetObjectW(bitmap, sizeof(info), &info) == 0 || info.bmBitsPixel != 32 || info.bmWidth != width ||
+          info.bmHeight != height || info.bmWidthBytes != width * 4) {
+        return false;
+      }
+      (void)GdiFlush(); // DrawTextW may still sit in the GDI batch; GetPixel flushes it implicitly
+      std::array<std::uint32_t, N> bits{};
+      if (GetBitmapBits(bitmap, static_cast<LONG>(N * sizeof(std::uint32_t)), bits.data()) != static_cast<LONG>(N * sizeof(std::uint32_t))) {
+        return false;
+      }
+      out.fill(0u);
+      for (int y = 0; y < sampleHeight; ++y) {
+        for (int x = 0; x < sampleWidth; ++x) {
+          const std::uint32_t bgrx = bits[static_cast<std::size_t>(y * width + x)]; // bytes B, G, R, X
+          out[static_cast<std::size_t>(y * width + x)] = RGB((bgrx >> 16) & 0xFFu, (bgrx >> 8) & 0xFFu, bgrx & 0xFFu);
+        }
+      }
+      return true;
+    }
+
     struct FontLookup
     {
       std::int32_t mPointSize = 0;
@@ -795,10 +843,31 @@ namespace moho
     std::array<COLORREF, static_cast<std::size_t>(kGlyphScratchWidth * kGlyphScratchHeight)> pixels{};
     const int sampleWidth = (std::min)(glyphWidth + 4, kGlyphScratchWidth);
     const int sampleHeight = (std::min)(glyphHeight + 4, kGlyphScratchHeight);
-    for (int y = 0; y < sampleHeight; ++y) {
-      for (int x = 0; x < sampleWidth; ++x) {
-        pixels[static_cast<std::size_t>(y * kGlyphScratchWidth + x)] = GetPixel(mDeviceContext, x, y);
+    const auto readWithGetPixel = [&](std::array<COLORREF, static_cast<std::size_t>(kGlyphScratchWidth * kGlyphScratchHeight)>& out) {
+      for (int y = 0; y < sampleHeight; ++y) {
+        for (int x = 0; x < sampleWidth; ++x) {
+          out[static_cast<std::size_t>(y * kGlyphScratchWidth + x)] = GetPixel(mDeviceContext, x, y);
+        }
       }
+    };
+    if (ren_GlyphBitmapRead && ReadGlyphBitmap(mBitmap, kGlyphScratchWidth, kGlyphScratchHeight, sampleWidth, sampleHeight, pixels)) {
+      // Engine addition (ren_GlyphBitmapRead): the whole 128x128 scratch bitmap in one call, instead
+      // of the binary's GetPixel per pixel (0x00425BC7), one kernel call each: 70 ms in a zoom frame
+      // that met new characters. The first glyph of the session is read both ways; any difference
+      // turns the fast read off for good.
+      static bool sChecked = false;
+      if (!sChecked) {
+        sChecked = true;
+        std::array<COLORREF, static_cast<std::size_t>(kGlyphScratchWidth * kGlyphScratchHeight)> reference{};
+        readWithGetPixel(reference);
+        if (reference != pixels) {
+          gpg::Warnf("CD3DFont: the glyph bitmap read differs from GetPixel; reading glyphs with GetPixel from now on");
+          ren_GlyphBitmapRead = false;
+          pixels = reference;
+        }
+      }
+    } else {
+      readWithGetPixel(pixels);
     }
 
     auto isColumnBlack = [&pixels](const int x, const int yMin, const int yMaxExclusive) noexcept {

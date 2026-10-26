@@ -59,6 +59,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/d3d12/ResourcesD3D12.cpp
   gpg/gal/backends/d3d12/DeviceD3D12.cpp
   gpg/gal/backends/d3d12/GpuDrivenD3D12.cpp
+  gpg/gal/backends/d3d12/PipelineCacheD3D12.cpp
   gpg/gal/effects/SpirvReflect.cpp
   gpg/gal/backends/vulkan/VulkanLoader.cpp
   gpg/gal/backends/vulkan/VulkanSurface.cpp
@@ -218,6 +219,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/diagnostics/CrashHooks.cpp
   gpg/core/diagnostics/CrashReport.cpp
   gpg/core/diagnostics/ProbeWatch.cpp
+  gpg/core/diagnostics/FrameSampler.cpp
   lua/LuaCrashDump.cpp
   lua/LuaMemAccounting.cpp
   lua/LuaGcEventLog.cpp

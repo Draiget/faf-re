@@ -46,13 +46,13 @@ namespace moho
   bool UI_RenProjectileArcs = false;
 
   /** Address: 0x00F57B50 (?UI_RenProjectileArcsSampleInterval@Moho@@3HA). */
-  std::int32_t UI_RenProjectileArcsSampleInterval = 0;
+  std::int32_t UI_RenProjectileArcsSampleInterval = 5;
 
-  /** Address: 0x00F57B48 (?UI_RenProjectileTrailColor@Moho@@3HA). */
-  std::int32_t UI_RenProjectileTrailColor = 0;
+  /** Address: 0x00F57B48 (?UI_RenProjectileTrailColor@Moho@@3HA) - ARGB 0x80A80000. */
+  std::int32_t UI_RenProjectileTrailColor = static_cast<std::int32_t>(0x80A80000u);
 
   /** Address: 0x00F57B4C (?UI_RenProectileTrailWidth@Moho@@3MA) - the binary's own spelling. */
-  float UI_RenProectileTrailWidth = 0.0f;
+  float UI_RenProectileTrailWidth = 2.0f;
 
   /**
    * Address: 0x008600E0 (FUN_008600E0, Moho::RenderProjectileArcs)

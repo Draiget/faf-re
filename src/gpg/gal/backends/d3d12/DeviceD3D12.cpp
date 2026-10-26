@@ -28,6 +28,7 @@
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
@@ -263,12 +264,19 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       key.Add(rasterizer.antialiasedLineEnable);
     }
 
-    /** The state every technique begins with (D3D10 `CreateState2`, 0x00902940). */
+    /**
+     * The state every technique begins with: the D3D10 pack (`CreateState2`,
+     * 0x00902940), except that it culls nothing, as Direct3D 9's begin state
+     * does (see backend::Direct3D10TechniqueCull).
+     */
     void TechniquePack(effects::BlendDesc& blend, effects::DepthStencilDesc& depth, effects::RasterizerDesc& rasterizer)
     {
       blend = effects::BlendDesc{};
       depth = effects::DepthStencilDesc{};
       rasterizer = effects::RasterizerDesc{};
+      if (!backend::Direct3D10TechniqueCull()) {
+        rasterizer.cullMode = 1U; // NONE
+      }
     }
 
     void WriteBmp(const char* const path, const imaging::Image& image)
@@ -370,11 +378,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mIndexBuffer.reset();
     mSwapChains.clear();
     mGarbage.clear();
+    mPipelineCache.Close();
     mPipelines.clear();
     mBlitPipelines.clear();
     mPipelineState.reset();
     mCursor.Destroy();
     mUpload.Release();
+    mPlacedTextures.Release();
+    mPlacedBuffers.Release();
     mRtvPool.Release();
     mDsvPool.Release();
     mSrvPool.Release();
@@ -487,6 +498,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     CreateDrawMarkers();
 
     mUpload.Initialize(mDevice.Get());
+    mPlacedTextures.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, L"placed textures");
+    mPlacedBuffers.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS, L"placed buffers");
     mRtvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 256U);
     mDsvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 256U);
     mSrvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096U);
@@ -758,6 +771,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     CreateDevice();
     CreateQueueAndFrames();
     CreateRootSignature();
+    mPipelineCache.Open(mDevice.Get(), effects::ShaderCacheDirectory());
     BeginRecording();
     CreateSwapChains(*context);
     CreateBuiltInPipelines();
@@ -1648,6 +1662,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     if (const char* const precompile = std::getenv("FAF_SHADER_PRECOMPILE"); precompile != nullptr && precompile[0] == '1') {
       program->CompileAll();
+    } else if (effects::gBackgroundShaders) {
+      effects::EffectProgram::PrepareInBackground(program); // engine addition: ren_BackgroundShaders
     }
     gpg::Logf(
       "D3D12: effect %s: %u techniques, %u entry points, %u bytes of parameters (%lu ms)", sourceName,
@@ -1656,6 +1672,48 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     );
     return boost::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
   }
+
+  namespace
+  {
+    [[nodiscard]] std::int64_t TextureTimingNow() noexcept
+    {
+      LARGE_INTEGER now{};
+      ::QueryPerformanceCounter(&now);
+      return now.QuadPart;
+    }
+
+    /**
+     * Diagnostics: FAF_TEXTURE_TIMING=1 logs every file texture whose decode, resource creation
+     * and upload took 4 ms or more together, with the time of each step and how it was decoded.
+     */
+    void LogTextureTiming(
+      const char* const location, const char* const route, const std::int64_t decodeStarted, const std::int64_t decodeEnded,
+      const std::int64_t created, const std::int64_t uploaded, const std::size_t bytes
+    )
+    {
+      static const bool enabled = [] {
+        const char* const value = std::getenv("FAF_TEXTURE_TIMING");
+        return value != nullptr && value[0] == '1';
+      }();
+      if (!enabled) {
+        return;
+      }
+      static const double ticksPerMs = [] {
+        LARGE_INTEGER frequency{};
+        ::QueryPerformanceFrequency(&frequency);
+        return static_cast<double>(frequency.QuadPart) / 1000.0;
+      }();
+      const double total = static_cast<double>(uploaded - decodeStarted) / ticksPerMs;
+      if (total < 4.0) {
+        return;
+      }
+      gpg::Logf(
+        "D3D12: texture %s: %.1f ms (decode %.1f via %s, create %.1f, upload %.1f), %zu bytes", location, total,
+        static_cast<double>(decodeEnded - decodeStarted) / ticksPerMs, route, static_cast<double>(created - decodeEnded) / ticksPerMs,
+        static_cast<double>(uploaded - created) / ticksPerMs, bytes
+      );
+    }
+  } // namespace
 
   boost::shared_ptr<Texture> DeviceD3D12::CreateTexture(const TextureContext* const context)
   {
@@ -1668,6 +1726,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     bool cube = false;
     bool contentsFromEngine = false;
     imaging::Image image;
+    std::int64_t decodeStarted = 0;
+    std::int64_t decodeEnded = 0;
 
     if (context->source_ == 2U) {
       desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -1690,8 +1750,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       // The texture-quality option skips top mip levels (D3D9's
       // D3DX_SKIP_DDS_MIP_LEVELS, `reserved0x44_`).
       options.skipMipLevels = context->reserved0x44_ & 0x1FU;
+      decodeStarted = TextureTimingNow();
       const HRESULT result =
         imaging::ImageCodec::Instance()->Decode(context->dataBuffer_.mBegin, context->DataSizeBytes(), options, image);
+      decodeEnded = TextureTimingNow();
       if (FAILED(result)) {
         char message[640]{};
         std::snprintf(message, sizeof(message), "unable to load texture %s: HRESULT 0x%08lX", context->location_.c_str(),
@@ -1715,11 +1777,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       ThrowError("DeviceD3D12.cpp", __LINE__, "invalid source specified for texture data");
     }
 
-    CheckHresult(
-      "DeviceD3D12.cpp", __LINE__,
-      mDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-                                       IID_PPV_ARGS(&resource.resource))
-    );
+    // Engine addition (gal::gPlacedResources): a file texture, whose every subresource is
+    // uploaded below, goes in a heap. One the engine fills itself stays committed: it relies
+    // on starting zeroed, and placed memory is not.
+    if (contentsFromEngine || !gPlacedResources ||
+        !mPlacedTextures.Create(desc, D3D12_RESOURCE_STATE_COPY_DEST, resource.resource)) {
+      CheckHresult(
+        "DeviceD3D12.cpp", __LINE__,
+        mDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                         IID_PPV_ARGS(&resource.resource))
+      );
+    }
     resource.state = D3D12_RESOURCE_STATE_COPY_DEST;
     {
       const std::string_view location = context->location_.view();
@@ -1727,9 +1795,15 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       static_cast<void>(resource.resource->SetName(name.empty() ? L"engine texture" : name.c_str()));
     }
 
+    const std::int64_t created = TextureTimingNow();
+
     for (std::uint32_t index = 0U; index < image.subresources.size(); ++index) {
       const imaging::Image::Subresource& subresource = image.subresources[index];
       UploadSubresource(resource, index, image.bytes.data() + subresource.offset, subresource.rowPitch);
+    }
+    if (decodeEnded != 0) {
+      LogTextureTiming(context->location_.c_str(), imaging::ImageCodec::LastDecodeRoute(), decodeStarted, decodeEnded, created,
+                       TextureTimingNow(), image.bytes.size());
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC view{};
@@ -2273,11 +2347,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     constexpr double kMiB = 1.0 / (1024.0 * 1024.0);
     gpg::Logf(
-      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), %zu pipelines, %zu retiring, "
+      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), placed textures %.1f of "
+      "%.1f MB, placed buffers %.1f of %.1f MB, %zu pipelines, %zu retiring, "
       "%llu upload-pressure submissions, %llu passes carried over one, at most %llu submissions in flight; process private "
       "%.1f MB, address space free %.1f MB (largest block %.1f MB)",
       static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB, static_cast<double>(TextureD3D12::CpuCopyBytes()) * kMiB,
-      static_cast<double>(mUpload.PageBytes()) * kMiB, mUpload.PageCount(), mPipelines.size(), mGarbage.size(),
+      static_cast<double>(mUpload.PageBytes()) * kMiB, mUpload.PageCount(), static_cast<double>(mPlacedTextures.UsedBytes()) * kMiB,
+      static_cast<double>(mPlacedTextures.HeapBytes()) * kMiB, static_cast<double>(mPlacedBuffers.UsedBytes()) * kMiB,
+      static_cast<double>(mPlacedBuffers.HeapBytes()) * kMiB, mPipelines.size(), mGarbage.size(),
       static_cast<unsigned long long>(mUploadSubmits), static_cast<unsigned long long>(mCarriedPasses),
       static_cast<unsigned long long>(mMostInFlight), static_cast<double>(counters.PrivateUsage) * kMiB,
       static_cast<double>(freeBytes) * kMiB, static_cast<double>(largestFree) * kMiB
@@ -2317,6 +2394,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     ++mFrameNumber;
+    mPipelineCache.OnFrame();
     {
       static const long start = [] {
         const char* const value = std::getenv("FAF_GAL_TRACE_START");
@@ -2904,8 +2982,18 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     desc.DSVFormat = depthFormat;
     desc.SampleDesc.Count = 1U;
 
-    ComPtr<ID3D12PipelineState> pipeline;
+    // Engine addition (gPipelineDiskCache): a pipeline an earlier session created comes from the
+    // pipeline library on disk instead of a driver compile in this frame.
+    effects::Fnv1a64 cacheKey;
+    cacheKey.Add(key.Key().data(), key.Key().size());
+    ComPtr<ID3D12PipelineState> pipeline = mPipelineCache.Load(cacheKey.Value(), desc);
+    if (pipeline != nullptr) {
+      return mPipelines.emplace(std::move(key.Key()), pipeline).first->second.Get();
+    }
     const HRESULT result = mDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline));
+    if (SUCCEEDED(result)) {
+      mPipelineCache.Store(cacheKey.Value(), pipeline.Get());
+    }
     if (FAILED(result)) {
       static int logged = 0;
       if (logged++ < 16) {

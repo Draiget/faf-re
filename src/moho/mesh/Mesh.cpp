@@ -69,8 +69,8 @@ namespace moho
 
 namespace moho
 {
-  float ren_MeshDissolve = 0.0f;
-  float ren_MeshDissolveCutoff = 0.0f;
+  float ren_MeshDissolve = 20.0f;      // 0x00F57F00 (shipped .data)
+  float ren_MeshDissolveCutoff = 0.2f; // 0x00F57F04
 
   // Mesh-pass inclusion flags read by MeshRenderer::Batch. Byte-verified
   // defaults from ForgedAlliance.exe: ?ren_MeshSkinned@Moho@@3_NA = 1 and

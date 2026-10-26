@@ -178,14 +178,13 @@ namespace moho
    * Address: 0x008D3BE0 (FUN_008D3BE0, sub_8D3BE0)
    *
    * What it does:
-   * See header. The binary's `atoi(args[1])==1` parse (0x008D3C67) has no
-   * side effects and its result is never read again, so it is omitted here;
-   * the observable behavior - an unconditional device-context reset gated
-   * only on argument *count* - is preserved exactly. Mirrors
-   * `SC_PrimaryAdapter`'s device-context-copy/`sDeviceLock`/`Clear`+
-   * `InitContext` idiom above; unlike that command, `deviceInstance` here is
-   * also never null-checked by the binary before the initial
-   * `GetDeviceContext()` dereference, matching what this recovery keeps.
+   * See header. The `atoi(args[1]) == 1` result (0x008D3C60-0x008D3C6E) is
+   * stored to `[esp+0x18]`, which is +0x10 of the context copy at
+   * `[esp+0x08]`: `mVSync`. Mirrors `SC_PrimaryAdapter`'s
+   * device-context-copy/`sDeviceLock`/`Clear`+`InitContext` idiom above;
+   * unlike that command, `deviceInstance` here is also never null-checked by
+   * the binary before the initial `GetDeviceContext()` dereference, matching
+   * what this recovery keeps.
    */
   void SC_VerticalSync(const msvc8::vector<msvc8::string>& args)
   {
@@ -196,6 +195,7 @@ namespace moho
     sDeviceLock = true;
 
     if (args.size() == 2u) {
+      deviceContext.mVSync = std::atoi(args[1].c_str()) == 1;
       device->Clear();
       (void)device->InitContext(&deviceContext);
     }

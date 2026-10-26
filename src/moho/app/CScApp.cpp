@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/diagnostics/FrameSampler.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -771,14 +772,18 @@ namespace
    *
    * What it does:
    * Executes one startup graphics-options setup chain:
-   * primary/secondary adapter settings, fidelity presets/settings, shadow
-   * quality, and anti-aliasing.
+   * primary/secondary adapter settings, fidelity settings, shadow quality,
+   * and anti-aliasing.
    */
   void ConfigureStartupGraphicsOptionGroups(const bool secondarySetupMode)
   {
     moho::SetupPrimaryAdapterSettings();
     moho::SetupSecondaryAdapterSettings(secondarySetupMode);
-    moho::CreateFidelityPresets();
+    // FAF hot-patch (FA-Binary-Patches UnlockUltraPreset.cpp): the stock chain
+    // called `CreateFidelityPresets` (0x008D2B90) here; the PE has five NOPs at
+    // 0x008D0E93 in its place. That call rewrote the `fidelity_presets` option
+    // states and dropped Ultra unless the pixel-shader profile was above 8, so
+    // options.lua's own preset list (Ultra always present) now stays.
     moho::SetupFidelitySettings();
     moho::SetupShadowQualitySettings();
     moho::SetupAntiAliasingSettings();
@@ -1100,6 +1105,7 @@ void CScApp::Main()
     curTime.Reset();
   }
 
+  gpg::diag::FrameSamplerMark(); // debugging aid, off unless FAF_FRAME_SAMPLER is set
   (void)framerates.Push(frameSeconds);
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.

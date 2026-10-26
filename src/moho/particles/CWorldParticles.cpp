@@ -892,7 +892,10 @@ namespace
 
 namespace moho
 {
-  float efx_ParticleWaterSurface = 0.0F;
+  // Initial value from the binary's .data (0x00F58DCC = 0xC2CA0000). Buckets at or below it
+  // draw in the pass before the water surface, buckets at or above it in the pass after.
+  // The stock ship-wake emitters use SortOrder -101, so they draw in both passes.
+  float efx_ParticleWaterSurface = -101.0F;
 
   CWorldParticles sWorldParticles{};
 

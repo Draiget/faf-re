@@ -2660,9 +2660,16 @@ bool UserUnit::IsSelectable() const
     return false;
   }
 
+  // FAF hot-patch: 0x008C05FE jumps to 0x01291439 in .exxt, which tests
+  // "CQUEMOV" (string at 0x01292A9C, via the pointer at 0x01292A98) and goes
+  // straight to the SELECTABLE test at 0x008C062A when it holds, before
+  // falling back to the original "FACTORY" test at 0x008C0603. It is the UI
+  // half of the 0x006EFAC9 patch in `ProcessIssuedUnitCommand` (Sim.cpp):
+  // a CQUEMOV unit can be selected, and so given orders, while being built.
   if (IsBeingBuilt()) {
+    const msvc8::string queueMoveCategory("CQUEMOV", 7u);
     const msvc8::string factoryCategory("FACTORY", 7u);
-    if (!entityView->IsInCategory(factoryCategory)) {
+    if (!entityView->IsInCategory(queueMoveCategory) && !entityView->IsInCategory(factoryCategory)) {
       return false;
     }
   }
@@ -4831,6 +4838,94 @@ int moho::cfunc_UserUnitGetWorkProgressL(LuaPlus::LuaState* const state)
   return 1;
 }
 
+// --- FAF community binary-patch additions: UserUnit:GetInterpolatedPosition and
+// UserUnit:GetFractionComplete. No `Address:` blocks -- these never existed in the
+// original 2007 binary; they ship only via FA-Binary-Patches (section/UserUnit.cpp,
+// `UIRegFuncT<0x00E4DA64, 0x00F8D89C>` on class "UserUnit"). The argument count
+// error names the function, as the patch's `__FUNCTION__` does.
+
+int moho::cfunc_UserUnitGetInterpolatedPosition(lua_State* const luaContext)
+{
+  return cfunc_UserUnitGetInterpolatedPositionL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+CScrLuaInitForm* moho::func_UserUnitGetInterpolatedPosition_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetInterpolatedPosition",
+    &moho::cfunc_UserUnitGetInterpolatedPosition,
+    &CScrLuaMetatableFactory<UserUnit>::Instance(),
+    kUserUnitLuaClassName,
+    "UserUnit:GetInterpolatedPosition()"
+  );
+  return &binder;
+}
+
+int moho::cfunc_UserUnitGetInterpolatedPositionL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, "GetInterpolatedPosition", 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
+  const UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
+  if (userUnit == nullptr || userUnit->mMeshInstance == nullptr) {
+    return 0;
+  }
+
+  // The patch refreshes the interpolated transform (0x007DEC80) and returns the
+  // position as a plain {x, y, z} array, without the vector metatable.
+  MeshInstance* const meshInstance = userUnit->mMeshInstance;
+  meshInstance->UpdateInterpolatedFields();
+  const Wm3::Vec3f& position = meshInstance->interpolatedPosition;
+  lua_newtable(rawState);
+  lua_pushnumber(rawState, position.x);
+  lua_rawseti(rawState, -2, 1);
+  lua_pushnumber(rawState, position.y);
+  lua_rawseti(rawState, -2, 2);
+  lua_pushnumber(rawState, position.z);
+  lua_rawseti(rawState, -2, 3);
+  return 1;
+}
+
+int moho::cfunc_UserUnitGetFractionComplete(lua_State* const luaContext)
+{
+  return cfunc_UserUnitGetFractionCompleteL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+CScrLuaInitForm* moho::func_UserUnitGetFractionComplete_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetFractionComplete",
+    &moho::cfunc_UserUnitGetFractionComplete,
+    &CScrLuaMetatableFactory<UserUnit>::Instance(),
+    kUserUnitLuaClassName,
+    "UserUnit:GetFractionComplete()"
+  );
+  return &binder;
+}
+
+int moho::cfunc_UserUnitGetFractionCompleteL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, "GetFractionComplete", 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
+  const UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
+  if (userUnit == nullptr) {
+    return 0;
+  }
+  lua_pushnumber(rawState, userUnit->mVariableData.mFractionComplete);
+  return 1;
+}
+
 /**
  * Address: 0x008C30E0 (FUN_008C30E0, cfunc_UserUnitGetStat)
  *
@@ -5976,6 +6071,9 @@ namespace
       (void)::moho::func_UserUnitGetFuelRatio_LuaFuncDef();
       (void)::moho::func_UserUnitGetShieldRatio_LuaFuncDef();
       (void)::moho::func_UserUnitGetWorkProgress_LuaFuncDef();
+      // FAF FA-Binary-Patches additions, not in the shipped registration sequence.
+      (void)::moho::func_UserUnitGetInterpolatedPosition_LuaFuncDef();
+      (void)::moho::func_UserUnitGetFractionComplete_LuaFuncDef();
       (void)::moho::func_UserUnitGetStat_LuaFuncDef();
       (void)::moho::func_UserUnitIsStunned_LuaFuncDef();
       (void)::moho::func_UserUnitGetCustomName_LuaFuncDef();

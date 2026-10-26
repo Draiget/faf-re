@@ -1058,6 +1058,41 @@ namespace
   constexpr const char* kRenderOverlayIntelHelpText = "RenderOverlayIntel(bool)";
   constexpr const char* kRenderOverlayEconomyHelpText = "RenderOverlayEconomy(bool)";
   constexpr const char* kTeamColorModeHelpText = "TeamColorMode(bool)";
+
+  /**
+   * FA-Binary-Patches section/TeamColorMode.cpp (`TeamColorMode` stub): reads
+   * hex colours separated by any non-hex character ("ffrrggbb,ffrrggbb,...")
+   * into `teamcolors` from slot 0; slots the text does not reach keep their
+   * values. The stub steps past the terminator after the last colour and keeps
+   * parsing whatever follows the string, and has no slot limit; this stops at
+   * the terminator and after the palette's 32 slots.
+   */
+  void ParseTeamColorPalette(const char* const text)
+  {
+    const char* cursor = text;
+    for (std::size_t slot = 0; *cursor != '\0' && slot < moho::kTeamColorPaletteSize; ++slot) {
+      std::uint32_t color = 0u;
+      for (;; ++cursor) {
+        const char c = *cursor;
+        std::uint32_t digit = 0u;
+        if (c >= '0' && c <= '9') {
+          digit = static_cast<std::uint32_t>(c - '0');
+        } else if (c >= 'A' && c <= 'F') {
+          digit = static_cast<std::uint32_t>(c - 'A' + 10);
+        } else if (c >= 'a' && c <= 'f') {
+          digit = static_cast<std::uint32_t>(c - 'a' + 10);
+        } else {
+          break;
+        }
+        color = (color << 4) + digit;
+      }
+      moho::teamcolors[slot] = color;
+      if (*cursor == '\0') {
+        break;
+      }
+      ++cursor;
+    }
+  }
   constexpr const char* kEjectSessionClientHelpText =
     "EjectSessionClient(int clientIndex) -- eject another client from your session";
   constexpr const char* kNoSessionStartedText = "No session started.";
@@ -16147,8 +16182,10 @@ moho::CScrLuaInitForm* moho::func_SelectUnits_LuaFuncDef()
  * Address: 0x008BD8F0 (FUN_008BD8F0, cfunc_SelectUnitsL)
  *
  * What it does:
- * Builds one validated selection set from Lua input units, applies it to the
- * world session, and returns a Lua array of accepted unit objects.
+ * Builds one validated selection set from Lua input units and applies it to
+ * the world session. FAF hot-patch (FA-Binary-Patches SelecUnitsTableFix): the
+ * result table's AssignNewTable (0x008BD9BF) and PushStack (0x008BDBA6) are
+ * NOPed and 0x008BDC18 returns 0, so nothing is returned.
  */
 int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
 {
@@ -16168,11 +16205,8 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
-  LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, 0, 0u);
 
   msvc8::vector<UserUnit*> selectionUnits{};
-  std::int32_t resultIndex = 1;
   if (sourceUnitsObject.IsTable()) {
     const int unitCount = sourceUnitsObject.GetCount();
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
@@ -16190,16 +16224,11 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
                  attachmentParent != nullptr) {
         AppendSelectionUnitUnique(selectionUnits, attachmentParent);
       }
-
-      LuaPlus::LuaObject selectedUnitObject = iunitBridge->GetLuaObject();
-      resultTable.SetObject(resultIndex, selectedUnitObject);
-      ++resultIndex;
     }
   }
 
   session->SetSelectionUnits(selectionUnits);
-  resultTable.PushStack(state);
-  return 1;
+  return 0;
 }
 
 /**
@@ -17769,6 +17798,27 @@ moho::CScrLuaInitForm* moho::func_GetMouseWorldPosUser_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     UserLuaInitSet(),
+    "GetMouseWorldPos",
+    &moho::cfunc_GetMouseWorldPos,
+    nullptr,
+    "<global>",
+    kGetMouseWorldPosUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global `GetMouseWorldPos`:
+ * FA-Binary-Patches section/SimGetMouseWorldPos.cpp registers the stock user
+ * body (0x00842BB0) in the sim set too (.exxt block 0x0129287D..0x012928A5). It
+ * reads the local session's cursor, so it is not deterministic in the sim, as in
+ * the FAF exe.
+ */
+moho::CScrLuaInitForm* moho::func_GetMouseWorldPosSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
     "GetMouseWorldPos",
     &moho::cfunc_GetMouseWorldPos,
     nullptr,
@@ -19933,7 +19983,10 @@ moho::CScrLuaInitForm* moho::func_TeamColorMode_LuaFuncDef()
  * Address: 0x00847E10 (FUN_00847E10, cfunc_TeamColorModeL)
  *
  * What it does:
- * Validates one Lua bool and updates the active user session team-color mode.
+ * A Lua bool turns the active user session's team-color mode on or off. FAF
+ * hot-patch (FA-Binary-Patches TeamColorMode, 0x00847E51): a string such as
+ * "ffrrggbb,ffrrggbb,..." instead fills the per-army palette `teamcolors` in
+ * army order and leaves the mode alone.
  */
 int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
 {
@@ -19944,7 +19997,12 @@ int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
 
   if (CWldSession* const session = WLD_GetActiveSession()) {
     const LuaPlus::LuaStackObject modeArg(state, 1);
-    if (lua_type(state->m_state, 1) != LUA_TBOOLEAN) {
+    const int argumentType = lua_type(state->m_state, 1);
+    if (argumentType == LUA_TSTRING || argumentType == LUA_TNUMBER) {
+      ParseTeamColorPalette(lua_tostring(state->m_state, 1));
+      return 0;
+    }
+    if (argumentType != LUA_TBOOLEAN) {
       modeArg.TypeError("bool");
     }
     session->mTeamColorMode = modeArg.GetBoolean();
@@ -23511,12 +23569,58 @@ moho::CScrLuaInitForm* moho::func_CreateResourceDeposit_LuaFuncDef()
   return &binder;
 }
 
+namespace
+{
+  /**
+   * The shared body of section/SimGetDepositsAroundPoint.cpp: reads `(x, z,
+   * radius, type)` and returns an array of `{ X1, Z1, X2, Z2, Type, Dist }`
+   * (the key spelling of the string block at 0x012938C3) from `resources`.
+   */
+  int PushDepositsAroundPoint(lua_State* const luaContext, moho::CSimResources* const resources)
+  {
+    const float x = static_cast<float>(lua_tonumber(luaContext, 1));
+    const float z = static_cast<float>(lua_tonumber(luaContext, 2));
+    const float radius = static_cast<float>(lua_tonumber(luaContext, 3));
+    const float nanGuard = x + z + radius;
+    if (nanGuard != nanGuard) {
+      return 0;
+    }
+
+    const auto type = static_cast<moho::EDepositType>(static_cast<int>(lua_tonumber(luaContext, 4)));
+
+    lua_newtable(luaContext);
+    if (!resources) {
+      return 1;
+    }
+
+    gpg::fastvector<moho::ResourceDepositDistance> nearbyDeposits{};
+    resources->GetDepositsAroundPoint(x, z, radius, type, &nearbyDeposits);
+
+    for (std::size_t i = 0; i < nearbyDeposits.size(); ++i) {
+      const moho::ResourceDepositDistance& hit = nearbyDeposits[i];
+      const moho::ResourceDeposit& deposit = hit.deposit;
+
+      lua_pushnumber(luaContext, static_cast<lua_Number>(i + 1u));
+      lua_newtable(luaContext);
+      LuaPushNumberField(luaContext, "X1", deposit.footprintRect.x0);
+      LuaPushNumberField(luaContext, "Z1", deposit.footprintRect.z0);
+      LuaPushNumberField(luaContext, "X2", deposit.footprintRect.x1);
+      LuaPushNumberField(luaContext, "Z2", deposit.footprintRect.z1);
+      LuaPushNumberField(luaContext, "Type", static_cast<int>(deposit.depositType));
+      LuaPushNumberField(luaContext, "Dist", hit.centerDistance);
+      lua_settable(luaContext, -3);
+    }
+
+    return 1;
+  }
+} // namespace
+
 /**
  * Address: 0x0128B884 (FUN_0128B884, cfunc_GetDepositsAroundPoint)
  *
  * What it does:
  * Reads `(x, z, radius, type)` from Lua and returns an array of deposits:
- * `{ x1, z1, x2, z2, type, dist }`.
+ * `{ X1, Z1, X2, Z2, Type, Dist }`, from the sim's resources.
  */
 int moho::cfunc_GetDepositsAroundPoint(lua_State* const luaContext)
 {
@@ -23524,43 +23628,27 @@ int moho::cfunc_GetDepositsAroundPoint(lua_State* const luaContext)
     return 0;
   }
 
-  const float x = static_cast<float>(lua_tonumber(luaContext, 1));
-  const float z = static_cast<float>(lua_tonumber(luaContext, 2));
-  const float radius = static_cast<float>(lua_tonumber(luaContext, 3));
-  const float nanGuard = x + z + radius;
-  if (nanGuard != nanGuard) {
+  Sim* const sim = ResolveGlobalSim(luaContext);
+  return PushDepositsAroundPoint(luaContext, sim ? sim->mSimResources.px : nullptr);
+}
+
+/**
+ * Address: 0x0128B884 (FUN_0128B884; the same body registered in the user set)
+ *
+ * What it does:
+ * The user-state `GetDepositsAroundPoint`. The patch reads the process's sim
+ * (`g_Sim`, 0x010A63F0) from the user state too; this reads the same deposit
+ * list through the active session's resources, which the UI already uses for
+ * extractor snapping, so the user state never touches the sim.
+ */
+int moho::cfunc_GetDepositsAroundPointUser(lua_State* const luaContext)
+{
+  if (!luaContext) {
     return 0;
   }
 
-  const auto type = static_cast<EDepositType>(static_cast<int>(lua_tonumber(luaContext, 4)));
-
-  lua_newtable(luaContext);
-
-  Sim* const sim = ResolveGlobalSim(luaContext);
-  CSimResources* const resources = sim ? sim->mSimResources.px : nullptr;
-  if (!resources) {
-    return 1;
-  }
-
-  gpg::fastvector<ResourceDepositDistance> nearbyDeposits{};
-  resources->GetDepositsAroundPoint(x, z, radius, type, &nearbyDeposits);
-
-  for (std::size_t i = 0; i < nearbyDeposits.size(); ++i) {
-    const ResourceDepositDistance& hit = nearbyDeposits[i];
-    const ResourceDeposit& deposit = hit.deposit;
-
-    lua_pushnumber(luaContext, static_cast<lua_Number>(i + 1u));
-    lua_newtable(luaContext);
-    LuaPushNumberField(luaContext, "x1", deposit.footprintRect.x0);
-    LuaPushNumberField(luaContext, "z1", deposit.footprintRect.z0);
-    LuaPushNumberField(luaContext, "x2", deposit.footprintRect.x1);
-    LuaPushNumberField(luaContext, "z2", deposit.footprintRect.z1);
-    LuaPushNumberField(luaContext, "type", static_cast<int>(deposit.depositType));
-    LuaPushNumberField(luaContext, "dist", hit.centerDistance);
-    lua_settable(luaContext, -3);
-  }
-
-  return 1;
+  CWldSession* const session = WLD_GetActiveSession();
+  return PushDepositsAroundPoint(luaContext, session ? session->mSimResources.px : nullptr);
 }
 
 /**
@@ -23668,6 +23756,26 @@ moho::CScrLuaInitForm* moho::func_GetTimeForProfileSim_LuaFuncDef()
 
 /**
  * What it does:
+ * Publishes the user-lane Lua binder definition for global
+ * `GetTimeForProfile`, the same body as the sim one (section/GetTimeForProfile.cpp
+ * registers both; the name string 0x01293D36 is referenced from 0x012924BE and
+ * 0x0129251D).
+ */
+moho::CScrLuaInitForm* moho::func_GetTimeForProfileUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetTimeForProfile",
+    &moho::cfunc_GetTimeForProfileSim,
+    nullptr,
+    "<global>",
+    kGetTimeForProfileSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
  * Publishes the sim-lane Lua binder definition for global
  * `GetDepositsAroundPoint` (`.exxt` def chain node 0x0128EA8C, function
  * slot 0x0128B884).
@@ -23678,6 +23786,25 @@ moho::CScrLuaInitForm* moho::func_GetDepositsAroundPoint_LuaFuncDef()
     SimLuaInitSet(),
     "GetDepositsAroundPoint",
     &moho::cfunc_GetDepositsAroundPoint,
+    nullptr,
+    "<global>",
+    kGetDepositsAroundPointHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
+ * Publishes the user-lane Lua binder definition for global
+ * `GetDepositsAroundPoint` (section/SimGetDepositsAroundPoint.cpp `UIRegFunc
+ * SGDAPRegDesc`).
+ */
+moho::CScrLuaInitForm* moho::func_GetDepositsAroundPointUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetDepositsAroundPoint",
+    &moho::cfunc_GetDepositsAroundPointUser,
     nullptr,
     "<global>",
     kGetDepositsAroundPointHelpText
@@ -27189,6 +27316,7 @@ namespace
       (void)::moho::func_SessionIsReplaySim_LuaFuncDef();
       (void)::moho::func_SetFocusArmySim_LuaFuncDef();
       (void)::moho::func_GetTimeForProfileSim_LuaFuncDef();
+      (void)::moho::func_GetMouseWorldPosSim_LuaFuncDef();
       (void)::moho::func_GetDepositsAroundPoint_LuaFuncDef();
       (void)::moho::func_SetCommandSourceSim_LuaFuncDef();
       (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();
@@ -27202,6 +27330,8 @@ namespace
       (void)::moho::func_GetMouseScreenPos_LuaFuncDef();
       // FAF FA-Binary-Patches additions, not in the shipped registration sequence.
       (void)::moho::func_CopyToClipboard_LuaFuncDef();
+      (void)::moho::func_GetTimeForProfileUser_LuaFuncDef();
+      (void)::moho::func_GetDepositsAroundPointUser_LuaFuncDef();
       (void)::moho::func_GetHighlightCommand_LuaFuncDef();
       (void)::moho::func_SetFocusArmyUser_LuaFuncDef();
       (void)::moho::func_SetInvertMidMouseButton_LuaFuncDef();
