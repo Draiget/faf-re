@@ -39,6 +39,15 @@ namespace gpg::gal::backend
     return shift;
   }
 
+  bool Direct3D10TechniqueCull() noexcept
+  {
+    static const bool cull = [] {
+      const char* const value = std::getenv("FAF_GAL_D3D10_CULL");
+      return value != nullptr && value[0] == '1';
+    }();
+    return cull;
+  }
+
   bool SetupFailureRequested(const char* const name)
   {
     const char* const value = std::getenv("FAF_GAL_FAIL_SETUP");

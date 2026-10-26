@@ -2300,6 +2300,10 @@ namespace gpg::gal
     mCurrent.blend = effects::BlendDesc{};
     mCurrent.depthStencil = effects::DepthStencilDesc{};
     mCurrent.rasterizer = effects::RasterizerDesc{};
+    // Direct3D 9's begin state culls nothing (see backend::Direct3D10TechniqueCull).
+    if (!backend::Direct3D10TechniqueCull()) {
+      mCurrent.rasterizer.cullMode = 1U; // NONE
+    }
     std::fill(std::begin(mCurrent.blendFactor), std::end(mCurrent.blendFactor), 0.0f);
     mCurrent.sampleMask = 0xFFFFFFFFU;
     mCurrent.stencilRef = 0U;

@@ -264,12 +264,19 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       key.Add(rasterizer.antialiasedLineEnable);
     }
 
-    /** The state every technique begins with (D3D10 `CreateState2`, 0x00902940). */
+    /**
+     * The state every technique begins with: the D3D10 pack (`CreateState2`,
+     * 0x00902940), except that it culls nothing, as Direct3D 9's begin state
+     * does (see backend::Direct3D10TechniqueCull).
+     */
     void TechniquePack(effects::BlendDesc& blend, effects::DepthStencilDesc& depth, effects::RasterizerDesc& rasterizer)
     {
       blend = effects::BlendDesc{};
       depth = effects::DepthStencilDesc{};
       rasterizer = effects::RasterizerDesc{};
+      if (!backend::Direct3D10TechniqueCull()) {
+        rasterizer.cullMode = 1U; // NONE
+      }
     }
 
     void WriteBmp(const char* const path, const imaging::Image& image)
