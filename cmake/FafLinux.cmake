@@ -103,7 +103,9 @@ file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/windows.h" "#pragma once\n#include <
 # after the engine's sources as in the Windows server-mode build: faf-replay's wire checks
 # use it, and the Linux game server will.
 include("${PROJECT_SOURCE_DIR}/src/remote/sources.cmake")
-foreach(_src IN LISTS FAF_REMOTE_SOURCES)
+# The client half too (FAF_REMOTE_CLIENT_SOURCES), as Windows' server-mode faf_engine links it:
+# sim-side server-mode code (SetFocusArmy's driver lookup) calls into it.
+foreach(_src IN LISTS FAF_REMOTE_SOURCES FAF_REMOTE_CLIENT_SOURCES)
   list(APPEND _faf_sim_files "${PROJECT_SOURCE_DIR}/src/${_src}")
 endforeach()
 
@@ -138,7 +140,10 @@ target_link_options(faf_sim_settings INTERFACE "-Wl,--wrap=pthread_create")
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
 target_compile_definitions(faf_sim_settings INTERFACE
   LUAPLUS_LIB LUA_NUMBER=float
-  BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR)
+  BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR
+  # The server-mode build, as Windows' faf_engine with FAF_SERVER_MODE (src/CMakeLists.txt):
+  # the Linux programs are the server and the replay runner.
+  FAF_SERVER_MODE=1)
 target_include_directories(faf_sim_settings INTERFACE
   "${PROJECT_SOURCE_DIR}/src"
   # <Windows.h> and <intrin.h> for the shared code (plan WPL.5), and <windows.h>, the

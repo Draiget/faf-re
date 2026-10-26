@@ -28,3 +28,6 @@ atan2f (anonymous namespace)::CreateDecalFromTransform(moho::VTransform const&, 
 atan2 faf::remote::wire::QuantizeYaw(std::__1::array<float, 4ul> const&)
 sin faf::remote::wire::YawToQuaternion(unsigned int)
 cos faf::remote::wire::YawToQuaternion(unsigned int)
+cos faf::remote::wire::ApplyOrientationReckoning(faf::remote::wire::SEntityRecord&, faf::remote::wire::SEntityRecord const&, std::__1::span<unsigned int const, 18446744073709551615ul>, unsigned int, faf::remote::wire::SReckoningScheme const&, faf::remote::wire::SFrameCodec const&)
+# remote/client: the client rebuilding sync packets from the wire (runs on the client, not the sim).
+acos faf::remote::client::CSyncRebuilder::Apply(std::__1::span<unsigned char const, 18446744073709551615ul>, moho::SSyncData&)
