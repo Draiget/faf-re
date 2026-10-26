@@ -5,10 +5,15 @@
 #include <windows.h>
 #include <shlobj.h>
 
+#include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
+#include <functional>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 #include "gpg/core/utils/Logging.h"
@@ -96,7 +101,65 @@ namespace gpg::gal::effects
       }
     }
 
+    /**
+     * Engine addition (`ren_BackgroundShaders`): the threads that prepare shaders ahead of
+     * use. Below-normal priority, so they take only time the game leaves idle; a quarter of
+     * the cores, 1 to 4. Started on the first job and never stopped (the object is leaked so
+     * no static destructor runs under a waiting worker at exit).
+     */
+    class ShaderWorkers
+    {
+    public:
+      static ShaderWorkers& Instance()
+      {
+        static ShaderWorkers* const workers = new ShaderWorkers();
+        return *workers;
+      }
+
+      /** `first`: ahead of the queued jobs (cache reads go before compiles). */
+      void Submit(std::function<void()> job, const bool first)
+      {
+        {
+          const std::lock_guard<std::mutex> lock(mMutex);
+          if (first) {
+            mJobs.push_front(std::move(job));
+          } else {
+            mJobs.push_back(std::move(job));
+          }
+        }
+        std::call_once(mStarted, [this] {
+          const unsigned count = std::clamp(std::thread::hardware_concurrency() / 4U, 1U, 4U);
+          for (unsigned index = 0U; index < count; ++index) {
+            std::thread([this] { Run(); }).detach();
+          }
+        });
+        mWake.notify_one();
+      }
+
+    private:
+      void Run()
+      {
+        ::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+        for (;;) {
+          std::function<void()> job;
+          {
+            std::unique_lock<std::mutex> lock(mMutex);
+            mWake.wait(lock, [this] { return !mJobs.empty(); });
+            job = std::move(mJobs.front());
+            mJobs.pop_front();
+          }
+          job();
+        }
+      }
+
+      std::mutex mMutex;
+      std::condition_variable mWake;
+      std::deque<std::function<void()>> mJobs;
+      std::once_flag mStarted;
+    };
   } // namespace
+
+  bool gBackgroundShaders = true;
 
   void Fnv1a64::Add(const void* const data, const std::size_t bytes) noexcept
   {
@@ -221,49 +284,17 @@ namespace gpg::gal::effects
     if (entry >= mCompiled.size()) {
       return kMissing;
     }
-    const std::lock_guard<std::mutex> lock(mCompileMutex);
-    CompiledEntry& compiled = mCompiled[entry];
-    if (compiled.attempted) {
-      return compiled;
-    }
-    compiled.attempted = true;
-
-    const ShaderEntry& shaderEntry = mModern.entries[entry];
-    Fnv1a64 key;
-    key.Add(&mSourceKey, sizeof(mSourceKey));
-    key.Add(shaderEntry.name);
-    key.Add(mTarget == ShaderTarget::Dxil ? "dxil" : "spirv");
-    compiled.key = key.Value();
-    compiled.entryName = shaderEntry.name;
-
-    ShaderCompiler& compiler = ShaderCompiler::Instance();
-    const std::string path = CachePath(compiled.key, mTarget);
-    if (ReadCache(path, compiled.key, compiled.code)) {
-      compiled.succeeded = true;
-    } else {
-      const DWORD started = ::GetTickCount();
-      CompiledShader result = compiler.Compile(mModern.hlsl, shaderEntry, mTarget);
-      compiled.messages = std::move(result.messages);
-      if (!result.succeeded) {
-        gpg::Warnf(
-          "effects: %s: %s (%s %s) failed to compile:\n%s", mName.c_str(), shaderEntry.name.c_str(), shaderEntry.function.c_str(),
-          shaderEntry.arguments.c_str(), compiled.messages.substr(0U, 2000U).c_str()
-        );
-        return compiled;
+    {
+      std::unique_lock<std::mutex> lock(mCompileMutex);
+      // A worker already reading or compiling this entry finishes sooner than a second compile.
+      mEntryPrepared.wait(lock, [&] { return !mCompiled[entry].preparing; });
+      if (mCompiled[entry].attempted) {
+        return mCompiled[entry];
       }
-      compiled.code = std::move(result.code);
-      compiled.succeeded = true;
-      WriteCache(path, compiled.key, compiled.code);
-      static int logged = 0;
-      if (logged++ < 32) {
-        gpg::Logf("effects: %s: compiled %s (%s) in %lu ms", mName.c_str(), shaderEntry.name.c_str(), shaderEntry.function.c_str(),
-                  ::GetTickCount() - started);
-      }
+      mCompiled[entry].preparing = true;
     }
-    if (shaderEntry.stage == ShaderStage::Vertex && mTarget == ShaderTarget::Dxil) {
-      compiled.inputs = compiler.ReflectInputs(compiled.code);
-    }
-    return compiled;
+    Prepare(entry, PrepareMode::OnUse);
+    return mCompiled[entry];
   }
 
   void EffectProgram::CompileAll()
@@ -271,6 +302,119 @@ namespace gpg::gal::effects
     for (std::uint32_t entry = 0U; entry < mCompiled.size(); ++entry) {
       static_cast<void>(Shader(entry));
     }
+  }
+
+  std::uint64_t EffectProgram::EntryKey(const std::uint32_t entry) const
+  {
+    Fnv1a64 key;
+    key.Add(&mSourceKey, sizeof(mSourceKey));
+    key.Add(mModern.entries[entry].name);
+    key.Add(mTarget == ShaderTarget::Dxil ? "dxil" : "spirv");
+    return key.Value();
+  }
+
+  bool EffectProgram::Claim(const std::uint32_t entry)
+  {
+    const std::lock_guard<std::mutex> lock(mCompileMutex);
+    CompiledEntry& compiled = mCompiled[entry];
+    if (compiled.attempted || compiled.preparing) {
+      return false;
+    }
+    compiled.preparing = true;
+    return true;
+  }
+
+  bool EffectProgram::Prepare(const std::uint32_t entry, const PrepareMode mode)
+  {
+    // The entry is claimed (preparing), so no other thread writes it; the work runs outside
+    // the lock, and draws needing other entries meanwhile are not held up.
+    const ShaderEntry& shaderEntry = mModern.entries[entry];
+    CompiledEntry prepared;
+    prepared.key = EntryKey(entry);
+    prepared.entryName = shaderEntry.name;
+
+    ShaderCompiler& compiler = ShaderCompiler::Instance();
+    const std::string path = CachePath(prepared.key, mTarget);
+    if (ReadCache(path, prepared.key, prepared.code)) {
+      prepared.succeeded = true;
+    } else if (mode == PrepareMode::CacheOnly) {
+      {
+        const std::lock_guard<std::mutex> lock(mCompileMutex);
+        mCompiled[entry].preparing = false;
+      }
+      mEntryPrepared.notify_all();
+      return false;
+    } else {
+      const DWORD started = ::GetTickCount();
+      CompiledShader result = compiler.Compile(mModern.hlsl, shaderEntry, mTarget);
+      prepared.messages = std::move(result.messages);
+      if (!result.succeeded) {
+        gpg::Warnf(
+          "effects: %s: %s (%s %s) failed to compile:\n%s", mName.c_str(), shaderEntry.name.c_str(), shaderEntry.function.c_str(),
+          shaderEntry.arguments.c_str(), prepared.messages.substr(0U, 2000U).c_str()
+        );
+      } else {
+        prepared.code = std::move(result.code);
+        prepared.succeeded = true;
+        WriteCache(path, prepared.key, prepared.code);
+        static std::atomic<int> logged{0};
+        if (logged++ < 32) {
+          gpg::Logf(
+            "effects: %s: compiled %s (%s) in %lu ms%s", mName.c_str(), shaderEntry.name.c_str(), shaderEntry.function.c_str(),
+            ::GetTickCount() - started, mode == PrepareMode::Background ? " ahead of use" : ""
+          );
+        }
+      }
+    }
+    if (prepared.succeeded && shaderEntry.stage == ShaderStage::Vertex && mTarget == ShaderTarget::Dxil) {
+      prepared.inputs = compiler.ReflectInputs(prepared.code);
+    }
+
+    prepared.attempted = true;
+    {
+      const std::lock_guard<std::mutex> lock(mCompileMutex);
+      mCompiled[entry] = std::move(prepared); // preparing is false in `prepared`
+    }
+    mEntryPrepared.notify_all();
+    return true;
+  }
+
+  void EffectProgram::PrepareInBackground(const std::shared_ptr<EffectProgram>& program)
+  {
+    const std::weak_ptr<EffectProgram> weak = program;
+    ShaderWorkers::Instance().Submit(
+      [weak] {
+        const std::shared_ptr<EffectProgram> self = weak.lock();
+        if (self == nullptr) {
+          return;
+        }
+        std::uint32_t read = 0U;
+        std::uint32_t missing = 0U;
+        for (std::uint32_t entry = 0U; entry < self->mCompiled.size(); ++entry) {
+          if (!self->Claim(entry)) {
+            continue; // a draw got there first
+          }
+          if (self->Prepare(entry, PrepareMode::CacheOnly)) {
+            ++read;
+            continue;
+          }
+          ++missing;
+          ShaderWorkers::Instance().Submit(
+            [weak, entry] {
+              if (const std::shared_ptr<EffectProgram> owner = weak.lock(); owner != nullptr && owner->Claim(entry)) {
+                owner->Prepare(entry, PrepareMode::Background);
+              }
+            },
+            false
+          );
+        }
+        gpg::Logf(
+          "effects: %s: %u of %zu shaders read from the cache ahead of use, %u queued to compile", self->mName.c_str(), read,
+          self->mCompiled.size(), missing
+        );
+      },
+      true
+    );
   }
 
   std::int32_t EffectProgram::FindParameter(const std::string_view name) const noexcept

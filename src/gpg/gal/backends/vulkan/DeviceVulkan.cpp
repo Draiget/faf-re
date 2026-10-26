@@ -1577,6 +1577,8 @@ namespace gpg::gal
     }
     if (const char* const precompile = std::getenv("FAF_SHADER_PRECOMPILE"); precompile != nullptr && precompile[0] == '1') {
       program->CompileAll();
+    } else if (effects::gBackgroundShaders) {
+      effects::EffectProgram::PrepareInBackground(program); // engine addition: ren_BackgroundShaders
     }
     gpg::Logf(
       "Vulkan: effect %s: %u techniques, %u entry points, %u bytes of parameters (%lu ms)", sourceName,

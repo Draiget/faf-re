@@ -6,6 +6,7 @@
 #include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/PipelineDiskCache.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
 
 namespace moho
@@ -30,6 +31,15 @@ namespace moho
       "Direct3D 12 / Vulkan: read DXT1/3/5 DDS textures straight from the file (1, the default) instead of decoding "
       "every texture through D3DX11 on a software device (0), which takes 25-45 ms per 1024x1024 texture.",
       &gpg::gal::imaging::gDdsDirectLoad
+    );
+
+    /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
+    TConVar<bool> gTConVar_ren_BackgroundShaders(
+      "ren_BackgroundShaders",
+      "Direct3D 12 / Vulkan: prepare every shader of an effect on low-priority background threads when the effect is "
+      "created, reading the cached ones and compiling the rest into the cache (1, the default), instead of opening the "
+      "cache file or compiling in the frame that first draws with a shader (0). Read when an effect is created.",
+      &gpg::gal::effects::gBackgroundShaders
     );
 
     /** Engine addition: `ren_TextureDecodeCache` (see gpg/gal/backends/common/ImageCodec.h). */

@@ -1650,6 +1650,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     if (const char* const precompile = std::getenv("FAF_SHADER_PRECOMPILE"); precompile != nullptr && precompile[0] == '1') {
       program->CompileAll();
+    } else if (effects::gBackgroundShaders) {
+      effects::EffectProgram::PrepareInBackground(program); // engine addition: ren_BackgroundShaders
     }
     gpg::Logf(
       "D3D12: effect %s: %u techniques, %u entry points, %u bytes of parameters (%lu ms)", sourceName,
