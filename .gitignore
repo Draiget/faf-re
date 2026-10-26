@@ -72,3 +72,5 @@ RECOVERY_STATUS.md
 
 dependencies/.downloads/
 dependencies/dxsdk/
+
+tools/tracy/
