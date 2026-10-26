@@ -11,6 +11,9 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
@@ -1318,6 +1321,30 @@ namespace
         }
     }
 
+#if !defined(_WIN32)
+    /**
+     * Engine addition (dedicated-server plan WPL.5): an ELF image has no TLS callback
+     * directory. A pthread key whose destructor runs `TlsCallback_1`'s thread-detach path
+     * stands in for it: the key is given a value on each thread that makes a heap cache, so
+     * every such thread flushes it when it exits. As on Windows, a process that exits does
+     * not (key destructors run for exiting threads only).
+     */
+    void FlushThreadHeapCacheAtThreadExit(void*)
+    {
+        TlsCallback_1(nullptr, DLL_THREAD_DETACH, nullptr);
+    }
+
+    void RegisterThreadHeapCacheExit(ThreadHeapCache* const cache)
+    {
+        static const pthread_key_t exitKey = [] {
+            pthread_key_t key{};
+            (void)::pthread_key_create(&key, &FlushThreadHeapCacheAtThreadExit);
+            return key;
+        }();
+        (void)::pthread_setspecific(exitKey, cache);
+    }
+#endif
+
     /**
      * Address: 0x00958400 (FUN_00958400, func_AllocateNewBlock)
      *
@@ -1674,6 +1701,9 @@ namespace
 
         if (request.head != nullptr) {
             gThreadHeapCache = ResetThreadHeapCache(reinterpret_cast<ThreadHeapCache*>(request.head));
+#if !defined(_WIN32)
+            RegisterThreadHeapCacheExit(gThreadHeapCache);
+#endif
             if (hasLock != 0) {
                 ::LeaveCriticalSection(&gAllocatorSentinel);
             }
@@ -1714,6 +1744,7 @@ namespace
  * Registering the real callback fixes both: the reason code is whatever Windows
  * passes, and every thread exit runs it.
  */
+#if defined(_WIN32)
 #if defined(_M_IX86)
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
@@ -1724,6 +1755,7 @@ namespace
 #pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1;
 #pragma const_seg()
+#endif // _WIN32 (POSIX: RegisterThreadHeapCacheExit)
 
 #if defined(_M_X64)
 void gpg::LogHighMemoryReservation()
@@ -2180,9 +2212,19 @@ void* __cdecl operator new(const std::size_t size)
             return block;
         }
 
+#if defined(_WIN32)
         if (_callnewh(size) == 0) {
             throw std::bad_alloc{};
         }
+#else
+        // Engine addition (dedicated-server plan WPL.5): `_callnewh` is MSVC's; this is
+        // what it does.
+        const std::new_handler handler = std::get_new_handler();
+        if (handler == nullptr) {
+            throw std::bad_alloc{};
+        }
+        handler();
+#endif
     }
 }
 
@@ -2346,6 +2388,7 @@ void gpg::SetThreadName(const unsigned int id, const char* const name)
     payload.threadId = id;
     payload.flags = 0u;
 
+#if defined(_WIN32)
     __try {
         ::RaiseException(
           0x406D1388u,
@@ -2355,4 +2398,9 @@ void gpg::SetThreadName(const unsigned int id, const char* const name)
         );
     } __except (EXCEPTION_EXECUTE_HANDLER) {
     }
+#else
+    // Engine addition (dedicated-server plan WPL.5): the 0x406D1388 exception names a
+    // thread for a Windows debugger; there is none to tell here.
+    (void)payload;
+#endif
 }

@@ -1,6 +1,9 @@
 #include "CHostManager.h"
 
 #include <cstring>
+#if !defined(_WIN32)
+#include <winsock2.h> // platform/posix/win32: the BSD socket and resolver calls
+#endif
 
 #include "Common.h"
 #include "gpg/core/containers/String.h"

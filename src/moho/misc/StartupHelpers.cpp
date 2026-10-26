@@ -1,4 +1,3 @@
-#include "moho/movie/sfd/IndependentSfdBackend.h"
 #include "moho/misc/StartupHelpers.h"
 
 #include "legacy/containers/AutoPtr.h"
@@ -35,15 +34,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/Device.hpp"
-#include "gpg/gal/DeviceContext.hpp"
-#include "gpg/gal/Error.hpp"
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaTableIterator.h"
-#include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -51,17 +43,11 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
 #include "moho/misc/XFileError.h"
-#include "moho/render/textures/CD3DBatchTexture.h"
-#include "moho/render/d3d/CD3DDevice.h"
-#include "moho/render/RangeRenderer.h"
-#include "moho/render/VisionRenderer.h"
-#include "moho/render/WRenViewport.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SpecialFileType.h"
 #include "moho/task/CTaskThread.h"
-#include "moho/ui/CUIManager.h"
 #include "lua/LuaCrashDump.h"
 
 extern int __argc;
@@ -114,8 +100,6 @@ namespace
   constexpr moho::CfgAliasSet kWindowedAliasesSet{
     kWindowedAliases, sizeof(kWindowedAliases) / sizeof(kWindowedAliases[0])
   };
-  constexpr char kUserPrefsModulePath[] = "/lua/user/prefs.lua";
-  constexpr char kGetOptionMethodName[] = "GetOption";
   constexpr char kSHGetFolderPathHelpText[] = "(name, create?) -- Interface to Win32 SHGetFolderPath api";
   constexpr char kGetMovieDurationHelpText[] = "GetMovieDuration(localFileName)";
   constexpr char kUnknownShGetFolderPathIdErrorText[] = "Unknown id for SHGetFolderPath: %s";
@@ -557,15 +541,6 @@ namespace
     ThrowStartupFileError("Moho::FILE_Dir", detail.c_str());
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveStartupLuaState()
-  {
-    if (moho::g_UIManager != nullptr && moho::g_UIManager->mLuaState != nullptr) {
-      return moho::g_UIManager->mLuaState;
-    }
-
-    return moho::USER_GetLuaState();
-  }
-
   /**
    * Address: 0x0045C2A0 (FUN_0045C2A0, sub_45C2A0)
    *
@@ -739,172 +714,6 @@ namespace
     mountPoints.push_back(moho::SVFSMountPoint(folderUtf8.c_str(), "/fafengine"));
     moho::SCR_AddHookDirectory("/fafengine");
     gpg::Logf("engine hooks: %s mounted at /fafengine", folderUtf8.c_str());
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* const state, const char* const modulePath)
-  {
-    if (state == nullptr || modulePath == nullptr || modulePath[0] == '\0') {
-      return LuaPlus::LuaObject{};
-    }
-
-    return moho::SCR_ImportLuaModule(state, modulePath);
-  }
-
-  [[nodiscard]]
-  LuaPlus::LuaObject GetLuaModuleFunction(
-    LuaPlus::LuaState* const state, const LuaPlus::LuaObject& moduleObject, const char* const methodName
-  )
-  {
-    if (state == nullptr || methodName == nullptr || methodName[0] == '\0' || moduleObject.IsNil()) {
-      return LuaPlus::LuaObject{};
-    }
-
-    return moho::SCR_GetLuaTableField(state, moduleObject, methodName);
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject QueryOptionValue(const char* const key)
-  {
-    if (key == nullptr || key[0] == '\0') {
-      return LuaPlus::LuaObject{};
-    }
-
-    LuaPlus::LuaState* const state = ResolveStartupLuaState();
-    if (state == nullptr) {
-      return LuaPlus::LuaObject{};
-    }
-
-    const LuaPlus::LuaObject prefsModule = ImportLuaModule(state, kUserPrefsModulePath);
-    const LuaPlus::LuaObject getOptionFn = GetLuaModuleFunction(state, prefsModule, kGetOptionMethodName);
-    if (getOptionFn.IsNil()) {
-      return LuaPlus::LuaObject{};
-    }
-
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionCallable(getOptionFn);
-    return getOptionCallable(key);
-  }
-
-  [[nodiscard]] bool TryParseBooleanText(const char* const text, bool* const outValue)
-  {
-    if (text == nullptr || outValue == nullptr) {
-      return false;
-    }
-
-    if (
-      gpg::STR_CompareNoCase(text, "true") == 0 || gpg::STR_CompareNoCase(text, "yes") == 0 ||
-      gpg::STR_CompareNoCase(text, "on") == 0 || std::strcmp(text, "1") == 0
-    ) {
-      *outValue = true;
-      return true;
-    }
-
-    if (
-      gpg::STR_CompareNoCase(text, "false") == 0 || gpg::STR_CompareNoCase(text, "no") == 0 ||
-      gpg::STR_CompareNoCase(text, "off") == 0 || std::strcmp(text, "0") == 0
-    ) {
-      *outValue = false;
-      return true;
-    }
-
-    return false;
-  }
-
-
-  [[nodiscard]] LuaPlus::LuaObject
-  QueryOptionValueWithLocalOverride(LuaPlus::LuaObject* const localOverrideRoot, const msvc8::string& key)
-  {
-    if (localOverrideRoot != nullptr && !localOverrideRoot->IsNil()) {
-      const LuaPlus::LuaObject localValue = localOverrideRoot->GetByName(key.c_str());
-      if (!localValue.IsNil()) {
-        return localValue;
-      }
-    }
-    return QueryOptionValue(key.c_str());
-  }
-
-  [[nodiscard]] bool TryGetBooleanFromLuaValue(const LuaPlus::LuaObject& value, bool* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsBoolean()) {
-      *outValue = value.GetBoolean();
-      return true;
-    }
-    if (value.IsNumber()) {
-      *outValue = value.GetNumber() != 0.0;
-      return true;
-    }
-
-    return TryParseBooleanText(value.GetString(), outValue);
-  }
-
-  [[nodiscard]] bool TryGetIntegerFromLuaValue(const LuaPlus::LuaObject& value, std::int32_t* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsNumber()) {
-      *outValue = static_cast<std::int32_t>(value.GetNumber());
-      return true;
-    }
-    if (value.IsBoolean()) {
-      *outValue = value.GetBoolean() ? 1 : 0;
-      return true;
-    }
-
-    const char* const text = value.GetString();
-    if (text == nullptr || text[0] == '\0') {
-      return false;
-    }
-
-    *outValue = static_cast<std::int32_t>(std::atoi(text));
-    return true;
-  }
-
-  [[nodiscard]] bool TryGetNumberFromLuaValue(const LuaPlus::LuaObject& value, float* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsNumber()) {
-      *outValue = static_cast<float>(value.GetNumber());
-      return true;
-    }
-    if (value.IsBoolean()) {
-      *outValue = value.GetBoolean() ? 1.0f : 0.0f;
-      return true;
-    }
-
-    const char* const text = value.GetString();
-    if (text == nullptr || text[0] == '\0') {
-      return false;
-    }
-
-    *outValue = std::strtof(text, nullptr);
-    return true;
-  }
-
-  [[nodiscard]] bool TryGetHexFromLuaValue(const LuaPlus::LuaObject& value, std::uint32_t* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsNumber()) {
-      *outValue = static_cast<std::uint32_t>(value.GetNumber());
-      return true;
-    }
-
-    const char* const text = value.GetString();
-    if (text == nullptr || text[0] == '\0') {
-      return false;
-    }
-
-    *outValue = static_cast<std::uint32_t>(std::strtoul(text, nullptr, 0));
-    return true;
   }
 
   /**

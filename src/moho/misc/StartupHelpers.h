@@ -301,6 +301,15 @@ namespace moho
   [[nodiscard]] IUserPrefs* USER_GetPreferences();
 
   /**
+   * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
+   *
+   * What it does:
+   * Lazily initializes and returns the process user Lua state, wiring the user
+   * task stage, script-disk watcher task, and core/user init-form execution.
+   */
+  [[nodiscard]] LuaPlus::LuaState* USER_GetLuaState();
+
+  /**
    * Address: 0x008C68A0
    * Mangled: ?OPTIONS_GetInt@Moho@@YAHVStrArg@gpg@@@Z
    */

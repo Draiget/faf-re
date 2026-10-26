@@ -27,6 +27,7 @@
 #include "legacy/containers/String.h"
 #include "moho/audio/XAudioError.h"
 #include "moho/audio/XactClock.h"
+#include "moho/audio/CSimSoundManager.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/CVirtualFileSystem.h"
@@ -43,14 +44,17 @@ boost::scoped_ptr<moho::SoundConfiguration> moho::sSoundConfiguration;
 
 namespace
 {
-  // Engine addition (dedicated-server plan WPL.4): sSoundConfigurationLookup (AudioEngine.h).
-  moho::SoundConfiguration* LookupSoundConfiguration()
+  // Engine addition (dedicated-server plan WPL.4): sSoundEnabled (CSimSoundManager.h), the
+  // test Sim::Sim made on sSoundConfiguration before it creates its sound manager.
+  bool IsSoundEnabled()
   {
-    return moho::sSoundConfiguration.get();
+    const moho::SoundConfiguration* const soundConfiguration = moho::sSoundConfiguration.get();
+    return soundConfiguration != nullptr && soundConfiguration->mEngines.mStart != nullptr &&
+      soundConfiguration->mEngines.mFinish != soundConfiguration->mEngines.mStart &&
+      soundConfiguration->mNoSound == 0;
   }
 
-  [[maybe_unused]] const bool gSoundConfigurationLookupSet =
-    (moho::sSoundConfigurationLookup = &LookupSoundConfiguration, true);
+  [[maybe_unused]] const bool gSoundEnabledSet = (moho::sSoundEnabled = &IsSoundEnabled, true);
 } // namespace
 
 extern "C" __declspec(dllimport) void __cdecl X3DAudioCalculate(

@@ -11,6 +11,7 @@
 #include <map>
 #include <mutex>
 #include <new>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -20,15 +21,10 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/exceptions/StdExcept.h"
-#include "gpg/gal/MeshFormatter.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/animation/CAniSkel.h"
-#include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
-#include "moho/audio/CUserSoundManager.h"
-#include "moho/audio/IUserSoundManager.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConFunc.h"
@@ -41,34 +37,23 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_String.h"
-#include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/ScrDebugHooks.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/misc/IConOutputHandler.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
-#include "moho/render/MapImager.h"
-#include "moho/render/RCamManager.h"
-#include "moho/render/camera/CameraImpl.h"
-#include "moho/render/d3d/CD3DDevice.h"
-#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CRandomStream.h"
-#include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
-#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/UserArmy.h"
-#include "moho/ui/CUIManager.h"
-#include "moho/ui/IUIManager.h"
-#include "moho/ui/UiRuntimeTypes.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UnitAttributes.h"
 #include "moho/unit/core/UserUnit.h"
@@ -77,9 +62,7 @@ using namespace moho;
 
 namespace moho
 {
-  void CON_WxInputBox(const msvc8::vector<msvc8::string>& args);
   extern bool sPathDebuggerEnabled;
-  extern CWinLogTarget sLogWindowTarget;
 }
 
 namespace moho
@@ -1292,7 +1275,13 @@ void moho::CON_Debug_Crash(const msvc8::vector<msvc8::string>& args)
 void moho::CON_Debug_Throw(const msvc8::vector<msvc8::string>& args)
 {
   (void)args;
+#if defined(_WIN32)
   throw std::exception("Hope you really wanted to do this...");
+#else
+  // Engine addition (dedicated-server plan WPL.5): std::exception has no message
+  // constructor outside MSVC's library.
+  throw std::runtime_error("Hope you really wanted to do this...");
+#endif
 }
 
 /**

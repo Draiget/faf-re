@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "moho/misc/StartupHelpers.h"
 #include <cstdint>
 #include <string>
 
@@ -4561,15 +4562,6 @@ namespace moho
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::vector<msvc8::string>) == 0x10, "msvc8::vector<msvc8::string> size must be 0x10");
 
-
-  /**
-   * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
-   *
-   * What it does:
-   * Lazily initializes and returns the process user Lua state, wiring the user
-   * task stage, script-disk watcher task, and core/user init-form execution.
-   */
-  [[nodiscard]] LuaPlus::LuaState* USER_GetLuaState();
 
   /**
    * Address: 0x0083CD30 (FUN_0083CD30, Moho::MAUI_StartMainScript)

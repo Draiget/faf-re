@@ -29,6 +29,7 @@
 #define APIENTRY
 #define WINBASEAPI
 
+using VOID = void;
 using BOOL = int;
 using BYTE = std::uint8_t;
 using UCHAR = unsigned char;
@@ -82,10 +83,13 @@ using LONGLONG = std::int64_t;
 #define WAIT_ABANDONED 0x00000080u
 #define WAIT_TIMEOUT 0x00000102u
 #define WAIT_FAILED 0xFFFFFFFFu
+#define WAIT_IO_COMPLETION 0x000000C0u
 #define INVALID_HANDLE_VALUE (reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)))
 #define MAX_PATH 260
 
 #define ERROR_SUCCESS 0u
+#define NO_ERROR 0u
+#define ERROR_FILE_INVALID 1006u
 #define ERROR_FILE_NOT_FOUND 2u
 #define ERROR_PATH_NOT_FOUND 3u
 #define ERROR_ACCESS_DENIED 5u
@@ -96,6 +100,28 @@ using LONGLONG = std::int64_t;
 #define ERROR_INSUFFICIENT_BUFFER 122u
 #define ERROR_ALREADY_EXISTS 183u
 #define ERROR_ENVVAR_NOT_FOUND 203u
+
+struct tagRECT
+{
+  LONG left;
+  LONG top;
+  LONG right;
+  LONG bottom;
+};
+using RECT = tagRECT;
+struct tagPOINT
+{
+  LONG x;
+  LONG y;
+};
+using POINT = tagPOINT;
+struct tagSIZE
+{
+  LONG cx;
+  LONG cy;
+};
+using SIZE = tagSIZE;
+using HBITMAP = void*;
 
 struct FILETIME
 {
@@ -177,6 +203,22 @@ HANDLE GetCurrentProcess();
 DWORD GetCurrentProcessId();
 void Sleep(DWORD milliseconds);
 DWORD SleepEx(DWORD milliseconds, BOOL alertable);
+
+// Asynchronous procedure calls: QueueUserAPC queues the call to the thread OpenThread named;
+// that thread runs its queued calls, in order, in its next alertable wait (SleepEx,
+// WaitForSingleObjectEx with `alertable`), which then returns WAIT_IO_COMPLETION.
+#define STANDARD_RIGHTS_REQUIRED 0x000F0000u
+#define SYNCHRONIZE 0x00100000u
+#define THREAD_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFFu)
+using PAPCFUNC = void (*)(ULONG_PTR parameter);
+HANDLE OpenThread(DWORD desiredAccess, BOOL inheritHandle, DWORD threadId);
+DWORD QueueUserAPC(PAPCFUNC function, HANDLE thread, ULONG_PTR data);
+
+// Shared objects, through the dynamic loader.
+HMODULE GetModuleHandleA(const char* moduleName);
+HMODULE LoadLibraryA(const char* fileName);
+void* GetProcAddress(HMODULE module, const char* procName);
+BOOL FreeLibrary(HMODULE module);
 DWORD GetTickCount();
 BOOL QueryPerformanceCounter(LARGE_INTEGER* count);
 BOOL QueryPerformanceFrequency(LARGE_INTEGER* frequency);
@@ -300,6 +342,69 @@ HLOCAL LocalFree(HLOCAL memory);
 #define INVALID_SET_FILE_POINTER 0xFFFFFFFFu
 #define INVALID_FILE_ATTRIBUTES 0xFFFFFFFFu
 #define MOVEFILE_REPLACE_EXISTING 0x00000001u
+BOOL ReplaceFileW(const wchar_t* replacedFile, const wchar_t* replacementFile, const wchar_t* backupFile, DWORD flags, void* exclude, void* reserved);
+BOOL PathFileExistsW(const wchar_t* path);
+BOOL CreateDirectoryA(const char* path, void* attributes);
+/// `_fullpath`: the absolute, lexically normalised form of `path` (which need not exist).
+char* _fullpath(char* absolutePath, const char* relativePath, std::size_t maxLength);
+
+// Code pages: the ANSI and OEM code pages are UTF-8 here.
+#define CP_ACP 0u
+#define CP_OEMCP 1u
+#define CP_UTF8 65001u
+int WideCharToMultiByte(UINT codePage, DWORD flags, const wchar_t* wide, int wideLength, char* multiByte, int multiByteLength, const char* defaultChar, BOOL* usedDefaultChar);
+int MultiByteToWideChar(UINT codePage, DWORD flags, const char* multiByte, int multiByteLength, wchar_t* wide, int wideLength);
+// The secure scanf takes a buffer size after each %s, %c and %[ argument; the shared code
+// scans numbers only, where it is sscanf.
+#define sscanf_s sscanf
+DWORD GetModuleFileNameW(HMODULE module, wchar_t* fileName, DWORD size);
+BOOL SetProcessAffinityMask(HANDLE process, DWORD_PTR processMask);
+
+// The shell folders, as the XDG directories: CSIDL_LOCAL_APPDATA is $XDG_DATA_HOME
+// (~/.local/share), CSIDL_APPDATA $XDG_CONFIG_HOME (~/.config), CSIDL_PERSONAL ~/Documents,
+// CSIDL_DESKTOPDIRECTORY ~/Desktop; other folders fail with E_FAIL.
+#define CSIDL_DESKTOP 0x0000
+#define CSIDL_PERSONAL 0x0005
+#define CSIDL_DESKTOPDIRECTORY 0x0010
+#define CSIDL_APPDATA 0x001A
+#define CSIDL_LOCAL_APPDATA 0x001C
+#define CSIDL_FLAG_CREATE 0x8000
+HRESULT SHGetFolderPathW(HWND owner, int folder, HANDLE token, DWORD flags, wchar_t* path);
+
+// Shell file operations are not available: SHFileOperation fails with ERROR_NOT_SUPPORTED and
+// touches nothing.
+#define FO_MOVE 0x0001u
+#define FO_COPY 0x0002u
+#define FO_DELETE 0x0003u
+#define FO_RENAME 0x0004u
+#define FOF_SILENT 0x0004u
+#define FOF_NOCONFIRMATION 0x0010u
+#define FOF_ALLOWUNDO 0x0040u
+#define FOF_NOERRORUI 0x0400u
+struct SHFILEOPSTRUCTA
+{
+  HWND hwnd;
+  UINT wFunc;
+  const char* pFrom;
+  const char* pTo;
+  WORD fFlags;
+  BOOL fAnyOperationsAborted;
+  void* hNameMappings;
+  const char* lpszProgressTitle;
+};
+struct SHFILEOPSTRUCTW
+{
+  HWND hwnd;
+  UINT wFunc;
+  const wchar_t* pFrom;
+  const wchar_t* pTo;
+  WORD fFlags;
+  BOOL fAnyOperationsAborted;
+  void* hNameMappings;
+  const wchar_t* lpszProgressTitle;
+};
+int SHFileOperationA(SHFILEOPSTRUCTA* operation);
+int SHFileOperationW(SHFILEOPSTRUCTW* operation);
 #define MOVEFILE_COPY_ALLOWED 0x00000002u
 #define MOVEFILE_WRITE_THROUGH 0x00000008u
 
@@ -316,6 +421,11 @@ DWORD SetFilePointer(HANDLE file, LONG distance, LONG* distanceHigh, DWORD moveM
 BOOL GetFileSizeEx(HANDLE file, LARGE_INTEGER* size);
 DWORD GetFileSize(HANDLE file, DWORD* sizeHigh);
 BOOL FlushFileBuffers(HANDLE file);
+// Read-only views of a whole file (the only mapping the shared code makes).
+#define FILE_MAP_READ 0x0004u
+HANDLE CreateFileMappingW(HANDLE file, void* attributes, DWORD protect, DWORD maximumSizeHigh, DWORD maximumSizeLow, const wchar_t* name);
+void* MapViewOfFile(HANDLE mapping, DWORD desiredAccess, DWORD offsetHigh, DWORD offsetLow, std::size_t bytes);
+BOOL UnmapViewOfFile(const void* view);
 BOOL SetEndOfFile(HANDLE file);
 DWORD GetFileAttributesW(const wchar_t* path);
 DWORD GetFileAttributesA(const char* path);
@@ -486,9 +596,10 @@ struct WIN32_FILE_ATTRIBUTE_DATA
 BOOL GetFileAttributesExW(const wchar_t* path, GET_FILEEX_INFO_LEVELS level, void* information);
 BOOL GetFileAttributesExA(const char* path, GET_FILEEX_INFO_LEVELS level, void* information);
 
+using KAFFINITY = std::uintptr_t;
 struct GROUP_AFFINITY
 {
-  std::uintptr_t Mask;
+  KAFFINITY Mask;
   WORD Group;
   WORD Reserved[3];
 };
@@ -524,6 +635,10 @@ struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX
   };
 };
 void GetCurrentProcessorNumberEx(PROCESSOR_NUMBER* number);
+// One processor group (group 0, the CPUs the kernel numbers 0..63): the group affinity is
+// the thread's affinity mask, and the ideal processor is a hint Linux has no call for.
+BOOL SetThreadGroupAffinity(HANDLE thread, const GROUP_AFFINITY* affinity, GROUP_AFFINITY* previous);
+BOOL SetThreadIdealProcessorEx(HANDLE thread, PROCESSOR_NUMBER* ideal, PROCESSOR_NUMBER* previous);
 BOOL GetNumaProcessorNode(UCHAR processor, UCHAR* nodeNumber);
 BOOL GetNumaNodeProcessorMask(UCHAR node, ULONGLONG* processorMask);
 
@@ -534,6 +649,23 @@ inline std::tm* _localtime64(const __time64_t* const time) noexcept
 {
   const std::time_t value = static_cast<std::time_t>(*time);
   return std::localtime(&value);
+}
+inline std::tm* _gmtime64(const __time64_t* const time) noexcept
+{
+  const std::time_t value = static_cast<std::time_t>(*time);
+  return std::gmtime(&value);
+}
+inline __time64_t _mktime64(std::tm* const brokenDown) noexcept
+{
+  return static_cast<__time64_t>(std::mktime(brokenDown));
+}
+inline std::FILE* _popen(const char* const command, const char* const mode) noexcept
+{
+  return ::popen(command, mode);
+}
+inline int _pclose(std::FILE* const stream) noexcept
+{
+  return ::pclose(stream);
 }
 inline int* _errno() noexcept
 {

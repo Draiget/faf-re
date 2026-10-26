@@ -11,13 +11,14 @@
 #include "CHostManager.h"
 #include "CGpgNetInterface.h"
 #include "CNetNullConnector.h"
+#if defined(_WIN32)
 #include "CNetTCPConnector.h"
 #include "CNetUDPConnector.h"
+#endif
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "NetConVars.h"
 using namespace moho;
 
@@ -782,6 +783,7 @@ INetConnector* moho::NET_MakeConnector(
  */
 INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<INetNATTraversalProvider> prov)
 {
+#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -812,6 +814,14 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
     return nullptr;
   }
   return new CNetUDPConnector{sock, prov};
+#else
+  // Engine addition (dedicated-server plan WPL.5): the lockstep transport (the WSAEventSelect
+  // connectors and their sockets) is Windows only; NET_Init fails here, so this fails as the
+  // Windows function does when Winsock cannot start.
+  (void)port;
+  (void)prov;
+  return nullptr;
+#endif
 }
 
 /**
@@ -822,6 +832,7 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
  */
 INetConnector* moho::NET_MakeTCPConnector(const u_short port)
 {
+#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -861,6 +872,11 @@ INetConnector* moho::NET_MakeTCPConnector(const u_short port)
     return nullptr;
   }
   return connector;
+#else
+  // Engine addition (dedicated-server plan WPL.5): see NET_MakeUDPConnector.
+  (void)port;
+  return nullptr;
+#endif
 }
 
 /**

@@ -16,7 +16,6 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
-#include "moho/audio/AudioEngine.h"
 
 namespace
 {

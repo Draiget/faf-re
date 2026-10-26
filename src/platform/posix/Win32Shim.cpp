@@ -5,18 +5,29 @@
 #if !defined(_WIN32)
 
 #include "platform/posix/win32/Windows.h"
+#include "platform/posix/win32/io.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
+#include <deque>
+#include <unordered_map>
 #include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
+#include <dirent.h>
+#include <dlfcn.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
@@ -86,6 +97,33 @@ namespace
     return out;
   }
 
+  /// The wide (UTF-32) form of a UTF-8 string.
+  [[nodiscard]] std::wstring WidenUtf8(const std::string& text)
+  {
+    std::wstring out;
+    for (std::size_t at = 0; at < text.size();) {
+      const auto lead = static_cast<unsigned char>(text[at]);
+      std::uint32_t c = lead;
+      std::size_t extra = 0;
+      if (lead >= 0xF0u) {
+        c = lead & 0x07u;
+        extra = 3;
+      } else if (lead >= 0xE0u) {
+        c = lead & 0x0Fu;
+        extra = 2;
+      } else if (lead >= 0xC0u) {
+        c = lead & 0x1Fu;
+        extra = 1;
+      }
+      ++at;
+      for (std::size_t k = 0; k < extra && at < text.size(); ++k, ++at) {
+        c = (c << 6) | (static_cast<unsigned char>(text[at]) & 0x3Fu);
+      }
+      out.push_back(static_cast<wchar_t>(c));
+    }
+    return out;
+  }
+
   [[nodiscard]] std::string SlashPath(const char* const path)
   {
     std::string out = path != nullptr ? path : "";
@@ -100,7 +138,7 @@ namespace
   /// Every HANDLE this file hands out points at one of these.
   struct ShimHandle
   {
-    enum class Kind { Event, Semaphore, Mutex, File };
+    enum class Kind { Event, Semaphore, Mutex, File, Mapping, Thread };
 
     explicit ShimHandle(const Kind kind) noexcept
       : kind(kind)
@@ -173,6 +211,108 @@ namespace
     int fd = -1;
   };
 
+  /// A file mapping: its own descriptor of the file and the file's size when it was made.
+  struct MappingObject final : ShimHandle
+  {
+    MappingObject() noexcept
+      : ShimHandle(Kind::Mapping)
+    {}
+    ~MappingObject() override
+    {
+      if (fd >= 0) {
+        (void)::close(fd);
+      }
+    }
+
+    int fd = -1;
+    std::size_t size = 0;
+  };
+
+  /// One thread's queued asynchronous procedure calls.
+  struct ApcQueue
+  {
+    std::mutex mutex;
+    std::condition_variable queued;
+    std::deque<std::pair<PAPCFUNC, ULONG_PTR>> calls;
+  };
+
+  /// Every thread's APC queue, by thread id; made by the thread itself or by OpenThread.
+  std::mutex gApcQueuesLock;
+  std::unordered_map<DWORD, std::shared_ptr<ApcQueue>> gApcQueues;
+
+  [[nodiscard]] std::shared_ptr<ApcQueue> ApcQueueOf(const DWORD threadId)
+  {
+    const std::lock_guard<std::mutex> lock(gApcQueuesLock);
+    std::shared_ptr<ApcQueue>& queue = gApcQueues[threadId];
+    if (queue == nullptr) {
+      queue = std::make_shared<ApcQueue>();
+    }
+    return queue;
+  }
+
+  /// The calling thread's queue, dropped from the registry when the thread exits.
+  struct CurrentThreadApcQueue
+  {
+    DWORD threadId = 0;
+    std::shared_ptr<ApcQueue> queue;
+
+    ~CurrentThreadApcQueue()
+    {
+      if (queue != nullptr) {
+        const std::lock_guard<std::mutex> lock(gApcQueuesLock);
+        const auto found = gApcQueues.find(threadId);
+        if (found != gApcQueues.end() && found->second == queue) {
+          gApcQueues.erase(found);
+        }
+      }
+    }
+  };
+
+  [[nodiscard]] ApcQueue& CurrentApcQueue()
+  {
+    thread_local CurrentThreadApcQueue current;
+    if (current.queue == nullptr) {
+      current.threadId = static_cast<DWORD>(::syscall(SYS_gettid));
+      current.queue = ApcQueueOf(current.threadId);
+    }
+    return *current.queue;
+  }
+
+  /// Runs the calling thread's queued calls; true when there was at least one.
+  bool RunQueuedApcs()
+  {
+    ApcQueue& queue = CurrentApcQueue();
+    bool ran = false;
+    for (;;) {
+      std::pair<PAPCFUNC, ULONG_PTR> call{};
+      {
+        const std::lock_guard<std::mutex> lock(queue.mutex);
+        if (queue.calls.empty()) {
+          return ran;
+        }
+        call = queue.calls.front();
+        queue.calls.pop_front();
+      }
+      call.first(call.second);
+      ran = true;
+    }
+  }
+
+  /// A thread opened by OpenThread: the queue its APCs go to.
+  struct ThreadObject final : ShimHandle
+  {
+    ThreadObject() noexcept
+      : ShimHandle(Kind::Thread)
+    {}
+
+    DWORD threadId = 0;
+    std::shared_ptr<ApcQueue> queue;
+  };
+
+  /// The length of every view MapViewOfFile handed out, for UnmapViewOfFile.
+  std::mutex gViewLock;
+  std::vector<std::pair<const void*, std::size_t>> gViews;
+
   const HANDLE kCurrentThreadPseudoHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-2));
   const HANDLE kCurrentProcessPseudoHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
 
@@ -187,7 +327,10 @@ namespace
   [[nodiscard]] WaitObject* AsWaitObject(const HANDLE handle) noexcept
   {
     ShimHandle* const object = AsShimHandle(handle);
-    return object != nullptr && object->kind != ShimHandle::Kind::File ? static_cast<WaitObject*>(object) : nullptr;
+    return object != nullptr && (object->kind == ShimHandle::Kind::Event || object->kind == ShimHandle::Kind::Semaphore ||
+                                 object->kind == ShimHandle::Kind::Mutex)
+             ? static_cast<WaitObject*>(object)
+             : nullptr;
   }
 
   [[nodiscard]] FileObject* AsFileObject(const HANDLE handle) noexcept
@@ -335,9 +478,33 @@ DWORD WaitForSingleObject(const HANDLE handle, const DWORD milliseconds)
   return WAIT_OBJECT_0;
 }
 
-DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, BOOL)
+DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, const BOOL alertable)
 {
-  return WaitForSingleObject(handle, milliseconds);
+  if (alertable == FALSE) {
+    return WaitForSingleObject(handle, milliseconds);
+  }
+  WaitObject* const object = AsWaitObject(handle);
+  if (object == nullptr) {
+    tLastError = ERROR_INVALID_HANDLE;
+    return WAIT_FAILED;
+  }
+  // Alertable: the object or a queued call, whichever comes first, in 1 ms slices.
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds);
+  for (;;) {
+    if (RunQueuedApcs()) {
+      return WAIT_IO_COMPLETION;
+    }
+    {
+      std::unique_lock<std::mutex> lock(object->mutex);
+      if (object->signalled.wait_for(lock, std::chrono::milliseconds(1), [object] { return object->ReadyLocked(); })) {
+        object->AcquireLocked();
+        return WAIT_OBJECT_0;
+      }
+    }
+    if (milliseconds != INFINITE && std::chrono::steady_clock::now() >= deadline) {
+      return WAIT_TIMEOUT;
+    }
+  }
 }
 
 DWORD WaitForMultipleObjects(const DWORD count, const HANDLE* const handles, const BOOL waitAll, const DWORD milliseconds)
@@ -465,10 +632,90 @@ void Sleep(const DWORD milliseconds)
   std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 }
 
-DWORD SleepEx(const DWORD milliseconds, BOOL)
+DWORD SleepEx(const DWORD milliseconds, const BOOL alertable)
 {
-  Sleep(milliseconds);
-  return 0;
+  if (alertable == FALSE) {
+    Sleep(milliseconds);
+    return 0;
+  }
+  if (RunQueuedApcs()) {
+    return WAIT_IO_COMPLETION;
+  }
+  ApcQueue& queue = CurrentApcQueue();
+  {
+    std::unique_lock<std::mutex> lock(queue.mutex);
+    const auto hasCalls = [&queue] { return !queue.calls.empty(); };
+    if (milliseconds == INFINITE) {
+      queue.queued.wait(lock, hasCalls);
+    } else if (!queue.queued.wait_for(lock, std::chrono::milliseconds(milliseconds), hasCalls)) {
+      return 0;
+    }
+  }
+  (void)RunQueuedApcs();
+  return WAIT_IO_COMPLETION;
+}
+
+HANDLE OpenThread(DWORD, BOOL, const DWORD threadId)
+{
+  char taskPath[64]{};
+  std::snprintf(taskPath, sizeof(taskPath), "/proc/self/task/%u", static_cast<unsigned>(threadId));
+  if (::access(taskPath, F_OK) != 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return nullptr;
+  }
+  auto* const thread = new ThreadObject();
+  thread->threadId = threadId;
+  thread->queue = ApcQueueOf(threadId);
+  return thread;
+}
+
+DWORD QueueUserAPC(const PAPCFUNC function, const HANDLE threadHandle, const ULONG_PTR data)
+{
+  ShimHandle* const object = AsShimHandle(threadHandle);
+  std::shared_ptr<ApcQueue> queue;
+  if (threadHandle == kCurrentThreadPseudoHandle) {
+    queue = ApcQueueOf(static_cast<DWORD>(::syscall(SYS_gettid)));
+  } else if (object != nullptr && object->kind == ShimHandle::Kind::Thread) {
+    queue = static_cast<ThreadObject*>(object)->queue;
+  }
+  if (function == nullptr || queue == nullptr) {
+    tLastError = ERROR_INVALID_HANDLE;
+    return 0;
+  }
+  {
+    const std::lock_guard<std::mutex> lock(queue->mutex);
+    queue->calls.emplace_back(function, data);
+  }
+  queue->queued.notify_all();
+  return 1;
+}
+
+HMODULE GetModuleHandleA(const char* const moduleName)
+{
+  void* const module = ::dlopen(moduleName, RTLD_NOW | RTLD_NOLOAD);
+  if (module != nullptr) {
+    (void)::dlclose(module); // GetModuleHandle takes no reference.
+  }
+  return module;
+}
+
+HMODULE LoadLibraryA(const char* const fileName)
+{
+  void* const module = ::dlopen(fileName, RTLD_NOW | RTLD_LOCAL);
+  if (module == nullptr) {
+    tLastError = ERROR_FILE_NOT_FOUND;
+  }
+  return module;
+}
+
+void* GetProcAddress(const HMODULE module, const char* const procName)
+{
+  return module != nullptr ? ::dlsym(module, procName) : nullptr;
+}
+
+BOOL FreeLibrary(const HMODULE module)
+{
+  return module != nullptr && ::dlclose(module) == 0 ? TRUE : FALSE;
 }
 
 DWORD GetTickCount()
@@ -864,6 +1111,72 @@ DWORD GetFileSize(const HANDLE handle, DWORD* const sizeHigh)
   return static_cast<DWORD>(size.QuadPart & 0xFFFFFFFF);
 }
 
+HANDLE CreateFileMappingW(
+  const HANDLE file, void*, const DWORD protect, const DWORD maximumSizeHigh, const DWORD maximumSizeLow, const wchar_t*
+)
+{
+  FileObject* const source = AsFileObject(file);
+  struct stat status{};
+  if (source == nullptr || protect != PAGE_READONLY || maximumSizeHigh != 0 || maximumSizeLow != 0 ||
+      ::fstat(source->fd, &status) != 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return nullptr;
+  }
+  if (status.st_size == 0) {
+    // Windows refuses to map an empty file.
+    tLastError = ERROR_FILE_INVALID;
+    return nullptr;
+  }
+  const int fd = ::fcntl(source->fd, F_DUPFD_CLOEXEC, 0);
+  if (fd < 0) {
+    SetErrnoError();
+    return nullptr;
+  }
+  auto* const mapping = new MappingObject();
+  mapping->fd = fd;
+  mapping->size = static_cast<std::size_t>(status.st_size);
+  tLastError = ERROR_SUCCESS;
+  return mapping;
+}
+
+void* MapViewOfFile(
+  const HANDLE mappingHandle, const DWORD desiredAccess, const DWORD offsetHigh, const DWORD offsetLow, const std::size_t bytes
+)
+{
+  ShimHandle* const object = AsShimHandle(mappingHandle);
+  if (object == nullptr || object->kind != ShimHandle::Kind::Mapping || desiredAccess != FILE_MAP_READ ||
+      offsetHigh != 0 || offsetLow != 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return nullptr;
+  }
+  const auto* const mapping = static_cast<const MappingObject*>(object);
+  const std::size_t length = bytes != 0 ? bytes : mapping->size;
+  void* const view = ::mmap(nullptr, length, PROT_READ, MAP_PRIVATE, mapping->fd, 0);
+  if (view == MAP_FAILED) {
+    SetErrnoError();
+    return nullptr;
+  }
+  const std::lock_guard<std::mutex> lock(gViewLock);
+  gViews.emplace_back(view, length);
+  return view;
+}
+
+BOOL UnmapViewOfFile(const void* const view)
+{
+  std::size_t length = 0;
+  {
+    const std::lock_guard<std::mutex> lock(gViewLock);
+    const auto found = std::find_if(gViews.begin(), gViews.end(), [view](const auto& entry) { return entry.first == view; });
+    if (found == gViews.end()) {
+      tLastError = ERROR_INVALID_PARAMETER;
+      return FALSE;
+    }
+    length = found->second;
+    gViews.erase(found);
+  }
+  return ::munmap(const_cast<void*>(view), length) == 0 ? TRUE : FALSE;
+}
+
 BOOL FlushFileBuffers(const HANDLE handle)
 {
   FileObject* const file = AsFileObject(handle);
@@ -940,6 +1253,214 @@ BOOL CreateDirectoryW(const wchar_t* const path, void*)
     return FALSE;
   }
   return TRUE;
+}
+
+BOOL ReplaceFileW(
+  const wchar_t* const replacedFile, const wchar_t* const replacementFile, const wchar_t* const backupFile, DWORD, void*, void*
+)
+{
+  const std::string replaced = NarrowPath(replacedFile);
+  const std::string replacement = NarrowPath(replacementFile);
+  if (::access(replaced.c_str(), F_OK) != 0) {
+    tLastError = ERROR_FILE_NOT_FOUND;
+    return FALSE;
+  }
+  if (backupFile != nullptr) {
+    const std::string backup = NarrowPath(backupFile);
+    if (::link(replaced.c_str(), backup.c_str()) != 0 && errno != EEXIST) {
+      SetErrnoError();
+      return FALSE;
+    }
+  }
+  if (::rename(replacement.c_str(), replaced.c_str()) != 0) {
+    SetErrnoError();
+    return FALSE;
+  }
+  return TRUE;
+}
+
+BOOL CreateDirectoryA(const char* const path, void*)
+{
+  if (::mkdir(SlashPath(path).c_str(), 0755) != 0) {
+    SetErrnoError();
+    return FALSE;
+  }
+  return TRUE;
+}
+
+char* _fullpath(char* const absolutePath, const char* const relativePath, const std::size_t maxLength)
+{
+  if (relativePath == nullptr) {
+    errno = EINVAL;
+    return nullptr;
+  }
+  std::error_code error;
+  const std::string full = std::filesystem::absolute(SlashPath(relativePath), error).lexically_normal().string();
+  if (error) {
+    errno = ENOENT;
+    return nullptr;
+  }
+  if (absolutePath == nullptr) {
+    return ::strdup(full.c_str());
+  }
+  if (full.size() + 1 > maxLength) {
+    errno = ERANGE;
+    return nullptr;
+  }
+  std::memcpy(absolutePath, full.c_str(), full.size() + 1);
+  return absolutePath;
+}
+
+int WideCharToMultiByte(
+  UINT, DWORD, const wchar_t* const wide, const int wideLength, char* const multiByte, const int multiByteLength,
+  const char*, BOOL* const usedDefaultChar
+)
+{
+  if (usedDefaultChar != nullptr) {
+    *usedDefaultChar = FALSE;
+  }
+  if (wide == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return 0;
+  }
+  // UTF-8, with the terminator converted too when the length is -1.
+  const std::size_t count = wideLength < 0 ? std::wcslen(wide) : static_cast<std::size_t>(wideLength);
+  std::string out = NarrowPath(std::wstring(wide, count).c_str());
+  if (wideLength < 0) {
+    out.push_back('\0');
+  }
+  if (multiByteLength == 0) {
+    return static_cast<int>(out.size());
+  }
+  if (multiByte == nullptr || out.size() > static_cast<std::size_t>(multiByteLength)) {
+    tLastError = ERROR_INSUFFICIENT_BUFFER;
+    return 0;
+  }
+  std::memcpy(multiByte, out.data(), out.size());
+  return static_cast<int>(out.size());
+}
+
+int MultiByteToWideChar(
+  UINT, DWORD, const char* const multiByte, const int multiByteLength, wchar_t* const wide, const int wideLength
+)
+{
+  if (multiByte == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return 0;
+  }
+  const std::size_t count = multiByteLength < 0 ? std::strlen(multiByte) : static_cast<std::size_t>(multiByteLength);
+  std::wstring out = WidenUtf8(std::string(multiByte, count));
+  if (multiByteLength < 0) {
+    out.push_back(L'\0');
+  }
+  if (wideLength == 0) {
+    return static_cast<int>(out.size());
+  }
+  if (wide == nullptr || out.size() > static_cast<std::size_t>(wideLength)) {
+    tLastError = ERROR_INSUFFICIENT_BUFFER;
+    return 0;
+  }
+  std::wmemcpy(wide, out.data(), out.size());
+  return static_cast<int>(out.size());
+}
+
+BOOL PathFileExistsW(const wchar_t* const path)
+{
+  return ::access(NarrowPath(path).c_str(), F_OK) == 0 ? TRUE : FALSE;
+}
+
+DWORD GetModuleFileNameW(const HMODULE module, wchar_t* const fileName, const DWORD size)
+{
+  if (module != nullptr || fileName == nullptr || size == 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return 0;
+  }
+  char exe[4096]{};
+  const ssize_t length = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+  if (length <= 0) {
+    SetErrnoError();
+    return 0;
+  }
+  const std::wstring wide = WidenUtf8(std::string(exe, static_cast<std::size_t>(length)));
+  if (wide.size() >= size) {
+    // Windows truncates and reports the buffer as too small.
+    std::wmemcpy(fileName, wide.c_str(), size - 1);
+    fileName[size - 1] = L'\0';
+    tLastError = ERROR_INSUFFICIENT_BUFFER;
+    return size;
+  }
+  std::wmemcpy(fileName, wide.c_str(), wide.size() + 1);
+  tLastError = ERROR_SUCCESS;
+  return static_cast<DWORD>(wide.size());
+}
+
+BOOL SetProcessAffinityMask(const HANDLE process, const DWORD_PTR processMask)
+{
+  if (process != kCurrentProcessPseudoHandle || processMask == 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return FALSE;
+  }
+  cpu_set_t wanted;
+  CPU_ZERO(&wanted);
+  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
+    if ((processMask & (DWORD_PTR{1} << cpu)) != 0) {
+      CPU_SET(cpu, &wanted);
+    }
+  }
+  if (::sched_setaffinity(0, sizeof(wanted), &wanted) != 0) {
+    SetErrnoError();
+    return FALSE;
+  }
+  return TRUE;
+}
+
+HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const path)
+{
+  if (path == nullptr) {
+    return E_INVALIDARG;
+  }
+  const char* const home = std::getenv("HOME");
+  if (home == nullptr || home[0] == '\0') {
+    return E_FAIL;
+  }
+  const auto fromEnvironment = [home](const char* const variable, const char* const fallback) {
+    const char* const value = std::getenv(variable);
+    return value != nullptr && value[0] == '/' ? std::string(value) : std::string(home) + fallback;
+  };
+  std::string resolved;
+  switch (folder & ~CSIDL_FLAG_CREATE) {
+  case CSIDL_LOCAL_APPDATA:
+    resolved = fromEnvironment("XDG_DATA_HOME", "/.local/share");
+    break;
+  case CSIDL_APPDATA:
+    resolved = fromEnvironment("XDG_CONFIG_HOME", "/.config");
+    break;
+  case CSIDL_PERSONAL:
+    resolved = std::string(home) + "/Documents";
+    break;
+  case CSIDL_DESKTOP:
+  case CSIDL_DESKTOPDIRECTORY:
+    resolved = std::string(home) + "/Desktop";
+    break;
+  default:
+    return E_FAIL;
+  }
+  const std::wstring wide = WidenUtf8(resolved);
+  if (wide.size() >= MAX_PATH) {
+    return E_FAIL;
+  }
+  std::wmemcpy(path, wide.c_str(), wide.size() + 1);
+  return S_OK;
+}
+
+int SHFileOperationA(SHFILEOPSTRUCTA*)
+{
+  return static_cast<int>(ERROR_NOT_SUPPORTED);
+}
+
+int SHFileOperationW(SHFILEOPSTRUCTW*)
+{
+  return static_cast<int>(ERROR_NOT_SUPPORTED);
 }
 
 BOOL DosDateTimeToFileTime(const WORD fatDate, const WORD fatTime, FILETIME* const fileTime)
@@ -1251,6 +1772,35 @@ void GetCurrentProcessorNumberEx(PROCESSOR_NUMBER* const number)
   number->Reserved = 0;
 }
 
+BOOL SetThreadGroupAffinity(const HANDLE thread, const GROUP_AFFINITY* const affinity, GROUP_AFFINITY* const previous)
+{
+  if (affinity == nullptr || affinity->Group != 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return FALSE;
+  }
+  const DWORD_PTR previousMask = SetThreadAffinityMask(thread, affinity->Mask);
+  if (previousMask == 0) {
+    return FALSE;
+  }
+  if (previous != nullptr) {
+    *previous = GROUP_AFFINITY{};
+    previous->Mask = previousMask;
+  }
+  return TRUE;
+}
+
+BOOL SetThreadIdealProcessorEx(const HANDLE thread, PROCESSOR_NUMBER* const ideal, PROCESSOR_NUMBER* const previous)
+{
+  if (thread != kCurrentThreadPseudoHandle || ideal == nullptr || ideal->Group != 0) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return FALSE;
+  }
+  if (previous != nullptr) {
+    GetCurrentProcessorNumberEx(previous);
+  }
+  return TRUE;
+}
+
 BOOL GetNumaProcessorNode(UCHAR, UCHAR* const nodeNumber)
 {
   if (nodeNumber != nullptr) {
@@ -1307,6 +1857,114 @@ int _snprintf(char* const buffer, const std::size_t count, const char* const for
   const int written = _vsnprintf(buffer, count, format, arguments);
   va_end(arguments);
   return written;
+}
+
+namespace
+{
+  /// One `_findfirst64` search: the matches, sorted, and the next one to hand out.
+  struct FindSearch
+  {
+    std::vector<__finddata64_t> matches;
+    std::size_t next = 0;
+  };
+
+  [[nodiscard]] __time64_t ToTime64(const struct timespec& time) noexcept
+  {
+    return static_cast<__time64_t>(time.tv_sec);
+  }
+} // namespace
+
+std::intptr_t _findfirst64(const char* const spec, __finddata64_t* const data)
+{
+  if (spec == nullptr || data == nullptr) {
+    errno = EINVAL;
+    return -1;
+  }
+  const std::string path = SlashPath(spec);
+  const std::size_t slash = path.find_last_of('/');
+  const std::string directory = slash == std::string::npos ? std::string(".") : slash == 0 ? std::string("/") : path.substr(0, slash);
+  std::string pattern = slash == std::string::npos ? path : path.substr(slash + 1);
+  if (pattern == "*.*") {
+    pattern = "*";
+  }
+
+  DIR* const dir = ::opendir(directory.c_str());
+  if (dir == nullptr) {
+    errno = ENOENT;
+    return -1;
+  }
+  auto search = std::make_unique<FindSearch>();
+  while (const dirent* const entry = ::readdir(dir)) {
+    if (::fnmatch(pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+      continue;
+    }
+    __finddata64_t match{};
+    const std::size_t length = std::min(std::strlen(entry->d_name), sizeof(match.name) - 1);
+    std::memcpy(match.name, entry->d_name, length);
+    match.name[length] = '\0';
+    struct stat status{};
+    const std::string full = directory + "/" + entry->d_name;
+    if (::stat(full.c_str(), &status) == 0) {
+      match.attrib = S_ISDIR(status.st_mode) ? _A_SUBDIR : _A_ARCH;
+      if ((status.st_mode & S_IWUSR) == 0) {
+        match.attrib |= _A_RDONLY;
+      }
+      match.time_create = ToTime64(status.st_ctim);
+      match.time_access = ToTime64(status.st_atim);
+      match.time_write = ToTime64(status.st_mtim);
+      match.size = S_ISDIR(status.st_mode) ? 0 : static_cast<std::int64_t>(status.st_size);
+    }
+    search->matches.push_back(match);
+  }
+  (void)::closedir(dir);
+  if (search->matches.empty()) {
+    errno = ENOENT;
+    return -1;
+  }
+
+  // NTFS keeps a directory's names in upper-cased order, which is the order FindNextFile
+  // and so the CRT report them in.
+  std::stable_sort(search->matches.begin(), search->matches.end(), [](const __finddata64_t& a, const __finddata64_t& b) {
+    for (std::size_t at = 0;; ++at) {
+      const auto ca = static_cast<unsigned char>(std::toupper(static_cast<unsigned char>(a.name[at])));
+      const auto cb = static_cast<unsigned char>(std::toupper(static_cast<unsigned char>(b.name[at])));
+      if (ca != cb) {
+        return ca < cb;
+      }
+      if (ca == 0) {
+        return false;
+      }
+    }
+  });
+
+  *data = search->matches[0];
+  search->next = 1;
+  return reinterpret_cast<std::intptr_t>(search.release());
+}
+
+int _findnext64(const std::intptr_t handle, __finddata64_t* const data)
+{
+  auto* const search = reinterpret_cast<FindSearch*>(handle);
+  if (handle == -1 || search == nullptr || data == nullptr) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (search->next >= search->matches.size()) {
+    errno = ENOENT;
+    return -1;
+  }
+  *data = search->matches[search->next++];
+  return 0;
+}
+
+int _findclose(const std::intptr_t handle)
+{
+  if (handle == -1 || handle == 0) {
+    errno = EINVAL;
+    return -1;
+  }
+  delete reinterpret_cast<FindSearch*>(handle);
+  return 0;
 }
 
 #endif // !defined(_WIN32)

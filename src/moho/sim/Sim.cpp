@@ -57,11 +57,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
-#include "moho/audio/AudioEngine.h"
-#include "moho/audio/CUserSoundManager.h"
 #include "moho/audio/CSimSoundManager.h"
-#include "moho/audio/CSndParams.h"
-#include "moho/audio/HSound.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/command/CommandIssueHelper.h"
 #include "moho/sim/BuildQueueCommandDecrement.h"
@@ -87,14 +83,8 @@
 #include "moho/path/PathTables.h"
 #include "moho/particles/SParticleBuffer.h"
 #include "moho/render/camera/CameraImpl.h"
-#include "moho/render/camera/GeomCamera3.h"
-#include "moho/render/camera/VTransform.h"
 #include "moho/render/CDecalBuffer.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
-#include "moho/render/d3d/CD3DDevice.h"
-#include "moho/render/d3d/CD3DFont.h"
-#include "moho/render/d3d/CD3DPrimBatcher.h"
-#include "moho/render/textures/CD3DBatchTexture.h"
 #include "lua/LuaError.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "lua/LuaTableIterator.h"
@@ -154,7 +144,6 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/STIMapReflection.h"
-#include "moho/ui/CUIManager.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/EIntelTypeInfo.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
@@ -192,8 +181,8 @@ namespace
 } // namespace
 
 
-// Engine addition (dedicated-server plan WPL.4), declared in AudioEngine.h.
-moho::SoundConfigurationLookupHook moho::sSoundConfigurationLookup = nullptr;
+// Engine addition (dedicated-server plan WPL.4), declared in CSimSoundManager.h.
+moho::SoundEnabledHook moho::sSoundEnabled = nullptr;
 
 std::uint8_t moho::ren_Steering = 0;
 bool moho::sim_KeepAllLogFiles = false;
@@ -5849,13 +5838,9 @@ void Sim::Setup(LaunchInfoNew* const info)
 
   // Optional sound manager: only when a non-empty engine list is configured and
   // sound is not disabled.
-  // Engine addition (plan WPL.4): the configuration is the client's, asked through
-  // sSoundConfigurationLookup (AudioEngine.h).
-  const SoundConfiguration* const soundConfiguration =
-    sSoundConfigurationLookup != nullptr ? sSoundConfigurationLookup() : nullptr;
-  if (soundConfiguration && soundConfiguration->mEngines.mStart != nullptr &&
-      soundConfiguration->mEngines.mFinish != soundConfiguration->mEngines.mStart &&
-      soundConfiguration->mNoSound == 0) {
+  // Engine addition (plan WPL.4): the configuration is the client's, tested through
+  // sSoundEnabled (CSimSoundManager.h).
+  if (sSoundEnabled != nullptr && sSoundEnabled()) {
     auto* const newSoundManager = new CSimSoundManager(this);
     CSimSoundManager* const previousSoundManager = mSoundManager;
     mSoundManager = newSoundManager;

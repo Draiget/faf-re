@@ -41,6 +41,7 @@
  *     GPG_PREREGISTER_INIT(SFootprintTypeInfo, register_SFootprintTypeInfo)
  */
 
+#if defined(_WIN32)
 #define GPG_PREREGISTER_INIT(TAG, FN)                                              \
   static void __cdecl gGpgPreRegisterThunk_##TAG()                                 \
   {                                                                                \
@@ -50,3 +51,16 @@
   extern "C" __declspec(allocate(".CRT$XCL")) void(__cdecl* const                  \
                                                    gGpgPreRegisterInit_##TAG)() =  \
     &gGpgPreRegisterThunk_##TAG;
+#else
+/*
+ * Engine addition (dedicated-server plan WPL.5, WPL.18): the same phase on ELF. A
+ * constructor of priority 101 goes into `.init_array.00101`, which the loader runs before
+ * the unprioritised `.init_array` that holds ordinary dynamic initializers; among
+ * themselves they run in link order, as the `.CRT$XCL` entries do.
+ */
+#define GPG_PREREGISTER_INIT(TAG, FN)                                              \
+  __attribute__((constructor(101))) static void gGpgPreRegisterThunk_##TAG()       \
+  {                                                                                \
+    (void)FN();                                                                    \
+  }
+#endif

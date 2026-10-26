@@ -34,8 +34,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include "gpg/core/reflection/StaticInitPhase.h"
 #endif
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {

@@ -78,6 +78,13 @@ list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/tss_(dll|hooks|pe)\\
 # The Windows platform services (call stacks, crash-report paths, message
 # boxes); the POSIX implementation of the same functions is plan WPL.5.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/misc/WinPlatform\\.cpp$")
+# The crash diagnostics on dbghelp, vectored exception handlers, minidumps and debug
+# registers; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp implements their headers.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^gpg/core/diagnostics/(CrashHooks|CrashReport|ProbeWatch)\\.cpp$")
+# The lockstep transport: Winsock sockets driven by WSAEventSelect. Linux replays and
+# serves games without it (the server has its own channel, plan D3); moho/net/Common.cpp's
+# connector factories fail here as on a Windows host without Winsock.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
 
 set(_faf_sim_files "")
 foreach(_src IN LISTS FAF_SIM_SOURCES)
@@ -106,6 +113,8 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
+# The crash diagnostics' headers on POSIX (plan WPL.5).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/posix/DiagnosticsPosix.cpp")
 
 # The Windows build's engine definitions without the Win32 ones (WIN32,
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
@@ -190,3 +199,17 @@ add_custom_command(TARGET faf_sim_math_tests POST_BUILD
 add_executable(faf-sim-link "${PROJECT_SOURCE_DIR}/tests/linux/SimLinkMain.cpp")
 target_link_libraries(faf-sim-link PRIVATE faf_sim)
 target_link_options(faf-sim-link PRIVATE -Wl,--error-limit=0)
+
+# --- faf-replay (plan WPL.7) ------------------------------------------------------------
+# The headless replay runner on Linux: replay/sources.cmake on every faf_sim object, as
+# Windows' sim-only faf-replay (FAF_REPLAY_SIM_ONLY: a plain Lua state for sync packets and
+# launch configs, no wx entry, no userInit.lua).
+include("${PROJECT_SOURCE_DIR}/src/replay/sources.cmake")
+set(_faf_replay_files "")
+foreach(_src IN LISTS FAF_REPLAY_SOURCES)
+  list(APPEND _faf_replay_files "${PROJECT_SOURCE_DIR}/src/${_src}")
+endforeach()
+add_executable(faf-replay ${_faf_replay_files})
+target_link_libraries(faf-replay PRIVATE faf_sim)
+target_compile_definitions(faf-replay PRIVATE FAF_SERVER_MODE=1 FAF_REPLAY_SIM_ONLY=1)
+target_link_options(faf-replay PRIVATE -Wl,--error-limit=0)
