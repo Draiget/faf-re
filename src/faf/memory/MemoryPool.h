@@ -20,7 +20,7 @@ namespace faf
     size_t GetBlockSize() const;
 
     void* Allocate();
-    void Deallocate(void* ptr);
+    void Deallocate(void* ptr) noexcept;
 
     bool Owns(
       const void* ptr
