@@ -72,13 +72,10 @@ namespace faf
   }
   void MemoryPool::Deallocate(
     void* ptr
-  )
+  ) noexcept
   {
     if (ptr == nullptr) {
       return;
-    }
-    if (!Owns(ptr)) {
-      throw std::runtime_error("Tried to deallocate unowned pointer");
     }
     FreeNode* node = static_cast<FreeNode*>(ptr);
     node->next = m_freeList;
