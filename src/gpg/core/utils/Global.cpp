@@ -1855,6 +1855,16 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
     if (gMemHook != nullptr) {
         gMemHook(0, static_cast<int>(size), block);
     }
+#if defined(TRACY_ENABLE)
+    if (block != nullptr) {
+        thread_local bool tInMem = false;
+        if (!tInMem) {
+            tInMem = true;
+            FAF_PROFILE_ALLOC(block, size);
+            tInMem = false;
+        }
+    }
+#endif
     return block;
 #else
     ThreadHeapCache* const threadCache = GetOrCreateThreadHeapCache();
@@ -1909,6 +1919,16 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
     if (gMemHook != nullptr) {
         gMemHook(0, static_cast<int>(size), allocation);
     }
+#if defined(TRACY_ENABLE)
+    if (allocation != nullptr) {
+        thread_local bool tInMem = false;
+        if (!tInMem) {
+            tInMem = true;
+            FAF_PROFILE_ALLOC(allocation, size);
+            tInMem = false;
+        }
+    }
+#endif
 
     return allocation;
 #endif
@@ -1929,6 +1949,14 @@ extern "C" void __cdecl free_0(void* ptr)
     if (ptr == nullptr) {
         return;
     }
+#if defined(TRACY_ENABLE)
+    thread_local bool tInMem = false;
+    if (!tInMem) {
+        tInMem = true;
+        FAF_PROFILE_FREE(ptr);
+        tInMem = false;
+    }
+#endif
 
 #if defined(_M_X64)
     // This has to come before `GetPageOwner`, which is only meaningful for
