@@ -384,6 +384,7 @@ namespace
           component = mRng() % 3u == 0u ? 0 : static_cast<std::int32_t>(mRng() % 2001u) - 1000;
         }
         record.verticalAcceleration = mRng() % 4u == 0u ? static_cast<std::int32_t>(mRng() % 201u) - 100 : 0;
+        record.followsGround = mRng() % 3u == 0u;
         record.anchorBeat = mBeat;
       }
       if (mRng() % 16u == 0u) {
@@ -394,6 +395,7 @@ namespace
         record.velocity = {};
         record.verticalAcceleration = 0;
         record.anchorBeat = 0;
+        record.followsGround = false;
       }
       record.yawOnly = (mRng() & 1u) != 0u;
       record.orientation = record.yawOnly ? (mRng() & 0xFFFFu) : static_cast<std::uint32_t>(mRng());
@@ -467,6 +469,7 @@ namespace
         record.position = fresh.position;
         record.velocity = fresh.velocity;
         record.verticalAcceleration = fresh.verticalAcceleration;
+        record.followsGround = fresh.followsGround;
         record.anchorBeat = fresh.anchorBeat;
         record.farPosition = fresh.farPosition;
         record.farValue = fresh.farValue;
@@ -612,7 +615,7 @@ namespace
     std::vector<SEntityRecord> mLive;
   };
 
-  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true, 0, true};
+  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true, 0, true, true};
 
   [[nodiscard]] std::vector<std::uint8_t> Encode(
     const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec = kCodec
@@ -846,6 +849,33 @@ namespace
     edge.velocity = {-10, -10, 10};
     const QuantizedPosition clamped = PredictPosition(edge, 5, codec);
     CHECK(clamped[0] == 0u && clamped[1] == 0u && clamped[2] == codec.position.z.MaxQuantized());
+
+    // Ground following: a unit crossing a hill (height sin(x / 20) * 8) at a steady speed. Its
+    // height is anything but linear, so a straight fit re-anchors over and over; following the
+    // terrain it re-anchors about as often as on flat ground.
+    struct SHill final : IGroundHeight
+    {
+      [[nodiscard]] float HeightAt(const float x, const float) const noexcept override
+      {
+        return 20.0f + 8.0f * std::sin(x / 20.0f);
+      }
+    } hill;
+    SFrameCodec onHill = fine;
+    onHill.groundFollowing = true;
+    onHill.ground = &hill;
+    const auto overHill = [&](const std::uint32_t beat) {
+      const float x = 100.0f + 0.3f * static_cast<float>(beat);
+      const float z = 200.0f;
+      return QuantizedPosition{
+        onHill.position.x.Encode(x), onHill.position.y.Encode(hill.HeightAt(x, z)), onHill.position.z.Encode(z)
+      };
+    };
+    SReckoningScheme ground = fitted;
+    ground.followGround = true;
+    const int straightHill = anchorsOver(fitted, onHill, overHill);
+    const int groundHill = anchorsOver(ground, onHill, overHill);
+    std::printf("  hill anchors over 200 beats: straight %d, following the ground %d\n", straightHill, groundHill);
+    CHECK(groundHill * 3 < straightHill);
 
     // Orientation: a steady turn of 100.3 yaw units a beat through the wrap at a full turn, held
     // within 64 units (0.35 degrees) by a fitted rate; re-anchored far less than every beat.

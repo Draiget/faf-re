@@ -53,7 +53,9 @@ namespace faf::remote::wire
       const bool turnFits = codec.orientationReckoning && record.yawOnly
                               ? record.orientationBeat <= beat
                               : (record.orientationBeat == 0u && record.yawRate == 0);
-      if (!turnFits || (codec.orientationReckoning && !codec.deadReckoning)) {
+      if (!turnFits || (codec.orientationReckoning && !codec.deadReckoning)
+          || (codec.groundFollowing && !codec.deadReckoning)
+          || (record.followsGround && (!codec.groundFollowing || record.farPosition))) {
         return false;
       }
       if (record.farPosition) {
@@ -195,6 +197,9 @@ namespace faf::remote::wire
             writer.WriteVarUint(ZigZag(component));
           }
           writer.WriteVarUint(ZigZag(record.verticalAcceleration));
+          if (codec.groundFollowing) {
+            writer.WriteBool(record.followsGround);
+          }
         }
       }
       if ((fields & kFieldOrientation) != 0u) {
@@ -392,6 +397,7 @@ namespace faf::remote::wire
         record.velocity = {};
         record.verticalAcceleration = 0;
         record.anchorBeat = 0;
+        record.followsGround = false;
       } else if ((fields & kFieldPosition) != 0u) {
         record.farValue = {};
         record.position[0] = reader.ReadBits(codec.position.x.bits);
@@ -408,6 +414,7 @@ namespace faf::remote::wire
             component = UnZigZag(reader.ReadVarUint());
           }
           record.verticalAcceleration = UnZigZag(reader.ReadVarUint());
+          record.followsGround = codec.groundFollowing && reader.ReadBool();
         }
       }
       if ((fields & kFieldOrientation) != 0u) {
@@ -704,7 +711,7 @@ namespace faf::remote::wire
     return id == other.id && tickCreated == other.tickCreated && blueprint == other.blueprint && army == other.army && position == other.position
         && farPosition == other.farPosition && SameFloats(farValue.data(), other.farValue.data(), farValue.size())
         && velocity == other.velocity && verticalAcceleration == other.verticalAcceleration
-        && anchorBeat == other.anchorBeat
+        && anchorBeat == other.anchorBeat && followsGround == other.followsGround
         && orientation == other.orientation && yawOnly == other.yawOnly && yawRate == other.yawRate
         && orientationBeat == other.orientationBeat && Bits(health) == Bits(other.health)
         && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
@@ -723,6 +730,7 @@ namespace faf::remote::wire
     std::uint32_t fields = AppearanceChanges(before.appearance, after.appearance);
     if (before.position != after.position || before.velocity != after.velocity
         || before.verticalAcceleration != after.verticalAcceleration || before.anchorBeat != after.anchorBeat
+        || before.followsGround != after.followsGround
         || before.farPosition != after.farPosition
         || !SameFloats(before.farValue.data(), after.farValue.data(), before.farValue.size())) {
       fields |= kFieldPosition;
@@ -880,6 +888,17 @@ namespace faf::remote::wire
     }
   } // namespace
 
+  namespace
+  {
+    /** The quantised terrain height under a quantised x and z (`codec.ground` set). */
+    [[nodiscard]] std::uint32_t GroundStep(const QuantizedPosition& at, const SFrameCodec& codec) noexcept
+    {
+      return codec.position.y.Encode(
+        codec.ground->HeightAt(codec.position.x.Decode(at[0]), codec.position.z.Decode(at[2]))
+      );
+    }
+  } // namespace
+
   QuantizedPosition PredictPosition(const SEntityRecord& record, const std::uint32_t beat, const SFrameCodec& codec) noexcept
   {
     const std::int64_t elapsed = static_cast<std::int64_t>(beat) - static_cast<std::int64_t>(record.anchorBeat);
@@ -893,6 +912,9 @@ namespace faf::remote::wire
       const std::int64_t value = static_cast<std::int64_t>(record.position[axis])
                                + DivideRounded(TwiceOffset(record.velocity[axis], acceleration, elapsed), 2 * unit);
       predicted[axis] = value < 0 ? 0u : (value > limits[axis] ? limits[axis] : static_cast<std::uint32_t>(value));
+    }
+    if (record.followsGround && codec.ground != nullptr) {
+      predicted[1] = GroundStep(predicted, codec);
     }
     return predicted;
   }
@@ -929,6 +951,21 @@ namespace faf::remote::wire
       sent.velocity[axis] = static_cast<std::int32_t>(motion.velocity);
       if (axis == 1) {
         sent.verticalAcceleration = static_cast<std::int32_t>(motion.acceleration);
+      }
+    }
+    // On the terrain for the last beats (within a step): the height follows it, no vertical motion.
+    sent.followsGround = false;
+    if (scheme.followGround && codec.groundFollowing && codec.ground != nullptr) {
+      bool onGround = true;
+      for (std::size_t k = 0; k < std::min<std::size_t>(count, 3u) && onGround; ++k) {
+        const QuantizedPosition& at = history[history.size() - 1u - k];
+        const std::int64_t gap = static_cast<std::int64_t>(at[1]) - static_cast<std::int64_t>(GroundStep(at, codec));
+        onGround = gap <= 1 && gap >= -1;
+      }
+      if (onGround) {
+        sent.followsGround = true;
+        sent.velocity[1] = 0;
+        sent.verticalAcceleration = 0;
       }
     }
     sent.anchorBeat = beat;

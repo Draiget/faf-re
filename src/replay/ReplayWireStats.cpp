@@ -5,6 +5,7 @@
 #include <bit>
 
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
 
 // Engine addition, server mode: see ReplayWireStats.h.
 
@@ -38,25 +39,32 @@ namespace faf::replay
     , mBuilder(tables, mCodec)
   {
     const auto variant = [&](const char* name, const std::uint32_t tolerance, const std::uint32_t window,
-                             const std::uint32_t fractionBits, const bool bend, const std::uint32_t turnTolerance) {
+                             const std::uint32_t fractionBits, const bool bend, const std::uint32_t turnTolerance,
+                             const bool ground = false) {
       wire::SFrameCodec codec = mCodec;
       codec.deadReckoning = true;
       codec.velocityFractionBits = fractionBits;
       codec.orientationReckoning = turnTolerance != 0u;
+      codec.groundFollowing = ground;
+      codec.ground = ground ? &mGround : nullptr;
       wire::SReckoningScheme scheme{};
       scheme.tolerance = tolerance;
       scheme.window = window;
       scheme.verticalAcceleration = bend;
       scheme.orientationTolerance = turnTolerance;
+      scheme.followGround = ground;
       mDeadReckoning.push_back(SDeadReckoningVariant{name, codec, faf::remote::CDeadReckoner(scheme), {}, 0});
     };
     variant("WP7.5 4 steps", 4, 1, 0, false, 0);
     variant("WP7.5 16 steps", 16, 1, 0, false, 0);
     variant("fit 4 steps", 4, 8, 4, false, 0);
     variant("fit+bend 4 steps", 4, 8, 4, true, 0);
-    variant("fit+bend 16 steps", 16, 8, 4, true, 0);
     variant("fit+bend 4 steps, turns 0.35 deg", 4, 8, 4, true, 64);
     variant("fit+bend 4 steps, turns 1 deg", 4, 8, 4, true, 182);
+    variant("WP7.5+ground 4 steps", 4, 1, 0, false, 0, true);
+    variant("fit+bend+ground 4 steps", 4, 8, 4, true, 0, true);
+    variant("WP7.5+ground 4 steps, turns 1 deg", 4, 1, 0, false, 182, true);
+    variant("WP7.5+ground 16 steps, turns 1 deg", 16, 1, 0, false, 182, true);
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -75,6 +83,7 @@ namespace faf::replay
 
   void CReplayWireStats::OnPacket(const moho::SSyncData& packet)
   {
+    mGround.SetField(packet.mTerrainUpdate.px);
     mBuilder.Apply(packet);
     Measure(static_cast<std::uint32_t>(packet.mCurBeat));
   }
@@ -223,7 +232,27 @@ namespace faf::replay
                              + varintBits(d.selectionInheritor) + varintBits(d.customName + 1u) + varintBits(d.focusUnit)
                              + varintBits(d.guardedUnit) + varintBits(d.targetBlip) + 8u + zz(d.reconFlags);
         }
-        if ((fields & wire::kFieldUnitEconomy) != 0u) into.unitParts[3] += 192;
+        if ((fields & wire::kFieldUnitEconomy) != 0u) {
+          into.unitParts[3] += 192;
+          // How many of the six floats changed (a mask inside the economy would send only those).
+          if (&into == &mFieldBits && mHavePrevious) {
+            const auto it = std::lower_bound(
+              mPrevious.entities.begin(), mPrevious.entities.end(), record.id,
+              [](const wire::SEntityRecord& r, const std::uint32_t id) { return r.id < id; }
+            );
+            if (it != mPrevious.entities.end() && it->id == record.id && it->isUnit) {
+              std::uint32_t changed = 0;
+              for (std::size_t i = 0; i < 6; ++i) {
+                changed += std::bit_cast<std::uint32_t>(record.unit.detail->economy[i])
+                               != std::bit_cast<std::uint32_t>(it->unit.detail->economy[i])
+                             ? 1u
+                             : 0u;
+              }
+              ++mEconomyChanges;
+              mEconomyFloatsChanged += changed;
+            }
+          }
+        }
         if ((fields & wire::kFieldUnitQueues) != 0u) {
           std::uint64_t bits = varintBits(static_cast<std::uint32_t>(d.commands.size()))
                              + varintBits(static_cast<std::uint32_t>(d.buildQueue.size()));
@@ -360,14 +389,43 @@ namespace faf::replay
       rate(mFieldBits.unitParts[4]), rate(mFieldBits.unitParts[5]), rate(mFieldBits.unitParts[6])
     );
     std::string summary = text;
+    {
+      const faf::remote::CDeadReckoner::SReanchorCauses& c = mDeadReckoning.front().reckoner.Causes();
+      const double all = mDeadReckoning.front().reckoner.Reanchors() != 0u
+                           ? static_cast<double>(mDeadReckoning.front().reckoner.Reanchors())
+                           : 1.0;
+      char causes[400];
+      std::snprintf(
+        causes, sizeof(causes),
+        "; re-anchors at 4 steps (WP7.5): horizontal only %.0f%%, vertical only %.0f%%, both %.0f%%, units %.0f%%, "
+        "stopped %.0f%%, after 1 beat %.0f%%, 2-3 %.0f%%, 4-9 %.0f%%, 10+ %.0f%%",
+        100.0 * c.horizontalOnly / all, 100.0 * c.verticalOnly / all, 100.0 * c.both / all, 100.0 * c.units / all,
+        100.0 * c.stopped / all, 100.0 * c.afterBeats[0] / all, 100.0 * c.afterBeats[1] / all,
+        100.0 * c.afterBeats[2] / all, 100.0 * c.afterBeats[3] / all
+      );
+      summary += causes;
+    }
+    {
+      char economy[160];
+      std::snprintf(
+        economy, sizeof(economy), "; economy changes %llu, floats changed per change %.2f of 6",
+        static_cast<unsigned long long>(mEconomyChanges),
+        mEconomyChanges != 0u ? static_cast<double>(mEconomyFloatsChanged) / static_cast<double>(mEconomyChanges) : 0.0
+      );
+      summary += economy;
+    }
     summary += "; dead reckoning schemes (WP7.8):";
     for (const SDeadReckoningVariant& variant : mDeadReckoning) {
-      char part[200];
+      char part[240];
       const double entityBeats = mEntitySum != 0 ? static_cast<double>(mEntitySum) : 1.0;
       std::snprintf(
-        part, sizeof(part), " %s %.1f KB/s (%.3f position, %.3f orientation re-anchors per entity-beat);", variant.name,
+        part, sizeof(part), " %s %.1f KB/s (%.3f position, %.3f orientation re-anchors per entity-beat, %.0f%% of "
+        "the position ones onto the ground);", variant.name,
         rate(variant.bytes * 8u), static_cast<double>(variant.reckoner.Reanchors()) / entityBeats,
-        static_cast<double>(variant.reckoner.OrientationReanchors()) / entityBeats
+        static_cast<double>(variant.reckoner.OrientationReanchors()) / entityBeats,
+        variant.reckoner.Reanchors() != 0u
+          ? 100.0 * static_cast<double>(variant.reckoner.GroundAnchors()) / static_cast<double>(variant.reckoner.Reanchors())
+          : 0.0
       );
       summary += part;
     }

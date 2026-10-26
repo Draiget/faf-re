@@ -128,6 +128,7 @@ namespace
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --loopback [--loopback-dr <steps> [--loopback-turns <units>]]  every packet through the wire format and the\n"
       "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
+      "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -184,6 +185,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
+  options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
   (void)ReadIntOption("--loopback-dr", options.loopbackDeadReckoning, bad);
   (void)ReadIntOption("--loopback-turns", options.loopbackTurnTolerance, bad);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
@@ -262,6 +264,9 @@ int main(int argc, char** argv)
     }
     std::printf("[%s] %s\n", label, summary.c_str());
   }
+  if (!result.commandSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.commandSummary.c_str());
+  }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
@@ -309,7 +314,8 @@ int main(int argc, char** argv)
     exitCode = kExitBadInput;
   } else if (result.crashed) {
     exitCode = kExitCrash;
-  } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0) {
+  } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0
+             || result.commandFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

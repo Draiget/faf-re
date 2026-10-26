@@ -20,6 +20,7 @@
 
 namespace moho
 {
+  class CHeightField;
   struct SSyncData;
 }
 
@@ -76,6 +77,8 @@ namespace faf::replay
      */
     std::vector<SDeadReckoningVariant> mDeadReckoning;
 
+    faf::remote::CHeightFieldGround mGround; // the sim's terrain, for ground following (WP7.8)
+
     /** Bits of changed records by field class, summed over the run (creations and ids apart). */
     struct SFieldBits
     {
@@ -93,6 +96,8 @@ namespace faf::replay
       std::uint64_t removals = 0;   // removed ids
     } mFieldBits;
     std::array<std::uint64_t, 7> mCreationAppearanceBits{}; // the appearance part of `creations`
+    std::uint64_t mEconomyChanges = 0;       // changed records with an economy change
+    std::uint64_t mEconomyFloatsChanged = 0; // of their six floats, how many changed in all
     bool mHavePrevious = false;
 
     std::uint64_t mBeats = 0;

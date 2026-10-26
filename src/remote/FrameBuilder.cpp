@@ -335,6 +335,11 @@ namespace faf::remote
     // Terrain edits: each changed rectangle with the heights the sim's field now holds there.
     if (mSession != nullptr) {
       const moho::CHeightField* const field = packet.mTerrainUpdate.px;
+      if (field != nullptr && !mSentTerrain) {
+        // The heights as the client starts with them (SyncRebuilder.cpp: the first beat's).
+        mSentTerrain.reset(new moho::CHeightField(field->width - 1, field->height - 1));
+        std::copy_n(field->data, static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height), mSentTerrain->data);
+      }
       for (const gpg::Rect2i& rect : packet.mPlayableRectUpdates) {
         wire::STerrainEdit edit{};
         edit.dirty = {rect.x0, rect.z0, rect.x1, rect.z1};
@@ -352,6 +357,8 @@ namespace faf::remote
             for (std::int32_t z = clipped.z0; z <= clipped.z1; ++z) {
               const std::uint16_t* const row = field->data + static_cast<std::ptrdiff_t>(z) * field->width;
               edit.heights.insert(edit.heights.end(), row + clipped.x0, row + clipped.x1 + 1);
+              std::copy(row + clipped.x0, row + clipped.x1 + 1,
+                        mSentTerrain->data + static_cast<std::ptrdiff_t>(z) * mSentTerrain->width + clipped.x0);
             }
           }
         }
@@ -453,6 +460,11 @@ namespace faf::remote
     return frame;
   }
 
+  float CHeightFieldGround::HeightAt(const float x, const float z) const noexcept
+  {
+    return mField != nullptr ? mField->GetElevation(x, z) : 0.0f;
+  }
+
   void CDeadReckoner::Apply(wire::SViewFrame& frame, const wire::SFrameCodec& codec)
   {
     // Both are in id order: records the frame no longer has (or has far away) are dropped.
@@ -506,11 +518,27 @@ namespace faf::remote
       }
       entry.history[entry.historyCount++] = actual;
       entry.lastBeat = frame.beat;
+      const wire::QuantizedPosition predicted = wire::PredictPosition(entry.anchor, frame.beat, codec);
+      const std::uint32_t anchoredAt = entry.anchor.anchorBeat;
       if (wire::ApplyDeadReckoning(
             entry.anchor, std::span<const wire::QuantizedPosition>(entry.history.data(), entry.historyCount),
             frame.beat, mScheme, codec
           )) {
         ++mReanchors;
+        mGroundAnchors += entry.anchor.followsGround ? 1u : 0u;
+        const auto off = [&](const int axis) {
+          const std::int64_t error = static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(predicted[axis]);
+          return error > mScheme.tolerance || -error > mScheme.tolerance;
+        };
+        const bool horizontal = off(0) || off(2);
+        const bool vertical = off(1);
+        mCauses.horizontalOnly += horizontal && !vertical ? 1u : 0u;
+        mCauses.verticalOnly += vertical && !horizontal ? 1u : 0u;
+        mCauses.both += horizontal && vertical ? 1u : 0u;
+        mCauses.units += record.isUnit ? 1u : 0u;
+        mCauses.stopped += entry.historyCount >= 2u && entry.history[entry.historyCount - 2u] == actual ? 1u : 0u;
+        const std::uint32_t age = frame.beat - anchoredAt;
+        ++mCauses.afterBeats[age <= 1u ? 0 : (age <= 3u ? 1 : (age <= 9u ? 2 : 3))];
       }
       record.position = entry.anchor.position;
       record.velocity = entry.anchor.velocity;

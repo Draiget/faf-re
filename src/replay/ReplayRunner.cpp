@@ -39,6 +39,7 @@
 #include "remote/ContentTables.h"
 #include "replay/ReplayBoneStats.h"
 #include "replay/ReplayFpuReport.h"
+#include "replay/ReplayCommandCheck.h"
 #include "replay/ReplayWireStats.h"
 
 namespace faf::replay
@@ -449,6 +450,13 @@ namespace faf::replay
       syncWriters.Enable();
     }
 
+    // `--command-check`: watches the sim's decoder from its first message.
+    std::unique_ptr<CReplayCommandCheck> commandCheck;
+    if (options.commandCheck) {
+      commandCheck = std::make_unique<CReplayCommandCheck>(*rules);
+      commandCheck->Install();
+    }
+
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
     moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Replay);
@@ -656,6 +664,10 @@ namespace faf::replay
     if (loopback) {
       result.loopbackSummary = loopback->Summary("end");
       result.loopbackFailures = loopback->CheckFailures();
+    }
+    if (commandCheck) {
+      result.commandSummary = commandCheck->Summary();
+      result.commandFailures = commandCheck->Failures();
     }
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;

@@ -72,6 +72,9 @@ namespace faf::remote::client
     using Clock = std::chrono::steady_clock;
     const Clock::time_point start = Clock::now();
     mBuilder.Apply(packet);
+    if (const moho::CHeightField* const sent = mBuilder.SentTerrain(); sent != nullptr) {
+      mRebuilder.SeedTerrain(*sent); // both ends start from one snapshot of the heights
+    }
     wire::SViewFrame frame = mBuilder.Build(static_cast<std::uint32_t>(packet.mCurBeat));
     if (mReckoner) {
       mReckoner->Apply(frame, mCodec);

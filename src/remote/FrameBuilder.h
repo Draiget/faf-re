@@ -26,6 +26,7 @@
 
 namespace moho
 {
+  class CHeightField;
   class StatItem;
   template <class T>
   class Stats;
@@ -95,6 +96,12 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t UnknownUnderlays() const noexcept { return mUnknownUnderlays; }
     /** Beats with more resource deposits than the session record may carry (should stay 0). */
     [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mDepositOverflows; }
+    /**
+     * The heights as the client holds them after this beat's edits: the server's terrain for
+     * predictions the client makes on its own copy (ground following). The sim's own field may
+     * be ahead of the frames when the sim runs ahead of them (loopback, replays).
+     */
+    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept { return mSentTerrain.get(); }
     /** Terrain edits the session record could not carry (should stay 0). */
     [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
 
@@ -110,9 +117,21 @@ namespace faf::remote
     std::uint64_t mUnknownUnderlays = 0;
     std::uint64_t mDepositOverflows = 0;
     std::uint64_t mTerrainEditOverflows = 0;
+    boost::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
     wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared
     std::vector<wire::SUnitStat> mStatsScratch;  // a unit's stats, likewise
     wire::CSessionTableWriters* mSession = nullptr;
+  };
+
+  /** A height field as the terrain ground-following records stand on (WP7.8). */
+  class CHeightFieldGround final : public wire::IGroundHeight
+  {
+  public:
+    void SetField(const moho::CHeightField* field) noexcept { mField = field; }
+    [[nodiscard]] float HeightAt(float x, float z) const noexcept override;
+
+  private:
+    const moho::CHeightField* mField = nullptr;
   };
 
   /**
@@ -135,6 +154,20 @@ namespace faf::remote
     [[nodiscard]] std::uint32_t Tolerance() const noexcept { return mScheme.tolerance; }
     [[nodiscard]] std::uint64_t Reanchors() const noexcept { return mReanchors; }
     [[nodiscard]] std::uint64_t OrientationReanchors() const noexcept { return mOrientationReanchors; }
+    /** Re-anchors that made the position follow the terrain. */
+    [[nodiscard]] std::uint64_t GroundAnchors() const noexcept { return mGroundAnchors; }
+
+    /** What the re-anchors were (to tune the schemes, WP7.8). */
+    struct SReanchorCauses
+    {
+      std::uint64_t horizontalOnly = 0; // only x or z beyond the tolerance
+      std::uint64_t verticalOnly = 0;
+      std::uint64_t both = 0;
+      std::uint64_t units = 0;
+      std::uint64_t stopped = 0;          // the position did not move on the last beat
+      std::uint64_t afterBeats[4]{};      // beats since the anchor: 1, 2-3, 4-9, 10 or more
+    };
+    [[nodiscard]] const SReanchorCauses& Causes() const noexcept { return mCauses; }
 
   private:
     struct SSent
@@ -151,5 +184,7 @@ namespace faf::remote
     std::map<std::uint32_t, SSent> mSent;
     std::uint64_t mReanchors = 0;
     std::uint64_t mOrientationReanchors = 0;
+    std::uint64_t mGroundAnchors = 0;
+    SReanchorCauses mCauses;
   };
 } // namespace faf::remote

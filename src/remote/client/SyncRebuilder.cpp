@@ -368,6 +368,15 @@ namespace faf::remote::client
     return differing;
   }
 
+  void CSyncRebuilder::SeedTerrain(const moho::CHeightField& heights)
+  {
+    if (mTerrain) {
+      return;
+    }
+    mTerrain.reset(new moho::CHeightField(heights.width - 1, heights.height - 1));
+    std::copy_n(heights.data, static_cast<std::size_t>(heights.width) * static_cast<std::size_t>(heights.height), mTerrain->data);
+  }
+
   void CSyncRebuilder::ApplyTerrain(moho::SSyncData& packet)
   {
     const moho::CHeightField* const sim = packet.mTerrainUpdate.px;
@@ -518,6 +527,7 @@ namespace faf::remote::client
     mStats.frameBytes += frameBytes.size();
 
     const Clock::time_point decoded = Clock::now();
+    ApplyTerrain(packet);
     const wire::SFrameDelta delta = wire::ComputeFrameDelta(mHasShown ? &mShown : nullptr, frame);
     const Clock::time_point compared = Clock::now();
     const std::uint32_t beat = frame.beat;
@@ -811,7 +821,6 @@ namespace faf::remote::client
     }
 
     ApplyDeposits(packet);
-    ApplyTerrain(packet);
 
     packet.mNewEntities.swap(newEntities);
     packet.mNewUnits.swap(newUnits);

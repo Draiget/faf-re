@@ -118,6 +118,12 @@ namespace faf::remote::client
      * as at the end of a session.
      */
     [[nodiscard]] std::uint64_t TerrainCellsDiffering() const noexcept;
+    /**
+     * The heights to start from, before the first frame: the map's as loaded (in loopback the
+     * server's copy of them, taken at the same instant as its own). Without it the first
+     * beat's field from the packet is taken.
+     */
+    void SeedTerrain(const moho::CHeightField& heights);
     /** The last frame decoded: the baseline the next frame must name. */
     [[nodiscard]] const wire::SViewFrame* Baseline() const noexcept { return mHasShown ? &mShown : nullptr; }
 

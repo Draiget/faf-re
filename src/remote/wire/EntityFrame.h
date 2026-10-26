@@ -185,6 +185,8 @@ namespace faf::remote::wire
     std::array<std::int32_t, 3> velocity{};
     std::int32_t verticalAcceleration = 0;
     std::uint32_t anchorBeat = 0;
+    /** Ground following (WP7.8): the height is the terrain's under the predicted x and z. */
+    bool followsGround = false;
     std::uint32_t orientation = 0;                  // yawOnly ? QuantizeYaw : PackQuaternion
     bool yawOnly = false;                           // a rotation about the vertical axis only
     /**
@@ -293,6 +295,15 @@ namespace faf::remote::wire
   /** `baseline` null: everything in `frame` is created. Both frames must be well formed. */
   [[nodiscard]] SFrameDelta ComputeFrameDelta(const SViewFrame* baseline, const SViewFrame& frame);
 
+  /** The terrain a ground-following record stands on: each end samples its own height field. */
+  class IGroundHeight
+  {
+  public:
+    virtual ~IGroundHeight() = default;
+    /** World height at world (x, z). */
+    [[nodiscard]] virtual float HeightAt(float x, float z) const noexcept = 0;
+  };
+
   /** What both ends agree on at connect (the map size fixes the position quantiser). */
   struct SFrameCodec
   {
@@ -310,6 +321,12 @@ namespace faf::remote::wire
      * turn rate, and the client shows `PredictYaw`. Needs `deadReckoning`.
      */
     bool orientationReckoning = false;
+    /**
+     * Ground following (WP7.8): a dead-reckoned position carries a bit saying its height is the
+     * terrain's. Needs `deadReckoning`. `ground` is this end's terrain; it is not sent.
+     */
+    bool groundFollowing = false;
+    const IGroundHeight* ground = nullptr;
   };
 
   /** How the server fits the motion it sends (the client only predicts). */
@@ -327,6 +344,8 @@ namespace faf::remote::wire
      * predicted yaw or a held quaternion, before it is sent again. 0: every change is sent.
      */
     std::uint32_t orientationTolerance = 0;
+    /** With ground following: a position on the terrain is sent as following it. */
+    bool followGround = false;
   };
 
   /** Beats of position history `ApplyDeadReckoning` can use (a window of 8 and its start). */

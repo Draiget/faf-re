@@ -27,9 +27,9 @@ namespace faf::remote::client
     /** Dead-reckoning tolerance in quantiser steps (1/64 unit); 0: off. */
     std::uint32_t deadReckoningTolerance = 0;
     /** With dead reckoning (WP7.8): the fitted window, the bent vertical fit and sub-steps. */
-    std::uint32_t reckoningWindow = 8;
-    bool reckonVerticalAcceleration = true;
-    std::uint32_t velocityFractionBits = 4;
+    std::uint32_t reckoningWindow = 1;          // measured (WP7.8): a longer fit sends more, saves nothing
+    bool reckonVerticalAcceleration = false;    // likewise the bend
+    std::uint32_t velocityFractionBits = 0;
     /** Orientation reckoning tolerance in 1/65536 turns; 0: off (every change is sent). */
     std::uint32_t orientationTolerance = 0;
   };
