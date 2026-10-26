@@ -3,7 +3,12 @@
 #include "D3D12Core.h"
 
 #include <algorithm>
+#include <atomic>
+#include <map>
+#include <mutex>
+#include <string>
 
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 
 namespace gpg::gal::d3d12
@@ -281,4 +286,251 @@ namespace gpg::gal::d3d12
     mUsed += count;
     return true;
   }
+
+  // ---------------------------------------------------------------------------
+  // PlacedHeapAllocator
+
+  namespace
+  {
+    constexpr std::uint64_t kPlacedHeapSize = 64ULL << 20U;
+    constexpr std::uint64_t kLargestPlaced = kPlacedHeapSize / 2U; // larger ones stay committed
+
+    // {5B0D4F62-8C4E-4C41-9F0B-6A2E1D7C3A90}: the private data slot holding a placed
+    // resource's RangeOwner.
+    constexpr GUID kRangeOwnerSlot = {0x5b0d4f62, 0x8c4e, 0x4c41, {0x9f, 0x0b, 0x6a, 0x2e, 0x1d, 0x7c, 0x3a, 0x90}};
+  } // namespace
+
+  struct PlacedHeapAllocator::State
+  {
+    struct Heap
+    {
+      ComPtr<ID3D12Heap> heap;
+      std::map<std::uint64_t, std::uint64_t> free; // offset -> size, adjacent ranges merged
+      std::uint64_t used = 0;
+    };
+
+    std::mutex mutex;
+    ComPtr<ID3D12Device> device;
+    D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+    std::wstring name;
+    bool notZeroed = true; // D3D12_HEAP_FLAG_CREATE_NOT_ZEROED until the runtime refuses it
+    std::vector<std::unique_ptr<Heap>> heaps;
+    std::atomic<std::uint64_t> heapBytes{0};
+    std::atomic<std::uint64_t> usedBytes{0};
+
+    /** Takes `size` bytes at `alignment` from a heap, making one when none has room. */
+    [[nodiscard]] Heap* Take(std::uint64_t size, std::uint64_t alignment, std::uint64_t& outOffset);
+    void Give(Heap* heap, std::uint64_t offset, std::uint64_t size);
+  };
+
+  PlacedHeapAllocator::State::Heap* PlacedHeapAllocator::State::Take(
+    const std::uint64_t size, const std::uint64_t alignment, std::uint64_t& outOffset
+  )
+  {
+    for (const std::unique_ptr<Heap>& heap : heaps) {
+      for (auto range = heap->free.begin(); range != heap->free.end(); ++range) {
+        const auto [start, length] = *range;
+        const std::uint64_t offset = AlignUp(start, alignment);
+        if (offset + size > start + length) {
+          continue;
+        }
+        heap->free.erase(range);
+        if (offset > start) {
+          heap->free.emplace(start, offset - start);
+        }
+        if (offset + size < start + length) {
+          heap->free.emplace(offset + size, start + length - offset - size);
+        }
+        heap->used += size;
+        outOffset = offset;
+        return heap.get();
+      }
+    }
+
+    D3D12_HEAP_DESC desc{};
+    desc.SizeInBytes = kPlacedHeapSize;
+    desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    desc.Flags = flags | (notZeroed ? D3D12_HEAP_FLAG_CREATE_NOT_ZEROED : D3D12_HEAP_FLAG_NONE);
+    auto heap = std::make_unique<Heap>();
+    if (FAILED(device->CreateHeap(&desc, IID_PPV_ARGS(&heap->heap)))) {
+      if (!notZeroed) {
+        return nullptr;
+      }
+      // Windows before 10 2004 does not know the flag.
+      notZeroed = false;
+      desc.Flags = flags;
+      if (FAILED(device->CreateHeap(&desc, IID_PPV_ARGS(&heap->heap)))) {
+        return nullptr;
+      }
+    }
+    static_cast<void>(heap->heap->SetName(name.c_str()));
+    heap->free.emplace(size, kPlacedHeapSize - size);
+    heap->used = size;
+    heapBytes += kPlacedHeapSize;
+    outOffset = 0U;
+    heaps.push_back(std::move(heap));
+    return heaps.back().get();
+  }
+
+  void PlacedHeapAllocator::State::Give(Heap* const heap, const std::uint64_t offset, const std::uint64_t size)
+  {
+    std::uint64_t start = offset;
+    std::uint64_t length = size;
+    auto next = heap->free.lower_bound(offset);
+    if (next != heap->free.begin()) {
+      const auto previous = std::prev(next);
+      if (previous->first + previous->second == start) {
+        start = previous->first;
+        length += previous->second;
+        heap->free.erase(previous);
+      }
+    }
+    if (next != heap->free.end() && next->first == offset + size) {
+      length += next->second;
+      heap->free.erase(next);
+    }
+    heap->free.emplace(start, length);
+    heap->used -= size;
+
+    // An empty heap goes when another empty one is kept for the next allocations.
+    if (heap->used == 0U) {
+      const auto empty = std::count_if(heaps.begin(), heaps.end(), [](const std::unique_ptr<Heap>& h) { return h->used == 0U; });
+      if (empty > 1) {
+        heaps.erase(std::find_if(heaps.begin(), heaps.end(), [heap](const std::unique_ptr<Heap>& h) { return h.get() == heap; }));
+        heapBytes -= kPlacedHeapSize;
+      }
+    }
+  }
+
+  /** Gives a placed resource's range back when the resource, which holds it as private data, goes. */
+  class PlacedHeapAllocator::RangeOwner final : public IUnknown
+  {
+  public:
+    RangeOwner(std::shared_ptr<State> state, State::Heap* const heap, const std::uint64_t offset, const std::uint64_t size)
+      : mState(std::move(state))
+      , mHeap(heap)
+      , mOffset(offset)
+      , mSize(size)
+    {
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** const object) override
+    {
+      if (object == nullptr) {
+        return E_POINTER;
+      }
+      if (riid == __uuidof(IUnknown)) {
+        AddRef();
+        *object = static_cast<IUnknown*>(this);
+        return S_OK;
+      }
+      *object = nullptr;
+      return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++mReferences; }
+
+    ULONG STDMETHODCALLTYPE Release() override
+    {
+      const ULONG left = --mReferences;
+      if (left == 0U) {
+        {
+          const std::lock_guard<std::mutex> lock(mState->mutex);
+          mState->Give(mHeap, mOffset, mSize);
+        }
+        mState->usedBytes -= mSize;
+        delete this;
+      }
+      return left;
+    }
+
+  private:
+    std::shared_ptr<State> mState;
+    State::Heap* mHeap;
+    std::uint64_t mOffset;
+    std::uint64_t mSize;
+    std::atomic<ULONG> mReferences{1U};
+  };
+
+  PlacedHeapAllocator::PlacedHeapAllocator() = default;
+  PlacedHeapAllocator::~PlacedHeapAllocator() = default;
+
+  void PlacedHeapAllocator::Initialize(ID3D12Device* const device, const D3D12_HEAP_FLAGS flags, const wchar_t* const name)
+  {
+    mState = std::make_shared<State>();
+    mState->device = device;
+    mState->flags = flags;
+    mState->name = name;
+  }
+
+  void PlacedHeapAllocator::Release() noexcept
+  {
+    mState.reset();
+  }
+
+  bool PlacedHeapAllocator::Create(
+    const D3D12_RESOURCE_DESC& desc, const D3D12_RESOURCE_STATES state, ComPtr<ID3D12Resource>& outResource
+  )
+  {
+    if (mState == nullptr) {
+      return false;
+    }
+    // Small textures may take 4 KB alignment instead of 64 KB when the driver allows it.
+    D3D12_RESOURCE_DESC placed = desc;
+    D3D12_RESOURCE_ALLOCATION_INFO info{};
+    if (desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER) {
+      placed.Alignment = D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
+      info = mState->device->GetResourceAllocationInfo(0U, 1U, &placed);
+      if (info.Alignment != D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT) {
+        placed.Alignment = 0U;
+        info = mState->device->GetResourceAllocationInfo(0U, 1U, &placed);
+      }
+    } else {
+      placed.Alignment = 0U;
+      info = mState->device->GetResourceAllocationInfo(0U, 1U, &placed);
+    }
+    if (info.SizeInBytes == UINT64_MAX || info.SizeInBytes == 0U || info.SizeInBytes > kLargestPlaced) {
+      return false;
+    }
+
+    std::uint64_t offset = 0U;
+    State::Heap* heap = nullptr;
+    {
+      const std::lock_guard<std::mutex> lock(mState->mutex);
+      heap = mState->Take(info.SizeInBytes, info.Alignment, offset);
+    }
+    if (heap == nullptr) {
+      return false;
+    }
+    ComPtr<ID3D12Resource> resource;
+    if (FAILED(mState->device->CreatePlacedResource(heap->heap.Get(), offset, &placed, state, nullptr, IID_PPV_ARGS(&resource)))) {
+      const std::lock_guard<std::mutex> lock(mState->mutex);
+      mState->Give(heap, offset, info.SizeInBytes);
+      return false;
+    }
+    auto* const owner = new RangeOwner(mState, heap, offset, info.SizeInBytes);
+    mState->usedBytes += info.SizeInBytes;
+    const HRESULT attached = resource->SetPrivateDataInterface(kRangeOwnerSlot, owner);
+    owner->Release(); // the resource holds it now, or nothing does and the range is free again
+    if (FAILED(attached)) {
+      return false;
+    }
+    outResource = std::move(resource);
+    return true;
+  }
+
+  std::uint64_t PlacedHeapAllocator::HeapBytes() const noexcept
+  {
+    return mState != nullptr ? mState->heapBytes.load() : 0U;
+  }
+
+  std::uint64_t PlacedHeapAllocator::UsedBytes() const noexcept
+  {
+    return mState != nullptr ? mState->usedBytes.load() : 0U;
+  }
 } // namespace gpg::gal::d3d12
+
+namespace gpg::gal
+{
+  bool gPlacedResources = true;
+} // namespace gpg::gal

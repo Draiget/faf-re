@@ -16,11 +16,6 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 
-namespace moho
-{
-    [[nodiscard]] std::uint8_t APP_GetAqtimeInstrumentationMode();
-}
-
 /// Engine addition: the x86 allocator finds a size class by table (true) or by the binary's
 /// binary search (false). Same class either way; `mem_SmallBlockIndexTable` (registered in Sim.cpp).
 bool gpg::mem_SmallBlockIndexTable = true;
@@ -2324,35 +2319,12 @@ bool gpg::ParseNum(const char* start, const char* end, int* dest) noexcept
 
 /**
  * Address: 0x009071D0 (FUN_009071D0, gpg::SetThreadName)
+ *
+ * What it does:
+ * Nothing. FAF hot-patch (FA-Binary-Patches Kill_maploader_except): 0x009071FE jumps
+ * straight to the epilogue at 0x0090723B, so the 0x406D1388 thread-naming exception the
+ * stock binary raised (when AQtime instrumentation was on) is never raised.
  */
-void gpg::SetThreadName(const unsigned int id, const char* const name)
+void gpg::SetThreadName([[maybe_unused]] const unsigned int id, [[maybe_unused]] const char* const name)
 {
-    if (moho::APP_GetAqtimeInstrumentationMode() == 0u) {
-        return;
-    }
-
-    struct ThreadNamePayload
-    {
-        std::uint32_t type;
-        const char* name;
-        std::uint32_t threadId;
-        std::uint32_t flags;
-    };
-    static_assert(sizeof(ThreadNamePayload) == 0x10, "ThreadNamePayload size must be 0x10");
-
-    ThreadNamePayload payload{};
-    payload.type = 0x1000u;
-    payload.name = name;
-    payload.threadId = id;
-    payload.flags = 0u;
-
-    __try {
-        ::RaiseException(
-          0x406D1388u,
-          0u,
-          4u,
-          reinterpret_cast<const ULONG_PTR*>(&payload)
-        );
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-    }
 }

@@ -339,7 +339,7 @@ namespace
 
 namespace moho
 {
-  float ren_ClutterRadius = 0.0f;
+  float ren_ClutterRadius = 50.0f; // 0x00F57F34 (shipped .data)
 
   /**
    * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop of

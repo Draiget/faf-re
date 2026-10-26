@@ -23,13 +23,40 @@ namespace gpg::gal::effects
   {
     HMODULE signer = nullptr;   // dxil.dll
     HMODULE compiler = nullptr; // dxcompiler.dll
+    DxcCreateInstanceProc create = nullptr;
     ComPtr<IDxcUtils> utils;
     ComPtr<IDxcCompiler3> dxc;
-    std::mutex mutex; // one compiler object: not for concurrent use
   };
 
   namespace
   {
+    /**
+     * Engine addition: a DXC compiler and utils object per thread. One object must not be used
+     * by two threads at once, but separate objects compile in parallel, so the background
+     * shader workers (EffectProgram::PrepareInBackground) and the render thread never queue
+     * behind one another.
+     */
+    struct ThreadDxc
+    {
+      ComPtr<IDxcUtils> utils;
+      ComPtr<IDxcCompiler3> dxc;
+    };
+
+    [[nodiscard]] ThreadDxc* ThisThreadDxc(const DxcCreateInstanceProc create)
+    {
+      thread_local ThreadDxc instance;
+      thread_local bool tried = false;
+      if (!tried) {
+        tried = true;
+        if (create == nullptr || FAILED(create(CLSID_DxcUtils, IID_PPV_ARGS(&instance.utils))) ||
+            FAILED(create(CLSID_DxcCompiler, IID_PPV_ARGS(&instance.dxc)))) {
+          instance.utils.Reset();
+          instance.dxc.Reset();
+        }
+      }
+      return instance.dxc != nullptr ? &instance : nullptr;
+    }
+
     [[nodiscard]] std::wstring ExecutableDirectory()
     {
       wchar_t path[MAX_PATH]{};
@@ -112,6 +139,7 @@ namespace gpg::gal::effects
     } else {
       mVersion = "dxc";
     }
+    library->create = create;
     mLibrary = library;
   }
 
@@ -205,9 +233,13 @@ namespace gpg::gal::effects
     source.Size = hlsl.size();
     source.Encoding = DXC_CP_UTF8;
 
-    const std::lock_guard<std::mutex> lock(mLibrary->mutex);
+    ThreadDxc* const dxc = ThisThreadDxc(mLibrary->create);
+    if (dxc == nullptr) {
+      result.messages = "DxcCreateInstance failed on this thread";
+      return result;
+    }
     ComPtr<IDxcResult> compiled;
-    const HRESULT hr = mLibrary->dxc->Compile(
+    const HRESULT hr = dxc->dxc->Compile(
       &source, argumentPointers.data(), static_cast<UINT32>(argumentPointers.size()), nullptr, IID_PPV_ARGS(&compiled)
     );
     if (FAILED(hr) || compiled == nullptr) {
@@ -247,9 +279,12 @@ namespace gpg::gal::effects
     DxcBuffer buffer{};
     buffer.Ptr = dxil.data();
     buffer.Size = dxil.size();
-    const std::lock_guard<std::mutex> lock(mLibrary->mutex);
+    ThreadDxc* const dxc = ThisThreadDxc(mLibrary->create);
+    if (dxc == nullptr) {
+      return inputs;
+    }
     ComPtr<ID3D12ShaderReflection> reflection;
-    if (FAILED(mLibrary->utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection)))) {
+    if (FAILED(dxc->utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection)))) {
       return inputs;
     }
     D3D12_SHADER_DESC desc{};

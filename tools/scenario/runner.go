@@ -421,6 +421,31 @@ func (r *runner) check(e Expect) []string {
 	for _, la := range e.LogsAgree {
 		fails = append(fails, r.checkLogsAgree(la)...)
 	}
+	for _, lc := range e.LogsContain {
+		fails = append(fails, r.checkLogsContain(lc)...)
+	}
+	return fails
+}
+
+// checkLogsContain requires a matching line in every listed player's game
+// log, and journals the matches.
+func (r *runner) checkLogsContain(lc LogsAgree) []string {
+	re, err := regexp.Compile(lc.Pattern)
+	if err != nil {
+		return []string{fmt.Sprintf("logsContain %q: %v", lc.Pattern, err)}
+	}
+	var fails []string
+	for _, uid := range lc.UIDs.Resolve(r.l.Players(), r.l.Host()) {
+		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d.log", uid)), re)
+		if err != nil {
+			fails = append(fails, fmt.Sprintf("logsContain %q: player %d: %v", lc.Pattern, uid, err))
+			continue
+		}
+		r.j.Note(journal.Note, uid, fmt.Sprintf("logsContain %q: %d match(es)", lc.Pattern, len(got)), got)
+		if len(got) == 0 {
+			fails = append(fails, fmt.Sprintf("logsContain %q: player %d logged no matching line", lc.Pattern, uid))
+		}
+	}
 	return fails
 }
 

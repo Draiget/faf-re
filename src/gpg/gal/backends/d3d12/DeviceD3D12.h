@@ -32,6 +32,7 @@
 
 #include "D3D12Core.h"
 #include "GpuDrivenD3D12.h"
+#include "PipelineCacheD3D12.h"
 #include "ResourcesD3D12.h"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
@@ -151,6 +152,8 @@ namespace gpg::gal
 
     // ---- services for the resources ----------------------------------------
     [[nodiscard]] ID3D12Device* Native() const noexcept { return mDevice.Get(); }
+    /** Engine addition (gal::gPlacedResources): where static buffers are placed. */
+    [[nodiscard]] d3d12::PlacedHeapAllocator& PlacedBuffers() noexcept { return mPlacedBuffers; }
     [[nodiscard]] std::recursive_mutex& Mutex() noexcept { return mMutex; }
     /** The submission the commands being recorded belong to. */
     [[nodiscard]] std::uint64_t RecordingSerial() const noexcept { return mSubmittedSerial + 1U; }
@@ -316,6 +319,8 @@ namespace gpg::gal
     std::vector<Garbage> mGarbage;
 
     d3d12::UploadAllocator mUpload;
+    d3d12::PlacedHeapAllocator mPlacedTextures; // engine addition: gal::gPlacedResources
+    d3d12::PlacedHeapAllocator mPlacedBuffers;
     d3d12::DescriptorPool mRtvPool;
     d3d12::DescriptorPool mDsvPool;
     d3d12::DescriptorPool mSrvPool;
@@ -334,6 +339,7 @@ namespace gpg::gal
 
     // ---- pipeline state ------------------------------------------------------
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPipelines;
+    d3d12::PipelineCache mPipelineCache; // engine addition: mPipelines' entries kept on disk across sessions
     std::map<std::string, D3D12_GPU_DESCRIPTOR_HANDLE> mSamplerTables; // by content
     std::uint64_t mArenaEpoch = 0; // bumped when a frame's view arena is emptied mid-frame
     BlendState mCurrent;      // what passes leave behind (D3D9's persistent render states)

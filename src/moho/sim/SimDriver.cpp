@@ -1283,7 +1283,7 @@ void CSimDriver::ThreadRun()
         // `GetSimRate()` starts at 0 (`msPerBeat` 100.00, correct) and within
         // seconds reads **50**, making `simRateScale` 100000 and `msPerBeat`
         // 0.0010. The throttle is then faithfully pacing a sim asked to run
-        // fifty steps fast. `net_Lag` is 0, `mSimBusy` is only set for a pause
+        // fifty steps fast. `net_Lag` was 0 then, `mSimBusy` is only set for a pause
         // or game-over sync, and `mLastSyncCycleTime` is stamped per dequeue by
         // `CSimDriver::GetSyncData` -- none of them contribute.
         //

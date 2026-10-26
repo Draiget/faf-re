@@ -13,6 +13,8 @@
 #include <set>
 #include <utility>
 
+#include "gpg/gal/backends/common/BackendErrors.h"
+
 namespace gpg::gal::d3d11
 {
   namespace
@@ -175,7 +177,10 @@ namespace gpg::gal::d3d11
         return {{"DepthEnable", "TRUE"}, {"DepthWriteMask", "ALL"}, {"DepthFunc", "LESS_EQUAL"}};
       case StateKind::Rasterizer:
       default:
-        return {{"FillMode", "SOLID"}, {"CullMode", "BACK"}, {"DepthClipEnable", "FALSE"}, {"MultisampleEnable", "TRUE"}};
+        // A pass that sets some rasterizer state but no cull mode keeps the
+        // begin state's, which culls nothing as in Direct3D 9.
+        return {{"FillMode", "SOLID"}, {"CullMode", backend::Direct3D10TechniqueCull() ? "BACK" : "NONE"},
+                {"DepthClipEnable", "FALSE"}, {"MultisampleEnable", "TRUE"}};
       }
     }
 

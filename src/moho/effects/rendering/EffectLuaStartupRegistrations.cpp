@@ -392,10 +392,13 @@ namespace
    * Address: 0x00BD4250 (FUN_00BD4250, dynamic initializer for `gTConVar_dbg_Emitter`)
    * Address: 0x00BFBCE0 (FUN_00BFBCE0, dynamic atexit destructor for `gTConVar_dbg_Emitter`)
    *
-   * The shipped exe's name and description bytes are blanked; both are
-   * taken from the same command in MohoEngine.dll.
+   * The shipped exe's name and description bytes are blanked (MohoEngine.dll
+   * names it "dbg_Emitter", "Show emitter positions."). FA-Binary-Patches
+   * EnableConsoleCommands fills in the names of six such commands but leaves
+   * this one out (its h4 section is commented out), so in the FAF exe it has
+   * no name and the console cannot reach it.
    */
-  moho::TConVar<bool> gTConVar_dbg_Emitter("dbg_Emitter", "Show emitter positions.", &moho::dbg_Emitter);
+  moho::TConVar<bool> gTConVar_dbg_Emitter("", "", &moho::dbg_Emitter);
 
   /**
    * Address: 0x00BD4910 (FUN_00BD4910, dynamic initializer for `gTConVar_dbg_Trail`)
@@ -419,7 +422,8 @@ namespace
 
 namespace moho
 {
-  float efx_WaterOffset = 0.0f;
+  // Initial value from the binary's .data (0x00F5850C = 0x3C23D70A).
+  float efx_WaterOffset = 0.01f;
   bool dbg_EfxBeams = false;
   bool dbg_Emitter = false;
   bool dbg_Trail = false;

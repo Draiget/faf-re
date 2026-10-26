@@ -127,6 +127,42 @@ namespace gpg::gal::d3d12
     std::uint32_t mIncrement = 0;
   };
 
+  /**
+   * Engine addition (gal::gPlacedResources): resources placed in 64 MB default heaps of one
+   * kind (textures that are not render targets, or buffers). A heap range is free again when
+   * its resource is destroyed, which the device delays until the GPU is done with it, so the
+   * memory is never reused while a submission still reads it. Thread-safe.
+   */
+  class PlacedHeapAllocator
+  {
+  public:
+    PlacedHeapAllocator();
+    ~PlacedHeapAllocator();
+    PlacedHeapAllocator(const PlacedHeapAllocator&) = delete;
+    PlacedHeapAllocator& operator=(const PlacedHeapAllocator&) = delete;
+
+    /** `flags`: D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES or D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS. */
+    void Initialize(ID3D12Device* device, D3D12_HEAP_FLAGS flags, const wchar_t* name);
+    /** The heaps go once the last resource placed in them is destroyed. */
+    void Release() noexcept;
+
+    /**
+     * Creates `desc` in a heap; false when it should be a committed resource instead (too large
+     * for a heap, or the driver refused), and `outResource` is left empty.
+     */
+    [[nodiscard]] bool Create(const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES state,
+                              Microsoft::WRL::ComPtr<ID3D12Resource>& outResource);
+
+    /** Bytes in heaps, and bytes placed resources take in them (memory diagnostics). */
+    [[nodiscard]] std::uint64_t HeapBytes() const noexcept;
+    [[nodiscard]] std::uint64_t UsedBytes() const noexcept;
+
+  private:
+    struct State;
+    class RangeOwner;
+    std::shared_ptr<State> mState;
+  };
+
   /** A resource and the state its last barrier left it in. */
   struct TrackedResource
   {

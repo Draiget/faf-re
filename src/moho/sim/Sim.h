@@ -5171,6 +5171,13 @@ namespace moho
   CScrLuaInitForm* func_GetMouseWorldPosUser_LuaFuncDef();
 
   /**
+   * What it does:
+   * Publishes the sim-lane binder for `GetMouseWorldPos` (FA-Binary-Patches
+   * section/SimGetMouseWorldPos.cpp registers the user body in the sim set too).
+   */
+  CScrLuaInitForm* func_GetMouseWorldPosSim_LuaFuncDef();
+
+  /**
    * Address: 0x00842C30 (FUN_00842C30, cfunc_GetMouseWorldPosL)
    *
    * LuaPlus::LuaState *
@@ -5968,6 +5975,14 @@ namespace moho
   int cfunc_GetDepositsAroundPoint(lua_State* luaContext);
 
   /**
+   * Address: 0x0128B884 (FUN_0128B884; the same body registered in the user set)
+   *
+   * What it does:
+   * The user-state `GetDepositsAroundPoint`, reading the active session's deposits.
+   */
+  int cfunc_GetDepositsAroundPointUser(lua_State* luaContext);
+
+  /**
    * Address: 0x0128BB27 (FUN_0128BB27, cfunc_SessionIsReplaySim)
    *
    * lua_State *
@@ -6003,11 +6018,28 @@ namespace moho
 
   /**
    * What it does:
+   * Publishes the user-lane Lua binder definition for global
+   * `GetTimeForProfile`: section/GetTimeForProfile.cpp registers the same
+   * body in both states (the name string 0x01293D36 is referenced from the
+   * records at 0x012924BE and 0x0129251D).
+   */
+  CScrLuaInitForm* func_GetTimeForProfileUser_LuaFuncDef();
+
+  /**
+   * What it does:
    * Publishes the sim-lane Lua binder definition for global
    * `GetDepositsAroundPoint` (`.exxt` def chain node 0x0128EA8C, function
    * slot 0x0128B884).
    */
   CScrLuaInitForm* func_GetDepositsAroundPoint_LuaFuncDef();
+
+  /**
+   * What it does:
+   * Publishes the user-lane Lua binder definition for global
+   * `GetDepositsAroundPoint` (section/SimGetDepositsAroundPoint.cpp registers
+   * the body in both sets).
+   */
+  CScrLuaInitForm* func_GetDepositsAroundPointUser_LuaFuncDef();
 
   /**
    * What it does:

@@ -378,14 +378,6 @@ namespace moho
   void SetupSecondaryAdapterSettings(bool adapterNotCommandLineOverridden);
 
   /**
-   * Address: 0x008D2B90 (FUN_008D2B90)
-   *
-   * What it does:
-   * Publishes fidelity-preset option states (`Low/Medium/High/Ultra/Custom`).
-   */
-  void CreateFidelityPresets();
-
-  /**
    * Address: 0x008D2E20 (FUN_008D2E20)
    *
    * What it does:

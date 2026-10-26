@@ -178,10 +178,12 @@ namespace gpg::gal
      */
     void PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset);
     /** A static buffer's resource, for a GPU copy into it; nullptr for a dynamic buffer. */
-    [[nodiscard]] d3d12::TrackedResource* CopyDestination() noexcept { return mDynamic ? nullptr : &mResource; }
+    [[nodiscard]] d3d12::TrackedResource* CopyDestination();
 
   private:
     void TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk);
+    /** A placed buffer's first upload sends the whole zeroed shadow (see the constructor). */
+    void FillUnwritten(DeviceD3D12& device);
 
     std::uint32_t mByteWidth = 0;
     const char* mKind = nullptr;
@@ -189,6 +191,7 @@ namespace gpg::gal
     D3D12_RESOURCE_STATES mReadState = D3D12_RESOURCE_STATE_GENERIC_READ;
     backend::LockShadow mShadow;
     d3d12::TrackedResource mResource;    // static buffers
+    bool mUnwritten = false;             // placed, and not yet uploaded whole
     D3D12_GPU_VIRTUAL_ADDRESS mChunk = 0; // dynamic buffers: the current copy in upload memory
     std::uint8_t* mChunkCpu = nullptr;
     ID3D12Resource* mChunkResource = nullptr; // the upload page holding that copy, and where in it

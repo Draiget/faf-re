@@ -75,10 +75,16 @@ namespace moho
         desc.vertexEntry = "SelectionBracketVS";
         desc.pixelEntry = "SelectionBracketPS";
         // TAlphaBlendLinearSample: AlphaBlend_SrcAlpha_InvSrcAlpha_Write_RGB,
-        // Rasterizer_Cull_None, LinearSampler (clamp), no depth state of its own.
+        // Rasterizer_Cull_None, LinearSampler (clamp). Its pass sets no depth
+        // state, so the batcher draws it with the technique's begin pack:
+        // depth test LESS_EQUAL with writes, no stencil. Not the state the
+        // previous pass left bound - this draw runs before the batcher begins
+        // the technique, and on Dual Gap that leftover state hid every bracket.
         desc.blend = gpg::gal::GpuBlend::AlphaBlend;
         desc.colorWriteMask = 0x07U;
-        desc.inheritDepthStencil = true;
+        desc.depthTest = true;
+        desc.depthWrite = true;
+        desc.depthFunc = gpg::gal::GpuCompare::LessEqual;
         desc.cullBackFaces = false;
         desc.sampler = gpg::gal::GpuSampler::LinearClamp;
         mProgram = device->CreateGpuProgram(desc);

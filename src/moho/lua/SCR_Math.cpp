@@ -51,6 +51,33 @@ namespace
     return sSet;
   }
 
+  /**
+   * Address: 0x0128DD44 (FA-Binary-Patches include/utility.h `ToVector`, .exxt)
+   *
+   * What it does:
+   * FAF hot-patch reader for a Lua vector argument: a non-table value is the
+   * zero vector; a table's raw `[1]`, `[2]`, `[3]` (`lua_rawgeti`, no
+   * `__index`) are read with `lua_tonumber`, so a missing or non-numeric
+   * component is 0 and a numeric string converts. Leaves the stack as found.
+   */
+  [[nodiscard]] Wm3::Vec3f ReadLuaVector3OrZero(lua_State* const luaState, const int stackIndex)
+  {
+    Wm3::Vec3f vector{0.0f, 0.0f, 0.0f};
+    if (!lua_istable(luaState, stackIndex)) {
+      return vector;
+    }
+
+    lua_pushvalue(luaState, stackIndex);
+    lua_rawgeti(luaState, -1, 1);
+    vector.x = lua_tonumber(luaState, -1);
+    lua_rawgeti(luaState, -2, 2);
+    vector.y = lua_tonumber(luaState, -1);
+    lua_rawgeti(luaState, -3, 3);
+    vector.z = lua_tonumber(luaState, -1);
+    lua_pop(luaState, 4);
+    return vector;
+  }
+
 } // namespace
 
 /**
@@ -688,32 +715,36 @@ int moho::cfunc_VDist3(lua_State* const luaContext)
 
 /**
  * Address: 0x004D0F30 (FUN_004D0F30, cfunc_VDist3L)
+ * Address: 0x01291979 (FA-Binary-Patches section/VDist3.cpp `VDist3`, .exxt)
  *
  * What it does:
- * Validates two `Vector3f` Lua arguments and returns Euclidean 3D distance.
+ * Returns the Euclidean 3D distance between two Lua vectors.
+ *
+ * FAF hot-patch (FA-Binary-Patches VDist3.cpp): 0x004D0F02 stores 0x01291979
+ * into the binder's function slot (0x010A8FE4), replacing the stock body. The
+ * replacement raises `luaL_error("%s\n  expected %d args, but got %d", "VDist3",
+ * 2, n)` on a wrong argument count, and reads each argument with the lenient
+ * `ToVector` (0x0128DD44): a non-table is the zero vector and missing or
+ * non-numeric components are 0, where the stock `SCR_FromLuaCopy<Vector3f>`
+ * read raised. The arithmetic is unchanged - `(dx*dx + dy*dy) + dz*dz` in
+ * float, then `sqrtf` (0x00452FC0) - so normal vectors give the same bits.
  */
 int moho::cfunc_VDist3L(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
+  lua_State* const luaState = state->m_state;
+  const int argumentCount = lua_gettop(luaState);
   if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVDist3HelpText, 2, argumentCount);
+    luaL_error(luaState, "%s\n  expected %d args, but got %d", "VDist3", 2, argumentCount);
+    return 0;
   }
 
-  LuaPlus::LuaStackObject rightArg(state, 2);
-  LuaPlus::LuaObject rightObject(rightArg);
-  Wm3::Vec3f right{};
-  SCR_FromLuaCopy<Wm3::Vector3<float>>(&rightObject, &right);
-
-  LuaPlus::LuaStackObject leftArg(state, 1);
-  LuaPlus::LuaObject leftObject(leftArg);
-  Wm3::Vec3f left{};
-  SCR_FromLuaCopy<Wm3::Vector3<float>>(&leftObject, &left);
+  const Wm3::Vec3f left = ReadLuaVector3OrZero(luaState, 1);
+  const Wm3::Vec3f right = ReadLuaVector3OrZero(luaState, 2);
 
   const float dx = left.x - right.x;
   const float dy = left.y - right.y;
   const float dz = left.z - right.z;
-  lua_pushnumber(state->m_state, std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
-  (void)lua_gettop(state->m_state);
+  lua_pushnumber(luaState, std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
   return 1;
 }
 

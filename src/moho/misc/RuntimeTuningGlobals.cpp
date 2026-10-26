@@ -109,9 +109,12 @@ namespace moho
   float cam_NearZoom = 5.0f;
   /// Address: 0x00F57FD0 (?cam_NearPitch@Moho@@3MA) -- pitch at full zoom-in.
   float cam_NearPitch = 40.0f;
-  float cam_ZoomAmount = 0.05f;
-  float cam_ZoomSpeedLarge = 8.0f;
-  float cam_ZoomSpeedSmall = 1.0f;
+  /// Address: 0x00F57FD8 (?cam_ZoomAmount@Moho@@3MA)
+  float cam_ZoomAmount = 0.4f;
+  /// Address: 0x00F57FE0 (?cam_ZoomSpeedLarge@Moho@@3MA)
+  float cam_ZoomSpeedLarge = 5.0f;
+  /// Address: 0x00F57FDC (?cam_ZoomSpeedSmall@Moho@@3MA)
+  float cam_ZoomSpeedSmall = 0.5f;
   /// Address: 0x00F57FC8 (?cam_NearFOV@Moho@@3MA)
   float cam_NearFOV = 65.0f;
   /// Address: 0x00F57FCC (?cam_FarFOV@Moho@@3MA)
@@ -130,17 +133,19 @@ namespace moho
   // Address: 0x00F57FEC (?cam_PanSpeed@Moho@@3MA) — ground-plane pan speed scale.
   float cam_PanSpeed = 1.0f;
   float cam_EntityBoxExpand = 20.0f;
-  float ren_BorderSize = 0.0f;
-  float ren_SyncTerrainLOD = 200.0f;
-  float ren_FrameTimeSeconds = 1.0f / 30.0f;
-  float wld_SkewRateAdjustBase = 1.05f;
-  float wld_SkewRateAdjustMax = 2.0f;
-  float fog_OffsetMultiplier = 1.0f;
-  float ren_ShoreErrorCoeff = 1.0f;
-  float ren_DecalAlbedoLodCutoff = 1.0f;
-  float ren_DecalNormalLodCutoff = 1.0f;
-  float ren_DecalFlatTol = 0.01f;
-  float ren_DecalFadeFraction = 0.75f;
+  // Initial values from the shipped binary's .data, at the address each convar's
+  // dynamic initializer stores as its backing pointer.
+  float ren_BorderSize = 5.0f;              // 0x00F57DB8
+  float ren_SyncTerrainLOD = 128.0f;        // 0x00F579A0
+  float ren_FrameTimeSeconds = 1.0f;        // 0x00F57E5C
+  float wld_SkewRateAdjustBase = 1.03f;     // 0x00F57A08
+  float wld_SkewRateAdjustMax = 1.1f;       // 0x00F57A0C
+  float fog_OffsetMultiplier = 1.01f;       // 0x00F57E60
+  float ren_ShoreErrorCoeff = 0.4f;         // 0x00F57DBC
+  float ren_DecalAlbedoLodCutoff = 15.0f;   // 0x00F579BC
+  float ren_DecalNormalLodCutoff = 6.0f;    // 0x00F579B8
+  float ren_DecalFlatTol = 0.05f;           // 0x00F579C4
+  float ren_DecalFadeFraction = 0.5f;       // 0x00F579C0
   // 0x00F57DB0. Read straight out of the shipped binary's .data (file offset
   // 0xB57DB0) as 0.003f, not the 1.0f placeholder this previously carried.
   // This is the screen-error threshold `CTesselator::GetIntersectionResult`

@@ -9,6 +9,7 @@
 #include "DeviceD3D12.h"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
@@ -345,13 +346,38 @@ namespace gpg::gal
     desc.MipLevels = 1U;
     desc.SampleDesc.Count = 1U;
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    CheckHresult(
-      mKind, __LINE__,
-      device.Native()->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource.resource)
-      )
-    );
+    // Engine addition (gal::gPlacedResources): placed in a heap. Placed memory is not zeroed
+    // as a committed buffer is, so the zeroed shadow goes up whole before the GPU first reads
+    // the buffer, unless the first lock writes all of it anyway (FillUnwritten).
+    if (gPlacedResources && device.PlacedBuffers().Create(desc, D3D12_RESOURCE_STATE_COMMON, mResource.resource)) {
+      mUnwritten = true;
+    } else {
+      CheckHresult(
+        mKind, __LINE__,
+        device.Native()->CreateCommittedResource(
+          &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource.resource)
+        )
+      );
+    }
     mResource.state = D3D12_RESOURCE_STATE_COMMON;
+  }
+
+  void BufferStorageD3D12::FillUnwritten(DeviceD3D12& device)
+  {
+    if (!mUnwritten) {
+      return;
+    }
+    mUnwritten = false;
+    device.UploadBuffer(mResource, 0U, mShadow.data(), mByteWidth);
+  }
+
+  d3d12::TrackedResource* BufferStorageD3D12::CopyDestination()
+  {
+    if (mDynamic) {
+      return nullptr;
+    }
+    FillUnwritten(RequireDevice(mKind, __LINE__));
+    return &mResource;
   }
 
   BufferStorageD3D12::~BufferStorageD3D12()
@@ -388,6 +414,13 @@ namespace gpg::gal
     DeviceD3D12& device = RequireDevice(mKind, __LINE__);
     const std::lock_guard<std::recursive_mutex> lock(device.Mutex());
     if (!mDynamic) {
+      if (mUnwritten && mLockOffset == 0U && mLockSize == mByteWidth) {
+        mUnwritten = false; // this upload writes every byte
+      }
+      if (mUnwritten) {
+        FillUnwritten(device); // the shadow holds this lock's bytes too
+        return;
+      }
       device.UploadBuffer(mResource, mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
     }
@@ -420,6 +453,7 @@ namespace gpg::gal
   D3D12_GPU_VIRTUAL_ADDRESS BufferStorageD3D12::PrepareForDraw(DeviceD3D12& device)
   {
     if (!mDynamic) {
+      FillUnwritten(device);
       device.Transition(mResource, mReadState);
       return mResource.resource->GetGPUVirtualAddress();
     }
@@ -435,6 +469,7 @@ namespace gpg::gal
   void BufferStorageD3D12::PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset)
   {
     if (!mDynamic) {
+      FillUnwritten(device);
       device.Transition(mResource, D3D12_RESOURCE_STATE_COPY_SOURCE);
       resource = mResource.resource.Get();
       offset = 0U;

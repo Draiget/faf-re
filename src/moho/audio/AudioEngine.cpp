@@ -2156,6 +2156,27 @@ namespace moho
       return;
     }
 
+    // Deliberate change from retail: retail sized mSettings (mDelayTimes and
+    // mMatrixCoefficients) in AudioEngineImpl using ResolveDstChannelCount from
+    // DirectSound's speaker setting (which on modern Windows reports 9/8 for
+    // 5.1/7.1 Surround and defaults to stereo, 2 floats). X3DAudio is initialized
+    // from XACT's real output channel mask (GetFinalMixFormat). If the output has
+    // 5.1/7.1 channels (6 or 8 floats), X3DAudioCalculate writes past the 2-float
+    // buffer into adjacent heap memory (corrupting AudioEngine instances), and
+    // SetMatrixCoefficients fails with "XACT3DApply failed: Invalid arg".
+    // Size mSettings from the real output channel count from GetFinalMixFormat.
+    WAVEFORMATEXTENSIBLE finalMixFormat{};
+    if (mImpl->mInstance->GetFinalMixFormat(&finalMixFormat) >= 0) {
+      const std::uint32_t realDstChannels = finalMixFormat.Format.nChannels;
+      if (realDstChannels != 0u && realDstChannels != mImpl->mSettings.mDstChannelCount) {
+        delete[] mImpl->mSettings.mDelayTimes;
+        delete[] mImpl->mSettings.mMatrixCoefficients;
+        mImpl->mSettings.mDstChannelCount = realDstChannels;
+        mImpl->mSettings.mDelayTimes = new float[realDstChannels]();
+        mImpl->mSettings.mMatrixCoefficients = new float[realDstChannels * mImpl->mSettings.mSrcChannelCount]();
+      }
+    }
+
     RegisterNotificationOrWarn(mImpl, 10u);
     RegisterNotificationOrWarn(mImpl, 11u);
     RegisterNotificationOrWarn(mImpl, 17u);
@@ -2650,7 +2671,8 @@ namespace moho
    * );
    *
    * What it does:
-   * Applies 3D listener/emitter transform to an active cue.
+   * Applies 3D listener/emitter transform to an active cue. A failed apply is
+   * warned about once per process (FAF hot-patch, see the body).
    */
   void AudioEngine::Calculate3D(const Wm3::Vec3f* const worldPos, AudioEngine* const engine, IXACTCue* const cue)
   {
@@ -2682,7 +2704,18 @@ namespace moho
 
     const int applyResult = ApplySettingsToCue(&impl->mSettings, cue);
     if (applyResult < 0) {
-      gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
+      // FAF hot-patch (FA-Binary-Patches xact_3dapply.cpp / section/xact_3d_fix.cpp):
+      // 0x004D9A60 jumps to a copy of this body at 0x01291B52 in which this warning
+      // is guarded by a process-wide byte (0x01292A60, tested at 0x01291C0D and
+      // cleared at 0x01291C24 after the first log), so it is logged once per
+      // process. The error-text lookup (0x004D8A50) still runs before the test.
+      // The XACT3DCalculate warning above keeps logging every time.
+      static bool sApplyFailureLogged = false;
+      const char* const errorText = func_SoundErrorCodeToMsg(applyResult);
+      if (!sApplyFailureLogged) {
+        gpg::Warnf("SND: XACT3DApply failed.\n%s", errorText);
+        sApplyFailureLogged = true;
+      }
     }
   }
 

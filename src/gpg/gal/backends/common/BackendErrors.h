@@ -32,6 +32,17 @@ namespace gpg::gal::backend
    */
   [[nodiscard]] float Direct3D9PixelCentreShift() noexcept;
 
+  /**
+   * Whether an effect technique begins with back faces culled, as the D3D10
+   * state pack (`CreateState2`, 0x00902940) has it, instead of Direct3D 9's
+   * begin state (`PipelineStateD3D9::BeginTechnique`, 0x00946260), which culls
+   * nothing. A pass that sets no cull mode draws with the begin state: the
+   * low and medium fidelity water passes are such passes, and their map-sized
+   * quad faces away from the camera, so with culling the water vanished.
+   * False, or true with the diagnostic FAF_GAL_D3D10_CULL=1.
+   */
+  [[nodiscard]] bool Direct3D10TechniqueCull() noexcept;
+
   /** `ThrowHresult` when `result` failed. */
   inline void CheckHresult(const char* const file, const int line, const HRESULT result)
   {

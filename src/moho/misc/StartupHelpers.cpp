@@ -138,7 +138,6 @@ namespace
     "Error running '/lua/options/optionslogic.lua':OPTIONS_SetCustomData %s";
   constexpr char kPrimaryAdapterKey[] = "primary_adapter";
   constexpr char kSecondaryAdapterKey[] = "secondary_adapter";
-  constexpr char kFidelityPresetsKey[] = "fidelity_presets";
   constexpr char kFidelityKey[] = "fidelity";
   constexpr char kShadowQualityKey[] = "shadow_quality";
   constexpr char kAntiAliasingKey[] = "antialiasing";
@@ -2000,10 +1999,11 @@ std::int32_t moho::wnd_MinDragHeight = 768;
 std::int32_t moho::wnd_DefaultCreateWidth = 1024;
 std::int32_t moho::wnd_DefaultCreateHeight = 768;
 
-std::int32_t moho::graphics_Fidelity = 1;
-std::int32_t moho::graphics_FidelitySupported = 1;
+// Shipped .data 0x00F58E88..0x00F58E94; device caps and the options apply later.
+std::int32_t moho::graphics_Fidelity = 2;
+std::int32_t moho::graphics_FidelitySupported = 2;
 std::int32_t moho::shadow_Fidelity = 2;
-std::int32_t moho::shadow_FidelitySupported = 2;
+std::int32_t moho::shadow_FidelitySupported = 3;
 bool moho::d3d_UseRefRast = false;
 bool moho::d3d_ForceSoftwareVP = false;
 bool moho::d3d_NoPureDevice = false;
@@ -6483,47 +6483,6 @@ void moho::SetupSecondaryAdapterSettings(const bool adapterNotCommandLineOverrid
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignString(state, kDisabledModeKey);
   OPTIONS_SetCustomData(kSecondaryAdapterKey, optionRoot, defaultValue);
-}
-
-/**
- * Address: 0x008D2B90 (FUN_008D2B90)
- *
- * What it does:
- * Publishes fidelity-preset option states and default preset selection.
- */
-void moho::CreateFidelityPresets()
-{
-  LuaPlus::LuaState* const state = ResolveStartupLuaState();
-  if (state == nullptr) {
-    return;
-  }
-
-  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
-  RefreshFidelitySupportLanes(context);
-
-  LuaPlus::LuaObject optionRoot = BuildOptionRoot(state);
-  LuaPlus::LuaObject statesTable = optionRoot.GetByName("states");
-
-  AddOptionStateInteger(state, &statesTable, 1, "<LOC _Low>", 0);
-  AddOptionStateInteger(state, &statesTable, 2, "<LOC _Medium>", 1);
-
-  std::int32_t nextStateIndex = 3;
-  if (graphics_FidelitySupported > 1) {
-    AddOptionStateInteger(state, &statesTable, nextStateIndex, "<LOC _High>", 2);
-    ++nextStateIndex;
-  }
-
-  if (context != nullptr && context->mPixelShaderProfile > 8) {
-    AddOptionStateInteger(state, &statesTable, nextStateIndex, "<LOC _Ultra>", 3);
-    ++nextStateIndex;
-  }
-
-  AddOptionStateInteger(state, &statesTable, nextStateIndex, "<LOC _Custom>", 4);
-
-  LuaPlus::LuaObject defaultValue(state);
-  defaultValue.AssignNumber(state, 1.0);
-  OPTIONS_SetCustomData(kFidelityPresetsKey, optionRoot, defaultValue);
 }
 
 /**

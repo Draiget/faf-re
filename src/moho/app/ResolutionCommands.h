@@ -42,12 +42,9 @@ namespace moho
    * int __cdecl sub_8D3BE0(int commandArgs);
    *
    * What it does:
-   * `SC_VerticalSync` console command. Unconditionally resets the primary
-   * D3D device context (`CD3DDevice::Clear()` + `InitContext()`) while
-   * `sDeviceLock` is held, whenever exactly one argument is present. The
-   * binary parses that argument via `atoi(...)==1` but never reads the
-   * parsed value afterward - the reset is gated only on argument *count*,
-   * not on what the argument says.
+   * `SC_VerticalSync <0|1>` console command. With exactly one argument, sets
+   * the device context's `mVSync` to `atoi(arg) == 1` and resets the device
+   * (`CD3DDevice::Clear()` + `InitContext()`) while `sDeviceLock` is held.
    */
   void SC_VerticalSync(const msvc8::vector<msvc8::string>& args);
 

@@ -592,8 +592,10 @@ namespace gpg::gal
     sampler.MaxLOD = D3D11_FLOAT32_MAX;
     CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateSamplerState(&sampler, &mStartupSampler));
 
-    // Pack 2 (D3D10 `CreateState2`).
-    const D3D11_RASTERIZER_DESC techniqueRasterizer = SolidRasterizerDesc(D3D11_CULL_BACK, FALSE);
+    // Pack 2 (D3D10 `CreateState2`), culling nothing as Direct3D 9's begin state
+    // does (see backend::Direct3D10TechniqueCull).
+    const D3D11_RASTERIZER_DESC techniqueRasterizer =
+      SolidRasterizerDesc(backend::Direct3D10TechniqueCull() ? D3D11_CULL_BACK : D3D11_CULL_NONE, FALSE);
     CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateRasterizerState(&techniqueRasterizer, &mTechniqueRasterizer));
     const D3D11_DEPTH_STENCIL_DESC techniqueDepth = DepthWriteDesc(D3D11_COMPARISON_LESS_EQUAL);
     CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&techniqueDepth, &mTechniqueDepthStencil));

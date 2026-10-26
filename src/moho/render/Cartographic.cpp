@@ -52,6 +52,12 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
 
+namespace moho
+{
+  // Address: 0x00F57A88 (?cam_DefaultMiniLOD@Moho@@3MA), defined in UiRuntimeTypes.cpp.
+  extern float cam_DefaultMiniLOD;
+} // namespace moho
+
 namespace
 {
   constexpr std::size_t kCartographicNodeStorageSize = platform::BinaryObjectBytes(0x7C);
@@ -2223,9 +2229,14 @@ namespace moho
     profileStep.reset();
     profileStep.emplace("CartoTerrain1");
     RenderTerrainStage1(static_cast<std::int32_t>(headIndex), colorTarget);
-    profileStep.reset();
-    profileStep.emplace("CartoMeshes");
-    RenderMeshes(gameTick, deltaFrame, cameraView);
+    // FAF hot-patch (FA-Binary-Patches MinimapMesh): 0x007D1AE9 jumps to 0x0128F877, which
+    // skips the mesh pass when `cam_DefaultMiniLOD` is 0 (`cmp dword ptr [0x00F57A88], 0`, a
+    // bitwise test, so -0.0 still draws). FAF's minimap sets it to 0 after creating the view.
+    if (std::bit_cast<std::uint32_t>(cam_DefaultMiniLOD) != 0u) {
+      profileStep.reset();
+      profileStep.emplace("CartoMeshes");
+      RenderMeshes(gameTick, deltaFrame, cameraView);
+    }
 
     // The shipped body inlines this one-line forwarder at 0x007D1AFB..
     // 0x007D1B20 (`sWorldParticles.RenderEffects(camera, 0, 1, tick, alpha)`),
