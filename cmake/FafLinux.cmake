@@ -226,6 +226,17 @@ target_link_libraries(faf-replay PRIVATE faf_sim)
 target_compile_definitions(faf-replay PRIVATE FAF_SERVER_MODE=1 FAF_REPLAY_SIM_ONLY=1)
 target_link_options(faf-replay PRIVATE -Wl,--error-limit=0)
 
+# The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
+# tests/linux/libm_allowlist.txt; faf-replay is not built while one does.
+add_custom_target(faf_sim_libm_gate
+  COMMAND python3 "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
+          "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "$<TARGET_OBJECTS:faf_sim>"
+  DEPENDS faf_sim
+  COMMAND_EXPAND_LISTS
+  COMMENT "Checking faf_sim's libm transcendental calls against tests/linux/libm_allowlist.txt"
+  VERBATIM)
+add_dependencies(faf-replay faf_sim_libm_gate)
+
 # --- faf_registration_dump_sim (plan WPL.4) ----------------------------------------------
 # What the static initialisers of the Linux faf_sim objects registered (tests/registry): its
 # sections must equal Windows' faf_registration_dump_sim (src/CMakeLists.txt).

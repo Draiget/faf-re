@@ -526,10 +526,69 @@ namespace
     std::fclose(in);
     return true;
   }
+  /**
+   * Engine addition (plan WPL.12): `--sweep <function>` runs one unary float function of the
+   * engine on every float bit pattern (NaNs included) and prints one FNV-1a hash of the
+   * (input, output) bit pairs per block of 2^20 inputs, "function block hash". The same sweep
+   * on another platform, diffed, finds every input whose result differs.
+   */
+  int RunSweep(const char* const name)
+  {
+    using UnaryFloat = float (*)(float);
+    struct Entry
+    {
+      const char* name;
+      UnaryFloat fn;
+    };
+    static const Entry kFunctions[] = {
+      {"sinf", [](const float x) { return msvc8::sinf(x); }},
+      {"cosf", [](const float x) { return msvc8::cosf(x); }},
+      {"tanf", [](const float x) { return msvc8::tanf(x); }},
+      {"atanf", [](const float x) { return msvc8::atanf(x); }},
+      {"asinf", [](const float x) { return msvc8::asinf(x); }},
+      {"acosf", [](const float x) { return msvc8::acosf(x); }},
+      {"expf", [](const float x) { return msvc8::expf(x); }},
+      {"logf", [](const float x) { return msvc8::logf(x); }},
+      {"IntrinsicExp", [](const float x) { return msvc8::IntrinsicExp(x); }},
+      {"IntrinsicLn", [](const float x) { return msvc8::IntrinsicLn(x); }},
+      {"IntrinsicLog10", [](const float x) { return msvc8::IntrinsicLog10(x); }},
+      {"sqrt_float", [](const float x) { return std::sqrt(x); }},
+      {"RoundToInt", [](const float x) { return std::bit_cast<float>(msvc8::RoundToInt(x)); }},
+    };
+    UnaryFloat fn = nullptr;
+    for (const Entry& entry : kFunctions) {
+      if (std::strcmp(entry.name, name) == 0) {
+        fn = entry.fn;
+      }
+    }
+    if (fn == nullptr) {
+      std::fprintf(stderr, "unknown sweep function %s\n", name);
+      return 2;
+    }
+    for (std::uint64_t block = 0; block < (1ull << 12); ++block) {
+      std::uint64_t hash = 1469598103934665603ull;
+      for (std::uint64_t index = 0; index < (1ull << 20); ++index) {
+        const auto bits = static_cast<std::uint32_t>((block << 20) | index);
+        const std::uint32_t out = std::bit_cast<std::uint32_t>(fn(std::bit_cast<float>(bits)));
+        hash = (hash ^ bits) * 1099511628211ull;
+        hash = (hash ^ out) * 1099511628211ull;
+      }
+      std::printf("%s %llu %016llx\n", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash));
+    }
+    return 0;
+  }
 } // namespace
 
 int main(int argc, char** argv)
 {
+  if (argc > 2 && std::strcmp(argv[1], "--sweep") == 0) {
+#if defined(_PC_24)
+    platform::SetX87PrecisionControl(_PC_24);
+#endif
+    (void)SetSse2Mode(0);
+    return RunSweep(argv[2]);
+  }
+
   // faf_sim_math_tests <golden.txt> [--known <overlay.txt>]
   // faf_sim_math_tests --generate <golden.txt>
   // faf_sim_math_tests --generate-known <golden.txt> <overlay.txt> <reason>
