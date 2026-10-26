@@ -128,6 +128,11 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/p
 target_sources(faf_sim PRIVATE
   "${PROJECT_SOURCE_DIR}/src/moho/misc/posix/PlatformPosix.cpp"
   "${PROJECT_SOURCE_DIR}/src/platform/posix/ClientTypeInfoPosix.cpp")
+# Every thread's x87 control word and MXCSR as on Windows x64 (plan WPL.9): the main thread's
+# from a constructor, the others' from pthread_create, wrapped in every program that links the
+# sim.
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/FpEnvPosix.cpp")
+target_link_options(faf_sim_settings INTERFACE "-Wl,--wrap=pthread_create")
 
 # The Windows build's engine definitions without the Win32 ones (WIN32,
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
@@ -220,3 +225,9 @@ add_executable(faf-replay ${_faf_replay_files})
 target_link_libraries(faf-replay PRIVATE faf_sim)
 target_compile_definitions(faf-replay PRIVATE FAF_SERVER_MODE=1 FAF_REPLAY_SIM_ONLY=1)
 target_link_options(faf-replay PRIVATE -Wl,--error-limit=0)
+
+# --- faf_registration_dump_sim (plan WPL.4) ----------------------------------------------
+# What the static initialisers of the Linux faf_sim objects registered (tests/registry): its
+# sections must equal Windows' faf_registration_dump_sim (src/CMakeLists.txt).
+add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
+target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
