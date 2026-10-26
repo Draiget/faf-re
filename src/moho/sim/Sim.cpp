@@ -4807,16 +4807,12 @@ void Sim::UpdateChecksum()
       Logf("    mReclaimed=%.1f,%.1f\n", economy.mReclaimed.ENERGY, economy.mReclaimed.MASS);
       Logf("    mLastUseRequested=%.1f,%.1f\n", economy.mLastUseRequested.ENERGY, economy.mLastUseRequested.MASS);
       Logf("    mLastUseActual=%.1f,%.1f\n", economy.mLastUseActual.ENERGY, economy.mLastUseActual.MASS);
-      // 0x0074A780: one line per resource, index first; "%I64" has no
-      // conversion letter, so the shipped trace prints nothing after '='.
-      const std::uint64_t maxStorage[] = {economy.mMaxStorage.ENERGY, economy.mMaxStorage.MASS};
+      // 0x0074A780: one line per resource, index first; the binary's format is
+      // "%I64" with no conversion letter, so the shipped trace prints nothing
+      // after '='. Engine addition (dedicated-server plan WPL.21): that text is
+      // written out here, since glibc's printf prints a malformed "%I64" as it is.
       for (int resource = 0; resource < 2; ++resource) {
-        Logf(
-          "    mMaxStorage[%d]=%I64\n",
-          resource,
-          static_cast<std::uint32_t>(maxStorage[resource] & 0xFFFFFFFFu),
-          static_cast<std::uint32_t>(maxStorage[resource] >> 32)
-        );
+        Logf("    mMaxStorage[%d]=\n", resource);
       }
       logChecksumDigest();
     }

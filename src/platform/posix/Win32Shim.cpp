@@ -126,6 +126,66 @@ namespace
     return out;
   }
 
+  [[nodiscard]] bool SameNameIgnoringCase(const char* a, const char* b) noexcept
+  {
+    for (; *a != '\0' && *b != '\0'; ++a, ++b) {
+      if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b))) {
+        return false;
+      }
+    }
+    return *a == *b;
+  }
+
+  /**
+   * Plan WPL.15: a path as NTFS would find it, case-insensitively. When the path does not exist
+   * as spelled, each component is looked up in its directory ignoring ASCII case and replaced
+   * by the spelling on disk; the first component with no match and everything after it stay as
+   * given (a file about to be created). The result names an existing file whenever Windows
+   * would have found one.
+   */
+  [[nodiscard]] std::string ResolveCase(std::string path)
+  {
+    if (path.empty() || ::access(path.c_str(), F_OK) == 0) {
+      return path;
+    }
+    std::string resolved = path[0] == '/' ? "/" : "";
+    std::size_t at = path[0] == '/' ? 1 : 0;
+    while (at <= path.size()) {
+      const std::size_t slash = path.find('/', at);
+      const std::size_t end = slash == std::string::npos ? path.size() : slash;
+      const std::string component = path.substr(at, end - at);
+      if (!component.empty()) {
+        std::string candidate = resolved + component;
+        if (::access(candidate.c_str(), F_OK) != 0 && component != "." && component != "..") {
+          bool found = false;
+          if (DIR* const dir = ::opendir(resolved.empty() ? "." : resolved.c_str())) {
+            while (const dirent* const entry = ::readdir(dir)) {
+              if (SameNameIgnoringCase(entry->d_name, component.c_str())) {
+                candidate = resolved + entry->d_name;
+                found = true;
+                break;
+              }
+            }
+            (void)::closedir(dir);
+          }
+          if (!found) {
+            // Nothing to match here: keep the rest as it was spelled.
+            return resolved + path.substr(at);
+          }
+        }
+        resolved = candidate;
+      }
+      if (slash == std::string::npos) {
+        break;
+      }
+      if (resolved.empty() || resolved.back() != '/') {
+        resolved += '/';
+      }
+      at = slash + 1;
+    }
+    return resolved;
+  }
+
   [[nodiscard]] std::string SlashPath(const char* const path)
   {
     std::string out = path != nullptr ? path : "";
@@ -134,7 +194,7 @@ namespace
         c = '/';
       }
     }
-    return out;
+    return ResolveCase(std::move(out));
   }
 
   /// Every HANDLE this file hands out points at one of these.
@@ -1302,8 +1362,8 @@ DWORD GetFileAttributesW(const wchar_t* const path)
 
 BOOL MoveFileExW(const wchar_t* const from, const wchar_t* const to, const DWORD flags)
 {
-  const std::string source = NarrowPath(from);
-  const std::string target = NarrowPath(to);
+  const std::string source = ResolveCase(NarrowPath(from));
+  const std::string target = ResolveCase(NarrowPath(to));
   if ((flags & MOVEFILE_REPLACE_EXISTING) == 0 && ::access(target.c_str(), F_OK) == 0) {
     tLastError = ERROR_ALREADY_EXISTS;
     return FALSE;
@@ -1336,7 +1396,7 @@ BOOL DeleteFileW(const wchar_t* const path)
 
 BOOL CreateDirectoryW(const wchar_t* const path, void*)
 {
-  if (::mkdir(NarrowPath(path).c_str(), 0755) != 0) {
+  if (::mkdir(ResolveCase(NarrowPath(path)).c_str(), 0755) != 0) {
     SetErrnoError();
     return FALSE;
   }
@@ -1347,14 +1407,14 @@ BOOL ReplaceFileW(
   const wchar_t* const replacedFile, const wchar_t* const replacementFile, const wchar_t* const backupFile, DWORD, void*, void*
 )
 {
-  const std::string replaced = NarrowPath(replacedFile);
-  const std::string replacement = NarrowPath(replacementFile);
+  const std::string replaced = ResolveCase(NarrowPath(replacedFile));
+  const std::string replacement = ResolveCase(NarrowPath(replacementFile));
   if (::access(replaced.c_str(), F_OK) != 0) {
     tLastError = ERROR_FILE_NOT_FOUND;
     return FALSE;
   }
   if (backupFile != nullptr) {
-    const std::string backup = NarrowPath(backupFile);
+    const std::string backup = ResolveCase(NarrowPath(backupFile));
     if (::link(replaced.c_str(), backup.c_str()) != 0 && errno != EEXIST) {
       SetErrnoError();
       return FALSE;
@@ -1454,7 +1514,7 @@ int MultiByteToWideChar(
 
 BOOL PathFileExistsW(const wchar_t* const path)
 {
-  return ::access(NarrowPath(path).c_str(), F_OK) == 0 ? TRUE : FALSE;
+  return ::access(ResolveCase(NarrowPath(path)).c_str(), F_OK) == 0 ? TRUE : FALSE;
 }
 
 DWORD GetModuleFileNameW(const HMODULE module, wchar_t* const fileName, const DWORD size)
