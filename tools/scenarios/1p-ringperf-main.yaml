@@ -1,0 +1,38 @@
+name: 1p-ringperf-main
+description: >
+  Range-ring render cost, recovered x64 engine: 2000 UEF T1 engineers packed one unit apart
+  with the Build Range overlay on. The UI hook holds six 12-second phases (no, half and all of
+  them selected, each with range_StencilFlush 1 and 0) and logs "RINGPERF phase <name>" at each.
+  Run mpemu with FAF_GPU_PROFILE=<frames> in its environment so the game log carries each render
+  pass's CPU and GPU time ("pass Ranges"). Setup: tools/scenarios/ring-perf/map copied into the
+  vault as maps/faf_re_ringperf, with the faf_re_lockstep scmap and save hard-linked in as
+  faf_re_ringperf.scmap / faf_re_ringperf_save.lua; copy ring-perf/init_ringperf.lua into
+  C:\ProgramData\FAForever\bin. The exe is a build copied into bin_x64 as main_x64_rings.exe.
+  Do not click into the game window.
+timeout: 6m
+
+mode: direct
+lobby: auto
+map: faf_re_ringperf
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64_rings.exe'
+  init: init_ringperf.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: RingPerf, faction: uef, args: ['/title', 'ringperf-main'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 150s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'RINGPERF DONE' }
