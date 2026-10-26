@@ -25993,11 +25993,7 @@ int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
   if (AudioEngine* const tutorialEngine = userSound->mAmbientEngine.get(); tutorialEngine != nullptr) {
     tutorialEngine->Shutdown();
   }
-  if (FILE_GetFileInfo(localizedRootPath.c_str(), nullptr, false)) {
-    userSound->mAmbientEngine = AudioEngine::Create(localizedRootPath.c_str());
-  } else {
-    userSound->mAmbientEngine.reset();
-  }
+  userSound->mAmbientEngine = AudioEngine::Create(localizedRootPath.c_str());
 
   userSound->mLanguageTag.assign(normalizedLanguage, 0u, msvc8::string::npos);
   return 0;

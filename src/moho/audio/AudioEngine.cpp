@@ -920,30 +920,6 @@ namespace
   }
 
   /**
-   * Unregisters one `AudioEngine` instance from the sound-configuration engine vector.
-   */
-  void UnregisterEngineRef(
-    moho::SoundConfiguration& configuration, const moho::AudioEngine* const engine
-  )
-  {
-    if (engine == nullptr || configuration.mEngines.mStart == nullptr) {
-      return;
-    }
-
-    moho::AudioEngineRefVector& engines = configuration.mEngines;
-    moho::AudioEngineRef* it = engines.mStart;
-    while (it != engines.mFinish) {
-      if (it->mEngine == engine) {
-        moho::AudioEngineRef* next = nullptr;
-        (void)EraseAudioEngineRefAndStoreNext(engines, &next, it);
-      } else {
-        ++it;
-      }
-    }
-  }
-
-
-  /**
    * Address: 0x004DB090 (FUN_004DB090)
    *
    * What it does:
@@ -1772,22 +1748,7 @@ namespace moho
       return nullptr;
     }
 
-    const auto engineAddr = reinterpret_cast<std::uintptr_t>(engine);
-    if ((engineAddr & (alignof(void*) - 1)) != 0 || engineAddr < 0x10000) {
-      return nullptr;
-    }
-
-    AudioEngineImpl* const impl = engine->mImpl;
-    if (impl == nullptr) {
-      return nullptr;
-    }
-
-    const auto implAddr = reinterpret_cast<std::uintptr_t>(impl);
-    if ((implAddr & (alignof(void*) - 1)) != 0 || implAddr < 0x10000) {
-      return nullptr;
-    }
-
-    return impl;
+    return engine->mImpl;
   }
 
   /**
@@ -2281,10 +2242,6 @@ namespace moho
    */
   void AudioEngine::Shutdown()
   {
-    if (sSoundConfiguration) {
-      UnregisterEngineRef(*sSoundConfiguration, this);
-    }
-
     AudioEngineImpl* const impl = mImpl;
     mImpl = nullptr;
     if (impl == nullptr) {
@@ -2303,7 +2260,12 @@ namespace moho
    */
   AudioEngine::~AudioEngine()
   {
-    Shutdown();
+    if (mImpl == nullptr) {
+      return;
+    }
+
+    mImpl->~AudioEngineImpl();
+    operator delete(mImpl);
   }
 
   /**
