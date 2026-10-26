@@ -2,15 +2,18 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "moho/entity/FixedSlabPool.h"
+#include <memory>
+#include <vector>
 
 namespace moho
 {
+  class FixedSlabPool;
+
   extern bool sim_EntityPools;
 
   /**
    * High-level manager coordinating FixedSlabPool instances for each Entity size class.
-   * Dispatches Allocate/Deallocate and provides fallback to global new/delete.
+   * Dispatches Allocate/Deallocate with slab_region range checks and fallback to global new/delete.
    */
   class EntityMemoryManager
   {
@@ -36,19 +39,9 @@ namespace moho
     EntityMemoryManager(const EntityMemoryManager&) = delete;
     EntityMemoryManager& operator=(const EntityMemoryManager&) = delete;
 
-    // Known Entity class sizes:
-    // 0x6A8 (1704) - Unit
-    // 0x380 (896)  - Projectile
-    // 0x2A0 (672)  - CollisionBeamEntity
-    // 0x288 (648)  - Prop
-    // 0x280 (640)  - ReconBlip
-    // 0x270 (624)  - Shield / Entity
-    FixedSlabPool mPoolUnit;
-    FixedSlabPool mPoolProjectile;
-    FixedSlabPool mPoolCollisionBeam;
-    FixedSlabPool mPoolProp;
-    FixedSlabPool mPoolReconBlip;
-    FixedSlabPool mPoolEntityShield;
+    void RegisterSize(std::size_t size);
+
+    std::vector<std::unique_ptr<FixedSlabPool>> mPools;
   };
 
 } // namespace moho

@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <new>
+#include <vector>
 
 namespace moho
 {
@@ -12,6 +13,78 @@ namespace moho
       return (value + (alignment - 1u)) & ~(alignment - 1u);
     }
   } // namespace
+
+  namespace slab_region
+  {
+    static std::uintptr_t gBase = 0;
+    static INIT_ONCE gInitOnce = INIT_ONCE_STATIC_INIT;
+    static SRWLOCK gLock = SRWLOCK_INIT;
+    static std::vector<std::size_t> gFreeSlabOffsets;
+    static std::size_t gNextOffset = 0;
+
+    static BOOL CALLBACK InitReserve(PINIT_ONCE, PVOID, PVOID*) noexcept
+    {
+      void* const base = ::VirtualAlloc(nullptr, kReserveBytes, MEM_RESERVE, PAGE_NOACCESS);
+      gBase = reinterpret_cast<std::uintptr_t>(base);
+      return TRUE;
+    }
+
+    static void EnsureInit() noexcept
+    {
+      (void)::InitOnceExecuteOnce(&gInitOnce, &InitReserve, nullptr, nullptr);
+    }
+
+    bool Owns(const void* const ptr) noexcept
+    {
+      EnsureInit();
+      const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(ptr);
+      return gBase != 0 && (address - gBase) < kReserveBytes;
+    }
+
+    void* AllocateSlab() noexcept
+    {
+      EnsureInit();
+      if (gBase == 0) {
+        return nullptr;
+      }
+
+      std::size_t offset = 0;
+      ::AcquireSRWLockExclusive(&gLock);
+      if (!gFreeSlabOffsets.empty()) {
+        offset = gFreeSlabOffsets.back();
+        gFreeSlabOffsets.pop_back();
+      } else if (gNextOffset + kSlabBytes <= kReserveBytes) {
+        offset = gNextOffset;
+        gNextOffset += kSlabBytes;
+      } else {
+        ::ReleaseSRWLockExclusive(&gLock);
+        return nullptr;
+      }
+      ::ReleaseSRWLockExclusive(&gLock);
+
+      void* const slabPtr = reinterpret_cast<void*>(gBase + offset);
+      void* const committed = ::VirtualAlloc(slabPtr, kSlabBytes, MEM_COMMIT, PAGE_READWRITE);
+      return committed;
+    }
+
+    void FreeSlab(void* const slab) noexcept
+    {
+      if (slab == nullptr) {
+        return;
+      }
+
+      const std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(slab);
+      assert(Owns(slab));
+      assert((addr & (kSlabBytes - 1u)) == 0);
+
+      const std::size_t offset = addr - gBase;
+      ::VirtualFree(slab, kSlabBytes, MEM_DECOMMIT);
+
+      ::AcquireSRWLockExclusive(&gLock);
+      gFreeSlabOffsets.push_back(offset);
+      ::ReleaseSRWLockExclusive(&gLock);
+    }
+  } // namespace slab_region
 
   FixedSlabPool::FixedSlabPool(const std::size_t blockSize, const std::size_t alignment)
     : mBlockSize(blockSize)
@@ -35,26 +108,25 @@ namespace moho
   {
     ::AcquireSRWLockExclusive(&mLock);
 
-    auto freeList = [this](SlabHeader* head) {
+    auto freeList = [this](SlabHeader*& head) {
       while (head != nullptr) {
-        SlabHeader* next = head->nextSlab;
+        SlabHeader* const next = head->nextSlab;
         FreeSlabToOs(head);
         head = next;
       }
     };
 
-    freeList(mActiveSlab);
-    mActiveSlab = nullptr;
-
-    freeList(mFullSlabs);
-    mFullSlabs = nullptr;
-
+    // Cached empty slabs hold 0 live blocks, safe to free to OS
     freeList(mCachedEmptySlabs);
-    mCachedEmptySlabs = nullptr;
-
-    mAllocatedCount = 0;
-    mActiveSlabCount = 0;
     mCachedEmptySlabCount = 0;
+
+    // Free active and full slabs only when no live allocated blocks remain
+    if (mAllocatedCount == 0) {
+      freeList(mActiveSlab);
+      mActiveSlabCount = 0;
+
+      freeList(mFullSlabs);
+    }
 
     ::ReleaseSRWLockExclusive(&mLock);
   }
@@ -83,7 +155,7 @@ namespace moho
     }
 
     assert(slab->freeList != nullptr);
-    FreeNode* node = slab->freeList;
+    FreeNode* const node = slab->freeList;
     slab->freeList = node->next;
     ++slab->allocatedBlocks;
     ++mAllocatedCount;
@@ -147,13 +219,7 @@ namespace moho
 
   SlabHeader* FixedSlabPool::CreateNewSlab()
   {
-    void* const rawMemory = ::VirtualAlloc(
-      nullptr,
-      kSlabBytes,
-      MEM_COMMIT | MEM_RESERVE,
-      PAGE_READWRITE
-    );
-
+    void* const rawMemory = slab_region::AllocateSlab();
     if (rawMemory == nullptr) {
       return nullptr;
     }
@@ -195,7 +261,7 @@ namespace moho
     if (slab != nullptr) {
       slab->magic = 0;
       slab->ownerPool = nullptr;
-      ::VirtualFree(slab, 0, MEM_RELEASE);
+      slab_region::FreeSlab(slab);
     }
   }
 

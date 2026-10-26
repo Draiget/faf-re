@@ -28,15 +28,30 @@ namespace moho
     FreeNode* freeList;            // Head of free block list
   };
 
+  namespace slab_region
+  {
+#if defined(_WIN64)
+    constexpr std::size_t kReserveBytes = std::size_t{2} << 30; // 2 GB virtual address space
+#else
+    constexpr std::size_t kReserveBytes = 128u * 1024u * 1024u; // 128 MB virtual address space
+#endif
+    constexpr std::size_t kSlabBytes = 64u * 1024u;
+
+    [[nodiscard]] bool Owns(const void* ptr) noexcept;
+    [[nodiscard]] void* AllocateSlab() noexcept;
+    void FreeSlab(void* slab) noexcept;
+  } // namespace slab_region
+
   /**
    * Thread-safe fixed-size slab allocator managing 64-KB virtual memory blocks.
-   * Derives slab headers via pointer masking: ptr & ~0xFFFF.
-   * Reclaims completely empty slabs to the OS via VirtualFree when cache limit is exceeded.
+   * Allocates slabs within a contiguous reserved virtual address region (slab_region).
+   * Range-checked via slab_region::Owns to ensure external heap pointers are never dereferenced.
+   * Reclaims completely empty slabs to the OS via VirtualFree(MEM_DECOMMIT) when cache limit is exceeded.
    */
   class FixedSlabPool
   {
   public:
-    static constexpr std::size_t kSlabBytes = 64u * 1024u;
+    static constexpr std::size_t kSlabBytes = slab_region::kSlabBytes;
     static constexpr std::uint32_t kSlabMagic = 0x534C4142u; // 'SLAB'
     static constexpr std::uint32_t kMaxCachedEmptySlabs = 2u;
 
