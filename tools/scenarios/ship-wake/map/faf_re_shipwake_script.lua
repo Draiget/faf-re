@@ -6,9 +6,12 @@ local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')
 
 local MinDepth = 3
 local Step = 4
+-- Keep the lane well inside the map so the camera never looks past its edge, which
+-- renders differently from the playable area and would muddy the comparison.
+local EdgeMargin = 128
 
 local function IsDeep(x, z)
-    if x < 8 or z < 8 or x > 1016 or z > 1016 then
+    if x < EdgeMargin or z < EdgeMargin or x > 1024 - EdgeMargin or z > 1024 - EdgeMargin then
         return false
     end
     return GetSurfaceHeight(x, z) - GetTerrainHeight(x, z) >= MinDepth
