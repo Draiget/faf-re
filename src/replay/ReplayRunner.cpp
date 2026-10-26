@@ -402,6 +402,22 @@ namespace faf::replay
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
     std::unique_ptr<moho::CWldMap> wldMap(gameData.mWldMap);
 
+    // Plan WPL.16: the blueprints in the order the rules loaded them (their ordinals), to
+    // compare between platforms.
+    if (!options.blueprintOrderPath.empty()) {
+      std::FILE* orderFile = nullptr;
+      if (fopen_s(&orderFile, options.blueprintOrderPath.c_str(), "w") != 0 || orderFile == nullptr) {
+        result.error = "cannot write " + options.blueprintOrderPath;
+        return result;
+      }
+      int ordinal = 0;
+      for (; const moho::RBlueprint* const blueprint = rules->GetBlueprintFromOrdinal(ordinal); ++ordinal) {
+        std::fprintf(orderFile, "%d %s\n", ordinal, blueprint->mBlueprintId.c_str());
+      }
+      std::fclose(orderFile);
+      std::printf("[%s] blueprint order: %d blueprints written to %s\n", label, ordinal, options.blueprintOrderPath.c_str());
+    }
+
     // The wire format's content tables (plan WP7.2), as a server or client builds them at load.
     const faf::remote::wire::SContentTables tables = faf::remote::BuildContentTables(*rules);
     {

@@ -150,6 +150,7 @@ namespace
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
+      "  --blueprint-order <file> write every blueprint by ordinal, in the rules' load order\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --terrain-check <list>    faf-replay-full: load each .scmap in <list> with the client's and the\n"
@@ -217,6 +218,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
+  (void)ReadOption("--blueprint-order", options.blueprintOrderPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
