@@ -2156,6 +2156,27 @@ namespace moho
       return;
     }
 
+    // Deliberate change from retail: retail sized mSettings (mDelayTimes and
+    // mMatrixCoefficients) in AudioEngineImpl using ResolveDstChannelCount from
+    // DirectSound's speaker setting (which on modern Windows reports 9/8 for
+    // 5.1/7.1 Surround and defaults to stereo, 2 floats). X3DAudio is initialized
+    // from XACT's real output channel mask (GetFinalMixFormat). If the output has
+    // 5.1/7.1 channels (6 or 8 floats), X3DAudioCalculate writes past the 2-float
+    // buffer into adjacent heap memory (corrupting AudioEngine instances), and
+    // SetMatrixCoefficients fails with "XACT3DApply failed: Invalid arg".
+    // Size mSettings from the real output channel count from GetFinalMixFormat.
+    WAVEFORMATEXTENSIBLE finalMixFormat{};
+    if (mImpl->mInstance->GetFinalMixFormat(&finalMixFormat) >= 0) {
+      const std::uint32_t realDstChannels = finalMixFormat.Format.nChannels;
+      if (realDstChannels != 0u && realDstChannels != mImpl->mSettings.mDstChannelCount) {
+        delete[] mImpl->mSettings.mDelayTimes;
+        delete[] mImpl->mSettings.mMatrixCoefficients;
+        mImpl->mSettings.mDstChannelCount = realDstChannels;
+        mImpl->mSettings.mDelayTimes = new float[realDstChannels]();
+        mImpl->mSettings.mMatrixCoefficients = new float[realDstChannels * mImpl->mSettings.mSrcChannelCount]();
+      }
+    }
+
     RegisterNotificationOrWarn(mImpl, 10u);
     RegisterNotificationOrWarn(mImpl, 11u);
     RegisterNotificationOrWarn(mImpl, 17u);
