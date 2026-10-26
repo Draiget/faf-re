@@ -1,4 +1,5 @@
 #include "Sim.h"
+#include "moho/entity/EntityMemoryManager.h"
 #include "legacy/math/X87Math.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Global.h"
@@ -7415,6 +7416,7 @@ Sim::~Sim()
   if (mEntityDB) {
     delete mEntityDB;
     mEntityDB = nullptr;
+    EntityMemoryManager::Instance().Clear();
   }
 
   // Random stream (raw storage; no destructor in the binary).
