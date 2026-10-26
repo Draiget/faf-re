@@ -748,15 +748,82 @@ namespace gpg::gal::imaging
     return S_OK;
   }
 
+  namespace
+  {
+    /**
+     * A 32 bpp top-down BMP of the first subresource, for 8-bit BGRA/RGBA images: D3DX11's BMP
+     * writer refuses B8G8R8A8 (E_FAIL), the back buffer format dump_Frame saves on Direct3D 12.
+     * False for other formats.
+     */
+    [[nodiscard]] bool WriteBgraBmp(const Image& image, const char* const path, HRESULT& outResult)
+    {
+      const bool bgra = image.format == DXGI_FORMAT_B8G8R8A8_UNORM || image.format == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB ||
+        image.format == DXGI_FORMAT_B8G8R8X8_UNORM;
+      const bool rgba = image.format == DXGI_FORMAT_R8G8B8A8_UNORM || image.format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+      if ((!bgra && !rgba) || image.subresources.empty()) {
+        return false;
+      }
+      const Image::Subresource& top = image.subresources.front();
+      const std::uint32_t rowBytes = top.width * 4U;
+      BITMAPINFOHEADER info{};
+      info.biSize = sizeof(info);
+      info.biWidth = static_cast<LONG>(top.width);
+      info.biHeight = -static_cast<LONG>(top.height); // top-down
+      info.biPlanes = 1;
+      info.biBitCount = 32;
+      info.biCompression = BI_RGB;
+      info.biSizeImage = rowBytes * top.height;
+      BITMAPFILEHEADER file{};
+      file.bfType = 0x4D42; // "BM"
+      file.bfOffBits = sizeof(file) + sizeof(info);
+      file.bfSize = file.bfOffBits + info.biSizeImage;
+
+      std::vector<std::uint8_t> pixels(info.biSizeImage);
+      for (std::uint32_t row = 0U; row < top.height; ++row) {
+        const std::uint8_t* const source = image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
+        std::uint8_t* const target = pixels.data() + static_cast<std::size_t>(row) * rowBytes;
+        std::memcpy(target, source, rowBytes);
+        if (rgba) {
+          for (std::uint32_t x = 0U; x < top.width; ++x) {
+            std::swap(target[x * 4U], target[x * 4U + 2U]);
+          }
+        }
+      }
+
+      HANDLE const handle = ::CreateFileA(path, GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, 0U, nullptr);
+      if (handle == INVALID_HANDLE_VALUE) {
+        outResult = HRESULT_FROM_WIN32(::GetLastError());
+        return true;
+      }
+      DWORD written = 0U;
+      const bool ok = ::WriteFile(handle, &file, sizeof(file), &written, nullptr) && written == sizeof(file) &&
+        ::WriteFile(handle, &info, sizeof(info), &written, nullptr) && written == sizeof(info) &&
+        ::WriteFile(handle, pixels.data(), static_cast<DWORD>(pixels.size()), &written, nullptr) && written == pixels.size();
+      ::CloseHandle(handle);
+      outResult = ok ? S_OK : E_FAIL;
+      return true;
+    }
+  } // namespace
+
   HRESULT ImageCodec::EncodeToFile(const Image& image, const FileFormat format, const char* const path)
   {
+    if (HRESULT written = S_OK; format == FileFormat::Bmp && WriteBgraBmp(image, path, written)) {
+      return written;
+    }
     const std::lock_guard<std::mutex> lock(mMutex);
     ComPtr<ID3D11Texture2D> texture;
-    const HRESULT result = CreateEncodable(mState->device.Get(), image, texture);
-    if (FAILED(result)) {
-      return result;
+    HRESULT result = CreateEncodable(mState->device.Get(), image, texture);
+    if (SUCCEEDED(result)) {
+      result = mState->saveToFile(mState->context.Get(), texture.Get(), static_cast<D3DX11_IMAGE_FILE_FORMAT>(format), path);
+      if (FAILED(result)) {
+        gpg::Warnf("imaging: D3DX11 could not save %s (DXGI format %d, %ux%u, file format %d): HRESULT 0x%08lX", path,
+                   static_cast<int>(image.format), image.width, image.height, static_cast<int>(format), static_cast<unsigned long>(result));
+      }
+    } else {
+      gpg::Warnf("imaging: no encodable texture for %s (DXGI format %d, %ux%u): HRESULT 0x%08lX", path, static_cast<int>(image.format),
+                 image.width, image.height, static_cast<unsigned long>(result));
     }
-    return mState->saveToFile(mState->context.Get(), texture.Get(), static_cast<D3DX11_IMAGE_FILE_FORMAT>(format), path);
+    return result;
   }
 
   FileFormat ImageCodec::FromGalFormat(const int galFormat) noexcept
