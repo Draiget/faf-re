@@ -249,17 +249,76 @@ namespace gpg::gal::imaging
       std::uint64_t byteCount;
     };
 
+    /**
+     * XXH64 (Yann Collet's algorithm) of the file's bytes. The key used to be FNV-1a, one
+     * multiply per byte: 16% of a 274 ms zoom frame went to hashing the textures it loaded.
+     */
+    [[nodiscard]] std::uint64_t HashBytes(const void* const data, const std::size_t bytes, const std::uint64_t seed) noexcept
+    {
+      constexpr std::uint64_t kPrime1 = 0x9E3779B185EBCA87ULL;
+      constexpr std::uint64_t kPrime2 = 0xC2B2AE3D27D4EB4FULL;
+      constexpr std::uint64_t kPrime3 = 0x165667B19E3779F9ULL;
+      constexpr std::uint64_t kPrime4 = 0x85EBCA77C2B2AE63ULL;
+      constexpr std::uint64_t kPrime5 = 0x27D4EB2F165667C5ULL;
+      const auto rotate = [](const std::uint64_t value, const int bits) { return (value << bits) | (value >> (64 - bits)); };
+      const auto round = [&](std::uint64_t accumulator, const std::uint64_t input) {
+        accumulator += input * kPrime2;
+        return rotate(accumulator, 31) * kPrime1;
+      };
+      const auto read64 = [](const std::uint8_t* const at) {
+        std::uint64_t value;
+        std::memcpy(&value, at, sizeof(value));
+        return value;
+      };
+
+      const auto* at = static_cast<const std::uint8_t*>(data);
+      const std::uint8_t* const end = at + bytes;
+      std::uint64_t hash;
+      if (bytes >= 32U) {
+        std::uint64_t lanes[4] = {seed + kPrime1 + kPrime2, seed + kPrime2, seed, seed - kPrime1};
+        for (; at + 32 <= end; at += 32) {
+          for (int lane = 0; lane < 4; ++lane) {
+            lanes[lane] = round(lanes[lane], read64(at + lane * 8));
+          }
+        }
+        hash = rotate(lanes[0], 1) + rotate(lanes[1], 7) + rotate(lanes[2], 12) + rotate(lanes[3], 18);
+        for (const std::uint64_t lane : lanes) {
+          hash = (hash ^ round(0U, lane)) * kPrime1 + kPrime4;
+        }
+      } else {
+        hash = seed + kPrime5;
+      }
+      hash += static_cast<std::uint64_t>(bytes);
+      for (; at + 8 <= end; at += 8) {
+        hash = rotate(hash ^ round(0U, read64(at)), 27) * kPrime1 + kPrime4;
+      }
+      if (at + 4 <= end) {
+        std::uint32_t word;
+        std::memcpy(&word, at, sizeof(word));
+        hash = rotate(hash ^ (static_cast<std::uint64_t>(word) * kPrime1), 23) * kPrime2 + kPrime3;
+        at += 4;
+      }
+      for (; at < end; ++at) {
+        hash = rotate(hash ^ (*at * kPrime5), 11) * kPrime1;
+      }
+      hash ^= hash >> 33U;
+      hash *= kPrime2;
+      hash ^= hash >> 29U;
+      hash *= kPrime3;
+      hash ^= hash >> 32U;
+      return hash;
+    }
+
     [[nodiscard]] std::uint64_t DecodeCacheKey(const void* const data, const std::size_t bytes, const DecodeOptions& options)
     {
       effects::Fnv1a64 hash;
-      hash.Add("faf image decode cache 1");
+      hash.Add("faf image decode cache 2");
       // The file stores Image::Subresource as is, whose offset is pointer-sized: x86 and x64
       // builds share the directory and keep separate entries.
       const std::uint32_t pointerBytes = sizeof(void*);
       hash.Add(&pointerBytes, sizeof(pointerBytes));
-      hash.Add(data, bytes);
       hash.Add(&options, sizeof(options));
-      return hash.Value();
+      return HashBytes(data, bytes, hash.Value());
     }
 
     [[nodiscard]] std::string DecodeCachePath(const std::uint64_t key)
