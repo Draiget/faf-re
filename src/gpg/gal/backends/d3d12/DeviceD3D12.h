@@ -152,6 +152,8 @@ namespace gpg::gal
 
     // ---- services for the resources ----------------------------------------
     [[nodiscard]] ID3D12Device* Native() const noexcept { return mDevice.Get(); }
+    /** Engine addition (gal::gPlacedResources): where static buffers are placed. */
+    [[nodiscard]] d3d12::PlacedHeapAllocator& PlacedBuffers() noexcept { return mPlacedBuffers; }
     [[nodiscard]] std::recursive_mutex& Mutex() noexcept { return mMutex; }
     /** The submission the commands being recorded belong to. */
     [[nodiscard]] std::uint64_t RecordingSerial() const noexcept { return mSubmittedSerial + 1U; }
@@ -317,6 +319,8 @@ namespace gpg::gal
     std::vector<Garbage> mGarbage;
 
     d3d12::UploadAllocator mUpload;
+    d3d12::PlacedHeapAllocator mPlacedTextures; // engine addition: gal::gPlacedResources
+    d3d12::PlacedHeapAllocator mPlacedBuffers;
     d3d12::DescriptorPool mRtvPool;
     d3d12::DescriptorPool mDsvPool;
     d3d12::DescriptorPool mSrvPool;

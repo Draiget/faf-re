@@ -28,6 +28,7 @@
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
@@ -376,6 +377,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mPipelineState.reset();
     mCursor.Destroy();
     mUpload.Release();
+    mPlacedTextures.Release();
+    mPlacedBuffers.Release();
     mRtvPool.Release();
     mDsvPool.Release();
     mSrvPool.Release();
@@ -488,6 +491,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     CreateDrawMarkers();
 
     mUpload.Initialize(mDevice.Get());
+    mPlacedTextures.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, L"placed textures");
+    mPlacedBuffers.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS, L"placed buffers");
     mRtvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 256U);
     mDsvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 256U);
     mSrvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096U);
@@ -1765,11 +1770,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       ThrowError("DeviceD3D12.cpp", __LINE__, "invalid source specified for texture data");
     }
 
-    CheckHresult(
-      "DeviceD3D12.cpp", __LINE__,
-      mDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-                                       IID_PPV_ARGS(&resource.resource))
-    );
+    // Engine addition (gal::gPlacedResources): a file texture, whose every subresource is
+    // uploaded below, goes in a heap. One the engine fills itself stays committed: it relies
+    // on starting zeroed, and placed memory is not.
+    if (contentsFromEngine || !gPlacedResources ||
+        !mPlacedTextures.Create(desc, D3D12_RESOURCE_STATE_COPY_DEST, resource.resource)) {
+      CheckHresult(
+        "DeviceD3D12.cpp", __LINE__,
+        mDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                         IID_PPV_ARGS(&resource.resource))
+      );
+    }
     resource.state = D3D12_RESOURCE_STATE_COPY_DEST;
     {
       const std::string_view location = context->location_.view();
@@ -2329,11 +2340,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     constexpr double kMiB = 1.0 / (1024.0 * 1024.0);
     gpg::Logf(
-      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), %zu pipelines, %zu retiring, "
+      "D3D12 memory: buffer copies %.1f MB, texture copies %.1f MB, upload pages %.1f MB (%zu), placed textures %.1f of "
+      "%.1f MB, placed buffers %.1f of %.1f MB, %zu pipelines, %zu retiring, "
       "%llu upload-pressure submissions, %llu passes carried over one, at most %llu submissions in flight; process private "
       "%.1f MB, address space free %.1f MB (largest block %.1f MB)",
       static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB, static_cast<double>(TextureD3D12::CpuCopyBytes()) * kMiB,
-      static_cast<double>(mUpload.PageBytes()) * kMiB, mUpload.PageCount(), mPipelines.size(), mGarbage.size(),
+      static_cast<double>(mUpload.PageBytes()) * kMiB, mUpload.PageCount(), static_cast<double>(mPlacedTextures.UsedBytes()) * kMiB,
+      static_cast<double>(mPlacedTextures.HeapBytes()) * kMiB, static_cast<double>(mPlacedBuffers.UsedBytes()) * kMiB,
+      static_cast<double>(mPlacedBuffers.HeapBytes()) * kMiB, mPipelines.size(), mGarbage.size(),
       static_cast<unsigned long long>(mUploadSubmits), static_cast<unsigned long long>(mCarriedPasses),
       static_cast<unsigned long long>(mMostInFlight), static_cast<double>(counters.PrivateUsage) * kMiB,
       static_cast<double>(freeBytes) * kMiB, static_cast<double>(largestFree) * kMiB

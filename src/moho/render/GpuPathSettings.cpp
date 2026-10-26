@@ -5,6 +5,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/PipelineDiskCache.h"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
@@ -23,6 +24,15 @@ namespace moho
       "Keep Direct3D 12 pipeline states on disk across sessions, so they are not compiled again in the frame that "
       "first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it off at startup.",
       &gpg::gal::gPipelineDiskCache
+    );
+
+    /** Engine addition: `d3d_PlacedResources` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_d3d_PlacedResources(
+      "d3d_PlacedResources",
+      "Direct3D 12: place file textures and static buffers in large heaps created ahead of time (1, the default), "
+      "or give each its own committed resource, which costs a driver allocation and a fence wait each (0). Read at "
+      "each creation.",
+      &gpg::gal::gPlacedResources
     );
 
     /** Engine addition: `ren_DdsDirectLoad` (see gpg/gal/backends/common/ImageCodec.h). */
