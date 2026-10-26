@@ -14,6 +14,8 @@
 #if defined(_WIN32)
 #include "CNetTCPConnector.h"
 #include "CNetUDPConnector.h"
+#else
+#include "INetTCPSocket.h"
 #endif
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
@@ -878,6 +880,20 @@ INetConnector* moho::NET_MakeTCPConnector(const u_short port)
   return nullptr;
 #endif
 }
+
+#if !defined(_WIN32)
+/**
+ * Engine addition (dedicated-server plan WPL.5): moho/net/INetTCPSocket.cpp (the Winsock TCP
+ * socket) is Windows only. NET_Init fails here, and NET_TCPConnect fails as the Windows
+ * function does then.
+ */
+moho::INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
+{
+  (void)address;
+  (void)port;
+  return nullptr;
+}
+#endif
 
 /**
  * Address: 0x0047F990 (FUN_0047F990)

@@ -7,7 +7,12 @@
 // out every window, device, audio and UI step.
 
 #include <Windows.h>
+#if defined(_WIN32)
 #include <objbase.h>
+#else
+#include <csignal>
+#include <execinfo.h>
+#endif
 
 #include <algorithm>
 #include <cfloat>
@@ -54,7 +59,9 @@ namespace
     std::fflush(stderr);
     // The sim and loader threads are still running; nothing after the verdict is observed,
     // so the process ends here instead of tearing them down.
+#if defined(_WIN32)
     ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(exitCode));
+#endif
     std::_Exit(exitCode);
   }
 
@@ -65,6 +72,7 @@ namespace
     EndProcess(kExitCrash);
   }
 
+#if defined(_WIN32)
   LONG WINAPI ReplayCrashFilter(EXCEPTION_POINTERS* const info)
   {
     const EXCEPTION_RECORD* const record = info != nullptr ? info->ExceptionRecord : nullptr;
@@ -77,6 +85,20 @@ namespace
     std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
     EndProcess(kExitCrash);
   }
+#else
+  /// The POSIX counterpart of the crash filter: a fatal signal is reported as a crash.
+  void ReplayCrashSignal(const int signalNumber, siginfo_t* const info, void*)
+  {
+    std::printf(
+      "[%s] CRASH signal %d at %p\n", gLabel.c_str(), signalNumber, info != nullptr ? info->si_addr : nullptr
+    );
+    std::fflush(stdout);
+    void* frames[64];
+    ::backtrace_symbols_fd(frames, ::backtrace(frames, 64), 1);
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    EndProcess(kExitCrash);
+  }
+#endif
 
   /** The common services every engine app sets up (`IWinApp::AppInitCommonServices`). */
   class ReplayApp final : public moho::IWinApp
@@ -165,8 +187,20 @@ int main(int argc, char** argv)
 {
   (void)argc;
   (void)argv;
+#if defined(_WIN32)
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
   ::SetUnhandledExceptionFilter(&ReplayCrashFilter);
+#else
+  {
+    struct sigaction action{};
+    action.sa_sigaction = &ReplayCrashSignal;
+    action.sa_flags = SA_SIGINFO;
+    sigemptyset(&action.sa_mask);
+    for (const int signalNumber : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
+      (void)::sigaction(signalNumber, &action, nullptr);
+    }
+  }
+#endif
   gpg::SetDieHandler(&ReplayDieHandler);
 
   faf::replay::SReplayOptions options{};
@@ -204,7 +238,9 @@ int main(int argc, char** argv)
   // `wxTheApp` without a null check. faf-replay links only the simulation and has neither.
   wxEntry(reinterpret_cast<WXHINSTANCE>(::GetModuleHandleW(nullptr)), nullptr, nullptr, 0, false);
 #endif
+#if defined(_WIN32)
   (void)::CoInitialize(nullptr);
+#endif
   moho::PLAT_Init();
 
   // `CScApp::Init`, without the splash, fonts, UI manager and device.

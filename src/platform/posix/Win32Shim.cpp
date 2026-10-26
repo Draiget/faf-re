@@ -22,11 +22,13 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <typeinfo>
 #include <vector>
 
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <malloc.h>
 #include <fnmatch.h>
 #include <pthread.h>
 #include <sched.h>
@@ -697,6 +699,92 @@ HMODULE GetModuleHandleA(const char* const moduleName)
     (void)::dlclose(module); // GetModuleHandle takes no reference.
   }
   return module;
+}
+
+HMODULE GetModuleHandleW(const wchar_t* const moduleName)
+{
+  if (moduleName == nullptr) {
+    extern char __executable_start;
+    return &__executable_start;
+  }
+  return GetModuleHandleA(NarrowPath(moduleName).c_str());
+}
+
+BOOL InitOnceExecuteOnce(const PINIT_ONCE initOnce, const PINIT_ONCE_FN function, const PVOID parameter, PVOID* const context)
+{
+  for (;;) {
+    int state = __atomic_load_n(&initOnce->state, __ATOMIC_ACQUIRE);
+    if (state == 2) {
+      return TRUE;
+    }
+    if (state == 0 && __atomic_compare_exchange_n(&initOnce->state, &state, 1, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+      const BOOL done = function(initOnce, parameter, context);
+      __atomic_store_n(&initOnce->state, done != FALSE ? 2 : 0, __ATOMIC_RELEASE);
+      return done;
+    }
+    ::sched_yield();
+  }
+}
+
+const wchar_t* GetCommandLineW()
+{
+  // Built once, without the heap (the allocator asks for it before it is set up).
+  static wchar_t sCommandLine[8192];
+  static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
+  (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
+    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+      return TRUE;
+    }
+    char raw[8192];
+    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
+    (void)::close(fd);
+    std::size_t out = 0;
+    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine) / sizeof(sCommandLine[0]); ++at) {
+      // Arguments are NUL-separated; the trailing NUL ends the line.
+      if (raw[at] == '\0') {
+        if (at + 1 < got) {
+          sCommandLine[out++] = L' ';
+        }
+      } else {
+        sCommandLine[out++] = static_cast<wchar_t>(static_cast<unsigned char>(raw[at]));
+      }
+    }
+    sCommandLine[out] = L'\0';
+    return TRUE;
+  }, nullptr, nullptr);
+  return sCommandLine;
+}
+
+HANDLE GetProcessHeap()
+{
+  static int sProcessHeap = 0;
+  return &sProcessHeap;
+}
+
+HANDLE HeapCreate(DWORD, SIZE_T, SIZE_T)
+{
+  return GetProcessHeap();
+}
+
+void* HeapAlloc(HANDLE, const DWORD flags, const SIZE_T bytes)
+{
+  void* const block = (flags & HEAP_ZERO_MEMORY) != 0 ? std::calloc(1, bytes != 0 ? bytes : 1) : std::malloc(bytes != 0 ? bytes : 1);
+  if (block == nullptr) {
+    tLastError = ERROR_NOT_ENOUGH_MEMORY;
+  }
+  return block;
+}
+
+BOOL HeapFree(HANDLE, DWORD, void* const memory)
+{
+  std::free(memory);
+  return TRUE;
+}
+
+SIZE_T HeapSize(HANDLE, DWORD, const void* const memory)
+{
+  return memory != nullptr ? ::malloc_usable_size(const_cast<void*>(memory)) : static_cast<SIZE_T>(-1);
 }
 
 HMODULE LoadLibraryA(const char* const fileName)
@@ -1965,6 +2053,33 @@ int _findclose(const std::intptr_t handle)
   }
   delete reinterpret_cast<FindSearch*>(handle);
   return 0;
+}
+
+// The MSVC CRT's copies of the command line (moho::CFG_GetArgs and the startup helpers read
+// them). glibc passes argc and argv to the initialisers in .init_array, so they are set before
+// any of the engine's static initialisers or main run.
+int __argc = 0;
+char** __argv = nullptr;
+
+namespace
+{
+  __attribute__((constructor(101))) void CaptureCommandLine(const int argc, char** const argv, char**)
+  {
+    __argc = argc;
+    __argv = argv;
+  }
+} // namespace
+
+// MSVC's polymorphic typeid entry point (gpg/core/reflection/Reflection.cpp calls it on objects
+// of unknown dynamic type). In the Itanium ABI every vtable of an object, primary or secondary,
+// holds the complete object's type_info in the slot before its address point.
+extern "C" void* __RTtypeid(void* const object)
+{
+  if (object == nullptr) {
+    throw std::bad_typeid();
+  }
+  void* const* const vtable = *static_cast<void* const* const*>(object);
+  return vtable[-1];
 }
 
 #endif // !defined(_WIN32)

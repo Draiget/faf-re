@@ -1180,15 +1180,23 @@ msvc8::string gpg::STR_Va(
     return written < 0 || static_cast<std::size_t>(written) >= capacity;
   };
 
+  // Each pass formats from its own copy of `va`: a va_list is consumed by the call that reads
+  // it (on System V x64 it is a cursor into the register save area; on Windows a pointer the
+  // callee copies, so there the copy changes nothing).
   char stackBuffer[256]{};
-  int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, va);
+  va_list attempt;
+  va_copy(attempt, va);
+  int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, attempt);
+  va_end(attempt);
   if (didNotFit(formattedLength, sizeof(stackBuffer))) {
     msvc8::vector<char> dynamicBuffer{};
     std::size_t capacity = sizeof(stackBuffer);
     do {
       capacity *= 2;
       dynamicBuffer.resize(capacity, 0);
-      formattedLength = std::vsnprintf(dynamicBuffer.data(), capacity, fmt, va);
+      va_copy(attempt, va);
+      formattedLength = std::vsnprintf(dynamicBuffer.data(), capacity, fmt, attempt);
+      va_end(attempt);
       if (formattedLength < 0) {
         // `_vsnprintf` only ever returned -1 for truncation, so the binary's
         // loop always terminated. The C99 function also returns negative for a

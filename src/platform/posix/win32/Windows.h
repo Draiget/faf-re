@@ -24,6 +24,8 @@
 #include <cwctype>
 #include <cerrno>
 
+#include <pthread.h>
+
 #define WINAPI
 #define CALLBACK
 #define APIENTRY
@@ -97,6 +99,7 @@ using LONGLONG = std::int64_t;
 #define ERROR_NOT_SUPPORTED 50u
 #define ERROR_FILE_EXISTS 80u
 #define ERROR_INVALID_PARAMETER 87u
+#define ERROR_NOT_ENOUGH_MEMORY 8u
 #define ERROR_INSUFFICIENT_BUFFER 122u
 #define ERROR_ALREADY_EXISTS 183u
 #define ERROR_ENVVAR_NOT_FOUND 203u
@@ -196,6 +199,48 @@ BOOL TryEnterCriticalSection(CRITICAL_SECTION* section);
 void LeaveCriticalSection(CRITICAL_SECTION* section);
 void DeleteCriticalSection(CRITICAL_SECTION* section);
 
+using PVOID = void*;
+
+/// One-time initialisation (InitOnceExecuteOnce's synchronous form).
+struct INIT_ONCE
+{
+  int state; // 0 not run, 1 running, 2 done
+};
+#define INIT_ONCE_STATIC_INIT {0}
+using PINIT_ONCE = INIT_ONCE*;
+using PINIT_ONCE_FN = BOOL (*)(PINIT_ONCE initOnce, PVOID parameter, PVOID* context);
+BOOL InitOnceExecuteOnce(PINIT_ONCE initOnce, PINIT_ONCE_FN function, PVOID parameter, PVOID* context);
+
+/// The process's command line (/proc/self/cmdline, arguments joined by spaces).
+const wchar_t* GetCommandLineW();
+
+/// A slim reader/writer lock, as a POSIX rwlock (statically initialisable as SRWLOCK_INIT).
+struct SRWLOCK
+{
+  pthread_rwlock_t lock;
+};
+#define SRWLOCK_INIT {PTHREAD_RWLOCK_INITIALIZER}
+inline void InitializeSRWLock(SRWLOCK* const lock) noexcept
+{
+  (void)::pthread_rwlock_init(&lock->lock, nullptr);
+}
+inline void AcquireSRWLockExclusive(SRWLOCK* const lock) noexcept
+{
+  (void)::pthread_rwlock_wrlock(&lock->lock);
+}
+inline void ReleaseSRWLockExclusive(SRWLOCK* const lock) noexcept
+{
+  (void)::pthread_rwlock_unlock(&lock->lock);
+}
+inline void AcquireSRWLockShared(SRWLOCK* const lock) noexcept
+{
+  (void)::pthread_rwlock_rdlock(&lock->lock);
+}
+inline void ReleaseSRWLockShared(SRWLOCK* const lock) noexcept
+{
+  (void)::pthread_rwlock_unlock(&lock->lock);
+}
+
 // --- Threads, processes and time ---------------------------------------------------------
 DWORD GetCurrentThreadId();
 HANDLE GetCurrentThread();
@@ -216,6 +261,7 @@ DWORD QueueUserAPC(PAPCFUNC function, HANDLE thread, ULONG_PTR data);
 
 // Shared objects, through the dynamic loader.
 HMODULE GetModuleHandleA(const char* moduleName);
+HMODULE GetModuleHandleW(const wchar_t* moduleName); // null: the executable's load address
 HMODULE LoadLibraryA(const char* fileName);
 void* GetProcAddress(HMODULE module, const char* procName);
 BOOL FreeLibrary(HMODULE module);
@@ -289,6 +335,7 @@ inline std::int64_t InterlockedCompareExchange64(
 // --- Memory ------------------------------------------------------------------------------
 #define MEM_COMMIT 0x00001000u
 #define MEM_RESERVE 0x00002000u
+#define MEM_TOP_DOWN 0x00100000u
 #define MEM_FREE 0x00010000u
 #define MEM_RELEASE 0x00008000u
 #define MEM_PRIVATE 0x00020000u
@@ -344,6 +391,15 @@ HLOCAL LocalFree(HLOCAL memory);
 #define MOVEFILE_REPLACE_EXISTING 0x00000001u
 BOOL ReplaceFileW(const wchar_t* replacedFile, const wchar_t* replacementFile, const wchar_t* backupFile, DWORD flags, void* exclude, void* reserved);
 BOOL PathFileExistsW(const wchar_t* path);
+
+// Heaps: every heap is the C library's (HeapSize is malloc_usable_size, at least the
+// requested size).
+#define HEAP_ZERO_MEMORY 0x00000008u
+HANDLE GetProcessHeap();
+HANDLE HeapCreate(DWORD options, SIZE_T initialSize, SIZE_T maximumSize);
+void* HeapAlloc(HANDLE heap, DWORD flags, SIZE_T bytes);
+BOOL HeapFree(HANDLE heap, DWORD flags, void* memory);
+SIZE_T HeapSize(HANDLE heap, DWORD flags, const void* memory);
 BOOL CreateDirectoryA(const char* path, void* attributes);
 /// `_fullpath`: the absolute, lexically normalised form of `path` (which need not exist).
 char* _fullpath(char* absolutePath, const char* relativePath, std::size_t maxLength);

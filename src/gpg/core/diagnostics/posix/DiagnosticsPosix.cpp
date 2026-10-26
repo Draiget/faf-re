@@ -135,6 +135,38 @@ namespace
     (void)::raise(signalNumber);
   }
 
+  /// Until InstallCrtDiagnosticHooks runs (static initialisation, early startup): the signal
+  /// and the raw stack on stderr, async-signal-safe, then the default action.
+  void OnEarlyFatalSignal(const int signalNumber, siginfo_t* const info, void*)
+  {
+    char line[128];
+    const int length = std::snprintf(
+      line, sizeof(line), "fatal signal %d at address %p before the diagnostic hooks; stack:\n", signalNumber,
+      info != nullptr ? info->si_addr : nullptr
+    );
+    (void)::write(2, line, static_cast<std::size_t>(length));
+    void* frames[kMaxFrames];
+    const int count = ::backtrace(frames, kMaxFrames);
+    ::backtrace_symbols_fd(frames, count, 2);
+    std::signal(signalNumber, SIG_DFL);
+    (void)::raise(signalNumber);
+  }
+
+  // Priority 100: before the reflection pre-registration phase (101, StaticInitPhase.h).
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wprio-ctor-dtor"
+  __attribute__((constructor(100))) void InstallEarlyFatalSignalTrace()
+  {
+    struct sigaction action{};
+    action.sa_sigaction = &OnEarlyFatalSignal;
+    action.sa_flags = SA_SIGINFO | SA_RESETHAND;
+    sigemptyset(&action.sa_mask);
+    for (const int signalNumber : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
+      (void)::sigaction(signalNumber, &action, nullptr);
+    }
+  }
+#pragma clang diagnostic pop
+
   void OnTerminate()
   {
     gpg::diag::CrashReportContext context{};

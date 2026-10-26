@@ -99,6 +99,14 @@ message(STATUS "faf_sim: ${_faf_sim_count} translation units")
 
 file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/windows.h" "#pragma once\n#include <Windows.h>\n")
 
+# The wire format of server-authoritative sessions (remote/sources.cmake, FAF_REMOTE_SOURCES),
+# after the engine's sources as in the Windows server-mode build: faf-replay's wire checks
+# use it, and the Linux game server will.
+include("${PROJECT_SOURCE_DIR}/src/remote/sources.cmake")
+foreach(_src IN LISTS FAF_REMOTE_SOURCES)
+  list(APPEND _faf_sim_files "${PROJECT_SOURCE_DIR}/src/${_src}")
+endforeach()
+
 add_library(faf_sim OBJECT ${_faf_sim_files})
 # Its compile and link settings, which targets built from a few sim sources
 # (tests/sim_math) share without depending on every faf_sim object.
@@ -115,6 +123,11 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
 # The crash diagnostics' headers on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/posix/DiagnosticsPosix.cpp")
+# moho/misc/WinPlatform.cpp's platform services (call stacks, error text, message boxes) and
+# the type_info of client classes the sim names (plan WPL.5).
+target_sources(faf_sim PRIVATE
+  "${PROJECT_SOURCE_DIR}/src/moho/misc/posix/PlatformPosix.cpp"
+  "${PROJECT_SOURCE_DIR}/src/platform/posix/ClientTypeInfoPosix.cpp")
 
 # The Windows build's engine definitions without the Win32 ones (WIN32,
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
@@ -172,16 +185,10 @@ foreach(_src IN LISTS _faf_sim_files)
 endforeach()
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
-# The golden sim-math tests (tests/sim_math), compiled with faf_sim's settings.
-# Until every faf_sim object compiles and links, the Linux run covers the parts
-# whose code builds here (FAF_SIM_MATH_SUBSET: the X87Math helpers, sqrt and the
-# navigator's cell arithmetic) and reports the golden cases it skipped.
-add_executable(faf_sim_math_tests
-  "${PROJECT_SOURCE_DIR}/tests/sim_math/SimMathTests.cpp"
-  "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math.cpp"
-  "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
-target_link_libraries(faf_sim_math_tests PRIVATE faf_sim_settings)
-target_compile_definitions(faf_sim_math_tests PRIVATE FAF_SIM_MATH_SUBSET=1)
+# The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
+# them on faf_engine: every golden case, the pathfinder's and the random stream's too.
+add_executable(faf_sim_math_tests "${PROJECT_SOURCE_DIR}/tests/sim_math/SimMathTests.cpp")
+target_link_libraries(faf_sim_math_tests PRIVATE faf_sim)
 set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
 if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
   list(APPEND _faf_sim_math_args --known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")

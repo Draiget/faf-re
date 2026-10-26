@@ -1,7 +1,9 @@
 #include "replay/ReplayFpuReport.h"
 
+#if defined(_WIN32)
 #include <Windows.h>
 #include <TlHelp32.h>
+#endif
 
 #include <algorithm>
 #include <cstdio>
@@ -9,8 +11,18 @@
 #include <utility>
 #include <vector>
 
-// Engine addition, server mode: see ReplayFpuReport.h. Windows only (as faf-replay v1 is).
+// Engine addition, server mode: see ReplayFpuReport.h. The thread sampling is Windows only;
+// on Linux the report says so (plan WPL.9 covers the Linux threads' control words).
 
+#if !defined(_WIN32)
+namespace faf::replay
+{
+  std::string ReportThreadFloatingPointState(int, int)
+  {
+    return "thread floating-point sampling is not available on this platform\n";
+  }
+} // namespace faf::replay
+#else
 namespace faf::replay
 {
   namespace
@@ -113,3 +125,4 @@ namespace faf::replay
     return text;
   }
 } // namespace faf::replay
+#endif // _WIN32
