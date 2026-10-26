@@ -22,7 +22,10 @@
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
+#include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
+#include "remote/wire/Roster.h"
+#include "remote/wire/SessionTables.h"
 #include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
 
@@ -372,6 +375,7 @@ namespace
     {
       SEntityRecord record{};
       record.id = id;
+      record.tickCreated = mRng() % 4u == 0u ? 0u : mRng() % 100000u;
       record.blueprint = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 5000u;
       record.army = static_cast<std::uint8_t>(mRng() % 17u == 16u ? 0xFFu : mRng() % 16u);
       record.position = {Axis(kCodec.position.x), Axis(kCodec.position.y), Axis(kCodec.position.z)};
@@ -380,10 +384,27 @@ namespace
         for (std::int32_t& component : record.velocity) {
           component = mRng() % 3u == 0u ? 0 : static_cast<std::int32_t>(mRng() % 2001u) - 1000;
         }
+        record.verticalAcceleration = mRng() % 4u == 0u ? static_cast<std::int32_t>(mRng() % 201u) - 100 : 0;
+        record.followsGround = mRng() % 3u == 0u;
         record.anchorBeat = mBeat;
+      }
+      if (mRng() % 16u == 0u) {
+        // Off the quantiser's range: exact floats, no motion.
+        record.farPosition = true;
+        record.farValue = {RandomFloat(), RandomFloat(), RandomFloat()};
+        record.position = {};
+        record.velocity = {};
+        record.verticalAcceleration = 0;
+        record.anchorBeat = 0;
+        record.followsGround = false;
       }
       record.yawOnly = (mRng() & 1u) != 0u;
       record.orientation = record.yawOnly ? (mRng() & 0xFFFFu) : static_cast<std::uint32_t>(mRng());
+      if (mDeadReckoning && record.yawOnly) {
+        // Turning or not, anchored this frame or earlier.
+        record.yawRate = mRng() % 2u == 0u ? 0 : static_cast<std::int32_t>(mRng() % 4001u) - 2000;
+        record.orientationBeat = mBeat - std::min<std::uint32_t>(mBeat, mRng() % 50u);
+      }
       record.health = RandomFloat();
       record.maxHealth = RandomFloat();
       record.fractionComplete = RandomFloat();
@@ -399,8 +420,44 @@ namespace
           count = static_cast<std::uint16_t>(mRng());
         }
         record.unit.unitFlags = static_cast<std::uint8_t>(mRng());
+        record.unit.buildStateTag = static_cast<std::uint8_t>(mRng());
+        record.unit.fake = static_cast<std::uint8_t>(mRng() & 1u);
+        record.unit.stats = TSharedValue<std::vector<SUnitStat>>(RandomStats());
+        if (mRng() % 2u == 0u) {
+          record.unit.detail = TSharedValue<SUnitDetail>(RandomDetail());
+        }
+      }
+      // Appearance: mostly defaults (a creation then sends none of it), sometimes anything.
+      if (mRng() % 3u == 0u) {
+        RandomAppearance(record.appearance, mRng());
       }
       return record;
+    }
+
+    void RandomAppearance(SAppearance& look, const std::uint32_t fields)
+    {
+      if ((fields & 1u) != 0u) look.mesh = mRng() % 4u == 0u ? COrdinalTable::kNone : mRng() % 3000u;
+      if ((fields & 2u) != 0u) look.scale = {RandomFloat(), RandomFloat(), RandomFloat()};
+      if ((fields & 4u) != 0u) {
+        look.attachParent = mRng() % 2u == 0u ? SAppearance::kNoAttachParent : static_cast<std::uint32_t>(mRng());
+        look.attachments.resize(mRng() % 4u == 0u ? mRng() % (SAppearance::kMaxAttachments + 1u) : 0u);
+        for (std::uint32_t& id : look.attachments) {
+          id = static_cast<std::uint32_t>(mRng());
+        }
+      }
+      if ((fields & 8u) != 0u) look.visualFlags = static_cast<std::uint8_t>(mRng() & 0x1Fu);
+      if ((fields & 16u) != 0u) look.impact = RandomFloat();
+      if ((fields & 32u) != 0u) look.scroll = {RandomFloat(), RandomFloat(), RandomFloat(), RandomFloat()};
+      if ((fields & 64u) != 0u) {
+        for (std::uint32_t& radius : look.intel) {
+          radius = mRng() % 2u == 0u ? 0u : static_cast<std::uint32_t>(mRng());
+        }
+      }
+      if ((fields & 128u) != 0u) {
+        look.ambientSound = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 500u;
+        look.rumbleSound = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 500u;
+      }
+      if ((fields & 256u) != 0u) look.underlay = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 50u;
     }
 
     void Mutate(SEntityRecord& record)
@@ -412,16 +469,25 @@ namespace
       if ((fields & kFieldPosition) != 0u) {
         record.position = fresh.position;
         record.velocity = fresh.velocity;
+        record.verticalAcceleration = fresh.verticalAcceleration;
+        record.followsGround = fresh.followsGround;
         record.anchorBeat = fresh.anchorBeat;
+        record.farPosition = fresh.farPosition;
+        record.farValue = fresh.farValue;
       }
       if ((fields & kFieldOrientation) != 0u) {
         record.orientation = fresh.orientation;
         record.yawOnly = fresh.yawOnly;
+        record.yawRate = fresh.yawRate;
+        record.orientationBeat = fresh.orientationBeat;
       }
       if ((fields & kFieldHealth) != 0u) record.health = fresh.health;
       if ((fields & kFieldMaxHealth) != 0u) record.maxHealth = fresh.maxHealth;
       if ((fields & kFieldFraction) != 0u) record.fractionComplete = fresh.fractionComplete;
       if ((fields & kFieldFlags) != 0u) record.flags = fresh.flags;
+      if (mRng() % 4u == 0u) {
+        RandomAppearance(record.appearance, mRng());
+      }
       // A kind change is rare in the sim (an entity is a unit for life); flip it now and then.
       if ((fields & kFieldKind) != 0u && mRng() % 8u == 0u) {
         record.isUnit = fresh.isUnit;
@@ -437,7 +503,100 @@ namespace
         if ((fields & kFieldUnitScriptBits) != 0u) unit.scriptBits = source.scriptBits;
         if ((fields & kFieldUnitSilos) != 0u) unit.siloCounts = source.siloCounts;
         if ((fields & kFieldUnitFlags) != 0u) unit.unitFlags = source.unitFlags;
+        if (mRng() % 5u == 0u) unit.stats = source.stats;
+        if (mRng() % 4u == 0u) {
+          const SUnitDetail fresh = RandomDetail();
+          switch (mRng() % 4u) {
+          case 0: unit.detail.Edit().commands = fresh.commands; break;
+          case 1: unit.detail.Edit().weapons = fresh.weapons; break;
+          case 2: unit.detail.Edit().attributes = fresh.attributes; break;
+          default: unit.detail.Edit().focusUnit = fresh.focusUnit; unit.detail.Edit().economy = fresh.economy; break;
+          }
+        }
       }
+    }
+
+    SCategoryBits RandomCategories()
+    {
+      SCategoryBits bits;
+      bits.firstWord = mRng() % 8u;
+      bits.words.resize(mRng() % 5u);
+      for (std::uint32_t& word : bits.words) {
+        word = static_cast<std::uint32_t>(mRng());
+      }
+      return bits;
+    }
+
+    SUnitDetail RandomDetail()
+    {
+      SUnitDetail detail;
+      detail.creator = static_cast<std::uint32_t>(mRng());
+      detail.creationTick = static_cast<std::int32_t>(mRng());
+      detail.stunTicks = static_cast<std::int32_t>(mRng() % 50u) - 10;
+      detail.jobType = static_cast<std::int32_t>(mRng() % 8u);
+      detail.fireState = static_cast<std::int32_t>(mRng() % 3u);
+      detail.siloMaxStorage = {static_cast<std::int32_t>(mRng() % 5u), -1};
+      detail.selectionInheritor = static_cast<std::uint32_t>(mRng());
+      detail.customName = mRng() % 3u == 0u ? 0xFFFFFFFFu : mRng() % 100u;
+      detail.focusUnit = static_cast<std::uint32_t>(mRng());
+      detail.guardedUnit = mRng() % 2u == 0u ? 0xF0000000u : static_cast<std::uint32_t>(mRng());
+      detail.targetBlip = static_cast<std::uint32_t>(mRng());
+      detail.didRefresh = static_cast<std::uint8_t>(mRng() & 1u);
+      detail.reconFlags = static_cast<std::int32_t>(mRng());
+      for (float& value : detail.economy) {
+        value = RandomFloat();
+      }
+      detail.commands.resize(mRng() % 6u);
+      for (std::int32_t& id : detail.commands) {
+        id = static_cast<std::int32_t>(mRng());
+      }
+      detail.buildQueue.resize(mRng() % 4u);
+      for (std::int32_t& id : detail.buildQueue) {
+        id = static_cast<std::int32_t>(mRng() % 1000u);
+      }
+      detail.weapons.resize(mRng() % 3u);
+      for (SUnitWeapon& weapon : detail.weapons) {
+        weapon.targets = RandomCategories();
+        weapon.secondary = RandomCategories();
+        weapon.layer = mRng() % 128u;
+        weapon.minRadius = RandomFloat();
+        weapon.maxRadius = RandomFloat();
+        weapon.effectiveRadius = RandomFloat();
+        weapon.minRangeVisual = mRng() % 3u == 0u ? 0xFFFFFFFFu : mRng() % 50u;
+        weapon.maxRangeVisual = mRng() % 50u;
+      }
+      SUnitAttributes& attributes = detail.attributes;
+      attributes.blueprint = mRng() % 4u == 0u ? 0xFFFFFFFFu : mRng() % 5000u;
+      attributes.reserved04 = mRng() % 2u;
+      attributes.restriction = RandomCategories();
+      for (float& value : attributes.scalars) {
+        value = RandomFloat();
+      }
+      attributes.commandCaps = static_cast<std::uint32_t>(mRng());
+      attributes.toggleCaps = static_cast<std::uint32_t>(mRng());
+      attributes.flags = {static_cast<std::uint8_t>(mRng() & 1u), static_cast<std::uint8_t>(mRng() & 1u), 0, 0};
+      return detail;
+    }
+
+    std::vector<SUnitStat> RandomStats()
+    {
+      std::vector<SUnitStat> stats;
+      std::uint32_t name = mRng() % 5u;
+      const int count = static_cast<int>(mRng() % 6u);
+      for (int i = 0; i < count; ++i) {
+        SUnitStat stat{};
+        stat.name = name;
+        name += 1u + mRng() % 40u;
+        stat.type = static_cast<std::uint8_t>(mRng() % 4u);
+        stat.realtime = (mRng() & 1u) != 0u;
+        if (stat.type == SUnitStat::kString) {
+          stat.text = mRng() % 4u == 0u ? 0xFFFFFFFFu : mRng() % 100u;
+        } else {
+          stat.bits = static_cast<std::uint32_t>(mRng());
+        }
+        stats.push_back(stat);
+      }
+      return stats;
     }
 
     SUnitFields RandomRecordUnit()
@@ -457,7 +616,7 @@ namespace
     std::vector<SEntityRecord> mLive;
   };
 
-  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true};
+  const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true, 0, true, true};
 
   [[nodiscard]] std::vector<std::uint8_t> Encode(
     const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec = kCodec
@@ -562,22 +721,52 @@ namespace
     future.entities[0].anchorBeat = 51;
     BitWriter futureWriter;
     CHECK(!EncodeFrame(future, nullptr, kDeadReckoningCodec, futureWriter));
+    SViewFrame falling{};
+    falling.beat = 50;
+    falling.entities.resize(1);
+    falling.entities[0].verticalAcceleration = -3;
+    BitWriter fallingWriter;
+    CHECK(!EncodeFrame(falling, nullptr, kCodec, fallingWriter));
+    // A turn rate needs orientation reckoning and a yaw-only record; its anchor not in the future.
+    SViewFrame turning{};
+    turning.beat = 50;
+    turning.entities.resize(1);
+    turning.entities[0].yawOnly = true;
+    turning.entities[0].yawRate = 40;
+    turning.entities[0].orientationBeat = 49;
+    BitWriter turningWriter;
+    CHECK(!EncodeFrame(turning, nullptr, kCodec, turningWriter));
+    CHECK(EncodeFrame(turning, nullptr, kDeadReckoningCodec, turningWriter));
+    SViewFrame tumbling = turning;
+    tumbling.entities[0].yawOnly = false;
+    BitWriter tumblingWriter;
+    CHECK(!EncodeFrame(tumbling, nullptr, kDeadReckoningCodec, tumblingWriter));
+    SViewFrame early = turning;
+    early.entities[0].orientationBeat = 51;
+    BitWriter earlyWriter;
+    CHECK(!EncodeFrame(early, nullptr, kDeadReckoningCodec, earlyWriter));
   }
 
   void TestDeadReckoningRules()
   {
     const SFrameCodec& codec = kDeadReckoningCodec;
-    constexpr std::uint32_t kTolerance = 2;
+    SReckoningScheme scheme{};
+    scheme.tolerance = 2;
     SEntityRecord sent{};
     sent.position = {1000, 500, 1000};
     sent.anchorBeat = 0;
     QuantizedPosition previous = sent.position;
+    const auto apply = [&](SEntityRecord& record, const QuantizedPosition& last, const QuantizedPosition& now,
+                           const std::uint32_t beat) {
+      const QuantizedPosition pair[2] = {last, now};
+      return ApplyDeadReckoning(record, pair, beat, scheme, codec);
+    };
 
     // Starts moving at 5 steps per beat on x: one re-anchor, then the prediction holds.
     int anchors = 0;
     for (std::uint32_t beat = 1; beat <= 20; ++beat) {
       const QuantizedPosition actual{1000 + 5 * beat, 500, 1000};
-      anchors += ApplyDeadReckoning(sent, actual, previous, beat, kTolerance, codec) ? 1 : 0;
+      anchors += apply(sent, previous, actual, beat) ? 1 : 0;
       CHECK(PredictPosition(sent, beat, codec) == actual);
       previous = actual;
     }
@@ -586,13 +775,74 @@ namespace
 
     // Stops: the prediction runs ahead, the next beat re-anchors with zero velocity.
     const QuantizedPosition stopped{1100, 500, 1000};
-    CHECK(ApplyDeadReckoning(sent, stopped, previous, 21, kTolerance, codec));
+    CHECK(apply(sent, previous, stopped, 21));
     CHECK(sent.velocity == (std::array<std::int32_t, 3>{0, 0, 0}) && sent.position == stopped);
-    CHECK(!ApplyDeadReckoning(sent, stopped, stopped, 22, kTolerance, codec));
+    CHECK(!apply(sent, stopped, stopped, 22));
 
     // Small drift within the tolerance does not re-anchor.
     const QuantizedPosition drift{1102, 498, 1001};
-    CHECK(!ApplyDeadReckoning(sent, drift, stopped, 23, kTolerance, codec));
+    CHECK(!apply(sent, stopped, drift, 23));
+
+    // WP7.8: a speed between whole steps (0.3 units a beat, 19.2 steps), fitted over 8 beats in
+    // 1/16 steps, re-anchors far less often than the last beat's whole-step motion.
+    SFrameCodec fine = codec;
+    fine.velocityFractionBits = 4;
+    const auto quantised = [](const double x, const double y, const double z) {
+      return QuantizedPosition{
+        static_cast<std::uint32_t>(std::lround(x)), static_cast<std::uint32_t>(std::lround(y)),
+        static_cast<std::uint32_t>(std::lround(z))
+      };
+    };
+    const auto anchorsOver = [&](const SReckoningScheme& use, const SFrameCodec& useCodec, const auto& path) {
+      SEntityRecord record{};
+      record.position = path(0);
+      std::vector<QuantizedPosition> history{path(0)};
+      int count = 0;
+      for (std::uint32_t beat = 1; beat <= 200; ++beat) {
+        history.push_back(path(beat));
+        const std::size_t keep = std::min<std::size_t>(history.size(), kReckoningHistory);
+        count += ApplyDeadReckoning(
+                   record, std::span<const QuantizedPosition>(history.data() + history.size() - keep, keep), beat, use,
+                   useCodec
+                 )
+                 ? 1
+                 : 0;
+        const QuantizedPosition shown = PredictPosition(record, beat, useCodec);
+        for (int axis = 0; axis < 3; ++axis) {
+          const std::int64_t error = static_cast<std::int64_t>(shown[axis]) - static_cast<std::int64_t>(history.back()[axis]);
+          CHECK(error <= use.tolerance && -error <= use.tolerance);
+        }
+      }
+      return count;
+    };
+    const auto cruise = [&](const std::uint32_t beat) { return quantised(1000.0 + 19.2 * beat, 500.0, 2000.0 - 7.7 * beat); };
+    SReckoningScheme fitted = scheme;
+    fitted.window = 8;
+    const int wholeSteps = anchorsOver(scheme, codec, cruise);
+    const int subSteps = anchorsOver(fitted, fine, cruise);
+    CHECK(subSteps * 4 < wholeSteps);
+    std::printf("  dead reckoning anchors over 200 beats: whole %d, fitted %d\n", wholeSteps, subSteps);
+
+    // A ballistic arc (gravity on the vertical axis): the bent fit holds it, a straight one not.
+    const auto arc = [quantised](const std::uint32_t beat) {
+      const double t = beat;
+      return quantised(1000.0 + 30.0 * t, 20000.0 + 150.0 * t - 3.1 * t * t, 3000.0);
+    };
+    SReckoningScheme bent = fitted;
+    bent.verticalAcceleration = true;
+    const int straightArc = anchorsOver(fitted, fine, [&](const std::uint32_t beat) { return arc(beat % 90u); });
+    const int bentArc = anchorsOver(bent, fine, [&](const std::uint32_t beat) { return arc(beat % 90u); });
+    std::printf("  ballistic arc anchors: straight %d, bent %d\n", straightArc, bentArc);
+    CHECK(bentArc * 4 < straightArc);
+
+    // Sub-step predictions round half up, the same on every axis and direction.
+    SEntityRecord back{};
+    back.position = {5000, 5000, 5000};
+    back.velocity = {-24, 24, 0}; // 1.5 steps a beat
+    CHECK(PredictPosition(back, 1, fine) == (QuantizedPosition{4999, 5002, 5000}));
+    CHECK(PredictPosition(back, 2, fine) == (QuantizedPosition{4997, 5003, 5000}));
+    back.verticalAcceleration = -16; // a step a beat squared: 1.5 t - t^2 / 2
+    CHECK(PredictPosition(back, 4, fine) == (QuantizedPosition{4994, 4998, 5000}));
 
     // Predictions clamp to the axes.
     SEntityRecord edge{};
@@ -600,6 +850,157 @@ namespace
     edge.velocity = {-10, -10, 10};
     const QuantizedPosition clamped = PredictPosition(edge, 5, codec);
     CHECK(clamped[0] == 0u && clamped[1] == 0u && clamped[2] == codec.position.z.MaxQuantized());
+
+    // Ground following: a unit crossing a hill (height sin(x / 20) * 8) at a steady speed. Its
+    // height is anything but linear, so a straight fit re-anchors over and over; following the
+    // terrain it re-anchors about as often as on flat ground.
+    struct SHill final : IGroundHeight
+    {
+      [[nodiscard]] float HeightAt(const float x, const float) const noexcept override
+      {
+        return 20.0f + 8.0f * std::sin(x / 20.0f);
+      }
+    } hill;
+    SFrameCodec onHill = fine;
+    onHill.groundFollowing = true;
+    onHill.ground = &hill;
+    const auto overHill = [&](const std::uint32_t beat) {
+      const float x = 100.0f + 0.3f * static_cast<float>(beat);
+      const float z = 200.0f;
+      return QuantizedPosition{
+        onHill.position.x.Encode(x), onHill.position.y.Encode(hill.HeightAt(x, z)), onHill.position.z.Encode(z)
+      };
+    };
+    SReckoningScheme ground = fitted;
+    ground.followGround = true;
+    const int straightHill = anchorsOver(fitted, onHill, overHill);
+    const int groundHill = anchorsOver(ground, onHill, overHill);
+    std::printf("  hill anchors over 200 beats: straight %d, following the ground %d\n", straightHill, groundHill);
+    CHECK(groundHill * 3 < straightHill);
+
+    // Orientation: a steady turn of 100.3 yaw units a beat through the wrap at a full turn, held
+    // within 64 units (0.35 degrees) by a fitted rate; re-anchored far less than every beat.
+    SReckoningScheme turns = fitted;
+    turns.orientationTolerance = 64;
+    SEntityRecord turner{};
+    turner.yawOnly = true;
+    turner.orientation = 65000;
+    turner.orientationBeat = 0;
+    std::vector<std::uint32_t> yaws{65000};
+    int turnAnchors = 0;
+    for (std::uint32_t beat = 1; beat <= 200; ++beat) {
+      SEntityRecord actual{};
+      actual.yawOnly = true;
+      actual.orientation = static_cast<std::uint32_t>(std::lround(65000.0 + 100.3 * beat)) & 0xFFFFu;
+      yaws.push_back(actual.orientation);
+      const std::size_t keep = std::min<std::size_t>(yaws.size(), kReckoningHistory);
+      turnAnchors += ApplyOrientationReckoning(
+                       turner, actual, std::span<const std::uint32_t>(yaws.data() + yaws.size() - keep, keep), beat, turns,
+                       fine
+                     )
+                     ? 1
+                     : 0;
+      const auto error = static_cast<std::int16_t>(static_cast<std::uint16_t>(actual.orientation - PredictYaw(turner, beat, fine)));
+      CHECK(error <= 64 && error >= -64);
+    }
+    std::printf("  turn anchors over 200 beats: %d\n", turnAnchors);
+    CHECK(turnAnchors <= 10);
+
+    // A quaternion is held while within the tolerance and sent again past it; a change between
+    // yaw-only and not is always sent.
+    SEntityRecord tilted{};
+    tilted.orientation = PackQuaternion({0.1f, 0.0f, 0.0f, 0.995f});
+    SEntityRecord near = tilted;
+    near.orientation = PackQuaternion({0.1003f, 0.0f, 0.0f, 0.99496f});
+    SEntityRecord far = tilted;
+    far.orientation = PackQuaternion({0.2f, 0.0f, 0.0f, 0.9798f});
+    SEntityRecord held = tilted;
+    CHECK(!ApplyOrientationReckoning(held, near, {}, 5, turns, fine) && held.orientation == tilted.orientation);
+    CHECK(ApplyOrientationReckoning(held, far, {}, 6, turns, fine) && held.orientation == far.orientation);
+    SEntityRecord flat{};
+    flat.yawOnly = true;
+    flat.orientation = 1000;
+    const std::uint32_t flatYaw[1] = {1000};
+    CHECK(ApplyOrientationReckoning(held, flat, flatYaw, 7, turns, fine) && held.yawOnly && held.yawRate == 0
+          && held.orientationBeat == 7u);
+  }
+
+  void TestFrameAppearance()
+  {
+    // A creation with the default appearance sends none of it; each non-default field costs
+    // its own bytes and comes back exactly.
+    SViewFrame plain{};
+    plain.frameId = 1;
+    plain.entities.resize(1);
+    plain.entities[0].id = 7;
+    CHECK(CreationFields(plain.entities[0]) == (kEntityFields | kFieldKind));
+    const std::vector<std::uint8_t> plainBytes = Encode(plain, nullptr);
+
+    SViewFrame dressed = plain;
+    SAppearance& look = dressed.entities[0].appearance;
+    look.mesh = 1234;
+    look.scale = {2.0f, 0.5f, -0.0f};
+    look.attachParent = 0x00100005u;
+    look.attachments = {0x00100006u, 0x00100009u};
+    look.visualFlags = 0x15u;
+    look.impact = 0.25f;
+    look.scroll = {0.0f, 1.0f, 2.0f, 3.0f};
+    look.intel = {20, 0, 60, 0, 0, 0, 0, 1};
+    look.ambientSound = 0;
+    look.rumbleSound = 7;
+    look.underlay = 3;
+    CHECK(CreationFields(dressed.entities[0]) == (kEntityFields | kFieldKind | kAppearanceFields));
+    const std::vector<std::uint8_t> dressedBytes = Encode(dressed, nullptr);
+    CHECK(dressedBytes.size() > plainBytes.size() + 40u);
+    SViewFrame decoded{};
+    CHECK(Decode(dressedBytes, nullptr, decoded) && decoded == dressed);
+
+    // A change of one appearance field sends that field alone.
+    SViewFrame moved = dressed;
+    moved.frameId = 2;
+    moved.entities[0].appearance.scale[0] = 3.0f;
+    CHECK(ChangedFields(dressed.entities[0], moved.entities[0]) == kFieldScale);
+    const std::vector<std::uint8_t> movedBytes = Encode(moved, &dressed);
+    CHECK(Decode(movedBytes, &dressed, decoded) && decoded == moved);
+
+    // A texture scroll that shifts (new start = old end) costs one bit and the end; any other
+    // change of the scroll sends all four floats.
+    SViewFrame shifted = moved;
+    shifted.frameId = 3;
+    shifted.entities[0].appearance.scroll = {moved.entities[0].appearance.scroll[2], moved.entities[0].appearance.scroll[3], 5.0f, 6.0f};
+    SViewFrame jumped = moved;
+    jumped.frameId = 3;
+    jumped.entities[0].appearance.scroll = {7.0f, 8.0f, 5.0f, 6.0f};
+    const std::vector<std::uint8_t> shiftedBytes = Encode(shifted, &moved);
+    const std::vector<std::uint8_t> jumpedBytes = Encode(jumped, &moved);
+    CHECK(shiftedBytes.size() + 8u == jumpedBytes.size());
+    CHECK(Decode(shiftedBytes, &moved, decoded) && decoded == shifted);
+    CHECK(Decode(jumpedBytes, &moved, decoded) && decoded == jumped);
+
+    // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
+    for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
+      BitWriter writer;
+      writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
+      writer.WriteBits(1u, 32);
+      writer.WriteBits(kNoBaseline, 32);
+      writer.WriteBits(0u, 32);
+      writer.WriteVarUint(0u);
+      writer.WriteVarUint(1u);
+      writer.WriteVarUint(7u);
+      writer.WriteVarUint(mask);
+      writer.WriteBool(false); // not a unit
+      for (int i = 0; i < 40; ++i) {
+        writer.WriteBits(0u, 32);
+      }
+      CHECK(!Decode(Bytes(writer), nullptr, decoded));
+    }
+
+    // Too many attachments are refused.
+    SViewFrame crowded = plain;
+    crowded.entities[0].appearance.attachments.resize(SAppearance::kMaxAttachments + 1u);
+    BitWriter crowdedWriter;
+    CHECK(EncodeFrame(crowded, nullptr, kCodec, crowdedWriter));
+    CHECK(!Decode(Bytes(crowdedWriter), nullptr, decoded));
   }
 
   void TestFrameUnchangedIsSmall()
@@ -773,9 +1174,11 @@ namespace
     dup.WriteVarUint(0u);
     dup.WriteVarUint(1u);
     dup.WriteVarUint(10u);
-    // every field of a non-unit, in the encoder's order: kind, position, orientation,
+    dup.WriteVarUint(kEntityFields | kFieldKind); // a creation's mask: no unit block, default appearance
+    // every field of a non-unit, in the encoder's order: kind, position (far bit first), orientation,
     // health, fraction, flags, max health, blueprint, army
     dup.WriteBool(false);
+    dup.WriteBool(false); // position in the quantiser's range
     dup.WriteBits(0u, kCodec.position.x.bits);
     dup.WriteBits(0u, kCodec.position.y.bits);
     dup.WriteBits(0u, kCodec.position.z.bits);
@@ -810,6 +1213,200 @@ namespace
   }
 
   // --- Sound table ------------------------------------------------------------------------
+
+  void TestSessionTables()
+  {
+    // Sounds (with the RPC loop variable) and names, interned once, written as one record per
+    // batch, read back in order on the other side.
+    CSessionTableWriters server;
+    CSessionTableReaders client;
+    const SSoundEntry loop{"UEL_Unit", "UEL0001_Move_Loop", "UnitMove_LodCutoff", "UEL0001_Move_Loop"};
+    const SSoundEntry plain{"Explosions", "Explosion_Small", "", ""};
+    CHECK(server.Sound(loop) == 0u && server.Sound(plain) == 1u && server.Sound(loop) == 0u);
+    CHECK(server.Name("/textures/ui/common/game/strategicicons/icon_land_rest.dds") == 0u);
+    CHECK(server.HasPending());
+    BitWriter first;
+    server.WritePending(first);
+    CHECK(!server.HasPending());
+    const std::vector<std::uint8_t> firstBytes = Bytes(first);
+    BitReader firstIn(firstBytes);
+    CHECK(client.Read(firstIn));
+    CHECK(client.Sounds().Size() == 2u && client.Sounds().Find(0) != nullptr && *client.Sounds().Find(0) == loop);
+    CHECK(client.Names().Size() == 1u && *client.Names().Find(0) == "/textures/ui/common/game/strategicicons/icon_land_rest.dds");
+
+    // A second batch adds only what is new; an empty batch is four zero counts.
+    CHECK(server.Name("/textures/ui/common/game/strategicicons/icon_land_rest.dds") == 0u);
+    CHECK(server.Name("/a.dds") == 1u);
+    BitWriter second;
+    server.WritePending(second);
+    const std::vector<std::uint8_t> secondBytes = Bytes(second);
+    BitReader secondIn(secondBytes);
+    CHECK(client.Read(secondIn) && client.Names().Size() == 2u && client.Sounds().Size() == 2u);
+    BitWriter empty;
+    server.WritePending(empty);
+    CHECK(Bytes(empty).size() == 4u);
+
+    // Resource deposits: each one once, in order, across records; negative cells survive.
+    const SDeposit mass{1, 10, 12, 12, 14};
+    const SDeposit hydro{2, -3, 500, 1, 504};
+    CHECK(server.Deposit(mass) && server.Deposit(hydro) && server.DepositCount() == 2u && server.HasPending());
+    BitWriter third;
+    server.WritePending(third);
+    const std::vector<std::uint8_t> thirdBytes = Bytes(third);
+    BitReader thirdIn(thirdBytes);
+    CHECK(client.Read(thirdIn) && client.Deposits() == (std::vector<SDeposit>{mass, hydro}));
+    CHECK(server.Deposit(mass) && server.DepositCount() == 3u);
+    BitWriter fourth;
+    server.WritePending(fourth);
+    const std::vector<std::uint8_t> fourthBytes = Bytes(fourth);
+    BitReader fourthIn(fourthBytes);
+    CHECK(client.Read(fourthIn) && client.Deposits().size() == 3u && client.Deposits()[2] == mass);
+    for (std::size_t length = 0; length < thirdBytes.size(); ++length) {
+      CSessionTableReaders cut;
+      BitReader cutIn(std::span<const std::uint8_t>(thirdBytes.data(), length));
+      CHECK(!cut.Read(cutIn));
+    }
+    // More deposits than a session may have are refused before any is read.
+    BitWriter flood;
+    flood.WriteVarUint(0u);
+    flood.WriteVarUint(0u);
+    flood.WriteVarUint(CSessionTableWriters::kMaxDeposits + 1u);
+    const std::vector<std::uint8_t> floodBytes = Bytes(flood);
+    CSessionTableReaders flooded;
+    BitReader floodIn(floodBytes);
+    CHECK(!flooded.Read(floodIn) && flooded.Deposits().empty());
+
+    // Terrain edits: rectangles and heights come back exactly, once; a flat edit costs about a
+    // byte a cell; an edit outside the field carries its rectangle alone.
+    STerrainEdit flat{};
+    flat.dirty = {9, 19, 13, 23};
+    flat.cells = {10, 20, 13, 23};
+    flat.heights.assign(16, 4321);
+    flat.heights[5] = 65535;
+    STerrainEdit outside{};
+    outside.dirty = {2000, 2000, 2004, 2004};
+    outside.cells = {0, 0, -1, -1};
+    CHECK(server.TerrainEdit(flat) && server.TerrainEdit(outside));
+    STerrainEdit wrong = flat;
+    wrong.heights.pop_back();
+    CHECK(!server.TerrainEdit(wrong));
+    BitWriter fifth;
+    server.WritePending(fifth);
+    const std::vector<std::uint8_t> fifthBytes = Bytes(fifth);
+    CHECK(fifthBytes.size() < 60u);
+    BitReader fifthIn(fifthBytes);
+    CHECK(client.Read(fifthIn));
+    const std::vector<STerrainEdit> taken = client.TakeTerrainEdits();
+    CHECK(taken.size() == 2u && taken[0] == flat && taken[1] == outside);
+    CHECK(client.TakeTerrainEdits().empty());
+    for (std::size_t length = 0; length < fifthBytes.size(); ++length) {
+      CSessionTableReaders cut;
+      BitReader cutIn(std::span<const std::uint8_t>(fifthBytes.data(), length));
+      CHECK(!cut.Read(cutIn));
+    }
+    // A height out of range and an edit larger than allowed are refused.
+    BitWriter tall;
+    tall.WriteVarUint(0u);
+    tall.WriteVarUint(0u);
+    tall.WriteVarUint(0u);
+    tall.WriteVarUint(1u);
+    for (int i = 0; i < 4; ++i) {
+      tall.WriteVarUint(0u);
+    }
+    tall.WriteBool(true);
+    for (int i = 0; i < 4; ++i) {
+      tall.WriteVarUint(0u);
+    }
+    tall.WriteVarUint(2u * 70000u); // zig-zag of 70000
+    CSessionTableReaders tallReader;
+    const std::vector<std::uint8_t> tallBytes = Bytes(tall);
+    BitReader tallIn(tallBytes);
+    CHECK(!tallReader.Read(tallIn));
+    BitWriter huge;
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(1u);
+    for (int i = 0; i < 4; ++i) {
+      huge.WriteVarUint(0u);
+    }
+    huge.WriteBool(true);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(0u);
+    huge.WriteVarUint(2u * 4000u);
+    huge.WriteVarUint(2u * 4000u);
+    CSessionTableReaders hugeReader;
+    const std::vector<std::uint8_t> hugeBytes = Bytes(huge);
+    BitReader hugeIn(hugeBytes);
+    CHECK(!hugeReader.Read(hugeIn));
+
+    // The same record twice is refused (ids out of order); truncation everywhere is refused.
+    CSessionTableReaders again;
+    BitReader againIn(firstBytes);
+    CHECK(again.Read(againIn));
+    BitReader repeatIn(firstBytes);
+    CHECK(!again.Read(repeatIn));
+    for (std::size_t length = 0; length < firstBytes.size(); ++length) {
+      CSessionTableReaders cut;
+      BitReader cutIn(std::span<const std::uint8_t>(firstBytes.data(), length));
+      CHECK(!cut.Read(cutIn));
+    }
+    // An oversized name.
+    BitWriter big;
+    big.WriteVarUint(0u);
+    big.WriteVarUint(1u);
+    big.WriteVarUint(0u);
+    big.WriteVarUint(static_cast<std::uint32_t>(CNameTableReader::kMaxNameBytes + 1u));
+    for (std::size_t i = 0; i <= CNameTableReader::kMaxNameBytes; ++i) {
+      big.WriteBits('x', 8);
+    }
+    CSessionTableReaders bigReader;
+    const std::vector<std::uint8_t> bigBytes = Bytes(big);
+    BitReader bigIn(bigBytes);
+    CHECK(!bigReader.Read(bigIn) && bigReader.Names().Size() == 0u);
+  }
+
+  void TestRoster()
+  {
+    // Every field comes back; truncation anywhere and hostile counts are refused.
+    SRoster roster{};
+    roster.localIndex = 1;
+    SRosterEntry host{};
+    host.index = 0;
+    host.name = "Host";
+    host.ownerId = 12345;
+    host.sources = {0, 2};
+    host.simRate = 3;
+    host.ping = 41.5f;
+    host.quiet = 0.25f;
+    SRosterEntry joiner = host;
+    joiner.index = 1;
+    joiner.name = "Joiner";
+    joiner.ownerId = -7;
+    joiner.sources = {1};
+    joiner.connected = false;
+    joiner.ejectedBy = {0};
+    roster.entries = {host, joiner};
+    BitWriter writer;
+    roster.Encode(writer);
+    const std::vector<std::uint8_t> bytes = Bytes(writer);
+    BitReader reader(bytes);
+    const std::optional<SRoster> back = SRoster::Decode(reader);
+    CHECK(back && *back == roster);
+    for (std::size_t length = 0; length < bytes.size(); ++length) {
+      BitReader cut(std::span<const std::uint8_t>(bytes.data(), length));
+      CHECK(!SRoster::Decode(cut));
+    }
+    BitWriter many;
+    many.WriteVarUint(0u);
+    many.WriteVarUint(static_cast<std::uint32_t>(SRoster::kMaxEntries + 1u));
+    const std::vector<std::uint8_t> manyBytes = Bytes(many);
+    BitReader manyIn(manyBytes);
+    CHECK(!SRoster::Decode(manyIn));
+    SRoster other = roster;
+    other.entries[0].ping = 42.0f;
+    CHECK(!(other == roster));
+  }
 
   void TestSoundTable()
   {
@@ -905,6 +1502,8 @@ namespace
 
   const TestCase kTests[] = {
     {"sounds: session table", &TestSoundTable},
+    {"roster: round trip and refusals", &TestRoster},
+    {"session tables: sounds and names", &TestSessionTables},
     {"bits: round trip", &TestBitStreamRoundTrip},
     {"bits: overrun", &TestBitStreamOverrun},
     {"bits: malformed varuint", &TestBitStreamMalformedVarUint},
@@ -922,6 +1521,7 @@ namespace
     {"frame: truncation", &TestDecoderTruncation},
     {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
     {"frame: hostile counts and ids", &TestDecoderHostileCounts},
+    {"frame: appearance block", &TestFrameAppearance},
   };
 } // namespace
 

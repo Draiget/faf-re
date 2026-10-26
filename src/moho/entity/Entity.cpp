@@ -1,4 +1,7 @@
 #include "Entity.h"
+#if FAF_SERVER_MODE
+#include "remote/UnderlayPaths.h"
+#endif
 #include "platform/Interlocked.h"
 
 #include <utility>
@@ -1922,6 +1925,9 @@ namespace moho
    */
   Entity::~Entity()
   {
+#if FAF_SERVER_MODE
+    faf::remote::ForgetUnderlayPath(static_cast<std::uint32_t>(id_));
+#endif
     if (SimulationRef != nullptr && SimulationRef->mEntityDB != nullptr) {
       (void)SimulationRef->mEntityDB->ReleaseId(static_cast<std::uint32_t>(id_));
     }
@@ -4002,6 +4008,9 @@ namespace moho
   {
     if (underlayId.name.empty()) {
       mVarDat.mUnderlayTexture.reset();
+#if FAF_SERVER_MODE
+      faf::remote::SetUnderlayPath(static_cast<std::uint32_t>(id_), std::string());
+#endif
       return;
     }
 
@@ -4018,6 +4027,10 @@ namespace moho
     // (CD3DBatchTexture.h sBatchTextureFromFile); without a client there is none.
     mVarDat.mUnderlayTexture =
       sBatchTextureFromFile != nullptr ? sBatchTextureFromFile(underlayPath.c_str(), 0u) : boost::shared_ptr<CD3DBatchTexture>{};
+#if FAF_SERVER_MODE
+    // Engine addition, server mode: the path, for the frames (remote/UnderlayPaths.h).
+    faf::remote::SetUnderlayPath(static_cast<std::uint32_t>(id_), underlayPath);
+#endif
 
     ListLinkBefore(&SimulationRef->mCoordEntities);
   }

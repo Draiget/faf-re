@@ -83,6 +83,25 @@ namespace faf::replay
       return value.IsNil() ? "nil" : "<other>";
     }
 
+    /** As `Canonical`, but in the tables' own iteration order (what the serialiser writes). */
+    [[nodiscard]] std::string Ordered(const LuaPlus::LuaObject& value, const int depth = 0)
+    {
+      if (depth > 32) {
+        return "<deep>";
+      }
+      if (value.IsTable()) {
+        std::string text = "{";
+        LuaPlus::LuaObject table = value;
+        LuaPlus::LuaTableIterator it(&table, 1);
+        while (!it.m_isDone) {
+          text += Ordered(it.GetKey(), depth + 1) + "=" + Ordered(it.GetValue(), depth + 1) + ",";
+          it.Next();
+        }
+        return text + "}";
+      }
+      return Canonical(value, depth);
+    }
+
     struct SParticipant
     {
       std::int32_t uid = 0;
@@ -213,6 +232,17 @@ namespace faf::replay
         }
         if (Canonical(FromString(a, state)) == Canonical(FromString(b, state))) {
           ++result.orderOnly;
+          if (std::getenv("FAF_LAUNCHCHECK_VERBOSE") != nullptr) {
+            const std::string x = Ordered(FromString(a, state));
+            const std::string y = Ordered(FromString(b, state));
+            std::size_t at = 0;
+            while (at < x.size() && at < y.size() && x[at] == y[at]) {
+              ++at;
+            }
+            const std::size_t from = at > 80 ? at - 80 : 0;
+            result.report += std::string(path) + ": " + name + " key order: recorded ..." + x.substr(from, 240)
+                           + "\n    built    ..." + y.substr(from, 240) + "\n";
+          }
           return;
         }
         differ(gpg::STR_Printf("%s differs in content (%zu vs %zu bytes)", name, a.size(), b.size()).c_str());
@@ -280,7 +310,7 @@ namespace faf::replay
     }
   } // namespace
 
-  SLaunchCheckResult RunLaunchCheck(const std::string& replayPath)
+  SLaunchCheckResult RunLaunchCheck(const std::string& replayPath, const std::string& expectPath)
   {
     SLaunchCheckResult result;
     msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(replayPath.c_str());
@@ -289,13 +319,27 @@ namespace faf::replay
       result.error = "cannot read the replay's header";
       return result;
     }
-    const moho::LaunchInfoNew& recorded = *sessionInfo->mLaunchInfo->GetNew();
+    const moho::LaunchInfoNew& source = *sessionInfo->mLaunchInfo->GetNew();
+    // The header compared with: the same replay's, or another client's of the same game (a
+    // joiner builds its launch from tables it rebuilt from the host's config bytes, which is
+    // what this check does with the host's header).
+    msvc8::auto_ptr<moho::SWldSessionInfo> expectInfo;
+    if (!expectPath.empty()) {
+      expectInfo = moho::VCR_SetupReplaySession(expectPath.c_str());
+      if (expectInfo.get() == nullptr || expectInfo->mLaunchInfo.get() == nullptr
+          || expectInfo->mLaunchInfo->GetNew() == nullptr) {
+        result.error = "cannot read the expected replay's header";
+        return result;
+      }
+    }
+    const moho::SWldSessionInfo& expectSession = expectInfo.get() != nullptr ? *expectInfo : *sessionInfo;
+    const moho::LaunchInfoNew& recorded = *expectSession.mLaunchInfo->GetNew();
     LuaPlus::LuaState* const state = ReplayLuaState();
     try {
       // The lobby's order (command-source order, the order peers were assigned), then the
       // reverse, as another roster would list them: the launch must not depend on it.
       for (const bool reversed : {false, true}) {
-        const SRebuiltConfig config = RebuildConfig(recorded, state);
+        const SRebuiltConfig config = RebuildConfig(source, state);
         std::vector<SParticipant> order = config.participants;
         if (reversed) {
           std::reverse(order.begin(), order.end());
@@ -305,7 +349,7 @@ namespace faf::replay
           result.error = std::string("launch failed: '") + build.failure + "'";
           return result;
         }
-        Compare(reversed ? "server order" : "lobby order", recorded, sessionInfo->mMapName, build, state, result);
+        Compare(reversed ? "server order" : "lobby order", recorded, expectSession.mMapName, build, state, result);
       }
     } catch (const std::exception& error) {
       result.error = error.what();

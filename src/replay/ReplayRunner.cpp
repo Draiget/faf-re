@@ -1,5 +1,8 @@
 #include "replay/ReplayRunner.h"
 #include "replay/ReplayLuaState.h"
+#include "replay/ReplaySyncWriters.h"
+
+#include "remote/client/LoopbackLink.h"
 
 #include <Windows.h>
 
@@ -39,6 +42,7 @@
 #include "remote/ContentTables.h"
 #include "replay/ReplayBoneStats.h"
 #include "replay/ReplayFpuReport.h"
+#include "replay/ReplayCommandCheck.h"
 #include "replay/ReplayWireStats.h"
 
 namespace faf::replay
@@ -402,22 +406,6 @@ namespace faf::replay
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
     std::unique_ptr<moho::CWldMap> wldMap(gameData.mWldMap);
 
-    // Plan WPL.16: the blueprints in the order the rules loaded them (their ordinals), to
-    // compare between platforms.
-    if (!options.blueprintOrderPath.empty()) {
-      std::FILE* orderFile = nullptr;
-      if (fopen_s(&orderFile, options.blueprintOrderPath.c_str(), "w") != 0 || orderFile == nullptr) {
-        result.error = "cannot write " + options.blueprintOrderPath;
-        return result;
-      }
-      int ordinal = 0;
-      for (; const moho::RBlueprint* const blueprint = rules->GetBlueprintFromOrdinal(ordinal); ++ordinal) {
-        std::fprintf(orderFile, "%d %s\n", ordinal, blueprint->mBlueprintId.c_str());
-      }
-      std::fclose(orderFile);
-      std::printf("[%s] blueprint order: %d blueprints written to %s\n", label, ordinal, options.blueprintOrderPath.c_str());
-    }
-
     // The wire format's content tables (plan WP7.2), as a server or client builds them at load.
     const faf::remote::wire::SContentTables tables = faf::remote::BuildContentTables(*rules);
     {
@@ -456,6 +444,20 @@ namespace faf::replay
     moho::sim_LeadOnSchedule = 0;
     if (options.replayLead >= 0) {
       moho::sim_ReplayLead = options.replayLead;
+    }
+
+    // `--sync-writers`: the Sync write recorder goes in before the sim (and its scripts) exist.
+    CSyncWriters syncWriters;
+    const bool attributeSyncWrites = !options.syncWritersPath.empty();
+    if (attributeSyncWrites) {
+      syncWriters.Enable();
+    }
+
+    // `--command-check`: watches the sim's decoder from its first message.
+    std::unique_ptr<CReplayCommandCheck> commandCheck;
+    if (options.commandCheck) {
+      commandCheck = std::make_unique<CReplayCommandCheck>(*rules);
+      commandCheck->Install();
     }
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
@@ -508,6 +510,24 @@ namespace faf::replay
         result.error = "cannot write " + options.wireStatsPath;
         return result;
       }
+    }
+
+    // `--loopback`: every packet through the wire format and the client's rebuild, after the
+    // consumers above have seen the sim's own packet.
+    std::unique_ptr<faf::remote::client::CLoopbackLink> loopback;
+    // The remote client's client manager, answering from the roster the link sends (WP11.4).
+    std::unique_ptr<faf::remote::client::CRemoteClientManager> rosterFacade;
+    if (options.loopback) {
+      faf::remote::client::SLoopbackOptions loopbackOptions{};
+      loopbackOptions.deadReckoningTolerance = static_cast<std::uint32_t>(options.loopbackDeadReckoning);
+      loopbackOptions.orientationTolerance = static_cast<std::uint32_t>(options.loopbackTurnTolerance);
+      loopback = std::make_unique<faf::remote::client::CLoopbackLink>(
+        *rules,
+        faf::remote::client::MakeLoopbackCodec(
+          mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, loopbackOptions
+        ),
+        loopbackOptions
+      );
     }
 
     LuaPlus::LuaState* const syncState = ReplayLuaState();
@@ -596,6 +616,15 @@ namespace faf::replay
         if (packet->mGameOver) {
           result.gameOver = true;
         }
+        if (loopback) {
+          loopback->Pass(*packet);
+          if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
+            if (!rosterFacade) {
+              rosterFacade = std::make_unique<faf::remote::client::CRemoteClientManager>(nullptr, standIn);
+            }
+            loopback->PassRoster(*standIn, *rosterFacade);
+          }
+        }
 
         if (!result.started) {
           // `WLD_DoInitializing`: the first beat is applied, then this client declares itself
@@ -639,6 +668,17 @@ namespace faf::replay
     }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
+    }
+    if (attributeSyncWrites) {
+      result.syncWritersSummary = syncWriters.Write(options.syncWritersPath);
+    }
+    if (loopback) {
+      result.loopbackSummary = loopback->Summary("end");
+      result.loopbackFailures = loopback->CheckFailures();
+    }
+    if (commandCheck) {
+      result.commandSummary = commandCheck->Summary();
+      result.commandFailures = commandCheck->Failures();
     }
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;

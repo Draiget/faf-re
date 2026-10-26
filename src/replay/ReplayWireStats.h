@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -19,6 +20,7 @@
 
 namespace moho
 {
+  class CHeightField;
   struct SSyncData;
 }
 
@@ -60,15 +62,22 @@ namespace faf::replay
     std::uint64_t mDeltaBytesNoUnits = 0;
     std::uint64_t mYawOnlyRecords = 0;
     std::uint64_t mUnitRecords = 0;
-    /** The same frames dead-reckoned (WP7.5) at one tolerance, with their own state and baseline. */
+    /** The same frames dead-reckoned with one scheme, with their own codec, state and baseline. */
     struct SDeadReckoningVariant
     {
+      const char* name;
+      faf::remote::wire::SFrameCodec codec;
       faf::remote::CDeadReckoner reckoner;
       faf::remote::wire::SViewFrame previous;
       std::uint64_t bytes = 0;
     };
-    SDeadReckoningVariant mDeadReckoning[2]{{faf::remote::CDeadReckoner(4)}, {faf::remote::CDeadReckoner(16)}}; // 1/16, 1/4 unit
-    faf::remote::wire::SFrameCodec mDeadReckoningCodec;
+    /**
+     * WP7.5's at 4 and 16 steps (1/16, 1/4 unit), then WP7.8's fits: sub-steps over a window of
+     * 8 beats, with and without the bent vertical fit.
+     */
+    std::vector<SDeadReckoningVariant> mDeadReckoning;
+
+    faf::remote::CHeightFieldGround mGround; // the sim's terrain, for ground following (WP7.8)
 
     /** Bits of changed records by field class, summed over the run (creations and ids apart). */
     struct SFieldBits
@@ -78,10 +87,17 @@ namespace faf::replay
       std::uint64_t scalars = 0;    // health, max health, build progress
       std::uint64_t flags = 0;      // entity flags, kind, blueprint, army
       std::uint64_t unit = 0;       // unit block
+      /** Appearance block: mesh, scale, attachments, visual flags, impact, scroll, intel radii. */
+      std::array<std::uint64_t, 7> appearance{};
+      /** Unit block beyond the basics: stats tree, constants, detail ids, economy, queues, weapons, attributes. */
+      std::array<std::uint64_t, 7> unitParts{};
       std::uint64_t overhead = 0;   // id gaps and masks of changed records
       std::uint64_t creations = 0;  // whole created records with their ids
       std::uint64_t removals = 0;   // removed ids
     } mFieldBits;
+    std::array<std::uint64_t, 7> mCreationAppearanceBits{}; // the appearance part of `creations`
+    std::uint64_t mEconomyChanges = 0;       // changed records with an economy change
+    std::uint64_t mEconomyFloatsChanged = 0; // of their six floats, how many changed in all
     bool mHavePrevious = false;
 
     std::uint64_t mBeats = 0;

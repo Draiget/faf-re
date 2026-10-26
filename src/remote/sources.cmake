@@ -8,16 +8,23 @@
 
 set(FAF_REMOTE_SOURCES
   remote/FrameBuilder.cpp
+  remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
+  remote/wire/NameTable.cpp
   remote/wire/OrdinalTable.cpp
   remote/wire/Quantize.cpp
+  remote/wire/Roster.cpp
+  remote/wire/SessionTables.cpp
   remote/wire/SoundTable.cpp
   remote/wire/WireVersion.cpp
 )
 
 set(FAF_REMOTE_CLIENT_SOURCES
+  remote/client/LoopbackCommands.cpp
+  remote/client/LoopbackLink.cpp
+  remote/client/RemoteClientManager.cpp
   remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp
   remote/client/SessionSummary.cpp

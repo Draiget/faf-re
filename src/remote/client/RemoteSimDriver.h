@@ -1,14 +1,17 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <optional>
 
 #include "moho/sim/ISTIDriver.h"
 #include "Wm3AxisAlignedBox3.h"
-#include "remote/FrameBuilder.h"
-#include "remote/client/SyncRebuilder.h"
-#include "remote/wire/EntityFrame.h"
-#include "remote/wire/OrdinalTable.h"
+#include "legacy/containers/AutoPtr.h"
+#include "moho/misc/CDecoder.h"
+#include "remote/client/LockstepDriver.h"
+#include "remote/client/LoopbackCommands.h"
+#include "remote/client/LoopbackLink.h"
+#include "remote/client/RemoteClientManager.h"
 
 // Engine addition, server mode (plan WP11): the client's remote driver, in its first,
 // in-process loopback form. It owns the session's lockstep driver as its "server": each sync
@@ -17,23 +20,25 @@
 // `DoBeat` sees it, so the session runs on what the entities lane carried. Lanes the wire
 // format does not carry yet pass through from the server's packet (SyncRebuilder.h).
 //
-// Every command and session request still goes to the owned driver; the network form replaces
-// that driver with the server connection (WP11.1, WP10). Only `/loopback` builds this driver
-// (`WrapForLoopback`); without it a session is the lockstep one, unchanged.
+// Commands (driver slots 17-35) go as the messages a networked client sends: `CMarshaller`
+// builds each one for `CRemoteClientManager`, the stand-in server decodes it with `CDecoder`
+// and `CLoopbackCommandIntake` hands it to the owned driver (WP11.1). Session requests still go
+// to the owned driver directly; the network form replaces it with the server connection
+// (WP10). Only `/loopback` builds this driver (`WrapForLoopback`); without it a session is the
+// lockstep one, unchanged.
 
 namespace moho
 {
   class RRuleGameRules;
 }
 
+namespace LuaPlus
+{
+  class LuaState;
+}
+
 namespace faf::remote::client
 {
-  struct SLoopbackOptions
-  {
-    /** Dead-reckoning tolerance in quantiser steps (1/64 unit); 0: off. */
-    std::uint32_t deadReckoningTolerance = 0;
-  };
-
   class CRemoteSimDriver final : public moho::ISTIDriver
   {
   public:
@@ -96,25 +101,41 @@ namespace faf::remote::client
     void DrawNetworkStats(moho::CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY)
       override;
 
+    /** The lockstep driver standing in for the server. */
+    [[nodiscard]] moho::ISTIDriver* Server() const noexcept { return mServer.get(); }
+
   private:
     /** One beat through the wire: server encode, client decode and rebuild. */
     void PassThroughWire(moho::SSyncData& packet);
     void LogSummary(const char* when) const;
+    /** Marshals one command (`send` calls `mMarshaller`) through to the server; its cookie. */
+    template <class Send>
+    moho::CmdId SendCommand(Send&& send);
 
     std::unique_ptr<moho::ISTIDriver> mServer;
-    wire::SContentTables mTables;
-    wire::SFrameCodec mCodec;
-    CViewFrameBuilder mBuilder;
-    std::optional<CDeadReckoner> mReckoner;
-    wire::SViewFrame mLastSent;
-    bool mHasSent = false;
-    std::uint64_t mEncodeFailures = 0;
-    std::uint64_t mRebuildFailures = 0;
-    double mServerSeconds = 0.0; // building and encoding frames
-    double mClientSeconds = 0.0; // decoding and rebuilding packets
-    double mMaxBeatSeconds = 0.0;
-    CSyncRebuilder mRebuilder;
+    CLoopbackLink mLink;
+    // The command path (WP11.1): marshaller -> client manager -> the server's decoder -> intake.
+    CLoopbackCommandIntake mIntake;
+    std::unique_ptr<LuaPlus::LuaState> mCommandLua; // decodes the Lua payloads on the server end
+    msvc8::auto_ptr<gpg::Stream> mNoRecording;
+    moho::CDecoder mServerDecoder;
+    CRemoteClientManager mClientManager;
+    moho::CMarshaller mMarshaller;
+    std::uint64_t mCommandsSent = 0;
+    std::uint64_t mCommandsDropped = 0;
+    // Session requests (WP11.1).
+    /** Sends the cameras held back by the rate limit once their interval has passed. */
+    void FlushGeomCams(bool force);
+    SLoopbackOptions mOptions;
+    std::uint64_t mArmyRequests = 0;
+    std::uint64_t mArmyRefusals = 0;
+    msvc8::vector<moho::GeomCamera3> mPendingCams;
+    bool mHavePendingCams = false;
+    std::chrono::steady_clock::time_point mLastCamsSent{};
+    std::uint64_t mCamsReceived = 0;
+    std::uint64_t mCamsSent = 0;
   };
+
 
   /**
    * `/loopback` on the command line (and `/loopbackdr <steps>` for dead reckoning): wraps a new
