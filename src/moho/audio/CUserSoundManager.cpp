@@ -13,6 +13,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
+#include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
@@ -431,12 +432,17 @@ namespace
     } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
   }
 
-  [[nodiscard]] float ComputePitchRadians(const Wm3::Vec3f& value)
-  {
-    const float horizontal = std::sqrt((value.x * value.x) + (value.y * value.y));
-    return std::atan2(value.z, horizontal);
-  }
-
+  /**
+   * The cue's `Angle` variable: degrees between straight down from the
+   * listener and the emitter (0 = right under the camera, 90 = on the horizon).
+   *
+   * Both callers (0x008AA5C9 entity loops, 0x008AC63E one-shots) call
+   * `COORDS_Pitch` (0x0050B710) on `emitter - listener`, which reads Y as up.
+   * A local `atan2(z, hypot(x, y))` stood here and read Z as up, so the angle
+   * tracked how far north or south the sound was rather than its elevation:
+   * sounds south of the camera played as if right under it and on-screen
+   * sounds as if on the horizon (issue #23).
+   */
   [[nodiscard]] float ComputeCueAngleDegrees(const Wm3::Vec3f& worldPos, const Wm3::Vec3f& listenerPos)
   {
     const Wm3::Vec3f delta{
@@ -444,7 +450,7 @@ namespace
       worldPos.y - listenerPos.y,
       worldPos.z - listenerPos.z,
     };
-    return (kHalfPi - ComputePitchRadians(delta)) * kRadToDeg;
+    return (kHalfPi - moho::COORDS_Pitch(delta)) * kRadToDeg;
   }
 
   [[nodiscard]] moho::UserEntity*
