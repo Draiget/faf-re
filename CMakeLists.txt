@@ -96,15 +96,16 @@ if(FAF_ENABLE_TRACY)
     GIT_TAG        v0.14.1
     GIT_SHALLOW    TRUE
   )
-  FetchContent_GetProperties(tracy)
-  if(NOT tracy_POPULATED)
-    FetchContent_Populate(tracy)
-  endif()
-
-  add_library(TracyClient STATIC "${tracy_SOURCE_DIR}/public/TracyClient.cpp")
-  target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE TRACY_ON_DEMAND)
-  target_include_directories(TracyClient PUBLIC "${tracy_SOURCE_DIR}/public")
-  target_link_libraries(TracyClient PUBLIC faf_codegen ws2_32 dbghelp)
+  # Tracy's own CMake builds the TracyClient target. A static client that only
+  # collects while a profiler is connected.
+  set(TRACY_ENABLE ON)
+  set(TRACY_ON_DEMAND ON)
+  set(TRACY_STATIC ON)
+  FetchContent_MakeAvailable(tracy)
+  # faf_codegen's options, not a link to it: Tracy exports TracyClient, and an
+  # export cannot reference faf_codegen.
+  target_compile_options(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_OPTIONS>)
+  target_compile_definitions(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_DEFINITIONS>)
 endif()
 
 # --- Engine -----------------------------------------------------------------------------
