@@ -198,7 +198,7 @@ namespace moho
     "Periodic forced Lua GC interval in sim ticks (0 = disabled, dynamic Lua threshold).",
     "DoSimCommand sim_GCPeriod"
   );
-  TSimConVar<int> gSimConVar_sim_GCPeriod(false, "sim_GCPeriod", 0);
+  TSimConVar<int> gSimConVar_sim_GCPeriod(false, "sim_GCPeriod", 70);
 
   /**
    * Address: 0x00BDBD50 (FUN_00BDBD50, dynamic initializer for `gConAlias_sim_DebugCrash`)
