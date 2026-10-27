@@ -1101,7 +1101,13 @@ void CScApp::Main()
     if (fixedFrameSeconds > 0.0f) {
       frameSeconds = fixedFrameSeconds;
     } else {
-      frameSeconds = static_cast<float>(curTime.ElapsedMilliseconds() * 0.001);
+      float elapsed = curTime.ElapsedMilliseconds();
+      if (moho::sc_FrameTimeClamp > elapsed)
+      {
+        moho::WIN_SetWakeupTimer(moho::sc_FrameTimeClamp - elapsed);
+        return;
+      }
+      frameSeconds = static_cast<float>(elapsed * 0.001);
     }
 
     curTime.Reset();
