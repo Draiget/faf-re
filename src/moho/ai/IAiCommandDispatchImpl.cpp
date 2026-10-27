@@ -706,9 +706,13 @@ namespace
             target->mVarDat.mMaxHealth > target->mVarDat.mHealth) {
           CUnitSacrificeTask::Create(dispatch, target);
         } else if (target->IsUnitState(UNITSTATE_Building)) {
-          if (Entity* const focusEntity = target->GetFocusEntity();
-              focusEntity != nullptr && static_cast<std::uint32_t>(focusEntity->id_) != 0) {
-            CUnitSacrificeTask::Create(dispatch, target);
+          // A builder that is done but busy hands the sacrifice on to the unit
+          // it is building (0x00609A50-0x00609A9C: GetFocusEntity()->IsUnit()
+          // is the task's recipient, not the builder).
+          if (Entity* const focusEntity = target->GetFocusEntity(); focusEntity != nullptr) {
+            if (Unit* const focusUnit = focusEntity->IsUnit(); focusUnit != nullptr) {
+              CUnitSacrificeTask::Create(dispatch, focusUnit);
+            }
           }
         }
         return;
