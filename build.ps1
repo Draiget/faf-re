@@ -33,9 +33,10 @@ param(
   # Build with Tracy profiler enabled (shortcut for -Configuration Profile).
   [switch]$Profile,
 
-  # Exe name in the run folder, without .exe (default main_x64 / main). Use another name to
-  # keep the current build alongside, e.g. -Name main_x64_test. With -Arch both it gets a
-  # _x86 suffix for the x86 copy unless it already differs per architecture.
+  # Exe name in the run folder, without .exe (default main_x64 / main; main_x64_profile /
+  # main_profile for a Profile build, so it never replaces the exe the FAF client launches).
+  # Use another name to keep the current build alongside, e.g. -Name main_x64_test. With
+  # -Arch both it gets a _x86 suffix for the x86 copy unless it already differs per architecture.
   [string]$Name,
 
   # FAF data folder that holds bin\ and bin_x64\.
@@ -67,6 +68,16 @@ $targets = @{
   x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     RunDir = 'bin' }
 }
 $archs = if ($Arch -eq 'both') { @('x64', 'x86') } else { @($Arch) }
+
+# The exe name in the run folder.
+function Get-RunName([string]$a, [hashtable]$t) {
+  if ($Name) {
+    if ($archs.Count -gt 1 -and $a -eq 'x86') { return "${Name}_x86" }
+    return $Name
+  }
+  if ($Configuration -eq 'Profile') { return "$($t.Exe)_profile" }
+  return $t.Exe
+}
 
 # cmake and ninja from PATH, else the copies Visual Studio 2022 ships with its CMake support.
 function Find-CMake {
@@ -147,12 +158,7 @@ foreach ($a in $archs) {
   if (-not $NoBuild) { Invoke-Build $t }
   if ($NoCopy) { continue }
 
-  $exeName = $t.Exe
-  if ($Name) {
-    $exeName = $Name
-    if ($archs.Count -gt 1 -and $a -eq 'x86') { $exeName = "${Name}_x86" }
-  }
-  Copy-Build $t (Join-Path $FafDir $t.RunDir) $exeName
+  Copy-Build $t (Join-Path $FafDir $t.RunDir) (Get-RunName $a $t)
   if ($Out) { Copy-Build $t (Join-Path $repo "out\$a") $t.Exe }
 }
 
@@ -160,7 +166,7 @@ Write-Host ''
 foreach ($a in $archs) {
   $t = $targets[$a]
   if ($NoCopy) { break }
-  $exeName = if ($Name) { if ($archs.Count -gt 1 -and $a -eq 'x86') { "${Name}_x86" } else { $Name } } else { $t.Exe }
+  $exeName = Get-RunName $a $t
   Write-Host "Run ($a):" -ForegroundColor Cyan
   Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"
   Write-Host "  .\$exeName.exe /init init_faf.lua /nobugreport /log $(Join-Path $FafDir "logs\$exeName.log")"
