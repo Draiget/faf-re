@@ -20845,7 +20845,9 @@ int32_t LuaStackObject::GetInteger() const
 	if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
 		TypeError("integer");
 	}
-	return static_cast<int32_t>(lua_tonumber(cState, m_stackIndex));
+	// 0x0041B553: tail call to `__ftol2_sse`, so NaN reads as 0x80000000 --
+	// `WaitTicks(NaN)` is then a negative tick count and ends the thread.
+	return msvc8::TruncateToInt(lua_tonumber(cState, m_stackIndex));
 }
 
 /**

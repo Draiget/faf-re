@@ -12,6 +12,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/exceptions/StdExcept.h"
+#include "legacy/math/X87Math.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityId.h"
 #include "moho/math/GridPos.h"
@@ -769,11 +770,14 @@ namespace moho
    *
    * What it does:
    * Sets the projectile expiration tick to `mCurTick + round(seconds * 10.0f)`;
-   * 0x0069DEA1 converts with `fistp` (round-to-nearest), not truncation.
+   * 0x0069DEA1 converts with `fistp` (round-to-nearest), not truncation. A NaN
+   * lifetime -- a tactical missile's glide time after its speed dropped to 0 --
+   * stores the integer indefinite 0x80000000, so the projectile expires about
+   * 2^31 ticks later instead of on the next tick.
    */
   void Projectile::SetLifetime(const float lifetimeSeconds)
   {
-    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(std::lrintf(lifetimeSeconds * 10.0f));
+    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(msvc8::RoundToInt(lifetimeSeconds * 10.0f));
     mLifetimeEnd = SimulationRef->mCurTick + lifetimeTicks;
   }
 

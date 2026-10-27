@@ -12,6 +12,13 @@ namespace msvc8
    */
   [[nodiscard]] std::int32_t RoundToInt(float value) noexcept;
   /**
+   * The MSVC8 CRT's `__ftol2_sse` (0x00A89CC0, `cvttsd2si eax`): truncation
+   * toward zero, and the integer indefinite 0x80000000 for NaN or a value
+   * outside the int32 range. A plain cast on x64 can convert through a 64-bit
+   * `cvttss2si` and keep the low half, which turns NaN into 0.
+   */
+  [[nodiscard]] std::int32_t TruncateToInt(float value) noexcept;
+  /**
    * `factor * word` exactly as the shipped engine forms it from a Mersenne
    * Twister word under 24-bit x87 precision control (e.g. CRandomStream::FRand,
    * 0x0051B5C0): `fild` loads the word exactly - a word at or above 2^31 loads
