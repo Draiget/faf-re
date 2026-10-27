@@ -2056,8 +2056,12 @@ namespace moho
       return true;
     }
 
+    // `comiss 0, sideP2; jbe` (0x00477AFE): only an ordered `sideP2 < 0` is a
+    // crossing. A NaN end point -- the diagonal split of a line running
+    // exactly along x == z divides by zero -- is a miss, not a hit on the
+    // unbounded line far past the segment.
     const float sideP2 = PlaneSide(p2, normal, planeDistance);
-    if (sideP2 >= 0.0f) {
+    if (!(sideP2 < 0.0f)) {
       return false;
     }
 
@@ -2114,8 +2118,10 @@ namespace moho
       return true;
     }
 
+    // `comiss 0, sideP2; jbe` (0x00477D90): a NaN end point is a miss, as in
+    // DoIntersectionLL.
     const float sideP2 = PlaneSide(p2, normal, planeDistance);
-    if (sideP2 >= 0.0f) {
+    if (!(sideP2 < 0.0f)) {
       return false;
     }
 
@@ -3784,12 +3790,16 @@ namespace moho
       return false;
     }
 
-    if ((dest.layers & (LAYER_Land | LAYER_Seabed)) != 0 &&
-        grid.terrainOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, false)) {
+    // 0x00720F23..0x00720F55: the static path tests the footprint through
+    // GetRectNeg (FUN_00720580, `GetRectOr(..., true)`), so a footprint that
+    // reaches the occupancy grid's last row or column counts as occupied.
+    const gpg::Rect2i footprintRect{
+      footprintX0, footprintZ0, footprintX0 + footprintWidth, footprintZ0 + footprintHeight
+    };
+    if ((dest.layers & (LAYER_Land | LAYER_Seabed)) != 0 && grid.terrainOccupation.GetRectNeg(footprintRect)) {
       dest.layers &= ~(LAYER_Land | LAYER_Seabed);
     }
-    if ((dest.layers & LAYER_Water) != 0 &&
-        grid.waterOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, false)) {
+    if ((dest.layers & LAYER_Water) != 0 && grid.waterOccupation.GetRectNeg(footprintRect)) {
       dest.layers &= ~LAYER_Water;
     }
     return dest.layers != LAYER_None;
