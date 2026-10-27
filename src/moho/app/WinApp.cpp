@@ -1718,12 +1718,15 @@ namespace
    * inside those calls, and its paint can take the message `Pending` saw; `GetMessage` then slept
    * until the next input, the frame loop with it. This takes the message without waiting and hands
    * it to the same `wxApp::DoMessage` filter (accelerators, dialog navigation) the original uses.
-   * wx is built ANSI, hence the A functions.
+   * wx is built Unicode and `DoMessage` dispatches with `DispatchMessageW`, so the message must be
+   * taken with `PeekMessageW` too (the original imports only the W pump functions). `PeekMessageA`
+   * turns a typed WM_CHAR into its code-page byte, which the W dispatch then reads as a UTF-16
+   * code unit: Cyrillic "П" (0xCF in 1251) reached the edit box as "Ï" (U+00CF).
    */
   void DispatchPendingMessage()
   {
     MSG message{};
-    if (::PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
+    if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
       return;
     }
     if (message.message == WM_QUIT) {
