@@ -1594,22 +1594,19 @@ namespace moho
       }
     }
 
-    // The alliance change can flip what every unit of this army is visible to,
-    // so re-queue each owned unit into the Sim coord-dirty list to have its
-    // visibility recomputed next tick. The binary (0x006FDF6C-0x006FDFF0) walks
-    // EntityDB::mAllUnits and relinks every unit whose ArmyRef == this at the
-    // front of Sim::mCoordEntities; the army-keyed range yields exactly those
-    // units in the same order.
-    const std::uint32_t armyIndex = static_cast<std::uint32_t>(mConstDat.mArmyIndex);
-    CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
-    const CEntityDbAllUnitsNode* const endNode = Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
-    while (node != endNode) {
-      Unit* const unit = EntityDB::UnitFromAllUnitsNode(node);
-      if (unit == nullptr) {
-        break;
+    // The alliance change can flip what everything this army owns is visible
+    // to, so every entity of this army goes to the tail of the Sim coord-dirty
+    // list. The binary (0x006FDFD5-0x006FE07A) walks the whole of
+    // EntityDB::mAllUnits in id order and relinks each entry whose ArmyRef
+    // (+0x14C) is this army. That map also holds the recon blips (0x3xxxxxxx),
+    // owned by the army that sees them, so the army's blips follow its units.
+    // Walking only the army's unit-id range skipped them and reordered the
+    // dirty list, which the beat checksum hashes in order (replay 27049782,
+    // beat 200).
+    for (const auto& [entityId, entity] : Simulation->mEntityDB->mAllUnits) {
+      if (entity->ArmyRef == this) {
+        entity->ListLinkBefore(&Simulation->mCoordEntities);
       }
-      unit->ListLinkBefore(&Simulation->mCoordEntities);
-      node = EntityDB::NextAllUnitsNode(node);
     }
   }
 
