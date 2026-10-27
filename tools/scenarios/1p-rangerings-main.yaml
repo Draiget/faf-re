@@ -1,0 +1,38 @@
+name: 1p-rangerings-main
+description: >
+  Range-ring stencil overflow (FAF FA-Binary-Patches #149 and the outline loop), recovered x64
+  engine. Two UEF engineer clusters on Seton's Clutch with the Build Range overlay on: 128
+  stacked on one point and 200 in a tight spiral. The UI hook logs "RINGTEST SHOT <name>" for
+  each cluster with range_StencilFlush 1 and then 0; run range-rings\capture.ps1 alongside to
+  save the window at those lines. Setup: tools/scenarios/range-rings/map copied into the vault
+  as maps/faf_re_rangerings, with the faf_re_lockstep scmap and save hard-linked in as
+  faf_re_rangerings.scmap / faf_re_rangerings_save.lua; copy range-rings/init_rangerings.lua
+  into C:\ProgramData\FAForever\bin. The exe is a build copied into bin_x64 as
+  main_x64_rings.exe. Do not click into the game window.
+timeout: 5m
+
+mode: direct
+lobby: auto
+map: faf_re_rangerings
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64_rings.exe'
+  init: init_rangerings.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: RingTest, faction: uef, args: ['/title', 'rangerings-main'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 130s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'RINGTEST DONE' }

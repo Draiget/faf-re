@@ -28,6 +28,9 @@ namespace moho
 
   // NOT IN THE ORIGINAL BINARY - see the header. Additive, defaults off.
   bool range_RenderHoveredAttack = false;
+
+  // NOT IN THE ORIGINAL BINARY - FAF FA-Binary-Patches #149, see the header.
+  bool range_StencilFlush = true;
 } // namespace moho
 
 namespace
@@ -112,6 +115,19 @@ namespace
     "range_RenderHoveredAttack",
     kRangeConVarNoDescription,
     &moho::range_RenderHoveredAttack
+  );
+
+  /**
+   * NOT IN THE ORIGINAL BINARY - FAF FA-Binary-Patches #149, see the header.
+   * No console object for this exists in the shipped image, so there is no
+   * address to cite.
+   */
+  moho::TConVar<bool> gTConVar_range_StencilFlush(
+    "range_StencilFlush",
+    "Draw range rings 127 at a time with a stencil flush after each batch (1, the default), so 128 or more "
+    "overlapping rings merge cleanly. 0 keeps the original 1000-ring batches, which leave ring outlines inside "
+    "dense clusters and gaps in their outer outline.",
+    &moho::range_StencilFlush
   );
 
   /**

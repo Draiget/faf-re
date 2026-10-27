@@ -12546,9 +12546,9 @@ namespace moho
    *    `v148.playableRectX1` in the original binary - hovered units are
    *    excluded from all four runs below, matching the binary, but nothing
    *    collects or consumes that slot's own icon data yet).
-   *  - The formation-ghost pass ("TStrategicFormationIcon"): needs
-   *    `IFormationInstance::Contains`, not modelled yet - a separate,
-   *    already-tracked blocker (see the `CFormationInstance` split notes).
+   *
+   * The formation-preview icons ("TStrategicFormationIcon", 0x0085C3C2..
+   * 0x0085C859) draw in phase 3.75.
    */
   void CWldSession::RenderStrategicIcons(
     CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, const float tickFraction, const bool isMiniMap
@@ -13433,10 +13433,8 @@ namespace moho
       // (0x0085D9A0) under its own technique (0x0085B79D..0x0085BCCD in the
       // binary). This runs before the lifebar pass below, matching the
       // binary's own SetTexture/DrawQuad-then-Flush ordering (0x0085BBE9..
-      // 0x0085BCCD then Flush at 0x0085BFA9). The single dedicated "hovered
-      // unit" slot and the formation-ghost pass that follow this in the
-      // binary (`v148.playableRectX1` / "TStrategicFormationIcon") are still
-      // deferred - see the function comment.
+      // 0x0085BCCD then Flush at 0x0085BFA9). The formation-preview icons
+      // follow in phase 3.75.
       profilePhase.reset();
       profilePhase.emplace("IconDraw");
       (void)primBatcher->Setup("TStrategicIcon");
@@ -13513,6 +13511,67 @@ namespace moho
     }
 
     primBatcher->Flush();
+
+    // --- Phase 3.75: formation-preview icons (0x0085C3C2..0x0085C859) -------
+    // While a formation is being placed, every participant's strategic icon is
+    // drawn at the slot the formation assigned it, as a ghost under its own
+    // technique. The gates and the slot height are the ones
+    // `RenderMeshPreviews` uses for the matching mesh ghosts.
+    {
+      CFormation* const formation = mCurFormation;
+      // 0x0085C3E7 `comiss 0, mTimeLeft; jb`: only once the placement timer
+      // has run out.
+      if (formation->mReady && formation->mCurInstance != nullptr && formation->mTimeLeft <= 0.0f) {
+        (void)primBatcher->Setup("TStrategicFormationIcon");
+
+        // Same reinterpret_cast as `RenderMeshPreviews`: `Contains` (slot 16,
+        // 0x0085C4D9) and `GetFormationPosition` (slot 6, 0x0085C5C8) are
+        // declared on the concrete instance only.
+        CAiFormationInstance* const instance = reinterpret_cast<CAiFormationInstance*>(formation->mCurInstance);
+        for (UserUnit* const unit : formation->mParticipants) {
+          IUnit* const bridge = GetIUnitBridge(unit);
+          Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
+          // 0x0085C4E9..0x0085C51B is `GetAttachmentParent()` inlined.
+          if (bridge->IsDead() || !instance->Contains(formationUnit, false) || unit->GetAttachmentParent() != nullptr) {
+            continue;
+          }
+
+          UnitIconData iconData{};
+          iconData.mUnit = LookupEntityId(bridge->GetEntityId());
+          iconData.mBlueprint = bridge->GetBlueprint();
+          // +0x150 is the size word of `mStrategicIconName` (0x0085C5AC).
+          if (iconData.mBlueprint->mStrategicIconName.empty()) {
+            continue;
+          }
+
+          SCoordsVec2 slot{};
+          instance->GetFormationPosition(&slot, formationUnit, nullptr);
+          const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
+          iconData.mWorldX = slot.x;
+          iconData.mWorldY = (blueprint->mSizeY + GetSTIMap()->GetSurface(slot.x, slot.z)) + blueprint->Physics.Elevation;
+          iconData.mWorldZ = slot.z;
+
+          // The camera-distance test of the main pass, without its
+          // `GetMaxZoom() * 0.89` clamp (0x0085C6A1..0x0085C6E0).
+          const auto& lodRow = aux.mCamera->viewport.r[1];
+          const float zoom = ((iconData.mWorldZ * lodRow.z) + (iconData.mWorldY * lodRow.y)) +
+            (lodRow.x * iconData.mWorldX) + lodRow.w;
+          if (iconData.mUnit->mVariableData.mMeshBlueprint->mIconFadeInZoom > zoom) {
+            continue;
+          }
+
+          // Not selected, selected variant eligible, hovered (0x0085C6E6..0x0085C6EF):
+          // the ghosts show the highlighted icon.
+          iconData.mIconTexture = PickUnitStrategicIconTexture(aux, iconData, false, true, true);
+          if (iconData.mIconTexture) {
+            iconData.mIsFormationGhost = true;
+            RenderUnitIcon(iconData, aux);
+          }
+        }
+      }
+    }
+    primBatcher->Flush();
+
     profilePhase.reset();
     profilePhase.emplace("Lifebars");
 

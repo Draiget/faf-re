@@ -19,12 +19,14 @@ namespace moho
   // because its header-scope yaw constants would add dynamic initializers to
   // this translation unit.
   Wm3::Quaternionf* MatrixColumnsToQuatCanonical(const Wm3::Vector3f* matrixColumns, Wm3::Quaternionf* out) noexcept;
+
+  // Address: 0x00F58E4C (cam_DefaultLOD), defined in RCamManager.cpp.
+  extern float cam_DefaultLOD;
 }
 
 namespace
 {
   constexpr std::uint32_t kFrustumPlaneCount = 6;
-  constexpr float kDefaultLodScale = 1.0f;
   constexpr float kPerspectiveDefaultFovXRadians = 1.5707964f;
   constexpr float kPerspectiveDefaultFovYRadians = 1.5707964f;
   constexpr float kPerspectiveDefaultNearDepth = -10.0f;
@@ -351,7 +353,10 @@ namespace moho
     InitializeFrustumStorage(this);
     const VTransform identityTransform{};
     Init(identityTransform, VMatrix4::Identity());
-    SetLODScale(kDefaultLodScale);
+    // The seed is the live `cam_DefaultLOD` console variable (0x0046FF46
+    // `movss xmm0, [0x00F58E4C]`), which `SC_CameraScaleLOD` rewrites from the
+    // graphics-detail option (0.9 on High), not a fixed 1.0.
+    SetLODScale(cam_DefaultLOD);
   }
 
   /**
@@ -460,8 +465,12 @@ namespace moho
   {
     lodScale = value;
 
+    // Unlike `Init`, this rebuild folds the scale into r[2] as well:
+    // 0x00470BB8..0x00470BC4 multiply r[0] by the new scale before
+    // 0x00470BD8..0x00470BFC multiply by 1/r[3].z.
     const float reciprocalViewportDepth = 1.0f / viewport.r[3].z;
     viewport.r[2] = viewport.r[0];
+    viewport.r[2] *= lodScale;
     viewport.r[2] *= reciprocalViewportDepth;
 
     viewport.r[1] = viewport.r[0];
