@@ -190,8 +190,8 @@ namespace moho
 
   /**
    * Engine addition: controls periodic forced full Lua GC interval in sim ticks.
-   * Default: 0 (disabled), letting Lua manage GC threshold dynamically.
-   * Retail behavior was 70 ticks.
+   * Default: 70 (retail behavior to preserve lockstep determinism and avoid desync).
+   * Set to 0 to disable forced resets and let Lua manage GC threshold dynamically.
    */
   moho::CConAlias gConAlias_sim_GCPeriod(
     "sim_GCPeriod",
