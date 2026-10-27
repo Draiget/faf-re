@@ -2204,10 +2204,16 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     imaging::DecodeOptions options;
     options.format = DXGI_FORMAT_BC3_UNORM;
     options.mipLevels = 1U;
+    // Padded to whole blocks, not stretched over them: D3D9 converts with D3DX_FILTER_NONE.
+    options.filter = imaging::ResizeFilter::None;
     imaging::Image image;
     CheckHresult("DeviceD3D12.cpp", __LINE__, imaging::ImageCodec::Instance()->Decode(sourceData, sourceBytes, options, image));
-    *outWidth = image.width;
-    *outHeight = static_cast<int>(image.height);
+    // The file's size, as D3D9 reports it (0x008ECD20); `image` is padded to whole BC3 blocks.
+    std::uint32_t sourceHeight = 0U;
+    CheckHresult(
+      "DeviceD3D12.cpp", __LINE__, imaging::ImageCodec::Instance()->GetImageSize(sourceData, sourceBytes, *outWidth, sourceHeight)
+    );
+    *outHeight = static_cast<int>(sourceHeight);
     const imaging::Image::Subresource& top = image.subresources.front();
     const std::size_t requiredBytes = top.slicePitch;
     if (outTextureData->Size() != requiredBytes) {

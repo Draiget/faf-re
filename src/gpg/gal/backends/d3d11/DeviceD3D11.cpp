@@ -1415,6 +1415,10 @@ namespace gpg::gal
     loadInfo.Usage = D3D11_USAGE_STAGING;
     loadInfo.BindFlags = 0U;
     loadInfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
+    // Padded to whole blocks, not stretched over them: D3D9 converts with D3DX_FILTER_NONE.
+    loadInfo.Filter = D3DX11_FILTER_NONE;
+    D3DX11_IMAGE_INFO sourceInfo{};
+    loadInfo.pSrcInfo = &sourceInfo;
 
     ComPtr<ID3D11Resource> decoded;
     CheckHresult(
@@ -1424,10 +1428,13 @@ namespace gpg::gal
     ComPtr<ID3D11Texture2D> staging;
     CheckHresult("DeviceD3D11.cpp", __LINE__, decoded.As(&staging));
 
+    // The size is the file's, as D3D9 reports it (0x008ECD20). A BC3 texture
+    // is padded to a multiple of 4, so the desc of a 792x21 image says 792x24;
+    // the blocks below are copied at that padded size.
     D3D11_TEXTURE2D_DESC desc{};
     staging->GetDesc(&desc);
-    *outWidth = desc.Width;
-    *outHeight = static_cast<int>(desc.Height);
+    *outWidth = sourceInfo.Width;
+    *outHeight = static_cast<int>(sourceInfo.Height);
 
     D3D11_MAPPED_SUBRESOURCE mapped{};
     CheckHresult("DeviceD3D11.cpp", __LINE__, mDecodeContext->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped));

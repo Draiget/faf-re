@@ -49,6 +49,14 @@ namespace gpg::gal::imaging
     void Allocate(DXGI_FORMAT imageFormat, std::uint32_t imageWidth, std::uint32_t imageHeight, std::uint32_t levels, std::uint32_t slices);
   };
 
+  /** How D3DX fits the file into the decoded top level. */
+  enum class ResizeFilter : std::uint32_t
+  {
+    Default = 0, // D3DX11's default: an 18x18 image going to BC3 is stretched over 20x20
+    None = 1,    // D3DX11_FILTER_NONE: the image keeps its size, the rest is transparent black
+  };
+
+  // Hashed as raw bytes into the decode cache key: keep every field 4 bytes, so no padding.
   struct DecodeOptions
   {
     std::uint32_t skipMipLevels = 0;           // D3DX "first mip level"
@@ -56,6 +64,7 @@ namespace gpg::gal::imaging
     std::uint32_t width = 0;                   // 0: as the file
     std::uint32_t height = 0;
     std::uint32_t mipLevels = 0;               // 0: as the file
+    ResizeFilter filter = ResizeFilter::Default;
   };
 
   /** D3DX11_IMAGE_FILE_FORMAT values. */
@@ -100,6 +109,12 @@ namespace gpg::gal::imaging
 
     /** Decodes a texture file (DDS, PNG, BMP, JPG, TGA ...). */
     HRESULT Decode(const void* data, std::size_t bytes, const DecodeOptions& options, Image& outImage);
+
+    /**
+     * The file's own width and height. A block-compressed decode pads its top level to a
+     * multiple of 4 (a 792x21 image decodes as 792x24); this is the size before that.
+     */
+    HRESULT GetImageSize(const void* data, std::size_t bytes, std::uint32_t& outWidth, std::uint32_t& outHeight);
 
     /** How this thread's last Decode got its image (diagnostics: "direct", "cache", "d3dx", ...). */
     [[nodiscard]] static const char* LastDecodeRoute() noexcept;

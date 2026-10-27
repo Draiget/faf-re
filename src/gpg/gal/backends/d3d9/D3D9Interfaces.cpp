@@ -3222,8 +3222,12 @@ namespace gpg::gal
         D3DSURFACE_DESC sourceDesc;
         CheckD3DCall("DeviceD3D9.cpp", 785, [&] { return surface->GetDesc(&sourceDesc); });
 
-        *outWidth = sourceDesc.Width;
-        *outHeight = static_cast<int>(sourceDesc.Height);
+        // The size is the file's (D3DXIMAGE_INFO at [esp+0xA8], 0x008ECF58),
+        // not the surface's ([esp+0xC4], only read for Format). D3DX pads a
+        // DXT surface to a multiple of 4, so the surface of the 792x21 lobby
+        // slot is 792x24, and every bitmap built from it came out 3 px too tall.
+        *outWidth = sourceImageInfo.Width;
+        *outHeight = static_cast<int>(sourceImageInfo.Height);
 
         // Anything that is not already DXT5 is converted through a DXT5
         // system-memory copy, which then stands in for the source surface.
@@ -3232,7 +3236,7 @@ namespace gpg::gal
         {
             CheckD3DCall("DeviceD3D9.cpp", 801, [&] {
                 return mDevice->CreateTexture(
-                    AlignToDword(sourceDesc.Width), AlignToDword(sourceDesc.Height), 1U, 0U, D3DFMT_DXT5,
+                    AlignToDword(*outWidth), AlignToDword(static_cast<unsigned int>(*outHeight)), 1U, 0U, D3DFMT_DXT5,
                     D3DPOOL_SYSTEMMEM, &decodeTexture, nullptr
                 );
             });

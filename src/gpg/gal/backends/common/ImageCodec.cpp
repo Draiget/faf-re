@@ -573,6 +573,18 @@ namespace gpg::gal::imaging
     return result;
   }
 
+  HRESULT ImageCodec::GetImageSize(const void* const data, const std::size_t bytes, std::uint32_t& outWidth, std::uint32_t& outHeight)
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    D3DX11_IMAGE_INFO info{};
+    const HRESULT result = mState->getImageInfo(data, bytes, nullptr, &info, nullptr);
+    if (SUCCEEDED(result)) {
+      outWidth = info.Width;
+      outHeight = info.Height;
+    }
+    return result;
+  }
+
   HRESULT ImageCodec::DecodeWithD3dx(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
   {
     const std::lock_guard<std::mutex> lock(mMutex);
@@ -597,6 +609,9 @@ namespace gpg::gal::imaging
       }
       if (options.format != DXGI_FORMAT_UNKNOWN) {
         loadInfo.Format = options.format;
+      }
+      if (options.filter == ResizeFilter::None) {
+        loadInfo.Filter = D3DX11_FILTER_NONE;
       }
       if (firstMip != 0U) {
         loadInfo.FirstMipLevel = firstMip;
