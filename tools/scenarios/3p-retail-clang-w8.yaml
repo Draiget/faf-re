@@ -1,0 +1,45 @@
+name: 3p-retail-clang-w8
+description: >
+  Sim parity of the clang-cl builds in a live game: the shipped
+  ForgedAlliance.exe, our x86 main_clang.exe and our x64 main_x64_clang.exe play
+  one FFA on faf_re_lockstep, where the map script hands every player army to
+  FAF's built-in AI. Run B: our two clients with /simworkers 8 (Automatic renderer: x86 D3D11, x64 D3D12).
+  A Desync fails the run; compare the "faf_re_lockstep: status tick=N" lines
+  across game-*.log. Needs init_mpemu_localvault.lua in the FAF bin folder.
+  Do not click into the game windows.
+timeout: 40m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef, args: ['/title', 'mp3-w8-retail'] }
+  - { uid: 2, name: FafRe-x86, faction: aeon, exe: '%ProgramData%\FAForever\bin\main_clang.exe', args: ['/simworkers', '8', '/title', 'mp3-w8-x86'] }
+  - { uid: 3, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_x64_clang.exe', args: ['/simworkers', '8', '/title', 'mp3-w8-x64'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 25m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsAgree:
+    - { uids: all, pattern: 'faf_re_lockstep: (handover .*|handed \d+ armies to the AI)' }
+    - { uids: all, pattern: 'faf_re_lockstep: (army \d+ \S+ brain=\S+ skirmish=\S+ personality=\S+ faction=\d+)' }
