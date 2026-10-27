@@ -1,4 +1,5 @@
 #include "SimDriver.h"
+#include "gpg/core/profiling/Profiler.h"
 #include "moho/core/ThreadPlacement.h"
 #include "legacy/math/X87Math.h"
 #include "platform/X87Precision.h"
@@ -892,6 +893,7 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
  */
 void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
 {
+  FAF_PROFILE_ZONE_NAMED("SimTick");
   const int32_t beatToDispatch = mDispatchBeat;
   ++mDispatchBeat;
 
@@ -902,6 +904,7 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   lock.lock();
 
   FinalizeSyncDispatchLocked(lock);
+  FAF_PROFILE_FRAME("Sim Beat");
 
   if (mSimBusy) {
     return;

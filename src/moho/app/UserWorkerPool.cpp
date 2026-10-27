@@ -1,4 +1,5 @@
 #include "moho/app/UserWorkerPool.h"
+#include "gpg/core/profiling/Profiler.h"
 #include "moho/core/ThreadPlacement.h"
 
 #include <algorithm>
@@ -84,6 +85,7 @@ namespace moho
 
         const std::size_t begin = chunk * grain;
         try {
+          FAF_PROFILE_ZONE_NAMED("UserWorker Task");
           fn(context, begin, std::min(count, begin + grain));
         } catch (...) {
           const std::lock_guard<std::mutex> errorLock(errorMutex);

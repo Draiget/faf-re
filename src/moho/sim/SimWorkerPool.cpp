@@ -1,4 +1,5 @@
 #include "moho/sim/SimWorkerPool.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <algorithm>
 #include <atomic>
@@ -150,6 +151,7 @@ namespace moho
         const std::size_t begin = chunk * grain;
         const std::size_t end = std::min(count, begin + grain);
         try {
+          FAF_PROFILE_ZONE_NAMED("SimWorker Task");
           fn(context, begin, end);
         } catch (...) {
           const std::lock_guard<std::mutex> errorLock(errorMutex);

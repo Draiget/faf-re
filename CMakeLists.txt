@@ -86,6 +86,28 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()
 
+# --- Profiler (optional Tracy integration) --------------------------------------------
+option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)
+if(FAF_ENABLE_TRACY)
+  include(FetchContent)
+  FetchContent_Declare(
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG        v0.14.1
+    GIT_SHALLOW    TRUE
+  )
+  # Tracy's own CMake builds the TracyClient target. A static client that only
+  # collects while a profiler is connected.
+  set(TRACY_ENABLE ON)
+  set(TRACY_ON_DEMAND ON)
+  set(TRACY_STATIC ON)
+  FetchContent_MakeAvailable(tracy)
+  # faf_codegen's options, not a link to it: Tracy exports TracyClient, and an
+  # export cannot reference faf_codegen.
+  target_compile_options(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_OPTIONS>)
+  target_compile_definitions(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_DEFINITIONS>)
+endif()
+
 # --- Engine -----------------------------------------------------------------------------
 add_subdirectory(src)
 

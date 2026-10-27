@@ -1,4 +1,5 @@
 #include "CD3DDevice.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
 #include <d3d9.h>
@@ -1749,7 +1750,10 @@ namespace moho
       }
 
       const auto presentStart = std::chrono::steady_clock::now();
-      device->Present();
+      {
+        FAF_PROFILE_ZONE_NAMED("Present");
+        device->Present();
+      }
       sPresentSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - presentStart).count();
       (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderPresentCount, "Render_PresentCount"), 1);
 

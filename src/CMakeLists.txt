@@ -233,6 +233,10 @@ set(_faf_ucrt_dir "${FAF_WINSDK_DIR}/Lib/${FAF_UCRT_LIB_VERSION}/ucrt/${_faf_sdk
 target_link_options(faf_engine INTERFACE "/NODEFAULTLIB:libucrt$<$<CONFIG:Debug>:d>.lib")
 target_link_libraries(faf_engine PUBLIC "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
 
+if(FAF_ENABLE_TRACY)
+  target_link_libraries(faf_engine PUBLIC TracyClient)
+endif()
+
 if(FAF_TARGET_ARCH STREQUAL "x86")
   # Both from the shipped binary's PE header (characteristics 0x123, stack
   # reserve 0x1E8480 = /STACK:2000000).

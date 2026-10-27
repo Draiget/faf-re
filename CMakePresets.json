@@ -24,6 +24,18 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
+      "name": "clang-x64-profile",
+      "displayName": "clang-cl x64 Profile with Tracy (main_x64.exe)",
+      "inherits": "clang-x64-release",
+      "cacheVariables": { "FAF_ENABLE_TRACY": "ON" }
+    },
+    {
+      "name": "clang-x86-profile",
+      "displayName": "clang-cl x86 Profile with Tracy (main.exe)",
+      "inherits": "clang-x86-release",
+      "cacheVariables": { "FAF_ENABLE_TRACY": "ON" }
+    },
+    {
       "name": "clang-x64-debug",
       "displayName": "clang-cl x64 Debug",
       "inherits": "clang-base",
@@ -41,6 +53,8 @@
   "buildPresets": [
     { "name": "clang-x64-release", "configurePreset": "clang-x64-release" },
     { "name": "clang-x86-release", "configurePreset": "clang-x86-release" },
+    { "name": "clang-x64-profile", "configurePreset": "clang-x64-profile" },
+    { "name": "clang-x86-profile", "configurePreset": "clang-x86-profile" },
     { "name": "clang-x64-debug", "configurePreset": "clang-x64-debug" },
     { "name": "clang-x86-debug", "configurePreset": "clang-x86-debug" }
   ]

@@ -1,6 +1,7 @@
 // FAF instrumentation, not in the shipped binary (see RenderProfiler.h).
 
 #include "RenderProfiler.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -139,6 +140,7 @@ namespace gpg::gal
 
   void RenderProfiler::EndFrame(const DrawStatistics& frame) noexcept
   {
+    FAF_PROFILE_FRAME_DEFAULT();
     const std::int64_t now = NowTicks();
     ++mSummary.frames;
     mSummary.lastFrame = frame;
