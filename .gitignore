@@ -74,3 +74,6 @@ dependencies/.downloads/
 dependencies/dxsdk/
 
 tools/tracy/
+
+# Built tools (go build in tools/, e.g. fakegame.exe); no exe is tracked.
+*.exe
