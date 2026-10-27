@@ -45,13 +45,20 @@ function tickedOptions(impact) {
   return ticked;
 }
 
+// The replay ID in a table cell: bare digits, or written as code, bold or a
+// link (`26902315`, **26902315**, [26902315](https://...)).
+function replayId(cell) {
+  const text = cell.replace(/[`*_]/g, '').replace(/^\[([^\]]*)\]\([^)]*\)$/, '$1').trim();
+  return /^\d{6,}$/.test(text) ? text : null;
+}
+
 // Rows of the testing table with a replay ID and a filled result cell.
 function replayRows(testing) {
   return testing
     .split(/\r?\n/)
     .filter((l) => l.trim().startsWith('|'))
     .map((l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim()))
-    .filter((cells) => /^\d{6,}$/.test(cells[0]) && cells[cells.length - 1] !== '');
+    .filter((cells) => replayId(cells[0]) !== null && cells[cells.length - 1] !== '');
 }
 
 // Returns a list of error messages; empty means the check passes.
