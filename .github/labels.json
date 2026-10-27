@@ -1,0 +1,49 @@
+{
+  "repo": "Draiget/faf-re",
+  "labels": [
+    { "group": "sim",    "name": "sim: none",            "color": "c2e0c6", "description": "UI, render, audio, movies, tooling, docs or build only" },
+    { "group": "sim",    "name": "sim: replay/net only", "color": "bfd4f2", "description": "Replay, lobby or network; same commands on the same beats" },
+    { "group": "sim",    "name": "sim: same behaviour",  "color": "fbca04", "description": "Sim code touched, behaviour must stay identical" },
+    { "group": "sim",    "name": "sim: behaviour change","color": "d93f0b", "description": "Sim behaviour changes on purpose; must be gated" },
+    { "group": "sim",    "name": "sim: not sure",        "color": "e4e669", "description": "Sim impact needs a reviewer's call" },
+
+    { "group": "parity", "name": "parity: verified",     "color": "0e8a16", "description": "Core replay set played, checksums match retail" },
+    { "group": "parity", "name": "parity: desync",       "color": "b60205", "description": "A replay mismatches retail" },
+
+    { "group": "area",   "name": "area: audio",          "color": "1d76db", "description": "Touches the audio subsystem" },
+    { "group": "area",   "name": "area: render",         "color": "1d76db", "description": "Touches the render subsystem" },
+    { "group": "area",   "name": "area: ui",             "color": "1d76db", "description": "Touches the ui subsystem" },
+    { "group": "area",   "name": "area: sim",            "color": "1d76db", "description": "Touches the sim subsystem" },
+    { "group": "area",   "name": "area: net",            "color": "1d76db", "description": "Touches the net subsystem" },
+    { "group": "area",   "name": "area: replay",         "color": "1d76db", "description": "Touches the replay subsystem" },
+    { "group": "area",   "name": "area: movie",          "color": "1d76db", "description": "Touches the movie subsystem" },
+    { "group": "area",   "name": "area: lua",            "color": "1d76db", "description": "Touches the lua subsystem" },
+    { "group": "area",   "name": "area: server",         "color": "1d76db", "description": "Touches the server subsystem" },
+    { "group": "area",   "name": "area: build",          "color": "1d76db", "description": "Touches the build subsystem" },
+
+    { "group": "platform", "name": "arch: x64",          "color": "5319e7", "description": "64-bit build" },
+    { "group": "platform", "name": "arch: x86",          "color": "5319e7", "description": "32-bit build" },
+    { "group": "platform", "name": "platform: linux",    "color": "5319e7", "description": "Linux build" },
+
+    { "group": "kind",   "name": "crash",                "color": "b60205", "description": "Crash or hang" },
+    { "group": "kind",   "name": "recovery",             "color": "0052cc", "description": "Code recovered from the original binary" },
+    { "group": "kind",   "name": "retail divergence",    "color": "d93f0b", "description": "Deliberately differs from the original ForgedAlliance.exe" },
+    { "group": "kind",   "name": "faf-patch",            "color": "006b75", "description": "Port of an FA-Binary-Patches change" },
+    { "group": "kind",   "name": "performance",          "color": "0e8a16", "description": "Performance change behind a switch" },
+
+    { "group": "status", "name": "needs template",       "color": "ededed", "description": "Description does not follow the PR template" },
+    { "group": "status", "name": "needs info",           "color": "ededed", "description": "Waiting for repro, logs or setup details" },
+    { "group": "status", "name": "needs replay check",   "color": "ededed", "description": "Replays from docs/PR_REPLAY_CHECK.md not played yet" },
+    { "group": "status", "name": "merge conflict",       "color": "e11d21", "description": "Conflicts with master; rebase or merge master in" },
+
+    { "group": "default", "name": "bug",              "color": "d73a4a", "description": "Something isn't working" },
+    { "group": "default", "name": "documentation",    "color": "0075ca", "description": "Improvements or additions to documentation" },
+    { "group": "default", "name": "duplicate",        "color": "cfd3d7", "description": "This issue or pull request already exists" },
+    { "group": "default", "name": "enhancement",      "color": "a2eeef", "description": "New feature or request" },
+    { "group": "default", "name": "good first issue", "color": "7057ff", "description": "Good for newcomers" },
+    { "group": "default", "name": "help wanted",      "color": "008672", "description": "Extra attention is needed" },
+    { "group": "default", "name": "invalid",          "color": "e4e669", "description": "This doesn't seem right" },
+    { "group": "default", "name": "question",         "color": "d876e3", "description": "Further information is requested" },
+    { "group": "default", "name": "wontfix",          "color": "ffffff", "description": "This will not be worked on" }
+  ]
+}

@@ -1,0 +1,38 @@
+name: PR labels
+
+# Sets the automatic labels (sim impact, area, recovery, documentation,
+# needs template, needs replay check, merge conflict) from the PR description,
+# its changed files and whether it still merges. Labels a person set or removed
+# by hand are left alone; see .github/scripts/pr-labels.js.
+#
+# pull_request_target runs the base branch's script with a token that can
+# label PRs from forks; no code from the PR is checked out or run.
+# A push to master can make open PRs conflict (or stop conflicting), so it
+# rechecks "merge conflict" on every open PR into master.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number || 'push' }}
+  cancel-in-progress: true
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run = require('./.github/scripts/pr-labels.js');
+            await run({ github, context, core });

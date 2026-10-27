@@ -113,3 +113,5 @@ module.exports = async ({ github, context, core }) => {
   }
 };
 module.exports.check = check;
+// Shared with pr-labels.js, so labels and this check read the template the same way.
+Object.assign(module.exports, { SIM_PATHS, NEEDS_REPLAYS, stripComments, section, tickedOptions, replayRows });
