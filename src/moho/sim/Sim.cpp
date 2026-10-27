@@ -10773,7 +10773,8 @@ void Sim::AdvanceBeat(const int amt)
     TickDebugOverlay(overlay, this);
   }
 
-  if (mLuaState && mLuaState->m_state && (mCurTick % 70u) == 0u) {
+  const int gcPeriod = ReadSimConVarInt(this, &gSimConVar_sim_GCPeriod, 0);
+  if (gcPeriod > 0 && mLuaState && mLuaState->m_state && (mCurTick % static_cast<uint32_t>(gcPeriod)) == 0u) {
     FAF_PROFILE_ZONE_NAMED("Sim::LuaGC");
     lua_setgcthreshold(mLuaState->m_state, 0);
   }

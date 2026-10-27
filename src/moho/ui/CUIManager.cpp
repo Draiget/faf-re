@@ -14,9 +14,17 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/console/TConVarbool.h"
 
 namespace
 {
+  bool ui_PeriodicGC = false;
+  moho::TConVar<bool> gTConVar_ui_PeriodicGC(
+    "ui_PeriodicGC",
+    "Enable forced periodic 5-second UI Lua GC reset (retail behaviour). When false, Lua manages GC threshold dynamically.",
+    &ui_PeriodicGC
+  );
+
   /**
    * Frames whose owning reference was dropped while a MAUI event was being
    * dispatched. Released by `ReleaseRetiredFrames` on the next UI tick.
@@ -358,12 +366,14 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
   if (mLuaState != nullptr) {
     PublishEngineStatsToLua(mLuaState);
 
-    mGCTime += deltaSeconds;
-    if (mGCTime > 5.0f) {
-      mGCTime -= 5.0f;
-      if (mLuaState->m_state != nullptr) {
-        FAF_PROFILE_ZONE_NAMED("UI::LuaGC");
-        lua_setgcthreshold(mLuaState->m_state, 0);
+    if (ui_PeriodicGC) {
+      mGCTime += deltaSeconds;
+      if (mGCTime > 5.0f) {
+        mGCTime -= 5.0f;
+        if (mLuaState->m_state != nullptr) {
+          FAF_PROFILE_ZONE_NAMED("UI::LuaGC");
+          lua_setgcthreshold(mLuaState->m_state, 0);
+        }
       }
     }
   }
