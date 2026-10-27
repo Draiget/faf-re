@@ -20949,18 +20949,9 @@ void moho::CUIWorldView::UpdateSelection(
     float bestDistSq = std::numeric_limits<float>::max();
 
     for (UserEntity* const candidate : collected) {
-      static int sRejectBudget = 0;
-      const auto rejectProbe = [&](const char* const why, const char* const extra = "") {
-        if (candidate->IsUserUnit() != nullptr && sRejectBudget < 40) {
-          ++sRejectBudget;
-          gpg::Warnf("[PICKREJ] %s unit=%p zoom=%.1f %s", why, static_cast<void*>(candidate), cameraZoom, extra);
-        }
-      };
       if (candidate->mVariableData.mIsDead) {
-        rejectProbe("dead");
         continue;
       }
-      rejectProbe("step:alive");
 
       // SELECTABLE, or FERRYBEACON, or (not) UNTARGETABLE - matches the
       // binary's short-circuit chain exactly (only the categories actually
@@ -20970,17 +20961,14 @@ void moho::CUIWorldView::UpdateSelection(
         included = candidate->IsInCategory("FERRYBEACON") || !candidate->IsInCategory("UNTARGETABLE");
       }
       if (!included) {
-        rejectProbe("category");
         continue;
       }
 
-      rejectProbe("step:category-ok");
       bool isOnCarrier = false;
       if (UserEntity* const attachmentParent = candidate->GetAttachmentParent()) {
         isOnCarrier = attachmentParent->IsInCategory("CARRIER");
       }
       if (isOnCarrier) {
-        rejectProbe("carrier");
         continue;
       }
 
@@ -20992,11 +20980,9 @@ void moho::CUIWorldView::UpdateSelection(
       if (
         candidateAsUnit != nullptr && (candidateAsUnit->mIntelStateFlags & kStrategicIconEntitySuppressedMask) != 0u
       ) {
-        rejectProbe("intel-suppressed");
         continue;
       }
 
-      rejectProbe("step:intel-ok");
       const std::int32_t focusArmy = mWldSession->FocusArmy;
       UserArmy* const focusArmyPtr = (focusArmy < 0) ? nullptr : mWldSession->userArmies[focusArmy];
       const bool ownedByFocusArmy = candidate->mArmy == focusArmyPtr;
@@ -21004,11 +20990,9 @@ void moho::CUIWorldView::UpdateSelection(
         mWldSession->GetSTIMap()->IsPlayable(candidate->mVariableData.mCurTransform.pos_) &&
         (candidateAsUnit == nullptr || !candidateAsUnit->mUnitVarDat.mIsBusy);
       if (!ownedByFocusArmy && !visibleOnPlayableMap) {
-        rejectProbe("army/playable");
         continue;
       }
 
-      rejectProbe("step:army-ok");
       if (MeshInstance* const mesh = candidate->mMeshInstance) {
         const REntityBlueprint* const blueprint = candidate->mParams.mBlueprint;
         if (blueprint->IsMobile() && blueprint->mUseOOBTestZoom > cameraZoom) {
@@ -21019,30 +21003,6 @@ void moho::CUIWorldView::UpdateSelection(
           mesh->UpdateInterpolatedFields();
           Wm3::IntrLine3Box3f intersector(wmPickRay, mesh->box);
           if (!intersector.Test()) {
-            char extra[320];
-            (void)std::snprintf(
-              extra,
-              sizeof(extra),
-              "oob zoomThr=%.1f center=(%.2f,%.2f,%.2f) ext=(%.2f,%.2f,%.2f) ax0=(%.2f,%.2f,%.2f) "
-              "ray=(%.1f,%.1f,%.1f)+(%.3f,%.3f,%.3f)",
-              blueprint->mUseOOBTestZoom,
-              mesh->box.Center.X(),
-              mesh->box.Center.Y(),
-              mesh->box.Center.Z(),
-              mesh->box.Extent[0],
-              mesh->box.Extent[1],
-              mesh->box.Extent[2],
-              mesh->box.Axis[0].X(),
-              mesh->box.Axis[0].Y(),
-              mesh->box.Axis[0].Z(),
-              pickRay.pos.x,
-              pickRay.pos.y,
-              pickRay.pos.z,
-              pickRay.dir.x,
-              pickRay.dir.y,
-              pickRay.dir.z
-            );
-            rejectProbe("oob-miss", extra);
             continue;
           }
         } else {
@@ -21076,26 +21036,11 @@ void moho::CUIWorldView::UpdateSelection(
 
           const Wm3::AxisAlignedBox3f selectionBounds{{boxXMin, boxYMin, boxZMin}, {boxXMax, boxYMax, boxZMax}};
           if (!selectionSolid.Intersects(selectionBounds)) {
-            char extra[200];
-            (void)std::snprintf(
-              extra,
-              sizeof(extra),
-              "aabb=(%.2f,%.2f,%.2f)-(%.2f,%.2f,%.2f) zoomThr=%.1f",
-              boxXMin,
-              boxYMin,
-              boxZMin,
-              boxXMax,
-              boxYMax,
-              boxZMax,
-              blueprint->mUseOOBTestZoom
-            );
-            rejectProbe("aabb-miss", extra);
             continue;
           }
         }
       }
 
-      rejectProbe("step:mesh-ok");
       // Interpolation alpha reads the still-zero (from entry) `mIsDragger`
       // scratch slot - i.e. always 0.0f (last-known/non-interpolated pose).
       const Wm3::Vec3f interpolatedPosition = candidate->GetInterpolatedPosition(0.0f);
@@ -21103,40 +21048,12 @@ void moho::CUIWorldView::UpdateSelection(
       const float dx = projected.x - mouseScreenPos.x;
       const float dy = projected.y - mouseScreenPos.y;
       const float distSq = (dx * dx) + (dy * dy);
-      {
-        char extra[300];
-        (void)std::snprintf(
-          extra,
-          sizeof(extra),
-          "ipos=(%.2f,%.2f,%.2f) proj=(%.1f,%.1f) mouse=(%.1f,%.1f) distSq=%.2f lastInterp=%.3f last=(%.2f,%.2f,%.2f) "
-          "cur=(%.2f,%.2f,%.2f) impact=%.3f best=%.2f",
-          interpolatedPosition.x,
-          interpolatedPosition.y,
-          interpolatedPosition.z,
-          projected.x,
-          projected.y,
-          mouseScreenPos.x,
-          mouseScreenPos.y,
-          distSq,
-          candidate->mLastInterpAmt,
-          candidate->mVariableData.mLastTransform.pos_.x,
-          candidate->mVariableData.mLastTransform.pos_.y,
-          candidate->mVariableData.mLastTransform.pos_.z,
-          candidate->mVariableData.mCurTransform.pos_.x,
-          candidate->mVariableData.mCurTransform.pos_.y,
-          candidate->mVariableData.mCurTransform.pos_.z,
-          candidate->mVariableData.mCurImpactValue,
-          bestDistSq
-        );
-        rejectProbe("step:dist", extra);
-      }
 
       const bool preferOverCurrentBest =
         bestCandidate != nullptr && bestCandidate->IsUserUnit() == nullptr && candidateAsUnit != nullptr;
       if (bestDistSq > distSq || preferOverCurrentBest) {
         bestDistSq = distSq;
         bestCandidate = candidate;
-        rejectProbe("ACCEPT");
       }
     }
 
@@ -21168,13 +21085,17 @@ void moho::CUIWorldView::UpdateSelection(
           }
         }
       } else if (UserUnit* const attachmentParentAsUnit = attachmentParent->IsUserUnit()) {
+        // A unit riding a transport, or still being built inside a factory,
+        // hands the hover to its attachment parent, so clicking a factory
+        // selects the factory and not the unit on its roll-off pad.
+        // 0x0086FDE8 tests TRANSPORTATION and on a hit jumps straight to the
+        // redirect (0x0086FDEF `jne 0x0086FE2B`); only a miss tests FACTORY
+        // (0x0086FE1D), whose result is the flag. Then 0x0086FE6D re-reads
+        // GetAttachmentParent() into the best candidate.
         if (
-          attachmentParentAsUnit->IsInCategory("TRANSPORTATION") &&
-          (attachmentParentAsUnit->IsInCategory("FACTORY") ? false : true)
+          attachmentParentAsUnit->IsInCategory("TRANSPORTATION") ||
+          attachmentParentAsUnit->IsInCategory("FACTORY")
         ) {
-          // The binary re-evaluates TRANSPORTATION-then-FACTORY on the
-          // attachment parent and, when it's a transport but not itself a
-          // factory, redirects hover to that attachment parent.
           bestCandidate = attachmentParent;
         }
       }
