@@ -1,4 +1,4 @@
-#include "replay/ReplayFpuReport.h"
+#include "headless/ReplayFpuReport.h"
 
 #if defined(_WIN32)
 #include <Windows.h>
@@ -29,7 +29,7 @@
 // are reset, the interrupted thread's are in ucontext's fpregs).
 
 #if !defined(_WIN32)
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -147,9 +147,9 @@ namespace faf::replay
     }
     return text;
   }
-} // namespace faf::replay
+} // namespace faf::headless
 #else
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -250,5 +250,5 @@ namespace faf::replay
     }
     return text;
   }
-} // namespace faf::replay
+} // namespace faf::headless
 #endif // _WIN32

@@ -9,7 +9,7 @@
 #include "legacy/containers/AutoPtr.h"
 #include "remote/client/RemoteClientManager.h"
 
-// Engine addition, server mode (plan WP11.1): faf-replay's `--command-check`. A remote client
+// Engine addition, server mode (plan WP11.1): headless's `--command-check`. A remote client
 // sends the server its commands as `CMarshaller` messages and the server decodes them with
 // `CDecoder`; this check runs every command of a replay through that pair (decoded as the sim
 // decodes it, marshalled again as a client would send it) and compares the bytes with the
@@ -34,7 +34,7 @@ namespace moho
   struct CMessage;
 } // namespace moho
 
-namespace faf::replay
+namespace faf::headless
 {
   class CReplayCommandCheck
   {
@@ -68,4 +68,4 @@ namespace faf::replay
     std::array<std::uint64_t, 256> mKeyOrderOnly{}; // a Lua table's pairs in another order only
     std::array<std::uint64_t, 256> mSeen{};
   };
-} // namespace faf::replay
+} // namespace faf::headless

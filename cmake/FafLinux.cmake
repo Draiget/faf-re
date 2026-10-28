@@ -100,7 +100,7 @@ message(STATUS "faf_sim: ${_faf_sim_count} translation units")
 file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/windows.h" "#pragma once\n#include <Windows.h>\n")
 
 # The wire format of server-authoritative sessions (remote/sources.cmake, FAF_REMOTE_SOURCES),
-# after the engine's sources as in the Windows server-mode build: faf-replay's wire checks
+# after the engine's sources as in the Windows server-mode build: headless's wire checks
 # use it, and the Linux game server will.
 include("${PROJECT_SOURCE_DIR}/src/remote/sources.cmake")
 # The client half too (FAF_REMOTE_CLIENT_SOURCES), as Windows' server-mode faf_engine links it:
@@ -217,22 +217,23 @@ add_executable(faf-sim-link "${PROJECT_SOURCE_DIR}/tests/linux/SimLinkMain.cpp")
 target_link_libraries(faf-sim-link PRIVATE faf_sim)
 target_link_options(faf-sim-link PRIVATE -Wl,--error-limit=0)
 
-# --- faf-replay (plan WPL.7) ------------------------------------------------------------
-# The headless replay runner on Linux: replay/sources.cmake on every faf_sim object, as
-# Windows' sim-only faf-replay (FAF_REPLAY_SIM_ONLY: a plain Lua state for sync packets and
-# launch configs, no wx entry, no userInit.lua).
-include("${PROJECT_SOURCE_DIR}/src/replay/sources.cmake")
-set(_faf_replay_files "")
-foreach(_src IN LISTS FAF_REPLAY_SOURCES)
-  list(APPEND _faf_replay_files "${PROJECT_SOURCE_DIR}/src/${_src}")
+# --- headless (plan WPL.7) --------------------------------------------------------------
+# The headless replay runner on Linux: headless/sources.cmake on every faf_sim object, as on
+# Windows (a plain Lua state for sync packets and launch configs, no wx entry, no
+# userInit.lua). Linux has one architecture, so the file is `headless`, without the
+# Windows x64 build's `_x64`.
+include("${PROJECT_SOURCE_DIR}/src/headless/sources.cmake")
+set(_faf_headless_files "")
+foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
+  list(APPEND _faf_headless_files "${PROJECT_SOURCE_DIR}/src/${_src}")
 endforeach()
-add_executable(faf-replay ${_faf_replay_files})
-target_link_libraries(faf-replay PRIVATE faf_sim)
-target_compile_definitions(faf-replay PRIVATE FAF_SERVER_MODE=1 FAF_REPLAY_SIM_ONLY=1)
-target_link_options(faf-replay PRIVATE -Wl,--error-limit=0)
+add_executable(headless ${_faf_headless_files})
+target_link_libraries(headless PRIVATE faf_sim)
+target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
+target_link_options(headless PRIVATE -Wl,--error-limit=0)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
-# tests/linux/libm_allowlist.txt; faf-replay is not built while one does.
+# tests/linux/libm_allowlist.txt; headless is not built while one does.
 add_custom_target(faf_sim_libm_gate
   COMMAND python3 "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
           "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "$<TARGET_OBJECTS:faf_sim>"
@@ -240,7 +241,7 @@ add_custom_target(faf_sim_libm_gate
   COMMAND_EXPAND_LISTS
   COMMENT "Checking faf_sim's libm transcendental calls against tests/linux/libm_allowlist.txt"
   VERBATIM)
-add_dependencies(faf-replay faf_sim_libm_gate)
+add_dependencies(headless faf_sim_libm_gate)
 
 # --- faf_registration_dump_sim (plan WPL.4) ----------------------------------------------
 # What the static initialisers of the Linux faf_sim objects registered (tests/registry): its

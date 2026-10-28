@@ -11,7 +11,7 @@
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
 
-// Engine addition, server mode (faf-replay `--wire-stats`): the entities lane of the wire
+// Engine addition, server mode (headless `--wire-stats`): the entities lane of the wire
 // format run offline on a replay's sync packets. Each beat's entity state, as the sim
 // published it to this run's focus, becomes a view frame; the frame is encoded against the
 // previous one, decoded, and must come back equal (WPR.38 on recorded frames); the bytes are
@@ -24,7 +24,7 @@ namespace moho
   struct SSyncData;
 }
 
-namespace faf::replay
+namespace faf::headless
 {
   class CReplayWireStats
   {
@@ -110,4 +110,4 @@ namespace faf::replay
     std::uint64_t mFullBytesSum = 0;
     std::uint64_t mFullSamples = 0;
   };
-} // namespace faf::replay
+} // namespace faf::headless

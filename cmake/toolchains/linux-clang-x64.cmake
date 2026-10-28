@@ -1,6 +1,6 @@
 # Engine addition (dedicated-server plan WPL.2): Linux x86_64 with clang,
-# libc++ and lld, for the headless simulation (faf_sim, faf-replay, later
-# faf-server). Used by the linux-clang-x64-release preset.
+# libc++ and lld, for the headless simulation (faf_sim, headless, later
+# server). Used by the linux-clang-x64-release preset.
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 #

@@ -1,6 +1,6 @@
 // Engine addition (dedicated-server plan WPL.9): the floating-point environment of every
 // Linux thread is the one the Windows x64 build's threads run with (WPL.8: x87 control word
-// 0x027F, MXCSR 0x1F80 on every thread of faf-replay at beat 1).
+// 0x027F, MXCSR 0x1F80 on every thread of headless at beat 1).
 //
 //   x87 control word 0x027F: 53-bit precision, round to nearest, every exception masked.
 //                    Linux starts threads at 0x037F (64-bit precision).

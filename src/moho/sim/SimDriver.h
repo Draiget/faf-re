@@ -821,7 +821,7 @@ namespace moho
     [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
 
 #if FAF_SERVER_MODE
-    /// Engine addition, server mode (faf-replay): the sim, read-only. faf-replay reads a beat's
+    /// Engine addition, server mode (headless): the sim, read-only. headless reads a beat's
     /// checksum from `Sim::mSimHashes` after taking that beat's packet off the queue; the sim
     /// wrote it before queueing the packet and rewrites the slot only 128 beats later.
     [[nodiscard]] const Sim* GetSimForReplayCheck() const noexcept { return mSim.get(); }

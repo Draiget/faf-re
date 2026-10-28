@@ -1,5 +1,5 @@
-#include "replay/ReplayLaunchCheck.h"
-#include "replay/ReplayLuaState.h"
+#include "headless/ReplayLaunchCheck.h"
+#include "headless/ReplayLuaState.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -22,7 +22,7 @@
 
 // Engine addition, server mode: see ReplayLaunchCheck.h.
 
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -362,4 +362,4 @@ namespace faf::replay
     ).c_str();
     return result;
   }
-} // namespace faf::replay
+} // namespace faf::headless

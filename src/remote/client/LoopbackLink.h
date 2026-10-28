@@ -14,7 +14,7 @@
 // Each sync packet goes through the server side of the entities lane (frame builder, optional
 // dead reckoning, encoder against the last frame sent) and the client side (decoder,
 // `CSyncRebuilder`), which rewrites the packet's entity lanes from the frames. The GUI client's
-// `/loopback` (`CRemoteSimDriver`) and faf-replay's `--loopback` both run it.
+// `/loopback` (`CRemoteSimDriver`) and headless's `--loopback` both run it.
 
 namespace moho
 {

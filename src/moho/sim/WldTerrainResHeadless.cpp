@@ -1,5 +1,5 @@
 // Engine addition (dedicated-server plan WPL.4, WPR.11): the terrain resource a map
-// loads into when there is no client (no renderer): the game server, faf-replay and
+// loads into when there is no client (no renderer): the game server, headless and
 // the Linux build. CWldTerrainRes (moho/terrain/CWldTerrainRes.cpp) is the client's.
 //
 // Load reads the terrain payload of a `.scmap` exactly as CWldTerrainRes::Load

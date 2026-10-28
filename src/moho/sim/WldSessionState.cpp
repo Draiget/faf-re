@@ -2,7 +2,7 @@
 // process-global state and its accessors, moved unchanged out of
 // CWldSession.cpp (see WldSessionState.h). Simulation code calls these
 // accessors (SessionIsReplay, SetFocusArmy, SetFireState, ...); without a user
-// world the session is null, as it is in faf-replay.
+// world the session is null, as it is in headless.
 
 #include "moho/sim/WldSessionState.h"
 

@@ -3,16 +3,16 @@
 #include <cstdint>
 #include <string>
 
-// Engine addition, server mode (docs/SWITCHES.md, "faf-replay"): the headless replay runner.
+// Engine addition, server mode (docs/SWITCHES.md, "headless"): the headless replay runner.
 // It plays one `.scfareplay` through the same sim, driver and replay client the game uses,
 // with no world session, window, render device or audio engine.
 
-namespace faf::replay
+namespace faf::headless
 {
   struct SReplayOptions
   {
     std::string replayPath;     // `.scfareplay`
-    std::string label;          // prefix of every line faf-replay prints
+    std::string label;          // prefix of every line headless prints
     int focusArmy = -1;         // the army whose view `Sim::Sync` builds; -1 = observer
     std::string digestPath;     // when set: one "beat digest" line per checksummed beat
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
@@ -66,4 +66,4 @@ namespace faf::replay
   /** Counts the checksum warnings the sim logs; installed for the whole process. */
   void InstallChecksumWatch(const std::string& label);
   [[nodiscard]] int ChecksumMismatchCount() noexcept;
-} // namespace faf::replay
+} // namespace faf::headless
