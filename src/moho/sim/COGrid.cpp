@@ -1017,6 +1017,13 @@ namespace moho
     &sim_GatherLargeBuffers
   );
 
+  bool sim_SweptProbeEarlyOut = true;
+  TConVar<bool> gTConVar_sim_SweptProbeEarlyOut(
+    "sim_SweptProbeEarlyOut",
+    "Swept path probes test units before the box overlap and stop at the first blocker (same results).",
+    &sim_SweptProbeEarlyOut
+  );
+
   bool sim_GatherReserve = true;
   TConVar<bool> gTConVar_sim_GatherReserve(
     "sim_GatherReserve",
@@ -1412,6 +1419,40 @@ namespace moho
       static_cast<float>(blueprint->mSizeX) * 0.55555558f,
       1000.0f,
       halfLength);
+
+    // Engine change (sim_SweptProbeEarlyOut): the answer is "some candidate passes every test",
+    // and every test below only reads state, so the cheap unit tests run before the box overlap
+    // and the first blocker ends the scan. Same candidates, same tests, same answer as collecting
+    // every hit through CollectEntitiesInBox first.
+    if (sim_SweptProbeEarlyOut) {
+      const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(sweptBox);
+      GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+      gpg::core::FastVectorInline<Entity*>& gathered = gatherScratch.Get();
+      const int gatheredCount = grid.GatherUnmarkedEntities(queryBounds, ENTITYTYPE_Unit, gathered);
+      CollisionResult collisionResult{};
+      for (int index = 0; index < gatheredCount; ++index) {
+        Entity* const source = gathered.start_[index];
+        if (source == nullptr || !AxisAlignedBoundsOverlapEntityBounds(queryBounds, *source)) {
+          continue;
+        }
+        CColPrimitiveBase* const collisionPrimitive = source->CollisionExtents;
+        Unit* const candidate = source->IsUnit();
+        if (collisionPrimitive == nullptr || candidate == nullptr) {
+          continue;
+        }
+        const ELayer candidateLayer = candidate->mVarDat.mLayerMask;
+        if (candidateLayer == LAYER_Air || candidateLayer == LAYER_Sub) {
+          continue;
+        }
+        if (unit->IsSameFormationLayerWith(candidate) || func_IsSourceUnit(mode, *unit, candidate)) {
+          continue;
+        }
+        if (collisionPrimitive->CollideBox(&sweptBox, &collisionResult)) {
+          return true;
+        }
+      }
+      return false;
+    }
 
     gpg::core::FastVectorN<CollisionResult, 10> hits{};
     grid.CollectEntitiesInBox(hits, ENTITYTYPE_Unit, sweptBox);
