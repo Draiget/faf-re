@@ -8,7 +8,7 @@
 
 #include "moho/render/camera/VTransform.h"
 
-// Engine addition, server mode (faf-replay `--bone-stats`, plan M0.3): how many bones of each
+// Engine addition, server mode (headless `--bone-stats`, plan M0.3): how many bones of each
 // unit change from one beat to the next, per blueprint. The sim publishes each unit's pose for
 // the beat (a fresh `CAniPose` every tick, `CAniActor::UpdateManipulators`); this compares its
 // bones' local transforms with the same unit's previous beat, exactly and beyond a small
@@ -19,7 +19,7 @@ namespace moho
   struct SSyncData;
 }
 
-namespace faf::replay
+namespace faf::headless
 {
   class CReplayBoneStats
   {
@@ -61,4 +61,4 @@ namespace faf::replay
     std::vector<std::uint32_t> mChangedPerBeat;
     std::uint64_t mBeats = 0;
   };
-} // namespace faf::replay
+} // namespace faf::headless

@@ -1,4 +1,4 @@
-#include "replay/ReplaySyncWriters.h"
+#include "headless/ReplaySyncWriters.h"
 
 #include <atomic>
 #include <cstdio>
@@ -16,7 +16,7 @@
 
 // Engine addition, server mode: see ReplaySyncWriters.h.
 
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -150,7 +150,7 @@ end
     {
     public:
       explicit CSyncWritersInitForm(moho::CScrLuaInitFormSet& set)
-        : CScrLuaInitForm(set, "__faf_sync_record", "faf-replay", "faf-replay --sync-writers")
+        : CScrLuaInitForm(set, "__faf_sync_record", "headless", "headless --sync-writers")
       {}
 
       void Run(LuaPlus::LuaState* const state) override
@@ -186,7 +186,7 @@ end
     if (fopen_s(&file, path.c_str(), "w") != 0 || file == nullptr) {
       return "sync writers: cannot write " + path;
     }
-    std::fprintf(file, "# key\twrites\tcall site (faf-replay --sync-writers)\n");
+    std::fprintf(file, "# key\twrites\tcall site (headless --sync-writers)\n");
     std::size_t sites = 0;
     std::uint64_t writes = 0;
     for (const auto& [key, bySite] : gWrites) {
@@ -203,4 +203,4 @@ end
       gInstallError.empty() ? "" : (std::string(", install error: ") + gInstallError).c_str()
     ).c_str();
   }
-} // namespace faf::replay
+} // namespace faf::headless

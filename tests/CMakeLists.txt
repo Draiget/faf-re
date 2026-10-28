@@ -36,4 +36,11 @@ endif()
 # initialisers of faf_main's objects registered (tests/registry).
 add_executable(faf_registration_dump EXCLUDE_FROM_ALL registry/RegistrationDump.cpp)
 target_link_libraries(faf_registration_dump PRIVATE faf_engine)
+
+# Engine addition (dedicated-server plan WPL.4, WPR.11): every map in a list
+# loaded with the client's and the headless terrain resource, compared
+# (tests/terrain). Needs the game data: run it from a folder staged like the
+# game's bin folder, with /init.
+add_executable(faf_terrain_check EXCLUDE_FROM_ALL terrain/TerrainCheck.cpp)
+target_link_libraries(faf_terrain_check PRIVATE faf_engine)
 add_subdirectory(remote)

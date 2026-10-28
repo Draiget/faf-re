@@ -2,7 +2,7 @@
 
 #include <string>
 
-// Engine addition, server mode (plan WP6.1, M0.4): faf-replay `--sync-writers <file>`. Attributes
+// Engine addition, server mode (plan WP6.1, M0.4): headless `--sync-writers <file>`. Attributes
 // every write to the sim's Lua `Sync` table to the Lua call site that made it.
 //
 // Lua 5.0 hooks fire on calls, returns, lines and counts, not on table writes, so the attribution
@@ -19,7 +19,7 @@
 // `Sync`, then removes itself. Every new key is seen (a top-level key's first write each beat,
 // each new entry of a stored table); an overwrite of an existing entry is not.
 
-namespace faf::replay
+namespace faf::headless
 {
   class CSyncWriters
   {
@@ -32,4 +32,4 @@ namespace faf::replay
     /** Writes "key<TAB>writes<TAB>call site" lines, sorted, and returns a one-line summary. */
     [[nodiscard]] std::string Write(const std::string& path) const;
   };
-} // namespace faf::replay
+} // namespace faf::headless

@@ -1,7 +1,7 @@
 // Engine addition (dedicated-server plan WPL.4, WPR.11): VCR_SetupReplaySession,
 // which reads a replay file into a replay session's launch info, moved unchanged
 // out of moho/misc/SessionStartup.cpp (the front end's session launch, user side):
-// faf-replay and the game server set up replay sessions without a user side.
+// headless and the game server set up replay sessions without a user side.
 #include "moho/misc/SessionStartup.h"
 
 #include <Windows.h>

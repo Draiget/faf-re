@@ -1,5 +1,5 @@
 // Engine addition (dedicated-server plan WPR.12, WPL.5): gpg::gal::Math without D3DX, for
-// the programs that link the simulation without the client (faf-replay, the game server,
+// the programs that link the simulation without the client (headless, the game server,
 // the Linux build). The client (faf_main) links gpg/gal/Matrix.cpp, the D3DX version.
 //
 // The matrices are D3DX's (row vectors, `out = lhs * rhs`; the same rotation, scaling and

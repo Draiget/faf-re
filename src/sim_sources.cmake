@@ -76,7 +76,7 @@ set(_faf_sim_patterns
   "^moho/render/camera/(VTransform|GeomCamera3)\\.cpp$"
   # The application base (IWinApp): identity strings and the common services
   # (log file, reflection types, resource manager, data search paths) every
-  # engine program sets up, faf-replay and the game server among them.
+  # engine program sets up, headless and the game server among them.
   "^moho/app/IWinApp\\.cpp$"
   # The emitter curve and parameter enums' reflection (the effect emitters the sim
   # creates take them by name from Lua).

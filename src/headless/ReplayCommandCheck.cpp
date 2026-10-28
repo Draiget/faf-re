@@ -1,4 +1,4 @@
-#include "replay/ReplayCommandCheck.h"
+#include "headless/ReplayCommandCheck.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -10,7 +10,7 @@
 
 // Engine addition, server mode: see ReplayCommandCheck.h.
 
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -243,4 +243,4 @@ namespace faf::replay
     }
     return summary + "; by opcode:" + byOpcode;
   }
-} // namespace faf::replay
+} // namespace faf::headless

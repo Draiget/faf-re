@@ -1,6 +1,6 @@
 """Focus gate (plan WPR.2): a replay's sim must not depend on the army whose view it builds.
 
-Plays each replay with faf-replay at focus -1 (an observer) and at chosen armies, every run with
+Plays each replay with headless at focus -1 (an observer) and at chosen armies, every run with
 `--checksum-period 1` (the sim's checksum on every beat), and compares the per-beat digests of
 each focus run with the -1 run's. Prints one verdict line per replay and a summary line; the exit
 code is 0 when no run differs.
@@ -13,18 +13,18 @@ trailing beats, counts as matching ("tail-only"): after the end of a replay's re
 the number of extra beats depends on thread timing (plan §12).
 
 usage:
-  focus_gate.py --exe <faf-replay.exe> --init <init.lua> --replay-dir <dir> [options] [replay id ...]
+  focus_gate.py --exe <headless.exe> --init <init.lua> --replay-dir <dir> [options] [replay id ...]
 
   replay ids          default: the core set of docs/PR_REPLAY_CHECK.md; or --ids-file <file>
   --replay-dir        holds <id>.scfareplay or vault_<id>.scfareplay
   --armies all|ends|N[,M...]
                       all (default): every army; ends: the first and the last army;
                       a list: those armies (skipped where a replay has fewer)
-  --jobs N            faf-replay processes at a time (default 2)
+  --jobs N            headless processes at a time (default 2)
   --jobs-file F       re-read on every scheduling step: when it holds a number, that is the limit
                       (lets other work borrow a slot without restarting the gate)
   --out DIR           digests, logs and outputs (default ./focus_gate_out)
-  --before-start CMD  a command run (through the shell) before each faf-replay start; it may block,
+  --before-start CMD  a command run (through the shell) before each headless start; it may block,
                       e.g. a machine-wide game-instance limit ("bash game_slots.sh wait 1")
   --simworkers N      passed through (default 8)
   --timeout MIN       per run (default 180)

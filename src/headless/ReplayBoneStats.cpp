@@ -1,4 +1,4 @@
-#include "replay/ReplayBoneStats.h"
+#include "headless/ReplayBoneStats.h"
 
 #include <algorithm>
 #include <bit>
@@ -11,7 +11,7 @@
 
 // Engine addition, server mode: see ReplayBoneStats.h.
 
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -173,4 +173,4 @@ namespace faf::replay
     );
     return text;
   }
-} // namespace faf::replay
+} // namespace faf::headless

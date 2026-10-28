@@ -1,4 +1,4 @@
-#include "replay/ReplayWireStats.h"
+#include "headless/ReplayWireStats.h"
 
 #include <algorithm>
 #include <array>
@@ -9,7 +9,7 @@
 
 // Engine addition, server mode: see ReplayWireStats.h.
 
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -431,4 +431,4 @@ namespace faf::replay
     }
     return summary;
   }
-} // namespace faf::replay
+} // namespace faf::headless

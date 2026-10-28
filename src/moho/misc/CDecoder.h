@@ -70,7 +70,7 @@ namespace moho
 #if FAF_SERVER_MODE
     /**
      * Engine addition, server mode (plan WP11.1): a function every decoder calls with each
-     * message it receives, before decoding it, on the thread that decodes it. faf-replay's
+     * message it receives, before decoding it, on the thread that decodes it. headless's
      * command round trip uses it; null (the default) is none.
      */
     using MessageObserver = void (*)(const CMessage& message, void* context);

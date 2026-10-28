@@ -1,5 +1,5 @@
-// Engine addition, server mode (docs/SWITCHES.md, "faf-replay"): the entry point of
-// `faf-replay`, a console program that plays one replay with no window, render device or
+// Engine addition, server mode (docs/SWITCHES.md, "headless"): the entry point of
+// `headless`, a console program that plays one replay with no window, render device or
 // audio engine and reports whether every checksum the players recorded matches.
 //
 // It brings up the parts of the game's startup the sim depends on, in the game's order
@@ -23,19 +23,14 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/app/IWinApp.h"
 #include "moho/app/WinApp.h"
-#if !FAF_REPLAY_SIM_ONLY
-#include "moho/app/WxRuntimeTypes.h"
-#include "moho/ui/UiRuntimeTypes.h"
-#endif
 #include "moho/console/CConCommand.h"
 #include "moho/core/ThreadPlacement.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
 #include "moho/misc/StartupHelpers.h"
 #include "platform/X87Precision.h"
-#include "replay/ReplayLaunchCheck.h"
-#include "replay/ReplayRunner.h"
-#include "replay/ReplayTerrainCheck.h"
+#include "headless/ReplayLaunchCheck.h"
+#include "headless/ReplayRunner.h"
 
 namespace
 {
@@ -51,7 +46,7 @@ namespace
   /// `sim_ChecksumPeriod` of the players' games, the period the recorded checksums were taken at.
   constexpr int kRecordedChecksumPeriod = 50;
 
-  std::string gLabel = "faf-replay";
+  std::string gLabel = "headless";
 
   [[noreturn]] void EndProcess(const int exitCode)
   {
@@ -68,7 +63,7 @@ namespace
   void ReplayDieHandler(const char* const message)
   {
     std::printf("[%s] FATAL %s\n", gLabel.c_str(), message != nullptr ? message : "engine Die()");
-    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::headless::ChecksumMismatchCount());
     EndProcess(kExitCrash);
   }
 
@@ -82,7 +77,7 @@ namespace
       record != nullptr ? record->ExceptionCode : 0ul,
       record != nullptr ? record->ExceptionAddress : nullptr
     );
-    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::headless::ChecksumMismatchCount());
     EndProcess(kExitCrash);
   }
 #else
@@ -95,7 +90,7 @@ namespace
     std::fflush(stdout);
     void* frames[64];
     ::backtrace_symbols_fd(frames, ::backtrace(frames, 64), 1);
-    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::replay::ChecksumMismatchCount());
+    std::printf("[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::headless::ChecksumMismatchCount());
     EndProcess(kExitCrash);
   }
 #endif
@@ -142,7 +137,7 @@ namespace
   void PrintUsage()
   {
     std::printf(
-      "usage: faf-replay --replay <file.scfareplay> /init <init.lua> [options]\n"
+      "usage: headless --replay <file.scfareplay> /init <init.lua> [options]\n"
       "  --focus <army|-1>         army whose view the sim builds (0-based; -1 observer, default)\n"
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
@@ -156,8 +151,6 @@ namespace
       "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
-      "  --terrain-check <list>    faf-replay-full: load each .scmap in <list> with the client's and the\n"
-      "                            headless terrain resource and compare (plays nothing; --replay required)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -207,7 +200,7 @@ int main(int argc, char** argv)
 #endif
   gpg::SetDieHandler(&ReplayDieHandler);
 
-  faf::replay::SReplayOptions options{};
+  faf::headless::SReplayOptions options{};
   bool bad = false;
   (void)ReadOption("--label", gLabel);
   options.label = gLabel;
@@ -242,12 +235,8 @@ int main(int argc, char** argv)
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();
 
-#if !FAF_REPLAY_SIM_ONLY
-  // `WIN_AppExecute`: wx builds the application object without a window or a message loop.
-  // The client's event pump (WinApp.cpp, reached from the driver's event wait) uses
-  // `wxTheApp` without a null check. faf-replay links only the simulation and has neither.
-  wxEntry(reinterpret_cast<WXHINSTANCE>(::GetModuleHandleW(nullptr)), nullptr, nullptr, 0, false);
-#endif
+  // `WIN_AppExecute` builds wx's application object here; headless links only the
+  // simulation and has no wx.
 #if defined(_WIN32)
   (void)::CoInitialize(nullptr);
 #endif
@@ -266,10 +255,8 @@ int main(int argc, char** argv)
   } else {
     moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
   }
-#if !FAF_REPLAY_SIM_ONLY
-  // The user Lua state's init. faf-replay has no user state (replay/ReplayLuaState.h).
-  (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
-#endif
+  // The game runs /lua/userInit.lua in the user Lua state here; headless has no user state
+  // (headless/ReplayLuaState.h).
 
   // `WIN_AppExecute`, before its frame loop.
   platform::SetX87PrecisionControl(_PC_24);
@@ -278,25 +265,11 @@ int main(int argc, char** argv)
   RunStartupConsoleCommands();
   moho::PlaceCurrentThread(moho::EThreadRole::Main);
 
-  std::string terrainCheckList;
-  if (ReadOption("--terrain-check", terrainCheckList)) {
-    // Plan WPL.4: every listed map through the client's and the headless terrain resource.
-    const faf::replay::STerrainCheckResult check = faf::replay::RunTerrainCheck(terrainCheckList);
-    if (!check.ran) {
-      std::printf("[%s] TERRAINCHECK error: %s\n", gLabel.c_str(), check.error.c_str());
-      std::fflush(stdout);
-      EndProcess(kExitBadInput);
-    }
-    std::printf("%s\n", check.report.c_str());
-    std::fflush(stdout);
-    EndProcess(check.differences == 0 ? 0 : 1);
-  }
-
   if (moho::CFG_GetArgOption("--launch-check", 0, nullptr)) {
     // Plan WP2.10: the header against `BuildLaunchInfo`; plays nothing.
     std::string expectPath;
     (void)ReadOption("--launch-expect", expectPath);
-    const faf::replay::SLaunchCheckResult check = faf::replay::RunLaunchCheck(options.replayPath, expectPath);
+    const faf::headless::SLaunchCheckResult check = faf::headless::RunLaunchCheck(options.replayPath, expectPath);
     if (!check.ran) {
       std::printf("[%s] LAUNCHCHECK error: %s\n", gLabel.c_str(), check.error.c_str());
       std::fflush(stdout);
@@ -307,8 +280,8 @@ int main(int argc, char** argv)
     EndProcess(check.differences == 0 ? 0 : 1);
   }
 
-  faf::replay::InstallChecksumWatch(gLabel);
-  const faf::replay::SReplayResult result = faf::replay::RunReplay(options);
+  faf::headless::InstallChecksumWatch(gLabel);
+  const faf::headless::SReplayResult result = faf::headless::RunReplay(options);
 
   const char* const label = gLabel.c_str();
   if (!result.error.empty()) {

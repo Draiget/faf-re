@@ -1,6 +1,6 @@
-#include "replay/ReplayRunner.h"
-#include "replay/ReplayLuaState.h"
-#include "replay/ReplaySyncWriters.h"
+#include "headless/ReplayRunner.h"
+#include "headless/ReplayLuaState.h"
+#include "headless/ReplaySyncWriters.h"
 
 #include "remote/client/LoopbackLink.h"
 
@@ -40,12 +40,12 @@
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "remote/ContentTables.h"
-#include "replay/ReplayBoneStats.h"
-#include "replay/ReplayFpuReport.h"
-#include "replay/ReplayCommandCheck.h"
-#include "replay/ReplayWireStats.h"
+#include "headless/ReplayBoneStats.h"
+#include "headless/ReplayFpuReport.h"
+#include "headless/ReplayCommandCheck.h"
+#include "headless/ReplayWireStats.h"
 
-namespace faf::replay
+namespace faf::headless
 {
   namespace
   {
@@ -701,4 +701,4 @@ namespace faf::replay
     (void)wldMap.release();
     return result;
   }
-} // namespace faf::replay
+} // namespace faf::headless
