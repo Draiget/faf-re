@@ -85,7 +85,10 @@ namespace
    */
   struct TraverseCache
   {
-    gpg::core::FlatGenerationMap<bool> answers{12};
+    /// 4096 slots: room for 2048 cells before the first growth; the map keeps what it grew to.
+    static constexpr unsigned kCapacityLog2 = 12;
+
+    gpg::core::FlatGenerationMap<bool> answers{kCapacityLog2};
     int mPassDepth = 0; // > 0 while a WorkOnce pass runs
   };
 
@@ -287,6 +290,7 @@ namespace moho
     if (!sim_PathTraverseCache || cache.mPassDepth <= 0) {
       return traveler.CanTraverseCell(cell);
     }
+    static_assert(sizeof(SOCellPos) == sizeof(std::uint32_t), "the cell is its own 32-bit key");
     std::uint32_t key;
     std::memcpy(&key, &cell, sizeof(key));
     if (const bool* const known = cache.answers.Find(key)) {

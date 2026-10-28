@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace gpg::core
@@ -23,18 +25,25 @@ namespace gpg::core
   class FlatGenerationMap
   {
   public:
-    /** Starts with 2^capacityLog2 slots. */
-    explicit FlatGenerationMap(const unsigned capacityLog2 = 10)
+    /// Slot count of a default-constructed map, as a power of two (1024 slots).
+    static constexpr unsigned kDefaultCapacityLog2 = 10;
+    /// Largest starting size: the slot index must fit 32 bits on x86 as well.
+    static constexpr unsigned kMaxCapacityLog2 = 31;
+
+    /** Starts with 2^capacityLog2 slots (1 to kMaxCapacityLog2). */
+    explicit FlatGenerationMap(const unsigned capacityLog2 = kDefaultCapacityLog2)
       : mSlots(std::size_t{1} << capacityLog2)
       , mMask((std::size_t{1} << capacityLog2) - 1)
-      , mShift(64 - capacityLog2)
+      , mShift(kHashBits - capacityLog2)
     {
+      assert(capacityLog2 >= 1 && capacityLog2 <= kMaxCapacityLog2);
     }
 
     /** The value stored for `key` since the last Clear(), or null. */
     [[nodiscard]] TValue* Find(const std::uint32_t key) noexcept
     {
-      for (std::size_t i = Bucket(key);; i = (i + 1) & mMask) {
+      // Terminates: the map is never more than half full, so an empty slot follows.
+      for (std::size_t i = Bucket(key);; i = Next(i)) {
         Slot& slot = mSlots[i];
         if (slot.generation != mGeneration) {
           return nullptr;
@@ -48,42 +57,59 @@ namespace gpg::core
     /** Stores `value` for `key`, which must not be in the map. */
     TValue& Insert(const std::uint32_t key, const TValue& value)
     {
-      if ((mCount + 1) * 2 > mSlots.size()) {
+      assert(Find(key) == nullptr && "FlatGenerationMap::Insert: the key is already in the map");
+      if ((mCount + 1) * kSlotsPerEntry > mSlots.size()) {
         Grow();
       }
       ++mCount;
       return Place(key, value);
     }
 
+    /** Empties the map in O(1): slots of older generations read as empty. */
     void Clear() noexcept
     {
       mCount = 0;
-      if (++mGeneration == 0) {
+      if (++mGeneration == kEmptyGeneration) {
+        // Wrapped: stamps from 2^32 generations ago would read as current again.
         for (Slot& slot : mSlots) {
-          slot.generation = 0;
+          slot.generation = kEmptyGeneration;
         }
-        mGeneration = 1;
+        mGeneration = kFirstGeneration;
       }
     }
 
   private:
+    /// Width of the hash the slot index is taken from (the top bits of a 64-bit product).
+    static constexpr unsigned kHashBits = 64;
+    /// 2^64 / golden ratio, odd: Fibonacci hashing spreads consecutive keys (neighbouring
+    /// cells) across the whole table.
+    static constexpr std::uint64_t kFibonacciMultiplier = 0x9E3779B97F4A7C15ull;
+    /// At least this many slots per stored entry, i.e. at most half full, which keeps
+    /// linear-probe runs short and guarantees Find() meets an empty slot.
+    static constexpr std::size_t kSlotsPerEntry = 2;
+    /// A slot's generation before anything is placed in it; never a live generation.
+    static constexpr std::uint32_t kEmptyGeneration = 0;
+    static constexpr std::uint32_t kFirstGeneration = 1;
+
     struct Slot
     {
       std::uint32_t key = 0;
-      std::uint32_t generation = 0; // filled only when it equals the map's
+      std::uint32_t generation = kEmptyGeneration; // filled only when it equals the map's
       TValue value{};
     };
 
     [[nodiscard]] std::size_t Bucket(const std::uint32_t key) const noexcept
     {
-      return static_cast<std::size_t>((key * 0x9E3779B97F4A7C15ull) >> mShift);
+      return static_cast<std::size_t>((key * kFibonacciMultiplier) >> mShift);
     }
+
+    [[nodiscard]] std::size_t Next(const std::size_t index) const noexcept { return (index + 1) & mMask; }
 
     TValue& Place(const std::uint32_t key, const TValue& value) noexcept
     {
       std::size_t i = Bucket(key);
       while (mSlots[i].generation == mGeneration) {
-        i = (i + 1) & mMask;
+        i = Next(i);
       }
       mSlots[i].key = key;
       mSlots[i].generation = mGeneration;
@@ -91,13 +117,13 @@ namespace gpg::core
       return mSlots[i].value;
     }
 
+    /** Doubles the slot array and places the current generation's entries again. */
     void Grow()
     {
-      std::vector<Slot> old(mSlots.size() * 2);
-      old.swap(mSlots);
+      std::vector<Slot> previous = std::exchange(mSlots, std::vector<Slot>(mSlots.size() * 2));
       mMask = mSlots.size() - 1;
       --mShift;
-      for (const Slot& slot : old) {
+      for (const Slot& slot : previous) {
         if (slot.generation == mGeneration) {
           (void)Place(slot.key, slot.value);
         }
@@ -107,7 +133,7 @@ namespace gpg::core
     std::vector<Slot> mSlots;
     std::size_t mMask;
     unsigned mShift;
-    std::uint32_t mGeneration = 1;
+    std::uint32_t mGeneration = kFirstGeneration;
     std::size_t mCount = 0;
   };
 } // namespace gpg::core
