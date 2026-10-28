@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -21,6 +22,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Logging.h"
+#include "lua/LuaObject.h"
+#include "moho/lua/SCR_String.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StartupHelpers.h"
@@ -167,6 +170,47 @@ namespace
 
 namespace moho
 {
+  /**
+   * Engine addition, not in the binary: whether the serialized Lua values a
+   * replay or saved game carries (game mods, scenario, army setups) decode.
+   * The session decodes them again with the same SCR_FromString when it
+   * starts, on the main, loader and sim threads, where a failure is not
+   * caught and ends the process. Checking them here lets the file be refused
+   * while its reader can still say so.
+   */
+  bool LaunchInfoStringsDecode(
+    const LaunchInfoBase& launchInfo, const msvc8::vector<msvc8::string>& armySetups
+  )
+  {
+    LuaPlus::LuaState scratch(LuaPlus::LuaState::LIB_NONE);
+    // Each of them is a table where it is used (Sim::Setup writes into the
+    // army setups and the scenario), so anything else is refused too.
+    const auto decodesTo = [&scratch](const msvc8::string& text, const bool nilAllowed) {
+      try {
+        LuaPlus::LuaObject value;
+        (void)SCR_FromString(&value, text, &scratch);
+        return value.IsTable() || (nilAllowed && value.IsNil());
+      } catch (const std::exception&) {
+        return false;
+      }
+    };
+
+    // An empty mods string means no mods (RRuleGameRules skips the decode),
+    // and so does an encoded nil (a launch without a mods table).
+    if (!launchInfo.mGameMods.empty() && !decodesTo(launchInfo.mGameMods, true)) {
+      return false;
+    }
+    if (!decodesTo(launchInfo.mScenarioInfo, false)) {
+      return false;
+    }
+    for (const msvc8::string& armySetup : armySetups) {
+      if (!decodesTo(armySetup, false)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   ReplayLocalClientNameHook sReplayLocalClientName = nullptr;
 
   namespace

@@ -20,8 +20,11 @@ namespace moho
   // this translation unit.
   Wm3::Quaternionf* MatrixColumnsToQuatCanonical(const Wm3::Vector3f* matrixColumns, Wm3::Quaternionf* out) noexcept;
 
-  // Address: 0x00F58E4C (cam_DefaultLOD), defined in RCamManager.cpp.
-  extern float cam_DefaultLOD;
+  // Address: 0x00F58E4C (cam_DefaultLOD). Engine addition (dedicated-server plan WPL.4):
+  // defined here, beside the camera that reads it, rather than in
+  // moho/render/RCamManager.cpp, which registers its console variable; the
+  // simulation links this file without the client's render code.
+  float cam_DefaultLOD = 1.0f;
 }
 
 namespace
