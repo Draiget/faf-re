@@ -2584,12 +2584,12 @@ Cluster ClusterBuild(const SubclusterData& subclusterData)
         for (std::uint32_t low = 0u; low < high; ++low) {
             SubclusterCell key{};
             key.mNode = nodes[low];
-            const auto found = search.Nodes().find(key);
-            if (found == search.Nodes().end()) {
+            const auto* const found = search.Nodes().Find(key);
+            if (found == nullptr) {
                 continue;
             }
             edges[low + ((high * (high - 1u)) >> 1u)].cost =
-                Cluster::Node::CostTo(nodes[low], nodes[high], found->second.mCell.mDistance);
+                Cluster::Node::CostTo(nodes[low], nodes[high], found->mCell.mDistance);
         }
     }
 
