@@ -37,6 +37,7 @@ before its recorded length), crash, timeout, aborted (stopped by the user; queue
 """
 import argparse
 import ctypes
+import csv
 import ctypes.wintypes as wt
 import datetime
 import hashlib
@@ -713,8 +714,34 @@ def cmd_fetch(args):
 u32 = ctypes.WinDLL("user32", use_last_error=True)
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 ntdll = ctypes.WinDLL("ntdll")
-k32.OpenProcess.restype = wt.HANDLE
 EnumProc = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+
+
+def _declare(fn, restype, *argtypes):
+    """Every call's types, so ctypes never guesses an int's width: on x64 a handle, WPARAM,
+    LPARAM or LRESULT is 64 bits (a runner died in _ctypes.pyd, 0xC0000005, on 2026-10-28)."""
+    fn.restype = restype
+    fn.argtypes = argtypes
+
+
+LRESULT = ctypes.c_ssize_t
+_declare(k32.OpenProcess, wt.HANDLE, wt.DWORD, wt.BOOL, wt.DWORD)
+_declare(k32.CloseHandle, wt.BOOL, wt.HANDLE)
+_declare(k32.GetStdHandle, wt.HANDLE, wt.DWORD)
+_declare(k32.GetConsoleMode, wt.BOOL, wt.HANDLE, ctypes.POINTER(wt.DWORD))
+_declare(k32.SetConsoleMode, wt.BOOL, wt.HANDLE, wt.DWORD)
+_declare(k32.GetNumberOfConsoleInputEvents, wt.BOOL, wt.HANDLE, ctypes.POINTER(wt.DWORD))
+_declare(ntdll.NtSuspendProcess, ctypes.c_long, wt.HANDLE)
+_declare(ntdll.NtResumeProcess, ctypes.c_long, wt.HANDLE)
+_declare(u32.EnumWindows, wt.BOOL, EnumProc, wt.LPARAM)
+_declare(u32.EnumChildWindows, wt.BOOL, wt.HWND, EnumProc, wt.LPARAM)
+_declare(u32.GetWindowThreadProcessId, wt.DWORD, wt.HWND, ctypes.POINTER(wt.DWORD))
+_declare(u32.GetClassNameW, ctypes.c_int, wt.HWND, wt.LPWSTR, ctypes.c_int)
+_declare(u32.IsWindowVisible, wt.BOOL, wt.HWND)
+_declare(u32.ShowWindowAsync, wt.BOOL, wt.HWND, ctypes.c_int)
+_declare(u32.PostMessageW, wt.BOOL, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+_declare(u32.SendMessageTimeoutW, LRESULT, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM, wt.UINT, wt.UINT,
+         ctypes.POINTER(ctypes.c_size_t))
 PROCESS_SUSPEND_RESUME = 0x0800
 SW_SHOWNOACTIVATE, SW_SHOWMINNOACTIVE = 4, 7
 WM_GETTEXT, WM_GETTEXTLENGTH, BM_CLICK = 0x000D, 0x000E, 0x00F5
@@ -760,12 +787,21 @@ def windows_of(pid):
     return found
 
 
+SMTO_ABORTIFHUNG = 0x0002
+
+
 def window_text(hwnd):
-    n = u32.SendMessageW(hwnd, WM_GETTEXTLENGTH, 0, 0)
+    # With a timeout: a game window that stopped pumping messages must not hang the runner.
+    result = ctypes.c_size_t()
+    if not u32.SendMessageTimeoutW(hwnd, WM_GETTEXTLENGTH, 0, 0, SMTO_ABORTIFHUNG, 1000, ctypes.byref(result)):
+        return ""
+    n = result.value
     if not 0 < n < 8192:
         return ""
     buf = ctypes.create_unicode_buffer(n + 1)
-    u32.SendMessageW(hwnd, WM_GETTEXT, n + 1, buf)
+    if not u32.SendMessageTimeoutW(hwnd, WM_GETTEXT, n + 1, ctypes.addressof(buf), SMTO_ABORTIFHUNG, 1000,
+                                   ctypes.byref(result)):
+        return ""
     return buf.value
 
 
@@ -821,10 +857,22 @@ def kill_pid(pid):
     subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
 
 
+PARITY_EXE_RE = re.compile(r"^.+_parity_[0-9a-f]{10}\.exe$", re.I)
+
+
 def kill_leftover_games():
     """Games a runner that died left behind (only one runner runs at a time, so any snapshot
-    exe still running belongs to none). Another account's games are out of reach and stay."""
-    subprocess.run(["taskkill", "/F", "/IM", "*_parity_*.exe"], capture_output=True)
+    exe still running belongs to none). Another account's games are out of reach and stay.
+    By pid: `taskkill /IM` takes a wildcard only at the end of the name, so the old
+    "*_parity_*.exe" matched nothing and leftovers kept running."""
+    try:
+        out = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
+                             timeout=60).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return
+    for row in csv.reader(out.splitlines()):
+        if len(row) >= 2 and PARITY_EXE_RE.match(row[0]) and row[1].isdigit():
+            kill_pid(int(row[1]))
 
 # ----------------------------------------------------------------------------- the build
 
