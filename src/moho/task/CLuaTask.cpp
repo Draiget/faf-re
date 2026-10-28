@@ -1,6 +1,7 @@
 #include "CLuaTask.h"
 
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <new>
 #include <string>
@@ -12,6 +13,8 @@
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/profiling/Profiler.h"
+#include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StatItem.h"
 #include "moho/script/CScriptEvent.h"
@@ -177,6 +180,42 @@ namespace
     ++task->mResumeArgCount;
   }
 
+#if defined(TRACY_ENABLE)
+  /**
+   * Engine addition, profile builds only: "lua thread <source>:<line>" for the outermost Lua
+   * function of a suspended thread (the function ForkThread started), or "lua thread (start)"
+   * before its first resume. Reads the thread's frames only (lua_getstack / lua_getinfo "S").
+   */
+  void DescribeLuaThreadForProfile(
+    lua_State* const thread, const int resumeArgCount, char* const out, const std::size_t size
+  )
+  {
+    lua_Debug outermost{};
+    bool found = false;
+    for (int level = 0;; ++level) {
+      lua_Debug frame{};
+      if (lua_getstack(thread, level, &frame) == 0) {
+        break;
+      }
+      outermost = frame;
+      found = true;
+    }
+    if (found && lua_getinfo(thread, "S", &outermost) != 0) {
+      std::snprintf(out, size, "lua thread %s:%d", outermost.short_src, outermost.linedefined);
+      return;
+    }
+    // Not started yet: the function sits below its resume arguments. "S" with '>' pops the copy.
+    if (lua_gettop(thread) > resumeArgCount && lua_type(thread, -(resumeArgCount + 1)) == LUA_TFUNCTION) {
+      lua_pushvalue(thread, -(resumeArgCount + 1));
+      if (lua_getinfo(thread, ">S", &outermost) != 0) {
+        std::snprintf(out, size, "lua thread %s:%d", outermost.short_src, outermost.linedefined);
+        return;
+      }
+    }
+    std::snprintf(out, size, "lua thread (start)");
+  }
+#endif
+
 } // namespace
 
 /**
@@ -285,6 +324,12 @@ int CLuaTask::Execute()
 
   int resumeResult = 0;
   try {
+#if defined(TRACY_ENABLE)
+    // Profile builds: the resume's zone is named after the thread's outermost Lua function.
+    char threadZoneName[128];
+    DescribeLuaThreadForProfile(state->m_state, mResumeArgCount, threadZoneName, sizeof(threadZoneName));
+    FAF_PROFILE_ZONE_TRANSIENT(threadZoneName);
+#endif
     resumeResult = lua_resume(state->m_state, mResumeArgCount);
   } catch (...) {
     if (destroyedByDtor) {

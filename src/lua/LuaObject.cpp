@@ -34,6 +34,8 @@
 #include "LuaMemAccounting.h"
 #include "LuaNumberText.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
+#include "gpg/core/profiling/ProfileNames.h"
+#include "gpg/core/profiling/Profiler.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
 #include "LuaUndump.h"
@@ -3481,6 +3483,13 @@ extern "C"
 			}
 			lua_pushcclosure(state, registration->func, nup);
 			lua_settable(state, destinationTableIndex);
+#if defined(TRACY_ENABLE)
+			// Profile builds: name library functions (table.insert, string.find, next) for their zones.
+			gpg::profiling::NameLuaCFunction(
+				reinterpret_cast<const void*>(registration->func), libname != nullptr ? libname : "<global>",
+				registration->name
+			);
+#endif
 			++registration;
 		}
 
@@ -18055,6 +18064,10 @@ extern "C"
 			++invocationsHigh;
 		}
 
+#if defined(TRACY_ENABLE)
+		// Profile builds: one zone per engine function Lua calls, named by its binder.
+		FAF_PROFILE_ZONE_TRANSIENT(gpg::profiling::LuaCFunctionName(reinterpret_cast<const void*>(closure->c.f)));
+#endif
 		const int produced = closure->c.f(state);
 		return state->top - produced;
 	}
