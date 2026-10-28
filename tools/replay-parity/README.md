@@ -2,6 +2,8 @@
 
 Plays FAF vault replays on a rebuilt engine in the background and records, per build, whether every checksum the live players recorded matches. No agent is needed while it runs: one Python process launches the games, watches their logs and writes the results.
 
+Two modes, both on Windows: **gui** plays each replay in the game (`main_x64.exe`, hidden), **headless** in `headless_x64.exe`, the console replay player that links the simulation alone (no window, rendering or audio; [docs/SWITCHES.md](../../docs/SWITCHES.md#headless)). gui tests the whole client as players run it; headless is much faster (a replay plays flat out) and tests the simulation only.
+
 Needs Python 3.14 or newer (stdlib `compression.zstd`). `parity.cmd` uses the Azure CLI Python by default; set `FAF_PY` to use another one.
 
 ## Quick start
@@ -9,6 +11,7 @@ Needs Python 3.14 or newer (stdlib `compression.zstd`). `parity.cmd` uses the Az
 ```bat
 tools\replay-parity\parity.cmd import          :: once: pool the replays already downloaded in tools/runs/replay_20261013
 tools\replay-parity\parity.cmd                 :: the console: runs the games and shows them live
+tools\replay-parity\parity.cmd console --mode headless   :: the same with headless_x64.exe
 ```
 
 ## Console
@@ -20,6 +23,7 @@ tools\replay-parity\parity.cmd                 :: the console: runs the games an
 | `+` / `-` | One instance more / fewer |
 | `p` | Pause / resume (running games are suspended) |
 | `r` | Resume: clears a pause and a pending stop; starts the runner again if it stopped |
+| `m` | Mode: gui / headless. New games use the other exe (its own build); running games finish as they are |
 | `a` | Auto-fetch on/off (on by default): when every ready replay has a result for the build and a slot is free, fetch `auto_fetch` (10) more for the game version the exe plays, so the runner never runs dry |
 | `f` | Fetch 10 more replays from the vault. A FETCH panel shows ready replays against the target, headers read, what was skipped and why, the file being downloaded with its bytes, and each new replay's outcome |
 | `s` | Stop after the running games finish (press again, or `r`, to cancel) |
@@ -32,12 +36,13 @@ With no runner going, the console is the runner, like a miner: `q` kills its gam
 
 | Command | What it does |
 |---|---|
-| `console [-n N]` | The live console (the default command). |
+| `console [-n N] [--mode gui\|headless]` | The live console (the default command). |
 | `init` | Creates `tmp/parity` with `config.json` and `control.json`. Every other command runs it. |
 | `import [DIR...]` | Copies `<id>.fafreplay` files into the pool and prepares them. Without arguments it takes `tools/runs/replay_20261013/dl` and that folder itself. |
 | `fetch [-n 20]` | Reads replay headers at random ids in `scan_range` (one 4 KB request each) and downloads replays that qualify until `-n` more are ready. Maps and M28AI versions are downloaded as needed. |
 | `retry` | Prepares again the replays that failed on a map or M28AI download. |
-| `start [-n N]` | Starts the runner detached from the console. With `-n` it also sets the instance count. |
+| `start [-n N] [--mode gui\|headless]` | Starts the runner detached from the console. With `-n` it also sets the instance count. |
+| `mode [gui\|headless]` | Shows the mode and the exe it tests, or switches it (`mode` in `config.json`). A running runner takes it for its next games. |
 | `instances N` | Number of games running at once. Lowering it suspends the newest games; raising it resumes them first, then launches new ones. |
 | `pause` / `resume` | Suspends every running game (their CPU drops to zero) and stops launching / resumes them. |
 | `stop` | Starts no new games and exits after the running ones finish. `stop --now` kills them; they are queued again. |
@@ -48,12 +53,19 @@ With no runner going, the console is the runner, like a miner: `q` kills its gam
 
 ## What a game does
 
+In gui mode:
+
 - **Launch:** `<exe> /init init_parity[_m28_vNNNN].lua /replay <id>.scfareplay /replayid <id> /nosound /nomovie /windowed 1024 576 /log ... /title parity-<id>` plus `args` from the config (default `/simworkers 8`), from the exe's folder.
 - **Init file:** generated next to the exe from its `init_faf.lua` at every launch. It points the vault at `tmp/parity/vault` (downloaded maps), also mounts the maps in `extra_map_dirs`, mounts the M28AI version the replay was recorded with at `/mods/m28ai`, and adds the `hook` folder.
 - **Hook** (`hook/lua/ui/game/gamemain.lua`, appended to the stock file): `WLD_GameSpeed 50` (the uncapped console rate), camera reset to the map centre and zoomed fully in, and a `PARITY heartbeat tick=... time=...` log line every 2 seconds. It runs in the user Lua state only.
 - **Hidden:** the game starts minimized (the show state in its STARTUPINFO, so the window never appears) and the runner removes its taskbar button (`ITaskbarList::DeleteTab`). A minimized window keeps running the sim but skips rendering (`CScApp` frame loop), so this is close to headless. `"window_mode": "minimized"` keeps the taskbar button; `"normal"` shows the window, for watching a game. A desktop of its own (`CreateDesktop`) would hide even more, but on this sandboxed account every process started on one dies at startup (0xC0000142).
 - **Watch:** the runner reads the game log. `Checksum for beat N mismatched` ends the game at once, unless the live game itself disagreed at that beat: when more of the clients recorded in the replay have the sim's checksum than the mismatching client's, that client desynced in the live game, not us. The game plays on and the note says `<client> disagreed at beat N` (26946725: nine clients and the sim agree at beat 6700, Paulosan alone differs). A client outvoted once is ignored for the rest of the game, so it cannot turn a later 1-vs-1 split into a desync (26988102: Auhram desynced live at beat 8950; by beat 20150 only Auhram and jamaker were left, and the sim matched jamaker). The heartbeat's `over=true` held for 5 seconds ends it as played to the end: the sim stops at game over, a few beats before the stream ends after a victory (the beats where players leave are never simulated), one tick past the last beat when the replay simply runs out. A replay that never reports game over ends when its beat stops advancing for `stall_seconds`.
 - **Length:** the exact game length is the sum of the `CMDST_Advance` beat counts in the replay's command stream, read once when the replay is prepared. The header's `launched_at`..`game_end` is the live game's wall time with lobby, loading and pauses (26935800: 40:56 of game against 51.5 header minutes), so it is only a fallback.
+
+In headless mode:
+
+- **Launch:** `headless_x64.exe --replay <id>.scfareplay /init <exe folder>\init_parity[_m28_vNNNN].lua /nosound /log logs/<build>/<id>.log --label parity-<id> --timeout <max_wall_minutes + 5>` plus `headless_args` (default `/simworkers 8`), from the exe's folder, with no window or console (`CREATE_NO_WINDOW`). Same init file; the hook does nothing there, as headless has no user Lua state.
+- **Watch:** its output goes to `logs/<build>/<id>.out`: `loaded in`, a `beat N game time` line every 30 s, each mismatch (`DESYNC-LINE Checksum for beat N mismatched: ...`, judged with the same live-client vote as above), `GAME-ENDED beat N`, and at the exit `beats=... last-beat=... game-over=...` and `VERDICT ended=... mismatches=... crash=...`. It plays the replay flat out and exits, and the verdict is taken then: pass when the sim's game ended, game over was reached or the last beat is within 2 of the stream's length; incomplete otherwise; crash on `crash=True` or no VERDICT line.
 
 ## Verdicts
 
@@ -71,7 +83,7 @@ Every finished game is also one line in `tmp/parity/results.txt`. A desynced rep
 
 ## Builds
 
-The runner tests the exe named by `exe` in the config (default `C:/ProgramData/FAForever/bin_x64/main_x64.exe`, where `build.ps1` puts the x64 Release build). It copies it to `main_x64_parity_<hash>.exe` next to it and labels results with that hash and the git HEAD at the time. With `follow_exe` on, a rebuilt exe (unchanged for a minute) becomes the new build for the next launches, and the whole pool is queued again for it. Games already running finish on the old build.
+The runner tests the exe of the mode: `exe` in gui mode (default `C:/ProgramData/FAForever/bin_x64/main_x64.exe`, where `build.ps1` puts the x64 Release build), `headless_exe` in headless mode (default `.../bin_x64/headless_x64.exe`, which `build.ps1` copies beside it). It copies it to `<name>_parity_<hash>.exe` next to it and labels results with that hash and the git HEAD at the time. With `follow_exe` on, a rebuilt exe (unchanged for a minute) becomes the new build for the next launches, and the whole pool is queued again for it. Games already running finish on the old build.
 
 ## Pool
 
@@ -87,10 +99,13 @@ The console sets the window's QuickEdit mode off while it runs: with it on, a mo
 
 | Key | Default | |
 |---|---|---|
-| `exe` | `C:/ProgramData/FAForever/bin_x64/main_x64.exe` | Build under test |
+| `mode` | `gui` | `gui` or `headless` |
+| `exe` | `C:/ProgramData/FAForever/bin_x64/main_x64.exe` | Build under test in gui mode |
+| `headless_exe` | `C:/ProgramData/FAForever/bin_x64/headless_x64.exe` | Build under test in headless mode |
 | `follow_exe` | `true` | Switch to a rebuilt exe automatically |
-| `args` | `["/simworkers", "8"]` | Extra game arguments |
-| `window`, `window_mode` | `[1024, 576]`, `hidden` | `hidden`, `minimized` or `normal` |
+| `args` | `["/simworkers", "8"]` | Extra game arguments (gui) |
+| `headless_args` | `["/simworkers", "8"]` | Extra headless arguments ([its switches](../../docs/SWITCHES.md#headless)) |
+| `window`, `window_mode` | `[1024, 576]`, `hidden` | gui: `hidden`, `minimized` or `normal` |
 | `stall_seconds` | 45 | No new beat for this long: the replay is over |
 | `startup_seconds`, `max_wall_minutes` | 240, 120 | |
 | `min_minutes` | 5 | |

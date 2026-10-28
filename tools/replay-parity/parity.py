@@ -13,6 +13,7 @@ usage: parity.py [<command> [options]]    (see README.md next to this file)
   pause / resume             suspend every running game and stop launching / continue
   stop [--now]               finish the running games and exit / kill them and exit now
   status [-v]                pool, per-build results, running games, desyncs
+  mode [gui|headless]        show or switch what plays the replays (takes effect for new games)
   run                        the runner itself, in the foreground
 
 Data lives in tmp/parity (FAF_PARITY_DATA overrides): parity.sqlite (pool and results),
@@ -25,6 +26,10 @@ M28AI version the replay was recorded with, and tools/replay-parity/hook, which 
 at WLD_GameSpeed 50, parks the camera zoomed in at the map centre and logs a heartbeat.
 The game starts minimized (STARTUPINFO show state) and, in window_mode "hidden", loses its
 taskbar button: a minimized window keeps the sim running but skips rendering (CScApp::OnFrame).
+
+Mode "headless" plays the replays with headless_x64.exe instead (docs/SWITCHES.md, "headless"):
+the simulation alone, no window or console, its progress and verdict read from its output.
+Each mode tests its own exe, so their results are separate builds.
 
 Verdicts: pass (no mismatch, played to the end), desync (first mismatched beat recorded,
 replay and log saved, game killed), incomplete (no mismatch, but the replay stopped well
@@ -83,12 +88,18 @@ EXTENDED_SET = [26975290, 26953273, 27034831, 26917867, 26876279, 26935800, 2689
                 27004084, 26915859, 26905122]
 
 DEFAULT_CONFIG = {
-    # Built exe to test. The runner snapshots it (copy next to it, named by content hash) and
-    # follows rebuilds: once the file changes and has been stable for a minute, new games use
-    # the new build and the whole pool is queued again for it.
+    # What plays the replays: "gui", the game (main_x64.exe, hidden as window_mode says), or
+    # "headless", the console replay player (headless_x64.exe: the simulation alone, no window,
+    # rendering or audio). `parity.py mode` and the console's `m` key switch it.
+    "mode": "gui",
+    # Built exe to test in each mode. The runner snapshots it (copy next to it, named by content
+    # hash) and follows rebuilds: once the file changes and has been stable for a minute, new
+    # games use the new build and the whole pool is queued again for it.
     "exe": FAF_DIR + "/bin_x64/main_x64.exe",
+    "headless_exe": FAF_DIR + "/bin_x64/headless_x64.exe",
     "follow_exe": True,
     "args": ["/simworkers", "8"],
+    "headless_args": ["/simworkers", "8"],
     "window": [1024, 576],
     # hidden: minimized from the first frame and its taskbar button removed, so nothing shows;
     # minimized: the same with the taskbar button; normal: visible, for watching a game.
@@ -170,7 +181,29 @@ def load_config():
     cfg = read_json(CONFIG_PATH, DEFAULT_CONFIG)
     if not cfg.get("game_version"):
         cfg["game_version"] = int(fa_path_values().get("GameVersion", "3835"))
+    if cfg.get("mode") not in MODES:
+        cfg["mode"] = "gui"
     return cfg
+
+
+MODES = ("gui", "headless")
+
+
+def mode_exe(cfg):
+    """The exe the configured mode tests."""
+    return cfg["headless_exe"] if cfg["mode"] == "headless" else cfg["exe"]
+
+
+def set_mode(mode):
+    """Write the mode into config.json, keeping the rest of the file as the user left it."""
+    raw = read_json(CONFIG_PATH, {})
+    raw["mode"] = mode
+    write_json(CONFIG_PATH, raw)
+    return mode
+
+
+def mode_of_exe(path):
+    return "headless" if "headless" in os.path.basename(path or "").lower() else "gui"
 
 
 def update_control(**changes):
@@ -874,7 +907,14 @@ TROUBLE_RE = re.compile(r"(?-i:\bFATAL\b)|access violation|Assertion failed|Unab
                         r"Failed to setup initial search path|Unhandled exception", re.I)
 
 
+def new_game(row, build, exe, cfg):
+    """A game of the kind the build's exe plays."""
+    return (HeadlessGame if mode_of_exe(exe) == "headless" else Game)(row, build, exe, cfg)
+
+
 class Game:
+    """One replay played by the game (main_x64.exe), minimized or hidden."""
+
     def __init__(self, row, build, exe, cfg):
         self.id = row["id"]
         self.expect = row["minutes"]  # header: the live game's wall time, lobby and pauses included
@@ -890,15 +930,7 @@ class Game:
             os.remove(self.log)
         exe_dir = os.path.dirname(exe)
         init = init_file_for(exe_dir, row["m28"], cfg)
-        w, h = cfg["window"]
-        cmd = [exe, "/init", init, "/nobugreport", "/replay", pool_path(self.id, "scfareplay"),
-               "/replayid", str(self.id), "/nosound", "/nomovie", "/windowed", str(w), str(h),
-               "/log", self.log, "/title", "parity-%d" % self.id, *cfg["args"]]
-        env = dict(os.environ, __COMPAT_LAYER="HighDpiAware")
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW  # the game's first ShowWindow takes this
-        si.wShowWindow = SW_SHOWNOACTIVATE if cfg["window_mode"] == "normal" else SW_SHOWMINNOACTIVE
-        self.proc = subprocess.Popen(cmd, cwd=exe_dir, env=env, startupinfo=si)
+        self.proc = self.launch(exe, exe_dir, init, cfg)
         self.untabbed = set()
         self.pos = 0
         self.tick = -1
@@ -918,6 +950,36 @@ class Game:
         self.paused_total_at_progress = 0.0
         self.last_progress = time.time()
         self.verdict = None
+
+    def launch(self, exe, exe_dir, init, cfg):
+        w, h = cfg["window"]
+        cmd = [exe, "/init", init, "/nobugreport", "/replay", pool_path(self.id, "scfareplay"),
+               "/replayid", str(self.id), "/nosound", "/nomovie", "/windowed", str(w), str(h),
+               "/log", self.log, "/title", "parity-%d" % self.id, *cfg["args"]]
+        env = dict(os.environ, __COMPAT_LAYER="HighDpiAware")
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW  # the game's first ShowWindow takes this
+        si.wShowWindow = SW_SHOWNOACTIVATE if cfg["window_mode"] == "normal" else SW_SHOWMINNOACTIVE
+        return subprocess.Popen(cmd, cwd=exe_dir, env=env, startupinfo=si)
+
+    def progress(self, tick):
+        if tick > self.tick:
+            self.tick = tick
+            self.last_progress = time.time()
+            self.paused_total_at_progress = self.paused_total
+
+    def note_mismatch(self, m):
+        """A "Checksum for beat N mismatched" line: ours, or the live game's (see below)."""
+        beat, sim, theirs, client = int(m.group(1)), m.group(2), m.group(3), m.group(4)
+        if client in self.desynced_clients:
+            return  # desynced in the live game earlier; stays wrong for the rest of it
+        if self.live_client_desync(beat, sim, theirs):
+            self.desynced_clients.add(client)
+            self.client_desyncs.append("%s disagreed at beat %d" % (client, beat))
+            return
+        self.mismatches += 1
+        if self.first_beat is None:
+            self.first_beat = beat
 
     def active_seconds_since(self, t):
         paused = self.paused_total + (time.time() - self.suspended_at if self.suspended else 0.0)
@@ -945,26 +1007,13 @@ class Game:
         for line in chunk.splitlines():
             m = HEARTBEAT_RE.search(line)
             if m:
-                tick = int(m.group(1))
-                if tick > self.tick:
-                    self.tick = tick
-                    self.last_progress = time.time()
-                    self.paused_total_at_progress = self.paused_total
+                self.progress(int(m.group(1)))
                 self.time = float(m.group(2))
                 self.over = self.over or m.group(3) == "true"
                 continue
             m = MISMATCH_RE.search(line)
             if m:
-                beat, sim, theirs, client = int(m.group(1)), m.group(2), m.group(3), m.group(4)
-                if client in self.desynced_clients:
-                    continue  # desynced in the live game earlier; stays wrong for the rest of it
-                if self.live_client_desync(beat, sim, theirs):
-                    self.desynced_clients.add(client)
-                    self.client_desyncs.append("%s disagreed at beat %d" % (client, beat))
-                    continue
-                self.mismatches += 1
-                if self.first_beat is None:
-                    self.first_beat = beat
+                self.note_mismatch(m)
                 continue
             if "GameEnded" in line:
                 self.ended = True
@@ -1059,6 +1108,91 @@ class Game:
                 "game_time": round(self.time), "expect_min": self.expect, "beats": self.beats,
                 "wall_s": round(self.active_seconds_since(self.t0)), "stalled_s": round(self.stalled_seconds())}
 
+
+# headless_x64.exe's output (src/headless/ReplayRunner.cpp, HeadlessMain.cpp), every line
+# prefixed with "[<label>] ".
+HL_LOADED_RE = re.compile(r"\] loaded in [\d.]+s")
+HL_PROGRESS_RE = re.compile(r"\] beat (-?\d+) game time \d+:\d+:\d+ after")
+HL_ENDED_RE = re.compile(r"\] GAME-ENDED beat (-?\d+)")
+HL_SUMMARY_RE = re.compile(r"\] beats=\d+ last-beat=(-?\d+) game-over=(\w+)")
+HL_VERDICT_RE = re.compile(r"\] VERDICT ended=(\w+) .*crash=(\w+)")
+HL_TROUBLE_RE = re.compile(r"\] (?:FATAL|CRASH|ERROR) ")
+
+
+class HeadlessGame(Game):
+    """One replay played by headless_x64.exe: no window and no console. It plays the replay
+    flat out and exits; what it prints goes to logs/<build>/<id>.out, the engine log to
+    <id>.log. Mismatch lines are the engine's own ("DESYNC-LINE Checksum for beat N
+    mismatched: ..."), so the live-client vote below works as for the game."""
+
+    def launch(self, exe, exe_dir, init, cfg):
+        self.out = os.path.splitext(self.log)[0] + ".out"
+        self.out_pos = 0
+        self.final = None  # (ended, crash) from the VERDICT line
+        cmd = [exe, "--replay", pool_path(self.id, "scfareplay"), "/init", os.path.join(exe_dir, init),
+               "/nosound", "/log", self.log, "--label", "parity-%d" % self.id,
+               "--timeout", str(int(cfg["max_wall_minutes"]) + 5), *cfg["headless_args"]]
+        with open(self.out, "wb") as out:
+            return subprocess.Popen(cmd, cwd=exe_dir, stdout=out, stderr=subprocess.STDOUT,
+                                    stdin=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+
+    def read_log(self):
+        try:
+            with open(self.out, encoding="latin1", errors="replace") as f:
+                f.seek(self.out_pos)
+                chunk = f.read()
+        except OSError:
+            return
+        # Only whole lines: the process may be writing the last one.
+        cut = chunk.rfind("\n") + 1
+        if self.proc.poll() is None:
+            chunk = chunk[:cut]
+        self.out_pos += len(chunk.encode("latin1", errors="replace"))
+        for line in chunk.splitlines():
+            m = MISMATCH_RE.search(line)
+            if m:
+                self.note_mismatch(m)
+                continue
+            m = HL_PROGRESS_RE.search(line) or HL_ENDED_RE.search(line)
+            if m:
+                self.progress(int(m.group(1)))
+                self.ended = self.ended or "GAME-ENDED" in line
+            elif HL_LOADED_RE.search(line):
+                self.progress(0)
+            elif (m := HL_SUMMARY_RE.search(line)):
+                self.progress(int(m.group(1)))
+                self.over = m.group(2) == "True"
+            elif (m := HL_VERDICT_RE.search(line)):
+                self.final = (m.group(1) == "True", m.group(2) == "True")
+            elif HL_TROUBLE_RE.search(line):
+                self.notes.append(line.strip()[:200])
+            self.time = max(self.tick, 0) / 10.0
+
+    def poll(self):
+        if self.suspended:
+            return None
+        self.read_log()
+        if self.first_beat is not None:
+            return "desync"
+        if self.proc.poll() is not None:
+            self.read_log()
+            if self.first_beat is not None:
+                return "desync"
+            if self.final is None or self.final[1]:
+                self.notes.append("exit code %s%s" % (self.proc.returncode, "" if self.final else ", no verdict"))
+                return "crash"
+            if self.ended or self.over or (self.beats and self.tick >= self.beats - 2):
+                return "pass"
+            self.notes.append("stopped at beat %d of %s" % (self.tick, self.beats or "?"))
+            return "incomplete"
+        wall = self.active_seconds_since(self.t0)
+        if wall > self.cfg["max_wall_minutes"] * 60:
+            return "timeout"
+        if self.tick < 0 and wall > self.cfg["startup_seconds"]:
+            self.notes.append("not loaded after %ds" % wall)
+            return "crash"
+        return None
+
 # ---------------------------------------------------------------------------- the runner
 
 
@@ -1082,7 +1216,9 @@ class Runner:
         self.games = []
         self.build = None
         self.exe = None
+        self.source = None
         self.source_seen = None
+        self.source_missing = None
         self.last_build_check = 0.0
         self.last_launch = 0.0
         self.fetching = None
@@ -1094,26 +1230,33 @@ class Runner:
         log_line("%s %s" % (now(), text), self.echo)
 
     def refresh_build(self, cfg, force=False):
-        if not force and time.time() - self.last_build_check < 60:
+        source = mode_exe(cfg)
+        # A mode switch takes the other exe at once; running games finish on their own build.
+        switched = source != self.source
+        if not force and not switched and time.time() - self.last_build_check < 60:
             return
         self.last_build_check = time.time()
-        source = cfg["exe"]
         try:
             stat = os.stat(source)
         except OSError:
             if force:
                 raise
+            if switched and self.source_missing != source:
+                self.source_missing = source
+                self.say("mode %s: %s not found; staying on build %s" % (cfg["mode"], source, self.build))
             return
-        key = (stat.st_size, stat.st_mtime)
-        if not force and (not cfg["follow_exe"] or key == self.source_seen):
+        key = (source, stat.st_size, stat.st_mtime)
+        if not force and not switched and (not cfg["follow_exe"] or key == self.source_seen):
             return
-        if not force and time.time() - stat.st_mtime < 60:
+        if not force and not switched and time.time() - stat.st_mtime < 60:
             return  # still being written by a build
         build, exe = snapshot_build(self.conn, source)
         self.source_seen = key
+        self.source = source
+        self.source_missing = None
         if build != self.build:
             self.build, self.exe = build, exe
-            self.say("build %s (%s) %s" % (build, exe, git_head()))
+            self.say("build %s (%s, %s) %s" % (build, cfg["mode"], exe, git_head()))
 
     def next_replay(self):
         running = {g.id for g in self.games} | self.launch_skipped
@@ -1170,6 +1313,7 @@ class Runner:
     def write_state(self, ctl):
         write_json(STATE_PATH, {"updated": now(), "updated_ts": time.time(), "pid": os.getpid(),
                                 "running": True, "build": self.build, "exe": self.exe,
+                                "mode": mode_of_exe(self.exe),
                                 "control": ctl, "fetching": bool(self.fetching and self.fetching.is_alive()),
                                 "games": [g.describe() for g in self.games]})
 
@@ -1262,7 +1406,7 @@ class Runner:
             if row is not None:
                 self.idle_reported = False
                 try:
-                    self.games.append(Game(row, self.build, self.exe, cfg))
+                    self.games.append(new_game(row, self.build, self.exe, cfg))
                     self.say("start replay %d (%s, %s players, %s min%s)" % (
                         row["id"], row["map"], row["players"], row["minutes"],
                         ", M28AI v%d" % row["m28"] if row["m28"] else ""))
@@ -1315,6 +1459,8 @@ def cmd_run(args):
 
 def cmd_start(args):
     cmd_init(args)
+    if args.mode:
+        set_mode(args.mode)
     if args.n is not None:
         update_control(instances=args.n)
     update_control(stop=False, stop_now=False)
@@ -1354,15 +1500,32 @@ def cmd_stop(args):
         print("stopping after the running games finish (`stop --now` to kill them)")
 
 
+def cmd_mode(args):
+    cmd_init_quiet()
+    if args.mode:
+        set_mode(args.mode)
+    cfg = load_config()
+    exe = mode_exe(cfg)
+    print("mode %s: %s%s" % (cfg["mode"], exe, "" if os.path.isfile(exe) else " (not found)"))
+    if args.mode and runner_pid():
+        print("the runner takes it for its next games; running games finish as they are")
+
+
+def cmd_init_quiet():
+    if not os.path.isfile(CONFIG_PATH):
+        os.makedirs(DATA, exist_ok=True)
+        write_json(CONFIG_PATH, DEFAULT_CONFIG)
+
+
 def cmd_status(args):
     conn = db()
     fill_beats(conn)
     ctl = read_json(CONTROL_PATH, DEFAULT_CONTROL)
     state = read_json(STATE_PATH, {})
     pid = runner_pid()
-    print("runner: %s | instances %s%s%s" % (
-        "pid %d" % pid if pid else "not running", ctl["instances"], " | PAUSED" if ctl["paused"] else "",
-        " | stopping" if ctl["stop"] else ""))
+    print("runner: %s | mode %s | instances %s%s%s" % (
+        "pid %d" % pid if pid else "not running", load_config()["mode"], ctl["instances"],
+        " | PAUSED" if ctl["paused"] else "", " | stopping" if ctl["stop"] else ""))
     pool = dict(conn.execute("SELECT state, COUNT(*) FROM replays GROUP BY state").fetchall())
     print("pool: %d ready, %d unsupported" % (pool.get("ready", 0), pool.get("unsupported", 0)))
     build = state.get("build")
@@ -1371,7 +1534,8 @@ def cmd_status(args):
             "SELECT verdict, COUNT(DISTINCT replay) FROM runs WHERE build=? GROUP BY verdict", (b["build"],)).fetchall())
         done = conn.execute("SELECT COUNT(DISTINCT replay) FROM runs WHERE build=? AND verdict IN (%s)"
                             % ",".join("?" * len(FINAL_VERDICTS)), (b["build"], *FINAL_VERDICTS)).fetchone()[0]
-        print("build %s%s  %s  [%s]" % (b["build"], " (current)" if b["build"] == build else "", b["git"], b["created"]))
+        print("build %s%s  %s  %s  [%s]" % (b["build"], " (current)" if b["build"] == build else "",
+                                             mode_of_exe(b["source"]), b["git"], b["created"]))
         print("   %d/%d done: %s" % (done, pool.get("ready", 0),
                                      ", ".join("%s %d" % kv for kv in sorted(counts.items())) or "nothing yet"))
         for r in conn.execute("SELECT * FROM runs WHERE build=? AND verdict NOT IN ('pass','aborted') "
@@ -1549,7 +1713,11 @@ def console_screen(conn, mode, message):
     lines.append("%sFAF replay parity%s   %s   runner %s (%s)   %s" % (
         BOLD, RESET, status, pid or "-", mode, time.strftime("%H:%M:%S")))
     b = conn.execute("SELECT * FROM builds WHERE build=?", (build,)).fetchone() if build else None
-    lines.append("build %s%s%s  %s" % (CYAN, build or "-", RESET, b["git"] if b else ""))
+    wanted = load_config()["mode"]
+    playing = state.get("mode") or (mode_of_exe(b["source"]) if b else wanted)
+    mode_text = "%s%s%s" % (BOLD, playing, RESET) + (
+        YELLOW + " -> %s for the next games" % wanted + RESET if pid and wanted != playing else "")
+    lines.append("build %s%s%s  %s   mode %s" % (CYAN, build or "-", RESET, b["git"] if b else "", mode_text))
     ready = conn.execute("SELECT COUNT(*) FROM replays WHERE state='ready'").fetchone()[0]
     counts = dict(conn.execute("SELECT verdict, COUNT(DISTINCT replay) FROM runs WHERE build=? GROUP BY verdict",
                                (build,)).fetchall()) if build else {}
@@ -1610,6 +1778,7 @@ def console_screen(conn, mode, message):
     lines.append("")
     keys = [("+/-", "instances"), ("p", "pause"), ("r", "resume"), ("f", "fetch 10 from vault"),
             ("a", "auto-fetch " + ("on" if ctl["auto_fetch"] else "off")),
+            ("m", "mode: " + ("gui" if wanted == "headless" else "headless")),
             ("s", "stop after running"), ("k", "kill now"), ("q", "quit")]
     lines.append("  ".join("%s[%s]%s %s" % (BOLD, k, RESET, what) for k, what in keys)
                  + (("   " + YELLOW + message + RESET) if message else ""))
@@ -1622,6 +1791,8 @@ def cmd_console(args):
     os.makedirs(DATA, exist_ok=True)
     if not os.path.isfile(CONFIG_PATH):
         cmd_init(args)
+    if args.mode:
+        set_mode(args.mode)
     if args.n is not None:
         update_control(instances=args.n)
     def runner_main():
@@ -1692,6 +1863,11 @@ def cmd_console(args):
             elif key in "aA":
                 on = update_control(auto_fetch=not ctl["auto_fetch"])["auto_fetch"]
                 note("auto-fetch %s" % ("on: 10 more replays whenever the queue runs dry" if on else "off"))
+            elif key in "mM":
+                cfg = load_config()
+                mode = set_mode("gui" if cfg["mode"] == "headless" else "headless")
+                note("mode %s: new games use %s; running ones finish as they are"
+                     % (mode, mode_exe(load_config())))
             elif key in "sS":
                 update_control(stop=not ctl["stop"])
                 note("stopping after the running games" if not ctl["stop"] else "stop cancelled")
@@ -1758,12 +1934,14 @@ def main():
     p.set_defaults(fn=cmd_fetch)
     p = sub.add_parser("start")
     p.add_argument("-n", type=int)
+    p.add_argument("--mode", choices=MODES)
     p.set_defaults(fn=cmd_start)
     p = sub.add_parser("run")
     p.add_argument("--quiet", action="store_true")
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("console")
     p.add_argument("-n", type=int)
+    p.add_argument("--mode", choices=MODES)
     p.set_defaults(fn=cmd_console)
     p = sub.add_parser("instances")
     p.add_argument("n", type=int)
@@ -1776,6 +1954,9 @@ def main():
     p = sub.add_parser("status")
     p.add_argument("-v", action="store_true")
     p.set_defaults(fn=cmd_status)
+    p = sub.add_parser("mode")
+    p.add_argument("mode", nargs="?", choices=MODES)
+    p.set_defaults(fn=cmd_mode)
     args = ap.parse_args(sys.argv[1:] or ["console"])
     args.fn(args)
 
