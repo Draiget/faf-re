@@ -9,6 +9,7 @@
 #include "CTask.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/profiling/Profiler.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
@@ -380,6 +381,8 @@ namespace
 
       int executeResult = 0;
       try {
+        // Profile builds: one zone per task type, so a stage's time splits by what ran.
+        FAF_PROFILE_ZONE_TRANSIENT(typeid(*task).name());
         executeResult = task->Execute();
       } catch (const std::exception& ex) {
         gpg::Warnf("Unhandled error -- aborting thread: %s", ex.what());

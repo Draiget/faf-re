@@ -9264,9 +9264,18 @@ void Sim::AdvanceBeat(const int amt)
     // navigator declare arrival from stale state (see IAiCommandDispatchImpl).
     {
       FAF_PROFILE_ZONE_NAMED("Sim::TaskStages");
-      TickTaskStage(&mTaskStageB);
-      TickTaskStage(&mDiskWatcherTaskStage);
-      TickTaskStage(&mTaskStageA);
+      {
+        FAF_PROFILE_ZONE_NAMED("Sim::TaskStageB");
+        TickTaskStage(&mTaskStageB);
+      }
+      {
+        FAF_PROFILE_ZONE_NAMED("Sim::DiskWatcherStage");
+        TickTaskStage(&mDiskWatcherTaskStage);
+      }
+      {
+        FAF_PROFILE_ZONE_NAMED("Sim::TaskStageA");
+        TickTaskStage(&mTaskStageA);
+      }
     }
     {
       FAF_PROFILE_ZONE_NAMED("Sim::Recon");
