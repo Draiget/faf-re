@@ -1829,7 +1829,7 @@ def console_screen(conn, mode, message):
     lines.append("")
     keys = [("+/-", "instances"), ("p", "pause"), ("r", "resume"), ("f", "fetch 10 from vault"),
             ("a", "auto-fetch " + ("on" if ctl["auto_fetch"] else "off")),
-            ("m", "mode: " + ("gui" if wanted == "headless" else "headless")),
+            ("m", "switch to " + ("gui" if wanted == "headless" else "headless")),
             ("s", "stop after running"), ("k", "kill now"), ("q", "quit")]
     lines.append("  ".join("%s[%s]%s %s" % (BOLD, k, RESET, what) for k, what in keys)
                  + (("   " + YELLOW + message + RESET) if message else ""))
