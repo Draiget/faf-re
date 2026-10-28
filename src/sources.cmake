@@ -13,6 +13,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/algorithms/Cluster.cpp
   gpg/core/algorithms/MD5.cpp
   gpg/core/algorithms/SHA256.cpp
+  gpg/core/algorithms/AStarSearch.cpp
   gpg/core/containers/ArchiveSerialization.cpp
   moho/misc/CrtRuntimeExportedHelpers.cpp
   moho/misc/RuntimeTuningGlobals.cpp

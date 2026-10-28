@@ -30,6 +30,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_SquadUnitSearch` | 1 | `/con` | live | Squad membership test by binary search of the id-sorted unit set |
 | `sim_ParallelCoords` | 1 | `/con` | live | Per-entity half of the coordinate advance (transforms, history, collision shape) on sim workers; grid relinks, intel updates and list links stay serial in list order (needs `sim_Workers` > 0) |
 | `sim_ReconBlipIndex` | 1 | `/con` | live | Recon blip lookup by entity id through a hash index instead of the blip map walk |
+| flat A* node table | on | `/astartable 0` or `FAF_ASTARTABLE=0` | startup only | Unit pathfinding (`PathQueue`) keeps its A* search records in an open-addressing table over a node pool, cleared by a generation bump, instead of the binary's `hash_map` (a node allocation per cell and a full free after each query); the search only finds and inserts, so paths are the same. The log says `path: flat A* node table on/off` |
+| `sim_PathTraverseCache` | 1 | `/con` | live | Unit pathfinding remembers each cell's traversability (`CanTraverseCell`, an occupation-grid gather per cell) for the rest of one A* pass instead of asking the unit again for every neighbouring cell it is expanded from; nothing moves during a pass and the cache is emptied when a pass starts and ends |
 | `sim_ParallelBlipFlush` | 1 | `/con` | live | The bulk blip-unlink pass splices separate weak chains on sim workers (needs `sim_Workers` > 0) |
 | `sim_ParallelSyncHeap` | 1 | `/con` | live | With `sim_ParallelSync`, the allocating members of unit-update records are copied on workers too |
 | `sim_ParallelEntitySync` | 1 | `/con` | live | With `sim_ParallelSync`, entity-update records are copied on workers |
