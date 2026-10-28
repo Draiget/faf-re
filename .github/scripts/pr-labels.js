@@ -6,6 +6,10 @@
 //   sim: ...            the ticked "Sim impact" box; "sim: not sure" when "None"
 //                       is ticked but the PR changes code that runs in the sim.
 //   area: ...           from the changed paths (see AREAS).
+//   parity: at risk     "behaviour change" or "not sure" is the sim label, or the
+//                       diff adds a sim console variable or sim command
+//                       (TSimConVar, CSimConFunc, CSimConCommand, a "DoSimCommand"
+//                       alias): those reach every player through the command stream.
 //   recovery            the diff adds an "Address: 0x..." anchor.
 //   documentation       every changed file is documentation.
 //   needs template      no "## Sim impact" section, or not exactly one box ticked.
@@ -62,6 +66,13 @@ const AREAS = {
 const DOC_PATHS = [/^docs\//, /\.md$/i];
 const ADDED_ADDRESS_ANCHOR = /^\+.*\bAddress:\s*0x[0-9A-Fa-f]{6,8}\b/m;
 
+const PARITY_AT_RISK = 'parity: at risk';
+// Sim labels that mean the sim may compute something retail does not.
+const RISKY_SIM_LABELS = new Set([SIM_LABELS.simChanged, SIM_LABELS.unsure]);
+// An added line that declares a sim console variable or command.
+const ADDED_SIM_SETTING = /^\+.*(\bTSimConVar\s*<|\bCSimConFunc\b|\bCSimConCommand\s*\(|"DoSimCommand\s)/m;
+const isSourceFile = (name) => /^src\/.*\.(c|cc|cpp|h|hpp|inl)$/.test(name);
+
 const MERGE_CONFLICT = 'merge conflict';
 // Labels the bot keeps correct even when a person set or removed them.
 const AUTHORITATIVE = new Set([MERGE_CONFLICT, 'needs template']);
@@ -69,6 +80,7 @@ const AUTHORITATIVE = new Set([MERGE_CONFLICT, 'needs template']);
 const MANAGED = new Set([
   ...Object.values(SIM_LABELS),
   ...Object.keys(AREAS),
+  PARITY_AT_RISK,
   'recovery',
   'documentation',
   'needs template',
@@ -108,6 +120,8 @@ function wantedLabels(rawBody, files) {
   for (const [label, patterns] of Object.entries(AREAS)) {
     if (names.some((f) => patterns.some((p) => p.test(f)))) want.add(label);
   }
+  const addsSimSetting = files.some((f) => isSourceFile(f.filename) && f.patch && ADDED_SIM_SETTING.test(f.patch));
+  if (addsSimSetting || [...want].some((name) => RISKY_SIM_LABELS.has(name))) want.add(PARITY_AT_RISK);
   if (files.some((f) => f.patch && ADDED_ADDRESS_ANCHOR.test(f.patch))) want.add('recovery');
   if (names.length > 0 && names.every((f) => DOC_PATHS.some((p) => p.test(f)))) want.add('documentation');
   return want;

@@ -9,6 +9,7 @@
 
     { "group": "parity", "name": "parity: verified",     "color": "0e8a16", "description": "Core replay set played, checksums match retail" },
     { "group": "parity", "name": "parity: desync",       "color": "b60205", "description": "A replay mismatches retail" },
+    { "group": "parity", "name": "parity: at risk",      "color": "f9a03f", "description": "Can change sim state, or adds a sim setting players can change; needs owner sign-off" },
 
     { "group": "area",   "name": "area: audio",          "color": "1d76db", "description": "Touches the audio subsystem" },
     { "group": "area",   "name": "area: render",         "color": "1d76db", "description": "Touches the render subsystem" },
