@@ -4,6 +4,7 @@
 #include "moho/sim/COGrid.h"
 
 #include <algorithm>
+#include <cassert>
 #include <bit>
 #include <cmath>
 #include <cstddef>
@@ -1040,6 +1041,8 @@ namespace moho
     // decides where the elements live), so a larger window changes nothing
     // but the malloc/free pair. These locals are not part of any struct layout.
     constexpr std::size_t kGatherInlineCapacity = 256u;
+    // The binary's inline window of those gather buffers, used with `sim_GatherLargeBuffers` off.
+    constexpr std::size_t kGatherBinaryCapacity = 20u;
     // `UnitIsBlocked`'s `CollisionResult` buffer (binary: 10 inline slots).
     constexpr std::size_t kUnitBlockedInlineCapacity = 32u;
 
@@ -1131,7 +1134,7 @@ namespace moho
     CollisionDBRect queryRect{};
     (void)func_AABoxToRect(&queryRect, source->mAABox);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount =
       mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
@@ -1190,7 +1193,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
@@ -1239,7 +1242,7 @@ namespace moho
     gpg::core::FastVectorInline<CollisionResult>& into
   )
   {
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = grid.GatherUnmarkedEntities(box, ENTITYTYPE_Unit, gatheredEntities);
 
@@ -1388,6 +1391,7 @@ namespace moho
   [[nodiscard]] bool SweptPathBlockedByUnit(
     COGrid& grid, Unit* const unit, const Wm3::Vector3f& fromCenter, const Wm3::Vector3f& toCenter, const int mode)
   {
+    assert(unit != nullptr && "SweptPathBlockedByUnit: the moving unit is required");
     if (fromCenter == toCenter) {
       // Endpoints coincide — nothing to sweep.
       return false;
@@ -1426,7 +1430,7 @@ namespace moho
     // every hit through CollectEntitiesInBox first.
     if (sim_SweptProbeEarlyOut) {
       const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(sweptBox);
-      GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+      GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
       gpg::core::FastVectorInline<Entity*>& gathered = gatherScratch.Get();
       const int gatheredCount = grid.GatherUnmarkedEntities(queryBounds, ENTITYTYPE_Unit, gathered);
       CollisionResult collisionResult{};
@@ -1522,7 +1526,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
@@ -1593,7 +1597,7 @@ namespace moho
     const Wm3::Vec3f& lineEnd
   )
   {
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const std::int32_t gatheredCount =
       GatherUnmarkedEntitiesInLine(mEntityOccupationManager, gatheredEntities, lineStart, lineEnd);
@@ -1754,7 +1758,7 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
 
-    GatherScratch<CollisionShapeBase*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<CollisionShapeBase*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<CollisionShapeBase*>& gatheredSpans = gatherScratch.Get();
     (void)grid.mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, cellRect, ENTITYTYPE_Unit);
 
@@ -1830,7 +1834,7 @@ namespace moho
     CollisionDBRect gatherRect{};
     (void)func_AABoxToRect(&gatherRect, queryBounds);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
 
