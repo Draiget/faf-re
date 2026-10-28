@@ -12,7 +12,6 @@ Every performance change has a switch that brings back the original path, and bo
 | `lua_ParallelMark` | 1 | `/con` | live (next collection) | Lua GC mark on sim workers (needs `sim_Workers` > 0): propagation, thread stacks, the LuaPlus root objects, weak-table clearing and the userdata separation; stack shrinks, the GC hook and finalizers stay serial |
 | `lua_ParallelSweep` | 1 | `/con` | live (next collection) | Lua GC sweep: live/dead classification and mark reset on sim workers (needs `sim_Workers` > 0); every free stays on the sim thread, in the original list order |
 | `lua_GcVerify` | 0 | `/con` | live (next collection) | Debug only: check each parallel sim collection against a serial one, see [Debugging aids](#debugging-aids) |
-| `sim_GCPeriod` | 70 | `/con` | live (next beat) | Forced full Lua GC interval in sim ticks (70 is retail behavior; 0 disables forced resets, letting Lua manage threshold dynamically - note: changing from 70 causes multiplayer/replay desync due to Lua state divergence) |
 | `sim_DeferBlipUnlinks` | 1 | `/con` | live | Dropped blips-in-range lists leave their weak chains in one bulk pass instead of one chain walk per blip |
 | `sim_DeferBlipUnlinksTicks` | 4 | `/con` | live | Ticks between those bulk passes |
 | `sim_ExemptCheckInPlace` | 1 | `/con` | live | Target exemption reads the command queue instead of copying it |

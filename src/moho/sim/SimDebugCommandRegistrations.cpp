@@ -189,18 +189,6 @@ namespace moho
   TSimConVar<int> gSimConVar_sim_ChecksumPeriod(false, "sim_ChecksumPeriod", 50);
 
   /**
-   * Engine addition: controls periodic forced full Lua GC interval in sim ticks.
-   * Default: 70 (retail behavior to preserve lockstep determinism and avoid desync).
-   * Set to 0 to disable forced resets and let Lua manage GC threshold dynamically.
-   */
-  moho::CConAlias gConAlias_sim_GCPeriod(
-    "sim_GCPeriod",
-    "Periodic forced Lua GC interval in sim ticks (0 = disabled, dynamic Lua threshold).",
-    "DoSimCommand sim_GCPeriod"
-  );
-  TSimConVar<int> gSimConVar_sim_GCPeriod(false, "sim_GCPeriod", 70);
-
-  /**
    * Address: 0x00BDBD50 (FUN_00BDBD50, dynamic initializer for `gConAlias_sim_DebugCrash`)
    * Address: 0x00C00F50 (FUN_00C00F50, dynamic atexit destructor for `gConAlias_sim_DebugCrash`)
    */

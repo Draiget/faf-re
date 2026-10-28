@@ -54,6 +54,9 @@ The sim checksum covers every bit of game state, so a speed-up is only kept if i
 - **Lua interpreter**: about 140 CPU cycles per instruction, spent waiting on memory for table lookups. Two faster dispatch paths changed nothing, so they were dropped.
 - **Running Lua callbacks in parallel**: only 2–7 % of them are independent. The rest allocate, use the random stream or call into the engine.
 - **Reusing a unit's old pose object, or keeping unchanged blip lists**: in real games the conditions almost never hold.
+- **Dynamic sim Lua GC threshold (`sim_GCPeriod`)**: Disabling the forced 70-tick GC reset in the sim thread (`lua_setgcthreshold(mLuaState->m_state, 0)`) or changing its interval caused multiplayer and replay desyncs because Lua garbage collection timings diverged across clients. Prerequisites for enabling this optimization in the future:
+  - All players in the match must run the same new engine build (a complete transition away from the legacy/retail `ForgedAlliance.exe`, which hardcodes 70-tick resets).
+  - All connected clients must share the exact same `sim_GCPeriod` setting.
 
 ## Next
 
@@ -61,3 +64,4 @@ The sim checksum covers every bit of game state, so a speed-up is only kept if i
 2. D3D12 cost in replays at full speed.
 3. Memory use.
 4. GPU-driven draws (branch `gpu-driven`, not merged).
+5. Dynamic sim Lua GC threshold (`sim_GCPeriod`): eliminate periodic forced Lua GC resets in the sim once all players transition to the new engine build (completely abandoning legacy `ForgedAlliance.exe`) and share the exact same `sim_GCPeriod` setting.
