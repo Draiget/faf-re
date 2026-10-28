@@ -1139,12 +1139,22 @@ namespace moho
    */
   void CArmyStats::SetUnitStatGreaterFloat(const char* const statPath, const float* const candidate)
   {
+    if (candidate == nullptr) {
+      return;
+    }
     CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(this, statPath);
+    SetUnitStatGreaterFloat(item, *candidate);
+  }
+
+  void CArmyStats::SetUnitStatGreaterFloat(CArmyStatItem* const item, const float candidateValue)
+  {
+    if (item == nullptr) {
+      return;
+    }
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
 
     const std::int32_t currentBits = AtomicCompareExchangeI32(counter, 0, 0);
     const float currentValue = IntBitsToFloat(currentBits);
-    const float candidateValue = *candidate;
     const float targetValue = (currentValue > candidateValue) ? currentValue : candidateValue;
     if (targetValue == currentValue) {
       return;
