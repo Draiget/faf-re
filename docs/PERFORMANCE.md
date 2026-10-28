@@ -54,10 +54,12 @@ The sim checksum covers every bit of game state, so a speed-up is only kept if i
 - **Lua interpreter**: about 140 CPU cycles per instruction, spent waiting on memory for table lookups. Two faster dispatch paths changed nothing, so they were dropped.
 - **Running Lua callbacks in parallel**: only 2–7 % of them are independent. The rest allocate, use the random stream or call into the engine.
 - **Reusing a unit's old pose object, or keeping unchanged blip lists**: in real games the conditions almost never hold.
+- **In-place pose recycling (sim_RecyclePose)**: eliminates heap allocations in CAniPose and saves ~5.3 MB RAM with 100% replay determinism, but yields no wall-clock gain. See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
+- **Pose and animation updates on worker pool (sim_ParallelPose)**: AniActor->UpdateManipulators() triggers Lua callbacks (unit->RunScript in CBuilderArmManipulator), crashing the single-threaded Lua VM. See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
+- **Parallel army ticks on worker pool (sim_ParallelArmies)**: allied resource sharing in ProcessArmyEconomy modifies ally bank balances concurrently, causing data races and replay desyncs. See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
+- **Spatial grid memory packing & SIMD AABB (sim_PackedOgrid)**: Sim::AdvanceCoords is only ~3.2% of SimTick, yielding < 0.1% overall gain.
 
 ## Next
-
-1. Pose and animation on sim workers (about 14 % of sim time).
 2. D3D12 cost in replays at full speed.
 3. Memory use.
 4. GPU-driven draws (branch `gpu-driven`, not merged).
