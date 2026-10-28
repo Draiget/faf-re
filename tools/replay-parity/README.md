@@ -2,7 +2,10 @@
 
 Plays FAF vault replays on a rebuilt engine in the background and records, per build, whether every checksum the live players recorded matches. No agent is needed while it runs: one Python process launches the games, watches their logs and writes the results.
 
-Two modes, both on Windows: **gui** plays each replay in the game (`main_x64.exe`, hidden), **headless** in `headless_x64.exe`, the console replay player that links the simulation alone (no window, rendering or audio; [docs/SWITCHES.md](../../docs/SWITCHES.md#headless)). gui tests the whole client as players run it; headless is much faster (a replay plays flat out) and tests the simulation only.
+Two modes, both on Windows:
+
+- **headless** (the default) plays each replay in `headless_x64.exe`, the console replay player that links the simulation alone (no window, rendering or audio; [docs/SWITCHES.md](../../docs/SWITCHES.md#headless)). The sim runs flat out, so it is the fast way to screen a build: replay 26942923 (5:40 of game time) plays in about 10 s.
+- **gui** plays each replay in the game (`main_x64.exe`, hidden) at `WLD_GameSpeed 50`. Slower, but it tests the client as players run it: use it for changes to the session, UI-side Lua or anything headless does not link.
 
 Needs Python 3.14 or newer (stdlib `compression.zstd`). `parity.cmd` uses the Azure CLI Python by default; set `FAF_PY` to use another one.
 
@@ -10,8 +13,8 @@ Needs Python 3.14 or newer (stdlib `compression.zstd`). `parity.cmd` uses the Az
 
 ```bat
 tools\replay-parity\parity.cmd import          :: once: pool the replays already downloaded in tools/runs/replay_20261013
-tools\replay-parity\parity.cmd                 :: the console: runs the games and shows them live
-tools\replay-parity\parity.cmd console --mode headless   :: the same with headless_x64.exe
+tools\replay-parity\parity.cmd                 :: the console: runs the games (headless) and shows them live
+tools\replay-parity\parity.cmd console --mode gui   :: the same in the game, hidden
 ```
 
 ## Console
@@ -53,6 +56,11 @@ With no runner going, the console is the runner, like a miner: `q` kills its gam
 
 ## What a game does
 
+In headless mode:
+
+- **Launch:** `headless_x64.exe --replay <id>.scfareplay /init <exe folder>\init_parity[_m28_vNNNN].lua /nosound /log logs/<build>/<id>.log --label parity-<id> --timeout <max_wall_minutes + 5>` plus `headless_args` (default `/simworkers 8`), from the exe's folder, with no window or console (`CREATE_NO_WINDOW`). The init file is the one described under gui mode; its hook does nothing here, as headless has no user Lua state.
+- **Watch:** its output goes to `logs/<build>/<id>.out`: `loaded in`, a `beat N game time` line every 30 s, each mismatch (`DESYNC-LINE Checksum for beat N mismatched: ...`, judged with the same live-client vote as in gui mode), `GAME-ENDED beat N`, and at the exit `beats=... last-beat=... game-over=...` and `VERDICT ended=... mismatches=... crash=...`. It plays the replay flat out and exits, and the verdict is taken then: pass when the sim's game ended, game over was reached or the last beat is within 2 of the stream's length; incomplete otherwise; crash on `crash=True` or no VERDICT line.
+
 In gui mode:
 
 - **Launch:** `<exe> /init init_parity[_m28_vNNNN].lua /replay <id>.scfareplay /replayid <id> /nosound /nomovie /windowed 1024 576 /log ... /title parity-<id>` plus `args` from the config (default `/simworkers 8`), from the exe's folder.
@@ -61,11 +69,6 @@ In gui mode:
 - **Hidden:** the game starts minimized (the show state in its STARTUPINFO, so the window never appears) and the runner removes its taskbar button (`ITaskbarList::DeleteTab`). A minimized window keeps running the sim but skips rendering (`CScApp` frame loop), so this is close to headless. `"window_mode": "minimized"` keeps the taskbar button; `"normal"` shows the window, for watching a game. A desktop of its own (`CreateDesktop`) would hide even more, but on this sandboxed account every process started on one dies at startup (0xC0000142).
 - **Watch:** the runner reads the game log. `Checksum for beat N mismatched` ends the game at once, unless the live game itself disagreed at that beat: when more of the clients recorded in the replay have the sim's checksum than the mismatching client's, that client desynced in the live game, not us. The game plays on and the note says `<client> disagreed at beat N` (26946725: nine clients and the sim agree at beat 6700, Paulosan alone differs). A client outvoted once is ignored for the rest of the game, so it cannot turn a later 1-vs-1 split into a desync (26988102: Auhram desynced live at beat 8950; by beat 20150 only Auhram and jamaker were left, and the sim matched jamaker). The heartbeat's `over=true` held for 5 seconds ends it as played to the end: the sim stops at game over, a few beats before the stream ends after a victory (the beats where players leave are never simulated), one tick past the last beat when the replay simply runs out. A replay that never reports game over ends when its beat stops advancing for `stall_seconds`.
 - **Length:** the exact game length is the sum of the `CMDST_Advance` beat counts in the replay's command stream, read once when the replay is prepared. The header's `launched_at`..`game_end` is the live game's wall time with lobby, loading and pauses (26935800: 40:56 of game against 51.5 header minutes), so it is only a fallback.
-
-In headless mode:
-
-- **Launch:** `headless_x64.exe --replay <id>.scfareplay /init <exe folder>\init_parity[_m28_vNNNN].lua /nosound /log logs/<build>/<id>.log --label parity-<id> --timeout <max_wall_minutes + 5>` plus `headless_args` (default `/simworkers 8`), from the exe's folder, with no window or console (`CREATE_NO_WINDOW`). Same init file; the hook does nothing there, as headless has no user Lua state.
-- **Watch:** its output goes to `logs/<build>/<id>.out`: `loaded in`, a `beat N game time` line every 30 s, each mismatch (`DESYNC-LINE Checksum for beat N mismatched: ...`, judged with the same live-client vote as above), `GAME-ENDED beat N`, and at the exit `beats=... last-beat=... game-over=...` and `VERDICT ended=... mismatches=... crash=...`. It plays the replay flat out and exits, and the verdict is taken then: pass when the sim's game ended, game over was reached or the last beat is within 2 of the stream's length; incomplete otherwise; crash on `crash=True` or no VERDICT line.
 
 ## Verdicts
 
@@ -83,7 +86,7 @@ Every finished game is also one line in `tmp/parity/results.txt`. A desynced rep
 
 ## Builds
 
-The runner tests the exe of the mode: `exe` in gui mode (default `C:/ProgramData/FAForever/bin_x64/main_x64.exe`, where `build.ps1` puts the x64 Release build), `headless_exe` in headless mode (default `.../bin_x64/headless_x64.exe`, which `build.ps1` copies beside it). It copies it to `<name>_parity_<hash>.exe` next to it and labels results with that hash and the git HEAD at the time. With `follow_exe` on, a rebuilt exe (unchanged for a minute) becomes the new build for the next launches, and the whole pool is queued again for it. Games already running finish on the old build.
+The runner tests the exe of the mode: `headless_exe` in headless mode (default `C:/ProgramData/FAForever/bin_x64/headless_x64.exe`), `exe` in gui mode (default `.../bin_x64/main_x64.exe`); `build.ps1` puts both there from the x64 Release build. It copies it to `<name>_parity_<hash>.exe` next to it and labels results with that hash and the git HEAD at the time. With `follow_exe` on, a rebuilt exe (unchanged for a minute) becomes the new build for the next launches, and the whole pool is queued again for it. Games already running finish on the old build.
 
 ## Pool
 
@@ -99,7 +102,7 @@ The console sets the window's QuickEdit mode off while it runs: with it on, a mo
 
 | Key | Default | |
 |---|---|---|
-| `mode` | `gui` | `gui` or `headless` |
+| `mode` | `headless` | `headless` or `gui` |
 | `exe` | `C:/ProgramData/FAForever/bin_x64/main_x64.exe` | Build under test in gui mode |
 | `headless_exe` | `C:/ProgramData/FAForever/bin_x64/headless_x64.exe` | Build under test in headless mode |
 | `follow_exe` | `true` | Switch to a rebuilt exe automatically |

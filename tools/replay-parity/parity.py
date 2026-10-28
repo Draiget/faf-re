@@ -20,16 +20,18 @@ Data lives in tmp/parity (FAF_PARITY_DATA overrides): parity.sqlite (pool and re
 results.txt (one line per finished game), desyncs/<build>/, crashes/<build>/, logs/<build>/.
 The runner reads control.json every second, so `instances`, `pause` and `stop` only edit it.
 
-One game: <exe> /init init_parity*.lua /replay <id>.scfareplay ... The init file is generated
+Two modes; each tests its own exe, so their results are separate builds.
+
+Mode "headless" (the default): headless_x64.exe --replay <id>.scfareplay /init init_parity*.lua
+... (docs/SWITCHES.md, "headless"): the simulation alone, flat out, with no window or console;
+its progress and verdict are read from its output.
+
+Mode "gui": <exe> /init init_parity*.lua /replay <id>.scfareplay ... The init file is generated
 next to the exe from its init_faf.lua; it mounts the parity vault (downloaded maps), the
 M28AI version the replay was recorded with, and tools/replay-parity/hook, which runs the sim
 at WLD_GameSpeed 50, parks the camera zoomed in at the map centre and logs a heartbeat.
 The game starts minimized (STARTUPINFO show state) and, in window_mode "hidden", loses its
 taskbar button: a minimized window keeps the sim running but skips rendering (CScApp::OnFrame).
-
-Mode "headless" plays the replays with headless_x64.exe instead (docs/SWITCHES.md, "headless"):
-the simulation alone, no window or console, its progress and verdict read from its output.
-Each mode tests its own exe, so their results are separate builds.
 
 Verdicts: pass (no mismatch, played to the end), desync (first mismatched beat recorded,
 replay and log saved, game killed), incomplete (no mismatch, but the replay stopped well
@@ -89,10 +91,11 @@ EXTENDED_SET = [26975290, 26953273, 27034831, 26917867, 26876279, 26935800, 2689
                 27004084, 26915859, 26905122]
 
 DEFAULT_CONFIG = {
-    # What plays the replays: "gui", the game (main_x64.exe, hidden as window_mode says), or
-    # "headless", the console replay player (headless_x64.exe: the simulation alone, no window,
-    # rendering or audio). `parity.py mode` and the console's `m` key switch it.
-    "mode": "gui",
+    # What plays the replays: "headless", the console replay player (headless_x64.exe: the
+    # simulation alone, no window, rendering or audio, flat out), or "gui", the game
+    # (main_x64.exe, hidden as window_mode says), which tests the client as players run it.
+    # `parity.py mode` and the console's `m` key switch it.
+    "mode": "headless",
     # Built exe to test in each mode. The runner snapshots it (copy next to it, named by content
     # hash) and follows rebuilds: once the file changes and has been stable for a minute, new
     # games use the new build and the whole pool is queued again for it.
@@ -183,7 +186,7 @@ def load_config():
     if not cfg.get("game_version"):
         cfg["game_version"] = int(fa_path_values().get("GameVersion", "3835"))
     if cfg.get("mode") not in MODES:
-        cfg["mode"] = "gui"
+        cfg["mode"] = DEFAULT_CONFIG["mode"]
     return cfg
 
 

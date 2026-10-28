@@ -18,7 +18,7 @@ Real games from the FAF replay vault, multiplayer and against the built-in AI or
 
 ## Method
 
-1. **Screening.** The rebuilt engine plays the replay back and compares its sim checksum with the checksums the live players' clients recorded into the replay every 50 beats. [`tools/replay-parity`](../tools/replay-parity/README.md) does this unattended: it picks the replays, plays several at once with the window hidden, and records a verdict per replay and build.
+1. **Screening.** The rebuilt engine plays the replay back and compares its sim checksum with the checksums the live players' clients recorded into the replay every 50 beats. [`tools/replay-parity`](../tools/replay-parity/README.md) does this unattended: it picks the replays, plays several at once, and records a verdict per replay and build. By default it plays them in `headless_x64.exe`, the simulation alone running flat out; in gui mode it plays them in the game with the window hidden, which also covers the client.
 2. **Narrowing.** When a replay diverges, the window is narrowed beat by beat: retail and the rebuilt engine both dump the full sim state on every beat (`sim_ChecksumPeriod` 1) and the dumps are diffed. One differing bit anywhere in the sim state fails the beat.
 3. **Regression.** Every fix is re-screened against all replays that already matched before it is committed.
 
