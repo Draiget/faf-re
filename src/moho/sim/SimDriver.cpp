@@ -897,10 +897,16 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   gpg::time::Timer dispatchTimer;
 
   lock.unlock();
-  mClientManager->UpdateStates(beatToDispatch);
+  {
+    FAF_PROFILE_ZONE_NAMED("SimTick::UpdateStates");
+    mClientManager->UpdateStates(beatToDispatch);
+  }
   lock.lock();
 
-  FinalizeSyncDispatchLocked(lock);
+  {
+    FAF_PROFILE_ZONE_NAMED("SimTick::SyncDispatch");
+    FinalizeSyncDispatchLocked(lock);
+  }
   FAF_PROFILE_FRAME("Sim Beat");
 
   if (mSimBusy) {

@@ -9308,14 +9308,23 @@ void Sim::AdvanceBeat(const int amt)
 
     }
 
-    TickEffectManager(mEffectManager);
-    UpdateFormationDb(mFormationDB);
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::EffectManager");
+      TickEffectManager(mEffectManager);
+    }
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::FormationDb");
+      UpdateFormationDb(mFormationDB);
+    }
 
-    ForEachAllArmyUnit(this, [](Unit* unit) {
-      if (unit->NeedsKillCleanup()) {
-        unit->KillCleanup();
-      }
-    });
+    {
+      FAF_PROFILE_ZONE_NAMED("Sim::KillCleanup");
+      ForEachAllArmyUnit(this, [](Unit* unit) {
+        if (unit->NeedsKillCleanup()) {
+          unit->KillCleanup();
+        }
+      });
+    }
 
     {
       FAF_PROFILE_ZONE_NAMED("Sim::AdvanceCoords");
@@ -9334,6 +9343,7 @@ void Sim::AdvanceBeat(const int amt)
     // then filled in place through the returned `back()` reference, so its
     // inline pair storage is anchored inside the vector element rather
     // than aliasing a temporary that could be relocated by a later grow.
+    FAF_PROFILE_ZONE_NAMED("Sim::ExtraUnitData");
     mSyncFilter.maskA.ForEachValue([this](const unsigned int entityId) {
       Entity* const entity = mEntityDB->FindEntityById(entityId);
       if (entity == nullptr) {
@@ -9358,17 +9368,24 @@ void Sim::AdvanceBeat(const int amt)
     mSingleStep = false;
   }
 
-  while (!mDeletionQueue.empty()) {
-    void* queuedObject = mDeletionQueue.front();
-    mDeletionQueue.pop_front();
-    RunQueuedDestroy(queuedObject);
+  {
+    FAF_PROFILE_ZONE_NAMED("Sim::DeletionQueue");
+    while (!mDeletionQueue.empty()) {
+      void* queuedObject = mDeletionQueue.front();
+      mDeletionQueue.pop_front();
+      RunQueuedDestroy(queuedObject);
+    }
   }
 
-  PurgeDestroyedEffects(mEffectManager);
-  CleanupDecals(mDecalBuffer);
+  {
+    FAF_PROFILE_ZONE_NAMED("Sim::EffectDecalCleanup");
+    PurgeDestroyedEffects(mEffectManager);
+    CleanupDecals(mDecalBuffer);
+  }
 
   const int checksumPeriod = ReadSimConVarInt(this, &gSimConVar_sim_ChecksumPeriod, 1);
   if (checksumPeriod > 0 && (mCurBeat % static_cast<uint32_t>(checksumPeriod)) == 0u) {
+    FAF_PROFILE_ZONE_NAMED("Sim::Checksum");
     UpdateChecksum();
   }
 
