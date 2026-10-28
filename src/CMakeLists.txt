@@ -377,6 +377,10 @@ target_link_libraries(faf_sim INTERFACE
   ${_faf_zlib}
   "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
 target_link_options(faf_sim INTERFACE $<TARGET_PROPERTY:faf_engine,INTERFACE_LINK_OPTIONS>)
+# The Profile presets' Tracy client: faf_engine's objects call it, as faf_main's do.
+if(FAF_ENABLE_TRACY)
+  target_link_libraries(faf_sim INTERFACE TracyClient)
+endif()
 
 # --- headless -------------------------------------------------------------------------
 # headless_x64.exe (x64) / headless.exe (x86), the console replay runner
@@ -401,7 +405,8 @@ endif()
 # No UI, graphics or audio import (cmake/HeadlessImports.cmake): the link fails otherwise.
 add_custom_command(TARGET headless POST_BUILD
   COMMAND "${CMAKE_COMMAND}" "-DREADOBJ=${FAF_LLVM_ROOT}/bin/llvm-readobj.exe"
-          "-DEXE=$<TARGET_FILE:headless>" -P "${PROJECT_SOURCE_DIR}/cmake/HeadlessImports.cmake"
+          "-DEXE=$<TARGET_FILE:headless>" "-DTRACY=$<BOOL:${FAF_ENABLE_TRACY}>"
+          -P "${PROJECT_SOURCE_DIR}/cmake/HeadlessImports.cmake"
   COMMENT "Checking headless's imports: no UI, graphics or audio"
   VERBATIM)
 

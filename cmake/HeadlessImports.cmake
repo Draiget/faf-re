@@ -7,11 +7,18 @@
 # Debug builds keep every function of every object they link, so they show what a release
 # build's dead-code elimination hides.
 #
-#   cmake -DREADOBJ=<llvm-readobj> -DEXE=<headless> -P HeadlessImports.cmake
+#   cmake -DREADOBJ=<llvm-readobj> -DEXE=<headless> [-DTRACY=ON] -P HeadlessImports.cmake
+#
+# TRACY=ON (the Profile presets) also allows what the Tracy client itself imports:
+# user32.dll (MessageBoxA when the profiler fails to start, TracyProfiler.cpp) and
+# secur32.dll (Tracy's CMake links TracyClient to it).
 
 cmake_minimum_required(VERSION 3.20)
 
 set(_allowed_dlls kernel32.dll advapi32.dll ole32.dll shell32.dll shlwapi.dll ws2_32.dll dbghelp.dll)
+if(TRACY)
+  list(APPEND _allowed_dlls user32.dll secur32.dll)
+endif()
 set(_allowed_ole32 CoInitialize CoInitializeEx CoUninitialize)
 
 execute_process(
