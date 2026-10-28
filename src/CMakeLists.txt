@@ -313,10 +313,21 @@ set(_faf_sim_objects "$<TARGET_OBJECTS:faf_engine>")
 set(_faf_client_regex "")
 set(_faf_client_count 0)
 foreach(_src IN LISTS _faf_client_sources)
-  # An object is faf_engine.dir/<source>.obj, after a "./" segment; an out-of-tree
-  # source's path has its drive colon dropped (G:/x/y.cpp -> faf_engine.dir/./G_/x/y.cpp.obj),
-  # so those match on the path after the drive.
-  string(REGEX REPLACE "^[A-Za-z]:" "" _tail "${_src}")
+  # An object is faf_engine.dir/<source>.obj, after a "./" segment. A source outside src/
+  # (FX11, under the dependencies folder) is named after its path, which depends on where
+  # that folder is: faf_engine.dir/__/dependencies/FX11/x.cpp.obj when it is inside the
+  # source tree, faf_engine.dir/G_/<path>/FX11/x.cpp.obj (drive colon dropped) when it is
+  # not. Those match on the path from the dependencies folder on.
+  if(IS_ABSOLUTE "${_src}")
+    file(RELATIVE_PATH _tail "${FAF_DEPENDENCIES_DIR}" "${_src}")
+    if(_tail MATCHES "^\\.\\./")
+      string(REGEX REPLACE "^[A-Za-z]:" "" _tail "${_src}")
+    else()
+      set(_tail "/${_tail}")
+    endif()
+  else()
+    set(_tail "${_src}")
+  endif()
   string(REGEX REPLACE "([.+*?^$()|\\[\\]\\\\])" "\\\\\\1" _tail "${_tail}")
   if(NOT IS_ABSOLUTE "${_src}")
     set(_tail "faf_engine\\.dir/(\\./)?${_tail}")
@@ -369,6 +380,12 @@ target_link_libraries(headless PRIVATE
   "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
 target_link_options(headless PRIVATE
   $<TARGET_PROPERTY:faf_engine,INTERFACE_LINK_OPTIONS>)
+# No UI, graphics or audio import (cmake/HeadlessImports.cmake): the link fails otherwise.
+add_custom_command(TARGET headless POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" "-DREADOBJ=${FAF_LLVM_ROOT}/bin/llvm-readobj.exe"
+          "-DEXE=$<TARGET_FILE:headless>" -P "${PROJECT_SOURCE_DIR}/cmake/HeadlessImports.cmake"
+  COMMENT "Checking headless's imports: no UI, graphics or audio"
+  VERBATIM)
 
 # The registration dump (tests/registry) of the objects headless links: its Sim and
 # Core sets must equal faf_main's (tests/registry/RegistrationDump.cpp).
