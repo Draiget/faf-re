@@ -18,7 +18,6 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/List.h"
 #include "lua/LuaObject.h"
-#include "moho/audio/AudioEngine.h"
 #include "moho/audio/HSound.h"
 #include "moho/audio/SParamKey.h"
 #include "moho/lua/CScrLuaClassBinder.h"
@@ -30,14 +29,8 @@
 namespace
 {
   constexpr std::uint32_t kResolvePolicyUnresolved = 0u;
-  constexpr std::uint32_t kResolvePolicyResolved = 1u;
-  constexpr std::uint32_t kResolvePolicyMissingEngine = 2u;
-  constexpr std::uint32_t kResolvePolicyMissingCue = 3u;
-  constexpr std::uint32_t kResolvePolicyMissingBank = 4u;
   constexpr std::uint32_t kSndParamsHashSalt = 0x7BEF2693u;
 
-  constexpr int kSndParamsUnreachableLine = 387;
-  constexpr const char* kSndParamsSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\SndParams.cpp";
 
   /**
    * Address: 0x004DFC80 (FUN_004DFC80) -- the constructor group for the sound
@@ -177,18 +170,6 @@ namespace
     gSndParamsRegistry.push_back(params);
   }
 
-  /**
-   * Address: 0x004E14C0 (FUN_004E14C0)
-   *
-   * What it does:
-   * Promotes one weak `AudioEngine` handle to a shared handle when the engine
-   * is still alive.
-   */
-  [[nodiscard]] boost::shared_ptr<moho::AudioEngine>
-  LockWeakAudioEngine(const boost::weak_ptr<moho::AudioEngine>& weakEngine)
-  {
-    return weakEngine.lock();
-  }
 
   constexpr const char* kSoundHelpText = "Sound( {cue,bank,cutoff} ) - Make a sound parameters object";
   constexpr const char* kRpcSoundHelpText = "RPCSound( {cue,bank,cutoff} ) - Make a sound parameters object";
@@ -912,109 +893,6 @@ namespace moho
     return cached;
   }
 
-  /**
-   * Address: 0x004E0820 (FUN_004E0820)
-   *
-   * What it does:
-   * Returns a resolved engine handle according to cached resolve state and
-   * current sound-configuration availability.
-   */
-  boost::shared_ptr<AudioEngine>* CSndParams::GetEngine(boost::shared_ptr<AudioEngine>* const outEngine) const
-  {
-    if (outEngine == nullptr) {
-      return outEngine;
-    }
-
-    const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
-        configuration->mEngines.mFinish == nullptr || configuration->mEngines.mStart == configuration->mEngines.mFinish ||
-        configuration->mNoSound != 0u) {
-      *outEngine = {};
-      return outEngine;
-    }
-
-    boost::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
-    switch (mResolvePolicy) {
-    case kResolvePolicyUnresolved:
-      *outEngine = DoResolve();
-      break;
-
-    case kResolvePolicyResolved:
-      if (resolvedEngine.get() != nullptr) {
-        *outEngine = resolvedEngine;
-      } else {
-        *outEngine = DoResolve();
-      }
-      break;
-
-    case kResolvePolicyMissingEngine:
-      *outEngine = {};
-      break;
-
-    case kResolvePolicyMissingCue:
-    case kResolvePolicyMissingBank:
-      if (resolvedEngine.get() != nullptr) {
-        *outEngine = {};
-      } else {
-        *outEngine = DoResolve();
-      }
-      break;
-
-    default:
-      gpg::HandleAssertFailure("Reached the supposably unreachable.", kSndParamsUnreachableLine, kSndParamsSourcePath);
-      *outEngine = {};
-      break;
-    }
-
-    return outEngine;
-  }
-
-  /**
-   * Address: 0x004E0930 (FUN_004E0930)
-   * Mangled: ?DoResolve@CSndParams@Moho@@ABE?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@XZ
-   *
-   * What it does:
-   * Resolves one engine/bank/cue tuple and caches ids/resolve policy for
-   * subsequent cue playback requests.
-   */
-  boost::shared_ptr<AudioEngine> CSndParams::DoResolve() const
-  {
-    boost::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
-    if (resolvedEngine.get() == nullptr) {
-      resolvedEngine = SND_FindEngine(mBank.c_str());
-      mEngine = resolvedEngine;
-
-
-      if (resolvedEngine.get() == nullptr) {
-        gpg::Warnf("Error resolving bank '%s' to audio engine", mBank.c_str());
-        mResolvePolicy = kResolvePolicyMissingEngine;
-        return {};
-      }
-    }
-
-    if (!resolvedEngine->GetBankIndex(mBank.c_str(), &mBankId)) {
-      gpg::Warnf("Error resolving bank '%s'", mBank.c_str());
-      mResolvePolicy = kResolvePolicyMissingBank;
-      return {};
-    }
-
-    if (!resolvedEngine->GetCueIndex(mCue.c_str(), mBankId, &mCueId)) {
-      gpg::Warnf("Error resolving cue '%s' in bank '%s'", mCue.c_str(), mBank.c_str());
-      mResolvePolicy = kResolvePolicyMissingCue;
-      return {};
-    }
-
-    if (mLodCutoff != nullptr && mLodCutoff->mResolved == 0u) {
-      (void)mLodCutoff->DoResolve();
-    }
-
-    if (mRpcLoopVariable != nullptr && mRpcLoopVariable->mResolved == 0u) {
-      (void)mRpcLoopVariable->DoResolve();
-    }
-
-    mResolvePolicy = kResolvePolicyResolved;
-    return resolvedEngine;
-  }
 
   /**
    * Address: 0x004DFD90 (FUN_004DFD90, cfunc_Sound)
@@ -1272,6 +1150,22 @@ namespace moho
    */
   struct CSndParamsConstruct : gpg::SerConstructHelper<CSndParams>
   {};
+
+  // Engine addition, server mode: see the declaration.
+#if FAF_SERVER_MODE
+  CSndParams* SND_FindOrCreateParams(
+    const msvc8::string& bankName, const msvc8::string& cueName, const msvc8::string& lodCutoffName,
+    const msvc8::string& rpcLoopName
+  )
+  {
+    SParamKey key{};
+    key.mCueName = cueName;
+    key.mBankName = bankName;
+    key.mLodCutoffVariableName = lodCutoffName;
+    key.mRpcLoopVariableName = rpcLoopName;
+    return FindOrCreateSndParamsByKey(key);
+  }
+#endif
 } // namespace moho
 
 namespace

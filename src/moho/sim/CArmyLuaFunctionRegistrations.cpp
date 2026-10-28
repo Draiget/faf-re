@@ -19,7 +19,6 @@
 #include "moho/sim/CSimConFunc.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
-#include "moho/ui/UiRuntimeTypes.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
 #include "lua/LuaCrashDump.h"

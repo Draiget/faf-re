@@ -13,6 +13,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "legacy/math/X87Math.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/CAnimTexture.h"
@@ -1874,3 +1875,29 @@ namespace
   // Address: 0x010B291C -- process-global `CAnimationManipulatorSerializer` singleton.
   moho::CAnimationManipulatorSerializer gCAnimationManipulatorSerializer;
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00422940 (FUN_00422940)
+   *
+   * What it does:
+   * Computes `value mod range` with the same positive-wrap behavior used by
+   * animation frame sampling paths.
+   *
+   * 0x00422949..0x0042294F: `fld value; fld range; call _CIfmod` -- the MSVC8
+   * CRT, which returns +0 for a zero dividend. 0x00422958..0x00422987 shifts by
+   * `range` when `0 > r` and `0 > range` disagree (both ordered compares). No
+   * zero-range guard: the callers test the range first (0x0063FAB7, 0x0064005D,
+   * and a non-empty frame list in GetFrameAt).
+   */
+  float WrapPositiveModulo(const float value, const float range) noexcept
+  {
+    float wrapped = static_cast<float>(msvc8::fmod(value, range));
+    if ((0.0f > wrapped) != (0.0f > range)) {
+      wrapped += range;
+    }
+    return wrapped;
+  }
+
+} // namespace moho

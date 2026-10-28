@@ -32,6 +32,7 @@
 #include "LuaError.h"
 #include "LuaGcEventLog.h"
 #include "LuaMemAccounting.h"
+#include "LuaNumberText.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
@@ -5835,7 +5836,7 @@ namespace
 	 * Allocates one heap WrapFile storage payload and returns it as reflected
 	 * `gpg::RRef` with close-enabled default state.
 	 */
-	gpg::RRef* NewWrapFileStorageRef(gpg::RRef* const out)
+	gpg::RRef NewWrapFileStorageRef()
 	{
 		auto* const wrapFile = static_cast<WrapFile*>(::operator new(sizeof(WrapFile), std::nothrow));
 		if (wrapFile != nullptr) {
@@ -5843,7 +5844,12 @@ namespace
 			wrapFile->closeEnabled = 1u;
 		}
 
-		return BuildWrapFileRef(out, wrapFile);
+		// Returned by value, as `RType::new_ref_func_t` declares it: each ABI then passes the
+		// result as its callers expect (MSVC through a hidden pointer, System V x64 in
+		// registers); a `RRef*(RRef*)` body cast to that type only matches the first.
+		gpg::RRef out{};
+		(void)BuildWrapFileRef(&out, wrapFile);
+		return out;
 	}
 
 	/**
@@ -5853,17 +5859,18 @@ namespace
 	 * Initializes caller-owned WrapFile storage and returns the reflected
 	 * `gpg::RRef` view of that payload.
 	 */
-	gpg::RRef* ConstructWrapFileStorageRef(
-		gpg::RRef* const out,
-		WrapFile* const wrapFile
-	)
+	gpg::RRef ConstructWrapFileStorageRef(void* const storage)
 	{
+		auto* const wrapFile = static_cast<WrapFile*>(storage);
 		if (wrapFile != nullptr) {
 			wrapFile->stream = nullptr;
 			wrapFile->closeEnabled = 1u;
 		}
 
-		return BuildWrapFileRef(out, wrapFile);
+		// By value, as `RType::ctor_ref_func_t` declares it (see NewWrapFileStorageRef).
+		gpg::RRef out{};
+		(void)BuildWrapFileRef(&out, wrapFile);
+		return out;
 	}
 
 	/**
@@ -5894,8 +5901,8 @@ namespace
 	{
 		size_ = sizeof(WrapFile);
 		gpg::RType::Init();
-		newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		newRefFunc_ = &NewWrapFileStorageRef;
+		ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 		Finish();
@@ -6031,8 +6038,8 @@ namespace
 	 */
 	gpg::RType* ConfigureWrapFileRefCallbacks(gpg::RType* const type)
 	{
-		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->newRefFunc_ = &NewWrapFileStorageRef;
+		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		return type;
 	}
 
@@ -6045,8 +6052,8 @@ namespace
 	 */
 	gpg::RType* ConfigureWrapFileAllCallbacks(gpg::RType* const type)
 	{
-		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->newRefFunc_ = &NewWrapFileStorageRef;
+		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 		return type;
@@ -6061,8 +6068,8 @@ namespace
 	 */
 	void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
 	{
-		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
-		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->newRefFunc_ = &NewWrapFileStorageRef;
+		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 	}
@@ -6477,7 +6484,10 @@ namespace
 			if (lua_type(state, firstArgumentIndex) == LUA_TNUMBER) {
 				if (writeSucceeded != 0) {
 					const double value = lua_tonumber(state, firstArgumentIndex);
-					writeSucceeded = std::fprintf(stream, "%.14g", value) > 0 ? 1 : 0;
+					// Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
+					char rendered[64];
+					(void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", value);
+					writeSucceeded = std::fputs(rendered, stream) >= 0 ? 1 : 0;
 				}
 			} else if (lua_type(state, firstArgumentIndex) == LUA_TSTRING) {
 				std::size_t elementCount = 0u;
@@ -9801,7 +9811,8 @@ namespace
 			case 'f':
 			case 'g':
 			case 'G':
-				std::sprintf(item, form, static_cast<double>(luaL_checknumber(state, argumentIndex)));
+				// Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
+				(void)lua::FormatNumberLikeWindowsCrt(item, form, static_cast<double>(luaL_checknumber(state, argumentIndex)));
 				break;
 
 			case 'q':
@@ -16670,7 +16681,8 @@ extern "C"
 		}
 
 		char rendered[32];
-		std::sprintf(rendered, "%.14g", static_cast<double>(object->value.n));
+		// Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
+		(void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", static_cast<double>(object->value.n));
 
 		TString* const interned = luaS_newlstr(state, rendered, std::strlen(rendered));
 		object->value.p = interned;
@@ -17675,7 +17687,8 @@ extern "C"
 	int luaO_str2d(const char* const s, float* const result)
 	{
 		char* end = nullptr;
-		const float value = static_cast<float>(std::strtod(s, &end));
+		// Plan WPL.17: the Windows CRT's NaN spellings (LuaNumberText.h).
+		const float value = static_cast<float>(lua::ParseNumberLikeWindowsCrt(s, &end));
 		if (end == s) {
 			return 0; // nothing converted
 		}

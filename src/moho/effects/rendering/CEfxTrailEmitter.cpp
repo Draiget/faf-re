@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEfxTrailEmitter.h"
+#include "platform/Interlocked.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -535,7 +536,7 @@ namespace moho
       (void)sEngineStatRenderActiveEmitters->Release(0);
     }
     _InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+      reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
 
     const std::int32_t pendingTicks = mTrailLength;
     const RTrailBlueprint* const bp = mTrailBlueprint;

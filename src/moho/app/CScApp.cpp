@@ -50,6 +50,9 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiWorldShapes.h"
+#if FAF_SERVER_MODE
+#include "remote/client/ServerConnect.h"
+#endif
 
 namespace gpg
 {
@@ -384,6 +387,22 @@ namespace
     // Engine addition: `sys_ThreadPlacement` (`/threadplacement N`) for the main thread; the sim,
     // issue and worker threads place themselves as they start.
     moho::PlaceCurrentThread(moho::EThreadRole::Main);
+
+#if FAF_SERVER_MODE
+    // Engine addition, server mode: `/connectserver` takes over startup. Without it, every
+    // path below runs as before.
+    switch (faf::remote::StartServerSessionFromCommandLine()) {
+    case faf::remote::EServerSessionStart::NotRequested:
+      break;
+    case faf::remote::EServerSessionStart::Started:
+      return;
+    case faf::remote::EServerSessionStart::Failed:
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop();
+      }
+      return;
+    }
+#endif
 
     if (moho::CFG_GetArgOption("/scenario", 1, &args) || moho::CFG_GetArgOption("/map", 1, &args)) {
       if (!args.empty()) {

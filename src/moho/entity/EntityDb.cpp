@@ -1,4 +1,5 @@
 #include "legacy/containers/Vector.h"
+#include "platform/Interlocked.h"
 #include "EntityDb.h"
 
 #include <cstdlib>
@@ -223,7 +224,7 @@ namespace
     }
 
 #if defined(_WIN32)
-    ::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), static_cast<long>(delta));
+    ::InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), static_cast<long>(delta));
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif

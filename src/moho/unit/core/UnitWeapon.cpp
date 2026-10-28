@@ -1,4 +1,5 @@
 #include "moho/unit/core/UnitWeapon.h"
+#include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
@@ -41,8 +42,6 @@
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/misc/ID3DDeviceResources.h"
-#include "moho/render/d3d/CD3DDevice.h"
-#include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/sim/CDamage.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CSimConVarBase.h"
@@ -635,6 +634,9 @@ namespace
 
 namespace moho
 {
+  // Engine addition (dedicated-server plan WPL.4), declared in ID3DDeviceResources.h.
+  DeviceTextureLookupHook sDeviceTextureLookup = nullptr;
+
   gpg::RType* UnitWeapon::sType = nullptr;
   gpg::RType* UnitWeapon::sPointerType = nullptr;
 
@@ -1145,8 +1147,12 @@ namespace moho
     // D3D_GetDevice()->GetResources()->GetTexture(...allowFallback=true)) owns the
     // handle across the DoInstaHit call. DoInstaHit hardcodes the beam texture and
     // never dereferences the handle -- it just keeps it alive, then releases it.
+    // Engine addition (plan WPL.4): through the client's sDeviceTextureLookup
+    // (ID3DDeviceResources.h); without a client the handle stays empty.
     ID3DDeviceResources::TextureResourceHandle textureSheet{};
-    D3D_GetDevice()->GetResources()->GetTexture(textureSheet, textureName, 0, true);
+    if (sDeviceTextureLookup != nullptr) {
+      sDeviceTextureLookup(textureSheet, textureName);
+    }
 
     LuaPlus::LuaStackObject lifetimeArg(state, 9);
     if (lua_type(rawState, 9) != LUA_TNUMBER) {
@@ -1221,7 +1227,7 @@ namespace moho
       + (impactResolved ? "_Shots_Hit" : "_Shots_Missed");
     CArmyStatItem* const shotItem = armyStats->GetItem(statPath.c_str());
     shotItem->SynchronizeAsInt();
-    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&shotItem->mPrimaryValueBits), 1);
+    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&shotItem->mPrimaryValueBits), 1);
   }
 
   /**
@@ -3530,7 +3536,7 @@ namespace moho
       CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&armyStats, statPath);
       item->SynchronizeAsFloat();
 
-      volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
+      volatile platform::InterlockedLong* const counter = reinterpret_cast<volatile platform::InterlockedLong*>(&item->mPrimaryValueBits);
       const std::int32_t desiredBits = std::bit_cast<std::int32_t>(value);
       for (;;) {
         const std::int32_t observed = _InterlockedCompareExchange(counter, 0, 0);
@@ -3641,7 +3647,7 @@ namespace moho
       {
         CArmyStatItem* const shotsFired = armyStats->GetItem(shotsFiredPath.c_str());
         shotsFired->Synchronize();
-        (void)_InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&shotsFired->mPrimaryValueBits), 1);
+        (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&shotsFired->mPrimaryValueBits), 1);
       }
 
       // Number of shots fired so far, used to average the fire-range lanes.

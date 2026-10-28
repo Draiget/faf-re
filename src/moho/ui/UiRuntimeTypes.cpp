@@ -3364,7 +3364,7 @@ namespace
 
 } // namespace
 
-moho::EUIState moho::sUIState = moho::UIS_none;
+// `moho::sUIState` is defined in gpg/core/reflection/Reflection.cpp (sim side).
 bool moho::cam_Free = false;
 // 0x00F57AA0 `?ren_BgLowerBound@Moho@@3MA`; the shipped `.data` word is
 // `00 00 fa 42` == 125.0f.

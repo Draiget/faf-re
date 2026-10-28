@@ -85,7 +85,7 @@ namespace gpg
 	/// binary's binary search; console variable `mem_SmallBlockIndexTable`.
 	extern bool mem_SmallBlockIndexTable;
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 	/**
 	 * x64 port (not in the binary): logs the image base (and whether it is below
 	 * 4 GB), then what `FAF_HIGHMEM=1` reserved below 4 GB before the CRT

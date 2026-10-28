@@ -35,8 +35,10 @@ namespace
   constexpr std::uint8_t kWatchMapColorRed = 0u;
   constexpr std::uint8_t kWatchMapColorBlack = 1u;
   constexpr std::size_t kDefaultReadBufferSize = 0x1000u;
+#if defined(_WIN32)
   constexpr DWORD kDirectoryNotifyFilter =
     FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE;
+#endif
   constexpr float kPendingEventDispatchDelayMs = 250.0f;
   constexpr const char* kEnablePrivilegesWarning =
     "CDiskWatch::EnablePrivileges: Unable to enable privilege: %s -- GetLastError(): %d "
@@ -112,6 +114,7 @@ namespace
     return FileWildMatch(path + 1, currentPattern);
   }
 
+#if defined(_WIN32)
   [[nodiscard]]
   OVERLAPPED* AsOverlapped(CDiskDirWatch& watch)
   {
@@ -149,6 +152,7 @@ namespace
     const std::wstring wideName(notifyRecord.FileName, notifyRecord.FileNameLength / sizeof(wchar_t));
     return gpg::STR_WideToUtf8(wideName.c_str());
   }
+#endif
 
   void SetEventTimestampFromTimer(SDiskWatchEvent& event, const gpg::time::Timer& timer)
   {
@@ -190,6 +194,7 @@ namespace
   [[nodiscard]]
   bool IsFileStillWriterLocked(const SDiskWatchEvent& event)
   {
+#if defined(_WIN32)
     if (event.mActionCode != FILE_ACTION_MODIFIED) {
       return false;
     }
@@ -210,6 +215,11 @@ namespace
       (void)::CloseHandle(fileHandle);
     }
     return locked;
+#else
+    // Engine addition (dedicated-server plan WPL.5): POSIX has no sharing violations to wait out.
+    (void)event;
+    return false;
+#endif
   }
 
   [[nodiscard]]
@@ -296,6 +306,7 @@ CDiskDirWatch::CDiskDirWatch(CDiskWatch* const owner, const gpg::StrArg director
   mReadBuffer.resize(kDefaultReadBufferSize, 0u);
 
   const char* const watchPath = mDirectoryPath.c_str();
+#if defined(_WIN32)
   const HANDLE watchHandle = ::CreateFileA(
     watchPath,
     FILE_READ_DATA,
@@ -315,6 +326,11 @@ CDiskDirWatch::CDiskDirWatch(CDiskWatch* const owner, const gpg::StrArg director
 
   gpg::Logf("Watching directory \"%s\"", directoryPath != nullptr ? directoryPath : "");
   DoRead();
+#else
+  // Engine addition (dedicated-server plan WPL.5): directories are not watched on POSIX; the
+  // handle stays invalid, so CDiskWatch::AddDirectory reports the directory as not added.
+  gpg::Warnf("CDiskWatch(\"%s\") failed: directory watching is not available on this platform", watchPath);
+#endif
 }
 
 /**
@@ -322,11 +338,13 @@ CDiskDirWatch::CDiskDirWatch(CDiskWatch* const owner, const gpg::StrArg director
  */
 CDiskDirWatch::~CDiskDirWatch()
 {
+#if defined(_WIN32)
   const HANDLE watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   if (watchHandle != INVALID_HANDLE_VALUE) {
     (void)::CancelIo(watchHandle);
     (void)::CloseHandle(watchHandle);
   }
+#endif
   mDirectoryHandle = INVALID_HANDLE_VALUE;
 
   mReadBuffer.clear();
@@ -342,6 +360,7 @@ CDiskDirWatch::~CDiskDirWatch()
  */
 void CDiskDirWatch::DoRead()
 {
+#if defined(_WIN32)
   const HANDLE watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   if (watchHandle == INVALID_HANDLE_VALUE || mReadBuffer.empty()) {
     return;
@@ -367,6 +386,7 @@ void CDiskDirWatch::DoRead()
   gpg::Warnf(kReadDirectoryChangesFailedWarning, errorText.c_str());
   (void)::CloseHandle(watchHandle);
   mDirectoryHandle = INVALID_HANDLE_VALUE;
+#endif
 }
 
 /**
@@ -378,6 +398,7 @@ void CDiskDirWatch::DoRead()
  */
 void CDiskDirWatch::Update()
 {
+#if defined(_WIN32)
   HANDLE watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   while (watchHandle != INVALID_HANDLE_VALUE) {
     DWORD transferredBytes = 0;
@@ -427,6 +448,7 @@ void CDiskDirWatch::Update()
 
     watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   }
+#endif
 
   for (auto* eventIt = mPendingEvents.begin(); eventIt != mPendingEvents.end();) {
     if (!IsPendingEventReady(*eventIt)) {
@@ -682,6 +704,7 @@ bool CDiskWatch::EnablePrivileges() const
  */
 bool CDiskWatch::EnablePrivilege(const msvc8::string& privilegeName, const bool enable) const
 {
+#if defined(_WIN32)
   HANDLE tokenHandle = nullptr;
   const HANDLE currentProcess = ::GetCurrentProcess();
   if (!::OpenProcessToken(currentProcess, TOKEN_ADJUST_PRIVILEGES, &tokenHandle)) {
@@ -701,6 +724,12 @@ bool CDiskWatch::EnablePrivilege(const msvc8::string& privilegeName, const bool 
 
   (void)::CloseHandle(tokenHandle);
   return success;
+#else
+  // Engine addition (dedicated-server plan WPL.5): POSIX has no process privileges to enable.
+  (void)privilegeName;
+  (void)enable;
+  return true;
+#endif
 }
 
 /**

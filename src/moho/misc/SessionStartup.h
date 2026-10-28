@@ -98,6 +98,16 @@ namespace moho
   VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr);
 
   /**
+   * Engine addition (dedicated-server plan WPL.4): the name of the local client
+   * VCR_SetupReplaySession creates, `Loc(USER_GetLuaState(), "<LOC
+   * Engine0031>Local")` in the binary. The user Lua state is user-side code, so
+   * SessionStartup.cpp (user side) sets this during static initialisation;
+   * without a user side the name is the key's text, "Local".
+   */
+  using ReplayLocalClientNameHook = msvc8::string (*)();
+  extern ReplayLocalClientNameHook sReplayLocalClientName;
+
+  /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)
    * Mangled:
    * ?WLD_SetupSessionInfo@Moho@@YA?AV?$auto_ptr@USWldSessionInfo@Moho@@@std@@ABVLuaObject@LuaPlus@@@Z

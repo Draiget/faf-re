@@ -22,6 +22,17 @@ add_executable(faf_main WIN32)
 set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
 target_link_libraries(faf_main PRIVATE faf_engine)
 
+# --- Server mode ----------------------------------------------------------------------
+# The client half of server-authoritative sessions (remote/sources.cmake). Its sources
+# come after the engine's, so the static-init order stays the same. Without
+# `/connectserver` on the command line the client is the lockstep client it is with the
+# option off.
+if(FAF_SERVER_MODE)
+  include(remote/sources.cmake)
+  target_sources(faf_engine PRIVATE ${FAF_REMOTE_SOURCES} ${FAF_REMOTE_CLIENT_SOURCES})
+  target_compile_definitions(faf_engine PRIVATE FAF_SERVER_MODE=1)
+endif()
+
 # --- Resources ------------------------------------------------------------------------
 # MohoResources.rc includes wx/msw/wx.rc (wx's cursors, bitmaps, menus).
 # MohoManifest.rc embeds the application manifest (asInvoker, system DPI
@@ -283,3 +294,118 @@ add_custom_command(TARGET faf_main POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_faf_dxc_bin}/dxcompiler.dll"
           "${_faf_dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:faf_main>"
   VERBATIM)
+
+# --- faf_sim: the simulation ------------------------------------------------------------
+# faf_sim (plan WPR.11) is the simulation as programs without the client link it
+# (headless here, headless and the game server on Linux, cmake/FafLinux.cmake): the
+# objects of the translation units in sim_sources.cmake, gpg::gal::Math without D3DX
+# (gpg/gal/MatrixPortable.cpp instead of gpg/gal/Matrix.cpp), and what linking them takes,
+# with no wx, Direct3D, D3DX, XACT, DirectSound or FFmpeg library.
+#
+# The objects are faf_engine's, compiled once for faf_main and faf_sim alike: each client
+# translation unit's object is filtered out of $<TARGET_OBJECTS:faf_engine>, and the rest
+# keep faf_engine's order. A separately compiled sim library would put faf_main's objects
+# in another order, and static initialisers run in link order: the Lua init forms and
+# reflection types would register in a different order (tests/registry checks it). The
+# sim's sources include no wx or DirectX header (the Linux build compiles them without
+# either). With FAF_SERVER_MODE the objects include src/remote.
+include(sim_sources.cmake)
+
+set(_faf_client_sources ${FAF_ENGINE_SOURCES})
+list(REMOVE_ITEM _faf_client_sources ${FAF_SIM_SOURCES})
+set(_faf_sim_objects "$<TARGET_OBJECTS:faf_engine>")
+set(_faf_client_regex "")
+set(_faf_client_count 0)
+foreach(_src IN LISTS _faf_client_sources)
+  # An object is faf_engine.dir/<source>.obj, after a "./" segment. A source outside src/
+  # (FX11, under the dependencies folder) is named after its path, which depends on where
+  # that folder is: faf_engine.dir/__/dependencies/FX11/x.cpp.obj when it is inside the
+  # source tree, faf_engine.dir/G_/<path>/FX11/x.cpp.obj (drive colon dropped) when it is
+  # not. Those match on the path from the dependencies folder on.
+  if(IS_ABSOLUTE "${_src}")
+    file(RELATIVE_PATH _tail "${FAF_DEPENDENCIES_DIR}" "${_src}")
+    if(_tail MATCHES "^\\.\\./")
+      string(REGEX REPLACE "^[A-Za-z]:" "" _tail "${_src}")
+    else()
+      set(_tail "/${_tail}")
+    endif()
+  else()
+    set(_tail "${_src}")
+  endif()
+  string(REGEX REPLACE "([.+*?^$()|\\[\\]\\\\])" "\\\\\\1" _tail "${_tail}")
+  if(NOT IS_ABSOLUTE "${_src}")
+    set(_tail "faf_engine\\.dir/(\\./)?${_tail}")
+  endif()
+  if(_faf_client_regex STREQUAL "")
+    set(_faf_client_regex "${_tail}\\.obj$")
+  else()
+    string(APPEND _faf_client_regex "|${_tail}\\.obj$")
+  endif()
+  math(EXPR _faf_client_count "${_faf_client_count} + 1")
+  # A few dozen alternatives per filter keeps each regular expression small.
+  if(_faf_client_count EQUAL 24)
+    set(_faf_sim_objects "$<FILTER:${_faf_sim_objects},EXCLUDE,${_faf_client_regex}>")
+    set(_faf_client_regex "")
+    set(_faf_client_count 0)
+  endif()
+endforeach()
+if(NOT _faf_client_regex STREQUAL "")
+  set(_faf_sim_objects "$<FILTER:${_faf_sim_objects},EXCLUDE,${_faf_client_regex}>")
+endif()
+
+# faf_engine's compile settings, without its libraries (as cmake/FafLinux.cmake's).
+add_library(faf_sim_settings INTERFACE)
+target_compile_definitions(faf_sim_settings INTERFACE
+  $<TARGET_PROPERTY:faf_engine,INTERFACE_COMPILE_DEFINITIONS>)
+target_include_directories(faf_sim_settings INTERFACE
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
+  "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
+target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
+target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Foundation)
+
+# MatrixPortable.cpp (faf_main has the D3DX version) is compiled by each program that links
+# faf_sim, so its object (it has a static initialiser) links after the program's own, as
+# before faf_sim existed: an object library's objects would link first.
+add_library(faf_sim INTERFACE)
+target_sources(faf_sim INTERFACE ${_faf_sim_objects} "${CMAKE_CURRENT_SOURCE_DIR}/gpg/gal/MatrixPortable.cpp")
+add_dependencies(faf_sim faf_engine)
+target_link_libraries(faf_sim INTERFACE
+  faf_sim_settings
+  ws2_32 legacy_stdio_definitions legacy_stdio_wide_specifiers
+  dbghelp winmm version shlwapi faultrep
+  ${_faf_zlib}
+  "${_faf_ucrt_dir}/libucrt$<$<CONFIG:Debug>:d>.lib")
+target_link_options(faf_sim INTERFACE $<TARGET_PROPERTY:faf_engine,INTERFACE_LINK_OPTIONS>)
+
+# --- headless -------------------------------------------------------------------------
+# headless_x64.exe (x64) / headless.exe (x86), the console replay runner
+# (headless/sources.cmake, docs/SWITCHES.md "headless"): plays a replay with no window,
+# render device or audio engine, on faf_sim alone. Built by every Windows build (plan
+# WPR.12), so a simulation change that reaches for UI, graphics or audio code fails to
+# link here. With FAF_SERVER_MODE it also has the switches that use src/remote.
+include(headless/sources.cmake)
+set(_faf_headless_sources ${FAF_HEADLESS_SOURCES})
+if(NOT FAF_SERVER_MODE)
+  list(REMOVE_ITEM _faf_headless_sources ${FAF_HEADLESS_SERVER_SOURCES})
+endif()
+
+add_executable(headless ${_faf_headless_sources})
+if(FAF_TARGET_ARCH STREQUAL "x64")
+  set_target_properties(headless PROPERTIES OUTPUT_NAME headless_x64)
+endif()
+target_link_libraries(headless PRIVATE faf_sim)
+if(FAF_SERVER_MODE)
+  target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
+endif()
+# No UI, graphics or audio import (cmake/HeadlessImports.cmake): the link fails otherwise.
+add_custom_command(TARGET headless POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" "-DREADOBJ=${FAF_LLVM_ROOT}/bin/llvm-readobj.exe"
+          "-DEXE=$<TARGET_FILE:headless>" -P "${PROJECT_SOURCE_DIR}/cmake/HeadlessImports.cmake"
+  COMMENT "Checking headless's imports: no UI, graphics or audio"
+  VERBATIM)
+
+# The registration dump (tests/registry) of faf_sim: its Sim and Core sets must equal
+# faf_main's (tests/registry/RegistrationDump.cpp), and its sections the Linux faf_sim's.
+add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
+target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)

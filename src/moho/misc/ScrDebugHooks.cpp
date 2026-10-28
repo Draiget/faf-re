@@ -22,8 +22,6 @@
 #include "moho/misc/PausedThread.h"
 #include "moho/misc/ScrActivation.h"
 #include "moho/misc/ScrBreakpoint.h"
-#include "moho/misc/ScrDebugWindow.h"
-#include "moho/misc/ScrPauseEvent.h"
 #include "moho/misc/ScrWatch.h"
 #include "moho/misc/StartupHelpers.h"
 
@@ -301,8 +299,11 @@ namespace
     {
       boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
 
-      moho::ScrPauseEvent pauseEvent(mountedSource, sourceLine);
-      runtime.debugWindow->AddPendingEvent(pauseEvent);
+      // Engine addition (plan WPL.4): the pause event goes to the client's
+      // window through sScrDebugWindowPostPause (ScrDebugHooks.h).
+      if (moho::sScrDebugWindowPostPause != nullptr) {
+        moho::sScrDebugWindowPostPause(*runtime.debugWindow, mountedSource, sourceLine);
+      }
 
       const std::uint32_t currentThreadId = ::GetCurrentThreadId();
       if (runtime.debugWindowOwnerThreadId == 0U) {
@@ -325,6 +326,11 @@ namespace
     }
   }
 } // namespace
+
+// Engine addition (dedicated-server plan WPL.4), declared in ScrDebugHooks.h.
+moho::ScrDebugWindowOpenHook moho::sScrDebugWindowOpen = nullptr;
+moho::ScrDebugWindowDestroyHook moho::sScrDebugWindowDestroy = nullptr;
+moho::ScrDebugWindowPostPauseHook moho::sScrDebugWindowPostPause = nullptr;
 
 /**
  * Address: 0x004B49B0 (FUN_004B49B0, Moho::SCR_HookState)
@@ -812,9 +818,10 @@ void moho::SCR_CreateDebugWindow()
   runtime.debugWindowOwnerThreadId = ::GetCurrentThreadId();
   SCR_LoadBreakpoints();
 
-  auto* const window = new ScrDebugWindow();
-  runtime.debugWindow = window;
-  (void)window->Show(true);
+  // Engine addition (plan WPL.4): the window is the client's (ScrDebugHooks.h).
+  if (sScrDebugWindowOpen != nullptr) {
+    sScrDebugWindowOpen(runtime.debugWindow);
+  }
 }
 
 /**
@@ -837,7 +844,10 @@ void moho::SCR_DestroyDebugWindow()
     return;
   }
 
-  (void)runtime.debugWindow->Destroy();
+  // Engine addition (plan WPL.4): an open window means the client set the hook.
+  if (sScrDebugWindowDestroy != nullptr) {
+    sScrDebugWindowDestroy(*runtime.debugWindow);
+  }
   runtime.debugWindow = nullptr;
 
   {

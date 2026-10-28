@@ -1,0 +1,33 @@
+# Engine addition (dedicated-server plan WPL.13): the faf_sim functions that may call a host libm
+# transcendental (tests/linux/LibmGate.py). One "symbol demangled-function" per line; the reason
+# above each group. A new call fails the Linux build until it is reviewed here.
+
+# legacy/math/X87Math: the CRT-dispatch lanes. In the domain the engine's x87 bodies run
+# (X87Math64.S); the host CRT is reached only with the CRT's SSE2 mode on (never in the sim) or,
+# for asinf/expf/logf, for (float)f((double)x), which tools/mathsweep compared on every non-NaN
+# float: identical on Windows x64 UCRT and glibc 2.39.
+acos msvc8::acos(double)
+asin msvc8::asin(double)
+asin msvc8::asinf(float)
+pow msvc8::pow(double, double)
+pow msvc8::powf(float, float)
+exp msvc8::expf(float)
+log msvc8::logf(float)
+
+# Camera projection (effect culling against the sync filter's cameras, the render-side view):
+# visual only.
+tanf moho::GeomCamera3::ViewInitPerspective(float, float, float, float)
+tanf moho::VEC_D3DProjectionMatrixFOV(float, float, float, float, float)
+
+# Effects and decals: visual state, not in the sim checksum.
+atan2f moho::CEfxEmitter::Tick(int)
+atan2f (anonymous namespace)::CreateDecalFromTransform(moho::VTransform const&, Wm3::Vector3<float> const&, moho::Sim*, float, msvc8::string const&, msvc8::string const&, float, bool, msvc8::string const&, unsigned int, unsigned int)
+
+# remote/wire: the server-authoritative wire format (the server quantises, clients decode); not
+# sim state.
+atan2 faf::remote::wire::QuantizeYaw(std::__1::array<float, 4ul> const&)
+sin faf::remote::wire::YawToQuaternion(unsigned int)
+cos faf::remote::wire::YawToQuaternion(unsigned int)
+cos faf::remote::wire::ApplyOrientationReckoning(faf::remote::wire::SEntityRecord&, faf::remote::wire::SEntityRecord const&, std::__1::span<unsigned int const, 18446744073709551615ul>, unsigned int, faf::remote::wire::SReckoningScheme const&, faf::remote::wire::SFrameCodec const&)
+# remote/client: the client rebuilding sync packets from the wire (runs on the client, not the sim).
+acos faf::remote::client::CSyncRebuilder::Apply(std::__1::span<unsigned char const, 18446744073709551615ul>, moho::SSyncData&)

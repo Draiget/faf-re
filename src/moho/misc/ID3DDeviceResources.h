@@ -245,4 +245,15 @@ namespace moho
   };
 
   static_assert(sizeof(ID3DDeviceResources) == 0x04, "ID3DDeviceResources size must be 0x04");
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): the device resources' texture
+   * lookup with the fallback texture allowed,
+   * `D3D_GetDevice()->GetResources()->GetTexture(outTexture, name, 0, true)`, for
+   * simulation code (UnitWeapon:DoInstaHit). moho/render/d3d/CD3DDevice.cpp sets it
+   * during static initialisation; defined in moho/unit/core/UnitWeapon.cpp. Without a
+   * client it is null and there is no texture.
+   */
+  using DeviceTextureLookupHook = void (*)(ID3DDeviceResources::TextureResourceHandle& outTexture, const char* name);
+  extern DeviceTextureLookupHook sDeviceTextureLookup;
 } // namespace moho

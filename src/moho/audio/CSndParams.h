@@ -201,6 +201,18 @@ namespace moho
   LuaPlus::LuaObject*
   func_NewCSndParams(LuaPlus::LuaState* state, LuaPlus::LuaObject* outObject, CSndParams** paramsSlot);
 
+#if FAF_SERVER_MODE
+  /**
+   * Engine addition, server mode: the process's interned params for these names, as
+   * `Sound{Cue, Bank, LodCutoff}` (and `RPCSound`, with the RPC loop variable) make them. A
+   * remote client resolves the sounds the server names this way. Empty names: no variable.
+   */
+  [[nodiscard]] CSndParams* SND_FindOrCreateParams(
+    const msvc8::string& bankName, const msvc8::string& cueName, const msvc8::string& lodCutoffName,
+    const msvc8::string& rpcLoopName
+  );
+#endif
+
   /**
    * Address: 0x004E4B40 (FUN_004E4B40, func_GetCObj_CSndParams)
    *
