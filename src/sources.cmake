@@ -220,6 +220,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/WinPlatform.cpp
   gpg/core/diagnostics/CrashHooks.cpp
   gpg/core/diagnostics/CrashReport.cpp
+  gpg/core/diagnostics/CrashReportDialog.cpp
   gpg/core/diagnostics/ProbeWatch.cpp
   lua/LuaCrashDump.cpp
   lua/LuaMemAccounting.cpp

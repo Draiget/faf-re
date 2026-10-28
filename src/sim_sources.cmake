@@ -63,7 +63,10 @@ set(_faf_client_only_patterns
   "^moho/sim/(IdleUnitSelector|PauseListener|SelectionListener|SSessionSaveDataTypeInfo)\\.cpp$"
   # The front end's session launch, saves and replay recording (replay
   # playback setup is moho/misc/ReplaySessionSetup.cpp).
-  "^moho/misc/SessionStartup\\.cpp$")
+  "^moho/misc/SessionStartup\\.cpp$"
+  # The crash dialog (window, clipboard, shell; CrashReport.cpp writes the
+  # report and the minidump without it).
+  "^gpg/core/diagnostics/CrashReportDialog\\.cpp$")
 
 set(_faf_sim_patterns
   # Decals the sim creates and expires (CDecalBuffer::CleanupTick runs on
