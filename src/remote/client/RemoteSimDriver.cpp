@@ -90,9 +90,16 @@ namespace faf::remote::client
 
   void CRemoteSimDriver::PassThroughWire(moho::SSyncData& packet)
   {
+    moho::IClientManager* const standIn = mServer->GetClientManager();
+    if (standIn != nullptr) {
+      mLink.SetServerSimRate(standIn->GetSimRate());
+    }
     mLink.Pass(packet);
-    if (moho::IClientManager* const standIn = mServer->GetClientManager(); standIn != nullptr) {
+    if (standIn != nullptr) {
       mLink.PassRoster(*standIn, mClientManager);
+    }
+    if (mLink.Clock().HasFrames()) {
+      mClientManager.SetServerSimRate(mLink.Clock().ServerSimRate());
     }
     if (mLink.Stats().frames % kSummaryEveryBeats == 0u) {
       LogSummary("so far");
@@ -156,7 +163,8 @@ namespace faf::remote::client
 
   double CRemoteSimDriver::GetSimSpeed()
   {
-    return mServer->GetSimSpeed();
+    // The display's skew from the frames held (WP11.5); 0 in loopback, as the lockstep driver's.
+    return mLink.Refused() ? mServer->GetSimSpeed() : mLink.Clock().Skew();
   }
 
   void CRemoteSimDriver::SetArmyIndex(const int armyIndex)

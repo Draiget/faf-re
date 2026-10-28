@@ -1,9 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
 #include <optional>
 #include <string>
 
 #include "remote/FrameBuilder.h"
+#include "remote/client/BeatClock.h"
 #include "remote/client/RemoteClientManager.h"
 #include "remote/client/SyncRebuilder.h"
 #include "remote/wire/Roster.h"
@@ -62,6 +65,12 @@ namespace faf::remote::client
      */
     void PassRoster(moho::IClientManager& standIn, CRemoteClientManager& facade);
 
+    /** The sim rate the server runs at (its client manager's), stamped on the next frames. */
+    void SetServerSimRate(std::int32_t simRate) noexcept { mServerSimRate = simRate; }
+    /** The client's clock of the server's beats (WP11.5), fed by every frame decoded. */
+    [[nodiscard]] const CBeatClock& Clock() const noexcept { return mClock; }
+    [[nodiscard]] bool Refused() const noexcept { return !mRefusal.empty(); }
+
     [[nodiscard]] const wire::SContentTables& Tables() const noexcept { return mTables; }
     /** Why the client refused the server's hello at connect (WP7.2), or empty: then `Pass` does nothing. */
     [[nodiscard]] const std::string& Refusal() const noexcept { return mRefusal; }
@@ -89,6 +98,10 @@ namespace faf::remote::client
     std::uint64_t mRebuildFailures = 0;
     std::uint64_t mTableFailures = 0;
     std::uint64_t mTableBytes = 0; // session-table records (the reliable stream)
+    // Beat stamps and the client's clock (WP11.5).
+    std::int32_t mServerSimRate = 0;
+    std::chrono::steady_clock::time_point mStart = std::chrono::steady_clock::now();
+    CBeatClock mClock;
     // The roster (WP11.4).
     wire::SRoster mSentRoster;
     bool mHaveSentRoster = false;

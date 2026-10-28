@@ -286,6 +286,9 @@ namespace faf::remote::client
 
   int CRemoteClientManager::GetSimRate()
   {
+    if (mHaveServerSimRate) {
+      return mServerSimRate;
+    }
     return mStandIn != nullptr ? mStandIn->GetSimRate() : CClientManagerImpl::GetSimRate();
   }
 
