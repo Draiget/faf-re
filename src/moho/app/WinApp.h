@@ -308,13 +308,14 @@ namespace moho
   void WIN_OkBox(gpg::StrArg caption, gpg::StrArg text);
 
   /**
-   * Engine addition (dedicated-server plan WPL.4): the window WIN_OkBox
-   * (moho/misc/WinPlatform.cpp) uses as owner, the client's main window
-   * handle. WinApp.cpp sets it during static initialisation; without it the
-   * box has no owner.
+   * Engine addition (dedicated-server plan WPL.4, WPR.12): shows WIN_OkBox's
+   * box (moho/misc/WinPlatform.cpp). WinApp.cpp sets it during static
+   * initialisation to the message box the binary showed, owned by the client's
+   * main window. A program without the client (headless, the game server) has
+   * no window to show it in: WIN_OkBox then writes the text to stderr.
    */
-  using OkBoxOwnerWindowHook = void* (*)();
-  extern OkBoxOwnerWindowHook sOkBoxOwnerWindow;
+  using OkBoxPresenterHook = void (*)(gpg::StrArg caption, gpg::StrArg text);
+  extern OkBoxPresenterHook sOkBoxPresenter;
 
   /**
    * Engine addition (dedicated-server plan WPL.4): ends the client's main loop

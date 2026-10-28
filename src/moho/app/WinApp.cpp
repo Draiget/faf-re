@@ -2757,16 +2757,20 @@ bool moho::WIN_YesNoBox(const gpg::StrArg caption, const gpg::StrArg text)
 
 namespace
 {
-  // Engine addition (dedicated-server plan WPL.4): WIN_OkBox's owner window
-  // (moho/misc/WinPlatform.cpp), the expression it used before the move.
-  void* OkBoxOwnerWindow()
+  // Engine addition (dedicated-server plan WPL.4, WPR.12): WIN_OkBox's box
+  // (moho/misc/WinPlatform.cpp), as the binary showed it (0x004F2800): owned by
+  // the main window when there is one, MB_SETFOREGROUND.
+  void ShowOkBox(const gpg::StrArg caption, const gpg::StrArg text)
   {
-    return moho::sMainWindow != nullptr
-             ? reinterpret_cast<void*>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
-             : nullptr;
+    const HWND ownerWindow = moho::sMainWindow != nullptr
+                               ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
+                               : nullptr;
+    const std::wstring wideCaption = gpg::STR_Utf8ToWide(caption);
+    const std::wstring wideText = gpg::STR_Utf8ToWide(text);
+    (void)::MessageBoxW(ownerWindow, wideText.c_str(), wideCaption.c_str(), 0x40000u);
   }
 
-  [[maybe_unused]] const bool gOkBoxOwnerWindowSet = (moho::sOkBoxOwnerWindow = &OkBoxOwnerWindow, true);
+  [[maybe_unused]] const bool gOkBoxPresenterSet = (moho::sOkBoxPresenter = &ShowOkBox, true);
 
   // Engine addition (dedicated-server plan WPL.4): sAppExitMainLoop, what
   // cfunc_EndLoggingStatsL (moho/misc/StatItem.cpp) did before the move.

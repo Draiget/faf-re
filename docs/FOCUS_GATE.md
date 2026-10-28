@@ -2,7 +2,7 @@
 
 A game server runs one sim and builds a view for every player from it, so the sim must not depend on which army a client watches: a lockstep client's sim builds its packets for its own army (the "focus army"), and the server's sim has to give the same game whatever focus it runs with. The focus gate checks that on replays. Run it with every change to sim code and at every server milestone (plan WPR.2).
 
-It needs a server-mode build (`clang-x64-release-server` or `clang-x86-release-server`, which produce `headless_x64.exe` or `headless.exe`, see [Switches](SWITCHES.md#headless)) and Python 3.
+It needs `headless_x64.exe` or `headless.exe`, which every build produces (see [Switches](SWITCHES.md#headless)), and Python 3.
 
 ## What it does
 

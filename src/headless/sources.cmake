@@ -1,7 +1,11 @@
-# Server mode (FAF_SERVER_MODE, see docs/SWITCHES.md). Paths are relative to src/.
+# headless, the console replay runner (docs/SWITCHES.md, "headless"). Paths are relative
+# to src/.
 #
-# FAF_HEADLESS_SOURCES: headless, the headless replay runner. Its own sources only; the
-# simulation's objects come from faf_engine (Windows) or faf_sim (Linux).
+# FAF_HEADLESS_SOURCES: its own sources only; the simulation's objects come from faf_engine
+# (Windows) or faf_sim (Linux). Every Windows build has headless; FAF_SERVER_MODE adds the
+# wire format and the remote client (src/remote), which --wire-stats, --loopback and
+# --command-check use. Without it the build leaves out FAF_HEADLESS_SERVER_SOURCES and
+# those switches (#if FAF_SERVER_MODE in the rest). The Linux build is always server mode.
 
 set(FAF_HEADLESS_SOURCES
   headless/ReplayBoneStats.cpp
@@ -12,5 +16,10 @@ set(FAF_HEADLESS_SOURCES
   headless/HeadlessMain.cpp
   headless/ReplayRunner.cpp
   headless/ReplaySyncWriters.cpp
+  headless/ReplayWireStats.cpp
+)
+
+set(FAF_HEADLESS_SERVER_SOURCES
+  headless/ReplayCommandCheck.cpp
   headless/ReplayWireStats.cpp
 )
