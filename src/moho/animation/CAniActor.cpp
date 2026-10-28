@@ -14,10 +14,18 @@
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/console/CConCommand.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
+  bool sim_RecyclePose = true;
+  moho::TConVar<bool> gTConVar_sim_RecyclePose(
+    "sim_RecyclePose",
+    "Recycle CAniPose buffers in-place when unique to eliminate heap churn.",
+    &sim_RecyclePose
+  );
+
   constexpr std::uint32_t kWatchBoneEnabledFlag = 0x8000u;
 
   // Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer) -- MSVC's
@@ -543,7 +551,12 @@ namespace moho
     // 0x0063AAB0-0x0063AAE7: `mPose.reset(new CAniPose(*mPriorPose.px))`. The
     // new frame starts as a copy of the pose just retired, under a fresh
     // control block; the referent this lane held before the swap is released.
-    mPose.reset(new CAniPose(*mPriorPose));
+    // Engine addition (sim_RecyclePose): when unique, overwrite in-place without heap reallocation.
+    if (sim_RecyclePose && mPose != nullptr && mPose.unique()) {
+      mPose->OverwritePose(*mPriorPose);
+    } else {
+      mPose.reset(new CAniPose(*mPriorPose));
+    }
 
     mPose->UpdateBones();                     // 0x0063AAEE
     mPose->SetWorldTransform(worldTransform); // 0x0063AAFA
