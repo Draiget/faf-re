@@ -820,12 +820,11 @@ namespace moho
     [[nodiscard]] int32_t DiagNextIssueBeat() const { return mNextIssueBeat; }
     [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
 
-#if FAF_SERVER_MODE
-    /// Engine addition, server mode (headless): the sim, read-only. headless reads a beat's
+    /// Engine addition (headless, plan WPR.12): the sim, read-only. headless reads a beat's
     /// checksum from `Sim::mSimHashes` after taking that beat's packet off the queue; the sim
-    /// wrote it before queueing the packet and rewrites the slot only 128 beats later.
+    /// wrote it before queueing the packet and rewrites the slot only 128 beats later. Inline
+    /// and unused by the client: no layout or code change in main.
     [[nodiscard]] const Sim* GetSimForReplayCheck() const noexcept { return mSim.get(); }
-#endif
 
   private:
     /**

@@ -146,10 +146,12 @@ namespace
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --blueprint-order <file> write every blueprint by ordinal, in the rules' load order\n"
-      "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV)\n"
+      "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV; server-mode build)\n"
       "  --loopback [--loopback-dr <steps> [--loopback-turns <units>]]  every packet through the wire format and the\n"
       "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
+      "                            (server-mode build)\n"
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
+      "                            (server-mode build)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -229,6 +231,17 @@ int main(int argc, char** argv)
     PrintUsage();
     return kExitBadInput;
   }
+#if !FAF_SERVER_MODE
+  // The wire format and the remote client (src/remote) are built only with FAF_SERVER_MODE.
+  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck) {
+    std::printf(
+      "[%s] --wire-stats, --loopback and --command-check need a server-mode build "
+      "(FAF_SERVER_MODE, the *-server presets)\n",
+      gLabel.c_str()
+    );
+    return kExitBadInput;
+  }
+#endif
   std::printf("[%s] replay %s\n", gLabel.c_str(), options.replayPath.c_str());
   std::fflush(stdout);
 

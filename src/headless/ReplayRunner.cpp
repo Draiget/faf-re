@@ -2,7 +2,9 @@
 #include "headless/ReplayLuaState.h"
 #include "headless/ReplaySyncWriters.h"
 
+#if FAF_SERVER_MODE
 #include "remote/client/LoopbackLink.h"
+#endif
 
 #include <Windows.h>
 
@@ -39,11 +41,15 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/unit/core/Unit.h"
-#include "remote/ContentTables.h"
 #include "headless/ReplayBoneStats.h"
 #include "headless/ReplayFpuReport.h"
+#if FAF_SERVER_MODE
+// The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
+// --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
 #include "headless/ReplayCommandCheck.h"
 #include "headless/ReplayWireStats.h"
+#include "remote/ContentTables.h"
+#endif
 
 namespace faf::headless
 {
@@ -406,6 +412,7 @@ namespace faf::headless
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
     std::unique_ptr<moho::CWldMap> wldMap(gameData.mWldMap);
 
+#if FAF_SERVER_MODE
     // The wire format's content tables (plan WP7.2), as a server or client builds them at load.
     const faf::remote::wire::SContentTables tables = faf::remote::BuildContentTables(*rules);
     {
@@ -417,6 +424,7 @@ namespace faf::headless
         static_cast<unsigned long long>(tables.Hash())
       );
     }
+#endif
     gameData = moho::SWldGameData{};
 
     // The launch info, completed as `WLD_DoLoading` completes it from the world session.
@@ -453,12 +461,14 @@ namespace faf::headless
       syncWriters.Enable();
     }
 
+#if FAF_SERVER_MODE
     // `--command-check`: watches the sim's decoder from its first message.
     std::unique_ptr<CReplayCommandCheck> commandCheck;
     if (options.commandCheck) {
       commandCheck = std::make_unique<CReplayCommandCheck>(*rules);
       commandCheck->Install();
     }
+#endif
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
@@ -501,6 +511,7 @@ namespace faf::headless
         return result;
       }
     }
+#if FAF_SERVER_MODE
     std::unique_ptr<CReplayWireStats> wireStats;
     if (!options.wireStatsPath.empty()) {
       wireStats = std::make_unique<CReplayWireStats>(
@@ -529,6 +540,7 @@ namespace faf::headless
         loopbackOptions
       );
     }
+#endif
 
     LuaPlus::LuaState* const syncState = ReplayLuaState();
     std::map<std::string, SSyncKeySeen> syncKeys;
@@ -604,9 +616,11 @@ namespace faf::headless
           std::printf("[%s] GAME-ENDED beat %d\n", label, packet->mCurBeat);
           std::fflush(stdout);
         }
+#if FAF_SERVER_MODE
         if (wireStats) {
           wireStats->OnPacket(*packet);
         }
+#endif
         if (options.fpuReport && result.fpuReport.empty() && packet->mCurBeat >= 1) {
           result.fpuReport = ReportThreadFloatingPointState(40, 25);
         }
@@ -616,6 +630,7 @@ namespace faf::headless
         if (packet->mGameOver) {
           result.gameOver = true;
         }
+#if FAF_SERVER_MODE
         if (loopback) {
           loopback->Pass(*packet);
           if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
@@ -625,6 +640,7 @@ namespace faf::headless
             loopback->PassRoster(*standIn, *rosterFacade);
           }
         }
+#endif
 
         if (!result.started) {
           // `WLD_DoInitializing`: the first beat is applied, then this client declares itself
@@ -663,14 +679,15 @@ namespace faf::headless
     if (laneSizesFile != nullptr) {
       std::fclose(laneSizesFile);
     }
-    if (wireStats) {
-      result.wireSummary = wireStats->Summary();
-    }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
     }
     if (attributeSyncWrites) {
       result.syncWritersSummary = syncWriters.Write(options.syncWritersPath);
+    }
+#if FAF_SERVER_MODE
+    if (wireStats) {
+      result.wireSummary = wireStats->Summary();
     }
     if (loopback) {
       result.loopbackSummary = loopback->Summary("end");
@@ -680,6 +697,7 @@ namespace faf::headless
       result.commandSummary = commandCheck->Summary();
       result.commandFailures = commandCheck->Failures();
     }
+#endif
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;
       if (fopen_s(&keysFile, options.syncKeysPath.c_str(), "w") == 0 && keysFile != nullptr) {

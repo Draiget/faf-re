@@ -369,7 +369,7 @@ namespace
 
 
 // Engine addition (dedicated-server plan WPL.4), declared in WinApp.h.
-moho::OkBoxOwnerWindowHook moho::sOkBoxOwnerWindow = nullptr;
+moho::OkBoxPresenterHook moho::sOkBoxPresenter = nullptr;
 moho::AppExitMainLoopHook moho::sAppExitMainLoop = nullptr;
 moho::AppPumpEventsHook moho::sAppPumpEvents = nullptr;
 moho::AppPumpStepHook moho::sAppPumpStep = nullptr;
@@ -755,12 +755,16 @@ msvc8::string moho::WIN_GetLastError()
  */
 void moho::WIN_OkBox(const gpg::StrArg caption, const gpg::StrArg text)
 {
-  // Engine addition (dedicated-server plan WPL.4): the owner is the client's
-  // main window (`sMainWindow`, wx), asked through sOkBoxOwnerWindow.
-  const HWND ownerWindow = sOkBoxOwnerWindow != nullptr ? static_cast<HWND>(sOkBoxOwnerWindow()) : nullptr;
-  const std::wstring wideCaption = gpg::STR_Utf8ToWide(caption);
-  const std::wstring wideText = gpg::STR_Utf8ToWide(text);
-  (void)::MessageBoxW(ownerWindow, wideText.c_str(), wideCaption.c_str(), 0x40000u);
+  // Engine addition (dedicated-server plan WPL.4, WPR.12): the box itself is the
+  // client's (sOkBoxPresenter, WinApp.cpp: the binary's MessageBoxW owned by the
+  // main window). Without the client there is no window: the text goes to stderr,
+  // as on Linux (moho/misc/posix/PlatformPosix.cpp).
+  if (sOkBoxPresenter != nullptr) {
+    sOkBoxPresenter(caption, text);
+    return;
+  }
+  std::fprintf(stderr, "[%s] %s\n", caption != nullptr ? caption : "", text != nullptr ? text : "");
+  std::fflush(stderr);
 }
 
 /**

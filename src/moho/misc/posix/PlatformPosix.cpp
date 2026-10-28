@@ -24,7 +24,7 @@
 #include "gpg/core/containers/String.h"
 
 // Declared in WinApp.h; the client's TUs set them (none on Linux).
-moho::OkBoxOwnerWindowHook moho::sOkBoxOwnerWindow = nullptr;
+moho::OkBoxPresenterHook moho::sOkBoxPresenter = nullptr;
 moho::AppExitMainLoopHook moho::sAppExitMainLoop = nullptr;
 moho::AppPumpEventsHook moho::sAppPumpEvents = nullptr;
 moho::AppPumpStepHook moho::sAppPumpStep = nullptr;
