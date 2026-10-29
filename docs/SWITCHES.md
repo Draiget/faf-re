@@ -36,6 +36,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ParallelBlipFlush` | 1 | `/con` | live | The bulk blip-unlink pass splices separate weak chains on sim workers (needs `sim_Workers` > 0) |
 | `sim_ParallelSyncHeap` | 1 | `/con` | live | With `sim_ParallelSync`, the allocating members of unit-update records are copied on workers too |
 | `sim_ParallelEntitySync` | 1 | `/con` | live | With `sim_ParallelSync`, entity-update records are copied on workers |
+| `sim_ParallelEffects` | 1 | `/con` | live | The effect manager's tick (beams, emitters, trails) on sim workers in chunks of consecutive effects; each chunk collects its particles and its effects' self-destroys, and the chunks are committed in list order, so the particle buffer and the destroyed list are the serial ones. Any other effect class in the list, or `dbg_EfxBeams` / `dbg_Emitter` / `dbg_Trail`, keeps the beat serial (needs `sim_Workers` > 0) |
+| `sim_ParallelEffectsMin` | 64 | `/con` | live | Fewest active effects for which `sim_ParallelEffects` uses the workers |
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |

@@ -530,11 +530,7 @@ namespace moho
       return;
     }
 
-    if (sEngineStatRenderActiveEmitters == nullptr) {
-      EngineStats* const engineStats = GetEngineStats();
-      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
-      (void)sEngineStatRenderActiveEmitters->Release(0);
-    }
+    PrepareTickStats();
     _InterlockedExchangeAdd(
       reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
 
@@ -562,6 +558,15 @@ namespace moho
     mTrailLength = 0;
     Tick(0);
     mTotalTicks = mTotalTicks + 1.0f;
+  }
+
+  void CEfxTrailEmitter::PrepareTickStats()
+  {
+    if (sEngineStatRenderActiveEmitters == nullptr) {
+      EngineStats* const engineStats = GetEngineStats();
+      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
+      (void)sEngineStatRenderActiveEmitters->Release(0);
+    }
   }
 } // namespace moho
 

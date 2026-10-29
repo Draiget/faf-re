@@ -146,6 +146,12 @@ namespace moho
     void OnTick() override;
 
     /**
+     * Engine addition (`sim_ParallelEffects`): resolves the "Render_ActiveEmitters" handle that
+     * OnTick looks up on first use, so ticks on sim workers never race to set it.
+     */
+    static void PrepareTickStats();
+
+    /**
      * Address: 0x0065CE00 (FUN_0065CE00, Moho::CEfxEmitter::Tick)
      *
      * What it does:

@@ -1,9 +1,14 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 
+#include <algorithm>
+#include <memory>
 #include <new>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/console/CConCommand.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/CEfxBeam.h"
 #include "moho/effects/rendering/CEfxEmitter.h"
@@ -25,11 +30,33 @@
 #include "moho/resource/RResId.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 
 
 namespace moho
 {
+  // Debug console flags defined in EffectLuaStartupRegistrations.cpp. Each makes its effect class
+  // draw into the sim's debug canvas, which the effect tick on workers does not support.
+  extern bool dbg_EfxBeams;
+  extern bool dbg_Emitter;
+  extern bool dbg_Trail;
+
+  bool sim_ParallelEffects = true;
+  TConVar<bool> gTConVar_sim_ParallelEffects(
+    "sim_ParallelEffects",
+    "Tick beams, emitters and trails on sim workers (when sim_Workers > 0); same particles, same "
+    "destroyed effects, in the same order.",
+    &sim_ParallelEffects
+  );
+
+  int sim_ParallelEffectsMin = 64;
+  TConVar<int> gTConVar_sim_ParallelEffectsMin(
+    "sim_ParallelEffectsMin",
+    "Fewest active effects for which sim_ParallelEffects uses the workers.",
+    &sim_ParallelEffectsMin
+  );
+
   gpg::RType* CEffectManagerImpl::sType = nullptr;
 
   gpg::RType* CEffectManagerImpl::StaticGetClass()
@@ -49,6 +76,39 @@ namespace moho
      * the latest effect-manager tick.
      */
     StatItem* sEngineStatRenderActiveEmitters = nullptr;
+
+    /// sim_ParallelEffects: what one chunk of effect ticks produced, committed after the chunk.
+    struct SEffectTickChunk
+    {
+      SParticleBuffer mParticles;          // the chunk's particle, trail and beam appends
+      std::vector<IEffect*> mDestroyed;    // its DestroyEffect calls, in call order
+    };
+
+    // Effects per chunk. Chunk boundaries depend only on this and the effect count.
+    constexpr std::size_t kEffectTickGrain = 32;
+
+    thread_local SEffectTickChunk* tEffectTickChunk = nullptr;
+    std::uint64_t sParallelEffectTicks = 0; // logged every 5000
+    std::vector<IEffect*> sEffectTickSnapshot;
+    std::vector<std::unique_ptr<SEffectTickChunk>> sEffectTickChunks;
+
+    /// The classes whose OnTick is known to write only the effect itself, the particle buffer and
+    /// the destroyed list (through DestroyEffect on itself).
+    [[nodiscard]] bool TicksOnWorkers(IEffect* const effect)
+    {
+      const std::type_info& type = typeid(*effect);
+      return type == typeid(CEfxEmitter) || type == typeid(CEfxTrailEmitter) || type == typeid(CEfxBeam);
+    }
+
+    /// Appends `source` to `target` one push_back at a time, as the serial walk does, and empties it.
+    template <class T>
+    void AppendInOrder(msvc8::vector<T>& target, msvc8::vector<T>& source)
+    {
+      for (const T& value : source) {
+        target.push_back(value);
+      }
+      source.clear();
+    }
 
     [[nodiscard]] msvc8::string BuildParticleTexturePath(
       const msvc8::string& textureName,
@@ -404,6 +464,12 @@ namespace moho
       return;
     }
 
+    // sim_ParallelEffects: inside a chunk the relink waits for the chunk's commit.
+    if (SEffectTickChunk* const chunk = tEffectTickChunk; chunk != nullptr) {
+      chunk->mDestroyed.push_back(effect);
+      return;
+    }
+
     effect->ListLinkBefore(&mDestroyedEffects);
   }
 
@@ -423,11 +489,92 @@ namespace moho
     constexpr std::int32_t kNoEmitters = 0;
     (void)sEngineStatRenderActiveEmitters->SetInt(&kNoEmitters);
 
+    if (TickParallel()) {
+      return;
+    }
+
     // The successor is read before each OnTick, as the binary does: an effect
     // that destroys itself relinks into mDestroyedEffects mid-walk.
     for (IEffect* const effect : mActiveEffects.owners_safe()) {
       effect->OnTick();
     }
+  }
+
+  bool CEffectManagerImpl::TickParallel()
+  {
+    if (!sim_ParallelEffects || !CSimWorkerPool::ParallelEnabled() || dbg_EfxBeams || dbg_Emitter || dbg_Trail ||
+        tEffectTickChunk != nullptr) {
+      return false;
+    }
+
+    // The serial walk visits exactly this list: an OnTick relinks at most itself, and only into
+    // mDestroyedEffects, which the walk has already read past.
+    sEffectTickSnapshot.clear();
+    for (IEffect* const effect : mActiveEffects.owners()) {
+      if (!TicksOnWorkers(effect)) {
+        return false;
+      }
+      sEffectTickSnapshot.push_back(effect);
+    }
+    const std::size_t count = sEffectTickSnapshot.size();
+    if (count == 0u || count < static_cast<std::size_t>(std::max(1, sim_ParallelEffectsMin))) {
+      return false;
+    }
+
+    // Their OnTicks resolve a stat handle lazily; resolve it here, before two workers could.
+    CEfxEmitter::PrepareTickStats();
+    CEfxTrailEmitter::PrepareTickStats();
+
+    const std::size_t chunkCount = (count + kEffectTickGrain - 1u) / kEffectTickGrain;
+    while (sEffectTickChunks.size() < chunkCount) {
+      sEffectTickChunks.push_back(std::make_unique<SEffectTickChunk>());
+    }
+
+    CSimWorkerPool::Get().ParallelFor(count, kEffectTickGrain, [](const std::size_t begin, const std::size_t end) {
+      struct SChunkScope
+      {
+        explicit SChunkScope(SEffectTickChunk* const chunk) noexcept { tEffectTickChunk = chunk; }
+        ~SChunkScope() { tEffectTickChunk = nullptr; }
+      } scope(sEffectTickChunks[begin / kEffectTickGrain].get());
+      for (std::size_t i = begin; i < end; ++i) {
+        sEffectTickSnapshot[i]->OnTick();
+      }
+    });
+
+    // Chunks are consecutive runs of the list, so committing them in chunk order is list order.
+    SParticleBuffer* target = nullptr;
+    for (std::size_t i = 0; i < chunkCount; ++i) {
+      SEffectTickChunk& chunk = *sEffectTickChunks[i];
+      for (IEffect* const effect : chunk.mDestroyed) {
+        DestroyEffect(effect);
+      }
+      chunk.mDestroyed.clear();
+
+      SParticleBuffer& produced = chunk.mParticles;
+      if (produced.mParticles.empty() && produced.mTrails.empty() && produced.mBeams.empty()) {
+        continue;
+      }
+      if (target == nullptr) {
+        target = mSim->GetParticleBuffer(); // created on first use, as the first serial append would
+      }
+      AppendInOrder(target->mParticles, produced.mParticles);
+      AppendInOrder(target->mTrails, produced.mTrails);
+      AppendInOrder(target->mBeams, produced.mBeams);
+    }
+
+    if ((++sParallelEffectTicks % 5000u) == 0u) {
+      gpg::Logf(
+        "sim_ParallelEffects: %llu effect ticks on workers (this one: %zu effects)",
+        static_cast<unsigned long long>(sParallelEffectTicks), count
+      );
+    }
+    return true;
+  }
+
+  SParticleBuffer* EffectTickChunkParticleBuffer() noexcept
+  {
+    SEffectTickChunk* const chunk = tEffectTickChunk;
+    return chunk != nullptr ? &chunk->mParticles : nullptr;
   }
 
   /**

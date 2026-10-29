@@ -6391,6 +6391,12 @@ boost::shared_ptr<CHeightField>* CopySharedHeightFieldPtr(
  */
 SParticleBuffer* Sim::GetParticleBuffer()
 {
+  // Engine addition (sim_ParallelEffects): an effect tick on a sim worker appends to its chunk's
+  // buffer, which CEffectManagerImpl::TickParallel then commits here in list order.
+  if (SParticleBuffer* const chunkBuffer = EffectTickChunkParticleBuffer(); chunkBuffer != nullptr) {
+    return chunkBuffer;
+  }
+
   if (!mParticleBuffer) {
     (void)AssignSharedParticleBufferFromRaw(&mParticleBuffer, new SParticleBuffer());
   }

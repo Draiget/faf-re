@@ -1148,11 +1148,7 @@ namespace moho
       return;
     }
 
-    if (sEngineStatRenderActiveEmitters == nullptr) {
-      EngineStats* const engineStats = GetEngineStats();
-      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
-      (void)sEngineStatRenderActiveEmitters->Release(0);
-    }
+    PrepareTickStats();
     _InterlockedExchangeAdd(
       reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
 
@@ -1196,6 +1192,15 @@ namespace moho
       line.depth0 = static_cast<std::int32_t>(0xFF0000FFu);
       line.depth1 = static_cast<std::int32_t>(0xFFFF0000u);
       debugCanvas->DebugDrawLine(line);
+    }
+  }
+
+  void CEfxEmitter::PrepareTickStats()
+  {
+    if (sEngineStatRenderActiveEmitters == nullptr) {
+      EngineStats* const engineStats = GetEngineStats();
+      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
+      (void)sEngineStatRenderActiveEmitters->Release(0);
     }
   }
 } // namespace moho
