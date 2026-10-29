@@ -31,3 +31,5 @@ cos faf::remote::wire::YawToQuaternion(unsigned int)
 cos faf::remote::wire::ApplyOrientationReckoning(faf::remote::wire::SEntityRecord&, faf::remote::wire::SEntityRecord const&, std::__1::span<unsigned int const, 18446744073709551615ul>, unsigned int, faf::remote::wire::SReckoningScheme const&, faf::remote::wire::SFrameCodec const&)
 # remote/client: the client rebuilding sync packets from the wire (runs on the client, not the sim).
 acos faf::remote::client::CSyncRebuilder::Apply(std::__1::span<unsigned char const, 18446744073709551615ul>, moho::SSyncData&)
+# The client's beat clock: the beat rate the server's sim rate implies, for pacing and skew stats.
+pow faf::remote::client::CBeatClock::ExpectedBeatsPerSecond() const

@@ -66,7 +66,9 @@ set(_faf_client_only_patterns
   "^moho/misc/SessionStartup\\.cpp$"
   # The crash dialog (window, clipboard, shell; CrashReport.cpp writes the
   # report and the minidump without it).
-  "^gpg/core/diagnostics/CrashReportDialog\\.cpp$")
+  "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
+  # The frame-stall sampler (FAF_FRAME_SAMPLER; the client's frame loop marks it).
+  "^gpg/core/diagnostics/FrameSampler\\.cpp$")
 
 set(_faf_sim_patterns
   # Decals the sim creates and expires (CDecalBuffer::CleanupTick runs on
