@@ -164,6 +164,51 @@
 using namespace moho;
 using EntId = std::int32_t;
 
+namespace
+{
+  /// Plan WPL.18: one table's keys in `lua_next` order, `depth` levels down into tables under
+  /// string keys (at the top level only into `moho`). Other keys print as their number or
+  /// type, never as an address.
+  void DumpLuaTableKeys(lua_State* const state, std::FILE* const out, const std::string& path, const int depth)
+  {
+    lua_pushnil(state);
+    while (lua_next(state, -2) != 0) {
+      const int keyType = lua_type(state, -2);
+      std::string name;
+      if (keyType == LUA_TSTRING) {
+        name = lua_tostring(state, -2);
+      } else if (keyType == LUA_TNUMBER) {
+        char number[32];
+        std::snprintf(number, sizeof(number), "[%.14g]", static_cast<double>(lua_tonumber(state, -2)));
+        name = number;
+      } else {
+        name = std::string("<") + lua_typename(state, keyType) + ">";
+      }
+      const std::string child = path.empty() ? name : path + "." + name;
+      std::fprintf(out, "%s %s\n", child.c_str(), lua_typename(state, lua_type(state, -1)));
+      if (depth > 0 && keyType == LUA_TSTRING && lua_type(state, -1) == LUA_TTABLE && (!path.empty() || name == "moho")) {
+        DumpLuaTableKeys(state, out, child, depth - 1);
+      }
+      lua_settop(state, -2); // pop the value, keep the key for lua_next
+    }
+  }
+
+  /// Plan WPL.18: the globals' `pairs()` order and that of the `moho` class tables.
+  void DumpLuaPairsOrder(lua_State* const state, const char* const path)
+  {
+    std::FILE* out = nullptr;
+    if (state == nullptr || fopen_s(&out, path, "w") != 0 || out == nullptr) {
+      gpg::Warnf("cannot write the Lua pairs order to %s", path);
+      return;
+    }
+    const int top = lua_gettop(state);
+    lua_pushvalue(state, LUA_GLOBALSINDEX);
+    DumpLuaTableKeys(state, out, "", 2);
+    lua_settop(state, top);
+    std::fclose(out);
+  }
+} // namespace
+
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
@@ -191,6 +236,7 @@ moho::SoundEnabledHook moho::sSoundEnabled = nullptr;
 std::uint8_t moho::ren_Steering = 0;
 bool moho::sim_KeepAllLogFiles = false;
 bool moho::sim_ShowDamage = false;
+const char* moho::sim_LuaPairsDumpPath = nullptr;
 
 namespace moho
 {
@@ -5870,6 +5916,12 @@ void Sim::Setup(LaunchInfoNew* const info)
       }
     }
     gpg::Warnf(" NUM PROPS = %d", propCount);
+  }
+
+  // Engine addition (dedicated-server plan WPL.18): the Lua pairs() order, for headless
+  // --lua-pairs. Off by default.
+  if (sim_LuaPairsDumpPath != nullptr) {
+    DumpLuaPairsOrder(mLuaState->m_state, sim_LuaPairsDumpPath);
   }
 
   // BeginSession() Lua callback: lookup and call are both guarded

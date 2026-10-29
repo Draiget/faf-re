@@ -146,6 +146,7 @@ namespace
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --blueprint-order <file> write every blueprint by ordinal, in the rules' load order\n"
+      "  --lua-pairs <file>       write the sim Lua globals' and moho class tables' pairs() order, before BeginSession\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV; server-mode build)\n"
       "  --loopback [--loopback-dr <steps> [--loopback-turns <units>]]  every packet through the wire format and the\n"
       "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
@@ -218,6 +219,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
   (void)ReadOption("--blueprint-order", options.blueprintOrderPath);
+  (void)ReadOption("--lua-pairs", options.luaPairsPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
