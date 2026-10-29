@@ -49,7 +49,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `user_Workers` | −1 (auto: min(CPUs − 2, 6)) | `/con` | live | User-side worker threads; 0 runs everything on the main thread |
 | `ren_ParallelCull` | 1 | `/con` | live | Mesh and decal view queries and fog-of-war circles collected on user workers |
 | `ui_ParallelIcons` | 1 | `/con` | live | Strategic icons classified on user workers and drawn in bulk |
-| `ui_PeriodicGC` | 0 | `/con` | live | Enable forced periodic 5-second UI Lua GC reset (1 is retail behavior); 0 leaves GC threshold dynamic, eliminating 46 ms frame stutters in the main render thread |
+| `ui_PeriodicGC` | 1 | `/con` | live | Enable forced periodic 5-second UI Lua GC reset (retail behavior); 0 leaves GC threshold dynamic |
+| `ui_ParallelMark` | 1 | `/con` | live (next collection) | Mark UI Lua objects across CUserWorkerPool worker threads; 0 runs mark serially on main thread |
 | `wld_ParallelSync` | 1 | `/con` | live | Beat sync apply: pose and data copies on user workers |
 | `wld_FrameClock` | 1 | `/con` | live | Replays and single player: game clock from the mean frame time (0: the original median, 2: each frame's own time) |
 | `wld_VisionChainHints` | 1 | `/con` | live | Vision-tree chain tails and predecessors from checked hints instead of chain walks |

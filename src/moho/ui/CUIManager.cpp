@@ -16,14 +16,25 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/console/TConVarbool.h"
 
-namespace
+namespace moho
 {
-  bool ui_PeriodicGC = false;
-  moho::TConVar<bool> gTConVar_ui_PeriodicGC(
+  bool ui_PeriodicGC = true;
+  TConVar<bool> gTConVar_ui_PeriodicGC(
     "ui_PeriodicGC",
     "Enable forced periodic 5-second UI Lua GC reset (retail behaviour). When false, Lua manages GC threshold dynamically.",
     &ui_PeriodicGC
   );
+
+  bool ui_ParallelMark = true;
+  TConVar<bool> gTConVar_ui_ParallelMark(
+    "ui_ParallelMark",
+    "Mark UI Lua objects on CUserWorkerPool worker threads during garbage collection.",
+    &ui_ParallelMark
+  );
+}
+
+namespace
+{
 
   /**
    * Frames whose owning reference was dropped while a MAUI event was being
