@@ -41,6 +41,7 @@
 #include "LuaUndump.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/BadRefCast.h"
@@ -5530,28 +5531,36 @@ namespace
 	 * What it does:
 	 * Expands one wildcard expression through CRT find-first/find-next and
 	 * returns one Lua table of 1-based filename entries.
+	 *
+	 * Engine addition (dedicated-server plan WPL.15): the names are sorted in
+	 * NTFS's order (`gpg::STR_FileNameOrderLess`) before they go into the
+	 * table, the order the shipped game gets them in on NTFS, on every platform
+	 * and file system. Init scripts mount what this lists in this order.
 	 */
 	int LuaIoDir(lua_State* const state)
 	{
 		const char* const wildcard = lua_tostring(state, 1);
 		lua_newtable(state);
 
+		std::vector<std::string> names{};
 		__finddata64_t findData{};
 		const intptr_t findHandle = ::_findfirst64(wildcard, &findData);
 		if (findHandle != -1) {
-			int index = 1;
-			lua_pushnumber(state, static_cast<lua_Number>(index));
-			lua_pushstring(state, findData.name);
-			lua_settable(state, -3);
-
-			while (::_findnext64(findHandle, &findData) == 0) {
-				++index;
-				lua_pushnumber(state, static_cast<lua_Number>(index));
-				lua_pushstring(state, findData.name);
-				lua_settable(state, -3);
-			}
-
+			do {
+				names.emplace_back(findData.name);
+			} while (::_findnext64(findHandle, &findData) == 0);
 			(void)::_findclose(findHandle);
+		}
+		std::sort(names.begin(), names.end(), [](const std::string& lhs, const std::string& rhs) {
+			return gpg::STR_FileNameOrderLess(lhs.c_str(), rhs.c_str());
+		});
+
+		int index = 1;
+		for (const std::string& name : names) {
+			lua_pushnumber(state, static_cast<lua_Number>(index));
+			lua_pushstring(state, name.c_str());
+			lua_settable(state, -3);
+			++index;
 		}
 
 		return 1;
