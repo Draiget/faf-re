@@ -247,11 +247,12 @@ namespace msvc8
 
   /**
    * Except for the legacy-dispatched acos overload below, these float
-   * functions go through the host CRT's double routine and
-   * round once, which is what the x86 CRT's own float overloads do; x64's CRT
-   * has separate float implementations that disagree with them. The double
-   * routines of the two CRTs differ in the last bit for some inputs, but
-   * rounding to float hides that (0 of 1,000,000 sampled inputs differed).
+   * functions go through a double routine and round once, which is what the
+   * x86 CRT's own float overloads do; x64's CRT has separate float
+   * implementations that disagree with them. asinf, expf and logf use the
+   * engine's double routines (msvc8::libm, plan WPL.11), equal after the
+   * rounding to the Windows x64 UCRT's for every float; powf still uses the
+   * host's (its only caller is the sim driver's wall-clock pacing).
    */
   [[nodiscard]] float asinf(float x) noexcept;
   [[nodiscard]] float acosf(float x) noexcept;

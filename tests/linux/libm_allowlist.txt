@@ -3,16 +3,14 @@
 # above each group. A new call fails the Linux build until it is reviewed here.
 
 # legacy/math/X87Math: the CRT-dispatch lanes. In the domain the engine's x87 bodies run
-# (X87Math64.S); the host CRT is reached only with the CRT's SSE2 mode on (never in the sim) or,
-# for asinf/expf/logf, for (float)f((double)x), which tools/mathsweep compared on every non-NaN
-# float: identical on Windows x64 UCRT and glibc 2.39.
+# (X87Math64.S); the host CRT is reached only with the CRT's SSE2 mode on (never in the sim) or
+# for pow's zero, infinite and NaN operands (IEEE-defined results). asinf, expf and logf use the
+# engine's legacy/math/Libm.cpp (plan WPL.11) and are not listed: a host call there fails.
 acos msvc8::acos(double)
 asin msvc8::asin(double)
-asin msvc8::asinf(float)
 pow msvc8::pow(double, double)
+# powf: the sim driver's wall-clock pacing only (SimDriver.cpp, the beat rate from the sim rate).
 pow msvc8::powf(float, float)
-exp msvc8::expf(float)
-log msvc8::logf(float)
 
 # Camera projection (effect culling against the sync filter's cameras, the render-side view):
 # visual only.
