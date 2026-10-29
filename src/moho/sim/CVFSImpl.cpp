@@ -275,10 +275,22 @@ namespace
     if (findHandle == -1) {
       return candidates;
     }
+    std::vector<__finddata64_t> matches{};
+    do {
+      matches.push_back(findData);
+    } while (::_findnext64(findHandle, &findData) == 0);
+    (void)::_findclose(findHandle);
+
+    // Engine addition (dedicated-server plan WPL.15): the matches in NTFS's order on every
+    // platform and file system, as the shipped game sees them on NTFS. The order is the
+    // mount order, which decides which of two mounted files with one path wins.
+    std::sort(matches.begin(), matches.end(), [](const __finddata64_t& lhs, const __finddata64_t& rhs) {
+      return gpg::STR_FileNameOrderLess(lhs.name, rhs.name);
+    });
 
     const msvc8::string parentDirectory = ParentDirectoryFromPattern(canonicalPattern);
-    do {
-      if (std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
+    for (const __finddata64_t& match : matches) {
+      if (std::strcmp(match.name, ".") == 0 || std::strcmp(match.name, "..") == 0) {
         continue;
       }
 
@@ -289,7 +301,7 @@ namespace
           (void)candidatePath.push_back('\\');
         }
       }
-      (void)candidatePath.append(findData.name, std::strlen(findData.name));
+      (void)candidatePath.append(match.name, std::strlen(match.name));
 
       msvc8::string canonicalCandidate{};
       gpg::STR_CanonizeFilename(&canonicalCandidate, candidatePath.c_str());
@@ -299,11 +311,9 @@ namespace
 
       SearchPathCandidate candidate{};
       candidate.mResolvedPath.assign_owned(canonicalCandidate.view());
-      candidate.mIsDirectory = (findData.attrib & _A_SUBDIR) != 0;
+      candidate.mIsDirectory = (match.attrib & _A_SUBDIR) != 0;
       candidates.push_back(std::move(candidate));
-    } while (::_findnext64(findHandle, &findData) == 0);
-
-    (void)::_findclose(findHandle);
+    }
     return candidates;
   }
 

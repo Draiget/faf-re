@@ -24,9 +24,18 @@ namespace msvc8
    * The MSVC8 CRT's `__ftol2_sse` (0x00A89CC0, `cvttsd2si eax`): truncation
    * toward zero, and the integer indefinite 0x80000000 for NaN or a value
    * outside the int32 range. A plain cast on x64 can convert through a 64-bit
-   * `cvttss2si` and keep the low half, which turns NaN into 0.
+   * `cvttss2si` and keep the low half, which turns NaN into 0, and an
+   * out-of-range one is undefined in C++ (a saturating target gives another
+   * result; plan WPL.19). Inline: the Lua table code calls it per number key.
    */
-  [[nodiscard]] std::int32_t TruncateToInt(float value) noexcept;
+  [[nodiscard]] inline std::int32_t TruncateToInt(const float value) noexcept
+  {
+    constexpr float kInt32Bound = 2147483648.0f;
+    if (!(value > -kInt32Bound - 1.0f && value < kInt32Bound)) {
+      return static_cast<std::int32_t>(0x80000000u);
+    }
+    return static_cast<std::int32_t>(value);
+  }
   /**
    * `factor * word` exactly as the shipped engine forms it from a Mersenne
    * Twister word under 24-bit x87 precision control (e.g. CRandomStream::FRand,
@@ -238,11 +247,12 @@ namespace msvc8
 
   /**
    * Except for the legacy-dispatched acos overload below, these float
-   * functions go through the host CRT's double routine and
-   * round once, which is what the x86 CRT's own float overloads do; x64's CRT
-   * has separate float implementations that disagree with them. The double
-   * routines of the two CRTs differ in the last bit for some inputs, but
-   * rounding to float hides that (0 of 1,000,000 sampled inputs differed).
+   * functions go through a double routine and round once, which is what the
+   * x86 CRT's own float overloads do; x64's CRT has separate float
+   * implementations that disagree with them. asinf, expf and logf use the
+   * engine's double routines (msvc8::libm, plan WPL.11), equal after the
+   * rounding to the Windows x64 UCRT's for every float; powf still uses the
+   * host's (its only caller is the sim driver's wall-clock pacing).
    */
   [[nodiscard]] float asinf(float x) noexcept;
   [[nodiscard]] float acosf(float x) noexcept;
@@ -300,24 +310,27 @@ namespace msvc8
    */
   [[nodiscard]] float VectorLengthZYXX87(const float* lanes) noexcept;
 
+  // Plan WPL.11: no generic forward to the host's libm. Any other argument type is an error
+  // here instead of a host call (or a silent conversion to the float overloads above); the
+  // caller picks the engine function or, outside the sim, `std::` by name.
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto sin(const T x) noexcept { return std::sin(x); }
+  float sin(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto cos(const T x) noexcept { return std::cos(x); }
+  float cos(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto tan(const T x) noexcept { return std::tan(x); }
+  float tan(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto atan(const T x) noexcept { return std::atan(x); }
+  float atan(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
-  [[nodiscard]] inline auto asin(const T x) noexcept { return std::asin(x); }
+  float asin(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
-  [[nodiscard]] inline auto acos(const T x) noexcept { return std::acos(x); }
+  float acos(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto exp(const T x) noexcept { return std::exp(x); }
+  float exp(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto log(const T x) noexcept { return std::log(x); }
+  float log(T x) = delete;
   template <class Y, class X, std::enable_if_t<!(std::is_same_v<Y, float> && std::is_same_v<X, float>), int> = 0>
-  [[nodiscard]] inline auto atan2(const Y y, const X x) noexcept { return std::atan2(y, x); }
+  float atan2(Y y, X x) = delete;
   template <class B, class E, std::enable_if_t<!(std::is_same_v<B, float> && std::is_same_v<E, float>), int> = 0>
-  [[nodiscard]] inline auto pow(const B base, const E exponent) noexcept { return std::pow(base, exponent); }
+  float pow(B base, E exponent) = delete;
 } // namespace msvc8

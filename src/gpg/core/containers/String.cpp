@@ -521,6 +521,21 @@ int gpg::STR_CompareNoCase(
   return _stricmp(lhs, rhs);
 }
 
+bool gpg::STR_FileNameOrderLess(const StrArg lhs, const StrArg rhs) noexcept
+{
+  const auto upper = [](const char c) noexcept {
+    const auto byte = static_cast<unsigned char>(c);
+    return byte >= 'a' && byte <= 'z' ? static_cast<unsigned char>(byte - ('a' - 'A')) : byte;
+  };
+  std::size_t at = 0;
+  for (; upper(lhs[at]) == upper(rhs[at]); ++at) {
+    if (lhs[at] == '\0') {
+      return std::strcmp(lhs, rhs) < 0; // equal apart from case: byte order
+    }
+  }
+  return upper(lhs[at]) < upper(rhs[at]);
+}
+
 bool gpg::STR_ContainsNoCase(
   const StrArg str,
   const StrArg needle

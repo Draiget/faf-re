@@ -1457,7 +1457,7 @@ namespace moho
     // 0x008A69FE: `fld qword ptr [0x00E4FA18]` loads 72 degrees as the float
     // 1.2566370f widened to double (0x3FF41B2F60000000), not the double 0.4*pi.
     const float domeRadius = static_cast<float>(
-      std::sqrt(halfExtentZSquared + halfExtentXSquared) / msvc8::cos(0x1.41b2f6p+0)
+      std::sqrt(halfExtentZSquared + halfExtentXSquared) / std::cos(0x1.41b2f6p+0)
     );
 
     const STIMap* const map = mMap;
@@ -3214,7 +3214,7 @@ namespace moho
       const float halfY = bounds.Min.y - centerY;
       // 0x008A2D4C: the same widened-float 72 degrees from 0x00E4FA18.
       const float domeRadius =
-        static_cast<float>(std::sqrt(halfX * halfX + halfY * halfY) / msvc8::cos(0x1.41b2f6p+0));
+        static_cast<float>(std::sqrt(halfX * halfX + halfY * halfY) / std::cos(0x1.41b2f6p+0));
       const float sunElevation = mMap->mWaterEnabled ? mMap->mWaterElevation : bounds.Min.y;
 
       const Wm3::Vector3f domeOrigin{centerX, centerY, centerZ};

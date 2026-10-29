@@ -7259,6 +7259,14 @@ namespace moho
   extern bool sim_KeepAllLogFiles;
 
   /**
+   * Engine addition (dedicated-server plan WPL.18), not in the binary: when not null,
+   * `Sim::Setup` writes the sim Lua state's `pairs()` order (the globals, and the tables under
+   * `moho` two levels down) to this file just before `BeginSession`, to compare the binding
+   * and class tables' order between platforms. `headless --lua-pairs` sets it.
+   */
+  extern const char* sim_LuaPairsDumpPath;
+
+  /**
    * VFTABLE: 0x00E3481C
    * COL:  0x00E8DF18
    */
