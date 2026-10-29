@@ -6,9 +6,11 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <new>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
@@ -34,6 +36,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/ShaderVar.h"
+#include "moho/render/RangeGpuRenderer.h"
 #include "moho/render/RangeRendererStartupRegistrations.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -58,6 +61,16 @@ namespace
   constexpr std::uint32_t kDynamicVertexStrideBytes = 16u;
 
   constexpr float kRangeAngleStepRadians = 0.13962634f; // 2*pi/45
+
+  /**
+   * Engine addition (`range_ViewCull`): the vertical extent `RangeRenderer::Init`
+   * last gave the ring template (`patch_minMapHeight` / `patch_maxMapHeight`
+   * then), so the culling below matches the volumes "Cast" actually draws.
+   */
+  float sRingTemplateLowerHeight = 0.0f;
+  float sRingTemplateUpperHeight = 0.0f;
+  bool sRingTemplateHeightsKnown = false;
+
   /**
    * Address: 0x007EC320 (FUN_007EC320, func_GetRangeEffect)
    *
@@ -322,6 +335,491 @@ namespace
   }
 
   /**
+   * Engine addition (`range_ViewCull`), not in the shipped binary.
+   *
+   * Every ring volume is a 45-sided prism between the template's two heights,
+   * and "Cast" counts a pixel only where the depth buffer's surface point lies
+   * inside one. So a volume can change only pixels whose surface point is both
+   * in the camera frustum and between those heights. `points` is the convex
+   * hull, in (x, z) and counter-clockwise, of that slab of the frustum: its
+   * corners inside the slab plus its edges' crossings of the two height planes.
+   */
+  struct RangeViewFootprint
+  {
+    Wm3::Vector2f points[32];
+    std::uint32_t count = 0u;
+    /**
+     * Every far-plane corner is below the slab, so no view ray leaves the
+     * frustum before it has crossed the lower height: no volume face that
+     * counts is cut off by the far plane.
+     */
+    bool farPlaneBelowSlab = false;
+  };
+
+  /** cos(pi/45): the 45-gon's apothem, the radius of the circle it contains, per unit radius. */
+  constexpr float kRingTemplateApothem = 0.99756405f;
+
+  [[nodiscard]] float Cross2(const Wm3::Vector2f& o, const Wm3::Vector2f& a, const Wm3::Vector2f& b) noexcept
+  {
+    return ((a.x - o.x) * (b.y - o.y)) - ((a.y - o.y) * (b.x - o.x));
+  }
+
+  /** False when the camera's inverse matrix gives no usable frustum (then nothing is culled). */
+  [[nodiscard]] bool BuildRangeViewFootprint(
+    const moho::GeomCamera3& camera, const float lowerHeight, const float upperHeight, RangeViewFootprint& out
+  )
+  {
+    // The frustum's corners: NDC x, y in {-1, 1}, z in {0, 1} (Direct3D depth), through the
+    // inverse view-projection (row vectors, as the engine's matrices are).
+    const gpg::gal::Matrix& m = camera.inverseViewProjection;
+    Wm3::Vector3f corners[8];
+    for (std::uint32_t i = 0u; i < 8u; ++i) {
+      const float x = (i & 1u) != 0u ? 1.0f : -1.0f;
+      const float y = (i & 2u) != 0u ? 1.0f : -1.0f;
+      const float z = (i & 4u) != 0u ? 1.0f : 0.0f;
+      const float w = (x * m.r[0].w) + (y * m.r[1].w) + (z * m.r[2].w) + m.r[3].w;
+      if (!(w > 1.0e-6f) || !std::isfinite(w)) {
+        return false;
+      }
+      corners[i] = Wm3::Vector3f{
+        ((x * m.r[0].x) + (y * m.r[1].x) + (z * m.r[2].x) + m.r[3].x) / w,
+        ((x * m.r[0].y) + (y * m.r[1].y) + (z * m.r[2].y) + m.r[3].y) / w,
+        ((x * m.r[0].z) + (y * m.r[1].z) + (z * m.r[2].z) + m.r[3].z) / w,
+      };
+      if (!std::isfinite(corners[i].x) || !std::isfinite(corners[i].y) || !std::isfinite(corners[i].z)) {
+        return false;
+      }
+    }
+
+    out.farPlaneBelowSlab = true;
+    for (std::uint32_t i = 4u; i < 8u; ++i) {
+      out.farPlaneBelowSlab = out.farPlaneBelowSlab && corners[i].y < lowerHeight;
+    }
+
+    Wm3::Vector2f points[32];
+    std::uint32_t pointCount = 0u;
+    for (const Wm3::Vector3f& corner : corners) {
+      if (corner.y >= lowerHeight && corner.y <= upperHeight) {
+        points[pointCount++] = Wm3::Vector2f{corner.x, corner.z};
+      }
+    }
+    // The 12 edges join corners that differ in one NDC coordinate.
+    for (std::uint32_t a = 0u; a < 8u; ++a) {
+      for (std::uint32_t bit = 1u; bit < 8u; bit <<= 1u) {
+        if ((a & bit) != 0u) {
+          continue;
+        }
+        const Wm3::Vector3f& from = corners[a];
+        const Wm3::Vector3f& to = corners[a | bit];
+        for (const float height : {lowerHeight, upperHeight}) {
+          if ((from.y - height) * (to.y - height) < 0.0f) {
+            const float t = (height - from.y) / (to.y - from.y);
+            points[pointCount++] = Wm3::Vector2f{from.x + ((to.x - from.x) * t), from.z + ((to.z - from.z) * t)};
+          }
+        }
+      }
+    }
+
+    // Andrew's monotone chain.
+    std::sort(points, points + pointCount, [](const Wm3::Vector2f& l, const Wm3::Vector2f& r) {
+      return l.x < r.x || (l.x == r.x && l.y < r.y);
+    });
+    out.count = 0u;
+    if (pointCount < 3u) {
+      for (std::uint32_t i = 0u; i < pointCount; ++i) {
+        out.points[out.count++] = points[i];
+      }
+      return true;
+    }
+    Wm3::Vector2f hull[64];
+    std::uint32_t hullCount = 0u;
+    for (std::uint32_t i = 0u; i < pointCount; ++i) {
+      while (hullCount >= 2u && Cross2(hull[hullCount - 2u], hull[hullCount - 1u], points[i]) <= 0.0f) {
+        --hullCount;
+      }
+      hull[hullCount++] = points[i];
+    }
+    const std::uint32_t lowerCount = hullCount + 1u;
+    for (std::uint32_t i = pointCount - 1u; i-- > 0u;) {
+      while (hullCount >= lowerCount && Cross2(hull[hullCount - 2u], hull[hullCount - 1u], points[i]) <= 0.0f) {
+        --hullCount;
+      }
+      hull[hullCount++] = points[i];
+    }
+    --hullCount; // the first point closed the chain
+    for (std::uint32_t i = 0u; i < hullCount; ++i) {
+      out.points[out.count++] = hull[i];
+    }
+    return true;
+  }
+
+  /** Distance from `center` to the footprint (0 inside it); infinite for an empty footprint. */
+  [[nodiscard]] float DistanceToFootprint(const RangeViewFootprint& footprint, const Wm3::Vector2f& center) noexcept
+  {
+    if (footprint.count == 0u) {
+      return std::numeric_limits<float>::infinity();
+    }
+    bool inside = footprint.count >= 3u;
+    float nearestSq = std::numeric_limits<float>::infinity();
+    for (std::uint32_t i = 0u; i < footprint.count; ++i) {
+      const Wm3::Vector2f& a = footprint.points[i];
+      const Wm3::Vector2f& b = footprint.points[(i + 1u) % footprint.count];
+      if (Cross2(a, b, center) < 0.0f) {
+        inside = false;
+      }
+      const float dx = b.x - a.x;
+      const float dy = b.y - a.y;
+      const float lengthSq = (dx * dx) + (dy * dy);
+      float t = lengthSq > 0.0f ? (((center.x - a.x) * dx) + ((center.y - a.y) * dy)) / lengthSq : 0.0f;
+      t = std::clamp(t, 0.0f, 1.0f);
+      const float px = a.x + (dx * t) - center.x;
+      const float py = a.y + (dy * t) - center.y;
+      nearestSq = std::min(nearestSq, (px * px) + (py * py));
+    }
+    return inside ? 0.0f : std::sqrt(nearestSq);
+  }
+
+  /**
+   * The lowest terrain sample over the map rectangle [minX, maxX] x [minZ, maxZ], from the
+   * height field's min/max tiers (a coarser tier when the rectangle is large, which only lowers
+   * the result). False when the rectangle leaves the map.
+   */
+  [[nodiscard]] bool LowestTerrainIn(
+    const moho::CHeightField& field, const float minX, const float maxX, const float minZ, const float maxZ, float& out
+  )
+  {
+    if (field.data == nullptr || !(minX >= 0.0f) || !(minZ >= 0.0f) ||
+        !(maxX <= static_cast<float>(field.width - 1)) || !(maxZ <= static_cast<float>(field.height - 1))) {
+      return false;
+    }
+    const auto x0 = static_cast<std::int32_t>(std::floor(minX));
+    const auto x1 = static_cast<std::int32_t>(std::ceil(maxX));
+    const auto z0 = static_cast<std::int32_t>(std::floor(minZ));
+    const auto z1 = static_cast<std::int32_t>(std::ceil(maxZ));
+    const auto tierCount = static_cast<std::int32_t>(field.mGrids.end() - field.mGrids.begin());
+    std::int32_t tier = 0;
+    while (tier < tierCount && ((x1 >> tier) - (x0 >> tier) + 1) * ((z1 >> tier) - (z0 >> tier) + 1) > 64) {
+      ++tier;
+    }
+    std::uint16_t lowest = 0xFFFFu;
+    for (std::int32_t z = z0 >> tier; z <= (z1 >> tier); ++z) {
+      for (std::int32_t x = x0 >> tier; x <= (x1 >> tier); ++x) {
+        lowest = std::min(lowest, field.GetTierBoundsUWord(tier, x, z).min);
+      }
+    }
+    out = static_cast<float>(lowest) * 0.0078125f;
+    return true;
+  }
+
+  /** Slack for the footprint's float error: the tests below only ever keep more than they need. */
+  [[nodiscard]] float CullMargin(const float radius) noexcept
+  {
+    return 0.1f + (0.001f * std::fabs(radius));
+  }
+
+  /** Below this many fill payloads in view the coverage grid costs more than it saves. */
+  constexpr std::size_t kCoverageMinFills = 16u;
+  /** Cells per side of the coverage grid, at most. */
+  constexpr std::int32_t kCoverageGridMax = 24;
+
+  /** An axis-aligned cell of the coverage grid, in (x, z). */
+  struct CoverageCell
+  {
+    float minX;
+    float minZ;
+    float maxX;
+    float maxZ;
+  };
+
+  [[nodiscard]] float DistanceToCell(const CoverageCell& cell, const float x, const float z) noexcept
+  {
+    const float dx = std::max({cell.minX - x, 0.0f, x - cell.maxX});
+    const float dz = std::max({cell.minZ - z, 0.0f, z - cell.maxZ});
+    return std::sqrt((dx * dx) + (dz * dz));
+  }
+
+  [[nodiscard]] float FarthestCellCorner(const CoverageCell& cell, const float x, const float z) noexcept
+  {
+    const float dx = std::max(std::fabs(cell.minX - x), std::fabs(cell.maxX - x));
+    const float dz = std::max(std::fabs(cell.minZ - z), std::fabs(cell.maxZ - z));
+    return std::sqrt((dx * dx) + (dz * dz));
+  }
+
+  /** The cell lies entirely outside the (counter-clockwise, convex) footprint. */
+  [[nodiscard]] bool CellOutsideFootprint(const CoverageCell& cell, const RangeViewFootprint& footprint) noexcept
+  {
+    const Wm3::Vector2f corners[4] = {
+      {cell.minX, cell.minZ}, {cell.maxX, cell.minZ}, {cell.maxX, cell.maxZ}, {cell.minX, cell.maxZ}
+    };
+    for (std::uint32_t i = 0u; i < footprint.count; ++i) {
+      const Wm3::Vector2f& a = footprint.points[i];
+      const Wm3::Vector2f& b = footprint.points[(i + 1u) % footprint.count];
+      bool allOutside = true;
+      for (const Wm3::Vector2f& corner : corners) {
+        allOutside = allOutside && Cross2(a, b, corner) < 0.0f;
+      }
+      if (allOutside) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The payload's volume holds the whole cell's column: its 45-gon annulus contains the cell. */
+  [[nodiscard]] bool PayloadHoldsCell(const moho::SRangeExtractionPayload& payload, const CoverageCell& cell) noexcept
+  {
+    if (payload.innerRadius < 0.0f || payload.outerRadius <= payload.innerRadius) {
+      return false;
+    }
+    const float margin = CullMargin(payload.outerRadius);
+    if (FarthestCellCorner(cell, payload.centerX, payload.centerZ) > (payload.outerRadius * kRingTemplateApothem) - margin) {
+      return false;
+    }
+    // The hole's 45-gon lies inside the circle of the inner radius.
+    return payload.innerRadius == 0.0f ||
+           DistanceToCell(cell, payload.centerX, payload.centerZ) >= payload.innerRadius + margin;
+  }
+
+  /** The payload's volume may reach into the cell's column. */
+  [[nodiscard]] bool PayloadMayTouchCell(const moho::SRangeExtractionPayload& payload, const CoverageCell& cell) noexcept
+  {
+    if (payload.innerRadius < 0.0f || payload.outerRadius < payload.innerRadius) {
+      // Not a plain annulus: the whole disc its vertices span.
+      const float reach = std::max(std::fabs(payload.innerRadius), std::fabs(payload.outerRadius));
+      return DistanceToCell(cell, payload.centerX, payload.centerZ) <= reach + CullMargin(reach);
+    }
+    if (DistanceToCell(cell, payload.centerX, payload.centerZ) > payload.outerRadius + CullMargin(payload.outerRadius)) {
+      return false;
+    }
+    // Inside the circle the hole's 45-gon contains, the cell is in the hole.
+    return payload.innerRadius == 0.0f ||
+           FarthestCellCorner(cell, payload.centerX, payload.centerZ) >=
+             (payload.innerRadius * kRingTemplateApothem) - CullMargin(payload.innerRadius);
+  }
+
+  /**
+   * Engine addition (`range_ViewCull`), with `range_StencilFlush` and the far
+   * plane below the slab: the fill mask is then exactly the union of the fill
+   * volumes, and a pixel's outline shows only where no fill holds it.
+   *
+   * The footprint's bounding box is cut into a grid. A cell some single fill
+   * holds entirely is masked whatever else is drawn, so that fill alone keeps
+   * it masked and no outline can show in it. Every other cell in view keeps
+   * every fill and outline that may touch it. So the image is the same with
+   * only the fills that hold a cell, plus the fills and outlines that touch a
+   * cell no fill holds: zoomed in on a large selection, that is a handful of
+   * fills and nothing else.
+   */
+  void CullRingPayloadsToCoverage(
+    const RangeViewFootprint& footprint, RangeExtractionPayloadVector& fillPayloads, RangeExtractionPayloadVector& edgePayloads
+  )
+  {
+    float minX = footprint.points[0].x;
+    float maxX = minX;
+    float minZ = footprint.points[0].y;
+    float maxZ = minZ;
+    for (std::uint32_t i = 1u; i < footprint.count; ++i) {
+      minX = std::min(minX, footprint.points[i].x);
+      maxX = std::max(maxX, footprint.points[i].x);
+      minZ = std::min(minZ, footprint.points[i].y);
+      maxZ = std::max(maxZ, footprint.points[i].y);
+    }
+    if (!(maxX > minX) || !(maxZ > minZ)) {
+      return;
+    }
+    // Cells no wider than the smallest fill's apothem, so small rings can hold cells too.
+    float smallestFill = std::numeric_limits<float>::infinity();
+    for (const moho::SRangeExtractionPayload& fill : fillPayloads) {
+      if (fill.outerRadius > fill.innerRadius && fill.innerRadius >= 0.0f) {
+        smallestFill = std::min(smallestFill, fill.outerRadius);
+      }
+    }
+    const float cellTarget = std::max(smallestFill * 0.6f, 0.5f);
+    const auto columns = std::clamp(static_cast<std::int32_t>(std::ceil((maxX - minX) / cellTarget)), 1, kCoverageGridMax);
+    const auto rows = std::clamp(static_cast<std::int32_t>(std::ceil((maxZ - minZ) / cellTarget)), 1, kCoverageGridMax);
+    const float cellW = (maxX - minX) / static_cast<float>(columns);
+    const float cellH = (maxZ - minZ) / static_cast<float>(rows);
+    const auto cellAt = [&](const std::int32_t column, const std::int32_t row) {
+      return CoverageCell{
+        minX + (cellW * static_cast<float>(column)), minZ + (cellH * static_cast<float>(row)),
+        minX + (cellW * static_cast<float>(column + 1)), minZ + (cellH * static_cast<float>(row + 1))
+      };
+    };
+
+    // Per cell: -2 out of view, -1 in view and held by no fill, else the index of a fill holding it.
+    static std::vector<std::int32_t> sHolder;
+    sHolder.assign(static_cast<std::size_t>(columns * rows), -1);
+    for (std::int32_t row = 0; row < rows; ++row) {
+      for (std::int32_t column = 0; column < columns; ++column) {
+        if (CellOutsideFootprint(cellAt(column, row), footprint)) {
+          sHolder[static_cast<std::size_t>((row * columns) + column)] = -2;
+        }
+      }
+    }
+    // The cells under each fill's bounding box that it holds.
+    const auto cellRange = [&](const float center, const float reach, const float origin, const float size,
+                               const std::int32_t count, std::int32_t& first, std::int32_t& last) {
+      first = std::clamp(static_cast<std::int32_t>(std::floor((center - reach - origin) / size)), 0, count - 1);
+      last = std::clamp(static_cast<std::int32_t>(std::floor((center + reach - origin) / size)), 0, count - 1);
+    };
+    for (std::size_t index = 0u; index < fillPayloads.size(); ++index) {
+      const moho::SRangeExtractionPayload& fill = fillPayloads[index];
+      if (fill.innerRadius < 0.0f || fill.outerRadius <= fill.innerRadius) {
+        continue;
+      }
+      std::int32_t c0, c1, r0, r1;
+      cellRange(fill.centerX, fill.outerRadius, minX, cellW, columns, c0, c1);
+      cellRange(fill.centerZ, fill.outerRadius, minZ, cellH, rows, r0, r1);
+      for (std::int32_t row = r0; row <= r1; ++row) {
+        for (std::int32_t column = c0; column <= c1; ++column) {
+          std::int32_t& holder = sHolder[static_cast<std::size_t>((row * columns) + column)];
+          if (holder == -1 && PayloadHoldsCell(fill, cellAt(column, row))) {
+            holder = static_cast<std::int32_t>(index);
+          }
+        }
+      }
+    }
+
+    static std::vector<CoverageCell> sOpenCells;
+    static std::vector<std::uint8_t> sKeepFill;
+    sOpenCells.clear();
+    sKeepFill.assign(fillPayloads.size(), 0u);
+    bool anyHeld = false;
+    for (std::int32_t row = 0; row < rows; ++row) {
+      for (std::int32_t column = 0; column < columns; ++column) {
+        const std::int32_t holder = sHolder[static_cast<std::size_t>((row * columns) + column)];
+        if (holder >= 0) {
+          sKeepFill[static_cast<std::size_t>(holder)] = 1u;
+          anyHeld = true;
+        } else if (holder == -1) {
+          sOpenCells.push_back(cellAt(column, row));
+        }
+      }
+    }
+    if (!anyHeld) {
+      return; // every cell in view is open: the view cull above already kept just what touches one
+    }
+    // Through the open-cell list or the cells under the payload's bounding box, whichever is shorter.
+    const auto touchesOpenCell = [&](const moho::SRangeExtractionPayload& payload) {
+      const float reach = std::max(std::fabs(payload.innerRadius), std::fabs(payload.outerRadius));
+      std::int32_t c0, c1, r0, r1;
+      cellRange(payload.centerX, reach, minX, cellW, columns, c0, c1);
+      cellRange(payload.centerZ, reach, minZ, cellH, rows, r0, r1);
+      if (static_cast<std::size_t>((c1 - c0 + 1) * (r1 - r0 + 1)) < sOpenCells.size()) {
+        for (std::int32_t row = r0; row <= r1; ++row) {
+          for (std::int32_t column = c0; column <= c1; ++column) {
+            if (sHolder[static_cast<std::size_t>((row * columns) + column)] == -1 &&
+                PayloadMayTouchCell(payload, cellAt(column, row))) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      for (const CoverageCell& cell : sOpenCells) {
+        if (PayloadMayTouchCell(payload, cell)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    std::size_t kept = 0u;
+    for (std::size_t index = 0u; index < fillPayloads.size(); ++index) {
+      if (sKeepFill[index] != 0u || touchesOpenCell(fillPayloads[index])) {
+        fillPayloads[kept++] = fillPayloads[index];
+      }
+    }
+    fillPayloads.erase(fillPayloads.begin() + kept, fillPayloads.end());
+    edgePayloads.erase(
+      std::remove_if(edgePayloads.begin(), edgePayloads.end(), [&](const moho::SRangeExtractionPayload& edge) {
+        return !touchesOpenCell(edge);
+      }),
+      edgePayloads.end()
+    );
+  }
+
+  /**
+   * Engine addition (`range_ViewCull`): drops payloads "Cast" would draw with
+   * no effect on the image.
+   *
+   * - A volume whose (x, z) extent misses the footprint has no fragment in
+   *   view. Its vertices all lie within max(|inner|, |outer|) of its centre,
+   *   so its prism lies inside that cylinder, whatever the radii's signs.
+   * - With `range_StencilFlush` the fill mask is the union of the fill volumes
+   *   (no batch reaches the 128 wrap), and `CullRingPayloadsToCoverage` drops
+   *   the volumes that add nothing to it and the outlines it hides. Without the
+   *   flush the count wraps at 128 and the image depends on how many volumes
+   *   overlap, so only the first rule applies. It also needs the far plane
+   *   below the slab: a volume whose exit face lies past the far plane counts
+   *   0 there, and the dropped volumes might not.
+   */
+  void CullRingPayloadsToView(
+    const moho::GeomCamera3& camera, const moho::CHeightField* const heightField,
+    RangeExtractionPayloadVector& fillPayloads, RangeExtractionPayloadVector& edgePayloads
+  )
+  {
+    if (!sRingTemplateHeightsKnown) {
+      return;
+    }
+    RangeViewFootprint footprint{};
+    float lowerHeight = sRingTemplateLowerHeight;
+    if (!BuildRangeViewFootprint(camera, lowerHeight, sRingTemplateUpperHeight, footprint)) {
+      return;
+    }
+    // A visible surface point is never below the terrain under it: the camera is above the
+    // terrain, so a view ray reaching a point under the ground crosses the ground first, and the
+    // terrain is in the depth buffer before the rings. So the slab can start at the lowest
+    // terrain under the footprint, which shrinks the footprint, which can raise that lowest
+    // terrain again. Each step keeps every surface point in the slab.
+    if (heightField != nullptr) {
+      for (int step = 0; step < 3 && footprint.count != 0u; ++step) {
+        float minX = footprint.points[0].x;
+        float maxX = minX;
+        float minZ = footprint.points[0].y;
+        float maxZ = minZ;
+        for (std::uint32_t i = 1u; i < footprint.count; ++i) {
+          minX = std::min(minX, footprint.points[i].x);
+          maxX = std::max(maxX, footprint.points[i].x);
+          minZ = std::min(minZ, footprint.points[i].y);
+          maxZ = std::max(maxZ, footprint.points[i].y);
+        }
+        float terrain = 0.0f;
+        if (!LowestTerrainIn(*heightField, minX, maxX, minZ, maxZ, terrain)) {
+          break;
+        }
+        // Rendered terrain interpolates between samples, so it never dips below the lowest one.
+        const float raised = terrain - 0.5f;
+        if (raised <= lowerHeight + 0.5f) {
+          break;
+        }
+        RangeViewFootprint tighter{};
+        if (!BuildRangeViewFootprint(camera, raised, sRingTemplateUpperHeight, tighter)) {
+          break;
+        }
+        lowerHeight = raised;
+        // The far-plane test is about the volumes' own faces, which still reach the template's
+        // lower height.
+        tighter.farPlaneBelowSlab = footprint.farPlaneBelowSlab;
+        footprint = tighter;
+      }
+    }
+
+    const auto outOfView = [&](const moho::SRangeExtractionPayload& payload) {
+      const float reach = std::max(std::fabs(payload.innerRadius), std::fabs(payload.outerRadius));
+      return DistanceToFootprint(footprint, Wm3::Vector2f{payload.centerX, payload.centerZ}) > reach + CullMargin(reach);
+    };
+    fillPayloads.erase(std::remove_if(fillPayloads.begin(), fillPayloads.end(), outOfView), fillPayloads.end());
+    edgePayloads.erase(std::remove_if(edgePayloads.begin(), edgePayloads.end(), outOfView), edgePayloads.end());
+
+    if (!moho::range_StencilFlush || footprint.count < 3u || !footprint.farPlaneBelowSlab ||
+        fillPayloads.size() < kCoverageMinFills) {
+      return;
+    }
+    CullRingPayloadsToCoverage(footprint, fillPayloads, edgePayloads);
+  }
+
+  /**
    * Address: 0x007EF5A0 (FUN_007EF5A0, func_RenderRings)
    *
    * IDA signature (LTCG-reshaped __fastcall; param roles resolved from
@@ -418,6 +916,21 @@ namespace
     RangeRingGeometryBuildState buildState{innerThicknessOffset, outerThicknessOffset, &fillPayloads, &edgePayloads};
     BuildRingPayloadBuffers(buildState, ringEntries.begin(), ringEntries.end());
 
+    if (moho::range_ViewCull) {
+      CullRingPayloadsToView(cameraView, terrainRes->GetHeightField(), fillPayloads, edgePayloads);
+    }
+
+    // `ren_GpuRanges`: both payload lists in one GPU buffer, fill first, and each batch below one
+    // instanced draw from it instead of a dynamic-buffer lock and the effect technique.
+    bool gpuCast = false;
+    if (moho::RangeGpuRenderer::Get().IsActive()) {
+      static std::vector<moho::SRangeExtractionPayload> sGpuPayloads;
+      sGpuPayloads.assign(fillPayloads.begin(), fillPayloads.end());
+      sGpuPayloads.insert(sGpuPayloads.end(), edgePayloads.begin(), edgePayloads.end());
+      gpuCast = moho::RangeGpuRenderer::Get().Upload(rangeRenderer, sGpuPayloads);
+    }
+    const auto edgeFirstPayload = static_cast<std::uint32_t>(fillPayloads.size());
+
     const auto runFramePass = [&](const std::string_view technique) {
       rangeRenderer.mFrame.mName.assign_owned(technique);
       rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
@@ -437,8 +950,9 @@ namespace
     // `afterBatch(lastBatch)` runs after every batch, including one whose
     // reserve failed: FAF #149 hooks the loop tail (0x007EF7EA), which a failed
     // reserve also reaches.
-    const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads, const std::uint32_t batchLimit,
-                                 auto&& afterBatch) {
+    // `gpuFirstPayload`: where `payloads` starts in the `ren_GpuRanges` buffer.
+    const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads, const std::uint32_t gpuFirstPayload,
+                                 const std::uint32_t batchLimit, auto&& afterBatch) {
       const std::uint32_t totalCount = static_cast<std::uint32_t>(payloads.size());
       std::uint32_t drawn = 0u;
       while (drawn < totalCount) {
@@ -447,7 +961,9 @@ namespace
 
         void* lockedWritePtr = nullptr;
         std::uint32_t previousVertexCount = 0u;
-        if (ReserveDynamicRingVertexSlice(batchCount, &lockedWritePtr, rangeRenderer, &previousVertexCount)) {
+        if (gpuCast) {
+          moho::RangeGpuRenderer::Get().Cast(rangeRenderer, cameraView, gpuFirstPayload + drawn, batchCount);
+        } else if (ReserveDynamicRingVertexSlice(batchCount, &lockedWritePtr, rangeRenderer, &previousVertexCount)) {
           // Raw GPU upload: range payload blob into the dynamic ring buffer.
           std::copy_n(payloads.begin() + drawn, batchCount, static_cast<moho::SRangeExtractionPayload*>(lockedWritePtr));
           rangeRenderer.mDynamicVertexBuffer->Unlock();
@@ -466,7 +982,7 @@ namespace
       // Fill, as FAF FA-Binary-Patches #149: the last batch's "RangeMask" is
       // the final one, and no fill payloads means no "RangeMask" at all (its
       // `jle` at 0x007EF76E goes straight to the edge loop).
-      drawBatched(fillPayloads, kStencilSafeBatchLimit, [&](bool) { runRangeMaskPass(); });
+      drawBatched(fillPayloads, 0u, kStencilSafeBatchLimit, [&](bool) { runRangeMaskPass(); });
 
       if (moho::range_Fill) {
         runFramePass("RangeFill");
@@ -475,17 +991,17 @@ namespace
       setRingColor();
       // Edge: burn each batch, then move its pixels to bit 7 so later batches
       // skip them (not needed after the last one; the clear below resets it).
-      drawBatched(edgePayloads, kStencilSafeBatchLimit, [&](const bool lastBatch) {
+      drawBatched(edgePayloads, edgeFirstPayload, kStencilSafeBatchLimit, [&](const bool lastBatch) {
         runFramePass("RangeBurn");
         if (!lastBatch || keepShapeInStencil) {
           runRangeMaskPass();
         }
       });
     } else {
-      drawBatched(fillPayloads, kDynamicVertexBatchLimit, [](bool) {});
+      drawBatched(fillPayloads, 0u, kDynamicVertexBatchLimit, [](bool) {});
       runRangeMaskPass();
 
-      drawBatched(edgePayloads, kDynamicVertexBatchLimit, [](bool) {});
+      drawBatched(edgePayloads, edgeFirstPayload, kDynamicVertexBatchLimit, [](bool) {});
 
       if (moho::range_Fill) {
         runFramePass("RangeFill");
@@ -1535,6 +2051,11 @@ namespace moho
           // and `ds:patch_minMapHeight` at 0x007EE336 for the lower one.
           const float upperBandHeight = moho::patch_maxMapHeight;
           const float lowerBandHeight = moho::patch_minMapHeight;
+          // The names are the binary's lanes, not an order: `patch_maxMapHeight` holds the lowest
+          // height sample minus 5 and `patch_minMapHeight` the highest (StartupClientHelpers.cpp).
+          sRingTemplateLowerHeight = std::min(upperBandHeight, lowerBandHeight);
+          sRingTemplateUpperHeight = std::max(upperBandHeight, lowerBandHeight);
+          sRingTemplateHeightsKnown = true;
 
           WriteRingBandVertex(vertexData, i, x, upperBandHeight, z, 1.0f, 0.0f);
           WriteRingBandVertex(vertexData, i + kRangeRingSegmentCount, x, upperBandHeight, z, 0.0f, 1.0f);
