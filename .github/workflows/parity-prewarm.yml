@@ -148,14 +148,19 @@ jobs:
           python tools/parity-data/prewarm.py replays --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
           --bucket ${{ matrix.bucket }} --cache cache/replays --game-version "$GAME_VERSION"
           --minutes ${{ inputs.replay_minutes || '20' }}
+      # Counted from the index on disk, and saved even when the fetch was cancelled or failed:
+      # every replay a job downloaded stays for the next run.
+      - id: count
+        if: always()
+        run: echo "count=$([ -f cache/replays/index.jsonl ] && wc -l < cache/replays/index.jsonl || echo 0)" >> "$GITHUB_OUTPUT"
       - if: >
-          steps.fetch.outputs.count != '0' &&
-          steps.restore.outputs.cache-matched-key != format('replays-{0}-b{1}-n{2}', env.GAME_VERSION, matrix.bucket, steps.fetch.outputs.count)
+          always() && steps.count.outputs.count != '0' &&
+          steps.restore.outputs.cache-matched-key != format('replays-{0}-b{1}-n{2}', env.GAME_VERSION, matrix.bucket, steps.count.outputs.count)
         uses: actions/cache/save@v4
         with:
           path: cache/replays
-          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-n${{ steps.fetch.outputs.count }}
-      - if: steps.fetch.outputs.count != '0'
+          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-n${{ steps.count.outputs.count }}
+      - if: always() && steps.count.outputs.count != '0'
         uses: actions/upload-artifact@v4
         with:
           name: index-b${{ matrix.bucket }}
@@ -195,20 +200,30 @@ jobs:
           python tools/parity-data/prewarm.py assets --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
           --index index --maps cache/maps --m28 cache/m28 --index-out cache/index/index.jsonl
           --minutes ${{ inputs.asset_minutes || '60' }}
+      # Counted on disk (complete folders only), and saved even when the fetch was cancelled.
+      - id: count
+        if: always()
+        run: |
+          echo "maps=$(ls cache/maps 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+          echo "m28=$(ls cache/m28 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
       - if: >
-          steps.fetch.outputs.maps != '0' &&
-          steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.fetch.outputs.maps)
+          always() && steps.count.outputs.maps != '0' &&
+          steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.maps)
         uses: actions/cache/save@v4
         with:
-          path: cache/maps
-          key: maps-${{ env.GAME_VERSION }}-n${{ steps.fetch.outputs.maps }}
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.maps }}
       - if: >
-          steps.fetch.outputs.m28 != '0' &&
-          steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.fetch.outputs.m28)
+          always() && steps.count.outputs.m28 != '0' &&
+          steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.m28)
         uses: actions/cache/save@v4
         with:
-          path: cache/m28
-          key: m28-${{ env.GAME_VERSION }}-n${{ steps.fetch.outputs.m28 }}
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.m28 }}
       # Saved every run: a cache key is written once, so the run number keeps it new.
       - if: steps.fetch.outputs.indexed != '0'
         uses: actions/cache/save@v4

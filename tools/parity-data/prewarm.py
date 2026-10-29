@@ -38,6 +38,9 @@ from common import (GAME_URL, MAP_URL, MOD_URL, REPLAY_URL, bucket_of, check_rep
 # publishes every one: 3835 has no mods package.
 FAF_PACKAGES = ("effects", "env", "etc", "loc", "lua", "meshes", "mods", "projectiles", "textures", "units")
 REQUIRED_PACKAGES = {"lua", "units"}
+# A map or M28AI version is unpacked under this prefix and renamed when complete, so a run
+# cancelled halfway never leaves (or caches) a half-written one under its real name.
+PARTIAL = ".partial-"
 
 
 def read_index(path):
@@ -69,12 +72,30 @@ def cmd_replays(args):
     todo = [i for i in ids if i not in index]
     # Replays already on disk first: they cost no request, and a slow network cannot keep them out.
     todo.sort(key=lambda i: not os.path.isfile(os.path.join(args.cache, "%d.fafreplay" % i)))
-    deadline = time.time() + args.minutes * 60
+    start = time.time()
+    deadline = start + args.minutes * 60
     done = 0
+    new_ready = 0
+    shown = start
+    print("bucket %d: %d corpus replays, %d indexed before this run, %d to fetch, %g minutes"
+          % (args.bucket, len(ids), len(index), len(todo), args.minutes), flush=True)
+
+    def progress(final=False):
+        took = time.time() - start
+        per = took / done if done else 0.0
+        left = len(todo) - done
+        print("bucket %d: %d/%d done this run (%d ready, %d not playable), %.1f s a replay, %s"
+              % (args.bucket, done, len(todo), new_ready, done - new_ready, per,
+                 ("bucket complete" if left == 0 else "stopped at the time limit, %d left" % left) if final
+                 else "about %.0f min to finish the bucket" % (left * per / 60)), flush=True)
+
     with open(index_path, "a", encoding="utf-8") as out:
         for replay_id in todo:
             if time.time() > deadline:
                 break
+            if time.time() - shown >= 30:
+                progress()
+                shown = time.time()
             path = os.path.join(args.cache, "%d.fafreplay" % replay_id)
             entry = {"id": replay_id, "state": "unsupported", "reason": None, "map": None, "m28": None,
                      "beats": None, "players": corpus[replay_id]["players"]}
@@ -94,6 +115,8 @@ def cmd_replays(args):
             out.write(json.dumps(entry) + "\n")
             out.flush()
             done += 1
+            new_ready += entry["state"] == "ready"
+    progress(final=True)
     index = read_index(index_path)
     ready = sum(1 for e in index.values() if e["state"] == "ready")
     print("bucket %d: %d of %d corpus replays indexed (%d ready), %d new this run, %d left"
@@ -110,6 +133,10 @@ def cmd_assets(args):
     deadline = time.time() + args.minutes * 60
     os.makedirs(args.maps, exist_ok=True)
     os.makedirs(args.m28, exist_ok=True)
+    for parent in (args.maps, args.m28):  # what a cancelled run left half written
+        for name in os.listdir(parent):
+            if name.startswith(PARTIAL):
+                shutil.rmtree(os.path.join(parent, name), ignore_errors=True)
     work = tempfile.mkdtemp(prefix="prewarm-")
     content = set(make_pack.CONTENT_TYPES)
     try:
@@ -120,18 +147,29 @@ def cmd_assets(args):
                 continue
             zpath = os.path.join(work, tag + ".zip")
             fetch(MOD_URL % tag, zpath, args.delay)
-            shutil.unpack_archive(zpath, os.path.join(args.m28, tag), "zip")
+            partial = os.path.join(args.m28, PARTIAL + tag)
+            shutil.unpack_archive(zpath, partial, "zip")
+            os.replace(partial, os.path.join(args.m28, tag))
             print("M28AI v%d" % version, flush=True)
 
         # The retail maps come from FAF's map vault too: their .scmap and Lua are the game's
         # (x1mp_005, scmp_009 compared file for file); FAF adds previews.
         cached = {row["map"] for row in corpus.values() if row["map_kind"] in ("cached", "retail")}
-        have = {n.lower() for n in os.listdir(args.maps)}
+        have = {n.lower() for n in os.listdir(args.maps) if not n.startswith(PARTIAL)}
         wanted = sorted(cached - have)
         failed = 0
+        fetched = 0
+        start = shown = time.time()
+        print("maps: %d top and retail maps, %d cached before this run, %d to fetch"
+              % (len(cached), len(cached & have), len(wanted)), flush=True)
         for folder in wanted:
             if time.time() > deadline:
                 break
+            if time.time() - shown >= 30:
+                per = (time.time() - start) / max(1, fetched + failed)
+                print("maps: %d/%d fetched (%d failed), %.1f s a map, about %.0f min left"
+                      % (fetched, len(wanted), failed, per, (len(wanted) - fetched - failed) * per / 60), flush=True)
+                shown = time.time()
             zpath = os.path.join(work, "map.zip")
             raw = os.path.join(work, "raw")
             shutil.rmtree(raw, ignore_errors=True)
@@ -143,8 +181,11 @@ def cmd_assets(args):
                 failed += 1
                 continue
             stats = make_pack.Stats()
-            make_pack.pack_tree(src, os.path.join(args.maps, folder), content, stats)
-        maps_now = len(os.listdir(args.maps))
+            partial = os.path.join(args.maps, PARTIAL + folder)
+            make_pack.pack_tree(src, partial, content, stats)
+            os.replace(partial, os.path.join(args.maps, folder))
+            fetched += 1
+        maps_now = sum(1 for n in os.listdir(args.maps) if not n.startswith(PARTIAL))
         print("maps cached: %d of %d top and retail maps (%d failed this run); M28AI versions: %d"
               % (maps_now, len(cached), failed, len(os.listdir(args.m28))))
         if args.index_out:
@@ -152,7 +193,8 @@ def cmd_assets(args):
             with open(args.index_out, "w", encoding="utf-8") as f:
                 for replay_id in sorted(index):
                     f.write(json.dumps(index[replay_id]) + "\n")
-        write_output(maps=maps_now, m28=len(os.listdir(args.m28)), indexed=len(index))
+        write_output(maps=maps_now, m28=sum(1 for n in os.listdir(args.m28) if not n.startswith(PARTIAL)),
+                     indexed=len(index))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return 0
