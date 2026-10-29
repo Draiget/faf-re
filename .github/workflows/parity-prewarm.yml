@@ -21,6 +21,9 @@ on:
       asset_minutes:
         description: Minutes spent fetching maps and M28AI versions
         default: "60"
+      parallel:
+        description: Replay buckets fetched at once (each one request a second to FAF)
+        default: "4"
   schedule:
     - cron: "23 4 * * 1"
 
@@ -120,12 +123,12 @@ jobs:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
 
-  # One bucket of 10,000 replay ids per job, one job at a time: FAF sees a single requester.
+  # One bucket of 10,000 replay ids per job, `parallel` jobs at a time, each one request a second.
   replays:
     needs: corpus
     runs-on: ubuntu-24.04
     strategy:
-      max-parallel: 1
+      max-parallel: ${{ fromJSON(inputs.parallel || '4') }}
       fail-fast: false
       matrix:
         bucket: ${{ fromJSON(needs.corpus.outputs.buckets) }}

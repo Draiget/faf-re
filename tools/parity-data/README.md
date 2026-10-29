@@ -10,7 +10,7 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 |---|---|
 | `game` | Once per version: downloads FAF's packages and init file for the version from FAF's updater (`<package>.<version>.nx2`, `init_faf_<version>.lua`, no sign-in needed) and strips them |
 | `retail` | Once: downloads the encrypted retail archives from `PARITY_RETAIL_URL` and checks they open with `PARITY_RETAIL_KEY` |
-| `replays` | One job per bucket of 10,000 replay ids, one job at a time: downloads the corpus replays the bucket's cache lacks, checks each as the parity runner does (featured mod, engine version, sim mods, map) and records the result in the bucket's `index.jsonl`; keeps the ready ones |
+| `replays` | One job per bucket of 10,000 replay ids, `parallel` jobs at a time (default 4, each one request a second): downloads the corpus replays the bucket's cache lacks, checks each as the parity runner does (featured mod, engine version, sim mods, map) and records the result in the bucket's `index.jsonl`; keeps the ready ones |
 | `assets` | Downloads the corpus' top and retail maps (stripped) and every M28AI version a ready replay needs, and saves every bucket's index in one file for the planner |
 
 **Replay parity** (by hand, with the commit to test):
@@ -24,7 +24,7 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 
 Run both from master: caches saved on master are the ones every run reads. Anyone with write access to the repository can start them. The weekly prewarm fetches what is still missing and keeps the caches from expiring (GitHub drops a cache unused for 7 days).
 
-**FAF's servers.** Only the prewarm asks FAF for anything, one request at a time a second apart, and only for what the cache lacks: once the caches are full, a parity run sends FAF nothing. A `run` job downloads a replay, map or M28AI version only when the caches lack it (a map outside the top maps, a replay the prewarm has not reached yet); the core and extended sets are played from shared jobs that fetch their 8 or 18 replays.
+**FAF's servers.** Only the prewarm asks FAF for anything, each job one request a second (the replay buckets `parallel` jobs at a time), and only for what the cache lacks: once the caches are full, a parity run sends FAF nothing. A `run` job downloads a replay, map or M28AI version only when the caches lack it (a map outside the top maps, a replay the prewarm has not reached yet); the core and extended sets are played from shared jobs that fetch their 8 or 18 replays.
 
 **Caches** (10 GB per repository; most keys carry an entry count, so a run saves a new one only when something was added):
 
@@ -49,18 +49,18 @@ A pull request's workflow can read master's caches too, a fork's included, which
 
 ## The corpus
 
-[corpus/3835.tsv.gz](corpus/3835.tsv.gz) lists the replays CI may play: every 3835 game in the vault with 2 or more players, at least 5 minutes of game, a replay, and a map that can be had (generated maps cannot), plus the core and extended sets of [PR_REPLAY_CHECK.md](../../docs/PR_REPLAY_CHECK.md). One line per replay: id, ticks, players, map folder, and where its map comes from: `retail` (a map the game ships, cached from FAF's map vault), `cached` (one of the 500 most played vault maps) or `download` (fetched by the job that plays it). On 29/10/2026: 43,159 replays, 9,211 on retail maps, 29,036 on the top 500 maps, 4,912 on others. About 30% of them need a sim mod and are left out when the prewarm reads them.
+[corpus/3835.tsv.gz](corpus/3835.tsv.gz) lists the replays CI may play: every 3835 game in the vault with 2 or more players, at least 5 minutes of game, a replay, and a map that can be had (generated maps cannot), plus the core and extended sets of [PR_REPLAY_CHECK.md](../../docs/PR_REPLAY_CHECK.md). One line per replay: id, ticks, players, map folder, and where its map comes from: `retail` (a map the game ships, cached from FAF's map vault), `cached` (one of the 500 most played vault maps) or `download` (fetched by the job that plays it). On 29/10/2026: 43,091 replays, 9,194 on retail maps, 28,989 on the top 500 maps, 4,908 on others. About 30% of them need a sim mod and are left out when the prewarm reads them.
 
 It is made from the FAF API, which needs a signed-in user:
 
 ```
 python corpus.py login                                  # prints a link and a code; tokens go to tmp/claude/
-python corpus.py export --first 26825350 --last 27067140 --out tmp/claude/export3835
+python corpus.py export --first 26825749 --last 27067140 --out tmp/claude/export3835
 python corpus.py build --export tmp/claude/export3835 --retail-maps <pack>/fa/maps --top-maps 500 \
   --out tools/parity-data/corpus/3835.tsv.gz
 ```
 
-26,825,350 to 27,067,140 are the vault ids of game version 3835 (found by reading replay headers either side). The export asks for one page of 100 games a second, about 1,000 requests. The login is the FAF client's (its client id and the device-code sign-in of `api/TokenRetriever.java`), as FAF has no client registered for this project.
+26,825,749 to 27,067,140 are the vault ids of game version 3835: the first replay whose engine version (inside the replay, `Supreme Commander v1.50.3835`) is 3835, and the last whose header names 3835. Headers name 3835 from 26,825,350 on, but the replays up to 26,825,721 were recorded by the 3834 engine. The export asks for one page of 100 games a second, about 1,000 requests. The login is the FAF client's (its client id and the device-code sign-in of `api/TokenRetriever.java`), as FAF has no client registered for this project.
 
 Known failures, which the report lists but does not fail on, are in [expected/3835.json](expected/3835.json).
 
