@@ -12957,6 +12957,13 @@ extern "C" void luaV_settable(
 
 namespace moho
 {
+	static UserGcDispatcher sUserGcDispatcher{};
+
+	void RegisterUserGcDispatcher(const UserGcDispatcher& dispatcher) noexcept
+	{
+		sUserGcDispatcher = dispatcher;
+	}
+
 	/**
 	 * Engine addition: `lua_AllowPrecompiledChunks`. Off by default: `lua_load`
 	 * (and so `doscript`, `import`, `loadstring`, `dofile`) refuses compiled
@@ -13742,15 +13749,70 @@ namespace
 			}
 		}
 
+	enum class EGcPoolKind
+	{
+		None,
+		Sim,
+		User
+	};
+
+	struct GcWorkerPoolInfo
+	{
+		EGcPoolKind kind{EGcPoolKind::None};
+		unsigned int workerCount{0};
+
+		[[nodiscard]] bool IsParallel() const noexcept {
+			return kind != EGcPoolKind::None && workerCount > 0u;
+		}
+
+		template <class Body>
+		void ParallelFor(std::size_t count, std::size_t grain, Body&& body) const
+		{
+			if (kind == EGcPoolKind::Sim) {
+				moho::CSimWorkerPool::Get().ParallelFor(count, grain, std::forward<Body>(body));
+			} else if (kind == EGcPoolKind::User) {
+				using BodyType = std::remove_reference_t<Body>;
+				moho::sUserGcDispatcher.parallelFor(
+					count,
+					grain,
+					[](void* context, std::size_t begin, std::size_t end) {
+						(*static_cast<BodyType*>(context))(begin, end);
+					},
+					const_cast<void*>(static_cast<const void*>(std::addressof(body)))
+				);
+			} else {
+				for (std::size_t begin = 0; begin < count; begin += grain) {
+					body(begin, std::min(count, begin + grain));
+				}
+			}
+		}
+	};
+
+	[[nodiscard]] GcWorkerPoolInfo GetActiveGcPool() noexcept
+	{
+		if (moho::IsSimThread()) {
+			if (!moho::IsSimWorkerThread() && moho::lua_ParallelMark &&
+				moho::CSimWorkerPool::ParallelEnabled() && moho::CSimWorkerPool::Get().WorkerCount() > 0u) {
+				return {EGcPoolKind::Sim, moho::CSimWorkerPool::Get().WorkerCount()};
+			}
+		} else {
+			const auto& disp = moho::sUserGcDispatcher;
+			if (disp.parallelFor != nullptr && disp.workerCount != nullptr &&
+				disp.enabledFlag != nullptr && *disp.enabledFlag && disp.workerCount() > 0u) {
+				return {EGcPoolKind::User, disp.workerCount()};
+			}
+		}
+		return {EGcPoolKind::None, 0u};
+	}
+
 		[[nodiscard]] bool Enabled() noexcept
 		{
-			return moho::lua_ParallelMark && moho::IsSimThread() && !moho::IsSimWorkerThread()
-				&& moho::CSimWorkerPool::ParallelEnabled() && moho::CSimWorkerPool::Get().WorkerCount() > 0u;
+			return GetActiveGcPool().IsParallel();
 		}
 	} // namespace parallel_mark
 
 	/**
-	 * `propagatemarks`, on the sim worker pool when `lua_ParallelMark` allows (see
+	 * `propagatemarks`, on the active worker pool when `parallel_mark` allows (see
 	 * `parallel_mark`); serially otherwise. The parallel path gathers the weak tables it traverses
 	 * into `weakSets`, the collection's own (see `parallel_mark::WeakSets`).
 	 */
@@ -13764,10 +13826,10 @@ namespace
 			return;
 		}
 
-		moho::CSimWorkerPool& pool = moho::CSimWorkerPool::Get();
+		const GcWorkerPoolInfo pool = GetActiveGcPool();
 		Round round;
 		round.g = st->g;
-		round.workers.resize(pool.WorkerCount() + 1u);
+		round.workers.resize(pool.workerCount + 1u);
 
 		while (st->tmark != nullptr || rootObjects != nullptr) {
 			// The serial gray list (claimed objects linked through gclist) seeds the round.
@@ -13916,7 +13978,7 @@ namespace
 					jobs.push_back(Job{table, list.clear});
 				}
 			}
-			moho::CSimWorkerPool::Get().ParallelFor(jobs.size(), 8u, [&jobs](const std::size_t begin, const std::size_t end) {
+			parallel_mark::GetActiveGcPool().ParallelFor(jobs.size(), 8u, [&jobs](const std::size_t begin, const std::size_t end) {
 				for (std::size_t index = begin; index < end; ++index) {
 					if ((jobs[index].clear & kKeys) != 0u) {
 						ClearKeys(jobs[index].table);
@@ -18389,6 +18451,8 @@ extern "C"
 	 */
 	void luaC_collectgarbage(lua_State* const state)
 	{
+		FAF_PROFILE_ZONE_TRANSIENT(moho::IsSimThread() ? "Sim::LuaGC" : "UI::LuaGC");
+
 		// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
 		lua::GcEventLogCollection(state->l_G, state->l_G->nblocks, state->l_G->GCthreshold);
 

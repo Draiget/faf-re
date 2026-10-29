@@ -15,6 +15,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/console/TConVarbool.h"
+#include "moho/app/UserWorkerPool.h"
 
 namespace moho
 {
@@ -31,6 +32,20 @@ namespace moho
     "Mark UI Lua objects on CUserWorkerPool worker threads during garbage collection.",
     &ui_ParallelMark
   );
+
+  struct UserGcDispatcherRegistrar
+  {
+    UserGcDispatcherRegistrar()
+    {
+      RegisterUserGcDispatcher({
+        [](std::size_t count, std::size_t grain, void (*fn)(void*, std::size_t, std::size_t), void* context) {
+          CUserWorkerPool::Get().Run(count, grain, fn, context);
+        },
+        []() { return CUserWorkerPool::ConfiguredWorkerCount(); },
+        &ui_ParallelMark
+      });
+    }
+  } gUserGcDispatcherRegistrar;
 }
 
 namespace
