@@ -33,6 +33,22 @@ namespace moho
     &ui_ParallelMark
   );
 
+  bool ui_ParallelSweep = true;
+  TConVar<bool> gTConVar_ui_ParallelSweep(
+    "ui_ParallelSweep",
+    "Sweep UI Lua objects on CUserWorkerPool worker threads during garbage collection.",
+    &ui_ParallelSweep
+  );
+
+  bool ui_IdleGC = true;
+  TConVar<bool> gTConVar_ui_IdleGC(
+    "ui_IdleGC",
+    "Defer periodic UI Lua GC to the post-present frame idle window.",
+    &ui_IdleGC
+  );
+
+  static bool sPendingUiGc = false;
+
   struct UserGcDispatcherRegistrar
   {
     UserGcDispatcherRegistrar()
@@ -42,7 +58,8 @@ namespace moho
           CUserWorkerPool::Get().Run(count, grain, fn, context);
         },
         []() { return CUserWorkerPool::ConfiguredWorkerCount(); },
-        &ui_ParallelMark
+        &ui_ParallelMark,
+        &ui_ParallelSweep
       });
     }
   } gUserGcDispatcherRegistrar;
@@ -396,7 +413,9 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
       mGCTime += deltaSeconds;
       if (mGCTime > 5.0f) {
         mGCTime -= 5.0f;
-        if (mLuaState->m_state != nullptr) {
+        if (ui_IdleGC) {
+          sPendingUiGc = true;
+        } else if (mLuaState->m_state != nullptr) {
           lua_setgcthreshold(mLuaState->m_state, 0);
         }
       }
@@ -405,6 +424,19 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
 
   STAT_Frame();
   UI_UpdateCommandFeedbackBlips(deltaSeconds);
+}
+
+void moho::UI_ProcessIdleGC()
+{
+  if (!sPendingUiGc) {
+    return;
+  }
+  sPendingUiGc = false;
+  if (CUIManager* const uiMgr = static_cast<CUIManager*>(UI_GetManager())) {
+    if (uiMgr->mLuaState != nullptr && uiMgr->mLuaState->m_state != nullptr) {
+      lua_setgcthreshold(uiMgr->mLuaState->m_state, 0);
+    }
+  }
 }
 
 /**

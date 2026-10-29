@@ -29,7 +29,7 @@ def run_configuration(cfg, replay_path, bin_dir, capture_tool, csvexport_tool, s
                 pass
 
     exe = os.path.join(bin_dir, "main_x64_profile.exe")
-    con_str = f"sim_Workers=8;ui_PeriodicGC={cfg['periodic']};ui_ParallelMark={cfg['parallel']}"
+    con_str = f"sim_Workers=8;ui_PeriodicGC={cfg.get('periodic', 1)};ui_ParallelMark={cfg.get('parallel_mark', 1)};ui_ParallelSweep={cfg.get('parallel_sweep', 1)};ui_IdleGC={cfg.get('idle_gc', 1)}"
     args = [
         exe,
         "/prefs", "dev.prefs",
@@ -111,13 +111,13 @@ def run_configuration(cfg, replay_path, bin_dir, capture_tool, csvexport_tool, s
     # Parse UI::LuaGC stats
     gc_stats = {
         "name": cfg["name"],
-        "periodic": cfg["periodic"],
-        "parallel": cfg["parallel"],
         "count": 0,
         "total_ms": 0.0,
         "mean_ms": 0.0,
         "min_ms": 0.0,
         "max_ms": 0.0,
+        "app_frame_max_ms": 0.0,
+        "ui_update_max_ms": 0.0,
         "durations_ms": []
     }
 
@@ -126,7 +126,6 @@ def run_configuration(cfg, replay_path, bin_dir, capture_tool, csvexport_tool, s
     if len(lines) > 1:
         reader = csv.reader(lines)
         header = next(reader)
-        # Find duration column: usually "duration_ns" or "exec_time_ns"
         dur_idx = -1
         for idx, col in enumerate(header):
             if "duration" in col.lower() or "exec_time" in col.lower() or "time" in col.lower():
@@ -150,15 +149,24 @@ def run_configuration(cfg, replay_path, bin_dir, capture_tool, csvexport_tool, s
             gc_stats["max_ms"] = max(durations)
             gc_stats["durations_ms"] = durations
 
-    # Also parse from aggregate stats if unwrap had empty rows
-    if gc_stats["count"] == 0 and os.path.exists(csv_stats_path):
+    # Also parse from aggregate stats
+    if os.path.exists(csv_stats_path):
         with open(csv_stats_path, 'r', encoding='utf-8') as f:
             for line in f:
-                if "UI::LuaGC" in line:
-                    parts = [p.strip() for p in line.split(",")]
-                    print(f"[*] Found UI::LuaGC aggregate row: {line.strip()}", flush=True)
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) >= 9:
+                    name = parts[0]
+                    file_src = parts[1]
+                    try:
+                        max_ns = float(parts[8])
+                        if name == "AppFrame":
+                            gc_stats["app_frame_max_ms"] = max(gc_stats["app_frame_max_ms"], max_ns / 1_000_000.0)
+                        elif name == "UI" and "CUIManager.cpp" in file_src:
+                            gc_stats["ui_update_max_ms"] = max(gc_stats["ui_update_max_ms"], max_ns / 1_000_000.0)
+                    except ValueError:
+                        pass
 
-    print(f"[*] Result: Count={gc_stats['count']} | Min={gc_stats['min_ms']:.2f}ms | Mean={gc_stats['mean_ms']:.2f}ms | Max={gc_stats['max_ms']:.2f}ms | Total={gc_stats['total_ms']:.2f}ms", flush=True)
+    print(f"[*] Result: Count={gc_stats['count']} | Min={gc_stats['min_ms']:.2f}ms | Mean={gc_stats['mean_ms']:.2f}ms | Max={gc_stats['max_ms']:.2f}ms | UI Update Max={gc_stats['ui_update_max_ms']:.2f}ms | AppFrame Max={gc_stats['app_frame_max_ms']:.2f}ms", flush=True)
     return gc_stats
 
 def main():
@@ -169,10 +177,38 @@ def main():
     speedkeys_script = r"I:\ProjectsFaf\faf-re\scripts\perf\speedkeys.py"
 
     configurations = [
-        {"id": "retail_baseline", "name": "Retail Baseline (Periodic 1, Parallel 0)", "periodic": 1, "parallel": 0},
-        {"id": "both_off", "name": "Both OFF (Periodic 0, Parallel 0)", "periodic": 0, "parallel": 0},
-        {"id": "opt_parallel_only", "name": "Dynamic Parallel (Periodic 0, Parallel 1)", "periodic": 0, "parallel": 1},
-        {"id": "opt_both_on", "name": "Periodic Parallel (Periodic 1, Parallel 1)", "periodic": 1, "parallel": 1},
+        {
+            "id": "retail_baseline",
+            "name": "Retail Baseline (Mark 0, Sweep 0, Idle 0)",
+            "periodic": 1,
+            "parallel_mark": 0,
+            "parallel_sweep": 0,
+            "idle_gc": 0
+        },
+        {
+            "id": "parallel_mark_only",
+            "name": "Parallel Mark Only (Mark 1, Sweep 0, Idle 0)",
+            "periodic": 1,
+            "parallel_mark": 1,
+            "parallel_sweep": 0,
+            "idle_gc": 0
+        },
+        {
+            "id": "parallel_mark_sweep",
+            "name": "Parallel Mark + Sweep (Mark 1, Sweep 1, Idle 0)",
+            "periodic": 1,
+            "parallel_mark": 1,
+            "parallel_sweep": 1,
+            "idle_gc": 0
+        },
+        {
+            "id": "full_opt_with_idle",
+            "name": "Full Opt + Idle GC (Mark 1, Sweep 1, Idle 1)",
+            "periodic": 1,
+            "parallel_mark": 1,
+            "parallel_sweep": 1,
+            "idle_gc": 1
+        },
     ]
 
     results = []
@@ -182,14 +218,14 @@ def main():
             results.append(res)
         time.sleep(3)
 
-    print("\n\n" + "="*80)
-    print("FINAL BENCHMARK COMPARISON TABLE (UI Lua GC - 60s Windowed Capture)")
-    print("="*80)
-    print(f"{'Configuration':<42} | {'Collections':<11} | {'Min Pause':<10} | {'Mean Pause':<11} | {'Max Pause':<10} | {'Total GC Time'}")
-    print("-" * 105)
+    print("\n\n" + "="*115)
+    print("FINAL BENCHMARK COMPARISON TABLE (UI Lua GC & Frame Times - 60s Windowed Capture)")
+    print("="*115)
+    print(f"{'Configuration':<45} | {'GC Count':<8} | {'Mean Pause':<10} | {'Max Pause':<10} | {'Max UI Loop':<11} | {'Max AppFrame'}")
+    print("-" * 115)
     for r in results:
-        print(f"{r['name']:<42} | {r['count']:<11} | {r['min_ms']:<7.2f} ms | {r['mean_ms']:<8.2f} ms | {r['max_ms']:<7.2f} ms | {r['total_ms']:.2f} ms")
-    print("="*80)
+        print(f"{r['name']:<45} | {r['count']:<8} | {r['mean_ms']:<7.2f} ms | {r['max_ms']:<7.2f} ms | {r['ui_update_max_ms']:<8.2f} ms | {r['app_frame_max_ms']:.2f} ms")
+    print("="*115)
 
 if __name__ == "__main__":
     main()

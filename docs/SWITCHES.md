@@ -51,6 +51,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `ui_ParallelIcons` | 1 | `/con` | live | Strategic icons classified on user workers and drawn in bulk |
 | `ui_PeriodicGC` | 1 | `/con` | live | Enable forced periodic 5-second UI Lua GC reset (retail behavior); 0 leaves GC threshold dynamic |
 | `ui_ParallelMark` | 1 | `/con` | live (next collection) | Mark UI Lua objects across CUserWorkerPool worker threads; 0 runs mark serially on main thread |
+| `ui_ParallelSweep` | 1 | `/con` | live (next collection) | Sweep UI Lua objects across CUserWorkerPool worker threads; 0 runs sweep serially on main thread |
+| `ui_IdleGC` | 1 | `/con` | live | Move periodic UI Lua GC execution to post-present idle/slack window after device refresh; 0 runs synchronously during UpdateFrameRate (retail) |
 | `wld_ParallelSync` | 1 | `/con` | live | Beat sync apply: pose and data copies on user workers |
 | `wld_FrameClock` | 1 | `/con` | live | Replays and single player: game clock from the mean frame time (0: the original median, 2: each frame's own time) |
 | `wld_VisionChainHints` | 1 | `/con` | live | Vision-tree chain tails and predecessors from checked hints instead of chain walks |

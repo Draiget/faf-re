@@ -3254,6 +3254,7 @@ namespace moho
 		GcUserParallelForFn parallelFor{nullptr};
 		GcUserWorkerCountFn workerCount{nullptr};
 		const bool* enabledFlag{nullptr};
+		const bool* sweepEnabledFlag{nullptr};
 	};
 
 	void RegisterUserGcDispatcher(const UserGcDispatcher& dispatcher) noexcept;

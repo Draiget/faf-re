@@ -198,6 +198,11 @@ namespace moho
   [[nodiscard]] IUIManager* UI_GetManager();
 
   /**
+   * Runs pending periodic UI Lua GC in the post-present frame idle window.
+   */
+  void UI_ProcessIdleGC();
+
+  /**
    * Address: 0x0084C680 (FUN_0084C680)
    *
    * What it does:
