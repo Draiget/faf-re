@@ -158,15 +158,6 @@ namespace msvc8
 #endif
   }
 
-  std::int32_t TruncateToInt(const float value) noexcept
-  {
-    constexpr float kInt32Bound = 2147483648.0f;
-    if (!(value > -kInt32Bound - 1.0f && value < kInt32Bound)) {
-      return static_cast<std::int32_t>(0x80000000u);
-    }
-    return static_cast<std::int32_t>(value);
-  }
-
   void ScaleVectorByMaxLengthX87(float& x, float& y, float& z, const float maxLength) noexcept
   {
     // FUN_005D1E70 shape: squared length formed from the float components,

@@ -24,9 +24,18 @@ namespace msvc8
    * The MSVC8 CRT's `__ftol2_sse` (0x00A89CC0, `cvttsd2si eax`): truncation
    * toward zero, and the integer indefinite 0x80000000 for NaN or a value
    * outside the int32 range. A plain cast on x64 can convert through a 64-bit
-   * `cvttss2si` and keep the low half, which turns NaN into 0.
+   * `cvttss2si` and keep the low half, which turns NaN into 0, and an
+   * out-of-range one is undefined in C++ (a saturating target gives another
+   * result; plan WPL.19). Inline: the Lua table code calls it per number key.
    */
-  [[nodiscard]] std::int32_t TruncateToInt(float value) noexcept;
+  [[nodiscard]] inline std::int32_t TruncateToInt(const float value) noexcept
+  {
+    constexpr float kInt32Bound = 2147483648.0f;
+    if (!(value > -kInt32Bound - 1.0f && value < kInt32Bound)) {
+      return static_cast<std::int32_t>(0x80000000u);
+    }
+    return static_cast<std::int32_t>(value);
+  }
   /**
    * `factor * word` exactly as the shipped engine forms it from a Mersenne
    * Twister word under 24-bit x87 precision control (e.g. CRandomStream::FRand,
