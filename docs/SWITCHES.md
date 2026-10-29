@@ -19,6 +19,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_BlueprintLookupFast` | 1 | `/con` | live | Blueprint lookups without a copy of the id, and without a retry that cannot match |
 | `sim_GatherLargeBuffers` | 1 | `/con` | live | Grid gathers use large stack buffers, so dense queries stay off the heap |
 | `sim_GatherReserve` | 1 | `/con` | live | Area queries size their result list once |
+| `sim_SweptProbeEarlyOut` | 1 | `/con` | live | A path navigator's swept probe tests each unit before the box overlap and stops at the first blocker |
 | `sim_ChecksumBatching` | 1 | `/con` | live | Each entity's checksum bytes go to MD5 in one run |
 | `sim_MD5Unrolled` | 1 | `/con` | live | MD5 blocks unrolled instead of the table-driven loop |
 | `sim_ReconProbeCellCache` | 1 | `/con` | live | A recon point probe computes each intel-grid cell once per grid size |
