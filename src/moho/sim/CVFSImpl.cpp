@@ -1033,6 +1033,16 @@ namespace moho
     }
 
     SortAndUniquePaths(*outPaths);
+    // Engine addition (`DISK_SetAccessTrace`): the query and every path it returned.
+    if (DISK_AccessTraceOn()) {
+      const msvc8::string query = gpg::STR_Printf(
+        "%s %s%s", normalizedPrefix.c_str(), wildcardPattern.c_str(), allowPrefixWildcard ? " recursive" : ""
+      );
+      DISK_TraceAccess("list", query.c_str());
+      for (const msvc8::string& path : *outPaths) {
+        DISK_TraceAccess("listed", path.c_str());
+      }
+    }
   }
 
   /**
@@ -1082,6 +1092,13 @@ namespace moho
     }
 
     SortAndUniquePaths(*outPaths);
+    // Engine addition (`DISK_SetAccessTrace`): the query and every path it returned.
+    if (DISK_AccessTraceOn()) {
+      DISK_TraceAccess("children", normalizedPrefix.c_str());
+      for (const msvc8::string& path : *outPaths) {
+        DISK_TraceAccess("child", path.c_str());
+      }
+    }
   }
 
   /**
