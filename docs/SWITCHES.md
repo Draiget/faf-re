@@ -21,6 +21,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_BlueprintLookupFast` | 1 | `/con` | live | Blueprint lookups without a copy of the id, and without a retry that cannot match |
 | `sim_GatherLargeBuffers` | 1 | `/con` | live | Grid gathers use large stack buffers, so dense queries stay off the heap |
 | `sim_GatherReserve` | 1 | `/con` | live | Area queries size their result list once |
+| `sim_SweptProbeEarlyOut` | 1 | `/con` | live | A path navigator's swept probe tests each unit before the box overlap and stops at the first blocker |
 | `sim_ChecksumBatching` | 1 | `/con` | live | Each entity's checksum bytes go to MD5 in one run |
 | `sim_MD5Unrolled` | 1 | `/con` | live | MD5 blocks unrolled instead of the table-driven loop |
 | `sim_ReconProbeCellCache` | 1 | `/con` | live | A recon point probe computes each intel-grid cell once per grid size |
@@ -43,6 +44,9 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
+| `sim_RecyclePose` | 1 | `/con` | live | Reuses `CAniPose` double-buffer in-place when unique, eliminating thousands of heap allocations per second during unit movement; bit-for-bit checksum identical to retail |
+| sim_FastBoneUpdates | 1 | /con | live | Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches, accelerating bone rest updates; bit-for-bit checksum identical to retail |
+| `sim_FastEconStats` | 1 | `/con` | live | Bypasses string map lookups and allocations for per-tick army economy statistics by caching resolved `CArmyStatItem` pointers; bit-for-bit checksum identical to retail |
 | `mem_SmallBlockIndexTable` | 1 | `/con` | live | x86 allocator: size class by table instead of a binary search |
 | `mem_InlineTransformCopy` | 1 | `/con` | live | Transform copies inline instead of through Wm3's out-of-line `memcpy_s` |
 | small-block pool (x64) | on | `/smallpool 0` or `FAF_SMALLPOOL=0` | startup only | Size-class pool for blocks up to 4 KB in front of the system heap; the log says `mem: small-block pool on/off` |

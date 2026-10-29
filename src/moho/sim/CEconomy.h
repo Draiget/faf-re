@@ -18,6 +18,7 @@ namespace gpg
 
 namespace moho
 {
+  class CArmyStats;
   class CEconStorage;
   class Sim;
 
@@ -36,6 +37,13 @@ namespace moho
    * `CArmyImpl::OnTick` with `army->EconomyInfo`.
    */
   void ProcessArmyEconomy(CEconomy& economy);
+
+  /**
+   * Engine addition (`sim_FastEconStats`): drops the cached `Economy_*` stat items of
+   * `stats`, which `~CArmyStats` is destroying. Without it an army of a later session
+   * whose stats land at the same address keeps writing into the freed items.
+   */
+  void ForgetCachedEconomyStats(const CArmyStats& stats) noexcept;
 
   /**
    * Runtime economy state serialized on army save/load lanes.
