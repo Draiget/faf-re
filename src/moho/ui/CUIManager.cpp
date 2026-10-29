@@ -19,13 +19,6 @@
 
 namespace moho
 {
-  bool ui_PeriodicGC = true;
-  TConVar<bool> gTConVar_ui_PeriodicGC(
-    "ui_PeriodicGC",
-    "Enable forced periodic 5-second UI Lua GC reset (retail behaviour). When false, Lua manages GC threshold dynamically.",
-    &ui_PeriodicGC
-  );
-
   bool ui_ParallelMark = true;
   TConVar<bool> gTConVar_ui_ParallelMark(
     "ui_ParallelMark",
@@ -409,15 +402,13 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
   if (mLuaState != nullptr) {
     PublishEngineStatsToLua(mLuaState);
 
-    if (ui_PeriodicGC) {
-      mGCTime += deltaSeconds;
-      if (mGCTime > 5.0f) {
-        mGCTime -= 5.0f;
-        if (ui_IdleGC) {
-          sPendingUiGc = true;
-        } else if (mLuaState->m_state != nullptr) {
-          lua_setgcthreshold(mLuaState->m_state, 0);
-        }
+    mGCTime += deltaSeconds;
+    if (mGCTime > 5.0f) {
+      mGCTime -= 5.0f;
+      if (ui_IdleGC) {
+        sPendingUiGc = true;
+      } else if (mLuaState->m_state != nullptr) {
+        lua_setgcthreshold(mLuaState->m_state, 0);
       }
     }
   }
