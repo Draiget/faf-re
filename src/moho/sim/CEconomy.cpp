@@ -413,6 +413,15 @@ namespace moho
     static SEconStatCache sEconStatCaches[16]{};
   } // namespace
 
+  void ForgetCachedEconomyStats(const CArmyStats& stats) noexcept
+  {
+    for (SEconStatCache& cache : sEconStatCaches) {
+      if (cache.stats == &stats) {
+        cache = SEconStatCache{};
+      }
+    }
+  }
+
   /**
    * Address: 0x00771B50 (FUN_00771B50, func_ArmyProcessEconomy)
    *

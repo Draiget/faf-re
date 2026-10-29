@@ -34,6 +34,7 @@
 #include "moho/ai/CAiBrain.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 #include "moho/sim/Sim.h"
@@ -665,8 +666,11 @@ namespace moho
    */
   CArmyStats::~CArmyStats()
   {
-    // `~list` (0x007015C0) and `~rb_tree` run on the two members; the body
-    // says nothing.
+    // Engine addition: the economy's stat cache (`sim_FastEconStats`) must not
+    // outlive the items it points into.
+    ForgetCachedEconomyStats(*this);
+    // `~list` (0x007015C0) and `~rb_tree` run on the two members; the binary's
+    // body says nothing.
   }
 
   /**
