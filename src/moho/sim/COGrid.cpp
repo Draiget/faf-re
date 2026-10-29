@@ -4,8 +4,8 @@
 #include "moho/sim/COGrid.h"
 
 #include <algorithm>
-#include <cassert>
 #include <bit>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
