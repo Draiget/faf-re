@@ -300,24 +300,27 @@ namespace msvc8
    */
   [[nodiscard]] float VectorLengthZYXX87(const float* lanes) noexcept;
 
+  // Plan WPL.11: no generic forward to the host's libm. Any other argument type is an error
+  // here instead of a host call (or a silent conversion to the float overloads above); the
+  // caller picks the engine function or, outside the sim, `std::` by name.
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto sin(const T x) noexcept { return std::sin(x); }
+  float sin(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto cos(const T x) noexcept { return std::cos(x); }
+  float cos(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto tan(const T x) noexcept { return std::tan(x); }
+  float tan(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto atan(const T x) noexcept { return std::atan(x); }
+  float atan(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
-  [[nodiscard]] inline auto asin(const T x) noexcept { return std::asin(x); }
+  float asin(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
-  [[nodiscard]] inline auto acos(const T x) noexcept { return std::acos(x); }
+  float acos(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto exp(const T x) noexcept { return std::exp(x); }
+  float exp(T x) = delete;
   template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
-  [[nodiscard]] inline auto log(const T x) noexcept { return std::log(x); }
+  float log(T x) = delete;
   template <class Y, class X, std::enable_if_t<!(std::is_same_v<Y, float> && std::is_same_v<X, float>), int> = 0>
-  [[nodiscard]] inline auto atan2(const Y y, const X x) noexcept { return std::atan2(y, x); }
+  float atan2(Y y, X x) = delete;
   template <class B, class E, std::enable_if_t<!(std::is_same_v<B, float> && std::is_same_v<E, float>), int> = 0>
-  [[nodiscard]] inline auto pow(const B base, const E exponent) noexcept { return std::pow(base, exponent); }
+  float pow(B base, E exponent) = delete;
 } // namespace msvc8
