@@ -133,6 +133,7 @@ jobs:
       - env:
           KEY: ${{ secrets.PARITY_RETAIL_KEY }}
         run: |
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc | tar -xJf - -C game
           rm retail.enc
           chmod +x bin/headless

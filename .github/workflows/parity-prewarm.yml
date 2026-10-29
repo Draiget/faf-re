@@ -105,8 +105,15 @@ jobs:
           if [ "$(head -c 8 retail.enc)" != "Salted__" ]; then
             echo "::error::PARITY_RETAIL_URL did not return the encrypted pack (is the link shared?)"; exit 1
           fi
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc | tar -tJf - | tee contents.txt
+          # A pasted secret often carries a line break; the passphrase has no white space.
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
+          if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc -out retail.tar.xz \
+              || ! tar -tJf retail.tar.xz > contents.txt; then
+            echo "::error::PARITY_RETAIL_KEY does not open the file at PARITY_RETAIL_URL (a wrong passphrase decrypts to noise)"; exit 1
+          fi
+          cat contents.txt
           grep -q "fa/gamedata/units.scd" contents.txt
+          rm retail.tar.xz
       - if: steps.have.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
