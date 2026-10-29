@@ -4,12 +4,15 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -370,6 +373,9 @@ namespace
   {
     return owner ? owner->ReconCanDetect(entity, pos, oldFlags) : RECON_None;
   }
+
+  [[nodiscard]] EReconFlags ReconTickQuery(const CAiReconDBImpl* db, Unit* unit, std::size_t index);
+  void EndReconTickQueries(const CAiReconDBImpl* db);
 
   void TickAllReconGrids(CAiReconDBImpl* const owner, const int dTicks)
   {
@@ -766,6 +772,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   }
 
   msvc8::vector<SNewBlip> pendingNewBlips{};
+  std::size_t queryIndex = 0; // sim_ReconQueryCache: this unit's place among the queried ones
   if (mSim->mEntityDB) {
     // 0x005C104C: `CUnitIterAllArmies(Sim*)` walks only the unit-family prefix
     // of `mAllUnits`, in id order; blips, projectiles and props never enter.
@@ -790,7 +797,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
         continue;
       }
 
-      const EReconFlags detectFlags = ReconCanDetectEntity(this, unit, unit->GetPositionWm3(), RECON_AnySense);
+      const EReconFlags detectFlags = ReconTickQuery(this, unit, queryIndex++);
       auto [rangeBegin, rangeEnd] = FindReconBlipRange(this, unit);
       if (detectFlags != RECON_None) {
         if (rangeBegin == rangeEnd) {
@@ -816,6 +823,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       }
     }
   }
+  EndReconTickQueries(this); // engine addition, sim_ReconQueryCache
 
   GenerateNewBlips(pendingNewBlips);
   RebuildBlipListFromMapAndOrphans(this);
@@ -2160,4 +2168,146 @@ namespace moho
 void moho::RECON_DropBlipIndex(const CAiReconDBImpl* const db)
 {
   gReconBlipIndexes.erase(db);
+}
+
+namespace
+{
+  /// sim_ReconQueryCache: one ReconTick's precomputed main-loop queries.
+  struct SReconQueryCache
+  {
+    static constexpr std::size_t kChunkUnits = 64u;
+
+    struct SEntry
+    {
+      Unit* mUnit;
+      EReconFlags mFlags;
+    };
+
+    const CAiReconDBImpl* mDb = nullptr;     // serving for this DB's ReconTick; null when stopped
+    const CAiReconDBImpl* mFillDb = nullptr; // the DB the fills query for (only Start writes it)
+    std::vector<SEntry> mEntries;
+    std::unique_ptr<std::atomic<bool>[]> mChunkDone;
+    std::size_t mChunkCapacity = 0;
+    std::atomic<bool> mStopFills{false}; // set: chunks not yet begun are skipped
+    std::atomic<int> mActiveFills{0};    // chunks being filled right now
+    std::uint64_t mStarts = 0;
+    std::uint64_t mServed = 0;
+    std::uint64_t mQueried = 0;
+  } sReconQueryCache;
+
+  /// The units ReconTick's main loop queries, by its own filters.
+  [[nodiscard]] bool IsReconTickQueryUnit(const CAiReconDBImpl& db, const Unit* const unit)
+  {
+    return !unit->DestroyQueued() && unit->BluePrint != nullptr && unit->ArmyRef != db.mArmy &&
+           db.mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex);
+  }
+
+  /// ReconTick's query of `unit`, the `index`th unit its main loop queries: the cached result when
+  /// the cache serves this DB, lists that unit there and its chunk is done; else computed here.
+  [[nodiscard]] EReconFlags ReconTickQuery(const CAiReconDBImpl* const db, Unit* const unit, const std::size_t index)
+  {
+    SReconQueryCache& cache = sReconQueryCache;
+    if (cache.mDb == db) {
+      ++cache.mQueried;
+      if (index < cache.mEntries.size() && cache.mEntries[index].mUnit == unit &&
+          cache.mChunkDone[index / SReconQueryCache::kChunkUnits].load(std::memory_order_acquire)) {
+        ++cache.mServed;
+        return cache.mEntries[index].mFlags;
+      }
+    }
+    return ReconCanDetectEntity(db, unit, unit->GetPositionWm3(), RECON_AnySense);
+  }
+
+  /// After ReconTick's main loop nothing takes a cached query, and what follows (blip creation,
+  /// the grid advance) writes what fills read: stop the fills and wait for those in progress.
+  void EndReconTickQueries(const CAiReconDBImpl* const db)
+  {
+    SReconQueryCache& cache = sReconQueryCache;
+    if (cache.mDb != db) {
+      return;
+    }
+    RECON_StopQueryCache();
+    while (cache.mActiveFills.load() != 0) {
+      std::this_thread::yield();
+    }
+  }
+} // namespace
+
+namespace moho
+{
+  bool sim_ReconQueryCache = true;
+  TConVar<bool> gTConVar_sim_ReconQueryCache(
+    "sim_ReconQueryCache",
+    "With sim_ReconOverlap, the ReconTick army's per-unit detection queries are computed ahead on sim workers (same recon).",
+    &sim_ReconQueryCache
+  );
+} // namespace moho
+
+std::size_t moho::RECON_StartQueryCache(const CAiReconDBImpl* const db)
+{
+  SReconQueryCache& cache = sReconQueryCache;
+  cache.mDb = nullptr;
+  cache.mEntries.clear();
+  if (!sim_ReconQueryCache || db == nullptr || db->mArmy == nullptr || db->mSim == nullptr ||
+      db->mSim->mEntityDB == nullptr) {
+    return 0u;
+  }
+
+  for (CUnitIterAllArmies iter(db->mSim); iter.mCur != nullptr; iter.Next()) {
+    if (IsReconTickQueryUnit(*db, iter.mCur)) {
+      cache.mEntries.push_back(SReconQueryCache::SEntry{iter.mCur, RECON_None});
+    }
+  }
+  const std::size_t chunks =
+    (cache.mEntries.size() + SReconQueryCache::kChunkUnits - 1u) / SReconQueryCache::kChunkUnits;
+  if (chunks == 0u) {
+    return 0u;
+  }
+  if (chunks > cache.mChunkCapacity) {
+    cache.mChunkDone = std::make_unique<std::atomic<bool>[]>(chunks);
+    cache.mChunkCapacity = chunks;
+  }
+  for (std::size_t i = 0; i < chunks; ++i) {
+    cache.mChunkDone[i].store(false, std::memory_order_relaxed);
+  }
+  cache.mDb = db;
+  cache.mFillDb = db;
+  cache.mStopFills.store(false);
+
+  if ((++cache.mStarts % 5000u) == 0u) {
+    gpg::Logf(
+      "sim_ReconQueryCache: %llu ticks, %llu of %llu queries served",
+      static_cast<unsigned long long>(cache.mStarts),
+      static_cast<unsigned long long>(cache.mServed),
+      static_cast<unsigned long long>(cache.mQueried)
+    );
+  }
+  return chunks;
+}
+
+void moho::RECON_FillQueryCache(const std::size_t firstChunk, const std::size_t lastChunk)
+{
+  SReconQueryCache& cache = sReconQueryCache;
+  const CAiReconDBImpl* const db = cache.mFillDb;
+  for (std::size_t chunk = firstChunk; chunk < lastChunk; ++chunk) {
+    // Counted before the stop test, so a stopper that sees no fill in progress sees every later
+    // one skip (both sequentially consistent).
+    cache.mActiveFills.fetch_add(1);
+    if (!cache.mStopFills.load()) {
+      const std::size_t begin = chunk * SReconQueryCache::kChunkUnits;
+      const std::size_t end = std::min(cache.mEntries.size(), begin + SReconQueryCache::kChunkUnits);
+      for (std::size_t i = begin; i < end; ++i) {
+        Unit* const unit = cache.mEntries[i].mUnit;
+        cache.mEntries[i].mFlags = ReconCanDetectEntity(db, unit, unit->GetPositionWm3(), RECON_AnySense);
+      }
+      cache.mChunkDone[chunk].store(true, std::memory_order_release);
+    }
+    cache.mActiveFills.fetch_sub(1);
+  }
+}
+
+void moho::RECON_StopQueryCache() noexcept
+{
+  sReconQueryCache.mDb = nullptr;
+  sReconQueryCache.mStopFills.store(true);
 }

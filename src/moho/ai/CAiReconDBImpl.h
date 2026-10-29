@@ -670,4 +670,20 @@ namespace moho
   static_assert(offsetof(CAiReconDBImpl, mFogOfWar) == 0xA8, "CAiReconDBImpl::mFogOfWar offset must be 0xA8");
   /// Engine addition (`sim_ReconBlipIndex`): forgets `db`'s blip id index (rebuilt on next use).
   void RECON_DropBlipIndex(const CAiReconDBImpl* db);
+
+  /**
+   * Engine addition (`sim_ReconQueryCache`): the detection query of each unit in `db`'s next
+   * ReconTick main loop, computed ahead on sim workers while that ReconTick runs. The query only
+   * reads (positions, layers, alliances, intel states, intel grids), and nothing ReconTick's C++
+   * does before or in its loop writes those; the grids advance after the loop. The caller stops the
+   * cache before anything else could change them, and from then on the loop queries itself.
+   * - `RECON_StartQueryCache` (sim thread) lists the units the loop will query, in its order, and
+   *   returns the number of chunks to fill (0: no cache this tick).
+   * - `RECON_FillQueryCache` (any thread) computes chunks [first, last).
+   * - `RECON_StopQueryCache` (sim thread) stops serving; the caller still waits for its fills.
+   */
+  extern bool sim_ReconQueryCache;
+  [[nodiscard]] std::size_t RECON_StartQueryCache(const CAiReconDBImpl* db);
+  void RECON_FillQueryCache(std::size_t firstChunk, std::size_t lastChunk);
+  void RECON_StopQueryCache() noexcept;
 } // namespace moho

@@ -9338,6 +9338,7 @@ namespace
     }
     sReconOverlap.mPending = false;
     LUA_SetCallGate(nullptr);
+    RECON_StopQueryCache();
     CSimWorkerPool::Get().FinishAsync();
     for (std::size_t i = 0; i < sReconOverlap.mEnd; ++i) {
       CArmyImpl* const army = sReconOverlap.mSim->mArmiesList[i];
@@ -9368,6 +9369,9 @@ namespace
   /// queued blip destroys, the checksum), and a refresh writes only its army's slots, so the two
   /// commute. Its Lua could change what a refresh reads only through an engine C function, and
   /// the call gate finishes the refreshes before any such call or collection runs.
+  ///
+  /// sim_ReconQueryCache: the same job also computes its main loop's unit queries ahead (chunks
+  /// after the armies), and the gate stops serving them the same way.
   void RunReconPhaseParallel(Sim& sim)
   {
     const std::size_t armyCount = sim.mArmiesList.size();
@@ -9375,14 +9379,19 @@ namespace
     CAiReconDBImpl* const heavyDb =
       sim.mArmiesList[reconTickIndex] != nullptr ? sim.mArmiesList[reconTickIndex]->GetReconDB() : nullptr;
 
-    if (sim_ReconOverlap && reconTickIndex > 0u && heavyDb != nullptr) {
+    const std::size_t queryChunks = (sim_ReconOverlap && heavyDb != nullptr) ? RECON_StartQueryCache(heavyDb) : 0u;
+    if (sim_ReconOverlap && reconTickIndex + queryChunks > 0u && heavyDb != nullptr) {
       sReconOverlap.mSim = &sim;
       sReconOverlap.mEnd = reconTickIndex;
       const bool running = CSimWorkerPool::Get().StartAsync(
-        reconTickIndex, 1u,
+        reconTickIndex + queryChunks, 1u,
         [](void* const context, const std::size_t first, const std::size_t last) {
           Sim& owner = *static_cast<Sim*>(context);
           for (std::size_t i = first; i < last; ++i) {
+            if (i >= sReconOverlap.mEnd) {
+              RECON_FillQueryCache(i - sReconOverlap.mEnd, i - sReconOverlap.mEnd + 1u);
+              continue;
+            }
             CArmyImpl* const army = owner.mArmiesList[i];
             if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
               reconDb->RefreshDeferringHandles(sReconRefreshFixups[i]);
