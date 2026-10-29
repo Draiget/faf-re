@@ -60,7 +60,7 @@ Rules the check enforces:
 
 - The type is one of those above, in lowercase.
 - `feat`, `fix`, `perf`, `refactor` and `test` need a scope: the area the change touches, in lowercase (`ui`, `sim`, `render`, `d3d12`, `audio`, `lua`, `net`, `replay`, `range-rings`, ...). Several are separated by commas: `perf(d3d12,vulkan)`. The scope is optional for the other types.
-- One space after the colon; the title does not end with a full stop; at most 100 characters.
+- One space after the colon; the title does not end with a full stop; at most 150 characters.
 - A `!` after the scope marks a breaking change, e.g. a changed save or replay format: `feat(replay)!: ...`.
 - In a commit message, a blank line separates the title from the body.
 - No AI or bot `Co-authored-by:` lines and no "Generated with ..." lines. Commits are authored by the people who submit them.

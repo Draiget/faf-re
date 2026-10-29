@@ -27,7 +27,7 @@ const TYPES = {
 // These change engine code, so the title must name the area it touches.
 const SCOPE_REQUIRED = new Set(['feat', 'fix', 'perf', 'refactor', 'test']);
 
-const MAX_HEADER = 100;
+const MAX_HEADER = 150;
 
 // type(scope)!: subject
 const HEADER = /^(?<type>[A-Za-z]+)(?:\((?<scope>[^()]*)\))?(?<bang>!)?(?<colon>:?)(?<space> ?)(?<subject>.*)$/;
