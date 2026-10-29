@@ -52,6 +52,7 @@
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/sim/SimWorkerPool.h"
+#include "lua/LuaCallGate.h"
 #include "moho/sim/UnitUpdateFill.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/IAiTransport.h"
@@ -163,6 +164,14 @@
 
 using namespace moho;
 using EntId = std::int32_t;
+
+namespace moho
+{
+  int cfunc_ReconBlipGetSource(lua_State* luaContext); // ReconBlip.cpp, `ReconBlip:GetSource()`
+
+  /// Engine addition: the light recon refreshes before the heavy army run next to its ReconTick.
+  extern bool sim_ReconOverlap;
+} // namespace moho
 
 namespace
 {
@@ -3507,6 +3516,41 @@ namespace
     return true;
   }
 
+  /**
+   * Engine addition (`sim_ParallelUnitSyncRefresh`): `Unit::RefreshSyncBlock` for every unit the
+   * sync walk is about to reach, on the sim workers, before the walk. The walk reaches every entity
+   * it starts with (an entity's Sync unlinks only itself), the refresh reads nothing the walk writes
+   * and writes only the unit's own block, which only the unit's own SyncInterface reads, and the
+   * walk's own refresh then finds nothing left to do. So the packet is the serial one.
+   */
+  void RefreshUnitSyncBlocksParallel(std::vector<Unit*>& units)
+  {
+    constexpr std::size_t kMinParallelUnits = 128u;
+    constexpr std::size_t kGrain = 32u;
+    if (units.size() < kMinParallelUnits) {
+      return; // the walk refreshes them as it goes
+    }
+    // The pose handles each refresh replaces, dropped below on this thread in unit order.
+    struct SReleasedPoses
+    {
+      boost::shared_ptr<CAniPose> mPose;
+      boost::shared_ptr<CAniPose> mPriorPose;
+    };
+    static std::vector<SReleasedPoses> sReleased;
+    if (sReleased.size() < units.size()) {
+      sReleased.resize(units.size());
+    }
+    CSimWorkerPool::Get().ParallelFor(units.size(), kGrain, [&units](const std::size_t begin, const std::size_t end) {
+      for (std::size_t index = begin; index < end; ++index) {
+        units[index]->RefreshSyncBlock(&sReleased[index].mPose, &sReleased[index].mPriorPose);
+      }
+    });
+    for (std::size_t index = 0; index < units.size(); ++index) {
+      sReleased[index].mPose.reset();
+      sReleased[index].mPriorPose.reset();
+    }
+  }
+
   void RunQueuedDestroy(void* queuedObject)
   {
     if (!queuedObject) {
@@ -4411,6 +4455,28 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // sim_ParallelSync: the walk leaves the allocation-free half of each unit-update copy to
   // workers, which finish it before anything else touches the packet.
   CUnitUpdateFills unitUpdateFills(outSyncData);
+  if (sim_ParallelUnitSyncRefresh && CSimWorkerPool::ParallelEnabled()) {
+    static std::vector<Unit*> sSyncUnits;
+    sSyncUnits.clear();
+    if (focusArmyChanged) {
+      for (const auto& idAndEntity : mEntityDB->mAllUnits) {
+        if (Entity* const entity = idAndEntity.second; entity != nullptr) {
+          if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+            sSyncUnits.push_back(unit);
+          }
+        }
+      }
+    } else {
+      for (Entity* const entity : mCoordEntities.owners()) {
+        if (entity != nullptr) {
+          if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+            sSyncUnits.push_back(unit);
+          }
+        }
+      }
+    }
+    RefreshUnitSyncBlocksParallel(sSyncUnits);
+  }
   if (focusArmyChanged) {
     // 0x007478AA..0x0074791A walks the entity DB's whole id map -- every
     // entity, not only units -- and dispatches Sync on each node's value.
@@ -4725,6 +4791,20 @@ namespace moho
     "sim_ParallelCoords",
     "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial (needs sim_Workers > 0).",
     &sim_ParallelCoords
+  );
+
+  bool sim_ReconOverlap = true;
+  TConVar<bool> gTConVar_sim_ReconOverlap(
+    "sim_ReconOverlap",
+    "With sim_ParallelRecon, refresh the recon blips of the armies before the beat's ReconTick army on sim workers while that ReconTick runs; any engine call from its Lua waits for them first (same recon).",
+    &sim_ReconOverlap
+  );
+
+  bool sim_ParallelUnitSyncRefresh = true;
+  TConVar<bool> gTConVar_sim_ParallelUnitSyncRefresh(
+    "sim_ParallelUnitSyncRefresh",
+    "Refresh each synced unit's own sync block (weapon info, silo counts, target ids, poses) on sim workers before the sync walk (needs sim_Workers > 0; same packet).",
+    &sim_ParallelUnitSyncRefresh
   );
 
   bool sim_ChecksumBatching = true;
@@ -6391,6 +6471,12 @@ boost::shared_ptr<CHeightField>* CopySharedHeightFieldPtr(
  */
 SParticleBuffer* Sim::GetParticleBuffer()
 {
+  // Engine addition (sim_ParallelEffects): an effect tick on a sim worker appends to its chunk's
+  // buffer, which CEffectManagerImpl::TickParallel then commits here in list order.
+  if (SParticleBuffer* const chunkBuffer = EffectTickChunkParticleBuffer(); chunkBuffer != nullptr) {
+    return chunkBuffer;
+  }
+
   if (!mParticleBuffer) {
     (void)AssignSharedParticleBufferFromRaw(&mParticleBuffer, new SParticleBuffer());
   }
@@ -9233,17 +9319,117 @@ namespace
     }
   }
 
+  /// sim_ReconOverlap: the light refreshes still running next to the heavy ReconTick.
+  struct SReconOverlap
+  {
+    Sim* mSim = nullptr;
+    std::size_t mEnd = 0;  // armies [0, mEnd) are being refreshed
+    bool mPending = false;
+    std::uint64_t mStarted = 0;
+    std::uint64_t mEndedEarly = 0;
+  } sReconOverlap;
+
+  /// Waits for the overlapped refreshes and drops their displaced handles, in army order. Called
+  /// before Lua can reach engine state, and when the heavy tick returns.
+  void FinishReconOverlap()
+  {
+    if (!sReconOverlap.mPending) {
+      return;
+    }
+    sReconOverlap.mPending = false;
+    LUA_SetCallGate(nullptr);
+    RECON_StopQueryCache();
+    CSimWorkerPool::Get().FinishAsync();
+    for (std::size_t i = 0; i < sReconOverlap.mEnd; ++i) {
+      CArmyImpl* const army = sReconOverlap.mSim->mArmiesList[i];
+      if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
+        reconDb->ApplyRefreshFixups(sReconRefreshFixups[i]);
+      }
+    }
+  }
+
+  /// The heavy tick's Lua is about to call `function` (null: collect garbage). The Lua libraries
+  /// touch only Lua values and ReconBlip:GetSource only reads the blip, so those calls keep the
+  /// overlap; anything else may reach what the refreshes read, so they finish first.
+  void ReconOverlapGate(const LuaCFunctionPtr function)
+  {
+    if (function != nullptr && (function == &cfunc_ReconBlipGetSource || LUA_IsLibraryCFunction(function))) {
+      return;
+    }
+    ++sReconOverlap.mEndedEarly;
+    FinishReconOverlap();
+  }
+
   /// The serial loop refreshes every army except `mCurTick % armyCount`, which runs ReconTick
   /// instead, in army order. ReconTick calls Lua, so it stays on this thread between the two
   /// parallel groups: armies before it see the state before it, armies after it the state after.
+  ///
+  /// sim_ReconOverlap: the armies before it are refreshed next to it instead of before it. Its own
+  /// C++ writes nothing a refresh reads (its army's recon slots, its maps, grids, blip creation,
+  /// queued blip destroys, the checksum), and a refresh writes only its army's slots, so the two
+  /// commute. Its Lua could change what a refresh reads only through an engine C function, and
+  /// the call gate finishes the refreshes before any such call or collection runs.
+  ///
+  /// sim_ReconQueryCache: the same job also computes its main loop's unit queries ahead (chunks
+  /// after the armies), and the gate stops serving them the same way.
   void RunReconPhaseParallel(Sim& sim)
   {
     const std::size_t armyCount = sim.mArmiesList.size();
     const std::size_t reconTickIndex = static_cast<std::size_t>(sim.mCurTick) % armyCount;
-    RefreshReconArmyRange(sim, 0u, reconTickIndex);
-    if (CArmyImpl* const army = sim.mArmiesList[reconTickIndex]; army != nullptr) {
-      if (CAiReconDBImpl* const reconDb = army->GetReconDB(); reconDb != nullptr) {
-        reconDb->ReconTick(static_cast<int>(armyCount));
+    CAiReconDBImpl* const heavyDb =
+      sim.mArmiesList[reconTickIndex] != nullptr ? sim.mArmiesList[reconTickIndex]->GetReconDB() : nullptr;
+
+    const std::size_t queryChunks = (sim_ReconOverlap && heavyDb != nullptr) ? RECON_StartQueryCache(heavyDb) : 0u;
+    if (sim_ReconOverlap && reconTickIndex + queryChunks > 0u && heavyDb != nullptr) {
+      sReconOverlap.mSim = &sim;
+      sReconOverlap.mEnd = reconTickIndex;
+      const bool running = CSimWorkerPool::Get().StartAsync(
+        reconTickIndex + queryChunks, 1u,
+        [](void* const context, const std::size_t first, const std::size_t last) {
+          Sim& owner = *static_cast<Sim*>(context);
+          for (std::size_t i = first; i < last; ++i) {
+            if (i >= sReconOverlap.mEnd) {
+              RECON_FillQueryCache(i - sReconOverlap.mEnd, i - sReconOverlap.mEnd + 1u);
+              continue;
+            }
+            CArmyImpl* const army = owner.mArmiesList[i];
+            if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
+              reconDb->RefreshDeferringHandles(sReconRefreshFixups[i]);
+            }
+          }
+        },
+        &sim
+      );
+      sReconOverlap.mPending = true;
+      if (running) {
+        if ((++sReconOverlap.mStarted % 5000u) == 0u) {
+          gpg::Logf(
+            "sim_ReconOverlap: %llu overlaps, %llu finished early by the heavy tick's Lua",
+            static_cast<unsigned long long>(sReconOverlap.mStarted),
+            static_cast<unsigned long long>(sReconOverlap.mEndedEarly)
+          );
+        }
+        LUA_SetCallGate(&ReconOverlapGate);
+      } else {
+        FinishReconOverlap(); // ran serially: the fixups go before the heavy tick, as serial
+      }
+
+      struct SFinishOnExit
+      {
+        ~SFinishOnExit()
+        {
+          try {
+            FinishReconOverlap();
+          } catch (...) {
+          }
+        }
+      } finishOnExit;
+      heavyDb->ReconTick(static_cast<int>(armyCount));
+      FinishReconOverlap();
+    } else {
+      RefreshReconArmyRange(sim, 0u, reconTickIndex);
+      if (heavyDb != nullptr) {
+        heavyDb->ReconTick(static_cast<int>(armyCount));
       }
     }
     RefreshReconArmyRange(sim, reconTickIndex + 1u, armyCount);
