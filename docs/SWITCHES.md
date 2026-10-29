@@ -12,6 +12,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `lua_ParallelMark` | 1 | `/con` | live (next collection) | Lua GC mark on sim workers (needs `sim_Workers` > 0): propagation, thread stacks, the LuaPlus root objects, weak-table clearing and the userdata separation; stack shrinks, the GC hook and finalizers stay serial |
 | `lua_ParallelSweep` | 1 | `/con` | live (next collection) | Lua GC sweep: live/dead classification and mark reset on sim workers (needs `sim_Workers` > 0); every free stays on the sim thread, in the original list order |
 | `lua_GcVerify` | 0 | `/con` | live (next collection) | Debug only: check each parallel sim collection against a serial one, see [Debugging aids](#debugging-aids) |
+| `sim_WorkerJobDelayUs` | 0 | `/con` | live (next dispatch) | Debug only: microseconds each sim worker waits before every chunk it takes. A stress test: with 2 workers and a delay of 20 the dispatching thread runs the first chunks alone and the workers' chunks overlap them late, so a chunk that touches state another chunk owns fails the checksum instead of passing by luck. Results are identical with any value |
 | `sim_DeferBlipUnlinks` | 1 | `/con` | live | Dropped blips-in-range lists leave their weak chains in one bulk pass instead of one chain walk per blip |
 | `sim_DeferBlipUnlinksTicks` | 4 | `/con` | live | Ticks between those bulk passes |
 | `sim_ExemptCheckInPlace` | 1 | `/con` | live | Target exemption reads the command queue instead of copying it |

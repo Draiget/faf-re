@@ -66,6 +66,14 @@ namespace moho
   extern bool sim_ParallelRecon;
   extern bool sim_ParallelSync;
   extern bool sim_ParallelCoords; // Sim.cpp: the coordinate pass on workers
+  /**
+   * Engine addition, debug only: microseconds a worker thread waits before each chunk it takes
+   * (0, the default, waits nothing). The dispatching thread takes the first chunks itself and the
+   * workers come in late, so chunks overlap in other combinations than they do without it: a chunk
+   * that touches state another chunk owns shows up as a checksum mismatch instead of passing by
+   * luck. Results must not change with any value.
+   */
+  extern int sim_WorkerJobDelayUs;
 
   class CSimWorkerPool
   {

@@ -84,6 +84,15 @@ namespace moho
     &sim_ParallelSync
   );
 
+  int sim_WorkerJobDelayUs = 0;
+
+  TConVar<int> gTConVar_sim_WorkerJobDelayUs(
+    "sim_WorkerJobDelayUs",
+    "Debug: microseconds a sim worker waits before each chunk it takes (0 = none). Stress test for "
+    "parallel phases; results are identical with any value.",
+    &sim_WorkerJobDelayUs
+  );
+
   TConVar<int> gTConVar_sim_Workers(
     "sim_Workers",
     "Worker threads for parallel sim phases; 0 runs every phase serially. Results are identical "
@@ -134,6 +143,7 @@ namespace moho
     std::size_t grain = 1;
     std::size_t chunkCount = 0;
     SFpuControlState fpu{};
+    std::int64_t workerDelayTicks = 0; // sim_WorkerJobDelayUs in QueryPerformanceCounter ticks
     std::atomic<std::size_t> nextChunk{0};
     std::atomic<std::size_t> chunksLeft{0};
 
@@ -142,7 +152,17 @@ namespace moho
 
     void RunChunks()
     {
+      const bool delayed = workerDelayTicks > 0 && IsSimWorkerThread();
       for (;;) {
+        if (delayed) {
+          LARGE_INTEGER start{};
+          LARGE_INTEGER now{};
+          ::QueryPerformanceCounter(&start);
+          do {
+            _mm_pause();
+            ::QueryPerformanceCounter(&now);
+          } while (now.QuadPart - start.QuadPart < workerDelayTicks);
+        }
         const std::size_t chunk = nextChunk.fetch_add(1u, std::memory_order_relaxed);
         if (chunk >= chunkCount) {
           return;
@@ -321,6 +341,12 @@ namespace moho
       impl.grain = grain;
       impl.chunkCount = (count + grain - 1u) / grain;
       impl.fpu = SFpuControlState::Capture();
+      impl.workerDelayTicks = 0;
+      if (sim_WorkerJobDelayUs > 0) {
+        LARGE_INTEGER frequency{};
+        ::QueryPerformanceFrequency(&frequency);
+        impl.workerDelayTicks = frequency.QuadPart * sim_WorkerJobDelayUs / 1000000;
+      }
       impl.nextChunk.store(0u, std::memory_order_relaxed);
       impl.chunksLeft.store(impl.chunkCount, std::memory_order_relaxed);
       impl.firstError = nullptr;
