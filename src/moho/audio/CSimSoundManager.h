@@ -20,6 +20,16 @@ namespace moho
   class Sim;
 
   /**
+   * Engine addition (dedicated-server plan WPL.4, WPL.5): whether the client's sound
+   * configuration names at least one engine and sound is not switched off -- the test
+   * Sim::Sim makes before creating its sound manager. moho/audio/AudioEngine.cpp (client)
+   * sets it during static initialisation; defined in moho/sim/Sim.cpp. Null in programs
+   * without the client's audio: no sound manager.
+   */
+  using SoundEnabledHook = bool (*)();
+  extern SoundEnabledHook sSoundEnabled;
+
+  /**
    * VFTABLE: 0x00E35A50
    * COL:     0x00E8F1B8
    */

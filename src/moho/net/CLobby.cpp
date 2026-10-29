@@ -38,6 +38,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/LaunchInfoBase.h"
+#include "moho/net/LaunchInfoBuilder.h"
 #include "moho/misc/StringUtils.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CWldSession.h"
@@ -166,13 +167,6 @@ namespace
     return cached;
   }
 
-  struct LaunchPlayerOptionEntry
-  {
-    int32_t mSlotIndex{-1};
-    LuaPlus::LuaObject mOptions;
-  };
-  static_assert(sizeof(LaunchPlayerOptionEntry) == 0x18, "LaunchPlayerOptionEntry size must be 0x18");
-
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
     for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
@@ -192,14 +186,6 @@ namespace
 
     static moho::CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
-  }
-
-  [[nodiscard]] int32_t ParseOwnerId(
-    const LuaPlus::LuaObject& ownerIdObject
-  )
-  {
-    const char* const ownerIdStr = ownerIdObject.GetString();
-    return std::atoi(ownerIdStr ? ownerIdStr : "");
   }
 
   /**
@@ -491,11 +477,6 @@ namespace
     va_end(va);
     gpg::Warnf("%s", line.c_str());
   }
-
-  // Client indices (0..255) and command source ids (0..254; 0xFF is "none")
-  // are single bytes on the wire.
-  constexpr int32_t kMaxLaunchClients = 0x100;
-  constexpr std::size_t kMaxLaunchCommandSources = 0xFF;
 } // namespace
 
 namespace moho
@@ -3299,6 +3280,43 @@ LuaPlus::LuaObject CLobby::GetPeers(
   return ret;
 }
 
+namespace
+{
+  /** `BuildLaunchInfo`'s participants: the lobby's peers, through its own bookkeeping. */
+  class CLobbyLaunchParticipants final : public moho::ILaunchParticipants
+  {
+  public:
+    explicit CLobbyLaunchParticipants(moho::CLobby& lobby)
+      : mLobby(lobby)
+    {}
+
+    [[nodiscard]] std::int32_t LocalUid() const override { return mLobby.localUid; }
+
+    void BeginAssignments() override { mAssigning = true; }
+
+    /** Whether a throw came from the part that hands out client indices and sources. */
+    [[nodiscard]] bool Assigning() const noexcept { return mAssigning; }
+
+    void AssignClientIndex(std::int32_t& clientIndex, const std::int32_t ownerId, const char* const name, std::int32_t& localIndex)
+      override
+    {
+      mLobby.AssignClientIndex(clientIndex, ownerId, name, localIndex);
+    }
+
+    std::uint32_t AssignCommandSource(
+      const std::int32_t timeouts, const std::int32_t ownerId, msvc8::vector<moho::SSTICommandSource>& commandSources,
+      std::uint32_t& localSource
+    ) override
+    {
+      return mLobby.AssignCommandSource(timeouts, ownerId, commandSources, localSource);
+    }
+
+  private:
+    moho::CLobby& mLobby;
+    bool mAssigning = false;
+  };
+} // namespace
+
 /**
  * Address: 0x007C38C0 (FUN_007C38C0)
  */
@@ -3306,210 +3324,19 @@ void CLobby::LaunchGame(
   const LuaPlus::LuaObject& dat
 )
 {
+  // Engine addition (plan WP2.7): the launch info, army order, client indices and command
+  // sources are built by `BuildLaunchInfo`, which a game server shares; the participants are
+  // this lobby's peers, given their indices by `AssignClientIndex` / `AssignCommandSource`.
   LuaPlus::LuaObject gameOptions = dat["GameOptions"];
-
-  const LuaPlus::LuaObject scenarioFileObject = gameOptions["ScenarioFile"];
-  const char* const scenarioFileText = scenarioFileObject.GetString();
-  const msvc8::string scenarioFile{scenarioFileText ? scenarioFileText : ""};
-
-  LuaPlus::LuaObject scenarioInfo = WLD_LoadScenarioInfo(scenarioFile, USER_GetLuaState());
-  if (scenarioInfo.IsNil()) {
-    const char* reason = "";
-    CallbackStr("LaunchFailed", &reason);
-    return;
-  }
-  scenarioInfo.SetObject("Options", gameOptions);
-
-  boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
-  launchInfo->mGameMods = SCR_ToString(dat["GameMods"]);
-  launchInfo->mScenarioInfo = SCR_ToString(scenarioInfo);
-  launchInfo->mInitSeed = hostedTime;
-
-  const LuaPlus::LuaObject cheatsEnabled = gameOptions["CheatsEnabled"];
-  if (cheatsEnabled && cheatsEnabled.IsString()) {
-    const char* const enabledStr = cheatsEnabled.GetString();
-    if (enabledStr != nullptr && std::strcmp(enabledStr, "true") == 0) {
-      launchInfo->mCheatsEnabled = true;
-    }
-  }
-
-  LuaPlus::LuaObject teamsConfig = scenarioInfo.Lookup("Configurations.standard.teams");
-  if (teamsConfig.IsNil()) {
-    const char* reason = "NoConfig";
-    CallbackStr("LaunchFailed", &reason);
-    return;
-  }
-
-  msvc8::vector<msvc8::string> ffaArmies;
-  {
-    LuaPlus::LuaTableIterator teamIt(&teamsConfig, 1);
-    while (!teamIt.m_isDone) {
-      LuaPlus::LuaObject teamObject = teamIt.GetValue();
-      const LuaPlus::LuaObject teamNameObject = teamObject["name"];
-      const char* const teamName = teamNameObject.GetString();
-      if (teamName != nullptr && _stricmp(teamName, "FFA") == 0) {
-        LuaPlus::LuaObject teamArmies = teamObject["armies"];
-        LuaPlus::LuaTableIterator armyIt(&teamArmies, 1);
-        while (!armyIt.m_isDone) {
-          LuaPlus::LuaObject armyNameObject = armyIt.GetValue();
-          const char* const armyName = armyNameObject.GetString();
-          if (armyName != nullptr) {
-            ffaArmies.push_back(msvc8::string(armyName));
-          }
-          armyIt.Next();
-        }
-        break;
-      }
-      teamIt.Next();
-    }
-  }
-
-  msvc8::vector<LaunchPlayerOptionEntry> playerOptions;
-  LuaPlus::LuaObject playerOptionsTable = dat["PlayerOptions"];
-  if (!playerOptionsTable.IsNil()) {
-    LuaPlus::LuaTableIterator optionIt(&playerOptionsTable, 1);
-    while (!optionIt.m_isDone) {
-      LuaPlus::LuaObject keyObject = optionIt.GetKey();
-      LuaPlus::LuaObject optionObject = optionIt.GetValue();
-      const int32_t slotIndex = keyObject.GetInteger() - 1;
-      if (slotIndex >= 0 && static_cast<std::size_t>(slotIndex) < ffaArmies.size()) {
-        optionObject.SetString("ArmyName", ffaArmies[static_cast<std::size_t>(slotIndex)].c_str());
-      }
-
-      LaunchPlayerOptionEntry entry{};
-      entry.mSlotIndex = slotIndex;
-      entry.mOptions = optionObject;
-      playerOptions.push_back(entry);
-      optionIt.Next();
-    }
-  }
-
-  if (playerOptions.size() > ffaArmies.size()) {
-    const char* reason = "StartSpots";
-    CallbackStr("LaunchFailed", &reason);
-    return;
-  }
-
-  if (!playerOptions.empty()) {
-    std::sort(
-      playerOptions.begin(),
-      playerOptions.end(),
-      [](const LaunchPlayerOptionEntry& lhs, const LaunchPlayerOptionEntry& rhs) {
-      return lhs.mSlotIndex < rhs.mSlotIndex;
-    }
-    );
-  }
-
-  auto sessionInfo = msvc8::auto_ptr<SWldSessionInfo>(new SWldSessionInfo());
-  sessionInfo->mIsBeingRecorded = true;
-  sessionInfo->mIsReplay = false;
-  sessionInfo->mIsMultiplayer = connector->GetProtocol() != ENetProtocolType::kNone;
-  sessionInfo->mSourceId = 0xFFu;
-  launchInfo->mCommandSources.mOriginalSource = -1;
-
-  int32_t timeouts = -1;
-  if (sessionInfo->mIsMultiplayer) {
-    const LuaPlus::LuaObject timeoutObj = gameOptions["Timeouts"];
-    if (timeoutObj.IsString()) {
-      const char* const timeoutStr = timeoutObj.GetString();
-      timeouts = std::atoi(timeoutStr ? timeoutStr : "");
-    }
-  }
-
-  if (playerOptions.empty()) {
-    LuaPlus::LuaObject defaultOptions = RULE_GetDefaultPlayerOptions(USER_GetLuaState());
-    defaultOptions.SetString("PlayerName", "default");
-    defaultOptions.SetString("ArmyName", "default");
-    defaultOptions.SetBoolean("Human", false);
-
-    LaunchPlayerOptionEntry entry{};
-    entry.mSlotIndex = 0;
-    entry.mOptions = defaultOptions;
-    playerOptions.push_back(entry);
-  }
-
-  LuaPlus::LuaObject civilianAlliance = gameOptions["CivilianAlliance"];
-  if (civilianAlliance && civilianAlliance.IsString()) {
-    const char* const civilianText = civilianAlliance.GetString();
-    if (civilianText != nullptr && _stricmp(civilianText, "none") != 0) {
-      LuaPlus::LuaObject extraArmiesObject = scenarioInfo.Lookup("Configurations.standard.customprops.ExtraArmies");
-      if (extraArmiesObject.IsString()) {
-        const char* const extraArmiesText = extraArmiesObject.GetString();
-        msvc8::vector<msvc8::string> extraArmies;
-        gpg::STR_GetTokens(extraArmiesText ? extraArmiesText : "", " ", extraArmies);
-        for (const msvc8::string& extraArmyName : extraArmies) {
-          LuaPlus::LuaObject civilianOptions = RULE_GetDefaultPlayerOptions(USER_GetLuaState());
-          civilianOptions.SetString("PlayerName", "civilian");
-          civilianOptions.SetString("ArmyName", extraArmyName.c_str());
-          civilianOptions.SetBoolean("Civilian", true);
-          civilianOptions.SetBoolean("Human", false);
-
-          LaunchPlayerOptionEntry entry{};
-          entry.mSlotIndex = -1;
-          entry.mOptions = civilianOptions;
-          playerOptions.push_back(entry);
-        }
-      }
-    }
-  }
-
-  int32_t clientIndex = 0;
-  int32_t localClientIndex = -1;
+  const bool isMultiplayer = connector->GetProtocol() != ENetProtocolType::kNone;
+  CLobbyLaunchParticipants participants(*this);
+  SLaunchBuild build{};
   try {
-    for (std::size_t playerIndex = 0; playerIndex < playerOptions.size(); ++playerIndex) {
-      const LuaPlus::LuaObject& option = playerOptions[playerIndex].mOptions;
-      BVIntSet commandSourceSet{};
-
-      const LuaPlus::LuaObject isHumanObject = option["Human"];
-      if (isHumanObject.GetBoolean()) {
-        const LuaPlus::LuaObject ownerIdObject = option["OwnerID"];
-        const int32_t ownerId = ParseOwnerId(ownerIdObject);
-        if (ownerId == localUid) {
-          launchInfo->mCommandSources.mOriginalSource = static_cast<int32_t>(playerIndex);
-        }
-
-        const LuaPlus::LuaObject playerNameObject = option["PlayerName"];
-        const char* const optionPlayerName = playerNameObject.GetString();
-        AssignClientIndex(clientIndex, ownerId, optionPlayerName ? optionPlayerName : "", localClientIndex);
-
-        const uint32_t sourceId =
-          AssignCommandSource(timeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
-        if (sourceId != 0xFFu) {
-          (void)commandSourceSet.Add(sourceId);
-        }
-      }
-
-      launchInfo->mStrVec.push_back(SCR_ToString(option));
-      moho::ArmyLaunchInfo armySourceInfo{};
-      armySourceInfo.mUnitSources = commandSourceSet;
-      launchInfo->mArmyLaunchInfo.push_back(armySourceInfo);
-    }
-
-    LuaPlus::LuaObject observersTable = dat["Observers"];
-    LuaPlus::LuaTableIterator observerIt(&observersTable, 1);
-    while (!observerIt.m_isDone) {
-      LuaPlus::LuaObject observer = observerIt.GetValue();
-      const int32_t ownerId = ParseOwnerId(observer["OwnerID"]);
-      const LuaPlus::LuaObject observerNameObject = observer["PlayerName"];
-      const char* const observerName = observerNameObject.GetString();
-      AssignClientIndex(clientIndex, ownerId, observerName ? observerName : "", localClientIndex);
-
-      const int32_t observerTimeouts = sessionInfo->mIsMultiplayer ? 0 : -1;
-      (void)AssignCommandSource(observerTimeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
-      observerIt.Next();
-    }
-
-    // Engine addition: the launch info comes from the host. Without us in it
-    // the local client index stays -1, which the client manager uses as an
-    // array index. Client indices and command sources each travel as one byte
-    // (0xFF being "no source"), so more of them would alias.
-    if (localClientIndex == -1) {
-      throw std::runtime_error("LaunchGame: the local player is neither a player nor an observer.");
-    }
-    if (clientIndex > kMaxLaunchClients || launchInfo->mCommandSources.mSrcs.size() > kMaxLaunchCommandSources) {
-      throw std::runtime_error("LaunchGame: too many players and observers.");
-    }
+    build = BuildLaunchInfo(dat, participants, hostedTime, isMultiplayer, USER_GetLuaState());
   } catch (...) {
+    if (!participants.Assigning()) {
+      throw;
+    }
     // A client launches from the host's Launch message, so a malformed entry
     // (an observer that is not a table, say) can throw part-way through. That
     // left behind the connection-less peers AssignClientIndex had created and
@@ -3525,6 +3352,20 @@ void CLobby::LaunchGame(
     }
     throw;
   }
+  if (build.failure != nullptr) {
+    const char* reason = build.failure;
+    CallbackStr("LaunchFailed", &reason);
+    return;
+  }
+
+  auto sessionInfo = msvc8::auto_ptr<SWldSessionInfo>(new SWldSessionInfo());
+  sessionInfo->mIsBeingRecorded = true;
+  sessionInfo->mIsReplay = false;
+  sessionInfo->mIsMultiplayer = isMultiplayer;
+  sessionInfo->mSourceId = build.localSourceId;
+  const boost::shared_ptr<LaunchInfoNew>& launchInfo = build.launchInfo;
+  const int32_t clientIndex = build.clientCount;
+  const int32_t localClientIndex = build.localClientIndex;
 
   int gameSpeed = 0;
   bool adjustableGameSpeed = false;
@@ -3583,9 +3424,7 @@ void CLobby::LaunchGame(
     delete peer;
   }
 
-  const LuaPlus::LuaObject mapObject = scenarioInfo["map"];
-  const char* const mapName = mapObject.GetString();
-  sessionInfo->mMapName = mapName ? mapName : "";
+  sessionInfo->mMapName = build.mapName;
   sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
 
   RunScript("GameLaunched");

@@ -1,6 +1,8 @@
 #include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
+#include "platform/Interlocked.h"
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/profiling/Profiler.h"
 #include "legacy/math/X87Math.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiNavigatorImpl.h"
@@ -1577,7 +1579,7 @@ namespace
       return;
     }
 #if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+    InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
@@ -6821,7 +6823,7 @@ std::int32_t StorePrimaryStatBitsAtomic(
 ) noexcept
 {
 #if defined(_WIN32)
-  volatile long* const slot = reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits);
+  volatile platform::InterlockedLong* const slot = reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits);
   for (;;) {
     const long observed = InterlockedCompareExchange(slot, 0L, 0L);
     const long exchanged = InterlockedCompareExchange(slot, static_cast<long>(*newValueBits), observed);
@@ -12873,25 +12875,39 @@ int Unit::MotionTick()
 {
   SimulationRef->Logf("0x%08x's motion tick.\n", id_);
 
-  if (AiSiloBuild != nullptr) {
-    AiSiloBuild->SiloTick();
-  }
+  {
+    FAF_PROFILE_ZONE_NAMED("Unit::PreMotion");
+    if (AiSiloBuild != nullptr) {
+      AiSiloBuild->SiloTick();
+    }
 
-  UpdateGuardFormation();
-  UpdateInfoCache();
+    UpdateGuardFormation();
+    UpdateInfoCache();
+  }
 
   if (mUnitVarDat.mStunTicks > 0) {
     --mUnitVarDat.mStunTicks;
   }
 
-  const int motionResult =
-    (UnitMotion != nullptr) ? static_cast<int>(UnitMotion->MotionTick()) : static_cast<int>(TASKSTATUS_Wait);
-
-  for (CEconomyEvent* const economyEvent : mEconomyEventListHead) {
-    economyEvent->ProcessTick();
+  int motionResult = static_cast<int>(TASKSTATUS_Wait);
+  {
+    FAF_PROFILE_ZONE_NAMED("Unit::Motion");
+    if (UnitMotion != nullptr) {
+      motionResult = static_cast<int>(UnitMotion->MotionTick());
+    }
   }
 
-  AniActor->UpdateManipulators(mPendingTransform);
+  {
+    FAF_PROFILE_ZONE_NAMED("Unit::EconomyEvents");
+    for (CEconomyEvent* const economyEvent : mEconomyEventListHead) {
+      economyEvent->ProcessTick();
+    }
+  }
+
+  {
+    FAF_PROFILE_ZONE_NAMED("Unit::Manipulators");
+    AniActor->UpdateManipulators(mPendingTransform);
+  }
 
   mUnitVarDat.mIsBusy = mAttachInfo.HasAttachTarget();
 
@@ -12912,7 +12928,10 @@ int Unit::MotionTick()
     }
   }
 
-  HandleResourceManagement();
+  {
+    FAF_PROFILE_ZONE_NAMED("Unit::ResourceManagement");
+    HandleResourceManagement();
+  }
 
   if (mIsNotPod && (CommandQueue == nullptr || CommandQueue->mCommandVec.empty())) {
     EntitySetTemplate<Unit> selectedUnits{};

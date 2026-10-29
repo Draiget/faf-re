@@ -88,6 +88,25 @@ namespace moho
    */
   [[nodiscard]] Sim* Sim_Create_exxt(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo);
 
+  /**
+   * Engine addition (dedicated-server plan WPL.4): what Sim_Create_exxt runs
+   * after building the simulation for the client's renderers (the map height
+   * lanes and the range/vision renderer init). The client sets it during
+   * static initialisation (moho/app/StartupClientHelpers.cpp); a headless
+   * build leaves it null.
+   */
+  using SimCreatedRenderHook = void (*)(Sim& sim);
+  extern SimCreatedRenderHook sSimCreatedRenderHook;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): whether the client's movie
+   * manager (`sMovieManager`, moho/app/StartupClientHelpers.cpp) exists, for
+   * MOV_GetDuration. Set by the client during static initialisation; null in a
+   * headless build, where the movie component never exists.
+   */
+  using MovieManagerPresentHook = bool (*)();
+  extern MovieManagerPresentHook sMovieManagerPresent;
+
   bool CFG_GetArgOptionComposedAliases(
     const CfgAliasSet& leftAliases,
     const CfgAliasSet& rightAliases,
@@ -280,6 +299,15 @@ namespace moho
    * Mangled: ?USER_GetPreferences@Moho@@YAPAVIUserPrefs@1@XZ
    */
   [[nodiscard]] IUserPrefs* USER_GetPreferences();
+
+  /**
+   * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
+   *
+   * What it does:
+   * Lazily initializes and returns the process user Lua state, wiring the user
+   * task stage, script-disk watcher task, and core/user init-form execution.
+   */
+  [[nodiscard]] LuaPlus::LuaState* USER_GetLuaState();
 
   /**
    * Address: 0x008C68A0

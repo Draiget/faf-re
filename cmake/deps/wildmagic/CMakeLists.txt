@@ -17,8 +17,15 @@ foreach(_dir IN LISTS WM3_FOUNDATION_SUBDIRS)
 endforeach()
 
 add_library(faf_wm3_build_flags INTERFACE)
-target_compile_definitions(faf_wm3_build_flags INTERFACE WIN32 NDEBUG _LIB)
-target_compile_options(faf_wm3_build_flags INTERFACE /EHsc /W0)
+if(FAF_LINUX)
+  # Engine addition (dedicated-server plan WPL.3): the Linux build takes
+  # Foundation only (below), without WIN32.
+  target_compile_definitions(faf_wm3_build_flags INTERFACE NDEBUG _LIB)
+  target_compile_options(faf_wm3_build_flags INTERFACE -w "$<$<COMPILE_LANGUAGE:CXX>:${FAF_LINUX_MS_DIALECT}>")
+else()
+  target_compile_definitions(faf_wm3_build_flags INTERFACE WIN32 NDEBUG _LIB)
+  target_compile_options(faf_wm3_build_flags INTERFACE /EHsc /W0)
+endif()
 target_link_libraries(faf_wm3_build_flags INTERFACE faf_codegen)
 
 # --- Foundation ------------------------------------------------------------------
@@ -214,10 +221,39 @@ list(REMOVE_ITEM WM3_FOUNDATION_SOURCES
   Interpolation/Wm3IntpBicubic2.cpp Interpolation/Wm3IntpBilinear2.cpp
   Interpolation/Wm3IntpTricubic3.cpp Interpolation/Wm3IntpTrilinear3.cpp
   Miscellaneous/Wm3GridGraph2.cpp Physics/Wm3LCPPolyDist.cpp)
+if(FAF_LINUX)
+  # Engine addition (dedicated-server plan WPL.3): sources that name members
+  # of dependent bases without qualification, which only Microsoft lookup
+  # (-fms-compatibility, not usable on Linux) accepts. The tree is read-only;
+  # nothing the simulation links is among them (they are not in its
+  # unresolved-symbol list).
+  list(REMOVE_ITEM WM3_FOUNDATION_SOURCES
+    Containment/Wm3ConvexHull2.cpp Containment/Wm3ConvexHull3.cpp
+    Curves/Wm3CubicPolynomialCurve2.cpp Curves/Wm3CubicPolynomialCurve3.cpp
+    Curves/Wm3MultipleCurve2.cpp Curves/Wm3MultipleCurve3.cpp
+    Curves/Wm3NaturalSpline2.cpp Curves/Wm3NaturalSpline3.cpp
+    Curves/Wm3SingleCurve2.cpp Curves/Wm3SingleCurve3.cpp
+    Curves/Wm3TCBSpline2.cpp Curves/Wm3TCBSpline3.cpp
+    Interpolation/Wm3IntpAkimaNonuniform1.cpp Interpolation/Wm3IntpAkimaUniform1.cpp
+    Interpolation/Wm3IntpBSplineUniform1.cpp Interpolation/Wm3IntpBSplineUniform2.cpp
+    Interpolation/Wm3IntpBSplineUniform3.cpp Interpolation/Wm3IntpBSplineUniform4.cpp
+    Interpolation/Wm3IntpBSplineUniformN.cpp
+    Numerics/Wm3OdeEuler.cpp Numerics/Wm3OdeImplicitEuler.cpp
+    Numerics/Wm3OdeMidpoint.cpp Numerics/Wm3OdeRungeKutta4.cpp
+    Tessellation/Wm3Delaunay2.cpp Tessellation/Wm3Delaunay3.cpp
+    Tessellation/Wm3TriangulateEC.cpp)
+endif()
 list(TRANSFORM WM3_FOUNDATION_SOURCES PREPEND "${WM3_FOUNDATION}/")
 add_library(Wm3Foundation STATIC ${WM3_FOUNDATION_SOURCES})
 target_include_directories(Wm3Foundation PUBLIC ${WM3_FOUNDATION_INCLUDES})
 target_link_libraries(Wm3Foundation PRIVATE faf_wm3_build_flags)
+
+# Engine addition (dedicated-server plan WPL.3): no renderer or application
+# layer on Linux.
+if(FAF_LINUX)
+  set_target_properties(Wm3Foundation PROPERTIES FOLDER "dependencies/WildMagic")
+  return()
+endif()
 
 # --- Dx9Renderer -----------------------------------------------------------------
 set(WM3_DX9RENDERER "${WM3_ROOT}/Renderers/Dx9Renderer")

@@ -64,8 +64,8 @@ $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 
 $targets = @{
-  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; RunDir = 'bin_x64' }
-  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     RunDir = 'bin' }
+  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; Headless = 'headless_x64'; RunDir = 'bin_x64' }
+  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     Headless = 'headless';     RunDir = 'bin' }
 }
 $archs = if ($Arch -eq 'both') { @('x64', 'x86') } else { @($Arch) }
 
@@ -140,6 +140,23 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
 
   $hooks = Join-Path $src 'fafengine'
   if (Test-Path $hooks) { Copy-Item $hooks $destDir -Recurse -Force }
+
+  # headless (the console replay player, docs/SWITCHES.md) beside it: <name>_headless with
+  # -Name, headless_x64 / headless otherwise (_profile for a Profile build).
+  $headless = Join-Path $src "$($t.Headless).exe"
+  if (Test-Path $headless) {
+    $headlessName = if ($Name) { "${exeName}_headless" }
+                    elseif ($Configuration -eq 'Profile') { "$($t.Headless)_profile" }
+                    else { $t.Headless }
+    $destHeadless = Join-Path $destDir "$headlessName.exe"
+    try {
+      Copy-Item $headless $destHeadless -Force
+      $headlessPdb = Join-Path $src "$($t.Headless).pdb"
+      if (Test-Path $headlessPdb) { Copy-Item $headlessPdb (Join-Path $destDir "$headlessName.pdb") -Force }
+      Write-Host "   -> $destHeadless" -ForegroundColor Green
+    }
+    catch { Write-Warning "$destHeadless not replaced (in use?): $($_.Exception.Message)" }
+  }
 
   # The DXC runtime the build staged next to the exe (named, so leftovers of older
   # builds in the same folder are not copied along).

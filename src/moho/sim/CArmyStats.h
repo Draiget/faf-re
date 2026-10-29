@@ -465,6 +465,17 @@ namespace moho
    * the natural ctor-arg construction.
    */
   void ConstructSharedSTriggerFromRaw(boost::shared_ptr<STrigger>& out, STrigger* raw);
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): the folder prompt
+   * CArmyStats::DumpStats shows on its first call (the wxDirDialog at
+   * 0x0070C438), given the default directory and replacing it with the path
+   * the user accepts. The client sets it during static initialisation
+   * (moho/app/SnapshotDirectoryDialog.cpp); a headless build leaves it null and
+   * keeps the default.
+   */
+  using SnapshotDirectoryPrompt = void (*)(msvc8::string& directory);
+  extern SnapshotDirectoryPrompt sSnapshotDirectoryPrompt;
 } // namespace moho
 
 namespace gpg

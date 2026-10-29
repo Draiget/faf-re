@@ -1,4 +1,8 @@
-﻿#include "Entity.h"
+#include "Entity.h"
+#if FAF_SERVER_MODE
+#include "remote/UnderlayPaths.h"
+#endif
+#include "platform/Interlocked.h"
 
 #include <utility>
 #include "legacy/math/X87Math.h"
@@ -344,7 +348,7 @@ namespace
       return;
     }
 #if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+    InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
@@ -1921,6 +1925,9 @@ namespace moho
    */
   Entity::~Entity()
   {
+#if FAF_SERVER_MODE
+    faf::remote::ForgetUnderlayPath(static_cast<std::uint32_t>(id_));
+#endif
     if (SimulationRef != nullptr && SimulationRef->mEntityDB != nullptr) {
       (void)SimulationRef->mEntityDB->ReleaseId(static_cast<std::uint32_t>(id_));
     }
@@ -4001,6 +4008,9 @@ namespace moho
   {
     if (underlayId.name.empty()) {
       mVarDat.mUnderlayTexture.reset();
+#if FAF_SERVER_MODE
+      faf::remote::SetUnderlayPath(static_cast<std::uint32_t>(id_), std::string());
+#endif
       return;
     }
 
@@ -4013,7 +4023,14 @@ namespace moho
     underlayPath.append(underlayName, std::strlen(underlayName));
     underlayPath.append("_rest.dds", 9u);
 
-    mVarDat.mUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
+    // Engine addition (plan WPL.4): the texture is the client's
+    // (CD3DBatchTexture.h sBatchTextureFromFile); without a client there is none.
+    mVarDat.mUnderlayTexture =
+      sBatchTextureFromFile != nullptr ? sBatchTextureFromFile(underlayPath.c_str(), 0u) : boost::shared_ptr<CD3DBatchTexture>{};
+#if FAF_SERVER_MODE
+    // Engine addition, server mode: the path, for the frames (remote/UnderlayPaths.h).
+    faf::remote::SetUnderlayPath(static_cast<std::uint32_t>(id_), underlayPath);
+#endif
 
     ListLinkBefore(&SimulationRef->mCoordEntities);
   }

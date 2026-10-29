@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdint>
 #include <chrono>
 #include <limits>
@@ -120,6 +120,12 @@ namespace gpg::core
             set_owned(false);
         }
 #else
+        /**
+         * Engine addition (plan WPL.5): the Windows build's critical section is a
+         * recursive lock; here it is the portable recursive pthread mutex.
+         */
+        void init_critical_section() noexcept { init_portable(); }
+
         /**
          * Initialize owned portable recursive pthread mutex.
          */

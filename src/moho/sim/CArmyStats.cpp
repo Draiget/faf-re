@@ -1,13 +1,10 @@
 // `CArmyStats::DumpStats` (0x0070C160) asks for its output directory through a
-// `wxDirDialog` on the first call (0x0070C438), so this sim translation unit
-// really does pull in the wx dialog family. wx has to be included first: it
-// needs to own the `windows.h` inclusion so that `wx/msw/winundef.h` can drop
-// the `CreateDialog`/`GetClassInfo` macros before the wx class declarations are
-// parsed.
-#include "platform/WxWidgets.h"
+// `wxDirDialog` on the first call (0x0070C438); the dialog is the client's
+// (moho/app/SnapshotDirectoryDialog.cpp, through sSnapshotDirectoryPrompt), so
+// this sim translation unit needs no wx.
 #include "platform/X87Precision.h"
+#include "platform/Interlocked.h"
 #include <bit>
-#include <wx/dirdlg.h>
 
 #include "CArmyStats.h"
 
@@ -102,7 +99,7 @@ namespace
   {
 #if defined(_MSC_VER)
     return static_cast<std::int32_t>(
-      _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(slot), static_cast<long>(value))
+      _InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(value))
     );
 #else
     const std::int32_t previous = *slot;
@@ -117,7 +114,7 @@ namespace
 #if defined(_MSC_VER)
     return static_cast<std::int32_t>(
       _InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(slot),
+        reinterpret_cast<volatile platform::InterlockedLong*>(slot),
         static_cast<long>(desired),
         static_cast<long>(expected)
       )
@@ -897,6 +894,9 @@ namespace moho
     return item;
   }
 
+  // Engine addition (dedicated-server plan WPL.4), declared in CArmyStats.h.
+  SnapshotDirectoryPrompt sSnapshotDirectoryPrompt = nullptr;
+
   /**
    * Address: 0x0070C160 (FUN_0070C160, Moho::CArmyStats::DumpStats)
    *
@@ -960,16 +960,11 @@ namespace moho
         gpg::STR_Printf("%s/Desktop", std::getenv("USERPROFILE")), 0, msvc8::string::npos
       );
 
-      wxDirDialog directoryDialog(
-        nullptr,
-        wxT("Dump snap shot data to"),
-        gpg::STR_Utf8ToWide(gSnapshotDirectory.c_str()).c_str(),
-        wxDD_NEW_DIR_BUTTON
-      );
-      if (directoryDialog.ShowModal() == wxID_OK) {
-        gSnapshotDirectory.assign(
-          gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, msvc8::string::npos
-        );
+      // Engine addition (dedicated-server plan WPL.4): the wxDirDialog
+      // (0x0070C438) is the client's (moho/app/SnapshotDirectoryDialog.cpp);
+      // a headless build keeps the default.
+      if (sSnapshotDirectoryPrompt != nullptr) {
+        sSnapshotDirectoryPrompt(gSnapshotDirectory);
       }
 
       platform::SetX87PrecisionControl(_PC_24);

@@ -30,7 +30,8 @@ namespace moho
   float cam_HighLOD = 0.9f;
   float cam_MediumLOD = 1.0f;
   float cam_LowLOD = 1.2f;
-  float cam_DefaultLOD = 1.0f;
+  // cam_DefaultLOD: moho/render/camera/GeomCamera3.cpp (GeomCamera3 reads it).
+  extern float cam_DefaultLOD;
 } // namespace moho
 
 namespace

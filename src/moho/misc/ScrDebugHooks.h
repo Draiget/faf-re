@@ -210,4 +210,25 @@ namespace moho
    * Returns whether the script debug window runtime is currently active.
    */
   [[nodiscard]] bool SCR_IsDebugWindowActive();
+
+  class ScrDebugWindow;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): the debugger's wx window, which
+   * is client code. moho/misc/ScrDebugWindow.cpp sets these during static
+   * initialisation; without a client they are null and no window opens, so no
+   * breakpoint pauses a thread.
+   *
+   * - sScrDebugWindowOpen: SCR_CreateDebugWindow's `window = new ScrDebugWindow();
+   *   runtimeWindow = window; window->Show(true);`, publishing before showing.
+   * - sScrDebugWindowDestroy: SCR_DestroyDebugWindow's `window.Destroy()`.
+   * - sScrDebugWindowPostPause: posts one ScrPauseEvent for `source`:`line` to the
+   *   window (`AddPendingEvent`), under the paused-queue lock.
+   */
+  using ScrDebugWindowOpenHook = void (*)(ScrDebugWindow*& runtimeWindow);
+  using ScrDebugWindowDestroyHook = void (*)(ScrDebugWindow& window);
+  using ScrDebugWindowPostPauseHook = void (*)(ScrDebugWindow& window, const msvc8::string& source, int line);
+  extern ScrDebugWindowOpenHook sScrDebugWindowOpen;
+  extern ScrDebugWindowDestroyHook sScrDebugWindowDestroy;
+  extern ScrDebugWindowPostPauseHook sScrDebugWindowPostPause;
 } // namespace moho
