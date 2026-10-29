@@ -5,9 +5,11 @@ usage: synclog_compare.py <dir> <dir> --last-beat <n>
 The sim writes one file per beat, beatNNNNN.log, and keeps beat00000.log plus the latest
 sim_ChecksumPeriod + 20 (Sim::FlushLog). It opens a beat's file when the previous beat ends and
 writes it while the beat runs, so the files after the last beat whose packet headless took
-(`last-beat=` in its output) hold whatever the process exit caught: those are left out. Every
-other file must exist in both folders and be identical apart from line endings (Windows text
-mode writes CRLF, Linux LF).
+(`last-beat=` in its output) hold whatever the process exit caught: those are left out. The
+retained window's first beat moves with them (a run that got one beat further has deleted one
+more old file), so the files compared start at the later of the two folders' first beats after
+beat 0. Every file in that range must exist in both folders and be identical apart from line
+endings (Windows text mode writes CRLF, Linux LF).
 
 Exit code 0 when every compared file is identical, 1 otherwise, 2 on bad arguments.
 """
@@ -51,6 +53,9 @@ def main():
     if not a or not b:
         print("SYNCLOG no beat files up to beat %d" % args.last_beat)
         return 2
+    first = max(min((k for k in a if k > 0), default=0), min((k for k in b if k > 0), default=0))
+    a = {k: v for k, v in a.items() if k == 0 or k >= first}
+    b = {k: v for k, v in b.items() if k == 0 or k >= first}
     problems = 0
     for beat in sorted(set(a) | set(b)):
         if beat not in a or beat not in b:
