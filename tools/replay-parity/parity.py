@@ -29,7 +29,7 @@ its progress and verdict are read from its output.
 Mode "gui": <exe> /init init_parity*.lua /replay <id>.scfareplay ... The init file is generated
 next to the exe from its init_faf.lua; it mounts the parity vault (downloaded maps), the
 M28AI version the replay was recorded with, and tools/replay-parity/hook, which runs the sim
-at WLD_GameSpeed 50, parks the camera zoomed in at the map centre and logs a heartbeat.
+with wld_RunWithTheWind 1 at WLD_GameSpeed 50, parks the camera zoomed in at the map centre and logs a heartbeat.
 The game starts minimized (STARTUPINFO show state) and, in window_mode "hidden", loses its
 taskbar button: a minimized window keeps the sim running but skips rendering (CScApp::OnFrame).
 
