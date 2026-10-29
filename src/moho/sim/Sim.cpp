@@ -3507,6 +3507,41 @@ namespace
     return true;
   }
 
+  /**
+   * Engine addition (`sim_ParallelUnitSyncRefresh`): `Unit::RefreshSyncBlock` for every unit the
+   * sync walk is about to reach, on the sim workers, before the walk. The walk reaches every entity
+   * it starts with (an entity's Sync unlinks only itself), the refresh reads nothing the walk writes
+   * and writes only the unit's own block, which only the unit's own SyncInterface reads, and the
+   * walk's own refresh then finds nothing left to do. So the packet is the serial one.
+   */
+  void RefreshUnitSyncBlocksParallel(std::vector<Unit*>& units)
+  {
+    constexpr std::size_t kMinParallelUnits = 128u;
+    constexpr std::size_t kGrain = 32u;
+    if (units.size() < kMinParallelUnits) {
+      return; // the walk refreshes them as it goes
+    }
+    // The pose handles each refresh replaces, dropped below on this thread in unit order.
+    struct SReleasedPoses
+    {
+      boost::shared_ptr<CAniPose> mPose;
+      boost::shared_ptr<CAniPose> mPriorPose;
+    };
+    static std::vector<SReleasedPoses> sReleased;
+    if (sReleased.size() < units.size()) {
+      sReleased.resize(units.size());
+    }
+    CSimWorkerPool::Get().ParallelFor(units.size(), kGrain, [&units](const std::size_t begin, const std::size_t end) {
+      for (std::size_t index = begin; index < end; ++index) {
+        units[index]->RefreshSyncBlock(&sReleased[index].mPose, &sReleased[index].mPriorPose);
+      }
+    });
+    for (std::size_t index = 0; index < units.size(); ++index) {
+      sReleased[index].mPose.reset();
+      sReleased[index].mPriorPose.reset();
+    }
+  }
+
   void RunQueuedDestroy(void* queuedObject)
   {
     if (!queuedObject) {
@@ -4411,6 +4446,28 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // sim_ParallelSync: the walk leaves the allocation-free half of each unit-update copy to
   // workers, which finish it before anything else touches the packet.
   CUnitUpdateFills unitUpdateFills(outSyncData);
+  if (sim_ParallelUnitSyncRefresh && CSimWorkerPool::ParallelEnabled()) {
+    static std::vector<Unit*> sSyncUnits;
+    sSyncUnits.clear();
+    if (focusArmyChanged) {
+      for (const auto& idAndEntity : mEntityDB->mAllUnits) {
+        if (Entity* const entity = idAndEntity.second; entity != nullptr) {
+          if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+            sSyncUnits.push_back(unit);
+          }
+        }
+      }
+    } else {
+      for (Entity* const entity : mCoordEntities.owners()) {
+        if (entity != nullptr) {
+          if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+            sSyncUnits.push_back(unit);
+          }
+        }
+      }
+    }
+    RefreshUnitSyncBlocksParallel(sSyncUnits);
+  }
   if (focusArmyChanged) {
     // 0x007478AA..0x0074791A walks the entity DB's whole id map -- every
     // entity, not only units -- and dispatches Sync on each node's value.
@@ -4725,6 +4782,13 @@ namespace moho
     "sim_ParallelCoords",
     "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial (needs sim_Workers > 0).",
     &sim_ParallelCoords
+  );
+
+  bool sim_ParallelUnitSyncRefresh = true;
+  TConVar<bool> gTConVar_sim_ParallelUnitSyncRefresh(
+    "sim_ParallelUnitSyncRefresh",
+    "Refresh each synced unit's own sync block (weapon info, silo counts, target ids, poses) on sim workers before the sync walk (needs sim_Workers > 0; same packet).",
+    &sim_ParallelUnitSyncRefresh
   );
 
   bool sim_ChecksumBatching = true;

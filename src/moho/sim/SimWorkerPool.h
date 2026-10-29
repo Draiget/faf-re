@@ -66,6 +66,8 @@ namespace moho
   extern bool sim_ParallelRecon;
   extern bool sim_ParallelSync;
   extern bool sim_ParallelCoords; // Sim.cpp: the coordinate pass on workers
+  extern bool sim_ParallelUnitSyncRefresh; // Sim.cpp: units' own sync blocks refreshed on workers
+
   /**
    * Engine addition, debug only: microseconds a worker thread waits before each chunk it takes
    * (0, the default, waits nothing). The dispatching thread takes the first chunks itself and the

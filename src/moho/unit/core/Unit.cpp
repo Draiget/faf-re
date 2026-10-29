@@ -16851,6 +16851,14 @@ namespace
  */
 void Unit::Sync(SSyncData* const syncData)
 {
+  RefreshSyncBlock();
+  Entity::Sync(syncData);
+}
+
+void Unit::RefreshSyncBlock(
+  boost::shared_ptr<CAniPose>* const releasedPose, boost::shared_ptr<CAniPose>* const releasedPriorPose
+)
+{
   if (NeedSyncGameData) {
     SSTIUnitVariableData& varDat = VarDat();
 
@@ -16925,10 +16933,14 @@ void Unit::Sync(SSyncData* const syncData)
     NeedSyncGameData = false;
   }
 
+  if (releasedPose != nullptr) {
+    releasedPose->swap(VarDat().mSharedPose);
+  }
   VarDat().mSharedPose = AniActor->GetPoseShared();
+  if (releasedPriorPose != nullptr) {
+    releasedPriorPose->swap(VarDat().mPriorSharedPose);
+  }
   VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
-
-  Entity::Sync(syncData);
 }
 
 /**
