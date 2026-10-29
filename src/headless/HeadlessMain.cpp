@@ -27,6 +27,7 @@
 #include "moho/core/ThreadPlacement.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "platform/X87Precision.h"
 #include "headless/ReplayLaunchCheck.h"
@@ -50,8 +51,8 @@ namespace
 
   [[noreturn]] void EndProcess(const int exitCode)
   {
-    std::fflush(stdout);
-    std::fflush(stderr);
+    // Every output stream: stdout, stderr and the --disk-trace file.
+    std::fflush(nullptr);
     // The sim and loader threads are still running; nothing after the verdict is observed,
     // so the process ends here instead of tearing them down.
 #if defined(_WIN32)
@@ -154,6 +155,7 @@ namespace
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "                            (server-mode build)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
+      "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -246,6 +248,17 @@ int main(int argc, char** argv)
 #endif
   std::printf("[%s] replay %s\n", gLabel.c_str(), options.replayPath.c_str());
   std::fflush(stdout);
+
+  // From the first mount on, so the trace holds everything the run needs.
+  std::string diskTracePath;
+  if (ReadOption("--disk-trace", diskTracePath)) {
+    std::FILE* const diskTrace = std::fopen(diskTracePath.c_str(), "w");
+    if (diskTrace == nullptr) {
+      std::printf("[%s] --disk-trace: cannot write %s\n", gLabel.c_str(), diskTracePath.c_str());
+      return kExitBadInput;
+    }
+    moho::DISK_SetAccessTrace(diskTrace);
+  }
 
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();
