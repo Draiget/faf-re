@@ -345,6 +345,7 @@ namespace moho
      * atomic compare-exchange loop over the bitwise float lane.
      */
     void SetUnitStatGreaterFloat(const char* statPath, const float* candidate);
+    void SetUnitStatGreaterFloat(CArmyStatItem* item, float candidate);
 
     /**
      * Address: 0x0070BAB0 (FUN_0070BAB0, Moho::CArmyStats::GetTrigger)
