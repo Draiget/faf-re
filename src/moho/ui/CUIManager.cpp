@@ -397,7 +397,6 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
       if (mGCTime > 5.0f) {
         mGCTime -= 5.0f;
         if (mLuaState->m_state != nullptr) {
-          FAF_PROFILE_ZONE_NAMED("UI::LuaGC");
           lua_setgcthreshold(mLuaState->m_state, 0);
         }
       }
