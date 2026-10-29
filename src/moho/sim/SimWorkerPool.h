@@ -106,6 +106,19 @@ namespace moho
      */
     void Run(std::size_t count, std::size_t grain, RangeFunction fn, void* context);
 
+    /**
+     * Starts `fn(context, begin, end)` over [0, count) on the workers and returns at once. The
+     * calling thread takes no chunk until `FinishAsync`, where it helps with the chunks left and
+     * waits for the rest; it must call `FinishAsync` before it returns from the phase. Meanwhile
+     * it must not touch what the chunks read or write, and a `Run` on this thread runs serially.
+     * With no workers, or a single chunk, the chunks run here before this returns and `FinishAsync`
+     * has nothing left to do. Returns true when chunks are still running.
+     */
+    bool StartAsync(std::size_t count, std::size_t grain, RangeFunction fn, void* context);
+
+    /// Ends the dispatch `StartAsync` began (nothing when none is pending); rethrows a chunk's error.
+    void FinishAsync();
+
     /// `Run` over a callable taking `(std::size_t begin, std::size_t end)`.
     template <class Body>
     void ParallelFor(const std::size_t count, const std::size_t grain, Body&& body)

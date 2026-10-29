@@ -28,6 +28,7 @@
 #include <stdexcept>
 
 #include "LuaAssertion.h"
+#include "LuaCallGate.h"
 #include "LuaCrashDump.h"
 #include "LuaError.h"
 #include "LuaGcEventLog.h"
@@ -17963,6 +17964,23 @@ extern "C"
 		state->top = result;
 	}
 
+	namespace
+	{
+		// Engine addition (LuaCallGate.h): this thread's gate, and how many threads have one, so the
+		// C-call path reads one shared word and reaches thread-local storage only while a gate is set.
+		thread_local moho::LuaCallGate tLuaCallGate = nullptr;
+		std::atomic<int> sLuaCallGateCount{0};
+
+		inline void RunLuaCallGate(const moho::LuaCFunctionPtr function)
+		{
+			if (sLuaCallGateCount.load(std::memory_order_relaxed) != 0) {
+				if (const moho::LuaCallGate gate = tLuaCallGate; gate != nullptr) {
+					gate(function);
+				}
+			}
+		}
+	} // namespace
+
 	/**
 	 * Address: 0x009142A0 (FUN_009142A0, luaD_precall)
 	 *
@@ -18077,6 +18095,7 @@ extern "C"
 		// Profile builds: one zone per engine function Lua calls, named by its binder.
 		FAF_PROFILE_ZONE_TRANSIENT(gpg::profiling::LuaCFunctionName(reinterpret_cast<const void*>(closure->c.f)));
 #endif
+		RunLuaCallGate(closure->c.f); // engine addition, LuaCallGate.h
 		const int produced = closure->c.f(state);
 		return state->top - produced;
 	}
@@ -18398,6 +18417,8 @@ extern "C"
 	 */
 	void luaC_collectgarbage(lua_State* const state)
 	{
+		RunLuaCallGate(nullptr); // engine addition, LuaCallGate.h: finalizers may reach the engine
+
 		// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
 		lua::GcEventLogCollection(state->l_G, state->l_G->nblocks, state->l_G->GCthreshold);
 
@@ -19165,6 +19186,33 @@ extern "C"
 	}
 }
 #pragma warning(pop)
+
+void moho::LUA_SetCallGate(const LuaCallGate gate) noexcept
+{
+	const LuaCallGate previous = tLuaCallGate;
+	tLuaCallGate = gate;
+	if (previous == nullptr && gate != nullptr) {
+		sLuaCallGateCount.fetch_add(1, std::memory_order_relaxed);
+	} else if (previous != nullptr && gate == nullptr) {
+		sLuaCallGateCount.fetch_sub(1, std::memory_order_relaxed);
+	}
+}
+
+bool moho::LUA_IsLibraryCFunction(const LuaCFunctionPtr function) noexcept
+{
+	static const std::vector<LuaCFunctionPtr> sLibraryFunctions = [] {
+		std::vector<LuaCFunctionPtr> functions;
+		for (const luaL_reg* const library :
+		     {base_funcs, co_funcs, kLuaStringLibrary, kLuaTableLibrary, kFafTableLibraryExtensions, kLuaMathLib}) {
+			for (const luaL_reg* entry = library; entry->name != nullptr; ++entry) {
+				functions.push_back(entry->func);
+			}
+		}
+		std::sort(functions.begin(), functions.end(), std::less<>{});
+		return functions;
+	}();
+	return std::binary_search(sLibraryFunctions.begin(), sLibraryFunctions.end(), function, std::less<>{});
+}
 
 extern "C"
 {

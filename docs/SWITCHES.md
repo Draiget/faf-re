@@ -8,6 +8,7 @@ Every performance change has a switch that brings back the original path, and bo
 |---|---|---|---|---|
 | `sim_Workers` | 0 | `/simworkers N` or `/con sim_Workers=N` | live (next dispatch) | Sim worker threads; 0 runs every phase serially |
 | `sim_ParallelRecon` | 1 | `/con` | live | Recon blip refresh per army on sim workers (needs `sim_Workers` > 0) |
+| `sim_ReconOverlap` | 1 | `/con` | live | With `sim_ParallelRecon`, the blip refreshes of the armies before the beat's `ReconTick` army run on sim workers while that `ReconTick` runs on the sim thread, instead of before it. Its C++ writes nothing the refreshes read; before its Lua calls any engine function (the Lua libraries and `ReconBlip:GetSource` excepted) or collects garbage, the refreshes are finished and their handle releases applied. The log counts overlaps and early finishes every 5000 overlaps |
 | `sim_ParallelSync` | 1 | `/con` | live | Sync packet unit updates filled on sim workers (needs `sim_Workers` > 0) |
 | `lua_ParallelMark` | 1 | `/con` | live (next collection) | Lua GC mark on sim workers (needs `sim_Workers` > 0): propagation, thread stacks, the LuaPlus root objects, weak-table clearing and the userdata separation; stack shrinks, the GC hook and finalizers stay serial |
 | `lua_ParallelSweep` | 1 | `/con` | live (next collection) | Lua GC sweep: live/dead classification and mark reset on sim workers (needs `sim_Workers` > 0); every free stays on the sim thread, in the original list order |
