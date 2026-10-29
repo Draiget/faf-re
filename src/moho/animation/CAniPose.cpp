@@ -15,9 +15,16 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/console/CConCommand.h"
 
 namespace
 {
+  bool sim_FastBoneUpdates = true;
+  moho::TConVar<bool> gTConVar_sim_FastBoneUpdates(
+    "sim_FastBoneUpdates",
+    "Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches.",
+    &sim_FastBoneUpdates
+  );
   [[nodiscard]] gpg::RType* CachedVTransformType()
   {
     static gpg::RType* sType = nullptr;
@@ -832,11 +839,30 @@ namespace moho
     const std::uint32_t boneCount = (sourceBegin && sourceEnd && sourceEnd >= sourceBegin)
       ? static_cast<std::uint32_t>(sourceEnd - sourceBegin)
       : 0u;
-    mBones.resize(boneCount, fillBone);
 
     if (boneCount == 0u || sourceBegin == nullptr) {
+      mBones.resize(0, fillBone);
       return;
     }
+
+    CAniPoseBone* const existingBegin = mBones.begin();
+    // Fast path: if skeleton and bone count match, we are recycling an existing pose buffer.
+    // The skeleton hierarchy (mParent, mPose, mIdx) is already established and identical.
+    if (sim_FastBoneUpdates && mSkeleton == copy.mSkeleton && mBones.size() == boneCount && existingBegin != nullptr) {
+      for (std::uint32_t index = 0; index < boneCount; ++index) {
+        CAniPoseBone& destinationBone = existingBegin[index];
+        const CAniPoseBone& sourceBone = sourceBegin[index];
+
+        destinationBone.mVisible = sourceBone.mVisible;
+        destinationBone.mSkipNextInterp = sourceBone.mSkipNextInterp;
+        destinationBone.mLocalTransform = sourceBone.mLocalTransform;
+        destinationBone.mCompositeDirty = 1u;
+        destinationBone.mCompositeIsLocal = sourceBone.mCompositeIsLocal;
+      }
+      return;
+    }
+
+    mBones.resize(boneCount, fillBone);
 
     CAniPoseBone* const destinationBegin = mBones.begin();
     if (destinationBegin == nullptr) {
@@ -894,24 +920,61 @@ namespace moho
 
     const std::int32_t destinationBoneCount = static_cast<std::int32_t>(destinationEnd - destinationBegin);
     const float scale = mScale;
-    for (std::int32_t index = 0; index < destinationBoneCount; ++index) {
-      const SAniSkelBone* const skeletonBone = skeleton->GetBone(static_cast<std::uint32_t>(index));
-      if (skeletonBone == nullptr) {
-        continue;
+
+    if (sim_FastBoneUpdates) {
+      const SAniSkelBone* const skeletonBegin = skeleton->mBones.begin();
+      const std::int32_t skeletonCount = static_cast<std::int32_t>(skeleton->mBones.size());
+      if (skeletonBegin == nullptr || skeletonCount <= 0) {
+        return;
       }
+      const std::int32_t count = (destinationBoneCount < skeletonCount) ? destinationBoneCount : skeletonCount;
 
-      // 0x0054B64A..0x0054B679: the skeleton bone's rest transform at +0x08 is copied lane
-      // for lane -- orientation verbatim, position scaled.
-      const VTransform& rest = skeletonBone->mLocalTransform;
-      CAniPoseBone& destinationBone = destinationBegin[index];
-      destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
-      destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
-      destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
-      destinationBone.mLocalTransform.orient_ = rest.orient_;
+      if (scale == 1.0f) {
+        for (std::int32_t index = 0; index < count; ++index) {
+          const SAniSkelBone& skeletonBone = skeletonBegin[index];
+          CAniPoseBone& destinationBone = destinationBegin[index];
 
-      destinationBone.mCompositeDirty = 1u;
-      destinationBone.mSkipNextInterp = 0u;
-      destinationBone.mCompositeIsLocal = 0u;
+          destinationBone.mLocalTransform = skeletonBone.mLocalTransform;
+          destinationBone.mCompositeDirty = 1u;
+          destinationBone.mSkipNextInterp = 0u;
+          destinationBone.mCompositeIsLocal = 0u;
+        }
+      } else {
+        for (std::int32_t index = 0; index < count; ++index) {
+          const SAniSkelBone& skeletonBone = skeletonBegin[index];
+          const VTransform& rest = skeletonBone.mLocalTransform;
+          CAniPoseBone& destinationBone = destinationBegin[index];
+
+          destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
+          destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
+          destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
+          destinationBone.mLocalTransform.orient_ = rest.orient_;
+
+          destinationBone.mCompositeDirty = 1u;
+          destinationBone.mSkipNextInterp = 0u;
+          destinationBone.mCompositeIsLocal = 0u;
+        }
+      }
+    } else {
+      for (std::int32_t index = 0; index < destinationBoneCount; ++index) {
+        const SAniSkelBone* const skeletonBone = skeleton->GetBone(static_cast<std::uint32_t>(index));
+        if (skeletonBone == nullptr) {
+          continue;
+        }
+
+        // 0x0054B64A..0x0054B679: the skeleton bone's rest transform at +0x08 is copied lane
+        // for lane -- orientation verbatim, position scaled.
+        const VTransform& rest = skeletonBone->mLocalTransform;
+        CAniPoseBone& destinationBone = destinationBegin[index];
+        destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
+        destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
+        destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
+        destinationBone.mLocalTransform.orient_ = rest.orient_;
+
+        destinationBone.mCompositeDirty = 1u;
+        destinationBone.mSkipNextInterp = 0u;
+        destinationBone.mCompositeIsLocal = 0u;
+      }
     }
   }
 

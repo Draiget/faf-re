@@ -802,6 +802,15 @@ namespace moho
     void DrawNetworkStats(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY) override;
 
     /**
+     * Engine addition (dedicated-server plan WPL.4): the body of
+     * DrawNetworkStats (0x0073DFE0), defined with the client's drawing code in
+     * moho/sim/SimDriverNetworkStats.cpp. DrawNetworkStats reaches it through
+     * sSimDriverNetworkStatsDraw, so the simulation's objects link without the
+     * render device.
+     */
+    void DrawNetworkStatsPanel(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY);
+
+    /**
      * Address: 0x0073F430 (FUN_0073F430)
      */
     DWORD PerformNextEvent();
@@ -810,6 +819,12 @@ namespace moho
     [[nodiscard]] int32_t DiagDispatchBeat() const { return mDispatchBeat; }
     [[nodiscard]] int32_t DiagNextIssueBeat() const { return mNextIssueBeat; }
     [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
+
+    /// Engine addition (headless, plan WPR.12): the sim, read-only. headless reads a beat's
+    /// checksum from `Sim::mSimHashes` after taking that beat's packet off the queue; the sim
+    /// wrote it before queueing the packet and rewrites the slot only 128 beats later. Inline
+    /// and unused by the client: no layout or code change in main.
+    [[nodiscard]] const Sim* GetSimForReplayCheck() const noexcept { return mSim.get(); }
 
   private:
     /**
@@ -1035,5 +1050,15 @@ namespace moho
    * 0 otherwise. The display clock follows it so the sim is not held to the rounded rate.
    */
   [[nodiscard]] float SIM_GetLeadSimSpeedEstimate() noexcept;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): CSimDriver::DrawNetworkStatsPanel for
+   * CSimDriver::DrawNetworkStats. moho/sim/SimDriverNetworkStats.cpp (client) sets it during
+   * static initialisation; without a client there is nothing to draw on.
+   */
+  using SimDriverNetworkStatsDrawHook = void (*)(
+    CSimDriver& driver, CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY
+  );
+  extern SimDriverNetworkStatsDrawHook sSimDriverNetworkStatsDraw;
 
 } // namespace moho

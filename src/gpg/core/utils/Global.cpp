@@ -12,6 +12,9 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
@@ -305,7 +308,7 @@ namespace
         return node;
     }
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // x64 always allocates from a system heap. The engine allocator is the x86
     // binary's: its smallest size classes (4..28 bytes, step 4) cannot hold the
     // 8-byte free-list link a freed block carries, nor give the 16-byte
@@ -341,6 +344,11 @@ namespace
 
     [[nodiscard]] bool ImageIsLargeAddressAware() noexcept
     {
+#if !defined(_WIN32)
+        // Engine addition (dedicated-server plan WPL.5): a 64-bit ELF process has the whole
+        // address space.
+        return true;
+#else
         const HMODULE image = ::GetModuleHandleW(nullptr);
         const auto* const dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
         // PE header walk: the NT headers sit `e_lfanew` bytes into the image.
@@ -348,6 +356,7 @@ namespace
             reinterpret_cast<const std::uint8_t*>(dosHeader) + dosHeader->e_lfanew
         );
         return (ntHeaders->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) != 0;
+#endif
     }
 
     void ReserveAddressSpaceBelow4Gb() noexcept
@@ -1301,7 +1310,7 @@ namespace
         (void)moduleHandle;
         (void)reserved;
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
         // Not in the binary: the x64 FAF_HIGHMEM test mode has to run before
         // the CRT allocates anything, and this callback is the first code the
         // loader runs in the image.
@@ -1313,6 +1322,30 @@ namespace
             FlushCurrentThreadHeapCache();
         }
     }
+
+#if !defined(_WIN32)
+    /**
+     * Engine addition (dedicated-server plan WPL.5): an ELF image has no TLS callback
+     * directory. A pthread key whose destructor runs `TlsCallback_1`'s thread-detach path
+     * stands in for it: the key is given a value on each thread that makes a heap cache, so
+     * every such thread flushes it when it exits. As on Windows, a process that exits does
+     * not (key destructors run for exiting threads only).
+     */
+    void FlushThreadHeapCacheAtThreadExit(void*)
+    {
+        TlsCallback_1(nullptr, DLL_THREAD_DETACH, nullptr);
+    }
+
+    void RegisterThreadHeapCacheExit(ThreadHeapCache* const cache)
+    {
+        static const pthread_key_t exitKey = [] {
+            pthread_key_t key{};
+            (void)::pthread_key_create(&key, &FlushThreadHeapCacheAtThreadExit);
+            return key;
+        }();
+        (void)::pthread_setspecific(exitKey, cache);
+    }
+#endif
 
     /**
      * Address: 0x00958400 (FUN_00958400, func_AllocateNewBlock)
@@ -1670,6 +1703,9 @@ namespace
 
         if (request.head != nullptr) {
             gThreadHeapCache = ResetThreadHeapCache(reinterpret_cast<ThreadHeapCache*>(request.head));
+#if !defined(_WIN32)
+            RegisterThreadHeapCacheExit(gThreadHeapCache);
+#endif
             if (hasLock != 0) {
                 ::LeaveCriticalSection(&gAllocatorSentinel);
             }
@@ -1710,6 +1746,7 @@ namespace
  * Registering the real callback fixes both: the reason code is whatever Windows
  * passes, and every thread exit runs it.
  */
+#if defined(_WIN32)
 #if defined(_M_IX86)
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
@@ -1720,8 +1757,9 @@ namespace
 #pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1;
 #pragma const_seg()
+#endif // _WIN32 (POSIX: RegisterThreadHeapCacheExit)
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 void gpg::LogHighMemoryReservation()
 {
     // Plan 7.1: Stage A keeps the image below 4 GB (static addresses still
@@ -1847,7 +1885,7 @@ extern "C" void* __cdecl malloc_crt(size_t size)
  */
 extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 {
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     void* block = (size <= small_pool::kMaxPooledBytes && small_pool::Enabled()) ? small_pool::Allocate(size) : nullptr;
     if (block == nullptr) {
         block = SystemHeapAlloc(size); // larger blocks, no pool, or the pool's range is used up
@@ -1958,7 +1996,7 @@ extern "C" void __cdecl free_0(void* ptr)
     }
 #endif
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // This has to come before `GetPageOwner`, which is only meaningful for
     // pages the engine allocator owns.
     if (gMemHook != nullptr) {
@@ -2029,7 +2067,7 @@ extern "C" size_t __cdecl msize(void* memblock)
         return 0;
     }
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // `realloc_0` sizes its copy from this, so it has to answer for system-heap
     // blocks; `HeapSize` reports `(SIZE_T)-1` for a pointer it does not own.
     if (small_pool::Owns(memblock)) {
@@ -2204,9 +2242,19 @@ void* __cdecl operator new(const std::size_t size)
             return block;
         }
 
+#if defined(_WIN32)
         if (_callnewh(size) == 0) {
             throw std::bad_alloc{};
         }
+#else
+        // Engine addition (dedicated-server plan WPL.5): `_callnewh` is MSVC's; this is
+        // what it does.
+        const std::new_handler handler = std::get_new_handler();
+        if (handler == nullptr) {
+            throw std::bad_alloc{};
+        }
+        handler();
+#endif
     }
 }
 
@@ -2272,7 +2320,7 @@ void gpg::GetHeapInfo(HeapStats* const outStats)
         return;
     }
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // On the x64 system heap the engine allocator never starts, and must not
     // be started here just to read its (empty) counters.
     FillSystemHeapStats(*outStats);

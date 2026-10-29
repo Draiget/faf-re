@@ -9,6 +9,7 @@ Every replay here is from the [retail parity set](RETAIL_REPLAY_PARITY.md): it p
 - **Core set:** required for any PR that touches sim code, replay playback or the network layer. Eight games, 2 to 12 players, the built-in AI and two M28AI versions.
 - **Extended set:** the core set plus ten longer or larger games. Run it as well for changes to pathfinding, formations, x87 math helpers, engine functions the AI scripts call, and sim worker threading, where past divergences only showed up late in long games ([Where divergences came from](RETAIL_REPLAY_PARITY.md#where-divergences-came-from)).
 - **Performance switches:** play the core set with the switch on and with it off. Both runs must match ([Switches](SWITCHES.md)).
+- **Server mode:** for a server-mode build, also run the [focus gate](FOCUS_GATE.md) on the core set: the sim must give the same game whichever army it builds its view for.
 
 ### Core set
 

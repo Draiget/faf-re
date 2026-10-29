@@ -4,6 +4,15 @@
 #include <cstdint>
 #include <type_traits>
 
+/**
+ * The CRT's SSE2 math lane (`_set_SSE2_enable`, FUN_00A8ECD3 func_SetSSE2):
+ * CScApp turns it off unless /sse2 is given, so the `_CI*` entries msvc8::acos,
+ * asin and pow reproduce take their x87 bodies. Defined in X87Math.cpp next to
+ * the helpers that read it.
+ */
+extern "C" int global_mode_sse2;
+extern "C" int __cdecl SetSse2Mode(int enableSse2);
+
 namespace msvc8
 {
   /**

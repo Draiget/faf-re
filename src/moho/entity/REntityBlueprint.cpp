@@ -11,6 +11,9 @@
 
 namespace moho
 {
+  // Engine addition (dedicated-server plan WPL.4), declared in CD3DBatchTexture.h.
+  BatchTextureFromFileHook sBatchTextureFromFile = nullptr;
+
   gpg::RType* REntityBlueprint::sType = nullptr;
 
   REntityBlueprint::REntityBlueprint()
@@ -146,7 +149,12 @@ namespace moho
       const msvc8::string& variantLabel
     )
     {
-      boost::shared_ptr<moho::CD3DBatchTexture> icon = moho::CD3DBatchTexture::FromFile(iconPath.c_str(), 0u);
+      // Engine addition (plan WPL.4): the texture is the client's
+      // (CD3DBatchTexture.h sBatchTextureFromFile); without a client there is none.
+      if (moho::sBatchTextureFromFile == nullptr) {
+        return {};
+      }
+      boost::shared_ptr<moho::CD3DBatchTexture> icon = moho::sBatchTextureFromFile(iconPath.c_str(), 0u);
       if (!icon) {
         gpg::Logf("Failed to load %s icon %s", variantLabel.c_str(), iconPath.c_str());
       }

@@ -1,4 +1,7 @@
 #include "moho/sim/ReconBlip.h"
+#if FAF_SERVER_MODE
+#include "remote/UnderlayPaths.h"
+#endif
 
 #include <algorithm>
 #include <cstddef>
@@ -1003,6 +1006,9 @@ void ReconBlip::Refresh()
   // the blip (Entity::SetStrategicUnderlay) at 0x005BF89A-0x005BF8B4; the prior
   // recovery omitted this, so blips never picked up the unit's strategic icon.
   SetStrategicUnderlay(sourceUnit->GetStrategicUnderlay());
+#if FAF_SERVER_MODE
+  faf::remote::CopyUnderlayPath(static_cast<std::uint32_t>(sourceUnit->id_), static_cast<std::uint32_t>(id_));
+#endif
 
   // The blip mirrors the source unit's sync payload: +0x0A is `mIsBusy`
   // (which the UI reads back as "attached and hidden"), and +0x208/+0x209 are

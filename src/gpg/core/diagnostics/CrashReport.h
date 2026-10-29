@@ -90,15 +90,29 @@ namespace gpg::diag
    */
   void NoteSimLuaError(const char* message);
 
-  /** Copies the report text to the clipboard (CF_UNICODETEXT, no CRT heap). */
+  /**
+   * Copies the report text to the clipboard (CF_UNICODETEXT, no CRT heap).
+   * Client only (CrashReportDialog.cpp).
+   */
   void CopyCrashReportToClipboard();
 
   /**
    * Modal crash dialog built from an in-memory template (no resource
    * dependency): read-only report text + Copy / Open folder / Close.
-   * Falls back to a message box when even that fails.
+   * Falls back to a message box when even that fails. Client only
+   * (CrashReportDialog.cpp).
    */
   void ShowCrashReportDialog(const char* reportPath);
+
+  /**
+   * Engine addition (dedicated-server plan WPR.12): the dialog the fatal path
+   * shows after writing the report and the minidump. CrashReportDialog.cpp sets
+   * it to ShowCrashReportDialog during static initialisation; a program without
+   * the client (headless, the game server) leaves it null and ends without a
+   * dialog.
+   */
+  using CrashReportDialogHook = void (*)(const char* reportPath);
+  extern CrashReportDialogHook sCrashReportDialog;
 
 } // namespace gpg::diag
 

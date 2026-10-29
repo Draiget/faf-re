@@ -23,7 +23,9 @@
 #include "moho/containers/TDatList.h"
 #include "moho/path/ClusterMap.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/FlatGenerationMap.h"
 #include "moho/ai/CAiPathFinder.h"
+#include "moho/console/CConCommand.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/path/IPathTraveler.h"
 #include "moho/path/SNamedFootprint.h"
@@ -34,8 +36,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include "gpg/core/reflection/StaticInitPhase.h"
 #endif
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -68,10 +70,61 @@ namespace
   constexpr std::int8_t kStepOffsetZ[8] = { -1, 0, 1, 0, -1, 1, 1, -1 };
   constexpr std::uint8_t kStepGate[8] = { 0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u };
   constexpr float kStepCost[8] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.414f, 1.414f, 1.414f, 1.414f };
+
+  /**
+   * Engine addition (`sim_PathTraverseCache`): the traveler's `CanTraverseCell`
+   * answers within one A* pass (`WorkOnce`). A cell is a neighbour of up to
+   * eight expanded cells, and each expansion asked the traveler about it again,
+   * which for a unit is an occupation-grid gather (`COGrid::UnitIsBlocked`)
+   * every time. Nothing moves during a pass and the traveler is the same one
+   * throughout, so a remembered answer is the answer it would give again.
+   *
+   * The cache is emptied when a pass starts and when it ends (a generation
+   * bump), so no answer outlives the pass it was given in, and it is only
+   * consulted inside a pass.
+   */
+  struct TraverseCache
+  {
+    /// 4096 slots: room for 2048 cells before the first growth; the map keeps what it grew to.
+    static constexpr unsigned kCapacityLog2 = 12;
+
+    gpg::core::FlatGenerationMap<bool> answers{kCapacityLog2};
+    int mPassDepth = 0; // > 0 while a WorkOnce pass runs
+  };
+
+  // Path queues run on the sim thread; thread_local keeps any other caller apart.
+  thread_local TraverseCache tTraverseCache;
+
+  /** Brackets one WorkOnce pass for the traverse cache. */
+  class TraversePassScope
+  {
+  public:
+    TraversePassScope() noexcept
+    {
+      tTraverseCache.answers.Clear();
+      ++tTraverseCache.mPassDepth;
+    }
+
+    ~TraversePassScope()
+    {
+      --tTraverseCache.mPassDepth;
+      tTraverseCache.answers.Clear();
+    }
+
+    TraversePassScope(const TraversePassScope&) = delete;
+    TraversePassScope& operator=(const TraversePassScope&) = delete;
+  };
 } // namespace
 
 namespace moho
 {
+  bool sim_PathTraverseCache = true;
+  TConVar<bool> gTConVar_sim_PathTraverseCache(
+    "sim_PathTraverseCache",
+    "Remember a cell's traversability for the rest of one pathfinding pass instead of asking the unit again (same paths).",
+    &sim_PathTraverseCache
+  );
+
   /**
    * `Moho::PathQueue::ImplBase` - one in-flight path query.
    *
@@ -95,7 +148,7 @@ namespace moho
    *   +0x78 : mPathCap        traveler-supplied expansion cap
    */
   struct PathQueue::ImplBase
-    : gpg::AStarSearch<SOCellPos, PathQueue::ImplBase, PathQueueCellTraits>
+    : gpg::AStarSearch<SOCellPos, PathQueue::ImplBase, PathQueueCellTraits, true>
   {
     /** How one expansion ends: `ExpandNode`'s answer, which `WorkOnce` returns. */
     enum class Step : std::int32_t
@@ -228,6 +281,27 @@ namespace moho
   }
 
   /**
+   * `traveler.CanTraverseCell(cell)`, through the pass cache when
+   * `sim_PathTraverseCache` is on and a pass is running.
+   */
+  [[nodiscard]] bool CanTraverseCellCached(IPathTraveler& traveler, const SOCellPos& cell)
+  {
+    TraverseCache& cache = tTraverseCache;
+    if (!sim_PathTraverseCache || cache.mPassDepth <= 0) {
+      return traveler.CanTraverseCell(cell);
+    }
+    static_assert(sizeof(SOCellPos) == sizeof(std::uint32_t), "the cell is its own 32-bit key");
+    std::uint32_t key;
+    std::memcpy(&key, &cell, sizeof(key));
+    if (const bool* const known = cache.answers.Find(key)) {
+      return *known;
+    }
+    const bool traversable = traveler.CanTraverseCell(cell);
+    (void)cache.answers.Insert(key, traversable);
+    return traversable;
+  }
+
+  /**
    * What it does:
    * The level-0 arm of `AddNeighbours` (0x00766350): the walkable subset of
    * the eight cells adjacent to `cell`.
@@ -263,7 +337,7 @@ namespace moho
       candidate.x = static_cast<std::int16_t>(candidateX);
       candidate.z = static_cast<std::int16_t>(candidateZ);
 
-      if (!traveler->CanTraverseCell(candidate)) {
+      if (!CanTraverseCellCached(*traveler, candidate)) {
         continue;
       }
 
@@ -1391,7 +1465,11 @@ namespace moho
       assert(!impl.mBase.mTraveler.empty());
 
       impl.mBase.mBudget = budget;
-      const ImplBase::Step step = impl.mBase.WorkOnce(impl.mBase);
+      ImplBase::Step step;
+      {
+        const TraversePassScope traversePass;
+        step = impl.mBase.WorkOnce(impl.mBase);
+      }
       budget = impl.mBase.mBudget;
 
       if (step == ImplBase::Step::BudgetExhausted) {
@@ -1427,7 +1505,11 @@ namespace moho
     assert(!scratch.mTraveler.empty());
 
     scratch.mBudget = budget;
-    const ImplBase::Step step = scratch.WorkOnce(scratch);
+    ImplBase::Step step;
+    {
+      const TraversePassScope traversePass;
+      step = scratch.WorkOnce(scratch);
+    }
     budget = scratch.mBudget;
 
     scratch.FinishQuery(step == ImplBase::Step::GoalReached);

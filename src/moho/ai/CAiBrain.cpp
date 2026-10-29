@@ -1,4 +1,5 @@
 #include "moho/ai/CAiBrain.h"
+#include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
 #include "legacy/algorithms/Sort.h"
@@ -573,7 +574,7 @@ namespace
   [[nodiscard]] std::int32_t AtomicLoadStatValueBits(volatile std::int32_t* const valueBits) noexcept
   {
     return static_cast<std::int32_t>(
-      InterlockedCompareExchange(reinterpret_cast<volatile long*>(valueBits), 0L, 0L)
+      InterlockedCompareExchange(reinterpret_cast<volatile platform::InterlockedLong*>(valueBits), 0L, 0L)
     );
   }
 
@@ -582,7 +583,7 @@ namespace
     for (;;) {
       const std::int32_t observedValueBits = AtomicLoadStatValueBits(valueBits);
       const std::int32_t exchangedValueBits = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(valueBits),
+        reinterpret_cast<volatile platform::InterlockedLong*>(valueBits),
         static_cast<long>(nextValueBits),
         static_cast<long>(observedValueBits)
       ));
@@ -603,7 +604,7 @@ namespace
       const std::int32_t nextValueBits = std::bit_cast<std::int32_t>(nextValue);
 
       const std::int32_t exchangedValueBits = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(valueBits),
+        reinterpret_cast<volatile platform::InterlockedLong*>(valueBits),
         static_cast<long>(nextValueBits),
         static_cast<long>(observedValueBits)
       ));
@@ -693,7 +694,7 @@ namespace
         }
 
         const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-          reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits),
+          reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits),
           static_cast<long>(candidate),
           static_cast<long>(observed)
         ));
@@ -719,7 +720,7 @@ namespace
         }
 
         const std::int32_t exchangedBits = static_cast<std::int32_t>(InterlockedCompareExchange(
-          reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits),
+          reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits),
           static_cast<long>(candidateBits),
           static_cast<long>(observedBits)
         ));
@@ -3367,7 +3368,7 @@ int moho::cfunc_CAiBrainAddArmyStatL(LuaPlus::LuaState* const state)
     if (CArmyStatItem* const statItem = ResolveCachedArmyStatPath(armyStats, statName); statItem != nullptr) {
       statItem->SynchronizeAsInt();
       (void)InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits),
+        reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits),
         static_cast<long>(intDelta)
       );
     }

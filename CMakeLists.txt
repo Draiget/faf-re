@@ -13,6 +13,16 @@
 
 cmake_minimum_required(VERSION 3.25)
 
+# Engine addition (dedicated-server plan WPL.2): the Linux build of the
+# simulation, chosen by its toolchain file (cmake/toolchains/linux-clang-*.cmake,
+# read by project(), sets FAF_LINUX) and described in cmake/FafLinux.cmake.
+# Nothing below this block runs for it.
+if(CMAKE_TOOLCHAIN_FILE MATCHES "/linux-clang-[^/]*\\.cmake$")
+  project(faf_engine LANGUAGES C CXX)
+  include(cmake/FafLinux.cmake)
+  return()
+endif()
+
 project(faf_engine LANGUAGES C CXX RC)
 
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
@@ -78,6 +88,10 @@ if(NOT EXISTS "${FAF_DXSDK_DIR}/Include/d3dx9.h")
 endif()
 
 include(FafCodegen)
+
+# Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's
+# `/connectserver` path. Off, the build contains none of it.
+option(FAF_SERVER_MODE "Build the client side of server-authoritative sessions (/connectserver)" OFF)
 
 # --- Dependencies (built here, /MT, read-only sources) ----------------------------------
 add_subdirectory(cmake/deps/wxwindows)

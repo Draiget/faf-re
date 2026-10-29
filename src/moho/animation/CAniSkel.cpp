@@ -12,12 +12,8 @@
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
 #include "moho/animation/CAniPose.h"
-#include "moho/console/CConCommand.h"
-#include "moho/entity/UserEntity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/resource/SScmFile.h"
-#include "moho/sim/CWldSession.h"
-#include "moho/unit/core/UserUnit.h"
 #include "Wm3Vector3.h"
 #include "legacy/algorithms/Sort.h"
 
@@ -124,68 +120,6 @@ namespace
   }
 
 
-  /**
-   * Address: 0x007B2050 (FUN_007B2050, sub_7B2050)
-   *
-   * IDA signature:
-   * _DWORD *__cdecl sub_7B2050(int arg0, unsigned int a2, int a3);
-   *
-   * What it does:
-   * Recursive, indented bone-hierarchy printer for `ANI_DumpSkeleton`. Walks
-   * `children` in order; for each stored bone pointer, formats
-   * "<indent><name><pad>p=<x,y,z> q=<x,y,z,w>" (name right-padded so the
-   * `p=` column lands at ~50 characters, clamped to at least 2 spaces) via
-   * `gpg::STR_Printf`, emits it through both `Moho::CON_Printf` and
-   * `gpg::Logf`, then recurses into that bone's own children
-   * (`dedupTree[boneKey]`) with `indent + 2`.
-   *
-   * `dedupTree` is threaded through explicitly - it is the binary's third
-   * parameter, proven via raw `.asm` at 0x007B2233-0x007B224E to be the
-   * outer map pointer loaded into `ecx` as `this` for the recursive
-   * `operator[]` call, not an inert/unused context value (the top-level
-   * decompiler pseudocode's `(int)&v18._Myend` naming for this argument at
-   * the initial call site does not survive a register-level check either;
-   * the pushed value is `&a2._Myval`, the same outer-map local the per-bone
-   * loop already builds).
-   */
-  void PrintAniSkeletonBoneHierarchy(
-    const msvc8::set<const moho::SAniSkelBone*>& children,
-    const std::uint32_t indent,
-    msvc8::map<const moho::SAniSkelBone*, msvc8::set<const moho::SAniSkelBone*>>& dedupTree
-  )
-  {
-    for (const moho::SAniSkelBone* const bone : children) {
-      const moho::VTransform& transform = bone->mLocalTransform;
-
-      const std::size_t nameLength = std::strlen(bone->mBoneName);
-      const int rawPadWidth = 50 - static_cast<int>(nameLength) - static_cast<int>(indent);
-      const std::size_t namePadWidth = static_cast<std::size_t>(rawPadWidth > 2 ? rawPadWidth : 2);
-
-      msvc8::string indentPad;
-      (void)indentPad.assign(static_cast<std::size_t>(indent), ' ');
-      msvc8::string namePad;
-      (void)namePad.assign(namePadWidth, ' ');
-
-      const msvc8::string line = gpg::STR_Printf(
-        "%s%s%sp=<%5.2f,%5.2f,%5.2f> q=<%5.2f,%5.2f,%5.2f,%5.2f>",
-        indentPad.c_str(),
-        bone->mBoneName,
-        namePad.c_str(),
-        transform.pos_.x,
-        transform.pos_.y,
-        transform.pos_.z,
-        transform.orient_.x,
-        transform.orient_.y,
-        transform.orient_.z,
-        transform.orient_.w
-      );
-
-      moho::CON_Printf("%s", line.c_str());
-      gpg::Logf("%s", line.c_str());
-
-      PrintAniSkeletonBoneHierarchy(dedupTree[bone], indent + 2u, dedupTree);
-    }
-  }
 } // namespace
 
 namespace moho
@@ -488,74 +422,4 @@ namespace moho
     }
   }
 
-  /**
-   * The active world session (`Moho::sWldSession`, 0x010A6470). The global
-   * has no owning header in this tree yet, so it is declared here where it
-   * is used, matching the established pattern (Cartographic.cpp,
-   * WxRuntimeTypes.cpp).
-   */
-  extern CWldSession* sWldSession;
-
-  /**
-   * Address: 0x007B22B0 (FUN_007B22B0, Moho::ANI_DumpSkeleton)
-   *
-   * IDA signature:
-   * void __cdecl Moho::ANI_DumpSkeleton();
-   *
-   * What it does:
-   * The `ANI_DumpSkeleton` console command. Resolves the current selection's
-   * first live unit, prints its animation skeleton's bone hierarchy
-   * (indented, parent-then-children) through both the console and the log,
-   * then releases the transient selection snapshot and per-parent dedup
-   * tree it built to reconstruct that hierarchy from the skeleton's flat,
-   * parent-index-only bone array. Prints "There is no selected unit." when
-   * the selection is empty or has no live entries. The binary reads
-   * `mPoseSecondary` (+0x24) unconditionally once a live entity is found,
-   * with no null check on the resulting `CAniPose*` before calling
-   * `GetSkeleton()` - reproduced as-is.
-   *
-   * The dedup map (`dedupTree`) and its nested per-parent sets, and the
-   * transient selection snapshot (`selectionGuard`), are released by their
-   * own destructors at scope exit - the binary's `erase_range` +
-   * `operator delete` on both.
-   */
-  void ANI_DumpSkeleton()
-  {
-    WeakSet<UserUnit> selection;
-    // 0x007B22FD/0x007B2308: reads the global session and calls straight
-    // through with no null check - reproduced as-is.
-    WLD_GetActiveSession()->GetSelectionUnits(selection);
-
-    // 0x007B2372-0x007B2385: the first live unit, if any.
-    UserEntity* selectedEntity = nullptr;
-    if (!selection.Empty()) {
-      selectedEntity = *selection.begin();
-    }
-
-    if (selectedEntity == nullptr) {
-      CON_Printf("There is no selected unit.");
-      return;
-    }
-
-    CAniPose* const pose = selectedEntity->mPoseSecondary.get();
-
-    // The binary extracts the raw skeleton pointer and releases the
-    // temporary `shared_ptr<const CAniSkel>` handle immediately
-    // (`Moho::WeakPtr_CAniSkel_D::release`, 0x00538320) rather than holding
-    // it for the whole function - matched here with a tight scope instead of
-    // keeping the shared_ptr alive across the walk below.
-    const CAniSkel* skel;
-    {
-      const boost::shared_ptr<const CAniSkel> skelHandle = pose->GetSkeleton();
-      skel = skelHandle.get();
-    }
-
-    msvc8::map<const SAniSkelBone*, msvc8::set<const SAniSkelBone*>> dedupTree;
-    for (const SAniSkelBone& bone : skel->mBones) {
-      const SAniSkelBone* const parentBone = skel->GetBone(static_cast<std::uint32_t>(bone.mParentBoneIndex));
-      (void)dedupTree[parentBone].insert(&bone);
-    }
-
-    PrintAniSkeletonBoneHierarchy(dedupTree[nullptr], 0u, dedupTree);
-  }
 } // namespace moho

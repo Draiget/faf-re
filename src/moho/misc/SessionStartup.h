@@ -5,6 +5,7 @@
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "moho/serialization/SSavedGameHeader.h"
 
 struct lua_State;
@@ -23,6 +24,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class LaunchInfoBase;
   class CScrLuaInitForm;
   struct SWldSessionInfo;
 
@@ -96,6 +98,26 @@ namespace moho
    */
   [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo>
   VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr);
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): the name of the local client
+   * VCR_SetupReplaySession creates, `Loc(USER_GetLuaState(), "<LOC
+   * Engine0031>Local")` in the binary. The user Lua state is user-side code, so
+   * SessionStartup.cpp (user side) sets this during static initialisation;
+   * without a user side the name is the key's text, "Local".
+   */
+  using ReplayLocalClientNameHook = msvc8::string (*)();
+  extern ReplayLocalClientNameHook sReplayLocalClientName;
+
+  /**
+   * Engine addition, not in the binary: whether the serialized Lua values a
+   * replay or saved game carries (game mods, scenario, army setups) decode
+   * (moho/misc/ReplaySessionSetup.cpp). Replay and saved-game loading refuse a
+   * file whose values do not, while their reader can still say why.
+   */
+  [[nodiscard]] bool LaunchInfoStringsDecode(
+    const LaunchInfoBase& launchInfo, const msvc8::vector<msvc8::string>& armySetups
+  );
 
   /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)

@@ -4,9 +4,28 @@
 #include <cmath>
 #include <xmmintrin.h>
 
-extern "C" int global_mode_sse2;
+// Moved here unchanged from moho/math/MathReflection.cpp (dedicated-server plan
+// WPL.23): the lane state belongs with the helpers that read it, and the
+// simulation's math tests link this file without the reflection code.
+extern "C" int global_mode_sse2 = 1;
+extern "C" int global_compat_flag = 1;
 
-#if defined(_M_X64)
+/**
+ * Address: 0x00A8ECD3 (FUN_00A8ECD3, func_SetSSE2)
+ *
+ * What it does:
+ * Enables/disables the SSE2 runtime lane by masking with the startup
+ * compatibility flag, then publishes and returns the resulting mode value.
+ */
+extern "C" int __cdecl SetSse2Mode(const int enableSse2)
+{
+  const int mode = (enableSse2 != 0) ? global_compat_flag : 0;
+  global_mode_sse2 = mode;
+  return mode;
+}
+
+// x64 (Windows x64 and System V): legacy/math/X87Math64.asm / X87Math64.S.
+#if defined(_M_X64) || defined(__x86_64__)
 // legacy/math/X87Math64.asm: the same instruction sequences for 64-bit code,
 // which has no inline assembly.
 extern "C" float __cdecl msvc8_x87_sinf(float x);
@@ -69,6 +88,17 @@ namespace msvc8
     [[nodiscard]] bool TakesSse2Lane(const unsigned int controlWord) noexcept
     {
       return global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u && (controlWord & 0x7Fu) == 0x7Fu;
+    }
+
+    /**
+     * Engine addition (dedicated-server plan WPL.11): the NaN a domain error gives, the x87
+     * indefinite (negative quiet NaN) the Windows CRT returns for acos/asin of |x| > 1 and pow
+     * of a negative base with a fractional exponent. Spelled here so every platform gives it:
+     * glibc returns the positive quiet NaN.
+     */
+    [[nodiscard]] double DomainErrorNaN() noexcept
+    {
+      return std::bit_cast<double>(0xFFF8000000000000ull);
     }
 
     /**
@@ -284,6 +314,21 @@ namespace msvc8
     if (x == 0.0 && y != 0.0 && std::isfinite(y)) {
       return 0.0;
     }
+    // Engine addition (plan WPL.11): the domain errors as the Windows x64 CRT answers them
+    // (probed: an infinite dividend gives the quiet NaN with its sign, a zero divisor the
+    // positive one); glibc gives the negative NaN for both. NaN operands stay with the CRT,
+    // which passes them through alike on both platforms. x86 keeps its CRT's answer (the
+    // negative indefinite for both, tests/sim_math/known_windows-x86.txt).
+#if !defined(_M_IX86)
+    if (!std::isnan(x) && !std::isnan(y)) {
+      if (std::isinf(x)) {
+        return std::bit_cast<double>(std::signbit(x) ? 0xFFF8000000000000ull : 0x7FF8000000000000ull);
+      }
+      if (y == 0.0) {
+        return std::bit_cast<double>(0x7FF8000000000000ull);
+      }
+    }
+#endif
     return std::fmod(x, y);
   }
 
@@ -733,6 +778,11 @@ namespace msvc8
 
   float asinf(const float x) noexcept
   {
+    // Engine addition (plan WPL.11): the domain errors' NaN as on Windows x64 (DomainErrorNaN);
+    // in the domain the CRT's asin, as the binary's asinf called it.
+    if (!std::isnan(x) && !(x >= -1.0f && x <= 1.0f)) {
+      return static_cast<float>(DomainErrorNaN());
+    }
     return static_cast<float>(std::asin(static_cast<double>(x)));
   }
 
@@ -743,6 +793,10 @@ namespace msvc8
 
   double acos(const double x) noexcept
   {
+    // Engine addition (plan WPL.11): |x| > 1 and the infinities are a domain error.
+    if (!std::isnan(x) && !(x >= -1.0 && x <= 1.0)) {
+      return DomainErrorNaN();
+    }
     if (TakesSse2Lane(CurrentControlWord()) || !(x >= -1.0 && x <= 1.0)) {
       return std::acos(x);
     }
@@ -775,8 +829,11 @@ namespace msvc8
   double asin(const double x) noexcept
   {
     const unsigned int controlWord = CurrentControlWord();
-    // NaN, infinities and |x| > 1 take the CRT's errno lane; the host CRT
-    // returns the same NaN.
+    // NaN, infinities and |x| > 1 take the CRT's errno lane. Engine addition (plan WPL.11):
+    // the domain errors' NaN is spelled out (DomainErrorNaN); a NaN passes through the CRT.
+    if (!std::isnan(x) && !(x >= -1.0 && x <= 1.0)) {
+      return DomainErrorNaN();
+    }
     if (TakesSse2Lane(controlWord) || !(x >= -1.0 && x <= 1.0)) {
       return std::asin(x);
     }
@@ -828,7 +885,7 @@ namespace msvc8
       // 0x00A8E2DD: classify the exponent (0x00A8E302: integer, then whether
       // y * 0.5 is too), run the positive lane on -x and negate for odd y.
       if (y != std::floor(y)) {
-        return std::pow(x, y);
+        return DomainErrorNaN(); // engine addition (plan WPL.11), the CRT's domain error
       }
       const bool oddExponent = (y * 0.5) != std::floor(y * 0.5);
       const double magnitude = PowPositiveBase(controlWord, -x, y);

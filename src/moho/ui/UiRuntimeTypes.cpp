@@ -3364,7 +3364,7 @@ namespace
 
 } // namespace
 
-moho::EUIState moho::sUIState = moho::UIS_none;
+// `moho::sUIState` is defined in gpg/core/reflection/Reflection.cpp (sim side).
 bool moho::cam_Free = false;
 // 0x00F57AA0 `?ren_BgLowerBound@Moho@@3MA`; the shipped `.data` word is
 // `00 00 fa 42` == 125.0f.
@@ -27242,12 +27242,24 @@ int moho::cfunc_AddCommandFeedbackBlipL(
     shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr
   );
 
-  boost::shared_ptr<Mesh> mesh(new Mesh(modelResource, material));
-
   MeshRenderer* const renderer = MeshRenderer::GetInstance();
   const Wm3::Vector3f meshScale{uniformScale, uniformScale, uniformScale};
-  MeshInstance* const meshInstance =
-    renderer != nullptr ? renderer->CreateMeshInstance(worldSession->mGameTick, -1, meshScale, false, mesh) : nullptr;
+  // 0x008581BB..0x008581F6: the resource/material overload (0x007DF710) with
+  // a LOD cutoff of FLT_MAX (0x00E4F798 = 0x7F7FFFFF), so the blip is never
+  // LOD-culled. The `CommandFeedback` vertex shader grows the mesh with
+  // distance instead; with the default 1000 cutoff the blip vanished once
+  // the camera zoomed out.
+  MeshInstance* const meshInstance = renderer != nullptr
+    ? renderer->CreateMeshInstance(
+        worldSession->mGameTick,
+        -1,
+        modelResource,
+        meshScale,
+        false,
+        material,
+        std::numeric_limits<float>::max()
+      )
+    : nullptr;
   if (meshInstance == nullptr) {
     return 0;
   }
