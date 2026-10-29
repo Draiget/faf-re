@@ -15,6 +15,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
+#include "moho/console/CConCommand.h"
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
@@ -22,6 +23,12 @@
 
 namespace
 {
+  bool sim_FastEconStats = true;
+  moho::TConVar<bool> gTConVar_sim_FastEconStats(
+    "sim_FastEconStats",
+    "Bypasses string map lookups for per-tick army economy statistics updates.",
+    &sim_FastEconStats
+  );
   class SEconValueTypeInfo final : public gpg::RType
   {
   public:
@@ -325,7 +332,95 @@ namespace moho
       item->SynchronizeAsFloat();
       (void)item->AddFloat(&value);
     }
+
+    void SetFloatStatDirect(CArmyStatItem* const item, const float value)
+    {
+      if (item == nullptr) {
+        return;
+      }
+      item->SynchronizeAsFloat();
+      const std::int32_t bits = std::bit_cast<std::int32_t>(value);
+      (void)item->SetInt(&bits);
+    }
+
+    void AddFloatStatDirect(CArmyStatItem* const item, float value)
+    {
+      if (item == nullptr) {
+        return;
+      }
+      item->SynchronizeAsFloat();
+      (void)item->AddFloat(&value);
+    }
+
+    struct SEconStatCache
+    {
+      const CArmyStats* stats{nullptr};
+      CArmyStatItem* totalProducedMass{nullptr};
+      CArmyStatItem* totalProducedEnergy{nullptr};
+      CArmyStatItem* totalConsumedMass{nullptr};
+      CArmyStatItem* totalConsumedEnergy{nullptr};
+      CArmyStatItem* incomeMass{nullptr};
+      CArmyStatItem* incomeEnergy{nullptr};
+      CArmyStatItem* outputMass{nullptr};
+      CArmyStatItem* outputEnergy{nullptr};
+      CArmyStatItem* storedMass{nullptr};
+      CArmyStatItem* storedEnergy{nullptr};
+      CArmyStatItem* maxStorageMass{nullptr};
+      CArmyStatItem* maxStorageEnergy{nullptr};
+      CArmyStatItem* reclaimedMass{nullptr};
+      CArmyStatItem* reclaimedEnergy{nullptr};
+      CArmyStatItem* sharedMass{nullptr};
+      CArmyStatItem* sharedEnergy{nullptr};
+      CArmyStatItem* trendMass{nullptr};
+      CArmyStatItem* trendEnergy{nullptr};
+      CArmyStatItem* ratioMass{nullptr};
+      CArmyStatItem* ratioEnergy{nullptr};
+      CArmyStatItem* peakStorageMass{nullptr};
+      CArmyStatItem* peakStorageEnergy{nullptr};
+      CArmyStatItem* accumExcessEnergy{nullptr};
+      CArmyStatItem* accumExcessMass{nullptr};
+
+      void Initialize(CArmyStats& s)
+      {
+        stats = &s;
+        totalProducedMass = ResolveArmyStatItemCachedCreate(&s, "Economy_TotalProduced_Mass");
+        totalProducedEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_TotalProduced_Energy");
+        totalConsumedMass = ResolveArmyStatItemCachedCreate(&s, "Economy_TotalConsumed_Mass");
+        totalConsumedEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_TotalConsumed_Energy");
+        incomeMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Income_Mass");
+        incomeEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Income_Energy");
+        outputMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Output_Mass");
+        outputEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Output_Energy");
+        storedMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Stored_Mass");
+        storedEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Stored_Energy");
+        maxStorageMass = ResolveArmyStatItemCachedCreate(&s, "Economy_MaxStorage_Mass");
+        maxStorageEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_MaxStorage_Energy");
+        reclaimedMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Reclaimed_Mass");
+        reclaimedEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Reclaimed_Energy");
+        sharedMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Shared_Mass");
+        sharedEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Shared_Energy");
+        trendMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Trend_Mass");
+        trendEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Trend_Energy");
+        ratioMass = ResolveArmyStatItemCachedCreate(&s, "Economy_Ratio_Mass");
+        ratioEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_Ratio_Energy");
+        peakStorageMass = ResolveArmyStatItemCachedCreate(&s, "Economy_PeakStorage_Mass");
+        peakStorageEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_PeakStorage_Energy");
+        accumExcessEnergy = ResolveArmyStatItemCachedCreate(&s, "Economy_AccumExcess_Energy");
+        accumExcessMass = ResolveArmyStatItemCachedCreate(&s, "Economy_AccumExcess_Mass");
+      }
+    };
+
+    static SEconStatCache sEconStatCaches[16]{};
   } // namespace
+
+  void ForgetCachedEconomyStats(const CArmyStats& stats) noexcept
+  {
+    for (SEconStatCache& cache : sEconStatCaches) {
+      if (cache.stats == &stats) {
+        cache = SEconStatCache{};
+      }
+    }
+  }
 
   /**
    * Address: 0x00771B50 (FUN_00771B50, func_ArmyProcessEconomy)
@@ -541,44 +636,88 @@ namespace moho
     CArmyStats& stats = *army->GetArmyStats();
     const SEconValue maxStorage{MaxStorage(economy.mTotals, kEnergyLane), MaxStorage(economy.mTotals, kMassLane)};
 
-    AddFloatStat(stats, "Economy_TotalProduced_Mass", economy.mResources.mass);
-    AddFloatStat(stats, "Economy_TotalProduced_Energy", economy.mResources.energy);
-    AddFloatStat(stats, "Economy_TotalConsumed_Mass", consumed.mass);
-    AddFloatStat(stats, "Economy_TotalConsumed_Energy", consumed.energy);
-    SetFloatStat(stats, "Economy_Income_Mass", economy.mResources.mass);
-    SetFloatStat(stats, "Economy_Income_Energy", economy.mResources.energy);
-    SetFloatStat(stats, "Economy_Output_Mass", consumed.mass);
-    SetFloatStat(stats, "Economy_Output_Energy", consumed.energy);
-    SetFloatStat(stats, "Economy_Stored_Mass", economy.mTotals.mStored.MASS);
-    SetFloatStat(stats, "Economy_Stored_Energy", economy.mTotals.mStored.ENERGY);
-    SetFloatStat(stats, "Economy_MaxStorage_Mass", maxStorage.mass);
-    SetFloatStat(stats, "Economy_MaxStorage_Energy", maxStorage.energy);
-    SetFloatStat(stats, "Economy_Reclaimed_Mass", economy.mTotals.mReclaimed.MASS);
-    SetFloatStat(stats, "Economy_Reclaimed_Energy", economy.mTotals.mReclaimed.ENERGY);
-    AddFloatStat(stats, "Economy_Shared_Mass", shared.mass);
-    AddFloatStat(stats, "Economy_Shared_Energy", shared.energy);
-    SetFloatStat(
-      stats,
-      "Economy_Trend_Mass",
-      (economy.mPendingResources.mass - economy.mTotals.mLastUseRequested.MASS) * kTicksPerSecond
-    );
-    SetFloatStat(
-      stats,
-      "Economy_Trend_Energy",
-      (economy.mPendingResources.energy - economy.mTotals.mLastUseRequested.ENERGY) * kTicksPerSecond
-    );
-    SetFloatStat(
-      stats, "Economy_Ratio_Mass", maxStorage.mass > 0.0f ? economy.mTotals.mStored.MASS / maxStorage.mass : 0.0f
-    );
-    SetFloatStat(
-      stats,
-      "Economy_Ratio_Energy",
-      maxStorage.energy > 0.0f ? economy.mTotals.mStored.ENERGY / maxStorage.energy : 0.0f
-    );
-    stats.SetUnitStatGreaterFloat("Economy_PeakStorage_Mass", &maxStorage.mass);
-    stats.SetUnitStatGreaterFloat("Economy_PeakStorage_Energy", &maxStorage.energy);
-    AddFloatStat(stats, "Economy_AccumExcess_Energy", excess.energy);
-    AddFloatStat(stats, "Economy_AccumExcess_Mass", excess.mass);
+    if (sim_FastEconStats) {
+      const std::size_t armyIdx = static_cast<std::size_t>(std::max(0, std::min(15, economy.mIndex)));
+      SEconStatCache& cache = sEconStatCaches[armyIdx];
+      if (cache.stats != &stats) {
+        cache.Initialize(stats);
+      }
+
+      AddFloatStatDirect(cache.totalProducedMass, economy.mResources.mass);
+      AddFloatStatDirect(cache.totalProducedEnergy, economy.mResources.energy);
+      AddFloatStatDirect(cache.totalConsumedMass, consumed.mass);
+      AddFloatStatDirect(cache.totalConsumedEnergy, consumed.energy);
+      SetFloatStatDirect(cache.incomeMass, economy.mResources.mass);
+      SetFloatStatDirect(cache.incomeEnergy, economy.mResources.energy);
+      SetFloatStatDirect(cache.outputMass, consumed.mass);
+      SetFloatStatDirect(cache.outputEnergy, consumed.energy);
+      SetFloatStatDirect(cache.storedMass, economy.mTotals.mStored.MASS);
+      SetFloatStatDirect(cache.storedEnergy, economy.mTotals.mStored.ENERGY);
+      SetFloatStatDirect(cache.maxStorageMass, maxStorage.mass);
+      SetFloatStatDirect(cache.maxStorageEnergy, maxStorage.energy);
+      SetFloatStatDirect(cache.reclaimedMass, economy.mTotals.mReclaimed.MASS);
+      SetFloatStatDirect(cache.reclaimedEnergy, economy.mTotals.mReclaimed.ENERGY);
+      AddFloatStatDirect(cache.sharedMass, shared.mass);
+      AddFloatStatDirect(cache.sharedEnergy, shared.energy);
+      SetFloatStatDirect(
+        cache.trendMass,
+        (economy.mPendingResources.mass - economy.mTotals.mLastUseRequested.MASS) * kTicksPerSecond
+      );
+      SetFloatStatDirect(
+        cache.trendEnergy,
+        (economy.mPendingResources.energy - economy.mTotals.mLastUseRequested.ENERGY) * kTicksPerSecond
+      );
+      SetFloatStatDirect(
+        cache.ratioMass, maxStorage.mass > 0.0f ? economy.mTotals.mStored.MASS / maxStorage.mass : 0.0f
+      );
+      SetFloatStatDirect(
+        cache.ratioEnergy,
+        maxStorage.energy > 0.0f ? economy.mTotals.mStored.ENERGY / maxStorage.energy : 0.0f
+      );
+      stats.SetUnitStatGreaterFloat(cache.peakStorageMass, maxStorage.mass);
+      stats.SetUnitStatGreaterFloat(cache.peakStorageEnergy, maxStorage.energy);
+      AddFloatStatDirect(cache.accumExcessEnergy, excess.energy);
+      AddFloatStatDirect(cache.accumExcessMass, excess.mass);
+    } else {
+      AddFloatStat(stats, "Economy_TotalProduced_Mass", economy.mResources.mass);
+      AddFloatStat(stats, "Economy_TotalProduced_Energy", economy.mResources.energy);
+      AddFloatStat(stats, "Economy_TotalConsumed_Mass", consumed.mass);
+      AddFloatStat(stats, "Economy_TotalConsumed_Energy", consumed.energy);
+      SetFloatStat(stats, "Economy_Income_Mass", economy.mResources.mass);
+      SetFloatStat(stats, "Economy_Income_Energy", economy.mResources.energy);
+      SetFloatStat(stats, "Economy_Output_Mass", consumed.mass);
+      SetFloatStat(stats, "Economy_Output_Energy", consumed.energy);
+      SetFloatStat(stats, "Economy_Stored_Mass", economy.mTotals.mStored.MASS);
+      SetFloatStat(stats, "Economy_Stored_Energy", economy.mTotals.mStored.ENERGY);
+      SetFloatStat(stats, "Economy_MaxStorage_Mass", maxStorage.mass);
+      SetFloatStat(stats, "Economy_MaxStorage_Energy", maxStorage.energy);
+      SetFloatStat(stats, "Economy_Reclaimed_Mass", economy.mTotals.mReclaimed.MASS);
+      SetFloatStat(stats, "Economy_Reclaimed_Energy", economy.mTotals.mReclaimed.ENERGY);
+      AddFloatStat(stats, "Economy_Shared_Mass", shared.mass);
+      AddFloatStat(stats, "Economy_Shared_Energy", shared.energy);
+      SetFloatStat(
+        stats,
+        "Economy_Trend_Mass",
+        (economy.mPendingResources.mass - economy.mTotals.mLastUseRequested.MASS) * kTicksPerSecond
+      );
+      SetFloatStat(
+        stats,
+        "Economy_Trend_Energy",
+        (economy.mPendingResources.energy - economy.mTotals.mLastUseRequested.ENERGY) * kTicksPerSecond
+      );
+      SetFloatStat(
+        stats, "Economy_Ratio_Mass", maxStorage.mass > 0.0f ? economy.mTotals.mStored.MASS / maxStorage.mass : 0.0f
+      );
+      SetFloatStat(
+        stats,
+        "Economy_Ratio_Energy",
+        maxStorage.energy > 0.0f ? economy.mTotals.mStored.ENERGY / maxStorage.energy : 0.0f
+      );
+      stats.SetUnitStatGreaterFloat("Economy_PeakStorage_Mass", &maxStorage.mass);
+      stats.SetUnitStatGreaterFloat("Economy_PeakStorage_Energy", &maxStorage.energy);
+      AddFloatStat(stats, "Economy_AccumExcess_Energy", excess.energy);
+      AddFloatStat(stats, "Economy_AccumExcess_Mass", excess.mass);
+    }
 
     // The per-tick banks are consumed, so they start the next tick empty
     // (0x00772D1D); without this, income would accumulate without bound.
