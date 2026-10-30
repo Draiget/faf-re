@@ -1582,12 +1582,12 @@ namespace gpg::gal
    * Address: 0x0094D510 (FUN_0094D510)
    *
    * What it does:
-   * Returns the active device context's hardware-instancing flag. Unlike the
-   * D3D9 formatters it ignores the `mesh_Rebatch` switches.
+   * Requires hardware instancing and the `mesh_Rebatch` instancing switch,
+   * as the D3D9 formatter does.
    */
   bool HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
-    return Device::GetInstance()->GetDeviceContext()->mHWBasedInstancing;
+    return MeshInstancingEnabled();
   }
 
   /**
@@ -1697,13 +1697,12 @@ namespace gpg::gal
    * Address: 0x0094D790 (FUN_0094D790)
    *
    * What it does:
-   * Needs both of the active device context's flags, hardware instancing
-   * (+0x11) and float16 (+0x12); ignores the `mesh_Rebatch` switches.
+   * Requires hardware instancing and float16 support, including both
+   * `mesh_Rebatch` switches, as the D3D9 float16 formatter does.
    */
   bool Float16HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
-    const DeviceContext* const context = Device::GetInstance()->GetDeviceContext();
-    return context->mHWBasedInstancing && context->mSupportsFloat16;
+    return MeshInstancingEnabled() && MeshFloat16Enabled();
   }
 
   /**
@@ -5736,3 +5735,4 @@ namespace gpg::gal
    */
   void EffectD3D10::OnLost() {}
 } // namespace gpg::gal
+
