@@ -11,7 +11,9 @@ missing from the caches is downloaded from FAF (one request at a time).
 Verdicts are the parity runner's (tools/replay-parity/parity.py, HeadlessGame): pass, desync
 (first mismatched beat; the replay is stopped), incomplete, crash, timeout; plus unsupported
 (the replay needs a sim mod or another game version), error (the replay, its map or M28AI could
-not be got ready) and not-run (no time left in the job). A mismatch is the live game's,
+not be got ready) and not-run (no time left in the job, or stopped at its time limit; a later run
+with --after picks those up). What fits is judged by the plan's estimates times the ratio of
+measured to estimated time of the replays the job has finished. A mismatch is the live game's,
 not ours, when more of the recorded clients agree with the sim at that beat than with the one
 that differs; that client is not counted again for the rest of the game (live_desyncs).
 
@@ -215,8 +217,9 @@ class Shard:
         """parity.py HeadlessGame.poll, for a process that exited (or was stopped)."""
         if game["first_beat"] is not None:
             return "desync"
-        if timed_out:
-            return "timeout"
+        if timed_out:  # the job's time ran out, not the replay's fault: a later run plays it
+            game["notes"].append("stopped at the job's time limit at beat %d" % max(0, game["tick"]))
+            return "not-run"
         if game["final"] is None or game["final"][1]:
             game["notes"].append("exit code %s%s" % (game["proc"].returncode, "" if game["final"] else ", no verdict"))
             return "crash"
@@ -284,10 +287,21 @@ class Shard:
         for row in rows:
             print(row, flush=True)
 
+    def factor(self):
+        """Measured wall time over the plan's estimate, from the replays this job finished (1.25
+        until three have: run 41025691648's shard 3 measured 1.17 to 1.34)."""
+        done = [r for r in self.results if r["verdict"] == "pass" and r.get("est_s") and r.get("wall_s")]
+        if len(done) < 3:
+            return 1.25
+        return sum(r["wall_s"] for r in done) / sum(r["est_s"] for r in done)
+
     def next_fitting(self):
+        """The longest replay whose estimate, corrected by what this job measured, still ends
+        before the deadline."""
         left = self.deadline - time.time()
+        factor = self.factor()
         for n, item in enumerate(self.queue):
-            if item["est"] <= left * 0.95:
+            if item["est"] * factor <= left * 0.95:
                 return self.queue.pop(n)
         return None
 
