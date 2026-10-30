@@ -41,7 +41,7 @@ env:
   # Jobs play for this long; plan.py packs shards to it, shard.py starts nothing that would not
   # end by then. A job may run 360 minutes in all.
   PLAY_MINUTES: "300"
-  # Part of the headless build's cache key: a new value rebuilds every commit once.
+  # Part of the headless build's cache key: a new value rebuilds everything once.
   BUILD_CACHE: "v1"
 
 jobs:
@@ -59,13 +59,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.commit.outputs.sha }}
-      # A commit is built once: its headless binary is cached by the commit (the pinned toolchain
-      # makes the same commit the same binary). Bump BUILD_CACHE when the build steps change.
+      # The headless binary is cached by what it is built from: the git trees of the paths the
+      # build reads (the pinned toolchain makes the same sources the same binary). Commits that
+      # change only tools/, docs/ or .github/ reuse it. Bump BUILD_CACHE when the build steps change.
+      - id: sources
+        run: |
+          tree=$(git ls-tree HEAD CMakeLists.txt CMakePresets.json cmake data dependencies src tests | sha256sum | cut -c1-20)
+          echo "key=headless-$BUILD_CACHE-$tree" >> "$GITHUB_OUTPUT"
       - id: built
         uses: actions/cache/restore@v6
         with:
           path: build/linux-clang-x64-release/headless
-          key: headless-${{ env.BUILD_CACHE }}-${{ steps.commit.outputs.sha }}
+          key: ${{ steps.sources.outputs.key }}
       # The pinned toolchain (cmake/toolchains/linux-clang-pins.cmake): configure refuses another.
       - if: steps.built.outputs.cache-hit != 'true'
         run: |
@@ -88,10 +93,10 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: build/linux-clang-x64-release/headless
-          key: headless-${{ env.BUILD_CACHE }}-${{ steps.commit.outputs.sha }}
+          key: ${{ steps.sources.outputs.key }}
       - run: |
-          what=$([ "${{ steps.built.outputs.cache-hit }}" = true ] && echo "Reused the build of" || echo "Built")
-          echo "$what ${{ steps.commit.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          what=$([ "${{ steps.built.outputs.cache-hit }}" = true ] && echo "Reused the build" || echo "Built")
+          echo "$what ${{ steps.sources.outputs.key }} for ${{ steps.commit.outputs.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: headless
