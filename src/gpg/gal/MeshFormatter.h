@@ -145,4 +145,3 @@ namespace gpg::gal
 	extern std::uint8_t sMeshAllowInstancing;
 	extern std::uint8_t sMeshAllowFloat16;
 }
-
