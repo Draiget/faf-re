@@ -2262,77 +2262,6 @@ void moho::WIN_SetMainWindow(wxWindow* const mainWindow)
   sMainWindow = mainWindow;
 }
 
-namespace
-{
-  /**
-   * Engine addition, not in the shipped binary: Windows resolves a finite
-   * timeout passed to MsgWaitForMultipleObjectsEx against the system timer
-   * tick (~15.6 ms by default). CScApp::Main asks for a 10 ms wakeup
-   * (sc_FrameTimeClamp), so every frame waited a whole tick and any extra work
-   * pushed the next frame onto the following one. Raising the process timer
-   * resolution to 1 ms makes the requested timeout real. `/hrtimer 0` or
-   * FAF_HRTIMER=0 keeps the original behavior.
-   */
-  [[nodiscard]] bool HighResolutionTimerEnabled()
-  {
-    char value[4] = {};
-    const DWORD written = ::GetEnvironmentVariableA("FAF_HRTIMER", value, static_cast<DWORD>(sizeof(value)));
-    if (written == 1u && value[0] == '0') {
-      return false;
-    }
-
-    msvc8::vector<msvc8::string> args;
-    if (moho::CFG_GetArgOption("/hrtimer", 1, &args) && !args.empty()) {
-      return std::atoi(args[0].c_str()) != 0;
-    }
-    return true;
-  }
-
-  class ScopedHighResolutionTimer
-  {
-  public:
-    explicit ScopedHighResolutionTimer(const bool enable)
-    {
-      if (!enable) {
-        return;
-      }
-
-      using TimeBeginPeriodFn = UINT(WINAPI*)(UINT);
-      using TimeEndPeriodFn = UINT(WINAPI*)(UINT);
-
-      winmm_ = ::LoadLibraryA("winmm.dll");
-      if (winmm_ == nullptr) {
-        return;
-      }
-      const auto begin = reinterpret_cast<TimeBeginPeriodFn>(::GetProcAddress(winmm_, "timeBeginPeriod"));
-      end_ = reinterpret_cast<TimeEndPeriodFn>(::GetProcAddress(winmm_, "timeEndPeriod"));
-      if (begin != nullptr) {
-        active_ = begin(1U) == 0U; // TIMERR_NOERROR
-      }
-    }
-
-    ~ScopedHighResolutionTimer()
-    {
-      if (active_ && end_ != nullptr) {
-        (void)end_(1U);
-      }
-      if (winmm_ != nullptr) {
-        (void)::FreeLibrary(winmm_);
-      }
-    }
-
-    ScopedHighResolutionTimer(const ScopedHighResolutionTimer&) = delete;
-    ScopedHighResolutionTimer& operator=(const ScopedHighResolutionTimer&) = delete;
-
-    [[nodiscard]] bool active() const { return active_; }
-
-  private:
-    HMODULE winmm_ = nullptr;
-    UINT(WINAPI* end_)(UINT) = nullptr;
-    bool active_ = false;
-  };
-} // namespace
-
 /**
  * Address: 0x004F20B0 (FUN_004F20B0)
  *
@@ -2382,14 +2311,6 @@ void moho::WIN_AppExecute(IWinApp* const app)
   if (!app->Init()) {
     ::TerminateProcess(::GetCurrentProcess(), 1u);
   }
-
-  const bool highResolutionTimerRequested = HighResolutionTimerEnabled();
-  ScopedHighResolutionTimer highResolutionTimer(highResolutionTimerRequested);
-  gpg::Logf(
-    "time: 1 ms timer resolution %s",
-    highResolutionTimer.active() ? "on" : (highResolutionTimerRequested ? "failed" : "off")
-  );
-
   // 0x004F2227..0x004F2233: wxApp::m_exitOnFrameDelete (+0x44) = Yes and
   // m_keepGoing (+0x5C) = TRUE, the flag this loop runs on.
   wxTheApp->SetExitOnFrameDelete(true);
