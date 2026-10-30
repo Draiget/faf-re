@@ -899,6 +899,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/StrategicIconRenderer.cpp
   moho/render/SelectionBracketGpuRenderer.cpp
   moho/render/WorldShapeGpuRenderer.cpp
+  moho/render/RangeGpuRenderer.cpp
   moho/ui/UiWorldShapes.cpp
   moho/render/ProjectileIconRenderer.cpp
   moho/render/GpuPathSettings.cpp

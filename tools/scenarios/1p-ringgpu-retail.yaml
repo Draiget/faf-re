@@ -1,0 +1,35 @@
+name: 1p-ringgpu-retail
+description: >
+  Range-ring reference images from the retail ForgedAlliance.exe (Direct3D 9, x86), for
+  1p-ringgpu-main: the same packs and five scenes, one "RINGGPU SHOT <scene>-legacy" each, no
+  switches and no timing (init_ringgpu_reference.lua mounts hook-reference). Retail draws this
+  many units slowly, hence the long wait. Run ring-gpu\capture.ps1 alongside with -ProcessName
+  ForgedAlliance. Setup as 1p-ringgpu-main, plus init_ringgpu_reference.lua copied into
+  C:\ProgramData\FAForever\bin. Do not click into the game window.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_ringgpu
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_ringgpu_reference.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: RingGpu, faction: uef, args: ['/title', 'ringgpu-retail'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 660s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'RINGGPU DONE' }

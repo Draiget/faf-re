@@ -108,9 +108,10 @@ Each path has a console variable with three values: `-1` (default, auto: on only
 | `ren_ParticleBatch` | `kGpuPathParticleBatch` | Buffer copy (`Device::CopyVertexBufferRegion` on the GPU) |
 | `ren_GpuProjectileIcons` | `kGpuPathProjectileIcons` | Vertex pulling |
 | `ren_GpuShapes` | `kGpuPathWorldShapes` | Vertex pulling |
+| `ren_GpuRanges` | `kGpuPathRanges` | Vertex pulling |
 
 - **Direct3D 9** reports no features, so every path is off there whatever its variable says.
-- **Direct3D 11, 12 and Vulkan** report all features and every verified bit except `kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of `ren_ParticleBatch` is clean at several zooms (one showed extra particle specks with it on).
+- **Direct3D 11, 12 and Vulkan** report all features and every verified bit except `kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of `ren_ParticleBatch` is clean at several zooms (one showed extra particle specks with it on), and `kGpuPathRanges`: its paused A/B is pixel-identical on Direct3D 12 and Vulkan (`tools/scenarios/1p-ringgpu-main.yaml`, `1p-ringgpu-vulkan.yaml`), but with `range_ViewCull` on it makes the range pass slower, not faster (see [Switches](SWITCHES.md)).
 - **Verifying a path:** a backend turns a path on by default by adding its bit to `GetGpuDrivenVerified()` once it passes that path's checks (the self-check readback where one exists, and a same-process screenshot A/B against the variable at 0); no variable or default changes.
 - **Log:** the resolved state is logged once at startup and by `ren_Info`, as `GPU-driven paths: ren_GpuIcons=auto:on, ...`.
 - `ui_IconRecords` and `ren_CacheFogFootprint` are CPU-side and on by default on every backend. All of these variables are also listed in [Switches](SWITCHES.md).

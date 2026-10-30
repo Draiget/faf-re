@@ -110,6 +110,18 @@ namespace moho
    */
   extern bool range_StencilFlush;
 
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY.
+   *
+   * Performance switch: `func_RenderRings` drops the ring volumes "Cast" would
+   * draw with no effect on the image - those outside the camera's view of the
+   * ring slab, and, with `range_StencilFlush`, the fills and outlines that only
+   * reach parts of the view another single fill already holds (zoomed in on a
+   * large selection, nearly all of them). Default true; false casts every
+   * volume as the original does. Render only.
+   */
+  extern bool range_ViewCull;
+
   extern bool ren_Ranges;
 
 

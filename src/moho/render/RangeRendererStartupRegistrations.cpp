@@ -31,6 +31,9 @@ namespace moho
 
   // NOT IN THE ORIGINAL BINARY - FAF FA-Binary-Patches #149, see the header.
   bool range_StencilFlush = true;
+
+  // NOT IN THE ORIGINAL BINARY - performance switch, see the header.
+  bool range_ViewCull = true;
 } // namespace moho
 
 namespace
@@ -128,6 +131,17 @@ namespace
     "overlapping rings merge cleanly. 0 keeps the original 1000-ring batches, which leave ring outlines inside "
     "dense clusters and gaps in their outer outline.",
     &moho::range_StencilFlush
+  );
+
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY - performance switch for
+   * `func_RenderRings`, see `range_ViewCull` in the header.
+   */
+  moho::TConVar<bool> gTConVar_range_ViewCull(
+    "range_ViewCull",
+    "Skip range-ring volumes that cannot change the image: those out of view, and those that only reach parts of "
+    "the view another ring's fill already covers (1, the default). 0 draws every volume.",
+    &moho::range_ViewCull
   );
 
   /**
