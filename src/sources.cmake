@@ -227,6 +227,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/diagnostics/CrashReportDialog.cpp
   gpg/core/diagnostics/ProbeWatch.cpp
   gpg/core/diagnostics/FrameSampler.cpp
+  gpg/core/diagnostics/BuildInfo.cpp
   lua/LuaCrashDump.cpp
   lua/LuaMemAccounting.cpp
   lua/LuaGcEventLog.cpp
