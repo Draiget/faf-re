@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -17,6 +18,26 @@ USER_AGENT = "faf-re-parity-data/1.0 (+https://github.com/Draiget/faf-re)"
 REPLAY_URL = "https://replay.faforever.com/%d"
 MOD_URL = "https://content.faforever.com/mods/%s.zip"
 MAP_URL = "https://content.faforever.com/maps/%s.zip"
+
+
+def clock(seconds):
+    """1:02:03 or 2:03, for game and wall times."""
+    s = int(round(seconds))
+    return "%d:%02d:%02d" % (s // 3600, s // 60 % 60, s % 60) if s >= 3600 else "%d:%02d" % (s // 60, s % 60)
+
+
+def speed(entry):
+    """A result's game time, wall time and speedup (game seconds per wall second) as text, or None
+    when it did not play a beat. Wall time runs from launch to exit, loading included."""
+    if not entry.get("game_s") or not entry.get("wall_s"):
+        return None
+    return "game %s, wall %s, x%.1f" % (clock(entry["game_s"]), clock(entry["wall_s"]), entry["game_s"] / entry["wall_s"])
+
+
+def map_url(folder):
+    """Many vault map folders have spaces ("flat 512"): quoted, as FAF serves them."""
+    return MAP_URL % urllib.parse.quote(folder)
+
 # FAF's game files by version, as the FAF client's updater fetches them: <package>.<version>.nx2
 # and init_faf_<version>.lua. Public: no sign-in.
 GAME_URL = "https://content.faforever.com/faf/updaterNew/updates_faf_files/%s"
@@ -117,13 +138,20 @@ def check_replay(raw, game_version):
 
 
 def extract_map(zip_path, maps_dir, folder):
-    """A map zip into maps_dir/<folder> (its top folder renamed to the replay's name for it)."""
+    """A map zip into maps_dir/<folder>: its top folder renamed to the replay's name for it, which
+    may differ in case alone (FAF's retail maps are SCMP_015/, the replay says scmp_015)."""
     with zipfile.ZipFile(zip_path) as z:
         tops = {n.split("/")[0] for n in z.namelist() if n.strip("/")}
         z.extractall(maps_dir)
-    if folder not in {t.lower() for t in tops} and len(tops) == 1:
-        os.replace(os.path.join(maps_dir, tops.pop()), os.path.join(maps_dir, folder))
-    return os.path.join(maps_dir, folder)
+    path = os.path.join(maps_dir, folder)
+    if folder not in tops:
+        top = next((t for t in tops if t.lower() == folder.lower()), None)
+        if top is None and len(tops) == 1:
+            top = next(iter(tops))
+        if top is None:
+            raise ValueError("no folder %s in the map zip (%s)" % (folder, ", ".join(sorted(tops))[:80]))
+        os.replace(os.path.join(maps_dir, top), path)
+    return path
 
 
 def find_mod_info(root):

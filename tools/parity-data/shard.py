@@ -10,12 +10,15 @@ missing from the caches is downloaded from FAF (one request at a time).
 
 Verdicts are the parity runner's (tools/replay-parity/parity.py, HeadlessGame): pass, desync
 (first mismatched beat; the replay is stopped), incomplete, crash, timeout; plus unsupported
-(the replay needs a sim mod or another game version) and not-run. A mismatch is the live game's,
+(the replay needs a sim mod or another game version), error (the replay, its map or M28AI could
+not be got ready) and not-run (no time left in the job). A mismatch is the live game's,
 not ours, when more of the recorded clients agree with the sim at that beat than with the one
 that differs; that client is not counted again for the rest of the game (live_desyncs).
 
 Writes DIR/results.jsonl (one line per replay) and DIR/logs/<id>.out/.log for every replay that
-did not pass.
+did not pass. Every 30 seconds the job log gets a progress block: the shard's replays done, game
+time played of all, speedup over all slots and time left, then each running replay's beat, share
+done, game and wall time, speedup and time left.
 """
 import argparse
 import json
@@ -26,11 +29,12 @@ import subprocess
 import sys
 import time
 
-from common import (MAP_URL, MOD_URL, REPLAY_URL, check_replay, extract_map, fetch, find_mod_info)
+from common import (MOD_URL, REPLAY_URL, check_replay, clock, extract_map, fetch, find_mod_info, map_url, speed)
 from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE, HL_TROUBLE_RE, HL_VERDICT_RE,
                         MISMATCH_RE, live_client_desync, replay_checksums)
 
 VAULT_LINE_RE = re.compile(r"^custom_vault_path = .*$", re.M)
+PROGRESS_S = 30  # seconds between progress blocks in the job log
 
 
 def find_folder(parent, name):
@@ -56,6 +60,8 @@ class Shard:
         self.running = []
         self.results = []
         self.start = time.time()
+        self.shown = self.start
+        self.total = len(self.queue)
         self.deadline = self.start + args.minutes * 60
         with open(os.path.join(args.pack, "bin", "init_ci.lua"), encoding="utf-8") as f:
             self.init_text = f.read()
@@ -73,9 +79,11 @@ class Shard:
             for src, ext in ((game["out"], "out"), (game["log"], "log")):
                 if os.path.isfile(src):
                     shutil.copyfile(src, os.path.join(self.args.out, "logs", "%d.%s" % (entry["id"], ext)))
-        print("%-8d %-11s %s" % (entry["id"], entry["verdict"],
-                                 "beat %s" % entry["first_beat"] if "first_beat" in entry else entry.get("why", "")),
-              flush=True)
+        if "first_beat" in entry:
+            detail = "beat %s" % entry["first_beat"]
+        else:
+            detail = speed(entry) or entry.get("why", "")
+        print("%-8d %-11s %s" % (entry["id"], entry["verdict"], detail), flush=True)
 
     # ------------------------------------------------------------------------ preparing
     def replay_bytes(self, replay_id):
@@ -96,7 +104,7 @@ class Shard:
         if found:
             return found
         zpath = os.path.join(self.args.work, "dl", folder + ".zip")
-        fetch(MAP_URL % folder, zpath, self.args.delay)
+        fetch(map_url(folder), zpath, self.args.delay)
         return extract_map(zpath, os.path.join(self.args.work, "maps"), folder)
 
     def m28_folder(self, version):
@@ -229,6 +237,7 @@ class Shard:
             "id": item["id"], "verdict": verdict, "first_beat": game["first_beat"],
             "mismatches": game["mismatches"] or None, "live_desyncs": game["live"] or None,
             "last_beat": game["tick"], "length": game["info"].get("beats"), "ended": game["ended"],
+            "game_s": game["tick"] / 10.0 if game["tick"] > 0 else None,  # 10 beats a game second
             "game_over": game["over"], "players": item["players"], "map": game["info"]["map"],
             "m28": game["info"]["m28"], "wall_s": round(time.time() - game["t0"], 1), "est_s": item["est"],
             "downloaded": game["downloaded"] or None, "notes": game["notes"] or None,
@@ -236,6 +245,44 @@ class Shard:
         self.running.remove(game)
         os.remove(game["init"])
         shutil.rmtree(game["run"], ignore_errors=True)
+
+    def progress(self):
+        """The shard (replays done, game time played of all, the speedup all slots give together,
+        time left) and each running replay (beat, share done, game and wall time, speedup, time
+        left). Game time is beats / 10; speedup is game time over wall time."""
+        now = self.shown = time.time()
+        played = sum(r.get("game_s") or 0 for r in self.results)
+        left = sum(item["ticks"] for item in self.queue) / 10.0
+        planned = sum(item["est"] for item in self.queue)  # the plan's wall seconds, for before any beat
+        rows = []
+        slowest = 0.0  # the job lasts at least as long as its slowest running replay
+        for game in self.running:
+            beats = game["info"].get("beats") or game["item"]["ticks"]
+            game_s, total_s, wall = max(0, game["tick"]) / 10.0, beats / 10.0, now - game["t0"]
+            played += game_s
+            left += max(0.0, total_s - game_s)
+            rate = game_s / wall if wall > 0 else 0.0
+            if rate > 0:  # measured once the replay has played beats
+                eta, how = (total_s - game_s) / rate, ""
+            else:  # still loading: what the plan estimated, less the time it has had
+                eta, how = max(0.0, game["item"]["est"] - wall), " (planned)"
+            planned += eta
+            slowest = max(slowest, eta)
+            rows.append("  %-8d beat %d/%d (%d%%), game %s of %s, wall %s, x%.1f, about %s left%s"
+                        % (game["item"]["id"], game_s * 10, beats, 100 * game_s / total_s if total_s else 0,
+                           clock(game_s), clock(total_s), clock(wall), rate, clock(eta), how))
+        wall = now - self.start
+        rate = played / wall if wall > 0 else 0.0
+        if rate > 0:
+            eta, how = max(left / rate, slowest), ""
+        else:
+            eta, how = max(planned / max(1, self.args.slots), slowest), " (planned)"
+        print("[%s] %d/%d replays done, %d playing, %d waiting; game %s of %s played (%d%%), x%.1f over all slots, "
+              "about %s left%s" % (clock(wall), len(self.results), self.total, len(self.running), len(self.queue),
+                                   clock(played), clock(played + left), 100 * played / (played + left) if played + left else 0,
+                                   rate, clock(eta), how), flush=True)
+        for row in rows:
+            print(row, flush=True)
 
     def next_fitting(self):
         left = self.deadline - time.time()
@@ -257,7 +304,7 @@ class Shard:
                 try:
                     prepared, result = self.prepare(item)
                 except Exception as exc:
-                    self.record({"id": item["id"], "verdict": "not-run", "why": "prepare: %s" % str(exc)[:120]})
+                    self.record({"id": item["id"], "verdict": "error", "why": "prepare: %s" % str(exc)[:120]})
                     continue
                 if result:
                     self.record(result)
@@ -269,6 +316,8 @@ class Shard:
                     self.finish(game)
                 elif time.time() > self.deadline:
                     self.finish(game, timed_out=True)
+            if self.running and time.time() - self.shown >= PROGRESS_S:
+                self.progress()
             time.sleep(1.0)
         counts = {}
         for r in self.results:

@@ -4,10 +4,12 @@ usage: report.py --plan plan.json --results DIR [--expected FILE] --out DIR
 
 DIR holds the shards' results (any depth: every results.jsonl under it). Writes OUT/report.json
 (every replay) and OUT/report.md (the summary: counts, every replay that did not pass with its
-beat and notes, replays where a live client desynced, the time model fitted to this run), and
+beat and notes, replays where a live client desynced, every passing replay with its replay time,
+wall time and speedup, the time model fitted to this run), and
 appends report.md to the GitHub job summary. --expected lists known failures
 ({"<id>": {"verdict": "desync", "note": "..."}}); exit code 1 when a replay desynced, crashed,
-stopped early or ran out of time and is not listed there with that verdict.
+stopped early, ran out of time, could not be got ready or got no result from its shard, and is
+not listed there with that verdict.
 """
 import argparse
 import glob
@@ -15,8 +17,14 @@ import json
 import os
 import sys
 
-FAILURES = ("desync", "crash", "incomplete", "timeout")
-ORDER = ("pass", "desync", "crash", "incomplete", "timeout", "unsupported", "not-run", "not-scheduled")
+from common import clock
+
+# error: the replay could not be got ready (download, map, M28AI) or its shard's job died; a
+# replay the run meant to play and did not is a failure of the run, not a pass.
+FAILURES = ("desync", "crash", "incomplete", "timeout", "error")
+# Passing replays listed in report.md (GitHub caps a job summary at 1 MiB); report.json has all.
+PASS_ROWS = 500
+ORDER = ("pass", "desync", "crash", "incomplete", "timeout", "error", "unsupported", "not-run", "not-scheduled")
 
 
 def fit_time_model(results):
@@ -76,7 +84,7 @@ def main():
         results.setdefault(n["id"], {"id": n["id"], "verdict": "not-scheduled", "why": n["why"]})
     for shard in plan["shards"]:  # a shard whose job died wrote nothing
         for item in shard["replays"]:
-            results.setdefault(item["id"], {"id": item["id"], "verdict": "not-run",
+            results.setdefault(item["id"], {"id": item["id"], "verdict": "error",
                                             "why": "no result from shard %d" % shard["shard"]})
 
     regressions, known, fixed = [], [], []
@@ -121,6 +129,26 @@ def main():
                   "A live client disagreed with the others and the sim sided with the majority.", ""]
         lines += ["- %d: %s" % (r["id"], ", ".join("%s at beat %d" % (d["client"], d["beat"]) for d in r["live_desyncs"]))
                   for r in sorted(live, key=lambda r: r["id"])] + [""]
+    passed = sorted((r for r in results.values() if r["verdict"] == "pass" and r.get("wall_s")), key=lambda r: r["id"])
+    if passed:
+        for r in passed:  # results written before game_s existed
+            r.setdefault("game_s", max(0, r.get("last_beat") or 0) / 10.0)
+        game_total = sum(r["game_s"] for r in passed)
+        wall_total = sum(r["wall_s"] for r in passed)
+        lines += ["## Passed (%d)" % len(passed), "",
+                  "Replay time is the game time played (10 beats a second); wall time runs from starting headless "
+                  "to its exit, loading included; speedup is replay time over wall time. A runner plays %s at once."
+                  % plan["settings"].get("slots", "several"), "",
+                  "In all: %s of replay time in %s of wall time, x%.1f." % (clock(game_total), clock(wall_total),
+                                                                            game_total / wall_total if wall_total else 0), "",
+                  "| Replay | Replay time | Wall time | Speedup | Players | Map |", "|---|---|---|---|---|---|"]
+        shown = passed[:PASS_ROWS]
+        lines += ["| %d | %s | %s | x%.1f | %s | %s |" % (r["id"], clock(r["game_s"]), clock(r["wall_s"]),
+                                                          r["game_s"] / r["wall_s"], r.get("players", ""), r.get("map", ""))
+                  for r in shown]
+        if len(passed) > len(shown):
+            lines += ["", "%d more in report.json." % (len(passed) - len(shown))]
+        lines += [""]
     other = [r for r in results.values() if r["verdict"] in ("not-run", "not-scheduled", "unsupported")]
     if other:
         why = {}

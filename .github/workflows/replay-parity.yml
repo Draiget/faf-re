@@ -41,29 +41,63 @@ env:
   # Jobs play for this long; plan.py packs shards to it, shard.py starts nothing that would not
   # end by then. A job may run 360 minutes in all.
   PLAY_MINUTES: "300"
+  # Part of the headless build's cache key: a new value rebuilds everything once.
+  BUILD_CACHE: "v1"
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      # The full commit of `ref`: checkout takes a short commit id for a branch or tag name.
+      - id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+        run: |
+          sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ steps.commit.outputs.sha }}
+      # The headless binary is cached by what it is built from: the git trees of the paths the
+      # build reads (the pinned toolchain makes the same sources the same binary). Commits that
+      # change only tools/, docs/ or .github/ reuse it. Bump BUILD_CACHE when the build steps change.
+      - id: sources
+        run: |
+          tree=$(git ls-tree HEAD CMakeLists.txt CMakePresets.json cmake data dependencies src tests | sha256sum | cut -c1-20)
+          echo "key=headless-$BUILD_CACHE-$tree" >> "$GITHUB_OUTPUT"
+      - id: built
+        uses: actions/cache/restore@v6
+        with:
+          path: build/linux-clang-x64-release/headless
+          key: ${{ steps.sources.outputs.key }}
       # The pinned toolchain (cmake/toolchains/linux-clang-pins.cmake): configure refuses another.
-      - run: |
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: |
           sudo apt-get update
           v=1:18.1.3-1ubuntu1
           sudo apt-get install -y --no-install-recommends ninja-build \
             clang-18=$v lld-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
-      - uses: actions/cache@v4
+      - if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache@v6
         with:
           path: dependencies/.downloads
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
-      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
-      - run: cmake --preset linux-clang-x64-release
-      - run: cmake --build --preset linux-clang-x64-release --target headless
-      - run: echo "Built $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake --preset linux-clang-x64-release
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake --build --preset linux-clang-x64-release --target headless
+      - if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/linux-clang-x64-release/headless
+          key: ${{ steps.sources.outputs.key }}
+      - run: |
+          what=$([ "${{ steps.built.outputs.cache-hit }}" = true ] && echo "Reused the build" || echo "Built")
+          echo "$what ${{ steps.sources.outputs.key }} for ${{ steps.commit.outputs.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
         with:
           name: headless
           path: build/linux-clang-x64-release/headless
@@ -74,13 +108,13 @@ jobs:
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       # What the prewarm learnt about each replay (ready, or why not). Without it every corpus
       # replay is scheduled and the jobs check them.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: cache/index
           key: index-${{ env.GAME_VERSION }}-latest
@@ -91,7 +125,7 @@ jobs:
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
           --set ${{ inputs.set }} --sample ${{ inputs.sample }} --seed ${{ inputs.seed }} --slots 4
           --budget-minutes "$PLAY_MINUTES" --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plan
           path: plan.json
@@ -108,23 +142,23 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     name: run (shard ${{ matrix.shard }})
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: headless
           path: bin
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: plan
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: game
           key: game-${{ env.GAME_VERSION }}
           fail-on-cache-miss: true
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
@@ -133,21 +167,27 @@ jobs:
       - env:
           KEY: ${{ secrets.PARITY_RETAIL_KEY }}
         run: |
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc | tar -xJf - -C game
           rm retail.enc
           chmod +x bin/headless
-      - uses: actions/cache/restore@v4
+      # A cache entry matches only a restore with the same path lines: these are the prewarm's.
+      - uses: actions/cache/restore@v6
         with:
-          path: cache/maps
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
           key: maps-${{ env.GAME_VERSION }}-latest
           restore-keys: maps-${{ env.GAME_VERSION }}-
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
-          path: cache/m28
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
           key: m28-${{ env.GAME_VERSION }}-latest
           restore-keys: m28-${{ env.GAME_VERSION }}-
       - if: matrix.bucket >= 0
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: cache/replays
           key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-latest
@@ -158,7 +198,7 @@ jobs:
           --pack game --replays cache/replays --maps cache/maps --m28 cache/m28 --work work
           --out results --minutes "$PLAY_MINUTES" --game-version "$GAME_VERSION"
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.shard }}
           path: results
@@ -169,14 +209,14 @@ jobs:
     if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: plan
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: results-*
           path: results
@@ -185,7 +225,7 @@ jobs:
           --expected tools/parity-data/expected/$GAME_VERSION.json --out report
           --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}, game version $GAME_VERSION"
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: report
           path: report

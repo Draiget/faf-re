@@ -21,6 +21,9 @@ on:
       asset_minutes:
         description: Minutes spent fetching maps and M28AI versions
         default: "60"
+      parallel:
+        description: Replay buckets fetched at once (each one request a second to FAF)
+        default: "4"
   schedule:
     - cron: "23 4 * * 1"
 
@@ -42,7 +45,7 @@ jobs:
     outputs:
       buckets: ${{ steps.buckets.outputs.buckets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: tools/parity-data
       - id: buckets
@@ -59,21 +62,21 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - id: have
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: game
           key: game-${{ env.GAME_VERSION }}
           lookup-only: true
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - if: steps.have.outputs.cache-hit != 'true'
         run: python tools/parity-data/prewarm.py game --game-version "$GAME_VERSION" --out game
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: game
           key: game-${{ env.GAME_VERSION }}
@@ -86,7 +89,7 @@ jobs:
     environment: parity
     steps:
       - id: have
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
@@ -105,30 +108,37 @@ jobs:
           if [ "$(head -c 8 retail.enc)" != "Salted__" ]; then
             echo "::error::PARITY_RETAIL_URL did not return the encrypted pack (is the link shared?)"; exit 1
           fi
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc | tar -tJf - | tee contents.txt
+          # A pasted secret often carries a line break; the passphrase has no white space.
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
+          if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc -out retail.tar.xz \
+              || ! tar -tJf retail.tar.xz > contents.txt; then
+            echo "::error::PARITY_RETAIL_KEY does not open the file at PARITY_RETAIL_URL (a wrong passphrase decrypts to noise)"; exit 1
+          fi
+          cat contents.txt
           grep -q "fa/gamedata/units.scd" contents.txt
+          rm retail.tar.xz
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
 
-  # One bucket of 10,000 replay ids per job, one job at a time: FAF sees a single requester.
+  # One bucket of 10,000 replay ids per job, `parallel` jobs at a time, each one request a second.
   replays:
     needs: corpus
     runs-on: ubuntu-24.04
     strategy:
-      max-parallel: 1
+      max-parallel: ${{ fromJSON(inputs.parallel || '4') }}
       fail-fast: false
       matrix:
         bucket: ${{ fromJSON(needs.corpus.outputs.buckets) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - id: restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: cache/replays
           key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-latest
@@ -138,15 +148,20 @@ jobs:
           python tools/parity-data/prewarm.py replays --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
           --bucket ${{ matrix.bucket }} --cache cache/replays --game-version "$GAME_VERSION"
           --minutes ${{ inputs.replay_minutes || '20' }}
+      # Counted from the index on disk, and saved even when the fetch was cancelled or failed:
+      # every replay a job downloaded stays for the next run.
+      - id: count
+        if: always()
+        run: echo "count=$([ -f cache/replays/index.jsonl ] && wc -l < cache/replays/index.jsonl || echo 0)" >> "$GITHUB_OUTPUT"
       - if: >
-          steps.fetch.outputs.count != '0' &&
-          steps.restore.outputs.cache-matched-key != format('replays-{0}-b{1}-n{2}', env.GAME_VERSION, matrix.bucket, steps.fetch.outputs.count)
-        uses: actions/cache/save@v4
+          always() && steps.count.outputs.count != '0' &&
+          steps.restore.outputs.cache-matched-key != format('replays-{0}-b{1}-n{2}', env.GAME_VERSION, matrix.bucket, steps.count.outputs.count)
+        uses: actions/cache/save@v6
         with:
           path: cache/replays
-          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-n${{ steps.fetch.outputs.count }}
-      - if: steps.fetch.outputs.count != '0'
-        uses: actions/upload-artifact@v4
+          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-n${{ steps.count.outputs.count }}
+      - if: always() && steps.count.outputs.count != '0'
+        uses: actions/upload-artifact@v7
         with:
           name: index-b${{ matrix.bucket }}
           path: cache/replays/index.jsonl
@@ -159,24 +174,29 @@ jobs:
     if: always() && needs.replays.result != 'cancelled'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: index-*
           path: index
+      # A cache entry matches only a restore with the same path lines: these are the save steps'.
       - id: maps
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
-          path: cache/maps
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
           key: maps-${{ env.GAME_VERSION }}-latest
           restore-keys: maps-${{ env.GAME_VERSION }}-
       - id: m28
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
-          path: cache/m28
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
           key: m28-${{ env.GAME_VERSION }}-latest
           restore-keys: m28-${{ env.GAME_VERSION }}-
       - id: fetch
@@ -185,23 +205,33 @@ jobs:
           python tools/parity-data/prewarm.py assets --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
           --index index --maps cache/maps --m28 cache/m28 --index-out cache/index/index.jsonl
           --minutes ${{ inputs.asset_minutes || '60' }}
+      # Counted on disk (complete folders only), and saved even when the fetch was cancelled.
+      - id: count
+        if: always()
+        run: |
+          echo "maps=$(ls cache/maps 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+          echo "m28=$(ls cache/m28 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
       - if: >
-          steps.fetch.outputs.maps != '0' &&
-          steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.fetch.outputs.maps)
-        uses: actions/cache/save@v4
+          always() && steps.count.outputs.maps != '0' &&
+          steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.maps)
+        uses: actions/cache/save@v6
         with:
-          path: cache/maps
-          key: maps-${{ env.GAME_VERSION }}-n${{ steps.fetch.outputs.maps }}
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.maps }}
       - if: >
-          steps.fetch.outputs.m28 != '0' &&
-          steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.fetch.outputs.m28)
-        uses: actions/cache/save@v4
+          always() && steps.count.outputs.m28 != '0' &&
+          steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.m28)
+        uses: actions/cache/save@v6
         with:
-          path: cache/m28
-          key: m28-${{ env.GAME_VERSION }}-n${{ steps.fetch.outputs.m28 }}
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.m28 }}
       # Saved every run: a cache key is written once, so the run number keeps it new.
       - if: steps.fetch.outputs.indexed != '0'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: cache/index
           key: index-${{ env.GAME_VERSION }}-r${{ github.run_number }}
