@@ -11,6 +11,7 @@ set(FAF_REMOTE_SOURCES
   remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
   remote/VisibilityOracle.cpp
+  remote/SpatialOracle.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/NameTable.cpp
@@ -26,6 +27,7 @@ set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/BeatClock.cpp
   remote/client/LoopbackCommands.cpp
   remote/client/LoopbackLink.cpp
+  remote/client/OracleGolden.cpp
   remote/client/RemoteClientManager.cpp
   remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp

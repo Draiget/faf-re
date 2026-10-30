@@ -492,7 +492,11 @@ namespace faf::headless
     // `--oracle-check`: after every `Sim::Sync`, on the sim's thread.
     std::unique_ptr<CReplayOracleCheck> oracleCheck;
     if (options.oracleCheck) {
-      oracleCheck = std::make_unique<CReplayOracleCheck>();
+      oracleCheck = std::make_unique<CReplayOracleCheck>(options.oracleDigestsPath);
+      if (!oracleCheck->IsOpen()) {
+        result.error = "cannot write " + options.oracleDigestsPath;
+        return result;
+      }
       oracleCheck->Install();
     }
 #endif

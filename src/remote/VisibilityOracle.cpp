@@ -3,6 +3,8 @@
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/GridPos.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/EAllianceTypeInfo.h"
@@ -69,39 +71,77 @@ namespace faf::remote
       return result;
     }
 
-    /**
-     * `UserArmy::CanSeeCell` (0x008B17F0) on the sim's grids: the view's own vision (or water)
-     * grid, then every other army that counts the view as an ally, where an ally without the
-     * grid counts as seeing.
-     */
-    [[nodiscard]] bool ViewCanSeeCell(
-      const moho::Sim& sim, const moho::CArmyImpl& view, const std::int32_t x, const std::int32_t z,
-      const bool underwater
-    )
+    /** Units and blips: a `UserUnit` on the client, which never tests the grid. */
+    [[nodiscard]] bool IsClientUnit(moho::Entity& entity)
     {
-      const moho::SSTIArmyConstantData& own = view.mConstDat;
-      const moho::CIntelGrid* const ownGrid =
-        underwater ? own.mWaterReconGrid.get() : own.mVisionReconGrid.get();
-      if (ownGrid != nullptr && ownGrid->IsVisible(x, z)) {
-        return true;
-      }
+      return entity.IsUnit() != nullptr || entity.IsReconBlip() != nullptr;
+    }
 
-      // 0x008B186E..0x008B18B6: every army of the list but the view itself, kept when it lists
-      // the view among its allies (`ally->IsAlly(view index)`, 0x008B18AB).
-      const std::uint32_t viewIndex = static_cast<std::uint32_t>(own.mArmyIndex);
-      for (const moho::CArmyImpl* const ally : sim.mArmiesList) {
-        if (ally == nullptr || ally == &view || !ally->mVarDat.mAllies.Contains(viewIndex)) {
-          continue;
-        }
-        const moho::CIntelGrid* const allyGrid =
-          underwater ? ally->mConstDat.mWaterReconGrid.get() : ally->mConstDat.mVisionReconGrid.get();
-        if (allyGrid == nullptr || allyGrid->IsVisible(x, z)) {
-          return true;
-        }
+    constexpr std::uint32_t kReconSeenNow = 0x08u;  // `UserUnit::mIntelStateFlags`, 0x008C09ED
+    constexpr std::uint32_t kReconSeenEver = 0x10u; // 0x008C0A02
+    constexpr std::uint32_t kUnitReconFlags = 28u;  // `Unit::SyncInterface`: every unit update
+
+    /** The recon flags the client's `UserUnit` holds: the unit's fixed word, or the blip's record. */
+    [[nodiscard]] std::uint32_t ClientReconFlags(const std::int32_t viewArmy, moho::Entity& entity)
+    {
+      const moho::ReconBlip* const blip = entity.IsReconBlip();
+      if (blip == nullptr) {
+        return kUnitReconFlags;
       }
-      return false;
+      if (viewArmy < 0 || static_cast<std::uint32_t>(viewArmy) >= blip->mReconDat.size()) {
+        return 0u;
+      }
+      return blip->mReconDat[static_cast<std::size_t>(viewArmy)].mReconFlags;
+    }
+
+    /**
+     * `UserUnit::IsMobile` (0x008C04E0) on the blueprint the client unit was created with (the
+     * entity's own, `ReconBlip::CreateInterface` / `Unit::CreateInterface`): motion types Land
+     * through AmphibiousFloating.
+     */
+    [[nodiscard]] bool IsClientMobile(const moho::Entity& entity)
+    {
+      const auto* const blueprint = reinterpret_cast<const moho::RUnitBlueprint*>(entity.BluePrint);
+      if (blueprint == nullptr) {
+        return false;
+      }
+      const auto motionType = static_cast<std::uint32_t>(blueprint->Physics.MotionType);
+      return (motionType - 1u) <= (static_cast<std::uint32_t>(moho::RULEUMT_AmphibiousFloating) - 1u);
     }
   } // namespace
+
+  /**
+   * `UserArmy::CanSeeCell` (0x008B17F0) on the sim's grids: the view's own vision (or water)
+   * grid, then every other army that counts the view as an ally, where an ally without the
+   * grid counts as seeing.
+   */
+  [[nodiscard]] bool ViewCanSeeCell(
+    const moho::Sim& sim, const moho::CArmyImpl& view, const std::int32_t x, const std::int32_t z,
+    const bool underwater
+  )
+  {
+    const moho::SSTIArmyConstantData& own = view.mConstDat;
+    const moho::CIntelGrid* const ownGrid =
+      underwater ? own.mWaterReconGrid.get() : own.mVisionReconGrid.get();
+    if (ownGrid != nullptr && ownGrid->IsVisible(x, z)) {
+      return true;
+    }
+
+    // 0x008B186E..0x008B18B6: every army of the list but the view itself, kept when it lists
+    // the view among its allies (`ally->IsAlly(view index)`, 0x008B18AB).
+    const std::uint32_t viewIndex = static_cast<std::uint32_t>(own.mArmyIndex);
+    for (const moho::CArmyImpl* const ally : sim.mArmiesList) {
+      if (ally == nullptr || ally == &view || !ally->mVarDat.mAllies.Contains(viewIndex)) {
+        continue;
+      }
+      const moho::CIntelGrid* const allyGrid =
+        underwater ? ally->mConstDat.mWaterReconGrid.get() : ally->mConstDat.mVisionReconGrid.get();
+      if (allyGrid == nullptr || allyGrid->IsVisible(x, z)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   SViewVisibility ResolveViewVisibility(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)
   {
@@ -158,11 +198,52 @@ namespace faf::remote
     if (!visibility.published) {
       return false;
     }
-    if (visibility.mode != moho::EUserEntityVisibilityMode::ReconGrid) {
+    if (visibility.mode != moho::EUserEntityVisibilityMode::ReconGrid || IsClientUnit(entity)) {
       return true;
     }
     return ViewCanSeePoint(
       sim, viewArmy, entity.mVarDat.mCurTransform.pos_, entity.mVarDat.UsesUnderwaterReconGrid()
     );
+  }
+
+  bool ViewShowsMesh(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)
+  {
+    const SViewVisibility visibility = ResolveViewVisibility(sim, viewArmy, entity);
+    if (!visibility.published) {
+      return false;
+    }
+
+    const bool clientUnit = IsClientUnit(entity);
+    switch (visibility.mode) {
+      case moho::EUserEntityVisibilityMode::Hidden:
+        return false;
+
+      case moho::EUserEntityVisibilityMode::MapPlayableRect: {
+        // `UserUnit::UpdateVisibility` 0x008C0A24: shown. `UserEntity::UpdateVisibility`: the
+        // cell of the truncated position inside the playable rect, `[min, max)`.
+        if (clientUnit) {
+          return true;
+        }
+        const gpg::Rect2i& rect = sim.mMapData->mPlayableRect;
+        const auto cellX = static_cast<std::int32_t>(entity.mVarDat.mCurTransform.pos_.x);
+        const auto cellZ = static_cast<std::int32_t>(entity.mVarDat.mCurTransform.pos_.z);
+        return cellX >= rect.x0 && cellX < rect.x1 && cellZ >= rect.z0 && cellZ < rect.z1;
+      }
+
+      case moho::EUserEntityVisibilityMode::ReconGrid: {
+        if (!clientUnit) {
+          return ViewCanSeePoint(
+            sim, viewArmy, entity.mVarDat.mCurTransform.pos_, entity.mVarDat.UsesUnderwaterReconGrid()
+          );
+        }
+        // 0x008C09CF..0x008C0A0A: a mobile unit shows on "seen now", a structure on "seen ever".
+        const std::uint32_t flags = ClientReconFlags(viewArmy, entity);
+        return IsClientMobile(entity) ? (flags & kReconSeenNow) != 0u : (flags & kReconSeenEver) != 0u;
+      }
+
+      default:
+        // Both client functions leave the mesh as it was for any other mode.
+        return true;
+    }
   }
 } // namespace faf::remote

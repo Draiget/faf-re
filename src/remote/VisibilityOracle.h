@@ -17,10 +17,16 @@
 //      viz channel for that army, `Unit::UpdateVisibility` (0x006ABC30) publishes a unit to its
 //      own army only, `ReconBlip::UpdateVisibility` (0x005BEE40) publishes a blip while the
 //      army's recon record needs a flush. `Prop::Sync` (0x006FA2A0) never tests visibility.
-//   2. The client shows a published entity in mode ReconGrid only where its army or an army
-//      that counts it as an ally can see the point (`UserEntity::UpdateVisibility` 0x008B9580,
-//      `UserArmy::CanSeePoint` 0x008B22B0, `UserArmy::CanSeeCell` 0x008B17F0). Those grids are
-//      the sim's own recon grids (`CArmyImpl` hands them to the client by shared pointer).
+//   2. The client draws a published entity's mesh by its visibility mode. A plain entity
+//      (`UserEntity::UpdateVisibility` 0x008B9580) in mode ReconGrid shows only where its army
+//      or an army that counts it as an ally can see the point (`UserArmy::CanSeePoint`
+//      0x008B22B0, `UserArmy::CanSeeCell` 0x008B17F0; the grids are the sim's own, handed to
+//      the client by shared pointer), and in mode MapPlayableRect only inside the playable
+//      rect. Units and blips are `UserUnit`s on the client (`UserUnit::UpdateVisibility`
+//      0x008C09B0): no grid and no rect; in mode ReconGrid a mobile one shows while its recon
+//      flags say "seen now" (0x08), a structure once "seen ever" (0x10). A unit always sends
+//      the flags 0x1C (`Unit::SyncInterface`), a blip its record for the focus army
+//      (`ReconBlip::SyncInterface` 0x005BEFB0).
 //
 // Brute force on purpose: this is the reference the spatial oracle (WPR.44) is checked
 // against (WPR.54). Two client-side inputs are not modelled: the client's fog-of-war console
@@ -29,6 +35,7 @@
 
 namespace moho
 {
+  class CArmyImpl;
   class Entity;
   class Sim;
 }
@@ -49,6 +56,15 @@ namespace faf::remote
   [[nodiscard]] SViewVisibility ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
 
   /**
+   * `UserArmy::CanSeeCell` (0x008B17F0) on the sim's grids: whether `view` sees the cell through
+   * its own vision (or, `underwater`, water) grid or the grid of an army that counts it as an
+   * ally. `ViewCanSeePoint` maps the point to the cell; the spatial oracle tests cells directly.
+   */
+  [[nodiscard]] bool ViewCanSeeCell(
+    const moho::Sim& sim, const moho::CArmyImpl& view, std::int32_t x, std::int32_t z, bool underwater
+  );
+
+  /**
    * Stage 2 (WP4.2): whether `viewArmy`'s client sees the world point `pos` through its own
    * recon grids or an ally's, mapped to cells as `UserArmy::CanSeePoint` maps them. An
    * underwater entity is tested against the water grids, everything else against the vision
@@ -57,9 +73,18 @@ namespace faf::remote
   [[nodiscard]] bool ViewCanSeePoint(const moho::Sim& sim, std::int32_t viewArmy, const Wm3::Vec3f& pos, bool underwater);
 
   /**
-   * Whether the entity belongs in `viewArmy`'s view this beat: published, and for mode
-   * ReconGrid inside the view's sight. Other modes are sent as the client would show them
-   * (hidden or clipped to the playable rect on the client, never by fog).
+   * Whether the entity belongs in `viewArmy`'s view this beat: published, and for a plain
+   * entity in mode ReconGrid inside the view's sight (plan §6). Units and blips are sent
+   * whenever published: the client keeps a blip it does not draw (its radar icon), and never
+   * tests them against the grid. Other modes are sent as published; the client hides or clips
+   * them itself.
    */
   [[nodiscard]] bool CanViewSee(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
+
+  /**
+   * Whether `viewArmy`'s lockstep client draws the entity's mesh this beat (stage 2 above,
+   * `UserEntity::UpdateVisibility` or `UserUnit::UpdateVisibility`). What the golden test
+   * (plan WP4.4) compares with a client's display.
+   */
+  [[nodiscard]] bool ViewShowsMesh(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
 } // namespace faf::remote

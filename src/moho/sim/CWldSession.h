@@ -601,6 +601,16 @@ namespace moho
      */
     void DoBeat(msvc8::auto_ptr<SSyncData> syncData);
 
+#if FAF_SERVER_MODE
+    /**
+     * Engine addition, server mode (plan WP4.4): a function `DoBeat` calls once the beat's
+     * orphan and visibility walks are done, with the session and the beat; the oracle's golden
+     * test (remote/client/OracleGolden.h) reads what the client draws there. Null by default.
+     */
+    using BeatObserver = void (*)(CWldSession& session, std::int32_t beat, void* context);
+    static void SetBeatObserver(BeatObserver observer, void* context) noexcept;
+#endif
+
     /**
      * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)
      *

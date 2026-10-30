@@ -317,6 +317,10 @@ include(sim_sources.cmake)
 
 set(_faf_client_sources ${FAF_ENGINE_SOURCES})
 list(REMOVE_ITEM _faf_client_sources ${FAF_SIM_SOURCES})
+if(FAF_SERVER_MODE)
+  # The oracle's golden test reads the client world (CWldSession): faf_main's alone.
+  list(APPEND _faf_client_sources remote/client/OracleGolden.cpp)
+endif()
 set(_faf_sim_objects "$<TARGET_OBJECTS:faf_engine>")
 set(_faf_client_regex "")
 set(_faf_client_count 0)

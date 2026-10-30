@@ -23,6 +23,7 @@ namespace faf::headless
     int loopbackTurnTolerance = 0; // with dead reckoning: orientation tolerance in 1/65536 turns (0: off)
     bool commandCheck = false;  // every command decoded and marshalled again, compared (ReplayCommandCheck.h)
     bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
+    std::string oracleDigestsPath; // with `oracleCheck`: per beat and army, the oracle's answers as a digest
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end

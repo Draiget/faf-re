@@ -8539,6 +8539,20 @@ namespace moho
     return mBeatDebugCanvas.clone_retained();
   }
 
+#if FAF_SERVER_MODE
+  namespace
+  {
+    CWldSession::BeatObserver sBeatObserver = nullptr;
+    void* sBeatObserverContext = nullptr;
+  } // namespace
+
+  void CWldSession::SetBeatObserver(const BeatObserver observer, void* const context) noexcept
+  {
+    sBeatObserverContext = context;
+    sBeatObserver = observer;
+  }
+#endif
+
   /**
    * Address: 0x00894530 (FUN_00894530,
    * ?DoBeat@CWldSession@Moho@@QAEXV?$auto_ptr@USSyncData@Moho@@@std@@@Z)
@@ -8842,6 +8856,11 @@ namespace moho
         entity->UpdateVisibility();
       }
     }
+#if FAF_SERVER_MODE
+    if (sBeatObserver != nullptr) {
+      sBeatObserver(*this, beat.mCurBeat, sBeatObserverContext);
+    }
+#endif
 
     AdvanceCommandIssueHelpersToBeat(*mCommandManager, beat.mCurBeat);
 
