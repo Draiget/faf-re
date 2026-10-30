@@ -253,6 +253,7 @@ class Shard:
         now = self.shown = time.time()
         played = sum(r.get("game_s") or 0 for r in self.results)
         left = sum(item["ticks"] for item in self.queue) / 10.0
+        planned = sum(item["est"] for item in self.queue)  # the plan's wall seconds, for before any beat
         rows = []
         slowest = 0.0  # the job lasts at least as long as its slowest running replay
         for game in self.running:
@@ -261,17 +262,25 @@ class Shard:
             played += game_s
             left += max(0.0, total_s - game_s)
             rate = game_s / wall if wall > 0 else 0.0
-            eta = (total_s - game_s) / rate if rate > 0 else None
-            slowest = max(slowest, eta or 0.0)
-            rows.append("  %-8d beat %d/%d (%d%%), game %s of %s, wall %s, x%.1f, about %s left"
+            if rate > 0:  # measured once the replay has played beats
+                eta, how = (total_s - game_s) / rate, ""
+            else:  # still loading: what the plan estimated, less the time it has had
+                eta, how = max(0.0, game["item"]["est"] - wall), " (planned)"
+            planned += eta
+            slowest = max(slowest, eta)
+            rows.append("  %-8d beat %d/%d (%d%%), game %s of %s, wall %s, x%.1f, about %s left%s"
                         % (game["item"]["id"], game_s * 10, beats, 100 * game_s / total_s if total_s else 0,
-                           clock(game_s), clock(total_s), clock(wall), rate, clock(eta) if eta is not None else "?"))
+                           clock(game_s), clock(total_s), clock(wall), rate, clock(eta), how))
         wall = now - self.start
         rate = played / wall if wall > 0 else 0.0
+        if rate > 0:
+            eta, how = max(left / rate, slowest), ""
+        else:
+            eta, how = max(planned / max(1, self.args.slots), slowest), " (planned)"
         print("[%s] %d/%d replays done, %d playing, %d waiting; game %s of %s played (%d%%), x%.1f over all slots, "
-              "about %s left" % (clock(wall), len(self.results), self.total, len(self.running), len(self.queue),
-                                 clock(played), clock(played + left), 100 * played / (played + left) if played + left else 0,
-                                 rate, clock(max(left / rate, slowest)) if rate > 0 else "?"), flush=True)
+              "about %s left%s" % (clock(wall), len(self.results), self.total, len(self.running), len(self.queue),
+                                   clock(played), clock(played + left), 100 * played / (played + left) if played + left else 0,
+                                   rate, clock(eta), how), flush=True)
         for row in rows:
             print(row, flush=True)
 
