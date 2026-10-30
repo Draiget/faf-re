@@ -10,7 +10,8 @@ missing from the caches is downloaded from FAF (one request at a time).
 
 Verdicts are the parity runner's (tools/replay-parity/parity.py, HeadlessGame): pass, desync
 (first mismatched beat; the replay is stopped), incomplete, crash, timeout; plus unsupported
-(the replay needs a sim mod or another game version) and not-run. A mismatch is the live game's,
+(the replay needs a sim mod or another game version), error (the replay, its map or M28AI could
+not be got ready) and not-run (no time left in the job). A mismatch is the live game's,
 not ours, when more of the recorded clients agree with the sim at that beat than with the one
 that differs; that client is not counted again for the rest of the game (live_desyncs).
 
@@ -260,7 +261,7 @@ class Shard:
                 try:
                     prepared, result = self.prepare(item)
                 except Exception as exc:
-                    self.record({"id": item["id"], "verdict": "not-run", "why": "prepare: %s" % str(exc)[:120]})
+                    self.record({"id": item["id"], "verdict": "error", "why": "prepare: %s" % str(exc)[:120]})
                     continue
                 if result:
                     self.record(result)

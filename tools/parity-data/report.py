@@ -8,7 +8,8 @@ beat and notes, replays where a live client desynced, every passing replay with 
 wall time and speedup, the time model fitted to this run), and
 appends report.md to the GitHub job summary. --expected lists known failures
 ({"<id>": {"verdict": "desync", "note": "..."}}); exit code 1 when a replay desynced, crashed,
-stopped early or ran out of time and is not listed there with that verdict.
+stopped early, ran out of time, could not be got ready or got no result from its shard, and is
+not listed there with that verdict.
 """
 import argparse
 import glob
@@ -18,10 +19,12 @@ import sys
 
 from common import clock
 
-FAILURES = ("desync", "crash", "incomplete", "timeout")
+# error: the replay could not be got ready (download, map, M28AI) or its shard's job died; a
+# replay the run meant to play and did not is a failure of the run, not a pass.
+FAILURES = ("desync", "crash", "incomplete", "timeout", "error")
 # Passing replays listed in report.md (GitHub caps a job summary at 1 MiB); report.json has all.
 PASS_ROWS = 500
-ORDER = ("pass", "desync", "crash", "incomplete", "timeout", "unsupported", "not-run", "not-scheduled")
+ORDER = ("pass", "desync", "crash", "incomplete", "timeout", "error", "unsupported", "not-run", "not-scheduled")
 
 
 def fit_time_model(results):
@@ -81,7 +84,7 @@ def main():
         results.setdefault(n["id"], {"id": n["id"], "verdict": "not-scheduled", "why": n["why"]})
     for shard in plan["shards"]:  # a shard whose job died wrote nothing
         for item in shard["replays"]:
-            results.setdefault(item["id"], {"id": item["id"], "verdict": "not-run",
+            results.setdefault(item["id"], {"id": item["id"], "verdict": "error",
                                             "why": "no result from shard %d" % shard["shard"]})
 
     regressions, known, fixed = [], [], []

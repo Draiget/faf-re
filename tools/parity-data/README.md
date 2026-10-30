@@ -20,7 +20,7 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 | `build` | Builds `headless` from the commit given, with the pinned toolchain |
 | `plan` | Picks the replays (`core`, `extended`, a seeded `sample` or `all`) and packs them into jobs |
 | `run` | One job per shard: puts the pack together (FAF's game files and the retail archives), plays its replays four at a time, and uploads `results.jsonl` and the logs of every replay that did not pass |
-| `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and fails on any new desync, crash, early stop or timeout |
+| `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and fails on any new desync, crash, early stop, timeout or error (a replay that could not be got ready, or a shard that died) |
 
 Run both from master: caches saved on master are the ones every run reads. Anyone with write access to the repository can start them. The weekly prewarm fetches what is still missing and keeps the caches from expiring (GitHub drops a cache unused for 7 days).
 
