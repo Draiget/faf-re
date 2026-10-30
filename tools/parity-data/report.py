@@ -6,7 +6,8 @@ DIR holds the shards' results (any depth: every results.jsonl under it). Writes 
 (every replay) and OUT/report.md (the summary: counts, every replay that did not pass with its
 beat and notes, replays where a live client desynced, every passing replay with its replay time,
 wall time and speedup, the time model fitted to this run), and
-appends report.md to the GitHub job summary. --expected lists known failures
+appends report.md to the GitHub job summary. --after DIR merges an earlier run's results
+under this run's (a run that finishes what the earlier one had no time for). --expected lists known failures
 ({"<id>": {"verdict": "desync", "note": "..."}}); exit code 1 when a replay desynced, crashed,
 stopped early, ran out of time, could not be got ready or got no result from its shard, and is
 not listed there with that verdict.
@@ -60,6 +61,7 @@ def main():
     parser.add_argument("--plan", required=True)
     parser.add_argument("--results", required=True)
     parser.add_argument("--expected")
+    parser.add_argument("--after", help="the earlier run's results (plan.py --after): merged under this run's")
     parser.add_argument("--out", required=True)
     parser.add_argument("--title", default="Replay parity")
     args = parser.parse_args()
@@ -72,12 +74,13 @@ def main():
             expected = {int(k): v for k, v in json.load(f).items()}
 
     results = {}
-    for path in glob.glob(os.path.join(args.results, "**", "results.jsonl"), recursive=True):
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
-                    r = json.loads(line)
-                    results[r["id"]] = r
+    for folder in filter(None, (args.after, args.results)):  # this run's results replace the earlier's
+        for path in glob.glob(os.path.join(folder, "**", "results.jsonl"), recursive=True):
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        r = json.loads(line)
+                        results[r["id"]] = r
     for u in plan["unsupported"]:
         results.setdefault(u["id"], {"id": u["id"], "verdict": "unsupported", "why": u["reason"]})
     for n in plan["not_scheduled"]:

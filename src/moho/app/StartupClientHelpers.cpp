@@ -284,6 +284,40 @@ namespace
     gpg::Warnf("SofDec error: %s", message);
     return 0;
   }
+
+  /**
+   * The binary's ADX middleware raised the process timer resolution to 1 ms
+   * when the movie manager started it (0x00874B1F: call func_AdxmStart,
+   * 0x00B07C8A: jmp 0x00B06C10, 0x00B06CC2: call [timeBeginPeriod] with 1) and
+   * never lowered it. The independent movie backend's ADXM_SetupThrd does not,
+   * so the constructor below makes the call: without it Windows rounds the
+   * main loop's finite MsgWaitForMultipleObjectsEx timeout up to the ~15.6 ms
+   * system tick and sc_FrameTimeClamp (10 ms) cannot hold. Once per process,
+   * as the middleware's init-level guard made it. `/hrtimer 0` or
+   * FAF_HRTIMER=0 keeps the system tick.
+   */
+  void RaiseTimerResolution()
+  {
+    static const bool sRaised = [] {
+      bool enabled = true;
+      char value[4] = {};
+      const DWORD written = ::GetEnvironmentVariableA("FAF_HRTIMER", value, static_cast<DWORD>(sizeof(value)));
+      if (written == 1u && value[0] == '0') {
+        enabled = false;
+      } else {
+        msvc8::vector<msvc8::string> args;
+        if (moho::CFG_GetArgOption("/hrtimer", 1, &args) && !args.empty()) {
+          enabled = std::atoi(args[0].c_str()) != 0;
+        }
+      }
+
+      const bool raised = enabled && ::timeBeginPeriod(1u) == TIMERR_NOERROR;
+      gpg::Logf("time: 1 ms timer resolution %s", raised ? "on" : (enabled ? "failed" : "off"));
+      return raised;
+    }();
+    (void)sRaised;
+  }
+
   constexpr char kAntiAliasingKey[] = "antialiasing";
   constexpr char kCommandLineOverrideModeKey[] = "overridden";
   constexpr char kDebugFacilitiesEnabledHelpText[] =
@@ -1156,7 +1190,8 @@ int moho::cfunc_DebugFacilitiesEnabledL(LuaPlus::LuaState* const state)
  *
  * What it does:
  * Opens DirectSound, hands it to the ADX middleware along with the default
- * file system and thread setup, routes middleware errors to the log, and
+ * file system and thread setup, raises the process timer resolution to 1 ms
+ * as that thread setup did, routes middleware errors to the log, and
  * initialises Sofdec for a 59.94 Hz display. The volume starts at 0: full
  * volume, in DirectSound's attenuation units.
  */
@@ -1169,6 +1204,7 @@ moho::CMovieManager::CMovieManager()
   ::ADXPC_SetupSoundDirectSound8(mDirectSound);
   ::ADXPC_SetupFileSystem(nullptr);
   ::ADXM_SetupThrd(nullptr);
+  RaiseTimerResolution();
 
   MwsfdInitPrm initParams{};
   initParams.vhz = kMovieSofdecVideoRefreshHz;

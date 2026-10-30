@@ -205,21 +205,23 @@ jobs:
           python tools/parity-data/prewarm.py assets --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
           --index index --maps cache/maps --m28 cache/m28 --index-out cache/index/index.jsonl
           --minutes ${{ inputs.asset_minutes || '60' }}
-      # Counted on disk (complete folders only), and saved even when the fetch was cancelled.
+      # Counted on disk (complete folders only; a map folder must hold its scenario file), and
+      # saved even when the fetch was cancelled. The maps key's letter changed from n to s when the
+      # count started leaving out folders without one (2026-10-30), so a repaired cache saves anew.
       - id: count
         if: always()
         run: |
-          echo "maps=$(ls cache/maps 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+          echo "maps=$(find cache/maps -mindepth 2 -maxdepth 2 -iname '*_scenario.lua' -printf '%h\n' 2>/dev/null | grep -v '/\.partial-' | sort -u | wc -l)" >> "$GITHUB_OUTPUT"
           echo "m28=$(ls cache/m28 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
       - if: >
           always() && steps.count.outputs.maps != '0' &&
-          steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.maps)
+          steps.maps.outputs.cache-matched-key != format('maps-{0}-s{1}', env.GAME_VERSION, steps.count.outputs.maps)
         uses: actions/cache/save@v6
         with:
           path: |
             cache/maps
             !cache/maps/.partial-*
-          key: maps-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.maps }}
+          key: maps-${{ env.GAME_VERSION }}-s${{ steps.count.outputs.maps }}
       - if: >
           always() && steps.count.outputs.m28 != '0' &&
           steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.m28)

@@ -35,6 +35,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ParallelCoords` | 1 | `/con` | live | Per-entity half of the coordinate advance (transforms, history, collision shape) on sim workers; grid relinks, intel updates and list links stay serial in list order (needs `sim_Workers` > 0) |
 | `sim_ReconBlipIndex` | 1 | `/con` | live | Recon blip lookup by entity id through a hash index instead of the blip map walk |
 | flat A* node table | on | `/astartable 0` or `FAF_ASTARTABLE=0` | startup only | Unit pathfinding (`PathQueue`) keeps its A* search records in an open-addressing table over a node pool, cleared by a generation bump, instead of the binary's `hash_map` (a node allocation per cell and a full free after each query); the search only finds and inserts, so paths are the same. The log says `path: flat A* node table on/off` |
+| 1 ms timer resolution | on | `/hrtimer 0` or `FAF_HRTIMER=0` | startup only | The movie manager raises the process timer resolution to 1 ms (`timeBeginPeriod(1)`), as the binary's ADX middleware did when it started (0x00B06C10) and the independent movie backend does not, so the finite `MsgWaitForMultipleObjectsEx` timeout that paces the main loop is honored and `sc_FrameTimeClamp` (10 ms) holds. Off is not the binary's path: Windows rounds the timeout up to the ~15.6 ms system tick and a frame waits a whole tick. The log says `time: 1 ms timer resolution on/off/failed` |
 | `sim_PathTraverseCache` | 1 | `/con` | live | Unit pathfinding remembers each cell's traversability (`CanTraverseCell`, an occupation-grid gather per cell) for the rest of one A* pass instead of asking the unit again for every neighbouring cell it is expanded from; nothing moves during a pass and the cache is emptied when a pass starts and ends |
 | `sim_ParallelBlipFlush` | 1 | `/con` | live | The bulk blip-unlink pass splices separate weak chains on sim workers (needs `sim_Workers` > 0) |
 | `sim_ParallelSyncHeap` | 1 | `/con` | live | With `sim_ParallelSync`, the allocating members of unit-update records are copied on workers too |
@@ -55,6 +56,9 @@ Every performance change has a switch that brings back the original path, and bo
 | `user_Workers` | −1 (auto: min(CPUs − 2, 6)) | `/con` | live | User-side worker threads; 0 runs everything on the main thread |
 | `ren_ParallelCull` | 1 | `/con` | live | Mesh and decal view queries and fog-of-war circles collected on user workers |
 | `ui_ParallelIcons` | 1 | `/con` | live | Strategic icons classified on user workers and drawn in bulk |
+| `ui_ParallelMark` | 1 | `/con` | live (next collection) | Mark UI Lua objects across CUserWorkerPool worker threads; 0 runs mark serially on main thread |
+| `ui_ParallelSweep` | 1 | `/con` | live (next collection) | Sweep UI Lua objects across CUserWorkerPool worker threads; 0 runs sweep serially on main thread |
+| `ui_IdleGC` | 1 | `/con` | live | Move periodic UI Lua GC execution to post-present idle/slack window after device refresh; 0 runs synchronously during UpdateFrameRate (retail) |
 | `wld_ParallelSync` | 1 | `/con` | live | Beat sync apply: pose and data copies on user workers |
 | `wld_FrameClock` | 1 | `/con` | live | Replays and single player: game clock from the mean frame time (0: the original median, 2: each frame's own time) |
 | `wld_VisionChainHints` | 1 | `/con` | live | Vision-tree chain tails and predecessors from checked hints instead of chain walks |

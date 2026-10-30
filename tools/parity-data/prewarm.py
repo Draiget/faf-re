@@ -32,7 +32,7 @@ import urllib.error
 
 import make_pack
 from common import (GAME_URL, MOD_URL, REPLAY_URL, bucket_of, check_replay, extract_map, fetch,
-                    find_mod_info, map_url, read_corpus)
+                    find_mod_info, has_scenario, map_url, read_corpus)
 
 # FAF's packages the init file mounts (allowedAssetsNxy in init_faf.lua). Not every version
 # publishes every one: 3835 has no mods package.
@@ -155,13 +155,17 @@ def cmd_assets(args):
         # The retail maps come from FAF's map vault too: their .scmap and Lua are the game's
         # (x1mp_005, scmp_009 compared file for file); FAF adds previews.
         cached = {row["map"] for row in corpus.values() if row["map_kind"] in ("cached", "retail")}
-        have = {n.lower() for n in os.listdir(args.maps) if not n.startswith(PARTIAL)}
+        # A folder without a scenario file came from a zip whose map was not at the top (caches
+        # saved before 2026-10-30, scmp_001): fetched again.
+        listed = [n for n in os.listdir(args.maps) if not n.startswith(PARTIAL)]
+        have = {n.lower() for n in listed if has_scenario(os.path.join(args.maps, n))}
+        broken = [n for n in listed if n.lower() not in have]
         wanted = sorted(cached - have)
         failed = 0
         fetched = 0
         start = shown = time.time()
-        print("maps: %d top and retail maps, %d cached before this run, %d to fetch"
-              % (len(cached), len(cached & have), len(wanted)), flush=True)
+        print("maps: %d top and retail maps, %d cached before this run, %d to fetch (%d of them cached without "
+              "a scenario file)" % (len(cached), len(cached & have), len(wanted), len(broken)), flush=True)
         for folder in wanted:
             if time.time() > deadline:
                 break
@@ -183,9 +187,10 @@ def cmd_assets(args):
             stats = make_pack.Stats()
             partial = os.path.join(args.maps, PARTIAL + folder)
             make_pack.pack_tree(src, partial, content, stats)
+            shutil.rmtree(os.path.join(args.maps, folder), ignore_errors=True)
             os.replace(partial, os.path.join(args.maps, folder))
             fetched += 1
-        maps_now = sum(1 for n in os.listdir(args.maps) if not n.startswith(PARTIAL))
+        maps_now = sum(1 for n in os.listdir(args.maps) if not n.startswith(PARTIAL) and has_scenario(os.path.join(args.maps, n)))
         print("maps cached: %d of %d top and retail maps (%d failed this run); M28AI versions: %d"
               % (maps_now, len(cached), failed, len(os.listdir(args.m28))))
         if args.index_out:

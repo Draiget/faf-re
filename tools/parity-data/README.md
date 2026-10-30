@@ -19,8 +19,10 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 |---|---|
 | `build` | Builds `headless` from the commit given, with the pinned toolchain |
 | `plan` | Picks the replays (`core`, `extended`, a seeded `sample` or `all`) and packs them into jobs |
-| `run` | One job per shard: puts the pack together (FAF's game files and the retail archives), plays its replays four at a time, and uploads `results.jsonl` and the logs of every replay that did not pass |
+| `run` | One job per shard: puts the pack together (FAF's game files and the retail archives), plays its replays four at a time, and uploads `results.jsonl` and the logs of every replay that did not pass. It starts a replay only if its estimate, scaled by how much longer than estimated the job's finished replays took, ends before the job's 300 minutes; a replay that does not fit, or is still playing then, is `not-run` |
 | `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and fails on any new desync, crash, early stop, timeout or error (a replay that could not be got ready, or a shard that died) |
+
+A run whose jobs ran out of time leaves replays `not-run`. Start another with `after_run` set to its run id: it plays only those (and any `error`, `timeout` or `crash`), and its report covers both runs.
 
 Run both from master: caches saved on master are the ones every run reads. Anyone with write access to the repository can start them. The weekly prewarm fetches what is still missing and keeps the caches from expiring (GitHub drops a cache unused for 7 days).
 
@@ -33,7 +35,7 @@ Run both from master: caches saved on master are the ones every run reads. Anyon
 | `game-<version>` | FAF's packages and init file, stripped (34 MB for 3835) |
 | `retail-<PARITY_RETAIL_ID>` | the retail archives, encrypted as downloaded (73 MB) |
 | `replays-<version>-b<bucket>-n<count>` | one bucket's ready `.fafreplay` files and `index.jsonl` (about 80 KB a replay) |
-| `maps-<version>-n<count>` | the top and retail maps, stripped |
+| `maps-<version>-s<count>` | the top and retail maps, stripped (count: folders holding their scenario file) |
 | `m28-<version>-n<count>` | M28AI versions |
 | `index-<version>-r<run>` | every bucket's index, for the planner |
 

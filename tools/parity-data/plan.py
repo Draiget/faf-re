@@ -12,6 +12,9 @@ the shards would pass --max-shards, the replays at the end of that order are lef
 the plan as not scheduled). Replays the prewarm found unplayable (a sim mod, another version)
 are listed as unsupported; replays it has not seen yet are scheduled and checked by the job.
 
+--after DIR (an earlier run's results) leaves out the replays that run played to a verdict, so a
+run cut short by job time limits is finished by a second one.
+
 Writes the plan and, for GitHub Actions, `matrix` (the shards) and `shards` to GITHUB_OUTPUT.
 """
 import argparse
@@ -85,6 +88,8 @@ def main():
     parser.add_argument("--max-shards", type=int, default=256)
     parser.add_argument("--jobs", type=int, default=20,
                         help="jobs GitHub runs at once (20 on Free): a small set is spread over this many")
+    parser.add_argument("--after", help="an earlier run's results (any depth of results.jsonl): its replays "
+                                        "with a verdict are left out, so this run plays what it did not")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -93,9 +98,21 @@ def main():
     for path in glob.glob(os.path.join(args.index, "**", "index.jsonl"), recursive=True):
         index.update(read_index(path))
 
+    # Replays the earlier run played to a verdict. Retried: not-run, error, timeout (which before
+    # 2026-10-30 was a replay stopped at its job's time limit) and crash (before 2026-10-30 a map
+    # cached without its scenario file, scmp_001, failed to load as a crash).
+    settled = set()
+    if args.after:
+        for path in glob.glob(os.path.join(args.after, "**", "results.jsonl"), recursive=True):
+            with open(path, encoding="utf-8") as f:
+                settled.update(r["id"] for r in map(json.loads, filter(str.strip, f))
+                               if r["verdict"] not in ("not-run", "error", "timeout", "crash"))
+
     unsupported = []
     chosen = []
     for replay_id in select(corpus, args.which, args.sample, args.seed):
+        if replay_id in settled:
+            continue
         row = corpus[replay_id]
         e = index.get(replay_id)
         if e and e["state"] != "ready":
@@ -132,7 +149,8 @@ def main():
     shards = spread(shards, min(args.jobs, args.max_shards), args.slots)
 
     plan = {
-        "settings": {k: getattr(args, k) for k in ("which", "sample", "seed", "slots", "budget_minutes", "fill")},
+        "settings": dict({k: getattr(args, k) for k in ("which", "sample", "seed", "slots", "budget_minutes", "fill")},
+                         after=len(settled)),
         "shards": [{"shard": n, "bucket": b, "load_s": round(x["load"]),
                     "replays": sorted(x["items"], key=lambda r: -r["est"])} for n, (b, x) in enumerate(shards)],
         "unsupported": unsupported,
@@ -143,6 +161,8 @@ def main():
         json.dump(plan, f, indent=1)
 
     scheduled = sum(len(s["replays"]) for s in plan["shards"])
+    if settled:
+        print("left out %d replays the earlier run played" % len(settled))
     print("set %s: %d replays in %d shards (%.0f%% full on average), %d unsupported, %d not scheduled"
           % (args.which, scheduled, len(shards),
              100.0 * sum(s["load_s"] for s in plan["shards"]) / max(1, len(shards) * capacity / args.fill),

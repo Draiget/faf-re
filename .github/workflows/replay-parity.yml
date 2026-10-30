@@ -27,9 +27,13 @@ on:
       game_version:
         description: FAF game version of the replays
         default: "3835"
+      after_run:
+        description: An earlier run's id; play only what it did not (no time left, not got ready) or what crashed, and report both
+        default: ""
 
 permissions:
   contents: read
+  actions: read  # an earlier run's results (after_run)
 
 concurrency:
   group: replay-parity
@@ -119,12 +123,21 @@ jobs:
           path: cache/index
           key: index-${{ env.GAME_VERSION }}-latest
           restore-keys: index-${{ env.GAME_VERSION }}-
+      # The earlier run's results: what it played to a verdict is left out of this plan.
+      - if: inputs.after_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: results-*
+          path: after
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
       - id: plan
         run: >
           mkdir -p cache/index &&
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
           --set ${{ inputs.set }} --sample ${{ inputs.sample }} --seed ${{ inputs.seed }} --slots 4
-          --budget-minutes "$PLAY_MINUTES" --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
+          --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
+          --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: plan
@@ -220,10 +233,18 @@ jobs:
         with:
           pattern: results-*
           path: results
+      - if: inputs.after_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: results-*
+          path: after
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
       - run: >
           python tools/parity-data/report.py --plan plan.json --results results
+          ${{ inputs.after_run != '' && '--after after' || '' }}
           --expected tools/parity-data/expected/$GAME_VERSION.json --out report
-          --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}, game version $GAME_VERSION"
+          --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
