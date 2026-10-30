@@ -138,9 +138,11 @@ namespace gpg::gal
 
 	/**
 	 * The two `mesh_Rebatch` switches (0x00F324B5 instancing, 0x00F324B4
-	 * float16), both on by default. The console command writes them directly
+	 * float16), both on by default in retail. FAF defaults float16 off while
+	 * keeping instancing on. The console command still writes them directly
 	 * and then calls `ResetHardwareVertexFormatter`.
 	 */
 	extern std::uint8_t sMeshAllowInstancing;
 	extern std::uint8_t sMeshAllowFloat16;
 }
+
