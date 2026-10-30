@@ -108,12 +108,12 @@ The switches below are read when a session begins. In a multiplayer game every c
 
 ## Protection against other players
 
-Not performance switches: these guard a game against players who send crafted traffic or host crafted maps and mods. The defaults are the protected ones.
+Not performance switches: these guard a game against players who send crafted traffic or host crafted maps and mods. The defaults are the protected ones, except `lua_AllowPrecompiledChunks`, which stays on while mods and maps move to source.
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
 | `net_CheckOrderStreams` | 1 | `/con` | next game | Compares every player's orders as each client received them (a hash in the acknowledgements the engine already sends; the shipped exe ignores it). 1 logs and shows in chat who sent players different orders; desyncs against a player whose own acknowledgement contradicts what reached this client are logged instead of reported to FAF. 2 also stops the game; 0 turns the check off |
-| `lua_AllowPrecompiledChunks` | 0 | `/con` | live | 1 lets Lua load compiled chunks as well as source. Off, a map or mod cannot run crafted bytecode, which can get past the loader's checks |
+| `lua_AllowPrecompiledChunks` | 1 | `/con` | live | 1 lets Lua load compiled chunks as well as source, and logs each one it loads (`Lua: loaded compiled chunk ...`) so its author can ship source instead. 0 refuses them: a map or mod cannot run crafted bytecode, which can get past the loader's checks. On for now while mods and maps migrate; it will become 0 by default |
 | `net_DebugAlterOrdersTo` | −1 | `/con` | live | Test only: alters this client's checksum reports to the player with that client index, for `tools/scenarios/3p-retail-orders-cheat.yaml` |
 
 Game Lua states (sim, user interface, blueprints, session) read files through the mounted game folders only: `dofile` and `loadfile` look paths up like `doscript` and `import`, a path that climbs above a mount with `..` is not found, and `LuaDumpBinary` is gone. The start-up state that runs the init file keeps real paths.

@@ -1272,14 +1272,17 @@ namespace
   void TestLuaCompiledChunksRefused()
   {
     LuaPlus::LuaState& state = TestLuaState();
+    const bool previous = lua_AllowPrecompiledChunks;
     const std::string load =
       "local f, err = loadstring(string.char(27) .. 'Lua' .. string.rep('x', 32)) return tostring(err)";
-    CHECK(RunLua(state, load).find("compiled Lua chunks are not loaded") != std::string::npos);
+    lua_AllowPrecompiledChunks = false;
+    const std::string refused = RunLua(state, load);
 
     // Switched on, the chunk reaches the undumper (which rejects this junk).
     lua_AllowPrecompiledChunks = true;
     const std::string allowed = RunLua(state, load);
-    lua_AllowPrecompiledChunks = false;
+    lua_AllowPrecompiledChunks = previous;
+    CHECK(refused.find("compiled Lua chunks are not loaded") != std::string::npos);
     CHECK(allowed.find("compiled Lua chunks are not loaded") == std::string::npos);
     CHECK(allowed != "nil");
   }

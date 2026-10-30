@@ -12998,13 +12998,14 @@ namespace moho
 	}
 
 	/**
-	 * Engine addition: `lua_AllowPrecompiledChunks`. Off by default: `lua_load`
-	 * (and so `doscript`, `import`, `loadstring`, `dofile`) refuses compiled
-	 * Lua chunks and takes source only. A crafted chunk can get past
-	 * `luaG_checkcode` and run native code, and a lobby's map or mod would run
-	 * it on every joiner; no FAF, retail or vault file checked ships one.
+	 * Engine addition: `lua_AllowPrecompiledChunks`. Off, `lua_load` (and so
+	 * `doscript`, `import`, `loadstring`, `dofile`) refuses compiled Lua chunks
+	 * and takes source only. A crafted chunk can get past `luaG_checkcode` and
+	 * run native code, and a lobby's map or mod would run it on every joiner.
+	 * On by default for now, so mods and maps that ship compiled chunks can move
+	 * to source; each compiled chunk loaded is named in the log (`f_parser`).
 	 */
-	bool lua_AllowPrecompiledChunks = false;
+	bool lua_AllowPrecompiledChunks = true;
 
 	TConVar<bool> gTConVar_lua_AllowPrecompiledChunks(
 		"lua_AllowPrecompiledChunks",
