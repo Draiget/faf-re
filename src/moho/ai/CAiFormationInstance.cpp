@@ -6,8 +6,10 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <limits>
+#include <mutex>
 #include <new>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
@@ -2436,6 +2438,66 @@ namespace moho
     mPlanUpdate = 0u;
     mMaxSize = 0;
     mScale = 0.0f;
+  }
+
+  namespace
+  {
+    /// The formation free list: freed blocks, the last freed at the back (see `operator new`).
+    struct SFormationRecycler
+    {
+      std::mutex lock;
+      std::vector<void*> blocks;
+    };
+
+    SFormationRecycler& FormationRecycler()
+    {
+      static SFormationRecycler sRecycler;
+      return sRecycler;
+    }
+  } // namespace
+
+  void* CAiFormationInstance::operator new(const std::size_t size)
+  {
+    if (void* const block = operator new(size, std::nothrow)) {
+      return block;
+    }
+    throw std::bad_alloc();
+  }
+
+  void* CAiFormationInstance::operator new(const std::size_t size, const std::nothrow_t&) noexcept
+  {
+    if (size == sizeof(CAiFormationInstance)) {
+      SFormationRecycler& recycler = FormationRecycler();
+      const std::lock_guard guard(recycler.lock);
+      if (!recycler.blocks.empty()) {
+        void* const block = recycler.blocks.back();
+        recycler.blocks.pop_back();
+        return block;
+      }
+    }
+    return ::operator new(size, std::nothrow);
+  }
+
+  void CAiFormationInstance::operator delete(void* const block, const std::size_t size) noexcept
+  {
+    if (block == nullptr) {
+      return;
+    }
+    if (size == sizeof(CAiFormationInstance)) {
+      SFormationRecycler& recycler = FormationRecycler();
+      const std::lock_guard guard(recycler.lock);
+      try {
+        recycler.blocks.push_back(block);
+        return;
+      } catch (...) {
+      }
+    }
+    ::operator delete(block);
+  }
+
+  void CAiFormationInstance::operator delete(void* const block, const std::nothrow_t&) noexcept
+  {
+    operator delete(block, sizeof(CAiFormationInstance));
   }
 
   /**
