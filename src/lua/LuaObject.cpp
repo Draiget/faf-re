@@ -18108,6 +18108,8 @@ extern "C"
 	 * here and its first result returned. Anything else is routed through
 	 * `__call` first.
 	 */
+	LuaCFunctionCallHook gLuaCFunctionCallHook = nullptr;
+
 	StkId luaD_precall(lua_State* const state, StkId func)
 	{
 		constexpr int kMinCStackSlots = 20;
@@ -18211,6 +18213,10 @@ extern "C"
 		FAF_PROFILE_ZONE_TRANSIENT(gpg::profiling::LuaCFunctionName(reinterpret_cast<const void*>(closure->c.f)));
 #endif
 		RunLuaCallGate(closure->c.f); // engine addition, LuaCallGate.h
+		if (const LuaCFunctionCallHook hook = gLuaCFunctionCallHook; hook != nullptr) {
+			hook(closure->c.f);
+		}
+
 		const int produced = closure->c.f(state);
 		return state->top - produced;
 	}

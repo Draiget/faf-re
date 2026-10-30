@@ -3,7 +3,18 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstring>
+#include <mutex>
+#include <unordered_map>
 
+#if defined(_WIN32)
+#include <Windows.h>
+#include <DbgHelp.h>
+
+#include "gpg/core/diagnostics/CrashHooks.h"
+#endif
+#include "lua/LuaObject.h"
+#include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/sim/SimDriver.h"
@@ -42,11 +53,92 @@ namespace faf::headless
           && std::fabs(a.orient_.y - b.orient_.y) < kRotationTolerance
           && std::fabs(a.orient_.z - b.orient_.z) < kRotationTolerance;
     }
+
+    // Per pose, the class of the manipulator that last changed each bone this beat (null: none).
+    // Written from the sim's threads, read when the pose's packet arrives; the packet keeps the
+    // pose alive, so its address is not reused while it is read.
+    std::mutex sWriterMutex;
+    std::unordered_map<const moho::CAniPose*, std::vector<const char*>> sBoneWriters;
+
+    void RecordBoneWrite(const moho::CAniPose* const pose, const char* const manipulatorClass, const int boneIndex)
+    {
+      const std::lock_guard<std::mutex> lock(sWriterMutex);
+      std::vector<const char*>& writers = sBoneWriters[pose];
+      if (boneIndex < 0) {
+        writers.assign(static_cast<std::size_t>(pose->mBones.end() - pose->mBones.begin()), nullptr);
+        return;
+      }
+      if (static_cast<std::size_t>(boneIndex) < writers.size()) {
+        writers[static_cast<std::size_t>(boneIndex)] = manipulatorClass;
+      }
+    }
+
+    // Lua calls into manipulator bindings (`cfunc_*Manipulator*` and the `Create*` constructors),
+    // counted per C function; every other C function maps to an empty name and is skipped. Names
+    // come from the PDB the first time a function is seen (Windows only: on Linux nothing is
+    // named, so nothing is counted). Lua runs on the sim thread only.
+    struct SLuaFunctionCalls
+    {
+      std::string name;
+      std::uint64_t calls = 0;
+    };
+    std::mutex sCallMutex;
+    std::unordered_map<const void*, SLuaFunctionCalls> sLuaCalls;
+
+    [[nodiscard]] std::string ManipulatorBindingName(const void* const function)
+    {
+#if defined(_WIN32)
+      if (!gpg::diag::DiagSymbolsReady()) {
+        return {};
+      }
+      alignas(SYMBOL_INFO) unsigned char storage[sizeof(SYMBOL_INFO) + 256] = {};
+      auto* const symbol = reinterpret_cast<SYMBOL_INFO*>(storage);
+      symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+      symbol->MaxNameLen = 255;
+      DWORD64 offset = 0;
+      if (::SymFromAddr(::GetCurrentProcess(), reinterpret_cast<DWORD64>(function), &offset, symbol) == FALSE
+          || offset != 0) {
+        return {};
+      }
+      const char* const cfunc = std::strstr(symbol->Name, "cfunc_");
+#else
+      (void)function;
+      const char* const cfunc = nullptr;
+#endif
+      if (cfunc == nullptr) {
+        return {};
+      }
+      const std::string name(cfunc + 6);
+      static constexpr const char* kConstructors[] = {
+        "CreateAnimator", "CreateRotator", "CreateSlider", "CreateSlaver", "CreateAimController",
+        "CreateBuilderArmController", "CreateFootPlantController", "CreateThrustController", "CreateStorageManip",
+        "CreateCollisionDetector",
+      };
+      for (const char* const constructor : kConstructors) {
+        if (name == constructor) {
+          return name;
+        }
+      }
+      return name.find("Manipulator") != std::string::npos ? name : std::string();
+    }
+
+    void RecordLuaCall(int (*const function)(lua_State*))
+    {
+      const void* const key = reinterpret_cast<const void*>(function);
+      const std::lock_guard<std::mutex> lock(sCallMutex);
+      auto found = sLuaCalls.find(key);
+      if (found == sLuaCalls.end()) {
+        found = sLuaCalls.emplace(key, SLuaFunctionCalls{ManipulatorBindingName(key), 0}).first;
+      }
+      ++found->second.calls;
+    }
   } // namespace
 
   CReplayBoneStats::CReplayBoneStats(const std::string& path)
     : mPath(path)
   {
+    moho::gAniBoneWriteHook = &RecordBoneWrite;
+    gLuaCFunctionCallHook = &RecordLuaCall;
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -56,6 +148,8 @@ namespace faf::headless
 
   CReplayBoneStats::~CReplayBoneStats()
   {
+    moho::gAniBoneWriteHook = nullptr;
+    gLuaCFunctionCallHook = nullptr;
     if (mFile != nullptr) {
       std::fclose(mFile);
     }
@@ -86,6 +180,16 @@ namespace faf::headless
       ++unitsWithPose;
       bones += count;
 
+      std::vector<const char*> writers;
+      bool haveWriters = false;
+      {
+        const std::lock_guard<std::mutex> lock(sWriterMutex);
+        if (const auto found = sBoneWriters.find(pose); found != sBoneWriters.end()) {
+          writers = found->second;
+          haveWriters = writers.size() == count;
+        }
+      }
+
       std::uint32_t unitExact = 0;
       std::uint32_t unitTolerance = 0;
       const bool comparable = unit.bones.size() == count;
@@ -96,6 +200,11 @@ namespace faf::headless
             ++unitExact;
             if (!WithinTolerance(bone.mLocalTransform, unit.bones[i])) {
               ++unitTolerance;
+              const char* const writer =
+                !haveWriters ? "(no record)" : (writers[i] != nullptr ? writers[i] : "(rest)");
+              SWriterTotals& writerTotals = mWriters[writer];
+              ++writerTotals.changedOverTolerance;
+              ++writerTotals.byBlueprint[unit.blueprint];
             }
           }
         }
@@ -155,6 +264,56 @@ namespace faf::headless
       std::fclose(blueprintFile);
     }
 
+    std::uint64_t changedTotal = 0;
+    for (const auto& [name, totals] : mWriters) {
+      changedTotal += totals.changedOverTolerance;
+    }
+    std::string writerSummary;
+    std::FILE* writerFile = nullptr;
+    if (fopen_s(&writerFile, (mPath + ".writers.csv").c_str(), "w") == 0 && writerFile != nullptr) {
+      std::fprintf(writerFile, "manipulator,blueprint,changed_over_tolerance\n");
+      for (const auto& [name, totals] : mWriters) {
+        std::fprintf(
+          writerFile, "%s,*,%llu\n", name.c_str(), static_cast<unsigned long long>(totals.changedOverTolerance)
+        );
+        for (const auto& [blueprint, changed] : totals.byBlueprint) {
+          std::fprintf(
+            writerFile, "%s,%s,%llu\n", name.c_str(), blueprint.c_str(), static_cast<unsigned long long>(changed)
+          );
+        }
+      }
+      std::fclose(writerFile);
+    }
+    for (const auto& [name, totals] : mWriters) {
+      char part[128];
+      std::snprintf(
+        part, sizeof(part), "%s%s %.1f%%", writerSummary.empty() ? "" : ", ", name.c_str(),
+        changedTotal == 0 ? 0.0 : 100.0 * static_cast<double>(totals.changedOverTolerance) / changedTotal
+      );
+      writerSummary += part;
+    }
+
+    std::uint64_t manipulatorCalls = 0;
+    std::FILE* callFile = nullptr;
+    if (fopen_s(&callFile, (mPath + ".lua_calls.csv").c_str(), "w") == 0 && callFile != nullptr) {
+      std::fprintf(callFile, "function,calls,calls_per_beat\n");
+      const std::lock_guard<std::mutex> lock(sCallMutex);
+      std::map<std::string, std::uint64_t> byName;
+      for (const auto& [function, calls] : sLuaCalls) {
+        if (!calls.name.empty()) {
+          byName[calls.name] += calls.calls;
+        }
+      }
+      for (const auto& [name, calls] : byName) {
+        manipulatorCalls += calls;
+        std::fprintf(
+          callFile, "%s,%llu,%.3f\n", name.c_str(), static_cast<unsigned long long>(calls),
+          mBeats == 0 ? 0.0 : static_cast<double>(calls) / static_cast<double>(mBeats)
+        );
+      }
+      std::fclose(callFile);
+    }
+
     std::vector<std::uint32_t> sorted = mChangedPerBeat;
     std::sort(sorted.begin(), sorted.end());
     std::uint64_t sum = 0;
@@ -171,6 +330,12 @@ namespace faf::headless
       static_cast<unsigned long long>(mBeats), mBlueprints.size(), mean, p95, sorted.empty() ? 0u : sorted.back(),
       kBytesPerBoneDelta, mean * kBytesPerBoneDelta * 10.0 / 1000.0
     );
-    return text;
+    char calls[128];
+    std::snprintf(
+      calls, sizeof(calls), "; manipulator Lua calls %llu (%.1f per beat)",
+      static_cast<unsigned long long>(manipulatorCalls),
+      mBeats == 0 ? 0.0 : static_cast<double>(manipulatorCalls) / static_cast<double>(mBeats)
+    );
+    return std::string(text) + "; set by: " + writerSummary + calls;
   }
 } // namespace faf::headless

@@ -12,7 +12,9 @@
 // unit change from one beat to the next, per blueprint. The sim publishes each unit's pose for
 // the beat (a fresh `CAniPose` every tick, `CAniActor::UpdateManipulators`); this compares its
 // bones' local transforms with the same unit's previous beat, exactly and beyond a small
-// tolerance, the input to the pose budget (§7.2 bone delta, WP8).
+// tolerance, the input to the pose budget (§7.2 bone delta, WP8). Each changed bone is also
+// attributed to the manipulator class that set it (`moho::gAniBoneWriteHook`): "(rest)" when no
+// manipulator touched it this beat, "(no record)" when the pose did not come from an actor update.
 
 namespace moho
 {
@@ -45,6 +47,13 @@ namespace faf::headless
       std::vector<moho::VTransform> bones;
     };
 
+    /** Changed bones (over tolerance) by the class of the manipulator that set them this beat. */
+    struct SWriterTotals
+    {
+      std::uint64_t changedOverTolerance = 0;
+      std::map<std::string, std::uint64_t> byBlueprint;
+    };
+
     struct SBlueprintTotals
     {
       std::uint64_t unitBeats = 0;
@@ -58,6 +67,7 @@ namespace faf::headless
     std::string mPath;
     std::map<std::uint32_t, SUnitPose> mUnits;
     std::map<std::string, SBlueprintTotals> mBlueprints;
+    std::map<std::string, SWriterTotals> mWriters;
     std::vector<std::uint32_t> mChangedPerBeat;
     std::uint64_t mBeats = 0;
   };

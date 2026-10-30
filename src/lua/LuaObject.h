@@ -5,6 +5,16 @@
 #include <type_traits>
 #include "lua/LuaRuntimeTypes.h"
 
+extern "C"
+{
+	/**
+	 * Engine addition, headless `--bone-stats` (dedicated-server plan WP8.5): when set,
+	 * `luaD_precall` calls it with every C function it is about to run. Null in the game.
+	 */
+	using LuaCFunctionCallHook = void (*)(int (*function)(lua_State*));
+	extern LuaCFunctionCallHook gLuaCFunctionCallHook;
+}
+
 namespace gpg
 {
 	class ReadArchive;

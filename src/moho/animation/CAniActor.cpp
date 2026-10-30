@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <typeinfo>
 #include <utility>
+#include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
@@ -561,6 +563,12 @@ namespace moho
     mPose->UpdateBones();                     // 0x0063AAEE
     mPose->SetWorldTransform(worldTransform); // 0x0063AAFA
 
+    const AniBoneWriteHook hook = gAniBoneWriteHook;
+    std::vector<VTransform> before;
+    if (hook != nullptr) {
+      hook(mPose.get(), nullptr, -1);
+    }
+
     auto* const listHead = static_cast<TDatListItem<IAniManipulator, void>*>(&mManipulatorsByPrecedence);
     for (auto* node = mManipulatorsByPrecedence.mNext; node != listHead;) {
       IAniManipulator* const manipulator = ListNodeToManipulator(node);
@@ -572,11 +580,35 @@ namespace moho
       node = node->mNext;
 
       if (enabled) {
+        // The class is read before the update: the manipulator may delete itself inside it.
+        // RTTI, not `GetClass()`: several manipulators (rotate, slide, slave, builder arm) inherit
+        // IAniManipulator's and would all report the base class.
+        const char* const manipulatorClass = hook != nullptr ? typeid(*manipulator).name() : nullptr;
+        if (hook != nullptr) {
+          before.clear();
+          for (const CAniPoseBone& bone : mPose->mBones) {
+            before.push_back(bone.mLocalTransform);
+          }
+        }
+
         // Result discarded at the call site.
         (void)manipulator->ManipulatorUpdate();
+
+        if (hook != nullptr) {
+          int index = 0;
+          for (const CAniPoseBone& bone : mPose->mBones) {
+            if (static_cast<std::size_t>(index) < before.size()
+                && std::memcmp(&bone.mLocalTransform, &before[index], sizeof(VTransform)) != 0) {
+              hook(mPose.get(), manipulatorClass, index);
+            }
+            ++index;
+          }
+        }
       }
     }
   }
+
+  AniBoneWriteHook gAniBoneWriteHook = nullptr;
 
   /**
    * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)
