@@ -1189,6 +1189,8 @@ void CScApp::Main()
     device->Refresh();
   }
 
+  moho::UI_ProcessIdleGC();
+
   if (initialized == 0) {
     InitializeSessionFromCommandLine();
     initialized = 1;
