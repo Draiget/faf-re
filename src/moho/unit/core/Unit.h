@@ -1146,6 +1146,18 @@ namespace moho
     void Sync(SSyncData* syncData) override;
 
     /**
+     * Engine addition: the part of `Sync` before `Entity::Sync`. It writes only this unit's own
+     * sync block and `NeedSyncGameData`, and running it twice gives the result of running it once
+     * (the second run finds the flag clear and copies the same two poses), so
+     * `sim_ParallelUnitSyncRefresh` can run it for every unit of the walk on sim workers first.
+     * With `releasedPose` / `releasedPriorPose` set, the pose handles it replaces are moved there
+     * instead of released, so a worker never drops what may be a pose's last owner.
+     */
+    void RefreshSyncBlock(
+      boost::shared_ptr<CAniPose>* releasedPose = nullptr, boost::shared_ptr<CAniPose>* releasedPriorPose = nullptr
+    );
+
+    /**
      * Address: 0x006AC2C0 (FUN_006AC2C0, ?CreateInterface@Unit@Moho@@MAEXPAUSSyncData@2@@Z)
      *
      * What it does:

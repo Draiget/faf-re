@@ -1,0 +1,3 @@
+{
+  "27051951": {"verdict": "desync", "note": "Proxima m: desyncs at beat 50, the replay's first checksum; probably the map (docs/RETAIL_REPLAY_PARITY.md)"}
+}

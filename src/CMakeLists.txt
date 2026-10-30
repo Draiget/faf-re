@@ -18,6 +18,10 @@ set(FAF_OUTPUT_NAME "${_faf_default_name}" CACHE STRING "Engine executable name,
 
 add_library(faf_engine OBJECT ${FAF_ENGINE_SOURCES})
 
+# The git commit for gpg/core/diagnostics/BuildInfo.cpp, read on every build.
+include(FafBuildInfo)
+faf_build_info(faf_engine ${FAF_TARGET_ARCH})
+
 add_executable(faf_main WIN32)
 set_target_properties(faf_main PROPERTIES OUTPUT_NAME "${FAF_OUTPUT_NAME}")
 target_link_libraries(faf_main PRIVATE faf_engine)

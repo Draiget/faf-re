@@ -1,4 +1,5 @@
 #include "legacy/math/X87Math.h"
+#include "legacy/math/Libm.h"
 
 #include <bit>
 #include <cmath>
@@ -156,15 +157,6 @@ namespace msvc8
 #else
     return msvc8_x87_round_to_int(value);
 #endif
-  }
-
-  std::int32_t TruncateToInt(const float value) noexcept
-  {
-    constexpr float kInt32Bound = 2147483648.0f;
-    if (!(value > -kInt32Bound - 1.0f && value < kInt32Bound)) {
-      return static_cast<std::int32_t>(0x80000000u);
-    }
-    return static_cast<std::int32_t>(value);
   }
 
   void ScaleVectorByMaxLengthX87(float& x, float& y, float& z, const float maxLength) noexcept
@@ -779,11 +771,12 @@ namespace msvc8
   float asinf(const float x) noexcept
   {
     // Engine addition (plan WPL.11): the domain errors' NaN as on Windows x64 (DomainErrorNaN);
-    // in the domain the CRT's asin, as the binary's asinf called it.
+    // in the domain a double asin, as the binary's asinf called the CRT's: the engine's
+    // (msvc8::libm, equal to the Windows x64 UCRT's for every float), not the host's.
     if (!std::isnan(x) && !(x >= -1.0f && x <= 1.0f)) {
       return static_cast<float>(DomainErrorNaN());
     }
-    return static_cast<float>(std::asin(static_cast<double>(x)));
+    return static_cast<float>(libm::asin(static_cast<double>(x)));
   }
 
   float acosf(const float x) noexcept
@@ -925,14 +918,16 @@ namespace msvc8
 #endif
   }
 
+  // expf and logf: a double exp/log rounded once, as the x86 CRT's float overloads do; the
+  // engine's (msvc8::libm, plan WPL.11), equal to the Windows x64 UCRT's for every float.
   float expf(const float x) noexcept
   {
-    return static_cast<float>(std::exp(static_cast<double>(x)));
+    return static_cast<float>(libm::exp(static_cast<double>(x)));
   }
 
   float logf(const float x) noexcept
   {
-    return static_cast<float>(std::log(static_cast<double>(x)));
+    return static_cast<float>(libm::log(static_cast<double>(x)));
   }
 
   float powf(const float x, const float y) noexcept

@@ -36,6 +36,9 @@ else()
 endif()
 if(FAF_TARGET_ARCH STREQUAL "x64")
   enable_language(ASM_MASM)
+  # CMake maps the Embedded debug format to ml64's -Zi, which llvm-ml64 does
+  # not support and ignores with a warning; the object is the same without it.
+  set(CMAKE_ASM_MASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded "")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

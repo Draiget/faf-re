@@ -20,6 +20,10 @@
 #   * The DirectX SDK (June 2010): an installed one, else its headers and libraries
 #     extracted from Microsoft's installer (see faf_dependency_dxsdk).
 #
+# FAF_DEPENDENCIES_ONLY, a list of names (dxsdk for the DirectX SDK), limits a run to those;
+# the Linux build (cmake/FafLinux.cmake) needs three:
+#   cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
+#
 # FFmpeg (dependencies/ffmpeg, Draiget/ffmpeg-mirror) is the unmodified 7.1.3 source
 # with a faf/ CMake build; src/CMakeLists.txt compiles it into static libraries
 # (see docs/FAF_SFD_COMPATIBILITY.md).
@@ -83,6 +87,9 @@ endfunction()
 
 # Applies the patches of one tree, see the header.
 function(faf_dependency_patches name kind)
+  if(FAF_DEPENDENCIES_ONLY AND NOT name IN_LIST FAF_DEPENDENCIES_ONLY)
+    return()
+  endif()
   set(_dir "${FAF_DEPENDENCIES_DIR}/${name}")
   set(_stamp "${_dir}/.faf-patches")
   if(NOT CMAKE_SCRIPT_MODE_FILE)
@@ -131,6 +138,9 @@ endfunction()
 
 # --- Submodules -----------------------------------------------------------------------
 function(faf_dependency_submodule name)
+  if(FAF_DEPENDENCIES_ONLY AND NOT name IN_LIST FAF_DEPENDENCIES_ONLY)
+    return()
+  endif()
   set(_dir "${FAF_DEPENDENCIES_DIR}/${name}")
   if(EXISTS "${_dir}/.git")
     # Follow a pin change (a pull that moved the gitlink): back to the baseline,
@@ -212,6 +222,9 @@ function(_faf_download_tree name)
 endfunction()
 
 function(faf_dependency_download name)
+  if(FAF_DEPENDENCIES_ONLY AND NOT name IN_LIST FAF_DEPENDENCIES_ONLY)
+    return()
+  endif()
   if(EXISTS "${FAF_DEPENDENCIES_DIR}/${name}")
     return()  # downloaded earlier, or a tree made before this script
   endif()
@@ -222,6 +235,9 @@ endfunction()
 # What wx's makefile.vc and FAF's former Build-Deps step produced: the per-configuration
 # setup.h copies (Unicode for mswu) and the parser sources it copies from their DOS names.
 function(_faf_wx_generated)
+  if(FAF_DEPENDENCIES_ONLY AND NOT "wxWindows-2.4.2" IN_LIST FAF_DEPENDENCIES_ONLY)
+    return()
+  endif()
   set(_wx "${FAF_DEPENDENCIES_DIR}/wxWindows-2.4.2")
   file(READ "${_wx}/include/wx/msw/setup.h" _setup)
   if(NOT EXISTS "${_wx}/lib/msw/wx/setup.h")
@@ -261,6 +277,9 @@ function(_faf_dxsdk_is_june2010 dir out)
 endfunction()
 
 function(faf_dependency_dxsdk)
+  if(FAF_DEPENDENCIES_ONLY AND NOT "dxsdk" IN_LIST FAF_DEPENDENCIES_ONLY)
+    return()
+  endif()
   set(_candidates "")
   if(NOT FAF_DXSDK_FORCE_DOWNLOAD)  # FAF_DXSDK_FORCE_DOWNLOAD=ON tests the fallback
     if(FAF_DXSDK_DIR)

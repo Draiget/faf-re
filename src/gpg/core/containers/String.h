@@ -148,6 +148,15 @@ namespace gpg
   bool STR_StartsWithNoCase(StrArg str, StrArg start);
   bool STR_EqualsNoCaseN(StrArg lhs, StrArg rhs, std::size_t count);
   int STR_CompareNoCase(StrArg lhs, StrArg rhs);
+  /**
+   * Engine addition (dedicated-server plan WPL.15), not in the binary: the order NTFS keeps a
+   * directory's names in, which is the order `_findfirst64`/`_findnext64` report them on
+   * Windows: bytes compared with ASCII letters upper-cased (so `_` sorts after `Z` and after
+   * `a`), then plain byte order for names equal apart from case, so the order is total on a
+   * case-sensitive file system too. Directory listings that feed the sim (mount points, the
+   * init scripts' `io.dir`) sort with it on every platform and every file system.
+   */
+  [[nodiscard]] bool STR_FileNameOrderLess(StrArg lhs, StrArg rhs) noexcept;
   bool STR_ContainsNoCase(StrArg str, StrArg needle);
   bool STR_EqualsNoCase(StrArg lhs, StrArg rhs);
   /**

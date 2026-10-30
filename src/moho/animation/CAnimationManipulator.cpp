@@ -172,6 +172,7 @@ namespace
     lua_pushstring(rawState, message);
     (void)lua_gettop(rawState);
     lua_error(rawState);
+    std::abort();
   }
 
   /**

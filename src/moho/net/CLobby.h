@@ -353,6 +353,14 @@ namespace moho
     int32_t hostedTime{0};                       // 0xC4
   };
   static_assert(sizeof(CLobby) == 0xC8, "CLobby size must be 0xC8");
+
+  /**
+   * Engine addition (issue #215): whether a lobby object exists, i.e. the lobby
+   * screen is up or a game is being launched from it. Counted by CLobby's
+   * constructor and destructor, outside the class, whose layout is the binary's.
+   * Read by the lobby build label (WxRuntimeTypes.cpp).
+   */
+  [[nodiscard]] bool LOBBY_IsActive() noexcept;
   static_assert(sizeof(CPushTask<CLobby>) == 0x1C, "CPushTask<CLobby> size must be 0x1C");
   static_assert(sizeof(CPullTask<CLobby>) == 0x18, "CPullTask<CLobby> size must be 0x18");
   static_assert(offsetof(CLobby, connector) == 0x78, "connector offset");

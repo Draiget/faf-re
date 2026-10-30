@@ -35,6 +35,7 @@ set(FAF_ENGINE_SOURCES
   legacy/containers/Set.cpp
   legacy/containers/String.cpp
   legacy/exceptions/StdExcept.cpp
+  legacy/math/Libm.cpp
   legacy/math/X87Math.cpp
   lua/LuaAssertion.cpp
   gpg/gal/backends/d3d10/D3D10Interfaces.cpp
@@ -226,6 +227,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/diagnostics/CrashReportDialog.cpp
   gpg/core/diagnostics/ProbeWatch.cpp
   gpg/core/diagnostics/FrameSampler.cpp
+  gpg/core/diagnostics/BuildInfo.cpp
   lua/LuaCrashDump.cpp
   lua/LuaMemAccounting.cpp
   lua/LuaGcEventLog.cpp

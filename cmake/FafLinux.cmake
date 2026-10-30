@@ -115,6 +115,10 @@ add_library(faf_sim OBJECT ${_faf_sim_files})
 add_library(faf_sim_settings INTERFACE)
 target_link_libraries(faf_sim PUBLIC faf_sim_settings)
 
+# The git commit for gpg/core/diagnostics/BuildInfo.cpp, read on every build.
+include(FafBuildInfo)
+faf_build_info(faf_sim x64-linux)
+
 # The x64 half of legacy/math/X87Math.cpp, in GNU syntax for System V (the
 # Windows build assembles X87Math64.asm, plan WPL.10).
 enable_language(ASM)

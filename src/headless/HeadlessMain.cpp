@@ -27,6 +27,7 @@
 #include "moho/core/ThreadPlacement.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "platform/X87Precision.h"
 #include "headless/ReplayLaunchCheck.h"
@@ -50,8 +51,8 @@ namespace
 
   [[noreturn]] void EndProcess(const int exitCode)
   {
-    std::fflush(stdout);
-    std::fflush(stderr);
+    // Every output stream: stdout, stderr and the --disk-trace file.
+    std::fflush(nullptr);
     // The sim and loader threads are still running; nothing after the verdict is observed,
     // so the process ends here instead of tearing them down.
 #if defined(_WIN32)
@@ -146,6 +147,7 @@ namespace
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --blueprint-order <file> write every blueprint by ordinal, in the rules' load order\n"
+      "  --lua-pairs <file>       write the sim Lua globals' and moho class tables' pairs() order, before BeginSession\n"
       "  --wire-stats <file>      run the wire format's entities lane on every beat (CSV; server-mode build)\n"
       "  --loopback [--loopback-dr <steps> [--loopback-turns <units>]]  every packet through the wire format and the\n"
       "                            client's rebuild; dead reckoning in 1/64-unit steps, turns in 1/65536 turns\n"
@@ -153,6 +155,7 @@ namespace
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "                            (server-mode build)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
+      "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -218,6 +221,7 @@ int main(int argc, char** argv)
   (void)ReadOption("--state-digests", options.stateDigestPath);
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
   (void)ReadOption("--blueprint-order", options.blueprintOrderPath);
+  (void)ReadOption("--lua-pairs", options.luaPairsPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
@@ -244,6 +248,17 @@ int main(int argc, char** argv)
 #endif
   std::printf("[%s] replay %s\n", gLabel.c_str(), options.replayPath.c_str());
   std::fflush(stdout);
+
+  // From the first mount on, so the trace holds everything the run needs.
+  std::string diskTracePath;
+  if (ReadOption("--disk-trace", diskTracePath)) {
+    std::FILE* const diskTrace = std::fopen(diskTracePath.c_str(), "w");
+    if (diskTrace == nullptr) {
+      std::printf("[%s] --disk-trace: cannot write %s\n", gLabel.c_str(), diskTracePath.c_str());
+      return kExitBadInput;
+    }
+    moho::DISK_SetAccessTrace(diskTrace);
+  }
 
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();

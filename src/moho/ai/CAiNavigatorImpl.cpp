@@ -1331,12 +1331,8 @@ void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const 
 
   const gpg::RRef ownerRef{};
   archive->Read(CachedIAiNavigatorType(), this, ownerRef);
-  archive->Read(
-    CachedCScriptObjectType(),
-    this ? static_cast<void*>(static_cast<CScriptObject*>(this)) : nullptr,
-    ownerRef
-  );
-  archive->Read(CachedCTaskType(), this ? static_cast<void*>(static_cast<CTask*>(this)) : nullptr, ownerRef);
+  archive->Read(CachedCScriptObjectType(), static_cast<CScriptObject*>(this), ownerRef);
+  archive->Read(CachedCTaskType(), static_cast<CTask*>(this), ownerRef);
 
   Unit* const loadedUnit = ReadPointerWithType<Unit>(archive, ownerRef, CachedUnitType());
 
@@ -1371,29 +1367,13 @@ void CAiNavigatorImpl::MemberSerialize(gpg::WriteArchive* const archive, const i
 
   const gpg::RRef ownerRef{};
   archive->Write(CachedIAiNavigatorType(), this, ownerRef);
-  archive->Write(
-    CachedCScriptObjectType(),
-    this ? static_cast<const void*>(static_cast<const CScriptObject*>(this)) : nullptr,
-    ownerRef
-  );
-  archive->Write(
-    CachedCTaskType(),
-    this ? static_cast<const void*>(static_cast<const CTask*>(this)) : nullptr,
-    ownerRef
-  );
+  archive->Write(CachedCScriptObjectType(), static_cast<const CScriptObject*>(this), ownerRef);
+  archive->Write(CachedCTaskType(), static_cast<const CTask*>(this), ownerRef);
 
-  WritePointerWithType(
-    archive,
-    this ? mUnit : nullptr,
-    CachedUnitType(),
-    gpg::TrackedPointerState::Unowned,
-    ownerRef
-  );
+  WritePointerWithType(archive, mUnit, CachedUnitType(), gpg::TrackedPointerState::Unowned, ownerRef);
 
-  archive->WriteBool(this && mIgnoreFormation != 0u);
-
-  const EAiNavigatorStatus status = this ? mStatus : AINAVSTATUS_Idle;
-  archive->Write(CachedEAiNavigatorStatusType(), &status, ownerRef);
+  archive->WriteBool(mIgnoreFormation != 0u);
+  archive->Write(CachedEAiNavigatorStatusType(), &mStatus, ownerRef);
 }
 
 /**

@@ -5,6 +5,10 @@
 // the CRT's vector variants) and with -O2 -ffp-contract=off -fno-builtin on Linux.
 // 2026-10-26: all four identical on Windows x64 (static UCRT) and Linux x64 (glibc 2.39 libm),
 // tmp/server/linux/mathsweep/.
+// glibc picks its exp/log/pow bodies by CPU (FMA/AVX2 variants on x86-64-v3). 2026-10-29: run
+// with GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA,-AVX512F (ld.so --list-diagnostics:
+// dl_hwcaps_subdirs_active 0x7 -> 0x4), all four are still identical to Windows x64, so a CPU
+// without FMA gets the same results.
 #include <cmath>
 #include <cstdint>
 #include <cstdio>

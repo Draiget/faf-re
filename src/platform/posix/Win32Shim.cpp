@@ -6,6 +6,7 @@
 
 #include "platform/posix/win32/Windows.h"
 #include "platform/posix/win32/io.h"
+#include "gpg/core/containers/String.h"
 
 #include <algorithm>
 #include <cctype>
@@ -2071,18 +2072,9 @@ std::intptr_t _findfirst64(const char* const spec, __finddata64_t* const data)
   }
 
   // NTFS keeps a directory's names in upper-cased order, which is the order FindNextFile
-  // and so the CRT report them in.
-  std::stable_sort(search->matches.begin(), search->matches.end(), [](const __finddata64_t& a, const __finddata64_t& b) {
-    for (std::size_t at = 0;; ++at) {
-      const auto ca = static_cast<unsigned char>(std::toupper(static_cast<unsigned char>(a.name[at])));
-      const auto cb = static_cast<unsigned char>(std::toupper(static_cast<unsigned char>(b.name[at])));
-      if (ca != cb) {
-        return ca < cb;
-      }
-      if (ca == 0) {
-        return false;
-      }
-    }
+  // and so the CRT report them in (plan WPL.15: the engine's one comparison for it).
+  std::sort(search->matches.begin(), search->matches.end(), [](const __finddata64_t& a, const __finddata64_t& b) {
+    return gpg::STR_FileNameOrderLess(a.name, b.name);
   });
 
   *data = search->matches[0];

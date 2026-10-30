@@ -28,6 +28,7 @@
 #include <stdexcept>
 
 #include "LuaAssertion.h"
+#include "LuaCallGate.h"
 #include "LuaCrashDump.h"
 #include "LuaError.h"
 #include "LuaGcEventLog.h"
@@ -41,6 +42,7 @@
 #include "LuaUndump.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/BadRefCast.h"
@@ -3063,7 +3065,7 @@ extern "C"
 	{
 		if (key->tt == LUA_TNUMBER) {
 			const float numericKey = key->value.n;
-			const int integerKey = static_cast<int>(numericKey);
+			const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
 			if (static_cast<float>(integerKey) == numericKey) {
 				return luaH_getnum(t, integerKey);
 			}
@@ -3089,7 +3091,7 @@ extern "C"
 
 		if (key->tt == LUA_TNUMBER) {
 			const float numericKey = key->value.n;
-			const int integerKey = static_cast<int>(numericKey);
+			const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
 			if (static_cast<float>(integerKey) == numericKey && integerKey >= 1) {
 				const int zeroBased = integerKey - 1;
 				if ((zeroBased & 0xFF000000) == 0 && integerKey <= table->sizearray) {
@@ -3631,7 +3633,7 @@ extern "C"
 
 			if (node.i_key.tt == LUA_TNUMBER) {
 				const float numericKey = node.i_key.value.n;
-				const int integerKey = static_cast<int>(numericKey);
+				const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
 				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1
 					&& ((integerKey - 1) & 0xFF000000) == 0) {
 					const int logIndex = luaO_log2(static_cast<unsigned int>(integerKey - 1));
@@ -3923,7 +3925,7 @@ extern "C"
 		TObject* valueSlot = nullptr;
 		if (key->tt == LUA_TNUMBER) {
 			const float numericKey = key->value.n;
-			const int integerKey = static_cast<int>(numericKey);
+			const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
 			if (static_cast<float>(integerKey) == numericKey) {
 				valueSlot = const_cast<TObject*>(luaH_getnum(table, integerKey));
 			}
@@ -3951,7 +3953,7 @@ extern "C"
 		const TObject* slot = nullptr;
 		if (key->tt == LUA_TNUMBER) {
 			const float numericKey = key->value.n;
-			const int integerKey = static_cast<int>(numericKey);
+			const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
 			if (static_cast<float>(integerKey) == numericKey) {
 				slot = luaH_getnum(table, integerKey);
 			}
@@ -5553,28 +5555,36 @@ namespace
 	 * What it does:
 	 * Expands one wildcard expression through CRT find-first/find-next and
 	 * returns one Lua table of 1-based filename entries.
+	 *
+	 * Engine addition (dedicated-server plan WPL.15): the names are sorted in
+	 * NTFS's order (`gpg::STR_FileNameOrderLess`) before they go into the
+	 * table, the order the shipped game gets them in on NTFS, on every platform
+	 * and file system. Init scripts mount what this lists in this order.
 	 */
 	int LuaIoDir(lua_State* const state)
 	{
 		const char* const wildcard = lua_tostring(state, 1);
 		lua_newtable(state);
 
+		std::vector<std::string> names{};
 		__finddata64_t findData{};
 		const intptr_t findHandle = ::_findfirst64(wildcard, &findData);
 		if (findHandle != -1) {
-			int index = 1;
-			lua_pushnumber(state, static_cast<lua_Number>(index));
-			lua_pushstring(state, findData.name);
-			lua_settable(state, -3);
-
-			while (::_findnext64(findHandle, &findData) == 0) {
-				++index;
-				lua_pushnumber(state, static_cast<lua_Number>(index));
-				lua_pushstring(state, findData.name);
-				lua_settable(state, -3);
-			}
-
+			do {
+				names.emplace_back(findData.name);
+			} while (::_findnext64(findHandle, &findData) == 0);
 			(void)::_findclose(findHandle);
+		}
+		std::sort(names.begin(), names.end(), [](const std::string& lhs, const std::string& rhs) {
+			return gpg::STR_FileNameOrderLess(lhs.c_str(), rhs.c_str());
+		});
+
+		int index = 1;
+		for (const std::string& name : names) {
+			lua_pushnumber(state, static_cast<lua_Number>(index));
+			lua_pushstring(state, name.c_str());
+			lua_settable(state, -3);
+			++index;
 		}
 
 		return 1;
@@ -18069,6 +18079,23 @@ extern "C"
 		state->top = result;
 	}
 
+	namespace
+	{
+		// Engine addition (LuaCallGate.h): this thread's gate, and how many threads have one, so the
+		// C-call path reads one shared word and reaches thread-local storage only while a gate is set.
+		thread_local moho::LuaCallGate tLuaCallGate = nullptr;
+		std::atomic<int> sLuaCallGateCount{0};
+
+		inline void RunLuaCallGate(const moho::LuaCFunctionPtr function)
+		{
+			if (sLuaCallGateCount.load(std::memory_order_relaxed) != 0) {
+				if (const moho::LuaCallGate gate = tLuaCallGate; gate != nullptr) {
+					gate(function);
+				}
+			}
+		}
+	} // namespace
+
 	/**
 	 * Address: 0x009142A0 (FUN_009142A0, luaD_precall)
 	 *
@@ -18183,6 +18210,7 @@ extern "C"
 		// Profile builds: one zone per engine function Lua calls, named by its binder.
 		FAF_PROFILE_ZONE_TRANSIENT(gpg::profiling::LuaCFunctionName(reinterpret_cast<const void*>(closure->c.f)));
 #endif
+		RunLuaCallGate(closure->c.f); // engine addition, LuaCallGate.h
 		const int produced = closure->c.f(state);
 		return state->top - produced;
 	}
@@ -18504,6 +18532,7 @@ extern "C"
 	 */
 	void luaC_collectgarbage(lua_State* const state)
 	{
+		RunLuaCallGate(nullptr); // engine addition, LuaCallGate.h: finalizers may reach the engine
 		FAF_PROFILE_ZONE_TRANSIENT(moho::IsSimThread() ? "Sim::LuaGC" : "UI::LuaGC");
 
 		// x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
@@ -19273,6 +19302,33 @@ extern "C"
 	}
 }
 #pragma warning(pop)
+
+void moho::LUA_SetCallGate(const LuaCallGate gate) noexcept
+{
+	const LuaCallGate previous = tLuaCallGate;
+	tLuaCallGate = gate;
+	if (previous == nullptr && gate != nullptr) {
+		sLuaCallGateCount.fetch_add(1, std::memory_order_relaxed);
+	} else if (previous != nullptr && gate == nullptr) {
+		sLuaCallGateCount.fetch_sub(1, std::memory_order_relaxed);
+	}
+}
+
+bool moho::LUA_IsLibraryCFunction(const LuaCFunctionPtr function) noexcept
+{
+	static const std::vector<LuaCFunctionPtr> sLibraryFunctions = [] {
+		std::vector<LuaCFunctionPtr> functions;
+		for (const luaL_reg* const library :
+		     {base_funcs, co_funcs, kLuaStringLibrary, kLuaTableLibrary, kFafTableLibraryExtensions, kLuaMathLib}) {
+			for (const luaL_reg* entry = library; entry->name != nullptr; ++entry) {
+				functions.push_back(entry->func);
+			}
+		}
+		std::sort(functions.begin(), functions.end(), std::less<>{});
+		return functions;
+	}();
+	return std::binary_search(sLibraryFunctions.begin(), sLibraryFunctions.end(), function, std::less<>{});
+}
 
 extern "C"
 {

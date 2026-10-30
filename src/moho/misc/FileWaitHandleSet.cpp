@@ -4,6 +4,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -27,6 +28,12 @@ namespace moho
 namespace
 {
   moho::FWaitHandleSet* sPFWaitHandleSet = nullptr;
+
+  // Engine addition (`DISK_SetAccessTrace`): the trace file, and the lock that keeps the
+  // loader, sim and main threads' lines whole.
+  std::atomic<std::FILE*> sAccessTrace{nullptr};
+  std::mutex sAccessTraceLock;
+
   using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadState*, msvc8::string*>;
 
   /**
@@ -445,9 +452,11 @@ namespace
         return msvc8::auto_ptr<gpg::Stream>(nullptr);
       }
 
+      moho::DISK_TraceAccess("open", canonicalPath.c_str());
       return handle->mZipFile->OpenEntry(zipEntryIndex);
     }
 
+    moho::DISK_TraceAccess("open", canonicalPath.c_str());
     return msvc8::auto_ptr<gpg::Stream>(
       new gpg::FileStream(canonicalPath.c_str(), gpg::Stream::ModeReceive, 0x0Bu, 4096)
     );
@@ -913,6 +922,40 @@ void moho::DISK_InvalidateFileInfoCache(
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet != nullptr) {
     sPFWaitHandleSet->InvalidateFileInfoCache(sourcePath);
+  }
+}
+
+/**
+ * Engine addition (headless `--disk-trace`): installs or clears the access trace file.
+ */
+void moho::DISK_SetAccessTrace(std::FILE* const file)
+{
+  std::lock_guard<std::mutex> guard(sAccessTraceLock);
+  std::FILE* const previous = sAccessTrace.exchange(file);
+  if (previous != nullptr) {
+    std::fflush(previous);
+  }
+}
+
+/**
+ * Engine addition: whether an access trace file is set.
+ */
+bool moho::DISK_AccessTraceOn()
+{
+  return sAccessTrace.load(std::memory_order_relaxed) != nullptr;
+}
+
+/**
+ * Engine addition: one `kind path` line in the access trace, when one is set.
+ */
+void moho::DISK_TraceAccess(const char* const kind, const gpg::StrArg path)
+{
+  if (!DISK_AccessTraceOn()) {
+    return;
+  }
+  std::lock_guard<std::mutex> guard(sAccessTraceLock);
+  if (std::FILE* const file = sAccessTrace.load(std::memory_order_relaxed)) {
+    std::fprintf(file, "%s %s\n", kind, path != nullptr ? path : "");
   }
 }
 
@@ -1547,6 +1590,7 @@ bool moho::FWaitHandleSet::GetFileInfo(
     }
 
     ReleaseWaitHandleReference(handle);
+    DISK_TraceAccess("stat", canonicalPath.c_str());
     return true;
   }
 
@@ -1562,6 +1606,9 @@ bool moho::FWaitHandleSet::GetFileInfo(
     }
     const bool hasCachedWriteTime = HasWriteTime(cachedInfo->second);
     Notify();
+    if (hasCachedWriteTime) {
+      DISK_TraceAccess("stat", canonicalPath.c_str());
+    }
     return hasCachedWriteTime;
   }
 
@@ -1578,7 +1625,11 @@ bool moho::FWaitHandleSet::GetFileInfo(
   if (outInfo != nullptr) {
     *outInfo = diskInfo;
   }
-  return queryOk && HasWriteTime(diskInfo);
+  const bool found = queryOk && HasWriteTime(diskInfo);
+  if (found) {
+    DISK_TraceAccess("stat", canonicalPath.c_str());
+  }
+  return found;
 }
 
 /**
@@ -1644,6 +1695,7 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
       return {};
     }
 
+    DISK_TraceAccess("read", canonicalPath.c_str());
     return zipFile->CopyEntry(zipEntryIndex);
   }
 
@@ -1681,6 +1733,7 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
     return {};
   }
 
+  DISK_TraceAccess("read", canonicalPath.c_str());
   return diskBytes;
 }
 
@@ -1718,6 +1771,7 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
       return {};
     }
 
+    DISK_TraceAccess("map", canonicalPath.c_str());
     return zipFile->ReadEntry(zipEntryIndex);
   }
 
@@ -1755,6 +1809,7 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
   const char* const begin = static_cast<const char*>(mappedView);
   const char* const end = begin + fileSize;
   boost::shared_ptr<const char> mappedOwner(begin, &UnmapFileView);
+  DISK_TraceAccess("map", canonicalPath.c_str());
   return gpg::MemBuffer<const char>(mappedOwner, begin, end);
 }
 

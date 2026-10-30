@@ -1,0 +1,237 @@
+name: Parity prewarm
+
+# Fills the caches the Replay parity workflow plays from, for one game version: FAF's game files
+# (stripped), the corpus replays, the top and retail maps, the M28AI versions, and the retail
+# archives (the one part not from FAF: an encrypted file at PARITY_RETAIL_URL). Everything from
+# FAF is fetched one request at a time, only what the caches lack. tools/parity-data/README.md.
+#
+# Run by hand by a maintainer (anyone with write access can) for a new game version, or to fetch
+# more replays; the weekly run fetches a little more and keeps the caches from expiring (GitHub
+# drops a cache unused for 7 days). Caches saved here, on master, are the ones every run reads.
+on:
+  workflow_dispatch:
+    inputs:
+      game_version:
+        description: FAF game version (tools/parity-data/corpus/<version>.tsv.gz must exist)
+        required: true
+        default: "3835"
+      replay_minutes:
+        description: Minutes per replay bucket spent fetching new replays from FAF (0 fetches none)
+        default: "20"
+      asset_minutes:
+        description: Minutes spent fetching maps and M28AI versions
+        default: "60"
+      parallel:
+        description: Replay buckets fetched at once (each one request a second to FAF)
+        default: "4"
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+# One run at a time, and never next to a parity run that reads these caches mid-save.
+concurrency:
+  group: replay-parity
+  cancel-in-progress: false
+
+env:
+  GAME_VERSION: ${{ inputs.game_version || '3835' }}
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  corpus:
+    runs-on: ubuntu-24.04
+    outputs:
+      buckets: ${{ steps.buckets.outputs.buckets }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: tools/parity-data
+      - id: buckets
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import gzip, json, os
+          path = "tools/parity-data/corpus/%s.tsv.gz" % os.environ["GAME_VERSION"]
+          ids = [int(l.split("\t")[0]) for l in gzip.open(path, "rt") if not l.startswith("#")]
+          print("buckets=" + json.dumps(sorted({i // 10000 for i in ids})))
+          EOF
+
+  # FAF's packages and init file for the version, stripped. Built once per version.
+  game:
+    runs-on: ubuntu-24.04
+    steps:
+      - id: have
+        uses: actions/cache/restore@v6
+        with:
+          path: game
+          key: game-${{ env.GAME_VERSION }}
+          lookup-only: true
+      - if: steps.have.outputs.cache-hit != 'true'
+        uses: actions/checkout@v7
+      - if: steps.have.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - if: steps.have.outputs.cache-hit != 'true'
+        run: python tools/parity-data/prewarm.py game --game-version "$GAME_VERSION" --out game
+      - if: steps.have.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: game
+          key: game-${{ env.GAME_VERSION }}
+
+  # The retail archives (make_pack.py retail, encrypted), kept in the cache as downloaded: a
+  # fork's workflow can read master's caches, and gets nothing it can open.
+  retail:
+    runs-on: ubuntu-24.04
+    # PARITY_RETAIL_URL and PARITY_RETAIL_KEY are this environment's secrets, given to master only.
+    environment: parity
+    steps:
+      - id: have
+        uses: actions/cache/restore@v6
+        with:
+          path: retail.enc
+          key: retail-${{ vars.PARITY_RETAIL_ID }}
+          lookup-only: true
+      - if: steps.have.outputs.cache-hit != 'true'
+        env:
+          # Secret or variable: the file is useless without the key.
+          URL: ${{ secrets.PARITY_RETAIL_URL || vars.PARITY_RETAIL_URL }}
+          KEY: ${{ secrets.PARITY_RETAIL_KEY }}
+        run: |
+          # A Google Drive share link (drive.google.com/file/d/<id>/...) becomes its download URL.
+          if [[ "$URL" =~ drive\.google\.com/file/d/([^/?]+) ]]; then
+            URL="https://drive.usercontent.google.com/download?id=${BASH_REMATCH[1]}&export=download&confirm=t"
+          fi
+          curl -fsSL "$URL" -o retail.enc
+          if [ "$(head -c 8 retail.enc)" != "Salted__" ]; then
+            echo "::error::PARITY_RETAIL_URL did not return the encrypted pack (is the link shared?)"; exit 1
+          fi
+          # A pasted secret often carries a line break; the passphrase has no white space.
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
+          if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc -out retail.tar.xz \
+              || ! tar -tJf retail.tar.xz > contents.txt; then
+            echo "::error::PARITY_RETAIL_KEY does not open the file at PARITY_RETAIL_URL (a wrong passphrase decrypts to noise)"; exit 1
+          fi
+          cat contents.txt
+          grep -q "fa/gamedata/units.scd" contents.txt
+          rm retail.tar.xz
+      - if: steps.have.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: retail.enc
+          key: retail-${{ vars.PARITY_RETAIL_ID }}
+
+  # One bucket of 10,000 replay ids per job, `parallel` jobs at a time, each one request a second.
+  replays:
+    needs: corpus
+    runs-on: ubuntu-24.04
+    strategy:
+      max-parallel: ${{ fromJSON(inputs.parallel || '4') }}
+      fail-fast: false
+      matrix:
+        bucket: ${{ fromJSON(needs.corpus.outputs.buckets) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: cache/replays
+          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-latest
+          restore-keys: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-
+      - id: fetch
+        run: >
+          python tools/parity-data/prewarm.py replays --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
+          --bucket ${{ matrix.bucket }} --cache cache/replays --game-version "$GAME_VERSION"
+          --minutes ${{ inputs.replay_minutes || '20' }}
+      # Counted from the index on disk, and saved even when the fetch was cancelled or failed:
+      # every replay a job downloaded stays for the next run.
+      - id: count
+        if: always()
+        run: echo "count=$([ -f cache/replays/index.jsonl ] && wc -l < cache/replays/index.jsonl || echo 0)" >> "$GITHUB_OUTPUT"
+      - if: >
+          always() && steps.count.outputs.count != '0' &&
+          steps.restore.outputs.cache-matched-key != format('replays-{0}-b{1}-n{2}', env.GAME_VERSION, matrix.bucket, steps.count.outputs.count)
+        uses: actions/cache/save@v6
+        with:
+          path: cache/replays
+          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-n${{ steps.count.outputs.count }}
+      - if: always() && steps.count.outputs.count != '0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: index-b${{ matrix.bucket }}
+          path: cache/replays/index.jsonl
+          retention-days: 3
+
+  # The top and retail maps (stripped), the M28AI versions the ready replays need, and every
+  # bucket's index in one file for plan.py.
+  assets:
+    needs: replays
+    if: always() && needs.replays.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: index-*
+          path: index
+      # A cache entry matches only a restore with the same path lines: these are the save steps'.
+      - id: maps
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.GAME_VERSION }}-latest
+          restore-keys: maps-${{ env.GAME_VERSION }}-
+      - id: m28
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.GAME_VERSION }}-latest
+          restore-keys: m28-${{ env.GAME_VERSION }}-
+      - id: fetch
+        run: >
+          mkdir -p index &&
+          python tools/parity-data/prewarm.py assets --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz
+          --index index --maps cache/maps --m28 cache/m28 --index-out cache/index/index.jsonl
+          --minutes ${{ inputs.asset_minutes || '60' }}
+      # Counted on disk (complete folders only), and saved even when the fetch was cancelled.
+      - id: count
+        if: always()
+        run: |
+          echo "maps=$(ls cache/maps 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+          echo "m28=$(ls cache/m28 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+      - if: >
+          always() && steps.count.outputs.maps != '0' &&
+          steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.maps)
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.maps }}
+      - if: >
+          always() && steps.count.outputs.m28 != '0' &&
+          steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.m28)
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.m28 }}
+      # Saved every run: a cache key is written once, so the run number keeps it new.
+      - if: steps.fetch.outputs.indexed != '0'
+        uses: actions/cache/save@v6
+        with:
+          path: cache/index
+          key: index-${{ env.GAME_VERSION }}-r${{ github.run_number }}

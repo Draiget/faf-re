@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/containers/String.h"
@@ -158,6 +159,7 @@ namespace gpg::diag
       ReportLine(sink, "Config    : Debug");
 #endif
       ReportLine(sink, "Built     : %s %s", __DATE__, __TIME__);
+      ReportLine(sink, "Commit    : %s", BuildIdentity()); // Engine addition (issue #215)
 #ifdef _MSC_VER
       ReportLine(sink, "Compiler  : MSVC %d", _MSC_VER);
 #endif

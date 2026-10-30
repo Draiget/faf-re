@@ -11,6 +11,7 @@
 #include <new>
 #include <type_traits>
 
+#include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -144,6 +145,10 @@ bool IWinApp::AppInitCommonServices()
       static gpg::StreamLogTarget sStartupLogTarget(*logStream, 3U);
     }
   }
+
+  // Engine addition (issue #215): the commit this exe was built from, as the log's
+  // first line, after the `/log` target exists so the line lands in the .sclog.
+  gpg::Logf("Engine build: %s", gpg::diag::BuildIdentity());
 
 #if defined(_M_X64)
   // x64 port test mode, not in the binary; see gpg::LogHighMemoryReservation.

@@ -17,6 +17,14 @@
 #define MSVC8_VECTOR_DISABLE_FREE 0
 #endif
 
+// The MSVC ABI ignores the standard `[[no_unique_address]]`, and other ABIs
+// don't know the `msvc::` spelling; each target reports only its own.
+#if __has_cpp_attribute(msvc::no_unique_address)
+#define MSVC8_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+#define MSVC8_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
+
 namespace msvc8
 {
 #ifndef MSVC8_CONTAINER_PROXY_DEFINED
@@ -1302,7 +1310,7 @@ namespace msvc8
          * Empty tag type standing in for `myProxy_` when a `vector<T,
          * HasDebugProxy>` instantiation carries no VC8 debug-iterator proxy at
          * all -- see `vector`'s `HasDebugProxy` template parameter below.
-         * `[[msvc::no_unique_address]]` lets the compiler fully elide this
+         * `MSVC8_NO_UNIQUE_ADDRESS` lets the compiler fully elide this
          * tag's storage, dropping the class from 16 to 12 bytes.
          * Address: 0x00508040 (FUN_00508040 -- the empty `_Container_base` / `_Iterator_base` bodies of a release build (`_Orphan_all`, `_Swap_all`, `_Adopt` and friends), as emitted for `msvc8::vector<moho::SDelayedSubVizInfo>`; each is a bare `ret`, zero callers, unreachable. Formerly the seven `noop_DelayedSubVizLaneVariant*` functions in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x005080A0 (FUN_005080A0 -- same, taking one ignored argument.)
@@ -1692,7 +1700,7 @@ namespace msvc8
         using const_iterator = const T*;
 
     private:
-        [[msvc::no_unique_address]] std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxy> myProxy_; // +0x0 when present (opaque _Container_proxy*)
+        MSVC8_NO_UNIQUE_ADDRESS std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxy> myProxy_; // +0x0 when present (opaque _Container_proxy*)
         T* first_;      // +0x4 (+0x0 when HasDebugProxy=false)
         T* last_;       // +0x8 (+0x4 when HasDebugProxy=false)
         T* end_;        // +0xC (+0x8 when HasDebugProxy=false)

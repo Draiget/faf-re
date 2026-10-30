@@ -262,29 +262,14 @@ void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
   CAiPathNavigator* loadedPathNavigator = nullptr;
   archive->ReadPointerOwned(&loadedPathNavigator, &ownerRef);
 
-  if (this) {
-    CAiPathNavigator* const oldPathNavigator = mPathNavigator;
-    mPathNavigator = loadedPathNavigator;
-    if (oldPathNavigator) {
-      delete oldPathNavigator;
-    }
-  } else if (loadedPathNavigator) {
-    delete loadedPathNavigator;
+  CAiPathNavigator* const oldPathNavigator = mPathNavigator;
+  mPathNavigator = loadedPathNavigator;
+  if (oldPathNavigator) {
+    delete oldPathNavigator;
   }
 
-  WeakPtr<Entity> destinationEntity{};
-  archive->Read(
-    CachedWeakEntityType(),
-    this ? static_cast<void*>(&mDestinationEntity) : static_cast<void*>(&destinationEntity),
-    ownerRef
-  );
-
-  SAiNavigatorGoal goal{};
-  archive->Read(
-    CachedSAiNavigatorGoalType(),
-    this ? static_cast<void*>(&mGoal) : static_cast<void*>(&goal),
-    ownerRef
-  );
+  archive->Read(CachedWeakEntityType(), &mDestinationEntity, ownerRef);
+  archive->Read(CachedSAiNavigatorGoalType(), &mGoal, ownerRef);
 }
 
 /**
@@ -303,27 +288,9 @@ void CAiNavigatorLand::MemberSerialize(gpg::WriteArchive* const archive) const
   const gpg::RRef ownerRef{};
   archive->Write(CachedCAiNavigatorImplType(), this, ownerRef);
 
-  WritePointerWithType(
-    archive,
-    this ? mPathNavigator : nullptr,
-    CachedCAiPathNavigatorType(),
-    gpg::TrackedPointerState::Owned,
-    ownerRef
-  );
-
-  const WeakPtr<Entity> destinationEntity{};
-  archive->Write(
-    CachedWeakEntityType(),
-    this ? static_cast<const void*>(&mDestinationEntity) : static_cast<const void*>(&destinationEntity),
-    ownerRef
-  );
-
-  const SAiNavigatorGoal goal{};
-  archive->Write(
-    CachedSAiNavigatorGoalType(),
-    this ? static_cast<const void*>(&mGoal) : static_cast<const void*>(&goal),
-    ownerRef
-  );
+  WritePointerWithType(archive, mPathNavigator, CachedCAiPathNavigatorType(), gpg::TrackedPointerState::Owned, ownerRef);
+  archive->Write(CachedWeakEntityType(), &mDestinationEntity, ownerRef);
+  archive->Write(CachedSAiNavigatorGoalType(), &mGoal, ownerRef);
 }
 
 /**

@@ -98,7 +98,7 @@ namespace moho
       return;
     }
 
-    const gpg::RRef objectRef = MakeDerivedRef(this ? cImpl : nullptr, CachedCAiAttackerImplType());
+    const gpg::RRef objectRef = MakeDerivedRef(cImpl, CachedCAiAttackerImplType());
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 } // namespace moho

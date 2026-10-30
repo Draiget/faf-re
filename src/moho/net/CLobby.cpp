@@ -1,6 +1,7 @@
 #include "CLobby.h"
 
 #include <algorithm>
+#include <atomic>
 #include <charconv>
 #include <chrono>
 #include <cstdarg>
@@ -548,6 +549,17 @@ gpg::RRef CLobby::GetDerivedObjectRef()
   return ref;
 }
 
+namespace
+{
+  // Engine addition (issue #215): live CLobby objects, for LOBBY_IsActive.
+  std::atomic<int> sLiveLobbies{0};
+} // namespace
+
+bool moho::LOBBY_IsActive() noexcept
+{
+  return sLiveLobbies.load(std::memory_order_relaxed) > 0;
+}
+
 /**
  * Address: 0x007C0970 (FUN_007C0970)
  * Mangled: ??0CLobby@Moho@@QAE@ABVLuaObject@LuaPlus@@PAVINetConnector@1@H_NVStrArg@gpg@@H@Z
@@ -587,6 +599,10 @@ CLobby::CLobby(
 
   this->connector->SelectEvent(event);
   WIN_GetWaitHandleSet()->AddHandle(event);
+
+  // Engine addition (issue #215): counted last, so a constructor that throws
+  // above (no destructor runs) leaves the count alone.
+  sLiveLobbies.fetch_add(1, std::memory_order_relaxed);
 }
 
 /**
@@ -598,6 +614,8 @@ CLobby::CLobby(
  */
 CLobby::~CLobby()
 {
+  sLiveLobbies.fetch_sub(1, std::memory_order_relaxed); // Engine addition (issue #215)
+
   if (mSocket != nullptr) {
     WIN_GetWaitHandleSet()->RemoveHandle(mSocket->CreateEvent());
   }

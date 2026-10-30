@@ -22,6 +22,7 @@
 #include "boost/function.hpp"
 #include <boost/bind.hpp>
 #include <boost/ptr_container/exception.hpp>
+#include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/app/WinApp.h"
@@ -185,6 +186,10 @@ void CSimDriver::DrawNetworkStatsPanel(
 
   // ---- Summary block: 4 lines (0x0073E687..0x0073E876).
   msvc8::vector<msvc8::string> summary;
+
+  // Engine addition (issue #215): the exe's build as the first line, so F11 (FAF's
+  // connectivity screen turns this panel on) tells which build each player runs.
+  summary.push_back(msvc8::string(gpg::diag::BuildLabel()));
 
   {
     int availableBeat = 0;

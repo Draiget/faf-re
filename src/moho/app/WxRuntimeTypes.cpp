@@ -18,6 +18,7 @@
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/RenderProfiler.h"
@@ -65,6 +66,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/CLobby.h"
 #include "moho/net/Common.h"
 #include "moho/net/INetConnector.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
@@ -2914,6 +2916,77 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
   // batcher shared_ptr destructs here (asm 0x007FA9FB..0x007FAA2D).
 }
 
+namespace
+{
+  /// The current profile's ui_scale option, as SimDriverNetworkStats.cpp reads it;
+  /// 1.0 when it is unset or not a number.
+  [[nodiscard]] float BuildLabelUiScale()
+  {
+    moho::IUserPrefs* const prefs = moho::USER_GetPreferences();
+    if (prefs == nullptr) {
+      return 1.0f;
+    }
+    const LuaPlus::LuaObject value = prefs->LookupCurrentOption("ui_scale");
+    if (!value.IsNumber()) {
+      return 1.0f;
+    }
+    return std::clamp(static_cast<float>(value.GetNumber()), 0.5f, 4.0f);
+  }
+
+  /**
+   * Engine addition (issue #215): gpg::diag::BuildLabel ("FAF-RE by Draiget, build
+   * <commit> <arch>") in small gray text, centred at the bottom of the first head, while
+   * the lobby screen is up (a CLobby exists and no game session runs). In a game the
+   * same line heads the network-stats panel (F11) instead. The engine draws it after the UI, from
+   * the commit compiled into the exe, so no Lua code can change or hide it; there is
+   * deliberately no console variable for it either, since Lua can set those.
+   */
+  void DrawLobbyBuildLabel(moho::CD3DPrimBatcher* const primBatcher, const int head)
+  {
+    if (head != 0 || !moho::LOBBY_IsActive() || moho::WLD_GetActiveSession() != nullptr) {
+      return;
+    }
+
+    const char* const label = gpg::diag::BuildLabel();
+    const float uiScale = BuildLabelUiScale();
+    const int fontPoints = std::max(1, static_cast<int>(std::lround(9.0f * uiScale)));
+    boost::SharedPtrRaw<moho::CD3DFont> rawFont = moho::CD3DFont::Create(fontPoints, "Arial");
+    moho::CD3DFont* const font = rawFont.px;
+    if (font == nullptr) {
+      return;
+    }
+
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    device->SelectFxFile("primbatcher");
+    device->SelectTechnique("TAlphaBlendLinearSampleNoDepth");
+    primBatcher->mRebuildComposite = 0;
+
+    // The screen-space projection REN_DebugStuff sets: pixels, origin top left.
+    const float widthF = static_cast<float>(device->GetHeadWidth(head));
+    const float heightF = static_cast<float>(device->GetHeadHeight(head));
+    moho::VMatrix4 projection{};
+    projection.r[0] = {2.0f / widthF, 0.0f, 0.0f, 0.0f};
+    projection.r[1] = {0.0f, 2.0f / (-0.0f - heightF), 0.0f, 0.0f};
+    projection.r[2] = {0.0f, 0.0f, -0.5f, 0.0f};
+    projection.r[3] = {(widthF / (-0.0f - widthF)) - (1.0f / widthF), (heightF / heightF) + (1.0f / heightF), 0.5f, 1.0f};
+    primBatcher->SetProjectionMatrix(projection);
+    primBatcher->SetViewMatrix(moho::VMatrix4::Identity());
+
+    // Baseline 4 px (scaled) above the bottom edge, below the descenders.
+    const float advance = font->GetAdvance(label, -1);
+    const float descent = font->mHeight - font->mAscent;
+    const moho::Vector3f origin{
+      std::floor((widthF - advance) * 0.5f), std::floor(heightF - descent - 4.0f * uiScale), 0.0f};
+    const moho::Vector3f xAxis{1.0f, 0.0f, 0.0f};
+    const moho::Vector3f yAxis{0.0f, -1.0f, 0.0f};
+    constexpr std::uint32_t kGray = 0xB0A0A0A0u; // ARGB: light gray, partly transparent
+    (void)font->Render(label, primBatcher, origin, xAxis, yAxis, kGray, 0.0f, gpg::NaN);
+
+    primBatcher->Flush();
+    rawFont.release();
+  }
+} // namespace
+
 /**
  * Address: 0x007F88B0 (FUN_007F88B0)
  * Mangled: ?RenderUI@WRenViewport@Moho@@AAEXABV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
@@ -2958,6 +3031,9 @@ void moho::WRenViewport::RenderUI(const msvc8::vector<SWorldViewInfo>& worldView
 
   // 0x007F89C3..0x007F89F8: debug overlays, handed a copy of the batcher.
   REN_DebugStuff(mPrimBatcher, mHead);
+
+  // Engine addition (issue #215): the lobby's build label.
+  DrawLobbyBuildLabel(primBatcher, mHead);
 
   // 0x007F89FB..0x007F8A13: editor render hook. ED_Render (0x007B6450) is
   // inlined here by LTCG: `mov ecx,[ed_Hook]; cmp ecx,esi; ...; call [vtbl+4]`.
