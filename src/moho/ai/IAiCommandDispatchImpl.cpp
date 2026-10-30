@@ -1180,9 +1180,9 @@ void IAiCommandDispatchImpl::MemberSerialize(gpg::WriteArchive* const archive) c
 
   const gpg::RRef ownerRef{};
   archive->Write(CachedCCommandTaskType(), this, ownerRef);
-  archive->WriteBool(this && mState != 0u);
+  archive->WriteBool(mState != 0u);
 
-  const gpg::RRef queueRef = MakeCommandQueueRef(this ? mCommandQueue : nullptr);
+  const gpg::RRef queueRef = MakeCommandQueueRef(mCommandQueue);
   gpg::WriteRawPointer(archive, queueRef, gpg::TrackedPointerState::Unowned, ownerRef);
 }
 

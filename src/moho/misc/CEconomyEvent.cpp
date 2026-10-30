@@ -299,6 +299,7 @@ namespace
       activeState = state->GetCState();
     }
     luaL_error(activeState, "%s", text ? text : "<lua error>");
+    std::abort();
   }
 
   template <typename TObject>

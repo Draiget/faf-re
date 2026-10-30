@@ -1,6 +1,6 @@
 # FAF Boost 1.34.1 patch
 
-Baseline: the upstream `boost_1_34_1.tar.bz2` from SourceForge, SHA256 `0f866c75b025a4f1340117a106595cc0675f48ba1e5a9b5c221ec7f19e96ec4c`. `cmake/FafDependencies.cmake` downloads it, checks the hash, extracts it to `dependencies/boost_1_34_1` and applies this patch (nine files, all code changes).
+Baseline: the upstream `boost_1_34_1.tar.bz2` from SourceForge, SHA256 `0f866c75b025a4f1340117a106595cc0675f48ba1e5a9b5c221ec7f19e96ec4c`. `cmake/FafDependencies.cmake` downloads it, checks the hash, extracts it to `dependencies/boost_1_34_1` and applies this patch (ten files, all code changes).
 
 ## There is no bjam step
 
@@ -24,6 +24,7 @@ thread.cpp   tss.cpp        tss_dll.cpp     tss_hooks.cpp  tss_pe.cpp  xtime.cpp
 | `boost/function/function_base.hpp`, `function_template.hpp` | modern-compiler compatibility |
 | `boost/get_pointer.hpp` | modern-compiler compatibility |
 | `boost/config/compiler/visualc.hpp` | known-version ceiling raised from `1400` (VC8) to `1950`, suppressing the unknown-compiler diagnostic |
+| `boost/type_traits/intrinsics.hpp` | `BOOST_IS_POD` uses `__is_trivially_constructible(T)` instead of `__has_trivial_constructor(T)`, which clang deprecates (`-Wdeprecated-builtins`); the two agree for every POD type. The other `__has_*` macros in that block are not used by the engine and stay as they are |
 
 Not a patch but related: `src/CMakeLists.txt` compiles `libs/thread/src/condition.cpp` without `UNICODE`/`_UNICODE`, so `CreateSemaphore`/`CreateMutex` resolve to the `…A` entry points the shipped binary uses (0x00AC2190).
 

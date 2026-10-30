@@ -1297,11 +1297,7 @@ void IAiNavigator::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(
-    CachedBroadcasterEAiNavigatorEventType(),
-    this ? static_cast<void*>(static_cast<Broadcaster<EAiNavigatorEvent>*>(this)) : nullptr,
-    ownerRef
-  );
+  archive->Read(CachedBroadcasterEAiNavigatorEventType(), static_cast<Broadcaster<EAiNavigatorEvent>*>(this), ownerRef);
 }
 
 /**
@@ -1319,9 +1315,7 @@ void IAiNavigator::MemberSerialize(gpg::WriteArchive* const archive) const
 
   const gpg::RRef ownerRef{};
   archive->Write(
-    CachedBroadcasterEAiNavigatorEventType(),
-    this ? static_cast<const void*>(static_cast<const Broadcaster<EAiNavigatorEvent>*>(this)) : nullptr,
-    ownerRef
+    CachedBroadcasterEAiNavigatorEventType(), static_cast<const Broadcaster<EAiNavigatorEvent>*>(this), ownerRef
   );
 }
 

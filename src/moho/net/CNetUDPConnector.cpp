@@ -972,7 +972,7 @@ void CNetUDPConnector::Entry()
     }
     lock.unlock();
     if (net_DebugCrash) {
-      *static_cast<int*>(0) = 0;
+      *static_cast<volatile int*>(nullptr) = 0;
     }
 
     LONGLONG startTime = 0;

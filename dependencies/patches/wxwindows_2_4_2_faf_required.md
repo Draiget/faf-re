@@ -16,6 +16,7 @@ The patch file `wxwindows_2_4_2_faf_required.patch` captures local fixes needed 
 
 Patched files in `wxwindows_2_4_2_faf_required.patch`:
 
+- `include/wx/generic/dirctrlg.h`: the default `style` of `wxGenericDirCtrl`'s constructor and `Create` ORs an anonymous enum with `wxBorder`, which C++20 deprecates (`-Wdeprecated-anon-enum-enum-conversion` in every engine file that includes `wx/dirctrl.h`). `wxSUNKEN_BORDER` is converted to `long` first; the value is the same.
 - `include/wx/treelistctrl.h` (new, see below)
 - `src/common/datetime.cpp`
 - `src/common/intl.cpp`

@@ -787,7 +787,7 @@ void CUnitScriptTask::MemberDeserialize(gpg::ReadArchive* const archive, const i
   gpg::RRef owner{};
   archive->Read(CachedCCommandTaskType(), this, owner);
 
-  CScriptObject* const scriptObject = this ? static_cast<CScriptObject*>(this) : nullptr;
+  CScriptObject* const scriptObject = static_cast<CScriptObject*>(this);
   gpg::RRef scriptOwner{};
   archive->Read(CachedCScriptObjectType(), scriptObject, scriptOwner);
 
@@ -810,7 +810,7 @@ void CUnitScriptTask::MemberSerialize(gpg::WriteArchive* const archive, const in
   gpg::RRef owner{};
   archive->Write(CachedCCommandTaskType(), this, owner);
 
-  CScriptObject* const scriptObject = this ? static_cast<CScriptObject*>(this) : nullptr;
+  CScriptObject* const scriptObject = static_cast<CScriptObject*>(this);
   gpg::RRef scriptOwner{};
   archive->Write(CachedCScriptObjectType(), scriptObject, scriptOwner);
 

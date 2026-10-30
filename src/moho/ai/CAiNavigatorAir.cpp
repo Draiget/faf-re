@@ -142,32 +142,13 @@ void CAiNavigatorAir::MemberDeserialize(gpg::ReadArchive* const archive)
   const gpg::RRef ownerRef{};
   archive->Read(CachedCAiNavigatorImplType(), this, ownerRef);
 
-  WeakPtr<Entity> destination{};
-  archive->Read(
-    CachedWeakEntityType(),
-    this ? static_cast<void*>(&mDestinationEntity) : static_cast<void*>(&destination),
-    ownerRef
-  );
-
-  Wm3::Vector3f currentTarget = Wm3::Vector3f::Zero();
-  archive->Read(
-    CachedVector3fType(),
-    this ? static_cast<void*>(&mCurrentTargetPos) : static_cast<void*>(&currentTarget),
-    ownerRef
-  );
-
-  Wm3::Vector3f goalPos = Wm3::Vector3f::Zero();
-  archive->Read(
-    CachedVector3fType(),
-    this ? static_cast<void*>(&mGoalPos) : static_cast<void*>(&goalPos),
-    ownerRef
-  );
+  archive->Read(CachedWeakEntityType(), &mDestinationEntity, ownerRef);
+  archive->Read(CachedVector3fType(), &mCurrentTargetPos, ownerRef);
+  archive->Read(CachedVector3fType(), &mGoalPos, ownerRef);
 
   bool trackFormation = false;
   archive->ReadBool(&trackFormation);
-  if (this) {
-    mTrackFormationTarget = trackFormation ? 1u : 0u;
-  }
+  mTrackFormationTarget = trackFormation ? 1u : 0u;
 }
 
 /**
@@ -186,28 +167,10 @@ void CAiNavigatorAir::MemberSerialize(gpg::WriteArchive* const archive) const
   const gpg::RRef ownerRef{};
   archive->Write(CachedCAiNavigatorImplType(), this, ownerRef);
 
-  const WeakPtr<Entity> destination{};
-  archive->Write(
-    CachedWeakEntityType(),
-    this ? static_cast<const void*>(&mDestinationEntity) : static_cast<const void*>(&destination),
-    ownerRef
-  );
-
-  const Wm3::Vector3f currentTarget = Wm3::Vector3f::Zero();
-  archive->Write(
-    CachedVector3fType(),
-    this ? static_cast<const void*>(&mCurrentTargetPos) : static_cast<const void*>(&currentTarget),
-    ownerRef
-  );
-
-  const Wm3::Vector3f goalPos = Wm3::Vector3f::Zero();
-  archive->Write(
-    CachedVector3fType(),
-    this ? static_cast<const void*>(&mGoalPos) : static_cast<const void*>(&goalPos),
-    ownerRef
-  );
-
-  archive->WriteBool(this && mTrackFormationTarget != 0u);
+  archive->Write(CachedWeakEntityType(), &mDestinationEntity, ownerRef);
+  archive->Write(CachedVector3fType(), &mCurrentTargetPos, ownerRef);
+  archive->Write(CachedVector3fType(), &mGoalPos, ownerRef);
+  archive->WriteBool(mTrackFormationTarget != 0u);
 }
 
 /**
