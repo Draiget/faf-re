@@ -46,7 +46,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       # The pinned toolchain (cmake/toolchains/linux-clang-pins.cmake): configure refuses another.
@@ -55,7 +55,7 @@ jobs:
           v=1:18.1.3-1ubuntu1
           sudo apt-get install -y --no-install-recommends ninja-build \
             clang-18=$v lld-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: dependencies/.downloads
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
@@ -63,7 +63,7 @@ jobs:
       - run: cmake --preset linux-clang-x64-release
       - run: cmake --build --preset linux-clang-x64-release --target headless
       - run: echo "Built $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: headless
           path: build/linux-clang-x64-release/headless
@@ -74,13 +74,13 @@ jobs:
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       # What the prewarm learnt about each replay (ready, or why not). Without it every corpus
       # replay is scheduled and the jobs check them.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: cache/index
           key: index-${{ env.GAME_VERSION }}-latest
@@ -91,7 +91,7 @@ jobs:
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
           --set ${{ inputs.set }} --sample ${{ inputs.sample }} --seed ${{ inputs.seed }} --slots 4
           --budget-minutes "$PLAY_MINUTES" --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plan
           path: plan.json
@@ -108,23 +108,23 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     name: run (shard ${{ matrix.shard }})
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: headless
           path: bin
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: plan
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: game
           key: game-${{ env.GAME_VERSION }}
           fail-on-cache-miss: true
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
@@ -137,18 +137,18 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc | tar -xJf - -C game
           rm retail.enc
           chmod +x bin/headless
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: cache/maps
           key: maps-${{ env.GAME_VERSION }}-latest
           restore-keys: maps-${{ env.GAME_VERSION }}-
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: cache/m28
           key: m28-${{ env.GAME_VERSION }}-latest
           restore-keys: m28-${{ env.GAME_VERSION }}-
       - if: matrix.bucket >= 0
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: cache/replays
           key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-latest
@@ -159,7 +159,7 @@ jobs:
           --pack game --replays cache/replays --maps cache/maps --m28 cache/m28 --work work
           --out results --minutes "$PLAY_MINUTES" --game-version "$GAME_VERSION"
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.shard }}
           path: results
@@ -170,14 +170,14 @@ jobs:
     if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: plan
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: results-*
           path: results
@@ -186,7 +186,7 @@ jobs:
           --expected tools/parity-data/expected/$GAME_VERSION.json --out report
           --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}, game version $GAME_VERSION"
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: report
           path: report

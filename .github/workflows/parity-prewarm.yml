@@ -45,7 +45,7 @@ jobs:
     outputs:
       buckets: ${{ steps.buckets.outputs.buckets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: tools/parity-data
       - id: buckets
@@ -62,21 +62,21 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - id: have
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: game
           key: game-${{ env.GAME_VERSION }}
           lookup-only: true
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - if: steps.have.outputs.cache-hit != 'true'
         run: python tools/parity-data/prewarm.py game --game-version "$GAME_VERSION" --out game
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: game
           key: game-${{ env.GAME_VERSION }}
@@ -89,7 +89,7 @@ jobs:
     environment: parity
     steps:
       - id: have
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
@@ -118,7 +118,7 @@ jobs:
           grep -q "fa/gamedata/units.scd" contents.txt
           rm retail.tar.xz
       - if: steps.have.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: retail.enc
           key: retail-${{ vars.PARITY_RETAIL_ID }}
@@ -133,12 +133,12 @@ jobs:
       matrix:
         bucket: ${{ fromJSON(needs.corpus.outputs.buckets) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - id: restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: cache/replays
           key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-latest
@@ -156,12 +156,12 @@ jobs:
       - if: >
           always() && steps.count.outputs.count != '0' &&
           steps.restore.outputs.cache-matched-key != format('replays-{0}-b{1}-n{2}', env.GAME_VERSION, matrix.bucket, steps.count.outputs.count)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: cache/replays
           key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-n${{ steps.count.outputs.count }}
       - if: always() && steps.count.outputs.count != '0'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: index-b${{ matrix.bucket }}
           path: cache/replays/index.jsonl
@@ -174,22 +174,22 @@ jobs:
     if: always() && needs.replays.result != 'cancelled'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: index-*
           path: index
       - id: maps
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: cache/maps
           key: maps-${{ env.GAME_VERSION }}-latest
           restore-keys: maps-${{ env.GAME_VERSION }}-
       - id: m28
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: cache/m28
           key: m28-${{ env.GAME_VERSION }}-latest
@@ -209,7 +209,7 @@ jobs:
       - if: >
           always() && steps.count.outputs.maps != '0' &&
           steps.maps.outputs.cache-matched-key != format('maps-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.maps)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             cache/maps
@@ -218,7 +218,7 @@ jobs:
       - if: >
           always() && steps.count.outputs.m28 != '0' &&
           steps.m28.outputs.cache-matched-key != format('m28-{0}-n{1}', env.GAME_VERSION, steps.count.outputs.m28)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             cache/m28
@@ -226,7 +226,7 @@ jobs:
           key: m28-${{ env.GAME_VERSION }}-n${{ steps.count.outputs.m28 }}
       # Saved every run: a cache key is written once, so the run number keeps it new.
       - if: steps.fetch.outputs.indexed != '0'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: cache/index
           key: index-${{ env.GAME_VERSION }}-r${{ github.run_number }}
