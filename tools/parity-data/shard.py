@@ -31,7 +31,8 @@ import subprocess
 import sys
 import time
 
-from common import (MOD_URL, REPLAY_URL, check_replay, clock, extract_map, fetch, find_mod_info, map_url, speed)
+from common import (MOD_URL, REPLAY_URL, check_replay, clock, extract_map, fetch, find_mod_info, has_scenario, map_url,
+                    speed)
 from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE, HL_TROUBLE_RE, HL_VERDICT_RE,
                         MISMATCH_RE, live_client_desync, replay_checksums)
 
@@ -102,9 +103,12 @@ class Shard:
         build), else the map's folder: from the maps cache, or downloaded."""
         if find_folder(self.retail_maps, folder):
             return None
-        found = find_folder(self.args.maps, folder) or find_folder(os.path.join(self.args.work, "maps"), folder)
+        # A cached folder without a scenario file came from a zip whose map was not at the top
+        # (caches saved before 2026-10-30): fetched again.
+        found = [f for f in (find_folder(self.args.maps, folder), find_folder(os.path.join(self.args.work, "maps"), folder))
+                 if f and has_scenario(f)]
         if found:
-            return found
+            return found[0]
         zpath = os.path.join(self.args.work, "dl", folder + ".zip")
         fetch(map_url(folder), zpath, self.args.delay)
         return extract_map(zpath, os.path.join(self.args.work, "maps"), folder)

@@ -98,14 +98,15 @@ def main():
     for path in glob.glob(os.path.join(args.index, "**", "index.jsonl"), recursive=True):
         index.update(read_index(path))
 
-    # Replays the earlier run played to a verdict. Retried: not-run, error, and timeout (which
-    # before 2026-10-30 was a replay stopped at its job's time limit).
+    # Replays the earlier run played to a verdict. Retried: not-run, error, timeout (which before
+    # 2026-10-30 was a replay stopped at its job's time limit) and crash (before 2026-10-30 a map
+    # cached without its scenario file, scmp_001, failed to load as a crash).
     settled = set()
     if args.after:
         for path in glob.glob(os.path.join(args.after, "**", "results.jsonl"), recursive=True):
             with open(path, encoding="utf-8") as f:
                 settled.update(r["id"] for r in map(json.loads, filter(str.strip, f))
-                               if r["verdict"] not in ("not-run", "error", "timeout"))
+                               if r["verdict"] not in ("not-run", "error", "timeout", "crash"))
 
     unsupported = []
     chosen = []
