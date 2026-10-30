@@ -20,6 +20,20 @@ MOD_URL = "https://content.faforever.com/mods/%s.zip"
 MAP_URL = "https://content.faforever.com/maps/%s.zip"
 
 
+def clock(seconds):
+    """1:02:03 or 2:03, for game and wall times."""
+    s = int(round(seconds))
+    return "%d:%02d:%02d" % (s // 3600, s // 60 % 60, s % 60) if s >= 3600 else "%d:%02d" % (s // 60, s % 60)
+
+
+def speed(entry):
+    """A result's game time, wall time and speedup (game seconds per wall second) as text, or None
+    when it did not play a beat. Wall time runs from launch to exit, loading included."""
+    if not entry.get("game_s") or not entry.get("wall_s"):
+        return None
+    return "game %s, wall %s, x%.1f" % (clock(entry["game_s"]), clock(entry["wall_s"]), entry["game_s"] / entry["wall_s"])
+
+
 def map_url(folder):
     """Many vault map folders have spaces ("flat 512"): quoted, as FAF serves them."""
     return MAP_URL % urllib.parse.quote(folder)

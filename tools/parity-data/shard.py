@@ -26,7 +26,7 @@ import subprocess
 import sys
 import time
 
-from common import (MOD_URL, REPLAY_URL, check_replay, extract_map, fetch, find_mod_info, map_url)
+from common import (MOD_URL, REPLAY_URL, check_replay, extract_map, fetch, find_mod_info, map_url, speed)
 from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE, HL_TROUBLE_RE, HL_VERDICT_RE,
                         MISMATCH_RE, live_client_desync, replay_checksums)
 
@@ -73,9 +73,11 @@ class Shard:
             for src, ext in ((game["out"], "out"), (game["log"], "log")):
                 if os.path.isfile(src):
                     shutil.copyfile(src, os.path.join(self.args.out, "logs", "%d.%s" % (entry["id"], ext)))
-        print("%-8d %-11s %s" % (entry["id"], entry["verdict"],
-                                 "beat %s" % entry["first_beat"] if "first_beat" in entry else entry.get("why", "")),
-              flush=True)
+        if "first_beat" in entry:
+            detail = "beat %s" % entry["first_beat"]
+        else:
+            detail = speed(entry) or entry.get("why", "")
+        print("%-8d %-11s %s" % (entry["id"], entry["verdict"], detail), flush=True)
 
     # ------------------------------------------------------------------------ preparing
     def replay_bytes(self, replay_id):
@@ -229,6 +231,7 @@ class Shard:
             "id": item["id"], "verdict": verdict, "first_beat": game["first_beat"],
             "mismatches": game["mismatches"] or None, "live_desyncs": game["live"] or None,
             "last_beat": game["tick"], "length": game["info"].get("beats"), "ended": game["ended"],
+            "game_s": game["tick"] / 10.0 if game["tick"] > 0 else None,  # 10 beats a game second
             "game_over": game["over"], "players": item["players"], "map": game["info"]["map"],
             "m28": game["info"]["m28"], "wall_s": round(time.time() - game["t0"], 1), "est_s": item["est"],
             "downloaded": game["downloaded"] or None, "notes": game["notes"] or None,
