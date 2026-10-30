@@ -5,6 +5,8 @@ usage: plan.py --corpus FILE --index DIR --set core|extended|sample|all [options
 Every shard holds replays of one id bucket (so its job restores one replay cache; the core and
 extended sets share shards, bucket -1, and their jobs fetch the replays) whose
 estimated times fill `slots` parallel players for `budget-minutes` (first fit, longest first).
+A set that fills fewer than --jobs shards (the jobs GitHub runs at once) is split further, down
+to `slots` replays a shard, so it ends as soon as the jobs running at once allow.
 The core set comes first, then the extended set, then the rest in a seeded random order; when
 the shards would pass --max-shards, the replays at the end of that order are left out (listed in
 the plan as not scheduled). Replays the prewarm found unplayable (a sim mod, another version)
@@ -51,6 +53,25 @@ def pack(items, capacity):
     return bins
 
 
+def spread(shards, want, slots):
+    """Splits the most loaded shard in two (longest first, each to the lighter half) until there
+    are `want` shards or none holds more than `slots` replays: a set too small to fill a job's
+    budget still plays on as many jobs as run at once, `slots` replays to each."""
+    while len(shards) < want:
+        splittable = [s for s in shards if len(s[1]["items"]) > slots]
+        if not splittable:
+            break
+        bucket, big = max(splittable, key=lambda s: s[1]["load"])
+        halves = [{"items": [], "load": 0}, {"items": [], "load": 0}]
+        for item in sorted(big["items"], key=lambda r: -r["est"]):
+            half = min(halves, key=lambda h: h["load"])
+            half["items"].append(item)
+            half["load"] += item["est"]
+        i = next(n for n, s in enumerate(shards) if s[1] is big)
+        shards[i:i + 1] = [(bucket, h) for h in halves]
+    return shards
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--corpus", required=True)
@@ -62,6 +83,8 @@ def main():
     parser.add_argument("--budget-minutes", type=float, default=300, help="time a job spends playing")
     parser.add_argument("--fill", type=float, default=0.85, help="share of slots x budget a shard is packed to")
     parser.add_argument("--max-shards", type=int, default=256)
+    parser.add_argument("--jobs", type=int, default=20,
+                        help="jobs GitHub runs at once (20 on Free): a small set is spread over this many")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -106,6 +129,7 @@ def main():
         dropped = chosen[-cut:] + dropped
         chosen = chosen[:-cut]
         shards = shards_for(chosen)
+    shards = spread(shards, min(args.jobs, args.max_shards), args.slots)
 
     plan = {
         "settings": {k: getattr(args, k) for k in ("which", "sample", "seed", "slots", "budget_minutes", "fill")},
