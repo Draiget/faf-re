@@ -15,6 +15,8 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplayLaunchCheck.cpp
   headless/ReplayLuaState.cpp
   headless/ReplayOracleCheck.cpp
+  headless/ReplayViewPacketCheck.cpp
+  headless/ReplayViewFrameStats.cpp
   headless/HeadlessMain.cpp
   headless/ReplayRunner.cpp
   headless/ReplaySyncWriters.cpp
@@ -25,5 +27,7 @@ set(FAF_HEADLESS_SERVER_SOURCES
   headless/ReplayChangeSetCheck.cpp
   headless/ReplayCommandCheck.cpp
   headless/ReplayOracleCheck.cpp
+  headless/ReplayViewPacketCheck.cpp
+  headless/ReplayViewFrameStats.cpp
   headless/ReplayWireStats.cpp
 )

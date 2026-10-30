@@ -4497,6 +4497,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     // replay viewer switching focus army changed the sim checksum.
     for (const auto& idAndEntity : mEntityDB->mAllUnits) {
       if (Entity* const entity = idAndEntity.second; entity != nullptr) {
+#if FAF_SERVER_MODE
+        if (sSyncObserver != nullptr) {
+          sSyncObserver->OnEntityWillSync(*entity);
+        }
+#endif
         entity->Sync(outSyncData);
         ++syncedEntityCount;
 #if FAF_SERVER_MODE
@@ -4512,6 +4517,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       Entity* const entity = *it;
       ++it;
       if (entity != nullptr) {
+#if FAF_SERVER_MODE
+        if (sSyncObserver != nullptr) {
+          sSyncObserver->OnEntityWillSync(*entity);
+        }
+#endif
         entity->Sync(outSyncData);
         ++syncedEntityCount;
 #if FAF_SERVER_MODE

@@ -16,6 +16,14 @@
 
 namespace faf::remote
 {
+  /** One entity of the change set. */
+  struct SChangedEntity
+  {
+    moho::Entity* entity = nullptr;
+    /** `mRequestRefreshUI` as the walk found it: `Entity::Sync` clears it after the packet copy. */
+    bool requestRefreshUI = false;
+  };
+
   /**
    * Collects the entities `Sim::Sync` syncs (`Sim::SetSyncObserver(this)`), and seals them as
    * one beat's change set when the walk is done. Reads only.
@@ -23,6 +31,7 @@ namespace faf::remote
   class CBeatChangeSet : public moho::CSyncObserver
   {
   public:
+    void OnEntityWillSync(moho::Entity& entity) override;
     void OnEntitySynced(moho::Entity& entity) override;
     void OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet) override;
 
@@ -30,7 +39,7 @@ namespace faf::remote
      * The last sealed beat's synced entities, by id ascending. Raw pointers: valid until the sim
      * runs its next tick, so a reader takes what it needs from `OnBeatChanges`.
      */
-    [[nodiscard]] const std::vector<moho::Entity*>& Entities() const noexcept { return mSealed; }
+    [[nodiscard]] const std::vector<SChangedEntity>& Entities() const noexcept { return mSealed; }
     /** The sealed beat (`Sim::mCurBeat` when its walk ended). */
     [[nodiscard]] std::uint32_t Beat() const noexcept { return mBeat; }
 
@@ -43,8 +52,9 @@ namespace faf::remote
     }
 
   private:
-    std::vector<moho::Entity*> mPending; // the walk in progress
-    std::vector<moho::Entity*> mSealed;  // the last beat's, sorted by id
+    std::vector<SChangedEntity> mPending; // the walk in progress
+    std::vector<SChangedEntity> mSealed;  // the last beat's, sorted by id
+    bool mPendingRefreshUI = false;        // the entity about to sync
     std::uint32_t mBeat = 0;
   };
 } // namespace faf::remote

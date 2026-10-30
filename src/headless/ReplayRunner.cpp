@@ -49,6 +49,8 @@
 #include "headless/ReplayCommandCheck.h"
 #include "headless/ReplayChangeSetCheck.h"
 #include "headless/ReplayOracleCheck.h"
+#include "headless/ReplayViewFrameStats.h"
+#include "headless/ReplayViewPacketCheck.h"
 #include "headless/ReplayWireStats.h"
 #include "remote/ContentTables.h"
 #endif
@@ -507,6 +509,30 @@ namespace faf::headless
       changeSetCheck = std::make_unique<CReplayChangeSetCheck>();
       changeSetCheck->Install();
     }
+
+    // `--view-packets`: the sync walk's observer as well.
+    std::unique_ptr<CReplayViewPacketCheck> viewPackets;
+    if (!options.viewPacketsPath.empty()) {
+      viewPackets = std::make_unique<CReplayViewPacketCheck>(options.viewPacketsArmy, options.viewPacketsPath);
+      if (!viewPackets->IsOpen()) {
+        result.error = "cannot write " + options.viewPacketsPath;
+        return result;
+      }
+      viewPackets->Install();
+    }
+
+    // `--view-frames`: the sync walk's observer as well.
+    std::unique_ptr<CReplayViewFrameStats> viewFrames;
+    if (!options.viewFramesPath.empty()) {
+      viewFrames = std::make_unique<CReplayViewFrameStats>(
+        options.viewFramesPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z
+      );
+      if (!viewFrames->IsOpen()) {
+        result.error = "cannot write " + options.viewFramesPath;
+        return result;
+      }
+      viewFrames->Install();
+    }
 #endif
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
@@ -746,6 +772,13 @@ namespace faf::headless
     if (changeSetCheck) {
       result.changeSetSummary = changeSetCheck->Summary();
       result.changeSetFailures = changeSetCheck->Failures();
+    }
+    if (viewPackets) {
+      result.viewPacketsSummary = viewPackets->Summary();
+    }
+    if (viewFrames) {
+      result.viewFramesSummary = viewFrames->Summary();
+      result.viewFramesFailures = viewFrames->Failures();
     }
 #endif
     if (!options.syncKeysPath.empty()) {

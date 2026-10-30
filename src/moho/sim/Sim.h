@@ -57,6 +57,13 @@ namespace moho
   public:
     virtual ~CSyncObserver() = default;
 
+    /**
+     * An entity the walk is about to sync. `Entity::Sync` clears state the packet carries
+     * (`mRequestRefreshUI`, 0x0067A10B) after copying it; an observer that rebuilds another
+     * view's packet reads it here.
+     */
+    virtual void OnEntityWillSync(Entity& entity) { (void)entity; }
+
     /** An entity the walk just synced (its `Sync` has run): the beat's dirty run, or every entity on a focus change. */
     virtual void OnEntitySynced(Entity& entity) { (void)entity; }
 

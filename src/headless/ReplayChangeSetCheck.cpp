@@ -55,8 +55,8 @@ namespace faf::headless
     ++mBeats;
 
     mIds.clear();
-    for (const moho::Entity* const entity : Entities()) {
-      mIds.push_back(static_cast<std::uint32_t>(entity->id_));
+    for (const remote::SChangedEntity& changed : Entities()) {
+      mIds.push_back(static_cast<std::uint32_t>(changed.entity->id_));
     }
     mChanged += mIds.size();
 
@@ -99,7 +99,8 @@ namespace faf::headless
     }
 
     const std::int32_t focusArmy = sim.mSyncFilter.focusArmy;
-    for (moho::Entity* const entity : Entities()) {
+    for (const remote::SChangedEntity& changed : Entities()) {
+      moho::Entity* const entity = changed.entity;
       const auto id = static_cast<std::uint32_t>(entity->id_);
       if (std::binary_search(mPacketIds.begin(), mPacketIds.end(), id)) {
         continue;
