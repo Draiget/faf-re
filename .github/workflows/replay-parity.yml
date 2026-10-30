@@ -48,11 +48,17 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
+      # The full commit of `ref`: checkout takes a short commit id for a branch or tag name.
+      - id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+        run: |
+          sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
-      - id: commit
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          ref: ${{ steps.commit.outputs.sha }}
       # A commit is built once: its headless binary is cached by the commit (the pinned toolchain
       # makes the same commit the same binary). Bump BUILD_CACHE when the build steps change.
       - id: built
