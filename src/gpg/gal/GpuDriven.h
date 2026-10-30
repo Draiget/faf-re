@@ -66,6 +66,7 @@ namespace gpg::gal
     kGpuPathParticleBatch = 1U << 4U,   ///< `ren_ParticleBatch`
     kGpuPathProjectileIcons = 1U << 5U, ///< `ren_GpuProjectileIcons`
     kGpuPathWorldShapes = 1U << 6U,     ///< `ren_GpuShapes`
+    kGpuPathRanges = 1U << 7U,          ///< `ren_GpuRanges`
   };
 
   enum class GpuBufferKind : std::uint8_t
