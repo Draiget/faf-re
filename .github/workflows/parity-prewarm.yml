@@ -182,16 +182,21 @@ jobs:
         with:
           pattern: index-*
           path: index
+      # A cache entry matches only a restore with the same path lines: these are the save steps'.
       - id: maps
         uses: actions/cache/restore@v6
         with:
-          path: cache/maps
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
           key: maps-${{ env.GAME_VERSION }}-latest
           restore-keys: maps-${{ env.GAME_VERSION }}-
       - id: m28
         uses: actions/cache/restore@v6
         with:
-          path: cache/m28
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
           key: m28-${{ env.GAME_VERSION }}-latest
           restore-keys: m28-${{ env.GAME_VERSION }}-
       - id: fetch
