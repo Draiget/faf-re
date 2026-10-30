@@ -254,22 +254,24 @@ class Shard:
         played = sum(r.get("game_s") or 0 for r in self.results)
         left = sum(item["ticks"] for item in self.queue) / 10.0
         rows = []
+        slowest = 0.0  # the job lasts at least as long as its slowest running replay
         for game in self.running:
             beats = game["info"].get("beats") or game["item"]["ticks"]
             game_s, total_s, wall = max(0, game["tick"]) / 10.0, beats / 10.0, now - game["t0"]
             played += game_s
             left += max(0.0, total_s - game_s)
             rate = game_s / wall if wall > 0 else 0.0
+            eta = (total_s - game_s) / rate if rate > 0 else None
+            slowest = max(slowest, eta or 0.0)
             rows.append("  %-8d beat %d/%d (%d%%), game %s of %s, wall %s, x%.1f, about %s left"
                         % (game["item"]["id"], game_s * 10, beats, 100 * game_s / total_s if total_s else 0,
-                           clock(game_s), clock(total_s), clock(wall), rate,
-                           clock((total_s - game_s) / rate) if rate > 0 else "?"))
+                           clock(game_s), clock(total_s), clock(wall), rate, clock(eta) if eta is not None else "?"))
         wall = now - self.start
         rate = played / wall if wall > 0 else 0.0
         print("[%s] %d/%d replays done, %d playing, %d waiting; game %s of %s played (%d%%), x%.1f over all slots, "
               "about %s left" % (clock(wall), len(self.results), self.total, len(self.running), len(self.queue),
                                  clock(played), clock(played + left), 100 * played / (played + left) if played + left else 0,
-                                 rate, clock(left / rate) if rate > 0 else "?"), flush=True)
+                                 rate, clock(max(left / rate, slowest)) if rate > 0 else "?"), flush=True)
         for row in rows:
             print(row, flush=True)
 
