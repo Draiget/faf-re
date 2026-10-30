@@ -1353,6 +1353,16 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
 
   Entity::SyncInterface(syncData);
 
+  // Only an active real contact in current line of sight publishes creator scroll.
+  // Jammer contacts may be visible while their creator is not; keep their endpoints.
+  // Radar/sonar and last-seen contacts likewise keep the blip's own endpoints.
+  // Capture values on the sim thread: no creator pointer survives into workers.
+  const bool copyCreatorScroll = !IsFake() && creator != nullptr && reconInfo.mNeedsFlush != 0u &&
+    reconInfo.mMaybeDead == 0u && (reconInfo.mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u;
+  if (copyCreatorScroll) {
+    OverrideEntityUpdateScroll(syncData, creator->mVarDat);
+  }
+
   // 0x005BF168..0x005BF1C4: the record `Entity::SyncInterface` just queued (sim_ParallelEntitySync:
   // the same lanes are written after the deferred copy instead).
   if (OverrideDeferredEntityUpdateFromRecon(syncData, &reconInfo)) {
