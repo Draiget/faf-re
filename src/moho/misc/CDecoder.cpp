@@ -17,6 +17,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/RResId.h"
+#include "moho/sim/DesyncRecorder.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SOCellPos.h"
 
@@ -201,6 +202,12 @@ namespace moho
     gpg::BinaryReader reader(&stream);
 
     const auto opcode = static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(message.mBuff[0]));
+
+    // Engine addition (issue #216): the desync recorder counts each beat's player commands.
+    if (opcode != ECmdStreamOp::CMDST_Advance && opcode != ECmdStreamOp::CMDST_SetCommandSource
+        && opcode != ECmdStreamOp::CMDST_VerifyChecksum) {
+      CDesyncRecorder::NoteCommandFor(mSink);
+    }
 
     try {
       DecodeOpcode(opcode, reader);

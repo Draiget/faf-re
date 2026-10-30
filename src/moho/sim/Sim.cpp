@@ -52,6 +52,7 @@
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/sim/SimWorkerPool.h"
+#include "moho/sim/DesyncRecorder.h"
 #include "lua/LuaCallGate.h"
 #include "moho/sim/UnitUpdateFill.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
@@ -4746,6 +4747,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
  */
 void Sim::FlushLog()
 {
+  // Engine addition (issue #216): the recorder closes the same beat, the one just retired.
+  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+    recorder->EndBeat(*this, static_cast<int>(mCurBeat) - 1);
+  }
+
   if (!mLog) {
     return;
   }
@@ -4916,8 +4922,10 @@ void Sim::RefreshBlips()
  */
 void Sim::UpdateChecksum()
 {
-  auto logChecksumDigest = [this]() {
-    if (!mLog) {
+  // Engine addition (issue #216): read once; the binary tested `mLog` at each line.
+  const bool syncLog = IsSyncLogOn();
+  auto logChecksumDigest = [this, syncLog]() {
+    if (!syncLog) {
       return;
     }
 
@@ -4934,7 +4942,7 @@ void Sim::UpdateChecksum()
 
     const SEconTotals& economy = army->GetEconomy()->economy;
     mContext.Update(&economy, sizeof(economy));
-    if (mLog) {
+    if (syncLog) {
       Logf("    mStored=%.1f,%.1f\n", economy.mStored.ENERGY, economy.mStored.MASS);
       Logf("    mIncome=%.1f,%.1f\n", economy.mIncome.ENERGY, economy.mIncome.MASS);
       Logf("    mReclaimed=%.1f,%.1f\n", economy.mReclaimed.ENERGY, economy.mReclaimed.MASS);
@@ -4966,7 +4974,7 @@ void Sim::UpdateChecksum()
   for (Entity* entity : mCoordEntities.owners()) {
     const std::uint32_t entityId = static_cast<std::uint32_t>(entity->id_);
     entityChecksum.Update(&entityId, sizeof(entityId));
-    if (mLog) {
+    if (syncLog) {
       Logf("  0x%08x\n", entityId);
       entityChecksum.Flush();
       logChecksumDigest();
@@ -4974,7 +4982,7 @@ void Sim::UpdateChecksum()
 
     const float health = entity->mVarDat.mHealth;
     entityChecksum.Update(&health, sizeof(health));
-    if (mLog) {
+    if (syncLog) {
       Logf("    health: %.1f 0x%08x\n", health, FloatBits(health));
       entityChecksum.Flush();
       logChecksumDigest();
@@ -4982,14 +4990,14 @@ void Sim::UpdateChecksum()
 
     const char* blueprintId = ResolveBlueprintIdCString(entity);
     UpdateChecksumWithNullableCString(entityChecksum, blueprintId);
-    if (mLog) {
+    if (syncLog) {
       Logf("    bp:%s\n", blueprintId ? blueprintId : "");
       entityChecksum.Flush();
       logChecksumDigest();
     }
 
     entityChecksum.Update(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
-    if (mLog) {
+    if (syncLog) {
       const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
       const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
       Logf(
@@ -5019,7 +5027,7 @@ void Sim::UpdateChecksum()
     Wm3::Vec3f velocity{};
     ReadEntityVelocity(entity, &velocity);
     entityChecksum.Update(&velocity, sizeof(velocity));
-    if (mLog) {
+    if (syncLog) {
       Logf(
         "   vel: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n",
         velocity.x,
@@ -5042,6 +5050,106 @@ void Sim::UpdateChecksum()
   if (mRngState->hasMarsagliaPair) {
     mContext.Update(&mRngState->marsagliaPair, 4u);
   }
+}
+
+void moho::SIM_DescribeStateForDesync(const Sim& sim, std::string& out)
+{
+  const auto line = [&out](const char* const format, auto... args) {
+    char buffer[512];
+    const int written = std::snprintf(buffer, sizeof(buffer), format, args...);
+    if (written > 0) {
+      out.append(buffer, std::min(static_cast<std::size_t>(written), sizeof(buffer) - 1u));
+    }
+  };
+
+  line("beat %u tick %u\n", sim.mCurBeat, sim.mCurTick);
+  line("sim_ChecksumPeriod=%d\n", SIM_GetChecksumPeriod(sim));
+
+  out += "Armies\n";
+  for (CArmyImpl* const army : sim.mArmiesList) {
+    if (army == nullptr) {
+      continue;
+    }
+    const SEconTotals& economy = army->GetEconomy()->economy;
+    line(
+      "  %d \"%s\" [%s]\n", army->mConstDat.mArmyIndex, army->mConstDat.mPlayerName.raw_data_unsafe(),
+      army->mConstDat.mArmyName.raw_data_unsafe()
+    );
+    line("    mStored=%.9g,%.9g\n", economy.mStored.ENERGY, economy.mStored.MASS);
+    line("    mIncome=%.9g,%.9g\n", economy.mIncome.ENERGY, economy.mIncome.MASS);
+    line("    mReclaimed=%.9g,%.9g\n", economy.mReclaimed.ENERGY, economy.mReclaimed.MASS);
+    line("    mLastUseRequested=%.9g,%.9g\n", economy.mLastUseRequested.ENERGY, economy.mLastUseRequested.MASS);
+    line("    mLastUseActual=%.9g,%.9g\n", economy.mLastUseActual.ENERGY, economy.mLastUseActual.MASS);
+  }
+
+  // `mAllUnits` holds every live entity, ordered by id, so two players' lists line up.
+  out += "Entities\n";
+  for (auto it = sim.mEntityDB->mAllUnits.begin(); it != sim.mEntityDB->mAllUnits.end(); ++it) {
+    Entity* const entity = it->second;
+    if (entity == nullptr) {
+      continue;
+    }
+    const float health = entity->mVarDat.mHealth;
+    const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
+    const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
+    Wm3::Vec3f velocity{};
+    ReadEntityVelocity(entity, &velocity);
+    const char* const blueprintId = ResolveBlueprintIdCString(entity);
+    line(
+      "0x%08x bp=%s army=%d layer=%d health=%.9g [0x%08x]\n", static_cast<std::uint32_t>(entity->id_),
+      blueprintId != nullptr ? blueprintId : "", entity->ArmyRef != nullptr ? entity->ArmyRef->mConstDat.mArmyIndex : -1,
+      static_cast<int>(entity->mVarDat.mLayerMask), health, FloatBits(health)
+    );
+    line(
+      "  pos=<%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x]\n", pos[0], pos[1], pos[2], FloatBits(pos[0]), FloatBits(pos[1]),
+      FloatBits(pos[2])
+    );
+    line(
+      "  rot=<%.9g,%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x 0x%08x]\n", rot[0], rot[1], rot[2], rot[3], FloatBits(rot[0]),
+      FloatBits(rot[1]), FloatBits(rot[2]), FloatBits(rot[3])
+    );
+    line(
+      "  vel=<%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x]\n", velocity.x, velocity.y, velocity.z, FloatBits(velocity.x),
+      FloatBits(velocity.y), FloatBits(velocity.z)
+    );
+    if (Unit* const unit = entity->IsUnit(); unit != nullptr && unit->CommandQueue != nullptr) {
+      if (const CUnitCommand* const command = unit->CommandQueue->GetCurrentCommand(); command != nullptr) {
+        line("  command=0x%08x type=%d\n", static_cast<std::uint32_t>(command->mConstDat.cmd), static_cast<int>(command->mVarDat.mCmdType));
+      }
+    }
+  }
+}
+
+int moho::SIM_GetChecksumPeriod(const Sim& sim)
+{
+  return ReadSimConVarInt(const_cast<Sim*>(&sim), &gSimConVar_sim_ChecksumPeriod, 1);
+}
+
+void moho::SIM_ApplyDesyncTestNudge(Sim& sim)
+{
+  // Once per sim: the first checksum beat at or after the requested one, on the lowest-id unit the
+  // checksum covers that beat (the dirty entities), so the next hash differs.
+  static const Sim* sNudged = nullptr;
+  if (sim_DesyncTestNudgeBeat < 0 || static_cast<int>(sim.mCurBeat) < sim_DesyncTestNudgeBeat || sNudged == &sim) {
+    return;
+  }
+  Unit* target = nullptr;
+  for (Entity* const entity : sim.mCoordEntities.owners()) {
+    Unit* const unit = entity->IsUnit();
+    if (unit != nullptr && unit->mVarDat.mHealth > 0.0f && (target == nullptr || unit->id_ < target->id_)) {
+      target = unit;
+    }
+  }
+  if (target == nullptr) {
+    return;
+  }
+  sNudged = &sim;
+  const float before = target->mVarDat.mHealth;
+  target->mVarDat.mHealth = std::nextafter(before, std::numeric_limits<float>::infinity());
+  gpg::Warnf(
+    "sim_DesyncTestNudgeBeat: unit 0x%08x health %.9g -> %.9g at beat %u (this client only)",
+    static_cast<std::uint32_t>(target->id_), before, static_cast<double>(target->mVarDat.mHealth), sim.mCurBeat
+  );
 }
 
 /**
@@ -5630,11 +5738,26 @@ void Sim::Logf(const char* fmt, ...)
   va_list args;
   va_start(args, fmt);
 
+  // Engine addition (issue #216): the desync recorder keeps the same text in memory. It formats
+  // from a copy of `args`, so the file below still gets them unread.
+  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+    recorder->Append(fmt, args);
+  }
+
   if (mLog) {
     (void)vfprintf(mLog, fmt, args);
   }
 
   va_end(args);
+}
+
+bool Sim::IsSyncLogOn() const noexcept
+{
+  if (mLog != nullptr) {
+    return true;
+  }
+  const CDesyncRecorder* const recorder = CDesyncRecorder::For(this);
+  return recorder != nullptr && recorder->IsRecording();
 }
 
 /**
@@ -5733,6 +5856,9 @@ Sim::Sim(LaunchInfoBase* const info)
     mLog = std::fopen(beatFile.c_str(), "w");
   }
 
+  // Engine addition (issue #216): the desync recorder starts with beat 0, as the file does.
+  CDesyncRecorder::Attach(*this);
+
   Logf("********** beat %d **********\n", mCurBeat);
 
   // Adopt ownership of the map data (moved out of the launch info).
@@ -5811,7 +5937,30 @@ Sim::Sim(LaunchInfoBase* const info)
   }
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
-  mRules->UpdateChecksum(&mContext, mLog);
+  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+    // Engine addition (issue #216): REF_UpdateMD5 traces into a FILE*, so the recorder takes the
+    // rules trace through a temporary file the CRT deletes when it is closed; the /synclog file,
+    // when there is one, gets the same text.
+    std::FILE* const trace = std::tmpfile();
+    if (trace == nullptr) {
+      gpg::Warnf("Desync recorder: no temporary file for the rules trace; beat 0 is recorded without it");
+    }
+    mRules->UpdateChecksum(&mContext, trace);
+    if (trace != nullptr) {
+      std::rewind(trace);
+      char chunk[64 * 1024];
+      std::size_t got = 0;
+      while ((got = std::fread(chunk, 1u, sizeof(chunk), trace)) > 0u) {
+        recorder->Append(chunk, got);
+        if (mLog) {
+          (void)std::fwrite(chunk, 1u, got, mLog);
+        }
+      }
+      (void)std::fclose(trace);
+    }
+  } else {
+    mRules->UpdateChecksum(&mContext, mLog);
+  }
   const gpg::MD5Digest digest = mContext.Digest();
   Logf("SimChecksum after rules: %s\n", digest.ToString().c_str());
 }
@@ -6159,6 +6308,9 @@ Sim* Sim::Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo)
  */
 Sim::~Sim()
 {
+  // Engine addition (issue #216): a dump still owed is taken while the state it describes exists.
+  CDesyncRecorder::Detach(*this);
+
   // Stop the three task stages (disk-watcher + two sim task stages).
   mDiskWatcherTaskStage.Teardown();
   mTaskStageA.Teardown();
@@ -6739,6 +6891,13 @@ void Sim::VerifyChecksum(const gpg::MD5Digest& checksum, const CSeqNo beat)
   }
 
   gpg::MD5Digest* expected = &mSimHashes[beat & 0x7F];
+
+  // Engine addition (issue #216): every compared report, matching or not, so a dump shows who
+  // agrees with whom.
+  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+    recorder->NoteChecksum(*this, beat, mCurCommandSource, checksum, *expected);
+  }
+
   if (std::memcmp(expected, &checksum, sizeof(gpg::MD5Digest)) == 0) {
     return;
   }
@@ -9624,6 +9783,7 @@ void Sim::AdvanceBeat(const int amt)
   const int checksumPeriod = ReadSimConVarInt(this, &gSimConVar_sim_ChecksumPeriod, 1);
   if (checksumPeriod > 0 && (mCurBeat % static_cast<uint32_t>(checksumPeriod)) == 0u) {
     FAF_PROFILE_ZONE_NAMED("Sim::Checksum");
+    SIM_ApplyDesyncTestNudge(*this); // engine addition (issue #216), test only, off by default
     UpdateChecksum();
   }
 

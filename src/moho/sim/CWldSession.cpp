@@ -84,6 +84,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/net/CGpgNetInterface.h"
+#include "moho/sim/DesyncRecorder.h"
 #include "moho/sim/SDesyncInfo.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/particles/CWorldParticles.h"
@@ -6901,6 +6902,9 @@ namespace moho
     IsMultiplayer = sessionInfo.mIsMultiplayer;
     IsGameOver = 0;
 
+    // Engine addition (issue #216): the desync dump's header names the map and the session kind.
+    CDesyncRecorder::SetSessionInfo(mMapName.c_str(), IsReplay);
+
     if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
       // One null army slot per launch-info army (0x008932A7): the run has to
       // exist before the first beat, because `DoBeat` addresses it by army
@@ -8761,6 +8765,10 @@ namespace moho
             desync.beat,
             armyName.c_str()
           );
+          CDesyncRecorder::AddNote(gpg::STR_Printf(
+            "beat %d, %s: orders reached this client differently from what %s acknowledged sending", desync.beat,
+            armyName.c_str(), armyName.c_str()
+          ).c_str());
           continue;
         }
         desyncArmyNames.push_back(armyName);
@@ -8768,6 +8776,10 @@ namespace moho
       }
 
       if (!desyncArmyNames.empty()) {
+        // Engine addition (issue #216): the dialog's diagnostic lines name the recorder's dump.
+        if (const std::string dumpPath = CDesyncRecorder::DumpPath(); !dumpPath.empty()) {
+          desyncArmyNames.push_back(msvc8::string(("Desync dump: " + dumpPath).c_str()));
+        }
         UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
       }
     }

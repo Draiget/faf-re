@@ -25,16 +25,20 @@ if(CMAKE_SCRIPT_MODE_FILE)
       set(_commit "${_out}")
       string(SUBSTRING "${_commit}" 0 7 _short)
 
-      # Local edits to tracked files make the build "-dirty"; untracked files don't.
-      execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" status --porcelain --untracked-files=no
+      # Local edits to tracked files make the build "-dirty"; untracked files and the pinned
+      # dependency submodules don't. A status that fails can't prove the tree clean, so it
+      # counts as dirty (a worktree whose submodule folders link elsewhere fails here).
+      execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" status --porcelain --untracked-files=no --ignore-submodules=all
         OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-      if(_rc EQUAL 0 AND _out)
+      if(NOT _rc EQUAL 0 OR _out)
         set(_dirty 1)
       endif()
 
-      execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" describe --tags --abbrev=7 --dirty
+      execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" describe --tags --abbrev=7
         OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-      if(_rc EQUAL 0 AND _out)
+      if(_rc EQUAL 0 AND _out AND _dirty)
+        set(_describe "${_out}-dirty")
+      elseif(_rc EQUAL 0 AND _out)
         set(_describe "${_out}")
       elseif(_dirty)
         set(_describe "${_short}-dirty")

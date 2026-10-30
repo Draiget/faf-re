@@ -395,6 +395,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SimDriver.cpp
   moho/sim/SimDriverNetworkStats.cpp
   moho/sim/SimWorkerPool.cpp
+  moho/sim/DesyncRecorder.cpp
   moho/sim/UnitUpdateFill.cpp
   moho/sim/SSyncFilter.cpp
   moho/sim/SSTIArmyConstantData.cpp

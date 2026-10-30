@@ -1054,6 +1054,13 @@ namespace moho
     void Logf(const char* fmt, ...);
 
     /**
+     * Engine addition (issue #216): whether sync-log text is wanted, by the `/synclog` file or the
+     * desync recorder. The call sites that format lines only for the log test this, where the
+     * binary tested `mLog`.
+     */
+    [[nodiscard]] bool IsSyncLogOn() const noexcept;
+
+    /**
      * Address: 0x007462A0 (FUN_007462A0, ?Printf@Sim@Moho@@QAAXPBDZZ)
      *
      * What it does:

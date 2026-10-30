@@ -1,0 +1,47 @@
+name: 2p-desync-recorder
+description: >
+  Issue #216 acceptance check. Two clients of our x64 build (staged as
+  bin_x64\desync_test.exe) play faf_re_lockstep with the desync recorder on;
+  client 2 alone raises one moving unit's health by one float step on the
+  first checksum beat at or after 300 (/desynctestbeat), a real difference in
+  hashed state. Both must report the same first mismatched beat and write a
+  desync_*.zip into the run folder (next to game-<uid>.log). Compare the two
+  zips' state.txt and beats/ to find the nudged unit's health.
+  Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
+  isolated account. Do not click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\desync_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Recorder-A, faction: uef, args: ['/title', 'desync-A', '/desyncrecorder'] }
+  - { uid: 2, name: Recorder-B, faction: cybran, args: ['/title', 'desync-B', '/desyncrecorder', '/desynctestbeat', '300'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: [2], pattern: 'sim_DesyncTestNudgeBeat: unit 0x[0-9a-f]+ health' }
+    - { uids: all, pattern: 'Desync recorder: wrote .*desync_.*\.zip' }
+  logsAgree:
+    - { uids: all, pattern: 'Desync recorder: beat (\d+) mismatched' }

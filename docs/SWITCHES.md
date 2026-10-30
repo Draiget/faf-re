@@ -173,6 +173,16 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 
 Engine switches work as in the game: `/init`, `/log`, `/synclog`, `/simworkers`, `/con`, `/prefs`, `/sse2`, `/noversioncheck`. Exit code: 0 every recorded checksum matched and the replay reached its end; 1 a mismatch; 2 the end was not reached in time; 3 a crash or fatal error; 4 bad arguments or a replay that could not be loaded.
 
+## Desync recorder
+
+Issue #216. The recorder keeps the `/synclog` text of recent beats in memory, compressed, and writes `desync_<FAF game id>_beat<N>_army<A>.zip` next to the game log once the sim reaches the mismatched beat + 30, the same beat on every client so their state snapshots line up (at least 10 beats after the mismatch was seen). Nothing goes to disk before that, except a temporary file for the start-of-game rules trace, which is deleted at once. Checksums are the same with it on or off.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `sim_DesyncRecorder` | 0 | `/desyncrecorder` or `/con sim_DesyncRecorder=1` | next game | Records beats for a desync dump; recording stops once the dump is taken |
+| `sim_DesyncRecorderMB` | 32 | `/con` | live | Memory cap for the recorded beats; the oldest go first. The beats kept reach back to the last beat every player's checksum agreed on, at most 192 (one checksum period, 128 beats of report delay and the beats recorded after a mismatch is seen) |
+| `sim_DesyncTestNudgeBeat` | -1 | `/desynctestbeat N` or `/con` | live | Test only: on the first checksum beat at or after N, this client alone raises its lowest-id moving unit's health by one float step, so the game desyncs for real |
+
 ## Debugging aids
 
 Off by default.
