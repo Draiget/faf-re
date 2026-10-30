@@ -154,6 +154,8 @@ namespace
       "                            (server-mode build)\n"
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "                            (server-mode build)\n"
+      "  --oracle-check            the visibility oracle for the --focus army against what the sim publishes,\n"
+      "                            every entity and beat (server-mode build)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
@@ -226,6 +228,7 @@ int main(int argc, char** argv)
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
   options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
+  options.oracleCheck = moho::CFG_GetArgOption("--oracle-check", 0, nullptr);
   (void)ReadIntOption("--loopback-dr", options.loopbackDeadReckoning, bad);
   (void)ReadIntOption("--loopback-turns", options.loopbackTurnTolerance, bad);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
@@ -237,9 +240,9 @@ int main(int argc, char** argv)
   }
 #if !FAF_SERVER_MODE
   // The wire format and the remote client (src/remote) are built only with FAF_SERVER_MODE.
-  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck) {
+  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck || options.oracleCheck) {
     std::printf(
-      "[%s] --wire-stats, --loopback and --command-check need a server-mode build "
+      "[%s] --wire-stats, --loopback, --command-check and --oracle-check need a server-mode build "
       "(FAF_SERVER_MODE, the *-server presets)\n",
       gLabel.c_str()
     );
@@ -331,6 +334,9 @@ int main(int argc, char** argv)
   if (!result.commandSummary.empty()) {
     std::printf("[%s] %s\n", label, result.commandSummary.c_str());
   }
+  if (!result.oracleSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.oracleSummary.c_str());
+  }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
@@ -379,7 +385,7 @@ int main(int argc, char** argv)
   } else if (result.crashed) {
     exitCode = kExitCrash;
   } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0
-             || result.commandFailures > 0) {
+             || result.commandFailures > 0 || result.oracleFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

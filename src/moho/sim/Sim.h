@@ -1130,6 +1130,16 @@ namespace moho
      */
     void Sync(const SSyncFilter& filter, SSyncData*& outSyncData);
 
+#if FAF_SERVER_MODE
+    /**
+     * Engine addition, server mode (plan WP4.1): a function `Sync` calls once the beat's
+     * entities are published, on the sim's thread, before the packet goes out. It must only
+     * read the sim. headless's `--oracle-check` uses it; null (the default) is none.
+     */
+    using SyncObserver = void (*)(Sim& sim, void* context);
+    static void SetSyncObserver(SyncObserver observer, void* context) noexcept;
+#endif
+
     /**
      * Address: 0x0074AFB0 (FUN_0074AFB0, ?SaveState@Sim@Moho@@QAEXAAVWriteArchive@gpg@@@Z)
      *

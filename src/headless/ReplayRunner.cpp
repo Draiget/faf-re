@@ -47,6 +47,7 @@
 // The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
 // --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
 #include "headless/ReplayCommandCheck.h"
+#include "headless/ReplayOracleCheck.h"
 #include "headless/ReplayWireStats.h"
 #include "remote/ContentTables.h"
 #endif
@@ -487,6 +488,13 @@ namespace faf::headless
       commandCheck = std::make_unique<CReplayCommandCheck>(*rules);
       commandCheck->Install();
     }
+
+    // `--oracle-check`: after every `Sim::Sync`, on the sim's thread.
+    std::unique_ptr<CReplayOracleCheck> oracleCheck;
+    if (options.oracleCheck) {
+      oracleCheck = std::make_unique<CReplayOracleCheck>();
+      oracleCheck->Install();
+    }
 #endif
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
@@ -718,6 +726,10 @@ namespace faf::headless
     if (commandCheck) {
       result.commandSummary = commandCheck->Summary();
       result.commandFailures = commandCheck->Failures();
+    }
+    if (oracleCheck) {
+      result.oracleSummary = oracleCheck->Summary();
+      result.oracleFailures = oracleCheck->Failures();
     }
 #endif
     if (!options.syncKeysPath.empty()) {

@@ -4263,6 +4263,20 @@ namespace
   }
 } // namespace
 
+#if FAF_SERVER_MODE
+namespace
+{
+  Sim::SyncObserver sSyncObserver = nullptr;
+  void* sSyncObserverContext = nullptr;
+} // namespace
+
+void Sim::SetSyncObserver(const SyncObserver observer, void* const context) noexcept
+{
+  sSyncObserverContext = context;
+  sSyncObserver = observer;
+}
+#endif
+
 /**
  * Address: 0x007474B0 (FUN_007474B0)
  *
@@ -4502,6 +4516,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   }
   unitUpdateFills.Finish();
   StoreSyncEntityCountStat(syncedEntityCount);
+#if FAF_SERVER_MODE
+  if (sSyncObserver != nullptr) {
+    sSyncObserver(*this, sSyncObserverContext);
+  }
+#endif
 
   if (mRequestXMLArmyStatsSubmit) {
     mRequestXMLArmyStatsSubmit = false;

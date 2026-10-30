@@ -22,6 +22,7 @@ namespace faf::headless
     int loopbackDeadReckoning = 0; // with `loopback`: dead-reckoning tolerance in 1/64-unit steps
     int loopbackTurnTolerance = 0; // with dead reckoning: orientation tolerance in 1/65536 turns (0: off)
     bool commandCheck = false;  // every command decoded and marshalled again, compared (ReplayCommandCheck.h)
+    bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end
@@ -54,6 +55,8 @@ namespace faf::headless
     std::uint64_t loopbackFailures = 0;
     std::string commandSummary; // with `commandCheck`: one line
     std::uint64_t commandFailures = 0;
+    std::string oracleSummary;  // with `oracleCheck`: a few lines
+    std::uint64_t oracleFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line
     std::string fpuReport;      // with `fpuReport`: one line per thread
   };

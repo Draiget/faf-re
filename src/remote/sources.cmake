@@ -10,6 +10,7 @@ set(FAF_REMOTE_SOURCES
   remote/FrameBuilder.cpp
   remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
+  remote/VisibilityOracle.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/NameTable.cpp
