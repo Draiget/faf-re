@@ -158,6 +158,8 @@ namespace
       "                            every entity and beat (server-mode build)\n"
       "  --oracle-digests <file>  with --oracle-check: per beat, the oracle's answers for every army (unfocused)\n"
       "                            or for the focus army, one digest line each\n"
+      "  --changeset-check         the sync walk's change set against its packet, every beat (server-mode build;\n"
+      "                            not with --oracle-check)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
@@ -234,6 +236,11 @@ int main(int argc, char** argv)
   if (ReadOption("--oracle-digests", options.oracleDigestsPath)) {
     options.oracleCheck = true;
   }
+  options.changeSetCheck = moho::CFG_GetArgOption("--changeset-check", 0, nullptr);
+  if (options.oracleCheck && options.changeSetCheck) {
+    std::printf("[%s] --oracle-check and --changeset-check both observe the sync walk: one at a time\n", gLabel.c_str());
+    return kExitBadInput;
+  }
   (void)ReadIntOption("--loopback-dr", options.loopbackDeadReckoning, bad);
   (void)ReadIntOption("--loopback-turns", options.loopbackTurnTolerance, bad);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
@@ -245,9 +252,10 @@ int main(int argc, char** argv)
   }
 #if !FAF_SERVER_MODE
   // The wire format and the remote client (src/remote) are built only with FAF_SERVER_MODE.
-  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck || options.oracleCheck) {
+  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck || options.oracleCheck
+      || options.changeSetCheck) {
     std::printf(
-      "[%s] --wire-stats, --loopback, --command-check and --oracle-check need a server-mode build "
+      "[%s] --wire-stats, --loopback, --command-check, --oracle-check and --changeset-check need a server-mode build"
       "(FAF_SERVER_MODE, the *-server presets)\n",
       gLabel.c_str()
     );
@@ -342,6 +350,9 @@ int main(int argc, char** argv)
   if (!result.oracleSummary.empty()) {
     std::printf("[%s] %s\n", label, result.oracleSummary.c_str());
   }
+  if (!result.changeSetSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.changeSetSummary.c_str());
+  }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
@@ -390,7 +401,8 @@ int main(int argc, char** argv)
   } else if (result.crashed) {
     exitCode = kExitCrash;
   } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0
-             || result.commandFailures > 0 || result.oracleFailures > 0) {
+             || result.commandFailures > 0 || result.oracleFailures > 0
+             || result.changeSetFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

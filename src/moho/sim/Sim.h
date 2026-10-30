@@ -43,6 +43,32 @@ namespace moho
   class Unit;
   class CAniPose;
 
+#if FAF_SERVER_MODE
+  class Entity;
+  class Sim;
+
+  /**
+   * Engine addition, server mode (plan WP5.1): what `Sim::Sync` tells its observer
+   * (`Sim::SetSyncObserver`). Calls come on the sim's thread, in walk order; an observer only
+   * reads.
+   */
+  class CSyncObserver
+  {
+  public:
+    virtual ~CSyncObserver() = default;
+
+    /** An entity the walk just synced (its `Sync` has run): the beat's dirty run, or every entity on a focus change. */
+    virtual void OnEntitySynced(Entity& entity) { (void)entity; }
+
+    /** The walk is done and the beat's packet holds every entity record it will carry. */
+    virtual void OnSyncWalkDone(Sim& sim, const SSyncData& packet)
+    {
+      (void)sim;
+      (void)packet;
+    }
+  };
+#endif
+
   /**
    * Address: 0x004A4920 (FUN_004A4920)
    * Mangled: ?REF_UpdateMD5@Moho@@YAXAAVMD5Context@gpg@@ABVRRef@3@PAU_iobuf@@H@Z
@@ -1132,12 +1158,12 @@ namespace moho
 
 #if FAF_SERVER_MODE
     /**
-     * Engine addition, server mode (plan WP4.1): a function `Sync` calls once the beat's
-     * entities are published, on the sim's thread, before the packet goes out. It must only
-     * read the sim. headless's `--oracle-check` uses it; null (the default) is none.
+     * Engine addition, server mode (plan WP5.1, WP4.1): the sync walk's observer, null by default
+     * and in lockstep. `Sync` calls it on the sim's thread for every entity its walk syncs and
+     * once the walk is done; it must only read the sim. The server builds its views from it
+     * (remote/BeatChangeSet.h); headless's checks and the golden test use it too. One at a time.
      */
-    using SyncObserver = void (*)(Sim& sim, void* context);
-    static void SetSyncObserver(SyncObserver observer, void* context) noexcept;
+    static void SetSyncObserver(CSyncObserver* observer) noexcept;
 #endif
 
     /**

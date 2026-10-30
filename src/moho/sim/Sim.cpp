@@ -4266,13 +4266,11 @@ namespace
 #if FAF_SERVER_MODE
 namespace
 {
-  Sim::SyncObserver sSyncObserver = nullptr;
-  void* sSyncObserverContext = nullptr;
+  CSyncObserver* sSyncObserver = nullptr;
 } // namespace
 
-void Sim::SetSyncObserver(const SyncObserver observer, void* const context) noexcept
+void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
 {
-  sSyncObserverContext = context;
   sSyncObserver = observer;
 }
 #endif
@@ -4501,6 +4499,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       if (Entity* const entity = idAndEntity.second; entity != nullptr) {
         entity->Sync(outSyncData);
         ++syncedEntityCount;
+#if FAF_SERVER_MODE
+        if (sSyncObserver != nullptr) {
+          sSyncObserver->OnEntitySynced(*entity);
+        }
+#endif
       }
     }
   } else {
@@ -4511,6 +4514,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       if (entity != nullptr) {
         entity->Sync(outSyncData);
         ++syncedEntityCount;
+#if FAF_SERVER_MODE
+        if (sSyncObserver != nullptr) {
+          sSyncObserver->OnEntitySynced(*entity);
+        }
+#endif
       }
     }
   }
@@ -4518,7 +4526,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   StoreSyncEntityCountStat(syncedEntityCount);
 #if FAF_SERVER_MODE
   if (sSyncObserver != nullptr) {
-    sSyncObserver(*this, sSyncObserverContext);
+    sSyncObserver->OnSyncWalkDone(*this, *outSyncData);
   }
 #endif
 

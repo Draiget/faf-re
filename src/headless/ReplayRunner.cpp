@@ -47,6 +47,7 @@
 // The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
 // --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
 #include "headless/ReplayCommandCheck.h"
+#include "headless/ReplayChangeSetCheck.h"
 #include "headless/ReplayOracleCheck.h"
 #include "headless/ReplayWireStats.h"
 #include "remote/ContentTables.h"
@@ -499,6 +500,13 @@ namespace faf::headless
       }
       oracleCheck->Install();
     }
+
+    // `--changeset-check`: the sync walk's observer too, so not with `--oracle-check`.
+    std::unique_ptr<CReplayChangeSetCheck> changeSetCheck;
+    if (options.changeSetCheck) {
+      changeSetCheck = std::make_unique<CReplayChangeSetCheck>();
+      changeSetCheck->Install();
+    }
 #endif
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
@@ -734,6 +742,10 @@ namespace faf::headless
     if (oracleCheck) {
       result.oracleSummary = oracleCheck->Summary();
       result.oracleFailures = oracleCheck->Failures();
+    }
+    if (changeSetCheck) {
+      result.changeSetSummary = changeSetCheck->Summary();
+      result.changeSetFailures = changeSetCheck->Failures();
     }
 #endif
     if (!options.syncKeysPath.empty()) {

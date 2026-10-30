@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "moho/sim/Sim.h"
 #include "remote/SpatialOracle.h"
 
 // Engine addition, server mode (plan WP4.1): headless's `--oracle-check`. The sim runs with the
@@ -27,19 +28,14 @@
 // that its set for each army it asks about (every army unfocused, the focus army otherwise)
 // equals the brute-force set (plan WPR.54); a difference counts as a failure.
 
-namespace moho
-{
-  class Sim;
-}
-
 namespace faf::headless
 {
-  class CReplayOracleCheck
+  class CReplayOracleCheck final : public moho::CSyncObserver
   {
   public:
     /** `digestPath` empty: no digest file. */
     explicit CReplayOracleCheck(const std::string& digestPath);
-    ~CReplayOracleCheck();
+    ~CReplayOracleCheck() override;
 
     /** The digest file could be opened (always true without one). */
     [[nodiscard]] bool IsOpen() const noexcept;
@@ -74,8 +70,7 @@ namespace faf::headless
       std::uint64_t meshShown = 0;     // published by both and `ViewShowsMesh` (the client draws it)
     };
 
-    static void Observe(moho::Sim& sim, void* context);
-    void OnSync(moho::Sim& sim);
+    void OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet) override;
     void WriteDigests(moho::Sim& sim, std::int32_t focusArmy);
     void CompareSpatial(moho::Sim& sim, std::int32_t focusArmy);
 

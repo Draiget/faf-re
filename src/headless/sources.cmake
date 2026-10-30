@@ -9,6 +9,7 @@
 
 set(FAF_HEADLESS_SOURCES
   headless/ReplayBoneStats.cpp
+  headless/ReplayChangeSetCheck.cpp
   headless/ReplayCommandCheck.cpp
   headless/ReplayFpuReport.cpp
   headless/ReplayLaunchCheck.cpp
@@ -21,6 +22,7 @@ set(FAF_HEADLESS_SOURCES
 )
 
 set(FAF_HEADLESS_SERVER_SOURCES
+  headless/ReplayChangeSetCheck.cpp
   headless/ReplayCommandCheck.cpp
   headless/ReplayOracleCheck.cpp
   headless/ReplayWireStats.cpp

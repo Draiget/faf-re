@@ -46,7 +46,7 @@ namespace faf::remote::client
 
     constexpr const char* kKindNames[] = {"other", "unit", "blip", "prop", "projectile"};
 
-    class COracleGolden
+    class COracleGolden final : public moho::CSyncObserver
     {
     public:
       explicit COracleGolden(std::FILE* file)
@@ -55,9 +55,10 @@ namespace faf::remote::client
         std::fprintf(mFile, "# beat focus compared agree oracle-only client-only orphan-client no-mesh live-grid\n");
       }
 
-      static void ObserveSim(moho::Sim& sim, void* const context)
+      void OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet) override
       {
-        static_cast<COracleGolden*>(context)->OnSimSync(sim);
+        (void)packet;
+        OnSimSync(sim);
       }
 
       static void ObserveBeat(moho::CWldSession& session, const std::int32_t beat, void* const context)
@@ -293,7 +294,7 @@ namespace faf::remote::client
     }
     // Lives as long as the process: both observers may still fire while the session ends.
     static COracleGolden* const golden = new COracleGolden(file);
-    moho::Sim::SetSyncObserver(&COracleGolden::ObserveSim, golden);
+    moho::Sim::SetSyncObserver(golden);
     moho::CWldSession::SetBeatObserver(&COracleGolden::ObserveBeat, golden);
     gpg::Logf("ORACLEGOLDEN installed, writing %s", args[0].c_str());
     return true;

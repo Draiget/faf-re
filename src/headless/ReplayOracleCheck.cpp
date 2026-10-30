@@ -44,21 +44,17 @@ namespace faf::headless
 
   void CReplayOracleCheck::Install()
   {
-    moho::Sim::SetSyncObserver(&CReplayOracleCheck::Observe, this);
+    moho::Sim::SetSyncObserver(this);
   }
 
   void CReplayOracleCheck::Uninstall()
   {
-    moho::Sim::SetSyncObserver(nullptr, nullptr);
+    moho::Sim::SetSyncObserver(nullptr);
   }
 
-  void CReplayOracleCheck::Observe(moho::Sim& sim, void* const context)
+  void CReplayOracleCheck::OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet)
   {
-    static_cast<CReplayOracleCheck*>(context)->OnSync(sim);
-  }
-
-  void CReplayOracleCheck::OnSync(moho::Sim& sim)
-  {
+    (void)packet;
     const std::int32_t focusArmy = sim.mSyncFilter.focusArmy;
     const std::lock_guard<std::mutex> guard(mLock);
     ++mBeats;
