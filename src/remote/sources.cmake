@@ -17,6 +17,7 @@ set(FAF_REMOTE_SOURCES
   remote/ViewFrames.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
+  remote/wire/IntelGridDelta.cpp
   remote/wire/NameTable.cpp
   remote/wire/OrdinalTable.cpp
   remote/wire/Quantize.cpp

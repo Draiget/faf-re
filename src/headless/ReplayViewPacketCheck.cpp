@@ -6,6 +6,8 @@
 
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 
@@ -118,6 +120,51 @@ namespace faf::headless
       }
     }
 
+    /**
+     * The army lane: every army's public fields and `mIsAlly`, plus the fields only the focus
+     * army's own client reads (remote/ViewPackets.cpp, `ArmyRecordForView`) for `viewArmy` alone.
+     */
+    [[nodiscard]] std::uint64_t ArmiesDigest(const msvc8::vector<moho::SSTIArmyVariableData>& armies, const std::int32_t viewArmy)
+    {
+      CDigest digest;
+      const auto count = static_cast<std::uint32_t>(armies.size());
+      digest.Add(count);
+      for (std::uint32_t index = 0; index < count; ++index) {
+        const moho::SSTIArmyVariableData& army = armies[index];
+        for (std::uint32_t other = 0; other < count; ++other) {
+          digest.Add(static_cast<std::uint8_t>(
+            (army.mNeutrals.Contains(other) ? 1u : 0u) | (army.mAllies.Contains(other) ? 2u : 0u)
+            | (army.mEnemies.Contains(other) ? 4u : 0u) | (army.mValidCommandSources.Contains(other) ? 8u : 0u)
+          ));
+        }
+        digest.Add(army.mIsAlly);
+        digest.Add(army.mPlayerColorBgra);
+        digest.Add(army.mArmyColorBgra);
+        digest.Text(army.mArmyType.c_str());
+        digest.Add(army.mFaction);
+        digest.Add(army.mShowScore);
+        digest.Add(army.mIsOutOfGame);
+        digest.Add(army.mHandicapValue);
+        digest.Add(army.mHandicapExtra);
+        if (static_cast<std::int32_t>(index) == viewArmy) {
+          digest.Add(army.mEconomyTotals.mStored.ENERGY);
+          digest.Add(army.mEconomyTotals.mStored.MASS);
+          digest.Add(army.mEconomyTotals.mIncome.ENERGY);
+          digest.Add(army.mEconomyTotals.mIncome.MASS);
+          digest.Add(army.mIsResourceSharingEnabled);
+          digest.Add(army.mUseWholeMap);
+          digest.Add(army.mArmyStart.x);
+          digest.Add(army.mArmyStart.y);
+          digest.Add(army.mNoRushTimer);
+          digest.Add(army.mNoRushRadius);
+          digest.Add(army.mNoRushOffset.x);
+          digest.Add(army.mNoRushOffset.y);
+          digest.Add(static_cast<std::uint32_t>(army.mWordVectorWithMeta.mWords.size()));
+        }
+      }
+      return digest.Value();
+    }
+
     template <class TRecord>
     [[nodiscard]] std::vector<const TRecord*> ById(const msvc8::vector<TRecord>& records)
     {
@@ -226,14 +273,15 @@ namespace faf::headless
     }
 
     std::fprintf(
-      mFile, "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx\n", beat,
+      mFile, "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx %016llx\n", beat,
       static_cast<std::size_t>(packet.mNewEntities.size()), static_cast<std::size_t>(packet.mNewUnits.size()),
       static_cast<std::size_t>(packet.mEntityUpdates.size()), static_cast<std::size_t>(packet.mUnitUpdates.size()),
       static_cast<std::size_t>(packet.mDeleteIds.size()), static_cast<std::size_t>(packet.mEraseIds.size()),
       static_cast<unsigned long long>(creates.Value()), static_cast<unsigned long long>(unitCreates.Value()),
       static_cast<unsigned long long>(entities.Value()), static_cast<unsigned long long>(units.Value()),
       static_cast<unsigned long long>(IdsDigest(packet.mDeleteIds)),
-      static_cast<unsigned long long>(IdsDigest(packet.mEraseIds))
+      static_cast<unsigned long long>(IdsDigest(packet.mEraseIds)),
+      static_cast<unsigned long long>(ArmiesDigest(packet.mArmyUpdates, mArmy))
     );
   }
 

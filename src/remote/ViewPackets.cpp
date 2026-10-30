@@ -6,6 +6,8 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/Prop.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 #include "remote/VisibilityOracle.h"
@@ -47,6 +49,42 @@ namespace faf::remote
     }
   } // namespace
 
+  /**
+   * Plan WP5.4: army `index`'s record as view `viewArmy` gets it. Every army's public fields go to
+   * every view; the fields the client reads for the focus army alone go to their own view only,
+   * zeroed for the others: economy totals (`GetEconomyTotals`, UserLuaFunctions.cpp:3954),
+   * resource sharing (:4093), use-whole-map (the focus army's camera bounds and command checks, CameraImpl.cpp:1286/1487, UserCommandIssue.cpp:418/746), the path-preview
+   * scratch (CWldSession.cpp:4734), start position and no-rush ring (RangeRenderer.cpp:1934-1954,
+   * CWldSession.cpp:9164, UserCommandIssue.cpp:422/750). `mIsAlly` is the one focus-dependent field
+   * the sim writes (`CArmyImpl::SetCanSee` 0x006FDEE0): 1 with no focus, else whether the army lists
+   * the view's army among its allies.
+   */
+  [[nodiscard]] static moho::SSTIArmyVariableData ArmyRecordForView(
+    const moho::SSTIArmyVariableData& source, const std::size_t index, const std::int32_t viewArmy,
+    const bool beforeFirstTick
+  )
+  {
+    moho::SSTIArmyVariableData record = source;
+    if (beforeFirstTick) {
+      // The constructor's value, until the army's first tick runs `SetCanSee`: the army the sim
+      // was focused on when it was built (`Sim.cpp` 6350, `CArmyImpl.cpp` 1141).
+      record.mIsAlly = static_cast<std::int32_t>(index) == viewArmy ? 1u : 0u;
+    } else {
+      record.mIsAlly = viewArmy < 0 || source.mAllies.Contains(static_cast<std::uint32_t>(viewArmy)) ? 1u : 0u;
+    }
+    if (viewArmy >= 0 && index != static_cast<std::size_t>(viewArmy)) {
+      record.mEconomyTotals = moho::SEconTotals{};
+      record.mIsResourceSharingEnabled = 0u;
+      record.mUseWholeMap = 0u;
+      record.mWordVectorWithMeta = moho::SArmyVectorWithMeta{};
+      record.mArmyStart = Wm3::Vector2f{0.0f, 0.0f};
+      record.mNoRushTimer = 0;
+      record.mNoRushRadius = 0.0f;
+      record.mNoRushOffset = Wm3::Vector2f{0.0f, 0.0f};
+    }
+    return record;
+  }
+
   CViewPackets::CViewPackets() = default;
   CViewPackets::~CViewPackets() = default;
 
@@ -72,6 +110,14 @@ namespace faf::remote
       out.mFocusArmy = static_cast<std::int32_t>(army);
       for (const SChangedEntity& changed : Entities()) {
         SyncForView(sim, static_cast<std::int32_t>(army), changed, out, mViews[army]);
+      }
+
+      // Plan WP5.4: the army lane, positionally as `Sim::Sync` fills it.
+      out.mArmyUpdates.clear();
+      for (std::size_t index = 0; index < packet.mArmyUpdates.size(); ++index) {
+        out.mArmyUpdates.push_back(
+          ArmyRecordForView(packet.mArmyUpdates[index], index, static_cast<std::int32_t>(army), packet.mCurBeat == 0)
+        );
       }
     }
     OnViewPackets(sim);

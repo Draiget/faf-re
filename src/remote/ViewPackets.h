@@ -25,8 +25,10 @@
 //     block and overrides both from the view's recon record (`ReconBlip::SyncInterface`
 //     0x005BEFB0), and keeps the vision range the view last copied from its creator.
 //
-// Only the entity lanes are filled: creations, entity and unit updates, deletes and erases.
-// The other lanes (Lua `Sync`, army data, commands, decals, effects) are other plan items.
+// The entity lanes are filled (creations, entity and unit updates, deletes and erases) and the
+// army lane (plan WP5.4: every army's public record, the focus-only fields for the view's own
+// army alone, `mIsAlly` for the view). The other lanes (Lua `Sync`, grids, commands, decals,
+// effects) are other plan items.
 
 namespace faf::remote
 {
