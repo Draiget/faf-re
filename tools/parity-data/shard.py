@@ -26,7 +26,7 @@ import subprocess
 import sys
 import time
 
-from common import (MAP_URL, MOD_URL, REPLAY_URL, check_replay, extract_map, fetch, find_mod_info)
+from common import (MOD_URL, REPLAY_URL, check_replay, extract_map, fetch, find_mod_info, map_url)
 from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE, HL_TROUBLE_RE, HL_VERDICT_RE,
                         MISMATCH_RE, live_client_desync, replay_checksums)
 
@@ -96,7 +96,7 @@ class Shard:
         if found:
             return found
         zpath = os.path.join(self.args.work, "dl", folder + ".zip")
-        fetch(MAP_URL % folder, zpath, self.args.delay)
+        fetch(map_url(folder), zpath, self.args.delay)
         return extract_map(zpath, os.path.join(self.args.work, "maps"), folder)
 
     def m28_folder(self, version):

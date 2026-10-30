@@ -31,8 +31,8 @@ import time
 import urllib.error
 
 import make_pack
-from common import (GAME_URL, MAP_URL, MOD_URL, REPLAY_URL, bucket_of, check_replay, extract_map, fetch,
-                    find_mod_info, read_corpus)
+from common import (GAME_URL, MOD_URL, REPLAY_URL, bucket_of, check_replay, extract_map, fetch,
+                    find_mod_info, map_url, read_corpus)
 
 # FAF's packages the init file mounts (allowedAssetsNxy in init_faf.lua). Not every version
 # publishes every one: 3835 has no mods package.
@@ -174,7 +174,7 @@ def cmd_assets(args):
             raw = os.path.join(work, "raw")
             shutil.rmtree(raw, ignore_errors=True)
             try:
-                fetch(MAP_URL % folder, zpath, args.delay)
+                fetch(map_url(folder), zpath, args.delay)
                 src = extract_map(zpath, raw, folder)
             except Exception as exc:
                 print("map %s: %s" % (folder, str(exc)[:80]), flush=True)
