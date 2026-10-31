@@ -9,6 +9,7 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/mpemu` | Runs multiplayer sessions against an emulated FAF client + lobby server and checks them. `mpemu agent` serves one test PC's players |
 | `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the director–agent control channel and a latching game relay. Deployment: [deploy/README.md](deploy/README.md) |
 | `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP and reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
+| `cmd/fafclient` | Emulates the mainline FAF client's side of the ICE adapter contract and the lobby server's pairing, so any adapter (FAF's `faf-ice-adapter.jar`, ours) runs unchanged; see [docs/LAUNCHER_ADAPTER_CONTRACT.md](../docs/LAUNCHER_ADAPTER_CONTRACT.md) |
 | `scenarios/` | YAML scenarios for mpemu |
 | `desync-diff/` | Compares players' desync dumps from one game and prints the first value that differs; rebuilds a missing side from the replay. See [desync-diff/README.md](desync-diff/README.md) |
 | `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered; see [difffuzz/README.md](difffuzz/README.md) |
@@ -31,6 +32,7 @@ The rest of this page covers mpemu. It is one Go module (`faf-main/tools`): shar
 | `scenario` | YAML scenarios, step runner, assertions, interactive console |
 | `procs` | Child processes in a kill-on-close job object: nothing survives mpemu |
 | `fakegame` | Library behind `cmd/fakegame` |
+| `fafclient` | Library behind `cmd/fafclient`: the client's JSON-RPC (JJsonRpc framing), adapter launch, lobby-server pairing and `IceMsg` relay |
 
 ## Build
 
