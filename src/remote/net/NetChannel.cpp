@@ -37,9 +37,13 @@ namespace faf::remote::net
     }
   }
 
-  void NetChannel::SetKeys(const ChannelKeys& keys)
+  bool NetChannel::SetKeys(const ChannelKeys& keys)
   {
+    if (mKeys) {
+      return false;
+    }
     mKeys = keys;
+    return true;
   }
 
   std::size_t NetChannel::PayloadBudget() const noexcept

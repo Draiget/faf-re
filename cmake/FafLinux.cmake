@@ -67,13 +67,20 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/wildmagic" "${CMAKE_BINARY_DI
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/deps/zlib")
 
 # The net channel (src/remote/net, plan WP10) and its one download, Monocypher, pinned in
-# cmake/FafDependencies.cmake; the Windows-only dependencies there are skipped.
-set(FAF_DEPENDENCIES_ONLY monocypher)
-include(FafDependencies)
+# cmake/FafDependencies.cmake; the Windows-only dependencies there are skipped. Without the
+# download (FAF_FETCH_DEPENDENCIES=OFF, or no network) the channel is left out and the
+# simulation targets build as before.
+option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at configure time" ON)
+if(FAF_FETCH_DEPENDENCIES)
+  set(FAF_DEPENDENCIES_ONLY monocypher)
+  include(FafDependencies)
+endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
-add_executable(faf_netchannel_tests "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
-target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel)
+if(TARGET faf_netchannel)
+  add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
+  target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
+endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
 # The simulation's translation units (src/sim_sources.cmake), in the engine's

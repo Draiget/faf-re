@@ -32,6 +32,10 @@ Chunks:
 | 2 unreliable | varint length, bytes | one unreliable message |
 | 3 acks | varint block count (1–16), then per block: varint (header ack − block top), 4 bytes of bits (bit i: sequence top − i received) | acks for a burst larger than the header's 33 sequences |
 
+The plan's header (§7.1) also lists the acknowledged frame id and, every N ticks, an 8-byte frame hash. Both belong to the snapshot lane (WP10.4, WPR.30) and will travel in its own chunk type, so datagrams without a snapshot (commands, acks, keepalives) don't carry them. The reliable stream's state is the offsets in its chunks.
+
+Per datagram the overhead is 32 bytes of channel (header and tag) plus 28 of IP and UDP, 60 in all with encryption. The plan's traffic model (§7.2) counts 44, without the tag.
+
 The receiver keeps the last 1,024 sequences: a sequence seen before is dropped as a duplicate or replay, one older than the window as too old. A datagram is authenticated and fully parsed before anything is recorded, so a broken or forged datagram changes no state. A datagram that acks a sequence the channel never sent is malformed.
 
 ## Reliable stream (WP10.3, #142)
@@ -54,9 +58,11 @@ Unreliable messages fit one datagram each (`MaxUnreliableSize()`, 1,181 bytes wi
 
 ## Encryption (WP10.6, #145)
 
-After the handshake (WP10.5) gives the channel one key per direction, `SetKeys` turns on XChaCha20-Poly1305 for every datagram both ways. The header stays readable and is the associated data, so the tag covers it as well. The payload is encrypted in place and the tag follows it. The nonce is the sequence number, which never repeats under one key, because each direction has its own key, a channel never reuses a sequence, and the handshake makes new keys per session. With keys set, a datagram that is not sealed, or whose tag does not match, is dropped before anything else reads it. Replays pass the tag but are dropped by the receive window. Keys are wiped when the channel is destroyed.
+After the handshake (WP10.5) gives the channel one key per direction, `SetKeys` turns on XChaCha20-Poly1305 for every datagram both ways. It works once per channel and refuses a second call. Each end calls it when it has the keys. Datagrams the other end sends unsealed in between are dropped, and the losses are made good like any others. The header stays readable and is the associated data, so the tag covers it as well. The payload is encrypted in place and the tag follows it. The nonce is the sequence number, which never repeats under one key, because each direction has its own key, a channel never reuses a sequence, and the handshake makes new keys per channel. A reconnect is a new channel, starting again at sequence 1, so it must have new keys. The channel can't detect a reused key, so that rule falls on WP10.5. With keys set, a datagram that is not sealed, or whose tag does not match, is dropped before anything else reads it. Replays pass the tag but are dropped by the receive window. Keys are wiped when the channel is destroyed.
 
-The primitive is Monocypher 4.0.2 ([monocypher.org](https://monocypher.org)), dual-licensed BSD-2-Clause or CC0 at the user's choice. It is one C file, pinned by SHA256 in `cmake/FafDependencies.cmake`, built by `cmake/deps/monocypher`. The same file has X25519 for the handshake.
+Without keys the channel trusts its path. Anyone who can put a datagram on it can ack data that never arrived, or inject stream bytes. A channel between players has keys before game data flows over it.
+
+The primitive is Monocypher 4.0.2 ([monocypher.org](https://monocypher.org)), dual-licensed BSD-2-Clause or CC0 at the user's choice. It is one C file, pinned by SHA256 in `cmake/FafDependencies.cmake`, built by `cmake/deps/monocypher`. The same file has X25519 for the handshake. A tree without the download (configured with `FAF_FETCH_DEPENDENCIES=OFF`, or fetched before this dependency existed) builds without the channel and says so at configure time.
 
 ## Tests
 
@@ -69,10 +75,12 @@ The primitive is Monocypher 4.0.2 ([monocypher.org](https://monocypher.org)), du
 - the in-flight limit;
 - that unreliable messages arrive at most once and intact;
 - sealing, including every single-bit change;
+- known answers: the XChaCha20-Poly1305 test vector of draft-irtf-cfrg-xchacha-03 (A.3.1), and the channel's own layout against bytes libsodium produced;
+- keys set mid-session, at different moments on the two ends, with data in flight;
 - the encrypted channel against tampering, replay, plaintext and keys on one side only;
 - keepalives and RTT on an idle link;
 - loss statistics at 10 % loss;
-- timeout after a 12 s partition and none after a 2 s one;
+- timeout after a 12 s partition and none after a 2 s one (the server's use of the timeout, WP3.5, is not written yet);
 - backoff during a partition;
 - 200,000 fuzzed datagrams with and without keys.
 

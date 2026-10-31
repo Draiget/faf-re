@@ -14,8 +14,10 @@
 #include <map>
 #include <random>
 #include <set>
+#include <string>
 #include <vector>
 
+#include "monocypher.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/DatagramCipher.h"
 #include "remote/net/NetChannel.h"
@@ -598,12 +600,127 @@ namespace
       other[5] ^= 1;
       CHECK(!OpenDatagram(other, 42, datagram.data(), datagram.size(), plain.data()));
       // Every single-bit change anywhere, header included, is refused.
+      Bytes tampered = datagram;
       for (std::size_t i = 0; i < datagram.size(); ++i) {
-        Bytes tampered = datagram;
-        tampered[i] ^= static_cast<std::uint8_t>(1u << (i % 8));
-        CHECK(!OpenDatagram(key, 42, tampered.data(), tampered.size(), plain.data()));
+        for (int bit = 0; bit < 8; ++bit) {
+          tampered[i] ^= static_cast<std::uint8_t>(1u << bit);
+          CHECK(!OpenDatagram(key, 42, tampered.data(), tampered.size(), plain.data()));
+          tampered[i] ^= static_cast<std::uint8_t>(1u << bit);
+        }
       }
     }
+  }
+
+  Bytes Hex(const char* text)
+  {
+    Bytes bytes;
+    for (; text[0] != 0 && text[1] != 0; text += 2) {
+      const auto nibble = [](const char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
+      bytes.push_back(static_cast<std::uint8_t>(nibble(text[0]) * 16 + nibble(text[1])));
+    }
+    return bytes;
+  }
+
+  // Known answers from an independent implementation, so the tests do not only show the
+  // code agrees with itself. (1) draft-irtf-cfrg-xchacha-03 A.3.1 through Monocypher's
+  // crypto_aead_lock. (2) The channel's layout (header as associated data, sequence as
+  // nonce) through SealDatagram, the expected bytes made with libsodium 1.0 via PyNaCl 1.6.2
+  // crypto_aead_xchacha20poly1305_ietf_encrypt(payload, header, seq LE + 20 zeros, key).
+  void TestCipherKnownAnswers()
+  {
+    const char* const sunscreen =
+      "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would "
+      "be it.";
+    const Bytes plain(sunscreen, sunscreen + std::char_traits<char>::length(sunscreen));
+    const Bytes aad = Hex("50515253c0c1c2c3c4c5c6c7");
+    std::uint8_t key[32];
+    std::uint8_t nonce[24];
+    for (int i = 0; i < 32; ++i) {
+      key[i] = static_cast<std::uint8_t>(0x80 + i);
+    }
+    for (int i = 0; i < 24; ++i) {
+      nonce[i] = static_cast<std::uint8_t>(0x40 + i);
+    }
+    Bytes cipher(plain.size() + 16);
+    crypto_aead_lock(cipher.data(), cipher.data() + plain.size(), key, nonce, aad.data(), aad.size(), plain.data(), plain.size());
+    CHECK(cipher ==
+          Hex("bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c670"
+              "8c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da97"
+              "68812f615c68b13b52ec0875924c1c7987947deafd8780acf49"));
+
+    ChannelKey channelKey{};
+    for (std::size_t i = 0; i < kKeySize; ++i) {
+      channelKey[i] = static_cast<std::uint8_t>(7 * i + 3);
+    }
+    DatagramHeader header;
+    header.flags = kFlagEncrypted;
+    header.sequence = 0x01020304;
+    header.ack = 5;
+    header.ackBits = 0x80000001;
+    header.ackDelay = 12;
+    Bytes datagram(kHeaderSize + 40 + kTagSize);
+    WriteHeader(header, datagram.data());
+    CHECK(Bytes(datagram.begin(), datagram.begin() + kHeaderSize) == Hex("fc010403020105000000010000800c00"));
+    for (std::size_t i = 0; i < 40; ++i) {
+      datagram[kHeaderSize + i] = static_cast<std::uint8_t>(i);
+    }
+    SealDatagram(channelKey, header.sequence, datagram.data(), 40);
+    CHECK(Bytes(datagram.begin() + kHeaderSize, datagram.end()) ==
+          Hex("ad41c4abaa2469294f4ecff48110bdfc026fcfee7c57328f0010f4dbe246c7ca3ce94d47f292bcb0794ed6590f957a8b06ef0cd7ab"
+              "6b7be7"));
+  }
+
+  // The handshake runs in plaintext, then each end calls SetKeys when it has the keys; the
+  // two ends do that at different moments, with plaintext data and acks still in flight.
+  // Whatever one end drops in between comes back sealed, and every message arrives once.
+  void TestKeysMidSession()
+  {
+    LinkConfig link;
+    link.latencyUs = 30'000;
+    link.loss = 0.05;
+    Pair pair({}, link, 21);
+    Traffic toB;
+    Traffic toA;
+    std::mt19937_64 rng(22);
+    for (int ms = 0; ms < 20'000; ++ms) {
+      if (ms < 6'000 && ms % 10 == 0) {
+        toB.sent.push_back(RandomBytes(rng, rng() % 3 == 0 ? 3000 : 60));
+        pair.a.SendReliable(toB.sent.back().data(), toB.sent.back().size());
+        toA.sent.push_back(RandomBytes(rng, 60));
+        pair.b.SendReliable(toA.sent.back().data(), toA.sent.back().size());
+        // 1,175 bytes: under the plaintext limit (1,181), over the sealed one (1,165).
+        const Bytes ping = RandomBytes(rng, 1175);
+        pair.a.SendUnreliable(ping.data(), ping.size());
+      }
+      if (ms == 2'000) {
+        CHECK(pair.a.SetKeys(KeysFor(5, false)));
+        CHECK(!pair.a.SetKeys(KeysFor(6, false)));  // once only
+      }
+      if (ms == 2'080) {
+        CHECK(pair.b.SetKeys(KeysFor(5, true)));
+      }
+      pair.Step();
+      Pump(pair.b, toB);
+      Pump(pair.a, toA);
+      Bytes drop;
+      while (pair.b.TakeUnreliable(drop)) {
+      }
+    }
+    std::printf(
+      "    keys set at 2.000 s (A) and 2.080 s (B): %zu/%zu and %zu/%zu messages in order, B refused %llu "
+      "unauthenticated, A dropped %llu unreliable that no longer fit\n",
+      toB.received,
+      toB.sent.size(),
+      toA.received,
+      toA.sent.size(),
+      static_cast<unsigned long long>(pair.b.Stats().unauthenticatedDropped),
+      static_cast<unsigned long long>(pair.a.Stats().unreliableDropped)
+    );
+    CHECK(toB.inOrder && toA.inOrder);
+    CHECK(toB.received == toB.sent.size() && toA.received == toA.sent.size());
+    CHECK(pair.b.Stats().unauthenticatedDropped > 0);
+    CHECK(pair.a.Stats().unreliableDropped > 0);  // queued before the keys, too big after
+    CHECK(pair.a.State() == ChannelState::Connected && pair.b.State() == ChannelState::Connected);
   }
 
   void TestEncryptedChannel()
@@ -883,7 +1000,9 @@ namespace
     {"message size limits", TestMessageLimits},
     {"unreliable messages: at most once, intact", TestUnreliable},
     {"seal and open (WP10.6)", TestSealOpen},
+    {"cipher known answers: XChaCha20-Poly1305 vector, the channel's layout (WP10.6)", TestCipherKnownAnswers},
     {"encrypted channel: delivery, tampering, replay, plaintext, one-sided keys (WP10.6)", TestEncryptedChannel},
+    {"keys set mid-session at different moments on each end (WP10.6)", TestKeysMidSession},
     {"keepalive and RTT on an idle link (WP10.8)", TestKeepaliveAndRtt},
     {"loss statistics at 10% loss (WP10.8)", TestLossStatistics},
     {"timeout after a long partition, none after a short one (WP10.8)", TestTimeoutAndPartition},

@@ -3,6 +3,10 @@
 # every build has it: the dedicated server on Linux, and the client for links between our
 # engines (issue #240). Tests: tests/remote/net (faf_netchannel_tests).
 
+if(NOT TARGET faf_monocypher)
+  return()  # cmake/deps/monocypher said why
+endif()
+
 add_library(faf_netchannel STATIC
   Datagram.cpp
   DatagramCipher.cpp

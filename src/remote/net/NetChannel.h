@@ -138,9 +138,12 @@ namespace faf::remote::net
 
     /**
      * From now on every datagram out is sealed and every datagram in must be (WP10.6).
-     * Set it before the first datagram of the session goes either way.
+     * Called once, when the handshake has made the keys; the sequence numbers go on from
+     * where they are, so no nonce repeats within this channel. The keys must be new for
+     * this channel: a reconnect makes a new channel and new keys, since a new channel
+     * starts again at sequence 1. False, changing nothing, when keys are already set.
      */
-    void SetKeys(const ChannelKeys& keys);
+    bool SetKeys(const ChannelKeys& keys);
 
     /** False when larger than maxMessageSize, or the channel is closed. */
     bool SendReliable(const void* data, std::size_t size);

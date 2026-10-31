@@ -4,7 +4,10 @@
 
 set(_monocypher_src "${FAF_DEPENDENCIES_DIR}/monocypher/src")
 if(NOT EXISTS "${_monocypher_src}/monocypher.c")
-  message(FATAL_ERROR "Monocypher sources not found in ${_monocypher_src} (configure with FAF_FETCH_DEPENDENCIES=ON)")
+  # Nothing in the engine needs the net channel yet, so a tree fetched before it existed
+  # (or configured with FAF_FETCH_DEPENDENCIES=OFF) still builds; the channel is left out.
+  message(STATUS "Dependencies: Monocypher not found in ${_monocypher_src}; the net channel (src/remote/net) is not built")
+  return()
 endif()
 
 add_library(faf_monocypher STATIC "${_monocypher_src}/monocypher.c")
