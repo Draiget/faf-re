@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC): pinned by SHA256, cached in
+#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, libjuice): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -180,6 +180,13 @@ set(_faf_download_wxWindows-2.4.2
     "https://github.com/wxWidgets/wxWidgets/releases/download/v2.4.2/wxMSW-2.4.2.zip"
     "081cb30347ed9092a50c39311b46586f4264fb125942652db168851be96ebf33"
     "wxWindows-2.4.2")
+# libjuice (MPL-2.0): the ICE agent behind src/netlink (issue #228). The tag's
+# source archive; cmake/deps/libjuice builds it.
+set(_faf_download_libjuice
+    "https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.7.4.tar.gz"
+    "95c088862aa1b88b73d62aa99577135010eb768fcafb252d13aa85a8515ef798"
+    "libjuice-1.7.4"
+    "libjuice-1.7.4.tar.gz")
 set(_faf_download_dxc
     "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip"
     "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1"
@@ -193,7 +200,13 @@ function(_faf_download_tree name)
   if(_n GREATER 2)
     list(GET _faf_download_${name} 2 _root)
   endif()
-  get_filename_component(_file "${_url}" NAME)
+  # An optional fourth entry names the cached archive, for URLs whose file
+  # name says nothing (a tag archive is just "v1.7.4.tar.gz").
+  if(_n GREATER 3)
+    list(GET _faf_download_${name} 3 _file)
+  else()
+    get_filename_component(_file "${_url}" NAME)
+  endif()
   set(_archive "${_faf_downloads}/${_file}")
   if(EXISTS "${_archive}")
     file(SHA256 "${_archive}" _have)
@@ -340,6 +353,7 @@ faf_dependency_submodule(ffmpeg)
 faf_dependency_download(boost_1_34_1)
 faf_dependency_download(wxWindows-2.4.2)
 faf_dependency_download(dxc)
+faf_dependency_download(libjuice)
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)

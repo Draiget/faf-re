@@ -27,6 +27,7 @@ dependencies/boost_1_34_1/**/*
 dependencies/wxWindows-2.4.2/**/*
 # Renderer toolchains fetched locally (docs/RENDERER_BACKENDS.md).
 dependencies/dxc/
+dependencies/libjuice/
 dependencies/slang/
 dependencies/*.7z
 *.7z

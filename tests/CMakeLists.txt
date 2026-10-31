@@ -9,6 +9,11 @@ target_link_libraries(faf_net_tests PRIVATE faf_engine)
 
 add_test(NAME net_robustness COMMAND faf_net_tests)
 
+# libjuice gathering against a STUN/TURN server (issue #228), run by hand:
+#   faf_juice_gather <host> <port> [<turn user> <turn password>]
+add_executable(faf_juice_gather EXCLUDE_FROM_ALL netlink/JuiceGatherTest.cpp)
+target_link_libraries(faf_juice_gather PRIVATE faf_juice faf_codegen)
+
 add_executable(faf_profiler_tests EXCLUDE_FROM_ALL profiling/ProfilerFacadeTests.cpp)
 target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
