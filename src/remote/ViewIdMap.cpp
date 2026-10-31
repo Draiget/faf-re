@@ -118,7 +118,9 @@ namespace faf::remote
   {
     for (const std::uint32_t simId : simIds) {
       if (const auto found = mEntityToView.find(simId); found != mEntityToView.end()) {
-        mGrace.push_back({mBeat + kInboundGraceBeats, found->second, false});
+        mGrace.push_back({mBeat + kInboundGraceBeats, found->second, simId, false});
+        mGraceEntities[simId] = found->second;
+        mRetiredAt[simId] = mBeat;
         mEntityToView.erase(found);
       }
     }
@@ -128,7 +130,8 @@ namespace faf::remote
   {
     for (const std::uint32_t simId : simIds) {
       if (const auto found = mCommandToView.find(simId); found != mCommandToView.end()) {
-        mGrace.push_back({mBeat + kInboundGraceBeats, found->second, true});
+        mGrace.push_back({mBeat + kInboundGraceBeats, found->second, simId, true});
+        mGraceCommands[simId] = found->second;
         mCommandToView.erase(found);
       }
     }
@@ -141,7 +144,8 @@ namespace faf::remote
         ++it;
         continue;
       }
-      mGrace.push_back({mBeat + kInboundGraceBeats, it->second, true});
+      mGrace.push_back({mBeat + kInboundGraceBeats, it->second, it->first, true});
+      mGraceCommands[it->first] = it->second;
       it = mCommandToView.erase(it);
     }
   }
@@ -152,6 +156,10 @@ namespace faf::remote
     while (!mGrace.empty() && mGrace.front().until <= beat) {
       const SGrace& retired = mGrace.front();
       (retired.command ? mCommandToSim : mEntityToSim).erase(retired.viewId);
+      auto& held = retired.command ? mGraceCommands : mGraceEntities;
+      if (const auto found = held.find(retired.simId); found != held.end() && found->second == retired.viewId) {
+        held.erase(found);
+      }
       mGrace.pop_front();
     }
   }
@@ -194,6 +202,34 @@ namespace faf::remote
     }
     const auto found = mCommandToView.find(simId);
     if (found == mCommandToView.end()) {
+      return false;
+    }
+    viewId = found->second;
+    return true;
+  }
+
+  bool CViewIdMap::EntityToHeldView(const std::uint32_t simId, std::uint32_t& viewId) const
+  {
+    if (EntityToView(simId, viewId)) {
+      return true;
+    }
+    const auto found = mGraceEntities.find(simId);
+    if (found == mGraceEntities.end()) {
+      return false;
+    }
+    viewId = found->second;
+    return true;
+  }
+
+  bool CViewIdMap::CommandToHeldView(
+    const std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId
+  ) const
+  {
+    if (CommandToView(simId, isOwnCommand, viewId)) {
+      return true;
+    }
+    const auto found = mGraceCommands.find(simId);
+    if (found == mGraceCommands.end()) {
       return false;
     }
     viewId = found->second;

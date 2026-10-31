@@ -112,6 +112,7 @@ namespace faf::headless
     std::unique_ptr<moho::CDecoder> mIdDecoder;    // decode, to view ids, back, marshal
     bool mInside = false;
     std::int32_t mArmy = -1;                  // the current source's army
+    std::uint32_t mLastRefused = 0;           // the last entity id the client side looked up
     std::uint64_t mMessages = 0;
     std::uint64_t mBeforeViews = 0;           // before the first beat's views (no maps yet)
     std::uint64_t mIdentical = 0;

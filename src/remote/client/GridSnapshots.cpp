@@ -10,7 +10,9 @@ namespace faf::remote::client
 {
   namespace
   {
-    constexpr std::size_t kMaxQueuedBeats = 64; // a link that stops taking does not grow this without end
+    // A link that falls behind the sim (the GUI at high game speed takes several beats a frame) still
+    // finds its beat; a link that stops taking does not grow this without end.
+    constexpr std::size_t kMaxQueuedBeats = 256;
   }
 
   CGridSnapshots::~CGridSnapshots()

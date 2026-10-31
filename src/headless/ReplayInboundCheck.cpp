@@ -13,6 +13,7 @@
 #include "moho/net/CMessage.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
+#include "remote/VisibilityOracle.h"
 
 // Engine addition, server mode: see ReplayInboundCheck.h.
 
@@ -167,10 +168,11 @@ namespace faf::headless
 
   bool CReplayInboundCheck::CClientSide::RewriteEntity(std::uint32_t& id)
   {
+    mOwner.mLastRefused = id;
     if (mOwner.mArmy < 0 || static_cast<std::size_t>(mOwner.mArmy) >= mOwner.mViews.ViewCount()) {
       return !mOwner.mNoMap.MapsEntity(id); // no view: only ids that are never renumbered go through
     }
-    return mOwner.mViews.IdMap(mOwner.mArmy).EntityToView(id, id);
+    return mOwner.mViews.IdMap(mOwner.mArmy).EntityToHeldView(id, id);
   }
 
   bool CReplayInboundCheck::CClientSide::RewriteCommand(std::uint32_t& id)
@@ -179,7 +181,7 @@ namespace faf::headless
       return false;
     }
     const auto own = [this](const std::uint32_t commandId) { return mOwner.IsOwnCommand(commandId); };
-    return mOwner.mViews.IdMap(mOwner.mArmy).CommandToView(id, own, id);
+    return mOwner.mViews.IdMap(mOwner.mArmy).CommandToHeldView(id, own, id);
   }
 
   void CReplayInboundCheck::OnMessage(const moho::CMessage& message)
@@ -217,10 +219,38 @@ namespace faf::headless
       ++mNotShown;
       if (mNotShownExamples.size() < kNamedExamples) {
         const moho::Sim* const sim = mViews.LastSim();
-        char text[256];
+        // Why: when the view's map retired the id, whether the sim still has the entity and lets
+        // this view have it now, and which other views were given it.
+        const std::uint32_t id = mLastRefused;
+        std::string why;
+        std::uint32_t retired = 0;
+        if (mArmy >= 0 && static_cast<std::size_t>(mArmy) < mViews.ViewCount() && mViews.IdMap(mArmy).RetiredAt(id, retired)) {
+          why += " retired at beat " + std::to_string(retired) + ";";
+        } else {
+          why += " never in this view's map;";
+        }
+        moho::Entity* entity = nullptr;
+        if (sim != nullptr && sim->mEntityDB != nullptr) {
+          const auto found = sim->mEntityDB->mAllUnits.find(id);
+          entity = found != sim->mEntityDB->mAllUnits.end() ? found->second : nullptr;
+        }
+        if (entity == nullptr) {
+          why += " the sim no longer has it;";
+        } else if (mArmy >= 0) {
+          why += remote::ResolveViewVisibility(*sim, mArmy, *entity).published ? " published to this view" : " not published to this view";
+          why += remote::CanViewSee(*sim, mArmy, *entity) ? ", seen;" : ", not seen;";
+        }
+        std::string others;
+        for (std::size_t view = 0; view < mViews.ViewCount(); ++view) {
+          std::uint32_t viewId = 0;
+          if (static_cast<std::int32_t>(view) != mArmy && mViews.IdMap(static_cast<std::int32_t>(view)).EntityToView(id, viewId)) {
+            others += (others.empty() ? " held by views " : ",") + std::to_string(view);
+          }
+        }
+        char text[384];
         std::snprintf(
-          text, sizeof(text), "beat %d, army %d: %s", sim != nullptr ? static_cast<int>(sim->mCurBeat) : -1, mArmy,
-          mClient.LastDrop().c_str()
+          text, sizeof(text), "beat %d, army %d: %s;%s%s", sim != nullptr ? static_cast<int>(sim->mCurBeat) : -1, mArmy,
+          mClient.LastDrop().c_str(), why.c_str(), others.c_str()
         );
         mNotShownExamples.emplace_back(text);
       }

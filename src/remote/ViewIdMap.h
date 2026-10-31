@@ -76,6 +76,23 @@ namespace faf::remote
      * that is renumbered but the view never got (or that retired). Ids kept as they are map to themselves.
      */
     [[nodiscard]] bool EntityToView(std::uint32_t simId, std::uint32_t& viewId) const;
+    /**
+     * The view id a client of this view holds for a sim id: the current one, or one retired within
+     * the grace beats (the client may still name it). What a client sends, as the checks model it.
+     */
+    [[nodiscard]] bool EntityToHeldView(std::uint32_t simId, std::uint32_t& viewId) const;
+    [[nodiscard]] bool CommandToHeldView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
+
+    /** Diagnostics: the beat a renumbered sim entity id last retired in this view, or false if it never did. */
+    [[nodiscard]] bool RetiredAt(const std::uint32_t simId, std::uint32_t& beat) const
+    {
+      const auto found = mRetiredAt.find(simId);
+      if (found == mRetiredAt.end()) {
+        return false;
+      }
+      beat = found->second;
+      return true;
+    }
     [[nodiscard]] bool CommandToView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
 
     [[nodiscard]] std::uint64_t EntitiesMapped() const noexcept { return mEntitiesMapped; }
@@ -102,9 +119,13 @@ namespace faf::remote
     {
       std::uint32_t until;  // the beat the view id stops translating inbound
       std::uint32_t viewId;
+      std::uint32_t simId;
       bool command;
     };
     std::deque<SGrace> mGrace; // retired, oldest first
+    std::unordered_map<std::uint32_t, std::uint32_t> mRetiredAt; // sim id -> beat it last retired (diagnostics)
+    std::unordered_map<std::uint32_t, std::uint32_t> mGraceEntities; // sim id -> view id, while in grace
+    std::unordered_map<std::uint32_t, std::uint32_t> mGraceCommands;
     std::uint32_t mBeat = 0;
     std::uint32_t mNextCommand = 0;
     std::uint64_t mEntitiesMapped = 0;

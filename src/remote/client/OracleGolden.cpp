@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -163,6 +164,13 @@ namespace faf::remote::client
           const int live = LiveGridAnswer(oracle.focusArmy, record, userEntity);
           if (live >= 0 && (live != 0) == drawn) {
             ++liveGrid;
+          } else if (record.shown && !drawn && userEntity != nullptr) {
+            // A mesh this beat's updates created or rebuilt (`UserEntity::ApplyEntityDataUpdate`)
+            // is drawn from the next beat's visibility update on: the client's timing, not the oracle.
+            const auto last = mLastMesh.find(record.id);
+            if (last == mLastMesh.end() || last->second != userEntity->mMeshInstance) {
+              ++mTotalMeshNew;
+            }
           }
           LogDifference(beat, oracle.focusArmy, record, userEntity, drawn, live);
         }
@@ -181,6 +189,14 @@ namespace faf::remote::client
             SOracleEntity unknown;
             unknown.id = id;
             LogDifference(beat, oracle.focusArmy, unknown, userEntity, true, -1);
+          }
+        }
+
+        // Each client entity's mesh instance as this beat left it, for the next beat's comparison.
+        mLastMesh.clear();
+        for (const auto& [id, userEntity] : session.mEntities) {
+          if (userEntity != nullptr) {
+            mLastMesh[id] = userEntity->mMeshInstance;
           }
         }
 
@@ -254,11 +270,12 @@ namespace faf::remote::client
       {
         gpg::Logf(
           "ORACLEGOLDEN totals beats=%llu compared=%llu agree=%llu oracle-only=%llu client-only=%llu "
-          "orphan-client=%llu live-grid=%llu missing-beats=%llu other-focus-beats=%llu",
+          "orphan-client=%llu live-grid=%llu mesh-new=%llu missing-beats=%llu other-focus-beats=%llu",
           static_cast<unsigned long long>(mComparedBeats), static_cast<unsigned long long>(mTotalCompared),
           static_cast<unsigned long long>(mTotalAgree), static_cast<unsigned long long>(mTotalOracleOnly),
           static_cast<unsigned long long>(mTotalClientOnly), static_cast<unsigned long long>(mTotalOrphanClient),
-          static_cast<unsigned long long>(mTotalLiveGrid), static_cast<unsigned long long>(mMissingBeats),
+          static_cast<unsigned long long>(mTotalLiveGrid), static_cast<unsigned long long>(mTotalMeshNew),
+          static_cast<unsigned long long>(mMissingBeats),
           static_cast<unsigned long long>(mOtherFocusBeats)
         );
       }
@@ -275,6 +292,8 @@ namespace faf::remote::client
       std::uint64_t mTotalClientOnly = 0;
       std::uint64_t mTotalOrphanClient = 0;
       std::uint64_t mTotalLiveGrid = 0;
+      std::uint64_t mTotalMeshNew = 0; // oracle shows, client hides, mesh created or rebuilt this beat
+      std::unordered_map<std::uint32_t, const void*> mLastMesh; // id -> mesh instance after the last beat
       std::atomic<moho::Sim*> mSim{nullptr}; // the sim, for `LiveGridAnswer` on the client's thread
       std::size_t mLoggedDifferences = 0;
       std::size_t mLoggedExplained = 0;
