@@ -28,10 +28,18 @@ namespace
 {
     constexpr std::uint32_t kPageShift = 12u;
     constexpr std::uint32_t kPageSizeBytes = (1u << kPageShift);
+#if defined(_M_X64) || defined(__x86_64__)
     constexpr std::uint32_t kMaxPageIndex = 0xC0000u;
+    constexpr std::uint32_t kPageOwnerMapBytes = 0x3FF000u;
+#else
+    // One owner per 4 KiB page in the x86 address space, including LAA addresses.
+    // The coalescing limit is exclusive: page 0x100000 is beyond 4 GiB.
+    constexpr std::uint32_t kMaxPageIndex = 0x100000u;
+    constexpr std::uint32_t kPageOwnerMapBytes = 0x400000u;
+    static_assert(kPageOwnerMapBytes / 4u == kMaxPageIndex);
+#endif
     constexpr std::uint32_t kSmallBlockClassCount = 44u;
     constexpr std::uint32_t kFreeRegionBucketCount = 256u;
-    constexpr std::uint32_t kPageOwnerMapBytes = 0x3FF000u;
     constexpr std::uint32_t kPrimaryHeapReserveBytes = 0x20000000u;
     constexpr std::uint32_t kThreadCacheSizeBytes = 0x214u;
     constexpr std::uint32_t kHeapRecordSizeBytes = 0x28u;
@@ -2406,3 +2414,7 @@ void gpg::SetThreadName([[maybe_unused]] const unsigned int id, [[maybe_unused]]
 {
   FAF_PROFILE_SET_THREAD_NAME(name);
 }
+
+#if defined(FAF_ALLOCATOR_BOUNDARY_TESTS)
+#include "../../../../tests/memory/AllocatorBoundsNative.inl"
+#endif
