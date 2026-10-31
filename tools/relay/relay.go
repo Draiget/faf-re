@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,6 +50,11 @@ type DirStats struct {
 	Stray     uint64 `json:"stray"`     // fixed mode: from an unexpected address
 	Unlatched uint64 `json:"unlatched"` // latch mode: the far side has not sent yet
 	Relatched uint64 `json:"relatched"` // latch mode: the sender's address changed (NAT rebinding)
+	// Game DATA packets the relay dropped and a later copy of (same sequence
+	// number) passed: how long after the drop, in ms (issue #237).
+	Recovered      uint64  `json:"recovered,omitempty"`
+	RecoveryMedian float64 `json:"recoveryMedianMs,omitempty"`
+	RecoveryP90    float64 `json:"recoveryP90Ms,omitempty"`
 }
 
 type direction struct {
@@ -57,14 +63,86 @@ type direction struct {
 	stats struct {
 		packets, bytes, dropped, blocked, duplicated, stray, unlatched, relatched atomic.Uint64
 	}
+	rec recovery
 }
 
 func (d *direction) snapshot() DirStats {
-	return DirStats{
+	s := DirStats{
 		Packets: d.stats.packets.Load(), Bytes: d.stats.bytes.Load(), Dropped: d.stats.dropped.Load(),
 		Blocked: d.stats.blocked.Load(), Duplicate: d.stats.duplicated.Load(), Stray: d.stats.stray.Load(),
 		Unlatched: d.stats.unlatched.Load(), Relatched: d.stats.relatched.Load(),
 	}
+	s.Recovered, s.RecoveryMedian, s.RecoveryP90 = d.rec.summary()
+	return s
+}
+
+// The game's packet header (SNetPacketHeader, 15 bytes): type at +0, DATA is
+// 4; the sequence number at +9, little-endian.
+const (
+	gameHeaderSize = 15
+	gameTypeData   = 4
+)
+
+func gameDataSequence(p []byte) (uint16, bool) {
+	if len(p) < gameHeaderSize || p[0] != gameTypeData {
+		return 0, false
+	}
+	return uint16(p[9]) | uint16(p[10])<<8, true
+}
+
+// recovery times how long a dropped DATA packet takes to pass again.
+type recovery struct {
+	mu      sync.Mutex
+	dropped map[uint16]time.Time // first drop of each sequence number still missing
+	samples []time.Duration
+}
+
+const maxRecoverySamples = 100000
+
+func (r *recovery) onDrop(p []byte, now time.Time) {
+	seq, ok := gameDataSequence(p)
+	if !ok {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.dropped == nil {
+		r.dropped = make(map[uint16]time.Time)
+	}
+	if _, seen := r.dropped[seq]; !seen { // a dropped resend keeps the first drop's time
+		r.dropped[seq] = now
+	}
+}
+
+func (r *recovery) onPass(p []byte, now time.Time) {
+	seq, ok := gameDataSequence(p)
+	if !ok {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	at, missing := r.dropped[seq]
+	if !missing {
+		return
+	}
+	delete(r.dropped, seq)
+	if len(r.samples) < maxRecoverySamples {
+		r.samples = append(r.samples, now.Sub(at))
+	}
+}
+
+func (r *recovery) summary() (n uint64, medianMs, p90Ms float64) {
+	r.mu.Lock()
+	sorted := append([]time.Duration(nil), r.samples...)
+	r.mu.Unlock()
+	if len(sorted) == 0 {
+		return 0, 0, 0
+	}
+	slices.Sort(sorted)
+	ms := func(q float64) float64 {
+		return float64(sorted[int(q*float64(len(sorted)-1))]) / float64(time.Millisecond)
+	}
+	return uint64(len(sorted)), ms(0.5), ms(0.9)
 }
 
 // Link is one proxied pair. A < B.
@@ -363,8 +441,10 @@ func (l *Link) pump(in *net.UDPConn, sender *atomic.Pointer[net.UDPAddr], out *n
 		}
 		if imp.Loss > 0 && rand.Float64() < imp.Loss {
 			d.stats.dropped.Add(1)
+			d.rec.onDrop(buf[:n], time.Now())
 			continue
 		}
+		d.rec.onPass(buf[:n], time.Now())
 		copies := 1
 		if imp.Duplicate > 0 && rand.Float64() < imp.Duplicate {
 			copies = 2

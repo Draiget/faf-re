@@ -148,7 +148,9 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 
 	switch {
 	case cfg.Mode == ModeRelay && l.hub == nil:
-		l.relay = relay.New(j, relay.Options{Default: cfg.Link})
+		// The relay listens where the games are: a socket bound to 127.0.0.1
+		// cannot send to -advertise's address (WSAEADDRNOTAVAIL).
+		l.relay = relay.New(j, relay.Options{Default: cfg.Link, ListenIP: net.ParseIP(localHost)})
 	case cfg.Mode == ModeContract:
 		if l.hub != nil {
 			job.Close()
@@ -577,10 +579,9 @@ func (l *Launcher) addr(viewer, target *Player) (string, error) {
 		if l.hub != nil {
 			return l.hubRelayAddr(viewer.Cfg.UID, target.Cfg.UID)
 		}
-		loop := net.IPv4(127, 0, 0, 1)
 		if _, err := l.relay.Ensure(viewer.Cfg.UID, target.Cfg.UID,
-			&net.UDPAddr{IP: loop, Port: viewer.seat.LobbyPort()},
-			&net.UDPAddr{IP: loop, Port: target.seat.LobbyPort()}); err != nil {
+			&net.UDPAddr{IP: net.ParseIP(viewer.host), Port: viewer.seat.LobbyPort()},
+			&net.UDPAddr{IP: net.ParseIP(target.host), Port: target.seat.LobbyPort()}); err != nil {
 			return "", err
 		}
 		return l.relay.AddrFor(viewer.Cfg.UID, target.Cfg.UID)
