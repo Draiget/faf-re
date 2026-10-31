@@ -9,6 +9,7 @@
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
+#include <chrono>
 #include <bit>
 #include <cmath>
 #include <cstdarg>
@@ -256,6 +257,11 @@ namespace moho
   extern bool ren_FogOfWar;
   extern bool dbg_Metronome;
   extern bool wld_RunWithTheWind;
+
+  /// Engine addition: Replay fast-forward batch limits & pending restart target
+  std::int32_t sim_ScrubMaxBeatsPerFrame = 500;
+  float sim_ScrubTimeBudgetMs = 15.0f;
+  std::int32_t CWldSession::sPendingRestartScrubTarget = -1;
 
   /// Lazily-bound engine-stat handles. `DoBeat` publishes how many units it
   /// ticked; `SessionFrame` publishes how many beats the drain consumed.
@@ -6902,6 +6908,11 @@ namespace moho
     IsMultiplayer = sessionInfo.mIsMultiplayer;
     IsGameOver = 0;
 
+    mScrubTargetBeat = -1;
+    mScrubStartBeat = 0;
+    mIsScrubbing = false;
+    mTotalReplayBeats = sessionInfo.mTotalBeats;
+
     // Engine addition (issues #216, #218): the desync dump's header names the map, the game mods
     // and the session kind; telemetry is sent for live multiplayer games only.
     CDesyncRecorder::SetSessionInfo(
@@ -8916,6 +8927,85 @@ namespace moho
   }
 
   /**
+   * Engine addition: Initiates fast-forward / scrubbing to `targetBeat`.
+   * If `targetBeat < mGameTick`, triggers session restart with handover.
+   */
+  void CWldSession::StartScrubToBeat(const std::int32_t targetBeat)
+  {
+    if (!IsReplay) {
+      return;
+    }
+
+    std::int32_t clampedTarget = targetBeat < 0 ? 0 : targetBeat;
+
+    if (clampedTarget < mGameTick) {
+      mIsScrubbing = false;
+      mScrubTargetBeat = -1;
+      sPendingRestartScrubTarget = clampedTarget;
+      WLD_RequestRestartSession();
+      return;
+    }
+
+    if (mTotalReplayBeats > 0 && clampedTarget > mTotalReplayBeats) {
+      clampedTarget = mTotalReplayBeats;
+    }
+
+    if (clampedTarget <= mGameTick) {
+      CancelScrub();
+      return;
+    }
+
+    mScrubTargetBeat = clampedTarget;
+    mScrubStartBeat = mGameTick;
+    mIsScrubbing = true;
+  }
+
+  /**
+   * Engine addition: Cancels any active replay scrub and clears pending restart targets.
+   */
+  void CWldSession::CancelScrub()
+  {
+    mIsScrubbing = false;
+    mScrubTargetBeat = -1;
+    sPendingRestartScrubTarget = -1;
+  }
+
+  /**
+   * Engine addition: Returns true if fast-forward scrubbing is active.
+   */
+  bool CWldSession::IsScrubbing() const noexcept
+  {
+    return mIsScrubbing;
+  }
+
+  /**
+   * Engine addition: Returns fast-forward progress [0.0f, 1.0f] toward `mScrubTargetBeat`.
+   */
+  float CWldSession::GetScrubProgress() const noexcept
+  {
+    if (!mIsScrubbing) {
+      return 0.0f;
+    }
+
+    const std::int32_t totalSpan = mScrubTargetBeat - mScrubStartBeat;
+    if (totalSpan <= 0) {
+      return 1.0f;
+    }
+
+    const std::int32_t currentProgress = mGameTick - mScrubStartBeat;
+    const float progress = static_cast<float>(currentProgress) / static_cast<float>(totalSpan);
+    return std::max(0.0f, std::min(progress, 1.0f));
+  }
+
+  /**
+   * Engine addition: Returns total duration of the replay in simulation beats/ticks.
+   */
+  std::int32_t CWldSession::GetTotalReplayBeats() const noexcept
+  {
+    return mTotalReplayBeats;
+  }
+
+  /**
    * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)
    */
   void CWldSession::SessionFrame(const float deltaSeconds)
@@ -8924,10 +9014,10 @@ namespace moho
 
     ISTIDriver* const simDriver = sSimDriver.get();
 
-    // Interpolation between ticks. Running with the wind means "do not
-    // interpolate, just consume beats", so the fraction is pinned at a whole
-    // tick and the drain below never waits for the clock.
-    if (mLastBeatWasTick == 0 || wld_RunWithTheWind) {
+    // Interpolation between ticks. Running with the wind or scrubbing means
+    // "do not interpolate, just consume beats", so the fraction is pinned at
+    // a whole tick and the drain below never waits for the clock.
+    if (mLastBeatWasTick == 0 || wld_RunWithTheWind || mIsScrubbing) {
       mTimeSinceLastTick = 1.0f;
     } else {
       mTimeSinceLastTick += WLD_GetSimRate() * deltaSeconds * 10.0f;
@@ -8937,27 +9027,58 @@ namespace moho
 
     const std::int32_t tickAtFrameStart = mGameTick;
     const std::int32_t targetTick = mGameTick + static_cast<std::int32_t>(std::floor(mTimeSinceLastTick));
+    const bool wasScrubbing = mIsScrubbing;
 
-    // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
-    // stall cannot make one frame arbitrarily long.
     std::int32_t beatsApplied = 0;
-    for (; beatsApplied < 100; ++beatsApplied) {
-      if (mReplayIsPaused) {
-        // A paused replay still applies beats until it lands on a tick.
-        if (mLastBeatWasTick != 0) {
+    if (mIsScrubbing) {
+      if (simDriver != nullptr) {
+        const auto startTime = std::chrono::steady_clock::now();
+        const float timeBudgetMs = sim_ScrubTimeBudgetMs > 0.0f ? sim_ScrubTimeBudgetMs : 15.0f;
+        const std::int32_t maxBeats = sim_ScrubMaxBeatsPerFrame > 0 ? sim_ScrubMaxBeatsPerFrame : 500;
+
+        while (beatsApplied < maxBeats && mGameTick < mScrubTargetBeat && simDriver->HasSyncData()) {
+          SSyncData* packet = nullptr;
+          simDriver->GetSyncData(packet);
+          DoBeat(msvc8::auto_ptr<SSyncData>(packet));
+          ++beatsApplied;
+
+          if (IsGameOver != 0) {
+            break;
+          }
+
+          const auto elapsedMs =
+            std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - startTime).count();
+          if (elapsedMs >= timeBudgetMs) {
+            break;
+          }
+        }
+      }
+
+      if (mGameTick >= mScrubTargetBeat || (IsGameOver != 0) || (mTotalReplayBeats > 0 && mGameTick >= mTotalReplayBeats)) {
+        mIsScrubbing = false;
+        mScrubTargetBeat = -1;
+      }
+    } else {
+      // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
+      // stall cannot make one frame arbitrarily long.
+      for (; beatsApplied < 100; ++beatsApplied) {
+        if (mReplayIsPaused) {
+          // A paused replay still applies beats until it lands on a tick.
+          if (mLastBeatWasTick != 0) {
+            break;
+          }
+        } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
           break;
         }
-      } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
-        break;
-      }
 
-      if (!simDriver->HasSyncData()) {
-        break;
-      }
+        if (simDriver == nullptr || !simDriver->HasSyncData()) {
+          break;
+        }
 
-      SSyncData* packet = nullptr;
-      simDriver->GetSyncData(packet);
-      DoBeat(msvc8::auto_ptr<SSyncData>(packet));
+        SSyncData* packet = nullptr;
+        simDriver->GetSyncData(packet);
+        DoBeat(msvc8::auto_ptr<SSyncData>(packet));
+      }
     }
 
     if (sEngineStat_Sync_Count == nullptr) {
@@ -8968,9 +9089,11 @@ namespace moho
 
     // Whatever the drain consumed comes back off the interpolation fraction, so
     // the render clock does not run ahead of the sim clock.
-    if (!wld_RunWithTheWind) {
+    if (!wld_RunWithTheWind && !wasScrubbing) {
       const float remainder = mTimeSinceLastTick - static_cast<float>(mGameTick - tickAtFrameStart);
       mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
+    } else if (wasScrubbing && !mIsScrubbing) {
+      mTimeSinceLastTick = 0.0f;
     }
 
     if (const boost::shared_ptr<UICommandGraph> commandGraph = GetCommandGraph(false)) {
@@ -14940,6 +15063,11 @@ namespace moho
       }
 
       if (CWldSession* const activeSession = WLD_GetActiveSession(); activeSession != nullptr) {
+        if (CWldSession::sPendingRestartScrubTarget >= 0) {
+          const std::int32_t restartTarget = CWldSession::sPendingRestartScrubTarget;
+          CWldSession::sPendingRestartScrubTarget = -1;
+          activeSession->StartScrubToBeat(restartTarget);
+        }
         activeSession->SessionFrame(deltaSeconds);
       }
 

@@ -327,6 +327,10 @@ namespace moho
     SSessionSaveData* saveData
   );
 
+  /// Engine addition: Replay fast-forward batch limits
+  extern std::int32_t sim_ScrubMaxBeatsPerFrame;
+  extern float sim_ScrubTimeBudgetMs;
+
   class CWldSession
   {
   public:
@@ -619,6 +623,35 @@ namespace moho
      * mesh build, and task-stage user frame.
      */
     void SessionFrame(float deltaSeconds);
+
+    /// Static target for backward scrub across session restarts
+    static std::int32_t sPendingRestartScrubTarget;
+
+    /**
+     * Engine addition: Initiates fast-forward / scrubbing to `targetBeat`.
+     * If `targetBeat < mGameTick`, triggers session restart with handover.
+     */
+    void StartScrubToBeat(std::int32_t targetBeat);
+
+    /**
+     * Engine addition: Cancels any active replay scrub and clears pending restart targets.
+     */
+    void CancelScrub();
+
+    /**
+     * Engine addition: Returns true if fast-forward scrubbing is active.
+     */
+    [[nodiscard]] bool IsScrubbing() const noexcept;
+
+    /**
+     * Engine addition: Returns fast-forward progress [0.0f, 1.0f] toward `mScrubTargetBeat`.
+     */
+    [[nodiscard]] float GetScrubProgress() const noexcept;
+
+    /**
+     * Engine addition: Returns total duration of the replay in simulation beats/ticks.
+     */
+    [[nodiscard]] std::int32_t GetTotalReplayBeats() const noexcept;
 
     /**
      * Address: 0x00896900 (FUN_00896900, ?GetDelayToNextBeat@CWldSession@Moho@@QBEMXZ)
@@ -1238,7 +1271,13 @@ namespace moho
     char pad_04EA[2];                                       // 0x04EA
     gpg::MemBuffer<char> mEdgeFog;                          // 0x04EC
     boost::shared_ptr<SSessionSaveData> mPendingSaveData;   // 0x04FC
-    char pad_0504[4];                                       // 0x0504
+    /// Engine addition: Replay fast-forward & scrubbing state
+    std::int32_t mScrubTargetBeat{-1};                      // 0x0504
+    std::int32_t mScrubStartBeat{0};                        // 0x0508
+    bool mIsScrubbing{false};                               // 0x050C
+    char pad_050D[3]{};                                     // 0x050D
+    std::int32_t mTotalReplayBeats{0};                      // 0x0510
+    char pad_0514[4]{};                                     // 0x0514
   };
 
   static_assert(
@@ -1276,9 +1315,21 @@ namespace moho
   static_assert(
     offsetof(CWldSession, mReplayIsPaused) == 0x46C, "CWldSession::mReplayIsPaused offset must be 0x46C"
   );
-  // FUN_00897220 allocates this with `operator new(0x508u)`. The offset asserts
-  // above pin the interior; this pins the end.
-  static_assert(sizeof(CWldSession) == 0x508, "CWldSession size must be 0x508");
+  // FUN_00897220 allocates this with `operator new(0x508u)`.
+  // Extended to 0x518 with replay fast-forward scrubbing state.
+  static_assert(sizeof(CWldSession) == 0x518, "CWldSession size must be 0x518");
+  static_assert(
+    offsetof(CWldSession, mScrubTargetBeat) == 0x504, "CWldSession::mScrubTargetBeat offset must be 0x504"
+  );
+  static_assert(
+    offsetof(CWldSession, mScrubStartBeat) == 0x508, "CWldSession::mScrubStartBeat offset must be 0x508"
+  );
+  static_assert(
+    offsetof(CWldSession, mIsScrubbing) == 0x50C, "CWldSession::mIsScrubbing offset must be 0x50C"
+  );
+  static_assert(
+    offsetof(CWldSession, mTotalReplayBeats) == 0x510, "CWldSession::mTotalReplayBeats offset must be 0x510"
+  );
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
   static_assert(offsetof(CWldSession, mSelectionSize) == 0x4AC, "CWldSession::mSelectionSize offset must be 0x4AC");
   static_assert(offsetof(CWldSession, mSelection) == 0x4A0, "CWldSession::mSelection offset must be 0x4A0");

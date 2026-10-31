@@ -10,6 +10,8 @@
 #include "moho/net/CMessageStream.h"
 #include "moho/net/ECmdStreamOp.h"
 #include "moho/sim/WldSessionInfo.h"
+#include "moho/sim/CWldSession.h"
+#include <cmath>
 
 namespace
 {
@@ -235,6 +237,71 @@ namespace
     }
   }
 
+  void TestCWldSessionScrubbingStateTransitions()
+  {
+    // Test static pending restart target
+    moho::CWldSession::sPendingRestartScrubTarget = -1;
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
+
+    // Mock CWldSession buffer
+    alignas(moho::CWldSession) std::uint8_t buffer[sizeof(moho::CWldSession)];
+    std::memset(buffer, 0, sizeof(buffer));
+    moho::CWldSession* const session = reinterpret_cast<moho::CWldSession*>(buffer);
+
+    session->mScrubTargetBeat = -1;
+    session->mScrubStartBeat = 0;
+    session->mIsScrubbing = false;
+    session->mTotalReplayBeats = 1000;
+    session->mGameTick = 100;
+    session->IsReplay = false;
+
+    // Test 1: Non-replay guard - refuse to scrub if not replay
+    session->StartScrubToBeat(500);
+    CHECK(session->IsScrubbing() == false);
+    CHECK(session->mScrubTargetBeat == -1);
+
+    // Test 2: Forward scrub when IsReplay is true
+    session->IsReplay = true;
+    session->StartScrubToBeat(500);
+    CHECK(session->IsScrubbing() == true);
+    CHECK(session->mScrubStartBeat == 100);
+    CHECK(session->mScrubTargetBeat == 500);
+    CHECK(session->GetTotalReplayBeats() == 1000);
+
+    // Test 3: Scrub progress calculation
+    session->mGameTick = 100;
+    CHECK(session->GetScrubProgress() == 0.0f);
+    session->mGameTick = 300;
+    CHECK(std::abs(session->GetScrubProgress() - 0.5f) < 1e-4f);
+    session->mGameTick = 500;
+    CHECK(session->GetScrubProgress() == 1.0f);
+
+    // Test 4: Clamp to total replay beats
+    session->mGameTick = 200;
+    session->StartScrubToBeat(1500);
+    CHECK(session->mScrubTargetBeat == 1000);
+
+    // Test 5: Target <= current tick cancels/completes
+    session->StartScrubToBeat(200);
+    CHECK(session->IsScrubbing() == false);
+    CHECK(session->mScrubTargetBeat == -1);
+
+    // Test 6: Backward seek triggers pending restart target
+    session->mGameTick = 500;
+    session->StartScrubToBeat(250);
+    CHECK(session->IsScrubbing() == false);
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == 250);
+
+    // Test 7: CancelScrub resets state and clears pending restart target
+    moho::CWldSession::sPendingRestartScrubTarget = 100;
+    session->mIsScrubbing = true;
+    session->mScrubTargetBeat = 800;
+    session->CancelScrub();
+    CHECK(session->IsScrubbing() == false);
+    CHECK(session->mScrubTargetBeat == -1);
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
+  }
+
   struct TestCase
   {
     const char* name;
@@ -250,6 +317,7 @@ namespace
     {"truncated stream", &TestTruncatedStream},
     {"session info default total beats", &TestSessionInfoDefaultTotalBeats},
     {"vcr setup replay session calculates total beats", &TestVCRSetupReplaySessionCalculatesTotalBeats},
+    {"wldsession scrubbing state transitions", &TestCWldSessionScrubbingStateTransitions},
   };
 } // namespace
 
