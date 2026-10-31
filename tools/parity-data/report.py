@@ -21,11 +21,13 @@ import sys
 from common import clock
 
 # error: the replay could not be got ready (download, map, M28AI) or its shard's job died; a
-# replay the run meant to play and did not is a failure of the run, not a pass.
-FAILURES = ("desync", "crash", "incomplete", "timeout", "error")
+# replay the run meant to play and did not is a failure of the run, not a pass. oracle: with
+# shard.py --oracle-check, the visibility oracles differed (or reported nothing).
+FAILURES = ("desync", "crash", "incomplete", "timeout", "error", "oracle")
 # Passing replays listed in report.md (GitHub caps a job summary at 1 MiB); report.json has all.
 PASS_ROWS = 500
-ORDER = ("pass", "desync", "crash", "incomplete", "timeout", "error", "unsupported", "not-run", "not-scheduled")
+ORDER = ("pass", "desync", "oracle", "crash", "incomplete", "timeout", "error", "unsupported", "not-run",
+         "not-scheduled")
 
 
 def fit_time_model(results):
@@ -106,6 +108,10 @@ def main():
     def row(r):
         beat = r.get("first_beat", "")
         detail = "; ".join(r.get("notes") or []) or r.get("why", "")
+        if r["verdict"] == "oracle" and r.get("oracle"):
+            o = r["oracle"]
+            detail = "oracle: %d of %d beats' entities differ, spatial %d of %d army-beats; %s" % (
+                o["differ"], o["beats"], o["spatial_differ"], o["spatial_beats"], detail)
         return "| %d | %s | %s | %s/%s | %s | %s | %s |" % (
             r["id"], r["verdict"], beat, r.get("last_beat", ""), r.get("length", ""), r.get("players", ""),
             r.get("map", ""), detail.replace("|", "/")[:160])

@@ -30,6 +30,10 @@ on:
       after_run:
         description: An earlier run's id; play only what it did not (no time left, not got ready) or what crashed, and report both
         default: ""
+      oracle_check:
+        description: Also check the server's visibility oracles every beat (unfocused, every army; slower), verdict oracle on a difference
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -210,6 +214,7 @@ jobs:
           python tools/parity-data/shard.py --plan plan.json --shard ${{ matrix.shard }} --headless bin/headless
           --pack game --replays cache/replays --maps cache/maps --m28 cache/m28 --work work
           --out results --minutes "$PLAY_MINUTES" --game-version "$GAME_VERSION"
+          ${{ inputs.oracle_check && '--oracle-check' || '' }}
       - if: always()
         uses: actions/upload-artifact@v7
         with:

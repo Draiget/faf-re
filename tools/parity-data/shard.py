@@ -1,7 +1,7 @@
 """Plays one shard of a parity plan on headless and writes a result per replay.
 
 usage: shard.py --plan plan.json --shard N --headless EXE --pack DIR --replays DIR --maps DIR
-                --m28 DIR --work DIR --out DIR [--minutes M] [--slots N] [--simworkers N]
+                --m28 DIR --work DIR --out DIR [--minutes M] [--slots N] [--simworkers N] [--oracle-check]
 
 Runs --slots replays at once (default: one per CPU). Whenever a slot is free it starts the
 longest replay left whose estimated time still fits before --minutes are up; what no longer fits
@@ -16,6 +16,11 @@ with --after picks those up). What fits is judged by the plan's estimates times 
 measured to estimated time of the replays the job has finished. A mismatch is the live game's,
 not ours, when more of the recorded clients agree with the sim at that beat than with the one
 that differs; that client is not counted again for the rest of the game (live_desyncs).
+
+With --oracle-check (dedicated-server plan WPR.54) every replay plays unfocused with headless's
+--oracle-check: each beat, for every army, the visibility oracle against what the sim publishes
+and the spatial oracle against the brute-force one. A replay whose summary reports a difference,
+or that ends without one, gets the verdict oracle; its counts are in the result's `oracle`.
 
 Writes DIR/results.jsonl (one line per replay) and DIR/logs/<id>.out/.log for every replay that
 did not pass. Every 30 seconds the job log gets a progress block: the shard's replays done, game
@@ -38,6 +43,9 @@ from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE
 
 VAULT_LINE_RE = re.compile(r"^custom_vault_path = .*$", re.M)
 PROGRESS_S = 30  # seconds between progress blocks in the job log
+# headless --oracle-check's summary (src/headless/ReplayOracleCheck.cpp, Summary)
+ORACLE_RE = re.compile(r"\] oracle check: focus -?\d+, (\d+) beats, (\d+) entity-beats differ"
+                       r"(?:; spatial oracle: (\d+) army-beats, (\d+) differ)?")
 
 
 def find_folder(parent, name):
@@ -160,11 +168,13 @@ class Shard:
         game.update({"out": os.path.join(run, "headless.out"), "log": os.path.join(run, "engine.log"),
                      "t0": time.time(), "pos": 0, "tick": -1, "ended": False, "over": False, "final": None,
                      "first_beat": None, "mismatches": 0, "live": [], "outvoted": set(), "recorded": None,
-                     "notes": []})
+                     "notes": [], "oracle": None})
         minutes_left = max(1, int((self.deadline - time.time()) / 60) + 1)
         cmd = [self.args.headless, "--replay", prepared["scfa"], "/init", prepared["init"], "/nobugreport",
                "/nosound", "/log", game["log"], "--label", "r%d" % replay_id, "--timeout", str(minutes_left),
                "/simworkers", str(self.args.simworkers)]
+        if self.args.oracle_check:
+            cmd += ["--focus", "-1", "--oracle-check"]
         with open(game["out"], "wb") as out:
             game["proc"] = subprocess.Popen(cmd, cwd=run, stdout=out, stderr=subprocess.STDOUT,
                                             stdin=subprocess.DEVNULL)
@@ -196,6 +206,9 @@ class Shard:
                 game["over"] = m.group(2) == "True"
             elif (m := HL_VERDICT_RE.search(line)):
                 game["final"] = (m.group(1) == "True", m.group(2) == "True")
+            elif (m := ORACLE_RE.search(line)):
+                game["oracle"] = {"beats": int(m.group(1)), "differ": int(m.group(2)),
+                                  "spatial_beats": int(m.group(3) or 0), "spatial_differ": int(m.group(4) or 0)}
             elif HL_TROUBLE_RE.search(line):
                 game["notes"].append(line.strip()[:200])
 
@@ -227,6 +240,13 @@ class Shard:
         if game["final"] is None or game["final"][1]:
             game["notes"].append("exit code %s%s" % (game["proc"].returncode, "" if game["final"] else ", no verdict"))
             return "crash"
+        if self.args.oracle_check:
+            oracle = game["oracle"]
+            if oracle is None:
+                game["notes"].append("no oracle summary")
+                return "oracle"
+            if oracle["differ"] or oracle["spatial_differ"]:
+                return "oracle"
         beats = game["info"].get("beats")
         if game["ended"] or game["over"] or (beats and game["tick"] >= beats - 2):
             return "pass"
@@ -248,6 +268,7 @@ class Shard:
             "game_over": game["over"], "players": item["players"], "map": game["info"]["map"],
             "m28": game["info"]["m28"], "wall_s": round(time.time() - game["t0"], 1), "est_s": item["est"],
             "downloaded": game["downloaded"] or None, "notes": game["notes"] or None,
+            "oracle": game["oracle"],
         }, game)
         self.running.remove(game)
         os.remove(game["init"])
@@ -358,6 +379,8 @@ def main():
     parser.add_argument("--slots", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--simworkers", type=int, default=1)
     parser.add_argument("--game-version", type=int, default=3835)
+    parser.add_argument("--oracle-check", action="store_true",
+                        help="play unfocused with headless --oracle-check; a difference is the verdict oracle")
     parser.add_argument("--delay", type=float, default=1.0, help="seconds between requests to FAF")
     args = parser.parse_args()
     args.pack = os.path.abspath(args.pack)
