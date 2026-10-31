@@ -47,6 +47,10 @@
 // The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
 // --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
 #include "headless/ReplayCommandCheck.h"
+#include "headless/ReplayChangeSetCheck.h"
+#include "headless/ReplayOracleCheck.h"
+#include "headless/ReplayViewFrameStats.h"
+#include "headless/ReplayViewPacketCheck.h"
 #include "headless/ReplayWireStats.h"
 #include "remote/ContentTables.h"
 #endif
@@ -487,6 +491,51 @@ namespace faf::headless
       commandCheck = std::make_unique<CReplayCommandCheck>(*rules);
       commandCheck->Install();
     }
+
+    // `--oracle-check`: after every `Sim::Sync`, on the sim's thread.
+    std::unique_ptr<CReplayOracleCheck> oracleCheck;
+    if (options.oracleCheck) {
+      oracleCheck = std::make_unique<CReplayOracleCheck>(options.oracleDigestsPath);
+      if (!oracleCheck->IsOpen()) {
+        result.error = "cannot write " + options.oracleDigestsPath;
+        return result;
+      }
+      oracleCheck->Install();
+    }
+
+    // `--changeset-check`: the sync walk's observer too, so not with `--oracle-check`.
+    std::unique_ptr<CReplayChangeSetCheck> changeSetCheck;
+    if (options.changeSetCheck) {
+      changeSetCheck = std::make_unique<CReplayChangeSetCheck>();
+      changeSetCheck->Install();
+    }
+
+    // `--view-packets`: the sync walk's observer as well.
+    std::unique_ptr<CReplayViewPacketCheck> viewPackets;
+    if (!options.viewPacketsPath.empty()) {
+      viewPackets = std::make_unique<CReplayViewPacketCheck>(
+        options.viewPacketsArmy, options.viewPacketsPath, options.viewPacketsEntriesPath
+      );
+      if (!viewPackets->IsOpen()) {
+        result.error = "cannot write " + options.viewPacketsPath
+          + (options.viewPacketsEntriesPath.empty() ? "" : " or " + options.viewPacketsEntriesPath);
+        return result;
+      }
+      viewPackets->Install();
+    }
+
+    // `--view-frames`: the sync walk's observer as well.
+    std::unique_ptr<CReplayViewFrameStats> viewFrames;
+    if (!options.viewFramesPath.empty()) {
+      viewFrames = std::make_unique<CReplayViewFrameStats>(
+        options.viewFramesPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z
+      );
+      if (!viewFrames->IsOpen()) {
+        result.error = "cannot write " + options.viewFramesPath;
+        return result;
+      }
+      viewFrames->Install();
+    }
 #endif
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
@@ -690,6 +739,11 @@ namespace faf::headless
       }
     }
 
+#if FAF_SERVER_MODE
+    // The sim's thread keeps running beats after a time limit ends the loop; the sync-walk
+    // observers are read (and destroyed) below, so none of them may be called from here on.
+    moho::Sim::SetSyncObserver(nullptr);
+#endif
     result.playSeconds = SecondsSince(playStart);
     result.mismatches = ChecksumMismatchCount();
     if (digestFile != nullptr) {
@@ -718,6 +772,21 @@ namespace faf::headless
     if (commandCheck) {
       result.commandSummary = commandCheck->Summary();
       result.commandFailures = commandCheck->Failures();
+    }
+    if (oracleCheck) {
+      result.oracleSummary = oracleCheck->Summary();
+      result.oracleFailures = oracleCheck->Failures();
+    }
+    if (changeSetCheck) {
+      result.changeSetSummary = changeSetCheck->Summary();
+      result.changeSetFailures = changeSetCheck->Failures();
+    }
+    if (viewPackets) {
+      result.viewPacketsSummary = viewPackets->Summary();
+    }
+    if (viewFrames) {
+      result.viewFramesSummary = viewFrames->Summary();
+      result.viewFramesFailures = viewFrames->Failures();
     }
 #endif
     if (!options.syncKeysPath.empty()) {

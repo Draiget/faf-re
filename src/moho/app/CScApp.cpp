@@ -51,6 +51,7 @@
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiWorldShapes.h"
 #if FAF_SERVER_MODE
+#include "remote/client/OracleGolden.h"
 #include "remote/client/ServerConnect.h"
 #endif
 
@@ -389,6 +390,10 @@ namespace
     moho::PlaceCurrentThread(moho::EThreadRole::Main);
 
 #if FAF_SERVER_MODE
+    // Engine addition, server mode: `/oraclegolden <file>`, the visibility oracle's golden test
+    // (remote/client/OracleGolden.h), for whatever session starts below.
+    (void)faf::remote::client::InstallOracleGoldenFromCommandLine();
+
     // Engine addition, server mode: `/connectserver` takes over startup. Without it, every
     // path below runs as before.
     switch (faf::remote::StartServerSessionFromCommandLine()) {

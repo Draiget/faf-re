@@ -22,6 +22,13 @@ namespace faf::headless
     int loopbackDeadReckoning = 0; // with `loopback`: dead-reckoning tolerance in 1/64-unit steps
     int loopbackTurnTolerance = 0; // with dead reckoning: orientation tolerance in 1/65536 turns (0: off)
     bool commandCheck = false;  // every command decoded and marshalled again, compared (ReplayCommandCheck.h)
+    bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
+    std::string oracleDigestsPath; // with `oracleCheck`: per beat and army, the oracle's answers as a digest
+    bool changeSetCheck = false; // the sync walk's change set against its packet (ReplayChangeSetCheck.h)
+    int viewPacketsArmy = -1;    // with `viewPacketsPath`: the army whose packet is digested
+    std::string viewPacketsPath; // when set: per beat, that army's entity lanes (ReplayViewPacketCheck.h)
+    std::string viewPacketsEntriesPath; // with `viewPacketsPath`: one line per record (beat, lane, id, digest)
+    std::string viewFramesPath;  // when set: every army's frame, per beat (CSV; ReplayViewFrameStats.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end
@@ -54,6 +61,13 @@ namespace faf::headless
     std::uint64_t loopbackFailures = 0;
     std::string commandSummary; // with `commandCheck`: one line
     std::uint64_t commandFailures = 0;
+    std::string oracleSummary;  // with `oracleCheck`: a few lines
+    std::uint64_t oracleFailures = 0;
+    std::string changeSetSummary; // with `changeSetCheck`: two lines and the first differences
+    std::uint64_t changeSetFailures = 0;
+    std::string viewPacketsSummary; // with `viewPacketsPath`: one line
+    std::string viewFramesSummary;  // with `viewFramesPath`: a line per army
+    std::uint64_t viewFramesFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line
     std::string fpuReport;      // with `fpuReport`: one line per thread
   };

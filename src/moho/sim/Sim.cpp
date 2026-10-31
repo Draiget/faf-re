@@ -23,6 +23,7 @@
 #include <initializer_list>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <new>
 #include <stdexcept>
 #include <set>
@@ -4264,6 +4265,22 @@ namespace
   }
 } // namespace
 
+#if FAF_SERVER_MODE
+namespace
+{
+  CSyncObserver* sSyncObserver = nullptr;
+  // Held by `Sync` from its walk to `OnSyncWalkDone`, so a caller that removes the observer
+  // knows no call into it is still running on the sim's thread.
+  std::mutex sSyncObserverLock;
+} // namespace
+
+void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
+{
+  const std::lock_guard<std::mutex> guard(sSyncObserverLock);
+  sSyncObserver = observer;
+}
+#endif
+
 /**
  * Address: 0x007474B0 (FUN_007474B0)
  *
@@ -4478,6 +4495,10 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     }
     RefreshUnitSyncBlocksParallel(sSyncUnits);
   }
+#if FAF_SERVER_MODE
+  std::unique_lock<std::mutex> observerLock(sSyncObserverLock);
+  CSyncObserver* const observer = sSyncObserver;
+#endif
   if (focusArmyChanged) {
     // 0x007478AA..0x0074791A walks the entity DB's whole id map -- every
     // entity, not only units -- and dispatches Sync on each node's value.
@@ -4486,8 +4507,18 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     // replay viewer switching focus army changed the sim checksum.
     for (const auto& idAndEntity : mEntityDB->mAllUnits) {
       if (Entity* const entity = idAndEntity.second; entity != nullptr) {
+#if FAF_SERVER_MODE
+        if (observer != nullptr) {
+          observer->OnEntityWillSync(*entity);
+        }
+#endif
         entity->Sync(outSyncData);
         ++syncedEntityCount;
+#if FAF_SERVER_MODE
+        if (observer != nullptr) {
+          observer->OnEntitySynced(*entity);
+        }
+#endif
       }
     }
   } else {
@@ -4496,13 +4527,29 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       Entity* const entity = *it;
       ++it;
       if (entity != nullptr) {
+#if FAF_SERVER_MODE
+        if (observer != nullptr) {
+          observer->OnEntityWillSync(*entity);
+        }
+#endif
         entity->Sync(outSyncData);
         ++syncedEntityCount;
+#if FAF_SERVER_MODE
+        if (observer != nullptr) {
+          observer->OnEntitySynced(*entity);
+        }
+#endif
       }
     }
   }
   unitUpdateFills.Finish();
   StoreSyncEntityCountStat(syncedEntityCount);
+#if FAF_SERVER_MODE
+  if (observer != nullptr) {
+    observer->OnSyncWalkDone(*this, *outSyncData);
+  }
+  observerLock.unlock();
+#endif
 
   if (mRequestXMLArmyStatsSubmit) {
     mRequestXMLArmyStatsSubmit = false;

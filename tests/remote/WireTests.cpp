@@ -21,6 +21,7 @@
 
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
+#include "remote/wire/IntelGridDelta.h"
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
@@ -1512,7 +1513,124 @@ namespace
     CHECK(accepted == CSoundTableReader::kMaxEntries && full.Size() == CSoundTableReader::kMaxEntries);
   }
 
+  // --- Intel grid deltas (plan WP5.4) -------------------------------------------------------
+
+  [[nodiscard]] SGridBits RandomGrid(std::mt19937& rng, const std::uint32_t width, const std::uint32_t height, const int percent)
+  {
+    SGridBits grid;
+    grid.width = width;
+    grid.height = height;
+    grid.cells.resize(static_cast<std::size_t>(width) * height);
+    std::uniform_int_distribution<int> roll(0, 99);
+    for (std::uint8_t& cell : grid.cells) {
+      cell = roll(rng) < percent ? 1u : 0u;
+    }
+    return grid;
+  }
+
+  void TestGridDeltaRoundTrip()
+  {
+    std::mt19937 rng(20261030u);
+    std::uniform_int_distribution<std::uint32_t> side(1, 64);
+    for (int round = 0; round < 300; ++round) {
+      const std::uint32_t width = side(rng);
+      const std::uint32_t height = side(rng);
+      SGridBits held = RandomGrid(rng, width, height, 40);
+      // A beat sequence: each step flips a few cells, as fog moves at its edges.
+      for (int beat = 0; beat < 8; ++beat) {
+        SGridBits next = held;
+        std::uniform_int_distribution<std::size_t> cell(0, next.cells.size() - 1);
+        const int flips = static_cast<int>(rng() % 6u);
+        for (int i = 0; i < flips; ++i) {
+          next.cells[cell(rng)] ^= 1u;
+        }
+        BitWriter writer;
+        CHECK(EncodeGridDelta(next, &held, writer));
+        const std::vector<std::uint8_t> bytes = Bytes(writer);
+        BitReader reader(bytes);
+        SGridBits decoded;
+        CHECK(DecodeGridDelta(reader, &held, 1u << 20, decoded));
+        CHECK(decoded == next);
+        held = next;
+      }
+      // Against no baseline, and against one of another size.
+      const SGridBits fresh = RandomGrid(rng, width, height, 50);
+      const SGridBits other = RandomGrid(rng, width + 1, height, 50);
+      for (const SGridBits* baseline : {static_cast<const SGridBits*>(nullptr), &other}) {
+        BitWriter writer;
+        CHECK(EncodeGridDelta(fresh, baseline, writer));
+        const std::vector<std::uint8_t> bytes = Bytes(writer);
+        BitReader reader(bytes);
+        SGridBits decoded;
+        CHECK(DecodeGridDelta(reader, baseline, 1u << 20, decoded));
+        CHECK(decoded == fresh);
+      }
+    }
+  }
+
+  void TestGridDeltaUnchangedIsSmall()
+  {
+    std::mt19937 rng(7u);
+    const SGridBits grid = RandomGrid(rng, 256, 256, 50);
+    BitWriter writer;
+    CHECK(EncodeGridDelta(grid, &grid, writer));
+    // Width and height (2 bytes each) and one run of 65536 unchanged cells (3 bytes).
+    CHECK(Bytes(writer).size() <= 7u);
+  }
+
+  void TestGridDeltaHostile()
+  {
+    // Too many cells: refused before allocating.
+    {
+      BitWriter writer;
+      writer.WriteVarUint(100000);
+      writer.WriteVarUint(100000);
+      const std::vector<std::uint8_t> bytes = Bytes(writer);
+      BitReader reader(bytes);
+      SGridBits decoded;
+      CHECK(!DecodeGridDelta(reader, nullptr, 1u << 20, decoded));
+    }
+    // A run past the end.
+    {
+      BitWriter writer;
+      writer.WriteVarUint(4);
+      writer.WriteVarUint(4);
+      writer.WriteVarUint(10);
+      writer.WriteVarUint(10);
+      const std::vector<std::uint8_t> bytes = Bytes(writer);
+      BitReader reader(bytes);
+      SGridBits decoded;
+      CHECK(!DecodeGridDelta(reader, nullptr, 1u << 20, decoded));
+    }
+    // Truncated: every prefix of a valid delta is refused.
+    {
+      std::mt19937 rng(11u);
+      const SGridBits grid = RandomGrid(rng, 20, 20, 50);
+      BitWriter writer;
+      CHECK(EncodeGridDelta(grid, nullptr, writer));
+      const std::vector<std::uint8_t> bytes = Bytes(writer);
+      for (std::size_t length = 0; length + 1 < bytes.size(); ++length) {
+        const std::vector<std::uint8_t> prefix(bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(length));
+        BitReader reader(prefix);
+        SGridBits decoded;
+        CHECK(!DecodeGridDelta(reader, nullptr, 1u << 20, decoded));
+      }
+    }
+    // The encoder refuses a grid whose cells do not match its size.
+    {
+      SGridBits bad;
+      bad.width = 3;
+      bad.height = 3;
+      bad.cells.resize(8);
+      BitWriter writer;
+      CHECK(!EncodeGridDelta(bad, nullptr, writer));
+    }
+  }
+
   const TestCase kTests[] = {
+    {"grids: delta round trip", &TestGridDeltaRoundTrip},
+    {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
+    {"grids: hostile input", &TestGridDeltaHostile},
     {"sounds: session table", &TestSoundTable},
     {"roster: round trip and refusals", &TestRoster},
     {"session tables: sounds and names", &TestSessionTables},

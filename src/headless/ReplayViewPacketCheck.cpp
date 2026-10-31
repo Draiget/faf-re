@@ -1,0 +1,347 @@
+#include "headless/ReplayViewPacketCheck.h"
+
+#include <algorithm>
+#include <cstring>
+#include <vector>
+
+#include "moho/entity/Entity.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/SSTIArmyVariableData.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/unit/core/Unit.h"
+
+// Engine addition, server mode: see ReplayViewPacketCheck.h.
+
+namespace faf::headless
+{
+  namespace
+  {
+    /** 64-bit FNV-1a, field by field. */
+    class CDigest
+    {
+    public:
+      template <typename T>
+      void Add(const T& value) noexcept
+      {
+        static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>);
+        Bytes(&value, sizeof(value));
+      }
+
+      void Bytes(const void* const data, const std::size_t size) noexcept
+      {
+        const auto* const bytes = static_cast<const unsigned char*>(data);
+        for (std::size_t i = 0; i < size; ++i) {
+          mHash ^= bytes[i];
+          mHash *= 0x100000001B3ull;
+        }
+      }
+
+      void Text(const char* const text) noexcept { Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u); }
+
+      [[nodiscard]] std::uint64_t Value() const noexcept { return mHash; }
+
+    private:
+      std::uint64_t mHash = 0xCBF29CE484222325ull;
+    };
+
+    void AddTransform(CDigest& digest, const moho::VTransform& transform) noexcept
+    {
+      digest.Add(transform.orient_.x);
+      digest.Add(transform.orient_.y);
+      digest.Add(transform.orient_.z);
+      digest.Add(transform.orient_.w);
+      digest.Add(transform.pos_.x);
+      digest.Add(transform.pos_.y);
+      digest.Add(transform.pos_.z);
+    }
+
+    void AddEntityBlock(CDigest& digest, const moho::SSTIEntityVariableData& data)
+    {
+      digest.Text(data.mMeshBlueprint != nullptr ? data.mMeshBlueprint->mBlueprintId.c_str() : nullptr);
+      digest.Add(data.mScale.x);
+      digest.Add(data.mScale.y);
+      digest.Add(data.mScale.z);
+      digest.Add(data.mHealth);
+      digest.Add(data.mMaxHealth);
+      digest.Add(data.mIsBeingBuilt);
+      digest.Add(data.mIsDead);
+      digest.Add(data.mRequestRefreshUI);
+      digest.Add(data.mDestroyedByKill);
+      AddTransform(digest, data.mCurTransform);
+      AddTransform(digest, data.mLastTransform);
+      digest.Add(data.mCurImpactValue);
+      digest.Add(data.mFractionComplete);
+      digest.Add(data.mAttachmentParentRef);
+      digest.Add(static_cast<std::uint32_t>(data.mAuxValueVector.size()));
+      for (const moho::SSTIEntityAttachInfo& child : data.mAuxValueVector) {
+        digest.Add(child.mAttachedEntityId);
+      }
+      digest.Add(data.mScrollBeatStart);
+      digest.Add(data.mScrollBeatEnd);
+      digest.Add(data.mVisibilityHidden);
+      digest.Add(data.mVisibilityMode);
+      digest.Add(data.mLayerMask);
+      digest.Add(data.mUsingAltFootprint);
+      digest.Add(data.mUsingAltFootprintSecondary);
+      digest.Add(data.mIntelAttributes.GetRange(moho::ENTATTR_Vision));
+    }
+
+    void AddUnitBlock(CDigest& digest, const moho::SSTIUnitVariableData& data, const std::int32_t reconFlags)
+    {
+      digest.Add(reconFlags);
+      digest.Add(data.mCreator);
+      digest.Add(data.mAutoMode);
+      digest.Add(data.mIsBusy);
+      digest.Add(data.mFuelRatio);
+      digest.Add(data.mShieldRatio);
+      digest.Add(data.mStunTicks);
+      digest.Add(data.mIsPaused);
+      digest.Add(data.mJobType);
+      digest.Add(data.mFireState);
+      digest.Add(data.mWorkProgress);
+      digest.Add(data.mTacticalSiloBuildCount);
+      digest.Add(data.mNukeSiloBuildCount);
+      digest.Add(data.mTacticalSiloStorageCount);
+      digest.Add(data.mNukeSiloStorageCount);
+      digest.Add(data.mFocusUnit);
+      digest.Add(data.mGuardedUnit);
+      digest.Add(data.mTargetBlip);
+      digest.Add(data.mScriptbits);
+      digest.Add(data.mUnitStates);
+      digest.Add(data.mDidRefresh);
+      digest.Add(static_cast<std::uint32_t>(data.mCommands.size()));
+      for (const moho::CmdId command : data.mCommands) {
+        digest.Add(command);
+      }
+      digest.Add(static_cast<std::uint32_t>(data.mBuildQueue.size()));
+      for (const moho::CmdId command : data.mBuildQueue) {
+        digest.Add(command);
+      }
+    }
+
+    /**
+     * The army lane: every army's public fields and `mIsAlly`, plus the fields only the focus
+     * army's own client reads (remote/ViewPackets.cpp, `ArmyRecordForView`) for `viewArmy` alone.
+     */
+    [[nodiscard]] std::uint64_t ArmiesDigest(const msvc8::vector<moho::SSTIArmyVariableData>& armies, const std::int32_t viewArmy)
+    {
+      CDigest digest;
+      const auto count = static_cast<std::uint32_t>(armies.size());
+      digest.Add(count);
+      for (std::uint32_t index = 0; index < count; ++index) {
+        const moho::SSTIArmyVariableData& army = armies[index];
+        for (std::uint32_t other = 0; other < count; ++other) {
+          digest.Add(static_cast<std::uint8_t>(
+            (army.mNeutrals.Contains(other) ? 1u : 0u) | (army.mAllies.Contains(other) ? 2u : 0u)
+            | (army.mEnemies.Contains(other) ? 4u : 0u) | (army.mValidCommandSources.Contains(other) ? 8u : 0u)
+          ));
+        }
+        digest.Add(army.mIsAlly);
+        digest.Add(army.mPlayerColorBgra);
+        digest.Add(army.mArmyColorBgra);
+        digest.Text(army.mArmyType.c_str());
+        digest.Add(army.mFaction);
+        digest.Add(army.mShowScore);
+        digest.Add(army.mIsOutOfGame);
+        digest.Add(army.mHandicapValue);
+        digest.Add(army.mHandicapExtra);
+        if (static_cast<std::int32_t>(index) == viewArmy) {
+          digest.Add(army.mEconomyTotals.mStored.ENERGY);
+          digest.Add(army.mEconomyTotals.mStored.MASS);
+          digest.Add(army.mEconomyTotals.mIncome.ENERGY);
+          digest.Add(army.mEconomyTotals.mIncome.MASS);
+          digest.Add(army.mIsResourceSharingEnabled);
+          digest.Add(army.mUseWholeMap);
+          digest.Add(army.mArmyStart.x);
+          digest.Add(army.mArmyStart.y);
+          digest.Add(army.mNoRushTimer);
+          digest.Add(army.mNoRushRadius);
+          digest.Add(army.mNoRushOffset.x);
+          digest.Add(army.mNoRushOffset.y);
+          digest.Add(static_cast<std::uint32_t>(army.mWordVectorWithMeta.mWords.size()));
+        }
+      }
+      return digest.Value();
+    }
+
+    template <class TRecord>
+    [[nodiscard]] std::vector<const TRecord*> ById(const msvc8::vector<TRecord>& records)
+    {
+      std::vector<const TRecord*> sorted;
+      sorted.reserve(records.size());
+      for (const TRecord& record : records) {
+        sorted.push_back(&record);
+      }
+      std::sort(sorted.begin(), sorted.end(), [](const TRecord* const lhs, const TRecord* const rhs) {
+        return static_cast<std::uint32_t>(lhs->mEntityId) < static_cast<std::uint32_t>(rhs->mEntityId);
+      });
+      return sorted;
+    }
+
+    [[nodiscard]] std::uint64_t IdsDigest(const msvc8::vector<moho::EntId>& ids)
+    {
+      std::vector<std::uint32_t> sorted;
+      for (const moho::EntId id : ids) {
+        sorted.push_back(static_cast<std::uint32_t>(id));
+      }
+      std::sort(sorted.begin(), sorted.end());
+      CDigest digest;
+      for (const std::uint32_t id : sorted) {
+        digest.Add(id);
+      }
+      return digest.Value();
+    }
+  } // namespace
+
+  CReplayViewPacketCheck::CReplayViewPacketCheck(
+    const std::int32_t army, const std::string& path, const std::string& entriesPath
+  )
+    : mArmy(army)
+    , mWantEntries(!entriesPath.empty())
+  {
+    if (fopen_s(&mFile, path.c_str(), "w") != 0) {
+      mFile = nullptr;
+    }
+    if (mWantEntries && fopen_s(&mEntries, entriesPath.c_str(), "w") != 0) {
+      mEntries = nullptr;
+    }
+  }
+
+  CReplayViewPacketCheck::~CReplayViewPacketCheck()
+  {
+    Uninstall();
+    if (mFile != nullptr) {
+      std::fclose(mFile);
+    }
+    if (mEntries != nullptr) {
+      std::fclose(mEntries);
+    }
+  }
+
+  void CReplayViewPacketCheck::Install()
+  {
+    moho::Sim::SetSyncObserver(this);
+  }
+
+  void CReplayViewPacketCheck::Uninstall()
+  {
+    moho::Sim::SetSyncObserver(nullptr);
+  }
+
+  void CReplayViewPacketCheck::OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
+  {
+    if (sim.mSyncFilter.focusArmy == -1) {
+      remote::CViewPackets::OnBeatChanges(sim, packet); // rebuilds, then OnViewPackets
+      return;
+    }
+    if (sim.mSyncFilter.focusArmy == mArmy) {
+      WriteDigest(sim.mCurBeat, packet, false);
+    }
+  }
+
+  void CReplayViewPacketCheck::OnViewPackets(moho::Sim& sim)
+  {
+    if (mArmy >= 0 && mArmy < ArmyCount()) {
+      WriteDigest(sim.mCurBeat, Packet(mArmy), true);
+    }
+  }
+
+  void CReplayViewPacketCheck::WriteDigest(const std::uint32_t beat, const moho::SSyncData& packet, const bool rebuilt)
+  {
+    if (mFile == nullptr) {
+      return;
+    }
+    mRebuilt = rebuilt;
+    ++mBeats;
+
+    // Each record goes into its lane's digest and, with an entries file, into a digest of its own.
+    const auto entry = [&](const char lane, const moho::EntId id, const auto& addRecord) {
+      if (mEntries != nullptr) {
+        CDigest own;
+        addRecord(own);
+        std::fprintf(
+          mEntries, "%u %c %08x %016llx\n", beat, lane, static_cast<std::uint32_t>(id),
+          static_cast<unsigned long long>(own.Value())
+        );
+      }
+    };
+
+    CDigest creates;
+    for (const moho::SCreateEntityParams* const params : ById(packet.mNewEntities)) {
+      const auto add = [params](CDigest& digest) {
+        digest.Add(params->mEntityId);
+        digest.Text(params->mBlueprint != nullptr ? params->mBlueprint->mBlueprintId.c_str() : nullptr);
+        digest.Add(params->mTickCreated);
+      };
+      add(creates);
+      entry('c', params->mEntityId, add);
+    }
+    CDigest unitCreates;
+    for (const moho::SCreateUnitParams* const params : ById(packet.mNewUnits)) {
+      const auto add = [params](CDigest& digest) {
+        digest.Add(params->mEntityId);
+        digest.Text(params->mBlueprint != nullptr ? params->mBlueprint->mBlueprintId.c_str() : nullptr);
+        digest.Add(params->mTickCreated);
+        digest.Add(params->mConstDat.mBuildStateTag);
+        digest.Add(params->mConstDat.mFake);
+        digest.Add(params->mConstDat.mStatsRoot ? 1 : 0);
+      };
+      add(unitCreates);
+      entry('u', params->mEntityId, add);
+    }
+    CDigest entities;
+    for (const moho::SEntityVariableUpdateEntry* const update : ById(packet.mEntityUpdates)) {
+      const auto add = [update](CDigest& digest) {
+        digest.Add(update->mEntityId);
+        AddEntityBlock(digest, update->mVariableData);
+      };
+      add(entities);
+      entry('e', update->mEntityId, add);
+    }
+    CDigest units;
+    for (const moho::SUnitVariableUpdateEntry* const update : ById(packet.mUnitUpdates)) {
+      const auto add = [update](CDigest& digest) {
+        digest.Add(update->mEntityId);
+        AddUnitBlock(digest, update->mVariableData, update->mReconFlags);
+      };
+      add(units);
+      entry('n', update->mEntityId, add);
+    }
+    // In id order, as their lane digests take them (`IdsDigest`).
+    const auto idEntries = [&](const char lane, const msvc8::vector<moho::EntId>& ids) {
+      std::vector<std::uint32_t> sorted;
+      for (const moho::EntId id : ids) {
+        sorted.push_back(static_cast<std::uint32_t>(id));
+      }
+      std::sort(sorted.begin(), sorted.end());
+      for (const std::uint32_t id : sorted) {
+        entry(lane, static_cast<moho::EntId>(id), [id](CDigest& digest) { digest.Add(id); });
+      }
+    };
+    idEntries('d', packet.mDeleteIds);
+    idEntries('x', packet.mEraseIds);
+
+    std::fprintf(
+      mFile, "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx %016llx\n", beat,
+      static_cast<std::size_t>(packet.mNewEntities.size()), static_cast<std::size_t>(packet.mNewUnits.size()),
+      static_cast<std::size_t>(packet.mEntityUpdates.size()), static_cast<std::size_t>(packet.mUnitUpdates.size()),
+      static_cast<std::size_t>(packet.mDeleteIds.size()), static_cast<std::size_t>(packet.mEraseIds.size()),
+      static_cast<unsigned long long>(creates.Value()), static_cast<unsigned long long>(unitCreates.Value()),
+      static_cast<unsigned long long>(entities.Value()), static_cast<unsigned long long>(units.Value()),
+      static_cast<unsigned long long>(IdsDigest(packet.mDeleteIds)),
+      static_cast<unsigned long long>(IdsDigest(packet.mEraseIds)),
+      static_cast<unsigned long long>(ArmiesDigest(packet.mArmyUpdates, mArmy))
+    );
+  }
+
+  std::string CReplayViewPacketCheck::Summary() const
+  {
+    char text[160];
+    std::snprintf(
+      text, sizeof(text), "view-packets: army %d, %llu beats written (%s)", mArmy,
+      static_cast<unsigned long long>(mBeats), mRebuilt ? "rebuilt from the change set" : "the sim's own packet"
+    );
+    return text;
+  }
+} // namespace faf::headless

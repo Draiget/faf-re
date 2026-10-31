@@ -10,8 +10,14 @@ set(FAF_REMOTE_SOURCES
   remote/FrameBuilder.cpp
   remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
+  remote/VisibilityOracle.cpp
+  remote/SpatialOracle.cpp
+  remote/BeatChangeSet.cpp
+  remote/ViewPackets.cpp
+  remote/ViewFrames.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
+  remote/wire/IntelGridDelta.cpp
   remote/wire/NameTable.cpp
   remote/wire/OrdinalTable.cpp
   remote/wire/Quantize.cpp
@@ -25,6 +31,7 @@ set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/BeatClock.cpp
   remote/client/LoopbackCommands.cpp
   remote/client/LoopbackLink.cpp
+  remote/client/OracleGolden.cpp
   remote/client/RemoteClientManager.cpp
   remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp
