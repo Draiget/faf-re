@@ -53,11 +53,13 @@ cmake --preset clang-x64-release; cmake --build --preset clang-x64-release   # b
 cmake --preset clang-x86-release; cmake --build --preset clang-x86-release   # build/clang-x86-release/src/main.exe
 ```
 
-Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers, FFmpeg 7.1.3), then boost 1.34.1, wxWidgets 2.4.2, DXC, libjuice 1.7.4 and libdatachannel 0.24.6 with usrsctp, plog and Mbed TLS 3.6.7, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. A missing submodule is cloned, a missing download is fetched, and everything is compiled from source. The DirectX SDK (June 2010) is used when installed; otherwise its headers and libraries are extracted from Microsoft's installer. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers, FFmpeg 7.1.3), then boost 1.34.1, wxWidgets 2.4.2, DXC, libjuice 1.7.4, libdatachannel 0.24.6 with usrsctp, plog and Mbed TLS 3.6.7, and Monocypher 4.0.2, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. A missing submodule is cloned, a missing download is fetched, and everything is compiled from source. The DirectX SDK (June 2010) is used when installed; otherwise its headers and libraries are extracted from Microsoft's installer. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
 
 **IDEs.** Visual Studio 2022: File → Open → Folder, then pick a preset. VS Code: install the recommended extensions (CMake Tools, C/C++); CMake Tools offers the same presets, and IntelliSense reads the configured preset.
 
 FFmpeg 7.1.3 (the SFD movie player's decoder) is compiled from source with the engine: `dependencies/ffmpeg` is the unmodified FFmpeg release plus a CMake build ([Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror)), and its libraries are linked statically, so there are no FFmpeg DLLs and no prebuilt binaries. Its configuration and licence (LGPL v2.1+): [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build).
+
+Monocypher 4.0.2 (BSD-2-Clause or CC0, at the user's choice) encrypts and authenticates the net channel's datagrams: [net channel](docs/NET_CHANNEL.md).
 
 ### Profiling with Tracy
 

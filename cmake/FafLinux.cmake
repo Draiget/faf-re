@@ -66,6 +66,15 @@ set(FAF_LINUX_MS_DIALECT -fms-extensions -fms-volatile)
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/wildmagic" "${CMAKE_BINARY_DIR}/deps/wildmagic")
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/deps/zlib")
 
+# The net channel (src/remote/net, plan WP10) and its one download, Monocypher, pinned in
+# cmake/FafDependencies.cmake; the Windows-only dependencies there are skipped.
+set(FAF_DEPENDENCIES_ONLY monocypher)
+include(FafDependencies)
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
+add_executable(faf_netchannel_tests "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
+target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel)
+
 # --- faf_sim ----------------------------------------------------------------------------
 # The simulation's translation units (src/sim_sources.cmake), in the engine's
 # order, as an object library: every object is linked, so every static

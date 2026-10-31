@@ -9,6 +9,9 @@
 
 include(sources.cmake)
 
+# The net channel, a library of its own (no engine dependency, see its CMakeLists).
+add_subdirectory(remote/net)
+
 if(FAF_TARGET_ARCH STREQUAL "x64")
   set(_faf_default_name main_x64)
 else()
