@@ -14,6 +14,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "NetConVars.h"
 #include "NetMessageRanges.h"
+#include "NetPeerTransport.h"
 using namespace moho;
 
 namespace
@@ -1380,7 +1381,11 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
 
   const auto payloadLen = static_cast<int>(packet->GetPayloadSize());
   const auto payload = static_cast<const char*>(packet->GetPayload());
-  sendto(mConnector->socket_, payload, payloadLen, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+  // Engine addition (issue #232): an in-process transport for this address.
+  if (!NET_PeerTransportsActive() ||
+      !NET_SendThroughPeerTransport(mConnector, mAddr, mPort, payload, static_cast<std::size_t>(payloadLen))) {
+    sendto(mConnector->socket_, payload, payloadLen, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+  }
 
   const int64_t nowUs = mConnector->GetTime();
   mConnector->LogPacket(0, nowUs, mAddr, mPort, payload, payloadLen);

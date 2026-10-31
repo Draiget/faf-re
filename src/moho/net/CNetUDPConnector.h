@@ -141,6 +141,12 @@ namespace moho
     CNetUDPConnection* Connect(u_long address, u_short port) override;
 
     /**
+     * Engine addition (issue #232): wakes this connector's thread for
+     * datagrams queued by an in-process transport (NetPeerTransport.h).
+     */
+    void SignalPeerTransportDelivery() noexcept;
+
+    /**
      * Address: 0x0048B410
      * Address: 0x10084DD0 (sub_10084DD0)
      * Slot: 5
@@ -234,6 +240,11 @@ namespace moho
      * Receives and dispatches UDP packets, recycling unconsumed buffers.
      */
     void ReceiveData();
+
+    /**
+     * Engine addition (issue #232): ReceiveData's per-datagram half.
+     */
+    void HandleReceivedDatagram(SNetPacket* packet, int n, uint32_t addrHost, uint16_t portHost);
 
     /**
      * Address: 0x0048AA40 (FUN_0048AA40)

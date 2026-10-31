@@ -9,6 +9,13 @@ target_link_libraries(faf_net_tests PRIVATE faf_engine)
 
 add_test(NAME net_robustness COMMAND faf_net_tests)
 
+# Peer transports of the UDP connector (issue #232): two connectors in one
+# process, over their sockets and through transports.
+add_executable(faf_peer_transport_tests EXCLUDE_FROM_ALL net/PeerTransportTests.cpp)
+target_link_libraries(faf_peer_transport_tests PRIVATE faf_engine)
+
+add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
+
 # libjuice gathering against a STUN/TURN server (issue #228), run by hand:
 #   faf_juice_gather <host> <port> [<turn user> <turn password>]
 add_executable(faf_juice_gather EXCLUDE_FROM_ALL netlink/JuiceGatherTest.cpp)

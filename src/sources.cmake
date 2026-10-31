@@ -183,6 +183,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/FileWaitHandleSet.cpp
   moho/net/Common.cpp
   moho/net/NetConVars.cpp
+  moho/net/NetPeerTransport.cpp
   moho/net/IClient.cpp
   moho/net/IMessageReceiver.cpp
   moho/net/INetConnection.cpp
