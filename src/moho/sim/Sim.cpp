@@ -7369,10 +7369,10 @@ void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const 
     nullptr,
     true
   );
-  params.mUseLayerOverride = 0;
+  // 0x00748BE7 clears only the elevation byte (+0x25). mUseLayerOverride stays 1
+  // from the ctor, so the Unit ctor keeps the requested heading instead of
+  // resetting it (or drawing a random yaw for SpawnRandomRotation blueprints).
   params.mFixElevation = 0;
-  params.mLayer = 0;
-  params.mComplete = 1;
 
   (void)CreateUnit(params, true);
 }
@@ -8474,7 +8474,8 @@ namespace
 {
   constexpr std::uint64_t kInt64SignBitMask = 0x8000000000000000ull;
   constexpr std::uint64_t kInt64MagnitudeMask = 0x7FFFFFFFFFFFFFFFull;
-  constexpr double kSignedInt64HighBitContribution = -9223372036854775808.0;
+  // 0x0064BA94..0x0064BAA4: fild of the sign-bit-only qword, then fchs: +2^63.
+  constexpr double kSignedInt64HighBitContribution = 9223372036854775808.0;
 
   [[nodiscard]] float ConvertSignedStorageLaneToFloat(const std::uint64_t lane) noexcept
   {
@@ -8540,12 +8541,12 @@ int Sim::BlingBling(
   storage->mAmt.mass += 10000.0f;
   (void)storage->Chng(1);
 
+  // 0x0064BC79..0x0064BC96 adds into economy-info +0x08 (this tick's banked
+  // resources), not the stored totals; the next economy tick moves it into storage.
   SEconPair grantedStorage{};
   (void)BuildSignedMaxStorageFloatPair(&grantedStorage, economyInfo->economy);
-  economyInfo->economy.mStored.ENERGY += grantedStorage.ENERGY;
-  economyInfo->economy.mStored.MASS += grantedStorage.MASS;
-  focusArmy->mVarDat.mEconomyTotals.mStored.ENERGY = economyInfo->economy.mStored.ENERGY;
-  focusArmy->mVarDat.mEconomyTotals.mStored.MASS = economyInfo->economy.mStored.MASS;
+  economyInfo->mResources.ENERGY += grantedStorage.ENERGY;
+  economyInfo->mResources.MASS += grantedStorage.MASS;
 
   return 0;
 }
