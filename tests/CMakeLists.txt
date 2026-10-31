@@ -26,6 +26,15 @@ target_link_libraries(faf_juice_gather PRIVATE faf_juice faf_codegen)
 add_executable(faf_netlink_tests EXCLUDE_FROM_ALL netlink/NetlinkTests.cpp)
 target_link_libraries(faf_netlink_tests PRIVATE faf_netlink faf_codegen)
 
+# libdatachannel (issue #238): two local peers open an unordered, unreliable
+# data channel and echo datagrams. --bind <address> as above.
+add_executable(faf_datachannel_test EXCLUDE_FROM_ALL netlink/DataChannelTest.cpp)
+target_link_libraries(faf_datachannel_test PRIVATE faf_datachannel faf_codegen)
+set_target_properties(faf_datachannel_test PROPERTIES CXX_STANDARD 17)
+if(MSVC)
+  target_compile_options(faf_datachannel_test PRIVATE /EHsc)
+endif()
+
 add_executable(faf_profiler_tests EXCLUDE_FROM_ALL profiling/ProfilerFacadeTests.cpp)
 target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

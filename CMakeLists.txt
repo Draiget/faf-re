@@ -100,6 +100,7 @@ option(FAF_SERVER_MODE "Build the client side of server-authoritative sessions (
 add_subdirectory(cmake/deps/wxwindows)
 add_subdirectory(cmake/deps/wildmagic)
 add_subdirectory(cmake/deps/libjuice)
+add_subdirectory(cmake/deps/libdatachannel)
 if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()

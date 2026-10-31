@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, libjuice): pinned by SHA256, cached in
+#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -187,6 +187,30 @@ set(_faf_download_libjuice
     "95c088862aa1b88b73d62aa99577135010eb768fcafb252d13aa85a8515ef798"
     "libjuice-1.7.4"
     "libjuice-1.7.4.tar.gz")
+# libdatachannel (MPL-2.0) and what it needs for WebRTC data channels (issue
+# #238): usrsctp (BSD-3-Clause) and plog (MIT) at the commits libdatachannel
+# 0.24.6 pins as submodules, Mbed TLS 3.6 LTS (Apache-2.0) for DTLS. Its
+# libjuice submodule is the v1.7.4 tag above, so it uses faf_juice.
+# cmake/deps/libdatachannel builds them.
+set(_faf_download_libdatachannel
+    "https://github.com/paullouisageneau/libdatachannel/archive/refs/tags/v0.24.6.tar.gz"
+    "22a66aebebd8dae561d8e5181da96f2fcc203e067c5b2186c07b39af913464c0"
+    "libdatachannel-0.24.6"
+    "libdatachannel-0.24.6.tar.gz")
+set(_faf_download_usrsctp
+    "https://github.com/sctplab/usrsctp/archive/fec583d54493f879d2ae44a743423bf8a04371ab.tar.gz"
+    "e5c114afe73c9a0ec419fab5f5b3f63f3ce57b09b90d06ea85e63dca8aed3e7c"
+    "usrsctp-fec583d54493f879d2ae44a743423bf8a04371ab"
+    "usrsctp-fec583d5.tar.gz")
+set(_faf_download_plog
+    "https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz"
+    "92a08bce559b5f28aa88d3fd9071567414b9f43a83fe2a05a6dd14f1da536072"
+    "plog-94899e0b926ac1b0f4750bfbd495167b4a6ae9ef"
+    "plog-94899e0b.tar.gz")
+set(_faf_download_mbedtls
+    "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2"
+    "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6"
+    "mbedtls-3.6.7")
 set(_faf_download_dxc
     "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip"
     "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1"
@@ -354,6 +378,10 @@ faf_dependency_download(boost_1_34_1)
 faf_dependency_download(wxWindows-2.4.2)
 faf_dependency_download(dxc)
 faf_dependency_download(libjuice)
+faf_dependency_download(libdatachannel)
+faf_dependency_download(usrsctp)
+faf_dependency_download(plog)
+faf_dependency_download(mbedtls)
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)
