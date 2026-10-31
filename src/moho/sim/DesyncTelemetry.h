@@ -22,6 +22,13 @@ namespace moho
   /// Ingest token sent as `Authorization: Bearer <token>` when set (`/telemetrytoken T`).
   extern msvc8::string telemetry_Token;
 
+  /**
+   * Where the recorder's dump goes, as a `.tar.gz` POSTed to this URL as given
+   * (`/telemetrydumpendpoint URL`). Empty uploads nothing. Unlike the records, the dump holds
+   * player names and the sync log; the token and user folder names are masked (`TELEMETRY_Scrub`).
+   */
+  extern msvc8::string telemetry_DumpEndpoint;
+
   /// One log record's attributes, built as OTLP JSON (`{"key": ..., "value": {...}}` items).
   class CTelemetryAttributes
   {
@@ -51,6 +58,19 @@ namespace moho
 
   /// Whether records are sent: `telemetry_Enabled` with an endpoint set.
   [[nodiscard]] bool TELEMETRY_IsOn();
+
+  /// Whether dumps are uploaded: records are sent and `telemetry_DumpEndpoint` is set.
+  [[nodiscard]] bool TELEMETRY_DumpUploadOn();
+
+  /**
+   * Queues the file at `path` (a packed dump) for upload to `telemetry_DumpEndpoint`, through
+   * the same outbox and attempts as a record. The file is deleted once it is sent or dropped.
+   */
+  void TELEMETRY_SendFile(const std::string& path);
+
+  /// Masks what a dump must not carry off the machine: the ingest token, and the user's folder
+  /// name in `...\Users\<name>\...` and `/home/<name>/` paths.
+  void TELEMETRY_Scrub(std::string& text);
 
   /**
    * Queues one log record (`eventName`, OTLP severity number and text, attributes) for the

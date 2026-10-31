@@ -6,7 +6,9 @@ Compares the desync dumps that players' games wrote for one game and prints the 
 python tools\desync-diff\desync_diff.py desync_11204007_beat300_army0.zip desync_11204007_beat300_army1.zip
 ```
 
-With more than two dumps, the first is A and each other is compared with it.
+With more than two dumps, the first is A and each other is compared with it. A dump can also be the `.tar.gz` copy the engine uploads to `telemetry_DumpEndpoint` ([docs/SWITCHES.md](../../docs/SWITCHES.md#desync-telemetry)); it holds the same files.
+
+`receive.py` is a reference receiver for those uploads: `python tools\desync-diff\receive.py --port 4319 --out dumps --token T` stores each one as `dumps\<game id>\<name>.tar.gz` after checking it is a dump, answers 201, and writes `report.txt` from this tool once the game has dumps from two armies.
 
 ## What it prints
 

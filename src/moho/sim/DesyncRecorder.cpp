@@ -167,6 +167,120 @@ namespace moho
       return static_cast<std::uint32_t>(crc32(0uL, static_cast<const Bytef*>(data), static_cast<uInt>(size)));
     }
 
+    /// A ring beat's raw deflate stream back to its text.
+    [[nodiscard]] bool InflateRaw(const std::vector<unsigned char>& deflated, const std::uint32_t rawSize, std::string& out)
+    {
+      out.assign(rawSize, '\0');
+      if (rawSize == 0u) {
+        return true;
+      }
+      z_stream stream;
+      std::memset(&stream, 0, sizeof(stream));
+      if (inflateInit2_(&stream, -MAX_WBITS, ZLIB_VERSION, sizeof(z_stream)) != Z_OK) {
+        return false;
+      }
+      stream.next_in = const_cast<Bytef*>(deflated.data());
+      stream.avail_in = static_cast<uInt>(deflated.size());
+      stream.next_out = reinterpret_cast<Bytef*>(out.data());
+      stream.avail_out = static_cast<uInt>(rawSize);
+      const int status = inflate(&stream, Z_FINISH);
+      const bool whole = status == Z_STREAM_END && stream.total_out == rawSize;
+      (void)inflateEnd(&stream);
+      return whole;
+    }
+
+    /// A .tar.gz written front to back: ustar entries through one gzip stream (the dump upload).
+    class CTarGzOut
+    {
+    public:
+      explicit CTarGzOut(std::FILE* const file)
+        : mFile(file)
+        , mTime(static_cast<std::uint64_t>(std::time(nullptr)))
+      {
+        std::memset(&mStream, 0, sizeof(mStream));
+        mOk = deflateInit2_(
+                &mStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, sizeof(z_stream)
+              )
+          == Z_OK;
+        mInit = mOk;
+      }
+
+      ~CTarGzOut()
+      {
+        if (mInit) {
+          (void)deflateEnd(&mStream);
+        }
+      }
+
+      CTarGzOut(const CTarGzOut&) = delete;
+      CTarGzOut& operator=(const CTarGzOut&) = delete;
+
+      void Add(const std::string& name, const std::string& data)
+      {
+        char header[512] = {};
+        std::memcpy(header, name.data(), std::min<std::size_t>(name.size(), 99u));
+        std::memcpy(header + 100, "0000644", 7u);
+        std::memcpy(header + 108, "0000000", 7u);
+        std::memcpy(header + 116, "0000000", 7u);
+        std::snprintf(header + 124, 12u, "%011llo", static_cast<unsigned long long>(data.size()));
+        std::snprintf(header + 136, 12u, "%011llo", static_cast<unsigned long long>(mTime));
+        std::memset(header + 148, ' ', 8u); // the checksum counts its own field as spaces
+        header[156] = '0';
+        std::memcpy(header + 257, "ustar", 6u);
+        std::memcpy(header + 263, "00", 2u);
+        unsigned checksum = 0;
+        for (const char c : header) {
+          checksum += static_cast<unsigned char>(c);
+        }
+        std::snprintf(header + 148, 8u, "%06o", checksum);
+        header[155] = ' ';
+        Write(header, sizeof(header));
+        Write(data.data(), data.size());
+        static const char kZeros[512] = {};
+        Write(kZeros, (512u - data.size() % 512u) % 512u);
+      }
+
+      /// Two empty blocks end the archive; false when compression or a write failed.
+      [[nodiscard]] bool Finish()
+      {
+        static const char kZeros[1024] = {};
+        Write(kZeros, sizeof(kZeros));
+        Write(nullptr, 0u, Z_FINISH);
+        return mOk;
+      }
+
+    private:
+      void Write(const void* const data, const std::size_t size, const int flush = Z_NO_FLUSH)
+      {
+        if (!mOk) {
+          return;
+        }
+        mStream.next_in = static_cast<Bytef*>(const_cast<void*>(data));
+        mStream.avail_in = static_cast<uInt>(size);
+        unsigned char chunk[64 * 1024];
+        do {
+          mStream.next_out = chunk;
+          mStream.avail_out = sizeof(chunk);
+          const int status = deflate(&mStream, flush);
+          if (status == Z_STREAM_ERROR) {
+            mOk = false;
+            return;
+          }
+          const std::size_t produced = sizeof(chunk) - mStream.avail_out;
+          if (produced != 0u && std::fwrite(chunk, 1u, produced, mFile) != produced) {
+            mOk = false;
+            return;
+          }
+        } while (mStream.avail_out == 0u || (flush == Z_FINISH && mStream.avail_in != 0u));
+      }
+
+      std::FILE* mFile;
+      std::uint64_t mTime;
+      z_stream mStream;
+      bool mInit = false;
+      bool mOk = false;
+    };
+
     /// A zip archive written front to back; the last entry can be rewritten in place later.
     class CZipOut
     {
@@ -554,9 +668,10 @@ namespace moho
     }
 
     /// Recorder thread: writes the zip. `notes.txt` goes last so a later note can rewrite it alone.
+    /// `upload`: the same files also go into `<dump>.tar.gz`, queued for telemetry_DumpEndpoint.
     void WriteDump(
-      const std::string& path, const std::string& header, const std::string& hashes, const std::string& state,
-      const std::string& recentLog
+      const std::string& path, std::string header, const std::string& hashes, const std::string& state,
+      std::string recentLog, const bool upload
     )
     {
       std::FILE* const file = std::fopen(path.c_str(), "wb");
@@ -564,6 +679,11 @@ namespace moho
         gpg::Warnf("Desync recorder: can't create %s", path.c_str());
         return;
       }
+      std::string environment = CaptureFileText(&gpg::diag::WriteEnvironmentReport);
+      const std::string modules = CaptureFileText(&gpg::diag::WriteModuleList);
+      TELEMETRY_Scrub(header); // the replay path
+      TELEMETRY_Scrub(recentLog);
+      TELEMETRY_Scrub(environment); // the command line, with /telemetrytoken
       mZip = std::make_unique<CZipOut>(file);
       mZip->AddText("header.json", header);
       mZip->AddText("hashes.csv", hashes);
@@ -585,8 +705,8 @@ namespace moho
       mZip->AddText("beats.csv", beats);
       mZip->AddText("state.txt", state);
       mZip->AddText("log.txt", recentLog);
-      mZip->AddText("environment.txt", CaptureFileText(&gpg::diag::WriteEnvironmentReport));
-      mZip->AddText("modules.txt", CaptureFileText(&gpg::diag::WriteModuleList));
+      mZip->AddText("environment.txt", environment);
+      mZip->AddText("modules.txt", modules);
       if (mDroppedBeats != 0u) {
         mNotes.push_back(Printf("%u beats were not recorded (compression failed or the recorder fell behind)", mDroppedBeats));
       }
@@ -595,9 +715,62 @@ namespace moho
       (void)std::fclose(file);
       mZip->SetFile(nullptr);
       mDumpWritten = true;
+      gpg::Logf("Desync recorder: wrote %s (%u bytes)", path.c_str(), size);
+      if (upload) {
+        WriteUpload(path, header, hashes, beats, state, recentLog, environment, modules);
+      }
       mRing.clear();
       mRingBytes = 0;
-      gpg::Logf("Desync recorder: wrote %s (%u bytes)", path.c_str(), size);
+    }
+
+    /// Recorder thread: the zip's files again as `<dump>.tar.gz` (beats inflated back to text),
+    /// handed to the telemetry sender. Notes added after this stay in the zip only.
+    void WriteUpload(
+      const std::string& zipPath, const std::string& header, const std::string& hashes, const std::string& beats,
+      const std::string& state, const std::string& recentLog, const std::string& environment, const std::string& modules
+    )
+    {
+      const std::string path = std::filesystem::path(zipPath).replace_extension(".tar.gz").string();
+      std::FILE* const file = std::fopen(path.c_str(), "wb");
+      if (file == nullptr) {
+        gpg::Warnf("Desync recorder: can't create %s", path.c_str());
+        return;
+      }
+      bool written = false;
+      {
+        CTarGzOut tar(file);
+        tar.Add("header.json", header);
+        tar.Add("hashes.csv", hashes);
+        std::string text;
+        const auto addBeat = [&tar, &text](const SBeatRecord& record) {
+          if (InflateRaw(record.mDeflated, record.mRawSize, text)) {
+            tar.Add(Printf("beats/beat%05d.log", record.mBeat), text);
+          }
+        };
+        if (mHaveBeatZero) {
+          addBeat(mBeatZero);
+        }
+        for (const SBeatRecord& record : mRing) {
+          addBeat(record);
+        }
+        tar.Add("beats.csv", beats);
+        tar.Add("state.txt", state);
+        tar.Add("log.txt", recentLog);
+        tar.Add("environment.txt", environment);
+        tar.Add("modules.txt", modules);
+        tar.Add("notes.txt", NotesText());
+        written = tar.Finish();
+      }
+      const bool closed = std::fclose(file) == 0;
+      std::error_code error;
+      if (!written || !closed) {
+        std::filesystem::remove(path, error);
+        gpg::Warnf("Desync recorder: can't write %s", path.c_str());
+        return;
+      }
+      gpg::Logf("Desync recorder: wrote %s (%u bytes) for upload", path.c_str(),
+                static_cast<unsigned>(std::filesystem::file_size(path, error)));
+      TELEMETRY_SendFile(path);
     }
 
     /// Recorder thread: one more note; once the zip exists, its notes entry is rewritten.
@@ -1056,8 +1229,9 @@ namespace moho
     SIM_DescribeStateForDesync(sim, state);
     const std::string recentLog = gpg::GetRecentLogLines().c_str();
 
+    const bool upload = TelemetryApplies() && TELEMETRY_DumpUploadOn();
     impl.Post([&impl, path = impl.mDumpPath, header = std::move(header), hashes = std::move(hashes),
-               state = std::move(state), recentLog] { impl.WriteDump(path, header, hashes, state, recentLog); });
+               state = std::move(state), recentLog, upload] { impl.WriteDump(path, header, hashes, state, recentLog, upload); });
     SendDesyncTelemetry(sim);
   }
 
@@ -1071,10 +1245,12 @@ namespace moho
   {
     const Impl& impl = *mImpl;
     std::string mapName;
+    std::string gameMods;
     std::string defaults;
     {
       std::lock_guard<std::mutex> lock(sSharedMutex);
       mapName = sMapName;
+      gameMods = sGameMods;
       defaults = sSwitchDefaults;
     }
     out.Add("faf.game.id", FafGameIdFromCommandLine());
@@ -1085,6 +1261,12 @@ namespace moho
     std::string mapFolder = slash == std::string::npos ? mapName : mapName.substr(slash + 6u);
     mapFolder = mapFolder.substr(0, mapFolder.find('/'));
     out.Add("faf.map", mapFolder);
+    // As the dump header's game_mods_md5: the launch info's serialized mods table, hashed.
+    gpg::MD5Context modsHash{};
+    modsHash.Reset();
+    modsHash.Update(gameMods.data(), gameMods.size());
+    out.Add("faf.game.mods_md5", std::string(modsHash.Digest().ToString().c_str()));
+    out.Add("faf.checksum_period", static_cast<std::int64_t>(SIM_GetChecksumPeriod(sim)));
     out.Add("faf.players", static_cast<std::int64_t>(sim.mCommandSources.size()));
     out.Add("faf.army.local", static_cast<std::int64_t>(sim.mSyncFilter.focusArmy));
     out.Add("faf.sim.workers", static_cast<std::int64_t>(impl.mBeatWorkers));
@@ -1189,13 +1371,17 @@ namespace moho
     }
 
     // Sent from the recorder's thread after the dump is written, so its size is known.
-    impl.Post([records = std::move(records), path = impl.mDumpPath]() mutable {
+    const bool upload = impl.mKeepText && TELEMETRY_DumpUploadOn();
+    impl.Post([records = std::move(records), path = impl.mDumpPath, upload]() mutable {
       std::error_code error;
       const std::uintmax_t size = path.empty() ? 0u : std::filesystem::file_size(path, error);
       for (CTelemetryAttributes& record : records) {
         if (!path.empty() && !error) {
           record.Add("faf.dump.file", std::filesystem::path(path).filename().string());
           record.Add("faf.dump.bytes", static_cast<std::int64_t>(size));
+          if (upload) { // the name the dump endpoint gets in X-FAF-Dump
+            record.Add("faf.dump.upload", std::filesystem::path(path).replace_extension(".tar.gz").filename().string());
+          }
         }
         TELEMETRY_Send("faf.desync", 13, "WARN", record);
       }
