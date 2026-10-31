@@ -368,16 +368,21 @@ namespace moho
         {
           std::lock_guard<std::mutex> lock(mMutex);
           mIncoming.push_back(std::move(body));
+          mAbandoned = false;
           StartLocked();
         }
         mSignal.notify_one();
       }
 
-      /// Waits until every queued record had its attempt, or `timeout` passed.
+      /// Waits until every queued record had its attempt, or `timeout` passed. On a timeout the
+      /// process may exit next: the sender stops posting, writing and logging until the next record
+      /// (the outbox file already holds everything, see `Attempt`).
       void WaitIdle(const std::chrono::milliseconds timeout)
       {
         std::unique_lock<std::mutex> lock(mMutex);
-        (void)mIdle.wait_for(lock, timeout, [this] { return !mStarted || (mIncoming.empty() && !mWorking && !mRetryOutbox); });
+        if (!mIdle.wait_for(lock, timeout, [this] { return !mStarted || (mIncoming.empty() && !mWorking && !mRetryOutbox); })) {
+          mAbandoned = true;
+        }
       }
 
       void RetryOutbox()
@@ -385,6 +390,7 @@ namespace moho
         {
           std::lock_guard<std::mutex> lock(mMutex);
           mRetryOutbox = true;
+          mAbandoned = false;
           StartLocked();
         }
         mSignal.notify_one();
@@ -453,8 +459,11 @@ namespace moho
         const std::string url = telemetry_Endpoint.c_str();
         const std::string token = telemetry_Token.c_str();
         if (!ParseEndpoint(url, endpoint)) {
-          gpg::Warnf("Telemetry: endpoint \"%s\" is not http(s)://host[:port][/path]; %u record(s) kept", url.c_str(),
-                     static_cast<unsigned>(outbox.size()));
+          const std::lock_guard<std::mutex> lock(mMutex);
+          if (!mAbandoned) {
+            gpg::Warnf("Telemetry: endpoint \"%s\" is not http(s)://host[:port][/path]; %u record(s) kept", url.c_str(),
+                       static_cast<unsigned>(outbox.size()));
+          }
           return;
         }
         std::vector<SOutboxEntry> kept;
@@ -462,6 +471,10 @@ namespace moho
         unsigned dropped = 0;
         int lastStatus = 0;
         for (SOutboxEntry& entry : outbox) {
+          if (Abandoned()) { // a quit stopped waiting: the rest is not posted now
+            kept.push_back(std::move(entry));
+            continue;
+          }
           const std::string request =
             "{\"resourceLogs\":[{\"resource\":" + ResourceJson() + ",\"scopeLogs\":[" + entry.mBody + "]}]}";
           lastStatus = Post(http, endpoint, token, request);
@@ -476,11 +489,24 @@ namespace moho
           }
         }
         outbox.swap(kept);
+        // Under the lock, so WaitIdle can't time out (and let the process exit) halfway: once a quit
+        // stopped waiting, the log may be torn down (atexit) and the file is left as it was saved
+        // above, with every record in it.
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (mAbandoned) {
+          return;
+        }
         Save(path, outbox);
         gpg::Logf(
           "Telemetry: %u record(s) sent, %u dropped, %u kept for a retry (last HTTP status %d)", sent, dropped,
           static_cast<unsigned>(outbox.size()), lastStatus
         );
+      }
+
+      [[nodiscard]] bool Abandoned()
+      {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        return mAbandoned;
       }
 
       [[nodiscard]] static std::vector<SOutboxEntry> Load(const std::filesystem::path& path)
@@ -515,6 +541,7 @@ namespace moho
       std::condition_variable mIdle;
       std::deque<std::string> mIncoming;
       bool mRetryOutbox = false;
+      bool mAbandoned = false; // WaitIdle timed out; cleared by the next record
       bool mStarted = false;
       bool mWorking = false;
     };

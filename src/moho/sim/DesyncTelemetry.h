@@ -62,7 +62,9 @@ namespace moho
 
   /**
    * Waits up to `timeoutMs` until every queued record had its attempt, so the game-end record is
-   * posted before the process exits. Returns at once when nothing was queued.
+   * posted before the process exits. Returns at once when nothing was queued. On a timeout the
+   * sender stops until the next record: no more posts, outbox writes or log lines while a quit
+   * tears the process down; the outbox file keeps the records for the next start.
    */
   void TELEMETRY_WaitIdle(int timeoutMs);
 

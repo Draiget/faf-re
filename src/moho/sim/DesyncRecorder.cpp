@@ -708,7 +708,7 @@ namespace moho
     const bool telemetry = recorder->TelemetryApplies();
     delete recorder; // waits for the dump; the telemetry records are queued by then
     if (telemetry) {
-      TELEMETRY_WaitIdle(4000); // one attempt each (3 s timeouts) before a quit can end the process
+      TELEMETRY_WaitIdle(4000); // what isn't sent by then stays in the outbox file for the next start
     }
   }
 
