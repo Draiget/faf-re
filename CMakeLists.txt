@@ -126,6 +126,9 @@ if(FAF_ENABLE_TRACY)
   target_compile_definitions(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_DEFINITIONS>)
 endif()
 
+# --- Peer links (issue #229) and the adapter replacement --------------------------------
+add_subdirectory(src/netlink)
+
 # --- Engine -----------------------------------------------------------------------------
 add_subdirectory(src)
 

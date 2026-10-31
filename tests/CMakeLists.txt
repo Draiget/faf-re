@@ -14,6 +14,11 @@ add_test(NAME net_robustness COMMAND faf_net_tests)
 add_executable(faf_juice_gather EXCLUDE_FROM_ALL netlink/JuiceGatherTest.cpp)
 target_link_libraries(faf_juice_gather PRIVATE faf_juice faf_codegen)
 
+# netlink (issue #229): JSON, signalling and SDP checks, then two links in one
+# process. --bind <address> where inbound UDP to 0.0.0.0 is dropped.
+add_executable(faf_netlink_tests EXCLUDE_FROM_ALL netlink/NetlinkTests.cpp)
+target_link_libraries(faf_netlink_tests PRIVATE faf_netlink faf_codegen)
+
 add_executable(faf_profiler_tests EXCLUDE_FROM_ALL profiling/ProfilerFacadeTests.cpp)
 target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

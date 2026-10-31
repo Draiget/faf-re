@@ -1,0 +1,185 @@
+#pragma once
+
+// One peer link that behaves on the wire like a link of FAF's Java ICE adapter
+// (java-ice-adapter 3.3.14, PeerIceModule and PeerConnectivityCheckerModule),
+// on libjuice. docs/LAUNCHER_ADAPTER_CONTRACT.md §5-§6, issue #229.
+//
+//   * ICE with one UDP component; the offerer is the controlling agent.
+//   * No trickle: each side gathers fully and sends one CandidatesMessage.
+//     The answerer answers the offerer's message with its own.
+//   * Datagrams: 'd' + game datagram; 'e' + 8 bytes echo, sent every second by
+//     the offerer and returned unchanged by the answerer.
+//   * Timers and restarts as PeerIceModule: gathering 5 s, no answer 6 s after
+//     sending candidates, ICE checks 15 s, no echo answer 10 s. Only the
+//     offerer starts again: at once after a lost connection, 5 s after a
+//     failed attempt. 1 / 2 attempts in the last 2 minutes drop host / host
+//     and reflexive candidates.
+//
+// Threading: Start, OnSignal, Send, Tick and Close may be called from any
+// thread. libjuice runs its own thread; received game datagrams are handed to
+// onData from it. Every other callback runs inside Tick, which the owner calls
+// at least every 100 ms. Callbacks run without the link's lock held.
+// Engine addition, not recovered code.
+
+#include "netlink/Signal.h"
+
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <vector>
+
+struct juice_agent;
+
+namespace faf::netlink
+{
+  // PeerIceModule's IceState, with the strings it reports through
+  // onIceConnectionStateChanged.
+  enum class LinkState
+  {
+    New,
+    Gathering,
+    AwaitingCandidates,
+    Checking,
+    Connected,
+    Disconnected
+  };
+  const char* LinkStateName(LinkState state);
+
+  struct LinkOptions
+  {
+    std::int64_t localId = 0;
+    std::int64_t remoteId = 0;
+    bool offerer = false;
+    std::vector<IceServer> iceServers;
+    bool forceRelay = false;
+    // Local address for every host candidate; empty binds all interfaces.
+    std::string bindAddress;
+    std::uint16_t portRangeBegin = 0;
+    std::uint16_t portRangeEnd = 0;
+    // Issue #234: our links start their ICE ufrag with this prefix (empty:
+    // libjuice picks ufrag and password, nothing is marked). The Java adapter
+    // reads the ufrag only as an ICE credential. A link whose remote ufrag has
+    // the same prefix sends a probe ('f' datagrams) once connected; a peer
+    // that answers is ours. A Java peer never gets one: its ufrags are lower-
+    // case letters and digits, and kOurUfragPrefix holds a '+'.
+    std::string ufragPrefix;
+    // Issue #235: send every game datagram a second time, this many
+    // milliseconds after the first (0: right after it). -1 (default) is off.
+    // The game drops a repeated DATA packet by its sequence number
+    // (FUN_00486DB0), so the copy only matters when the first is lost.
+    int duplicateGapMs = -1;
+  };
+
+  // The prefix faf-netbridge and the engine use.
+  inline constexpr const char* kOurUfragPrefix = "fnl+";
+
+  struct LinkCallbacks
+  {
+    std::function<void(const CandidatesMessage&)> onSignal; // to the remote peer, via onIceMsg
+    std::function<void(const std::uint8_t*, std::size_t)> onData; // game datagram from the peer
+    std::function<void(LinkState)> onState;
+    std::function<void(bool)> onConnected;
+    std::function<void(const std::string&)> onLog;
+    // Issue #234: the peer answered our probe (once per connection).
+    std::function<void()> onOurPeer;
+  };
+
+  struct LinkStats
+  {
+    std::uint64_t dataSent = 0;
+    std::uint64_t dataReceived = 0;
+    std::uint64_t dataDropped = 0; // Send while not connected
+    std::uint64_t duplicatesSent = 0;
+    std::uint64_t echoesSent = 0;
+    std::uint64_t echoesAnswered = 0;
+    std::uint64_t invalidReceived = 0; // first byte neither 'd' nor 'e'
+    std::uint32_t attempts = 0;
+    double lastRttMs = -1;
+  };
+
+  class Link
+  {
+  public:
+    using Clock = std::chrono::steady_clock;
+
+    Link(LinkOptions options, LinkCallbacks callbacks);
+    ~Link();
+    Link(const Link&) = delete;
+    Link& operator=(const Link&) = delete;
+
+    // The offerer starts gathering; the answerer waits for the offer.
+    void Start();
+    // A CandidatesMessage from the peer (iceMsg).
+    void OnSignal(const CandidatesMessage& remote);
+    // Sends 'd' + data. Dropped while not connected, as the Java adapter does.
+    bool Send(const void* data, std::size_t size);
+    // Timers, state changes and restarts.
+    void Tick();
+    // Stops the link for good.
+    void Close();
+    // No more restarts after a loss (GPGNet GameEnded).
+    void SetGameEnded();
+
+    LinkState GetState() const;
+    bool IsConnected() const { return mConnected.load(); }
+    // Issue #234: the peer on this connection proved to be ours.
+    bool IsOurPeer() const { return mOurPeer.load(); }
+    LinkStats GetStats() const;
+    const LinkOptions& GetOptions() const { return mOptions; }
+
+  private:
+    struct Pending; // deferred callbacks, run after the lock is released
+    struct Internals; // libjuice-facing state (Link.cpp)
+
+    void InitiateLocked(Pending& out, const CandidatesMessage* remote);
+    void SendCandidatesLocked(Pending& out, Clock::time_point now);
+    void ApplyRemoteLocked(Pending& out, const CandidatesMessage& remote, Clock::time_point now);
+    void ConnectionLostLocked(Pending& out, const char* reason, Clock::time_point now);
+    void SetStateLocked(Pending& out, LinkState state);
+    void DestroyAgentLocked();
+    std::uint32_t AttemptsInLastTwoMinutesLocked(Clock::time_point now) const;
+    bool AllowedLocked(CandidateType type, Clock::time_point now) const;
+    std::string RemoteDescriptionLocked(const CandidatesMessage& remote, Clock::time_point now) const;
+    void Run(Pending& p);
+    void Log(Pending& out, std::string text);
+    bool SendFramed(const char* framed, std::size_t size);
+
+    const LinkOptions mOptions;
+    const LinkCallbacks mCallbacks;
+    const std::unique_ptr<Internals> mIn;
+
+    mutable std::mutex mMutex;
+    juice_agent* mAgent = nullptr;
+    LinkState mState = LinkState::New;
+    bool mClosed = false;
+    bool mGameEnded = false;
+    bool mPendingAnswer = false; // answerer: go to checking once our candidates are out
+    std::deque<CandidatesMessage> mInbox;
+    std::deque<Clock::time_point> mAttemptTimes; // newest first, as connectivityAttemptTimes
+    std::optional<Clock::time_point> mGatherDeadline;
+    std::optional<Clock::time_point> mAwaitDeadline;
+    std::optional<Clock::time_point> mCheckDeadline;
+    std::optional<Clock::time_point> mRestartAt;
+    Clock::time_point mNextEcho{};
+    std::atomic<std::int64_t> mLastEchoReplyMs{0};
+    LinkStats mStats;
+    std::atomic<std::uint64_t> mDataReceived{0};
+    std::atomic<std::uint64_t> mInvalidReceived{0};
+    std::atomic<std::uint64_t> mEchoesAnswered{0};
+    std::atomic<std::int64_t> mLastRttMicros{-1};
+    std::atomic<bool> mConnected{false};
+    std::string mRemoteUfrag;
+    bool mRemoteMarked = false;
+    int mProbesSent = 0;
+    Clock::time_point mNextProbe{};
+    std::atomic<bool> mOurPeer{false};
+    std::atomic<bool> mOurPeerReported{false};
+  };
+} // namespace faf::netlink
