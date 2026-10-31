@@ -1,8 +1,11 @@
 #include "moho/net/NetConVars.h"
 
+#include <atomic>
 #include <cstdint>
 
+#include "gpg/core/utils/Logging.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/StartupHelpers.h"
 
 namespace moho
 {
@@ -33,9 +36,19 @@ namespace moho
   // faf-netbridge (NetlinkPeers.cpp); 0 leaves them to the adapter, as the
   // binary does. Read when the game reports Idle.
   int32_t net_InEngineLinks = 0;
+  // Issue #237: 1 resends a packet early once the peer has 3 later ones
+  // (CNetUDPConnection::FastRetransmitFromMask); 0 waits for the resend
+  // timer, as the binary does. Live.
+  int32_t net_FastRetransmit = 0;
 
   namespace
   {
+    TConVar<int32_t> gTConVar_net_FastRetransmit(
+      "net_FastRetransmit",
+      "1: resend a packet once the peer has received 3 later ones, at most once a round trip; 0 (default) waits for the resend timer.",
+      &net_FastRetransmit
+    );
+
     TConVar<int32_t> gTConVar_net_InEngineLinks(
       "net_InEngineLinks",
       "1: run the peer links in the game when the ICE adapter is faf-netbridge; 0 (default) leaves them to the adapter.",
@@ -139,4 +152,24 @@ namespace moho
      */
     TConVar<int32_t> gTConVar_net_ResendDelayBias("net_ResendDelayBias", "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.", &net_ResendDelayBias);
   } // namespace
+
+  bool NET_FastRetransmitEnabled()
+  {
+    // The command line is read once; the console variable stays live.
+    static const bool sFromCommandLine = CFG_GetArgOption("/fastretransmit", 0u, nullptr);
+    return net_FastRetransmit != 0 || sFromCommandLine;
+  }
+
+  void NET_CountFastRetransmits(const int count)
+  {
+    static std::atomic<std::uint64_t> sTotal{0};
+    if (count <= 0) {
+      return;
+    }
+    const std::uint64_t before = sTotal.fetch_add(static_cast<std::uint64_t>(count));
+    const std::uint64_t after = before + static_cast<std::uint64_t>(count);
+    if (before == 0 || before / 1000 != after / 1000) {
+      gpg::Logf("NET: %llu packets resent early so far (net_FastRetransmit)", static_cast<unsigned long long>(after));
+    }
+  }
 } // namespace moho

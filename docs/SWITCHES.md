@@ -133,6 +133,7 @@ The game's own UDP transport (`CNetUDPConnection`). Not performance switches and
 | `net_SocketRecvBuffer` | 0 | `/con` | next game | Receive buffer of the game's UDP socket in bytes (`SO_RCVBUF`); 0 keeps the system default, as the shipped game. The log says `NET_MakeUDPConnector: SO_RCVBUF <n>` |
 | `net_SocketSendBuffer` | 0 | `/con` | next game | Send buffer of the game's UDP socket in bytes (`SO_SNDBUF`); 0 keeps the system default |
 | `net_InEngineLinks` | 0 | `/inenginelinks` or `/con` | next game | 1: when the ICE adapter is `faf-netbridge`, the game runs the peer links itself and the bridge only passes their signalling (issue #233, [NETBRIDGE.md](NETBRIDGE.md)); 0 leaves the links to the adapter, as the shipped game does. Read when the game reports `Idle` |
+| `net_FastRetransmit` | 0 | `/fastretransmit` or `/con` | live | 1: a DATA packet the peer's acknowledgement shows 3 later packets past is resent at once instead of on its resend timer (`net_MinResendDelay`, 100 ms as shipped), at most once per round trip per packet (issue #237); 0 waits for the timer, as the shipped game does. The log counts early resends (`NET: n packets resent early so far`). Only the timing of resends changes, never what is sent. Measured gain so far: none. At 50 ms round trip and 2 % loss the game sent about 15 DATA packets a second, so the resend timer fired first and no packet was resent early in 5 minutes |
 
 ## Server mode
 

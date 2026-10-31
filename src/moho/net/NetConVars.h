@@ -25,4 +25,10 @@ namespace moho
   extern int32_t net_SocketRecvBuffer;
   extern int32_t net_SocketSendBuffer;
   extern int32_t net_InEngineLinks;
+  extern int32_t net_FastRetransmit;
+
+  // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.
+  bool NET_FastRetransmitEnabled();
+  // Counts early resends; logs the first and every 1000th.
+  void NET_CountFastRetransmits(int count);
 } // namespace moho

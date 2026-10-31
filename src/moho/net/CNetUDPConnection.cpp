@@ -1,6 +1,7 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -737,12 +738,59 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
     }
   }
 
+  // Engine addition (issue #237), off by default: resend a packet the peer
+  // reports 3 later packets past without waiting for its resend timer.
+  if (NET_FastRetransmitEnabled()) {
+    FastRetransmitFromMask(expected, earlyMask);
+  }
+
   // Track far end's window head if it advanced.
   if (static_cast<int16_t>(expected - mRemoteExpectedSequenceNumber) > 0) {
     mRemoteExpectedSequenceNumber = expected;
   }
 
   return true;
+}
+
+/**
+ * Engine addition (issue #237), not in the binary.
+ *
+ * What it does:
+ * With the ACKed packets gone, makes every unACKed packet that the peer's
+ * early mask shows at least 3 later packets past due now, unless it was sent
+ * less than one round trip ago, and puts it back in send-time order
+ * (`SendData` only looks at the head). The last send time is the scheduled
+ * resend time less the delay `SendPacket` added, which it computed before
+ * counting that send.
+ */
+void CNetUDPConnection::FastRetransmitFromMask(const uint16_t expected, const uint32_t earlyMask)
+{
+  const int64_t now = mConnector->GetTime();
+  const int64_t roundTripUs = std::max<int64_t>(5'000, static_cast<int64_t>(mPingTime * 1000.0f));
+
+  SNetPacket* due[32];
+  int dueCount = 0;
+  for (SNetPacket* p : mUnAckedPayloads.owners()) {
+    const int16_t d = static_cast<int16_t>(p->header.mSequenceNumber - expected);
+    if (d < 0 || d > 31 || p->mSentTime <= now) {
+      continue;
+    }
+    // Bit i of the mask is sequence expected + 1 + i: the packets after p.
+    if (std::popcount(earlyMask >> d) < 3) {
+      continue;
+    }
+    if (now - (p->mSentTime - CalcResendDelayForCount(p->mResendCount - 1)) < roundTripUs) {
+      continue;
+    }
+    if (dueCount < 32) {
+      due[dueCount++] = p;
+    }
+  }
+  for (int i = 0; i < dueCount; ++i) {
+    due[i]->mSentTime = now;
+    InsertUnAckedSorted(due[i]);
+  }
+  NET_CountFastRetransmits(dueCount);
 }
 
 /**
@@ -945,9 +993,18 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
  */
 int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
 {
+  return CalcResendDelayForCount(packet->mResendCount);
+}
+
+/**
+ * The body of CalcResendDelay (0x00488170) for a given resend count (engine
+ * addition, issue #237: FastRetransmitFromMask needs the count of the last
+ * send, one below the packet's).
+ */
+int64_t CNetUDPConnection::CalcResendDelayForCount(int rc) const
+{
   const float baseMs = mPingTime * net_ResendPingMultiplier + static_cast<float>(net_ResendDelayBias);
 
-  int rc = packet->mResendCount;
   if (rc > 3) {
     rc = 3;
   }
