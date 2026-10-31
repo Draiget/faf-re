@@ -215,6 +215,12 @@ set(_faf_download_dxc
     "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip"
     "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1"
     "")
+# Monocypher 4.0.2 (BSD-2-Clause or CC0): the net channel's AEAD (src/remote/net,
+# issue #145). The tag's source archive; cmake/deps/monocypher builds it.
+set(_faf_download_monocypher
+    "https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz"
+    "bc1ca30b1b2654e4e7daf2492c0d204200e55137f23fda6b7142fd7d523bd6b4"
+    "Monocypher-4.0.2")
 
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
@@ -382,6 +388,7 @@ faf_dependency_download(libdatachannel)
 faf_dependency_download(usrsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
+faf_dependency_download(monocypher)
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)

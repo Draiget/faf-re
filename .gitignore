@@ -78,6 +78,7 @@ RECOVERY_STATUS.md
 
 dependencies/.downloads/
 dependencies/dxsdk/
+dependencies/monocypher/
 
 tools/tracy/
 
