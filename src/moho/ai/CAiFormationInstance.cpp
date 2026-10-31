@@ -2442,6 +2442,15 @@ namespace moho
 
   namespace
   {
+#if defined(_M_X64) || defined(__x86_64__)
+    constexpr bool kUseFormationRecycler = true;
+#else
+    // x86 runs the recovered binary allocator (malloc_0, 0x00958B20), whose per-thread 896-byte lane formations
+    // share with projectiles, pose bone arrays and container buffers; a formation-only list would override that
+    // order (26916583 passes on x86 without the list and fails at beat 4900 with it).
+    constexpr bool kUseFormationRecycler = false;
+#endif
+
     /// The formation free list: freed blocks, the last freed at the back (see `operator new`).
     struct SFormationRecycler
     {
@@ -2466,7 +2475,7 @@ namespace moho
 
   void* CAiFormationInstance::operator new(const std::size_t size, const std::nothrow_t&) noexcept
   {
-    if (size == sizeof(CAiFormationInstance)) {
+    if (kUseFormationRecycler && size == sizeof(CAiFormationInstance)) {
       SFormationRecycler& recycler = FormationRecycler();
       const std::lock_guard guard(recycler.lock);
       if (!recycler.blocks.empty()) {
@@ -2483,7 +2492,7 @@ namespace moho
     if (block == nullptr) {
       return;
     }
-    if (size == sizeof(CAiFormationInstance)) {
+    if (kUseFormationRecycler && size == sizeof(CAiFormationInstance)) {
       SFormationRecycler& recycler = FormationRecycler();
       const std::lock_guard guard(recycler.lock);
       try {
