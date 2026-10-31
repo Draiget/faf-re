@@ -27,6 +27,7 @@ namespace faf::headless
     bool changeSetCheck = false; // the sync walk's change set against its packet (ReplayChangeSetCheck.h)
     int viewPacketsArmy = -1;    // with `viewPacketsPath`: the army whose packet is digested
     std::string viewPacketsPath; // when set: per beat, that army's entity lanes (ReplayViewPacketCheck.h)
+    std::string viewPacketsEntriesPath; // with `viewPacketsPath`: one line per record (beat, lane, id, digest)
     std::string viewFramesPath;  // when set: every army's frame, per beat (CSV; ReplayViewFrameStats.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR

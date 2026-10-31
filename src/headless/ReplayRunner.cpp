@@ -513,9 +513,12 @@ namespace faf::headless
     // `--view-packets`: the sync walk's observer as well.
     std::unique_ptr<CReplayViewPacketCheck> viewPackets;
     if (!options.viewPacketsPath.empty()) {
-      viewPackets = std::make_unique<CReplayViewPacketCheck>(options.viewPacketsArmy, options.viewPacketsPath);
+      viewPackets = std::make_unique<CReplayViewPacketCheck>(
+        options.viewPacketsArmy, options.viewPacketsPath, options.viewPacketsEntriesPath
+      );
       if (!viewPackets->IsOpen()) {
-        result.error = "cannot write " + options.viewPacketsPath;
+        result.error = "cannot write " + options.viewPacketsPath
+          + (options.viewPacketsEntriesPath.empty() ? "" : " or " + options.viewPacketsEntriesPath);
         return result;
       }
       viewPackets->Install();

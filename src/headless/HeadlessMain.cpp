@@ -163,6 +163,8 @@ namespace
       "  --view-packets <army> <file>  per beat, a digest of each entity lane of that army's packet: rebuilt\n"
       "                            from the change set when unfocused, the sim's own when focused on the army\n"
       "                            (server-mode build; not with the other two checks)\n"
+      "  --view-packets-entries <file>  with --view-packets: one line per record (beat, lane, id, digest),\n"
+      "                            so two runs can be compared entry by entry\n"
       "  --view-frames <file>      unfocused: every army's frame per beat (CSV: entities, withheld, delta bytes),\n"
       "                            each decoded again and compared (server-mode build; not with the checks above)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
@@ -249,6 +251,7 @@ int main(int argc, char** argv)
       options.viewPacketsPath = viewArgs[1].c_str();
     }
   }
+  (void)ReadOption("--view-packets-entries", options.viewPacketsEntriesPath);
   (void)ReadOption("--view-frames", options.viewFramesPath);
   if ((options.oracleCheck ? 1 : 0) + (options.changeSetCheck ? 1 : 0) + (options.viewPacketsPath.empty() ? 0 : 1)
         + (options.viewFramesPath.empty() ? 0 : 1)

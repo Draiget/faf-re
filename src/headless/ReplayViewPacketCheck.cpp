@@ -194,11 +194,17 @@ namespace faf::headless
     }
   } // namespace
 
-  CReplayViewPacketCheck::CReplayViewPacketCheck(const std::int32_t army, const std::string& path)
+  CReplayViewPacketCheck::CReplayViewPacketCheck(
+    const std::int32_t army, const std::string& path, const std::string& entriesPath
+  )
     : mArmy(army)
+    , mWantEntries(!entriesPath.empty())
   {
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
+    }
+    if (mWantEntries && fopen_s(&mEntries, entriesPath.c_str(), "w") != 0) {
+      mEntries = nullptr;
     }
   }
 
@@ -207,6 +213,9 @@ namespace faf::headless
     Uninstall();
     if (mFile != nullptr) {
       std::fclose(mFile);
+    }
+    if (mEntries != nullptr) {
+      std::fclose(mEntries);
     }
   }
 
@@ -246,31 +255,72 @@ namespace faf::headless
     mRebuilt = rebuilt;
     ++mBeats;
 
+    // Each record goes into its lane's digest and, with an entries file, into a digest of its own.
+    const auto entry = [&](const char lane, const moho::EntId id, const auto& addRecord) {
+      if (mEntries != nullptr) {
+        CDigest own;
+        addRecord(own);
+        std::fprintf(
+          mEntries, "%u %c %08x %016llx\n", beat, lane, static_cast<std::uint32_t>(id),
+          static_cast<unsigned long long>(own.Value())
+        );
+      }
+    };
+
     CDigest creates;
     for (const moho::SCreateEntityParams* const params : ById(packet.mNewEntities)) {
-      creates.Add(params->mEntityId);
-      creates.Text(params->mBlueprint != nullptr ? params->mBlueprint->mBlueprintId.c_str() : nullptr);
-      creates.Add(params->mTickCreated);
+      const auto add = [params](CDigest& digest) {
+        digest.Add(params->mEntityId);
+        digest.Text(params->mBlueprint != nullptr ? params->mBlueprint->mBlueprintId.c_str() : nullptr);
+        digest.Add(params->mTickCreated);
+      };
+      add(creates);
+      entry('c', params->mEntityId, add);
     }
     CDigest unitCreates;
     for (const moho::SCreateUnitParams* const params : ById(packet.mNewUnits)) {
-      unitCreates.Add(params->mEntityId);
-      unitCreates.Text(params->mBlueprint != nullptr ? params->mBlueprint->mBlueprintId.c_str() : nullptr);
-      unitCreates.Add(params->mTickCreated);
-      unitCreates.Add(params->mConstDat.mBuildStateTag);
-      unitCreates.Add(params->mConstDat.mFake);
-      unitCreates.Add(params->mConstDat.mStatsRoot ? 1 : 0);
+      const auto add = [params](CDigest& digest) {
+        digest.Add(params->mEntityId);
+        digest.Text(params->mBlueprint != nullptr ? params->mBlueprint->mBlueprintId.c_str() : nullptr);
+        digest.Add(params->mTickCreated);
+        digest.Add(params->mConstDat.mBuildStateTag);
+        digest.Add(params->mConstDat.mFake);
+        digest.Add(params->mConstDat.mStatsRoot ? 1 : 0);
+      };
+      add(unitCreates);
+      entry('u', params->mEntityId, add);
     }
     CDigest entities;
     for (const moho::SEntityVariableUpdateEntry* const update : ById(packet.mEntityUpdates)) {
-      entities.Add(update->mEntityId);
-      AddEntityBlock(entities, update->mVariableData);
+      const auto add = [update](CDigest& digest) {
+        digest.Add(update->mEntityId);
+        AddEntityBlock(digest, update->mVariableData);
+      };
+      add(entities);
+      entry('e', update->mEntityId, add);
     }
     CDigest units;
     for (const moho::SUnitVariableUpdateEntry* const update : ById(packet.mUnitUpdates)) {
-      units.Add(update->mEntityId);
-      AddUnitBlock(units, update->mVariableData, update->mReconFlags);
+      const auto add = [update](CDigest& digest) {
+        digest.Add(update->mEntityId);
+        AddUnitBlock(digest, update->mVariableData, update->mReconFlags);
+      };
+      add(units);
+      entry('n', update->mEntityId, add);
     }
+    // In id order, as their lane digests take them (`IdsDigest`).
+    const auto idEntries = [&](const char lane, const msvc8::vector<moho::EntId>& ids) {
+      std::vector<std::uint32_t> sorted;
+      for (const moho::EntId id : ids) {
+        sorted.push_back(static_cast<std::uint32_t>(id));
+      }
+      std::sort(sorted.begin(), sorted.end());
+      for (const std::uint32_t id : sorted) {
+        entry(lane, static_cast<moho::EntId>(id), [id](CDigest& digest) { digest.Add(id); });
+      }
+    };
+    idEntries('d', packet.mDeleteIds);
+    idEntries('x', packet.mEraseIds);
 
     std::fprintf(
       mFile, "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx %016llx\n", beat,
