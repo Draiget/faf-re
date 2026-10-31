@@ -736,6 +736,11 @@ namespace faf::headless
       }
     }
 
+#if FAF_SERVER_MODE
+    // The sim's thread keeps running beats after a time limit ends the loop; the sync-walk
+    // observers are read (and destroyed) below, so none of them may be called from here on.
+    moho::Sim::SetSyncObserver(nullptr);
+#endif
     result.playSeconds = SecondsSince(playStart);
     result.mismatches = ChecksumMismatchCount();
     if (digestFile != nullptr) {

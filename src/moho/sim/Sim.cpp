@@ -23,6 +23,7 @@
 #include <initializer_list>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <new>
 #include <stdexcept>
 #include <set>
@@ -4267,10 +4268,14 @@ namespace
 namespace
 {
   CSyncObserver* sSyncObserver = nullptr;
+  // Held by `Sync` from its walk to `OnSyncWalkDone`, so a caller that removes the observer
+  // knows no call into it is still running on the sim's thread.
+  std::mutex sSyncObserverLock;
 } // namespace
 
 void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
 {
+  const std::lock_guard<std::mutex> guard(sSyncObserverLock);
   sSyncObserver = observer;
 }
 #endif
@@ -4489,6 +4494,10 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     }
     RefreshUnitSyncBlocksParallel(sSyncUnits);
   }
+#if FAF_SERVER_MODE
+  std::unique_lock<std::mutex> observerLock(sSyncObserverLock);
+  CSyncObserver* const observer = sSyncObserver;
+#endif
   if (focusArmyChanged) {
     // 0x007478AA..0x0074791A walks the entity DB's whole id map -- every
     // entity, not only units -- and dispatches Sync on each node's value.
@@ -4498,15 +4507,15 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     for (const auto& idAndEntity : mEntityDB->mAllUnits) {
       if (Entity* const entity = idAndEntity.second; entity != nullptr) {
 #if FAF_SERVER_MODE
-        if (sSyncObserver != nullptr) {
-          sSyncObserver->OnEntityWillSync(*entity);
+        if (observer != nullptr) {
+          observer->OnEntityWillSync(*entity);
         }
 #endif
         entity->Sync(outSyncData);
         ++syncedEntityCount;
 #if FAF_SERVER_MODE
-        if (sSyncObserver != nullptr) {
-          sSyncObserver->OnEntitySynced(*entity);
+        if (observer != nullptr) {
+          observer->OnEntitySynced(*entity);
         }
 #endif
       }
@@ -4518,15 +4527,15 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       ++it;
       if (entity != nullptr) {
 #if FAF_SERVER_MODE
-        if (sSyncObserver != nullptr) {
-          sSyncObserver->OnEntityWillSync(*entity);
+        if (observer != nullptr) {
+          observer->OnEntityWillSync(*entity);
         }
 #endif
         entity->Sync(outSyncData);
         ++syncedEntityCount;
 #if FAF_SERVER_MODE
-        if (sSyncObserver != nullptr) {
-          sSyncObserver->OnEntitySynced(*entity);
+        if (observer != nullptr) {
+          observer->OnEntitySynced(*entity);
         }
 #endif
       }
@@ -4535,9 +4544,10 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   unitUpdateFills.Finish();
   StoreSyncEntityCountStat(syncedEntityCount);
 #if FAF_SERVER_MODE
-  if (sSyncObserver != nullptr) {
-    sSyncObserver->OnSyncWalkDone(*this, *outSyncData);
+  if (observer != nullptr) {
+    observer->OnSyncWalkDone(*this, *outSyncData);
   }
+  observerLock.unlock();
 #endif
 
   if (mRequestXMLArmyStatsSubmit) {

@@ -1169,6 +1169,7 @@ namespace moho
      * and in lockstep. `Sync` calls it on the sim's thread for every entity its walk syncs and
      * once the walk is done; it must only read the sim. The server builds its views from it
      * (remote/BeatChangeSet.h); headless's checks and the golden test use it too. One at a time.
+     * Setting it waits for a walk in progress, so once it returns the old observer gets no more calls.
      */
     static void SetSyncObserver(CSyncObserver* observer) noexcept;
 #endif
