@@ -13,6 +13,7 @@ namespace gpg
 
 namespace moho
 {
+  class CTelemetryAttributes;
   class ICommandSink;
   class Sim;
 
@@ -32,6 +33,13 @@ namespace moho
    * clients don't have. -1, the default, does nothing. Seeded by `/desynctestbeat N`.
    */
   extern int sim_DesyncTestNudgeBeat;
+
+  /**
+   * Engine addition (issue #217): the recorder writes its dump at this beat whether or not a
+   * checksum mismatched, so a headless replay can rebuild the side of a desync nobody sent. -1, the
+   * default, waits for a mismatch. Seeded by `/desyncdumpbeat N`; read when a sim is created.
+   */
+  extern int sim_DesyncDumpBeat;
 
   /**
    * Engine addition (issue #216): the desync recorder. While a game runs it keeps the sync-log
@@ -58,8 +66,16 @@ namespace moho
       return sim != nullptr && sim == sSim ? sInstance : nullptr;
     }
 
-    /// The user side's session facts for the next dump header (map, replay or live game).
-    static void SetSessionInfo(const char* mapName, bool isReplay);
+    /// The user side's session facts for the next dump header (map, game mods, replay or live game)
+    /// and for telemetry, which is sent for live multiplayer games only.
+    static void SetSessionInfo(const char* mapName, const char* gameMods, bool isReplay, bool isMultiplayer);
+
+    /// Issue #218: `source`'s orders were proven altered on their way to this client.
+    static void NoteOrdersAltered(int source);
+
+    /// Issue #218: notes the console switch values as they are before `/con` runs, so telemetry
+    /// can list the ones a player changed. Called by `TELEMETRY_Startup`.
+    static void NoteSwitchDefaults();
 
     /// The dump file this game writes, empty until the first mismatch. Any thread.
     [[nodiscard]] static std::string DumpPath();
@@ -91,6 +107,22 @@ namespace moho
 
   private:
     explicit CDesyncRecorder(Sim& sim);
+
+    /// Names the dump `desync_<game id>_<tag>_army<local army>.zip` next to the game log.
+    void ChooseDumpPath(const Sim& sim, const std::string& tag);
+
+    /// Issue #218: telemetry is on and this is a live multiplayer game.
+    [[nodiscard]] bool TelemetryApplies() const;
+
+    /// Issue #218: the attributes both telemetry records carry (game, settings, switches).
+    void AddGameAttributes(const Sim& sim, CTelemetryAttributes& out) const;
+
+    /// Issue #218: one `faf.desync` record per player that disagreed at the first mismatched beat,
+    /// sent from the recorder's thread after the dump. Sim thread.
+    void SendDesyncTelemetry(const Sim& sim);
+
+    /// Issue #218: the `faf.game.end` record. Sim thread, from `Detach`.
+    void SendGameEnd(const Sim& sim);
 
     /// Stops recording and hands the dump to the recorder's thread. Sim thread.
     void TakeDump(const Sim& sim);

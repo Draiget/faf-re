@@ -5,8 +5,9 @@ description: >
   client 2 alone raises one moving unit's health by one float step on the
   first checksum beat at or after 300 (/desynctestbeat), a real difference in
   hashed state. Both must report the same first mismatched beat and write a
-  desync_*.zip into the run folder (next to game-<uid>.log). Compare the two
-  zips' state.txt and beats/ to find the nudged unit's health.
+  desync_*.zip into the run folder (next to game-<uid>.log).
+  tools\desync-diff\desync_diff.py on the two zips (issue #217) must name the
+  nudged unit's health at beat 300 and exit 1.
   Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
   isolated account. Do not click into the game windows.
 timeout: 15m

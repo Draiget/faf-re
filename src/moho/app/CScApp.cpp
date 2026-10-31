@@ -33,6 +33,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
+#include "moho/sim/DesyncTelemetry.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDiskWatch.h"
 #include "moho/net/CGpgNetInterface.h"
@@ -368,6 +369,9 @@ namespace
     if (moho::CFG_GetArgOption("/showlog", 0, nullptr)) {
       moho::CON_Execute("WIN_ShowLogDialog true");
     }
+
+    // Engine addition (issue #218): telemetry flags and the switch defaults, before /con changes them.
+    moho::TELEMETRY_Startup();
 
     // Engine addition: `/con name=value;name2=value2` runs console commands at startup, so a
     // launcher can set user-side console variables (e.g. `/con sim_ReplayLead=0`).

@@ -190,6 +190,28 @@ Issue #216. The recorder keeps the `/synclog` text of recent beats in memory, co
 | `sim_DesyncRecorder` | 0 | `/desyncrecorder` or `/con sim_DesyncRecorder=1` | next game | Records beats for a desync dump; recording stops once the dump is taken |
 | `sim_DesyncRecorderMB` | 32 | `/con` | live | Memory cap for the recorded beats; the oldest go first. The beats kept reach back to the last beat every player's checksum agreed on, at most 192 (one checksum period, 128 beats of report delay and the beats recorded after a mismatch is seen) |
 | `sim_DesyncTestNudgeBeat` | -1 | `/desynctestbeat N` or `/con` | live | Test only: on the first checksum beat at or after N, this client alone raises its lowest-id moving unit's health by one float step, so the game desyncs for real |
+| `sim_DesyncDumpBeat` | -1 | `/desyncdumpbeat N` or `/con` | next game | Writes the dump when the sim reaches beat N, mismatch or not, keeping the newest beats whatever the checksums say. For rebuilding the side of a desync nobody sent from a replay (`tools/desync-diff/`). -1 waits for a mismatch |
+
+Compare dumps with `tools/desync-diff/desync_diff.py` (issue #217); it prints the first value that differs.
+
+## Desync telemetry
+
+Issue #218. Off by default. On, a live multiplayer game sends two kinds of OpenTelemetry log record, as one OTLP/HTTP JSON `POST` each to `<telemetry_Endpoint>/v1/logs`:
+
+- `faf.desync`: one per player whose hash differed from ours at the first mismatched beat, sent when the sim reaches the dump beat (the mismatched beat + 30, as for the recorder), so every player's report for that beat has arrived. Later desyncs only raise `faf.desync.later_records` in the game-end record.
+- `faf.game.end`: one per game, desync or not, when the game's sim is destroyed (quitting, or leaving to the menu).
+
+Every request carries the process: `service.name` `faf-engine`, `service.version` the commit (#215), `faf.engine.version` (`git describe`), `faf.engine.dirty`, `host.arch`, `faf.arch`, `os.type`, `os.description`, `faf.cpu.logical_count`. Both records carry `faf.game.id` (from `/savereplay gpgnet://host:port/<id>/...`), `faf.game.version`, `faf.sim_fixes`, `faf.map` (the map's folder name), `faf.players`, `faf.army.local`, `faf.sim.workers`, `faf.sse2`, `faf.switches.hash` (MD5 of every `sim_*` and `lua_Parallel*` switch value) and `faf.switches.changed` (each `sim_`/`lua_` switch whose value differs from what it was before `/con` ran). `faf.desync` adds `faf.desync.beat`, `faf.desync.last_agreed_beat`, `faf.desync.delay_beats`, `faf.game.time_s`, `faf.hash.local`, `faf.hash.remote`, `faf.army.remote`, `faf.source.remote`, `faf.desync.players_disagreeing`, `faf.desync.players_reported`, `faf.orders_altered`, `faf.fpu.x87_control`, `faf.fpu.mxcsr`, and `faf.dump.file` and `faf.dump.bytes` when the recorder wrote a dump. `faf.game.end` adds `faf.game.beats`, `faf.desync`, `faf.desync.beat` and `faf.desync.later_records`. Not sent: player names, FAF user ids, the command line, file paths, dump contents.
+
+Sending runs on its own thread; the sim and render threads only queue a record. Each record goes to an outbox file next to the game log (`faf_telemetry_outbox_<pid>.txt`) before it is posted and leaves it once the collector answers 2xx. A failed record is retried with the next record (the game end) and at the next start, three attempts in all; a starting client also sends the outbox files of clients that no longer run, never those of a client still running in the same folder; a 4xx answer other than 408 or 429 drops it at once. Requests time out after 3 s; when a game ends, the engine waits up to 4 s for the queued records before it goes on, so the game-end record is posted before a quit. Windows uses WinHTTP (http and https), loaded when the first record is posted; the Linux build posts plain http only. With only telemetry on, the recorder keeps checksums and no sync-log text, so it costs nothing per beat.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `telemetry_Enabled` | 0 | `/telemetry` or `/con` | next record | Sends the records. Nothing starts while it is off: no thread, no file, no connection |
+| `telemetry_Endpoint` | empty | `/telemetryendpoint URL` or `/con` | next record | Collector base URL, `http://host:port` or `https://host`; `/v1/logs` is appended unless the path ends with it. Empty sends nothing |
+| `telemetry_Token` | empty | `/telemetrytoken T` or `/con` | next record | Sent as `Authorization: Bearer T`. It ships with the game, so it only keeps casual junk out |
+
+`/exitattick N` (test only) quits the game at game tick N the way `/exitongameover` does, so scenarios end their games cleanly: `tools/scenarios/2p-desync-telemetry.yaml` and `2p-telemetry-no-desync.yaml`.
 
 ## Debugging aids
 

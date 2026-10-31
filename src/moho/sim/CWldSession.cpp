@@ -6902,8 +6902,11 @@ namespace moho
     IsMultiplayer = sessionInfo.mIsMultiplayer;
     IsGameOver = 0;
 
-    // Engine addition (issue #216): the desync dump's header names the map and the session kind.
-    CDesyncRecorder::SetSessionInfo(mMapName.c_str(), IsReplay);
+    // Engine addition (issues #216, #218): the desync dump's header names the map, the game mods
+    // and the session kind; telemetry is sent for live multiplayer games only.
+    CDesyncRecorder::SetSessionInfo(
+      mMapName.c_str(), mLaunchInfo.get() != nullptr ? mLaunchInfo->mGameMods.c_str() : "", IsReplay, IsMultiplayer
+    );
 
     if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
       // One null army slot per launch-info army (0x008932A7): the run has to
@@ -8783,6 +8786,7 @@ namespace moho
             "beat %d, %s: orders reached this client differently from what %s acknowledged sending", desync.beat,
             armyName.c_str(), armyName.c_str()
           ).c_str());
+          CDesyncRecorder::NoteOrdersAltered(desync.army); // issue #218: faf.orders_altered
           continue;
         }
         desyncArmyNames.push_back(armyName);
@@ -8807,6 +8811,22 @@ namespace moho
       IsGameOver = 1u;
       UI_NoteGameOver();
       if (CFG_GetArgOption("/exitongameover", 0u, nullptr)) {
+        wxTheApp->ExitMainLoop();
+      }
+    }
+
+    // Engine addition (issue #218), test only: `/exitattick N` quits the app at game tick N the
+    // way /exitongameover does, so a scenario ends its games cleanly (the game-end telemetry
+    // record is sent on that path; mpemu's kill would skip it).
+    {
+      static int sExitAtTick = -2;
+      if (sExitAtTick == -2) {
+        msvc8::vector<msvc8::string> args;
+        sExitAtTick = CFG_GetArgOption("/exitattick", 1u, &args) && !args.empty() ? std::atoi(args[0].c_str()) : -1;
+      }
+      if (sExitAtTick >= 0 && static_cast<int>(mGameTick) >= sExitAtTick) {
+        sExitAtTick = -1;
+        gpg::Logf("exitattick: quitting at game tick %d", static_cast<int>(mGameTick));
         wxTheApp->ExitMainLoop();
       }
     }

@@ -30,6 +30,7 @@
 #include "moho/net/IClientMgrUIInterface.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/sim/DesyncRecorder.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
@@ -400,6 +401,12 @@ namespace faf::headless
     if (sessionInfo->mClientManager != nullptr) {
       sessionInfo->mClientManager->SetUIInterface(&gReplayClientEvents);
     }
+
+    // Issue #217: a dump this run writes (`/desyncdumpbeat`) names the map and game mods, and
+    // says it came from a replay, as a game's CWldSession would tell the recorder.
+    moho::CDesyncRecorder::SetSessionInfo(
+      sessionInfo->mMapName.c_str(), launchInfo->mGameMods.c_str(), true, sessionInfo->mIsMultiplayer
+    );
 
     moho::SWldGameData gameData{};
     if (!LoadScenario(*sessionInfo, gameData, result.error)) {

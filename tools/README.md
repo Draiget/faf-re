@@ -10,6 +10,7 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the director–agent control channel and a latching game relay. Deployment: [deploy/README.md](deploy/README.md) |
 | `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP and reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
 | `scenarios/` | YAML scenarios for mpemu |
+| `desync-diff/` | Compares players' desync dumps from one game and prints the first value that differs; rebuilds a missing side from the replay. See [desync-diff/README.md](desync-diff/README.md) |
 | `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered; see [difffuzz/README.md](difffuzz/README.md) |
 | `sfd-inspect/` | Independent SFD diagnostics and parser tests; see [sfd-inspect/README.md](sfd-inspect/README.md) |
 

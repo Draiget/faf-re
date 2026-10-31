@@ -12,6 +12,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -27,6 +28,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/DesyncTelemetry.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimWorkerPool.h"
@@ -57,6 +59,15 @@ namespace moho
     "Test only: at this beat this client alone raises its lowest-id unit's health by one float "
     "step, which desyncs the game. -1 does nothing.",
     &sim_DesyncTestNudgeBeat
+  );
+
+  int sim_DesyncDumpBeat = -1;
+
+  TConVar<int> gTConVar_sim_DesyncDumpBeat(
+    "sim_DesyncDumpBeat",
+    "Write the desync recorder's dump at this beat, mismatch or not (next game), to rebuild the "
+    "missing side of a desync from a replay. -1 waits for a mismatch.",
+    &sim_DesyncDumpBeat
   );
 
   const Sim* CDesyncRecorder::sSim = nullptr;
@@ -121,8 +132,12 @@ namespace moho
     // The user side's facts and the published dump path; any thread.
     std::mutex sSharedMutex;
     std::string sMapName;
+    std::string sGameMods;
     bool sIsReplay = false;
+    bool sIsMultiplayer = false;
     std::string sDumpPath;
+    std::set<int> sOrdersAltered; // command sources whose orders reached us altered
+    std::string sSwitchDefaults;  // ConsoleSwitches() before /con ran
 
     [[nodiscard]] bool DeflateRaw(const void* const data, const std::size_t size, const int level, std::vector<unsigned char>& out)
     {
@@ -441,6 +456,7 @@ namespace moho
     unsigned int mBeatWorkers = 0;
     std::atomic<unsigned int> mBeatCommands{0}; // the decoder's thread may differ from the sim's
     bool mRecording = true;
+    bool mKeepText = true; // false: checksums only, for telemetry
     std::map<int, SChecksumBeat> mChecks;
     std::size_t mCommandSourceCount = 0;
     std::map<int, int> mLastReportBeat; // per source
@@ -451,6 +467,7 @@ namespace moho
     bool mDesyncSeen = false;
     bool mDumpTaken = false;
     int mDumpAtBeat = 0;
+    int mForcedDumpBeat = -1; // sim_DesyncDumpBeat when the game started
     int mLocalArmy = -1;
     std::string mDumpPath;
     std::size_t mPendingBytes = 0; // also read by the recorder thread under mQueueMutex
@@ -608,7 +625,13 @@ namespace moho
   CDesyncRecorder::CDesyncRecorder(Sim& sim)
     : mImpl(std::make_unique<Impl>())
   {
-    mImpl->mText.reserve(1024u * 1024u);
+    // With only telemetry on, the recorder keeps checksums, not text: the sync-log call sites
+    // stay off (IsRecording) and no dump is written.
+    mImpl->mKeepText = sim_DesyncRecorder;
+    mImpl->mRecording = mImpl->mKeepText;
+    if (mImpl->mKeepText) {
+      mImpl->mText.reserve(1024u * 1024u);
+    }
     mImpl->mBeatFpu = SFpuControlState::Capture();
     mImpl->mBeatWorkers = SimWorkerCount();
     mImpl->mStartFpu = mImpl->mBeatFpu;
@@ -640,18 +663,30 @@ namespace moho
       if (CFG_GetArgOption("/desynctestbeat", 1u, &args) && !args.empty()) {
         sim_DesyncTestNudgeBeat = std::atoi(args[0].c_str());
       }
+      args.clear();
+      if (CFG_GetArgOption("/desyncdumpbeat", 1u, &args) && !args.empty()) {
+        sim_DesyncDumpBeat = std::atoi(args[0].c_str());
+      }
     }
 
     {
       std::lock_guard<std::mutex> lock(sSharedMutex);
       sDumpPath.clear();
+      sOrdersAltered.clear();
     }
-    if (!sim_DesyncRecorder || sInstance != nullptr) {
+    if (!(sim_DesyncRecorder || TELEMETRY_IsOn()) || sInstance != nullptr) {
       return;
     }
     sInstance = new CDesyncRecorder(sim);
+    sInstance->mImpl->mForcedDumpBeat = sim_DesyncRecorder ? sim_DesyncDumpBeat : -1;
     sSim = &sim;
-    gpg::Logf("Desync recorder: on, cap %d MB", sim_DesyncRecorderMB);
+    if (!sim_DesyncRecorder) {
+      gpg::Logf("Desync recorder: checksums only, for telemetry");
+    } else if (sim_DesyncDumpBeat >= 0) {
+      gpg::Logf("Desync recorder: on, cap %d MB, dump at beat %d", sim_DesyncRecorderMB, sim_DesyncDumpBeat);
+    } else {
+      gpg::Logf("Desync recorder: on, cap %d MB", sim_DesyncRecorderMB);
+    }
   }
 
   void CDesyncRecorder::Detach(const Sim& sim)
@@ -660,22 +695,45 @@ namespace moho
     if (recorder == nullptr) {
       return;
     }
-    if (recorder->mImpl->mDesyncSeen && !recorder->mImpl->mDumpTaken) {
+    const Impl& impl = *recorder->mImpl;
+    if ((impl.mDesyncSeen || impl.mForcedDumpBeat >= 0) && !impl.mDumpTaken) {
       recorder->TakeDump(sim);
     }
+    recorder->SendGameEnd(sim); // queued behind the dump, so a faf.desync goes first
     {
       std::lock_guard<std::mutex> lock(sSharedMutex);
       sInstance = nullptr;
       sSim = nullptr;
     }
-    delete recorder; // waits for the dump
+    const bool telemetry = recorder->TelemetryApplies();
+    delete recorder; // waits for the dump; the telemetry records are queued by then
+    if (telemetry) {
+      TELEMETRY_WaitIdle(4000); // one attempt each (3 s timeouts) before a quit can end the process
+    }
   }
 
-  void CDesyncRecorder::SetSessionInfo(const char* const mapName, const bool isReplay)
+  void CDesyncRecorder::SetSessionInfo(
+    const char* const mapName, const char* const gameMods, const bool isReplay, const bool isMultiplayer
+  )
   {
     std::lock_guard<std::mutex> lock(sSharedMutex);
     sMapName = mapName != nullptr ? mapName : "";
+    sGameMods = gameMods != nullptr ? gameMods : "";
     sIsReplay = isReplay;
+    sIsMultiplayer = isMultiplayer;
+  }
+
+  void CDesyncRecorder::NoteOrdersAltered(const int source)
+  {
+    std::lock_guard<std::mutex> lock(sSharedMutex);
+    sOrdersAltered.insert(source);
+  }
+
+  void CDesyncRecorder::NoteSwitchDefaults()
+  {
+    std::string defaults = ConsoleSwitches();
+    std::lock_guard<std::mutex> lock(sSharedMutex);
+    sSwitchDefaults = std::move(defaults);
   }
 
   std::string CDesyncRecorder::DumpPath()
@@ -763,7 +821,9 @@ namespace moho
         }
       }
       if (queued) {
-        const int trimBefore = impl.mDesyncSeen ? INT_MIN : impl.mLastAgreedBeat;
+        // A forced dump keeps the newest beats whatever the checksums say: the dump it is compared
+        // with starts at its own last agreed beat.
+        const int trimBefore = impl.mDesyncSeen || impl.mForcedDumpBeat >= 0 ? INT_MIN : impl.mLastAgreedBeat;
         const std::size_t capBytes = static_cast<std::size_t>(std::max(1, sim_DesyncRecorderMB)) * 1024u * 1024u;
         impl.Post([&impl, record = std::move(record), text, trimBefore, capBytes]() mutable {
           impl.StoreBeat(std::move(record), *text, trimBefore, capBytes);
@@ -773,12 +833,16 @@ namespace moho
       } else {
         impl.Post([&impl] { ++impl.mDroppedBeats; });
       }
-
+    }
+    if (!impl.mDumpTaken) {
       impl.mBeatFpu = SFpuControlState::Capture();
       impl.mBeatWorkers = SimWorkerCount();
     }
 
-    if (impl.mDesyncSeen && !impl.mDumpTaken && beat >= impl.mDumpAtBeat) {
+    // The dump's beat is the sim's current beat, `beat` + 1.
+    const bool due = impl.mDesyncSeen ? beat >= impl.mDumpAtBeat
+                                      : impl.mForcedDumpBeat >= 0 && beat + 1 >= impl.mForcedDumpBeat;
+    if (due && !impl.mDumpTaken) {
       TakeDump(sim);
     }
   }
@@ -832,7 +896,7 @@ namespace moho
     desync.mReported = reported.ToString().c_str();
     const std::string sourceName = sim.GetCurrentCommandSourceName();
 
-    if (impl.mDesyncSeen) {
+    if (impl.mDesyncSeen || impl.mDumpTaken) { // a forced dump can come before any mismatch
       if (impl.mDumpTaken) {
         AddNote(Printf(
           "later desync: beat %d, %s (source %d) sent %s, ours %s, seen at beat %d", beat, sourceName.c_str(), source,
@@ -844,24 +908,37 @@ namespace moho
     }
 
     impl.mDesyncSeen = true;
-    impl.mDumpAtBeat = std::max(beat + kDumpBeatsAfterMismatch, static_cast<int>(sim.mCurBeat) + kBeatsAfterDesync);
+    impl.mDumpAtBeat = impl.mForcedDumpBeat >= 0
+      ? impl.mForcedDumpBeat - 1
+      : std::max(beat + kDumpBeatsAfterMismatch, static_cast<int>(sim.mCurBeat) + kBeatsAfterDesync);
     impl.mDesyncs.push_back(std::move(desync));
-    impl.mLocalArmy = sim.mSyncFilter.focusArmy;
-
-    std::string gameId = FafGameIdFromCommandLine();
-    if (gameId.empty()) {
-      gameId = LOG_GenerateFilenamePrefix().c_str();
+    if (!impl.mKeepText) {
+      impl.mLocalArmy = sim.mSyncFilter.focusArmy;
+      gpg::Warnf(
+        "Desync recorder: beat %d mismatched with %s; telemetry record at beat %d", beat, sourceName.c_str(),
+        impl.mDumpAtBeat + 1
+      );
+      return;
     }
-    const std::string fileName = Printf("desync_%s_beat%d_army%d.zip", gameId.c_str(), beat, impl.mLocalArmy);
-    impl.mDumpPath = (DumpFolder() / fileName).string();
-    {
-      std::lock_guard<std::mutex> lock(sSharedMutex);
-      sDumpPath = impl.mDumpPath;
-    }
+    ChooseDumpPath(sim, Printf("beat%d", beat));
     gpg::Warnf(
       "Desync recorder: beat %d mismatched with %s; recording to beat %d, then writing %s", beat, sourceName.c_str(),
       impl.mDumpAtBeat, impl.mDumpPath.c_str()
     );
+  }
+
+  void CDesyncRecorder::ChooseDumpPath(const Sim& sim, const std::string& tag)
+  {
+    Impl& impl = *mImpl;
+    impl.mLocalArmy = sim.mSyncFilter.focusArmy;
+    std::string gameId = FafGameIdFromCommandLine();
+    if (gameId.empty()) {
+      gameId = LOG_GenerateFilenamePrefix().c_str();
+    }
+    const std::string fileName = Printf("desync_%s_%s_army%d.zip", gameId.c_str(), tag.c_str(), impl.mLocalArmy);
+    impl.mDumpPath = (DumpFolder() / fileName).string();
+    std::lock_guard<std::mutex> lock(sSharedMutex);
+    sDumpPath = impl.mDumpPath;
   }
 
   void CDesyncRecorder::TakeDump(const Sim& sim)
@@ -869,12 +946,22 @@ namespace moho
     Impl& impl = *mImpl;
     impl.mDumpTaken = true;
     impl.mRecording = false;
+    if (!impl.mKeepText) {
+      SendDesyncTelemetry(sim);
+      return;
+    }
+    if (impl.mDumpPath.empty()) { // forced dump without a mismatch
+      ChooseDumpPath(sim, Printf("at%d", static_cast<int>(sim.mCurBeat)));
+      gpg::Logf("Desync recorder: dump at beat %d (sim_DesyncDumpBeat)", static_cast<int>(sim.mCurBeat));
+    }
 
     std::string mapName;
+    std::string gameMods;
     bool isReplay = false;
     {
       std::lock_guard<std::mutex> lock(sSharedMutex);
       mapName = sMapName;
+      gameMods = sGameMods;
       isReplay = sIsReplay;
     }
 
@@ -888,10 +975,15 @@ namespace moho
       + JsonString(gpg::diag::BuildIdentity()) + ", \"commit\": " + JsonString(gpg::diag::BuildCommit())
       + ", \"arch\": " + JsonString(gpg::diag::BuildArch()) + ", \"dirty\": "
       + (gpg::diag::BuildDirty() ? "true" : "false") + "},\n";
+    // The game mods are the launch info's serialized Lua table, not text: the header names its MD5.
+    gpg::MD5Context modsHash{};
+    modsHash.Reset();
+    modsHash.Update(gameMods.data(), gameMods.size());
     header += Printf(
-      "  \"game\": {\"faf_game_version\": %d, \"sim_fixes\": %u, \"map\": %s, \"replay\": %s, \"faf_game_id\": %s},\n",
+      "  \"game\": {\"faf_game_version\": %d, \"sim_fixes\": %u, \"map\": %s, \"game_mods_md5\": \"%s\", "
+      "\"replay\": %s, \"faf_game_id\": %s},\n",
       FAF_GetSessionGameVersion(), static_cast<unsigned>(gFafSessionSimFixes), JsonString(mapName).c_str(),
-      isReplay ? "true" : "false", JsonString(FafGameIdFromCommandLine()).c_str()
+      modsHash.Digest().ToString().c_str(), isReplay ? "true" : "false", JsonString(FafGameIdFromCommandLine()).c_str()
     );
 
     header += "  \"command_sources\": [";
@@ -916,9 +1008,9 @@ namespace moho
 
     header += Printf(
       "  \"desync\": {\"first_mismatched_beat\": %d, \"last_agreed_beat\": %d, \"detected_at_beat\": %d, "
-      "\"delay_beats\": %d, \"dump_beat\": %d, \"records\": [",
+      "\"delay_beats\": %d, \"dump_beat\": %d, \"forced_dump_beat\": %d, \"records\": [",
       firstBeat, impl.mLastAgreedBeat == INT_MIN ? -1 : impl.mLastAgreedBeat, detectedAt,
-      firstBeat >= 0 ? detectedAt - firstBeat : -1, static_cast<int>(sim.mCurBeat)
+      firstBeat >= 0 ? detectedAt - firstBeat : -1, static_cast<int>(sim.mCurBeat), impl.mForcedDumpBeat
     );
     for (std::size_t i = 0; i < impl.mDesyncs.size(); ++i) {
       const SDesyncRecord& desync = impl.mDesyncs[i];
@@ -966,5 +1058,162 @@ namespace moho
 
     impl.Post([&impl, path = impl.mDumpPath, header = std::move(header), hashes = std::move(hashes),
                state = std::move(state), recentLog] { impl.WriteDump(path, header, hashes, state, recentLog); });
+    SendDesyncTelemetry(sim);
+  }
+
+  bool CDesyncRecorder::TelemetryApplies() const
+  {
+    std::lock_guard<std::mutex> lock(sSharedMutex);
+    return TELEMETRY_IsOn() && sIsMultiplayer && !sIsReplay;
+  }
+
+  void CDesyncRecorder::AddGameAttributes(const Sim& sim, CTelemetryAttributes& out) const
+  {
+    const Impl& impl = *mImpl;
+    std::string mapName;
+    std::string defaults;
+    {
+      std::lock_guard<std::mutex> lock(sSharedMutex);
+      mapName = sMapName;
+      defaults = sSwitchDefaults;
+    }
+    out.Add("faf.game.id", FafGameIdFromCommandLine());
+    out.Add("faf.game.version", static_cast<std::int64_t>(FAF_GetSessionGameVersion()));
+    out.Add("faf.sim_fixes", static_cast<std::int64_t>(gFafSessionSimFixes));
+    // The map's folder name, without the rest of its path.
+    const std::size_t slash = mapName.find("/maps/");
+    std::string mapFolder = slash == std::string::npos ? mapName : mapName.substr(slash + 6u);
+    mapFolder = mapFolder.substr(0, mapFolder.find('/'));
+    out.Add("faf.map", mapFolder);
+    out.Add("faf.players", static_cast<std::int64_t>(sim.mCommandSources.size()));
+    out.Add("faf.army.local", static_cast<std::int64_t>(sim.mSyncFilter.focusArmy));
+    out.Add("faf.sim.workers", static_cast<std::int64_t>(impl.mBeatWorkers));
+    out.AddBool("faf.sse2", CFG_GetArgOption("/sse2", 0u, nullptr));
+
+    // Switch values: sim_* and lua_Parallel* hashed, and every sim_/lua_ switch that differs from
+    // its value before /con ran ("unknown" when that wasn't noted).
+    const std::string now = ConsoleSwitches();
+    std::string hashed;
+    std::string changed;
+    std::map<std::string, std::string> before;
+    for (std::size_t begin = 0; begin < defaults.size();) {
+      const std::size_t end = std::min(defaults.find('\n', begin), defaults.size());
+      const std::string line = defaults.substr(begin, end - begin);
+      if (const std::size_t eq = line.find('='); eq != std::string::npos) {
+        before[line.substr(0, eq)] = line.substr(eq + 1u);
+      }
+      begin = end + 1u;
+    }
+    for (std::size_t begin = 0; begin < now.size();) {
+      const std::size_t end = std::min(now.find('\n', begin), now.size());
+      const std::string line = now.substr(begin, end - begin);
+      begin = end + 1u;
+      const std::size_t eq = line.find('=');
+      if (eq == std::string::npos) {
+        continue;
+      }
+      const std::string name = line.substr(0, eq);
+      if (name.compare(0, 4, "sim_") == 0 || name.compare(0, 12, "lua_Parallel") == 0) {
+        hashed += line + "\n";
+      }
+      // sim_Workers starts at -1 and the engine sets it from /simworkers when the sim starts:
+      // faf.sim.workers carries the count in use.
+      const auto it = before.find(name);
+      if (it != before.end() && it->second != line.substr(eq + 1u) && name != "sim_Workers") {
+        changed += (changed.empty() ? "" : ";") + line;
+      }
+    }
+    gpg::MD5Context context{};
+    context.Reset();
+    context.Update(hashed.data(), hashed.size());
+    out.Add("faf.switches.hash", std::string(context.Digest().ToString().c_str()));
+    out.Add("faf.switches.changed", defaults.empty() ? std::string("unknown") : changed);
+  }
+
+  void CDesyncRecorder::SendDesyncTelemetry(const Sim& sim)
+  {
+    Impl& impl = *mImpl;
+    if (impl.mDesyncs.empty() || !TelemetryApplies()) {
+      return;
+    }
+    const SDesyncRecord& first = impl.mDesyncs.front();
+    const auto check = impl.mChecks.find(first.mBeat);
+    if (check == impl.mChecks.end()) {
+      return;
+    }
+    std::set<int> altered;
+    {
+      std::lock_guard<std::mutex> lock(sSharedMutex);
+      altered = sOrdersAltered;
+    }
+
+    // One record per player whose hash differed from ours at the first mismatched beat.
+    const SChecksumBeat& entry = check->second;
+    std::size_t disagreeing = 0;
+    for (const SChecksumReport& report : entry.mReports) {
+      disagreeing += std::memcmp(&report.mReported, &entry.mOurs, sizeof(gpg::MD5Digest)) != 0 ? 1u : 0u;
+    }
+    CTelemetryAttributes common;
+    AddGameAttributes(sim, common);
+    common.Add("faf.desync.beat", static_cast<std::int64_t>(first.mBeat));
+    common.Add("faf.desync.last_agreed_beat", static_cast<std::int64_t>(impl.mLastAgreedBeat == INT_MIN ? -1 : impl.mLastAgreedBeat));
+    common.Add("faf.desync.delay_beats", static_cast<std::int64_t>(first.mDetectedAtBeat - first.mBeat));
+    common.AddDouble("faf.game.time_s", first.mBeat * 0.1); // one beat is one 100 ms sim tick
+    common.Add("faf.hash.local", std::string(entry.mOurs.ToString().c_str()));
+    common.Add("faf.desync.players_disagreeing", static_cast<std::int64_t>(disagreeing));
+    common.Add("faf.desync.players_reported", static_cast<std::int64_t>(entry.mReports.size()));
+    common.Add("faf.fpu.x87_control", Printf("0x%04x", impl.mBeatFpu.mX87ControlWord));
+    common.Add("faf.fpu.mxcsr", Printf("0x%08x", impl.mBeatFpu.mMxcsr));
+
+    std::vector<CTelemetryAttributes> records;
+    for (const SChecksumReport& report : entry.mReports) {
+      if (std::memcmp(&report.mReported, &entry.mOurs, sizeof(gpg::MD5Digest)) == 0) {
+        continue;
+      }
+      CTelemetryAttributes record = common;
+      int army = -1;
+      if (report.mSource >= 0 && static_cast<std::size_t>(report.mSource) < sim.mCommandSources.size()) {
+        const std::string name = sim.mCommandSources[static_cast<std::size_t>(report.mSource)].mName.c_str();
+        for (const CArmyImpl* const candidate : sim.mArmiesList) {
+          if (candidate != nullptr && name == candidate->mConstDat.mPlayerName.raw_data_unsafe()) {
+            army = candidate->mConstDat.mArmyIndex;
+            break;
+          }
+        }
+      }
+      record.Add("faf.army.remote", static_cast<std::int64_t>(army));
+      record.Add("faf.source.remote", static_cast<std::int64_t>(report.mSource));
+      record.Add("faf.hash.remote", std::string(report.mReported.ToString().c_str()));
+      record.AddBool("faf.orders_altered", altered.count(report.mSource) != 0);
+      records.push_back(std::move(record));
+    }
+
+    // Sent from the recorder's thread after the dump is written, so its size is known.
+    impl.Post([records = std::move(records), path = impl.mDumpPath]() mutable {
+      std::error_code error;
+      const std::uintmax_t size = path.empty() ? 0u : std::filesystem::file_size(path, error);
+      for (CTelemetryAttributes& record : records) {
+        if (!path.empty() && !error) {
+          record.Add("faf.dump.file", std::filesystem::path(path).filename().string());
+          record.Add("faf.dump.bytes", static_cast<std::int64_t>(size));
+        }
+        TELEMETRY_Send("faf.desync", 13, "WARN", record);
+      }
+    });
+  }
+
+  void CDesyncRecorder::SendGameEnd(const Sim& sim)
+  {
+    const Impl& impl = *mImpl;
+    if (!TelemetryApplies()) {
+      return;
+    }
+    CTelemetryAttributes record;
+    AddGameAttributes(sim, record);
+    record.Add("faf.game.beats", static_cast<std::int64_t>(sim.mCurBeat));
+    record.AddBool("faf.desync", !impl.mDesyncs.empty());
+    record.Add("faf.desync.beat", static_cast<std::int64_t>(impl.mDesyncs.empty() ? -1 : impl.mDesyncs.front().mBeat));
+    record.Add("faf.desync.later_records", static_cast<std::int64_t>(impl.mDesyncs.empty() ? 0 : impl.mDesyncs.size() - 1u));
+    mImpl->Post([record = std::move(record)] { TELEMETRY_Send("faf.game.end", 9, "INFO", record); });
   }
 } // namespace moho
