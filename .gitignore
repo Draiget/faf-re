@@ -40,6 +40,7 @@ mcp/
 skills/
 
 .claude/**/*
+.tools/
 .github/copilot-instructions.md
 .github/instructions/**/*
 .workflows/**/*
