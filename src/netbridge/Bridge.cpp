@@ -1,5 +1,6 @@
 #include "netbridge/Bridge.h"
 #include "netlink/EngineLinks.h"
+#include "netlink/WebRtc.h"
 
 #include <algorithm>
 #include <chrono>
@@ -112,6 +113,10 @@ namespace faf::netbridge
         o.gameAddress = next();
       } else if (name == "--duplicate-ms") {
         o.duplicateGapMs = std::atoi(next());
+      } else if (name == "--webrtc") {
+        o.webrtc = true;
+      } else if (name == "--test-drop-percent") {
+        o.testDropPercent = std::atoi(next());
       } else if (name == "--stats-interval") {
         o.statsIntervalSec = std::atoi(next());
       } else if (name == "--log-file") {
@@ -556,6 +561,10 @@ namespace faf::netbridge
       return;
     }
     const std::string text = msg.IsString() ? msg.AsString() : netlink::WriteJson(msg);
+    if (netlink::IsWebRtcSignal(text)) {
+      it->second->link->OnSignalText(text); // issue #239
+      return;
+    }
     std::string error;
     const std::optional<netlink::CandidatesMessage> m = netlink::CandidatesMessageFromJson(text, &error);
     if (!m) {
@@ -672,6 +681,8 @@ namespace faf::netbridge
     config.Set("forceRelay", mOptions.forceRelay);
     config.Set("bindAddress", mOptions.bindAddress);
     config.Set("duplicateMs", static_cast<std::int64_t>(mOptions.duplicateGapMs));
+    config.Set("webrtc", mOptions.webrtc);
+    config.Set("testDropPercent", static_cast<std::int64_t>(mOptions.testDropPercent));
     SendToGame({netlink::kCmdConfig, {GpgArg::Str(netlink::WriteJson(config))}}, false);
   }
 
@@ -743,6 +754,8 @@ namespace faf::netbridge
     lo.forceRelay = mOptions.forceRelay;
     lo.bindAddress = mOptions.bindAddress;
     lo.duplicateGapMs = mOptions.duplicateGapMs;
+    lo.webrtc = mOptions.webrtc;
+    lo.testDropPercent = mOptions.testDropPercent;
     lo.ufragPrefix = netlink::kOurUfragPrefix;
 
     Peer* raw = peer.get();
@@ -753,6 +766,13 @@ namespace faf::netbridge
       p.Push(mOptions.id);
       p.Push(id);
       p.Push(netlink::ToJson(m));
+      Notify("onIceMsg", std::move(p));
+    };
+    cb.onSignalText = [this, id](const std::string& text) {
+      JsonValue p = JsonValue::Array();
+      p.Push(mOptions.id);
+      p.Push(id);
+      p.Push(text);
       Notify("onIceMsg", std::move(p));
     };
     cb.onState = [this, id](const netlink::LinkState s) {
@@ -854,7 +874,12 @@ namespace faf::netbridge
                   static_cast<unsigned long long>(ls.dataDropped), static_cast<unsigned long long>(ls.duplicatesSent),
                   static_cast<unsigned long long>(c.received), static_cast<unsigned long long>(c.lost), lossPercent,
                   static_cast<unsigned long long>(c.repeats), static_cast<unsigned long long>(c.late));
-    Log(line);
+    std::string text = line;
+    if (ls.webRtcSent > 0 || ls.onWebRtc) {
+      // Issue #239: how many of the datagrams to the peer took the data channel.
+      text += "; " + std::to_string(ls.webRtcSent) + " sent on WebRTC" + (ls.onWebRtc ? " (open)" : " (closed)");
+    }
+    Log(text);
   }
 
   // --- GPGNet ----------------------------------------------------------------

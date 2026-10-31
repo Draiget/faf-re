@@ -19,6 +19,8 @@ The launcher's arguments, plus a few of ours:
 | `--lobby-port <port>` | the game's UDP port; default a free port from 20000 up, as the Java adapter |
 | `--access-token`, `--icebreaker-base-url`, others | accepted and ignored |
 | `--duplicate-ms <n>` | send every game datagram a second time, `n` ms after the first (0: right after it); off by default (#235). The game drops a repeated DATA packet by its sequence number, so the copy only counts when the first is lost |
+| `--webrtc` | offer WebRTC data channels to our own peers (#239, below); also `FAF_NETBRIDGE_WEBRTC=1` |
+| `--test-drop-percent <n>` | tests only: drop n % of the game's datagrams before sending, on either path |
 | `--stats-interval <s>` | seconds between statistics lines, default 10; 0 logs them only when a link closes (#241) |
 | `--bind-address <ip>` | local address for ICE host candidates (default all interfaces) |
 | `--game-address <ip>` | where the game's lobby port is reached, and the address the per-peer ports are bound to and the game is told (default 127.0.0.1) |
@@ -29,6 +31,21 @@ The launcher's arguments, plus a few of ours:
 ## Links in the game
 
 Our game with `net_InEngineLinks 1` (startup flag `/inenginelinks`, issue #233) announces itself with `NetlinkHello` after `GameState Idle`. For that game the bridge opens no loopback ports and relays no datagrams: it passes `setIceServers`, `iceMsg` and each new peer to the game over GPGNet, and the game's signalling and link states back to the client ([LAUNCHER_ADAPTER_CONTRACT.md](LAUNCHER_ADAPTER_CONTRACT.md) §8). The game is told `240.x.y.z:p` for each peer and reaches it through its own link. The log says `the game runs the peer links itself`, and per peer `link in the game`. The retail game, and ours with the default 0, keep the relayed path. The bridge's statistics lines cover relayed peers only; the game logs its links with `NETLINK:` lines.
+
+## WebRTC between our peers (layer 2)
+
+With `--webrtc` (or `webrtc` in the game's `NetlinkConfig`) a link marks its ICE ufrag `fnl+w+`. When both sides are ours (#234) and both carry the mark, the offerer opens a WebRTC peer connection beside the ICE link: libdatachannel 0.24.6 (`src/netlink/WebRtc.cpp`), one data channel `game`, unordered with no retransmissions, so the game's own resends stay the only ones. The offer, the answer and trickled candidates go through `iceMsg` / `onIceMsg` like the CandidatesMessage, as JSON text with a `webrtc` member. Only our peers ever see one, and they tell it apart from a CandidatesMessage by that member. Once the channel opens, game datagrams go over it; the ICE link stays up underneath with its echo, and the datagrams go back to it if the channel closes or fails (`WebRTC gave up` in the log). A peer without the mark, the Java adapter included, never sees any of this.
+
+The log shows `starting WebRTC as offerer`, then `webrtc: data channel open, game datagrams move onto it`.
+
+### faf-pioneer
+
+FAF's WebRTC adapter ([FAForever/faf-pioneer](https://github.com/FAForever/faf-pioneer), Pion) is not a peer for this mode, by decision:
+
+- it signals through faf-icebreaker, a separate server API with its own sessions (its README; the launcher passes `--icebreaker-base-url`), not through `iceMsg`;
+- its data channel `gameData` is created with Pion's defaults (`webrtc/peer.go`, "default is ordered"): ordered and reliable. SCTP then retransmits under the game's own resends and holds later datagrams behind a lost one, the second resend layer this mode avoids.
+
+Talking to pioneer would need an icebreaker client in the bridge and a channel with pioneer's settings. Pioneer runs only on the FAF client's `pioneer` branch, so no released client mixes the two.
 
 ## Statistics
 

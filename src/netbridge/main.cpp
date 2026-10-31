@@ -26,6 +26,9 @@ int main(int argc, char** argv)
   if (const char* game = std::getenv("FAF_NETBRIDGE_GAME_ADDRESS"); game != nullptr && *game != 0) {
     options.gameAddress = game;
   }
+  if (const char* webrtc = std::getenv("FAF_NETBRIDGE_WEBRTC"); webrtc != nullptr && *webrtc == '1') {
+    options.webrtc = true; // issue #239, for runs through the launch shim
+  }
   if (options.logPath.empty()) {
     if (const char* dir = std::getenv("LOG_DIR"); dir != nullptr && *dir != '\0') {
       options.logPath = std::string(dir) + "/faf-netbridge.log";

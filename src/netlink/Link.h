@@ -39,6 +39,11 @@ struct juice_agent;
 
 namespace faf::netlink
 {
+  class WebRtcChannel;
+}
+
+namespace faf::netlink
+{
   // PeerIceModule's IceState, with the strings it reports through
   // onIceConnectionStateChanged.
   enum class LinkState
@@ -75,6 +80,13 @@ namespace faf::netlink
     // The game drops a repeated DATA packet by its sequence number
     // (FUN_00486DB0), so the copy only matters when the first is lost.
     int duplicateGapMs = -1;
+    // Issue #239: offer layer 2. Our ufrag then starts with ufragPrefix +
+    // "w+", and with a peer that does the same and proved to be ours the
+    // game datagrams move onto a WebRTC data channel (netlink/WebRtc.h).
+    bool webrtc = false;
+    // Tests only: drop this share (0-100) of game datagrams in Send, on
+    // either path, to compare loss handling.
+    int testDropPercent = 0;
   };
 
   // The prefix faf-netbridge and the engine use.
@@ -89,6 +101,9 @@ namespace faf::netlink
     std::function<void(const std::string&)> onLog;
     // Issue #234: the peer answered our probe (once per connection).
     std::function<void()> onOurPeer;
+    // Issue #239: a WebRTC signal for the peer, JSON text, through iceMsg
+    // like onSignal's message.
+    std::function<void(const std::string&)> onSignalText;
   };
 
   struct LinkStats
@@ -102,6 +117,8 @@ namespace faf::netlink
     std::uint64_t invalidReceived = 0; // first byte neither 'd' nor 'e'
     std::uint32_t attempts = 0;
     double lastRttMs = -1;
+    bool onWebRtc = false;         // issue #239: datagrams on the data channel
+    std::uint64_t webRtcSent = 0;  // of dataSent
   };
 
   class Link
@@ -118,6 +135,8 @@ namespace faf::netlink
     void Start();
     // A CandidatesMessage from the peer (iceMsg).
     void OnSignal(const CandidatesMessage& remote);
+    // Issue #239: a WebRTC signal from the peer (IsWebRtcSignal).
+    void OnSignalText(const std::string& json);
     // Sends 'd' + data. Dropped while not connected, as the Java adapter does.
     bool Send(const void* data, std::size_t size);
     // Timers, state changes and restarts.
@@ -142,6 +161,8 @@ namespace faf::netlink
     void SendCandidatesLocked(Pending& out, Clock::time_point now);
     void ApplyRemoteLocked(Pending& out, const CandidatesMessage& remote, Clock::time_point now);
     void ConnectionLostLocked(Pending& out, const char* reason, Clock::time_point now);
+    void StartWebRtcLocked(Pending& out);
+    void DropWebRtcLocked(Pending& out);
     void SetStateLocked(Pending& out, LinkState state);
     void DestroyAgentLocked();
     std::uint32_t AttemptsInLastTwoMinutesLocked(Clock::time_point now) const;
@@ -181,5 +202,10 @@ namespace faf::netlink
     Clock::time_point mNextProbe{};
     std::atomic<bool> mOurPeer{false};
     std::atomic<bool> mOurPeerReported{false};
+    // Issue #239.
+    bool mRemoteWebRtc = false;
+    bool mWebRtcGaveUp = false; // for this connection
+    std::shared_ptr<WebRtcChannel> mRtc;
+    std::atomic<std::uint64_t> mWebRtcSent{0};
   };
 } // namespace faf::netlink

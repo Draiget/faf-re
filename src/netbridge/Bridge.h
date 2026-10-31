@@ -53,6 +53,10 @@ namespace faf::netbridge
     // Issue #235: send each game datagram twice, the copy this many ms later
     // (-1 off, the default).
     int duplicateGapMs = -1;
+    // Issue #239: offer WebRTC data channels to our peers (--webrtc).
+    bool webrtc = false;
+    // Tests only: drop this share of game datagrams before sending (0-100).
+    int testDropPercent = 0;
     // Seconds between per-peer statistics lines (issue #241); 0 only at close.
     int statsIntervalSec = 10;
   };

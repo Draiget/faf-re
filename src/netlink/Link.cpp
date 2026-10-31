@@ -1,4 +1,5 @@
 #include "netlink/Link.h"
+#include "netlink/WebRtc.h"
 
 #include <juice/juice.h>
 
@@ -266,6 +267,60 @@ namespace faf::netlink
     }
   }
 
+  void Link::OnSignalText(const std::string& json)
+  {
+    std::shared_ptr<WebRtcChannel> rtc;
+    {
+      Pending p;
+      std::lock_guard lock(mMutex);
+      if (mClosed || !mOptions.webrtc) {
+        return;
+      }
+      if (!mRtc && !mOptions.offerer && !mWebRtcGaveUp) {
+        StartWebRtcLocked(p); // the answerer's side starts with the offer
+      }
+      rtc = mRtc;
+    }
+    if (rtc) {
+      rtc->OnSignal(json);
+    }
+  }
+
+  void Link::StartWebRtcLocked(Pending& out)
+  {
+    WebRtcOptions o;
+    o.localId = mOptions.localId;
+    o.remoteId = mOptions.remoteId;
+    o.offerer = mOptions.offerer;
+    o.iceServers = mOptions.iceServers;
+    o.forceRelay = mOptions.forceRelay;
+    o.bindAddress = mOptions.bindAddress;
+    auto onLog = [this](const std::string& text) {
+      if (mCallbacks.onLog) {
+        mCallbacks.onLog(text);
+      }
+    };
+    auto onData = [this](const std::uint8_t* data, const std::size_t size) {
+      mDataReceived.fetch_add(1);
+      if (mCallbacks.onData) {
+        mCallbacks.onData(data, size);
+      }
+    };
+    mRtc = std::make_shared<WebRtcChannel>(std::move(o), std::move(onData), std::move(onLog));
+    Log(out, std::string("starting WebRTC as ") + (mOptions.offerer ? "offerer" : "answerer"));
+    mRtc->Start();
+  }
+
+  void Link::DropWebRtcLocked(Pending& out)
+  {
+    if (!mRtc) {
+      return;
+    }
+    // Closing joins libdatachannel's work; do it outside the lock.
+    out.actions.push_back([rtc = std::move(mRtc)] { rtc->Close(); });
+    mRtc.reset();
+  }
+
   void Link::SetGameEnded()
   {
     std::lock_guard lock(mMutex);
@@ -287,6 +342,8 @@ namespace faf::netlink
     s.echoesAnswered = mEchoesAnswered.load();
     const std::int64_t rtt = mLastRttMicros.load();
     s.lastRttMs = rtt < 0 ? -1.0 : static_cast<double>(rtt) / 1000.0;
+    s.onWebRtc = mRtc && mRtc->IsOpen();
+    s.webRtcSent = mWebRtcSent.load();
     return s;
   }
 
@@ -406,8 +463,11 @@ namespace faf::netlink
       return;
     }
     if (!mOptions.ufragPrefix.empty()) {
-      const std::size_t prefix = mOptions.ufragPrefix.size();
-      const std::string ufrag = mOptions.ufragPrefix + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
+      // Issue #239: "w+" after the prefix offers WebRTC. A random token never
+      // holds '+', so only a peer that offers it starts that way.
+      const std::string mark = mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "");
+      const std::size_t prefix = mark.size();
+      const std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
       juice_set_local_ice_attributes(agent, ufrag.c_str(), RandomToken(26).c_str());
     }
     {
@@ -423,6 +483,7 @@ namespace faf::netlink
     if (remote != nullptr) {
       mRemoteUfrag = remote->ufrag;
       mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
+      mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
       // Answerer: the remote description goes in before gathering, so
       // libjuice takes the controlled role (the offerer controls, as
       // agent.setControlling(peer.isLocalOffer())).
@@ -517,6 +578,7 @@ namespace faf::netlink
     }
     mRemoteUfrag = remote.ufrag;
     mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
+    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
     const std::string sdp = RemoteDescriptionLocked(remote, now);
     if (juice_set_remote_description(mAgent, sdp.c_str()) < 0) {
       Log(out, "remote description rejected: " + sdp);
@@ -541,6 +603,8 @@ namespace faf::netlink
       out.actions.push_back([this] { mCallbacks.onConnected(false); });
     }
     SetStateLocked(out, LinkState::Disconnected);
+    DropWebRtcLocked(out);
+    mWebRtcGaveUp = false; // the next connection may try again
     DestroyAgentLocked();
     mGatherDeadline.reset();
     mAwaitDeadline.reset();
@@ -665,6 +729,25 @@ namespace faf::netlink
         }
       }
 
+      // Issue #239: the offerer opens the data channel once the peer is ours
+      // and offers WebRTC too; the answerer starts on its first signal.
+      if (mState == LinkState::Connected && mOptions.offerer && mOptions.webrtc && mRemoteWebRtc && mOurPeer.load() &&
+          !mRtc && !mWebRtcGaveUp) {
+        StartWebRtcLocked(p);
+      }
+      if (mRtc) {
+        for (std::string& signal : mRtc->TakeSignals()) {
+          if (mCallbacks.onSignalText) {
+            p.actions.push_back([this, signal = std::move(signal)] { mCallbacks.onSignalText(signal); });
+          }
+        }
+        if (mRtc->HasFailed()) {
+          Log(p, "WebRTC gave up; game datagrams stay on the ICE link");
+          DropWebRtcLocked(p);
+          mWebRtcGaveUp = true;
+        }
+      }
+
       if (mState == LinkState::Disconnected && mRestartAt && now >= *mRestartAt) {
         mRestartAt.reset();
         InitiateLocked(p, nullptr);
@@ -679,6 +762,26 @@ namespace faf::netlink
       std::lock_guard lock(mMutex);
       ++mStats.dataDropped;
       return false;
+    }
+    if (mOptions.testDropPercent > 0) {
+      thread_local std::minstd_rand rng{std::random_device{}()};
+      if (static_cast<int>(rng() % 100) < mOptions.testDropPercent) {
+        std::lock_guard lock(mMutex);
+        ++mStats.dataSent; // as if it was lost on the way
+        return true;
+      }
+    }
+    // Issue #239: on the data channel while it is open, as the bare datagram.
+    std::shared_ptr<WebRtcChannel> rtc;
+    {
+      std::lock_guard lock(mMutex);
+      rtc = mRtc;
+    }
+    if (rtc && rtc->Send(data, size)) {
+      std::lock_guard lock(mMutex);
+      ++mStats.dataSent;
+      mWebRtcSent.fetch_add(1);
+      return true;
     }
     // 'd' + datagram (PeerIceModule.onFaDataReceived).
     char buf[2048];
@@ -722,6 +825,10 @@ namespace faf::netlink
     }
     mClosed = true;
     mConnected = false;
+    if (mRtc) {
+      mRtc->Close();
+      mRtc.reset();
+    }
     DestroyAgentLocked();
   }
 

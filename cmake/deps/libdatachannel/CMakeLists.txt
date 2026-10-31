@@ -92,7 +92,7 @@ else()
   target_link_libraries(faf_usrsctp PUBLIC ws2_32 iphlpapi)
   target_link_libraries(faf_datachannel PUBLIC ws2_32)
 endif()
-# Built only for what links them (faf_datachannel_test until #239 uses them).
+# Built only for what links them (faf_netlink since #239, faf_datachannel_test).
 foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
   target_link_libraries(${_t} PRIVATE faf_codegen)
   set_target_properties(${_t} PROPERTIES EXCLUDE_FROM_ALL TRUE)

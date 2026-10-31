@@ -21,6 +21,7 @@
 #include "netlink/EngineLinks.h"
 #include "netlink/Json.h"
 #include "netlink/Link.h"
+#include "netlink/WebRtc.h"
 
 namespace moho
 {
@@ -72,6 +73,8 @@ namespace moho
         mForceRelay = config->Get("forceRelay").AsBool();
         mBindAddress = config->Get("bindAddress").AsString();
         mDuplicateGapMs = static_cast<int>(config->Get("duplicateMs").AsInt(-1));
+        mWebRtc = config->Get("webrtc").AsBool();
+        mTestDropPercent = static_cast<int>(config->Get("testDropPercent").AsInt(0));
         gpg::Logf(
           "NETLINK: configured, local id %lld, %d ICE server addresses%s", static_cast<long long>(mLocalId),
           static_cast<int>(mIceServers.size()), mForceRelay ? ", relay only" : ""
@@ -90,6 +93,8 @@ namespace moho
           options.forceRelay = mForceRelay;
           options.bindAddress = mBindAddress;
           options.duplicateGapMs = mDuplicateGapMs;
+          options.webrtc = mWebRtc;
+          options.testDropPercent = mTestDropPercent;
         }
         options.remoteId = id;
         options.offerer = offerer;
@@ -101,6 +106,11 @@ namespace moho
           SNetCommandArg remote(static_cast<std::int32_t>(id));
           SNetCommandArg text(msvc8::string(nl::ToJson(m).c_str()));
           Write(nl::kCmdIceMsg, &remote, &text);
+        };
+        cb.onSignalText = [this, id](const std::string& text) {
+          SNetCommandArg remote(static_cast<std::int32_t>(id));
+          SNetCommandArg body(msvc8::string(text.c_str()));
+          Write(nl::kCmdIceMsg, &remote, &body);
         };
         cb.onState = [this, id](const nl::LinkState) { ReportState(id); };
         cb.onConnected = [this, id](const bool) { ReportState(id); };
@@ -141,6 +151,10 @@ namespace moho
         std::shared_ptr<nl::Link> link = Find(id);
         if (!link) {
           gpg::Logf("NETLINK: ICE message for unknown peer %lld", static_cast<long long>(id));
+          return;
+        }
+        if (nl::IsWebRtcSignal(json)) {
+          link->OnSignalText(json); // issue #239
           return;
         }
         std::string error;
@@ -283,6 +297,8 @@ namespace moho
       bool mForceRelay = false;
       std::string mBindAddress;
       int mDuplicateGapMs = -1;
+      bool mWebRtc = false;
+      int mTestDropPercent = 0;
       bool mGameEnded = false;
       std::map<std::int64_t, std::unique_ptr<EnginePeer>> mPeers;
     };
