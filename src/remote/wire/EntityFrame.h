@@ -55,6 +55,11 @@ namespace faf::remote::wire
     [[nodiscard]] bool operator==(const SCategoryBits& other) const noexcept = default;
   };
 
+  /** A category set on the wire: its first word index, then its words. */
+  void WriteCategoryBits(BitWriter& writer, const SCategoryBits& bits);
+  /** False, with the reader failed, for more than `SCategoryBits::kMaxWords` words or a short stream. */
+  [[nodiscard]] bool ReadCategoryBits(BitReader& reader, SCategoryBits& bits);
+
   /** One weapon's UI facts (`UnitWeaponInfo`): target categories, layer, ranges, range rings. */
   struct SUnitWeapon
   {

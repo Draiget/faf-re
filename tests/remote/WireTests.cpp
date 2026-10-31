@@ -19,6 +19,16 @@
 #include <string>
 #include <vector>
 
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTITarget.h"
+#include "lua/LuaObject.h"
+#include "remote/FrameWindow.h"
+#include "remote/InboundIds.h"
+#include "remote/ViewIdMap.h"
+// The command headers bring in <windows.h>, whose `near` and `far` macros the tests below use as names.
+#undef near
+#undef far
+#include "remote/wire/ArmyLane.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/IntelGridDelta.h"
@@ -157,8 +167,12 @@ namespace
     const SAxisQuantizer axis{-256.0f, 1.0f / 64.0f, 17};
     for (float v = -256.0f; v < 1700.0f; v += 0.37f) {
       const float back = axis.Decode(axis.Encode(v));
-      CHECK(std::fabs(back - v) <= axis.step * 0.5f + 1e-4f);
+      // Down to the step: never above the value, less than a step below it, and in the same
+      // whole unit, so an intel grid cell (whole units) holds both.
+      CHECK(back <= v + 1e-4f && v - back < axis.step + 1e-4f);
+      CHECK(std::floor(back) == std::floor(v));
     }
+    CHECK(std::floor(axis.Decode(axis.Encode(241.99553f))) == 241.0f); // the #103 case
     CHECK(axis.Encode(-1.0e9f) == 0u);
     CHECK(axis.Encode(1.0e9f) == axis.MaxQuantized());
     CHECK(axis.Encode(std::numeric_limits<float>::quiet_NaN()) == 0u);
@@ -1627,7 +1641,406 @@ namespace
     }
   }
 
+  // Plan WP5.9: per-view ids for blips, foreign projectiles and foreign commands.
+  void TestViewIdMap()
+  {
+    using faf::remote::CViewIdMap;
+    const auto ownSource = [](const std::uint32_t commandId) { return (commandId >> 24u) == 2u; };
+    const auto record = [](const std::uint32_t id) {
+      SEntityRecord r{};
+      r.id = id;
+      return r;
+    };
+
+    CViewIdMap map(2); // the view of army 2, commanded through source 2
+    SViewFrame frame{};
+    frame.entities.push_back(record(0x00200001u)); // own unit: kept
+    frame.entities.push_back(record(0x00500003u)); // foreign unit: kept (D6 renumbers no units)
+    frame.entities.push_back(record(0x10200010u)); // own projectile: kept
+    frame.entities.push_back(record(0x10500044u)); // foreign projectile: army 5's first in this view
+    frame.entities.push_back(record(0x2FF00005u)); // prop: kept
+    frame.entities.push_back(record(0x30500007u)); // blip of an army-5 unit: first
+    frame.entities.push_back(record(0x30500002u)); // second
+    SEntityRecord unit = record(0x00200009u);
+    unit.isUnit = true;
+    SUnitDetail detail{};
+    detail.targetBlip = 0x30500007u;
+    detail.creator = 0x00200001u;
+    detail.commands = {0x02000005, static_cast<std::int32_t>(0x80000123u), 0x05000009};
+    detail.buildQueue = {static_cast<std::int32_t>(0x80000123u)};
+    unit.unit.detail = TSharedValue<SUnitDetail>(detail);
+    frame.entities.push_back(unit);
+
+    map.Translate(frame, ownSource);
+    std::vector<std::uint32_t> ids;
+    for (const SEntityRecord& r : frame.entities) {
+      ids.push_back(r.id);
+    }
+    // Family nibble and source byte kept; serials by first appearance; records sorted again.
+    const std::vector<std::uint32_t> expected = {0x00200001u, 0x00200009u, 0x00500003u, 0x10200010u,
+                                                 0x10500001u, 0x2FF00005u, 0x30500001u, 0x30500002u};
+    CHECK(ids == expected);
+    const SUnitDetail& mapped = *frame.entities[1].unit.detail;
+    CHECK(mapped.targetBlip == 0x30500001u); // the same view id as the blip's own record
+    CHECK(mapped.creator == 0x00200001u);
+    CHECK(mapped.commands.size() == 3u && mapped.commands[0] == 0x02000005); // own command kept
+    CHECK(static_cast<std::uint32_t>(mapped.commands[1]) == 0x80000001u);  // the sim's own: renumbered
+    CHECK(static_cast<std::uint32_t>(mapped.commands[2]) == 0x80000002u);  // another client's: renumbered
+    CHECK(mapped.buildQueue.size() == 1u && static_cast<std::uint32_t>(mapped.buildQueue[0]) == 0x80000001u);
+    CHECK(map.EntitiesMapped() == 3u && map.CommandsMapped() == 2u && map.Overflows() == 0u);
+
+    // Inbound: view ids map back; own and unmapped ids are the sim's; unknown view ids refuse.
+    std::uint32_t sim = 0;
+    CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
+    CHECK(map.EntityToSim(0x10500001u, sim) && sim == 0x10500044u);
+    CHECK(map.EntityToSim(0x00500003u, sim) && sim == 0x00500003u);
+    CHECK(!map.EntityToSim(0x30500009u, sim));
+    CHECK(map.CommandToSim(0x80000002u, sim) && sim == 0x05000009u);
+    CHECK(map.CommandToSim(0x02000005u, sim) && sim == 0x02000005u);
+    CHECK(!map.CommandToSim(0x80000007u, sim));
+    CHECK(!map.MapsEntity(SAppearance::kNoAttachParent));
+
+    // Retired ids are never handed out again: the sim reusing a serial gets a fresh view id.
+    const std::uint32_t retiredEntities[] = {0x30500007u};
+    const std::uint32_t retiredCommands[] = {0x80000123u};
+    map.RetireEntities(retiredEntities);
+    map.RetireCommands(retiredCommands);
+    // A retired id still translates inbound for the grace beats (a late command), then no more.
+    CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
+    CHECK(map.CommandToSim(0x80000001u, sim) && sim == 0x80000123u);
+    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    map.AdvanceTo(CViewIdMap::kInboundGraceBeats);
+    CHECK(!map.EntityToSim(0x30500001u, sim));
+    CHECK(!map.CommandToSim(0x80000001u, sim));
+    CHECK(!map.CommandToSim(0x80000002u, sim));
+    SViewFrame again{};
+    again.entities.push_back(record(0x30500007u));
+    SEntityRecord again2 = unit;
+    SUnitDetail queued{};
+    queued.commands = {static_cast<std::int32_t>(0x80000123u)};
+    again2.unit.detail = TSharedValue<SUnitDetail>(queued);
+    again.entities.push_back(again2);
+    map.Translate(again, ownSource);
+    CHECK(again.entities[1].id == 0x30500003u);
+    CHECK(static_cast<std::uint32_t>((*again.entities[0].unit.detail).commands[0]) == 0x80000003u);
+
+    // Another view numbers on its own: army 5's view keeps its own projectile and blips get serial 1 up.
+    CViewIdMap other(5);
+    SViewFrame theirs{};
+    theirs.entities.push_back(record(0x30500002u));
+    theirs.entities.push_back(record(0x10500044u));
+    other.Translate(theirs, [](std::uint32_t) { return false; });
+    CHECK(theirs.entities[0].id == 0x10500044u);
+    CHECK(theirs.entities[1].id == 0x30500001u);
+  }
+
+  /** Records what reaches the sim side of `CInboundIdTranslator`. */
+  class CRecordingSink final : public moho::ICommandSink
+  {
+  public:
+    std::vector<std::uint32_t> destroyed;
+    std::vector<std::uint32_t> issuedUnits;
+    std::int32_t partner = 0;
+    std::int32_t insertBefore = 0;
+    std::uint32_t target = 0;
+    std::vector<std::uint32_t> removed; // command, unit
+    int issued = 0;
+
+    void SetCommandSource(moho::CommandSourceId) override {}
+    void OnCommandSourceTerminated() override {}
+    void VerifyChecksum(const gpg::MD5Digest&, moho::CSeqNo) override {}
+    void RequestPause() override {}
+    void Resume() override {}
+    void SingleStep() override {}
+    void CreateUnit(uint32_t, const moho::RResId&, const moho::SCoordsVec2&, float) override {}
+    void CreateProp(const char*, const Wm3::Vec3f&) override {}
+    void DestroyEntity(const moho::EntId id) override { destroyed.push_back(static_cast<std::uint32_t>(id)); }
+    void WarpEntity(moho::EntId, const moho::VTransform&) override {}
+    void ProcessInfoPair(moho::EntId, gpg::StrArg, gpg::StrArg) override {}
+    void IssueCommand(
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& units, const moho::SSTICommandIssueData& data, bool
+    ) override
+    {
+      ++issued;
+      issuedUnits.clear();
+      units.ForEachValue([this](const unsigned int id) { issuedUnits.push_back(id); });
+      partner = data.unk04;
+      insertBefore = data.mIndex;
+      target = data.mTarget.mEntityId;
+    }
+    void IssueFactoryCommand(
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&, const moho::SSTICommandIssueData&, bool
+    ) override
+    {}
+    void IncreaseCommandCount(moho::CmdId, int) override {}
+    void DecreaseCommandCount(moho::CmdId, int) override {}
+    void SetCommandTarget(moho::CmdId, const moho::SSTITarget&) override {}
+    void SetCommandType(moho::CmdId, moho::EUnitCommandType) override {}
+    void SetCommandCells(moho::CmdId, const gpg::core::FastVector<moho::SOCellPos>&, const Wm3::Vector3<float>&) override {}
+    void RemoveCommandFromUnitQueue(const moho::CmdId command, const moho::EntId unit) override
+    {
+      removed = {static_cast<std::uint32_t>(command), static_cast<std::uint32_t>(unit)};
+    }
+    void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override {}
+    std::string callbackEntity;
+    void LuaSimCallback(const char*, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&) override
+    {
+      const LuaPlus::LuaObject entity = args["entity"];
+      callbackEntity = entity.IsString() ? entity.GetString() : "";
+    }
+    void ExecuteDebugCommand(
+      const char*, const Wm3::Vector3<float>&, uint32_t, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
+    ) override
+    {}
+    void AdvanceBeat(int) override {}
+    void EndGame() override {}
+  };
+
+  // Plan WP5.10: a client's commands in its view's ids come out in the sim's; unknown ids drop them.
+  void TestInboundIds()
+  {
+    using faf::remote::CViewIdMap;
+    const auto ownSource = [](const std::uint32_t commandId) { return (commandId >> 24u) == 2u; };
+    CViewIdMap map(2);
+    SViewFrame frame{};
+    SEntityRecord blip{};
+    blip.id = 0x30500007u; // -> 0x30500001
+    frame.entities.push_back(blip);
+    SEntityRecord unit{};
+    unit.id = 0x00200009u;
+    unit.isUnit = true;
+    SUnitDetail detail{};
+    detail.commands = {static_cast<std::int32_t>(0x80000123u), 0x05000009}; // -> 0x80000001, 0x80000002
+    unit.unit.detail = TSharedValue<SUnitDetail>(detail);
+    frame.entities.push_back(unit);
+    map.Translate(frame, ownSource);
+
+    CRecordingSink sim;
+    faf::remote::CInboundIdTranslator intake(sim, map);
+    moho::BVSet<moho::EntId, moho::EntIdUniverse> units{};
+    (void)units.Add(static_cast<moho::EntId>(0x00200009u));
+    moho::SSTICommandIssueData data(moho::EUnitCommandType::UNITCOMMAND_Attack);
+    data.nextCommandId = 0x02000010;                           // the client's own new id
+    data.unk04 = static_cast<std::int32_t>(0x80000002u);        // partner: another client's command
+    data.mIndex = static_cast<std::int32_t>(0x80000001u);       // insert before the sim's command
+    data.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
+    data.mTarget.mEntityId = 0x30500001u;                       // the blip, in view ids
+    intake.IssueCommand(units, data, false);
+    CHECK(sim.issued == 1);
+    CHECK(sim.issuedUnits == std::vector<std::uint32_t>{0x00200009u});
+    CHECK(static_cast<std::uint32_t>(sim.partner) == 0x05000009u);
+    CHECK(static_cast<std::uint32_t>(sim.insertBefore) == 0x80000123u);
+    CHECK(sim.target == 0x30500007u);
+
+    intake.RemoveCommandFromUnitQueue(static_cast<moho::CmdId>(0x80000001u), static_cast<moho::EntId>(0x00200009u));
+    CHECK((sim.removed == std::vector<std::uint32_t>{0x80000123u, 0x00200009u}));
+
+    // A blip id the view was never given drops the command; a foreign unit passes as it is.
+    data.mTarget.mEntityId = 0x30500004u;
+    intake.IssueCommand(units, data, false);
+    CHECK(sim.issued == 1);
+    CHECK(intake.Dropped() == 1u);
+    intake.DestroyEntity(static_cast<moho::EntId>(0x00500003u));
+    CHECK(sim.destroyed == std::vector<std::uint32_t>{0x00500003u});
+    intake.IncreaseCommandCount(static_cast<moho::CmdId>(0x80000009u), 1); // a view command id never given
+    CHECK(intake.Dropped() == 2u);
+    CHECK(intake.BlipTargets(moho::EUnitCommandType::UNITCOMMAND_Attack) == 1u);
+
+    // Plan WP5.6: a selection mask in view ids comes out in sim ids; unknown or unheld ids are left out.
+    moho::SSyncFilterMaskBlock mask{};
+    (void)mask.Add(0x00200009u); // own unit, held
+    (void)mask.Add(0x30500001u); // the blip, in view ids
+    (void)mask.Add(0x30500003u); // a view blip id never given
+    (void)mask.Add(0x00500001u); // a unit id the view holds no record of
+    moho::SSyncFilterMaskBlock simMask{};
+    const auto held = [](const std::uint32_t simId) { return simId == 0x00200009u || simId == 0x30500007u; };
+    CHECK(faf::remote::TranslateSelectionMask(map, mask, simMask, held) == 2u);
+    CHECK(simMask.Contains(0x00200009u) && simMask.Contains(0x30500007u) && !simMask.Contains(0x30500001u));
+
+    // Plan WP5.11: a marked callback field (`Rebuild`'s `entity`, a decimal string) is translated too.
+    LuaPlus::LuaState lua(LuaPlus::LuaState::LIB_BASE);
+    LuaPlus::LuaObject args;
+    args.AssignNewTable(&lua, 0, 4);
+    args.SetString("entity", "810549249"); // 0x30500001, the blip in view ids
+    moho::BVSet<moho::EntId, moho::EntIdUniverse> none{};
+    intake.LuaSimCallback("Rebuild", args, none);
+    CHECK(sim.callbackEntity == "810549255"); // 0x30500007, the sim's
+    args.SetString("entity", "810549252");   // 0x30500004, never given
+    sim.callbackEntity.clear();
+    intake.LuaSimCallback("Rebuild", args, none);
+    CHECK(sim.callbackEntity.empty() && intake.Dropped() == 3u);
+    args.SetString("entity", "810549252");   // an unmarked callback passes as it is
+    intake.LuaSimCallback("SomethingElse", args, none);
+    CHECK(sim.callbackEntity == "810549252");
+
+    // An id of this view in a field the policy does not mark passes as it is and is counted.
+    args.SetString("entity", "810549249");
+    args.SetString("other", "810549249");
+    const std::uint64_t unmarkedBefore = intake.UnmarkedIds();
+    intake.LuaSimCallback("Rebuild", args, none);
+    CHECK(intake.UnmarkedIds() == unmarkedBefore + 1u);
+
+    // A list of ids (`OnControlGroupAssign`): every element is translated.
+    LuaPlus::LuaObject group;
+    group.AssignNewTable(&lua, 2, 0);
+    group.SetString(1, "2097161");   // 0x00200009, own unit: kept
+    group.SetString(2, "810549249"); // the blip in view ids
+    intake.LuaSimCallback("OnControlGroupAssign", group, none);
+    CHECK(std::string(group.GetByIndex(1).GetString()) == "2097161");
+    CHECK(std::string(group.GetByIndex(2).GetString()) == "810549255");
+
+    // Plan WP5.12: capture and guard on a blip go through like attack.
+    data.mTarget.mEntityId = 0x30500001u;
+    data.mCommandType = moho::EUnitCommandType::UNITCOMMAND_Capture;
+    intake.IssueCommand(units, data, false);
+    data.mCommandType = moho::EUnitCommandType::UNITCOMMAND_Guard;
+    intake.IssueCommand(units, data, false);
+    CHECK(sim.target == 0x30500007u);
+    CHECK(intake.BlipTargets(moho::EUnitCommandType::UNITCOMMAND_Capture) == 1u);
+    CHECK(intake.BlipTargets(moho::EUnitCommandType::UNITCOMMAND_Guard) == 1u);
+  }
+
+  // Plan WP5.3: frames against the newest acknowledged one; losses cost freshness only.
+  void TestFrameWindow()
+  {
+    using faf::remote::CClientFrameWindow;
+    using faf::remote::CServerFrameWindow;
+    SFrameCodec codec{};
+    const auto frameAt = [](const std::uint32_t id) {
+      SViewFrame frame{};
+      frame.frameId = id;
+      frame.beat = id;
+      for (std::uint32_t e = 0; e < 3u + id % 4u; ++e) { // entities come and go
+        SEntityRecord record{};
+        record.id = 0x00100000u + e;
+        record.health = static_cast<float>(id * 10u + e);
+        frame.entities.push_back(record);
+      }
+      return frame;
+    };
+    CServerFrameWindow server;
+    CClientFrameWindow client;
+    const auto send = [&](const SViewFrame& frame, const bool lost) {
+      BitWriter writer;
+      const bool encoded = EncodeFrame(frame, server.Baseline(), codec, writer);
+      server.Sent(frame);
+      if (!encoded || lost) {
+        return encoded;
+      }
+      SViewFrame decoded{};
+      return client.Decode(writer.Bytes(), codec, decoded) && decoded == frame;
+    };
+
+    CHECK(server.Baseline() == nullptr);
+    CHECK(send(frameAt(1), false));           // full
+    server.Ack(client.Newest());              // 1
+    CHECK(server.Baseline() != nullptr && server.Baseline()->frameId == 1u);
+    CHECK(send(frameAt(2), true));            // lost
+    CHECK(send(frameAt(3), false));           // against 1 still: decodes without 2
+    server.Ack(client.Newest());              // 3
+    CHECK(server.Baseline()->frameId == 3u && server.Kept() == 1u);
+    server.Ack(1u);                           // a late acknowledgement changes nothing
+    CHECK(server.Baseline()->frameId == 3u);
+    CHECK(server.FullFrames() == 0u);
+
+    // Past the cap without an acknowledgement the baseline is gone: the next frame goes in full.
+    for (std::uint32_t id = 4; id < 4u + faf::remote::kMaxFrames; ++id) {
+      CHECK(send(frameAt(id), true));
+    }
+    CHECK(server.Baseline() == nullptr);
+    CHECK(send(frameAt(100), false));
+    CHECK(server.FullFrames() == 1u);
+    server.Ack(client.Newest());
+    CHECK(send(frameAt(101), false));
+
+    // A frame whose baseline the client does not hold does not decode.
+    CClientFrameWindow fresh;
+    SViewFrame out{};
+    SViewFrame base = frameAt(101);
+    BitWriter againstBase;
+    CHECK(EncodeFrame(frameAt(102), &base, codec, againstBase));
+    CHECK(!fresh.Decode(againstBase.Bytes(), codec, out));
+  }
+
+  // Plan WP5.13: the army lane and the grid lane round-trip; unchanged records cost a bit.
+  void TestArmyAndGridLanes()
+  {
+    SArmyRecord a{};
+    a.economy[0] = 123.5f;
+    a.maxStorage = {5000u, std::uint64_t{1} << 40};
+    a.allies = {0u, 2u};
+    a.enemies = {1u};
+    a.validCommandSources = {3u};
+    a.armyType = "human";
+    a.faction = 2;
+    a.categoryFilter.firstWord = 1;
+    a.categoryFilter.words = {0xDEADBEEFu, 7u};
+    a.armyStart = {12.5f, 99.25f};
+    a.noRushRadius = 75.0f;
+    SArmyRecord b = a;
+    b.armyType = "AI: Rush";
+    b.isAlly = 1;
+    const std::vector<SArmyRecord> first = {a, b};
+
+    BitWriter full;
+    CHECK(EncodeArmyLane(first, nullptr, full));
+    BitReader fullReader(full.Bytes());
+    std::vector<SArmyRecord> held;
+    CHECK(DecodeArmyLane(fullReader, nullptr, held) && held == first);
+
+    std::vector<SArmyRecord> second = first;
+    second[0].economy[0] = 124.0f;
+    BitWriter delta;
+    CHECK(EncodeArmyLane(second, &first, delta));
+    CHECK(delta.Bytes().size() < full.Bytes().size());
+    BitReader deltaReader(delta.Bytes());
+    std::vector<SArmyRecord> next;
+    CHECK(DecodeArmyLane(deltaReader, &held, next) && next == second);
+
+    BitWriter same;
+    CHECK(EncodeArmyLane(second, &second, same) && same.Bytes().size() <= 2u); // the count, then a bit per army
+
+    std::vector<std::uint8_t> cut(full.Bytes().begin(), full.Bytes().begin() + static_cast<std::ptrdiff_t>(full.Bytes().size() / 2));
+    BitReader cutReader(cut);
+    std::vector<SArmyRecord> none;
+    CHECK(!DecodeArmyLane(cutReader, nullptr, none));
+    BitWriter unchangedOnly;
+    CHECK(EncodeArmyLane(first, &first, unchangedOnly));
+    BitReader orphanReader(unchangedOnly.Bytes());
+    CHECK(!DecodeArmyLane(orphanReader, nullptr, none)); // "unchanged" with nothing held
+
+    SGridSlot vision{};
+    vision.army = 1;
+    vision.kind = 0;
+    vision.gridSize = 8;
+    vision.bits.width = 16;
+    vision.bits.height = 16;
+    vision.bits.cells.assign(256, 0u);
+    vision.bits.cells[17] = 1u;
+    SGridSlot water = vision;
+    water.kind = 1;
+    water.bits.cells[200] = 1u;
+    std::vector<SGridSlot> serverHeld;
+    std::vector<SGridSlot> clientHeld;
+    const std::vector<SGridSlot> beat1 = {vision, water};
+    BitWriter grids1;
+    CHECK(EncodeGridLane(beat1, serverHeld, grids1));
+    BitReader gridReader1(grids1.Bytes());
+    CHECK(DecodeGridLane(gridReader1, clientHeld) && clientHeld == beat1);
+    serverHeld = beat1;
+    std::vector<SGridSlot> beat2 = beat1;
+    beat2[0].bits.cells[18] = 1u;
+    BitWriter grids2;
+    CHECK(EncodeGridLane(beat2, serverHeld, grids2));
+    BitReader gridReader2(grids2.Bytes());
+    CHECK(DecodeGridLane(gridReader2, clientHeld) && clientHeld == beat2);
+  }
+
   const TestCase kTests[] = {
+    {"armies and grids: lanes round trip", &TestArmyAndGridLanes},
+    {"frames: window of acknowledged baselines", &TestFrameWindow},
+    {"view ids: renumbering, inbound and retirement", &TestViewIdMap},
+    {"view ids: inbound translation of commands", &TestInboundIds},
     {"grids: delta round trip", &TestGridDeltaRoundTrip},
     {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
     {"grids: hostile input", &TestGridDeltaHostile},

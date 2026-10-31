@@ -32,7 +32,11 @@ namespace faf::remote::wire
     if (!(value == value)) {
       return 0u;
     }
-    const double scaled = std::floor((static_cast<double>(value) - minValue) / step + 0.5);
+    // Down, not to the nearest step: with a whole-number `minValue` and a step that divides one
+    // unit, a value and its quantised one then share `floor`, so a position stays in its intel
+    // grid cell (`GridPos`, cells of a whole number of units). To the nearest, 241.9955 became
+    // 242.0 and the client tested the next cell over (the #103 golden test under /loopback).
+    const double scaled = std::floor((static_cast<double>(value) - minValue) / step);
     if (scaled <= 0.0) {
       return 0u;
     }

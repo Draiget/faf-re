@@ -50,6 +50,7 @@
 #include "headless/ReplayCommandCheck.h"
 #include "headless/ReplayChangeSetCheck.h"
 #include "headless/ReplayOracleCheck.h"
+#include "headless/ReplayInboundCheck.h"
 #include "headless/ReplayViewFrameStats.h"
 #include "headless/ReplayViewPacketCheck.h"
 #include "headless/ReplayWireStats.h"
@@ -542,7 +543,23 @@ namespace faf::headless
         result.error = "cannot write " + options.viewFramesPath;
         return result;
       }
+      if (options.viewIds) {
+        viewFrames->EnableIdMaps();
+      }
+      viewFrames->SetParallel(options.parallelViews);
+      if (options.spy) {
+        viewFrames->EnableSpy();
+      }
+      viewFrames->SetChannel(
+        static_cast<std::uint32_t>(options.viewLossPercent), static_cast<std::uint32_t>(options.viewAckDelay)
+      );
       viewFrames->Install();
+    }
+    // `--inbound-check`: the decoder's messages through view ids and back (with --view-ids).
+    std::unique_ptr<CReplayInboundCheck> inboundCheck;
+    if (options.inboundCheck && viewFrames) {
+      inboundCheck = std::make_unique<CReplayInboundCheck>(*rules, *viewFrames);
+      inboundCheck->Install();
     }
 #endif
 
@@ -795,6 +812,10 @@ namespace faf::headless
     if (viewFrames) {
       result.viewFramesSummary = viewFrames->Summary();
       result.viewFramesFailures = viewFrames->Failures();
+    }
+    if (inboundCheck) {
+      result.inboundSummary = inboundCheck->Summary();
+      result.inboundFailures = inboundCheck->Failures();
     }
 #endif
     if (!options.syncKeysPath.empty()) {

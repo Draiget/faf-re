@@ -1,15 +1,18 @@
 #pragma once
 
 #include <chrono>
+#include <map>
 #include <cstdint>
 #include <optional>
 #include <string>
 
 #include "remote/FrameBuilder.h"
 #include "remote/client/BeatClock.h"
+#include "remote/client/GridSnapshots.h"
 #include "remote/client/RemoteClientManager.h"
 #include "remote/client/SyncRebuilder.h"
 #include "remote/wire/Roster.h"
+#include "remote/wire/ArmyLane.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
 
@@ -53,6 +56,7 @@ namespace faf::remote::client
   {
   public:
     CLoopbackLink(moho::RRuleGameRules& rules, const wire::SFrameCodec& codec, const SLoopbackOptions& options);
+    ~CLoopbackLink();
 
     /** One beat through the wire; `packet` comes out rebuilt. */
     void Pass(moho::SSyncData& packet);
@@ -77,7 +81,7 @@ namespace faf::remote::client
     [[nodiscard]] const SRebuildStats& Stats() const noexcept { return mRebuilder.Stats(); }
     [[nodiscard]] bool DeadReckoning() const noexcept { return mReckoner.has_value(); }
 
-    /** Two lines (no trailing newline): traffic and timing, then the checks, which should all be 0. */
+    /** Three lines (no trailing newline): traffic and timing, the checks (all should be 0), the army and grid lanes. */
     [[nodiscard]] std::string Summary(const char* when) const;
 
     /** The sum of the check counters that must stay 0. */
@@ -110,6 +114,25 @@ namespace faf::remote::client
     std::uint64_t mRosterBytes = 0;
     std::uint64_t mRosterFailures = 0;   // a roster that did not decode as sent
     std::uint64_t mRosterMismatches = 0; // the facade answering otherwise than the stand-in
+    // The army lane and the view army's grids (WP5.13).
+    void PassArmiesAndGrids(moho::SSyncData& packet);
+    void InstallUserGrids();
+    std::map<std::pair<std::uint8_t, std::uint8_t>, boost::shared_ptr<moho::CIntelGrid>> mUserGrids; // (army, kind)
+    moho::RRuleGameRules* mRules = nullptr;
+    CGridSnapshots mGridSnapshots;
+    std::vector<wire::SArmyRecord> mSentArmies;   // the server's copy of what the client holds
+    std::vector<wire::SArmyRecord> mClientArmies; // the client's
+    bool mHasSentArmies = false;
+    std::vector<wire::SGridSlot> mSentGrids;      // likewise for the grids
+    std::vector<wire::SGridSlot> mClientGrids;
+    std::uint64_t mArmyBytes = 0;
+    std::uint64_t mGridBytes = 0;
+    std::uint64_t mArmyFailures = 0;    // a lane that did not encode or decode
+    std::uint64_t mArmyMismatches = 0;  // decoded records other than those sent
+    std::uint64_t mGridFailures = 0;
+    std::uint64_t mGridMismatches = 0;  // decoded grids other than the sim's
+    std::uint64_t mGridBeatsMissing = 0; // beats with no grid copy from the sim thread
+    std::uint64_t mUserGridsInstalled = 0; // client-owned grids handed to a session's armies
     double mServerSeconds = 0.0; // building and encoding frames
     double mClientSeconds = 0.0; // decoding and rebuilding packets
     double mMaxBeatSeconds = 0.0;

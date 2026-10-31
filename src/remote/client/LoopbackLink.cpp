@@ -5,9 +5,15 @@
 #include <utility>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/CIntelGrid.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/UserArmy.h"
+#include "remote/ArmyRecords.h"
 #include "remote/ContentTables.h"
+#include "remote/ViewPackets.h"
 #include "remote/wire/WireVersion.h"
 #include "moho/net/CClientBase.h"
 
@@ -61,6 +67,100 @@ namespace faf::remote::client
     mBuilder.SetSessionTables(&mServerTables);
     mRebuilder.SetSessionTables(&mClientTables);
     mRebuilder.SetRules(&rules);
+    mRules = &rules;
+    mGridSnapshots.Install(); // the view's grids, copied on the sim thread (WP5.13)
+  }
+
+  CLoopbackLink::~CLoopbackLink()
+  {
+    mGridSnapshots.Uninstall();
+  }
+
+  void CLoopbackLink::PassArmiesAndGrids(moho::SSyncData& packet)
+  {
+    // Army lane: every army's record as the view gets it, through the wire; the client's records
+    // then stand in the packet in place of the sim's.
+    const std::int32_t view = packet.mFocusArmy;
+    std::vector<wire::SArmyRecord> records;
+    records.reserve(packet.mArmyUpdates.size());
+    for (std::size_t index = 0; index < packet.mArmyUpdates.size(); ++index) {
+      records.push_back(ArmyToWire(ArmyRecordForView(packet.mArmyUpdates[index], index, view, packet.mCurBeat == 0)));
+    }
+    wire::BitWriter armyWriter;
+    if (!wire::EncodeArmyLane(records, mHasSentArmies ? &mSentArmies : nullptr, armyWriter)) {
+      ++mArmyFailures;
+    } else {
+      mArmyBytes += armyWriter.Bytes().size();
+      wire::BitReader reader(armyWriter.Bytes());
+      std::vector<wire::SArmyRecord> decoded;
+      if (!wire::DecodeArmyLane(reader, mHasSentArmies ? &mClientArmies : nullptr, decoded)) {
+        ++mArmyFailures;
+      } else {
+        mArmyMismatches += decoded == records ? 0u : 1u;
+        mClientArmies = decoded;
+        for (std::size_t index = 0; index < decoded.size() && index < packet.mArmyUpdates.size(); ++index) {
+          ArmyFromWire(decoded[index], packet.mArmyUpdates[index], mRules);
+        }
+      }
+      mSentArmies = std::move(records);
+      mHasSentArmies = true;
+    }
+
+    // Grid lane: the grids the sim thread copied for this beat, as deltas against the client's.
+    std::vector<wire::SGridSlot> grids;
+    if (!mGridSnapshots.Take(static_cast<std::uint32_t>(packet.mCurBeat), grids)) {
+      ++mGridBeatsMissing;
+      return;
+    }
+    wire::BitWriter gridWriter;
+    if (!wire::EncodeGridLane(grids, mSentGrids, gridWriter)) {
+      ++mGridFailures;
+      return;
+    }
+    mGridBytes += gridWriter.Bytes().size();
+    wire::BitReader reader(gridWriter.Bytes());
+    if (!wire::DecodeGridLane(reader, mClientGrids)) {
+      ++mGridFailures;
+    } else {
+      mGridMismatches += mClientGrids == grids ? 0u : 1u;
+      InstallUserGrids();
+    }
+    mSentGrids = std::move(grids);
+  }
+
+  void CLoopbackLink::InstallUserGrids()
+  {
+    // A session that shows this client's world reads the grids the client holds, not the sim's
+    // (WP5.13): each army's vision and water grid becomes a client-owned copy of what arrived.
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr || session->mWldMap == nullptr || session->mWldMap->mTerrainRes == nullptr) {
+      return;
+    }
+    moho::STIMap* const map = session->mWldMap->mTerrainRes->mMap;
+    for (const wire::SGridSlot& slot : mClientGrids) {
+      if (slot.army >= session->userArmies.size() || session->userArmies[slot.army] == nullptr) {
+        continue;
+      }
+      moho::UserArmy& army = *session->userArmies[slot.army];
+      boost::shared_ptr<moho::CIntelGrid>& held = slot.kind == 0 ? army.mVisionReconGrid : army.mWaterReconGrid;
+      auto& owned = mUserGrids[{slot.army, slot.kind}];
+      if (!owned || owned->mWidth != slot.bits.width || owned->mHeight != slot.bits.height) {
+        owned.reset(new moho::CIntelGrid(map, slot.gridSize));
+        if (owned->mWidth != slot.bits.width || owned->mHeight != slot.bits.height) {
+          owned.reset(); // a grid of another size than the server's: keep the session's
+          continue;
+        }
+        ++mUserGridsInstalled;
+        gpg::Logf(
+          "loopback: army %u's %s grid is now the client's own (%ux%u cells)", static_cast<unsigned>(slot.army),
+          slot.kind == 0 ? "vision" : "water", slot.bits.width, slot.bits.height
+        );
+      }
+      for (std::size_t cell = 0; cell < slot.bits.cells.size(); ++cell) {
+        owned->mGrid[cell] = static_cast<std::int8_t>(slot.bits.cells[cell]);
+      }
+      held = owned;
+    }
   }
 
   void CLoopbackLink::Pass(moho::SSyncData& packet)
@@ -73,6 +173,7 @@ namespace faf::remote::client
     using Clock = std::chrono::steady_clock;
     const Clock::time_point start = Clock::now();
     mBuilder.Apply(packet);
+    mBuilder.ReleaseDropped();
     if (const moho::CHeightField* const sent = mBuilder.SentTerrain(); sent != nullptr) {
       mRebuilder.SeedTerrain(*sent); // both ends start from one snapshot of the heights
     }
@@ -105,9 +206,13 @@ namespace faf::remote::client
     const Clock::time_point encoded = Clock::now();
 
     // Client.
-    if (!mRebuilder.Apply(writer.Bytes(), packet)) {
+    const bool applied = mRebuilder.Apply(writer.Bytes(), packet);
+    if (!applied) {
       ++mRebuildFailures;
-    } else if (const wire::SViewFrame* const shown = mRebuilder.Baseline(); shown != nullptr) {
+    } else {
+      PassArmiesAndGrids(packet);
+    }
+    if (const wire::SViewFrame* const shown = applied ? mRebuilder.Baseline() : nullptr; shown != nullptr) {
       const double now = std::chrono::duration<double>(Clock::now() - mStart).count();
       mClock.OnFrame(shown->beat, shown->simRate, shown->serverMs, now);
       mClock.OnShown(shown->beat); // loopback: the session takes this packet now
@@ -193,7 +298,8 @@ namespace faf::remote::client
          + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
          + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches + s.depositMismatches
          + mBuilder.DepositOverflows() + s.terrainRectMismatches + mRebuilder.TerrainCellsDiffering()
-         + mBuilder.TerrainEditOverflows() + mRosterFailures + mRosterMismatches;
+         + mBuilder.TerrainEditOverflows() + mRosterFailures + mRosterMismatches + mArmyFailures + mArmyMismatches
+         + mGridFailures + mGridMismatches;
   }
 
   std::string CLoopbackLink::Summary(const char* const when) const
@@ -236,6 +342,15 @@ namespace faf::remote::client
       static_cast<double>(mRosterBytes) / 1024.0, u(mRosterFailures), u(mRosterMismatches), mClock.ServerSimRate(),
       mClock.ExpectedBeatsPerSecond(), mClock.ServerBeatsPerSecond(), mClock.ArrivalBeatsPerSecond(),
       static_cast<long long>(mClock.Backlog()), mClock.Skew()
+    ).c_str();
+    text += "\n";
+    text += gpg::STR_Printf(
+      "loopback %s armies and grids: army lane %.2f KB/s (failures %llu, records other than sent %llu); grid lane %.2f "
+      "KB/s (failures %llu, grids other than the sim's %llu, beats without a copy %llu); client grids installed in "
+      "the session %llu",
+      when, static_cast<double>(mArmyBytes) / frames * 10.0 / 1024.0, u(mArmyFailures), u(mArmyMismatches),
+      static_cast<double>(mGridBytes) / frames * 10.0 / 1024.0, u(mGridFailures), u(mGridMismatches),
+      u(mGridBeatsMissing), u(mUserGridsInstalled)
     ).c_str();
     return text;
   }

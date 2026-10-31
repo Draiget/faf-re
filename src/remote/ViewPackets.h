@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
@@ -30,8 +31,22 @@
 // army alone, `mIsAlly` for the view). The other lanes (Lua `Sync`, grids, commands, decals,
 // effects) are other plan items.
 
+namespace moho
+{
+  struct SSTIArmyVariableData;
+}
+
 namespace faf::remote
 {
+  /**
+   * Plan WP5.4: army `index`'s record as view `viewArmy` gets it (ViewPackets.cpp): every army's
+   * public fields, the focus-only ones for the view's own army alone, and `mIsAlly` as the sim
+   * would write it for that focus (`beforeFirstTick`: as the constructor leaves it).
+   */
+  [[nodiscard]] moho::SSTIArmyVariableData ArmyRecordForView(
+    const moho::SSTIArmyVariableData& source, std::size_t index, std::int32_t viewArmy, bool beforeFirstTick
+  );
+
   class CViewPackets : public CBeatChangeSet
   {
   public:
@@ -40,6 +55,15 @@ namespace faf::remote
 
     /** The armies the last beat was built for (the sim's army count). */
     [[nodiscard]] std::int32_t ArmyCount() const noexcept { return static_cast<std::int32_t>(mPackets.size()); }
+
+    /**
+     * Builds the views on the sim's workers (plan WP5.7, under I3) from the next beat on. Off by
+     * default; the views come out the same either way.
+     */
+    void SetParallel(bool parallel) noexcept { mParallel = parallel; }
+    [[nodiscard]] bool Parallel() const noexcept { return mParallel; }
+    /** Wall time spent building views since the start, in seconds (`AddBuildTime`). */
+    [[nodiscard]] double BuildSeconds() const noexcept { return mBuildSeconds; }
 
     /** The last beat's entity lanes for `army`, in the change set's id order. */
     [[nodiscard]] const moho::SSyncData& Packet(std::int32_t army) const { return *mPackets[static_cast<std::size_t>(army)]; }
@@ -64,7 +88,18 @@ namespace faf::remote
       std::unordered_map<std::uint32_t, SViewEntity>& view
     );
 
+  protected:
+    /** Adds the time from this beat's start to now to `BuildSeconds` (once the views are built). */
+    void AddBuildTime() noexcept
+    {
+      mBuildSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - mBuildStart).count();
+    }
+
+  private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
+    bool mParallel = false;
+    std::chrono::steady_clock::time_point mBuildStart{};
+    double mBuildSeconds = 0.0;
     std::vector<std::unordered_map<std::uint32_t, SViewEntity>> mViews;
   };
 } // namespace faf::remote

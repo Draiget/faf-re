@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -36,6 +37,8 @@ namespace faf::remote::client
       bool shown = false;
       std::uint8_t kind = 0; // 0 other, 1 unit, 2 blip, 3 prop, 4 projectile
       std::int32_t mode = 0;
+      float x = 0.0f; // the sim's position at the beat (the client's comes through the wire)
+      float z = 0.0f;
     };
 
     struct SOracleBeat
@@ -85,6 +88,8 @@ namespace faf::remote::client
             record.id = static_cast<std::uint32_t>(entity->id_);
             record.shown = ViewShowsMesh(sim, entry.focusArmy, *entity);
             record.mode = static_cast<std::int32_t>(view.mode);
+            record.x = entity->mVarDat.mCurTransform.pos_.x;
+            record.z = entity->mVarDat.mCurTransform.pos_.z;
             if (entity->IsUnit() != nullptr) {
               record.kind = 1;
             } else if (entity->IsReconBlip() != nullptr) {
@@ -139,6 +144,14 @@ namespace faf::remote::client
         std::uint64_t noMesh = 0;
         std::uint64_t liveGrid = 0; // differences the live grid explains (`LiveGridAnswer`)
 
+        // The entities this beat's visibility walk updated (`CWldSession::DoBeat`, `mVizUpdates`).
+        std::unordered_set<const moho::UserEntity*> visited;
+        for (const moho::UserEntity* const entity : session.mVizUpdates) {
+          if (entity != nullptr) {
+            visited.insert(entity);
+          }
+        }
+
         std::unordered_set<std::uint32_t> oracleIds;
         oracleIds.reserve(oracle.published.size());
         for (const SOracleEntity& record : oracle.published) {
@@ -163,6 +176,17 @@ namespace faf::remote::client
           const int live = LiveGridAnswer(oracle.focusArmy, record, userEntity);
           if (live >= 0 && (live != 0) == drawn) {
             ++liveGrid;
+          } else if (record.shown && !drawn && userEntity != nullptr) {
+            // The client's timing, not the oracle: a mesh this beat's updates created or rebuilt
+            // (`UserEntity::ApplyEntityDataUpdate`) is drawn from the next visibility update on, and
+            // `DoBeat`'s visibility walk visits only `mVizUpdates` (0x0089564A), so an entity it did
+            // not visit keeps the draw state of its last visit (a lockstep client holds it, undrawn).
+            const auto last = mLastMesh.find(record.id);
+            if (last == mLastMesh.end() || last->second != userEntity->mMeshInstance) {
+              ++mTotalMeshNew;
+            } else if (visited.count(userEntity) == 0u) {
+              ++mTotalNotVisited;
+            }
           }
           LogDifference(beat, oracle.focusArmy, record, userEntity, drawn, live);
         }
@@ -181,6 +205,14 @@ namespace faf::remote::client
             SOracleEntity unknown;
             unknown.id = id;
             LogDifference(beat, oracle.focusArmy, unknown, userEntity, true, -1);
+          }
+        }
+
+        // Each client entity's mesh instance as this beat left it, for the next beat's comparison.
+        mLastMesh.clear();
+        for (const auto& [id, userEntity] : session.mEntities) {
+          if (userEntity != nullptr) {
+            mLastMesh[id] = userEntity->mMeshInstance;
           }
         }
 
@@ -242,11 +274,14 @@ namespace faf::remote::client
         ++logged;
         const int clientMode =
           userEntity != nullptr ? static_cast<int>(userEntity->mVariableData.mVisibilityMode) : -1;
+        const float clientX = userEntity != nullptr ? userEntity->mVariableData.mCurTransform.pos_.x : 0.0f;
+        const float clientZ = userEntity != nullptr ? userEntity->mVariableData.mCurTransform.pos_.z : 0.0f;
         gpg::Logf(
           "ORACLEGOLDEN diff beat=%d focus=%d id=0x%08X kind=%s oracle-mode=%d oracle-shown=%d client=%s "
-          "client-mode=%d drawn=%d live-grid=%d",
+          "client-mode=%d drawn=%d live-grid=%d sim-pos=%.5f,%.5f client-pos=%.5f,%.5f",
           beat, focusArmy, record.id, kKindNames[record.kind], record.mode, record.shown ? 1 : 0,
-          userEntity != nullptr ? "present" : "absent", clientMode, drawn ? 1 : 0, live
+          userEntity != nullptr ? "present" : "absent", clientMode, drawn ? 1 : 0, live, record.x, record.z, clientX,
+          clientZ
         );
       }
 
@@ -254,11 +289,13 @@ namespace faf::remote::client
       {
         gpg::Logf(
           "ORACLEGOLDEN totals beats=%llu compared=%llu agree=%llu oracle-only=%llu client-only=%llu "
-          "orphan-client=%llu live-grid=%llu missing-beats=%llu other-focus-beats=%llu",
+          "orphan-client=%llu live-grid=%llu mesh-new=%llu not-visited=%llu missing-beats=%llu other-focus-beats=%llu",
           static_cast<unsigned long long>(mComparedBeats), static_cast<unsigned long long>(mTotalCompared),
           static_cast<unsigned long long>(mTotalAgree), static_cast<unsigned long long>(mTotalOracleOnly),
           static_cast<unsigned long long>(mTotalClientOnly), static_cast<unsigned long long>(mTotalOrphanClient),
-          static_cast<unsigned long long>(mTotalLiveGrid), static_cast<unsigned long long>(mMissingBeats),
+          static_cast<unsigned long long>(mTotalLiveGrid), static_cast<unsigned long long>(mTotalMeshNew),
+          static_cast<unsigned long long>(mTotalNotVisited),
+          static_cast<unsigned long long>(mMissingBeats),
           static_cast<unsigned long long>(mOtherFocusBeats)
         );
       }
@@ -275,6 +312,9 @@ namespace faf::remote::client
       std::uint64_t mTotalClientOnly = 0;
       std::uint64_t mTotalOrphanClient = 0;
       std::uint64_t mTotalLiveGrid = 0;
+      std::uint64_t mTotalMeshNew = 0; // oracle shows, client hides, mesh created or rebuilt this beat
+      std::uint64_t mTotalNotVisited = 0; // oracle shows, client hides, not in this beat's visibility walk
+      std::unordered_map<std::uint32_t, const void*> mLastMesh; // id -> mesh instance after the last beat
       std::atomic<moho::Sim*> mSim{nullptr}; // the sim, for `LiveGridAnswer` on the client's thread
       std::size_t mLoggedDifferences = 0;
       std::size_t mLoggedExplained = 0;
