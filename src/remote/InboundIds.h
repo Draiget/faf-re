@@ -26,10 +26,28 @@
 //     own and passes as it is.
 //
 // A renumbered id the view was never given, or one already retired, drops the whole command,
-// which is counted and logged. Ids inside Lua payloads are WP5.11's; they pass as they are.
+// which is counted and logged. Inside a sim callback's Lua arguments, the fields the routing
+// policy marks (`kCallbackIdFields`, WP5.11) are translated too; the rest pass as they are.
 
 namespace faf::remote
 {
+  /**
+   * Plan WP5.11: the Lua fields of sim callbacks that carry an entity id, as the routing policy
+   * marks them. FA's Lua hands entity ids around as decimal strings (a Lua number is a float here
+   * and cannot hold every id); these are translated like any other entity id. From the corpus
+   * audit (headless --inbound-check, plan WPR.19): `Rebuild`'s `entity` and `DistributeOrders`'s
+   * `Target` carry unit ids; the other keys whose values matched ids are army indices and amounts.
+   */
+  struct SCallbackIdField
+  {
+    const char* callback;
+    const char* key; // a field of the argument table
+  };
+  inline constexpr SCallbackIdField kCallbackIdFields[] = {
+    {"Rebuild", "entity"},
+    {"DistributeOrders", "Target"},
+  };
+
   /**
    * Every id-bearing field of every command, rewritten by `RewriteEntity` / `RewriteCommand`
    * before the command goes on to `next`; a field either refuses drops the whole command.
@@ -105,6 +123,7 @@ namespace faf::remote
     [[nodiscard]] bool IssueData(const char* message, moho::SSTICommandIssueData& data);
     void Drop(const char* message, const char* kind, std::uint32_t id);
     void CountBlipTarget(const moho::SSTICommandIssueData& data) noexcept;
+    [[nodiscard]] bool CallbackIds(const char* name, const LuaPlus::LuaObject& args);
 
     moho::ICommandSink& mNext;
     std::uint64_t mCommands = 0;

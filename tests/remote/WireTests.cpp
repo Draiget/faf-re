@@ -21,6 +21,7 @@
 
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
+#include "lua/LuaObject.h"
 #include "remote/FrameWindow.h"
 #include "remote/InboundIds.h"
 #include "remote/ViewIdMap.h"
@@ -1772,7 +1773,12 @@ namespace
       removed = {static_cast<std::uint32_t>(command), static_cast<std::uint32_t>(unit)};
     }
     void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override {}
-    void LuaSimCallback(const char*, const LuaPlus::LuaObject&, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&) override {}
+    std::string callbackEntity;
+    void LuaSimCallback(const char*, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&) override
+    {
+      const LuaPlus::LuaObject entity = args["entity"];
+      callbackEntity = entity.IsString() ? entity.GetString() : "";
+    }
     void ExecuteDebugCommand(
       const char*, const Wm3::Vector3<float>&, uint32_t, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
     ) override
@@ -1841,6 +1847,22 @@ namespace
     const auto held = [](const std::uint32_t simId) { return simId == 0x00200009u || simId == 0x30500007u; };
     CHECK(faf::remote::TranslateSelectionMask(map, mask, simMask, held) == 2u);
     CHECK(simMask.Contains(0x00200009u) && simMask.Contains(0x30500007u) && !simMask.Contains(0x30500001u));
+
+    // Plan WP5.11: a marked callback field (`Rebuild`'s `entity`, a decimal string) is translated too.
+    LuaPlus::LuaState lua(LuaPlus::LuaState::LIB_BASE);
+    LuaPlus::LuaObject args;
+    args.AssignNewTable(&lua, 0, 4);
+    args.SetString("entity", "810549249"); // 0x30500001, the blip in view ids
+    moho::BVSet<moho::EntId, moho::EntIdUniverse> none{};
+    intake.LuaSimCallback("Rebuild", args, none);
+    CHECK(sim.callbackEntity == "810549255"); // 0x30500007, the sim's
+    args.SetString("entity", "810549252");   // 0x30500004, never given
+    sim.callbackEntity.clear();
+    intake.LuaSimCallback("Rebuild", args, none);
+    CHECK(sim.callbackEntity.empty() && intake.Dropped() == 3u);
+    args.SetString("entity", "810549252");   // an unmarked callback passes as it is
+    intake.LuaSimCallback("SomethingElse", args, none);
+    CHECK(sim.callbackEntity == "810549252");
   }
 
   // Plan WP5.3: frames against the newest acknowledged one; losses cost freshness only.

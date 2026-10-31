@@ -1,8 +1,11 @@
 #include "remote/InboundIds.h"
 
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "gpg/core/utils/Logging.h"
+#include "lua/LuaObject.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
 
@@ -281,9 +284,46 @@ namespace faf::remote
   {
     ++mCommands;
     EntitySet units{};
-    if (Entities("LuaSimCallback", entities, units)) {
+    if (Entities("LuaSimCallback", entities, units) && CallbackIds(name, args)) {
       mNext.LuaSimCallback(name, args, units);
     }
+  }
+
+  bool CCommandIdRewriter::CallbackIds(const char* const name, const LuaPlus::LuaObject& args)
+  {
+    if (name == nullptr || !args.IsTable()) {
+      return true;
+    }
+    for (const SCallbackIdField& field : kCallbackIdFields) {
+      if (std::strcmp(field.callback, name) != 0) {
+        continue;
+      }
+      const LuaPlus::LuaObject value = args[field.key];
+      if (!value.IsString()) {
+        continue;
+      }
+      const char* const text = value.GetString();
+      const std::size_t length = text != nullptr ? std::strlen(text) : 0u;
+      if (length == 0u || length > 10u || std::strspn(text, "0123456789") != length) {
+        continue;
+      }
+      const unsigned long long parsed = std::strtoull(text, nullptr, 10);
+      if (parsed > 0xFFFFFFFFull) {
+        continue;
+      }
+      auto id = static_cast<std::uint32_t>(parsed);
+      const std::uint32_t before = id;
+      if (!Entity("LuaSimCallback", id)) {
+        return false;
+      }
+      if (id != before) {
+        // The payload is this command's own, decoded from the client's message: rewritten in place.
+        char rewritten[16];
+        std::snprintf(rewritten, sizeof(rewritten), "%u", id);
+        const_cast<LuaPlus::LuaObject&>(args).SetString(field.key, rewritten);
+      }
+    }
+    return true;
   }
 
   void CCommandIdRewriter::ExecuteDebugCommand(
