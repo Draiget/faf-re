@@ -311,6 +311,19 @@ namespace faf::remote
     std::sort(out.begin(), out.end(), [](const wire::SUnitStat& a, const wire::SUnitStat& b) { return a.name < b.name; });
   }
 
+  void CViewFrameBuilder::DropStats(const std::uint32_t id)
+  {
+    if (const auto found = mUnitStats.find(id); found != mUnitStats.end()) {
+      mDroppedStats.push_back(std::move(found->second));
+      mUnitStats.erase(found);
+    }
+  }
+
+  void CViewFrameBuilder::ReleaseDropped()
+  {
+    mDroppedStats.clear();
+  }
+
   void CViewFrameBuilder::Apply(const moho::SSyncData& packet)
   {
     // Resource deposits the sim added since the last beat go on the session record (the sim
@@ -372,7 +385,7 @@ namespace faf::remote
     for (auto it = mOrphanedAt.begin(); it != mOrphanedAt.end();) {
       if (beat - it->second >= mOrphanBeats) {
         mWorld.erase(it->first);
-        mUnitStats.erase(it->first);
+        DropStats(it->first);
         it = mOrphanedAt.erase(it);
       } else {
         ++it;
@@ -401,10 +414,9 @@ namespace faf::remote
       record.isUnit = true;
       record.unit.buildStateTag = params.mConstDat.mBuildStateTag;
       record.unit.fake = params.mConstDat.mFake;
+      DropStats(record.id);
       if (params.mConstDat.mStatsRoot) {
         mUnitStats[record.id] = params.mConstDat.mStatsRoot;
-      } else {
-        mUnitStats.erase(record.id);
       }
     }
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
@@ -431,7 +443,7 @@ namespace faf::remote
     }
     for (const moho::EntId id : packet.mDeleteIds) {
       mWorld.erase(static_cast<std::uint32_t>(id));
-      mUnitStats.erase(static_cast<std::uint32_t>(id));
+      DropStats(static_cast<std::uint32_t>(id));
       mOrphanedAt.erase(static_cast<std::uint32_t>(id));
     }
   }

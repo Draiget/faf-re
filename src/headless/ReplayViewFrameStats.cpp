@@ -192,6 +192,11 @@ namespace faf::headless
       static_cast<unsigned long long>(mRoundTripFailures)
     );
     summary = text;
+    std::snprintf(
+      text, sizeof(text), "; views built in %.2f ms per beat (%s)",
+      mBeats > 0 ? BuildSeconds() * 1000.0 / static_cast<double>(mBeats) : 0.0, Parallel() ? "parallel" : "serial"
+    );
+    summary += text;
     for (std::size_t army = 0; army < mBytes.size(); ++army) {
       // 10 beats a second: bytes per beat x 10 / 1000 = KB/s.
       const double beats = mBeats > 0 ? static_cast<double>(mBeats) : 1.0;

@@ -9,6 +9,7 @@
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "moho/unit/core/Unit.h"
 #include "remote/VisibilityOracle.h"
 
@@ -90,13 +91,15 @@ namespace faf::remote
 
   void CViewPackets::OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
   {
-    (void)packet;
+    mBuildStart = std::chrono::steady_clock::now();
     const std::size_t armyCount = sim.mArmiesList.size();
     while (mPackets.size() < armyCount) {
       mPackets.push_back(std::make_unique<moho::SSyncData>());
       mViews.emplace_back();
     }
 
+    // Last beat's records go on the sim thread: they hold references to sim objects (poses,
+    // stats trees), whose last one a sim worker must not drop (.plans/sim-threading/PLAN.md §2).
     for (std::size_t army = 0; army < armyCount; ++army) {
       moho::SSyncData& out = *mPackets[army];
       out.mNewEntities.clear();
@@ -105,19 +108,36 @@ namespace faf::remote
       out.mUnitUpdates.clear();
       out.mDeleteIds.clear();
       out.mEraseIds.clear();
+      out.mArmyUpdates.clear();
       out.mCurBeat = static_cast<std::int32_t>(sim.mCurBeat);
       out.mCurTick = static_cast<std::int32_t>(sim.mCurTick);
       out.mFocusArmy = static_cast<std::int32_t>(army);
+    }
+
+    // Each view reads the sim and the change set and writes its own packet and view state only
+    // (plan I3), so the views can be built on the sim's workers (plan WP5.7).
+    const auto build = [&](const std::size_t army) {
+      moho::SSyncData& out = *mPackets[army];
       for (const SChangedEntity& changed : Entities()) {
         SyncForView(sim, static_cast<std::int32_t>(army), changed, out, mViews[army]);
       }
 
       // Plan WP5.4: the army lane, positionally as `Sim::Sync` fills it.
-      out.mArmyUpdates.clear();
       for (std::size_t index = 0; index < packet.mArmyUpdates.size(); ++index) {
         out.mArmyUpdates.push_back(
           ArmyRecordForView(packet.mArmyUpdates[index], index, static_cast<std::int32_t>(army), packet.mCurBeat == 0)
         );
+      }
+    };
+    if (mParallel && armyCount > 1u) {
+      moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [&build](const std::size_t begin, const std::size_t end) {
+        for (std::size_t army = begin; army < end; ++army) {
+          build(army);
+        }
+      });
+    } else {
+      for (std::size_t army = 0; army < armyCount; ++army) {
+        build(army);
       }
     }
     OnViewPackets(sim);

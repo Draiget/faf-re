@@ -82,8 +82,14 @@ namespace faf::remote
      */
     void SetSessionTables(wire::CSessionTableWriters* session) noexcept { mSession = session; }
 
-    /** Applies one packet's entity lanes to the world the frames are built from. */
+    /**
+     * Applies one packet's entity lanes to the world the frames are built from. The sim's unit
+     * stats trees it lets go of are kept until `ReleaseDropped`: a builder running on a sim
+     * worker must not drop the last reference of a sim object (.plans/sim-threading/PLAN.md §2).
+     */
     void Apply(const moho::SSyncData& packet);
+    /** Drops the stats trees `Apply` let go of; on the sim thread. */
+    void ReleaseDropped();
 
     /** The frame of the world as it stands, stamped with `beat` and the next frame id. */
     [[nodiscard]] wire::SViewFrame Build(std::uint32_t beat);
@@ -114,6 +120,7 @@ namespace faf::remote
     std::map<std::uint32_t, wire::SEntityRecord> mWorld;
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
+    std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`
     std::uint32_t mNextFrameId = 1;
     std::uint64_t mUnknownBlueprints = 0;
     std::uint64_t mUnknownUnderlays = 0;
@@ -123,6 +130,8 @@ namespace faf::remote
     wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared
     std::vector<wire::SUnitStat> mStatsScratch;  // a unit's stats, likewise
     wire::CSessionTableWriters* mSession = nullptr;
+
+    void DropStats(std::uint32_t id);
   };
 
   /** A height field as the terrain ground-following records stand on (WP7.8). */

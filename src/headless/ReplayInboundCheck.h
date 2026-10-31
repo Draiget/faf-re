@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -18,6 +20,11 @@
 // message decoded and marshalled with no ids touched. A command naming a renumbered id its view
 // was never given cannot be sent in view ids at all; it is counted, with the first few named, and
 // the translator drops it as the server would.
+//
+// It also audits the Lua arguments of every `LuaSimCallback` (plan WPR.19): a number, or a string
+// of digits, that names an entity the sim has is an id the client put into a payload. Per callback
+// name and key path the summary counts such ids: the caller's own army's, blips, and foreign ones
+// (another army's or nobody's). Those keys are what the Lua routing policy (WP5.11) has to mark.
 
 namespace gpg
 {
@@ -64,6 +71,9 @@ namespace faf::headless
       {}
 
       void SetCommandSource(moho::CommandSourceId sourceId) override;
+      void LuaSimCallback(
+        const char* name, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+      ) override;
 
     protected:
       [[nodiscard]] bool RewriteEntity(std::uint32_t& id) override;
@@ -72,6 +82,17 @@ namespace faf::headless
     private:
       CReplayInboundCheck& mOwner;
     };
+
+    /** Per callback name and key path: ids found, by whose they are. */
+    struct SPayloadIds
+    {
+      std::uint64_t own = 0;
+      std::uint64_t blips = 0;
+      std::uint64_t foreign = 0;
+      std::uint32_t example = 0; // the first id seen there
+    };
+    void AuditPayload(const std::string& callback, const LuaPlus::LuaObject& value, const std::string& path, int depth);
+    void AuditValue(const std::string& callback, const std::string& path, double number);
 
     static void Observe(const moho::CMessage& message, void* context);
     void OnMessage(const moho::CMessage& message);
@@ -97,5 +118,7 @@ namespace faf::headless
     std::uint64_t mDiffering = 0;
     std::uint64_t mNotShown = 0;              // named a renumbered id the view never got
     std::vector<std::string> mNotShownExamples;
+    std::map<std::string, std::uint64_t> mCallbacks;                         // calls by name
+    std::map<std::pair<std::string, std::string>, SPayloadIds> mPayloadIds; // (callback, key path)
   };
 } // namespace faf::headless

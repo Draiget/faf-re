@@ -539,6 +539,7 @@ namespace faf::headless
       if (options.viewIds) {
         viewFrames->EnableIdMaps();
       }
+      viewFrames->SetParallel(options.parallelViews);
       viewFrames->SetChannel(
         static_cast<std::uint32_t>(options.viewLossPercent), static_cast<std::uint32_t>(options.viewAckDelay)
       );

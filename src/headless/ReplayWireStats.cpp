@@ -85,6 +85,7 @@ namespace faf::headless
   {
     mGround.SetField(packet.mTerrainUpdate.px);
     mBuilder.Apply(packet);
+    mBuilder.ReleaseDropped();
     Measure(static_cast<std::uint32_t>(packet.mCurBeat));
   }
 

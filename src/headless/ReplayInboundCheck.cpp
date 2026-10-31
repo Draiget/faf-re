@@ -1,9 +1,14 @@
 #include "headless/ReplayInboundCheck.h"
 
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "gpg/core/streams/Stream.h"
 #include "lua/LuaObject.h"
+#include "lua/LuaTableIterator.h"
+#include "moho/entity/EntityDb.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CMessage.h"
 #include "moho/sim/CArmyImpl.h"
@@ -89,6 +94,75 @@ namespace faf::headless
   {
     mOwner.SelectSource(sourceId);
     CCommandIdRewriter::SetCommandSource(sourceId);
+  }
+
+  void CReplayInboundCheck::CClientSide::LuaSimCallback(
+    const char* const name, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+  )
+  {
+    if (mOwner.mViews.LastSim() != nullptr && name != nullptr) {
+      ++mOwner.mCallbacks[name];
+      mOwner.AuditPayload(name, args, "args", 0);
+    }
+    CCommandIdRewriter::LuaSimCallback(name, args, entities);
+  }
+
+  void CReplayInboundCheck::AuditPayload(
+    const std::string& callback, const LuaPlus::LuaObject& value, const std::string& path, const int depth
+  )
+  {
+    if (depth > 8) {
+      return;
+    }
+    if (value.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(value, 1); it.IsValid(); it.Next()) {
+        LuaPlus::LuaObject& key = it.GetKey();
+        std::string child = path;
+        if (key.IsString()) {
+          child += ".";
+          child += key.GetString();
+        } else {
+          child += "[]"; // array positions are one key: the same field in every element
+        }
+        AuditPayload(callback, it.GetValue(), child, depth + 1);
+      }
+      return;
+    }
+    if (value.IsNumber()) {
+      AuditValue(callback, path, value.GetNumber());
+    } else if (value.IsString()) {
+      const char* const text = value.GetString();
+      if (text != nullptr && *text != '\0' && std::strspn(text, "0123456789") == std::strlen(text) && std::strlen(text) <= 10u) {
+        AuditValue(callback, path + "(string)", std::strtod(text, nullptr));
+      }
+    }
+  }
+
+  void CReplayInboundCheck::AuditValue(const std::string& callback, const std::string& path, const double number)
+  {
+    if (number < 0.0 || number > 4294967295.0 || number != std::floor(number)) {
+      return;
+    }
+    const moho::Sim* const sim = mViews.LastSim();
+    if (sim == nullptr || sim->mEntityDB == nullptr) {
+      return;
+    }
+    const auto id = static_cast<std::uint32_t>(number);
+    const auto found = sim->mEntityDB->mAllUnits.find(id);
+    if (found == sim->mEntityDB->mAllUnits.end() || found->second == nullptr) {
+      return; // not an entity the sim has
+    }
+    SPayloadIds& ids = mPayloadIds[{callback, path}];
+    if (ids.own + ids.blips + ids.foreign == 0u) {
+      ids.example = id;
+    }
+    if ((id >> 28u) == 3u) {
+      ++ids.blips;
+    } else if (mArmy >= 0 && ((id >> 20u) & 0xFFu) == static_cast<std::uint32_t>(mArmy)) {
+      ++ids.own;
+    } else {
+      ++ids.foreign;
+    }
   }
 
   bool CReplayInboundCheck::CClientSide::RewriteEntity(std::uint32_t& id)
@@ -198,6 +272,28 @@ namespace faf::headless
     summary += text;
     for (const std::string& example : mNotShownExamples) {
       summary += "\n  never given: " + example;
+    }
+    // Plan WPR.19: entity ids inside sim callbacks' Lua arguments.
+    std::uint64_t calls = 0;
+    for (const auto& [name, count] : mCallbacks) {
+      calls += count;
+    }
+    std::snprintf(
+      text, sizeof(text), "\n  sim callbacks: %llu calls, %zu names; Lua arguments that name an entity the sim has:",
+      static_cast<unsigned long long>(calls), mCallbacks.size()
+    );
+    summary += text;
+    if (mPayloadIds.empty()) {
+      summary += " none";
+    }
+    for (const auto& [where, ids] : mPayloadIds) {
+      std::snprintf(
+        text, sizeof(text), "\n    %s %s: own %llu, blips %llu, foreign %llu (first 0x%08x; %llu calls)", where.first.c_str(),
+        where.second.c_str(), static_cast<unsigned long long>(ids.own), static_cast<unsigned long long>(ids.blips),
+        static_cast<unsigned long long>(ids.foreign), ids.example,
+        static_cast<unsigned long long>(mCallbacks.count(where.first) != 0u ? mCallbacks.at(where.first) : 0u)
+      );
+      summary += text;
     }
     return summary;
   }

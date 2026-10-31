@@ -173,6 +173,7 @@ namespace
       "  --view-loss <percent> [--view-ack-delay <beats>]  with --view-frames: every view's frames also go over a\n"
       "                            simulated channel that loses that share of frames and acknowledges late; each\n"
       "                            frame is encoded against the newest acknowledged one and must decode exactly\n"
+      "  --parallel-views          with --view-frames: the views are built on the sim's workers\n"
       "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
       "                            back as the server would; it must marshal to the same bytes\n"
       "  --launch-check           rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
@@ -269,6 +270,7 @@ int main(int argc, char** argv)
   if (ReadIntOption("--view-ack-delay", options.viewAckDelay, bad) && options.viewAckDelay < 0) {
     bad = true;
   }
+  options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
   options.inboundCheck = moho::CFG_GetArgOption("--inbound-check", 0, nullptr);
   if (options.inboundCheck && (!options.viewIds || options.commandCheck)) {
     std::printf("[%s] --inbound-check needs --view-frames and --view-ids, and not --command-check\n", gLabel.c_str());

@@ -73,6 +73,7 @@ namespace faf::remote::client
     using Clock = std::chrono::steady_clock;
     const Clock::time_point start = Clock::now();
     mBuilder.Apply(packet);
+    mBuilder.ReleaseDropped();
     if (const moho::CHeightField* const sent = mBuilder.SentTerrain(); sent != nullptr) {
       mRebuilder.SeedTerrain(*sent); // both ends start from one snapshot of the heights
     }

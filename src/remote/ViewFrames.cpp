@@ -8,6 +8,7 @@
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "remote/VisibilityOracle.h"
 
 // Engine addition, server mode: see ViewFrames.h.
@@ -33,7 +34,9 @@ namespace faf::remote
       mWithheld.push_back(0u);
     }
 
-    for (std::size_t army = 0; army < armyCount; ++army) {
+    // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
+    // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
+    const auto buildFrame = [&](const std::size_t army) {
       CViewFrameBuilder& builder = *mBuilders[army];
       const moho::SSyncData& packet = Packet(static_cast<std::int32_t>(army));
       builder.Apply(packet);
@@ -101,7 +104,23 @@ namespace faf::remote
 
       mFrames[army] = std::move(frame);
       mWithheld[army] = withheld;
+    };
+    if (Parallel() && armyCount > 1u) {
+      moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [&buildFrame](const std::size_t begin, const std::size_t end) {
+        for (std::size_t army = begin; army < end; ++army) {
+          buildFrame(army);
+        }
+      });
+    } else {
+      for (std::size_t army = 0; army < armyCount; ++army) {
+        buildFrame(army);
+      }
     }
+    // The sim's stats trees the builders let go of are dropped here, on the sim thread, in army order.
+    for (std::size_t army = 0; army < armyCount; ++army) {
+      mBuilders[army]->ReleaseDropped();
+    }
+    AddBuildTime();
     mLastSim = &sim;
     OnViewFrames(sim);
   }
