@@ -1172,6 +1172,8 @@ namespace moho
      * Setting it waits for a walk in progress, so once it returns the old observer gets no more calls.
      */
     static void SetSyncObserver(CSyncObserver* observer) noexcept;
+    /** The observer set now (null by default); one that replaces it may pass the calls on. */
+    [[nodiscard]] static CSyncObserver* SyncObserver() noexcept;
 #endif
 
     /**

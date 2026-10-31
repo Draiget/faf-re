@@ -167,8 +167,12 @@ namespace
     const SAxisQuantizer axis{-256.0f, 1.0f / 64.0f, 17};
     for (float v = -256.0f; v < 1700.0f; v += 0.37f) {
       const float back = axis.Decode(axis.Encode(v));
-      CHECK(std::fabs(back - v) <= axis.step * 0.5f + 1e-4f);
+      // Down to the step: never above the value, less than a step below it, and in the same
+      // whole unit, so an intel grid cell (whole units) holds both.
+      CHECK(back <= v + 1e-4f && v - back < axis.step + 1e-4f);
+      CHECK(std::floor(back) == std::floor(v));
     }
+    CHECK(std::floor(axis.Decode(axis.Encode(241.99553f))) == 241.0f); // the #103 case
     CHECK(axis.Encode(-1.0e9f) == 0u);
     CHECK(axis.Encode(1.0e9f) == axis.MaxQuantized());
     CHECK(axis.Encode(std::numeric_limits<float>::quiet_NaN()) == 0u);

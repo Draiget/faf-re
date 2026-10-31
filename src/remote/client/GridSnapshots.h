@@ -24,16 +24,22 @@ namespace faf::remote::client
     CGridSnapshots() = default;
     ~CGridSnapshots() override;
 
-    /** Watches every sync walk from now on (`Sim::SetSyncObserver`, one observer at a time). */
+    /**
+     * Watches every sync walk from now on (`Sim::SetSyncObserver`). An observer already set (the
+     * game's `/oraclegolden`, say) keeps getting every call, through this one.
+     */
     void Install();
     void Uninstall();
 
     /** The grids copied at `beat` (older copies are dropped); false when that beat was not copied. */
     [[nodiscard]] bool Take(std::uint32_t beat, std::vector<wire::SGridSlot>& out);
 
+    void OnEntityWillSync(moho::Entity& entity) override;
+    void OnEntitySynced(moho::Entity& entity) override;
     void OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet) override;
 
   private:
+    moho::CSyncObserver* mNext = nullptr; // the observer this one replaced
     std::mutex mLock;
     std::deque<std::pair<std::uint32_t, std::vector<wire::SGridSlot>>> mBeats; // beat, grids
     bool mInstalled = false;

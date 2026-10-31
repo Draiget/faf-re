@@ -4278,6 +4278,12 @@ void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
   const std::lock_guard<std::mutex> guard(sSyncObserverLock);
   sSyncObserver = observer;
 }
+
+CSyncObserver* Sim::SyncObserver() noexcept
+{
+  const std::lock_guard<std::mutex> guard(sSyncObserverLock);
+  return sSyncObserver;
+}
 #endif
 
 /**

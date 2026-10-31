@@ -22,6 +22,7 @@ namespace faf::remote::client
 
   void CGridSnapshots::Install()
   {
+    mNext = moho::Sim::SyncObserver();
     moho::Sim::SetSyncObserver(this);
     mInstalled = true;
   }
@@ -29,13 +30,30 @@ namespace faf::remote::client
   void CGridSnapshots::Uninstall()
   {
     if (mInstalled) {
-      moho::Sim::SetSyncObserver(nullptr); // waits for a walk in progress
+      moho::Sim::SetSyncObserver(mNext); // waits for a walk in progress; the one replaced comes back
       mInstalled = false;
+    }
+  }
+
+  void CGridSnapshots::OnEntityWillSync(moho::Entity& entity)
+  {
+    if (mNext != nullptr) {
+      mNext->OnEntityWillSync(entity);
+    }
+  }
+
+  void CGridSnapshots::OnEntitySynced(moho::Entity& entity)
+  {
+    if (mNext != nullptr) {
+      mNext->OnEntitySynced(entity);
     }
   }
 
   void CGridSnapshots::OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet)
   {
+    if (mNext != nullptr) {
+      mNext->OnSyncWalkDone(sim, packet);
+    }
     std::vector<wire::SGridSlot> grids;
     const std::int32_t view = sim.mSyncFilter.focusArmy;
     if (view >= 0) {
