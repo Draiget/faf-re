@@ -1,5 +1,9 @@
 #include "headless/ReplayViewFrameStats.h"
 
+#include <algorithm>
+#include <functional>
+#include <utility>
+
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
@@ -26,12 +30,15 @@ namespace faf::headless
   )
     : remote::CViewFrames(tables, MakeCodec(mapSizeX, mapSizeZ))
     , mCodec(MakeCodec(mapSizeX, mapSizeZ))
+    , mReckonedCodec(MakeCodec(mapSizeX, mapSizeZ))
+    , mTables(&tables)
   {
+    mReckonedCodec.deadReckoning = true;
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
     }
-    std::fprintf(mFile, "beat,army,entities,withheld,delta_bytes,grid_bytes\n");
+    std::fprintf(mFile, "beat,army,entities,withheld,delta_bytes,grid_bytes,reckoned_bytes\n");
   }
 
   CReplayViewFrameStats::~CReplayViewFrameStats()
@@ -61,6 +68,14 @@ namespace faf::headless
       mBytes.push_back(0);
       mEntities.push_back(0);
       mGridBytes.push_back(0);
+      remote::wire::SReckoningScheme scheme{};
+      scheme.tolerance = 16; // plan WP7.5's 16-step scheme, as --wire-stats measures it
+      scheme.window = 1;
+      mReckoners.emplace_back(scheme);
+      mPreviousReckoned.emplace_back();
+      mReckonedBytes.push_back(0);
+      mAnchoredByFamily.emplace_back();
+      mAnchoredByBlueprint.emplace_back();
     }
     ++mBeats;
 
@@ -78,14 +93,38 @@ namespace faf::headless
         ++mRoundTripFailures;
       }
       const auto bytes = static_cast<std::uint32_t>(writer.Bytes().size());
+
+      // The same frame with dead reckoning, against this view's previous reckoned frame.
+      remote::wire::SViewFrame reckoned = frame;
+      mReckoners[army].Apply(reckoned, mReckonedCodec);
+      for (const remote::wire::SEntityRecord& record : reckoned.entities) {
+        if (record.farPosition || record.anchorBeat != reckoned.beat) {
+          continue;
+        }
+        ++mAnchoredByFamily[army][record.id >> 28];
+        if (!record.isUnit) {
+          ++mAnchoredByBlueprint[army][record.blueprint];
+        }
+      }
+      remote::wire::BitWriter reckonedWriter;
+      std::uint32_t reckonedBytes = 0;
+      if (remote::wire::EncodeFrame(
+            reckoned, mHavePrevious[army] ? &mPreviousReckoned[army] : nullptr, mReckonedCodec, reckonedWriter
+          )) {
+        reckonedBytes = static_cast<std::uint32_t>(reckonedWriter.Bytes().size());
+        mReckonedBytes[army] += reckonedBytes;
+      } else {
+        ++mEncodeFailures;
+      }
+      mPreviousReckoned[army] = std::move(reckoned);
       const std::uint32_t gridBytes = SendGrids(sim, army);
       mBytes[army] += bytes;
       mEntities[army] += frame.entities.size();
       mGridBytes[army] += gridBytes;
       if (mFile != nullptr) {
         std::fprintf(
-          mFile, "%u,%zu,%zu,%u,%u,%u\n", sim.mCurBeat, army, frame.entities.size(),
-          Withheld(static_cast<std::int32_t>(army)), bytes, gridBytes
+          mFile, "%u,%zu,%zu,%u,%u,%u,%u\n", sim.mCurBeat, army, frame.entities.size(),
+          Withheld(static_cast<std::int32_t>(army)), bytes, gridBytes, reckonedBytes
         );
       }
       mPrevious[army] = frame;
@@ -152,12 +191,63 @@ namespace faf::headless
       const double beats = mBeats > 0 ? static_cast<double>(mBeats) : 1.0;
       std::snprintf(
         text, sizeof(text),
-        "\n  army %zu: %.0f entities and %.0f bytes per frame on average (%.1f KB/s); grids %.0f bytes per beat (%.2f KB/s)",
+        "\n  army %zu: %.0f entities and %.0f bytes per frame on average (%.1f KB/s; with dead reckoning %.1f KB/s); "
+        "grids %.0f bytes per beat (%.2f KB/s)",
         army, static_cast<double>(mEntities[army]) / beats, static_cast<double>(mBytes[army]) / beats,
-        static_cast<double>(mBytes[army]) / beats * 10.0 / 1000.0, static_cast<double>(mGridBytes[army]) / beats,
+        static_cast<double>(mBytes[army]) / beats * 10.0 / 1000.0,
+        static_cast<double>(mReckonedBytes[army]) / beats * 10.0 / 1000.0, static_cast<double>(mGridBytes[army]) / beats,
         static_cast<double>(mGridBytes[army]) / beats * 10.0 / 1000.0
       );
       summary += text;
+
+      const remote::CDeadReckoner& reckoner = mReckoners[army];
+      const remote::CDeadReckoner::SReanchorCauses& causes = reckoner.Causes();
+      std::snprintf(
+        text, sizeof(text),
+        "\n    re-anchors %.1f per beat (units %llu, stopped %llu, after 1 beat %llu, 2-3 %llu, 4-9 %llu, 10+ %llu)",
+        static_cast<double>(reckoner.Reanchors()) / beats, static_cast<unsigned long long>(causes.units),
+        static_cast<unsigned long long>(causes.stopped), static_cast<unsigned long long>(causes.afterBeats[0]),
+        static_cast<unsigned long long>(causes.afterBeats[1]), static_cast<unsigned long long>(causes.afterBeats[2]),
+        static_cast<unsigned long long>(causes.afterBeats[3])
+      );
+      summary += text;
+
+      // Anchored records by id family: units, projectiles, props, blips (`(army | 0x300) << 20`,
+      // ReconBlip.cpp), shields (0x400, 0x007764B2), script entities (`_c_CreateEntity`'s 0x500,
+      // 0x006924F3); then the non-unit blueprints anchored most.
+      const std::array<std::uint64_t, 16>& families = mAnchoredByFamily[army];
+      std::snprintf(
+        text, sizeof(text),
+        "\n    anchored per beat: units %.1f, projectiles %.1f, props %.1f, blips %.1f, shields %.1f, script entities %.1f; most:",
+        static_cast<double>(families[0]) / beats, static_cast<double>(families[1]) / beats,
+        static_cast<double>(families[2]) / beats, static_cast<double>(families[3]) / beats,
+        static_cast<double>(families[4]) / beats, static_cast<double>(families[5]) / beats
+      );
+      summary += text;
+      for (std::size_t nibble = 6; nibble < families.size(); ++nibble) {
+        if (families[nibble] != 0u) {
+          std::snprintf(
+            text, sizeof(text), " (family %zX %.1f)", nibble, static_cast<double>(families[nibble]) / beats
+          );
+          summary += text;
+        }
+      }
+      std::vector<std::pair<std::uint64_t, std::uint32_t>> top;
+      for (const auto& [blueprint, count] : mAnchoredByBlueprint[army]) {
+        top.emplace_back(count, blueprint);
+      }
+      std::sort(top.begin(), top.end(), std::greater<>{});
+      for (std::size_t i = 0; i < top.size() && i < 5; ++i) {
+        std::string_view name = mTables->blueprints.Name(top[i].second);
+        if (name.empty()) {
+          name = "(no-blueprint)";
+        }
+        std::snprintf(
+          text, sizeof(text), " %.*s %.1f", static_cast<int>(name.size()), name.data(),
+          static_cast<double>(top[i].first) / beats
+        );
+        summary += text;
+      }
     }
     return summary;
   }

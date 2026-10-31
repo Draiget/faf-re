@@ -1,10 +1,12 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <map>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 #include "remote/ViewFrames.h"
@@ -17,7 +19,9 @@
 // WPR.6 measures the full channel). Each frame is decoded again and compared (a round trip
 // that differs counts as a failure). It also measures the grid lane (plan WP5.4): the vision and
 // water grids of the view's army and of every army that counts it as an ally, each as a
-// run-length delta against the copy that view last received, decoded again and compared.
+// run-length delta against the copy that view last received, decoded again and compared. And
+// the entity frames once more with dead reckoning (plan WP7.5's 16-step scheme), each view's
+// own reckoner and baseline, for the bytes a player would get (plan WPR.6; the CSV's last column).
 
 namespace faf::headless
 {
@@ -44,6 +48,15 @@ namespace faf::headless
 
     std::FILE* mFile = nullptr;
     remote::wire::SFrameCodec mCodec;
+    remote::wire::SFrameCodec mReckonedCodec;
+    std::vector<remote::CDeadReckoner> mReckoners;          // per army
+    std::vector<remote::wire::SViewFrame> mPreviousReckoned; // per army
+    std::vector<std::uint64_t> mReckonedBytes;               // per army, all beats
+    // Records the reckoner anchored on the beat they were sent (new or re-anchored), per army: by
+    // id family nibble, and the non-unit ones by blueprint ordinal (which entities the scheme fits badly).
+    std::vector<std::array<std::uint64_t, 16>> mAnchoredByFamily;
+    std::vector<std::unordered_map<std::uint32_t, std::uint64_t>> mAnchoredByBlueprint;
+    const remote::wire::SContentTables* mTables = nullptr;
     std::vector<remote::wire::SViewFrame> mPrevious;
     std::vector<bool> mHavePrevious;
     std::vector<std::uint64_t> mBytes;    // per army, all beats
