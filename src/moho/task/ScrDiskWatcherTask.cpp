@@ -107,10 +107,19 @@ namespace
     return &sInstance;
   }
 
+  /**
+   * What it does:
+   * Maps one event's disk path to its mounted path, as the binary does inline
+   * in `Execute` (0x004C0D7D..0x004C0D90): the event's own path is the source
+   * and a fresh string the output of the VFS's `ToMountedPath`.
+   *
+   * The source must not be the output's own buffer: `FILE_ToMountedPath`
+   * first assigns the source to the output, and that assign frees the buffer
+   * it is reading, so every `__diskwatch` callback got an empty path.
+   */
   void ResolvePathForLua(const SDiskWatchEvent& event, msvc8::string& normalizedPath)
   {
-    normalizedPath = event.mPath;
-    (void)FILE_ToMountedPath(&normalizedPath, normalizedPath.c_str());
+    (void)FILE_ToMountedPath(&normalizedPath, event.mPath.c_str());
   }
 
   /**
