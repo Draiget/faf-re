@@ -73,6 +73,9 @@ type Config struct {
 	PrivateCache bool `json:"privateCache,omitempty"`
 
 	ICE *ICE `json:"ice,omitempty"`
+	// Contract puts the game behind an adapter of the FAF client's contract
+	// (contract.go) instead.
+	Contract *Contract `json:"contract,omitempty"`
 }
 
 // CheckNoFullscreen refuses a fullscreen request anywhere on a command line.
@@ -125,6 +128,7 @@ type Seat struct {
 	adapter  *procs.Process
 	adapterC chan struct{}
 	once     sync.Once
+	contract *contractLink
 }
 
 // New validates cfg and opens the seat's GPGNet endpoint and lobby port.
@@ -162,7 +166,7 @@ func New(cfg Config, job *procs.Job, sink func(journal.Record)) (*Seat, error) {
 		return nil, err
 	}
 	s.endpoint = ep
-	if cfg.ICE == nil {
+	if cfg.ICE == nil && cfg.Contract == nil {
 		if s.lobbyPort, err = freeUDPPort(); err != nil {
 			ep.Close()
 			return nil, err
@@ -226,6 +230,12 @@ func freeTCPPort() (int, error) {
 // (or printed instructions to start it by hand).
 func (s *Seat) Start(ctx context.Context) error {
 	gpgPort := s.endpoint.Port()
+	if s.cfg.Contract != nil {
+		if err := s.startContract(ctx); err != nil {
+			return err
+		}
+		return s.startGame(s.adapterPort)
+	}
 	if s.cfg.ICE != nil {
 		if err := s.startAdapter(ctx); err != nil {
 			return err
@@ -400,7 +410,7 @@ func (s *Seat) watchExit(proc *procs.Process, what string) {
 func (s *Seat) onMessage(m gpgnet.Message) {
 	uid := s.cfg.UID
 	s.emit(journal.Record{Kind: journal.GpgIn, UID: uid, Command: m.Command, Args: m.Args})
-	if m.Command == "GameState" && m.Str(0) == "Idle" {
+	if m.Command == "GameState" && m.Str(0) == "Idle" && s.cfg.Contract == nil {
 		mode := 0
 		if s.cfg.AutoLobby {
 			mode = 1
@@ -451,6 +461,15 @@ func (s *Seat) Kill() {
 // Close kills the seat's processes, closes its endpoint and moves its private
 // preferences file into the run directory.
 func (s *Seat) Close() {
+	s.mu.Lock()
+	link := s.contract
+	s.mu.Unlock()
+	if link != nil {
+		_, _ = link.rpc.Call("quit")
+		time.Sleep(200 * time.Millisecond)
+		_ = link.rpcConn.Close()
+		_ = link.gpg.Close()
+	}
 	s.Kill()
 	s.endpoint.Close()
 	if s.cfg.Prefs == PrefsShared {

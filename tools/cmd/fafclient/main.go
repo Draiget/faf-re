@@ -39,7 +39,8 @@ func main() {
 	players := flag.Int("players", 2, "number of players (player 1 hosts)")
 	nativeDir := flag.String("native-dir", "", "folder with faf-ice-adapter.jar (the client's nativeDir)")
 	java := flag.String("java", `C:\Program Files\FAF Client\jre\bin\java.exe`, "java executable; empty with -exe runs a native adapter")
-	exe := flag.String("exe", "", "native adapter executable (instead of the jar), comma-separated per player to mix")
+	exe := flag.String("exe", "", `native adapter executable (instead of the jar), comma-separated per player to mix ("jar" keeps the jar for that player)`)
+	exeArgs := flag.String("exe-args", "", "extra arguments for native adapters only, after the launcher's (e.g. --bind-address 192.168.42.77)")
 	clientLib := flag.String("client-lib", `C:\Program Files\FAF Client\lib`, "the client's lib folder; its javafx-* jars go on the class path, as the client adds them (read only)")
 	forceRelay := flag.Bool("force-relay", false, "pass --force-relay to every adapter")
 	useTurn := flag.Bool("turn", true, "start a local STUN/TURN server and hand it out with setIceServers")
@@ -49,6 +50,7 @@ func main() {
 	game := flag.String("game", "fake", `"fake" runs tools/fakegame in-process`)
 	gameCmd := flag.String("game-cmd", "", `game command line, {gpgnet} and {login} are replaced`)
 	mode := flag.String("init-mode", "normal", "setLobbyInitMode argument (normal or auto)")
+	loadTime := flag.Duration("load-time", 2*time.Second, "fake game loading time before GameState Idle (the real game takes seconds; FAF's adapter 3.3.14 can lose a game that reports Idle within ms of connecting)")
 	hold := flag.Duration("hold", 20*time.Second, "how long to keep the game running after every game launched")
 	timeout := flag.Duration("timeout", 90*time.Second, "time allowed until every game launched")
 	tracePath := flag.String("trace", "", "JSONL trace of every RPC frame and lobby step")
@@ -117,6 +119,7 @@ func main() {
 		if *exe != "" {
 			if e := strings.TrimSpace(exes[i%len(exes)]); e != "" && e != "jar" {
 				a.Java, a.Exe = "", e
+				a.Extra = strings.Fields(*exeArgs)
 			}
 		}
 		adapters[i] = a
@@ -146,7 +149,7 @@ func main() {
 		if *game != "fake" {
 			return fmt.Errorf("unknown -game %q", *game)
 		}
-		opts := fakegame.Options{GpgNet: gpg, Players: len(ps), BindIP: *gameBind}
+		opts := fakegame.Options{GpgNet: gpg, Players: len(ps), BindIP: *gameBind, LoadTime: *loadTime}
 		if *logDir != "" {
 			_ = os.MkdirAll(*logDir, 0o755)
 			opts.LogPath = fmt.Sprintf("%s/fakegame-%s.log", *logDir, p.Login)

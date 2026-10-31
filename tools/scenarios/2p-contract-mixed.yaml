@@ -1,0 +1,43 @@
+name: 2p-contract-mixed
+description: >
+  Mixed adapters (issue #230): player 1 behind FAF's faf-ice-adapter.jar,
+  player 2 behind faf-netbridge, so every packet crosses one Java and one
+  netlink peer link. Retail game against ours, autolobby. Set FAF_ADAPTER_DIR
+  to a folder with a copy of faf-ice-adapter.jar and FAF_NETBRIDGE to
+  faf-netbridge.exe.
+timeout: 10m
+
+mode: contract
+lobby: auto
+map: SCMP_009
+
+contract:
+  nativeDir: '%FAF_ADAPTER_DIR%'
+  adapter: jar
+  # FAF_TEST_BIND: see 2p-contract-bridge.yaml. The Java adapter always
+  # sends to 127.0.0.1, so on a host that drops loopback UDP to sockets bound
+  # to 0.0.0.0 this scenario cannot pass; tools/fafclient covers the mix
+  # there with fake games.
+  exeArgs: [--bind-address, '%FAF_TEST_BIND%', --game-address, '%FAF_TEST_BIND%']
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo, exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe', adapter: '%FAF_NETBRIDGE%' }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - note: launched across a Java and a netlink link; letting the sim run
+  - wait: 5m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true

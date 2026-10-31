@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"faf-main/tools/fafclient"
 	"faf-main/tools/gpgnet"
 	"faf-main/tools/hub"
 	"faf-main/tools/icebreaker"
@@ -82,6 +83,8 @@ type Launcher struct {
 	ice   *icebreaker.Server
 	turn  *turnsrv.Server
 	hub   *hubSession // players on other machines, or services on a remote hub
+
+	contractBus *seat.ContractBus // ModeContract: IceMsg between the seats
 
 	players map[int]*Player
 	order   []int
@@ -146,6 +149,20 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 	switch {
 	case cfg.Mode == ModeRelay && l.hub == nil:
 		l.relay = relay.New(j, relay.Options{Default: cfg.Link})
+	case cfg.Mode == ModeContract:
+		if l.hub != nil {
+			job.Close()
+			return nil, fmt.Errorf("mode contract runs local seats only")
+		}
+		l.contractBus = seat.NewContractBus()
+		if !cfg.Contract.NoTurn {
+			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
+			if err != nil {
+				job.Close()
+				return nil, err
+			}
+			j.Note(journal.Note, 0, "contract mode, TURN at "+l.turn.Addr(), nil)
+		}
 	case cfg.Mode == ModeICE && l.hub == nil:
 		if !cfg.ICE.NoTurn {
 			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
@@ -333,6 +350,9 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 		idx := sort.SearchInts(l.sortedUIDs(), pc.UID)
 		sc.Position = []int{20 + idx*60, 20 + idx*60}
 	}
+	if c.Mode == ModeContract {
+		sc.Contract = l.contractFor(pc)
+	}
 	if c.Mode == ModeICE {
 		sc.ICE = &seat.ICE{Adapter: c.ICE.Adapter, GameID: c.GameID,
 			ForceRelay: c.ICE.ForceRelay, LogLevel: c.ICE.LogLevel}
@@ -341,6 +361,48 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 		} else {
 			sc.ICE.APIRoot = l.ice.URL()
 		}
+	}
+	return sc
+}
+
+// contractFor is one seat's adapter in ModeContract: FAF's jar run as the
+// client runs it, or a native adapter given by path.
+func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
+	c := l.cfg.Contract
+	choice := pc.Adapter
+	if choice == "" {
+		choice = c.Adapter
+	}
+	a := fafclient.Adapter{NativeDir: c.NativeDir, ForceRelay: c.ForceRelay}
+	if choice == "" || strings.EqualFold(choice, "jar") {
+		a.Java = c.Java
+		// IceAdapterImpl.getJavaFXClassPathJars: entries whose name contains "javafx-".
+		if entries, err := os.ReadDir(c.ClientLib); err == nil {
+			var fx []string
+			for _, e := range entries {
+				if strings.Contains(e.Name(), "javafx-") {
+					fx = append(fx, filepath.Join(c.ClientLib, e.Name()))
+				}
+			}
+			a.JavaFXClassPath = strings.Join(fx, string(os.PathListSeparator))
+		}
+	} else {
+		a.Exe = choice
+		a.Extra = c.ExeArgs
+	}
+	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus}
+	if l.turn != nil {
+		// The Java adapter reads each URL with java.net.URI and needs its host
+		// part: "turn://h:p", not "turn:h:p" (contract §2).
+		var urls []string
+		for _, u := range l.turn.URLs() {
+			scheme, rest, _ := strings.Cut(u, ":")
+			urls = append(urls, scheme+"://"+rest)
+		}
+		user, pass := l.turn.Credentials(l.cfg.GameID, uint(pc.UID), 24*time.Hour)
+		sc.IceServers = []map[string]any{{"urls": urls, "username": user, "credential": pass}}
+	} else {
+		sc.IceServers = []map[string]any{}
 	}
 	return sc
 }

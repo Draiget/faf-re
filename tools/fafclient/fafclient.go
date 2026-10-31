@@ -176,7 +176,8 @@ type Lobby struct {
 	j        *journal.Journal
 	mu       sync.Mutex
 	sessions map[int]*Session
-	inLobby  []int // player ids in the order their game reached Lobby
+	joinMu   sync.Mutex
+	joined   []int // joiners whose join finished, in order (the host is not in it)
 }
 
 func freePort() (int, error) {
@@ -392,30 +393,27 @@ func (l *Lobby) onCallback(s *Session, m Message) {
 // onLobby is FAForever/server GameConnection._handle_lobby_state.
 func (l *Lobby) onLobby(s *Session) {
 	host := l.opts.Players[0]
-	l.mu.Lock()
-	others := append([]int(nil), l.inLobby...)
-	l.inLobby = append(l.inLobby, s.Player.ID)
-	l.mu.Unlock()
 	if s.Player.ID == host.ID {
 		l.note(s.Player.ID, "HostGame "+l.opts.Map, nil)
 		_, _ = s.rpc.Call("hostGame", l.opts.Map)
 		return
 	}
-	hs := l.Session(host.ID)
-	if hs == nil || hs.GameState() != "Lobby" {
-		// The real server aborts the join ("The host left the lobby"); here
-		// every game starts at once, so the joiner waits for the host instead.
-		l.note(s.Player.ID, "host not in lobby yet; join waits", nil)
-		go func() {
-			for hs == nil || hs.GameState() != "Lobby" {
-				time.Sleep(50 * time.Millisecond)
-				hs = l.Session(host.ID)
-			}
-			l.join(s, hs, others)
-		}()
-		return
-	}
-	l.join(s, hs, others)
+	// The real server aborts a join while the host is not in the lobby ("The
+	// host left the lobby"); here every game starts at once, so the joiner
+	// waits for the host instead. Joins run one at a time, as the server
+	// handles them, so each joiner is paired with the players whose join
+	// finished before its own.
+	go func() {
+		hs := l.Session(host.ID)
+		for hs == nil || hs.GameState() != "Lobby" {
+			time.Sleep(50 * time.Millisecond)
+			hs = l.Session(host.ID)
+		}
+		l.joinMu.Lock()
+		defer l.joinMu.Unlock()
+		l.join(s, hs, append([]int(nil), l.joined...))
+		l.joined = append(l.joined, s.Player.ID)
+	}()
 }
 
 func (l *Lobby) join(s, hs *Session, others []int) {
@@ -427,9 +425,6 @@ func (l *Lobby) join(s, hs *Session, others []int) {
 	// connect_to_peer for every other player already in the game: the joiner
 	// offers, the other side answers.
 	for _, id := range others {
-		if id == host.ID {
-			continue
-		}
 		o := l.Session(id)
 		_, _ = s.rpc.Call("connectToPeer", o.Player.Login, o.Player.ID, true)
 		_, _ = o.rpc.Call("connectToPeer", s.Player.Login, s.Player.ID, false)
