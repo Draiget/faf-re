@@ -28,6 +28,7 @@
 // The command headers bring in <windows.h>, whose `near` and `far` macros the tests below use as names.
 #undef near
 #undef far
+#include "remote/wire/ArmyLane.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/IntelGridDelta.h"
@@ -1957,7 +1958,82 @@ namespace
     CHECK(!fresh.Decode(againstBase.Bytes(), codec, out));
   }
 
+  // Plan WP5.13: the army lane and the grid lane round-trip; unchanged records cost a bit.
+  void TestArmyAndGridLanes()
+  {
+    SArmyRecord a{};
+    a.economy[0] = 123.5f;
+    a.maxStorage = {5000u, std::uint64_t{1} << 40};
+    a.allies = {0u, 2u};
+    a.enemies = {1u};
+    a.validCommandSources = {3u};
+    a.armyType = "human";
+    a.faction = 2;
+    a.categoryFilter.firstWord = 1;
+    a.categoryFilter.words = {0xDEADBEEFu, 7u};
+    a.armyStart = {12.5f, 99.25f};
+    a.noRushRadius = 75.0f;
+    SArmyRecord b = a;
+    b.armyType = "AI: Rush";
+    b.isAlly = 1;
+    const std::vector<SArmyRecord> first = {a, b};
+
+    BitWriter full;
+    CHECK(EncodeArmyLane(first, nullptr, full));
+    BitReader fullReader(full.Bytes());
+    std::vector<SArmyRecord> held;
+    CHECK(DecodeArmyLane(fullReader, nullptr, held) && held == first);
+
+    std::vector<SArmyRecord> second = first;
+    second[0].economy[0] = 124.0f;
+    BitWriter delta;
+    CHECK(EncodeArmyLane(second, &first, delta));
+    CHECK(delta.Bytes().size() < full.Bytes().size());
+    BitReader deltaReader(delta.Bytes());
+    std::vector<SArmyRecord> next;
+    CHECK(DecodeArmyLane(deltaReader, &held, next) && next == second);
+
+    BitWriter same;
+    CHECK(EncodeArmyLane(second, &second, same) && same.Bytes().size() <= 2u); // the count, then a bit per army
+
+    std::vector<std::uint8_t> cut(full.Bytes().begin(), full.Bytes().begin() + static_cast<std::ptrdiff_t>(full.Bytes().size() / 2));
+    BitReader cutReader(cut);
+    std::vector<SArmyRecord> none;
+    CHECK(!DecodeArmyLane(cutReader, nullptr, none));
+    BitWriter unchangedOnly;
+    CHECK(EncodeArmyLane(first, &first, unchangedOnly));
+    BitReader orphanReader(unchangedOnly.Bytes());
+    CHECK(!DecodeArmyLane(orphanReader, nullptr, none)); // "unchanged" with nothing held
+
+    SGridSlot vision{};
+    vision.army = 1;
+    vision.kind = 0;
+    vision.gridSize = 8;
+    vision.bits.width = 16;
+    vision.bits.height = 16;
+    vision.bits.cells.assign(256, 0u);
+    vision.bits.cells[17] = 1u;
+    SGridSlot water = vision;
+    water.kind = 1;
+    water.bits.cells[200] = 1u;
+    std::vector<SGridSlot> serverHeld;
+    std::vector<SGridSlot> clientHeld;
+    const std::vector<SGridSlot> beat1 = {vision, water};
+    BitWriter grids1;
+    CHECK(EncodeGridLane(beat1, serverHeld, grids1));
+    BitReader gridReader1(grids1.Bytes());
+    CHECK(DecodeGridLane(gridReader1, clientHeld) && clientHeld == beat1);
+    serverHeld = beat1;
+    std::vector<SGridSlot> beat2 = beat1;
+    beat2[0].bits.cells[18] = 1u;
+    BitWriter grids2;
+    CHECK(EncodeGridLane(beat2, serverHeld, grids2));
+    BitReader gridReader2(grids2.Bytes());
+    CHECK(DecodeGridLane(gridReader2, clientHeld) && clientHeld == beat2);
+  }
+
   const TestCase kTests[] = {
+    {"armies and grids: lanes round trip", &TestArmyAndGridLanes},
     {"frames: window of acknowledged baselines", &TestFrameWindow},
     {"view ids: renumbering, inbound and retirement", &TestViewIdMap},
     {"view ids: inbound translation of commands", &TestInboundIds},

@@ -60,7 +60,7 @@ namespace faf::remote
    * the sim writes (`CArmyImpl::SetCanSee` 0x006FDEE0): 1 with no focus, else whether the army lists
    * the view's army among its allies.
    */
-  [[nodiscard]] static moho::SSTIArmyVariableData ArmyRecordForView(
+  moho::SSTIArmyVariableData ArmyRecordForView(
     const moho::SSTIArmyVariableData& source, const std::size_t index, const std::int32_t viewArmy,
     const bool beforeFirstTick
   )

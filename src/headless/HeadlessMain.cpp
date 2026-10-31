@@ -280,11 +280,11 @@ int main(int argc, char** argv)
     bad = true;
   }
   if ((options.oracleCheck ? 1 : 0) + (options.changeSetCheck ? 1 : 0) + (options.viewPacketsPath.empty() ? 0 : 1)
-        + (options.viewFramesPath.empty() ? 0 : 1)
+        + (options.viewFramesPath.empty() ? 0 : 1) + (options.loopback ? 1 : 0)
       > 1) {
     std::printf(
-      "[%s] --oracle-check, --changeset-check, --view-packets and --view-frames all observe the sync walk: one at a "
-      "time\n",
+      "[%s] --oracle-check, --changeset-check, --view-packets, --view-frames and --loopback (its grid copies) all "
+      "observe the sync walk: one at a time\n",
       gLabel.c_str()
     );
     return kExitBadInput;

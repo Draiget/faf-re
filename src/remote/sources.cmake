@@ -18,6 +18,8 @@ set(FAF_REMOTE_SOURCES
   remote/ViewIdMap.cpp
   remote/InboundIds.cpp
   remote/FrameWindow.cpp
+  remote/ArmyRecords.cpp
+  remote/wire/ArmyLane.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/IntelGridDelta.cpp
@@ -32,6 +34,7 @@ set(FAF_REMOTE_SOURCES
 
 set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/BeatClock.cpp
+  remote/client/GridSnapshots.cpp
   remote/client/LoopbackCommands.cpp
   remote/client/LoopbackLink.cpp
   remote/client/OracleGolden.cpp

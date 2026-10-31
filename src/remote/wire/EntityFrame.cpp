@@ -83,30 +83,6 @@ namespace faf::remote::wire
       return true;
     }
 
-    void WriteCategories(BitWriter& writer, const SCategoryBits& bits)
-    {
-      writer.WriteVarUint(bits.firstWord);
-      writer.WriteVarUint(static_cast<std::uint32_t>(bits.words.size()));
-      for (const std::uint32_t word : bits.words) {
-        writer.WriteBits(word, 32);
-      }
-    }
-
-    [[nodiscard]] bool ReadCategories(BitReader& reader, SCategoryBits& bits)
-    {
-      bits.firstWord = reader.ReadVarUint();
-      const std::uint32_t count = reader.ReadVarUint();
-      if (!reader.Ok() || count > SCategoryBits::kMaxWords || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()) {
-        reader.Fail();
-        return false;
-      }
-      bits.words.resize(count);
-      for (std::uint32_t& word : bits.words) {
-        word = reader.ReadBits(32);
-      }
-      return reader.Ok();
-    }
-
     void WriteInt(BitWriter& writer, const std::int32_t value)
     {
       writer.WriteVarUint(ZigZag(value));
@@ -303,8 +279,8 @@ namespace faf::remote::wire
       if ((fields & kFieldUnitWeapons) != 0u) {
         writer.WriteVarUint(static_cast<std::uint32_t>(detail.weapons.size()));
         for (const SUnitWeapon& weapon : detail.weapons) {
-          WriteCategories(writer, weapon.targets);
-          WriteCategories(writer, weapon.secondary);
+          WriteCategoryBits(writer, weapon.targets);
+          WriteCategoryBits(writer, weapon.secondary);
           writer.WriteVarUint(weapon.layer);
           writer.WriteFloatExact(weapon.minRadius);
           writer.WriteFloatExact(weapon.maxRadius);
@@ -317,7 +293,7 @@ namespace faf::remote::wire
         const SUnitAttributes& attributes = detail.attributes;
         writer.WriteVarUint(attributes.blueprint + 1u);
         writer.WriteBits(attributes.reserved04, 32);
-        WriteCategories(writer, attributes.restriction);
+        WriteCategoryBits(writer, attributes.restriction);
         for (const float value : attributes.scalars) {
           writer.WriteFloatExact(value);
         }
@@ -553,7 +529,7 @@ namespace faf::remote::wire
           }
           detail.weapons.resize(count);
           for (SUnitWeapon& weapon : detail.weapons) {
-            if (!ReadCategories(reader, weapon.targets) || !ReadCategories(reader, weapon.secondary)) {
+            if (!ReadCategoryBits(reader, weapon.targets) || !ReadCategoryBits(reader, weapon.secondary)) {
               return false;
             }
             weapon.layer = reader.ReadVarUint();
@@ -568,7 +544,7 @@ namespace faf::remote::wire
           SUnitAttributes& attributes = detail.attributes;
           attributes.blueprint = reader.ReadVarUint() - 1u;
           attributes.reserved04 = reader.ReadBits(32);
-          if (!ReadCategories(reader, attributes.restriction)) {
+          if (!ReadCategoryBits(reader, attributes.restriction)) {
             return false;
           }
           for (float& value : attributes.scalars) {
@@ -678,6 +654,30 @@ namespace faf::remote::wire
       return true;
     }
   } // namespace
+
+  void WriteCategoryBits(BitWriter& writer, const SCategoryBits& bits)
+  {
+    writer.WriteVarUint(bits.firstWord);
+    writer.WriteVarUint(static_cast<std::uint32_t>(bits.words.size()));
+    for (const std::uint32_t word : bits.words) {
+      writer.WriteBits(word, 32);
+    }
+  }
+
+  bool ReadCategoryBits(BitReader& reader, SCategoryBits& bits)
+  {
+    bits.firstWord = reader.ReadVarUint();
+    const std::uint32_t count = reader.ReadVarUint();
+    if (!reader.Ok() || count > SCategoryBits::kMaxWords || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()) {
+      reader.Fail();
+      return false;
+    }
+    bits.words.resize(count);
+    for (std::uint32_t& word : bits.words) {
+      word = reader.ReadBits(32);
+    }
+    return reader.Ok();
+  }
 
   bool SUnitWeapon::operator==(const SUnitWeapon& other) const noexcept
   {

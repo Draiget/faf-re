@@ -31,8 +31,22 @@
 // army alone, `mIsAlly` for the view). The other lanes (Lua `Sync`, grids, commands, decals,
 // effects) are other plan items.
 
+namespace moho
+{
+  struct SSTIArmyVariableData;
+}
+
 namespace faf::remote
 {
+  /**
+   * Plan WP5.4: army `index`'s record as view `viewArmy` gets it (ViewPackets.cpp): every army's
+   * public fields, the focus-only ones for the view's own army alone, and `mIsAlly` as the sim
+   * would write it for that focus (`beforeFirstTick`: as the constructor leaves it).
+   */
+  [[nodiscard]] moho::SSTIArmyVariableData ArmyRecordForView(
+    const moho::SSTIArmyVariableData& source, std::size_t index, std::int32_t viewArmy, bool beforeFirstTick
+  );
+
   class CViewPackets : public CBeatChangeSet
   {
   public:
