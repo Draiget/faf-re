@@ -1392,8 +1392,11 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   mConnector->mSendStampBuffer.Add(0, nowUs, payloadLen);
 
   if (packet->header.mType == PT_Data) {
-    ++packet->mResendCount;
+    // 0x00488E62..0x00488E6D: the delay uses the count before this send
+    // (call 0x00488170, then `add [ebx+10h], 1`), so the first resend waits
+    // one base delay, not two.
     packet->mSentTime = nowUs + CalcResendDelay(packet); // microseconds
+    ++packet->mResendCount;
     InsertUnAckedSorted(packet);
   } else {
     // Return to connector pool immediately for any other:
