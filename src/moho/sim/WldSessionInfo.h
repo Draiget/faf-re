@@ -45,6 +45,7 @@ namespace moho
     std::uint8_t pad_27{};                         // 0x27
     IClientManager* mClientManager;                // 0x28
     std::uint32_t mSourceId;                       // 0x2C
+    std::int32_t mTotalBeats{0};                   // 0x30
 
     /**
      * Address: 0x007C90E0 (FUN_007C90E0, ??1SWldSessionInfo@Moho@@QAE@@Z)
@@ -56,7 +57,7 @@ namespace moho
     ~SWldSessionInfo();
   };
 
-  static_assert(sizeof(SWldSessionInfo) == 0x30, "SWldSessionInfo size must be 0x30");
+  static_assert(sizeof(SWldSessionInfo) == 0x34, "SWldSessionInfo size must be 0x34");
   static_assert(offsetof(SWldSessionInfo, mMapName) == 0x00, "SWldSessionInfo::mMapName offset must be 0x00");
   static_assert(offsetof(SWldSessionInfo, mLaunchInfo) == 0x1C, "SWldSessionInfo::mLaunchInfo offset must be 0x1C");
   static_assert(
@@ -70,6 +71,7 @@ namespace moho
     offsetof(SWldSessionInfo, mClientManager) == 0x28, "SWldSessionInfo::mClientManager offset must be 0x28"
   );
   static_assert(offsetof(SWldSessionInfo, mSourceId) == 0x2C, "SWldSessionInfo::mSourceId offset must be 0x2C");
+  static_assert(offsetof(SWldSessionInfo, mTotalBeats) == 0x30, "SWldSessionInfo::mTotalBeats offset must be 0x30");
 
   /**
    * Address: 0x007C8FE0 (FUN_007C8FE0)

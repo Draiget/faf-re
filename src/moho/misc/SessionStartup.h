@@ -100,6 +100,14 @@ namespace moho
   VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr);
 
   /**
+   * Engine addition: Scans a replay stream from its current position for all
+   * `CMDST_Advance` (opcode 0) packets to sum the total beats/ticks in the replay.
+   * Rewinds stream position back to the starting offset when finished.
+   * Returns total accumulated beats (0 on stream error or if stream does not support seek).
+   */
+  [[nodiscard]] std::int32_t VCR_ScanReplayTotalBeats(gpg::Stream* stream);
+
+  /**
    * Engine addition (dedicated-server plan WPL.4): the name of the local client
    * VCR_SetupReplaySession creates, `Loc(USER_GetLuaState(), "<LOC
    * Engine0031>Local")` in the binary. The user Lua state is user-side code, so

@@ -9,6 +9,11 @@ target_link_libraries(faf_net_tests PRIVATE faf_engine)
 
 add_test(NAME net_robustness COMMAND faf_net_tests)
 
+add_executable(faf_replay_tests EXCLUDE_FROM_ALL moho/ReplaySetupTests.cpp)
+target_link_libraries(faf_replay_tests PRIVATE faf_engine)
+
+add_test(NAME replay_setup COMMAND faf_replay_tests)
+
 add_executable(faf_profiler_tests EXCLUDE_FROM_ALL profiling/ProfilerFacadeTests.cpp)
 target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

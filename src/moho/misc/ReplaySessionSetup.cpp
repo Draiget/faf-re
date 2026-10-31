@@ -30,6 +30,9 @@
 #include "moho/misc/StringUtils.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/Common.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
+#include "moho/net/ECmdStreamOp.h"
 #include "moho/net/INetTCPSocket.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/WldSessionInfo.h"
@@ -228,6 +231,65 @@ namespace moho
   } // namespace
 
   /**
+   * Engine addition: Scans a replay stream from its current position for all
+   * `CMDST_Advance` (opcode 0) packets to sum the total beats/ticks in the replay.
+   * Rewinds stream position back to the starting offset when finished.
+   * Returns total accumulated beats (0 on stream error or if stream does not support seek).
+   */
+  std::int32_t VCR_ScanReplayTotalBeats(gpg::Stream* const stream)
+  {
+    if (stream == nullptr) {
+      return 0;
+    }
+
+    std::uint64_t startPos = 0;
+    try {
+      startPos = stream->VirtTell(gpg::Stream::ModeReceive);
+    } catch (...) {
+      // Non-seekable stream (e.g. network socket); cannot pre-scan without consuming it.
+      return 0;
+    }
+
+    struct StreamRewinder
+    {
+      gpg::Stream* mStream;
+      std::uint64_t mPos;
+      ~StreamRewinder()
+      {
+        if (mStream != nullptr) {
+          try {
+            (void)mStream->Seek(gpg::Stream::OriginBegin, static_cast<std::int64_t>(mPos));
+          } catch (...) {
+          }
+        }
+      }
+    } rewinder{stream, startPos};
+
+    std::int32_t totalBeats = 0;
+    try {
+      CMessage message;
+      while (message.ReadMessage(stream)) {
+        if (message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+          if (message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))) {
+            CMessageStream input(message, CMessageStream::Access::kReadOnly);
+            gpg::BinaryReader reader(&input);
+            std::int32_t beatDelta = 0;
+            reader.ReadExact(beatDelta);
+            if (beatDelta > 0) {
+              totalBeats += beatDelta;
+            }
+          }
+        }
+        message.Clear();
+      }
+    } catch (...) {
+      // In case of premature EOF or stream error, return what we accumulated.
+    }
+
+    return totalBeats;
+  }
+
+  /**
    * Address: 0x008765E0 (FUN_008765E0)
    * Mangled:
    * ?VCR_SetupReplaySession@Moho@@YA?AV?$auto_ptr@USWldSessionInfo@Moho@@@std@@VStrArg@gpg@@@Z
@@ -387,6 +449,8 @@ namespace moho
       return refuse(gpg::STR_Printf("The file is damaged (%s).", error.what()));
     }
 
+    const std::int32_t totalBeats = VCR_ScanReplayTotalBeats(replayStream.get());
+
     msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     sessionInfo->mMapName = replayMapName;
     (void)CopyLaunchInfoBasePtr(&sessionInfo->mLaunchInfo, launchInfo);
@@ -395,6 +459,7 @@ namespace moho
     sessionInfo->mIsMultiplayer = false;
     sessionInfo->mClientManager = CLIENT_CreateClientManager(2u, nullptr, 0, true);
     sessionInfo->mSourceId = kInvalidSourceIndex;
+    sessionInfo->mTotalBeats = totalBeats;
 
     if (sessionInfo->mClientManager != nullptr) {
       gpg::Stream* replayStreamOwnership = replayStream.release();
