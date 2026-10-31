@@ -49,3 +49,5 @@ target_link_libraries(faf_registration_dump PRIVATE faf_engine)
 add_executable(faf_terrain_check EXCLUDE_FROM_ALL terrain/TerrainCheck.cpp)
 target_link_libraries(faf_terrain_check PRIVATE faf_engine)
 add_subdirectory(remote)
+
+add_subdirectory(tread_rotation)
