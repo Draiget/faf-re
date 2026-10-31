@@ -779,6 +779,32 @@ namespace
     CHECK(half.b.Stats().unauthenticatedDropped > 0 && half.a.Stats().unauthenticatedDropped > 0);
   }
 
+  // The last sequences: each is sent once, 2^32 - 1 never, and the channel then fails
+  // instead of wrapping to a sequence (and so a nonce) used before.
+  void TestSequenceEnd()
+  {
+    ChannelConfig config;
+    config.firstSequence = UINT32_MAX - 3;
+    NetChannel channel(config);
+    channel.SetKeys(KeysFor(4, false));
+    const Bytes message(5000, 9);  // several datagrams' worth
+    CHECK(channel.SendReliable(message.data(), message.size()));
+    std::vector<Bytes> out;
+    channel.Poll(1000, out);
+    std::vector<std::uint32_t> sequences;
+    for (const Bytes& d : out) {
+      DatagramHeader header;
+      CHECK(ReadHeader(d.data(), d.size(), header));
+      sequences.push_back(header.sequence);
+    }
+    CHECK((sequences == std::vector<std::uint32_t>{UINT32_MAX - 3, UINT32_MAX - 2, UINT32_MAX - 1}));
+    CHECK(channel.State() == ChannelState::Failed);
+    out.clear();
+    channel.Poll(2000, out);
+    CHECK(out.empty());
+    CHECK(!channel.SendReliable(message.data(), 1));
+  }
+
   // --- WP10.8: keepalive, RTT, loss, timeout ---------------------------------------------
 
   void TestKeepaliveAndRtt()
@@ -1003,6 +1029,7 @@ namespace
     {"cipher known answers: XChaCha20-Poly1305 vector, the channel's layout (WP10.6)", TestCipherKnownAnswers},
     {"encrypted channel: delivery, tampering, replay, plaintext, one-sided keys (WP10.6)", TestEncryptedChannel},
     {"keys set mid-session at different moments on each end (WP10.6)", TestKeysMidSession},
+    {"the sequence ends in failure, never a wrap (WP10.2, WP10.6)", TestSequenceEnd},
     {"keepalive and RTT on an idle link (WP10.8)", TestKeepaliveAndRtt},
     {"loss statistics at 10% loss (WP10.8)", TestLossStatistics},
     {"timeout after a long partition, none after a short one (WP10.8)", TestTimeoutAndPartition},

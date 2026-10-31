@@ -27,6 +27,7 @@ namespace faf::remote::net
     mStats.rttVarUs = mConfig.initialRttUs / 2;
     mStats.rtoUs = Rto();
     mStats.reorderThreshold = mConfig.lossThreshold;
+    mNextSequence = std::max<std::uint32_t>(mConfig.firstSequence, 1);
   }
 
   NetChannel::~NetChannel()

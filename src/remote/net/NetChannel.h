@@ -54,6 +54,8 @@ namespace faf::remote::net
     /** Unreliable messages waiting either way at most; past it they are dropped. */
     std::size_t maxUnreliableQueued = 1024;
     std::size_t maxDatagramsPerPoll = 64;
+    /** The first sequence number sent (1 in use; tests start near the end). */
+    std::uint32_t firstSequence = 1;
     std::uint64_t ackDelayUs = 10'000;
     /** The most ack delay a peer's report may take off an RTT sample; added to the RTO. */
     std::uint64_t maxAckDelayUs = 25'000;
