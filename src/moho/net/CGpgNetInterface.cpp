@@ -32,6 +32,7 @@
 #include "moho/misc/StartupHelpers.h"
 
 #include "moho/net/INetNATTraversalProviderWeakPtrReflection.h"
+#include "moho/net/NetlinkPeers.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/ui/IUIManager.h"
@@ -554,6 +555,7 @@ void moho::GPGNET_Attach(
  */
 void moho::GPGNET_Shutdown()
 {
+  NETLINK_Shutdown(); // engine addition (issue #233): in-engine links go with GPGNet
   sGPGNet.reset();
 }
 
@@ -1470,7 +1472,8 @@ void CGpgNetInterface::PullTask()
         SendNatPacket(command.mArgs);
       } else if (commandName == "EjectPlayer") {
         EjectPlayer(command.mArgs);
-      } else {
+      } else if (!NETLINK_HandleCommand(command.mName, command.mArgs)) {
+        // Engine addition (issue #233): Netlink* commands are in-engine links'.
         LogUnknownCommand(command.mName);
       }
     } catch (const std::exception& ex) {
@@ -1539,6 +1542,9 @@ void CGpgNetInterface::Connected(
   gpg::Logf("GPGNET: entering idle state.");
   SNetCommandArg stateArg(msvc8::string("Idle"));
   WriteCommandWith1Arg("GameState", &stateArg);
+  // Engine addition (issue #233): with net_InEngineLinks 1, ask the adapter
+  // to leave the peer links to the game.
+  NETLINK_SayHello(*this);
 }
 
 /**

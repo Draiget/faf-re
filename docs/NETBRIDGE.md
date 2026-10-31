@@ -4,7 +4,7 @@
 
 - a JSON-RPC server on `--rpc-port` for the client: the 10 methods, the 5 callbacks;
 - a GPGNet server on `--gpgnet-port` for the game: `CreateLobby` when the game reports `Idle`, then `HostGame`, `JoinGame`, `ConnectToPeer`, `DisconnectFromPeer`; every message from the game goes to the client;
-- one peer link per player (`src/netlink`, on libjuice) and one loopback UDP port per peer, which the game is told as `127.0.0.1:<port>`.
+- one peer link per player (`src/netlink`, on libjuice) and one UDP port per peer on the game's address (`--game-address`, default 127.0.0.1), which the game is told as `<game address>:<port>`.
 
 On the wire a link is a Java adapter link: ICE with the offerer controlling, one `CandidatesMessage` per side through `iceMsg` / `onIceMsg`, `'d'` + game datagram, and the offerer's `'e'` echo every second. Players on the Java adapter and players on the bridge can share a game. It works with the retail game as well as ours, since the game only sees GPGNet and loopback UDP.
 
@@ -21,10 +21,14 @@ The launcher's arguments, plus a few of ours:
 | `--duplicate-ms <n>` | send every game datagram a second time, `n` ms after the first (0: right after it); off by default (#235). The game drops a repeated DATA packet by its sequence number, so the copy only counts when the first is lost |
 | `--stats-interval <s>` | seconds between statistics lines, default 10; 0 logs them only when a link closes (#241) |
 | `--bind-address <ip>` | local address for ICE host candidates (default all interfaces) |
-| `--game-address <ip>` | where the game's lobby port is reached (default 127.0.0.1) |
+| `--game-address <ip>` | where the game's lobby port is reached, and the address the per-peer ports are bound to and the game is told (default 127.0.0.1) |
 | `--log-file <path>` | log file; default `$LOG_DIR/faf-netbridge.log` when the launcher sets `LOG_DIR`. The log also goes to stderr |
 
 `--bind-address` and `--game-address` are for test machines that drop UDP to sockets bound to 0.0.0.0, even over loopback (the game binds its lobby port that way). The environment variables `FAF_NETBRIDGE_BIND_ADDRESS` and `FAF_NETBRIDGE_GAME_ADDRESS` set them too, for runs through the launch shim, which passes only the launcher's arguments.
+
+## Links in the game
+
+Our game with `net_InEngineLinks 1` (startup flag `/inenginelinks`, issue #233) announces itself with `NetlinkHello` after `GameState Idle`. For that game the bridge opens no loopback ports and relays no datagrams: it passes `setIceServers`, `iceMsg` and each new peer to the game over GPGNet, and the game's signalling and link states back to the client ([LAUNCHER_ADAPTER_CONTRACT.md](LAUNCHER_ADAPTER_CONTRACT.md) §8). The game is told `240.x.y.z:p` for each peer and reaches it through its own link. The log says `the game runs the peer links itself`, and per peer `link in the game`. The retail game, and ours with the default 0, keep the relayed path. The bridge's statistics lines cover relayed peers only; the game logs its links with `NETLINK:` lines.
 
 ## Statistics
 

@@ -9,8 +9,12 @@
 //   * GPGNet server on --gpgnet-port for the game: CreateLobby on Idle,
 //     HostGame / JoinGame / ConnectToPeer / DisconnectFromPeer, every game
 //     message passed to the client.
-//   * One netlink::Link and one loopback UDP port per peer; the game sends to
-//     127.0.0.1:<that port>, as with the Java adapter.
+//   * One netlink::Link and one UDP port per peer on the game's address
+//     (default 127.0.0.1); the game sends to <that address>:<that port>, as
+//     with the Java adapter.
+//   * Issue #233: a game that sends NetlinkHello runs the links itself. For
+//     its peers the bridge only passes the signalling over GPGNet
+//     (netlink/EngineLinks.h) and relays no datagrams.
 
 #include "netbridge/GpgNet.h"
 #include "netbridge/Socket.h"
@@ -117,6 +121,15 @@ namespace faf::netbridge
       GameCounters counters;
     };
 
+    // A peer whose link runs in the game (issue #233).
+    struct EnginePeer
+    {
+      std::string login;
+      bool offerer = false;
+      std::string state = "new";
+      bool connected = false;
+    };
+
     bool Listen();
     void Poll();
     void AcceptRpc();
@@ -138,7 +151,12 @@ namespace faf::netbridge
     void WriteGame(const GpgMessage& m);
 
     void NewGameSession();
+    // The address the game sends to for this peer: our loopback port, or with
+    // in-engine links the peer's engine address.
+    std::string ConnectPeer(std::int64_t id, const std::string& login, bool offerer);
     std::uint16_t AddPeer(std::int64_t id, const std::string& login, bool offerer);
+    void SendEngineConfig();
+    bool HandleEngineMessage(const GpgMessage& m);
     void RemovePeer(std::int64_t id);
     void OnIceMsg(std::int64_t remoteId, const netlink::JsonValue& msg);
     netlink::JsonValue Status() const;
@@ -162,8 +180,11 @@ namespace faf::netbridge
     std::vector<GpgMessage> mForGame; // waits for GameState Lobby
     int mInitMode = 0;
     std::vector<netlink::IceServer> mIceServers;
+    netlink::JsonValue mIceServersJson = netlink::JsonValue::Array(); // as setIceServers gave them
     std::uint16_t mLobbyPort = 0;
     std::map<std::int64_t, std::unique_ptr<Peer>> mPeers;
+    bool mEngineLinks = false; // the game sent NetlinkHello
+    std::map<std::int64_t, EnginePeer> mEnginePeers;
 
     std::chrono::steady_clock::time_point mNextStats{};
     bool mQuit = false;

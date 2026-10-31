@@ -153,3 +153,24 @@ fafclient -players 2 -native-dir <folder with faf-ice-adapter.jar> [-exe <native
 With the default `-game fake` every player's game is `tools/fakegame`, which pings each peer over the adapters 10 times a second. The run passes when every game reached `Launching` and no ping was lost during `-hold`. On the isolated test account inbound UDP to sockets bound to 0.0.0.0 is dropped, hence `-game-bind 127.0.0.1`, and a TURN server on 127.0.0.1 got no allocations from the Java adapter, hence the default `-turn-ip` of the first private IPv4 address.
 
 Results on 2026-10-31 with two shipped adapters: direct 138 pings each way, none lost, mean RTT 0.4 ms; `--force-relay` 131 each way, none lost, only relay candidates exchanged.
+
+## 8. Links in the game (ours, issue #233)
+
+Not part of FAF's contract: an extension between our game and `faf-netbridge` that the client, the lobby server and Java peers never see. With `net_InEngineLinks 1` the game runs each peer link itself (`src/moho/net/NetlinkPeers.cpp`) and the bridge only passes the signalling. Message names and the address scheme are in `src/netlink/EngineLinks.h`.
+
+| Direction | Message | Arguments | Meaning |
+|---|---|---|---|
+| game → bridge | `NetlinkHello` | version (1) | sent right after `GameState Idle`; from now on this game links itself |
+| bridge → game | `NetlinkConfig` | JSON text | `localId`, `iceServers` (as `setIceServers` gave them), `forceRelay`, `bindAddress`, `duplicateMs`; again after every `setIceServers` |
+| bridge → game | `NetlinkPeer` | remote id, login, offerer 0/1 | start a link; sent ahead of the `JoinGame` / `ConnectToPeer` that names its address |
+| bridge → game | `NetlinkIceMsg` | remote id, JSON text | the client's `iceMsg` for that peer |
+| bridge → game | `NetlinkClose` | remote id | `disconnectFromPeer`, or a new game session |
+| bridge → game | `NetlinkGameEnded` | — | the game sent `GameEnded`: no more restarts |
+| game → bridge | `NetlinkIceMsg` | remote id, JSON text | the bridge calls `onIceMsg(localId, remote id, text)` |
+| game → bridge | `NetlinkState` | remote id, state, connected 0/1 | the bridge calls `onIceConnectionStateChanged`, and `onConnected` when connected changes |
+
+- The address the game is given for a peer is `240.x.y.z:p`: the peer id's low 24 bits in the address (240.0.0.0/4 is reserved and never routed) and 1000 + the bits above in the port. Every player computes the same address for the same peer. The game's datagrams to it go through a peer transport (#232) into that peer's link.
+- The bridge consumes these messages; the client gets none of them through `onGpgNetMessageReceived`.
+- The links are the same as the bridge's (§6, `src/netlink`), so the remote side may be a Java adapter, a bridge, or another game linking itself.
+- A game that never says hello (retail, or ours with `net_InEngineLinks 0`) gets none of these, and the bridge relays its datagrams as in §3.
+- The bridge must see `NetlinkHello` before the client's `joinGame` / `connectToPeer`; the lobby server sends those only after the game reports `GameState Lobby`, which follows `Idle`.

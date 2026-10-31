@@ -39,7 +39,9 @@ namespace moho
   }
 
   // Registers (or, with null, removes) the transport for addrHost:portHost
-  // (host byte order) on one connector.
+  // (host byte order) on one connector. A null connector registers it for
+  // every connector (issue #233: the links run before the lobby's connector
+  // exists); the connector that sends to the address first receives from it.
   void NET_SetPeerTransport(
     CNetUDPConnector* connector, std::uint32_t addrHost, std::uint16_t portHost,
     std::shared_ptr<INetPeerTransport> transport
@@ -53,7 +55,10 @@ namespace moho
   );
 
   // A transport received a datagram from its peer: queue it for the
-  // connector's receive loop and wake the connector. Any thread.
+  // connector's receive loop and wake the connector. Any thread. A null
+  // connector means the one that sends to addrHost:portHost through a
+  // transport registered for every connector; until one has, up to 256
+  // datagrams wait.
   void NET_DeliverFromPeerTransport(
     CNetUDPConnector* connector, std::uint32_t addrHost, std::uint16_t portHost, const void* data,
     std::size_t size

@@ -29,9 +29,19 @@ namespace moho
   // system's buffer size, as the binary does (issue #236).
   int32_t net_SocketRecvBuffer = 0;
   int32_t net_SocketSendBuffer = 0;
+  // Issue #233: 1 runs the peer links in the game when the adapter is
+  // faf-netbridge (NetlinkPeers.cpp); 0 leaves them to the adapter, as the
+  // binary does. Read when the game reports Idle.
+  int32_t net_InEngineLinks = 0;
 
   namespace
   {
+    TConVar<int32_t> gTConVar_net_InEngineLinks(
+      "net_InEngineLinks",
+      "1: run the peer links in the game when the ICE adapter is faf-netbridge; 0 (default) leaves them to the adapter.",
+      &net_InEngineLinks
+    );
+
     TConVar<int32_t> gTConVar_net_CheckOrderStreams(
       "net_CheckOrderStreams",
       "Check that each player's orders reached every player alike (CommandStreamCheck): 0 off, 1 report who "

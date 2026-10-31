@@ -24,4 +24,5 @@ namespace moho
   extern int32_t net_DebugAlterOrdersTo;
   extern int32_t net_SocketRecvBuffer;
   extern int32_t net_SocketSendBuffer;
+  extern int32_t net_InEngineLinks;
 } // namespace moho

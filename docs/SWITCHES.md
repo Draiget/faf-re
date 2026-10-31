@@ -132,6 +132,7 @@ The game's own UDP transport (`CNetUDPConnection`). Not performance switches and
 | `net_SendDelay` | 25 | `/con` | live | Milliseconds data smaller than one packet (497 bytes) is held for more to join it |
 | `net_SocketRecvBuffer` | 0 | `/con` | next game | Receive buffer of the game's UDP socket in bytes (`SO_RCVBUF`); 0 keeps the system default, as the shipped game. The log says `NET_MakeUDPConnector: SO_RCVBUF <n>` |
 | `net_SocketSendBuffer` | 0 | `/con` | next game | Send buffer of the game's UDP socket in bytes (`SO_SNDBUF`); 0 keeps the system default |
+| `net_InEngineLinks` | 0 | `/inenginelinks` or `/con` | next game | 1: when the ICE adapter is `faf-netbridge`, the game runs the peer links itself and the bridge only passes their signalling (issue #233, [NETBRIDGE.md](NETBRIDGE.md)); 0 leaves the links to the adapter, as the shipped game does. Read when the game reports `Idle` |
 
 ## Server mode
 

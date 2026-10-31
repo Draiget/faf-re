@@ -1,4 +1,5 @@
 #include "netbridge/Bridge.h"
+#include "netlink/EngineLinks.h"
 
 #include <algorithm>
 #include <chrono>
@@ -490,22 +491,25 @@ namespace faf::netbridge
       NewGameSession();
       const std::string& login = params[0].AsString();
       const std::int64_t remote = params[1].AsInt();
-      const std::uint16_t port = AddPeer(remote, login, false);
-      SendToGame({"JoinGame", {GpgArg::Str("127.0.0.1:" + std::to_string(port)), GpgArg::Str(login),
-                               GpgArg::Int(static_cast<std::int32_t>(remote))}});
+      const std::string address = ConnectPeer(remote, login, false);
+      SendToGame({"JoinGame", {GpgArg::Str(address), GpgArg::Str(login), GpgArg::Int(static_cast<std::int32_t>(remote))}});
     } else if (method == "connectToPeer") {
       if (mGpgClient != kInvalidSocket && (mGameState == "Launching" || mGameState == "Ended")) {
         Log("game ended or in progress, ignoring connectToPeer");
       } else {
         const std::string& login = params[0].AsString();
         const std::int64_t remote = params[1].AsInt();
-        const std::uint16_t port = AddPeer(remote, login, params[2].AsBool());
-        SendToGame({"ConnectToPeer", {GpgArg::Str("127.0.0.1:" + std::to_string(port)), GpgArg::Str(login),
-                                      GpgArg::Int(static_cast<std::int32_t>(remote))}});
+        const std::string address = ConnectPeer(remote, login, params[2].AsBool());
+        SendToGame(
+          {"ConnectToPeer", {GpgArg::Str(address), GpgArg::Str(login), GpgArg::Int(static_cast<std::int32_t>(remote))}}
+        );
       }
     } else if (method == "disconnectFromPeer") {
       const std::int64_t remote = params[0].AsInt();
       RemovePeer(remote);
+      if (mEnginePeers.erase(remote) != 0) {
+        SendToGame({netlink::kCmdClose, {GpgArg::Int(static_cast<std::int32_t>(remote))}});
+      }
       SendToGame({"DisconnectFromPeer", {GpgArg::Int(static_cast<std::int32_t>(remote))}});
     } else if (method == "setLobbyInitMode") {
       mInitMode = params[0].AsString() == "auto" ? 1 : 0; // LobbyInitMode NORMAL 0, AUTO 1
@@ -521,7 +525,11 @@ namespace faf::netbridge
       result = netlink::WriteJson(Status());
     } else if (method == "setIceServers") {
       mIceServers = netlink::ParseIceServers(params[0]);
+      mIceServersJson = params[0];
       Log("ICE servers set, " + std::to_string(mIceServers.size()) + " usable addresses");
+      if (mEngineLinks) {
+        SendEngineConfig();
+      }
     } else {
       known = false;
     }
@@ -537,6 +545,11 @@ namespace faf::netbridge
 
   void Bridge::OnIceMsg(const std::int64_t remoteId, const JsonValue& msg)
   {
+    if (mEnginePeers.count(remoteId) != 0) {
+      const std::string text = msg.IsString() ? msg.AsString() : netlink::WriteJson(msg);
+      SendToGame({netlink::kCmdIceMsg, {GpgArg::Int(static_cast<std::int32_t>(remoteId)), GpgArg::Str(text)}});
+      return;
+    }
     const auto it = mPeers.find(remoteId);
     if (it == mPeers.end()) {
       Log("ICE message ignored for unknown peer " + std::to_string(remoteId));
@@ -585,6 +598,25 @@ namespace faf::netbridge
       relay.Set("ice", std::move(ice));
       relays.Push(std::move(relay));
     }
+    for (const auto& [id, peer] : mEnginePeers) {
+      JsonValue ice = JsonValue::Object();
+      ice.Set("offerer", peer.offerer);
+      ice.Set("state", peer.state);
+      ice.Set("gathering_state", "");
+      ice.Set("datachannel_state", "");
+      ice.Set("connected", peer.connected);
+      ice.Set("loc_cand_addr", "");
+      ice.Set("rem_cand_addr", "");
+      ice.Set("loc_cand_type", "");
+      ice.Set("rem_cand_type", "");
+      ice.Set("time_to_connected", -1.0);
+      JsonValue relay = JsonValue::Object();
+      relay.Set("remote_player_id", id);
+      relay.Set("remote_player_login", peer.login);
+      relay.Set("local_game_udp_port", static_cast<int>(netlink::EngineAddressFor(id).portHost));
+      relay.Set("ice", std::move(ice));
+      relays.Push(std::move(relay));
+    }
     JsonValue s = JsonValue::Object();
     s.Set("version", kVersion);
     s.Set("ice_servers_size", static_cast<int>(mIceServers.size()));
@@ -605,7 +637,85 @@ namespace faf::netbridge
       Log("new game session, closing " + std::to_string(mPeers.size()) + " links");
     }
     mPeers.clear();
+    for (const auto& [id, peer] : mEnginePeers) {
+      SendToGame({netlink::kCmdClose, {GpgArg::Int(static_cast<std::int32_t>(id))}});
+    }
+    mEnginePeers.clear();
     mGameEnded = false;
+  }
+
+  std::string Bridge::ConnectPeer(const std::int64_t id, const std::string& login, const bool offerer)
+  {
+    if (!mEngineLinks) {
+      return mOptions.gameAddress + ":" + std::to_string(AddPeer(id, login, offerer));
+    }
+    // Issue #233: the game links; NetlinkPeer goes ahead of the command that
+    // names the address, through the same queue.
+    RemovePeer(id);
+    EnginePeer& peer = mEnginePeers[id];
+    peer = EnginePeer{};
+    peer.login = login;
+    peer.offerer = offerer;
+    const std::string address = netlink::EngineAddressText(id);
+    Log("peer " + login + "(" + std::to_string(id) + "): link in the game, " + (offerer ? "offerer" : "answerer") +
+        ", game sends to " + address);
+    SendToGame({netlink::kCmdPeer,
+                {GpgArg::Int(static_cast<std::int32_t>(id)), GpgArg::Str(login), GpgArg::Int(offerer ? 1 : 0)}});
+    return address;
+  }
+
+  void Bridge::SendEngineConfig()
+  {
+    JsonValue config = JsonValue::Object();
+    config.Set("localId", mOptions.id);
+    config.Set("iceServers", mIceServersJson);
+    config.Set("forceRelay", mOptions.forceRelay);
+    config.Set("bindAddress", mOptions.bindAddress);
+    config.Set("duplicateMs", static_cast<std::int64_t>(mOptions.duplicateGapMs));
+    SendToGame({netlink::kCmdConfig, {GpgArg::Str(netlink::WriteJson(config))}}, false);
+  }
+
+  bool Bridge::HandleEngineMessage(const GpgMessage& m)
+  {
+    if (m.command == netlink::kCmdHello) {
+      const int version = m.args.empty() ? 0 : m.args[0].number;
+      Log("the game runs the peer links itself (NetlinkHello " + std::to_string(version) + ")");
+      mEngineLinks = true;
+      SendEngineConfig();
+      return true;
+    }
+    if (m.command == netlink::kCmdIceMsg && m.args.size() == 2) {
+      JsonValue p = JsonValue::Array();
+      p.Push(mOptions.id);
+      p.Push(static_cast<std::int64_t>(m.args[0].number));
+      p.Push(m.args[1].text);
+      Notify("onIceMsg", std::move(p));
+      return true;
+    }
+    if (m.command == netlink::kCmdState && m.args.size() == 3) {
+      const std::int64_t id = m.args[0].number;
+      const auto it = mEnginePeers.find(id);
+      const bool connected = m.args[2].number != 0;
+      const bool connectedChanged = it == mEnginePeers.end() || it->second.connected != connected;
+      if (it != mEnginePeers.end()) {
+        it->second.state = m.args[1].text;
+        it->second.connected = connected;
+      }
+      JsonValue p = JsonValue::Array();
+      p.Push(mOptions.id);
+      p.Push(id);
+      p.Push(m.args[1].text);
+      Notify("onIceConnectionStateChanged", std::move(p));
+      if (connectedChanged) {
+        JsonValue c = JsonValue::Array();
+        c.Push(mOptions.id);
+        c.Push(id);
+        c.Push(connected);
+        Notify("onConnected", std::move(c));
+      }
+      return true;
+    }
+    return m.command.rfind("Netlink", 0) == 0;
   }
 
   std::uint16_t Bridge::AddPeer(const std::int64_t id, const std::string& login, const bool offerer)
@@ -615,9 +725,12 @@ namespace faf::netbridge
     peer->id = id;
     peer->login = login;
     peer->offerer = offerer;
-    peer->udp = BindUdp("127.0.0.1", 0);
+    // On the game's address: a socket bound to 127.0.0.1 cannot send to
+    // another local address (WSAEADDRNOTAVAIL), so with --game-address the
+    // game's datagrams never arrived.
+    peer->udp = BindUdp(mOptions.gameAddress.c_str(), 0);
     if (peer->udp == kInvalidSocket) {
-      Log("cannot open a loopback UDP port for peer " + std::to_string(id));
+      Log("cannot open a UDP port on " + mOptions.gameAddress + " for peer " + std::to_string(id));
       return 0;
     }
     peer->port = LocalPort(peer->udp);
@@ -672,7 +785,7 @@ namespace faf::netbridge
     if (mGameEnded) {
       peer->link->SetGameEnded();
     }
-    Log(prefix + (offerer ? "offerer" : "answerer") + ", game sends to 127.0.0.1:" + std::to_string(peer->port));
+    Log(prefix + (offerer ? "offerer" : "answerer") + ", game sends to " + mOptions.gameAddress + ":" + std::to_string(peer->port));
     peer->link->Start();
     const std::uint16_t port = peer->port;
     mPeers[id] = std::move(peer);
@@ -804,11 +917,16 @@ namespace faf::netbridge
     Notify("onConnectionStateChanged", std::move(p));
     // IceAdapter.onFAShutdown: the game session goes with the game.
     mPeers.clear();
+    mEngineLinks = false;
+    mEnginePeers.clear();
   }
 
   void Bridge::HandleGame(const GpgMessage& m)
   {
     Log("from game: " + DescribeGpg(m));
+    if (HandleEngineMessage(m)) {
+      return; // ours (issue #233), not the client's
+    }
     if (m.command == "GameState" && !m.args.empty()) {
       mGameState = m.args[0].text;
       if (mGameState == "Idle") {
@@ -829,6 +947,9 @@ namespace faf::netbridge
       mGameEnded = true;
       for (auto& [id, peer] : mPeers) {
         peer->link->SetGameEnded();
+      }
+      if (mEngineLinks) {
+        SendToGame({netlink::kCmdGameEnded, {}}, false);
       }
       Log("GameEnded received, stopping reconnects");
     }
