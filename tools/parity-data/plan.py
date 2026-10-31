@@ -15,6 +15,9 @@ are listed as unsupported; replays it has not seen yet are scheduled and checked
 --after DIR (an earlier run's results) leaves out the replays that run played to a verdict, so a
 run cut short by job time limits is finished by a second one.
 
+--batch K/N plays the K-th of N equal id ranges of the set. GitHub cancels a job that waits 24
+hours for a runner, so a set needing more than about a day of all runners goes in N runs.
+
 Writes the plan and, for GitHub Actions, `matrix` (the shards) and `shards` to GITHUB_OUTPUT.
 """
 import argparse
@@ -90,6 +93,9 @@ def main():
                         help="jobs GitHub runs at once (20 on Free): a small set is spread over this many")
     parser.add_argument("--after", help="an earlier run's results (any depth of results.jsonl): its replays "
                                         "with a verdict are left out, so this run plays what it did not")
+    parser.add_argument("--batch", default="1/1",
+                        help="K/N: play only the K-th of N equal id ranges of the set, so a set too big for "
+                             "one run (GitHub cancels a job that waits 24 hours for a runner) takes N runs")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -108,10 +114,20 @@ def main():
                 settled.update(r["id"] for r in map(json.loads, filter(str.strip, f))
                                if r["verdict"] not in ("not-run", "error", "timeout", "crash"))
 
+    # Batch K of N: the K-th of N equal ranges of the ids left to play, cut before the index is
+    # applied, so batches planned on different days (all with the same --after) neither overlap
+    # nor leave gaps.
+    left = [i for i in select(corpus, args.which, args.sample, args.seed) if i not in settled]
+    k, n = map(int, args.batch.split("/"))
+    if not 1 <= k <= n:
+        parser.error("--batch wants K/N with 1 <= K <= N")
+    ordered = sorted(left)
+    batch = set(ordered[len(ordered) * (k - 1) // n:len(ordered) * k // n])
+
     unsupported = []
     chosen = []
-    for replay_id in select(corpus, args.which, args.sample, args.seed):
-        if replay_id in settled:
+    for replay_id in left:
+        if replay_id not in batch:
             continue
         row = corpus[replay_id]
         e = index.get(replay_id)
@@ -149,7 +165,8 @@ def main():
     shards = spread(shards, min(args.jobs, args.max_shards), args.slots)
 
     plan = {
-        "settings": dict({k: getattr(args, k) for k in ("which", "sample", "seed", "slots", "budget_minutes", "fill")},
+        "settings": dict({k: getattr(args, k) for k in ("which", "sample", "seed", "slots", "budget_minutes", "fill",
+                                                        "batch")},
                          after=len(settled)),
         "shards": [{"shard": n, "bucket": b, "load_s": round(x["load"]),
                     "replays": sorted(x["items"], key=lambda r: -r["est"])} for n, (b, x) in enumerate(shards)],
@@ -163,8 +180,8 @@ def main():
     scheduled = sum(len(s["replays"]) for s in plan["shards"])
     if settled:
         print("left out %d replays the earlier run played" % len(settled))
-    print("set %s: %d replays in %d shards (%.0f%% full on average), %d unsupported, %d not scheduled"
-          % (args.which, scheduled, len(shards),
+    print("set %s, batch %s: %d replays in %d shards (%.0f%% full on average), %d unsupported, %d not scheduled"
+          % (args.which, args.batch, scheduled, len(shards),
              100.0 * sum(s["load_s"] for s in plan["shards"]) / max(1, len(shards) * capacity / args.fill),
              len(unsupported), len(plan["not_scheduled"])))
     matrix = {"include": [{"shard": s["shard"], "bucket": s["bucket"]} for s in plan["shards"]]}

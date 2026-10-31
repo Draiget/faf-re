@@ -34,6 +34,12 @@ on:
         description: Also check the server's visibility oracles every beat (unfocused, every army; slower), verdict oracle on a difference
         type: boolean
         default: false
+      batch:
+        description: K/N plays the K-th of N equal id ranges of the set (GitHub cancels jobs that wait 24 h for a runner; set=all needs 3 or more)
+        default: "1/1"
+      job_minutes:
+        description: Minutes each job plays (fewer = more, shorter jobs; at most 300)
+        default: "300"
 
 permissions:
   contents: read
@@ -48,7 +54,7 @@ env:
   PYTHON_VERSION: "3.14"
   # Jobs play for this long; plan.py packs shards to it, shard.py starts nothing that would not
   # end by then. A job may run 360 minutes in all.
-  PLAY_MINUTES: "300"
+  PLAY_MINUTES: ${{ inputs.job_minutes }}
   # Part of the headless build's cache key: a new value rebuilds everything once.
   BUILD_CACHE: "v1"
 
@@ -140,7 +146,7 @@ jobs:
           mkdir -p cache/index &&
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
           --set ${{ inputs.set }} --sample ${{ inputs.sample }} --seed ${{ inputs.seed }} --slots 4
-          --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
+          --batch "${{ inputs.batch }}" --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
           --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
@@ -249,7 +255,7 @@ jobs:
           python tools/parity-data/report.py --plan plan.json --results results
           ${{ inputs.after_run != '' && '--after after' || '' }}
           --expected tools/parity-data/expected/$GAME_VERSION.json --out report
-          --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
+          --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}${{ inputs.batch != '1/1' && format(' batch {0}', inputs.batch) || '' }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
