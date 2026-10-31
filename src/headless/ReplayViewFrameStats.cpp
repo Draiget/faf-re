@@ -96,6 +96,9 @@ namespace faf::headless
       if (IdMapsOn()) {
         CheckIds(frame, IdMap(static_cast<std::int32_t>(army)));
       }
+      if (mChannelOn) {
+        SendOverChannel(army, frame, sim.mCurBeat);
+      }
 
       // The same frame with dead reckoning, against this view's previous reckoned frame.
       remote::wire::SViewFrame reckoned = frame;
@@ -251,6 +254,17 @@ namespace faf::headless
         );
         summary += text;
       }
+      if (mChannelOn && army < mChannels.size()) {
+        const SChannel& channel = mChannels[army];
+        std::snprintf(
+          text, sizeof(text),
+          "\n    channel (%u %% lost, acks %u beats late): %.1f KB/s, %llu frames lost, %llu sent in full, %zu kept at the end",
+          mLossPercent, mAckDelay, static_cast<double>(channel.bytes) / beats * 10.0 / 1000.0,
+          static_cast<unsigned long long>(channel.lost), static_cast<unsigned long long>(channel.server.FullFrames()),
+          channel.server.Kept()
+        );
+        summary += text;
+      }
       if (IdMapsOn()) {
         const remote::CViewIdMap& map = IdMap(static_cast<std::int32_t>(army));
         std::snprintf(
@@ -262,6 +276,13 @@ namespace faf::headless
         summary += text;
       }
     }
+    if (mChannelOn) {
+      std::snprintf(
+        text, sizeof(text), "\n  channel: %llu frames arrived and did not decode to the frame sent",
+        static_cast<unsigned long long>(mChannelFailures)
+      );
+      summary += text;
+    }
     if (IdMapsOn()) {
       std::snprintf(
         text, sizeof(text), "\n  view ids checked in the frames: %llu, not mapping back to their family and source: %llu",
@@ -270,6 +291,43 @@ namespace faf::headless
       summary += text;
     }
     return summary;
+  }
+
+  void CReplayViewFrameStats::SendOverChannel(
+    const std::size_t army, const remote::wire::SViewFrame& frame, const std::uint32_t beat
+  )
+  {
+    while (mChannels.size() <= army) {
+      SChannel channel{};
+      channel.random.seed(static_cast<std::uint32_t>(0x5EED0000u + mChannels.size())); // the same losses every run
+      mChannels.push_back(std::move(channel));
+    }
+    SChannel& channel = mChannels[army];
+
+    // Acknowledgements due by now reach the server first.
+    while (!channel.acks.empty() && channel.acks.front().first <= beat) {
+      channel.server.Ack(channel.acks.front().second);
+      channel.acks.pop_front();
+    }
+
+    remote::wire::BitWriter writer;
+    if (!remote::wire::EncodeFrame(frame, channel.server.Baseline(), mCodec, writer)) {
+      ++mChannelFailures;
+      return;
+    }
+    channel.server.Sent(frame);
+    channel.bytes += writer.Bytes().size();
+
+    if (std::uniform_int_distribution<std::uint32_t>(0u, 99u)(channel.random) < mLossPercent) {
+      ++channel.lost;
+      return;
+    }
+    remote::wire::SViewFrame decoded{};
+    if (!channel.client.Decode(writer.Bytes(), mCodec, decoded) || !(decoded == frame)) {
+      ++mChannelFailures;
+      return;
+    }
+    channel.acks.emplace_back(beat + mAckDelay, channel.client.Newest());
   }
 
   void CReplayViewFrameStats::CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map)

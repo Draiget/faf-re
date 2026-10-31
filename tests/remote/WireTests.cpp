@@ -19,7 +19,14 @@
 #include <string>
 #include <vector>
 
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTITarget.h"
+#include "remote/FrameWindow.h"
+#include "remote/InboundIds.h"
 #include "remote/ViewIdMap.h"
+// The command headers bring in <windows.h>, whose `near` and `far` macros the tests below use as names.
+#undef near
+#undef far
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/IntelGridDelta.h"
@@ -1717,8 +1724,191 @@ namespace
     CHECK(theirs.entities[1].id == 0x30500001u);
   }
 
+  /** Records what reaches the sim side of `CInboundIdTranslator`. */
+  class CRecordingSink final : public moho::ICommandSink
+  {
+  public:
+    std::vector<std::uint32_t> destroyed;
+    std::vector<std::uint32_t> issuedUnits;
+    std::int32_t partner = 0;
+    std::int32_t insertBefore = 0;
+    std::uint32_t target = 0;
+    std::vector<std::uint32_t> removed; // command, unit
+    int issued = 0;
+
+    void SetCommandSource(moho::CommandSourceId) override {}
+    void OnCommandSourceTerminated() override {}
+    void VerifyChecksum(const gpg::MD5Digest&, moho::CSeqNo) override {}
+    void RequestPause() override {}
+    void Resume() override {}
+    void SingleStep() override {}
+    void CreateUnit(uint32_t, const moho::RResId&, const moho::SCoordsVec2&, float) override {}
+    void CreateProp(const char*, const Wm3::Vec3f&) override {}
+    void DestroyEntity(const moho::EntId id) override { destroyed.push_back(static_cast<std::uint32_t>(id)); }
+    void WarpEntity(moho::EntId, const moho::VTransform&) override {}
+    void ProcessInfoPair(moho::EntId, gpg::StrArg, gpg::StrArg) override {}
+    void IssueCommand(
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& units, const moho::SSTICommandIssueData& data, bool
+    ) override
+    {
+      ++issued;
+      issuedUnits.clear();
+      units.ForEachValue([this](const unsigned int id) { issuedUnits.push_back(id); });
+      partner = data.unk04;
+      insertBefore = data.mIndex;
+      target = data.mTarget.mEntityId;
+    }
+    void IssueFactoryCommand(
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&, const moho::SSTICommandIssueData&, bool
+    ) override
+    {}
+    void IncreaseCommandCount(moho::CmdId, int) override {}
+    void DecreaseCommandCount(moho::CmdId, int) override {}
+    void SetCommandTarget(moho::CmdId, const moho::SSTITarget&) override {}
+    void SetCommandType(moho::CmdId, moho::EUnitCommandType) override {}
+    void SetCommandCells(moho::CmdId, const gpg::core::FastVector<moho::SOCellPos>&, const Wm3::Vector3<float>&) override {}
+    void RemoveCommandFromUnitQueue(const moho::CmdId command, const moho::EntId unit) override
+    {
+      removed = {static_cast<std::uint32_t>(command), static_cast<std::uint32_t>(unit)};
+    }
+    void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override {}
+    void LuaSimCallback(const char*, const LuaPlus::LuaObject&, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&) override {}
+    void ExecuteDebugCommand(
+      const char*, const Wm3::Vector3<float>&, uint32_t, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
+    ) override
+    {}
+    void AdvanceBeat(int) override {}
+    void EndGame() override {}
+  };
+
+  // Plan WP5.10: a client's commands in its view's ids come out in the sim's; unknown ids drop them.
+  void TestInboundIds()
+  {
+    using faf::remote::CViewIdMap;
+    const auto ownSource = [](const std::uint32_t commandId) { return (commandId >> 24u) == 2u; };
+    CViewIdMap map(2);
+    SViewFrame frame{};
+    SEntityRecord blip{};
+    blip.id = 0x30500007u; // -> 0x30500001
+    frame.entities.push_back(blip);
+    SEntityRecord unit{};
+    unit.id = 0x00200009u;
+    unit.isUnit = true;
+    SUnitDetail detail{};
+    detail.commands = {static_cast<std::int32_t>(0x80000123u), 0x05000009}; // -> 0x80000001, 0x80000002
+    unit.unit.detail = TSharedValue<SUnitDetail>(detail);
+    frame.entities.push_back(unit);
+    map.Translate(frame, ownSource);
+
+    CRecordingSink sim;
+    faf::remote::CInboundIdTranslator intake(sim, map);
+    moho::BVSet<moho::EntId, moho::EntIdUniverse> units{};
+    (void)units.Add(static_cast<moho::EntId>(0x00200009u));
+    moho::SSTICommandIssueData data(moho::EUnitCommandType::UNITCOMMAND_Attack);
+    data.nextCommandId = 0x02000010;                           // the client's own new id
+    data.unk04 = static_cast<std::int32_t>(0x80000002u);        // partner: another client's command
+    data.mIndex = static_cast<std::int32_t>(0x80000001u);       // insert before the sim's command
+    data.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
+    data.mTarget.mEntityId = 0x30500001u;                       // the blip, in view ids
+    intake.IssueCommand(units, data, false);
+    CHECK(sim.issued == 1);
+    CHECK(sim.issuedUnits == std::vector<std::uint32_t>{0x00200009u});
+    CHECK(static_cast<std::uint32_t>(sim.partner) == 0x05000009u);
+    CHECK(static_cast<std::uint32_t>(sim.insertBefore) == 0x80000123u);
+    CHECK(sim.target == 0x30500007u);
+
+    intake.RemoveCommandFromUnitQueue(static_cast<moho::CmdId>(0x80000001u), static_cast<moho::EntId>(0x00200009u));
+    CHECK((sim.removed == std::vector<std::uint32_t>{0x80000123u, 0x00200009u}));
+
+    // A blip id the view was never given drops the command; a foreign unit passes as it is.
+    data.mTarget.mEntityId = 0x30500004u;
+    intake.IssueCommand(units, data, false);
+    CHECK(sim.issued == 1);
+    CHECK(intake.Dropped() == 1u);
+    intake.DestroyEntity(static_cast<moho::EntId>(0x00500003u));
+    CHECK(sim.destroyed == std::vector<std::uint32_t>{0x00500003u});
+    intake.IncreaseCommandCount(static_cast<moho::CmdId>(0x80000009u), 1); // a view command id never given
+    CHECK(intake.Dropped() == 2u);
+    CHECK(intake.BlipTargets(moho::EUnitCommandType::UNITCOMMAND_Attack) == 1u);
+
+    // Plan WP5.6: a selection mask in view ids comes out in sim ids; unknown or unheld ids are left out.
+    moho::SSyncFilterMaskBlock mask{};
+    (void)mask.Add(0x00200009u); // own unit, held
+    (void)mask.Add(0x30500001u); // the blip, in view ids
+    (void)mask.Add(0x30500003u); // a view blip id never given
+    (void)mask.Add(0x00500001u); // a unit id the view holds no record of
+    moho::SSyncFilterMaskBlock simMask{};
+    const auto held = [](const std::uint32_t simId) { return simId == 0x00200009u || simId == 0x30500007u; };
+    CHECK(faf::remote::TranslateSelectionMask(map, mask, simMask, held) == 2u);
+    CHECK(simMask.Contains(0x00200009u) && simMask.Contains(0x30500007u) && !simMask.Contains(0x30500001u));
+  }
+
+  // Plan WP5.3: frames against the newest acknowledged one; losses cost freshness only.
+  void TestFrameWindow()
+  {
+    using faf::remote::CClientFrameWindow;
+    using faf::remote::CServerFrameWindow;
+    SFrameCodec codec{};
+    const auto frameAt = [](const std::uint32_t id) {
+      SViewFrame frame{};
+      frame.frameId = id;
+      frame.beat = id;
+      for (std::uint32_t e = 0; e < 3u + id % 4u; ++e) { // entities come and go
+        SEntityRecord record{};
+        record.id = 0x00100000u + e;
+        record.health = static_cast<float>(id * 10u + e);
+        frame.entities.push_back(record);
+      }
+      return frame;
+    };
+    CServerFrameWindow server;
+    CClientFrameWindow client;
+    const auto send = [&](const SViewFrame& frame, const bool lost) {
+      BitWriter writer;
+      const bool encoded = EncodeFrame(frame, server.Baseline(), codec, writer);
+      server.Sent(frame);
+      if (!encoded || lost) {
+        return encoded;
+      }
+      SViewFrame decoded{};
+      return client.Decode(writer.Bytes(), codec, decoded) && decoded == frame;
+    };
+
+    CHECK(server.Baseline() == nullptr);
+    CHECK(send(frameAt(1), false));           // full
+    server.Ack(client.Newest());              // 1
+    CHECK(server.Baseline() != nullptr && server.Baseline()->frameId == 1u);
+    CHECK(send(frameAt(2), true));            // lost
+    CHECK(send(frameAt(3), false));           // against 1 still: decodes without 2
+    server.Ack(client.Newest());              // 3
+    CHECK(server.Baseline()->frameId == 3u && server.Kept() == 1u);
+    server.Ack(1u);                           // a late acknowledgement changes nothing
+    CHECK(server.Baseline()->frameId == 3u);
+    CHECK(server.FullFrames() == 0u);
+
+    // Past the cap without an acknowledgement the baseline is gone: the next frame goes in full.
+    for (std::uint32_t id = 4; id < 4u + faf::remote::kMaxFrames; ++id) {
+      CHECK(send(frameAt(id), true));
+    }
+    CHECK(server.Baseline() == nullptr);
+    CHECK(send(frameAt(100), false));
+    CHECK(server.FullFrames() == 1u);
+    server.Ack(client.Newest());
+    CHECK(send(frameAt(101), false));
+
+    // A frame whose baseline the client does not hold does not decode.
+    CClientFrameWindow fresh;
+    SViewFrame out{};
+    SViewFrame base = frameAt(101);
+    BitWriter againstBase;
+    CHECK(EncodeFrame(frameAt(102), &base, codec, againstBase));
+    CHECK(!fresh.Decode(againstBase.Bytes(), codec, out));
+  }
+
   const TestCase kTests[] = {
+    {"frames: window of acknowledged baselines", &TestFrameWindow},
     {"view ids: renumbering, inbound and retirement", &TestViewIdMap},
+    {"view ids: inbound translation of commands", &TestInboundIds},
     {"grids: delta round trip", &TestGridDeltaRoundTrip},
     {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
     {"grids: hostile input", &TestGridDeltaHostile},

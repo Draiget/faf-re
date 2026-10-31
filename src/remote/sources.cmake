@@ -16,6 +16,8 @@ set(FAF_REMOTE_SOURCES
   remote/ViewPackets.cpp
   remote/ViewFrames.cpp
   remote/ViewIdMap.cpp
+  remote/InboundIds.cpp
+  remote/FrameWindow.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/IntelGridDelta.cpp

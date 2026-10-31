@@ -59,6 +59,12 @@ namespace faf::remote
     /** The sim id behind a view id (inbound translation), or false when the view never got it. */
     [[nodiscard]] bool EntityToSim(std::uint32_t viewId, std::uint32_t& simId) const;
     [[nodiscard]] bool CommandToSim(std::uint32_t viewId, std::uint32_t& simId) const;
+    /**
+     * The view id the view was given for a sim id, without handing out a new one: false for an id
+     * that is renumbered but the view never got (or that retired). Ids kept as they are map to themselves.
+     */
+    [[nodiscard]] bool EntityToView(std::uint32_t simId, std::uint32_t& viewId) const;
+    [[nodiscard]] bool CommandToView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
 
     [[nodiscard]] std::uint64_t EntitiesMapped() const noexcept { return mEntitiesMapped; }
     [[nodiscard]] std::uint64_t CommandsMapped() const noexcept { return mCommandsMapped; }

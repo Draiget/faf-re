@@ -3,12 +3,15 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <map>
+#include <random>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
 
+#include "remote/FrameWindow.h"
 #include "remote/ViewFrames.h"
 #include "remote/wire/IntelGridDelta.h"
 
@@ -23,7 +26,12 @@
 // the entity frames once more with dead reckoning (plan WP7.5's 16-step scheme), each view's
 // own reckoner and baseline, for the bytes a player would get (plan WPR.6; the CSV's last column).
 // With `--view-ids` the frames carry each view's own ids (plan WP5.9, remote/ViewIdMap.h), and
-// every renumbered id in them must map back to a sim id of the same family and source.
+// every renumbered id in them must map back to a sim id of the same family and source. With
+// `--view-loss <percent>` (and `--view-ack-delay <beats>`) every view's frames also go through a
+// simulated lossy channel (plan WP5.3, remote/FrameWindow.h): each frame is encoded against the
+// newest frame the client acknowledged, a seeded share of frames is lost, the client acknowledges
+// its newest decoded frame and the acknowledgement reaches the server that many beats later.
+// Every frame that arrives must decode to the frame sent.
 
 namespace faf::headless
 {
@@ -42,7 +50,15 @@ namespace faf::headless
     /** Frames that did not encode, or decoded to another frame (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept
     {
-      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures;
+      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures + mChannelFailures;
+    }
+
+    /** The simulated channel (`--view-loss`, `--view-ack-delay`); off at 0 % loss and 0 beats. */
+    void SetChannel(std::uint32_t lossPercent, std::uint32_t ackDelayBeats) noexcept
+    {
+      mLossPercent = lossPercent;
+      mAckDelay = ackDelayBeats;
+      mChannelOn = lossPercent != 0u || ackDelayBeats != 0u;
     }
 
   protected:
@@ -51,6 +67,18 @@ namespace faf::headless
   private:
     [[nodiscard]] std::uint32_t SendGrids(const moho::Sim& sim, std::size_t view);
     void CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map);
+    void SendOverChannel(std::size_t army, const remote::wire::SViewFrame& frame, std::uint32_t beat);
+
+    /** One view's simulated channel. */
+    struct SChannel
+    {
+      remote::CServerFrameWindow server;
+      remote::CClientFrameWindow client;
+      std::mt19937 random;
+      std::deque<std::pair<std::uint32_t, std::uint32_t>> acks; // (beat it arrives, frame id)
+      std::uint64_t bytes = 0;
+      std::uint64_t lost = 0;
+    };
 
     std::FILE* mFile = nullptr;
     remote::wire::SFrameCodec mCodec;
@@ -73,6 +101,11 @@ namespace faf::headless
     std::uint64_t mBeats = 0;
     std::uint64_t mEncodeFailures = 0;
     std::uint64_t mRoundTripFailures = 0;
+    bool mChannelOn = false;
+    std::uint32_t mLossPercent = 0;
+    std::uint32_t mAckDelay = 0;
+    std::vector<SChannel> mChannels; // per army
+    std::uint64_t mChannelFailures = 0; // frames that arrived and did not decode to the frame sent
     std::uint64_t mIdsChecked = 0; // renumbered ids found in the frames (with `--view-ids`)
     std::uint64_t mIdFailures = 0; // of those, ids that do not map back to a sim id of their family and source
   };

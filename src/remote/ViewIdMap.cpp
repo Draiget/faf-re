@@ -160,6 +160,36 @@ namespace faf::remote
     return true;
   }
 
+  bool CViewIdMap::EntityToView(const std::uint32_t simId, std::uint32_t& viewId) const
+  {
+    if (!MapsEntity(simId)) {
+      viewId = simId;
+      return true;
+    }
+    const auto found = mEntityToView.find(simId);
+    if (found == mEntityToView.end()) {
+      return false;
+    }
+    viewId = found->second;
+    return true;
+  }
+
+  bool CViewIdMap::CommandToView(
+    const std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId
+  ) const
+  {
+    if (isOwnCommand(simId)) {
+      viewId = simId;
+      return true;
+    }
+    const auto found = mCommandToView.find(simId);
+    if (found == mCommandToView.end()) {
+      return false;
+    }
+    viewId = found->second;
+    return true;
+  }
+
   bool CViewIdMap::CommandToSim(const std::uint32_t viewId, std::uint32_t& simId) const
   {
     const auto found = mCommandToSim.find(viewId);

@@ -170,7 +170,12 @@ namespace
       "                            each decoded again and compared (server-mode build; not with the checks above)\n"
       "  --view-ids                with --view-frames: blips, foreign projectiles and foreign command ids renumbered\n"
       "                            per view, and every renumbered id checked to map back to its sim id\n"
-      "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
+      "  --view-loss <percent> [--view-ack-delay <beats>]  with --view-frames: every view's frames also go over a\n"
+      "                            simulated channel that loses that share of frames and acknowledges late; each\n"
+      "                            frame is encoded against the newest acknowledged one and must decode exactly\n"
+      "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
+      "                            back as the server would; it must marshal to the same bytes\n"
+      "  --launch-check           rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
@@ -257,6 +262,18 @@ int main(int argc, char** argv)
   (void)ReadOption("--view-packets-entries", options.viewPacketsEntriesPath);
   (void)ReadOption("--view-frames", options.viewFramesPath);
   options.viewIds = moho::CFG_GetArgOption("--view-ids", 0, nullptr);
+  if (ReadIntOption("--view-loss", options.viewLossPercent, bad)
+      && (options.viewLossPercent < 0 || options.viewLossPercent > 100)) {
+    bad = true;
+  }
+  if (ReadIntOption("--view-ack-delay", options.viewAckDelay, bad) && options.viewAckDelay < 0) {
+    bad = true;
+  }
+  options.inboundCheck = moho::CFG_GetArgOption("--inbound-check", 0, nullptr);
+  if (options.inboundCheck && (!options.viewIds || options.commandCheck)) {
+    std::printf("[%s] --inbound-check needs --view-frames and --view-ids, and not --command-check\n", gLabel.c_str());
+    bad = true;
+  }
   if ((options.oracleCheck ? 1 : 0) + (options.changeSetCheck ? 1 : 0) + (options.viewPacketsPath.empty() ? 0 : 1)
         + (options.viewFramesPath.empty() ? 0 : 1)
       > 1) {
@@ -375,6 +392,9 @@ int main(int argc, char** argv)
     }
     std::printf("[%s] %s\n", label, summary.c_str());
   }
+  if (!result.inboundSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.inboundSummary.c_str());
+  }
   if (!result.commandSummary.empty()) {
     std::printf("[%s] %s\n", label, result.commandSummary.c_str());
   }
@@ -438,7 +458,7 @@ int main(int argc, char** argv)
   } else if (result.crashed) {
     exitCode = kExitCrash;
   } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0
-             || result.commandFailures > 0 || result.oracleFailures > 0
+             || result.commandFailures > 0 || result.oracleFailures > 0 || result.inboundFailures > 0
              || result.changeSetFailures > 0 || result.viewFramesFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {

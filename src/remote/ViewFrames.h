@@ -36,6 +36,10 @@ namespace faf::remote
     [[nodiscard]] bool IdMapsOn() const noexcept { return mIdMapsOn; }
     /** `army`'s id map (with `EnableIdMaps`, once a beat has been built). */
     [[nodiscard]] const CViewIdMap& IdMap(std::int32_t army) const { return *mIdMaps[static_cast<std::size_t>(army)]; }
+    /** The views built so far (0 before the first beat). */
+    [[nodiscard]] std::size_t ViewCount() const noexcept { return mIdMaps.size(); }
+    /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
+    [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
 
     /** The last beat's frame for `army`. */
     [[nodiscard]] const wire::SViewFrame& Frame(std::int32_t army) const { return mFrames[static_cast<std::size_t>(army)]; }
@@ -55,6 +59,7 @@ namespace faf::remote
     std::vector<wire::SViewFrame> mFrames;
     std::vector<std::uint32_t> mWithheld;
     bool mIdMapsOn = false;
+    moho::Sim* mLastSim = nullptr;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;
     std::vector<std::unordered_set<std::uint32_t>> mRetiring; // per view: deleted or erased, still held
     std::vector<std::vector<std::uint32_t>> mRetired;         // per view: no longer held; retired next beat

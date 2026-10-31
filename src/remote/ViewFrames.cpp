@@ -102,6 +102,7 @@ namespace faf::remote
       mFrames[army] = std::move(frame);
       mWithheld[army] = withheld;
     }
+    mLastSim = &sim;
     OnViewFrames(sim);
   }
 } // namespace faf::remote
