@@ -42,6 +42,13 @@ from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE
                         MISMATCH_RE, live_client_desync, replay_checksums)
 
 VAULT_LINE_RE = re.compile(r"^custom_vault_path = .*$", re.M)
+# FAF's init mounts the user's preferences folder at /preferences. Blueprints.lua loads a map's own
+# blueprints (*.bp in the map folder) only when Game.prefs names the map in PreGameData.CurrentMapDir,
+# which the live lobby writes; without it a map that ships blueprints desyncs at beat 0
+# (survival_cybran_wrath, 26830688). Each replay gets a prefs folder of its own.
+PREFS_MOUNT_RE = re.compile(r"^MountDirectory\(SHGetFolderPath\('LOCAL_APPDATA'\) \.\. "
+                            r"'Gas Powered Games/Supreme Commander Forged Alliance', '/preferences'\)$", re.M)
+GAME_PREFS = "PreGameData = {\n    CurrentMapDir = '/maps/%s',\n    IconReplacements = { }\n}\n"
 PROGRESS_S = 30  # seconds between progress blocks in the job log
 # headless --oracle-check's summary (src/headless/ReplayOracleCheck.cpp, Summary)
 ORACLE_RE = re.compile(r"\] oracle check: focus -?\d+, (\d+) beats, (\d+) entity-beats differ"
@@ -76,6 +83,8 @@ class Shard:
         self.deadline = self.start + args.minutes * 60
         with open(os.path.join(args.pack, "bin", "init_ci.lua"), encoding="utf-8") as f:
             self.init_text = f.read()
+        if not PREFS_MOUNT_RE.search(self.init_text):
+            raise SystemExit("init_ci.lua has no /preferences mount to point at a replay's own Game.prefs")
         self.retail_maps = os.path.join(args.pack, "fa", "maps")
         for sub in ("run", "dl", "maps", "m28"):
             os.makedirs(os.path.join(args.work, sub), exist_ok=True)
@@ -153,10 +162,16 @@ class Shard:
             if not mod:
                 return None, {"id": replay_id, "verdict": "unsupported", "why": "M28AI v%d not found" % info["m28"]}
             link_tree(mod, os.path.join(run, "vault", "mods", "m28ai"))
+        prefs = os.path.join(run, "prefs")
+        os.makedirs(prefs)
+        with open(os.path.join(prefs, "Game.prefs"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(GAME_PREFS % info["map"])
         init = os.path.join(self.args.pack, "bin", "init_%d.lua" % replay_id)
         vault = os.path.join(run, "vault").replace("\\", "/")
+        text = VAULT_LINE_RE.sub(lambda m: "custom_vault_path = '%s'" % vault, self.init_text, count=1)
+        text = PREFS_MOUNT_RE.sub(lambda m: "MountDirectory('%s', '/preferences')" % prefs.replace("\\", "/"), text, count=1)
         with open(init, "w", encoding="utf-8", newline="\n") as f:
-            f.write(VAULT_LINE_RE.sub(lambda m: "custom_vault_path = '%s'" % vault, self.init_text, count=1))
+            f.write(text)
         return {"item": item, "info": info, "run": run, "scfa": scfa, "init": init,
                 "downloaded": downloaded}, None
 

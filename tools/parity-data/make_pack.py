@@ -7,8 +7,9 @@ usage: make_pack.py <command> [options]    (see README.md next to this file)
                              and file type, and the directory listings; the content types
   build --fa DIR --faf DIR --init FILE --out DIR [--vault DIR] [--m28 DIR] [--content EXTS]
                              a whole pack from local data, to play from locally (layout in README.md)
-  retail --fa DIR --out DIR  the retail archives alone (fa/gamedata/*.scd), the one part of the
-                             CI data that does not come from FAF (prewarm.py game fetches the rest)
+  retail --fa DIR --out DIR  the retail archives (fa/gamedata/*.scd) and the campaign maps'
+                             strings (fa/maps/X1CA_*/*_strings.lua), the one part of the CI data
+                             that does not come from FAF (prewarm.py game fetches the rest)
   verify --pack DIR --root ORIG=PACK... <trace>...
                              every file the traces read, mapped or opened is in the pack with
                              its content (not an empty stand-in)
@@ -193,7 +194,21 @@ def cmd_retail(args):
             pack_archive(os.path.join(scd_dir, name), dst, content, stats)
             total += os.path.getsize(dst)
             print(f"fa/gamedata/{name:24} {os.path.getsize(dst) / 1048576:8.1f} MB  {stats.line()}")
-    print(f"retail archives: {total / 1048576:.1f} MB")
+    # The campaign maps' dialogue: survival maps import /maps/X1CA_00N/X1CA_00N_strings.lua
+    # (survival_horde_ee_script.lua:1092), and FAF's map vault does not serve the campaign maps.
+    # Without them the import errors in the sim and the game desyncs (26830435 at beat 200).
+    maps_dir = os.path.join(args.fa, "maps")
+    for folder in sorted(os.listdir(maps_dir)):
+        if not folder.upper().startswith("X1CA_"):
+            continue
+        for name in sorted(os.listdir(os.path.join(maps_dir, folder))):
+            if name.lower().endswith("_strings.lua"):
+                dst = os.path.join(args.out, "fa", "maps", folder, name)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copyfile(os.path.join(maps_dir, folder, name), dst)
+                total += os.path.getsize(dst)
+                print(f"fa/maps/{folder}/{name}")
+    print(f"retail archives and campaign strings: {total / 1048576:.1f} MB")
     return 0
 
 
@@ -320,7 +335,7 @@ def main():
     p.add_argument("--content", help="comma-separated types to keep the bytes of (default: CONTENT_TYPES)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("retail")
-    p.add_argument("--fa", required=True, help="the game's install folder (gamedata/*.scd)")
+    p.add_argument("--fa", required=True, help="the game's install folder (gamedata/*.scd, maps/X1CA_*)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("verify")
     p.add_argument("--pack", required=True)

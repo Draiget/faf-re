@@ -84,6 +84,7 @@ Headless never reads a texture, a sound or a movie, but it does ask whether some
 | `fa_path.lua` | written for the pack: `fa_path` relative to `InitFileDir`, the game version |
 | `gamedata/*.nx2` | FAF's packages for the version, from FAF's updater |
 | `fa/gamedata/*.scd` | the retail archives: the one part FAF does not publish. Kept private: encrypted, behind a secret |
+| `fa/maps/X1CA_*/*_strings.lua` | the campaign maps' dialogue, in the retail file too: survival maps import it (`survival_horde_ee`, `xxx_survival`, `sh1r3_mycelium2_survival` and others), FAF's map vault does not serve the campaign maps, and without it the import errors in the sim and the replay desyncs (26830435 at beat 200). `init_ci.lua` mounts `fa/maps` at `/maps` |
 | `vault/` | empty; `shard.py` gives each replay a vault of its own with its map and M28AI version |
 | `manifest.json` | game version, kept types, SHA-256 of every source file |
 
@@ -91,7 +92,7 @@ The retail maps come from FAF's map vault like any other map: their `.scmap` and
 
 ### Making the retail file
 
-For a new copy of the retail archives (they do not change between FAF versions):
+For a new copy of the retail archives and campaign strings (they do not change between FAF versions; a file made before 31/10/2026 has no campaign strings and needs remaking):
 
 ```
 python make_pack.py retail --fa <game install> --out <dir>

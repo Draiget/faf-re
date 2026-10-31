@@ -116,6 +116,9 @@ jobs:
           fi
           cat contents.txt
           grep -q "fa/gamedata/units.scd" contents.txt
+          if ! grep -qi "fa/maps/X1CA_005/X1CA_005_strings.lua" contents.txt; then
+            echo "::warning::the retail file has no campaign strings (fa/maps/X1CA_*): survival-map replays will desync; remake it (tools/parity-data/README.md, Making the retail file)"
+          fi
           rm retail.tar.xz
       - if: steps.have.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6

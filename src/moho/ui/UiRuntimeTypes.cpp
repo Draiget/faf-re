@@ -2260,24 +2260,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject CopyLuaObjectToState(
-    const LuaPlus::LuaObject& source,
-    LuaPlus::LuaState* const targetState
-  )
-  {
-    if (!targetState || !targetState->GetCState()) {
-      return {};
-    }
-
-    LuaPlus::LuaObject copy{};
-    lua_State* const lstate = targetState->GetCState();
-    const int savedTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(source).PushStack(lstate);
-    copy = LuaPlus::LuaObject(LuaPlus::LuaStackObject(targetState, -1));
-    lua_settop(lstate, savedTop);
-    return copy;
-  }
-
   gpg::RRef ExtractUserDataRef(
     const LuaPlus::LuaObject& userDataObject
   )
@@ -17343,8 +17325,8 @@ int moho::cfunc_SetFrontEndDataL(
 
   const LuaPlus::LuaObject callerValue(LuaPlus::LuaStackObject(state, 2));
   const LuaPlus::LuaObject callerKey(LuaPlus::LuaStackObject(state, 1));
-  const LuaPlus::LuaObject valueOnUserState = CopyLuaObjectToState(callerValue, userState);
-  const LuaPlus::LuaObject keyOnUserState = CopyLuaObjectToState(callerKey, userState);
+  const LuaPlus::LuaObject valueOnUserState = SCR_Copy(callerValue, userState);
+  const LuaPlus::LuaObject keyOnUserState = SCR_Copy(callerKey, userState);
   frontEndData.SetObject(keyOnUserState, valueOnUserState);
   return 0;
 }
@@ -17396,9 +17378,9 @@ int moho::cfunc_GetFrontEndDataL(
   LuaPlus::LuaObject frontEndData = userState->GetGlobals()["FrontEndData"];
 
   const LuaPlus::LuaObject keyObject(LuaPlus::LuaStackObject(state, 1));
-  const LuaPlus::LuaObject keyOnUserState = CopyLuaObjectToState(keyObject, userState);
+  const LuaPlus::LuaObject keyOnUserState = SCR_Copy(keyObject, userState);
   const LuaPlus::LuaObject valueOnUserState = frontEndData.GetByObject(keyOnUserState);
-  LuaPlus::LuaObject valueOnCallerState = CopyLuaObjectToState(valueOnUserState, state);
+  LuaPlus::LuaObject valueOnCallerState = SCR_Copy(valueOnUserState, state);
   valueOnCallerState.PushStack(state);
   return 1;
 }
