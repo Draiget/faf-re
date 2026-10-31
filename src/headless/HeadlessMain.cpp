@@ -165,6 +165,7 @@ namespace
       "                            (server-mode build; not with the other two checks)\n"
       "  --view-packets-entries <file>  with --view-packets: one line per record (beat, lane, id, digest),\n"
       "                            so two runs can be compared entry by entry\n"
+      "  --view-packets-entries-every <n>  with --view-packets-entries: the records of every nth beat only\n"
       "  --view-frames <file>      unfocused: every army's frame per beat (CSV: entities, withheld, delta bytes),\n"
       "                            each decoded again and compared (server-mode build; not with the checks above)\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
@@ -268,6 +269,10 @@ int main(int argc, char** argv)
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
+  if (ReadIntOption("--view-packets-entries-every", options.viewPacketsEntriesEvery, bad)
+      && options.viewPacketsEntriesEvery < 1) {
+    bad = true;
+  }
   if (bad) {
     PrintUsage();
     return kExitBadInput;

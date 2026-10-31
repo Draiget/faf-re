@@ -514,7 +514,8 @@ namespace faf::headless
     std::unique_ptr<CReplayViewPacketCheck> viewPackets;
     if (!options.viewPacketsPath.empty()) {
       viewPackets = std::make_unique<CReplayViewPacketCheck>(
-        options.viewPacketsArmy, options.viewPacketsPath, options.viewPacketsEntriesPath
+        options.viewPacketsArmy, options.viewPacketsPath, options.viewPacketsEntriesPath,
+        static_cast<std::uint32_t>(options.viewPacketsEntriesEvery)
       );
       if (!viewPackets->IsOpen()) {
         result.error = "cannot write " + options.viewPacketsPath

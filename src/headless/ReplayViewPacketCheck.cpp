@@ -195,10 +195,11 @@ namespace faf::headless
   } // namespace
 
   CReplayViewPacketCheck::CReplayViewPacketCheck(
-    const std::int32_t army, const std::string& path, const std::string& entriesPath
+    const std::int32_t army, const std::string& path, const std::string& entriesPath, const std::uint32_t entriesEvery
   )
     : mArmy(army)
     , mWantEntries(!entriesPath.empty())
+    , mEntriesEvery(entriesEvery != 0u ? entriesEvery : 1u)
   {
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
@@ -256,8 +257,9 @@ namespace faf::headless
     ++mBeats;
 
     // Each record goes into its lane's digest and, with an entries file, into a digest of its own.
+    const bool sampled = beat % mEntriesEvery == 0u;
     const auto entry = [&](const char lane, const moho::EntId id, const auto& addRecord) {
-      if (mEntries != nullptr) {
+      if (mEntries != nullptr && sampled) {
         CDigest own;
         addRecord(own);
         std::fprintf(

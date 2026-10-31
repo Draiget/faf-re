@@ -24,6 +24,8 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 
 A run whose jobs ran out of time leaves replays `not-run`. Start another with `after_run` set to its run id: it plays only those (and any `error`, `timeout` or `crash`), and its report covers both runs.
 
+`oracle_check` (dedicated-server plan WPR.54) plays every replay unfocused with headless `--oracle-check`: each beat, for every army, the server's visibility oracle against what the sim publishes, and the spatial oracle against the brute-force one. A replay with any difference, or without the oracle's summary, gets the verdict `oracle`, which fails the run. The check makes replays slower than the plan's estimates, so a large set leaves more `not-run` for an `after_run`.
+
 Run both from master: caches saved on master are the ones every run reads. Anyone with write access to the repository can start them. The weekly prewarm fetches what is still missing and keeps the caches from expiring (GitHub drops a cache unused for 7 days).
 
 **FAF's servers.** Only the prewarm asks FAF for anything, each job one request a second (the replay buckets `parallel` jobs at a time), and only for what the cache lacks: once the caches are full, a parity run sends FAF nothing. A `run` job downloads a replay, map or M28AI version only when the caches lack it (a map outside the top maps, a replay the prewarm has not reached yet); the core and extended sets are played from shared jobs that fetch their 8 or 18 replays.
