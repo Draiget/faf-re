@@ -84,7 +84,8 @@ list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^gpg/core/diagnostics/(CrashHooks|Cra
 # The lockstep transport: Winsock sockets driven by WSAEventSelect. Linux replays and
 # serves games without it (the server has its own channel, plan D3); moho/net/Common.cpp's
 # connector factories fail here as on a Windows host without Winsock.
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
+# NetPeerTransport (issue #232) belongs to CNetUDPConnector and goes with it.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|NetPeerTransport|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
 
 set(_faf_sim_files "")
 foreach(_src IN LISTS FAF_SIM_SOURCES)
