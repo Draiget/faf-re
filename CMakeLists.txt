@@ -128,6 +128,7 @@ endif()
 
 # --- Peer links (issue #229) and the adapter replacement --------------------------------
 add_subdirectory(src/netlink)
+add_subdirectory(src/netbridge)
 
 # --- Engine -----------------------------------------------------------------------------
 add_subdirectory(src)

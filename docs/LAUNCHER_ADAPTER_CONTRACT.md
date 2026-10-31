@@ -103,6 +103,7 @@ The adapter listens on `--gpgnet-port`; the client starts the game with `/gpgnet
 - Every message from the game, including the ones the adapter acts on (`GameState`, `GameEnded`), goes to the client with `onGpgNetMessageReceived`.
 - Messages for the game (`sendToGpgNet`, the commands above) wait until the game reported `GameState Lobby`.
 - GPGNet connection lost → `onConnectionStateChanged "Disconnected"` and all links close.
+- A race in 3.3.14: `GPGNetClient`'s constructor starts the listener thread before `GPGNetServer` stores the client. A game that sends `GameState` within milliseconds of connecting makes `TelemetryDebugger.gameStateChanged` throw `IllegalStateException: gameState must not change to null`, which ends the listener; that game then never gets `CreateLobby`'s follow-ups. Seen with a fake game that reports `Idle` at once (2026-10-31); the real game loads for seconds first. `faf-netbridge` handles the game's messages on one thread and has no such window.
 
 ## 4. Lobby server's part
 
