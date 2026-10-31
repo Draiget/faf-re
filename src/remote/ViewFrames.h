@@ -53,6 +53,9 @@ namespace faf::remote
     virtual void OnViewFrames(moho::Sim& sim) { (void)sim; }
 
   private:
+    /** References to entities `frame` does not hold become the sim's "none" (plan WP5.12). */
+    static void ClearUnheldReferences(wire::SViewFrame& frame);
+
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;

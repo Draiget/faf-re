@@ -6,6 +6,7 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
 
@@ -294,36 +295,115 @@ namespace faf::remote
     if (name == nullptr || !args.IsTable()) {
       return true;
     }
-    for (const SCallbackIdField& field : kCallbackIdFields) {
-      if (std::strcmp(field.callback, name) != 0) {
-        continue;
-      }
-      const LuaPlus::LuaObject value = args[field.key];
+    // One value: a decimal id string is rewritten; anything else passes. False drops the call.
+    // The payload is this command's own, decoded from the client's message: rewritten in place.
+    auto& table = const_cast<LuaPlus::LuaObject&>(args);
+    const auto rewrite = [&](const LuaPlus::LuaObject& value, char (&rewritten)[16], bool& changed) {
+      changed = false;
       if (!value.IsString()) {
-        continue;
+        return true;
       }
       const char* const text = value.GetString();
       const std::size_t length = text != nullptr ? std::strlen(text) : 0u;
       if (length == 0u || length > 10u || std::strspn(text, "0123456789") != length) {
-        continue;
+        return true;
       }
       const unsigned long long parsed = std::strtoull(text, nullptr, 10);
       if (parsed > 0xFFFFFFFFull) {
-        continue;
+        return true;
       }
       auto id = static_cast<std::uint32_t>(parsed);
       const std::uint32_t before = id;
       if (!Entity("LuaSimCallback", id)) {
         return false;
       }
-      if (id != before) {
-        // The payload is this command's own, decoded from the client's message: rewritten in place.
-        char rewritten[16];
-        std::snprintf(rewritten, sizeof(rewritten), "%u", id);
-        const_cast<LuaPlus::LuaObject&>(args).SetString(field.key, rewritten);
+      changed = id != before;
+      std::snprintf(rewritten, sizeof(rewritten), "%u", id);
+      return true;
+    };
+    for (const SCallbackIdField& field : kCallbackIdFields) {
+      if (std::strcmp(field.callback, name) != 0) {
+        continue;
+      }
+      char rewritten[16];
+      bool changed = false;
+      if (!field.list) {
+        if (!rewrite(args[field.key], rewritten, changed)) {
+          return false;
+        }
+        if (changed) {
+          table.SetString(field.key, rewritten);
+        }
+        continue;
+      }
+      LuaPlus::LuaObject list = field.key != nullptr ? args[field.key] : table;
+      if (!list.IsTable()) {
+        continue;
+      }
+      const std::int32_t count = list.GetCount();
+      for (std::int32_t index = 1; index <= count; ++index) {
+        if (!rewrite(list.GetByIndex(index), rewritten, changed)) {
+          return false;
+        }
+        if (changed) {
+          list.SetString(index, rewritten);
+        }
       }
     }
+    LogUnmarked(name, args, std::string(), 0);
     return true;
+  }
+
+  void CCommandIdRewriter::LogUnmarked(
+    const char* const name, const LuaPlus::LuaObject& value, const std::string& path, const int depth
+  )
+  {
+    if (depth > 6) {
+      return;
+    }
+    if (value.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(value, 1); it.IsValid(); it.Next()) {
+        LuaPlus::LuaObject& key = it.GetKey();
+        const std::string child = key.IsString() ? path + "." + key.GetString() : path + "[]";
+        bool marked = false;
+        for (const SCallbackIdField& field : kCallbackIdFields) {
+          marked = marked
+                || (std::strcmp(field.callback, name) == 0
+                    && (field.key == nullptr ? depth == 0 : depth == 0 && key.IsString()
+                                                               && std::strcmp(field.key, key.GetString()) == 0));
+        }
+        if (!marked) {
+          LogUnmarked(name, it.GetValue(), child, depth + 1);
+        }
+      }
+      return;
+    }
+    double number = 0.0;
+    if (value.IsString()) {
+      const char* const text = value.GetString();
+      const std::size_t length = text != nullptr ? std::strlen(text) : 0u;
+      if (length == 0u || length > 10u || std::strspn(text, "0123456789") != length) {
+        return;
+      }
+      number = std::strtod(text, nullptr);
+    } else if (value.IsNumber()) {
+      number = value.GetNumber();
+    } else {
+      return;
+    }
+    if (number < 0.0 || number > 4294967295.0 || number != static_cast<double>(static_cast<std::uint64_t>(number))) {
+      return;
+    }
+    if (!LooksRenumbered(static_cast<std::uint32_t>(number))) {
+      return;
+    }
+    // Plan WP5.11: an id the policy does not mark goes to the sim untranslated; logged for the policy.
+    if (mUnmarkedIds++ < 8u) {
+      gpg::Warnf(
+        "command ids: %s args%s holds 0x%08x, an id this view was given, in a field the policy does not mark", name,
+        path.c_str(), static_cast<std::uint32_t>(number)
+      );
+    }
   }
 
   void CCommandIdRewriter::ExecuteDebugCommand(

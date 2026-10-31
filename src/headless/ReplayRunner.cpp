@@ -540,6 +540,9 @@ namespace faf::headless
         viewFrames->EnableIdMaps();
       }
       viewFrames->SetParallel(options.parallelViews);
+      if (options.spy) {
+        viewFrames->EnableSpy();
+      }
       viewFrames->SetChannel(
         static_cast<std::uint32_t>(options.viewLossPercent), static_cast<std::uint32_t>(options.viewAckDelay)
       );

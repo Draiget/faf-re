@@ -118,7 +118,7 @@ namespace faf::remote
   {
     for (const std::uint32_t simId : simIds) {
       if (const auto found = mEntityToView.find(simId); found != mEntityToView.end()) {
-        mEntityToSim.erase(found->second);
+        mGrace.push_back({mBeat + kInboundGraceBeats, found->second, false});
         mEntityToView.erase(found);
       }
     }
@@ -128,7 +128,7 @@ namespace faf::remote
   {
     for (const std::uint32_t simId : simIds) {
       if (const auto found = mCommandToView.find(simId); found != mCommandToView.end()) {
-        mCommandToSim.erase(found->second);
+        mGrace.push_back({mBeat + kInboundGraceBeats, found->second, true});
         mCommandToView.erase(found);
       }
     }
@@ -141,8 +141,18 @@ namespace faf::remote
         ++it;
         continue;
       }
-      mCommandToSim.erase(it->second);
+      mGrace.push_back({mBeat + kInboundGraceBeats, it->second, true});
       it = mCommandToView.erase(it);
+    }
+  }
+
+  void CViewIdMap::AdvanceTo(const std::uint32_t beat)
+  {
+    mBeat = beat;
+    while (!mGrace.empty() && mGrace.front().until <= beat) {
+      const SGrace& retired = mGrace.front();
+      (retired.command ? mCommandToSim : mEntityToSim).erase(retired.viewId);
+      mGrace.pop_front();
     }
   }
 

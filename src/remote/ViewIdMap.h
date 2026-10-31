@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <span>
 #include <unordered_map>
@@ -49,6 +50,17 @@ namespace faf::remote
      */
     void Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand);
 
+    /**
+     * Beats a retired view id still translates inbound: a client's command can name an entity it
+     * still shows for its latency after the sim deleted it, and the sim should get that command as
+     * a lockstep client's would arrive. Well under the ~99 beats after which the sim reuses a
+     * released serial (`EntityDB` 0x00684560's 100-slot ring), so a late id never reaches a newer entity.
+     */
+    static constexpr std::uint32_t kInboundGraceBeats = 50;
+
+    /** The beat from now on (retirements count their grace from it); ends the grace of older ones. */
+    void AdvanceTo(std::uint32_t beat);
+
     /** The sim deleted or erased these entities: their view ids retire. */
     void RetireEntities(std::span<const std::uint32_t> simIds);
     /** The sim released these commands: their view ids retire. */
@@ -86,6 +98,14 @@ namespace faf::remote
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToView;
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToSim;
     std::unordered_map<std::uint32_t, std::uint32_t> mNextSerial; // family and source (id >> 20) -> next serial
+    struct SGrace
+    {
+      std::uint32_t until;  // the beat the view id stops translating inbound
+      std::uint32_t viewId;
+      bool command;
+    };
+    std::deque<SGrace> mGrace; // retired, oldest first
+    std::uint32_t mBeat = 0;
     std::uint32_t mNextCommand = 0;
     std::uint64_t mEntitiesMapped = 0;
     std::uint64_t mCommandsMapped = 0;

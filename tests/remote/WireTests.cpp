@@ -1700,9 +1700,13 @@ namespace
     const std::uint32_t retiredCommands[] = {0x80000123u};
     map.RetireEntities(retiredEntities);
     map.RetireCommands(retiredCommands);
+    // A retired id still translates inbound for the grace beats (a late command), then no more.
+    CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
+    CHECK(map.CommandToSim(0x80000001u, sim) && sim == 0x80000123u);
+    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    map.AdvanceTo(CViewIdMap::kInboundGraceBeats);
     CHECK(!map.EntityToSim(0x30500001u, sim));
     CHECK(!map.CommandToSim(0x80000001u, sim));
-    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
     CHECK(!map.CommandToSim(0x80000002u, sim));
     SViewFrame again{};
     again.entities.push_back(record(0x30500007u));
@@ -1863,6 +1867,32 @@ namespace
     args.SetString("entity", "810549252");   // an unmarked callback passes as it is
     intake.LuaSimCallback("SomethingElse", args, none);
     CHECK(sim.callbackEntity == "810549252");
+
+    // An id of this view in a field the policy does not mark passes as it is and is counted.
+    args.SetString("entity", "810549249");
+    args.SetString("other", "810549249");
+    const std::uint64_t unmarkedBefore = intake.UnmarkedIds();
+    intake.LuaSimCallback("Rebuild", args, none);
+    CHECK(intake.UnmarkedIds() == unmarkedBefore + 1u);
+
+    // A list of ids (`OnControlGroupAssign`): every element is translated.
+    LuaPlus::LuaObject group;
+    group.AssignNewTable(&lua, 2, 0);
+    group.SetString(1, "2097161");   // 0x00200009, own unit: kept
+    group.SetString(2, "810549249"); // the blip in view ids
+    intake.LuaSimCallback("OnControlGroupAssign", group, none);
+    CHECK(std::string(group.GetByIndex(1).GetString()) == "2097161");
+    CHECK(std::string(group.GetByIndex(2).GetString()) == "810549255");
+
+    // Plan WP5.12: capture and guard on a blip go through like attack.
+    data.mTarget.mEntityId = 0x30500001u;
+    data.mCommandType = moho::EUnitCommandType::UNITCOMMAND_Capture;
+    intake.IssueCommand(units, data, false);
+    data.mCommandType = moho::EUnitCommandType::UNITCOMMAND_Guard;
+    intake.IssueCommand(units, data, false);
+    CHECK(sim.target == 0x30500007u);
+    CHECK(intake.BlipTargets(moho::EUnitCommandType::UNITCOMMAND_Capture) == 1u);
+    CHECK(intake.BlipTargets(moho::EUnitCommandType::UNITCOMMAND_Guard) == 1u);
   }
 
   // Plan WP5.3: frames against the newest acknowledged one; losses cost freshness only.

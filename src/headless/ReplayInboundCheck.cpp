@@ -270,6 +270,11 @@ namespace faf::headless
       static_cast<unsigned long long>(otherBlipTargets)
     );
     summary += text;
+    std::snprintf(
+      text, sizeof(text), "\n  callback values outside the marked fields that are ids the view was given: %llu",
+      static_cast<unsigned long long>(mTranslator.UnmarkedIds())
+    );
+    summary += text;
     for (const std::string& example : mNotShownExamples) {
       summary += "\n  never given: " + example;
     }

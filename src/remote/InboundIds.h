@@ -35,17 +35,27 @@ namespace faf::remote
    * Plan WP5.11: the Lua fields of sim callbacks that carry an entity id, as the routing policy
    * marks them. FA's Lua hands entity ids around as decimal strings (a Lua number is a float here
    * and cannot hold every id); these are translated like any other entity id. From the corpus
-   * audit (headless --inbound-check, plan WPR.19): `Rebuild`'s `entity` and `DistributeOrders`'s
-   * `Target` carry unit ids; the other keys whose values matched ids are army indices and amounts.
+   * audit over the core replays (headless --inbound-check, plan WPR.19): the `target` of
+   * `RingWithStorages`, `RingRadar`, `FlagShield` and `ValidateAssist`, `Rebuild`'s `entity` and
+   * `DistributeOrders`'s `Target` carry a unit or blip id; `OnControlGroupAssign`'s arguments and
+   * `WeaponPriorities`'s `SelectedUnits` are lists of unit ids. The other keys whose values
+   * matched ids are army indices, amounts, coordinates and marker numbers.
    */
   struct SCallbackIdField
   {
     const char* callback;
-    const char* key; // a field of the argument table
+    const char* key; // a field of the argument table; null: the argument table itself
+    bool list;       // the field is a list of ids (every element is one)
   };
   inline constexpr SCallbackIdField kCallbackIdFields[] = {
-    {"Rebuild", "entity"},
-    {"DistributeOrders", "Target"},
+    {"Rebuild", "entity", false},
+    {"DistributeOrders", "Target", false},
+    {"RingWithStorages", "target", false},
+    {"RingRadar", "target", false},
+    {"FlagShield", "target", false},
+    {"ValidateAssist", "target", false},
+    {"OnControlGroupAssign", nullptr, true},
+    {"WeaponPriorities", "SelectedUnits", true},
   };
 
   /**
@@ -107,10 +117,18 @@ namespace faf::remote
     void AdvanceBeat(int beats) override;
     void EndGame() override;
 
+    /**
+     * Values in sim callbacks' Lua arguments, outside the marked fields, that have the form of a
+     * renumbered id (`LooksRenumbered`): passed as they are, counted, and the first few logged.
+     */
+    [[nodiscard]] std::uint64_t UnmarkedIds() const noexcept { return mUnmarkedIds; }
+
   protected:
     /** The id as `next` gets it, in place; false refuses it (the command is dropped). */
     [[nodiscard]] virtual bool RewriteEntity(std::uint32_t& id) = 0;
     [[nodiscard]] virtual bool RewriteCommand(std::uint32_t& id) = 0;
+    /** Whether an unmarked Lua value is worth logging as an id (none by default). */
+    [[nodiscard]] virtual bool LooksRenumbered(std::uint32_t value) const { return false; }
 
   private:
     using EntitySet = moho::BVSet<moho::EntId, moho::EntIdUniverse>;
@@ -124,8 +142,10 @@ namespace faf::remote
     void Drop(const char* message, const char* kind, std::uint32_t id);
     void CountBlipTarget(const moho::SSTICommandIssueData& data) noexcept;
     [[nodiscard]] bool CallbackIds(const char* name, const LuaPlus::LuaObject& args);
+    void LogUnmarked(const char* name, const LuaPlus::LuaObject& value, const std::string& path, int depth);
 
     moho::ICommandSink& mNext;
+    std::uint64_t mUnmarkedIds = 0;
     std::uint64_t mCommands = 0;
     std::uint64_t mIdsRewritten = 0;
     std::uint64_t mDropped = 0;
@@ -159,6 +179,12 @@ namespace faf::remote
   protected:
     [[nodiscard]] bool RewriteEntity(std::uint32_t& id) override { return mMap->EntityToSim(id, id); }
     [[nodiscard]] bool RewriteCommand(std::uint32_t& id) override { return mMap->CommandToSim(id, id); }
+    /** A blip or foreign projectile id of this view, as only a view id can be. */
+    [[nodiscard]] bool LooksRenumbered(const std::uint32_t value) const override
+    {
+      std::uint32_t simId = 0;
+      return mMap->MapsEntity(value) && mMap->EntityToSim(value, simId);
+    }
 
   private:
     const CViewIdMap* mMap;

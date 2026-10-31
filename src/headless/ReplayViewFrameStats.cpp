@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <functional>
+#include <unordered_set>
 #include <utility>
 
+#include "moho/entity/EntityDb.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
+#include "remote/VisibilityOracle.h"
 #include "remote/wire/BitStream.h"
 
 // Engine addition, server mode: see ReplayViewFrameStats.h.
@@ -15,6 +18,10 @@ namespace faf::headless
 {
   namespace
   {
+    /** The fields a record names other entities in (the spy's reference check). */
+    constexpr const char* kSpyFields[7] = {"attachment parent", "attachment", "creator", "selection inheritor",
+                                           "focus", "guarded unit", "target blip"};
+
     /** The codec `--wire-stats` uses: positions over the map, no dead reckoning. */
     [[nodiscard]] remote::wire::SFrameCodec MakeCodec(const float mapSizeX, const float mapSizeZ)
     {
@@ -91,6 +98,9 @@ namespace faf::headless
       remote::wire::SViewFrame decoded{};
       if (!remote::wire::DecodeFrame(reader, baseline, mCodec, decoded) || !(decoded == frame)) {
         ++mRoundTripFailures;
+      }
+      if (mSpyOn) {
+        Spy(sim, army, decoded); // what the client holds after the wire
       }
       const auto bytes = static_cast<std::uint32_t>(writer.Bytes().size());
       if (IdMapsOn()) {
@@ -281,6 +291,25 @@ namespace faf::headless
         summary += text;
       }
     }
+    if (mSpyOn) {
+      std::snprintf(
+        text, sizeof(text),
+        "\n  spy: %llu records held, %llu outside the view, %llu orphans; %llu references, not held:",
+        static_cast<unsigned long long>(mSpyRecords), static_cast<unsigned long long>(mSpyOutside),
+        static_cast<unsigned long long>(mSpyOrphans), static_cast<unsigned long long>(mSpyReferences)
+      );
+      summary += text;
+      for (std::size_t field = 0; field < mSpyUnheld.size(); ++field) {
+        std::snprintf(
+          text, sizeof(text), "%s %s %llu", field == 0 ? "" : ",", kSpyFields[field],
+          static_cast<unsigned long long>(mSpyUnheld[field])
+        );
+        summary += text;
+      }
+      for (const std::string& example : mSpyExamples) {
+        summary += "\n    " + example;
+      }
+    }
     if (mChannelOn) {
       std::snprintf(
         text, sizeof(text), "\n  channel: %llu frames arrived and did not decode to the frame sent",
@@ -333,6 +362,73 @@ namespace faf::headless
       return;
     }
     channel.acks.emplace_back(beat + mAckDelay, channel.client.Newest());
+  }
+
+  void CReplayViewFrameStats::Spy(const moho::Sim& sim, const std::size_t army, const remote::wire::SViewFrame& held)
+  {
+    const auto viewArmy = static_cast<std::int32_t>(army);
+    const remote::CViewIdMap* const map = IdMapsOn() ? &IdMap(viewArmy) : nullptr;
+    const auto example = [&](const char* what, const std::uint32_t id, const std::uint32_t named) {
+      if (mSpyExamples.size() < 12u) {
+        char text[160];
+        std::snprintf(text, sizeof(text), "beat %u, army %d: %s 0x%08x names 0x%08x", held.beat, viewArmy, what, id, named);
+        mSpyExamples.emplace_back(text);
+      }
+    };
+
+    // Every record must be one the oracle lets this view have.
+    std::unordered_set<std::uint32_t> ids;
+    ids.reserve(held.entities.size());
+    for (const remote::wire::SEntityRecord& record : held.entities) {
+      ids.insert(record.id);
+      ++mSpyRecords;
+      std::uint32_t simId = record.id;
+      if (map != nullptr && !map->EntityToSim(record.id, simId)) {
+        ++mSpyOutside;
+        example("record without a sim id", record.id, record.id);
+        continue;
+      }
+      moho::Entity* entity = nullptr;
+      if (sim.mEntityDB != nullptr) {
+        const auto found = sim.mEntityDB->mAllUnits.find(simId);
+        entity = found != sim.mEntityDB->mAllUnits.end() ? found->second : nullptr;
+      }
+      if (entity == nullptr) {
+        ++mSpyOrphans;
+        continue;
+      }
+      if (!remote::ResolveViewVisibility(sim, viewArmy, *entity).published || !remote::CanViewSee(sim, viewArmy, *entity)) {
+        ++mSpyOutside;
+        example("record outside the view", record.id, simId);
+      }
+    }
+
+    // Every entity a record names must be one the client holds.
+    const auto reference = [&](const std::size_t field, const std::uint32_t owner, const std::uint32_t named) {
+      if (named == 0xF0000000u) {
+        return; // the sim's "none"
+      }
+      ++mSpyReferences;
+      if (ids.count(named) == 0u) {
+        ++mSpyUnheld[field];
+        example(kSpyFields[field], owner, named);
+      }
+    };
+    for (const remote::wire::SEntityRecord& record : held.entities) {
+      reference(0, record.id, record.appearance.attachParent);
+      for (const std::uint32_t child : record.appearance.attachments) {
+        reference(1, record.id, child);
+      }
+      if (!record.isUnit) {
+        continue;
+      }
+      const remote::wire::SUnitDetail& detail = *record.unit.detail;
+      reference(2, record.id, detail.creator);
+      reference(3, record.id, detail.selectionInheritor);
+      reference(4, record.id, detail.focusUnit);
+      reference(5, record.id, detail.guardedUnit);
+      reference(6, record.id, detail.targetBlip);
+    }
   }
 
   void CReplayViewFrameStats::CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map)

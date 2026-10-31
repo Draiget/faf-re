@@ -31,7 +31,12 @@
 // simulated lossy channel (plan WP5.3, remote/FrameWindow.h): each frame is encoded against the
 // newest frame the client acknowledged, a seeded share of frames is lost, the client acknowledges
 // its newest decoded frame and the acknowledgement reaches the server that many beats later.
-// Every frame that arrives must decode to the frame sent.
+// Every frame that arrives must decode to the frame sent. With `--spy` (plan WP16.3) every view's
+// decoded frame, what its client holds, is checked against the sim each beat: every record must
+// be one the oracle lets that view have (`ResolveViewVisibility` publishes it and `CanViewSee`
+// passes; a record the sim no longer has is an orphan, WP7.7), and every entity a record names
+// (attachment parent and children, a unit's creator, selection inheritor, focus, guarded unit and
+// target blip) must be one the client holds. Each miss is a violation, counted by kind.
 
 namespace faf::headless
 {
@@ -50,8 +55,15 @@ namespace faf::headless
     /** Frames that did not encode, or decoded to another frame (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept
     {
-      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures + mChannelFailures;
+      std::uint64_t unheld = 0;
+      for (const std::uint64_t count : mSpyUnheld) {
+        unheld += count;
+      }
+      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures + mChannelFailures + mSpyOutside + unheld;
     }
+
+    /** The spy client's checks (`--spy`). */
+    void EnableSpy() noexcept { mSpyOn = true; }
 
     /** The simulated channel (`--view-loss`, `--view-ack-delay`); off at 0 % loss and 0 beats. */
     void SetChannel(std::uint32_t lossPercent, std::uint32_t ackDelayBeats) noexcept
@@ -68,6 +80,7 @@ namespace faf::headless
     [[nodiscard]] std::uint32_t SendGrids(const moho::Sim& sim, std::size_t view);
     void CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map);
     void SendOverChannel(std::size_t army, const remote::wire::SViewFrame& frame, std::uint32_t beat);
+    void Spy(const moho::Sim& sim, std::size_t army, const remote::wire::SViewFrame& held);
 
     /** One view's simulated channel. */
     struct SChannel
@@ -106,6 +119,13 @@ namespace faf::headless
     std::uint32_t mAckDelay = 0;
     std::vector<SChannel> mChannels; // per army
     std::uint64_t mChannelFailures = 0; // frames that arrived and did not decode to the frame sent
+    bool mSpyOn = false;
+    std::uint64_t mSpyRecords = 0;
+    std::uint64_t mSpyOutside = 0;  // records the oracle does not let the view have
+    std::uint64_t mSpyOrphans = 0;  // records the sim no longer has
+    std::uint64_t mSpyReferences = 0;
+    std::array<std::uint64_t, 7> mSpyUnheld{}; // by field: names an entity the client does not hold
+    std::vector<std::string> mSpyExamples;
     std::uint64_t mIdsChecked = 0; // renumbered ids found in the frames (with `--view-ids`)
     std::uint64_t mIdFailures = 0; // of those, ids that do not map back to a sim id of their family and source
   };
