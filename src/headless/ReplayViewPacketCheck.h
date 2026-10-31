@@ -19,14 +19,17 @@
 // meshes) is digested by its name, and the animation poses (shared objects, plan WP8) are left
 // out. With an entries file (`--view-packets-entries`) it also writes one line per record,
 // `beat lane id digest`, so a beat whose lane digests differ can be listed entry by entry:
-// missing, extra and changed records (plan WPR.3's equivalence harness).
+// missing, extra and changed records (plan WPR.3's equivalence harness). `entriesEvery` keeps the
+// records of every Nth beat only, for long games with many armies.
 
 namespace faf::headless
 {
   class CReplayViewPacketCheck final : public remote::CViewPackets
   {
   public:
-    CReplayViewPacketCheck(std::int32_t army, const std::string& path, const std::string& entriesPath);
+    CReplayViewPacketCheck(
+      std::int32_t army, const std::string& path, const std::string& entriesPath, std::uint32_t entriesEvery
+    );
     ~CReplayViewPacketCheck() override;
 
     [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr && (mWantEntries == (mEntries != nullptr)); }
@@ -47,6 +50,7 @@ namespace faf::headless
     std::FILE* mFile = nullptr;
     std::FILE* mEntries = nullptr; // `beat lane id digest` per record, when asked for
     bool mWantEntries = false;
+    std::uint32_t mEntriesEvery = 1;
     std::uint64_t mBeats = 0;
     bool mRebuilt = false; // the lines are rebuilt packets (unfocused run)
   };

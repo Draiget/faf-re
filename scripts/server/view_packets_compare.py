@@ -8,7 +8,9 @@ routed packet) and one focused on the army (the reference), named `vp_<replay>_a
 digests and, from WP5.4 on, the army lane's digest. With `--view-packets-entries` each run also
 wrote `<same name>.vpe`, one line per record ("beat lane id digest"); for every beat whose lines
 differ, the records are listed: MISSING from the routed packet, EXTRA in it, or CHANGED. Ids are
-compared as the sim assigns them (no per-view id mapping yet).
+compared as the sim assigns them (no per-view id mapping yet). Runs with
+`--view-packets-entries-every N` write the records of every Nth beat only; a differing beat
+outside the sample is counted as not sampled, and its lane digests still show the difference.
 
 A pair that matches on every beat both played but played a different number of trailing beats
 counts as matching ("tail-only"), as in focus_gate.py: after a replay's recorded commands end, the
@@ -56,6 +58,9 @@ def print_entries(routed_path, reference_path, beats):
         print("  ENTRIES not written (run both with --view-packets-entries)")
         return
     routed, reference = read_entries(routed_path, beats), read_entries(reference_path, beats)
+    sampled = {key[0] for key in routed} | {key[0] for key in reference}
+    if len(sampled) < len(beats):
+        print("  ENTRIES not sampled on %d of %d differing beats" % (len(beats) - len(sampled), len(beats)))
     rows = []
     for key in sorted(set(routed) | set(reference)):
         if key not in routed:
