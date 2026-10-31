@@ -30,6 +30,7 @@ namespace faf::headless
     std::string viewPacketsEntriesPath; // with `viewPacketsPath`: one line per record (beat, lane, id, digest)
     int viewPacketsEntriesEvery = 1;    // with `viewPacketsEntriesPath`: records of every Nth beat only
     std::string viewFramesPath;  // when set: every army's frame, per beat (CSV; ReplayViewFrameStats.h)
+    bool viewIds = false;        // with `viewFramesPath`: the frames carry each view's own ids (remote/ViewIdMap.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end

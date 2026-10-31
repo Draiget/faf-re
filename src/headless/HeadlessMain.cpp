@@ -168,6 +168,8 @@ namespace
       "  --view-packets-entries-every <n>  with --view-packets-entries: the records of every nth beat only\n"
       "  --view-frames <file>      unfocused: every army's frame per beat (CSV: entities, withheld, delta bytes),\n"
       "                            each decoded again and compared (server-mode build; not with the checks above)\n"
+      "  --view-ids                with --view-frames: blips, foreign projectiles and foreign command ids renumbered\n"
+      "                            per view, and every renumbered id checked to map back to its sim id\n"
       "  --launch-check            rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
@@ -254,6 +256,7 @@ int main(int argc, char** argv)
   }
   (void)ReadOption("--view-packets-entries", options.viewPacketsEntriesPath);
   (void)ReadOption("--view-frames", options.viewFramesPath);
+  options.viewIds = moho::CFG_GetArgOption("--view-ids", 0, nullptr);
   if ((options.oracleCheck ? 1 : 0) + (options.changeSetCheck ? 1 : 0) + (options.viewPacketsPath.empty() ? 0 : 1)
         + (options.viewFramesPath.empty() ? 0 : 1)
       > 1) {

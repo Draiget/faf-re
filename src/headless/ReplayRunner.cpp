@@ -535,6 +535,9 @@ namespace faf::headless
         result.error = "cannot write " + options.viewFramesPath;
         return result;
       }
+      if (options.viewIds) {
+        viewFrames->EnableIdMaps();
+      }
       viewFrames->Install();
     }
 #endif

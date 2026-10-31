@@ -22,6 +22,8 @@
 // run-length delta against the copy that view last received, decoded again and compared. And
 // the entity frames once more with dead reckoning (plan WP7.5's 16-step scheme), each view's
 // own reckoner and baseline, for the bytes a player would get (plan WPR.6; the CSV's last column).
+// With `--view-ids` the frames carry each view's own ids (plan WP5.9, remote/ViewIdMap.h), and
+// every renumbered id in them must map back to a sim id of the same family and source.
 
 namespace faf::headless
 {
@@ -38,13 +40,17 @@ namespace faf::headless
 
     [[nodiscard]] std::string Summary() const;
     /** Frames that did not encode, or decoded to another frame (should stay 0). */
-    [[nodiscard]] std::uint64_t Failures() const noexcept { return mEncodeFailures + mRoundTripFailures + mGridFailures; }
+    [[nodiscard]] std::uint64_t Failures() const noexcept
+    {
+      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures;
+    }
 
   protected:
     void OnViewFrames(moho::Sim& sim) override;
 
   private:
     [[nodiscard]] std::uint32_t SendGrids(const moho::Sim& sim, std::size_t view);
+    void CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map);
 
     std::FILE* mFile = nullptr;
     remote::wire::SFrameCodec mCodec;
@@ -67,5 +73,7 @@ namespace faf::headless
     std::uint64_t mBeats = 0;
     std::uint64_t mEncodeFailures = 0;
     std::uint64_t mRoundTripFailures = 0;
+    std::uint64_t mIdsChecked = 0; // renumbered ids found in the frames (with `--view-ids`)
+    std::uint64_t mIdFailures = 0; // of those, ids that do not map back to a sim id of their family and source
   };
 } // namespace faf::headless

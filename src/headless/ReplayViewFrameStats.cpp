@@ -93,6 +93,9 @@ namespace faf::headless
         ++mRoundTripFailures;
       }
       const auto bytes = static_cast<std::uint32_t>(writer.Bytes().size());
+      if (IdMapsOn()) {
+        CheckIds(frame, IdMap(static_cast<std::int32_t>(army)));
+      }
 
       // The same frame with dead reckoning, against this view's previous reckoned frame.
       remote::wire::SViewFrame reckoned = frame;
@@ -248,7 +251,73 @@ namespace faf::headless
         );
         summary += text;
       }
+      if (IdMapsOn()) {
+        const remote::CViewIdMap& map = IdMap(static_cast<std::int32_t>(army));
+        std::snprintf(
+          text, sizeof(text),
+          "\n    view ids: %llu entities and %llu commands renumbered, %zu and %zu live at the end, %llu overflows",
+          static_cast<unsigned long long>(map.EntitiesMapped()), static_cast<unsigned long long>(map.CommandsMapped()),
+          map.LiveEntities(), map.LiveCommands(), static_cast<unsigned long long>(map.Overflows())
+        );
+        summary += text;
+      }
+    }
+    if (IdMapsOn()) {
+      std::snprintf(
+        text, sizeof(text), "\n  view ids checked in the frames: %llu, not mapping back to their family and source: %llu",
+        static_cast<unsigned long long>(mIdsChecked), static_cast<unsigned long long>(mIdFailures)
+      );
+      summary += text;
     }
     return summary;
+  }
+
+  void CReplayViewFrameStats::CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map)
+  {
+    const auto entity = [&](const std::uint32_t viewId) {
+      if (!map.MapsEntity(viewId)) {
+        return;
+      }
+      ++mIdsChecked;
+      std::uint32_t simId = 0;
+      if (!map.EntityToSim(viewId, simId) || (simId & 0xFFF00000u) != (viewId & 0xFFF00000u)) {
+        ++mIdFailures;
+      }
+    };
+    const auto command = [&](const std::int32_t value) {
+      const auto viewId = static_cast<std::uint32_t>(value);
+      if ((viewId & 0xFF000000u) != 0x80000000u) {
+        return; // the client's own command keeps its id
+      }
+      ++mIdsChecked;
+      std::uint32_t simId = 0;
+      if (!map.CommandToSim(viewId, simId)) {
+        ++mIdFailures;
+      }
+    };
+    for (const remote::wire::SEntityRecord& record : frame.entities) {
+      entity(record.id);
+      if (record.appearance.attachParent != remote::wire::SAppearance::kNoAttachParent) {
+        entity(record.appearance.attachParent);
+      }
+      for (const std::uint32_t child : record.appearance.attachments) {
+        entity(child);
+      }
+      if (!record.isUnit) {
+        continue;
+      }
+      const remote::wire::SUnitDetail& detail = *record.unit.detail;
+      entity(detail.creator);
+      entity(detail.selectionInheritor);
+      entity(detail.focusUnit);
+      entity(detail.guardedUnit);
+      entity(detail.targetBlip);
+      for (const std::int32_t value : detail.commands) {
+        command(value);
+      }
+      for (const std::int32_t value : detail.buildQueue) {
+        command(value);
+      }
+    }
   }
 } // namespace faf::headless

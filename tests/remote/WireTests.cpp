@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 
+#include "remote/ViewIdMap.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/IntelGridDelta.h"
@@ -1627,7 +1628,97 @@ namespace
     }
   }
 
+  // Plan WP5.9: per-view ids for blips, foreign projectiles and foreign commands.
+  void TestViewIdMap()
+  {
+    using faf::remote::CViewIdMap;
+    const auto ownSource = [](const std::uint32_t commandId) { return (commandId >> 24u) == 2u; };
+    const auto record = [](const std::uint32_t id) {
+      SEntityRecord r{};
+      r.id = id;
+      return r;
+    };
+
+    CViewIdMap map(2); // the view of army 2, commanded through source 2
+    SViewFrame frame{};
+    frame.entities.push_back(record(0x00200001u)); // own unit: kept
+    frame.entities.push_back(record(0x00500003u)); // foreign unit: kept (D6 renumbers no units)
+    frame.entities.push_back(record(0x10200010u)); // own projectile: kept
+    frame.entities.push_back(record(0x10500044u)); // foreign projectile: army 5's first in this view
+    frame.entities.push_back(record(0x2FF00005u)); // prop: kept
+    frame.entities.push_back(record(0x30500007u)); // blip of an army-5 unit: first
+    frame.entities.push_back(record(0x30500002u)); // second
+    SEntityRecord unit = record(0x00200009u);
+    unit.isUnit = true;
+    SUnitDetail detail{};
+    detail.targetBlip = 0x30500007u;
+    detail.creator = 0x00200001u;
+    detail.commands = {0x02000005, static_cast<std::int32_t>(0x80000123u), 0x05000009};
+    detail.buildQueue = {static_cast<std::int32_t>(0x80000123u)};
+    unit.unit.detail = TSharedValue<SUnitDetail>(detail);
+    frame.entities.push_back(unit);
+
+    map.Translate(frame, ownSource);
+    std::vector<std::uint32_t> ids;
+    for (const SEntityRecord& r : frame.entities) {
+      ids.push_back(r.id);
+    }
+    // Family nibble and source byte kept; serials by first appearance; records sorted again.
+    const std::vector<std::uint32_t> expected = {0x00200001u, 0x00200009u, 0x00500003u, 0x10200010u,
+                                                 0x10500001u, 0x2FF00005u, 0x30500001u, 0x30500002u};
+    CHECK(ids == expected);
+    const SUnitDetail& mapped = *frame.entities[1].unit.detail;
+    CHECK(mapped.targetBlip == 0x30500001u); // the same view id as the blip's own record
+    CHECK(mapped.creator == 0x00200001u);
+    CHECK(mapped.commands.size() == 3u && mapped.commands[0] == 0x02000005); // own command kept
+    CHECK(static_cast<std::uint32_t>(mapped.commands[1]) == 0x80000001u);  // the sim's own: renumbered
+    CHECK(static_cast<std::uint32_t>(mapped.commands[2]) == 0x80000002u);  // another client's: renumbered
+    CHECK(mapped.buildQueue.size() == 1u && static_cast<std::uint32_t>(mapped.buildQueue[0]) == 0x80000001u);
+    CHECK(map.EntitiesMapped() == 3u && map.CommandsMapped() == 2u && map.Overflows() == 0u);
+
+    // Inbound: view ids map back; own and unmapped ids are the sim's; unknown view ids refuse.
+    std::uint32_t sim = 0;
+    CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
+    CHECK(map.EntityToSim(0x10500001u, sim) && sim == 0x10500044u);
+    CHECK(map.EntityToSim(0x00500003u, sim) && sim == 0x00500003u);
+    CHECK(!map.EntityToSim(0x30500009u, sim));
+    CHECK(map.CommandToSim(0x80000002u, sim) && sim == 0x05000009u);
+    CHECK(map.CommandToSim(0x02000005u, sim) && sim == 0x02000005u);
+    CHECK(!map.CommandToSim(0x80000007u, sim));
+    CHECK(!map.MapsEntity(SAppearance::kNoAttachParent));
+
+    // Retired ids are never handed out again: the sim reusing a serial gets a fresh view id.
+    const std::uint32_t retiredEntities[] = {0x30500007u};
+    const std::uint32_t retiredCommands[] = {0x80000123u};
+    map.RetireEntities(retiredEntities);
+    map.RetireCommands(retiredCommands);
+    CHECK(!map.EntityToSim(0x30500001u, sim));
+    CHECK(!map.CommandToSim(0x80000001u, sim));
+    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    CHECK(!map.CommandToSim(0x80000002u, sim));
+    SViewFrame again{};
+    again.entities.push_back(record(0x30500007u));
+    SEntityRecord again2 = unit;
+    SUnitDetail queued{};
+    queued.commands = {static_cast<std::int32_t>(0x80000123u)};
+    again2.unit.detail = TSharedValue<SUnitDetail>(queued);
+    again.entities.push_back(again2);
+    map.Translate(again, ownSource);
+    CHECK(again.entities[1].id == 0x30500003u);
+    CHECK(static_cast<std::uint32_t>((*again.entities[0].unit.detail).commands[0]) == 0x80000003u);
+
+    // Another view numbers on its own: army 5's view keeps its own projectile and blips get serial 1 up.
+    CViewIdMap other(5);
+    SViewFrame theirs{};
+    theirs.entities.push_back(record(0x30500002u));
+    theirs.entities.push_back(record(0x10500044u));
+    other.Translate(theirs, [](std::uint32_t) { return false; });
+    CHECK(theirs.entities[0].id == 0x10500044u);
+    CHECK(theirs.entities[1].id == 0x30500001u);
+  }
+
   const TestCase kTests[] = {
+    {"view ids: renumbering, inbound and retirement", &TestViewIdMap},
     {"grids: delta round trip", &TestGridDeltaRoundTrip},
     {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
     {"grids: hostile input", &TestGridDeltaHostile},

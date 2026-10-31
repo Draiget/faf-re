@@ -90,6 +90,8 @@ namespace faf::remote
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
     [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorld.size(); }
+    /** Whether the client still holds a record of `id` (orphans included). */
+    [[nodiscard]] bool Holds(std::uint32_t id) const { return mWorld.contains(id); }
     /** Creations whose blueprint is missing from the content tables (should stay 0). */
     [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept { return mUnknownBlueprints; }
     /** Underlay textures that are not plain file textures (should stay 0). */
