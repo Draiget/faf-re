@@ -42,6 +42,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/collision/CColPrimitiveBase.h"
@@ -12906,7 +12907,7 @@ int Unit::MotionTick()
 
   {
     FAF_PROFILE_ZONE_NAMED("Unit::Manipulators");
-    AniActor->UpdateManipulators(mPendingTransform);
+    POSE_UpdateManipulators(*this); // AniActor->UpdateManipulators(mPendingTransform), or queued (sim_ParallelPose)
   }
 
   mUnitVarDat.mIsBusy = mAttachInfo.HasAttachTarget();
@@ -13776,6 +13777,9 @@ Wm3::Vec3f Unit::GetTargetPoint(std::int32_t targetPoint) const
  */
 VTransform Unit::GetBoneWorldTransform(const int boneIndex) const
 {
+  if (boneIndex >= 0) {
+    POSE_WaitFor(AniActor); // engine addition (sim_ParallelPose): this tick's pose first
+  }
   if (AniActor != nullptr && AniActor->mPose.get() != nullptr && boneIndex >= 0) {
     const CAniPose* const pose = AniActor->mPose.get();
     const CAniPoseBone* const bonesBegin = pose->mBones.begin();
@@ -13827,6 +13831,7 @@ VTransform Unit::GetBoneLocalTransform(const int boneIndex) const
   localTransform.pos_.y = 0.0f;
   localTransform.pos_.z = 0.0f;
 
+  POSE_WaitFor(AniActor); // engine addition (sim_ParallelPose): this tick's pose first
   if (AniActor != nullptr && AniActor->mPose.get() != nullptr) {
     const CAniPose* const pose = AniActor->mPose.get();
     const CAniPoseBone* const bonesBegin = pose->mBones.begin();

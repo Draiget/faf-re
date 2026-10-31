@@ -61,6 +61,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/audio/CSimSoundManager.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/command/CommandIssueHelper.h"
@@ -9719,6 +9720,7 @@ void Sim::AdvanceBeat(const int amt)
       {
         FAF_PROFILE_ZONE_NAMED("Sim::TaskStageA");
         TickTaskStage(&mTaskStageA);
+        POSE_FinishStage(); // engine addition (sim_ParallelPose): every queued pose update done here
       }
     }
     {

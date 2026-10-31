@@ -397,6 +397,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SimWorkerPool.cpp
   moho/sim/DesyncRecorder.cpp
   moho/sim/DesyncTelemetry.cpp
+  moho/sim/SimJobStream.cpp
   moho/sim/UnitUpdateFill.cpp
   moho/sim/SSyncFilter.cpp
   moho/sim/SSTIArmyConstantData.cpp
@@ -615,6 +616,7 @@ set(FAF_ENGINE_SOURCES
   moho/animation/CSlaveManipulator.cpp
   moho/animation/CStorageManipulator.cpp
   moho/animation/CSlideManipulator.cpp
+  moho/animation/PoseJobs.cpp
   moho/animation/CThrustManipulator.cpp
   moho/sim/CSimConCommand.cpp
   moho/sim/CSimConFunc.cpp

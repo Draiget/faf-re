@@ -16,6 +16,7 @@
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/console/CConCommand.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -366,6 +367,8 @@ namespace moho
    */
   CAniActor::~CAniActor()
   {
+    POSE_WaitFor(this); // engine addition (sim_ParallelPose): a queued update must not outlive us
+
     auto* const listHead = static_cast<TDatListItem<IAniManipulator, void>*>(&mManipulatorsByPrecedence);
     while (listHead->mNext != listHead) {
       IAniManipulator* const manipulator = ListNodeToManipulator(listHead->mNext);
@@ -490,6 +493,7 @@ namespace moho
    */
   boost::shared_ptr<const CAniSkel> CAniActor::GetSkeleton() const
   {
+    POSE_WaitFor(this); // engine addition (sim_ParallelPose)
     return mPose->GetSkeleton();
   }
 
@@ -501,6 +505,7 @@ namespace moho
    */
   boost::shared_ptr<CAniPose> CAniActor::GetPoseShared() const
   {
+    POSE_WaitFor(this); // engine addition (sim_ParallelPose)
     return mPose;
   }
 
@@ -512,6 +517,7 @@ namespace moho
    */
   boost::shared_ptr<CAniPose> CAniActor::GetPriorPoseShared() const
   {
+    POSE_WaitFor(this); // engine addition (sim_ParallelPose)
     return mPriorPose;
   }
 
@@ -609,6 +615,20 @@ namespace moho
   }
 
   AniBoneWriteHook gAniBoneWriteHook = nullptr;
+
+  bool CAniActor::AllEnabledManipulators(bool (*const test)(const IAniManipulator& manipulator)) const
+  {
+    auto* const listHead = const_cast<TDatListItem<IAniManipulator, void>*>(
+      static_cast<const TDatListItem<IAniManipulator, void>*>(&mManipulatorsByPrecedence)
+    );
+    for (auto* node = listHead->mNext; node != listHead; node = node->mNext) {
+      const IAniManipulator* const manipulator = ListNodeToManipulator(node);
+      if (manipulator != nullptr && manipulator->mEnabled && !test(*manipulator)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /**
    * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)

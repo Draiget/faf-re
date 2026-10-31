@@ -133,6 +133,9 @@ namespace moho
      */
     void UpdateManipulators(const VTransform& worldTransform);
 
+    /// Engine addition (sim_ParallelPose): true when `test` holds for every enabled manipulator.
+    [[nodiscard]] bool AllEnabledManipulators(bool (*test)(const IAniManipulator& manipulator)) const;
+
     /**
      * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)
      *
