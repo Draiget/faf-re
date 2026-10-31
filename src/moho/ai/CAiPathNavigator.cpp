@@ -1447,7 +1447,7 @@ void CAiPathNavigator::SetTargetPoint(const std::int32_t targetIndex)
     );
     mSim->Logf("  mPath.size()=%d\n", mPath.CountInt());
     mSim->mContext.Update(&mTargetPos, sizeof(mTargetPos));
-    if (mSim->mLog) {
+    if (mSim->IsSyncLogOn()) {
       const gpg::MD5Digest digest = mSim->mContext.Digest();
       mSim->Logf("checksum=%s\n", digest.ToString().c_str());
     }

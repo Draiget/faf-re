@@ -17,6 +17,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/CAnimTexture.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
@@ -1302,8 +1303,10 @@ namespace moho
     float rate = mRate;
     if (mDirectionalAnim) {
       Unit* const unit = mGoal.GetObjectPtr();
-      const Wm3::Quatf& q = unit->GetTransform().orient_;
-      const Wm3::Vec3f velocity = unit->GetVelocity();
+      // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time.
+      const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(unit);
+      const Wm3::Quatf& q = jobInputs != nullptr ? jobInputs->mTransformOrient : unit->GetTransform().orient_;
+      const Wm3::Vec3f velocity = jobInputs != nullptr ? jobInputs->mVelocity : unit->GetVelocity();
       const float forwardX = 2.0f * (q.x * q.z + q.w * q.y);
       const float forwardY = 2.0f * (q.y * q.z - q.w * q.x);
       const float forwardZ = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
@@ -1321,11 +1324,14 @@ namespace moho
       if (unit == nullptr) {
         mAnimationTime += rate * 0.1f;
       } else {
-        const Wm3::Vec3f velocity = unit->GetVelocity();
+        // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time.
+        const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(unit);
+        const Wm3::Vec3f velocity = jobInputs != nullptr ? jobInputs->mVelocity : unit->GetVelocity();
         const float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
         const float speedFraction = speed / unit->GetBlueprint()->Physics.MaxSpeed;
-        const Wm3::Quatf& orientation = unit->mVarDat.mCurTransform.orient_;
-        const Wm3::Quatf& prevOrientation = unit->mVarDat.mLastTransform.orient_;
+        const Wm3::Quatf& orientation = jobInputs != nullptr ? jobInputs->mCurOrient : unit->mVarDat.mCurTransform.orient_;
+        const Wm3::Quatf& prevOrientation =
+          jobInputs != nullptr ? jobInputs->mLastOrient : unit->mVarDat.mLastTransform.orient_;
         // 0x0063FFDE: `0x004F0B40` is a 16-byte memcmp, so this is bitwise
         // inequality (a -0/+0 lane flip counts as turning), which is exactly
         // Wm3 `Quaternion::operator==`.

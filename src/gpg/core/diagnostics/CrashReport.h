@@ -62,6 +62,15 @@ namespace gpg::diag
   bool WriteCrashReport(const CrashReportContext& context);
 
   /**
+   * Engine addition (issue #216): the report's build, process and system sections (commit, exe
+   * stamp, command line, OS, CPU model and flags, RAM) on their own, for the desync dump.
+   */
+  void WriteEnvironmentReport(std::FILE* sink);
+
+  /** Engine addition (issue #216): the report's loaded-module list on its own. */
+  void WriteModuleList(std::FILE* sink);
+
+  /**
    * One fatal path end-to-end: write the report, write the minidump, show
    * the crash-report dialog. The dialog appears only on the call that
    * actually wrote the report - nested fatals (abort after terminate) stay

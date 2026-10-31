@@ -7,6 +7,7 @@
 #include <Windows.h>
 
 #include <dbghelp.h>
+#include <intrin.h>
 #include <psapi.h>
 #include <tlhelp32.h>
 
@@ -145,7 +146,6 @@ namespace gpg::diag
 
     void WriteBuildSection(std::FILE* const sink)
     {
-      ReportLine(sink, "=== FAF crash report ===");
 #if defined(_M_IX86)
       ReportLine(sink, "Arch      : x86");
 #elif defined(_M_X64)
@@ -264,6 +264,31 @@ namespace gpg::diag
       SYSTEM_INFO sysInfo{};
       ::GetNativeSystemInfo(&sysInfo);
       ReportLine(sink, "CPUs      : %lu logical", sysInfo.dwNumberOfProcessors);
+
+      // Engine addition (issue #216): the CPU model and the instruction-set extensions that can
+      // change how a build's floating-point code runs.
+      int regs[4] = {};
+      __cpuid(regs, static_cast<int>(0x80000000u));
+      if (static_cast<unsigned>(regs[0]) >= 0x80000004u) {
+        char brand[49] = {};
+        for (int i = 0; i < 3; ++i) {
+          __cpuid(reinterpret_cast<int*>(brand + 16 * i), static_cast<int>(0x80000002u) + i);
+        }
+        const char* model = brand;
+        while (*model == ' ') {
+          ++model;
+        }
+        ReportLine(sink, "CPU model : %s", model);
+      }
+      __cpuid(regs, 1);
+      const unsigned ecx1 = static_cast<unsigned>(regs[2]);
+      const unsigned edx1 = static_cast<unsigned>(regs[3]);
+      __cpuidex(regs, 7, 0);
+      const unsigned ebx7 = static_cast<unsigned>(regs[1]);
+      ReportLine(sink, "CPU flags :%s%s%s%s%s%s%s%s%s%s", (edx1 >> 26) & 1u ? " sse2" : "", (ecx1 >> 0) & 1u ? " sse3" : "",
+                 (ecx1 >> 9) & 1u ? " ssse3" : "", (ecx1 >> 19) & 1u ? " sse4.1" : "", (ecx1 >> 20) & 1u ? " sse4.2" : "",
+                 (ecx1 >> 28) & 1u ? " avx" : "", (ecx1 >> 12) & 1u ? " fma" : "", (ebx7 >> 5) & 1u ? " avx2" : "",
+                 (ebx7 >> 16) & 1u ? " avx512f" : "", (ecx1 >> 29) & 1u ? " f16c" : "");
 
       MEMORYSTATUSEX mem{};
       mem.dwLength = sizeof(mem);
@@ -650,6 +675,18 @@ namespace gpg::diag
     ++registry.count;
   }
 
+  void WriteEnvironmentReport(std::FILE* const sink)
+  {
+    WriteBuildSection(sink);
+    WriteProcessSection(sink);
+    WriteSystemSection(sink);
+  }
+
+  void WriteModuleList(std::FILE* const sink)
+  {
+    WriteModulesSection(sink);
+  }
+
   bool WriteCrashReport(const CrashReportContext& context)
   {
     if (::InterlockedCompareExchange(&sReportInProgress, 1, 0) != 0) {
@@ -701,6 +738,7 @@ namespace gpg::diag
       }
     };
 
+    ReportLine(sink, "=== FAF crash report ===");
     WriteBuildSection(sink);
     WriteProcessSection(sink);
     WriteSystemSection(sink);

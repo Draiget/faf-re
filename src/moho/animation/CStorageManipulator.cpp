@@ -9,6 +9,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CScriptEvent.h"
@@ -378,14 +379,24 @@ namespace moho
       return false;
     }
 
-    if (mUnit == nullptr || mUnit->IsBeingBuilt()) {
+    // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time.
+    const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(mUnit);
+    if (mUnit == nullptr || (jobInputs != nullptr ? jobInputs->mBeingBuilt : mUnit->IsBeingBuilt())) {
       ApplyStorageOffsetToWatchedBone(watchedBone, mCur);
       EventSetSignaled(true);
       return true;
     }
 
     float storageRatio = 0.0f;
-    if (CArmyImpl* const army = mUnit->ArmyRef; army != nullptr) {
+    if (jobInputs != nullptr) {
+      if (jobInputs->mHasEconomy) {
+        const double maxStorage = (mResourceType == ECON_MASS) ? jobInputs->mMaxStorageMass : jobInputs->mMaxStorageEnergy;
+        if (maxStorage > 0.0) {
+          const float storedValue = (mResourceType == ECON_MASS) ? jobInputs->mStoredMass : jobInputs->mStoredEnergy;
+          storageRatio = storedValue / static_cast<float>(maxStorage);
+        }
+      }
+    } else if (CArmyImpl* const army = mUnit->ArmyRef; army != nullptr) {
       if (CSimArmyEconomyInfo* const economyInfo = army->GetEconomy(); economyInfo != nullptr) {
         const double maxStorage = economyInfo->economy.MaxStorageOf(mResourceType);
         if (maxStorage > 0.0) {

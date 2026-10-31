@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/Map.h"
@@ -1099,6 +1100,30 @@ namespace moho
      * True when no assigned slot of `layer` overlaps `position` by `size`.
      */
     virtual bool PosIsFree(const SCoordsVec2& position, std::int32_t size, std::int32_t layer) const;
+
+    /**
+     * Engine addition: formations get their memory from a free list of their own, last freed
+     * first reused, instead of the general allocator.
+     *
+     * The binary compares units' cached formation pointers (`SInfoCache::mFormationLayer`, refreshed
+     * only by each unit's own `UpdateInfoCache`): `IsSameFormationLayerWith` (0x006A8D40),
+     * `IsHigherPriorityThan` (0x006A8D80), `COGrid::UnitIsBlocked` (0x00721340) and the steering
+     * braking test. A cache can still hold a formation that was freed, so whether it equals a newer
+     * formation depends on where that one was allocated. In the binary, `new` (0x00A825B9 ->
+     * malloc 0x00958B20) serves the sim thread from its own per-size lane, last freed first reused,
+     * so a new formation lands on the formation freed last, the same way on every machine. The x64
+     * allocator's size classes and shared lists differ, and other threads change what it hands out:
+     * replay 26883293 desynced at beat 3697 in some runs (a stale pointer matched a formation placed
+     * on an older freed block) and not in others. With this list the new formation takes the block
+     * the last formation freed, as in the binary, in every run: on that replay the stale pointer
+     * matches at beat 4019 and does not at beat 3697, as the live players' checksums require.
+     */
+    [[nodiscard]] static void* operator new(std::size_t size);
+    [[nodiscard]] static void* operator new(std::size_t size, const std::nothrow_t&) noexcept;
+    [[nodiscard]] static void* operator new(std::size_t, void* const place) noexcept { return place; }
+    static void operator delete(void* block, std::size_t size) noexcept;
+    static void operator delete(void* block, const std::nothrow_t&) noexcept;
+    static void operator delete(void*, void*) noexcept {}
 
   public:
     Sim* mSim;                                    // +0x328

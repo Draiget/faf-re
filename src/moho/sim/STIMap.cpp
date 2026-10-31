@@ -1810,7 +1810,18 @@ namespace moho
       return;
     }
 
-    const std::uint16_t heightWord = ClampWordFromFloat((*sourceHeights) * 128.0f);
+    // 0x00477E9C..0x00477EBF: `comiss 65535, h; ja` keeps h only below 65535,
+    // so a NaN height (FAF's FlattenGradientMapRect divides by a zero-width
+    // skirt for structures off the map) becomes 65535, not the 0 that a NaN
+    // cvttss2si leaves in the low word.
+    float scaledHeight = (*sourceHeights) * 128.0f;
+    if (!(scaledHeight < 65535.0f)) {
+      scaledHeight = 65535.0f;
+    }
+    if (scaledHeight < 0.0f) {
+      scaledHeight = 0.0f;
+    }
+    const std::uint16_t heightWord = static_cast<std::uint16_t>(scaledHeight);
     for (std::int32_t z = z0; z < z1; ++z) {
       for (std::int32_t x = x0; x < x1; ++x) {
         data[x + z * width] = heightWord;

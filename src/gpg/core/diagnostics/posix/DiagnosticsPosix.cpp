@@ -11,6 +11,7 @@
 
 #if !defined(_WIN32)
 
+#include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
@@ -30,6 +31,7 @@
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 namespace
@@ -362,6 +364,68 @@ namespace gpg::diag
     }
     DiagLine("crash report written: %s (%s)", reportPath, context.reason != nullptr ? context.reason : "");
     return true;
+  }
+
+  void WriteEnvironmentReport(std::FILE* const sink)
+  {
+    std::fprintf(sink, "Commit    : %s\n", BuildIdentity());
+    char exe[kPathBytes]{};
+    const ssize_t exeLength = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+    std::fprintf(sink, "exe       : %s\n", exeLength > 0 ? exe : "(unknown)");
+    if (std::FILE* const cmdline = std::fopen("/proc/self/cmdline", "rb")) {
+      char args[kPathBytes]{};
+      const std::size_t got = std::fread(args, 1, sizeof(args) - 1, cmdline);
+      std::fclose(cmdline);
+      for (std::size_t i = 0; i + 1 < got; ++i) {
+        if (args[i] == '\0') {
+          args[i] = ' ';
+        }
+      }
+      std::fprintf(sink, "cmdline   : %s\n", args);
+    }
+    utsname system{};
+    if (::uname(&system) == 0) {
+      std::fprintf(sink, "OS        : %s %s %s\n", system.sysname, system.release, system.machine);
+    }
+    std::fprintf(sink, "CPUs      : %ld logical\n", ::sysconf(_SC_NPROCESSORS_ONLN));
+    if (std::FILE* const cpuinfo = std::fopen("/proc/cpuinfo", "r")) {
+      char line[4096];
+      bool model = false;
+      bool flags = false;
+      while ((!model || !flags) && std::fgets(line, sizeof(line), cpuinfo) != nullptr) {
+        if (!model && std::strncmp(line, "model name", 10) == 0) {
+          std::fprintf(sink, "CPU model : %s", std::strchr(line, ':') != nullptr ? std::strchr(line, ':') + 2 : line);
+          model = true;
+        } else if (!flags && std::strncmp(line, "flags", 5) == 0) {
+          std::fprintf(sink, "CPU flags : %s", std::strchr(line, ':') != nullptr ? std::strchr(line, ':') + 2 : line);
+          flags = true;
+        }
+      }
+      std::fclose(cpuinfo);
+    }
+    const long pages = ::sysconf(_SC_PHYS_PAGES);
+    const long pageSize = ::sysconf(_SC_PAGESIZE);
+    if (pages > 0 && pageSize > 0) {
+      std::fprintf(sink, "RAM       : %lld MB total\n", static_cast<long long>(pages) * pageSize / (1024LL * 1024LL));
+    }
+  }
+
+  void WriteModuleList(std::FILE* const sink)
+  {
+    std::FILE* const maps = std::fopen("/proc/self/maps", "r");
+    if (maps == nullptr) {
+      return;
+    }
+    char line[kPathBytes];
+    char last[kPathBytes]{};
+    while (std::fgets(line, sizeof(line), maps) != nullptr) {
+      const char* const path = std::strchr(line, '/');
+      if (path != nullptr && std::strcmp(path, last) != 0) {
+        std::snprintf(last, sizeof(last), "%s", path);
+        std::fputs(path, sink);
+      }
+    }
+    std::fclose(maps);
   }
 
   void HandleFatalPath(const CrashReportContext& context)

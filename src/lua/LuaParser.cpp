@@ -1,5 +1,6 @@
 #include "LuaRuntimeTypes.h"
 
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaError.h"
 #include "lua/LuaParser.h"
 #include "lua/LuaMemAccounting.h"
@@ -3259,9 +3260,17 @@ namespace
       luaC_collectgarbage(state);
     }
 
-    // Engine addition: compiled chunks only when asked for (LuaObject.cpp).
-    if (parser->bin != 0 && !moho::lua_AllowPrecompiledChunks) {
-      luaG_runerror(state, "compiled Lua chunks are not loaded (source only; see lua_AllowPrecompiledChunks)");
+    // Engine addition: compiled chunks can be refused (LuaObject.cpp). While they are
+    // allowed, each one is named in the log so its author can move it to source.
+    if (parser->bin != 0) {
+      if (!moho::lua_AllowPrecompiledChunks) {
+        luaG_runerror(state, "compiled Lua chunks are not loaded (source only; see lua_AllowPrecompiledChunks)");
+      }
+      const char* const chunkName = parser->z->chunkName;
+      gpg::Warnf(
+        "Lua: loaded compiled chunk %s; compiled chunks will be refused in a later version, ship source instead",
+        (chunkName != nullptr && chunkName[0] == '@') ? chunkName + 1 : "(string)"
+      );
     }
 
     Proto* const parsedProto = (parser->bin != 0)

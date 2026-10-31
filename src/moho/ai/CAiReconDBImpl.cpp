@@ -842,7 +842,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   // and traces the running digest, before the intel grids advance.
   const std::uint32_t reconTickChecksumTag = 3u;
   mSim->mContext.Update(&reconTickChecksumTag, sizeof(reconTickChecksumTag));
-  if (mSim->mLog) {
+  if (mSim->IsSyncLogOn()) {
     mSim->Logf("      %s\n", mSim->mContext.Digest().ToString().c_str());
   }
 

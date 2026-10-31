@@ -3872,7 +3872,7 @@ namespace moho
   {
     const Entity* const targetEntity = mTarget.targetEntity.GetObjectPtr();
 
-    if (mSim->mLog) {
+    if (mSim->IsSyncLogOn()) {
       const char* targetEntityText = "NULL";
       msvc8::string targetEntityIdText{};
       if (targetEntity != nullptr) {

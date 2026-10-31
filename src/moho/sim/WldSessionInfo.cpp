@@ -1,7 +1,7 @@
 #include "WldSessionInfo.h"
 
-#include <climits>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #include "boost/thread.h"
@@ -161,7 +161,7 @@ namespace moho
 
   SWldScenarioLoadWakeSet::SWldScenarioLoadWakeSet()
     : mWakeEvent(CreateEventW(nullptr, FALSE, FALSE, nullptr))
-    , mQueueSemaphore(CreateSemaphoreW(nullptr, 0, LONG_MAX, nullptr))
+    , mQueueSemaphore(CreateSemaphoreW(nullptr, 0, std::numeric_limits<LONG>::max(), nullptr))
     , mCountersMutex(CreateMutexW(nullptr, FALSE, nullptr))
     , mGoneCount(0)
     , mBlockedCount(0)

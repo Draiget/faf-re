@@ -1,0 +1,59 @@
+name: 2p-desync-telemetry
+description: >
+  Issue #218 acceptance check. Two clients of our x64 build (staged as
+  bin_x64\desync_test.exe) play faf_re_lockstep with telemetry on, sending to
+  an OpenTelemetry collector on 127.0.0.1:4318 (start it first; see
+  docs/SWITCHES.md, "Desync telemetry"). Client 1 also runs the desync
+  recorder; client 2 runs telemetry alone and raises one unit's health by one
+  float step at beat 300 (/desynctestbeat), a real desync. Each client must
+  send one faf.desync record (game id 424242 from its gpgnet:// /savereplay)
+  and, when /exitattick quits it at tick 450, one faf.game.end record.
+  Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
+  isolated account. Do not click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\desync_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+
+players:
+  - uid: 1
+    name: Telemetry-A
+    faction: uef
+    args: ['/title', 'telemetry-A', '/desyncrecorder', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
+           '/telemetrytoken', 'test-token', '/savereplay', 'gpgnet://127.0.0.1:1/424242/Telemetry-A.SCFAreplay',
+           '/exitattick', '450']
+  - uid: 2
+    name: Telemetry-B
+    faction: cybran
+    args: ['/title', 'telemetry-B', '/desynctestbeat', '300', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
+           '/telemetrytoken', 'test-token', '/savereplay', 'gpgnet://127.0.0.1:1/424242/Telemetry-B.SCFAreplay',
+           '/exitattick', '450']
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  logsContain:
+    - { uids: all, pattern: 'Telemetry: on, endpoint http://127.0.0.1:4318' }
+    - { uids: [1], pattern: 'Desync recorder: wrote .*desync_424242_beat300_army0\.zip' }
+    - { uids: [2], pattern: 'Desync recorder: beat 300 mismatched with .*; telemetry record at beat' }
+    - { uids: all, pattern: 'exitattick: quitting at game tick' }
+    - { uids: all, pattern: 'Telemetry: [1-9]\d* record\(s\) sent' }
+  logsAgree:
+    - { uids: all, pattern: 'Desync recorder: beat (\d+) mismatched' }

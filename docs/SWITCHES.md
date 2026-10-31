@@ -43,6 +43,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ParallelUnitSyncRefresh` | 1 | `/con` | live | Before the sync walk, each synced unit's own sync block (target ids, silo counts, weapon info, pose handles) is refreshed on sim workers; the walk then finds nothing left to refresh. The block is written only by its unit and read only by its unit's own sync entry, so the packet is the serial one (needs `sim_Workers` > 0; 128 units or more) |
 | `sim_ParallelEffects` | 1 | `/con` | live | The effect manager's tick (beams, emitters, trails) on sim workers in chunks of consecutive effects; each chunk collects its particles and its effects' self-destroys, and the chunks are committed in list order, so the particle buffer and the destroyed list are the serial ones. Any other effect class in the list, or `dbg_EfxBeams` / `dbg_Emitter` / `dbg_Trail`, keeps the beat serial (needs `sim_Workers` > 0) |
 | `sim_ParallelEffectsMin` | 64 | `/con` | live | Fewest active effects for which `sim_ParallelEffects` uses the workers |
+| `sim_ParallelPose` | 1 | `/con` | live | A unit's bone pose update (its manipulators) runs on sim workers when every enabled manipulator is Rotate, Slide, Slave, Animation or Storage and none has a Lua waiter; the inputs those read from the unit and its army (orientation, velocity, being built, storage) are copied when the job is queued. A reader of the pose waits for that unit's job; any engine call from Lua waits for all of them, a Lua collection and the end of task stage A close the batch. Other units update on the sim thread in their usual place (needs `sim_Workers` > 0) |
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
@@ -110,12 +111,12 @@ The switches below are read when a session begins. In a multiplayer game every c
 
 ## Protection against other players
 
-Not performance switches: these guard a game against players who send crafted traffic or host crafted maps and mods. The defaults are the protected ones.
+Not performance switches: these guard a game against players who send crafted traffic or host crafted maps and mods. The defaults are the protected ones, except `lua_AllowPrecompiledChunks`, which stays on while mods and maps move to source.
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
 | `net_CheckOrderStreams` | 1 | `/con` | next game | Compares every player's orders as each client received them (a hash in the acknowledgements the engine already sends; the shipped exe ignores it). 1 logs and shows in chat who sent players different orders; desyncs against a player whose own acknowledgement contradicts what reached this client are logged instead of reported to FAF. 2 also stops the game; 0 turns the check off |
-| `lua_AllowPrecompiledChunks` | 0 | `/con` | live | 1 lets Lua load compiled chunks as well as source. Off, a map or mod cannot run crafted bytecode, which can get past the loader's checks |
+| `lua_AllowPrecompiledChunks` | 1 | `/con` | live | 1 lets Lua load compiled chunks as well as source, and logs each one it loads (`Lua: loaded compiled chunk ...`) so its author can ship source instead. 0 refuses them: a map or mod cannot run crafted bytecode, which can get past the loader's checks. On for now while mods and maps migrate; it will become 0 by default |
 | `net_DebugAlterOrdersTo` | −1 | `/con` | live | Test only: alters this client's checksum reports to the player with that client index, for `tools/scenarios/3p-retail-orders-cheat.yaml` |
 
 Game Lua states (sim, user interface, blueprints, session) read files through the mounted game folders only: `dofile` and `loadfile` look paths up like `doscript` and `import`, a path that climbs above a mount with `..` is not found, and `LuaDumpBinary` is gone. The start-up state that runs the init file keeps real paths.
@@ -185,6 +186,38 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--label text` | `headless` | Prefix of every printed line |
 
 Engine switches work as in the game: `/init`, `/log`, `/synclog`, `/simworkers`, `/con`, `/prefs`, `/sse2`, `/noversioncheck`. Exit code: 0 every recorded checksum matched and the replay reached its end; 1 a mismatch; 2 the end was not reached in time; 3 a crash or fatal error; 4 bad arguments or a replay that could not be loaded.
+
+## Desync recorder
+
+Issue #216. The recorder keeps the `/synclog` text of recent beats in memory, compressed, and writes `desync_<FAF game id>_beat<N>_army<A>.zip` next to the game log once the sim reaches the mismatched beat + 30, the same beat on every client so their state snapshots line up (at least 10 beats after the mismatch was seen). Nothing goes to disk before that, except a temporary file for the start-of-game rules trace, which is deleted at once. Checksums are the same with it on or off.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `sim_DesyncRecorder` | 0 | `/desyncrecorder` or `/con sim_DesyncRecorder=1` | next game | Records beats for a desync dump; recording stops once the dump is taken |
+| `sim_DesyncRecorderMB` | 32 | `/con` | live | Memory cap for the recorded beats; the oldest go first. The beats kept reach back to the last beat every player's checksum agreed on, at most 192 (one checksum period, 128 beats of report delay and the beats recorded after a mismatch is seen) |
+| `sim_DesyncTestNudgeBeat` | -1 | `/desynctestbeat N` or `/con` | live | Test only: on the first checksum beat at or after N, this client alone raises its lowest-id moving unit's health by one float step, so the game desyncs for real |
+| `sim_DesyncDumpBeat` | -1 | `/desyncdumpbeat N` or `/con` | next game | Writes the dump when the sim reaches beat N, mismatch or not, keeping the newest beats whatever the checksums say. For rebuilding the side of a desync nobody sent from a replay (`tools/desync-diff/`). -1 waits for a mismatch |
+
+Compare dumps with `tools/desync-diff/desync_diff.py` (issue #217); it prints the first value that differs.
+
+## Desync telemetry
+
+Issue #218. Off by default. On, a live multiplayer game sends two kinds of OpenTelemetry log record, as one OTLP/HTTP JSON `POST` each to `<telemetry_Endpoint>/v1/logs`:
+
+- `faf.desync`: one per player whose hash differed from ours at the first mismatched beat, sent when the sim reaches the dump beat (the mismatched beat + 30, as for the recorder), so every player's report for that beat has arrived. Later desyncs only raise `faf.desync.later_records` in the game-end record.
+- `faf.game.end`: one per game, desync or not, when the game's sim is destroyed (quitting, or leaving to the menu).
+
+Every request carries the process: `service.name` `faf-engine`, `service.version` the commit (#215), `faf.engine.version` (`git describe`), `faf.engine.dirty`, `host.arch`, `faf.arch`, `os.type`, `os.description`, `faf.cpu.logical_count`. Both records carry `faf.game.id` (from `/savereplay gpgnet://host:port/<id>/...`), `faf.game.version`, `faf.sim_fixes`, `faf.map` (the map's folder name), `faf.players`, `faf.army.local`, `faf.sim.workers`, `faf.sse2`, `faf.switches.hash` (MD5 of every `sim_*` and `lua_Parallel*` switch value) and `faf.switches.changed` (each `sim_`/`lua_` switch whose value differs from what it was before `/con` ran). `faf.desync` adds `faf.desync.beat`, `faf.desync.last_agreed_beat`, `faf.desync.delay_beats`, `faf.game.time_s`, `faf.hash.local`, `faf.hash.remote`, `faf.army.remote`, `faf.source.remote`, `faf.desync.players_disagreeing`, `faf.desync.players_reported`, `faf.orders_altered`, `faf.fpu.x87_control`, `faf.fpu.mxcsr`, and `faf.dump.file` and `faf.dump.bytes` when the recorder wrote a dump. `faf.game.end` adds `faf.game.beats`, `faf.desync`, `faf.desync.beat` and `faf.desync.later_records`. Not sent: player names, FAF user ids, the command line, file paths, dump contents.
+
+Sending runs on its own thread; the sim and render threads only queue a record. Each record goes to an outbox file next to the game log (`faf_telemetry_outbox_<pid>.txt`) before it is posted and leaves it once the collector answers 2xx. A failed record is retried with the next record (the game end) and at the next start, three attempts in all; a starting client also sends the outbox files of clients that no longer run, never those of a client still running in the same folder; a 4xx answer other than 408 or 429 drops it at once. Requests time out after 3 s; when a game ends, the engine waits up to 4 s for the queued records before it goes on, so the game-end record is posted before a quit. Windows uses WinHTTP (http and https), loaded when the first record is posted; the Linux build posts plain http only. With only telemetry on, the recorder keeps checksums and no sync-log text, so it costs nothing per beat.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `telemetry_Enabled` | 0 | `/telemetry` or `/con` | next record | Sends the records. Nothing starts while it is off: no thread, no file, no connection |
+| `telemetry_Endpoint` | empty | `/telemetryendpoint URL` or `/con` | next record | Collector base URL, `http://host:port` or `https://host`; `/v1/logs` is appended unless the path ends with it. Empty sends nothing |
+| `telemetry_Token` | empty | `/telemetrytoken T` or `/con` | next record | Sent as `Authorization: Bearer T`. It ships with the game, so it only keeps casual junk out |
+
+`/exitattick N` (test only) quits the game at game tick N the way `/exitongameover` does, so scenarios end their games cleanly: `tools/scenarios/2p-desync-telemetry.yaml` and `2p-telemetry-no-desync.yaml`.
 
 ## Debugging aids
 
