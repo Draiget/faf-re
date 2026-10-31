@@ -121,6 +121,18 @@ Not performance switches: these guard a game against players who send crafted tr
 
 Game Lua states (sim, user interface, blueprints, session) read files through the mounted game folders only: `dofile` and `loadfile` look paths up like `doscript` and `import`, a path that climbs above a mount with `..` is not found, and `LuaDumpBinary` is gone. The start-up state that runs the init file keeps real paths.
 
+## Network transport
+
+The game's own UDP transport (`CNetUDPConnection`). Not performance switches and not sim settings: they change how fast this client sends, never what the sim computes. The first three are the shipped console variables with the shipped defaults (`.data` 0x00F58DE4, 0x00F58DF0, 0x00F58DF4); the defaults stay until a live check says otherwise (issue #236).
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `net_MaxSendRate` | 2048 | `/con` | live | Bytes per second one connection may send before it waits (with `net_MaxBacklog`). A modelled order burst of 44,891 deflated bytes (replay 27039808, beat 15427) takes about 21 s at 2048 |
+| `net_MaxBacklog` | 2048 | `/con` | live | Bytes a connection may have sent beyond what `net_MaxSendRate` has drained; above it the connection waits (`CNetUDPConnection::GetBacklogTimeout`) |
+| `net_SendDelay` | 25 | `/con` | live | Milliseconds data smaller than one packet (497 bytes) is held for more to join it |
+| `net_SocketRecvBuffer` | 0 | `/con` | next game | Receive buffer of the game's UDP socket in bytes (`SO_RCVBUF`); 0 keeps the system default, as the shipped game. The log says `NET_MakeUDPConnector: SO_RCVBUF <n>` |
+| `net_SocketSendBuffer` | 0 | `/con` | next game | Send buffer of the game's UDP socket in bytes (`SO_SNDBUF`); 0 keeps the system default |
+
 ## Server mode
 
 Server-authoritative sessions are being built: one server runs the only sim, and each player receives only what their army can see. The code is behind the CMake option `FAF_SERVER_MODE` (off by default; the presets `clang-x64-release-server` and `clang-x86-release-server` turn it on). A client built with it is the same lockstep client for every normal game, replay and lobby: the server-mode path runs only when `/connectserver` is on the command line, and it never falls back to a lockstep session. The test switches `/loopback` and `/sessionsummary` below change nothing unless given.

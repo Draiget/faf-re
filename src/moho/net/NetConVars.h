@@ -22,4 +22,6 @@ namespace moho
   // Engine additions, not in the binary (see NetConVars.cpp).
   extern int32_t net_CheckOrderStreams;
   extern int32_t net_DebugAlterOrdersTo;
+  extern int32_t net_SocketRecvBuffer;
+  extern int32_t net_SocketSendBuffer;
 } // namespace moho

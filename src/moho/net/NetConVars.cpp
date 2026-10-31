@@ -25,6 +25,10 @@ namespace moho
   // (`net_DebugAlterOrdersTo`).
   int32_t net_CheckOrderStreams = 1;
   int32_t net_DebugAlterOrdersTo = -1;
+  // Read when a game's UDP socket is made (NET_MakeUDPConnector); 0 keeps the
+  // system's buffer size, as the binary does (issue #236).
+  int32_t net_SocketRecvBuffer = 0;
+  int32_t net_SocketSendBuffer = 0;
 
   namespace
   {
@@ -33,6 +37,18 @@ namespace moho
       "Check that each player's orders reached every player alike (CommandStreamCheck): 0 off, 1 report who "
       "(default), 2 report and stop the game. Next game.",
       &net_CheckOrderStreams
+    );
+
+    TConVar<int32_t> gTConVar_net_SocketRecvBuffer(
+      "net_SocketRecvBuffer",
+      "Receive buffer of the game's UDP socket in bytes (SO_RCVBUF); 0 keeps the system default. Next game.",
+      &net_SocketRecvBuffer
+    );
+
+    TConVar<int32_t> gTConVar_net_SocketSendBuffer(
+      "net_SocketSendBuffer",
+      "Send buffer of the game's UDP socket in bytes (SO_SNDBUF); 0 keeps the system default. Next game.",
+      &net_SocketSendBuffer
     );
 
     TConVar<int32_t> gTConVar_net_DebugAlterOrdersTo(
