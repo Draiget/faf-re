@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -80,6 +81,77 @@ namespace moho
           static_cast<int>(mIceServers.size()), mForceRelay ? ", relay only" : ""
         );
         StartTickerLocked();
+      }
+
+      // Issue #274: native mode, the launcher talks to the game directly. Link
+      // options come from the command line and the launcher's messages.
+      void StartNative(
+        const boost::weak_ptr<CGpgNetInterface>& gpgnet,
+        const std::string& bindAddress,
+        const bool forceRelay,
+        const bool webrtc
+      )
+      {
+        std::lock_guard lock(mMutex);
+        mNative = true;
+        mGpgNet = gpgnet;
+        mBindAddress = bindAddress;
+        mForceRelay = forceRelay;
+        mWebRtc = webrtc;
+        StartTickerLocked();
+      }
+
+      [[nodiscard]] bool IsNative()
+      {
+        std::lock_guard lock(mMutex);
+        return mNative;
+      }
+
+      void SetLocalId(const std::int64_t id)
+      {
+        std::lock_guard lock(mMutex);
+        mLocalId = id;
+      }
+
+      // The launcher's IceServers: a list of {urls, username, credential}, or
+      // the API's session object holding one under "servers" or "iceServers".
+      void SetIceServers(const std::string& json)
+      {
+        std::string error;
+        const std::optional<nl::JsonValue> parsed = nl::ParseJson(json, &error);
+        if (!parsed) {
+          gpg::Logf("NETLINK: bad IceServers (%s)", error.c_str());
+          return;
+        }
+        const nl::JsonValue* list = &*parsed;
+        if (parsed->IsObject()) {
+          list = parsed->Find("servers");
+          if (list == nullptr) {
+            list = parsed->Find("iceServers");
+          }
+        }
+        if (list == nullptr || !list->IsArray()) {
+          gpg::Logf("NETLINK: IceServers holds no server list");
+          return;
+        }
+        std::lock_guard lock(mMutex);
+        mIceServers = nl::ParseIceServers(*list);
+        gpg::Logf("NETLINK: %d ICE server addresses for new links", static_cast<int>(mIceServers.size()));
+      }
+
+      void RemoveAll()
+      {
+        std::vector<std::int64_t> ids;
+        {
+          std::lock_guard lock(mMutex);
+          for (const auto& [id, peer] : mPeers) {
+            ids.push_back(id);
+          }
+          mGameEnded = false;
+        }
+        for (const std::int64_t id : ids) {
+          RemovePeer(id);
+        }
       }
 
       void AddPeer(const std::int64_t id, const std::string& login, const bool offerer)
@@ -212,6 +284,7 @@ namespace moho
         std::lock_guard lock(mMutex);
         mStop = false;
         mGameEnded = false;
+        mNative = false;
       }
 
     private:
@@ -226,6 +299,14 @@ namespace moho
       {
         std::shared_ptr<nl::Link> link = Find(id);
         if (!link) {
+          return;
+        }
+        if (IsNative()) {
+          // The lobby server has no message for it; the log keeps it.
+          gpg::Logf(
+            "NETLINK: peer %lld %s%s", static_cast<long long>(id), nl::LinkStateName(link->GetState()),
+            link->IsConnected() ? ", connected" : ""
+          );
           return;
         }
         SNetCommandArg remote(static_cast<std::int32_t>(id));
@@ -246,6 +327,9 @@ namespace moho
         boost::shared_ptr<CGpgNetInterface> gpgnet = GpgNet();
         if (!gpgnet) {
           return;
+        }
+        if (IsNative() && std::string_view(name) == nl::kCmdIceMsg) {
+          name = nl::kCmdNativeIceMsg; // the lobby server routes IceMsg to the peer
         }
         try {
           gpgnet->WriteCommandWith2Args(name, a, b);
@@ -300,6 +384,7 @@ namespace moho
       bool mWebRtc = false;
       int mTestDropPercent = 0;
       bool mGameEnded = false;
+      bool mNative = false;
       std::map<std::int64_t, std::unique_ptr<EnginePeer>> mPeers;
     };
 
@@ -374,5 +459,109 @@ namespace moho
   void NETLINK_Shutdown()
   {
     Links().Shutdown();
+  }
+
+  bool NATIVENET_Enabled()
+  {
+    // `/nativenet` on the command line: /con runs on the first frame, after
+    // the launcher's first messages.
+    static const bool fromCommandLine = CFG_GetArgOption("/nativenet", 0u, nullptr);
+    return net_NativeNet != 0 || fromCommandLine;
+  }
+
+  void NATIVENET_Start()
+  {
+    if (!NATIVENET_Enabled()) {
+      return;
+    }
+    // Ours, for test hosts and players who pin an interface: the address ICE
+    // host candidates bind to (empty: every interface).
+    std::string bindAddress;
+    msvc8::vector<msvc8::string> bindArgs;
+    if (CFG_GetArgOption("/nativenetbind", 1u, &bindArgs) && !bindArgs.empty()) {
+      bindAddress.assign(bindArgs[0].c_str(), bindArgs[0].size());
+    }
+    // The client's "force relay" setting: only TURN-relayed candidates.
+    const bool forceRelay = CFG_GetArgOption("/nativenetrelay", 0u, nullptr);
+    boost::weak_ptr<CGpgNetInterface> weak;
+    boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
+    Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0);
+    gpg::Logf(
+      "NETLINK: native mode, the game links every peer itself%s%s%s", forceRelay ? ", relay only" : "",
+      bindAddress.empty() ? "" : ", bound to ", bindAddress.c_str()
+    );
+  }
+
+  bool NATIVENET_HandleCommand(const msvc8::string& name, msvc8::vector<SNetCommandArg>& args)
+  {
+    namespace nl = faf::netlink;
+    if (!Links().IsNative()) {
+      return false;
+    }
+    const auto command = name.view();
+    const auto isString = [&](const std::size_t i) {
+      return args.size() > i && args[i].mType == SNetCommandArg::NETARG_String;
+    };
+    const auto isNumber = [&](const std::size_t i) {
+      return args.size() > i && args[i].mType == SNetCommandArg::NETARG_Num;
+    };
+    // The shipped form with the peer's engine address, for PullTask's handler.
+    const auto toShipped = [&](const std::int64_t id, const std::string& login) {
+      msvc8::vector<SNetCommandArg> shipped;
+      shipped.push_back(SNetCommandArg(msvc8::string(nl::EngineAddressText(id).c_str())));
+      shipped.push_back(SNetCommandArg(msvc8::string(login.c_str())));
+      shipped.push_back(SNetCommandArg(static_cast<std::int32_t>(id)));
+      args = shipped;
+    };
+
+    if (command == nl::kCmdIceServers && isString(0)) {
+      Links().SetIceServers(StrArg(args[0]));
+      return true;
+    }
+    if (command == nl::kCmdNativeIceMsg && args.size() == 2 && isNumber(0) && isString(1)) {
+      Links().OnIceMsg(IntArg(args[0]), StrArg(args[1]));
+      return true;
+    }
+    if (command == "CreateLobby" && isNumber(3)) {
+      Links().SetLocalId(IntArg(args[3]));
+      return false;
+    }
+    if (command == "HostGame") {
+      Links().RemoveAll(); // a new game session, as the adapter's createGameSession
+      return false;
+    }
+    // The lobby server's JoinGame [login, id]: link to the host as answerer.
+    if (command == "JoinGame" && args.size() == 2 && isString(0) && isNumber(1)) {
+      Links().RemoveAll();
+      const std::int64_t id = IntArg(args[1]);
+      const std::string login = StrArg(args[0]);
+      Links().AddPeer(id, login, false);
+      toShipped(id, login);
+      return false;
+    }
+    // ConnectToPeer [login, id, offer]: the shipped form has a string second.
+    if (command == "ConnectToPeer" && args.size() == 3 && isString(0) && isNumber(1) && isNumber(2)) {
+      const std::int64_t id = IntArg(args[1]);
+      const std::string login = StrArg(args[0]);
+      Links().AddPeer(id, login, IntArg(args[2]) != 0);
+      toShipped(id, login);
+      return false;
+    }
+    if (command == "DisconnectFromPeer" && isNumber(0)) {
+      Links().RemovePeer(IntArg(args[0]));
+      return false;
+    }
+    if (command.rfind("Netlink", 0) == 0) {
+      gpg::Logf("NETLINK: %s ignored in native mode", name.c_str());
+      return true;
+    }
+    return false;
+  }
+
+  void NATIVENET_OnGameMessage(const char* const name)
+  {
+    if (name != nullptr && std::string_view(name) == "GameEnded" && Links().IsNative()) {
+      Links().SetGameEnded();
+    }
   }
 } // namespace moho

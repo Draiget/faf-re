@@ -40,6 +40,14 @@ namespace moho
   // (CNetUDPConnection::FastRetransmitFromMask); 0 waits for the resend
   // timer, as the binary does. Live.
   int32_t net_FastRetransmit = 0;
+  // Issue #274: 1 makes the game run every peer link itself with the launcher
+  // talking to it directly, no ICE adapter (NetlinkPeers.cpp,
+  // docs/LAUNCHER_NATIVE_NETWORK.md); 0 is the adapter path. Read when the
+  // game reports Idle.
+  int32_t net_NativeNet = 0;
+  // Issue #274: in native mode, offer a WebRTC data channel to peers that are
+  // our builds too (#239). Read when a link starts.
+  int32_t net_NativeNetWebRtc = 1;
 
   namespace
   {
@@ -47,6 +55,18 @@ namespace moho
       "net_FastRetransmit",
       "1: resend a packet once the peer has received 3 later ones, at most once a round trip; 0 (default) waits for the resend timer.",
       &net_FastRetransmit
+    );
+
+    TConVar<int32_t> gTConVar_net_NativeNet(
+      "net_NativeNet",
+      "1: the game runs every peer link and the launcher talks to it directly (/nativenet); 0 (default) uses the launcher's ICE adapter.",
+      &net_NativeNet
+    );
+
+    TConVar<int32_t> gTConVar_net_NativeNetWebRtc(
+      "net_NativeNetWebRtc",
+      "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
+      &net_NativeNetWebRtc
     );
 
     TConVar<int32_t> gTConVar_net_InEngineLinks(

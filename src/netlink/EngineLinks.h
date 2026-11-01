@@ -33,6 +33,18 @@ namespace faf::netlink
   inline constexpr const char* kCmdGameEnded = "NetlinkGameEnded";
   inline constexpr const char* kCmdState = "NetlinkState";
 
+  // Issue #274, native mode: no adapter; the launcher talks to the game
+  // directly (docs/LAUNCHER_NATIVE_NETWORK.md). The lobby server's own game
+  // messages arrive as it sends them, plus one of the launcher's:
+  //
+  //   launcher -> game  IceServers      [string json]  the TURN/STUN list
+  //   launcher -> game  JoinGame        [string login, int id]            (server's form)
+  //   launcher -> game  ConnectToPeer   [string login, int id, int offer] (server's form)
+  //   launcher -> game  IceMsg          [int sender id, string text]
+  //   game -> launcher  IceMsg          [int receiver id, string text]    the server routes it
+  inline constexpr const char* kCmdIceServers = "IceServers";
+  inline constexpr const char* kCmdNativeIceMsg = "IceMsg";
+
   // Where the game reaches the player `remoteId` when its link runs in the
   // engine: 240.x.y.z (240.0.0.0/4 is reserved and never routed) with the
   // id's low 24 bits, the port from the bits above. Every player derives the

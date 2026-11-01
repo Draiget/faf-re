@@ -1168,6 +1168,9 @@ void CGpgNetInterface::WriteCommand(
     return;
   }
 
+  // Engine addition (issue #274): GameEnded from the lobby script stops the
+  // native links' restarts.
+  NATIVENET_OnGameMessage(name);
   WriteCommandName(name);
 
   const uint32_t argc = static_cast<uint32_t>(GetCommandArgCount(args));
@@ -1450,7 +1453,10 @@ void CGpgNetInterface::PullTask()
 
     try {
       const auto commandName = command.mName.view();
-      if (commandName == "Test") {
+      if (NATIVENET_HandleCommand(command.mName, command.mArgs)) {
+        // Engine addition (issue #274): native mode's own messages. The lobby
+        // server's JoinGame / ConnectToPeer go on below, rewritten.
+      } else if (commandName == "Test") {
         Test(command.mArgs);
       } else if (commandName == "Connected") {
         Connected(command.mArgs);
@@ -1545,6 +1551,9 @@ void CGpgNetInterface::Connected(
   // Engine addition (issue #233): with net_InEngineLinks 1, ask the adapter
   // to leave the peer links to the game.
   NETLINK_SayHello(*this);
+  // Engine addition (issue #274): with net_NativeNet 1 there is no adapter;
+  // the game links every peer itself.
+  NATIVENET_Start();
 }
 
 /**

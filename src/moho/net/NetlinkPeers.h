@@ -27,4 +27,24 @@ namespace moho
 
   // Closes every link (GPGNet shut down).
   void NETLINK_Shutdown();
+
+  // Issue #274, native mode (net_NativeNet, or /nativenet): no ICE adapter;
+  // the launcher talks to the game directly and the game links every peer
+  // itself (docs/LAUNCHER_NATIVE_NETWORK.md). Off, nothing below does
+  // anything and the game talks to an adapter as the shipped game does.
+  [[nodiscard]] bool NATIVENET_Enabled();
+
+  // After GameState Idle (CGpgNetInterface::Connected). Main thread.
+  void NATIVENET_Start();
+
+  // A command from the launcher, before PullTask dispatches it. In native mode
+  // IceServers and IceMsg are taken here (true); the server's JoinGame and
+  // ConnectToPeer start a link and are rewritten to the shipped form with the
+  // peer's engine address; DisconnectFromPeer and HostGame close links. False
+  // leaves the command to PullTask. Main thread.
+  bool NATIVENET_HandleCommand(const msvc8::string& name, msvc8::vector<SNetCommandArg>& args);
+
+  // A command the game sends to the launcher (CGpgNetInterface::WriteCommand*):
+  // GameEnded stops link restarts. Any thread.
+  void NATIVENET_OnGameMessage(const char* name);
 } // namespace moho
