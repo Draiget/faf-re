@@ -1,11 +1,9 @@
 # faf-re desync test server on Kubernetes: the OpenTelemetry collector and the dump receiver behind
 # one Ingress host, /v1/logs to the collector and /dumps to the receiver. Before applying (README.md):
 #   - the faf-desync-tokens Secret (FAF_UPLOAD_TOKEN, FAF_READ_TOKEN),
-#   - the faf-desync-tools ConfigMap (tools/desync-diff/receive.py and desync_diff.py,
-#     tools/desync-server/dashboard.py),
+#   - the faf-desync-tools ConfigMap (tools/desync-diff/receive.py and desync_diff.py),
 #   - the faf-desync-collector ConfigMap (tools/desync-server/collector.yaml),
-#   - HOST below replaced by the server's name, DASHBOARD_NAME by the dashboard's (and the TLS
-#     lines filled in or removed).
+#   - HOST below replaced by the server's name (and the TLS lines filled in or removed).
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -102,56 +100,6 @@ spec:
         - name: data
           persistentVolumeClaim: {claimName: faf-desync-data}
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dashboard
-  namespace: faf-desync
-spec:
-  replicas: 1
-  selector:
-    matchLabels: {app: dashboard}
-  template:
-    metadata:
-      labels: {app: dashboard}
-    spec:
-      containers:
-        - name: dashboard
-          image: python:3.12-slim
-          command: ["python", "/opt/faf/dashboard.py", "--host", "0.0.0.0", "--port", "4320",
-                    "--otel", "/data/otel", "--dumps", "/data/dumps"]
-          env:
-            - name: FAF_READ_TOKEN
-              valueFrom:
-                secretKeyRef: {name: faf-desync-tokens, key: FAF_READ_TOKEN}
-            - {name: PYTHONUNBUFFERED, value: "1"}
-          ports:
-            - containerPort: 4320
-          readinessProbe:
-            httpGet: {path: /healthz, port: 4320}
-          resources:
-            requests: {cpu: 20m, memory: 64Mi}
-            limits: {cpu: "1", memory: 512Mi}
-          volumeMounts:
-            - {name: tools, mountPath: /opt/faf}
-            - {name: data, mountPath: /data/otel, subPath: otel, readOnly: true}
-            - {name: data, mountPath: /data/dumps, subPath: dumps, readOnly: true}
-      volumes:
-        - name: tools
-          configMap: {name: faf-desync-tools}
-        - name: data
-          persistentVolumeClaim: {claimName: faf-desync-data}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dashboard
-  namespace: faf-desync
-spec:
-  selector: {app: dashboard}
-  ports:
-    - {name: http, port: 4320, targetPort: 4320}
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -200,25 +148,3 @@ spec:
   # tls:
   #   - hosts: [HOST]
   #     secretName: faf-desync-tls
----
-# The dashboard on a name of its own, meant for an internal one: it shows player names and the
-# dumps, so it asks for the read token (login form or Authorization: Bearer) on every page.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: faf-desync-dashboard
-  namespace: faf-desync
-  # With cert-manager: annotations: {cert-manager.io/cluster-issuer: <issuer>}
-spec:
-  # ingressClassName: <class>
-  rules:
-    - host: DASHBOARD_NAME
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service: {name: dashboard, port: {number: 4320}}
-  # tls:
-  #   - hosts: [DASHBOARD_NAME]
-  #     secretName: faf-desync-dashboard-tls
