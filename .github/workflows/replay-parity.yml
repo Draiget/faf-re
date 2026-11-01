@@ -171,8 +171,11 @@ jobs:
     needs: [build, plan]
     runs-on: ubuntu-24.04
     timeout-minutes: 350
-    # PARITY_RETAIL_KEY is this environment's secret, given to master only.
-    environment: parity
+    # PARITY_RETAIL_KEY is this environment's secret, given to master only. No deployment: the
+    # secret comes without one, and one per shard filled the environment's deployment history.
+    environment:
+      name: parity
+      deployment: false
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}

@@ -111,7 +111,11 @@ jobs:
     needs: plan
     runs-on: ubuntu-24.04
     # For PARITY_RETAIL_ID, this environment's variable; the job runs no code of the pull request.
-    environment: parity
+    # No deployment: the secrets and variables come without one, and a deployment per job posts
+    # "deployed to parity" to the pull request each time.
+    environment:
+      name: parity
+      deployment: false
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -303,8 +307,10 @@ jobs:
     runs-on: ${{ startsWith(matrix.platform, 'windows') && 'windows-2025' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     # PARITY_RETAIL_KEY is this environment's secret, given to master only (a pull_request_target
-    # run is master's).
-    environment: parity
+    # run is master's). No deployment (see the data job).
+    environment:
+      name: parity
+      deployment: false
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.play) }}
