@@ -4978,6 +4978,13 @@ void Sim::UpdateChecksum()
 {
   // Engine addition (issue #216): read once; the binary tested `mLog` at each line.
   const bool syncLog = IsSyncLogOn();
+  // Engine addition (sim_DesyncDump): the hashed values, framed, also go into the desync recorder's
+  // memory ring (CDesyncRecorder::StateTap documents the records); copied, nothing formatted.
+  CDesyncRecorder* const recorder = CDesyncRecorder::For(this);
+  std::string* const stateTap = recorder != nullptr ? recorder->StateTap() : nullptr;
+  const auto tap = [stateTap](const void* const data, const std::size_t size) {
+    stateTap->append(static_cast<const char*>(data), size);
+  };
   auto logChecksumDigest = [this, syncLog]() {
     if (!syncLog) {
       return;
@@ -4996,6 +5003,12 @@ void Sim::UpdateChecksum()
 
     const SEconTotals& economy = army->GetEconomy()->economy;
     mContext.Update(&economy, sizeof(economy));
+    if (stateTap != nullptr) {
+      const std::int32_t armyIndex = army->mConstDat.mArmyIndex;
+      stateTap->push_back('A');
+      tap(&armyIndex, sizeof(armyIndex));
+      tap(&economy, sizeof(economy));
+    }
     if (syncLog) {
       Logf("    mStored=%.1f,%.1f\n", economy.mStored.ENERGY, economy.mStored.MASS);
       Logf("    mIncome=%.1f,%.1f\n", economy.mIncome.ENERGY, economy.mIncome.MASS);
@@ -5094,6 +5107,20 @@ void Sim::UpdateChecksum()
       entityChecksum.Flush();
       logChecksumDigest();
     }
+    if (stateTap != nullptr) {
+      const std::uint16_t blueprintLength = blueprintId != nullptr
+        ? static_cast<std::uint16_t>(std::min<std::size_t>(std::strlen(blueprintId), 0xFFFEu))
+        : std::uint16_t{0xFFFFu};
+      stateTap->push_back('E');
+      tap(&entityId, sizeof(entityId));
+      tap(&health, sizeof(health));
+      tap(&blueprintLength, sizeof(blueprintLength));
+      if (blueprintId != nullptr) {
+        tap(blueprintId, blueprintLength);
+      }
+      tap(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
+      tap(&velocity, sizeof(velocity));
+    }
   }
   entityChecksum.Flush();
 
@@ -5103,6 +5130,16 @@ void Sim::UpdateChecksum()
   mContext.Update(&mRngState->hasMarsagliaPair, 1u);
   if (mRngState->hasMarsagliaPair) {
     mContext.Update(&mRngState->marsagliaPair, 4u);
+  }
+  if (stateTap != nullptr) {
+    std::uint32_t pair = 0;
+    if (mRngState->hasMarsagliaPair) {
+      std::memcpy(&pair, &mRngState->marsagliaPair, sizeof(pair));
+    }
+    stateTap->push_back('G');
+    tap(&mRngState->twister.state[0], kRngMtBytes);
+    tap(&mRngState->hasMarsagliaPair, 1u);
+    tap(&pair, sizeof(pair));
   }
 }
 

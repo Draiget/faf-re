@@ -1,10 +1,10 @@
 # Desync diagnostics
 
-A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats by default (one beat is one 100 ms sim tick) each client hashes its game state and sends the hash to the others, and a hash that differs from a client's own is a desync. The engine has three opt-in aids for finding out why, all off by default:
+A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats by default (one beat is one 100 ms sim tick) each client hashes its game state and sends the hash to the others, and a hash that differs from a client's own is a desync. The engine has three aids for finding out why. The recorder is on by default in live multiplayer games; the rest is opt-in:
 
 | Aid | What it does | Issue | Switches |
 |---|---|---|---|
-| Desync recorder | Keeps the recent beats' sync log in memory and writes `desync_<game id>_beat<N>_army<A>.zip` next to the game log after a mismatch | #216 | [Desync recorder](SWITCHES.md#desync-recorder) |
+| Desync recorder | On by default in live multiplayer: keeps the state each beat hashes for the recent beats in memory, copied as bytes (`/nodesyncdump` turns it off). After a mismatch it writes `desync_<game id>_beat<N>_army<A>.zip` into the folder of the game's log file (`/log`; the working folder without it); the log names the folder at game start. `/desyncrecorder` records the full sync log instead, call trace included, at a sim-time cost | #216 | [Desync recorder](SWITCHES.md#desync-recorder) |
 | `tools/desync-diff/desync_diff.py` | Compares two players' dumps and prints the first value that differs: beat, entity, field | #217 | [README](../tools/desync-diff/README.md) |
 | Desync telemetry | Sends one small record per desync and one per game end to an OpenTelemetry collector; optionally uploads the dump as `.tar.gz` to a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
 
@@ -116,10 +116,10 @@ Add to the game's command line (or set the switches in the console):
 
 ```
 /telemetry /telemetryendpoint https://collector.example.org /telemetrytoken <token>
-/desyncrecorder /telemetrydumpendpoint https://dumps.example.org/dumps
+/telemetrydumpendpoint https://dumps.example.org/dumps
 ```
 
-The first line sends the records. The second also writes and uploads the dump; without `/desyncrecorder` there is no dump to upload. `/v1/logs` is appended to the collector URL unless it already ends with it. Records and dumps are only sent from live multiplayer games, never from replays.
+The first line sends the records. The second also uploads the dump the recorder writes; the recorder is on by default in live multiplayer, and with `/nodesyncdump` there is no dump to upload. `/v1/logs` is appended to the collector URL unless it already ends with it. Records and dumps are only sent from live multiplayer games, never from replays.
 
 The game log shows it working:
 

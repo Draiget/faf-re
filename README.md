@@ -34,11 +34,11 @@ Numbers, method and what is next: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Desync diagnostics
 
-When a multiplayer game desyncs, three opt-in aids show why; all are off by default.
+When a multiplayer game desyncs, three aids show why.
 
-- **Desync recorder** (`/desyncrecorder`): keeps the recent beats' sync log in memory and, after a checksum mismatch, writes a `desync_<game id>_beat<N>_army<A>.zip` dump next to the game log.
+- **Desync recorder** (on by default in live multiplayer games, `/nodesyncdump` turns it off): keeps the state each beat hashes for the recent beats in memory, copied as bytes, and after a checksum mismatch writes a `desync_<game id>_beat<N>_army<A>.zip` dump into the folder of the game's log file. The game log names that folder when a game starts. `/desyncrecorder` records the full sync log instead, at a sim-time cost.
 - **Dump compare** (`tools/desync-diff/desync_diff.py`): two players' dumps in, the first value that differs out: beat, entity, field.
-- **Telemetry** (`/telemetry /telemetryendpoint URL`): one small OpenTelemetry log record per desync and per game end, sent to an OpenTelemetry collector, without player names, user ids or paths. With `/telemetrydumpendpoint URL` the dump is also uploaded as `.tar.gz` to a server of your own; `tools/desync-diff/receive.py` is a reference receiver that stores the uploads per game and compares them.
+- **Telemetry** (off by default; `/telemetry /telemetryendpoint URL`): one small OpenTelemetry log record per desync and per game end, sent to an OpenTelemetry collector, without player names, user ids or paths. With `/telemetrydumpendpoint URL` the dump is also uploaded as `.tar.gz` to a server of your own; `tools/desync-diff/receive.py` is a reference receiver that stores the uploads per game and compares them.
 
 Setting up the collector and the receiver, and what they receive: [docs/DESYNC_DIAGNOSTICS.md](docs/DESYNC_DIAGNOSTICS.md). Every switch and field: [docs/SWITCHES.md](docs/SWITCHES.md#desync-telemetry).
 

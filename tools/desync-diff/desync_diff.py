@@ -39,6 +39,9 @@ import zlib
 RECORDER_SWITCHES = {"sim_DesyncRecorder", "sim_DesyncRecorderMB", "sim_DesyncDumpBeat"}
 # Pacing switches headless sets for every replay run (ReplayRunner.cpp); they don't reach the sim.
 REPLAY_RUNNER_SWITCHES = {"sim_LeadOnSchedule"}
+# Dumps list these too (rendering, UI, camera, the user-side thread pool); players may set them
+# differently without touching the sim, so a difference is shown but doesn't count.
+CLIENT_SWITCH_PREFIXES = ("ren_", "ui_", "range_", "cam_", "user_", "sys_")
 
 HEADER_FIELDS = [
     ("build", "commit"), ("build", "arch"), ("build", "dirty"),
@@ -193,6 +196,9 @@ def compare_headers(base, other):
         if a != b:
             if one_replay and name in REPLAY_RUNNER_SWITCHES:
                 print("  switch %s: %s | %s (set by the replay runner, not counted)" % (name, a, b))
+                continue
+            if name.startswith(CLIENT_SWITCH_PREFIXES):
+                print("  switch %s: %s | %s (render, UI or thread setting, not counted)" % (name, a, b))
                 continue
             print("  switch %s: %s | %s" % (name, a, b))
             found = True
