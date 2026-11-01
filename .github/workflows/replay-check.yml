@@ -161,10 +161,13 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.platforms), 'linux-x64')
     runs-on: ubuntu-24.04
     steps:
+      # A fork's code in a pull_request_target run: checkout refuses it without the opt-in. The
+      # `replay check` label is the review that makes it safe (see the top of this file).
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
+          allow-unsafe-pr-checkout: true
       # The Replay parity workflow's build of the same sources, when it made one (restore only).
       - id: sources
         run: |
@@ -249,6 +252,7 @@ jobs:
         with:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
+          allow-unsafe-pr-checkout: true
       - if: steps.wanted.outputs.build == 'true'
         uses: actions/cache/restore@v6
         with:
