@@ -1,10 +1,10 @@
-name = "FAF Engine"
+name = "FAF-RE Engine"
 uid = "faf-engine-features-v01"
 version = 1
 copyright = "MIT"
-description = "FAF Engine Features: Graphics API selector (Direct3D 9/11/12/Vulkan) in Video Options and interactive replay timeline bar with fast-forward scrubbing."
+description = "FAF-RE Engine Features: Graphics API selector (Direct3D 9/11/12/Vulkan) in Video Options and interactive replay timeline bar with fast-forward scrubbing."
 author = "FAF Community"
-url = "https://github.com/4z0t/FAF-UI-Mods"
+url = "https://github.com/Draiget/faf-re"
 icon = "/mods/FAFEngine/icon.png"
 selectable = true
 enabled = true
