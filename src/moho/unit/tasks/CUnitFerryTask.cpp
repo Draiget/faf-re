@@ -891,8 +891,11 @@ namespace moho
     const float deltaX = ownerPos.x - mPos.x;
     const float distance = std::sqrt((deltaZ * deltaZ) + (deltaX * deltaX));
 
+    // 0x0060F2B7 `comiss` + `jbe`: an unordered compare also takes the branch, so
+    // a NaN route anchor (a beacon at a NaN target) counts as arrived and the
+    // grounded transport stays put; `<=` would send it flying.
     if (mUnit->mVarDat.mLayerMask == LAYER_Land
-        && distance <= mUnit->GetBlueprint()->Air.StartTurnDistance) {
+        && !(distance > mUnit->GetBlueprint()->Air.StartTurnDistance)) {
       mTaskState = TASKSTATE_Preparing;
       return;
     }
