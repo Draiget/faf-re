@@ -1146,7 +1146,13 @@ void CScApp::Main()
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.
   moho::UI_SetRenderWorldFrameSeconds(frameSeconds);
-  moho::SND_Frame();
+
+  // Engine addition: suppress sound mixing and world audio during replay scrubbing.
+  const moho::CWldSession* const preWldSession = moho::WLD_GetActiveSession();
+  const bool isScrubbingPre = preWldSession != nullptr && preWldSession->IsScrubbing();
+  if (!isScrubbingPre) {
+    moho::SND_Frame();
+  }
   moho::DISK_UpdateWatcher();
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
@@ -1160,17 +1166,29 @@ void CScApp::Main()
   }
 
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
+  const bool isScrubbing = activeSession != nullptr && activeSession->IsScrubbing();
   const std::int32_t gameTick = activeSession != nullptr ? activeSession->mGameTick : 0;
   const float simDeltaSeconds = activeSession != nullptr ? activeSession->mTimeSinceLastTick : 0.0f;
-  moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
+
+  // Engine addition: suppress camera projection updates during replay scrubbing.
+  if (!isScrubbing) {
+    moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
+  }
   if (moho::sUserStage != nullptr) {
     FAF_PROFILE_ZONE_NAMED("UserStage");
     moho::sUserStage->UserFrame();
   }
   ::ADXM_ExecMain();
-  moho::REN_Frame(gameTick, simDeltaSeconds, frameSeconds);
-  if (moho::IUserSoundManager* const userSound = moho::USER_GetSound(); userSound != nullptr) {
-    userSound->Frame(simDeltaSeconds, frameSeconds);
+
+  // Engine addition: suppress world rendering and user sound during replay scrubbing,
+  // re-checking session state in case UserStage modified the active scrubbing mode.
+  const moho::CWldSession* const postStageSession = moho::WLD_GetActiveSession();
+  const bool isScrubbingPostStage = postStageSession != nullptr && postStageSession->IsScrubbing();
+  if (!isScrubbing && !isScrubbingPostStage) {
+    moho::REN_Frame(gameTick, simDeltaSeconds, frameSeconds);
+    if (moho::IUserSoundManager* const userSound = moho::USER_GetSound(); userSound != nullptr) {
+      userSound->Frame(simDeltaSeconds, frameSeconds);
+    }
   }
 
   if (moho::IUIManager* const uiManager = moho::UI_GetManager()) {
