@@ -297,46 +297,52 @@ function CreateReplayTimeline(parent)
     end
 
     local rootFrame = GetFrame(0)
-    parent = parent or rootFrame
+    parent = rootFrame
 
     -- Create scrubbing overlay on root frame
     controls.overlay = ScrubbingOverlay(rootFrame)
 
-    -- Bottom-centered timeline bar
-    local bar = Group(parent, "ReplayTimelineBar")
-    LayoutHelpers.SetDimensions(bar, LayoutHelpers.ScaleNumber(540), LayoutHelpers.ScaleNumber(36))
-    LayoutHelpers.AtBottomIn(bar, parent, LayoutHelpers.ScaleNumber(14))
-    LayoutHelpers.AtHorizontalCenterIn(bar, parent)
-    bar.Depth:Set(120)
+    -- Bottom-centered timeline bar directly on root frame
+    local bar = Group(rootFrame, "ReplayTimelineBar")
+    bar.Width:Set(LayoutHelpers.ScaleNumber(540))
+    bar.Height:Set(LayoutHelpers.ScaleNumber(36))
+    bar.Bottom:Set(function() return math.floor(rootFrame.Bottom() - LayoutHelpers.ScaleNumber(14)) end)
+    bar.Top:Set(function() return math.floor(bar.Bottom() - bar.Height()) end)
+    bar.Left:Set(function() return math.floor(rootFrame.Left() + (rootFrame.Width() - bar.Width()) * 0.5) end)
+    bar.Right:Set(function() return math.floor(bar.Left() + bar.Width()) end)
+    bar.Depth:Set(1000)
     bar:Show()
 
     -- Semi-transparent dark background
     local bg = Bitmap(bar)
-    LayoutHelpers.FillParent(bg, bar)
-    bg:SetSolidColor('d80d1117') -- semi-transparent dark charcoal
+    bg.Left:Set(bar.Left)
+    bg.Right:Set(bar.Right)
+    bg.Top:Set(bar.Top)
+    bg.Bottom:Set(bar.Bottom)
+    bg:SetSolidColor('e60d1117') -- semi-transparent dark charcoal
     bg.Depth:Set(function() return bar.Depth() end)
 
     -- Top accent line
     local topBorder = Bitmap(bar)
-    LayoutHelpers.AtTopIn(topBorder, bar)
-    LayoutHelpers.SetHeight(topBorder, 1)
     topBorder.Left:Set(bar.Left)
     topBorder.Right:Set(bar.Right)
+    topBorder.Top:Set(bar.Top)
+    LayoutHelpers.SetHeight(topBorder, 1)
     topBorder:SetSolidColor('ff2b3d54')
     topBorder.Depth:Set(function() return bar.Depth() + 1 end)
 
     -- Subtle perimeter borders
     local borderCol = 'ff141c26'
     local botBorder = Bitmap(bar)
-    LayoutHelpers.AtBottomIn(botBorder, bar)
-    LayoutHelpers.SetHeight(botBorder, 1)
     botBorder.Left:Set(bar.Left)
     botBorder.Right:Set(bar.Right)
+    botBorder.Bottom:Set(bar.Bottom)
+    LayoutHelpers.SetHeight(botBorder, 1)
     botBorder:SetSolidColor(borderCol)
     botBorder.Depth:Set(function() return bar.Depth() + 1 end)
 
     local leftBorder = Bitmap(bar)
-    LayoutHelpers.AtLeftIn(leftBorder, bar)
+    leftBorder.Left:Set(bar.Left)
     LayoutHelpers.SetWidth(leftBorder, 1)
     leftBorder.Top:Set(bar.Top)
     leftBorder.Bottom:Set(bar.Bottom)
@@ -344,7 +350,7 @@ function CreateReplayTimeline(parent)
     leftBorder.Depth:Set(function() return bar.Depth() + 1 end)
 
     local rightBorder = Bitmap(bar)
-    LayoutHelpers.AtRightIn(rightBorder, bar)
+    rightBorder.Right:Set(bar.Right)
     LayoutHelpers.SetWidth(rightBorder, 1)
     rightBorder.Top:Set(bar.Top)
     rightBorder.Bottom:Set(bar.Bottom)
@@ -353,14 +359,16 @@ function CreateReplayTimeline(parent)
 
     -- Current time label
     local curTimeLabel = UIUtil.CreateText(bar, "00:00", 12, UIUtil.bodyFont)
-    LayoutHelpers.AtLeftIn(curTimeLabel, bar, LayoutHelpers.ScaleNumber(14))
+    curTimeLabel.Left:Set(function() return math.floor(bar.Left() + LayoutHelpers.ScaleNumber(14)) end)
+    curTimeLabel.Width:Set(LayoutHelpers.ScaleNumber(55))
     LayoutHelpers.AtVerticalCenterIn(curTimeLabel, bar)
     curTimeLabel:SetColor('ffffffff')
     curTimeLabel.Depth:Set(function() return bar.Depth() + 2 end)
 
     -- Total duration label
     local totalTimeLabel = UIUtil.CreateText(bar, "00:00", 12, UIUtil.bodyFont)
-    LayoutHelpers.AtRightIn(totalTimeLabel, bar, LayoutHelpers.ScaleNumber(14))
+    totalTimeLabel.Right:Set(function() return math.floor(bar.Right() - LayoutHelpers.ScaleNumber(14)) end)
+    totalTimeLabel.Width:Set(LayoutHelpers.ScaleNumber(55))
     LayoutHelpers.AtVerticalCenterIn(totalTimeLabel, bar)
     totalTimeLabel:SetColor('ff9cb0c6')
     totalTimeLabel.Depth:Set(function() return bar.Depth() + 2 end)
@@ -386,9 +394,9 @@ function CreateReplayTimeline(parent)
         GetSkinFile('/slider02/slider_btn_down.dds'),
         GetSkinFile('/dialogs/options/slider-back_bmp.dds')
     )
-    slider.Left:Set(function() return curTimeLabel.Right() + LayoutHelpers.ScaleNumber(10) end)
-    slider.Right:Set(function() return totalTimeLabel.Left() - LayoutHelpers.ScaleNumber(10) end)
-    LayoutHelpers.SetHeight(slider, LayoutHelpers.ScaleNumber(16))
+    slider.Left:Set(function() return math.floor(curTimeLabel.Left() + curTimeLabel.Width() + LayoutHelpers.ScaleNumber(10)) end)
+    slider.Right:Set(function() return math.floor(totalTimeLabel.Right() - totalTimeLabel.Width() - LayoutHelpers.ScaleNumber(10)) end)
+    slider.Height:Set(LayoutHelpers.ScaleNumber(16))
     LayoutHelpers.AtVerticalCenterIn(slider, bar)
 
     slider._background.Left:Set(slider.Left)
