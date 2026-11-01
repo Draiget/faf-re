@@ -11,6 +11,7 @@
 #include "moho/net/ECmdStreamOp.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include <cmath>
 
 namespace
@@ -286,11 +287,22 @@ namespace
     CHECK(session->IsScrubbing() == false);
     CHECK(session->mScrubTargetBeat == -1);
 
-    // Test 6: Backward seek triggers pending restart target
+    // Test 6a: Backward seek without mLaunchInfo bails out safely
     session->mGameTick = 500;
     session->StartScrubToBeat(250);
     CHECK(session->IsScrubbing() == false);
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
+
+    // Test 6b: Backward seek with mLaunchInfo triggers pending restart target
+    struct DummyLaunchInfo : moho::LaunchInfoBase
+    {
+      void Create(boost::SharedPtrRaw<void>& outCreated) override {}
+    };
+    session->mLaunchInfo.reset(new DummyLaunchInfo());
+    session->StartScrubToBeat(250);
+    CHECK(session->IsScrubbing() == false);
     CHECK(moho::CWldSession::sPendingRestartScrubTarget == 250);
+    session->mLaunchInfo.reset();
 
     // Test 7: CancelScrub resets state and clears pending restart target
     moho::CWldSession::sPendingRestartScrubTarget = 100;

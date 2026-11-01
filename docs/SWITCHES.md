@@ -47,8 +47,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
-| `sim_ScrubMaxBeatsPerFrame` | 500 | `/con` | live | Maximum simulation beats processed in a single frame during replay fast-forward scrubbing |
-| `sim_ScrubTimeBudgetMs` | 15.0 | `/con` | live | Simulation CPU time budget in milliseconds per frame during replay fast-forward scrubbing before yielding to UI |
+| `sim_ScrubMaxBeatsPerFrame` | 500 | `/con` | live | Maximum simulation beats processed in a single frame during replay fast-forward scrubbing. Modifying this switch maintains replay simulation determinism; does not affect multiplayer parity as scrubbing is replay-only. |
+| `sim_ScrubTimeBudgetMs` | 15.0 | `/con` | live | Simulation CPU time budget in milliseconds per frame during replay fast-forward scrubbing before yielding to UI. Modifying this switch maintains replay simulation determinism; does not affect multiplayer parity as scrubbing is replay-only. |
 | `sim_RecyclePose` | 1 | `/con` | live | Reuses `CAniPose` double-buffer in-place when unique, eliminating thousands of heap allocations per second during unit movement; bit-for-bit checksum identical to retail |
 | sim_FastBoneUpdates | 1 | /con | live | Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches, accelerating bone rest updates; bit-for-bit checksum identical to retail |
 | `sim_FastEconStats` | 1 | `/con` | live | Bypasses string map lookups and allocations for per-tick army economy statistics by caching resolved `CArmyStatItem` pointers; bit-for-bit checksum identical to retail |

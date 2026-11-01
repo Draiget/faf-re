@@ -263,6 +263,21 @@ namespace moho
   float sim_ScrubTimeBudgetMs = 15.0f;
   std::int32_t CWldSession::sPendingRestartScrubTarget = -1;
 
+  namespace
+  {
+    TConVar<int> gTConVar_sim_ScrubMaxBeatsPerFrame(
+      "sim_ScrubMaxBeatsPerFrame",
+      "Maximum simulation beats processed in a single frame during replay fast-forward scrubbing.",
+      &sim_ScrubMaxBeatsPerFrame
+    );
+
+    TConVar<float> gTConVar_sim_ScrubTimeBudgetMs(
+      "sim_ScrubTimeBudgetMs",
+      "Simulation CPU time budget in milliseconds per frame during replay fast-forward scrubbing before yielding to UI.",
+      &sim_ScrubTimeBudgetMs
+    );
+  } // namespace
+
   /// Lazily-bound engine-stat handles. `DoBeat` publishes how many units it
   /// ticked; `SessionFrame` publishes how many beats the drain consumed.
   StatItem* sEngineStat_UserSync_SessionTick_NumTickers = nullptr;
@@ -8937,17 +8952,20 @@ namespace moho
     }
 
     std::int32_t clampedTarget = targetBeat < 0 ? 0 : targetBeat;
+    if (mTotalReplayBeats > 0 && clampedTarget > mTotalReplayBeats) {
+      clampedTarget = mTotalReplayBeats;
+    }
 
     if (clampedTarget < mGameTick) {
+      if (mLaunchInfo.get() == nullptr) {
+        CancelScrub();
+        return;
+      }
       mIsScrubbing = false;
       mScrubTargetBeat = -1;
       sPendingRestartScrubTarget = clampedTarget;
       WLD_RequestRestartSession();
       return;
-    }
-
-    if (mTotalReplayBeats > 0 && clampedTarget > mTotalReplayBeats) {
-      clampedTarget = mTotalReplayBeats;
     }
 
     if (clampedTarget <= mGameTick) {
@@ -15342,6 +15360,12 @@ namespace moho
    */
   void WLD_Teardown()
   {
+    // Avoid stale pending restart targets across sessions unless tearing down
+    // as part of an active session restart sequence (Preload/CreateSession).
+    if (gWldFrameAction != EWldFrameAction::Preload && gWldFrameAction != EWldFrameAction::CreateSession) {
+      CWldSession::sPendingRestartScrubTarget = -1;
+    }
+
     if (sSimDriver) {
       sSimDriver->ShutDown();
       CWldSession* const session = gActiveWldSession;
