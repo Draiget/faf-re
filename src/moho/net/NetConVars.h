@@ -26,6 +26,9 @@ namespace moho
   extern int32_t net_SocketSendBuffer;
   extern int32_t net_InEngineLinks;
   extern int32_t net_NativeNet;
+  extern int32_t net_LogBeatWaitMs;
+  extern int32_t net_TestBurstBeat;
+  extern int32_t net_TestBurstBytes;
   extern int32_t net_NativeNetWebRtc;
   extern int32_t net_FastRetransmit;
 

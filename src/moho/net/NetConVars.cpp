@@ -48,6 +48,16 @@ namespace moho
   // Issue #274: in native mode, offer a WebRTC data channel to peers that are
   // our builds too (#239). Read when a link starts.
   int32_t net_NativeNetWebRtc = 1;
+  // Issue #236, diagnostics: log every beat that became available this many ms
+  // or more after the one before it (waiting on a peer's data); 0 logs nothing.
+  // Live.
+  int32_t net_LogBeatWaitMs = 0;
+  // Issue #236, test only: once beat net_TestBurstBeat is available, this game
+  // sends net_TestBurstBytes incompressible filler bytes to every peer on the
+  // ordered stream, the way a large order burst occupies it; peers drop it.
+  // -1 / 0 (the defaults) send nothing.
+  int32_t net_TestBurstBeat = -1;
+  int32_t net_TestBurstBytes = 0;
 
   namespace
   {
@@ -67,6 +77,24 @@ namespace moho
       "net_NativeNetWebRtc",
       "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
       &net_NativeNetWebRtc
+    );
+
+    TConVar<int32_t> gTConVar_net_LogBeatWaitMs(
+      "net_LogBeatWaitMs",
+      "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
+      &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_TestBurstBeat(
+      "net_TestBurstBeat",
+      "Test only: at this beat send net_TestBurstBytes filler bytes to every peer; -1 (default) never.",
+      &net_TestBurstBeat
+    );
+
+    TConVar<int32_t> gTConVar_net_TestBurstBytes(
+      "net_TestBurstBytes",
+      "Test only: size of the net_TestBurstBeat burst in bytes (incompressible); 0 (default) sends nothing.",
+      &net_TestBurstBytes
     );
 
     TConVar<int32_t> gTConVar_net_InEngineLinks(

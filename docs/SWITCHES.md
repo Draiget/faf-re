@@ -127,9 +127,12 @@ The game's own UDP transport (`CNetUDPConnection`). Not performance switches and
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
-| `net_MaxSendRate` | 2048 | `/con` | live | Bytes per second one connection may send before it waits (with `net_MaxBacklog`). A modelled order burst of 44,891 deflated bytes (replay 27039808, beat 15427) takes about 21 s at 2048 |
+| `net_MaxSendRate` | 2048 | `/con` | live | Bytes per second one connection may send before it waits (with `net_MaxBacklog`). A modelled order burst of 44,891 deflated bytes (replay 27039808, beat 15427) takes about 21 s at 2048. Measured (issue #236, `net_TestBurstBytes`, 25 ms each way through mpemu's relay): the beat after the burst became available 21.8 s late at 2048 / 2048, and with both raised to 65536 no beat near the burst waited and none in the game waited over 0.8 s. Set it at startup with `/con net_MaxSendRate=65536` |
 | `net_MaxBacklog` | 2048 | `/con` | live | Bytes a connection may have sent beyond what `net_MaxSendRate` has drained; above it the connection waits (`CNetUDPConnection::GetBacklogTimeout`) |
 | `net_SendDelay` | 25 | `/con` | live | Milliseconds data smaller than one packet (497 bytes) is held for more to join it |
+| `net_LogBeatWaitMs` | 0 | `/con` | live | Logs `NET: beat N available M ms after beat K` for every beat that waited this many ms or more for some player's data (issue #236); 0 logs nothing. The game's own `Bottleneck` report starts at 5 s |
+| `net_TestBurstBeat` | -1 | `/con` | next game | Test only (issue #236): once this beat is available, the game sends `net_TestBurstBytes` incompressible filler bytes to every peer on the ordered stream, as a large order burst occupies it; peers drop it (message type 90, no receiver). -1 sends nothing |
+| `net_TestBurstBytes` | 0 | `/con` | next game | Test only: the burst's size in bytes; 0 sends nothing |
 | `net_SocketRecvBuffer` | 0 | `/con` | next game | Receive buffer of the game's UDP socket in bytes (`SO_RCVBUF`); 0 keeps the system default, as the shipped game. The log says `NET_MakeUDPConnector: SO_RCVBUF <n>` |
 | `net_SocketSendBuffer` | 0 | `/con` | next game | Send buffer of the game's UDP socket in bytes (`SO_SNDBUF`); 0 keeps the system default |
 | `net_InEngineLinks` | 0 | `/inenginelinks` or `/con` | next game | 1: when the ICE adapter is `faf-netbridge`, the game runs the peer links itself and the bridge only passes their signalling (issue #233, [NETBRIDGE.md](NETBRIDGE.md)); 0 leaves the links to the adapter, as the shipped game does. Read when the game reports `Idle` |
