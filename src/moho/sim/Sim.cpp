@@ -2194,8 +2194,11 @@ namespace
       return nullptr;
     }
 
-    CAiTarget target{};
-    target.DecodeFromSSTITarget(commandIssueData.mTarget, sim);
+    // 0x006F1530..0x006F1596 tests the raw target; decoding it here would draw
+    // from the sim RNG (replay 27960975 desynced at beat 31123).
+    CAiTarget noRushTarget{};
+    noRushTarget.targetType = commandIssueData.mTarget.mType;
+    noRushTarget.position = commandIssueData.mTarget.mPos;
 
     CUnitCommand* issuedCommand = nullptr;
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
@@ -2208,7 +2211,7 @@ namespace
         continue;
       }
 
-      if (IsOutsideArmyNoRushRadius(unit->ArmyRef, target)) {
+      if (IsOutsideArmyNoRushRadius(unit->ArmyRef, noRushTarget)) {
         continue;
       }
 
