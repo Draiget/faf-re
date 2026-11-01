@@ -746,6 +746,12 @@ namespace faf::headless
             manager->Cleanup();
           }
         }
+
+        // The sim's thread keeps running beats after the game-over packet. Packets it queued
+        // meanwhile are not part of the game, and how many there are depends on thread timing.
+        if (result.gameOver) {
+          break;
+        }
       }
 
       if (elapsed - lastReport >= 30.0) {
