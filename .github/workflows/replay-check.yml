@@ -295,8 +295,11 @@ jobs:
 
   play:
     needs: [plan, data, build-linux, build-windows]
-    # A build left out of `platforms` is skipped, not failed; a failed one fails its jobs here.
-    if: always() && needs.plan.result == 'success' && needs.data.result == 'success'
+    # A build left out of `platforms` is skipped, not failed. A failed build stops every play job
+    # (run 41294903846 started 48 that each failed on the missing download); the reports then fail.
+    if: >
+      !cancelled() && needs.plan.result == 'success' && needs.data.result == 'success' &&
+      needs.build-linux.result != 'failure' && needs.build-windows.result != 'failure'
     runs-on: ${{ startsWith(matrix.platform, 'windows') && 'windows-2025' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     # PARITY_RETAIL_KEY is this environment's secret, given to master only (a pull_request_target
