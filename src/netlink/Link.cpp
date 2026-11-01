@@ -252,6 +252,19 @@ namespace faf::netlink
         return true;
       }
 
+      // The setting just read, once after each change, for one link to log so
+      // a run shows what every process applied.
+      bool TakeChange(std::string& text)
+      {
+        std::lock_guard lock(mMutex);
+        if (mChange.empty()) {
+          return false;
+        }
+        text = std::move(mChange);
+        mChange.clear();
+        return true;
+      }
+
     private:
       TestShaping()
       {
@@ -271,6 +284,13 @@ namespace faf::netlink
         double loss = 0;
         int blocked = 0;
         if (std::fscanf(f, "%lld %lld %lf %d", &latency, &jitter, &loss, &blocked) == 4) {
+          if (!mRead || latency != mLatencyUs || jitter != mJitterUs || loss != mLoss || (blocked != 0) != mBlocked) {
+            char line[160];
+            std::snprintf(line, sizeof(line), "test shaping (%s): %lld us + up to %lld us jitter, loss %.3f%s",
+                          mPath.c_str(), latency, jitter, loss, blocked != 0 ? ", blocked" : "");
+            mChange = line;
+          }
+          mRead = true;
           mLatencyUs = latency;
           mJitterUs = jitter;
           mLoss = loss;
@@ -280,6 +300,8 @@ namespace faf::netlink
       }
 
       std::string mPath;
+      bool mRead = false;
+      std::string mChange;
       std::mutex mMutex;
       Link::Clock::time_point mNextRead{};
       std::int64_t mLatencyUs = 0;
@@ -752,6 +774,13 @@ namespace faf::netlink
         return;
       }
       const Clock::time_point now = Clock::now();
+
+      if (TestShaping::Get().Enabled()) {
+        std::string change;
+        if (TestShaping::Get().TakeChange(change)) {
+          Log(p, std::move(change)); // tests only (#242)
+        }
+      }
 
       while (!mInbox.empty()) {
         CandidatesMessage m = std::move(mInbox.front());
