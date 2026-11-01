@@ -900,10 +900,13 @@ int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
   optionKey.assign_owned(keyText);
 
   // 0x008C95BF..0x008C95DE: the option object lives on the preferences state;
-  // SCR_Copy rebuilds it on the caller's state so numbers stay numbers.
-  const LuaPlus::LuaObject valueObject = SCR_Copy(
-    USER_GetPreferences()->LookupCurrentOption(optionKey), state
-  );
+  // SCR_Copy rebuilds it on the caller's state so numbers stay numbers. The
+  // preferences lock covers the lookup and the copy (#247).
+  LuaPlus::LuaObject valueObject;
+  {
+    const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
+    valueObject = SCR_Copy(USER_GetPreferences()->LookupCurrentOption(optionKey), state);
+  }
   valueObject.PushStack(state);
   return 1;
 }
@@ -981,6 +984,7 @@ int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
     // check the binary has too. The binary copies across first: 0x008C9991
     // dispatches vtable slot 16 (LookupKey), then 0x008C99AE calls
     // SCR_Copy(&result, looked_up, callerState) before the push.
+    const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock()); // #247
     preferenceObject = SCR_Copy(preferences->LookupKey(key), state);
   }
 
@@ -1061,6 +1065,7 @@ int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
     // value written into it share a state, and passing the caller's object
     // straight through tripped that on every SetPreference - which is as far
     // as userInit.lua got.
+    const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock()); // #247
     auto* const prefsState = static_cast<LuaPlus::LuaState*>(preferences->GetState());
     LuaPlus::LuaObject copiedValue = moho::SCR_Copy(valueObject, prefsState);
     preferences->SetObject(key, &copiedValue);
@@ -1695,6 +1700,8 @@ void moho::USER_SetCurrentProfile(const msvc8::string& profileName)
       return;
     }
 
+    // Every object below lives on the preferences state (#247: USER_PreferencesLock).
+    const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
     LuaPlus::LuaObject rootPreferences = preferences->GetPreferenceTable();
     LuaPlus::LuaObject profileTable = rootPreferences.Lookup(kProfileProfilesPath);
 

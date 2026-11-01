@@ -70,6 +70,12 @@ if(EXISTS "${_faf_sim_math_golden}")
   add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 endif()
 
+# Engine addition (#247): the user preferences from several threads at once
+# (tests/prefs); fails without USER_PreferencesLock.
+add_executable(faf_prefs_thread_tests EXCLUDE_FROM_ALL prefs/PrefsThreadTests.cpp)
+target_link_libraries(faf_prefs_thread_tests PRIVATE faf_engine)
+add_test(NAME prefs_threads COMMAND faf_prefs_thread_tests)
+
 # Engine addition (dedicated-server plan WPL.4, WPR.11): what the static
 # initialisers of faf_main's objects registered (tests/registry).
 add_executable(faf_registration_dump EXCLUDE_FROM_ALL registry/RegistrationDump.cpp)

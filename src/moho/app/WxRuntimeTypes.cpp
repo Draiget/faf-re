@@ -2926,6 +2926,7 @@ namespace
     if (prefs == nullptr) {
       return 1.0f;
     }
+    const std::lock_guard<std::recursive_mutex> lock(moho::USER_PreferencesLock()); // #247
     const LuaPlus::LuaObject value = prefs->LookupCurrentOption("ui_scale");
     if (!value.IsNumber()) {
       return 1.0f;

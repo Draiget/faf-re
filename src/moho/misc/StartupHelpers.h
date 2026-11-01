@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -299,6 +300,20 @@ namespace moho
    * Mangled: ?USER_GetPreferences@Moho@@YAPAVIUserPrefs@1@XZ
    */
   [[nodiscard]] IUserPrefs* USER_GetPreferences();
+
+  /**
+   * Engine addition (#247): the lock around the user preferences. `CUserPrefs` keeps them in a
+   * Lua state of its own, and two threads use it: the main thread (the UI's Lua) and the
+   * scenario loader thread (`SessionInit.lua` runs `userInit.lua`, which reads and writes
+   * preferences, as `mods.lua` does). Unserialized, the two corrupted that state's stack and its
+   * LuaObject list, whose nodes often live on the callers' own stacks: a loader-thread local
+   * overwritten mid-call, or a collector worker reading a garbage list node.
+   *
+   * Every `IUserPrefs` method takes it. Code that keeps a LuaObject of the preferences state
+   * (`LookupKey`, `LookupCurrentOption`, `GetPreferenceTable`) or uses the state itself
+   * (`GetState`) holds it for as long as it does. Recursive, so a holder can call the methods.
+   */
+  [[nodiscard]] std::recursive_mutex& USER_PreferencesLock();
 
   /**
    * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
