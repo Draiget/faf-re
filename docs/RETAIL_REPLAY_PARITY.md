@@ -1,10 +1,43 @@
 # Retail replay parity
 
-Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the current run 448 of 449 replays match every checksum the live players recorded; the one that does not desyncs at its first checksum, probably because of its map.
+Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; with the fixes made since, 12,756 (97.0 %). Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 14 % from live games whose players already disagreed, 1 % give retail's own hash, 19.5 % come from our bugs (42 of those 45 fixed) and 12 % are not explained yet.
 
-*Snapshot: 29/10/2026.*
+*Snapshot: 01/11/2026.*
 
 ## Current result
+
+### CI run 41025691648 (30–31/10/2026)
+
+The [Replay parity workflow](../.github/workflows/replay-parity.yml) on commit `7986851b6`, x64 headless, played 13,148 of 14,838 listed replays before the run was cancelled. A replay passes when every checksum the live players recorded matches.
+
+| Result | Replays | Share of played | Cause |
+|---|---|---|---|
+| **Pass** | **12,714** | **96.70 %** | every recorded checksum matches |
+| Desync | 231 | 1.76 % | split below |
+| Timeout | 121 | 0.92 % | the job's time ran out before the replay ended; no mismatch in any of them |
+| Crash | 73 | 0.56 % | the runner's map extraction (`Map loader ... aborted`, scmp_001/002/004 and one dual_gap), fixed in the runner after the run (`94c6ab12f`) |
+| Error | 9 | 0.07 % | the map is not on FAF's map server (HTTP 404): generated maps and `na_alps` |
+
+The 231 desyncs by cause, as of master `7ced1a507` (01/11/2026):
+
+| Cause | Desyncs | Share of desyncs | Share of played | Engine bug? |
+|---|---|---|---|---|
+| Maps and content the run did not provide | 123 | 53.2 % | 0.94 % | no |
+| Live game split: the players' own checksums already disagreed | 33 | 14.3 % | 0.25 % | no (which side retail takes is not checked) |
+| Retail gives the same hash as ours | 3 | 1.3 % | 0.02 % | no |
+| Our bugs, fixed | 42 | 18.2 % | 0.32 % | yes, fixed |
+| Our bugs, cause known, open on x64 | 3 | 1.3 % | 0.02 % | yes |
+| Not explained yet | 27 | 11.7 % | 0.21 % | unknown |
+
+With the 42 fixed, 12,756 of 13,148 (97.02 %) would pass on master. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 123 content desyncs), at most 30 of 12,822 replays (0.23 %) still fail because of the engine: the 3 known and the 27 unexplained.
+
+- **Maps and content (123).** 104 survival maps whose scripts import the campaign's `X1CA_00N_strings.lua`, which CI's game data lacks (survival_horde*, survival_dday_horde, survival_shillingstone, survival_stranded, survival_the_goats_*, xxx_survival, sh1r3_mycelium2_survival); 23 of them were replayed with the retail `X1CA_001`..`006` maps added and all 23 pass. 19 on maps that ship their own unit blueprints (survival_cybran_wrath, blackstar, little_pass_revised, adaptive_esais_vengeance): the game loads those only when `Game.prefs` names the map, which the runner never writes; the beat-0 hash `c3179fbe` is "no map blueprints loaded" on any map.
+- **Live game split (33).** Two human players recorded different checksums at the same beat and ours equals one of them, so the live game itself had desynced there.
+- **Our bugs, fixed (42).** 24 by the cheat commands (`649cb57b5`: `CreateUnit` kept retail's layer override, `BlingBling` adds to the army's resources; `3e2299f95`: height-rect clamp), 5 by formation address reuse (`9f33f6980`, `9c2bf7c7b`), 4 by a self-destruct order with no units, which in retail still runs the cheat check that feeds the checksum (`7ced1a507`), 1 probably by factory orders no longer drawing from the sim's random stream (`ba1058e02`, not confirmed), and 8 that pass on master with the fixing commit not identified.
+- **Known, open on x64 (3).** 26846675, 26916583 and 26851180: units keep a raw formation pointer, so whether a freed formation's address is reused changes results. The x86 build, which uses the recovered allocator of the binary, plays them clean; the x64 build's formation-only free list does not reuse in the binary's order.
+- **Not explained (27).** 20 fail on master with the cause not found: in 13 of them retail `ForgedAlliance.exe` plays past that beat, so the bug is ours; in 2 the retail runs were inconclusive; 5 have no retail run yet. 7 more have not been replayed on master yet.
+
+### Local run, 28–29/10/2026
 
 - **x64 `headless_x64.exe`, master `4cebee11e`** (parity build `c6e3d7ad31`), `/simworkers 8`, game version 3835, played by the [parity runner](../tools/replay-parity/README.md) in headless mode (the simulation alone, see Method) overnight on 28–29/10/2026, 21:30 to 06:13: 449 vault replays on 168 maps, 1–12 players (49 single-player games), 3 to 108 minutes, 26 with M28AI (v292 to v296); 232 hours of game in total. The set contains all 323 replays of the 27/10/2026 run and 126 more.
 - **448 match every checksum** to the end of the game, each in a single run. In 11 of them one or two clients desynced in the live game, and the rebuilt engine matches every other client (see below).
@@ -525,4 +558,6 @@ A replay checks the rebuilt engine against checksums the players recorded. A liv
 - **Engine functions the AI scripts call.** The Lua AI is not part of the checksum, but the orders it issues are. A wrong return value from `CPlatoon:FormPlatoon` raised a Lua error in our build only, the AI stopped issuing orders retail's AI issued, and the games diverged a few hundred beats later.
 - **Formation orders.** A patrol given to a group in formation must stay tied to that formation. Ours never passed the formation to the patrol task, so each unit's patrol leg ended on its own arrival check instead of the formation's.
 - **Pathfinder edge costs.** The hierarchical pathfinder buckets each edge cost as `ceil(ln(cost / distance) * 6)`. Retail takes the logarithm with the x87 `fyl2x` instruction and rounds only the product to float; ours rounded the logarithm first. Where the product sits at a whole number the bucket moved by one and a unit took a different route; seen only in long AI games, which send many units across the map.
+- **Cheat commands.** Games with cheats on create units and add resources through sim callbacks. Ours cleared the layer override retail's `CreateUnit` keeps, and `BlingBling` filled the stored amount instead of the army's resources (24 replays of the CI run).
+- **Checks that feed the checksum.** `CheatsEnabled()` hashes its flag into the beat checksum. Retail tests it for a self-destruct order even when no unit was selected; ours returned first, so the beat had one byte less in its hash (26863712 and three more).
 - **Signed versus unsigned cells.** The path navigator reads a cell's coordinates as unsigned 16-bit words, so a formation slot just off the map edge (z = -1) is 65,535 cells away; ours sign-extended them, saw the slot as close, probed it, failed and dropped out of the formation one beat early.
