@@ -1,6 +1,6 @@
 # Retail replay parity
 
-Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; with the fixes made since, 12,756 (97.0 %). Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 14 % from live games whose players already disagreed, 1 % give retail's own hash, 19.5 % come from our bugs (42 of those 45 fixed) and 12 % are not explained yet.
+Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; with the fixes made since, 12,758 (97.0 %). Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 1 % give retail's own hash, 20 % come from our bugs (44 of those 47 fixed) and 11 % are not explained yet.
 
 *Snapshot: 01/11/2026.*
 
@@ -22,20 +22,20 @@ The 231 desyncs by cause, as of master `7ced1a507` (01/11/2026):
 
 | Cause | Desyncs | Share of desyncs | Share of played | Engine bug? |
 |---|---|---|---|---|
-| Maps and content the run did not provide | 123 | 53.2 % | 0.94 % | no |
-| Live game split: the players' own checksums already disagreed | 33 | 14.3 % | 0.25 % | no (which side retail takes is not checked) |
+| Maps and content the run did not provide | 122 | 52.8 % | 0.93 % | no |
+| Live game split: the players' own checksums already disagreed | 34 | 14.7 % | 0.26 % | no (which side retail takes is not checked) |
 | Retail gives the same hash as ours | 3 | 1.3 % | 0.02 % | no |
-| Our bugs, fixed | 42 | 18.2 % | 0.32 % | yes, fixed |
+| Our bugs, fixed | 44 | 19.0 % | 0.33 % | yes, fixed |
 | Our bugs, cause known, open on x64 | 3 | 1.3 % | 0.02 % | yes |
-| Not explained yet | 27 | 11.7 % | 0.21 % | unknown |
+| Not explained yet | 25 | 10.8 % | 0.19 % | unknown |
 
-With the 42 fixed, 12,756 of 13,148 (97.02 %) would pass on master. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 123 content desyncs), at most 30 of 12,822 replays (0.23 %) still fail because of the engine: the 3 known and the 27 unexplained.
+With the 44 fixed, 12,758 of 13,148 (97.03 %) would pass on master. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 122 content desyncs), at most 28 of 12,823 replays (0.22 %) still fail because of the engine: the 3 known and the 25 unexplained.
 
-- **Maps and content (123).** 104 survival maps whose scripts import the campaign's `X1CA_00N_strings.lua`, which CI's game data lacks (survival_horde*, survival_dday_horde, survival_shillingstone, survival_stranded, survival_the_goats_*, xxx_survival, sh1r3_mycelium2_survival); 23 of them were replayed with the retail `X1CA_001`..`006` maps added and all 23 pass. 19 on maps that ship their own unit blueprints (survival_cybran_wrath, blackstar, little_pass_revised, adaptive_esais_vengeance): the game loads those only when `Game.prefs` names the map, which the runner never writes; the beat-0 hash `c3179fbe` is "no map blueprints loaded" on any map.
-- **Live game split (33).** Two human players recorded different checksums at the same beat and ours equals one of them, so the live game itself had desynced there.
-- **Our bugs, fixed (42).** 24 by the cheat commands (`649cb57b5`: `CreateUnit` kept retail's layer override, `BlingBling` adds to the army's resources; `3e2299f95`: height-rect clamp), 5 by formation address reuse (`9f33f6980`, `9c2bf7c7b`), 4 by a self-destruct order with no units, which in retail still runs the cheat check that feeds the checksum (`7ced1a507`), 1 probably by factory orders no longer drawing from the sim's random stream (`ba1058e02`, not confirmed), and 8 that pass on master with the fixing commit not identified.
+- **Maps and content (122).** 103 on survival maps whose scripts import the campaign's `X1CA_00N_strings.lua`, which CI's game data lacks (survival_horde*, survival_dday_horde, survival_shillingstone, survival_stranded, survival_the_goats_last_hope, xxx_survival, sh1r3_mycelium2_survival); 24 of them were replayed with the retail `X1CA_001`..`006` maps added and all 24 pass. 19 on maps that ship their own unit blueprints (survival_cybran_wrath, blackstar, little_pass_revised, adaptive_esais_vengeance): the game loads those only when `Game.prefs` names the map, which the runner never writes; the beat-0 hash `c3179fbe` is "no map blueprints loaded" on any map.
+- **Live game split (34).** The players recorded different checksums at the same beat and ours equals some of them, so the live game itself had desynced there: 33 one-against-one, and 26844459 with 4 players on our hash and 6 on another.
+- **Our bugs, fixed (44).** 24 by the cheat commands (`649cb57b5`: `CreateUnit` kept retail's layer override, `BlingBling` adds to the army's resources; `3e2299f95`: height-rect clamp), 5 by formation address reuse (`9f33f6980`, `9c2bf7c7b`), 4 by a self-destruct order with no units, which in retail still runs the cheat check that feeds the checksum (`7ced1a507`), 1 probably by factory orders no longer drawing from the sim's random stream (`ba1058e02`, not confirmed), and 10 that pass on master with the fixing commit not identified.
 - **Known, open on x64 (3).** 26846675, 26916583 and 26851180: units keep a raw formation pointer, so whether a freed formation's address is reused changes results. The x86 build, which uses the recovered allocator of the binary, plays them clean; the x64 build's formation-only free list does not reuse in the binary's order.
-- **Not explained (27).** 20 fail on master with the cause not found: in 13 of them retail `ForgedAlliance.exe` plays past that beat, so the bug is ours; in 2 the retail runs were inconclusive; 5 have no retail run yet. 7 more have not been replayed on master yet.
+- **Not explained (25).** 24 fail on master with the cause not found: in 13 of them retail `ForgedAlliance.exe` plays past that beat, so the bug is ours; in 2 the retail runs were inconclusive; 9 have no retail run yet. One (26849471, 64,250 beats) is still being replayed on master.
 
 ### Local run, 28–29/10/2026
 
