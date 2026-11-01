@@ -8936,7 +8936,7 @@ namespace moho
     CFormation::UpdateOrientation(CursorInfo().mMouseWorldPos, mCurFormation);
 
     const std::int32_t tickAtFrameStart = mGameTick;
-    const std::int32_t targetTick = mGameTick + static_cast<std::int32_t>(std::floor(mTimeSinceLastTick));
+    const std::int32_t targetTick = mGameTick + msvc8::FloorToIntX87(mTimeSinceLastTick); // 0x00895BEA..0x00895BFD
 
     // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
     // stall cannot make one frame arbitrarily long.

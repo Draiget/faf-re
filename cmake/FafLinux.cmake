@@ -174,7 +174,7 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
-target_link_libraries(faf_sim PUBLIC Wm3Foundation zlib123)
+target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123)
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
@@ -228,6 +228,13 @@ add_custom_command(TARGET faf_sim_math_tests POST_BUILD
   COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
   COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
   VERBATIM)
+
+# --- faf_math_dump (plan WPR.21) --------------------------------------------------------
+# The difffuzz targets on every faf_sim object, as Windows builds them on faf_engine,
+# checked against retail's outputs (tests/math_dump/golden.txt) after every build
+# (tools/difffuzz/dump.cmake).
+set(FAF_MATH_DUMP_ENGINE faf_sim)
+include("${PROJECT_SOURCE_DIR}/tools/difffuzz/dump.cmake")
 
 # --- faf-sim-link -----------------------------------------------------------------------
 # Every faf_sim object linked into one executable with no entry point of its

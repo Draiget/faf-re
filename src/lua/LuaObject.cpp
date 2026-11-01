@@ -2062,6 +2062,11 @@ extern "C"
 			return 1;
 		case LUA_TNUMBER:
 			return (t1->value.n == t2->value.n) ? 1 : 0;
+		case LUA_TBOOLEAN:
+			// 0x0091A5A8 compares the 4-byte value word. Booleans are written
+			// through `b`, which on x64 leaves the upper half of `p` holding
+			// whatever the slot held before, so compare `b`.
+			return (t1->value.b == t2->value.b) ? 1 : 0;
 		default:
 			return (t1->value.p == t2->value.p) ? 1 : 0;
 		}
@@ -5575,6 +5580,8 @@ namespace
 			} while (::_findnext64(findHandle, &findData) == 0);
 			(void)::_findclose(findHandle);
 		}
+		// Engine addition (dedicated-server plan WPR.22): res_EnumOrderFuzz shuffles them first.
+		moho::DISK_FuzzEnumerationOrder(names.begin(), names.end(), [](const std::string& name) { return name.c_str(); });
 		std::sort(names.begin(), names.end(), [](const std::string& lhs, const std::string& rhs) {
 			return gpg::STR_FileNameOrderLess(lhs.c_str(), rhs.c_str());
 		});
@@ -11155,8 +11162,9 @@ namespace
 	{
 		// 0x0091A0F5: `fistp qword` (truncating), low dword kept - so negative and
 		// >= 2^32 seeds wrap modulo 2^32 rather than hitting a float-to-unsigned
-		// conversion that is undefined for them.
-		const auto seed = static_cast<unsigned int>(static_cast<std::int64_t>(luaL_checknumber(state, 1)));
+		// conversion that is undefined for them, and NaN, infinities and values
+		// beyond int64 seed 0 (the integer indefinite's low dword).
+		const auto seed = static_cast<unsigned int>(msvc8::TruncateToInt64(luaL_checknumber(state, 1)));
 		std::srand(seed);
 		return 0;
 	}
@@ -16552,7 +16560,10 @@ extern "C"
 				break;
 			}
 			default:
-				return left->value.b == right->value.b;
+				// Every other tag holds a pointer (string, function, light
+				// userdata, thread): 0x009298D2 compares the whole value word,
+				// which on x64 is `p`, not the low half `b`.
+				return left->value.p == right->value.p;
 		}
 
 		const TObject* const handler = get_compTM(leftMetatable, kTagMethodEqual, state, rightMetatable);

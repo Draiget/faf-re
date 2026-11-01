@@ -10,7 +10,7 @@
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "legacy/containers/List.h"
 #include "moho/math/Wm3Segment3FafExtras.h"
-#include "Wm3DistVector3Segment3.h"
+#include "moho/math/Wm3Queries.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/ProjectileArcRenderer.h"
 #include "moho/render/camera/CameraImpl.h"
@@ -273,8 +273,7 @@ namespace moho
     std::int32_t farthest = -1;
     float farthestDistance = 0.0f;
     for (std::int32_t index = first + 1; index < last; ++index) {
-      Wm3::DistVector3Segment3f pointDistance(points[index], span);
-      const float distance = pointDistance.Get();
+      const float distance = Wm3::DistanceVector3Segment3(points[index], span);
       if (distance > farthestDistance) {
         farthestDistance = distance;
         farthest = index;

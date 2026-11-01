@@ -33,7 +33,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "Wm3Box2.h"
-#include "Wm3IntrBox2Box2.h"
+#include "moho/math/Wm3Queries.h"
 
 using namespace moho;
 
@@ -270,7 +270,7 @@ namespace
     const Wm3::Box2f primaryBox = BuildCollisionBox2(primaryUnit, primaryPos, primaryLead, primaryInflatedLength);
     const Wm3::Box2f secondaryBox =
       BuildCollisionBox2(secondaryUnit, secondaryPos, secondaryLead, secondaryInflatedLength);
-    return Wm3::IntrBox2Box2f(primaryBox, secondaryBox).Test();
+    return Wm3::TestBox2Box2(primaryBox, secondaryBox);
   }
 
   // moho::func_IsSourceUnit (FUN_0062EEA0) is defined at namespace-moho file

@@ -52,6 +52,43 @@ msvc8_x87_bilinear_height PROC
     ret
 msvc8_x87_bilinear_height ENDP
 
+; float msvc8_x87_subtract_bilinear_height(top, h00, h01, h10, h11, fracX, fracZ)
+; The same block, then top - height before the store. The fifth to seventh
+; float arguments occupy stack slots beyond the home area.
+msvc8_x87_subtract_bilinear_height PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    movss   dword ptr [rsp+16], xmm2
+    movss   dword ptr [rsp+20], xmm3
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fld     dword ptr [rsp+16]
+    fld     dword ptr [rsp+12]
+    fsub    st(1), st(0)
+    fld     dword ptr [rsp+56]
+    fmul    st(2), st(0)
+    fxch    st(2)
+    faddp   st(1), st(0)
+    fld     dword ptr [rsp+40]
+    fld     dword ptr [rsp+20]
+    fsub    st(1), st(0)
+    fxch    st(1)
+    fmulp   st(3), st(0)
+    faddp   st(2), st(0)
+    fsub    st(1), st(0)
+    fxch    st(1)
+    fmul    dword ptr [rsp+48]
+    faddp   st(1), st(0)
+    fsubr   dword ptr [rsp+8]
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_subtract_bilinear_height ENDP
+
 ; float msvc8_x87_sinf(float x)
 msvc8_x87_sinf PROC
     movss   dword ptr [rsp+8], xmm0
@@ -249,24 +286,61 @@ msvc8_x87_sin_times_cos PROC
 msvc8_x87_sin_times_cos ENDP
 
 
-; float msvc8_x87_sin_times(float sinArg, float factor)
-; fsin stays unrounded; the product rounds once under PC24 (FUN_006C3220).
-msvc8_x87_sin_times PROC
+; float msvc8_x87_sin_of_product_times(float a, float b, float factor)
+; The argument product and fsin stay on the stack; the final product rounds
+; once under PC24 (FUN_006C3220, 0x006C336C..0x006C3380).
+msvc8_x87_sin_of_product_times PROC
     movss   dword ptr [rsp+8], xmm0
     movss   dword ptr [rsp+12], xmm1
+    movss   dword ptr [rsp+16], xmm2
     fnstcw  word ptr [rsp+24]
     movzx   eax, word ptr [rsp+24]
     and     eax, 0fffffcffh
     mov     word ptr [rsp+26], ax
     fldcw   word ptr [rsp+26]
     fld     dword ptr [rsp+8]
-    fsin
     fmul    dword ptr [rsp+12]
+    fsin
+    fmul    dword ptr [rsp+16]
     fstp    dword ptr [rsp+8]
     fldcw   word ptr [rsp+24]
     movss   xmm0, dword ptr [rsp+8]
     ret
-msvc8_x87_sin_times ENDP
+msvc8_x87_sin_of_product_times ENDP
+
+
+; float msvc8_x87_twister_word_in_range(float lower, float upper, uint32_t word)
+; CRandomStream::FRand(lower, upper) 0x0051B5C6..0x0051B5EA under PC24: the
+; word loaded signed plus 2^32 when negative, then range, product, 2^-32 and
+; the sum on the stack. xmm0 = lower, xmm1 = upper, r8d = word.
+msvc8_x87_twister_word_in_range PROC
+    movss   dword ptr [rsp+8], xmm0
+    movss   dword ptr [rsp+12], xmm1
+    mov     dword ptr [rsp+16], r8d
+    mov     dword ptr [rsp+20], 4F800000h   ; 2^32
+    mov     dword ptr [rsp+28], 2F800000h   ; 2^-32
+    fnstcw  word ptr [rsp+24]
+    movzx   eax, word ptr [rsp+24]
+    and     eax, 0fffffcffh
+    mov     word ptr [rsp+26], ax
+    fldcw   word ptr [rsp+26]
+    fild    dword ptr [rsp+16]
+    test    r8d, r8d
+    jge     @F
+    fadd    dword ptr [rsp+20]
+@@:
+    fld     dword ptr [rsp+12]
+    fld     dword ptr [rsp+8]
+    fsub    st(1), st(0)
+    fxch    st(2)
+    fmulp   st(1), st(0)
+    fmul    dword ptr [rsp+28]
+    faddp   st(1), st(0)
+    fstp    dword ptr [rsp+8]
+    fldcw   word ptr [rsp+24]
+    movss   xmm0, dword ptr [rsp+8]
+    ret
+msvc8_x87_twister_word_in_range ENDP
 
 
 ; void msvc8_x87_slerp_spherical_blend(float* out, const float* q1, const float* rhs,

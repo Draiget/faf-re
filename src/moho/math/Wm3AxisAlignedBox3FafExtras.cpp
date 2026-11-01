@@ -3,7 +3,7 @@
 #include <cmath>
 #include <limits>
 
-#include "Wm3ContBox3.h"
+#include "moho/math/Wm3Queries.h"
 
 #include "gpg/core/utils/Global.h"
 
@@ -23,7 +23,7 @@ namespace moho
     {
         Wm3::Vector3f vertices[8];
         box.ComputeVertices(vertices);
-        const Wm3::Box3f aligned = Wm3::ContAlignedBox(8, vertices);
+        const Wm3::Box3f aligned = Wm3::ContAlignedBox3(8, vertices);
         Wm3::AxisAlignedBox3f bounds{};
         for (int axis = 0; axis < 3; ++axis) {
             const float radius =

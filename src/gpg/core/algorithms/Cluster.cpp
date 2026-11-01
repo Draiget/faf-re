@@ -2018,7 +2018,15 @@ float Cluster::QuantizeEdgeCost(const float a, const float b)
     // 0x0092D8B0..0x0092D8C4: `fld a; fdiv b; fldln2; fxch; fyl2x; fmul 6.0f`.
     // The logarithm is never rounded to float on its own.
     const float scaled = msvc8::ScaledLnQuotient(a, b, 6.0f);
-    int quantized = static_cast<int>(std::ceil(scaled));
+    // 0x0092D8C8..0x0092D8E2: ceil as `frndint`, +1 when the value is above its
+    // nearest integer (`cmova`, false when unordered), added to the `fistp`. An
+    // infinite or NaN quotient stores the integer indefinite, which the clamp
+    // below turns into bucket 0; a plain cast of `ceil(+inf)` is undefined, and
+    // clang's x64 code saturated it into bucket 31 (difffuzz, plan WPR.21).
+    const float nearest = std::nearbyint(scaled);
+    int quantized = static_cast<int>(
+        static_cast<std::uint32_t>(msvc8::RoundToInt(nearest)) + (scaled > nearest ? 1u : 0u)
+    );
     if (quantized > 31) {
         quantized = 31;
     }

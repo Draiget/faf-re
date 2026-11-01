@@ -1309,15 +1309,15 @@ void CSimDriver::ThreadRun()
 
         if (dueAt >= now) {
           const float remaining = gpg::time::CyclesToMilliseconds(dueAt - now);
-          waitMilliseconds = static_cast<int>(std::ceil(remaining));
+          waitMilliseconds = msvc8::CeilToIntX87(remaining); // 0x0073C0D8..0x0073C0EB
         } else {
           // Behind schedule: issue however many whole beats have come due, but
           // never further ahead of the executed beat than two seconds' worth.
           const float lateMilliseconds = gpg::time::CyclesToMilliseconds(now - dueAt);
           const float lateBeats = (1.0f / millisecondsPerBeat) * lateMilliseconds;
-          lastBeatToIssue = static_cast<int>(std::floor(lateBeats)) + mNextIssueBeat;
+          lastBeatToIssue = msvc8::FloorToIntX87(lateBeats) + mNextIssueBeat; // 0x0073C072..0x0073C085
 
-          int catchUpCeiling = static_cast<int>((1.0f / millisecondsPerBeat) * 2000.0f);
+          int catchUpCeiling = msvc8::TruncateToInt((1.0f / millisecondsPerBeat) * 2000.0f); // 0x0073C096
           if (catchUpCeiling > kMaxCatchUpBeats) {
             catchUpCeiling = kMaxCatchUpBeats;
           }

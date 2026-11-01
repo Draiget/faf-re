@@ -19050,8 +19050,9 @@ namespace
 
     const float extentX = p0z - p0x;
     const float extentZ = p1x - p0y;
-    int cursorX = static_cast<int>(std::floor(p0x));
-    int cursorZ = static_cast<int>(std::floor(p0y));
+    // FUN_0040D860's inlined floor (0x0040D908, 0x0040D93A); the step-1 mask is -1.
+    int cursorX = msvc8::FloorToIntX87(p0x);
+    int cursorZ = msvc8::FloorToIntX87(p0y);
 
     for (;;) {
       const int cellDX = dirMaskX ^ cursorX;

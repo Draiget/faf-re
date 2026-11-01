@@ -523,7 +523,7 @@ namespace moho
           phaseDuration = wasForward ? mScroller.mFloat10 : mScroller.mFloat0C;
         }
 
-        mSpeed[axis] = static_cast<std::int32_t>(std::floor(phaseDuration * 10.0f));
+        mSpeed[axis] = msvc8::FloorToIntX87(phaseDuration * 10.0f); // 0x00777791, 0x007777C0
       }
 
       if (!changed) {

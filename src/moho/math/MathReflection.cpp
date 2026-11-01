@@ -209,9 +209,12 @@ namespace moho
     const float wx = twoW * orientation.x;
     const float wy = twoW * orientation.y;
     const float wz = twoW * orientation.z;
-    const float xy = twoX * orientation.y;
-    const float xz = twoX * orientation.z;
-    const float yz = twoY * orientation.z;
+    // 0x004EC5D5..0x004EC611 doubles the later lane of each mixed product, as
+    // VMatrix4::Set does: (2y)x, (2z)x, (2z)y. The other choice overflows to
+    // infinity where the binary stays finite once a lane passes FLT_MAX / 2.
+    const float xy = twoY * orientation.x;
+    const float xz = twoZ * orientation.x;
+    const float yz = twoZ * orientation.y;
 
     vX.x = 1.0f - (zz + yy);
     vX.y = wz + xy;

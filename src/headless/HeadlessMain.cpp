@@ -49,10 +49,19 @@ namespace
 
   std::string gLabel = "headless";
 
+#if defined(FAF_COVERAGE_PROFILE)
+  extern "C" int __llvm_profile_write_file(void);
+#endif
+
   [[noreturn]] void EndProcess(const int exitCode)
   {
     // Every output stream: stdout, stderr and the --disk-trace file.
     std::fflush(nullptr);
+#if defined(FAF_COVERAGE_PROFILE)
+    // A build with -fprofile-instr-generate writes its counters from an atexit
+    // handler, which TerminateProcess skips.
+    (void)__llvm_profile_write_file();
+#endif
     // The sim and loader threads are still running; nothing after the verdict is observed,
     // so the process ends here instead of tearing them down.
 #if defined(_WIN32)

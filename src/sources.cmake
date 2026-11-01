@@ -752,6 +752,8 @@ set(FAF_ENGINE_SOURCES
   moho/vision/VisionDB.cpp
   moho/math/Wm3Segment3FafExtras.cpp
   moho/math/Wm3AxisAlignedBox3FafExtras.cpp
+  moho/math/Wm3Queries.cpp
+  moho/math/Wm3FoundationStatics.cpp
   moho/unit/CUnitCommandQueueReflection.cpp
   moho/sim/CCommandLuaFunctionRegistrations.cpp
   moho/sim/UserCommandLuaFunctions.cpp

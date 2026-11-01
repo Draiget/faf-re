@@ -54,6 +54,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `mem_InlineTransformCopy` | 1 | `/con` | live | Transform copies inline instead of through Wm3's out-of-line `memcpy_s` |
 | small-block pool (x64) | on | `/smallpool 0` or `FAF_SMALLPOOL=0` | startup only | Size-class pool for blocks up to 4 KB in front of the system heap; the log says `mem: small-block pool on/off` |
 | `res_CacheFileLookups` | 1 | `/con` | live | Remembers where the mounted file system found each file (cleared on disk-watch events, mount changes and the engine's own deletes and moves; "not found" kept only for archive-only lookups) |
+| `res_EnumOrderFuzz` | 0 | `/enumorderfuzz N` or `/con res_EnumOrderFuzz=N` | live | Test switch (dedicated-server plan WPR.22): every directory listing (mount wildcards, mounted-folder walks, Lua `io.dir`) is shuffled with seed N before the engine sorts it; results must not change. The log says `res_EnumOrderFuzz: directory listings shuffled with seed N` |
 | `user_Workers` | −1 (auto: min(CPUs − 2, 6)) | `/con` | live | User-side worker threads; 0 runs everything on the main thread |
 | `ren_ParallelCull` | 1 | `/con` | live | Mesh and decal view queries and fog-of-war circles collected on user workers |
 | `ui_ParallelIcons` | 1 | `/con` | live | Strategic icons classified on user workers and drawn in bulk |

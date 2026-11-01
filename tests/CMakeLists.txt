@@ -87,4 +87,10 @@ target_link_libraries(faf_registration_dump PRIVATE faf_engine)
 # game's bin folder, with /init.
 add_executable(faf_terrain_check EXCLUDE_FROM_ALL terrain/TerrainCheck.cpp)
 target_link_libraries(faf_terrain_check PRIVATE faf_engine)
+
+# Engine addition (dedicated-server plan WPR.21): the difffuzz targets on the
+# engine's objects, checked against retail's outputs (tests/math_dump/golden.txt)
+# after every build (tools/difffuzz/dump.cmake).
+set(FAF_MATH_DUMP_ENGINE faf_engine)
+include("${CMAKE_SOURCE_DIR}/tools/difffuzz/dump.cmake")
 add_subdirectory(remote)

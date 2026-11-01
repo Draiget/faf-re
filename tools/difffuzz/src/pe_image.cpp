@@ -280,4 +280,22 @@ namespace difffuzz
     VirtualProtect(p, 4, oldProtect, &oldProtect);
     return true;
   }
+
+  bool RetailImage::PatchJump(const std::uint32_t va, const void* const target) noexcept
+  {
+    if (va < mBase || va + 5 > mBase + mSizeOfImage) {
+      return false;
+    }
+    unsigned char* const p = reinterpret_cast<unsigned char*>(static_cast<std::uintptr_t>(va));
+    DWORD oldProtect = 0;
+    if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+      return false;
+    }
+    const std::uint32_t rel = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(target)) - (va + 5);
+    p[0] = 0xE9;
+    std::memcpy(p + 1, &rel, 4);
+    VirtualProtect(p, 5, oldProtect, &oldProtect);
+    FlushInstructionCache(GetCurrentProcess(), p, 5);
+    return true;
+  }
 } // namespace difffuzz

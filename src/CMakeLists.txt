@@ -80,7 +80,7 @@ target_include_directories(faf_engine PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
-target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Dx9Application)
+target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Headers)
 # In-engine peer links (moho/net/NetlinkPeers.cpp, issue #233; client only).
 target_link_libraries(faf_engine PUBLIC faf_netlink)
 
@@ -375,7 +375,7 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
-target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Foundation)
+target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Headers)
 
 # MatrixPortable.cpp (faf_main has the D3DX version) is compiled by each program that links
 # faf_sim, so its object (it has a static initialiser) links after the program's own, as

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <io.h>
@@ -34,6 +35,30 @@ namespace moho
     "Remember where the mounted file system found each file until the mounts or files change (same results, less work).",
     &res_CacheFileLookups
   );
+
+  int res_EnumOrderFuzz = -1;
+
+  TConVar<int> gTConVar_res_EnumOrderFuzz(
+    "res_EnumOrderFuzz",
+    "Test switch: shuffle every directory listing with this seed before the engine sorts it; 0 off. "
+    "Results must not change (seeded from /enumorderfuzz N).",
+    &res_EnumOrderFuzz
+  );
+
+  std::uint32_t DISK_EnumerationOrderFuzzSeed()
+  {
+    if (res_EnumOrderFuzz < 0) {
+      msvc8::vector<msvc8::string> args;
+      const int seed = CFG_GetArgOption("/enumorderfuzz", 1u, &args) && !args.empty()
+        ? static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)))
+        : 0;
+      if (seed != 0) {
+        gpg::Logf("res_EnumOrderFuzz: directory listings shuffled with seed %d before they are sorted", seed);
+      }
+      res_EnumOrderFuzz = seed;
+    }
+    return static_cast<std::uint32_t>(res_EnumOrderFuzz);
+  }
 } // namespace moho
 
 namespace
@@ -280,6 +305,9 @@ namespace
       matches.push_back(findData);
     } while (::_findnext64(findHandle, &findData) == 0);
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(matches.begin(), matches.end(), [](const __finddata64_t& match) {
+      return match.name;
+    });
 
     // Engine addition (dedicated-server plan WPL.15): the matches in NTFS's order on every
     // platform and file system, as the shipped game sees them on NTFS. The order is the
@@ -490,6 +518,9 @@ namespace
       return;
     }
 
+    // Engine addition (dedicated-server plan WPR.22): the paths this folder adds, in the order
+    // the file system lists it; the callers sort them (SortAndUniquePaths).
+    const std::size_t firstAdded = outPaths.size();
     do {
       msvc8::string loweredName = gpg::STR_ToLower(findData.name);
       const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
@@ -519,6 +550,9 @@ namespace
     } while (::_findnext64(findHandle, &findData) == 0);
 
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(outPaths.begin() + firstAdded, outPaths.end(), [](const msvc8::string& path) {
+      return path.c_str();
+    });
   }
 
   /**
@@ -546,6 +580,7 @@ namespace
       return;
     }
 
+    const std::size_t firstAdded = outPaths.size(); // engine addition (plan WPR.22), as above
     do {
       const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
       if (!isDirectory || std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
@@ -559,6 +594,9 @@ namespace
     } while (::_findnext64(findHandle, &findData) == 0);
 
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(outPaths.begin() + firstAdded, outPaths.end(), [](const msvc8::string& path) {
+      return path.c_str();
+    });
   }
 
   void RetainMountedZipHandle(moho::SFileWaitHandle* const handle)

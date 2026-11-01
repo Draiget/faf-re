@@ -1667,16 +1667,6 @@ namespace
     AddIntStatCounter(item, 1L);
   }
 
-  [[nodiscard]] std::int32_t RoundGridCoordDown(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::floor(value));
-  }
-
-  [[nodiscard]] std::int32_t RoundGridCoordUp(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::ceil(value));
-  }
-
   [[nodiscard]] Wm3::Vector3f& InvalidNavigatorTargetLane() noexcept
   {
     static bool initialized = false;
@@ -2118,9 +2108,10 @@ namespace
     return COORDS_CanMoveAt(&moveCell, &ogrid, &moveUnit, true, ignoreUnit);
   }
 
+  // 0x006A7827..0x006A784F: `addss 0.5`, stored to float, then the inlined floor.
   [[nodiscard]] std::int32_t RoundOccupyRectEdge(const float value) noexcept
   {
-    return static_cast<std::int32_t>(std::floor(value + 0.5f));
+    return msvc8::FloorToIntX87(value + 0.5f);
   }
 
   void DrawRaisedPlatformEdge(
@@ -10274,10 +10265,11 @@ int moho::cfunc_UnitCanPathToRectL(LuaPlus::LuaState* const state)
   const Wm3::Vector3f maxCorner = SCR_FromLuaCopy<Wm3::Vector3f>(maxCornerObject);
 
   SAiNavigatorGoal goal{};
-  goal.minX = RoundGridCoordDown(minCorner.x);
-  goal.minZ = RoundGridCoordDown(minCorner.z);
-  goal.maxX = RoundGridCoordUp(maxCorner.x);
-  goal.maxZ = RoundGridCoordUp(maxCorner.z);
+  // 0x006CBEA4..0x006CBF25: the binary's inlined ceil and floor.
+  goal.minX = msvc8::FloorToIntX87(minCorner.x);
+  goal.minZ = msvc8::FloorToIntX87(minCorner.z);
+  goal.maxX = msvc8::CeilToIntX87(maxCorner.x);
+  goal.maxZ = msvc8::CeilToIntX87(maxCorner.z);
 
   Wm3::Vector3f targetPos = InvalidNavigatorTargetLane();
   const bool canPath = unit->AiNavigator->CanPathTo(&targetPos, goal);
@@ -13054,15 +13046,15 @@ namespace
   /**
    * Floor the two minima and ceil the two maxima of a skirt rectangle onto the
    * occupancy grid, which is what the binary's four `frndint`s plus sign
-   * fixups come out to.
+   * fixups come out to (Unit::Unit, 0x006A618F..0x006A6220).
    */
   [[nodiscard]] gpg::Rect2i SkirtRectToOgridRect(const gpg::Rect2f& skirt) noexcept
   {
     return gpg::Rect2i{
-      static_cast<std::int32_t>(std::floor(skirt.x0)),
-      static_cast<std::int32_t>(std::floor(skirt.z0)),
-      static_cast<std::int32_t>(std::ceil(skirt.x1)),
-      static_cast<std::int32_t>(std::ceil(skirt.z1)),
+      msvc8::FloorToIntX87(skirt.x0),
+      msvc8::FloorToIntX87(skirt.z0),
+      msvc8::CeilToIntX87(skirt.x1),
+      msvc8::CeilToIntX87(skirt.z1),
     };
   }
 } // namespace
@@ -15863,10 +15855,11 @@ bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const i
   );
   CollisionResult collisionResult{};
 
-  const int minX = RoundGridCoordDown(target->mAABox.Min.x) - static_cast<int>(moverFootprint.mSizeX);
-  const int maxX = RoundGridCoordUp(target->mAABox.Max.x) + 1;
-  const int minZ = RoundGridCoordDown(target->mAABox.Min.z) - static_cast<int>(moverFootprint.mSizeZ);
-  const int maxZ = RoundGridCoordUp(target->mAABox.Max.z) + 1;
+  // 0x0062C558..0x0062C5F0: the binary's inlined floor and ceil.
+  const int minX = msvc8::FloorToIntX87(target->mAABox.Min.x) - static_cast<int>(moverFootprint.mSizeX);
+  const int maxX = msvc8::CeilToIntX87(target->mAABox.Max.x) + 1;
+  const int minZ = msvc8::FloorToIntX87(target->mAABox.Min.z) - static_cast<int>(moverFootprint.mSizeZ);
+  const int maxZ = msvc8::CeilToIntX87(target->mAABox.Max.z) + 1;
   if (minZ > maxZ) {
     return false;
   }

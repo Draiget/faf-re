@@ -901,16 +901,6 @@ namespace
   using moho::InitGridTraversalLine;
   using moho::IsGridTraversalBeyondEnd;
 
-  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::floor(value));
-  }
-
-  [[nodiscard]] std::int32_t CeilToInt(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::ceil(value));
-  }
-
   [[nodiscard]] std::int32_t HighestBitIndex(std::int32_t value) noexcept
   {
     if (value <= 0) {
@@ -985,8 +975,9 @@ namespace
         line.zMask = (line.zMask == 0) ? 0 : -newStep;
 
         const std::int32_t alignMask = -newStep;
-        line.xEdge = FloorToInt(line.x0) & alignMask;
-        line.zEdge = FloorToInt(line.z0) & alignMask;
+        // 0x0040D9DA, 0x0040DA0C: the binary's inlined floor.
+        line.xEdge = msvc8::FloorToIntX87(line.x0) & alignMask;
+        line.zEdge = msvc8::FloorToIntX87(line.z0) & alignMask;
       }
       return;
     }
@@ -1338,35 +1329,58 @@ namespace moho
    * What it does:
    * Bilinearly samples scaled terrain elevation at world coordinates.
    */
+  namespace
+  {
+    /// The four samples and the fractions FUN_0044FB90 interpolates.
+    struct ElevationSample
+    {
+      float h00;
+      float h01;
+      float h10;
+      float h11;
+      float fracX;
+      float fracZ;
+    };
+
+    [[nodiscard]] ElevationSample SampleElevation(const CHeightField& field, const float x, const float z) noexcept
+    {
+      // 0x0044FB9D..0x0044FBD0: frndint, the -1 borrow and fistp. Outside the
+      // int range (and for NaN) that is not std::floor, and the fraction below
+      // is `x + 2^31`, not 0 (difffuzz, plan WPR.21).
+      const int fx = msvc8::FloorToIntX87(x);
+      const int fz = msvc8::FloorToIntX87(z);
+
+      const int wMax = field.width - 1;
+      const int hMax = field.height - 1;
+
+      // `lea ecx, [esi+1]` wraps: a NaN's 0x7FFFFFFF + 1 is INT_MIN.
+      const int fxNext = static_cast<int>(static_cast<std::uint32_t>(fx) + 1u);
+      const int fzNext = static_cast<int>(static_cast<std::uint32_t>(fz) + 1u);
+      const int x0 = ClampIndex(fx, wMax);
+      const int x1 = ClampIndex(fxNext, wMax);
+      const int z0 = ClampIndex(fz, hMax);
+      const int z1 = ClampIndex(fzNext, hMax);
+
+      // Sample scaling by 1/128 is exact in every precision, so the float
+      // products match the binary's mixed SSE/x87 scaling bit for bit.
+      ElevationSample sample{};
+      sample.h00 = static_cast<float>(field.data[x0 + z0 * field.width]) * 0.0078125f;
+      sample.h01 = static_cast<float>(field.data[x0 + z1 * field.width]) * 0.0078125f;
+      sample.h10 = static_cast<float>(field.data[x1 + z0 * field.width]) * 0.0078125f;
+      sample.h11 = static_cast<float>(field.data[x1 + z1 * field.width]) * 0.0078125f;
+      sample.fracX = x - static_cast<float>(fx);
+      sample.fracZ = z - static_cast<float>(fz);
+      return sample;
+    }
+  } // namespace
+
   float CHeightField::GetElevation(const float x, const float z) const
   {
-    // 0x0044FB90 floor: x87 frndint (round-half-even) with a -1 adjust when
-    // the value rounded up -- arithmetically std::floor for every input.
-    const int fx = static_cast<int>(std::floor(static_cast<double>(x)));
-    const int fz = static_cast<int>(std::floor(static_cast<double>(z)));
-
-    const float fracX = x - static_cast<float>(fx);
-    const float fracZ = z - static_cast<float>(fz);
-
-    const int wMax = width - 1;
-    const int hMax = height - 1;
-
-    const int x0 = ClampIndex(fx, wMax);
-    const int x1 = ClampIndex(fx + 1, wMax);
-    const int z0 = ClampIndex(fz, hMax);
-    const int z1 = ClampIndex(fz + 1, hMax);
-
-    // Sample scaling by 1/128 is exact in every precision, so the float
-    // products match the binary's mixed SSE/x87 scaling bit for bit.
-    const float h00 = static_cast<float>(data[x0 + z0 * width]) * 0.0078125f;
-    const float h01 = static_cast<float>(data[x0 + z1 * width]) * 0.0078125f;
-    const float h10 = static_cast<float>(data[x1 + z0 * width]) * 0.0078125f;
-    const float h11 = static_cast<float>(data[x1 + z1 * width]) * 0.0078125f;
-
     // 0x0044FCFB..0x0044FD3D keeps both interpolated rows on the x87 stack.
     // The simulation sets PC24: double intermediates ignore that control and
     // produce different heights. Preserve the original arithmetic explicitly.
-    return msvc8::BilinearHeight(h00, h01, h10, h11, fracX, fracZ);
+    const ElevationSample s = SampleElevation(*this, x, z);
+    return msvc8::BilinearHeight(s.h00, s.h01, s.h10, s.h11, s.fracX, s.fracZ);
   }
 
   /**
@@ -1377,18 +1391,26 @@ namespace moho
    * What it does:
    * Samples four neighboring elevations around `(x,z)`, builds one terrain
    * gradient normal, and normalizes the output vector.
+   *
+   * The first three heights are stored as floats (`fstp dword`); the fourth
+   * stays in st0, where GetElevation returns it, and `fsubr [top]`
+   * (0x0069A6DA) subtracts it there. A height in the float denormal range
+   * therefore enters the z difference unrounded: `top - bottom` can be a
+   * negative value too small for a float, stored as -0.
    */
   Wm3::Vec3f CHeightField::GetNormal(const float x, const float z) const
   {
     const float top = GetElevation(x, z - 0.5f);
     const float left = GetElevation(x - 0.5f, z);
     const float right = GetElevation(x + 0.5f, z);
-    const float bottom = GetElevation(x, z + 0.5f);
+    const ElevationSample bottom = SampleElevation(*this, x, z + 0.5f);
 
     Wm3::Vec3f out{};
     out.x = left - right;
     out.y = 1.0f;
-    out.z = top - bottom;
+    out.z = msvc8::SubtractBilinearHeight(
+      top, bottom.h00, bottom.h01, bottom.h10, bottom.h11, bottom.fracX, bottom.fracZ
+    );
     (void)out.Normalize();
     return out;
   }
@@ -1957,6 +1979,10 @@ namespace moho
    *
    * What it does:
    * Clips `[min,max]` segment parameter range to map XY bounds and top-height ceiling.
+   *
+   * The far limit is taken unless it is greater than max (`comiss far, max; ja skip` at 0x00477747, 0x004777DB,
+   * 0x004778B1), so a NaN limit replaces max and the final `comiss max, min; jb` (0x004778B9) rejects the segment.
+   * A NaN dir.y takes the far-limit side (`comiss 0, dir.y; jbe` at 0x00477890).
    */
   bool CHeightField::ClipSegmentToWorld(const Wm3::Vec3f& pos, const Wm3::Vec3f& dir, float& min, float& max) const
   {
@@ -1970,13 +1996,14 @@ namespace moho
     } else {
       const float t0 = (-1.0f / dir.x) * pos.x;
       const float t1 = (static_cast<float>(width - 1) - pos.x) / dir.x;
-      const float nearT = (t1 <= t0) ? t1 : t0;
-      const float farT = (t1 <= t0) ? t0 : t1;
+      const bool swapped = !(t1 > t0); // 0x0047773A comiss t1, t0; jbe
+      const float nearT = swapped ? t1 : t0;
+      const float farT = swapped ? t0 : t1;
 
       if (nearT > newMin) {
         newMin = nearT;
       }
-      if (farT <= newMax) {
+      if (!(farT > newMax)) {
         newMax = farT;
       }
     }
@@ -1988,13 +2015,14 @@ namespace moho
     } else {
       const float t0 = (-1.0f / dir.z) * pos.z;
       const float t1 = (static_cast<float>(height - 1) - pos.z) / dir.z;
-      const float nearT = (t1 <= t0) ? t1 : t0;
-      const float farT = (t1 <= t0) ? t0 : t1;
+      const bool swapped = !(t1 > t0); // 0x004777CE comiss t1, t0; jbe
+      const float nearT = swapped ? t1 : t0;
+      const float farT = swapped ? t0 : t1;
 
       if (nearT > newMin) {
         newMin = nearT;
       }
-      if (farT <= newMax) {
+      if (!(farT > newMax)) {
         newMax = farT;
       }
     }
@@ -2005,8 +2033,8 @@ namespace moho
       const float maxTerrainY = static_cast<float>(topBounds.max) * 0.0078125f;
       const float t = (maxTerrainY - pos.y) / dir.y;
 
-      if (dir.y >= 0.0f) {
-        if (t <= newMax) {
+      if (!(0.0f > dir.y)) {
+        if (!(t > newMax)) {
           newMax = t;
         }
       } else if (t > newMin) {
@@ -2185,7 +2213,7 @@ namespace moho
 
     std::int32_t tier = tierCount;
     const float scaledSpan = (end - start) * dirMax * 2.0f;
-    const std::int32_t walkSpanCeil = CeilToInt(scaledSpan);
+    const std::int32_t walkSpanCeil = msvc8::CeilToIntX87(scaledSpan); // 0x0047718A..0x0047719D
     const std::int32_t spanBit = HighestBitIndex(walkSpanCeil);
     if (spanBit < tier) {
       tier = spanBit;
@@ -3671,11 +3699,11 @@ namespace moho
     const gpg::Rect2f skirtWorldRect = blueprint.GetSkirtRect(worldPos);
 
     // Integer skirt rect: floor the top-left and ceil the bottom-right for
-    // the map-bounds check.
-    const std::int32_t skirtCellX0 = static_cast<std::int32_t>(std::floor(skirtWorldRect.x0));
-    const std::int32_t skirtCellZ0 = static_cast<std::int32_t>(std::floor(skirtWorldRect.z0));
-    const std::int32_t skirtCellX1 = static_cast<std::int32_t>(std::ceil(skirtWorldRect.x1));
-    const std::int32_t skirtCellZ1 = static_cast<std::int32_t>(std::ceil(skirtWorldRect.z1));
+    // the map-bounds check (0x00565484..0x005654FB).
+    const std::int32_t skirtCellX0 = msvc8::FloorToIntX87(skirtWorldRect.x0);
+    const std::int32_t skirtCellZ0 = msvc8::FloorToIntX87(skirtWorldRect.z0);
+    const std::int32_t skirtCellX1 = msvc8::CeilToIntX87(skirtWorldRect.x1);
+    const std::int32_t skirtCellZ1 = msvc8::CeilToIntX87(skirtWorldRect.z1);
 
     const CHeightField* const field = map.mHeightField.get();
     if (skirtCellX0 < 0 || skirtCellX1 > (field->width - 1) ||

@@ -1,17 +1,16 @@
 #include "GridPos.h"
 
 #include <cmath>
+#include <cstdint>
+
+#include "legacy/math/X87Math.h"
 
 namespace
 {
   [[nodiscard]] int ComputeGridCellCoordinate(const float worldCoordinate, const int gridSize) noexcept
   {
     const float reciprocal = 1.0f / static_cast<float>(gridSize);
-    const float scaled = worldCoordinate * reciprocal;
-
-    // Binary shape: frndint + conditional -1 adjust when source < rounded.
-    const double rounded = std::nearbyint(static_cast<double>(scaled));
-    return static_cast<int>(rounded) + ((scaled < rounded) ? -1 : 0);
+    return msvc8::FloorToIntX87(worldCoordinate * reciprocal);
   }
 
 } // namespace
@@ -35,8 +34,6 @@ namespace moho
 
   int FloorSecondsToTicks(const float seconds) noexcept
   {
-    const float scaled = seconds * 10.0f;
-    const double rounded = std::nearbyint(static_cast<double>(scaled));
-    return static_cast<int>(rounded) + ((static_cast<double>(scaled) < rounded) ? -1 : 0);
+    return msvc8::FloorToIntX87(seconds * 10.0f);
   }
 } // namespace moho

@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Wm3IntrBox2Circle2.h"
+#include "moho/math/Wm3Queries.h"
 #include "moho/app/UserWorkerPool.h"
 #include "moho/console/CConCommand.h"
 
@@ -82,11 +82,10 @@ namespace
   {
     sampled = InterpolateCircle(entry.mPrevCircle, entry.mCurCircle, interpolant);
 
-    // `Wm3::IntrBox2Circle2f` keeps references to both operands, so `box` and
-    // `sampled` must outlive it - matching the two stack temporaries the binary
-    // builds at 0x0081B4F2/0x0081B504 before the ctor call at 0x0081B52C.
-    Wm3::IntrBox2Circle2f overlap{box, sampled};
-    if (!overlap.Test()) {
+    // The binary's `Wm3::IntrBox2Circle2f` keeps references to the two stack
+    // temporaries it builds at 0x0081B4F2/0x0081B504 before the ctor call at
+    // 0x0081B52C; Wm3::TestBox2Circle2 is that query's Test.
+    if (!Wm3::TestBox2Circle2(box, sampled)) {
       return EVisionEntryResult::Outside;
     }
     return (entry.mIsReal && entry.mVisible) ? EVisionEntryResult::Circle : EVisionEntryResult::Descend;

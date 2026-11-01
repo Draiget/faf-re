@@ -40,7 +40,8 @@ extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
 extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
 extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
-extern "C" float __cdecl msvc8_x87_sin_times(float sinArg, float factor);
+extern "C" float __cdecl msvc8_x87_sin_of_product_times(float a, float b, float factor);
+extern "C" float __cdecl msvc8_x87_twister_word_in_range(float lower, float upper, std::uint32_t word);
 extern "C" void __cdecl msvc8_x87_slerp_spherical_blend(
   float* outLanes, const float* q1Lanes, const float* rhsLanes, float angle, float oneMinusT, float t
 );
@@ -51,6 +52,9 @@ extern "C" float __cdecl msvc8_x87_intrinsic_ln_quotient(float x, double base);
 extern "C" float __cdecl msvc8_x87_scaled_ln_quotient(float numerator, float denominator, float scale);
 extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
+extern "C" float __cdecl msvc8_x87_subtract_bilinear_height(
+  float top, float h00, float h01, float h10, float h11, float fracX, float fracZ
+);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
 extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength, float lengthSq);
 extern "C" void __cdecl msvc8_x87_scale_vector_to_length(
@@ -157,6 +161,22 @@ namespace msvc8
 #else
     return msvc8_x87_round_to_int(value);
 #endif
+  }
+
+  std::int32_t FloorToIntX87(const float value) noexcept
+  {
+    const float nearest = std::nearbyint(value);
+    const auto whole = static_cast<std::uint32_t>(RoundToInt(nearest));
+    const std::uint32_t borrow = (value < nearest || std::isunordered(value, nearest)) ? 1u : 0u;
+    return static_cast<std::int32_t>(whole - borrow);
+  }
+
+  std::int32_t CeilToIntX87(const float value) noexcept
+  {
+    const float nearest = std::nearbyint(value);
+    const auto whole = static_cast<std::uint32_t>(RoundToInt(nearest));
+    const std::uint32_t carry = value > nearest ? 1u : 0u;
+    return static_cast<std::int32_t>(whole + carry);
   }
 
   void ScaleVectorByMaxLengthX87(float& x, float& y, float& z, const float maxLength) noexcept
@@ -439,11 +459,78 @@ namespace msvc8
 #endif
   }
 
+  float SubtractBilinearHeight(
+    const float top, const float h00, const float h01, const float h10, const float h11, const float fracX,
+    const float fracZ
+  ) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld h01
+      fld h00
+      fsub st(1), st(0)
+      fld fracZ
+      fmul st(2), st(0)
+      fxch st(2)
+      faddp st(1), st(0)
+      fld h11
+      fld h10
+      fsub st(1), st(0)
+      fxch st(1)
+      fmulp st(3), st(0)
+      faddp st(2), st(0)
+      fsub st(1), st(0)
+      fxch st(1)
+      fmul fracX
+      faddp st(1), st(0)
+      fsubr top
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_subtract_bilinear_height(top, h00, h01, h10, h11, fracX, fracZ);
+#endif
+  }
+
   float MulTwisterWord(const float factor, const std::uint32_t word) noexcept
   {
     const double wordValue =
       word < 0x80000000u ? static_cast<double>(word) : static_cast<double>(static_cast<float>(word));
     return RoundExactProductToFloat(static_cast<double>(factor), wordValue);
+  }
+
+  float TwisterWordInRange(const float lower, const float upper, const std::uint32_t twisterWord) noexcept
+  {
+#if defined(_M_IX86)
+    // 0x0051B5C6..0x0051B5EA: `fild` the word as signed and add 2^32 back
+    // when it loaded negative, then range, product, 2^-32 and the sum on the
+    // stack (constants 0x00E4F710 and 0x00E4F7B0).
+    constexpr float kTwoTo32 = 4294967296.0f;
+    constexpr float kInvTwoTo32 = 2.3283064365386962890625e-10f;
+    const float twoTo32 = kTwoTo32;
+    const float invTwoTo32 = kInvTwoTo32;
+    float result;
+    __asm {
+      fild twisterWord
+      mov eax, twisterWord
+      test eax, eax
+      jge loaded
+      fadd twoTo32
+    loaded:
+      fld upper
+      fld lower
+      fsub st(1), st
+      fxch st(2)
+      fmulp st(1), st
+      fmul invTwoTo32
+      faddp st(1), st
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_twister_word_in_range(lower, upper, twisterWord);
+#endif
   }
 
   /**
@@ -579,19 +666,20 @@ namespace msvc8
 #endif
   }
 
-  float SinTimes(const float sinArg, const float factor) noexcept
+  float SinOfProductTimes(const float a, const float b, const float factor) noexcept
   {
 #if defined(_M_IX86)
     float result;
     __asm {
-      fld sinArg
+      fld a
+      fmul b
       fsin
       fmul factor
       fstp result
     }
     return result;
 #else
-    return msvc8_x87_sin_times(sinArg, factor);
+    return msvc8_x87_sin_of_product_times(a, b, factor);
 #endif
   }
 

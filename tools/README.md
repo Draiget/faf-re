@@ -13,7 +13,7 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/turnsrv` | `turnsrv` on its own (prints its URLs and one set of credentials), for testing ICE agents such as `faf_juice_gather` |
 | `scenarios/` | YAML scenarios for mpemu |
 | `desync-diff/` | Compares players' desync dumps from one game and prints the first value that differs; rebuilds a missing side from the replay. See [desync-diff/README.md](desync-diff/README.md) |
-| `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered; see [difffuzz/README.md](difffuzz/README.md) |
+| `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered, and `faf_math_dump`, the same functions compared across Windows and Linux; see [difffuzz/README.md](difffuzz/README.md) |
 | `sfd-inspect/` | Independent SFD diagnostics and parser tests; see [sfd-inspect/README.md](sfd-inspect/README.md) |
 
 The rest of this page covers mpemu. It is one Go module (`faf-main/tools`): shared packages at the top level, each program in `cmd/<app>`.

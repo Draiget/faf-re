@@ -2547,8 +2547,9 @@ namespace moho
 
     const float minDiveSpeed = baseDiveSpeed * kDiveSpeedMinFactor;
     // 0x006C336C..0x006C3380: `fld phase; fmul pi; fsin; fmul base; fst` --
-    // the sine is never stored, so only the product rounds to float.
-    const float curveDiveSpeed = msvc8::SinTimes(depthPhase * kPi, baseDiveSpeed);
+    // neither `phase * pi` nor the sine is stored, so only the product rounds
+    // to float (a denormal phase keeps its argument; difffuzz).
+    const float curveDiveSpeed = msvc8::SinOfProductTimes(depthPhase, kPi, baseDiveSpeed);
     // 0x006C3384..0x006C338F: `comiss min, curve; ja` keeps the minimum only
     // when it is strictly greater, so a NaN curve speed is taken.
     mDivingSpeed = (minDiveSpeed > curveDiveSpeed) ? minDiveSpeed : curveDiveSpeed;
@@ -3623,8 +3624,9 @@ namespace moho
 
     const auto rollBreakOff = [&]() {
       mCombatState = ACS_BreakOff;
-      const auto minTicks = static_cast<int>(std::ceil((breakOffDist / maxAirSpeed) * 10.0f));
-      const auto maxTicks = static_cast<int>(static_cast<float>(minTicks) * air.RandomBreakOffDistanceMult);
+      // 0x006BD235..0x006BD27C: inline ceil, then cvttss2si.
+      const auto minTicks = msvc8::CeilToIntX87((breakOffDist / maxAirSpeed) * 10.0f);
+      const auto maxTicks = msvc8::TruncateToInt(static_cast<float>(minTicks) * air.RandomBreakOffDistanceMult);
       mCombatStateTimeoutTick = curTick + static_cast<std::uint32_t>(RandomUniformIntRange(minTicks, maxTicks, randomStream));
     };
 
@@ -3667,7 +3669,7 @@ namespace moho
         }
 
         if (!triggerBreakOff) {
-          const auto sustainedTurnThresholdTicks = static_cast<int>(std::floor(air.SustainedTurnThreshold * 10.0f));
+          const auto sustainedTurnThresholdTicks = msvc8::FloorToIntX87(air.SustainedTurnThreshold * 10.0f); // 0x006BD1A0..0x006BD1C4
           if (mSustainedTurnTicks > sustainedTurnThresholdTicks) {
             triggerBreakOff = true;
           }
