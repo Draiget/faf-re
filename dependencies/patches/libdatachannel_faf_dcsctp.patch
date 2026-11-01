@@ -56,7 +56,7 @@ index 0000000..f84b5c6
 +	SctpTransport *transport = nullptr;
 +	size_t maxMessageSize = 262144;
 +	std::unique_ptr<dcsctp::DcSctpSocketInterface> socket;
-+	std::mutex mutex;
++	std::recursive_mutex mutex;
 +	std::atomic<size_t> bytesSent{0};
 +	std::atomic<size_t> bytesReceived{0};
 +

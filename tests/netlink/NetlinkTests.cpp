@@ -477,6 +477,49 @@ namespace
     Check(r.a.webRtcSent == 1000 && r.b.webRtcSent == 1000, "every game datagram goes on the data channel");
     Check(r.atA.size() == 1000 && r.atB.size() == 1000 && r.corrupt == 0, "and arrives unaltered");
   }
+
+  // Issue #239: dcSCTP backend test with 10,000 datagrams.
+  void DcSctpTest(const std::string& bind)
+  {
+    LinkOptions o;
+    o.bindAddress = bind;
+    o.ufragPrefix = kOurUfragPrefix;
+    o.webrtc = true;
+    o.sctpBackend = SctpBackend::DcSctp;
+    const PairResult r =
+      RunPair(o, o, 10000, [](Link& a, Link& b) { return a.GetStats().onWebRtc && b.GetStats().onWebRtc; });
+    std::printf("  dcsctp: offerer sent %llu, %llu on the data channel; got %zu\n",
+                static_cast<unsigned long long>(r.a.dataSent), static_cast<unsigned long long>(r.a.webRtcSent),
+                r.atA.size());
+    Check(r.ready, "both links open the dcSCTP data channel");
+    Check(r.a.webRtcSent == 10000 && r.b.webRtcSent == 10000, "every game datagram goes on the dcSCTP data channel (10000)");
+    Check(r.atA.size() == 10000 && r.atB.size() == 10000 && r.corrupt == 0, "and arrives unaltered on dcSCTP");
+  }
+
+  // Issue #239: cross-backend interoperability test: offerer on usrsctp, answerer on dcSCTP.
+  void CrossBackendTest(const std::string& bind)
+  {
+    LinkOptions aOpt;
+    aOpt.bindAddress = bind;
+    aOpt.ufragPrefix = kOurUfragPrefix;
+    aOpt.webrtc = true;
+    aOpt.sctpBackend = SctpBackend::UsrSctp;
+
+    LinkOptions bOpt;
+    bOpt.bindAddress = bind;
+    bOpt.ufragPrefix = kOurUfragPrefix;
+    bOpt.webrtc = true;
+    bOpt.sctpBackend = SctpBackend::DcSctp;
+
+    const PairResult r =
+      RunPair(aOpt, bOpt, 1000, [](Link& a, Link& b) { return a.GetStats().onWebRtc && b.GetStats().onWebRtc; });
+    std::printf("  cross sctp (usrsctp vs dcsctp): offerer sent %llu, %llu on data channel; got %zu\n",
+                static_cast<unsigned long long>(r.a.dataSent), static_cast<unsigned long long>(r.a.webRtcSent),
+                r.atA.size());
+    Check(r.ready, "both links open the cross-backend data channel");
+    Check(r.a.webRtcSent == 1000 && r.b.webRtcSent == 1000, "every game datagram goes on cross-backend data channel");
+    Check(r.atA.size() == 1000 && r.atB.size() == 1000 && r.corrupt == 0, "and arrives unaltered between usrsctp and dcSCTP");
+  }
 } // namespace
 
 int main(int argc, char** argv)
@@ -496,6 +539,8 @@ int main(int argc, char** argv)
   OurPeerTest(bind);
   DuplicateTest(bind);
   WebRtcTest(bind);
+  DcSctpTest(bind);
+  CrossBackendTest(bind);
   std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
   return gFailures == 0 ? 0 : 1;
 }
