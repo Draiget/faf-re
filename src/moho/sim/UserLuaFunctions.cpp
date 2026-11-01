@@ -503,6 +503,16 @@ namespace
   constexpr const char* kSessionIsPausedHelpText = "Return true iff the session is paused.";
   constexpr const char* kSessionIsPausedNoActiveSessionText = "SessionIsPaused(): no active session.";
   constexpr const char* kSessionIsReplayUserHelpText = "Return true iff the active session is a replay session.";
+  constexpr const char* kGetReplayTotalTicksHelpText =
+    "int GetReplayTotalTicks() - return total ticks in the replay, or 0 if not a replay.";
+  constexpr const char* kScrubReplayHelpText =
+    "ScrubReplay(targetTick) - start fast-forward scrubbing to target tick.";
+  constexpr const char* kCancelReplayScrubHelpText =
+    "CancelReplayScrub() - cancel active fast-forward scrub.";
+  constexpr const char* kIsReplayScrubbingHelpText =
+    "bool IsReplayScrubbing() - return true if fast-forward scrubbing is active.";
+  constexpr const char* kGetReplayScrubProgressHelpText =
+    "table GetReplayScrubProgress() - return scrub progress table or nil if not scrubbing.";
   constexpr const char* kSessionRequestPauseHelpText = "Pause the world simulation.";
   constexpr const char* kSessionRequestPauseNoActiveSessionText = "SessionRequestPause(): no active session.";
   constexpr const char* kSessionResumeHelpText = "Resume the world simulation.";
@@ -4543,6 +4553,310 @@ int moho::cfunc_SessionIsReplayUserL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetReplayTotalTicksL`.
+ */
+int moho::cfunc_GetReplayTotalTicks(lua_State* const luaContext)
+{
+  return cfunc_GetReplayTotalTicksL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetReplayTotalTicks`.
+ */
+moho::CScrLuaInitForm* moho::func_GetReplayTotalTicks_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetReplayTotalTicks",
+    &moho::cfunc_GetReplayTotalTicks,
+    nullptr,
+    "<global>",
+    kGetReplayTotalTicksHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Returns total replay simulation ticks/beats, or 0 if not a replay.
+ */
+int moho::cfunc_GetReplayTotalTicksL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetReplayTotalTicksHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || !session->IsReplay) {
+    lua_pushnumber(rawState, 0.0);
+    return 1;
+  }
+
+  lua_pushnumber(rawState, static_cast<lua_Number>(session->GetTotalReplayBeats()));
+  return 1;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_ScrubReplayL`.
+ */
+int moho::cfunc_ScrubReplay(lua_State* const luaContext)
+{
+  return cfunc_ScrubReplayL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ScrubReplay`.
+ */
+moho::CScrLuaInitForm* moho::func_ScrubReplay_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ScrubReplay",
+    &moho::cfunc_ScrubReplay,
+    nullptr,
+    "<global>",
+    kScrubReplayHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Initiates fast-forward scrubbing to `targetTick`. Refuses or no-ops if not a replay.
+ */
+int moho::cfunc_ScrubReplayL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kScrubReplayHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject targetArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&targetArg, "number");
+  }
+
+  const auto targetTick = static_cast<std::int32_t>(lua_tonumber(rawState, 1));
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session != nullptr && session->IsReplay) {
+    session->StartScrubToBeat(targetTick);
+  }
+
+  return 0;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_CancelReplayScrubL`.
+ */
+int moho::cfunc_CancelReplayScrub(lua_State* const luaContext)
+{
+  return cfunc_CancelReplayScrubL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `CancelReplayScrub`.
+ */
+moho::CScrLuaInitForm* moho::func_CancelReplayScrub_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "CancelReplayScrub",
+    &moho::cfunc_CancelReplayScrub,
+    nullptr,
+    "<global>",
+    kCancelReplayScrubHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Cancels active replay scrubbing.
+ */
+int moho::cfunc_CancelReplayScrubL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCancelReplayScrubHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session != nullptr && session->IsReplay) {
+    session->CancelScrub();
+  }
+
+  return 0;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_IsReplayScrubbingL`.
+ */
+int moho::cfunc_IsReplayScrubbing(lua_State* const luaContext)
+{
+  return cfunc_IsReplayScrubbingL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsReplayScrubbing`.
+ */
+moho::CScrLuaInitForm* moho::func_IsReplayScrubbing_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IsReplayScrubbing",
+    &moho::cfunc_IsReplayScrubbing,
+    nullptr,
+    "<global>",
+    kIsReplayScrubbingHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Returns true if replay fast-forward scrubbing is active.
+ */
+int moho::cfunc_IsReplayScrubbingL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsReplayScrubbingHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || !session->IsReplay) {
+    lua_pushboolean(rawState, 0);
+    return 1;
+  }
+
+  lua_pushboolean(rawState, session->IsScrubbing() ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetReplayScrubProgressL`.
+ */
+int moho::cfunc_GetReplayScrubProgress(lua_State* const luaContext)
+{
+  return cfunc_GetReplayScrubProgressL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetReplayScrubProgress`.
+ */
+moho::CScrLuaInitForm* moho::func_GetReplayScrubProgress_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetReplayScrubProgress",
+    &moho::cfunc_GetReplayScrubProgress,
+    nullptr,
+    "<global>",
+    kGetReplayScrubProgressHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition: Replay scrubbing API
+ *
+ * What it does:
+ * Returns a Lua table with scrub progress details, or nil if not scrubbing.
+ */
+int moho::cfunc_GetReplayScrubProgressL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetReplayScrubProgressHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || !session->IsReplay || !session->IsScrubbing()) {
+    lua_pushnil(rawState);
+    return 1;
+  }
+
+  lua_newtable(rawState);
+  const auto setNumber = [rawState](const char* const key, const lua_Number value) {
+    lua_pushstring(rawState, key);
+    lua_pushnumber(rawState, value);
+    lua_rawset(rawState, -3);
+  };
+
+  setNumber("progress", static_cast<lua_Number>(session->GetScrubProgress()));
+  setNumber("currentTick", static_cast<lua_Number>(session->mGameTick));
+  setNumber("startTick", static_cast<lua_Number>(session->mScrubStartBeat));
+  setNumber("targetTick", static_cast<lua_Number>(session->mScrubTargetBeat));
+  setNumber("totalTicks", static_cast<lua_Number>(session->GetTotalReplayBeats()));
+  return 1;
+}
+
+
+/**
  * Address: 0x00897E60 (FUN_00897E60, cfunc_SessionIsBeingRecorded)
  *
  * What it does:
@@ -7644,6 +7958,11 @@ namespace
       (void)::moho::func_SessionIsGameOver_LuaFuncDef();
       (void)::moho::func_SessionGetLocalCommandSource_LuaFuncDef();
       (void)::moho::func_SessionIsReplayUser_LuaFuncDef();
+      (void)::moho::func_GetReplayTotalTicks_LuaFuncDef();
+      (void)::moho::func_ScrubReplay_LuaFuncDef();
+      (void)::moho::func_CancelReplayScrub_LuaFuncDef();
+      (void)::moho::func_IsReplayScrubbing_LuaFuncDef();
+      (void)::moho::func_GetReplayScrubProgress_LuaFuncDef();
       (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();
       (void)::moho::func_SessionIsMultiplayer_LuaFuncDef();
       (void)::moho::func_SessionIsObservingAllowed_LuaFuncDef();

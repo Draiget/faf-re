@@ -4975,6 +4975,146 @@ namespace moho
   int cfunc_SessionIsReplayUserL(LuaPlus::LuaState* state);
 
   /**
+   * Engine addition: Replay scrubbing API
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_GetReplayTotalTicksL`.
+   */
+  int cfunc_GetReplayTotalTicks(lua_State* luaContext);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `GetReplayTotalTicks`.
+   */
+  CScrLuaInitForm* func_GetReplayTotalTicks_LuaFuncDef();
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Returns total replay simulation ticks/beats, or 0 if not a replay.
+   */
+  int cfunc_GetReplayTotalTicksL(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_ScrubReplayL`.
+   */
+  int cfunc_ScrubReplay(lua_State* luaContext);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `ScrubReplay`.
+   */
+  CScrLuaInitForm* func_ScrubReplay_LuaFuncDef();
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Initiates fast-forward scrubbing to `targetTick`. Refuses or no-ops if not a replay.
+   */
+  int cfunc_ScrubReplayL(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_CancelReplayScrubL`.
+   */
+  int cfunc_CancelReplayScrub(lua_State* luaContext);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `CancelReplayScrub`.
+   */
+  CScrLuaInitForm* func_CancelReplayScrub_LuaFuncDef();
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Cancels active replay scrubbing.
+   */
+  int cfunc_CancelReplayScrubL(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_IsReplayScrubbingL`.
+   */
+  int cfunc_IsReplayScrubbing(lua_State* luaContext);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `IsReplayScrubbing`.
+   */
+  CScrLuaInitForm* func_IsReplayScrubbing_LuaFuncDef();
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Returns true if replay fast-forward scrubbing is active.
+   */
+  int cfunc_IsReplayScrubbingL(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_GetReplayScrubProgressL`.
+   */
+  int cfunc_GetReplayScrubProgress(lua_State* luaContext);
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `GetReplayScrubProgress`.
+   */
+  CScrLuaInitForm* func_GetReplayScrubProgress_LuaFuncDef();
+
+  /**
+   * Engine addition: Replay scrubbing API
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Returns a Lua table with scrub progress details, or nil if not scrubbing.
+   */
+  int cfunc_GetReplayScrubProgressL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00897E60 (FUN_00897E60, cfunc_SessionIsBeingRecorded)
    *
    * lua_State *

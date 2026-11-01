@@ -12,6 +12,11 @@
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/misc/LaunchInfoBase.h"
+#include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/sim/Sim.h"
+#include "moho/sim/WldSessionState.h"
 #include <cmath>
 
 namespace
@@ -314,6 +319,131 @@ namespace
     CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
   }
 
+  void TestReplayScrubbingUserLuaBindings()
+  {
+    LuaPlus::LuaState state(LuaPlus::LuaState::LIB_BASE);
+
+    // Register replay scrubbing Lua functions
+    moho::func_GetReplayTotalTicks_LuaFuncDef()->Run(&state);
+    moho::func_ScrubReplay_LuaFuncDef()->Run(&state);
+    moho::func_CancelReplayScrub_LuaFuncDef()->Run(&state);
+    moho::func_IsReplayScrubbing_LuaFuncDef()->Run(&state);
+    moho::func_GetReplayScrubProgress_LuaFuncDef()->Run(&state);
+
+    // Verify all functions are bound and callable in Lua global scope
+    CHECK(state.GetGlobal("GetReplayTotalTicks").IsFunction());
+    CHECK(state.GetGlobal("ScrubReplay").IsFunction());
+    CHECK(state.GetGlobal("CancelReplayScrub").IsFunction());
+    CHECK(state.GetGlobal("IsReplayScrubbing").IsFunction());
+    CHECK(state.GetGlobal("GetReplayScrubProgress").IsFunction());
+
+    // Mock CWldSession buffer
+    alignas(moho::CWldSession) std::uint8_t buffer[sizeof(moho::CWldSession)];
+    std::memset(buffer, 0, sizeof(buffer));
+    moho::CWldSession* const session = reinterpret_cast<moho::CWldSession*>(buffer);
+
+    moho::CWldSession* const savedActiveSession = moho::gActiveWldSession;
+
+    // --- Scenario 1: No active session (gActiveWldSession == nullptr) ---
+    moho::gActiveWldSession = nullptr;
+
+    CHECK(moho::SCR_LuaDoString("ticks = GetReplayTotalTicks()", &state));
+    CHECK(state.GetGlobal("ticks").GetNumber() == 0.0);
+
+    CHECK(moho::SCR_LuaDoString("isScrub = IsReplayScrubbing()", &state));
+    CHECK(state.GetGlobal("isScrub").GetBoolean() == false);
+
+    CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
+    CHECK(state.GetGlobal("prog").IsNil());
+
+    // ScrubReplay and CancelReplayScrub should safely no-op without session
+    CHECK(moho::SCR_LuaDoString("ScrubReplay(100)", &state));
+    CHECK(moho::SCR_LuaDoString("CancelReplayScrub()", &state));
+
+    // --- Scenario 2: Active session is NOT a replay (IsReplay == false) ---
+    session->IsReplay = false;
+    session->mTotalReplayBeats = 1200;
+    session->mGameTick = 50;
+    session->mScrubTargetBeat = -1;
+    session->mScrubStartBeat = 0;
+    session->mIsScrubbing = false;
+    moho::gActiveWldSession = session;
+
+    CHECK(moho::SCR_LuaDoString("ticks = GetReplayTotalTicks()", &state));
+    CHECK(state.GetGlobal("ticks").GetNumber() == 0.0);
+
+    CHECK(moho::SCR_LuaDoString("isScrub = IsReplayScrubbing()", &state));
+    CHECK(state.GetGlobal("isScrub").GetBoolean() == false);
+
+    CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
+    CHECK(state.GetGlobal("prog").IsNil());
+
+    // Scrubbing initiation should be refused
+    CHECK(moho::SCR_LuaDoString("ScrubReplay(500)", &state));
+    CHECK(session->IsScrubbing() == false);
+    CHECK(session->mScrubTargetBeat == -1);
+
+    // --- Scenario 3: Active session IS a replay (IsReplay == true) ---
+    session->IsReplay = true;
+    session->mTotalReplayBeats = 1500;
+    session->mGameTick = 200;
+    session->mScrubTargetBeat = -1;
+    session->mScrubStartBeat = 0;
+    session->mIsScrubbing = false;
+
+    CHECK(moho::SCR_LuaDoString("ticks = GetReplayTotalTicks()", &state));
+    CHECK(state.GetGlobal("ticks").GetNumber() == 1500.0);
+
+    CHECK(moho::SCR_LuaDoString("isScrub = IsReplayScrubbing()", &state));
+    CHECK(state.GetGlobal("isScrub").GetBoolean() == false);
+
+    CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
+    CHECK(state.GetGlobal("prog").IsNil());
+
+    // Start scrubbing to tick 800
+    CHECK(moho::SCR_LuaDoString("ScrubReplay(800)", &state));
+    CHECK(session->IsScrubbing() == true);
+    CHECK(session->mScrubStartBeat == 200);
+    CHECK(session->mScrubTargetBeat == 800);
+
+    CHECK(moho::SCR_LuaDoString("isScrub = IsReplayScrubbing()", &state));
+    CHECK(state.GetGlobal("isScrub").GetBoolean() == true);
+
+    // Verify progress table at start of scrub (progress == 0.0)
+    CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
+    LuaPlus::LuaObject prog = state.GetGlobal("prog");
+    CHECK(prog.IsTable());
+    CHECK(std::abs(prog["progress"].GetNumber() - 0.0f) < 1e-4f);
+    CHECK(prog["currentTick"].GetInteger() == 200);
+    CHECK(prog["startTick"].GetInteger() == 200);
+    CHECK(prog["targetTick"].GetInteger() == 800);
+    CHECK(prog["totalTicks"].GetInteger() == 1500);
+
+    // Simulate progress advance to midway (tick 500: (500-200)/(800-200) = 0.5)
+    session->mGameTick = 500;
+    CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
+    prog = state.GetGlobal("prog");
+    CHECK(prog.IsTable());
+    CHECK(std::abs(prog["progress"].GetNumber() - 0.5f) < 1e-4f);
+    CHECK(prog["currentTick"].GetInteger() == 500);
+    CHECK(prog["startTick"].GetInteger() == 200);
+    CHECK(prog["targetTick"].GetInteger() == 800);
+
+    // Cancel scrubbing via Lua
+    CHECK(moho::SCR_LuaDoString("CancelReplayScrub()", &state));
+    CHECK(session->IsScrubbing() == false);
+    CHECK(session->mScrubTargetBeat == -1);
+
+    CHECK(moho::SCR_LuaDoString("isScrub = IsReplayScrubbing()", &state));
+    CHECK(state.GetGlobal("isScrub").GetBoolean() == false);
+
+    CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
+    CHECK(state.GetGlobal("prog").IsNil());
+
+    // Restore active session
+    moho::gActiveWldSession = savedActiveSession;
+  }
+
   struct TestCase
   {
     const char* name;
@@ -330,6 +460,7 @@ namespace
     {"session info default total beats", &TestSessionInfoDefaultTotalBeats},
     {"vcr setup replay session calculates total beats", &TestVCRSetupReplaySessionCalculatesTotalBeats},
     {"wldsession scrubbing state transitions", &TestCWldSessionScrubbingStateTransitions},
+    {"replay scrubbing user lua bindings", &TestReplayScrubbingUserLuaBindings},
   };
 } // namespace
 
