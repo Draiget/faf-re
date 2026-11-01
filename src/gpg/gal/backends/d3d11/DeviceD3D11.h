@@ -203,9 +203,7 @@ namespace gpg::gal
     void LogDebugLayerMessages();
     /**
      * Draws `sourceRect` of the source (`sourceWidth` x `sourceHeight`) over
-     * `destinationRect` of the destination, stretched. The draw is only
-     * clipped by the destination's bounds, which is enough for the callers:
-     * none passes a destination rect smaller than the target.
+     * `destinationRect` of the destination, stretched.
      */
     void StretchRectBlit(
       UINT sourceWidth,

@@ -583,10 +583,12 @@ namespace gpg::gal
       ThrowError("DeviceD3D11.cpp", __LINE__, "internal D3D11 RTT effect error");
     }
 
+    // Dynamic: StretchRectBlit writes the source rect's texture coordinates.
     D3D11_BUFFER_DESC bufferDesc{};
     bufferDesc.ByteWidth = sizeof(kRttFullscreenVertices);
-    bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     D3D11_SUBRESOURCE_DATA initialData{};
     initialData.pSysMem = kRttFullscreenVertices;
     CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateBuffer(&bufferDesc, &initialData, &mRttQuadVertexBuffer));
@@ -1224,18 +1226,29 @@ namespace gpg::gal
     ComPtr<ID3D11DepthStencilView> savedDepth;
     mImmediate->OMGetRenderTargets(1U, &savedTarget, &savedDepth);
 
-    // The quad covers the whole viewport with the whole source. Scale and
-    // offset the viewport so that the source rect lands on the destination
-    // rect.
-    const float scaleX = static_cast<float>(destinationRect.right - destinationRect.left) /
-      static_cast<float>(sourceRect.right - sourceRect.left);
-    const float scaleY = static_cast<float>(destinationRect.bottom - destinationRect.top) /
-      static_cast<float>(sourceRect.bottom - sourceRect.top);
+    // The quad covers the viewport, which is the destination rect, and its
+    // texture coordinates cover the source rect. Scaling the viewport instead
+    // would leave the viewport bounds (-32768..32767) for small rects.
+    const float u0 = static_cast<float>(sourceRect.left) / static_cast<float>(sourceWidth);
+    const float u1 = static_cast<float>(sourceRect.right) / static_cast<float>(sourceWidth);
+    const float v0 = static_cast<float>(sourceRect.top) / static_cast<float>(sourceHeight);
+    const float v1 = static_cast<float>(sourceRect.bottom) / static_cast<float>(sourceHeight);
+    const RttVertex vertices[4] = {
+      {-1.0f, -1.0f, 0.0f, u0, v1},
+      {1.0f, -1.0f, 0.0f, u1, v1},
+      {-1.0f, 1.0f, 0.0f, u0, v0},
+      {1.0f, 1.0f, 0.0f, u1, v0},
+    };
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    CheckHresult("DeviceD3D11.cpp", __LINE__, mImmediate->Map(mRttQuadVertexBuffer.Get(), 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped));
+    std::memcpy(mapped.pData, vertices, sizeof(vertices));
+    mImmediate->Unmap(mRttQuadVertexBuffer.Get(), 0U);
+
     D3D11_VIEWPORT viewport{};
-    viewport.TopLeftX = static_cast<float>(destinationRect.left) - static_cast<float>(sourceRect.left) * scaleX;
-    viewport.TopLeftY = static_cast<float>(destinationRect.top) - static_cast<float>(sourceRect.top) * scaleY;
-    viewport.Width = static_cast<float>(sourceWidth) * scaleX;
-    viewport.Height = static_cast<float>(sourceHeight) * scaleY;
+    viewport.TopLeftX = static_cast<float>(destinationRect.left);
+    viewport.TopLeftY = static_cast<float>(destinationRect.top);
+    viewport.Width = static_cast<float>(destinationRect.right - destinationRect.left);
+    viewport.Height = static_cast<float>(destinationRect.bottom - destinationRect.top);
     viewport.MaxDepth = 1.0f;
     mImmediate->RSSetViewports(1U, &viewport);
 

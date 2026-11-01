@@ -106,12 +106,14 @@ namespace gpg::gal
 
     constexpr char kBlitSource[] = R"hlsl(
 struct BlitVertex { float4 position : SV_Position; float2 uv : TEXCOORD0; };
+// The source rect in texture coordinates: xy its top-left corner, zw its size.
+cbuffer BlitSource : register(b0) { float4 faf_sourceRect; };
 BlitVertex BlitVS(uint id : SV_VertexID)
 {
     BlitVertex o;
     float2 p = float2((id << 1) & 2, id & 2);
     o.position = float4(p * float2(2, -2) + float2(-1, 1), 0, 1);
-    o.uv = p;
+    o.uv = faf_sourceRect.xy + p * faf_sourceRect.zw;
     return o;
 }
 Texture2D faf_source : register(t0);
@@ -2074,6 +2076,20 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       CheckHresult("DeviceD3D12.cpp", __LINE__, mDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline)));
     }
 
+    // The draw covers the viewport, which is the destination rect, and its
+    // texture coordinates cover the source rect. Scaling the viewport instead
+    // would leave the viewport bounds (-32768..32767) for small rects.
+    // Allocated first: an upload can hand the recorded commands to the GPU.
+    const float sourceUv[4] = {
+      static_cast<float>(sourceRect.left) / static_cast<float>(sourceWidth),
+      static_cast<float>(sourceRect.top) / static_cast<float>(sourceHeight),
+      static_cast<float>(sourceRect.right - sourceRect.left) / static_cast<float>(sourceWidth),
+      static_cast<float>(sourceRect.bottom - sourceRect.top) / static_cast<float>(sourceHeight),
+    };
+    const d3d12::UploadAllocation constants =
+      AllocateUpload(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+    std::memcpy(constants.cpu, sourceUv, sizeof(sourceUv));
+
     D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
     const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
     mDevice->CopyDescriptorsSimple(1U, cpu, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -2085,18 +2101,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     Transition(destination.resource, D3D12_RESOURCE_STATE_RENDER_TARGET);
     FlushBarriers();
     mList->OMSetRenderTargets(1U, &destination.renderTargetView, FALSE, nullptr);
-    // The blit draws the whole source over the viewport. Scale and offset the
-    // viewport so that the source rect lands on the destination rect, and
-    // scissor away the rest of the source.
-    const float scaleX = static_cast<float>(destinationRect.right - destinationRect.left) /
-      static_cast<float>(sourceRect.right - sourceRect.left);
-    const float scaleY = static_cast<float>(destinationRect.bottom - destinationRect.top) /
-      static_cast<float>(sourceRect.bottom - sourceRect.top);
     const D3D12_VIEWPORT viewport{
-      static_cast<float>(destinationRect.left) - static_cast<float>(sourceRect.left) * scaleX,
-      static_cast<float>(destinationRect.top) - static_cast<float>(sourceRect.top) * scaleY,
-      static_cast<float>(sourceWidth) * scaleX,
-      static_cast<float>(sourceHeight) * scaleY,
+      static_cast<float>(destinationRect.left),
+      static_cast<float>(destinationRect.top),
+      static_cast<float>(destinationRect.right - destinationRect.left),
+      static_cast<float>(destinationRect.bottom - destinationRect.top),
       0.0f,
       1.0f
     };
@@ -2104,7 +2113,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->RSSetViewports(1U, &viewport);
     mList->RSSetScissorRects(1U, &scissor);
     mList->SetPipelineState(pipeline.Get());
-    mList->SetGraphicsRootConstantBufferView(0U, 0U);
+    mList->SetGraphicsRootConstantBufferView(0U, constants.gpu);
     mList->SetGraphicsRootDescriptorTable(1U, table);
     mList->SetGraphicsRootDescriptorTable(2U, mBlitSamplers);
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
