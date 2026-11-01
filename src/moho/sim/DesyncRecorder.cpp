@@ -1530,9 +1530,11 @@ namespace moho
     out.Add("faf.sim.workers", static_cast<std::int64_t>(impl.mBeatWorkers));
     out.AddBool("faf.sse2", CFG_GetArgOption("/sse2", 0u, nullptr));
 
-    // Switch values: sim_* and lua_Parallel* hashed, and every sim_/lua_ switch that differs from
-    // its value before /con ran ("unknown" when that wasn't noted).
+    // Switch values: every reported number or on/off switch with its value, sim_* and lua_Parallel*
+    // hashed, and every one that differs from its value before /con ran ("unknown" when that
+    // wasn't noted).
     const std::string now = ConsoleSwitches(false);
+    std::string values;
     std::string hashed;
     std::string changed;
     std::map<std::string, std::string> before;
@@ -1553,6 +1555,7 @@ namespace moho
         continue;
       }
       const std::string name = line.substr(0, eq);
+      values += (values.empty() ? "" : ";") + line;
       if (name.compare(0, 4, "sim_") == 0 || name.compare(0, 12, "lua_Parallel") == 0) {
         hashed += line + "\n";
       }
@@ -1568,6 +1571,7 @@ namespace moho
     context.Update(hashed.data(), hashed.size());
     out.Add("faf.switches.hash", std::string(context.Digest().ToString().c_str()));
     out.Add("faf.switches.changed", defaults.empty() ? std::string("unknown") : changed);
+    out.Add("faf.switches", values);
   }
 
   void CDesyncRecorder::SendDesyncTelemetry(const Sim& sim)
