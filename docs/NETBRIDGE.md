@@ -20,7 +20,8 @@ The launcher's arguments, plus a few of ours:
 | `--access-token`, `--icebreaker-base-url`, others | accepted and ignored |
 | `--duplicate-ms <n>` | send every game datagram a second time, `n` ms after the first (0: right after it); off by default (#235). The game drops a repeated DATA packet by its sequence number, so the copy only counts when the first is lost |
 | `--webrtc` | offer WebRTC data channels to our own peers (#239, below); also `FAF_NETBRIDGE_WEBRTC=1` |
-| `--test-drop-percent <n>` | tests only: drop n % of the game's datagrams before sending, on either path |
+| `--redundancy <n>` | with our own peers, carry game datagrams on the redundant lane, each repeated up to `n` times until acked (#240, below); 0 (default) is off. Also `FAF_NETBRIDGE_REDUNDANCY=<n>`, and passed to a game that runs its own links (`redundancy` in `NetlinkConfig`) |
+| `--test-drop-percent <n>` | tests only: drop n % of the game's datagrams before sending, on either path; on the redundant lane, of the lane's datagrams |
 | `--stats-interval <s>` | seconds between statistics lines, default 10; 0 logs them only when a link closes (#241) |
 | `--bind-address <ip>` | local address for ICE host candidates (default all interfaces) |
 | `--game-address <ip>` | where the game's lobby port is reached, and the address the per-peer ports are bound to and the game is told (default 127.0.0.1) |
@@ -35,6 +36,12 @@ Our game with `net_InEngineLinks 1` (startup flag `/inenginelinks`, issue #233) 
 ## WebRTC between our peers (layer 2)
 
 With `--webrtc` (or `webrtc` in the game's `NetlinkConfig`) a link marks its ICE ufrag `fnl+w+`. When both sides are ours (#234) and both carry the mark, the offerer opens a WebRTC peer connection beside the ICE link: libdatachannel 0.24.6 (`src/netlink/WebRtc.cpp`), one data channel `game`, unordered with no retransmissions, so the game's own resends stay the only ones. The offer, the answer and trickled candidates go through `iceMsg` / `onIceMsg` like the CandidatesMessage, as JSON text with a `webrtc` member. Only our peers ever see one, and they tell it apart from a CandidatesMessage by that member. Once the channel opens, game datagrams go over it; the ICE link stays up underneath with its echo, and the datagrams go back to it if the channel closes or fails (`WebRTC gave up` in the log). A peer without the mark, the Java adapter included, never sees any of this.
+
+### Redundant lane (layer 3, #240)
+
+With `--redundancy <n>` (or `redundancy` in `NetlinkConfig`, or `net_NativeNetRedundancy` in native mode) a link also marks its ufrag `c+`, after `fnl+` and the optional `w+`. When both sides are ours (#234) and both carry it, game datagrams move into a net channel (`src/remote/net`, [NET_CHANNEL.md](NET_CHANNEL.md)). Each channel datagram carries the new game datagram, plus up to `n` earlier ones the peer has not acknowledged yet. One lost datagram is then covered by the next one, about 30 ms later at the game's rate, instead of by the game's resend timer (100 ms or more). The game's own protocol still runs end to end on top: it drops a repeated packet by its sequence number, so lobby, sim and replays see nothing different.
+
+When the game is quiet, the link's 50 ms timer sends the remaining repeats. On ICE the channel's datagrams go behind a `c` byte; on the WebRTC data channel they go bare (their first byte, `0xFC`, starts no game packet). A new connection starts a new lane on both sides. A peer without the mark, the Java adapter included, never sees any of this.
 
 The log shows `starting WebRTC as offerer`, then `webrtc: data channel open, game datagrams move onto it`.
 

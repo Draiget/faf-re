@@ -12,6 +12,7 @@
 #include "netlink/Link.h"
 #include "netlink/Signal.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -198,6 +199,107 @@ namespace
     a.link->Close();
     b.link->Close();
   }
+  // Issue #240: two of our links with the redundant lane, dropping 10 % of the
+  // lane's datagrams each way. Repeats bring nearly every game datagram
+  // through, each once.
+  void LaneTest(const std::string& bind, const int count)
+  {
+    Side a;
+    Side b;
+    std::atomic<int> laneOn{0};
+    auto makeCallbacks = [&laneOn](Side& self, Side& other, const char* name) {
+      LinkCallbacks cb;
+      cb.onSignal = [&other](const CandidatesMessage& m) { other.link->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+      cb.onData = [&self](const std::uint8_t* data, const std::size_t size) {
+        std::uint32_t seq = 0;
+        if (size != 400) {
+          ++self.corrupt;
+          return;
+        }
+        std::memcpy(&seq, data, sizeof(seq));
+        for (std::size_t i = sizeof(seq); i < size; ++i) {
+          if (data[i] != static_cast<std::uint8_t>(seq + i)) {
+            ++self.corrupt;
+            return;
+          }
+        }
+        std::lock_guard lock(self.mutex);
+        self.received.push_back(seq);
+      };
+      cb.onLog = [name, &laneOn](const std::string& t) {
+        std::printf("  %s: %s\n", name, t.c_str());
+        if (t.find("redundant lane") != std::string::npos) {
+          ++laneOn;
+        }
+      };
+      return cb;
+    };
+    LinkOptions oa;
+    oa.localId = 1;
+    oa.remoteId = 2;
+    oa.offerer = true;
+    oa.bindAddress = bind;
+    oa.ufragPrefix = kOurUfragPrefix;
+    oa.redundancy = 2;
+    oa.testDropPercent = 10;
+    LinkOptions ob = oa;
+    ob.localId = 2;
+    ob.remoteId = 1;
+    ob.offerer = false;
+    a.link = std::make_unique<Link>(oa, makeCallbacks(a, b, "lane offerer"));
+    b.link = std::make_unique<Link>(ob, makeCallbacks(b, a, "lane answerer"));
+
+    std::atomic<bool> stop{false};
+    std::thread ticker([&] {
+      while (!stop) {
+        a.link->Tick();
+        b.link->Tick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+    a.link->Start();
+    b.link->Start();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (laneOn.load() < 2 && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    Check(laneOn.load() == 2, "both links moved onto the redundant lane");
+
+    std::uint8_t buf[400];
+    for (int i = 0; i < count && a.link->IsConnected(); ++i) {
+      for (std::size_t k = 0; k < sizeof(buf); ++k) {
+        buf[k] = static_cast<std::uint8_t>(i + k);
+      }
+      const auto seq = static_cast<std::uint32_t>(i);
+      std::memcpy(buf, &seq, sizeof(seq));
+      a.link->Send(buf, sizeof(buf));
+      b.link->Send(buf, sizeof(buf));
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    stop = true;
+    ticker.join();
+    const LinkStats sa = a.link->GetStats();
+    const auto distinct = [](Side& s) {
+      std::lock_guard lock(s.mutex);
+      std::vector<std::uint32_t> v = s.received;
+      std::sort(v.begin(), v.end());
+      return static_cast<std::size_t>(std::unique(v.begin(), v.end()) - v.begin());
+    };
+    const std::size_t da = distinct(a);
+    const std::size_t db = distinct(b);
+    std::printf("  lane, 10%% of lane datagrams dropped each way: offerer got %zu of %d, answerer %zu of %d; "
+                "repeats %llu, run out unacked %llu\n",
+                da, count, db, count, static_cast<unsigned long long>(sa.laneRepeats),
+                static_cast<unsigned long long>(sa.laneUnacked));
+    Check(sa.onLane, "the offerer reports the lane on");
+    Check(da == a.received.size() && db == b.received.size(), "no game datagram delivered twice");
+    Check(da >= static_cast<std::size_t>(count) * 985 / 1000 && db >= static_cast<std::size_t>(count) * 985 / 1000,
+          "at least 98.5 % arrive through 10 % loss");
+    Check(a.corrupt == 0 && b.corrupt == 0, "no datagram altered");
+    a.link->Close();
+    b.link->Close();
+  }
 } // namespace
 
 int main(int argc, char** argv)
@@ -213,6 +315,7 @@ int main(int argc, char** argv)
   }
   UnitTests();
   LoopbackTest(bind, count);
+  LaneTest(bind, 2000);
   std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
   return gFailures == 0 ? 0 : 1;
 }

@@ -8,7 +8,7 @@ add_library(faf_netlink STATIC
   Link.cpp
   WebRtc.cpp)
 target_include_directories(faf_netlink PUBLIC "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(faf_netlink PUBLIC faf_juice PRIVATE faf_datachannel faf_codegen)
+target_link_libraries(faf_netlink PUBLIC faf_juice PRIVATE faf_datachannel faf_netchannel faf_codegen)
 # WebRtc.cpp catches libdatachannel's exceptions (issue #239); the root
 # CMakeLists.txt leaves exception handling to each target.
 if(MSVC)

@@ -48,6 +48,10 @@ namespace moho
   // Issue #274: in native mode, offer a WebRTC data channel to peers that are
   // our builds too (#239). Read when a link starts.
   int32_t net_NativeNetWebRtc = 1;
+  // Issue #240: in native mode, with peers running our build, game datagrams go
+  // on a redundant lane that repeats each up to this many times until acked;
+  // 0 sends them plainly. Read when a link starts.
+  int32_t net_NativeNetRedundancy = 2;
   // Issue #236, diagnostics: log every beat that became available this many ms
   // or more after the one before it (waiting on a peer's data); 0 logs nothing.
   // Live.
@@ -95,6 +99,12 @@ namespace moho
       "net_TestBurstBytes",
       "Test only: size of the net_TestBurstBeat burst in bytes (incompressible); 0 (default) sends nothing.",
       &net_TestBurstBytes
+    );
+
+    TConVar<int32_t> gTConVar_net_NativeNetRedundancy(
+      "net_NativeNetRedundancy",
+      "In native mode, repeat each game datagram to peers running our build up to this many times until acked (default 2); 0 sends them plainly.",
+      &net_NativeNetRedundancy
     );
 
     TConVar<int32_t> gTConVar_net_InEngineLinks(

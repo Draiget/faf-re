@@ -1,5 +1,7 @@
 #include "netlink/Link.h"
 #include "netlink/WebRtc.h"
+#include "remote/net/Datagram.h"
+#include "remote/net/NetChannel.h"
 
 #include <juice/juice.h>
 
@@ -34,6 +36,21 @@ namespace faf::netlink
     std::int64_t SteadyMs()
     {
       return std::chrono::duration_cast<std::chrono::milliseconds>(Link::Clock::now().time_since_epoch()).count();
+    }
+
+    // Issue #240: whether a marked ufrag offers `tag` after the prefix (and an
+    // optional "w+").
+    bool OffersAfterPrefix(const std::string& ufrag, const std::string& prefix, const std::string_view tag)
+    {
+      std::string_view rest(ufrag);
+      if (rest.rfind(prefix, 0) != 0) {
+        return false;
+      }
+      rest.remove_prefix(prefix.size());
+      if (rest.rfind("w+", 0) == 0) {
+        rest.remove_prefix(2);
+      }
+      return rest.rfind(tag, 0) == 0;
     }
 
     std::int64_t SteadyMicros()
@@ -301,6 +318,10 @@ namespace faf::netlink
       }
     };
     auto onData = [this](const std::uint8_t* data, const std::size_t size) {
+      if (size > 0 && data[0] == remote::net::kDatagramTag && mOptions.redundancy > 0) {
+        LaneDeliver(data, size); // issue #240
+        return;
+      }
       mDataReceived.fetch_add(1);
       if (mCallbacks.onData) {
         mCallbacks.onData(data, size);
@@ -335,8 +356,24 @@ namespace faf::netlink
 
   LinkStats Link::GetStats() const
   {
+    remote::net::ChannelStats lane;
+    bool haveLane = false;
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      if (mLane) {
+        lane = mLane->Stats();
+        haveLane = true;
+      }
+    }
     std::lock_guard lock(mMutex);
     LinkStats s = mStats;
+    s.onLane = mLaneActive.load();
+    if (haveLane) {
+      s.laneRepeats = lane.redundantRepeats;
+      s.laneUnacked = lane.redundantUnacked;
+      s.laneDuplicates = lane.redundantDuplicates;
+      s.laneLost = lane.datagramsLost;
+    }
     s.dataReceived = mDataReceived.load();
     s.invalidReceived = mInvalidReceived.load();
     s.echoesAnswered = mEchoesAnswered.load();
@@ -375,6 +412,9 @@ namespace faf::netlink
 
   void Link::DestroyAgentLocked()
   {
+    // Issue #240: a new connection starts a new lane (lazily, under mLaneMutex).
+    mLaneActive = false;
+    mLaneReset = true;
     juice_agent* agent = nullptr;
     {
       std::unique_lock agentLock(mIn->agentMutex);
@@ -463,9 +503,11 @@ namespace faf::netlink
       return;
     }
     if (!mOptions.ufragPrefix.empty()) {
-      // Issue #239: "w+" after the prefix offers WebRTC. A random token never
-      // holds '+', so only a peer that offers it starts that way.
-      const std::string mark = mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "");
+      // Issue #239: "w+" after the prefix offers WebRTC, and issue #240: "c+"
+      // after that the redundant lane. A random token never holds '+', so
+      // only a peer that offers them starts that way.
+      const std::string mark =
+        mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "") + (mOptions.redundancy > 0 ? "c+" : "");
       const std::size_t prefix = mark.size();
       const std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
       juice_set_local_ice_attributes(agent, ufrag.c_str(), RandomToken(26).c_str());
@@ -484,6 +526,7 @@ namespace faf::netlink
       mRemoteUfrag = remote->ufrag;
       mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
       mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
+      mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
       // Answerer: the remote description goes in before gathering, so
       // libjuice takes the controlled role (the offerer controls, as
       // agent.setControlling(peer.isLocalOffer())).
@@ -579,6 +622,7 @@ namespace faf::netlink
     mRemoteUfrag = remote.ufrag;
     mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
     mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
+    mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
     const std::string sdp = RemoteDescriptionLocked(remote, now);
     if (juice_set_remote_description(mAgent, sdp.c_str()) < 0) {
       Log(out, "remote description rejected: " + sdp);
@@ -748,12 +792,24 @@ namespace faf::netlink
         }
       }
 
+      // Issue #240: with a peer that is ours and offers it, game datagrams
+      // move onto the redundant lane.
+      if (mState == LinkState::Connected && mOptions.redundancy > 0 && mRemoteLane && mOurPeer.load() &&
+          !mLaneActive.load()) {
+        mLaneActive = true;
+        Log(p, "game datagrams move onto the redundant lane, each repeated up to " +
+                 std::to_string(mOptions.redundancy) + " times until acked");
+      }
+
       if (mState == LinkState::Disconnected && mRestartAt && now >= *mRestartAt) {
         mRestartAt.reset();
         InitiateLocked(p, nullptr);
       }
     }
     Run(p);
+    if (mLaneActive.load()) {
+      LanePoll(); // acks, and repeats while the game is quiet
+    }
   }
 
   bool Link::Send(const void* data, const std::size_t size)
@@ -763,13 +819,33 @@ namespace faf::netlink
       ++mStats.dataDropped;
       return false;
     }
-    if (mOptions.testDropPercent > 0) {
+    // On the lane the test drop takes the lane's own datagrams (LaneTransmit).
+    if (mOptions.testDropPercent > 0 && !mLaneActive.load()) {
       thread_local std::minstd_rand rng{std::random_device{}()};
       if (static_cast<int>(rng() % 100) < mOptions.testDropPercent) {
         std::lock_guard lock(mMutex);
         ++mStats.dataSent; // as if it was lost on the way
         return true;
       }
+    }
+    // Issue #240: on the redundant lane once it is on.
+    if (mLaneActive.load()) {
+      std::vector<std::vector<std::uint8_t>> datagrams;
+      bool queued = false;
+      {
+        std::lock_guard laneLock(mLaneMutex);
+        remote::net::NetChannel& lane = LaneLocked();
+        queued = lane.SendRedundant(data, size);
+        lane.Poll(static_cast<std::uint64_t>(SteadyMicros()), datagrams);
+      }
+      LaneTransmit(datagrams);
+      std::lock_guard lock(mMutex);
+      if (queued) {
+        ++mStats.dataSent;
+      } else {
+        ++mStats.dataDropped;
+      }
+      return queued;
     }
     // Issue #239: on the data channel while it is open, as the bare datagram.
     std::shared_ptr<WebRtcChannel> rtc;
@@ -808,6 +884,90 @@ namespace faf::netlink
     return true;
   }
 
+  remote::net::NetChannel& Link::LaneLocked()
+  {
+    if (!mLane || mLaneReset.exchange(false)) {
+      remote::net::ChannelConfig config;
+      config.redundancy = static_cast<std::uint32_t>(mOptions.redundancy);
+      // The link has its own liveness check (echoes); the lane never times out.
+      config.timeoutUs = 24ull * 3600 * 1000 * 1000;
+      config.keepaliveIntervalUs = 1'000'000;
+      mLane = std::make_unique<remote::net::NetChannel>(config);
+    }
+    return *mLane;
+  }
+
+  void Link::LaneDeliver(const std::uint8_t* const data, const std::size_t size)
+  {
+    if (mOptions.redundancy <= 0) {
+      mInvalidReceived.fetch_add(1);
+      return;
+    }
+    std::vector<std::vector<std::uint8_t>> messages;
+    std::vector<std::vector<std::uint8_t>> datagrams;
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      remote::net::NetChannel& lane = LaneLocked();
+      const auto now = static_cast<std::uint64_t>(SteadyMicros());
+      lane.Receive(data, size, now);
+      std::vector<std::uint8_t> m;
+      while (lane.TakeUnreliable(m)) {
+        messages.push_back(std::move(m));
+      }
+      lane.Poll(now, datagrams);
+    }
+    LaneTransmit(datagrams);
+    for (const std::vector<std::uint8_t>& m : messages) {
+      mDataReceived.fetch_add(1);
+      if (mCallbacks.onData) {
+        mCallbacks.onData(m.data(), m.size());
+      }
+    }
+  }
+
+  void Link::LanePoll()
+  {
+    std::vector<std::vector<std::uint8_t>> datagrams;
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      LaneLocked().Poll(static_cast<std::uint64_t>(SteadyMicros()), datagrams);
+    }
+    LaneTransmit(datagrams);
+  }
+
+  void Link::LaneTransmit(const std::vector<std::vector<std::uint8_t>>& datagrams)
+  {
+    if (datagrams.empty()) {
+      return;
+    }
+    std::shared_ptr<WebRtcChannel> rtc;
+    {
+      std::lock_guard lock(mMutex);
+      rtc = mRtc;
+    }
+    for (const std::vector<std::uint8_t>& d : datagrams) {
+      if (mOptions.testDropPercent > 0) {
+        thread_local std::minstd_rand rng{std::random_device{}()};
+        if (static_cast<int>(rng() % 100) < mOptions.testDropPercent) {
+          continue; // tests only: lost on the way
+        }
+      }
+      // On the data channel bare (its first byte is the channel's tag, which no
+      // game packet starts with); on ICE behind a 'c'.
+      if (rtc && rtc->Send(d.data(), d.size())) {
+        mWebRtcSent.fetch_add(1);
+        continue;
+      }
+      char buf[2048];
+      if (d.size() + 1 > sizeof(buf)) {
+        continue;
+      }
+      buf[0] = 'c';
+      std::memcpy(buf + 1, d.data(), d.size());
+      SendFramed(buf, d.size() + 1);
+    }
+  }
+
   bool Link::SendFramed(const char* framed, const std::size_t size)
   {
     std::shared_lock agentLock(mIn->agentMutex);
@@ -825,6 +985,7 @@ namespace faf::netlink
     }
     mClosed = true;
     mConnected = false;
+    mLaneActive = false;
     if (mRtc) {
       mRtc->Close();
       mRtc.reset();
@@ -882,6 +1043,9 @@ namespace faf::netlink
       } else {
         juice_send(agent, data, size); // turn around (PeerIceModule:539)
       }
+    } else if (data[0] == 'c') {
+      // Issue #240: a redundant-lane datagram.
+      self->LaneDeliver(reinterpret_cast<const std::uint8_t*>(data + 1), size - 1);
     } else if (data[0] == 'f' && self->mRemoteMarked) {
       // Issue #234: only peers with our ufrag prefix send or get these.
       const std::string_view body(data + 1, size - 1);

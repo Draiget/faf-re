@@ -55,6 +55,9 @@ namespace faf::netbridge
     int duplicateGapMs = -1;
     // Issue #239: offer WebRTC data channels to our peers (--webrtc).
     bool webrtc = false;
+    // Issue #240: the redundant lane with our peers, each game datagram
+    // repeated up to this many times until acked (--redundancy N); 0 is off.
+    int redundancy = 0;
     // Tests only: drop this share of game datagrams before sending (0-100).
     int testDropPercent = 0;
     // Seconds between per-peer statistics lines (issue #241); 0 only at close.

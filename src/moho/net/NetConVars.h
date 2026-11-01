@@ -30,6 +30,7 @@ namespace moho
   extern int32_t net_TestBurstBeat;
   extern int32_t net_TestBurstBytes;
   extern int32_t net_NativeNetWebRtc;
+  extern int32_t net_NativeNetRedundancy;
   extern int32_t net_FastRetransmit;
 
   // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.

@@ -75,6 +75,7 @@ namespace moho
         mBindAddress = config->Get("bindAddress").AsString();
         mDuplicateGapMs = static_cast<int>(config->Get("duplicateMs").AsInt(-1));
         mWebRtc = config->Get("webrtc").AsBool();
+        mRedundancy = static_cast<int>(config->Get("redundancy").AsInt(0));
         mTestDropPercent = static_cast<int>(config->Get("testDropPercent").AsInt(0));
         gpg::Logf(
           "NETLINK: configured, local id %lld, %d ICE server addresses%s", static_cast<long long>(mLocalId),
@@ -89,7 +90,8 @@ namespace moho
         const boost::weak_ptr<CGpgNetInterface>& gpgnet,
         const std::string& bindAddress,
         const bool forceRelay,
-        const bool webrtc
+        const bool webrtc,
+        const int redundancy
       )
       {
         std::lock_guard lock(mMutex);
@@ -98,6 +100,7 @@ namespace moho
         mBindAddress = bindAddress;
         mForceRelay = forceRelay;
         mWebRtc = webrtc;
+        mRedundancy = redundancy;
         StartTickerLocked();
       }
 
@@ -166,6 +169,7 @@ namespace moho
           options.bindAddress = mBindAddress;
           options.duplicateGapMs = mDuplicateGapMs;
           options.webrtc = mWebRtc;
+          options.redundancy = mRedundancy;
           options.testDropPercent = mTestDropPercent;
         }
         options.remoteId = id;
@@ -382,6 +386,7 @@ namespace moho
       std::string mBindAddress;
       int mDuplicateGapMs = -1;
       bool mWebRtc = false;
+      int mRedundancy = 0;
       int mTestDropPercent = 0;
       bool mGameEnded = false;
       bool mNative = false;
@@ -485,10 +490,10 @@ namespace moho
     const bool forceRelay = CFG_GetArgOption("/nativenetrelay", 0u, nullptr);
     boost::weak_ptr<CGpgNetInterface> weak;
     boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
-    Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0);
+    Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0, net_NativeNetRedundancy);
     gpg::Logf(
-      "NETLINK: native mode, the game links every peer itself%s%s%s", forceRelay ? ", relay only" : "",
-      bindAddress.empty() ? "" : ", bound to ", bindAddress.c_str()
+      "NETLINK: native mode, the game links every peer itself%s%s%s, redundancy %d", forceRelay ? ", relay only" : "",
+      bindAddress.empty() ? "" : ", bound to ", bindAddress.c_str(), static_cast<int>(net_NativeNetRedundancy)
     );
   }
 

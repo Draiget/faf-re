@@ -42,6 +42,11 @@ namespace faf::netlink
   class WebRtcChannel;
 }
 
+namespace faf::remote::net
+{
+  class NetChannel;
+}
+
 namespace faf::netlink
 {
   // PeerIceModule's IceState, with the strings it reports through
@@ -85,8 +90,15 @@ namespace faf::netlink
     // game datagrams move onto a WebRTC data channel (netlink/WebRtc.h).
     bool webrtc = false;
     // Tests only: drop this share (0-100) of game datagrams in Send, on
-    // either path, to compare loss handling.
+    // either path, to compare loss handling; on the redundant lane (#240), of
+    // the lane's datagrams instead.
     int testDropPercent = 0;
+    // Issue #240, layer 3: with a peer that is ours and offers it too, game
+    // datagrams go in a net channel (src/remote/net) whose datagrams repeat
+    // each one in up to this many later datagrams until it is acked, so one
+    // lost datagram costs no resend wait. The ufrag then carries "c+" after
+    // the prefix (and "w+"). 0 (default) is off: plain 'd' frames.
+    int redundancy = 0;
   };
 
   // The prefix faf-netbridge and the engine use.
@@ -119,6 +131,12 @@ namespace faf::netlink
     double lastRttMs = -1;
     bool onWebRtc = false;         // issue #239: datagrams on the data channel
     std::uint64_t webRtcSent = 0;  // of dataSent
+    // Issue #240: the redundant lane, while on.
+    bool onLane = false;
+    std::uint64_t laneRepeats = 0;     // copies sent
+    std::uint64_t laneUnacked = 0;     // datagrams whose copies ran out before an ack
+    std::uint64_t laneDuplicates = 0;  // copies received after the datagram itself
+    std::uint64_t laneLost = 0;        // lane datagrams counted lost
   };
 
   class Link
@@ -171,6 +189,12 @@ namespace faf::netlink
     void Run(Pending& p);
     void Log(Pending& out, std::string text);
     bool SendFramed(const char* framed, std::size_t size);
+    // Issue #240. None of these is called with mMutex held, and none holds
+    // mLaneMutex while it takes mMutex.
+    void LaneDeliver(const std::uint8_t* data, std::size_t size);
+    void LanePoll();
+    void LaneTransmit(const std::vector<std::vector<std::uint8_t>>& datagrams);
+    remote::net::NetChannel& LaneLocked(); // mLaneMutex held: the lane, new after a reset
 
     const LinkOptions mOptions;
     const LinkCallbacks mCallbacks;
@@ -207,5 +231,11 @@ namespace faf::netlink
     bool mWebRtcGaveUp = false; // for this connection
     std::shared_ptr<WebRtcChannel> mRtc;
     std::atomic<std::uint64_t> mWebRtcSent{0};
+    // Issue #240.
+    bool mRemoteLane = false;
+    std::atomic<bool> mLaneActive{false};
+    std::atomic<bool> mLaneReset{false}; // a new connection: the next use starts a new lane
+    mutable std::mutex mLaneMutex;
+    std::unique_ptr<remote::net::NetChannel> mLane;
   };
 } // namespace faf::netlink
