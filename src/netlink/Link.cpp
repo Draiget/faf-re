@@ -1188,7 +1188,19 @@ namespace faf::netlink
         self->mEchoesAnswered.fetch_add(1);
         self->mLastEchoReplyMs = SteadyMs();
       } else {
-        juice_send(agent, data, size); // turn around (PeerIceModule:539)
+        // Turn around (PeerIceModule:539). Under test shaping the answer is
+        // delayed and dropped like every other send, so the offerer's rtt
+        // covers both directions.
+        Clock::duration delay{};
+        if (TestShaping::Get().Enabled() && !TestShaping::Get().Roll(delay)) {
+          return; // tests only: lost on the way
+        }
+        if (delay > Clock::duration::zero()) {
+          DelayedSender::Get().Schedule(self, Clock::now() + delay, std::string(data, size),
+                                        [self](const std::string& b) { self->SendFramedNow(b.data(), b.size()); });
+        } else {
+          juice_send(agent, data, size);
+        }
       }
     } else if (data[0] == 'c') {
       // Issue #240: a redundant-lane datagram.
