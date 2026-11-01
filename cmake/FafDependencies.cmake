@@ -404,4 +404,6 @@ faf_dependency_patches(boost_1_34_1 download
   boost_1_34_1_faf_required.patch)
 faf_dependency_patches(wxWindows-2.4.2 download
   wxwindows_2_4_2_faf_required.patch wxwindows_2_4_2_faf_x64.patch wxwindows_2_4_2_faf_x64_pointers.patch)
+faf_dependency_patches(libdatachannel download
+  libdatachannel_faf_dcsctp.patch)
 _faf_wx_generated()
