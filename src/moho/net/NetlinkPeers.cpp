@@ -77,6 +77,7 @@ namespace moho
         mWebRtc = config->Get("webrtc").AsBool();
         mRedundancy = static_cast<int>(config->Get("redundancy").AsInt(0));
         mTestDropPercent = static_cast<int>(config->Get("testDropPercent").AsInt(0));
+        mSctpBackend = config->Get("sctpBackend").AsString() == "dcsctp" ? nl::SctpBackend::DcSctp : nl::SctpBackend::UsrSctp;
         gpg::Logf(
           "NETLINK: configured, local id %lld, %d ICE server addresses%s", static_cast<long long>(mLocalId),
           static_cast<int>(mIceServers.size()), mForceRelay ? ", relay only" : ""
@@ -171,6 +172,8 @@ namespace moho
           options.webrtc = mWebRtc;
           options.redundancy = mRedundancy;
           options.testDropPercent = mTestDropPercent;
+          const bool useDcSctp = (NET_GetSctpBackend() != 0) || (mSctpBackend == nl::SctpBackend::DcSctp);
+          options.sctpBackend = useDcSctp ? nl::SctpBackend::DcSctp : nl::SctpBackend::UsrSctp;
         }
         options.remoteId = id;
         options.offerer = offerer;
@@ -388,6 +391,7 @@ namespace moho
       bool mWebRtc = false;
       int mRedundancy = 0;
       int mTestDropPercent = 0;
+      nl::SctpBackend mSctpBackend = nl::SctpBackend::UsrSctp;
       bool mGameEnded = false;
       bool mNative = false;
       std::map<std::int64_t, std::unique_ptr<EnginePeer>> mPeers;

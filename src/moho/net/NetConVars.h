@@ -32,6 +32,10 @@ namespace moho
   extern int32_t net_NativeNetWebRtc;
   extern int32_t net_NativeNetRedundancy;
   extern int32_t net_FastRetransmit;
+  extern int32_t net_SctpBackend;
+
+  // Issue #239: returns net_SctpBackend (0: usrsctp, 1: dcSCTP) or 1 if /dcsctp was given on command line.
+  int32_t NET_GetSctpBackend();
 
   // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.
   bool NET_FastRetransmitEnabled();
