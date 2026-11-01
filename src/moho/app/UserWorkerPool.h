@@ -35,6 +35,10 @@ namespace moho
    *
    * Chunks run under the dispatching thread's x87/SSE control state, so floating-point results are
    * bit-identical to the serial path.
+   *
+   * The pool has one dispatcher: the main thread. `Run` from any other thread (the scenario
+   * loader collecting its blueprint Lua state, say) runs serially, since two dispatchers would
+   * overwrite each other's job.
    */
   class CUserWorkerPool
   {
@@ -50,10 +54,14 @@ namespace moho
     /// Worker threads the next dispatch will use (0 = serial), after resolving `user_Workers`.
     [[nodiscard]] static unsigned int ConfiguredWorkerCount();
 
+    /// True on the main thread, the only thread whose dispatches use the workers.
+    [[nodiscard]] static bool IsDispatcherThread() noexcept;
+
     /**
      * Runs `fn(context, begin, end)` over [0, count) in chunks of `grain` items; the calling
      * thread helps. Returns once every chunk has finished; the first exception a chunk threw is
-     * rethrown here. Nested calls and calls from a worker run serially.
+     * rethrown here. Nested calls, calls from a worker and calls from any thread but the main one
+     * run serially.
      */
     void Run(std::size_t count, std::size_t grain, RangeFunction fn, void* context);
 
