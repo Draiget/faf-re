@@ -78,6 +78,75 @@ namespace
   // beat time) before `RATE_GameRateToSpeed` rounds it down to a whole rate step.
   std::atomic<float> gLeadSimSpeedEstimate{0.0f};
 
+  /**
+   * Engine addition (wld_SkewCorrection): how far the beat on screen is behind real time, for
+   * `CSimDriver::GetSimSpeed`. The retail driver returns 0 there, which leaves the display-clock
+   * skew correction in `WLD_GetSimRate` (`wld_SkewRateAdjustBase` per beat of skew, capped at
+   * `wld_SkewRateAdjustMax`) permanently at 1x.
+   *
+   * Each tick taken off the sync queue adds the real time since the previous tick, minus the time
+   * those ticks take at the current sim rate. Beats that do not advance a tick are a pause, and the
+   * interval that spans them is left out, so paused time is never owed. Counting starts at the
+   * first tick that comes at least half a tick after the one before: the ticks computed while the
+   * session loaded are taken in one burst, and counting them would read as being ahead. Only the
+   * main thread touches it (`GetSyncData`, `GetSimSpeed`).
+   */
+  struct SkewClock
+  {
+    bool mStarted = false;
+    bool mSettled = false;
+    bool mPausedSinceTick = false;
+    std::int32_t mLastTick = 0;
+    std::int64_t mLastTickCycles = 0;
+    std::int64_t mNextLogCycles = 0;
+    float mLagMs = 0.0f;   // clamped to +/- wld_SkewMaxLag: what the correction acts on
+    float mDriftMs = 0.0f; // unclamped: what actually happened, for the log
+  };
+
+  SkewClock gSkewClock;
+
+  void UpdateSkewClock(const SSyncData& beat, const std::int64_t now, const int simRate)
+  {
+    SkewClock& clock = gSkewClock;
+    if (!beat.mAdvanced) {
+      clock.mPausedSinceTick = true;
+      return;
+    }
+
+    if (!clock.mStarted || beat.mCurTick <= clock.mLastTick) {
+      clock = SkewClock{};
+      clock.mStarted = true;
+      clock.mLastTick = beat.mCurTick;
+      clock.mLastTickCycles = now;
+      clock.mNextLogCycles = now;
+      return;
+    }
+
+    const float tickMs = 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
+    const float elapsedMs = gpg::time::CyclesToMilliseconds(now - clock.mLastTickCycles);
+    if (!clock.mSettled && elapsedMs >= tickMs * 0.5f) {
+      clock.mSettled = true;
+    }
+    if (clock.mSettled && !clock.mPausedSinceTick) {
+      const float errorMs = elapsedMs - static_cast<float>(beat.mCurTick - clock.mLastTick) * tickMs;
+      const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
+      clock.mLagMs = std::clamp(clock.mLagMs + errorMs, -maxLagMs, maxLagMs);
+      clock.mDriftMs += errorMs;
+    }
+    clock.mPausedSinceTick = false;
+    clock.mLastTick = beat.mCurTick;
+    clock.mLastTickCycles = now;
+
+    if (wld_SkewLog > 0 && now >= clock.mNextLogCycles) {
+      gpg::Logf(
+        "SkewClock: tick %d drift %+.3f s lag %+.3f s rate %d correction %s",
+        beat.mCurTick, clock.mDriftMs * 0.001f, clock.mLagMs * 0.001f, simRate,
+        wld_SkewCorrection != 0 ? "on" : "off"
+      );
+      clock.mNextLogCycles = now + gpg::time::MillisecondsToCycles(static_cast<float>(wld_SkewLog) * 1000.0f);
+    }
+  }
+
   // Sim bootstrap, from CSimDriver::ThreadCreateSim (0x0073D260).
   constexpr std::uint32_t kSimThreadTimeBarColor = 0xFFFF0000u;
   constexpr unsigned int kSimCommandMessageUpperBound = 0x32u;
@@ -1495,15 +1564,31 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   if (mSyncDataQueue.Empty() && mSyncDataAvailableEvent) {
     ResetEvent(mSyncDataAvailableEvent);
   }
+
+  // Engine addition (wld_SkewCorrection): outside the driver lock, since the sim rate takes the
+  // client manager's.
+  const std::int64_t dequeuedAt = mLastSyncCycleTime;
+  lock.unlock();
+  if (outSyncData) {
+    UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate());
+  }
 }
 
 /**
  * Address: 0x0073C630 (FUN_0073C630), ISTIDriver slot 11
  * Returns the driver sim-speed metric (retail implementation returns 0.0).
+ *
+ * Engine addition (wld_SkewCorrection): with the switch on, the skew of the beat on screen in
+ * beats, positive when ahead of real time. `WLD_GetSimRate` turns it into a display-clock factor of
+ * `wld_SkewRateAdjustBase^-skew`, capped at `wld_SkewRateAdjustMax`, so a session behind real time
+ * runs slightly fast until it has caught up, and one ahead slightly slow.
  */
 double CSimDriver::GetSimSpeed()
 {
-  return 0.0;
+  if (wld_SkewCorrection == 0 || !gSkewClock.mSettled) {
+    return 0.0;
+  }
+  return -static_cast<double>(gSkewClock.mLagMs) / 100.0;
 }
 
 /**
@@ -1904,15 +1989,39 @@ ISTIDriver* moho::SIM_CreateDriver(
 {
   msvc8::auto_ptr<CClientManagerImpl> clientOwner(clientManager);
   msvc8::auto_ptr<gpg::Stream> streamOwner(stream);
+  gSkewClock = SkewClock{};
   return new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
 }
 
 int moho::sim_ReplayLead = 10;
 int moho::sim_LocalLead = 2;
 int moho::sim_LeadOnSchedule = 1;
+int moho::wld_SkewCorrection = 0;
+float moho::wld_SkewMaxLag = 3.0f;
+int moho::wld_SkewLog = 0;
 
 namespace
 {
+  TConVar<int> gTConVar_wld_SkewCorrection(
+    "wld_SkewCorrection",
+    "1 feeds the beat on screen's skew from real time to the display clock's skew correction "
+    "(wld_SkewRateAdjustBase per beat, capped at wld_SkewRateAdjustMax), so a session that fell "
+    "behind catches up and one ahead waits; 0 = original (no correction).",
+    &moho::wld_SkewCorrection
+  );
+
+  TConVar<float> gTConVar_wld_SkewMaxLag(
+    "wld_SkewMaxLag",
+    "Most real time, in seconds, the skew correction will try to make up (or give back when ahead).",
+    &moho::wld_SkewMaxLag
+  );
+
+  TConVar<int> gTConVar_wld_SkewLog(
+    "wld_SkewLog",
+    "Log the session's drift from real time every this many seconds (0 = off).",
+    &moho::wld_SkewLog
+  );
+
   TConVar<int> gTConVar_sim_ReplayLead(
     "sim_ReplayLead",
     "Replays only: beats the sim may compute ahead of the beat on screen (0 = original pacing, "

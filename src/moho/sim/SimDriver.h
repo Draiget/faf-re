@@ -1045,6 +1045,21 @@ namespace moho
   extern int sim_LeadOnSchedule;
 
   /**
+   * Engine addition: user-side console variables for the display-clock skew correction, which the
+   * retail engine carries but never feeds (`CSimDriver::GetSimSpeed` returns 0).
+   * - `wld_SkewCorrection` (default 0): 1 makes `GetSimSpeed` return how many beats the beat on
+   *   screen is ahead of real time (negative when behind), measured tick by tick from the first
+   *   tick on screen with paused time left out. `WLD_GetSimRate` then runs the display clock at
+   *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
+   *   It changes when beats are issued, never what the sim computes.
+   * - `wld_SkewMaxLag` (default 3 s): the skew is clamped to this much real time either way.
+   * - `wld_SkewLog` (default 0): log the drift every this many seconds.
+   */
+  extern int wld_SkewCorrection;
+  extern float wld_SkewMaxLag;
+  extern int wld_SkewLog;
+
+  /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game
    * time per real time, from its median beat cost) before it is rounded down to a whole rate step;
    * 0 otherwise. The display clock follows it so the sim is not held to the rounded rate.
