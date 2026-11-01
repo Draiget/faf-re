@@ -32,6 +32,16 @@ Real games from the FAF replay vault (stock and community maps, 1–12 human pla
 
 Numbers, method and what is next: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
+## Desync diagnostics
+
+When a multiplayer game desyncs, three opt-in aids show why; all are off by default.
+
+- **Desync recorder** (`/desyncrecorder`): keeps the recent beats' sync log in memory and, after a checksum mismatch, writes a `desync_<game id>_beat<N>_army<A>.zip` dump next to the game log.
+- **Dump compare** (`tools/desync-diff/desync_diff.py`): two players' dumps in, the first value that differs out: beat, entity, field.
+- **Telemetry** (`/telemetry /telemetryendpoint URL`): one small OpenTelemetry log record per desync and per game end, sent to an OpenTelemetry collector, without player names, user ids or paths. With `/telemetrydumpendpoint URL` the dump is also uploaded as `.tar.gz` to a server of your own; `tools/desync-diff/receive.py` is a reference receiver that stores the uploads per game and compares them.
+
+Setting up the collector and the receiver, and what they receive: [docs/DESYNC_DIAGNOSTICS.md](docs/DESYNC_DIAGNOSTICS.md). Every switch and field: [docs/SWITCHES.md](docs/SWITCHES.md#desync-telemetry).
+
 ## Build
 
 CMake with clang-cl, for x64 and x86. The C/C++ runtime is linked statically, so the executables need no MSVC runtime DLLs.
@@ -87,7 +97,7 @@ The client collects only while a profiler is connected (`TRACY_ON_DEMAND`): star
 | `data/fafengine/` | Engine-owned Lua hooks copied next to the exe (for example the Graphics API option) |
 | `tools/` | Go multiplayer test harness (`mpemu`) and checkers; see [tools/README.md](tools/README.md) |
 | `scripts/` | Sampling profiler, benchmark and replay helpers (`perf/`), shader and texture checks (`effects/`), and the hang stack dumper (`stackdump.cpp`) |
-| `docs/` | [Performance](docs/PERFORMANCE.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [PR replay check](docs/PR_REPLAY_CHECK.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md) |
+| `docs/` | [Performance](docs/PERFORMANCE.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [PR replay check](docs/PR_REPLAY_CHECK.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md), [Desync diagnostics](docs/DESYNC_DIAGNOSTICS.md) |
 
 ## Libraries the engine uses
 

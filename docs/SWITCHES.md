@@ -216,7 +216,7 @@ Compare dumps with `tools/desync-diff/desync_diff.py` (issue #217); it prints th
 
 ## Desync telemetry
 
-Issue #218. Off by default. On, a live multiplayer game sends two kinds of OpenTelemetry log record, as one OTLP/HTTP JSON `POST` each to `<telemetry_Endpoint>/v1/logs`:
+Issue #218. Off by default. Setting up the collector and the dump receiver: [Desync diagnostics](DESYNC_DIAGNOSTICS.md). On, a live multiplayer game sends two kinds of OpenTelemetry log record, as one OTLP/HTTP JSON `POST` each to `<telemetry_Endpoint>/v1/logs`:
 
 - `faf.desync`: one per player whose hash differed from ours at the first mismatched beat, sent when the sim reaches the dump beat (the mismatched beat + 30, as for the recorder), so every player's report for that beat has arrived. Later desyncs only raise `faf.desync.later_records` in the game-end record.
 - `faf.game.end`: one per game, desync or not, when the game's sim is destroyed (quitting, or leaving to the menu).
