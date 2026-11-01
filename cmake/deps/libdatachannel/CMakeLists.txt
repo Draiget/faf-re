@@ -15,10 +15,11 @@
 
 set(_dc "${FAF_DEPENDENCIES_DIR}/libdatachannel")
 set(_sctp "${FAF_DEPENDENCIES_DIR}/usrsctp/usrsctplib")
+set(_dcsctp "${FAF_DEPENDENCIES_DIR}/dcsctp/dcsctp")
 set(_mbed "${FAF_DEPENDENCIES_DIR}/mbedtls")
 set(_plog "${FAF_DEPENDENCIES_DIR}/plog")
-foreach(_probe "${_dc}/src/peerconnection.cpp" "${_sctp}/user_socket.c" "${_mbed}/library/ssl_tls.c"
-               "${_plog}/include/plog/Log.h")
+foreach(_probe "${_dc}/src/peerconnection.cpp" "${_sctp}/user_socket.c" "${_dcsctp}/net/dcsctp/socket/dcsctp_socket.cc"
+               "${_mbed}/library/ssl_tls.c" "${_plog}/include/plog/Log.h")
   if(NOT EXISTS "${_probe}")
     message(FATAL_ERROR "${_probe} not found (cmake -P cmake/FafDependencies.cmake)")
   endif()
@@ -49,6 +50,25 @@ target_compile_definitions(faf_usrsctp PRIVATE __Userspace__ SCTP_SIMPLE_ALLOCAT
 target_compile_definitions(faf_usrsctp PUBLIC "SCTP_STDINT_INCLUDE=<stdint.h>")
 set_target_properties(faf_usrsctp PROPERTIES C_STANDARD 99 FOLDER "dependencies")
 
+# --- dcsctp ------------------------------------------------------------------
+file(GLOB_RECURSE _dcsctp_sources CONFIGURE_DEPENDS "${_dcsctp}/*.cc")
+list(FILTER _dcsctp_sources EXCLUDE REGEX ".*/fuzzers/.*")
+list(FILTER _dcsctp_sources EXCLUDE REGEX ".*/testing/.*")
+if(NOT WIN32)
+  list(FILTER _dcsctp_sources EXCLUDE REGEX ".*win32\\.cc$")
+endif()
+add_library(faf_dcsctp STATIC ${_dcsctp_sources})
+target_include_directories(faf_dcsctp PUBLIC "${_dcsctp}")
+target_compile_definitions(faf_dcsctp PUBLIC
+  $<$<PLATFORM_ID:Linux>:WEBRTC_LINUX;WEBRTC_POSIX>
+  $<$<PLATFORM_ID:Windows>:WEBRTC_WIN;NOMINMAX>
+  $<$<PLATFORM_ID:Darwin>:WEBRTC_MAC;WEBRTC_POSIX>
+)
+set_target_properties(faf_dcsctp PROPERTIES CXX_STANDARD 20 FOLDER "dependencies")
+if(MSVC)
+  target_compile_options(faf_dcsctp PRIVATE /std:c++latest /EHsc)
+endif()
+
 # --- libdatachannel ----------------------------------------------------------
 set(_dc_sources
   candidate.cpp channel.cpp configuration.cpp datachannel.cpp dependencydescriptor.cpp description.cpp
@@ -72,17 +92,17 @@ target_compile_definitions(faf_datachannel PUBLIC RTC_STATIC RTC_ENABLE_MEDIA=0 
 target_compile_definitions(faf_datachannel PRIVATE RTC_EXPORTS USE_MBEDTLS=1 USE_GNUTLS=0 USE_NICE=0
   RTC_SYSTEM_SRTP=0)
 set_target_properties(faf_datachannel PROPERTIES CXX_STANDARD 17 FOLDER "dependencies")
-target_link_libraries(faf_datachannel PRIVATE faf_usrsctp faf_mbedtls faf_juice)
+target_link_libraries(faf_datachannel PRIVATE faf_usrsctp faf_dcsctp faf_mbedtls faf_juice)
 
 if(FAF_LINUX)
-  foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
+  foreach(_t faf_mbedtls faf_usrsctp faf_dcsctp faf_datachannel)
     target_compile_options(${_t} PRIVATE -w)
   endforeach()
   find_package(Threads REQUIRED)
   target_link_libraries(faf_usrsctp PUBLIC Threads::Threads)
   target_link_libraries(faf_datachannel PUBLIC Threads::Threads)
 else()
-  foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
+  foreach(_t faf_mbedtls faf_usrsctp faf_dcsctp faf_datachannel)
     target_compile_definitions(${_t} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
     target_compile_options(${_t} PRIVATE /W0)
   endforeach()
@@ -90,10 +110,11 @@ else()
   target_compile_options(faf_datachannel PRIVATE /EHsc)
   target_link_libraries(faf_mbedtls PUBLIC bcrypt)
   target_link_libraries(faf_usrsctp PUBLIC ws2_32 iphlpapi)
+  target_link_libraries(faf_dcsctp PUBLIC winmm)
   target_link_libraries(faf_datachannel PUBLIC ws2_32)
 endif()
 # Built only for what links them (faf_netlink since #239, faf_datachannel_test).
-foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
+foreach(_t faf_mbedtls faf_usrsctp faf_dcsctp faf_datachannel)
   target_link_libraries(${_t} PRIVATE faf_codegen)
   set_target_properties(${_t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endforeach()
