@@ -18,6 +18,8 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/WldSessionState.h"
 #include <cmath>
+#include <fstream>
+#include <sstream>
 
 namespace
 {
@@ -329,6 +331,8 @@ namespace
     moho::func_CancelReplayScrub_LuaFuncDef()->Run(&state);
     moho::func_IsReplayScrubbing_LuaFuncDef()->Run(&state);
     moho::func_GetReplayScrubProgress_LuaFuncDef()->Run(&state);
+    moho::func_GetGameTickUser_LuaFuncDef()->Run(&state);
+    moho::func_GameTick_LuaFuncDef()->Run(&state);
 
     // Verify all functions are bound and callable in Lua global scope
     CHECK(state.GetGlobal("GetReplayTotalTicks").IsFunction());
@@ -336,6 +340,8 @@ namespace
     CHECK(state.GetGlobal("CancelReplayScrub").IsFunction());
     CHECK(state.GetGlobal("IsReplayScrubbing").IsFunction());
     CHECK(state.GetGlobal("GetReplayScrubProgress").IsFunction());
+    CHECK(state.GetGlobal("GetGameTick").IsFunction());
+    CHECK(state.GetGlobal("GameTick").IsFunction());
 
     // Mock CWldSession buffer
     alignas(moho::CWldSession) std::uint8_t buffer[sizeof(moho::CWldSession)];
@@ -421,6 +427,13 @@ namespace
 
     // Simulate progress advance to midway (tick 500: (500-200)/(800-200) = 0.5)
     session->mGameTick = 500;
+
+    CHECK(moho::SCR_LuaDoString("gt = GetGameTick()", &state));
+    CHECK(state.GetGlobal("gt").GetInteger() == 500);
+
+    CHECK(moho::SCR_LuaDoString("gt2 = GameTick()", &state));
+    CHECK(state.GetGlobal("gt2").GetInteger() == 500);
+
     CHECK(moho::SCR_LuaDoString("prog = GetReplayScrubProgress()", &state));
     prog = state.GetGlobal("prog");
     CHECK(prog.IsTable());
@@ -444,6 +457,276 @@ namespace
     moho::gActiveWldSession = savedActiveSession;
   }
 
+  static std::string ReadFileToString(const char* path)
+  {
+    std::ifstream file(path, std::ios::in | std::ios::binary);
+    if (!file.is_open()) {
+      return "";
+    }
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
+  }
+
+  void TestReplayTimelineLuaSyntaxAndExecution()
+  {
+    LuaPlus::LuaState state(LuaPlus::LuaState::LIB_BASE);
+
+    // Mock UI environment
+    const char* const mockEnv =
+      "local function MakeProp(val)\n"
+      "    local p = { _val = val or 0 }\n"
+      "    p.Set = function(self, v) self._val = v end\n"
+      "    setmetatable(p, {\n"
+      "        __call = function(self)\n"
+      "            if type(self._val) == 'function' then return self._val() end\n"
+      "            return self._val\n"
+      "        end\n"
+      "    })\n"
+      "    return p\n"
+      "end\n"
+      "local G = {\n"
+      "    __init = function(self, parent, name)\n"
+      "        self._parent = parent\n"
+      "        self._name = name\n"
+      "        self._hidden = false\n"
+      "        self.Depth = MakeProp(10)\n"
+      "        self.Left = MakeProp(0)\n"
+      "        self.Right = MakeProp(500)\n"
+      "        self.Top = MakeProp(0)\n"
+      "        self.Bottom = MakeProp(100)\n"
+      "        self.Width = MakeProp(500)\n"
+      "        self.Height = MakeProp(100)\n"
+      "    end,\n"
+      "    Hide = function(self) self._hidden = true end,\n"
+      "    Show = function(self) self._hidden = false end,\n"
+      "    IsHidden = function(self) return self._hidden end,\n"
+      "    SetNeedsFrameUpdate = function(self, b) end,\n"
+      "    Destroy = function(self) end,\n"
+      "    GetTopmostDepth = function(self) return 10 end,\n"
+      "}\n"
+      "setmetatable(G, {\n"
+      "    __call = function(cls, parent, name)\n"
+      "        local inst = {}\n"
+      "        for k, v in cls do inst[k] = v end\n"
+      "        inst:__init(parent, name)\n"
+      "        return inst\n"
+      "    end\n"
+      "})\n"
+      "function import(mod)\n"
+      "    if mod == '/lua/ui/uiutil.lua' then\n"
+      "        return {\n"
+      "            bodyFont = 'Arial',\n"
+      "            titleFont = 'Arial',\n"
+      "            CreateText = function(parent, text, size, font)\n"
+      "                local t = { _text = text, _size = size, _color = 'ffffffff', _hidden = false }\n"
+      "                t.Depth = MakeProp(10)\n"
+      "                t.Left = MakeProp(0)\n"
+      "                t.Right = MakeProp(100)\n"
+      "                t.Top = MakeProp(0)\n"
+      "                t.Bottom = MakeProp(20)\n"
+      "                t.Width = MakeProp(100)\n"
+      "                t.Height = MakeProp(20)\n"
+      "                t.SetText = function(self, s) self._text = s end\n"
+      "                t.GetText = function(self) return self._text end\n"
+      "                t.SetColor = function(self, c) self._color = c end\n"
+      "                t.Hide = function(self) self._hidden = true end\n"
+      "                t.Show = function(self) self._hidden = false end\n"
+      "                return t\n"
+      "            end,\n"
+      "            CreateButtonWithDropshadow = function(parent, path, text)\n"
+      "                local b = { _text = text, _hidden = false }\n"
+      "                b.Depth = MakeProp(10)\n"
+      "                b.Left = MakeProp(0)\n"
+      "                b.Right = MakeProp(80)\n"
+      "                b.Top = MakeProp(0)\n"
+      "                b.Bottom = MakeProp(25)\n"
+      "                b.Width = MakeProp(80)\n"
+      "                b.Height = MakeProp(25)\n"
+      "                return b\n"
+      "            end,\n"
+      "        }\n"
+      "    elseif mod == '/lua/maui/layouthelpers.lua' then\n"
+      "        local lh = {}\n"
+      "        lh.ScaleNumber = function(n) return n end\n"
+      "        lh.FillParent = function(c, p) end\n"
+      "        lh.SetDimensions = function(c, w, h) end\n"
+      "        lh.AtCenterIn = function(c, p) end\n"
+      "        lh.AtHorizontalCenterIn = function(c, p) end\n"
+      "        lh.AtVerticalCenterIn = function(c, p) end\n"
+      "        lh.AtBottomIn = function(c, p, o) end\n"
+      "        lh.AtTopIn = function(c, p, o) end\n"
+      "        lh.AtLeftIn = function(c, p, o) end\n"
+      "        lh.AtRightIn = function(c, p, o) end\n"
+      "        lh.Below = function(c, p, o) end\n"
+      "        lh.Above = function(c, p, o) end\n"
+      "        lh.SetWidth = function(c, w) end\n"
+      "        lh.SetHeight = function(c, h) end\n"
+      "        return lh\n"
+      "    elseif mod == '/lua/maui/group.lua' then\n"
+      "        return { Group = G }\n"
+      "    elseif mod == '/lua/maui/bitmap.lua' then\n"
+      "        local B = function(parent)\n"
+      "            local b = { _parent = parent, _color = 'ffffffff' }\n"
+      "            b.Depth = MakeProp(10)\n"
+      "            b.Left = MakeProp(0)\n"
+      "            b.Right = MakeProp(100)\n"
+      "            b.Top = MakeProp(0)\n"
+      "            b.Bottom = MakeProp(20)\n"
+      "            b.Width = MakeProp(100)\n"
+      "            b.Height = MakeProp(20)\n"
+      "            b.SetSolidColor = function(self, c) self._color = c end\n"
+      "            return b\n"
+      "        end\n"
+      "        return { Bitmap = B }\n"
+      "    elseif mod == '/lua/maui/slider.lua' then\n"
+      "        local S = function(parent, isVert, min, max, inc)\n"
+      "            local s = { _min = min, _max = max, _val = min, _endValue = max }\n"
+      "            s.Depth = MakeProp(10)\n"
+      "            s.Left = MakeProp(0)\n"
+      "            s.Right = MakeProp(200)\n"
+      "            s.Top = MakeProp(0)\n"
+      "            s.Bottom = MakeProp(20)\n"
+      "            s.Width = MakeProp(200)\n"
+      "            s.Height = MakeProp(20)\n"
+      "            s._background = {\n"
+      "                Left = MakeProp(0),\n"
+      "                Right = MakeProp(200),\n"
+      "                Top = MakeProp(0),\n"
+      "                Bottom = MakeProp(20),\n"
+      "                Depth = MakeProp(9),\n"
+      "            }\n"
+      "            s._thumb = {\n"
+      "                Depth = MakeProp(11),\n"
+      "            }\n"
+      "            s.SetValue = function(self, v) self._val = v end\n"
+      "            s.GetValue = function(self) return self._val end\n"
+      "            s.SetEndValue = function(self, v) self._endValue = v end\n"
+      "            return s\n"
+      "        end\n"
+      "        return { IntegerSlider = S }\n"
+      "    elseif mod == '/lua/ui/dialogs/eschandler.lua' then\n"
+      "        return {\n"
+      "            PushEscapeHandler = function(fn) end,\n"
+      "            PopEscapeHandler = function() end,\n"
+      "        }\n"
+      "    end\n"
+      "    error('Unknown mock import: ' .. tostring(mod))\n"
+      "end\n"
+      "\n"
+      "function ClassUI(...)\n"
+      "    return function(members)\n"
+      "        local c = {}\n"
+      "        for k, v in G do c[k] = v end\n"
+      "        for k, v in members do\n"
+      "            c[k] = v\n"
+      "        end\n"
+      "        setmetatable(c, {\n"
+      "            __call = function(cls, p1, p2, p3, p4)\n"
+      "                local inst = {}\n"
+      "                for k, v in cls do inst[k] = v end\n"
+      "                if inst.__init then\n"
+      "                    inst:__init(p1, p2, p3, p4)\n"
+      "                end\n"
+      "                return inst\n"
+      "            end\n"
+      "        })\n"
+      "        return c\n"
+      "    end\n"
+      "end\n"
+      "\n"
+      "function GetFrame(n)\n"
+      "    local f = { _depth = 1 }\n"
+      "    f.GetTopmostDepth = function(self) return 10 end\n"
+      "    f.Depth = MakeProp(10)\n"
+      "    return f\n"
+      "end\n";
+
+    CHECK(moho::SCR_LuaDoString(mockEnv, &state));
+
+    // Register engine replay functions into test state
+    moho::func_GetReplayTotalTicks_LuaFuncDef()->Run(&state);
+    moho::func_ScrubReplay_LuaFuncDef()->Run(&state);
+    moho::func_CancelReplayScrub_LuaFuncDef()->Run(&state);
+    moho::func_IsReplayScrubbing_LuaFuncDef()->Run(&state);
+    moho::func_GetReplayScrubProgress_LuaFuncDef()->Run(&state);
+    moho::func_GetGameTickUser_LuaFuncDef()->Run(&state);
+
+    std::string timelineLua = ReadFileToString("data/fafengine/lua/ui/game/replay_timeline.lua");
+    if (timelineLua.empty()) {
+      timelineLua = ReadFileToString("../../data/fafengine/lua/ui/game/replay_timeline.lua");
+    }
+    CHECK(!timelineLua.empty());
+
+    // Execute replay_timeline.lua in engine Lua state
+    CHECK(moho::SCR_LuaDoString(timelineLua.c_str(), &state));
+
+    // Verify functions exported
+    CHECK(state.GetGlobal("CreateReplayTimeline").IsFunction());
+    CHECK(state.GetGlobal("GetTimelineControl").IsFunction());
+    CHECK(state.GetGlobal("GetScrubOverlay").IsFunction());
+
+    // Create the timeline
+    CHECK(moho::SCR_LuaDoString("tb = CreateReplayTimeline(GetFrame(0))", &state));
+    CHECK(!state.GetGlobal("tb").IsNil());
+
+    // Verify overlay
+    CHECK(moho::SCR_LuaDoString("ov = GetScrubOverlay()", &state));
+    CHECK(!state.GetGlobal("ov").IsNil());
+
+    // Test overlay Show/Update/Hide cycle
+    CHECK(moho::SCR_LuaDoString("ov:ShowOverlay(1200)", &state));
+    CHECK(moho::SCR_LuaDoString("ish = ov:IsHidden()", &state));
+    CHECK(state.GetGlobal("ish").GetBoolean() == false);
+
+    CHECK(moho::SCR_LuaDoString("ov:UpdateProgress({ progress = 0.5, currentTick = 600, targetTick = 1200 })", &state));
+
+    CHECK(moho::SCR_LuaDoString("ov:HideOverlay()", &state));
+    CHECK(moho::SCR_LuaDoString("ish = ov:IsHidden()", &state));
+    CHECK(state.GetGlobal("ish").GetBoolean() == true);
+
+    // Test timeline frame update
+    CHECK(moho::SCR_LuaDoString("tb:OnFrame(0.016)", &state));
+
+    // Test gamemain.lua hook
+    std::string gamemainLua = ReadFileToString("data/fafengine/lua/ui/game/gamemain.lua");
+    if (gamemainLua.empty()) {
+      gamemainLua = ReadFileToString("../../data/fafengine/lua/ui/game/gamemain.lua");
+    }
+    CHECK(!gamemainLua.empty());
+
+    // Setup mock gamemain base functions
+    const char* const mockGameMainBase =
+      "CreateUICalled = false\n"
+      "OnFirstUpdateCalled = false\n"
+      "function CreateUI(isReplay)\n"
+      "    CreateUICalled = true\n"
+      "end\n"
+      "function OnFirstUpdate()\n"
+      "    OnFirstUpdateCalled = true\n"
+      "end\n"
+      "function SessionIsReplay()\n"
+      "    return true\n"
+      "end\n";
+    CHECK(moho::SCR_LuaDoString(mockGameMainBase, &state));
+
+    // Execute gamemain.lua hook
+    CHECK(moho::SCR_LuaDoString(gamemainLua.c_str(), &state));
+
+    // Call hooked CreateUI
+    CHECK(moho::SCR_LuaDoString("CreateUI(true)", &state));
+    CHECK(state.GetGlobal("CreateUICalled").GetBoolean() == true);
+
+    // Call hooked OnFirstUpdate
+    CHECK(moho::SCR_LuaDoString("OnFirstUpdate()", &state));
+    CHECK(state.GetGlobal("OnFirstUpdateCalled").GetBoolean() == true);
+
+    // Cleanup
+    CHECK(moho::SCR_LuaDoString("tb:OnDestroy()", &state));
+    CHECK(moho::SCR_LuaDoString("ctrl = GetTimelineControl()", &state));
+    CHECK(state.GetGlobal("ctrl").GetBoolean() == false);
+  }
+
   struct TestCase
   {
     const char* name;
@@ -461,6 +744,7 @@ namespace
     {"vcr setup replay session calculates total beats", &TestVCRSetupReplaySessionCalculatesTotalBeats},
     {"wldsession scrubbing state transitions", &TestCWldSessionScrubbingStateTransitions},
     {"replay scrubbing user lua bindings", &TestReplayScrubbingUserLuaBindings},
+    {"replay timeline lua syntax and execution", &TestReplayTimelineLuaSyntaxAndExecution},
   };
 } // namespace
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "gpg/core/containers/DList.h"
 #include "../../gpg/core/reflection/Reflection.h"
@@ -5113,6 +5113,14 @@ namespace moho
    * Returns a Lua table with scrub progress details, or nil if not scrubbing.
    */
   int cfunc_GetReplayScrubProgressL(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition: Expose GetGameTick alias in user Lua as well.
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `GetGameTick` in user Lua.
+   */
+  CScrLuaInitForm* func_GetGameTickUser_LuaFuncDef();
 
   /**
    * Address: 0x00897E60 (FUN_00897E60, cfunc_SessionIsBeingRecorded)

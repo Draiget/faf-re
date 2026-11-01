@@ -1569,6 +1569,25 @@ moho::CScrLuaInitForm* moho::func_GameTick_LuaFuncDef()
 }
 
 /**
+ * Engine addition: Expose GetGameTick alias in user Lua as well.
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetGameTick` in user Lua.
+ */
+moho::CScrLuaInitForm* moho::func_GetGameTickUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetGameTick",
+    &moho::cfunc_GameTick,
+    nullptr,
+    "<global>",
+    kGameTickUserHelpText
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x008BE420 (FUN_008BE420, cfunc_GameTickL)
  *
  * What it does:
@@ -7916,6 +7935,7 @@ namespace
       (void)::moho::func_CurrentTime_LuaFuncDef();
       (void)::moho::func_GameTime_LuaFuncDef();
       (void)::moho::func_GameTick_LuaFuncDef();
+      (void)::moho::func_GetGameTickUser_LuaFuncDef();
       (void)::moho::func_IsAllyUser_LuaFuncDef();
       (void)::moho::func_IsEnemyUser_LuaFuncDef();
       (void)::moho::func_IsNeutral_LuaFuncDef();
