@@ -20,6 +20,7 @@ The launcher's arguments, plus a few of ours:
 | `--access-token`, `--icebreaker-base-url`, others | accepted and ignored |
 | `--duplicate-ms <n>` | send every game datagram a second time, `n` ms after the first (0: right after it); off by default (#235). The game drops a repeated DATA packet by its sequence number, so the copy only counts when the first is lost |
 | `--webrtc` | offer WebRTC data channels to our own peers (#239, below); also `FAF_NETBRIDGE_WEBRTC=1` |
+| `--sctp-backend <usrsctp|dcsctp>` | SCTP implementation for WebRTC data channels: `usrsctp` (default) or `dcsctp` (Google WebRTC); also `FAF_NETBRIDGE_SCTP=<usrsctp|dcsctp>` |
 | `--redundancy <n>` | with our own peers, carry game datagrams on the redundant lane, each repeated up to `n` times until acked (#240, below); 0 (default) is off. Also `FAF_NETBRIDGE_REDUNDANCY=<n>`, and passed to a game that runs its own links (`redundancy` in `NetlinkConfig`) |
 | `--test-drop-percent <n>` | tests only: drop n % of the game's datagrams before sending, on either path; on the redundant lane, of the lane's datagrams |
 | `--stats-interval <s>` | seconds between statistics lines, default 10; 0 logs them only when a link closes (#241) |

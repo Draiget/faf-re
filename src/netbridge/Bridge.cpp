@@ -115,6 +115,13 @@ namespace faf::netbridge
         o.duplicateGapMs = std::atoi(next());
       } else if (name == "--webrtc") {
         o.webrtc = true;
+      } else if (name == "--sctp-backend" && i + 1 < argc) {
+        std::string backend = argv[++i];
+        if (backend == "dcsctp" || backend == "1") {
+          o.sctpBackend = netlink::SctpBackend::DcSctp;
+        } else {
+          o.sctpBackend = netlink::SctpBackend::UsrSctp;
+        }
       } else if (name == "--redundancy") {
         o.redundancy = std::atoi(next()); // issue #240
       } else if (name == "--test-drop-percent") {
@@ -684,6 +691,7 @@ namespace faf::netbridge
     config.Set("bindAddress", mOptions.bindAddress);
     config.Set("duplicateMs", static_cast<std::int64_t>(mOptions.duplicateGapMs));
     config.Set("webrtc", mOptions.webrtc);
+    config.Set("sctpBackend", mOptions.sctpBackend == netlink::SctpBackend::DcSctp ? "dcsctp" : "usrsctp");
     config.Set("redundancy", static_cast<std::int64_t>(mOptions.redundancy));
     config.Set("testDropPercent", static_cast<std::int64_t>(mOptions.testDropPercent));
     SendToGame({netlink::kCmdConfig, {GpgArg::Str(netlink::WriteJson(config))}}, false);
@@ -758,6 +766,7 @@ namespace faf::netbridge
     lo.bindAddress = mOptions.bindAddress;
     lo.duplicateGapMs = mOptions.duplicateGapMs;
     lo.webrtc = mOptions.webrtc;
+    lo.sctpBackend = mOptions.sctpBackend;
     lo.redundancy = mOptions.redundancy;
     lo.testDropPercent = mOptions.testDropPercent;
     lo.ufragPrefix = netlink::kOurUfragPrefix;

@@ -1,0 +1,521 @@
+diff --git a/include/rtc/configuration.hpp b/include/rtc/configuration.hpp
+index f2cb135..d98e2ea 100644
+--- a/include/rtc/configuration.hpp
++++ b/include/rtc/configuration.hpp
+@@ -63,7 +63,10 @@ enum class CertificateType {
+ 
+ enum class TransportPolicy { All = RTC_TRANSPORT_POLICY_ALL, Relay = RTC_TRANSPORT_POLICY_RELAY };
+ 
++enum class SctpBackend { UsrSctp = 0, DcSctp = 1 };
++
+ struct RTC_CPP_EXPORT Configuration {
++	using SctpBackend = rtc::SctpBackend;
+ 	// ICE settings
+ 	std::vector<IceServer> iceServers;
+ 	optional<ProxyServer> proxyServer; // libnice only
+@@ -72,6 +75,7 @@ struct RTC_CPP_EXPORT Configuration {
+ 	// Options
+ 	CertificateType certificateType = CertificateType::Default;
+ 	TransportPolicy iceTransportPolicy = TransportPolicy::All;
++	SctpBackend sctpBackend = SctpBackend::UsrSctp;
+ 	bool enableIceTcp = false;
+ 	bool enableIceUdpMux = false; // libjuice only
+ 	bool disableAutoNegotiation = false;
+diff --git a/src/impl/dcsctpbackend.cpp b/src/impl/dcsctpbackend.cpp
+new file mode 100644
+index 0000000..f84b5c6
+--- /dev/null
++++ b/src/impl/dcsctpbackend.cpp
+@@ -0,0 +1,272 @@
++#include "dcsctpbackend.hpp"
++#include "sctptransport.hpp"
++#include "threadpool.hpp"
++
++#include "net/dcsctp/public/dcsctp_socket_factory.h"
++#include "net/dcsctp/public/dcsctp_socket.h"
++#include "net/dcsctp/public/dcsctp_options.h"
++#include "net/dcsctp/public/types.h"
++#include "net/dcsctp/public/dcsctp_message.h"
++#include "net/dcsctp/public/timeout.h"
++#include "api/units/time_delta.h"
++#include "api/units/timestamp.h"
++
++#include <atomic>
++#include <mutex>
++#include <random>
++#include <vector>
++#include <stdexcept>
++#include <iostream>
++
++#include "plog/Log.h"
++
++namespace rtc::impl {
++
++struct DcSctpBackend::Impl : public dcsctp::DcSctpSocketCallbacks,
++                             public std::enable_shared_from_this<DcSctpBackend::Impl> {
++	SctpTransport *transport = nullptr;
++	size_t maxMessageSize = 262144;
++	std::unique_ptr<dcsctp::DcSctpSocketInterface> socket;
++	std::recursive_mutex mutex;
++	std::atomic<size_t> bytesSent{0};
++	std::atomic<size_t> bytesReceived{0};
++
++	class DcSctpTimeout final : public dcsctp::Timeout {
++	public:
++		DcSctpTimeout(std::weak_ptr<DcSctpBackend::Impl> parent) : mParent(std::move(parent)) {}
++		~DcSctpTimeout() override { Stop(); }
++
++		void Start(dcsctp::DurationMs duration, dcsctp::TimeoutID timeout_id) override {
++			uint64_t gen = ++mGeneration;
++			mActiveFlag->store(gen);
++			ThreadPool::Instance().schedule(std::chrono::milliseconds(*duration),
++			    [weak = mParent, gen, timeout_id, flag = mActiveFlag]() {
++				    if (flag->load() == gen) {
++					    if (auto p = weak.lock()) {
++						    p->handleTimeout(timeout_id);
++					    }
++				    }
++			    });
++		}
++
++		void Stop() override {
++			mActiveFlag->store(0);
++		}
++
++	private:
++		std::weak_ptr<DcSctpBackend::Impl> mParent;
++		std::atomic<uint64_t> mGeneration{0};
++		std::shared_ptr<std::atomic<uint64_t>> mActiveFlag = std::make_shared<std::atomic<uint64_t>>(0);
++	};
++
++	void handleTimeout(dcsctp::TimeoutID timeout_id) {
++		std::lock_guard lock(mutex);
++		if (socket) {
++			socket->HandleTimeout(timeout_id);
++		}
++	}
++
++	// --- dcsctp::DcSctpSocketCallbacks implementation ---
++
++	dcsctp::SendPacketStatus SendPacketWithStatus(std::span<const uint8_t> data) override {
++		try {
++			const auto *raw = reinterpret_cast<const std::byte *>(data.data());
++			if (!transport->triggerOutgoing(make_message(raw, raw + data.size())))
++				return dcsctp::SendPacketStatus::kError;
++			bytesSent += data.size();
++			return dcsctp::SendPacketStatus::kSuccess;
++		} catch (...) {
++			return dcsctp::SendPacketStatus::kError;
++		}
++	}
++
++	std::unique_ptr<dcsctp::Timeout> CreateTimeout(webrtc::TaskQueueBase::DelayPrecision) override {
++		return std::make_unique<DcSctpTimeout>(weak_from_this());
++	}
++
++	webrtc::Timestamp Now() override {
++		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
++		              std::chrono::steady_clock::now().time_since_epoch())
++		              .count();
++		return webrtc::Timestamp::Millis(ms);
++	}
++
++	uint32_t GetRandomInt(uint32_t low, uint32_t high) override {
++		if (low >= high)
++			return low;
++		std::random_device rd;
++		std::mt19937 gen(rd());
++		std::uniform_int_distribution<uint32_t> dis(low, high - 1);
++		return dis(gen);
++	}
++
++	void OnMessageReceived(dcsctp::DcSctpMessage message) override {
++		uint32_t ppid = *message.ppid();
++		uint16_t sid = *message.stream_id();
++		auto payload = std::move(message).ReleasePayload();
++		bytesReceived += payload.size();
++
++		Message::Type type = Message::Binary;
++		if (ppid == 50) {
++			type = Message::Control;
++		} else if (ppid == 51 || ppid == 54 || ppid == 56) {
++			type = Message::String;
++		}
++
++		const auto *raw = reinterpret_cast<const std::byte *>(payload.data());
++		auto msg = make_message(raw, raw + payload.size(), type, sid);
++		transport->triggerRecv(std::move(msg));
++	}
++
++	void OnConnected() override {
++		PLOG_DEBUG << "dcSCTP socket connected";
++		transport->triggerChangeState(Transport::State::Connected);
++	}
++
++	void OnClosed() override {
++		PLOG_DEBUG << "dcSCTP socket closed";
++		transport->triggerChangeState(Transport::State::Disconnected);
++	}
++
++	void OnError(dcsctp::ErrorKind error, std::string_view msg) override {
++		PLOG_WARNING << "dcSCTP error: " << ToString(error) << ": " << msg;
++		transport->triggerChangeState(Transport::State::Failed);
++	}
++
++	void OnAborted(dcsctp::ErrorKind error, std::string_view msg) override {
++		PLOG_WARNING << "dcSCTP aborted: " << ToString(error) << ": " << msg;
++		transport->triggerChangeState(Transport::State::Failed);
++	}
++
++	void OnConnectionRestarted() override {}
++	void OnStreamsResetFailed(std::span<const dcsctp::StreamID>, std::string_view) override {}
++	void OnStreamsResetPerformed(std::span<const dcsctp::StreamID>) override {}
++	void OnIncomingStreamsReset(std::span<const dcsctp::StreamID>) override {}
++};
++
++DcSctpBackend::DcSctpBackend(SctpTransport *transport, const Configuration &config,
++                             uint16_t localPort, uint16_t remotePort, size_t maxMessageSize)
++    : mImpl(std::make_shared<Impl>()) {
++	mImpl->transport = transport;
++	mImpl->maxMessageSize = maxMessageSize;
++
++	dcsctp::DcSctpOptions options;
++	options.local_port = localPort;
++	options.remote_port = remotePort;
++	options.max_message_size = maxMessageSize;
++	if (config.mtu.has_value()) {
++		size_t pmtu = *config.mtu - 12 - 48 - 8 - 40;
++		if (pmtu >= 500 && pmtu <= 65535)
++			options.mtu = pmtu;
++	}
++
++	mImpl->socket = dcsctp::DcSctpSocketFactory().Create("dcsctp", *mImpl, nullptr, options);
++}
++
++DcSctpBackend::~DcSctpBackend() {
++	close();
++}
++
++void DcSctpBackend::connect() {
++	mImpl->transport->triggerChangeState(Transport::State::Connecting);
++	std::lock_guard lock(mImpl->mutex);
++	if (mImpl->socket) {
++		mImpl->socket->Connect();
++	}
++}
++
++void DcSctpBackend::close() {
++	std::lock_guard lock(mImpl->mutex);
++	if (mImpl->socket) {
++		mImpl->socket->Close();
++	}
++}
++
++void DcSctpBackend::closeStream(unsigned int stream) {
++	std::lock_guard lock(mImpl->mutex);
++	if (mImpl->socket) {
++		std::vector<dcsctp::StreamID> streams = {dcsctp::StreamID(uint16_t(stream))};
++		mImpl->socket->ResetStreams(streams);
++	}
++}
++
++bool DcSctpBackend::send(message_ptr message) {
++	std::lock_guard lock(mImpl->mutex);
++	if (!mImpl->socket || mImpl->transport->state() != Transport::State::Connected)
++		return false;
++	if (!message)
++		return true;
++	if (message->size() > mImpl->maxMessageSize)
++		throw std::invalid_argument("Message size exceeds limit");
++
++	uint32_t ppid = 53; // PPID_BINARY
++	switch (message->type) {
++	case Message::String:
++		ppid = !message->empty() ? 51 : 56;
++		break;
++	case Message::Binary:
++		ppid = !message->empty() ? 53 : 57;
++		break;
++	case Message::Control:
++		ppid = 50;
++		break;
++	case Message::Reset:
++		closeStream(uint16_t(message->stream));
++		return true;
++	default:
++		return true;
++	}
++
++	dcsctp::SendOptions send_options;
++	const Reliability reliability = message->reliability ? *message->reliability : Reliability();
++	if (reliability.unordered)
++		send_options.unordered = dcsctp::IsUnordered(true);
++	if (reliability.maxPacketLifeTime.has_value())
++		send_options.lifetime = dcsctp::DurationMs(reliability.maxPacketLifeTime->count());
++	else if (reliability.maxRetransmits.has_value())
++		send_options.max_retransmissions = *reliability.maxRetransmits;
++
++	const auto *raw = reinterpret_cast<const uint8_t *>(message->data());
++	std::vector<uint8_t> payload(raw, raw + message->size());
++	dcsctp::DcSctpMessage dcsctp_msg(
++	    dcsctp::StreamID(uint16_t(message->stream)),
++	    dcsctp::PPID(ppid),
++	    std::move(payload));
++
++	auto status = mImpl->socket->Send(std::move(dcsctp_msg), send_options);
++	return status == dcsctp::SendStatus::kSuccess;
++}
++
++void DcSctpBackend::incoming(message_ptr message) {
++	if (!message || message->empty())
++		return;
++	std::lock_guard lock(mImpl->mutex);
++	if (mImpl->socket) {
++		mImpl->socket->ReceivePacket(std::span<const uint8_t>(
++		    reinterpret_cast<const uint8_t *>(message->data()), message->size()));
++	}
++}
++
++unsigned int DcSctpBackend::maxStream() const {
++	return 65534;
++}
++
++size_t DcSctpBackend::bytesSent() const {
++	return mImpl->bytesSent.load();
++}
++
++size_t DcSctpBackend::bytesReceived() const {
++	return mImpl->bytesReceived.load();
++}
++
++std::optional<std::chrono::milliseconds> DcSctpBackend::rtt() const {
++	std::lock_guard lock(mImpl->mutex);
++	if (!mImpl->socket)
++		return std::nullopt;
++	auto metrics = mImpl->socket->GetMetrics();
++	if (metrics && metrics->srtt_ms > 0)
++		return std::chrono::milliseconds(metrics->srtt_ms);
++	return std::nullopt;
++}
++
++} // namespace rtc::impl
+diff --git a/src/impl/dcsctpbackend.hpp b/src/impl/dcsctpbackend.hpp
+new file mode 100644
+index 0000000..bb8e554
+--- /dev/null
++++ b/src/impl/dcsctpbackend.hpp
+@@ -0,0 +1,40 @@
++#ifndef RTC_IMPL_DCSCTP_BACKEND_H
++#define RTC_IMPL_DCSCTP_BACKEND_H
++
++#include "common.hpp"
++#include "configuration.hpp"
++#include "message.hpp"
++
++#include <chrono>
++#include <memory>
++#include <optional>
++
++namespace rtc::impl {
++
++class SctpTransport;
++
++class DcSctpBackend {
++public:
++	DcSctpBackend(SctpTransport *transport, const Configuration &config,
++	              uint16_t localPort, uint16_t remotePort, size_t maxMessageSize);
++	~DcSctpBackend();
++
++	void connect();
++	void close();
++	void closeStream(unsigned int stream);
++	bool send(message_ptr message);
++	void incoming(message_ptr message);
++	unsigned int maxStream() const;
++
++	size_t bytesSent() const;
++	size_t bytesReceived() const;
++	std::optional<std::chrono::milliseconds> rtt() const;
++
++private:
++	struct Impl;
++	std::shared_ptr<Impl> mImpl;
++};
++
++} // namespace rtc::impl
++
++#endif // RTC_IMPL_DCSCTP_BACKEND_H
+diff --git a/src/impl/sctptransport.cpp b/src/impl/sctptransport.cpp
+index 552ee94..1e0d597 100644
+--- a/src/impl/sctptransport.cpp
++++ b/src/impl/sctptransport.cpp
+@@ -7,6 +7,7 @@
+  */
+ 
+ #include "sctptransport.hpp"
++#include "dcsctpbackend.hpp"
+ #include "dtlstransport.hpp"
+ #include "internals.hpp"
+ #include "logcounter.hpp"
+@@ -164,6 +165,13 @@ SctpTransport::SctpTransport(shared_ptr<Transport> lower, const Configuration &c
+       mBufferedAmountCallback(std::move(bufferedAmountCallback)) {
+ 	onRecv(std::move(recvCallback));
+ 
++	mBackend = config.sctpBackend;
++	if (mBackend == Configuration::SctpBackend::DcSctp) {
++		mSock = nullptr;
++		mDcSctp = std::make_shared<DcSctpBackend>(this, config, mPorts.local, mPorts.remote, mMaxMessageSize);
++		return;
++	}
++
+ 	PLOG_DEBUG << "Initializing SCTP transport";
+ 
+ 	mSock = usrsctp_socket(AF_CONN, SOCK_STREAM, IPPROTO_SCTP, nullptr, nullptr, 0, nullptr);
+@@ -316,6 +324,12 @@ SctpTransport::SctpTransport(shared_ptr<Transport> lower, const Configuration &c
+ SctpTransport::~SctpTransport() {
+ 	PLOG_DEBUG << "Destroying SCTP transport";
+ 
++	if (mDcSctp) {
++		unregisterIncoming();
++		mDcSctp.reset();
++		return;
++	}
++
+ 	mProcessor.join(); // if we are here, the processor must be empty
+ 
+ 	// Before unregistering incoming() from the lower layer, we need to make sure the thread from
+@@ -337,6 +351,10 @@ void SctpTransport::onBufferedAmount(amount_callback callback) {
+ 
+ void SctpTransport::start() {
+ 	registerIncoming();
++	if (mDcSctp) {
++		mDcSctp->connect();
++		return;
++	}
+ 	connect();
+ }
+ 
+@@ -354,6 +372,11 @@ struct sockaddr_conn SctpTransport::getSockAddrConn(uint16_t port) {
+ }
+ 
+ void SctpTransport::connect() {
++	if (mDcSctp) {
++		mDcSctp->connect();
++		return;
++	}
++
+ 	PLOG_DEBUG << "SCTP connecting (local port=" << mPorts.local
+ 	           << ", remote port=" << mPorts.remote << ")";
+ 	changeState(State::Connecting);
+@@ -372,6 +395,9 @@ void SctpTransport::connect() {
+ }
+ 
+ bool SctpTransport::send(message_ptr message) {
++	if (mDcSctp)
++		return mDcSctp->send(message);
++
+ 	std::lock_guard lock(mSendMutex);
+ 	if (state() != State::Connected)
+ 		return false;
+@@ -409,6 +435,11 @@ bool SctpTransport::flush() {
+ }
+ 
+ void SctpTransport::closeStream(unsigned int stream) {
++	if (mDcSctp) {
++		mDcSctp->closeStream(stream);
++		return;
++	}
++
+ 	std::lock_guard lock(mSendMutex);
+ 
+ 	// RFC 8831 6.7. Closing a Data Channel
+@@ -421,6 +452,11 @@ void SctpTransport::closeStream(unsigned int stream) {
+ }
+ 
+ void SctpTransport::close() {
++	if (mDcSctp) {
++		mDcSctp->close();
++		return;
++	}
++
+ 	mSendQueue.stop();
+ 	if (state() == State::Connected) {
+ 		mProcessor.enqueue(&SctpTransport::flush, shared_from_this());
+@@ -439,11 +475,19 @@ void SctpTransport::close() {
+ }
+ 
+ unsigned int SctpTransport::maxStream() const {
++	if (mDcSctp)
++		return mDcSctp->maxStream();
++
+ 	unsigned int streamsCount = mNegotiatedStreamsCount.value_or(MAX_SCTP_STREAMS_COUNT);
+ 	return streamsCount > 0 ? streamsCount - 1 : 0;
+ }
+ 
+ void SctpTransport::incoming(message_ptr message) {
++	if (mDcSctp) {
++		mDcSctp->incoming(message);
++		return;
++	}
++
+ 	// There could be a race condition here where we receive the remote INIT before the local one is
+ 	// sent, which would result in the connection being aborted. Therefore, we need to wait for data
+ 	// to be sent on our side (i.e. the local INIT) before proceeding.
+@@ -945,11 +989,21 @@ void SctpTransport::clearStats() {
+ 	mBytesSent = 0;
+ }
+ 
+-size_t SctpTransport::bytesSent() { return mBytesSent; }
++size_t SctpTransport::bytesSent() {
++	if (mDcSctp)
++		return mDcSctp->bytesSent();
++	return mBytesSent;
++}
+ 
+-size_t SctpTransport::bytesReceived() { return mBytesReceived; }
++size_t SctpTransport::bytesReceived() {
++	if (mDcSctp)
++		return mDcSctp->bytesReceived();
++	return mBytesReceived;
++}
+ 
+ optional<milliseconds> SctpTransport::rtt() {
++	if (mDcSctp)
++		return mDcSctp->rtt();
+ 	if (state() != State::Connected)
+ 		return nullopt;
+ 
+diff --git a/src/impl/sctptransport.hpp b/src/impl/sctptransport.hpp
+index 769b505..f4a9c23 100644
+--- a/src/impl/sctptransport.hpp
++++ b/src/impl/sctptransport.hpp
+@@ -25,12 +25,19 @@
+ 
+ namespace rtc::impl {
+ 
++class DcSctpBackend;
++
+ class SctpTransport final : public Transport, public std::enable_shared_from_this<SctpTransport> {
++	friend class DcSctpBackend;
+ public:
+ 	static void Init();
+ 	static void SetSettings(const SctpSettings &s);
+ 	static void Cleanup();
+ 
++	void triggerRecv(message_ptr message) { recv(std::move(message)); }
++	void triggerChangeState(State s) { changeState(s); }
++	bool triggerOutgoing(message_ptr message) { return outgoing(std::move(message)); }
++
+ 	using amount_callback = std::function<void(uint16_t streamId, size_t amount)>;
+ 
+ 	struct Ports {
+@@ -128,6 +135,9 @@ private:
+ 
+ 	class InstancesSet;
+ 	static InstancesSet* Instances;
++
++	rtc::SctpBackend mBackend = rtc::SctpBackend::UsrSctp;
++	std::shared_ptr<DcSctpBackend> mDcSctp;
+ };
+ 
+ } // namespace rtc::impl

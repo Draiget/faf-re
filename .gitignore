@@ -30,6 +30,7 @@ dependencies/dxc/
 dependencies/libjuice/
 dependencies/libdatachannel/
 dependencies/usrsctp/
+dependencies/dcsctp/
 dependencies/plog/
 dependencies/mbedtls/
 dependencies/slang/

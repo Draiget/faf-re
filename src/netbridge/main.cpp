@@ -29,6 +29,11 @@ int main(int argc, char** argv)
   if (const char* webrtc = std::getenv("FAF_NETBRIDGE_WEBRTC"); webrtc != nullptr && *webrtc == '1') {
     options.webrtc = true; // issue #239, for runs through the launch shim
   }
+  if (const char* sctp = std::getenv("FAF_NETBRIDGE_SCTP"); sctp != nullptr) {
+    if (std::string(sctp) == "dcsctp" || std::string(sctp) == "1") {
+      options.sctpBackend = faf::netlink::SctpBackend::DcSctp;
+    }
+  }
   if (const char* redundancy = std::getenv("FAF_NETBRIDGE_REDUNDANCY"); redundancy != nullptr) {
     options.redundancy = std::atoi(redundancy); // issue #240, for runs through the launch shim
   }

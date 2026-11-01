@@ -55,6 +55,8 @@ namespace faf::netbridge
     int duplicateGapMs = -1;
     // Issue #239: offer WebRTC data channels to our peers (--webrtc).
     bool webrtc = false;
+    // Issue #239: SCTP backend selection (--sctp-backend <usrsctp|dcsctp>).
+    netlink::SctpBackend sctpBackend = netlink::SctpBackend::UsrSctp;
     // Issue #240: the redundant lane with our peers, each game datagram
     // repeated up to this many times until acked (--redundancy N); 0 is off.
     int redundancy = 0;

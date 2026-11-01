@@ -52,6 +52,9 @@ namespace moho
   // on a redundant lane that repeats each up to this many times until acked;
   // 0 sends them plainly. Read when a link starts.
   int32_t net_NativeNetRedundancy = 2;
+  // Issue #239: SCTP implementation for WebRTC data channels: 0 (default) usrsctp,
+  // 1 dcSCTP (Google WebRTC). Read when a link starts.
+  int32_t net_SctpBackend = 0;
   // Issue #236, diagnostics: log every beat that became available this many ms
   // or more after the one before it (waiting on a peer's data); 0 logs nothing.
   // Live.
@@ -81,6 +84,12 @@ namespace moho
       "net_NativeNetWebRtc",
       "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
       &net_NativeNetWebRtc
+    );
+
+    TConVar<int32_t> gTConVar_net_SctpBackend(
+      "net_SctpBackend",
+      "SCTP implementation for WebRTC data channels: 0 (default) usrsctp (BSD-3-Clause), 1 dcSCTP (Google WebRTC). Next link.",
+      &net_SctpBackend
     );
 
     TConVar<int32_t> gTConVar_net_LogBeatWaitMs(
@@ -210,6 +219,15 @@ namespace moho
      */
     TConVar<int32_t> gTConVar_net_ResendDelayBias("net_ResendDelayBias", "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.", &net_ResendDelayBias);
   } // namespace
+
+  int32_t NET_GetSctpBackend()
+  {
+    static const bool sDcSctpFlag = CFG_GetArgOption("/dcsctp", 0u, nullptr);
+    if (sDcSctpFlag) {
+      return 1;
+    }
+    return net_SctpBackend;
+  }
 
   bool NET_FastRetransmitEnabled()
   {

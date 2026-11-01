@@ -202,6 +202,11 @@ set(_faf_download_usrsctp
     "e5c114afe73c9a0ec419fab5f5b3f63f3ce57b09b90d06ea85e63dca8aed3e7c"
     "usrsctp-fec583d54493f879d2ae44a743423bf8a04371ab"
     "usrsctp-fec583d5.tar.gz")
+set(_faf_download_dcsctp
+    "https://github.com/SamGaaWaa/dcsctp/archive/d72f73c619701fc18a4da6dacb4da99566d83dd2.tar.gz"
+    "2a43a7da39c4bf07606088d75aa9bd5b65363b50be87eccb3e2e856cb2c6645a"
+    "dcsctp-d72f73c619701fc18a4da6dacb4da99566d83dd2"
+    "dcsctp-d72f73c6.tar.gz")
 set(_faf_download_plog
     "https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz"
     "92a08bce559b5f28aa88d3fd9071567414b9f43a83fe2a05a6dd14f1da536072"
@@ -386,6 +391,7 @@ faf_dependency_download(dxc)
 faf_dependency_download(libjuice)
 faf_dependency_download(libdatachannel)
 faf_dependency_download(usrsctp)
+faf_dependency_download(dcsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
@@ -398,4 +404,6 @@ faf_dependency_patches(boost_1_34_1 download
   boost_1_34_1_faf_required.patch)
 faf_dependency_patches(wxWindows-2.4.2 download
   wxwindows_2_4_2_faf_required.patch wxwindows_2_4_2_faf_x64.patch wxwindows_2_4_2_faf_x64_pointers.patch)
+faf_dependency_patches(libdatachannel download
+  libdatachannel_faf_dcsctp.patch)
 _faf_wx_generated()
