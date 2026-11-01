@@ -138,6 +138,15 @@ namespace moho
       return !out.mHost.empty() && out.mPort > 0 && out.mPort < 65536;
     }
 
+    /// What one POST carries besides the body: its type, any further header lines
+    /// (`Name: value\r\n` each) and the send/receive timeout.
+    struct SPostKind
+    {
+      const char* mContentType = "application/json";
+      std::string mHeaders;
+      int mTimeoutMs = kTimeoutMs;
+    };
+
 #if defined(_WIN32)
     /// WinHTTP, loaded at the first post: the import table stays as it is, so the headless exe's
     /// allowed-DLL check (cmake/HeadlessImports.cmake) still holds.
@@ -191,15 +200,6 @@ namespace moho
       }
       return out;
     }
-
-    /// What one POST carries besides the body: its type, any further header lines
-    /// (`Name: value\r\n` each) and the send/receive timeout.
-    struct SPostKind
-    {
-      const char* mContentType = "application/json";
-      std::string mHeaders;
-      int mTimeoutMs = kTimeoutMs;
-    };
 
     /// The HTTP status of one POST, or 0 when the request failed.
     [[nodiscard]] int Post(
