@@ -12,6 +12,8 @@ namespace faf::remote::net
     constexpr std::uint32_t kAckAfterUnanswered = 4;
     constexpr std::uint32_t kMaxReorderThreshold = 64;
     constexpr std::uint32_t kMaxReorderTimeEighths = 16;
+    // Redundant messages kept for repeats at most; older ones are given up.
+    constexpr std::size_t kMaxLaneMessages = 512;
     // Consecutive timeouts double the retransmission timeout up to 2^this.
     constexpr std::uint32_t kMaxBackoff = 6;
   } // namespace
@@ -77,6 +79,93 @@ namespace faf::remote::net
     return true;
   }
 
+  bool NetChannel::SendRedundant(const void* const data, const std::size_t size)
+  {
+    if (mState == ChannelState::TimedOut || mState == ChannelState::Failed || size > MaxUnreliableSize() ||
+        mNextLaneSequence == UINT32_MAX) {
+      return false;
+    }
+    if (mLaneOut.size() >= kMaxLaneMessages) {
+      if (!mLaneOut.front().sent) {
+        return false; // nothing has gone out for a while: the caller is far ahead of Poll
+      }
+      mLaneOut.pop_front();
+      ++mStats.redundantUnacked;
+    }
+    const auto* const bytes = static_cast<const std::uint8_t*>(data);
+    LaneMessage& m = mLaneOut.emplace_back();
+    m.sequence = mNextLaneSequence++;
+    m.bytes.assign(bytes, bytes + size);
+    m.repeatsLeft = mConfig.redundancy;
+    return true;
+  }
+
+  void NetChannel::LaneAcked(const std::vector<std::uint32_t>& sequences)
+  {
+    for (const std::uint32_t s : sequences) {
+      const auto it = std::lower_bound(mLaneOut.begin(), mLaneOut.end(), s, [](const LaneMessage& m, std::uint32_t v) {
+        return m.sequence < v;
+      });
+      if (it != mLaneOut.end() && it->sequence == s) {
+        mLaneOut.erase(it);
+      }
+    }
+  }
+
+  bool NetChannel::HasLaneRepeats() const noexcept
+  {
+    return std::any_of(mLaneOut.begin(), mLaneOut.end(), [](const LaneMessage& m) {
+      return m.sent && m.repeatsLeft > 0;
+    });
+  }
+
+  void NetChannel::WriteLane(
+    ByteWriter& out, const std::size_t budget, const bool newOnly, std::vector<std::uint32_t>& carried
+  )
+  {
+    const std::size_t start = out.Size();
+    const auto fits = [&](const LaneMessage& m) {
+      const std::size_t need = 1 + VarintSize(m.sequence) + VarintSize(m.bytes.size()) + m.bytes.size();
+      return out.Size() - start + need <= budget;
+    };
+    const auto write = [&](const LaneMessage& m) {
+      out.Byte(kChunkRedundant);
+      out.Varint(m.sequence);
+      out.Varint(m.bytes.size());
+      out.Bytes(m.bytes.data(), m.bytes.size());
+      carried.push_back(m.sequence);
+    };
+    const std::size_t fresh = carried.size();
+    for (LaneMessage& m : mLaneOut) {
+      if (m.sent) {
+        continue;
+      }
+      if (!fits(m)) {
+        break;
+      }
+      write(m);
+      m.sent = true;
+      ++mStats.redundantSent;
+    }
+    if (!newOnly) {
+      const auto writtenNow = [&](const std::uint32_t s) {
+        return std::find(carried.begin() + static_cast<std::ptrdiff_t>(fresh), carried.end(), s) != carried.end();
+      };
+      for (auto it = mLaneOut.rbegin(); it != mLaneOut.rend(); ++it) {
+        if (!it->sent || it->repeatsLeft == 0 || writtenNow(it->sequence) || !fits(*it)) {
+          continue;
+        }
+        write(*it);
+        --it->repeatsLeft;
+        ++mStats.redundantRepeats;
+      }
+    }
+    while (!mLaneOut.empty() && mLaneOut.front().sent && mLaneOut.front().repeatsLeft == 0) {
+      mLaneOut.pop_front();
+      ++mStats.redundantUnacked;
+    }
+  }
+
   bool NetChannel::TakeUnreliable(std::vector<std::uint8_t>& out)
   {
     if (mUnreliableIn.empty()) {
@@ -124,8 +213,11 @@ namespace faf::remote::net
         }
         continue;
       }
-      if (chunk.type == kChunkReliable) {
-        chunk.offset = in.Varint();
+      if (chunk.type == kChunkReliable || chunk.type == kChunkRedundant) {
+        chunk.offset = in.Varint(); // the lane sequence for a redundant message
+        if (chunk.type == kChunkRedundant && (chunk.offset == 0 || chunk.offset > UINT32_MAX)) {
+          return false;
+        }
       } else if (chunk.type != kChunkUnreliable) {
         return false;
       }
@@ -226,6 +318,19 @@ namespace faf::remote::net
           mState = ChannelState::Failed;
           return ReceiveResult::Malformed;
         }
+      } else if (chunk.type == kChunkRedundant) {
+        const auto sequence = static_cast<std::uint32_t>(chunk.offset);
+        if (mLaneIn.Check(sequence) != ReceiveWindow::Verdict::New) {
+          ++mStats.redundantDuplicates;
+          continue;
+        }
+        mLaneIn.Accept(sequence);
+        ++mStats.redundantReceived;
+        if (mUnreliableIn.size() < mConfig.maxUnreliableQueued) {
+          mUnreliableIn.emplace_back(chunk.data, chunk.data + chunk.size);
+        } else {
+          ++mStats.unreliableDropped;
+        }
       } else if (mUnreliableIn.size() < mConfig.maxUnreliableQueued) {
         mUnreliableIn.emplace_back(chunk.data, chunk.data + chunk.size);
       } else {
@@ -302,6 +407,7 @@ namespace faf::remote::net
         // Counted lost too early (reordering, a delayed ack): its bytes did arrive.
         it->acked = true;
         mSender.OnAcked(it->reliable);
+        LaneAcked(it->redundant);
         ++mStats.spuriousLosses;
         --mStats.datagramsLost;
         ++mStats.datagramsAcked;
@@ -438,10 +544,24 @@ namespace faf::remote::net
     std::vector<std::uint8_t> payload;
     std::size_t produced = 0;
     while (produced < mConfig.maxDatagramsPerPoll && mState != ChannelState::Failed) {
+      const bool laneNew = std::any_of(mLaneOut.begin(), mLaneOut.end(), [](const LaneMessage& m) { return !m.sent; });
+      const bool fresh = laneNew || !mUnreliableOut.empty() || mSender.HasPending();
+      const bool repeatDue = HasLaneRepeats() && nowUs - mLastLaneRepeatUs >= mConfig.redundantRepeatUs;
+      if (!fresh && !(repeatDue && produced == 0)) {
+        break;
+      }
       payload.clear();
       WriteAckChunk(payload);
       const std::size_t dataStart = payload.size();
       ByteWriter writer(payload);
+      // Issue #240: the redundant lane first; repeats of unacked messages ride
+      // along with new data, or go alone once the repeat interval has passed.
+      std::vector<std::uint32_t> lane;
+      const std::uint64_t repeatsBefore = mStats.redundantRepeats;
+      WriteLane(writer, budget, false, lane);
+      if (mStats.redundantRepeats != repeatsBefore) {
+        mLastLaneRepeatUs = nowUs;
+      }
       while (!mUnreliableOut.empty()) {
         const std::vector<std::uint8_t>& message = mUnreliableOut.front();
         if (1 + VarintSize(message.size()) + message.size() > budget - writer.Size()) {
@@ -465,18 +585,21 @@ namespace faf::remote::net
       if (payload.size() == dataStart) {
         break;
       }
-      Emit(0, payload, std::move(reliable), nowUs, out);
+      Emit(0, payload, std::move(reliable), std::move(lane), nowUs, out);
       ++produced;
+      if (!fresh) {
+        break; // one repeat-only datagram per interval
+      }
     }
 
     if (produced == 0 && mState != ChannelState::Failed) {
       payload.clear();
       WriteAckChunk(payload);
       if (mAckPending && nowUs >= mAckDueUs) {
-        Emit(kFlagAckOnly, payload, {}, nowUs, out);
+        Emit(kFlagAckOnly, payload, {}, {}, nowUs, out);
         ++mStats.ackOnlySent;
       } else if (!mSentAny || nowUs - mLastElicitingSentUs >= mConfig.keepaliveIntervalUs) {
-        Emit(0, payload, {}, nowUs, out);
+        Emit(0, payload, {}, {}, nowUs, out);
         ++mStats.keepalivesSent;
       }
     }
@@ -487,6 +610,7 @@ namespace faf::remote::net
     const std::uint8_t flags,
     const std::vector<std::uint8_t>& payload,
     std::vector<StreamRange>&& reliable,
+    std::vector<std::uint32_t>&& redundant,
     const std::uint64_t nowUs,
     std::vector<std::vector<std::uint8_t>>& out
   )
@@ -525,6 +649,7 @@ namespace faf::remote::net
       sent.sequence = header.sequence;
       sent.sentUs = nowUs;
       sent.reliable = std::move(reliable);
+      sent.redundant = std::move(redundant);
     }
     out.push_back(std::move(datagram));
   }
@@ -534,6 +659,7 @@ namespace faf::remote::net
     if (acked) {
       sent.acked = true;
       mSender.OnAcked(sent.reliable);
+      LaneAcked(sent.redundant);
       ++mStats.datagramsAcked;
     } else {
       sent.lost = true;

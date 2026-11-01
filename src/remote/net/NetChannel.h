@@ -22,6 +22,14 @@
 //   - unreliable messages: one datagram each, delivered at most once, never resent:
 //       [2] chunk type 2, varint length, the bytes
 //
+// Redundant messages (issue #240): unreliable messages that ride again in the
+// next datagrams until one carrying them is acked, at most `redundancy` more
+// times each, so one lost datagram costs no wait:
+//       [4] chunk type 4, varint lane sequence (1, 2, ...), varint length, the bytes
+// The receiver hands each lane sequence out once (TakeUnreliable) and drops
+// repeats. With nothing new to send, Poll repeats unacked ones at most every
+// redundantRepeatUs.
+//
 // Acks: the header acks the newest datagram and the 32 before it. When more than that
 // arrived since the last datagram out (a burst), an ack chunk covers the rest, up to 16
 // blocks of 32 below the header's range:
@@ -56,6 +64,10 @@ namespace faf::remote::net
     std::size_t maxDatagramsPerPoll = 64;
     /** The first sequence number sent (1 in use; tests start near the end). */
     std::uint32_t firstSequence = 1;
+    /** SendRedundant: how many later datagrams repeat each message (0: none). */
+    std::uint32_t redundancy = 2;
+    /** With nothing new to send, unacked redundant messages go again this often. */
+    std::uint64_t redundantRepeatUs = 30'000;
     std::uint64_t ackDelayUs = 10'000;
     /** The most ack delay a peer's report may take off an RTT sample; added to the RTO. */
     std::uint64_t maxAckDelayUs = 25'000;
@@ -114,6 +126,14 @@ namespace faf::remote::net
     /** The reordering allowance now: datagrams, and eighths of an RTT. */
     std::uint32_t reorderThreshold = 0;
     std::uint32_t reorderTimeEighths = 9;
+
+    /** Redundant lane: messages sent, repeats sent, messages that ran out of
+     * repeats before an ack, and on the receiving side repeats dropped. */
+    std::uint64_t redundantSent = 0;
+    std::uint64_t redundantRepeats = 0;
+    std::uint64_t redundantUnacked = 0;
+    std::uint64_t redundantReceived = 0;
+    std::uint64_t redundantDuplicates = 0;
     std::uint64_t reliableBytesResent = 0;
     /** Lost share of the last 256 ack-eliciting datagrams resolved (acked or counted lost;
      * a later spurious ack does not change it). */
@@ -151,6 +171,12 @@ namespace faf::remote::net
     bool SendReliable(const void* data, std::size_t size);
     /** False when it does not fit one datagram, the queue is full, or the channel is closed. */
     bool SendUnreliable(const void* data, std::size_t size);
+    /**
+     * An unreliable message that later datagrams repeat until one carrying it is
+     * acked (ChannelConfig::redundancy). Arrives through TakeUnreliable, at most
+     * once. False when it does not fit one datagram or the channel is closed.
+     */
+    bool SendRedundant(const void* data, std::size_t size);
     /** The largest unreliable message one datagram carries. */
     [[nodiscard]] std::size_t MaxUnreliableSize() const noexcept;
 
@@ -179,6 +205,7 @@ namespace faf::remote::net
       bool lostByTime = false;
       std::uint32_t lostBehind = 0;  // how far behind the largest acked it was counted lost
       std::vector<StreamRange> reliable;
+      std::vector<std::uint32_t> redundant;  // lane sequences it carried
     };
 
     struct AckBlock
@@ -186,6 +213,20 @@ namespace faf::remote::net
       std::uint32_t top = 0;
       std::uint32_t bits = 0;
     };
+
+    struct LaneMessage
+    {
+      std::uint32_t sequence = 0;
+      std::vector<std::uint8_t> bytes;
+      std::uint32_t repeatsLeft = 0;
+      bool sent = false;
+    };
+
+    // Appends lane chunks to `out` within `budget`: new messages, then repeats
+    // of unacked ones (newest first) unless `newOnly`.
+    void WriteLane(ByteWriter& out, std::size_t budget, bool newOnly, std::vector<std::uint32_t>& carried);
+    [[nodiscard]] bool HasLaneRepeats() const noexcept;
+    void LaneAcked(const std::vector<std::uint32_t>& sequences);
 
     struct ParsedChunk
     {
@@ -215,6 +256,7 @@ namespace faf::remote::net
       std::uint8_t flags,
       const std::vector<std::uint8_t>& payload,
       std::vector<StreamRange>&& reliable,
+      std::vector<std::uint32_t>&& redundant,
       std::uint64_t nowUs,
       std::vector<std::vector<std::uint8_t>>& out
     );
@@ -238,6 +280,9 @@ namespace faf::remote::net
     std::size_t mRecentNext = 0;
     std::size_t mRecentCount = 0;
     std::size_t mRecentLost = 0;
+    std::deque<LaneMessage> mLaneOut;  // by lane sequence
+    std::uint32_t mNextLaneSequence = 1;
+    std::uint64_t mLastLaneRepeatUs = 0;
 
     // Receiving.
     ReceiveWindow mWindow;
@@ -251,5 +296,6 @@ namespace faf::remote::net
     std::uint32_t mReportFrom = 0;   // lowest sequence received since then, 0 = none
     ReliableReceiver mReceiver;
     std::deque<std::vector<std::uint8_t>> mUnreliableIn;
+    ReceiveWindow mLaneIn;
   };
 } // namespace faf::remote::net

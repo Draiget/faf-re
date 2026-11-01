@@ -44,6 +44,8 @@ Messages are laid end to end in one byte stream per direction, each a varint len
 
 The receiver puts fragments back in stream order, drops bytes it already has, and holds out-of-order bytes up to `receiveWindow` (1 MiB) past what it has delivered; a fragment beyond that is dropped and comes back on a resend. A message announcing more than `maxMessageSize` fails the channel.
 
+Redundant messages (`SendRedundant`, chunk type 4: varint lane sequence, varint length, bytes) are unreliable messages that ride again in later datagrams, up to `redundancy` (2) more times each, until a datagram carrying them is acked. With nothing new to send, `Poll` repeats unacked ones at most every `redundantRepeatUs` (30 ms). The receiver hands each lane sequence out once, through `TakeUnreliable`, and drops repeats. Peer links between our builds carry game datagrams this way (issue #240, [NETBRIDGE.md](NETBRIDGE.md)). In the tests, at 20 % loss each way with a message every 33 ms, 78.4 % arrive with no repeats and 98.92 % with redundancy 2.
+
 Unreliable messages fit one datagram each (`MaxUnreliableSize()`, 1,181 bytes without encryption), go out before reliable bytes, are never resent, and arrive at most once.
 
 ## Acks, loss and RTT (WP10.8, #147)

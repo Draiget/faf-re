@@ -26,6 +26,7 @@ namespace faf::remote::net
   inline constexpr std::uint8_t kChunkReliable = 1;
   inline constexpr std::uint8_t kChunkUnreliable = 2;
   inline constexpr std::uint8_t kChunkAcks = 3;
+  inline constexpr std::uint8_t kChunkRedundant = 4;
 
   /** Stream bytes [begin, end). */
   struct StreamRange

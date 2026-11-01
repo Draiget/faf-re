@@ -571,6 +571,62 @@ namespace
     CHECK(share > 0.7 && share < 0.9);
   }
 
+  // Issue #240: the redundant lane. Messages every 33 ms (the game's datagram
+  // rate) over 20 % loss each way: with redundancy 2 nearly all arrive, each
+  // once and intact; with redundancy 0 only the lucky 80 %.
+  double LaneDelivery(const std::uint32_t redundancy, std::uint64_t* repeats)
+  {
+    ChannelConfig config;
+    config.redundancy = redundancy;
+    LinkConfig link;
+    link.latencyUs = 50'000;
+    link.loss = 0.2;
+    Pair pair(config, link, 31);
+    std::mt19937_64 rng(32);
+    std::vector<Bytes> sent;
+    std::set<std::size_t> seen;
+    bool intact = true;
+    for (int ms = 0; ms < 60'000; ++ms) {
+      if (ms < 58'000 && ms % 33 == 0) {
+        Bytes m = RandomBytes(rng, 60 + rng() % 400);
+        m[0] = static_cast<std::uint8_t>(sent.size());
+        m[1] = static_cast<std::uint8_t>(sent.size() >> 8);
+        CHECK(pair.a.SendRedundant(m.data(), m.size()));
+        sent.push_back(std::move(m));
+      }
+      pair.Step();
+      Bytes got;
+      while (pair.b.TakeUnreliable(got)) {
+        const std::size_t index = got[0] | (got[1] << 8);
+        intact = intact && index < sent.size() && sent[index] == got;
+        CHECK(seen.insert(index).second); // never twice
+      }
+    }
+    CHECK(intact);
+    if (repeats != nullptr) {
+      *repeats = pair.a.Stats().redundantRepeats;
+    }
+    return static_cast<double>(seen.size()) / static_cast<double>(sent.size());
+  }
+
+  void TestRedundantLane()
+  {
+    std::uint64_t repeats0 = 0;
+    std::uint64_t repeats2 = 0;
+    const double plain = LaneDelivery(0, &repeats0);
+    const double redundant = LaneDelivery(2, &repeats2);
+    std::printf(
+      "    20%% loss each way, a message every 33 ms: %.1f%% arrive with no repeats, %.2f%% with redundancy 2 "
+      "(%llu repeats)\n",
+      plain * 100,
+      redundant * 100,
+      static_cast<unsigned long long>(repeats2)
+    );
+    CHECK(repeats0 == 0);
+    CHECK(plain > 0.75 && plain < 0.85);
+    CHECK(redundant > 0.985);
+  }
+
   // --- WP10.6: AEAD -----------------------------------------------------------------------
 
   void TestSealOpen()
@@ -1025,6 +1081,7 @@ namespace
     {"in-flight limit (WP10.3)", TestInFlightLimit},
     {"message size limits", TestMessageLimits},
     {"unreliable messages: at most once, intact", TestUnreliable},
+    {"redundant lane: losses covered by repeats, each message once (#240)", TestRedundantLane},
     {"seal and open (WP10.6)", TestSealOpen},
     {"cipher known answers: XChaCha20-Poly1305 vector, the channel's layout (WP10.6)", TestCipherKnownAnswers},
     {"encrypted channel: delivery, tampering, replay, plaintext, one-sided keys (WP10.6)", TestEncryptedChannel},
