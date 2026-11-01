@@ -5,8 +5,10 @@
 // Unit checks of the JSON, signalling and SDP code against what the shipped
 // Java adapter writes, then two links in this process (offerer and answerer,
 // host candidates only) that connect and exchange N datagrams each way with
-// none lost or altered. --bind picks the local address, for hosts that drop
-// inbound UDP to sockets bound to every interface.
+// none lost or altered. Then the layers on top: the redundant lane (#240),
+// our-peer detection (#234), duplication (#235) and the WebRTC data channel
+// (#239). --bind picks the local address, for hosts that drop inbound UDP to
+// sockets bound to every interface.
 
 #include "netlink/Json.h"
 #include "netlink/Link.h"
@@ -18,6 +20,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -300,6 +303,180 @@ namespace
     a.link->Close();
     b.link->Close();
   }
+
+  // Two links with the given options: connect, wait for `ready` (or 10 s),
+  // send `count` 400-byte datagrams each way, let them settle. Datagrams are
+  // checked as in LoopbackTest; `invalid` counts first bytes neither side knew.
+  struct PairResult
+  {
+    bool connected = false;
+    bool ready = false;
+    LinkStats a;
+    LinkStats b;
+    std::vector<std::uint32_t> atA;
+    std::vector<std::uint32_t> atB;
+    int corrupt = 0;
+    bool ourA = false;
+    bool ourB = false;
+  };
+
+  PairResult RunPair(LinkOptions oa, LinkOptions ob, const int count, const std::function<bool(Link&, Link&)>& ready)
+  {
+    Side a;
+    Side b;
+    auto makeCallbacks = [](Side& self, Side& other) {
+      LinkCallbacks cb;
+      cb.onSignal = [&other](const CandidatesMessage& m) { other.link->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+      cb.onSignalText = [&other](const std::string& json) { other.link->OnSignalText(json); };
+      cb.onData = [&self](const std::uint8_t* data, const std::size_t size) {
+        std::uint32_t seq = 0;
+        if (size != 400) {
+          ++self.corrupt;
+          return;
+        }
+        std::memcpy(&seq, data, sizeof(seq));
+        for (std::size_t i = sizeof(seq); i < size; ++i) {
+          if (data[i] != static_cast<std::uint8_t>(seq + i)) {
+            ++self.corrupt;
+            return;
+          }
+        }
+        std::lock_guard lock(self.mutex);
+        self.received.push_back(seq);
+      };
+      return cb;
+    };
+    oa.localId = 1;
+    oa.remoteId = 2;
+    oa.offerer = true;
+    ob.localId = 2;
+    ob.remoteId = 1;
+    ob.offerer = false;
+    a.link = std::make_unique<Link>(oa, makeCallbacks(a, b));
+    b.link = std::make_unique<Link>(ob, makeCallbacks(b, a));
+
+    std::atomic<bool> stop{false};
+    std::thread ticker([&] {
+      while (!stop) {
+        a.link->Tick();
+        b.link->Tick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+    a.link->Start();
+    b.link->Start();
+
+    PairResult r;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (!(a.link->IsConnected() && b.link->IsConnected()) && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    r.connected = a.link->IsConnected() && b.link->IsConnected();
+    deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (r.connected && !ready(*a.link, *b.link) && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    r.ready = r.connected && ready(*a.link, *b.link);
+
+    std::uint8_t buf[400];
+    for (int i = 0; r.connected && i < count; ++i) {
+      for (std::size_t k = 0; k < sizeof(buf); ++k) {
+        buf[k] = static_cast<std::uint8_t>(i + k);
+      }
+      const auto seq = static_cast<std::uint32_t>(i);
+      std::memcpy(buf, &seq, sizeof(seq));
+      a.link->Send(buf, sizeof(buf));
+      b.link->Send(buf, sizeof(buf));
+      if (i % 50 == 49) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    stop = true;
+    ticker.join();
+    r.a = a.link->GetStats();
+    r.b = b.link->GetStats();
+    r.ourA = a.link->IsOurPeer();
+    r.ourB = b.link->IsOurPeer();
+    {
+      std::lock_guard la(a.mutex);
+      r.atA = a.received;
+    }
+    {
+      std::lock_guard lb(b.mutex);
+      r.atB = b.received;
+    }
+    r.corrupt = a.corrupt + b.corrupt;
+    a.link->Close();
+    b.link->Close();
+    return r;
+  }
+
+  std::size_t Distinct(std::vector<std::uint32_t> v)
+  {
+    std::sort(v.begin(), v.end());
+    return static_cast<std::size_t>(std::unique(v.begin(), v.end()) - v.begin());
+  }
+
+  // Issue #234: two marked links find each other ours; a marked link and an
+  // unmarked one (as a Java adapter peer looks) never do, and the unmarked one
+  // never gets a probe.
+  void OurPeerTest(const std::string& bind)
+  {
+    LinkOptions marked;
+    marked.bindAddress = bind;
+    marked.ufragPrefix = kOurUfragPrefix;
+    const PairResult ours =
+      RunPair(marked, marked, 200, [](Link& a, Link& b) { return a.IsOurPeer() && b.IsOurPeer(); });
+    Check(ours.connected && ours.ourA && ours.ourB, "two marked links prove each other ours");
+    Check(ours.atA.size() == 200 && ours.atB.size() == 200 && ours.corrupt == 0, "and carry game datagrams as before");
+
+    LinkOptions plain;
+    plain.bindAddress = bind;
+    const PairResult mixed = RunPair(marked, plain, 200, [](Link&, Link&) { return false; }); // waits the full 10 s
+    Check(mixed.connected && !mixed.ourA && !mixed.ourB, "a marked link and an unmarked one: neither counts as ours");
+    Check(mixed.b.invalidReceived == 0, "the unmarked side never received a probe");
+    Check(mixed.atA.size() == 200 && mixed.atB.size() == 200 && mixed.corrupt == 0, "and game datagrams still flow");
+  }
+
+  // Issue #235: with duplicateGapMs 0 every game datagram goes out twice; the
+  // link hands both copies on (the game drops the second by its sequence).
+  void DuplicateTest(const std::string& bind)
+  {
+    LinkOptions o;
+    o.bindAddress = bind;
+    o.duplicateGapMs = 0;
+    const PairResult r = RunPair(o, o, 500, [](Link&, Link&) { return true; });
+    std::printf("  duplicates: offerer sent %llu with %llu copies; answerer got %zu (%zu distinct)\n",
+                static_cast<unsigned long long>(r.a.dataSent), static_cast<unsigned long long>(r.a.duplicatesSent),
+                r.atB.size(), Distinct(r.atB));
+    Check(r.connected && r.a.duplicatesSent == r.a.dataSent && r.a.dataSent == 500, "every datagram sent with a copy");
+    Check(r.atB.size() == 1000 && Distinct(r.atB) == 500, "both copies arrive, each datagram twice");
+    Check(r.corrupt == 0, "no copy altered");
+
+    LinkOptions later = o;
+    later.duplicateGapMs = 20;
+    const PairResult d = RunPair(later, later, 500, [](Link&, Link&) { return true; });
+    Check(d.connected && d.atB.size() == 1000 && Distinct(d.atB) == 500, "a copy 20 ms later arrives too");
+  }
+
+  // Issue #239: two of our links that both offer WebRTC move game datagrams
+  // onto a data channel.
+  void WebRtcTest(const std::string& bind)
+  {
+    LinkOptions o;
+    o.bindAddress = bind;
+    o.ufragPrefix = kOurUfragPrefix;
+    o.webrtc = true;
+    const PairResult r =
+      RunPair(o, o, 1000, [](Link& a, Link& b) { return a.GetStats().onWebRtc && b.GetStats().onWebRtc; });
+    std::printf("  webrtc: offerer sent %llu, %llu on the data channel; got %zu\n",
+                static_cast<unsigned long long>(r.a.dataSent), static_cast<unsigned long long>(r.a.webRtcSent),
+                r.atA.size());
+    Check(r.ready, "both links open the data channel");
+    Check(r.a.webRtcSent == 1000 && r.b.webRtcSent == 1000, "every game datagram goes on the data channel");
+    Check(r.atA.size() == 1000 && r.atB.size() == 1000 && r.corrupt == 0, "and arrives unaltered");
+  }
 } // namespace
 
 int main(int argc, char** argv)
@@ -316,6 +493,9 @@ int main(int argc, char** argv)
   UnitTests();
   LoopbackTest(bind, count);
   LaneTest(bind, 2000);
+  OurPeerTest(bind);
+  DuplicateTest(bind);
+  WebRtcTest(bind);
   std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
   return gFailures == 0 ? 0 : 1;
 }
