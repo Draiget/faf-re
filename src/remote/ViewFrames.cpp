@@ -75,7 +75,20 @@ namespace faf::remote
       mRetired.emplace_back();
       mBuilders.push_back(std::make_unique<CViewFrameBuilder>(mTables, mCodec));
       mFrames.emplace_back();
+      mPreviousFrames.emplace_back();
+      mHavePrevious.push_back(false);
       mWithheld.push_back(0u);
+    }
+    // The frames built before this beat become the previous ones: moved, not copied. A view's
+    // frame exists once it has been built (its id comes from its builder, starting at 0).
+    for (std::size_t army = 0; army < armyCount; ++army) {
+      if (mBuilt.size() <= army) {
+        mBuilt.push_back(false);
+      }
+      if (mBuilt[army]) {
+        mPreviousFrames[army] = std::move(mFrames[army]);
+        mHavePrevious[army] = true;
+      }
     }
 
     // The sim's entities in ascending id order, once for every view: a frame's records are in
@@ -179,6 +192,7 @@ namespace faf::remote
     // The sim's stats trees the builders let go of are dropped here, on the sim thread, in army order.
     for (std::size_t army = 0; army < armyCount; ++army) {
       mBuilders[army]->ReleaseDropped();
+      mBuilt[army] = true;
     }
     AddBuildTime();
     mLastSim = &sim;

@@ -1079,7 +1079,39 @@ namespace faf::remote::wire
       }
     }
 
-    const SFrameDelta delta = ComputeFrameDelta(baseline, frame);
+    // ComputeFrameDelta's walk, keeping pointers into the two frames instead of copies of the
+    // records (a server encodes every view's frame each beat), and each change's baseline record.
+    std::vector<std::uint32_t> removed;
+    std::vector<const SEntityRecord*> created;
+    struct SChangeRef
+    {
+      std::uint32_t fields;
+      const SEntityRecord* after;
+      const SEntityRecord* before;
+    };
+    std::vector<SChangeRef> changed;
+    {
+      static const std::vector<SEntityRecord> kEmpty;
+      const std::vector<SEntityRecord>& before = baseline != nullptr ? baseline->entities : kEmpty;
+      const std::vector<SEntityRecord>& after = frame.entities;
+      std::size_t b = 0;
+      std::size_t a = 0;
+      while (b < before.size() || a < after.size()) {
+        if (a == after.size() || (b < before.size() && before[b].id < after[a].id)) {
+          removed.push_back(before[b].id);
+          ++b;
+        } else if (b == before.size() || after[a].id < before[b].id) {
+          created.push_back(&after[a]);
+          ++a;
+        } else {
+          if (const std::uint32_t fields = ChangedFields(before[b], after[a]); fields != 0u) {
+            changed.push_back({fields, &after[a], &before[b]});
+          }
+          ++a;
+          ++b;
+        }
+      }
+    }
     writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
     writer.WriteBits(frame.frameId, 32);
     writer.WriteBits(baseline != nullptr ? baseline->frameId : kNoBaseline, 32);
@@ -1089,32 +1121,27 @@ namespace faf::remote::wire
 
     bool first = true;
     std::uint32_t previous = 0;
-    writer.WriteVarUint(static_cast<std::uint32_t>(delta.removed.size()));
-    for (const std::uint32_t id : delta.removed) {
+    writer.WriteVarUint(static_cast<std::uint32_t>(removed.size()));
+    for (const std::uint32_t id : removed) {
       WriteGap(writer, first, previous, id);
     }
 
     first = true;
-    writer.WriteVarUint(static_cast<std::uint32_t>(delta.created.size()));
-    for (const SEntityRecord& record : delta.created) {
-      WriteGap(writer, first, previous, record.id);
-      const std::uint32_t fields = CreationFields(record);
+    writer.WriteVarUint(static_cast<std::uint32_t>(created.size()));
+    for (const SEntityRecord* const record : created) {
+      WriteGap(writer, first, previous, record->id);
+      const std::uint32_t fields = CreationFields(*record);
       writer.WriteVarUint(fields);
-      writer.WriteVarUint(record.tickCreated);
-      WriteFields(writer, record, fields, codec, frame.beat, nullptr);
+      writer.WriteVarUint(record->tickCreated);
+      WriteFields(writer, *record, fields, codec, frame.beat, nullptr);
     }
 
     first = true;
-    writer.WriteVarUint(static_cast<std::uint32_t>(delta.changed.size()));
-    for (const SFrameDelta::SChange& change : delta.changed) {
-      WriteGap(writer, first, previous, change.record.id);
+    writer.WriteVarUint(static_cast<std::uint32_t>(changed.size()));
+    for (const SChangeRef& change : changed) {
+      WriteGap(writer, first, previous, change.after->id);
       writer.WriteVarUint(change.fields);
-      // A change's id is in the baseline (ComputeFrameDelta); both lists are in id order.
-      const auto before = std::lower_bound(
-        baseline->entities.begin(), baseline->entities.end(), change.record.id,
-        [](const SEntityRecord& record, const std::uint32_t id) { return record.id < id; }
-      );
-      WriteFields(writer, change.record, change.fields, codec, frame.beat, &*before);
+      WriteFields(writer, *change.after, change.fields, codec, frame.beat, change.before);
     }
     return true;
   }

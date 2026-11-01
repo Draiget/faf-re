@@ -169,16 +169,14 @@ namespace faf::headless
     client.bytes = 0;
     const auto view = static_cast<std::int32_t>(army);
 
-    // Entity lanes: the view's frame against the one its client holds.
-    const remote::wire::SViewFrame& frame = Frame(view);
+    // Entity lanes: the view's frame against the one its client holds, the view's previous frame
+    // (kept by CViewFrames without a copy).
     remote::wire::BitWriter frameWriter;
-    if (remote::wire::EncodeFrame(frame, client.haveFrame ? &client.frame : nullptr, mCodec, frameWriter)) {
+    if (remote::wire::EncodeFrame(Frame(view), PreviousFrame(view), mCodec, frameWriter)) {
       client.bytes += static_cast<std::uint32_t>(frameWriter.Bytes().size());
     } else {
       ++client.failures;
     }
-    client.frame = frame;
-    client.haveFrame = true;
 
     // Army lane: every army's record as the view gets it.
     const moho::SSyncData& packet = Packet(view);

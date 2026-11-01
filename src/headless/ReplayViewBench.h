@@ -42,11 +42,9 @@ namespace faf::headless
     void OnViewFrames(moho::Sim& sim) override;
 
   private:
-    /** What one view's client received last. */
+    /** What one view's client received last (its frame is CViewFrames::PreviousFrame). */
     struct SClient
     {
-      remote::wire::SViewFrame frame;
-      bool haveFrame = false;
       std::vector<remote::wire::SArmyRecord> armies;
       bool haveArmies = false;
       std::vector<remote::wire::SGridSlot> grids;

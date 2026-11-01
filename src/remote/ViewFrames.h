@@ -49,6 +49,15 @@ namespace faf::remote
 
     /** The last beat's frame for `army`. */
     [[nodiscard]] const wire::SViewFrame& Frame(std::int32_t army) const { return mFrames[static_cast<std::size_t>(army)]; }
+    /**
+     * The frame `army` had the beat before (moved aside, not copied); null before its second
+     * beat. A client that received every frame holds it: the server's baseline without loss.
+     */
+    [[nodiscard]] const wire::SViewFrame* PreviousFrame(std::int32_t army) const
+    {
+      const auto index = static_cast<std::size_t>(army);
+      return mHavePrevious[index] ? &mPreviousFrames[index] : nullptr;
+    }
     /** Records `army`'s client holds that its last frame withheld. */
     [[nodiscard]] std::uint32_t Withheld(std::int32_t army) const { return mWithheld[static_cast<std::size_t>(army)]; }
 
@@ -66,6 +75,9 @@ namespace faf::remote
     wire::SFrameCodec mCodec;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<wire::SViewFrame> mFrames;
+    std::vector<wire::SViewFrame> mPreviousFrames;
+    std::vector<bool> mHavePrevious; // per view: mPreviousFrames holds a frame (written on the sim thread only)
+    std::vector<bool> mBuilt;        // per view: mFrames holds a built frame (likewise)
     std::vector<std::uint32_t> mWithheld;
     std::vector<std::pair<std::uint32_t, moho::Entity*>> mEntityIndex; // the sim's entities by id, this beat
     bool mIdMapsOn = false;
