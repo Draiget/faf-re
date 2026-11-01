@@ -8,7 +8,7 @@ A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats
 | `tools/desync-diff/desync_diff.py` | Compares two players' dumps and prints the first value that differs: beat, entity, field | #217 | [README](../tools/desync-diff/README.md) |
 | Desync telemetry | Sends one small record per desync and one per game end to an OpenTelemetry collector; optionally uploads the dump as `.tar.gz` to a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
 
-This page is the setup side: what reaches the servers, how to run them, and how to check it works. Every field and switch is listed in [SWITCHES.md](SWITCHES.md#desync-telemetry). A ready server with both parts, for Docker Compose or Kubernetes, is [tools/desync-server](../tools/desync-server/README.md).
+This page is the setup side: what reaches the servers, how to run them, and how to check it works. Every field and switch is listed in [SWITCHES.md](SWITCHES.md#desync-telemetry). A ready server with both parts and a dashboard over them, for Docker Compose or Kubernetes, is [tools/desync-server](../tools/desync-server/README.md).
 
 ## What the servers receive
 

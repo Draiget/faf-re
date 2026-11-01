@@ -1,5 +1,6 @@
 # faf-re desync test server on one machine: the OpenTelemetry collector (records, port 4318) and
-# the dump receiver (uploads and downloads under /dumps, port 4319). See README.md.
+# the dump receiver (uploads and downloads under /dumps, port 4319), and the dashboard over both
+# (port 4320, this machine only). See README.md.
 #
 #   cp .env.example .env    # set the two tokens
 #   docker compose up -d
@@ -37,6 +38,23 @@ services:
       - ./data/dumps:/data/dumps
     ports:
       - "4319:4319"
+    restart: unless-stopped
+    cpus: 1
+    mem_limit: 512m
+
+  dashboard:
+    image: python:3.12-slim
+    command: ["python", "/opt/faf/dashboard.py", "--host", "0.0.0.0", "--port", "4320",
+              "--otel", "/data/otel", "--dumps", "/data/dumps"]
+    environment:
+      FAF_READ_TOKEN: ${FAF_READ_TOKEN:?set it in .env}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./dashboard.py:/opt/faf/dashboard.py:ro
+      - ./data/otel:/data/otel:ro
+      - ./data/dumps:/data/dumps:ro
+    ports:
+      - "127.0.0.1:4320:4320"
     restart: unless-stopped
     cpus: 1
     mem_limit: 512m
