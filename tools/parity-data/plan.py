@@ -15,6 +15,10 @@ are listed as unsupported; replays it has not seen yet are scheduled and checked
 --after DIR (an earlier run's results) leaves out the replays that run played to a verdict, so a
 run cut short by job time limits is finished by a second one.
 
+--replays-of PLAN (an earlier run's plan.json) keeps only the replays that plan scheduled. With
+--after on the same run it resumes a cancelled run: what it scheduled and did not play, with the
+--after and --batch it was planned with already applied (its own after_run's replays stay out).
+
 --batch K/N plays the K-th of N equal id ranges of the set. GitHub cancels a job that waits 24
 hours for a runner, so a set needing more than about a day of all runners goes in N runs.
 
@@ -93,6 +97,7 @@ def main():
                         help="jobs GitHub runs at once (20 on Free): a small set is spread over this many")
     parser.add_argument("--after", help="an earlier run's results (any depth of results.jsonl): its replays "
                                         "with a verdict are left out, so this run plays what it did not")
+    parser.add_argument("--replays-of", help="an earlier run's plan.json: only the replays it scheduled")
     parser.add_argument("--batch", default="1/1",
                         help="K/N: play only the K-th of N equal id ranges of the set, so a set too big for "
                              "one run (GitHub cancels a job that waits 24 hours for a runner) takes N runs")
@@ -118,6 +123,10 @@ def main():
     # applied, so batches planned on different days (all with the same --after) neither overlap
     # nor leave gaps.
     left = [i for i in select(corpus, args.which, args.sample, args.seed) if i not in settled]
+    if args.replays_of:
+        with open(args.replays_of, encoding="utf-8") as f:
+            scheduled = {r["id"] for s in json.load(f)["shards"] for r in s["replays"]}
+        left = [i for i in left if i in scheduled]
     k, n = map(int, args.batch.split("/"))
     if not 1 <= k <= n:
         parser.error("--batch wants K/N with 1 <= K <= N")
@@ -166,7 +175,7 @@ def main():
 
     plan = {
         "settings": dict({k: getattr(args, k) for k in ("which", "sample", "seed", "slots", "budget_minutes", "fill",
-                                                        "batch")},
+                                                        "batch", "replays_of")},
                          after=len(settled)),
         "shards": [{"shard": n, "bucket": b, "load_s": round(x["load"]),
                     "replays": sorted(x["items"], key=lambda r: -r["est"])} for n, (b, x) in enumerate(shards)],

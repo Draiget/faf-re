@@ -30,6 +30,10 @@ on:
       after_run:
         description: An earlier run's id; play only what it did not (no time left, not got ready) or what crashed, and report both
         default: ""
+      resume:
+        description: With after_run, play only what that run scheduled (resumes a cancelled run; set and batch are then that run's, give set=all and batch 1/1)
+        type: boolean
+        default: false
       oracle_check:
         description: Also check the server's visibility oracles every beat (unfocused, every army; slower), verdict oracle on a difference
         type: boolean
@@ -141,12 +145,21 @@ jobs:
           path: after
           run-id: ${{ inputs.after_run }}
           github-token: ${{ github.token }}
+      # The earlier run's plan, for resume: its replays, with its own after_run and batch applied.
+      - if: inputs.after_run != '' && inputs.resume
+        uses: actions/download-artifact@v8
+        with:
+          name: plan
+          path: resumed
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
       - id: plan
         run: >
           mkdir -p cache/index &&
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
           --set ${{ inputs.set }} --sample ${{ inputs.sample }} --seed ${{ inputs.seed }} --slots 4
           --batch "${{ inputs.batch }}" --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
+          ${{ inputs.after_run != '' && inputs.resume && '--replays-of resumed/plan.json' || '' }}
           --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
