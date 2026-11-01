@@ -1,0 +1,15 @@
+name = "FAF Engine"
+uid = "faf-engine-features-v01"
+version = 1
+copyright = "MIT"
+description = "FAF Engine Features: Graphics API selector (Direct3D 9/11/12/Vulkan) in Video Options and interactive replay timeline bar with fast-forward scrubbing."
+author = "FAF Community"
+url = "https://github.com/4z0t/FAF-UI-Mods"
+icon = "/mods/FAFEngine/icon.png"
+selectable = true
+enabled = true
+exclusive = false
+ui_only = true
+requiresNames = {}
+conflicts = {}
+after = {}
