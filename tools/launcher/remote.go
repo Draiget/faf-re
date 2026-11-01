@@ -191,8 +191,15 @@ func (l *Launcher) SetLink(from, to int, imp relay.Impairment, both bool) error 
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		return l.hub.client.RelayImpair(ctx, l.hub.run, from, to, imp, both)
+	case l.turn != nil && l.cfg.Mode == ModeContract:
+		// Issue #242: ICE games on relayed candidates (contract.forceRelay) are
+		// shaped in mpemu's TURN server, every path the same: from and to are
+		// not told apart there.
+		l.turn.SetImpairment(imp)
+		l.j.Note(journal.RelayLink, 0, "impairment on every TURN path", map[string]any{"impairment": imp})
+		return nil
 	}
-	return errors.New("link impairment needs mode relay")
+	return errors.New("link impairment needs mode relay, or mode contract with mpemu's TURN server")
 }
 
 // Isolate cuts (or restores) all of a player's links. ModeRelay only.
