@@ -27,12 +27,20 @@ namespace faf::remote
   void CViewFrames::ClearUnheldReferences(wire::SViewFrame& frame)
   {
     constexpr std::uint32_t kNone = 0xF0000000u; // the sim's invalid entity id (`EntityId.h`)
-    std::unordered_set<std::uint32_t> held;
-    held.reserve(frame.entities.size());
-    for (const wire::SEntityRecord& record : frame.entities) {
-      held.insert(record.id);
-    }
-    const auto unheld = [&held](const std::uint32_t id) { return id != kNone && held.count(id) == 0u; };
+    // The records are in ascending id order (`SViewFrame::entities`) and only their fields change
+    // below, so a held id is found by binary search, without a set of every id per view and beat.
+    const std::vector<wire::SEntityRecord>& records = frame.entities;
+    const auto unheld = [&records](const std::uint32_t id) {
+      if (id == kNone) {
+        return false;
+      }
+      const auto found = std::lower_bound(
+        records.begin(), records.end(), id, [](const wire::SEntityRecord& record, const std::uint32_t value) {
+          return record.id < value;
+        }
+      );
+      return found == records.end() || found->id != id;
+    };
     for (wire::SEntityRecord& record : frame.entities) {
       if (unheld(record.appearance.attachParent)) {
         record.appearance.attachParent = wire::SAppearance::kNoAttachParent;
@@ -70,6 +78,16 @@ namespace faf::remote
       mWithheld.push_back(0u);
     }
 
+    // The sim's entities in ascending id order, once for every view: a frame's records are in
+    // that order too, so each view finds its records' entities in one forward pass.
+    mEntityIndex.clear();
+    if (sim.mEntityDB != nullptr) {
+      mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
+      for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
+        mEntityIndex.emplace_back(id, entity);
+      }
+    }
+
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
     const auto buildFrame = [&](const std::size_t army) {
@@ -82,14 +100,12 @@ namespace faf::remote
       std::uint32_t withheld = 0;
       std::vector<wire::SEntityRecord> kept;
       kept.reserve(frame.entities.size());
+      auto index = mEntityIndex.begin();
       for (wire::SEntityRecord& record : frame.entities) {
-        moho::Entity* entity = nullptr;
-        if (sim.mEntityDB != nullptr) {
-          const auto found = sim.mEntityDB->mAllUnits.find(record.id);
-          if (found != sim.mEntityDB->mAllUnits.end()) {
-            entity = found->second;
-          }
+        while (index != mEntityIndex.end() && index->first < record.id) {
+          ++index;
         }
+        moho::Entity* const entity = index != mEntityIndex.end() && index->first == record.id ? index->second : nullptr;
         if (entity != nullptr && !CanViewSee(sim, static_cast<std::int32_t>(army), *entity)) {
           ++withheld;
           continue;

@@ -3,12 +3,18 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "remote/FrameBuilder.h"
 #include "remote/ViewIdMap.h"
 #include "remote/ViewPackets.h"
 #include "remote/wire/EntityFrame.h"
+
+namespace moho
+{
+  class Entity;
+}
 
 // Engine addition, server mode (plan WP5.2): per view and beat, the frame the server sends one
 // army. Each army's rebuilt packet (remote/ViewPackets.h, equal to the lockstep client's) is
@@ -61,6 +67,7 @@ namespace faf::remote
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<wire::SViewFrame> mFrames;
     std::vector<std::uint32_t> mWithheld;
+    std::vector<std::pair<std::uint32_t, moho::Entity*>> mEntityIndex; // the sim's entities by id, this beat
     bool mIdMapsOn = false;
     moho::Sim* mLastSim = nullptr;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;
