@@ -109,9 +109,13 @@ type ContractConfig struct {
 	Java string `yaml:"java"`
 	// ClientLib is the FAF client's lib folder, for its javafx-* jars.
 	ClientLib string `yaml:"clientLib"`
-	// Adapter is the default per player: "jar" (NativeDir's jar, the default)
-	// or the path of a native adapter (faf-netbridge.exe) run directly.
+	// Adapter is the default per player: "jar" (NativeDir's jar, the default),
+	// the path of a native adapter (faf-netbridge.exe) run directly, or
+	// "native": no adapter, the game links every peer itself (issue #274).
 	Adapter string `yaml:"adapter"`
+	// NativeBind is /nativenetbind for "native" players: the address ICE host
+	// candidates use (e.g. 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
+	NativeBind string `yaml:"nativeBind"`
 	// ExeArgs go after the launcher's arguments for native adapters only
 	// (e.g. --bind-address 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
 	ExeArgs []string `yaml:"exeArgs"`
@@ -119,6 +123,18 @@ type ContractConfig struct {
 	ForceRelay bool `yaml:"forceRelay"`
 	// NoTurn hands out no ICE servers.
 	NoTurn bool `yaml:"noTurn"`
+	// IceServers, when set, are handed out instead of mpemu's own TURN server
+	// (use with noTurn), e.g. a TURN server on another machine. Every field
+	// expands %VAR% and $VAR, so a scenario names no address itself.
+	IceServers []IceServerConfig `yaml:"iceServers"`
+}
+
+// IceServerConfig is one entry of ContractConfig.IceServers, in the client's
+// setIceServers shape.
+type IceServerConfig struct {
+	URLs       []string `yaml:"urls"`
+	Username   string   `yaml:"username"`
+	Credential string   `yaml:"credential"`
 }
 
 // PlayerConfig is one seat.

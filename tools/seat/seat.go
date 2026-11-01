@@ -76,6 +76,9 @@ type Config struct {
 	// Contract puts the game behind an adapter of the FAF client's contract
 	// (contract.go) instead.
 	Contract *Contract `json:"contract,omitempty"`
+	// Native runs the game with no adapter, linking every peer itself
+	// (native.go, issue #274).
+	Native *Native `json:"native,omitempty"`
 }
 
 // CheckNoFullscreen refuses a fullscreen request anywhere on a command line.
@@ -230,6 +233,13 @@ func freeTCPPort() (int, error) {
 // (or printed instructions to start it by hand).
 func (s *Seat) Start(ctx context.Context) error {
 	gpgPort := s.endpoint.Port()
+	if s.cfg.Native != nil {
+		if s.cfg.Native.Bus == nil {
+			return fmt.Errorf("player %d: native mode needs the run's IceMsg bus (local seats only)", s.cfg.UID)
+		}
+		s.cfg.Native.Bus.add(s.cfg.UID, nativeTarget{s})
+		return s.startGame(gpgPort)
+	}
 	if s.cfg.Contract != nil {
 		if err := s.startContract(ctx); err != nil {
 			return err
@@ -351,6 +361,9 @@ func (c Config) GameArgs(gpgPort int) []string {
 	if c.PrivateCache {
 		args = append(args, "/cachedir", filepath.Join(c.RunDir, fmt.Sprintf("cache-%d", c.UID)))
 	}
+	if c.Native != nil {
+		args = append(args, c.Native.nativeArgs()...)
+	}
 	return append(args, c.Args...)
 }
 
@@ -410,6 +423,12 @@ func (s *Seat) watchExit(proc *procs.Process, what string) {
 func (s *Seat) onMessage(m gpgnet.Message) {
 	uid := s.cfg.UID
 	s.emit(journal.Record{Kind: journal.GpgIn, UID: uid, Command: m.Command, Args: m.Args})
+	if s.cfg.Native != nil {
+		s.nativeIncoming(m)
+		if m.Command == "GameState" && m.Str(0) == "Idle" {
+			s.nativeIceServers()
+		}
+	}
 	if m.Command == "GameState" && m.Str(0) == "Idle" && s.cfg.Contract == nil {
 		mode := 0
 		if s.cfg.AutoLobby {
@@ -425,7 +444,10 @@ func (s *Seat) onMessage(m gpgnet.Message) {
 // game runs on, so a hub known by name resolves the way this machine sees it
 // (split-horizon DNS) and no address is fixed anywhere else.
 func (s *Seat) Send(m gpgnet.Message) error {
-	if (m.Command == "JoinGame" || m.Command == "ConnectToPeer") && len(m.Args) > 0 {
+	if s.cfg.Native != nil {
+		m = s.nativeOutgoing(m)
+	}
+	if s.cfg.Native == nil && (m.Command == "JoinGame" || m.Command == "ConnectToPeer") && len(m.Args) > 0 {
 		if addr, ok := m.Args[0].(string); ok {
 			resolved, err := resolveHostPort(addr)
 			if err != nil {

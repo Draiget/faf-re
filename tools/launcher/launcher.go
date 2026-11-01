@@ -353,7 +353,15 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 		sc.Position = []int{20 + idx*60, 20 + idx*60}
 	}
 	if c.Mode == ModeContract {
-		sc.Contract = l.contractFor(pc)
+		choice := pc.Adapter
+		if choice == "" {
+			choice = c.Contract.Adapter
+		}
+		if strings.EqualFold(choice, "native") {
+			sc.Native = l.nativeFor(pc)
+		} else {
+			sc.Contract = l.contractFor(pc)
+		}
 	}
 	if c.Mode == ModeICE {
 		sc.ICE = &seat.ICE{Adapter: c.ICE.Adapter, GameID: c.GameID,
@@ -393,7 +401,18 @@ func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
 		a.Extra = c.ExeArgs
 	}
 	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus}
-	if l.turn != nil {
+	if len(c.IceServers) > 0 {
+		sc.IceServers = []map[string]any{}
+		for _, s := range c.IceServers {
+			var urls []string
+			for _, u := range s.URLs {
+				urls = append(urls, ExpandPath(u))
+			}
+			sc.IceServers = append(sc.IceServers, map[string]any{
+				"urls": urls, "username": ExpandPath(s.Username), "credential": ExpandPath(s.Credential),
+			})
+		}
+	} else if l.turn != nil {
 		// The Java adapter reads each URL with java.net.URI and needs its host
 		// part: "turn://h:p", not "turn:h:p" (contract §2).
 		var urls []string
@@ -407,6 +426,16 @@ func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
 		sc.IceServers = []map[string]any{}
 	}
 	return sc
+}
+
+// nativeFor is one seat's part in ModeContract with adapter "native": no
+// adapter, the game links every peer itself (issue #274) and gets the same ICE
+// servers an adapter would.
+func (l *Launcher) nativeFor(pc PlayerConfig) *seat.Native {
+	c := l.cfg.Contract
+	n := &seat.Native{Bind: c.NativeBind, ForceRelay: c.ForceRelay, Bus: l.contractBus}
+	n.IceServers = l.contractFor(pc).IceServers
+	return n
 }
 
 func (l *Launcher) sortedUIDs() []int {

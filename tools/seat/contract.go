@@ -35,28 +35,38 @@ type Contract struct {
 	Bus *ContractBus `json:"-"`
 }
 
-// ContractBus relays onIceMsg from one seat's adapter to another's iceMsg,
-// as the lobby server does.
+// ContractBus relays IceMsg between the seats of one run as the lobby server
+// does: an adapter's onIceMsg or a native game's IceMsg goes to the receiver's
+// adapter (iceMsg) or native game (IceMsg).
 type ContractBus struct {
 	mu    sync.Mutex
-	seats map[int]*contractLink
+	seats map[int]iceTarget
 }
 
-func NewContractBus() *ContractBus { return &ContractBus{seats: map[int]*contractLink{}} }
+// iceTarget is one seat's way in for relayed IceMsg.
+type iceTarget interface {
+	iceMsg(from int, msg any) bool
+}
 
-func (b *ContractBus) add(uid int, c *contractLink) {
+func NewContractBus() *ContractBus { return &ContractBus{seats: map[int]iceTarget{}} }
+
+func (b *ContractBus) add(uid int, t iceTarget) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.seats[uid] = c
+	b.seats[uid] = t
 }
 
 func (b *ContractBus) deliver(from, to int, msg any) bool {
 	b.mu.Lock()
-	c := b.seats[to]
+	t := b.seats[to]
 	b.mu.Unlock()
-	if c == nil {
+	if t == nil {
 		return false
 	}
+	return t.iceMsg(from, msg)
+}
+
+func (c *contractLink) iceMsg(from int, msg any) bool {
 	_, err := c.rpc.Call("iceMsg", from, msg)
 	return err == nil
 }
