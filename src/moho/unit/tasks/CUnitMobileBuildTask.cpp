@@ -431,8 +431,11 @@ namespace moho
       // is the class that defines GetRebuildBonus -- the wreck has no such method.
       if (!mUnit->RunScriptMultiRet("GetRebuildBonus", results, bpLua, e1, e2, e3, e4) ||
           (results.end() - results.begin()) != 1) {
+        // 0x005F73D7..0x005F7429: after the warning the failure path falls into
+        // the common exit, which returns the nearest prop, so a builder without
+        // GetRebuildBonus (a build drone's DummyUnit class) reclaims the wreck.
         gpg::Warnf("Failed to get valid rebuild bonus from the script");
-        return nullptr;
+        return nearest;
       }
       const float fractionComplete = nearest->mVarDat.mFractionComplete;
       const float rebuildBonus = static_cast<float>(results.begin()->ToNumber());
