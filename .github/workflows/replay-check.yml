@@ -337,15 +337,18 @@ jobs:
         with:
           name: data
           path: data
-      # The pack: FAF's game files with the retail archives in fa/gamedata. On Windows, Windows'
-      # own tar (bsdtar), which reads xz whatever Git Bash's tar was built with.
+      # The pack: FAF's game files with the retail archives in fa/gamedata. Decrypted to a file and
+      # unpacked by Python, the same on every runner: on Windows, Windows' tar.exe reading the pipe
+      # from Git Bash's openssl hung (run 41297054548, every Windows job, 23 minutes and more).
       - env:
           KEY: ${{ secrets.PARITY_RETAIL_KEY }}
+        timeout-minutes: 10
         run: |
           KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
-          tar=tar; [ "$RUNNER_OS" = Windows ] && tar=/c/Windows/System32/tar.exe
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in data/retail.enc | "$tar" -xJf - -C data/game
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in data/retail.enc -out retail.tar.xz
           rm data/retail.enc
+          python -c "import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2], filter='data')" retail.tar.xz data/game
+          rm retail.tar.xz
           case "${{ matrix.platform }}" in
             linux-x64) exe=bin/headless; chmod +x "$exe" ;;
             windows-x64) exe=bin/headless_x64.exe ;;
