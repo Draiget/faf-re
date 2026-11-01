@@ -68,8 +68,13 @@ namespace moho
      */
     void RunLuaInitFormSet(const char* const setName, LuaPlus::LuaState* const state)
     {
-      if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet(setName); set != nullptr) {
-        set->RunInits(state);
+      if (setName == nullptr || state == nullptr) {
+        return;
+      }
+      for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+        if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
+          set->RunInits(state);
+        }
       }
     }
 

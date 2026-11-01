@@ -1,6 +1,6 @@
 --*****************************************************************************
 --* File: data/fafengine/lua/ui/game/replay_timeline.lua
---* Summary: Replay timeline bar and fast-forward scrubbing overlay
+--* Summary: Replay timeline bar and fast-forward scrubbing overlay (SupCom UI)
 --*****************************************************************************
 
 local UIUtil = import('/lua/ui/uiutil.lua')
@@ -9,6 +9,36 @@ local Group = import('/lua/maui/group.lua').Group
 local Bitmap = import('/lua/maui/bitmap.lua').Bitmap
 local IntegerSlider = import('/lua/maui/slider.lua').IntegerSlider
 local EscapeHandler = import('/lua/ui/dialogs/eschandler.lua')
+
+-- Lua 5.0 compatibility: C/C++ engine bindings have type 'cfunction', Lua functions have 'function',
+-- and Maui lazyvars are callable tables with __call metamethod.
+local function is_callable(fn)
+    if not fn then
+        return false
+    end
+    local t = type(fn)
+    if t == 'function' or t == 'cfunction' then
+        return true
+    end
+    if t == 'table' then
+        local mt = getmetatable(fn)
+        if mt and (type(mt.__call) == 'function' or type(mt.__call) == 'cfunction') then
+            return true
+        end
+    end
+    return false
+end
+
+-- Safe skinnable/UI file lookup with mock fallback
+local function GetSkinFile(path)
+    if UIUtil and is_callable(UIUtil.SkinnableFile) then
+        return UIUtil.SkinnableFile(path)
+    end
+    if UIUtil and is_callable(UIUtil.UIFile) then
+        return UIUtil.UIFile(path)
+    end
+    return path
+end
 
 -- Format total simulation seconds into HH:MM:SS or MM:SS (Lua 5.0 compatible)
 local function FormatSeconds(totalSeconds)
@@ -37,7 +67,7 @@ end
 
 -- Safe global accessors for engine bindings
 local function GetTotalTicks()
-    if type(GetReplayTotalTicks) == 'function' then
+    if is_callable(GetReplayTotalTicks) then
         local ok, val = pcall(GetReplayTotalTicks)
         if ok and val then
             return val
@@ -47,8 +77,8 @@ local function GetTotalTicks()
 end
 
 local function GetCurrentTick()
-    local fn = (type(GetGameTick) == 'function' and GetGameTick)
-        or (type(GameTick) == 'function' and GameTick)
+    local fn = (is_callable(GetGameTick) and GetGameTick)
+        or (is_callable(GameTick) and GameTick)
     if fn then
         local ok, val = pcall(fn)
         if ok and val then
@@ -59,7 +89,7 @@ local function GetCurrentTick()
 end
 
 local function IsScrubbing()
-    if type(IsReplayScrubbing) == 'function' then
+    if is_callable(IsReplayScrubbing) then
         local ok, val = pcall(IsReplayScrubbing)
         if ok then
             return val
@@ -69,19 +99,19 @@ local function IsScrubbing()
 end
 
 local function DoScrub(targetTick)
-    if type(ScrubReplay) == 'function' then
+    if is_callable(ScrubReplay) then
         pcall(ScrubReplay, targetTick)
     end
 end
 
 local function DoCancelScrub()
-    if type(CancelReplayScrub) == 'function' then
+    if is_callable(CancelReplayScrub) then
         pcall(CancelReplayScrub)
     end
 end
 
 local function GetScrubProgress()
-    if type(GetReplayScrubProgress) == 'function' then
+    if is_callable(GetReplayScrubProgress) then
         local ok, val = pcall(GetReplayScrubProgress)
         if ok then
             return val
@@ -95,106 +125,71 @@ end
 local ScrubbingOverlay = ClassUI(Group) {
     __init = function(self, parent)
         Group.__init(self, parent, "ScrubbingModalOverlay")
-        self:SetRenderPass(UIUtil.UIRP_PostGlow)
+        if self.SetRenderPass and UIUtil and UIUtil.UIRP_PostGlow then
+            self:SetRenderPass(UIUtil.UIRP_PostGlow)
+        end
         LayoutHelpers.FillParent(self, parent)
         self.Depth:Set(10000)
 
         self._escPushed = false
 
-        -- Semi-transparent dim background covering full screen
+        -- Semi-transparent dim background covering full screen (matching SupCom popup shadow)
         self.dimBg = Bitmap(self)
         LayoutHelpers.FillParent(self.dimBg, self)
-        self.dimBg:SetSolidColor('b0000000') -- 70% black dim
+        self.dimBg:SetSolidColor('78000000')
         self.dimBg.Depth:Set(function() return self.Depth() end)
         self.dimBg.HandleEvent = function(control, event)
-            -- Intercept all mouse clicks while scrubbing
+            -- Intercept mouse clicks while scrubbing
             return true
         end
 
         -- Centered modal dialog box
         self.dialog = Group(self, "ScrubbingDialog")
-        LayoutHelpers.SetDimensions(self.dialog, 420, 170)
+        LayoutHelpers.SetDimensions(self.dialog, 420, 160)
         LayoutHelpers.AtCenterIn(self.dialog, self)
-        self.dialog.Depth:Set(function() return self.Depth() + 5 end)
+        self.dialog.Depth:Set(function() return self.Depth() + 10 end)
 
-        -- Dialog background panel
-        self.dialogBg = Bitmap(self.dialog)
-        LayoutHelpers.FillParent(self.dialogBg, self.dialog)
-        self.dialogBg:SetSolidColor('f8101520')
-        self.dialogBg.Depth:Set(function() return self.dialog.Depth() end)
+        -- Authentic Supreme Commander dialog border
+        if UIUtil and is_callable(UIUtil.CreateNinePatchStd) then
+            local bgPatch = UIUtil.CreateNinePatchStd(self.dialog, '/scx_menu/lan-game-lobby/dialog/background/')
+            LayoutHelpers.FillParentFixedBorder(bgPatch, self.dialog, 32)
+            LayoutHelpers.DepthUnderParent(bgPatch, self.dialog, 2)
+        else
+            self.dialogBg = Bitmap(self.dialog)
+            LayoutHelpers.FillParent(self.dialogBg, self.dialog)
+            self.dialogBg:SetSolidColor('f8101520')
+            self.dialogBg.Depth:Set(function() return self.dialog.Depth() end)
+        end
 
-        -- 1px border around dialog
-        local borderCol = 'ff3c5270'
-        self.borderTop = Bitmap(self.dialog)
-        self.borderTop.Left:Set(self.dialog.Left)
-        self.borderTop.Right:Set(self.dialog.Right)
-        self.borderTop.Top:Set(self.dialog.Top)
-        LayoutHelpers.SetHeight(self.borderTop, 1)
-        self.borderTop:SetSolidColor(borderCol)
-        self.borderTop.Depth:Set(function() return self.dialog.Depth() + 1 end)
-
-        self.borderBottom = Bitmap(self.dialog)
-        self.borderBottom.Left:Set(self.dialog.Left)
-        self.borderBottom.Right:Set(self.dialog.Right)
-        self.borderBottom.Bottom:Set(self.dialog.Bottom)
-        LayoutHelpers.SetHeight(self.borderBottom, 1)
-        self.borderBottom:SetSolidColor(borderCol)
-        self.borderBottom.Depth:Set(function() return self.dialog.Depth() + 1 end)
-
-        self.borderLeft = Bitmap(self.dialog)
-        self.borderLeft.Left:Set(self.dialog.Left)
-        self.borderLeft.Top:Set(self.dialog.Top)
-        self.borderLeft.Bottom:Set(self.dialog.Bottom)
-        LayoutHelpers.SetWidth(self.borderLeft, 1)
-        self.borderLeft:SetSolidColor(borderCol)
-        self.borderLeft.Depth:Set(function() return self.dialog.Depth() + 1 end)
-
-        self.borderRight = Bitmap(self.dialog)
-        self.borderRight.Right:Set(self.dialog.Right)
-        self.borderRight.Top:Set(self.dialog.Top)
-        self.borderRight.Bottom:Set(self.dialog.Bottom)
-        LayoutHelpers.SetWidth(self.borderRight, 1)
-        self.borderRight:SetSolidColor(borderCol)
-        self.borderRight.Depth:Set(function() return self.dialog.Depth() + 1 end)
-
-        -- Title text
-        self.titleText = UIUtil.CreateText(self.dialog, "Fast-forwarding Replay", 16, UIUtil.titleFont)
-        LayoutHelpers.AtTopIn(self.titleText, self.dialog, 16)
+        -- Title text in SupCom title font
+        self.titleText = UIUtil.CreateText(self.dialog, "FAST-FORWARDING REPLAY", 15, UIUtil.titleFont)
+        LayoutHelpers.AtTopIn(self.titleText, self.dialog, 20)
         LayoutHelpers.AtHorizontalCenterIn(self.titleText, self.dialog)
-        self.titleText:SetColor('ffffffff')
-        self.titleText.Depth:Set(function() return self.dialog.Depth() + 2 end)
+        self.titleText:SetColor('ffb0c8e0')
+        self.titleText.Depth:Set(function() return self.dialog.Depth() + 5 end)
 
-        -- Detail text: "Fast-forwarding to MM:SS"
-        self.targetText = UIUtil.CreateText(self.dialog, "Fast-forwarding to --:--", 13, UIUtil.bodyFont)
+        -- Target status: "Advancing to MM:SS"
+        self.targetText = UIUtil.CreateText(self.dialog, "Advancing to --:--", 12, UIUtil.bodyFont)
         LayoutHelpers.Below(self.targetText, self.titleText, 8)
         LayoutHelpers.AtHorizontalCenterIn(self.targetText, self.dialog)
-        self.targetText:SetColor('ff99ccff')
-        self.targetText.Depth:Set(function() return self.dialog.Depth() + 2 end)
+        self.targetText:SetColor('ffffffff')
+        self.targetText.Depth:Set(function() return self.dialog.Depth() + 5 end)
 
-        -- Progress bar track
-        self.barTrack = Bitmap(self.dialog)
-        LayoutHelpers.SetDimensions(self.barTrack, 340, 16)
-        LayoutHelpers.Below(self.barTrack, self.targetText, 12)
+        -- Progress bar track using SupCom game slider track texture
+        local trackTexture = GetSkinFile('/game/slider/slider-back_bmp.dds')
+        self.barTrack = Bitmap(self.dialog, trackTexture)
+        LayoutHelpers.SetDimensions(self.barTrack, 320, 16)
+        LayoutHelpers.Below(self.barTrack, self.targetText, 14)
         LayoutHelpers.AtHorizontalCenterIn(self.barTrack, self.dialog)
-        self.barTrack:SetSolidColor('ff080c12')
-        self.barTrack.Depth:Set(function() return self.dialog.Depth() + 2 end)
+        self.barTrack.Depth:Set(function() return self.dialog.Depth() + 5 end)
 
-        -- Progress bar track border
-        self.barTrackBorder = Bitmap(self.barTrack)
-        self.barTrackBorder.Left:Set(function() return self.barTrack.Left() - 1 end)
-        self.barTrackBorder.Right:Set(function() return self.barTrack.Right() + 1 end)
-        self.barTrackBorder.Top:Set(function() return self.barTrack.Top() - 1 end)
-        self.barTrackBorder.Bottom:Set(function() return self.barTrack.Bottom() + 1 end)
-        self.barTrackBorder:SetSolidColor('ff1a2636')
-        self.barTrackBorder.Depth:Set(function() return self.barTrack.Depth() - 1 end)
-
-        -- Progress bar fill
+        -- Progress bar fill (bright cyan fill)
         self.barFill = Bitmap(self.barTrack)
         self.barFill.Left:Set(self.barTrack.Left)
         self.barFill.Top:Set(self.barTrack.Top)
         self.barFill.Bottom:Set(self.barTrack.Bottom)
         self.barFill.Width:Set(0)
-        self.barFill:SetSolidColor('ff00b4d8') -- bright cyan fill
+        self.barFill:SetSolidColor('b000b4d8')
         self.barFill.Depth:Set(function() return self.barTrack.Depth() + 1 end)
 
         -- Percentage text
@@ -203,17 +198,17 @@ local ScrubbingOverlay = ClassUI(Group) {
         self.percentText:SetColor('ffffffff')
         self.percentText.Depth:Set(function() return self.barFill.Depth() + 2 end)
 
-        -- Cancel button
+        -- Cancel button with standard SupCom drop shadow
         self.cancelButton = UIUtil.CreateButtonWithDropshadow(self.dialog, '/BUTTON/medium/', "<LOC _Cancel>Cancel")
-        LayoutHelpers.Below(self.cancelButton, self.barTrack, 14)
+        LayoutHelpers.Below(self.cancelButton, self.barTrack, 16)
         LayoutHelpers.AtHorizontalCenterIn(self.cancelButton, self.dialog)
-        self.cancelButton.Depth:Set(function() return self.dialog.Depth() + 2 end)
+        self.cancelButton.Depth:Set(function() return self.dialog.Depth() + 5 end)
         self.cancelButton.OnClick = function(btn)
             DoCancelScrub()
             self:HideOverlay()
         end
 
-        -- Key and mouse event intercept
+        -- Key event intercept (ESC to cancel)
         self.HandleEvent = function(control, event)
             if event.Type == 'KeyDown' and event.KeyCode == 27 then -- ESC
                 DoCancelScrub()
@@ -231,7 +226,7 @@ local ScrubbingOverlay = ClassUI(Group) {
             return
         end
         if targetTick then
-            self.targetText:SetText(string.format("Fast-forwarding to %s", FormatTicks(targetTick)))
+            self.targetText:SetText(string.format("Advancing to %s", FormatTicks(targetTick)))
         end
         self.barFill.Width:Set(0)
         self.percentText:SetText("0%")
@@ -268,7 +263,7 @@ local ScrubbingOverlay = ClassUI(Group) {
             return
         end
         if prog.targetTick then
-            self.targetText:SetText(string.format("Fast-forwarding to %s", FormatTicks(prog.targetTick)))
+            self.targetText:SetText(string.format("Advancing to %s", FormatTicks(prog.targetTick)))
         end
         local pct = prog.progress
         if not pct or pct < 0 then
@@ -287,7 +282,7 @@ local controls = {
     overlay = false,
 }
 
---- Build bottom-centered replay timeline bar
+--- Build replay timeline bar styled for Supreme Commander
 ---@param parent Control
 ---@return Group
 function CreateReplayTimeline(parent)
@@ -301,78 +296,74 @@ function CreateReplayTimeline(parent)
     -- Create scrubbing overlay on root frame
     controls.overlay = ScrubbingOverlay(rootFrame)
 
-    -- Bottom-centered timeline bar directly on root frame
+    -- Bottom-centered timeline bar directly on root frame (lifted midway between center and bottom)
     local bar = Group(rootFrame, "ReplayTimelineBar")
-    bar:SetRenderPass(UIUtil.UIRP_PostGlow)
-    LayoutHelpers.SetDimensions(bar, 600, 42)
-    LayoutHelpers.AtBottomIn(bar, rootFrame, 16)
+    if bar.SetRenderPass and UIUtil and UIUtil.UIRP_PostGlow then
+        bar:SetRenderPass(UIUtil.UIRP_PostGlow)
+    end
+    LayoutHelpers.SetDimensions(bar, 640, 48)
     LayoutHelpers.AtHorizontalCenterIn(bar, rootFrame)
+    bar.Top:Set(function()
+        local top = 0
+        local height = 1080
+        if rootFrame.Top then
+            local ok, val = pcall(rootFrame.Top)
+            if ok and type(val) == 'number' then
+                top = val
+            end
+        end
+        if rootFrame.Height then
+            local ok, val = pcall(rootFrame.Height)
+            if ok and type(val) == 'number' then
+                height = val
+            end
+        end
+        -- Midway between screen center (0.50) and screen bottom (1.00)
+        return math.floor(top + height * 0.72)
+    end)
     bar.Depth:Set(9500)
     bar:Show()
 
-    -- Semi-transparent dark background
+    -- Authentic Supreme Commander border using NinePatch
+    if UIUtil and is_callable(UIUtil.SurroundWithNinePatch) then
+        UIUtil.SurroundWithNinePatch(bar, "/game/chat_brd/", 4, 4)
+    end
+
+    -- Dark translucent backing (SupCom frosted HUD glass)
     local bg = Bitmap(bar)
     LayoutHelpers.FillParent(bg, bar)
-    bg:SetSolidColor('e60d1117') -- semi-transparent dark charcoal
+    bg:SetSolidColor('80080d14')
     bg.Depth:Set(function() return bar.Depth() + 1 end)
 
-    -- Top accent line
-    local topBorder = Bitmap(bar)
-    topBorder.Left:Set(bar.Left)
-    topBorder.Right:Set(bar.Right)
-    topBorder.Top:Set(bar.Top)
-    LayoutHelpers.SetHeight(topBorder, 1)
-    topBorder:SetSolidColor('ff2b3d54')
-    topBorder.Depth:Set(function() return bar.Depth() + 2 end)
-
-    -- Subtle perimeter borders
-    local borderCol = 'ff141c26'
-    local botBorder = Bitmap(bar)
-    botBorder.Left:Set(bar.Left)
-    botBorder.Right:Set(bar.Right)
-    botBorder.Bottom:Set(bar.Bottom)
-    LayoutHelpers.SetHeight(botBorder, 1)
-    botBorder:SetSolidColor(borderCol)
-    botBorder.Depth:Set(function() return bar.Depth() + 2 end)
-
-    local leftBorder = Bitmap(bar)
-    leftBorder.Left:Set(bar.Left)
-    leftBorder.Top:Set(bar.Top)
-    leftBorder.Bottom:Set(bar.Bottom)
-    LayoutHelpers.SetWidth(leftBorder, 1)
-    leftBorder:SetSolidColor(borderCol)
-    leftBorder.Depth:Set(function() return bar.Depth() + 2 end)
-
-    local rightBorder = Bitmap(bar)
-    rightBorder.Right:Set(bar.Right)
-    rightBorder.Top:Set(bar.Top)
-    rightBorder.Bottom:Set(bar.Bottom)
-    LayoutHelpers.SetWidth(rightBorder, 1)
-    rightBorder:SetSolidColor(borderCol)
-    rightBorder.Depth:Set(function() return bar.Depth() + 2 end)
+    -- Header label in SupCom title font
+    local barHeader = UIUtil.CreateText(bar, "-- REPLAY TIMELINE --", 9, UIUtil.titleFont)
+    LayoutHelpers.AtTopIn(barHeader, bar, 4)
+    LayoutHelpers.AtHorizontalCenterIn(barHeader, bar)
+    barHeader:SetColor('ff829cb4')
+    barHeader.Depth:Set(function() return bar.Depth() + 3 end)
 
     -- Current time label
     local curTimeLabel = UIUtil.CreateText(bar, "00:00", 12, UIUtil.bodyFont)
-    LayoutHelpers.AtLeftIn(curTimeLabel, bar, 16)
-    LayoutHelpers.AtVerticalCenterIn(curTimeLabel, bar)
+    LayoutHelpers.AtLeftIn(curTimeLabel, bar, 18)
+    LayoutHelpers.AtVerticalCenterIn(curTimeLabel, bar, 4)
     curTimeLabel:SetColor('ffffffff')
     curTimeLabel.Depth:Set(function() return bar.Depth() + 3 end)
 
     -- Total duration label
-    local totalTimeLabel = UIUtil.CreateText(bar, "00:00", 12, UIUtil.bodyFont)
-    LayoutHelpers.AtRightIn(totalTimeLabel, bar, 16)
-    LayoutHelpers.AtVerticalCenterIn(totalTimeLabel, bar)
-    totalTimeLabel:SetColor('ff9cb0c6')
+    local totalTimeLabel = UIUtil.CreateText(bar, "--:--", 12, UIUtil.bodyFont)
+    LayoutHelpers.AtRightIn(totalTimeLabel, bar, 18)
+    LayoutHelpers.AtVerticalCenterIn(totalTimeLabel, bar, 4)
+    totalTimeLabel:SetColor('ffb0c4de')
     totalTimeLabel.Depth:Set(function() return bar.Depth() + 3 end)
 
-    -- Interactive slider
-    local thumbUp = UIUtil.UIFile('/game/slider-btn/slider_btn_up.dds')
-    local thumbOver = UIUtil.UIFile('/game/slider-btn/slider_btn_over.dds')
-    local thumbDown = UIUtil.UIFile('/game/slider-btn/slider_btn_down.dds')
-    local sliderBg = UIUtil.UIFile('/game/slider/slider-back_bmp.dds')
+    -- Authentic Supreme Commander slider textures
+    local thumbUp = GetSkinFile('/game/slider-btn/slider_btn_up.dds')
+    local thumbOver = GetSkinFile('/game/slider-btn/slider_btn_over.dds')
+    local thumbDown = GetSkinFile('/game/slider-btn/slider_btn_down.dds')
+    local sliderBg = GetSkinFile('/game/slider/slider-back_bmp.dds')
 
     local initialTotal = GetTotalTicks()
-    local maxTicks = math.max(10, initialTotal)
+    local maxTicks = (initialTotal and initialTotal > 0) and initialTotal or 100
     local slider = IntegerSlider(
         bar,
         false,
@@ -387,22 +378,42 @@ function CreateReplayTimeline(parent)
     slider.Left:Set(function() return math.floor(curTimeLabel.Right() + LayoutHelpers.ScaleNumber(12)) end)
     slider.Right:Set(function() return math.floor(totalTimeLabel.Left() - LayoutHelpers.ScaleNumber(12)) end)
     slider.Width:Set(function() return math.max(10, math.floor(slider.Right() - slider.Left())) end)
-    LayoutHelpers.SetHeight(slider, 16)
-    LayoutHelpers.AtVerticalCenterIn(slider, bar)
+    LayoutHelpers.SetHeight(slider, 20)
+    LayoutHelpers.AtVerticalCenterIn(slider, bar, 4)
 
     LayoutHelpers.FillParent(slider._background, slider)
     slider._thumb.Depth:Set(function() return bar.Depth() + 6 end)
     slider._background.Depth:Set(function() return bar.Depth() + 2 end)
+    if slider.EnableHitTest then
+        slider:EnableHitTest()
+    end
+    if slider._thumb and slider._thumb.EnableHitTest then
+        slider._thumb:EnableHitTest()
+    end
+    if slider._background and slider._background.EnableHitTest then
+        slider._background:EnableHitTest()
+    end
 
     -- Floating preview label above slider thumb while dragging
     local thumbPreview = UIUtil.CreateText(bar, "", 11, UIUtil.bodyFont)
     LayoutHelpers.Above(thumbPreview, slider._thumb, 2)
     LayoutHelpers.AtHorizontalCenterIn(thumbPreview, slider._thumb)
     thumbPreview:SetColor('ff00d0ff')
-    thumbPreview.Depth:Set(function() return slider._thumb.Depth() + 1 end)
+    thumbPreview.Depth:Set(function() return slider._thumb.Depth() + 2 end)
     thumbPreview:Hide()
 
     local isDragging = false
+
+    -- Constrain dragging to forward only (cannot seek backward into the past)
+    local oldCalc = slider.CalculateValueFromMouse
+    slider.CalculateValueFromMouse = function(self, x, y)
+        local curTick = GetCurrentTick()
+        local val = oldCalc(self, x, y)
+        if val < curTick then
+            return curTick
+        end
+        return val
+    end
 
     slider.OnBeginChange = function(self)
         isDragging = true
@@ -410,14 +421,16 @@ function CreateReplayTimeline(parent)
     end
 
     slider.OnScrub = function(self, val)
-        val = math.floor(val)
+        local curTick = GetCurrentTick()
+        val = math.max(curTick, math.floor(val))
         curTimeLabel:SetText(FormatTicks(val))
         thumbPreview:SetText(FormatTicks(val))
     end
 
     slider.OnValueChanged = function(self, val)
         if isDragging then
-            val = math.floor(val)
+            local curTick = GetCurrentTick()
+            val = math.max(curTick, math.floor(val))
             curTimeLabel:SetText(FormatTicks(val))
             thumbPreview:SetText(FormatTicks(val))
         end
@@ -431,7 +444,16 @@ function CreateReplayTimeline(parent)
     slider.OnValueSet = function(self, newValue)
         isDragging = false
         thumbPreview:Hide()
+        local curTick = GetCurrentTick()
         local targetTick = math.floor(newValue)
+
+        -- Replays cannot roll back in simulation memory without reloading
+        if targetTick <= curTick then
+            slider:SetValue(curTick)
+            curTimeLabel:SetText(FormatTicks(curTick))
+            return
+        end
+
         DoScrub(targetTick)
         if controls.overlay then
             controls.overlay:ShowOverlay(targetTick)
@@ -441,20 +463,28 @@ function CreateReplayTimeline(parent)
     local loggedOnce = false
     bar:SetNeedsFrameUpdate(true)
     bar.OnFrame = function(self, deltaTime)
+        local total = GetTotalTicks()
+        local curTick = GetCurrentTick()
+
+        if total and total > 0 then
+            if slider._endValue ~= total then
+                slider:SetEndValue(total)
+            end
+            totalTimeLabel:SetText(FormatTicks(total))
+        else
+            local fallbackMax = math.max(100, curTick)
+            if slider._endValue ~= fallbackMax then
+                slider:SetEndValue(fallbackMax)
+            end
+            totalTimeLabel:SetText("--:--")
+        end
+
         if not loggedOnce then
             loggedOnce = true
-            local totalDbg = GetTotalTicks()
-            local curDbg = GetCurrentTick()
             LOG(string.format("FAFENGINE: Timeline rendered at Left=%s Top=%s Right=%s Bottom=%s Depth=%s Hidden=%s TotalTicks=%s CurTick=%s",
                 tostring(self.Left()), tostring(self.Top()), tostring(self.Right()), tostring(self.Bottom()),
                 tostring(self.Depth()), tostring(self:IsHidden()),
-                tostring(totalDbg), tostring(curDbg)))
-        end
-
-        local total = GetTotalTicks()
-        if total > 0 and slider._endValue ~= total then
-            slider:SetEndValue(total)
-            totalTimeLabel:SetText(FormatTicks(total))
+                tostring(total), tostring(curTick)))
         end
 
         local scrubbing = IsScrubbing()
@@ -475,7 +505,6 @@ function CreateReplayTimeline(parent)
             end
 
             if not isDragging then
-                local curTick = GetCurrentTick()
                 slider:SetValue(curTick)
                 curTimeLabel:SetText(FormatTicks(curTick))
             end
@@ -493,7 +522,6 @@ function CreateReplayTimeline(parent)
 
     controls.timeline = bar
     LOG("FAFENGINE: Replay timeline bar created successfully")
-
 
     return bar
 end

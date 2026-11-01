@@ -8956,18 +8956,6 @@ namespace moho
       clampedTarget = mTotalReplayBeats;
     }
 
-    if (clampedTarget < mGameTick) {
-      if (mLaunchInfo.get() == nullptr) {
-        CancelScrub();
-        return;
-      }
-      mIsScrubbing = false;
-      mScrubTargetBeat = -1;
-      sPendingRestartScrubTarget = clampedTarget;
-      WLD_RequestRestartSession();
-      return;
-    }
-
     if (clampedTarget <= mGameTick) {
       CancelScrub();
       return;

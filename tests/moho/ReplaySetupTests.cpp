@@ -253,6 +253,18 @@ namespace
 
     sessionInfo.reset();
     std::remove(path.c_str());
+
+    FILE* const realF = std::fopen("C:/ProgramData/FAForever/replays/28013017.scfareplay", "rb");
+    if (realF != nullptr) {
+      std::fclose(realF);
+      msvc8::string reasonReal;
+      msvc8::auto_ptr<moho::SWldSessionInfo> realSession =
+        moho::VCR_SetupReplaySession("C:/ProgramData/FAForever/replays/28013017.scfareplay", &reasonReal);
+      CHECK(realSession.get() != nullptr);
+      if (realSession.get() != nullptr) {
+        CHECK(realSession->mTotalBeats == 9608);
+      }
+    }
   }
 
   void TestCWldSessionScrubbingStateTransitions()
@@ -310,16 +322,10 @@ namespace
     CHECK(session->IsScrubbing() == false);
     CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
 
-    // Test 6b: Backward seek with mLaunchInfo triggers pending restart target
-    struct DummyLaunchInfo : moho::LaunchInfoBase
-    {
-      void Create(boost::SharedPtrRaw<void>& outCreated) override {}
-    };
-    session->mLaunchInfo.reset(new DummyLaunchInfo());
+    // Test 6b: Backward seek safely no-ops and cancels scrub without hanging session
     session->StartScrubToBeat(250);
     CHECK(session->IsScrubbing() == false);
-    CHECK(moho::CWldSession::sPendingRestartScrubTarget == 250);
-    session->mLaunchInfo.reset();
+    CHECK(session->mScrubTargetBeat == -1);
 
     // Test 7: CancelScrub resets state and clears pending restart target
     moho::CWldSession::sPendingRestartScrubTarget = 100;
@@ -528,6 +534,8 @@ namespace
       "        return {\n"
       "            bodyFont = 'Arial',\n"
       "            titleFont = 'Arial',\n"
+      "            UIFile = function(p) return p end,\n"
+      "            SkinnableFile = function(p) return p end,\n"
       "            CreateText = function(parent, text, size, font)\n"
       "                local t = { _text = text, _size = size, _color = 'ffffffff', _hidden = false }\n"
       "                t.Depth = MakeProp(10)\n"
@@ -555,11 +563,20 @@ namespace
       "                b.Height = MakeProp(25)\n"
       "                return b\n"
       "            end,\n"
+      "            SurroundWithNinePatch = function(control, path, fx, fy) end,\n"
+      "            CreateNinePatchStd = function(parent, path)\n"
+      "                return {\n"
+      "                    Depth = MakeProp(5),\n"
+      "                    Surround = function(self, c, x, y) end,\n"
+      "                }\n"
+      "            end,\n"
       "        }\n"
       "    elseif mod == '/lua/maui/layouthelpers.lua' then\n"
       "        local lh = {}\n"
       "        lh.ScaleNumber = function(n) return n end\n"
       "        lh.FillParent = function(c, p) end\n"
+      "        lh.FillParentFixedBorder = function(c, p, b) end\n"
+      "        lh.DepthUnderParent = function(c, p, d) end\n"
       "        lh.SetDimensions = function(c, w, h) end\n"
       "        lh.AtCenterIn = function(c, p) end\n"
       "        lh.AtHorizontalCenterIn = function(c, p) end\n"
@@ -649,6 +666,12 @@ namespace
       "    local f = { _depth = 1 }\n"
       "    f.GetTopmostDepth = function(self) return 10 end\n"
       "    f.Depth = MakeProp(10)\n"
+      "    f.Top = MakeProp(0)\n"
+      "    f.Bottom = MakeProp(1080)\n"
+      "    f.Left = MakeProp(0)\n"
+      "    f.Right = MakeProp(1920)\n"
+      "    f.Width = MakeProp(1920)\n"
+      "    f.Height = MakeProp(1080)\n"
       "    return f\n"
       "end\n";
 
@@ -1171,27 +1194,12 @@ namespace
     }
     CHECK(sessionNormal->mGameTick == 75);
 
-    // 2. Attach dummy launch info to permit backward seek restart handover
-    struct DummyLaunchInfo : moho::LaunchInfoBase
-    {
-      void Create(boost::SharedPtrRaw<void>&) override {}
-    };
-    sessionNormal->mLaunchInfo.reset(new DummyLaunchInfo());
-
-    // 3. User seeks backward from 75 to 30
+    // 2. User seeks backward from 75 to 30: backward seek safely cancels/no-ops without hanging session
     sessionNormal->StartScrubToBeat(30);
     CHECK(sessionNormal->IsScrubbing() == false);
-    CHECK(moho::CWldSession::sPendingRestartScrubTarget == 30);
-    sessionNormal->mLaunchInfo.reset();
+    CHECK(sessionNormal->mScrubTargetBeat == -1);
 
-    // 4. Restart handover simulation (as performed by WLD_DoPlayingAction):
-    CHECK(moho::CWldSession::sPendingRestartScrubTarget >= 0);
-    const std::int32_t handoverTarget = moho::CWldSession::sPendingRestartScrubTarget;
-    moho::CWldSession::sPendingRestartScrubTarget = -1;
-    CHECK(handoverTarget == 30);
-    CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
-
-    // 5. Create restarted session from beat 0
+    // 3. Create fresh replay session from beat 0 to verify scrub to 30
     alignas(moho::CWldSession) std::uint8_t bufferRestarted[sizeof(moho::CWldSession)];
     std::memset(bufferRestarted, 0, sizeof(bufferRestarted));
     moho::CWldSession* const sessionRestarted = reinterpret_cast<moho::CWldSession*>(bufferRestarted);
@@ -1206,7 +1214,7 @@ namespace
     msvc8::auto_ptr<gpg::Stream> recordingRestarted;
     moho::CDecoder decoderRestarted(&sinkRestarted, recordingRestarted, nullptr, &luaRestarted);
 
-    sessionRestarted->StartScrubToBeat(handoverTarget);
+    sessionRestarted->StartScrubToBeat(30);
     CHECK(sessionRestarted->IsScrubbing() == true);
     CHECK(sessionRestarted->mScrubTargetBeat == 30);
     CHECK(sessionRestarted->mScrubStartBeat == 0);

@@ -667,14 +667,17 @@ namespace
     LuaPlus::LuaState* const state
   )
   {
-    moho::CScrLuaInitFormSet* const initSet = moho::SCR_FindLuaInitFormSet(setName);
-    if (initSet == nullptr) {
+    if (setName == nullptr || state == nullptr) {
       return;
     }
 
-    initSet->mRegistered = 1;
-    for (moho::CScrLuaInitForm* form = initSet->mForms; form != nullptr; form = form->mNextInSet) {
-      form->Run(state);
+    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
+        set->mRegistered = 1;
+        for (moho::CScrLuaInitForm* form = set->mForms; form != nullptr; form = form->mNextInSet) {
+          form->Run(state);
+        }
+      }
     }
   }
 

@@ -6,16 +6,21 @@
 --*****************************************************************************
 
 do
+    local function is_callable(fn)
+        local t = type(fn)
+        return t == 'function' or t == 'cfunction'
+    end
+
     local function InitReplayTimeline(isReplayParam)
         local isReplaySession = false
         if isReplayParam != nil then
             isReplaySession = isReplayParam
-        elseif type(SessionIsReplay) == 'function' then
+        elseif is_callable(SessionIsReplay) then
             local ok, val = pcall(SessionIsReplay)
             if ok and val then
                 isReplaySession = true
             end
-        elseif type(GetReplayState) == 'function' then
+        elseif is_callable(GetReplayState) then
             local ok, val = pcall(GetReplayState)
             if ok and val then
                 isReplaySession = true
