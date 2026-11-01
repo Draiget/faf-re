@@ -15,6 +15,7 @@
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/String.h"
 #include "moho/ai/IAiReconDB.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/console/CConAlias.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
@@ -2801,7 +2802,7 @@ namespace moho
 
     static gpg::RType* entIdType = nullptr;
     if (entIdType == nullptr) {
-      entIdType = gpg::LookupRType(typeid(moho::EntId));
+      entIdType = gpg::RTypeOf<moho::EntIdValue>(); // `Moho::EntId`, not `int`
     }
     archive->Read(entIdType, &entityId, ownerRef);
 
@@ -2852,7 +2853,7 @@ namespace moho
 
     static gpg::RType* entIdType = nullptr;
     if (entIdType == nullptr) {
-      entIdType = gpg::LookupRType(typeid(moho::EntId));
+      entIdType = gpg::RTypeOf<moho::EntIdValue>(); // `Moho::EntId`, not `int`
     }
     archive->Write(entIdType, &entityId, ownerRef);
 
