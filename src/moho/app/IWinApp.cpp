@@ -15,6 +15,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/core/Thread.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/ResourceManager.h"
 
@@ -24,7 +25,6 @@ extern char** __argv;
 
 namespace
 {
-  std::uint32_t sInitThreadId = 0;
   [[nodiscard]]
   std::filesystem::path ResolveLaunchDirectory()
   {
@@ -102,13 +102,15 @@ bool IWinApp::AppGetHelpText(msvc8::string& outHelpText, const bool shortMode)
  * Mangled: ?AppInitCommonServices@IWinApp@Moho@@UAE_NXZ
  *
  * What it does:
- * Performs shared app service bootstrap before concrete app init: with
+ * Performs shared app service bootstrap before concrete app init: records
+ * the main thread for `THREAD_InvokeAsync` / `CON_Printf` (the binary inlines
+ * `THREAD_InitInvoke` here; it has no other caller), then with
  * `/log <file>`, opens `<file>.sclog` and attaches it once as a static
  * stream log target.
  */
 bool IWinApp::AppInitCommonServices()
 {
-  sInitThreadId = ::GetCurrentThreadId();
+  THREAD_InitInvoke();
   gpg::EnableLogHistory(100);
 
   msvc8::vector<msvc8::string> logArgs;

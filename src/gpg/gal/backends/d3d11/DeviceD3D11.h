@@ -201,7 +201,18 @@ namespace gpg::gal
       }
     };
     void LogDebugLayerMessages();
-    void StretchRectBlit(UINT width, UINT height, ID3D11RenderTargetView* destination, ID3D11ShaderResourceView* source);
+    /**
+     * Draws `sourceRect` of the source (`sourceWidth` x `sourceHeight`) over
+     * `destinationRect` of the destination, stretched.
+     */
+    void StretchRectBlit(
+      UINT sourceWidth,
+      UINT sourceHeight,
+      const RECT& sourceRect,
+      const RECT& destinationRect,
+      ID3D11RenderTargetView* destination,
+      ID3D11ShaderResourceView* source
+    );
 
     /**
      * Compiles one effect as fx_4_0 (the D3D10 dialect) and loads it into
