@@ -31,6 +31,10 @@ namespace moho
     // serially instead of waiting on itself.
     thread_local bool tInsideUserJob = false;
 
+    // Static initialisation runs on the main thread. (`THREAD_InitInvoke`, which would record it
+    // too, has no caller.)
+    const DWORD sDispatcherThreadId = ::GetCurrentThreadId();
+
     [[nodiscard]] unsigned int UsableCpuCount() noexcept
     {
       DWORD_PTR processMask = 0;
@@ -190,6 +194,11 @@ namespace moho
     return std::min({static_cast<unsigned int>(user_Workers), cpus, kMaxUserWorkers});
   }
 
+  bool CUserWorkerPool::IsDispatcherThread() noexcept
+  {
+    return ::GetCurrentThreadId() == sDispatcherThreadId;
+  }
+
   void CUserWorkerPool::Run(const std::size_t count, std::size_t grain, const RangeFunction fn, void* const context)
   {
     if (count == 0u || fn == nullptr) {
@@ -199,8 +208,16 @@ namespace moho
       grain = 1u;
     }
 
+    // Serial path: the same chunk boundaries as the parallel one.
+    if (tInsideUserJob || !IsDispatcherThread()) {
+      for (std::size_t begin = 0; begin < count; begin += grain) {
+        fn(context, begin, std::min(count, begin + grain));
+      }
+      return;
+    }
+
     Impl& impl = *mImpl;
-    if (!tInsideUserJob) {
+    {
       const unsigned int wanted = ConfiguredWorkerCount();
       if (wanted != impl.workerCount) {
         impl.Stop();
@@ -208,8 +225,7 @@ namespace moho
       }
     }
 
-    // Serial path: the same chunk boundaries as the parallel one.
-    if (impl.workerCount == 0u || count <= grain || tInsideUserJob) {
+    if (impl.workerCount == 0u || count <= grain) {
       for (std::size_t begin = 0; begin < count; begin += grain) {
         fn(context, begin, std::min(count, begin + grain));
       }

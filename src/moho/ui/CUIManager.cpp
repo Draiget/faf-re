@@ -50,7 +50,9 @@ namespace moho
         [](std::size_t count, std::size_t grain, void (*fn)(void*, std::size_t, std::size_t), void* context) {
           CUserWorkerPool::Get().Run(count, grain, fn, context);
         },
-        []() { return CUserWorkerPool::ConfiguredWorkerCount(); },
+        // Off the main thread (the scenario loader's blueprint state) the collection runs
+        // serially: it would share the pool and the GC's user-side scratch with the UI's.
+        []() { return CUserWorkerPool::IsDispatcherThread() ? CUserWorkerPool::ConfiguredWorkerCount() : 0u; },
         &ui_ParallelMark,
         &ui_ParallelSweep
       });
