@@ -24,6 +24,20 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 
 A run whose jobs ran out of time leaves replays `not-run`. Start another with `after_run` set to its run id: it plays only those (and any `error`, `timeout` or `crash`), and its report covers both runs.
 
+A cancelled run is resumed with `after_run` set to it, `resume` ticked, `set=all` and `batch=1/1`: the new run plays only the replays the cancelled one scheduled (its own `after_run` and `batch` already applied) and did not play to a verdict. Give `ref` the commit the cancelled run built (its `build` job's summary line), not a branch that has moved since.
+
+**Replay check** (the `replay check` label on a pull request, or by hand; [replay-check.yml](../../.github/workflows/replay-check.yml)): the core set, one replay per job, on Linux x64, Windows x64 and Windows x86, once for each engine flag set (default `/simworkers 1` and `/simworkers 8`), for a pull request's check rather than a parity survey.
+
+| Job | What it does |
+|---|---|
+| `plan` | The commit (the pull request's head, or `ref`), the core set one replay a shard (`plan.py --slots 1`), and the matrix of builds, flag sets and shards |
+| `data` | Restores the caches and gathers the core set's replays, maps and M28AI versions with the game files and the encrypted retail file into one artifact (`stage.py`): a cache saved on a Linux runner does not restore on a Windows one |
+| `build-linux`, `build-windows` | Build `headless` from the commit: Linux with the pinned clang 18, Windows with clang-cl from LLVM 22.1.7 (the version maintainers build with). They only restore caches; `windows-downloads`, which runs the workflow's own commit, saves the Windows dependency downloads and the LLVM installer |
+| `play` | One job per build, flag set and replay: decrypts the retail file and plays with `shard.py` (`--simworkers`, `--engine-args`) |
+| `report` | One per build and flag set, failing on any new desync, crash, early stop or error |
+
+The play jobs run the pull request's build next to the decrypted retail archives, so the check starts only when someone with write access adds the label after reading the diff; a new push does not start it again (remove and add the label). It saves no cache, so a pull request's code never writes one that other runs read.
+
 `oracle_check` (dedicated-server plan WPR.54) plays every replay unfocused with headless `--oracle-check`: each beat, for every army, the server's visibility oracle against what the sim publishes, and the spatial oracle against the brute-force one. A replay with any difference, or without the oracle's summary, gets the verdict `oracle`, which fails the run. The check makes replays slower than the plan's estimates, so a large set leaves more `not-run` for an `after_run`.
 
 Run both from master: caches saved on master are the ones every run reads. Anyone with write access to the repository can start them. The weekly prewarm fetches what is still missing and keeps the caches from expiring (GitHub drops a cache unused for 7 days).

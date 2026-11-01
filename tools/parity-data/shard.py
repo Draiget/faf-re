@@ -1,7 +1,8 @@
 """Plays one shard of a parity plan on headless and writes a result per replay.
 
 usage: shard.py --plan plan.json --shard N --headless EXE --pack DIR --replays DIR --maps DIR
-                --m28 DIR --work DIR --out DIR [--minutes M] [--slots N] [--simworkers N] [--oracle-check]
+                --m28 DIR --work DIR --out DIR [--minutes M] [--slots N] [--simworkers N]
+                [--engine-args "/switch value ..."] [--oracle-check]
 
 Runs --slots replays at once (default: one per CPU). Whenever a slot is free it starts the
 longest replay left whose estimated time still fits before --minutes are up; what no longer fits
@@ -31,6 +32,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -187,7 +189,7 @@ class Shard:
         minutes_left = max(1, int((self.deadline - time.time()) / 60) + 1)
         cmd = [self.args.headless, "--replay", prepared["scfa"], "/init", prepared["init"], "/nobugreport",
                "/nosound", "/log", game["log"], "--label", "r%d" % replay_id, "--timeout", str(minutes_left),
-               "/simworkers", str(self.args.simworkers)]
+               "/simworkers", str(self.args.simworkers), *shlex.split(self.args.engine_args)]
         if self.args.oracle_check:
             cmd += ["--focus", "-1", "--oracle-check"]
         with open(game["out"], "wb") as out:
@@ -393,6 +395,8 @@ def main():
     parser.add_argument("--minutes", type=float, default=300, help="time to play in; nothing starts that would not end by then")
     parser.add_argument("--slots", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--simworkers", type=int, default=1)
+    parser.add_argument("--engine-args", default="",
+                        help="more engine switches for every replay, e.g. \"/con sim_ParallelPose=0\" (docs/SWITCHES.md)")
     parser.add_argument("--game-version", type=int, default=3835)
     parser.add_argument("--oracle-check", action="store_true",
                         help="play unfocused with headless --oracle-check; a difference is the verdict oracle")
