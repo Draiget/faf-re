@@ -39,7 +39,10 @@ concurrency:
 env:
   GAME_VERSION: "3835"
   PYTHON_VERSION: "3.14"
-  # The clang-cl the Windows builds use, as a maintainer's build.ps1 does (LLVM 22.1.7).
+  # The clang-cl the Windows builds use, as a maintainer's build.ps1 does (LLVM 22.1.7), with
+  # Visual Studio 2022's MSVC toolset (14.44 on the maintainer's machine): the Windows jobs run on
+  # windows-2022. windows-2025 has Visual Studio 18 (MSVC 14.51), whose static runtime imports
+  # api-ms-win-core-synch-l1-2-0.dll, which headless's import check refuses (run 41295222768).
   LLVM_VERSION: "22.1.7"
   # Part of the Linux headless build's cache key, the same as the Replay parity workflow's.
   BUILD_CACHE: "v1"
@@ -213,7 +216,7 @@ jobs:
   windows-downloads:
     needs: plan
     if: contains(needs.plan.outputs.platforms, 'windows')
-    runs-on: windows-2025
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v7
       - id: have
@@ -242,7 +245,7 @@ jobs:
   build-windows:
     needs: [plan, windows-downloads]
     if: contains(needs.plan.outputs.platforms, 'windows')
-    runs-on: windows-2025
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
@@ -304,7 +307,7 @@ jobs:
     if: >
       !cancelled() && needs.plan.result == 'success' && needs.data.result == 'success' &&
       needs.build-linux.result != 'failure' && needs.build-windows.result != 'failure'
-    runs-on: ${{ startsWith(matrix.platform, 'windows') && 'windows-2025' || 'ubuntu-24.04' }}
+    runs-on: ${{ startsWith(matrix.platform, 'windows') && 'windows-2022' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     # PARITY_RETAIL_KEY is this environment's secret, given to master only (a pull_request_target
     # run is master's). No deployment (see the data job).
