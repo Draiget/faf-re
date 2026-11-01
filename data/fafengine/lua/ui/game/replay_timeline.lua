@@ -37,7 +37,7 @@ end
 
 -- Safe global accessors for engine bindings
 local function GetTotalTicks()
-    if rawget(_G, 'GetReplayTotalTicks') then
+    if type(GetReplayTotalTicks) == 'function' then
         local ok, val = pcall(GetReplayTotalTicks)
         if ok and val then
             return val
@@ -47,7 +47,8 @@ local function GetTotalTicks()
 end
 
 local function GetCurrentTick()
-    local fn = rawget(_G, 'GetGameTick') or rawget(_G, 'GameTick')
+    local fn = (type(GetGameTick) == 'function' and GetGameTick)
+        or (type(GameTick) == 'function' and GameTick)
     if fn then
         local ok, val = pcall(fn)
         if ok and val then
@@ -58,7 +59,7 @@ local function GetCurrentTick()
 end
 
 local function IsScrubbing()
-    if rawget(_G, 'IsReplayScrubbing') then
+    if type(IsReplayScrubbing) == 'function' then
         local ok, val = pcall(IsReplayScrubbing)
         if ok then
             return val
@@ -68,19 +69,19 @@ local function IsScrubbing()
 end
 
 local function DoScrub(targetTick)
-    if rawget(_G, 'ScrubReplay') then
+    if type(ScrubReplay) == 'function' then
         pcall(ScrubReplay, targetTick)
     end
 end
 
 local function DoCancelScrub()
-    if rawget(_G, 'CancelReplayScrub') then
+    if type(CancelReplayScrub) == 'function' then
         pcall(CancelReplayScrub)
     end
 end
 
 local function GetScrubProgress()
-    if rawget(_G, 'GetReplayScrubProgress') then
+    if type(GetReplayScrubProgress) == 'function' then
         local ok, val = pcall(GetReplayScrubProgress)
         if ok then
             return val
@@ -295,10 +296,10 @@ function CreateReplayTimeline(parent)
         return controls.timeline
     end
 
-    parent = parent or GetFrame(0)
+    local rootFrame = GetFrame(0)
+    parent = parent or rootFrame
 
     -- Create scrubbing overlay on root frame
-    local rootFrame = GetFrame(0)
     controls.overlay = ScrubbingOverlay(rootFrame)
 
     -- Bottom-centered timeline bar
@@ -306,7 +307,18 @@ function CreateReplayTimeline(parent)
     LayoutHelpers.SetDimensions(bar, LayoutHelpers.ScaleNumber(540), LayoutHelpers.ScaleNumber(36))
     LayoutHelpers.AtBottomIn(bar, parent, LayoutHelpers.ScaleNumber(14))
     LayoutHelpers.AtHorizontalCenterIn(bar, parent)
-    bar.Depth:Set(function() return parent.Depth() + 20 end)
+
+    local function ResolveBarDepth()
+        if parent and type(parent.Depth) == 'function' then
+            local ok, d = pcall(parent.Depth)
+            if ok and d then
+                return d + 20
+            end
+        end
+        return rootFrame:GetTopmostDepth() + 20
+    end
+    bar.Depth:Set(ResolveBarDepth)
+    bar:Show()
 
     -- Semi-transparent dark background
     local bg = Bitmap(bar)
@@ -466,6 +478,7 @@ function CreateReplayTimeline(parent)
     end
 
     controls.timeline = bar
+    LOG("FAFENGINE: Replay timeline bar created successfully")
     return bar
 end
 
