@@ -37,24 +37,37 @@
 
 namespace moho
 {
-  bool telemetry_Enabled = false;
+  namespace
+  {
+#if defined(_WIN32)
+    constexpr const char kDefaultScheme[] = "https://";
+#else
+    constexpr const char kDefaultScheme[] = "http://"; // no TLS library in the Linux build
+#endif
+    const std::string kDefaultEndpoint = std::string(kDefaultScheme) + kTelemetryDefaultHost;
+  } // namespace
+
+  bool telemetry_Enabled = true;
 
   TConVar<bool> gTConVar_telemetry_Enabled(
     "telemetry_Enabled",
-    "Send one small record per desync and one per game end to telemetry_Endpoint (OTLP/HTTP JSON). "
-    "No names, ids, paths or dump contents. Off by default.",
+    "Send one small record per desync and one per game end of a live multiplayer game to telemetry_Endpoint "
+    "(OTLP/HTTP JSON), and the desync dump to telemetry_DumpEndpoint. The records carry no names, ids or paths. "
+    "On by default; /notelemetry turns it off.",
     &telemetry_Enabled
   );
 
-  msvc8::string telemetry_Endpoint;
+  msvc8::string telemetry_Endpoint = kDefaultEndpoint.c_str();
 
   TConVar<msvc8::string> gTConVar_telemetry_Endpoint(
     "telemetry_Endpoint",
-    "OpenTelemetry collector base URL for telemetry_Enabled, e.g. http://127.0.0.1:4318 (/v1/logs is appended).",
+    "OpenTelemetry collector base URL for telemetry_Enabled (/v1/logs is appended); default the faf-re desync server.",
     &telemetry_Endpoint
   );
 
-  msvc8::string telemetry_Token;
+  // The desync server's upload token. It ships with every build, so it is no secret: it only keeps
+  // casual junk out. Reading what arrived needs the server's read token, which never leaves it.
+  msvc8::string telemetry_Token = "faf-ckSHHu7NnIZu3HNnseugwrGz";
 
   TConVar<msvc8::string> gTConVar_telemetry_Token(
     "telemetry_Token",
@@ -62,11 +75,11 @@ namespace moho
     &telemetry_Token
   );
 
-  msvc8::string telemetry_DumpEndpoint;
+  msvc8::string telemetry_DumpEndpoint = (kDefaultEndpoint + "/dumps").c_str();
 
   TConVar<msvc8::string> gTConVar_telemetry_DumpEndpoint(
     "telemetry_DumpEndpoint",
-    "URL the desync recorder's dump is POSTed to as .tar.gz (needs telemetry_Enabled and /desyncrecorder). "
+    "URL the desync dump is POSTed to as .tar.gz; default the faf-re desync server. "
     "The dump holds player names and the sync log. Empty uploads nothing.",
     &telemetry_DumpEndpoint
   );
@@ -734,6 +747,9 @@ namespace moho
     }
     sStarted = true;
     msvc8::vector<msvc8::string> args;
+    if (CFG_GetArgOption("/notelemetry", 0u, nullptr)) {
+      telemetry_Enabled = false;
+    }
     if (CFG_GetArgOption("/telemetry", 0u, nullptr)) {
       telemetry_Enabled = true;
     }

@@ -364,7 +364,21 @@ func (c Config) GameArgs(gpgPort int) []string {
 	if c.Native != nil {
 		args = append(args, c.Native.nativeArgs()...)
 	}
+	// faf-re sends desync telemetry to its public server by default; test games stay off it
+	// unless the scenario configures telemetry itself.
+	if !hasArg(c.Args, "/telemetry") {
+		args = append(args, "/notelemetry")
+	}
 	return append(args, c.Args...)
+}
+
+func hasArg(args []string, name string) bool {
+	for _, a := range args {
+		if strings.EqualFold(a, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Seat) startGame(gpgPort int) error {

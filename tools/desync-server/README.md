@@ -16,7 +16,7 @@ Two tokens:
 ## Game side
 
 ```
-/telemetry /telemetryendpoint https://<host> /telemetrytoken <upload token>
+/telemetryendpoint https://<host> /telemetrytoken <upload token>
 /telemetrydumpendpoint https://<host>/dumps
 ```
 

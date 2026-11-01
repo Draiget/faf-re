@@ -1,12 +1,12 @@
 # Desync diagnostics
 
-A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats by default (one beat is one 100 ms sim tick) each client hashes its game state and sends the hash to the others, and a hash that differs from a client's own is a desync. The engine has three aids for finding out why. The recorder is on by default in live multiplayer games; the rest is opt-in:
+A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats by default (one beat is one 100 ms sim tick) each client hashes its game state and sends the hash to the others, and a hash that differs from a client's own is a desync. The engine has three aids for finding out why. The recorder and telemetry are on by default in live multiplayer games:
 
 | Aid | What it does | Issue | Switches |
 |---|---|---|---|
 | Desync recorder | On by default in live multiplayer: keeps the state each beat hashes for the recent beats in memory, copied as bytes (`/nodesyncdump` turns it off). After a mismatch it writes `desync_<game id>_beat<N>_army<A>.zip` into the folder of the game's log file (`/log`; the working folder without it); the log names the folder at game start. `/desyncrecorder` records the full sync log instead, call trace included, at a sim-time cost | #216 | [Desync recorder](SWITCHES.md#desync-recorder) |
 | `tools/desync-diff/desync_diff.py` | Compares two players' dumps and prints the first value that differs: beat, entity, field | #217 | [README](../tools/desync-diff/README.md) |
-| Desync telemetry | Sends one small record per desync and one per game end to an OpenTelemetry collector; optionally uploads the dump as `.tar.gz` to a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
+| Desync telemetry | On by default in live multiplayer (`/notelemetry` turns it off): sends one small record per desync and one per game end to the faf-re desync server's OpenTelemetry collector, and uploads the dump as `.tar.gz` to its dump receiver; the switches point both at a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
 
 This page is the setup side: what reaches the servers, how to run them, and how to check it works. Every field and switch is listed in [SWITCHES.md](SWITCHES.md#desync-telemetry). A ready server with both parts, for Docker Compose or Kubernetes, is [tools/desync-server](../tools/desync-server/README.md).
 
@@ -118,14 +118,14 @@ The client deletes its `.tar.gz` once the receiver answers 2xx, after six failed
 
 ## Game side
 
-Add to the game's command line (or set the switches in the console):
+By default a live multiplayer game sends its records to `https://fafre-metrics.draiget.dev/v1/logs` and its dump to `https://fafre-metrics.draiget.dev/dumps` (the Linux build posts plain `http://`: it has no TLS library), the faf-re desync server behind Cloudflare. `/notelemetry` sends nothing. To use a server of your own, add to the game's command line (or set the switches in the console):
 
 ```
-/telemetry /telemetryendpoint https://collector.example.org /telemetrytoken <token>
+/telemetryendpoint https://collector.example.org /telemetrytoken <token>
 /telemetrydumpendpoint https://dumps.example.org/dumps
 ```
 
-The first line sends the records. The second also uploads the dump the recorder writes; the recorder is on by default in live multiplayer, and with `/nodesyncdump` there is no dump to upload. `/v1/logs` is appended to the collector URL unless it already ends with it. Records and dumps are only sent from live multiplayer games, never from replays.
+The first line moves the records. The second moves the dump the recorder writes (an empty URL uploads none); the recorder is on by default in live multiplayer, and with `/nodesyncdump` there is no dump to upload. `/v1/logs` is appended to the collector URL unless it already ends with it. Records and dumps are only sent from live multiplayer games, never from replays.
 
 The game log shows it working:
 

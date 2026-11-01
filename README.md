@@ -55,7 +55,7 @@ When a multiplayer game desyncs, three aids show why.
 
 - **Desync recorder** (on by default in live multiplayer games, `/nodesyncdump` turns it off): keeps the state each beat hashes for the recent beats in memory, copied as bytes, and after a checksum mismatch writes a `desync_<game id>_beat<N>_army<A>.zip` dump into the folder of the game's log file. The game log names that folder when a game starts. `/desyncrecorder` records the full sync log instead, at a sim-time cost.
 - **Dump compare** (`tools/desync-diff/desync_diff.py`): two players' dumps in, the first value that differs out: beat, entity, field.
-- **Telemetry** (off by default; `/telemetry /telemetryendpoint URL`): one small OpenTelemetry log record per desync and per game end, sent to an OpenTelemetry collector, without player names, user ids or paths. With `/telemetrydumpendpoint URL` the dump is also uploaded as `.tar.gz` to a server of your own; `tools/desync-diff/receive.py` is a reference receiver that stores the uploads per game and compares them.
+- **Telemetry** (on by default in live multiplayer games, `/notelemetry` turns it off): one small OpenTelemetry log record per desync and per game end, without player names, user ids or paths, and the desync dump as `.tar.gz`, sent to the faf-re desync server (`fafre-metrics.draiget.dev`). Unlike the records, a dump holds player names and the game's sync log. `/telemetryendpoint URL` and `/telemetrydumpendpoint URL` send to a server of your own instead; `tools/desync-server` is one, ready for Docker Compose or Kubernetes.
 
 Setting up the collector and the receiver, and what they receive: [docs/DESYNC_DIAGNOSTICS.md](docs/DESYNC_DIAGNOSTICS.md). Every switch and field: [docs/SWITCHES.md](docs/SWITCHES.md#desync-telemetry).
 
