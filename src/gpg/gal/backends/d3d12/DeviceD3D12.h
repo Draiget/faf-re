@@ -274,13 +274,19 @@ namespace gpg::gal
     void EndProfileFrame();
     void CollectProfileFrames();
 
+    /**
+     * Draws `sourceRect` of the source (`sourceWidth` x `sourceHeight`) into
+     * `destinationRect` of the destination, stretched with linear filtering.
+     */
     void BlitTexture(
       D3D12_CPU_DESCRIPTOR_HANDLE source,
       d3d12::TrackedResource& sourceResource,
+      std::uint32_t sourceWidth,
+      std::uint32_t sourceHeight,
+      const RECT& sourceRect,
       RenderTargetD3D12::Buffer& destination,
       DXGI_FORMAT destinationFormat,
-      std::uint32_t width,
-      std::uint32_t height
+      const RECT& destinationRect
     );
 
     // ---- core objects --------------------------------------------------------

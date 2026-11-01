@@ -1161,42 +1161,59 @@ namespace gpg::gal
     sourceTarget->GetTexture()->GetDesc(&sourceDesc);
     destinationTarget->GetTexture()->GetDesc(&destinationDesc);
 
-    if (sourceContext->width_ == destinationContext->width_ && sourceContext->height_ == destinationContext->height_ &&
-        sourceDesc.Format == destinationDesc.Format) {
-      // As D3D10: a direct copy; only the destination rect's corner is used.
-      UINT destinationX = 0U;
-      UINT destinationY = 0U;
-      if (destinationRect != nullptr) {
-        destinationX = static_cast<UINT>(destinationRect->left);
-        destinationY = static_cast<UINT>(destinationRect->top);
-      }
+    // As D3D9 StretchRect: a null rect is the whole surface, and the source
+    // rect is stretched over the destination rect. The refraction copy of a
+    // split-screen view relies on this: it passes the view's rect and no
+    // destination rect, and the particle shaders sample the copy with
+    // view-relative coordinates.
+    const RECT fromRect =
+      (sourceRect != nullptr) ? *sourceRect
+                              : RECT{0, 0, static_cast<LONG>(sourceContext->width_), static_cast<LONG>(sourceContext->height_)};
+    const RECT toRect =
+      (destinationRect != nullptr)
+        ? *destinationRect
+        : RECT{0, 0, static_cast<LONG>(destinationContext->width_), static_cast<LONG>(destinationContext->height_)};
+
+    if (fromRect.right - fromRect.left == toRect.right - toRect.left &&
+        fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && sourceDesc.Format == destinationDesc.Format) {
+      // Same size: a direct copy.
       D3D11_BOX box{};
-      const D3D11_BOX* boxPointer = nullptr;
-      if (sourceRect != nullptr) {
-        box.left = static_cast<UINT>(sourceRect->left);
-        box.top = static_cast<UINT>(sourceRect->top);
-        box.right = static_cast<UINT>(sourceRect->right);
-        box.bottom = static_cast<UINT>(sourceRect->bottom);
-        box.front = 0U;
-        box.back = 1U;
-        boxPointer = &box;
-      }
+      box.left = static_cast<UINT>(fromRect.left);
+      box.top = static_cast<UINT>(fromRect.top);
+      box.right = static_cast<UINT>(fromRect.right);
+      box.bottom = static_cast<UINT>(fromRect.bottom);
+      box.front = 0U;
+      box.back = 1U;
       mImmediate->CopySubresourceRegion(
-        destinationTarget->GetTexture(), 0U, destinationX, destinationY, 0U, sourceTarget->GetTexture(), 0U, boxPointer
+        destinationTarget->GetTexture(),
+        0U,
+        static_cast<UINT>(toRect.left),
+        static_cast<UINT>(toRect.top),
+        0U,
+        sourceTarget->GetTexture(),
+        0U,
+        &box
       );
       return;
     }
 
     StretchRectBlit(
-      destinationContext->width_,
-      destinationContext->height_,
+      sourceContext->width_,
+      sourceContext->height_,
+      fromRect,
+      toRect,
       destinationTarget->GetRenderTargetView(),
       sourceTarget->GetShaderResourceView()
     );
   }
 
   void DeviceD3D11::StretchRectBlit(
-    const UINT width, const UINT height, ID3D11RenderTargetView* const destination, ID3D11ShaderResourceView* const source
+    const UINT sourceWidth,
+    const UINT sourceHeight,
+    const RECT& sourceRect,
+    const RECT& destinationRect,
+    ID3D11RenderTargetView* const destination,
+    ID3D11ShaderResourceView* const source
   )
   {
     D3D11_VIEWPORT savedViewport{};
@@ -1207,9 +1224,18 @@ namespace gpg::gal
     ComPtr<ID3D11DepthStencilView> savedDepth;
     mImmediate->OMGetRenderTargets(1U, &savedTarget, &savedDepth);
 
+    // The quad covers the whole viewport with the whole source. Scale and
+    // offset the viewport so that the source rect lands on the destination
+    // rect.
+    const float scaleX = static_cast<float>(destinationRect.right - destinationRect.left) /
+      static_cast<float>(sourceRect.right - sourceRect.left);
+    const float scaleY = static_cast<float>(destinationRect.bottom - destinationRect.top) /
+      static_cast<float>(sourceRect.bottom - sourceRect.top);
     D3D11_VIEWPORT viewport{};
-    viewport.Width = static_cast<float>(width);
-    viewport.Height = static_cast<float>(height);
+    viewport.TopLeftX = static_cast<float>(destinationRect.left) - static_cast<float>(sourceRect.left) * scaleX;
+    viewport.TopLeftY = static_cast<float>(destinationRect.top) - static_cast<float>(sourceRect.top) * scaleY;
+    viewport.Width = static_cast<float>(sourceWidth) * scaleX;
+    viewport.Height = static_cast<float>(sourceHeight) * scaleY;
     viewport.MaxDepth = 1.0f;
     mImmediate->RSSetViewports(1U, &viewport);
 

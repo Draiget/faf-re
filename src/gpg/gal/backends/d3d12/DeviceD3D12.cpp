@@ -1989,9 +1989,22 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     RenderTargetD3D12::Buffer& from = sourceTarget->Current();
     RenderTargetD3D12::Buffer& to = destinationTarget->Current();
 
-    if (sourceContext->width_ == destinationContext->width_ && sourceContext->height_ == destinationContext->height_ &&
-        sourceTarget->Format() == destinationTarget->Format()) {
-      // As D3D10: a direct copy; only the destination rect's corner is used.
+    // As D3D9 StretchRect: a null rect is the whole surface, and the source
+    // rect is stretched over the destination rect. The refraction copy of a
+    // split-screen view relies on this: it passes the view's rect and no
+    // destination rect, and the particle shaders sample the copy with
+    // view-relative coordinates.
+    const RECT fromRect =
+      (sourceRect != nullptr) ? *sourceRect
+                              : RECT{0, 0, static_cast<LONG>(sourceContext->width_), static_cast<LONG>(sourceContext->height_)};
+    const RECT toRect =
+      (destinationRect != nullptr)
+        ? *destinationRect
+        : RECT{0, 0, static_cast<LONG>(destinationContext->width_), static_cast<LONG>(destinationContext->height_)};
+
+    if (fromRect.right - fromRect.left == toRect.right - toRect.left &&
+        fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && sourceTarget->Format() == destinationTarget->Format()) {
+      // Same size: a direct copy.
       Transition(from.resource, D3D12_RESOURCE_STATE_COPY_SOURCE);
       Transition(to.resource, D3D12_RESOURCE_STATE_COPY_DEST);
       FlushBarriers();
@@ -2002,33 +2015,38 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       origin.pResource = from.resource.resource.Get();
       origin.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
       D3D12_BOX box{};
-      const D3D12_BOX* boxPointer = nullptr;
-      if (sourceRect != nullptr) {
-        box.left = static_cast<UINT>(sourceRect->left);
-        box.top = static_cast<UINT>(sourceRect->top);
-        box.right = static_cast<UINT>(sourceRect->right);
-        box.bottom = static_cast<UINT>(sourceRect->bottom);
-        box.front = 0U;
-        box.back = 1U;
-        boxPointer = &box;
-      }
-      const UINT x = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->left) : 0U;
-      const UINT y = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->top) : 0U;
+      box.left = static_cast<UINT>(fromRect.left);
+      box.top = static_cast<UINT>(fromRect.top);
+      box.right = static_cast<UINT>(fromRect.right);
+      box.bottom = static_cast<UINT>(fromRect.bottom);
+      box.front = 0U;
+      box.back = 1U;
       MarkDraw("StretchRect copy");
-      mList->CopyTextureRegion(&target, x, y, 0U, &origin, boxPointer);
+      mList->CopyTextureRegion(&target, static_cast<UINT>(toRect.left), static_cast<UINT>(toRect.top), 0U, &origin, &box);
       FinishDraw();
       return;
     }
-    BlitTexture(from.shaderResourceView, from.resource, to, destinationTarget->Format(), destinationContext->width_, destinationContext->height_);
+    BlitTexture(
+      from.shaderResourceView,
+      from.resource,
+      sourceContext->width_,
+      sourceContext->height_,
+      fromRect,
+      to,
+      destinationTarget->Format(),
+      toRect
+    );
   }
 
   void DeviceD3D12::BlitTexture(
     const D3D12_CPU_DESCRIPTOR_HANDLE source,
     d3d12::TrackedResource& sourceResource,
+    const std::uint32_t sourceWidth,
+    const std::uint32_t sourceHeight,
+    const RECT& sourceRect,
     RenderTargetD3D12::Buffer& destination,
     const DXGI_FORMAT destinationFormat,
-    const std::uint32_t width,
-    const std::uint32_t height
+    const RECT& destinationRect
   )
   {
     ComPtr<ID3D12PipelineState>& pipeline = mBlitPipelines[destinationFormat];
@@ -2067,8 +2085,22 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     Transition(destination.resource, D3D12_RESOURCE_STATE_RENDER_TARGET);
     FlushBarriers();
     mList->OMSetRenderTargets(1U, &destination.renderTargetView, FALSE, nullptr);
-    const D3D12_VIEWPORT viewport{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
-    const D3D12_RECT scissor{0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    // The blit draws the whole source over the viewport. Scale and offset the
+    // viewport so that the source rect lands on the destination rect, and
+    // scissor away the rest of the source.
+    const float scaleX = static_cast<float>(destinationRect.right - destinationRect.left) /
+      static_cast<float>(sourceRect.right - sourceRect.left);
+    const float scaleY = static_cast<float>(destinationRect.bottom - destinationRect.top) /
+      static_cast<float>(sourceRect.bottom - sourceRect.top);
+    const D3D12_VIEWPORT viewport{
+      static_cast<float>(destinationRect.left) - static_cast<float>(sourceRect.left) * scaleX,
+      static_cast<float>(destinationRect.top) - static_cast<float>(sourceRect.top) * scaleY,
+      static_cast<float>(sourceWidth) * scaleX,
+      static_cast<float>(sourceHeight) * scaleY,
+      0.0f,
+      1.0f
+    };
+    const D3D12_RECT scissor{destinationRect.left, destinationRect.top, destinationRect.right, destinationRect.bottom};
     mList->RSSetViewports(1U, &viewport);
     mList->RSSetScissorRects(1U, &scissor);
     mList->SetPipelineState(pipeline.Get());

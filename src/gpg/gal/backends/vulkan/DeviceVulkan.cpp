@@ -1829,12 +1829,21 @@ namespace gpg::gal
       Vk().vkCmdCopyImage(mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destination.image,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region);
     } else {
-      // As D3D10/11: a whole-target stretch, linear filtered.
+      // A stretch of the source rect over the destination rect, linear
+      // filtered; a null rect is the whole image.
       VkImageBlit region{};
       region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
       region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
       region.srcOffsets[1] = {static_cast<std::int32_t>(source.width), static_cast<std::int32_t>(source.height), 1};
       region.dstOffsets[1] = {static_cast<std::int32_t>(destination.width), static_cast<std::int32_t>(destination.height), 1};
+      if (sourceRect != nullptr) {
+        region.srcOffsets[0] = {sourceRect->left, sourceRect->top, 0};
+        region.srcOffsets[1] = {sourceRect->right, sourceRect->bottom, 1};
+      }
+      if (destinationRect != nullptr) {
+        region.dstOffsets[0] = {destinationRect->left, destinationRect->top, 0};
+        region.dstOffsets[1] = {destinationRect->right, destinationRect->bottom, 1};
+      }
       Vk().vkCmdBlitImage(mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destination.image,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region, VK_FILTER_LINEAR);
     }
@@ -1872,8 +1881,21 @@ namespace gpg::gal
     auto* const to = static_cast<RenderTargetVulkan*>(destination.get());
     vulkan::TrackedImage& fromImage = from->Current().image;
     vulkan::TrackedImage& toImage = to->Current().image;
-    const bool same = fromImage.width == toImage.width && fromImage.height == toImage.height && fromImage.format == toImage.format;
-    CopyImage(fromImage, toImage, same ? sourceRect : nullptr, same ? destinationRect : nullptr, !same);
+
+    // As D3D9 StretchRect: a null rect is the whole surface, and the source
+    // rect is stretched over the destination rect. The refraction copy of a
+    // split-screen view relies on this: it passes the view's rect and no
+    // destination rect, and the particle shaders sample the copy with
+    // view-relative coordinates.
+    const RECT fromRect =
+      (sourceRect != nullptr) ? *sourceRect
+                              : RECT{0, 0, static_cast<LONG>(fromImage.width), static_cast<LONG>(fromImage.height)};
+    const RECT toRect =
+      (destinationRect != nullptr) ? *destinationRect
+                                   : RECT{0, 0, static_cast<LONG>(toImage.width), static_cast<LONG>(toImage.height)};
+    const bool copy = fromRect.right - fromRect.left == toRect.right - toRect.left &&
+      fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && fromImage.format == toImage.format;
+    CopyImage(fromImage, toImage, &fromRect, &toRect, !copy);
   }
 
   void DeviceVulkan::UpdateSurface(
