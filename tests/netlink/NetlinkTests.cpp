@@ -597,11 +597,252 @@ namespace
     std::printf("=================================================================================\n\n");
   }
 
+
+  struct MeshStats {
+    double setupMs = 0.0;
+    double simMs = 0.0;
+    std::size_t totalSent = 0;
+    std::size_t totalRecv = 0;
+    int corrupt = 0;
+    bool allReady = false;
+  };
+
+  MeshStats RunMesh(const std::string& bind, const int numPlayers, const int ticks, SctpBackend backend)
+  {
+    MeshStats res;
+    struct PlayerSide {
+      int id;
+      std::atomic<std::size_t> received{0};
+      std::atomic<int> corrupt{0};
+    };
+
+    std::vector<std::unique_ptr<PlayerSide>> players(numPlayers);
+    for (int i = 0; i < numPlayers; ++i) {
+      players[i] = std::make_unique<PlayerSide>();
+      players[i]->id = i;
+    }
+
+    struct PairWiring {
+      std::unique_ptr<Link> linkA;
+      std::unique_ptr<Link> linkB;
+      Link* rawA = nullptr;
+      Link* rawB = nullptr;
+      int i = 0;
+      int j = 0;
+    };
+
+    std::vector<PairWiring> wirings;
+    wirings.reserve(numPlayers * (numPlayers - 1) / 2);
+
+    for (int i = 0; i < numPlayers; ++i) {
+      for (int j = i + 1; j < numPlayers; ++j) {
+        PairWiring pw;
+        pw.i = i;
+        pw.j = j;
+        wirings.push_back(std::move(pw));
+      }
+    }
+
+    for (auto& pw : wirings) {
+      LinkOptions oa;
+      oa.bindAddress = bind;
+      oa.ufragPrefix = kOurUfragPrefix;
+      oa.webrtc = true;
+      oa.sctpBackend = backend;
+      oa.localId = static_cast<uint64_t>(pw.i + 1);
+      oa.remoteId = static_cast<uint64_t>(pw.j + 1);
+      oa.offerer = true;
+
+      LinkOptions ob;
+      ob.bindAddress = bind;
+      ob.ufragPrefix = kOurUfragPrefix;
+      ob.webrtc = true;
+      ob.sctpBackend = backend;
+      ob.localId = static_cast<uint64_t>(pw.j + 1);
+      ob.remoteId = static_cast<uint64_t>(pw.i + 1);
+      ob.offerer = false;
+
+      int pi = pw.i;
+      int pj = pw.j;
+
+      LinkCallbacks cba;
+      cba.onSignal = [&pw](const CandidatesMessage& m) { if (pw.rawB) pw.rawB->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+      cba.onSignalText = [&pw](const std::string& json) { if (pw.rawB) pw.rawB->OnSignalText(json); };
+      cba.onData = [&players, pi](const std::uint8_t* data, const std::size_t size) {
+        if (size != 400) { ++players[pi]->corrupt; return; }
+        std::uint32_t seq = 0;
+        std::memcpy(&seq, data, sizeof(seq));
+        for (std::size_t k = sizeof(seq); k < size; ++k) {
+          if (data[k] != static_cast<std::uint8_t>(seq + k)) {
+            ++players[pi]->corrupt;
+            return;
+          }
+        }
+        players[pi]->received.fetch_add(1, std::memory_order_relaxed);
+      };
+
+      LinkCallbacks cbb;
+      cbb.onSignal = [&pw](const CandidatesMessage& m) { if (pw.rawA) pw.rawA->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+      cbb.onSignalText = [&pw](const std::string& json) { if (pw.rawA) pw.rawA->OnSignalText(json); };
+      cbb.onData = [&players, pj](const std::uint8_t* data, const std::size_t size) {
+        if (size != 400) { ++players[pj]->corrupt; return; }
+        std::uint32_t seq = 0;
+        std::memcpy(&seq, data, sizeof(seq));
+        for (std::size_t k = sizeof(seq); k < size; ++k) {
+          if (data[k] != static_cast<std::uint8_t>(seq + k)) {
+            ++players[pj]->corrupt;
+            return;
+          }
+        }
+        players[pj]->received.fetch_add(1, std::memory_order_relaxed);
+      };
+
+      pw.linkA = std::make_unique<Link>(oa, cba);
+      pw.linkB = std::make_unique<Link>(ob, cbb);
+      pw.rawA = pw.linkA.get();
+      pw.rawB = pw.linkB.get();
+    }
+
+    std::atomic<bool> stop{false};
+    std::thread ticker([&] {
+      while (!stop) {
+        for (auto& pw : wirings) {
+          pw.rawA->Tick();
+          pw.rawB->Tick();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+
+    const auto tStart = std::chrono::steady_clock::now();
+    for (auto& pw : wirings) {
+      pw.rawA->Start();
+      pw.rawB->Start();
+    }
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(35);
+    bool allReady = false;
+    while (std::chrono::steady_clock::now() < deadline) {
+      bool ok = true;
+      for (auto& pw : wirings) {
+        if (!pw.rawA->GetStats().onWebRtc || !pw.rawB->GetStats().onWebRtc) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
+        allReady = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+
+    res.allReady = allReady;
+    res.setupMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
+
+    if (allReady && ticks > 0) {
+      const auto tSimStart = std::chrono::steady_clock::now();
+      std::uint8_t buf[400];
+      std::uint32_t seqCounter = 0;
+
+      for (int t = 0; t < ticks; ++t) {
+        for (auto& pw : wirings) {
+          {
+            const auto seq = ++seqCounter;
+            std::memcpy(buf, &seq, sizeof(seq));
+            for (std::size_t k = sizeof(seq); k < sizeof(buf); ++k) buf[k] = static_cast<std::uint8_t>(seq + k);
+            pw.rawA->Send(buf, sizeof(buf));
+            ++res.totalSent;
+          }
+          {
+            const auto seq = ++seqCounter;
+            std::memcpy(buf, &seq, sizeof(seq));
+            for (std::size_t k = sizeof(seq); k < sizeof(buf); ++k) buf[k] = static_cast<std::uint8_t>(seq + k);
+            pw.rawB->Send(buf, sizeof(buf));
+            ++res.totalSent;
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+
+      const auto drainDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      while (std::chrono::steady_clock::now() < drainDeadline) {
+        std::size_t totalRcv = 0;
+        for (int p = 0; p < numPlayers; ++p) {
+          totalRcv += players[p]->received.load(std::memory_order_relaxed);
+        }
+        if (totalRcv >= res.totalSent) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      res.simMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tSimStart).count();
+    }
+
+    stop = true;
+    ticker.join();
+
+    for (int p = 0; p < numPlayers; ++p) {
+      res.totalRecv += players[p]->received.load();
+      res.corrupt += players[p]->corrupt.load();
+    }
+
+    for (auto& pw : wirings) {
+      pw.rawA->Close();
+      pw.rawB->Close();
+    }
+
+    return res;
+  }
+
+  void BenchmarkMesh(const std::string& bind, const int numPlayers, const int ticks)
+  {
+    const int totalLinks = numPlayers * (numPlayers - 1) / 2;
+    const std::size_t expectedPackets = static_cast<std::size_t>(ticks) * totalLinks * 2;
+    const double expectedMB = (expectedPackets * 400.0) / (1024.0 * 1024.0);
+
+    std::printf("\n=================================================================================\n");
+    std::printf("              %d-PLAYER FULL P2P MESH SIMULATION BENCHMARK\n", numPlayers);
+    std::printf("=================================================================================\n");
+    std::printf("Topology:  %d players, %d peer-to-peer links (%d endpoints in process)\n",
+                numPlayers, totalLinks, totalLinks * 2);
+    std::printf("Traffic:   %d simulation beats, %zu total datagrams (~%.2f MB)\n",
+                ticks, expectedPackets, expectedMB);
+    std::printf("Policy:    unordered = true, maxRetransmits = 0 (FAF game datagrams)\n");
+    std::printf("---------------------------------------------------------------------------------\n");
+
+    struct MeshConfig {
+      const char* name;
+      SctpBackend backend;
+    };
+    const MeshConfig configs[] = {
+      {"1. usrsctp (baseline)", SctpBackend::UsrSctp},
+      {"2. dcSCTP  (optimized)", SctpBackend::DcSctp},
+    };
+
+    for (const auto& cfg : configs) {
+      std::printf("Running %s...\n", cfg.name);
+      const MeshStats s = RunMesh(bind, numPlayers, ticks, cfg.backend);
+      const double sec = s.simMs / 1000.0;
+      const double pps = sec > 0 ? s.totalRecv / sec : 0;
+      const double mbps = sec > 0 ? (s.totalRecv * 400.0 / (1024.0 * 1024.0)) / sec : 0;
+
+      std::printf("  Full Mesh Ready:    %s (%6.1f ms for %d links)\n",
+                  s.allReady ? "YES" : "NO", s.setupMs, totalLinks);
+      std::printf("  Packets Delivered:  %zu / %zu (corrupt: %d)\n",
+                  s.totalRecv, s.totalSent, s.corrupt);
+      std::printf("  Simulation Time:    %6.1f ms (%6.0f datagrams/sec, %.2f MB/s)\n",
+                  s.simMs, pps, mbps);
+      std::printf("---------------------------------------------------------------------------------\n");
+    }
+    std::printf("=================================================================================\n\n");
+  }
+
 int main(int argc, char** argv)
 {
   std::string bind;
   int count = 10000;
   bool benchmark = false;
+  int meshPlayers = 0;
+  int meshTicks = 50;
   for (int i = 1; i < argc; ++i) {
     if (std::strcmp(argv[i], "--bind") == 0 && i + 1 < argc) {
       bind = argv[++i];
@@ -609,7 +850,15 @@ int main(int argc, char** argv)
       count = std::atoi(argv[++i]);
     } else if (std::strcmp(argv[i], "--benchmark") == 0) {
       benchmark = true;
+    } else if (std::strcmp(argv[i], "--mesh") == 0 && i + 1 < argc) {
+      meshPlayers = std::atoi(argv[++i]);
+    } else if (std::strcmp(argv[i], "--beats") == 0 && i + 1 < argc) {
+      meshTicks = std::atoi(argv[++i]);
     }
+  }
+  if (meshPlayers > 1) {
+    BenchmarkMesh(bind, meshPlayers, meshTicks);
+    return 0;
   }
   if (benchmark) {
     BenchmarkBackends(bind, count);
