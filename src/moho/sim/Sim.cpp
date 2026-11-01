@@ -7640,12 +7640,15 @@ void Sim::IssueCommand(
     collectUnit(static_cast<EntId>(value));
   });
 
-  if (selectedUnits.Empty()) {
-    ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
+  // 0x00749411..0x0074945E: the DestroySelf cheat test follows the entity loop
+  // directly, so CheatsEnabled() (which folds its flag into the checksum) runs
+  // even when nothing was selected, and a refused order returns without
+  // releasing the command id.
+  if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_DestroySelf && !CheatsEnabled()) {
     return;
   }
 
-  if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_DestroySelf && !CheatsEnabled()) {
+  if (selectedUnits.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
     return;
   }
