@@ -95,8 +95,9 @@ end
 local ScrubbingOverlay = ClassUI(Group) {
     __init = function(self, parent)
         Group.__init(self, parent, "ScrubbingModalOverlay")
+        self:SetRenderPass(UIUtil.UIRP_PostGlow)
         LayoutHelpers.FillParent(self, parent)
-        self.Depth:Set(1500)
+        self.Depth:Set(10000)
 
         self._escPushed = false
 
@@ -112,7 +113,7 @@ local ScrubbingOverlay = ClassUI(Group) {
 
         -- Centered modal dialog box
         self.dialog = Group(self, "ScrubbingDialog")
-        LayoutHelpers.SetDimensions(self.dialog, LayoutHelpers.ScaleNumber(420), LayoutHelpers.ScaleNumber(170))
+        LayoutHelpers.SetDimensions(self.dialog, 420, 170)
         LayoutHelpers.AtCenterIn(self.dialog, self)
         self.dialog.Depth:Set(function() return self.Depth() + 5 end)
 
@@ -125,57 +126,55 @@ local ScrubbingOverlay = ClassUI(Group) {
         -- 1px border around dialog
         local borderCol = 'ff3c5270'
         self.borderTop = Bitmap(self.dialog)
-        LayoutHelpers.AtTopIn(self.borderTop, self.dialog)
-        LayoutHelpers.SetHeight(self.borderTop, 1)
         self.borderTop.Left:Set(self.dialog.Left)
         self.borderTop.Right:Set(self.dialog.Right)
+        self.borderTop.Top:Set(self.dialog.Top)
+        LayoutHelpers.SetHeight(self.borderTop, 1)
         self.borderTop:SetSolidColor(borderCol)
         self.borderTop.Depth:Set(function() return self.dialog.Depth() + 1 end)
 
         self.borderBottom = Bitmap(self.dialog)
-        LayoutHelpers.AtBottomIn(self.borderBottom, self.dialog)
-        LayoutHelpers.SetHeight(self.borderBottom, 1)
         self.borderBottom.Left:Set(self.dialog.Left)
         self.borderBottom.Right:Set(self.dialog.Right)
+        self.borderBottom.Bottom:Set(self.dialog.Bottom)
+        LayoutHelpers.SetHeight(self.borderBottom, 1)
         self.borderBottom:SetSolidColor(borderCol)
         self.borderBottom.Depth:Set(function() return self.dialog.Depth() + 1 end)
 
         self.borderLeft = Bitmap(self.dialog)
-        LayoutHelpers.AtLeftIn(self.borderLeft, self.dialog)
-        LayoutHelpers.SetWidth(self.borderLeft, 1)
+        self.borderLeft.Left:Set(self.dialog.Left)
         self.borderLeft.Top:Set(self.dialog.Top)
         self.borderLeft.Bottom:Set(self.dialog.Bottom)
+        LayoutHelpers.SetWidth(self.borderLeft, 1)
         self.borderLeft:SetSolidColor(borderCol)
         self.borderLeft.Depth:Set(function() return self.dialog.Depth() + 1 end)
 
         self.borderRight = Bitmap(self.dialog)
-        LayoutHelpers.AtRightIn(self.borderRight, self.dialog)
-        LayoutHelpers.SetWidth(self.borderRight, 1)
+        self.borderRight.Right:Set(self.dialog.Right)
         self.borderRight.Top:Set(self.dialog.Top)
         self.borderRight.Bottom:Set(self.dialog.Bottom)
+        LayoutHelpers.SetWidth(self.borderRight, 1)
         self.borderRight:SetSolidColor(borderCol)
         self.borderRight.Depth:Set(function() return self.dialog.Depth() + 1 end)
 
         -- Title text
         self.titleText = UIUtil.CreateText(self.dialog, "Fast-forwarding Replay", 16, UIUtil.titleFont)
-        LayoutHelpers.AtTopIn(self.titleText, self.dialog, LayoutHelpers.ScaleNumber(16))
+        LayoutHelpers.AtTopIn(self.titleText, self.dialog, 16)
         LayoutHelpers.AtHorizontalCenterIn(self.titleText, self.dialog)
         self.titleText:SetColor('ffffffff')
         self.titleText.Depth:Set(function() return self.dialog.Depth() + 2 end)
 
         -- Detail text: "Fast-forwarding to MM:SS"
         self.targetText = UIUtil.CreateText(self.dialog, "Fast-forwarding to --:--", 13, UIUtil.bodyFont)
-        LayoutHelpers.Below(self.targetText, self.titleText, LayoutHelpers.ScaleNumber(8))
+        LayoutHelpers.Below(self.targetText, self.titleText, 8)
         LayoutHelpers.AtHorizontalCenterIn(self.targetText, self.dialog)
         self.targetText:SetColor('ff99ccff')
         self.targetText.Depth:Set(function() return self.dialog.Depth() + 2 end)
 
         -- Progress bar track
-        local trackWidth = LayoutHelpers.ScaleNumber(340)
-        local trackHeight = LayoutHelpers.ScaleNumber(16)
         self.barTrack = Bitmap(self.dialog)
-        LayoutHelpers.SetDimensions(self.barTrack, trackWidth, trackHeight)
-        LayoutHelpers.Below(self.barTrack, self.targetText, LayoutHelpers.ScaleNumber(12))
+        LayoutHelpers.SetDimensions(self.barTrack, 340, 16)
+        LayoutHelpers.Below(self.barTrack, self.targetText, 12)
         LayoutHelpers.AtHorizontalCenterIn(self.barTrack, self.dialog)
         self.barTrack:SetSolidColor('ff080c12')
         self.barTrack.Depth:Set(function() return self.dialog.Depth() + 2 end)
@@ -206,7 +205,7 @@ local ScrubbingOverlay = ClassUI(Group) {
 
         -- Cancel button
         self.cancelButton = UIUtil.CreateButtonWithDropshadow(self.dialog, '/BUTTON/medium/', "<LOC _Cancel>Cancel")
-        LayoutHelpers.Below(self.cancelButton, self.barTrack, LayoutHelpers.ScaleNumber(14))
+        LayoutHelpers.Below(self.cancelButton, self.barTrack, 14)
         LayoutHelpers.AtHorizontalCenterIn(self.cancelButton, self.dialog)
         self.cancelButton.Depth:Set(function() return self.dialog.Depth() + 2 end)
         self.cancelButton.OnClick = function(btn)
@@ -304,23 +303,18 @@ function CreateReplayTimeline(parent)
 
     -- Bottom-centered timeline bar directly on root frame
     local bar = Group(rootFrame, "ReplayTimelineBar")
-    bar.Width:Set(LayoutHelpers.ScaleNumber(540))
-    bar.Height:Set(LayoutHelpers.ScaleNumber(36))
-    bar.Bottom:Set(function() return math.floor(rootFrame.Bottom() - LayoutHelpers.ScaleNumber(14)) end)
-    bar.Top:Set(function() return math.floor(bar.Bottom() - bar.Height()) end)
-    bar.Left:Set(function() return math.floor(rootFrame.Left() + (rootFrame.Width() - bar.Width()) * 0.5) end)
-    bar.Right:Set(function() return math.floor(bar.Left() + bar.Width()) end)
-    bar.Depth:Set(1000)
+    bar:SetRenderPass(UIUtil.UIRP_PostGlow)
+    LayoutHelpers.SetDimensions(bar, 600, 42)
+    LayoutHelpers.AtBottomIn(bar, rootFrame, 16)
+    LayoutHelpers.AtHorizontalCenterIn(bar, rootFrame)
+    bar.Depth:Set(9500)
     bar:Show()
 
     -- Semi-transparent dark background
     local bg = Bitmap(bar)
-    bg.Left:Set(bar.Left)
-    bg.Right:Set(bar.Right)
-    bg.Top:Set(bar.Top)
-    bg.Bottom:Set(bar.Bottom)
+    LayoutHelpers.FillParent(bg, bar)
     bg:SetSolidColor('e60d1117') -- semi-transparent dark charcoal
-    bg.Depth:Set(function() return bar.Depth() end)
+    bg.Depth:Set(function() return bar.Depth() + 1 end)
 
     -- Top accent line
     local topBorder = Bitmap(bar)
@@ -329,7 +323,7 @@ function CreateReplayTimeline(parent)
     topBorder.Top:Set(bar.Top)
     LayoutHelpers.SetHeight(topBorder, 1)
     topBorder:SetSolidColor('ff2b3d54')
-    topBorder.Depth:Set(function() return bar.Depth() + 1 end)
+    topBorder.Depth:Set(function() return bar.Depth() + 2 end)
 
     -- Subtle perimeter borders
     local borderCol = 'ff141c26'
@@ -339,47 +333,43 @@ function CreateReplayTimeline(parent)
     botBorder.Bottom:Set(bar.Bottom)
     LayoutHelpers.SetHeight(botBorder, 1)
     botBorder:SetSolidColor(borderCol)
-    botBorder.Depth:Set(function() return bar.Depth() + 1 end)
+    botBorder.Depth:Set(function() return bar.Depth() + 2 end)
 
     local leftBorder = Bitmap(bar)
     leftBorder.Left:Set(bar.Left)
-    LayoutHelpers.SetWidth(leftBorder, 1)
     leftBorder.Top:Set(bar.Top)
     leftBorder.Bottom:Set(bar.Bottom)
+    LayoutHelpers.SetWidth(leftBorder, 1)
     leftBorder:SetSolidColor(borderCol)
-    leftBorder.Depth:Set(function() return bar.Depth() + 1 end)
+    leftBorder.Depth:Set(function() return bar.Depth() + 2 end)
 
     local rightBorder = Bitmap(bar)
     rightBorder.Right:Set(bar.Right)
-    LayoutHelpers.SetWidth(rightBorder, 1)
     rightBorder.Top:Set(bar.Top)
     rightBorder.Bottom:Set(bar.Bottom)
+    LayoutHelpers.SetWidth(rightBorder, 1)
     rightBorder:SetSolidColor(borderCol)
-    rightBorder.Depth:Set(function() return bar.Depth() + 1 end)
+    rightBorder.Depth:Set(function() return bar.Depth() + 2 end)
 
     -- Current time label
     local curTimeLabel = UIUtil.CreateText(bar, "00:00", 12, UIUtil.bodyFont)
-    curTimeLabel.Left:Set(function() return math.floor(bar.Left() + LayoutHelpers.ScaleNumber(14)) end)
-    curTimeLabel.Width:Set(LayoutHelpers.ScaleNumber(55))
+    LayoutHelpers.AtLeftIn(curTimeLabel, bar, 16)
     LayoutHelpers.AtVerticalCenterIn(curTimeLabel, bar)
     curTimeLabel:SetColor('ffffffff')
-    curTimeLabel.Depth:Set(function() return bar.Depth() + 2 end)
+    curTimeLabel.Depth:Set(function() return bar.Depth() + 3 end)
 
     -- Total duration label
     local totalTimeLabel = UIUtil.CreateText(bar, "00:00", 12, UIUtil.bodyFont)
-    totalTimeLabel.Right:Set(function() return math.floor(bar.Right() - LayoutHelpers.ScaleNumber(14)) end)
-    totalTimeLabel.Width:Set(LayoutHelpers.ScaleNumber(55))
+    LayoutHelpers.AtRightIn(totalTimeLabel, bar, 16)
     LayoutHelpers.AtVerticalCenterIn(totalTimeLabel, bar)
     totalTimeLabel:SetColor('ff9cb0c6')
-    totalTimeLabel.Depth:Set(function() return bar.Depth() + 2 end)
+    totalTimeLabel.Depth:Set(function() return bar.Depth() + 3 end)
 
     -- Interactive slider
-    local function GetSkinFile(path)
-        if UIUtil and UIUtil.SkinnableFile then
-            return UIUtil.SkinnableFile(path)
-        end
-        return path
-    end
+    local thumbUp = UIUtil.UIFile('/game/slider-btn/slider_btn_up.dds')
+    local thumbOver = UIUtil.UIFile('/game/slider-btn/slider_btn_over.dds')
+    local thumbDown = UIUtil.UIFile('/game/slider-btn/slider_btn_down.dds')
+    local sliderBg = UIUtil.UIFile('/game/slider/slider-back_bmp.dds')
 
     local initialTotal = GetTotalTicks()
     local maxTicks = math.max(10, initialTotal)
@@ -389,26 +379,24 @@ function CreateReplayTimeline(parent)
         0,
         maxTicks,
         1,
-        GetSkinFile('/slider02/slider_btn_up.dds'),
-        GetSkinFile('/slider02/slider_btn_over.dds'),
-        GetSkinFile('/slider02/slider_btn_down.dds'),
-        GetSkinFile('/dialogs/options/slider-back_bmp.dds')
+        thumbUp,
+        thumbOver,
+        thumbDown,
+        sliderBg
     )
-    slider.Left:Set(function() return math.floor(curTimeLabel.Left() + curTimeLabel.Width() + LayoutHelpers.ScaleNumber(10)) end)
-    slider.Right:Set(function() return math.floor(totalTimeLabel.Right() - totalTimeLabel.Width() - LayoutHelpers.ScaleNumber(10)) end)
-    slider.Height:Set(LayoutHelpers.ScaleNumber(16))
+    slider.Left:Set(function() return math.floor(curTimeLabel.Right() + LayoutHelpers.ScaleNumber(12)) end)
+    slider.Right:Set(function() return math.floor(totalTimeLabel.Left() - LayoutHelpers.ScaleNumber(12)) end)
+    slider.Width:Set(function() return math.max(10, math.floor(slider.Right() - slider.Left())) end)
+    LayoutHelpers.SetHeight(slider, 16)
     LayoutHelpers.AtVerticalCenterIn(slider, bar)
 
-    slider._background.Left:Set(slider.Left)
-    slider._background.Right:Set(slider.Right)
-    slider._background.Top:Set(slider.Top)
-    slider._background.Bottom:Set(slider.Bottom)
+    LayoutHelpers.FillParent(slider._background, slider)
     slider._thumb.Depth:Set(function() return bar.Depth() + 6 end)
     slider._background.Depth:Set(function() return bar.Depth() + 2 end)
 
     -- Floating preview label above slider thumb while dragging
     local thumbPreview = UIUtil.CreateText(bar, "", 11, UIUtil.bodyFont)
-    LayoutHelpers.Above(thumbPreview, slider._thumb, LayoutHelpers.ScaleNumber(2))
+    LayoutHelpers.Above(thumbPreview, slider._thumb, 2)
     LayoutHelpers.AtHorizontalCenterIn(thumbPreview, slider._thumb)
     thumbPreview:SetColor('ff00d0ff')
     thumbPreview.Depth:Set(function() return slider._thumb.Depth() + 1 end)
@@ -450,8 +438,19 @@ function CreateReplayTimeline(parent)
         end
     end
 
+    local loggedOnce = false
     bar:SetNeedsFrameUpdate(true)
     bar.OnFrame = function(self, deltaTime)
+        if not loggedOnce then
+            loggedOnce = true
+            local totalDbg = GetTotalTicks()
+            local curDbg = GetCurrentTick()
+            LOG(string.format("FAFENGINE: Timeline rendered at Left=%s Top=%s Right=%s Bottom=%s Depth=%s Hidden=%s TotalTicks=%s CurTick=%s",
+                tostring(self.Left()), tostring(self.Top()), tostring(self.Right()), tostring(self.Bottom()),
+                tostring(self.Depth()), tostring(self:IsHidden()),
+                tostring(totalDbg), tostring(curDbg)))
+        end
+
         local total = GetTotalTicks()
         if total > 0 and slider._endValue ~= total then
             slider:SetEndValue(total)
@@ -494,6 +493,8 @@ function CreateReplayTimeline(parent)
 
     controls.timeline = bar
     LOG("FAFENGINE: Replay timeline bar created successfully")
+
+
     return bar
 end
 
