@@ -127,6 +127,12 @@ type ContractConfig struct {
 	// (use with noTurn), e.g. a TURN server on another machine. Every field
 	// expands %VAR% and $VAR, so a scenario names no address itself.
 	IceServers []IceServerConfig `yaml:"iceServers"`
+	// Shaping is where link steps apply: "turn" (default) in mpemu's TURN
+	// server, which shapes only paths through it; "links" in every netlink
+	// link's sends (FAF_NETLINK_TEST_SHAPING), whichever path ICE picks. Use
+	// "links" when every player is our build, the bridge or the bridge's
+	// retail game, never with the Java adapter (issue #242).
+	Shaping string `yaml:"shaping"`
 }
 
 // IceServerConfig is one entry of ContractConfig.IceServers, in the client's

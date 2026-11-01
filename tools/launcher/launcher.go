@@ -85,6 +85,7 @@ type Launcher struct {
 	hub   *hubSession // players on other machines, or services on a remote hub
 
 	contractBus *seat.ContractBus // ModeContract: IceMsg between the seats
+	shapingFile string            // ModeContract with shaping "links": FAF_NETLINK_TEST_SHAPING
 
 	players map[int]*Player
 	order   []int
@@ -157,6 +158,20 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 			return nil, fmt.Errorf("mode contract runs local seats only")
 		}
 		l.contractBus = seat.NewContractBus()
+		if cfg.Contract.Shaping == "links" {
+			// Every game and adapter this process starts inherits the variable.
+			dir := cfg.RunDir
+			if dir == "" {
+				dir = os.TempDir()
+			}
+			l.shapingFile = filepath.Join(dir, "link-shaping.txt")
+			if err := writeShaping(l.shapingFile, relay.Impairment{}); err != nil {
+				job.Close()
+				return nil, err
+			}
+			_ = os.Setenv("FAF_NETLINK_TEST_SHAPING", l.shapingFile)
+			j.Note(journal.Note, 0, "link steps shape every netlink link's sends: "+l.shapingFile, nil)
+		}
 		if !cfg.Contract.NoTurn {
 			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
 			if err != nil {

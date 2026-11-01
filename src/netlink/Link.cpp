@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <thread>
@@ -208,6 +210,83 @@ namespace faf::netlink
       const void* mBusy = nullptr;
       bool mStop = false;
       std::thread mThread;
+    };
+
+    // Tests only (issue #242): when FAF_NETLINK_TEST_SHAPING names a file, every
+    // link delays, drops or holds back what it sends as the file's one line
+    // says: "<latency us> <jitter us> <loss 0-1> <blocked 0|1>". mpemu rewrites
+    // it when a scenario changes the link. Shaping each sender covers every
+    // path a link may take (ICE through TURN or host to host, WebRTC), which a
+    // TURN server alone cannot do when both players are on one machine.
+    class TestShaping
+    {
+    public:
+      static TestShaping& Get()
+      {
+        static TestShaping instance;
+        return instance;
+      }
+
+      bool Enabled() const { return !mPath.empty(); }
+
+      // False: lost on the way. Else `delay` is how long it stays in flight.
+      bool Roll(Link::Clock::duration& delay)
+      {
+        std::lock_guard lock(mMutex);
+        const Link::Clock::time_point now = Link::Clock::now();
+        if (now >= mNextRead) {
+          mNextRead = now + std::chrono::milliseconds(100);
+          ReadLocked();
+        }
+        if (mBlocked) {
+          return false;
+        }
+        if (mLoss > 0 && std::uniform_real_distribution<double>(0.0, 1.0)(mRng) < mLoss) {
+          return false;
+        }
+        std::int64_t us = mLatencyUs;
+        if (mJitterUs > 0) {
+          us += std::uniform_int_distribution<std::int64_t>(0, mJitterUs)(mRng);
+        }
+        delay = std::chrono::microseconds(us);
+        return true;
+      }
+
+    private:
+      TestShaping()
+      {
+        if (const char* path = std::getenv("FAF_NETLINK_TEST_SHAPING"); path != nullptr) {
+          mPath = path;
+        }
+      }
+
+      void ReadLocked()
+      {
+        std::FILE* f = std::fopen(mPath.c_str(), "r");
+        if (f == nullptr) {
+          return; // keep the last setting
+        }
+        long long latency = 0;
+        long long jitter = 0;
+        double loss = 0;
+        int blocked = 0;
+        if (std::fscanf(f, "%lld %lld %lf %d", &latency, &jitter, &loss, &blocked) == 4) {
+          mLatencyUs = latency;
+          mJitterUs = jitter;
+          mLoss = loss;
+          mBlocked = blocked != 0;
+        }
+        std::fclose(f);
+      }
+
+      std::string mPath;
+      std::mutex mMutex;
+      Link::Clock::time_point mNextRead{};
+      std::int64_t mLatencyUs = 0;
+      std::int64_t mJitterUs = 0;
+      double mLoss = 0;
+      bool mBlocked = false;
+      std::minstd_rand mRng{std::random_device{}()};
     };
   } // namespace
 
@@ -748,8 +827,7 @@ namespace faf::netlink
           echo[0] = 'e';
           const std::int64_t t = SteadyMicros();
           std::memcpy(echo + 1, &t, sizeof(t));
-          std::shared_lock agentLock(mIn->agentMutex);
-          if (mAgent != nullptr && juice_send(mAgent, echo, sizeof(echo)) == 0) {
+          if (SendFramed(echo, sizeof(echo))) {
             ++mStats.echoesSent;
           }
         }
@@ -853,7 +931,7 @@ namespace faf::netlink
       std::lock_guard lock(mMutex);
       rtc = mRtc;
     }
-    if (rtc && rtc->Send(data, size)) {
+    if (SendWebRtc(rtc, data, size)) {
       std::lock_guard lock(mMutex);
       ++mStats.dataSent;
       mWebRtcSent.fetch_add(1);
@@ -954,7 +1032,7 @@ namespace faf::netlink
       }
       // On the data channel bare (its first byte is the channel's tag, which no
       // game packet starts with); on ICE behind a 'c'.
-      if (rtc && rtc->Send(d.data(), d.size())) {
+      if (SendWebRtc(rtc, d.data(), d.size())) {
         mWebRtcSent.fetch_add(1);
         continue;
       }
@@ -970,13 +1048,53 @@ namespace faf::netlink
 
   bool Link::SendFramed(const char* framed, const std::size_t size)
   {
+    if (TestShaping::Get().Enabled()) {
+      Clock::duration delay{};
+      if (!TestShaping::Get().Roll(delay)) {
+        return true; // tests only: lost on the way
+      }
+      if (delay > Clock::duration::zero()) {
+        DelayedSender::Get().Schedule(this, Clock::now() + delay, std::string(framed, size),
+                                      [this](const std::string& b) { SendFramedNow(b.data(), b.size()); });
+        return true;
+      }
+    }
+    return SendFramedNow(framed, size);
+  }
+
+  bool Link::SendFramedNow(const char* framed, const std::size_t size)
+  {
     std::shared_lock agentLock(mIn->agentMutex);
     return mAgent != nullptr && juice_send(mAgent, framed, size) == 0;
   }
 
+  bool Link::SendWebRtc(const std::shared_ptr<WebRtcChannel>& rtc, const void* data, const std::size_t size)
+  {
+    if (!rtc) {
+      return false;
+    }
+    if (!TestShaping::Get().Enabled()) {
+      return rtc->Send(data, size);
+    }
+    if (!rtc->IsOpen()) {
+      return false;
+    }
+    Clock::duration delay{};
+    if (!TestShaping::Get().Roll(delay)) {
+      return true; // tests only: lost on the way
+    }
+    if (delay > Clock::duration::zero()) {
+      DelayedSender::Get().Schedule(this, Clock::now() + delay,
+                                    std::string(static_cast<const char*>(data), size),
+                                    [rtc](const std::string& b) { rtc->Send(b.data(), b.size()); });
+      return true;
+    }
+    return rtc->Send(data, size);
+  }
+
   void Link::Close()
   {
-    if (mOptions.duplicateGapMs > 0) {
+    if (mOptions.duplicateGapMs > 0 || TestShaping::Get().Enabled()) {
       DelayedSender::Get().Cancel(this); // before the agent goes
     }
     std::lock_guard lock(mMutex);

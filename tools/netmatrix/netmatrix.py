@@ -21,8 +21,11 @@ Profiles:
   relay    relayed candidates only, through mpemu's TURN server, 25 ms each way
   worst    relayed only, 150 ms each way + up to 50 ms jitter, 5 % loss, and
            one 2 s partition
-Impairments are applied in mpemu's TURN server (tools/turnsrv/impair.go), so
-they need the relay profiles.
+Impairments are applied where every link sends (contract `shaping: links`,
+FAF_NETLINK_TEST_SHAPING in src/netlink/Link.cpp), so they hold on whichever
+path ICE picks. Shaping them in mpemu's TURN server instead missed some cells:
+with both players on one machine, ICE may settle on a host-to-host path that
+never reaches the TURN server, even with relayed candidates only.
 
 Example (from tools/, after `go build -o mpemu.exe ./cmd/mpemu`):
   python netmatrix/netmatrix.py --mpemu mpemu.exe --out ../tmp/matrix \\
@@ -95,6 +98,7 @@ def scenario(a: str, b: str, profile: str, args: argparse.Namespace) -> str:
         "contract:",
         f"  exeArgs: {exe_args}",
         f"  forceRelay: {'true' if p['forceRelay'] else 'false'}",
+        "  shaping: links",
     ]
     if bind:
         lines.append(f"  nativeBind: {yaml_str(bind)}")

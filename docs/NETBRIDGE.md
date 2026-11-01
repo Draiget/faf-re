@@ -101,7 +101,7 @@ A client update may replace `faf-ice-adapter.jar` again.
 | `relay` | relayed candidates only, 25 ms each way |
 | `worst` | relayed only, 150 ms each way + up to 50 ms jitter, 5 % loss, one 2 s partition |
 
-The relay profiles are shaped in mpemu's TURN server (`tools/turnsrv/impair.go`): each one-way path between two players is impaired once, at its last hop out of the server. FAF's Java adapter is not a kind: it always sends to 127.0.0.1, which hosts that drop loopback UDP to sockets bound to every interface cannot run. `tools/fafclient` covers it with fake games.
+The profiles are shaped where each link sends: the scenarios set `shaping: links`, mpemu writes the current impairment to a file, and every netlink link (in our game or in the bridge) reads it through `FAF_NETLINK_TEST_SHAPING` and delays or drops what it sends (`src/netlink/Link.cpp`, `TestShaping`). That holds on whichever path ICE picks. Shaping in mpemu's TURN server (`tools/turnsrv/impair.go`, the default `shaping: turn`) missed some games: with both players on one machine, ICE can settle on a host-to-host path that never reaches the server, even with relayed candidates only. FAF's Java adapter is not a kind: it always sends to 127.0.0.1, which hosts that drop loopback UDP to sockets bound to every interface cannot run. `tools/fafclient` covers it with fake games.
 
 Run it before a pull request that changes `src/netlink`, `src/netbridge` or `src/moho/net` (from `tools/`, with mpemu built):
 

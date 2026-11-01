@@ -188,7 +188,11 @@ namespace faf::netlink
     std::string RemoteDescriptionLocked(const CandidatesMessage& remote, Clock::time_point now) const;
     void Run(Pending& p);
     void Log(Pending& out, std::string text);
+    // Through the test shaping when it is on (FAF_NETLINK_TEST_SHAPING), else
+    // straight out.
     bool SendFramed(const char* framed, std::size_t size);
+    bool SendFramedNow(const char* framed, std::size_t size);
+    bool SendWebRtc(const std::shared_ptr<WebRtcChannel>& rtc, const void* data, std::size_t size);
     // Issue #240. None of these is called with mMutex held, and none holds
     // mLaneMutex while it takes mMutex.
     void LaneDeliver(const std::uint8_t* data, std::size_t size);
