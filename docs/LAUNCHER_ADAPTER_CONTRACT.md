@@ -156,7 +156,7 @@ Results on 2026-10-31 with two shipped adapters: direct 138 pings each way, none
 
 ## 8. Links in the game (ours, issue #233)
 
-Not part of FAF's contract: an extension between our game and `faf-netbridge` that the client, the lobby server and Java peers never see. With `net_InEngineLinks 1` the game runs each peer link itself (`src/moho/net/NetlinkPeers.cpp`) and the bridge only passes the signalling. Message names and the address scheme are in `src/netlink/EngineLinks.h`.
+Not part of FAF's contract: an extension between our game and `faf-netbridge` that the client, the lobby server and Java peers never see. Without any adapter, the launcher can talk to the game directly instead: [LAUNCHER_NATIVE_NETWORK.md](LAUNCHER_NATIVE_NETWORK.md) (issue #274). With `net_InEngineLinks 1` the game runs each peer link itself (`src/moho/net/NetlinkPeers.cpp`) and the bridge only passes the signalling. Message names and the address scheme are in `src/netlink/EngineLinks.h`.
 
 | Direction | Message | Arguments | Meaning |
 |---|---|---|---|
