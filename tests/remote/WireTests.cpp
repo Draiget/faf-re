@@ -425,7 +425,7 @@ namespace
       case 1:
         return -0.0f;
       case 2:
-        return std::bit_cast<float>(0x7FC00001u + (mRng() & 0xFFu)); // NaN payloads survive
+        return std::bit_cast<float>(static_cast<std::uint32_t>(0x7FC00001u + (mRng() & 0xFFu))); // NaN payloads survive
       default:
         return std::uniform_real_distribution<float>(-1.0e6f, 1.0e6f)(mRng);
       }

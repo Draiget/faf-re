@@ -253,6 +253,14 @@ target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
 target_link_options(headless PRIVATE -Wl,--error-limit=0)
 
+# --- faf_remote_tests -------------------------------------------------------------------
+# The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
+# server-mode build runs them on faf_engine.
+add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/WireTests.cpp")
+target_link_libraries(faf_remote_tests PRIVATE faf_sim)
+target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
+
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.
 add_custom_target(faf_sim_libm_gate
