@@ -96,7 +96,7 @@ local ScrubbingOverlay = ClassUI(Group) {
     __init = function(self, parent)
         Group.__init(self, parent, "ScrubbingModalOverlay")
         LayoutHelpers.FillParent(self, parent)
-        self.Depth:Set(parent:GetTopmostDepth() + 50)
+        self.Depth:Set(1500)
 
         self._escPushed = false
 
@@ -307,17 +307,7 @@ function CreateReplayTimeline(parent)
     LayoutHelpers.SetDimensions(bar, LayoutHelpers.ScaleNumber(540), LayoutHelpers.ScaleNumber(36))
     LayoutHelpers.AtBottomIn(bar, parent, LayoutHelpers.ScaleNumber(14))
     LayoutHelpers.AtHorizontalCenterIn(bar, parent)
-
-    local function ResolveBarDepth()
-        if parent and type(parent.Depth) == 'function' then
-            local ok, d = pcall(parent.Depth)
-            if ok and d then
-                return d + 20
-            end
-        end
-        return rootFrame:GetTopmostDepth() + 20
-    end
-    bar.Depth:Set(ResolveBarDepth)
+    bar.Depth:Set(120)
     bar:Show()
 
     -- Semi-transparent dark background
@@ -376,9 +366,26 @@ function CreateReplayTimeline(parent)
     totalTimeLabel.Depth:Set(function() return bar.Depth() + 2 end)
 
     -- Interactive slider
+    local function GetSkinFile(path)
+        if UIUtil and UIUtil.SkinnableFile then
+            return UIUtil.SkinnableFile(path)
+        end
+        return path
+    end
+
     local initialTotal = GetTotalTicks()
     local maxTicks = math.max(10, initialTotal)
-    local slider = IntegerSlider(bar, false, 0, maxTicks, 1)
+    local slider = IntegerSlider(
+        bar,
+        false,
+        0,
+        maxTicks,
+        1,
+        GetSkinFile('/slider02/slider_btn_up.dds'),
+        GetSkinFile('/slider02/slider_btn_over.dds'),
+        GetSkinFile('/slider02/slider_btn_down.dds'),
+        GetSkinFile('/dialogs/options/slider-back_bmp.dds')
+    )
     slider.Left:Set(function() return curTimeLabel.Right() + LayoutHelpers.ScaleNumber(10) end)
     slider.Right:Set(function() return totalTimeLabel.Left() - LayoutHelpers.ScaleNumber(10) end)
     LayoutHelpers.SetHeight(slider, LayoutHelpers.ScaleNumber(16))
