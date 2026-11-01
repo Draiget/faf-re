@@ -173,7 +173,10 @@ namespace
       "  --view-loss <percent> [--view-ack-delay <beats>]  with --view-frames: every view's frames also go over a\n"
       "                            simulated channel that loses that share of frames and acknowledges late; each\n"
       "                            frame is encoded against the newest acknowledged one and must decode exactly\n"
-      "  --parallel-views          with --view-frames: the views are built on the sim's workers\n"
+      "  --view-bench <file>       unfocused: only the server's view work per beat (views with their own ids, every\n"
+      "                            lane encoded for every client), timed (CSV: build, send and beat ms, entities,\n"
+      "                            bytes; server-mode build; not with the checks above)\n"
+      "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
       "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
@@ -264,6 +267,7 @@ int main(int argc, char** argv)
   }
   (void)ReadOption("--view-packets-entries", options.viewPacketsEntriesPath);
   (void)ReadOption("--view-frames", options.viewFramesPath);
+  (void)ReadOption("--view-bench", options.viewBenchPath);
   options.viewIds = moho::CFG_GetArgOption("--view-ids", 0, nullptr);
   if (ReadIntOption("--view-loss", options.viewLossPercent, bad)
       && (options.viewLossPercent < 0 || options.viewLossPercent > 100)) {
@@ -280,10 +284,10 @@ int main(int argc, char** argv)
     bad = true;
   }
   if ((options.oracleCheck ? 1 : 0) + (options.changeSetCheck ? 1 : 0) + (options.viewPacketsPath.empty() ? 0 : 1)
-        + (options.viewFramesPath.empty() ? 0 : 1) + (options.loopback ? 1 : 0)
+        + (options.viewFramesPath.empty() ? 0 : 1) + (options.viewBenchPath.empty() ? 0 : 1) + (options.loopback ? 1 : 0)
       > 1) {
     std::printf(
-      "[%s] --oracle-check, --changeset-check, --view-packets, --view-frames and --loopback (its grid copies) all "
+      "[%s] --oracle-check, --changeset-check, --view-packets, --view-frames, --view-bench and --loopback (its grid copies) all "
       "observe the sync walk: one at a time\n",
       gLabel.c_str()
     );
@@ -305,9 +309,11 @@ int main(int argc, char** argv)
 #if !FAF_SERVER_MODE
   // The wire format and the remote client (src/remote) are built only with FAF_SERVER_MODE.
   if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck || options.oracleCheck
-      || options.changeSetCheck || !options.viewPacketsPath.empty() || !options.viewFramesPath.empty()) {
+      || options.changeSetCheck || !options.viewPacketsPath.empty() || !options.viewFramesPath.empty()
+      || !options.viewBenchPath.empty()) {
     std::printf(
-      "[%s] --wire-stats, --loopback, --command-check, --oracle-check, --changeset-check, --view-packets and --view-frames need a "
+      "[%s] --wire-stats, --loopback, --command-check, --oracle-check, --changeset-check, --view-packets, --view-frames and "
+      "--view-bench need a "
       "server-mode build "
       "(FAF_SERVER_MODE, the *-server presets)\n",
       gLabel.c_str()
@@ -415,6 +421,9 @@ int main(int argc, char** argv)
   if (!result.viewFramesSummary.empty()) {
     std::printf("[%s] %s\n", label, result.viewFramesSummary.c_str());
   }
+  if (!result.viewBenchSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.viewBenchSummary.c_str());
+  }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
@@ -464,7 +473,7 @@ int main(int argc, char** argv)
     exitCode = kExitCrash;
   } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0
              || result.commandFailures > 0 || result.oracleFailures > 0 || result.inboundFailures > 0
-             || result.changeSetFailures > 0 || result.viewFramesFailures > 0) {
+             || result.changeSetFailures > 0 || result.viewFramesFailures > 0 || result.viewBenchFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

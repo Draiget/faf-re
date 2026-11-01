@@ -51,6 +51,7 @@
 #include "headless/ReplayChangeSetCheck.h"
 #include "headless/ReplayOracleCheck.h"
 #include "headless/ReplayInboundCheck.h"
+#include "headless/ReplayViewBench.h"
 #include "headless/ReplayViewFrameStats.h"
 #include "headless/ReplayViewPacketCheck.h"
 #include "headless/ReplayWireStats.h"
@@ -555,6 +556,19 @@ namespace faf::headless
       );
       viewFrames->Install();
     }
+    // `--view-bench`: the server's view work alone, timed (also a sync-walk observer).
+    std::unique_ptr<CReplayViewBench> viewBench;
+    if (!options.viewBenchPath.empty()) {
+      viewBench = std::make_unique<CReplayViewBench>(
+        options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z
+      );
+      if (!viewBench->IsOpen()) {
+        result.error = "cannot write " + options.viewBenchPath;
+        return result;
+      }
+      viewBench->SetParallel(options.parallelViews);
+      viewBench->Install();
+    }
     // `--inbound-check`: the decoder's messages through view ids and back (with --view-ids).
     std::unique_ptr<CReplayInboundCheck> inboundCheck;
     if (options.inboundCheck && viewFrames) {
@@ -818,6 +832,10 @@ namespace faf::headless
     if (viewFrames) {
       result.viewFramesSummary = viewFrames->Summary();
       result.viewFramesFailures = viewFrames->Failures();
+    }
+    if (viewBench) {
+      result.viewBenchSummary = viewBench->Summary();
+      result.viewBenchFailures = viewBench->Failures();
     }
     if (inboundCheck) {
       result.inboundSummary = inboundCheck->Summary();

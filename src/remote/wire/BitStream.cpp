@@ -8,14 +8,21 @@ namespace faf::remote::wire
 {
   void BitWriter::WriteBits(const std::uint32_t value, const int bitCount)
   {
-    for (int bit = 0; bit < bitCount; ++bit) {
-      if ((mBitCount & 7u) == 0u) {
+    // Least significant bit first, filling each byte from its low bit: as many bits per step as
+    // the current byte has room for.
+    std::uint64_t bits = bitCount >= 32 ? value : (value & ((std::uint64_t{1} << bitCount) - 1u));
+    int left = bitCount;
+    while (left > 0) {
+      const auto used = static_cast<int>(mBitCount & 7u);
+      if (used == 0) {
         mBytes.push_back(0u);
       }
-      if (((value >> bit) & 1u) != 0u) {
-        mBytes.back() = static_cast<std::uint8_t>(mBytes.back() | (1u << (mBitCount & 7u)));
-      }
-      ++mBitCount;
+      const int room = 8 - used;
+      const int take = left < room ? left : room;
+      mBytes.back() = static_cast<std::uint8_t>(mBytes.back() | ((bits & ((1u << take) - 1u)) << used));
+      bits >>= take;
+      left -= take;
+      mBitCount += static_cast<std::size_t>(take);
     }
   }
 
@@ -43,15 +50,18 @@ namespace faf::remote::wire
       mFailed = true;
       return 0u;
     }
-    std::uint32_t value = 0;
-    for (int bit = 0; bit < bitCount; ++bit) {
-      const std::uint8_t byte = mBytes[mBitPos >> 3];
-      if (((byte >> (mBitPos & 7u)) & 1u) != 0u) {
-        value |= 1u << bit;
-      }
-      ++mBitPos;
+    std::uint64_t value = 0;
+    int done = 0;
+    while (done < bitCount) {
+      const auto used = static_cast<int>(mBitPos & 7u);
+      const int room = 8 - used;
+      const int take = bitCount - done < room ? bitCount - done : room;
+      const std::uint32_t chunk = (static_cast<std::uint32_t>(mBytes[mBitPos >> 3]) >> used) & ((1u << take) - 1u);
+      value |= static_cast<std::uint64_t>(chunk) << done;
+      done += take;
+      mBitPos += static_cast<std::size_t>(take);
     }
-    return value;
+    return static_cast<std::uint32_t>(value);
   }
 
   std::uint32_t BitReader::ReadVarUint() noexcept

@@ -138,6 +138,49 @@ namespace
     CHECK(badWidth.ReadBits(33) == 0u && !badWidth.Ok());
   }
 
+  /** The bit-at-a-time writer the wire format was defined with: the byte-wise one must match it. */
+  [[nodiscard]] std::vector<std::uint8_t> ReferenceWrite(const std::vector<std::pair<std::uint32_t, int>>& writes)
+  {
+    std::vector<std::uint8_t> bytes;
+    std::size_t bitCount = 0;
+    for (const auto& [value, count] : writes) {
+      for (int bit = 0; bit < count; ++bit) {
+        if ((bitCount & 7u) == 0u) {
+          bytes.push_back(0u);
+        }
+        if (((value >> bit) & 1u) != 0u) {
+          bytes.back() = static_cast<std::uint8_t>(bytes.back() | (1u << (bitCount & 7u)));
+        }
+        ++bitCount;
+      }
+    }
+    return bytes;
+  }
+
+  void TestBitStreamMatchesBitAtATime()
+  {
+    std::mt19937 random(20261101u);
+    for (int round = 0; round < 200; ++round) {
+      std::vector<std::pair<std::uint32_t, int>> writes;
+      BitWriter writer;
+      const int count = 1 + static_cast<int>(random() % 64u);
+      for (int i = 0; i < count; ++i) {
+        const auto bits = static_cast<int>(random() % 33u);
+        const std::uint32_t value = random(); // bits above `bits` must be ignored
+        writes.emplace_back(value, bits);
+        writer.WriteBits(value, bits);
+      }
+      const std::vector<std::uint8_t> bytes = Bytes(writer);
+      CHECK(bytes == ReferenceWrite(writes));
+      BitReader reader(bytes);
+      for (const auto& [value, bits] : writes) {
+        const std::uint32_t expected = bits == 32 ? value : (value & ((1u << bits) - 1u));
+        CHECK(reader.ReadBits(bits) == expected);
+      }
+      CHECK(reader.Ok());
+    }
+  }
+
   void TestBitStreamMalformedVarUint()
   {
     const std::uint8_t sixGroups[] = {0x80u, 0x80u, 0x80u, 0x80u, 0x80u, 0x00u};
@@ -1582,6 +1625,61 @@ namespace
     }
   }
 
+  /** The cell-at-a-time encoder the grid delta was defined with: the word-skipping one must match it. */
+  [[nodiscard]] std::vector<std::uint8_t> ReferenceGridDelta(const SGridBits& current, const SGridBits* baseline)
+  {
+    const bool sameShape = baseline != nullptr && baseline->width == current.width && baseline->height == current.height
+                        && baseline->cells.size() == current.cells.size();
+    BitWriter writer;
+    writer.WriteVarUint(current.width);
+    writer.WriteVarUint(current.height);
+    bool flipped = false;
+    std::uint32_t run = 0;
+    for (std::size_t i = 0; i < current.cells.size(); ++i) {
+      const std::uint8_t before = sameShape ? baseline->cells[i] : 0u;
+      const bool cellFlipped = (current.cells[i] != 0u) != (before != 0u);
+      if (cellFlipped != flipped) {
+        writer.WriteVarUint(run);
+        flipped = cellFlipped;
+        run = 0;
+      }
+      ++run;
+    }
+    if (run > 0u) {
+      writer.WriteVarUint(run);
+    }
+    return Bytes(writer);
+  }
+
+  void TestGridDeltaMatchesCellAtATime()
+  {
+    std::mt19937 rng(20261102u);
+    std::uniform_int_distribution<std::uint32_t> side(1, 80);
+    for (int round = 0; round < 300; ++round) {
+      const std::uint32_t width = side(rng);
+      const std::uint32_t height = side(rng);
+      SGridBits held = RandomGrid(rng, width, height, static_cast<int>(rng() % 101u));
+      SGridBits next = held;
+      std::uniform_int_distribution<std::size_t> cell(0, next.cells.size() - 1);
+      const int flips = static_cast<int>(rng() % 40u);
+      for (int i = 0; i < flips; ++i) {
+        next.cells[cell(rng)] ^= 1u;
+      }
+      // Bytes that differ but are both "seen" (2 against 1) are unchanged cells.
+      for (int i = 0; i < 3; ++i) {
+        std::uint8_t& value = next.cells[cell(rng)];
+        if (value != 0u) {
+          value = 2u;
+        }
+      }
+      for (const SGridBits* baseline : {static_cast<const SGridBits*>(nullptr), static_cast<const SGridBits*>(&held)}) {
+        BitWriter writer;
+        CHECK(EncodeGridDelta(next, baseline, writer));
+        CHECK(Bytes(writer) == ReferenceGridDelta(next, baseline));
+      }
+    }
+  }
+
   void TestGridDeltaUnchangedIsSmall()
   {
     std::mt19937 rng(7u);
@@ -2043,12 +2141,14 @@ namespace
     {"view ids: inbound translation of commands", &TestInboundIds},
     {"grids: delta round trip", &TestGridDeltaRoundTrip},
     {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
+    {"grids: same bytes as cell at a time", &TestGridDeltaMatchesCellAtATime},
     {"grids: hostile input", &TestGridDeltaHostile},
     {"sounds: session table", &TestSoundTable},
     {"roster: round trip and refusals", &TestRoster},
     {"session tables: sounds and names", &TestSessionTables},
     {"bits: round trip", &TestBitStreamRoundTrip},
     {"bits: overrun", &TestBitStreamOverrun},
+    {"bits: same bytes as bit at a time", &TestBitStreamMatchesBitAtATime},
     {"bits: malformed varuint", &TestBitStreamMalformedVarUint},
     {"quantize: axis", &TestAxisQuantizer},
     {"quantize: map position bits", &TestPositionQuantizerForMap},
