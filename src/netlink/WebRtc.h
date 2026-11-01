@@ -27,6 +27,12 @@
 
 namespace faf::netlink
 {
+  enum class SctpBackend
+  {
+    UsrSctp = 0,
+    DcSctp = 1
+  };
+
   struct WebRtcOptions
   {
     std::int64_t localId = 0;
@@ -35,6 +41,7 @@ namespace faf::netlink
     std::vector<IceServer> iceServers;
     bool forceRelay = false;
     std::string bindAddress;
+    SctpBackend sctpBackend = SctpBackend::UsrSctp;
   };
 
   // True for a signal of this channel, false for a CandidatesMessage.

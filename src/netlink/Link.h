@@ -37,10 +37,7 @@
 
 struct juice_agent;
 
-namespace faf::netlink
-{
-  class WebRtcChannel;
-}
+#include "netlink/WebRtc.h"
 
 namespace faf::remote::net
 {
@@ -89,6 +86,8 @@ namespace faf::netlink
     // "w+", and with a peer that does the same and proved to be ours the
     // game datagrams move onto a WebRTC data channel (netlink/WebRtc.h).
     bool webrtc = false;
+    // Issue #239: SCTP backend selection (usrsctp or dcSCTP).
+    SctpBackend sctpBackend = SctpBackend::UsrSctp;
     // Tests only: drop this share (0-100) of game datagrams in Send, on
     // either path, to compare loss handling; on the redundant lane (#240), of
     // the lane's datagrams instead.

@@ -413,6 +413,7 @@ namespace faf::netlink
     o.iceServers = mOptions.iceServers;
     o.forceRelay = mOptions.forceRelay;
     o.bindAddress = mOptions.bindAddress;
+    o.sctpBackend = mOptions.sctpBackend;
     auto onLog = [this](const std::string& text) {
       if (mCallbacks.onLog) {
         mCallbacks.onLog(text);

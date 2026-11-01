@@ -79,10 +79,14 @@ namespace faf::netlink
     if (in.options.forceRelay) {
       config.iceTransportPolicy = rtc::TransportPolicy::Relay;
     }
+    config.sctpBackend = (in.options.sctpBackend == SctpBackend::DcSctp)
+        ? rtc::Configuration::SctpBackend::DcSctp
+        : rtc::Configuration::SctpBackend::UsrSctp;
 
     try {
       auto pc = std::make_shared<rtc::PeerConnection>(config);
       Impl* raw = mImpl.get();
+      raw->Log(std::string("SCTP backend: ") + (in.options.sctpBackend == SctpBackend::DcSctp ? "dcSCTP" : "usrsctp"));
       pc->onLocalDescription([raw](rtc::Description d) {
         JsonValue body = JsonValue::Object();
         body.Set("description", std::string(d));
