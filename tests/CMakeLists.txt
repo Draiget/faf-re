@@ -16,6 +16,13 @@ target_link_libraries(faf_peer_transport_tests PRIVATE faf_engine)
 
 add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
 
+# net_FastRetransmit (issue #237): a lost DATA packet's recovery with the
+# switch off and on, at a fast rate and at the game's rate.
+add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL net/FastRetransmitTests.cpp)
+target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_engine)
+
+add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
+
 # libjuice gathering against a STUN/TURN server (issue #228), run by hand:
 #   faf_juice_gather <host> <port> [<turn user> <turn password>]
 add_executable(faf_juice_gather EXCLUDE_FROM_ALL netlink/JuiceGatherTest.cpp)
