@@ -8,7 +8,7 @@ A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats
 | `tools/desync-diff/desync_diff.py` | Compares two players' dumps and prints the first value that differs: beat, entity, field | #217 | [README](../tools/desync-diff/README.md) |
 | Desync telemetry | Sends one small record per desync and one per game end to an OpenTelemetry collector; optionally uploads the dump as `.tar.gz` to a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
 
-This page is the setup side: what reaches the servers, how to run them, and how to check it works. Every field and switch is listed in [SWITCHES.md](SWITCHES.md#desync-telemetry).
+This page is the setup side: what reaches the servers, how to run them, and how to check it works. Every field and switch is listed in [SWITCHES.md](SWITCHES.md#desync-telemetry). A ready server with both parts, for Docker Compose or Kubernetes, is [tools/desync-server](../tools/desync-server/README.md).
 
 ## What the servers receive
 
@@ -32,9 +32,12 @@ A `faf.desync` record from a test game (`tools/scenarios/2p-desync-dump-upload.y
   "faf.army.remote": "1", "faf.desync.players_disagreeing": "1", "faf.desync.players_reported": "2",
   "faf.fpu.x87_control": "0x0000", "faf.fpu.mxcsr": "0x00001f80", "faf.orders_altered": false,
   "faf.dump.file": "desync_424242_beat300_army0.zip", "faf.dump.bytes": "1226486",
-  "faf.dump.upload": "desync_424242_beat300_army0.tar.gz"
+  "faf.dump.upload": "desync_424242_beat300_army0.tar.gz",
+  "faf.dump.url": "https://dumps.example.org/dumps/424242/desync_424242_beat300_army0.tar.gz"
 }
 ```
+
+`faf.dump.url` is the dump endpoint plus `/<game id>/<file>`, where `receive.py` serves the stored file (with the read token).
 
 Every request also carries the process as the OTLP resource: `service.name` `faf-engine`, `service.version` (the commit), `faf.engine.version`, `faf.engine.dirty`, `host.arch`, `faf.arch`, `os.type`, `os.description`, `faf.cpu.logical_count`. A `faf.game.end` record follows at the end of every game, desync or not, with `faf.game.beats`, `faf.desync` and `faf.desync.later_records`. Records of one game pair up by `faf.game.id`; a record pairs with its uploaded dump by `faf.dump.upload`.
 
@@ -86,7 +89,7 @@ docker run -d --name faf-otel -p 4318:4318 \
 
 with `path: /data/received.jsonl` in the `file` exporter, so the file lands in `./data` on the host.
 
-The core collector does not check the token. To refuse requests without it, put the collector behind a reverse proxy that checks `Authorization`, or use the contrib distribution (`otel/opentelemetry-collector-contrib`) with its `bearertokenauth` extension on the receiver (`auth: { authenticator: bearertokenauth }`; not run in this repository's tests).
+The core collector does not check the token. To refuse requests without it, put the collector behind a reverse proxy that checks `Authorization`, or use the contrib distribution (`otel/opentelemetry-collector-contrib`) with its `bearertokenauth` extension on the receiver, as [tools/desync-server/collector.yaml](../tools/desync-server/collector.yaml) does: a request without the token or with a wrong one gets 401.
 
 HTTPS: the Windows build posts `https://` URLs through WinHTTP; the Linux build posts plain `http://` only. A public collector normally sits behind a reverse proxy that terminates TLS and forwards to port 4318.
 
@@ -95,20 +98,23 @@ HTTPS: the Windows build posts `https://` URLs through WinHTTP; the Linux build 
 `tools/desync-diff/receive.py` is a reference receiver, Python 3 with the standard library only:
 
 ```sh
-python tools/desync-diff/receive.py --host 0.0.0.0 --port 4319 --out /srv/faf-dumps --token <token> --max-mb 64
+python tools/desync-diff/receive.py --host 0.0.0.0 --port 4319 --prefix /dumps --out /srv/faf-dumps \
+  --token <upload token> --read-token <read token> --max-mb 64
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
 | `--host` | `127.0.0.1` | Address to listen on |
 | `--port` | `4319` | Port |
+| `--prefix` | `/dumps` | Path the dumps are read under; uploads are taken at any path |
 | `--out` | `received-dumps` | Storage folder; each dump goes to `<out>/<game id>/<name>.tar.gz` |
-| `--token` | empty | Required `Authorization: Bearer` token; empty accepts any request |
+| `--token` | `FAF_UPLOAD_TOKEN` | Required `Authorization: Bearer` token for uploads; empty accepts any |
+| `--read-token` | `FAF_READ_TOKEN` | Required token for reads (`Authorization: Bearer` or `?token=`); empty lets anyone read |
 | `--max-mb` | 64 | Largest body accepted |
 
-It answers 201 to a stored dump, 401 to a wrong token, 400 to a name that isn't a dump name or a body that isn't a dump (`header.json` missing from the archive), 413 to an empty or oversized body. Once a game has dumps from two armies, it runs `desync_diff.py` on them and writes `<out>/<game id>/report.txt`. It is single-threaded and has no TLS: for a public server, run it behind a reverse proxy that terminates TLS, or replace it with a service of your own that accepts the same request. The engine posts to the URL as given, so the path (`/dumps` in the examples) is the receiver's choice.
+Uploads: 201 to a stored dump (with its path), 401 to a wrong token, 400 to a name that isn't a dump name or a body that isn't a dump (`header.json` missing from the archive), 413 to an empty or oversized body. Once a game has dumps from two armies, it runs `desync_diff.py` on them and writes `<out>/<game id>/report.txt`. Reads: `GET <prefix>/` lists the games, `<prefix>/<game id>/` a game's dumps and report, `<prefix>/<game id>/<file>` downloads one; the upload token never reads, since it ships with the game. `GET /healthz` answers `ok` without a token. It serves each request on its own thread and has no TLS: for a public server, run it behind a reverse proxy that terminates TLS ([tools/desync-server](../tools/desync-server/README.md)). The engine posts to the URL as given; with `--prefix` equal to that URL's path, `faf.dump.url` points at the stored file.
 
-The client deletes its `.tar.gz` once the receiver answers 2xx, or after three failed attempts (when queued, with the game-end record, and at the next start), or at once on a 4xx other than 408 and 429. The zip stays on the player's disk either way.
+The client deletes its `.tar.gz` once the receiver answers 2xx, after six failed attempts (when queued, with the game-end record, then at up to four later starts), or at once on a 4xx other than 408 and 429. The zip stays on the player's disk either way.
 
 ## Game side
 

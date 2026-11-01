@@ -75,6 +75,9 @@ namespace moho
   {
     /// A record is posted when queued, with the next record (the game end), and at the next start.
     constexpr int kMaxAttempts = 3;
+    /// A dump upload, posted the same way, gets up to four more starts: a receiver that is down
+    /// during the game would otherwise get one try after it.
+    constexpr int kMaxFileAttempts = 6;
     constexpr int kTimeoutMs = 3000;
     /// Sending or answering a dump upload, which can be megabytes.
     constexpr int kFileTimeoutMs = 30000;
@@ -551,7 +554,7 @@ namespace moho
           } else if (lastStatus >= 400 && lastStatus < 500 && lastStatus != 408 && lastStatus != 429) {
             ++dropped; // the collector refused this record; sending it again won't change that
             RemoveUploadFile(entry);
-          } else if (++entry.mAttempts >= kMaxAttempts) {
+          } else if (++entry.mAttempts >= (file.empty() ? kMaxAttempts : kMaxFileAttempts)) {
             ++dropped;
             RemoveUploadFile(entry);
           } else {

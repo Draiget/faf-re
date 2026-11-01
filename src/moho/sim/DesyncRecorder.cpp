@@ -771,6 +771,7 @@ namespace moho
     int mForcedDumpBeat = -1; // sim_DesyncDumpBeat when the game started
     int mLocalArmy = -1;
     std::string mDumpPath;
+    std::string mDumpGameId; // the folder a dump receiver files it under
     std::size_t mPendingBytes = 0; // also read by the recorder thread under mQueueMutex
 
     // Recorder thread.
@@ -1354,6 +1355,7 @@ namespace moho
     }
     const std::string fileName = Printf("desync_%s_%s_army%d.zip", gameId.c_str(), tag.c_str(), impl.mLocalArmy);
     impl.mDumpPath = (DumpFolder() / fileName).string();
+    impl.mDumpGameId = gameId;
     std::lock_guard<std::mutex> lock(sSharedMutex);
     sDumpPath = impl.mDumpPath;
   }
@@ -1633,16 +1635,22 @@ namespace moho
     }
 
     // Sent from the recorder's thread after the dump is written, so its size is known.
-    const bool upload = impl.mKeepText && TELEMETRY_DumpUploadOn();
-    impl.Post([records = std::move(records), path = impl.mDumpPath, upload]() mutable {
+    const bool upload = (impl.mKeepText || impl.mStateRing) && TELEMETRY_DumpUploadOn();
+    std::string endpoint = telemetry_DumpEndpoint.c_str();
+    while (!endpoint.empty() && endpoint.back() == '/') {
+      endpoint.pop_back();
+    }
+    impl.Post([records = std::move(records), path = impl.mDumpPath, gameId = impl.mDumpGameId, upload, endpoint]() mutable {
       std::error_code error;
       const std::uintmax_t size = path.empty() ? 0u : std::filesystem::file_size(path, error);
       for (CTelemetryAttributes& record : records) {
         if (!path.empty() && !error) {
           record.Add("faf.dump.file", std::filesystem::path(path).filename().string());
           record.Add("faf.dump.bytes", static_cast<std::int64_t>(size));
-          if (upload) { // the name the dump endpoint gets in X-FAF-Dump
-            record.Add("faf.dump.upload", std::filesystem::path(path).replace_extension(".tar.gz").filename().string());
+          if (upload) { // the name the dump endpoint gets in X-FAF-Dump, and where the receiver serves it
+            const std::string name = std::filesystem::path(path).replace_extension(".tar.gz").filename().string();
+            record.Add("faf.dump.upload", name);
+            record.Add("faf.dump.url", endpoint + "/" + gameId + "/" + name);
           }
         }
         TELEMETRY_Send("faf.desync", 13, "WARN", record);

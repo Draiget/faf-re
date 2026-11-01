@@ -1,0 +1,150 @@
+# faf-re desync test server on Kubernetes: the OpenTelemetry collector and the dump receiver behind
+# one Ingress host, /v1/logs to the collector and /dumps to the receiver. Before applying (README.md):
+#   - the faf-desync-tokens Secret (FAF_UPLOAD_TOKEN, FAF_READ_TOKEN),
+#   - the faf-desync-tools ConfigMap (tools/desync-diff/receive.py and desync_diff.py),
+#   - the faf-desync-collector ConfigMap (tools/desync-server/collector.yaml),
+#   - HOST below replaced by the server's name (and the TLS lines filled in or removed).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: faf-desync
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: faf-desync-data
+  namespace: faf-desync
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: faf-desync
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: collector}
+  template:
+    metadata:
+      labels: {app: collector}
+    spec:
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.164.0
+          args: ["--config=/etc/faf/collector.yaml"]
+          envFrom:
+            - secretRef: {name: faf-desync-tokens}
+          ports:
+            - containerPort: 4318
+            - containerPort: 13133
+          readinessProbe:
+            httpGet: {path: /, port: 13133}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/faf}
+            - {name: data, mountPath: /data/otel, subPath: otel}
+      volumes:
+        - name: config
+          configMap: {name: faf-desync-collector}
+        - name: data
+          persistentVolumeClaim: {claimName: faf-desync-data}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dumps
+  namespace: faf-desync
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: dumps}
+  template:
+    metadata:
+      labels: {app: dumps}
+    spec:
+      containers:
+        - name: dumps
+          image: python:3.12-slim
+          command: ["python", "/opt/faf/receive.py", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
+                    "--out", "/data/dumps", "--max-mb", "64"]
+          envFrom:
+            - secretRef: {name: faf-desync-tokens}
+          env:
+            - {name: PYTHONUNBUFFERED, value: "1"}
+          ports:
+            - containerPort: 4319
+          readinessProbe:
+            httpGet: {path: /healthz, port: 4319}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          volumeMounts:
+            - {name: tools, mountPath: /opt/faf}
+            - {name: data, mountPath: /data/dumps, subPath: dumps}
+      volumes:
+        - name: tools
+          configMap: {name: faf-desync-tools}
+        - name: data
+          persistentVolumeClaim: {claimName: faf-desync-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+  namespace: faf-desync
+spec:
+  selector: {app: collector}
+  ports:
+    - {name: otlp-http, port: 4318, targetPort: 4318}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dumps
+  namespace: faf-desync
+spec:
+  selector: {app: dumps}
+  ports:
+    - {name: http, port: 4319, targetPort: 4319}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: faf-desync
+  namespace: faf-desync
+  annotations:
+    # Dumps are up to 64 MB; ingress-nginx refuses bodies over 1 MB by default.
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
+    # The Linux build posts plain HTTP only: no redirect to HTTPS.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # With cert-manager: cert-manager.io/cluster-issuer: <issuer>
+spec:
+  # ingressClassName: <class>
+  rules:
+    - host: HOST
+      http:
+        paths:
+          - path: /v1/logs
+            pathType: Prefix
+            backend:
+              service: {name: collector, port: {number: 4318}}
+          - path: /dumps
+            pathType: Prefix
+            backend:
+              service: {name: dumps, port: {number: 4319}}
+  # tls:
+  #   - hosts: [HOST]
+  #     secretName: faf-desync-tls
