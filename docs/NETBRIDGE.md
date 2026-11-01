@@ -83,3 +83,33 @@ A client update may replace `faf-ice-adapter.jar` again.
 | netlink unit checks, two links in one process, 10,000 datagrams each way | `build\...\tests\faf_netlink_tests.exe [--bind <lan ip>]` |
 | the client's contract with fake games, any adapter mix | `go run ./cmd/fafclient -players 2 -native-dir <jar folder> -exe <faf-netbridge.exe>,jar -exe-args "--bind-address <lan ip>" -game-bind 127.0.0.1` (from `tools/`) |
 | real games through the contract | `mpemu run scenarios/2p-contract-bridge.yaml` (see the scenario for its environment variables) |
+
+## Compatibility matrix (#242)
+
+`tools/netmatrix/netmatrix.py` plays every pair of player kinds through mpemu and writes `results.md`: verdict, the beat both games reached (a cell needs 3000), the longest wait the games reported, and disconnects (the game's `LOBBY: lost connection` / `host disconnected` / `we've been ejected` lines).
+
+| Kind | Player |
+|---|---|
+| `native` | our build, `/nativenet` (no adapter) |
+| `inengine` | our build behind `faf-netbridge`, `/inenginelinks` |
+| `bridge` | our build behind `faf-netbridge`, relayed |
+| `retail` | the retail game behind `faf-netbridge` |
+
+| Profile | Link |
+|---|---|
+| `direct` | host candidates, no impairment |
+| `relay` | relayed candidates only, 25 ms each way |
+| `worst` | relayed only, 150 ms each way + up to 50 ms jitter, 5 % loss, one 2 s partition |
+
+The relay profiles are shaped in mpemu's TURN server (`tools/turnsrv/impair.go`): each one-way path between two players is impaired once, at its last hop out of the server. FAF's Java adapter is not a kind: it always sends to 127.0.0.1, which hosts that drop loopback UDP to sockets bound to every interface cannot run. `tools/fafclient` covers it with fake games.
+
+Run it before a pull request that changes `src/netlink`, `src/netbridge` or `src/moho/net` (from `tools/`, with mpemu built):
+
+```
+python netmatrix/netmatrix.py --mpemu mpemu.exe --out ../tmp/matrix ^
+  --ours <our exe> --retail <ForgedAlliance.exe> --bridge <faf-netbridge.exe> ^
+  [--bind <LAN address>] [--kinds native,retail] [--profiles direct,worst] ^
+  --mpemu-args -advertise <LAN address> -turn-ip <LAN address>
+```
+
+All 30 cells take about four hours, one after another.
