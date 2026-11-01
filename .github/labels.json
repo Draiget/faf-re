@@ -25,6 +25,7 @@
     { "group": "platform", "name": "arch: x64",          "color": "5319e7", "description": "64-bit build" },
     { "group": "platform", "name": "arch: x86",          "color": "5319e7", "description": "32-bit build" },
     { "group": "platform", "name": "platform: linux",    "color": "5319e7", "description": "Linux build" },
+    { "group": "platform", "name": "platform: macos",    "color": "5319e7", "description": "macOS build" },
 
     { "group": "kind",   "name": "crash",                "color": "b60205", "description": "Crash or hang" },
     { "group": "kind",   "name": "recovery",             "color": "0052cc", "description": "Code recovered from the original binary" },
