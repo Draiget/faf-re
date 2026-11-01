@@ -120,6 +120,16 @@ namespace moho
   );
 
   /**
+   * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
+   *
+   * What it does:
+   * Gives a single-player session info its one local command source and
+   * client: appends the source to the launch info, gives every army that
+   * source, and binds a one-client local client manager.
+   */
+  void SetupSinglePlayerCommandSourceLane(SWldSessionInfo& sessionInfo, const char* playerName);
+
+  /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)
    * Mangled:
    * ?WLD_SetupSessionInfo@Moho@@YA?AV?$auto_ptr@USWldSessionInfo@Moho@@@std@@ABVLuaObject@LuaPlus@@@Z

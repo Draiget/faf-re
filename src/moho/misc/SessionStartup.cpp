@@ -217,48 +217,6 @@ namespace
     return current;
   }
 
-
-  /**
-   * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
-   *
-   * What it does:
-   * Seeds one local command source, applies it to all army launch source sets,
-   * and binds a one-client local client-manager lane for single-player startup.
-   */
-  void SetupSinglePlayerCommandSourceLane(moho::SWldSessionInfo& sessionInfo, const char* playerName)
-  {
-    auto* const launchInfo = sessionInfo.mLaunchInfo.get();
-    if (launchInfo == nullptr) {
-      return;
-    }
-
-    const char* const localPlayerName = playerName != nullptr ? playerName : "";
-
-    moho::SSTICommandSource localCommandSource{};
-    localCommandSource.mIndex = 0u;
-    localCommandSource.mName = localPlayerName;
-    localCommandSource.mTimeouts = -1;
-    moho::AppendSSTICommandSource(launchInfo->mCommandSources.mSrcs, localCommandSource);
-
-    sessionInfo.mSourceId = 0u;
-
-    moho::BVIntSet localSourceSet{};
-    (void)localSourceSet.Add(0u);
-    for (moho::ArmyLaunchInfo& armySourceInfo : launchInfo->mArmyLaunchInfo) {
-      armySourceInfo.mUnitSources = localSourceSet;
-    }
-
-    moho::IClientManager* const createdManager = moho::CLIENT_CreateClientManager(1u, nullptr, 0, true);
-    if (createdManager != sessionInfo.mClientManager && sessionInfo.mClientManager != nullptr) {
-      delete sessionInfo.mClientManager;
-    }
-    sessionInfo.mClientManager = createdManager;
-
-    if (sessionInfo.mClientManager != nullptr) {
-      sessionInfo.mClientManager->CreateLocalClient(localPlayerName, 0, 0, sessionInfo.mSourceId);
-    }
-  }
-
   /**
    * Address: 0x00875690 (FUN_00875690, func_OpenGPGNet)
    *
@@ -495,6 +453,48 @@ namespace moho
     return msvc8::auto_ptr<gpg::Stream>(replayStream.release());
   }
 
+
+  /**
+   * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
+   *
+   * What it does:
+   * Seeds one local command source, applies it to all army launch source sets,
+   * and binds a one-client local client-manager lane for single-player startup.
+   * `WLD_SetupSessionInfo` and the session restart (0x0088C9D0) both use it.
+   */
+  void SetupSinglePlayerCommandSourceLane(SWldSessionInfo& sessionInfo, const char* playerName)
+  {
+    auto* const launchInfo = sessionInfo.mLaunchInfo.get();
+    if (launchInfo == nullptr) {
+      return;
+    }
+
+    const char* const localPlayerName = playerName != nullptr ? playerName : "";
+
+    SSTICommandSource localCommandSource{};
+    localCommandSource.mIndex = 0u;
+    localCommandSource.mName = localPlayerName;
+    localCommandSource.mTimeouts = -1;
+    AppendSSTICommandSource(launchInfo->mCommandSources.mSrcs, localCommandSource);
+
+    sessionInfo.mSourceId = 0u;
+
+    BVIntSet localSourceSet{};
+    (void)localSourceSet.Add(0u);
+    for (ArmyLaunchInfo& armySourceInfo : launchInfo->mArmyLaunchInfo) {
+      armySourceInfo.mUnitSources = localSourceSet;
+    }
+
+    IClientManager* const createdManager = CLIENT_CreateClientManager(1u, nullptr, 0, true);
+    if (createdManager != sessionInfo.mClientManager && sessionInfo.mClientManager != nullptr) {
+      delete sessionInfo.mClientManager;
+    }
+    sessionInfo.mClientManager = createdManager;
+
+    if (sessionInfo.mClientManager != nullptr) {
+      sessionInfo.mClientManager->CreateLocalClient(localPlayerName, 0, 0, sessionInfo.mSourceId);
+    }
+  }
 
   /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)
