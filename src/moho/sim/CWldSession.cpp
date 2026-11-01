@@ -14952,11 +14952,43 @@ namespace moho
       (void)UI_UpdateDisconnectDialogCallback();
     }
 
+    /**
+     * Address: 0x0088C9D0 (FUN_0088C9D0, func_CreateSWldSessionInfo)
+     *
+     * What it does:
+     * Drives the world-session `CreateSession` frame action, which only an
+     * explicit restart request (`RestartSession`) sets: builds a fresh session
+     * info from the active session - its map, its launch info, whether it is
+     * recorded - gives it a local client named after the session's own command
+     * source, and begins it, which schedules `Preload`.
+     *
+     * This only set `Preload`. `WLD_DoInitializing` has already released the
+     * pending session info, so `Preload` tore the session down, opened the
+     * loading screen and prefetched nothing, and `Loading` waited for a
+     * scenario that was never requested: a restart hung in the loading screen.
+     */
     void WLD_CreateSessionInfo()
     {
-      // Full `FUN_0088C9D0` session-info recreation still depends on
-      // unrecovered LaunchInfoNew/session bootstrap ownership lanes.
-      gWldFrameAction = EWldFrameAction::Preload;
+      // Engine addition: the binary reads the active session unchecked;
+      // without one there is nothing to restart, so leave to the front end.
+      const CWldSession* const session = gActiveWldSession;
+      if (session == nullptr) {
+        gWldFrameAction = EWldFrameAction::Exit;
+        return;
+      }
+
+      msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+      sessionInfo->mMapName = session->mMapName;
+      sessionInfo->mLaunchInfo = session->mLaunchInfo;
+      sessionInfo->mIsBeingRecorded = session->IsBeingRecorded;
+      sessionInfo->mIsReplay = false;
+      sessionInfo->mIsMultiplayer = false;
+      sessionInfo->mClientManager = nullptr;
+      sessionInfo->mSourceId = 0xFFu;
+
+      const SSTICommandSource& localSource = session->cmdSources[static_cast<std::size_t>(session->ourCmdSource)];
+      SetupSinglePlayerCommandSourceLane(*sessionInfo, localSource.mName.c_str());
+      WLD_BeginSession(sessionInfo);
     }
   } // namespace
 
