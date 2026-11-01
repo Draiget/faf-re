@@ -46,6 +46,7 @@
 #include "moho/unit/core/Unit.h"
 #include "headless/ReplayBoneStats.h"
 #include "headless/ReplayFpuReport.h"
+#include "headless/ReplayKeyframes.h"
 #if FAF_SERVER_MODE
 // The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
 // --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
@@ -632,6 +633,14 @@ namespace faf::headless
       return result;
     }
 
+    // `--keyframe-every`: the sim saved between beats, as a saved game is.
+    std::unique_ptr<CReplayKeyframes> keyframes;
+    if (options.keyframeEvery > 0) {
+      keyframes = std::make_unique<CReplayKeyframes>(
+        options.keyframeDir, options.keyframeEvery, options.keyframeKeep, options.label
+      );
+    }
+
     std::unique_ptr<CReplayBoneStats> boneStats;
     if (!options.boneStatsPath.empty()) {
       boneStats = std::make_unique<CReplayBoneStats>(options.boneStatsPath);
@@ -775,6 +784,9 @@ namespace faf::headless
         if (boneStats) {
           boneStats->OnPacket(*packet);
         }
+        if (keyframes && !packet->mGameOver) {
+          keyframes->OnBeat(*driver, simDriver->GetSimForReplayCheck(), packet->mCurBeat);
+        }
         if (packet->mGameOver) {
           result.gameOver = true;
         }
@@ -859,6 +871,10 @@ namespace faf::headless
     }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
+    }
+    if (keyframes) {
+      result.keyframeSummary = keyframes->Summary();
+      result.keyframeFailures = keyframes->Failures();
     }
     if (attributeSyncWrites) {
       result.syncWritersSummary = syncWriters.Write(options.syncWritersPath);

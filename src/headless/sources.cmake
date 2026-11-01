@@ -13,6 +13,7 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplayCommandCheck.cpp
   headless/ReplayFpuReport.cpp
   headless/ReplayInboundCheck.cpp
+  headless/ReplayKeyframes.cpp
   headless/ReplayLaunchCheck.cpp
   headless/ReplayLuaState.cpp
   headless/ReplayOracleCheck.cpp

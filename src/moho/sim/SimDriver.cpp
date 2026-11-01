@@ -1411,7 +1411,7 @@ void CSimDriver::Dispatch()
   boost::mutex::scoped_lock lock(mLock);
 
   if (mWantsToSave) {
-    CSaveGameRequestImpl* request = mSaveGameRequest;
+    ISaveRequest* request = mSaveGameRequest;
     SSaveGameDispatchData data{};
     data.useSuggestedName = mSaveRequestUsesSuggestedName;
     data.saveName = mPendingSaveName;
@@ -1923,7 +1923,7 @@ void CSimDriver::ReleaseInterlockRef()
  * Address: 0x0073DF60 (FUN_0073DF60), ISTIDriver slot 38
  * Queues a save-game request and wakes dispatch waiters.
  */
-void CSimDriver::RequestSaveGame(CSaveGameRequestImpl* request)
+void CSimDriver::RequestSaveGame(ISaveRequest* request)
 {
   boost::mutex::scoped_lock lock(mLock);
   mSaveGameRequest = request;

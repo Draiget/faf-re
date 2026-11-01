@@ -22,7 +22,7 @@
 #include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/entity/SSTIEntityVariableData.h"
-#include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/misc/ISaveRequest.h"
 #include "moho/audio/SAudioRequest.h"
 #include "moho/net/Common.h"
 #include "platform/Platform.h"
@@ -795,7 +795,7 @@ namespace moho
     /**
      * Address: 0x0073DF60 (FUN_0073DF60)
      */
-    void RequestSaveGame(CSaveGameRequestImpl* request) override;
+    void RequestSaveGame(ISaveRequest* request) override;
     /**
      * Address: 0x0073DFE0 (FUN_0073DFE0)
      */
@@ -950,7 +950,7 @@ namespace moho
     int32_t mInterlockRefCount = 0;                   // +0xAC
     SSyncFilter mPendingSyncFilter;                   // +0xB0
     SSyncFilter mActiveSyncFilter;                    // +0x120
-    CSaveGameRequestImpl* mSaveGameRequest = nullptr; // +0x190
+    ISaveRequest* mSaveGameRequest = nullptr; // +0x190
     bool mWantsToSave = false;                        // +0x194
     // +0x195..+0x197: compiler-inserted alignment before 4-byte aligned flag group.
     alignas(4) bool mSaveRequestUsesSuggestedName = false; // +0x198

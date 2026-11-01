@@ -158,6 +158,9 @@ namespace
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
+      "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
+      "  --keyframe-dir <dir>      where the keyframe files go (default: keyframes)\n"
+      "  --keyframe-keep           keep the keyframe files after measuring them\n"
       "  --bone-stats <file>      write changed bones per beat (CSV) and per blueprint (<file>.blueprints.csv)\n"
       "  --lane-sizes <file>      write per-beat element counts and bytes of every sync lane (CSV)\n"
       "  --blueprint-order <file> write every blueprint by ordinal, in the rules' load order\n"
@@ -272,6 +275,11 @@ int main(int argc, char** argv)
   (void)ReadOption("--lua-pairs", options.luaPairsPath);
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
+  (void)ReadIntOption("--keyframe-every", options.keyframeEvery, bad);
+  if (!ReadOption("--keyframe-dir", options.keyframeDir)) {
+    options.keyframeDir = "keyframes";
+  }
+  options.keyframeKeep = moho::CFG_GetArgOption("--keyframe-keep", 0, nullptr);
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
   options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
   options.oracleCheck = moho::CFG_GetArgOption("--oracle-check", 0, nullptr);
@@ -486,6 +494,9 @@ int main(int argc, char** argv)
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
   }
+  if (!result.keyframeSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.keyframeSummary.c_str());
+  }
   if (!result.fpuReport.empty()) {
     std::printf("[%s] floating-point state at beat 1, busiest thread first:\n%s", label, result.fpuReport.c_str());
   }
@@ -532,7 +543,8 @@ int main(int argc, char** argv)
     exitCode = kExitCrash;
   } else if ((recordedChecksumsComparable && result.mismatches > 0) || result.loopbackFailures > 0
              || result.commandFailures > 0 || result.oracleFailures > 0 || result.inboundFailures > 0
-             || result.changeSetFailures > 0 || result.viewFramesFailures > 0 || result.viewBenchFailures > 0) {
+             || result.changeSetFailures > 0 || result.viewFramesFailures > 0 || result.viewBenchFailures > 0
+             || result.keyframeFailures > 0) {
     exitCode = kExitMismatch;
   } else if (!result.gameOver) {
     exitCode = kExitIncomplete;

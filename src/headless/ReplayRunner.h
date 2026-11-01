@@ -45,6 +45,9 @@ namespace faf::headless
     std::string laneSizesPath;  // when set: per-beat element counts and bytes of every sync lane (CSV)
     std::string blueprintOrderPath; // when set: every blueprint by ordinal, in load order (plan WPL.16)
     std::string luaPairsPath;   // when set: the sim Lua state's pairs() order before BeginSession (plan WPL.18)
+    int keyframeEvery = 0;      // when > 0: save the sim every this many beats (ReplayKeyframes.h)
+    std::string keyframeDir;    // with `keyframeEvery`: where the keyframe files go
+    bool keyframeKeep = false;  // with `keyframeEvery`: keep the files after measuring them
     int checksumPeriod = 0;     // when > 0: `sim_ChecksumPeriod` for this run (0 = the default)
     int replayLead = -1;        // when >= 0: `sim_ReplayLead` for this run
     int paceMs = 0;             // when > 0: one beat per this many ms, as a live game plays (0 = as fast as it can)
@@ -84,6 +87,8 @@ namespace faf::headless
     std::string inboundSummary;     // with `inboundCheck`
     std::uint64_t inboundFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line
+    std::string keyframeSummary; // with `keyframeEvery`: one summary line
+    int keyframeFailures = 0;
     std::string fpuReport;      // with `fpuReport`: one line per thread
   };
 

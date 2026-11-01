@@ -349,7 +349,7 @@ namespace faf::remote::client
     mServer->ReleaseInterlockRef();
   }
 
-  void CRemoteSimDriver::RequestSaveGame(moho::CSaveGameRequestImpl* const request)
+  void CRemoteSimDriver::RequestSaveGame(moho::ISaveRequest* const request)
   {
     mServer->RequestSaveGame(request);
   }
