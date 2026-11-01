@@ -311,6 +311,8 @@ namespace
   {
     bool connected = false;
     bool ready = false;
+    double handshakeMs = 0.0;
+    double transmitMs = 0.0;
     LinkStats a;
     LinkStats b;
     std::vector<std::uint32_t> atA;
@@ -363,6 +365,7 @@ namespace
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
       }
     });
+    const auto tStart = std::chrono::steady_clock::now();
     a.link->Start();
     b.link->Start();
 
@@ -377,7 +380,9 @@ namespace
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     r.ready = r.connected && ready(*a.link, *b.link);
+    r.handshakeMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
 
+    const auto tTxStart = std::chrono::steady_clock::now();
     std::uint8_t buf[400];
     for (int i = 0; r.connected && i < count; ++i) {
       for (std::size_t k = 0; k < sizeof(buf); ++k) {
@@ -391,7 +396,20 @@ namespace
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
       }
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    if (count > 0 && r.connected) {
+      const auto drainDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      while (std::chrono::steady_clock::now() < drainDeadline) {
+        std::size_t na = 0, nb = 0;
+        { std::lock_guard la(a.mutex); na = a.received.size(); }
+        { std::lock_guard lb(b.mutex); nb = b.received.size(); }
+        if (na >= static_cast<std::size_t>(count) && nb >= static_cast<std::size_t>(count)) {
+          break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      }
+    }
+    r.transmitMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tTxStart).count();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     stop = true;
     ticker.join();
     r.a = a.link->GetStats();
@@ -522,16 +540,80 @@ namespace
   }
 } // namespace
 
+
+  void BenchmarkBackends(const std::string& bind, const int count)
+  {
+    std::printf("\n=================================================================================\n");
+    std::printf("                       SCTP BACKEND PERFORMANCE BENCHMARK\n");
+    std::printf("=================================================================================\n");
+    std::printf("Workload: %d datagrams bidirectional (%d datagrams total, ~%.2f MB)\n",
+                count, count * 2, (count * 2.0 * 400.0) / (1024.0 * 1024.0));
+    std::printf("Payload:  400 bytes per datagram (typical FAF game datagram)\n");
+    std::printf("Policy:   unordered = true, maxRetransmits = 0\n");
+    std::printf("---------------------------------------------------------------------------------\n");
+
+    struct BenchRun {
+      const char* name;
+      SctpBackend backendA;
+      SctpBackend backendB;
+    };
+
+    const BenchRun runs[] = {
+      {"1. usrsctp <-> usrsctp (baseline)", SctpBackend::UsrSctp, SctpBackend::UsrSctp},
+      {"2. dcSCTP  <-> dcSCTP  (optimized)", SctpBackend::DcSctp,  SctpBackend::DcSctp},
+      {"3. usrsctp <-> dcSCTP  (interop)",   SctpBackend::UsrSctp, SctpBackend::DcSctp},
+    };
+
+    for (const auto& run : runs) {
+      LinkOptions oa;
+      oa.bindAddress = bind;
+      oa.ufragPrefix = kOurUfragPrefix;
+      oa.webrtc = true;
+      oa.sctpBackend = run.backendA;
+
+      LinkOptions ob;
+      ob.bindAddress = bind;
+      ob.ufragPrefix = kOurUfragPrefix;
+      ob.webrtc = true;
+      ob.sctpBackend = run.backendB;
+
+      const PairResult r = RunPair(oa, ob, count, [](Link& a, Link& b) {
+        return a.GetStats().onWebRtc && b.GetStats().onWebRtc;
+      });
+
+      const double totalBytesMB = (r.atA.size() + r.atB.size()) * 400.0 / (1024.0 * 1024.0);
+      const double sec = r.transmitMs / 1000.0;
+      const double pps = sec > 0 ? (r.atA.size() + r.atB.size()) / sec : 0;
+      const double mbps = sec > 0 ? totalBytesMB / sec : 0;
+
+      std::printf("Configuration: %s\n", run.name);
+      std::printf("  Handshake time:     %6.1f ms\n", r.handshakeMs);
+      std::printf("  Transmit duration:  %6.1f ms\n", r.transmitMs);
+      std::printf("  Packets received:   A: %zu/%d, B: %zu/%d (corrupt: %d)\n",
+                  r.atA.size(), count, r.atB.size(), count, r.corrupt);
+      std::printf("  Throughput:         %6.0f datagrams/sec (%.2f MB/s)\n", pps, mbps);
+      std::printf("---------------------------------------------------------------------------------\n");
+    }
+    std::printf("=================================================================================\n\n");
+  }
+
 int main(int argc, char** argv)
 {
   std::string bind;
   int count = 10000;
-  for (int i = 1; i + 1 < argc; i += 2) {
-    if (std::strcmp(argv[i], "--bind") == 0) {
-      bind = argv[i + 1];
-    } else if (std::strcmp(argv[i], "--datagrams") == 0) {
-      count = std::atoi(argv[i + 1]);
+  bool benchmark = false;
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--bind") == 0 && i + 1 < argc) {
+      bind = argv[++i];
+    } else if (std::strcmp(argv[i], "--datagrams") == 0 && i + 1 < argc) {
+      count = std::atoi(argv[++i]);
+    } else if (std::strcmp(argv[i], "--benchmark") == 0) {
+      benchmark = true;
     }
+  }
+  if (benchmark) {
+    BenchmarkBackends(bind, count);
+    return 0;
   }
   UnitTests();
   LoopbackTest(bind, count);
