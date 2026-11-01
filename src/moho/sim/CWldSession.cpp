@@ -8986,6 +8986,7 @@ namespace moho
     mIsScrubbing = false;
     mScrubTargetBeat = -1;
     sPendingRestartScrubTarget = -1;
+    mTimeSinceLastTick = 0.0f;
   }
 
   /**

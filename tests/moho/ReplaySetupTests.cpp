@@ -17,9 +17,17 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/WldSessionState.h"
+#include "gpg/core/algorithms/MD5.h"
+#include "moho/command/ICommandSink.h"
+#include "moho/command/SSTITarget.h"
+#include "moho/misc/CDecoder.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/sim/SOCellPos.h"
 #include <cmath>
 #include <fstream>
+#include <map>
 #include <sstream>
+#include <vector>
 
 namespace
 {
@@ -236,13 +244,15 @@ namespace
 
     msvc8::string reason;
     msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(path.c_str(), &reason);
-    std::remove(path.c_str());
 
     CHECK(sessionInfo.get() != nullptr);
     if (sessionInfo.get() != nullptr) {
       CHECK(sessionInfo->mIsReplay == true);
       CHECK(sessionInfo->mTotalBeats == 100);
     }
+
+    sessionInfo.reset();
+    std::remove(path.c_str());
   }
 
   void TestCWldSessionScrubbingStateTransitions()
@@ -654,7 +664,13 @@ namespace
 
     std::string timelineLua = ReadFileToString("data/fafengine/lua/ui/game/replay_timeline.lua");
     if (timelineLua.empty()) {
+      timelineLua = ReadFileToString("../data/fafengine/lua/ui/game/replay_timeline.lua");
+    }
+    if (timelineLua.empty()) {
       timelineLua = ReadFileToString("../../data/fafengine/lua/ui/game/replay_timeline.lua");
+    }
+    if (timelineLua.empty()) {
+      timelineLua = ReadFileToString("../../../data/fafengine/lua/ui/game/replay_timeline.lua");
     }
     CHECK(!timelineLua.empty());
 
@@ -691,7 +707,13 @@ namespace
     // Test gamemain.lua hook
     std::string gamemainLua = ReadFileToString("data/fafengine/lua/ui/game/gamemain.lua");
     if (gamemainLua.empty()) {
+      gamemainLua = ReadFileToString("../data/fafengine/lua/ui/game/gamemain.lua");
+    }
+    if (gamemainLua.empty()) {
       gamemainLua = ReadFileToString("../../data/fafengine/lua/ui/game/gamemain.lua");
+    }
+    if (gamemainLua.empty()) {
+      gamemainLua = ReadFileToString("../../../data/fafengine/lua/ui/game/gamemain.lua");
     }
     CHECK(!gamemainLua.empty());
 
@@ -727,6 +749,488 @@ namespace
     CHECK(state.GetGlobal("ctrl").GetBoolean() == false);
   }
 
+  moho::CMessage MakeVerifyChecksumMessage(const gpg::MD5Digest& digest, const std::int32_t beat)
+  {
+    moho::CMessage msg(moho::ECmdStreamOp::CMDST_VerifyChecksum);
+    msg.Append(reinterpret_cast<const char*>(&digest), sizeof(digest));
+    msg.Append(reinterpret_cast<const char*>(&beat), sizeof(beat));
+    return msg;
+  }
+
+  moho::CMessage MakeSetCommandSourceMessage(const std::uint8_t sourceId)
+  {
+    moho::CMessage msg(moho::ECmdStreamOp::CMDST_SetCommandSource);
+    msg.Append(reinterpret_cast<const char*>(&sourceId), sizeof(sourceId));
+    return msg;
+  }
+
+  moho::CMessage MakeProcessInfoPairMessage(const moho::EntId id, const char* const key, const char* const val)
+  {
+    moho::CMessage msg(moho::ECmdStreamOp::CMDST_ProcessInfoPair);
+    msg.Append(reinterpret_cast<const char*>(&id), sizeof(id));
+    msg.Append(key, std::strlen(key) + 1);
+    msg.Append(val, std::strlen(val) + 1);
+    return msg;
+  }
+
+  moho::CMessage MakeDestroyEntityMessage(const moho::EntId id)
+  {
+    moho::CMessage msg(moho::ECmdStreamOp::CMDST_DestroyEntity);
+    msg.Append(reinterpret_cast<const char*>(&id), sizeof(id));
+    return msg;
+  }
+
+  bool AreDigestsEqual(const gpg::MD5Digest& a, const gpg::MD5Digest& b)
+  {
+    return a.vals[0] == b.vals[0] &&
+           a.vals[1] == b.vals[1] &&
+           a.vals[2] == b.vals[2] &&
+           a.vals[3] == b.vals[3];
+  }
+
+  class ParityTestStateSink final : public moho::ICommandSink
+  {
+  public:
+    std::int32_t currentBeat{0};
+    std::uint8_t currentSource{0};
+    std::map<moho::EntId, std::map<std::string, std::string>> entityInfo;
+    std::vector<std::pair<std::int32_t, gpg::MD5Digest>> verifiedChecksums;
+    std::vector<std::string> log;
+
+    void SetCommandSource(const moho::CommandSourceId sourceId) override
+    {
+      currentSource = sourceId;
+      log.push_back("SetSource:" + std::to_string(sourceId));
+    }
+    void OnCommandSourceTerminated() override {}
+    void VerifyChecksum(const gpg::MD5Digest& digest, const moho::CSeqNo seqNo) override
+    {
+      (void)seqNo;
+      verifiedChecksums.push_back({currentBeat, digest});
+      log.push_back("VerifyChecksum:beat=" + std::to_string(currentBeat));
+    }
+    void RequestPause() override {}
+    void Resume() override {}
+    void SingleStep() override {}
+    void CreateUnit(std::uint32_t, const moho::RResId&, const moho::SCoordsVec2&, float) override {}
+    void CreateProp(const char*, const Wm3::Vec3f&) override {}
+    void DestroyEntity(const moho::EntId id) override
+    {
+      entityInfo.erase(id);
+      log.push_back("Destroy:" + std::to_string(id));
+    }
+    void WarpEntity(moho::EntId, const moho::VTransform&) override {}
+    void ProcessInfoPair(const moho::EntId id, const gpg::StrArg key, const gpg::StrArg value) override
+    {
+      entityInfo[id][key != nullptr ? key : ""] = value != nullptr ? value : "";
+      log.push_back("InfoPair:" + std::to_string(id) + ":" + (key != nullptr ? key : "") + "=" + (value != nullptr ? value : ""));
+    }
+    void IssueCommand(
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&,
+      const moho::SSTICommandIssueData&,
+      bool
+    ) override {}
+    void IssueFactoryCommand(
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&,
+      const moho::SSTICommandIssueData&,
+      bool
+    ) override {}
+    void IncreaseCommandCount(moho::CmdId, int) override {}
+    void DecreaseCommandCount(moho::CmdId, int) override {}
+    void SetCommandTarget(moho::CmdId, const moho::SSTITarget&) override {}
+    void SetCommandType(moho::CmdId, moho::EUnitCommandType) override {}
+    void SetCommandCells(
+      moho::CmdId,
+      const gpg::core::FastVector<moho::SOCellPos>&,
+      const Wm3::Vector3<float>&
+    ) override {}
+    void RemoveCommandFromUnitQueue(moho::CmdId, moho::EntId) override {}
+    void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override {}
+    void LuaSimCallback(
+      const char*,
+      const LuaPlus::LuaObject&,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
+    ) override {}
+    void ExecuteDebugCommand(
+      const char*,
+      const Wm3::Vector3<float>&,
+      std::uint32_t,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
+    ) override {}
+    void AdvanceBeat(const int delta) override
+    {
+      currentBeat += delta;
+      log.push_back("Advance:" + std::to_string(delta) + "->beat=" + std::to_string(currentBeat));
+    }
+    void EndGame() override {}
+
+    [[nodiscard]] gpg::MD5Digest ComputeStateDigest() const
+    {
+      gpg::MD5Context ctx;
+      ctx.Reset();
+      ctx.Update(&currentBeat, sizeof(currentBeat));
+      ctx.Update(&currentSource, sizeof(currentSource));
+      for (const auto& pair : entityInfo) {
+        const moho::EntId entityId = pair.first;
+        ctx.Update(&entityId, sizeof(entityId));
+        for (const auto& kv : pair.second) {
+          ctx.Update(kv.first.data(), kv.first.size());
+          ctx.Update(kv.second.data(), kv.second.size());
+        }
+      }
+      for (const auto& ck : verifiedChecksums) {
+        ctx.Update(&ck.first, sizeof(ck.first));
+        ctx.Update(ck.second.vals, sizeof(ck.second.vals));
+      }
+      return ctx.Digest();
+    }
+  };
+
+  void DispatchFrameWithMaxBeats(
+    moho::CWldSession* const session,
+    moho::CDecoder& decoder,
+    const std::vector<std::vector<moho::CMessage>>& beats,
+    const std::int32_t customMaxBeats,
+    const float deltaSeconds = 0.05f
+  )
+  {
+    if (session->mLastBeatWasTick == 0 || session->mIsScrubbing) {
+      session->mTimeSinceLastTick = 1.0f;
+    } else {
+      session->mTimeSinceLastTick += 1.0f * deltaSeconds * 10.0f;
+    }
+
+    const std::int32_t targetTick =
+      session->mGameTick + static_cast<std::int32_t>(std::floor(session->mTimeSinceLastTick));
+    const bool wasScrubbing = session->mIsScrubbing;
+
+    std::int32_t beatsApplied = 0;
+    if (session->mIsScrubbing) {
+      while (beatsApplied < customMaxBeats && session->mGameTick < session->mScrubTargetBeat &&
+             session->mGameTick < static_cast<std::int32_t>(beats.size()) - 1) {
+        const std::int32_t nextBeat = session->mGameTick + 1;
+        for (const auto& msg : beats[nextBeat]) {
+          moho::CMessage copy = msg;
+          decoder.ReceiveMessage(&copy, nullptr);
+        }
+        session->mGameTick = nextBeat;
+        session->mLastBeatWasTick = 1;
+        ++beatsApplied;
+      }
+
+      if (session->mGameTick >= session->mScrubTargetBeat ||
+          (session->mTotalReplayBeats > 0 && session->mGameTick >= session->mTotalReplayBeats)) {
+        session->mIsScrubbing = false;
+        session->mScrubTargetBeat = -1;
+      }
+    } else {
+      for (; beatsApplied < 100; ++beatsApplied) {
+        if (session->mGameTick >= targetTick) {
+          break;
+        }
+        if (session->mGameTick >= static_cast<std::int32_t>(beats.size()) - 1) {
+          break;
+        }
+        const std::int32_t nextBeat = session->mGameTick + 1;
+        for (const auto& msg : beats[nextBeat]) {
+          moho::CMessage copy = msg;
+          decoder.ReceiveMessage(&copy, nullptr);
+        }
+        session->mGameTick = nextBeat;
+        session->mLastBeatWasTick = 1;
+      }
+    }
+
+    if (!wasScrubbing) {
+      const float remainder = session->mTimeSinceLastTick - static_cast<float>(beatsApplied);
+      session->mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
+    } else if (wasScrubbing && !session->mIsScrubbing) {
+      session->mTimeSinceLastTick = 0.0f;
+    }
+  }
+
+  void DispatchFrame(
+    moho::CWldSession* const session,
+    moho::CDecoder& decoder,
+    const std::vector<std::vector<moho::CMessage>>& beats,
+    const float deltaSeconds = 0.05f
+  )
+  {
+    DispatchFrameWithMaxBeats(session, decoder, beats, 500, deltaSeconds);
+  }
+
+  std::vector<std::vector<moho::CMessage>> BuildTestReplayStream(const int totalBeats)
+  {
+    std::vector<std::vector<moho::CMessage>> beats(totalBeats + 1);
+
+    const gpg::MD5Digest digest15{{0x15151515, 0x01, 0x02, 0x03}};
+    const gpg::MD5Digest digest45{{0x45454545, 0x04, 0x05, 0x06}};
+    const gpg::MD5Digest digest75{{0x75757575, 0x07, 0x08, 0x09}};
+    const gpg::MD5Digest digest100{{0x10001000, 0x0A, 0x0B, 0x0C}};
+
+    for (int b = 1; b <= totalBeats; ++b) {
+      beats[b].push_back(MakeAdvanceMessage(1));
+    }
+
+    beats[1].push_back(MakeSetCommandSourceMessage(0));
+    beats[10].push_back(MakeProcessInfoPairMessage(100, "state", "initializing"));
+    beats[15].push_back(MakeVerifyChecksumMessage(digest15, 15));
+    beats[25].push_back(MakeSetCommandSourceMessage(1));
+    beats[30].push_back(MakeProcessInfoPairMessage(200, "state", "building"));
+    beats[45].push_back(MakeVerifyChecksumMessage(digest45, 45));
+    beats[50].push_back(MakeProcessInfoPairMessage(100, "upgrade", "tech2"));
+    beats[65].push_back(MakeDestroyEntityMessage(200));
+    beats[75].push_back(MakeVerifyChecksumMessage(digest75, 75));
+    beats[90].push_back(MakeProcessInfoPairMessage(100, "state", "combat"));
+    beats[100].push_back(MakeVerifyChecksumMessage(digest100, 100));
+
+    return beats;
+  }
+
+  void TestReplayScrubbingChecksumParity()
+  {
+    constexpr int kTotalBeats = 100;
+    const auto beats = BuildTestReplayStream(kTotalBeats);
+
+    // 1. Normal pacing run to beat 75
+    alignas(moho::CWldSession) std::uint8_t bufferNormal[sizeof(moho::CWldSession)];
+    std::memset(bufferNormal, 0, sizeof(bufferNormal));
+    moho::CWldSession* const sessionNormal = reinterpret_cast<moho::CWldSession*>(bufferNormal);
+    sessionNormal->IsReplay = true;
+    sessionNormal->mTotalReplayBeats = kTotalBeats;
+    sessionNormal->mGameTick = 0;
+    sessionNormal->mScrubTargetBeat = -1;
+    sessionNormal->mIsScrubbing = false;
+
+    ParityTestStateSink sinkNormal;
+    LuaPlus::LuaState luaNormal(LuaPlus::LuaState::LIB_BASE);
+    msvc8::auto_ptr<gpg::Stream> recordingNormal;
+    moho::CDecoder decoderNormal(&sinkNormal, recordingNormal, nullptr, &luaNormal);
+
+    while (sessionNormal->mGameTick < 75) {
+      DispatchFrame(sessionNormal, decoderNormal, beats, 0.05f);
+    }
+
+    CHECK(sessionNormal->mGameTick == 75);
+    CHECK(sinkNormal.currentBeat == 75);
+    CHECK(sinkNormal.verifiedChecksums.size() == 3); // 15, 45, 75
+
+    const gpg::MD5Digest goldenDigest75 = sinkNormal.ComputeStateDigest();
+
+    // 2. Fast-forward scrub run from beat 0 to beat 75
+    alignas(moho::CWldSession) std::uint8_t bufferScrub[sizeof(moho::CWldSession)];
+    std::memset(bufferScrub, 0, sizeof(bufferScrub));
+    moho::CWldSession* const sessionScrub = reinterpret_cast<moho::CWldSession*>(bufferScrub);
+    sessionScrub->IsReplay = true;
+    sessionScrub->mTotalReplayBeats = kTotalBeats;
+    sessionScrub->mGameTick = 0;
+    sessionScrub->mScrubTargetBeat = -1;
+    sessionScrub->mIsScrubbing = false;
+
+    ParityTestStateSink sinkScrub;
+    LuaPlus::LuaState luaScrub(LuaPlus::LuaState::LIB_BASE);
+    msvc8::auto_ptr<gpg::Stream> recordingScrub;
+    moho::CDecoder decoderScrub(&sinkScrub, recordingScrub, nullptr, &luaScrub);
+
+    sessionScrub->StartScrubToBeat(75);
+    CHECK(sessionScrub->IsScrubbing() == true);
+    CHECK(sessionScrub->mScrubStartBeat == 0);
+    CHECK(sessionScrub->mScrubTargetBeat == 75);
+    CHECK(sessionScrub->GetScrubProgress() == 0.0f);
+
+    // Turbo frame processing reaches target
+    DispatchFrame(sessionScrub, decoderScrub, beats, 0.05f);
+
+    CHECK(sessionScrub->mGameTick == 75);
+    CHECK(sessionScrub->IsScrubbing() == false);
+    CHECK(sessionScrub->mScrubTargetBeat == -1);
+    CHECK(sessionScrub->GetScrubProgress() == 0.0f);
+    CHECK(sinkScrub.currentBeat == 75);
+    CHECK(sinkScrub.verifiedChecksums.size() == 3);
+
+    // 3. Bit-for-bit parity verification
+    const gpg::MD5Digest scrubDigest75 = sinkScrub.ComputeStateDigest();
+    CHECK(AreDigestsEqual(scrubDigest75, goldenDigest75));
+    CHECK(sinkScrub.entityInfo == sinkNormal.entityInfo);
+    for (std::size_t i = 0; i < sinkNormal.verifiedChecksums.size(); ++i) {
+      CHECK(sinkScrub.verifiedChecksums[i].first == sinkNormal.verifiedChecksums[i].first);
+      CHECK(AreDigestsEqual(sinkScrub.verifiedChecksums[i].second, sinkNormal.verifiedChecksums[i].second));
+    }
+  }
+
+  void TestReplayScrubbingCancellation()
+  {
+    constexpr int kTotalBeats = 100;
+    const auto beats = BuildTestReplayStream(kTotalBeats);
+
+    // 1. Establish golden state at beat 45 under normal pacing
+    alignas(moho::CWldSession) std::uint8_t bufferNormal[sizeof(moho::CWldSession)];
+    std::memset(bufferNormal, 0, sizeof(bufferNormal));
+    moho::CWldSession* const sessionNormal = reinterpret_cast<moho::CWldSession*>(bufferNormal);
+    sessionNormal->IsReplay = true;
+    sessionNormal->mTotalReplayBeats = kTotalBeats;
+    sessionNormal->mGameTick = 0;
+    sessionNormal->mScrubTargetBeat = -1;
+    sessionNormal->mIsScrubbing = false;
+
+    ParityTestStateSink sinkNormal;
+    LuaPlus::LuaState luaNormal(LuaPlus::LuaState::LIB_BASE);
+    msvc8::auto_ptr<gpg::Stream> recordingNormal;
+    moho::CDecoder decoderNormal(&sinkNormal, recordingNormal, nullptr, &luaNormal);
+
+    while (sessionNormal->mGameTick < 45) {
+      DispatchFrame(sessionNormal, decoderNormal, beats, 0.05f);
+    }
+    CHECK(sessionNormal->mGameTick == 45);
+    const gpg::MD5Digest goldenDigest45 = sinkNormal.ComputeStateDigest();
+
+    // 2. Start scrub to beat 80 on new session
+    alignas(moho::CWldSession) std::uint8_t bufferCancel[sizeof(moho::CWldSession)];
+    std::memset(bufferCancel, 0, sizeof(bufferCancel));
+    moho::CWldSession* const sessionCancel = reinterpret_cast<moho::CWldSession*>(bufferCancel);
+    sessionCancel->IsReplay = true;
+    sessionCancel->mTotalReplayBeats = kTotalBeats;
+    sessionCancel->mGameTick = 0;
+    sessionCancel->mScrubTargetBeat = -1;
+    sessionCancel->mIsScrubbing = false;
+
+    ParityTestStateSink sinkCancel;
+    LuaPlus::LuaState luaCancel(LuaPlus::LuaState::LIB_BASE);
+    msvc8::auto_ptr<gpg::Stream> recordingCancel;
+    moho::CDecoder decoderCancel(&sinkCancel, recordingCancel, nullptr, &luaCancel);
+
+    sessionCancel->StartScrubToBeat(80);
+    CHECK(sessionCancel->IsScrubbing() == true);
+    CHECK(sessionCancel->mScrubTargetBeat == 80);
+
+    // 3. Process a subset of beats in scrub mode: 25 beats
+    DispatchFrameWithMaxBeats(sessionCancel, decoderCancel, beats, 25);
+    CHECK(sessionCancel->mGameTick == 25);
+    CHECK(sessionCancel->IsScrubbing() == true);
+    CHECK(std::abs(sessionCancel->GetScrubProgress() - (25.0f / 80.0f)) < 1e-4f);
+
+    // 4. Cancel scrubbing mid-way
+    sessionCancel->CancelScrub();
+    CHECK(sessionCancel->IsScrubbing() == false);
+    CHECK(sessionCancel->mScrubTargetBeat == -1);
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
+
+    // 5. Verify normal pacing resumes cleanly
+    // A frame with small delta time (0.05s * 10 = 0.5 ticks) does not step
+    DispatchFrame(sessionCancel, decoderCancel, beats, 0.05f);
+    CHECK(sessionCancel->mGameTick == 25);
+
+    // Second frame reaches 1.0 tick, advancing exactly 1 tick
+    DispatchFrame(sessionCancel, decoderCancel, beats, 0.05f);
+    CHECK(sessionCancel->mGameTick == 26);
+
+    // Continue normal pacing to beat 45
+    while (sessionCancel->mGameTick < 45) {
+      DispatchFrame(sessionCancel, decoderCancel, beats, 0.05f);
+    }
+    CHECK(sessionCancel->mGameTick == 45);
+
+    // Parity at beat 45 must match golden state bit-for-bit
+    const gpg::MD5Digest cancelDigest45 = sinkCancel.ComputeStateDigest();
+    CHECK(AreDigestsEqual(cancelDigest45, goldenDigest45));
+    CHECK(sinkCancel.entityInfo == sinkNormal.entityInfo);
+    CHECK(sinkCancel.verifiedChecksums.size() == sinkNormal.verifiedChecksums.size());
+  }
+
+  void TestReplayScrubbingBackwardSeek()
+  {
+    constexpr int kTotalBeats = 100;
+    const auto beats = BuildTestReplayStream(kTotalBeats);
+
+    // 1. Establish golden state at beat 30 under normal pacing
+    alignas(moho::CWldSession) std::uint8_t bufferNormal[sizeof(moho::CWldSession)];
+    std::memset(bufferNormal, 0, sizeof(bufferNormal));
+    moho::CWldSession* const sessionNormal = reinterpret_cast<moho::CWldSession*>(bufferNormal);
+    sessionNormal->IsReplay = true;
+    sessionNormal->mTotalReplayBeats = kTotalBeats;
+    sessionNormal->mGameTick = 0;
+    sessionNormal->mScrubTargetBeat = -1;
+    sessionNormal->mIsScrubbing = false;
+
+    ParityTestStateSink sinkNormal;
+    LuaPlus::LuaState luaNormal(LuaPlus::LuaState::LIB_BASE);
+    msvc8::auto_ptr<gpg::Stream> recordingNormal;
+    moho::CDecoder decoderNormal(&sinkNormal, recordingNormal, nullptr, &luaNormal);
+
+    while (sessionNormal->mGameTick < 30) {
+      DispatchFrame(sessionNormal, decoderNormal, beats, 0.05f);
+    }
+    CHECK(sessionNormal->mGameTick == 30);
+    const gpg::MD5Digest goldenDigest30 = sinkNormal.ComputeStateDigest();
+    const auto goldenEntityInfo30 = sinkNormal.entityInfo;
+    const auto goldenChecksums30 = sinkNormal.verifiedChecksums;
+
+    // Continue normal run to beat 75
+    while (sessionNormal->mGameTick < 75) {
+      DispatchFrame(sessionNormal, decoderNormal, beats, 0.05f);
+    }
+    CHECK(sessionNormal->mGameTick == 75);
+
+    // 2. Attach dummy launch info to permit backward seek restart handover
+    struct DummyLaunchInfo : moho::LaunchInfoBase
+    {
+      void Create(boost::SharedPtrRaw<void>&) override {}
+    };
+    sessionNormal->mLaunchInfo.reset(new DummyLaunchInfo());
+
+    // 3. User seeks backward from 75 to 30
+    sessionNormal->StartScrubToBeat(30);
+    CHECK(sessionNormal->IsScrubbing() == false);
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == 30);
+    sessionNormal->mLaunchInfo.reset();
+
+    // 4. Restart handover simulation (as performed by WLD_DoPlayingAction):
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget >= 0);
+    const std::int32_t handoverTarget = moho::CWldSession::sPendingRestartScrubTarget;
+    moho::CWldSession::sPendingRestartScrubTarget = -1;
+    CHECK(handoverTarget == 30);
+    CHECK(moho::CWldSession::sPendingRestartScrubTarget == -1);
+
+    // 5. Create restarted session from beat 0
+    alignas(moho::CWldSession) std::uint8_t bufferRestarted[sizeof(moho::CWldSession)];
+    std::memset(bufferRestarted, 0, sizeof(bufferRestarted));
+    moho::CWldSession* const sessionRestarted = reinterpret_cast<moho::CWldSession*>(bufferRestarted);
+    sessionRestarted->IsReplay = true;
+    sessionRestarted->mTotalReplayBeats = kTotalBeats;
+    sessionRestarted->mGameTick = 0;
+    sessionRestarted->mScrubTargetBeat = -1;
+    sessionRestarted->mIsScrubbing = false;
+
+    ParityTestStateSink sinkRestarted;
+    LuaPlus::LuaState luaRestarted(LuaPlus::LuaState::LIB_BASE);
+    msvc8::auto_ptr<gpg::Stream> recordingRestarted;
+    moho::CDecoder decoderRestarted(&sinkRestarted, recordingRestarted, nullptr, &luaRestarted);
+
+    sessionRestarted->StartScrubToBeat(handoverTarget);
+    CHECK(sessionRestarted->IsScrubbing() == true);
+    CHECK(sessionRestarted->mScrubTargetBeat == 30);
+    CHECK(sessionRestarted->mScrubStartBeat == 0);
+
+    // Turbo scrub frame reaches beat 30
+    DispatchFrame(sessionRestarted, decoderRestarted, beats, 0.05f);
+
+    CHECK(sessionRestarted->mGameTick == 30);
+    CHECK(sessionRestarted->IsScrubbing() == false);
+    CHECK(sessionRestarted->mScrubTargetBeat == -1);
+    CHECK(sessionRestarted->GetScrubProgress() == 0.0f);
+    CHECK(sinkRestarted.currentBeat == 30);
+
+    // 6. Verify bit-for-bit parity at beat 30
+    const gpg::MD5Digest restartedDigest30 = sinkRestarted.ComputeStateDigest();
+    CHECK(AreDigestsEqual(restartedDigest30, goldenDigest30));
+    CHECK(sinkRestarted.entityInfo == goldenEntityInfo30);
+    CHECK(sinkRestarted.verifiedChecksums.size() == goldenChecksums30.size());
+    for (std::size_t i = 0; i < goldenChecksums30.size(); ++i) {
+      CHECK(sinkRestarted.verifiedChecksums[i].first == goldenChecksums30[i].first);
+      CHECK(AreDigestsEqual(sinkRestarted.verifiedChecksums[i].second, goldenChecksums30[i].second));
+    }
+  }
+
   struct TestCase
   {
     const char* name;
@@ -745,6 +1249,9 @@ namespace
     {"wldsession scrubbing state transitions", &TestCWldSessionScrubbingStateTransitions},
     {"replay scrubbing user lua bindings", &TestReplayScrubbingUserLuaBindings},
     {"replay timeline lua syntax and execution", &TestReplayTimelineLuaSyntaxAndExecution},
+    {"replay scrubbing checksum parity", &TestReplayScrubbingChecksumParity},
+    {"replay scrubbing cancellation", &TestReplayScrubbingCancellation},
+    {"replay scrubbing backward seek", &TestReplayScrubbingBackwardSeek},
   };
 } // namespace
 
