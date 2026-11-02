@@ -80,6 +80,7 @@
   "buildPresets": [
     { "name": "clang-x64-release", "configurePreset": "clang-x64-release" },
     { "name": "clang-x86-release", "configurePreset": "clang-x86-release" },
+    { "name": "clang-x86-retail-layout", "configurePreset": "clang-x86-retail-layout" },
     { "name": "clang-x64-profile", "configurePreset": "clang-x64-profile" },
     { "name": "clang-x86-profile", "configurePreset": "clang-x86-profile" },
     { "name": "clang-x64-debug", "configurePreset": "clang-x64-debug" },
