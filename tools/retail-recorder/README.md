@@ -40,3 +40,5 @@ The original game and an instrumented x86 build of ours play the same replay und
 4. `compare_sets.py <ours A.sets> <ours B.sets> <map.tsv> <self.tsv> --self` on two runs of our build lists what varies per run (wall-clock time, seeds). Those functions cannot be judged. Then `compare_sets.py <retail.sets> <ours.sets> <map.tsv> <out.tsv>`.
 
 Reading a `DIFFERS` row: with equal call counts it is a real lead. With different counts the same retail address can serve callers ours does not route through it (`atan2f` serves several folded functions), so a few missing hashes prove little on their own. Past 16,384 distinct hashes a function keeps a sample (a fixed rule on the hash, the same on both sides), so a rare difference in a very hot function can go unseen.
+
+The functions that compare the same are stored in `tests/replay_sets`, which checks a build with no original game (its README has the steps). The `FAF_CALL_HASH_BUILD` CMake option sets the build flags above.

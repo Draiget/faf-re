@@ -278,6 +278,32 @@ def our_locations(sig, params):
     return locations, stack
 
 
+def pop_bytes(rets, ret_rvas, rva, size, conv, stack_words):
+    """The bytes our function pops, or None when its returns do not fit its convention.
+
+    A jump table in the code decodes as stray returns, so more than one size is
+    normal: the convention says which is real, if that size is among them.
+    """
+    low, high = bisect.bisect_left(ret_rvas, rva), bisect.bisect_left(ret_rvas, rva + size)
+    pops = {rets[i][1] for i in range(low, high)}
+    expected = stack_words * 4 if conv in ("thiscall", "stdcall", "fastcall") else 0
+    if pops and expected not in pops:
+        if len(pops) > 1:
+            return None
+        return pops.pop()
+    return expected
+
+
+def write_spec(path, flags, entries):
+    with open(path, "wb") as f:
+        f.write(b"RRS3" + struct.pack("<II", len(entries), flags))
+        for va, pop, prologue, ret, args, ident in entries:
+            f.write(struct.pack("<IHBBBB", va, pop, prologue, ret, len(args), 1))
+            f.write(struct.pack("<I", ident))
+            for arg in args:
+                f.write(struct.pack("<BBBB", *arg))
+
+
 def plan_result(kind, retail_ret):
     """The result kinds (ours, retail), or None when it cannot be compared.
 
@@ -372,19 +398,11 @@ def main():
         if params is None:
             count("our stack layout is not certain (struct result or unknown size)")
             continue
-        low, high = bisect.bisect_left(ret_rvas, rva), bisect.bisect_left(ret_rvas, rva + size)
-        pops = {rets[i][1] for i in range(low, high)}
         locations, stack_words = our_locations(sig, params)
-        conv = sig[0]
-        # A jump table in the code decodes as stray returns, so more than one size
-        # is normal: the convention says which is real, if that size is among them.
-        expected = stack_words * 4 if conv in ("thiscall", "stdcall", "fastcall") else 0
-        if pops and expected not in pops:
-            if len(pops) > 1:
-                count("our function's return sizes do not fit its convention")
-                continue
-            expected = pops.pop()
-        pop = expected
+        pop = pop_bytes(rets, ret_rvas, rva, size, sig[0], stack_words)
+        if pop is None:
+            count("our function's return sizes do not fit its convention")
+            continue
 
         # Hex-Rays lists a register function's parameters in register order, not
         # the source's (Entity::SetVizToEnemies is (mode@eax, this@ecx)), so a
@@ -415,25 +433,15 @@ def main():
         ours_entries.append((rva, pop, 8, ours_ret, ours_args, va))
         rows.append((va, name, cols[1], cols[2], hashed_words, ours_ret))
 
-    def write(path, flags, entries):
-        with open(path, "wb") as f:
-            f.write(b"RRS3" + struct.pack("<II", len(entries), flags))
-            for va, pop, prologue, ret, args, ident in entries:
-                f.write(struct.pack("<IHBBBB", va, pop, prologue, ret, len(args), 1))
-                f.write(struct.pack("<I", ident))
-                for arg in args:
-                    f.write(struct.pack("<BBBB", *arg))
-
     # Sim::AdvanceBeat names the sim thread (RETAIL_RECORDER_SIM_ENTRY), so it is
     # hooked on both sides whether or not it has anything to hash.
     if not any(e[5] == SIM_ENTRY for e in retail_entries):
         entry = retail[SIM_ENTRY]
         retail_entries.append((SIM_ENTRY, entry["pop"], entry["prologue"], RET_NONE, [], SIM_ENTRY))
         rva, section, offset, size, tindex = by_name["moho::Sim::AdvanceBeat"][0]
-        low, high = bisect.bisect_left(ret_rvas, rva), bisect.bisect_left(ret_rvas, rva + size)
-        ours_entries.append((rva, rets[low][1] if low < high else 4, 8, RET_NONE, [], SIM_ENTRY))
-    write(retail_out, 0, retail_entries)
-    write(ours_out, 1, ours_entries)
+        ours_entries.append((rva, pop_bytes(rets, ret_rvas, rva, size, "thiscall", 1), 8, RET_NONE, [], SIM_ENTRY))
+    write_spec(retail_out, 0, retail_entries)
+    write_spec(ours_out, 1, ours_entries)
     with open(map_out, "w", encoding="utf-8", newline="\n") as f:
         f.write("va\tname\tfile\tline\thashed_arg_words\tresult_kind\n")
         for va, name, source, source_line, words, ret in rows:

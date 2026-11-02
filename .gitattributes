@@ -2,3 +2,7 @@
 # target files have, while headers and LF targets do not. core.autocrlf would
 # normalise that away and the patches would only apply inside this work tree.
 dependencies/patches/*.patch -text
+
+# Stored call hashes (tests/replay_sets): binary, and the list keeps its LF.
+tests/replay_sets/*.sets binary
+tests/replay_sets/*.tsv text eol=lf
