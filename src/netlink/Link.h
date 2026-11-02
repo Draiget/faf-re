@@ -234,6 +234,9 @@ namespace faf::netlink
     bool mRemoteWebRtc = false;
     bool mWebRtcGaveUp = false; // for this connection
     std::shared_ptr<WebRtcChannel> mRtc;
+    // mRtc for LaneTransmit, which must not take mMutex (see there). Held only to copy it.
+    std::mutex mLaneRtcMutex;
+    std::shared_ptr<WebRtcChannel> mLaneRtc;
     std::atomic<std::uint64_t> mWebRtcSent{0};
     // Issue #240.
     bool mRemoteLane = false;
