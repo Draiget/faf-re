@@ -3117,7 +3117,8 @@ namespace moho
       const float dx = center.x - unitPos.x;
       const float dy = center.y - unitPos.y;
       const float dz = center.z - unitPos.z;
-      const float distSq = dx * dx + dy * dy + dz * dz;
+      // (dy*dy + dz*dz) + dx*dx: a sum in another order can round differently and pick the other of two near-equal units.
+      const float distSq = (dy * dy + dz * dz) + dx * dx;
 
       if (rank < bestRank || (rank == bestRank && bestDistSq > distSq)) {
         bestUnit = unit;
@@ -3260,7 +3261,9 @@ namespace moho
           const float dx = unitPos.x - pos.x;
           const float dy = unitPos.y - pos.y;
           const float dz = unitPos.z - pos.z;
-          candidateValue = dx * dx + dy * dy + dz * dz;
+          // 0x00725E8F: (dy*dy + dz*dz) + dx*dx; a sum in another order can round differently and pick the other of two
+          // near-equal units (26902525 at beat 16871: 12825.258 and 12825.259).
+          candidateValue = (dy * dy + dz * dz) + dx * dx;
           const bool better = (cmpType == COMPARE_Closest) ? (bestValue > candidateValue)
                                                            : (candidateValue > bestValue);
           if (!better && bestValue >= 0.0f) {
