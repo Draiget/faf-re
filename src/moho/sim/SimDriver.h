@@ -1049,17 +1049,20 @@ namespace moho
    * retail engine carries but never feeds (`CSimDriver::GetSimSpeed` returns 0).
    * - `wld_SkewCorrection` (default 0): 1 makes `GetSimSpeed` return how many beats the beat on
    *   screen is ahead of real time (negative when behind), measured tick by tick from the first
-   *   tick on screen with paused time left out; in a network session against the moment the last
-   *   player's ready message left it (`CClientManagerImpl::EstimateSharedStartUs`), so every
-   *   player's screen keeps to one schedule. `WLD_GetSimRate` then runs the display clock at
+   *   tick on screen with paused time left out. `WLD_GetSimRate` then runs the display clock at
    *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
    *   It changes when beats are issued, never what the sim computes.
    * - `wld_SkewMaxLag` (default 2 s): the skew is clamped to this much real time either way.
    * - `wld_SkewLog` (default 0): log the drift every this many seconds.
+   * - `wld_PreciseSharedStart` (default 1): in a network session the count is measured against the
+   *   moment the last player's ready message left it (`CClientManagerImpl::EstimateSharedStartUs`),
+   *   which every player times alike, so every player's screen keeps to one schedule; 0 counts
+   *   from this client's own first tick on screen, as outside network sessions.
    */
   extern int wld_SkewCorrection;
   extern float wld_SkewMaxLag;
   extern int wld_SkewLog;
+  extern int wld_PreciseSharedStart;
 
 
   /**

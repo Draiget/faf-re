@@ -1637,8 +1637,9 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   const std::int64_t dequeuedAt = mLastSyncCycleTime;
   lock.unlock();
   if (outSyncData) {
-    // The shared start is measured against in network sessions only.
-    const bool sharedStart = gDriverSessionPacing.load(std::memory_order_relaxed) == ESimSessionPacing::Network;
+    // The shared start is measured against in network sessions only, with wld_PreciseSharedStart.
+    const bool sharedStart = wld_PreciseSharedStart != 0 &&
+      gDriverSessionPacing.load(std::memory_order_relaxed) == ESimSessionPacing::Network;
     UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate(), sharedStart ? mClientManager.get() : nullptr);
   }
 }
@@ -2068,6 +2069,7 @@ int moho::sim_LeadOnSchedule = 1;
 int moho::wld_SkewCorrection = 0;
 float moho::wld_SkewMaxLag = 2.0f;
 int moho::wld_SkewLog = 0;
+int moho::wld_PreciseSharedStart = 1;
 
 namespace
 {
@@ -2091,7 +2093,13 @@ namespace
     &moho::wld_SkewLog
   );
 
-
+  TConVar<int> gTConVar_wld_PreciseSharedStart(
+    "wld_PreciseSharedStart",
+    "Network sessions: the skew is counted from the moment the last player's ready message left it, the same on "
+    "every screen (1, the default), or from this client's own first tick on screen (0). Read when the first tick "
+    "is shown.",
+    &moho::wld_PreciseSharedStart
+  );
 
   TConVar<int> gTConVar_sim_ReplayLead(
     "sim_ReplayLead",
