@@ -1,6 +1,8 @@
 # Stored call hashes
 
-For each replay, `<replay>.sets` holds the original game's per-function call hashes, and `<replay>.tsv` says what they cover: for each function its name, its parameter and result kinds, which parameters are hashed, and its result kind. Every stored hash must appear when our build plays that replay, so the check needs no original game.
+For each replay in `replays.tsv`, `<replay>.sets` holds the original game's per-function call hashes, and `<replay>.tsv` says what they cover: for each function its name, its parameter and result kinds, which parameters are hashed, and its result kind. Every stored hash must appear when our build plays that replay, so the check needs no original game.
+
+Three replays cover 1,007 functions. A function is stored only if it matched the original game on every one of these replays where the original called it, and repeated between two runs of our build on each.
 
 A hash cannot be turned back into a function call: it holds no inputs, and most of these functions read game objects. So this needs a replay, and is not a direct-call test like `tests/math_dump`.
 
@@ -13,7 +15,7 @@ tools\retail-recorder\build.bat
 tools\retail-recorder\check_replay_sets.ps1 -BuildDir build\call-hash
 ```
 
-The replay comes from the parity pool (`tmp/parity/pool`) and needs game data 3835. Exit code 0 means every stored hash was found and every recorded checksum matched. The report names each function that differs, is no longer called, or changed its signature.
+The script plays every replay in `replays.tsv`; `-Replay <id>` plays one. The replays come from the parity pool (`tmp/parity/pool`) and need game data 3835 and the listed init file, which holds the M28AI version where one is needed. Exit code 0 means every stored hash was found and every recorded checksum matched. The report names each function that differs, is no longer called, or changed its signature.
 
 - **DIFFERS:** the same inputs now give another result, or those inputs no longer occur. This is the finding the test exists for.
 - **NOT CALLED:** nothing reaches that function on this replay any more.
