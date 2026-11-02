@@ -23,6 +23,7 @@
 #if defined(DIFFFUZZ_ENGINE_LINKED)
 extern "C" int luaO_log2(unsigned int x);           // src/lua/LuaObject.cpp, extern "C" block
 extern "C" unsigned int luaO_int2fb(unsigned int x); // src/lua/LuaObject.cpp, extern "C" block
+#include "lua/LuaArena.h"
 #include "lua/LuaRuntimeTypes.h"
 extern "C" const LuaPlus::TObject luaO_nilobject;                          // src/lua/LuaObject.cpp, extern "C" block
 extern "C" const LuaPlus::TObject* luaH_getstr(Table* t, TString* key);     // src/lua/LuaObject.cpp, extern "C" block
@@ -3026,21 +3027,58 @@ namespace difffuzz
       s.Value(in[6] + in[7], out + 4);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
+    /// Lua values hold 32-bit pointers on x64, so what they point at comes from the Lua range there.
+    template <class T>
+    struct LuaFixtureAllocator
+    {
+      using value_type = T;
+      LuaFixtureAllocator() = default;
+      template <class U>
+      LuaFixtureAllocator(const LuaFixtureAllocator<U>&) noexcept
+      {
+      }
+      [[nodiscard]] T* allocate(const std::size_t count)
+      {
+#if INTPTR_MAX == INT32_MAX
+        return std::allocator<T>{}.allocate(count);
+#else
+        return static_cast<T*>(lua::ArenaAllocate(count * sizeof(T)));
+#endif
+      }
+      void deallocate(T* const block, const std::size_t count) noexcept
+      {
+#if INTPTR_MAX == INT32_MAX
+        std::allocator<T>{}.deallocate(block, count);
+#else
+        (void)count;
+        lua::ArenaFree(block);
+#endif
+      }
+      template <class U>
+      bool operator==(const LuaFixtureAllocator<U>&) const noexcept
+      {
+        return true;
+      }
+    };
+    template <class T>
+    using LuaFixtureVector = std::vector<T, LuaFixtureAllocator<T>>;
+    using LuaFixtureStore = LuaFixtureVector<std::uint64_t>;
+
     struct OursLuaTable
     {
-      std::vector<std::max_align_t> tableStore;
-      std::vector<Node> nodes;
-      std::vector<LuaPlus::TObject> array;
-      std::vector<std::vector<std::max_align_t>> strings;
+      LuaFixtureStore tableStore;
+      LuaFixtureVector<Node> nodes;
+      LuaFixtureVector<LuaPlus::TObject> array;
+      std::vector<LuaFixtureStore> strings;
       Table* table = nullptr;
 
       explicit OursLuaTable(const LuaTableDesc& d)
-        : tableStore(sizeof(Table) / sizeof(std::max_align_t) + 1u)
+        : tableStore(sizeof(Table) / sizeof(std::uint64_t) + 1u)
         , nodes(d.keyTt.size())
         , array(d.sizearray + 1u)
       {
         for (std::size_t i = 0; i < d.poolHash.size(); ++i) {
-          strings.emplace_back(sizeof(TString) / sizeof(std::max_align_t) + 1u);
+          strings.emplace_back(sizeof(TString) / sizeof(std::uint64_t) + 1u);
           String(i)->tt = static_cast<lu_byte>(kLuaString);
           String(i)->hash = d.poolHash[i];
         }
@@ -3178,7 +3216,7 @@ namespace difffuzz
       SetLuaKey(t, in[5], in[6], key[0]);
       out[0] = static_cast<u32>(luaH_next(nullptr, t.table, key));
       const auto word = [](const LuaPlus::TObject& o) {
-        return static_cast<u32>(reinterpret_cast<std::uintptr_t>(o.value.p));
+        return LuaPlus::ValuePointerBits(o.value);
       };
       out[1] = static_cast<u32>(key[0].tt);
       out[2] = word(key[0]);
@@ -3215,7 +3253,7 @@ namespace difffuzz
     {
       LuaTableDesc tableDesc;
       OursLuaTable registry;
-      std::vector<std::max_align_t> stateStore, globalStore, frameStore, closureStore;
+      LuaFixtureStore stateStore, globalStore, frameStore, closureStore;
       std::vector<LuaPlus::TObject> stack;
       lua_State* state = nullptr;
       global_State* global = nullptr;
@@ -3229,7 +3267,7 @@ namespace difffuzz
       }
       [[nodiscard]] static std::size_t Blocks(const std::size_t bytes)
       {
-        return bytes / sizeof(std::max_align_t) + 1u;
+        return bytes / sizeof(std::uint64_t) + 1u;
       }
       static void Set(LuaPlus::TObject& o, const u32 tt, const u32 bits)
       {
@@ -3306,7 +3344,7 @@ namespace difffuzz
         std::vector<u32> v;
         const auto push = [&v](const LuaPlus::TObject& o) {
           v.push_back(static_cast<u32>(o.tt));
-          v.push_back(static_cast<u32>(reinterpret_cast<std::uintptr_t>(o.value.p)));
+          v.push_back(LuaPlus::ValuePointerBits(o.value));
         };
         for (const Node& n : registry.nodes) {
           push(n.i_val);
@@ -3320,7 +3358,7 @@ namespace difffuzz
       {
         const LuaPlus::TObject& o = stack[index];
         out[0] = static_cast<u32>(o.tt);
-        out[1] = static_cast<u32>(reinterpret_cast<std::uintptr_t>(o.value.p));
+        out[1] = LuaPlus::ValuePointerBits(o.value);
         if (o.tt == static_cast<int>(kLuaString)) {
           for (std::size_t i = 0; i < registry.strings.size(); ++i) {
             if (o.value.p == registry.String(i)) {
@@ -3388,7 +3426,7 @@ namespace difffuzz
       table->metatable = table; // its own metatable
       s.global->tmname[1] = s.registry.String(in[13]);
       const auto word = [](const LuaPlus::TObject& o) {
-        return static_cast<u32>(reinterpret_cast<std::uintptr_t>(o.value.p));
+        return LuaPlus::ValuePointerBits(o.value);
       };
       const auto values = [&s, &word]() {
         std::vector<u32> v;
@@ -3513,7 +3551,7 @@ namespace difffuzz
       lua_pushvalue(s.state, static_cast<int>(in[9]));
       out[0] = s.Classify(s.state->top);
       out[1] = static_cast<u32>(top->tt);
-      out[2] = static_cast<u32>(reinterpret_cast<std::uintptr_t>(top->value.p));
+      out[2] = LuaPlus::ValuePointerBits(top->value);
       if (out[1] == kLuaTable && top->value.p == s.registry.table) {
         out[2] = 0xAAAA0001u; // the registry table itself
       }

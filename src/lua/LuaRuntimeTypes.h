@@ -140,11 +140,11 @@ struct Table
 	int8_t flags;            // +0x08 Cached "missing TM" bitset.
 	lu_byte lsizenode;       // +0x09 log2(node array size).
 	// +0x0A..0x0B implicit padding before the pointer lanes.
-	Table* metatable;        // +0x0C
-	LuaPlus::TObject* array; // +0x10 Dense integer-key part.
-	Node* node;              // +0x14 Hash node array.
-	Node* firstfree;         // +0x18 First free hash node.
-	GCObject* gclist;        // +0x1C GC gray list link.
+	LuaPlus::ObjectPointer<Table> metatable; // +0x0C
+	LuaPlus::ObjectPointer<LuaPlus::TObject> array; // +0x10 Dense integer-key part.
+	LuaPlus::ObjectPointer<Node> node; // +0x14 Hash node array.
+	LuaPlus::ObjectPointer<Node> firstfree; // +0x18 First free hash node.
+	LuaPlus::ObjectPointer<GCObject> gclist; // +0x1C GC gray list link.
 	int sizearray;           // +0x20 Dense array slot count.
 
 	/**

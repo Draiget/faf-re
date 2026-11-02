@@ -1,5 +1,6 @@
 #include "Global.h"
 #include "gpg/core/profiling/Profiler.h"
+#include "lua/LuaArena.h"
 
 #include <Windows.h>
 
@@ -369,6 +370,10 @@ namespace
 
     void ReserveAddressSpaceBelow4Gb() noexcept
     {
+#if INTPTR_MAX != INT32_MAX
+        // Lua's objects live below 4 GB on purpose, so their range goes first.
+        lua::ArenaReserve();
+#endif
         constexpr std::uintptr_t kLowAddressLimit = 0x100000000ull;
         constexpr std::uintptr_t kAllocationGranularity = 0x10000u;
 
