@@ -1,8 +1,8 @@
 # Retail replay parity
 
-Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; with the fixes made since, 12,758 (97.0 %). Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 1 % give retail's own hash, 20 % come from our bugs (44 of those 47 fixed) and 11 % are not explained yet.
+Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; with the fixes made since, 12,771 (97.1 %). Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 2 % give retail's own hash, 28 % come from our bugs (57 of those 64 fixed) and 3 % are not explained yet.
 
-*Snapshot: 01/11/2026.*
+*Snapshot: 02/11/2026.*
 
 ## Current result
 
@@ -18,24 +18,24 @@ The [Replay parity workflow](../.github/workflows/replay-parity.yml) on commit `
 | Crash | 73 | 0.56 % | the runner's map extraction (`Map loader ... aborted`, scmp_001/002/004 and one dual_gap), fixed in the runner after the run (`94c6ab12f`) |
 | Error | 9 | 0.07 % | the map is not on FAF's map server (HTTP 404): generated maps and `na_alps` |
 
-The 231 desyncs by cause, as of master `7ced1a507` (01/11/2026):
+The 231 desyncs by cause, as of master `451934299` (02/11/2026):
 
 | Cause | Desyncs | Share of desyncs | Share of played | Engine bug? |
 |---|---|---|---|---|
 | Maps and content the run did not provide | 122 | 52.8 % | 0.93 % | no |
 | Live game split: the players' own checksums already disagreed | 34 | 14.7 % | 0.26 % | no (which side retail takes is not checked) |
-| Retail gives the same hash as ours | 3 | 1.3 % | 0.02 % | no |
-| Our bugs, fixed | 44 | 19.0 % | 0.33 % | yes, fixed |
-| Our bugs, cause known, open on x64 | 3 | 1.3 % | 0.02 % | yes |
-| Not explained yet | 25 | 10.8 % | 0.19 % | unknown |
+| Retail gives the same hash as ours | 4 | 1.7 % | 0.03 % | no |
+| Our bugs, fixed | 57 | 24.7 % | 0.43 % | yes, fixed |
+| Our bugs, cause known, open on x64 | 7 | 3.0 % | 0.05 % | yes |
+| Not explained yet | 7 | 3.0 % | 0.05 % | unknown |
 
-With the 44 fixed, 12,758 of 13,148 (97.03 %) would pass on master. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 122 content desyncs), at most 28 of 12,823 replays (0.22 %) still fail because of the engine: the 3 known and the 25 unexplained.
+With the 57 fixed, 12,771 of 13,148 (97.13 %) would pass on master. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 122 content desyncs), at most 14 of 12,823 replays (0.11 %) still fail because of the engine: the 7 known and the 7 unexplained.
 
 - **Maps and content (122).** 103 on survival maps whose scripts import the campaign's `X1CA_00N_strings.lua`, which CI's game data lacks (survival_horde*, survival_dday_horde, survival_shillingstone, survival_stranded, survival_the_goats_last_hope, xxx_survival, sh1r3_mycelium2_survival); 24 of them were replayed with the retail `X1CA_001`..`006` maps added and all 24 pass. 19 on maps that ship their own unit blueprints (survival_cybran_wrath, blackstar, little_pass_revised, adaptive_esais_vengeance): the game loads those only when `Game.prefs` names the map, which the runner never writes; the beat-0 hash `c3179fbe` is "no map blueprints loaded" on any map.
 - **Live game split (34).** The players recorded different checksums at the same beat and ours equals some of them, so the live game itself had desynced there: 33 one-against-one, and 26844459 with 4 players on our hash and 6 on another.
-- **Our bugs, fixed (44).** 24 by the cheat commands (`649cb57b5`: `CreateUnit` kept retail's layer override, `BlingBling` adds to the army's resources; `3e2299f95`: height-rect clamp), 5 by formation address reuse (`9f33f6980`, `9c2bf7c7b`), 4 by a self-destruct order with no units, which in retail still runs the cheat check that feeds the checksum (`7ced1a507`), 1 probably by factory orders no longer drawing from the sim's random stream (`ba1058e02`, not confirmed), and 10 that pass on master with the fixing commit not identified.
-- **Known, open on x64 (3).** 26846675, 26916583 and 26851180: units keep a raw formation pointer, so whether a freed formation's address is reused changes results. The x86 build, which uses the recovered allocator of the binary, plays them clean; the x64 build's formation-only free list does not reuse in the binary's order.
-- **Not explained (25).** 24 fail on master with the cause not found: in 13 of them retail `ForgedAlliance.exe` plays past that beat, so the bug is ours; in 2 the retail runs were inconclusive; 9 have no retail run yet. One (26849471, 64,250 beats) is still being replayed on master.
+- **Our bugs, fixed (57).** 24 by the cheat commands (`649cb57b5`: `CreateUnit` kept retail's layer override, `BlingBling` adds to the army's resources; `3e2299f95`: height-rect clamp), 5 by formation address reuse (`9f33f6980`, `9c2bf7c7b`), 4 by a self-destruct order with no units, which in retail still runs the cheat check that feeds the checksum (`7ced1a507`), 4 by a ferry transport whose route anchor is NaN, which retail's unordered compare keeps parked (`e1899bc9e`), 4 by a build drone on a wreck, whose failed `GetRebuildBonus` call makes retail reclaim the wreck (`39ef86768`), 1 by the Lua C-call limit, whose overflow error left the depth count one high, so a nuke's chain of death explosions nested deeper than retail's (`678ec0a5e`), 1 by assist pods given a repair task with no target when the host reclaims a non-unit (`451934299`), 2 by factory orders no longer drawing from the sim's random stream (`ba1058e02`; one of the two not confirmed), and 12 that pass on master with the fixing commit not identified.
+- **Known, open on x64 (7).** 26846675, 26916583, 26851180, 26949920, 26841630, 26901494 and 26906026: units keep a raw formation pointer, so whether a freed formation's address is reused changes results. The x86 build, which uses the recovered allocator of the binary, plays them clean; the x64 build's formation-only free list does not reuse in the binary's order.
+- **Not explained (7).** Retail plays past our failing beat in 26907417 and 26867306, so those bugs are ours; 26867306 also depends on the formation order above. 26935320 and 26902525 fail the same on x86, and their retail runs were inconsistent or stopped early. In 26831761 retail itself leaves the players' checksums at beat 13050, before we do, so it gives no reference. 26974352 and 26887317 have no retail run yet.
 
 ### Local run, 28–29/10/2026
 
@@ -560,4 +560,7 @@ A replay checks the rebuilt engine against checksums the players recorded. A liv
 - **Pathfinder edge costs.** The hierarchical pathfinder buckets each edge cost as `ceil(ln(cost / distance) * 6)`. Retail takes the logarithm with the x87 `fyl2x` instruction and rounds only the product to float; ours rounded the logarithm first. Where the product sits at a whole number the bucket moved by one and a unit took a different route; seen only in long AI games, which send many units across the map.
 - **Cheat commands.** Games with cheats on create units and add resources through sim callbacks. Ours cleared the layer override retail's `CreateUnit` keeps, and `BlingBling` filled the stored amount instead of the army's resources (24 replays of the CI run).
 - **Checks that feed the checksum.** `CheatsEnabled()` hashes its flag into the beat checksum. Retail tests it for a self-destruct order even when no unit was selected; ours returned first, so the beat had one byte less in its hash (26863712 and three more).
+- **NaN in a compare.** `comiss` followed by `jbe` also branches on an unordered result, so a NaN distance counts as "not greater". A ferry transport whose route anchor is NaN stays parked in retail; ours wrote `distance <= limit`, which is false for NaN, and it took off (26926987 and three more).
+- **Failure paths that keep going.** When a builder's `GetRebuildBonus` script call fails, retail logs a warning and falls into the common exit, which returns the wreck to reclaim; ours returned nothing. Cybran build drones have no such function, so every drone building on a wreck took this path (26834176 and three more).
+- **Lua's call-depth limit.** `luaD_call` raises "C stack overflow" inside its own try scope, so the frame's handler restores `nCcalls`. Ours raised it outside, and each overflow caught by a script callback left the count one high, so the limit at exactly 200 was stepped over. A nuke's chain of death explosions nests that deep: retail logs 342 overflows in 26930906, ours logged 4 and now logs 342.
 - **Signed versus unsigned cells.** The path navigator reads a cell's coordinates as unsigned 16-bit words, so a formation slot just off the map edge (z = -1) is 65,535 cells away; ours sign-extended them, saw the slot as close, probed it, failed and dropped out of the formation one beat early.
