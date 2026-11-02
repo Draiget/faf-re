@@ -121,6 +121,13 @@ namespace
   // draw, and their calls depend on frame timing; our headless has no such calls.
   u32 gSimEntryId = 0;
   volatile LONG gSimThreadId = 0;
+  // Sets mode: recording stops once this many beats ran (0: never), so both games
+  // record the same beats whichever plays further at the end of a replay.
+  u64 gSimBeats = 0;
+  bool gEndAtSimBeats = false;
+  HANDLE gLastWriteWanted = nullptr;
+  HANDLE gLastWriteDone = nullptr;
+  volatile LONG gSetsFinal = 0;
 
   // pushad image, then the stack the stubs see above it.
   struct EntryFrame
@@ -805,6 +812,9 @@ load_and_enter:
   // calls, and its hashes. Written whole and renamed into place.
   void WriteSets()
   {
+    if (gSetsFinal != 0) {
+      return;
+    }
     char tmp[MAX_PATH + 8];
     std::snprintf(tmp, sizeof(tmp), "%s.tmp", gSetsPath);
     std::FILE* f = std::fopen(tmp, "wb");
@@ -908,8 +918,16 @@ load_and_enter:
     }
     if (gSetsMode) {
       const LONG self = static_cast<LONG>(GetCurrentThreadId());
-      if (gSimThreadId == 0 && hook.id == gSimEntryId) {
-        InterlockedCompareExchange(&gSimThreadId, self, 0);
+      if (hook.id == gSimEntryId) {
+        if (gSimThreadId == 0) {
+          InterlockedCompareExchange(&gSimThreadId, self, 0);
+        }
+        if (gSimBeats != 0 && call == gSimBeats && gSimThreadId == self) {
+          // The sim waits, so the last write holds exactly these beats.
+          gSimThreadId = -1;
+          SetEvent(gLastWriteWanted);
+          WaitForSingleObject(gLastWriteDone, INFINITE);
+        }
       }
       pending.record = gSimThreadId == self;
     }
@@ -1344,11 +1362,21 @@ load_and_enter:
     }
   }
 
+  // The launcher ends the game from outside 12 s after the replay is over, which
+  // HookTerminateProcess cannot see, so a longer period loses the replay's last calls.
   DWORD WINAPI SetsWriter(void*)
   {
     for (;;) {
-      Sleep(60000);
+      const bool last = WaitForSingleObject(gLastWriteWanted, 10000) == WAIT_OBJECT_0;
       WriteSets();
+      if (last) {
+        gSetsFinal = 1;
+        if (gEndAtSimBeats) {
+          TerminateProcess(GetCurrentProcess(), 0);
+        }
+        SetEvent(gLastWriteDone);
+        return 0;
+      }
     }
   }
 
@@ -1407,6 +1435,12 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
       char simEntry[16] = {};
       GetEnvironmentVariableA("RETAIL_RECORDER_SIM_ENTRY", simEntry, sizeof(simEntry));
       gSimEntryId = std::strtoul(simEntry, nullptr, 16);
+      char simBeats[16] = {};
+      GetEnvironmentVariableA("RETAIL_RECORDER_SIM_BEATS", simBeats, sizeof(simBeats));
+      gSimBeats = std::strtoull(simBeats, nullptr, 10);
+      gEndAtSimBeats = GetEnvironmentVariableA("RETAIL_RECORDER_END_AT_SIM_BEATS", nullptr, 0) != 0;
+      gLastWriteWanted = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+      gLastWriteDone = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     }
     if (gSpecMode) {
       if (!LoadSpec(specPath)) {
