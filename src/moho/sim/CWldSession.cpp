@@ -262,6 +262,19 @@ namespace moho
   StatItem* sEngineStat_UserSync_SessionTick_NumTickers = nullptr;
   StatItem* sEngineStat_Sync_Count = nullptr;
 
+  /// Engine addition (wld_FrameClock): whether the current session has shown a tick yet, and
+  /// whether the app should start its frame-time window afresh (`WLD_TakeFrameClockReset`).
+  /// Main thread only.
+  bool gSessionShowedTick = false;
+  bool gFrameClockResetPending = false;
+
+  bool WLD_TakeFrameClockReset() noexcept
+  {
+    const bool pending = gFrameClockResetPending;
+    gFrameClockResetPending = false;
+    return pending;
+  }
+
   /**
    * Address: 0x0089AEC0 (FUN_0089AEC0, boost::shared_ptr_SSessionSaveData::shared_ptr_SSessionSaveData)
    *
@@ -6890,6 +6903,7 @@ namespace moho
     mGameTick = 0;
     mLastBeatWasTick = 0;
     mTimeSinceLastTick = 0.0f;
+    gSessionShowedTick = false;
     mSessionPauseStateA = 0;
     mRequestingPauseState = 0;
     mRequestingPause = 0;
@@ -8965,6 +8979,14 @@ namespace moho
       (void)sEngineStat_Sync_Count->Release(0);
     }
     (void)sEngineStat_Sync_Count->SetInt(&beatsApplied);
+
+    // Engine addition (wld_FrameClock): the session's first tick reached the screen. The frames
+    // before it include the long first frame of play, which would hold up the frame clock's
+    // average for the next frames and rush the opening ticks out a few milliseconds apart.
+    if (!gSessionShowedTick && mGameTick != tickAtFrameStart) {
+      gSessionShowedTick = true;
+      gFrameClockResetPending = true;
+    }
 
     // Whatever the drain consumed comes back off the interpolation fraction, so
     // the render clock does not run ahead of the sim clock.

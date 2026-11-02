@@ -1155,6 +1155,14 @@ void CScApp::Main()
   }
 
   gpg::diag::FrameSamplerMark(); // debugging aid, off unless FAF_FRAME_SAMPLER is set
+  // Engine addition (wld_FrameClock): with the mean clock, the session's opening frames (its long
+  // first frame of play) leave the window once its first tick is on screen; the median ignores
+  // one long frame, so the original clock keeps its window.
+  const bool meanFrameClock = fixedFrameSeconds <= 0.0f && wld_FrameClock == 1 &&
+    (wld_FrameClockNetwork != 0 || moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network);
+  if (moho::WLD_TakeFrameClockReset() && meanFrameClock) {
+    framerates.Reset();
+  }
   (void)framerates.Push(frameSeconds);
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.

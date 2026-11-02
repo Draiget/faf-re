@@ -80,21 +80,18 @@ namespace
 
   /**
    * Engine addition (wld_SkewCorrection): how far the beat on screen is behind real time, for
-   * `CSimDriver::GetSimSpeed`. The retail driver returns 0 there, which leaves the display-clock
-   * skew correction in `WLD_GetSimRate` (`wld_SkewRateAdjustBase` per beat of skew, capped at
-   * `wld_SkewRateAdjustMax`) permanently at 1x.
+   * `CSimDriver::GetSimSpeed`. The retail driver returns 0 there, which leaves the skew correction in `WLD_GetSimRate` permanently at 1x.
    *
-   * Each tick taken off the sync queue adds the real time since the previous tick, minus the time
-   * those ticks take at the current sim rate. Beats that do not advance a tick are a pause, and the
-   * interval that spans them is left out, so paused time is never owed. Counting starts at the
-   * first tick that comes at least half a tick after the one before: the ticks computed while the
-   * session loaded are taken in one burst, and counting them would read as being ahead. Only the
-   * main thread touches it (`GetSyncData`, `GetSimSpeed`).
+   * The divergence from real time is calculated for each tick taken off the sync queue.
+   * Beats that do not advance a tick are a pause, and are not counted. Counting starts at the
+   * session's first tick on screen; the long first frame of play before it is not owed, and the
+   * app drops it from the frame clock's window once that tick is shown
+   * (`WLD_TakeFrameClockReset`), so the ticks after it come a tick apart.
+   * Only the main thread touches it (`GetSyncData`, `GetSimSpeed`).
    */
   struct SkewClock
   {
     bool mStarted = false;
-    bool mSettled = false;
     bool mPausedSinceTick = false;
     std::int32_t mLastTick = 0;
     std::int64_t mLastTickCycles = 0;
@@ -122,12 +119,9 @@ namespace
       return;
     }
 
-    const float tickMs = 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
-    const float elapsedMs = gpg::time::CyclesToMilliseconds(now - clock.mLastTickCycles);
-    if (!clock.mSettled && elapsedMs >= tickMs * 0.5f) {
-      clock.mSettled = true;
-    }
-    if (clock.mSettled && !clock.mPausedSinceTick) {
+    if (!clock.mPausedSinceTick) {
+      const float tickMs = 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
+      const float elapsedMs = gpg::time::CyclesToMilliseconds(now - clock.mLastTickCycles);
       const float errorMs = elapsedMs - static_cast<float>(beat.mCurTick - clock.mLastTick) * tickMs;
       const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
       clock.mLagMs = std::clamp(clock.mLagMs + errorMs, -maxLagMs, maxLagMs);
@@ -1585,7 +1579,7 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
  */
 double CSimDriver::GetSimSpeed()
 {
-  if (wld_SkewCorrection == 0 || !gSkewClock.mSettled) {
+  if (wld_SkewCorrection == 0 || !gSkewClock.mStarted) {
     return 0.0;
   }
   return -static_cast<double>(gSkewClock.mLagMs) / 100.0;
