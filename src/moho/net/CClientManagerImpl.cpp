@@ -38,13 +38,6 @@ namespace
   // exists at a time; written and read under its `mLock`.
   std::int64_t gClientReadyUs[64] = {};
 
-  [[nodiscard]] std::int64_t SteadyClockMicroseconds()
-  {
-    return std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now().time_since_epoch()
-    ).count();
-  }
-
   float GetBottleneckUiTimestampMs(const CClientManagerImpl& manager)
   {
     // Low-dword float pun over Timer::mTime (binary reads only 4 of the 8 bytes).
@@ -191,7 +184,7 @@ void CClientManagerImpl::NoteClientReady(const int clientIndex)
   std::scoped_lock lock(mLock);
   if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < std::size(gClientReadyUs) &&
       gClientReadyUs[clientIndex] == 0) {
-    gClientReadyUs[clientIndex] = SteadyClockMicroseconds();
+    gClientReadyUs[clientIndex] = NET_SteadyClockMicroseconds();
   }
 }
 

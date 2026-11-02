@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
@@ -35,6 +34,7 @@
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/CNetUDPConnection.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
@@ -120,6 +120,19 @@ namespace
   // leave after the first tick is on screen); past them the count stays on this client's own.
   constexpr std::int32_t kSharedStartWaitTicks = 50;
 
+  /// A tick's length in ms at `simRate` (10 ticks a second at 0, x10 per 10 steps).
+  [[nodiscard]] float TickMs(const int simRate)
+  {
+    return 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
+  }
+
+  /// A lag within +/- wld_SkewMaxLag: what the correction acts on.
+  [[nodiscard]] float ClampLag(const float lagMs)
+  {
+    const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
+    return std::clamp(lagMs, -maxLagMs, maxLagMs);
+  }
+
   /// The display-clock factor `WLD_GetSimRate` makes of a lag, for the log.
   [[nodiscard]] float SkewDisplayFactor(const float lagMs)
   {
@@ -143,13 +156,10 @@ namespace
       return;
     }
     clock.mSharedStartPending = false;
-    const std::int64_t shownUs = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now().time_since_epoch()
-    ).count();
-    const float tickMs = 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
+    const std::int64_t shownUs = NET_SteadyClockMicroseconds();
+    const float tickMs = TickMs(simRate);
     const float lagMs = static_cast<float>(shownUs - sharedStartUs) * 0.001f - static_cast<float>(tick) * tickMs;
-    const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
-    clock.mLagMs = std::clamp(lagMs, -maxLagMs, maxLagMs);
+    clock.mLagMs = ClampLag(lagMs);
     clock.mDriftMs = lagMs;
     if (wld_SkewLog > 0) {
       gpg::Logf("SkewClock: tick %d shown %+.3f s after the shared start, due at %+.3f s: lag %+.3f s", tick,
@@ -182,11 +192,9 @@ namespace
     }
 
     if (!clock.mPausedSinceTick) {
-      const float tickMs = 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
       const float elapsedMs = gpg::time::CyclesToMilliseconds(now - clock.mLastTickCycles);
-      const float errorMs = elapsedMs - static_cast<float>(beat.mCurTick - clock.mLastTick) * tickMs;
-      const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
-      clock.mLagMs = std::clamp(clock.mLagMs + errorMs, -maxLagMs, maxLagMs);
+      const float errorMs = elapsedMs - static_cast<float>(beat.mCurTick - clock.mLastTick) * TickMs(simRate);
+      clock.mLagMs = ClampLag(clock.mLagMs + errorMs);
       clock.mDriftMs += errorMs;
     }
     clock.mPausedSinceTick = false;
@@ -2058,7 +2066,7 @@ int moho::sim_ReplayLead = 10;
 int moho::sim_LocalLead = 2;
 int moho::sim_LeadOnSchedule = 1;
 int moho::wld_SkewCorrection = 0;
-float moho::wld_SkewMaxLag = 3.0f;
+float moho::wld_SkewMaxLag = 2.0f;
 int moho::wld_SkewLog = 0;
 
 namespace

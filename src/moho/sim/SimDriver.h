@@ -1054,7 +1054,7 @@ namespace moho
    *   player's screen keeps to one schedule. `WLD_GetSimRate` then runs the display clock at
    *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
    *   It changes when beats are issued, never what the sim computes.
-   * - `wld_SkewMaxLag` (default 3 s): the skew is clamped to this much real time either way.
+   * - `wld_SkewMaxLag` (default 2 s): the skew is clamped to this much real time either way.
    * - `wld_SkewLog` (default 0): log the drift every this many seconds.
    */
   extern int wld_SkewCorrection;

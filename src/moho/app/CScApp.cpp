@@ -1155,12 +1155,13 @@ void CScApp::Main()
   }
 
   gpg::diag::FrameSamplerMark(); // debugging aid, off unless FAF_FRAME_SAMPLER is set
-  // Engine addition (wld_FrameClock): with the mean clock, the session's opening frames (its long
-  // first frame of play) leave the window once its first tick is on screen; the median ignores
-  // one long frame, so the original clock keeps its window.
-  const bool meanFrameClock = fixedFrameSeconds <= 0.0f && wld_FrameClock == 1 &&
-    (wld_FrameClockNetwork != 0 || moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network);
-  if (moho::WLD_TakeFrameClockReset() && meanFrameClock) {
+  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
+  // wld_FrameClockNetwork. It then drops the session's opening frames (its long first frame of
+  // play) from the window once its first tick is on screen; the median ignores one long frame, so
+  // the original clock keeps its window.
+  const bool realTimeClock = fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
+    (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0);
+  if (moho::WLD_TakeFrameClockReset() && realTimeClock) {
     framerates.Reset();
   }
   (void)framerates.Push(frameSeconds);
@@ -1171,10 +1172,7 @@ void CScApp::Main()
   moho::DISK_UpdateWatcher();
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
-  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
-  // wld_FrameClockNetwork.
-  if (fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
-      (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0)) {
+  if (realTimeClock) {
     smoothedFrameSeconds = wld_FrameClock == 2 ? frameSeconds : framerates.Mean();
   }
   if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {

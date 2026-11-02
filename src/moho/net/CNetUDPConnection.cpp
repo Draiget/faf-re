@@ -49,6 +49,11 @@ void moho::NET_ResetReadyDeparture() noexcept
   gReadyDepartureUs.store(0, std::memory_order_relaxed);
 }
 
+std::int64_t moho::NET_SteadyClockMicroseconds() noexcept
+{
+  return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 /**
  * Address: 0x00485BE0 (FUN_00485BE0)
  *
@@ -1468,9 +1473,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
     const auto awaiting = std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this);
     if (awaiting != gReadyAwaitingDeparture.end()) {
       gReadyAwaitingDeparture.erase(awaiting);
-      const std::int64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()
-      ).count();
+      const std::int64_t nowUs = NET_SteadyClockMicroseconds();
       gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
     }
   }

@@ -440,4 +440,7 @@ namespace moho
 
   /** Engine addition (wld_SkewCorrection, shared start): forget the last session's ready departure. */
   void NET_ResetReadyDeparture() noexcept;
+
+  /** Engine addition (wld_SkewCorrection, shared start): the system-wide steady clock in microseconds. */
+  [[nodiscard]] std::int64_t NET_SteadyClockMicroseconds() noexcept;
 } // namespace moho
