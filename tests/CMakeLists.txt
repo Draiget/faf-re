@@ -96,6 +96,7 @@ include("${CMAKE_SOURCE_DIR}/tools/difffuzz/dump.cmake")
 add_subdirectory(remote)
 
 add_subdirectory(memory)
+add_subdirectory(tread_rotation)
 
 # Entity update scroll snapshots and payload ownership.
 add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
