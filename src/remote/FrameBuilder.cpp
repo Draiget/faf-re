@@ -385,7 +385,7 @@ namespace faf::remote
       mWorldSlots[slot] = record;
     } else {
       slot = static_cast<std::uint32_t>(mWorldSlots.size());
-      mWorldSlots.push_back(record);
+      (void)mWorldSlots.push_back(record);
     }
     mWorldIndex.insert(found, SWorldEntry{record.id, slot});
     return mWorldSlots[slot];

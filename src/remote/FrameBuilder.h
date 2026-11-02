@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/ChunkedVector.h"
 
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "remote/UnderlayPaths.h"
@@ -245,7 +246,7 @@ namespace faf::remote
     // The world in ascending id order, as frames list it. Plan WPR.35: one flat index over stable
     // slots, so each beat's thousands of lookups and the frame's walk stay within a few arrays.
     std::vector<SWorldEntry> mWorldIndex;
-    std::vector<wire::SEntityRecord> mWorldSlots;
+    gpg::core::ChunkedVector<wire::SEntityRecord> mWorldSlots;
     std::vector<std::uint32_t> mFreeSlots;
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;

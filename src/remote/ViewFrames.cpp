@@ -138,7 +138,7 @@ namespace faf::remote
 
     const std::size_t slots = builder.SlotCount();
     if (held.records.size() < slots) {
-      held.records.resize(slots);
+      held.records.grow_to(slots);
       held.sent.resize(slots, 0u);
       held.keep.resize(slots, 0u);
       held.references.resize(slots, 0u);
@@ -207,7 +207,6 @@ namespace faf::remote
       std::uint32_t slot = 0;
       return !builder.FindSlot(id, slot) || held.keep[slot] == 0u;
     };
-    held.before.reserve(held.candidates.size()); // the changes point into it
     for (const std::uint32_t id : held.candidates) {
       std::uint32_t slot = 0;
       if (!builder.FindSlot(id, slot)) {
@@ -235,8 +234,8 @@ namespace faf::remote
       }
       const std::uint32_t fields = wire::ChangedFields(held.records[slot], next);
       if (fields != 0u) {
-        held.before.push_back(std::move(held.records[slot]));
-        held.changed.push_back({fields, &held.records[slot], &held.before.back()});
+        const wire::SEntityRecord& before = held.before.push_back(std::move(held.records[slot]));
+        held.changed.push_back({fields, &held.records[slot], &before}); // elements stay in place
       }
       held.records[slot] = std::move(next);
     }
