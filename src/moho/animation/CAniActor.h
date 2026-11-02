@@ -20,6 +20,22 @@ namespace LuaPlus
 
 namespace moho
 {
+  class CAniActor;
+
+  /**
+   * Engine addition: without a client (headless, unless `--keep-client-data` is given) the units'
+   * sync blocks and the armies' recon records hold no mesh and pose handles: only a client reads
+   * them. Poses then stay unique and are reused in place (`sim_RecyclePose`).
+   */
+  void POSE_SetKeepClientHandles(bool keep) noexcept;
+  /**
+   * Whether `actor`'s poses are held for a client. Those of 11 bones always are: when they are
+   * freed decides which block the next formation gets (`SimBlockLane`), which the sim can observe.
+   */
+  [[nodiscard]] bool POSE_HoldClientHandles(const CAniActor& actor) noexcept;
+  /** The mesh handles of the recon records, which no sim code reads. */
+  [[nodiscard]] bool POSE_KeepClientHandles() noexcept;
+
   class CAniPose;
   class CAniSkel;
   class IAniManipulator;

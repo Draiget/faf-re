@@ -36,6 +36,7 @@
 #include "platform/X87Precision.h"
 #include "headless/ReplayLaunchCheck.h"
 #include "headless/ReplayRunner.h"
+#include "moho/animation/CAniActor.h"
 
 namespace
 {
@@ -189,7 +190,7 @@ namespace
       "  --view-bench <file>       unfocused: only the server's view work per beat (views with their own ids, every\n"
       "                            lane encoded for every client), timed (CSV: build, send and beat ms, entities,\n"
       "                            bytes; server-mode build; not with the checks above)\n"
-      "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables, files read from archives, what effects draw\n"
+      "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables, files read from archives, what effects draw, the pose handles kept for a client\n"
       "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
@@ -359,6 +360,8 @@ int main(int argc, char** argv)
   moho::WLD_SetSessionKeepsBlueprints(keepClientData);
   moho::CZipFile::SetKeepEntryData(keepClientData);
   moho::EFFECT_SetLifetimeOnly(!keepClientData);
+  // `--bone-stats` reads the poses in the sim's packets.
+  moho::POSE_SetKeepClientHandles(keepClientData || moho::CFG_GetArgOption("--bone-stats", 0, nullptr));
 
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();

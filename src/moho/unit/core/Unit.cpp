@@ -16931,6 +16931,23 @@ void Unit::RefreshSyncBlock(
     NeedSyncGameData = false;
   }
 
+  if (!POSE_HoldClientHandles(*AniActor)) {
+    if (VarDat().mSharedPose.get() != nullptr || VarDat().mPriorSharedPose.get() != nullptr) {
+      boost::shared_ptr<CAniPose> none;
+      boost::shared_ptr<CAniPose> nonePrior;
+      if (releasedPose != nullptr) {
+        releasedPose->swap(VarDat().mSharedPose);
+      } else {
+        VarDat().mSharedPose.swap(none);
+      }
+      if (releasedPriorPose != nullptr) {
+        releasedPriorPose->swap(VarDat().mPriorSharedPose);
+      } else {
+        VarDat().mPriorSharedPose.swap(nonePrior);
+      }
+    }
+    return;
+  }
   if (releasedPose != nullptr) {
     releasedPose->swap(VarDat().mSharedPose);
   }

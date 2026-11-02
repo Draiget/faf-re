@@ -29,6 +29,8 @@ namespace
     &sim_RecyclePose
   );
 
+  bool gKeepClientPoseHandles = true;
+
   constexpr std::uint32_t kWatchBoneEnabledFlag = 0x8000u;
 
   // Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer) -- MSVC's
@@ -616,6 +618,22 @@ namespace moho
   }
 
   AniBoneWriteHook gAniBoneWriteHook = nullptr;
+
+  void POSE_SetKeepClientHandles(const bool keep) noexcept
+  {
+    gKeepClientPoseHandles = keep;
+  }
+
+  bool POSE_KeepClientHandles() noexcept
+  {
+    return gKeepClientPoseHandles;
+  }
+
+  bool POSE_HoldClientHandles(const CAniActor& actor) noexcept
+  {
+    return gKeepClientPoseHandles
+      || (actor.mPose.get() != nullptr && actor.mPose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones);
+  }
 
   bool CAniActor::AllEnabledManipulators(bool (*const test)(const IAniManipulator& manipulator)) const
   {

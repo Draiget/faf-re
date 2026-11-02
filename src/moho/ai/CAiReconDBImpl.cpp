@@ -1029,6 +1029,16 @@ ReconBlip* CAiReconDBImpl::FindOrCreateBlip(const SNewBlip& candidate)
 /**
  * Address: 0x005C1B90 (FUN_005C1B90)
  */
+namespace
+{
+  /// Whether this army's record of the unit holds its poses (`POSE_HoldClientHandles`). One it holds
+  /// from before the unit's skeleton changed is still replaced, as an 11-bone pose must be freed.
+  [[nodiscard]] bool BlipHoldsPoses(const SPerArmyReconInfo& perArmy, const CAniActor& actor) noexcept
+  {
+    return POSE_HoldClientHandles(actor) || perArmy.mPose.get() != nullptr || perArmy.mPriorPose.get() != nullptr;
+  }
+} // namespace
+
 void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
 {
   if (!mArmy || !blip || !sourceUnit || blip->IsFake()) {
@@ -1075,7 +1085,9 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     // keeps its own reference.
     // Engine change (sim_ReconBlipHandleAssign); off, the binary's getter copies are assigned.
     const bool assignFromFields = sim_ReconBlipHandleAssign;
-    if (assignFromFields) {
+    if (!POSE_KeepClientHandles()) {
+      // No client reads it (`POSE_SetKeepClientHandles`).
+    } else if (assignFromFields) {
       perArmy->mMesh = sourceUnit->mVarDat.mScmResource;
     } else {
       perArmy->mMesh = sourceUnit->Entity::GetMesh();
@@ -1083,7 +1095,9 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
 
     // 0x005C1C2F: an animated source unit reseats both pose lanes from its
     // actor; one without an actor drops them instead (0x005C1C95/0x005C1CA0).
-    if (const CAniActor* const actor = sourceUnit->AniActor; actor != nullptr) {
+    if (const CAniActor* const actor = sourceUnit->AniActor; actor != nullptr && !BlipHoldsPoses(*perArmy, *actor)) {
+      // No client reads them (`POSE_SetKeepClientHandles`).
+    } else if (actor != nullptr) {
       if (assignFromFields) {
         perArmy->mPriorPose = actor->mPriorPose;
         perArmy->mPose = actor->mPose;
@@ -1119,7 +1133,7 @@ namespace
   /// True when RefreshBlip's LOS branch would change any of the three handles.
   [[nodiscard]] bool BlipHandlesDiffer(const SPerArmyReconInfo& perArmy, const Unit& sourceUnit) noexcept
   {
-    if (!SameHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource)) {
+    if (POSE_KeepClientHandles() && !SameHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource)) {
       return true;
     }
     if (const CAniActor* const actor = sourceUnit.AniActor; actor != nullptr) {
@@ -1160,7 +1174,9 @@ namespace
   )
   {
     // A replaced mesh is never the one the source holds (that one is the replacement).
-    ExchangeHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource, released.mMesh, false);
+    if (POSE_KeepClientHandles()) {
+      ExchangeHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource, released.mMesh, false);
+    }
 
     const boost::shared_ptr<CAniPose> noPose;
     const CAniActor* const actor = sourceUnit.AniActor;
@@ -1203,7 +1219,8 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
 
     if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u) {
       perArmy->mMeshTypeClassId = sourceUnit->mVarDat.mMeshBlueprint;
-      if (BlipHandlesDiffer(*perArmy, *sourceUnit)) {
+      const CAniActor* const sourceActor = sourceUnit->AniActor;
+      if ((sourceActor == nullptr || BlipHoldsPoses(*perArmy, *sourceActor)) && BlipHandlesDiffer(*perArmy, *sourceUnit)) {
         if (fixups.mCount < SRefreshFixups::kCapacity) {
           ExchangeBlipHandles(*perArmy, *sourceUnit, fixups.mReleased[fixups.mCount++]);
         } else {
