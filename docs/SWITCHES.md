@@ -67,7 +67,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `wld_FrameClockNetwork` | 0 | `/con` | live | Network sessions: 1 applies `wld_FrameClock`, 0 keeps the original median frame time. Off by default, see [Frame clock in network sessions](#frame-clock-in-network-sessions) |
 | `wld_SkewCorrection` | 0 | `/con` | live | 1 feeds `GetSimSpeed` (retail: always 0) the beat on screen's lag behind real time, so the display-clock skew correction runs a session that fell behind up to `wld_SkewRateAdjustMax` fast until it caught up (3% per beat behind), and one ahead as much slower; every player needs it in a network game. In a network game the lag is measured from the moment the last player's ready message left it, which every player times alike, so every screen keeps to one schedule; a player declares itself ready once its first frame of play has been drawn |
 | `wld_SkewRateAdjustMax` | 1.15 | `/con` | live | Cap on that correction, either way (1.1 in the binary, where it never applied) |
-| `wld_SkewMaxLag` | 3.0 | `/con` | live | Most real time, in seconds, the skew correction makes up or gives back |
+| `wld_SkewMaxLag` | 2.0 | `/con` | live | Most real time, in seconds, the skew correction makes up or gives back |
 | `wld_SkewLog` | 0 | `/con` | live | Log the session's drift from real time every this many seconds (`SkewClock:` lines) |
 | `wld_VisionChainHints` | 1 | `/con` | live | Vision-tree chain tails and predecessors from checked hints instead of chain walks |
 | `wld_VisionRepeatInsert` | 1 | `/con` | live | A vision entry identical to the previous one goes where the tree walk would put it, without the walk |
