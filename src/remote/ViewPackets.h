@@ -80,6 +80,8 @@ namespace faf::remote
      * the checks compare the packets with what a lockstep client gets.
      */
     void SetDirectUpdates(const bool direct) noexcept { mDirectUpdates = direct; }
+    /** With direct updates: plain entities and props share `records` (not owned). */
+    void SetSharedRecords(CSharedEntityRecords* const records) noexcept { mSharedRecords = records; }
     /** The last beat's direct updates for `army`, in the change set's id order. */
     [[nodiscard]] const std::vector<SDirectUpdate>& Direct(const std::int32_t army) const { return mDirect[static_cast<std::size_t>(army)]; }
 
@@ -118,6 +120,7 @@ namespace faf::remote
     std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
     std::vector<std::vector<SDirectUpdate>> mDirect;
     bool mDirectUpdates = false;
+    CSharedEntityRecords* mSharedRecords = nullptr;
     bool mParallel = false;
     bool mSkipCivilians = false;
     std::chrono::steady_clock::time_point mBuildStart{};

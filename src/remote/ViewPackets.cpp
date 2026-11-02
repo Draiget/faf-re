@@ -102,6 +102,10 @@ namespace faf::remote
       mHasView[army] = mSkipCivilians && owner != nullptr && owner->IsCivilian() ? 0u : 1u;
     }
 
+    if (mSharedRecords != nullptr) {
+      mSharedRecords->BeginBeat(Entities().size());
+    }
+
     // Each view reads the sim and the change set and writes its own packet and view state only
     // (plan I3), so the views can be built on the sim's workers (plan WP5.7).
     const auto build = [&](const std::size_t army) {
@@ -130,6 +134,9 @@ namespace faf::remote
       for (std::size_t army = 0; army < armyCount; ++army) {
         build(army);
       }
+    }
+    if (mSharedRecords != nullptr) {
+      mSharedRecords->Build(Entities(), mParallel);
     }
     OnViewPackets(sim);
   }
@@ -165,6 +172,12 @@ namespace faf::remote
 
     SViewEntity* const known = view.Find(id);
     SViewEntity& state = known != nullptr ? *known : view.Insert(id, SViewEntity{});
+    // Plan WPR.35: the creation goes with the update, as the record both make is shared.
+    const bool shared = mSharedRecords != nullptr && unit == nullptr && blip == nullptr && CSharedEntityRecords::Shareable(entity);
+    const bool createdNow = !state.created;
+    if (shared) {
+      state.created = true;
+    }
     if (!state.created) {
       if (unit != nullptr || blip != nullptr) {
         // `Unit::CreateInterface` 0x006AC2C0 / `ReconBlip::CreateInterface` 0x005BEE90.
@@ -202,6 +215,12 @@ namespace faf::remote
         }
       }
       SDirectUpdate& direct = mDirect[static_cast<std::size_t>(army)].emplace_back();
+      if (shared) {
+        SSharedUpdate& update = mSharedRecords->Update(static_cast<std::size_t>(&changed - Entities().data()));
+        update.UseMode(visibility.mode);
+        direct.shared = &update;
+        direct.created = createdNow;
+      }
       direct.entity = &entity;
       direct.unit = unit;
       direct.blip = blip;

@@ -1,13 +1,17 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
+#include <bit>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <span>
 #include <vector>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/ChunkedVector.h"
+#include "gpg/core/containers/FlatGenerationMap.h"
 
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "remote/UnderlayPaths.h"
@@ -77,12 +81,93 @@ namespace faf::remote
   /** A frame's unit block, written into a unit update's data. */
   void UnpackUnitFields(const wire::SUnitFields& unit, moho::SSTIUnitVariableData& data) noexcept;
 
+  struct SChangedEntity;
+
+  /**
+   * Plan WPR.35: this beat's records of one changed plain entity or prop, one per visibility mode
+   * a view shows it in. Which modes is written by the views' workers, the records are read by them
+   * once `CSharedEntityRecords::Build` has made them.
+   */
+  struct SSharedUpdate
+  {
+    static constexpr std::size_t kModes = 3;
+
+    /** `EUserEntityVisibilityMode` is one bit per mode. */
+    [[nodiscard]] static std::size_t ModeIndex(const moho::EUserEntityVisibilityMode mode) noexcept
+    {
+      return static_cast<std::size_t>(std::countr_zero(static_cast<std::uint32_t>(mode)));
+    }
+    /** A view shows the entity in `mode`. Only the first view of a mode writes. */
+    void UseMode(const moho::EUserEntityVisibilityMode mode) noexcept
+    {
+      const auto bit = static_cast<std::uint8_t>(mode);
+      if ((modes.load(std::memory_order_relaxed) & bit) == 0u) {
+        modes.fetch_or(bit, std::memory_order_relaxed);
+      }
+    }
+
+    std::atomic<std::uint8_t> modes{0};
+    wire::SEntityRecord* records[kModes]{}; // valid for the modes used
+  };
+
+  /**
+   * Plan WPR.35: the records of plain entities and props, held once for all views. A published
+   * entity gets every change in every view and an unpublished one leaves the view, so a view's
+   * record is a function of the entity and the mode the view showed it in at its last change: the
+   * views need not store it, nor count their references. A record's last change replaces it for
+   * every view in one beat (a view that orphans it copies it), so the old one stays readable for
+   * that beat, as the record before the change, and is reused after it.
+   *
+   * What depends on a client's session tables (a sound, an underlay) stays in the view's own record.
+   */
+  class CSharedEntityRecords
+  {
+  public:
+    CSharedEntityRecords(const wire::SContentTables& tables, const wire::SFrameCodec& codec);
+    ~CSharedEntityRecords();
+
+    /** Whether `entity`'s record can be shared now: it names nothing in a session table. */
+    [[nodiscard]] static bool Shareable(const moho::Entity& entity) noexcept;
+
+    /** A new beat with `changedCount` changed entities; what the last beat replaced is free again. */
+    void BeginBeat(std::size_t changedCount);
+    /** The update of the change set's `index`th entity. */
+    [[nodiscard]] SSharedUpdate& Update(const std::size_t index) noexcept { return mUpdates[index]; }
+    /** Makes the records the views asked for (`UseMode`), on the sim's workers with `parallel`. */
+    void Build(const std::vector<SChangedEntity>& changed, bool parallel);
+
+  private:
+    static constexpr std::uint32_t kNoRecord = 0xFFFFFFFFu;
+
+    /** An entity some view holds. */
+    struct SEntry
+    {
+      const moho::Entity* entity = nullptr;
+      std::uint32_t blueprint = 0;
+      std::uint32_t tickCreated = 0;
+      std::uint32_t records[SSharedUpdate::kModes]{kNoRecord, kNoRecord, kNoRecord};
+    };
+
+    const wire::SContentTables& mTables;
+    wire::SFrameCodec mCodec;
+    CUnderlayPathReader mNoUnderlays;
+    gpg::core::ChunkedVector<wire::SEntityRecord> mRecords;
+    std::vector<std::uint32_t> mFree;
+    std::vector<std::uint32_t> mReplaced; // this beat's old records, free from the next beat on
+    gpg::core::FlatGenerationMap<SEntry> mEntries; // by entity id
+    std::unique_ptr<SSharedUpdate[]> mUpdates;
+    std::size_t mUpdateCapacity = 0;
+    std::size_t mUpdateCount = 0;
+  };
+
   /**
    * Plan WPR.35: one entity's update for one view, as what to read from the sim: the sim is
    * stopped until the views are built, so nothing is copied into a packet first.
    */
   struct SDirectUpdate
   {
+    const SSharedUpdate* shared = nullptr; // a plain entity or prop: its records for all views
+    bool created = false;                  // with `shared`: the view creates it now (`CreateInterface`)
     moho::Entity* entity = nullptr;
     moho::Unit* unit = nullptr;       // the entity as a unit, or
     moho::ReconBlip* blip = nullptr;  // as a blip
@@ -149,7 +234,7 @@ namespace faf::remote
     {
       frame.entities.reserve(mWorldIndex.size());
       for (const SWorldEntry& entry : mWorldIndex) {
-        const wire::SEntityRecord& record = mWorldSlots[entry.slot];
+        const wire::SEntityRecord& record = *mWorldSlots[entry.slot];
         if (keep(record)) {
           frame.entities.push_back(record);
         }
@@ -181,21 +266,22 @@ namespace faf::remote
      */
     void WatchRecord(const std::uint32_t slot)
     {
-      if (mBeforeIndex.size() <= slot) {
-        mBeforeIndex.resize(mWorldSlots.size(), kNotWatched);
+      if (mWatched.size() <= slot) {
+        mWatched.resize(mWorldSlots.size(), 0u);
+        mBeforeRecords.resize(mWorldSlots.size(), nullptr);
       }
-      mBeforeIndex[slot] = kWatched;
+      mWatched[slot] = 1u;
     }
     void UnwatchRecord(const std::uint32_t slot) noexcept
     {
-      if (slot < mBeforeIndex.size()) {
-        mBeforeIndex[slot] = kNotWatched;
+      if (slot < mWatched.size()) {
+        mWatched[slot] = 0u;
       }
     }
     /** What a watched `slot` held before this beat's changes; null if it was not changed. */
     [[nodiscard]] const wire::SEntityRecord* RecordBefore(const std::uint32_t slot) const noexcept
     {
-      return slot < mBeforeIndex.size() && mBeforeIndex[slot] < kWatched ? &mBefore[mBeforeIndex[slot]] : nullptr;
+      return slot < mBeforeRecords.size() ? mBeforeRecords[slot] : nullptr;
     }
     /** Lets go of last beat's saved records; before this beat's changes. */
     void ClearBefore() noexcept;
@@ -219,7 +305,7 @@ namespace faf::remote
       slot = found->slot;
       return true;
     }
-    [[nodiscard]] const wire::SEntityRecord& RecordAt(const std::uint32_t slot) const { return mWorldSlots[slot]; }
+    [[nodiscard]] const wire::SEntityRecord& RecordAt(const std::uint32_t slot) const { return *mWorldSlots[slot]; }
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
     [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorldIndex.size(); }
@@ -258,15 +344,22 @@ namespace faf::remote
         return entry.id < value;
       });
     }
-    static constexpr std::uint32_t kWatched = 0xFFFFFFFEu;
-    static constexpr std::uint32_t kNotWatched = 0xFFFFFFFFu;
+    static constexpr std::uint32_t kNoLocal = 0xFFFFFFFFu;
 
     /** A watched slot's record is about to change. */
     void SaveBefore(std::uint32_t slot);
-    /** `id`'s record, or null. */
+    /** `slot`'s record as this view's own, to change it. */
+    [[nodiscard]] wire::SEntityRecord& LocalRecord(std::uint32_t slot);
+    /** `slot` no longer has a record of this view's own. */
+    void ReleaseLocal(std::uint32_t slot);
+    /** The slot for a new record of `id`, which goes in the index at `found`. */
+    [[nodiscard]] std::uint32_t NewSlot(std::uint32_t id, std::vector<SWorldEntry>::const_iterator found);
+    /** `id`'s record, to change it, or null. */
     [[nodiscard]] wire::SEntityRecord* FindRecord(std::uint32_t id);
     /** Stores `record` under its id, over any record that id has, and returns it in place. */
     wire::SEntityRecord& PutRecord(const wire::SEntityRecord& record);
+    /** A shared update: the view's record is now the one all views share. */
+    void ApplySharedUpdate(const SDirectUpdate& update);
     void EraseRecord(std::uint32_t id);
 
     const wire::SContentTables& mTables;
@@ -275,14 +368,18 @@ namespace faf::remote
     // The world in ascending id order, as frames list it. Plan WPR.35: one flat index over stable
     // slots, so each beat's thousands of lookups and the frame's walk stay within a few arrays.
     std::vector<SWorldEntry> mWorldIndex;
-    gpg::core::ChunkedVector<wire::SEntityRecord> mWorldSlots;
+    gpg::core::ChunkedVector<const wire::SEntityRecord*> mWorldSlots; // a shared record or a local one
     std::vector<std::uint32_t> mFreeSlots;
+    gpg::core::ChunkedVector<wire::SEntityRecord> mLocalRecords;      // this view's own records
+    std::vector<std::uint32_t> mLocalSlots;                           // per slot: index into them, or `kNoLocal`
+    std::vector<std::uint32_t> mFreeLocal;
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;
     std::vector<SErasedRecord> mErasedRecords;
-    std::vector<std::uint32_t> mBeforeIndex;  // per slot: index into `mBefore`, or the two above
-    std::vector<std::uint32_t> mBeforeSlots;  // the slots with a record in `mBefore`
-    gpg::core::ChunkedVector<wire::SEntityRecord> mBefore;
+    std::vector<std::uint8_t> mWatched;                  // per slot
+    std::vector<const wire::SEntityRecord*> mBeforeRecords; // per slot: before this beat's changes, or null
+    std::vector<std::uint32_t> mBeforeSlots;             // the slots with one
+    gpg::core::ChunkedVector<wire::SEntityRecord> mBefore; // the local ones among them, which change in place
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`

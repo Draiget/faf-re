@@ -68,6 +68,7 @@ namespace faf::remote
       mHeldOn = true;
       mHeldCheck = check;
       SetDirectUpdates(true);
+      SetSharedRecords(&mSharedRecords);
     }
     [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
@@ -126,6 +127,7 @@ namespace faf::remote
     wire::SFrameCodec mCodec;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
+    CSharedEntityRecords mSharedRecords;
     bool mHeldOn = false;
     bool mHeldCheck = false;
     std::vector<wire::SViewFrame> mFrames;

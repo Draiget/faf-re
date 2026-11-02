@@ -21,6 +21,7 @@ namespace faf::remote
   CViewFrames::CViewFrames(const wire::SContentTables& tables, const wire::SFrameCodec& codec)
     : mTables(tables)
     , mCodec(codec)
+    , mSharedRecords(tables, codec)
   {}
 
   CViewFrames::~CViewFrames() = default;
