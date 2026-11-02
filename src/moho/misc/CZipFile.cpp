@@ -476,6 +476,16 @@ namespace moho
     );
   }
 
+  namespace
+  {
+    bool gKeepEntryData = true;
+  } // namespace
+
+  void CZipFile::SetKeepEntryData(const bool keep) noexcept
+  {
+    gKeepEntryData = keep;
+  }
+
   /**
    * Address: 0x0046CB80 (FUN_0046CB80, Moho::CZipFile::ReadEntry)
    *
@@ -518,6 +528,9 @@ namespace moho
         (void)zipStream->Read(uncompressedBytes.data(), static_cast<std::size_t>(entry.mUncompressedSize));
       }
 
+      if (!gKeepEntryData) {
+        return MakeConstMemBuffer(uncompressedBytes.mData, static_cast<std::size_t>(entry.mUncompressedSize));
+      }
       cachedEntry.mData = uncompressedBytes.mData;
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }
@@ -572,6 +585,9 @@ namespace moho
       }
 
       (void)inflateEnd(&inflateState);
+      if (!gKeepEntryData) {
+        return MakeConstMemBuffer(uncompressedBytes.mData, static_cast<std::size_t>(entry.mUncompressedSize));
+      }
       cachedEntry.mData = uncompressedBytes.mData;
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }

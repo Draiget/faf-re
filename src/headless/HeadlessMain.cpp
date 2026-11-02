@@ -27,6 +27,7 @@
 #include "moho/core/ThreadPlacement.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
+#include "moho/misc/CZipFile.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/RScmResource.h"
@@ -187,7 +188,7 @@ namespace
       "  --view-bench <file>       unfocused: only the server's view work per beat (views with their own ids, every\n"
       "                            lane encoded for every client), timed (CSV: build, send and beat ms, entities,\n"
       "                            bytes; server-mode build; not with the checks above)\n"
-      "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables\n"
+      "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables, files read from archives\n"
       "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
@@ -355,6 +356,7 @@ int main(int argc, char** argv)
   const bool keepClientData = moho::CFG_GetArgOption("--keep-client-data", 0, nullptr);
   moho::RScmResource::SetKeepGeometry(keepClientData);
   moho::WLD_SetSessionKeepsBlueprints(keepClientData);
+  moho::CZipFile::SetKeepEntryData(keepClientData);
 
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();
