@@ -3235,7 +3235,8 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
  *
  * What it does:
  * Runs world-space placement validation, then rejects placements that overlap
- * visible static/dead unit skirts or queued mobile-build command skirts.
+ * visible static or still-being-built unit skirts or queued mobile-build
+ * command skirts.
  */
 bool moho::USERUNIT_CanBeBuiltAt(
   CWldSession& session,
@@ -3288,7 +3289,9 @@ bool moho::USERUNIT_CanBeBuiltAt(
 
     const IUnit* const iunitBridge = GetIUnitBridge(nearbyUnit);
     const RUnitBlueprint* const nearbyBlueprint = iunitBridge->GetBlueprint();
-    if (!nearbyBlueprint->IsMobile() || iunitBridge->IsDead()) {
+    // 0x008C1880: the binary tests `IsBeingBuilt()` here, not `IsDead()`, so a
+    // mobile unit still under construction blocks with its blueprint skirt.
+    if (!nearbyBlueprint->IsMobile() || nearbyUnit->IsBeingBuilt()) {
       gpg::Rect2f nearbySkirt{};
       if (nearbyUnit->GetSkirt(&nearbySkirt)->Overlaps(candidateSkirt)) {
         return false;
