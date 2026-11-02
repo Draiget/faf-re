@@ -6,8 +6,8 @@ Sources, read for this document:
 
 | Source | Version |
 |---|---|
-| downlords-faf-client `IceAdapterImpl`, `IceAdapterApi`, `IceAdapterCallbacks`, `IceServerMapper` | `develop` at 5da818ba1a; the installed client is 2026.4.1 |
-| java-ice-adapter `IceAdapter`, `RPCHandler`, `RPCService`, `GPGNetServer`, `GameSession`, `PeerIceModule`, `PeerConnectivityCheckerModule`, `CandidatesMessage`, `CandidatePacket` | `master` at d49f9fe992 = release 3.3.14 (2025-08-11) |
+| downlords-faf-client `IceAdapterImpl`, `IceAdapterApi`, `IceAdapterCallbacks`, `IceServerMapper` | `develop` at 5da818ba1a, launch options at 66e624f119; the installed client is 2026.4.1 |
+| java-ice-adapter `IceAdapter`, `RPCHandler`, `RPCService`, `GPGNetServer`, `GameSession`, `PeerIceModule`, `PeerConnectivityCheckerModule`, `CandidatesMessage`, `CandidatePacket` | `master` at d49f9fe992 = release 3.3.14 (2025-08-11); the changes in 3.3.15 (tag at d81b88c, 2026-11-01) are in [section 9](#9-adapter-3315) |
 | the shipped `natives/faf-ice-adapter.jar` (sha256 `5d1348f57d29e51c…`), read with `javap` and small probes | classes dated 2025-08-11, bundles jackson-databind 2.13.4.2, ice4j 3.0-66-g1c60acc, JJsonRpc (faforever fork) |
 | FAForever/server `server/gameconnection.py` | `develop` at fa1ddac865 |
 
@@ -18,7 +18,7 @@ A full trace of two shipped adapters through `tools/fafclient` is in [launcher-a
 The client picks two free TCP ports (`new ServerSocket(0)`, closed again before the launch): the RPC port and the GPGNet port. It then starts:
 
 ```
-<client>/jre/bin/java.exe [-Dorg.ice4j.ipv6.DISABLED=true]
+<client>/jre/bin/java.exe [-XX:+UseZGC -Xms128m -Xmx512m] [-Dorg.ice4j.ipv6.DISABLED=true]
   -cp <nativeDir>/faf-ice-adapter.jar;<every client class path entry whose name contains "javafx-">
   com.faforever.iceadapter.IceAdapter
   --id <player id> --game-id <game id> --login <login>
@@ -27,6 +27,7 @@ The client picks two free TCP ports (`new ServerSocket(0)`, closed again before 
   [--force-relay] [--debug-window --info-window]
 ```
 
+- `-XX:+UseZGC -Xms128m -Xmx512m` come first in client `develop` since 66e624f119. The installed 2026.4.1 doesn't pass them. A replacement started by the jar never sees them, as they go to the JVM.
 - `-Dorg.ice4j.ipv6.DISABLED=true` is added unless the player allowed IPv6.
 - `nativeDir` comes from the system property `nativeDir` (default `lib`); the installed client sets `-DnativeDir=natives` in `faf-client.vmoptions`. It is resolved to an absolute path and is also the working directory.
 - Environment: `LOG_DIR=<client log dir>/iceAdapterLogs` is added.
@@ -69,13 +70,13 @@ JSON-RPC 2.0 with positional params. Client → adapter calls always carry an `i
 
 ### Methods (client → adapter)
 
-| Method | Params | Adapter behaviour (3.3.14) |
+| Method | Params | Adapter behaviour (3.3.14, with 3.3.15's differences) |
 |---|---|---|
 | `quit` | — | stop everything, exit 0 after about 500 ms |
 | `hostGame` | `mapName` string | new game session; GPGNet `HostGame mapName` to the game |
 | `joinGame` | `remoteLogin` string, `remoteId` int | new game session; link to the host as answerer; GPGNet `JoinGame "127.0.0.1:<port>" login id` |
 | `connectToPeer` | `remoteLogin` string, `remoteId` int, `offer` bool | link to the peer (offerer when `offer`); GPGNet `ConnectToPeer "127.0.0.1:<port>" login id`; ignored when the game is `Launching` or `Ended` |
-| `disconnectFromPeer` | `remoteId` int | close the link; GPGNet `DisconnectFromPeer id` |
+| `disconnectFromPeer` | `remoteId` int | close the link; GPGNet `DisconnectFromPeer id`; since 3.3.15 also `onConnected` false if the peer was connected |
 | `setLobbyInitMode` | `"normal"` or `"auto"` | value of the first `CreateLobby` argument (0 / 1) |
 | `iceMsg` | `remoteId` int, `msg` string | `msg` is the JSON text of a `CandidatesMessage` from that peer (§5) |
 | `sendToGpgNet` | `header` string, `chunks` list | GPGNet message to the game, sent once the game reached `Lobby` |
@@ -147,12 +148,12 @@ Restart rules (`PeerIceModule`): gathering times out after 5 s; 6 s without remo
 
 ```
 fafclient -players 2 -native-dir <folder with faf-ice-adapter.jar> [-exe <native adapter>[,jar,...]]
-          [-force-relay] [-game-cmd "<game> /gpgnet {gpgnet} ..."] [-game-bind 127.0.0.1] [-trace t.jsonl]
+          [-force-relay] [-game-cmd "<game> /gpgnet {gpgnet} ..."] [-game-bind 127.0.0.1] [-trace t.jsonl] [-disconnect]
 ```
 
 With the default `-game fake` every player's game is `tools/fakegame`, which pings each peer over the adapters 10 times a second. The run passes when every game reached `Launching` and no ping was lost during `-hold`. On the isolated test account inbound UDP to sockets bound to 0.0.0.0 is dropped, hence `-game-bind 127.0.0.1`, and a TURN server on 127.0.0.1 got no allocations from the Java adapter, hence the default `-turn-ip` of the first private IPv4 address.
 
-Results on 2026-10-31 with two shipped adapters: direct 138 pings each way, none lost, mean RTT 0.4 ms; `--force-relay` 131 each way, none lost, only relay candidates exchanged.
+Results on 2026-10-31 with two shipped adapters: direct 138 pings each way, none lost, mean RTT 0.4 ms; `--force-relay` 131 each way, none lost, only relay candidates exchanged. `-disconnect` sends `disconnectFromPeer` after the hold, so the trace shows what an adapter reports when a peer closes.
 
 ## 8. Links in the game (ours, issue #233)
 
@@ -174,3 +175,33 @@ Not part of FAF's contract: an extension between our game and `faf-netbridge` th
 - The links are the same as the bridge's (§6, `src/netlink`), so the remote side may be a Java adapter, a bridge, or another game linking itself.
 - A game that never says hello (retail, or ours with `net_InEngineLinks 0`) gets none of these, and the bridge relays its datagrams as in §3.
 - The bridge must see `NetlinkHello` before the client's `joinGame` / `connectToPeer`; the lobby server sends those only after the game reports `GameState Lobby`, which follows `Idle`.
+
+## 9. Adapter 3.3.15
+
+Read from the diff against 3.3.14. No file of the wire protocol or the RPC changed: `CandidatesMessage`, `CandidatePacket`, `PeerConnectivityCheckerModule`, `RPCHandler`, `RPCService` and `GameSession` are the same, and game data still goes as `'d'` + datagram. Its GitHub release has no jars and client `develop` still pins 3.3.14 (`iceAdapterVersion`), so players don't have it yet. To test it, build the tag with Java 25: `gradlew -Pversion=3.3.15 -PjavafxPlatform=win :ice-adapter:shadowJar`.
+
+| Change in 3.3.15 | What it means for a replacement |
+|---|---|
+| `disconnectFromPeer` reports `onConnected` false for a connected peer | `faf-netbridge` does the same |
+| 2 MB receive and send buffers on the game's loopback socket and on ICE sockets | `faf-netbridge` sets them on the game's socket; libjuice has its own 1 MB on ICE sockets |
+| Relayed candidates are no longer paired with private, link-local or loopback remote candidates, and a failed `CreatePermission` is retried at most 5 times with backoff | Nothing to match. On a LAN test relay every relayed address is private, so this applies to tests. |
+| ice4j agents are freed without the deadlock on relayed candidates | Inside ice4j only |
+| Java 25 class files | Runs on the client's bundled runtime, which is already Java 25 in 2026.4.1 |
+
+Results on 2026-11-02 and 2026-11-03 through `tools/fafclient` with fake games, 2 runs each, with `faf-netbridge` built from this change. The relay was outside the LAN (163 ms ping from the players' machine) and every player selected relay on both ends of its pair. Pings are the fake games' answered pings per player. The relay runs had 0 lost pings except one in one `bridge + 3.3.14` run:
+
+| Players | Direct | `--force-relay` | Relay round trip |
+|---|---|---|---|
+| bridge + 3.3.14 | 147-148, 0 lost | 140-164, 1 lost in one run | 551-723 ms |
+| bridge + 3.3.15 | 147-149, 0 lost | 148-165, 0 lost | 551-637 ms |
+| 3.3.15 + bridge | 131-154, 0 lost | 140-143, 0 lost | 547-550 ms |
+| bridge + bridge | 135-137, 0 lost | 133-137, 0 lost | 546-556 ms |
+| 3.3.15 + 3.3.15 | 133-135, 0 lost | 146-151, 0 lost (see below) | 556-562 ms |
+| 3.3.14 + 3.3.14 | 135-149, 0 lost | 144-149, 0 lost (see below) | 547-552 ms |
+
+The launch shim with `faf-netbridge` also passed direct with the new JVM options on the Java 25 runtime, twice: 135-136 pings, 0 lost.
+
+Two traps when testing with a relay:
+
+- A relay on the players' own address doesn't prove relaying. TURN permissions go by IP, so the players' host sockets get through it, and even with `--force-relay` the selected pairs came out `host`. Use `fafclient -turn-server host:port -turn-user U -turn-pass P` with a relay on another machine.
+- A jar opens a socket and a relay allocation per network interface. On a test machine with 10 interfaces, two 3.3.14 or 3.3.15 jars failed all 16 attempts in 240 s: the first attempt timed out on 101 host-to-relay pairs and never reached a relay-to-relay pair. The two jar rows above ran with `JAVA_TOOL_OPTIONS=-Dorg.ice4j.ice.harvest.ALLOWED_ADDRESSES=<address>` and connected on the first attempt. `faf-netbridge` has one socket per link, so it isn't affected.

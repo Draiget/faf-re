@@ -158,6 +158,12 @@ namespace faf::netbridge
     return s;
   }
 
+  inline void SetSocketBuffers(const SocketHandle s, const int bytes)
+  {
+    setsockopt(s, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&bytes), sizeof(bytes));
+    setsockopt(s, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&bytes), sizeof(bytes));
+  }
+
   inline bool SendAll(const SocketHandle s, const char* data, std::size_t size)
   {
     while (size > 0) {
