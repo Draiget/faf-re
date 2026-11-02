@@ -577,7 +577,11 @@ namespace moho
       return true;
     }
 
-    if (assistTargetUnit->IsUnitState(UNITSTATE_Repairing) || assistTargetUnit->IsUnitState(UNITSTATE_Building)) {
+    // 0x0061DEFF: a focus that is not a unit jumps straight to the Building test
+    // at 0x0061DF5E, past the Repairing test, so a host reclaiming a wreck while
+    // its Repairing bit is still set sends its pods to the reclaim below.
+    if ((focusUnit != nullptr && assistTargetUnit->IsUnitState(UNITSTATE_Repairing)) ||
+        assistTargetUnit->IsUnitState(UNITSTATE_Building)) {
       Kill();
       DispatchRepairTask(this, focusUnit, false);
       return true;
