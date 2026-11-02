@@ -24,6 +24,13 @@ namespace gpg::gal
 namespace gpg::gal::effects
 {
   /**
+   * `ren_EffectSourceCache` (registered in moho/render/GpuPathSettings.cpp): false translates every
+   * effect when it is created, one after another, as the original does. `/noeffectcache` turns it
+   * off at startup, before the device creates its effects.
+   */
+  extern bool gEffectSourceCache;
+
+  /**
    * The effect's source preprocessed with its macros, then translated as by
    * d3d11::TranslateEffectSource(source, true, {}): from a translation PrepareEffectSources left
    * waiting, else the cache, else the translator, whose result is then cached. A preprocessor

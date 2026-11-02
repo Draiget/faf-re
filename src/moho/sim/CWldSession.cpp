@@ -14762,8 +14762,19 @@ namespace moho
       return directory.empty() ? std::string() : directory + "first-frame-reads.txt";
     }
 
+    bool res_FirstFrameWarmup = true;
+    TConVar<bool> gTConVar_res_FirstFrameWarmup(
+      "res_FirstFrameWarmup",
+      "Note the game archive entries read while a session's first frame is built and drawn, and read them ahead "
+      "during the next session's loading wait (1, the default), or neither (0). Read when a session loads.",
+      &res_FirstFrameWarmup
+    );
+
     void StartFirstFrameWarmup()
     {
+      if (!res_FirstFrameWarmup) {
+        return;
+      }
       if (FirstFrameWarmup().joinable()) {
         FirstFrameWarmup().join();
       }
@@ -14858,7 +14869,9 @@ namespace moho
       }
 
       // Engine addition: the archive reads of this first frame, for the next session's warm-up.
-      FILE_BeginReadRecording();
+      if (res_FirstFrameWarmup) {
+        FILE_BeginReadRecording();
+      }
 
       CWldSession* const session = gActiveWldSession;
       if (session != nullptr && session->mState != nullptr) {

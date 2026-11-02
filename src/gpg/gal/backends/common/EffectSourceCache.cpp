@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <cwchar>
 #include <map>
 #include <mutex>
 #include <string>
@@ -26,6 +27,15 @@ namespace gpg::gal::effects
     constexpr const char* kTranslationCacheVersion = "faf translated effect 1";
 
     std::atomic<EffectSourceBuilder> gBuilder{nullptr};
+
+    [[nodiscard]] bool CacheEnabled()
+    {
+      static const bool startupOff = [] {
+        const wchar_t* const commandLine = ::GetCommandLineW();
+        return commandLine != nullptr && std::wcsstr(commandLine, L"/noeffectcache") != nullptr;
+      }();
+      return gEffectSourceCache && !startupOff;
+    }
 
     // Translations PrepareEffectSources made, until CreateEffect takes them.
     std::mutex gWaitingLock;
@@ -84,6 +94,8 @@ namespace gpg::gal::effects
     }
   } // namespace
 
+  bool gEffectSourceCache = true;
+
   d3d11::TranslatedEffectSource TranslateEffect(const EffectContext& context, const char* const errorFile)
   {
     std::vector<D3D_SHADER_MACRO> defines;
@@ -101,6 +113,11 @@ namespace gpg::gal::effects
       backend::ThrowError(errorFile, __LINE__, message.c_str());
     }
     const std::string_view source(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U);
+    if (!CacheEnabled()) {
+      // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
+      // and running the translator's copy as well would test twice.
+      return d3d11::TranslateEffectSource(source, true, std::string_view{});
+    }
 
     Fnv1a64 hash;
     hash.Add(kTranslationCacheVersion);
@@ -139,7 +156,7 @@ namespace gpg::gal::effects
   void PrepareEffectSources(const std::vector<EffectContext>& contexts)
   {
     const EffectSourceBuilder builder = gBuilder.load();
-    if (builder == nullptr || contexts.empty()) {
+    if (builder == nullptr || contexts.empty() || !CacheEnabled()) {
       return;
     }
     {

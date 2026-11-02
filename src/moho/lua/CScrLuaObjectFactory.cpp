@@ -14,6 +14,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/exceptions/StdExcept.h"
 #include "lua/LuaTableIterator.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 
 // The Lua core's own table and string primitives (defined in lua/LuaObject.cpp), for SCR_Copy's
@@ -103,10 +104,27 @@ namespace
    * CRT calls round correctly and 14 digits are far finer than a float's spacing, so it returns
    * the same float for every value but a NaN, which keeps the text path.
    */
+  bool sim_BlueprintFieldShortcuts = true;
+  moho::TConVar<bool> gTConVar_sim_BlueprintFieldShortcuts(
+    "sim_BlueprintFieldShortcuts",
+    "Blueprint fields: a number goes straight into a float field, and a plain value is set without the field's "
+    "log context (1, the default), or every value goes through its text with the context built first (0). Same "
+    "values and warnings either way.",
+    &sim_BlueprintFieldShortcuts
+  );
+
+  bool sim_BlueprintCopyDirect = true;
+  moho::TConVar<bool> gTConVar_sim_BlueprintCopyDirect(
+    "sim_BlueprintCopyDirect",
+    "Copy the rules' blueprint tables into a session or sim Lua state by walking them directly (1, the default), or "
+    "through a LuaObject per key and value (0). Same tables, laid out alike, either way.",
+    &sim_BlueprintCopyDirect
+  );
+
   [[nodiscard]] bool TrySetFloatDirectly(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
   {
     static const gpg::RType* const floatType = gpg::LookupRType(typeid(float));
-    if (value.m_object.tt != LUA_TNUMBER || destination.mType != floatType || std::isnan(value.m_object.value.n)) {
+    if (!sim_BlueprintFieldShortcuts || value.m_object.tt != LUA_TNUMBER || destination.mType != floatType || std::isnan(value.m_object.value.n)) {
       return false;
     }
     *static_cast<float*>(destination.mObj) = value.m_object.value.n;
@@ -848,9 +866,10 @@ namespace moho
 
       case LUA_TTABLE: {
         out.AssignNewTable(state, 0, 0);
-        // Engine addition: across universes - the rules' blueprints into a session or sim state -
-        // the entries are copied directly (CopyTableEntries), which builds the same tables.
-        if (source.m_state != state->m_rootState) {
+        // Engine addition (sim_BlueprintCopyDirect): across universes - the rules' blueprints into a
+        // session or sim state - the entries are copied directly (CopyTableEntries), which builds
+        // the same tables.
+        if (sim_BlueprintCopyDirect && source.m_state != state->m_rootState) {
           CopyTableEntries(
             out.GetActiveCState(), static_cast<const Table*>(source.m_object.value.p), out.m_object, source.m_state, state
           );
@@ -1409,7 +1428,7 @@ namespace moho
           // Engine addition: a plain value is set without the field's log context, whose
           // formatted text cost a third of blueprint loading; one that fails is converted again
           // inside the context, so its warning reads as before.
-          if (fieldValue.IsTable() || !TrySetPlainValue(fieldValue, fieldDestination)) {
+          if (!sim_BlueprintFieldShortcuts || fieldValue.IsTable() || !TrySetPlainValue(fieldValue, fieldDestination)) {
             const msvc8::string fieldContext = gpg::STR_Printf(
               "Initializing field %s of %s at %p",
               keyName.c_str(),

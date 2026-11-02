@@ -458,6 +458,17 @@ namespace
   }
 } // namespace
 
+namespace moho
+{
+  bool sim_RulesTraceOnDemand = true;
+  TConVar<bool> gTConVar_sim_RulesTraceOnDemand(
+    "sim_RulesTraceOnDemand",
+    "Write the rules checksum's text trace only for a desync recorder that keeps text or a /synclog file (1, the "
+    "default), or always build it as the original does (0). Same checksum either way.",
+    &sim_RulesTraceOnDemand
+  );
+} // namespace moho
+
 /**
  * Address: 0x004A4920 (FUN_004A4920)
  * Mangled: ?REF_UpdateMD5@Moho@@YAXAAVMD5Context@gpg@@ABVRRef@3@PAU_iobuf@@H@Z
@@ -482,10 +493,11 @@ void moho::REF_UpdateMD5(
     || refType == GetSignedCharRType() || refType == GetUnsignedCharRType() || refType == GetFloatRType()
     || refType == GetBoolRType() || refType->IsEnumType() != nullptr;
 
-  // Engine addition: the value's text is only built for a trace; formatting every float of every
-  // blueprint for nothing was most of the rules checksum.
+  // Engine addition (sim_RulesTraceOnDemand): the value's text is only built for a trace; formatting
+  // every float of every blueprint for nothing was most of the rules checksum.
+  const bool wantText = traceFile != nullptr || !sim_RulesTraceOnDemand;
   if (isPrimitiveLike) {
-    if (traceFile != nullptr) {
+    if (wantText) {
       PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
     }
     md5.Update(ref.mObj, static_cast<std::size_t>(refType->size_));
@@ -493,7 +505,7 @@ void moho::REF_UpdateMD5(
   }
 
   if (refType == GetStringRType()) {
-    if (traceFile != nullptr) {
+    if (wantText) {
       PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
     }
     const auto& stringValue = *static_cast<const msvc8::string*>(ref.mObj);
@@ -5881,6 +5893,14 @@ void Sim::Printf(const char* fmt, ...)
 
 namespace
 {
+  bool sim_PrepareLuaStateEarly = true;
+  moho::TConVar<bool> gTConVar_sim_PrepareLuaStateEarly(
+    "sim_PrepareLuaStateEarly",
+    "Build the sim's Lua state (bindings and the rules' blueprints) on a helper thread while the session loads, for "
+    "the sim to take (1, the default), or build it when the sim is created (0). Read when a session load reaches it.",
+    &sim_PrepareLuaStateEarly
+  );
+
   /**
    * Engine addition: the part of `Sim::Sim` that builds its Lua state from the rules alone - a
    * fresh state, the core and sim init sets, then the rules' blueprints - either on the sim
@@ -5952,7 +5972,7 @@ namespace
 
 void moho::SIM_PrepareLuaState(RRuleGameRules* const rules)
 {
-  if (rules == nullptr) {
+  if (rules == nullptr || !sim_PrepareLuaStateEarly) {
     return;
   }
 
@@ -6133,7 +6153,8 @@ Sim::Sim(LaunchInfoBase* const info)
   }
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
-  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this); recorder != nullptr && recorder->IsRecording()) {
+  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this);
+      recorder != nullptr && (recorder->IsRecording() || !sim_RulesTraceOnDemand)) {
     // Engine addition (issue #216): REF_UpdateMD5 traces into a FILE*, so the recorder takes the
     // rules trace through a temporary file the CRT deletes when it is closed; the /synclog file,
     // when there is one, gets the same text. A recorder keeping checksums only would drop the

@@ -20,6 +20,7 @@
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/console/CConCommand.h"
 
 namespace moho
 {
@@ -1749,6 +1750,13 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
  */
 namespace
 {
+  moho::TConVar<bool> gTConVar_res_LowerInPlace(
+    "res_LowerInPlace",
+    "Lowercase and canonize file names by copying them once and editing in place (1, the default), or a character "
+    "at a time as the original does (0). Same names either way.",
+    &gpg::str_LowerInPlace
+  );
+
   // Engine addition: FILE_BeginReadRecording's state - whether it records and what was read.
   std::mutex gReadRecordingLock;
   std::atomic<bool> gReadRecording{false};

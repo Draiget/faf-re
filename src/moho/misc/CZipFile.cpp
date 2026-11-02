@@ -16,6 +16,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/console/CConCommand.h"
 
 namespace
 {
@@ -211,6 +212,14 @@ namespace
   };
   thread_local SOpenArchive tOpenArchive;
 
+  bool res_ArchiveKeepOpen = true;
+  moho::TConVar<bool> gTConVar_res_ArchiveKeepOpen(
+    "res_ArchiveKeepOpen",
+    "During a session load, keep each game archive open between the entries read from it (1, the default), or open "
+    "and close it for every entry as the original does (0). Read at each entry.",
+    &res_ArchiveKeepOpen
+  );
+
   // Engine addition: the lock ReadEntry holds for one entry, one of a fixed set chosen by the
   // entry's address (the archive object keeps the binary's layout, with no room for one per entry).
   [[nodiscard]] std::mutex& EntryLock(const void* const entry)
@@ -225,7 +234,7 @@ namespace
     const void* const zip, const msvc8::string& zipPath, std::unique_ptr<gpg::Stream>& ownedStream
   )
   {
-    if (tOpenArchive.batchDepth == 0) {
+    if (tOpenArchive.batchDepth == 0 || !res_ArchiveKeepOpen) {
       ownedStream = OpenZipBackingStream(zipPath);
       return ownedStream.get();
     }
