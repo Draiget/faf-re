@@ -1346,7 +1346,8 @@ namespace moho
           (void)Wm3::Vector3f::Normalize(&toTarget);
 
           float rollRadians = blueprint->AI.AttackAngle * 0.017453292f;
-          if (((toTarget.z * forwardX) - (forwardZ * toTarget.x)) <= 0.0f) {
+          // 0x005F3CFD `comiss` + `jbe`: NaN takes the negative roll.
+          if (!(((toTarget.z * forwardX) - (forwardZ * toTarget.x)) > 0.0f)) {
             rollRadians = -rollRadians;
           }
 
