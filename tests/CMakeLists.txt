@@ -94,3 +94,5 @@ target_link_libraries(faf_terrain_check PRIVATE faf_engine)
 set(FAF_MATH_DUMP_ENGINE faf_engine)
 include("${CMAKE_SOURCE_DIR}/tools/difffuzz/dump.cmake")
 add_subdirectory(remote)
+
+add_subdirectory(memory)
