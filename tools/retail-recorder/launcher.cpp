@@ -83,7 +83,13 @@ int wmain(int argc, wchar_t** argv)
     std::fprintf(stderr, "recorder: CreateProcess failed (%lu)\n", GetLastError());
     return 3;
   }
+  // A console program (our headless) has no window to wait for: this returns
+  // at once, and the delay lets its own startup finish.
   WaitForInputIdle(pi.hProcess, 60000);
+  wchar_t delay[16] = {};
+  if (GetEnvironmentVariableW(L"RETAIL_RECORDER_INJECT_DELAY_MS", delay, 16) != 0) {
+    Sleep(static_cast<DWORD>(_wtoi(delay)));
+  }
 
   void* remote = VirtualAllocEx(pi.hProcess, nullptr, MAX_PATH, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
   WriteProcessMemory(pi.hProcess, remote, dllA, std::strlen(dllA) + 1, nullptr);
