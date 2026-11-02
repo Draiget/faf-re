@@ -63,6 +63,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ui_IdleGC` | 1 | `/con` | live | Move periodic UI Lua GC execution to post-present idle/slack window after device refresh; 0 runs synchronously during UpdateFrameRate (retail) |
 | `wld_ParallelSync` | 1 | `/con` | live | Beat sync apply: pose and data copies on user workers |
 | `wld_FrameClock` | 1 | `/con` | live | Replays and single player: game clock from the mean frame time (0: the original median, 2: each frame's own time) |
+| `wld_FrameClockNetwork` | 0 | `/con` | live | Network sessions: 1 applies `wld_FrameClock`, 0 keeps the original median frame time. Off by default, see [Frame clock in network sessions](#frame-clock-in-network-sessions) |
 | `wld_VisionChainHints` | 1 | `/con` | live | Vision-tree chain tails and predecessors from checked hints instead of chain walks |
 | `wld_VisionRepeatInsert` | 1 | `/con` | live | A vision entry identical to the previous one goes where the tree walk would put it, without the walk |
 | `ren_ParticleKeyShortcut` | 1 | `/con` | live | Particles reuse the cached render bucket when their key would match, without building the key |
@@ -94,6 +95,34 @@ Every performance change has a switch that brings back the original path, and bo
 | `sys_ThreadPlacement` | 0 | `/threadplacement N` | next thread start | Thread placement on cores (0 leaves it to Windows) |
 | XACT process clock | on | `/realtickcount` turns it off | startup only | XACT 2.9 times itself from process start instead of Windows boot, so sound keeps working after 24.8 days of uptime without UptimeFaker; the log says `SND: xactengine2_9.dll clock imports patched` (`FAF_TEST_TICK_OFFSET_DAYS=N` in the environment fakes N more days of uptime, for testing) |
 
+
+## Frame clock in network sessions
+
+`wld_FrameClockNetwork` is off by default because a session with a retail client gets no reliable gain from it, and our client gets choppier.
+
+The game clock decides when the UI takes finished ticks off the sim's queue. In a network session this also sets when the client tells the others to advance, and a tick only runs once every client has done so. Retail's clock is the median of the last 10 frame times. When one frame per tick is long and the rest are short, the median is a short frame and the game runs below its set speed, even though the sim keeps up. The mean adds up to real time, but it can't make a retail client on the median go faster.
+
+Measured on 2026-11-02 with `mpemu`: 2 players on one machine, normal game speed, a 1000 v 1000 air fight on a test map. "Median" is today's behaviour, "mean" is `wld_FrameClockNetwork 1`. In the retail rows, retail stays on the median and only our client changes.
+
+Ticks per second over game ticks 300-900, where 10 is normal speed:
+
+| Players | Network | Games per clock | Median | Mean |
+|---|---|---|---|---|
+| Ours + ours | No lag | 3 | 9.19 | 9.98 |
+| Ours + ours | 50 ms latency, 10 ms jitter, 1% loss | 2 | 9.28 | 9.99 |
+| Retail + ours | No lag | 3 | 8.28 | 8.58 |
+| Retail + ours | 50 ms latency, 10 ms jitter, 1% loss | 2 | 8.62 | 8.41 |
+
+Smoothness on our clients over the first 300 s of the lag games:
+
+| Players | Measure | Median | Mean |
+|---|---|---|---|
+| Ours + ours | Frames with no tick ready | 2.0% | 1.2% |
+| Ours + ours | Spread of the time between shown ticks | 22 ms | 16 ms |
+| Retail + ours | Frames with no tick ready | 11.9% | 21.5% |
+| Retail + ours | Spread of the time between shown ticks | 33 ms | 41 ms |
+
+None of the 24 games played desynced or crashed. Four no-lag retail games aren't in the tables: retail stalled in them, on both clocks, for a reason not found. The tests didn't cover separate machines, more than 2 players or our x86 build, and the choppiness wasn't judged on screen. The mean clock doesn't change what the sim computes, and in these games it didn't take a game above its set speed.
 
 ## FAF game version
 
