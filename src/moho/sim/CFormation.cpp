@@ -262,7 +262,8 @@ namespace moho
       const float dx = mFinish.x - mStart.x;
       const float dy = mFinish.y - mStart.y;
       const float dz = mFinish.z - mStart.z;
-      const float dragDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
+      // 0x0083877F: (dz*dz + dy*dy) + dx*dx.
+      const float dragDistance = std::sqrt((dz * dz + dy * dy) + dx * dx);
 
       if (dragDistance > 200.0f) {
         mTravelFormation = FORMATION_PickTravelFormation(state, formationType, dragDistance);
