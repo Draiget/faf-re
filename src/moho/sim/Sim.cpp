@@ -5994,6 +5994,7 @@ Sim::Sim(LaunchInfoBase* const info)
     mRules->ExportToLuaState(mLuaState);
     luaBpScope.Emit();
   }
+  static_cast<RRuleGameRulesImpl*>(mRules)->OnSimHasBlueprints();
 
   {
     LuaPlus::LuaObject globals = mLuaState->GetGlobals();

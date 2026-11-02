@@ -31,6 +31,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_IntelRasterRows` | 1 | `/con` | live | Intel circles rastered row by row instead of column by column |
 | `sim_IntelSameCellMove` | 1 | `/con` | live | An intel source moving inside its grid cell skips the two rasters that would cancel |
 | `sim_BlueprintNameCache` | 1 | `/con` | live | Emitter, trail and projectile blueprint lookups by name remembered per game rules (positive results only) |
+| `rule_ReleaseScriptBlueprints` | 1 on x64, 0 on x86 | `/con` | next sim | Frees the game rules' Lua copy of the blueprints once the session and the sim have their own. Off on x86, where Lua frees reach the allocator classes that formations and projectiles reuse addresses from |
 | `sim_SquadUnitSearch` | 1 | `/con` | live | Squad membership test by binary search of the id-sorted unit set |
 | `sim_ParallelCoords` | 1 | `/con` | live | Per-entity half of the coordinate advance (transforms, history, collision shape) on sim workers; grid relinks, intel updates and list links stay serial in list order (needs `sim_Workers` > 0) |
 | `sim_ReconBlipIndex` | 1 | `/con` | live | Recon blip lookup by entity id through a hash index instead of the blip map walk |
