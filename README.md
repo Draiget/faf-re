@@ -13,7 +13,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 | Builds | `main.exe` (x86) and `main_x64.exe` link and run |
 | Renders | Main menu, cinematic playback, in-game world view; Direct3D 9, 11, 12 and Vulkan ([Renderer backends](docs/RENDERER_BACKENDS.md)) |
 | Plays | Native save/load on both architectures |
-| Replay parity | 12,714 of 13,148 vault replays (96.7 %) match every recorded checksum on CI (30–31/10/2026), 12,782 (97.2 %) with the fixes since; at most 1 (0.01 %) still fails because of the engine ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
+| Replay parity | 12,714 of 13,148 vault replays (96.7 %) match every recorded checksum on CI (30–31/10/2026), 12,782 (97.2 %) with the fixes since; none is known to fail because of the engine ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
 | Performance | x64 replays take 19 % less time than retail on average (4 % to 33 %) ([Performance](docs/PERFORMANCE.md)) |
 | Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code we link from source (wxWidgets, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding |
@@ -30,13 +30,13 @@ Real games from the FAF replay vault (stock and community maps, 1–12 human pla
 | Desync | 231 | 1.76 % |
 | Timeout, crash or error of the CI runner (time limit, map extraction, map not on FAF's server) | 203 | 1.54 % |
 
-| Desync cause (as of master `a7b7e1921`, 02/11/2026) | Desyncs | Share of desyncs | Share of played |
+| Desync cause (as of master `1d83c0995`, 03/11/2026) | Desyncs | Share of desyncs | Share of played |
 |---|---|---|---|
-| Maps and content: survival maps that need the campaign's strings, maps that ship their own blueprints | 122 | 52.8 % | 0.93 % |
+| Maps and content: survival maps that need the campaign's strings, maps that ship their own blueprints, a map that reads the real-time clock | 123 | 53.2 % | 0.94 % |
 | Live game split: the players' own checksums already disagreed | 34 | 14.7 % | 0.26 % |
 | Retail fails there too | 6 | 2.6 % | 0.05 % |
 | Our bugs, fixed since | 68 | 29.4 % | 0.52 % |
-| Not explained yet | 1 | 0.4 % | 0.01 % |
+| Not explained yet | 0 | 0 % | 0 % |
 
 With the fixes, 12,782 of 13,148 (97.22 %) pass on master. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
