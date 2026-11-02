@@ -2951,7 +2951,7 @@ extern "C"
 
 		Node* node = luaH_mainposition(t, key);
 		while (luaO_rawequalObj(&node->i_key, key) == 0) {
-			node = node->next;
+			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
 			}
@@ -2977,7 +2977,7 @@ extern "C"
 		const std::uint32_t bucket = LuaFloatBitPattern(floatKey + 1.0f) % LuaHashOddModulus(t);
 		Node* node = &t->node[bucket];
 		while (node->i_key.tt != LUA_TNUMBER || node->i_key.value.n != floatKey) {
-			node = node->next;
+			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
 			}
@@ -2997,7 +2997,7 @@ extern "C"
 	{
 		Node* node = &t->node[key->hash & LuaHashMask(t)];
 		while (node->i_key.tt != LUA_TSTRING || static_cast<TString*>(node->i_key.value.p) != key) {
-			node = node->next;
+			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
 			}
@@ -3696,7 +3696,7 @@ extern "C"
 
 			for (int index = 0; index < size; ++index) {
 				Node& node = table->node[index];
-				node.next = nullptr;
+				node.SetNext(nullptr);
 				node.i_key.tt = LUA_TNIL;
 				node.i_val.tt = LUA_TNIL;
 			}
@@ -3886,20 +3886,20 @@ extern "C"
 			Node* const collidingMainPosition = luaH_mainposition(table, &mainPosition->i_key);
 			Node* const firstFree = table->firstfree;
 			if (collidingMainPosition == mainPosition) {
-				firstFree->next = mainPosition->next;
-				mainPosition->next = firstFree;
+				firstFree->SetNext(mainPosition->Next());
+				mainPosition->SetNext(firstFree);
 				mainPosition = firstFree;
 			} else {
 				Node* collisionPrev = collidingMainPosition;
-				while (collisionPrev->next != mainPosition) {
-					collisionPrev = collisionPrev->next;
+				while (collisionPrev->Next() != mainPosition) {
+					collisionPrev = collisionPrev->Next();
 				}
 
-				collisionPrev->next = firstFree;
+				collisionPrev->SetNext(firstFree);
 				firstFree->i_key = mainPosition->i_key;
 				firstFree->i_val = mainPosition->i_val;
-				firstFree->next = mainPosition->next;
-				mainPosition->next = nullptr;
+				firstFree->SetNext(mainPosition->Next());
+				mainPosition->SetNext(nullptr);
 				mainPosition->i_val.tt = LUA_TNIL;
 			}
 		}
@@ -19149,7 +19149,7 @@ extern "C"
 		globalState->lstate = state;
 		globalState->dummynode[0].i_key.tt = LUA_TNIL;
 		globalState->dummynode[0].i_val.tt = LUA_TNIL;
-		globalState->dummynode[0].next = nullptr;
+		globalState->dummynode[0].SetNext(nullptr);
 		globalState->fatalErrorFunc = &defaultFatalErrorFunc;
 		globalState->memData = luaHelper_memData;
 		globalState->reallocFunc = luaHelper_Realloc;

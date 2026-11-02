@@ -191,7 +191,7 @@ namespace
       DescribeTObject(node.i_val, valueText, sizeof(valueText));
       DumpLine(
         sink, "    node[%d] key=%s value=%s next=%p", i, keyText, valueText,
-        static_cast<const void*>(node.next)
+        static_cast<const void*>(node.Next())
       );
     }
     if (nilKeyNodes != 0) {
