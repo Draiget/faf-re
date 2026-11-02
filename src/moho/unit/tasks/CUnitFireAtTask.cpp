@@ -308,7 +308,9 @@ namespace moho
         return 1;
       }
 
-      if (groundDistance <= maxRadius) {
+      // 0x0060B5BA `comiss` + `jbe`: an unordered compare takes the branch too, so a NaN distance (a target at NaN, 26935320 at
+      // beat 13621) counts as in the band, and an immobile launcher keeps the order instead of ending it.
+      if (!(groundDistance > maxRadius)) {
         // In the band: stop moving and make sure a round is loaded.
         if (unit->IsMobile() && navigator) {
           navigator->AbortMove();
