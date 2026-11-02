@@ -10,6 +10,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEfxEmitter.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/render/ETrailParam.h"
@@ -526,6 +527,12 @@ namespace moho
    */
   void CEfxTrailEmitter::OnTick()
   {
+    if (EFFECT_LifetimeOnly()) {
+      if (!ProcessLifetime()) {
+        ++mTrailLength; // what `CalculateVisible` does for a trail no camera sees
+      }
+      return;
+    }
     if (ProcessLifetime() || !CalculateVisible()) {
       return;
     }
