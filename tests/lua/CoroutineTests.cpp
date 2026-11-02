@@ -4,16 +4,32 @@
 
 #include "lua/LuaObject.h"
 #include "lua/LuaPrimitives.h"
+#include "lua/LuaRuntimeTypes.h"
 
 namespace
 {
-  void Assert(const bool condition, const char* const message)
+  void Assert(const bool condition, const char* const message, const std::string& detail = "")
   {
     if (!condition) {
-      std::fprintf(stderr, "FAIL: %s\n", message);
+      if (!detail.empty()) {
+        std::fprintf(stderr, "FAIL: %s (detail: %s)\n", message, detail.c_str());
+      } else {
+        std::fprintf(stderr, "FAIL: %s\n", message);
+      }
       std::exit(1);
     }
     std::printf("PASS: %s\n", message);
+  }
+
+  int CountCoroutineThreads(lua_State* const L)
+  {
+    int count = 0;
+    if (L != nullptr && L->l_G != nullptr) {
+      for (GCObject* obj = L->l_G->rootgc1; obj != nullptr; obj = obj->gch.next) {
+        ++count;
+      }
+    }
+    return count;
   }
 
   std::string RunLua(LuaPlus::LuaState& state, const std::string& source)
@@ -218,10 +234,152 @@ int main()
     Assert(res == "ok", "engine / Moho integration inside coroutine (stateUserData, CurrentThread, KillThread/ResumeThread guards)");
   }
 
-  // 7. Garbage collection of coroutines
+  // 7. Garbage collection of coroutines: weak tables and finalizer tracking
   {
     const std::string res = RunLua(state, R"(
-      -- Create and abandon many coroutines (both suspended and finished)
+      -- Verify with weak-value and weak-key tables that unreferenced coroutines
+      -- in various states (suspended at start, yielded, dead) are swept.
+      local weakValues = setmetatable({}, { __mode = "v" })
+      local weakKeys = setmetatable({}, { __mode = "k" })
+
+      -- Case A: Coroutine never resumed (suspended at start)
+      local co_never = coroutine.create(function() end)
+      weakValues["never"] = co_never
+      weakKeys[co_never] = "never"
+
+      -- Case B: Coroutine yielded mid-execution (suspended)
+      local co_yielded = coroutine.create(function() coroutine.yield(42) end)
+      coroutine.resume(co_yielded)
+      weakValues["yielded"] = co_yielded
+      weakKeys[co_yielded] = "yielded"
+
+      -- Case C: Coroutine completed (dead)
+      local co_dead = coroutine.create(function() return 100 end)
+      coroutine.resume(co_dead)
+      weakValues["dead"] = co_dead
+      weakKeys[co_dead] = "dead"
+
+      -- Confirm initial presence
+      if weakValues["never"] == nil or weakValues["yielded"] == nil or weakValues["dead"] == nil then
+        return "coroutines missing from weakValues table"
+      end
+
+      -- With strong references held, collectgarbage() must NOT collect them
+      collectgarbage()
+      if weakValues["never"] ~= co_never or weakValues["yielded"] ~= co_yielded or weakValues["dead"] ~= co_dead then
+        return "referenced coroutines collected prematurely"
+      end
+      if weakKeys[co_never] ~= "never" or weakKeys[co_yielded] ~= "yielded" or weakKeys[co_dead] ~= "dead" then
+        return "referenced coroutine keys collected prematurely"
+      end
+
+      -- Drop strong references
+      co_never = nil
+      co_yielded = nil
+      co_dead = nil
+
+      -- Trigger garbage collection
+      collectgarbage()
+      collectgarbage()
+
+      -- Verify they are collected and removed from weak tables
+      if weakValues["never"] ~= nil then
+        return "unreferenced suspended coroutine was not collected from weakValues"
+      end
+      if weakValues["yielded"] ~= nil then
+        return "unreferenced yielded coroutine was not collected from weakValues"
+      end
+      if weakValues["dead"] ~= nil then
+        return "unreferenced dead coroutine was not collected from weakValues"
+      end
+
+      local keyCount = 0
+      for k, v in pairs(weakKeys) do
+        keyCount = keyCount + 1
+      end
+      if keyCount ~= 0 then
+        return "unreferenced coroutines still present in weakKeys: " .. tostring(keyCount)
+      end
+
+      -- Verify that tables held only on a coroutine stack are collected when the coroutine is collected
+      local weakStackObj = setmetatable({}, { __mode = "v" })
+      local co_stack = coroutine.create(function()
+        local frameObj = { payload = "stack_payload_123" }
+        weakStackObj[1] = frameObj
+        coroutine.yield()
+        frameObj = nil
+      end)
+      coroutine.resume(co_stack)
+
+      -- At this point, frameObj is reachable ONLY through co_stack's live stack
+      collectgarbage()
+      if weakStackObj[1] == nil or weakStackObj[1].payload ~= "stack_payload_123" then
+        return "stack object was prematurely collected while coroutine is alive"
+      end
+
+      -- Drop reference to the coroutine
+      co_stack = nil
+      collectgarbage()
+      collectgarbage()
+
+      if weakStackObj[1] ~= nil then
+        return "stack object was not collected after unreferenced coroutine was collected"
+      end
+
+      return "ok"
+    )");
+    Assert(res == "ok", "coroutine collection in weak tables (values and keys) and stack object cleanup", res);
+  }
+
+  // 8. C++ level verification of intrusive thread GC list (rootgc1)
+  {
+    lua_State* const L = state.GetCState();
+    const int baselineThreads = CountCoroutineThreads(L);
+
+    // Create 6 coroutines referenced in a Lua table
+    RunLua(state, R"(
+      _G.test_held_coroutines = {}
+      for i = 1, 6 do
+        local co = coroutine.create(function() coroutine.yield(i) end)
+        coroutine.resume(co)
+        table.insert(_G.test_held_coroutines, co)
+      end
+    )");
+
+    const int heldThreads = CountCoroutineThreads(L);
+    Assert(heldThreads == baselineThreads + 6, "rootgc1 tracks exactly 6 live coroutine threads when referenced");
+
+    // GC while referenced must preserve them
+    RunLua(state, "collectgarbage()");
+    Assert(CountCoroutineThreads(L) == baselineThreads + 6, "rootgc1 retains all coroutine threads while referenced");
+
+    // Release half (3) of the references
+    RunLua(state, R"(
+      _G.test_held_coroutines[1] = nil
+      _G.test_held_coroutines[2] = nil
+      _G.test_held_coroutines[3] = nil
+      collectgarbage()
+      collectgarbage()
+    )");
+    Assert(CountCoroutineThreads(L) == baselineThreads + 3, "rootgc1 frees exactly the 3 unreferenced coroutines and retains the 3 referenced ones");
+
+    // Drop all remaining references and collect garbage
+    RunLua(state, R"(
+      _G.test_held_coroutines = nil
+      collectgarbage()
+      collectgarbage()
+    )");
+
+    const int clearedThreads = CountCoroutineThreads(L);
+    Assert(clearedThreads == baselineThreads, "rootgc1 unlinks and frees all coroutine threads when unreferenced");
+  }
+
+  // 9. Stress allocation and collection of coroutines
+  {
+    lua_State* const L = state.GetCState();
+    const int baselineThreads = CountCoroutineThreads(L);
+
+    const std::string res = RunLua(state, R"(
       for i = 1, 100 do
         local co1 = coroutine.create(function() coroutine.yield(1) end)
         coroutine.resume(co1)
@@ -230,12 +388,12 @@ int main()
         local co3 = coroutine.create(function() end)
         -- co3 never resumed
       end
-
       collectgarbage()
       collectgarbage()
       return "ok"
     )");
-    Assert(res == "ok", "coroutine garbage collection cleans up unreferenced threads without crash or leak");
+    Assert(res == "ok", "stress test creating and abandoning 300 coroutines runs cleanly");
+    Assert(CountCoroutineThreads(L) == baselineThreads, "all 300 abandoned coroutines swept from rootgc1");
   }
 
   std::printf("ALL COROUTINE TESTS PASSED\n");
