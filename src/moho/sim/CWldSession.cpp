@@ -105,6 +105,8 @@
 #include "moho/client/Localization.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/render/GpuPathSettings.h"
+#include "moho/render/SkyDome.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/PauseListener.h"
 #include "moho/sim/SOCellPos.h"
@@ -14854,6 +14856,21 @@ namespace moho
         }
         gWldFrameAction = EWldFrameAction::Exit;
         return;
+      }
+
+      // Engine addition: once per session, while the loading screen waits for the sim's first
+      // sync, build the GPU-driven render paths the first frame of play would otherwise build
+      // (REN_PrepareGpuPaths); the main thread is idle here for the seconds the sim takes to start.
+      if (static const CWldSession* sPreparedFor = nullptr; ren_PrepareDuringLoading && sPreparedFor != gActiveWldSession) {
+        sPreparedFor = gActiveWldSession;
+        const auto prepareStart = std::chrono::steady_clock::now();
+        const int paths = REN_PrepareGpuPaths();
+        // The map's sky dome textures and buffers, which its first draw otherwise creates.
+        if (IWldTerrainRes* const terrainRes = REN_GetTerrainRes(); terrainRes != nullptr) {
+          terrainRes->GetSkyDome().CreateRenderAbility();
+        }
+        gpg::Logf("Render: %d GPU-driven paths and the sky dome prepared during loading in %.1f ms", paths,
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepareStart).count());
       }
 
       // Engine addition: once per session, while the loading screen waits for the sim, read ahead

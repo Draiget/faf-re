@@ -10,6 +10,11 @@
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/backends/common/EffectSourceCache.h"
 #include "moho/console/CConCommand.h"
+#include "moho/render/ProjectileIconRenderer.h"
+#include "moho/render/RangeGpuRenderer.h"
+#include "moho/render/SelectionBracketGpuRenderer.h"
+#include "moho/render/StrategicIconRenderer.h"
+#include "moho/render/WorldShapeGpuRenderer.h"
 
 namespace moho
 {
@@ -53,7 +58,15 @@ namespace moho
       &gpg::gal::imaging::gDdsDirectLoad
     );
 
-    /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
+    /** Engine addition: `ren_PrepareDuringLoading` (see REN_PrepareGpuPaths). */
+    TConVar<bool> gTConVar_ren_PrepareDuringLoading(
+      "ren_PrepareDuringLoading",
+      "Build the GPU-driven render paths and the map's sky dome while the loading screen waits for the sim (1, the "
+      "default) instead of in the first frame of play that draws them (0), where they took some 120 ms.",
+      &moho::ren_PrepareDuringLoading
+    );
+
+        /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
     TConVar<bool> gTConVar_ren_BackgroundShaders(
       "ren_BackgroundShaders",
       "Direct3D 12 / Vulkan: prepare every shader of an effect on low-priority background threads when the effect is "
@@ -131,3 +144,19 @@ namespace moho
     return text;
   }
 } // namespace moho
+
+bool moho::ren_PrepareDuringLoading = true;
+
+int moho::REN_PrepareGpuPaths()
+{
+  // `IsActive` builds a path's program on its first call, as the first frame that draws it would.
+  int active = 0;
+  active += StrategicIconRenderer::Get().IsActive() ? 1 : 0;
+  active += StrategicIconRenderer::Get().IsClassifyActive() ? 1 : 0;
+  active += ProjectileIconRenderer::Get().IsActive() ? 1 : 0;
+  active += SelectionBracketGpuRenderer::Get().IsActive() ? 1 : 0;
+  active += WorldShapeGpuRenderer::Get().IsActive() ? 1 : 0;
+  active += RangeGpuRenderer::Get().IsActive() ? 1 : 0;
+  active += REN_PrepareGpuVisionCaster() ? 1 : 0;
+  return active;
+}

@@ -20,4 +20,23 @@ namespace moho
 
   /** One line: every path's setting and what it resolves to on the active backend. */
   [[nodiscard]] std::string DescribeGpuPaths();
+
+  /**
+   * Builds every GPU-driven path's programs and resources now, as each path otherwise does on
+   * the first frame that draws it: strategic icons and their classification, projectile icons,
+   * selection brackets, world shapes, range rings and the fog of war's vision caster. They need
+   * only the device, and building them took some 100 ms of the first frame of play; the session
+   * calls this while the loading screen waits for the sim. Returns how many paths are active.
+   */
+  int REN_PrepareGpuPaths();
+
+  /**
+   * `ren_PrepareDuringLoading` (default true): the session prepares the GPU-driven paths and the
+   * map's sky dome while the loading screen waits for the sim (REN_PrepareGpuPaths); false leaves
+   * them to the first frame of play that draws them, as the original did.
+   */
+  extern bool ren_PrepareDuringLoading;
+
+  /** The fog of war's GPU vision caster, for REN_PrepareGpuPaths (VisionRenderer.cpp). */
+  bool REN_PrepareGpuVisionCaster();
 } // namespace moho
