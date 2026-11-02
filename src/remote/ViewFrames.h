@@ -9,12 +9,8 @@
 #include "remote/FrameBuilder.h"
 #include "remote/ViewIdMap.h"
 #include "remote/ViewPackets.h"
+#include "remote/VisibilityOracle.h"
 #include "remote/wire/EntityFrame.h"
-
-namespace moho
-{
-  class Entity;
-}
 
 // Engine addition, server mode (plan WP5.2): per view and beat, the frame the server sends one
 // army. Each army's rebuilt packet (remote/ViewPackets.h, equal to the lockstep client's) is
@@ -79,7 +75,7 @@ namespace faf::remote
     std::vector<bool> mHavePrevious; // per view: mPreviousFrames holds a frame (written on the sim thread only)
     std::vector<bool> mBuilt;        // per view: mFrames holds a built frame (likewise)
     std::vector<std::uint32_t> mWithheld;
-    std::vector<std::pair<std::uint32_t, moho::Entity*>> mEntityIndex; // the sim's entities by id, this beat
+    std::vector<std::pair<std::uint32_t, SEntityFacts>> mEntityIndex; // the sim's entities by id, this beat
     bool mIdMapsOn = false;
     moho::Sim* mLastSim = nullptr;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;

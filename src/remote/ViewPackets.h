@@ -62,6 +62,14 @@ namespace faf::remote
      */
     void SetParallel(bool parallel) noexcept { mParallel = parallel; }
     [[nodiscard]] bool Parallel() const noexcept { return mParallel; }
+    /**
+     * Builds no view for a civilian army (`IArmy::IsCivilian`) from the next beat on: no client
+     * receives one (plan WPR.35). Off by default, so the checks still see every army. A skipped
+     * view's packet and frame stay empty (`HasView`).
+     */
+    void SkipCivilianViews() noexcept { mSkipCivilians = true; }
+    /** Whether the last beat built `army`'s view. */
+    [[nodiscard]] bool HasView(std::int32_t army) const { return mHasView[static_cast<std::size_t>(army)] != 0u; }
     /** Wall time spent building views since the start, in seconds (`AddBuildTime`). */
     [[nodiscard]] double BuildSeconds() const noexcept { return mBuildSeconds; }
 
@@ -97,7 +105,9 @@ namespace faf::remote
 
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
+    std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
     bool mParallel = false;
+    bool mSkipCivilians = false;
     std::chrono::steady_clock::time_point mBuildStart{};
     double mBuildSeconds = 0.0;
     std::vector<std::unordered_map<std::uint32_t, SViewEntity>> mViews;

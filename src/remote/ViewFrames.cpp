@@ -91,41 +91,44 @@ namespace faf::remote
       }
     }
 
-    // The sim's entities in ascending id order, once for every view: a frame's records are in
-    // that order too, so each view finds its records' entities in one forward pass.
+    // The sim's entities in ascending id order with what the oracle reads from each, once for
+    // every view (plan WPR.35): a frame's records are in that order too, so each view finds its
+    // records' facts in one forward pass.
     mEntityIndex.clear();
     if (sim.mEntityDB != nullptr) {
       mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
       for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        mEntityIndex.emplace_back(id, entity);
+        mEntityIndex.emplace_back(id, ReadEntityFacts(*entity));
       }
     }
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
     const auto buildFrame = [&](const std::size_t army) {
+      const auto view = static_cast<std::int32_t>(army);
+      if (!HasView(view)) {
+        mFrames[army] = wire::SViewFrame{};
+        mWithheld[army] = 0u;
+        return;
+      }
       CViewFrameBuilder& builder = *mBuilders[army];
-      const moho::SSyncData& packet = Packet(static_cast<std::int32_t>(army));
+      const moho::SSyncData& packet = Packet(view);
       builder.Apply(packet);
-      wire::SViewFrame frame = builder.Build(sim.mCurBeat);
 
-      // Plan §6: a plain entity in mode ReconGrid goes out only while the view sees it.
+      // Plan §6: a plain entity in mode ReconGrid goes out only while the view sees it. A record
+      // the sim no longer has (an orphan) stays.
       std::uint32_t withheld = 0;
-      std::vector<wire::SEntityRecord> kept;
-      kept.reserve(frame.entities.size());
-      auto index = mEntityIndex.begin();
-      for (wire::SEntityRecord& record : frame.entities) {
-        while (index != mEntityIndex.end() && index->first < record.id) {
+      auto index = mEntityIndex.cbegin();
+      wire::SViewFrame frame = builder.Build(sim.mCurBeat, [&](const wire::SEntityRecord& record) {
+        while (index != mEntityIndex.cend() && index->first < record.id) {
           ++index;
         }
-        moho::Entity* const entity = index != mEntityIndex.end() && index->first == record.id ? index->second : nullptr;
-        if (entity != nullptr && !CanViewSee(sim, static_cast<std::int32_t>(army), *entity)) {
-          ++withheld;
-          continue;
+        if (index == mEntityIndex.cend() || index->first != record.id || CanViewSee(sim, view, index->second)) {
+          return true;
         }
-        kept.push_back(std::move(record));
-      }
-      frame.entities = std::move(kept);
+        ++withheld;
+        return false;
+      });
 
       if (mIdMapsOn) {
         // Plan WP5.12: a record may name an entity this view holds no record of (a visible enemy

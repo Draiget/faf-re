@@ -6,6 +6,7 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/Prop.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
@@ -96,6 +97,7 @@ namespace faf::remote
     while (mPackets.size() < armyCount) {
       mPackets.push_back(std::make_unique<moho::SSyncData>());
       mViews.emplace_back();
+      mHasView.push_back(1u);
     }
 
     // Last beat's records go on the sim thread: they hold references to sim objects (poses,
@@ -112,11 +114,16 @@ namespace faf::remote
       out.mCurBeat = static_cast<std::int32_t>(sim.mCurBeat);
       out.mCurTick = static_cast<std::int32_t>(sim.mCurTick);
       out.mFocusArmy = static_cast<std::int32_t>(army);
+      const moho::CArmyImpl* const owner = sim.mArmiesList[army];
+      mHasView[army] = mSkipCivilians && owner != nullptr && owner->IsCivilian() ? 0u : 1u;
     }
 
     // Each view reads the sim and the change set and writes its own packet and view state only
     // (plan I3), so the views can be built on the sim's workers (plan WP5.7).
     const auto build = [&](const std::size_t army) {
+      if (mHasView[army] == 0u) {
+        return;
+      }
       moho::SSyncData& out = *mPackets[army];
       for (const SChangedEntity& changed : Entities()) {
         SyncForView(sim, static_cast<std::int32_t>(army), changed, out, mViews[army]);

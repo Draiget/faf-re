@@ -11,7 +11,8 @@
 
 // Engine addition, server mode (plan WP16.5, WPR.35): headless's `--view-bench <file>`. Run
 // unfocused, every beat it does the work a dedicated server does for its players and nothing a
-// check adds: every army's view is built with its own ids (remote/ViewFrames.h, plan WP5.9), and
+// check adds: every army's view but a civilian army's (no client receives one) is built with its
+// own ids (remote/ViewFrames.h, plan WP5.9), and
 // for every view the entity frame, the army lane and the grid lane (the vision and water grids of
 // the view's army and of every army that counts it as an ally) are encoded against what that
 // view's client received the beat before, as the server does with no loss. Nothing is decoded
@@ -65,6 +66,7 @@ namespace faf::headless
     std::FILE* mFile = nullptr;
     remote::wire::SFrameCodec mCodec;
     std::vector<SClient> mClients;
+    std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
     std::vector<remote::wire::SGridSlot> mBeatGrids; // every army's grids this beat, copied once
     std::vector<SBeat> mBeats;
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat

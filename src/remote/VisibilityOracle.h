@@ -37,6 +37,7 @@ namespace moho
 {
   class CArmyImpl;
   class Entity;
+  class ReconBlip;
   class Sim;
 }
 
@@ -50,10 +51,44 @@ namespace faf::remote
   };
 
   /**
+   * Plan WPR.35: everything stages 1 and 2 read from one entity, read once a beat for all views
+   * instead of once per view. The entity-taking functions below read these first, so both
+   * forms give the same answers.
+   */
+  struct SEntityFacts
+  {
+    enum class EKind : std::uint8_t
+    {
+      Plain,
+      Prop,
+      Unit,
+      Blip
+    };
+
+    const moho::CArmyImpl* army = nullptr; // `Entity::ArmyRef`
+    std::int32_t armyIndex = -1;           // `Entity::GetArmyIndex`
+    std::int32_t vizToFocusPlayer = 0;
+    std::int32_t vizToAllies = 0;
+    std::int32_t vizToEnemies = 0;
+    std::int32_t vizToNeutrals = 0;
+    const moho::ReconBlip* blip = nullptr; // a blip's per-army records, for armies past 63
+    std::uint64_t blipNeedsFlush = 0;      // a blip: bit n is army n's `mNeedsFlush`, armies 0..63
+    Wm3::Vec3f pos{};                      // `mVarDat.mCurTransform.pos_`
+    EKind kind = EKind::Plain;
+    bool destroyed = false;  // `mOnDestroyDispatched`
+    bool underwater = false; // `mVarDat.UsesUnderwaterReconGrid()`
+  };
+
+  /** Reads `entity`'s facts for this beat. */
+  [[nodiscard]] SEntityFacts ReadEntityFacts(moho::Entity& entity);
+
+  /**
    * Stage 1: the publication and visibility mode `Sim::Sync` would give `entity` with
    * `viewArmy` (0-based, or -1 for an observer) as its focus. Reads only.
    */
   [[nodiscard]] SViewVisibility ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
+  /** Stage 1 from facts read this beat. */
+  [[nodiscard]] SViewVisibility ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, const SEntityFacts& facts);
 
   /**
    * `UserArmy::CanSeeCell` (0x008B17F0) on the sim's grids: whether `view` sees the cell through
@@ -80,6 +115,8 @@ namespace faf::remote
    * them itself.
    */
   [[nodiscard]] bool CanViewSee(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
+  /** `CanViewSee` from facts read this beat. */
+  [[nodiscard]] bool CanViewSee(const moho::Sim& sim, std::int32_t viewArmy, const SEntityFacts& facts);
 
   /**
    * Whether `viewArmy`'s lockstep client draws the entity's mesh this beat (stage 2 above,

@@ -448,7 +448,7 @@ namespace faf::remote
     }
   }
 
-  wire::SViewFrame CViewFrameBuilder::Build(const std::uint32_t beat)
+  wire::SViewFrame CViewFrameBuilder::StartFrame(const std::uint32_t beat)
   {
     wire::SViewFrame frame{};
     frame.frameId = mNextFrameId++;
@@ -462,10 +462,6 @@ namespace faf::remote
           it->second.unit.stats.Assign(mStatsScratch);
         }
       }
-    }
-    frame.entities.reserve(mWorld.size());
-    for (const auto& [id, record] : mWorld) {
-      frame.entities.push_back(record);
     }
     return frame;
   }

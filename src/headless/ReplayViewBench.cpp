@@ -60,7 +60,8 @@ namespace faf::headless
     : remote::CViewFrames(tables, MakeCodec(mapSizeX, mapSizeZ))
     , mCodec(MakeCodec(mapSizeX, mapSizeZ))
   {
-    EnableIdMaps(); // the server's frames carry each view's own ids
+    EnableIdMaps();       // the server's frames carry each view's own ids
+    SkipCivilianViews(); // and no client receives a civilian army's view
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -142,7 +143,12 @@ namespace faf::headless
 
     std::uint64_t entities = 0;
     std::uint64_t bytes = 0;
+    mViews = 0;
     for (std::size_t army = 0; army < armyCount; ++army) {
+      if (!HasView(static_cast<std::int32_t>(army))) {
+        continue;
+      }
+      ++mViews;
       SClient& client = mClients[army];
       entities += Frame(static_cast<std::int32_t>(army)).entities.size();
       bytes += client.bytes;
@@ -168,6 +174,9 @@ namespace faf::headless
     SClient& client = mClients[army];
     client.bytes = 0;
     const auto view = static_cast<std::int32_t>(army);
+    if (!HasView(view)) {
+      return; // a civilian army: no client
+    }
 
     // Entity lanes: the view's frame against the one its client holds, the view's previous frame
     // (kept by CViewFrames without a copy).
@@ -234,7 +243,7 @@ namespace faf::headless
     char text[200];
     std::snprintf(
       text, sizeof(text), "view bench: %zu beats, %zu views (%s), %llu encode failures, %.0f entities per beat",
-      mBeats.size(), mClients.size(), Parallel() ? "parallel" : "serial", static_cast<unsigned long long>(mEncodeFailures),
+      mBeats.size(), mViews, Parallel() ? "parallel" : "serial", static_cast<unsigned long long>(mEncodeFailures),
       mBeats.empty() ? 0.0 : static_cast<double>(mEntities) / static_cast<double>(mBeats.size() + 1u)
     );
     summary = text;

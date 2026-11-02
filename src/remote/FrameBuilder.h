@@ -92,7 +92,26 @@ namespace faf::remote
     void ReleaseDropped();
 
     /** The frame of the world as it stands, stamped with `beat` and the next frame id. */
-    [[nodiscard]] wire::SViewFrame Build(std::uint32_t beat);
+    [[nodiscard]] wire::SViewFrame Build(std::uint32_t beat)
+    {
+      return Build(beat, [](const wire::SEntityRecord&) { return true; });
+    }
+    /**
+     * `Build`, less the records `keep` refuses; it is asked in ascending id order, and a refused
+     * record is never copied (plan WPR.35).
+     */
+    template <class Keep>
+    [[nodiscard]] wire::SViewFrame Build(const std::uint32_t beat, Keep&& keep)
+    {
+      wire::SViewFrame frame = StartFrame(beat);
+      frame.entities.reserve(mWorld.size());
+      for (const auto& [id, record] : mWorld) {
+        if (keep(record)) {
+          frame.entities.push_back(record);
+        }
+      }
+      return frame;
+    }
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
     [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorld.size(); }
@@ -114,6 +133,9 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
 
   private:
+    /** An empty frame stamped with `beat` and the next frame id, after the units' stats are read. */
+    [[nodiscard]] wire::SViewFrame StartFrame(std::uint32_t beat);
+
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
     std::uint32_t mOrphanBeats;
