@@ -452,6 +452,8 @@ void CClientBase::Process(CMessage& msg)
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Ready):
     mReady = true;
+    // Engine addition (wld_SkewCorrection, shared start): when it was handled, for the session's shared start.
+    mManager->NoteClientReady(mIndex);
     return;
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject): {

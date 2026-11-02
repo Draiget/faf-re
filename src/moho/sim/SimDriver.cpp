@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
@@ -42,6 +43,13 @@
 #include "Sim.h"
 
 using namespace moho;
+
+namespace moho
+{
+  // Display-clock skew correction tuning (moho/misc/RuntimeTuningGlobals.cpp), read for the skew log.
+  extern float wld_SkewRateAdjustBase;
+  extern float wld_SkewRateAdjustMax;
+} // namespace moho
 
 namespace
 {
@@ -84,9 +92,13 @@ namespace
    *
    * The divergence from real time is calculated for each tick taken off the sync queue.
    * Beats that do not advance a tick are a pause, and are not counted. Counting starts at the
-   * session's first tick on screen; the long first frame of play before it is not owed, and the
-   * app drops it from the frame clock's window once that tick is shown
-   * (`WLD_TakeFrameClockReset`), so the ticks after it come a tick apart.
+   * session's first tick on screen; the app drops the long first frame of play before it from the
+   * frame clock's window once that tick is shown (`WLD_TakeFrameClockReset`), so the ticks after
+   * it come a tick apart. In a network session the count is then measured
+   * against the moment the last player's ready message left it, which every player times alike
+   * (`CClientManagerImpl::EstimateSharedStartUs`): tick N is due that long after it on every
+   * screen, so a player whose screen started late catches up instead of keeping the others'
+   * screens that far ahead of its own, out of the input window.
    * Only the main thread touches it (`GetSyncData`, `GetSimSpeed`).
    */
   struct SkewClock
@@ -98,11 +110,54 @@ namespace
     std::int64_t mNextLogCycles = 0;
     float mLagMs = 0.0f;   // clamped to +/- wld_SkewMaxLag: what the correction acts on
     float mDriftMs = 0.0f; // unclamped: what actually happened, for the log
+    bool mSharedStartPending = false; // network session: not measured against the shared start yet
+    std::int32_t mFirstTick = 0;
   };
 
   SkewClock gSkewClock;
 
-  void UpdateSkewClock(const SSyncData& beat, const std::int64_t now, const int simRate)
+  // Ticks after the first one the shared start may still be waited for (our own ready message can
+  // leave after the first tick is on screen); past them the count stays on this client's own.
+  constexpr std::int32_t kSharedStartWaitTicks = 50;
+
+  /// The display-clock factor `WLD_GetSimRate` makes of a lag, for the log.
+  [[nodiscard]] float SkewDisplayFactor(const float lagMs)
+  {
+    if (wld_SkewCorrection == 0) {
+      return 1.0f;
+    }
+    const float sample = std::pow(wld_SkewRateAdjustBase, lagMs / 100.0f);
+    return std::max(1.0f / wld_SkewRateAdjustMax, std::min(wld_SkewRateAdjustMax, sample));
+  }
+
+  /// Network sessions: once the shared start is known, the tick just shown is measured against it.
+  void ApplySharedStart(SkewClock& clock, const std::int32_t tick, const int simRate, CClientManagerImpl& manager)
+  {
+    if (tick - clock.mFirstTick > kSharedStartWaitTicks) {
+      clock.mSharedStartPending = false;
+      gpg::Logf("SkewClock: no shared start by tick %d; counting from this client's first tick", tick);
+      return;
+    }
+    const std::int64_t sharedStartUs = manager.EstimateSharedStartUs(wld_SkewLog > 0);
+    if (sharedStartUs == 0) {
+      return;
+    }
+    clock.mSharedStartPending = false;
+    const std::int64_t shownUs = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()
+    ).count();
+    const float tickMs = 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
+    const float lagMs = static_cast<float>(shownUs - sharedStartUs) * 0.001f - static_cast<float>(tick) * tickMs;
+    const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
+    clock.mLagMs = std::clamp(lagMs, -maxLagMs, maxLagMs);
+    clock.mDriftMs = lagMs;
+    if (wld_SkewLog > 0) {
+      gpg::Logf("SkewClock: tick %d shown %+.3f s after the shared start, due at %+.3f s: lag %+.3f s", tick,
+        static_cast<float>(shownUs - sharedStartUs) * 0.000001f, static_cast<float>(tick) * tickMs * 0.001f, lagMs * 0.001f);
+    }
+  }
+
+  void UpdateSkewClock(const SSyncData& beat, const std::int64_t now, const int simRate, CClientManagerImpl* const sharedStartFrom)
   {
     SkewClock& clock = gSkewClock;
     if (!beat.mAdvanced) {
@@ -116,6 +171,13 @@ namespace
       clock.mLastTick = beat.mCurTick;
       clock.mLastTickCycles = now;
       clock.mNextLogCycles = now;
+      clock.mFirstTick = beat.mCurTick;
+      clock.mSharedStartPending = sharedStartFrom != nullptr;
+      if (clock.mSharedStartPending) {
+        ApplySharedStart(clock, beat.mCurTick, simRate, *sharedStartFrom);
+      } else if (wld_SkewLog > 0) {
+        gpg::Logf("SkewClock: counting from tick %d, this client's first tick on screen", beat.mCurTick);
+      }
       return;
     }
 
@@ -130,11 +192,14 @@ namespace
     clock.mPausedSinceTick = false;
     clock.mLastTick = beat.mCurTick;
     clock.mLastTickCycles = now;
+    if (clock.mSharedStartPending && sharedStartFrom != nullptr) {
+      ApplySharedStart(clock, beat.mCurTick, simRate, *sharedStartFrom);
+    }
 
     if (wld_SkewLog > 0 && now >= clock.mNextLogCycles) {
       gpg::Logf(
-        "SkewClock: tick %d drift %+.3f s lag %+.3f s rate %d correction %s",
-        beat.mCurTick, clock.mDriftMs * 0.001f, clock.mLagMs * 0.001f, simRate,
+        "SkewClock: tick %d lag %+.3f s (unclamped %+.3f s), display speed x%.3f, sim rate %d, correction %s",
+        beat.mCurTick, clock.mLagMs * 0.001f, clock.mDriftMs * 0.001f, SkewDisplayFactor(clock.mLagMs), simRate,
         wld_SkewCorrection != 0 ? "on" : "off"
       );
       clock.mNextLogCycles = now + gpg::time::MillisecondsToCycles(static_cast<float>(wld_SkewLog) * 1000.0f);
@@ -1564,7 +1629,9 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   const std::int64_t dequeuedAt = mLastSyncCycleTime;
   lock.unlock();
   if (outSyncData) {
-    UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate());
+    // The shared start is measured against in network sessions only.
+    const bool sharedStart = gDriverSessionPacing.load(std::memory_order_relaxed) == ESimSessionPacing::Network;
+    UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate(), sharedStart ? mClientManager.get() : nullptr);
   }
 }
 
@@ -2015,6 +2082,8 @@ namespace
     "Log the session's drift from real time every this many seconds (0 = off).",
     &moho::wld_SkewLog
   );
+
+
 
   TConVar<int> gTConVar_sim_ReplayLead(
     "sim_ReplayLead",

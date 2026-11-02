@@ -1,7 +1,9 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
 #include <algorithm>
+#include <atomic>
 #include <bit>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -16,6 +18,8 @@
 #include "NetConVars.h"
 #include "NetMessageRanges.h"
 #include "NetPeerTransport.h"
+#include "EClientMsg.h"
+#include <vector>
 using namespace moho;
 
 namespace
@@ -27,7 +31,23 @@ namespace
 
   // "No receiver for message type" warnings logged per connection.
   constexpr std::uint32_t kMaxUnroutedMessageWarnings = 8;
+
+  // Engine addition (wld_SkewCorrection, shared start): connections holding a queued ready message that has not
+  // left yet (guarded by the connector lock), and when the last one left, on the system-wide
+  // steady clock in microseconds.
+  std::vector<const CNetUDPConnection*> gReadyAwaitingDeparture;
+  std::atomic<std::int64_t> gReadyDepartureUs{0};
 } // namespace
+
+std::int64_t moho::NET_GetReadyDepartureUs() noexcept
+{
+  return gReadyDepartureUs.load(std::memory_order_relaxed);
+}
+
+void moho::NET_ResetReadyDeparture() noexcept
+{
+  gReadyDepartureUs.store(0, std::memory_order_relaxed);
+}
 
 /**
  * Address: 0x00485BE0 (FUN_00485BE0)
@@ -147,6 +167,11 @@ void CNetUDPConnection::Write(NetDataSpan* data)
     mPendingOutputData.VirtWrite(reinterpret_cast<const char*>(begin), len);
   }
 
+  // Engine addition (wld_SkewCorrection, shared start): the ready message is timed when it leaves (SendPacket).
+  if (len != 0 && begin[0] == static_cast<uint8_t>(EClientMsg::CLIMSG_Ready) &&
+      std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this) == gReadyAwaitingDeparture.end()) {
+    gReadyAwaitingDeparture.push_back(this);
+  }
   // Schedule earliest send time once:
   // mSendBy = now + net_SendDelay * 1000 (ms > us ticks in bin)
   if (mSendBy.mTime == 0) {
@@ -369,6 +394,11 @@ CNetUDPConnection::CNetUDPConnection(
  */
 CNetUDPConnection::~CNetUDPConnection()
 {
+  // Engine addition (wld_SkewCorrection, shared start): a connection that goes before its ready message left.
+  gReadyAwaitingDeparture.erase(
+    std::remove(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this), gReadyAwaitingDeparture.end()
+  );
+
   constexpr int poolCap = 0x14u;
 
   auto recyclePacket = [this](SNetPacket* p) noexcept {
@@ -1433,6 +1463,17 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
  */
 void CNetUDPConnection::SendPacket(SNetPacket* packet)
 {
+  // Engine addition (wld_SkewCorrection, shared start): the first payload after a queued ready message carries it.
+  if (packet->header.mType == PT_Data && packet->header.mPayloadLength != 0 && !gReadyAwaitingDeparture.empty()) {
+    const auto awaiting = std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this);
+    if (awaiting != gReadyAwaitingDeparture.end()) {
+      gReadyAwaitingDeparture.erase(awaiting);
+      const std::int64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()
+      ).count();
+      gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
+    }
+  }
   packet->header.mSerialNumber = mNextSerialNumber;
   packet->header.mInResponseTo = mInResponseTo;
 

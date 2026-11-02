@@ -429,4 +429,15 @@ namespace moho
     gpg::MD5Context mTotalBytesDispatchedMD5;
   };
   static_assert(sizeof(CNetUDPConnection) == 0xFE8, "CNetUDPConnection size must be 0xFE8");
+
+  /**
+   * Engine addition (wld_SkewCorrection, shared start): when this client's ready message (`CLIMSG_Ready`) last
+   * left on the wire, on the system-wide steady clock in microseconds, over all UDP connections;
+   * 0 before it did. A peer times the same message as it arrives, so both sides time one event:
+   * its departure, which comes after it was queued: a send waits up to `net_SendDelay`.
+   */
+  [[nodiscard]] std::int64_t NET_GetReadyDepartureUs() noexcept;
+
+  /** Engine addition (wld_SkewCorrection, shared start): forget the last session's ready departure. */
+  void NET_ResetReadyDeparture() noexcept;
 } // namespace moho
