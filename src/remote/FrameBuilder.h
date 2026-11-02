@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <map>
+#include <span>
 #include <vector>
 
 #include "boost/shared_ptr.h"
 
+#include "moho/entity/SSTIEntityVariableData.h"
 #include "remote/UnderlayPaths.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
@@ -29,7 +31,10 @@
 namespace moho
 {
   class CHeightField;
+  class Entity;
+  class ReconBlip;
   class StatItem;
+  class Unit;
   template <class T>
   class Stats;
   struct SSyncData;
@@ -71,6 +76,30 @@ namespace faf::remote
   /** A frame's unit block, written into a unit update's data. */
   void UnpackUnitFields(const wire::SUnitFields& unit, moho::SSTIUnitVariableData& data) noexcept;
 
+  /**
+   * Plan WPR.35: one entity's update for one view, as what to read from the sim: the sim is
+   * stopped until the views are built, so nothing is copied into a packet first.
+   */
+  struct SDirectUpdate
+  {
+    moho::Entity* entity = nullptr;
+    moho::Unit* unit = nullptr;       // the entity as a unit, or
+    moho::ReconBlip* blip = nullptr;  // as a blip
+    std::int32_t army = 0;            // the view's army (a blip's recon record)
+    moho::EUserEntityVisibilityMode mode = moho::EUserEntityVisibilityMode::Hidden;
+    std::uint32_t vision = 0;         // a blip: the vision range the view last copied from its creator
+    bool hasVision = false;           // whether it ever did
+    bool requestRefreshUI = false;    // `mRequestRefreshUI` as the sync walk found it
+  };
+
+  /**
+   * What `Entity::SyncInterface` (0x0067A290) writes over its copy for a view: the attach parent
+   * and children from the live attach info, the view's visibility mode and flag, the refresh flag.
+   */
+  void WriteEntityBlockForView(
+    moho::SSTIEntityVariableData& data, moho::Entity& entity, moho::EUserEntityVisibilityMode mode, bool requestRefreshUI
+  );
+
   class CViewFrameBuilder
   {
   public:
@@ -88,8 +117,9 @@ namespace faf::remote
      * Applies one packet's entity lanes to the world the frames are built from. The sim's unit
      * stats trees it lets go of are kept until `ReleaseDropped`: a builder running on a sim
      * worker must not drop the last reference of a sim object (.plans/sim-threading/PLAN.md §2).
+     * `direct` are this beat's updates the packet does not carry (`SDirectUpdate`).
      */
-    void Apply(const moho::SSyncData& packet);
+    void Apply(const moho::SSyncData& packet, std::span<const SDirectUpdate> direct = {});
     /** Drops the stats trees `Apply` let go of; on the sim thread. */
     void ReleaseDropped();
 
@@ -229,6 +259,7 @@ namespace faf::remote
     std::uint64_t mDepositOverflows = 0;
     std::uint64_t mTerrainEditOverflows = 0;
     boost::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
+    moho::SSTIEntityVariableData mBlockScratch;  // a direct update's entity block
     CUnderlayPathReader mUnderlays;              // the entities' underlay paths, as of this beat
     wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared
     std::vector<wire::SUnitStat> mStatsScratch;  // a unit's stats, likewise

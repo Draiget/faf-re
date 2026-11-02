@@ -7,6 +7,7 @@
 
 #include "gpg/core/containers/FlatGenerationMap.h"
 #include "remote/BeatChangeSet.h"
+#include "remote/FrameBuilder.h"
 
 // Engine addition, server mode (plan WP5.2): the entity lanes of the packet a lockstep client
 // focused on each army would receive, rebuilt from the unfocused sim's change set without
@@ -73,6 +74,15 @@ namespace faf::remote
     /** Wall time spent building views since the start, in seconds (`AddBuildTime`). */
     [[nodiscard]] double BuildSeconds() const noexcept { return mBuildSeconds; }
 
+    /**
+     * Plan WPR.35: from the next beat on, an entity update is not copied into the packet: `Direct`
+     * lists what to read from the sim instead, valid until the sim runs on. Off by default, since
+     * the checks compare the packets with what a lockstep client gets.
+     */
+    void SetDirectUpdates(const bool direct) noexcept { mDirectUpdates = direct; }
+    /** The last beat's direct updates for `army`, in the change set's id order. */
+    [[nodiscard]] const std::vector<SDirectUpdate>& Direct(const std::int32_t army) const { return mDirect[static_cast<std::size_t>(army)]; }
+
     /** The last beat's entity lanes for `army`, in the change set's id order. */
     [[nodiscard]] const moho::SSyncData& Packet(std::int32_t army) const { return *mPackets[static_cast<std::size_t>(army)]; }
 
@@ -106,6 +116,8 @@ namespace faf::remote
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
     std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
+    std::vector<std::vector<SDirectUpdate>> mDirect;
+    bool mDirectUpdates = false;
     bool mParallel = false;
     bool mSkipCivilians = false;
     std::chrono::steady_clock::time_point mBuildStart{};

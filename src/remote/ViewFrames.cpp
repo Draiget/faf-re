@@ -130,7 +130,7 @@ namespace faf::remote
     SHeldView& held = mHeld[army];
     const auto view = static_cast<std::int32_t>(army);
     builder.TrackChanges();
-    builder.Apply(packet);
+    builder.Apply(packet, Direct(static_cast<std::int32_t>(army)));
     const wire::SViewFrame stamp = builder.StartFrame(sim.mCurBeat);
     held.baselineId = held.frameId != 0u ? held.frameId : wire::kNoBaseline;
     held.frameId = stamp.frameId;

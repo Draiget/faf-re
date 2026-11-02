@@ -66,6 +66,7 @@ namespace faf::remote
     {
       mHeldOn = true;
       mHeldCheck = check;
+      SetDirectUpdates(true);
     }
     [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
