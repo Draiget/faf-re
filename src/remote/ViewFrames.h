@@ -90,8 +90,11 @@ namespace faf::remote
     /** One view's frame kept between beats, and what its last beat changed. */
     struct SHeldView
     {
-      gpg::core::ChunkedVector<wire::SEntityRecord> records; // by the builder's slot, in the view's ids
-      std::vector<std::uint8_t> sent;           // per slot: `records` holds what the client holds
+      // What the client holds is the world's record, unless the view's differs (`ownSlot`).
+      gpg::core::ChunkedVector<wire::SEntityRecord> own; // in the view's ids
+      std::vector<std::uint32_t> ownSlot;       // per slot: index into `own`, or `kNoOwn`
+      std::vector<std::uint32_t> ownFree;       // elements of `own` no slot uses
+      std::vector<std::uint8_t> sent;           // per slot: the client holds a record
       std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
       std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
       std::size_t count = 0;
@@ -102,7 +105,7 @@ namespace faf::remote
       std::vector<std::uint32_t> removed;
       std::vector<const wire::SEntityRecord*> created;
       std::vector<wire::SFrameChange> changed;
-      gpg::core::ChunkedVector<wire::SEntityRecord> before; // the changed records as the client held them
+      gpg::core::ChunkedVector<wire::SEntityRecord> before; // changed `own` records as the client held them
       // With the check:
       std::unique_ptr<CViewIdMap> checkMap;
       wire::SViewFrame checkPrevious;

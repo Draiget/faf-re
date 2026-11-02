@@ -363,10 +363,34 @@ namespace faf::remote
     mDroppedStats.clear();
   }
 
+  void CViewFrameBuilder::ClearBefore() noexcept
+  {
+    for (const std::uint32_t slot : mBeforeSlots) {
+      if (mBeforeIndex[slot] < kWatched) {
+        mBeforeIndex[slot] = kWatched;
+      }
+    }
+    mBeforeSlots.clear();
+    mBefore.clear();
+  }
+
+  void CViewFrameBuilder::SaveBefore(const std::uint32_t slot)
+  {
+    if (slot < mBeforeIndex.size() && mBeforeIndex[slot] == kWatched) {
+      mBeforeIndex[slot] = static_cast<std::uint32_t>(mBefore.size());
+      mBeforeSlots.push_back(slot);
+      (void)mBefore.push_back(mWorldSlots[slot]);
+    }
+  }
+
   wire::SEntityRecord* CViewFrameBuilder::FindRecord(const std::uint32_t id)
   {
     const auto found = LowerBound(id);
-    return found != mWorldIndex.end() && found->id == id ? &mWorldSlots[found->slot] : nullptr;
+    if (found == mWorldIndex.end() || found->id != id) {
+      return nullptr;
+    }
+    SaveBefore(found->slot);
+    return &mWorldSlots[found->slot];
   }
 
   wire::SEntityRecord& CViewFrameBuilder::PutRecord(const wire::SEntityRecord& record)
@@ -376,6 +400,7 @@ namespace faf::remote
     }
     const auto found = LowerBound(record.id);
     if (found != mWorldIndex.end() && found->id == record.id) {
+      SaveBefore(found->slot);
       return mWorldSlots[found->slot] = record;
     }
     std::uint32_t slot;
@@ -400,6 +425,7 @@ namespace faf::remote
     if (mTrackChanges) {
       mErasedRecords.push_back({id, found->slot});
     }
+    UnwatchRecord(found->slot);
     mWorldSlots[found->slot] = wire::SEntityRecord{}; // lets go of what the record shares
     mFreeSlots.push_back(found->slot);
     mWorldIndex.erase(found);

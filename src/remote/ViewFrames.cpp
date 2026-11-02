@@ -28,6 +28,7 @@ namespace faf::remote
   namespace
   {
     constexpr std::uint32_t kNone = 0xF0000000u; // the sim's invalid entity id (`EntityId.h`)
+    constexpr std::uint32_t kNoOwn = 0xFFFFFFFFu; // `SHeldView::ownSlot`: the view's record is the world's
 
     /** References `unheld` says the view holds no record of become the sim's "none" (plan WP5.12). */
     template <class Unheld>
@@ -54,6 +55,22 @@ namespace faf::remote
         }
       }
       (void)record.unit.detail.Assign(detail);
+    }
+
+    /** Whether the view's record differs from the world's: ids to renumber, or names it cannot hold. */
+    template <class Unheld>
+    [[nodiscard]] bool NeedsOwnRecord(const wire::SEntityRecord& record, const CViewIdMap& map, const Unheld& unheld)
+    {
+      if (record.isUnit || map.MapsEntity(record.id)) {
+        return true;
+      }
+      const auto differs = [&map, &unheld](const std::uint32_t id) {
+        return id != kNone && (map.MapsEntity(id) || unheld(id));
+      };
+      if (differs(record.appearance.attachParent)) {
+        return true;
+      }
+      return std::any_of(record.appearance.attachments.begin(), record.appearance.attachments.end(), differs);
     }
 
     /** One bit of a 64-bit filter for a sim id. */
@@ -130,6 +147,7 @@ namespace faf::remote
     SHeldView& held = mHeld[army];
     const auto view = static_cast<std::int32_t>(army);
     builder.TrackChanges();
+    builder.ClearBefore();
     builder.Apply(packet, Direct(static_cast<std::int32_t>(army)));
     const wire::SViewFrame stamp = builder.StartFrame(sim.mCurBeat);
     held.baselineId = held.frameId != 0u ? held.frameId : wire::kNoBaseline;
@@ -137,8 +155,8 @@ namespace faf::remote
     held.beat = stamp.beat;
 
     const std::size_t slots = builder.SlotCount();
-    if (held.records.size() < slots) {
-      held.records.grow_to(slots);
+    if (held.ownSlot.size() < slots) {
+      held.ownSlot.resize(slots, kNoOwn);
       held.sent.resize(slots, 0u);
       held.keep.resize(slots, 0u);
       held.references.resize(slots, 0u);
@@ -149,13 +167,36 @@ namespace faf::remote
     held.changed.clear();
     held.before.clear();
 
+    const auto takeOwn = [&held](const std::uint32_t slot) -> wire::SEntityRecord& {
+      std::uint32_t index;
+      if (!held.ownFree.empty()) {
+        index = held.ownFree.back();
+        held.ownFree.pop_back();
+      } else {
+        index = static_cast<std::uint32_t>(held.own.size());
+        held.own.grow_to(held.own.size() + 1u);
+      }
+      held.ownSlot[slot] = index;
+      return held.own[index];
+    };
+    const auto dropOwn = [&held](const std::uint32_t slot) {
+      const std::uint32_t index = held.ownSlot[slot];
+      if (index != kNoOwn) {
+        held.own[index] = wire::SEntityRecord{}; // lets go of what the record shares
+        held.ownFree.push_back(index);
+        held.ownSlot[slot] = kNoOwn;
+      }
+    };
+
     // What left the world, then what the oracle lets into this beat's frame (plan §6: a plain
     // entity in mode ReconGrid goes out only while the view sees it; a record the sim no longer
     // has, an orphan, stays). A record that comes or goes can change the records that name it.
     std::uint64_t membership = 0;
     for (const CViewFrameBuilder::SErasedRecord& erased : builder.ErasedRecords()) {
       if (held.sent[erased.slot] != 0u) {
-        held.removed.push_back(held.records[erased.slot].id);
+        const std::uint32_t own = held.ownSlot[erased.slot];
+        held.removed.push_back(own != kNoOwn ? held.own[own].id : erased.id);
+        dropOwn(erased.slot);
         held.sent[erased.slot] = 0u;
         --held.count;
         membership |= ReferenceBit(erased.id);
@@ -213,31 +254,68 @@ namespace faf::remote
         continue;
       }
       const bool wasSent = held.sent[slot] != 0u;
+      const wire::SEntityRecord& world = builder.RecordAt(slot);
+      const std::uint32_t own = held.ownSlot[slot];
       if (held.keep[slot] == 0u) {
         if (wasSent) {
-          held.removed.push_back(held.records[slot].id);
+          held.removed.push_back(own != kNoOwn ? held.own[own].id : world.id);
+          dropOwn(slot);
           held.sent[slot] = 0u;
           --held.count;
         }
+        builder.UnwatchRecord(slot);
         continue;
       }
-      wire::SEntityRecord next = builder.RecordAt(slot);
-      held.references[slot] = ReferenceFilter(next);
+      held.references[slot] = ReferenceFilter(world);
+      if (!NeedsOwnRecord(world, map, unheld)) {
+        // The client's record is the world's, without a copy; the elements stay in place.
+        if (!wasSent) {
+          held.sent[slot] = 1u;
+          ++held.count;
+          held.created.push_back(&world);
+        } else if (own != kNoOwn) {
+          const std::uint32_t fields = wire::ChangedFields(held.own[own], world);
+          if (fields != 0u) {
+            held.changed.push_back({fields, &world, &held.before.push_back(held.own[own])});
+          }
+          dropOwn(slot);
+        } else if (const wire::SEntityRecord* const before = builder.RecordBefore(slot); before != nullptr) {
+          const std::uint32_t fields = wire::ChangedFields(*before, world);
+          if (fields != 0u) {
+            held.changed.push_back({fields, &world, before});
+          }
+        }
+        builder.WatchRecord(slot);
+        continue;
+      }
+      wire::SEntityRecord next = world;
       ClearRecordReferences(next, unheld);
       map.TranslateRecord(next, isOwnCommand);
       if (!wasSent) {
-        held.records[slot] = std::move(next);
+        wire::SEntityRecord& created = takeOwn(slot);
+        created = std::move(next);
         held.sent[slot] = 1u;
         ++held.count;
-        held.created.push_back(&held.records[slot]);
-        continue;
+        held.created.push_back(&created);
+      } else if (own != kNoOwn) {
+        wire::SEntityRecord& record = held.own[own];
+        const std::uint32_t fields = wire::ChangedFields(record, next);
+        if (fields != 0u) {
+          const wire::SEntityRecord& before = held.before.push_back(std::move(record));
+          held.changed.push_back({fields, &record, &before}); // elements stay in place
+        }
+        record = std::move(next);
+      } else {
+        const wire::SEntityRecord* const saved = builder.RecordBefore(slot);
+        const wire::SEntityRecord& before = saved != nullptr ? *saved : world;
+        wire::SEntityRecord& record = takeOwn(slot);
+        record = std::move(next);
+        const std::uint32_t fields = wire::ChangedFields(before, record);
+        if (fields != 0u) {
+          held.changed.push_back({fields, &record, &before});
+        }
       }
-      const std::uint32_t fields = wire::ChangedFields(held.records[slot], next);
-      if (fields != 0u) {
-        const wire::SEntityRecord& before = held.before.push_back(std::move(held.records[slot]));
-        held.changed.push_back({fields, &held.records[slot], &before}); // elements stay in place
-      }
-      held.records[slot] = std::move(next);
+      builder.UnwatchRecord(slot);
     }
     std::sort(held.removed.begin(), held.removed.end());
     std::sort(held.created.begin(), held.created.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
@@ -280,7 +358,8 @@ namespace faf::remote
     kept.reserve(held.count);
     builder.ForEachRecord([&](const std::uint32_t, const std::uint32_t slot) {
       if (held.sent[slot] != 0u) {
-        kept.push_back(&held.records[slot]);
+        const std::uint32_t own = held.ownSlot[slot];
+        kept.push_back(own != kNoOwn ? &held.own[own] : &builder.RecordAt(slot));
       }
     });
     std::sort(kept.begin(), kept.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {

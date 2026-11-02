@@ -175,6 +175,30 @@ namespace faf::remote
       mTouchedIds.clear();
       mErasedRecords.clear();
     }
+    /**
+     * Plan WPR.35: for a caller that holds no copy of `slot`'s record because its own would be
+     * equal. The first change of a beat to a watched slot first saves the record (`RecordBefore`).
+     */
+    void WatchRecord(const std::uint32_t slot)
+    {
+      if (mBeforeIndex.size() <= slot) {
+        mBeforeIndex.resize(mWorldSlots.size(), kNotWatched);
+      }
+      mBeforeIndex[slot] = kWatched;
+    }
+    void UnwatchRecord(const std::uint32_t slot) noexcept
+    {
+      if (slot < mBeforeIndex.size()) {
+        mBeforeIndex[slot] = kNotWatched;
+      }
+    }
+    /** What a watched `slot` held before this beat's changes; null if it was not changed. */
+    [[nodiscard]] const wire::SEntityRecord* RecordBefore(const std::uint32_t slot) const noexcept
+    {
+      return slot < mBeforeIndex.size() && mBeforeIndex[slot] < kWatched ? &mBefore[mBeforeIndex[slot]] : nullptr;
+    }
+    /** Lets go of last beat's saved records; before this beat's changes. */
+    void ClearBefore() noexcept;
     /** How many slots records can lie in (a slot is below this). */
     [[nodiscard]] std::size_t SlotCount() const noexcept { return mWorldSlots.size(); }
     /** `visit(id, slot)` for every record, in ascending id order, without reading the records. */
@@ -234,6 +258,11 @@ namespace faf::remote
         return entry.id < value;
       });
     }
+    static constexpr std::uint32_t kWatched = 0xFFFFFFFEu;
+    static constexpr std::uint32_t kNotWatched = 0xFFFFFFFFu;
+
+    /** A watched slot's record is about to change. */
+    void SaveBefore(std::uint32_t slot);
     /** `id`'s record, or null. */
     [[nodiscard]] wire::SEntityRecord* FindRecord(std::uint32_t id);
     /** Stores `record` under its id, over any record that id has, and returns it in place. */
@@ -251,6 +280,9 @@ namespace faf::remote
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;
     std::vector<SErasedRecord> mErasedRecords;
+    std::vector<std::uint32_t> mBeforeIndex;  // per slot: index into `mBefore`, or the two above
+    std::vector<std::uint32_t> mBeforeSlots;  // the slots with a record in `mBefore`
+    gpg::core::ChunkedVector<wire::SEntityRecord> mBefore;
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`
