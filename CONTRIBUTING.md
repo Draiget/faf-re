@@ -31,7 +31,7 @@ Every engine function in `src/` was rebuilt from the original binary, and its be
 
 - Keep the `Address: 0x...` comment block above a recovered function, in the header and the `.cpp`. It is how anyone checks the code against the binary.
 - When you fix a function to match the binary, cite the instructions you read (`0x008581BB: ...`) in the comment or the PR.
-- Recovered layouts stay on the legacy types (`msvc8::vector`, `msvc8::string`, `gpg::` containers). The game's builds drop the unused word the binary keeps at the start of each container, so the `static_assert(sizeof(...))` checks and `+0x..` comments describe the binary, and the `clang-x86-retail-layout` preset is what checks them. Keep them, and build that preset when you change a layout.
+- Recovered layouts stay on the legacy types (`msvc8::vector`, `msvc8::string`, `gpg::` containers). The game's builds drop the unused word the binary keeps at the start of each container, so the `static_assert(sizeof(...))` checks and `+0x..` comments describe the binary, and the `clang-x86-retail-layout` preset is what checks them (the `Layout check` workflow compiles it on every change to the engine). Keep them, and build that preset when you change a layout.
 - Use named fields and real virtual calls, not pointer arithmetic or offsets (`*(int*)(p + 0x78)`).
 - No stub or placeholder functions.
 
