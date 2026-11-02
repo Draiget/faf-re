@@ -588,14 +588,12 @@ int moho::cfunc_KillThreadL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState* const threadState = LuaPlus::LuaState::CastState(rawThreadState);
     (void)lua_gethookmask(state->m_state);
     if (threadState) {
-      if (threadState->m_rootState == threadState) {
+      CLuaTask* const threadTask = threadState->m_luaTask;
+      if (threadState->m_rootState == threadState || threadTask == nullptr) {
         LuaPlus::LuaState::Error(state, kKillThreadForkOnlyError);
       }
 
-      CLuaTask* const threadTask = threadState->m_luaTask;
-      if (threadTask != nullptr) {
-        threadTask->mOwnerThread->Destroy();
-      }
+      threadTask->mOwnerThread->Destroy();
     }
   }
 

@@ -11796,15 +11796,46 @@ namespace
 	 * Creates one new coroutine thread and moves arg-1 Lua function onto the
 	 * new thread stack as its entry lane.
 	 */
-	int luaB_cocreate(lua_State* const state)
+	/**
+	 * Creates a new coroutine thread using the internals of ForkThread (allocating
+	 * a LuaPlus::LuaState wrapper, setting up stateUserData, and mirroring active
+	 * hook settings), but leaving control over execution to Lua (not attaching to
+	 * an engine CTaskThread / CTaskStage scheduler).
+	 */
+	static lua_State* create_coroutine(lua_State* const state)
 	{
-		lua_State* const newThread = lua_newthread(state);
 		if (lua_type(state, 1) != LUA_TFUNCTION) {
 			luaL_argerror(state, 1, "Lua function expected");
 		}
 
+		LuaPlus::LuaState* const parentState = state->stateUserData;
+		if (parentState != nullptr) {
+			auto* const threadState = new LuaPlus::LuaState(parentState);
+			lua_State* const newThread = threadState->m_state;
+
+			lua_pushvalue(state, 1);
+			lua_xmove(state, newThread, 1);
+
+			const int hookMask = lua_gethookmask(state);
+			if (hookMask != 0) {
+				const lua_Hook hookFunction = lua_gethook(state);
+				lua_sethook(newThread, hookFunction, hookMask, 0);
+			}
+
+			threadState->m_threadObj.PushStack(state);
+			threadState->m_threadObj.Reset();
+			return newThread;
+		}
+
+		lua_State* const newThread = lua_newthread(state);
 		lua_pushvalue(state, 1);
 		lua_xmove(state, newThread, 1);
+		return newThread;
+	}
+
+	int luaB_cocreate(lua_State* const state)
+	{
+		(void)create_coroutine(state);
 		return 1;
 	}
 
@@ -12175,13 +12206,7 @@ namespace
 	 */
 	int luaB_cowrap(lua_State* const state)
 	{
-		lua_State* const newThread = lua_newthread(state);
-		if (lua_type(state, 1) != LUA_TFUNCTION) {
-			luaL_argerror(state, 1, "Lua function expected");
-		}
-
-		lua_pushvalue(state, 1);
-		lua_xmove(state, newThread, 1);
+		(void)create_coroutine(state);
 		lua_pushcclosure(state, luaB_auxwrap, 1);
 		return 1;
 	}
@@ -15678,6 +15703,13 @@ extern "C"
 		global_State* const globalState = state->l_G;
 		if (globalState != nullptr && globalState->lstate == thread) {
 			globalState->lstate = globalState->mainthread;
+		}
+
+		if (thread->stateUserData != nullptr) {
+			if (thread->stateUserData->m_luaTask == nullptr) {
+				delete thread->stateUserData;
+				thread->stateUserData = nullptr;
+			}
 		}
 
 		luaF_close(thread, thread->stack);

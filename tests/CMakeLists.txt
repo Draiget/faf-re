@@ -103,3 +103,8 @@ add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPac
 target_link_libraries(faf_recon_scroll_packet_tests PRIVATE faf_engine)
 add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
 set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120)
+
+# Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
+add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
+target_link_libraries(faf_coroutine_tests PRIVATE faf_engine)
+add_test(NAME lua_coroutine COMMAND faf_coroutine_tests)
