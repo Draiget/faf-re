@@ -324,6 +324,42 @@ namespace faf::remote
     mDroppedStats.clear();
   }
 
+  wire::SEntityRecord* CViewFrameBuilder::FindRecord(const std::uint32_t id)
+  {
+    const auto found = LowerBound(id);
+    return found != mWorldIndex.end() && found->id == id ? &mWorldSlots[found->slot] : nullptr;
+  }
+
+  wire::SEntityRecord& CViewFrameBuilder::PutRecord(const wire::SEntityRecord& record)
+  {
+    const auto found = LowerBound(record.id);
+    if (found != mWorldIndex.end() && found->id == record.id) {
+      return mWorldSlots[found->slot] = record;
+    }
+    std::uint32_t slot;
+    if (!mFreeSlots.empty()) {
+      slot = mFreeSlots.back();
+      mFreeSlots.pop_back();
+      mWorldSlots[slot] = record;
+    } else {
+      slot = static_cast<std::uint32_t>(mWorldSlots.size());
+      mWorldSlots.push_back(record);
+    }
+    mWorldIndex.insert(found, SWorldEntry{record.id, slot});
+    return mWorldSlots[slot];
+  }
+
+  void CViewFrameBuilder::EraseRecord(const std::uint32_t id)
+  {
+    const auto found = LowerBound(id);
+    if (found == mWorldIndex.end() || found->id != id) {
+      return;
+    }
+    mWorldSlots[found->slot] = wire::SEntityRecord{}; // lets go of what the record shares
+    mFreeSlots.push_back(found->slot);
+    mWorldIndex.erase(found);
+  }
+
   void CViewFrameBuilder::Apply(const moho::SSyncData& packet)
   {
     // Resource deposits the sim added since the last beat go on the session record (the sim
@@ -384,7 +420,7 @@ namespace faf::remote
     const auto beat = static_cast<std::uint32_t>(packet.mCurBeat);
     for (auto it = mOrphanedAt.begin(); it != mOrphanedAt.end();) {
       if (beat - it->second >= mOrphanBeats) {
-        mWorld.erase(it->first);
+        EraseRecord(it->first);
         DropStats(it->first);
         it = mOrphanedAt.erase(it);
       } else {
@@ -404,7 +440,7 @@ namespace faf::remote
         }
       }
       mOrphanedAt.erase(record.id); // an id the sim reuses is a new entity
-      return mWorld[record.id] = record;
+      return PutRecord(record);
     };
     for (const moho::SCreateEntityParams& params : packet.mNewEntities) {
       (void)create(params);
@@ -420,29 +456,27 @@ namespace faf::remote
       }
     }
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
-      const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
-      if (it != mWorld.end()) {
-        ApplyVariableData(it->second, update.mVariableData, mCodec, mTables, mSession, mUnknownUnderlays);
+      if (wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(update.mEntityId)); record != nullptr) {
+        ApplyVariableData(*record, update.mVariableData, mCodec, mTables, mSession, mUnknownUnderlays);
       }
     }
     for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
-      const auto it = mWorld.find(static_cast<std::uint32_t>(update.mEntityId));
-      if (it != mWorld.end() && it->second.isUnit) {
-        ApplyUnitData(it->second.unit, update.mVariableData);
+      wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(update.mEntityId));
+      if (record != nullptr && record->isUnit) {
+        ApplyUnitData(record->unit, update.mVariableData);
         // Built aside and kept shared with the frames before unless it changed.
         ApplyUnitDetail(mDetailScratch, update.mVariableData, update.mReconFlags, mTables, mSession);
-        it->second.unit.detail.Assign(mDetailScratch);
+        record->unit.detail.Assign(mDetailScratch);
       }
     }
     for (const moho::EntId id : packet.mEraseIds) {
-      const auto it = mWorld.find(static_cast<std::uint32_t>(id));
-      if (it != mWorld.end()) {
-        it->second.flags |= kEntityFlagOrphaned;
-        mOrphanedAt.emplace(it->first, beat);
+      if (wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(id)); record != nullptr) {
+        record->flags |= kEntityFlagOrphaned;
+        mOrphanedAt.emplace(record->id, beat);
       }
     }
     for (const moho::EntId id : packet.mDeleteIds) {
-      mWorld.erase(static_cast<std::uint32_t>(id));
+      EraseRecord(static_cast<std::uint32_t>(id));
       DropStats(static_cast<std::uint32_t>(id));
       mOrphanedAt.erase(static_cast<std::uint32_t>(id));
     }
@@ -457,9 +491,9 @@ namespace faf::remote
     // every unit's tree is read again for each frame.
     if (mSession != nullptr) {
       for (const auto& [id, stats] : mUnitStats) {
-        if (const auto it = mWorld.find(id); it != mWorld.end()) {
+        if (wire::SEntityRecord* const record = FindRecord(id); record != nullptr) {
           ReadUnitStats(*stats, *mSession, mStatsScratch);
-          it->second.unit.stats.Assign(mStatsScratch);
+          record->unit.stats.Assign(mStatsScratch);
         }
       }
     }

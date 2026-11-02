@@ -3,9 +3,9 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
+#include "gpg/core/containers/FlatGenerationMap.h"
 #include "remote/BeatChangeSet.h"
 
 // Engine addition, server mode (plan WP5.2): the entity lanes of the packet a lockstep client
@@ -93,7 +93,7 @@ namespace faf::remote
 
     void SyncForView(
       moho::Sim& sim, std::int32_t army, const SChangedEntity& changed, moho::SSyncData& out,
-      std::unordered_map<std::uint32_t, SViewEntity>& view
+      gpg::core::FlatGenerationMap<SViewEntity>& view
     );
 
   protected:
@@ -110,6 +110,6 @@ namespace faf::remote
     bool mSkipCivilians = false;
     std::chrono::steady_clock::time_point mBuildStart{};
     double mBuildSeconds = 0.0;
-    std::vector<std::unordered_map<std::uint32_t, SViewEntity>> mViews;
+    std::vector<gpg::core::FlatGenerationMap<SViewEntity>> mViews;
   };
 } // namespace faf::remote

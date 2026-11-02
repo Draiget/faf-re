@@ -152,7 +152,7 @@ namespace faf::remote
 
   void CViewPackets::SyncForView(
     moho::Sim& sim, const std::int32_t army, const SChangedEntity& changed, moho::SSyncData& out,
-    std::unordered_map<std::uint32_t, SViewEntity>& view
+    gpg::core::FlatGenerationMap<SViewEntity>& view
   )
   {
     moho::Entity& entity = *changed.entity;
@@ -164,22 +164,23 @@ namespace faf::remote
 
     if (!visibility.published) {
       // `Entity::Sync` 0x0067A0EA..0x0067A102 / `Prop::Sync` 0x006FA2B8..0x006FA2F1.
-      const auto found = view.find(id);
-      if (found != view.end() && found->second.created) {
+      SViewEntity* const found = view.Find(id);
+      if (found != nullptr && found->created) {
         if (prop != nullptr && prop->mReclaimTerminated) {
           out.mEraseIds.push_back(entity.id_);
         } else {
           out.mDeleteIds.push_back(entity.id_);
         }
-        found->second.created = false;
+        found->created = false;
       }
-      if (entity.mOnDestroyDispatched != 0u && found != view.end()) {
-        view.erase(found); // a later entity with this id is a new one
+      if (entity.mOnDestroyDispatched != 0u && found != nullptr) {
+        view.Erase(id); // a later entity with this id is a new one
       }
       return;
     }
 
-    SViewEntity& state = view[id];
+    SViewEntity* const known = view.Find(id);
+    SViewEntity& state = known != nullptr ? *known : view.Insert(id, SViewEntity{});
     if (!state.created) {
       if (unit != nullptr || blip != nullptr) {
         // `Unit::CreateInterface` 0x006AC2C0 / `ReconBlip::CreateInterface` 0x005BEE90.

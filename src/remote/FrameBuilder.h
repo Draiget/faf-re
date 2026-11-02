@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <vector>
@@ -104,8 +105,9 @@ namespace faf::remote
     [[nodiscard]] wire::SViewFrame Build(const std::uint32_t beat, Keep&& keep)
     {
       wire::SViewFrame frame = StartFrame(beat);
-      frame.entities.reserve(mWorld.size());
-      for (const auto& [id, record] : mWorld) {
+      frame.entities.reserve(mWorldIndex.size());
+      for (const SWorldEntry& entry : mWorldIndex) {
+        const wire::SEntityRecord& record = mWorldSlots[entry.slot];
         if (keep(record)) {
           frame.entities.push_back(record);
         }
@@ -114,9 +116,13 @@ namespace faf::remote
     }
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
-    [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorld.size(); }
+    [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorldIndex.size(); }
     /** Whether the client still holds a record of `id` (orphans included). */
-    [[nodiscard]] bool Holds(std::uint32_t id) const { return mWorld.contains(id); }
+    [[nodiscard]] bool Holds(const std::uint32_t id) const
+    {
+      const auto found = LowerBound(id);
+      return found != mWorldIndex.end() && found->id == id;
+    }
     /** Creations whose blueprint is missing from the content tables (should stay 0). */
     [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept { return mUnknownBlueprints; }
     /** Underlay textures that are not plain file textures (should stay 0). */
@@ -136,10 +142,33 @@ namespace faf::remote
     /** An empty frame stamped with `beat` and the next frame id, after the units' stats are read. */
     [[nodiscard]] wire::SViewFrame StartFrame(std::uint32_t beat);
 
+    /** One record of the world: its id and where it lies in `mWorldSlots`. */
+    struct SWorldEntry
+    {
+      std::uint32_t id;
+      std::uint32_t slot;
+    };
+
+    [[nodiscard]] std::vector<SWorldEntry>::const_iterator LowerBound(const std::uint32_t id) const
+    {
+      return std::lower_bound(mWorldIndex.begin(), mWorldIndex.end(), id, [](const SWorldEntry& entry, const std::uint32_t value) {
+        return entry.id < value;
+      });
+    }
+    /** `id`'s record, or null. */
+    [[nodiscard]] wire::SEntityRecord* FindRecord(std::uint32_t id);
+    /** Stores `record` under its id, over any record that id has, and returns it in place. */
+    wire::SEntityRecord& PutRecord(const wire::SEntityRecord& record);
+    void EraseRecord(std::uint32_t id);
+
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
     std::uint32_t mOrphanBeats;
-    std::map<std::uint32_t, wire::SEntityRecord> mWorld;
+    // The world in ascending id order, as frames list it. Plan WPR.35: one flat index over stable
+    // slots, so each beat's thousands of lookups and the frame's walk stay within a few arrays.
+    std::vector<SWorldEntry> mWorldIndex;
+    std::vector<wire::SEntityRecord> mWorldSlots;
+    std::vector<std::uint32_t> mFreeSlots;
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`

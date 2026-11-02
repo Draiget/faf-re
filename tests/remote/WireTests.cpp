@@ -15,10 +15,12 @@
 #include <cstdio>
 #include <exception>
 #include <limits>
+#include <map>
 #include <random>
 #include <string>
 #include <vector>
 
+#include "gpg/core/containers/FlatGenerationMap.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
 #include "lua/LuaObject.h"
@@ -1651,6 +1653,43 @@ namespace
     return Bytes(writer);
   }
 
+  // The view packets' per-view state: inserts, finds and erases against a reference map, in a
+  // table small enough for long probe runs and wrap-around, and over clears.
+  void TestFlatMapEraseMatchesMap()
+  {
+    std::mt19937 rng(20261103u);
+    for (int round = 0; round < 40; ++round) {
+      gpg::core::FlatGenerationMap<std::uint32_t> flat(1u + rng() % 6u);
+      std::map<std::uint32_t, std::uint32_t> reference;
+      const std::uint32_t keySpace = 8u + rng() % 400u;
+      for (int step = 0; step < 4000; ++step) {
+        const std::uint32_t key = rng() % keySpace;
+        const std::uint32_t action = rng() % 100u;
+        if (action < 45u) {
+          if (flat.Find(key) == nullptr) {
+            flat.Insert(key, step);
+            reference[key] = static_cast<std::uint32_t>(step);
+          }
+        } else if (action < 90u) {
+          flat.Erase(key);
+          reference.erase(key);
+        } else if (action == 99u && step % 7 == 0) {
+          flat.Clear();
+          reference.clear();
+        }
+        const std::uint32_t* const found = flat.Find(key);
+        const auto expected = reference.find(key);
+        CHECK((found != nullptr) == (expected != reference.end()));
+        if (found != nullptr && expected != reference.end()) {
+          CHECK(*found == expected->second);
+        }
+      }
+      for (std::uint32_t key = 0; key < keySpace; ++key) {
+        CHECK((flat.Find(key) != nullptr) == reference.contains(key));
+      }
+    }
+  }
+
   void TestGridDeltaMatchesCellAtATime()
   {
     std::mt19937 rng(20261102u);
@@ -2141,6 +2180,7 @@ namespace
     {"view ids: inbound translation of commands", &TestInboundIds},
     {"grids: delta round trip", &TestGridDeltaRoundTrip},
     {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
+    {"flat map: erase against a reference map", &TestFlatMapEraseMatchesMap},
     {"grids: same bytes as cell at a time", &TestGridDeltaMatchesCellAtATime},
     {"grids: hostile input", &TestGridDeltaHostile},
     {"sounds: session table", &TestSoundTable},
