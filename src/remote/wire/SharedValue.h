@@ -38,12 +38,14 @@ namespace faf::remote::wire
       return const_cast<T&>(*mValue);
     }
 
-    /** Replaces the value unless it is equal already (keeping the sharing). */
-    void Assign(const T& value)
+    /** Replaces the value unless it is equal already (keeping the sharing); whether it did. */
+    bool Assign(const T& value)
     {
-      if (!(*mValue == value)) {
-        mValue = std::make_shared<const T>(value);
+      if (*mValue == value) {
+        return false;
       }
+      mValue = std::make_shared<const T>(value);
+      return true;
     }
 
     [[nodiscard]] bool operator==(const TSharedValue& other) const noexcept

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <unordered_set>
@@ -54,6 +55,26 @@ namespace faf::remote
       const auto index = static_cast<std::size_t>(army);
       return mHavePrevious[index] ? &mPreviousFrames[index] : nullptr;
     }
+    /**
+     * Plan WPR.35: from the next beat on, each view keeps its frame between beats and each beat
+     * handles only the records that changed, so a record that did not change is neither copied,
+     * translated nor compared. `Frame` and `PreviousFrame` then stay empty: a server asks
+     * `HeldCount` and `EncodeHeldFrame`. With `check` every view's frame is also built whole
+     * (with its own id map) and compared, record by record and byte by byte (`HeldMismatches`).
+     */
+    void EnableHeldFrames(const bool check = false) noexcept
+    {
+      mHeldOn = true;
+      mHeldCheck = check;
+    }
+    [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
+    /** The records in `army`'s last frame (with `EnableHeldFrames`). */
+    [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
+    /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
+    [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /** Differences the check found (should stay 0). */
+    [[nodiscard]] std::uint64_t HeldMismatches() const noexcept;
+
     /** Records `army`'s client holds that its last frame withheld. */
     [[nodiscard]] std::uint32_t Withheld(std::int32_t army) const { return mWithheld[static_cast<std::size_t>(army)]; }
 
@@ -64,12 +85,44 @@ namespace faf::remote
     virtual void OnViewFrames(moho::Sim& sim) { (void)sim; }
 
   private:
+    /** One view's frame kept between beats, and what its last beat changed. */
+    struct SHeldView
+    {
+      std::vector<wire::SEntityRecord> records; // by the builder's slot, in the view's ids
+      std::vector<std::uint8_t> sent;           // per slot: `records` holds what the client holds
+      std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
+      std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
+      std::size_t count = 0;
+      std::uint32_t frameId = 0;
+      std::uint32_t baselineId = wire::kNoBaseline;
+      std::uint32_t beat = 0;
+      std::vector<std::uint32_t> candidates;
+      std::vector<std::uint32_t> removed;
+      std::vector<const wire::SEntityRecord*> created;
+      std::vector<wire::SFrameChange> changed;
+      std::vector<wire::SEntityRecord> before; // the changed records as the client held them
+      // With the check:
+      std::unique_ptr<CViewIdMap> checkMap;
+      wire::SViewFrame checkPrevious;
+      bool haveCheckPrevious = false;
+      std::uint64_t mismatches = 0;
+    };
+
+    /** The view's frame from its packet, keeping what did not change (`EnableHeldFrames`). */
+    void BuildHeldFrame(moho::Sim& sim, std::size_t army, const moho::SSyncData& packet);
+    /** Compares the held frame with the whole frame built from the same world. */
+    void CheckHeldFrame(moho::Sim& sim, std::size_t army, const CViewIdMap::OwnCommandTest& isOwnCommand);
+    /** The retirements of a beat before ids are translated, on `map`. */
+    void AdvanceIdMap(moho::Sim& sim, std::size_t army, CViewIdMap& map);
     /** References to entities `frame` does not hold become the sim's "none" (plan WP5.12). */
     static void ClearUnheldReferences(wire::SViewFrame& frame);
 
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
+    std::vector<SHeldView> mHeld;
+    bool mHeldOn = false;
+    bool mHeldCheck = false;
     std::vector<wire::SViewFrame> mFrames;
     std::vector<wire::SViewFrame> mPreviousFrames;
     std::vector<bool> mHavePrevious; // per view: mPreviousFrames holds a frame (written on the sim thread only)

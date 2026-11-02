@@ -1067,6 +1067,50 @@ namespace faf::remote::wire
     return delta;
   }
 
+  namespace
+  {
+    /** The frame's header and its removed, created and changed records. */
+    void WriteFrameChanges(
+      const std::uint32_t frameId, const std::uint32_t baselineId, const std::uint32_t beat, const std::int32_t simRate,
+      const std::uint32_t serverMs, const std::span<const std::uint32_t> removed,
+      const std::span<const SEntityRecord* const> created, const std::span<const SFrameChange> changed,
+      const SFrameCodec& codec, BitWriter& writer
+    )
+    {
+      writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
+      writer.WriteBits(frameId, 32);
+      writer.WriteBits(baselineId, 32);
+      writer.WriteBits(beat, 32);
+      writer.WriteVarUint(ZigZag(simRate));
+      writer.WriteBits(serverMs, 32);
+
+      bool first = true;
+      std::uint32_t previous = 0;
+      writer.WriteVarUint(static_cast<std::uint32_t>(removed.size()));
+      for (const std::uint32_t id : removed) {
+        WriteGap(writer, first, previous, id);
+      }
+
+      first = true;
+      writer.WriteVarUint(static_cast<std::uint32_t>(created.size()));
+      for (const SEntityRecord* const record : created) {
+        WriteGap(writer, first, previous, record->id);
+        const std::uint32_t fields = CreationFields(*record);
+        writer.WriteVarUint(fields);
+        writer.WriteVarUint(record->tickCreated);
+        WriteFields(writer, *record, fields, codec, beat, nullptr);
+      }
+
+      first = true;
+      writer.WriteVarUint(static_cast<std::uint32_t>(changed.size()));
+      for (const SFrameChange& change : changed) {
+        WriteGap(writer, first, previous, change.after->id);
+        writer.WriteVarUint(change.fields);
+        WriteFields(writer, *change.after, change.fields, codec, beat, change.before);
+      }
+    }
+  } // namespace
+
   bool EncodeFrame(const SViewFrame& frame, const SViewFrame* const baseline, const SFrameCodec& codec, BitWriter& writer)
   {
     if (!frame.IsWellFormed() || (baseline != nullptr && !baseline->IsWellFormed())
@@ -1083,13 +1127,7 @@ namespace faf::remote::wire
     // records (a server encodes every view's frame each beat), and each change's baseline record.
     std::vector<std::uint32_t> removed;
     std::vector<const SEntityRecord*> created;
-    struct SChangeRef
-    {
-      std::uint32_t fields;
-      const SEntityRecord* after;
-      const SEntityRecord* before;
-    };
-    std::vector<SChangeRef> changed;
+    std::vector<SFrameChange> changed;
     {
       static const std::vector<SEntityRecord> kEmpty;
       const std::vector<SEntityRecord>& before = baseline != nullptr ? baseline->entities : kEmpty;
@@ -1112,37 +1150,32 @@ namespace faf::remote::wire
         }
       }
     }
-    writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
-    writer.WriteBits(frame.frameId, 32);
-    writer.WriteBits(baseline != nullptr ? baseline->frameId : kNoBaseline, 32);
-    writer.WriteBits(frame.beat, 32);
-    writer.WriteVarUint(ZigZag(frame.simRate));
-    writer.WriteBits(frame.serverMs, 32);
+    WriteFrameChanges(
+      frame.frameId, baseline != nullptr ? baseline->frameId : kNoBaseline, frame.beat, frame.simRate, frame.serverMs, removed,
+      created, changed, codec, writer
+    );
+    return true;
+  }
 
-    bool first = true;
-    std::uint32_t previous = 0;
-    writer.WriteVarUint(static_cast<std::uint32_t>(removed.size()));
-    for (const std::uint32_t id : removed) {
-      WriteGap(writer, first, previous, id);
+  bool EncodeFrameChanges(const SFrameChanges& changes, const SFrameCodec& codec, BitWriter& writer)
+  {
+    if (changes.entityCount > codec.maxEntities) {
+      return false;
     }
-
-    first = true;
-    writer.WriteVarUint(static_cast<std::uint32_t>(created.size()));
-    for (const SEntityRecord* const record : created) {
-      WriteGap(writer, first, previous, record->id);
-      const std::uint32_t fields = CreationFields(*record);
-      writer.WriteVarUint(fields);
-      writer.WriteVarUint(record->tickCreated);
-      WriteFields(writer, *record, fields, codec, frame.beat, nullptr);
+    for (const SEntityRecord* const record : changes.created) {
+      if (!FitsCodec(*record, codec, changes.beat)) {
+        return false;
+      }
     }
-
-    first = true;
-    writer.WriteVarUint(static_cast<std::uint32_t>(changed.size()));
-    for (const SChangeRef& change : changed) {
-      WriteGap(writer, first, previous, change.after->id);
-      writer.WriteVarUint(change.fields);
-      WriteFields(writer, *change.after, change.fields, codec, frame.beat, change.before);
+    for (const SFrameChange& change : changes.changed) {
+      if (!FitsCodec(*change.after, codec, changes.beat)) {
+        return false;
+      }
     }
+    WriteFrameChanges(
+      changes.frameId, changes.baselineId, changes.beat, changes.simRate, changes.serverMs, changes.removed, changes.created,
+      changes.changed, codec, writer
+    );
     return true;
   }
 

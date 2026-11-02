@@ -35,6 +35,7 @@ namespace faf::headless
     int viewAckDelay = 0;        // its acknowledgements' delay in beats
     bool spy = false;            // with `viewFramesPath`: the spy client's checks (ReplayViewFrameStats.h)
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
+    bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one
     std::string viewBenchPath;   // when set: the server's per-beat view work, timed (CSV; ReplayViewBench.h)
     bool inboundCheck = false;   // with `viewIds`: every command through view ids and back (ReplayInboundCheck.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat

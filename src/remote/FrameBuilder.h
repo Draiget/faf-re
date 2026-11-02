@@ -106,6 +106,16 @@ namespace faf::remote
     [[nodiscard]] wire::SViewFrame Build(const std::uint32_t beat, Keep&& keep)
     {
       wire::SViewFrame frame = StartFrame(beat);
+      FillFrame(frame, keep);
+      return frame;
+    }
+
+    /** An empty frame stamped with `beat` and the next frame id, after the units' stats are read. */
+    [[nodiscard]] wire::SViewFrame StartFrame(std::uint32_t beat);
+    /** Adds the world's records `keep` accepts to `frame`. */
+    template <class Keep>
+    void FillFrame(wire::SViewFrame& frame, Keep&& keep) const
+    {
       frame.entities.reserve(mWorldIndex.size());
       for (const SWorldEntry& entry : mWorldIndex) {
         const wire::SEntityRecord& record = mWorldSlots[entry.slot];
@@ -113,8 +123,48 @@ namespace faf::remote
           frame.entities.push_back(record);
         }
       }
-      return frame;
     }
+
+    /** A record that left the world: its id and the slot it had. */
+    struct SErasedRecord
+    {
+      std::uint32_t id;
+      std::uint32_t slot;
+    };
+    /**
+     * Plan WPR.35: from now on `TouchedIds` and `ErasedRecords` say which records changed since
+     * `ClearChanges`, for a caller that keeps its frame between beats.
+     */
+    void TrackChanges() noexcept { mTrackChanges = true; }
+    /** Ids of the records created or changed; an id can be listed more than once. */
+    [[nodiscard]] const std::vector<std::uint32_t>& TouchedIds() const noexcept { return mTouchedIds; }
+    [[nodiscard]] const std::vector<SErasedRecord>& ErasedRecords() const noexcept { return mErasedRecords; }
+    void ClearChanges() noexcept
+    {
+      mTouchedIds.clear();
+      mErasedRecords.clear();
+    }
+    /** How many slots records can lie in (a slot is below this). */
+    [[nodiscard]] std::size_t SlotCount() const noexcept { return mWorldSlots.size(); }
+    /** `visit(id, slot)` for every record, in ascending id order, without reading the records. */
+    template <class Visit>
+    void ForEachRecord(Visit&& visit) const
+    {
+      for (const SWorldEntry& entry : mWorldIndex) {
+        visit(entry.id, entry.slot);
+      }
+    }
+    /** The slot of `id`'s record, if the world has one. */
+    [[nodiscard]] bool FindSlot(const std::uint32_t id, std::uint32_t& slot) const
+    {
+      const auto found = LowerBound(id);
+      if (found == mWorldIndex.end() || found->id != id) {
+        return false;
+      }
+      slot = found->slot;
+      return true;
+    }
+    [[nodiscard]] const wire::SEntityRecord& RecordAt(const std::uint32_t slot) const { return mWorldSlots[slot]; }
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
     [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorldIndex.size(); }
@@ -140,9 +190,6 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
 
   private:
-    /** An empty frame stamped with `beat` and the next frame id, after the units' stats are read. */
-    [[nodiscard]] wire::SViewFrame StartFrame(std::uint32_t beat);
-
     /** One record of the world: its id and where it lies in `mWorldSlots`. */
     struct SWorldEntry
     {
@@ -170,6 +217,9 @@ namespace faf::remote
     std::vector<SWorldEntry> mWorldIndex;
     std::vector<wire::SEntityRecord> mWorldSlots;
     std::vector<std::uint32_t> mFreeSlots;
+    bool mTrackChanges = false;
+    std::vector<std::uint32_t> mTouchedIds;
+    std::vector<SErasedRecord> mErasedRecords;
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`

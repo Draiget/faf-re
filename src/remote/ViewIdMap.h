@@ -49,6 +49,8 @@ namespace faf::remote
      * into view ids, allocating on first appearance, and sorts the records by their new ids.
      */
     void Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand);
+    /** `Translate` for one record, without the sort. */
+    void TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand);
 
     /**
      * Beats a retired view id still translates inbound: a client's command can name an entity it

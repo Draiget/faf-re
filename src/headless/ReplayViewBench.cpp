@@ -55,13 +55,15 @@ namespace faf::headless
   } // namespace
 
   CReplayViewBench::CReplayViewBench(
-    const std::string& path, const remote::wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ
+    const std::string& path, const remote::wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ,
+    const bool check
   )
     : remote::CViewFrames(tables, MakeCodec(mapSizeX, mapSizeZ))
     , mCodec(MakeCodec(mapSizeX, mapSizeZ))
   {
     EnableIdMaps();       // the server's frames carry each view's own ids
     SkipCivilianViews(); // and no client receives a civilian army's view
+    EnableHeldFrames(check);
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -168,7 +170,7 @@ namespace faf::headless
       }
       ++mViews;
       SClient& client = mClients[army];
-      entities += Frame(static_cast<std::int32_t>(army)).entities.size();
+      entities += HeldCount(static_cast<std::int32_t>(army));
       bytes += client.bytes;
       mClientBeatBytes.push_back(client.bytes);
       mEncodeFailures += client.failures;
@@ -196,10 +198,9 @@ namespace faf::headless
       return; // a civilian army: no client
     }
 
-    // Entity lanes: the view's frame against the one its client holds, the view's previous frame
-    // (kept by CViewFrames without a copy).
+    // Entity lanes: the view's frame against the one its client holds.
     remote::wire::BitWriter frameWriter;
-    if (remote::wire::EncodeFrame(Frame(view), PreviousFrame(view), mCodec, frameWriter)) {
+    if (EncodeHeldFrame(view, frameWriter)) {
       client.bytes += static_cast<std::uint32_t>(frameWriter.Bytes().size());
     } else {
       ++client.failures;
@@ -260,8 +261,9 @@ namespace faf::headless
     std::string summary;
     char text[200];
     std::snprintf(
-      text, sizeof(text), "view bench: %zu beats, %zu views (%s), %llu encode failures, %.0f entities per beat",
+      text, sizeof(text), "view bench: %zu beats, %zu views (%s), %llu encode failures, %llu check differences, %.0f entities per beat",
       mBeats.size(), mViews, Parallel() ? "parallel" : "serial", static_cast<unsigned long long>(mEncodeFailures),
+      static_cast<unsigned long long>(HeldMismatches()),
       mBeats.empty() ? 0.0 : static_cast<double>(mEntities) / static_cast<double>(mBeats.size() + 1u)
     );
     summary = text;

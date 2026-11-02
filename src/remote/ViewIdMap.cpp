@@ -70,44 +70,49 @@ namespace faf::remote
     return viewId;
   }
 
+  void CViewIdMap::TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand)
+  {
+    record.id = Entity(record.id);
+    if (record.appearance.attachParent != wire::SAppearance::kNoAttachParent) {
+      record.appearance.attachParent = Entity(record.appearance.attachParent);
+    }
+    for (std::uint32_t& child : record.appearance.attachments) {
+      child = Entity(child);
+    }
+    if (!record.isUnit) {
+      return;
+    }
+    // The detail is a value shared with the builder's world and earlier frames: it is copied
+    // only when one of its ids is renumbered.
+    const wire::SUnitDetail& shared = *record.unit.detail;
+    const auto foreignCommand = [&isOwnCommand](const std::int32_t command) {
+      return !isOwnCommand(static_cast<std::uint32_t>(command));
+    };
+    if (!MapsEntity(shared.creator) && !MapsEntity(shared.selectionInheritor) && !MapsEntity(shared.focusUnit)
+        && !MapsEntity(shared.guardedUnit) && !MapsEntity(shared.targetBlip)
+        && std::none_of(shared.commands.begin(), shared.commands.end(), foreignCommand)
+        && std::none_of(shared.buildQueue.begin(), shared.buildQueue.end(), foreignCommand)) {
+      return;
+    }
+    wire::SUnitDetail detail = shared;
+    detail.creator = Entity(detail.creator);
+    detail.selectionInheritor = Entity(detail.selectionInheritor);
+    detail.focusUnit = Entity(detail.focusUnit);
+    detail.guardedUnit = Entity(detail.guardedUnit);
+    detail.targetBlip = Entity(detail.targetBlip);
+    for (std::int32_t& command : detail.commands) {
+      command = static_cast<std::int32_t>(Command(static_cast<std::uint32_t>(command), isOwnCommand));
+    }
+    for (std::int32_t& command : detail.buildQueue) {
+      command = static_cast<std::int32_t>(Command(static_cast<std::uint32_t>(command), isOwnCommand));
+    }
+    (void)record.unit.detail.Assign(detail);
+  }
+
   void CViewIdMap::Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand)
   {
     for (wire::SEntityRecord& record : frame.entities) {
-      record.id = Entity(record.id);
-      if (record.appearance.attachParent != wire::SAppearance::kNoAttachParent) {
-        record.appearance.attachParent = Entity(record.appearance.attachParent);
-      }
-      for (std::uint32_t& child : record.appearance.attachments) {
-        child = Entity(child);
-      }
-      if (!record.isUnit) {
-        continue;
-      }
-      // The detail is a value shared with the builder's world and earlier frames: it is copied
-      // only when one of its ids is renumbered.
-      const wire::SUnitDetail& shared = *record.unit.detail;
-      const auto foreignCommand = [&isOwnCommand](const std::int32_t command) {
-        return !isOwnCommand(static_cast<std::uint32_t>(command));
-      };
-      if (!MapsEntity(shared.creator) && !MapsEntity(shared.selectionInheritor) && !MapsEntity(shared.focusUnit)
-          && !MapsEntity(shared.guardedUnit) && !MapsEntity(shared.targetBlip)
-          && std::none_of(shared.commands.begin(), shared.commands.end(), foreignCommand)
-          && std::none_of(shared.buildQueue.begin(), shared.buildQueue.end(), foreignCommand)) {
-        continue;
-      }
-      wire::SUnitDetail detail = shared;
-      detail.creator = Entity(detail.creator);
-      detail.selectionInheritor = Entity(detail.selectionInheritor);
-      detail.focusUnit = Entity(detail.focusUnit);
-      detail.guardedUnit = Entity(detail.guardedUnit);
-      detail.targetBlip = Entity(detail.targetBlip);
-      for (std::int32_t& command : detail.commands) {
-        command = static_cast<std::int32_t>(Command(static_cast<std::uint32_t>(command), isOwnCommand));
-      }
-      for (std::int32_t& command : detail.buildQueue) {
-        command = static_cast<std::int32_t>(Command(static_cast<std::uint32_t>(command), isOwnCommand));
-      }
-      record.unit.detail.Assign(detail);
+      TranslateRecord(record, isOwnCommand);
     }
     std::sort(frame.entities.begin(), frame.entities.end(), [](const wire::SEntityRecord& a, const wire::SEntityRecord& b) {
       return a.id < b.id;

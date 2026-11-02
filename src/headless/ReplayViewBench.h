@@ -34,21 +34,22 @@ namespace faf::headless
   class CReplayViewBench final : public remote::CViewFrames
   {
   public:
-    CReplayViewBench(const std::string& path, const remote::wire::SContentTables& tables, float mapSizeX, float mapSizeZ);
+    /** `check`: `--view-bench-check`, each held frame is compared with the whole one (slow). */
+    CReplayViewBench(const std::string& path, const remote::wire::SContentTables& tables, float mapSizeX, float mapSizeZ, bool check);
     ~CReplayViewBench() override;
 
     [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
     void Install();
     void Uninstall();
     [[nodiscard]] std::string Summary() const;
-    /** Lanes that did not encode (should stay 0). */
-    [[nodiscard]] std::uint64_t Failures() const noexcept { return mEncodeFailures; }
+    /** Lanes that did not encode, and what the check found (should stay 0). */
+    [[nodiscard]] std::uint64_t Failures() const noexcept { return mEncodeFailures + HeldMismatches(); }
 
   protected:
     void OnViewFrames(moho::Sim& sim) override;
 
   private:
-    /** What one view's client received last (its frame is CViewFrames::PreviousFrame). */
+    /** What one view's client received last (its frame is held by CViewFrames). */
     struct SClient
     {
       std::vector<remote::wire::SArmyRecord> armies;

@@ -334,6 +334,9 @@ namespace faf::remote
 
   wire::SEntityRecord& CViewFrameBuilder::PutRecord(const wire::SEntityRecord& record)
   {
+    if (mTrackChanges) {
+      mTouchedIds.push_back(record.id);
+    }
     const auto found = LowerBound(record.id);
     if (found != mWorldIndex.end() && found->id == record.id) {
       return mWorldSlots[found->slot] = record;
@@ -356,6 +359,9 @@ namespace faf::remote
     const auto found = LowerBound(id);
     if (found == mWorldIndex.end() || found->id != id) {
       return;
+    }
+    if (mTrackChanges) {
+      mErasedRecords.push_back({id, found->slot});
     }
     mWorldSlots[found->slot] = wire::SEntityRecord{}; // lets go of what the record shares
     mFreeSlots.push_back(found->slot);
@@ -462,6 +468,9 @@ namespace faf::remote
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
       if (wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(update.mEntityId)); record != nullptr) {
         ApplyVariableData(*record, update.mVariableData, mCodec, mTables, mSession, mUnderlays, mUnknownUnderlays);
+        if (mTrackChanges) {
+          mTouchedIds.push_back(record->id);
+        }
       }
     }
     for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
@@ -470,13 +479,19 @@ namespace faf::remote
         ApplyUnitData(record->unit, update.mVariableData);
         // Built aside and kept shared with the frames before unless it changed.
         ApplyUnitDetail(mDetailScratch, update.mVariableData, update.mReconFlags, mTables, mSession);
-        record->unit.detail.Assign(mDetailScratch);
+        (void)record->unit.detail.Assign(mDetailScratch);
+        if (mTrackChanges) {
+          mTouchedIds.push_back(record->id);
+        }
       }
     }
     for (const moho::EntId id : packet.mEraseIds) {
       if (wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(id)); record != nullptr) {
         record->flags |= kEntityFlagOrphaned;
         mOrphanedAt.emplace(record->id, beat);
+        if (mTrackChanges) {
+          mTouchedIds.push_back(record->id);
+        }
       }
     }
     for (const moho::EntId id : packet.mDeleteIds) {
@@ -497,7 +512,9 @@ namespace faf::remote
       for (const auto& [id, stats] : mUnitStats) {
         if (wire::SEntityRecord* const record = FindRecord(id); record != nullptr) {
           ReadUnitStats(*stats, *mSession, mStatsScratch);
-          record->unit.stats.Assign(mStatsScratch);
+          if (record->unit.stats.Assign(mStatsScratch) && mTrackChanges) {
+            mTouchedIds.push_back(id);
+          }
         }
       }
     }

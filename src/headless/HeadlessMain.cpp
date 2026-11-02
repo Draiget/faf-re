@@ -185,6 +185,7 @@ namespace
       "  --view-bench <file>       unfocused: only the server's view work per beat (views with their own ids, every\n"
       "                            lane encoded for every client), timed (CSV: build, send and beat ms, entities,\n"
       "                            bytes; server-mode build; not with the checks above)\n"
+      "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
@@ -286,6 +287,7 @@ int main(int argc, char** argv)
     bad = true;
   }
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
+  options.viewBenchCheck = moho::CFG_GetArgOption("--view-bench-check", 0, nullptr);
   options.spy = moho::CFG_GetArgOption("--spy", 0, nullptr);
   options.inboundCheck = moho::CFG_GetArgOption("--inbound-check", 0, nullptr);
   if (options.inboundCheck && (!options.viewIds || options.commandCheck)) {

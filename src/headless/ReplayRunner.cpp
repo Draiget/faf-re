@@ -560,7 +560,7 @@ namespace faf::headless
     std::unique_ptr<CReplayViewBench> viewBench;
     if (!options.viewBenchPath.empty()) {
       viewBench = std::make_unique<CReplayViewBench>(
-        options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z
+        options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options.viewBenchCheck
       );
       if (!viewBench->IsOpen()) {
         result.error = "cannot write " + options.viewBenchPath;
