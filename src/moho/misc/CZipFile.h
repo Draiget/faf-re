@@ -1,5 +1,6 @@
 #pragma once
 
+#include "legacy/containers/Layout.h"
 #include <Windows.h>
 
 #include <cstddef>
@@ -207,11 +208,20 @@ namespace moho
   private:
     [[nodiscard]] SZipFileCachedEntry& GetCachedEntryOrThrow(std::uint32_t entryIndex, const char* message) const;
     [[nodiscard]] const CZipFileEntry& GetEntryOrThrow(std::uint32_t entryIndex, const char* message) const;
+#if !FAF_RETAIL_LAYOUT
+    void BuildEntryIndex(const char* archivePath);
+#endif
 
   public:
     msvc8::string mPath{};                           // +0x00
     msvc8::vector<SZipFileCachedEntry> mEntries{};  // +0x1C
+#if FAF_RETAIL_LAYOUT
     SZipFileNameIndexMap mEntryByCanonicalPath{};   // +0x2C
+#else
+    // Engine change: entry indices sorted by name, in place of the binary's map. The map keeps a
+    // second copy of every name and a node per entry, for lookups only this file makes.
+    msvc8::vector<std::uint32_t> mEntryByCanonicalPath{};
+#endif
   };
 
   static_assert(offsetof(CZipFile, mEntries) == 0x1C, "CZipFile::mEntries offset must be 0x1C");
