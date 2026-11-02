@@ -1487,10 +1487,17 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   ++mNextSerialNumber;
   mInResponseTo = 0;
 
+  // Not in the binary: bytes still in the output filter (`mOutputFlushPending`, with deflate on) keep
+  // their deadline. The binary cleared it whenever the flushed buffer was empty, so an ACK or a resend
+  // sent while a message sat in the filter -- an ACK falls due on the very microsecond the message's
+  // deadline expires, since `HasPacketWaiting` holds data until `now > mSendBy` and the ACK goes at
+  // `now >= mSendBy` -- left nothing to wake the connector for it (`SendData` only waits on a set
+  // deadline), and the message stayed in the filter until the next one was written. A ready message
+  // queued at the start of the long first frame of play waited out the whole frame, some 250 ms.
   if (mPendingOutputData.GetLength()) {
     // time in us
     mSendBy.mTime = nowUs + 1000LL * net_SendDelay;
-  } else {
+  } else if (!mOutputFlushPending) {
     mSendBy.mTime = 0;
   }
 
