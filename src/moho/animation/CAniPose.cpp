@@ -802,7 +802,7 @@ namespace moho
   CAniPose::~CAniPose()
   {
     if (mBones.mBegin != mBones.mOriginal) {
-      delete[] mBones.mBegin;
+      mBones.FreeHeapBones();
       mBones.mBegin = mBones.mOriginal;
       mBones.mCapacity = mBones.InlineCapacityFromHeader();
     }

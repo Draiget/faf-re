@@ -95,6 +95,13 @@ namespace moho
   class CZipFile
   {
   public:
+    /**
+     * Engine addition (plan WPR.35): whether `ReadEntry` keeps every file it decompressed for the
+     * next read, as the binary does. A program with no UI, whose loaded data lives elsewhere, turns
+     * this off before it reads anything: a second read decompresses the file again.
+     */
+    static void SetKeepEntryData(bool keep) noexcept;
+
     static constexpr std::uint32_t kInvalidEntryIndex = 0xFFFFFFFFu;
 
     /**

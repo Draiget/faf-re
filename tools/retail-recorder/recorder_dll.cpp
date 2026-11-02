@@ -13,13 +13,19 @@
 //     64-bit FNV-1a hash per call over its hashed arguments and its result
 //     (order-independent, so sim worker threads do not change it). The table
 //     ("va calls sum") is rewritten to RETAIL_RECORDER_OUT every 10 s.
+//   RETAIL_RECORDER_SETS=<file> with a spec from spec_compare.py: instead of one
+//     sum, keeps per function the set of per-call hashes (arguments and result)
+//     and writes them to <file>, for compare_sets.py. The DLL is the same for the
+//     original game and for our instrumented build (see README).
 //   otherwise: the built-in kValueHooks, written call by call to
 //     RETAIL_RECORDER_OUT in faf_math_dump's values format.
 #include <windows.h>
 #include <tlhelp32.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -49,9 +55,26 @@ namespace
     std::uint8_t isFloat;
   };
 
+  // Sets mode: the distinct per-call hashes of one function. Past kMaxSetSize
+  // it keeps only hashes whose top `level` bits are zero, so two runs compare
+  // on the same sample whatever each one saw.
+  constexpr u32 kFirstSetCapacity = 16u;
+  constexpr u32 kMaxSetSize = 1u << 14;
+  struct HashSet
+  {
+    volatile LONG lock = 0;
+    u32 level = 0;
+    u32 count = 0;
+    u32 capacity = 0;
+    u64* slots = nullptr;
+  };
+
   struct Hook
   {
     u32 va = 0;
+    u32 id = 0; // what the hash starts from: the retail address on both sides
+    HashSet set;
+    volatile LONG64 recorded = 0;
     int prologueBytes = 0;
     u32 popBytes = 0;
     std::uint8_t ret = kRetNone;
@@ -92,6 +115,12 @@ namespace
 
   std::vector<Hook> gHooks;
   bool gSpecMode = false;
+  bool gSetsMode = false;
+  // Sets mode: only the sim thread records, known as the thread that first
+  // enters this function (Sim::AdvanceBeat). The original game's other threads
+  // draw, and their calls depend on frame timing; our headless has no such calls.
+  u32 gSimEntryId = 0;
+  volatile LONG gSimThreadId = 0;
 
   // pushad image, then the stack the stubs see above it.
   struct EntryFrame
@@ -140,6 +169,7 @@ namespace
   CRITICAL_SECTION gWriterLock;
   std::FILE* gOut = nullptr;
   char gOutPath[MAX_PATH] = {};
+  char gSetsPath[MAX_PATH] = {};
   unsigned gLinesSinceFlush = 0;
 
 
@@ -691,6 +721,123 @@ load_and_enter:
     }
   }
 
+  void SetLock(HashSet& set)
+  {
+    while (InterlockedExchange(&set.lock, 1) != 0) {
+      SwitchToThread();
+    }
+  }
+
+  void SetUnlock(HashSet& set)
+  {
+    InterlockedExchange(&set.lock, 0);
+  }
+
+  void SetPut(u64* const slots, const u32 capacity, const u64 hash)
+  {
+    u32 at = static_cast<u32>(hash) & (capacity - 1u);
+    while (slots[at] != 0u) {
+      at = (at + 1u) & (capacity - 1u);
+    }
+    slots[at] = hash;
+  }
+
+  [[nodiscard]] bool SetKeeps(const u32 level, const u64 hash)
+  {
+    return level == 0u || (hash >> (64u - level)) == 0u;
+  }
+
+  // Rebuilds the table with `capacity` slots, keeping what `level` keeps.
+  void SetRebuild(HashSet& set, const u32 capacity, const u32 level)
+  {
+    auto* const slots = static_cast<u64*>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, capacity * sizeof(u64)));
+    if (slots == nullptr) {
+      return; // no memory: this set stops growing, and SetInsert raises its level instead
+    }
+    u32 count = 0;
+    for (u32 i = 0; i < set.capacity; ++i) {
+      if (set.slots[i] != 0u && SetKeeps(level, set.slots[i])) {
+        SetPut(slots, capacity, set.slots[i]);
+        ++count;
+      }
+    }
+    if (set.slots != nullptr) {
+      HeapFree(GetProcessHeap(), 0, set.slots);
+    }
+    set.slots = slots;
+    set.capacity = capacity;
+    set.level = level;
+    set.count = count;
+  }
+
+  void SetInsert(HashSet& set, u64 hash)
+  {
+    hash = hash != 0u ? hash : 1u; // 0 marks an empty slot
+    SetLock(set);
+    if (set.capacity == 0u) {
+      SetRebuild(set, kFirstSetCapacity, 0u);
+    }
+    if (set.capacity != 0u && SetKeeps(set.level, hash)) {
+      u32 at = static_cast<u32>(hash) & (set.capacity - 1u);
+      while (set.slots[at] != 0u && set.slots[at] != hash) {
+        at = (at + 1u) & (set.capacity - 1u);
+      }
+      if (set.slots[at] == 0u) {
+        set.slots[at] = hash;
+        ++set.count;
+        if (set.count * 2u >= set.capacity) {
+          const u32 before = set.capacity;
+          if (before < kMaxSetSize * 2u) {
+            SetRebuild(set, before * 2u, set.level);
+          }
+          if (set.capacity == before) {
+            while (set.count * 2u >= set.capacity && set.level < 63u) {
+              SetRebuild(set, set.capacity, set.level + 1u);
+            }
+          }
+        }
+      }
+    }
+    SetUnlock(set);
+  }
+
+  // "RSET", then for each function with calls: id, level, count, calls, recorded
+  // calls, and its hashes. Written whole and renamed into place.
+  void WriteSets()
+  {
+    char tmp[MAX_PATH + 8];
+    std::snprintf(tmp, sizeof(tmp), "%s.tmp", gSetsPath);
+    std::FILE* f = std::fopen(tmp, "wb");
+    if (f == nullptr) {
+      return;
+    }
+    std::fwrite("RSET", 1, 4, f);
+    std::vector<u64> hashes;
+    for (Hook& h : gHooks) {
+      const LONG64 calls = h.calls;
+      if (calls == 0) {
+        continue;
+      }
+      SetLock(h.set);
+      hashes.clear();
+      for (u32 i = 0; i < h.set.capacity; ++i) {
+        if (h.set.slots[i] != 0u) {
+          hashes.push_back(h.set.slots[i]);
+        }
+      }
+      const u32 head[3] = {h.id, h.set.level, static_cast<u32>(hashes.size())};
+      SetUnlock(h.set);
+      const LONG64 counts[2] = {calls, h.recorded};
+      std::fwrite(head, sizeof(u32), 3, f);
+      std::fwrite(counts, sizeof(LONG64), 2, f);
+      if (!hashes.empty()) {
+        std::fwrite(hashes.data(), sizeof(u64), hashes.size(), f);
+      }
+    }
+    std::fclose(f);
+    MoveFileExA(tmp, gSetsPath, MOVEFILE_REPLACE_EXISTING);
+  }
+
   extern "C" void __cdecl OnEntry(EntryFrame* frame)
   {
     const int hookIndex = static_cast<int>(frame->slot);
@@ -728,7 +875,9 @@ load_and_enter:
     pending.sequence = static_cast<u32>(call);
     pending.hash = 0xCBF29CE484222325ull;
     pending.valueCount = 0;
-    HashWord(pending.hash, hook.va);
+    if (!gSetsMode) {
+      HashWord(pending.hash, hook.va);
+    }
     pending.record = gSpecMode || call < hook.recordAll || (call - hook.recordAll) % hook.thenEvery == 0u;
     for (const ArgSpec& arg : hook.args) {
       for (int w = 0; w < arg.words; ++w) {
@@ -740,11 +889,29 @@ load_and_enter:
         if (arg.isFloat && arg.words == 1) {
           word = CanonicalFloat(word);
         }
-        HashWord(pending.hash, word);
+        if (!gSetsMode) {
+          HashWord(pending.hash, word);
+        }
         if (pending.valueCount < kMaxValueWords) {
           pending.values[pending.valueCount++] = word;
         }
       }
+    }
+    if (gSetsMode) {
+      // In sorted order: Hex-Rays lists a retail function's register arguments
+      // in its own order, which can differ from ours.
+      std::sort(pending.values, pending.values + pending.valueCount);
+      HashWord(pending.hash, hook.id);
+      for (int i = 0; i < pending.valueCount; ++i) {
+        HashWord(pending.hash, pending.values[i]);
+      }
+    }
+    if (gSetsMode) {
+      const LONG self = static_cast<LONG>(GetCurrentThreadId());
+      if (gSimThreadId == 0 && hook.id == gSimEntryId) {
+        InterlockedCompareExchange(&gSimThreadId, self, 0);
+      }
+      pending.record = gSimThreadId == self;
     }
     frame->slot = reinterpret_cast<u32>(hook.trampoline);
     frame->callerRet = reinterpret_cast<u32>(&PostEntry);
@@ -812,6 +979,16 @@ load_and_enter:
       default: break;
     }
 
+    if (gSetsMode) {
+      if (pending.record) {
+        for (int i = 0; i < resultWords; ++i) {
+          HashWord(pending.hash, result[i]);
+        }
+        InterlockedIncrement64(&hook.recorded);
+        SetInsert(hook.set, pending.hash);
+      }
+      return;
+    }
     if (gSpecMode) {
       if (tInProbe) {
         return; // a probe's callee: neither in the table nor probed itself
@@ -932,12 +1109,22 @@ load_and_enter:
     }
     char magic[4];
     u32 count = 0;
-    const bool rrs2 = std::fread(magic, 1, 4, f) == 4 && std::memcmp(magic, "RRS2", 4) == 0;
+    const bool haveMagic = std::fread(magic, 1, 4, f) == 4;
+    const bool rrs3 = haveMagic && std::memcmp(magic, "RRS3", 4) == 0;
+    const bool rrs2 = rrs3 || (haveMagic && std::memcmp(magic, "RRS2", 4) == 0);
     const bool rrs1 = !rrs2 && std::memcmp(magic, "RRS1", 4) == 0;
     if ((!rrs1 && !rrs2) || std::fread(&count, 4, 1, f) != 1) {
       std::fclose(f);
       return false;
     }
+    // RRS3: flags (bit 0: addresses are relative to the exe, which moves with
+    // ASLR in our build), and each entry carries the id its hashes start from.
+    u32 flags = 0;
+    if (rrs3 && std::fread(&flags, 4, 1, f) != 1) {
+      std::fclose(f);
+      return false;
+    }
+    const u32 base = (flags & 1u) != 0u ? reinterpret_cast<u32>(GetModuleHandleW(nullptr)) : 0u;
     // Sanity: the spec generator emits a few thousand entries. A corrupt or
     // misparsed file once read count as millions, and the zero-va hook array
     // (hundreds of MB, then millions of failing installs) stalled the game's
@@ -962,6 +1149,12 @@ load_and_enter:
       h.ret = rec[7];
       h.args.resize(rec[8]);
       if (rrs2 && std::fread(&h.writes, 1, 1, f) != 1) {
+        std::fclose(f);
+        return false;
+      }
+      h.id = h.va;
+      h.va += base;
+      if (rrs3 && std::fread(&h.id, 4, 1, f) != 1) {
         std::fclose(f);
         return false;
       }
@@ -1107,6 +1300,58 @@ load_and_enter:
     }
   }
 
+  // Our headless ends in TerminateProcess, which skips DLL_PROCESS_DETACH, so the
+  // exe's import of it writes the sets first. Without this a run loses whatever
+  // it did after the writer thread's last pass.
+  using TerminateProcessFn = BOOL(WINAPI*)(HANDLE, UINT);
+  TerminateProcessFn gRealTerminateProcess = nullptr;
+
+  BOOL WINAPI TerminateProcessHook(HANDLE process, const UINT code)
+  {
+    if (process == GetCurrentProcess()) {
+      WriteSets();
+    }
+    return gRealTerminateProcess(process, code);
+  }
+
+  void HookTerminateProcess()
+  {
+    auto* const base = reinterpret_cast<std::uint8_t*>(GetModuleHandleW(nullptr));
+    const auto* const dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+    const auto* const nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
+    const IMAGE_DATA_DIRECTORY& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    if (dir.VirtualAddress == 0u) {
+      return;
+    }
+    const void* const real = reinterpret_cast<const void*>(
+      GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "TerminateProcess")
+    );
+    const auto* desc = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(base + dir.VirtualAddress);
+    for (; desc->Name != 0u; ++desc) {
+      auto* slot = reinterpret_cast<IMAGE_THUNK_DATA*>(base + desc->FirstThunk);
+      for (; slot->u1.Function != 0u; ++slot) {
+        if (reinterpret_cast<const void*>(slot->u1.Function) != real) {
+          continue;
+        }
+        gRealTerminateProcess = reinterpret_cast<TerminateProcessFn>(slot->u1.Function);
+        DWORD old = 0;
+        if (VirtualProtect(&slot->u1.Function, sizeof(slot->u1.Function), PAGE_READWRITE, &old)) {
+          slot->u1.Function = reinterpret_cast<DWORD>(&TerminateProcessHook);
+          VirtualProtect(&slot->u1.Function, sizeof(slot->u1.Function), old, &old);
+        }
+        return;
+      }
+    }
+  }
+
+  DWORD WINAPI SetsWriter(void*)
+  {
+    for (;;) {
+      Sleep(60000);
+      WriteSets();
+    }
+  }
+
   DWORD WINAPI JournalWriter(void*)
   {
     for (;;) {
@@ -1157,6 +1402,12 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
     GetEnvironmentVariableA("RETAIL_RECORDER_OUT", gOutPath, MAX_PATH);
     char specPath[MAX_PATH] = {};
     gSpecMode = GetEnvironmentVariableA("RETAIL_RECORDER_SPEC", specPath, MAX_PATH) != 0;
+    gSetsMode = gSpecMode && GetEnvironmentVariableA("RETAIL_RECORDER_SETS", gSetsPath, MAX_PATH) != 0;
+    if (gSetsMode) {
+      char simEntry[16] = {};
+      GetEnvironmentVariableA("RETAIL_RECORDER_SIM_ENTRY", simEntry, sizeof(simEntry));
+      gSimEntryId = std::strtoul(simEntry, nullptr, 16);
+    }
     if (gSpecMode) {
       if (!LoadSpec(specPath)) {
         return TRUE; // no hooks: the game runs as it is
@@ -1176,14 +1427,19 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
       }
     }
     InstallHooks();
-    if (gSpecMode && gOutPath[0] != '\0') {
+    if (gSetsMode) {
+      HookTerminateProcess();
+      CreateThread(nullptr, 0, &SetsWriter, nullptr, 0, nullptr);
+    } else if (gSpecMode && gOutPath[0] != '\0') {
       CreateThread(nullptr, 0, &TableWriter, nullptr, 0, nullptr);
     }
     if (gProbeMode && gJournalPath[0] != '\0') {
       CreateThread(nullptr, 0, &JournalWriter, nullptr, 0, nullptr);
     }
   } else if (reason == DLL_PROCESS_DETACH) {
-    if (gSpecMode && gOutPath[0] != '\0') {
+    if (gSetsMode) {
+      WriteSets();
+    } else if (gSpecMode && gOutPath[0] != '\0') {
       WriteTable();
     }
     if (gProbeMode) {

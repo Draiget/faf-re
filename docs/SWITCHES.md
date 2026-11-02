@@ -43,11 +43,11 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ParallelUnitSyncRefresh` | 1 | `/con` | live | Before the sync walk, each synced unit's own sync block (target ids, silo counts, weapon info, pose handles) is refreshed on sim workers; the walk then finds nothing left to refresh. The block is written only by its unit and read only by its unit's own sync entry, so the packet is the serial one (needs `sim_Workers` > 0; 128 units or more) |
 | `sim_ParallelEffects` | 1 | `/con` | live | The effect manager's tick (beams, emitters, trails) on sim workers in chunks of consecutive effects; each chunk collects its particles and its effects' self-destroys, and the chunks are committed in list order, so the particle buffer and the destroyed list are the serial ones. Any other effect class in the list, or `dbg_EfxBeams` / `dbg_Emitter` / `dbg_Trail`, keeps the beat serial (needs `sim_Workers` > 0) |
 | `sim_ParallelEffectsMin` | 64 | `/con` | live | Fewest active effects for which `sim_ParallelEffects` uses the workers |
-| `sim_ParallelPose` | 1 | `/con` | live | A unit's bone pose update (its manipulators) runs on sim workers when every enabled manipulator is Rotate, Slide, Slave, Animation or Storage and none has a Lua waiter; the inputs those read from the unit and its army (orientation, velocity, being built, storage) are copied when the job is queued. A reader of the pose waits for that unit's job; any engine call from Lua waits for all of them, a Lua collection and the end of task stage A close the batch. Other units update on the sim thread in their usual place (needs `sim_Workers` > 0) |
+| `sim_ParallelPose` | 1 | `/con` | live | A unit's bone pose update (its manipulators) runs on sim workers when every enabled manipulator is Rotate, Slide, Slave, Animation or Storage, none has a Lua waiter and the pose does not have exactly 11 bones (those allocate in the sim's order, see Reused addresses in [Retail replay parity](RETAIL_REPLAY_PARITY.md)); the inputs those read from the unit and its army (orientation, velocity, being built, storage) are copied when the job is queued. A reader of the pose waits for that unit's job; any engine call from Lua waits for all of them, a Lua collection and the end of task stage A close the batch. Other units update on the sim thread in their usual place (needs `sim_Workers` > 0) |
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
-| `sim_RecyclePose` | 1 | `/con` | live | Reuses `CAniPose` double-buffer in-place when unique, eliminating thousands of heap allocations per second during unit movement; bit-for-bit checksum identical to retail |
+| `sim_RecyclePose` | 1 | `/con` | live | Reuses `CAniPose` double-buffer in-place when unique and not of exactly 11 bones, eliminating thousands of heap allocations per second during unit movement; bit-for-bit checksum identical to retail |
 | sim_FastBoneUpdates | 1 | /con | live | Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches, accelerating bone rest updates; bit-for-bit checksum identical to retail |
 | `sim_FastEconStats` | 1 | `/con` | live | Bypasses string map lookups and allocations for per-tick army economy statistics by caching resolved `CArmyStatItem` pointers; bit-for-bit checksum identical to retail |
 | `mem_SmallBlockIndexTable` | 1 | `/con` | live | x86 allocator: size class by table instead of a binary search |
@@ -63,6 +63,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ui_IdleGC` | 1 | `/con` | live | Move periodic UI Lua GC execution to post-present idle/slack window after device refresh; 0 runs synchronously during UpdateFrameRate (retail) |
 | `wld_ParallelSync` | 1 | `/con` | live | Beat sync apply: pose and data copies on user workers |
 | `wld_FrameClock` | 1 | `/con` | live | Replays and single player: game clock from the mean frame time (0: the original median, 2: each frame's own time) |
+| `wld_FrameClockNetwork` | 0 | `/con` | live | Network sessions: 1 applies `wld_FrameClock`, 0 keeps the original median frame time. Off by default, see [Frame clock in network sessions](#frame-clock-in-network-sessions) |
 | `wld_VisionChainHints` | 1 | `/con` | live | Vision-tree chain tails and predecessors from checked hints instead of chain walks |
 | `wld_VisionRepeatInsert` | 1 | `/con` | live | A vision entry identical to the previous one goes where the tree walk would put it, without the walk |
 | `ren_ParticleKeyShortcut` | 1 | `/con` | live | Particles reuse the cached render bucket when their key would match, without building the key |
@@ -94,6 +95,34 @@ Every performance change has a switch that brings back the original path, and bo
 | `sys_ThreadPlacement` | 0 | `/threadplacement N` | next thread start | Thread placement on cores (0 leaves it to Windows) |
 | XACT process clock | on | `/realtickcount` turns it off | startup only | XACT 2.9 times itself from process start instead of Windows boot, so sound keeps working after 24.8 days of uptime without UptimeFaker; the log says `SND: xactengine2_9.dll clock imports patched` (`FAF_TEST_TICK_OFFSET_DAYS=N` in the environment fakes N more days of uptime, for testing) |
 
+
+## Frame clock in network sessions
+
+`wld_FrameClockNetwork` is off by default because a session with a retail client gets no reliable gain from it, and our client gets choppier.
+
+The game clock decides when the UI takes finished ticks off the sim's queue. In a network session this also sets when the client tells the others to advance, and a tick only runs once every client has done so. Retail's clock is the median of the last 10 frame times. When one frame per tick is long and the rest are short, the median is a short frame and the game runs below its set speed, even though the sim keeps up. The mean adds up to real time, but it can't make a retail client on the median go faster.
+
+Measured on 2026-11-02 with `mpemu`: 2 players on one machine, normal game speed, a 1000 v 1000 air fight on a test map. "Median" is today's behaviour, "mean" is `wld_FrameClockNetwork 1`. In the retail rows, retail stays on the median and only our client changes.
+
+Ticks per second over game ticks 300-900, where 10 is normal speed:
+
+| Players | Network | Games per clock | Median | Mean |
+|---|---|---|---|---|
+| Ours + ours | No lag | 3 | 9.19 | 9.98 |
+| Ours + ours | 50 ms latency, 10 ms jitter, 1% loss | 2 | 9.28 | 9.99 |
+| Retail + ours | No lag | 3 | 8.28 | 8.58 |
+| Retail + ours | 50 ms latency, 10 ms jitter, 1% loss | 2 | 8.62 | 8.41 |
+
+Smoothness on our clients over the first 300 s of the lag games:
+
+| Players | Measure | Median | Mean |
+|---|---|---|---|
+| Ours + ours | Frames with no tick ready | 2.0% | 1.2% |
+| Ours + ours | Spread of the time between shown ticks | 22 ms | 16 ms |
+| Retail + ours | Frames with no tick ready | 11.9% | 21.5% |
+| Retail + ours | Spread of the time between shown ticks | 33 ms | 41 ms |
+
+None of the 24 games played desynced or crashed. Four no-lag retail games aren't in the tables: retail stalled in them, on both clocks, for a reason not found. The tests didn't cover separate machines, more than 2 players or our x86 build, and the choppiness wasn't judged on screen. The mean clock doesn't change what the sim computes, and in these games it didn't take a game above its set speed.
 
 ## FAF game version
 
@@ -194,6 +223,7 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--view-ids` | — | With `--view-frames`: every frame carries its view's own ids (`src/remote/ViewIdMap.h`, plan WP5.9). Recon blips, other armies' projectiles and command ids not from the view army's command sources are renumbered per view by first appearance, keeping the family nibble and source byte (commands get top byte `0x80`), and a deleted, erased or released id's view id is never handed out again. The summary adds per army the ids renumbered, those live at the end and serial overflows, and checks that every renumbered id in the frames maps back to a sim id of its family and source; a failure makes the exit code 1 |
 | `--spy` | off | With `--view-frames` (plan WP16.3): every view's frame after the wire, what its client holds, is checked against the sim each beat. Every record must be one the oracle lets that view have (`ResolveViewVisibility` publishes it and `CanViewSee` passes; a record the sim no longer has is an orphan), and every entity a record names (attachment parent and children, a unit's creator, selection inheritor, focus, guarded unit, target blip) must be one the client holds. With `--view-ids` the server clears such references to the sim's "none" first (plan WP5.12). The summary counts records, orphans and misses by field with examples; a miss makes the exit code 1 |
 | `--view-bench <file>` | — | Server-mode build, run unfocused; not with the other sync-walk checks. Only the work a dedicated server does for its players each beat (`src/headless/ReplayViewBench.h`, plan WP16.5): every army's view with its own ids, then for every view the entity frame, the army lane and the grid lane encoded against what its client received the beat before. Nothing is decoded or checked again. One CSV row per beat: `beat, build_ms, send_ms, interval_ms, entities, bytes` (`interval_ms`: since the previous beat's frames, the sim's beat included when headless runs flat out). The summary gives mean, p50, p95, p99 and maximum of each time and the bytes per client per second |
+| `--keep-client-data` | off | Headless leaves out what only a client reads: a model's vertices and indices once its bounds and skeleton are computed (`RScmResource::DropGeometry`), the blueprint copy in the session's Lua state, the rules' own blueprint tables once the sim has its copy, every file read from an archive (`CZipFile::SetKeepEntryData`; it is read again when asked again), everything an effect does but run out its lifetime (`EFFECT_SetLifetimeOnly`: no particles, no curves), and the decoding of Lua `Sync` tables that cannot name `GameEnded`. This keeps them all, to compare memory or results. The game always keeps them. |
 | `--view-bench-check` | off | With `--view-bench`: every view keeps its frame between beats as always, and each beat its frame is also built whole, with its own id map, and compared record by record and byte by byte (`CViewFrames::EnableHeldFrames`). A difference counts as a failure. Slow. |
 | `--parallel-views` | off | With `--view-frames` or `--view-bench`: every army's view (its rebuilt packet, then its frame, oracle filter and id map; `src/remote/ViewPackets.h`, `ViewFrames.h`, plan WP5.7) is built on the sim's workers (`/simworkers`), one army per job. Records that hold references to sim objects are cleared, and the unit stats trees the builders let go of are dropped, on the sim thread (`.plans/sim-threading/PLAN.md` §2). The frames are the same as built serially; the summary gives the build time per beat |
 | `--inbound-check` | — | With `--view-frames --view-ids` (not with `--command-check`): every command of the replay is decoded once more, its ids rewritten into the view ids of the issuing source's army (only ids that view was given), translated back by the server's intake (`src/remote/InboundIds.h`, plan WP5.10: entity and command ids of every command, an unknown id drops the command) and marshalled. The bytes must equal the same message decoded and marshalled with no ids touched. The summary counts identical and differing messages, commands naming a renumbered id their view never got (with examples), and the orders on blips that went through (attack, formation attack, guard, reclaim, capture; plan WP5.12). It also audits every `LuaSimCallback`'s Lua arguments (plan WPR.19): per callback name and key path, the numbers and digit strings that name an entity the sim has, as the caller's own, blips or foreign (small numbers such as army indices also match army 0's first ids, so a key is an id field only by its name and values). A differing message makes the exit code 1 |

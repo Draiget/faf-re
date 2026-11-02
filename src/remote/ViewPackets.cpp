@@ -27,26 +27,8 @@ namespace faf::remote
       moho::Entity& entity, const SViewVisibility& visibility, const bool requestRefreshUI
     )
     {
-      constexpr std::uint32_t kInvalidEntityId = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
-
       moho::SSTIEntityVariableData data = entity.mVarDat;
-
-      // The attach parent and children as the function writes them before its copy.
-      moho::Entity* const parent = entity.mAttachInfo.GetAttachTargetEntity();
-      data.mAttachmentParentRef = parent != nullptr ? parent->id_ : kInvalidEntityId;
-      data.mAuxValueVector.resize(
-        entity.mAttachedEntities.size(), moho::SSTIEntityAttachInfo{std::bit_cast<std::int32_t>(kInvalidEntityId)}
-      );
-      for (std::size_t i = 0; i < entity.mAttachedEntities.size(); ++i) {
-        moho::Entity* const child = entity.mAttachedEntities[i];
-        data.mAuxValueVector[i].mAttachedEntityId = std::bit_cast<std::int32_t>(child != nullptr ? child->id_ : kInvalidEntityId);
-      }
-
-      // What `UpdateVisibility` would have left for this focus: published, and its mode.
-      data.mVisibilityMode = visibility.mode;
-      data.mVisibilityHidden = 1u;
-      // `Entity::Sync` clears it after the copy (0x0067A10B); the walk's value.
-      data.mRequestRefreshUI = requestRefreshUI ? 1u : 0u;
+      WriteEntityBlockForView(data, entity, visibility.mode, requestRefreshUI);
       return data;
     }
   } // namespace
@@ -98,6 +80,7 @@ namespace faf::remote
       mPackets.push_back(std::make_unique<moho::SSyncData>());
       mViews.emplace_back();
       mHasView.push_back(1u);
+      mDirect.emplace_back();
     }
 
     // Last beat's records go on the sim thread: they hold references to sim objects (poses,
@@ -114,6 +97,7 @@ namespace faf::remote
       out.mCurBeat = static_cast<std::int32_t>(sim.mCurBeat);
       out.mCurTick = static_cast<std::int32_t>(sim.mCurTick);
       out.mFocusArmy = static_cast<std::int32_t>(army);
+      mDirect[army].clear();
       const moho::CArmyImpl* const owner = sim.mArmiesList[army];
       mHasView[army] = mSkipCivilians && owner != nullptr && owner->IsCivilian() ? 0u : 1u;
     }
@@ -209,6 +193,26 @@ namespace faf::remote
       state.created = true;
     }
 
+    if (mDirectUpdates) {
+      // Plan WPR.35: the builder reads the sim directly, while it is stopped for this beat.
+      if (blip != nullptr) {
+        if (moho::Unit* const creator = blip->mCreator.GetObjectPtr(); creator != nullptr) {
+          state.vision = static_cast<moho::Entity*>(creator)->mVarDat.mIntelAttributes.GetRange(moho::ENTATTR_Vision);
+          state.hasVision = true;
+        }
+      }
+      SDirectUpdate& direct = mDirect[static_cast<std::size_t>(army)].emplace_back();
+      direct.entity = &entity;
+      direct.unit = unit;
+      direct.blip = blip;
+      direct.army = army;
+      direct.mode = visibility.mode;
+      direct.vision = state.vision;
+      direct.hasVision = state.hasVision;
+      direct.requestRefreshUI = changed.requestRefreshUI;
+      return;
+    }
+
     moho::SSTIEntityVariableData block = EntityBlockForView(entity, visibility, changed.requestRefreshUI);
 
     if (unit != nullptr) {
@@ -245,6 +249,15 @@ namespace faf::remote
       block.mMaxHealth = recon.mMaxHealth;
       block.mFractionComplete = recon.mFractionComplete;
       block.mIsDead = recon.mMaybeDead;
+
+      // `ReconBlip::SyncInterface`: only an active real contact in current line of sight
+      // publishes its creator's scroll.
+      if (!blip->IsFake() && creator != nullptr && recon.mNeedsFlush != 0u && recon.mMaybeDead == 0u &&
+          (recon.mReconFlags & static_cast<std::uint32_t>(moho::RECON_LOSNow)) != 0u) {
+        const moho::SSTIEntityVariableData& creatorData = static_cast<moho::Entity*>(creator)->mVarDat;
+        block.mScrollBeatStart = creatorData.mScrollBeatStart;
+        block.mScrollBeatEnd = creatorData.mScrollBeatEnd;
+      }
     }
 
     moho::SEntityVariableUpdateEntry& update = out.mEntityUpdates.emplace_back();

@@ -473,6 +473,21 @@ namespace moho
     effect->ListLinkBefore(&mDestroyedEffects);
   }
 
+  namespace
+  {
+    bool gEffectsLifetimeOnly = false;
+  } // namespace
+
+  void EFFECT_SetLifetimeOnly(const bool lifetimeOnly) noexcept
+  {
+    gEffectsLifetimeOnly = lifetimeOnly;
+  }
+
+  bool EFFECT_LifetimeOnly() noexcept
+  {
+    return gEffectsLifetimeOnly;
+  }
+
   /**
    * Address: 0x0066B4F0 (FUN_0066B4F0, Moho::CEffectManagerImpl::Tick)
    *

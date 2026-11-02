@@ -46,6 +46,7 @@
 #include "moho/unit/core/Unit.h"
 #include "Wm3Segment3.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "moho/sim/SimBlockLane.h"
 
 namespace moho
 {
@@ -699,6 +700,33 @@ namespace moho
       }
     }
   }
+
+#if defined(_M_X64) || defined(__x86_64__)
+  static_assert(sizeof(Projectile) <= SimBlockLane::kBlockBytes);
+
+  void* Projectile::operator new(const std::size_t size)
+  {
+    if (size == sizeof(Projectile)) {
+      if (void* const block = SimBlockLane::Allocate()) {
+        return block;
+      }
+      throw std::bad_alloc();
+    }
+    return ::operator new(size);
+  }
+
+  void Projectile::operator delete(void* const block, const std::size_t size) noexcept
+  {
+    if (block == nullptr) {
+      return;
+    }
+    if (size == sizeof(Projectile)) {
+      SimBlockLane::Free(block);
+      return;
+    }
+    ::operator delete(block);
+  }
+#endif
 
   /**
    * Address: 0x0069AED0 (FUN_0069AED0, Moho::Projectile::~Projectile)

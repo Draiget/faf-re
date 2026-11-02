@@ -97,3 +97,9 @@ add_subdirectory(remote)
 
 add_subdirectory(memory)
 add_subdirectory(tread_rotation)
+
+# Entity update scroll snapshots and payload ownership.
+add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
+target_link_libraries(faf_recon_scroll_packet_tests PRIVATE faf_engine)
+add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
+set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120)

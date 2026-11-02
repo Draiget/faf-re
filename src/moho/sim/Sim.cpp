@@ -14446,7 +14446,8 @@ int moho::cfunc_DrawLinePopL(LuaPlus::LuaState* const state)
   lineDirection.z = start.z - end.z;
 
   const float directionLengthSquared =
-    (lineDirection.x * lineDirection.x) + (lineDirection.y * lineDirection.y) + (lineDirection.z * lineDirection.z);
+    // 0x0075DF76: (z*z + y*y) + x*x.
+    ((lineDirection.z * lineDirection.z) + (lineDirection.y * lineDirection.y)) + (lineDirection.x * lineDirection.x);
   if (directionLengthSquared > 0.0f) {
     const float scale = 2.0f / std::sqrt(directionLengthSquared);
     lineDirection.x *= scale;

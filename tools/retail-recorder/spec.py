@@ -373,6 +373,10 @@ def spec_for(addr):
         entry["ret"] = RET_NONE
     elif retloc in (None, "eax") and classify(rt)[0] == "pointer":
         entry["ret"] = RET_EAX_POINTER
+    elif retloc is None and re.match(r"^(const\s+)?(unsigned\s+|signed\s+)?(char|bool|_BYTE|_BOOL1|__int8)$", rt):
+        entry["ret"] = RET_AL  # the upper bytes of eax are whatever was there
+    elif retloc is None and re.match(r"^(const\s+)?(unsigned\s+|signed\s+)?(short|_WORD|__int16)$", rt):
+        entry["ret"] = RET_AX
     elif retloc in (None, "eax") and classify(rt)[0] == "scalar":
         entry["ret"] = RET_EDX_EAX if classify(rt)[1] == 8 else RET_EAX
     if entry["review"] is None:

@@ -65,10 +65,23 @@ string(REGEX REPLACE "/EH[a-z-]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
+# x86 headless for tests/replay_sets (tools/retail-recorder/README.md): no inlining and no
+# folding, so each function has its own entry, and 8 bytes of nops there for the recorder's hook.
+# -finstrument-functions (src/headless/CallHashHooks.cpp) keeps each internal function's
+# calling convention and parameters as its PDB signature says. Build only the headless target.
+option(FAF_CALL_HASH_BUILD "Instrument the build for tests/replay_sets (x86 headless only)" OFF)
+if(FAF_CALL_HASH_BUILD)
+  string(REPLACE "/Ob2" "/Ob0" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+  string(APPEND CMAKE_CXX_FLAGS_RELEASE " /clang:-fpatchable-function-entry=8 /clang:-finstrument-functions")
+  set(_faf_icf "/OPT:NOICF")
+else()
+  set(_faf_icf "/OPT:ICF")
+endif()
+
 # Release links like the shipped binary's: debug information,
 # unreferenced code dropped, identical COMDATs folded.
 foreach(_kind EXE SHARED MODULE)
-  string(APPEND CMAKE_${_kind}_LINKER_FLAGS_RELEASE " /DEBUG /OPT:REF /OPT:ICF")
+  string(APPEND CMAKE_${_kind}_LINKER_FLAGS_RELEASE " /DEBUG /OPT:REF ${_faf_icf}")
 endforeach()
 
 # --- Locations ------------------------------------------------------------------------

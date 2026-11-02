@@ -430,6 +430,10 @@ namespace faf::netlink
     };
     mRtc = std::make_shared<WebRtcChannel>(std::move(o), std::move(onData), std::move(onLog));
     Log(out, std::string("starting WebRTC as ") + (mOptions.offerer ? "offerer" : "answerer"));
+    {
+      std::lock_guard lock(mLaneRtcMutex);
+      mLaneRtc = mRtc;
+    }
     mRtc->Start();
   }
 
@@ -439,6 +443,10 @@ namespace faf::netlink
       return;
     }
     // Closing joins libdatachannel's work; do it outside the lock.
+    {
+      std::lock_guard lock(mLaneRtcMutex);
+      mLaneRtc.reset();
+    }
     out.actions.push_back([rtc = std::move(mRtc)] { rtc->Close(); });
     mRtc.reset();
   }
@@ -1047,10 +1055,12 @@ namespace faf::netlink
     if (datagrams.empty()) {
       return;
     }
+    // Not mMutex: this runs on libjuice's poll thread, which holds libjuice's
+    // registry lock, and Tick holds mMutex while starting WebRTC takes that lock.
     std::shared_ptr<WebRtcChannel> rtc;
     {
-      std::lock_guard lock(mMutex);
-      rtc = mRtc;
+      std::lock_guard lock(mLaneRtcMutex);
+      rtc = mLaneRtc;
     }
     for (const std::vector<std::uint8_t>& d : datagrams) {
       if (mOptions.testDropPercent > 0) {
@@ -1134,6 +1144,10 @@ namespace faf::netlink
     mConnected = false;
     mLaneActive = false;
     if (mRtc) {
+      {
+        std::lock_guard lock(mLaneRtcMutex);
+        mLaneRtc.reset();
+      }
       mRtc->Close();
       mRtc.reset();
     }

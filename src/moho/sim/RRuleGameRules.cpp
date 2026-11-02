@@ -1123,6 +1123,16 @@ namespace moho
    * `EnqueueLuaReloadRequest` symbol must be reachable from this caller so
    * the per-T constructor body keeps its bind site.
    */
+  void RRuleGameRulesImpl::ReleaseScriptBlueprints()
+  {
+    if (mLuaState == nullptr) {
+      return;
+    }
+    LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+    globals.SetNil("__blueprints");
+    lua_setgcthreshold(mLuaState->m_state, 0);
+  }
+
   void RRuleGameRulesImpl::UpdateLuaState(LuaPlus::LuaState* luaState)
   {
     if (!luaState) {

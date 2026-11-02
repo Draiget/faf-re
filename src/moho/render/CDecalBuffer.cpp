@@ -382,17 +382,23 @@ void CDecalBuffer::CleanupTick()
 
   const std::uint32_t curTick = mSim->mCurTick;
 
-  // Pass 1: expire handles whose start tick has elapsed.
-  const auto* const listHeadNode = static_cast<const CDecalHandleListNode*>(&mHandleListHead);
-  for (CDecalHandleListNode* node = mHandleListHead.mNext; node != listHeadNode;) {
-    CDecalHandleListNode* const next = node->mNext;
-    CDecalHandle* const handle = CDecalHandle::FromListNode(node);
-    if (handle->mInfo.mStartTick != 0u && handle->mInfo.mStartTick <= curTick) {
+  // 0x00779737..0x00779857: while the first bucket's tick has come, its set moves out of the map,
+  // the bucket's map node goes, and every handle in the set is destroyed.
+  while (!mStartTickBuckets.empty()) {
+    const auto first = mStartTickBuckets.begin();
+    if (first->first > curTick) {
+      break;
+    }
+    CDecalBucketSet expired;
+    expired.swap(first->second);
+    mStartTickBuckets.erase(first);
+    for (CDecalHandle* const handle : expired) {
       handle->mInfo.mStartTick = 0u;
       DestroyHandle(handle);
     }
-    node = next;
   }
+
+  const auto* const listHeadNode = static_cast<const CDecalHandleListNode*>(&mHandleListHead);
 
   CArmyImpl** const armiesBegin = mSim->mArmiesList.begin();
   CArmyImpl** const armiesEnd = mSim->mArmiesList.end();

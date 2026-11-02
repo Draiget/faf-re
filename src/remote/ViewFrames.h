@@ -9,6 +9,7 @@
 
 #include "remote/FrameBuilder.h"
 #include "remote/ViewIdMap.h"
+#include "gpg/core/containers/ChunkedVector.h"
 #include "remote/ViewPackets.h"
 #include "remote/VisibilityOracle.h"
 #include "remote/wire/EntityFrame.h"
@@ -66,6 +67,7 @@ namespace faf::remote
     {
       mHeldOn = true;
       mHeldCheck = check;
+      SetDirectUpdates(true);
     }
     [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
@@ -88,7 +90,7 @@ namespace faf::remote
     /** One view's frame kept between beats, and what its last beat changed. */
     struct SHeldView
     {
-      std::vector<wire::SEntityRecord> records; // by the builder's slot, in the view's ids
+      gpg::core::ChunkedVector<wire::SEntityRecord> records; // by the builder's slot, in the view's ids
       std::vector<std::uint8_t> sent;           // per slot: `records` holds what the client holds
       std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
       std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
@@ -100,7 +102,7 @@ namespace faf::remote
       std::vector<std::uint32_t> removed;
       std::vector<const wire::SEntityRecord*> created;
       std::vector<wire::SFrameChange> changed;
-      std::vector<wire::SEntityRecord> before; // the changed records as the client held them
+      gpg::core::ChunkedVector<wire::SEntityRecord> before; // the changed records as the client held them
       // With the check:
       std::unique_ptr<CViewIdMap> checkMap;
       wire::SViewFrame checkPrevious;

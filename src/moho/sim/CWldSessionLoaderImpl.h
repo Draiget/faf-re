@@ -9,6 +9,12 @@
 
 namespace moho
 {
+  /**
+   * Engine addition (plan WPR.35): whether a loaded session's Lua state gets a copy of the
+   * blueprints. A program with no UI turns this off before it loads anything.
+   */
+  void WLD_SetSessionKeepsBlueprints(bool keep) noexcept;
+
   // Every virtual below except the destructor is pure. IWldSessionLoader's
   // vftable (0x00E49FA4) has all 7 of its slots pointing at _purecall
   // (0x00A82547), so this interface contributes no bodies; the stubs that used

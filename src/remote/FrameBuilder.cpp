@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 
 #include "moho/audio/CSndParams.h"
 #include "moho/audio/CSndVar.h"
+#include "moho/entity/Entity.h"
+#include "moho/entity/EntityId.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/sim/ReconBlip.h"
 #include "moho/misc/StatItem.h"
 #include "moho/unit/core/UnitAttributes.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -70,6 +74,39 @@ namespace faf::remote
       } else if (data.mUnderlayTexture) {
         ++unknownUnderlays; // a texture whose path was not recorded
       }
+    }
+
+    constexpr std::int32_t kUnitReconFlags = 28; // `Unit::SyncInterface`, 0x006AC4DC..0x006AC500
+
+    /**
+     * What `SSTIEntityVariableData::operator=` copies, less what the builder does not read: the
+     * mesh resource and the attached entities (`WriteEntityBlockForView` writes those). Sim
+     * objects are shared by every view on every worker, so their reference counts stay untouched,
+     * except for an underlay, which hardly any entity has.
+     */
+    void CopyEntityBlockReadByBuilder(moho::SSTIEntityVariableData& to, const moho::SSTIEntityVariableData& from)
+    {
+      to.mMeshBlueprint = from.mMeshBlueprint;
+      to.mScale = from.mScale;
+      to.mHealth = from.mHealth;
+      to.mMaxHealth = from.mMaxHealth;
+      to.mIsBeingBuilt = from.mIsBeingBuilt;
+      to.mIsDead = from.mIsDead;
+      to.mCurTransform = from.mCurTransform;
+      to.mLastTransform = from.mLastTransform;
+      to.mCurImpactValue = from.mCurImpactValue;
+      to.mFractionComplete = from.mFractionComplete;
+      to.mScrollBeatStart = from.mScrollBeatStart;
+      to.mScrollBeatEnd = from.mScrollBeatEnd;
+      to.mAmbientSound = from.mAmbientSound;
+      to.mRumbleSound = from.mRumbleSound;
+      to.mLayerMask = from.mLayerMask;
+      to.mUsingAltFootprint = from.mUsingAltFootprint;
+      to.mUsingAltFootprintSecondary = from.mUsingAltFootprintSecondary;
+      if (from.mUnderlayTexture || to.mUnderlayTexture) {
+        to.mUnderlayTexture = from.mUnderlayTexture;
+      }
+      to.mIntelAttributes = from.mIntelAttributes;
     }
 
     void ApplyVariableData(
@@ -348,7 +385,7 @@ namespace faf::remote
       mWorldSlots[slot] = record;
     } else {
       slot = static_cast<std::uint32_t>(mWorldSlots.size());
-      mWorldSlots.push_back(record);
+      (void)mWorldSlots.push_back(record);
     }
     mWorldIndex.insert(found, SWorldEntry{record.id, slot});
     return mWorldSlots[slot];
@@ -368,7 +405,32 @@ namespace faf::remote
     mWorldIndex.erase(found);
   }
 
-  void CViewFrameBuilder::Apply(const moho::SSyncData& packet)
+  void WriteEntityBlockForView(
+    moho::SSTIEntityVariableData& data, moho::Entity& entity, const moho::EUserEntityVisibilityMode mode,
+    const bool requestRefreshUI
+  )
+  {
+    constexpr std::uint32_t kInvalidEntityId = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
+
+    // The attach parent and children as the function writes them before its copy.
+    moho::Entity* const parent = entity.mAttachInfo.GetAttachTargetEntity();
+    data.mAttachmentParentRef = parent != nullptr ? parent->id_ : kInvalidEntityId;
+    data.mAuxValueVector.resize(
+      entity.mAttachedEntities.size(), moho::SSTIEntityAttachInfo{std::bit_cast<std::int32_t>(kInvalidEntityId)}
+    );
+    for (std::size_t i = 0; i < entity.mAttachedEntities.size(); ++i) {
+      moho::Entity* const child = entity.mAttachedEntities[i];
+      data.mAuxValueVector[i].mAttachedEntityId = std::bit_cast<std::int32_t>(child != nullptr ? child->id_ : kInvalidEntityId);
+    }
+
+    // What `UpdateVisibility` would have left for this focus: published, and its mode.
+    data.mVisibilityMode = mode;
+    data.mVisibilityHidden = 1u;
+    // `Entity::Sync` clears it after the copy (0x0067A10B); the walk's value.
+    data.mRequestRefreshUI = requestRefreshUI ? 1u : 0u;
+  }
+
+  void CViewFrameBuilder::Apply(const moho::SSyncData& packet, const std::span<const SDirectUpdate> direct)
   {
     mUnderlays.Refresh();
 
@@ -483,6 +545,47 @@ namespace faf::remote
         if (mTrackChanges) {
           mTouchedIds.push_back(record->id);
         }
+      }
+    }
+    for (const SDirectUpdate& update : direct) {
+      moho::Entity& entity = *update.entity;
+      wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(entity.id_));
+      if (record == nullptr) {
+        continue;
+      }
+      CopyEntityBlockReadByBuilder(mBlockScratch, entity.mVarDat);
+      WriteEntityBlockForView(mBlockScratch, entity, update.mode, update.requestRefreshUI);
+      const moho::SSTIUnitVariableData* unitData = nullptr;
+      std::int32_t reconFlags = kUnitReconFlags;
+      const moho::Unit* creator = nullptr;
+      if (update.unit != nullptr) {
+        unitData = &update.unit->VarDat();
+      } else if (update.blip != nullptr) {
+        const moho::SPerArmyReconInfo& recon = update.blip->mReconDat[static_cast<std::size_t>(update.army)];
+        creator = update.blip->mCreator.GetObjectPtr();
+        unitData = &update.blip->mUnitVarDat;
+        reconFlags = static_cast<std::int32_t>(recon.mReconFlags);
+        if (update.hasVision) {
+          mBlockScratch.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(update.vision));
+        }
+        // 0x005BF168..0x005BF1C4: the entity block from the recon record.
+        mBlockScratch.mMeshBlueprint = recon.mStiMesh;
+        mBlockScratch.mHealth = recon.mHealth;
+        mBlockScratch.mMaxHealth = recon.mMaxHealth;
+        mBlockScratch.mFractionComplete = recon.mFractionComplete;
+        mBlockScratch.mIsDead = recon.mMaybeDead;
+      }
+      ApplyVariableData(*record, mBlockScratch, mCodec, mTables, mSession, mUnderlays, mUnknownUnderlays);
+      if (unitData != nullptr && record->isUnit) {
+        ApplyUnitData(record->unit, *unitData);
+        ApplyUnitDetail(mDetailScratch, *unitData, reconFlags, mTables, mSession);
+        if (creator != nullptr) {
+          mDetailScratch.stunTicks = creator->mUnitVarDat.mStunTicks != 0 ? 1 : 0;
+        }
+        (void)record->unit.detail.Assign(mDetailScratch);
+      }
+      if (mTrackChanges) {
+        mTouchedIds.push_back(record->id);
       }
     }
     for (const moho::EntId id : packet.mEraseIds) {

@@ -13,6 +13,7 @@
 #include "gpg/gal/Matrix.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiReconDBImpl.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
@@ -284,28 +285,30 @@ namespace moho
 
     mBlueprint = const_cast<REmitterBlueprint*>(blueprint);
     if (blueprint != nullptr) {
-      gpg::fastvector_n<SEfxCurve, kEmitterCurveCount>& curves = mCurves;
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_XDIR_CURVE], blueprint->XDirectionCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_YDIR_CURVE], blueprint->YDirectionCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_ZDIR_CURVE], blueprint->ZDirectionCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_EMITRATE_CURVE], blueprint->EmitRateCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_LIFETIME_CURVE], blueprint->LifetimeCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_VELOCITY_CURVE], blueprint->VelocityCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_X_ACCEL_CURVE], blueprint->XAccelCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_Y_ACCEL_CURVE], blueprint->YAccelCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_Z_ACCEL_CURVE], blueprint->ZAccelCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_RESISTANCE_CURVE], blueprint->ResistanceCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_SIZE_CURVE], blueprint->SizeCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_X_POSITION_CURVE], blueprint->XPosCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_Y_POSITION_CURVE], blueprint->YPosCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_Z_POSITION_CURVE], blueprint->ZPosCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_BEGINSIZE_CURVE], blueprint->StartSizeCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_ENDSIZE_CURVE], blueprint->EndSizeCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_ROTATION_CURVE], blueprint->InitialRotationCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_ROTATION_RATE_CURVE], blueprint->RotationRateCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_FRAMERATE_CURVE], blueprint->FrameRateCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_TEXTURESELECTION_CURVE], blueprint->TextureSelectionCurve);
-      BuildEmitterCurveFromBlueprint(curves[EMITTER_RAMPSELECTION_CURVE], blueprint->RampSelectionCurve);
+      if (!EFFECT_LifetimeOnly()) {
+        gpg::fastvector_n<SEfxCurve, kEmitterCurveCount>& curves = mCurves;
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_XDIR_CURVE], blueprint->XDirectionCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_YDIR_CURVE], blueprint->YDirectionCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_ZDIR_CURVE], blueprint->ZDirectionCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_EMITRATE_CURVE], blueprint->EmitRateCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_LIFETIME_CURVE], blueprint->LifetimeCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_VELOCITY_CURVE], blueprint->VelocityCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_X_ACCEL_CURVE], blueprint->XAccelCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_Y_ACCEL_CURVE], blueprint->YAccelCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_Z_ACCEL_CURVE], blueprint->ZAccelCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_RESISTANCE_CURVE], blueprint->ResistanceCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_SIZE_CURVE], blueprint->SizeCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_X_POSITION_CURVE], blueprint->XPosCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_Y_POSITION_CURVE], blueprint->YPosCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_Z_POSITION_CURVE], blueprint->ZPosCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_BEGINSIZE_CURVE], blueprint->StartSizeCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_ENDSIZE_CURVE], blueprint->EndSizeCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_ROTATION_CURVE], blueprint->InitialRotationCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_ROTATION_RATE_CURVE], blueprint->RotationRateCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_FRAMERATE_CURVE], blueprint->FrameRateCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_TEXTURESELECTION_CURVE], blueprint->TextureSelectionCurve);
+        BuildEmitterCurveFromBlueprint(curves[EMITTER_RAMPSELECTION_CURVE], blueprint->RampSelectionCurve);
+      }
 
       SetFloatParam(EFFECT_LIFETIME, blueprint->Lifetime);
       SetFloatParam(EFFECT_REPEATTIME, blueprint->RepeatTime);
@@ -1125,6 +1128,12 @@ namespace moho
    */
   void CEfxEmitter::OnTick()
   {
+    if (EFFECT_LifetimeOnly()) {
+      if (!ProcessLifetime()) {
+        ++mLife;
+      }
+      return;
+    }
     const float* const start = mParams.start_;
     if ((start[EFFECT_EMITIFVISIBLE] > 0.0f || start[EFFECT_CREATEIFVISIBLE] > 0.0f)
         && (mManager->GetSim()->mCurTick % 3u) == 0u) {

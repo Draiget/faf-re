@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -418,6 +419,114 @@ namespace
     return static_cast<std::size_t>(std::unique(v.begin(), v.end()) - v.begin());
   }
 
+  // Link::Tick starts WebRTC holding the link's mutex and libjuice's registry
+  // lock is taken inside; the poll thread holds that lock while it delivers lane
+  // datagrams. Several links set up at once with traffic flowing, as in a game
+  // of more than two players. A deadlock freezes every link, so a watchdog ends
+  // the test: GetStats would block too.
+  void LaneWebRtcSetupTest(const std::string& bind)
+  {
+    constexpr int kLinks = 7;
+    constexpr int kRounds = 8;
+    std::atomic<bool> finished{false};
+    std::thread watchdog([&finished] {
+      for (int i = 0; i < 1800 && !finished; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+      if (!finished) {
+        std::printf("FAIL links froze while setting up WebRTC with the lane on (deadlock)\n");
+        std::fflush(stdout);
+        std::_Exit(1);
+      }
+    });
+    bool allOpen = true;
+    for (int round = 0; round < kRounds; ++round) {
+      struct Pair
+      {
+        std::unique_ptr<Link> a;
+        std::unique_ptr<Link> b;
+      };
+      std::vector<Pair> pairs(kLinks);
+      for (Pair& pair : pairs) {
+        LinkOptions o;
+        o.bindAddress = bind;
+        o.ufragPrefix = kOurUfragPrefix;
+        o.webrtc = true;
+        o.redundancy = 2;
+        LinkOptions oa = o;
+        oa.localId = 1;
+        oa.remoteId = 2;
+        oa.offerer = true;
+        LinkOptions ob = o;
+        ob.localId = 2;
+        ob.remoteId = 1;
+        LinkCallbacks ca;
+        LinkCallbacks cb;
+        Pair* raw = &pair;
+        ca.onSignal = [raw](const CandidatesMessage& m) { raw->b->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+        ca.onSignalText = [raw](const std::string& json) { raw->b->OnSignalText(json); };
+        cb.onSignal = [raw](const CandidatesMessage& m) { raw->a->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+        cb.onSignalText = [raw](const std::string& json) { raw->a->OnSignalText(json); };
+        pair.a = std::make_unique<Link>(oa, std::move(ca));
+        pair.b = std::make_unique<Link>(ob, std::move(cb));
+      }
+      std::atomic<bool> stop{false};
+      // Each end on its own thread, as two players' processes run: one end's
+      // lane datagrams must arrive while the other end is starting WebRTC.
+      std::thread tickerA([&] {
+        while (!stop) {
+          for (Pair& pair : pairs) {
+            pair.a->Tick();
+          }
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+      });
+      std::thread tickerB([&] {
+        while (!stop) {
+          for (Pair& pair : pairs) {
+            pair.b->Tick();
+          }
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+      });
+      std::thread sender([&] {
+        const std::uint8_t buf[200]{};
+        while (!stop) {
+          for (Pair& pair : pairs) {
+            pair.a->Send(buf, sizeof(buf));
+            pair.b->Send(buf, sizeof(buf));
+          }
+          std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+      });
+      for (Pair& pair : pairs) {
+        pair.a->Start();
+        pair.b->Start();
+      }
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+      bool open = false;
+      while (!open && std::chrono::steady_clock::now() < deadline) {
+        open = true;
+        for (Pair& pair : pairs) {
+          open = open && pair.a->GetStats().onWebRtc && pair.b->GetStats().onWebRtc;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      allOpen = allOpen && open;
+      stop = true;
+      tickerA.join();
+      tickerB.join();
+      sender.join();
+      for (Pair& pair : pairs) {
+        pair.a->Close();
+        pair.b->Close();
+      }
+    }
+    finished = true;
+    watchdog.join();
+    Check(allOpen, "7 links set up WebRTC with the lane on and traffic flowing, 8 times, without freezing");
+  }
+
   // Issue #234: two marked links find each other ours; a marked link and an
   // unmarked one (as a Java adapter peer looks) never do, and the unmarked one
   // never gets a probe.
@@ -496,6 +605,7 @@ int main(int argc, char** argv)
   OurPeerTest(bind);
   DuplicateTest(bind);
   WebRtcTest(bind);
+  LaneWebRtcSetupTest(bind);
   std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
   return gFailures == 0 ? 0 : 1;
 }

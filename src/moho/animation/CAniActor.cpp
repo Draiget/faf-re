@@ -560,7 +560,8 @@ namespace moho
     // new frame starts as a copy of the pose just retired, under a fresh
     // control block; the referent this lane held before the swap is released.
     // Engine addition (sim_RecyclePose): when unique, overwrite in-place without heap reallocation.
-    if (sim_RecyclePose && mPose != nullptr && mPose.unique()) {
+    // Not an 11-bone pose: the block order of the binary's allocator class depends on these (see SimBlockLane).
+    if (sim_RecyclePose && mPose != nullptr && mPose.unique() && mPose->mBones.size() != CAniPoseBoneArray::kBinaryLaneBones) {
       mPose->OverwritePose(*mPriorPose);
     } else {
       mPose.reset(new CAniPose(*mPriorPose));
