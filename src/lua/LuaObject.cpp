@@ -18257,13 +18257,7 @@ extern "C"
 		const lu_byte savedAllowHook = state->l_G->allowhook;
 		const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
 
-		if (++state->nCcalls >= kMaxCCalls) {
-			if (state->nCcalls == kMaxCCalls) {
-				luaG_runerror(state, "C stack overflow");
-			} else if (state->nCcalls >= kMaxCCallsHandling) {
-				throw lua_ErrorError(lua::lua_Error(state, LUA_ERRERR, "error in Lua error handling"));
-			}
-		}
+		++state->nCcalls;
 
 		// Unwind this frame back to the depth it started at, planting the
 		// message where the caller expects it, then let the error continue
@@ -18284,6 +18278,19 @@ extern "C"
 		};
 
 		try {
+			// 0x00914488 opens the try scope before the depth test at 0x0091447B,
+			// so both overflow errors unwind through this frame's handler, which
+			// puts nCcalls back. Raised outside it, every "C stack overflow"
+			// caught by a script callback left the count one high, and the limit
+			// stopped firing once the count had stepped past 200.
+			if (state->nCcalls >= kMaxCCalls) {
+				if (state->nCcalls == kMaxCCalls) {
+					luaG_runerror(state, "C stack overflow");
+				} else if (state->nCcalls >= kMaxCCallsHandling) {
+					throw lua_ErrorError(lua::lua_Error(state, LUA_ERRERR, "error in Lua error handling"));
+				}
+			}
+
 			StkId firstResult = luaD_precall(state, func);
 			if (firstResult == nullptr) {
 				firstResult = luaV_execute(state);
