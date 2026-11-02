@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: the Direct3D 12 gal device.
 
 #include "DeviceD3D12.h"
+#include "gpg/gal/backends/common/EffectSourceCache.h"
 
 #include <algorithm>
 #include <cctype>
@@ -350,12 +351,29 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   // ---------------------------------------------------------------------------
   // Construction and setup
 
+  namespace
+  {
+    // An effect's source as this backend compiles it: its macros, then the shared preprocess and
+    // translation (engine addition: cached and built ahead, see EffectSourceCache.h).
+    d3d11::TranslatedEffectSource BuildEffectSource(const EffectContext& context)
+    {
+      EffectContext localContext(context);
+      for (const MacroPair& macro : kInjectedMacros) {
+        localContext.DefineMacro(macro.name, macro.value);
+      }
+      return effects::TranslateEffect(localContext, "DeviceD3D12.cpp");
+    }
+  } // namespace
+
   DeviceD3D12::DeviceD3D12()
     : mCursor(&IsRgbaTexture)
-  {}
+  {
+    effects::SetEffectSourceBuilder(&BuildEffectSource); // engine addition, see EffectSourceCache.h
+  }
 
   DeviceD3D12::~DeviceD3D12()
   {
+    effects::SetEffectSourceBuilder(nullptr);
     Shutdown();
   }
 
@@ -1621,34 +1639,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (context.mSourceType != 2U) {
       ThrowError("DeviceD3D12.cpp", __LINE__, "invalid source defined for effect");
     }
-    EffectContext localContext(context);
-    for (const MacroPair& macro : kInjectedMacros) {
-      localContext.DefineMacro(macro.name, macro.value);
-    }
-    std::vector<D3D_SHADER_MACRO> defines;
-    defines.reserve(localContext.mMacros.size() + 1U);
-    for (const EffectMacro& macro : localContext.mMacros) {
-      defines.push_back(D3D_SHADER_MACRO{macro.keyText_.c_str(), macro.valueText_.c_str()});
-    }
-    defines.push_back(D3D_SHADER_MACRO{nullptr, nullptr});
-
     const DWORD started = ::GetTickCount();
     const char* const sourceName = context.mSourcePath.c_str();
     const char* const sourceData = context.mSourceBuffer.mBegin;
     const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
-    ComPtr<ID3DBlob> preprocessed;
-    ComPtr<ID3DBlob> errors;
-    if (FAILED(::D3DPreprocess(sourceData, sourceBytes, sourceName, defines.data(), nullptr, &preprocessed, &errors))) {
-      const std::string message = std::string("unable to preprocess effect: ") + sourceName + " reason: " +
-        ((errors != nullptr) ? std::string(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize()) : std::string());
-      ThrowError("DeviceD3D12.cpp", __LINE__, message.c_str());
-    }
-    d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
-      std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U), true,
-      // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
-      // and running the translator's copy as well would test twice.
-      std::string_view{}
-    );
+    d3d11::TranslatedEffectSource translated = BuildEffectSource(context);
     for (const std::string& note : translated.notes) {
       gpg::Logf("D3D12: %s: %s", sourceName, note.c_str());
     }

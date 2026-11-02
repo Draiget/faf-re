@@ -1026,6 +1026,9 @@ namespace moho
    */
   RRuleGameRulesImpl::~RRuleGameRulesImpl()
   {
+    // Engine addition: a sim Lua state prepared for these rules that no sim took holds an export
+    // binding into them; it goes first.
+    SIM_DiscardPreparedLuaState(this);
     gRulesGeneration.fetch_add(1u, std::memory_order_relaxed); // engine addition, see BlueprintNameCache
     DestroyBlueprintObjectsFromOrdinalArray(*this);
 

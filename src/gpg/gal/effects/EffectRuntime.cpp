@@ -40,18 +40,8 @@ namespace gpg::gal::effects
 
     constexpr char kCacheMagic[8] = {'F', 'A', 'F', 'S', 'H', 'D', 'R', '1'};
 
-    [[nodiscard]] std::string CachePath(const std::uint64_t key, const ShaderTarget target)
-    {
-      const std::string& directory = ShaderCacheDirectory();
-      if (directory.empty()) {
-        return {};
-      }
-      char name[64]{};
-      std::snprintf(name, sizeof(name), "%016llx.%s", static_cast<unsigned long long>(key), target == ShaderTarget::Dxil ? "dxil" : "spv");
-      return directory + name;
-    }
 
-    [[nodiscard]] bool ReadCache(const std::string& path, const std::uint64_t key, std::vector<std::uint8_t>& code)
+    [[nodiscard]] bool ReadCacheFile(const std::string& path, const std::uint64_t key, std::vector<std::uint8_t>& code)
     {
       if (path.empty()) {
         return false;
@@ -76,7 +66,7 @@ namespace gpg::gal::effects
       return ok;
     }
 
-    void WriteCache(const std::string& path, const std::uint64_t key, const std::vector<std::uint8_t>& code)
+    void WriteCacheFile(const std::string& path, const std::uint64_t key, const std::vector<std::uint8_t>& code)
     {
       if (path.empty()) {
         return;
@@ -160,6 +150,27 @@ namespace gpg::gal::effects
   } // namespace
 
   bool gBackgroundShaders = true;
+
+  std::string ShaderCachePath(const std::uint64_t key, const char* const extension)
+  {
+    const std::string& directory = ShaderCacheDirectory();
+    if (directory.empty()) {
+      return {};
+    }
+    char name[64]{};
+    std::snprintf(name, sizeof(name), "%016llx.%s", static_cast<unsigned long long>(key), extension);
+    return directory + name;
+  }
+
+  bool ReadShaderCache(const std::uint64_t key, const char* const extension, std::vector<std::uint8_t>& bytes)
+  {
+    return ReadCacheFile(ShaderCachePath(key, extension), key, bytes);
+  }
+
+  void WriteShaderCache(const std::uint64_t key, const char* const extension, const std::vector<std::uint8_t>& bytes)
+  {
+    WriteCacheFile(ShaderCachePath(key, extension), key, bytes);
+  }
 
   void Fnv1a64::Add(const void* const data, const std::size_t bytes) noexcept
   {
@@ -334,8 +345,8 @@ namespace gpg::gal::effects
     prepared.entryName = shaderEntry.name;
 
     ShaderCompiler& compiler = ShaderCompiler::Instance();
-    const std::string path = CachePath(prepared.key, mTarget);
-    if (ReadCache(path, prepared.key, prepared.code)) {
+    const std::string path = ShaderCachePath(prepared.key, mTarget == ShaderTarget::Dxil ? "dxil" : "spv");
+    if (ReadCacheFile(path, prepared.key, prepared.code)) {
       prepared.succeeded = true;
     } else if (mode == PrepareMode::CacheOnly) {
       {
@@ -356,7 +367,7 @@ namespace gpg::gal::effects
       } else {
         prepared.code = std::move(result.code);
         prepared.succeeded = true;
-        WriteCache(path, prepared.key, prepared.code);
+        WriteCacheFile(path, prepared.key, prepared.code);
         static std::atomic<int> logged{0};
         if (logged++ < 32) {
           gpg::Logf(

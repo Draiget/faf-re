@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
@@ -18,6 +19,7 @@
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/TextureContext.h"
+#include "gpg/gal/backends/common/EffectSourceCache.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -60,6 +62,41 @@ namespace moho
      * device has to be Direct3D 9 and able to read a float4 texture in a
      * vertex shader, and /nobonetexture on the command line turns it off.
      */
+    /**
+     * The compatibility preamble followed by the effect file: the text an effect is built from.
+     * `effectSource` gets the effect file alone.
+     */
+    [[nodiscard]] gpg::MemBuffer<char> LoadMergedEffectSource(
+      FWaitHandleSet& waitHandleSet, const char* const compatResourcePath, const char* const effectFilePath,
+      gpg::MemBuffer<const char>& effectSource
+    )
+    {
+      msvc8::string compatPath{};
+      (void)waitHandleSet.mHandle->FindFile(&compatPath, compatResourcePath, nullptr);
+      const gpg::MemBuffer<const char> compatStateBuffer = DISK_MemoryMapFile(compatPath.c_str());
+
+      effectSource = DISK_MemoryMapFile(effectFilePath);
+      const std::size_t compatByteCount = compatStateBuffer.Size();
+      const std::size_t effectByteCount = effectSource.Size();
+      gpg::MemBuffer<char> mergedBuffer = gpg::AllocMemBuffer(compatByteCount + effectByteCount);
+      if (compatByteCount > 0U) {
+        // Raw effect-code blob copy into the merged buffer.
+        std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+      }
+      if (effectByteCount > 0U) {
+        // Raw effect-code blob copy into the merged buffer.
+        std::copy_n(effectSource.GetPtr(0U, 0U), effectByteCount, mergedBuffer.GetPtr(compatByteCount, 0U));
+      }
+      return mergedBuffer;
+    }
+
+    [[nodiscard]] const char* CompatResourcePath(const gpg::gal::DeviceContext* const deviceContext)
+    {
+      return (deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType))
+        ? "/effects/d3d10states.compat"
+        : "/effects/d3d9states.compat";
+    }
+
     [[nodiscard]] bool WantsBoneTextureVariant(
       const gpg::gal::DeviceContext* const deviceContext, const gpg::MemBuffer<const char>& source
     )
@@ -418,6 +455,37 @@ namespace moho
   }
 
   /**
+   * Engine addition: builds each effect's source the way InitEffectFromFile hands it to the
+   * device and has the backend preprocess and translate the whole set on worker threads
+   * (gpg::gal::effects::PrepareEffectSources), so each effect's creation finds its translation
+   * waiting. With a backend that translates nothing, or a set that fails here, the effects are
+   * created as before.
+   */
+  void CD3DEffect::PrepareEffectSources(const msvc8::vector<msvc8::string>& effectFilePaths)
+  {
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    const gpg::gal::DeviceContext* const deviceContext = (device != nullptr) ? device->GetDeviceContext() : nullptr;
+    FILE_EnsureWaitHandleSet();
+    FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+    if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
+      return;
+    }
+
+    std::vector<gpg::gal::EffectContext> contexts;
+    for (const msvc8::string& effectFilePath : effectFilePaths) {
+      gpg::MemBuffer<const char> effectSource{};
+      const gpg::MemBuffer<char> mergedBuffer =
+        LoadMergedEffectSource(*waitHandleSet, CompatResourcePath(deviceContext), effectFilePath.c_str(), effectSource);
+      msvc8::vector<gpg::gal::EffectMacro> effectMacros{};
+      if (WantsBoneTextureVariant(deviceContext, effectSource)) {
+        effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
+      }
+      contexts.emplace_back(false, effectFilePath.c_str(), "", mergedBuffer, effectMacros);
+    }
+    gpg::gal::effects::PrepareEffectSources(contexts);
+  }
+
+  /**
    * Address: 0x0042C650 (FUN_0042C650)
    * Mangled: ?InitEffectFromFile@CD3DEffect@Moho@@QAE_NPBD@Z
    *
@@ -433,10 +501,7 @@ namespace moho
     try {
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       const gpg::gal::DeviceContext* const deviceContext = (device != nullptr) ? device->GetDeviceContext() : nullptr;
-      const char* const compatResourcePath =
-        (deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType))
-          ? "/effects/d3d10states.compat"
-          : "/effects/d3d9states.compat";
+      const char* const compatResourcePath = CompatResourcePath(deviceContext);
 
       FILE_EnsureWaitHandleSet();
       FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
@@ -444,9 +509,6 @@ namespace moho
         return false;
       }
 
-      msvc8::string compatPath{};
-      (void)waitHandleSet->mHandle->FindFile(&compatPath, compatResourcePath, nullptr);
-      const gpg::MemBuffer<const char> compatStateBuffer = DISK_MemoryMapFile(compatPath.c_str());
       const msvc8::string cacheDirectory = USER_GetAppCacheDir();
       const msvc8::string effectBaseName = FILE_Base(effectFilePath, true);
 
@@ -456,18 +518,9 @@ namespace moho
       SDiskFileInfo sourceInfo{};
       (void)waitHandleSet->GetFileInfo(mFile.c_str(), &sourceInfo, false);
 
-      const gpg::MemBuffer<const char> effectSourceBuffer = DISK_MemoryMapFile(mFile.c_str());
-      const std::size_t compatByteCount = compatStateBuffer.Size();
-      const std::size_t effectByteCount = effectSourceBuffer.Size();
-      gpg::MemBuffer<char> mergedBuffer = gpg::AllocMemBuffer(compatByteCount + effectByteCount);
-      if (compatByteCount > 0U) {
-        // Raw effect-code blob copy into the merged buffer.
-        std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
-      }
-      if (effectByteCount > 0U) {
-        // Raw effect-code blob copy into the merged buffer.
-        std::copy_n(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount, mergedBuffer.GetPtr(compatByteCount, 0U));
-      }
+      gpg::MemBuffer<const char> effectSourceBuffer{};
+      gpg::MemBuffer<char> mergedBuffer =
+        LoadMergedEffectSource(*waitHandleSet, compatResourcePath, mFile.c_str(), effectSourceBuffer);
 
       // Builds the effect, from its compiled copy in the cache when that is at
       // least as new as the source. FAF: `boneTexture` compiles the variant

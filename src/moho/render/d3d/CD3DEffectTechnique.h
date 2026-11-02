@@ -230,6 +230,12 @@ namespace moho
     [[nodiscard]] bool InitEffectFromFile(const char* effectFilePath);
 
     /**
+     * Engine addition: preprocesses and translates the sources of a whole set of effects on
+     * worker threads ahead of their InitEffectFromFile (see the definition).
+     */
+    static void PrepareEffectSources(const msvc8::vector<msvc8::string>& effectFilePaths);
+
+    /**
      * Address: 0x0042DB30 (FUN_0042DB30, ?EnumerateValidTechniques@CD3DEffect@Moho@@QAEXAAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z)
      *
      * What it does:

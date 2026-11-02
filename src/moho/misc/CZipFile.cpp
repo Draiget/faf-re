@@ -3,9 +3,11 @@
 #include <zlib.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -193,6 +195,49 @@ namespace
     entry.mCachedDataOffset = static_cast<std::int32_t>(dataOffset);
     return true;
   }
+
+  // Engine addition: inside a CZipFileReadBatch the thread keeps the archive it last read an entry
+  // from open for its next read; opening the file again for every entry was an eighth of blueprint
+  // loading. Creating or destroying any CZipFile moves the generation on, which retires every
+  // thread's open archive, so a stream is never reused for another archive at the same address.
+  std::atomic<std::uint64_t> gZipFileGeneration{0};
+
+  struct SOpenArchive
+  {
+    int batchDepth = 0;
+    const void* zip = nullptr;
+    std::uint64_t generation = 0;
+    std::unique_ptr<gpg::Stream> stream;
+  };
+  thread_local SOpenArchive tOpenArchive;
+
+  // Engine addition: the lock ReadEntry holds for one entry, one of a fixed set chosen by the
+  // entry's address (the archive object keeps the binary's layout, with no room for one per entry).
+  [[nodiscard]] std::mutex& EntryLock(const void* const entry)
+  {
+    static std::mutex locks[64];
+    return locks[(reinterpret_cast<std::uintptr_t>(entry) >> 4U) % 64U];
+  }
+
+  // The archive stream to read `zip`'s entry from: the thread's open one inside a batch, otherwise
+  // a fresh one in `ownedStream`, closed when the caller is done with it.
+  [[nodiscard]] gpg::Stream* OpenArchiveForRead(
+    const void* const zip, const msvc8::string& zipPath, std::unique_ptr<gpg::Stream>& ownedStream
+  )
+  {
+    if (tOpenArchive.batchDepth == 0) {
+      ownedStream = OpenZipBackingStream(zipPath);
+      return ownedStream.get();
+    }
+    const std::uint64_t generation = gZipFileGeneration.load(std::memory_order_acquire);
+    if (tOpenArchive.stream != nullptr && tOpenArchive.zip == zip && tOpenArchive.generation == generation) {
+      return tOpenArchive.stream.get();
+    }
+    tOpenArchive.stream = OpenZipBackingStream(zipPath);
+    tOpenArchive.zip = zip;
+    tOpenArchive.generation = generation;
+    return tOpenArchive.stream.get();
+  }
 } // namespace
 
 namespace moho
@@ -208,6 +253,7 @@ namespace moho
    */
   CZipFile::CZipFile(const gpg::StrArg sourcePath)
   {
+    gZipFileGeneration.fetch_add(1u, std::memory_order_acq_rel); // engine addition, see OpenArchiveForRead
     const char* const archivePath = sourcePath != nullptr ? sourcePath : "";
     mPath.assign_owned(archivePath);
 
@@ -366,8 +412,22 @@ namespace moho
    * What it does:
    * Releases map/vector-owned zip metadata and resets the owned path string.
    */
+  CZipFileReadBatch::CZipFileReadBatch() noexcept
+  {
+    ++tOpenArchive.batchDepth;
+  }
+
+  CZipFileReadBatch::~CZipFileReadBatch()
+  {
+    if (--tOpenArchive.batchDepth == 0) {
+      tOpenArchive.stream.reset();
+      tOpenArchive.zip = nullptr;
+    }
+  }
+
   CZipFile::~CZipFile()
   {
+    gZipFileGeneration.fetch_add(1u, std::memory_order_acq_rel); // engine addition, see OpenArchiveForRead
     // `mEntryByCanonicalPath`'s teardown is its destructor, which MSVC emits for
     // the member; only the two lanes with no destructor of their own are here.
     mEntries = msvc8::vector<SZipFileCachedEntry>();
@@ -552,11 +612,16 @@ namespace moho
     }
 
     CZipFileEntry& entry = *cachedEntry.mEntry.get();
+    // Engine addition: an entry is read and cached by one thread at a time; a second reader waits
+    // and takes the cached bytes. The binary filled the cache unguarded, which two threads reading
+    // one entry (the session loader and the main thread, or the first-frame warm-up) would race on.
+    const std::lock_guard<std::mutex> entryGuard(EntryLock(&cachedEntry));
     if (cachedEntry.mData) {
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }
 
-    std::unique_ptr<gpg::Stream> zipStream = OpenZipBackingStream(mPath);
+    std::unique_ptr<gpg::Stream> ownedStream;
+    gpg::Stream* const zipStream = OpenArchiveForRead(this, mPath, ownedStream);
     if (zipStream == nullptr) {
       return {};
     }

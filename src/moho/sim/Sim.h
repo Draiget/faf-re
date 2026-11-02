@@ -7421,4 +7421,19 @@ namespace moho
   static_assert(offsetof(Sim, mSyncSerializeGroup0) == 0x09B8, "Sim::mSyncSerializeGroup0 offset must be 0x09B8");
   static_assert(sizeof(Sim) == 0xAF8, "Sim size must be 0xAF8");
 #endif
+
+  /**
+   * Engine addition: starts building the sim's Lua state for `rules` on a helper thread - a fresh
+   * state with the core and sim bindings and the rules' blueprints exported into it, the part of
+   * `Sim::Sim` that needs nothing but the rules. The session loader calls it once the session's
+   * own export is done, so the copy runs while the loader finishes; `Sim::Sim` then takes the state
+   * instead of building it. Replaces a state prepared for other rules.
+   */
+  void SIM_PrepareLuaState(RRuleGameRules* rules);
+
+  /**
+   * Engine addition: drops a state `SIM_PrepareLuaState` built for `rules` that no sim took; the
+   * rules' destructor calls it, while the export binding the state holds is still valid.
+   */
+  void SIM_DiscardPreparedLuaState(const RRuleGameRules* rules);
 } // namespace moho

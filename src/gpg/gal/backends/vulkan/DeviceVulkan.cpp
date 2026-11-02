@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: the Vulkan gal device.
 
 #include "DeviceVulkan.h"
+#include "gpg/gal/backends/common/EffectSourceCache.h"
 
 #include <algorithm>
 #include <cctype>
@@ -254,12 +255,29 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Construction and setup
 
+  namespace
+  {
+    // An effect's source as this backend compiles it: its macros, then the shared preprocess and
+    // translation (engine addition: cached and built ahead, see EffectSourceCache.h).
+    d3d11::TranslatedEffectSource BuildEffectSource(const EffectContext& context)
+    {
+      EffectContext localContext(context);
+      for (const MacroPair& macro : kInjectedMacros) {
+        localContext.DefineMacro(macro.name, macro.value);
+      }
+      return effects::TranslateEffect(localContext, "DeviceVulkan.cpp");
+    }
+  } // namespace
+
   DeviceVulkan::DeviceVulkan()
     : mCursor(&IsRgbaTexture)
-  {}
+  {
+    effects::SetEffectSourceBuilder(&BuildEffectSource); // engine addition, see EffectSourceCache.h
+  }
 
   DeviceVulkan::~DeviceVulkan()
   {
+    effects::SetEffectSourceBuilder(nullptr);
     Shutdown();
   }
 
@@ -1539,32 +1557,10 @@ namespace gpg::gal
     if (context.mSourceType != 2U) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid source defined for effect");
     }
-    EffectContext localContext(context);
-    for (const MacroPair& macro : kInjectedMacros) {
-      localContext.DefineMacro(macro.name, macro.value);
-    }
-    std::vector<D3D_SHADER_MACRO> defines;
-    for (const EffectMacro& macro : localContext.mMacros) {
-      defines.push_back(D3D_SHADER_MACRO{macro.keyText_.c_str(), macro.valueText_.c_str()});
-    }
-    defines.push_back(D3D_SHADER_MACRO{nullptr, nullptr});
-
     const DWORD started = ::GetTickCount();
     const char* const sourceName = context.mSourcePath.c_str();
     const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
-    Microsoft::WRL::ComPtr<ID3DBlob> preprocessed;
-    Microsoft::WRL::ComPtr<ID3DBlob> errors;
-    if (FAILED(::D3DPreprocess(context.mSourceBuffer.mBegin, sourceBytes, sourceName, defines.data(), nullptr, &preprocessed, &errors))) {
-      const std::string message = std::string("unable to preprocess effect: ") + sourceName + " reason: " +
-        ((errors != nullptr) ? std::string(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize()) : std::string());
-      ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
-    }
-    d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
-      std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U), true,
-      // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
-      // and running the translator's copy as well would test twice.
-      std::string_view{}
-    );
+    d3d11::TranslatedEffectSource translated = BuildEffectSource(context);
     std::shared_ptr<effects::EffectProgram> program;
     try {
       program = std::make_shared<effects::EffectProgram>(

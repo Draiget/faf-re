@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include <Windows.h>
 
 #include <cstddef>
@@ -288,6 +291,13 @@ namespace moho
     [[nodiscard]] gpg::MemBuffer<const char> MemoryMapFile(gpg::StrArg sourcePath);
 
     /**
+     * Engine addition: reads one mounted archive entry by its canonical path into the archive's
+     * cache, as MemoryMapFile would, and does nothing for a path that is not an archive entry.
+     * Used to warm the reads a frame will make (see FILE_BeginReadRecording).
+     */
+    void WarmArchiveEntry(gpg::StrArg canonicalPath);
+
+    /**
      * Address: 0x00457F20 (FUN_00457F20, Moho::FWaitHandleSet::ErrorString)
      *
      * What it does:
@@ -353,6 +363,18 @@ namespace moho
    * Returns the process-global wait-handle set after one-time initialization.
    */
   [[nodiscard]] FWaitHandleSet* FILE_GetWaitHandleSet();
+
+  /**
+   * Engine addition: from now on, the canonical path of every archive entry any thread maps
+   * (FWaitHandleSet::MemoryMapFile) is noted, once each, until FILE_EndReadRecording.
+   */
+  void FILE_BeginReadRecording();
+
+  /** Engine addition: the calling thread's reads are never recorded (a thread reading ahead). */
+  void FILE_ExcludeThreadFromReadRecording();
+
+  /** Engine addition: stops the recording and returns the paths read. */
+  [[nodiscard]] std::vector<std::string> FILE_EndReadRecording();
 
   /**
    * Address: 0x00459C40 (FUN_00459C40, ?DISK_OpenFileRead@Moho@@YA?AV?$auto_ptr@VStream@gpg@@@std@@VStrArg@gpg@@@Z)

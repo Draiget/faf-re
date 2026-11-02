@@ -1,4 +1,5 @@
 #include "Sim.h"
+#include "platform/X87Precision.h"
 #include "legacy/math/X87Math.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Global.h"
@@ -29,6 +30,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -480,14 +482,20 @@ void moho::REF_UpdateMD5(
     || refType == GetSignedCharRType() || refType == GetUnsignedCharRType() || refType == GetFloatRType()
     || refType == GetBoolRType() || refType->IsEnumType() != nullptr;
 
+  // Engine addition: the value's text is only built for a trace; formatting every float of every
+  // blueprint for nothing was most of the rules checksum.
   if (isPrimitiveLike) {
-    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    if (traceFile != nullptr) {
+      PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    }
     md5.Update(ref.mObj, static_cast<std::size_t>(refType->size_));
     return;
   }
 
   if (refType == GetStringRType()) {
-    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    if (traceFile != nullptr) {
+      PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    }
     const auto& stringValue = *static_cast<const msvc8::string*>(ref.mObj);
     md5.Update(stringValue.c_str(), stringValue.size() + 1u);
     return;
@@ -5871,6 +5879,108 @@ void Sim::Printf(const char* fmt, ...)
   va_end(args);
 }
 
+namespace
+{
+  /**
+   * Engine addition: the part of `Sim::Sim` that builds its Lua state from the rules alone - a
+   * fresh state, the core and sim init sets, then the rules' blueprints - either on the sim
+   * thread or ahead of it (SIM_PrepareLuaState). The binding of the sim itself to the state
+   * follows in the constructor.
+   */
+  LuaPlus::LuaState* BuildSimLuaState(RRuleGameRules* const rules)
+  {
+    auto* const state = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+    lua::NameLuaVm(state->m_state, "Sim"); // diagnostics label only
+
+    if (CScrLuaInitFormSet* const coreSet = SCR_FindLuaInitFormSet("Core"); coreSet != nullptr) {
+      coreSet->RunInits(state);
+    }
+    if (CScrLuaInitFormSet* const simSet = SCR_FindLuaInitFormSet("Sim"); simSet != nullptr) {
+      simSet->RunInits(state);
+    }
+
+    gpg::LogScopeEntry luaBpScope(msvc8::string("MEM: %i bytes LUABP"));
+    rules->ExportToLuaState(state);
+    luaBpScope.Emit();
+    return state;
+  }
+
+  /// Engine addition: the state SIM_PrepareLuaState is building, and the rules it is for.
+  struct PreparedSimLuaState
+  {
+    std::mutex lock;
+    const RRuleGameRules* rules = nullptr;
+    std::thread builder;
+    LuaPlus::LuaState* state = nullptr; // written by `builder`, read after joining it
+  };
+
+  // Never destroyed: a thread still joinable at exit would terminate the process.
+  PreparedSimLuaState& Prepared()
+  {
+    static auto* const prepared = new PreparedSimLuaState();
+    return *prepared;
+  }
+
+  // With `prepared.lock` held: waits for the builder and hands over what it built, or null.
+  LuaPlus::LuaState* TakePreparedLocked(PreparedSimLuaState& prepared)
+  {
+    if (prepared.builder.joinable()) {
+      prepared.builder.join();
+    }
+    prepared.rules = nullptr;
+    return std::exchange(prepared.state, nullptr);
+  }
+
+  // With `prepared.lock` held: drops what the builder made, export binding first.
+  void DiscardPreparedLocked(PreparedSimLuaState& prepared)
+  {
+    RRuleGameRules* const rules = const_cast<RRuleGameRules*>(prepared.rules);
+    if (LuaPlus::LuaState* const state = TakePreparedLocked(prepared); state != nullptr) {
+      rules->CancelExport(state);
+      delete state;
+    }
+  }
+
+  // The state prepared for `rules`, once its builder is done, or null.
+  LuaPlus::LuaState* TakePreparedLuaState(const RRuleGameRules* const rules)
+  {
+    PreparedSimLuaState& prepared = Prepared();
+    const std::lock_guard<std::mutex> guard(prepared.lock);
+    return (rules != nullptr && prepared.rules == rules) ? TakePreparedLocked(prepared) : nullptr;
+  }
+} // namespace
+
+void moho::SIM_PrepareLuaState(RRuleGameRules* const rules)
+{
+  if (rules == nullptr) {
+    return;
+  }
+
+  PreparedSimLuaState& prepared = Prepared();
+  const std::lock_guard<std::mutex> guard(prepared.lock);
+  DiscardPreparedLocked(prepared);
+  prepared.rules = rules;
+  prepared.builder = std::thread([rules, &prepared] {
+    // The precision the sim thread builds it under.
+    platform::SetX87PrecisionControl(_PC_24);
+    gpg::SetThreadName(0xFFFFFFFFu, "Sim Lua prep");
+    try {
+      prepared.state = BuildSimLuaState(rules);
+    } catch (const std::exception& error) {
+      gpg::Warnf("Preparing the sim's Lua state failed, the sim builds its own: %s", error.what());
+    }
+  });
+}
+
+void moho::SIM_DiscardPreparedLuaState(const RRuleGameRules* const rules)
+{
+  PreparedSimLuaState& prepared = Prepared();
+  const std::lock_guard<std::mutex> guard(prepared.lock);
+  if (rules != nullptr && prepared.rules == rules) {
+    DiscardPreparedLocked(prepared);
+  }
+}
+
 // Global "current sim" singleton and reflection type descriptor.
 Sim* Sim::sInstance = nullptr;
 
@@ -5965,35 +6075,26 @@ Sim::Sim(LaunchInfoBase* const info)
 
   mSyncFilter.focusArmy = info->mCommandSources.mOriginalSource;
 
-  // Build a fresh Lua state, bind this Sim as the global userdata, and run the
-  // registered core + sim init form sets.
+  // A fresh Lua state with the core + sim init form sets and the rules' blueprints, then this
+  // Sim bound as its global userdata. Engine addition: the state the session loader had built
+  // ahead of the sim (SIM_PrepareLuaState) when there is one, otherwise built here; the binary
+  // bound the Sim and set the debug hook before running the init sets, none of which reads them.
   {
-    auto* const newState = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+    LuaPlus::LuaState* newState = TakePreparedLuaState(mRules);
+    if (newState == nullptr) {
+      newState = BuildSimLuaState(mRules);
+    }
     LuaPlus::LuaState* const previousState = mLuaState;
     mLuaState = newState;
     if (previousState) {
       delete previousState;
     }
   }
-  lua::NameLuaVm(mLuaState->m_state, "Sim"); // diagnostics label only
   lua_setglobaluserdata(mLuaState->m_state, this);
-
-  if (CScrLuaInitFormSet* const coreSet = SCR_FindLuaInitFormSet("Core"); coreSet != nullptr) {
-    coreSet->RunInits(mLuaState);
-  }
-  if (CScrLuaInitFormSet* const simSet = SCR_FindLuaInitFormSet("Sim"); simSet != nullptr) {
-    simSet->RunInits(mLuaState);
-  }
   if (SCR_IsDebugWindowActive()) {
     lua_sethook(mLuaState->m_state, &moho::DebugLuaHook, 4, 0);
   }
   mLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(&mDiskWatcherTaskStage);
-
-  {
-    gpg::LogScopeEntry luaBpScope(msvc8::string("MEM: %i bytes LUABP"));
-    mRules->ExportToLuaState(mLuaState);
-    luaBpScope.Emit();
-  }
   static_cast<RRuleGameRulesImpl*>(mRules)->OnSimHasBlueprints();
 
   {
@@ -6032,10 +6133,11 @@ Sim::Sim(LaunchInfoBase* const info)
   }
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
-  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this); recorder != nullptr && recorder->IsRecording()) {
     // Engine addition (issue #216): REF_UpdateMD5 traces into a FILE*, so the recorder takes the
     // rules trace through a temporary file the CRT deletes when it is closed; the /synclog file,
-    // when there is one, gets the same text.
+    // when there is one, gets the same text. A recorder keeping checksums only would drop the
+    // text, so it gets none and the checksum is taken as without a recorder.
     std::FILE* const trace = std::tmpfile();
     if (trace == nullptr) {
       gpg::Warnf("Desync recorder: no temporary file for the rules trace; beat 0 is recorded without it");

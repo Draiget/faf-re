@@ -1,10 +1,12 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <exception>
 #include <stdexcept>
 #include <string>
+#include <typeinfo>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -13,6 +15,16 @@
 #include "legacy/exceptions/StdExcept.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/misc/FileWaitHandleSet.h"
+
+// The Lua core's own table and string primitives (defined in lua/LuaObject.cpp), for SCR_Copy's
+// table walk.
+extern "C"
+{
+  Table* luaH_new(lua_State* L, int narray, int lnhash);
+  TString* luaS_newlstr(lua_State* L, const char* str, size_t len);
+  int luaO_log2(unsigned int x);
+  void luaV_settable(lua_State* L, const LuaPlus::TObject* t, LuaPlus::TObject* key, LuaPlus::TObject* val);
+}
 
 namespace
 {
@@ -78,6 +90,42 @@ namespace
     }
     lua_settop(lstate, savedTop);
     return convertible;
+  }
+
+  /**
+   * Engine addition: SCR_LuaBuildObject's conversion of a plain value - a string or number through
+   * `SetLexical`, a boolean as "1" or "0" - without its warnings. Neither path logs or writes
+   * anything but the destination, so a failed value can be converted again in full.
+   */
+  /**
+   * Engine addition: a Lua number stored into a `float` without its text. The text path prints the
+   * number with tostring's "%.14g" and reads it back with `atof` before narrowing to float; both
+   * CRT calls round correctly and 14 digits are far finer than a float's spacing, so it returns
+   * the same float for every value but a NaN, which keeps the text path.
+   */
+  [[nodiscard]] bool TrySetFloatDirectly(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
+  {
+    static const gpg::RType* const floatType = gpg::LookupRType(typeid(float));
+    if (value.m_object.tt != LUA_TNUMBER || destination.mType != floatType || std::isnan(value.m_object.value.n)) {
+      return false;
+    }
+    *static_cast<float*>(destination.mObj) = value.m_object.value.n;
+    return true;
+  }
+
+  [[nodiscard]] bool TrySetPlainValue(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
+  {
+    if (TrySetFloatDirectly(value, destination)) {
+      return true;
+    }
+    std::string lexicalValue;
+    if (LuaObjectTryToString(value, lexicalValue)) {
+      return destination.mType->SetLexical(destination, lexicalValue.c_str());
+    }
+    if (value.IsBoolean()) {
+      return destination.mType->SetLexical(destination, value.GetBoolean() ? "1" : "0");
+    }
+    return false;
   }
 
   /**
@@ -709,6 +757,67 @@ namespace moho
    * cloning userdata with reflected move handlers when crossing root-state
    * boundaries.
    */
+  namespace
+  {
+    /**
+     * Engine addition: SCR_Copy's table case without a LuaObject per key and value. The entries
+     * are visited in LuaTableIterator's order - the array part, then the hash nodes - and created
+     * and inserted through the same luaH_new / luaS_newlstr / luaV_settable calls in the same
+     * sequence, so every copied table is laid out, and iterates, exactly as before. A nested table
+     * is inserted before it is filled, so it is reachable from the anchored root should a userdata
+     * copy run the collector; anything but a boolean, number, string or table goes through SCR_Copy.
+     */
+    void CopyTableEntries(
+      lua_State* const L, const Table* const source, const LuaPlus::TObject& target,
+      LuaPlus::LuaState* const sourceState, LuaPlus::LuaState* const targetState
+    )
+    {
+      // `holder` keeps a value copied through SCR_Copy alive until it is in the table.
+      const auto copy = [&](const LuaPlus::TObject& value, LuaPlus::LuaObject& holder) {
+        LuaPlus::TObject out = value; // a boolean or number is the same value in either universe
+        if (value.tt == LUA_TSTRING) {
+          const char* const text = static_cast<const TString*>(value.value.p)->str;
+          TString* const interned = luaS_newlstr(L, text, std::strlen(text));
+          out.tt = interned->tt;
+          out.value.p = interned;
+        } else if (value.tt != LUA_TBOOLEAN && value.tt != LUA_TNUMBER) {
+          LuaPlus::LuaObject original{};
+          original.AssignTObject(sourceState, const_cast<LuaPlus::TObject*>(&value));
+          holder = SCR_Copy(original, targetState);
+          out = holder.m_object;
+        }
+        return out;
+      };
+      const auto copyEntry = [&](const LuaPlus::TObject& key, const LuaPlus::TObject& value) {
+        LuaPlus::LuaObject keyHolder{};
+        LuaPlus::TObject keyCopy = copy(key, keyHolder);
+        if (value.tt == LUA_TTABLE) {
+          Table* const childTable = luaH_new(L, 0, luaO_log2(0u) + 1);
+          LuaPlus::TObject child{};
+          child.tt = childTable->tt;
+          child.value.p = childTable;
+          luaV_settable(L, &target, &keyCopy, &child);
+          CopyTableEntries(L, static_cast<const Table*>(value.value.p), child, sourceState, targetState);
+          return;
+        }
+        LuaPlus::LuaObject valueHolder{};
+        LuaPlus::TObject valueCopy = copy(value, valueHolder);
+        luaV_settable(L, &target, &keyCopy, &valueCopy);
+      };
+
+      for (int index = 0; index < source->sizearray; ++index) {
+        if (source->array[index].tt != LUA_TNIL) {
+          copyEntry(LuaPlus::TObject(index + 1), source->array[index]);
+        }
+      }
+      for (int index = 0; index < (1 << source->lsizenode); ++index) {
+        if (source->node[index].i_val.tt != LUA_TNIL) {
+          copyEntry(source->node[index].i_key, source->node[index].i_val);
+        }
+      }
+    }
+  } // namespace
+
   LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* const state)
   {
     LuaPlus::LuaObject out{};
@@ -739,6 +848,14 @@ namespace moho
 
       case LUA_TTABLE: {
         out.AssignNewTable(state, 0, 0);
+        // Engine addition: across universes - the rules' blueprints into a session or sim state -
+        // the entries are copied directly (CopyTableEntries), which builds the same tables.
+        if (source.m_state != state->m_rootState) {
+          CopyTableEntries(
+            out.GetActiveCState(), static_cast<const Table*>(source.m_object.value.p), out.m_object, source.m_state, state
+          );
+          return out;
+        }
         LuaPlus::LuaObject mutableSource(source);
         for (LuaPlus::LuaTableIterator iter(mutableSource, 1); !iter.m_isDone; iter.Next()) {
           const LuaPlus::LuaObject keyCopy = SCR_Copy(iter.GetKey(), state);
@@ -1199,6 +1316,9 @@ namespace moho
     LuaPlus::LuaObject valueObject, const gpg::RRef& destination, const bool ignoreMissingFields
   )
   {
+    if (TrySetFloatDirectly(valueObject, destination)) {
+      return true;
+    }
     std::string lexicalValue;
     if (LuaObjectTryToString(valueObject, lexicalValue)) {
       if (destination.mType->SetLexical(destination, lexicalValue.c_str())) {
@@ -1280,22 +1400,27 @@ namespace moho
       } else {
         const gpg::RField* const field = destination.mType->GetFieldNamed(keyName.c_str());
         if (field) {
-          const msvc8::string fieldContext = gpg::STR_Printf(
-            "Initializing field %s of %s at %p",
-            keyName.c_str(),
-            destination.GetName(),
-            destination.mObj
-          );
-          gpg::ScopedLogContext scope(fieldContext);
-
           gpg::RRef fieldDestination{
             static_cast<std::uint8_t*>(destination.mObj) + field->mOffset,
             field->mType,
           };
 
           LuaPlus::LuaObject fieldValue(iter.GetValue());
-          if (!SCR_LuaBuildObject(fieldValue, fieldDestination, true)) {
-            recovered = false;
+          // Engine addition: a plain value is set without the field's log context, whose
+          // formatted text cost a third of blueprint loading; one that fails is converted again
+          // inside the context, so its warning reads as before.
+          if (fieldValue.IsTable() || !TrySetPlainValue(fieldValue, fieldDestination)) {
+            const msvc8::string fieldContext = gpg::STR_Printf(
+              "Initializing field %s of %s at %p",
+              keyName.c_str(),
+              destination.GetName(),
+              destination.mObj
+            );
+            gpg::ScopedLogContext scope(fieldContext);
+
+            if (!SCR_LuaBuildObject(fieldValue, fieldDestination, true)) {
+              recovered = false;
+            }
           }
         } else if (!ignoreMissingFields) {
           gpg::Warnf(

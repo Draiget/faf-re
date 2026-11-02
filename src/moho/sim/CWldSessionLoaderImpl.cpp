@@ -15,6 +15,8 @@
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/misc/CZipFile.h"
+#include "moho/sim/Sim.h"
 #include "lua/LuaCrashDump.h"
 
 namespace moho
@@ -111,6 +113,10 @@ namespace moho
       // map geometry loaded here rounds identically to the way it is simulated.
       platform::SetX87PrecisionControl(_PC_24);
 
+      // Engine addition: the load reads thousands of archive entries; each archive stays open
+      // between them until the load is done (CZipFileReadBatch).
+      const CZipFileReadBatch archiveReads;
+
       {
         const std::string marker(" World Session Load 1", 21u);
         (void)marker;
@@ -160,6 +166,9 @@ namespace moho
       if (gSessionKeepsBlueprints) {
         scenario->mGameRules->ExportToLuaState(scenario->mState);
       }
+      // Engine addition: with the session's copy done (or skipped), the sim's own copy of the rules
+      // starts on a helper thread, alongside SessionInit.lua and the map load below.
+      SIM_PrepareLuaState(scenario->mGameRules);
       AdvanceLoadingProgress(loadControl);
 
       {

@@ -162,6 +162,13 @@ namespace gpg::gal::effects
 
   /** The directory compiled shaders are kept in (FAF_SHADER_CACHE_DIR, else under %LOCALAPPDATA%). */
   [[nodiscard]] const std::string& ShaderCacheDirectory();
+
+  /** A file in that directory: `key` in hex with `extension`, or empty without the directory. */
+  [[nodiscard]] std::string ShaderCachePath(std::uint64_t key, const char* extension);
+
+  /** Reads or writes the bytes kept in the cache under `key` and `extension`; a miss reads false. */
+  [[nodiscard]] bool ReadShaderCache(std::uint64_t key, const char* extension, std::vector<std::uint8_t>& bytes);
+  void WriteShaderCache(std::uint64_t key, const char* extension, const std::vector<std::uint8_t>& bytes);
 } // namespace gpg::gal::effects
 
 namespace gpg::gal
