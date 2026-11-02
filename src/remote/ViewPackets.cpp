@@ -245,6 +245,15 @@ namespace faf::remote
       block.mMaxHealth = recon.mMaxHealth;
       block.mFractionComplete = recon.mFractionComplete;
       block.mIsDead = recon.mMaybeDead;
+
+      // `ReconBlip::SyncInterface`: only an active real contact in current line of sight
+      // publishes its creator's scroll.
+      if (!blip->IsFake() && creator != nullptr && recon.mNeedsFlush != 0u && recon.mMaybeDead == 0u &&
+          (recon.mReconFlags & static_cast<std::uint32_t>(moho::RECON_LOSNow)) != 0u) {
+        const moho::SSTIEntityVariableData& creatorData = static_cast<moho::Entity*>(creator)->mVarDat;
+        block.mScrollBeatStart = creatorData.mScrollBeatStart;
+        block.mScrollBeatEnd = creatorData.mScrollBeatEnd;
+      }
     }
 
     moho::SEntityVariableUpdateEntry& update = out.mEntityUpdates.emplace_back();
