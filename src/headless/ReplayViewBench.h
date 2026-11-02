@@ -24,6 +24,11 @@
 // bytes of all lanes. The summary gives the mean, p50, p95, p99 and maximum of each time and the
 // bytes per client per second.
 
+namespace moho
+{
+  class CIntelGrid;
+}
+
 namespace faf::headless
 {
   class CReplayViewBench final : public remote::CViewFrames
@@ -68,6 +73,7 @@ namespace faf::headless
     std::vector<SClient> mClients;
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
     std::vector<remote::wire::SGridSlot> mBeatGrids; // every army's grids this beat, copied once
+    std::vector<const moho::CIntelGrid*> mBeatGridSources; // the sim's grid of each of those slots
     std::vector<SBeat> mBeats;
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat
     std::uint64_t mEntities = 0;                 // in all frames, all beats

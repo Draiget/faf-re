@@ -7,6 +7,7 @@
 
 #include "boost/shared_ptr.h"
 
+#include "remote/UnderlayPaths.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/SessionTables.h"
@@ -178,6 +179,7 @@ namespace faf::remote
     std::uint64_t mDepositOverflows = 0;
     std::uint64_t mTerrainEditOverflows = 0;
     boost::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
+    CUnderlayPathReader mUnderlays;              // the entities' underlay paths, as of this beat
     wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared
     std::vector<wire::SUnitStat> mStatsScratch;  // a unit's stats, likewise
     wire::CSessionTableWriters* mSession = nullptr;

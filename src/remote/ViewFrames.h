@@ -76,6 +76,7 @@ namespace faf::remote
     std::vector<bool> mBuilt;        // per view: mFrames holds a built frame (likewise)
     std::vector<std::uint32_t> mWithheld;
     std::vector<std::pair<std::uint32_t, SEntityFacts>> mEntityIndex; // the sim's entities by id, this beat
+    std::vector<moho::Entity*> mEntityPointers;                       // the same entities, while their facts are read
     bool mIdMapsOn = false;
     moho::Sim* mLastSim = nullptr;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;

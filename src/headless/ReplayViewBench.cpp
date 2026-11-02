@@ -95,8 +95,10 @@ namespace faf::headless
       mClients.resize(armyCount);
     }
 
-    // Every army's grids, copied once for all the views that receive them.
-    mBeatGrids.clear();
+    // Every army's grids, copied once for all the views that receive them. The slots keep their
+    // storage from beat to beat, and the cells are copied on the workers.
+    std::size_t slots = 0;
+    mBeatGridSources.clear();
     for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
       const moho::CArmyImpl* const army = sim.mArmiesList[index];
       if (army == nullptr) {
@@ -108,17 +110,33 @@ namespace faf::headless
         if (grid == nullptr) {
           continue;
         }
-        remote::wire::SGridSlot& slot = mBeatGrids.emplace_back();
+        if (mBeatGrids.size() <= slots) {
+          mBeatGrids.emplace_back();
+        }
+        remote::wire::SGridSlot& slot = mBeatGrids[slots++];
         slot.army = static_cast<std::uint8_t>(index);
         slot.kind = kind;
         slot.gridSize = grid->mGridSize;
         slot.bits.width = grid->mWidth;
         slot.bits.height = grid->mHeight;
+        mBeatGridSources.push_back(grid);
+      }
+    }
+    mBeatGrids.resize(slots);
+    const auto copyGrids = [this](const std::size_t begin, const std::size_t end) {
+      for (std::size_t i = begin; i < end; ++i) {
+        remote::wire::SGridSlot& slot = mBeatGrids[i];
+        const moho::CIntelGrid* const grid = mBeatGridSources[i];
         slot.bits.cells.resize(static_cast<std::size_t>(grid->mWidth) * grid->mHeight);
         for (std::size_t cell = 0; cell < slot.bits.cells.size(); ++cell) {
           slot.bits.cells[cell] = grid->mGrid[cell] != 0 ? 1u : 0u;
         }
       }
+    };
+    if (Parallel() && slots > 1u) {
+      moho::CSimWorkerPool::Get().ParallelFor(slots, 1u, copyGrids);
+    } else {
+      copyGrids(0u, slots);
     }
 
     if (Parallel() && armyCount > 1u) {

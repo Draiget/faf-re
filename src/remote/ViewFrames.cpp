@@ -79,14 +79,14 @@ namespace faf::remote
       mHavePrevious.push_back(false);
       mWithheld.push_back(0u);
     }
-    // The frames built before this beat become the previous ones: moved, not copied. A view's
-    // frame exists once it has been built (its id comes from its builder, starting at 0).
+    // The frames built before this beat become the previous ones (in `buildFrame`, which also
+    // lets go of the older ones). A view's frame exists once it has been built (its id comes from
+    // its builder, starting at 0).
     for (std::size_t army = 0; army < armyCount; ++army) {
       if (mBuilt.size() <= army) {
         mBuilt.push_back(false);
       }
       if (mBuilt[army]) {
-        mPreviousFrames[army] = std::move(mFrames[army]);
         mHavePrevious[army] = true;
       }
     }
@@ -95,17 +95,35 @@ namespace faf::remote
     // every view (plan WPR.35): a frame's records are in that order too, so each view finds its
     // records' facts in one forward pass.
     mEntityIndex.clear();
+    mEntityPointers.clear();
     if (sim.mEntityDB != nullptr) {
       mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
+      mEntityPointers.reserve(sim.mEntityDB->mAllUnits.size());
       for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        mEntityIndex.emplace_back(id, ReadEntityFacts(*entity));
+        mEntityIndex.emplace_back(id, SEntityFacts{});
+        mEntityPointers.push_back(entity);
       }
+    }
+    const auto readFacts = [this](const std::size_t begin, const std::size_t end) {
+      for (std::size_t i = begin; i < end; ++i) {
+        mEntityIndex[i].second = ReadEntityFacts(*mEntityPointers[i]);
+      }
+    };
+    constexpr std::size_t kFactsGrain = 256;
+    if (Parallel() && mEntityIndex.size() > kFactsGrain) {
+      moho::CSimWorkerPool::Get().ParallelFor(mEntityIndex.size(), kFactsGrain, readFacts);
+    } else {
+      readFacts(0u, mEntityIndex.size());
     }
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
     const auto buildFrame = [&](const std::size_t army) {
       const auto view = static_cast<std::int32_t>(army);
+      // On this worker: a frame's records hold only the view's own shared values, no sim object.
+      if (mBuilt[army]) {
+        mPreviousFrames[army] = std::move(mFrames[army]);
+      }
       if (!HasView(view)) {
         mFrames[army] = wire::SViewFrame{};
         mWithheld[army] = 0u;

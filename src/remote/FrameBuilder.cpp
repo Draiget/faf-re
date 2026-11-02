@@ -40,7 +40,8 @@ namespace faf::remote
 
     void ApplyAppearance(
       wire::SAppearance& look, const std::uint32_t entityId, const moho::SSTIEntityVariableData& data,
-      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
+      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, const CUnderlayPathReader& underlays,
+      std::uint64_t& unknownUnderlays
     )
     {
       look.mesh = data.mMeshBlueprint != nullptr ? tables.meshes.Ordinal(data.mMeshBlueprint->mBlueprintId.c_str())
@@ -64,8 +65,8 @@ namespace faf::remote
       // The underlay by the path `Entity::SetStrategicUnderlay` recorded: a server without a
       // client has no texture to read it from.
       look.underlay = wire::COrdinalTable::kNone;
-      if (const std::string path = UnderlayPath(entityId); !path.empty() && session != nullptr) {
-        look.underlay = session->Name(path.c_str());
+      if (const std::string* const path = underlays.Find(entityId); path != nullptr && session != nullptr) {
+        look.underlay = session->Name(path->c_str());
       } else if (data.mUnderlayTexture) {
         ++unknownUnderlays; // a texture whose path was not recorded
       }
@@ -73,10 +74,11 @@ namespace faf::remote
 
     void ApplyVariableData(
       wire::SEntityRecord& record, const moho::SSTIEntityVariableData& data, const wire::SFrameCodec& codec,
-      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, std::uint64_t& unknownUnderlays
+      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, const CUnderlayPathReader& underlays,
+      std::uint64_t& unknownUnderlays
     )
     {
-      ApplyAppearance(record.appearance, record.id, data, tables, session, unknownUnderlays);
+      ApplyAppearance(record.appearance, record.id, data, tables, session, underlays, unknownUnderlays);
       const auto& pos = data.mCurTransform.pos_;
       const auto& orient = data.mCurTransform.orient_;
       record.position = {codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)};
@@ -362,6 +364,8 @@ namespace faf::remote
 
   void CViewFrameBuilder::Apply(const moho::SSyncData& packet)
   {
+    mUnderlays.Refresh();
+
     // Resource deposits the sim added since the last beat go on the session record (the sim
     // only ever appends them).
     if (mSession != nullptr && packet.mSimResources.px != nullptr) {
@@ -457,7 +461,7 @@ namespace faf::remote
     }
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
       if (wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(update.mEntityId)); record != nullptr) {
-        ApplyVariableData(*record, update.mVariableData, mCodec, mTables, mSession, mUnknownUnderlays);
+        ApplyVariableData(*record, update.mVariableData, mCodec, mTables, mSession, mUnderlays, mUnknownUnderlays);
       }
     }
     for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
