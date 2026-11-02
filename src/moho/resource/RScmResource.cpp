@@ -1,9 +1,11 @@
 #include "moho/resource/RScmResource.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <typeinfo>
 
@@ -100,6 +102,52 @@ namespace moho
     const int dominantAxis = VEC_LargestAxis(axisExtents);
     const float* const extentLanes = &axisExtents.x;
     mSize = extentLanes[dominantAxis] * 1.2f;
+  }
+
+  namespace
+  {
+    bool gKeepGeometry = true;
+
+    void DeleteTrimmedScmFile(const SScmFile* const file) noexcept
+    {
+      delete[] reinterpret_cast<const char*>(file);
+    }
+  } // namespace
+
+  void RScmResource::SetKeepGeometry(const bool keep) noexcept
+  {
+    gKeepGeometry = keep;
+  }
+
+  bool RScmResource::KeepGeometry() noexcept
+  {
+    return gKeepGeometry;
+  }
+
+  void RScmResource::DropGeometry()
+  {
+    const SScmFile& file = *mFile;
+    constexpr std::size_t kBoneRecordBytes = 0x6Cu; // `SScmBoneRecord` (CAniSkel.cpp)
+    const std::size_t keptBytes = file.mBoneTableOffset + std::size_t{file.mBoneTotalCount} * kBoneRecordBytes;
+    if (file.mVertexOffset < keptBytes || file.mIndexDataOffset < keptBytes) {
+      return;
+    }
+    (void)GetSkeleton();
+    const char* const base = reinterpret_cast<const char*>(&file);
+    for (const SAniSkelBone& bone : mSkeleton->mBones) {
+      if (bone.mBoneName != nullptr && bone.mBoneName + std::strlen(bone.mBoneName) >= base + keptBytes) {
+        return; // bone names after the bones
+      }
+    }
+
+    auto* const bytes = new char[keptBytes];
+    std::copy_n(base, keptBytes, bytes);
+    auto* const trimmed = reinterpret_cast<SScmFile*>(bytes);
+    trimmed->mVertexCount = 0u;
+    trimmed->mIndexCount = 0u;
+    const boost::shared_ptr<const SScmFile> trimmedFile(trimmed, &DeleteTrimmedScmFile);
+    mSkeleton->RebindFile(trimmedFile);
+    mFile = trimmedFile;
   }
 
   /**

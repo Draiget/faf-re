@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <string_view>
 #include <type_traits>
 #include <memory>
 
@@ -126,15 +127,35 @@ namespace faf::headless
       int lastBeat = -1;
     };
 
+    /** Whether this beat's Lua `Sync` bytes contain `text` (read whole and rewound). */
+    [[nodiscard]] bool SyncBytesContain(moho::SSyncData& packet, const std::string_view text)
+    {
+      std::string bytes;
+      char buffer[4096];
+      for (;;) {
+        const std::size_t read = packet.mStream->Read(buffer, sizeof(buffer));
+        if (read == 0u) {
+          break;
+        }
+        bytes.append(buffer, read);
+      }
+      (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+      return bytes.find(text) != std::string::npos;
+    }
+
     /**
      * Decodes this beat's Lua `Sync` table as the UI's `DoBeat` does, and reports whether it
-     * says the game ended. With `keys` set, every top-level key is counted.
+     * says the game ended. With `keys` set, every top-level key is counted. A table that cannot
+     * name the key is not decoded: the garbage of a whole game's decoding is tens of megabytes.
      */
     [[nodiscard]] bool InspectSync(
       moho::SSyncData& packet, LuaPlus::LuaState* const state, std::map<std::string, SSyncKeySeen>* const keys
     )
     {
       if (packet.mStream == nullptr || state == nullptr) {
+        return false;
+      }
+      if (keys == nullptr && !SyncBytesContain(packet, "GameEnded")) {
         return false;
       }
       gpg::BinaryReader syncReader(packet.mStream);
@@ -650,6 +671,7 @@ namespace faf::headless
 #endif
 
     LuaPlus::LuaState* const syncState = ReplayLuaState();
+    bool releasedScriptBlueprints = false;
     std::map<std::string, SSyncKeySeen> syncKeys;
     const Clock::time_point playStart = Clock::now();
     const double timeLimit = 60.0 * options.timeoutMinutes;
@@ -715,6 +737,11 @@ namespace faf::headless
             stateDigestFile, "%d %016llx\n", packet->mCurBeat,
             static_cast<unsigned long long>(DigestPublishedState(*packet))
           );
+        }
+        // The first packet means the sim exists and has its copy of the blueprints.
+        if (rules && !options.keepClientData && !releasedScriptBlueprints) {
+          static_cast<moho::RRuleGameRulesImpl*>(rules.get())->ReleaseScriptBlueprints();
+          releasedScriptBlueprints = true;
         }
         const bool syncSaysEnded =
           InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);

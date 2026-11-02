@@ -29,6 +29,8 @@
 #include "moho/math/MathReflection.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/resource/RScmResource.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
 #include "platform/X87Precision.h"
 #include "headless/ReplayLaunchCheck.h"
 #include "headless/ReplayRunner.h"
@@ -185,6 +187,7 @@ namespace
       "  --view-bench <file>       unfocused: only the server's view work per beat (views with their own ids, every\n"
       "                            lane encoded for every client), timed (CSV: build, send and beat ms, entities,\n"
       "                            bytes; server-mode build; not with the checks above)\n"
+      "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables\n"
       "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
@@ -288,6 +291,7 @@ int main(int argc, char** argv)
   }
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
   options.viewBenchCheck = moho::CFG_GetArgOption("--view-bench-check", 0, nullptr);
+  options.keepClientData = moho::CFG_GetArgOption("--keep-client-data", 0, nullptr);
   options.spy = moho::CFG_GetArgOption("--spy", 0, nullptr);
   options.inboundCheck = moho::CFG_GetArgOption("--inbound-check", 0, nullptr);
   if (options.inboundCheck && (!options.viewIds || options.commandCheck)) {
@@ -345,6 +349,12 @@ int main(int argc, char** argv)
     }
     moho::DISK_SetAccessTrace(diskTrace);
   }
+
+  // Nothing here draws or runs a UI: models keep what the sim reads (`RScmResource::DropGeometry`),
+  // and the session's Lua state gets no copy of the blueprints.
+  const bool keepClientData = moho::CFG_GetArgOption("--keep-client-data", 0, nullptr);
+  moho::RScmResource::SetKeepGeometry(keepClientData);
+  moho::WLD_SetSessionKeepsBlueprints(keepClientData);
 
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();

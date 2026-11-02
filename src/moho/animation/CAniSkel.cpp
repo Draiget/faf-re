@@ -348,6 +348,23 @@ namespace moho
    * convention mismatch as the other `orient_`-consuming sites (this bone
    * transform's quaternion is always in `VMatrix4::Set`'s convention).
    */
+  void CAniSkel::RebindFile(const boost::shared_ptr<const SScmFile>& file)
+  {
+    const char* const oldBase = reinterpret_cast<const char*>(mFile.get());
+    const char* const newBase = reinterpret_cast<const char*>(file.get());
+    for (SAniSkelBone& bone : mBones) {
+      if (bone.mBoneName != nullptr) {
+        bone.mBoneName = newBase + (bone.mBoneName - oldBase);
+      }
+    }
+    for (SAniSkelBoneNameIndex& entry : mBoneNameToIndex) {
+      if (entry.mBoneName != nullptr) {
+        entry.mBoneName = newBase + (entry.mBoneName - oldBase);
+      }
+    }
+    mFile = file;
+  }
+
   void CAniSkel::UpdateBoneBounds()
   {
     SAniSkelBone* const boneStart = mBones.begin();

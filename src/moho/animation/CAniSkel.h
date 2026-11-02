@@ -86,6 +86,12 @@ namespace moho
     explicit CAniSkel(const boost::shared_ptr<const SScmFile>& file);
 
     /**
+     * Engine addition (`RScmResource::DropGeometry`): the same file's start in another buffer. The
+     * bone names point into it. Nothing recomputes the bone bounds afterwards.
+     */
+    void RebindFile(const boost::shared_ptr<const SScmFile>& file);
+
+    /**
      * Address: 0x0054A370 (FUN_0054A370, scalar deleting destructor thunk)
      * Mangled: ??_GCAniSkel@Moho@@UAEPAXI@Z
      *
