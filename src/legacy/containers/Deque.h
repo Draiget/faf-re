@@ -7,6 +7,8 @@
 #include <cassert>
 #include <utility>
 
+#include "legacy/containers/Layout.h"
+
 #ifndef MSVC8_DEQUE_DISABLE_FREE
 #define MSVC8_DEQUE_DISABLE_FREE 0
 #endif
@@ -129,7 +131,7 @@ namespace msvc8
          * `kInitMapSlots`-sized pre-allocation.
          */
         deque()
-            : _Myproxy(nullptr), _Map(nullptr), _Mapsize(0), _Myoff(0), _Mysize(0)
+            : _Map(nullptr), _Mapsize(0), _Myoff(0), _Mysize(0)
         {
         }
 
@@ -422,13 +424,11 @@ namespace msvc8
             release_all();
         }
 
-        // Debug-proxy passthrough (opaque)
-        void* get_debug_proxy() const { return _Myproxy; }
-        void  set_debug_proxy(void* p) { _Myproxy = p; }
-
     private:
         // ---- Exact layout (keep order!) ----
-        void* _Myproxy;   // +0x00
+#if FAF_RETAIL_LAYOUT
+        void* _Myproxy = nullptr;   // +0x00
+#endif
         T** _Map;       // +0x04
         size_type _Mapsize;   // +0x08
         size_type _Myoff;     // +0x0C

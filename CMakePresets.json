@@ -24,6 +24,12 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
+      "name": "clang-x86-retail-layout",
+      "displayName": "clang-cl x86 Release with the binary's exact container layout (checks the layout asserts)",
+      "inherits": "clang-x86-release",
+      "cacheVariables": { "FAF_RETAIL_LAYOUT": "ON" }
+    },
+    {
       "name": "clang-x64-profile",
       "displayName": "clang-cl x64 Profile with Tracy (main_x64.exe)",
       "inherits": "clang-x64-release",

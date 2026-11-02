@@ -13,6 +13,15 @@
 
 cmake_minimum_required(VERSION 3.25)
 
+# ON keeps the binary's exact container sizes, to check the layout asserts against
+# them (src/legacy/containers/Layout.h). Preset clang-x86-retail-layout.
+option(FAF_RETAIL_LAYOUT "Keep the 2007 binary's exact legacy container layout" OFF)
+if(FAF_RETAIL_LAYOUT)
+  add_compile_definitions(FAF_RETAIL_LAYOUT=1)
+else()
+  add_compile_definitions(FAF_RETAIL_LAYOUT=0)
+endif()
+
 # Engine addition (dedicated-server plan WPL.2): the Linux build of the
 # simulation, chosen by its toolchain file (cmake/toolchains/linux-clang-*.cmake,
 # read by project(), sets FAF_LINUX) and described in cmake/FafLinux.cmake.

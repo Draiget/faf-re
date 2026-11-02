@@ -1415,7 +1415,11 @@ namespace moho
     }
     traveler->ListUnlink();
 
-    const SNavPath& path = *reinterpret_cast<const SNavPath*>(&mResultCells);
+    // The traveler reads the cells through an `SNavPath`, without owning them.
+    SNavPath path{};
+    path.start = mResultCells.begin();
+    path.finish = mResultCells.end();
+    path.capacity = mResultCells.begin() + mResultCells.capacity();
     if (reachedGoal) {
       traveler->OnPathAccepted(path);
     } else {

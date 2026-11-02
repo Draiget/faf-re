@@ -957,7 +957,6 @@ CAiPathNavigator::CAiPathNavigator()
   , mTickBucket7(0)
   , mTickBucket13(0)
 {
-  mPath.reserved0 = 0;
   mPath.start = nullptr;
   mPath.finish = nullptr;
   mPath.capacity = nullptr;
@@ -999,7 +998,6 @@ CAiPathNavigator::CAiPathNavigator(Unit* const unit)
   , mTickBucket7(unit ? (unit->GetEntityId() % 7) : 0)
   , mTickBucket13(unit ? (unit->GetEntityId() % 13) : 0)
 {
-  mPath.reserved0 = 0;
   mPath.start = nullptr;
   mPath.finish = nullptr;
   mPath.capacity = nullptr;

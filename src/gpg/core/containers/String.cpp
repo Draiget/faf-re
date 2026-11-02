@@ -1177,10 +1177,7 @@ msvc8::string gpg::STR_Va(
   // string silently produced an empty result - every Logf/Die/exception
   // message the engine formatted came out blank.
   //
-  // Concatenation is the wrapper's supported route for longer strings: it
-  // stages them in the thread-local arena behind get_concat_buffer and adopts
-  // that storage, which is the same lifetime contract every operator+ already
-  // relies on.
+  // Concatenation is the wrapper's supported route for longer strings.
   // 0x00938E1F / 0x00938E6B call MSVC8's `_vsnprintf`, whose truncation signal
   // is a -1 return; the binary's `while (n == -1)` loop is built on that.
   // `std::vsnprintf` here is the C99/UCRT function, which instead returns the

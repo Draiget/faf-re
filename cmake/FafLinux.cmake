@@ -179,7 +179,7 @@ target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123)
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
   # header).
-  "SHELL:-include platform/X64LayoutAsserts.h"
+  "SHELL:-include platform/LayoutAsserts.h"
   # The Windows names the shared code uses (plan WPL.5).
   "SHELL:-include platform/PosixCompat.h"
   ${FAF_LINUX_MS_DIALECT}

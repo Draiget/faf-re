@@ -98,10 +98,10 @@ set(_faf_main_options
   # the DirectX SDK.
   "/clang:-idirafter${FAF_DXSDK_DIR}/Include")
 
-if(FAF_TARGET_ARCH STREQUAL "x64")
-  # Switches off the Win32 layout static_asserts (see the header).
-  list(APPEND _faf_main_options /FIplatform/X64LayoutAsserts.h)
-else()
+# Switches off the Win32 layout static_asserts where they don't apply (see the
+# header).
+list(APPEND _faf_main_options /FIplatform/LayoutAsserts.h)
+if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   # Keeps sqrt a CRT call under the sim's _PC_24 x87 control word (see the
   # header and cmake/FafCodegen.cmake).
   list(APPEND _faf_main_options /FIplatform/X87SqrtCall.h)
