@@ -1611,6 +1611,9 @@ namespace moho
    *
    * What it does:
    * Clips one quad against `clipRect` and remaps UVs to the clipped position.
+   * A quad whose edges all lie inside `clipRect` is drawn as it is, with no
+   * emptiness test (0x00454E2D..0x00454F3B): CMauiBitmap::Draw passes the same
+   * rect twice, so an inverted control rect draws the texture flipped.
    */
   void DRAW_ClippedQuad(
     CD3DPrimBatcher* const primBatcher,
@@ -1621,6 +1624,16 @@ namespace moho
   )
   {
     if (primBatcher == nullptr) {
+      return;
+    }
+
+    if (quadRect.x0 >= clipRect.x0 && quadRect.x1 <= clipRect.x1 && quadRect.z0 >= clipRect.z0 &&
+        quadRect.z1 <= clipRect.z1) {
+      const CD3DPrimBatcher::Vertex topLeft = MakeVertex({quadRect.x0, quadRect.z0, 0.0f}, color, uvRect.x0, uvRect.z0);
+      const CD3DPrimBatcher::Vertex topRight = MakeVertex({quadRect.x1, quadRect.z0, 0.0f}, color, uvRect.x1, uvRect.z0);
+      const CD3DPrimBatcher::Vertex bottomRight = MakeVertex({quadRect.x1, quadRect.z1, 0.0f}, color, uvRect.x1, uvRect.z1);
+      const CD3DPrimBatcher::Vertex bottomLeft = MakeVertex({quadRect.x0, quadRect.z1, 0.0f}, color, uvRect.x0, uvRect.z1);
+      primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
       return;
     }
 
