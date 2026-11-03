@@ -199,6 +199,7 @@ namespace
       "                            back as the server would; it must marshal to the same bytes\n"
       "  --launch-check           rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
+      "  --path-spelling <file>    Linux: write each path found on disk only by ignoring case, as asked and as on disk\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
@@ -352,6 +353,17 @@ int main(int argc, char** argv)
     }
     moho::DISK_SetAccessTrace(diskTrace);
   }
+#if !defined(_WIN32)
+  std::string pathSpellingPath;
+  if (ReadOption("--path-spelling", pathSpellingPath)) {
+    std::FILE* const pathSpelling = std::fopen(pathSpellingPath.c_str(), "w");
+    if (pathSpelling == nullptr) {
+      std::printf("[%s] --path-spelling: cannot write %s\n", gLabel.c_str(), pathSpellingPath.c_str());
+      return kExitBadInput;
+    }
+    FAF_SetPathSpellingTrace(pathSpelling);
+  }
+#endif
 
   // Nothing here draws or runs a UI: models keep what the sim reads (`RScmResource::DropGeometry`),
   // and the session's Lua state gets no copy of the blueprints.

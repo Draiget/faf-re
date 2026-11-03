@@ -9,12 +9,15 @@
 #include "gpg/core/containers/String.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <unordered_map>
+#include <unordered_set>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -137,6 +140,11 @@ namespace
     return *a == *b;
   }
 
+  // Plan WPR.23: the `--path-spelling` file, and the pairs it already holds.
+  std::atomic<std::FILE*> sPathSpellingTrace{nullptr};
+  std::mutex sPathSpellingLock;
+  std::unordered_set<std::string> sPathSpellingSeen;
+
   /**
    * Plan WPL.15: a path as NTFS would find it, case-insensitively. When the path does not exist
    * as spelled, each component is looked up in its directory ignoring ASCII case and replaced
@@ -144,7 +152,7 @@ namespace
    * given (a file about to be created). The result names an existing file whenever Windows
    * would have found one.
    */
-  [[nodiscard]] std::string ResolveCase(std::string path)
+  [[nodiscard]] std::string ResolveCaseOnDisk(std::string path)
   {
     if (path.empty() || ::access(path.c_str(), F_OK) == 0) {
       return path;
@@ -183,6 +191,29 @@ namespace
         resolved += '/';
       }
       at = slash + 1;
+    }
+    return resolved;
+  }
+
+  [[nodiscard]] std::string ResolveCase(std::string path)
+  {
+    if (sPathSpellingTrace.load(std::memory_order_relaxed) == nullptr) {
+      return ResolveCaseOnDisk(std::move(path));
+    }
+    std::string resolved = ResolveCaseOnDisk(path);
+    // The lookup can also drop doubled slashes, which are no spelling.
+    const auto singleSlashes = [](std::string text) {
+      text.erase(std::unique(text.begin(), text.end(), [](const char a, const char b) { return a == '/' && b == '/'; }), text.end());
+      return text;
+    };
+    if (singleSlashes(resolved) != singleSlashes(path)) {
+      std::lock_guard<std::mutex> guard(sPathSpellingLock);
+      std::string line = path + "\t" + resolved + "\n";
+      if (std::FILE* const file = sPathSpellingTrace.load(std::memory_order_relaxed);
+          file != nullptr && sPathSpellingSeen.insert(line).second) {
+        (void)std::fputs(line.c_str(), file);
+        (void)std::fflush(file);
+      }
     }
     return resolved;
   }
@@ -1435,6 +1466,11 @@ BOOL CreateDirectoryA(const char* const path, void*)
     return FALSE;
   }
   return TRUE;
+}
+
+void FAF_SetPathSpellingTrace(std::FILE* const file)
+{
+  sPathSpellingTrace.store(file, std::memory_order_relaxed);
 }
 
 char* _fullpath(char* const absolutePath, const char* const relativePath, const std::size_t maxLength)
