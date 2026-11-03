@@ -19361,11 +19361,11 @@ extern "C"
 }
 
 /**
- * Address: 0x00911DD0 (ldblib.c::errorfb core, recovered)
+ * Address: 0x009134B0 (FUN_009134B0, _errorfb)
  *
  * What it does:
- * Walks the active Lua call stack starting at `level + 1`, pushing one
- * `"stack traceback:"` header followed by a `\n\t<chunk>:<line>: in
+ * Walks the active Lua call stack starting at `level`, pushing one
+ * `"stack traceback:"` header followed by a `\n\t<chunk>(<line>): in
  * function <name>` line for each frame. Compresses the middle of very deep
  * stacks with a single ellipsis (`LEVELS1=12`, `LEVELS2=10`). Concatenates
  * the result into one string at top-of-stack and returns 1. Recovered as a
@@ -19378,17 +19378,18 @@ extern "C" int _errorfb(lua_State* const state, int level)
 	constexpr int kLevels2 = 10;
 	int firstpart = 1;
 	lua_Debug ar;
+	int base = 0; // what stays below the message: only the text gets joined
 
 	if (lua_gettop(state) == 0) {
 		lua_pushlstring(state, "", 0);
-	} else if (!lua_isstring(state, 1)) {
+	} else if (!lua_isstring(state, -1)) {
 		return 1;
 	} else {
+		base = lua_gettop(state) - 1;
 		lua_pushlstring(state, "\n", 1);
 	}
 
 	lua_pushlstring(state, "stack traceback:", 16);
-	++level;
 	while (lua_getstack(state, level++, &ar)) {
 		if (level > kLevels1 && firstpart) {
 			if (!lua_getstack(state, level + kLevels2, &ar)) {
@@ -19405,10 +19406,11 @@ extern "C" int _errorfb(lua_State* const state, int level)
 
 		lua_pushlstring(state, "\n\t", 2);
 		lua_getinfo(state, "Snl", &ar);
-		lua_pushfstring(state, "%s:", ar.short_src);
+		lua_pushstring(state, ar.short_src);
 		if (ar.currentline > 0) {
-			lua_pushfstring(state, "%d:", ar.currentline);
+			lua_pushfstring(state, "(%d)", ar.currentline);
 		}
+		lua_pushlstring(state, ":", 1);
 
 		switch (*ar.namewhat) {
 			case 'g':
@@ -19427,10 +19429,10 @@ extern "C" int _errorfb(lua_State* const state, int level)
 				}
 		}
 
-		lua_concat(state, lua_gettop(state));
+		lua_concat(state, lua_gettop(state) - base);
 	}
 
-	lua_concat(state, lua_gettop(state));
+	lua_concat(state, lua_gettop(state) - base);
 	return 1;
 }
 
