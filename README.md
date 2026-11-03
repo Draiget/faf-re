@@ -20,9 +20,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 
 | | |
 |---|---|
-| Builds | `main.exe` (x86) and `main_x64.exe` link and run |
-| Renders | Main menu, cinematic playback, in-game world view; Direct3D 9, 11, 12 and Vulkan ([Renderer backends](docs/RENDERER_BACKENDS.md)) |
-| Plays | Native save/load on both architectures |
+| Renderers | [![Direct3D 9](https://img.shields.io/badge/Direct3D-9-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 10](https://img.shields.io/badge/Direct3D-10-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 11](https://img.shields.io/badge/Direct3D-11-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 12](https://img.shields.io/badge/Direct3D-12-0078D6)](docs/RENDERER_BACKENDS.md) [![Vulkan 1.3](https://img.shields.io/badge/Vulkan-1.3-AC162C)](docs/RENDERER_BACKENDS.md) |
 | Replay parity | 12,714 of 13,148 vault replays (96.7 %) match every recorded checksum on CI (30–31/10/2026), 12,782 (97.2 %) with the fixes since; none is known to fail because of the engine ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
 | Performance | x64 replays take 19 % less time than retail on average (4 % to 33 %) ([Performance](docs/PERFORMANCE.md)) |
