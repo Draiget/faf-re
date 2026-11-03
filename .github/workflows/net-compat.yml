@@ -1,10 +1,11 @@
 name: Network compatibility
 
 # The part of the compatibility matrix (issue #242, docs/NETBRIDGE.md) a hosted runner can do:
-# netlink and peer-transport tests, then FAF's faf-ice-adapter.jar and faf-netbridge linked to each
-# other, direct and through a relay, with the client's contract driving them and tools/fakegame as
-# the game. No real game runs here: the full matrix (tools/netmatrix) plays real games and runs by
-# hand. A pull request's code runs here with a read-only token and no secrets, and only restores the
+# netlink tests, then FAF's faf-ice-adapter.jar and faf-netbridge linked to each other, direct and
+# through a relay, with the client's contract driving them and tools/fakegame as the game. No real
+# game runs here: the full matrix (tools/netmatrix) plays real games and runs by hand. Neither does
+# anything that links the engine: faf_peer_transport_tests needs d3dx9_43.dll and X3DAudio1_7.dll,
+# which a runner doesn't have (run 41600266286, exit 0xC0000135). A pull request's code runs here with a read-only token and no secrets, and only restores the
 # caches.
 on:
   push:
@@ -80,17 +81,12 @@ jobs:
       - run: |
           cmake --preset clang-x64-release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build --preset clang-x64-release --target faf_netbridge faf_netlink_tests faf_peer_transport_tests
+          cmake --build --preset clang-x64-release --target faf_netbridge faf_netlink_tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: netlink tests
         run: |
           & "build/clang-x64-release/tests/faf_netlink_tests.exe"
           Write-Host "faf_netlink_tests: exit $LASTEXITCODE"
-          exit $LASTEXITCODE
-      - name: peer transport tests
-        run: |
-          & "build/clang-x64-release/tests/faf_peer_transport_tests.exe"
-          Write-Host "faf_peer_transport_tests: exit $LASTEXITCODE"
           exit $LASTEXITCODE
       # Every pairing of the two adapters, then the mixed pair through the relay.
       - run: |
