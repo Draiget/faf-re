@@ -34,7 +34,6 @@
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
-#include "moho/net/CNetUDPConnection.h"
 #include "moho/net/NetConVars.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"

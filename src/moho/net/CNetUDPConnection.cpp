@@ -1,9 +1,7 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
 #include <algorithm>
-#include <atomic>
 #include <bit>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -33,9 +31,8 @@ namespace
   constexpr std::uint32_t kMaxUnroutedMessageWarnings = 8;
 
   // Engine addition (wld_PreciseSharedStart): connections holding a queued ready message that has
-  // not left yet, the packet that carried it on each connection once it has (both guarded by the
-  // connector lock), and when the latest one left, in microseconds on the steady clock
-  // (NET_SteadyClockMicroseconds).
+  // not left yet, and the packet that carried it on each connection once it has (both guarded by
+  // the connector lock).
   struct SReadyCarrier
   {
     const CNetUDPConnection* mConnection;
@@ -43,29 +40,7 @@ namespace
   };
   std::vector<const CNetUDPConnection*> gReadyAwaitingDeparture;
   std::vector<SReadyCarrier> gReadyCarriers;
-  std::atomic<std::int64_t> gReadyDepartureUs{0};
-
-  void NoteReadyLeftNow() noexcept
-  {
-    const std::int64_t nowUs = NET_SteadyClockMicroseconds();
-    gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
-  }
 } // namespace
-
-std::int64_t moho::NET_GetReadyDepartureUs() noexcept
-{
-  return gReadyDepartureUs.load(std::memory_order_relaxed);
-}
-
-void moho::NET_ResetReadyDeparture() noexcept
-{
-  gReadyDepartureUs.store(0, std::memory_order_relaxed);
-}
-
-std::int64_t moho::NET_SteadyClockMicroseconds() noexcept
-{
-  return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
 
 /**
  * Address: 0x00485BE0 (FUN_00485BE0)
@@ -1497,7 +1472,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
     if (packet->mResendCount != 0) {
       for (const SReadyCarrier& carrier : gReadyCarriers) {
         if (carrier.mConnection == this && carrier.mSequenceNumber == packet->header.mSequenceNumber) {
-          NoteReadyLeftNow();
+          NET_NoteReadyLeftNow();
           break;
         }
       }
@@ -1506,7 +1481,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
       if (awaiting != gReadyAwaitingDeparture.end()) {
         gReadyAwaitingDeparture.erase(awaiting);
         gReadyCarriers.push_back(SReadyCarrier{this, packet->header.mSequenceNumber});
-        NoteReadyLeftNow();
+        NET_NoteReadyLeftNow();
       }
     }
   }

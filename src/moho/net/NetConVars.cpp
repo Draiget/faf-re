@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 
 #include "gpg/core/utils/Logging.h"
@@ -284,5 +285,31 @@ namespace moho
     if (before == 0 || before / 1000 != after / 1000) {
       gpg::Logf("NET: %llu packets resent early so far (net_FastRetransmit)", static_cast<unsigned long long>(after));
     }
+  }
+
+  namespace
+  {
+    std::atomic<std::int64_t> gReadyDepartureUs{0};
+  } // namespace
+
+  std::int64_t NET_GetReadyDepartureUs() noexcept
+  {
+    return gReadyDepartureUs.load(std::memory_order_relaxed);
+  }
+
+  void NET_NoteReadyLeftNow() noexcept
+  {
+    const std::int64_t nowUs = NET_SteadyClockMicroseconds();
+    gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
+  }
+
+  void NET_ResetReadyDeparture() noexcept
+  {
+    gReadyDepartureUs.store(0, std::memory_order_relaxed);
+  }
+
+  std::int64_t NET_SteadyClockMicroseconds() noexcept
+  {
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
   }
 } // namespace moho
