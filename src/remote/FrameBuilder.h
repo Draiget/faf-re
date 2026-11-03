@@ -111,6 +111,18 @@ namespace faf::remote
   };
 
   /**
+   * Plan WPR.35: what one blip's update writes for the views that show it the same way and share
+   * its recon data, worked out once a beat. Each view copies it into its own record, so nothing here
+   * is counted by more than one thread, and it lasts one beat.
+   */
+  struct SBlipRecord
+  {
+    wire::SEntityRecord record;
+    wire::SUnitDetail detail;
+    std::uint64_t hash = 0; // `wire::HashBlipUpdate`: a view holding this one already skips it
+  };
+
+  /**
    * Plan WPR.35: the records of plain entities and props, held once for all views. A published
    * entity gets every change in every view and an unpublished one leaves the view, so a view's
    * record is a function of the entity and the mode the view showed it in at its last change: the
@@ -136,6 +148,15 @@ namespace faf::remote
     /** Makes the records the views asked for (`UseMode`), on the sim's workers with `parallel`. */
     void Build(const std::vector<SChangedEntity>& changed, bool parallel);
 
+    /** `count` blip records for this beat; none moves until the next call. */
+    void ReserveBlipRecords(std::size_t count);
+    [[nodiscard]] SBlipRecord& BlipRecord(const std::size_t index) noexcept { return mBlipRecords[index]; }
+    /** One `army`'s update of `blip`; `block` is scratch. Reads only the sim. The blip must be `Shareable`. */
+    void FillBlipRecord(
+      SBlipRecord& out, moho::SSTIEntityVariableData& block, moho::ReconBlip& blip, bool requestRefreshUI, std::size_t army,
+      moho::EUserEntityVisibilityMode mode, std::uint32_t vision, bool hasVision
+    ) const;
+
   private:
     static constexpr std::uint32_t kNoRecord = 0xFFFFFFFFu;
 
@@ -152,6 +173,7 @@ namespace faf::remote
     wire::SFrameCodec mCodec;
     CUnderlayPathReader mNoUnderlays;
     gpg::core::ChunkedVector<wire::SEntityRecord> mRecords;
+    gpg::core::ChunkedVector<SBlipRecord> mBlipRecords;
     std::vector<std::uint32_t> mFree;
     std::vector<std::uint32_t> mReplaced; // this beat's old records, free from the next beat on
     gpg::core::FlatGenerationMap<SEntry> mEntries; // by entity id
@@ -177,6 +199,7 @@ namespace faf::remote
     };
 
     const STarget* target = nullptr;
+    const SBlipRecord* blipRecord = nullptr; // a blip: its update for this view, if it could be shared
     std::uint32_t vision = 0; // a blip: the vision range the view last copied from its creator
     std::uint8_t mode = 0;    // `EUserEntityVisibilityMode`
     std::uint8_t army = 0;    // the view's army (a blip's recon record)
@@ -316,6 +339,16 @@ namespace faf::remote
       slot = found->slot;
       return true;
     }
+    /** `FindSlot` for ids in ascending order: `cursor` starts at 0 and stays between calls. */
+    [[nodiscard]] bool FindSlotFrom(std::size_t& cursor, const std::uint32_t id, std::uint32_t& slot) const
+    {
+      cursor = SeekWorld(cursor, id);
+      if (cursor == mWorldIndex.size() || mWorldIndex[cursor].id != id) {
+        return false;
+      }
+      slot = mWorldIndex[cursor].slot;
+      return true;
+    }
     [[nodiscard]] const wire::SEntityRecord& RecordAt(const std::uint32_t slot) const { return *mWorldSlots[slot]; }
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
@@ -357,6 +390,29 @@ namespace faf::remote
     }
     static constexpr std::uint32_t kNoLocal = 0xFFFFFFFFu;
 
+    /**
+     * Where `id` is or belongs in the index, looking forward from `from`: a beat's updates come in
+     * ascending id order and lie close together. An id before `from` searches from the start.
+     */
+    [[nodiscard]] std::size_t SeekWorld(std::size_t from, const std::uint32_t id) const
+    {
+      const std::size_t size = mWorldIndex.size();
+      if (from > size || (from > 0u && mWorldIndex[from - 1u].id >= id)) {
+        from = 0u;
+      }
+      std::size_t step = 1u;
+      while (from + step < size && mWorldIndex[from + step].id < id) {
+        from += step;
+        step *= 2u;
+      }
+      const std::size_t end = from + step < size ? from + step + 1u : size;
+      const auto first = mWorldIndex.begin() + static_cast<std::ptrdiff_t>(from);
+      const auto last = mWorldIndex.begin() + static_cast<std::ptrdiff_t>(end);
+      return static_cast<std::size_t>(
+        std::lower_bound(first, last, id, [](const SWorldEntry& entry, const std::uint32_t value) { return entry.id < value; }) - mWorldIndex.begin()
+      );
+    }
+
     /** A watched slot's record is about to change. */
     void SaveBefore(std::uint32_t slot);
     /** `slot`'s record as this view's own, to change it. */
@@ -369,8 +425,8 @@ namespace faf::remote
     [[nodiscard]] wire::SEntityRecord* FindRecord(std::uint32_t id);
     /** Stores `record` under its id, over any record that id has, and returns it in place. */
     wire::SEntityRecord& PutRecord(const wire::SEntityRecord& record);
-    /** A shared update: the view's record is now the one all views share. */
-    void ApplySharedUpdate(const SDirectUpdate& update);
+    /** A shared update: the view's record is now the one all views share. `cursor`: `SeekWorld`'s. */
+    void ApplySharedUpdate(const SDirectUpdate& update, std::size_t& cursor);
     void EraseRecord(std::uint32_t id);
 
     const wire::SContentTables& mTables;
@@ -383,6 +439,7 @@ namespace faf::remote
     std::vector<std::uint32_t> mFreeSlots;
     gpg::core::ChunkedVector<wire::SEntityRecord> mLocalRecords;      // this view's own records
     std::vector<std::uint32_t> mLocalSlots;                           // per slot: index into them, or `kNoLocal`
+    std::vector<std::uint64_t> mBlipHashes;                           // per slot: the blip update its record is, or 0
     std::vector<std::uint32_t> mFreeLocal;
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;

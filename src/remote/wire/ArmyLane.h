@@ -86,6 +86,8 @@ namespace faf::remote::wire
    * The view's grids this beat, each a delta against the slot of the same army and kind in
    * `held` (the client's copies; none: all hidden). False for a malformed grid.
    */
+  /** One slot of the lane, against the `baseline` its client holds (null: none). */
+  [[nodiscard]] bool EncodeGridSlot(const SGridSlot& slot, const SGridBits* baseline, BitWriter& writer);
   [[nodiscard]] bool EncodeGridLane(
     const std::vector<SGridSlot>& grids, const std::vector<SGridSlot>& held, BitWriter& writer
   );

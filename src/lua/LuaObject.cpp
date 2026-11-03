@@ -12092,6 +12092,25 @@ namespace
 	}
 
 	/**
+	 * Engine addition, not in the binary: a coroutine gets its LuaState wrapper on its first
+	 * resume. The binary leaves `stateUserData` null on a coroutine, so an engine function
+	 * called inside one crashes on that null. A coroutine loaded from a save has no wrapper
+	 * either and gets it here too. The thread object is reset at once because LuaPlus treats
+	 * every bound LuaObject as a GC root, and `luaE_freethread` deletes the wrapper. Nothing here
+	 * allocates from Lua, so the collector runs when it does in retail.
+	 */
+	void BindCoroutineState(lua_State* const coroutineState)
+	{
+		if (coroutineState->stateUserData != nullptr || coroutineState->l_G->mainthread->stateUserData == nullptr) {
+			return;
+		}
+
+		auto* const wrapper = new LuaPlus::LuaState(LuaPlus::LuaState::UNBOUND);
+		wrapper->SetState(coroutineState);
+		wrapper->m_threadObj.Reset();
+	}
+
+	/**
 	 * Address: 0x0090FA00 (FUN_0090FA00, auxresume)
 	 *
 	 * What it does:
@@ -12100,6 +12119,7 @@ namespace
 	 */
 	int auxresume(const int argumentCount, lua_State* const callerState, lua_State* const coroutineState)
 	{
+		BindCoroutineState(coroutineState); // engine addition
 		if (lua_checkstack(coroutineState, argumentCount) == 0) {
 			luaL_error(callerState, "too many arguments to resume");
 		}
@@ -14108,9 +14128,9 @@ namespace
 		/// One dead object and the link the serial sweep would unlink it through.
 		struct DeadRecord
 		{
-			GCObject* object;
-			GCObject* lastLive;   // last live object before it in the chunk; null: the chunk's entry link
-			GCObject** headLink;  // string buckets: the bucket head; null: the link carried in from the previous chunk
+			LuaPlus::ObjectPointer<GCObject> object;
+			LuaPlus::ObjectPointer<GCObject> lastLive;   // last live object before it in the chunk; null: the chunk's entry link
+			LuaPlus::ObjectPointer<GCObject*> headLink;  // string buckets: the bucket head; null: the link carried in from the previous chunk
 		};
 
 		/// A stretch of one GC list (or a range of string buckets) classified by one participant.
@@ -14124,7 +14144,7 @@ namespace
 			bool reachedStop = true;
 			GCObject* lastLive = nullptr;
 			std::vector<DeadRecord> dead;
-			std::vector<GCObject*> live;
+			std::vector<LuaPlus::ObjectPointer<GCObject>> live;
 		};
 
 		/// Where one list's chunks are in the chunk array.
@@ -14257,9 +14277,9 @@ namespace
 			constexpr std::size_t kPrefetchDistance = 8u;
 			if (at + kPrefetchDistance < dead.size()) {
 				const DeadRecord& ahead = dead[at + kPrefetchDistance];
-				_mm_prefetch(reinterpret_cast<const char*>(ahead.object), _MM_HINT_T0);
+				_mm_prefetch(reinterpret_cast<const char*>(static_cast<GCObject*>(ahead.object)), _MM_HINT_T0);
 				if (ahead.lastLive != nullptr) {
-					_mm_prefetch(reinterpret_cast<const char*>(ahead.lastLive), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(static_cast<GCObject*>(ahead.lastLive)), _MM_HINT_T0);
 				}
 			}
 		}
@@ -14310,7 +14330,7 @@ namespace
 				for (std::size_t at = 0; at < dead.size(); ++at) {
 					PrefetchAhead(dead, at);
 					const DeadRecord& record = dead[at];
-					GCObject** const link = record.lastLive != nullptr ? &record.lastLive->gch.next : record.headLink;
+					GCObject** const link = record.lastLive != nullptr ? &record.lastLive->gch.next : static_cast<GCObject**>(record.headLink);
 					*link = record.object->gch.next;
 					++freed;
 					freeobj(record.object, state);
@@ -15687,6 +15707,15 @@ extern "C"
 		global_State* const globalState = state->l_G;
 		if (globalState != nullptr && globalState->lstate == thread) {
 			globalState->lstate = globalState->mainthread;
+		}
+
+		// Engine addition: a coroutine's wrapper (`BindCoroutineState`) has no other owner. A ForkThread
+		// state belongs to its task and clears `stateUserData` when it dies.
+		if (thread->stateUserData != nullptr) {
+			if (thread->stateUserData->m_luaTask == nullptr) {
+				delete thread->stateUserData;
+				thread->stateUserData = nullptr;
+			}
 		}
 
 		luaF_close(thread, thread->stack);

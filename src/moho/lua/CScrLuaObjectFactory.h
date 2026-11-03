@@ -96,6 +96,23 @@ namespace moho
   [[nodiscard]] LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* state);
 
   /**
+   * Engine addition: while one of these lives on a thread, SCR_Copy on that thread gives a table that
+   * is reached twice one copy, as the source has it, instead of two. Only for states the sim never
+   * reads: sharing changes table identity. `lua_SessionSharedBlueprints` 0 turns it off.
+   */
+  class SCR_CopySharedTablesScope
+  {
+  public:
+    SCR_CopySharedTablesScope();
+    ~SCR_CopySharedTablesScope();
+    SCR_CopySharedTablesScope(const SCR_CopySharedTablesScope&) = delete;
+    SCR_CopySharedTablesScope& operator=(const SCR_CopySharedTablesScope&) = delete;
+
+  private:
+    bool mActive = false;
+  };
+
+  /**
    * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
    *
    * What it does:

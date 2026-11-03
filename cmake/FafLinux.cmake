@@ -7,11 +7,12 @@
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 
-# Engine addition (#118): a profile-guided build, for a server's speed. Off, the build is as usual.
-#   -DFAF_PGO_GENERATE=ON            counts what the code does; a replay writes the counts on exit
-#                                    (LLVM_PROFILE_FILE names the file), llvm-profdata merges them.
-#   -DFAF_PGO_PROFILE=<file.profdata>  ThinLTO with those counts. Needs llvm-ar next to clang.
-# See docs/SWITCHES.md.
+# Engine addition (#118): a profile-guided build, for a server's speed. The linux-clang-x64-release
+# preset uses the stored profile, linux-clang-x64-release-plain none, -pgogen records one
+# (tools/pgo/record.sh). See docs/SWITCHES.md.
+#   FAF_PGO_GENERATE=ON                counts what the code does; a replay writes the counts on exit
+#                                      (LLVM_PROFILE_FILE names the file), llvm-profdata merges them.
+#   FAF_PGO_PROFILE=<file.profdata>    ThinLTO with those counts. Needs llvm-ar (package llvm-18).
 option(FAF_PGO_GENERATE "Build headless to record a profile for FAF_PGO_PROFILE" OFF)
 set(FAF_PGO_PROFILE "" CACHE FILEPATH "Merged LLVM profile to optimise with")
 if(FAF_PGO_GENERATE AND FAF_PGO_PROFILE)
@@ -22,8 +23,11 @@ if(FAF_PGO_GENERATE)
   add_link_options(-fprofile-generate)
   add_compile_definitions(FAF_COVERAGE_PROFILE=1)
 elseif(FAF_PGO_PROFILE)
-  find_program(FAF_LLVM_AR NAMES llvm-ar HINTS "${FAF_LINUX_LLVM_ROOT}/bin" REQUIRED)
-  find_program(FAF_LLVM_RANLIB NAMES llvm-ranlib HINTS "${FAF_LINUX_LLVM_ROOT}/bin" REQUIRED)
+  find_program(FAF_LLVM_AR NAMES llvm-ar HINTS "${FAF_LINUX_LLVM_ROOT}/bin")
+  find_program(FAF_LLVM_RANLIB NAMES llvm-ranlib HINTS "${FAF_LINUX_LLVM_ROOT}/bin")
+  if(NOT FAF_LLVM_AR OR NOT FAF_LLVM_RANLIB)
+    message(FATAL_ERROR "A profile-guided build needs llvm-ar and llvm-ranlib: install llvm-18, or use the linux-clang-x64-release-plain preset.")
+  endif()
   set(CMAKE_AR "${FAF_LLVM_AR}")
   set(CMAKE_RANLIB "${FAF_LLVM_RANLIB}")
   # A profile from older source still applies to the functions that did not change.

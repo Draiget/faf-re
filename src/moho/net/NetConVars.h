@@ -30,6 +30,7 @@ namespace moho
   extern int32_t net_NativeNet;
   extern int32_t net_LogBeatWaitMs;
   extern int32_t net_LogTraffic;
+  extern int32_t net_LogShownBeatMs;
 
   // Totals of every UDP connection in this process, for net_LogTraffic.
   struct NetTrafficTotals

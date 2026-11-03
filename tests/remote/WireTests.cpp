@@ -987,6 +987,156 @@ namespace
           && held.orientationBeat == 7u);
   }
 
+  void TestBitWriterAppend()
+  {
+    // A lane put together from slots encoded apart is the lane encoded in one go, at any bit position.
+    std::mt19937 rng(0x6A11u);
+    for (int round = 0; round < 200; ++round) {
+      std::vector<SGridSlot> before;
+      std::vector<SGridSlot> grids;
+      const std::size_t count = 1u + rng() % 6u;
+      for (std::size_t i = 0; i < count; ++i) {
+        SGridSlot slot{};
+        slot.army = static_cast<std::uint8_t>(i);
+        slot.kind = static_cast<std::uint8_t>(rng() & 1u);
+        slot.gridSize = 4u + rng() % 60u;
+        slot.bits.width = 1u + rng() % 16u;
+        slot.bits.height = 1u + rng() % 16u;
+        slot.bits.cells.resize(static_cast<std::size_t>(slot.bits.width) * slot.bits.height);
+        for (std::uint8_t& cell : slot.bits.cells) {
+          cell = static_cast<std::uint8_t>(rng() % 4u == 0u ? 1u : 0u);
+        }
+        if (rng() % 3u != 0u) {
+          SGridSlot held = slot;
+          for (std::uint8_t& cell : held.bits.cells) {
+            cell = static_cast<std::uint8_t>(rng() % 16u == 0u ? 1u - cell : cell);
+          }
+          before.push_back(std::move(held));
+        }
+        grids.push_back(std::move(slot));
+      }
+      BitWriter whole;
+      CHECK(EncodeGridLane(grids, before, whole));
+      BitWriter parts;
+      parts.WriteVarUint(static_cast<std::uint32_t>(grids.size()));
+      for (const SGridSlot& slot : grids) {
+        const auto held = std::find_if(before.begin(), before.end(), [&slot](const SGridSlot& other) {
+          return other.army == slot.army && other.kind == slot.kind;
+        });
+        BitWriter part;
+        CHECK(EncodeGridSlot(slot, held != before.end() ? &held->bits : nullptr, part));
+        parts.Append(part);
+      }
+      CHECK(parts.BitCount() == whole.BitCount());
+      CHECK(std::equal(parts.Bytes().begin(), parts.Bytes().end(), whole.Bytes().begin(), whole.Bytes().end()));
+    }
+    BitWriter none;
+    BitWriter some;
+    some.WriteBits(5u, 3);
+    some.Append(none);
+    CHECK(some.BitCount() == 3u);
+    none.Append(some);
+    CHECK(none.BitCount() == 3u);
+    none.Clear();
+    CHECK(none.BitCount() == 0u);
+    CHECK(none.Bytes().empty());
+  }
+
+  void TestBlipUpdateHash()
+  {
+    // Every field a blip's update writes moves the fingerprint: a field it missed would leave a view
+    // holding an old value while the sim's has changed.
+    SEntityRecord record{};
+    SUnitDetail detail{};
+    detail.weapons.resize(1);
+    detail.commands = {1};
+    detail.buildQueue = {2};
+    record.appearance.attachments = {3};
+    detail.weapons[0].targets.words = {4};
+    detail.weapons[0].secondary.words = {5};
+    detail.attributes.restriction.words = {6};
+    const std::uint64_t base = HashBlipUpdate(record, detail);
+    CHECK(base != 0u);
+    CHECK(base == HashBlipUpdate(record, detail));
+    int field = 0;
+    const auto changes = [&](auto&& change) {
+      SEntityRecord r = record;
+      SUnitDetail d = detail;
+      change(r, d);
+      ++field;
+      if (HashBlipUpdate(r, d) == base) {
+        std::printf("field %d doesn't move the hash\n", field);
+        CHECK(false);
+      }
+    };
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.mesh = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scale[2] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachParent = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments[0] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments.push_back(0); });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.impact = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scroll[3] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.visualFlags = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.intel[7] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.ambientSound = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.rumbleSound = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.underlay = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.position[2] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.farPosition = true; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.farValue[2] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.yawOnly = true; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.orientation = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.health = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.health = -0.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.maxHealth = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.fractionComplete = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.flags = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.fuelRatio = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.shieldRatio = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.workProgress = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitStates = std::uint64_t{1} << 40u; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.scriptBits = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.siloCounts[3] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitFlags = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.creator = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.creationTick = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.stunTicks = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.jobType = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.fireState = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[1] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.selectionInheritor = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.customName = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.focusUnit = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.guardedUnit = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.targetBlip = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.didRefresh = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.reconFlags = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.economy[5] = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.commands[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.buildQueue[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.firstWord = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].secondary.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].layer = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].effectiveRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRangeVisual = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRangeVisual = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons.push_back(SUnitWeapon{}); });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.blueprint = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved04 = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.restriction.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.scalars[11] = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.commandCaps = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.toggleCaps = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.flags[3] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved6C = 7; });
+    // A value moved between two neighbours is another update.
+    changes([](SEntityRecord&, SUnitDetail& d) { d.commands = {}; d.buildQueue = {1, 2}; });
+  }
+
   void TestFrameAppearance()
   {
     // A creation with the default appearance sends none of it; each non-default field costs
@@ -2212,6 +2362,8 @@ namespace
     {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
     {"frame: hostile counts and ids", &TestDecoderHostileCounts},
     {"frame: appearance block", &TestFrameAppearance},
+    {"frame: blip update hash", &TestBlipUpdateHash},
+    {"grid lane: slots encoded apart", &TestBitWriterAppend},
   };
 } // namespace
 

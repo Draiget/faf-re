@@ -403,6 +403,9 @@ SIZE_T HeapSize(HANDLE heap, DWORD flags, const void* memory);
 BOOL CreateDirectoryA(const char* path, void* attributes);
 /// `_fullpath`: the absolute, lexically normalised form of `path` (which need not exist).
 char* _fullpath(char* absolutePath, const char* relativePath, std::size_t maxLength);
+/// Plan WPR.23 (headless `--path-spelling`): from now on `file` gets one `requested<TAB>on disk` line
+/// for each path found on disk only by ignoring case, each once.
+void FAF_SetPathSpellingTrace(std::FILE* file);
 
 // Code pages: the ANSI and OEM code pages are UTF-8 here.
 #define CP_ACP 0u

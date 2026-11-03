@@ -481,13 +481,17 @@ void moho::REF_UpdateMD5(
     || refType == GetBoolRType() || refType->IsEnumType() != nullptr;
 
   if (isPrimitiveLike) {
-    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    if (traceFile != nullptr) {
+      PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    }
     md5.Update(ref.mObj, static_cast<std::size_t>(refType->size_));
     return;
   }
 
   if (refType == GetStringRType()) {
-    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    if (traceFile != nullptr) {
+      PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    }
     const auto& stringValue = *static_cast<const msvc8::string*>(ref.mObj);
     md5.Update(stringValue.c_str(), stringValue.size() + 1u);
     return;
@@ -4850,6 +4854,15 @@ namespace moho
 {
   /// Engine addition: switch for MD5UpdateBatch (batched checksum updates). Live; same digests.
   bool sim_ParallelCoords = true;
+  // The trace is text only: the checksum is the same with it or without it.
+  bool dbg_RulesTraceAlways = false;
+  TConVar<bool> gTConVar_dbg_RulesTraceAlways(
+    "dbg_RulesTraceAlways",
+    "Write the rules checksum's text trace to a temporary file at every session start (1), or only when a desync "
+    "recorder is recording (0, the default), since no one else reads it.",
+    &dbg_RulesTraceAlways
+  );
+
   TConVar<bool> gTConVar_sim_ParallelCoords(
     "sim_ParallelCoords",
     "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial (needs sim_Workers > 0).",
@@ -6032,7 +6045,10 @@ Sim::Sim(LaunchInfoBase* const info)
   }
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
-  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+  // Engine addition: a recorder that isn't recording drops the text, so with one like that only the
+  // /synclog file, if any, gets the trace (dbg_RulesTraceAlways 1: every session writes it, as before).
+  CDesyncRecorder* const recorder = CDesyncRecorder::For(this);
+  if (recorder != nullptr && (recorder->IsRecording() || dbg_RulesTraceAlways)) {
     // Engine addition (issue #216): REF_UpdateMD5 traces into a FILE*, so the recorder takes the
     // rules trace through a temporary file the CRT deletes when it is closed; the /synclog file,
     // when there is one, gets the same text.

@@ -35,6 +35,7 @@
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/CNetUDPConnection.h"
+#include "moho/net/NetConVars.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
@@ -63,6 +64,10 @@ namespace
   constexpr int kMaxBeatsAheadOfExecuted = 98;
   constexpr int kMaxCatchUpBeats = 99;
   constexpr float kBlockedIssueGraceMs = 250.0f;
+  // Engine addition, net_LogShownBeatMs only: when each beat was issued, by beat number. Under mLock.
+  constexpr int kIssuedAtSlots = 1024;
+  constexpr int kIssueToShownLogBeats = 100;
+  std::int64_t sIssuedAt[kIssuedAtSlots] = {};
 
   // Engine addition: set by the session before it creates its driver (see SIM_SetSessionPacing).
   // Read by that driver's issue thread.
@@ -1493,6 +1498,11 @@ void CSimDriver::ThreadRun()
       }
 
       if (lastBeatToIssue >= mNextIssueBeat) {
+        if (net_LogShownBeatMs > 0) {
+          for (int beat = mNextIssueBeat; beat <= lastBeatToIssue; ++beat) {
+            sIssuedAt[beat % kIssuedAtSlots] = now;
+          }
+        }
         mMarshaller->AdvanceBeat(lastBeatToIssue - mNextIssueBeat + 1);
         mNextIssueBeat = lastBeatToIssue + 1;
         mFirstCommandCycleTime = 0;
@@ -1644,6 +1654,42 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   outSyncData = PopFrontSSyncDataPtrDeque(mSyncDataQueue);
   if (outSyncData) {
     mLastDequeuedBeat = outSyncData->mCurBeat;
+    // Engine addition, off by default: the pause a player sees between beats.
+    if (net_LogShownBeatMs > 0) {
+      static int sLastShownBeat = -1;
+      static std::int64_t sLastShownAt = 0;
+      const std::int64_t shownAt = mTimer.ElapsedCycles();
+      if (sLastShownBeat >= 0 && mLastDequeuedBeat > sLastShownBeat) {
+        const float shownAfter = gpg::time::CyclesToMilliseconds(shownAt - sLastShownAt);
+        if (shownAfter >= static_cast<float>(net_LogShownBeatMs)) {
+          gpg::Logf("NET: beat %d shown %.0f ms after beat %d", mLastDequeuedBeat, shownAfter, sLastShownBeat);
+        }
+      }
+      sLastShownBeat = mLastDequeuedBeat;
+      sLastShownAt = shownAt;
+
+      // How long a beat, and an order placed just before it closed, took from issue to the player's screen.
+      static float sIssueToShownSum = 0.0f;
+      static float sIssueToShownMax = 0.0f;
+      static int sIssueToShownBeats = 0;
+      const std::int64_t issuedAt = mLastDequeuedBeat >= 0 ? sIssuedAt[mLastDequeuedBeat % kIssuedAtSlots] : 0;
+      if (issuedAt != 0 && shownAt >= issuedAt) {
+        const float issueToShown = gpg::time::CyclesToMilliseconds(shownAt - issuedAt);
+        sIssueToShownSum += issueToShown;
+        sIssueToShownMax = std::max(sIssueToShownMax, issueToShown);
+        if (++sIssueToShownBeats >= kIssueToShownLogBeats) {
+          gpg::Logf(
+            "NET: beats to beat %d shown %.0f ms after issue on average, %.0f at most",
+            mLastDequeuedBeat,
+            sIssueToShownSum / static_cast<float>(sIssueToShownBeats),
+            sIssueToShownMax
+          );
+          sIssueToShownSum = 0.0f;
+          sIssueToShownMax = 0.0f;
+          sIssueToShownBeats = 0;
+        }
+      }
+    }
   }
 
   mLastSyncCycleTime = mTimer.ElapsedCycles();

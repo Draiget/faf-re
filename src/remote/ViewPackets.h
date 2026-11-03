@@ -100,6 +100,7 @@ namespace faf::remote
 
   private:
     static constexpr std::uint32_t kNoVisions = 0xFFFFFFFFu;
+    static constexpr std::size_t kBlipViews = 32; // `kMaxViews`
 
     /** What the views' clients hold of one entity beyond its packed data; a bit per view. */
     struct SEntityViews
@@ -121,10 +122,20 @@ namespace faf::remote
       std::atomic<std::uint32_t> hasVision{0};
       std::uint32_t creatorVision = 0; // with `hasCreator`: the range to copy
       bool hasCreator = false;
+      // A blip whose update can be shared: its different updates this beat, from `firstBlipRecord`,
+      // the army each is read for, and which one each view gets.
+      std::uint8_t blipRecordCount = 0;
+      std::uint8_t blipRecordArmy[kBlipViews]{};
+      std::uint8_t blipRecordOf[kBlipViews]{};
+      std::uint32_t firstBlipRecord = 0;
     };
 
     /** Fills `mChanged` from the change set; the views only read the sim from here on. */
     void ReadChangedEntities(moho::Sim& sim);
+    /** The range `army`'s view last copied from a blip's creator (`SyncForView`), read before the views run. */
+    [[nodiscard]] bool ViewVision(const SChangedView& changed, std::size_t army, std::uint32_t& vision) const;
+    /** Which of a blip's updates each view gets. */
+    void MatchBlipViews(moho::Sim& sim, SChangedView& changed);
     /** What the views changed goes into `mEntityViews`. */
     void WriteChangedEntities();
 

@@ -57,9 +57,9 @@ namespace moho
   // docs/LAUNCHER_NATIVE_NETWORK.md); 0 is the adapter path. Read when the
   // game reports Idle.
   int32_t net_NativeNet = 0;
-  // Issue #274: in native mode, offer a WebRTC data channel to peers that are
+  // Issue #274: in native mode, 1 offers a WebRTC data channel to peers that are
   // our builds too (#239). Read when a link starts.
-  int32_t net_NativeNetWebRtc = 1;
+  int32_t net_NativeNetWebRtc = 0;
   // Issue #240: in native mode, with peers running our build, game datagrams go
   // on a redundant lane that repeats each up to this many times until acked;
   // 0 sends them plainly. Read when a link starts.
@@ -71,6 +71,9 @@ namespace moho
   // Diagnostics: every this many beats log the UDP connections' totals: packets,
   // bytes, resends, acks and mean ping; 0 logs nothing. Live.
   int32_t net_LogTraffic = 0;
+  // Diagnostics: log a beat the main thread took this many ms or more after the one
+  // before it, which is the pause a player sees; 0 logs nothing. Live.
+  int32_t net_LogShownBeatMs = 0;
   NetTrafficTotals gNetTraffic;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
   // sends net_TestBurstBytes incompressible filler bytes to every peer on the
@@ -107,7 +110,7 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_NativeNetWebRtc(
       "net_NativeNetWebRtc",
-      "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
+      "In native mode, 1: move game datagrams onto a WebRTC data channel with peers running our build; 0 (default): ICE only.",
       &net_NativeNetWebRtc
     );
 
@@ -115,6 +118,12 @@ namespace moho
       "net_LogBeatWaitMs",
       "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
       &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_LogShownBeatMs(
+      "net_LogShownBeatMs",
+      "Logs a beat the main thread took this many ms or more after the one before it; 0 (default) logs nothing.",
+      &net_LogShownBeatMs
     );
 
     TConVar<int32_t> gTConVar_net_LogTraffic(

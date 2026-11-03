@@ -158,6 +158,7 @@ namespace moho
       }
 
       if (gSessionKeepsBlueprints) {
+        const SCR_CopySharedTablesScope sharedTables;
         scenario->mGameRules->ExportToLuaState(scenario->mState);
       }
       AdvanceLoadingProgress(loadControl);

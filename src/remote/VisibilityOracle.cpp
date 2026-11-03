@@ -265,10 +265,8 @@ namespace faf::remote
       return 0u;
     }
     // One channel for every view and no grid to test: the answer is the same for all of them.
-    const std::int32_t viz = facts.vizToNeutrals;
-    if ((facts.army == nullptr || (facts.vizToFocusPlayer == viz && facts.vizToAllies == viz && facts.vizToEnemies == viz))
-        && static_cast<moho::EUserEntityVisibilityMode>(viz) != moho::EUserEntityVisibilityMode::ReconGrid) {
-      const bool published = facts.army == nullptr || facts.kind == SEntityFacts::EKind::Prop || viz != moho::VIZMODE_Never;
+    if (ViewsFollowFactsAlone(facts)) {
+      const bool published = facts.army == nullptr || facts.kind == SEntityFacts::EKind::Prop || facts.vizToNeutrals != moho::VIZMODE_Never;
       return published ? all : 0u;
     }
     std::uint32_t views = 0;
@@ -278,6 +276,16 @@ namespace faf::remote
       }
     }
     return views;
+  }
+
+  bool ViewsFollowFactsAlone(const SEntityFacts& facts) noexcept
+  {
+    if (IsClientUnit(facts) || facts.destroyed) {
+      return true;
+    }
+    const std::int32_t viz = facts.vizToNeutrals;
+    return (facts.army == nullptr || (facts.vizToFocusPlayer == viz && facts.vizToAllies == viz && facts.vizToEnemies == viz))
+        && static_cast<moho::EUserEntityVisibilityMode>(viz) != moho::EUserEntityVisibilityMode::ReconGrid;
   }
 
   bool ViewShowsMesh(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)

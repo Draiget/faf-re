@@ -47,6 +47,11 @@ target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 
+# Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
+add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
+target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
+
 # Engine addition (dedicated-server plan WPL.23): golden sim-math tests
 # (tests/sim_math). Built with every build, and run right after it: a change
 # that moves one result of the simulation's parity-sensitive arithmetic fails
@@ -103,3 +108,8 @@ add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPac
 target_link_libraries(faf_recon_scroll_packet_tests PRIVATE faf_engine)
 add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
 set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120)
+
+# Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
+add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
+target_link_libraries(faf_coroutine_tests PRIVATE faf_engine)
+add_test(NAME lua_coroutine COMMAND faf_coroutine_tests)

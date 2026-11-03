@@ -214,8 +214,10 @@ namespace faf::netlink
 
     // Tests only (issue #242): when FAF_NETLINK_TEST_SHAPING names a file, every
     // link delays, drops or holds back what it sends as the file's one line
-    // says: "<latency us> <jitter us> <loss 0-1> <blocked 0|1>". mpemu rewrites
-    // it when a scenario changes the link. Shaping each sender covers every
+    // says: "<latency us> <jitter us> <loss 0-1> <blocked 0|1> [<burst> [<only>]]".
+    // Burst: losses come in runs of this many sends, loss stays the long-run share.
+    // Only: a player id; just the links to or from that player are shaped.
+    // mpemu rewrites it when a scenario changes the link. Shaping each sender covers every
     // path a link may take (ICE through TURN or host to host, WebRTC), which a
     // TURN server alone cannot do when both players are on one machine.
     class TestShaping
@@ -230,7 +232,7 @@ namespace faf::netlink
       bool Enabled() const { return !mPath.empty(); }
 
       // False: lost on the way. Else `delay` is how long it stays in flight.
-      bool Roll(Link::Clock::duration& delay)
+      bool Roll(Link::Clock::duration& delay, const std::int64_t localId, const std::int64_t remoteId)
       {
         std::lock_guard lock(mMutex);
         const Link::Clock::time_point now = Link::Clock::now();
@@ -238,10 +240,19 @@ namespace faf::netlink
           mNextRead = now + std::chrono::milliseconds(100);
           ReadLocked();
         }
+        if (mOnlyId != 0 && localId != mOnlyId && remoteId != mOnlyId) {
+          return true;
+        }
         if (mBlocked) {
           return false;
         }
-        if (mLoss > 0 && std::uniform_real_distribution<double>(0.0, 1.0)(mRng) < mLoss) {
+        int& burstLeft = mBurstLeft[remoteId];
+        if (burstLeft > 0) {
+          --burstLeft;
+          return false;
+        }
+        if (mLoss > 0 && std::uniform_real_distribution<double>(0.0, 1.0)(mRng) < mLoss / mBurst) {
+          burstLeft = mBurst - 1;
           return false;
         }
         std::int64_t us = mLatencyUs;
@@ -283,7 +294,9 @@ namespace faf::netlink
         long long jitter = 0;
         double loss = 0;
         int blocked = 0;
-        if (std::fscanf(f, "%lld %lld %lf %d", &latency, &jitter, &loss, &blocked) == 4) {
+        int burst = 1;
+        long long only = 0;
+        if (std::fscanf(f, "%lld %lld %lf %d %d %lld", &latency, &jitter, &loss, &blocked, &burst, &only) >= 4) {
           if (!mRead || latency != mLatencyUs || jitter != mJitterUs || loss != mLoss || (blocked != 0) != mBlocked) {
             char line[160];
             std::snprintf(line, sizeof(line), "test shaping (%s): %lld us + up to %lld us jitter, loss %.3f%s",
@@ -295,6 +308,8 @@ namespace faf::netlink
           mJitterUs = jitter;
           mLoss = loss;
           mBlocked = blocked != 0;
+          mBurst = burst > 1 ? burst : 1;
+          mOnlyId = only;
         }
         std::fclose(f);
       }
@@ -308,6 +323,9 @@ namespace faf::netlink
       std::int64_t mJitterUs = 0;
       double mLoss = 0;
       bool mBlocked = false;
+      int mBurst = 1;
+      std::int64_t mOnlyId = 0;
+      std::map<std::int64_t, int> mBurstLeft;
       std::minstd_rand mRng{std::random_device{}()};
     };
   } // namespace
@@ -1089,7 +1107,7 @@ namespace faf::netlink
   {
     if (TestShaping::Get().Enabled()) {
       Clock::duration delay{};
-      if (!TestShaping::Get().Roll(delay)) {
+      if (!TestShaping::Get().Roll(delay, mOptions.localId, mOptions.remoteId)) {
         return true; // tests only: lost on the way
       }
       if (delay > Clock::duration::zero()) {
@@ -1119,7 +1137,7 @@ namespace faf::netlink
       return false;
     }
     Clock::duration delay{};
-    if (!TestShaping::Get().Roll(delay)) {
+    if (!TestShaping::Get().Roll(delay, mOptions.localId, mOptions.remoteId)) {
       return true; // tests only: lost on the way
     }
     if (delay > Clock::duration::zero()) {
@@ -1206,7 +1224,7 @@ namespace faf::netlink
         // delayed and dropped like every other send, so the offerer's rtt
         // covers both directions.
         Clock::duration delay{};
-        if (TestShaping::Get().Enabled() && !TestShaping::Get().Roll(delay)) {
+        if (TestShaping::Get().Enabled() && !TestShaping::Get().Roll(delay, self->mOptions.localId, self->mOptions.remoteId)) {
           return; // tests only: lost on the way
         }
         if (delay > Clock::duration::zero()) {
