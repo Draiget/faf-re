@@ -32,7 +32,7 @@ def parity_line():
             counts = json.load(f)["counts"]
         shown = [(counts.get(k, 0), k) for k in ("pass", "desync", "crash", "not-run")]
         text += " on Linux x64: " + ", ".join("%d %s" % c for c in shown if c[0])
-        text += ". The desyncs listed are known failures, none of them new"
+        text += ". Every desync and crash counted here is a [known failure](%s/blob/%s/tools/parity-data/expected/3835.json)" % (REPO, os.environ["SHA"])
     return text + "."
 
 
