@@ -1178,8 +1178,8 @@ namespace moho
   */
   void CartographicDecalBatch::Write(gpg::BinaryWriter& writer)
   {
-    writer.Write(reinterpret_cast<const char*>(&mTechniqueName), sizeof(mTechniqueName));
-    writer.Write(reinterpret_cast<const char*>(&mTexturePath), sizeof(mTexturePath));
+    writer.WriteString(mTechniqueName);
+    writer.WriteString(mTexturePath);
     writer.Write(mDecals.mDecalCount);
 
     const CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;
