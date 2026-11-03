@@ -41,7 +41,7 @@ Every engine function in `src/` was rebuilt from the original binary, and its be
 
 ## Commits and pull request titles
 
-Commit titles and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). A CI check (`Commit titles`) checks the PR title and every commit in the PR. When a PR is squash-merged its title becomes the commit title, so the title matters most.
+Commit titles and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). PRs are squash-merged and the PR's title becomes the commit title, so a CI check (`Commit titles`) checks that title and leaves the titles of a PR's commits free. A PR with one commit is the exception: the merge uses that commit's title, so it is checked too. Every commit on `master` is checked, and no commit in a PR may carry an AI or bot attribution line, because a squash copies commit messages into the merged one.
 
 ```
 <type>(<scope>): <what is true after this change>
@@ -68,7 +68,7 @@ Rules the check enforces:
 - A `!` after the scope marks a breaking change, e.g. a changed save or replay format: `feat(replay)!: ...`.
 - In a commit message, a blank line separates the title from the body.
 - No AI or bot `Co-authored-by:` lines and no "Generated with ..." lines. Commits are authored by the people who submit them.
-- `fixup!` and `squash!` commits are squashed before you push. Merge commits and git's own `Revert "..."` titles are accepted as they are.
+- A `fixup!` or `squash!` title is refused wherever a title is checked. Merge commits and git's own `Revert "..."` titles are accepted as they are.
 
 Write the title as what is now true, not as an instruction, and put the issue number at the end:
 
