@@ -14128,9 +14128,9 @@ namespace
 		/// One dead object and the link the serial sweep would unlink it through.
 		struct DeadRecord
 		{
-			GCObject* object;
-			GCObject* lastLive;   // last live object before it in the chunk; null: the chunk's entry link
-			GCObject** headLink;  // string buckets: the bucket head; null: the link carried in from the previous chunk
+			LuaPlus::ObjectPointer<GCObject> object;
+			LuaPlus::ObjectPointer<GCObject> lastLive;   // last live object before it in the chunk; null: the chunk's entry link
+			LuaPlus::ObjectPointer<GCObject*> headLink;  // string buckets: the bucket head; null: the link carried in from the previous chunk
 		};
 
 		/// A stretch of one GC list (or a range of string buckets) classified by one participant.
@@ -14144,7 +14144,7 @@ namespace
 			bool reachedStop = true;
 			GCObject* lastLive = nullptr;
 			std::vector<DeadRecord> dead;
-			std::vector<GCObject*> live;
+			std::vector<LuaPlus::ObjectPointer<GCObject>> live;
 		};
 
 		/// Where one list's chunks are in the chunk array.
@@ -14277,9 +14277,9 @@ namespace
 			constexpr std::size_t kPrefetchDistance = 8u;
 			if (at + kPrefetchDistance < dead.size()) {
 				const DeadRecord& ahead = dead[at + kPrefetchDistance];
-				_mm_prefetch(reinterpret_cast<const char*>(ahead.object), _MM_HINT_T0);
+				_mm_prefetch(reinterpret_cast<const char*>(static_cast<GCObject*>(ahead.object)), _MM_HINT_T0);
 				if (ahead.lastLive != nullptr) {
-					_mm_prefetch(reinterpret_cast<const char*>(ahead.lastLive), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(static_cast<GCObject*>(ahead.lastLive)), _MM_HINT_T0);
 				}
 			}
 		}
@@ -14330,7 +14330,7 @@ namespace
 				for (std::size_t at = 0; at < dead.size(); ++at) {
 					PrefetchAhead(dead, at);
 					const DeadRecord& record = dead[at];
-					GCObject** const link = record.lastLive != nullptr ? &record.lastLive->gch.next : record.headLink;
+					GCObject** const link = record.lastLive != nullptr ? &record.lastLive->gch.next : static_cast<GCObject**>(record.headLink);
 					*link = record.object->gch.next;
 					++freed;
 					freeobj(record.object, state);
