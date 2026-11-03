@@ -2,6 +2,8 @@
 
 #include <Windows.h>
 
+#include "gpg/core/utils/Logging.h"
+
 namespace gpg::gal::dxgi
 {
   using Microsoft::WRL::ComPtr;
@@ -62,14 +64,23 @@ namespace gpg::gal::dxgi
     std::vector<AdapterInfo> software;
     for (UINT adapterIndex = 0U;; ++adapterIndex) {
       AdapterInfo info{};
-      if (mFactory->EnumAdapters1(adapterIndex, &info.adapter) == DXGI_ERROR_NOT_FOUND) {
+      const HRESULT adapterResult = mFactory->EnumAdapters1(adapterIndex, &info.adapter);
+      if (FAILED(adapterResult)) {
+        if (adapterResult != DXGI_ERROR_NOT_FOUND) {
+          gpg::Warnf("dxgi: EnumAdapters1(%u) failed (HRESULT 0x%08lX)", adapterIndex, static_cast<unsigned long>(adapterResult));
+        }
         break;
       }
       static_cast<void>(info.adapter->GetDesc1(&info.desc));
 
       for (UINT outputIndex = 0U;; ++outputIndex) {
         OutputInfo output{};
-        if (info.adapter->EnumOutputs(outputIndex, &output.output) == DXGI_ERROR_NOT_FOUND) {
+        // Not only NOT_FOUND ends the list: a session with no display fails with another error and no output.
+        const HRESULT outputResult = info.adapter->EnumOutputs(outputIndex, &output.output);
+        if (FAILED(outputResult)) {
+          if (outputResult != DXGI_ERROR_NOT_FOUND) {
+            gpg::Warnf("dxgi: EnumOutputs(%u) failed (HRESULT 0x%08lX)", outputIndex, static_cast<unsigned long>(outputResult));
+          }
           break;
         }
         static_cast<void>(output.output->GetDesc(&output.desc));
