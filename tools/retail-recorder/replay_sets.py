@@ -15,6 +15,7 @@ difference, so a CI step or a person can use its exit code.
 """
 import csv
 import os
+import re
 import struct
 import sys
 
@@ -32,6 +33,12 @@ def kinds_text(described):
     sig, params, _, _ = described
     letter = lambda kind, words: f"S{words}" if kind == sc.STRUCT else KIND_LETTER[kind]
     return " ".join(letter(*p) for p in params) + " -> " + letter(*sig[1])
+
+
+def without_struct_sizes(text):
+    """Kinds as a check compares them. Struct sizes follow the container layout a build picks, and
+    no hash covers a struct: the words around one are found from the current build's sizes."""
+    return re.sub(r"S\d+", "S", text)
 
 
 class Build:
@@ -131,7 +138,7 @@ def spec(golden_dir, replay, exe, pdb, out_path):
         matches = []
         for candidate in build.by_name.get(row["name"], []):
             described = build.describe(candidate)
-            if described and kinds_text(described) == row["params"]:
+            if described and without_struct_sizes(kinds_text(described)) == without_struct_sizes(row["params"]):
                 matches.append((candidate, described))
         if len(matches) != 1:
             changed.append(row["name"])

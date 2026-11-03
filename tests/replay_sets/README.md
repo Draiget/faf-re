@@ -19,7 +19,7 @@ The script plays every replay in `replays.tsv`; `-Replay <id>` plays one. The re
 
 - **DIFFERS:** the same inputs now give another result, or those inputs no longer occur. This is the finding the test exists for.
 - **NOT CALLED:** nothing reaches that function on this replay any more.
-- **CHANGED:** the function's name or kinds changed, so its stored hashes no longer cover the same words. A rename or signature change lands here, and needs the data regenerated.
+- **CHANGED:** the function's name or kinds changed, so its stored hashes no longer cover the same words. A rename or signature change lands here, and needs the data regenerated. A struct's size does not count: it follows the container layout a build picks, and no stored hash covers a struct.
 
 The whole list goes to `<spec>.report`. One bug spreads through the game, so the function at fault is often not the one with the most missing hashes: a deliberate bug in `MaxInt` gave 100 differing functions, with `MaxInt` itself at line 82 of the report.
 
