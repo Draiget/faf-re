@@ -1,10 +1,18 @@
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 
 #include "lua/LuaObject.h"
 #include "lua/LuaPrimitives.h"
 #include "lua/LuaRuntimeTypes.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/task/CTaskThread.h"
+
+namespace moho
+{
+  class CLuaTask;
+}
 
 namespace
 {
@@ -51,7 +59,11 @@ namespace
 
 int main()
 {
+  // Set up as Sim::Sim does: the Core functions, and a task stage for ForkThread.
+  moho::CTaskStage stage;
   LuaPlus::LuaState state(LuaPlus::LuaState::LIB_BASE);
+  moho::SCR_FindLuaInitFormSet("Core")->RunInits(&state);
+  state.m_luaTask = reinterpret_cast<moho::CLuaTask*>(&stage);
 
   // 1. coroutine.create argument validation
   {
@@ -184,54 +196,92 @@ int main()
     Assert(res == "ok", "coroutine runtime errors propagate through resume as (false, msg) and leave thread dead");
   }
 
-  // 6. Engine integration: calling Moho/LuaPlus methods inside coroutine
+  // 6. Engine functions inside a coroutine: these crash when the coroutine has no LuaState wrapper.
   {
-    const std::string res = RunLua(state, R"(
-      local runningCo = nil
-      local currentThreadMatched = false
+    std::string res = RunLua(state, R"(
       local co
       co = coroutine.create(function()
-        -- CurrentThread() uses LuaObject::AssignThread with active stateUserData
-        local cur = rawget(_G, "CurrentThread")
-        if cur then
-          currentThreadMatched = (cur() == co)
-        else
-          currentThreadMatched = true
+        if CurrentThread() ~= co then
+          return "CurrentThread mismatch"
         end
-
-        -- Ensure stateUserData is valid by doing standard Lua/engine operations
-        local s = tostring(co)
-        if string.find(s, "thread:", 1, true) == nil then
-          error("tostring(thread) failed: " .. tostring(s))
+        -- As in the binary, for a thread that isn't a ForkThread: KillThread does nothing and
+        -- ResumeThread warns and returns.
+        local okKill, killErr = pcall(KillThread, co)
+        if not okKill then
+          return "KillThread raised: " .. tostring(killErr)
         end
-
-        -- Verify KillThread properly rejects a Lua coroutine
-        local killFn = rawget(_G, "KillThread")
-        if killFn then
-          local okKill, killErr = pcall(killFn, co)
-          if okKill or string.find(tostring(killErr), "wasn't created with ForkThread", 1, true) == nil then
-            error("KillThread should reject coroutines: " .. tostring(killErr))
-          end
+        local okResume, resumeErr = pcall(ResumeThread, co)
+        if not okResume then
+          return "ResumeThread raised: " .. tostring(resumeErr)
         end
-
-        -- Verify ResumeThread properly rejects a Lua coroutine
-        local resFn = rawget(_G, "ResumeThread")
-        if resFn then
-          local okRes, resErr = pcall(resFn, co)
-          if okRes or string.find(tostring(resErr), "wasn't created with ForkThread", 1, true) == nil then
-            error("ResumeThread should reject coroutines: " .. tostring(resErr))
-          end
-        end
-
+        ForkThread(function() _G.test_fork_ran = true end)
         return "ok"
       end)
 
       local ok, ret = coroutine.resume(co)
       if not ok then return "resume failed: " .. tostring(ret) end
-      if not currentThreadMatched then return "CurrentThread mismatch" end
       return ret
     )");
-    Assert(res == "ok", "engine / Moho integration inside coroutine (stateUserData, CurrentThread, KillThread/ResumeThread guards)");
+    Assert(res == "ok", "engine functions work inside a coroutine (CurrentThread, KillThread, ResumeThread, ForkThread)", res);
+
+    stage.UserFrame();
+    res = RunLua(state, "return tostring(_G.test_fork_ran)");
+    Assert(res == "true", "a thread forked from inside a coroutine runs", res);
+  }
+
+  // 6a. lua/platoon.lua kills a platoon's AI thread from that thread (PlatoonDisband), and
+  // OnDestroy kills it again before the thread yields. The binary ignores the second kill
+  // (0x004CA0F7..0x004CA0FC); an error there skips the rest of OnDestroy.
+  {
+    RunLua(state, R"(
+      _G.test_killed = "thread did not run"
+      ForkThread(function()
+        local me = CurrentThread()
+        KillThread(me)
+        _G.test_killed = "stopped at the second KillThread"
+        KillThread(me)
+        _G.test_killed = "reached the end"
+      end)
+    )");
+    stage.UserFrame();
+    const std::string res = RunLua(state, "return _G.test_killed");
+    Assert(res == "reached the end", "a thread killing itself twice runs on, as in the binary", res);
+  }
+
+  // 6b. A new coroutine takes its creator's globals, as lua_newthread gives it.
+  {
+    const std::string res = RunLua(state, R"(
+      local env = setmetatable({marker = "parent"}, {__index = _G})
+      local outer = coroutine.create(function()
+        setfenv(0, env)
+        local inner = coroutine.create(function() return getfenv(0).marker end)
+        local _, marker = coroutine.resume(inner)
+        return marker
+      end)
+      local _, marker = coroutine.resume(outer)
+      return tostring(marker)
+    )");
+    Assert(res == "parent", "a coroutine created inside a coroutine inherits its parent's globals", res);
+  }
+
+  // 6c. lua_State::MemberConstruct restores a coroutine from a save with no wrapper.
+  {
+    lua_State* const L = state.GetCState();
+    const char* const body = "return CurrentThread() == test_restored";
+    lua_State* const restored = lua_newthread(L);
+    lua_pushstring(L, "test_restored");
+    lua_insert(L, -2);
+    lua_settable(L, LUA_GLOBALSINDEX);
+    luaL_loadbuffer(L, body, std::strlen(body), "=restored");
+    lua_xmove(L, restored, 1);
+    Assert(restored->stateUserData == nullptr, "a thread made without a wrapper has none");
+
+    const std::string res = RunLua(state, R"(
+      local ok, same = coroutine.resume(test_restored)
+      test_restored = nil
+      return tostring(ok) .. " " .. tostring(same)
+    )");
+    Assert(res == "true true", "a coroutine without a wrapper can call engine functions after a resume", res);
   }
 
   // 7. Garbage collection of coroutines: weak tables and finalizer tracking
@@ -396,6 +446,7 @@ int main()
     Assert(CountCoroutineThreads(L) == baselineThreads, "all 300 abandoned coroutines swept from rootgc1");
   }
 
+  stage.Teardown();
   std::printf("ALL COROUTINE TESTS PASSED\n");
   return 0;
 }
