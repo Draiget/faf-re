@@ -32,12 +32,6 @@
 using namespace moho;
 namespace
 {
-  // Engine addition (wld_PreciseSharedStart): for each player (by client index), when its ready
-  // message was handled on this PC, in microseconds on the steady clock every process here shares;
-  // 0 until then. A global rather than a member, since the class keeps the binary's layout; there
-  // is only one client manager at a time, and it reads and writes this under its `mLock`.
-  std::int64_t gClientReadyUs[64] = {};
-
   float GetBottleneckUiTimestampMs(const CClientManagerImpl& manager)
   {
     // Low-dword float pun over Timer::mTime (binary reads only 4 of the 8 bytes).
@@ -172,8 +166,10 @@ CClientManagerImpl::CClientManagerImpl(
   , mPeerFeatures(std::make_unique<CPeerFeatures>(clientCount))
 {
   mClients.resize(clientCount, nullptr);
-  std::fill(std::begin(gClientReadyUs), std::end(gClientReadyUs), 0);
-  NET_ResetReadyDeparture();
+  // A manager with no clients (`CRemoteClientManager`) stands beside a session's real one.
+  if (clientCount != 0) {
+    NET_ResetReadyDeparture();
+  }
 }
 
 /**
@@ -182,10 +178,7 @@ CClientManagerImpl::CClientManagerImpl(
 void CClientManagerImpl::NoteClientReady(const int clientIndex)
 {
   std::scoped_lock lock(mLock);
-  if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < std::size(gClientReadyUs) &&
-      gClientReadyUs[clientIndex] == 0) {
-    gClientReadyUs[clientIndex] = NET_SteadyClockMicroseconds();
-  }
+  mPeerFeatures->NoteReady(clientIndex, NET_SteadyClockMicroseconds());
 }
 
 /**
@@ -204,24 +197,25 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
   std::scoped_lock lock(mLock);
   msvc8::vector<SReadyTiming> timings;
   std::int64_t start = 0;
-  for (std::size_t index = 0; index < mClients.size() && index < std::size(gClientReadyUs); ++index) {
+  for (std::size_t index = 0; index < mClients.size(); ++index) {
     CClientBase* const client = mClients[index];
     if (client == nullptr || !client->NoEjectionPending()) {
       continue;
     }
-    const std::int64_t handledUs = gClientReadyUs[index];
+    const std::int64_t handledUs = mPeerFeatures->ReadyUs(static_cast<int>(index));
     if (handledUs == 0) {
       return 0;
     }
     // Every ready message is timed as it left its sender. Ours: when our connection sent it
     // (NET_GetReadyDepartureUs). A peer's: when it was handled here, less the one-way trip, which
     // is half of what is left of its ping after the peer's wait before it acknowledges
-    // (NET_AckDelayMs: net_AckDelay, or net_FastAckDelay with net_FastRetransmit, taken to be
-    // set alike on every player). The local client reports a ping of 0.
+    // (`PeerAckDelayMs`: what it announced, or as this client does if it announced nothing).
+    // The local client reports a ping of 0.
     const float pingMs = client->GetStatusMetricA();
     std::int64_t leftUs = handledUs;
     if (pingMs > 0.0f) {
-      const float oneWayMs = std::max(0.0f, (pingMs - static_cast<float>(NET_AckDelayMs())) * 0.5f);
+      const float ackDelayMs = static_cast<float>(mPeerFeatures->PeerAckDelayMs(static_cast<int>(index)));
+      const float oneWayMs = std::max(0.0f, (pingMs - ackDelayMs) * 0.5f);
       leftUs = handledUs - static_cast<std::int64_t>(oneWayMs * 1000.0f);
     } else if (mLocalClient == client && mClients.size() > 1) {
       // Not known until our ready message has left; the caller asks again.
@@ -235,7 +229,9 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
   }
 
   if (logDetails) {
-    // Times are relative to the shared start, which is the latest departure.
+    // Times are relative to the shared start, which is the latest departure; players on one PC
+    // read one steady clock, so the absolute time compares their estimates directly.
+    gpg::Logf("SharedStart: %lld us on the steady clock", static_cast<long long>(start));
     for (const SReadyTiming& timing : timings) {
       const float handledMs = static_cast<float>(timing.mHandledUs - start) * 0.001f;
       const float leftMs = static_cast<float>(timing.mLeftUs - start) * 0.001f;

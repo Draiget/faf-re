@@ -23,6 +23,9 @@ manager.mPeerFeatures->PeerSupports(clientIndex, EPeerFeature::OrderStreamCheck)
 |---|---|---|---|
 | `OrderStreamCheck` | 0 | `net_CheckOrderStreams` was on as the game began | This client's acks carry `CommandStreamCheck`'s hash after their fields |
 
+| `SkewCorrection` | 1 | `wld_SkewCorrection` was on as the game began | This client's display clock keeps to real time; the correction only runs when every player announces this |
+| `FastAck` | 2 | `net_FastRetransmit` was on as the game began | This client acknowledges within `net_FastAckDelay`, which the shared start takes off that peer's ping |
+
 ## Adding a feature
 
 1. Add one entry to `EPeerFeature` in `src/moho/net/PeerFeatures.h`, with the next unused bit. Bits never change or get reused, because other builds read them.

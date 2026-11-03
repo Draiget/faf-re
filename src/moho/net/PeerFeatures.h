@@ -21,6 +21,10 @@ namespace moho
   {
     /// `CommandStreamCheck`'s hash after the fields of `CLIMSG_Ack`.
     OrderStreamCheck = 0,
+    /// wld_SkewCorrection: this client's display clock keeps to real time.
+    SkewCorrection = 1,
+    /// net_FastRetransmit: this client acknowledges within net_FastAckDelay.
+    FastAck = 2,
   };
 
   /**
@@ -42,6 +46,15 @@ namespace moho
     /// False for a client that has not announced: a retail client never does.
     [[nodiscard]] bool PeerSupports(int clientIndex, EPeerFeature feature) const;
 
+    /// How long `clientIndex` holds an acknowledgement, in ms: what it announced (`FastAck`), or as
+    /// this client does when it announced nothing.
+    [[nodiscard]] std::int32_t PeerAckDelayMs(int clientIndex) const;
+
+    /// wld_PreciseSharedStart: when this client's ready message was handled here, on the steady
+    /// clock in microseconds; the first time counts, and 0 means not yet.
+    void NoteReady(int clientIndex, std::int64_t handledUs);
+    [[nodiscard]] std::int64_t ReadyUs(int clientIndex) const;
+
     /// Whether this client and every client still in the game support `feature`.
     [[nodiscard]] bool EveryoneSupports(CClientManagerImpl& manager, EPeerFeature feature) const;
 
@@ -54,6 +67,7 @@ namespace moho
       bool announced{false};
       std::uint64_t mask{0};
       std::string build;
+      std::int64_t readyUs{0};
     };
     std::vector<SPeer> mPeers;
   };

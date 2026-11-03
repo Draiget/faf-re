@@ -597,8 +597,8 @@ namespace moho
      * not ready or our own ready message has not left yet. Every player works out the same moment
      * from when each ready message left: ours as our connection sent it (`NET_GetReadyDepartureUs`),
      * a peer's as it was handled here less the one-way trip (the ping less the peer's
-     * acknowledgement delay, `NET_AckDelayMs`, halved). What remains is any difference between the
-     * two directions of the network path, which nothing here can measure.
+     * acknowledgement delay, `CPeerFeatures::PeerAckDelayMs`, halved). What remains is any difference
+     * between the two directions of the network path, which nothing here can measure.
      */
     [[nodiscard]] std::int64_t EstimateSharedStartUs(bool logDetails = false);
 

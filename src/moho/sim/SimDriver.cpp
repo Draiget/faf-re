@@ -113,6 +113,7 @@ namespace
     float mDriftMs = 0.0f; // unclamped: what actually happened, for the log
     bool mSharedStartPending = false; // network session: not measured against the shared start yet
     std::int32_t mFirstTick = 0;
+    bool mCorrecting = false; // the display clock acts on it: wld_SkewCorrection, for every player of a network game
   };
 
   SkewClock gSkewClock;
@@ -137,7 +138,7 @@ namespace
   /// The display-clock factor `WLD_GetSimRate` makes of a lag, for the log.
   [[nodiscard]] float SkewDisplayFactor(const float lagMs)
   {
-    if (wld_SkewCorrection == 0) {
+    if (!gSkewClock.mCorrecting) {
       return 1.0f;
     }
     const float sample = std::pow(wld_SkewRateAdjustBase, lagMs / 100.0f);
@@ -168,16 +169,37 @@ namespace
     }
   }
 
-  void UpdateSkewClock(const SSyncData& beat, const std::int64_t now, const int simRate, CClientManagerImpl* const sharedStartFrom)
+  void LogSkewCorrection(const bool correcting, const std::int32_t tick)
+  {
+    if (wld_SkewCorrection == 0) {
+      return;
+    }
+    gpg::Logf(
+      "SkewClock: tick %d correction %s", tick,
+      correcting ? "on, every player runs it"
+                 : "waits: it needs a network game where every player announces it (net_PeerFeatures)"
+    );
+  }
+
+  void UpdateSkewClock(
+    const SSyncData& beat, const std::int64_t now, const int simRate, CClientManagerImpl* const sharedStartFrom,
+    const bool correcting
+  )
   {
     SkewClock& clock = gSkewClock;
+    if (clock.mStarted && correcting != clock.mCorrecting) {
+      LogSkewCorrection(correcting, beat.mCurTick);
+    }
+    clock.mCorrecting = correcting;
     if (!beat.mAdvanced) {
       clock.mPausedSinceTick = true;
       return;
     }
 
     if (!clock.mStarted || beat.mCurTick <= clock.mLastTick) {
+      LogSkewCorrection(correcting, beat.mCurTick);
       clock = SkewClock{};
+      clock.mCorrecting = correcting;
       clock.mStarted = true;
       clock.mLastTick = beat.mCurTick;
       clock.mLastTickCycles = now;
@@ -209,7 +231,7 @@ namespace
       gpg::Logf(
         "SkewClock: tick %d lag %+.3f s (unclamped %+.3f s), display speed x%.3f, sim rate %d, correction %s",
         beat.mCurTick, clock.mLagMs * 0.001f, clock.mDriftMs * 0.001f, SkewDisplayFactor(clock.mLagMs), simRate,
-        wld_SkewCorrection != 0 ? "on" : "off"
+        clock.mCorrecting ? "on" : "off"
       );
       clock.mNextLogCycles = now + gpg::time::MillisecondsToCycles(static_cast<float>(wld_SkewLog) * 1000.0f);
     }
@@ -1637,11 +1659,21 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   // client manager's.
   const std::int64_t dequeuedAt = mLastSyncCycleTime;
   lock.unlock();
-  if (outSyncData) {
-    // The shared start is measured against in network sessions only, with wld_PreciseSharedStart.
-    const bool sharedStart = wld_PreciseSharedStart != 0 &&
-      gDriverSessionPacing.load(std::memory_order_relaxed) == ESimSessionPacing::Network;
-    UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate(), sharedStart ? mClientManager.get() : nullptr);
+  if (wld_SkewCorrection == 0 && wld_SkewLog <= 0) {
+    gSkewClock.mStarted = false;
+  } else if (outSyncData) {
+    // The shared start is measured against, and the display clock corrected, in network sessions
+    // only: a paused replay issues no beats, so its pause would read as lag, and a lead-paced
+    // session's display follows the sim's measured speed, not the rate this clock counts by. The
+    // correction only pays off when every player runs it, so it asks them (docs/PEER_FEATURES.md).
+    const bool network = gDriverSessionPacing.load(std::memory_order_relaxed) == ESimSessionPacing::Network;
+    bool correcting = false;
+    if (network && wld_SkewCorrection != 0) {
+      std::scoped_lock managerLock(mClientManager->mLock);
+      correcting = mClientManager->mPeerFeatures->EveryoneSupports(*mClientManager, EPeerFeature::SkewCorrection);
+    }
+    CClientManagerImpl* const sharedStartFrom = network && wld_PreciseSharedStart != 0 ? mClientManager.get() : nullptr;
+    UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate(), sharedStartFrom, correcting);
   }
 }
 
@@ -1649,14 +1681,15 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
  * Address: 0x0073C630 (FUN_0073C630), ISTIDriver slot 11
  * Returns the driver sim-speed metric (retail implementation returns 0.0).
  *
- * Engine addition (wld_SkewCorrection): with the switch on, the skew of the beat on screen in
- * beats, positive when ahead of real time. `WLD_GetSimRate` turns it into a display-clock factor of
- * `wld_SkewRateAdjustBase^-skew`, capped at `wld_SkewRateAdjustMax`, so a session behind real time
- * runs slightly fast until it has caught up, and one ahead slightly slow.
+ * Engine addition (wld_SkewCorrection): with the switch on in a network game where every player
+ * announces it, the skew of the beat on screen in beats, positive when ahead of real time.
+ * `WLD_GetSimRate` turns it into a display-clock factor of `wld_SkewRateAdjustBase^-skew`, capped at
+ * `wld_SkewRateAdjustMax`, so a session behind real time runs slightly fast until it has caught up,
+ * and one ahead slightly slow.
  */
 double CSimDriver::GetSimSpeed()
 {
-  if (wld_SkewCorrection == 0 || !gSkewClock.mStarted) {
+  if (wld_SkewCorrection == 0 || !gSkewClock.mStarted || !gSkewClock.mCorrecting) {
     return 0.0;
   }
   return -static_cast<double>(gSkewClock.mLagMs) / 100.0;
@@ -2071,6 +2104,7 @@ int moho::wld_SkewCorrection = 0;
 float moho::wld_SkewMaxLag = 2.0f;
 int moho::wld_SkewLog = 0;
 int moho::wld_PreciseSharedStart = 1;
+int moho::wld_ReadyAfterFirstFrame = 1;
 
 namespace
 {
@@ -2100,6 +2134,13 @@ namespace
     "same on every screen (1, the default), or from this client's own first tick on screen (0). Read when the first "
     "tick is shown.",
     &moho::wld_PreciseSharedStart
+  );
+
+  TConVar<int> gTConVar_wld_ReadyAfterFirstFrame(
+    "wld_ReadyAfterFirstFrame",
+    "1 sends this client's ready message once the first frame of the game interface is drawn; 0 sends it before that "
+    "frame, as the original does.",
+    &moho::wld_ReadyAfterFirstFrame
   );
 
   TConVar<int> gTConVar_sim_ReplayLead(

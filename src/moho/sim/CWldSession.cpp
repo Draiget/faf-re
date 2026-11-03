@@ -14833,9 +14833,13 @@ namespace moho
       // writer of `mWeAreReady`, which `DoBeat` needs before it will ever set
       // `mEveryoneIsReady` - so without this the session sits in Waiting
       // forever showing "waiting for other players", local game or not.
-      // Engine addition: not until the first frame of the interface just built has been drawn
-      // (WLD_DoPostInitializing); the binary declared it here.
-      gReadyAfterFirstFrame = true;
+      // Engine addition (wld_ReadyAfterFirstFrame): not until the first frame of the interface just
+      // built has been drawn (WLD_DoPostInitializing); the binary declared it here.
+      if (wld_ReadyAfterFirstFrame != 0) {
+        gReadyAfterFirstFrame = true;
+      } else if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
+        clientManager->Cleanup();
+      }
 
       if (outContinue != nullptr) {
         *outContinue = false;

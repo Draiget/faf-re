@@ -1047,7 +1047,8 @@ namespace moho
   /**
    * Engine addition: user-side console variables for the display-clock skew correction, which the
    * retail engine carries but never feeds (`CSimDriver::GetSimSpeed` returns 0).
-   * - `wld_SkewCorrection` (default 0): 1 makes `GetSimSpeed` return how many beats the beat on
+   * - `wld_SkewCorrection` (default 0): 1 announces it to the other players (`net_PeerFeatures`); in
+   *   a network game where all of them announce it, `GetSimSpeed` returns how many beats the beat on
    *   screen is ahead of real time (negative when behind), measured tick by tick from the first
    *   tick on screen with paused time left out. `WLD_GetSimRate` then runs the display clock at
    *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
@@ -1058,11 +1059,14 @@ namespace moho
    *   moment the last player's ready message left its sender (`CClientManagerImpl::EstimateSharedStartUs`),
    *   which every player times alike, so every player's screen keeps to one schedule; 0 counts
    *   from this client's own first tick on screen, as outside network sessions.
+   * - `wld_ReadyAfterFirstFrame` (default 1): this client's ready message waits for the first frame
+   *   of the game interface to be drawn; 0 sends it before that frame, as the binary does.
    */
   extern int wld_SkewCorrection;
   extern float wld_SkewMaxLag;
   extern int wld_SkewLog;
   extern int wld_PreciseSharedStart;
+  extern int wld_ReadyAfterFirstFrame;
 
   /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game
