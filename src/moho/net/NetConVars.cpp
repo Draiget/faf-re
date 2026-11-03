@@ -56,9 +56,9 @@ namespace moho
   // docs/LAUNCHER_NATIVE_NETWORK.md); 0 is the adapter path. Read when the
   // game reports Idle.
   int32_t net_NativeNet = 0;
-  // Issue #274: in native mode, offer a WebRTC data channel to peers that are
+  // Issue #274: in native mode, 1 offers a WebRTC data channel to peers that are
   // our builds too (#239). Read when a link starts.
-  int32_t net_NativeNetWebRtc = 1;
+  int32_t net_NativeNetWebRtc = 0;
   // Issue #240: in native mode, with peers running our build, game datagrams go
   // on a redundant lane that repeats each up to this many times until acked;
   // 0 sends them plainly. Read when a link starts.
@@ -109,7 +109,7 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_NativeNetWebRtc(
       "net_NativeNetWebRtc",
-      "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
+      "In native mode, 1: move game datagrams onto a WebRTC data channel with peers running our build; 0 (default): ICE only.",
       &net_NativeNetWebRtc
     );
 
