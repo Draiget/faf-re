@@ -22,6 +22,10 @@ else()
   add_compile_definitions(FAF_RETAIL_LAYOUT=0)
 endif()
 
+# ON stops faf_engine's C and C++ files after the compiler's front end: errors and static_asserts
+# still fail the build, but no object is written, so nothing can link. For the Layout check workflow.
+option(FAF_SYNTAX_ONLY "Check faf_engine's sources without generating code" OFF)
+
 # Engine addition (dedicated-server plan WPL.2): the Linux build of the
 # simulation, chosen by its toolchain file (cmake/toolchains/linux-clang-*.cmake,
 # read by project(), sets FAF_LINUX) and described in cmake/FafLinux.cmake.

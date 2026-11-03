@@ -129,6 +129,9 @@ list(APPEND _faf_main_options
 
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
+if(FAF_SYNTAX_ONLY)
+  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs>")
+endif()
 
 # --- Per-file settings ---------------------------------------------------------------
 set(_fx11 "${FAF_DEPENDENCIES_DIR}/FX11")
