@@ -7,9 +7,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <vector>
 
 #include "CLobby.h"
 #include "CNetUDPConnector.h"
+#include "EClientMsg.h"
 #include "ELobbyMsg.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
@@ -18,8 +20,6 @@
 #include "NetConVars.h"
 #include "NetMessageRanges.h"
 #include "NetPeerTransport.h"
-#include "EClientMsg.h"
-#include <vector>
 using namespace moho;
 
 namespace
@@ -32,9 +32,9 @@ namespace
   // "No receiver for message type" warnings logged per connection.
   constexpr std::uint32_t kMaxUnroutedMessageWarnings = 8;
 
-  // Engine addition (wld_SkewCorrection, shared start): connections holding a queued ready message that has not
-  // left yet (guarded by the connector lock), and when the last one left, on the system-wide
-  // steady clock in microseconds.
+  // Engine addition (wld_PreciseSharedStart): connections holding a queued ready message that has
+  // not left yet (guarded by the connector lock), and when the latest one left, in microseconds on
+  // the steady clock (NET_SteadyClockMicroseconds).
   std::vector<const CNetUDPConnection*> gReadyAwaitingDeparture;
   std::atomic<std::int64_t> gReadyDepartureUs{0};
 } // namespace
@@ -172,7 +172,7 @@ void CNetUDPConnection::Write(NetDataSpan* data)
     mPendingOutputData.VirtWrite(reinterpret_cast<const char*>(begin), len);
   }
 
-  // Engine addition (wld_SkewCorrection, shared start): the ready message is timed when it leaves (SendPacket).
+  // Engine addition (wld_PreciseSharedStart): the ready message is timed when it leaves (SendPacket).
   if (len != 0 && begin[0] == static_cast<uint8_t>(EClientMsg::CLIMSG_Ready) &&
       std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this) == gReadyAwaitingDeparture.end()) {
     gReadyAwaitingDeparture.push_back(this);
@@ -399,7 +399,7 @@ CNetUDPConnection::CNetUDPConnection(
  */
 CNetUDPConnection::~CNetUDPConnection()
 {
-  // Engine addition (wld_SkewCorrection, shared start): a connection that goes before its ready message left.
+  // Engine addition (wld_PreciseSharedStart): a connection that goes before its ready message left.
   gReadyAwaitingDeparture.erase(
     std::remove(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this), gReadyAwaitingDeparture.end()
   );
@@ -1468,7 +1468,7 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
  */
 void CNetUDPConnection::SendPacket(SNetPacket* packet)
 {
-  // Engine addition (wld_SkewCorrection, shared start): the first payload after a queued ready message carries it.
+  // Engine addition (wld_PreciseSharedStart): the first payload after a queued ready message carries it.
   if (packet->header.mType == PT_Data && packet->header.mPayloadLength != 0 && !gReadyAwaitingDeparture.empty()) {
     const auto awaiting = std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this);
     if (awaiting != gReadyAwaitingDeparture.end()) {

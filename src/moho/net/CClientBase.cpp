@@ -452,7 +452,7 @@ void CClientBase::Process(CMessage& msg)
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Ready):
     mReady = true;
-    // Engine addition (shared start): when it was handled, for the session's shared start.
+    // Engine addition (wld_PreciseSharedStart): note when this ready was handled, for the shared start.
     mManager->NoteClientReady(mIndex);
     return;
 

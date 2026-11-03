@@ -14891,9 +14891,9 @@ namespace moho
 
       // Engine addition: the frame that built the game interface has been drawn, with the UI's
       // first update (`OnFirstUpdate`) and the world's first render, which take a few hundred ms
-      // more. Ready now, so the session's shared start (wld_SkewCorrection) is when the last player
-      // can show its first tick, not that long before it. Checked next frame, once
-      // the issue thread has counted it, so a lone player does not see the waiting dialog flash.
+      // more. Ready now, so the session's shared start (wld_PreciseSharedStart) is when the last
+      // player can show its first tick, not that long before it. Checked next frame, once the
+      // issue thread has counted it, so a lone player does not see the waiting dialog flash.
       if (gReadyAfterFirstFrame) {
         gReadyAfterFirstFrame = false;
         if (clientManager != nullptr) {

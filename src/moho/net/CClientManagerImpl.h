@@ -586,17 +586,17 @@ namespace moho
     void NoteDivergentOrders();
 
     /**
-     * Engine addition (wld_SkewCorrection, shared start): a client's ready message was handled here (the local
-     * client's own as it sends it), timed on the system-wide steady clock.
+     * Engine addition (wld_PreciseSharedStart): a client's ready message was handled here (the local
+     * client's own as it sends it); the time is kept for `EstimateSharedStartUs`.
      */
     void NoteClientReady(int clientIndex);
 
     /**
-     * Engine addition (wld_SkewCorrection, shared start): the moment the last player's ready message left it, on this
-     * machine's steady clock in microseconds, or 0 while some player is not ready or our own
-     * ready message has not left yet. Every player computes the same moment, from when each ready
-     * message left its sender: ours as our connection sent it (`NET_GetReadyDepartureUs`), a
-     * peer's half the round trip before it was handled here (the ping less the peer's
+     * Engine addition (wld_PreciseSharedStart): the moment the last player's ready message left its
+     * sender, on the steady clock in microseconds, or 0 while some player (this one included) is
+     * not ready or our own ready message has not left yet. Every player works out the same moment
+     * from when each ready message left: ours as our connection sent it (`NET_GetReadyDepartureUs`),
+     * a peer's as it was handled here less the one-way trip (the ping less the peer's
      * `net_AckDelay`, halved). What remains is any difference between the two directions of the
      * network path, which nothing here can measure.
      */

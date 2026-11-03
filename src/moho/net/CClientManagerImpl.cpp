@@ -10,7 +10,6 @@
 #include "ECmdStreamOp.h"
 
 #include <algorithm>
-#include <chrono>
 #include <iterator>
 #include <cstddef>
 #include <cstdint>
@@ -33,9 +32,10 @@
 using namespace moho;
 namespace
 {
-  // Engine addition (wld_SkewCorrection, shared start): when each client's ready message was handled here, on
-  // the system-wide steady clock in microseconds (0: not yet), by client index. One client manager
-  // exists at a time; written and read under its `mLock`.
+  // Engine addition (wld_PreciseSharedStart): for each player (by client index), when its ready
+  // message was handled on this PC, in microseconds on the steady clock every process here shares;
+  // 0 until then. A global rather than a member, since the class keeps the binary's layout; there
+  // is only one client manager at a time, and it reads and writes this under its `mLock`.
   std::int64_t gClientReadyUs[64] = {};
 
   float GetBottleneckUiTimestampMs(const CClientManagerImpl& manager)
@@ -177,7 +177,7 @@ CClientManagerImpl::CClientManagerImpl(
 }
 
 /**
- * Engine addition (wld_SkewCorrection, shared start): see the declaration.
+ * Engine addition (wld_PreciseSharedStart): see the declaration.
  */
 void CClientManagerImpl::NoteClientReady(const int clientIndex)
 {
@@ -189,7 +189,7 @@ void CClientManagerImpl::NoteClientReady(const int clientIndex)
 }
 
 /**
- * Engine addition (wld_SkewCorrection, shared start): see the declaration.
+ * Engine addition (wld_PreciseSharedStart): see the declaration.
  */
 std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
 {
@@ -213,10 +213,10 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
     if (handledUs == 0) {
       return 0;
     }
-    // Both sides time the ready message as it leaves its sender. Ours: when the connection sent it
-    // (NET_GetReadyDepartureUs). A peer's: as it was handled here, less the trip, which is half the
-    // round trip after the peer's wait before it acknowledges (net_AckDelay). The local client
-    // reports a ping of 0.
+    // Every ready message is timed as it left its sender. Ours: when our connection sent it
+    // (NET_GetReadyDepartureUs). A peer's: when it was handled here, less the one-way trip, which
+    // is half of what is left of its ping after the peer's wait before it acknowledges
+    // (net_AckDelay). The local client reports a ping of 0.
     const float pingMs = client->GetStatusMetricA();
     std::int64_t leftUs = handledUs;
     if (pingMs > 0.0f) {

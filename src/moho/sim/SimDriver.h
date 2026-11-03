@@ -1055,7 +1055,7 @@ namespace moho
    * - `wld_SkewMaxLag` (default 2 s): the skew is clamped to this much real time either way.
    * - `wld_SkewLog` (default 0): log the drift every this many seconds.
    * - `wld_PreciseSharedStart` (default 1): in a network session the count is measured against the
-   *   moment the last player's ready message left it (`CClientManagerImpl::EstimateSharedStartUs`),
+   *   moment the last player's ready message left its sender (`CClientManagerImpl::EstimateSharedStartUs`),
    *   which every player times alike, so every player's screen keeps to one schedule; 0 counts
    *   from this client's own first tick on screen, as outside network sessions.
    */
@@ -1063,7 +1063,6 @@ namespace moho
   extern float wld_SkewMaxLag;
   extern int wld_SkewLog;
   extern int wld_PreciseSharedStart;
-
 
   /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game

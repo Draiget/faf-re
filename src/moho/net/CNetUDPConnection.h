@@ -431,16 +431,19 @@ namespace moho
   static_assert(sizeof(CNetUDPConnection) == 0xFE8, "CNetUDPConnection size must be 0xFE8");
 
   /**
-   * Engine addition (wld_SkewCorrection, shared start): when this client's ready message (`CLIMSG_Ready`) last
-   * left on the wire, on the system-wide steady clock in microseconds, over all UDP connections;
-   * 0 before it did. A peer times the same message as it arrives, so both sides time one event:
-   * its departure, which comes after it was queued: a send waits up to `net_SendDelay`.
+   * Engine addition (wld_PreciseSharedStart): when this client's ready message (`CLIMSG_Ready`)
+   * left on the wire (the latest over all UDP connections), in microseconds on the steady clock;
+   * 0 before it did. It leaves up to `net_SendDelay` after it was queued, and the peers time that
+   * departure too, from its arrival, so both sides time the same moment.
    */
   [[nodiscard]] std::int64_t NET_GetReadyDepartureUs() noexcept;
 
-  /** Engine addition (wld_SkewCorrection, shared start): forget the last session's ready departure. */
+  /** Engine addition (wld_PreciseSharedStart): forget the last session's ready departure. */
   void NET_ResetReadyDeparture() noexcept;
 
-  /** Engine addition (wld_SkewCorrection, shared start): the system-wide steady clock in microseconds. */
+  /**
+   * Engine addition (wld_PreciseSharedStart, wld_SkewCorrection): `std::chrono::steady_clock` in
+   * microseconds, which every process on the PC reads alike.
+   */
   [[nodiscard]] std::int64_t NET_SteadyClockMicroseconds() noexcept;
 } // namespace moho

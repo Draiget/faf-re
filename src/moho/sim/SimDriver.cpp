@@ -88,15 +88,16 @@ namespace
 
   /**
    * Engine addition (wld_SkewCorrection): how far the beat on screen is behind real time, for
-   * `CSimDriver::GetSimSpeed`. The retail driver returns 0 there, which leaves the skew correction in `WLD_GetSimRate` permanently at 1x.
+   * `CSimDriver::GetSimSpeed`. The retail driver returns 0 there, which leaves the skew correction
+   * in `WLD_GetSimRate` at 1x for good.
    *
-   * The divergence from real time is calculated for each tick taken off the sync queue.
-   * Beats that do not advance a tick are a pause, and are not counted. Counting starts at the
-   * session's first tick on screen; the app drops the long first frame of play before it from the
-   * frame clock's window once that tick is shown (`WLD_TakeFrameClockReset`), so the ticks after
-   * it come a tick apart. In a network session the count is then measured
-   * against the moment the last player's ready message left it, which every player times alike
-   * (`CClientManagerImpl::EstimateSharedStartUs`): tick N is due that long after it on every
+   * The divergence from real time is worked out for each tick taken off the sync queue. Beats
+   * that do not advance a tick are a pause, and are not counted. Counting starts at the session's
+   * first tick on screen; the app drops the long first frame of play before it from the frame
+   * clock's window once that tick is shown (`WLD_TakeFrameClockReset`), so the ticks after it come
+   * a tick apart. In a network session, with wld_PreciseSharedStart, the count is then measured
+   * against the moment the last player's ready message left its sender, which every player times
+   * alike (`CClientManagerImpl::EstimateSharedStartUs`): tick N is due that long after it on every
    * screen, so a player whose screen started late catches up instead of keeping the others'
    * screens that far ahead of its own, out of the input window.
    * Only the main thread touches it (`GetSyncData`, `GetSimSpeed`).
@@ -2095,9 +2096,9 @@ namespace
 
   TConVar<int> gTConVar_wld_PreciseSharedStart(
     "wld_PreciseSharedStart",
-    "Network sessions: the skew is counted from the moment the last player's ready message left it, the same on "
-    "every screen (1, the default), or from this client's own first tick on screen (0). Read when the first tick "
-    "is shown.",
+    "Network sessions: the skew is counted from the moment the last player's ready message left its sender, the "
+    "same on every screen (1, the default), or from this client's own first tick on screen (0). Read when the first "
+    "tick is shown.",
     &moho::wld_PreciseSharedStart
   );
 
