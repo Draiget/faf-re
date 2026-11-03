@@ -7,13 +7,21 @@
 #include <initializer_list>
 #include <cmath>
 #include <cstdlib>
+#include <cwchar>
 #include <map>
 #include <optional>
 #include <regex>
 #include <set>
 #include <utility>
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/d3d11/EffectScan.h"
 
 namespace gpg::gal::d3d11
 {
@@ -397,57 +405,90 @@ namespace gpg::gal::d3d11
         static const std::regex techniqueName(R"(\btechnique1[01]\s+(\w+))");
         static const std::regex structName(R"(\bstruct\s+(\w+))");
         std::vector<std::string> techniques;
-        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), techniqueName); it != std::sregex_iterator(); ++it) {
-          techniques.push_back((*it)[1].str());
-        }
         std::vector<std::string> clashes;
-        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structName); it != std::sregex_iterator(); ++it) {
-          if (std::find(techniques.begin(), techniques.end(), (*it)[1].str()) != techniques.end()) {
-            clashes.push_back((*it)[1].str());
+        if (gEffectFastScan) {
+          scan::ForEachTechniqueName(mText, [&](const std::string_view name) { techniques.emplace_back(name); });
+          scan::ForEachStructName(mText, [&](const std::string_view name) {
+            if (std::find(techniques.begin(), techniques.end(), name) != techniques.end()) {
+              clashes.emplace_back(name);
+            }
+          });
+        } else {
+          for (auto it = std::sregex_iterator(mText.begin(), mText.end(), techniqueName); it != std::sregex_iterator(); ++it) {
+            techniques.push_back((*it)[1].str());
+          }
+          for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structName); it != std::sregex_iterator(); ++it) {
+            if (std::find(techniques.begin(), techniques.end(), (*it)[1].str()) != techniques.end()) {
+              clashes.push_back((*it)[1].str());
+            }
           }
         }
         for (const std::string& name : clashes) {
           ReplaceIdentifier(mText, name, "faf_" + name);
-          const std::regex renamedTechnique("(\\btechnique1[01]\\s+)faf_" + name + "\\b");
-          mText = std::regex_replace(mText, renamedTechnique, "$1" + name);
+          if (gEffectFastScan) {
+            mText = scan::RestoreRenamedTechnique(mText, name);
+          } else {
+            const std::regex renamedTechnique("(\\btechnique1[01]\\s+)faf_" + name + "\\b");
+            mText = std::regex_replace(mText, renamedTechnique, "$1" + name);
+          }
           mNotes.push_back("struct " + name + " renamed: a technique has the same name");
         }
       }
 
+      void AddStruct(const std::string& name, const std::size_t open)
+      {
+        const std::size_t close = MatchingBrace(mText, open);
+        if (close == std::string::npos) {
+          return;
+        }
+        std::vector<Variable> members;
+        for (const std::string& member : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+          if (!Trim(member).empty()) {
+            members.push_back(ParseVariable(member));
+          }
+        }
+        mStructs[name] = std::move(members);
+      }
+
+      void AddFunction(
+        const std::string& returnType, const std::string& name, const std::string& parameters, const std::string& returnSemantic
+      )
+      {
+        if (mFunctions.count(name) != 0U || name == "if" || name == "while" || name == "for" || name == "switch") {
+          return;
+        }
+        Function function{};
+        function.returnType = returnType;
+        function.returnSemantic = returnSemantic;
+        if (!Trim(parameters).empty()) {
+          for (const std::string& parameter : SplitTopLevel(parameters, ',')) {
+            function.parameters.push_back(ParseVariable(parameter));
+          }
+        }
+        mFunctions[name] = std::move(function);
+      }
+
       void CollectStructsAndFunctions()
       {
+        if (gEffectFastScan) {
+          scan::ForEachStructHead(mText, [&](const std::string_view name, const std::size_t open) { AddStruct(std::string(name), open); });
+          scan::ForEachFunctionHead(
+            mText,
+            [&](const std::string_view type, const std::string_view name, const std::string_view parameters, const std::string_view semantic, bool) {
+              AddFunction(std::string(type), std::string(name), std::string(parameters), std::string(semantic));
+            }
+          );
+          return;
+        }
+
         static const std::regex structHead(R"(\bstruct\s+(\w+)\s*\{)");
         for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structHead); it != std::sregex_iterator(); ++it) {
-          const std::size_t open = static_cast<std::size_t>(it->position(0) + it->length(0) - 1);
-          const std::size_t close = MatchingBrace(mText, open);
-          if (close == std::string::npos) {
-            continue;
-          }
-          std::vector<Variable> members;
-          for (const std::string& member : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
-            if (!Trim(member).empty()) {
-              members.push_back(ParseVariable(member));
-            }
-          }
-          mStructs[(*it)[1].str()] = std::move(members);
+          AddStruct((*it)[1].str(), static_cast<std::size_t>(it->position(0) + it->length(0) - 1));
         }
 
         static const std::regex functionHead(R"((\w+)\s+(\w+)\s*\(([^(){};]*)\)\s*(:\s*(\w+)\s*)?\{)");
         for (auto it = std::sregex_iterator(mText.begin(), mText.end(), functionHead); it != std::sregex_iterator(); ++it) {
-          const std::string name = (*it)[2].str();
-          if (mFunctions.count(name) != 0U || name == "if" || name == "while" || name == "for" || name == "switch") {
-            continue;
-          }
-          Function function{};
-          function.returnType = (*it)[1].str();
-          function.returnSemantic = (*it)[5].matched ? (*it)[5].str() : std::string();
-          const std::string parameters = (*it)[3].str();
-          if (!Trim(parameters).empty()) {
-            for (const std::string& parameter : SplitTopLevel(parameters, ',')) {
-              function.parameters.push_back(ParseVariable(parameter));
-            }
-          }
-          mFunctions[name] = std::move(function);
+          AddFunction((*it)[1].str(), (*it)[2].str(), (*it)[3].str(), (*it)[5].matched ? (*it)[5].str() : std::string());
         }
       }
 
@@ -580,29 +621,39 @@ namespace gpg::gal::d3d11
         }
       }
 
+      void AddStateObject(const std::string_view kind, const std::string& name, const std::size_t open)
+      {
+        const std::size_t close = MatchingBrace(mText, open);
+        if (close == std::string::npos) {
+          return;
+        }
+        StateObject object{};
+        object.kind = (kind == "BlendState") ? StateKind::Blend
+          : (kind == "DepthStencilState")    ? StateKind::DepthStencil
+                                             : StateKind::Rasterizer;
+        for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+          const std::size_t equals = statement.find('=');
+          if (equals == std::string::npos) {
+            continue;
+          }
+          object.fields.emplace_back(Trim(statement.substr(0U, equals)), Trim(statement.substr(equals + 1U)));
+        }
+        mStateObjects[name] = std::move(object);
+      }
+
       void CollectStateObjects()
       {
+        if (gEffectFastScan) {
+          scan::ForEachStateDeclaration(mText, [&](const std::string_view kind, const std::string_view name, const std::size_t open) {
+            AddStateObject(kind, std::string(name), open);
+          });
+          return;
+        }
+
         static const std::regex declaration(R"(\b(BlendState|DepthStencilState|RasterizerState)\s+(\w+)\s*\{)");
         for (auto it = std::sregex_iterator(mText.begin(), mText.end(), declaration); it != std::sregex_iterator(); ++it) {
           const std::smatch& match = *it;
-          const std::size_t open = static_cast<std::size_t>(match.position(0) + match.length(0) - 1);
-          const std::size_t close = MatchingBrace(mText, open);
-          if (close == std::string::npos) {
-            continue;
-          }
-          StateObject object{};
-          const std::string kind = match[1].str();
-          object.kind = (kind == "BlendState") ? StateKind::Blend
-            : (kind == "DepthStencilState")    ? StateKind::DepthStencil
-                                               : StateKind::Rasterizer;
-          for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
-            const std::size_t equals = statement.find('=');
-            if (equals == std::string::npos) {
-              continue;
-            }
-            object.fields.emplace_back(Trim(statement.substr(0U, equals)), Trim(statement.substr(equals + 1U)));
-          }
-          mStateObjects[match[2].str()] = std::move(object);
+          AddStateObject(match[1].str(), match[2].str(), static_cast<std::size_t>(match.position(0) + match.length(0) - 1));
         }
       }
 
@@ -750,9 +801,18 @@ namespace gpg::gal::d3d11
       void DropUndefinedFixedFunctionTechniques()
       {
         for (const char* const function : {"FixedFuncVS", "FixedFuncBloomVS", "FixedFuncPS"}) {
-          const std::regex definition(std::string(R"(\b\w+\s+)") + function + R"(\s*\([^;{]*\)\s*(:\s*\w+\s*)?\{)");
-          if (mText.find(function) == std::string::npos || std::regex_search(mText, definition)) {
+          if (mText.find(function) == std::string::npos) {
             continue;
+          }
+          if (gEffectFastScan) {
+            if (scan::HasFunctionDefinition(mText, function)) {
+              continue;
+            }
+          } else {
+            const std::regex definition(std::string(R"(\b\w+\s+)") + function + R"(\s*\([^;{]*\)\s*(:\s*\w+\s*)?\{)");
+            if (std::regex_search(mText, definition)) {
+              continue;
+            }
           }
           if (std::string_view(function) == "FixedFuncVS") {
             // D3D9 ran these passes with no vertex shader on pre-transformed
@@ -784,19 +844,31 @@ namespace gpg::gal::d3d11
           std::size_t searchFrom = 0U;
           std::smatch match;
           while (true) {
-            const std::string::const_iterator begin = mText.cbegin() + static_cast<std::ptrdiff_t>(searchFrom);
-            if (!std::regex_search(begin, mText.cend(), match, techniqueHead)) {
-              break;
+            std::size_t start = 0U;
+            std::size_t open = 0U;
+            std::string droppedName;
+            if (gEffectFastScan) {
+              std::string_view name;
+              if (!scan::FindTechniqueHead(mText, searchFrom, start, open, name)) {
+                break;
+              }
+              droppedName = name;
+            } else {
+              const std::string::const_iterator begin = mText.cbegin() + static_cast<std::ptrdiff_t>(searchFrom);
+              if (!std::regex_search(begin, mText.cend(), match, techniqueHead)) {
+                break;
+              }
+              start = searchFrom + static_cast<std::size_t>(match.position(0));
+              open = start + static_cast<std::size_t>(match.length(0)) - 1U;
+              droppedName = match[1].str();
             }
-            const std::size_t start = searchFrom + static_cast<std::size_t>(match.position(0));
-            const std::size_t open = start + static_cast<std::size_t>(match.length(0)) - 1U;
             const std::size_t close = MatchingBrace(mText, open);
             if (close == std::string::npos) {
               break;
             }
             const std::string_view body = std::string_view(mText).substr(open, close - open);
             if (body.find(function) != std::string_view::npos) {
-              mNotes.push_back("technique " + match[1].str() + " dropped: it uses the undefined D3D9 fixed-function " + function);
+              mNotes.push_back("technique " + droppedName + " dropped: it uses the undefined D3D9 fixed-function " + function);
               mText.erase(start, close + 1U - start);
               searchFrom = start;
             } else {
@@ -1526,10 +1598,37 @@ namespace gpg::gal::d3d11
     };
   } // namespace
 
+  bool gEffectFastScan = true;
+
   TranslatedEffectSource TranslateEffectSource(
     const std::string_view preprocessed, const bool shaderModel41, const std::string_view original
   )
   {
-    return Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
+    static const bool sStartupFlagRead = [] {
+      const wchar_t* const commandLine = ::GetCommandLineW();
+      if (commandLine != nullptr && std::wcsstr(commandLine, L"/fxregex") != nullptr) {
+        gEffectFastScan = false;
+      }
+      return true;
+    }();
+    (void)sStartupFlagRead;
+
+    TranslatedEffectSource result = Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
+
+    static const bool sVerify = [] {
+      const char* const value = std::getenv("FAF_FX_SCAN_VERIFY");
+      return value != nullptr && value[0] == '1';
+    }();
+    if (sVerify) {
+      const bool wasFast = gEffectFastScan;
+      gEffectFastScan = !wasFast;
+      const TranslatedEffectSource other = Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
+      gEffectFastScan = wasFast;
+      gpg::Logf(
+        "effect scan verify: %zu bytes, %s", result.source.size(),
+        result.source == other.source && result.notes == other.notes ? "same" : "DIFFERENT"
+      );
+    }
+    return result;
   }
 } // namespace gpg::gal::d3d11
