@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 
 #include "NetTransportEnums.h"
@@ -27,6 +28,19 @@ namespace moho
   extern int32_t net_InEngineLinks;
   extern int32_t net_NativeNet;
   extern int32_t net_LogBeatWaitMs;
+  extern int32_t net_LogTraffic;
+
+  // Totals of every UDP connection in this process, for net_LogTraffic.
+  struct NetTrafficTotals
+  {
+    std::atomic<std::int64_t> packets{0};
+    std::atomic<std::int64_t> bytes{0};
+    std::atomic<std::int64_t> resends{0};
+    std::atomic<std::int64_t> acks{0};
+    std::atomic<std::int64_t> pingSamples{0};
+    std::atomic<std::int64_t> pingMicrosSum{0};
+  };
+  extern NetTrafficTotals gNetTraffic;
   extern int32_t net_TestBurstBeat;
   extern int32_t net_TestBurstBytes;
   extern int32_t net_NativeNetWebRtc;

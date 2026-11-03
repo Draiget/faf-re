@@ -46,6 +46,9 @@ func main() {
 	useTurn := flag.Bool("turn", true, "start a local STUN/TURN server and hand it out with setIceServers")
 	turnPort := flag.Int("turn-port", 3478, "TURN/STUN port")
 	turnIP := flag.String("turn-ip", outboundIPv4(), "address the TURN server binds and relays from (default: the address of the outbound route; a TURN server on 127.0.0.1 got no allocations from the Java adapter on the test machine)")
+	turnServer := flag.String("turn-server", "", "host:port of a relay on another machine, handed out instead of the local one; a relay on the players' own address passes their host sockets through its IP-only permissions, so -force-relay doesn't prove relaying there")
+	turnUser := flag.String("turn-user", "", "username for -turn-server")
+	turnPass := flag.String("turn-pass", "", "credential for -turn-server")
 	gameBind := flag.String("game-bind", "", "address the fake game binds its lobby port to (default every interface, as the game; 127.0.0.1 where inbound UDP to 0.0.0.0 is blocked)")
 	game := flag.String("game", "fake", `"fake" runs tools/fakegame in-process`)
 	gameCmd := flag.String("game-cmd", "", `game command line, {gpgnet} and {login} are replaced`)
@@ -53,6 +56,7 @@ func main() {
 	loadTime := flag.Duration("load-time", 2*time.Second, "fake game loading time before GameState Idle (the real game takes seconds; FAF's adapter 3.3.14 can lose a game that reports Idle within ms of connecting)")
 	hold := flag.Duration("hold", 20*time.Second, "how long to keep the game running after every game launched")
 	timeout := flag.Duration("timeout", 90*time.Second, "time allowed until every game launched")
+	disconnect := flag.Bool("disconnect", false, "after -hold, every adapter gets disconnectFromPeer for the others before quit")
 	tracePath := flag.String("trace", "", "JSONL trace of every RPC frame and lobby step")
 	logDir := flag.String("logs", "", "LOG_DIR root for the adapters (one subfolder per player)")
 	quiet := flag.Bool("q", false, "don't echo the trace")
@@ -78,7 +82,9 @@ func main() {
 	}
 
 	var iceServers []map[string]any
-	if *useTurn {
+	if *turnServer != "" {
+		iceServers = []map[string]any{{"urls": []string{"turn://" + *turnServer + "?transport=udp", "stun://" + *turnServer}, "username": *turnUser, "credential": *turnPass}}
+	} else if *useTurn {
 		ts, err := turnsrv.Start(turnsrv.Config{ListenIP: *turnIP, Port: *turnPort, PublicHost: *turnIP, PublicIP: *turnIP}, j)
 		if err != nil {
 			fail(err)
@@ -205,6 +211,10 @@ func main() {
 	}
 
 	stats := lastPeerStats(j)
+	if *disconnect {
+		lobby.DisconnectPeers()
+		time.Sleep(2 * time.Second) // the adapters' callbacks reach the trace
+	}
 	lobby.Close()
 	cancel()
 	gameWG.Wait()

@@ -1447,6 +1447,13 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   const int64_t nowUs = mConnector->GetTime();
   mConnector->LogPacket(0, nowUs, mAddr, mPort, payload, payloadLen);
   mConnector->mSendStampBuffer.Add(0, nowUs, payloadLen);
+  gNetTraffic.packets.fetch_add(1, std::memory_order_relaxed);
+  gNetTraffic.bytes.fetch_add(payloadLen, std::memory_order_relaxed);
+  if (packet->header.mType == PT_Ack) {
+    gNetTraffic.acks.fetch_add(1, std::memory_order_relaxed);
+  } else if (packet->header.mType == PT_Data && packet->mResendCount > 0) {
+    gNetTraffic.resends.fetch_add(1, std::memory_order_relaxed);
+  }
 
   if (packet->header.mType == PT_Data) {
     // 0x00488E62..0x00488E6D: the delay uses the count before this send
@@ -1775,6 +1782,8 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
     mPings.Append(rawMs);
     const float filtered = mPings.Median();
     mPingTime = filtered;
+    gNetTraffic.pingSamples.fetch_add(1, std::memory_order_relaxed);
+    gNetTraffic.pingMicrosSum.fetch_add(static_cast<std::int64_t>(filtered * 1000.0f), std::memory_order_relaxed);
     const float jit = mPings.Jitter(filtered);
 
     if (net_DebugLevel) {

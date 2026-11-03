@@ -107,7 +107,7 @@ namespace
       case LUA_TSTRING: {
         const auto* const string = static_cast<const TString*>(object.value.p);
         if (!IsPlausiblePointer(string)) {
-          (void)std::snprintf(out, outBytes, "string(<bad %p>)", object.value.p);
+          (void)std::snprintf(out, outBytes, "string(<bad %p>)", static_cast<void*>(object.value.p));
           break;
         }
         std::size_t length = string->len;
@@ -118,7 +118,7 @@ namespace
         break;
       }
       default:
-        (void)std::snprintf(out, outBytes, "%s(%p)", LuaTypeName(object.tt), object.value.p);
+        (void)std::snprintf(out, outBytes, "%s(%p)", LuaTypeName(object.tt), static_cast<void*>(object.value.p));
         break;
     }
   }
@@ -191,7 +191,7 @@ namespace
       DescribeTObject(node.i_val, valueText, sizeof(valueText));
       DumpLine(
         sink, "    node[%d] key=%s value=%s next=%p", i, keyText, valueText,
-        static_cast<const void*>(node.next)
+        static_cast<const void*>(node.Next())
       );
     }
     if (nilKeyNodes != 0) {

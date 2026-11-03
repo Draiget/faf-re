@@ -1036,7 +1036,7 @@ extern "C"
 	{
 		TObject* const top = state->top;
 		top->tt = LUA_TLIGHTUSERDATA;
-		top->value.p = p;
+		SetLightPointer(top->value, p);
 		api_incr_top(state);
 	}
 
@@ -1453,9 +1453,9 @@ extern "C"
 
 		switch (object->tt) {
 			case LUA_TUSERDATA:
-				return reinterpret_cast<std::uint8_t*>(object->value.p) + sizeof(Udata);
+				return static_cast<std::uint8_t*>(object->value.p) + sizeof(Udata);
 			case LUA_TLIGHTUSERDATA:
-				return object->value.p;
+				return LightPointer(object->value);
 			default:
 				return nullptr;
 		}
@@ -1589,6 +1589,7 @@ extern "C"
 
 		switch (object->tt) {
 			case LUA_TLIGHTUSERDATA:
+				return LightPointer(object->value);
 			case LUA_TTABLE:
 			case LUA_CFUNCTION:
 			case LUA_TFUNCTION:
@@ -1597,7 +1598,7 @@ extern "C"
 			case LUA_TUSERDATA:
 				// Full userdata identifies by its payload, which starts one
 				// header past the object - `add eax, 10h`.
-				return reinterpret_cast<const std::uint8_t*>(object->value.p) + sizeof(Udata);
+				return static_cast<const std::uint8_t*>(object->value.p) + sizeof(Udata);
 			default:
 				return nullptr;
 		}
@@ -1916,7 +1917,7 @@ extern "C"
 			return nullptr;
 		}
 
-		return object->value.p;
+		return LightPointer(object->value);
 	}
 
 	/**
@@ -2918,7 +2919,7 @@ extern "C"
 		case LUA_TBOOLEAN:
 			return &t->node[static_cast<std::uint32_t>(key->value.b) & hashMask];
 		case LUA_TLIGHTUSERDATA: {
-			const std::uint32_t raw = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(key->value.p));
+			const std::uint32_t raw = ValuePointerBits(key->value);
 			return &t->node[raw % oddModulus];
 		}
 		case LUA_TNUMBER: {
@@ -2930,7 +2931,7 @@ extern "C"
 			return &t->node[stringKey->hash & hashMask];
 		}
 		default: {
-			const std::uint32_t raw = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(key->value.p));
+			const std::uint32_t raw = ValuePointerBits(key->value);
 			return &t->node[raw % oddModulus];
 		}
 		}
@@ -2951,7 +2952,7 @@ extern "C"
 
 		Node* node = luaH_mainposition(t, key);
 		while (luaO_rawequalObj(&node->i_key, key) == 0) {
-			node = node->next;
+			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
 			}
@@ -2977,7 +2978,7 @@ extern "C"
 		const std::uint32_t bucket = LuaFloatBitPattern(floatKey + 1.0f) % LuaHashOddModulus(t);
 		Node* node = &t->node[bucket];
 		while (node->i_key.tt != LUA_TNUMBER || node->i_key.value.n != floatKey) {
-			node = node->next;
+			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
 			}
@@ -2997,7 +2998,7 @@ extern "C"
 	{
 		Node* node = &t->node[key->hash & LuaHashMask(t)];
 		while (node->i_key.tt != LUA_TSTRING || static_cast<TString*>(node->i_key.value.p) != key) {
-			node = node->next;
+			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
 			}
@@ -3110,7 +3111,7 @@ extern "C"
 			luaG_runerror(state, "invalid key for `next'");
 		}
 
-		const auto nodeBase = reinterpret_cast<std::uintptr_t>(table->node);
+		const auto nodeBase = reinterpret_cast<std::uintptr_t>(static_cast<Node*>(table->node));
 		const auto slotAddress = reinterpret_cast<std::uintptr_t>(slot);
 		const std::uintptr_t valueLaneOffset = offsetof(Node, i_val);
 		const int nodeIndex =
@@ -3696,7 +3697,7 @@ extern "C"
 
 			for (int index = 0; index < size; ++index) {
 				Node& node = table->node[index];
-				node.next = nullptr;
+				node.SetNext(nullptr);
 				node.i_key.tt = LUA_TNIL;
 				node.i_val.tt = LUA_TNIL;
 			}
@@ -3886,20 +3887,20 @@ extern "C"
 			Node* const collidingMainPosition = luaH_mainposition(table, &mainPosition->i_key);
 			Node* const firstFree = table->firstfree;
 			if (collidingMainPosition == mainPosition) {
-				firstFree->next = mainPosition->next;
-				mainPosition->next = firstFree;
+				firstFree->SetNext(mainPosition->Next());
+				mainPosition->SetNext(firstFree);
 				mainPosition = firstFree;
 			} else {
 				Node* collisionPrev = collidingMainPosition;
-				while (collisionPrev->next != mainPosition) {
-					collisionPrev = collisionPrev->next;
+				while (collisionPrev->Next() != mainPosition) {
+					collisionPrev = collisionPrev->Next();
 				}
 
-				collisionPrev->next = firstFree;
+				collisionPrev->SetNext(firstFree);
 				firstFree->i_key = mainPosition->i_key;
 				firstFree->i_val = mainPosition->i_val;
-				firstFree->next = mainPosition->next;
-				mainPosition->next = nullptr;
+				firstFree->SetNext(mainPosition->Next());
+				mainPosition->SetNext(nullptr);
 				mainPosition->i_val.tt = LUA_TNIL;
 			}
 		}
@@ -7718,7 +7719,7 @@ namespace
 		};
 
 		for (Table* table = reinterpret_cast<Table*>(tableList); table != nullptr;
-			 table = reinterpret_cast<Table*>(table->gclist)) {
+			 table = reinterpret_cast<Table*>(static_cast<GCObject*>(table->gclist))) {
 			const int nodeCount = 1 << table->lsizenode;
 			for (int nodeIndex = nodeCount; nodeIndex != 0; --nodeIndex) {
 				Node& node = table->node[nodeIndex - 1];
@@ -7752,7 +7753,7 @@ namespace
 		};
 
 		for (Table* table = reinterpret_cast<Table*>(tableList); table != nullptr;
-			 table = reinterpret_cast<Table*>(table->gclist)) {
+			 table = reinterpret_cast<Table*>(static_cast<GCObject*>(table->gclist))) {
 			for (int arrayIndex = table->sizearray; arrayIndex != 0; --arrayIndex) {
 				LuaPlus::TObject& valueSlot = table->array[arrayIndex - 1];
 				markStringValue(valueSlot);
@@ -10513,7 +10514,7 @@ namespace
 					nodes, nodes + (1 << table->lsizenode), [&](const Node& node) { return isPresent(node.i_val); }
 				));
 			}
-			count += static_cast<int>(std::count_if(table->array, table->array + table->sizearray, isPresent));
+			count += static_cast<int>(std::count_if(static_cast<TObject*>(table->array), table->array + table->sizearray, isPresent));
 			size = static_cast<lua_Number>(count);
 		}
 
@@ -10544,7 +10545,7 @@ namespace
 				);
 			}
 			if (isEmpty) {
-				isEmpty = std::none_of(table->array, table->array + table->sizearray, isPresent);
+				isEmpty = std::none_of(static_cast<TObject*>(table->array), table->array + table->sizearray, isPresent);
 			}
 		}
 
@@ -13332,7 +13333,7 @@ namespace
 							++bad;
 							if (Report()) {
 								gpg::Warnf("[GCVERIFY] collection %ld: weak table %p array[%d] holds unmarked %s %p (marked=%02X)",
-									sCollection.load(), static_cast<void*>(h), index, TypeName(h->array[index].tt), h->array[index].value.p,
+									sCollection.load(), static_cast<void*>(h), index, TypeName(h->array[index].tt), static_cast<void*>(h->array[index].value.p),
 									static_cast<GCObject*>(h->array[index].value.p)->gch.marked);
 							}
 						}
@@ -13347,7 +13348,7 @@ namespace
 						++bad;
 						if (Report()) {
 							gpg::Warnf("[GCVERIFY] collection %ld: weak table %p (mode %s, marked=%02X) node %d key %s %p (marked=%02X) value %s",
-								sCollection.load(), static_cast<void*>(h), modeText, h->marked, index, TypeName(node.i_key.tt), node.i_key.value.p,
+								sCollection.load(), static_cast<void*>(h), modeText, h->marked, index, TypeName(node.i_key.tt), static_cast<void*>(node.i_key.value.p),
 								node.i_key.tt >= LUA_TSTRING ? static_cast<GCObject*>(node.i_key.value.p)->gch.marked : 0, TypeName(node.i_val.tt));
 						}
 					}
@@ -14674,7 +14675,11 @@ extern "C"
 		const unsigned int flags
 	)
 	{
+#if INTPTR_MAX == INT32_MAX
 		return realloc_0(ptr, static_cast<std::size_t>(size));
+#else
+		return lua::ArenaReallocate(ptr, static_cast<std::size_t>(oldsize), static_cast<std::size_t>(size));
+#endif
 	}
 
 	/**
@@ -14692,7 +14697,11 @@ extern "C"
 		void* const data
 	)
 	{
+#if INTPTR_MAX == INT32_MAX
 		free_crt(ptr);
+#else
+		lua::ArenaFree(ptr);
+#endif
 	}
 
 	// Allocator hooks and tuning knobs, read out of .data in the shipped image:
@@ -19181,7 +19190,7 @@ extern "C"
 		globalState->lstate = state;
 		globalState->dummynode[0].i_key.tt = LUA_TNIL;
 		globalState->dummynode[0].i_val.tt = LUA_TNIL;
-		globalState->dummynode[0].next = nullptr;
+		globalState->dummynode[0].SetNext(nullptr);
 		globalState->fatalErrorFunc = &defaultFatalErrorFunc;
 		globalState->memData = luaHelper_memData;
 		globalState->reallocFunc = luaHelper_Realloc;
@@ -19393,11 +19402,11 @@ extern "C"
 }
 
 /**
- * Address: 0x00911DD0 (ldblib.c::errorfb core, recovered)
+ * Address: 0x009134B0 (FUN_009134B0, _errorfb)
  *
  * What it does:
- * Walks the active Lua call stack starting at `level + 1`, pushing one
- * `"stack traceback:"` header followed by a `\n\t<chunk>:<line>: in
+ * Walks the active Lua call stack starting at `level`, pushing one
+ * `"stack traceback:"` header followed by a `\n\t<chunk>(<line>): in
  * function <name>` line for each frame. Compresses the middle of very deep
  * stacks with a single ellipsis (`LEVELS1=12`, `LEVELS2=10`). Concatenates
  * the result into one string at top-of-stack and returns 1. Recovered as a
@@ -19410,17 +19419,18 @@ extern "C" int _errorfb(lua_State* const state, int level)
 	constexpr int kLevels2 = 10;
 	int firstpart = 1;
 	lua_Debug ar;
+	int base = 0; // what stays below the message: only the text gets joined
 
 	if (lua_gettop(state) == 0) {
 		lua_pushlstring(state, "", 0);
-	} else if (!lua_isstring(state, 1)) {
+	} else if (!lua_isstring(state, -1)) {
 		return 1;
 	} else {
+		base = lua_gettop(state) - 1;
 		lua_pushlstring(state, "\n", 1);
 	}
 
 	lua_pushlstring(state, "stack traceback:", 16);
-	++level;
 	while (lua_getstack(state, level++, &ar)) {
 		if (level > kLevels1 && firstpart) {
 			if (!lua_getstack(state, level + kLevels2, &ar)) {
@@ -19437,10 +19447,11 @@ extern "C" int _errorfb(lua_State* const state, int level)
 
 		lua_pushlstring(state, "\n\t", 2);
 		lua_getinfo(state, "Snl", &ar);
-		lua_pushfstring(state, "%s:", ar.short_src);
+		lua_pushstring(state, ar.short_src);
 		if (ar.currentline > 0) {
-			lua_pushfstring(state, "%d:", ar.currentline);
+			lua_pushfstring(state, "(%d)", ar.currentline);
 		}
+		lua_pushlstring(state, ":", 1);
 
 		switch (*ar.namewhat) {
 			case 'g':
@@ -19459,10 +19470,10 @@ extern "C" int _errorfb(lua_State* const state, int level)
 				}
 		}
 
-		lua_concat(state, lua_gettop(state));
+		lua_concat(state, lua_gettop(state) - base);
 	}
 
-	lua_concat(state, lua_gettop(state));
+	lua_concat(state, lua_gettop(state) - base);
 	return 1;
 }
 
@@ -20460,7 +20471,9 @@ void Table::MemberDeserialize(gpg::ReadArchive* const archive, const int, const 
 		}
 	} lockGuard(ownerState->l_G);
 
-	(void)archive->ReadPointer(&metatable, &ownerRef);
+	Table* loadedMetatable = metatable;
+	(void)archive->ReadPointer(&loadedMetatable, &ownerRef);
+	metatable = loadedMetatable;
 
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 	int hashEntryCount = 0;
@@ -21914,7 +21927,7 @@ void LuaObject::AssignLightUserData(LuaState* state, void* value)
 {
 	RebindToState(*this, state);
 	m_object.tt = LUA_TLIGHTUSERDATA;
-	m_object.value.p = value;
+	SetLightPointer(m_object.value, value);
 }
 
 /**
@@ -22051,7 +22064,7 @@ void LuaObject::SetLightUserData(const char* const key, void* const value)
 
 	TObject object{};
 	object.tt = LUA_TLIGHTUSERDATA;
-	object.value.p = value;
+	SetLightPointer(object.value, value);
 	SetTableHelper(key, &object);
 }
 
@@ -22068,7 +22081,7 @@ void LuaObject::SetLightUserData(const int32_t index, void* const value)
 	lua_State* const lstate = GetActiveCState();
 
 	TObject val{};
-	val.value.p = value;
+	SetLightPointer(val.value, value);
 	val.tt = LUA_TLIGHTUSERDATA;
 
 	TObject key{};
@@ -22090,7 +22103,7 @@ void LuaObject::SetLightUserData(const LuaObject& key, void* const value)
 	Ensure(m_state == key.m_state, "m_state == key.m_state");
 
 	TObject val{};
-	val.value.p = value;
+	SetLightPointer(val.value, value);
 	val.tt = LUA_TLIGHTUSERDATA;
 
 	SetTableHelperRaw(key, &val);
@@ -22915,7 +22928,7 @@ LuaObject LuaObject::operator[](const char* const name) const
 	keyObject.tt = internedKey->tt;
 	keyObject.value.p = const_cast<TString*>(internedKey);
 
-	const TObject* const rawValue = luaH_get(reinterpret_cast<Table*>(m_object.value.p), &keyObject);
+	const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), &keyObject);
 	Ensure(rawValue != nullptr, "obj");
 
 	LuaObject result;
@@ -22941,7 +22954,7 @@ LuaObject LuaObject::operator[](const LuaObject& key) const
 		luaG_typeerror(lstate, &m_object, "index");
 	}
 
-	const TObject* const rawValue = luaH_get(reinterpret_cast<Table*>(m_object.value.p), &key.m_object);
+	const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), &key.m_object);
 	LuaObject result;
 	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
 	return result;
@@ -22968,7 +22981,7 @@ LuaObject LuaObject::operator[](const int32_t index) const
 		}
 	}
 
-	const TObject* const rawValue = luaH_getnum(reinterpret_cast<Table*>(m_object.value.p), index);
+	const TObject* const rawValue = luaH_getnum(static_cast<Table*>(m_object.value.p), index);
 	LuaObject result;
 	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
 	return result;
@@ -22995,7 +23008,7 @@ LuaObject LuaObject::operator[](const LuaStackObject& key) const
 	}
 
 	TObject* const stackKey = luaA_index(lstate, key.m_stackIndex);
-	const TObject* const rawValue = luaH_get(reinterpret_cast<Table*>(m_object.value.p), stackKey);
+	const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), stackKey);
 	LuaObject result;
 	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
 	return result;
@@ -23564,7 +23577,7 @@ void* LuaObjectGetLightUserDataChecked(const LuaObject* const object)
 		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as light userdata");
 	}
 
-	return object->m_object.value.p;
+	return LightPointer(object->m_object.value);
 }
 
 /**

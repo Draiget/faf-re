@@ -1823,7 +1823,8 @@ namespace moho
       return ownerElevation * kCarrierRelativeHeightScale;
     }
 
-    if (mHeight <= mUnit->GetPosition().y) {
+    // 0x006BC909 `comiss` + `jbe`: NaN takes this path.
+    if (!(mHeight > mUnit->GetPosition().y)) {
       return ownerElevation * kCarrierRelativeHeightScale;
     }
 
@@ -1843,12 +1844,13 @@ namespace moho
     const float targetElevation = GetElevation();
     const float lift = (wingFactor - 0.5f) * mUnit->GetBlueprint()->Air.LiftFactor;
 
-    if (lift <= 0.0f) {
+    // 0x006BC9DD `comiss` + `jbe`: NaN takes the low-lift path.
+    if (!(lift > 0.0f)) {
       const float halfTargetElevation = targetElevation * 0.5f;
       if (halfTargetElevation > mCurElevation) {
         return halfTargetElevation - mCurElevation;
       }
-    } else if (maxLift <= lift) {
+    } else if (!(maxLift > lift)) { // 0x006BC9ED `comiss` + `ja`
       return maxLift;
     }
 
@@ -3123,12 +3125,13 @@ namespace moho
     }
 
     const Wm3::Vector3f referenceVectorQuarterTurn = RotateByQuaternion(referenceVector, kQuatYawPos90);
+    // 0x006BDADB `comiss 0, dot` + `jbe`: NaN gives +1.
     const float turnSign =
-      ((referenceVectorQuarterTurn.z * selectedVector.z) +
-       (referenceVectorQuarterTurn.y * selectedVector.y) +
-       (referenceVectorQuarterTurn.x * selectedVector.x)) >= 0.0f
-        ? 1.0f
-        : -1.0f;
+      0.0f > ((referenceVectorQuarterTurn.z * selectedVector.z) +
+              (referenceVectorQuarterTurn.y * selectedVector.y) +
+              (referenceVectorQuarterTurn.x * selectedVector.x))
+        ? -1.0f
+        : 1.0f;
 
     // 0x006BDB12 spills the first angle; 0x006BDB2A subtracts the second
     // while it still has x87 precision, before the delta is stored as float.
@@ -3145,7 +3148,8 @@ namespace moho
 
     const float maxTurnSpeed = (combatState == kAirCombatStateCombatTurn) ? air.CombatTurnSpeed : air.TurnSpeed;
     const float maxTurnDelta = maxTurnSpeed * 0.1f;
-    if (turnDelta > maxTurnDelta) {
+    // 0x006BDB8B `comiss max, delta` + `jbe`: NaN clamps to the maximum.
+    if (!(maxTurnDelta > turnDelta)) {
       turnDelta = maxTurnDelta;
     }
     if (turnDelta < -maxTurnDelta) {
@@ -3211,7 +3215,8 @@ namespace moho
       bankFactor = air.BankFactor * 10.0f;
     }
 
-    if (forwardAlignment < 0.0f) {
+    // 0x006BDCD1 `comiss` + `jbe`: NaN and -0 give +0.
+    if (!(forwardAlignment > 0.0f)) {
       forwardAlignment = 0.0f;
     }
 
@@ -3915,7 +3920,8 @@ namespace moho
     // the UNIT's layer, not the motion's. Unit's Entity base sits at +0x08 and
     // Entity::mCurrentLayer at +0x118, so +0x120 from a Unit* is that field.
     if (!unit->IsDead() || (unit->mVarDat.mLayerMask != LAYER_Air && !ShouldHoverInsteadOfLand())) {
-      if (horizontalDistance <= air.StartTurnDistance || mCarrierEvent == kCarrierEventDescendToDeck) {
+      // 0x006BF3CF `comiss` + `jbe`: a NaN distance (a NaN target) takes the landing path.
+      if (!(horizontalDistance > air.StartTurnDistance) || mCarrierEvent == kCarrierEventDescendToDeck) {
         enteredLandingPhase = (mLayer != LAYER_None && mLayer != LAYER_Air);
         const auto autoLandTicks = static_cast<std::int32_t>(air.AutoLandTime * 10.0f);
 
@@ -3937,7 +3943,8 @@ namespace moho
                 enteredLandingPhase = true;
                 const float landElevation = mapData->GetHeightField()->GetElevation(mTargetPosition.x, mTargetPosition.z);
                 const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
-                mLayer = (landElevation <= waterElevation) ? LAYER_Water : LAYER_Land;
+                // 0x006BF64A `comiss` + `jbe`: NaN gives water.
+                mLayer = (landElevation > waterElevation) ? LAYER_Land : LAYER_Water;
               } else {
                 mPreparationTick = static_cast<std::int32_t>(curTick);
                 unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_CannotFindPlaceToLand);
@@ -4209,7 +4216,7 @@ namespace moho
         );
       } else if (mCombatState == ACS_None) {
         SetMotionHorzEvent(
-          (unit->mInfoCache.mFormationTopSpeed * kMotionStoppingSpeedScale <= groundSpeed) ? kUnitMotionHorzEventStopping : kUnitMotionHorzEventStopped
+          (unit->mInfoCache.mFormationTopSpeed * kMotionStoppingSpeedScale > groundSpeed) ? kUnitMotionHorzEventStopped : kUnitMotionHorzEventStopping
         );
       } else {
         SetMotionHorzEvent(kUnitMotionHorzEventCruising);

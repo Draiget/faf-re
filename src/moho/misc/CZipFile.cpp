@@ -274,7 +274,7 @@ namespace moho
       reader.ReadExact(directoryHeader);
       if (directoryHeader.mSignature != kZipCentralDirectoryFileHeaderMagic) {
         gpg::Warnf("Error reading zip directory entry for '%s'", archivePath);
-        return;
+        break;
       }
 
       boost::shared_ptr<CZipFileEntry> parsedEntry(new CZipFileEntry(), ZipFileEntrySharedDeleter{});
@@ -319,11 +319,46 @@ namespace moho
       cachedEntry.mEntry = parsedEntry;
       mEntries.push_back(cachedEntry);
 
+#if FAF_RETAIL_LAYOUT
       if (!mEntryByCanonicalPath.insert({parsedEntry->mName, newEntryIndex}).second) {
         gpg::Logf("%s: duplicate entries for %s.", archivePath, parsedEntry->mName.c_str());
       }
+#endif
+    }
+
+#if !FAF_RETAIL_LAYOUT
+    BuildEntryIndex(archivePath);
+#endif
+  }
+
+#if !FAF_RETAIL_LAYOUT
+  /**
+   * What it does:
+   * Sorts the entries' indices by name. As with the binary's map, the first entry of a name wins and
+   * the others are logged.
+   */
+  void CZipFile::BuildEntryIndex(const char* const archivePath)
+  {
+    std::vector<std::uint32_t> sorted(mEntries.size());
+    for (std::size_t index = 0; index < sorted.size(); ++index) {
+      sorted[index] = static_cast<std::uint32_t>(index);
+    }
+    const ZipEntryNameLess less{};
+    std::stable_sort(sorted.begin(), sorted.end(), [&](const std::uint32_t lhs, const std::uint32_t rhs) {
+      return less(mEntries[lhs].mEntry->mName, mEntries[rhs].mEntry->mName);
+    });
+
+    mEntryByCanonicalPath.reserve(sorted.size());
+    for (const std::uint32_t entryIndex : sorted) {
+      const msvc8::string& name = mEntries[entryIndex].mEntry->mName;
+      if (!mEntryByCanonicalPath.empty() && !less(mEntries[mEntryByCanonicalPath.back()].mEntry->mName, name)) {
+        gpg::Logf("%s: duplicate entries for %s.", archivePath, name.c_str());
+        continue;
+      }
+      mEntryByCanonicalPath.push_back(entryIndex);
     }
   }
+#endif
 
   /**
    * Address: 0x0046C6E0 (FUN_0046C6E0, Moho::CZipFile::~CZipFile)
@@ -333,8 +368,8 @@ namespace moho
    */
   CZipFile::~CZipFile()
   {
-    // `mEntryByCanonicalPath`'s teardown is `~map()`, which MSVC emits for the
-    // member; only the two lanes with no destructor of their own are here.
+    // `mEntryByCanonicalPath`'s teardown is its destructor, which MSVC emits for
+    // the member; only the two lanes with no destructor of their own are here.
     mEntries = msvc8::vector<SZipFileCachedEntry>();
     mPath.tidy(true, 0U);
   }
@@ -368,8 +403,22 @@ namespace moho
    */
   std::uint32_t CZipFile::FindFile(const msvc8::string& canonicalPath) const
   {
+#if FAF_RETAIL_LAYOUT
     const SZipFileNameIndexMap::const_iterator matched = mEntryByCanonicalPath.find(canonicalPath);
     return matched == mEntryByCanonicalPath.end() ? kInvalidEntryIndex : matched->second;
+#else
+    const ZipEntryNameLess less{};
+    const auto matched = std::lower_bound(
+      mEntryByCanonicalPath.begin(),
+      mEntryByCanonicalPath.end(),
+      canonicalPath,
+      [&](const std::uint32_t entryIndex, const msvc8::string& name) { return less(mEntries[entryIndex].mEntry->mName, name); }
+    );
+    if (matched == mEntryByCanonicalPath.end() || less(canonicalPath, mEntries[*matched].mEntry->mName)) {
+      return kInvalidEntryIndex;
+    }
+    return *matched;
+#endif
   }
 
   /**

@@ -602,6 +602,12 @@ namespace moho
     void ReleaseScriptBlueprints();
 
     /**
+     * Engine addition: the sim has exported, after the session did when it wants a copy, and only
+     * those two states ever export. `rule_ReleaseScriptBlueprints` frees the rules' copy here.
+     */
+    void OnSimHasBlueprints();
+
+    /**
      * Address: 0x0052A3D0 (FUN_0052A3D0)
      */
     void UpdateLuaState(LuaPlus::LuaState* luaState) override;

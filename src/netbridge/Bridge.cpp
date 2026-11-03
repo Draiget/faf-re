@@ -514,8 +514,17 @@ namespace faf::netbridge
     } else if (method == "disconnectFromPeer") {
       const std::int64_t remote = params[0].AsInt();
       RemovePeer(remote);
-      if (mEnginePeers.erase(remote) != 0) {
+      if (const auto engine = mEnginePeers.find(remote); engine != mEnginePeers.end()) {
+        const bool wasConnected = engine->second.connected;
+        mEnginePeers.erase(engine);
         SendToGame({netlink::kCmdClose, {GpgArg::Int(static_cast<std::int32_t>(remote))}});
+        if (wasConnected) {
+          JsonValue p = JsonValue::Array();
+          p.Push(mOptions.id);
+          p.Push(remote);
+          p.Push(false);
+          Notify("onConnected", std::move(p));
+        }
       }
       SendToGame({"DisconnectFromPeer", {GpgArg::Int(static_cast<std::int32_t>(remote))}});
     } else if (method == "setLobbyInitMode") {
@@ -747,6 +756,7 @@ namespace faf::netbridge
       Log("cannot open a UDP port on " + mOptions.gameAddress + " for peer " + std::to_string(id));
       return 0;
     }
+    SetSocketBuffers(peer->udp, 2 * 1024 * 1024); // as Peer.initForwarding, adapter 3.3.15
     peer->port = LocalPort(peer->udp);
 
     netlink::LinkOptions lo;
@@ -823,10 +833,18 @@ namespace faf::netbridge
       return;
     }
     Peer& peer = *it->second;
+    const bool wasConnected = peer.link->IsConnected();
     peer.link->Close(); // joins libjuice's thread before the socket goes
     LogStats(peer, "at close");
     CloseSocket(peer.udp);
     mPeers.erase(it);
+    if (wasConnected) { // PeerIceModule.tearDown, adapter 3.3.15
+      JsonValue p = JsonValue::Array();
+      p.Push(mOptions.id);
+      p.Push(id);
+      p.Push(false);
+      Notify("onConnected", std::move(p));
+    }
   }
 
   void Bridge::ReadPeer(Peer& peer)

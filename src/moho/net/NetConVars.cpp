@@ -56,6 +56,10 @@ namespace moho
   // or more after the one before it (waiting on a peer's data); 0 logs nothing.
   // Live.
   int32_t net_LogBeatWaitMs = 0;
+  // Diagnostics: every this many beats log the UDP connections' totals: packets,
+  // bytes, resends, acks and mean ping; 0 logs nothing. Live.
+  int32_t net_LogTraffic = 0;
+  NetTrafficTotals gNetTraffic;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
   // sends net_TestBurstBytes incompressible filler bytes to every peer on the
   // ordered stream, the way a large order burst occupies it; peers drop it.
@@ -87,6 +91,12 @@ namespace moho
       "net_LogBeatWaitMs",
       "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
       &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_LogTraffic(
+      "net_LogTraffic",
+      "Every this many beats log the UDP connections' packets, bytes, resends, acks and mean ping; 0 (default) logs nothing.",
+      &net_LogTraffic
     );
 
     TConVar<int32_t> gTConVar_net_TestBurstBeat(

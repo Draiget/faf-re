@@ -30,7 +30,7 @@ $env:RETAIL_RECORDER_SIM_ENTRY = '0x00749F40'
 $env:RETAIL_RECORDER_INJECT_DELAY_MS = '200'
 $allPassed = $true
 foreach ($line in Get-Content (Join-Path $golden 'replays.tsv')) {
-  $id, $init = $line -split "`t"
+  $id, $init, $beats = $line -split "`t"
   if ($id -eq 'replay' -or ($Replay -ne '' -and $id -ne $Replay)) { continue }
   $run = "$Tag$id"
   $spec = Join-Path $work "$run.bin"
@@ -39,6 +39,7 @@ foreach ($line in Get-Content (Join-Path $golden 'replays.tsv')) {
 
   $env:RETAIL_RECORDER_SPEC = $spec
   $env:RETAIL_RECORDER_SETS = Join-Path $work "$run.sets"
+  $env:RETAIL_RECORDER_SIM_BEATS = $beats
   $log = Join-Path $work "$run.log"
   $console = Join-Path $work "$run.console"
   & (Join-Path $here 'build\recorder.exe') (Join-Path $work "$run.out") $TimeoutSec $log $exe --replay (Join-Path $Pool "$id.scfareplay") /init (Join-Path $GameBin $init) /nosound /log $log /simworkers 0 --label replay 2>&1 | Out-File -Encoding ascii $console

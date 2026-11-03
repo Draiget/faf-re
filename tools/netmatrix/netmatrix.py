@@ -11,10 +11,10 @@ Kinds (both players of a cell take one each):
   inengine our build behind faf-netbridge, /inenginelinks (#233)
   bridge   our build behind faf-netbridge, which relays its datagrams (#230)
   retail   the retail game behind faf-netbridge
-FAF's Java adapter is not a kind here: it always sends to 127.0.0.1, which a
-host that drops loopback UDP to sockets bound to every interface cannot run
-(tools/scenarios/2p-contract-mixed.yaml); tools/fafclient covers it with fake
-games.
+  jar      the retail game behind FAF's faf-ice-adapter.jar (--jar-dir); with
+           --bind, mpemu stands between the two (tools/seat/jarbridge.go), as
+           the jar always sends to 127.0.0.1, which a host that drops loopback
+           UDP to sockets bound to every interface cannot deliver
 
 Profiles:
   direct   no impairment, host candidates
@@ -46,7 +46,7 @@ import sys
 import time
 from pathlib import Path
 
-KINDS = ["native", "inengine", "bridge", "retail"]
+KINDS = ["native", "inengine", "bridge", "retail", "jar"]
 PROFILES = {
     "direct": {"forceRelay": False, "play": "7m", "steps": []},
     "relay": {"forceRelay": True, "play": "7m", "steps": ["  - link: { from: 1, to: 2, latency: 25ms }"]},
@@ -72,8 +72,8 @@ def yaml_str(s: str) -> str:
 
 
 def player(uid: int, name: str, kind: str, args: argparse.Namespace) -> str:
-    exe = args.retail if kind == "retail" else args.ours
-    adapter = "native" if kind == "native" else args.bridge
+    exe = args.retail if kind in ("retail", "jar") else args.ours
+    adapter = {"native": "native", "jar": "jar"}.get(kind, args.bridge)
     extra = ["/inenginelinks"] if kind == "inengine" else []
     fields = [f"uid: {uid}", f"name: {name}", f"exe: {yaml_str(exe)}", f"adapter: {yaml_str(adapter)}"]
     if extra:
@@ -102,6 +102,9 @@ def scenario(a: str, b: str, profile: str, args: argparse.Namespace) -> str:
     ]
     if bind:
         lines.append(f"  nativeBind: {yaml_str(bind)}")
+        lines.append(f"  jarBind: {yaml_str(bind)}")
+    if args.jar_dir:
+        lines.append(f"  nativeDir: {yaml_str(args.jar_dir)}")
     lines += [
         "",
         "game:",
@@ -198,6 +201,7 @@ def main() -> int:
     ap.add_argument("--ours", required=True, help="our game exe")
     ap.add_argument("--retail", required=True, help="the retail game exe")
     ap.add_argument("--bridge", required=True, help="faf-netbridge.exe")
+    ap.add_argument("--jar-dir", default="", help="a folder with a copy of faf-ice-adapter.jar, for kind jar")
     ap.add_argument("--bind", default="", help="this machine's LAN address, for hosts that drop loopback UDP")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--kinds", default=",".join(KINDS))

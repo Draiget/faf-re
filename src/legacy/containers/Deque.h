@@ -9,10 +9,6 @@
 
 #include "legacy/containers/Layout.h"
 
-#ifndef MSVC8_DEQUE_DISABLE_FREE
-#define MSVC8_DEQUE_DISABLE_FREE 0
-#endif
-
 namespace msvc8
 {
     /**
@@ -234,9 +230,7 @@ namespace msvc8
                 if (--_Mysize == 0)
                     _Myoff = 0;
             }
-#if !MSVC8_DEQUE_DISABLE_FREE
             release_all();
-#endif
         }
 
         /**
@@ -474,11 +468,7 @@ namespace msvc8
 
         void deallocate_node(T* p)
         {
-#if !MSVC8_DEQUE_DISABLE_FREE
             ::operator delete(static_cast<void*>(p));
-#else
-            (void)p;
-#endif
         }
 
         void release_all()
@@ -594,10 +584,8 @@ namespace msvc8
                 }
             }
 
-#if !MSVC8_DEQUE_DISABLE_FREE
             if (oldMap != nullptr)
                 ::operator delete(static_cast<void*>(oldMap));
-#endif
             _Map = newMap;
             _Mapsize = newMapSize;
         }

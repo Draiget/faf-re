@@ -792,7 +792,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   // 0x005BE8BE..0x005BE9D8: when the source unit has an animation actor, the
   // blip shares its poses -- prior pose first (0x005BDD70), then the current
   // pose (0x005BDD50) -- for both real and jammer blips.
-  if (sourceUnit && sourceUnit->AniActor) {
+  if (sourceUnit && sourceUnit->AniActor && POSE_HoldClientHandles(*sourceUnit->AniActor)) {
     mUnitVarDat.mPriorSharedPose = sourceUnit->AniActor->GetPriorPoseShared();
     mUnitVarDat.mSharedPose = sourceUnit->AniActor->GetPoseShared();
   }

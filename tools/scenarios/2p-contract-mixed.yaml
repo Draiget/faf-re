@@ -16,8 +16,9 @@ contract:
   adapter: jar
   # FAF_TEST_BIND: see 2p-contract-bridge.yaml. The Java adapter always
   # sends to 127.0.0.1, so on a host that drops loopback UDP to sockets bound
-  # to 0.0.0.0 this scenario cannot pass; tools/fafclient covers the mix
-  # there with fake games.
+  # to 0.0.0.0 mpemu stands between it and the game (jarBind). Run with
+  # -advertise and -turn-ip set to that address.
+  jarBind: '%FAF_TEST_BIND%'
   exeArgs: [--bind-address, '%FAF_TEST_BIND%', --game-address, '%FAF_TEST_BIND%']
 
 game:

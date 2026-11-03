@@ -616,7 +616,8 @@ namespace moho
             const float dx = ownerPos.x - mPickupCenter.x;
             const float dz = ownerPos.z - mPickupCenter.z;
             const float distance = std::sqrt((dx * dx) + (dz * dz));
-            if (distance <= blueprint->AI.GuardScanRadius) {
+            // 0x00625BB5 `fcompi` + `jbe`: a NaN distance counts as in range.
+            if (!(distance > blueprint->AI.GuardScanRadius)) {
               mTaskState = NextTaskState(mTaskState);
               return 1;
             }

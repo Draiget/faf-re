@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <iterator>
 #include <unordered_set>
 #include <utility>
 
@@ -21,6 +22,7 @@ namespace faf::remote
   CViewFrames::CViewFrames(const wire::SContentTables& tables, const wire::SFrameCodec& codec)
     : mTables(tables)
     , mCodec(codec)
+    , mSharedRecords(tables, codec)
   {}
 
   CViewFrames::~CViewFrames() = default;
@@ -28,6 +30,7 @@ namespace faf::remote
   namespace
   {
     constexpr std::uint32_t kNone = 0xF0000000u; // the sim's invalid entity id (`EntityId.h`)
+    constexpr std::uint32_t kNoOwn = 0xFFFFFFFFu; // `SHeldView::ownSlot`: the view's record is the world's
 
     /** References `unheld` says the view holds no record of become the sim's "none" (plan WP5.12). */
     template <class Unheld>
@@ -54,6 +57,22 @@ namespace faf::remote
         }
       }
       (void)record.unit.detail.Assign(detail);
+    }
+
+    /** Whether the view's record differs from the world's: ids to renumber, or names it cannot hold. */
+    template <class Unheld>
+    [[nodiscard]] bool NeedsOwnRecord(const wire::SEntityRecord& record, const CViewIdMap& map, const Unheld& unheld)
+    {
+      if (record.isUnit || map.MapsEntity(record.id)) {
+        return true;
+      }
+      const auto differs = [&map, &unheld](const std::uint32_t id) {
+        return id != kNone && (map.MapsEntity(id) || unheld(id));
+      };
+      if (differs(record.appearance.attachParent)) {
+        return true;
+      }
+      return std::any_of(record.appearance.attachments.begin(), record.appearance.attachments.end(), differs);
     }
 
     /** One bit of a 64-bit filter for a sim id. */
@@ -118,7 +137,8 @@ namespace faf::remote
     map.AdvanceTo(sim.mCurBeat);
     map.RetireEntities(mRetired[army]);
     if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
-      map.RetireCommandsUnless([commands](const std::uint32_t simId) {
+      map.RetireCommands(mReleasedCommands);
+      map.RetireNewCommandsUnless([commands](const std::uint32_t simId) {
         return commands->commands.find(simId) != commands->commands.end();
       });
     }
@@ -128,8 +148,8 @@ namespace faf::remote
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
-    const auto view = static_cast<std::int32_t>(army);
     builder.TrackChanges();
+    builder.ClearBefore();
     builder.Apply(packet, Direct(static_cast<std::int32_t>(army)));
     const wire::SViewFrame stamp = builder.StartFrame(sim.mCurBeat);
     held.baselineId = held.frameId != 0u ? held.frameId : wire::kNoBaseline;
@@ -137,8 +157,8 @@ namespace faf::remote
     held.beat = stamp.beat;
 
     const std::size_t slots = builder.SlotCount();
-    if (held.records.size() < slots) {
-      held.records.grow_to(slots);
+    if (held.ownSlot.size() < slots) {
+      held.ownSlot.resize(slots, kNoOwn);
       held.sent.resize(slots, 0u);
       held.keep.resize(slots, 0u);
       held.references.resize(slots, 0u);
@@ -149,25 +169,49 @@ namespace faf::remote
     held.changed.clear();
     held.before.clear();
 
+    const auto takeOwn = [&held](const std::uint32_t slot) -> wire::SEntityRecord& {
+      std::uint32_t index;
+      if (!held.ownFree.empty()) {
+        index = held.ownFree.back();
+        held.ownFree.pop_back();
+      } else {
+        index = static_cast<std::uint32_t>(held.own.size());
+        held.own.grow_to(held.own.size() + 1u);
+      }
+      held.ownSlot[slot] = index;
+      return held.own[index];
+    };
+    const auto dropOwn = [&held](const std::uint32_t slot) {
+      const std::uint32_t index = held.ownSlot[slot];
+      if (index != kNoOwn) {
+        held.own[index] = wire::SEntityRecord{}; // lets go of what the record shares
+        held.ownFree.push_back(index);
+        held.ownSlot[slot] = kNoOwn;
+      }
+    };
+
     // What left the world, then what the oracle lets into this beat's frame (plan §6: a plain
     // entity in mode ReconGrid goes out only while the view sees it; a record the sim no longer
     // has, an orphan, stays). A record that comes or goes can change the records that name it.
     std::uint64_t membership = 0;
     for (const CViewFrameBuilder::SErasedRecord& erased : builder.ErasedRecords()) {
       if (held.sent[erased.slot] != 0u) {
-        held.removed.push_back(held.records[erased.slot].id);
+        const std::uint32_t own = held.ownSlot[erased.slot];
+        held.removed.push_back(own != kNoOwn ? held.own[own].id : erased.id);
+        dropOwn(erased.slot);
         held.sent[erased.slot] = 0u;
         --held.count;
         membership |= ReferenceBit(erased.id);
       }
     }
     std::uint32_t withheld = 0;
+    const std::uint32_t viewBit = std::uint32_t{1} << army;
     auto index = mEntityIndex.cbegin();
     builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
-      while (index != mEntityIndex.cend() && index->first < id) {
+      while (index != mEntityIndex.cend() && index->id < id) {
         ++index;
       }
-      const bool keep = index == mEntityIndex.cend() || index->first != id || CanViewSee(sim, view, index->second);
+      const bool keep = index == mEntityIndex.cend() || index->id != id || (index->views & viewBit) != 0u;
       held.keep[slot] = keep ? 1u : 0u;
       withheld += keep ? 0u : 1u;
       if (keep != (held.sent[slot] != 0u)) {
@@ -213,31 +257,68 @@ namespace faf::remote
         continue;
       }
       const bool wasSent = held.sent[slot] != 0u;
+      const wire::SEntityRecord& world = builder.RecordAt(slot);
+      const std::uint32_t own = held.ownSlot[slot];
       if (held.keep[slot] == 0u) {
         if (wasSent) {
-          held.removed.push_back(held.records[slot].id);
+          held.removed.push_back(own != kNoOwn ? held.own[own].id : world.id);
+          dropOwn(slot);
           held.sent[slot] = 0u;
           --held.count;
         }
+        builder.UnwatchRecord(slot);
         continue;
       }
-      wire::SEntityRecord next = builder.RecordAt(slot);
-      held.references[slot] = ReferenceFilter(next);
+      held.references[slot] = ReferenceFilter(world);
+      if (!NeedsOwnRecord(world, map, unheld)) {
+        // The client's record is the world's, without a copy; the elements stay in place.
+        if (!wasSent) {
+          held.sent[slot] = 1u;
+          ++held.count;
+          held.created.push_back(&world);
+        } else if (own != kNoOwn) {
+          const std::uint32_t fields = wire::ChangedFields(held.own[own], world);
+          if (fields != 0u) {
+            held.changed.push_back({fields, &world, &held.before.push_back(held.own[own])});
+          }
+          dropOwn(slot);
+        } else if (const wire::SEntityRecord* const before = builder.RecordBefore(slot); before != nullptr) {
+          const std::uint32_t fields = wire::ChangedFields(*before, world);
+          if (fields != 0u) {
+            held.changed.push_back({fields, &world, before});
+          }
+        }
+        builder.WatchRecord(slot);
+        continue;
+      }
+      wire::SEntityRecord next = world;
       ClearRecordReferences(next, unheld);
       map.TranslateRecord(next, isOwnCommand);
       if (!wasSent) {
-        held.records[slot] = std::move(next);
+        wire::SEntityRecord& created = takeOwn(slot);
+        created = std::move(next);
         held.sent[slot] = 1u;
         ++held.count;
-        held.created.push_back(&held.records[slot]);
-        continue;
+        held.created.push_back(&created);
+      } else if (own != kNoOwn) {
+        wire::SEntityRecord& record = held.own[own];
+        const std::uint32_t fields = wire::ChangedFields(record, next);
+        if (fields != 0u) {
+          const wire::SEntityRecord& before = held.before.push_back(std::move(record));
+          held.changed.push_back({fields, &record, &before}); // elements stay in place
+        }
+        record = std::move(next);
+      } else {
+        const wire::SEntityRecord* const saved = builder.RecordBefore(slot);
+        const wire::SEntityRecord& before = saved != nullptr ? *saved : world;
+        wire::SEntityRecord& record = takeOwn(slot);
+        record = std::move(next);
+        const std::uint32_t fields = wire::ChangedFields(before, record);
+        if (fields != 0u) {
+          held.changed.push_back({fields, &record, &before});
+        }
       }
-      const std::uint32_t fields = wire::ChangedFields(held.records[slot], next);
-      if (fields != 0u) {
-        const wire::SEntityRecord& before = held.before.push_back(std::move(held.records[slot]));
-        held.changed.push_back({fields, &held.records[slot], &before}); // elements stay in place
-      }
-      held.records[slot] = std::move(next);
+      builder.UnwatchRecord(slot);
     }
     std::sort(held.removed.begin(), held.removed.end());
     std::sort(held.created.begin(), held.created.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
@@ -280,7 +361,8 @@ namespace faf::remote
     kept.reserve(held.count);
     builder.ForEachRecord([&](const std::uint32_t, const std::uint32_t slot) {
       if (held.sent[slot] != 0u) {
-        kept.push_back(&held.records[slot]);
+        const std::uint32_t own = held.ownSlot[slot];
+        kept.push_back(own != kNoOwn ? &held.own[own] : &builder.RecordAt(slot));
       }
     });
     std::sort(kept.begin(), kept.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
@@ -355,22 +437,22 @@ namespace faf::remote
       }
     }
 
-    // The sim's entities in ascending id order with what the oracle reads from each, once for
+    // The sim's entities in ascending id order with the views that keep each, worked out once for
     // every view (plan WPR.35): a frame's records are in that order too, so each view finds its
-    // records' facts in one forward pass.
+    // records' answers in one forward pass.
     mEntityIndex.clear();
     mEntityPointers.clear();
     if (sim.mEntityDB != nullptr) {
       mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
       mEntityPointers.reserve(sim.mEntityDB->mAllUnits.size());
       for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        mEntityIndex.emplace_back(id, SEntityFacts{});
+        mEntityIndex.push_back({static_cast<std::uint32_t>(id), 0u});
         mEntityPointers.push_back(entity);
       }
     }
-    const auto readFacts = [this](const std::size_t begin, const std::size_t end) {
+    const auto readFacts = [this, &sim, armyCount](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        mEntityIndex[i].second = ReadEntityFacts(*mEntityPointers[i]);
+        mEntityIndex[i].views = ViewsThatSee(sim, armyCount, ReadEntityFacts(*mEntityPointers[i]));
       }
     };
     constexpr std::size_t kFactsGrain = 256;
@@ -379,6 +461,19 @@ namespace faf::remote
     } else {
       readFacts(0u, mEntityIndex.size());
     }
+
+    // The commands the sim released since last beat, once for every view (`AdvanceIdMap`).
+    mLastCommands.swap(mLiveCommands);
+    mLiveCommands.clear();
+    if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
+      for (const auto& [id, command] : commands->commands) {
+        mLiveCommands.push_back(static_cast<std::uint32_t>(id));
+      }
+    }
+    mReleasedCommands.clear();
+    std::set_difference(
+      mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
+    );
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
@@ -403,12 +498,13 @@ namespace faf::remote
         // Plan §6: a plain entity in mode ReconGrid goes out only while the view sees it. A record
         // the sim no longer has (an orphan) stays.
         std::uint32_t withheld = 0;
+        const std::uint32_t viewBit = std::uint32_t{1} << army;
         auto index = mEntityIndex.cbegin();
         wire::SViewFrame frame = builder.Build(sim.mCurBeat, [&](const wire::SEntityRecord& record) {
-          while (index != mEntityIndex.cend() && index->first < record.id) {
+          while (index != mEntityIndex.cend() && index->id < record.id) {
             ++index;
           }
-          if (index == mEntityIndex.cend() || index->first != record.id || CanViewSee(sim, view, index->second)) {
+          if (index == mEntityIndex.cend() || index->id != record.id || (index->views & viewBit) != 0u) {
             return true;
           }
           ++withheld;

@@ -15677,9 +15677,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using CrtDestroyCallbackFn = int(__thiscall*)(void*, int);
 
-  using CrtLegacyProxyVectorThrowFn = void (*)();
-  using CrtLegacyProxyVectorAllocateFn = void* (*)(unsigned int);
-
   using DequeMapThrowTooLongFn = void (*)();
 
   struct CrtPointerGrid

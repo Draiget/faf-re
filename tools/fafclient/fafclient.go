@@ -79,7 +79,7 @@ type Adapter struct {
 func (a Adapter) Command(p Player, gameID, rpcPort, gpgPort int, token, icebreakerURL string) []string {
 	var cmd []string
 	if a.Java != "" {
-		cmd = append(cmd, a.Java)
+		cmd = append(cmd, a.Java, "-XX:+UseZGC", "-Xms128m", "-Xmx512m")
 		if !a.AllowIPv6 {
 			cmd = append(cmd, "-Dorg.ice4j.ipv6.DISABLED=true")
 		}
@@ -428,6 +428,22 @@ func (l *Lobby) join(s, hs *Session, others []int) {
 		o := l.Session(id)
 		_, _ = s.rpc.Call("connectToPeer", o.Player.Login, o.Player.ID, true)
 		_, _ = o.rpc.Call("connectToPeer", s.Player.Login, s.Player.ID, false)
+	}
+}
+
+// DisconnectPeers has every adapter drop every other player, as the server's
+// DisconnectFromPeer does when a player leaves.
+func (l *Lobby) DisconnectPeers() {
+	for _, a := range l.opts.Players {
+		s := l.Session(a.ID)
+		if s == nil || s.rpc == nil {
+			continue
+		}
+		for _, b := range l.opts.Players {
+			if b.ID != a.ID {
+				_, _ = s.rpc.Call("disconnectFromPeer", b.ID)
+			}
+		}
 	}
 }
 

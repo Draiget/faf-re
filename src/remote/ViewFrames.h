@@ -68,6 +68,7 @@ namespace faf::remote
       mHeldOn = true;
       mHeldCheck = check;
       SetDirectUpdates(true);
+      SetSharedRecords(&mSharedRecords);
     }
     [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
@@ -90,8 +91,11 @@ namespace faf::remote
     /** One view's frame kept between beats, and what its last beat changed. */
     struct SHeldView
     {
-      gpg::core::ChunkedVector<wire::SEntityRecord> records; // by the builder's slot, in the view's ids
-      std::vector<std::uint8_t> sent;           // per slot: `records` holds what the client holds
+      // What the client holds is the world's record, unless the view's differs (`ownSlot`).
+      gpg::core::ChunkedVector<wire::SEntityRecord> own; // in the view's ids
+      std::vector<std::uint32_t> ownSlot;       // per slot: index into `own`, or `kNoOwn`
+      std::vector<std::uint32_t> ownFree;       // elements of `own` no slot uses
+      std::vector<std::uint8_t> sent;           // per slot: the client holds a record
       std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
       std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
       std::size_t count = 0;
@@ -102,7 +106,7 @@ namespace faf::remote
       std::vector<std::uint32_t> removed;
       std::vector<const wire::SEntityRecord*> created;
       std::vector<wire::SFrameChange> changed;
-      gpg::core::ChunkedVector<wire::SEntityRecord> before; // the changed records as the client held them
+      gpg::core::ChunkedVector<wire::SEntityRecord> before; // changed `own` records as the client held them
       // With the check:
       std::unique_ptr<CViewIdMap> checkMap;
       wire::SViewFrame checkPrevious;
@@ -123,6 +127,7 @@ namespace faf::remote
     wire::SFrameCodec mCodec;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
+    CSharedEntityRecords mSharedRecords;
     bool mHeldOn = false;
     bool mHeldCheck = false;
     std::vector<wire::SViewFrame> mFrames;
@@ -130,8 +135,17 @@ namespace faf::remote
     std::vector<bool> mHavePrevious; // per view: mPreviousFrames holds a frame (written on the sim thread only)
     std::vector<bool> mBuilt;        // per view: mFrames holds a built frame (likewise)
     std::vector<std::uint32_t> mWithheld;
-    std::vector<std::pair<std::uint32_t, SEntityFacts>> mEntityIndex; // the sim's entities by id, this beat
-    std::vector<moho::Entity*> mEntityPointers;                       // the same entities, while their facts are read
+    /** One of the sim's entities this beat: its id and the views that keep it (`ViewsThatSee`). */
+    struct SEntityKeep
+    {
+      std::uint32_t id;
+      std::uint32_t views;
+    };
+    std::vector<SEntityKeep> mEntityIndex;      // the sim's entities by id, this beat
+    std::vector<moho::Entity*> mEntityPointers; // the same entities, while their facts are read
+    std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
+    std::vector<std::uint32_t> mLastCommands;     // and last beat
+    std::vector<std::uint32_t> mReleasedCommands; // last beat's that are gone
     bool mIdMapsOn = false;
     moho::Sim* mLastSim = nullptr;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;

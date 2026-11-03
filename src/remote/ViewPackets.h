@@ -1,13 +1,16 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
+#include "gpg/core/containers/ChunkedVector.h"
 #include "gpg/core/containers/FlatGenerationMap.h"
 #include "remote/BeatChangeSet.h"
 #include "remote/FrameBuilder.h"
+#include "remote/VisibilityOracle.h"
 
 // Engine addition, server mode (plan WP5.2): the entity lanes of the packet a lockstep client
 // focused on each army would receive, rebuilt from the unfocused sim's change set without
@@ -34,6 +37,7 @@
 
 namespace moho
 {
+  class Prop;
   struct SSTIArmyVariableData;
 }
 
@@ -80,6 +84,8 @@ namespace faf::remote
      * the checks compare the packets with what a lockstep client gets.
      */
     void SetDirectUpdates(const bool direct) noexcept { mDirectUpdates = direct; }
+    /** With direct updates: plain entities and props share `records` (not owned). */
+    void SetSharedRecords(CSharedEntityRecords* const records) noexcept { mSharedRecords = records; }
     /** The last beat's direct updates for `army`, in the change set's id order. */
     [[nodiscard]] const std::vector<SDirectUpdate>& Direct(const std::int32_t army) const { return mDirect[static_cast<std::size_t>(army)]; }
 
@@ -93,18 +99,36 @@ namespace faf::remote
     virtual void OnViewPackets(moho::Sim& sim) { (void)sim; }
 
   private:
-    /** What one view's client holds of one entity, beyond its packed data. */
-    struct SViewEntity
+    static constexpr std::uint32_t kNoVisions = 0xFFFFFFFFu;
+
+    /** What the views' clients hold of one entity beyond its packed data; a bit per view. */
+    struct SEntityViews
     {
-      bool created = false;     // the view's `mInterfaceCreated`
-      bool hasVision = false;   // a blip: the view copied its creator's vision range at least once
-      std::uint32_t vision = 0; // that range
+      std::uint32_t created = 0;   // the views' `mInterfaceCreated`
+      std::uint32_t hasVision = 0; // a blip: the views that copied its creator's vision range at least once
+      std::uint32_t visions = kNoVisions; // that range per view: `mVisions[visions + army]`
     };
 
-    void SyncForView(
-      moho::Sim& sim, std::int32_t army, const SChangedEntity& changed, moho::SSyncData& out,
-      gpg::core::FlatGenerationMap<SViewEntity>& view
-    );
+    /** One changed entity as every view reads it: read once a beat, written back after the views. */
+    struct SChangedView
+    {
+      SDirectUpdate::STarget target;
+      SEntityFacts facts;
+      moho::Prop* prop = nullptr;
+      std::uint32_t mayAct = 0;      // the views with something to do; the others skip the entity
+      SEntityViews before;
+      std::atomic<std::uint32_t> created{0};   // `before`'s as the views change them this beat
+      std::atomic<std::uint32_t> hasVision{0};
+      std::uint32_t creatorVision = 0; // with `hasCreator`: the range to copy
+      bool hasCreator = false;
+    };
+
+    /** Fills `mChanged` from the change set; the views only read the sim from here on. */
+    void ReadChangedEntities(moho::Sim& sim);
+    /** What the views changed goes into `mEntityViews`. */
+    void WriteChangedEntities();
+
+    void SyncForView(moho::Sim& sim, std::int32_t army, SChangedView& changed, moho::SSyncData& out);
 
   protected:
     /** Adds the time from this beat's start to now to `BuildSeconds` (once the views are built). */
@@ -118,10 +142,15 @@ namespace faf::remote
     std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
     std::vector<std::vector<SDirectUpdate>> mDirect;
     bool mDirectUpdates = false;
+    CSharedEntityRecords* mSharedRecords = nullptr;
     bool mParallel = false;
     bool mSkipCivilians = false;
     std::chrono::steady_clock::time_point mBuildStart{};
     double mBuildSeconds = 0.0;
-    std::vector<gpg::core::FlatGenerationMap<SViewEntity>> mViews;
+    std::unique_ptr<SChangedView[]> mChanged;
+    std::size_t mChangedCapacity = 0;
+    gpg::core::FlatGenerationMap<SEntityViews> mEntityViews; // entities a view has or had a vision range of
+    gpg::core::ChunkedVector<std::uint32_t> mVisions; // a block of one per view for each blip with a creator
+    std::vector<std::uint32_t> mFreeVisions;
   };
 } // namespace faf::remote

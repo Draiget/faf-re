@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "lua/LuaPrimitives.h"
 
@@ -96,7 +97,25 @@ struct Node
 {
 	LuaPlus::TObject i_key; // Hash key.
 	LuaPlus::TObject i_val; // Hash value.
+#if INTPTR_MAX == INT32_MAX
 	Node* next;             // Collision chain link.
+
+	[[nodiscard]] Node* Next() const noexcept { return next; }
+	void SetNext(Node* const node) noexcept { next = node; }
+#else
+	// Engine change on x64: the link is the distance within the table's node array, as a pointer
+	// would make every node 4 bytes larger. 0: the end of the chain.
+	std::int32_t nextDistance;
+
+	[[nodiscard]] Node* Next() const noexcept
+	{
+		return nextDistance != 0 ? const_cast<Node*>(this) + nextDistance : nullptr;
+	}
+	void SetNext(const Node* const node) noexcept
+	{
+		nextDistance = node != nullptr ? static_cast<std::int32_t>(node - this) : 0;
+	}
+#endif
 };
 
 // `luaH_mainposition` (0x00926F70) indexes the node array as
@@ -107,7 +126,9 @@ struct Node
 // at [esi+14h], both already asserted on Table below.
 static_assert(offsetof(Node, i_key) == 0x00, "Node::i_key must be at +0x00");
 static_assert(offsetof(Node, i_val) == 0x08, "Node::i_val must be at +0x08");
+#if INTPTR_MAX == INT32_MAX
 static_assert(offsetof(Node, next) == 0x10, "Node::next must be at +0x10");
+#endif
 static_assert(sizeof(Node) == 0x14, "Node size must be 0x14");
 
 struct Table
@@ -119,11 +140,11 @@ struct Table
 	int8_t flags;            // +0x08 Cached "missing TM" bitset.
 	lu_byte lsizenode;       // +0x09 log2(node array size).
 	// +0x0A..0x0B implicit padding before the pointer lanes.
-	Table* metatable;        // +0x0C
-	LuaPlus::TObject* array; // +0x10 Dense integer-key part.
-	Node* node;              // +0x14 Hash node array.
-	Node* firstfree;         // +0x18 First free hash node.
-	GCObject* gclist;        // +0x1C GC gray list link.
+	LuaPlus::ObjectPointer<Table> metatable; // +0x0C
+	LuaPlus::ObjectPointer<LuaPlus::TObject> array; // +0x10 Dense integer-key part.
+	LuaPlus::ObjectPointer<Node> node; // +0x14 Hash node array.
+	LuaPlus::ObjectPointer<Node> firstfree; // +0x18 First free hash node.
+	LuaPlus::ObjectPointer<GCObject> gclist; // +0x1C GC gray list link.
 	int sizearray;           // +0x20 Dense array slot count.
 
 	/**

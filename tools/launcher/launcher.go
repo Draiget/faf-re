@@ -399,8 +399,10 @@ func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
 		choice = c.Adapter
 	}
 	a := fafclient.Adapter{NativeDir: c.NativeDir, ForceRelay: c.ForceRelay}
+	jarBind := ""
 	if choice == "" || strings.EqualFold(choice, "jar") {
 		a.Java = c.Java
+		jarBind = ExpandPath(c.JarBind)
 		// IceAdapterImpl.getJavaFXClassPathJars: entries whose name contains "javafx-".
 		if entries, err := os.ReadDir(c.ClientLib); err == nil {
 			var fx []string
@@ -415,7 +417,7 @@ func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
 		a.Exe = choice
 		a.Extra = c.ExeArgs
 	}
-	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus}
+	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus, JarBind: jarBind}
 	if len(c.IceServers) > 0 {
 		sc.IceServers = []map[string]any{}
 		for _, s := range c.IceServers {

@@ -232,6 +232,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/diagnostics/BuildInfo.cpp
   lua/LuaCrashDump.cpp
   lua/LuaMemAccounting.cpp
+  lua/LuaArena.cpp
   lua/LuaGcEventLog.cpp
   moho/serialization/PrefetchHandleBase.cpp
   moho/serialization/PrefetchHandleBaseTypeInfo.cpp

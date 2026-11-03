@@ -1845,7 +1845,7 @@ namespace
     // A retired id still translates inbound for the grace beats (a late command), then no more.
     CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
     CHECK(map.CommandToSim(0x80000001u, sim) && sim == 0x80000123u);
-    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    map.RetireNewCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
     map.AdvanceTo(CViewIdMap::kInboundGraceBeats);
     CHECK(!map.EntityToSim(0x30500001u, sim));
     CHECK(!map.CommandToSim(0x80000001u, sim));
@@ -1860,6 +1860,13 @@ namespace
     map.Translate(again, ownSource);
     CHECK(again.entities[1].id == 0x30500003u);
     CHECK(static_cast<std::uint32_t>((*again.entities[0].unit.detail).commands[0]) == 0x80000003u);
+    // A command found alive once is not asked about again; it retires when the sim releases it.
+    map.RetireNewCommandsUnless([](std::uint32_t) { return true; });
+    map.RetireNewCommandsUnless([](std::uint32_t) { return false; });
+    CHECK(map.LiveCommands() == 1u);
+    const std::uint32_t released[] = {0x80000123u};
+    map.RetireCommands(released);
+    CHECK(map.LiveCommands() == 0u);
 
     // Another view numbers on its own: army 5's view keeps its own projectile and blips get serial 1 up.
     CViewIdMap other(5);
