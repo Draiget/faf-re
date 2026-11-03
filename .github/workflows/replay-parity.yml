@@ -5,12 +5,14 @@ name: Replay parity
 # desync one live client had alone is not ours. Plays from the caches the Parity prewarm workflow
 # fills; it fetches from FAF only what they lack. tools/parity-data/README.md.
 #
-# Run it from master (its caches are the ones every run can read) with the commit to test. Every
-# night it plays master's head on the nightly set: every replay that desynced before and random
+# Run it from master (its caches are the ones every run can read) with the commit to test.
+#
+# The nightly set is ready but not scheduled yet: every replay that desynced before and random
 # others, as many as 40 jobs of 150 minutes play (20 at once, so two rounds, about 5 h 30 min).
+# Uncomment the two lines below to run it on master's head every night.
 on:
-  schedule:
-    - cron: "0 20 * * *"
+  # schedule:
+  #   - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       ref:

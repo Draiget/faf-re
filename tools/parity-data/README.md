@@ -13,7 +13,7 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 | `replays` | One job per bucket of 10,000 replay ids, `parallel` jobs at a time (default 4, each one request a second): downloads the corpus replays the bucket's cache lacks, checks each as the parity runner does (featured mod, engine version, sim mods, map) and records the result in the bucket's `index.jsonl`; keeps the ready ones |
 | `assets` | Downloads the corpus' top and retail maps (stripped) and every M28AI version a ready replay needs, and saves every bucket's index in one file for the planner |
 
-**Replay parity** (by hand, with the commit to test, and nightly on master):
+**Replay parity** (by hand, with the commit to test):
 
 | Job | What it does |
 |---|---|
@@ -22,7 +22,7 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 | `run` | One job per shard: puts the pack together (FAF's game files and the retail archives), plays its replays four at a time, and uploads `results.jsonl` and the logs of every replay that did not pass. It starts a replay only if its estimate, scaled by how much longer than estimated the job's finished replays took, ends before the job's 300 minutes; a replay that does not fit, or is still playing then, is `not-run` |
 | `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and fails on any new desync, crash, early stop, timeout or error (a replay that could not be got ready, or a shard that died) |
 
-**The nightly run** starts at 20:00 UTC on master's head and plays the `nightly` set: the core and extended sets, every replay in [desynced/3835.txt](desynced/3835.txt), and random others (a new seed each night, the run number). It keeps as many as 40 jobs of 150 minutes hold. GitHub runs 20 jobs at once on Free, so that is two rounds, about 5 h 30 min with a fresh build; a job holds one replay bucket, so 40 short jobs fill the runners where 25 buckets in full-length jobs could not end in time. While it runs, pull request checks wait for a free runner and another parity run queues behind it. Add a replay to `desynced/` when it desyncs; a failure the report calls new turns the night red until it is fixed or listed in `expected/` with its reason.
+**The nightly run** is ready but not scheduled yet: uncomment the `schedule` lines in the workflow to turn it on, or start it by hand with `set=nightly`, `sample=5000`, `job_minutes=150`. It would start at 20:00 UTC on master's head and play the `nightly` set: the core and extended sets, every replay in [desynced/3835.txt](desynced/3835.txt), and random others (a new seed each night, the run number). It keeps as many as 40 jobs of 150 minutes hold. GitHub runs 20 jobs at once on Free, so that is two rounds, about 5 h 30 min with a fresh build; a job holds one replay bucket, so 40 short jobs fill the runners where 25 buckets in full-length jobs could not end in time. While it runs, pull request checks wait for a free runner and another parity run queues behind it. Add a replay to `desynced/` when it desyncs; a failure the report calls new turns the night red until it is fixed or listed in `expected/` with its reason.
 
 A run whose jobs ran out of time leaves replays `not-run`. Start another with `after_run` set to its run id: it plays only those (and any `error`, `timeout` or `crash`), and its report covers both runs.
 
