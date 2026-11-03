@@ -251,9 +251,10 @@ namespace faf::remote
       std::uint32_t slot = 0;
       return !builder.FindSlot(id, slot) || held.keep[slot] == 0u;
     };
+    std::size_t cursor = 0;
     for (const std::uint32_t id : held.candidates) {
       std::uint32_t slot = 0;
-      if (!builder.FindSlot(id, slot)) {
+      if (!builder.FindSlotFrom(cursor, id, slot)) {
         continue;
       }
       const bool wasSent = held.sent[slot] != 0u;
@@ -404,7 +405,7 @@ namespace faf::remote
 
   std::uint64_t CViewFrames::HeldMismatches() const noexcept
   {
-    std::uint64_t mismatches = 0;
+    std::uint64_t mismatches = mEntityIndexMismatches;
     for (const SHeldView& held : mHeld) {
       mismatches += held.mismatches;
     }
@@ -439,27 +440,62 @@ namespace faf::remote
 
     // The sim's entities in ascending id order with the views that keep each, worked out once for
     // every view (plan WPR.35): a frame's records are in that order too, so each view finds its
-    // records' answers in one forward pass.
+    // records' answers in one forward pass. An entity that didn't sync keeps last beat's answer
+    // unless that answer depends on more than the entity, so most entities aren't read at all.
+    mLastEntityIndex.swap(mEntityIndex);
+    mLastEntityPointers.swap(mEntityPointers);
     mEntityIndex.clear();
     mEntityPointers.clear();
+    mEntityReads.clear();
     if (sim.mEntityDB != nullptr) {
       mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
       mEntityPointers.reserve(sim.mEntityDB->mAllUnits.size());
+      const std::vector<SChangedEntity>& changed = Entities();
+      std::size_t last = 0;
+      std::size_t next = 0;
       for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        mEntityIndex.push_back({static_cast<std::uint32_t>(id), 0u});
+        const auto key = static_cast<std::uint32_t>(id);
+        while (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < key) {
+          ++last;
+        }
+        while (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) < key) {
+          ++next;
+        }
+        const bool synced = next < changed.size() && changed[next].entity == entity;
+        if (!synced && last < mLastEntityIndex.size() && mLastEntityIndex[last].id == key && mLastEntityPointers[last] == entity
+            && !mLastEntityIndex[last].readEveryBeat) {
+          mEntityIndex.push_back(mLastEntityIndex[last]);
+        } else {
+          mEntityReads.push_back(static_cast<std::uint32_t>(mEntityIndex.size()));
+          mEntityIndex.push_back({key, 0u, false});
+        }
         mEntityPointers.push_back(entity);
       }
     }
     const auto readFacts = [this, &sim, armyCount](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        mEntityIndex[i].views = ViewsThatSee(sim, armyCount, ReadEntityFacts(*mEntityPointers[i]));
+        const std::uint32_t entry = mEntityReads[i];
+        const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[entry]);
+        mEntityIndex[entry].views = ViewsThatSee(sim, armyCount, facts);
+        mEntityIndex[entry].readEveryBeat = !ViewsFollowFactsAlone(facts);
       }
     };
     constexpr std::size_t kFactsGrain = 256;
-    if (Parallel() && mEntityIndex.size() > kFactsGrain) {
-      moho::CSimWorkerPool::Get().ParallelFor(mEntityIndex.size(), kFactsGrain, readFacts);
+    if (Parallel() && mEntityReads.size() > kFactsGrain) {
+      moho::CSimWorkerPool::Get().ParallelFor(mEntityReads.size(), kFactsGrain, readFacts);
     } else {
-      readFacts(0u, mEntityIndex.size());
+      readFacts(0u, mEntityReads.size());
+    }
+    if (mHeldCheck) {
+      for (std::size_t i = 0; i < mEntityIndex.size(); ++i) {
+        const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[i]);
+        if (ViewsThatSee(sim, armyCount, facts) != mEntityIndex[i].views && ++mEntityIndexMismatches <= 5u) {
+          std::fprintf(
+            stderr, "view frames check: beat %u: entity %08x kept views %08x, a read says %08x (kind %d)\n", sim.mCurBeat, mEntityIndex[i].id,
+            mEntityIndex[i].views, ViewsThatSee(sim, armyCount, facts), static_cast<int>(facts.kind)
+          );
+        }
+      }
     }
 
     // The commands the sim released since last beat, once for every view (`AdvanceIdMap`).

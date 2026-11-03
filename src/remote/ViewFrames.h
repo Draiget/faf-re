@@ -140,9 +140,14 @@ namespace faf::remote
     {
       std::uint32_t id;
       std::uint32_t views;
+      bool readEveryBeat; // the answer depends on more than the entity (`ViewsFollowFactsAlone`)
     };
-    std::vector<SEntityKeep> mEntityIndex;      // the sim's entities by id, this beat
-    std::vector<moho::Entity*> mEntityPointers; // the same entities, while their facts are read
+    std::vector<SEntityKeep> mEntityIndex;          // the sim's entities by id, this beat
+    std::vector<moho::Entity*> mEntityPointers;     // the same entities
+    std::vector<SEntityKeep> mLastEntityIndex;      // and last beat
+    std::vector<moho::Entity*> mLastEntityPointers;
+    std::vector<std::uint32_t> mEntityReads;        // this beat's entries to read from their entities
+    std::uint64_t mEntityIndexMismatches = 0;       // the check: answers kept that a read would change
     std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
     std::vector<std::uint32_t> mLastCommands;     // and last beat
     std::vector<std::uint32_t> mReleasedCommands; // last beat's that are gone

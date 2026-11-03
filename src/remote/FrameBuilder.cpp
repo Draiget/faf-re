@@ -648,11 +648,12 @@ namespace faf::remote
     return local;
   }
 
-  void CViewFrameBuilder::ApplySharedUpdate(const SDirectUpdate& update)
+  void CViewFrameBuilder::ApplySharedUpdate(const SDirectUpdate& update, std::size_t& cursor)
   {
     const auto id = static_cast<std::uint32_t>(update.target->entity->id_);
     const wire::SEntityRecord* const record = update.target->shared->records[SSharedUpdate::ModeIndex(update.Mode())];
-    const auto found = LowerBound(id);
+    cursor = SeekWorld(cursor, id);
+    const auto found = mWorldIndex.cbegin() + static_cast<std::ptrdiff_t>(cursor);
     const bool exists = found != mWorldIndex.end() && found->id == id;
     std::uint32_t slot;
     if (update.created) {
@@ -838,19 +839,20 @@ namespace faf::remote
         }
       }
     }
+    std::size_t cursor = 0;
     for (const SDirectUpdate& update : direct) {
       const SDirectUpdate::STarget& target = *update.target;
       if (target.shared != nullptr) {
-        ApplySharedUpdate(update);
+        ApplySharedUpdate(update, cursor);
         continue;
       }
       moho::Entity& entity = *target.entity;
       const auto id = static_cast<std::uint32_t>(entity.id_);
-      const auto found = LowerBound(id);
-      if (found == mWorldIndex.end() || found->id != id) {
+      cursor = SeekWorld(cursor, id);
+      if (cursor == mWorldIndex.size() || mWorldIndex[cursor].id != id) {
         continue;
       }
-      const std::uint32_t slot = found->slot;
+      const std::uint32_t slot = mWorldIndex[cursor].slot;
       const SBlipRecord* const blipRecord = mSession == nullptr ? update.blipRecord : nullptr;
       // Most of a late game's blip updates write what the record holds: nothing to read or compare.
       if (blipRecord != nullptr && mBlipHashes[slot] == blipRecord->hash) {

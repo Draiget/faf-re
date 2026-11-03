@@ -339,6 +339,16 @@ namespace faf::remote
       slot = found->slot;
       return true;
     }
+    /** `FindSlot` for ids in ascending order: `cursor` starts at 0 and stays between calls. */
+    [[nodiscard]] bool FindSlotFrom(std::size_t& cursor, const std::uint32_t id, std::uint32_t& slot) const
+    {
+      cursor = SeekWorld(cursor, id);
+      if (cursor == mWorldIndex.size() || mWorldIndex[cursor].id != id) {
+        return false;
+      }
+      slot = mWorldIndex[cursor].slot;
+      return true;
+    }
     [[nodiscard]] const wire::SEntityRecord& RecordAt(const std::uint32_t slot) const { return *mWorldSlots[slot]; }
 
     [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
@@ -380,6 +390,29 @@ namespace faf::remote
     }
     static constexpr std::uint32_t kNoLocal = 0xFFFFFFFFu;
 
+    /**
+     * Where `id` is or belongs in the index, looking forward from `from`: a beat's updates come in
+     * ascending id order and lie close together. An id before `from` searches from the start.
+     */
+    [[nodiscard]] std::size_t SeekWorld(std::size_t from, const std::uint32_t id) const
+    {
+      const std::size_t size = mWorldIndex.size();
+      if (from > size || (from > 0u && mWorldIndex[from - 1u].id >= id)) {
+        from = 0u;
+      }
+      std::size_t step = 1u;
+      while (from + step < size && mWorldIndex[from + step].id < id) {
+        from += step;
+        step *= 2u;
+      }
+      const std::size_t end = from + step < size ? from + step + 1u : size;
+      const auto first = mWorldIndex.begin() + static_cast<std::ptrdiff_t>(from);
+      const auto last = mWorldIndex.begin() + static_cast<std::ptrdiff_t>(end);
+      return static_cast<std::size_t>(
+        std::lower_bound(first, last, id, [](const SWorldEntry& entry, const std::uint32_t value) { return entry.id < value; }) - mWorldIndex.begin()
+      );
+    }
+
     /** A watched slot's record is about to change. */
     void SaveBefore(std::uint32_t slot);
     /** `slot`'s record as this view's own, to change it. */
@@ -392,8 +425,8 @@ namespace faf::remote
     [[nodiscard]] wire::SEntityRecord* FindRecord(std::uint32_t id);
     /** Stores `record` under its id, over any record that id has, and returns it in place. */
     wire::SEntityRecord& PutRecord(const wire::SEntityRecord& record);
-    /** A shared update: the view's record is now the one all views share. */
-    void ApplySharedUpdate(const SDirectUpdate& update);
+    /** A shared update: the view's record is now the one all views share. `cursor`: `SeekWorld`'s. */
+    void ApplySharedUpdate(const SDirectUpdate& update, std::size_t& cursor);
     void EraseRecord(std::uint32_t id);
 
     const wire::SContentTables& mTables;

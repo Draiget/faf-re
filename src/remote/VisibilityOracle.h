@@ -120,6 +120,8 @@ namespace faf::remote
   [[nodiscard]] bool CanViewSee(const moho::Sim& sim, std::int32_t viewArmy, const SEntityFacts& facts);
   /** `CanViewSee` for views 0 up to `viewCount` (at most 32), a bit each. */
   [[nodiscard]] std::uint32_t ViewsThatSee(const moho::Sim& sim, std::size_t viewCount, const SEntityFacts& facts);
+  /** Whether `ViewsThatSee` reads nothing but `facts`: no grid, and no alliance between armies. */
+  [[nodiscard]] bool ViewsFollowFactsAlone(const SEntityFacts& facts) noexcept;
 
   /**
    * Whether `viewArmy`'s lockstep client draws the entity's mesh this beat (stage 2 above,
