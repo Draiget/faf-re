@@ -47,6 +47,8 @@ namespace moho
   extern int32_t net_NativeNetWebRtc;
   extern int32_t net_NativeNetRedundancy;
   extern int32_t net_FastRetransmit;
+  extern float net_FastResendPings;
+  extern int32_t net_FastAckDelay;
 
   // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.
   bool NET_FastRetransmitEnabled();

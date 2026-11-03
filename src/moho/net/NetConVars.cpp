@@ -42,6 +42,15 @@ namespace moho
   // (CNetUDPConnection::FastRetransmitFromMask); 0 waits for the resend
   // timer, as the binary does. Live.
   int32_t net_FastRetransmit = 0;
+  // Issue #237: with net_FastRetransmit, a packet's first resend is due this
+  // many round trips after its send, under net_MinResendDelay and
+  // net_ResendDelayBias. The game sends too few packets for acknowledgements to
+  // show a loss sooner. Live.
+  float net_FastResendPings = 1.25f;
+  // Issue #237: with net_FastRetransmit, a received packet is acknowledged within
+  // this many ms, if net_AckDelay is longer. The peer's ping includes the wait,
+  // so its timer can't go under the time an acknowledgement takes without it. Live.
+  int32_t net_FastAckDelay = 5;
   // Issue #274: 1 makes the game run every peer link itself with the launcher
   // talking to it directly, no ICE adapter (NetlinkPeers.cpp,
   // docs/LAUNCHER_NATIVE_NETWORK.md); 0 is the adapter path. Read when the
@@ -73,8 +82,20 @@ namespace moho
   {
     TConVar<int32_t> gTConVar_net_FastRetransmit(
       "net_FastRetransmit",
-      "1: resend a packet once the peer has received 3 later ones, at most once a round trip; 0 (default) waits for the resend timer.",
+      "1: resend a packet once the peer has received 3 later ones or after net_FastResendPings round trips, and acknowledge within net_FastAckDelay; 0 (default) is as shipped.",
       &net_FastRetransmit
+    );
+
+    TConVar<float> gTConVar_net_FastResendPings(
+      "net_FastResendPings",
+      "With net_FastRetransmit, a packet's first resend is due this many round trips after its send (default 1.25).",
+      &net_FastResendPings
+    );
+
+    TConVar<int32_t> gTConVar_net_FastAckDelay(
+      "net_FastAckDelay",
+      "With net_FastRetransmit, acknowledge a received packet within this many ms, if net_AckDelay is longer (default 5).",
+      &net_FastAckDelay
     );
 
     TConVar<int32_t> gTConVar_net_NativeNet(

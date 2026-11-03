@@ -1003,6 +1003,15 @@ int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
  */
 int64_t CNetUDPConnection::CalcResendDelayForCount(int rc) const
 {
+  // Issue #237: at the game's packet rate no acknowledgement can show a loss
+  // before the timer fires, so with the switch the timer itself follows the
+  // round trip. Before the first measured round trip it stays as shipped.
+  if (rc == 0 && mPingTime > 0.0f && NET_FastRetransmitEnabled()) {
+    constexpr float kLowestFastResendMs = 10.0f;
+    const float delayMs = std::max(mPingTime * net_FastResendPings, kLowestFastResendMs);
+    return static_cast<int64_t>(delayMs * 1000.0f);
+  }
+
   const float baseMs = mPingTime * net_ResendPingMultiplier + static_cast<float>(net_ResendDelayBias);
 
   if (rc > 3) {
@@ -1732,8 +1741,9 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
   mInResponseTo = packet->header.mSerialNumber;
 
   if (mSendBy.mTime == 0) {
-    // net_AckDelay (ms) -> us
-    const int64_t ackDelayUs = static_cast<int64_t>(net_AckDelay) * 1000LL;
+    // net_AckDelay (ms) -> us; issue #237: less with net_FastRetransmit.
+    const int32_t ackDelayMs = NET_FastRetransmitEnabled() ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
+    const int64_t ackDelayUs = static_cast<int64_t>(ackDelayMs) * 1000LL;
     mSendBy.mTime = packet->mSentTime + ackDelayUs;
   }
 }
