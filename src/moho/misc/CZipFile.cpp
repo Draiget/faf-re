@@ -14,6 +14,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/StartupHelpers.h"
 
 namespace
 {
@@ -26,6 +27,10 @@ namespace
   constexpr std::uint16_t kZipCompressionStored = 0u;
   constexpr std::uint16_t kZipCompressionDeflated = 8u;
   constexpr std::uint16_t kZipDataDescriptorFlag = 0x0008u;
+
+  [[nodiscard]] bool ReadWholeZipDirectory(
+    gpg::Stream& stream, std::uint32_t directoryOffset, std::uint32_t directorySize, std::uint32_t entryCount, std::vector<char>& outBytes
+  );
 
 #pragma pack(push, 1)
   struct SZipCentralDirectoryFileHeader
@@ -61,6 +66,39 @@ namespace
     std::uint16_t mCommentLength = 0;
   };
 #pragma pack(pop)
+
+  /**
+   * Engine addition: reads the whole central directory and checks that `entryCount` records fit it
+   * exactly as the entry-by-entry parse would walk them. On false the stream is back at its start.
+   */
+  bool ReadWholeZipDirectory(
+    gpg::Stream& stream, const std::uint32_t directoryOffset, const std::uint32_t directorySize, const std::uint32_t entryCount, std::vector<char>& outBytes
+  )
+  {
+    static const bool disabled = moho::CFG_GetArgOption("/nozipbulk", 0u, nullptr);
+    if (disabled || directorySize == 0U) {
+      return false;
+    }
+    outBytes.resize(directorySize);
+    bool walks = stream.Read(outBytes.data(), directorySize) == directorySize;
+    std::size_t cursor = 0U;
+    for (std::uint32_t index = 0U; walks && index < entryCount; ++index) {
+      SZipCentralDirectoryFileHeader header{};
+      if (cursor + sizeof(header) > outBytes.size()) {
+        walks = false;
+        break;
+      }
+      std::memcpy(&header, outBytes.data() + cursor, sizeof(header));
+      cursor += sizeof(header) + header.mFileNameLength + header.mExtraFieldLength + header.mFileCommentLength;
+      walks = header.mSignature == kZipCentralDirectoryFileHeaderMagic && cursor <= outBytes.size();
+    }
+    if (!walks) {
+      outBytes.clear();
+      (void)stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::int64_t>(directoryOffset));
+    }
+    return walks;
+  }
+
 
   static_assert(sizeof(SZipCentralDirectoryFileHeader) == 0x2E, "SZipCentralDirectoryFileHeader size must be 0x2E");
   static_assert(sizeof(SZipEndOfCentralDirectoryRecord) == 0x16, "SZipEndOfCentralDirectoryRecord size must be 0x16");
@@ -268,10 +306,25 @@ namespace moho
       static_cast<std::int64_t>(endOfCentralDirectory.mCentralDirectoryOffset)
     );
 
+    // Engine addition: the directory in one read. Seeking past an entry's extra field drops the
+    // stream's buffer, which made two system calls per entry. Anything that doesn't walk cleanly
+    // goes the original way, entry by entry (also with /nozipbulk).
+    std::vector<char> directoryBytes;
+    const bool directoryRead = ReadWholeZipDirectory(
+      *zipStream, endOfCentralDirectory.mCentralDirectoryOffset, endOfCentralDirectory.mCentralDirectorySize,
+      endOfCentralDirectory.mTotalEntries, directoryBytes
+    );
+    std::size_t directoryCursor = 0U;
+
     mEntries.reserve(endOfCentralDirectory.mTotalEntries);
     for (std::uint32_t entryOrdinal = 0; entryOrdinal < endOfCentralDirectory.mTotalEntries; ++entryOrdinal) {
       SZipCentralDirectoryFileHeader directoryHeader{};
-      reader.ReadExact(directoryHeader);
+      if (directoryRead) {
+        std::memcpy(&directoryHeader, directoryBytes.data() + directoryCursor, sizeof(directoryHeader));
+        directoryCursor += sizeof(directoryHeader);
+      } else {
+        reader.ReadExact(directoryHeader);
+      }
       if (directoryHeader.mSignature != kZipCentralDirectoryFileHeaderMagic) {
         gpg::Warnf("Error reading zip directory entry for '%s'", archivePath);
         break;
@@ -287,7 +340,10 @@ namespace moho
       parsedEntry->mLocalHeaderOffset = directoryHeader.mLocalHeaderOffset;
       parsedEntry->mCachedDataOffset = -1;
 
-      if (directoryHeader.mFileNameLength != 0) {
+      if (directoryRead) {
+        parsedEntry->mName.assign_owned(std::string_view(directoryBytes.data() + directoryCursor, directoryHeader.mFileNameLength));
+        directoryCursor += directoryHeader.mFileNameLength;
+      } else if (directoryHeader.mFileNameLength != 0) {
         std::vector<char> fileNameBytes(directoryHeader.mFileNameLength);
         reader.ReadExactArray(fileNameBytes.data(), fileNameBytes.size());
         parsedEntry->mName.assign_owned(
@@ -299,7 +355,9 @@ namespace moho
 
       const std::size_t trailingSkipSize = static_cast<std::size_t>(directoryHeader.mExtraFieldLength) +
                                            static_cast<std::size_t>(directoryHeader.mFileCommentLength);
-      if (trailingSkipSize != 0) {
+      if (directoryRead) {
+        directoryCursor += trailingSkipSize;
+      } else if (trailingSkipSize != 0) {
         (void)zipStream->VirtSeek(
           gpg::Stream::ModeReceive, gpg::Stream::OriginCurr, static_cast<std::int64_t>(trailingSkipSize)
         );

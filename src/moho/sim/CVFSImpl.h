@@ -200,6 +200,9 @@ namespace moho
    */
   void DISK_InvalidateFileLookups();
 
+  /** Engine addition: changes whenever mounted file lookups are invalidated (see DISK_InvalidateFileLookups). */
+  [[nodiscard]] std::uint64_t DISK_FileLookupGeneration();
+
   /**
    * Engine addition (dedicated-server plan WPR.22, `res_EnumOrderFuzz`): the order-fuzz seed, 0
    * when off. Resolved from `/enumorderfuzz N` on first use, then the console variable.
