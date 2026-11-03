@@ -212,14 +212,14 @@ func (l *Launcher) SetLink(from, to int, imp relay.Impairment, both bool) error 
 }
 
 // writeShaping replaces the FAF_NETLINK_TEST_SHAPING file in one step: the
-// line "<latency us> <jitter us> <loss 0-1> <blocked 0|1>" that netlink reads
-// (src/netlink/Link.cpp, TestShaping). Duplication is not applied there.
+// line "<latency us> <jitter us> <loss 0-1> <blocked 0|1> <burst> <only>" that
+// netlink reads (src/netlink/Link.cpp, TestShaping). Duplication is not applied there.
 func writeShaping(path string, imp relay.Impairment) error {
 	blocked := 0
 	if imp.Blocked {
 		blocked = 1
 	}
-	line := fmt.Sprintf("%d %d %g %d\n", imp.Latency.Microseconds(), imp.Jitter.Microseconds(), imp.Loss, blocked)
+	line := fmt.Sprintf("%d %d %g %d %d %d\n", imp.Latency.Microseconds(), imp.Jitter.Microseconds(), imp.Loss, blocked, imp.Burst, imp.Only)
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(line), 0o644); err != nil {
 		return err

@@ -34,6 +34,10 @@ type Impairment struct {
 	Loss      float64       `json:"loss" yaml:"loss"`           // 0..1
 	Duplicate float64       `json:"duplicate" yaml:"duplicate"` // 0..1
 	Blocked   bool          `json:"blocked" yaml:"blocked"`
+	// Burst and Only reach netlink's test shaping alone: losses in runs of Burst
+	// sends with Loss the long-run share, and only the links of player Only shaped.
+	Burst int `json:"burst,omitempty" yaml:"burst"`
+	Only  int `json:"only,omitempty" yaml:"only"`
 }
 
 func (i Impairment) active() bool {
