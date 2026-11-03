@@ -70,6 +70,9 @@ namespace moho
   // Diagnostics: every this many beats log the UDP connections' totals: packets,
   // bytes, resends, acks and mean ping; 0 logs nothing. Live.
   int32_t net_LogTraffic = 0;
+  // Diagnostics: log a beat the main thread took this many ms or more after the one
+  // before it, which is the pause a player sees; 0 logs nothing. Live.
+  int32_t net_LogShownBeatMs = 0;
   NetTrafficTotals gNetTraffic;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
   // sends net_TestBurstBytes incompressible filler bytes to every peer on the
@@ -114,6 +117,12 @@ namespace moho
       "net_LogBeatWaitMs",
       "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
       &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_LogShownBeatMs(
+      "net_LogShownBeatMs",
+      "Logs a beat the main thread took this many ms or more after the one before it; 0 (default) logs nothing.",
+      &net_LogShownBeatMs
     );
 
     TConVar<int32_t> gTConVar_net_LogTraffic(
