@@ -27,6 +27,11 @@
 // foreign projectiles and foreign command ids are renumbered per view. Off until inbound
 // translation (WP5.10) exists, because a client would otherwise send back ids the sim lacks.
 
+namespace moho
+{
+  class EntityDB;
+}
+
 namespace faf::remote
 {
   class CViewFrames : public CViewPackets
@@ -116,6 +121,10 @@ namespace faf::remote
       std::uint64_t mismatches = 0;
     };
 
+    /** This beat's `mEntityIndex` from last beat's and the change set; false if that isn't the sim's entities. */
+    [[nodiscard]] bool AdvanceEntityIndex(const moho::EntityDB& database);
+    /** This beat's `mEntityIndex` from the sim's entity map. */
+    void WalkEntityIndex(const moho::EntityDB& database);
     /** Whether the view of `viewBit` keeps `id`'s record: yes for an id with no entity (an orphan). */
     [[nodiscard]] bool KeptByView(std::uint32_t id, std::uint32_t viewBit) const;
     /** The view's frame from its packet, keeping what did not change (`EnableHeldFrames`). */
@@ -145,6 +154,7 @@ namespace faf::remote
       std::uint32_t id;
       std::uint32_t views;
       bool readEveryBeat; // the answer depends on more than the entity (`ViewsFollowFactsAlone`)
+      bool leaving;       // in its destroy pass when last read: the sim may have let go of it since
     };
     std::vector<SEntityKeep> mEntityIndex;          // the sim's entities by id, this beat
     std::vector<moho::Entity*> mEntityPointers;     // the same entities
@@ -165,6 +175,8 @@ namespace faf::remote
       std::uint32_t changed; // whose answer changed
     };
     std::vector<SEntityRead> mEntityReads;
+    std::vector<std::uint32_t> mLeavingEntities; // ids of `SEntityKeep::leaving`
+    std::vector<std::uint32_t> mGoneEntities;    // those no longer in the sim, this beat
     std::vector<SKeepChange> mKeepChanges;
     std::uint64_t mEntityIndexMismatches = 0;       // the check: answers kept that a read would change
     std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
