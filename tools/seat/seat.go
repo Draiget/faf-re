@@ -244,6 +244,13 @@ func (s *Seat) Start(ctx context.Context) error {
 		if err := s.startContract(ctx); err != nil {
 			return err
 		}
+		if s.cfg.Contract.JarBind != "" {
+			port, err := s.startJarBridge(ctx, s.cfg.Contract.JarBind, s.adapterPort)
+			if err != nil {
+				return err
+			}
+			return s.startGame(port)
+		}
 		return s.startGame(s.adapterPort)
 	}
 	if s.cfg.ICE != nil {

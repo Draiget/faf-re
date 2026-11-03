@@ -94,6 +94,9 @@ A client update may replace `faf-ice-adapter.jar` again.
 | `inengine` | our build behind `faf-netbridge`, `/inenginelinks` |
 | `bridge` | our build behind `faf-netbridge`, relayed |
 | `retail` | the retail game behind `faf-netbridge` |
+| `jar` | the retail game behind FAF's `faf-ice-adapter.jar` (`--jar-dir`) |
+
+The jar always sends the game's datagrams to 127.0.0.1, which a host that drops loopback UDP to sockets bound to every interface doesn't deliver. With `--bind`, mpemu stands between the game and the jar (`tools/seat/jarbridge.go`): it renames the jar's addresses in GPGNet and passes the datagrams on over that address, and nothing changes on the jar's links to its peers. A `jar` player's impairment is applied there, on the game's datagrams only, so the jar's own ICE checks and echoes aren't impaired. Use adapter 3.3.14 with mpemu's TURN server: 3.3.15 doesn't pair relayed candidates with private addresses. Without `-turn-ip` set to a reachable address the jars take over 12 s to gather candidates and never connect.
 
 | Profile | Link |
 |---|---|
@@ -108,8 +111,8 @@ Run it before a pull request that changes `src/netlink`, `src/netbridge` or `src
 ```
 python netmatrix/netmatrix.py --mpemu mpemu.exe --out ../tmp/matrix ^
   --ours <our exe> --retail <ForgedAlliance.exe> --bridge <faf-netbridge.exe> ^
-  [--bind <LAN address>] [--kinds native,retail] [--profiles direct,worst] ^
+  [--bind <LAN address>] [--jar-dir <folder with faf-ice-adapter.jar>] [--kinds native,retail] [--profiles direct,worst] ^
   --mpemu-args -advertise <LAN address> -turn-ip <LAN address>
 ```
 
-All 30 cells take about four hours, one after another.
+All 45 cells take about seven hours, one after another.

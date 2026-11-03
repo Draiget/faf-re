@@ -31,6 +31,10 @@ type Contract struct {
 	fafclient.Adapter
 	GameID     uint64           `json:"gameId"`
 	IceServers []map[string]any `json:"iceServers"`
+	// JarBind, for FAF's jar on a host that drops loopback UDP to sockets bound
+	// to every interface: the address the game and the jar reach each other on,
+	// through a jarBridge. Its ICE host candidates are limited to it too.
+	JarBind string `json:"jarBind,omitempty"`
 	// Bus is the run's IceMsg relay; set by the launcher (local seats only).
 	Bus *ContractBus `json:"-"`
 }
@@ -106,9 +110,14 @@ func (s *Seat) startContract(ctx context.Context) error {
 	if dir == "" {
 		dir = logDir
 	}
+	env := []string{"LOG_DIR=" + logDir}
+	if c.JarBind != "" {
+		// A jar otherwise opens a socket and a TURN allocation per interface.
+		env = append(env, "JAVA_TOOL_OPTIONS=-Dorg.ice4j.ice.harvest.ALLOWED_ADDRESSES="+c.JarBind)
+	}
 	proc, err := procs.Start(procs.Spec{
 		Name: fmt.Sprintf("adapter-%d", uid), Exe: argv[0], Dir: dir, Args: argv[1:],
-		Output: filepath.Join(logDir, "stdout.log"), Env: []string{"LOG_DIR=" + logDir},
+		Output: filepath.Join(logDir, "stdout.log"), Env: env,
 	}, s.job)
 	if err != nil {
 		return err
