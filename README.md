@@ -1,8 +1,18 @@
+<div align="center">
+
 # faf-re
 
-The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++20 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays about a quarter faster.
+**The *Supreme Commander: Forged Alliance* engine, rebuilt as C++20**
 
-*Snapshot: 24/10/2026.*
+[![Replay parity](https://img.shields.io/badge/replay%20parity-96.7%25-brightgreen)](docs/RETAIL_REPLAY_PARITY.md)
+[![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-19%25%20less%20time-blue)](docs/PERFORMANCE.md)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20x64%20%7C%20x86-blue)](#build)
+
+[Build](#build) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++20 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays about a quarter faster.
 
 > An independent preservation and interoperability effort, inspired by and indebted to the [Forged Alliance Forever](https://faforever.com) community. Not affiliated with, endorsed by, or supported by the original publisher or developer.
 
@@ -135,7 +145,7 @@ The client collects only while a profiler is connected (`TRACY_ON_DEMAND`): star
 
 ## Libraries the engine uses
 
-All of them are fetched by CMake configure at the exact version below, patched with `dependencies/patches/` where noted, and compiled from source for x86 and x64. Nothing prebuilt is needed.
+CMake configure fetches all of them at the exact version below and applies the patches from `dependencies/patches/` where noted. All are compiled from source for x86 and x64, except the DirectX Shader Compiler and the DirectX SDK, which come as Microsoft's prebuilt files.
 
 | Library | Version | Source | FAF patch |
 |---|---|---|---|
