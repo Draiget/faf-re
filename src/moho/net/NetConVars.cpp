@@ -73,6 +73,9 @@ namespace moho
   // Diagnostics: log a beat the main thread took this many ms or more after the one
   // before it, which is the pause a player sees; 0 logs nothing. Live.
   int32_t net_LogShownBeatMs = 0;
+  // Above 0: a pause this player sees raises their net_Lag a step, up to this many ms, and a
+  // long quiet spell lowers it again; 0 keeps net_Lag as set. Live.
+  int32_t net_AdaptiveLagMax = 0;
   NetTrafficTotals gNetTraffic;
   void (*gNetLinkTrafficLog)(int beat) = nullptr;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
@@ -118,6 +121,12 @@ namespace moho
       "net_LogBeatWaitMs",
       "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
       &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_AdaptiveLagMax(
+      "net_AdaptiveLagMax",
+      "Above 0: pauses raise this player's net_Lag up to this many ms, and quiet spells lower it again; 0 (default) keeps net_Lag as set.",
+      &net_AdaptiveLagMax
     );
 
     TConVar<int32_t> gTConVar_net_LogShownBeatMs(
