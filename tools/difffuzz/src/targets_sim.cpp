@@ -3055,7 +3055,7 @@ namespace difffuzz
             n.i_key.value.b = static_cast<int>(d.keyBits[i]);
           }
           n.i_val = d.valueNil[i] != 0u ? LuaPlus::TObject() : LuaPlus::TObject(static_cast<float>(i));
-          n.next = d.next[i] == kNoNode ? nullptr : &nodes[d.next[i]];
+          n.SetNext(d.next[i] == kNoNode ? nullptr : &nodes[d.next[i]]);
         }
         for (u32 i = 0; i < d.sizearray; ++i) {
           array[i] = d.arrayNil[i] != 0u ? LuaPlus::TObject() : LuaPlus::TObject(static_cast<float>(i));
