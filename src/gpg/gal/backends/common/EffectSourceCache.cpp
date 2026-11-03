@@ -113,10 +113,11 @@ namespace gpg::gal::effects
       backend::ThrowError(errorFile, __LINE__, message.c_str());
     }
     const std::string_view source(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U);
+    // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
+    // and running the translator's copy as well would test twice.
+    const auto translate = [&] { return d3d11::TranslateEffectSource(source, true, std::string_view{}); };
     if (!CacheEnabled()) {
-      // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
-      // and running the translator's copy as well would test twice.
-      return d3d11::TranslateEffectSource(source, true, std::string_view{});
+      return translate();
     }
 
     Fnv1a64 hash;
@@ -136,9 +137,7 @@ namespace gpg::gal::effects
     }
     d3d11::TranslatedEffectSource result;
     if (!ReadTranslation(key, result)) {
-      // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
-      // and running the translator's copy as well would test twice.
-      result = d3d11::TranslateEffectSource(source, true, std::string_view{});
+      result = translate();
       WriteTranslation(key, result);
     }
     if (tPreparing) {

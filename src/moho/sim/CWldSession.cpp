@@ -11,9 +11,6 @@
 #include <algorithm>
 #include <bit>
 #include <chrono>
-#include <fstream>
-#include <vector>
-#include <thread>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -21,6 +18,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <limits>
 #include <map>
 #include <new>
@@ -28,12 +26,15 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/RenderProfiler.h"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/render/ProjectileIconRenderer.h"
 #include "moho/render/StrategicIconClassifyShader.h"
 #include "moho/render/StrategicIconRenderer.h"
@@ -53,7 +54,6 @@
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/CZipFile.h"
-#include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StartupHelpers.h"

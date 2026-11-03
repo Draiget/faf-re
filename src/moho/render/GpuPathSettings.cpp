@@ -66,7 +66,7 @@ namespace moho
       &moho::ren_PrepareDuringLoading
     );
 
-        /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
+    /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
     TConVar<bool> gTConVar_ren_BackgroundShaders(
       "ren_BackgroundShaders",
       "Direct3D 12 / Vulkan: prepare every shader of an effect on low-priority background threads when the effect is "

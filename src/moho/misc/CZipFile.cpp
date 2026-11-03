@@ -415,12 +415,6 @@ namespace moho
   }
 #endif
 
-  /**
-   * Address: 0x0046C6E0 (FUN_0046C6E0, Moho::CZipFile::~CZipFile)
-   *
-   * What it does:
-   * Releases map/vector-owned zip metadata and resets the owned path string.
-   */
   CZipFileReadBatch::CZipFileReadBatch() noexcept
   {
     ++tOpenArchive.batchDepth;
@@ -434,6 +428,12 @@ namespace moho
     }
   }
 
+  /**
+   * Address: 0x0046C6E0 (FUN_0046C6E0, Moho::CZipFile::~CZipFile)
+   *
+   * What it does:
+   * Releases map/vector-owned zip metadata and resets the owned path string.
+   */
   CZipFile::~CZipFile()
   {
     gZipFileGeneration.fetch_add(1u, std::memory_order_acq_rel); // engine addition, see OpenArchiveForRead

@@ -52,17 +52,6 @@ namespace moho
     }
 
     /**
-     * FAF addition, not in the shipped binary.
-     *
-     * What it does:
-     * Decides whether an effect is compiled with FAF_BONE_TEXTURE, which makes
-     * FAF's mesh.fx read the skinning palette from a vertex texture (see
-     * `HardwareMeshBatch::UsesBoneTexture`). The source has to mention the
-     * macro - any other effect would only gain a second cache file - the
-     * device has to be Direct3D 9 and able to read a float4 texture in a
-     * vertex shader, and /nobonetexture on the command line turns it off.
-     */
-    /**
      * The compatibility preamble followed by the effect file: the text an effect is built from.
      * `effectSource` gets the effect file alone.
      */
@@ -97,6 +86,17 @@ namespace moho
         : "/effects/d3d9states.compat";
     }
 
+    /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * Decides whether an effect is compiled with FAF_BONE_TEXTURE, which makes
+     * FAF's mesh.fx read the skinning palette from a vertex texture (see
+     * `HardwareMeshBatch::UsesBoneTexture`). The source has to mention the
+     * macro - any other effect would only gain a second cache file - the
+     * device has to be Direct3D 9 and able to read a float4 texture in a
+     * vertex shader, and /nobonetexture on the command line turns it off.
+     */
     [[nodiscard]] bool WantsBoneTextureVariant(
       const gpg::gal::DeviceContext* const deviceContext, const gpg::MemBuffer<const char>& source
     )

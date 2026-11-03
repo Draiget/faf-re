@@ -1739,15 +1739,6 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
   return diskBytes;
 }
 
-/**
- * Address: 0x004596C0 (FUN_004596C0, Moho::FWaitHandleSet::MemoryMapFile)
- *
- * gpg::StrArg
- *
- * What it does:
- * Maps one canonicalized file path into an immutable shared memory view,
- * preferring mounted zip entries when present.
- */
 namespace
 {
   moho::TConVar<bool> gTConVar_res_LowerInPlace(
@@ -1807,6 +1798,15 @@ void moho::FWaitHandleSet::WarmArchiveEntry(const gpg::StrArg canonicalPath)
   }
 }
 
+/**
+ * Address: 0x004596C0 (FUN_004596C0, Moho::FWaitHandleSet::MemoryMapFile)
+ *
+ * gpg::StrArg
+ *
+ * What it does:
+ * Maps one canonicalized file path into an immutable shared memory view,
+ * preferring mounted zip entries when present.
+ */
 gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
   const gpg::StrArg sourcePath
 )

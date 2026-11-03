@@ -93,17 +93,6 @@ namespace
     return convertible;
   }
 
-  /**
-   * Engine addition: SCR_LuaBuildObject's conversion of a plain value - a string or number through
-   * `SetLexical`, a boolean as "1" or "0" - without its warnings. Neither path logs or writes
-   * anything but the destination, so a failed value can be converted again in full.
-   */
-  /**
-   * Engine addition: a Lua number stored into a `float` without its text. The text path prints the
-   * number with tostring's "%.14g" and reads it back with `atof` before narrowing to float; both
-   * CRT calls round correctly and 14 digits are far finer than a float's spacing, so it returns
-   * the same float for every value but a NaN, which keeps the text path.
-   */
   bool sim_BlueprintFieldShortcuts = true;
   moho::TConVar<bool> gTConVar_sim_BlueprintFieldShortcuts(
     "sim_BlueprintFieldShortcuts",
@@ -121,6 +110,12 @@ namespace
     &sim_BlueprintCopyDirect
   );
 
+  /**
+   * Engine addition: a Lua number stored into a `float` without its text. The text path prints the
+   * number with tostring's "%.14g" and reads it back with `atof` before narrowing to float; both
+   * CRT calls round correctly and 14 digits are far finer than a float's spacing, so it returns
+   * the same float for every value but a NaN, which keeps the text path.
+   */
   [[nodiscard]] bool TrySetFloatDirectly(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
   {
     static const gpg::RType* const floatType = gpg::LookupRType(typeid(float));
@@ -131,6 +126,11 @@ namespace
     return true;
   }
 
+  /**
+   * Engine addition: SCR_LuaBuildObject's conversion of a plain value - a string or number through
+   * `SetLexical`, a boolean as "1" or "0" - without its warnings. Neither path logs or writes
+   * anything but the destination, so a failed value can be converted again in full.
+   */
   [[nodiscard]] bool TrySetPlainValue(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
   {
     if (TrySetFloatDirectly(value, destination)) {
