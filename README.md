@@ -30,7 +30,7 @@ Real games from the FAF replay vault (stock and community maps, 1–12 human pla
 | Desync | 231 | 1.76 % |
 | Timeout, crash or error of the CI runner (time limit, map extraction, map not on FAF's server) | 203 | 1.54 % |
 
-| Desync cause (as of master `1d83c0995`, 03/11/2026) | Desyncs | Share of desyncs | Share of played |
+| Desync cause (as of master `08411bd6f`, 03/11/2026) | Desyncs | Share of desyncs | Share of played |
 |---|---|---|---|
 | Maps and content: survival maps that need the campaign's strings, maps that ship their own blueprints, a map that reads the real-time clock | 123 | 53.2 % | 0.94 % |
 | Live game split: the players' own checksums already disagreed | 34 | 14.7 % | 0.26 % |
@@ -38,7 +38,7 @@ Real games from the FAF replay vault (stock and community maps, 1–12 human pla
 | Our bugs, fixed since | 68 | 29.4 % | 0.52 % |
 | Not explained yet | 0 | 0 % | 0 % |
 
-With the fixes, 12,782 of 13,148 (97.22 %) pass on master. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
+Counting the fixes, 12,782 of 13,148 (97.22 %) should pass on master. That number is worked out, not measured: no full run has played the new build yet. All 34 live splits were played on retail: 31 give our hash, and 3 differ because of a defect in retail's replay path that the rebuilt engine fixes. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 ## Performance
 
