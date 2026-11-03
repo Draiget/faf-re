@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <iterator>
 #include <unordered_set>
 #include <utility>
 
@@ -136,7 +137,8 @@ namespace faf::remote
     map.AdvanceTo(sim.mCurBeat);
     map.RetireEntities(mRetired[army]);
     if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
-      map.RetireCommandsUnless([commands](const std::uint32_t simId) {
+      map.RetireCommands(mReleasedCommands);
+      map.RetireNewCommandsUnless([commands](const std::uint32_t simId) {
         return commands->commands.find(simId) != commands->commands.end();
       });
     }
@@ -146,7 +148,6 @@ namespace faf::remote
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
-    const auto view = static_cast<std::int32_t>(army);
     builder.TrackChanges();
     builder.ClearBefore();
     builder.Apply(packet, Direct(static_cast<std::int32_t>(army)));
@@ -204,12 +205,13 @@ namespace faf::remote
       }
     }
     std::uint32_t withheld = 0;
+    const std::uint32_t viewBit = std::uint32_t{1} << army;
     auto index = mEntityIndex.cbegin();
     builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
-      while (index != mEntityIndex.cend() && index->first < id) {
+      while (index != mEntityIndex.cend() && index->id < id) {
         ++index;
       }
-      const bool keep = index == mEntityIndex.cend() || index->first != id || CanViewSee(sim, view, index->second);
+      const bool keep = index == mEntityIndex.cend() || index->id != id || (index->views & viewBit) != 0u;
       held.keep[slot] = keep ? 1u : 0u;
       withheld += keep ? 0u : 1u;
       if (keep != (held.sent[slot] != 0u)) {
@@ -435,22 +437,22 @@ namespace faf::remote
       }
     }
 
-    // The sim's entities in ascending id order with what the oracle reads from each, once for
+    // The sim's entities in ascending id order with the views that keep each, worked out once for
     // every view (plan WPR.35): a frame's records are in that order too, so each view finds its
-    // records' facts in one forward pass.
+    // records' answers in one forward pass.
     mEntityIndex.clear();
     mEntityPointers.clear();
     if (sim.mEntityDB != nullptr) {
       mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
       mEntityPointers.reserve(sim.mEntityDB->mAllUnits.size());
       for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        mEntityIndex.emplace_back(id, SEntityFacts{});
+        mEntityIndex.push_back({static_cast<std::uint32_t>(id), 0u});
         mEntityPointers.push_back(entity);
       }
     }
-    const auto readFacts = [this](const std::size_t begin, const std::size_t end) {
+    const auto readFacts = [this, &sim, armyCount](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        mEntityIndex[i].second = ReadEntityFacts(*mEntityPointers[i]);
+        mEntityIndex[i].views = ViewsThatSee(sim, armyCount, ReadEntityFacts(*mEntityPointers[i]));
       }
     };
     constexpr std::size_t kFactsGrain = 256;
@@ -459,6 +461,19 @@ namespace faf::remote
     } else {
       readFacts(0u, mEntityIndex.size());
     }
+
+    // The commands the sim released since last beat, once for every view (`AdvanceIdMap`).
+    mLastCommands.swap(mLiveCommands);
+    mLiveCommands.clear();
+    if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
+      for (const auto& [id, command] : commands->commands) {
+        mLiveCommands.push_back(static_cast<std::uint32_t>(id));
+      }
+    }
+    mReleasedCommands.clear();
+    std::set_difference(
+      mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
+    );
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
@@ -483,12 +498,13 @@ namespace faf::remote
         // Plan §6: a plain entity in mode ReconGrid goes out only while the view sees it. A record
         // the sim no longer has (an orphan) stays.
         std::uint32_t withheld = 0;
+        const std::uint32_t viewBit = std::uint32_t{1} << army;
         auto index = mEntityIndex.cbegin();
         wire::SViewFrame frame = builder.Build(sim.mCurBeat, [&](const wire::SEntityRecord& record) {
-          while (index != mEntityIndex.cend() && index->first < record.id) {
+          while (index != mEntityIndex.cend() && index->id < record.id) {
             ++index;
           }
-          if (index == mEntityIndex.cend() || index->first != record.id || CanViewSee(sim, view, index->second)) {
+          if (index == mEntityIndex.cend() || index->id != record.id || (index->views & viewBit) != 0u) {
             return true;
           }
           ++withheld;
