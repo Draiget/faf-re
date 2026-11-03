@@ -735,7 +735,11 @@ int moho::cfunc_ResumeThreadL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaState* const threadState = rawThreadState ? rawThreadState->stateUserData : nullptr;
-  if (!threadState) {
+  // Engine addition: the binary's coroutines have no wrapper, and ours (BindCoroutineState) must
+  // answer the same. Only a coroutine's wrapper has an unbound thread object.
+  const bool isCoroutine =
+    threadState && threadState->m_rootState != threadState && threadState->m_threadObj.m_state == nullptr;
+  if (!threadState || isCoroutine) {
     const msvc8::string traceback = SCR_Traceback(state, kResumeThreadKilledTraceback);
     // Logged as data: a traceback quotes script text, '%' included.
     gpg::Warnf("%s", traceback.c_str());

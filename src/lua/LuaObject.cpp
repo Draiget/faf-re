@@ -12092,6 +12092,25 @@ namespace
 	}
 
 	/**
+	 * Engine addition, not in the binary: a coroutine gets its LuaState wrapper on its first
+	 * resume. The binary leaves `stateUserData` null on a coroutine, so an engine function
+	 * called inside one crashes on that null. A coroutine loaded from a save has no wrapper
+	 * either and gets it here too. The thread object is reset at once because LuaPlus treats
+	 * every bound LuaObject as a GC root, and `luaE_freethread` deletes the wrapper. Nothing here
+	 * allocates from Lua, so the collector runs when it does in retail.
+	 */
+	void BindCoroutineState(lua_State* const coroutineState)
+	{
+		if (coroutineState->stateUserData != nullptr || coroutineState->l_G->mainthread->stateUserData == nullptr) {
+			return;
+		}
+
+		auto* const wrapper = new LuaPlus::LuaState(LuaPlus::LuaState::UNBOUND);
+		wrapper->SetState(coroutineState);
+		wrapper->m_threadObj.Reset();
+	}
+
+	/**
 	 * Address: 0x0090FA00 (FUN_0090FA00, auxresume)
 	 *
 	 * What it does:
@@ -12100,6 +12119,7 @@ namespace
 	 */
 	int auxresume(const int argumentCount, lua_State* const callerState, lua_State* const coroutineState)
 	{
+		BindCoroutineState(coroutineState); // engine addition
 		if (lua_checkstack(coroutineState, argumentCount) == 0) {
 			luaL_error(callerState, "too many arguments to resume");
 		}
@@ -15687,6 +15707,15 @@ extern "C"
 		global_State* const globalState = state->l_G;
 		if (globalState != nullptr && globalState->lstate == thread) {
 			globalState->lstate = globalState->mainthread;
+		}
+
+		// Engine addition: a coroutine's wrapper (`BindCoroutineState`) has no other owner. A ForkThread
+		// state belongs to its task and clears `stateUserData` when it dies.
+		if (thread->stateUserData != nullptr) {
+			if (thread->stateUserData->m_luaTask == nullptr) {
+				delete thread->stateUserData;
+				thread->stateUserData = nullptr;
+			}
 		}
 
 		luaF_close(thread, thread->stack);
