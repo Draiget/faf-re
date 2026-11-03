@@ -33,10 +33,23 @@ namespace
   constexpr std::uint32_t kMaxUnroutedMessageWarnings = 8;
 
   // Engine addition (wld_PreciseSharedStart): connections holding a queued ready message that has
-  // not left yet (guarded by the connector lock), and when the latest one left, in microseconds on
-  // the steady clock (NET_SteadyClockMicroseconds).
+  // not left yet, the packet that carried it on each connection once it has (both guarded by the
+  // connector lock), and when the latest one left, in microseconds on the steady clock
+  // (NET_SteadyClockMicroseconds).
+  struct SReadyCarrier
+  {
+    const CNetUDPConnection* mConnection;
+    std::uint16_t mSequenceNumber;
+  };
   std::vector<const CNetUDPConnection*> gReadyAwaitingDeparture;
+  std::vector<SReadyCarrier> gReadyCarriers;
   std::atomic<std::int64_t> gReadyDepartureUs{0};
+
+  void NoteReadyLeftNow() noexcept
+  {
+    const std::int64_t nowUs = NET_SteadyClockMicroseconds();
+    gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
+  }
 } // namespace
 
 std::int64_t moho::NET_GetReadyDepartureUs() noexcept
@@ -402,6 +415,12 @@ CNetUDPConnection::~CNetUDPConnection()
   // Engine addition (wld_PreciseSharedStart): a connection that goes before its ready message left.
   gReadyAwaitingDeparture.erase(
     std::remove(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this), gReadyAwaitingDeparture.end()
+  );
+  gReadyCarriers.erase(
+    std::remove_if(
+      gReadyCarriers.begin(), gReadyCarriers.end(), [this](const SReadyCarrier& carrier) { return carrier.mConnection == this; }
+    ),
+    gReadyCarriers.end()
   );
 
   constexpr int poolCap = 0x14u;
@@ -1468,13 +1487,25 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
  */
 void CNetUDPConnection::SendPacket(SNetPacket* packet)
 {
-  // Engine addition (wld_PreciseSharedStart): the first payload after a queued ready message carries it.
-  if (packet->header.mType == PT_Data && packet->header.mPayloadLength != 0 && !gReadyAwaitingDeparture.empty()) {
-    const auto awaiting = std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this);
-    if (awaiting != gReadyAwaitingDeparture.end()) {
-      gReadyAwaitingDeparture.erase(awaiting);
-      const std::int64_t nowUs = NET_SteadyClockMicroseconds();
-      gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
+  // Engine addition (wld_PreciseSharedStart): the first new payload after a queued ready message
+  // carries it; a resend of older data goes before it and says nothing about it. A resend of the
+  // carrier moves the time, as the peer times the copy that reached it: a lost first copy would
+  // otherwise leave the two players a whole resend wait apart on the shared start.
+  if (packet->header.mType == PT_Data && packet->header.mPayloadLength != 0) {
+    if (packet->mResendCount != 0) {
+      for (const SReadyCarrier& carrier : gReadyCarriers) {
+        if (carrier.mConnection == this && carrier.mSequenceNumber == packet->header.mSequenceNumber) {
+          NoteReadyLeftNow();
+          break;
+        }
+      }
+    } else if (!gReadyAwaitingDeparture.empty()) {
+      const auto awaiting = std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this);
+      if (awaiting != gReadyAwaitingDeparture.end()) {
+        gReadyAwaitingDeparture.erase(awaiting);
+        gReadyCarriers.push_back(SReadyCarrier{this, packet->header.mSequenceNumber});
+        NoteReadyLeftNow();
+      }
     }
   }
   packet->header.mSerialNumber = mNextSerialNumber;
@@ -1538,10 +1569,14 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   // `now >= mSendBy` -- left nothing to wake the connector for it (`SendData` only waits on a set
   // deadline), and the message stayed in the filter until the next one was written. A ready message
   // queued at the start of the long first frame of play waited out the whole frame, some 250 ms.
+  // Behind a full window the bytes cannot go anyway (`HasPacketWaiting`), and an expired deadline
+  // kept there would take every later ACK at once instead of after net_AckDelay (`AdoptPacket` only
+  // arms a clear deadline); the peer's ACK wakes the connector when the window opens.
+  const bool sendWindowOpen = static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= 32;
   if (mPendingOutputData.GetLength()) {
     // time in us
     mSendBy.mTime = nowUs + 1000LL * net_SendDelay;
-  } else if (!mOutputFlushPending) {
+  } else if (!mOutputFlushPending || !sendWindowOpen) {
     mSendBy.mTime = 0;
   }
 
