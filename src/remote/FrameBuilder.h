@@ -111,6 +111,17 @@ namespace faf::remote
   };
 
   /**
+   * Plan WPR.35: what one blip's update writes for the views that show it the same way and share
+   * its recon data, worked out once a beat. Each view copies it into its own record, so nothing here
+   * is counted by more than one thread, and it lasts one beat.
+   */
+  struct SBlipRecord
+  {
+    wire::SEntityRecord record;
+    wire::SUnitDetail detail;
+  };
+
+  /**
    * Plan WPR.35: the records of plain entities and props, held once for all views. A published
    * entity gets every change in every view and an unpublished one leaves the view, so a view's
    * record is a function of the entity and the mode the view showed it in at its last change: the
@@ -136,6 +147,15 @@ namespace faf::remote
     /** Makes the records the views asked for (`UseMode`), on the sim's workers with `parallel`. */
     void Build(const std::vector<SChangedEntity>& changed, bool parallel);
 
+    /** `count` blip records for this beat; none moves until the next call. */
+    void ReserveBlipRecords(std::size_t count);
+    [[nodiscard]] SBlipRecord& BlipRecord(const std::size_t index) noexcept { return mBlipRecords[index]; }
+    /** One `army`'s update of `blip`; `block` is scratch. Reads only the sim. The blip must be `Shareable`. */
+    void FillBlipRecord(
+      SBlipRecord& out, moho::SSTIEntityVariableData& block, moho::ReconBlip& blip, bool requestRefreshUI, std::size_t army,
+      moho::EUserEntityVisibilityMode mode, std::uint32_t vision, bool hasVision
+    ) const;
+
   private:
     static constexpr std::uint32_t kNoRecord = 0xFFFFFFFFu;
 
@@ -152,6 +172,7 @@ namespace faf::remote
     wire::SFrameCodec mCodec;
     CUnderlayPathReader mNoUnderlays;
     gpg::core::ChunkedVector<wire::SEntityRecord> mRecords;
+    gpg::core::ChunkedVector<SBlipRecord> mBlipRecords;
     std::vector<std::uint32_t> mFree;
     std::vector<std::uint32_t> mReplaced; // this beat's old records, free from the next beat on
     gpg::core::FlatGenerationMap<SEntry> mEntries; // by entity id
@@ -177,6 +198,7 @@ namespace faf::remote
     };
 
     const STarget* target = nullptr;
+    const SBlipRecord* blipRecord = nullptr; // a blip: its update for this view, if it could be shared
     std::uint32_t vision = 0; // a blip: the vision range the view last copied from its creator
     std::uint8_t mode = 0;    // `EUserEntityVisibilityMode`
     std::uint8_t army = 0;    // the view's army (a blip's recon record)

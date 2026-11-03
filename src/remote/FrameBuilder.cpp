@@ -242,6 +242,51 @@ namespace faf::remote
         | (data.mOverchargePaused ? 64u : 0u)
       );
     }
+
+    /** 0x005BF168..0x005BF1C4: the entity block from the view's recon record. */
+    void WriteReconBlock(
+      moho::SSTIEntityVariableData& block, const moho::SPerArmyReconInfo& recon, const std::uint32_t vision, const bool hasVision
+    )
+    {
+      if (hasVision) {
+        block.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(vision));
+      }
+      block.mMeshBlueprint = recon.mStiMesh;
+      block.mHealth = recon.mHealth;
+      block.mMaxHealth = recon.mMaxHealth;
+      block.mFractionComplete = recon.mFractionComplete;
+      block.mIsDead = recon.mMaybeDead;
+    }
+
+    /** What `ApplyVariableData` and `ApplyUnitData` write, from a record they wrote. */
+    void CopyBlipRecord(wire::SEntityRecord& record, const wire::SEntityRecord& from)
+    {
+      record.appearance = from.appearance;
+      record.position = from.position;
+      record.farPosition = from.farPosition;
+      record.farValue = from.farValue;
+      if (from.farPosition) {
+        record.velocity = {};
+        record.anchorBeat = 0;
+      }
+      record.yawOnly = from.yawOnly;
+      record.orientation = from.orientation;
+      record.health = from.health;
+      record.maxHealth = from.maxHealth;
+      record.fractionComplete = from.fractionComplete;
+      record.flags = static_cast<std::uint16_t>(from.flags | (record.flags & kEntityFlagOrphaned));
+      if (record.isUnit) {
+        wire::SUnitFields& unit = record.unit;
+        const wire::SUnitFields& fields = from.unit;
+        unit.fuelRatio = fields.fuelRatio;
+        unit.shieldRatio = fields.shieldRatio;
+        unit.workProgress = fields.workProgress;
+        unit.unitStates = fields.unitStates;
+        unit.scriptBits = fields.scriptBits;
+        unit.siloCounts = fields.siloCounts;
+        unit.unitFlags = fields.unitFlags;
+      }
+    }
   } // namespace
 
   std::uint16_t PackEntityFlags(const moho::SSTIEntityVariableData& data) noexcept
@@ -473,6 +518,33 @@ namespace faf::remote
       moho::CSimWorkerPool::Get().ParallelFor(changed.size(), 256u, fill);
     } else {
       fill(0u, changed.size());
+    }
+  }
+
+  void CSharedEntityRecords::ReserveBlipRecords(const std::size_t count)
+  {
+    if (count > mBlipRecords.size()) {
+      mBlipRecords.grow_to(count);
+    }
+  }
+
+  void CSharedEntityRecords::FillBlipRecord(
+    SBlipRecord& out, moho::SSTIEntityVariableData& block, moho::ReconBlip& blip, const bool requestRefreshUI, const std::size_t army,
+    const moho::EUserEntityVisibilityMode mode, const std::uint32_t vision, const bool hasVision
+  ) const
+  {
+    moho::Entity& entity = blip;
+    CopyEntityBlockReadByBuilder(block, entity.mVarDat);
+    WriteEntityBlockForView(block, entity, mode, requestRefreshUI);
+    const moho::SPerArmyReconInfo& recon = blip.mReconDat[army];
+    WriteReconBlock(block, recon, vision, hasVision);
+    out.record.id = static_cast<std::uint32_t>(entity.id_);
+    std::uint64_t unknownUnderlays = 0; // none: `Shareable`
+    ApplyVariableData(out.record, block, mCodec, mTables, nullptr, mNoUnderlays, unknownUnderlays);
+    ApplyUnitData(out.record.unit, blip.mUnitVarDat);
+    ApplyUnitDetail(out.detail, blip.mUnitVarDat, static_cast<std::int32_t>(recon.mReconFlags), mTables, nullptr);
+    if (const moho::Unit* const creator = blip.mCreator.GetObjectPtr(); creator != nullptr) {
+      out.detail.stunTicks = creator->mUnitVarDat.mStunTicks != 0 ? 1 : 0;
     }
   }
 
@@ -773,6 +845,16 @@ namespace faf::remote
       if (record == nullptr) {
         continue;
       }
+      if (update.blipRecord != nullptr && mSession == nullptr) {
+        CopyBlipRecord(*record, update.blipRecord->record);
+        if (record->isUnit) {
+          (void)record->unit.detail.Assign(update.blipRecord->detail);
+        }
+        if (mTrackChanges) {
+          mTouchedIds.push_back(record->id);
+        }
+        continue;
+      }
       CopyEntityBlockReadByBuilder(mBlockScratch, entity.mVarDat);
       WriteEntityBlockForView(mBlockScratch, entity, update.Mode(), target.requestRefreshUI);
       const moho::SSTIUnitVariableData* unitData = nullptr;
@@ -785,15 +867,7 @@ namespace faf::remote
         creator = target.blip->mCreator.GetObjectPtr();
         unitData = &target.blip->mUnitVarDat;
         reconFlags = static_cast<std::int32_t>(recon.mReconFlags);
-        if (update.hasVision) {
-          mBlockScratch.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(update.vision));
-        }
-        // 0x005BF168..0x005BF1C4: the entity block from the recon record.
-        mBlockScratch.mMeshBlueprint = recon.mStiMesh;
-        mBlockScratch.mHealth = recon.mHealth;
-        mBlockScratch.mMaxHealth = recon.mMaxHealth;
-        mBlockScratch.mFractionComplete = recon.mFractionComplete;
-        mBlockScratch.mIsDead = recon.mMaybeDead;
+        WriteReconBlock(mBlockScratch, recon, update.vision, update.hasVision);
       }
       ApplyVariableData(*record, mBlockScratch, mCodec, mTables, mSession, mUnderlays, mUnknownUnderlays);
       if (unitData != nullptr && record->isUnit) {
