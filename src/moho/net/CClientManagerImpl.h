@@ -614,8 +614,8 @@ namespace moho
     "CClientManagerImpl::mDispatchedTimer offset must be 0x184C0"
   );
   static_assert(offsetof(CClientManagerImpl, mTimer2) == 0x184C8, "CClientManagerImpl::mTimer2 offset must be 0x184C8");
-  // 0x184D0 in the binary, plus the engine's mStreamCheck and mPeerFeatures.
-  static_assert(sizeof(CClientManagerImpl) == 0x184DC, "CClientManagerImpl size must be 0x184DC");
+  // 0x184D0 in the binary, plus the engine's mStreamCheck and mPeerFeatures, 4 bytes each.
+  static_assert(sizeof(CClientManagerImpl) == 0x184D8, "CClientManagerImpl size must be 0x184D8");
 
   /**
    * Address: 0x0053FAF0 (FUN_0053FAF0)
