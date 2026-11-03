@@ -54,9 +54,21 @@ namespace faf::headless
     {
       std::vector<remote::wire::SArmyRecord> armies;
       bool haveArmies = false;
-      std::vector<remote::wire::SGridSlot> grids;
+      std::vector<std::uint16_t> grids; // the slots it received last beat (`SBeatGrid::key`)
+      std::vector<std::uint16_t> gridsNext;
       std::uint32_t bytes = 0;      // this beat
       std::uint64_t failures = 0;   // this beat
+    };
+
+    /** One grid this beat: every client that holds last beat's gets the same delta, encoded once. */
+    struct SBeatGrid
+    {
+      remote::wire::SGridSlot slot;
+      const moho::CIntelGrid* source = nullptr;    // the sim's grid
+      const remote::wire::SGridBits* last = nullptr; // last beat's, in `mLastGrids`
+      remote::wire::BitWriter delta;               // the slot against `last`
+      bool deltaOk = false;
+      std::uint16_t key = 0;                       // army and kind
     };
 
     /** One beat's measurements. */
@@ -73,8 +85,8 @@ namespace faf::headless
     remote::wire::SFrameCodec mCodec;
     std::vector<SClient> mClients;
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
-    std::vector<remote::wire::SGridSlot> mBeatGrids; // every army's grids this beat, copied once
-    std::vector<const moho::CIntelGrid*> mBeatGridSources; // the sim's grid of each of those slots
+    std::vector<SBeatGrid> mBeatGrids; // every army's grids this beat, copied once
+    std::vector<SBeatGrid> mLastGrids; // last beat's; their storage is the next beat's
     std::vector<SBeat> mBeats;
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat
     std::uint64_t mEntities = 0;                 // in all frames, all beats

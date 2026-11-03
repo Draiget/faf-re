@@ -987,6 +987,61 @@ namespace
           && held.orientationBeat == 7u);
   }
 
+  void TestBitWriterAppend()
+  {
+    // A lane put together from slots encoded apart is the lane encoded in one go, at any bit position.
+    std::mt19937 rng(0x6A11u);
+    for (int round = 0; round < 200; ++round) {
+      std::vector<SGridSlot> before;
+      std::vector<SGridSlot> grids;
+      const std::size_t count = 1u + rng() % 6u;
+      for (std::size_t i = 0; i < count; ++i) {
+        SGridSlot slot{};
+        slot.army = static_cast<std::uint8_t>(i);
+        slot.kind = static_cast<std::uint8_t>(rng() & 1u);
+        slot.gridSize = 4u + rng() % 60u;
+        slot.bits.width = 1u + rng() % 16u;
+        slot.bits.height = 1u + rng() % 16u;
+        slot.bits.cells.resize(static_cast<std::size_t>(slot.bits.width) * slot.bits.height);
+        for (std::uint8_t& cell : slot.bits.cells) {
+          cell = static_cast<std::uint8_t>(rng() % 4u == 0u ? 1u : 0u);
+        }
+        if (rng() % 3u != 0u) {
+          SGridSlot held = slot;
+          for (std::uint8_t& cell : held.bits.cells) {
+            cell = static_cast<std::uint8_t>(rng() % 16u == 0u ? 1u - cell : cell);
+          }
+          before.push_back(std::move(held));
+        }
+        grids.push_back(std::move(slot));
+      }
+      BitWriter whole;
+      CHECK(EncodeGridLane(grids, before, whole));
+      BitWriter parts;
+      parts.WriteVarUint(static_cast<std::uint32_t>(grids.size()));
+      for (const SGridSlot& slot : grids) {
+        const auto held = std::find_if(before.begin(), before.end(), [&slot](const SGridSlot& other) {
+          return other.army == slot.army && other.kind == slot.kind;
+        });
+        BitWriter part;
+        CHECK(EncodeGridSlot(slot, held != before.end() ? &held->bits : nullptr, part));
+        parts.Append(part);
+      }
+      CHECK(parts.BitCount() == whole.BitCount());
+      CHECK(std::equal(parts.Bytes().begin(), parts.Bytes().end(), whole.Bytes().begin(), whole.Bytes().end()));
+    }
+    BitWriter none;
+    BitWriter some;
+    some.WriteBits(5u, 3);
+    some.Append(none);
+    CHECK(some.BitCount() == 3u);
+    none.Append(some);
+    CHECK(none.BitCount() == 3u);
+    none.Clear();
+    CHECK(none.BitCount() == 0u);
+    CHECK(none.Bytes().empty());
+  }
+
   void TestBlipUpdateHash()
   {
     // Every field a blip's update writes moves the fingerprint: a field it missed would leave a view
@@ -2308,6 +2363,7 @@ namespace
     {"frame: hostile counts and ids", &TestDecoderHostileCounts},
     {"frame: appearance block", &TestFrameAppearance},
     {"frame: blip update hash", &TestBlipUpdateHash},
+    {"grid lane: slots encoded apart", &TestBitWriterAppend},
   };
 } // namespace
 

@@ -40,6 +40,22 @@ namespace faf::remote::wire
     WriteBits(std::bit_cast<std::uint32_t>(value), 32);
   }
 
+  void BitWriter::Append(const BitWriter& other)
+  {
+    const std::size_t whole = other.mBitCount / 8u;
+    if ((mBitCount & 7u) == 0u) {
+      mBytes.insert(mBytes.end(), other.mBytes.begin(), other.mBytes.begin() + static_cast<std::ptrdiff_t>(whole));
+      mBitCount += whole * 8u;
+    } else {
+      for (std::size_t i = 0; i < whole; ++i) {
+        WriteBits(other.mBytes[i], 8);
+      }
+    }
+    if (const auto rest = static_cast<int>(other.mBitCount & 7u); rest != 0) {
+      WriteBits(other.mBytes[whole], rest);
+    }
+  }
+
   std::uint32_t BitReader::ReadBits(const int bitCount) noexcept
   {
     if (mFailed || bitCount < 0 || bitCount > 32) {
