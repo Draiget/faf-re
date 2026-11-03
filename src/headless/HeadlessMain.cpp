@@ -193,6 +193,8 @@ namespace
       "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables, files read from archives, what effects draw, the pose handles kept for a client\n"
       "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
+      "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
+      "                            container counts too, and FAF's init scripts cannot change it\n"
       "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
       "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
@@ -294,6 +296,20 @@ int main(int argc, char** argv)
     bad = true;
   }
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
+  {
+    std::string cpuList;
+    if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {
+      bad = true;
+    }
+    moho::LockAssignedProcessCpus();
+    if (moho::ProcessCpusAreLocked()) {
+      DWORD_PTR processMask = 0;
+      DWORD_PTR systemMask = 0;
+      (void)::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask);
+      std::printf("[%s] assigned CPU mask %llx of %llx; scripts cannot change it\n", gLabel.c_str(),
+        static_cast<unsigned long long>(processMask), static_cast<unsigned long long>(systemMask));
+    }
+  }
   options.viewBenchCheck = moho::CFG_GetArgOption("--view-bench-check", 0, nullptr);
   options.keepClientData = moho::CFG_GetArgOption("--keep-client-data", 0, nullptr);
   options.spy = moho::CFG_GetArgOption("--spy", 0, nullptr);

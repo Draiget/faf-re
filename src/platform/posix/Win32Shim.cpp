@@ -956,14 +956,56 @@ void SetLastError(const DWORD error)
   tLastError = error;
 }
 
+/// A kernel CPU list such as "0-7,16-23" from a sysfs file; CPUs above 63 are left out, and an unreadable file is 0.
+[[nodiscard]] static DWORD_PTR ReadCpuListFile(const char* const path)
+{
+  std::ifstream file(path);
+  std::string list;
+  if (!file || !std::getline(file, list)) {
+    return 0;
+  }
+  DWORD_PTR mask = 0;
+  const char* cursor = list.c_str();
+  while (*cursor != '\0') {
+    char* end = nullptr;
+    const unsigned long first = std::strtoul(cursor, &end, 10);
+    if (end == cursor) {
+      break;
+    }
+    unsigned long last = first;
+    cursor = end;
+    if (*cursor == '-') {
+      last = std::strtoul(cursor + 1, &end, 10);
+      cursor = end;
+    }
+    for (unsigned long cpu = first; cpu <= last && cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
+      mask |= DWORD_PTR{1} << cpu;
+    }
+    if (*cursor != ',') {
+      break;
+    }
+    ++cursor;
+  }
+  return mask;
+}
+
+/// The process's CPU set. Linux keeps a set per thread, so a pinned thread must not change what this reports:
+/// it is read before main starts, and only `SetProcessAffinityMask` changes it.
+[[nodiscard]] static cpu_set_t& ProcessCpuSet()
+{
+  static cpu_set_t set = [] {
+    cpu_set_t initial;
+    CPU_ZERO(&initial);
+    (void)::sched_getaffinity(0, sizeof(initial), &initial);
+    return initial;
+  }();
+  return set;
+}
+[[maybe_unused]] static const bool sProcessCpuSetRead = (static_cast<void>(ProcessCpuSet()), true);
+
 BOOL GetProcessAffinityMask(HANDLE, DWORD_PTR* const processMask, DWORD_PTR* const systemMask)
 {
-  cpu_set_t set;
-  CPU_ZERO(&set);
-  if (::sched_getaffinity(0, sizeof(set), &set) != 0) {
-    SetErrnoError();
-    return FALSE;
-  }
+  const cpu_set_t& set = ProcessCpuSet();
   DWORD_PTR mask = 0;
   for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
     if (CPU_ISSET(cpu, &set)) {
@@ -974,7 +1016,10 @@ BOOL GetProcessAffinityMask(HANDLE, DWORD_PTR* const processMask, DWORD_PTR* con
     *processMask = mask;
   }
   if (systemMask != nullptr) {
-    *systemMask = mask;
+    // Every online CPU, as on Windows, so a process given fewer can tell. A process cannot run outside
+    // this set, so the process mask is what remains when the file can't be read.
+    const DWORD_PTR online = ReadCpuListFile("/sys/devices/system/cpu/online");
+    *systemMask = online != 0 ? online | mask : mask;
   }
   return TRUE;
 }
@@ -1043,13 +1088,67 @@ DWORD_PTR SetThreadAffinityMask(const HANDLE thread, const DWORD_PTR mask)
   return previousMask != 0 ? previousMask : 1u;
 }
 
-BOOL GetLogicalProcessorInformationEx(LOGICAL_PROCESSOR_RELATIONSHIP, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*, DWORD* const length)
+BOOL GetLogicalProcessorInformationEx(
+  const LOGICAL_PROCESSOR_RELATIONSHIP relation, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* const buffer, DWORD* const length
+)
 {
-  if (length != nullptr) {
-    *length = 0;
+  if (length == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return FALSE;
   }
-  tLastError = ERROR_NOT_SUPPORTED;
-  return FALSE;
+  // One record per physical core or per NUMA node, read from sysfs. CPUs above 63 are outside group 0.
+  std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX> records;
+  const auto addRecord = [&records, relation](const DWORD_PTR mask, const DWORD node) {
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX record{};
+    record.Relationship = relation;
+    record.Size = static_cast<DWORD>(sizeof(record));
+    if (relation == RelationProcessorCore) {
+      record.Processor.GroupCount = 1;
+      record.Processor.GroupMask[0].Mask = mask;
+    } else {
+      record.NumaNode.NodeNumber = node;
+      record.NumaNode.GroupCount = 1;
+      record.NumaNode.GroupMask.Mask = mask;
+    }
+    records.push_back(record);
+  };
+  if (relation == RelationProcessorCore) {
+    const DWORD_PTR online = ReadCpuListFile("/sys/devices/system/cpu/online");
+    DWORD_PTR seen = 0;
+    for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
+      const DWORD_PTR bit = DWORD_PTR{1} << cpu;
+      if ((online & bit) == 0 || (seen & bit) != 0) {
+        continue;
+      }
+      const std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/thread_siblings_list";
+      const DWORD_PTR siblings = ReadCpuListFile(path.c_str());
+      const DWORD_PTR core = (siblings != 0 ? siblings : bit) & online;
+      seen |= core;
+      addRecord(core, 0);
+    }
+  } else if (relation == RelationNumaNode) {
+    for (DWORD node = 0; node < 64; ++node) {
+      const std::string path = "/sys/devices/system/node/node" + std::to_string(node) + "/cpulist";
+      const DWORD_PTR cpus = ReadCpuListFile(path.c_str());
+      if (cpus != 0) {
+        addRecord(cpus, node);
+      }
+    }
+  }
+  const DWORD needed = static_cast<DWORD>(records.size() * sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX));
+  if (needed == 0) {
+    *length = 0;
+    tLastError = ERROR_NOT_SUPPORTED;
+    return FALSE;
+  }
+  if (buffer == nullptr || *length < needed) {
+    *length = needed;
+    tLastError = ERROR_INSUFFICIENT_BUFFER;
+    return FALSE;
+  }
+  std::memcpy(static_cast<void*>(buffer), records.data(), needed);
+  *length = needed;
+  return TRUE;
 }
 
 // --- Memory ------------------------------------------------------------------------------
@@ -1596,6 +1695,8 @@ BOOL SetProcessAffinityMask(const HANDLE process, const DWORD_PTR processMask)
     SetErrnoError();
     return FALSE;
   }
+  // What the kernel kept: a CPU outside the container's set drops out.
+  (void)::sched_getaffinity(0, sizeof(ProcessCpuSet()), &ProcessCpuSet());
   return TRUE;
 }
 
