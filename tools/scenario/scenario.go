@@ -163,6 +163,8 @@ type Expect struct {
 	// LogsContain: every listed player's game log has a line matching the
 	// pattern (any number of players, one included).
 	LogsContain []LogsAgree `yaml:"logsContain"`
+	// LogsAbsent: no listed player's game log holds a matching line.
+	LogsAbsent []LogsAgree `yaml:"logsAbsent"`
 }
 
 // LogsAgree requires every listed player's game log (<run>/game-<uid>.log,

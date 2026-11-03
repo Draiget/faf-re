@@ -10,6 +10,7 @@ namespace moho
   extern bool net_DebugCrash;            // 0x010A6380
   extern bool net_LogPackets;            // 0x010A6381
   extern int32_t net_DebugLevel;         // 0x010A6384
+  extern int32_t net_PeerFeatures;       // engine addition (issue #285), off by default
   extern int32_t net_AckDelay;           // 0x00F58DE0
   extern int32_t net_SendDelay;          // 0x00F58DE4
   extern int32_t net_MinResendDelay;     // 0x00F58DE8
@@ -46,6 +47,8 @@ namespace moho
   extern int32_t net_NativeNetWebRtc;
   extern int32_t net_NativeNetRedundancy;
   extern int32_t net_FastRetransmit;
+  extern float net_FastResendPings;
+  extern int32_t net_FastAckDelay;
 
   // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.
   bool NET_FastRetransmitEnabled();

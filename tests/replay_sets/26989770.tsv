@@ -723,6 +723,7 @@ va	name	params	hashed	result	calls	file	line
 0x00907970	LuaPlus::LuaObject::GetNumber	P -> D		3	147353	src/lua/LuaObject.cpp	23264
 0x00907C90	LuaPlus::LuaObject::GetBoolean	P -> B		5	6462	src/lua/LuaObject.cpp	23146
 0x00907F50	LuaPlus::LuaObject::GetCount	P -> I		1	1159506	src/lua/LuaObject.cpp	22878
+0x009081F0	LuaPlus::LuaObject::SetInteger	P P I -> V	2	0	23482	src/lua/LuaObject.cpp	22028
 0x00908320	LuaPlus::LuaObject::SetNumber	P P F -> V	2	0	118175	src/lua/LuaObject.cpp	21946
 0x00908370	LuaPlus::LuaObject::SetNumber	P I F -> V	1 2	0	921384	src/lua/LuaObject.cpp	21962
 0x009084E0	LuaPlus::LuaObject::SetString	P I P -> V	1	0	416	src/lua/LuaObject.cpp	21751

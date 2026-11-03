@@ -85,7 +85,7 @@ def read_spec(path):
 
 def make(retail_sets, cmp_tsv, self_tsv, ours_spec, exe, pdb, out_dir, replay):
     build = Build(exe, pdb)
-    sets = compare_sets.read_sets(retail_sets)
+    sets = compare_sets.read_retail_sets(retail_sets)
     spec = read_spec(ours_spec)
     noise = {r["va"] for r in csv.DictReader(open(self_tsv), delimiter="\t") if r["verdict"] == "DIFFERS"}
     os.makedirs(out_dir, exist_ok=True)

@@ -1,0 +1,47 @@
+name: 3p-peer-features-retail
+description: >
+  Issue #285. The shipped game and two of our x64 clients, the announcement on
+  for ours. Each of ours must see the other's list and none from retail, retail
+  must log the one message it ignores from each of them, and the game must play on
+  with no desync. Needs init_mpemu_localvault.lua in the FAF bin folder. Do not
+  click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef }
+  - { uid: 2, name: OursA, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\peerfeat_test.exe', args: ['/con', 'net_PeerFeatures=1'] }
+  - { uid: 3, name: OursB, faction: aeon, exe: '%ProgramData%\FAForever\bin_x64\peerfeat_test.exe', args: ['/con', 'net_PeerFeatures=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [2], pattern: 'PEERS: client \d+:OursB announced features' }
+    - { uids: [3], pattern: 'PEERS: client \d+:OursA announced features' }
+    - { uids: [1], pattern: 'Ignoring message type 58' }
+  logsAbsent:
+    - { uids: [2, 3], pattern: 'PEERS: client \d+:Retail announced' }
+    - { uids: [2, 3], pattern: 'PEERS: everyone supports \S+: yes' }
+    - { uids: [2, 3], pattern: 'mismatched' }

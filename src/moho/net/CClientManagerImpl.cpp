@@ -161,6 +161,7 @@ CClientManagerImpl::CClientManagerImpl(
       net_CheckOrderStreams > 0 ? std::make_unique<CommandStreamCheck>(clientCount, net_CheckOrderStreams >= 2)
                                 : nullptr
     )
+  , mPeerFeatures(std::make_unique<CPeerFeatures>(clientCount))
 {
   mClients.resize(clientCount, nullptr);
 }
@@ -826,6 +827,10 @@ void CClientManagerImpl::Cleanup()
     mWeAreReady = true;
     mDispatchedTimer.Reset();
   }
+
+  // Engine addition (issue #285): before this client's ready, so a peer knows
+  // what it supports before the game runs.
+  mPeerFeatures->Announce(*this);
 
   CMessage message{EClientMsg::CLIMSG_Ready};
   ProcessClients(message);

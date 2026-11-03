@@ -25,6 +25,10 @@ A PR that ticks "Sim behaviour changes" or "Not sure", or that adds a sim consol
 
 UI, rendering, audio and movies are not in the sim and can change freely, but a change to what the original game did should say so (the reviewer adds `retail divergence`).
 
+## Features that need other players on our engine
+
+A feature that only works when other players run our engine asks one shared announcement. Don't add another way to detect our builds, or a new message type: [docs/PEER_FEATURES.md](docs/PEER_FEATURES.md) says how to add it.
+
 ## Working on recovered code
 
 Every engine function in `src/` was rebuilt from the original binary, and its behaviour is the reference.

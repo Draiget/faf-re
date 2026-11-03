@@ -943,6 +943,7 @@ set(FAF_ENGINE_SOURCES
   moho/net/CClientManagerImpl.cpp
   moho/net/CNullClient.cpp
   moho/net/CReplayClient.cpp
+  moho/net/PeerFeatures.cpp
   moho/serialization/SSavedGameArmyInfoVectorReflection.cpp
   gpg/core/reflection/SerializationError.cpp
   gpg/core/streams/BinaryReader.cpp

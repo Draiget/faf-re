@@ -9,8 +9,12 @@ usage: compare_sets.py <retail.sets> <ours.sets> <map.tsv> <out.tsv> [--self]
 
 --self compares two runs of the same program: both directions must be empty.
 """
+import csv
+import os
 import struct
 import sys
+
+RETAIL_BUGS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tests", "replay_sets", "retail_bugs.tsv")
 
 
 def read_sets(path):
@@ -28,6 +32,16 @@ def read_sets(path):
     return out
 
 
+def read_retail_sets(path):
+    """The original game's sets without its known bugs: we don't copy those, so ours must not need them."""
+    sets = read_sets(path)
+    for bug in csv.DictReader(open(RETAIL_BUGS, encoding="utf-8"), delimiter="\t", quoting=csv.QUOTE_NONE):
+        found = sets.get(int(bug["va"], 16))
+        if found:
+            found["hashes"].discard(int(bug["hash"], 16))
+    return sets
+
+
 def sample(hashes, level):
     if level == 0:
         return hashes
@@ -39,7 +53,7 @@ def main():
     both_ways = "--self" in sys.argv
     if len(args) != 4:
         raise SystemExit(__doc__)
-    first, second = read_sets(args[0]), read_sets(args[1])
+    first, second = read_sets(args[0]) if both_ways else read_retail_sets(args[0]), read_sets(args[1])
     names = {}
     for line in open(args[2], encoding="utf-8"):
         cols = line.rstrip("\n").split("\t")
