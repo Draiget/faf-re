@@ -731,7 +731,7 @@ namespace msvc8
         /** string + C-string */
         [[nodiscard]] string operator+(const char* rhs) const noexcept;
 
-        /** operator+= appends in place, as MSVC8's does. */
+        /** operator+= appends in place, as the binary's `append` (0x004058F0) does: it grows through `_Copy` (0x00405C20) only when capacity runs out. */
         string& operator+=(const string& rhs) noexcept {
             const std::string_view view = rhs.view();
             (void)append(view.data(), view.size());

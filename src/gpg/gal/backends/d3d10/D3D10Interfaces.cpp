@@ -1061,68 +1061,6 @@ namespace gpg::gal
       return GetLegacyWideZeroStorageLane();
     }
 
-    struct ProxyVectorLane final
-    {
-      void* proxy = nullptr;          // +0x00
-      std::uint8_t* first = nullptr;  // +0x04
-      std::uint8_t* last = nullptr;   // +0x08
-      std::uint8_t* end = nullptr;    // +0x0C
-    };
-    static_assert(sizeof(ProxyVectorLane) == 0x10, "ProxyVectorLane size must be 0x10");
-
-    using ProxyVectorThrowFn = void (*)();
-    using ProxyVectorAllocateFn = void* (*)(std::uint32_t);
-
-    bool TryInitializeProxyVectorLane(
-      ProxyVectorLane* const lane,
-      const std::uint32_t elementCount,
-      const std::uint32_t maxElementCount,
-      const std::uint32_t elementStrideBytes,
-      ProxyVectorThrowFn throwTooLong,
-      ProxyVectorAllocateFn allocateStorage
-    )
-    {
-      lane->first = nullptr;
-      lane->last = nullptr;
-      lane->end = nullptr;
-
-      if (elementCount == 0U) {
-        return false;
-      }
-
-      if (elementCount > maxElementCount) {
-        throwTooLong();
-      }
-
-      auto* const storage = static_cast<std::uint8_t*>(allocateStorage(elementCount));
-      lane->first = storage;
-      lane->last = storage;
-      lane->end = storage + (static_cast<std::size_t>(elementStrideBytes) * static_cast<std::size_t>(elementCount));
-      return true;
-    }
-
-    /**
-     * Address: 0x008FDFC0 (FUN_008FDFC0)
-     *
-     * What it does:
-     * Clears one proxy-vector lane and reserves `count` 4-byte entries with
-     * legacy VC8 vector-length overflow semantics.
-     */
-    bool TryInitializeDwordProxyVectorLane(
-      ProxyVectorLane* const lane,
-      const std::uint32_t elementCount
-    )
-    {
-      return TryInitializeProxyVectorLane(
-        lane,
-        elementCount,
-        0x3FFFFFFFU,
-        0x04U,
-        ThrowVectorTooLongLengthErrorB,
-        AllocateStride04Array
-      );
-    }
-
   } // namespace
 
   /**

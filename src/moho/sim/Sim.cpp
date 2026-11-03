@@ -10354,7 +10354,7 @@ namespace
    *     disagreed with the header's `offsetof(REntityBlueprint,
    *     mCategories) == 0x60` and with `REntityBlueprintTypeInfo::AddFields`
    *     (FUN_00512870, `push 60h` for the reflected "Categories" field).
-   *     It does not: `msvc8::vector<T>` in this codebase is 16 bytes
+   *     It does not: the binary's vector is 16 bytes
    *     (leading `myProxy_` before `first_`/`last_`/`end_`, matching VC8's
    *     `_SECURE_SCL=1` `_Container_base12` proxy word), so `begin()`/
    *     `end()` sit at the vector object's `+0x4`/`+0x8` -- `this+0x64`/

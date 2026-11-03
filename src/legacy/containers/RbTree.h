@@ -52,10 +52,6 @@
  * iterators a single pointer wide.
  */
 
-#ifndef MSVC8_RBTREE_DISABLE_FREE
-#define MSVC8_RBTREE_DISABLE_FREE 0
-#endif
-
 #pragma pack(push, 4)
 
 namespace msvc8
@@ -6299,11 +6295,7 @@ namespace msvc8
              */
             static void free_raw(node_type* const n) noexcept
             {
-#if !MSVC8_RBTREE_DISABLE_FREE
                 ::operator delete(n);
-#else
-                (void)n;
-#endif
             }
 
             /**
