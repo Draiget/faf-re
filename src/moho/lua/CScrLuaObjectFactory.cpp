@@ -37,6 +37,16 @@ namespace
     &lua_BlueprintFieldContext
   );
 
+  bool lua_SessionSharedBlueprints = true;
+  moho::TConVar<bool> gTConVar_lua_SessionSharedBlueprints(
+    "lua_SessionSharedBlueprints",
+    "The session's Lua copy of the blueprints keeps one table for each blueprint, reached by its number and by its id "
+    "as in the rules' own state (1, the default), or two separate copies (0). The sim's copy always has two.",
+    &lua_SessionSharedBlueprints
+  );
+
+  thread_local std::unordered_map<const void*, LuaPlus::LuaObject>* tCopiedTables = nullptr;
+
   constexpr const char* kActiveModsGlobalName = "__active_mods";
   constexpr const char* kLocationFieldName = "location";
   constexpr const char* kHookDirFieldName = "hookdir";
@@ -817,6 +827,22 @@ namespace moho
    * cloning userdata with reflected move handlers when crossing root-state
    * boundaries.
    */
+  SCR_CopySharedTablesScope::SCR_CopySharedTablesScope()
+  {
+    if (lua_SessionSharedBlueprints && tCopiedTables == nullptr) {
+      tCopiedTables = new std::unordered_map<const void*, LuaPlus::LuaObject>();
+      mActive = true;
+    }
+  }
+
+  SCR_CopySharedTablesScope::~SCR_CopySharedTablesScope()
+  {
+    if (mActive) {
+      delete tCopiedTables;
+      tCopiedTables = nullptr;
+    }
+  }
+
   LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* const state)
   {
     LuaPlus::LuaObject out{};
@@ -846,7 +872,23 @@ namespace moho
         return out;
 
       case LUA_TTABLE: {
+        const void* sharedKey = nullptr;
+        if (tCopiedTables != nullptr) {
+          LuaPlus::LuaState* const sourceState = source.GetActiveState();
+          lua_State* const rawSource = sourceState->GetCState();
+          const int savedTop = lua_gettop(rawSource);
+          source.PushStack(sourceState);
+          sharedKey = lua_topointer(rawSource, -1);
+          lua_settop(rawSource, savedTop);
+          const auto found = tCopiedTables->find(sharedKey);
+          if (found != tCopiedTables->end()) {
+            return found->second;
+          }
+        }
         out.AssignNewTable(state, 0, 0);
+        if (sharedKey != nullptr) {
+          tCopiedTables->emplace(sharedKey, out);
+        }
         LuaPlus::LuaObject mutableSource(source);
         for (LuaPlus::LuaTableIterator iter(mutableSource, 1); !iter.m_isDone; iter.Next()) {
           const LuaPlus::LuaObject keyCopy = SCR_Copy(iter.GetKey(), state);
