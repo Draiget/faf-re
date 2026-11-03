@@ -497,6 +497,7 @@ namespace moho
     device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
     bindTargetWithBorder(mShadowMap);
 
+    terrain->DrawTerrainDepth(mCamera);
 
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
     meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
