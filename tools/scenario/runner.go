@@ -418,6 +418,9 @@ func (r *runner) check(e Expect) []string {
 	if e.PeerStats != nil {
 		fails = append(fails, r.checkPeerStats(*e.PeerStats)...)
 	}
+	for _, la := range e.LogsAbsent {
+		fails = append(fails, r.checkLogsAbsent(la)...)
+	}
 	for _, la := range e.LogsAgree {
 		fails = append(fails, r.checkLogsAgree(la)...)
 	}
@@ -429,6 +432,26 @@ func (r *runner) check(e Expect) []string {
 
 // checkLogsContain requires a matching line in every listed player's game
 // log, and journals the matches.
+// checkLogsAbsent fails when a listed player's game log holds a matching line.
+func (r *runner) checkLogsAbsent(la LogsAgree) []string {
+	re, err := regexp.Compile(la.Pattern)
+	if err != nil {
+		return []string{fmt.Sprintf("logsAbsent %q: %v", la.Pattern, err)}
+	}
+	var fails []string
+	for _, uid := range la.UIDs.Resolve(r.l.Players(), r.l.Host()) {
+		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d.log", uid)), re)
+		if err != nil {
+			fails = append(fails, fmt.Sprintf("logsAbsent %q: player %d: %v", la.Pattern, uid, err))
+			continue
+		}
+		if len(got) != 0 {
+			fails = append(fails, fmt.Sprintf("logsAbsent %q: player %d logged %q", la.Pattern, uid, got))
+		}
+	}
+	return fails
+}
+
 func (r *runner) checkLogsContain(lc LogsAgree) []string {
 	re, err := regexp.Compile(lc.Pattern)
 	if err != nil {
