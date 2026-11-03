@@ -1886,8 +1886,8 @@ extern "C"
 
 		const Node* node = table->node;
 		for (int remaining = 1 << table->lsizenode; remaining != 0; --remaining, ++node) {
-			if (node->i_key.tt == LUA_TNUMBER && node->i_val.tt != LUA_TNIL && node->i_key.value.n > largest) {
-				largest = node->i_key.value.n;
+			if (node->KeyIs(LUA_TNUMBER) && node->i_val.tt != LUA_TNIL && node->KeyValue().n > largest) {
+				largest = node->KeyValue().n;
 			}
 		}
 
@@ -2951,7 +2951,11 @@ extern "C"
 		}
 
 		Node* node = luaH_mainposition(t, key);
-		while (luaO_rawequalObj(&node->i_key, key) == 0) {
+		for (;;) {
+			const TObject nodeKey = node->Key();
+			if (luaO_rawequalObj(&nodeKey, key) != 0) {
+				break;
+			}
 			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
@@ -2977,7 +2981,7 @@ extern "C"
 		const float floatKey = static_cast<float>(key);
 		const std::uint32_t bucket = LuaFloatBitPattern(floatKey + 1.0f) % LuaHashOddModulus(t);
 		Node* node = &t->node[bucket];
-		while (node->i_key.tt != LUA_TNUMBER || node->i_key.value.n != floatKey) {
+		while (!node->KeyIs(LUA_TNUMBER) || node->KeyValue().n != floatKey) {
 			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
@@ -2997,7 +3001,7 @@ extern "C"
 	const TObject* luaH_getstr(Table* const t, TString* const key)
 	{
 		Node* node = &t->node[key->hash & LuaHashMask(t)];
-		while (node->i_key.tt != LUA_TSTRING || static_cast<TString*>(node->i_key.value.p) != key) {
+		while (!node->KeyIs(LUA_TSTRING) || static_cast<TString*>(node->KeyValue().p) != key) {
 			node = node->Next();
 			if (node == nullptr) {
 				return &luaO_nilobject;
@@ -3164,7 +3168,7 @@ extern "C"
 			}
 		}
 
-		key[0] = nodeBase[nodeIndex].i_key;
+		key[0] = nodeBase[nodeIndex].Key();
 		key[1] = nodeBase[nodeIndex].i_val;
 		return 1;
 	}
@@ -3228,7 +3232,8 @@ extern "C"
 			valueSlot = &nodeBase[nodeIndex].i_val;
 		}
 
-		key->AssignTObject(state, &nodeBase[nodeIndex].i_key);
+		TObject nodeKey = nodeBase[nodeIndex].Key();
+		key->AssignTObject(state, &nodeKey);
 		value->AssignTObject(state, &nodeBase[nodeIndex].i_val);
 		return 1;
 	}
@@ -3637,8 +3642,8 @@ extern "C"
 				continue;
 			}
 
-			if (node.i_key.tt == LUA_TNUMBER) {
-				const float numericKey = node.i_key.value.n;
+			if (node.KeyIs(LUA_TNUMBER)) {
+				const float numericKey = node.KeyValue().n;
 				const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
 				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1
 					&& ((integerKey - 1) & 0xFF000000) == 0) {
@@ -3698,7 +3703,7 @@ extern "C"
 			for (int index = 0; index < size; ++index) {
 				Node& node = table->node[index];
 				node.SetNext(nullptr);
-				node.i_key.tt = LUA_TNIL;
+				node.SetKeyTag(LUA_TNIL);
 				node.i_val.tt = LUA_TNIL;
 			}
 		} else {
@@ -3807,7 +3812,7 @@ extern "C"
 		if (oldHashBits == 0) {
 			copiedDummyNode = *oldNodeArray;
 			oldNodeArray = &copiedDummyNode;
-			state->l_G->dummynode[0].i_key.tt = LUA_TNIL;
+			state->l_G->dummynode[0].SetKeyTag(LUA_TNIL);
 			state->l_G->dummynode[0].i_val.tt = LUA_TNIL;
 		}
 
@@ -3844,7 +3849,8 @@ extern "C"
 				continue;
 			}
 
-			TObject* const destinationSlot = luaH_set(state, table, &oldNode.i_key);
+			const TObject oldKey = oldNode.Key();
+			TObject* const destinationSlot = luaH_set(state, table, &oldKey);
 			*destinationSlot = oldNode.i_val;
 		}
 
@@ -3884,7 +3890,8 @@ extern "C"
 	{
 		Node* mainPosition = luaH_mainposition(table, key);
 		if (mainPosition->i_val.tt != LUA_TNIL) {
-			Node* const collidingMainPosition = luaH_mainposition(table, &mainPosition->i_key);
+			const TObject occupantKey = mainPosition->Key();
+			Node* const collidingMainPosition = luaH_mainposition(table, &occupantKey);
 			Node* const firstFree = table->firstfree;
 			if (collidingMainPosition == mainPosition) {
 				firstFree->SetNext(mainPosition->Next());
@@ -3897,7 +3904,7 @@ extern "C"
 				}
 
 				collisionPrev->SetNext(firstFree);
-				firstFree->i_key = mainPosition->i_key;
+				firstFree->SetKey(occupantKey);
 				firstFree->i_val = mainPosition->i_val;
 				firstFree->SetNext(mainPosition->Next());
 				mainPosition->SetNext(nullptr);
@@ -3905,8 +3912,8 @@ extern "C"
 			}
 		}
 
-		mainPosition->i_key = *key;
-		if (table->firstfree->i_key.tt == LUA_TNIL) {
+		mainPosition->SetKey(*key);
+		if (table->firstfree->KeyIs(LUA_TNIL)) {
 			return &mainPosition->i_val;
 		}
 
@@ -3919,7 +3926,7 @@ extern "C"
 
 			Node* const previousNode = currentFirstFree - 1;
 			table->firstfree = previousNode;
-			if (previousNode->i_key.tt == LUA_TNIL) {
+			if (previousNode->KeyIs(LUA_TNIL)) {
 				return &mainPosition->i_val;
 			}
 		}
@@ -4326,8 +4333,8 @@ namespace
 			Node* const node = &globalsTable->node[--nodeIndex];
 			--remaining;
 
-			if (luaO_rawequalObj(object, &node->i_val) != 0 && node->i_key.tt == LUA_TSTRING) {
-				return static_cast<const TString*>(node->i_key.value.p)->str;
+			if (luaO_rawequalObj(object, &node->i_val) != 0 && node->KeyIs(LUA_TSTRING)) {
+				return static_cast<const TString*>(node->KeyValue().p)->str;
 			}
 		}
 
@@ -7469,7 +7476,7 @@ namespace
 		// was mismodelled as starting at 0x58.
 		constexpr int kLuaTagMethodMode = 2;
 
-		auto markCollectable = [st](TObject& slot) {
+		auto markCollectable = [st](const TObject& slot) {
 			if (slot.tt >= LUA_TSTRING) {
 				auto* const object = static_cast<GCObject*>(slot.value.p);
 				if (object != nullptr && (object->gch.marked & 0x11u) == 0u) {
@@ -7478,7 +7485,7 @@ namespace
 			}
 		};
 
-		auto condMarkCollectable = [&markCollectable](TObject& slot, const bool shouldMark) {
+		auto condMarkCollectable = [&markCollectable](const TObject& slot, const bool shouldMark) {
 			if (shouldMark) {
 				markCollectable(slot);
 			}
@@ -7523,7 +7530,7 @@ namespace
 		for (int index = 1 << h->lsizenode; index != 0; --index) {
 			Node* const node = &h->node[index - 1];
 			if (node->i_val.tt != LUA_TNIL) {
-				condMarkCollectable(node->i_key, !weakkey);
+				condMarkCollectable(node->Key(), !weakkey);
 				condMarkCollectable(node->i_val, !weakvalue);
 			}
 		}
@@ -7712,7 +7719,7 @@ namespace
 	 */
 	extern "C" void cleartablekeys(GCObject* tableList)
 	{
-		auto markStringKey = [](LuaPlus::TObject& keySlot) {
+		auto markStringKey = [](const LuaPlus::TObject& keySlot) {
 			if (keySlot.tt == LUA_TSTRING && keySlot.value.p != nullptr) {
 				static_cast<TString*>(keySlot.value.p)->marked |= 1u;
 			}
@@ -7723,14 +7730,14 @@ namespace
 			const int nodeCount = 1 << table->lsizenode;
 			for (int nodeIndex = nodeCount; nodeIndex != 0; --nodeIndex) {
 				Node& node = table->node[nodeIndex - 1];
-				LuaPlus::TObject& keySlot = node.i_key;
+				const LuaPlus::TObject keySlot = node.Key();
 				markStringKey(keySlot);
 
 				if (keySlot.tt >= LUA_TSTRING) {
 					auto* const keyObject = static_cast<GCObject*>(keySlot.value.p);
 					if (keyObject != nullptr && (keyObject->gch.marked & 1u) == 0u) {
 						node.i_val.tt = LUA_TNIL;
-						keySlot.tt = LUA_TNONE;
+						node.SetKeyTag(LUA_TNONE);
 					}
 				}
 			}
@@ -7774,10 +7781,10 @@ namespace
 				if (valueSlot.tt >= LUA_TSTRING) {
 					auto* const valueObject = static_cast<GCObject*>(valueSlot.value.p);
 					if (valueObject != nullptr && (valueObject->gch.marked & 1u) == 0u) {
-						const bool hasCollectableKey = node.i_key.tt >= LUA_TSTRING;
+						const bool hasCollectableKey = node.KeyTag() >= LUA_TSTRING;
 						valueSlot.tt = LUA_TNIL;
 						if (hasCollectableKey) {
-							node.i_key.tt = LUA_TNONE;
+							node.SetKeyTag(LUA_TNONE);
 						}
 					}
 				}
@@ -13339,12 +13346,13 @@ namespace
 					if (node.i_val.tt == LUA_TNIL) {
 						continue;
 					}
-					if ((weakkey && dead(node.i_key)) || (weakvalue && dead(node.i_val))) {
+					const TObject nodeKey = node.Key();
+					if ((weakkey && dead(nodeKey)) || (weakvalue && dead(node.i_val))) {
 						++bad;
 						if (Report()) {
 							gpg::Warnf("[GCVERIFY] collection %ld: weak table %p (mode %s, marked=%02X) node %d key %s %p (marked=%02X) value %s",
-								sCollection.load(), static_cast<void*>(h), modeText, h->marked, index, TypeName(node.i_key.tt), static_cast<void*>(node.i_key.value.p),
-								node.i_key.tt >= LUA_TSTRING ? static_cast<GCObject*>(node.i_key.value.p)->gch.marked : 0, TypeName(node.i_val.tt));
+								sCollection.load(), static_cast<void*>(h), modeText, h->marked, index, TypeName(nodeKey.tt), static_cast<void*>(nodeKey.value.p),
+								nodeKey.tt >= LUA_TSTRING ? static_cast<GCObject*>(nodeKey.value.p)->gch.marked : 0, TypeName(node.i_val.tt));
 						}
 					}
 				}
@@ -13613,7 +13621,7 @@ namespace
 				const Node& node = h->node[index - 1];
 				if (node.i_val.tt != LUA_TNIL) {
 					if (!weakkey) {
-						MarkValue(lists, node.i_key);
+						MarkValue(lists, node.Key());
 					}
 					if (!weakvalue) {
 						MarkValue(lists, node.i_val);
@@ -13995,10 +14003,11 @@ namespace
 		{
 			for (int nodeIndex = 1 << table->lsizenode; nodeIndex != 0; --nodeIndex) {
 				Node& node = table->node[nodeIndex - 1];
-				MarkStringSlot(node.i_key);
-				if (IsUnmarkedObject(node.i_key)) {
+				const TObject nodeKey = node.Key();
+				MarkStringSlot(nodeKey);
+				if (IsUnmarkedObject(nodeKey)) {
 					node.i_val.tt = LUA_TNIL;
-					node.i_key.tt = LUA_TNONE;
+					node.SetKeyTag(LUA_TNONE);
 				}
 			}
 		}
@@ -14017,10 +14026,10 @@ namespace
 				Node& node = table->node[nodeIndex - 1];
 				MarkStringSlot(node.i_val);
 				if (IsUnmarkedObject(node.i_val)) {
-					const bool hasCollectableKey = node.i_key.tt >= LUA_TSTRING;
+					const bool hasCollectableKey = node.KeyTag() >= LUA_TSTRING;
 					node.i_val.tt = LUA_TNIL;
 					if (hasCollectableKey) {
-						node.i_key.tt = LUA_TNONE;
+						node.SetKeyTag(LUA_TNONE);
 					}
 				}
 			}
@@ -19185,7 +19194,7 @@ extern "C"
 		globalState->_registry.tt = LUA_TNIL;
 		globalState->mainthread = state;
 		globalState->lstate = state;
-		globalState->dummynode[0].i_key.tt = LUA_TNIL;
+		globalState->dummynode[0].SetKeyTag(LUA_TNIL);
 		globalState->dummynode[0].i_val.tt = LUA_TNIL;
 		globalState->dummynode[0].SetNext(nullptr);
 		globalState->fatalErrorFunc = &defaultFatalErrorFunc;
@@ -20435,7 +20444,8 @@ void Table::MemberSerialize(gpg::WriteArchive* const archive, const int, const g
 			continue;
 		}
 
-		archive->Write(tObjectType, &slot.i_key, ownerRef);
+		const TObject slotKey = slot.Key();
+		archive->Write(tObjectType, &slotKey, ownerRef);
 		archive->Write(tObjectType, &slot.i_val, ownerRef);
 	}
 }
