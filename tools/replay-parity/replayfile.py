@@ -150,12 +150,15 @@ def replay_body_info(data):
 
 
 def live_client_desync(recorded, beat, sim, theirs):
-    """True when a mismatch is the live game's, not ours: at that beat more of the recorded
-    clients agree with the sim than with the one that differs (26946725: nine clients and the
-    sim on one checksum at beat 6700, Paulosan alone on another). `recorded` is
-    replay_checksums() of the replay."""
+    """True when a mismatch is the live game's, not ours: at that beat at least as many of the
+    recorded clients agree with the sim as with the one that differs (26946725: nine clients and
+    the sim on one checksum at beat 6700, Paulosan alone on another). A tie counts: two players
+    who split one against one each recorded their own checksum, and the sim matching one of them
+    exactly is not a bug of ours (run 41660446996: most of its desyncs). The game then goes on
+    checking against that side. `recorded` is replay_checksums() of the replay."""
     votes = recorded.get(beat, {})
-    return len(votes.get(sim, [])) > len(votes.get(theirs, []))
+    agree = len(votes.get(sim, []))
+    return agree > 0 and agree >= len(votes.get(theirs, []))
 
 
 MISMATCH_RE = re.compile(r"Checksum for beat (\d+) mismatched: ([0-9a-f]{32}) \(sim\) != ([0-9a-f]{32}) \((.*)\)\.")
