@@ -1490,7 +1490,9 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   // Engine addition (wld_PreciseSharedStart): the first new payload after a queued ready message
   // carries it; a resend of older data goes before it and says nothing about it. A resend of the
   // carrier moves the time, as the peer times the copy that reached it: a lost first copy would
-  // otherwise leave the two players a whole resend wait apart on the shared start.
+  // otherwise leave the two players a whole resend wait apart on the shared start. When only the
+  // ACK was lost the peer timed the earlier copy, so that gap remains; the reply echoes the last
+  // serial it saw (`AdoptPacket`) either way, and nothing here can tell the two cases apart.
   if (packet->header.mType == PT_Data && packet->header.mPayloadLength != 0) {
     if (packet->mResendCount != 0) {
       for (const SReadyCarrier& carrier : gReadyCarriers) {

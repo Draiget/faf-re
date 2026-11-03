@@ -194,6 +194,10 @@ namespace
     SkewClock& clock = gSkewClock;
     if (clock.mStarted && correcting != clock.mCorrecting) {
       LogSkewCorrection(correcting, beat.mCurTick);
+      // The last player without it has left: what built up while it waited is not paid back in one go.
+      if (correcting) {
+        clock.mLagMs = 0.0f;
+      }
     }
     clock.mCorrecting = correcting;
     if (!beat.mAdvanced) {
