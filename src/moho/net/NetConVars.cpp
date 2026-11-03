@@ -27,6 +27,8 @@ namespace moho
   // made (`net_CheckOrderStreams`) or for every message sent
   // (`net_DebugAlterOrdersTo`).
   int32_t net_CheckOrderStreams = 1;
+  // Read as a game finishes loading (issue #285).
+  int32_t net_PeerFeatures = 0;
   int32_t net_DebugAlterOrdersTo = -1;
   // Read when a game's UDP socket is made (NET_MakeUDPConnector); 0 keeps the
   // system's buffer size, as the binary does (issue #236).
@@ -121,6 +123,13 @@ namespace moho
       "net_InEngineLinks",
       "1: run the peer links in the game when the ICE adapter is faf-netbridge; 0 (default) leaves them to the adapter.",
       &net_InEngineLinks
+    );
+
+    TConVar<int32_t> gTConVar_net_PeerFeatures(
+      "net_PeerFeatures",
+      "1: tell every other player what this engine supports as the game finishes loading (docs/PEER_FEATURES.md); "
+      "0 (default): send nothing, as the original game. Next game.",
+      &net_PeerFeatures
     );
 
     TConVar<int32_t> gTConVar_net_CheckOrderStreams(
