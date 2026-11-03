@@ -39,6 +39,7 @@ A few more details:
 - **Less repeated work in the sim**: intel grids, recon blip refreshes, blueprint lookups, area queries and checksum hashing no longer redo work whose result is already known.
 - **Pacing**: replays and single player compute a few beats ahead of the screen, on the original rate schedule.
 - **Main thread on workers**: strategic icons, view culling, fog of war and applying each beat's unit updates.
+- **Added after this snapshot, not in the table above**: unit pose updates on sim workers (`sim_ParallelPose`: 7.8 % less wall time on 26954789 in one headless off/on/on/off test, with a spread between the two off runs larger than that), and the pose, bone and economy stat shortcuts from PR #30 (4.2 % less on 28007941 on D3D9, median of 6 runs, as measured in that PR). See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
 
 ## How it stays exact
 
@@ -53,11 +54,13 @@ The sim checksum covers every bit of game state, so a speed-up is only kept if i
 
 - **Lua interpreter**: about 140 CPU cycles per instruction, spent waiting on memory for table lookups. Two faster dispatch paths changed nothing, so they were dropped.
 - **Running Lua callbacks in parallel**: only 2–7 % of them are independent. The rest allocate, use the random stream or call into the engine.
-- **Reusing a unit's old pose object, or keeping unchanged blip lists**: in real games the conditions almost never hold.
+- **Reusing a unit's old pose object, or keeping unchanged blip lists**: in earlier trials the conditions almost never held in real games. The pose reuse later shipped as `sim_RecyclePose`, and how often it applies in a game has not been measured since. See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
+- **Army ticks on sim workers**: a trial desynced at beat 500. Allies write into each other's resources during a tick, and platoon cleanup and AI brains run Lua. See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
+- **Packing the spatial grid and SIMD overlap tests**: under 0.1 % change in match time, because `Sim::AdvanceCoords` is only about 3 % of a tick. See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
 
 ## Next
 
-1. Pose and animation on sim workers (about 14 % of sim time).
+1. Pose updates still on the sim thread, such as units with aim or builder arm manipulators: about 40 % of pose updates on 26954789 when last counted (see [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md)).
 2. D3D12 cost in replays at full speed.
 3. Memory use.
 4. GPU-driven draws (branch `gpu-driven`, not merged).

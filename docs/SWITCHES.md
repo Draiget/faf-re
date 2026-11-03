@@ -47,7 +47,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ReplayLead` | 10 | `/con` | live | Beats a replay may compute ahead of the screen |
 | `sim_LocalLead` | 2 | `/con` | live | Beats a single-player session may compute ahead |
 | `sim_LeadOnSchedule` | 1 | `/con` | live | With a lead, beats are still issued on the original rate schedule, with the lead on top (0: only the fixed lead, which caps the session at about lead × frame rate) |
-| `sim_RecyclePose` | 1 | `/con` | live | Reuses `CAniPose` double-buffer in-place when unique and not of exactly 11 bones, eliminating thousands of heap allocations per second during unit movement; bit-for-bit checksum identical to retail |
+| `sim_RecyclePose` | 1 | `/con` | live | Reuses `CAniPose` double-buffer in-place when unique and not of exactly 11 bones, instead of allocating a new pose for the tick; how often that applies in a game has not been measured ([Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md)); bit-for-bit checksum identical to retail |
 | sim_FastBoneUpdates | 1 | /con | live | Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches, accelerating bone rest updates; bit-for-bit checksum identical to retail |
 | `sim_FastEconStats` | 1 | `/con` | live | Bypasses string map lookups and allocations for per-tick army economy statistics by caching resolved `CArmyStatItem` pointers; bit-for-bit checksum identical to retail |
 | `mem_SmallBlockIndexTable` | 1 | `/con` | live | x86 allocator: size class by table instead of a binary search |
