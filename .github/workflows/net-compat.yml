@@ -28,7 +28,8 @@ permissions:
 
 concurrency:
   group: net-compat-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Master's pushes each finish: on a busy day, cancelling would leave none that did.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.14"
@@ -81,12 +82,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build --preset clang-x64-release --target faf_netbridge faf_netlink_tests faf_peer_transport_tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - run: |
-          $tests = "build/clang-x64-release/tests"
-          & "$tests/faf_netlink_tests.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & "$tests/faf_peer_transport_tests.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: netlink tests
+        run: |
+          & "build/clang-x64-release/tests/faf_netlink_tests.exe"
+          Write-Host "faf_netlink_tests: exit $LASTEXITCODE"
+          exit $LASTEXITCODE
+      - name: peer transport tests
+        run: |
+          & "build/clang-x64-release/tests/faf_peer_transport_tests.exe"
+          Write-Host "faf_peer_transport_tests: exit $LASTEXITCODE"
+          exit $LASTEXITCODE
       # Every pairing of the two adapters, then the mixed pair through the relay.
       - run: |
           New-Item -ItemType Directory -Force adapter, results | Out-Null

@@ -46,7 +46,7 @@ namespace moho
   // many round trips after its send, under net_MinResendDelay and
   // net_ResendDelayBias. The game sends too few packets for acknowledgements to
   // show a loss sooner. Live.
-  float net_FastResendPings = 1.25f;
+  float net_FastResendPings = 1.15f;
   // Issue #237: with net_FastRetransmit, a received packet is acknowledged within
   // this many ms, if net_AckDelay is longer. The peer's ping includes the wait,
   // so its timer can't go under the time an acknowledgement takes without it. Live.
@@ -88,7 +88,7 @@ namespace moho
 
     TConVar<float> gTConVar_net_FastResendPings(
       "net_FastResendPings",
-      "With net_FastRetransmit, a packet's first resend is due this many round trips after its send (default 1.25).",
+      "With net_FastRetransmit, a packet's first resend is due this many round trips after its send (default 1.15).",
       &net_FastResendPings
     );
 

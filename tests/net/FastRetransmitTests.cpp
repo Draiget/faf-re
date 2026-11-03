@@ -16,7 +16,7 @@
 //      as measured in game): 3 later packets take about 200 ms, so only the
 //      switch's resend timer, which follows the round trip, can come first.
 //      In games at 50 ms round trip and 2 % loss a lost packet came back in a
-//      median of 100.2 ms with the switch off and about 72 ms with it on.
+//      median of 100.2 ms with the switch off and 66.5-68.7 ms with it on.
 //
 // Build: cmake --build --preset clang-x64-release --target faf_fast_retransmit_tests
 // Run:   build\clang-x64-release\tests\faf_fast_retransmit_tests.exe   (exit code = failures)
