@@ -74,6 +74,7 @@ namespace moho
   // before it, which is the pause a player sees; 0 logs nothing. Live.
   int32_t net_LogShownBeatMs = 0;
   NetTrafficTotals gNetTraffic;
+  void (*gNetLinkTrafficLog)(int beat) = nullptr;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
   // sends net_TestBurstBytes incompressible filler bytes to every peer on the
   // ordered stream, the way a large order burst occupies it; peers drop it.

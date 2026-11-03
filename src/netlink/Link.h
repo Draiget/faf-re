@@ -118,6 +118,14 @@ namespace faf::netlink
     std::function<void(const std::string&)> onSignalText;
   };
 
+  /** Packets and bytes every link in this process has given to ICE, before UDP and IP headers. */
+  struct WireTotals
+  {
+    std::uint64_t packets = 0;
+    std::uint64_t bytes = 0;
+  };
+  WireTotals GetWireTotals();
+
   struct LinkStats
   {
     std::uint64_t dataSent = 0;

@@ -1028,6 +1028,9 @@ namespace
       }
     }
     if (net_LogTraffic > 0 && now / net_LogTraffic != before / net_LogTraffic) {
+      if (gNetLinkTrafficLog != nullptr) {
+        gNetLinkTrafficLog(now);
+      }
       const std::int64_t samples = gNetTraffic.pingSamples.load(std::memory_order_relaxed);
       const std::int64_t pingSum = gNetTraffic.pingMicrosSum.load(std::memory_order_relaxed);
       gpg::Logf(
