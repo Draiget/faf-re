@@ -2,7 +2,7 @@
 
 For each replay in `replays.tsv`, `<replay>.sets` holds the original game's per-function call hashes, and `<replay>.tsv` says what they cover: for each function its name, its parameter and result kinds, which parameters are hashed, and its result kind. Every stored hash must appear when our build plays that replay, so the check needs no original game.
 
-The eight replays of the core set cover 1,005 functions. A function is stored only if it matched the original game on every one of these replays where the original called it, and repeated between two runs of our build on each. Both games record up to the same beat, listed in `replays.tsv`, ten beats before the replay's end: the original usually plays a few beats further than our headless, and those calls would read as differences.
+The eight replays of the core set cover 1,006 functions. A function is stored only if it matched the original game on every one of these replays where the original called it, apart from the original's own bugs listed in `retail_bugs.tsv`, and repeated between two runs of our build on each. Both games record up to the same beat, listed in `replays.tsv`, ten beats before the replay's end: the original usually plays a few beats further than our headless, and those calls would read as differences.
 
 A hash cannot be turned back into a function call: it holds no inputs, and most of these functions read game objects. So this needs a replay, and is not a direct-call test like `tests/math_dump`.
 
@@ -26,6 +26,10 @@ The whole list goes to `<spec>.report`. One bug spreads through the game, so the
 ## What it does not catch
 
 It only sees inputs these replays produce. A bug in a branch no replay runs passes: a deliberate bug in `MaxInt`'s `lhs < rhs` branch changed nothing on the first replay, because all 35 calls there are `(1, 1)`. About half of the stored functions (541) have one distinct hash, so they are checked thinly, and more replays barely change that: going from three replays to eight doubled the stored hashes but moved this from 546 to 541, and added 3 functions. A function with no plain argument or result is not checked at all, and neither is a function the original game cannot hook.
+
+## Bugs of the original game
+
+We don't copy the original's bugs, so a call that only gives its result because of one is not a test. `retail_bugs.tsv` lists those calls by function and hash, each with its cause, and the comparison and `make` both leave them out, so the rest of the function stays checked. List a call only when its cause has been read in the binary.
 
 ## Regenerating
 
