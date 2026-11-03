@@ -93,6 +93,7 @@ namespace
     volatile LONG faults = 0;
     bool probeEnabled = true;
     std::uint8_t* trampoline = nullptr;
+    bool watched = false; // sets mode: each recorded call also goes to the watch file
     volatile LONG64 calls = 0;
     volatile LONG64 sum = 0;
   };
@@ -120,6 +121,10 @@ namespace
   // enters this function (Sim::AdvanceBeat). The original game's other threads
   // draw, and their calls depend on frame timing; our headless has no such calls.
   u32 gSimEntryId = 0;
+  // Sets mode: what a hash hides. Two runs' files line up call by call.
+  std::FILE* gWatchOut = nullptr;
+  int gWatchTextArg = -1;
+  int gWatchWordArg = -1;
   volatile LONG gSimThreadId = 0;
   // Sets mode: recording stops once this many beats ran (0: never), so both games
   // record the same beats whichever plays further at the end of a replay.
@@ -168,6 +173,8 @@ namespace
     u64 hash;
     int valueCount;
     u32 values[kMaxValueWords];
+    char text[128]; // watched call: the text at RETAIL_RECORDER_WATCH_TEXT_ARG
+    u32 pointee; // watched call: the word at RETAIL_RECORDER_WATCH_WORD_ARG
   };
   constexpr int kMaxDepth = 512;
   __declspec(thread) PendingCall tPending[kMaxDepth];
@@ -848,6 +855,30 @@ load_and_enter:
     MoveFileExA(tmp, gSetsPath, MOVEFILE_REPLACE_EXISTING);
   }
 
+  void ReadWatchText(const u32 address, char* const out, const int size)
+  {
+    int length = 0;
+    __try {
+      const char* const text = reinterpret_cast<const char*>(address);
+      while (length < size - 1 && ((text[length] >= 0x20 && text[length] < 0x7F) || text[length] == '\n' || text[length] == '\t')) {
+        out[length] = text[length] < 0x20 ? ' ' : text[length];
+        ++length;
+      }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+      length = 0;
+    }
+    out[length] = '\0';
+  }
+
+  u32 ReadWatchWord(const u32 address)
+  {
+    __try {
+      return *reinterpret_cast<const u32*>(address);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+      return 0xFFFFFFFFu;
+    }
+  }
+
   extern "C" void __cdecl OnEntry(EntryFrame* frame)
   {
     const int hookIndex = static_cast<int>(frame->slot);
@@ -930,6 +961,15 @@ load_and_enter:
         }
       }
       pending.record = gSimThreadId == self;
+      if (hook.watched && pending.record) {
+        pending.text[0] = '\0';
+        if (gWatchTextArg >= 0) {
+          ReadWatchText(frame->args[gWatchTextArg], pending.text, sizeof(pending.text));
+        }
+        if (gWatchWordArg >= 0) {
+          pending.pointee = ReadWatchWord(frame->args[gWatchWordArg]);
+        }
+      }
     }
     frame->slot = reinterpret_cast<u32>(hook.trampoline);
     frame->callerRet = reinterpret_cast<u32>(&PostEntry);
@@ -1004,6 +1044,20 @@ load_and_enter:
         }
         InterlockedIncrement64(&hook.recorded);
         SetInsert(hook.set, pending.hash);
+        if (hook.watched) {
+          std::fprintf(gWatchOut, "%08X", hook.id);
+          for (int i = 0; i < pending.valueCount; ++i) {
+            std::fprintf(gWatchOut, " %08X", pending.values[i]);
+          }
+          std::fputs(" ->", gWatchOut);
+          for (int i = 0; i < resultWords; ++i) {
+            std::fprintf(gWatchOut, " %08X", result[i]);
+          }
+          if (gWatchWordArg >= 0) {
+            std::fprintf(gWatchOut, " *%08X", pending.pointee);
+          }
+          std::fprintf(gWatchOut, " %s\n", pending.text);
+        }
       }
       return;
     }
@@ -1371,6 +1425,9 @@ load_and_enter:
       WriteSets();
       if (last) {
         gSetsFinal = 1;
+        if (gWatchOut != nullptr) {
+          std::fflush(gWatchOut);
+        }
         if (gEndAtSimBeats) {
           TerminateProcess(GetCurrentProcess(), 0);
         }
@@ -1458,6 +1515,30 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
       if (gOut != nullptr) {
         std::fprintf(gOut, "# retail call recorder: ForgedAlliance.exe calls, faf_math_dump values format\n");
         std::fflush(gOut);
+      }
+    }
+    char watchPath[MAX_PATH] = {};
+    if (gSetsMode && GetEnvironmentVariableA("RETAIL_RECORDER_WATCH", watchPath, MAX_PATH) != 0) {
+      gWatchOut = std::fopen(watchPath, "w");
+      char watchIds[256] = {};
+      GetEnvironmentVariableA("RETAIL_RECORDER_WATCH_IDS", watchIds, sizeof(watchIds));
+      char watchArg[16] = {};
+      if (GetEnvironmentVariableA("RETAIL_RECORDER_WATCH_TEXT_ARG", watchArg, sizeof(watchArg)) != 0) {
+        gWatchTextArg = std::atoi(watchArg);
+      }
+      if (GetEnvironmentVariableA("RETAIL_RECORDER_WATCH_WORD_ARG", watchArg, sizeof(watchArg)) != 0) {
+        gWatchWordArg = std::atoi(watchArg);
+      }
+      for (const char* at = watchIds; *at != '\0';) {
+        char* end = nullptr;
+        const u32 id = std::strtoul(at, &end, 16);
+        for (Hook& h : gHooks) {
+          h.watched = h.watched || h.id == id;
+        }
+        at = *end == ',' ? end + 1 : end;
+        if (end == at && *at != '\0') {
+          break;
+        }
       }
     }
     InstallHooks();
