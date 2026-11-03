@@ -166,16 +166,27 @@ namespace faf::remote
    */
   struct SDirectUpdate
   {
-    const SSharedUpdate* shared = nullptr; // a plain entity or prop: its records for all views
-    bool created = false;                  // with `shared`: the view creates it now (`CreateInterface`)
-    moho::Entity* entity = nullptr;
-    moho::Unit* unit = nullptr;       // the entity as a unit, or
-    moho::ReconBlip* blip = nullptr;  // as a blip
-    std::int32_t army = 0;            // the view's army (a blip's recon record)
-    moho::EUserEntityVisibilityMode mode = moho::EUserEntityVisibilityMode::Hidden;
-    std::uint32_t vision = 0;         // a blip: the vision range the view last copied from its creator
-    bool hasVision = false;           // whether it ever did
-    bool requestRefreshUI = false;    // `mRequestRefreshUI` as the sync walk found it
+    /** What every view reads of the entity, once a beat. */
+    struct STarget
+    {
+      SSharedUpdate* shared = nullptr;  // a plain entity or prop: its records for all views
+      moho::Entity* entity = nullptr;
+      moho::Unit* unit = nullptr;       // the entity as a unit, or
+      moho::ReconBlip* blip = nullptr;  // as a blip
+      bool requestRefreshUI = false;    // `mRequestRefreshUI` as the sync walk found it
+    };
+
+    const STarget* target = nullptr;
+    std::uint32_t vision = 0; // a blip: the vision range the view last copied from its creator
+    std::uint8_t mode = 0;    // `EUserEntityVisibilityMode`
+    std::uint8_t army = 0;    // the view's army (a blip's recon record)
+    bool hasVision = false;   // whether it ever did
+    bool created = false;     // with `shared`: the view creates it now (`CreateInterface`)
+
+    [[nodiscard]] moho::EUserEntityVisibilityMode Mode() const noexcept
+    {
+      return static_cast<moho::EUserEntityVisibilityMode>(mode);
+    }
   };
 
   /**

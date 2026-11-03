@@ -574,14 +574,14 @@ namespace faf::remote
 
   void CViewFrameBuilder::ApplySharedUpdate(const SDirectUpdate& update)
   {
-    const auto id = static_cast<std::uint32_t>(update.entity->id_);
-    const wire::SEntityRecord* const record = update.shared->records[SSharedUpdate::ModeIndex(update.mode)];
+    const auto id = static_cast<std::uint32_t>(update.target->entity->id_);
+    const wire::SEntityRecord* const record = update.target->shared->records[SSharedUpdate::ModeIndex(update.Mode())];
     const auto found = LowerBound(id);
     const bool exists = found != mWorldIndex.end() && found->id == id;
     std::uint32_t slot;
     if (update.created) {
       mOrphanedAt.erase(id); // an id the sim reuses is a new entity
-      if (record->blueprint == wire::COrdinalTable::kNone && update.entity->BluePrint != nullptr) {
+      if (record->blueprint == wire::COrdinalTable::kNone && update.target->entity->BluePrint != nullptr) {
         ++mUnknownBlueprints;
       }
       if (exists) {
@@ -763,26 +763,27 @@ namespace faf::remote
       }
     }
     for (const SDirectUpdate& update : direct) {
-      if (update.shared != nullptr) {
+      const SDirectUpdate::STarget& target = *update.target;
+      if (target.shared != nullptr) {
         ApplySharedUpdate(update);
         continue;
       }
-      moho::Entity& entity = *update.entity;
+      moho::Entity& entity = *target.entity;
       wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(entity.id_));
       if (record == nullptr) {
         continue;
       }
       CopyEntityBlockReadByBuilder(mBlockScratch, entity.mVarDat);
-      WriteEntityBlockForView(mBlockScratch, entity, update.mode, update.requestRefreshUI);
+      WriteEntityBlockForView(mBlockScratch, entity, update.Mode(), target.requestRefreshUI);
       const moho::SSTIUnitVariableData* unitData = nullptr;
       std::int32_t reconFlags = kUnitReconFlags;
       const moho::Unit* creator = nullptr;
-      if (update.unit != nullptr) {
-        unitData = &update.unit->VarDat();
-      } else if (update.blip != nullptr) {
-        const moho::SPerArmyReconInfo& recon = update.blip->mReconDat[static_cast<std::size_t>(update.army)];
-        creator = update.blip->mCreator.GetObjectPtr();
-        unitData = &update.blip->mUnitVarDat;
+      if (target.unit != nullptr) {
+        unitData = &target.unit->VarDat();
+      } else if (target.blip != nullptr) {
+        const moho::SPerArmyReconInfo& recon = target.blip->mReconDat[update.army];
+        creator = target.blip->mCreator.GetObjectPtr();
+        unitData = &target.blip->mUnitVarDat;
         reconFlags = static_cast<std::int32_t>(recon.mReconFlags);
         if (update.hasVision) {
           mBlockScratch.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(update.vision));
