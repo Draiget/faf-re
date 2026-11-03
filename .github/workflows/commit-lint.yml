@@ -1,7 +1,8 @@
 name: Commit titles
 
-# Checks the PR title and the PR's commits (or, on a push, the pushed commits)
-# against the Conventional Commits rules in CONTRIBUTING.md.
+# Checks the PR title (and the title of a PR's only commit, which is what a squash
+# merge then uses), or on a push the pushed commits, against the Conventional
+# Commits rules in CONTRIBUTING.md.
 # pull_request_target checks out the base branch, so the PR cannot change the
 # check it is held to; no code from the PR is run. "edited" reruns it after a
 # title change.

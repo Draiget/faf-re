@@ -2,8 +2,10 @@
 // rules in CONTRIBUTING.md ("Commits and pull request titles").
 //
 // In CI it is run by .github/workflows/commit-lint.yml through actions/github-script:
-//   pull request  the PR title (it becomes the commit title on a squash merge)
-//                 and every non-merge commit in the PR;
+//   pull request  the PR title, which becomes the commit title on a squash merge, the only merge
+//                 this repository allows. A PR's commits don't reach master, so their titles are
+//                 free, except a single commit's: GitHub then uses its title, not the PR's. Every
+//                 commit's body is still checked, since a squash can carry it into the message;
 //   push          every non-merge commit the push added to the branch.
 //
 // Locally, with Node 18 or later:
@@ -42,6 +44,15 @@ const GENERATED_WITH = /^\W*generated (with|by)\b/im;
 // Titles that git or GitHub write for you.
 const isMergeTitle = (header) => /^Merge (branch|pull request|remote-tracking branch|tag|commit) /.test(header);
 const isGitRevertTitle = (header) => /^Revert ".+"$/.test(header);
+
+// Problems with a commit message's body alone.
+function lintBody(message) {
+  const body = String(message ?? '').replace(/\r\n/g, '\n').split('\n').slice(1).join('\n');
+  const problems = [];
+  if (AI_COAUTHOR.test(body)) problems.push('remove the AI or bot "Co-authored-by:" line');
+  if (GENERATED_WITH.test(body)) problems.push('remove the "Generated with ..." line');
+  return problems;
+}
 
 // Problems with one commit message (or a PR title). Empty when it is fine.
 function lintMessage(message, { isTitle = false } = {}) {
@@ -96,9 +107,7 @@ function lintMessage(message, { isTitle = false } = {}) {
     if (lines.length > 1 && lines[1].trim() !== '') {
       problems.push('leave a blank line between the title and the body');
     }
-    const body = lines.slice(1).join('\n');
-    if (AI_COAUTHOR.test(body)) problems.push('remove the AI or bot "Co-authored-by:" line');
-    if (GENERATED_WITH.test(body)) problems.push('remove the "Generated with ..." line');
+    problems.push(...lintBody(message));
   }
   return problems;
 }
@@ -131,7 +140,7 @@ async function onPullRequest({ github, context, core, repo }) {
   for (const c of commits) {
     if (c.parents.length > 1) continue;
     checked++;
-    const problems = lintMessage(c.commit.message);
+    const problems = commits.length === 1 ? lintMessage(c.commit.message) : lintBody(c.commit.message);
     if (problems.length > 0) {
       failures.push({ what: `commit ${c.sha.slice(0, 9)}`, header: firstLine(c.commit.message), problems });
     }
