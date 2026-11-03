@@ -60,32 +60,50 @@ Setting up the collector and the receiver, and what they receive: [docs/DESYNC_D
 
 ## Build
 
-CMake with clang-cl, for x64 and x86. The C/C++ runtime is linked statically, so the executables need no MSVC runtime DLLs.
+Windows, with CMake and clang-cl, for x64 and x86. The C/C++ runtime is linked statically, so the executables need no MSVC runtime DLLs.
 
-Needs Visual Studio 2022 (C++ workload, for the Windows SDK and runtime libraries), LLVM (clang-cl, lld-link) in `C:\Program Files\LLVM` or `LLVM_ROOT`, and Git. CMake 3.25+ and Ninja come with Visual Studio's "C++ CMake tools for Windows" component, or from PATH.
+### Requirements
+
+- **[LLVM](https://github.com/llvm/llvm-project/releases)** in `C:\Program Files\LLVM`, or set `LLVM_ROOT`. CI uses 22.1.7.
+- **Visual Studio 2022** with the C++ workload. The build uses its MSVC headers and static libraries and the Windows SDK, not the IDE. Visual Studio Build Tools 2022 with the C++ workload should work too, but has not been tested.
+- **CMake 3.25+ and Ninja**, on `PATH` or from Visual Studio's "C++ CMake tools for Windows" component.
+- **Git**.
+
+Visual Studio 18 does not work: its static runtime imports a DLL that the `headless` import check refuses, which fails the build. If both versions are installed, build from a Visual Studio 2022 developer prompt; otherwise the build picks the newest one.
+
+### Building
 
 ```powershell
 git clone --recursive https://github.com/Draiget/faf-re.git
-.\build.ps1                    # x64 Release -> C:\ProgramData\FAForever\bin_x64\main_x64.exe
-.\build.ps1 -Arch both         # x64 and x86 (x86 -> C:\ProgramData\FAForever\bin\main.exe)
-.\build.ps1 -Arch x86 -Name main_test   # another exe name, to keep the current build alongside
-.\build.ps1 -NoBuild           # copy the last build only
+cd faf-re
+.\build.ps1
 ```
 
-`build.ps1` configures and builds the presets and copies the exe with its `.pdb`, the `fafengine\` hook folder and the DXC DLLs into the FAF run folders. Other options: `-Configuration Debug`, `-Profile` (see [Profiling with Tracy](#profiling-with-tracy)), `-FafDir`, `-Out` (also copy into `out\<arch>\`), `-NoCopy`, `-Rebuild`, `-Jobs`. Without it:
+This builds x64 Release and copies `main_x64.exe` with its `.pdb`, the `fafengine\` hook folder and the DXC DLLs into `C:\ProgramData\FAForever\bin_x64`, replacing the exe the FAF client launches. Use `-Name` to keep that exe.
+
+| Command | Result |
+|---|---|
+| `.\build.ps1 -Arch both` | x64 and x86 (x86 goes to `C:\ProgramData\FAForever\bin\main.exe`) |
+| `.\build.ps1 -Arch x86 -Name main_test` | another exe name, to keep the current build alongside |
+| `.\build.ps1 -NoBuild` | copies the last build only |
+
+Other options: `-Configuration Debug`, `-Profile` (see [Profiling with Tracy](#profiling-with-tracy)), `-FafDir`, `-Out` (also copy into `out\<arch>\`), `-NoCopy`, `-Rebuild`, `-Jobs`.
+
+Without `build.ps1`, using the presets in `CMakePresets.json`:
 
 ```powershell
-cmake --preset clang-x64-release; cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x64.exe
-cmake --preset clang-x86-release; cmake --build --preset clang-x86-release   # build/clang-x86-release/src/main.exe
+cmake --preset clang-x64-release
+cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x64.exe
 ```
 
-Configuring brings `dependencies/` up to date: the submodules (Wild Magic 3.8, zlib 1.2.3, FX11, Vulkan headers, FFmpeg 7.1.3), then boost 1.34.1, wxWidgets 2.4.2, DXC, libjuice 1.7.4, libdatachannel 0.24.6 with usrsctp, plog and Mbed TLS 3.6.7, and Monocypher 4.0.2, each pinned by commit or SHA256, and finally the FAF patches in `dependencies/patches/`. A missing submodule is cloned, a missing download is fetched, and everything is compiled from source. The DirectX SDK (June 2010) is used when installed; otherwise its headers and libraries are extracted from Microsoft's installer. `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+### Dependencies
 
-**IDEs.** Visual Studio 2022: File → Open → Folder, then pick a preset. VS Code: install the recommended extensions (CMake Tools, C/C++); CMake Tools offers the same presets, and IntelliSense reads the configured preset.
+Configuring brings `dependencies/` up to date: it clones missing submodules, fetches missing downloads pinned by commit or SHA256, and applies the FAF patches in `dependencies/patches/`. The full list is in [Libraries the engine uses](#libraries-the-engine-uses). `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
 
-FFmpeg 7.1.3 (the SFD movie player's decoder) is compiled from source with the engine: `dependencies/ffmpeg` is the unmodified FFmpeg release plus a CMake build ([Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror)), and its libraries are linked statically, so there are no FFmpeg DLLs and no prebuilt binaries. Its configuration and licence (LGPL v2.1+): [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build).
+### IDEs
 
-Monocypher 4.0.2 (BSD-2-Clause or CC0, at the user's choice) encrypts and authenticates the net channel's datagrams: [net channel](docs/NET_CHANNEL.md).
+- **Visual Studio 2022:** File → Open → Folder, then pick a preset.
+- **VS Code:** install the recommended extensions (CMake Tools, C/C++). CMake Tools offers the same presets, and IntelliSense reads the configured preset.
 
 ### Profiling with Tracy
 
@@ -125,7 +143,7 @@ All of them are fetched by CMake configure at the exact version below, patched w
 | wxWidgets (MSW) | 2.4.2 | [wxMSW-2.4.2.zip](https://github.com/wxWidgets/wxWidgets/releases/download/v2.4.2/wxMSW-2.4.2.zip) | `wxwindows_2_4_2_faf_required`, `_x64`, `_x64_pointers` |
 | Boost | 1.34.1 | [boost_1_34_1.tar.bz2](https://downloads.sourceforge.net/project/boost/boost/1.34.1/boost_1_34_1.tar.bz2) | `boost_1_34_1_faf_required` |
 | zlib | 1.2.3 | [madler/zlib](https://github.com/madler/zlib/tree/v1.2.3) (submodule) | `zlib_1_2_3_faf_required` |
-| FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX |
+| FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX. Configuration and licence: [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build) |
 | FX11 | bec3b8fc | [microsoft/FX11](https://github.com/microsoft/FX11) (submodule) | none |
 | Vulkan headers | 1.4.304 | [KhronosGroup/Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) (submodule) | none |
 | libjuice | 1.7.4 (MPL-2.0) | [v1.7.4 source archive](https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.7.4.tar.gz) | none; built by `cmake/deps/libjuice` as the ICE agent of `src/netlink` |
@@ -133,6 +151,7 @@ All of them are fetched by CMake configure at the exact version below, patched w
 | usrsctp | commit fec583d5, the one libdatachannel 0.24.6 pins (BSD-3-Clause) | [commit archive](https://github.com/sctplab/usrsctp/archive/fec583d54493f879d2ae44a743423bf8a04371ab.tar.gz) | none; SCTP for libdatachannel, without IPv4/IPv6 sockets |
 | plog | commit 94899e0b, the one libdatachannel 0.24.6 pins (MIT) | [commit archive](https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz) | none; headers only, libdatachannel's log |
 | Mbed TLS | 3.6.7 LTS (Apache-2.0 or GPL-2.0-or-later; used under Apache-2.0) | [release archive](https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2) | none; DTLS for libdatachannel, `MBEDTLS_SSL_DTLS_SRTP` turned on through `cmake/deps/libdatachannel/faf_mbedtls_config.h` |
+| Monocypher | 4.0.2 (BSD-2-Clause or CC0, at the user's choice) | [4.0.2 source archive](https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz) | none; encrypts and authenticates the [net channel](docs/NET_CHANNEL.md)'s datagrams |
 | DirectX Shader Compiler | 1.9.2609 | [DXC release](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.9.2609) | none |
 | DirectX SDK | June 2010 | an installed SDK, else extracted from [Microsoft's installer](https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe) | none |
 
