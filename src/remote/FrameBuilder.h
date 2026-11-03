@@ -289,10 +289,13 @@ namespace faf::remote
     /** Ids of the records created or changed; an id can be listed more than once. */
     [[nodiscard]] const std::vector<std::uint32_t>& TouchedIds() const noexcept { return mTouchedIds; }
     [[nodiscard]] const std::vector<SErasedRecord>& ErasedRecords() const noexcept { return mErasedRecords; }
+    /** Ids that got a record in a new slot; it may have left again (`ErasedRecords`). */
+    [[nodiscard]] const std::vector<std::uint32_t>& NewRecordIds() const noexcept { return mNewRecordIds; }
     void ClearChanges() noexcept
     {
       mTouchedIds.clear();
       mErasedRecords.clear();
+      mNewRecordIds.clear();
     }
     /**
      * Plan WPR.35: for a caller that holds no copy of `slot`'s record because its own would be
@@ -444,6 +447,7 @@ namespace faf::remote
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;
     std::vector<SErasedRecord> mErasedRecords;
+    std::vector<std::uint32_t> mNewRecordIds;
     std::vector<std::uint8_t> mWatched;                  // per slot
     std::vector<const wire::SEntityRecord*> mBeforeRecords; // per slot: before this beat's changes, or null
     std::vector<std::uint32_t> mBeforeSlots;             // the slots with one

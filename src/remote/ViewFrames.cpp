@@ -144,6 +144,14 @@ namespace faf::remote
     }
   }
 
+  bool CViewFrames::KeptByView(const std::uint32_t id, const std::uint32_t viewBit) const
+  {
+    const auto found = std::lower_bound(mEntityIndex.begin(), mEntityIndex.end(), id, [](const SEntityKeep& entry, const std::uint32_t value) {
+      return entry.id < value;
+    });
+    return found == mEntityIndex.end() || found->id != id || (found->views & viewBit) != 0u;
+  }
+
   void CViewFrames::BuildHeldFrame(moho::Sim& sim, const std::size_t army, const moho::SSyncData& packet)
   {
     CViewFrameBuilder& builder = *mBuilders[army];
@@ -162,6 +170,7 @@ namespace faf::remote
       held.sent.resize(slots, 0u);
       held.keep.resize(slots, 0u);
       held.references.resize(slots, 0u);
+      held.isReferrer.resize(slots, 0u);
     }
     held.candidates.clear();
     held.removed.clear();
@@ -195,6 +204,7 @@ namespace faf::remote
     // has, an orphan, stays). A record that comes or goes can change the records that name it.
     std::uint64_t membership = 0;
     for (const CViewFrameBuilder::SErasedRecord& erased : builder.ErasedRecords()) {
+      held.references[erased.slot] = 0u;
       if (held.sent[erased.slot] != 0u) {
         const std::uint32_t own = held.ownSlot[erased.slot];
         held.removed.push_back(own != kNoOwn ? held.own[own].id : erased.id);
@@ -204,28 +214,45 @@ namespace faf::remote
         membership |= ReferenceBit(erased.id);
       }
     }
-    std::uint32_t withheld = 0;
+    // Every record the view held last beat is sent if and only if it was kept, so only an answer
+    // that changed and a new record's can differ from what the client has: no walk over the records.
     const std::uint32_t viewBit = std::uint32_t{1} << army;
-    auto index = mEntityIndex.cbegin();
-    builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
-      while (index != mEntityIndex.cend() && index->id < id) {
-        ++index;
-      }
-      const bool keep = index == mEntityIndex.cend() || index->id != id || (index->views & viewBit) != 0u;
+    const auto setKeep = [&](const std::uint32_t id, const std::uint32_t slot, const bool keep) {
       held.keep[slot] = keep ? 1u : 0u;
-      withheld += keep ? 0u : 1u;
       if (keep != (held.sent[slot] != 0u)) {
         held.candidates.push_back(id);
         membership |= ReferenceBit(id);
       }
-    });
+    };
+    std::size_t changeCursor = 0;
+    for (const SKeepChange& change : mKeepChanges) {
+      std::uint32_t slot = 0;
+      if ((change.changed & viewBit) != 0u && builder.FindSlotFrom(changeCursor, change.id, slot)) {
+        setKeep(change.id, slot, (change.views & viewBit) != 0u);
+      }
+    }
+    for (const std::uint32_t id : builder.NewRecordIds()) {
+      std::uint32_t slot = 0;
+      if (builder.FindSlot(id, slot)) {
+        setKeep(id, slot, KeptByView(id, viewBit));
+      }
+    }
     held.candidates.insert(held.candidates.end(), builder.TouchedIds().begin(), builder.TouchedIds().end());
     if (membership != 0u) {
-      builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
-        if (held.sent[slot] != 0u && (held.references[slot] & membership) != 0u) {
-          held.candidates.push_back(id);
+      for (std::size_t i = 0; i < held.referrers.size();) {
+        const std::uint32_t slot = held.referrers[i];
+        const std::uint64_t references = held.references[slot];
+        if (references == 0u) {
+          held.isReferrer[slot] = 0u;
+          held.referrers[i] = held.referrers.back();
+          held.referrers.pop_back();
+          continue;
         }
-      });
+        if (held.sent[slot] != 0u && (references & membership) != 0u) {
+          held.candidates.push_back(builder.RecordAt(slot).id);
+        }
+        ++i;
+      }
     }
     std::sort(held.candidates.begin(), held.candidates.end());
     held.candidates.erase(std::unique(held.candidates.begin(), held.candidates.end()), held.candidates.end());
@@ -271,6 +298,10 @@ namespace faf::remote
         continue;
       }
       held.references[slot] = ReferenceFilter(world);
+      if (held.references[slot] != 0u && held.isReferrer[slot] == 0u) {
+        held.isReferrer[slot] = 1u;
+        held.referrers.push_back(slot);
+      }
       if (!NeedsOwnRecord(world, map, unheld)) {
         // The client's record is the world's, without a copy; the elements stay in place.
         if (!wasSent) {
@@ -328,7 +359,7 @@ namespace faf::remote
     std::sort(held.changed.begin(), held.changed.end(), [](const wire::SFrameChange& a, const wire::SFrameChange& b) {
       return a.after->id < b.after->id;
     });
-    mWithheld[army] = withheld;
+    mWithheld[army] = static_cast<std::uint32_t>(builder.EntityCount()) - held.count;
     if (mHeldCheck) {
       CheckHeldFrame(sim, army, isOwnCommand);
     }
@@ -344,6 +375,12 @@ namespace faf::remote
         std::fprintf(stderr, "view frames check: view %zu beat %u: %s (id %08x)\n", army, sim.mCurBeat, what, id);
       }
     };
+    builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
+      const bool keep = KeptByView(id, std::uint32_t{1} << army);
+      if (keep != (held.keep[slot] != 0u) || keep != (held.sent[slot] != 0u)) {
+        report("kept or sent is not what the sim's answer says", id);
+      }
+    });
     if (!held.checkMap) {
       held.checkMap = std::make_unique<CViewIdMap>(static_cast<std::int32_t>(army));
     }
@@ -466,7 +503,7 @@ namespace faf::remote
             && !mLastEntityIndex[last].readEveryBeat) {
           mEntityIndex.push_back(mLastEntityIndex[last]);
         } else {
-          mEntityReads.push_back(static_cast<std::uint32_t>(mEntityIndex.size()));
+          mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), synced ? static_cast<std::uint32_t>(next) : kNotChanged});
           mEntityIndex.push_back({key, 0u, false});
         }
         mEntityPointers.push_back(entity);
@@ -474,8 +511,8 @@ namespace faf::remote
     }
     const auto readFacts = [this, &sim, armyCount](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        const std::uint32_t entry = mEntityReads[i];
-        const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[entry]);
+        const std::uint32_t entry = mEntityReads[i].entry;
+        const SEntityFacts facts = mEntityReads[i].changed != kNotChanged ? ChangedFacts(mEntityReads[i].changed) : ReadEntityFacts(*mEntityPointers[entry]);
         mEntityIndex[entry].views = ViewsThatSee(sim, armyCount, facts);
         mEntityIndex[entry].readEveryBeat = !ViewsFollowFactsAlone(facts);
       }
@@ -494,6 +531,30 @@ namespace faf::remote
             stderr, "view frames check: beat %u: entity %08x kept views %08x, a read says %08x (kind %d)\n", sim.mCurBeat, mEntityIndex[i].id,
             mEntityIndex[i].views, ViewsThatSee(sim, armyCount, facts), static_cast<int>(facts.kind)
           );
+        }
+      }
+    }
+
+    // Whose answers changed since last beat, once for every view. An id without an entity has
+    // every view's answer "keep" (`KeptByView`).
+    mKeepChanges.clear();
+    {
+      constexpr std::uint32_t kEveryView = 0xFFFFFFFFu;
+      std::size_t last = 0;
+      std::size_t now = 0;
+      while (last < mLastEntityIndex.size() || now < mEntityIndex.size()) {
+        if (now == mEntityIndex.size() || (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < mEntityIndex[now].id)) {
+          mKeepChanges.push_back({mLastEntityIndex[last].id, kEveryView, ~mLastEntityIndex[last].views});
+          ++last;
+        } else if (last == mLastEntityIndex.size() || mEntityIndex[now].id < mLastEntityIndex[last].id) {
+          mKeepChanges.push_back({mEntityIndex[now].id, mEntityIndex[now].views, ~mEntityIndex[now].views});
+          ++now;
+        } else {
+          if (mLastEntityIndex[last].views != mEntityIndex[now].views) {
+            mKeepChanges.push_back({mEntityIndex[now].id, mEntityIndex[now].views, mLastEntityIndex[last].views ^ mEntityIndex[now].views});
+          }
+          ++last;
+          ++now;
         }
       }
     }

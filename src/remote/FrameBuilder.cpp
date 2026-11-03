@@ -617,6 +617,9 @@ namespace faf::remote
       mBlipHashes.push_back(0u);
     }
     mWorldIndex.insert(found, SWorldEntry{id, slot});
+    if (mTrackChanges) {
+      mNewRecordIds.push_back(id);
+    }
     return slot;
   }
 

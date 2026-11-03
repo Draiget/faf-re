@@ -98,6 +98,8 @@ namespace faf::remote
       std::vector<std::uint8_t> sent;           // per slot: the client holds a record
       std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
       std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
+      std::vector<std::uint32_t> referrers;     // the slots with a filter, and some that no longer have one
+      std::vector<std::uint8_t> isReferrer;     // per slot: in `referrers`
       std::size_t count = 0;
       std::uint32_t frameId = 0;
       std::uint32_t baselineId = wire::kNoBaseline;
@@ -114,6 +116,8 @@ namespace faf::remote
       std::uint64_t mismatches = 0;
     };
 
+    /** Whether the view of `viewBit` keeps `id`'s record: yes for an id with no entity (an orphan). */
+    [[nodiscard]] bool KeptByView(std::uint32_t id, std::uint32_t viewBit) const;
     /** The view's frame from its packet, keeping what did not change (`EnableHeldFrames`). */
     void BuildHeldFrame(moho::Sim& sim, std::size_t army, const moho::SSyncData& packet);
     /** Compares the held frame with the whole frame built from the same world. */
@@ -146,7 +150,22 @@ namespace faf::remote
     std::vector<moho::Entity*> mEntityPointers;     // the same entities
     std::vector<SEntityKeep> mLastEntityIndex;      // and last beat
     std::vector<moho::Entity*> mLastEntityPointers;
-    std::vector<std::uint32_t> mEntityReads;        // this beat's entries to read from their entities
+    /** An entry of `mEntityIndex` whose answer is worked out this beat. */
+    struct SEntityRead
+    {
+      std::uint32_t entry;
+      std::uint32_t changed; // its index in `Entities()`, whose facts were read this beat, or `kNotChanged`
+    };
+    static constexpr std::uint32_t kNotChanged = 0xFFFFFFFFu;
+    /** A sim id some view's answer changed for since last beat. No entity: every view keeps its record. */
+    struct SKeepChange
+    {
+      std::uint32_t id;
+      std::uint32_t views;   // who keeps it now
+      std::uint32_t changed; // whose answer changed
+    };
+    std::vector<SEntityRead> mEntityReads;
+    std::vector<SKeepChange> mKeepChanges;
     std::uint64_t mEntityIndexMismatches = 0;       // the check: answers kept that a read would change
     std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
     std::vector<std::uint32_t> mLastCommands;     // and last beat

@@ -147,6 +147,8 @@ namespace faf::remote
     {
       mBuildSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - mBuildStart).count();
     }
+    /** The facts of `Entities()[index]`, read this beat. */
+    [[nodiscard]] const SEntityFacts& ChangedFacts(const std::size_t index) const noexcept { return mChanged[index].facts; }
 
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;

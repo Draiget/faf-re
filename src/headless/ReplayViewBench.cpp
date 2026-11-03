@@ -137,8 +137,13 @@ namespace faf::headless
         remote::wire::SGridSlot& slot = beatGrid.slot;
         const moho::CIntelGrid* const grid = beatGrid.source;
         slot.bits.cells.resize(static_cast<std::size_t>(grid->mWidth) * grid->mHeight);
-        for (std::size_t cell = 0; cell < slot.bits.cells.size(); ++cell) {
-          slot.bits.cells[cell] = grid->mGrid[cell] != 0 ? 1u : 0u;
+        // Through local pointers: a byte written may alias anything, so a write through the vector
+        // would make the compiler read its pointers again for every cell, and copy them one by one.
+        std::uint8_t* const cells = slot.bits.cells.data();
+        const std::int8_t* const source = grid->mGrid.get();
+        const std::size_t count = slot.bits.cells.size();
+        for (std::size_t cell = 0; cell < count; ++cell) {
+          cells[cell] = source[cell] != 0 ? 1u : 0u;
         }
         beatGrid.delta.Clear();
         beatGrid.deltaOk = remote::wire::EncodeGridSlot(slot, beatGrid.last, beatGrid.delta);
