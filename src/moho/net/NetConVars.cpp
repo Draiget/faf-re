@@ -1,5 +1,6 @@
 #include "moho/net/NetConVars.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 
@@ -256,6 +257,11 @@ namespace moho
     // The command line is read once; the console variable stays live.
     static const bool sFromCommandLine = CFG_GetArgOption("/fastretransmit", 0u, nullptr);
     return net_FastRetransmit != 0 || sFromCommandLine;
+  }
+
+  int32_t NET_AckDelayMs()
+  {
+    return NET_FastRetransmitEnabled() ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
   }
 
   void NET_CountFastRetransmits(const int count)

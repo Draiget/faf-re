@@ -52,6 +52,9 @@ namespace moho
 
   // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.
   bool NET_FastRetransmitEnabled();
+  // How long a received packet waits for its acknowledgement, in ms: net_AckDelay, or
+  // net_FastAckDelay when that is less and net_FastRetransmit is on.
+  [[nodiscard]] int32_t NET_AckDelayMs();
   // Counts early resends; logs the first and every 1000th.
   void NET_CountFastRetransmits(int count);
 } // namespace moho

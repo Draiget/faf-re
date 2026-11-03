@@ -1793,8 +1793,7 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
 
   if (mSendBy.mTime == 0) {
     // net_AckDelay (ms) -> us; issue #237: less with net_FastRetransmit.
-    const int32_t ackDelayMs = NET_FastRetransmitEnabled() ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
-    const int64_t ackDelayUs = static_cast<int64_t>(ackDelayMs) * 1000LL;
+    const int64_t ackDelayUs = static_cast<int64_t>(NET_AckDelayMs()) * 1000LL;
     mSendBy.mTime = packet->mSentTime + ackDelayUs;
   }
 }

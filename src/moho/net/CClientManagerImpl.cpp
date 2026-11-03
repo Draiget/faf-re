@@ -216,11 +216,12 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
     // Every ready message is timed as it left its sender. Ours: when our connection sent it
     // (NET_GetReadyDepartureUs). A peer's: when it was handled here, less the one-way trip, which
     // is half of what is left of its ping after the peer's wait before it acknowledges
-    // (net_AckDelay). The local client reports a ping of 0.
+    // (NET_AckDelayMs: net_AckDelay, or net_FastAckDelay with net_FastRetransmit, taken to be
+    // set alike on every player). The local client reports a ping of 0.
     const float pingMs = client->GetStatusMetricA();
     std::int64_t leftUs = handledUs;
     if (pingMs > 0.0f) {
-      const float oneWayMs = std::max(0.0f, (pingMs - static_cast<float>(net_AckDelay)) * 0.5f);
+      const float oneWayMs = std::max(0.0f, (pingMs - static_cast<float>(NET_AckDelayMs())) * 0.5f);
       leftUs = handledUs - static_cast<std::int64_t>(oneWayMs * 1000.0f);
     } else if (mLocalClient == client && mClients.size() > 1) {
       // Not known until our ready message has left; the caller asks again.
