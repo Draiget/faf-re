@@ -21,7 +21,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 | | |
 |---|---|
 | Renderers | [![Direct3D 9](https://img.shields.io/badge/Direct3D-9-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 10](https://img.shields.io/badge/Direct3D-10-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 11](https://img.shields.io/badge/Direct3D-11-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 12](https://img.shields.io/badge/Direct3D-12-0078D6)](docs/RENDERER_BACKENDS.md) [![Vulkan 1.3](https://img.shields.io/badge/Vulkan-1.3-AC162C)](docs/RENDERER_BACKENDS.md) |
-| Replay parity | 12,714 of 13,148 vault replays (96.7 %) match every recorded checksum on CI (30–31/10/2026), 12,782 (97.2 %) with the fixes since; none is known to fail because of the engine ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
+| Replay parity | 12,714 of 13,148 vault replays (96.7 %) match every recorded checksum on CI (30–31/10/2026), 12,783 (97.2 %) with the fixes since; none is known to fail because of the engine ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
 | Performance | x64 replays take 19 % less time than retail on average (4 % to 33 %) ([Performance](docs/PERFORMANCE.md)) |
 | Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code we link from source (wxWidgets, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding |
@@ -34,10 +34,10 @@ Real games from the FAF replay vault (stock and community maps, 1–12 human pla
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/parity-overview-dark.svg">
-  <img alt="12,714 of 13,148 replays (96.70 %) match every recorded checksum. Of the 434 that did not pass, 231 desynced: 123 from maps and content, 68 from our bugs fixed since, 34 from live game splits, 6 where retail fails too. The other 203 are CI runner failures." src="docs/images/parity-overview-light.svg">
+  <img alt="12,714 of 13,148 replays (96.70 %) match every recorded checksum. Of the 434 that did not pass, 231 desynced: 122 from maps and content, 69 from our bugs fixed since, 34 from live game splits, 6 where retail fails too. The other 203 are CI runner failures." src="docs/images/parity-overview-light.svg">
 </picture>
 
-Every desync has a known cause. Counting the fixes, 12,782 of 13,148 (97.22 %) should pass on master. That number is worked out, not measured: no full run has played the new build yet. All 34 live splits were played on retail: 31 give our hash, and 3 differ because of a defect in retail's replay path that the rebuilt engine fixes. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
+Every desync has a known cause. Counting the fixes, 12,783 of 13,148 (97.22 %) should pass on master. That number is worked out, not measured: no full run has played the new build yet. All 34 live splits were played on retail: 33 give our hashes, and 1 differs because of a defect in retail's replay path that the rebuilt engine fixes. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 ## Performance
 
