@@ -258,7 +258,7 @@ namespace faf::remote
       block.mIsDead = recon.mMaybeDead;
     }
 
-    /** What `ApplyVariableData` and `ApplyUnitData` write, from a record they wrote. */
+    /** What `ApplyVariableData` and `ApplyUnitData` write, from a record they wrote (`wire::HashBlipUpdate` covers the same). */
     void CopyBlipRecord(wire::SEntityRecord& record, const wire::SEntityRecord& from)
     {
       record.appearance = from.appearance;
@@ -546,6 +546,7 @@ namespace faf::remote
     if (const moho::Unit* const creator = blip.mCreator.GetObjectPtr(); creator != nullptr) {
       out.detail.stunTicks = creator->mUnitVarDat.mStunTicks != 0 ? 1 : 0;
     }
+    out.hash = wire::HashBlipUpdate(out.record, out.detail);
   }
 
   void CViewFrameBuilder::ClearBefore() noexcept
@@ -571,6 +572,7 @@ namespace faf::remote
 
   wire::SEntityRecord& CViewFrameBuilder::LocalRecord(const std::uint32_t slot)
   {
+    mBlipHashes[slot] = 0u; // about to change; what changes it says otherwise
     if (mLocalSlots[slot] != kNoLocal) {
       return mLocalRecords[mLocalSlots[slot]];
     }
@@ -593,6 +595,7 @@ namespace faf::remote
 
   void CViewFrameBuilder::ReleaseLocal(const std::uint32_t slot)
   {
+    mBlipHashes[slot] = 0u;
     const std::uint32_t index = mLocalSlots[slot];
     if (index != kNoLocal) {
       mLocalRecords[index] = wire::SEntityRecord{}; // lets go of what the record shares
@@ -611,6 +614,7 @@ namespace faf::remote
       slot = static_cast<std::uint32_t>(mWorldSlots.size());
       (void)mWorldSlots.push_back(nullptr);
       mLocalSlots.push_back(kNoLocal);
+      mBlipHashes.push_back(0u);
     }
     mWorldIndex.insert(found, SWorldEntry{id, slot});
     return slot;
@@ -841,15 +845,25 @@ namespace faf::remote
         continue;
       }
       moho::Entity& entity = *target.entity;
-      wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(entity.id_));
-      if (record == nullptr) {
+      const auto id = static_cast<std::uint32_t>(entity.id_);
+      const auto found = LowerBound(id);
+      if (found == mWorldIndex.end() || found->id != id) {
         continue;
       }
-      if (update.blipRecord != nullptr && mSession == nullptr) {
-        CopyBlipRecord(*record, update.blipRecord->record);
+      const std::uint32_t slot = found->slot;
+      const SBlipRecord* const blipRecord = mSession == nullptr ? update.blipRecord : nullptr;
+      // Most of a late game's blip updates write what the record holds: nothing to read or compare.
+      if (blipRecord != nullptr && mBlipHashes[slot] == blipRecord->hash) {
+        continue;
+      }
+      SaveBefore(slot);
+      wire::SEntityRecord* const record = &LocalRecord(slot);
+      if (blipRecord != nullptr) {
+        CopyBlipRecord(*record, blipRecord->record);
         if (record->isUnit) {
-          (void)record->unit.detail.Assign(update.blipRecord->detail);
+          (void)record->unit.detail.Assign(blipRecord->detail);
         }
+        mBlipHashes[slot] = blipRecord->hash;
         if (mTrackChanges) {
           mTouchedIds.push_back(record->id);
         }

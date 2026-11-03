@@ -216,6 +216,12 @@ namespace faf::remote::wire
   };
 
   /**
+   * A fingerprint of what a blip's update writes to a view's record: everything but the id and the
+   * creation constants, and `detail` by value. Bitwise like `SEntityRecord::operator==`; never 0.
+   */
+  [[nodiscard]] std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept;
+
+  /**
    * Change-mask bits, one per field after the id. On the wire the mask is a varint, so the
    * fields that change every tick come first and a typical change costs one mask byte.
    * `kFieldKind` carries `isUnit`; the unit bits are only valid for a unit.
