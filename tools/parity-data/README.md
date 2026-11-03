@@ -65,6 +65,13 @@ A pull request's workflow can read master's caches too, a fork's included, which
 | `PARITY_RETAIL_KEY` | `parity` environment secret | the file's passphrase |
 | `PARITY_RETAIL_ID` | `parity` environment variable | names the retail file, for example `v1`; change it when the file changes (only the jobs in the environment use it) |
 
+**Charts.** After a full run, update the run, the commit and the causes in `parity_chart.json`, then redraw the charts in `docs/images/` (the README and `docs/RETAIL_REPLAY_PARITY.md` show them). The script refuses a causes list that doesn't add up to the report's desyncs:
+
+```
+gh run download <run id> -R Draiget/faf-re -n report -D tmp/parity-ci/run-<run id>/report
+python tools/parity-data/chart.py --report tmp/parity-ci/run-<run id>/report/report.json
+```
+
 ## The corpus
 
 [corpus/3835.tsv.gz](corpus/3835.tsv.gz) lists the replays CI may play: every 3835 game in the vault with 2 or more players, at least 5 minutes of game, a replay, and a map that can be had (generated maps cannot), plus the core and extended sets of [PR_REPLAY_CHECK.md](../../docs/PR_REPLAY_CHECK.md). One line per replay: id, ticks, players, map folder, and where its map comes from: `retail` (a map the game ships, cached from FAF's map vault), `cached` (one of the 500 most played vault maps) or `download` (fetched by the job that plays it). On 29/10/2026: 43,091 replays, 9,194 on retail maps, 28,989 on the top 500 maps, 4,908 on others. About 30% of them need a sim mod and are left out when the prewarm reads them.

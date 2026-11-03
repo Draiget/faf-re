@@ -30,23 +30,14 @@ Most symbols in the retail engine were never hand-written: they are template ins
 
 ## Retail parity
 
-Real games from the FAF replay vault (stock and community maps, 1–12 human players, games against the built-in AI and M28AI) play back on the rebuilt engine checksum-identical to retail. The largest run, CI run 41025691648 on commit `7986851b6` (x64 headless, 30–31/10/2026), played 13,148 replays:
+Real games from the FAF replay vault (stock and community maps, 1–12 human players, games against the built-in AI and M28AI) play back on the rebuilt engine checksum-identical to retail. The largest run played 13,148 replays:
 
-| Result | Replays | Share of played |
-|---|---|---|
-| **Pass**: every recorded checksum matches | **12,714** | **96.70 %** |
-| Desync | 231 | 1.76 % |
-| Timeout, crash or error of the CI runner (time limit, map extraction, map not on FAF's server) | 203 | 1.54 % |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/parity-overview-dark.svg">
+  <img alt="12,714 of 13,148 replays (96.70 %) match every recorded checksum. Of the 434 that did not pass, 231 desynced: 123 from maps and content, 68 from our bugs fixed since, 34 from live game splits, 6 where retail fails too. The other 203 are CI runner failures." src="docs/images/parity-overview-light.svg">
+</picture>
 
-| Desync cause (as of master `08411bd6f`, 03/11/2026) | Desyncs | Share of desyncs | Share of played |
-|---|---|---|---|
-| Maps and content: survival maps that need the campaign's strings, maps that ship their own blueprints, a map that reads the real-time clock | 123 | 53.2 % | 0.94 % |
-| Live game split: the players' own checksums already disagreed | 34 | 14.7 % | 0.26 % |
-| Retail fails there too | 6 | 2.6 % | 0.05 % |
-| Our bugs, fixed since | 68 | 29.4 % | 0.52 % |
-| Not explained yet | 0 | 0 % | 0 % |
-
-Counting the fixes, 12,782 of 13,148 (97.22 %) should pass on master. That number is worked out, not measured: no full run has played the new build yet. All 34 live splits were played on retail: 31 give our hash, and 3 differ because of a defect in retail's replay path that the rebuilt engine fixes. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
+Every desync has a known cause. Counting the fixes, 12,782 of 13,148 (97.22 %) should pass on master. That number is worked out, not measured: no full run has played the new build yet. All 34 live splits were played on retail: 31 give our hash, and 3 differ because of a defect in retail's replay path that the rebuilt engine fixes. Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 ## Performance
 

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="318" viewBox="0 0 880 318" role="img" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>Replays that did not pass, by player count and game length</title>
+<desc>2 players: 3.8 % of 5864; 3 players: 7.2 % of 906; 4 players: 8.7 % of 958; 5–7 players: 3.7 % of 404; 8 players: 0.8 % of 2266; 9–11 players: 0.9 % of 221; 12+ players: 0.8 % of 2520; Under 10 min: 6.1 % of 1332; 10–20 min: 2.4 % of 2872; 20–30 min: 1.8 % of 2942; 30–45 min: 2.8 % of 3604; 45–60 min: 3.7 % of 1331; 60–90 min: 6.2 % of 804; 90 min or more: 10.0 % of 230</desc>
+<text x="0.0" y="20.0" font-size="18" fill="#1f2328" font-weight="600">Replays that did not pass, by player count and game length</text>
+<text x="0.0" y="42.0" font-size="13" fill="#59636e">CI run 41025691648, commit 7986851b6, before the fixes. Share of each row's replays.</text>
+<rect x="0.00" y="56.00" width="11.00" height="11.00" rx="2.00" fill="#6250d6"/>
+<text x="18.0" y="66.0" font-size="13" fill="#59636e">Desync</text>
+<rect x="84.00" y="56.00" width="11.00" height="11.00" rx="2.00" fill="#6e7681"/>
+<text x="102.0" y="66.0" font-size="13" fill="#59636e">CI runner failure</text>
+<text x="0.0" y="96.0" font-size="14" fill="#1f2328" font-weight="600">By player count</text>
+<text x="420.0" y="96.0" font-size="12" fill="#59636e" text-anchor="end">Replays</text>
+<line x1="104.0" y1="114.0" x2="104.0" y2="289.0" stroke="#d1d9e0"/>
+<text x="0.0" y="130.0" font-size="13" fill="#1f2328">2 players</text>
+<rect x="104.00" y="120.00" width="40.59" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M146.59 120.00h30.79q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-30.79z" fill="#6e7681"/>
+<text x="185.4" y="130.0" font-size="12" fill="#1f2328" font-weight="600">3.8 %</text>
+<text x="420.0" y="130.0" font-size="12" fill="#59636e" text-anchor="end">5,864</text>
+<text x="0.0" y="155.0" font-size="13" fill="#1f2328">3 players</text>
+<rect x="104.00" y="145.00" width="64.02" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M170.02 145.00h75.47q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-75.47z" fill="#6e7681"/>
+<text x="253.5" y="155.0" font-size="12" fill="#1f2328" font-weight="600">7.2 %</text>
+<text x="420.0" y="155.0" font-size="12" fill="#59636e" text-anchor="end">906</text>
+<text x="0.0" y="180.0" font-size="13" fill="#1f2328">4 players</text>
+<rect x="104.00" y="170.00" width="104.38" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M210.38 170.00h64.89q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-64.89z" fill="#6e7681"/>
+<text x="283.3" y="180.0" font-size="12" fill="#1f2328" font-weight="600">8.7 %</text>
+<text x="420.0" y="180.0" font-size="12" fill="#59636e" text-anchor="end">958</text>
+<text x="0.0" y="205.0" font-size="13" fill="#1f2328">5–7 players</text>
+<rect x="104.00" y="195.00" width="49.50" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M155.50 195.00h20.75q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-20.75z" fill="#6e7681"/>
+<text x="184.3" y="205.0" font-size="12" fill="#1f2328" font-weight="600">3.7 %</text>
+<text x="420.0" y="205.0" font-size="12" fill="#59636e" text-anchor="end">404</text>
+<text x="0.0" y="230.0" font-size="13" fill="#1f2328">8 players</text>
+<rect x="104.00" y="220.00" width="11.47" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M117.47 220.00h1.30q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-1.30z" fill="#6e7681"/>
+<text x="126.8" y="230.0" font-size="12" fill="#1f2328" font-weight="600">0.8 %</text>
+<text x="420.0" y="230.0" font-size="12" fill="#59636e" text-anchor="end">2,266</text>
+<text x="0.0" y="255.0" font-size="13" fill="#1f2328">9–11 players</text>
+<path d="M104.00 245.00h14.10q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-14.10z" fill="#6250d6"/>
+<text x="126.1" y="255.0" font-size="12" fill="#1f2328" font-weight="600">0.9 %</text>
+<text x="420.0" y="255.0" font-size="12" fill="#59636e" text-anchor="end">221</text>
+<text x="0.0" y="280.0" font-size="13" fill="#1f2328">12+ players</text>
+<rect x="104.00" y="270.00" width="6.35" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M112.35 270.00h5.52q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-5.52z" fill="#6e7681"/>
+<text x="125.9" y="280.0" font-size="12" fill="#1f2328" font-weight="600">0.8 %</text>
+<text x="420.0" y="280.0" font-size="12" fill="#59636e" text-anchor="end">2,520</text>
+<text x="460.0" y="96.0" font-size="14" fill="#1f2328" font-weight="600">By game length</text>
+<text x="880.0" y="96.0" font-size="12" fill="#59636e" text-anchor="end">Replays</text>
+<line x1="564.0" y1="114.0" x2="564.0" y2="289.0" stroke="#d1d9e0"/>
+<text x="460.0" y="130.0" font-size="13" fill="#1f2328">Under 10 min</text>
+<rect x="564.00" y="120.00" width="88.59" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M654.59 120.00h29.03q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-29.03z" fill="#6e7681"/>
+<text x="691.6" y="130.0" font-size="12" fill="#1f2328" font-weight="600">6.1 %</text>
+<text x="880.0" y="130.0" font-size="12" fill="#59636e" text-anchor="end">1,332</text>
+<text x="460.0" y="155.0" font-size="13" fill="#1f2328">10–20 min</text>
+<rect x="564.00" y="145.00" width="30.64" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M596.64 145.00h14.11q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-14.11z" fill="#6e7681"/>
+<text x="618.7" y="155.0" font-size="12" fill="#1f2328" font-weight="600">2.4 %</text>
+<text x="880.0" y="155.0" font-size="12" fill="#59636e" text-anchor="end">2,872</text>
+<text x="460.0" y="180.0" font-size="13" fill="#1f2328">20–30 min</text>
+<rect x="564.00" y="170.00" width="26.51" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M592.51 170.00h4.84q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-4.84z" fill="#6e7681"/>
+<text x="605.4" y="180.0" font-size="12" fill="#1f2328" font-weight="600">1.8 %</text>
+<text x="880.0" y="180.0" font-size="12" fill="#59636e" text-anchor="end">2,942</text>
+<text x="460.0" y="205.0" font-size="13" fill="#1f2328">30–45 min</text>
+<rect x="564.00" y="195.00" width="32.74" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M598.74 195.00h18.75q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-18.75z" fill="#6e7681"/>
+<text x="625.5" y="205.0" font-size="12" fill="#1f2328" font-weight="600">2.8 %</text>
+<text x="880.0" y="205.0" font-size="12" fill="#59636e" text-anchor="end">3,604</text>
+<text x="460.0" y="230.0" font-size="13" fill="#1f2328">45–60 min</text>
+<rect x="564.00" y="220.00" width="18.03" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M584.03 220.00h51.60q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-51.60z" fill="#6e7681"/>
+<text x="643.6" y="230.0" font-size="12" fill="#1f2328" font-weight="600">3.7 %</text>
+<text x="880.0" y="230.0" font-size="12" fill="#59636e" text-anchor="end">1,331</text>
+<text x="460.0" y="255.0" font-size="13" fill="#1f2328">60–90 min</text>
+<rect x="564.00" y="245.00" width="37.31" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M603.31 245.00h83.06q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-83.06z" fill="#6e7681"/>
+<text x="694.4" y="255.0" font-size="12" fill="#1f2328" font-weight="600">6.2 %</text>
+<text x="880.0" y="255.0" font-size="12" fill="#59636e" text-anchor="end">804</text>
+<text x="460.0" y="280.0" font-size="13" fill="#1f2328">90 min or more</text>
+<rect x="564.00" y="270.00" width="26.09" height="13.00" rx="0.00" fill="#6250d6"/>
+<path d="M592.09 270.00h169.91q4.00 0 4.00 4.00v5.00q0 4.00 -4.00 4.00h-169.91z" fill="#6e7681"/>
+<text x="770.0" y="280.0" font-size="12" fill="#1f2328" font-weight="600">10.0 %</text>
+<text x="880.0" y="280.0" font-size="12" fill="#59636e" text-anchor="end">230</text>
+<text x="0.0" y="309.0" font-size="12" fill="#59636e">Not shown: 9 replays whose map was missing, so they never loaded. The game length rows also leave out 24 with no recorded length.</text>
+</svg>
