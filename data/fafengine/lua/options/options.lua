@@ -43,3 +43,31 @@ do
         table.insert(video.items, position, graphicsApi)
     end
 end
+
+
+do
+    local replayKeyframeOption = {
+        title = "Replay Keyframe Interval",
+        key = 'replay_keyframe_interval',
+        type = 'toggle',
+        default = '120',
+        tip = "Interval between keyframes saved during replay playback for fast backward scrubbing. Frequent keyframes allow faster rewinds at the cost of disk space.",
+        custom = {
+            states = {
+                { text = "Every 30 seconds", key = '30' },
+                { text = "Every 1 minute", key = '60' },
+                { text = "Every 2 minutes", key = '120' },
+                { text = "Every 5 minutes", key = '300' },
+                { text = "Disabled (Start only)", key = '0' },
+            },
+        },
+        set = function(key, value)
+            ConExecute("sim_ReplayKeyframeInterval " .. tostring(value))
+        end,
+    }
+
+    local targetTab = options and (options.gameplay or options.interface or options.video)
+    if targetTab and targetTab.items then
+        table.insert(targetTab.items, replayKeyframeOption)
+    end
+end

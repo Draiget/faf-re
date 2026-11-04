@@ -346,6 +346,11 @@ function CreateReplayTimeline(parent)
         return controls.timeline
     end
 
+    local prefInterval = GetPreference('options.replay_keyframe_interval', '120')
+    if prefInterval then
+        ConExecute('sim_ReplayKeyframeInterval ' .. tostring(prefInterval))
+    end
+
     local rootFrame = GetFrame(0)
     parent = rootFrame
 

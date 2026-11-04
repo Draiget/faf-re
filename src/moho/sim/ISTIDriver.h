@@ -206,8 +206,8 @@ namespace moho
     virtual void
     DrawNetworkStats(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY) = 0;
 
-    // Engine addition: Replay keyframe rewind to beat 0 without session restart.
-    virtual bool RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo) = 0;
+    // Engine addition: Replay keyframe rewind to nearest keyframe <= targetTick without session restart.
+    virtual bool RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo, std::int32_t targetTick = 0, std::int32_t* outRestoredTick = nullptr) = 0;
   };
 
   static_assert(sizeof(ISTIDriver) == 0x4, "ISTIDriver size must be 0x4");

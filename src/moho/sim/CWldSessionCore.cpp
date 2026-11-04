@@ -2023,7 +2023,7 @@ namespace
   /**
    * Engine addition: Rewinds replay session to tick 0 from keyframe without session restart.
    */
-  bool CWldSession::RewindToStart()
+  bool CWldSession::RewindToStart(const std::int32_t targetTick)
   {
     if (!IsReplay) {
       return false;
@@ -2061,7 +2061,6 @@ namespace
     }
 
     // 5. Reset session clock and state
-    mGameTick = 0;
     mTimeSinceLastTick = 0.0f;
     mLastBeatWasTick = 0;
     IsGameOver = 0;
@@ -2089,9 +2088,12 @@ namespace
     }
 
     // 7. Rewind sim driver
-    if (!simDriver->RewindToStart(loadInfo)) {
+    std::int32_t restoredTick = 0;
+    if (!simDriver->RewindToStart(loadInfo, targetTick, &restoredTick)) {
       return false;
     }
+
+    mGameTick = restoredTick;
 
     // 8. Consume opening sync
     if (simDriver->HasSyncData()) {
@@ -2100,7 +2102,8 @@ namespace
       DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
     }
 
-    gpg::Logf("CWldSession::RewindToStart: successfully rewound replay to tick 0");
+    gpg::Logf("CWldSession::RewindToStart: successfully rewound replay to tick %d (target %d)",
+              restoredTick, targetTick);
     return true;
   }
 

@@ -634,9 +634,9 @@ namespace moho
     void StartScrubToBeat(std::int32_t targetBeat);
 
     /**
-     * Engine addition: Rewinds replay session to tick 0 from keyframe without session restart.
+     * Engine addition: Rewinds replay session to nearest keyframe <= targetTick without session restart.
      */
-    bool RewindToStart();
+    bool RewindToStart(std::int32_t targetTick = 0);
 
     /**
      * Engine addition: Cancels any active replay scrub and clears pending restart targets.

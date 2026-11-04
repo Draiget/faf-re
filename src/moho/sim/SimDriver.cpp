@@ -63,37 +63,51 @@ namespace
 {
   bool gSimInterlocked = false;
 
-std::string sInitialKeyframePath;
-  moho::SSimKeyframeHeader sInitialKeyframeHeader{};
-  bool sHasInitialKeyframe = false;
+struct SReplayKeyframeEntry {
+    std::string path;
+    moho::SSimKeyframeHeader header;
+  };
 
-  void CaptureInitialKeyframeLocked(moho::Sim* const sim, const std::uint32_t processId)
+  std::map<std::uint32_t, SReplayKeyframeEntry> sReplayKeyframes;
+  boost::mutex sReplayKeyframesMutex;
+
+  void DeleteAllKeyframesLocked()
+  {
+    for (const auto& kv : sReplayKeyframes) {
+      std::error_code ignored;
+      std::filesystem::remove(kv.second.path, ignored);
+    }
+    sReplayKeyframes.clear();
+  }
+
+  void CaptureKeyframeLocked(moho::Sim* const sim, const std::uint32_t processId)
   {
     if (sim == nullptr) {
       return;
     }
 
-    if (sInitialKeyframePath.empty()) {
-      const std::filesystem::path tempDir = std::filesystem::temp_directory_path();
-      sInitialKeyframePath = (tempDir / ("faf_replay_initial_" + std::to_string(processId) + ".bin")).string();
-    }
+    moho::SSimKeyframeHeader header{};
+    moho::SIM_CaptureKeyframeHeader(*sim, header);
+
+    const std::uint32_t tick = header.tick;
+    const std::filesystem::path tempDir = std::filesystem::temp_directory_path();
+    const std::string path = (tempDir / ("faf_replay_kf_" + std::to_string(processId) + "_" + std::to_string(tick) + ".bin")).string();
 
     try {
       moho::gSimExactSaveCount.fetch_add(1u);
       moho::gSimExactArchive.store(true);
 
       std::FILE* file = nullptr;
-      if (fopen_s(&file, sInitialKeyframePath.c_str(), "wb") != 0 || file == nullptr) {
-        gpg::Warnf("CSimDriver: failed to open %s for initial keyframe", sInitialKeyframePath.c_str());
+      if (fopen_s(&file, path.c_str(), "wb") != 0 || file == nullptr) {
+        gpg::Warnf("CSimDriver: failed to open %s for keyframe", path.c_str());
         moho::gSimExactArchive.store(false);
         return;
       }
 
       boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
 
-      moho::SIM_CaptureKeyframeHeader(*sim, sInitialKeyframeHeader);
-      if (!moho::SIM_WriteKeyframeHeader(file, sInitialKeyframeHeader)) {
-        gpg::Warnf("CSimDriver: failed to write keyframe header to %s", sInitialKeyframePath.c_str());
+      if (!moho::SIM_WriteKeyframeHeader(file, header)) {
+        gpg::Warnf("CSimDriver: failed to write keyframe header to %s", path.c_str());
         moho::gSimExactArchive.store(false);
         return;
       }
@@ -103,15 +117,21 @@ std::string sInitialKeyframePath;
       delete archive;
 
       moho::gSimExactArchive.store(false);
-      sHasInitialKeyframe = true;
-      gpg::Logf("CSimDriver: initial keyframe captured at beat %u, tick %u to %s",
-                sInitialKeyframeHeader.beat, sInitialKeyframeHeader.tick, sInitialKeyframePath.c_str());
+
+      boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
+      SReplayKeyframeEntry entry;
+      entry.path = path;
+      entry.header = header;
+      sReplayKeyframes[tick] = entry;
+
+      gpg::Logf("CSimDriver: keyframe captured at beat %u, tick %u to %s",
+                header.beat, header.tick, path.c_str());
     } catch (const std::exception& ex) {
       moho::gSimExactArchive.store(false);
-      gpg::Warnf("CSimDriver: exception while capturing initial keyframe: %s", ex.what());
+      gpg::Warnf("CSimDriver: exception while capturing keyframe: %s", ex.what());
     } catch (...) {
       moho::gSimExactArchive.store(false);
-      gpg::Warnf("CSimDriver: unknown exception while capturing initial keyframe");
+      gpg::Warnf("CSimDriver: unknown exception while capturing keyframe");
     }
   }
 
@@ -971,10 +991,9 @@ CSimDriver::~CSimDriver()
 
   mSyncDataQueue.ClearAndDelete();
 
-  if (sHasInitialKeyframe && !sInitialKeyframePath.empty()) {
-    std::error_code ignored;
-    std::filesystem::remove(sInitialKeyframePath, ignored);
-    sHasInitialKeyframe = false;
+  {
+    boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
+    DeleteAllKeyframesLocked();
   }
 }
 
@@ -1158,9 +1177,24 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
   FAF_PROFILE_FRAME("Sim Beat");
 
-  // Engine addition: capture initial keyframe at beat 1 for rewind without session restart
-  if (mClientManager != nullptr && mClientManager->IsReplay() && !sHasInitialKeyframe && beatToDispatch == 1) {
-    CaptureInitialKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+  // Engine addition: capture replay keyframes (beat 1 and periodic every sim_ReplayKeyframeInterval seconds)
+  if (mClientManager != nullptr && mClientManager->IsReplay() && mSim) {
+    if (beatToDispatch == 1) {
+      boost::mutex::scoped_lock kfLock(sReplayKeyframesMutex);
+      if (sReplayKeyframes.find(1) == sReplayKeyframes.end()) {
+        kfLock.unlock();
+        CaptureKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+      }
+    } else if (sim_ReplayKeyframeInterval > 0) {
+      const std::uint32_t intervalTicks = static_cast<std::uint32_t>(sim_ReplayKeyframeInterval) * 10u;
+      if (intervalTicks > 0 && mSim->mCurTick > 0 && (mSim->mCurTick % intervalTicks) == 0) {
+        boost::mutex::scoped_lock kfLock(sReplayKeyframesMutex);
+        if (sReplayKeyframes.find(mSim->mCurTick) == sReplayKeyframes.end()) {
+          kfLock.unlock();
+          CaptureKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+        }
+      }
+    }
   }
 
   if (mSimBusy) {
@@ -2266,6 +2300,7 @@ ISTIDriver* moho::SIM_CreateDriver(
 }
 
 int moho::sim_ReplayLead = 10;
+int moho::sim_ReplayKeyframeInterval = 120;
 int moho::sim_LocalLead = 2;
 int moho::sim_LeadOnSchedule = 1;
 int moho::wld_SkewCorrection = 0;
@@ -2318,6 +2353,12 @@ namespace
     &moho::sim_ReplayLead
   );
 
+  TConVar<int> gTConVar_sim_ReplayKeyframeInterval(
+    "sim_ReplayKeyframeInterval",
+    "Replays only: interval in seconds between keyframes for fast backward scrubbing (default 120, 0 = disabled / initial only).",
+    &moho::sim_ReplayKeyframeInterval
+  );
+
   TConVar<int> gTConVar_sim_LocalLead(
     "sim_LocalLead",
     "Single player only (one human, no network peers): beats the sim may compute ahead of the beat "
@@ -2352,11 +2393,28 @@ float moho::SIM_GetLeadSimSpeedEstimate() noexcept
   return gLeadSimSpeedEstimate.load(std::memory_order_relaxed);
 }
 
-bool CSimDriver::RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo)
+bool CSimDriver::RewindToStart(
+  const boost::shared_ptr<LaunchInfoLoad>& loadInfo,
+  const std::int32_t targetTick,
+  std::int32_t* const outRestoredTick
+)
 {
-  if (!sHasInitialKeyframe || sInitialKeyframePath.empty() || !loadInfo) {
+  boost::mutex::scoped_lock kfLock(sReplayKeyframesMutex);
+  if (sReplayKeyframes.empty() || !loadInfo) {
     return false;
   }
+
+  // Find the closest keyframe with tick <= targetTick
+  const auto queryTick = targetTick > 0 ? static_cast<std::uint32_t>(targetTick) : 1u;
+  auto it = sReplayKeyframes.upper_bound(queryTick);
+  if (it != sReplayKeyframes.begin()) {
+    --it;
+  } else {
+    it = sReplayKeyframes.begin();
+  }
+
+  const SReplayKeyframeEntry bestEntry = it->second;
+  kfLock.unlock();
 
   boost::mutex::scoped_lock lock(mLock);
 
@@ -2396,15 +2454,15 @@ bool CSimDriver::RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo
 
   // 4. Open keyframe file and read keyframe header
   std::FILE* rawFile = nullptr;
-  if (fopen_s(&rawFile, sInitialKeyframePath.c_str(), "rb") != 0 || rawFile == nullptr) {
-    gpg::Warnf("CSimDriver::RewindToStart: cannot read %s", sInitialKeyframePath.c_str());
+  if (fopen_s(&rawFile, bestEntry.path.c_str(), "rb") != 0 || rawFile == nullptr) {
+    gpg::Warnf("CSimDriver::RewindToStart: cannot read %s", bestEntry.path.c_str());
     return false;
   }
 
   boost::shared_ptr<std::FILE> keyframeFile(rawFile, moho::SFileStarCloser{});
   moho::SSimKeyframeHeader keyframeHeader{};
   if (!moho::SIM_ReadKeyframeHeader(rawFile, keyframeHeader)) {
-    gpg::Warnf("CSimDriver::RewindToStart: %s is not a valid keyframe", sInitialKeyframePath.c_str());
+    gpg::Warnf("CSimDriver::RewindToStart: %s is not a valid keyframe", bestEntry.path.c_str());
     return false;
   }
 
@@ -2431,13 +2489,22 @@ bool CSimDriver::RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo
   loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
   mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
 
-  // 7. Restart ThreadCreateSim
+  // 8. Restart ThreadCreateSim
   mCreateSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this));
 
-  // 8. Wait for sim thread to recreate sim and reach Ready state
+  // 9. Wait for sim thread to recreate sim and reach Ready state
   while (mState != EDriverState::Ready && mState != EDriverState::Failed) {
     mStateChanged.wait(lock);
   }
 
-  return mState == EDriverState::Ready;
+  if (mState == EDriverState::Ready) {
+    if (outRestoredTick != nullptr) {
+      *outRestoredTick = static_cast<std::int32_t>(keyframeHeader.tick);
+    }
+    gpg::Logf("CSimDriver::RewindToStart: successfully restored keyframe at beat %u, tick %u from %s",
+              keyframeHeader.beat, keyframeHeader.tick, bestEntry.path.c_str());
+    return true;
+  }
+
+  return false;
 }

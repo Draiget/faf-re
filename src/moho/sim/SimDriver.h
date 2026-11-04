@@ -813,7 +813,11 @@ namespace moho
     /**
      * Engine addition: Rewinds simulation from initial keyframe without session restart.
      */
-    bool RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo) override;
+    bool RewindToStart(
+      const boost::shared_ptr<LaunchInfoLoad>& loadInfo,
+      std::int32_t targetTick = 0,
+      std::int32_t* outRestoredTick = nullptr
+    ) override;
 
     /**
      * Address: 0x0073F430 (FUN_0073F430)
@@ -1039,6 +1043,7 @@ namespace moho
    *   so a larger lead would delay the player's orders by that many beats; keep it small.
    */
   extern int sim_ReplayLead;
+  extern int sim_ReplayKeyframeInterval;
   extern int sim_LocalLead;
 
   /**
