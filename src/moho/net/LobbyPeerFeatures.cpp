@@ -1,6 +1,7 @@
 #include "LobbyPeerFeatures.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -13,11 +14,13 @@
 
 #include <Windows.h>
 
+#include "CLobby.h"
 #include "CMessage.h"
 #include "CMessageStream.h"
 #include "ELobbyMsg.h"
 #include "gpg/core/utils/Logging.h"
 #include "INetConnection.h"
+#include "lua/LuaObject.h"
 #include "moho/misc/StartupHelpers.h"
 #include "NetConVars.h"
 #include "SPeer.h"
@@ -94,14 +97,174 @@ namespace
     }
     return std::filesystem::path(modulePath.data()).parent_path() / L"peer_style.key";
   }
+
+  // The lobby the wrapped SetSlotInfo below asks. One exists at a time; a rehost
+  // installs the next one before the old one goes.
+  const CLobbyPeerFeatures* sSlotStyles = nullptr;
+
+  void PushField(lua_State* const state, const int tableIndex, const char* const name)
+  {
+    // Relative to the top before the push; the globals table's index is absolute.
+    const int table = tableIndex < 0 && tableIndex != LUA_GLOBALSINDEX ? lua_gettop(state) + tableIndex + 1 : tableIndex;
+    lua_pushstring(state, name);
+    lua_gettable(state, table);
+  }
+
+  // Pushes the lobby script's module table, or returns false with nothing pushed.
+  // Looked up, not imported: autolobby games never load that script.
+  [[nodiscard]] bool PushLobbyModule(lua_State* const state)
+  {
+    PushField(state, LUA_GLOBALSINDEX, "__modules");
+    if (lua_type(state, -1) != LUA_TTABLE) {
+      lua_pop(state, 1);
+      return false;
+    }
+    PushField(state, -1, "/lua/ui/lobby/lobby.lua");
+    lua_remove(state, -2);
+    if (lua_type(state, -1) != LUA_TTABLE) {
+      lua_pop(state, 1);
+      return false;
+    }
+    return true;
+  }
+
+  // Pushes the script's file-local GUI, an upvalue of its SetSlotInfo (the function
+  // at the absolute or upvalue index `function`, or the one wrapped by it). False with
+  // nothing pushed if not found.
+  [[nodiscard]] bool PushLobbyGui(lua_State* const state, const int function)
+  {
+    const int top = lua_gettop(state);
+    int script = function;
+    if (lua_type(state, script) == LUA_CFUNCTION) {
+      if (lua_getupvalue(state, script, 1) == nullptr) {
+        return false;
+      }
+      script = lua_gettop(state);
+    }
+    for (int index = 1;; ++index) {
+      const char* const name = lua_getupvalue(state, script, index);
+      if (name == nullptr) {
+        lua_settop(state, top);
+        return false;
+      }
+      if (std::strcmp(name, "GUI") == 0) {
+        // Over the wrapped function, when that was pushed first.
+        if (lua_gettop(state) > top + 1) {
+          lua_replace(state, top + 1);
+        }
+        return true;
+      }
+      lua_pop(state, 1);
+    }
+  }
+
+  // GUI.slots[slot].name:SetTitleTextColor(style). A failure costs the colour only.
+  void PaintSlot(lua_State* const state, const int function, const double slot, const std::string& style)
+  {
+    const int top = lua_gettop(state);
+    if (PushLobbyGui(state, function) && lua_type(state, -1) == LUA_TTABLE) {
+      PushField(state, -1, "slots");
+      if (lua_type(state, -1) == LUA_TTABLE) {
+        lua_pushnumber(state, slot);
+        lua_gettable(state, -2);
+        if (lua_type(state, -1) == LUA_TTABLE) {
+          PushField(state, -1, "name");
+          if (lua_type(state, -1) == LUA_TTABLE) {
+            PushField(state, -1, "SetTitleTextColor");
+            lua_pushvalue(state, -2);
+            lua_pushstring(state, style.c_str());
+            if (LuaCallProtected(state, 2, 0) != 0) {
+              gpg::Warnf("PEERS: could not show a style on slot %d", static_cast<int>(slot));
+            }
+          }
+        }
+      }
+    }
+    lua_settop(state, top);
+  }
+
+  // Stands in for the lobby script's SetSlotInfo(slotNum, playerInfo): the script's
+  // function is upvalue 1. It sets the name's colour by the slot's state, so a style
+  // goes on after it, over the host, player and local colours.
+  int SetSlotInfoWithStyle(lua_State* const state)
+  {
+    const int argumentCount = lua_gettop(state);
+    lua_pushvalue(state, lua_upvalueindex(1));
+    for (int index = 1; index <= argumentCount; ++index) {
+      lua_pushvalue(state, index);
+    }
+    lua_call(state, argumentCount, 0);
+
+    if (sSlotStyles == nullptr || argumentCount < 2 || lua_type(state, 2) != LUA_TTABLE) {
+      return 0;
+    }
+    PushField(state, 2, "Human");
+    const bool human = lua_toboolean(state, -1) != 0;
+    lua_pop(state, 1);
+    if (!human) {
+      return 0;
+    }
+    PushField(state, 2, "OwnerID");
+    const char* const owner = lua_tostring(state, -1);
+    const std::string style = owner != nullptr ? sSlotStyles->StyleOf(std::atoi(owner)) : std::string{};
+    lua_pop(state, 1);
+    if (!style.empty()) {
+      PaintSlot(state, lua_upvalueindex(1), lua_tonumber(state, 1), style);
+    }
+    return 0;
+  }
 } // namespace
 
-CLobbyPeerFeatures::CLobbyPeerFeatures()
+CLobbyPeerFeatures::CLobbyPeerFeatures(const CLobby& lobby)
+  : mLobby(lobby)
 {
   LoadKey();
 }
 
-CLobbyPeerFeatures::~CLobbyPeerFeatures() = default;
+CLobbyPeerFeatures::~CLobbyPeerFeatures()
+{
+  if (sSlotStyles == this) {
+    sSlotStyles = nullptr;
+  }
+}
+
+void CLobbyPeerFeatures::InstallSlotStyles(lua_State* const state)
+{
+  sSlotStyles = this;
+
+  const int top = lua_gettop(state);
+  if (PushLobbyModule(state)) {
+    PushField(state, -1, "SetSlotInfo");
+    // LUA_TFUNCTION is a script function in this fork; a C function here has its own
+    // type, and is the wrapper already, from the lobby before this one.
+    if (lua_type(state, -1) == LUA_TFUNCTION) {
+      lua_pushstring(state, "SetSlotInfo");
+      lua_pushvalue(state, -2);
+      lua_pushcclosure(state, &SetSlotInfoWithStyle, 1);
+      lua_settable(state, -4);
+    }
+  }
+  lua_settop(state, top);
+}
+
+void CLobbyPeerFeatures::PaintPeer(lua_State* const state, const std::int32_t uid) const
+{
+  const std::string style = StyleOf(uid);
+  const int top = lua_gettop(state);
+  if (!style.empty() && PushLobbyModule(state)) {
+    const int module = lua_gettop(state);
+    PushField(state, module, "FindSlotForID");
+    lua_pushstring(state, std::to_string(uid).c_str());
+    if (LuaCallProtected(state, 1, 1) == 0 && lua_type(state, -1) == LUA_TNUMBER) {
+      const double slot = lua_tonumber(state, -1);
+      PushField(state, module, "SetSlotInfo");
+      if (lua_type(state, -1) == LUA_CFUNCTION) {
+        PaintSlot(state, lua_gettop(state), slot, style);
+      }
+    }
+  }
+  lua_settop(state, top);
+}
 
 void CLobbyPeerFeatures::LoadKey()
 {
@@ -237,9 +400,9 @@ bool CLobbyPeerFeatures::PeerRunsOurEngine(const std::int32_t uid) const
   return found != mPeers.end() && found->second.announced;
 }
 
-std::string CLobbyPeerFeatures::StyleOf(const std::int32_t uid, const std::int32_t localUid) const
+std::string CLobbyPeerFeatures::StyleOf(const std::int32_t uid) const
 {
-  if (uid == localUid) {
+  if (uid == mLobby.localUid) {
     return mKey != nullptr ? FormatColor(mLocalStyle) : std::string{};
   }
   const auto found = mPeers.find(uid);

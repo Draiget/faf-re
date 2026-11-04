@@ -10,8 +10,11 @@
 #include "PeerFeatures.h"
 #include "remote/net/StyleProof.h"
 
+struct lua_State;
+
 namespace moho
 {
+  class CLobby;
   class SPeer;
   struct CMessage;
 
@@ -25,8 +28,14 @@ namespace moho
   class CLobbyPeerFeatures
   {
   public:
-    CLobbyPeerFeatures();
+    explicit CLobbyPeerFeatures(const CLobby& lobby);
     ~CLobbyPeerFeatures();
+
+    /// Makes the lobby script's slots show proven styles. Nothing when it isn't loaded.
+    void InstallSlotStyles(lua_State* state);
+
+    /// Shows `uid`'s style on their slot, when they have one and a slot is drawn.
+    void PaintPeer(lua_State* state, std::int32_t uid) const;
 
     /// A link to `peer` was just established: forget its old state and announce.
     void PeerEstablished(const SPeer& peer);
@@ -41,7 +50,7 @@ namespace moho
     [[nodiscard]] bool PeerRunsOurEngine(std::int32_t uid) const;
 
     /// "rrggbb" for a proven style, empty for none. The local player's comes from their key.
-    [[nodiscard]] std::string StyleOf(std::int32_t uid, std::int32_t localUid) const;
+    [[nodiscard]] std::string StyleOf(std::int32_t uid) const;
 
   private:
     struct SLobbyPeer
@@ -57,6 +66,7 @@ namespace moho
 
     void LoadKey();
 
+    const CLobby& mLobby;
     std::map<std::int32_t, SLobbyPeer> mPeers;
     std::unique_ptr<faf::remote::net::StyleSigningKey> mKey;
     faf::remote::net::StyleColor mLocalStyle{};

@@ -31,11 +31,12 @@ steps:
 expect:
   noCrash: true
   logsContain:
-    - { uids: [1, 2], pattern: 'Hooked /lua/ui/lobby/lobby.lua' }
     - { uids: [1], pattern: 'PEERS: lobby player \d+:NoKey runs our engine, features 0+,' }
     - { uids: [2], pattern: 'PEERS: lobby player \d+:KeyHost runs our engine, features 0+8,' }
     - { uids: [2], pattern: 'PEERS: lobby player \d+:KeyHost has style [0-9a-f]{6}' }
   logsAbsent:
+    - { uids: [1, 2], pattern: 'Hooked /lua/ui/lobby/lobby.lua' }
+    - { uids: [1, 2], pattern: 'could not show a style' }
     - { uids: [1], pattern: 'has style' }
     - { uids: [1, 2], pattern: 'does not check' }
     - { uids: [1, 2], pattern: 'style key' }

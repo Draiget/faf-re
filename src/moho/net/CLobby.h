@@ -596,13 +596,6 @@ namespace moho
   int cfunc_CLobbyGetPeerL(LuaPlus::LuaState* state);
 
   /**
-   * Engine addition, not in the binary: `CLobby:GetPeerStyle(uid)`.
-   */
-  int cfunc_CLobbyGetPeerStyle(lua_State* luaContext);
-  CScrLuaInitForm* func_CLobbyGetPeerStyle_LuaFuncDef();
-  int cfunc_CLobbyGetPeerStyleL(LuaPlus::LuaState* state);
-
-  /**
    * Address: 0x007C2DF0 (FUN_007C2DF0, cfunc_CLobbyGetLocalPlayerName)
    */
   int cfunc_CLobbyGetLocalPlayerName(lua_State* luaContext);
