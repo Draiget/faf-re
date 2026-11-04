@@ -196,6 +196,20 @@ namespace
     {
       std::lock_guard<std::mutex> guard(gSpanLock);
       span = TakeSpans(1u);
+      if (span == kSpanCount && gFreeRuns != nullptr) {
+        // Reuse already committed storage only after allocating a fresh span fails.
+        for (LargeRun& run : *gFreeRuns) {
+          if (run.spans == 0u) {
+            continue;
+          }
+          span = run.firstSpan++;
+          if (--run.spans == 0u) {
+            run = gFreeRuns->back();
+            gFreeRuns->pop_back();
+          }
+          break;
+        }
+      }
       if (span == kSpanCount) {
         return nullptr;
       }
