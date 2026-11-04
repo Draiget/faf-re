@@ -189,49 +189,6 @@ namespace
     "of strings, or builds a multi-squad platoon from a table of "
     "{platoonName, planName, [bp, ?, count, squadClass, squadName]...} entries";
 
-  [[nodiscard]] std::int32_t AtomicLoadStatValueBits(volatile std::int32_t* const valueBits) noexcept
-  {
-    return static_cast<std::int32_t>(
-      InterlockedCompareExchange(reinterpret_cast<volatile platform::InterlockedLong*>(valueBits), 0L, 0L)
-    );
-  }
-
-  void AtomicStoreStatValueBits(volatile std::int32_t* const valueBits, const std::int32_t nextValueBits) noexcept
-  {
-    for (;;) {
-      const std::int32_t observedValueBits = AtomicLoadStatValueBits(valueBits);
-      const std::int32_t exchangedValueBits = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(valueBits),
-        static_cast<long>(nextValueBits),
-        static_cast<long>(observedValueBits)
-      ));
-      if (exchangedValueBits == observedValueBits) {
-        return;
-      }
-    }
-  }
-
-  void AtomicAddFloatStatValueBits(volatile std::int32_t* const valueBits, const float delta) noexcept
-  {
-    for (;;) {
-      const std::int32_t observedValueBits = AtomicLoadStatValueBits(valueBits);
-
-      const float observedValue = std::bit_cast<float>(observedValueBits);
-      const float nextValue = observedValue + delta;
-
-      const std::int32_t nextValueBits = std::bit_cast<std::int32_t>(nextValue);
-
-      const std::int32_t exchangedValueBits = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(valueBits),
-        static_cast<long>(nextValueBits),
-        static_cast<long>(observedValueBits)
-      ));
-      if (exchangedValueBits == observedValueBits) {
-        return;
-      }
-    }
-  }
-
   [[nodiscard]] moho::CArmyStatItem* ResolveCachedArmyStatPath(
     moho::CArmyStats* const armyStats, const char* const statPath
   )
@@ -265,16 +222,12 @@ namespace
       statItem->SynchronizeAsInt();
 
       for (;;) {
-        const std::int32_t observed = AtomicLoadStatValueBits(&statItem->mPrimaryValueBits);
+        const std::int32_t observed = platform::AtomicLoad(&statItem->mPrimaryValueBits);
         if (candidate <= observed) {
           return;
         }
 
-        const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-          reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits),
-          static_cast<long>(candidate),
-          static_cast<long>(observed)
-        ));
+        const std::int32_t exchanged = platform::AtomicCompareExchange(&statItem->mPrimaryValueBits, candidate, observed);
         if (exchanged == observed) {
           return;
         }
@@ -290,17 +243,13 @@ namespace
       const std::int32_t candidateBits = std::bit_cast<std::int32_t>(candidate);
 
       for (;;) {
-        const std::int32_t observedBits = AtomicLoadStatValueBits(&statItem->mPrimaryValueBits);
+        const std::int32_t observedBits = platform::AtomicLoad(&statItem->mPrimaryValueBits);
         const float observed = std::bit_cast<float>(observedBits);
         if (candidate <= observed) {
           return;
         }
 
-        const std::int32_t exchangedBits = static_cast<std::int32_t>(InterlockedCompareExchange(
-          reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits),
-          static_cast<long>(candidateBits),
-          static_cast<long>(observedBits)
-        ));
+        const std::int32_t exchangedBits = platform::AtomicCompareExchange(&statItem->mPrimaryValueBits, candidateBits, observedBits);
         if (exchangedBits == observedBits) {
           return;
         }
@@ -523,7 +472,7 @@ int moho::cfunc_CAiBrainSetArmyStatL(LuaPlus::LuaState* const state)
     const std::int32_t intValue = static_cast<std::int32_t>(lua_tonumber(rawState, 3));
     if (CArmyStatItem* const statItem = ResolveCachedArmyStatPath(armyStats, statName); statItem != nullptr) {
       statItem->SynchronizeAsInt();
-      AtomicStoreStatValueBits(&statItem->mPrimaryValueBits, intValue);
+      (void)platform::AtomicExchange(&statItem->mPrimaryValueBits, intValue);
     }
   } else if (lua_type(rawState, 3) == LUA_TNUMBER) {
     const float floatValue = valueArg.GetNumber();
@@ -531,7 +480,7 @@ int moho::cfunc_CAiBrainSetArmyStatL(LuaPlus::LuaState* const state)
       statItem->SynchronizeAsFloat();
 
       const std::int32_t floatValueBits = std::bit_cast<std::int32_t>(floatValue);
-      AtomicStoreStatValueBits(&statItem->mPrimaryValueBits, floatValueBits);
+      (void)platform::AtomicExchange(&statItem->mPrimaryValueBits, floatValueBits);
     }
   }
 
@@ -609,7 +558,7 @@ int moho::cfunc_CAiBrainAddArmyStatL(LuaPlus::LuaState* const state)
     const float floatDelta = valueArg.GetNumber();
     if (CArmyStatItem* const statItem = ResolveCachedArmyStatPath(armyStats, statName); statItem != nullptr) {
       statItem->SynchronizeAsFloat();
-      AtomicAddFloatStatValueBits(&statItem->mPrimaryValueBits, floatDelta);
+      (void)platform::AtomicAddFloat(&statItem->mPrimaryValueBits, floatDelta);
     }
   }
 

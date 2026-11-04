@@ -3387,15 +3387,7 @@ namespace moho
       CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&armyStats, statPath);
       item->SynchronizeAsFloat();
 
-      volatile platform::InterlockedLong* const counter = reinterpret_cast<volatile platform::InterlockedLong*>(&item->mPrimaryValueBits);
-      const std::int32_t desiredBits = std::bit_cast<std::int32_t>(value);
-      for (;;) {
-        const std::int32_t observed = _InterlockedCompareExchange(counter, 0, 0);
-        const std::int32_t result = _InterlockedCompareExchange(counter, desiredBits, observed);
-        if (result == observed) {
-          return;
-        }
-      }
+      (void)platform::AtomicExchange(&item->mPrimaryValueBits, std::bit_cast<std::int32_t>(value));
     }
 
     /**
