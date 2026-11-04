@@ -135,10 +135,7 @@ namespace moho
    */
   gpg::RRef CUnitLoadUnitsTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitLoadUnits*>(objectStorage);
-    if (task) {
-      new (task) CUnitLoadUnits();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitLoadUnits>(objectStorage);
 
     gpg::RRef out{};
     (void)gpg::RRef_CUnitLoadUnits(&out, task);

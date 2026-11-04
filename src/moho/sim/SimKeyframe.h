@@ -7,6 +7,12 @@
 
 #include "gpg/core/algorithms/MD5.h"
 
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
 namespace moho
 {
   class Sim;
@@ -110,4 +116,12 @@ namespace moho
    * collector, kept off since the load began, goes on from the keyframe's counters.
    */
   void SIM_FinishKeyframeRestore(Sim& sim);
+
+  /**
+   * On the session's thread, before its first `OnSync` after a restore: adds to its `Sync` what the sim
+   * publishes once and a loaded game normally sends again from Lua (`OnPostLoad`, lua/SimSync.lua), which
+   * a keyframe skips because that changes the sim: the playable area, unit data, unit enhancements.
+   * Read from the sim's tables at the end of the restore, without allocating in its Lua state.
+   */
+  void SIM_AddRestoredUiData(LuaPlus::LuaObject& sync, LuaPlus::LuaState* state);
 } // namespace moho

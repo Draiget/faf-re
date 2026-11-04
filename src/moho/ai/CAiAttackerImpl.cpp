@@ -1507,7 +1507,7 @@ void CAiAttackerImpl::PushStack(LuaPlus::LuaState* const luaState)
 void CAiAttackerImpl::Stop()
 {
   CAiTarget stopTarget{};
-  std::memset(&stopTarget, 0, 0x0C);
+  std::memset(static_cast<void*>(&stopTarget), 0, 0x0C);
   stopTarget.targetPoint = -1;
   stopTarget.targetIsMobile = false;
   SetDesiredTarget(&stopTarget);

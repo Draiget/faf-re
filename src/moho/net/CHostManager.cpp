@@ -192,7 +192,7 @@ bool moho::NET_GetAddrInfo(const char* str, const u_short defaultPort, const boo
 msvc8::string CHostManager::GetHostName(const std::uint32_t host)
 {
   {
-    boost::mutex::scoped_lock lock(mLock);
+    std::lock_guard<std::mutex> lock(mLock);
     const auto it = mHosts.find(host);
     if (it != mHosts.end() && it->second != nullptr) {
       Touch(*it->second);
@@ -204,7 +204,7 @@ msvc8::string CHostManager::GetHostName(const std::uint32_t host)
   const msvc8::string resolvedName = ResolveHostName(host);
   Host* const pendingHost = new Host(resolvedName);
 
-  boost::mutex::scoped_lock lock(mLock);
+  std::lock_guard<std::mutex> lock(mLock);
   const auto [it, inserted] = mHosts.emplace(host, pendingHost);
 
   if (inserted) {

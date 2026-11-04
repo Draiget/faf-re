@@ -83,6 +83,8 @@ target_include_directories(faf_engine PUBLIC
 target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Headers)
 # In-engine peer links (moho/net/NetlinkPeers.cpp, issue #233; client only).
 target_link_libraries(faf_engine PUBLIC faf_netlink)
+# The rejoin key's signatures (moho/net/RejoinKey.cpp) and the rejoin save's packing (issue #275).
+target_link_libraries(faf_engine PUBLIC faf_monocypher faf_zstd)
 
 set(_faf_main_options
   # C++ exceptions with extern "C" functions allowed to throw (/EHs, not
@@ -113,7 +115,8 @@ list(APPEND _faf_main_options ${FAF_WARNING_OPTIONS})
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 if(FAF_SYNTAX_ONLY)
-  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs>")
+  # /Zs doesn't use the -c the build rule passes.
+  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs;-Wno-unused-command-line-argument>")
 endif()
 
 # --- Per-file settings ---------------------------------------------------------------
@@ -377,6 +380,8 @@ target_sources(faf_sim INTERFACE ${_faf_sim_objects} "${CMAKE_CURRENT_SOURCE_DIR
 add_dependencies(faf_sim faf_engine)
 target_link_libraries(faf_sim INTERFACE
   faf_sim_settings
+  faf_monocypher
+  faf_zstd
   ws2_32 legacy_stdio_definitions legacy_stdio_wide_specifiers
   dbghelp winmm version shlwapi faultrep
   ${_faf_zlib}

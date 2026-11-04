@@ -100,7 +100,7 @@ namespace moho
    * Address: 0x00BC32E0 (FUN_00BC32E0, dynamic initializer for `math_GlobalRandomMutex`)
    * Address: 0x00BEE680 (FUN_00BEE680, dynamic atexit destructor for `math_GlobalRandomMutex`)
    */
-  boost::mutex math_GlobalRandomMutex;
+  std::mutex math_GlobalRandomMutex;
 
   VMatrix4 VMatrix4::NaN{};
 
@@ -113,7 +113,7 @@ namespace moho
    */
   double MathGlobalRandomUnitScaled(const float scale)
   {
-    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
     const float unit = CMersenneTwister::ToUnitFloat(math_GlobalRandomStream.twister.NextUInt32());
     return static_cast<double>(unit * scale);
   }
@@ -127,7 +127,7 @@ namespace moho
    */
   double MathGlobalRandomUnitSafe()
   {
-    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
     const float unit = CMersenneTwister::ToUnitFloat(math_GlobalRandomStream.twister.NextUInt32());
     return static_cast<double>(unit);
   }
@@ -141,7 +141,7 @@ namespace moho
    */
   double MathGlobalRandomRange(const float minValue, const float maxValue)
   {
-    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
     const float unit = CMersenneTwister::ToUnitFloat(math_GlobalRandomStream.twister.NextUInt32());
     return static_cast<double>(minValue + (maxValue - minValue) * unit);
   }

@@ -28,10 +28,7 @@ namespace
    */
   void DestroyCFactoryBuildTaskInPlace(void* const objectStorage)
   {
-    auto* const task = static_cast<moho::CFactoryBuildTask*>(objectStorage);
-    if (task != nullptr) {
-      task->~CFactoryBuildTask();
-    }
+    gpg::DestructInStorage<moho::CFactoryBuildTask>(objectStorage);
   }
 
   /**
@@ -120,10 +117,7 @@ namespace moho
    */
   gpg::RRef CFactoryBuildTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CFactoryBuildTask*>(objectStorage);
-    if (task) {
-      new (task) CFactoryBuildTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CFactoryBuildTask>(objectStorage);
 
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CFactoryBuildTask>(task);

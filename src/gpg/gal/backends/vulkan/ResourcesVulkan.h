@@ -136,6 +136,8 @@ namespace gpg::gal
     void Unlock();
     /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
     void ReleaseCopy() noexcept;
+    /** Device::CopyLockedRangeOnly. */
+    void CopyLockedRangeOnly() noexcept { mLockedRangeOnly = true; }
 
     /** The buffer and offset draws read from. */
     void PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset);
@@ -148,6 +150,7 @@ namespace gpg::gal
     const char* mKind = nullptr;
     bool mDynamic = false;
     backend::LockShadow mShadow;
+    bool mLockedRangeOnly = false;
     vulkan::TrackedBuffer mBuffer; // static buffers
     VkBuffer mChunkBuffer = VK_NULL_HANDLE;
     VkDeviceSize mChunkOffset = 0;

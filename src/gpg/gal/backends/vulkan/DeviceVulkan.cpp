@@ -232,6 +232,23 @@ namespace gpg::gal
     }
   } // namespace
 
+  namespace
+  {
+    const effects::TextureBinding kNoTextureBinding{};
+
+    // A slot's handles are copied only when they changed: each copy is an atomic increment, and a
+    // decal draw keeps all but a few of its effect's textures.
+    void KeepBinding(effects::TextureBinding& slot, const effects::TextureBinding& binding)
+    {
+      if (slot.texture.get() != binding.texture.get()) {
+        slot.texture = binding.texture;
+      }
+      if (slot.renderTarget.get() != binding.renderTarget.get()) {
+        slot.renderTarget = binding.renderTarget;
+      }
+    }
+  } // namespace
+
   struct DeviceVulkan::ProgramState
   {
     std::vector<VkSampler> samplers;
@@ -248,7 +265,7 @@ namespace gpg::gal
     std::uint64_t textureVersion = 0;
     const RenderTarget* tableSurface = nullptr;
     VkDescriptorSet table = VK_NULL_HANDLE;
-    std::shared_ptr<const std::vector<effects::TextureBinding>> tableBindings;
+    std::vector<effects::TextureBinding> tableBindings;
   };
 
   // ---------------------------------------------------------------------------
@@ -1242,6 +1259,16 @@ namespace gpg::gal
   void DeviceVulkan::ReleaseBufferCopy(IndexBuffer& buffer)
   {
     static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
+  }
+
+  void DeviceVulkan::CopyLockedRangeOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
+  void DeviceVulkan::CopyLockedRangeOnly(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
   }
 
   bool DeviceVulkan::CopyVertexBufferRegion(
@@ -2584,16 +2611,19 @@ namespace gpg::gal
         state.tableSurface != outputContext_.surface.get()) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
-      auto bindings = std::make_shared<std::vector<effects::TextureBinding>>();
+      std::vector<effects::TextureBinding>& bindings = state.tableBindings;
+      bindings.resize(std::min<std::size_t>(slots.size(), kTextureBindings));
       const VkDescriptorSet set = AllocateSet(mTextureLayout);
-      std::vector<VkDescriptorImageInfo> images(slots.size());
-      std::vector<VkDescriptorImageInfo> samplers(state.samplers.size());
-      std::vector<VkWriteDescriptorSet> writes;
+      VkDescriptorImageInfo images[kTextureBindings];
+      VkDescriptorImageInfo samplers[kSamplerBindings];
+      VkWriteDescriptorSet writes[kTextureBindings + kSamplerBindings];
+      std::uint32_t writeCount = 0U;
       for (std::size_t index = 0U; index < slots.size() && index < kTextureBindings; ++index) {
         const effects::TextureSlot& slot = slots[index];
         const std::int32_t parameter = slotParameters[index];
-        effects::TextureBinding binding =
-          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : effects::TextureBinding{};
+        const effects::TextureBinding& binding =
+          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : kNoTextureBinding;
+        const effects::TextureBinding* kept = &binding;
         VkImageView view = mNullViews[static_cast<int>(slot.dimension)];
         if (binding.texture != nullptr) {
           auto* const texture = static_cast<TextureVulkan*>(binding.texture.get());
@@ -2603,16 +2633,16 @@ namespace gpg::gal
           if (matches) {
             view = texture->View();
           } else {
-            binding = effects::TextureBinding{};
+            kept = &kNoTextureBinding;
           }
         } else if (binding.renderTarget != nullptr && slot.dimension == effects::TextureDimension::Texture2D) {
           if (binding.renderTarget.get() == outputContext_.surface.get()) {
-            binding = effects::TextureBinding{}; // a pass sampling its own target reads zero (D3D10/11)
+            kept = &kNoTextureBinding; // a pass sampling its own target reads zero (D3D10/11)
           } else {
             view = static_cast<RenderTargetVulkan*>(binding.renderTarget.get())->Current().view;
           }
         } else {
-          binding = effects::TextureBinding{};
+          kept = &kNoTextureBinding;
         }
         images[index] = VkDescriptorImageInfo{VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         VkWriteDescriptorSet write{};
@@ -2622,8 +2652,8 @@ namespace gpg::gal
         write.descriptorCount = 1U;
         write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         write.pImageInfo = &images[index];
-        writes.push_back(write);
-        bindings->push_back(binding);
+        writes[writeCount++] = write;
+        KeepBinding(bindings[index], *kept);
       }
       for (std::size_t index = 0U; index < state.samplers.size() && index < kSamplerBindings; ++index) {
         samplers[index] = VkDescriptorImageInfo{state.samplers[index], VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
@@ -2634,19 +2664,18 @@ namespace gpg::gal
         write.descriptorCount = 1U;
         write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
         write.pImageInfo = &samplers[index];
-        writes.push_back(write);
+        writes[writeCount++] = write;
       }
-      if (!writes.empty()) {
-        Vk().vkUpdateDescriptorSets(mDevice, static_cast<std::uint32_t>(writes.size()), writes.data(), 0U, nullptr);
+      if (writeCount != 0U) {
+        Vk().vkUpdateDescriptorSets(mDevice, writeCount, writes, 0U, nullptr);
       }
       state.table = set;
-      state.tableBindings = std::move(bindings);
       state.tableFrame = mFrameCount;
       state.textureVersion = parameters.TextureVersion();
       state.tableSurface = outputContext_.surface.get();
     }
     bound.textures = state.table;
-    bound.sampled = state.tableBindings;
+    bound.sampled = &state.tableBindings;
     if (mTracing) {
       Trace("BindPass %s technique %s pass %u valid %d", program.Name().c_str(),
             program.Description().techniques[technique].name.c_str(), pass, bound.valid ? 1 : 0);

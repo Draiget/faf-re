@@ -15,7 +15,7 @@
 #include "moho/sim/STIMap.h"
 
 #include <algorithm>
-#include <boost/mutex.h>
+#include <mutex>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -135,7 +135,7 @@ namespace
 
   [[nodiscard]] float NextGlobalRandomSignedUnit()
   {
-    boost::mutex::scoped_lock randomLock(moho::math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(moho::math_GlobalRandomMutex);
     const std::uint32_t randomWord = moho::math_GlobalRandomStream.twister.NextUInt32();
     constexpr double kInvTwoTo31 = 4.656612873077392578125e-10;
     return static_cast<float>(static_cast<double>(randomWord) * kInvTwoTo31 - 1.0);
@@ -143,7 +143,7 @@ namespace
 
   [[nodiscard]] float NextGlobalRandomUnit()
   {
-    boost::mutex::scoped_lock randomLock(moho::math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(moho::math_GlobalRandomMutex);
     const std::uint32_t randomWord = moho::math_GlobalRandomStream.twister.NextUInt32();
     constexpr double kInvTwoTo32 = 2.3283064365386962890625e-10;
     return static_cast<float>(static_cast<double>(randomWord) * kInvTwoTo32);

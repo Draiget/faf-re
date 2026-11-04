@@ -120,9 +120,10 @@ namespace
    * Only the CRITICAL_SECTION backing makes that legal, which is why this tree
    * models the two registry lanes with `std::recursive_mutex` instead. Folding
    * the three locks back into this one is a lock-topology change that wants
-   * its own pass.
+   * its own pass. With the two registry lanes on their own lock, this one has
+   * one section and it never re-enters, so a plain mutex is enough here.
    */
-  boost::mutex gSharedAmbientLoopMutex;
+  std::mutex gSharedAmbientLoopMutex;
 
   /**
    * Address: 0x010A92A0 (`msvc8::map<CSndParams*, HSndEntityLoop*>`; `_Myhead`
@@ -572,7 +573,7 @@ namespace
       return &gDefaultSharedAmbientLoop;
     }
 
-    boost::mutex::scoped_lock lock(gSharedAmbientLoopMutex);
+    std::lock_guard<std::mutex> lock(gSharedAmbientLoopMutex);
 
     const auto existing = gSharedAmbientLoopsByParams.find(params);
     if (existing != gSharedAmbientLoopsByParams.end()) {

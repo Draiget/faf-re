@@ -122,10 +122,7 @@ namespace moho
    */
   gpg::RRef CUnitMobileBuildTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitMobileBuildTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitMobileBuildTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitMobileBuildTask>(objectStorage);
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitMobileBuildTask>(task);
     return ref;

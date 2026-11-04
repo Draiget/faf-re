@@ -12,6 +12,7 @@
 #include "moho/command/ICommandSink.h"
 #include "moho/net/CommandStreamCheck.h"
 #include "moho/net/PeerFeatures.h"
+#include "moho/net/CRejoinFeed.h"
 
 namespace moho
 {
@@ -577,6 +578,23 @@ namespace moho
     // others support. Ask this, and add features to it (docs/PEER_FEATURES.md).
     std::unique_ptr<CPeerFeatures> mPeerFeatures;
 
+    // Engine addition, not in the binary (issue #275): set when this session
+    // catches up from a recorded command stream, before the driver exists.
+    // Null in every other session.
+    std::unique_ptr<CRejoinFeed> mRejoinFeed;
+
+    /**
+     * Engine addition (issue #275): true while `mRejoinFeed` keeps the driver
+     * from issuing beats; see `CRejoinFeed::HoldIssue`. Takes `mLock`.
+     */
+    [[nodiscard]] bool RejoinHoldsIssue(int& nextIssueBeat);
+
+    /// Engine addition (issue #275): this session still plays the recording. Takes `mLock`.
+    [[nodiscard]] bool RejoinCatchingUp();
+
+    /// Engine addition (issue #275): beats a sim loaded from a save starts past. Takes `mLock`.
+    [[nodiscard]] int RejoinSkippedBeats();
+
     /**
      * Engine addition, not in the binary: called when `mStreamCheck` has new
      * findings (a stream that reached players differently). Logs each and
@@ -641,8 +659,8 @@ namespace moho
     "CClientManagerImpl::mDispatchedTimer offset must be 0x184C0"
   );
   static_assert(offsetof(CClientManagerImpl, mTimer2) == 0x184C8, "CClientManagerImpl::mTimer2 offset must be 0x184C8");
-  // 0x184D0 in the binary, plus the engine's mStreamCheck and mPeerFeatures, 4 bytes each.
-  static_assert(sizeof(CClientManagerImpl) == 0x184D8, "CClientManagerImpl size must be 0x184D8");
+  // 0x184D0 in the binary, plus the engine's mStreamCheck, mPeerFeatures and mRejoinFeed.
+  static_assert(sizeof(CClientManagerImpl) == 0x184E0, "CClientManagerImpl size must be 0x184E0");
 
   /**
    * Address: 0x0053FAF0 (FUN_0053FAF0)

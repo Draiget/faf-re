@@ -751,6 +751,9 @@ void CMarshaller::WriteCells(CMessageStream& stream, const gpg::core::FastVector
  */
 CClientManagerImpl::~CClientManagerImpl()
 {
+  // It holds client pointers, and deleting a client can still route a message.
+  mRejoinFeed.reset();
+
   for (CClientBase*& client : mClients) {
     delete client;
     client = nullptr;
@@ -1005,6 +1008,12 @@ void CClientManagerImpl::BroadcastIntParam(const int value)
 void CClientManagerImpl::ProcessClients(CMessage& msg)
 {
   std::scoped_lock lock(mLock);
+
+  // Engine addition (issue #275): null outside a rejoin.
+  if (mRejoinFeed != nullptr && mRejoinFeed->Route(msg)) {
+    return;
+  }
+
   for (CClientBase* const client : mClients) {
     if (client != nullptr) {
       client->Process(msg);
@@ -1173,6 +1182,15 @@ void CClientManagerImpl::DoBeat()
     mConnector->Pull();
   }
 
+  // Engine addition (issue #275): null outside a rejoin.
+  if (mRejoinFeed != nullptr) {
+    mRejoinFeed->Pump();
+  }
+  if (mConnector != nullptr && (mRejoinFeed == nullptr || !mRejoinFeed->CatchingUp()) &&
+      mPeerFeatures->EveryoneSupports(*this, EPeerFeature::Rejoin)) {
+    REJOIN_ServeRestartedPeers(*this);
+  }
+
   if (mWeAreReady && !mEveryoneIsReady) {
     bool everyoneReady = true;
     for (const CClientBase* const client : mClients) {
@@ -1246,6 +1264,42 @@ void CClientManagerImpl::DoBeat()
   }
 
   mInDoBeat = false;
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::RejoinHoldsIssue(int& nextIssueBeat)
+{
+  if (mRejoinFeed == nullptr) {
+    return false;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->HoldIssue(nextIssueBeat);
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::RejoinCatchingUp()
+{
+  if (mRejoinFeed == nullptr) {
+    return false;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->CatchingUp();
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+int CClientManagerImpl::RejoinSkippedBeats()
+{
+  if (mRejoinFeed == nullptr) {
+    return 0;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->SkippedBeats();
 }
 
 /**

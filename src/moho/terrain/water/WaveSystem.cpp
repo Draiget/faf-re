@@ -882,7 +882,7 @@ namespace moho
       static_cast<std::uint32_t>(static_cast<std::int64_t>(mTextureSelectionRange));
     std::uint32_t randomSample = 0u;
     {
-      boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+      std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
       randomSample = math_GlobalRandomStream.twister.NextUInt32();
     }
     const std::uint32_t scaledSelection = static_cast<std::uint32_t>(

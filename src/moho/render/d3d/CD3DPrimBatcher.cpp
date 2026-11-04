@@ -14,6 +14,7 @@
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/ID3DIndexSheet.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "gpg/gal/Device.hpp"
 #include "moho/render/ID3DVertexStream.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
@@ -1090,6 +1091,18 @@ namespace moho
 
     ID3DVertexStream* const vertexStream = runtime->mVertexSheets[runtime->mCurVertexSheet]->GetVertStream(0);
     const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+    // Engine addition: the draw below reads only these vertices and indices.
+    {
+      ID3DVertexStream::BufferHandle vertexBuffer;
+      gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+      if (vertexStream->GetBuffer(vertexBuffer)) {
+        galDevice->CopyLockedRangeOnly(*vertexBuffer);
+      }
+      CD3DIndexSheet::BufferHandle indexBuffer;
+      if (runtime->mIndexSheet->GetBuffer(indexBuffer)) {
+        galDevice->CopyLockedRangeOnly(*indexBuffer);
+      }
+    }
     void* const lockedVertices = vertexStream->Lock(0, static_cast<int>(vertexCount), false, true);
     // Raw GPU upload: vertex blob into the locked D3D stream.
     std::copy_n(runtime->mVertices.data(), vertexCount, static_cast<Vertex*>(lockedVertices));

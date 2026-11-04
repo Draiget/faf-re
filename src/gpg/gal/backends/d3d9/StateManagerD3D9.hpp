@@ -36,7 +36,7 @@ namespace gpg::gal
          * Supports COM-style interface negotiation for IUnknown and the
          * state-manager interface IID.
          */
-        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** outObject) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** outObject) override;
 
         /**
          * Address: 0x009483A0 (FUN_009483A0)
@@ -45,7 +45,7 @@ namespace gpg::gal
          * What it does:
          * Increments and returns the intrusive COM-style reference count.
          */
-        ULONG STDMETHODCALLTYPE AddRef() override;
+        COM_DECLSPEC_NOTHROW ULONG STDMETHODCALLTYPE AddRef() override;
 
         /**
          * Address: 0x009483C0 (FUN_009483C0)
@@ -54,7 +54,7 @@ namespace gpg::gal
          * What it does:
          * Decrements reference count and destroys the object when it reaches 0.
          */
-        ULONG STDMETHODCALLTYPE Release() override;
+        COM_DECLSPEC_NOTHROW ULONG STDMETHODCALLTYPE Release() override;
 
         /**
          * Address: 0x009484D0 (FUN_009484D0)
@@ -63,7 +63,7 @@ namespace gpg::gal
          * What it does:
          * Forwards transform state updates directly to the D3D9 device.
          */
-        HRESULT STDMETHODCALLTYPE SetTransform(D3DTRANSFORMSTATETYPE state, const D3DMATRIX* matrix) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetTransform(D3DTRANSFORMSTATETYPE state, const D3DMATRIX* matrix) override;
 
         /**
          * Address: 0x009484F0 (FUN_009484F0)
@@ -72,7 +72,7 @@ namespace gpg::gal
          * What it does:
          * Forwards material updates directly to the D3D9 device.
          */
-        HRESULT STDMETHODCALLTYPE SetMaterial(const D3DMATERIAL9* material) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetMaterial(const D3DMATERIAL9* material) override;
 
         /**
          * Address: 0x00948510 (FUN_00948510)
@@ -81,7 +81,7 @@ namespace gpg::gal
          * What it does:
          * Forwards indexed light updates directly to the D3D9 device.
          */
-        HRESULT STDMETHODCALLTYPE SetLight(DWORD index, const D3DLIGHT9* light) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetLight(DWORD index, const D3DLIGHT9* light) override;
 
         /**
          * Address: 0x00948530 (FUN_00948530)
@@ -90,7 +90,7 @@ namespace gpg::gal
          * What it does:
          * Forwards indexed light enable/disable state to the D3D9 device.
          */
-        HRESULT STDMETHODCALLTYPE LightEnable(DWORD index, BOOL enable) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE LightEnable(DWORD index, BOOL enable) override;
 
         /**
          * Address: 0x00949DA0 (FUN_00949DA0)
@@ -99,7 +99,7 @@ namespace gpg::gal
          * What it does:
          * Caches a render-state value and forwards to D3D9 only when changed.
          */
-        HRESULT STDMETHODCALLTYPE SetRenderState(D3DRENDERSTATETYPE state, DWORD value) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetRenderState(D3DRENDERSTATETYPE state, DWORD value) override;
 
         /**
          * Address: 0x00948420 (FUN_00948420)
@@ -108,7 +108,7 @@ namespace gpg::gal
          * What it does:
          * Forwards stage-texture binding calls directly to the D3D9 device.
          */
-        HRESULT STDMETHODCALLTYPE SetTexture(DWORD stage, IDirect3DBaseTexture9* texture) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetTexture(DWORD stage, IDirect3DBaseTexture9* texture) override;
 
         /**
          * Address: 0x00949E50 (FUN_00949E50)
@@ -117,7 +117,7 @@ namespace gpg::gal
          * What it does:
          * Caches per-stage texture-stage state values for stages [0,7].
          */
-        HRESULT STDMETHODCALLTYPE SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE type, DWORD value) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE type, DWORD value) override;
 
         /**
          * Address: 0x00949DF0 (FUN_00949DF0)
@@ -126,7 +126,7 @@ namespace gpg::gal
          * What it does:
          * Caches per-sampler state values for samplers [0,15].
          */
-        HRESULT STDMETHODCALLTYPE SetSamplerState(DWORD sampler, D3DSAMPLERSTATETYPE type, DWORD value) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetSamplerState(DWORD sampler, D3DSAMPLERSTATETYPE type, DWORD value) override;
 
         /**
          * Address: 0x00948550 (FUN_00948550)
@@ -134,7 +134,7 @@ namespace gpg::gal
          * What it does:
          * Forwards N-patch tessellation mode directly to the backend device.
          */
-        HRESULT STDMETHODCALLTYPE SetNPatchMode(FLOAT numSegments) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetNPatchMode(FLOAT numSegments) override;
 
         /**
          * Address: 0x009484A0 (FUN_009484A0)
@@ -143,7 +143,7 @@ namespace gpg::gal
          * What it does:
          * Caches active FVF value and forwards only on change.
          */
-        HRESULT STDMETHODCALLTYPE SetFVF(DWORD fvf) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetFVF(DWORD fvf) override;
 
         /**
          * Address: 0x00948440 (FUN_00948440)
@@ -152,7 +152,7 @@ namespace gpg::gal
          * What it does:
          * Caches active vertex-shader pointer and forwards only on change.
          */
-        HRESULT STDMETHODCALLTYPE SetVertexShader(IDirect3DVertexShader9* shader) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetVertexShader(IDirect3DVertexShader9* shader) override;
 
         /**
          * Address: 0x00948570 (FUN_00948570)
@@ -160,7 +160,7 @@ namespace gpg::gal
          * What it does:
          * Forwards packed float4 constant uploads for the active vertex shader.
          */
-        HRESULT STDMETHODCALLTYPE SetVertexShaderConstantF(
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetVertexShaderConstantF(
             UINT registerIndex, const FLOAT* constantData, UINT registerCount
         ) override;
 
@@ -170,7 +170,7 @@ namespace gpg::gal
          * What it does:
          * Forwards packed int4 constant uploads for the active vertex shader.
          */
-        HRESULT STDMETHODCALLTYPE SetVertexShaderConstantI(
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetVertexShaderConstantI(
             UINT registerIndex, const INT* constantData, UINT registerCount
         ) override;
 
@@ -180,7 +180,7 @@ namespace gpg::gal
          * What it does:
          * Forwards boolean constant uploads for the active vertex shader.
          */
-        HRESULT STDMETHODCALLTYPE SetVertexShaderConstantB(
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetVertexShaderConstantB(
             UINT registerIndex, const BOOL* constantData, UINT registerCount
         ) override;
 
@@ -191,7 +191,7 @@ namespace gpg::gal
          * What it does:
          * Caches active pixel-shader pointer and forwards only on change.
          */
-        HRESULT STDMETHODCALLTYPE SetPixelShader(IDirect3DPixelShader9* shader) override;
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetPixelShader(IDirect3DPixelShader9* shader) override;
 
         /**
          * Address: 0x009485D0 (FUN_009485D0)
@@ -199,7 +199,7 @@ namespace gpg::gal
          * What it does:
          * Forwards packed float4 constant uploads for the active pixel shader.
          */
-        HRESULT STDMETHODCALLTYPE SetPixelShaderConstantF(
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetPixelShaderConstantF(
             UINT registerIndex, const FLOAT* constantData, UINT registerCount
         ) override;
 
@@ -209,7 +209,7 @@ namespace gpg::gal
          * What it does:
          * Forwards packed int4 constant uploads for the active pixel shader.
          */
-        HRESULT STDMETHODCALLTYPE SetPixelShaderConstantI(
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetPixelShaderConstantI(
             UINT registerIndex, const INT* constantData, UINT registerCount
         ) override;
 
@@ -219,7 +219,7 @@ namespace gpg::gal
          * What it does:
          * Forwards boolean constant uploads for the active pixel shader.
          */
-        HRESULT STDMETHODCALLTYPE SetPixelShaderConstantB(
+        COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE SetPixelShaderConstantB(
             UINT registerIndex, const BOOL* constantData, UINT registerCount
         ) override;
 

@@ -469,8 +469,33 @@ namespace faf::headless
       moho::gSimBeatOrigin.store(0); // an earlier session in this process may have been restored
     }
 
-    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo =
-      moho::VCR_SetupReplaySession(options.replayPath.c_str(), nullptr, skipBeats);
+    const bool liveRejoin = !options.rejoinPeers.empty();
+    const bool rejoinRehearsal = options.rejoinSource >= 0 && !liveRejoin;
+    std::unique_ptr<gpg::Stream> rejoinRecording;
+    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo;
+    if (liveRejoin) {
+      // Issue #275: as `CScApp` does for /rejoin, without a window to wait in.
+      msvc8::string reason;
+      bool failed = !moho::REJOIN_BeginSetup(
+        options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort), &reason
+      );
+      while (!failed && sessionInfo.get() == nullptr) {
+        msvc8::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
+        if (polled.get() != nullptr) {
+          sessionInfo = polled;
+        } else if (!failed) {
+          ::Sleep(20);
+        }
+      }
+      if (failed) {
+        result.error = std::string("the rejoin was refused: ") + reason.c_str();
+        return result;
+      }
+    } else {
+      sessionInfo = moho::VCR_SetupReplaySession(
+        options.replayPath.c_str(), nullptr, rejoinRehearsal ? &rejoinRecording : nullptr, skipBeats
+      );
+    }
     if (sessionInfo.get() == nullptr) {
       result.error = "cannot open the replay, or its game version is not supported";
       return result;
@@ -481,6 +506,25 @@ namespace faf::headless
     if (options.focusArmy < -1 || options.focusArmy >= armyCount) {
       result.error = "focus army out of range (the replay has " + std::to_string(armyCount) + " armies)";
       return result;
+    }
+
+    // Issue #275: this client's view of a live game, as `CLobby::LaunchGame` sets it up.
+    if (rejoinRehearsal) {
+      if (static_cast<std::size_t>(options.rejoinSource) >= launchInfo->mCommandSources.mSrcs.size()) {
+        result.error = "--rejoin-source out of range";
+        return result;
+      }
+      if (options.focusArmy < 0
+          || !launchInfo->mArmyLaunchInfo[static_cast<std::size_t>(options.focusArmy)].mUnitSources.Contains(
+            static_cast<unsigned int>(options.rejoinSource)
+          )) {
+        result.error = "--rejoin-source needs --focus on an army of that source";
+        return result;
+      }
+      sessionInfo->mSourceId = static_cast<std::uint32_t>(options.rejoinSource);
+      sessionInfo->mClientManager = moho::REJOIN_CreateRehearsalManager(
+        *launchInfo, std::move(rejoinRecording), options.rejoinSource, options.rejoinBeat, skipBeats
+      );
     }
 
     if (sessionInfo->mClientManager != nullptr) {
@@ -555,7 +599,11 @@ namespace faf::headless
     // The focus army: the sim and the driver both start from the launch info's original
     // source, which a lockstep client sets to its own army (CLobby::LaunchGame) and a replay
     // viewer to -1.
-    launchInfo->mCommandSources.mOriginalSource = options.focusArmy;
+    if (!liveRejoin) {
+      launchInfo->mCommandSources.mOriginalSource = options.focusArmy;
+    } else {
+      moho::REJOIN_PrepareRestore(*sessionInfo);
+    }
 
     // `--resume-from`: the same launch info, as `CSavedGame::CreateSinglePlayerSessionInfo` builds
     // a saved game's; the sim comes from the archive behind the header.
@@ -575,6 +623,10 @@ namespace faf::headless
       std::printf("[%s] resuming from beat %u, tick %u\n", label, keyframeHeader.beat, keyframeHeader.tick);
       std::fflush(stdout);
       moho::SIM_BeginKeyframeRestore(keyframeHeader);
+      if (rejoinRehearsal) {
+        // As REJOIN_PrepareRestore: this session's clients count in the game's own beats.
+        moho::gSimBeatOrigin.store(0);
+      }
       sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(loadInfo);
     }
 
@@ -671,6 +723,7 @@ namespace faf::headless
         return result;
       }
       viewBench->SetParallel(options.parallelViews);
+      viewBench->EnablePipeline(static_cast<unsigned int>(options.viewPipelineThreads));
       if (options.luaRouting) {
         viewBench->EnableLuaRouting(options.luaRoutingDump);
         if (options.spy) {
@@ -695,7 +748,7 @@ namespace faf::headless
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
-    moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Replay);
+    moho::SIM_SetSessionPacing(rejoinRehearsal || liveRejoin ? moho::ESimSessionPacing::Network : moho::ESimSessionPacing::Replay);
     std::unique_ptr<moho::ISTIDriver> driver(moho::SIM_CreateDriver(
       static_cast<moho::CClientManagerImpl*>(clientManager), nullptr, sessionInfo->mLaunchInfo, sessionInfo->mSourceId
     ));
@@ -799,6 +852,9 @@ namespace faf::headless
         break;
       }
 
+      if (liveRejoin) {
+        moho::REJOIN_MainFrame(*driver);
+      }
       driver->Dispatch();
       // `--pace`: the issue thread tops up only past the last beat taken from the queue, so holding
       // the next one back holds the sim too.
@@ -1038,6 +1094,7 @@ namespace faf::headless
       result.viewFramesFailures = viewFrames->Failures();
     }
     if (viewBench) {
+      (void)viewBench->FinishViews();
       result.viewBenchSummary = viewBench->Summary();
       result.viewBenchFailures = viewBench->Failures();
     }

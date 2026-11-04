@@ -63,6 +63,8 @@ namespace faf::headless
 
   protected:
     void OnViewFrames(moho::Sim& sim) override;
+    void OnViewReady(std::size_t army) override { Send(army); }
+    void OnViewsFinished() override;
 
   private:
     /** What one view's client received last (its frame is held by CViewFrames). */
@@ -73,6 +75,7 @@ namespace faf::headless
       std::vector<std::uint16_t> grids; // the slots it received last beat (`SBeatGrid::key`)
       std::vector<std::uint16_t> gridsNext;
       std::uint32_t bytes = 0;      // this beat
+      std::uint32_t luaBytes = 0;   // this beat's Lua lane, which is ready before the others
       std::uint64_t failures = 0;   // this beat
     };
 
@@ -80,6 +83,7 @@ namespace faf::headless
     struct SBeatGrid
     {
       remote::wire::SGridSlot slot;                // who and which; no cells
+      std::uint32_t receivers = 0;                 // the views that get it, by bit
       const moho::CIntelGrid* source = nullptr;    // the sim's grid
       std::vector<std::int8_t> cells;              // as of this beat, once `delta` is written
       remote::wire::BitWriter delta;               // the slot against last beat's cells
@@ -95,7 +99,7 @@ namespace faf::headless
       double intervalMs = 0.0;
     };
 
-    void Send(const moho::Sim& sim, std::size_t army);
+    void Send(std::size_t army);
 
     std::FILE* mFile = nullptr;
     remote::wire::SFrameCodec mCodec;
@@ -103,6 +107,7 @@ namespace faf::headless
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
     std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     std::vector<SBeat> mBeats;
+    SBeat mBeat{}; // this beat's, until `OnViewsFinished` adds it to them
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat
     std::uint64_t mEntities = 0;                 // in all frames, all beats
     double mLastBuildSeconds = 0.0;

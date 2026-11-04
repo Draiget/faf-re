@@ -1018,15 +1018,6 @@ namespace
     return sInputCapture.empty() ? nullptr : sInputCapture.back().GetObjectPtr();
   }
 
-  gpg::RType* CachedCScriptObjectPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CScriptObject*));
-    }
-    return cached;
-  }
-
   gpg::RRef ExtractUserDataRef(
     const LuaPlus::LuaObject& userDataObject
   )
@@ -1036,28 +1027,6 @@ namespace
     }
 
     return userDataObject.GetUserData();
-  }
-
-  moho::CScriptObject** ExtractScriptObjectSlotFromLuaObject(
-    const LuaPlus::LuaObject& object
-  )
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
-    return static_cast<moho::CScriptObject**>(upcast.mObj);
   }
 
   /**

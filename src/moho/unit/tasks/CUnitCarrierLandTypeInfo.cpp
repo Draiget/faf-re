@@ -109,10 +109,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierLandTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitCarrierLand*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitCarrierLand();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitCarrierLand>(objectStorage);
     return MakeCUnitCarrierLandRef(object);
   }
 

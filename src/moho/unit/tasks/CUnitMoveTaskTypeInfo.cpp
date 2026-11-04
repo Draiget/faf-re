@@ -191,10 +191,7 @@ namespace moho
    */
   gpg::RRef CUnitMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitMoveTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitMoveTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitMoveTask>(objectStorage);
 
     return gpg::RRef{task, gpg::RTypeOf<moho::CUnitMoveTask>()};
   }

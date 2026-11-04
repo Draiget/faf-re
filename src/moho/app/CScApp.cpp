@@ -36,6 +36,7 @@
 #include "moho/sim/DesyncTelemetry.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDiskWatch.h"
+#include "moho/net/CRejoinFeed.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/net/Common.h"
 #include "moho/app/CWaitHandleSet.h"
@@ -417,6 +418,22 @@ namespace
         }
       }
 
+      (void)moho::UI_StartSplashScreens();
+      return;
+    }
+
+    // Engine addition (issue #275): take a seat back in a running game. Without
+    // the option, every path below runs as before.
+    if (moho::CFG_GetArgOption("/rejoin", 3, &args) && args.size() >= 3) {
+      msvc8::string failureReason;
+      if (moho::REJOIN_BeginSetup(
+            args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
+          )) {
+        (void)moho::UI_StartRejoinScreen();
+        return;
+      }
+      gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
+      moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
       (void)moho::UI_StartSplashScreens();
       return;
     }
@@ -1191,6 +1208,25 @@ void CScApp::Main()
   if (realTimeClock) {
     smoothedFrameSeconds = wld_FrameClock == 2 ? frameSeconds : framerates.Mean();
   }
+  // Engine addition (issue #275): false outside a client started with /rejoin.
+  if (moho::REJOIN_SetupPending()) {
+    msvc8::string failureReason;
+    bool failed = false;
+    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::REJOIN_PollSetup(&failureReason, &failed);
+    if (sessionInfo.get() != nullptr) {
+      moho::UI_UpdateRejoinScreen("", -1.0f);
+      moho::WLD_BeginSession(sessionInfo);
+    } else if (failed) {
+      gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
+      moho::UI_UpdateRejoinScreen("", -1.0f);
+      moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
+      (void)moho::UI_StartSplashScreens();
+    } else {
+      const float progress = moho::REJOIN_SetupProgress();
+      moho::UI_UpdateRejoinScreen(progress >= 0.0f ? "transfer" : "connecting", progress);
+    }
+  }
+
   if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {
     wxTheApp->ExitMainLoop();
   }

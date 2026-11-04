@@ -668,6 +668,13 @@ namespace gpg::gal
     virtual void ReleaseBufferCopy(VertexBuffer& buffer);
     virtual void ReleaseBufferCopy(IndexBuffer& buffer);
 
+    /**
+     * Engine addition: draws of this dynamic buffer only read what its latest locks wrote, so a
+     * backend renaming it needs to copy only those bytes. Nothing here.
+     */
+    virtual void CopyLockedRangeOnly(VertexBuffer& buffer);
+    virtual void CopyLockedRangeOnly(IndexBuffer& buffer);
+
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)
   };

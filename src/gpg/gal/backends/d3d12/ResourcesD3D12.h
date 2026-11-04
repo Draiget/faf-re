@@ -168,6 +168,8 @@ namespace gpg::gal
     void Unlock();
     /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
     void ReleaseCopy() noexcept;
+    /** Device::CopyLockedRangeOnly. */
+    void CopyLockedRangeOnly() noexcept { mLockedRangeOnly = true; }
 
     /** The address draws read from, ready for reading. */
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);
@@ -194,6 +196,7 @@ namespace gpg::gal
     bool mDynamic = false;
     D3D12_RESOURCE_STATES mReadState = D3D12_RESOURCE_STATE_GENERIC_READ;
     backend::LockShadow mShadow;
+    bool mLockedRangeOnly = false;
     d3d12::TrackedResource mResource;    // static buffers with a resource of their own
     d3d12::TrackedResource* mTracked = &mResource; // or the large buffer this one shares (gal::gSharedBuffers)
     std::uint64_t mResourceOffset = 0;

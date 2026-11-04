@@ -142,6 +142,8 @@ namespace gpg::gal
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
     void ReleaseBufferCopy(VertexBuffer& buffer) override;
     void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyLockedRangeOnly(VertexBuffer& buffer) override;
+    void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
     ) override;
@@ -205,7 +207,7 @@ namespace gpg::gal
       std::uint64_t tableFrame = 0;               // the frame's view arena the table is in
       std::uint64_t tableEpoch = 0;
       D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled; // what the texture table holds
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // what the texture table holds, in the effect's state
       std::uint32_t techniqueIndex = 0;
       std::uint32_t passIndex = 0;
       const char* technique = ""; // diagnostics

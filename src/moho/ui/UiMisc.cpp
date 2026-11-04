@@ -318,10 +318,6 @@ bool moho::MAUI_KeyIsDown(
   const EMauiKeyCode keyCode
 )
 {
-  if (!gpg::gal::WindowIsForeground()) {
-    return false;
-  }
-
   if (Maui_CurrentFocusControl.GetObjectPtr() != nullptr && Maui_ControlHasFocus) {
     return false;
   }
@@ -329,7 +325,9 @@ bool moho::MAUI_KeyIsDown(
   bool isSpecial = false;
   const int virtualKey = wxCharCodeWXToMSW(static_cast<int>(keyCode), &isSpecial);
   (void)isSpecial;
-  return ::GetKeyState(virtualKey) < 0;
+  // Engine change: the same answer with the costly check last. GetForegroundWindow enters the kernel,
+  // the world view asks for Shift each frame, and the key is rarely down.
+  return ::GetKeyState(virtualKey) < 0 && gpg::gal::WindowIsForeground();
 }
 
 moho::CScrLuaMetatableFactory<moho::CUIWorldView> moho::CScrLuaMetatableFactory<moho::CUIWorldView>::sInstance{};

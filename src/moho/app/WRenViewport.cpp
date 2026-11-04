@@ -2347,27 +2347,6 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   // (line 375): Moho::REN_MaybeDumpFrame((ID3DRenderTarget *)viewport->mLocks1[0]),
   // where mLocks1[0] is the primary render-target writer-lock slot at +0x2164.
   // It is a no-op unless frame dumping has been armed via `dump_frameRate`.
-
-  // few frames so we get a BMP of exactly what the renderer produced. The whole
-  // terrain path measures healthy (rectCacheCount=122..128, DrawNormals=1,
-  // colour writes 0x07, camera over the map, cartographic drew=0) yet the
-  // window shows a flat fill -- this distinguishes "terrain is in the target
-  // but never reaches the screen" from "the draw genuinely produces nothing".
-  {
-    // Arm LATE: the first dumps came out as the Cybran loading screen because
-    // they fired on the very first Render call, during loading. Wait several
-    // thousand frames so the capture is unambiguously in-session.
-    static int sRenderCalls = 0;
-    static bool sArmedDump = false;
-    ++sRenderCalls;
-    if (!sArmedDump && sRenderCalls > 4000 && getenv("FAF_DUMP_FRAMES") != nullptr) {
-      sArmedDump = true;
-      moho::dump_frameDumpName.assign("C:\\ProgramData\\FAForever\\bin\\framedump");
-      moho::dump_frameRate = 3;
-      gpg::Warnf("[DUMPDIAG] armed frame dump -> %s", moho::dump_frameDumpName.c_str());
-    }
-  }
-
   moho::REN_MaybeDumpFrame(mPrimaryTargetLocks[0].get());
 }
 

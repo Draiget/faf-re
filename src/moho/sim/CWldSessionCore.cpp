@@ -1,3 +1,6 @@
+#include "moho/net/CClientManagerImpl.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/sim/CWldSessionPrivate.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -1694,6 +1697,19 @@ namespace
       (void)FindOrCreateCommandIssueHelper(*mCommandManager, commandConstantData, 0u, 0);
     }
 
+    // Engine addition (issue #275): orders this client gave before it restarted
+    // keep their ids, and `Sim::ValidateNewCommandId` refuses an id in use.
+    if (CClientManagerImpl* const clients = sSimDriver != nullptr ? sSimDriver->GetClientManager() : nullptr;
+        clients != nullptr && clients->mRejoinFeed != nullptr) {
+      for (const SSTICommandConstantData& commandConstantData : beat.mPublishedCommandDescriptors) {
+        const auto commandId = static_cast<std::uint32_t>(commandConstantData.cmd);
+        const std::int32_t lowId = static_cast<std::int32_t>(commandId & 0x00FFFFFFu);
+        if ((commandId >> 24u) == mCommandManager->mSourceId && lowId >= mCommandManager->mIdPool.mNextLowId) {
+          mCommandManager->mIdPool.mNextLowId = lowId + 1;
+        }
+      }
+    }
+
     if (!ApplyUnitUpdatesParallel(*this, beat.mUnitUpdates)) {
       for (const SUnitVariableUpdateEntry& unitUpdate : beat.mUnitUpdates) {
         auto* const unit = static_cast<UserUnit*>(LookupEntityId(unitUpdate.mEntityId));
@@ -1772,6 +1788,7 @@ namespace
       // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
       currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
       mState->GetGlobals().SetObject("Sync", currentSync);
+      SIM_AddRestoredUiData(currentSync, mState); // engine addition (replay keyframes)
     }
     (void)SCR_LuaDoString("OnSync()", mState);
 
@@ -2132,6 +2149,10 @@ namespace
     const std::int32_t targetTick = mGameTick + msvc8::FloorToIntX87(mTimeSinceLastTick); // 0x00895BEA..0x00895BFD
     const bool wasScrubbing = mIsScrubbing;
 
+    // Engine addition (issue #275): a client catching up shows nothing worth
+    // waiting for, and its driver needs the queue to have room at the handover.
+    CClientManagerImpl* const frameClients = simDriver != nullptr ? simDriver->GetClientManager() : nullptr;
+    const bool rejoinCatchingUp = frameClients != nullptr && frameClients->RejoinCatchingUp();
     std::int32_t beatsApplied = 0;
     if (mIsScrubbing) {
       if (simDriver != nullptr) {
@@ -2170,7 +2191,7 @@ namespace
           if (mLastBeatWasTick != 0) {
             break;
           }
-        } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
+        } else if (mGameTick >= targetTick && !wld_RunWithTheWind && !rejoinCatchingUp) {
           break;
         }
 

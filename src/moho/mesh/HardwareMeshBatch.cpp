@@ -443,6 +443,7 @@ namespace moho
           context.type_ = 3U;  // a per-instance stream
           context.usage_ = 2U; // dynamic
           mBuffer = gpg::gal::Device::GetInstance()->CreateVertexBuffer(&context);
+          gpg::gal::Device::GetInstance()->CopyLockedRangeOnly(*mBuffer); // a draw reads the run just appended
           mCapacity = capacity;
           mStride = stride;
           mCursor = capacity; // so the first append discards

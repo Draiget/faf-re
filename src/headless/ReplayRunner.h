@@ -17,6 +17,10 @@ namespace faf::headless
     std::string replayPath;     // `.scfareplay`
     std::string label;          // prefix of every line headless prints
     int focusArmy = -1;         // the army whose view `Sim::Sync` builds; -1 = observer
+    std::string rejoinPeers;    // when set, no replay: take seat `rejoinSource` back from these peers (address:port=source,...)
+    int rejoinPort = 0;         // with `rejoinPeers`: this client's game port
+    int rejoinSource = -1;      // when set: play as this source of a live game (CRejoinFeed.h)
+    int rejoinBeat = 0;         // with `rejoinSource`: the beat the driver takes over
     std::string digestPath;     // when set: one "beat digest" line per checksummed beat
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;  // when set: the entities lane of the wire format, per beat (CSV)
@@ -47,6 +51,7 @@ namespace faf::headless
     int focusSwitchBeat = -1;    // at this beat the sim's focus moves to `focusSwitchArmy`, as a lockstep client's does
     int focusSwitchArmy = 0;
     std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
+    int viewPipelineThreads = 0; // with `viewBenchPath`: threads that finish the views while the sim goes on
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
     bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one

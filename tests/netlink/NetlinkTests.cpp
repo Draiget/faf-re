@@ -548,6 +548,25 @@ namespace
     Check(mixed.atA.size() == 200 && mixed.atB.size() == 200 && mixed.corrupt == 0, "and game datagrams still flow");
   }
 
+  // STUN and TURN servers that never answer (192.0.2.1 is reserved, RFC 5737)
+  // keep libjuice gathering for 23.5 s. The links still connect by what they
+  // found, in time for the offerer's wait for an answer.
+  void SilentIceServerTest(const std::string& bind)
+  {
+    LinkOptions o;
+    o.bindAddress = bind;
+    IceServer stun;
+    stun.host = "192.0.2.1";
+    IceServer turn = stun;
+    turn.kind = IceServer::Kind::Turn;
+    turn.username = "u";
+    turn.credential = "c";
+    o.iceServers = {stun, turn};
+    const PairResult r = RunPair(o, o, 200, [](Link&, Link&) { return true; });
+    Check(r.connected && r.a.attempts == 1 && r.b.attempts == 1, "silent ICE servers: links connect on the first attempt");
+    Check(r.atA.size() == 200 && r.atB.size() == 200 && r.corrupt == 0, "and carry game datagrams");
+  }
+
   // Issue #235: with duplicateGapMs 0 every game datagram goes out twice; the
   // link hands both copies on (the game drops the second by its sequence).
   void DuplicateTest(const std::string& bind)
@@ -603,6 +622,7 @@ int main(int argc, char** argv)
   LoopbackTest(bind, count);
   LaneTest(bind, 2000);
   OurPeerTest(bind);
+  SilentIceServerTest(bind);
   DuplicateTest(bind);
   WebRtcTest(bind);
   LaneWebRtcSetupTest(bind);

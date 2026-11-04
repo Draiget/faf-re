@@ -21,3 +21,15 @@ set(FAF_WARNING_OPTIONS
   # declarations, wx 2.4's flag enums, which it also needs at every sizer call.
   -Wno-microsoft-unqualified-friend
   -Wno-deprecated-enum-enum-conversion)
+
+# Third-party headers read as system headers, so their warnings stay out of the
+# log: on x86, boost 1.34's member-function-pointer tester alone gave 50,544. By
+# include name, because /external:I would change the include search order, and
+# src/boost/ wraps boost's own headers. Generated code doesn't change.
+foreach(_faf_third_party_prefix boost/ wx/)
+  if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    list(APPEND FAF_WARNING_OPTIONS "/clang:--system-header-prefix=${_faf_third_party_prefix}")
+  else()
+    list(APPEND FAF_WARNING_OPTIONS "--system-header-prefix=${_faf_third_party_prefix}")
+  endif()
+endforeach()

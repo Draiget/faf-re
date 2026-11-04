@@ -1647,20 +1647,7 @@ std::int32_t StorePrimaryStatBitsAtomic(
   const std::int32_t* const newValueBits
 ) noexcept
 {
-#if defined(_WIN32)
-  volatile platform::InterlockedLong* const slot = reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits);
-  for (;;) {
-    const long observed = InterlockedCompareExchange(slot, 0L, 0L);
-    const long exchanged = InterlockedCompareExchange(slot, static_cast<long>(*newValueBits), observed);
-    if (exchanged == observed) {
-      return static_cast<std::int32_t>(observed);
-    }
-  }
-#else
-  const std::int32_t previous = statItem->mPrimaryValueBits;
-  statItem->mPrimaryValueBits = *newValueBits;
-  return previous;
-#endif
+  return platform::AtomicExchange(&statItem->mPrimaryValueBits, *newValueBits);
 }
 
 /**

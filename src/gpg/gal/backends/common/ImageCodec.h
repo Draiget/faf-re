@@ -119,9 +119,16 @@ namespace gpg::gal::imaging
     /** How this thread's last Decode got its image (diagnostics: "direct", "cache", "d3dx", ...). */
     [[nodiscard]] static const char* LastDecodeRoute() noexcept;
 
-    /** Encodes `image` (its first array slice) as an image file. */
+    /**
+     * Encodes `image` (its first array slice) as an image file. A DDS falls back to WriteDds when
+     * D3DX11 reports E_NOTIMPL, as Wine's d3dx11_43.dll does; FAF_IMAGECODEC_OWN_DDS=1 always
+     * writes it that way, to exercise that route on Windows.
+     */
     HRESULT Encode(const Image& image, FileFormat format, std::vector<std::uint8_t>& outBytes);
     HRESULT EncodeToFile(const Image& image, FileFormat format, const char* path);
+
+    /** The image's levels (one 2D slice or six cube faces) as a DDS file, without D3DX11. */
+    static HRESULT WriteDds(const Image& image, std::vector<std::uint8_t>& outBytes);
 
     /** gal image file format (BMP, JPG, PNG, PNG, DDS) -> FileFormat. */
     [[nodiscard]] static FileFormat FromGalFormat(int galFormat) noexcept;

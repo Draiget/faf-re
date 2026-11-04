@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/AutoPtr.h"
@@ -71,6 +72,18 @@ namespace moho
 
   static_assert(sizeof(CSavedGame) == 0x78, "CSavedGame size must be 0x78");
 
+  enum class EGpgNetOpenMode : int
+  {
+    Read = 1,
+    Write = 2,
+  };
+
+  /**
+   * Engine addition: `OpenGPGNetURI` (ReplaySessionSetup.cpp) for the client's session startup,
+   * which writes the replay it records through the same function.
+   */
+  [[nodiscard]] std::unique_ptr<gpg::Stream> VCR_OpenGPGNetURI(gpg::StrArg uri, EGpgNetOpenMode mode);
+
   /**
    * Address: 0x00875B60 (FUN_00875B60)
    * Mangled:
@@ -95,9 +108,29 @@ namespace moho
    *
    * Engine addition: when the replay is refused, `failureReason` (if given)
    * receives a sentence saying why, for the player.
+   *
+   * Engine addition (issue #275): with `commandStream`, the session gets no
+   * client manager; the stream, positioned on the first recorded command, goes
+   * to the caller, who builds one.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr, int skipBeats = 0);
+  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(
+    gpg::StrArg filename,
+    msvc8::string* failureReason = nullptr,
+    std::unique_ptr<gpg::Stream>* commandStream = nullptr,
+    int skipBeats = 0
+  );
+
+  /**
+   * Engine addition (issue #275): the same from a stream already open.
+   * `filename` only names it in messages.
+   */
+  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
+    std::unique_ptr<gpg::Stream> replayStream,
+    gpg::StrArg filename,
+    msvc8::string* failureReason,
+    std::unique_ptr<gpg::Stream>* commandStream,
+    int skipBeats = 0
+  );
 
   /**
    * Engine addition: Scans a replay stream from its current position for all

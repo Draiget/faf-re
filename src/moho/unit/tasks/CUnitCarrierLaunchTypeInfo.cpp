@@ -29,10 +29,7 @@ namespace
    */
   void DestroyCUnitCarrierLaunchInPlace(void* const objectStorage)
   {
-    auto* const task = static_cast<moho::CUnitCarrierLaunch*>(objectStorage);
-    if (task != nullptr) {
-      task->~CUnitCarrierLaunch();
-    }
+    gpg::DestructInStorage<moho::CUnitCarrierLaunch>(objectStorage);
   }
 } // namespace
 
@@ -111,10 +108,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierLaunchTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitCarrierLaunch*>(objectStorage);
-    if (task) {
-      new (task) CUnitCarrierLaunch();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitCarrierLaunch>(objectStorage);
 
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitCarrierLaunch>(task);

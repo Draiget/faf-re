@@ -101,10 +101,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierRetrieveTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitCarrierRetrieve*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitCarrierRetrieve();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitCarrierRetrieve>(objectStorage);
     return MakeCUnitCarrierRetrieveRef(object);
   }
 

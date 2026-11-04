@@ -746,10 +746,7 @@ namespace moho
    */
   gpg::RRef REmitterBlueprintCurveTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const curve = static_cast<REmitterBlueprintCurve*>(objectStorage);
-    if (curve != nullptr) {
-      new (curve) REmitterBlueprintCurve();
-    }
+    auto* const curve = gpg::ConstructInStorage<REmitterBlueprintCurve>(objectStorage);
 
     gpg::RRef curveRef{};
     curveRef = gpg::MakeRRef<moho::REmitterBlueprintCurve>(curve);

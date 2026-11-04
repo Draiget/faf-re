@@ -102,10 +102,7 @@ namespace moho
    */
   gpg::RRef CUnitFerryTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitFerryTask*>(objectStorage);
-    if (object) {
-      new (object) CUnitFerryTask();
-    }
+    auto* const object = gpg::ConstructInStorage<CUnitFerryTask>(objectStorage);
     return MakeCUnitFerryTaskRef(object);
   }
 

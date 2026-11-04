@@ -222,17 +222,6 @@ namespace
 #endif
   }
 
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
   /**
    * Address: 0x00463220 (FUN_00463220, disk-watch singleton init helper)
    *

@@ -28,6 +28,9 @@ namespace faf::netlink
     std::atomic<std::uint64_t> sWireBytes{0};
 
     constexpr auto kGatherTimeout = 5000ms;          // gatheringFuture cancel
+    // libjuice tries a silent ICE server for 23.5 s. The offerer waits kAwaitCandidatesTimeout for
+    // the answer, relayed both ways by the lobby server, so what was found by now goes out.
+    constexpr auto kGatherSendFound = 4000ms;
     constexpr auto kAwaitCandidatesTimeout = 6000ms; // no answer to our candidates
     constexpr auto kCheckTimeout = 15000ms;          // startIce loop
     constexpr auto kRetryAfterFailure = 5000ms;      // offerer, attempt never connected
@@ -830,6 +833,16 @@ namespace faf::netlink
       }
 
       if (mState == LinkState::Gathering && mAgent != nullptr) {
+        if (!gatheringDone && mGatherDeadline && now >= *mGatherDeadline - kGatherTimeout + kGatherSendFound) {
+          std::lock_guard cb(mIn->cbMutex);
+          for (const Candidate& c : mIn->candidates) {
+            if (AllowedLocked(c.type, now)) {
+              Log(p, "an ICE server hasn't answered, going on with the candidates found");
+              gatheringDone = true;
+              break;
+            }
+          }
+        }
         if (gatheringDone) {
           mGatherDeadline.reset();
           SendCandidatesLocked(p, now);

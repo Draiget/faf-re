@@ -29,6 +29,7 @@
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
@@ -641,10 +642,47 @@ namespace moho
    * What it does:
    * Triggers a viewport refresh for the active device window and reports success.
    */
+  bool ren_DirectPaint = true;
+
+  namespace
+  {
+    bool sDirectPaintPending = false;
+
+    TConVar<bool> gTConVar_ren_DirectPaint(
+      "ren_DirectPaint",
+      "The main loop draws each frame directly (1, the default), or the frame draws in a WM_PAINT message "
+      "as in the original (0). Read each frame.",
+      &ren_DirectPaint
+    );
+  } // namespace
+
   bool CD3DDevice::Refresh()
   {
     if (WRenViewport* const viewport = GetViewport(); viewport != nullptr) {
+      // A hidden window gets no WM_PAINT, so it draws nothing here either.
+      const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(viewport->GetHandle()));
+      if (ren_DirectPaint && gpg::gal::Device::IsReady() && ::IsWindowVisible(window) != FALSE) {
+        sDirectPaintPending = true;
+        return true;
+      }
       viewport->Refresh(true, nullptr);
+    }
+    return true;
+  }
+
+  bool D3D_IsDirectPaintPending() noexcept
+  {
+    return sDirectPaintPending;
+  }
+
+  bool D3D_RunDirectPaint()
+  {
+    if (!sDirectPaintPending) {
+      return false;
+    }
+    sDirectPaintPending = false;
+    if (WRenViewport* const viewport = D3D_GetDevice()->GetViewport(); viewport != nullptr) {
+      viewport->PaintWithoutMessage();
     }
     return true;
   }

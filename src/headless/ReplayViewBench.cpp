@@ -87,6 +87,7 @@ namespace faf::headless
 
   void CReplayViewBench::Uninstall()
   {
+    (void)FinishViews();
     moho::Sim::SetSyncRouting(nullptr);
     moho::Sim::SetSyncObserver(nullptr);
   }
@@ -153,6 +154,14 @@ namespace faf::headless
         }
         beatGrid.source = grid;
         beatGrid.key = static_cast<std::uint16_t>(index * 2u + kind);
+        // The view army's grids and those of every army that counts it as an ally
+        // (`UserArmy::CanSeeCell`, 0x008B17F0).
+        beatGrid.receivers = 0u;
+        for (std::size_t view = 0; view < armyCount && view < 32u; ++view) {
+          if (view == index || army->mVarDat.mAllies.Contains(static_cast<unsigned int>(view))) {
+            beatGrid.receivers |= std::uint32_t{1} << view;
+          }
+        }
       }
     }
     mBeatGrids.resize(slots);
@@ -171,26 +180,54 @@ namespace faf::headless
       copyGrids(0u, slots);
     }
 
-    if (Parallel() && armyCount > 1u) {
-      moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [this, &sim](const std::size_t begin, const std::size_t end) {
-        for (std::size_t army = begin; army < end; ++army) {
-          Send(sim, army);
+    // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
+    // beat's, and it writes them again once this returns: a real server sends them when the beat's
+    // sync is over.
+    if (mRouter != nullptr) {
+      for (std::size_t army = 0; army < armyCount && army < mRouter->ViewCount(); ++army) {
+        SClient& client = mClients[army];
+        client.luaBytes = 0u;
+        if (HasView(static_cast<std::int32_t>(army))) {
+          remote::wire::BitWriter luaWriter;
+          if (remote::wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), luaWriter)) {
+            client.luaBytes = static_cast<std::uint32_t>(luaWriter.Bytes().size());
+          } else {
+            ++client.failures;
+          }
         }
-      });
-    } else {
-      for (std::size_t army = 0; army < armyCount; ++army) {
-        Send(sim, army);
+      }
+    }
+
+    if (!PipelineOn()) {
+      if (Parallel() && armyCount > 1u) {
+        moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [this](const std::size_t begin, const std::size_t end) {
+          for (std::size_t army = begin; army < end; ++army) {
+            Send(army);
+          }
+        });
+      } else {
+        for (std::size_t army = 0; army < armyCount; ++army) {
+          Send(army);
+        }
       }
     }
 
     const auto sendEnd = std::chrono::steady_clock::now();
-    SBeat beat{};
-    beat.buildMs = (BuildSeconds() - mLastBuildSeconds) * 1000.0;
-    beat.sendMs = MillisecondsBetween(sendStart, sendEnd);
-    beat.intervalMs = mHaveLastFrames ? MillisecondsBetween(mLastFrames, sendEnd) : 0.0;
+    mBeat = SBeat{};
+    mBeat.buildMs = (BuildSeconds() - mLastBuildSeconds) * 1000.0;
+    mBeat.sendMs = MillisecondsBetween(sendStart, sendEnd);
+    mBeat.intervalMs = mHaveLastFrames ? MillisecondsBetween(mLastFrames, sendEnd) : 0.0;
     mLastBuildSeconds = BuildSeconds();
     mLastFrames = sendEnd;
+    if (!PipelineOn()) {
+      OnViewsFinished();
+    }
+  }
 
+  void CReplayViewBench::OnViewsFinished()
+  {
+    mBeat.sendMs += ViewWaitSeconds() * 1000.0; // what the views still cost the sim thread
+    const auto armyCount = static_cast<std::size_t>(ArmyCount());
     std::uint64_t entities = 0;
     std::uint64_t bytes = 0;
     mViews = 0;
@@ -208,21 +245,21 @@ namespace faf::headless
     }
     mEntities += entities;
     if (mHaveLastFrames) {
-      mBeats.push_back(beat); // the first beat has no interval and builds every view from nothing
+      mBeats.push_back(mBeat); // the first beat has no interval and builds every view from nothing
     }
     mHaveLastFrames = true;
     if (mFile != nullptr) {
       std::fprintf(
-        mFile, "%u,%.3f,%.3f,%.3f,%llu,%llu\n", sim.mCurBeat, beat.buildMs, beat.sendMs, beat.intervalMs,
+        mFile, "%u,%.3f,%.3f,%.3f,%llu,%llu\n", ViewBeat(), mBeat.buildMs, mBeat.sendMs, mBeat.intervalMs,
         static_cast<unsigned long long>(entities), static_cast<unsigned long long>(bytes)
       );
     }
   }
 
-  void CReplayViewBench::Send(const moho::Sim& sim, const std::size_t army)
+  void CReplayViewBench::Send(const std::size_t army)
   {
     SClient& client = mClients[army];
-    client.bytes = 0;
+    client.bytes = client.luaBytes;
     const auto view = static_cast<std::int32_t>(army);
     if (!HasView(view)) {
       client.grids.clear();
@@ -253,13 +290,10 @@ namespace faf::headless
     client.armies = std::move(records);
     client.haveArmies = true;
 
-    // Grid lane: the view army's grids and those of every army that counts it as an ally
-    // (`UserArmy::CanSeeCell`, 0x008B17F0).
+    // Grid lane.
     client.gridsNext.clear();
     for (const SBeatGrid& beatGrid : mBeatGrids) {
-      const moho::CArmyImpl* const owner = sim.mArmiesList[beatGrid.slot.army];
-      if ((beatGrid.slot.army == army || owner->mVarDat.mAllies.Contains(static_cast<unsigned int>(army)))
-          && client.gridsNext.size() < remote::wire::kMaxGridSlots) {
+      if ((beatGrid.receivers & (std::uint32_t{1} << army)) != 0u && client.gridsNext.size() < remote::wire::kMaxGridSlots) {
         client.gridsNext.push_back(beatGrid.key);
       }
     }
@@ -288,17 +322,6 @@ namespace faf::headless
       ++client.failures;
     }
     client.grids.swap(client.gridsNext);
-
-    // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
-    // beat's: a real server sends them when the beat's sync is over.
-    if (mRouter != nullptr && army < mRouter->ViewCount()) {
-      remote::wire::BitWriter luaWriter;
-      if (remote::wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), luaWriter)) {
-        client.bytes += static_cast<std::uint32_t>(luaWriter.Bytes().size());
-      } else {
-        ++client.failures;
-      }
-    }
   }
 
   std::uint64_t CReplayViewBench::Failures() const noexcept

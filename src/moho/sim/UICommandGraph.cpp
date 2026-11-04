@@ -369,7 +369,7 @@ namespace moho
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AllocateTreeSentinelNode()
   {
     auto* const node = static_cast<CommandGraphTreeNode*>(::operator new(sizeof(CommandGraphTreeNode)));
-    std::memset(node, 0, sizeof(CommandGraphTreeNode));
+    std::memset(static_cast<void*>(node), 0, sizeof(CommandGraphTreeNode));
     node->mColorOrAllocated = 1u;
     node->mIsSentinel = 0u;
     return node;

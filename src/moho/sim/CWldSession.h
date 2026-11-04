@@ -86,6 +86,7 @@ namespace moho
      * id).
      */
     SBuildTemplateInfo(const SBuildTemplateInfo& other);
+    SBuildTemplateInfo& operator=(const SBuildTemplateInfo&) = default;
   };
   static_assert(sizeof(SBuildTemplateInfo) == 0x2C, "SBuildTemplateInfo size must be 0x2C");
   static_assert(offsetof(SBuildTemplateInfo, mBuildOrder) == 0x0C, "SBuildTemplateInfo::mBuildOrder offset must be 0x0C");

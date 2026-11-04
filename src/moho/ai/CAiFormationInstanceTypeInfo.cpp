@@ -118,10 +118,7 @@ gpg::RRef CAiFormationInstanceTypeInfo::NewRef()
  */
 gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
-  if (object) {
-    new (object) CAiFormationInstance();
-  }
+  auto* const object = gpg::ConstructInStorage<CAiFormationInstance>(objectStorage);
   return MakeFormationInstanceRef(object);
 }
 

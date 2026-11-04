@@ -1,13 +1,18 @@
 #include "moho/sim/SimKeyframe.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <new>
 #include <unordered_map>
 #include <utility>
 
+#include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimBlockLane.h"
@@ -33,6 +38,39 @@ namespace moho
 
     std::unordered_map<std::uint64_t, void*> sRestoredBlocks;
     std::vector<SFormationPointer> sRestoredFormationPointers;
+
+    struct SRestoredUiData
+    {
+      std::int32_t x0 = 0;
+      std::int32_t z0 = 0;
+      std::int32_t x1 = 0;
+      std::int32_t z1 = 0;
+      gpg::MemBufferStream unitData{256u};
+      gpg::MemBufferStream enhancements{256u};
+      bool hasTables = false;
+    };
+
+    std::atomic<SRestoredUiData*> sRestoredUiData{nullptr};
+
+    void CaptureRestoredUiData(Sim& sim)
+    {
+      auto data = std::make_unique<SRestoredUiData>();
+      const gpg::Rect2i& playable = sim.mMapData->mPlayableRect;
+      data->x0 = playable.x0;
+      data->z0 = playable.z0;
+      data->x1 = playable.x1;
+      data->z1 = playable.z1;
+
+      // lua/simInit.lua loads lua/SimSync.lua with `doscript`, so these are globals of the sim's state.
+      LuaPlus::LuaObject unitData = sim.mLuaState->GetGlobal("UnitData");
+      LuaPlus::LuaObject enhancements = sim.mLuaState->GetGlobal("SimUnitEnhancements");
+      if (unitData.IsTable() && enhancements.IsTable()) {
+        (void)unitData.ToByteStream(data->unitData);
+        (void)enhancements.ToByteStream(data->enhancements);
+        data->hasTables = true;
+      }
+      delete sRestoredUiData.exchange(data.release());
+    }
 
     constexpr std::size_t kUnheldBlockBytes = 2048u;
 
@@ -252,6 +290,8 @@ namespace moho
     gSimExactArchive.store(false);
     gSimKeyframeRestoring.store(false);
 
+    CaptureRestoredUiData(sim);
+
     const SSimKeyframeHeader& header = *sRestore;
     sim.mCurBeat = header.beat;
     sim.mPausedByCommandSource = header.pausedBy;
@@ -273,5 +313,45 @@ namespace moho
 
     sFlattenLog = header.flattens;
     sRestore.reset();
+  }
+
+  void SIM_AddRestoredUiData(LuaPlus::LuaObject& sync, LuaPlus::LuaState* const state)
+  {
+    std::unique_ptr<SRestoredUiData> data(sRestoredUiData.exchange(nullptr));
+    if (!data) {
+      return;
+    }
+
+    LuaPlus::LuaObject area;
+    area.AssignNewTable(state, 4, 0);
+    area.SetInteger(1, data->x0);
+    area.SetInteger(2, data->z0);
+    area.SetInteger(3, data->x1);
+    area.SetInteger(4, data->z1);
+    sync.SetObject("NewPlayableArea", area);
+
+    if (!data->hasTables) {
+      gpg::Warnf("Keyframe restore: the sim's UnitData and SimUnitEnhancements tables were not found for the UI");
+      return;
+    }
+
+    gpg::BinaryReader enhancementsReader(&data->enhancements);
+    LuaPlus::LuaObject enhancements;
+    enhancements.SCR_FromLocalByteStream(enhancements, state, &enhancementsReader);
+    sync.SetObject("UserUnitEnhancements", enhancements);
+
+    gpg::BinaryReader unitDataReader(&data->unitData);
+    LuaPlus::LuaObject unitData;
+    unitData.SCR_FromLocalByteStream(unitData, state, &unitDataReader);
+    state->GetGlobals().SetObject("__RestoredUnitData", unitData);
+    (void)SCR_LuaDoString(
+      "local focus = GetFocusArmy() "
+      "Sync.UnitData = Sync.UnitData or {} "
+      "for id, entry in __RestoredUnitData do "
+      "if entry.OwnerArmy == focus or focus == -1 then Sync.UnitData[id] = entry.Data end "
+      "end "
+      "__RestoredUnitData = nil",
+      state
+    );
   }
 } // namespace moho

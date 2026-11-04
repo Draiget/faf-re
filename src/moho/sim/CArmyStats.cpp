@@ -95,39 +95,6 @@ namespace
     return std::strcmp(lhs.c_str(), rhs.c_str());
   }
 
-  [[nodiscard]] std::int32_t AtomicExchangeAddI32(volatile std::int32_t* const slot, const std::int32_t value) noexcept
-  {
-#if defined(_MSC_VER)
-    return static_cast<std::int32_t>(
-      _InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(value))
-    );
-#else
-    const std::int32_t previous = *slot;
-    *slot = previous + value;
-    return previous;
-#endif
-  }
-
-  [[nodiscard]] std::int32_t
-  AtomicCompareExchangeI32(volatile std::int32_t* const slot, const std::int32_t desired, const std::int32_t expected) noexcept
-  {
-#if defined(_MSC_VER)
-    return static_cast<std::int32_t>(
-      _InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(slot),
-        static_cast<long>(desired),
-        static_cast<long>(expected)
-      )
-    );
-#else
-    const std::int32_t observed = *slot;
-    if (observed == expected) {
-      *slot = desired;
-    }
-    return observed;
-#endif
-  }
-
   [[nodiscard]] float IntBitsToFloat(const std::int32_t bits) noexcept
   {
     return std::bit_cast<float>(bits);
@@ -1052,7 +1019,7 @@ namespace moho
   {
     CArmyStatItem* const item = GetItem(statPath);
     item->SynchronizeAsInt();
-    return AtomicExchangeAddI32(&item->mPrimaryValueBits, *delta);
+    return platform::AtomicAdd(&item->mPrimaryValueBits, *delta);
   }
 
   /**
@@ -1065,8 +1032,8 @@ namespace moho
 
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
     for (;;) {
-      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-      const std::int32_t result = AtomicCompareExchangeI32(counter, *value, observed);
+      const std::int32_t observed = platform::AtomicLoad(counter);
+      const std::int32_t result = platform::AtomicCompareExchange(counter, *value, observed);
       if (result == observed) {
         return result;
       }
@@ -1088,8 +1055,8 @@ namespace moho
 
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
     for (;;) {
-      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-      const std::int32_t previous = AtomicCompareExchangeI32(counter, *value, observed);
+      const std::int32_t observed = platform::AtomicLoad(counter);
+      const std::int32_t previous = platform::AtomicCompareExchange(counter, *value, observed);
       if (previous == observed) {
         return previous;
       }
@@ -1104,13 +1071,13 @@ namespace moho
     CArmyStatItem* const item = GetItem(statPath);
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
 
-    std::int32_t result = AtomicCompareExchangeI32(counter, 0, 0);
+    std::int32_t result = platform::AtomicLoad(counter);
     const std::int32_t targetValue = *candidate;
     if (targetValue > result) {
       item->SynchronizeAsInt();
       for (;;) {
-        const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-        result = AtomicCompareExchangeI32(counter, targetValue, observed);
+        const std::int32_t observed = platform::AtomicLoad(counter);
+        result = platform::AtomicCompareExchange(counter, targetValue, observed);
         if (result == observed) {
           break;
         }
@@ -1143,7 +1110,7 @@ namespace moho
     }
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
 
-    const std::int32_t currentBits = AtomicCompareExchangeI32(counter, 0, 0);
+    const std::int32_t currentBits = platform::AtomicLoad(counter);
     const float currentValue = IntBitsToFloat(currentBits);
     const float targetValue = (currentValue > candidateValue) ? currentValue : candidateValue;
     if (targetValue == currentValue) {
@@ -1153,8 +1120,8 @@ namespace moho
     item->SynchronizeAsFloat();
     const std::int32_t targetBits = FloatToIntBits(targetValue);
     for (;;) {
-      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-      const std::int32_t previous = AtomicCompareExchangeI32(counter, targetBits, observed);
+      const std::int32_t observed = platform::AtomicLoad(counter);
+      const std::int32_t previous = platform::AtomicCompareExchange(counter, targetBits, observed);
       if (previous == observed) {
         return;
       }

@@ -52,6 +52,7 @@ type DirStats struct {
 	Blocked   uint64 `json:"blocked"`
 	Duplicate uint64 `json:"duplicated"`
 	Stray     uint64 `json:"stray"`     // fixed mode: from an unexpected address
+	StrayFrom string `json:"strayFrom,omitempty"` // the last such address
 	Unlatched uint64 `json:"unlatched"` // latch mode: the far side has not sent yet
 	Relatched uint64 `json:"relatched"` // latch mode: the sender's address changed (NAT rebinding)
 	// Game DATA packets the relay dropped and a later copy of (same sequence
@@ -67,7 +68,8 @@ type direction struct {
 	stats struct {
 		packets, bytes, dropped, blocked, duplicated, stray, unlatched, relatched atomic.Uint64
 	}
-	rec recovery
+	strayFrom atomic.Pointer[net.UDPAddr]
+	rec       recovery
 }
 
 func (d *direction) snapshot() DirStats {
@@ -75,6 +77,9 @@ func (d *direction) snapshot() DirStats {
 		Packets: d.stats.packets.Load(), Bytes: d.stats.bytes.Load(), Dropped: d.stats.dropped.Load(),
 		Blocked: d.stats.blocked.Load(), Duplicate: d.stats.duplicated.Load(), Stray: d.stats.stray.Load(),
 		Unlatched: d.stats.unlatched.Load(), Relatched: d.stats.relatched.Load(),
+	}
+	if from := d.strayFrom.Load(); from != nil {
+		s.StrayFrom = from.String()
 	}
 	s.Recovered, s.RecoveryMedian, s.RecoveryP90 = d.rec.summary()
 	return s
@@ -418,6 +423,7 @@ func (l *Link) pump(in *net.UDPConn, sender *atomic.Pointer[net.UDPAddr], out *n
 		case known != nil && (from.Port != known.Port || !from.IP.Equal(known.IP)):
 			if !l.latch {
 				d.stats.stray.Add(1)
+				d.strayFrom.Store(from)
 				continue
 			}
 			sender.Store(from) // the NAT mapping moved

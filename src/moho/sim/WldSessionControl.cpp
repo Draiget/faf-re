@@ -1,3 +1,7 @@
+#include <mutex>
+
+#include "moho/net/CClientManagerImpl.h"
+#include "moho/net/CRejoinFeed.h"
 #include "moho/sim/CWldSessionPrivate.h"
 
 namespace moho
@@ -230,6 +234,33 @@ namespace
     }
 
     /**
+     * Engine addition (issue #275): what the screen of a client taking its seat back
+     * says this frame. Outside a rejoin there is no feed and it does nothing. Past the
+     * loading screen, the "loading" stage is only the first beat waiting for the sim,
+     * and it needs the cover as much as catching up does.
+     */
+    void UpdateRejoinScreen(IClientManager* const clientManager, const bool loadingScreenUp)
+    {
+      auto* const manager = static_cast<CClientManagerImpl*>(clientManager);
+      if (manager == nullptr || manager->mRejoinFeed == nullptr) {
+        return;
+      }
+
+      SRejoinStatus status{};
+      {
+        std::scoped_lock lock(manager->mLock);
+        status = manager->mRejoinFeed->Status();
+      }
+      if (status.stage == ERejoinStage::Loading) {
+        UI_UpdateRejoinScreen(loadingScreenUp ? "loading" : "catchingUp", loadingScreenUp ? -1.0f : 0.0f);
+      } else if (status.stage == ERejoinStage::CatchingUp) {
+        UI_UpdateRejoinScreen("catchingUp", status.progress);
+      } else {
+        UI_UpdateRejoinScreen("", -1.0f);
+      }
+    }
+
+    /**
      * Address: 0x0088C000 (FUN_0088C000, func_DoLoading)
      *
      * IDA signature:
@@ -264,6 +295,7 @@ namespace
       SWldSessionInfo* const sessionInfo = gPendingWldSessionInfo.get();
       if (sessionInfo != nullptr && sessionInfo->mClientManager != nullptr) {
         sessionInfo->mClientManager->DoBeat();
+        UpdateRejoinScreen(sessionInfo->mClientManager, true);
       }
 
       CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
@@ -364,6 +396,8 @@ namespace
       // driver; the session info gives its client manager up here.
       IClientManager* const clientManager = sessionInfo->mClientManager;
       sessionInfo->mClientManager = nullptr;
+      // Engine addition (issue #275): does nothing unless a save came with this client's seat.
+      REJOIN_PrepareRestore(*sessionInfo);
       // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
       // `sim_LocalLead`); a session with any network connector keeps the original pacing.
       SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
@@ -578,6 +612,7 @@ namespace
         return;
       }
 
+      REJOIN_MainFrame(*simDriver);
       simDriver->Dispatch();
       CClientManagerImpl* const clientManager = simDriver->GetClientManager();
       if (clientManager != nullptr && clientManager->IsEveryoneReady()) {
@@ -596,6 +631,7 @@ namespace
           *outContinue = true;
         }
       } else {
+        UpdateRejoinScreen(clientManager, false);
         (void)UI_UpdateDisconnectDialogCallback();
       }
     }
@@ -611,6 +647,7 @@ namespace
     void WLD_DoPlayingAction(const float deltaSeconds)
     {
       if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
+        REJOIN_MainFrame(*simDriver);
         simDriver->Dispatch();
 
         // Snapshot every active GeomCamera and forward to the sim driver so
@@ -632,6 +669,7 @@ namespace
         // Trailing sim-driver post-frame slot (Func1 in IDA): currently
         // a NoOp until full ISTIDriver vtable slot ownership is recovered.
         simDriver->NoOp();
+        UpdateRejoinScreen(simDriver->GetClientManager(), false);
       }
 
       (void)UI_UpdateDisconnectDialogCallback();

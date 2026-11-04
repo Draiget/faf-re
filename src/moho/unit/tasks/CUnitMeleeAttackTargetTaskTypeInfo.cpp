@@ -144,10 +144,7 @@ namespace moho
    */
   gpg::RRef CUnitMeleeAttackTargetTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitMeleeAttackTargetTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitMeleeAttackTargetTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitMeleeAttackTargetTask>(objectStorage);
     return gpg::RRef{task, gpg::RTypeOf<moho::CUnitMeleeAttackTargetTask>()};
   }
 

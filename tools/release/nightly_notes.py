@@ -1,7 +1,7 @@
 """Writes a nightly pre-release's notes: the parity run it passed, every commit since the previous
 nightly (or release), how to install it, and the zips' checksums.
 
-usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=...] nightly_notes.py --out notes.md
+usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=... NOTE=...] nightly_notes.py --out notes.md
 
 Reads git history, zips/SHA256SUMS.txt and, when the parity run's report was downloaded, report/report.json.
 """
@@ -26,12 +26,18 @@ def parity_line():
     run, url = os.environ.get("PARITY_RUN"), os.environ.get("PARITY_URL")
     if not run:
         return "Built by hand: no parity run is tied to this build."
-    text = "Passed the [nightly replay parity](%s)" % url
+    new = []
+    counts = {}
     if os.path.isfile("report/report.json"):
         with open("report/report.json", encoding="utf-8") as f:
-            counts = json.load(f)["counts"]
-        shown = [(counts.get(k, 0), k) for k in ("pass", "expected-desync", "expected-crash", "not-run")]
+            report = json.load(f)
+        counts, new = report["counts"], report.get("regressions", [])
+    text = ("**Built despite new failures in** the [nightly replay parity](%s)" if new else "Passed the [nightly replay parity](%s)") % url
+    if counts:
+        shown = [(counts.get(k, 0), k) for k in ("pass", "desync", "crash", "expected-desync", "expected-crash", "not-run")]
         text += " on Linux x64: " + ", ".join("%d %s" % (n, k.replace("expected-", "expected ")) for n, k in shown if n)
+        if new:
+            text += ". New failures: " + ", ".join(str(i) for i in new)
         text += ". What is expected is [listed with why](%s/blob/%s/tools/parity-data/expected/3835.json)" % (REPO, os.environ["SHA"])
     return text + "."
 
@@ -54,7 +60,7 @@ def main():
 
     lines = ["A nightly build of master at [`%s`](%s/commit/%s). It has had no testing beyond the checks below: "
              "use a [release](%s/releases/latest) unless you want the newest changes." % (sha[:7], REPO, sha, REPO), "",
-             parity_line(), "",
+             parity_line(), ""] + ([os.environ["NOTE"], ""] if os.environ.get("NOTE") else []) + [
              "## Changes since %s (%d)" % (previous, len(commits)), ""]
     lines += shown or ["No commits."]
     if len(shown) < len(commits):

@@ -42,6 +42,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/TimeBar.h"
+#include "moho/render/d3d/CD3DDevice.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/core/Thread.h"
 
@@ -1601,17 +1602,18 @@ namespace
    * turns a typed WM_CHAR into its code-page byte, which the W dispatch then reads as a UTF-16
    * code unit: Cyrillic "П" (0xCF in 1251) reached the edit box as "Ï" (U+00CF).
    */
-  void DispatchPendingMessage()
+  bool DispatchPendingMessage()
   {
     MSG message{};
     if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
-      return;
+      return false;
     }
     if (message.message == WM_QUIT) {
       wxTheApp->ExitMainLoop(); // what wxApp::DoMessage does on WM_QUIT
-      return;
+      return true;
     }
     wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
+    return true;
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -2327,15 +2329,25 @@ void moho::WIN_AppExecute(IWinApp* const app)
       acceptNewEvent = false;
     }
 
-    if (wxTheApp->Pending()) {
-      DispatchPendingMessage(); // engine change: wxTheApp->Dispatch() could block, see there
+    // Engine change: taking the message is the check, as a second PeekMessage per pass was 7 % of
+    // an uncapped frame. wxTheApp->Dispatch() could also block, see there.
+    if (DispatchPendingMessage()) {
       success = true;
       continue;
     }
 
+    // Engine addition: where the frame's WM_PAINT would come, after the messages and before idle.
+    if (moho::D3D_RunDirectPaint()) {
+      success = true;
+    }
+
+    // Engine change: with idle work done this goes on to the next frame without asking for messages
+    // a second or third time; one that arrives now waits for the top of the next frame.
     if (success) {
       success = wxTheApp->ProcessIdle();
-      continue;
+      if (success) {
+        continue;
+      }
     }
 
     if (!wxGetApp().KeepGoing()) {
@@ -2350,7 +2362,8 @@ void moho::WIN_AppExecute(IWinApp* const app)
 
     const DWORD timeoutMs = ComputeWaitTimeoutMs();
     wakeupTimerDur = kInfiniteWakeupMs;
-    WIN_GetWaitHandleSet()->MsgWaitEx(timeoutMs);
+    // Engine addition: no paint message wakes this wait for a frame that draws without one.
+    WIN_GetWaitHandleSet()->MsgWaitEx(moho::D3D_IsDirectPaintPending() ? 0u : timeoutMs);
   }
 
   app->Destroy();

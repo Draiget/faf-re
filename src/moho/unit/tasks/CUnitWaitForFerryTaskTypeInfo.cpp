@@ -98,10 +98,7 @@ namespace moho
    */
   gpg::RRef CUnitWaitForFerryTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitWaitForFerryTask*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitWaitForFerryTask();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitWaitForFerryTask>(objectStorage);
     return MakeCUnitWaitForFerryTaskRef(object);
   }
 

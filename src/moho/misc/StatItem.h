@@ -9,6 +9,7 @@
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatTreeItem.h"
 #include "moho/misc/Stats.h"
+#include "platform/Interlocked.h"
 
 namespace LuaPlus
 {
@@ -132,7 +133,7 @@ namespace moho
      */
     std::int32_t AddPrimaryBits(const std::int32_t delta) noexcept
     {
-      return std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(mPrimaryValueBits)).fetch_add(delta);
+      return platform::AtomicAdd(&mPrimaryValueBits, delta);
     }
 
     /**
@@ -140,7 +141,7 @@ namespace moho
      */
     std::int32_t ExchangePrimaryBits(const std::int32_t value) noexcept
     {
-      return std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(mPrimaryValueBits)).exchange(value);
+      return platform::AtomicExchange(&mPrimaryValueBits, value);
     }
 
     /**
@@ -148,7 +149,7 @@ namespace moho
      */
     void StorePrimaryBits(const std::int32_t value) noexcept
     {
-      std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(mPrimaryValueBits)).store(value);
+      platform::AtomicField(&mPrimaryValueBits).store(value);
     }
 
     /**
