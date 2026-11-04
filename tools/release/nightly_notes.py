@@ -26,12 +26,18 @@ def parity_line():
     run, url = os.environ.get("PARITY_RUN"), os.environ.get("PARITY_URL")
     if not run:
         return "Built by hand: no parity run is tied to this build."
-    text = "Passed the [nightly replay parity](%s)" % url
+    new = []
+    counts = {}
     if os.path.isfile("report/report.json"):
         with open("report/report.json", encoding="utf-8") as f:
-            counts = json.load(f)["counts"]
-        shown = [(counts.get(k, 0), k) for k in ("pass", "expected-desync", "expected-crash", "not-run")]
+            report = json.load(f)
+        counts, new = report["counts"], report.get("regressions", [])
+    text = ("**Built despite new failures in** the [nightly replay parity](%s)" if new else "Passed the [nightly replay parity](%s)") % url
+    if counts:
+        shown = [(counts.get(k, 0), k) for k in ("pass", "desync", "crash", "expected-desync", "expected-crash", "not-run")]
         text += " on Linux x64: " + ", ".join("%d %s" % (n, k.replace("expected-", "expected ")) for n, k in shown if n)
+        if new:
+            text += ". New failures: " + ", ".join(str(i) for i in new)
         text += ". What is expected is [listed with why](%s/blob/%s/tools/parity-data/expected/3835.json)" % (REPO, os.environ["SHA"])
     return text + "."
 
