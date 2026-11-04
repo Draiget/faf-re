@@ -200,8 +200,8 @@ namespace
 } // namespace
 
 // Defined at file scope (global namespace, external linkage) in
-// CrtRuntimeHelpers.cpp - shared by every legacy VC8 "<container> too long"
-// throw lane in that file. Forward-declared here rather than duplicated so
+// CrtRuntimeExportedHelpers.cpp - shared by every legacy VC8 "<container> too
+// long" throw lane. Forward-declared here rather than duplicated so
 // UICommandGraph's own hash-table growth guard (CheckedIncrementListSize) can
 // reuse the identical message/exception construction instead of re-emitting it
 // inline a second time. The bucket vector's own overflow lane (FUN_00830620)
