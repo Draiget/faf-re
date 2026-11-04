@@ -13,8 +13,8 @@
 namespace moho
 {
   /**
-   * x64 only: the free list formations, projectiles and 11-bone pose arrays share on the sim thread, the last freed
-   * block handed out first.
+   * x64 only: the free list on the sim thread that formations and projectiles return to and that 11-bone pose arrays
+   * also allocate from, the last freed block handed out first.
    *
    * Units keep a raw formation pointer (`SInfoCache::mFormationLayer`), and `IsSameFormationLayerWith` (0x006A8D40)
    * compares pointers, so a stale pointer can equal a new formation at a reused address. In the binary these objects
@@ -25,6 +25,10 @@ namespace moho
    * Tested in the x86 allocator: with cache trims off and every other object of the class moved out, 26901494 and
    * 26906026 still pass; without pose arrays they fail at the same beat and hash as a list of formations and
    * projectiles, and without projectiles too 26916583 fails at beat 4900.
+   *
+   * A pose array takes a block here but doesn't return one (`CAniPoseBoneArray::FreeHeapBones`). The binary freed no
+   * pose array on any thread in the ticks logged for 27064121 (7378 to 7381). When ours freed them here, they lay on
+   * top of a freed formation and the next formation missed its old address.
    *
    * Other threads never touch the list, as a block they free goes to their own lane in the binary.
    */
