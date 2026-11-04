@@ -36,6 +36,7 @@ namespace moho
   {
   public:
     static constexpr std::size_t kBlockBytes = 2048u;
+    static constexpr std::size_t kParkedBlocks = 4096u;
 
     [[nodiscard]] static void* Allocate() noexcept
     {
@@ -64,14 +65,20 @@ namespace moho
 
     /**
      * For an object that takes a block of this class in the binary but lives elsewhere here: the block it would have
-     * taken leaves the list, so the next object gets the one under it, as in the binary.
+     * taken leaves the list, so the next object gets the one under it, as in the binary. It isn't freed at once: the
+     * heap would hand the address straight back to the next formation (26910291 at tick 68593), where the binary's
+     * block is still occupied. The oldest of `kParkedBlocks` goes back to the heap instead.
      */
     static void PassTopBlock() noexcept
     {
       if (IsSimThread() && !gSimKeyframeRestoring.load(std::memory_order_relaxed)) {
         std::vector<void*>& blocks = Blocks();
         if (!blocks.empty()) {
-          ::operator delete(blocks.back());
+          static void* sParked[kParkedBlocks] = {};
+          static std::size_t sNextParked = 0;
+          ::operator delete(sParked[sNextParked]);
+          sParked[sNextParked] = blocks.back();
+          sNextParked = (sNextParked + 1u) % kParkedBlocks;
           blocks.pop_back();
         }
       }
