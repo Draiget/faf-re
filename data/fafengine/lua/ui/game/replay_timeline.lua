@@ -182,14 +182,18 @@ local ScrubbingOverlay = ClassUI(Group) {
         LayoutHelpers.FillParent(self.dialogBg, self.dialog)
         self.dialogBg:SetSolidColor('f0101520')
         self.dialogBg.Depth:Set(function() return self.dialog.Depth() + 1 end)
-        self.dialogBg:DisableHitTest(true)
+        if self.dialogBg.DisableHitTest then
+            self.dialogBg:DisableHitTest(true)
+        end
 
         -- Authentic Supreme Commander dialog border (pass clicks through)
         if UIUtil and is_callable(UIUtil.CreateNinePatchStd) then
             local bgPatch = UIUtil.CreateNinePatchStd(self.dialog, '/scx_menu/lan-game-lobby/dialog/background/')
             LayoutHelpers.FillParentFixedBorder(bgPatch, self.dialog, 32)
             LayoutHelpers.DepthUnderParent(bgPatch, self.dialog, 1)
-            bgPatch:DisableHitTest(true)
+            if bgPatch.DisableHitTest then
+                bgPatch:DisableHitTest(true)
+            end
         end
 
         -- Title text in SupCom title font
@@ -234,7 +238,9 @@ local ScrubbingOverlay = ClassUI(Group) {
         LayoutHelpers.Below(self.cancelButton, self.barTrack, 16)
         LayoutHelpers.AtHorizontalCenterIn(self.cancelButton, self.dialog)
         self.cancelButton.Depth:Set(function() return self.dialog.Depth() + 50 end)
-        self.cancelButton:EnableHitTest()
+        if self.cancelButton.EnableHitTest then
+            self.cancelButton:EnableHitTest()
+        end
         self.cancelButton.OnClick = function(btn)
             LOG("FAFENGINE: Cancel button clicked!")
             DoCancelScrub()
@@ -346,7 +352,10 @@ function CreateReplayTimeline(parent)
         return controls.timeline
     end
 
-    local Prefs = import('/lua/user/prefs.lua')
+    local okPrefs, Prefs = pcall(import, '/lua/user/prefs.lua')
+    if not okPrefs then
+        Prefs = nil
+    end
     local userOptions = Prefs and is_callable(Prefs.GetFromCurrentProfile) and Prefs.GetFromCurrentProfile('options')
     local prefInterval = userOptions and userOptions.replay_keyframe_interval
     if prefInterval ~= nil then
