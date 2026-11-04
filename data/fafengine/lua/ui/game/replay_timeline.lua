@@ -463,51 +463,63 @@ function CreateReplayTimeline(parent)
     controls.slider = slider
     controls.keyframeMarkers = {}
 
+    local function CreateKeyframeMarker(targetTick)
+        local marker = Bitmap(bar)
+        marker:SetSolidColor('ffffd700') -- Bright golden keyframe notch
+        LayoutHelpers.SetDimensions(marker, 3, 14)
+        marker.Depth:Set(function() return bar.Depth() + 5 end)
+        if marker.EnableHitTest then
+            marker:EnableHitTest()
+            marker.HandleEvent = function(self, event)
+                if event.Type == 'ButtonPress' then
+                    if slider.SetValue then
+                        slider:SetValue(targetTick)
+                    end
+                    if slider.OnValueSet then
+                        slider:OnValueSet(targetTick)
+                    end
+                    return true
+                end
+                return false
+            end
+        end
+
+        marker.Left:Set(function()
+            local thumbW = (slider._thumb and slider._thumb.Width()) or 10
+            local trackW = math.max(1, slider.Width() - thumbW)
+            local endVal = (slider._endValue and slider._endValue > 0) and slider._endValue or 1
+            local ratio = math.min(1.0, math.max(0.0, targetTick / endVal))
+            local centerX = math.floor(slider.Left() + (thumbW / 2) + (ratio * trackW))
+            return math.floor(centerX - (marker.Width() / 2))
+        end)
+        marker.Top:Set(function()
+            return math.floor(slider.Top() + (slider.Height() - marker.Height()) / 2)
+        end)
+
+        return marker
+    end
+
     local function UpdateKeyframeMarkers(totalTicks)
-        if not slider or not is_callable(GetReplayKeyframes) then
+        local getKf = rawget(_G, 'GetReplayKeyframes')
+        if not slider or not is_callable(getKf) then
             return
         end
         if not totalTicks or totalTicks <= 0 then
             return
         end
 
-        local ok, kfList = pcall(GetReplayKeyframes)
+        local ok, kfList = pcall(getKf)
         if not ok or type(kfList) ~= 'table' then
             return
         end
 
         local curMap = {}
         for _, kfTick in ipairs(kfList) do
-            curMap[kfTick] = true
-            if not controls.keyframeMarkers[kfTick] then
-                local marker = Bitmap(slider)
-                marker:SetSolidColor('ffffcc00') -- Bright golden keyframe notch
-                LayoutHelpers.SetDimensions(marker, 3, 12)
-                marker.Depth:Set(function() return bar.Depth() + 4 end)
-                if marker.EnableHitTest then
-                    marker:EnableHitTest()
-                    marker.HandleEvent = function(self, event)
-                        if event.Type == 'ButtonPress' then
-                            if slider.OnValueSet then
-                                slider:OnValueSet(kfTick)
-                            end
-                            return true
-                        end
-                        return false
-                    end
+            if kfTick and type(kfTick) == 'number' then
+                curMap[kfTick] = true
+                if not controls.keyframeMarkers[kfTick] then
+                    controls.keyframeMarkers[kfTick] = CreateKeyframeMarker(kfTick)
                 end
-
-                marker.Left:Set(function()
-                    local sw = slider.Width()
-                    local sl = slider.Left()
-                    local ratio = math.min(1.0, math.max(0.0, kfTick / totalTicks))
-                    return math.floor(sl + (ratio * sw) - (marker.Width() / 2))
-                end)
-                marker.Top:Set(function()
-                    return math.floor(slider.Top() + (slider.Height() - marker.Height()) / 2)
-                end)
-
-                controls.keyframeMarkers[kfTick] = marker
             end
         end
 
@@ -627,6 +639,7 @@ function CreateReplayTimeline(parent)
     local autoScrubStep = 0
     local autoScrubCooldown = 0
     local autoScrubStatusTimer = 0
+    local markerUpdateTimer = 0
 
     local loggedOnce = false
     bar:SetNeedsFrameUpdate(true)
@@ -730,7 +743,7 @@ function CreateReplayTimeline(parent)
         end
 
         local markerTotal = (total and total > 0) and total or math.max(100, curTick)
-        markerUpdateTimer = (markerUpdateTimer or 0) - deltaTime
+        markerUpdateTimer = markerUpdateTimer - deltaTime
         if markerUpdateTimer <= 0 then
             markerUpdateTimer = 0.5
             UpdateKeyframeMarkers(markerTotal)
