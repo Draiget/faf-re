@@ -121,10 +121,7 @@ namespace moho
    */
   gpg::RRef CUnitRepairTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitRepairTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitRepairTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitRepairTask>(objectStorage);
 
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitRepairTask>(task);

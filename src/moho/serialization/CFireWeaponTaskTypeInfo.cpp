@@ -100,10 +100,7 @@ namespace moho
    */
   gpg::RRef CFireWeaponTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CFireWeaponTask*>(objectStorage);
-    if (task) {
-      new (task) CFireWeaponTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CFireWeaponTask>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CFireWeaponTask))};
   }
 

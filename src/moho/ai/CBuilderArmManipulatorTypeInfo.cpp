@@ -255,10 +255,7 @@ namespace moho
    */
   gpg::RRef CBuilderArmManipulatorTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const manipulator = static_cast<CBuilderArmManipulator*>(objectStorage);
-    if (manipulator) {
-      new (manipulator) CBuilderArmManipulator();
-    }
+    auto* const manipulator = gpg::ConstructInStorage<CBuilderArmManipulator>(objectStorage);
 
     return MakeBuilderArmManipulatorRef(manipulator);
   }

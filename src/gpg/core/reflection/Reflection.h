@@ -1,4 +1,5 @@
 #pragma once
+#include <new>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -6250,6 +6251,32 @@ namespace gpg
     out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
     out.mType = dynamicType;
     return out;
+  }
+
+  /**
+   * Engine addition: the construct step of a TypeInfo's `CtrRef`: default-constructs `T` in
+   * `storage` unless it is null, and returns it.
+   */
+  template <class T>
+  T* ConstructInStorage(void* const storage)
+  {
+    auto* const object = static_cast<T*>(storage);
+    if (object) {
+      new (object) T();
+    }
+    return object;
+  }
+
+  /**
+   * Engine addition: a TypeInfo's `Destruct`: destroys the `T` in `storage` unless it is null.
+   */
+  template <class T>
+  void DestructInStorage(void* const storage)
+  {
+    auto* const object = static_cast<T*>(storage);
+    if (object) {
+      object->~T();
+    }
   }
 
   /**

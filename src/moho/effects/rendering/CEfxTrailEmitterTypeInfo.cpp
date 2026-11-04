@@ -81,10 +81,7 @@ namespace moho
    */
   gpg::RRef CEfxTrailEmitterTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CEfxTrailEmitter*>(objectStorage);
-    if (object) {
-      new (object) CEfxTrailEmitter();
-    }
+    auto* const object = gpg::ConstructInStorage<CEfxTrailEmitter>(objectStorage);
     gpg::RRef out{};
     gpg::RRef_CEfxTrailEmitter(&out, object);
     return out;
@@ -103,10 +100,7 @@ namespace moho
    */
   void CEfxTrailEmitterTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CEfxTrailEmitter*>(objectStorage);
-    if (object) {
-      object->~CEfxTrailEmitter();
-    }
+    gpg::DestructInStorage<CEfxTrailEmitter>(objectStorage);
   }
 
   /**

@@ -82,10 +82,7 @@ namespace moho
    */
   gpg::RRef RDebugNavPathTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<RDebugNavPath*>(objectStorage);
-    if (object != nullptr) {
-      new (object) RDebugNavPath();
-    }
+    auto* const object = gpg::ConstructInStorage<RDebugNavPath>(objectStorage);
     return MakeTypedRef(object);
   }
 
@@ -103,10 +100,7 @@ namespace moho
    */
   void RDebugNavPathTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<RDebugNavPath*>(objectStorage);
-    if (object != nullptr) {
-      object->~RDebugNavPath();
-    }
+    gpg::DestructInStorage<RDebugNavPath>(objectStorage);
   }
 
   /**

@@ -100,10 +100,7 @@ namespace moho
    */
   gpg::RRef CUnitTeleportTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitTeleportTask*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitTeleportTask();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitTeleportTask>(objectStorage);
     return MakeCUnitTeleportTaskRef(object);
   }
 

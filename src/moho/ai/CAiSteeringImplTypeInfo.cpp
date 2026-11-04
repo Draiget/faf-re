@@ -156,10 +156,7 @@ void CAiSteeringImplTypeInfo::Init()
  */
 gpg::RRef CAiSteeringImplTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const steering = static_cast<CAiSteeringImpl*>(objectStorage);
-  if (steering) {
-    new (steering) CAiSteeringImpl();
-  }
+  auto* const steering = gpg::ConstructInStorage<CAiSteeringImpl>(objectStorage);
   return gpg::MakeTypedRef(steering, CachedCAiSteeringImplType());
 }
 

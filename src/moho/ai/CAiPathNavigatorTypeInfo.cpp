@@ -139,10 +139,7 @@ gpg::RRef CAiPathNavigatorTypeInfo::NewRef()
  */
 gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const navigator = static_cast<CAiPathNavigator*>(objectStorage);
-  if (navigator) {
-    new (navigator) CAiPathNavigator();
-  }
+  auto* const navigator = gpg::ConstructInStorage<CAiPathNavigator>(objectStorage);
 
   gpg::RRef out{};
   PopulateCAiPathNavigatorRef(&out, navigator);

@@ -93,10 +93,7 @@ namespace moho
    */
   gpg::RRef CUnitPodAssistTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitPodAssist*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitPodAssist();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitPodAssist>(objectStorage);
 
     return MakeCUnitPodAssistRef(object);
   }

@@ -30,10 +30,7 @@ namespace
    */
   void DestroyCUnitUnloadUnitsInPlace(void* const objectStorage)
   {
-    auto* const task = static_cast<moho::CUnitUnloadUnits*>(objectStorage);
-    if (task != nullptr) {
-      task->~CUnitUnloadUnits();
-    }
+    gpg::DestructInStorage<moho::CUnitUnloadUnits>(objectStorage);
   }
 } // namespace
 

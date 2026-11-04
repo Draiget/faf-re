@@ -87,10 +87,7 @@ namespace moho
    */
   gpg::RRef CEfxBeamTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CEfxBeam*>(objectStorage);
-    if (object) {
-      new (object) CEfxBeam();
-    }
+    auto* const object = gpg::ConstructInStorage<CEfxBeam>(objectStorage);
     return MakeCEfxBeamRef(object);
   }
 
@@ -107,10 +104,7 @@ namespace moho
    */
   void CEfxBeamTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CEfxBeam*>(objectStorage);
-    if (object) {
-      object->~CEfxBeam();
-    }
+    gpg::DestructInStorage<CEfxBeam>(objectStorage);
   }
 
   /**

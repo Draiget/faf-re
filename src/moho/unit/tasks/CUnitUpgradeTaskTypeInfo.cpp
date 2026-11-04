@@ -93,10 +93,7 @@ namespace moho
    */
   gpg::RRef CUnitUpgradeTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitUpgradeTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitUpgradeTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitUpgradeTask>(objectStorage);
     return MakeCUnitUpgradeTaskRef(task);
   }
 

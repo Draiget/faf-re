@@ -86,10 +86,7 @@ namespace moho
    */
   gpg::RRef CUnitCallLandTransportTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitCallLandTransport*>(objectStorage);
-    if (task) {
-      new (task) CUnitCallLandTransport();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitCallLandTransport>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallLandTransport))};
   }
 

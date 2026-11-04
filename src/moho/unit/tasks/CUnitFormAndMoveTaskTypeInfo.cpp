@@ -198,10 +198,7 @@ namespace moho
    */
   gpg::RRef CUnitFormAndMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitFormAndMoveTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitFormAndMoveTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitFormAndMoveTask>(objectStorage);
     return MakeFormAndMoveTaskRef(task);
   }
 
