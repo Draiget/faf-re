@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/mutex.h"
+#include <mutex>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/VMatrix4.h"
@@ -23,7 +23,7 @@ namespace moho
   using Quaternionf = Wm3::Quaternionf;
 
   // Process-wide mutex used by math/random helper lanes.
-  extern boost::mutex math_GlobalRandomMutex;
+  extern std::mutex math_GlobalRandomMutex;
   // Process-wide random stream used by math helper lanes.
   extern CRandomStream math_GlobalRandomStream;
 

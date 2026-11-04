@@ -8,7 +8,6 @@
 #include <span>
 #include <streambuf>
 
-#include "boost/mutex.h"
 #include "gpg/core/containers/DList.h"
 #include "Sync.h"
 #include "Tss.h"
@@ -259,7 +258,7 @@ namespace gpg
         StreamBuffer* TailBuffer();
         bool IsSingleBuffer();
 
-        boost::mutex mMutex{};
+        std::mutex mMutex{};
         DList<StreamBuffer, void> mChunks{};
         std::uint8_t* mReadLimit{};
         std::uint8_t* mWriteCommit{};

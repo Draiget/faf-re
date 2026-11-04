@@ -761,7 +761,7 @@ int moho::cfunc_RandomUserL(LuaPlus::LuaState* const state)
     );
   }
 
-  boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+  std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
   if (argumentCount == 0) {
     // 0x008BEB38..0x008BEB4D: `fild; jge; fadd 2^32; fmul [0x00E4F7B0]`, the
     // float 2^-32 (0x2F800000), stored to float once.

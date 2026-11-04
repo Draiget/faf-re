@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/mutex.h"
+#include <mutex>
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/String.h"
@@ -158,7 +158,7 @@ namespace moho
    */
   void register_sResourceLock();
 
-  extern boost::mutex sResourceLock;
+  extern std::recursive_mutex sResourceLock;
 
   /**
    * Engine addition (dedicated-server plan WPL.4): CD3DBatchTexture::FromFile for
