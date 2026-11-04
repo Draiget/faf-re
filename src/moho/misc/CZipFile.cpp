@@ -3,7 +3,6 @@
 #include <zlib.h>
 
 #include <algorithm>
-#include <atomic>
 #include <cstring>
 #include <limits>
 #include <memory>
