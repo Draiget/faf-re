@@ -17083,6 +17083,141 @@ extern "C"
 		return &table->array[index - 1];
 	}
 
+	namespace
+	{
+		inline void RunLuaCallGate(moho::LuaCFunctionPtr function); // below, with luaD_precall
+	} // namespace
+
+	/**
+	 * Engine addition (lua_ThreadedDispatch): what luaH_next does from the slot after `index`
+	 * (luaH_index's answer for the current key), writing the next key and value at `key`. 0 at the end.
+	 */
+	[[nodiscard]] static int LuaNextFrom(Table* const table, int index, TObject* const key) noexcept
+	{
+		++index;
+		const int sizearray = table->sizearray;
+		if (index < sizearray) {
+			TObject* arraySlot = &table->array[index];
+			while (arraySlot->tt == LUA_TNIL) {
+				++index;
+				++arraySlot;
+				if (index >= sizearray) {
+					break;
+				}
+			}
+			if (index < sizearray) {
+				key->tt = LUA_TNUMBER;
+				key->value.n = static_cast<float>(index + 1);
+				key[1] = table->array[index];
+				return 1;
+			}
+		}
+		int nodeIndex = index - sizearray;
+		const int nodeCount = 1 << table->lsizenode;
+		if (nodeIndex >= nodeCount) {
+			return 0;
+		}
+		Node* const nodeBase = table->node;
+		while (nodeBase[nodeIndex].i_val.tt == LUA_TNIL) {
+			if (++nodeIndex >= nodeCount) {
+				return 0;
+			}
+		}
+		key[0] = nodeBase[nodeIndex].i_key;
+		key[1] = nodeBase[nodeIndex].i_val;
+		return 1;
+	}
+
+	/**
+	 * Engine addition (lua_ThreadedDispatch): OP_TFORLOOP's call of the built-in `next` (luaB_next)
+	 * over a table, done in place: what luaD_call, luaD_precall, luaB_next, lua_next and luaD_poscall
+	 * do, in the same order and to the same stack slots - the C-call depth, the closure's invocation
+	 * count, the call gate, the next key and value where luaH_next leaves them, the results moved down
+	 * and padded with nils to `nvar`, the top, then the collection check luaD_call ends with - without
+	 * the frame. False, having done nothing, whenever the call could do more than that: another
+	 * function, a call or return hook, a C-function hook, a depth at the limit, a call-info array or a
+	 * stack that would have to grow, or a key luaH_index refuses (the call raises that error itself).
+	 */
+	[[nodiscard]] static bool LuaInlineNextCall(lua_State* const L, StkId const callBase, const int nvar)
+	{
+		constexpr unsigned int kMaxCCalls = 200;
+		constexpr int kMinCStackSlots = 20;
+		constexpr int kHookMaskCallOrReturn = (1 << 0) | (1 << 1);
+
+		if (callBase[0].tt != LUA_TFUNCTION || callBase[1].tt != LUA_TTABLE) {
+			return false;
+		}
+		Closure* const closure = &static_cast<GCObject*>(callBase[0].value.p)->cl;
+		if (closure->c.isC == 0 || closure->c.f != &luaB_next || (L->l_G->hookmask & kHookMaskCallOrReturn) != 0 ||
+		    gLuaCFunctionCallHook != nullptr || static_cast<unsigned int>(L->nCcalls) + 1u >= kMaxCCalls ||
+		    &L->ci[1] == L->end_ci || L->stack_last - L->top <= kMinCStackSlots) {
+			return false;
+		}
+
+		// luaH_index, without its error.
+		Table* const table = static_cast<Table*>(callBase[1].value.p);
+		TObject* const key = &callBase[2];
+		int index = -1;
+		if (key->tt != LUA_TNIL) {
+			bool inArray = false;
+			if (key->tt == LUA_TNUMBER) {
+				const float numericKey = key->value.n;
+				const int integerKey = msvc8::TruncateToInt(numericKey);
+				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1) {
+					const int zeroBased = integerKey - 1;
+					if ((zeroBased & 0xFF000000) == 0 && integerKey <= table->sizearray) {
+						index = zeroBased;
+						inArray = true;
+					}
+				}
+			}
+			if (!inArray) {
+				const TObject* const slot = luaH_get(table, key);
+				if (slot == &luaO_nilobject) {
+					return false;
+				}
+				const auto nodeBase = reinterpret_cast<std::uintptr_t>(static_cast<Node*>(table->node));
+				const auto slotAddress = reinterpret_cast<std::uintptr_t>(slot);
+				index = table->sizearray +
+					static_cast<int>((slotAddress - nodeBase - offsetof(Node, i_val)) / static_cast<std::uintptr_t>(sizeof(Node)));
+			}
+		}
+
+		// luaD_call and luaD_precall up to the C function.
+		++L->nCcalls;
+		std::uint32_t& invocationsLow = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].tt);
+		std::uint32_t& invocationsHigh = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].value.b);
+		const std::uint32_t previousLow = invocationsLow++;
+		if (invocationsLow < previousLow) {
+			++invocationsHigh;
+		}
+		RunLuaCallGate(closure->c.f);
+
+		// luaB_next: lua_next over (state, control), then the nil it pushes at the end.
+		int produced = 2;
+		if (LuaNextFrom(table, index, key) == 0) {
+			key->tt = LUA_TNIL;
+			produced = 1;
+		}
+
+		// luaD_poscall.
+		StkId result = callBase;
+		StkId firstResult = callBase + 2;
+		StkId const top = firstResult + produced;
+		int wanted = nvar;
+		for (; wanted != 0 && firstResult < top; --wanted) {
+			*result++ = *firstResult++;
+		}
+		for (; wanted > 0; --wanted) {
+			(result++)->tt = LUA_TNIL;
+		}
+		L->top = result;
+
+		--L->nCcalls;
+		luaC_checkGC(L);
+		return true;
+	}
+
 	extern "C++"
 	{
 	/**
@@ -17545,7 +17680,19 @@ extern "C"
 				const TObject* const c = rkc();
 				int equal = 0;
 				if (b->tt == c->tt) {
-					equal = luaV_equalval(L, rkb(), rkc()) ? 1 : 0;
+					// luaV_equalval's answer for the tags that never reach __eq (lua_ThreadedDispatch).
+					const int tag = b->tt;
+					if (kThreaded && tag == LUA_TNUMBER) {
+						equal = (b->value.n == c->value.n) ? 1 : 0;
+					} else if (kThreaded && (tag == LUA_TNIL)) {
+						equal = 1;
+					} else if (kThreaded && tag == LUA_TBOOLEAN) {
+						equal = (b->value.b == c->value.b) ? 1 : 0;
+					} else if (kThreaded && tag == LUA_TSTRING) {
+						equal = (b->value.p == c->value.p) ? 1 : 0;
+					} else {
+						equal = luaV_equalval(L, rkb(), rkc()) ? 1 : 0;
+					}
 				}
 				if (equal == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
@@ -17556,7 +17703,9 @@ extern "C"
 			}
 
 			case kOpLt: op_Lt:
-				if (luaV_lessthan(L, rkb(), rkc()) == LuaGetArgA(i)) {
+				if ((kThreaded && rkb()->tt == LUA_TNUMBER && rkc()->tt == LUA_TNUMBER
+				       ? (rkc()->value.n > rkb()->value.n ? 1 : 0) // luaV_lessthan's number case (lua_ThreadedDispatch)
+				       : luaV_lessthan(L, rkb(), rkc())) == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
 				} else {
 					++pc;
@@ -17564,7 +17713,9 @@ extern "C"
 				break;
 
 			case kOpLe: op_Le:
-				if (luaV_lessequal(L, rkb(), rkc()) == LuaGetArgA(i)) {
+				if ((kThreaded && rkb()->tt == LUA_TNUMBER && rkc()->tt == LUA_TNUMBER
+				       ? (rkc()->value.n >= rkb()->value.n ? 1 : 0) // luaV_lessequal's number case (lua_ThreadedDispatch)
+				       : luaV_lessequal(L, rkb(), rkc())) == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
 				} else {
 					++pc;
@@ -17702,7 +17853,13 @@ extern "C"
 				callBase[1] = ra[1];
 				callBase[2] = ra[2];
 				L->top = callBase + 3; // iterator + state + control
-				(void)luaD_call(L, callBase, nvar);
+				bool calledInPlace = false;
+				if constexpr (kThreaded) {
+					calledInPlace = LuaInlineNextCall(L, callBase, nvar);
+				}
+				if (!calledInPlace) {
+					(void)luaD_call(L, callBase, nvar);
+				}
 
 				L->top = L->ci->top;
 				// the call may have moved the stack, so find the slots again
