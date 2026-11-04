@@ -8,6 +8,9 @@
 namespace moho
 {
   class CClientManagerImpl;
+  class CMessageStream;
+  class CMessageStream;
+  class CMessageStream;
   class CNetClient;
   struct CMessage;
 
@@ -25,7 +28,30 @@ namespace moho
     SkewCorrection = 1,
     /// net_FastRetransmit: this client acknowledges within net_FastAckDelay.
     FastAck = 2,
+    /// Announced in the lobby: this client can prove a style (LobbyPeerFeatures.h).
+    SignedStyle = 3,
   };
+
+  /// The first payload byte of a peer features message; other values are feature traffic.
+  inline constexpr std::uint8_t kPeerKindAnnounce = 0;
+
+  /// What one announcement says, in the game and in the lobby alike.
+  struct SPeerAnnouncement
+  {
+    std::uint64_t mask{0};
+    std::string build;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t PeerFeatureBit(const EPeerFeature feature) noexcept
+  {
+    return std::uint64_t{1} << static_cast<std::uint8_t>(feature);
+  }
+
+  /// Writes the announcement payload, with this build's name.
+  void WritePeerAnnouncement(CMessageStream& stream, std::uint64_t mask);
+
+  /// False when the payload is not an announcement.
+  [[nodiscard]] bool ReadPeerAnnouncement(const char* payload, std::size_t size, SPeerAnnouncement& out);
 
   /**
    * Engine addition, not in the binary (issue #285): this client's announcement
@@ -65,8 +91,7 @@ namespace moho
     struct SPeer
     {
       bool announced{false};
-      std::uint64_t mask{0};
-      std::string build;
+      SPeerAnnouncement announcement;
       std::int64_t readyUs{0};
     };
     std::vector<SPeer> mPeers;

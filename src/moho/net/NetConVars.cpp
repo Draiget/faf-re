@@ -31,6 +31,8 @@ namespace moho
   int32_t net_CheckOrderStreams = 1;
   // Read as a game finishes loading (issue #285).
   int32_t net_PeerFeatures = 0;
+  // Read as a lobby link is established and for each message on it.
+  int32_t net_LobbyPeerFeatures = 1;
   int32_t net_DebugAlterOrdersTo = -1;
   // Read when a game's UDP socket is made (NET_MakeUDPConnector); 0 keeps the
   // system's buffer size, as the binary does (issue #236).
@@ -172,6 +174,13 @@ namespace moho
       "1: tell every other player what this engine supports as the game finishes loading (docs/PEER_FEATURES.md); "
       "0 (default): send nothing, as the original game. Next game.",
       &net_PeerFeatures
+    );
+
+    TConVar<int32_t> gTConVar_net_LobbyPeerFeatures(
+      "net_LobbyPeerFeatures",
+      "1 (default): tell every other player in the lobby what this engine supports (docs/PEER_FEATURES.md); "
+      "0: send nothing and ignore theirs, as the original game. Next lobby link.",
+      &net_LobbyPeerFeatures
     );
 
     TConVar<int32_t> gTConVar_net_CheckOrderStreams(

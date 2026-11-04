@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 #include "Common.h"
 #include "gpg/core/containers/String.h"
@@ -22,6 +23,7 @@ namespace moho
   class CScrLuaInitForm;
   struct SSTICommandSource;
 
+  class CLobbyPeerFeatures;
   class INetConnector;
   class INetConnection;
 
@@ -129,6 +131,11 @@ namespace moho
      * Address: 0x007C6EE0
      */
     void OnScriptData(CMessage* message, INetConnection* connection);
+
+    /**
+     * Engine addition, not in the binary: takes a peer's `LOBMSG_PeerFeatures`.
+     */
+    void OnPeerFeatures(CMessage* message, INetConnection* connection);
 
     /**
      * Address: 0x007C5B60
@@ -351,8 +358,12 @@ namespace moho
     int32_t mNextId{0};                          // 0xBC
     msvc8::auto_ptr<INetDatagramSocket> mSocket; // 0xC0
     int32_t hostedTime{0};                       // 0xC4
+
+    // Engine addition, not in the binary: who in the lobby runs our engine.
+    std::unique_ptr<CLobbyPeerFeatures> mPeerFeatures;
   };
-  static_assert(sizeof(CLobby) == 0xC8, "CLobby size must be 0xC8");
+  // 0xC8 in the binary, plus the engine's mPeerFeatures, 4 bytes.
+  static_assert(sizeof(CLobby) == 0xCC, "CLobby size must be 0xCC");
 
   /**
    * Engine addition (issue #215): whether a lobby object exists, i.e. the lobby
@@ -583,6 +594,13 @@ namespace moho
    * Address: 0x007C2CE0 (FUN_007C2CE0, cfunc_CLobbyGetPeerL)
    */
   int cfunc_CLobbyGetPeerL(LuaPlus::LuaState* state);
+
+  /**
+   * Engine addition, not in the binary: `CLobby:GetPeerStyle(uid)`.
+   */
+  int cfunc_CLobbyGetPeerStyle(lua_State* luaContext);
+  CScrLuaInitForm* func_CLobbyGetPeerStyle_LuaFuncDef();
+  int cfunc_CLobbyGetPeerStyleL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007C2DF0 (FUN_007C2DF0, cfunc_CLobbyGetLocalPlayerName)

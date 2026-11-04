@@ -982,6 +982,7 @@ set(FAF_ENGINE_SOURCES
   moho/net/CNetUDPConnector.cpp
   moho/net/CDiscoveryService.cpp
   moho/net/CLobbyTypeInfo.cpp
+  moho/net/LobbyPeerFeatures.cpp
   moho/mesh/ShaderDictionary.cpp
   moho/mesh/MeshResource.cpp
   moho/mesh/SpatialDb.cpp

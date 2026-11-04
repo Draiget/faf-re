@@ -33,6 +33,7 @@
 #include "INetDatagramSocket.h"
 #include "INetNATTraversalProviderWeakPtrReflection.h"
 #include "legacy/containers/Set.h"
+#include "LobbyPeerFeatures.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
@@ -118,6 +119,7 @@ namespace
   constexpr const char* kCLobbyBroadcastDataHelp = "void CLobby.BradcastData(self,table)";
   constexpr const char* kCLobbyGetPeersHelp = "table CLobby.GetPeers(self)";
   constexpr const char* kCLobbyGetPeerHelp = "table CLobby.GetPeer(self,uid)";
+  constexpr const char* kCLobbyGetPeerStyleHelp = "string-or-nil CLobby.GetPeerStyle(self,uid)";
   constexpr const char* kCLobbyGetLocalPlayerNameHelp = "string CLobby.GetLocalPlayerName(self)";
   constexpr const char* kCLobbyGetLocalPlayerIdHelp = "int CLobby.GetLocalPlayerID(self)";
   constexpr const char* kCLobbyIsHostHelp = "bool CLobby.IsHost(self)";
@@ -524,6 +526,7 @@ CLobby::CLobby(
   , maxConnections(maxConnectionsArg)
   , mHasNAT(hasNAT)
   , localUid(localUidArg)
+  , mPeerFeatures(std::make_unique<CLobbyPeerFeatures>())
 {
   if (localUidArg != -1) {
     gpg::Logf("LOBBY: starting with local uid of %d [%s]", localUidArg, playerName);
@@ -660,6 +663,9 @@ void CLobby::ReceiveMessage(
     case ELobbyMsg::LOBMSG_BroadcastScriptData:
     case ELobbyMsg::LOBMSG_DirectScriptData:
       OnScriptData(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_PeerFeatures:
+      OnPeerFeatures(message, connection);
       break;
     case ELobbyMsg::LOBMSG_ConnFailed:
       OnConnectionFailed(message, connection);
@@ -830,6 +836,7 @@ void CLobby::OnJoin(
     acceptStream.Write(hostedTime);
   }
   connection->Write(accept);
+  mPeerFeatures->PeerEstablished(*player);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -932,6 +939,8 @@ void CLobby::OnWelcome(
 
     ProcessConnectionToHostEstablished(&pLocal, &pName, &pHost);
   }
+
+  mPeerFeatures->PeerEstablished(*peer);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -1100,6 +1109,29 @@ void CLobby::OnScriptData(
   }
 
   LuaCall("DataReceived", &script);
+}
+
+/**
+ * Engine addition, not in the binary. Each side announces once its link is
+ * established, so both uids are settled by the time anything is signed.
+ */
+void CLobby::OnPeerFeatures(
+  CMessage* message,
+  INetConnection* connection
+)
+{
+  const SPeer* const peer = FindPeerByConnection(connection);
+  if (peer == nullptr || peer->state != ENetworkPlayerState::kEstablished) {
+    LogDroppedLobbyMessage("LOBBY: ignoring peer features from conn=%p.", connection);
+    return;
+  }
+
+  if (mPeerFeatures->Receive(*peer, localUid, *message)) {
+    char uidBuf[kPlayerUidBufSize]{};
+    std::to_chars(uidBuf, uidBuf + kPlayerUidBufSize, peer->uid);
+    const char* const uid = uidBuf;
+    (void)RunScript("PeerStyleChanged", uid);
+  }
 }
 
 /**
@@ -2187,6 +2219,64 @@ int moho::cfunc_CLobbyGetPeerL(
 
   LuaPlus::LuaObject peerObject = LookupPeerByUidAsLua(uid, lobby, state);
   peerObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Engine addition, not in the binary.
+ */
+int moho::cfunc_CLobbyGetPeerStyle(
+  lua_State* const luaContext
+)
+{
+  return cfunc_CLobbyGetPeerStyleL(luaContext ? luaContext->stateUserData : nullptr);
+}
+
+/**
+ * Engine addition, not in the binary.
+ */
+moho::CScrLuaInitForm* moho::func_CLobbyGetPeerStyle_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetPeerStyle",
+    &moho::cfunc_CLobbyGetPeerStyle,
+    &CScrLuaMetatableFactory<CLobby>::Instance(),
+    "CLobby",
+    kCLobbyGetPeerStyleHelp
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition, not in the binary: "rrggbb" for a player with a proven
+ * style, nil for anyone else.
+ */
+int moho::cfunc_CLobbyGetPeerStyleL(
+  LuaPlus::LuaState* const state
+)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetPeerStyleHelp, 2, argumentCount);
+  }
+
+  LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
+  const CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
+
+  LuaPlus::LuaStackObject uidArg(state, 2);
+  const char* const uidText = lua_tostring(state->m_state, 2);
+  if (uidText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&uidArg, "string");
+  }
+
+  const std::string style = lobby->mPeerFeatures->StyleOf(std::atoi(uidText ? uidText : ""), lobby->localUid);
+  if (style.empty()) {
+    lua_pushnil(state->m_state);
+  } else {
+    lua_pushstring(state->m_state, style.c_str());
+  }
+  (void)lua_gettop(state->m_state);
   return 1;
 }
 
@@ -3492,6 +3582,7 @@ namespace
       (void)::moho::func_CLobbySendData_LuaFuncDef();
       (void)::moho::func_CLobbyGetPeers_LuaFuncDef();
       (void)::moho::func_CLobbyGetPeer_LuaFuncDef();
+      (void)::moho::func_CLobbyGetPeerStyle_LuaFuncDef();
       (void)::moho::func_CLobbyGetLocalPlayerName_LuaFuncDef();
       (void)::moho::func_CLobbyGetLocalPlayerID_LuaFuncDef();
       (void)::moho::func_CLobbyIsHost_LuaFuncDef();
