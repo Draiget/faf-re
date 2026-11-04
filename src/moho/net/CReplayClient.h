@@ -101,6 +101,12 @@ namespace moho
      */
     void SkipBeats(std::int32_t beats);
 
+    /**
+     * Engine addition: Rewinds the replay stream to its initial position (beat 0)
+     * and resets internal packet queue states.
+     */
+    void RewindToStart();
+
   private:
     /**
      * Address: 0x0053D240 (FUN_0053D240)
@@ -129,6 +135,8 @@ namespace moho
     bool mReplayPollRequested{false};        // 0x15C
     bool mReplayThreadStopRequested{false};  // 0x15D
     std::uint8_t mReserved15E[2]{};          // 0x15E
+    /// Engine addition: initial stream position before beat 1
+    std::uint64_t mInitialStreamPosition{0};
   };
 
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)

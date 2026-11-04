@@ -609,6 +609,11 @@ namespace moho
      * source is not evidence about this client's game. Takes `mLock`.
      */
     [[nodiscard]] bool OrdersAlteredFrom(CommandSourceId source);
+
+    /**
+     * Engine addition: Rewinds client manager and all replay clients to beat 0.
+     */
+    void RewindToStart();
   };
 
   static_assert(offsetof(CClientManagerImpl, mLock) == 0x40C, "CClientManagerImpl::mLock offset must be 0x40C");

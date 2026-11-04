@@ -1441,3 +1441,31 @@ void CClientManagerImpl::Disconnect()
   CMessage message{ECmdStreamOp::CMDST_EndGame};
   ProcessClients(message);
 }
+void CClientManagerImpl::RewindToStart()
+{
+  std::scoped_lock lock(mLock);
+  mDispatchedBeat = 0;
+  mAvailableBeat = 0;
+  mFullyQueuedBeat = 0;
+  mPartiallyQueuedBeat = 0;
+  mLastEmittedCommandSource = 0xFF;
+  mStream.Clear();
+  for (CClientBase* client : mClients) {
+    if (client != nullptr) {
+      if (auto* const replayClient = dynamic_cast<CReplayClient*>(client)) {
+        replayClient->RewindToStart();
+      } else {
+        client->mQueuedBeat = 0;
+        client->mDispatchedBeat = 0;
+        client->mAvailableBeatRemote = 0;
+        client->mLatestBeatDispatchedRemote = 0;
+        client->mPipe.Clear();
+        client->mLatestAckReceived.assign(client->mLatestAckReceived.size(), 0);
+        client->mCommandSourceId = 0xFFu;
+        client->mEjectPending = false;
+        client->mReady = true;
+      }
+    }
+  }
+}
+

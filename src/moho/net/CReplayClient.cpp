@@ -81,6 +81,9 @@ CReplayClient::CReplayClient(CClientManagerImpl* const manager, BVIntSet& comman
   : CClientBase(0, manager, "Replay", -1, commandSources, 0xFFu)
   , mReplayStream(replayStream)
 {
+  if (mReplayStream != nullptr) {
+    mInitialStreamPosition = mReplayStream->VirtTell(gpg::Stream::ModeReceive);
+  }
   replayStream = nullptr;
 }
 
@@ -256,9 +259,7 @@ void CReplayClient::Start()
   }
 
   if (mReplayStream->mReadHead == mReplayStream->mReadEnd && mReplayStream->VirtAtEnd()) {
-    delete mReplayStream;
-    mReplayStream = nullptr;
-
+    // Keep mReplayStream alive so rewinding remains possible after EOF
     CMessage endGameMessage(ECmdStreamOp::CMDST_EndGame);
     CClientBase::Process(endGameMessage);
 
@@ -279,6 +280,33 @@ void CReplayClient::Start()
 
   mReplayPollRequested = true;
   mReplayWorkerCondition.notify_all();
+}
+
+void CReplayClient::RewindToStart()
+{
+  std::scoped_lock lock(mManager->mLock);
+
+  if (mReplayStream != nullptr) {
+    mReplayStream->VirtSeek(
+      gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::int64_t>(mInitialStreamPosition)
+    );
+  }
+
+  mReplayMessage.Clear();
+  mPipe.Clear();
+
+  mQueuedBeat = 0;
+  mDispatchedBeat = 0;
+  mReplayBeat = 0;
+  mAvailableBeatRemote = 0;
+  mLatestBeatDispatchedRemote = 0;
+  mReplayPollRequested = false;
+  mCurrentSourceAllowed = false;
+  mCommandSourceId = 0xFFu;
+  mEjectPending = false;
+  mReady = true;
+
+  Start();
 }
 
 void CReplayClient::SkipBeats(const std::int32_t beats)

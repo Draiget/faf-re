@@ -107,6 +107,8 @@ namespace gpg
 		 */
 		bool Empty();
 
+		void Clear();
+
 		/**
 		 * Address: 0x009566C0 (FUN_009566C0)
 		 *

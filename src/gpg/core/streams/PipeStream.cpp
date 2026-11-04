@@ -52,6 +52,24 @@ PipeStream::~PipeStream()
     }
 }
 
+void PipeStream::Clear()
+{
+    boost::mutex::scoped_lock lock(mLock);
+    while (!mBuff.empty()) {
+        delete mBuff.pop_front();
+    }
+    auto* const first = new PipeStreamBuffer{};
+    mBuff.push_back(first);
+
+    mReadEnd = first->begin();
+    mReadHead = first->begin();
+    mReadStart = first->begin();
+    mWriteHead = first->begin();
+    mWriteStart = first->begin();
+    mWriteEnd = first->end();
+    mClosed = false;
+}
+
 /**
  * Address: 0x00956A50 (FUN_00956A50)
  *
