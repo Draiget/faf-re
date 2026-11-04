@@ -1,8 +1,8 @@
 # Retail replay parity
 
-Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; counting the fixes made since, 12,783 (97.2 %), worked out rather than measured. Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 3 % fail on retail too, 30 % come from our bugs, all fixed, and none is left unexplained.
+Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; counting the fixes made since, 12,783 (97.2 %), worked out rather than measured. Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 3 % fail on retail too, 30 % come from our bugs, all fixed, and none is left unexplained. Over all three CI runs, 16,667 of 17,077 replays with a verdict (97.60 %) pass and none of the 315 desyncs is unexplained.
 
-*Snapshot: 03/11/2026.*
+*Snapshot: 04/11/2026.*
 
 ## Current result
 
@@ -44,6 +44,35 @@ The same run by player count and game length, before the fixes:
 </picture>
 
 48 of the 50 desyncs at 4 players are on survival_horde_ee, survival_horde_ee_ba, survival_cybran_wrath and survival_horde, maps named under maps and content above. In games of 90 minutes or more, 15 of the 20 runner failures are timeouts, where the job's time ran out. `tools/parity-data/chart.py` draws these charts from the run's report.
+
+### All three CI runs
+
+Two more runs of the same workflow added replays the first did not reach: 41204776548 (31/10/2026, commit `75d34ffad`) with 2,536 passes and 61 desyncs, and 41281894679 (01/11/2026, commit `662a68129`) with 1,417 passes and 23 desyncs, on top of the first run's rows. Taking each replay once, with its best verdict from any run:
+
+| Result | Replays | Share of those with a verdict |
+|---|---|---|
+| **Pass** | **16,667** | **97.60 %** |
+| Desync | 315 | 1.84 % |
+| Timeout only | 74 | 0.43 % |
+| Crash only | 21 | 0.12 % |
+
+No replay has both a pass and a desync. Of the 43,091 listed, the other 26,014 have no verdict: 13,079 are unsupported (sim mods or another game version) and 12,935 were never played, because their job was cancelled or ran out of time, apart from a few whose map could not be fetched.
+
+The 315 desyncs by cause, as of master `019418f30` (04/11/2026):
+
+| Cause | Desyncs | Share of desyncs | Share with a verdict | Engine bug? |
+|---|---|---|---|---|
+| Pass on a later build | 143 | 45.4 % | 0.84 % | fixed, see below |
+| Maps and content | 122 | 38.7 % | 0.71 % | no |
+| Live game split | 44 | 14.0 % | 0.26 % | no |
+| Retail fails there too | 6 | 1.9 % | 0.04 % | no |
+| Not explained yet | 0 | 0 % | 0 % | none left |
+
+Counting the 143, 16,810 of 17,077 (98.44 %) would pass. This is worked out: no full CI run has played current master.
+
+- **The first run's 231** are split in the section above. The other 84 were each played to the end, x64 headless, 74 on a build of `ba75dddf6` and 10 on `019418f30`.
+- **Pass on a later build (74 of the 84).** One has a known cause: 26939667 mismatched from beat 23,300 until `019418f30`, where a factory treats a NaN income as the binary does, and now plays all 61,281 beats with no mismatch. For the other 73 the fixing commit is not identified: they failed on the older builds and pass now.
+- **Live game split (10 of the 84).** 26966538, 27001813, 26957395, 26893319, 26882046, 26928693, 26926930, 26925023, 26941574 and 26945410. Every mismatch is at a beat where the players recorded different checksums, and ours equals one player's. No build can match both sides of a recording, so most of these were not played on retail; 27001813 and 26957395 were and give the same result as ours. Two limits: in 26926930 the replay ends at the game-over packet on the side ours follows, so 21 split beats after it are not compared, and in 26925023 the last checksum, beat 32,150, comes only from the player on the other side.
 
 ### Local run, 28–29/10/2026
 
