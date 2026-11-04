@@ -166,6 +166,8 @@ namespace gpg::gal
 
     [[nodiscard]] std::uint8_t* Lock(std::uint32_t offset, std::uint32_t size, MohoD3DLockFlags flags);
     void Unlock();
+    /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
+    void ReleaseCopy() noexcept;
 
     /** The address draws read from, ready for reading. */
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);

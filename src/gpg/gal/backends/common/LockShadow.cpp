@@ -10,6 +10,12 @@
 #include <cstring>
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/PlacedResources.h"
+
+namespace gpg::gal
+{
+  bool gReleaseBufferCopies = true;
+} // namespace gpg::gal
 
 namespace gpg::gal::backend
 {
@@ -98,6 +104,13 @@ namespace gpg::gal::backend
     mBytes.assign(static_cast<std::size_t>(byteWidth) + kGuardBytes, 0U);
     Account(previous);
     Arm(byteWidth);
+  }
+
+  void LockShadow::Release() noexcept
+  {
+    const std::size_t previous = mBytes.capacity();
+    std::vector<std::uint8_t>().swap(mBytes);
+    Account(previous);
   }
 
   void LockShadow::Arm(const std::size_t from)

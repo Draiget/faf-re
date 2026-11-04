@@ -44,6 +44,14 @@ namespace moho
       &gpg::gal::gSharedBuffers
     );
 
+    /** Engine addition: `ren_ReleaseBufferCopies` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_ReleaseBufferCopies(
+      "ren_ReleaseBufferCopies",
+      "Direct3D 12 / Vulkan: free the CPU copy of a static buffer its owner won't lock again, such as a mesh's (1, the "
+      "default), or keep every copy (0). Read when the owner releases it.",
+      &gpg::gal::gReleaseBufferCopies
+    );
+
     /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */
     TConVar<int> gTConVar_d3d_UploadIdleMB(
       "d3d_UploadIdleMB",

@@ -27,4 +27,10 @@ namespace gpg::gal
    * needs `d3d_PlacedResources`.
    */
   extern bool gSharedBuffers;
+
+  /**
+   * Engine addition: Direct3D 12 and Vulkan free the CPU copy of a static buffer its owner says it
+   * won't lock again (Device::ReleaseBufferCopy). Console variable `ren_ReleaseBufferCopies` (moho).
+   */
+  extern bool gReleaseBufferCopies;
 } // namespace gpg::gal

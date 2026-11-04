@@ -6,7 +6,9 @@
 #include <cstring>
 
 #include "DeviceVulkan.h"
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DrawStatistics.h"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
@@ -294,7 +296,20 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
+    if (mShadow.Released()) {
+      if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
+        gpg::Warnf("gal: %s read lock after its CPU copy was released reads zeros", mKind);
+      }
+      mShadow.Reset(mByteWidth);
+    }
     return mShadow.Map(offset, size, mKind);
+  }
+
+  void BufferStorageVulkan::ReleaseCopy() noexcept
+  {
+    if (gReleaseBufferCopies && !mDynamic && !mLocked) {
+      mShadow.Release();
+    }
   }
 
   void BufferStorageVulkan::Unlock()
