@@ -121,19 +121,7 @@ namespace moho
    */
   void CArmyImplTypeInfo::AddBase_SimArmy(gpg::RType* const typeInfo)
   {
-    gpg::RType* baseType = SimArmy::sType;
-    if (!baseType) {
-      baseType = gpg::LookupRType(typeid(SimArmy));
-      SimArmy::sType = baseType;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<SimArmy>(typeInfo);
   }
 
   /**

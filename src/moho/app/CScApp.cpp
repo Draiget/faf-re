@@ -184,11 +184,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
   /**
@@ -1028,6 +1024,20 @@ namespace
     "Network sessions: 1 applies wld_FrameClock, 0 keeps the original median frame time.",
     &wld_FrameClockNetwork
   );
+
+  /**
+   * Engine addition: when the clock follows real time, it starts its window afresh once the
+   * session's first tick is on screen. Otherwise the long first frame of play stays in the mean and
+   * the clock repays it by rushing the next ticks out a few milliseconds apart.
+   */
+  int wld_FrameClockOpening = 1;
+
+  moho::TConVar<int> gTConVar_wld_FrameClockOpening(
+    "wld_FrameClockOpening",
+    "1 drops the long first frame of play from the mean frame clock once the first tick is shown; 0 keeps it, and the "
+    "clock rushes the next ticks to repay it.",
+    &wld_FrameClockOpening
+  );
 } // namespace
 
 /**
@@ -1246,6 +1256,15 @@ void CScApp::Main()
   }
 
   gpg::diag::FrameSamplerMark(); // debugging aid, off unless FAF_FRAME_SAMPLER is set
+  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
+  // wld_FrameClockNetwork. With wld_FrameClockOpening it then drops the session's opening frames (its
+  // long first frame of play) from the window once its first tick is on screen; the median ignores
+  // one long frame, so the original clock keeps its window.
+  const bool realTimeClock = fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
+    (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0);
+  if (moho::WLD_TakeFrameClockReset() && realTimeClock && wld_FrameClockOpening != 0) {
+    framerates.Reset();
+  }
   (void)framerates.Push(frameSeconds);
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.
@@ -1254,10 +1273,7 @@ void CScApp::Main()
   moho::DISK_UpdateWatcher();
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
-  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
-  // wld_FrameClockNetwork.
-  if (fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
-      (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0)) {
+  if (realTimeClock) {
     smoothedFrameSeconds = wld_FrameClock == 2 ? frameSeconds : framerates.Mean();
   }
   if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {

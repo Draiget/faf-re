@@ -25,12 +25,8 @@ using namespace moho;
 
 namespace
 {
-  gpg::RType* gUnitType = nullptr;
-  gpg::RType* gUnitWeaponType = nullptr;
   gpg::RType* gCEconRequestType = nullptr;
   gpg::RType* gSEconValueType = nullptr;
-  gpg::RType* gESiloBuildStageType = nullptr;
-  gpg::RType* gESiloTypeListType = nullptr;
 
   constexpr float kSiloMinimumBuildRate = 0.1f;
   constexpr std::uint64_t kSiloBuildingStateMask = (1ull << static_cast<std::uint32_t>(UNITSTATE_SiloBuildingAmmo));
@@ -52,50 +48,10 @@ namespace
     info->mMaxStorageCount = 0;
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCAiSiloBuildImplType()
-  {
-    if (!CAiSiloBuildImpl::sType) {
-      CAiSiloBuildImpl::sType = gpg::LookupRType(typeid(CAiSiloBuildImpl));
-    }
-    return CAiSiloBuildImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSSiloBuildInfoType()
-  {
-    if (!SSiloBuildInfo::sType) {
-      SSiloBuildInfo::sType = gpg::LookupRType(typeid(SSiloBuildInfo));
-    }
-    return SSiloBuildInfo::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveESiloTypeListType()
-  {
-    return CachedType<SSiloTypeList>(gESiloTypeListType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveUnitType()
-  {
-    return CachedType<Unit>(gUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveUnitWeaponType()
-  {
-    return CachedType<UnitWeapon>(gUnitWeaponType);
-  }
-
   [[nodiscard]] gpg::RType* ResolveCEconRequestType()
   {
     if (!CEconRequest::sType) {
-      CEconRequest::sType = CachedType<CEconRequest>(gCEconRequestType);
+      CEconRequest::sType = gpg::CachedLookup<CEconRequest>(gCEconRequestType);
     }
     return CEconRequest::sType;
   }
@@ -103,64 +59,11 @@ namespace
   [[nodiscard]] gpg::RType* ResolveSEconValueType()
   {
     if (!SEconValue::sType) {
-      SEconValue::sType = CachedType<SEconValue>(gSEconValueType);
+      SEconValue::sType = gpg::CachedLookup<SEconValue>(gSEconValueType);
     }
     return SEconValue::sType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveESiloBuildStageType()
-  {
-    return CachedType<ESiloBuildStage>(gESiloBuildStageType);
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType ? dynamicType : staticType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] TObject* ReadPointerWithType(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    // The binary reads these owned pointers via typed readers (ReadPointerOwned_*)
-    // that assign the loaded pointer without an upcast type-check or throw -- a
-    // type mismatch simply yields a null field, it does not abort the load.
-    return static_cast<TObject*>(upcast.mObj);
-  }
 
   template <typename TObject>
   void WritePointerWithType(
@@ -171,7 +74,7 @@ namespace
     const gpg::RRef& owner
   )
   {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    const gpg::RRef objectRef = gpg::MakeDerivedRef(object, staticType);
     gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
@@ -270,7 +173,7 @@ void SSiloBuildInfo::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef owner{};
-  mWeapon = ReadPointerWithType<UnitWeapon>(archive, owner, ResolveUnitWeaponType());
+  mWeapon = gpg::ReadPointerAs<UnitWeapon>(archive, owner, gpg::RTypeOf<UnitWeapon>());
   archive->ReadInt(&mAmmo);
   archive->ReadInt(&mMaxStorageCount);
 }
@@ -285,7 +188,7 @@ void SSiloBuildInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   const gpg::RRef owner{};
-  WritePointerWithType(archive, mWeapon, ResolveUnitWeaponType(), gpg::TrackedPointerState::Unowned, owner);
+  WritePointerWithType(archive, mWeapon, gpg::RTypeOf<UnitWeapon>(), gpg::TrackedPointerState::Unowned, owner);
   archive->WriteInt(mAmmo);
   archive->WriteInt(mMaxStorageCount);
 }
@@ -350,15 +253,15 @@ void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef owner{};
-  mUnit = ReadPointerWithType<Unit>(archive, owner, ResolveUnitType());
+  mUnit = gpg::ReadPointerAs<Unit>(archive, owner, gpg::RTypeOf<Unit>());
 
   for (std::size_t index = 0; index < 2; ++index) {
-    gpg::RType* const siloInfoType = ResolveSSiloBuildInfoType();
+    gpg::RType* const siloInfoType = gpg::RTypeOf<SSiloBuildInfo>();
     GPG_ASSERT(siloInfoType != nullptr);
     archive->Read(siloInfoType, &mSiloInfo[index], owner);
   }
 
-  gpg::RType* const siloListType = ResolveESiloTypeListType();
+  gpg::RType* const siloListType = gpg::RTypeOf<SSiloTypeList>();
   GPG_ASSERT(siloListType != nullptr);
   archive->Read(siloListType, &mSiloTypes, owner);
 
@@ -367,7 +270,7 @@ void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadPointerOwned(&loadedRequest, &owner);
   ReplaceEconomyRequestPointer(mRequest, loadedRequest);
 
-  gpg::RType* const stateType = ResolveESiloBuildStageType();
+  gpg::RType* const stateType = gpg::RTypeOf<ESiloBuildStage>();
   GPG_ASSERT(stateType != nullptr);
   archive->Read(stateType, &mState, owner);
 
@@ -393,21 +296,21 @@ void CAiSiloBuildImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   const gpg::RRef owner{};
-  WritePointerWithType(archive, mUnit, ResolveUnitType(), gpg::TrackedPointerState::Unowned, owner);
+  WritePointerWithType(archive, mUnit, gpg::RTypeOf<Unit>(), gpg::TrackedPointerState::Unowned, owner);
 
   for (std::size_t index = 0; index < 2; ++index) {
-    gpg::RType* const siloInfoType = ResolveSSiloBuildInfoType();
+    gpg::RType* const siloInfoType = gpg::RTypeOf<SSiloBuildInfo>();
     GPG_ASSERT(siloInfoType != nullptr);
     archive->Write(siloInfoType, &mSiloInfo[index], owner);
   }
 
-  gpg::RType* const siloListType = ResolveESiloTypeListType();
+  gpg::RType* const siloListType = gpg::RTypeOf<SSiloTypeList>();
   GPG_ASSERT(siloListType != nullptr);
   archive->Write(siloListType, &mSiloTypes, owner);
 
   WritePointerWithType(archive, mRequest, ResolveCEconRequestType(), gpg::TrackedPointerState::Owned, owner);
 
-  gpg::RType* const stateType = ResolveESiloBuildStageType();
+  gpg::RType* const stateType = gpg::RTypeOf<ESiloBuildStage>();
   GPG_ASSERT(stateType != nullptr);
   archive->Write(stateType, &mState, owner);
 

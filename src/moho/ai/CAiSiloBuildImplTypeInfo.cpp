@@ -97,13 +97,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAiSiloBuildType()
-  {
-    if (!IAiSiloBuild::sType) {
-      IAiSiloBuild::sType = gpg::LookupRType(typeid(IAiSiloBuild));
-    }
-    return IAiSiloBuild::sType;
-  }
 } // namespace
 
 /**
@@ -150,7 +143,7 @@ const char* CAiSiloBuildImplTypeInfo::GetName() const
  */
 void CAiSiloBuildImplTypeInfo::AddBase_IAiSiloBuild(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedIAiSiloBuildType(), 0);
+  gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiSiloBuild>(), 0);
 }
 
 /**

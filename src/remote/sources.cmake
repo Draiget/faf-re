@@ -15,11 +15,13 @@ set(FAF_REMOTE_SOURCES
   remote/BeatChangeSet.cpp
   remote/ViewPackets.cpp
   remote/ViewFrames.cpp
+  remote/SyncRouting.cpp
   remote/ViewIdMap.cpp
   remote/InboundIds.cpp
   remote/FrameWindow.cpp
   remote/ArmyRecords.cpp
   remote/wire/ArmyLane.cpp
+  remote/wire/LuaSyncLane.cpp
   remote/wire/BitStream.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/IntelGridDelta.cpp

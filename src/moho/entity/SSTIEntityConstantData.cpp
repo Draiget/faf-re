@@ -33,21 +33,6 @@ namespace
   };
 
   /**
-   * Element-type reflection cache for `SSTIEntityConstantData` itself, mirroring
-   * the `Cached<Type>Type()`/`Resolve<Type>Type()` helpers used throughout this
-   * codebase for the same lazy-resolve-and-cache need (e.g. `CachedShieldType`
-   * in Shield.cpp).
-   */
-  [[nodiscard]] gpg::RType* CachedSSTIEntityConstantDataType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::SSTIEntityConstantData));
-    }
-    return sType;
-  }
-
-  /**
    * VFTABLE: matches every other `SerSaveLoadHelper<T>` payload in this
    * codebase (vtable + `moho::TDatListItem` link pair + load/save callback
    * lanes = 0x14 bytes total).
@@ -88,7 +73,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = CachedSSTIEntityConstantDataType();
+      gpg::RType* const type = gpg::RTypeOf<moho::SSTIEntityConstantData>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;

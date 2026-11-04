@@ -34,6 +34,7 @@
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/IntelGridDelta.h"
+#include "remote/wire/LuaSyncLane.h"
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
@@ -1022,6 +1023,36 @@ namespace
       CHECK(std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
       CHECK(held == now);
     }
+  }
+
+  void TestLuaSyncLane()
+  {
+    const std::vector<std::uint8_t> table = {4u, 1u, 'a', 0u, 3u, 1u, 5u};
+    const std::vector<std::string> prints = {"first line", "", "third"};
+    BitWriter writer;
+    writer.WriteBits(5u, 3); // not on a byte edge
+    CHECK(EncodeLuaSyncLane(table, prints, writer));
+    BitReader reader(writer.Bytes());
+    CHECK(reader.ReadBits(3) == 5u);
+    std::vector<std::uint8_t> decodedTable;
+    std::vector<std::string> decodedPrints;
+    CHECK(DecodeLuaSyncLane(reader, decodedTable, decodedPrints));
+    CHECK(decodedTable == table);
+    CHECK(decodedPrints == prints);
+
+    // A size past what's there fails the reader and allocates nothing for it.
+    BitWriter hostile;
+    hostile.WriteVarUint(kMaxLuaSyncBytes);
+    BitReader hostileReader(hostile.Bytes());
+    std::vector<std::uint8_t> hostileTable;
+    std::vector<std::string> hostilePrints;
+    CHECK(!DecodeLuaSyncLane(hostileReader, hostileTable, hostilePrints));
+    CHECK(hostileTable.empty());
+    CHECK(!hostileReader.Ok());
+
+    BitWriter tooLong;
+    const std::vector<std::string> longLine = {std::string(kMaxLuaSyncLineBytes + 1u, 'x')};
+    CHECK(!EncodeLuaSyncLane({}, longLine, tooLong));
   }
 
   void TestBitWriterAppend()
@@ -2401,6 +2432,7 @@ namespace
     {"frame: appearance block", &TestFrameAppearance},
     {"frame: blip update hash", &TestBlipUpdateHash},
     {"grid lane: slots encoded apart", &TestBitWriterAppend},
+    {"lua lane: round trip and limits", &TestLuaSyncLane},
     {"grid lane: delta in place", &TestGridDeltaInPlace},
   };
 } // namespace

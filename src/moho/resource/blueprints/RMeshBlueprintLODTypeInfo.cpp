@@ -44,15 +44,6 @@ namespace
 
   static_assert(sizeof(VectorTypeInfo) == 0x68, "VectorTypeInfo size must be 0x68");
 
-  [[nodiscard]] gpg::RType* CachedRMeshBlueprintLODType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RMeshBlueprintLOD));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x0051A400 (FUN_0051A400)
    *
@@ -87,7 +78,7 @@ namespace
   {
     static msvc8::string cachedName{};
     if (cachedName.empty()) {
-      const gpg::RType* const elementType = CachedRMeshBlueprintLODType();
+      const gpg::RType* const elementType = gpg::RTypeOf<moho::RMeshBlueprintLOD>();
       const char* const elementName = elementType ? elementType->GetName() : "RMeshBlueprintLOD";
       cachedName = gpg::STR_Printf("vector<%s>", elementName);
     }
@@ -171,7 +162,7 @@ namespace
     LODVector loaded{};
     (void)EnsureMeshBlueprintLodVectorCapacity(loaded, count);
 
-    gpg::RType* const elementType = CachedRMeshBlueprintLODType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::RMeshBlueprintLOD>();
     GPG_ASSERT(elementType != nullptr);
     if (!elementType) {
       *storage = loaded;
@@ -229,7 +220,7 @@ namespace
       return;
     }
 
-    gpg::RType* const elementType = CachedRMeshBlueprintLODType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::RMeshBlueprintLOD>();
     GPG_ASSERT(elementType != nullptr);
     if (!elementType) {
       return;
@@ -244,7 +235,7 @@ namespace
   gpg::RRef VectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = CachedRMeshBlueprintLODType();
+    out.mType = gpg::RTypeOf<moho::RMeshBlueprintLOD>();
     out.mObj = nullptr;
 
     auto* const storage = static_cast<LODVector*>(obj);

@@ -11,13 +11,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSEconValueType()
-  {
-    if (moho::SEconValue::sType == nullptr) {
-      moho::SEconValue::sType = gpg::LookupRType(typeid(moho::SEconValue));
-    }
-    return moho::SEconValue::sType;
-  }
 } // namespace
 
 namespace moho
@@ -105,7 +98,7 @@ namespace moho
 
     (void)archive->ReadPointer(&mEconomy, &nullOwner);
 
-    gpg::RType* const econValueType = CachedSEconValueType();
+    gpg::RType* const econValueType = gpg::RTypeOf<moho::SEconValue>();
     GPG_ASSERT(econValueType != nullptr);
     archive->Read(econValueType, &mAmt, nullOwner);
   }
@@ -127,7 +120,7 @@ namespace moho
 
     archive->WritePointer(mEconomy, gpg::TrackedPointerState::Unowned, nullOwner);
 
-    gpg::RType* const econValueType = CachedSEconValueType();
+    gpg::RType* const econValueType = gpg::RTypeOf<moho::SEconValue>();
     GPG_ASSERT(econValueType != nullptr);
     archive->Write(econValueType, &mAmt, nullOwner);
   }

@@ -8,35 +8,21 @@
 
 namespace
 {
-  template <typename TType>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
-  {
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(TType));
-    }
-
-    return cached;
-  }
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
     static gpg::RType* cached = nullptr;
-    return ResolveCachedType<Wm3::Vector3<float>>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveParticleTextureCountedPtrType()
-  {
-    return ResolveCachedType<moho::CountedPtr_CParticleTexture>(moho::CountedPtr_CParticleTexture::sType);
+    return gpg::CachedLookup<Wm3::Vector3<float>>(cached);
   }
 
   [[nodiscard]] gpg::RType* ResolveSWorldParticleBlendModeType()
   {
-    return ResolveCachedType<moho::SWorldParticle::BlendMode>(moho::SWorldParticle::sBlendModeType);
+    return gpg::CachedLookup<moho::SWorldParticle::BlendMode>(moho::SWorldParticle::sBlendModeType);
   }
 
   [[nodiscard]] gpg::RType* ResolveSWorldParticleZModeType()
   {
-    return ResolveCachedType<moho::SWorldParticle::ZMode>(moho::SWorldParticle::sZModeType);
+    return gpg::CachedLookup<moho::SWorldParticle::ZMode>(moho::SWorldParticle::sZModeType);
   }
 } // namespace
 
@@ -103,8 +89,8 @@ namespace moho
     archive->ReadFloat(&mAngle);
     archive->ReadFloat(&mRotationCurve);
     archive->ReadFloat(&mReserved54);
-    archive->Read(ResolveParticleTextureCountedPtrType(), &mTexture, nullOwner);
-    archive->Read(ResolveParticleTextureCountedPtrType(), &mRampTexture, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mRampTexture, nullOwner);
     archive->ReadString(&mTypeTag);
     archive->ReadInt(&mArmyIndex);
     archive->Read(ResolveSWorldParticleBlendModeType(), &mBlendMode, nullOwner);
@@ -138,8 +124,8 @@ namespace moho
     archive->WriteFloat(mAngle);
     archive->WriteFloat(mRotationCurve);
     archive->WriteFloat(mReserved54);
-    archive->Write(ResolveParticleTextureCountedPtrType(), &mTexture, nullOwner);
-    archive->Write(ResolveParticleTextureCountedPtrType(), &mRampTexture, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mRampTexture, nullOwner);
     archive->WriteString(const_cast<msvc8::string*>(&mTypeTag));
     archive->WriteInt(mArmyIndex);
     archive->Write(ResolveSWorldParticleBlendModeType(), &mBlendMode, nullOwner);

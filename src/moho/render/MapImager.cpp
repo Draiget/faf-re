@@ -1,6 +1,7 @@
 // MapImager recovered implementation.
 
 #include "moho/render/MapImager.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 
 #include "gpg/core/containers/String.h"
@@ -28,16 +29,6 @@ namespace
   constexpr const char* kGlobalLuaClassName = "<global>";
 
 
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
 
   [[nodiscard]] moho::MapImager* ActiveViewportMapImager() noexcept
   {
@@ -310,7 +301,7 @@ int cfunc_MapBorderAdd(lua_State* const luaContext)
 CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kMapBorderAddName,
     &moho::cfunc_MapBorderAdd,
     nullptr,
@@ -329,10 +320,7 @@ CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
  */
 int cfunc_MapBorderAddL(LuaPlus::LuaState* const state)
 {
-  const int argCount = lua_gettop(state->m_state);
-  if (argCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kMapBorderAddHelpText, 1, argCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kMapBorderAddHelpText);
 
   LuaPlus::LuaStackObject blueprintArg(state, 1);
   const char* const blueprintId = lua_tostring(state->m_state, 1);
@@ -363,10 +351,7 @@ int cfunc_MapBorderClear(lua_State* rawState)
 
   static constexpr const char* kHelpText = "MapBorderClear()";
 
-  const int argCount = lua_gettop(state->m_state);
-  if (argCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kHelpText, 0, argCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kHelpText);
 
   ClearActiveViewportMapBorder();
   return 0;
@@ -382,7 +367,7 @@ int cfunc_MapBorderClear(lua_State* rawState)
 CScrLuaInitForm* func_MapBorderClear_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kMapBorderClearName,
     &moho::cfunc_MapBorderClear,
     nullptr,

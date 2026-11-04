@@ -19,15 +19,6 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RType* CachedRDebugOverlayType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::RDebugOverlay));
-    }
-    return sType;
-  }
-
   /**
    * Address: 0x00650680 (FUN_00650680)
    *
@@ -123,14 +114,6 @@ namespace moho
    */
   void RDebugNavPathTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedRDebugOverlayType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::RDebugOverlay>(typeInfo);
   }
 } // namespace moho

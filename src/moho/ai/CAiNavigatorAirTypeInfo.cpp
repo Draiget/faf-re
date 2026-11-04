@@ -20,16 +20,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
-  {
-    gpg::RType* type = CAiNavigatorImpl::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CAiNavigatorImpl));
-      CAiNavigatorImpl::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x005A7E70 (FUN_005A7E70)
    *
@@ -39,15 +29,7 @@ namespace
    */
   void AddCAiNavigatorImplBase(gpg::RType& typeInfo)
   {
-    gpg::RType* const baseType = CachedCAiNavigatorImplType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo.AddBase(baseField);
+    gpg::AddReflectedBase<CAiNavigatorImpl>(&typeInfo);
   }
 
 } // namespace

@@ -12,21 +12,6 @@ using namespace moho;
 
 namespace
 {
-  /**
-   * Address: 0x0054CFE0 (FUN_0054CFE0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `CAniPose`.
-   */
-  [[nodiscard]] gpg::RType* CachedCAniPoseType()
-  {
-    gpg::RType* type = moho::CAniPose::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CAniPose));
-      moho::CAniPose::sType = type;
-    }
-    return type;
-  }
 
   // Dispatches to the reflection layer's own `CAniPose` upcast (0x0054E230)
   // rather than repeating the lookup-and-throw: the binary emits that function

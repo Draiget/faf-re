@@ -1,5 +1,6 @@
 #include "PeerFeatures.h"
 
+#include <algorithm>
 #include <cstring>
 
 #include "CClientManagerImpl.h"
@@ -9,6 +10,7 @@
 #include "EClientMsg.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/sim/SimDriver.h"
 #include "NetConVars.h"
 
 using namespace moho;
@@ -38,6 +40,12 @@ std::uint64_t CPeerFeatures::LocalMask(const CClientManagerImpl& manager)
   std::uint64_t mask = 0;
   if (manager.mStreamCheck != nullptr) {
     mask |= Bit(EPeerFeature::OrderStreamCheck);
+  }
+  if (wld_SkewCorrection != 0) {
+    mask |= Bit(EPeerFeature::SkewCorrection);
+  }
+  if (NET_FastRetransmitEnabled()) {
+    mask |= Bit(EPeerFeature::FastAck);
   }
   return mask;
 }
@@ -98,6 +106,31 @@ bool CPeerFeatures::PeerSupports(const int clientIndex, const EPeerFeature featu
   }
   const SPeer& peer = mPeers[static_cast<std::size_t>(clientIndex)];
   return peer.announced && (peer.mask & Bit(feature)) != 0;
+}
+
+std::int32_t CPeerFeatures::PeerAckDelayMs(const int clientIndex) const
+{
+  if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size() ||
+      !mPeers[static_cast<std::size_t>(clientIndex)].announced) {
+    return NET_AckDelayMs();
+  }
+  return PeerSupports(clientIndex, EPeerFeature::FastAck) ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
+}
+
+void CPeerFeatures::NoteReady(const int clientIndex, const std::int64_t handledUs)
+{
+  if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size() &&
+      mPeers[static_cast<std::size_t>(clientIndex)].readyUs == 0) {
+    mPeers[static_cast<std::size_t>(clientIndex)].readyUs = handledUs;
+  }
+}
+
+std::int64_t CPeerFeatures::ReadyUs(const int clientIndex) const
+{
+  if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
+    return 0;
+  }
+  return mPeers[static_cast<std::size_t>(clientIndex)].readyUs;
 }
 
 bool CPeerFeatures::EveryoneSupports(CClientManagerImpl& manager, const EPeerFeature feature) const

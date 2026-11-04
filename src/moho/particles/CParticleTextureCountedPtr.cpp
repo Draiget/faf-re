@@ -111,15 +111,6 @@ namespace
     return moho::resource_reflection::ResolveCParticleTextureType();
   }
 
-  [[nodiscard]] gpg::RType* CachedCountedPtrCParticleTextureType()
-  {
-    if (moho::CountedPtr_CParticleTexture::sType == nullptr) {
-      moho::CountedPtr_CParticleTexture::sType = gpg::LookupRType(typeid(moho::CountedPtr_CParticleTexture));
-    }
-
-    return moho::CountedPtr_CParticleTexture::sType;
-  }
-
   [[nodiscard]] gpg::RRef MakeCParticleTextureRef(moho::CParticleTexture* const value)
   {
     gpg::RRef out{};
@@ -178,7 +169,7 @@ namespace
     const moho::CountedPtr_CParticleTexture fill{};
     vec.resize(static_cast<std::size_t>(count), fill);
 
-    gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::CountedPtr_CParticleTexture>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &vec[i], owner);
@@ -202,7 +193,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::CountedPtr_CParticleTexture>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &vec[i], owner);
@@ -253,7 +244,7 @@ namespace moho
   void ResetCountedParticleTexturePtr(CountedPtr_CParticleTexture& countedTexture) noexcept
   {
     if (countedTexture.tex != nullptr) {
-      countedTexture.tex->ReleaseReferenceAtomic();
+      (void)countedTexture.tex->ReleaseReferenceAtomic();
     }
     countedTexture.tex = nullptr;
   }
@@ -276,7 +267,7 @@ namespace moho
 
     if (target->tex != texture) {
       if (target->tex != nullptr) {
-        target->tex->ReleaseReferenceAtomic();
+        (void)target->tex->ReleaseReferenceAtomic();
       }
 
       target->tex = texture;
@@ -496,7 +487,7 @@ namespace gpg
   const char* RFastVectorType<moho::CountedPtr_CParticleTexture>::GetName() const
   {
     static const msvc8::string sName =
-      gpg::STR_Printf("fastvector<%s>", CachedCountedPtrCParticleTextureType()->GetName());
+      gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CountedPtr_CParticleTexture>()->GetName());
     return sName.c_str();
   }
 
@@ -551,7 +542,7 @@ namespace gpg
   gpg::RRef RFastVectorType<moho::CountedPtr_CParticleTexture>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = CachedCountedPtrCParticleTextureType();
+    out.mType = gpg::RTypeOf<moho::CountedPtr_CParticleTexture>();
     out.mObj = nullptr;
     if (!obj || ind < 0) {
       return out;

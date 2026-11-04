@@ -2684,7 +2684,7 @@ void InitializeClusterCache(ClusterCache& outCache)
     auto* const control = static_cast<boost::SpCountedImplStorage<void>*>(
         ::operator new(sizeof(boost::SpCountedImplStorage<void>))
     );
-    boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
+    (void)boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
 
     outCache.mCacheTree = impl;
     outCache.mCacheRefs = control;
@@ -3217,7 +3217,7 @@ void ClusterMap::BackgroundWork(int& budget)
                 budget = INT_MAX;
             }
 
-            WorkOnCluster(
+            (void)WorkOnCluster(
                 static_cast<int>(clusterX),
                 static_cast<int>(clusterY),
                 static_cast<int>(mNumLevels),

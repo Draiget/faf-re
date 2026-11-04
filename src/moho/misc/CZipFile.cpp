@@ -597,7 +597,20 @@ namespace moho
 
   namespace
   {
+    // Engine addition: the binary keeps every file it decompressed for the whole session, so a texture's
+    // bytes stay after its upload and a mesh file's after its geometry is built. On x64 a second read
+    // decompresses again; x86 keeps the original behaviour.
+#if defined(_M_IX86)
     bool gKeepEntryData = true;
+#else
+    bool gKeepEntryData = false;
+#endif
+    TConVar<bool> gTConVar_res_ZipKeepData(
+      "res_ZipKeepData",
+      "Keep every file decompressed from an archive for the whole session, as the original game does (1), or "
+      "decompress a file again when it is read again (0).",
+      &gKeepEntryData
+    );
 
     bool res_ZipKeepOpen = true;
     TConVar<bool> gTConVar_res_ZipKeepOpen(

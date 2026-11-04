@@ -12,25 +12,6 @@ using namespace moho;
 namespace
 {
 
-  [[nodiscard]] gpg::RType* CachedIAiTransportType()
-  {
-    gpg::RType* type = IAiTransport::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(IAiTransport));
-      IAiTransport::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedTransportBroadcasterType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Broadcaster<moho::EAiTransportEvent>));
-    }
-    return cached;
-  }
-
 } // namespace
 
 namespace moho
@@ -43,7 +24,7 @@ namespace moho
    */
   void IAiTransport::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    archive->Read(CachedTransportBroadcasterType(), static_cast<Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
+    archive->Read(gpg::RTypeOf<moho::Broadcaster<moho::EAiTransportEvent>>(), static_cast<Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
   }
 
   /**
@@ -54,7 +35,7 @@ namespace moho
    */
   void IAiTransport::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    archive->Write(CachedTransportBroadcasterType(), static_cast<const Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
+    archive->Write(gpg::RTypeOf<moho::Broadcaster<moho::EAiTransportEvent>>(), static_cast<const Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
   }
 } // namespace moho
 

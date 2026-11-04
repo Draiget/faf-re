@@ -34,15 +34,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00508270 (FUN_00508270, delayed-sub-viz RTTI cache resolve)
    */
@@ -285,7 +276,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Read(vector3Type, &mLastPos, ownerRef);
     archive->ReadFloat(&mRadius);
@@ -302,7 +293,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Write(vector3Type, &mLastPos, ownerRef);
     archive->WriteFloat(mRadius);

@@ -107,25 +107,8 @@ if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   list(APPEND _faf_main_options /FIplatform/X87SqrtCall.h)
 endif()
 
-# Diagnostics: the recovered tree is written against MSVC; keep clang's
-# portability chatter out of the log so real problems stand out.
-list(APPEND _faf_main_options
-  -Wno-microsoft
-  -Wno-unused-parameter -Wno-unused-variable -Wno-unused-private-field
-  -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-but-set-variable
-  -Wno-unused-lambda-capture -Wno-unused-value -Wno-unused-command-line-argument
-  -Wno-missing-field-initializers -Wno-sign-compare -Wno-switch
-  -Wno-invalid-offsetof -Wno-keyword-macro -Wno-unknown-pragmas
-  -Wno-ignored-pragma-intrinsic -Wno-pragma-pack -Wno-ignored-attributes
-  -Wno-deprecated-declarations -Wno-deprecated-enum-enum-conversion
-  -Wno-nonportable-include-path -Wno-reorder-ctor
-  -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual
-  -Wno-inconsistent-missing-override -Wno-missing-braces -Wno-braced-scalar-init
-  -Wno-char-subscripts -Wno-parentheses -Wno-dangling-else
-  -Wno-tautological-constant-out-of-range-compare
-  -Wno-tautological-undefined-compare -Wno-undefined-var-template
-  -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
-  -Wno-mismatched-tags -Wno-extra-qualification)
+include(FafWarnings)
+list(APPEND _faf_main_options ${FAF_WARNING_OPTIONS})
 
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
@@ -192,6 +175,8 @@ set_property(SOURCE ${_boost_thread_sources} APPEND PROPERTY COMPILE_OPTIONS /W0
 set_property(SOURCE "${_boost_thread}/condition.cpp" APPEND PROPERTY COMPILE_OPTIONS /UUNICODE /U_UNICODE)
 
 set_property(SOURCE moho/movie/sfd/FfmpegSfdDecoder.cpp APPEND PROPERTY COMPILE_OPTIONS -Wno-everything)
+include(FafPrecompiledHeaders)
+faf_precompile(faf_engine)
 
 # --- Link -----------------------------------------------------------------------------
 if(FAF_TARGET_ARCH STREQUAL "x64")

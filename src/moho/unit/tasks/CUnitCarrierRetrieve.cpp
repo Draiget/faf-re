@@ -29,24 +29,6 @@ namespace
   // elsewhere) pairs with this set.
   constexpr std::uint64_t kUnitStateMaskCarrierRetrieve = 0x0000000000000100ull;
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntitySetTemplateUnitType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -411,11 +393,11 @@ namespace moho
   void CUnitCarrierRetrieve::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), this, ownerRef);
     archive->ReadBool(&mRetrievalComplete);
 
     const gpg::RRef trackedUnitsOwnerRef{};
-    archive->Read(CachedEntitySetTemplateUnitType(), &mTrackedUnits, trackedUnitsOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mTrackedUnits, trackedUnitsOwnerRef);
   }
 
   /**
@@ -428,11 +410,11 @@ namespace moho
   void CUnitCarrierRetrieve::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), this, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), this, ownerRef);
     archive->WriteBool(mRetrievalComplete);
 
     const gpg::RRef trackedUnitsOwnerRef{};
-    archive->Write(CachedEntitySetTemplateUnitType(), &mTrackedUnits, trackedUnitsOwnerRef);
+    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mTrackedUnits, trackedUnitsOwnerRef);
   }
 
   /**

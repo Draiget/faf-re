@@ -16061,10 +16061,6 @@ extern "C"
 		 * site (the classic `luaL_loadfile` shebang-line peek: read one
 		 * byte, push it back, then decide text- vs binary-mode reopen) and
 		 * from the `io.read(0)`-style peek at `LuaObject.cpp` ~line 6112.
-		 * Both `FUN_00A868BB`/`FUN_00A8679D` were mass-mis-attributed to
-		 * `CrtRuntimeHelpers.cpp` by the 2026-08-24 DB-integrity bulk pass
-		 * (address not present in that file); classified
-		 * `external_dependency` here with a real citation instead.
 		 */
 		std::ungetc(first, lf.f);
 		if (std::isspace(first) == 0 && std::isprint(first) == 0 && lf.f != stdin) {

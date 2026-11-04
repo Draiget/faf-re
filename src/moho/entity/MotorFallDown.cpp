@@ -505,12 +505,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 6) {
-      LuaPlus::LuaState::Error(
-        state, "%s\n  expected %d args, but got %d", kMotorFallDownWhackHelpText, 6, argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 6, kMotorFallDownWhackHelpText);
 
     const LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
     MotorFallDown* const motor = SCR_FromLua_MotorFallDown(selfObject, state);

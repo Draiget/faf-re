@@ -11,25 +11,6 @@ using namespace moho;
 namespace
 {
 
-  [[nodiscard]] gpg::RType* CachedWeakUnitType()
-  {
-    gpg::RType* type = WeakPtr<Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(WeakPtr<Unit>));
-      WeakPtr<Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIntVectorType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::vector<int>));
-    }
-    return cached;
-  }
-
 } // namespace
 
 /**
@@ -91,11 +72,11 @@ void SAiReservedTransportBone::MemberDeserialize(gpg::ReadArchive* const archive
 
   const gpg::RRef ownerRef{};
 
-  gpg::RType* const weakUnitType = CachedWeakUnitType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Read(weakUnitType, &reservedUnit, ownerRef);
 
-  gpg::RType* const intVectorType = CachedIntVectorType();
+  gpg::RType* const intVectorType = gpg::RTypeOf<msvc8::vector<int>>();
   GPG_ASSERT(intVectorType != nullptr);
   archive->Read(intVectorType, &reservedBones, ownerRef);
 }
@@ -118,11 +99,11 @@ void SAiReservedTransportBone::MemberSerialize(gpg::WriteArchive* const archive)
 
   const gpg::RRef ownerRef{};
 
-  gpg::RType* const weakUnitType = CachedWeakUnitType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Write(weakUnitType, &reservedUnit, ownerRef);
 
-  gpg::RType* const intVectorType = CachedIntVectorType();
+  gpg::RType* const intVectorType = gpg::RTypeOf<msvc8::vector<int>>();
   GPG_ASSERT(intVectorType != nullptr);
   archive->Write(intVectorType, &reservedBones, ownerRef);
 }

@@ -8,7 +8,10 @@
 namespace moho::debug_reflection
 {
   [[nodiscard]]
-  gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo);
+  inline gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
+  {
+    return gpg::CachedLookup(cachedType, typeInfo);
+  }
 
   [[nodiscard]]
   gpg::RRef MakeRef(void* object, gpg::RType* typeInfo);

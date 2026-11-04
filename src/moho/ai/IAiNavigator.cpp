@@ -114,15 +114,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedBroadcasterEAiNavigatorEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Broadcaster<EAiNavigatorEvent>));
-    }
-    return cached;
-  }
-
   struct NavigatorGlueTailWord
   {
     std::uint8_t pad00[0xA8];
@@ -267,25 +258,6 @@ namespace
   // `gpg::RType::~RType()`, which already frees `bases_`/`fields_` in typed
   // form.
 
-  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplTypeForUpcast()
-  {
-    gpg::RType* type = moho::CAiNavigatorImpl::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiNavigatorImpl));
-      moho::CAiNavigatorImpl::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerEAiNavigatorEventTypeForUpcast()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::EAiNavigatorEvent>));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005A8970 (FUN_005A8970)
    *
@@ -299,7 +271,7 @@ namespace
       return nullptr;
     }
 
-    return gpg::REF_UpcastPtr(*source, CachedCAiNavigatorImplTypeForUpcast()).mObj;
+    return gpg::REF_UpcastPtr(*source, gpg::RTypeOf<moho::CAiNavigatorImpl>()).mObj;
   }
 
   /**
@@ -315,7 +287,7 @@ namespace
       return nullptr;
     }
 
-    return gpg::REF_UpcastPtr(*source, CachedListenerEAiNavigatorEventTypeForUpcast()).mObj;
+    return gpg::REF_UpcastPtr(*source, gpg::RTypeOf<moho::Listener<moho::EAiNavigatorEvent>>()).mObj;
   }
 
   /**
@@ -1296,7 +1268,7 @@ void IAiNavigator::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedBroadcasterEAiNavigatorEventType(), static_cast<Broadcaster<EAiNavigatorEvent>*>(this), ownerRef);
+  archive->Read(gpg::RTypeOf<Broadcaster<EAiNavigatorEvent>>(), static_cast<Broadcaster<EAiNavigatorEvent>*>(this), ownerRef);
 }
 
 /**
@@ -1314,7 +1286,7 @@ void IAiNavigator::MemberSerialize(gpg::WriteArchive* const archive) const
 
   const gpg::RRef ownerRef{};
   archive->Write(
-    CachedBroadcasterEAiNavigatorEventType(), static_cast<const Broadcaster<EAiNavigatorEvent>*>(this), ownerRef
+    gpg::RTypeOf<Broadcaster<EAiNavigatorEvent>>(), static_cast<const Broadcaster<EAiNavigatorEvent>*>(this), ownerRef
   );
 }
 

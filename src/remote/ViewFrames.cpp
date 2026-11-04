@@ -525,6 +525,11 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
+  std::uint32_t CViewFrames::ViewEntityId(const std::size_t view, const std::uint32_t simId)
+  {
+    return view < mIdMaps.size() ? mIdMaps[view]->EntityId(simId) : simId;
+  }
+
   std::uint64_t CViewFrames::HeldMismatches() const noexcept
   {
     std::uint64_t mismatches = mEntityIndexMismatches;

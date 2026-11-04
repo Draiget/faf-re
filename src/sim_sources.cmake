@@ -33,7 +33,7 @@ set(_faf_client_only_patterns
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
-  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
+  "^moho/sim/(CWldSession|CWldSessionCommands|CWldSessionCore|CWldSessionRender|CWldSessionTypes|UICommandGraph|WldSessionControl|UserArmy|UserLuaArmies|UserLuaFiles|UserLuaSession|UserLuaUi|UserLuaUnits|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
   # The user Lua state's decals (CreateDecal, moho.userDecal_methods).
   "^moho/script/(ScriptedDecal|ScriptedDecalTypeInfo)\\.cpp$"
   # Particle textures' render-device half (GetTexture).
@@ -49,7 +49,7 @@ set(_faf_client_only_patterns
   # The range-ring extractors (user entities' ranges for moho/render/RangeRenderer).
   "^moho/(misc|collision|ai|unit/core)/(Miscellaneous|Omni|Radar|CounterIntel|Intel|CombinedMilitary|Countermeasure|AirPlatform|Weapon|Range|Sonar)Extractor\\.cpp$"
   "^moho/entity/UserEntity\\.cpp$"
-  "^moho/unit/core/UserUnit\\.cpp$"
+  "^moho/unit/core/(UserUnitCore|UserUnitLua|UserCommandQueue)\\.cpp$"
   # The client's console commands and variables (CConCommand.cpp keeps the console).
   "^moho/console/ClientConCommands\\.cpp$"
   # The user world's vision (what the focus army sees, for drawing).

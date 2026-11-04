@@ -80,6 +80,8 @@ namespace faf::remote
     [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /** `simId` as `view`'s client knows it, for an id written outside its frames (plan WP6.10). */
+    [[nodiscard]] std::uint32_t ViewEntityId(std::size_t view, std::uint32_t simId);
     /** Differences the check found (should stay 0). */
     [[nodiscard]] std::uint64_t HeldMismatches() const noexcept;
 

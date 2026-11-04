@@ -838,7 +838,7 @@ namespace moho
       const auto cellX = static_cast<std::int32_t>(mVariableData.mCurTransform.pos_.x);
       const auto cellZ = static_cast<std::int32_t>(mVariableData.mCurTransform.pos_.z);
       VisibilityRect visibleRect{};
-      mSession->TryGetPlayableMapRect(visibleRect);
+      (void)mSession->TryGetPlayableMapRect(visibleRect);
       meshInstance->isHidden = ContainsCell(visibleRect, cellX, cellZ) ? 0 : 1;
       return;
     }

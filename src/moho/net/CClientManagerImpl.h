@@ -586,6 +586,23 @@ namespace moho
     void NoteDivergentOrders();
 
     /**
+     * Engine addition (wld_PreciseSharedStart): a client's ready message was handled here (the local
+     * client's own as it sends it); the time is kept for `EstimateSharedStartUs`.
+     */
+    void NoteClientReady(int clientIndex);
+
+    /**
+     * Engine addition (wld_PreciseSharedStart): the moment the last player's ready message left its
+     * sender, on the steady clock in microseconds, or 0 while some player (this one included) is
+     * not ready or our own ready message has not left yet. Every player works out the same moment
+     * from when each ready message left: ours as our connection sent it (`NET_GetReadyDepartureUs`),
+     * a peer's as it was handled here less the one-way trip (the ping less the peer's
+     * acknowledgement delay, `CPeerFeatures::PeerAckDelayMs`, halved). What remains is any difference
+     * between the two directions of the network path, which nothing here can measure.
+     */
+    [[nodiscard]] std::int64_t EstimateSharedStartUs(bool logDetails = false);
+
+    /**
      * Engine addition, not in the binary: whether `source` belongs to a client
      * whose own acknowledgement disagreed with the stream this client received
      * from it (`CommandStreamCheck::ProvenAltered`). A desync against that

@@ -161,9 +161,7 @@ namespace gpg::core
      * `ResetInline_` at `+0x10` -- free when `start_ != originalVec_`, restore
      * `capacity_` from the saved sentinel, then `end_ = start_`. Reached from
      * `~CEfxEmitter` (0x0065DE4B) and from both emitter constructors'
-     * `resize(21, value)`. Previously tagged `external_dependency` as an
-     * "all-external-callees thunk"; its one external callee is
-     * `::operator delete`, and the body is this template.)
+     * `resize(21, value)`.)
      * Address: 0x0055D940 (FUN_0055D940 -- `DestroyRange` for `gpg::fastvector_n<moho::UnitWeaponInfo, 1>` (`SSTIUnitVariableData::mWeaponInfo`, element 0x98): `first` in EAX, `last` in EBX, `~UnitWeaponInfo` (0x0055D170) per slot; callers 0x00561D90 (`AssignFrom`'s shrink tail, `DestroyRange(newEnd, end_)`), 0x0055D260 (`resize`), 0x0055D840, and unboxed code at 0x0055D7FA; formerly `DestroyUnitWeaponInfoRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x0056E7E0 (FUN_0056E7E0 -- `DestroyRange` for `gpg::fastvector_n<SFormationRunScriptCandidate, 16>` (CAiFormationInstance.cpp, element 0x48): `first` in EAX, `last` in EBX; each inlined `~SFormationRunScriptCandidate` is the reset of `category.mBits.mWords` at `+0x30`; callers 0x00567300 (`CFormationInstance::RunScript`'s three scope exits of the candidate vector), 0x0056C8A0 / 0x0056C900 / 0x0056E7A0 (out-of-line `~FastVectorN` emissions), 0x0056FAB0 (`GrowInsertDeepCopy`'s old-range teardown and catch rollback); formerly `NormalizeFormationLaneRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x0061CA70 (FUN_0061CA70 -- `DestroyRange` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: `~WeakPtr` per slot, the splice-out walk with no write to the node; reached from those vectors' destructors and `ResetStorageToInline` (`Unit::UpdateBlipsInRange` 0x006ACC60, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`), and from the reallocating insert's old-range teardown. Formerly an intrusive-slot range unlink beside this template, removed 2026-09-30.)
@@ -959,7 +957,7 @@ namespace gpg::core
      * Address: 0x009545D0 (FUN_009545D0 -- a second emission of `resize(n, value)`, for the reachability flags for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x00954650; formerly `FastVectorN12CharResize` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0092E410 (FUN_0092E410 -- `resize(n, value)` for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x009310E0, 0x00954A40; formerly `ResizeInlineBackedByteVectorWithFill` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0056D1D0 (FUN_0056D1D0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` (the 0x10 header of `CFormationInstance::mUnits`, element 0x08): shrink through 0x0056EF40, grow through `ReallocateInsert_` 0x0056D2B0, then copy-construct `value` (link at the owner head) into each new slot; callers `RFastVectorType<WeakPtr<IUnit>>::SetCount` 0x0056BF9D and its loader 0x0056DDC7; formerly `ResizeWeakPtrVector` over `WeakPtrVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (RULE THREE), removed 2026-09-30.)
-     * Address: 0x006AF0A0 (FUN_006AF0A0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::Entity>>` (the 0x10 header of `Unit::mBlipsInRange`): callers `RFastVectorType<WeakPtr<Entity>>::SetCount` 0x006AE570 and its load callback 0x006AF3F0, each with a default `WeakPtr` temporary as the fill, and the vector's copy constructor 0x006ADE50. It was tagged `external_dependency` as an "all-external-callees thunk".)
+     * Address: 0x006AF0A0 (FUN_006AF0A0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::Entity>>` (the 0x10 header of `Unit::mBlipsInRange`): callers `RFastVectorType<WeakPtr<Entity>>::SetCount` 0x006AE570 and its load callback 0x006AF3F0, each with a default `WeakPtr` temporary as the fill, and the vector's copy constructor 0x006ADE50.)
      */
     /**
      * Address: 0x00558EC0 (FUN_00558EC0, SSTIEntityAttachInfo resize emission)
@@ -3210,7 +3208,7 @@ namespace gpg
       return destination;
     }
 
-    FastVectorN2InitInlineNoHeader(*destination);
+    (void)FastVectorN2InitInlineNoHeader(*destination);
     destination->AssignFrom(*source);
     return destination;
   }

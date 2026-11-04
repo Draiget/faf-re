@@ -37,6 +37,9 @@ namespace faf::headless
     int viewLossPercent = 0;     // with `viewFramesPath`: a simulated lossy channel per view (FrameWindow.h)
     int viewAckDelay = 0;        // its acknowledgements' delay in beats
     bool spy = false;            // with `viewFramesPath`: the spy client's checks (ReplayViewFrameStats.h)
+    bool luaRouting = false;     // with `viewBenchPath`: each player's `Sync` routed
+    std::string luaRoutingDump;  // with `luaRouting`: each view's bytes go to `<this>_<view>.bin`
+    std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
     bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one

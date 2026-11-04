@@ -62,73 +62,7 @@ namespace
     return blueprint->mBlueprintId.c_str();
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitCallTransportType()
-  {
-    gpg::RType* type = moho::CUnitCallTransport::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitCallTransport));
-      moho::CUnitCallTransport::sType = type;
-    }
-    return type;
-  }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVTransformType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::VTransform));
-    }
-    return cached;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -375,12 +309,12 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetTransportUnit, nullOwner);
     archive->ReadBool(&mHasBeamupDestination);
     archive->ReadFloat(&mBeamupTime);
-    archive->Read(CachedVTransformType(), &mSourceTransform, nullOwner);
-    archive->Read(CachedVTransformType(), &mDestinationTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mSourceTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mDestinationTransform, nullOwner);
     archive->ReadInt(&mArrivalTickOrSequence);
   }
 
@@ -399,12 +333,12 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetTransportUnit, nullOwner);
     archive->WriteBool(mHasBeamupDestination);
     archive->WriteFloat(mBeamupTime);
-    archive->Write(CachedVTransformType(), &mSourceTransform, nullOwner);
-    archive->Write(CachedVTransformType(), &mDestinationTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mSourceTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mDestinationTransform, nullOwner);
     archive->WriteInt(mArrivalTickOrSequence);
   }
 
@@ -445,7 +379,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeDerivedRef(value, CachedCUnitCallTransportType());
+    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitCallTransport>());
     return outRef;
   }
 

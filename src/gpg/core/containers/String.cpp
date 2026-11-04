@@ -140,13 +140,13 @@ char* gpg::STR_EncodeUtf8Char(
     if (chr >= 0x800) {
       if (!limit || dest + 3 <= limit) {
         dest[0] = (chr >> 12) | 0xE0;
-        dest[1] = (chr >> 6) & 0x3F | 0x80;
-        dest[2] = chr & 0x3F | 0x80;
+        dest[1] = ((chr >> 6) & 0x3F) | 0x80;
+        dest[2] = (chr & 0x3F) | 0x80;
         return dest + 3;
       }
     } else if (!limit || dest + 2 <= limit) {
       dest[0] = (chr >> 6) | 0xC0;
-      dest[1] = chr & 0x3F | 0x80;
+      dest[1] = (chr & 0x3F) | 0x80;
       return dest + 2;
     }
   } else if (!limit || dest + 1 <= limit) {
@@ -576,7 +576,7 @@ bool gpg::STR_IsIdent(
 )
 {
   char c = *str++;
-  if (c == '\0' || (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && c != '_') {
+  if (c == '\0' || ((c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && c != '_')) {
     return false;
   }
   c = *str++;

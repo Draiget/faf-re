@@ -1,3 +1,4 @@
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "legacy/math/X87Math.h"
@@ -97,7 +98,6 @@ namespace moho
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kGetCameraName = "GetCamera";
   constexpr const char* kGetCameraHelpText = "GetCamera(name)";
@@ -377,16 +377,6 @@ namespace
     outShakeOffset->z =
       ((shakeDirection.z * radialAmount) + ((0.0f - shakeDirection.x) * tangentialAmount)) * moho::cam_ShakeMult;
     return outShakeOffset;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
   }
 
 } // namespace
@@ -2856,7 +2846,7 @@ int moho::cfunc_GetCamera(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetCamera_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kGetCameraName,
     &moho::cfunc_GetCamera,
     nullptr,
@@ -2876,10 +2866,7 @@ moho::CScrLuaInitForm* moho::func_GetCamera_LuaFuncDef()
 int moho::cfunc_GetCameraL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCameraHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetCameraHelpText);
 
   const LuaPlus::LuaStackObject cameraNameArg(state, 1);
   const char* const cameraName = lua_tostring(rawState, 1);
@@ -2918,7 +2905,7 @@ int moho::cfunc_CameraImplSnapTo(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplSnapTo_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplSnapToName,
     &moho::cfunc_CameraImplSnapTo,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -2938,10 +2925,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplSnapTo_LuaFuncDef()
 int moho::cfunc_CameraImplSnapToL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSnapToHelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kCameraImplSnapToHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -2994,7 +2978,7 @@ int moho::cfunc_CameraImplMoveToRegion(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplMoveToRegion_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplMoveToRegionName,
     &moho::cfunc_CameraImplMoveToRegion,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3070,10 +3054,7 @@ int moho::cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplMoveToL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 5) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplMoveToHelpText, 5, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 5, kCameraImplMoveToHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3120,7 +3101,7 @@ int moho::cfunc_CameraImplSetZoom(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplSetZoom_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "SetZoom",
     &moho::cfunc_CameraImplSetZoom,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3141,10 +3122,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetZoom_LuaFuncDef()
 int moho::cfunc_CameraImplSetZoomL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetZoomHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kCameraImplSetZoomHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3186,7 +3164,7 @@ int moho::cfunc_CameraImplSetTargetZoom(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplSetTargetZoom_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplSetTargetZoomName,
     &moho::cfunc_CameraImplSetTargetZoom,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3206,10 +3184,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetTargetZoom_LuaFuncDef()
 int moho::cfunc_CameraImplSetTargetZoomL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetTargetZoomHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCameraImplSetTargetZoomHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3232,7 +3207,7 @@ int moho::cfunc_CameraImplSetTargetZoomL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplMoveTo_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplMoveToName,
     &moho::cfunc_CameraImplMoveTo,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3263,7 +3238,7 @@ int moho::cfunc_CameraImplGetMinZoom(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplGetMinZoom_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplGetMinZoomName,
     &moho::cfunc_CameraImplGetMinZoom,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3283,10 +3258,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetMinZoom_LuaFuncDef()
 int moho::cfunc_CameraImplGetMinZoomL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetMinZoomHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetMinZoomHelpText);
 
   lua_pushnumber(rawState, cam_NearZoom);
   (void)lua_gettop(rawState);
@@ -3314,7 +3286,7 @@ int moho::cfunc_CameraImplSetMaxZoomMult(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplSetMaxZoomMult_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplSetMaxZoomMultName,
     &moho::cfunc_CameraImplSetMaxZoomMult,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3334,10 +3306,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetMaxZoomMult_LuaFuncDef()
 int moho::cfunc_CameraImplSetMaxZoomMultL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetMaxZoomMultHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCameraImplSetMaxZoomMultHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3373,10 +3342,7 @@ int moho::cfunc_CameraImplSetAccMode(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplSetAccModeL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetAccModeHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCameraImplSetAccModeHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3402,7 +3368,7 @@ int moho::cfunc_CameraImplSetAccModeL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplSetAccMode_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplSetAccModeName,
     &moho::cfunc_CameraImplSetAccMode,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3472,7 +3438,7 @@ int moho::cfunc_CameraImplSpinL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplSpin_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplSpinName,
     &moho::cfunc_CameraImplSpin,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3502,11 +3468,7 @@ int moho::cfunc_CameraImplReset(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplResetL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplResetHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplResetHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3523,7 +3485,7 @@ int moho::cfunc_CameraImplResetL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplReset_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplResetName,
     &moho::cfunc_CameraImplReset,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3542,7 +3504,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplReset_LuaFuncDef()
 moho::CScrLuaInitForm* moho::func_CameraImplTrackEntities_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplTrackEntitiesName,
     &moho::cfunc_CameraImplTrackEntities,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3575,10 +3537,7 @@ int moho::cfunc_CameraImplTrackEntities(lua_State* const luaContext)
 int moho::cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplTrackEntitiesHelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kCameraImplTrackEntitiesHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3625,10 +3584,7 @@ int moho::cfunc_CameraImplTargetEntities(lua_State* const luaContext)
 int moho::cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplTargetEntitiesHelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kCameraImplTargetEntitiesHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3674,10 +3630,7 @@ int moho::cfunc_CameraImplNoseCam(lua_State* const luaContext)
 int moho::cfunc_CameraImplNoseCamL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 6) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplNoseCamHelpText, 6, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 6, kCameraImplNoseCamHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3731,7 +3684,7 @@ int moho::cfunc_CameraImplNoseCamL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplTargetEntities_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplTargetEntitiesName,
     &moho::cfunc_CameraImplTargetEntities,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3750,7 +3703,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplTargetEntities_LuaFuncDef()
 moho::CScrLuaInitForm* moho::func_CameraImplNoseCam_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplNoseCamName,
     &moho::cfunc_CameraImplNoseCam,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3781,11 +3734,7 @@ int moho::cfunc_CameraImplHoldRotation(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplHoldRotationL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplHoldRotationHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplHoldRotationHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3802,7 +3751,7 @@ int moho::cfunc_CameraImplHoldRotationL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplHoldRotation_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplHoldRotationName,
     &moho::cfunc_CameraImplHoldRotation,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3833,11 +3782,7 @@ int moho::cfunc_CameraImplRevertRotation(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplRevertRotationL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplRevertRotationHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplRevertRotationHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3854,7 +3799,7 @@ int moho::cfunc_CameraImplRevertRotationL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplRevertRotation_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplRevertRotationName,
     &moho::cfunc_CameraImplRevertRotation,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3885,10 +3830,7 @@ int moho::cfunc_CameraImplGetZoom(lua_State* const luaContext)
 int moho::cfunc_CameraImplGetZoomL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetZoomHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetZoomHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3906,7 +3848,7 @@ int moho::cfunc_CameraImplGetZoomL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplGetZoom_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplGetZoomName,
     &moho::cfunc_CameraImplGetZoom,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3936,11 +3878,7 @@ int moho::cfunc_CameraImplGetFocusPosition(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplGetFocusPositionL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetFocusPositionHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetFocusPositionHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -3958,7 +3896,7 @@ int moho::cfunc_CameraImplGetFocusPositionL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplGetFocusPosition_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplGetFocusPositionName,
     &moho::cfunc_CameraImplGetFocusPosition,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -3989,11 +3927,7 @@ int moho::cfunc_CameraImplSaveSettings(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplSaveSettingsL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSaveSettingsHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplSaveSettingsHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4019,7 +3953,7 @@ int moho::cfunc_CameraImplSaveSettingsL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplSaveSettings_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplSaveSettingsName,
     &moho::cfunc_CameraImplSaveSettings,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4052,10 +3986,7 @@ int moho::cfunc_CameraImplRestoreSettings(lua_State* const luaContext)
 int moho::cfunc_CameraImplRestoreSettingsL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplRestoreSettingsHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCameraImplRestoreSettingsHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4107,7 +4038,7 @@ int moho::cfunc_CameraImplRestoreSettingsL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplRestoreSettings_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplRestoreSettingsName,
     &moho::cfunc_CameraImplRestoreSettings,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4138,7 +4069,7 @@ int moho::cfunc_CameraImplGetTargetZoom(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplGetTargetZoom_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplGetTargetZoomName,
     &moho::cfunc_CameraImplGetTargetZoom,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4158,10 +4089,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetTargetZoom_LuaFuncDef()
 int moho::cfunc_CameraImplGetTargetZoomL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetTargetZoomHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetTargetZoomHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4192,7 +4120,7 @@ int moho::cfunc_CameraImplGetMaxZoom(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CameraImplGetMaxZoom_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplGetMaxZoomName,
     &moho::cfunc_CameraImplGetMaxZoom,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4212,10 +4140,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetMaxZoom_LuaFuncDef()
 int moho::cfunc_CameraImplGetMaxZoomL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetMaxZoomHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetMaxZoomHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4246,11 +4171,7 @@ int moho::cfunc_CameraImplUseGameClock(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplUseGameClockHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplUseGameClockHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4267,7 +4188,7 @@ int moho::cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplUseGameClock_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplUseGameClockName,
     &moho::cfunc_CameraImplUseGameClock,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4298,11 +4219,7 @@ int moho::cfunc_CameraImplUseSystemClock(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplUseSystemClockL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplUseSystemClockHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplUseSystemClockHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4319,7 +4236,7 @@ int moho::cfunc_CameraImplUseSystemClockL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplUseSystemClock_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplUseSystemClockName,
     &moho::cfunc_CameraImplUseSystemClock,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4350,11 +4267,7 @@ int moho::cfunc_CameraImplEnableEaseInOut(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplEnableEaseInOutL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplEnableEaseInOutHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplEnableEaseInOutHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4371,7 +4284,7 @@ int moho::cfunc_CameraImplEnableEaseInOutL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplEnableEaseInOut_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplEnableEaseInOutName,
     &moho::cfunc_CameraImplEnableEaseInOut,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
@@ -4402,11 +4315,7 @@ int moho::cfunc_CameraImplDisableEaseInOut(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplDisableEaseInOutHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCameraImplDisableEaseInOutHelpText);
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
@@ -4423,7 +4332,7 @@ int moho::cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CameraImplDisableEaseInOut_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kCameraImplDisableEaseInOutName,
     &moho::cfunc_CameraImplDisableEaseInOut,
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),

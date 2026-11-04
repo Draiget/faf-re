@@ -28,24 +28,6 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedRBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RBlueprint));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStringType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::string));
-    }
-    return cached;
-  }
-
   void AddEnumEntry(gpg::REnumType* const typeInfo, const char* const token, const int value)
   {
     typeInfo->AddEnum(typeInfo->StripPrefix(token), value);
@@ -190,7 +172,7 @@ namespace
    */
   const char* RStringVectorTypeInfo::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedStringType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<msvc8::string>()->GetName());
     return sName.c_str();
   }
 
@@ -299,7 +281,7 @@ namespace
   gpg::RRef RStringVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = CachedStringType();
+    out.mType = gpg::RTypeOf<msvc8::string>();
 
     auto* const storage = static_cast<StringVector*>(obj);
     if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
@@ -525,14 +507,7 @@ namespace moho
    */
   void REntityBlueprintTypeInfo::AddBaseRBlueprint(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedRBlueprintType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::RBlueprint>(typeInfo);
   }
 
   /**

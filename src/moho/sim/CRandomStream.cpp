@@ -45,15 +45,6 @@ namespace moho
       return kNullOwner;
     }
 
-    [[nodiscard]] gpg::RType* CachedCMersenneTwisterType()
-    {
-      gpg::RType* type = CMersenneTwister::sType;
-      if (!type) {
-        type = gpg::LookupRType(typeid(CMersenneTwister));
-        CMersenneTwister::sType = type;
-      }
-      return type;
-    }
   } // namespace
 
   /**
@@ -305,7 +296,7 @@ namespace moho
       return;
     }
 
-    archive->Read(CachedCMersenneTwisterType(), &twister, NullOwnerRef());
+    archive->Read(gpg::RTypeOf<CMersenneTwister>(), &twister, NullOwnerRef());
     archive->ReadFloat(&marsagliaPair);
     archive->ReadBool(&hasMarsagliaPair);
   }
@@ -323,7 +314,7 @@ namespace moho
       return;
     }
 
-    archive->Write(CachedCMersenneTwisterType(), &twister, NullOwnerRef());
+    archive->Write(gpg::RTypeOf<CMersenneTwister>(), &twister, NullOwnerRef());
     archive->WriteFloat(marsagliaPair);
     archive->WriteBool(hasMarsagliaPair);
   }

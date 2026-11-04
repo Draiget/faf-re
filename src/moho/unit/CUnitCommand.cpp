@@ -58,15 +58,6 @@ startup_CScrLuaMetatableFactory_CUnitCommand_Index()
 
 namespace
 {
-  gpg::RType* gUnitBlueprintType = nullptr;
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintType()
-  {
-    if (gUnitBlueprintType == nullptr) {
-      gUnitBlueprintType = gpg::LookupRType(typeid(RUnitBlueprint));
-    }
-    return gUnitBlueprintType;
-  }
 
   /**
    * Reflection-mediated downcast of a blueprint reference to `RUnitBlueprint`,
@@ -79,7 +70,7 @@ namespace
     gpg::RRef blueprintRef{};
     blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(blueprint);
 
-    const gpg::RRef unitRef = gpg::REF_UpcastPtr(blueprintRef, CachedRUnitBlueprintType());
+    const gpg::RRef unitRef = gpg::REF_UpcastPtr(blueprintRef, gpg::RTypeOf<RUnitBlueprint>());
     return static_cast<const RUnitBlueprint*>(unitRef.mObj);
   }
 
@@ -198,16 +189,6 @@ namespace
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
 
-  template <class TObject>
-  [[nodiscard]] gpg::RType* ResolveCachedType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(TObject));
-    }
-    return sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveBroadcasterCommandEventType()
   {
     static gpg::RType* sType = nullptr;
@@ -256,26 +237,6 @@ namespace
         sType = register_WeakPtr_Unit_Type_00();
       }
       WeakPtr<Unit>::sType = sType;
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveLuaObjectType()
-  {
-    gpg::RType* sType = LuaPlus::LuaObject::sType;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
-      LuaPlus::LuaObject::sType = sType;
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntityUnitSetType()
-  {
-    gpg::RType* sType = EntitySetTemplate<Unit>::sType;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(EntitySetTemplate<Unit>));
-      EntitySetTemplate<Unit>::sType = sType;
     }
     return sType;
   }
@@ -329,7 +290,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandConstantData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandConstantData>()) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -352,7 +313,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandVariableData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandVariableData>()) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -421,7 +382,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandConstantData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandConstantData>()) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -444,7 +405,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandVariableData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandVariableData>()) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -491,35 +452,6 @@ namespace
     (void)ReadBroadcasterCommandEventArchiveAndReturnArchive(archive, objectPtr, ownerRef);
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uint8_t*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
   // The serializer works on the `Broadcaster` secondary base. That slice sits at
   // +0x34 in the binary layout, which is exactly where the compiler puts it:
@@ -937,7 +869,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
 
   const gpg::RRef ownerRef{};
 
-  if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
+  if (gpg::RType* const scriptType = gpg::RTypeOf<CScriptObject>()) {
     archive->Read(scriptType, this, ownerRef);
   }
 
@@ -947,15 +879,15 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
 
   (void)archive->ReadPointer(&mSim, &ownerRef);
 
-  if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
+  if (gpg::RType* const constDataType = gpg::RTypeOf<SSTICommandConstantData>()) {
     archive->Read(constDataType, &mConstDat, ownerRef);
   }
 
-  if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
+  if (gpg::RType* const variableDataType = gpg::RTypeOf<SSTICommandVariableData>()) {
     archive->Read(variableDataType, &mVarDat, ownerRef);
   }
 
-  if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
+  if (gpg::RType* const unitSetType = gpg::RTypeOf<EntitySetTemplate<Unit>>()) {
     archive->Read(unitSetType, &mUnitSet, ownerRef);
   }
 
@@ -972,7 +904,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
     mFormationInstance = static_cast<CAiFormationInstance*>(formation);
   }
 
-  if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
+  if (gpg::RType* const targetType = gpg::RTypeOf<CAiTarget>()) {
     archive->Read(targetType, &mTarget, ownerRef);
   }
 
@@ -995,7 +927,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
   }
 
   if (version >= 2) {
-    if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
+    if (gpg::RType* const luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>()) {
       archive->Read(luaObjectType, &mArgs, ownerRef);
     }
   }
@@ -1018,7 +950,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
 
   const gpg::RRef ownerRef{};
 
-  if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
+  if (gpg::RType* const scriptType = gpg::RTypeOf<CScriptObject>()) {
     archive->Write(scriptType, this, ownerRef);
   }
 
@@ -1026,20 +958,20 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
     archive->Write(broadcasterType, BroadcasterSubobjectPtr(this), ownerRef);
   }
 
-  if (gpg::RType* const simType = ResolveCachedType<Sim>()) {
-    const gpg::RRef simRef = MakeDerivedRef(mSim, simType);
+  if (gpg::RType* const simType = gpg::RTypeOf<Sim>()) {
+    const gpg::RRef simRef = gpg::MakeDerivedRef(mSim, simType);
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
-  if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
+  if (gpg::RType* const constDataType = gpg::RTypeOf<SSTICommandConstantData>()) {
     archive->Write(constDataType, &mConstDat, ownerRef);
   }
 
-  if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
+  if (gpg::RType* const variableDataType = gpg::RTypeOf<SSTICommandVariableData>()) {
     archive->Write(variableDataType, &mVarDat, ownerRef);
   }
 
-  if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
+  if (gpg::RType* const unitSetType = gpg::RTypeOf<EntitySetTemplate<Unit>>()) {
     archive->Write(unitSetType, &mUnitSet, ownerRef);
   }
 
@@ -1050,7 +982,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
     archive->Write(formationType, &formation, ownerRef);
   }
 
-  if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
+  if (gpg::RType* const targetType = gpg::RTypeOf<CAiTarget>()) {
     archive->Write(targetType, &mTarget, ownerRef);
   }
 
@@ -1070,7 +1002,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
   }
 
   if (version >= 2) {
-    if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
+    if (gpg::RType* const luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>()) {
       archive->Write(luaObjectType, &mArgs, ownerRef);
     }
   }

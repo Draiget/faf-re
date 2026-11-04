@@ -64,50 +64,16 @@ namespace
   constexpr float kProjectileUnsetValue = -1.0f;
   constexpr float kProjectileBounceVelocityDampingDefault = 0.5f;
 
-  template <class T>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(T));
-    }
-    return slot;
-  }
-
   [[nodiscard]] gpg::RType* CachedEntityType()
   {
     static gpg::RType* cached = nullptr;
-    return CachedType<moho::Entity>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* CachedImpactBroadcasterType()
-  {
-    return CachedType<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(moho::ManyToOneBroadcaster_EProjectileImpactEvent::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakEntityType()
-  {
-    return CachedType<moho::WeakPtr<moho::Entity>>(moho::WeakPtr<moho::Entity>::sType);
+    return gpg::CachedLookup<moho::Entity>(cached);
   }
 
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
     static gpg::RType* cached = nullptr;
-    return CachedType<Wm3::Vector3f>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* CachedAiTargetType()
-  {
-    return CachedType<moho::CAiTarget>(moho::CAiTarget::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedProjectileAttributesType()
-  {
-    return CachedType<moho::CProjectileAttributes>(moho::CProjectileAttributes::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedProjectileType()
-  {
-    return CachedType<moho::Projectile>(moho::Projectile::sType);
+    return gpg::CachedLookup<Wm3::Vector3f>(cached);
   }
 
   [[nodiscard]] gpg::RRef MakeProjectileRef(moho::Projectile* const object)
@@ -1851,8 +1817,8 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     archive->Read(CachedEntityType(), this, ownerRef);
-    archive->Read(CachedImpactBroadcasterType(), &mImpactEventBroadcaster, ownerRef);
-    archive->Read(CachedWeakEntityType(), &mLauncherWeak, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(), &mImpactEventBroadcaster, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mLauncherWeak, ownerRef);
     archive->Read(CachedVector3fType(), &mVelocity, ownerRef);
     archive->Read(CachedVector3fType(), &mLocalAngularVelocity, ownerRef);
     archive->Read(CachedVector3fType(), &mScaleVelocity, ownerRef);
@@ -1878,9 +1844,9 @@ namespace moho
     archive->ReadFloat(&mDamageRadius);
     archive->ReadString(&mDamageTypeName);
 
-    archive->Read(CachedAiTargetType(), &mTargetPosData, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
     archive->Read(CachedVector3fType(), &mImpactPosition, ownerRef);
-    archive->Read(CachedWeakEntityType(), &mCollidedEntityWeak, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mCollidedEntityWeak, ownerRef);
 
     archive->ReadUInt(&mLifetimeEnd);
     archive->ReadBool(&mBelowWater);
@@ -1891,7 +1857,7 @@ namespace moho
     archive->ReadFloat(&mBounceVelocityDamping);
     archive->ReadInt(&mZigZagNextTick);
     archive->Read(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
-    archive->Read(CachedProjectileAttributesType(), &mAttributes, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CProjectileAttributes>(), &mAttributes, ownerRef);
     archive->ReadBool(&mIsChildProjectile);
 
     // Engine addition (replay keyframes): not in a saved game, whose projectile that was about to
@@ -1925,8 +1891,8 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     archive->Write(CachedEntityType(), this, ownerRef);
-    archive->Write(CachedImpactBroadcasterType(), &mImpactEventBroadcaster, ownerRef);
-    archive->Write(CachedWeakEntityType(), &mLauncherWeak, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(), &mImpactEventBroadcaster, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mLauncherWeak, ownerRef);
     archive->Write(CachedVector3fType(), &mVelocity, ownerRef);
     archive->Write(CachedVector3fType(), &mLocalAngularVelocity, ownerRef);
     archive->Write(CachedVector3fType(), &mScaleVelocity, ownerRef);
@@ -1952,9 +1918,9 @@ namespace moho
     archive->WriteFloat(mDamageRadius);
     archive->WriteString(const_cast<msvc8::string*>(&mDamageTypeName));
 
-    archive->Write(CachedAiTargetType(), &mTargetPosData, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
     archive->Write(CachedVector3fType(), &mImpactPosition, ownerRef);
-    archive->Write(CachedWeakEntityType(), &mCollidedEntityWeak, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mCollidedEntityWeak, ownerRef);
 
     archive->WriteUInt(mLifetimeEnd);
     archive->WriteBool(mBelowWater);
@@ -1965,7 +1931,7 @@ namespace moho
     archive->WriteFloat(mBounceVelocityDamping);
     archive->WriteInt(mZigZagNextTick);
     archive->Write(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
-    archive->Write(CachedProjectileAttributesType(), &mAttributes, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CProjectileAttributes>(), &mAttributes, ownerRef);
     archive->WriteBool(mIsChildProjectile);
 
     // Engine addition (replay keyframes): see MemberDeserialize.

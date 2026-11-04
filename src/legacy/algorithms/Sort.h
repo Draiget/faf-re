@@ -116,20 +116,14 @@ namespace msvc8
          * `mBuildOrder`.)
          */
         /**
-         * Address: 0x008D9EE0 (FUN_008D9EE0, `_Med3` for the `gpg::RField`
-         * sort -- `strcmp(*a2,*a1)`/`strcmp(*a3,*a2)`/`strcmp(*a2,*a1)`
-         * against the three `mName` pointers, matching this member exactly
-         * (compares `*a`/`*b`/`*c` pairwise, swapping through `iter_swap`
-         * at 0x008D9E20 -- cited above -- to land the median in `*b`).
-         * Reached with `count <= 41` directly from `_Median`'s (`FUN_008DA410`,
-         * cited on `select_ninther` below) simple path, and always as the
-         * final "median of the three medians" step of the ninther itself.
-         * Previously mis-tagged `external_dependency` ("all-external-callees
-         * thunk... no engine references") -- `strcmp` is CRT, but the
-         * three-way compare-and-swap control flow orchestrating it is this
-         * project's own `_Med3` emission, reached from `gpg::RType::
-         * Finish()`'s `std::sort` (Reflection.cpp) -- not third-party
-         * runtime. DB-integrity fix, corrected to skip/cited-here.)
+         * Address: 0x008D9EE0 (FUN_008D9EE0, `_Med3` for the `gpg::RField` sort
+         * -- `strcmp(*a2,*a1)`/`strcmp(*a3,*a2)`/`strcmp(*a2,*a1)` against the
+         * three `mName` pointers, matching this member exactly (compares
+         * `*a`/`*b`/`*c` pairwise, swapping through `iter_swap` at 0x008D9E20
+         * -- cited above -- to land the median in `*b`). Reached with `count <=
+         * 41` directly from `_Median`'s (`FUN_008DA410`, cited on
+         * `select_ninther` below) simple path, and always as the final "median
+         * of the three medians" step of the ninther itself.)
          */
         /**
          * Address: 0x005751C0 (FUN_005751C0 -- `_Med3` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
@@ -301,8 +295,7 @@ namespace msvc8
          * inlined (this template folds that rotate into the loop below
          * directly; same observable result). Reached from `_Sort`'s
          * (`FUN_008DD790`, cited on `sort_impl` below) small-range fallback,
-         * `<= 32` elements. Was mis-tagged `blocked` (stale, pre-dates
-         * `no_block_guard.py`); corrected to skip/cited-here.)
+         * `<= 32` elements.)
          *
          * Address: 0x008DA5D0 (FUN_008DA5D0, sub_8DA5D0) -- the multi-element
          * rotate `FUN_008DB430` calls out to for this instantiation's `<= 32`
@@ -480,8 +473,7 @@ namespace msvc8
          * count, first[hole], comp)`, matching this member's loop exactly
          * (drives the sift-down half at `FUN_008DAF60`, cited above).
          * Reached from `_Sort`'s (`FUN_008DD790`, cited below) ideal-budget-
-         * exhausted heapsort fallback. Was mis-tagged `external_dependency`;
-         * corrected to skip/cited-here.)
+         * exhausted heapsort fallback.)
          */
         /**
          * Address: 0x00574A30 (FUN_00574A30 -- `make_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
@@ -547,8 +539,7 @@ namespace msvc8
          * member's loop exactly (drives the settle-upward half at
          * `FUN_008DB080`, cited above). Reached from `_Sort`'s
          * (`FUN_008DD790`, cited below) heapsort fallback, right after
-         * `make_heap`'s `FUN_008DB2A0`. Was mis-tagged `external_dependency`;
-         * corrected to skip/cited-here.)
+         * `make_heap`'s `FUN_008DB2A0`.)
          */
         /**
          * Address: 0x00574B40 (FUN_00574B40 -- `sort_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)

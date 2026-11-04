@@ -48,19 +48,9 @@ namespace
     return gpg::RRef{};
   }
 
-  [[nodiscard]] gpg::RType* CachedStatsStatItemType()
-  {
-    gpg::RType* type = moho::Stats<moho::StatItem>::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
-      moho::Stats<moho::StatItem>::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RRef MakeStatsStatItemRef(moho::Stats<moho::StatItem>* const value)
   {
-    return gpg::RRef(value, CachedStatsStatItemType());
+    return gpg::RRef(value, gpg::RTypeOf<moho::Stats<moho::StatItem>>());
   }
 
   /**

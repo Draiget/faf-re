@@ -1,4 +1,5 @@
 #include "moho/entity/MotorSinkAway.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdint>
 #include <new>
@@ -140,37 +141,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaObject GetMotorSinkAwayLuaFactoryObject(LuaPlus::LuaState* const state)
   {
     return moho::CScrLuaMetatableFactory<moho::MotorSinkAway>::Instance().Get(state);
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived =
-      dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
   }
 
   /**
@@ -462,7 +432,7 @@ namespace gpg
       return nullptr;
     }
 
-    *out = MakeDerivedRef(value, CachedMotorSinkAwayType());
+    *out = gpg::MakeDerivedRef(value, CachedMotorSinkAwayType());
     return out;
   }
 } // namespace gpg

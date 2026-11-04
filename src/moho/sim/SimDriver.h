@@ -1045,6 +1045,30 @@ namespace moho
   extern int sim_LeadOnSchedule;
 
   /**
+   * Engine addition: user-side console variables for the display-clock skew correction, which the
+   * retail engine carries but never feeds (`CSimDriver::GetSimSpeed` returns 0).
+   * - `wld_SkewCorrection` (default 0): 1 announces it to the other players (`net_PeerFeatures`); in
+   *   a network game where all of them announce it, `GetSimSpeed` returns how many beats the beat on
+   *   screen is ahead of real time (negative when behind), measured tick by tick from the first
+   *   tick on screen with paused time left out. `WLD_GetSimRate` then runs the display clock at
+   *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
+   *   It changes when beats are issued, never what the sim computes.
+   * - `wld_SkewMaxLag` (default 2 s): the skew is clamped to this much real time either way.
+   * - `wld_SkewLog` (default 0): log the drift every this many seconds.
+   * - `wld_PreciseSharedStart` (default 1): in a network session the count is measured against the
+   *   moment the last player's ready message left its sender (`CClientManagerImpl::EstimateSharedStartUs`),
+   *   which every player times alike, so every player's screen keeps to one schedule; 0 counts
+   *   from this client's own first tick on screen, as outside network sessions.
+   * - `wld_ReadyAfterFirstFrame` (default 1): this client's ready message waits for the first frame
+   *   of the game interface to be drawn; 0 sends it before that frame, as the binary does.
+   */
+  extern int wld_SkewCorrection;
+  extern float wld_SkewMaxLag;
+  extern int wld_SkewLog;
+  extern int wld_PreciseSharedStart;
+  extern int wld_ReadyAfterFirstFrame;
+
+  /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game
    * time per real time, from its median beat cost) before it is rounded down to a whole rate step;
    * 0 otherwise. The display clock follows it so the sim is not held to the rounded rate.

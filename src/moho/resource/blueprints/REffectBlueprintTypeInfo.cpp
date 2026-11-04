@@ -19,15 +19,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedRObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::RObject));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x0050F120 (FUN_0050F120)
    *
@@ -89,7 +80,7 @@ namespace moho
  */
 void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
 {
-  gpg::RType* const rObjectType = CachedRObjectType();
+  gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
   gpg::RField baseField(rObjectType->GetName(), rObjectType, 0);
   typeInfo->AddBase(baseField);
 }

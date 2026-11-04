@@ -305,7 +305,7 @@ void CReplayClient::SkipBeats(const std::int32_t beats)
       currentSource = mCurrentSourceAllowed ? sourceId : kNoCommandSource;
     } else if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_CommandSourceTerminated)) {
       if (mCurrentSourceAllowed && currentSource != kNoCommandSource) {
-        mValidCommandSources.Remove(currentSource);
+        (void)mValidCommandSources.Remove(currentSource);
         mValidCommandSources.Finalize();
         currentSource = kNoCommandSource;
       }

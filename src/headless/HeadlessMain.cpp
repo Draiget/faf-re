@@ -156,6 +156,8 @@ namespace
       "  --focus <army|-1>         army whose view the sim builds (0-based; -1 observer, default)\n"
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
+      "  --sync-dump <file>        write each beat's Lua Sync bytes (tools/sync-routing/compare.py)\n"
+      "  --lua-routing-dump <pre>  with --lua-routing: each view's Sync bytes, to <pre>_<view>.bin\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
@@ -199,6 +201,7 @@ namespace
       "                            bytes; server-mode build; not with the checks above)\n"
       "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables, files read from archives, what effects draw, the pose handles kept for a client\n"
       "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
+      "  --lua-routing             with --view-bench: the Lua lane too: each player's Sync routed (remote/SyncRouting.h)\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
       "                            container counts too, and FAF's init scripts cannot change it\n"
@@ -271,6 +274,8 @@ int main(int argc, char** argv)
   (void)ReadIntOption("--focus", options.focusArmy, bad);
   (void)ReadOption("--digests", options.digestPath);
   (void)ReadOption("--sync-keys", options.syncKeysPath);
+  (void)ReadOption("--sync-dump", options.syncDumpPath);
+  (void)ReadOption("--lua-routing-dump", options.luaRoutingDump);
   (void)ReadOption("--sync-writers", options.syncWritersPath);
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
@@ -322,6 +327,7 @@ int main(int argc, char** argv)
   if (ReadIntOption("--view-ack-delay", options.viewAckDelay, bad) && options.viewAckDelay < 0) {
     bad = true;
   }
+  options.luaRouting = moho::CFG_GetArgOption("--lua-routing", 0, nullptr);
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
   {
     std::string cpuList;

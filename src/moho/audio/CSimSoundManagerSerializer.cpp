@@ -22,15 +22,6 @@ namespace
     gpg::RRef* ownerRef
   );
 
-  [[nodiscard]] gpg::RType* CachedISoundManagerType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::ISoundManager));
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedAudioRequestVectorType()
   {
     static gpg::RType* type = nullptr;
@@ -164,7 +155,7 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedISoundManagerType(), static_cast<moho::ISoundManager*>(this), owner);
+    archive->Read(gpg::RTypeOf<moho::ISoundManager>(), static_cast<moho::ISoundManager*>(this), owner);
     archive->Read(CachedAudioRequestVectorType(), &mRequests, owner);
     DeserializeCSimSoundManagerLoopList(this, archive);
   }
@@ -185,7 +176,7 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Write(
-      CachedISoundManagerType(),
+      gpg::RTypeOf<moho::ISoundManager>(),
       const_cast<moho::ISoundManager*>(static_cast<const moho::ISoundManager*>(this)),
       owner
     );

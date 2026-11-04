@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -126,6 +127,30 @@ namespace moho
   class StatItem : public TDatTreeItem<StatItem>
   {
   public:
+    /**
+     * Engine addition: atomic add on the primary lane, returning the value before it.
+     */
+    std::int32_t AddPrimaryBits(const std::int32_t delta) noexcept
+    {
+      return std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(mPrimaryValueBits)).fetch_add(delta);
+    }
+
+    /**
+     * Engine addition: atomic exchange on the primary lane, returning the value before it.
+     */
+    std::int32_t ExchangePrimaryBits(const std::int32_t value) noexcept
+    {
+      return std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(mPrimaryValueBits)).exchange(value);
+    }
+
+    /**
+     * Engine addition: atomic store on the primary lane.
+     */
+    void StorePrimaryBits(const std::int32_t value) noexcept
+    {
+      std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(mPrimaryValueBits)).store(value);
+    }
+
     /**
      * Address: 0x00408730 (FUN_00408730, Moho::StatItem::StatItem)
      */

@@ -37,44 +37,7 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
 
-  [[nodiscard]] gpg::RType* CachedCUnitRepairTaskType()
-  {
-    gpg::RType* type = moho::CUnitRepairTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitRepairTask));
-      moho::CUnitRepairTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCBuildTaskHelperType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -95,11 +58,11 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
-    archive->Read(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CBuildTaskHelper>(), &mBuildHelper, ownerRef);
     archive->ReadPointer(&mCommand, &ownerRef);
-    archive->Read(CachedWeakPtrUnitType(), &mTargetUnit, ownerRef);
-    archive->Read(CachedWeakPtrUnitType(), &mBuildTargetUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mBuildTargetUnit, ownerRef);
     archive->ReadBool(&mInPosition);
     archive->ReadBool(&mIsSilo);
     archive->ReadBool(&mGuardAssistMode);
@@ -120,13 +83,13 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
-    archive->Write(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CBuildTaskHelper>(), &mBuildHelper, ownerRef);
 
     archive->WritePointer<moho::CUnitCommand>(mCommand, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedWeakPtrUnitType(), &mTargetUnit, ownerRef);
-    archive->Write(CachedWeakPtrUnitType(), &mBuildTargetUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mBuildTargetUnit, ownerRef);
 
     archive->WriteBool(mInPosition);
     archive->WriteBool(mIsSilo);
@@ -762,7 +725,7 @@ namespace
 
   void CUnitRepairTaskSerializerHelperNode::Init()
   {
-    gpg::RType* const type = CachedCUnitRepairTaskType();
+    gpg::RType* const type = gpg::RTypeOf<moho::CUnitRepairTask>();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mSerLoadFunc;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);

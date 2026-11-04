@@ -632,13 +632,13 @@ namespace moho
      * VFTable SLOT: 0
      */
     [[nodiscard]]
-    virtual gpg::RType* GetClass() const override;
+    gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x00676C60 (FUN_00676C60)
      * VFTable SLOT: 1
      */
-    virtual gpg::RRef GetDerivedObjectRef() override;
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0067CFA0 (FUN_0067CFA0, Moho::Entity::GetPointerType)
@@ -781,7 +781,7 @@ namespace moho
      * Address: 0x00678D40 (FUN_00678D40)
      * VFTable SLOT: 3
      */
-    virtual msvc8::string GetErrorDescription() override;
+    msvc8::string GetErrorDescription() override;
 
     /**
      * Address: 0x005BDB10 (FUN_005BDB10)

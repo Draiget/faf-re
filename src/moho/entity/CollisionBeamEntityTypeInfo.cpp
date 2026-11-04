@@ -65,19 +65,7 @@ namespace moho
    */
   void CollisionBeamEntityTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
   {
-    if (Entity::sType == nullptr) {
-      Entity::sType = gpg::LookupRType(typeid(Entity));
-    }
-
-    gpg::RType* const baseType = Entity::sType;
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<Entity>(typeInfo);
   }
 
   /**

@@ -124,7 +124,7 @@ namespace moho
      * Interpolates emitter attachment transform at `(tick=0, interp=0.0)` and
      * projects the first start-vector lane through that matrix into `mPos`.
      */
-    void Interpolate();
+    void Interpolate() override;
 
     /**
      * Address: 0x0065C700 (FUN_0065C700, Moho::CEfxEmitter::ProcessLifetime)

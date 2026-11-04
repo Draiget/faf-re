@@ -1,4 +1,5 @@
 #include "StatItem.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "platform/Interlocked.h"
 
 #include <algorithm>
@@ -103,73 +104,12 @@ namespace
   moho::StatItemSerializer gStatItemSerializer;
   moho::StatsRType<moho::StatItem> gStatsRTypeStatItem;
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
   template <typename TObject>
   void MaterializeReflectionSingleton(TObject& singleton)
   {
     (void)singleton;
   }
 
-  [[nodiscard]] gpg::RType* CachedStatItemType()
-  {
-    if (!moho::StatItem::sType) {
-      moho::StatItem::sType = gpg::LookupRType(typeid(moho::StatItem));
-    }
-    return moho::StatItem::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStatsStatItemType()
-  {
-    if (!moho::Stats<moho::StatItem>::sType) {
-      moho::Stats<moho::StatItem>::sType = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
-    }
-    return moho::Stats<moho::StatItem>::sType;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    int baseOffset = 0;
-    const bool isDerived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(isDerived);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   /**
    * Address: 0x0041A8B0 (FUN_0041A8B0, gpg::RRef_StatItem)
@@ -179,7 +119,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MakeStatItemRef(moho::StatItem* object)
   {
-    return MakeTypedRef(object, CachedStatItemType());
+    return gpg::MakeTypedRef(object, gpg::RTypeOf<moho::StatItem>());
   }
 
   /**
@@ -190,7 +130,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MakeStatsStatItemRef(moho::Stats<moho::StatItem>* object)
   {
-    return MakeTypedRef(object, CachedStatsStatItemType());
+    return gpg::MakeTypedRef(object, gpg::RTypeOf<moho::Stats<moho::StatItem>>());
   }
 
   /**
@@ -201,7 +141,7 @@ namespace
    */
   [[nodiscard]] moho::StatItem* CastStatItemFromRef(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedStatItemType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::StatItem>());
     return static_cast<moho::StatItem*>(upcast.mObj);
   }
 
@@ -229,7 +169,7 @@ namespace
 
     moho::StatItem* const item = CastStatItemFromRef(source);
     if (!item) {
-      const char* const expectedName = CachedStatItemType()->GetName();
+      const char* const expectedName = gpg::RTypeOf<moho::StatItem>()->GetName();
       const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
       const msvc8::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -929,9 +869,7 @@ namespace moho
      * `_gmtimebuf` field is unset, lazily `malloc(0x24)`s the `struct tm`
      * scratch buffer the `*time64` family fills and returns a pointer into
      * -- textbook CRT internals (`_tiddata`, `_gmtimebuf`, `_errno`), not
-     * engine code. Both were mass-mis-attributed to `CrtRuntimeHelpers.cpp`
-     * by the 2026-08-24 DB-integrity bulk pass (address not present in that
-     * file); classified `external_dependency` here with a real citation.
+     * engine code.
      */
     const std::tm* const localTime = _localtime64(selectedTime);
     if (localTime == nullptr) {
@@ -1551,7 +1489,7 @@ namespace moho
       }
     }
     if (sPrintStatsBoogersSquirt) {
-      (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1);
+      (void)sPrintStatsBoogersSquirt->AddPrimaryBits(1);
     }
 
     if (!sPrintStatsDouble) {
@@ -1665,7 +1603,7 @@ namespace moho
   CScrLuaInitForm* func_BeginLoggingStats_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "BeginLoggingStats",
       &moho::cfunc_BeginLoggingStats,
       nullptr,
@@ -1744,7 +1682,7 @@ namespace moho
   CScrLuaInitForm* func_EndLoggingStats_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "EndLoggingStats",
       &moho::cfunc_EndLoggingStats,
       nullptr,
@@ -2357,7 +2295,7 @@ namespace moho
    */
   const char* StatsRType<StatItem>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", CachedStatItemType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", gpg::RTypeOf<moho::StatItem>()->GetName());
     return sName.c_str();
   }
 

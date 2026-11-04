@@ -57,25 +57,6 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedEntIdType();
   [[nodiscard]] gpg::RType* CachedSUnitOffsetInfoType();
-  [[nodiscard]] gpg::RType* CachedSCoordsVec2Type();
-  [[nodiscard]] gpg::RType* CachedSOffsetInfoType();
-  [[nodiscard]] gpg::RType* CachedSAssignedLocInfoType();
-  [[nodiscard]] gpg::RType* CachedIFormationInstanceType();
-
-  /**
-   * The binary keeps a single global for this descriptor (`0x010C6F84`), read
-   * and filled in place by every consumer, so this uses the instantiation's
-   * own `sType` lane rather than a second function-local cache.
-   */
-  [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
-  {
-    gpg::RType* type = moho::Broadcaster<moho::EFormationdStatus>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::Broadcaster<moho::EFormationdStatus>));
-      moho::Broadcaster<moho::EFormationdStatus>::sType = type;
-    }
-    return type;
-  }
 
   /**
    * Address: 0x0056DCA0 (FUN_0056DCA0, Moho::RBroadcasterRType_EFormationdStatus::SerLoad)
@@ -154,18 +135,7 @@ namespace
    */
   void AddBroadcasterEFormationdStatusBaseToIFormationInstanceType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedBroadcasterEFormationdStatusType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<moho::IFormationInstance, moho::Broadcaster<moho::EFormationdStatus>>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::Broadcaster<moho::EFormationdStatus>>(typeInfo, gpg::BaseSubobjectOffset<moho::IFormationInstance, moho::Broadcaster<moho::EFormationdStatus>>());
   }
 
   class SUnitOffsetInfoTypeInfo final : public gpg::RType
@@ -326,7 +296,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = CachedSOffsetInfoType();
+      gpg::RType* const type = gpg::RTypeOf<moho::SOffsetInfo>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;
@@ -384,7 +354,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = CachedIFormationInstanceType();
+      gpg::RType* const type = gpg::RTypeOf<moho::IFormationInstance>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;
@@ -443,7 +413,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = CachedSAssignedLocInfoType();
+      gpg::RType* const type = gpg::RTypeOf<moho::SAssignedLocInfo>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;
@@ -654,15 +624,6 @@ namespace
     , mSerSaveFunc(&SerializeSAssignedLocInfoSerializerCallback)
   {}
 
-  [[nodiscard]] gpg::RType* CachedEFormationdStatusType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::EFormationdStatus));
-    }
-    return sType;
-  }
-
   class RMapType_EntId_SUnitOffsetInfo final : public gpg::RType
   {
   public:
@@ -872,7 +833,7 @@ namespace
       archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
 
       gpg::RType* const keyType = CachedEntIdType();
-      gpg::RType* const valueType = CachedSCoordsVec2Type();
+      gpg::RType* const valueType = gpg::RTypeOf<moho::SCoordsVec2>();
       GPG_ASSERT(keyType != nullptr);
       GPG_ASSERT(valueType != nullptr);
       if (!keyType || !valueType) {
@@ -914,7 +875,7 @@ namespace
       }
 
       gpg::RType* const keyType = CachedEntIdType();
-      gpg::RType* const valueType = CachedSCoordsVec2Type();
+      gpg::RType* const valueType = gpg::RTypeOf<moho::SCoordsVec2>();
       GPG_ASSERT(keyType != nullptr);
       GPG_ASSERT(valueType != nullptr);
       if (!keyType || !valueType) {
@@ -986,7 +947,7 @@ namespace
    */
   const char* RBroadcasterRType_EFormationdStatus::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", CachedEFormationdStatusType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
     return sName.c_str();
   }
 
@@ -1000,7 +961,7 @@ namespace
    */
   const char* RListenerRType_EFormationdStatus::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", CachedEFormationdStatusType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
     return sName.c_str();
   }
 
@@ -1015,7 +976,7 @@ namespace
   const char* RMapType_EntId_SCoordsVec2::GetName() const
   {
     static const msvc8::string sName =
-      gpg::STR_Printf("map<%s,%s>", CachedEntIdType()->GetName(), CachedSCoordsVec2Type()->GetName());
+      gpg::STR_Printf("map<%s,%s>", CachedEntIdType()->GetName(), gpg::RTypeOf<moho::SCoordsVec2>()->GetName());
     return sName.c_str();
   }
 
@@ -1034,32 +995,6 @@ namespace
     const auto* const mapObject = static_cast<const CoordMap*>(ref.mObj);
     const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
-  }
-
-  /// Caches into `CFormationInstance::sType` (0x010C6F80), which is where the binary keeps it,
-  /// from `gpg::LookupRType(typeid(CFormationInstance))` (FUN_008E0750; 0x0059E9B3..0x0059E9D4).
-  [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
-  {
-    if (!moho::CFormationInstance::sType) {
-      moho::CFormationInstance::sType = gpg::LookupRType(typeid(moho::CFormationInstance));
-    }
-    return moho::CFormationInstance::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSimType()
-  {
-    if (!moho::Sim::sType) {
-      moho::Sim::sType = gpg::LookupRType(typeid(moho::Sim));
-    }
-    return moho::Sim::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrIUnitType()
-  {
-    if (!moho::WeakPtr<moho::IUnit>::sType) {
-      moho::WeakPtr<moho::IUnit>::sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::IUnit>));
-    }
-    return moho::WeakPtr<moho::IUnit>::sType;
   }
 
   [[nodiscard]] gpg::RType* CachedEntIdType()
@@ -1086,35 +1021,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedSCoordsVec2Type()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SCoordsVec2));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return type;
-  }
-
   // Reflected-type caches for the fields CFormationInstance serializes. The
   // binary keeps one global per type in a single .data cluster; these mirror
   // them, following the gXxxType convention in Reflection.cpp. They are not
   // function-local statics on purpose - see the descriptor-cache defects fixed
   // in 39bd696 / 322b105 / b20cc03.
-  gpg::RType* gEUnitCommandTypeType = nullptr;          // binary 0x010C6EDC
-  gpg::RType* gMapEntIdSCoordsVec2Type = nullptr;       // binary 0x010C6F90
-  gpg::RType* gFastVectorWeakPtrIUnitType = nullptr;    // binary 0x010C6F94
-  gpg::RType* gFastVectorSOffsetInfoType = nullptr;     // binary 0x010C6F98
-  gpg::RType* gFastVectorSAssignedLocInfoType = nullptr;
-  gpg::RType* gQuaternionfType = nullptr;
 
   /// One reflected field, skipped when its descriptor has not resolved. The
   /// binary emits the same null-guarded Write/Read at every field; lifting it
@@ -1139,59 +1050,11 @@ namespace
     }
   }
 
-  [[nodiscard]] gpg::RType* CachedEUnitCommandTypeType()
-  {
-    if (!gEUnitCommandTypeType) {
-      gEUnitCommandTypeType = gpg::LookupRType(typeid(moho::EUnitCommandType));
-    }
-    return gEUnitCommandTypeType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedMapEntIdSCoordsVec2Type()
-  {
-    if (!gMapEntIdSCoordsVec2Type) {
-      gMapEntIdSCoordsVec2Type = gpg::LookupRType(typeid(CoordMap));
-    }
-    return gMapEntIdSCoordsVec2Type;
-  }
-
   // The three fastvector descriptors are registered under the base
   // `gpg::fastvector<T>` type ids (IUnitWeakPtrReflection.cpp:599,
   // FastVectorUIntReflection.cpp:2081/2212), which is what the binary's own
   // `LookupRType` calls at 0x00574518/0x0057453F/0x00574588 key on -- the
   // inline capacity is not part of the reflected type.
-
-  [[nodiscard]] gpg::RType* CachedFastVectorWeakPtrIUnitType()
-  {
-    if (!gFastVectorWeakPtrIUnitType) {
-      gFastVectorWeakPtrIUnitType = gpg::LookupRType(typeid(gpg::fastvector<moho::WeakPtr<moho::IUnit>>));
-    }
-    return gFastVectorWeakPtrIUnitType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFastVectorSOffsetInfoType()
-  {
-    if (!gFastVectorSOffsetInfoType) {
-      gFastVectorSOffsetInfoType = gpg::LookupRType(typeid(gpg::fastvector<moho::SOffsetInfo>));
-    }
-    return gFastVectorSOffsetInfoType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFastVectorSAssignedLocInfoType()
-  {
-    if (!gFastVectorSAssignedLocInfoType) {
-      gFastVectorSAssignedLocInfoType = gpg::LookupRType(typeid(gpg::fastvector<moho::SAssignedLocInfo>));
-    }
-    return gFastVectorSAssignedLocInfoType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    if (!gQuaternionfType) {
-      gQuaternionfType = gpg::LookupRType(typeid(Wm3::Quatf));
-    }
-    return gQuaternionfType;
-  }
 
   /**
    * Reflection cache for `map<EntId,SUnitOffsetInfo>`.
@@ -1202,62 +1065,11 @@ namespace
    * 0x010C6F6C that `RFastVectorType<SOffsetInfo>::SerLoad` fills at
    * 0x0056DF43.
    */
-  gpg::RType* gMapEntIdSUnitOffsetInfoType = nullptr;
-
-  [[nodiscard]] gpg::RType* CachedMapEntIdSUnitOffsetInfoType()
-  {
-    if (!gMapEntIdSUnitOffsetInfoType) {
-      gMapEntIdSUnitOffsetInfoType = gpg::LookupRType(typeid(UnitOffsetMap));
-    }
-    return gMapEntIdSUnitOffsetInfoType;
-  }
-
-  /**
-   * Element-type cache for `SOffsetInfo`, mirroring the binary's
-   * `Moho::SOffsetInfo::sType` global (0x010C6F6C).
-   */
-  [[nodiscard]] gpg::RType* CachedSOffsetInfoType()
-  {
-    gpg::RType* type = moho::SOffsetInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SOffsetInfo));
-      moho::SOffsetInfo::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Element-type cache for `SAssignedLocInfo`, mirroring the binary's
-   * `Moho::SAssignedLocInfo::sType` global.
-   */
-  [[nodiscard]] gpg::RType* CachedSAssignedLocInfoType()
-  {
-    gpg::RType* type = moho::SAssignedLocInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SAssignedLocInfo));
-      moho::SAssignedLocInfo::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Element-type cache for `IFormationInstance`, mirroring the binary's
-   * `Moho::IFormationInstance::sType` global.
-   */
-  [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
-  {
-    gpg::RType* type = moho::IFormationInstance::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IFormationInstance));
-      moho::IFormationInstance::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RRef MakeSimRef(moho::Sim* sim)
   {
     gpg::RRef out{};
-    gpg::RType* const staticType = CachedSimType();
+    gpg::RType* const staticType = gpg::RTypeOf<moho::Sim>();
     out.mObj = nullptr;
     out.mType = staticType;
     if (!sim || !staticType) {
@@ -1296,7 +1108,7 @@ namespace
       return nullptr;
     }
 
-    gpg::RType* const expectedType = CachedSimType();
+    gpg::RType* const expectedType = gpg::RTypeOf<moho::Sim>();
     if (!expectedType || !tracked.type) {
       return static_cast<moho::Sim*>(tracked.object);
     }
@@ -1752,7 +1564,7 @@ namespace moho
     archive->ReadUInt(&count);
     groups->Resize(count, SOffsetInfo());
 
-    gpg::RType* const elementType = CachedSOffsetInfoType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SOffsetInfo>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &(*groups)[i], owner);
@@ -1778,7 +1590,7 @@ namespace moho
     const unsigned int count = static_cast<unsigned int>(groups->size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedSOffsetInfoType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SOffsetInfo>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &(*groups)[i], owner);
@@ -1823,7 +1635,7 @@ namespace moho
     archive->ReadUInt(&count);
     slots->Resize(count, SAssignedLocInfo{});
 
-    gpg::RType* const elementType = CachedSAssignedLocInfoType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAssignedLocInfo>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &(*slots)[i], owner);
@@ -1850,7 +1662,7 @@ namespace moho
     const unsigned int count = static_cast<unsigned int>(slots->size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedSAssignedLocInfoType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAssignedLocInfo>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &(*slots)[i], owner);
@@ -1887,7 +1699,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
       archive->Read(coordsType, &slot->mPos, ownerRef);
@@ -1910,7 +1722,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
       archive->Write(coordsType, &slot->mPos, ownerRef);
@@ -1935,7 +1747,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    gpg::RType* const weakPtrType = gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>();
     GPG_ASSERT(weakPtrType != nullptr);
     if (weakPtrType) {
       archive->Read(weakPtrType, &mUnit, ownerRef);
@@ -1943,13 +1755,13 @@ namespace moho
 
     archive->ReadInt(&mLeaderPriority);
 
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
       archive->Read(coordsType, &mOffset, ownerRef);
     }
 
-    gpg::RType* const vectorType = CachedVector3fType();
+    gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
     GPG_ASSERT(vectorType != nullptr);
     if (vectorType) {
       archive->Read(vectorType, &mTargetPos, ownerRef);
@@ -1976,7 +1788,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    gpg::RType* const weakPtrType = gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>();
     GPG_ASSERT(weakPtrType != nullptr);
     if (weakPtrType) {
       archive->Write(weakPtrType, &mUnit, ownerRef);
@@ -1984,13 +1796,13 @@ namespace moho
 
     archive->WriteInt(mLeaderPriority);
 
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
       archive->Write(coordsType, &mOffset, ownerRef);
     }
 
-    gpg::RType* const vectorType = CachedVector3fType();
+    gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
     GPG_ASSERT(vectorType != nullptr);
     if (vectorType) {
       archive->Write(vectorType, &mTargetPos, ownerRef);
@@ -2018,19 +1830,19 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
+    gpg::RType* const mapType = gpg::RTypeOf<UnitOffsetMap>();
     GPG_ASSERT(mapType != nullptr);
     if (mapType) {
       archive->Write(mapType, &mUnitOffsets, ownerRef);
     }
 
-    gpg::RType* const vectorType = CachedVector3fType();
+    gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
     GPG_ASSERT(vectorType != nullptr);
     if (vectorType) {
       archive->Write(vectorType, &mPos, ownerRef);
     }
 
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
       archive->Write(coordsType, &mSlotCenter, ownerRef);
@@ -2044,7 +1856,7 @@ namespace moho
     archive->WriteFloat(mSpeed);
     archive->WriteFloat(mAvgDistToTarget);
 
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    gpg::RType* const weakPtrType = gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>();
     GPG_ASSERT(weakPtrType != nullptr);
     if (weakPtrType) {
       archive->Write(weakPtrType, &mLeader, ownerRef);
@@ -2088,19 +1900,19 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
+    gpg::RType* const mapType = gpg::RTypeOf<UnitOffsetMap>();
     GPG_ASSERT(mapType != nullptr);
     if (mapType) {
       archive->Read(mapType, &mUnitOffsets, ownerRef);
     }
 
-    gpg::RType* const vectorType = CachedVector3fType();
+    gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
     GPG_ASSERT(vectorType != nullptr);
     if (vectorType) {
       archive->Read(vectorType, &mPos, ownerRef);
     }
 
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
       archive->Read(coordsType, &mSlotCenter, ownerRef);
@@ -2114,7 +1926,7 @@ namespace moho
     archive->ReadFloat(&mSpeed);
     archive->ReadFloat(&mAvgDistToTarget);
 
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    gpg::RType* const weakPtrType = gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>();
     GPG_ASSERT(weakPtrType != nullptr);
     if (weakPtrType) {
       archive->Read(weakPtrType, &mLeader, ownerRef);
@@ -2167,7 +1979,7 @@ namespace moho
 
     // Binary 0x005744E9..0x00574518: the base, `IFormationInstance` (0x010C6F74). Writing this
     // object's own type here re-entered this function until the stack ran out.
-    archive->Write(CachedIFormationInstanceType(), self, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::IFormationInstance>(), self, ownerRef);
 
     gpg::RRef pointerRef{};
     pointerRef = gpg::MakeRRef<LuaPlus::LuaState>(mState);
@@ -2175,19 +1987,19 @@ namespace moho
     pointerRef = gpg::MakeRRef<moho::RRuleGameRules>(mGamerules);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    WriteFormationField(archive, CachedEUnitCommandTypeType(), &self->mCommandType, ownerRef);
-    WriteFormationField(archive, CachedFastVectorWeakPtrIUnitType(), &self->mUnits, ownerRef);
-    WriteFormationField(archive, CachedFastVectorSOffsetInfoType(), &self->mOffsetInfo[0], ownerRef);
-    WriteFormationField(archive, CachedFastVectorSOffsetInfoType(), &self->mOffsetInfo[1], ownerRef);
-    WriteFormationField(archive, CachedFastVectorSAssignedLocInfoType(), &self->mSlots, ownerRef);
-    WriteFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &self->mFormationPosCache, ownerRef);
-    WriteFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &self->mOffsetPosCache, ownerRef);
-    WriteFormationField(archive, CachedVector3fType(), &self->mForwardVector, ownerRef);
-    WriteFormationField(archive, CachedQuaternionfType(), &self->mOrientation, ownerRef);
-    WriteFormationField(archive, CachedQuaternionfType(), &self->mOrientationChange, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<moho::EUnitCommandType>(), &self->mCommandType, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::WeakPtr<moho::IUnit>>>(), &self->mUnits, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::SOffsetInfo>>(), &self->mOffsetInfo[0], ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::SOffsetInfo>>(), &self->mOffsetInfo[1], ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::SAssignedLocInfo>>(), &self->mSlots, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<CoordMap>(), &self->mFormationPosCache, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<CoordMap>(), &self->mOffsetPosCache, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<Wm3::Vector3<float>>(), &self->mForwardVector, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<Wm3::Quatf>(), &self->mOrientation, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<Wm3::Quatf>(), &self->mOrientationChange, ownerRef);
 
     archive->WriteString(&self->mScriptName);
-    WriteFormationField(archive, CachedSCoordsVec2Type(), &self->mCoords, ownerRef);
+    WriteFormationField(archive, gpg::RTypeOf<moho::SCoordsVec2>(), &self->mCoords, ownerRef);
     archive->WriteFloat(mScale);
     archive->WriteBool(mPlanUpdate != 0u);
     archive->WriteInt(mMaxSize);
@@ -2211,24 +2023,24 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     // Binary 0x005741E0..: the base, `IFormationInstance` (0x010C6F74), as MemberSerialize writes it.
-    archive->Read(CachedIFormationInstanceType(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::IFormationInstance>(), this, ownerRef);
 
     (void)archive->ReadPointer(&mState, &ownerRef);
     (void)archive->ReadPointer(&mGamerules, &ownerRef);
 
-    ReadFormationField(archive, CachedEUnitCommandTypeType(), &mCommandType, ownerRef);
-    ReadFormationField(archive, CachedFastVectorWeakPtrIUnitType(), &mUnits, ownerRef);
-    ReadFormationField(archive, CachedFastVectorSOffsetInfoType(), &mOffsetInfo[0], ownerRef);
-    ReadFormationField(archive, CachedFastVectorSOffsetInfoType(), &mOffsetInfo[1], ownerRef);
-    ReadFormationField(archive, CachedFastVectorSAssignedLocInfoType(), &mSlots, ownerRef);
-    ReadFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &mFormationPosCache, ownerRef);
-    ReadFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &mOffsetPosCache, ownerRef);
-    ReadFormationField(archive, CachedVector3fType(), &mForwardVector, ownerRef);
-    ReadFormationField(archive, CachedQuaternionfType(), &mOrientation, ownerRef);
-    ReadFormationField(archive, CachedQuaternionfType(), &mOrientationChange, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<moho::EUnitCommandType>(), &mCommandType, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::WeakPtr<moho::IUnit>>>(), &mUnits, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::SOffsetInfo>>(), &mOffsetInfo[0], ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::SOffsetInfo>>(), &mOffsetInfo[1], ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<gpg::fastvector<moho::SAssignedLocInfo>>(), &mSlots, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<CoordMap>(), &mFormationPosCache, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<CoordMap>(), &mOffsetPosCache, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<Wm3::Vector3<float>>(), &mForwardVector, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<Wm3::Quatf>(), &mOrientation, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<Wm3::Quatf>(), &mOrientationChange, ownerRef);
 
     archive->ReadString(&mScriptName);
-    ReadFormationField(archive, CachedSCoordsVec2Type(), &mCoords, ownerRef);
+    ReadFormationField(archive, gpg::RTypeOf<moho::SCoordsVec2>(), &mCoords, ownerRef);
     archive->ReadFloat(&mScale);
 
     bool planUpdate = false;
@@ -2554,7 +2366,7 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    gpg::RType* const baseType = CachedCFormationInstanceType();
+    gpg::RType* const baseType = gpg::RTypeOf<moho::CFormationInstance>();
     GPG_ASSERT(baseType != nullptr);
     if (baseType) {
       archive->Read(baseType, this, owner);
@@ -2586,7 +2398,7 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    gpg::RType* const baseType = CachedCFormationInstanceType();
+    gpg::RType* const baseType = gpg::RTypeOf<moho::CFormationInstance>();
     GPG_ASSERT(baseType != nullptr);
     if (baseType) {
       archive->Write(baseType, this, owner);

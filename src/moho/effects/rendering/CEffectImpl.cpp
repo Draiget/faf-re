@@ -19,7 +19,7 @@ namespace
     }
 
     auto* const counted = static_cast<moho::CountedObject*>(texture);
-    counted->ReleaseReferenceAtomic();
+    (void)counted->ReleaseReferenceAtomic();
     texture = nullptr;
   }
 
@@ -57,7 +57,7 @@ namespace
     while (begin != end) {
       moho::CParticleTexture* const texture = *begin;
       if (texture != nullptr) {
-        static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
+        (void)static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
       }
       *begin = nullptr;
       ++begin;

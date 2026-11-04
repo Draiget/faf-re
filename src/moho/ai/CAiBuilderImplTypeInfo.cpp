@@ -54,14 +54,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAiBuilderType()
-  {
-    if (!IAiBuilder::sType) {
-      IAiBuilder::sType = gpg::LookupRType(typeid(IAiBuilder));
-    }
-    return IAiBuilder::sType;
-  }
-
   /**
    * Address: 0x005A1C20 (FUN_005A1C20)
    *
@@ -71,43 +63,14 @@ namespace
    */
   void AddIAiBuilderBaseToCAiBuilderImplType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedIAiBuilderType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnsignedIntType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(unsigned int));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(RUnitBlueprint));
-    }
-    return type;
+    gpg::AddReflectedBase<IAiBuilder>(typeInfo);
   }
 
   [[nodiscard]] gpg::RRef MakeBlueprintObjectRef(const RUnitBlueprint* const blueprint)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedRUnitBlueprintType();
+    out.mType = gpg::RTypeOf<RUnitBlueprint>();
     if (!blueprint) {
       return out;
     }
@@ -138,7 +101,7 @@ namespace
       return nullptr;
     }
 
-    gpg::RType* const expectedType = CachedRUnitBlueprintType();
+    gpg::RType* const expectedType = gpg::RTypeOf<RUnitBlueprint>();
     if (!expectedType || !tracked.type) {
       return static_cast<const RUnitBlueprint*>(tracked.object);
     }
@@ -282,7 +245,7 @@ void CAiBuilderImplTypeInfo::Init()
 const char* CAiBuilderRebuildMapTypeInfo::GetName() const
 {
   static const msvc8::string sName =
-    gpg::STR_Printf("map<%s,%s>", CachedUnsignedIntType()->GetName(), RUnitBlueprint::GetPointerType()->GetName());
+    gpg::STR_Printf("map<%s,%s>", gpg::RTypeOf<unsigned int>()->GetName(), RUnitBlueprint::GetPointerType()->GetName());
   return sName.c_str();
 }
 
