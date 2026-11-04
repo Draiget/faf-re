@@ -7,6 +7,7 @@
 #include <limits>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/StartupHelpers.h"
 
 namespace
@@ -586,7 +588,60 @@ namespace moho
   namespace
   {
     bool gKeepEntryData = true;
+
+    bool res_ZipKeepOpen = true;
+    TConVar<bool> gTConVar_res_ZipKeepOpen(
+      "res_ZipKeepOpen",
+      "A thread that is loading keeps each archive open between file reads (1, the default), or opens it for "
+      "every file (0). Same bytes. /nozipkeepopen turns it off at startup.",
+      &res_ZipKeepOpen
+    );
+
+    struct KeptArchive
+    {
+      std::string path;
+      std::unique_ptr<gpg::Stream> stream;
+    };
+
+    thread_local std::vector<KeptArchive>* tKeptArchives = nullptr;
+
+    /** This thread's open stream for `zipPath`, opened on first use; null outside a read scope. */
+    [[nodiscard]] gpg::Stream* KeptArchiveStream(const msvc8::string& zipPath)
+    {
+      if (tKeptArchives == nullptr) {
+        return nullptr;
+      }
+      const std::string_view path(zipPath.c_str());
+      for (const KeptArchive& kept : *tKeptArchives) {
+        if (kept.path == path) {
+          return kept.stream.get();
+        }
+      }
+      std::unique_ptr<gpg::Stream> stream = OpenZipBackingStream(zipPath);
+      if (stream == nullptr) {
+        return nullptr;
+      }
+      tKeptArchives->push_back(KeptArchive{std::string(path), std::move(stream)});
+      return tKeptArchives->back().stream.get();
+    }
   } // namespace
+
+  CZipFileReadScope::CZipFileReadScope()
+  {
+    static const bool startupOff = CFG_GetArgOption("/nozipkeepopen", 0u, nullptr);
+    if (res_ZipKeepOpen && !startupOff && tKeptArchives == nullptr) {
+      tKeptArchives = new std::vector<KeptArchive>();
+      mOwnsArchives = true;
+    }
+  }
+
+  CZipFileReadScope::~CZipFileReadScope()
+  {
+    if (mOwnsArchives) {
+      delete tKeptArchives;
+      tKeptArchives = nullptr;
+    }
+  }
 
   void CZipFile::SetKeepEntryData(const bool keep) noexcept
   {
@@ -614,7 +669,12 @@ namespace moho
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }
 
-    std::unique_ptr<gpg::Stream> zipStream = OpenZipBackingStream(mPath);
+    std::unique_ptr<gpg::Stream> openedStream;
+    gpg::Stream* zipStream = KeptArchiveStream(mPath);
+    if (zipStream == nullptr) {
+      openedStream = OpenZipBackingStream(mPath);
+      zipStream = openedStream.get();
+    }
     if (zipStream == nullptr) {
       return {};
     }

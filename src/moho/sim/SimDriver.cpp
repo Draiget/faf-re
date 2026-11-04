@@ -28,6 +28,7 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/CZipFile.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -1152,6 +1153,7 @@ void CSimDriver::ThreadCreateSim()
   // driver in Failed below (std::exception, FuncInfo 0x00F29740 try state 0,
   // handler 0x0073D4C7).
   try {
+    const CZipFileReadScope archives;
     mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
   } catch (const std::exception& error) {
     gpg::Logf("Sim::Create() crashed: %s", error.what());
