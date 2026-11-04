@@ -34,7 +34,7 @@ namespace
       return;
     }
 
-    static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
+    (void)static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
     texture = nullptr;
   }
 

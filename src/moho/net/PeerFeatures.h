@@ -8,6 +8,9 @@
 namespace moho
 {
   class CClientManagerImpl;
+  class CMessageStream;
+  class CMessageStream;
+  class CMessageStream;
   class CNetClient;
   struct CMessage;
 
@@ -21,7 +24,34 @@ namespace moho
   {
     /// `CommandStreamCheck`'s hash after the fields of `CLIMSG_Ack`.
     OrderStreamCheck = 0,
+    /// wld_SkewCorrection: this client's display clock keeps to real time.
+    SkewCorrection = 1,
+    /// net_FastRetransmit: this client acknowledges within net_FastAckDelay.
+    FastAck = 2,
+    /// Announced in the lobby: this client can prove a style (LobbyPeerFeatures.h).
+    SignedStyle = 3,
   };
+
+  /// The first payload byte of a peer features message; other values are feature traffic.
+  inline constexpr std::uint8_t kPeerKindAnnounce = 0;
+
+  /// What one announcement says, in the game and in the lobby alike.
+  struct SPeerAnnouncement
+  {
+    std::uint64_t mask{0};
+    std::string build;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t PeerFeatureBit(const EPeerFeature feature) noexcept
+  {
+    return std::uint64_t{1} << static_cast<std::uint8_t>(feature);
+  }
+
+  /// Writes the announcement payload, with this build's name.
+  void WritePeerAnnouncement(CMessageStream& stream, std::uint64_t mask);
+
+  /// False when the payload is not an announcement.
+  [[nodiscard]] bool ReadPeerAnnouncement(const char* payload, std::size_t size, SPeerAnnouncement& out);
 
   /**
    * Engine addition, not in the binary (issue #285): this client's announcement
@@ -42,6 +72,15 @@ namespace moho
     /// False for a client that has not announced: a retail client never does.
     [[nodiscard]] bool PeerSupports(int clientIndex, EPeerFeature feature) const;
 
+    /// How long `clientIndex` holds an acknowledgement, in ms: what it announced (`FastAck`), or as
+    /// this client does when it announced nothing.
+    [[nodiscard]] std::int32_t PeerAckDelayMs(int clientIndex) const;
+
+    /// wld_PreciseSharedStart: when this client's ready message was handled here, on the steady
+    /// clock in microseconds; the first time counts, and 0 means not yet.
+    void NoteReady(int clientIndex, std::int64_t handledUs);
+    [[nodiscard]] std::int64_t ReadyUs(int clientIndex) const;
+
     /// Whether this client and every client still in the game support `feature`.
     [[nodiscard]] bool EveryoneSupports(CClientManagerImpl& manager, EPeerFeature feature) const;
 
@@ -52,8 +91,8 @@ namespace moho
     struct SPeer
     {
       bool announced{false};
-      std::uint64_t mask{0};
-      std::string build;
+      SPeerAnnouncement announcement;
+      std::int64_t readyUs{0};
     };
     std::vector<SPeer> mPeers;
   };

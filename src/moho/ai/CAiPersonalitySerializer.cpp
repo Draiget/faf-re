@@ -141,15 +141,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedSValuePairType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(SValuePair));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005B65E0 (FUN_005B65E0, preregister_SValuePairTypeInfo)
    *
@@ -228,7 +219,7 @@ SValuePairSerializer::SValuePairSerializer()
 
 void SValuePairSerializer::Init()
 {
-  gpg::RType* const type = CachedSValuePairType();
+  gpg::RType* const type = gpg::RTypeOf<SValuePair>();
   GPG_ASSERT(type != nullptr);
   GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
   GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);

@@ -1,5 +1,7 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
+#include "moho/animation/AniPoseBones.h"
 #include "moho/ai/CAimManipulator.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "legacy/math/X87Math.h"
 
 #include <cmath>
@@ -35,6 +37,7 @@
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/task/CTaskEvent.h"
 #include "moho/unit/core/Unit.h"
@@ -54,7 +57,6 @@ moho::CScrLuaMetatableFactory<moho::CAimManipulator>
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kAimManipulatorLuaClassName = "CAimManipulator";
 
   constexpr const char* kCAimManipulatorSetFiringArcName = "SetFiringArc";
@@ -201,97 +203,22 @@ namespace
     return archive;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitWeaponType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::UnitWeapon>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Quaternionf));
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
     return {};
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  /**
+   * The projectile blueprint whose `Physics` member `physics` is, or null.
+   */
+  [[nodiscard]] moho::RProjectileBlueprint*
+  ProjectileBlueprintOfPhysics(const moho::RProjectileBlueprintPhysics* const physics) noexcept
   {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
-  {
-    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
+    if (physics == nullptr) {
       return nullptr;
     }
-
-    moho::CAniPose* const pose = actor->mPose.get();
-    moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
-    moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
-    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
-      return nullptr;
-    }
-
-    const std::ptrdiff_t boneCount = bonesEnd - bonesBegin;
-    if (boneIndex >= boneCount) {
-      return nullptr;
-    }
-
-    return &bonesBegin[boneIndex];
+    auto* const bytes = reinterpret_cast<const std::uint8_t*>(physics) - offsetof(moho::RProjectileBlueprint, Physics);
+    return const_cast<moho::RProjectileBlueprint*>(reinterpret_cast<const moho::RProjectileBlueprint*>(bytes));
   }
 
   [[nodiscard]] moho::CAniPoseBone* ResolveWatchBone(
@@ -302,7 +229,7 @@ namespace
       return nullptr;
     }
 
-    return ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones[watchIndex].mBoneIndex);
+    return moho::ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones[watchIndex].mBoneIndex);
   }
 
   [[nodiscard]] std::string ToStdString(const msvc8::string& value)
@@ -781,7 +708,7 @@ gpg::RType* moho::CAimManipulator::GetClass() const
  */
 gpg::RRef moho::CAimManipulator::GetDerivedObjectRef()
 {
-  return MakeDerivedRef(this, CachedCAimManipulatorType());
+  return gpg::MakeDerivedRef(this, CachedCAimManipulatorType());
 }
 
 /**
@@ -1186,7 +1113,7 @@ int moho::cfunc_CAimManipulatorSetFiringArc(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorSetFiringArc_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorSetFiringArcName,
     &moho::cfunc_CAimManipulatorSetFiringArc,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1206,10 +1133,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorSetFiringArc_LuaFuncDef()
 int moho::cfunc_CAimManipulatorSetFiringArcL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 7) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCAimManipulatorSetFiringArcHelpText, 7, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 7, kCAimManipulatorSetFiringArcHelpText);
 
   const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = SCR_FromLua_CAimManipulator(manipulatorObject, state);
@@ -1568,7 +1492,7 @@ int moho::cfunc_CAimManipulatorSetResetPoseTime(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorSetResetPoseTime_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorSetResetPoseTimeName,
     &moho::cfunc_CAimManipulatorSetResetPoseTime,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1588,16 +1512,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorSetResetPoseTime_LuaFuncDef()
 int moho::cfunc_CAimManipulatorSetResetPoseTimeL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgsWarning,
-      kCAimManipulatorSetResetPoseTimeHelpText,
-      2,
-      argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCAimManipulatorSetResetPoseTimeHelpText);
 
   const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = SCR_FromLua_CAimManipulator(manipulatorObject, state);
@@ -1635,7 +1550,7 @@ int moho::cfunc_CAimManipulatorOnTarget(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorOnTarget_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorOnTargetName,
     &moho::cfunc_CAimManipulatorOnTarget,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1654,10 +1569,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorOnTarget_LuaFuncDef()
 int moho::cfunc_CAimManipulatorOnTargetL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCAimManipulatorOnTargetHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCAimManipulatorOnTargetHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
@@ -1688,7 +1600,7 @@ int moho::cfunc_CAimManipulatorSetEnabled(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorSetEnabled_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorSetEnabledName,
     &moho::cfunc_CAimManipulatorSetEnabled,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1707,11 +1619,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorSetEnabled_LuaFuncDef()
  */
 int moho::cfunc_CAimManipulatorSetEnabledL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCAimManipulatorSetEnabledHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCAimManipulatorSetEnabledHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
@@ -1742,7 +1650,7 @@ int moho::cfunc_CAimManipulatorGetHeadingPitch(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorGetHeadingPitch_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorGetHeadingPitchName,
     &moho::cfunc_CAimManipulatorGetHeadingPitch,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1761,10 +1669,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorGetHeadingPitch_LuaFuncDef()
 int moho::cfunc_CAimManipulatorGetHeadingPitchL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCAimManipulatorGetHeadingPitchHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCAimManipulatorGetHeadingPitchHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
@@ -1797,7 +1702,7 @@ int moho::cfunc_CAimManipulatorSetHeadingPitch(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorSetHeadingPitch_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorSetHeadingPitchName,
     &moho::cfunc_CAimManipulatorSetHeadingPitch,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1817,10 +1722,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorSetHeadingPitch_LuaFuncDef()
 int moho::cfunc_CAimManipulatorSetHeadingPitchL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCAimManipulatorSetHeadingPitchHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kCAimManipulatorSetHeadingPitchHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
@@ -1862,7 +1764,7 @@ int moho::cfunc_CAimManipulatorSetAimHeadingOffset(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CAimManipulatorSetAimHeadingOffset_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCAimManipulatorSetAimHeadingOffsetName,
     &moho::cfunc_CAimManipulatorSetAimHeadingOffset,
     &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
@@ -1881,16 +1783,7 @@ moho::CScrLuaInitForm* moho::func_CAimManipulatorSetAimHeadingOffset_LuaFuncDef(
 int moho::cfunc_CAimManipulatorSetAimHeadingOffsetL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgsWarning,
-      kCAimManipulatorSetAimHeadingOffsetHelpText,
-      2,
-      argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCAimManipulatorSetAimHeadingOffsetHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
@@ -1920,16 +1813,17 @@ void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   const gpg::RRef ownerRef = NullOwnerRef();
 
   archive->Read(CachedIAniManipulatorType(), this, ownerRef);
-  archive->Read(CachedWeakPtrUnitType(), &mUnit, ownerRef);
-  archive->Read(CachedWeakPtrUnitWeaponType(), &mWeapon, ownerRef);
+  archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mUnit, ownerRef);
+  archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::UnitWeapon>>(), &mWeapon, ownerRef);
   archive->ReadString(&mLabel);
 
   archive->ReadPointer(&mUnitWepBlueprint, &ownerRef);
 
+  const bool exact = gSimExactArchive.load(std::memory_order_relaxed);
   if (UnitWeapon* const weapon = mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* projectileBlueprint = weapon->mProjectileBlueprint;
     archive->ReadPointer(&projectileBlueprint, &ownerRef);
-    if (projectileBlueprint != nullptr) {
+    if (projectileBlueprint != nullptr && !exact) {
       mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
@@ -1949,9 +1843,16 @@ void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadBool(&mUnknownBoolE1);
   archive->ReadInt(&mResetPoseTime);
   archive->ReadInt(&mResetTime);
-  archive->Read(CachedQuaternionfType(), &mHeadingRot, ownerRef);
-  archive->Read(CachedQuaternionfType(), &mPitchRot, ownerRef);
+  archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &mHeadingRot, ownerRef);
+  archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &mPitchRot, ownerRef);
   archive->ReadFloat(&mHeadingOffset);
+
+  // Engine addition (keyframes): `MemberSerialize`'s exact-mode tail.
+  if (exact) {
+    RProjectileBlueprint* cachedBlueprint = nullptr;
+    archive->ReadPointer(&cachedBlueprint, &ownerRef);
+    mProjPhysBlueprint = cachedBlueprint != nullptr ? &cachedBlueprint->Physics : nullptr;
+  }
 }
 
 /**
@@ -1975,16 +1876,17 @@ void moho::CAimManipulator::MemberSerialize(gpg::WriteArchive* const archive) co
   CAimManipulator* const self = const_cast<CAimManipulator*>(this);
 
   archive->Write(CachedIAniManipulatorType(), this, ownerRef);
-  archive->Write(CachedWeakPtrUnitType(), &mUnit, ownerRef);
-  archive->Write(CachedWeakPtrUnitWeaponType(), &mWeapon, ownerRef);
+  archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mUnit, ownerRef);
+  archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::UnitWeapon>>(), &mWeapon, ownerRef);
   archive->WriteString(&self->mLabel);
 
   archive->WritePointer<moho::RUnitBlueprintWeapon>(mUnitWepBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
+  const bool exact = gSimExactArchive.load(std::memory_order_relaxed);
   if (UnitWeapon* const weapon = mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
     archive->WritePointer<moho::RProjectileBlueprint>(projectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
-    if (projectileBlueprint != nullptr) {
+    if (projectileBlueprint != nullptr && !exact) {
       self->mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
@@ -2004,9 +1906,16 @@ void moho::CAimManipulator::MemberSerialize(gpg::WriteArchive* const archive) co
   archive->WriteBool(mUnknownBoolE1);
   archive->WriteInt(mResetPoseTime);
   archive->WriteInt(mResetTime);
-  archive->Write(CachedQuaternionfType(), &mHeadingRot, ownerRef);
-  archive->Write(CachedQuaternionfType(), &mPitchRot, ownerRef);
+  archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &mHeadingRot, ownerRef);
+  archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &mPitchRot, ownerRef);
   archive->WriteFloat(mHeadingOffset);
+
+  // Engine addition (keyframes): the cached physics as it is, which may be null or an older
+  // projectile blueprint than the weapon's current one; retail stores neither.
+  if (exact) {
+    RProjectileBlueprint* const cachedBlueprint = ProjectileBlueprintOfPhysics(mProjPhysBlueprint);
+    archive->WritePointer<moho::RProjectileBlueprint>(cachedBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
 }
 
 namespace gpg
@@ -2024,7 +1933,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeDerivedRef(value, CachedCAimManipulatorType());
+    *outRef = gpg::MakeDerivedRef(value, CachedCAimManipulatorType());
     return outRef;
   }
 

@@ -558,19 +558,13 @@ namespace
     if (particle.mTexture.tex != nullptr) {
       particle.mTexture.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&key->texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture0)
-    );
+    boost::AssignSharedPairRetain(&key->texture0, &texture0);
 
     moho::CParticleTexture::TextureResourceHandle texture1{};
     if (particle.mRampTexture.tex != nullptr) {
       particle.mRampTexture.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&key->texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture1)
-    );
+    boost::AssignSharedPairRetain(&key->texture1, &texture1);
 
     key->tag.assign(particle.mTypeTag, 0U, msvc8::string::npos);
     key->blendMode = static_cast<std::int32_t>(particle.mBlendMode);

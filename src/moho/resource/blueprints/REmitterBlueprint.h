@@ -225,7 +225,7 @@ namespace moho
      * What it does:
      * Returns cached reflection descriptor for `REmitterBlueprint`.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0050E730 (FUN_0050E730)
@@ -234,7 +234,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflection reference handle.
      */
-    gpg::RRef GetDerivedObjectRef();
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0050EAE0 (FUN_0050EAE0)

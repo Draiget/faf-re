@@ -300,6 +300,122 @@ jobs:
           path: out
           retention-days: 3
 
+  # The x86 headless for tests/replay_sets: no inlining and no folding, each function hooked by the
+  # recorder (tools/retail-recorder/README.md, FAF_CALL_HASH_BUILD in CMakeLists.txt). Built with no
+  # secrets, like the other builds.
+  build-call-hash:
+    needs: [plan, windows-downloads]
+    if: contains(fromJSON(needs.plan.outputs.platforms), 'windows-x86')
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+          allow-unsafe-pr-checkout: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          restore-keys: windows-downloads-${{ env.LLVM_VERSION }}-
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - shell: pwsh
+        run: |
+          $exe = "llvm-installer/LLVM-$env:LLVM_VERSION-win64.exe"
+          if (-not (Test-Path $exe)) {
+            New-Item -ItemType Directory -Force llvm-installer | Out-Null
+            Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/LLVM-$env:LLVM_VERSION-win64.exe" -OutFile $exe
+          }
+          Start-Process -FilePath $exe -ArgumentList "/S", "/D=C:\llvm-$env:LLVM_VERSION" -Wait
+          "LLVM_ROOT=C:\llvm-$env:LLVM_VERSION" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          python -m pip install --disable-pip-version-check ninja
+      - shell: pwsh
+        run: |
+          cmake --preset clang-x86-release -B build/call-hash -DFAF_CALL_HASH_BUILD=ON
+          cmake --build build/call-hash --target headless
+          New-Item -ItemType Directory -Force out/src | Out-Null
+          Copy-Item build/call-hash/src/headless.exe, build/call-hash/src/headless.pdb out/src/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: headless-call-hash
+          path: out
+          retention-days: 3
+
+  # tests/replay_sets: the stored per-function call hashes of the original game, on the core set.
+  # A failure here names the function that changed, where a checksum only names the beat. The
+  # tools are the workflow's own commit; the exe is the pull request's, as in the play jobs.
+  replay-sets:
+    needs: [plan, data, build-call-hash]
+    if: >
+      !cancelled() && needs.data.result == 'success' && needs.build-call-hash.result == 'success'
+    runs-on: windows-2022
+    timeout-minutes: 240
+    environment:
+      name: parity
+      deployment: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      # llvm-pdbutil and llvm-objdump, which the recorder's spec step looks for in the default folder.
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          restore-keys: windows-downloads-${{ env.LLVM_VERSION }}-
+      - shell: pwsh
+        run: |
+          $exe = "llvm-installer/LLVM-$env:LLVM_VERSION-win64.exe"
+          if (-not (Test-Path $exe)) {
+            New-Item -ItemType Directory -Force llvm-installer | Out-Null
+            Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/LLVM-$env:LLVM_VERSION-win64.exe" -OutFile $exe
+          }
+          Start-Process -FilePath $exe -ArgumentList "/S" -Wait
+      - uses: actions/download-artifact@v8
+        with:
+          name: headless-call-hash
+          path: call-hash
+      - uses: actions/download-artifact@v8
+        with:
+          name: data
+          path: data
+      - env:
+          KEY: ${{ secrets.PARITY_RETAIL_KEY }}
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in data/retail.enc -out retail.tar.xz
+          rm data/retail.enc
+          python -c "import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2], filter='data')" retail.tar.xz data/game
+          rm retail.tar.xz
+      - shell: cmd
+        run: tools\retail-recorder\build.bat
+      - shell: bash
+        run: >
+          python tools/parity-data/sets_stage.py --sets tests/replay_sets --pack data/game --replays data/replays
+          --maps data/maps --m28 data/m28 --work work --pool pool --game-version "$GAME_VERSION"
+      - shell: pwsh
+        run: >
+          tools\retail-recorder\check_replay_sets.ps1 -BuildDir "$PWD\call-hash" -Pool "$PWD\pool"
+          -GameBin "$PWD\data\game\bin" -InitPattern 'init_{0}.lua'
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: replay-sets-report
+          path: |
+            tools/retail-recorder/bisect/*.report
+            tools/retail-recorder/bisect/*.console
+            tools/retail-recorder/bisect/*.log
+          retention-days: 30
+
   play:
     needs: [plan, data, build-linux, build-windows]
     # A build left out of `platforms` is skipped, not failed. A failed build stops every play job

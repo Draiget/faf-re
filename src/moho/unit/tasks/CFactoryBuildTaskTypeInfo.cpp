@@ -33,6 +33,23 @@ namespace
       task->~CFactoryBuildTask();
     }
   }
+
+  /**
+   * Address: 0x005FD420 (FUN_005FD420, func_RTypeAddBaseCCommandTask)
+   *
+   * What it does:
+   * Registers `CCommandTask` as the zero-offset reflected base, looking its type up once into
+   * `CCommandTask::sType` (0x010C6FF4). `Init` (0x005FA190) is its only caller.
+   */
+  void AddBaseCCommandTask(gpg::RType* const typeInfo)
+  {
+    if (moho::CCommandTask::sType == nullptr) {
+      moho::CCommandTask::sType = gpg::LookupRType(typeid(moho::CCommandTask));
+    }
+
+    gpg::RType* const baseType = moho::CCommandTask::sType;
+    typeInfo->AddBase(gpg::RField{baseType->GetName(), baseType, 0, 0, nullptr});
+  }
 } // namespace
 
 namespace moho
@@ -57,6 +74,14 @@ namespace moho
     return "CFactoryBuildTask";
   }
 
+  /**
+   * Address: 0x005FA190 (FUN_005FA190, Moho::CFactoryBuildTaskTypeInfo::Init)
+   *
+   * What it does:
+   * Size and lifecycle callbacks, base init, the `CCommandTask` base (0x005FA1BC), then
+   * `Finish`. Without the base, saving a factory's build task failed `isDer` (it is written
+   * through `CTask*`).
+   */
   void CFactoryBuildTaskTypeInfo::Init()
   {
     size_ = sizeof(CFactoryBuildTask);
@@ -68,6 +93,7 @@ namespace moho
       &DestroyCFactoryBuildTaskInPlace
     );
     gpg::RType::Init();
+    AddBaseCCommandTask(this);
     Finish();
   }
 

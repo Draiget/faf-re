@@ -20,43 +20,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedCMauiControlUpcastType()
-  {
-    if (moho::CMauiControl::sType == nullptr) {
-      moho::CMauiControl::sType = gpg::LookupRType(typeid(moho::CMauiControl));
-    }
-    return moho::CMauiControl::sType;
-  }
-
-  /**
-   * Address: 0x00786160 (FUN_00786160)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CMauiBorder`.
-   */
-  [[nodiscard]] gpg::RType* CachedCMauiBorderUpcastType()
-  {
-    if (moho::CMauiBorder::sType == nullptr) {
-      moho::CMauiBorder::sType = gpg::LookupRType(typeid(moho::CMauiBorder));
-    }
-    return moho::CMauiBorder::sType;
-  }
-
-  /**
-   * Address: 0x0086A380 (FUN_0086A380)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for
-   * `CLuaWldUIProvider`.
-   */
-  [[nodiscard]] gpg::RType* CachedCLuaWldUIProviderUpcastType()
-  {
-    if (moho::CLuaWldUIProvider::sType == nullptr) {
-      moho::CLuaWldUIProvider::sType = gpg::LookupRType(typeid(moho::CLuaWldUIProvider));
-    }
-    return moho::CLuaWldUIProvider::sType;
-  }
-
   /**
    * Address: 0x0086ABA0 (FUN_0086ABA0)
    *
@@ -83,21 +46,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (cached == nullptr) {
       cached = gpg::LookupRType(typeid(moho::EMauiScrollAxis));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x0078D920 (FUN_0078D920)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CMauiCursor`.
-   */
-  [[nodiscard]] gpg::RType* CachedCMauiCursorUpcastType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::CMauiCursor));
     }
     return cached;
   }
@@ -132,21 +80,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (cached == nullptr) {
       cached = gpg::LookupRType(typeid(moho::EMauiKeyCode));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x00794E40 (FUN_00794E40)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CMauiEdit`.
-   */
-  [[nodiscard]] gpg::RType* CachedCMauiEditType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::CMauiEdit));
     }
     return cached;
   }
@@ -254,21 +187,6 @@ namespace
   }
 
   /**
-   * Address: 0x007A23C0 (FUN_007A23C0)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CMauiScrollbar`.
-   */
-  [[nodiscard]] gpg::RType* CachedCMauiScrollbarType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::CMauiScrollbar));
-    }
-    return cached;
-  }
-
-  /**
    * Address: 0x007A29B0 (FUN_007A29B0)
    *
    * What it does:
@@ -312,7 +230,7 @@ namespace
    */
   [[maybe_unused]] void* UpcastRefToCMauiControlObject(const gpg::RRef* const sourceRef)
   {
-    return UpcastObjectRef(sourceRef, CachedCMauiControlUpcastType());
+    return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiControl>());
   }
 
   /**
@@ -334,7 +252,7 @@ namespace
    */
   [[maybe_unused]] void* UpcastRefToCMauiBorderObject(const gpg::RRef* const sourceRef)
   {
-    return UpcastObjectRef(sourceRef, CachedCMauiBorderUpcastType());
+    return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiBorder>());
   }
 
   /**
@@ -345,7 +263,7 @@ namespace
    */
   [[maybe_unused]] void* UpcastRefToCMauiCursorObject(const gpg::RRef* const sourceRef)
   {
-    return UpcastObjectRef(sourceRef, CachedCMauiCursorUpcastType());
+    return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiCursor>());
   }
 
   /**
@@ -378,7 +296,7 @@ namespace
    */
   [[maybe_unused]] void* UpcastRefToCMauiEditObject(const gpg::RRef* const sourceRef)
   {
-    return UpcastObjectRef(sourceRef, CachedCMauiEditType());
+    return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiEdit>());
   }
 
   /**
@@ -433,7 +351,7 @@ namespace
    */
   [[maybe_unused]] void* UpcastRefToCMauiScrollbarObject(const gpg::RRef* const sourceRef)
   {
-    return UpcastObjectRef(sourceRef, CachedCMauiScrollbarType());
+    return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiScrollbar>());
   }
 
   /**
@@ -444,6 +362,6 @@ namespace
    */
   [[maybe_unused]] void* UpcastRefToCLuaWldUIProviderObject(const gpg::RRef* const sourceRef)
   {
-    return UpcastObjectRef(sourceRef, CachedCLuaWldUIProviderUpcastType());
+    return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CLuaWldUIProvider>());
   }
 } // namespace

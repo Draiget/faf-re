@@ -119,7 +119,7 @@ namespace faf::remote
   {
     wire::SEntityRecord record;
     wire::SUnitDetail detail;
-    std::uint64_t hash = 0; // `wire::HashBlipUpdate`: a view holding this one already skips it
+    std::uint64_t hash = 0; // `wire::HashBlipUpdate`: a view whose client holds this one already skips it
   };
 
   /**
@@ -442,7 +442,6 @@ namespace faf::remote
     std::vector<std::uint32_t> mFreeSlots;
     gpg::core::ChunkedVector<wire::SEntityRecord> mLocalRecords;      // this view's own records
     std::vector<std::uint32_t> mLocalSlots;                           // per slot: index into them, or `kNoLocal`
-    std::vector<std::uint64_t> mBlipHashes;                           // per slot: the blip update its record is, or 0
     std::vector<std::uint32_t> mFreeLocal;
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;

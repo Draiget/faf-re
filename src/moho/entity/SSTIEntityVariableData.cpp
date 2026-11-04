@@ -1,3 +1,4 @@
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 
 #include <cstddef>
@@ -16,6 +17,7 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/audio/CSndParams.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityId.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
@@ -203,6 +205,22 @@ namespace
   SSTIEntityAttachInfoSerializerHelper gSSTIEntityAttachInfoSerializer;
 
   /**
+   * `EntId`'s reflected type, the binary's global 0x010C6EE4 (descriptor 0x00F66EB8) that both
+   * callbacks below read (0x00558313, 0x00558353). It is not `SSTIEntityAttachInfo::sType`
+   * (0x010C6F04, the helper's Init): sharing that one wrote the attach info as itself, and a
+   * save recursed until the stack ran out.
+   */
+  [[nodiscard]] gpg::RType* CachedEntIdType()
+  {
+    static gpg::RType* sEntIdType = nullptr;
+    if (sEntIdType == nullptr) {
+      // `moho::EntId` is still an int typedef here; `EntIdValue` holds the class descriptor.
+      sEntIdType = gpg::RTypeOf<moho::EntIdValue>();
+    }
+    return sEntIdType;
+  }
+
+  /**
    * Address: 0x00558310 (FUN_00558310, Moho::SSTIEntityAttachInfoSerializer::Deserialize)
    *
    * What it does:
@@ -216,14 +234,8 @@ namespace
     gpg::RRef*
   )
   {
-    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::EntId));
-      moho::SSTIEntityAttachInfo::sType = type;
-    }
-
     const gpg::RRef entIdRef{};
-    archive->Read(type, reinterpret_cast<void*>(objectPtr), entIdRef);
+    archive->Read(CachedEntIdType(), reinterpret_cast<void*>(objectPtr), entIdRef);
   }
 
   /**
@@ -240,14 +252,8 @@ namespace
     gpg::RRef*
   )
   {
-    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::EntId));
-      moho::SSTIEntityAttachInfo::sType = type;
-    }
-
     const gpg::RRef entIdRef{};
-    archive->Write(type, reinterpret_cast<const void*>(objectPtr), entIdRef);
+    archive->Write(CachedEntIdType(), reinterpret_cast<const void*>(objectPtr), entIdRef);
   }
 
   /**
@@ -329,26 +335,11 @@ namespace
   }
 
 
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] gpg::RType* ResolveRScmResourceType()
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"RScmResource", "Moho::RScmResource"});
+      sType = gpg::REF_FindFirstTypeNamed({"RScmResource", "Moho::RScmResource"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(moho::RScmResource));
       }
@@ -360,28 +351,10 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"RMeshBlueprint", "Moho::RMeshBlueprint"});
+      sType = gpg::REF_FindFirstTypeNamed({"RMeshBlueprint", "Moho::RMeshBlueprint"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(moho::RMeshBlueprint));
       }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(Wm3::Vec3f));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVTransformType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::VTransform));
     }
     return sType;
   }
@@ -390,10 +363,9 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"EntId", "Moho::EntId", "int", "signed int"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(int));
-      }
+      // Retail's `Moho::EntId` class (EntIdSerializer's type), never `int`'s, which has no
+      // serializer.
+      sType = gpg::RTypeOf<moho::EntIdValue>();
     }
     return sType;
   }
@@ -407,7 +379,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"CSndParams", "Moho::CSndParams"});
+      sType = gpg::REF_FindFirstTypeNamed({"CSndParams", "Moho::CSndParams"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(moho::CSndParams));
       }
@@ -419,7 +391,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"EVisibilityMode", "Moho::EVisibilityMode"});
+      sType = gpg::REF_FindFirstTypeNamed({"EVisibilityMode", "Moho::EVisibilityMode"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(int));
       }
@@ -431,7 +403,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"ELayer", "Moho::ELayer"});
+      sType = gpg::REF_FindFirstTypeNamed({"ELayer", "Moho::ELayer"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(int));
       }
@@ -443,7 +415,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"EntityAttributes", "Moho::EntityAttributes", "SSTIIntelAttributes"});
+      sType = gpg::REF_FindFirstTypeNamed({"EntityAttributes", "Moho::EntityAttributes", "SSTIIntelAttributes"});
       if (!sType) {
         sType = moho::preregister_EntityAttributesTypeInfo();
       }
@@ -651,7 +623,7 @@ namespace moho
     (void)archive->ReadPointer(&meshBlueprint, &ownerRef);
     mMeshBlueprint = meshBlueprint;
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vec3f>();
     GPG_ASSERT(vector3Type != nullptr);
     archive->Read(vector3Type, &mScale, ownerRef);
     archive->ReadFloat(&mHealth);
@@ -660,7 +632,7 @@ namespace moho
     ReadBoolByte(archive, mIsDead);
     ReadBoolByte(archive, mRequestRefreshUI);
 
-    gpg::RType* const transformType = ResolveVTransformType();
+    gpg::RType* const transformType = gpg::RTypeOf<moho::VTransform>();
     GPG_ASSERT(transformType != nullptr);
     archive->Read(transformType, &mCurTransform, ownerRef);
     archive->Read(transformType, &mLastTransform, ownerRef);
@@ -733,7 +705,7 @@ namespace moho
 
     archive->WritePointer<moho::RMeshBlueprint>(const_cast<RMeshBlueprint*>(mMeshBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vec3f>();
     GPG_ASSERT(vector3Type != nullptr);
     archive->Write(vector3Type, &mScale, ownerRef);
     archive->WriteFloat(mHealth);
@@ -742,7 +714,7 @@ namespace moho
     archive->WriteBool(mIsDead != 0u);
     archive->WriteBool(mRequestRefreshUI != 0u);
 
-    gpg::RType* const transformType = ResolveVTransformType();
+    gpg::RType* const transformType = gpg::RTypeOf<moho::VTransform>();
     GPG_ASSERT(transformType != nullptr);
     archive->Write(transformType, &mCurTransform, ownerRef);
     archive->Write(transformType, &mLastTransform, ownerRef);
@@ -780,7 +752,12 @@ namespace moho
     // written with `WriteInt` (0x0055A11D) instead of `WriteBool`. The patch
     // only swapped the call, so the value is still the zero-extended
     // alt-footprint byte (`movzx ecx, byte ptr [edi+0A4h]`).
-    archive->WriteInt(static_cast<int>(mUsingAltFootprint));
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      // Engine addition (replay keyframes): the second byte too; the patched save above loses it.
+      archive->WriteInt(static_cast<int>(mUsingAltFootprint) | (static_cast<int>(mUsingAltFootprintSecondary) << 8));
+    } else {
+      archive->WriteInt(static_cast<int>(mUsingAltFootprint));
+    }
 
     gpg::RType* const attributesType = ResolveEntityAttributesType();
     GPG_ASSERT(attributesType != nullptr);

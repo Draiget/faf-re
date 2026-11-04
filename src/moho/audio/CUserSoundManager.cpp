@@ -1,4 +1,6 @@
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/audio/CUserSoundManager.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <Windows.h>
 
@@ -57,7 +59,6 @@ namespace
   // the shipped image. Above this listener metric no entity loop is started.
   constexpr float kEntityLoopListenerCutoff = 200.0f;
   constexpr const char* kAngleVariableName = "Angle";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgsRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kPlaySoundHelpText = "handle = PlaySound(sndParams,prepareOnly)";
   constexpr const char* kPauseSoundHelpText = "PauseSound(categoryString,bPause)";
@@ -238,25 +239,6 @@ namespace
 
   void EnsureSoundCounterStat(moho::StatItem*& slot, const char* statPath);
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return set;
-    }
-
-    return moho::SCR_FindLuaInitFormSet("User");
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
-
 
 
   // The record's three tracked-entity lanes *are* the set object; keep the
@@ -334,10 +316,7 @@ namespace
 
     EnsureSoundCounterStat(gEngineStatSoundActiveEntityLoops, "Sound_ActiveEntityLoops");
     if (gEngineStatSoundActiveEntityLoops != nullptr) {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&gEngineStatSoundActiveEntityLoops->mPrimaryValueBits),
-        1L
-      );
+      (void)gEngineStatSoundActiveEntityLoops->AddPrimaryBits(1);
     }
   }
 
@@ -425,11 +404,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
   /**
@@ -826,10 +801,7 @@ namespace moho
     }
 
     if (gEngineStatSoundActiveEntityLoops != nullptr) {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&gEngineStatSoundActiveEntityLoops->mPrimaryValueBits),
-        -1L
-      );
+      (void)gEngineStatSoundActiveEntityLoops->AddPrimaryBits(-1);
     }
   }
 
@@ -1055,10 +1027,7 @@ namespace moho
 
         EnsureSoundCounterStat(gEngineStatSoundStopEntityLoop, "Sound_StopEntityLoop");
         if (gEngineStatSoundStopEntityLoop != nullptr) {
-          (void)::InterlockedExchangeAdd(
-            reinterpret_cast<volatile long*>(&gEngineStatSoundStopEntityLoop->mPrimaryValueBits),
-            1L
-          );
+          (void)gEngineStatSoundStopEntityLoop->AddPrimaryBits(1);
         }
 
         if (filterResult == EFilterType::DistanceCulled) {
@@ -1215,20 +1184,14 @@ namespace moho
     if (AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0) {
       EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
       if (gEngineStatSoundLimitedLoop != nullptr) {
-        (void)::InterlockedExchangeAdd(
-          reinterpret_cast<volatile long*>(&gEngineStatSoundLimitedLoop->mPrimaryValueBits),
-          1L
-        );
+        (void)gEngineStatSoundLimitedLoop->AddPrimaryBits(1);
       }
       return;
     }
 
     EnsureSoundCounterStat(gEngineStatSoundStartEntityLoop, "Sound_StartEntityLoop");
     if (gEngineStatSoundStartEntityLoop != nullptr) {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&gEngineStatSoundStartEntityLoop->mPrimaryValueBits),
-        1L
-      );
+      (void)gEngineStatSoundStartEntityLoop->AddPrimaryBits(1);
     }
 
     if (snd_SpewSound) {
@@ -1856,7 +1819,7 @@ namespace moho
    */
   CScrLuaInitForm* func_PlaySound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "PlaySound", &cfunc_PlaySound, nullptr, "<global>", kPlaySoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PlaySound", &cfunc_PlaySound, nullptr, "<global>", kPlaySoundHelpText);
     return &binder;
   }
 
@@ -1915,7 +1878,7 @@ namespace moho
    */
   CScrLuaInitForm* func_PauseSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText);
     return &binder;
   }
 
@@ -1935,10 +1898,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPauseSoundHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kPauseSoundHelpText);
 
     LuaPlus::LuaStackObject categoryArg(state, 1);
     const char* const categoryPtr = lua_tostring(rawState, 1);
@@ -1979,7 +1939,7 @@ namespace moho
    */
   CScrLuaInitForm* func_PauseVoice_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText);
     return &binder;
   }
 
@@ -1999,10 +1959,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPauseVoiceHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kPauseVoiceHelpText);
 
     LuaPlus::LuaStackObject categoryArg(state, 1);
     const char* const categoryPtr = lua_tostring(rawState, 1);
@@ -2044,7 +2001,7 @@ namespace moho
   CScrLuaInitForm* func_SoundIsPrepared_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "SoundIsPrepared",
       &cfunc_SoundIsPrepared,
       nullptr,
@@ -2064,10 +2021,7 @@ namespace moho
   int cfunc_SoundIsPreparedL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSoundIsPreparedHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kSoundIsPreparedHelpText);
 
     bool isPrepared = true;
     if (lua_type(rawState, 1) != LUA_TNIL) {
@@ -2102,7 +2056,7 @@ namespace moho
    */
   CScrLuaInitForm* func_StartSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "StartSound", &cfunc_StartSound, nullptr, "<global>", kStartSoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "StartSound", &cfunc_StartSound, nullptr, "<global>", kStartSoundHelpText);
     return &binder;
   }
 
@@ -2116,10 +2070,7 @@ namespace moho
   int cfunc_StartSoundL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kStartSoundHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kStartSoundHelpText);
 
     if (lua_type(rawState, 1) != LUA_TNIL) {
       const LuaPlus::LuaObject soundObject(LuaPlus::LuaStackObject(state, 1));
@@ -2168,7 +2119,7 @@ namespace moho
   CScrLuaInitForm* func_SetVolume_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "SetVolume", &cfunc_SetVolume, nullptr, "<global>", kSetVolumeHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "SetVolume", &cfunc_SetVolume, nullptr, "<global>", kSetVolumeHelpText);
     return &binder;
   }
 
@@ -2182,10 +2133,7 @@ namespace moho
   int cfunc_SetVolumeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetVolumeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetVolumeHelpText);
 
     CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
     if (userSound != nullptr) {
@@ -2227,7 +2175,7 @@ namespace moho
   CScrLuaInitForm* func_GetVolume_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "GetVolume", &cfunc_GetVolume, nullptr, "<global>", kGetVolumeHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "GetVolume", &cfunc_GetVolume, nullptr, "<global>", kGetVolumeHelpText);
     return &binder;
   }
 
@@ -2241,10 +2189,7 @@ namespace moho
   int cfunc_GetVolumeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetVolumeHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetVolumeHelpText);
 
     CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
     if (userSound != nullptr) {
@@ -2281,7 +2226,7 @@ namespace moho
   CScrLuaInitForm* func_StopSound_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "StopSound", &cfunc_StopSound, nullptr, "<global>", kStopSoundHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "StopSound", &cfunc_StopSound, nullptr, "<global>", kStopSoundHelpText);
     return &binder;
   }
 
@@ -2327,11 +2272,7 @@ namespace moho
   int cfunc_StopAllSounds(lua_State* const luaContext)
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kStopAllSoundsHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kStopAllSoundsHelpText);
 
     if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
       userSound->StopAllSounds();
@@ -2349,7 +2290,7 @@ namespace moho
   CScrLuaInitForm* func_StopAllSounds_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "StopAllSounds", &cfunc_StopAllSounds, nullptr, "<global>", kStopAllSoundsHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "StopAllSounds", &cfunc_StopAllSounds, nullptr, "<global>", kStopAllSoundsHelpText);
     return &binder;
   }
 
@@ -2362,11 +2303,7 @@ namespace moho
   int cfunc_DisableWorldSounds(lua_State* const luaContext)
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDisableWorldSoundsHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kDisableWorldSoundsHelpText);
 
     if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
       userSound->EnableWorldSounds(false);
@@ -2384,7 +2321,7 @@ namespace moho
   CScrLuaInitForm* func_DisableWorldSounds_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "DisableWorldSounds",
       &cfunc_DisableWorldSounds,
       nullptr,
@@ -2403,11 +2340,7 @@ namespace moho
   int cfunc_EnableWorldSounds(lua_State* const luaContext)
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEnableWorldSoundsHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kEnableWorldSoundsHelpText);
 
     if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
       userSound->EnableWorldSounds(true);
@@ -2425,7 +2358,7 @@ namespace moho
   CScrLuaInitForm* func_EnableWorldSounds_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "EnableWorldSounds",
       &cfunc_EnableWorldSounds,
       nullptr,
@@ -2455,7 +2388,7 @@ namespace moho
   CScrLuaInitForm* func_PlayTutorialVO_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "PlayTutorialVO",
       &cfunc_PlayTutorialVO,
       nullptr,
@@ -2474,10 +2407,7 @@ namespace moho
   int cfunc_PlayTutorialVOL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPlayTutorialVOHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kPlayTutorialVOHelpText);
 
     const LuaPlus::LuaObject paramsObject(LuaPlus::LuaStackObject(state, 1));
     CSndParams* const params = *func_GetCObj_CSndParams(paramsObject);
@@ -2523,7 +2453,7 @@ namespace moho
   CScrLuaInitForm* func_PlayVoice_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "PlayVoice", &cfunc_PlayVoice, nullptr, "<global>", kPlayVoiceHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "PlayVoice", &cfunc_PlayVoice, nullptr, "<global>", kPlayVoiceHelpText);
     return &binder;
   }
 

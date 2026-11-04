@@ -36,6 +36,30 @@ namespace moho
       &gpg::gal::gPlacedResources
     );
 
+    /** Engine addition: `d3d_SharedBuffers` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_d3d_SharedBuffers(
+      "d3d_SharedBuffers",
+      "Direct3D 12: small static buffers sit at offsets inside large buffers (1, the default), or each takes at "
+      "least 64 KB of a heap (0). Needs d3d_PlacedResources. Read at each creation.",
+      &gpg::gal::gSharedBuffers
+    );
+
+    /** Engine addition: `ren_ReleaseBufferCopies` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_ReleaseBufferCopies(
+      "ren_ReleaseBufferCopies",
+      "Direct3D 12 / Vulkan: free the CPU copy of a static buffer its owner won't lock again, such as a mesh's (1, the "
+      "default), or keep every copy (0). Read when the owner releases it.",
+      &gpg::gal::gReleaseBufferCopies
+    );
+
+    /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */
+    TConVar<int> gTConVar_d3d_UploadIdleMB(
+      "d3d_UploadIdleMB",
+      "Direct3D 12: megabytes of idle upload pages kept for reuse; past it they are given back. Each page is 8 MB of "
+      "committed process memory. Read at each retire.",
+      &gpg::gal::gUploadIdleMB
+    );
+
     /** Engine addition: `ren_DdsDirectLoad` (see gpg/gal/backends/common/ImageCodec.h). */
     TConVar<bool> gTConVar_ren_DdsDirectLoad(
       "ren_DdsDirectLoad",

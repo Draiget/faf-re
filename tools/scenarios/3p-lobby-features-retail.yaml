@@ -1,0 +1,42 @@
+name: 3p-lobby-features-retail
+description: >
+  The shipped game hosts two of our x64 clients, one holding a style key. Ours must
+  see each other and not retail, the style must be proven between ours, retail must
+  log the one lobby message it ignores from each of them.
+  Needs peer_style.key in bin_x64 and
+  init_mpemu_localvault.lua in the FAF bin folder. Do not click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef }
+  - { uid: 2, name: KeyPeer, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\peerstyle_test.exe' }
+  - { uid: 3, name: NoKey, faction: aeon, exe: '%ProgramData%\FAForever\bin_x64\peerstyle_test.exe', args: ['/peerstylekey', 'no-such-file.key'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: [1], pattern: 'Ignoring unrecognized lobby message w/ type 112' }
+    - { uids: [3], pattern: 'PEERS: lobby player \d+:KeyPeer has style [0-9a-f]{6}' }
+  logsAbsent:
+    - { uids: [2, 3], pattern: 'PEERS: lobby player \d+:Retail' }

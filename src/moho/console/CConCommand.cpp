@@ -129,20 +129,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
   [[nodiscard]]
   bool TokenEq(const msvc8::string* token, const std::string_view text) noexcept
   {
@@ -1371,10 +1357,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kConTextMatchesHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kConTextMatchesHelpText);
 
     LuaPlus::LuaStackObject prefixStack(state, 1);
     const char* const prefix = lua_tostring(rawState, 1);
@@ -1452,7 +1435,7 @@ int moho::cfunc_ConTextMatches(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ConTextMatches_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConTextMatches",
     &moho::cfunc_ConTextMatches,
     nullptr,
@@ -1515,7 +1498,7 @@ int moho::cfunc_ConExecuteSave(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ConExecute_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConExecute",
     &moho::cfunc_ConExecute,
     nullptr,
@@ -1534,7 +1517,7 @@ moho::CScrLuaInitForm* moho::func_ConExecute_LuaFuncDef()
 moho::CScrLuaInitForm* moho::func_ConExecuteSave_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConExecuteSave",
     &moho::cfunc_ConExecuteSave,
     nullptr,
@@ -2318,7 +2301,7 @@ namespace
 bool moho::dbg_MonitorAddressSpace = false;
 float moho::dump_Rate = 30.0f;
 float moho::efx_WaveCutoff = 400.0f;
-float moho::sc_FrameTimeClamp = 10.0f;
+float moho::sc_FrameTimeClamp = 4.0f; // engine change: the binary has 10 ms, which caps the game at 100 FPS
 bool moho::sc_SkipIntro = false;
 
 namespace moho

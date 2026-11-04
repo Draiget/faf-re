@@ -13,15 +13,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSPickUpInfoType()
-  {
-    gpg::RType* type = moho::SPickUpInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SPickUpInfo));
-      moho::SPickUpInfo::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RVectorType_SPickUpInfo& AcquireSPickUpInfoVectorType()
   {
@@ -50,7 +41,7 @@ namespace
  */
 const char* gpg::RVectorType_SPickUpInfo::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSPickUpInfoType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::SPickUpInfo>()->GetName());
     return sName.c_str();
 }
 
@@ -121,7 +112,7 @@ void gpg::RVectorType_SPickUpInfo::SerLoad(
   loaded.reserve(count);
   for (unsigned int i = 0u; i < count; ++i) {
     moho::SPickUpInfo element;
-    archive->Read(CachedSPickUpInfoType(), &element, gpg::RRef{});
+    archive->Read(gpg::RTypeOf<moho::SPickUpInfo>(), &element, gpg::RRef{});
     loaded.push_back(element);
   }
 
@@ -147,7 +138,7 @@ void gpg::RVectorType_SPickUpInfo::SerSave(
   const unsigned int count = static_cast<unsigned int>(storage.size());
   archive->WriteUInt(count);
   for (unsigned int i = 0u; i < count; ++i) {
-    archive->Write(CachedSPickUpInfoType(), &storage[i], *ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SPickUpInfo>(), &storage[i], *ownerRef);
   }
 }
 

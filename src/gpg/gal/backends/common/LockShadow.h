@@ -40,6 +40,10 @@ namespace gpg::gal::backend
     /** Sizes the copy for `byteWidth` bytes, zeroed, and arms the guard. */
     void Reset(std::uint32_t byteWidth);
 
+    /** Frees the copy. `Released` stays true until the next `Reset`. */
+    void Release() noexcept;
+    [[nodiscard]] bool Released() const noexcept { return mBytes.empty(); }
+
     /**
      * The address a lock of `size` bytes at `offset` returns (`size` 0 locks
      * to the end). `kind` names the buffer in the log.

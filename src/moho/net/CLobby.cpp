@@ -1,3 +1,5 @@
+#include "moho/lua/ScrLuaUserData.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "CLobby.h"
 
 #include <algorithm>
@@ -31,6 +33,7 @@
 #include "INetDatagramSocket.h"
 #include "INetNATTraversalProviderWeakPtrReflection.h"
 #include "legacy/containers/Set.h"
+#include "LobbyPeerFeatures.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
@@ -103,7 +106,6 @@ namespace moho
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kInternalCreateDiscoveryServiceHelp = "InternalCreateDiscoveryService(class)";
   constexpr const char* kInternalCreateLobbyHelp =
     "InternalCreateLobby(class, string protocol, int localPort, int maxConnections, string playerName, string playerUID, "
@@ -128,66 +130,6 @@ namespace
   constexpr const char* kCLobbyEjectPeerHelp = "void CLobby.EjectPeer(self,targetID,reason)";
   constexpr const char* kCLobbyDisconnectFromPeerHelp = "void CLobby.DisconnectFromPeer(self,uid";
   constexpr const char* kValidateIPAddressHelp = "str = ValidateIPAddress(ipaddr)";
-
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
-  /**
-   * Address: 0x007C8D70 (FUN_007C8D70)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CLobby`.
-   */
-  [[nodiscard]] gpg::RType* CachedCLobbyTypeBridge()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::CLobby));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "User") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
 
   /**
    * Address: 0x007CBC40 (FUN_007CBC40, func_GetIgnoreNamesSeparators)
@@ -532,7 +474,7 @@ namespace
  */
 gpg::RType* CLobby::GetClass() const
 {
-  return CachedCLobbyTypeBridge();
+  return gpg::RTypeOf<moho::CLobby>();
 }
 
 /**
@@ -583,6 +525,7 @@ CLobby::CLobby(
   , maxConnections(maxConnectionsArg)
   , mHasNAT(hasNAT)
   , localUid(localUidArg)
+  , mPeerFeatures(std::make_unique<CLobbyPeerFeatures>(*this))
 {
   if (localUidArg != -1) {
     gpg::Logf("LOBBY: starting with local uid of %d [%s]", localUidArg, playerName);
@@ -599,6 +542,8 @@ CLobby::CLobby(
 
   this->connector->SelectEvent(event);
   WIN_GetWaitHandleSet()->AddHandle(event);
+
+  mPeerFeatures->InstallSlotStyles(mLuaObj.GetActiveState()->m_state);
 
   // Engine addition (issue #215): counted last, so a constructor that throws
   // above (no destructor runs) leaves the count alone.
@@ -719,6 +664,9 @@ void CLobby::ReceiveMessage(
     case ELobbyMsg::LOBMSG_BroadcastScriptData:
     case ELobbyMsg::LOBMSG_DirectScriptData:
       OnScriptData(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_PeerFeatures:
+      OnPeerFeatures(message, connection);
       break;
     case ELobbyMsg::LOBMSG_ConnFailed:
       OnConnectionFailed(message, connection);
@@ -889,6 +837,7 @@ void CLobby::OnJoin(
     acceptStream.Write(hostedTime);
   }
   connection->Write(accept);
+  mPeerFeatures->PeerEstablished(*player);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -991,6 +940,8 @@ void CLobby::OnWelcome(
 
     ProcessConnectionToHostEstablished(&pLocal, &pName, &pHost);
   }
+
+  mPeerFeatures->PeerEstablished(*peer);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -1159,6 +1110,26 @@ void CLobby::OnScriptData(
   }
 
   LuaCall("DataReceived", &script);
+}
+
+/**
+ * Engine addition, not in the binary. Each side announces once its link is
+ * established, so both uids are settled by the time anything is signed.
+ */
+void CLobby::OnPeerFeatures(
+  CMessage* message,
+  INetConnection* connection
+)
+{
+  const SPeer* const peer = FindPeerByConnection(connection);
+  if (peer == nullptr || peer->state != ENetworkPlayerState::kEstablished) {
+    LogDroppedLobbyMessage("LOBBY: ignoring peer features from conn=%p.", connection);
+    return;
+  }
+
+  if (mPeerFeatures->Receive(*peer, localUid, *message)) {
+    mPeerFeatures->PaintPeer(mLuaObj.GetActiveState()->m_state, peer->uid);
+  }
 }
 
 /**
@@ -1475,10 +1446,7 @@ int moho::cfunc_InternalCreateDiscoveryService(lua_State* const luaContext)
  */
 int moho::cfunc_InternalCreateDiscoveryServiceL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateDiscoveryServiceHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kInternalCreateDiscoveryServiceHelp);
 
   const LuaPlus::LuaObject classObject(LuaPlus::LuaStackObject(state, 1));
   CDiscoveryService* const discoveryService = new CDiscoveryService(classObject);
@@ -1495,7 +1463,7 @@ int moho::cfunc_InternalCreateDiscoveryServiceL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_InternalCreateDiscoveryService_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "InternalCreateDiscoveryService",
     &moho::cfunc_InternalCreateDiscoveryService,
     nullptr,
@@ -1531,7 +1499,7 @@ boost::weak_ptr<moho::INetNATTraversalProvider>* moho::func_GetCObj_NatTraversal
     valueObject = valueObject.GetByName("_c_object");
   }
 
-  const gpg::RRef userDataRef = ExtractLuaUserDataRef(valueObject);
+  const gpg::RRef userDataRef = moho::SCR_UserDataRef(valueObject);
   const gpg::RRef upcastRef = gpg::REF_UpcastPtr(userDataRef, gpg::ResolveWeakPtrINetNATTraversalProviderType());
   auto* const providerSlot = static_cast<boost::weak_ptr<INetNATTraversalProvider>*>(upcastRef.mObj);
   if (providerSlot == nullptr) {
@@ -1549,10 +1517,7 @@ boost::weak_ptr<moho::INetNATTraversalProvider>* moho::func_GetCObj_NatTraversal
  */
 int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 7) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateLobbyHelp, 7, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 7, kInternalCreateLobbyHelp);
 
   const LuaPlus::LuaObject clazz(LuaPlus::LuaStackObject(state, 1));
 
@@ -1636,7 +1601,7 @@ int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_InternalCreateLobby_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "InternalCreateLobby",
     &moho::cfunc_InternalCreateLobby,
     nullptr,
@@ -1685,7 +1650,7 @@ int moho::cfunc_CLobbyDestroy(
 moho::CScrLuaInitForm* moho::func_CLobbyDestroy_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "Destroy",
     &moho::cfunc_CLobbyDestroy,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -1710,10 +1675,7 @@ int moho::cfunc_CLobbyDestroyL(
     return 0;
   }
 
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyDestroyHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyDestroyHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobbyOpt(lobbyObject, state);
@@ -1752,12 +1714,7 @@ int moho::cfunc_CLobbyMakeValidGameNameL(
     return 0;
   }
 
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kCLobbyMakeValidGameNameHelp, 2, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCLobbyMakeValidGameNameHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   (void)SCR_FromLua_CLobbyOpt(lobbyObject, state);
@@ -1796,7 +1753,7 @@ int moho::cfunc_CLobbyMakeValidGameName(
 moho::CScrLuaInitForm* moho::func_CLobbyMakeValidGameName_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "MakeValidGameName",
     &moho::cfunc_CLobbyMakeValidGameName,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -1831,12 +1788,7 @@ int moho::cfunc_CLobbyMakeValidPlayerNameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kCLobbyMakeValidPlayerNameHelp, 3, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kCLobbyMakeValidPlayerNameHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobbyOpt(lobbyObject, state);
@@ -1869,7 +1821,7 @@ int moho::cfunc_CLobbyMakeValidPlayerNameL(
 moho::CScrLuaInitForm* moho::func_CLobbyMakeValidPlayerName_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "MakeValidPlayerName",
     &moho::cfunc_CLobbyMakeValidPlayerName,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -1903,10 +1855,7 @@ int moho::cfunc_CLobbyHostGameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyHostGameHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyHostGameHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -1923,7 +1872,7 @@ int moho::cfunc_CLobbyHostGameL(
 moho::CScrLuaInitForm* moho::func_CLobbyHostGame_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "HostGame",
     &moho::cfunc_CLobbyHostGame,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -1958,10 +1907,7 @@ int moho::cfunc_CLobbyJoinGameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyJoinGameHelp, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kCLobbyJoinGameHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2010,7 +1956,7 @@ int moho::cfunc_CLobbyJoinGameL(
 moho::CScrLuaInitForm* moho::func_CLobbyJoinGame_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "JoinGame",
     &moho::cfunc_CLobbyJoinGame,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2044,10 +1990,7 @@ int moho::cfunc_CLobbyBroadcastDataL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyBroadcastDataHelp, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCLobbyBroadcastDataHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2069,7 +2012,7 @@ int moho::cfunc_CLobbyBroadcastDataL(
 moho::CScrLuaInitForm* moho::func_CLobbyBroadcastData_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "BroadcastData",
     &moho::cfunc_CLobbyBroadcastData,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2104,10 +2047,7 @@ int moho::cfunc_CLobbySendDataL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbySendDataHelp, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kCLobbySendDataHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2134,7 +2074,7 @@ int moho::cfunc_CLobbySendDataL(
 moho::CScrLuaInitForm* moho::func_CLobbySendData_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "SendData",
     &moho::cfunc_CLobbySendData,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2190,7 +2130,7 @@ int moho::cfunc_CLobbyGetPeers(
 moho::CScrLuaInitForm* moho::func_CLobbyGetPeers_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetPeers",
     &moho::cfunc_CLobbyGetPeers,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2210,10 +2150,7 @@ int moho::cfunc_CLobbyGetPeersL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetPeersHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyGetPeersHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2246,7 +2183,7 @@ int moho::cfunc_CLobbyGetPeer(
 moho::CScrLuaInitForm* moho::func_CLobbyGetPeer_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetPeer",
     &moho::cfunc_CLobbyGetPeer,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2266,10 +2203,7 @@ int moho::cfunc_CLobbyGetPeerL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetPeerHelp, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCLobbyGetPeerHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2309,7 +2243,7 @@ int moho::cfunc_CLobbyGetLocalPlayerName(
 moho::CScrLuaInitForm* moho::func_CLobbyGetLocalPlayerName_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetLocalPlayerName",
     &moho::cfunc_CLobbyGetLocalPlayerName,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2329,10 +2263,7 @@ int moho::cfunc_CLobbyGetLocalPlayerNameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetLocalPlayerNameHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyGetLocalPlayerNameHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   const CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2364,7 +2295,7 @@ int moho::cfunc_CLobbyGetLocalPlayerID(
 moho::CScrLuaInitForm* moho::func_CLobbyGetLocalPlayerID_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetLocalPlayerID",
     &moho::cfunc_CLobbyGetLocalPlayerID,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2384,10 +2315,7 @@ int moho::cfunc_CLobbyGetLocalPlayerIDL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetLocalPlayerIdHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyGetLocalPlayerIdHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   const CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2423,7 +2351,7 @@ int moho::cfunc_CLobbyIsHost(
 moho::CScrLuaInitForm* moho::func_CLobbyIsHost_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "IsHost",
     &moho::cfunc_CLobbyIsHost,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2443,10 +2371,7 @@ int moho::cfunc_CLobbyIsHostL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyIsHostHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyIsHostHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   const CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2478,7 +2403,7 @@ int moho::cfunc_CLobbyGetLocalPort(
 moho::CScrLuaInitForm* moho::func_CLobbyGetLocalPort_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetLocalPort",
     &moho::cfunc_CLobbyGetLocalPort,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2498,10 +2423,7 @@ int moho::cfunc_CLobbyGetLocalPortL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetLocalPortHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyGetLocalPortHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   const CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2547,10 +2469,7 @@ int moho::cfunc_CLobbyEjectPeerL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyEjectPeerHelp, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kCLobbyEjectPeerHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2581,7 +2500,7 @@ int moho::cfunc_CLobbyEjectPeerL(
 moho::CScrLuaInitForm* moho::func_CLobbyEjectPeer_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "EjectPeer",
     &moho::cfunc_CLobbyEjectPeer,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2614,7 +2533,7 @@ int moho::cfunc_CLobbyConnectToPeer(
 moho::CScrLuaInitForm* moho::func_CLobbyConnectToPeer_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConnectToPeer",
     &moho::cfunc_CLobbyConnectToPeer,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2635,10 +2554,7 @@ int moho::cfunc_CLobbyConnectToPeerL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyConnectToPeerHelp, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kCLobbyConnectToPeerHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2696,10 +2612,7 @@ int moho::cfunc_CLobbyDisconnectFromPeerL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyDisconnectFromPeerHelp, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCLobbyDisconnectFromPeerHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2724,7 +2637,7 @@ int moho::cfunc_CLobbyDisconnectFromPeerL(
 moho::CScrLuaInitForm* moho::func_CLobbyDisconnectFromPeer_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "DisconnectFromPeer",
     &moho::cfunc_CLobbyDisconnectFromPeer,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2758,10 +2671,7 @@ int moho::cfunc_CLobbyLaunchGameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyLaunchGameHelp, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCLobbyLaunchGameHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2780,7 +2690,7 @@ int moho::cfunc_CLobbyLaunchGameL(
 moho::CScrLuaInitForm* moho::func_CLobbyLaunchGame_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "LaunchGame",
     &moho::cfunc_CLobbyLaunchGame,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2814,10 +2724,7 @@ int moho::cfunc_CLobbyDebugDumpL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyDebugDumpHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCLobbyDebugDumpHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
@@ -2834,7 +2741,7 @@ int moho::cfunc_CLobbyDebugDumpL(
 moho::CScrLuaInitForm* moho::func_CLobbyDebugDump_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "DebugDump",
     &moho::cfunc_CLobbyDebugDump,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2855,10 +2762,7 @@ int moho::cfunc_ValidateIPAddressL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kValidateIPAddressHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kValidateIPAddressHelp);
 
   LuaPlus::LuaStackObject ipAddressArg(state, 1);
   const char* const ipAddressText = lua_tostring(state->m_state, 1);
@@ -2904,7 +2808,7 @@ int moho::cfunc_ValidateIPAddress(
 moho::CScrLuaInitForm* moho::func_ValidateIPAddress_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(), "ValidateIPAddress", &moho::cfunc_ValidateIPAddress, nullptr, "<global>", kValidateIPAddressHelp
+    moho::SCR_UserLuaInitSet(), "ValidateIPAddress", &moho::cfunc_ValidateIPAddress, nullptr, "<global>", kValidateIPAddressHelp
   );
   return &binder;
 }
@@ -3556,7 +3460,7 @@ namespace
   moho::CScrLuaInitForm* register_moho_lobby_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      UserLuaInitSet(), "moho.lobby_methods", &moho::CScrLuaMetatableFactory<moho::CLobby>::Instance(), "CLobby", ""
+      moho::SCR_UserLuaInitSet(), "moho.lobby_methods", &moho::CScrLuaMetatableFactory<moho::CLobby>::Instance(), "CLobby", ""
     );
     return &binder;
   }

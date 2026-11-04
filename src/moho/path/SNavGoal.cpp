@@ -51,24 +51,6 @@ namespace
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
 
-  [[nodiscard]] gpg::RType* CachedRect2iType()
-  {
-    gpg::RType* cached = gpg::Rect2i::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::Rect2i));
-      gpg::Rect2i::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedELayerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::ELayer));
-    }
-    return cached;
-  }
 } // namespace
 
 namespace moho
@@ -107,9 +89,9 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedRect2iType(), &mPos1, ownerRef);
-    archive->Read(CachedRect2iType(), &mPos2, ownerRef);
-    archive->Read(CachedELayerType(), &mLayer, ownerRef);
+    archive->Read(gpg::RTypeOf<gpg::Rect2i>(), &mPos1, ownerRef);
+    archive->Read(gpg::RTypeOf<gpg::Rect2i>(), &mPos2, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::ELayer>(), &mLayer, ownerRef);
   }
 
   /**
@@ -123,9 +105,9 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedRect2iType(), &mPos1, ownerRef);
-    archive->Write(CachedRect2iType(), &mPos2, ownerRef);
-    archive->Write(CachedELayerType(), &mLayer, ownerRef);
+    archive->Write(gpg::RTypeOf<gpg::Rect2i>(), &mPos1, ownerRef);
+    archive->Write(gpg::RTypeOf<gpg::Rect2i>(), &mPos2, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::ELayer>(), &mLayer, ownerRef);
   }
 
   /**

@@ -67,6 +67,7 @@ set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
 
 include(FafCodegen)
+include(FafWarnings)
 
 # --- Toolchain check ------------------------------------------------------------------
 # tests/linux/ToolchainCheck.cpp: data model, char signedness, no FMA
@@ -213,23 +214,8 @@ set(_faf_sim_options
   ${FAF_LINUX_MS_DIALECT}
   # boost.thread checks for the compiler's threading mode (_REENTRANT).
   -pthread
-  # The Windows build's diagnostics settings (src/CMakeLists.txt).
-  -Wno-microsoft
-  -Wno-unused-parameter -Wno-unused-variable -Wno-unused-private-field
-  -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-but-set-variable
-  -Wno-unused-lambda-capture -Wno-unused-value -Wno-unused-command-line-argument
-  -Wno-missing-field-initializers -Wno-sign-compare -Wno-switch
-  -Wno-invalid-offsetof -Wno-keyword-macro -Wno-unknown-pragmas
-  -Wno-ignored-pragma-intrinsic -Wno-pragma-pack -Wno-ignored-attributes
-  -Wno-deprecated-declarations -Wno-deprecated-enum-enum-conversion
-  -Wno-nonportable-include-path -Wno-reorder-ctor
-  -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual
-  -Wno-inconsistent-missing-override -Wno-missing-braces -Wno-braced-scalar-init
-  -Wno-char-subscripts -Wno-parentheses -Wno-dangling-else
-  -Wno-tautological-constant-out-of-range-compare
-  -Wno-tautological-undefined-compare -Wno-undefined-var-template
-  -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
-  -Wno-mismatched-tags -Wno-extra-qualification
+  -Wall
+  ${FAF_WARNING_OPTIONS}
   # Options clang 18 does not know yet (the Windows build uses a newer clang).
   -Wno-unknown-warning-option)
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
@@ -242,6 +228,8 @@ foreach(_src IN LISTS _faf_sim_files)
     set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
   endif()
 endforeach()
+include(FafPrecompiledHeaders)
+faf_precompile(faf_sim)
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs

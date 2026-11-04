@@ -1234,6 +1234,16 @@ namespace gpg::gal
     TransferBarrier();
   }
 
+  void DeviceVulkan::ReleaseBufferCopy(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().ReleaseCopy();
+  }
+
+  void DeviceVulkan::ReleaseBufferCopy(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
+  }
+
   bool DeviceVulkan::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount
@@ -2103,6 +2113,28 @@ namespace gpg::gal
     WriteBmp(path, image);
   }
 
+  void DeviceVulkan::LogMemoryIfDue()
+  {
+    // Diagnostics: with FAF_GAL_MEMORY_LOG=<seconds>, as Direct3D 12 logs it.
+    static const DWORD interval = [] {
+      const char* const value = std::getenv("FAF_GAL_MEMORY_LOG");
+      const long seconds = (value != nullptr) ? std::strtol(value, nullptr, 10) : 0L;
+      return static_cast<DWORD>((seconds > 0L) ? seconds * 1000L : 0L);
+    }();
+    static DWORD last = 0U;
+    const DWORD now = ::GetTickCount();
+    if (interval == 0U || (last != 0U && now - last < interval)) {
+      return;
+    }
+    last = now;
+    constexpr double kMiB = 1.0 / (1024.0 * 1024.0);
+    gpg::Logf(
+      "Vulkan memory: buffer copies %.1f MB, upload pages %.1f MB (%zu), device memory blocks %.1f MB",
+      static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB, static_cast<double>(mUpload.PageBytes()) * kMiB,
+      mUpload.PageCount(), static_cast<double>(mMemory.BlockBytes()) * kMiB
+    );
+  }
+
   void DeviceVulkan::Present()
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -2119,6 +2151,7 @@ namespace gpg::gal
       mTracing = start >= 0L && static_cast<long>(mFrameNumber) >= start && static_cast<long>(mFrameNumber) < start + frames;
     }
     DumpBackBufferIfDue();
+    LogMemoryIfDue();
 
     for (std::size_t index = 0U; index < mHeadOutputContexts.size(); ++index) {
       if (mSwapChains[index].hasImage) {

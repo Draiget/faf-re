@@ -33,7 +33,7 @@ set(_faf_client_only_patterns
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
-  "^moho/sim/(CWldSession|UserArmy|UserLuaFunctions|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
+  "^moho/sim/(CWldSession|CWldSessionCommands|CWldSessionCore|CWldSessionRender|CWldSessionTypes|UICommandGraph|WldSessionControl|UserArmy|UserLuaArmies|UserLuaFiles|UserLuaSession|UserLuaUi|UserLuaUnits|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
   # The user Lua state's decals (CreateDecal, moho.userDecal_methods).
   "^moho/script/(ScriptedDecal|ScriptedDecalTypeInfo)\\.cpp$"
   # Particle textures' render-device half (GetTexture).
@@ -49,14 +49,14 @@ set(_faf_client_only_patterns
   # The range-ring extractors (user entities' ranges for moho/render/RangeRenderer).
   "^moho/(misc|collision|ai|unit/core)/(Miscellaneous|Omni|Radar|CounterIntel|Intel|CombinedMilitary|Countermeasure|AirPlatform|Weapon|Range|Sonar)Extractor\\.cpp$"
   "^moho/entity/UserEntity\\.cpp$"
-  "^moho/unit/core/UserUnit\\.cpp$"
+  "^moho/unit/core/(UserUnitCore|UserUnitLua|UserCommandQueue)\\.cpp$"
   # The client's console commands and variables (CConCommand.cpp keeps the console).
   "^moho/console/ClientConCommands\\.cpp$"
   # The user world's vision (what the focus army sees, for drawing).
   "^moho/vision/VisionDB\\.cpp$"
   # The lobby, GPGNet, its in-engine peer links and LAN discovery (the game
   # connection and the replay stream stay).
-  "^moho/net/(CLobby|CLobbyTypeInfo|CGpgNetInterface|NetlinkPeers|CDiscoveryService|CDiscoveryServiceTypeInfo)\\.cpp$"
+  "^moho/net/(CLobby|CLobbyTypeInfo|LobbyPeerFeatures|CGpgNetInterface|NetlinkPeers|CDiscoveryService|CDiscoveryServiceTypeInfo)\\.cpp$"
   # The user world's client-manager UI callbacks (the interface's defaults stay).
   "^moho/net/CWldUiInterface\\.cpp$"
   # The user session's listeners (idle units, pause, selection) and its save data.
@@ -83,9 +83,12 @@ set(_faf_sim_patterns
   # (log file, reflection types, resource manager, data search paths) every
   # engine program sets up, headless and the game server among them.
   "^moho/app/IWinApp\\.cpp$"
-  # The emitter curve and parameter enums' reflection (the effect emitters the sim
-  # creates take them by name from Lua).
-  "^moho/render/(EEmitterCurveTypeInfo|EEmitterParamTypeInfo)\\.cpp$"
+  # The emitter curve, parameter and type enums' reflection (the effect emitters the sim
+  # creates take them by name from Lua; a saved sim writes each emitter's EmitterType).
+  "^moho/render/(EEmitterCurveTypeInfo|EEmitterParamTypeInfo|EmitterTypeTypeInfo)\\.cpp$"
+  # The texture scroll enum's reflection (an entity's CTextureScroller is sim state; a saved
+  # sim writes each scroller's EScrollType).
+  "^moho/ui/EScrollTypeTypeInfo\\.cpp$"
   # SFD movie headers (MOV_GetDuration, behind the core Lua set's GetMovieDuration).
   "^moho/movie/sfd/(SfdHeaderParser|SfdHeaderInfo)\\.cpp$")
 

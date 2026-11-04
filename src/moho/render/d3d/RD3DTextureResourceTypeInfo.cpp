@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/render/d3d/RD3DTextureResourceTypeInfo.h"
 
 #include <typeinfo>
@@ -98,13 +99,6 @@ namespace moho::resource_reflection
 {
   namespace
   {
-    [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
-    {
-      if (cachedType == nullptr) {
-        cachedType = gpg::LookupRType(typeInfo);
-      }
-      return cachedType;
-    }
   } // namespace
 
   /**
@@ -115,7 +109,7 @@ namespace moho::resource_reflection
    */
   gpg::RType* ResolveRD3DTextureResourceType()
   {
-    return ResolveCachedType(moho::RD3DTextureResource::sType, typeid(moho::RD3DTextureResource));
+    return gpg::CachedLookup(moho::RD3DTextureResource::sType, typeid(moho::RD3DTextureResource));
   }
 
   /**
@@ -126,6 +120,6 @@ namespace moho::resource_reflection
    */
   gpg::RType* ResolveID3DTextureSheetType()
   {
-    return ResolveCachedType(moho::ID3DTextureSheet::sType, typeid(moho::ID3DTextureSheet));
+    return gpg::CachedLookup(moho::ID3DTextureSheet::sType, typeid(moho::ID3DTextureSheet));
   }
 } // namespace moho::resource_reflection

@@ -1,3 +1,4 @@
+#include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 
 #include <cstddef>
@@ -331,7 +332,6 @@ namespace
   constexpr const char* kCRotateManipulatorSetFollowBoneHelpText = "RotateManipulator:SetFollowBone(bone)";
   constexpr const char* kCRotateManipulatorGetCurrentAngleHelpText = "RotateManipulator:GetCurrentAngle()";
   constexpr const char* kCRotateManipulatorSetCurrentAngleHelpText = "RotateManipulator:SetCurrentAngle(angle)";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
@@ -356,54 +356,10 @@ namespace
     return cached;
   }
 
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
-  [[nodiscard]] moho::CScriptObject** ExtractScriptObjectSlot(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, moho::CScriptObject::GetPointerType());
-    return static_cast<moho::CScriptObject**>(upcast.mObj);
-  }
-
   [[nodiscard]] moho::CRotateManipulator*
   GetRotateManipulatorOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
   {
-    moho::CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlot(object);
+    moho::CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (!scriptObjectSlot) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;
@@ -423,16 +379,6 @@ namespace
     }
 
     return static_cast<moho::CRotateManipulator*>(upcast.mObj);
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
   }
 
   [[nodiscard]] float ReadRequiredLuaNumber(LuaPlus::LuaState* const state, const int stackIndex)
@@ -547,10 +493,7 @@ namespace moho
    */
   int cfunc_CBuilderArmManipulatorSetAimingArcL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 7) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBuilderArmManipulatorSetAimingArcHelpText, 7, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 7, kCBuilderArmManipulatorSetAimingArcHelpText);
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CBuilderArmManipulator* const manipulator = moho::SCR_FromLua_CBuilderArmManipulator(manipulatorObject, state);
@@ -591,10 +534,7 @@ namespace moho
    */
   int cfunc_CBuilderArmManipulatorGetHeadingPitchL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBuilderArmManipulatorGetHeadingPitchHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCBuilderArmManipulatorGetHeadingPitchHelpText);
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CBuilderArmManipulator* const manipulator = moho::SCR_FromLua_CBuilderArmManipulator(manipulatorObject, state);
@@ -627,10 +567,7 @@ namespace moho
    */
   int cfunc_CBuilderArmManipulatorSetHeadingPitchL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBuilderArmManipulatorSetHeadingPitchHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kCBuilderArmManipulatorSetHeadingPitchHelpText);
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CBuilderArmManipulator* const manipulator = moho::SCR_FromLua_CBuilderArmManipulator(manipulatorObject, state);
@@ -663,10 +600,7 @@ namespace moho
    */
   int cfunc_CRotateManipulatorClearGoalL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCRotateManipulatorClearGoalHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCRotateManipulatorClearGoalHelpText);
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     moho::CRotateManipulator* const manipulator = GetRotateManipulatorOptional(manipulatorObject, state);
@@ -702,16 +636,7 @@ namespace moho
    */
   int cfunc_CThrustManipulatorSetThrustingParamL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 9) {
-      LuaPlus::LuaState::Error(
-        state,
-        kLuaExpectedArgsWarning,
-        kCThrustManipulatorSetThrustingParamHelpText,
-        9,
-        argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 9, kCThrustManipulatorSetThrustingParamHelpText);
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CThrustManipulator* const manipulator = moho::SCR_FromLua_CThrustManipulator(manipulatorObject, state);
@@ -778,10 +703,7 @@ namespace moho
    */
   int cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBoneEntityManipulatorSetPivotHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kCBoneEntityManipulatorSetPivotHelpText);
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CBoneEntityManipulator* const manipulator = moho::SCR_FromLua_CBoneEntityManipulator(manipulatorObject, state);
@@ -805,7 +727,7 @@ namespace moho
   CScrLuaInitForm* func_CBoneEntityManipulatorSetPivot_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCBoneEntityManipulatorSetPivotName,
       &cfunc_CBoneEntityManipulatorSetPivot,
       &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(),
@@ -843,12 +765,7 @@ namespace moho
    */
   int cfunc_EntityAttachBoneToEntityBoneL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 5) {
-      LuaPlus::LuaState::Error(
-        state, kLuaExpectedArgsWarning, kEntityAttachBoneToEntityBoneHelpText, 5, argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 5, kEntityAttachBoneToEntityBoneHelpText);
 
     const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
     Unit* const goalUnit = SCR_FromLua_Unit(unitObject);
@@ -882,7 +799,7 @@ namespace moho
   CScrLuaInitForm* func_EntityAttachBoneToEntityBone_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kEntityAttachBoneToEntityBoneName,
       &cfunc_EntityAttachBoneToEntityBone,
       &CScrLuaMetatableFactory<Entity>::Instance(),
@@ -901,7 +818,7 @@ namespace moho
   CScrLuaInitForm* func_CBuilderArmManipulatorSetAimingArc_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCBuilderArmManipulatorSetAimingArcName,
       &cfunc_CBuilderArmManipulatorSetAimingArc,
       &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
@@ -920,7 +837,7 @@ namespace moho
   CScrLuaInitForm* func_CBuilderArmManipulatorGetHeadingPitch_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCBuilderArmManipulatorGetHeadingPitchName,
       &cfunc_CBuilderArmManipulatorGetHeadingPitch,
       &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
@@ -940,7 +857,7 @@ namespace moho
   CScrLuaInitForm* func_CBuilderArmManipulatorSetHeadingPitch_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCBuilderArmManipulatorSetHeadingPitchName,
       &cfunc_CBuilderArmManipulatorSetHeadingPitch,
       &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
@@ -1043,7 +960,7 @@ namespace moho
   CScrLuaInitForm* func_CreateAimController_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateAimControllerName,
       &cfunc_CreateAimController,
       nullptr,
@@ -1123,7 +1040,7 @@ namespace moho
   CScrLuaInitForm* func_CreateBuilderArmController_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateBuilderArmControllerName,
       &cfunc_CreateBuilderArmController,
       nullptr,
@@ -1142,7 +1059,7 @@ namespace moho
   CScrLuaInitForm* func_CreateFootPlantController_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateFootPlantControllerName,
       &cfunc_CreateFootPlantController,
       nullptr,
@@ -1161,7 +1078,7 @@ namespace moho
   CScrLuaInitForm* func_CreateStorageManip_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateStorageManipName,
       &cfunc_CreateStorageManip,
       nullptr,
@@ -1248,7 +1165,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetSpinDown_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetSpinDownName,
       &cfunc_CRotateManipulatorSetSpinDown,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1267,7 +1184,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetGoal_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetGoalName,
       &cfunc_CRotateManipulatorSetGoal,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1286,7 +1203,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorClearGoal_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorClearGoalName,
       &cfunc_CRotateManipulatorClearGoal,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1305,7 +1222,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetSpeed_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetSpeedName,
       &cfunc_CRotateManipulatorSetSpeed,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1324,7 +1241,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetTargetSpeed_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetTargetSpeedName,
       &cfunc_CRotateManipulatorSetTargetSpeed,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1343,7 +1260,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetAccel_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetAccelName,
       &cfunc_CRotateManipulatorSetAccel,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1362,7 +1279,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorClearFollowBone_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorClearFollowBoneName,
       &cfunc_CRotateManipulatorClearFollowBone,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1381,7 +1298,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetFollowBone_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetFollowBoneName,
       &cfunc_CRotateManipulatorSetFollowBone,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1400,7 +1317,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorGetCurrentAngle_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorGetCurrentAngleName,
       &cfunc_CRotateManipulatorGetCurrentAngle,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1419,7 +1336,7 @@ namespace moho
   CScrLuaInitForm* func_CRotateManipulatorSetCurrentAngle_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCRotateManipulatorSetCurrentAngleName,
       &cfunc_CRotateManipulatorSetCurrentAngle,
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
@@ -1438,7 +1355,7 @@ namespace moho
   CScrLuaInitForm* func_CThrustManipulatorSetThrustingParam_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCThrustManipulatorSetThrustingParamName,
       &cfunc_CThrustManipulatorSetThrustingParam,
       &CScrLuaMetatableFactory<CThrustManipulator>::Instance(),
@@ -1457,7 +1374,7 @@ namespace moho
   CScrLuaInitForm* func_CreateThrustController_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateThrustControllerName,
       &cfunc_CreateThrustController,
       nullptr,

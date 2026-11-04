@@ -68,6 +68,16 @@ namespace moho
   void SCR_ExpectArgs(LuaPlus::LuaState* state, int maxArgs, int minArgs, const char* helpText);
 
   /**
+   * Engine addition: the exact-count check the binary inlines into its Lua
+   * bindings. SCR_ExpectArgs isn't the same check, its message says "between".
+   *
+   * What it does:
+   * Raises LuaState::Error with `helpText` unless the Lua stack holds exactly
+   * `expectedArgs` values.
+   */
+  void SCR_ExpectExactArgs(LuaPlus::LuaState* state, int expectedArgs, const char* helpText);
+
+  /**
    * Address: 0x004D2F70 (FUN_004D2F70, ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
    *
    * What it does:

@@ -224,7 +224,7 @@ namespace
     }
 
 #if defined(_WIN32)
-    ::InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), static_cast<long>(delta));
+    statItem->AddPrimaryBits(delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
@@ -967,20 +967,6 @@ namespace
     static_cast<moho::EntityDB*>(objectStorage)->~EntityDB();
   }
 
-  /**
-   * Shared `IdPool` RTTI cache lookup, used by `EntityDbIdPoolMapTypeInfo::
-   * GetName`/`SerLoad`/`SerSave` (all three resolve the same element type).
-   */
-  [[nodiscard]] gpg::RType* CachedIdPoolElementType()
-  {
-    gpg::RType* type = moho::IdPool::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::IdPool));
-      moho::IdPool::sType = type;
-    }
-    return type;
-  }
-
   class EntityDbIdPoolMapTypeInfo final : public gpg::RType
   {
   public:
@@ -1000,7 +986,7 @@ namespace
     [[nodiscard]] const char* GetName() const override
     {
       static const msvc8::string sName = gpg::STR_Printf(
-        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), CachedIdPoolElementType()->GetName()
+        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), gpg::RTypeOf<moho::IdPool>()->GetName()
       );
       return sName.c_str();
     }
@@ -1116,7 +1102,7 @@ namespace
     archive->ReadUInt(&count);
     map->clear();
 
-    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RType* const idPoolType = gpg::RTypeOf<moho::IdPool>();
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (unsigned int i = 0; i < count; ++i) {
@@ -1152,7 +1138,7 @@ namespace
 
     archive->WriteUInt(static_cast<unsigned int>(map->size()));
 
-    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RType* const idPoolType = gpg::RTypeOf<moho::IdPool>();
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (const auto& [key, pool] : *map) {
@@ -1217,19 +1203,14 @@ namespace moho
    * `AllUnitsHead()`'s teardown is the shipped body's direct call `sub_686EF0(
    * this, &outIter, AllUnitsHead()->_Myhead->_Left, AllUnitsHead()->_Myhead)` --
    * `EraseAllUnitsRange(leftmost(), header())`, cited on that member above
-   * (0x00686EF0) -- not an inlined recursive destroy. DB-integrity fix:
-   * this body previously called `DestroyAllUnitsSubtreeRecursive(AllUnitsHead()
-   * ->left)` directly, i.e. from the *leftmost* node instead of the real
-   * root (`AllUnitsHead()->parent`) -- the exact same wrong-root bug already
-   * documented and fixed for `mIdPoolTree` above, independently reintroduced
-   * here for `AllUnitsHead()`. Since leftmost() has no left child by definition,
-   * that call would destroy at most leftmost's own right subtree and then
-   * stop, leaking essentially the entire all-units tree (every tracked
-   * `Unit`) on every `EntityDB` teardown. Routing through the already-
-   * recovered `EraseAllUnitsRange` (which internally calls
+   * (0x00686EF0) -- not an inlined recursive destroy. Since leftmost() has no
+   * left child by definition, that call would destroy at most leftmost's own
+   * right subtree and then stop, leaking essentially the entire all-units tree
+   * (every tracked `Unit`) on every `EntityDB` teardown. Routing through the
+   * already- recovered `EraseAllUnitsRange` (which internally calls
    * `DestroyAllUnitsSubtreeRecursive(head->parent)`, the correct root, via
-   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and
-   * matches the real call target.
+   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and matches
+   * the real call target.
    */
   EntityDB::~EntityDB()
   {
@@ -1617,7 +1598,7 @@ namespace moho
    * `moho/sim/SimRecoveryRuntime.cpp` under the same private
    * `PriorityQueue20Runtime` type as `Swap`/`AcquireHandle`/`SiftUp` above
    * -- that copy carried this same address but had no real caller
-   * anywhere in `src/**`; removed rather than left as a citation
+   * anywhere in `src/ **`; removed rather than left as a citation
    * duplicate.
    */
   void CEntityDbBoundedPropQueue::SiftDown(std::int32_t index, const std::int32_t count) noexcept

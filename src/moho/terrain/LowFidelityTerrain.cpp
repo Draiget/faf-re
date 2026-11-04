@@ -1085,8 +1085,7 @@ namespace moho
                 sEngineStatRenderFlatDecals = engineStats->GetItem("Render_FlatDecals", true);
                 (void)sEngineStatRenderFlatDecals->Release(0);
               }
-              _InterlockedExchangeAdd(
-                reinterpret_cast<volatile long*>(&sEngineStatRenderFlatDecals->mPrimaryValueBits), 1);
+              sEngineStatRenderFlatDecals->AddPrimaryBits(1);
             }
           } else {
             std::int32_t baselineIndexCount = 0;
@@ -1111,7 +1110,7 @@ namespace moho
                 sEngineStatRenderDecals = engineStats->GetItem("Render_Decals", true);
                 (void)sEngineStatRenderDecals->Release(0);
               }
-              _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sEngineStatRenderDecals->mPrimaryValueBits), 1);
+              sEngineStatRenderDecals->AddPrimaryBits(1);
             }
           }
         }

@@ -37,27 +37,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CLuaWldUIProvider fails its upcast.
    */
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    gpg::RType* baseType = moho::CScriptObject::sType;
-    if (baseType == nullptr) {
-      baseType = gpg::LookupRType(typeid(moho::CScriptObject));
-      moho::CScriptObject::sType = baseType;
-    }
-    return baseType;
-  }
-
   void AddCScriptObjectBase(gpg::RType& typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptObjectType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo.AddBase(baseField);
+    gpg::AddReflectedBase<moho::CScriptObject>(&typeInfo);
   }
 } // namespace
 

@@ -44,21 +44,6 @@ namespace moho
       return randomStream->FRand(-range, range);
     }
 
-    /**
-     * Address: 0x0051CC40 (FUN_0051CC40)
-     *
-     * What it does:
-     * Lazily resolves and caches RTTI metadata for `RProjectileBlueprint`.
-     */
-    [[nodiscard]] gpg::RType* ResolveRProjectileBlueprintType()
-    {
-      gpg::RType* type = RProjectileBlueprint::sType;
-      if (!type) {
-        type = gpg::LookupRType(typeid(RProjectileBlueprint));
-        RProjectileBlueprint::sType = type;
-      }
-      return type;
-    }
   } // namespace
 
   gpg::RType* RProjectileBlueprint::sType = nullptr;
@@ -155,7 +140,7 @@ namespace moho
    */
   gpg::RType* RProjectileBlueprint::GetClass() const
   {
-    return ResolveRProjectileBlueprintType();
+    return gpg::RTypeOf<RProjectileBlueprint>();
   }
 
   /**

@@ -80,13 +80,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
-    const long nextBits = static_cast<long>(FloatToBits(value));
-
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, nextBits, observed) != observed);
+    item->StorePrimaryBits(static_cast<std::int32_t>(FloatToBits(value)));
   }
 
   moho::StatItem* EnsureEngineIntStat(moho::StatItem*& slot, const char* const statName)
@@ -108,12 +102,7 @@ namespace
       return 0;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, 0, observed) != observed);
-    return static_cast<int>(observed);
+    return static_cast<int>(item->ExchangePrimaryBits(0));
   }
 
   int AddToStatCounter(moho::StatItem* const item, const unsigned int amount)
@@ -122,8 +111,7 @@ namespace
       return 0;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
-    return static_cast<int>(::InterlockedExchangeAdd(counter, static_cast<long>(amount)));
+    return static_cast<int>(item->AddPrimaryBits(static_cast<std::int32_t>(amount)));
   }
 
   template <class T>
@@ -1796,7 +1784,7 @@ namespace moho
    * Address: 0x004305F0 (FUN_004305F0, ?REN_Init@Moho@@YAXXZ)
    *
    * What it does:
-   * Enumerates `/fonts/*.ttf`, loads each font file into memory, and registers
+   * Enumerates `/fonts/ *.ttf`, loads each font file into memory, and registers
    * successful payloads with `AddFontMemResourceEx`.
    */
   void REN_Init()

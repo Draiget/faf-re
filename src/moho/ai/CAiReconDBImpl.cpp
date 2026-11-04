@@ -1365,11 +1365,6 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
  * What it does:
  * Updates all map-owned blips for one source unit, prunes excess fake jammer
  * blips, and enqueues pending fake blips when jammer count increased.
- *
- * DB-integrity fix: `pending` was previously typed `std::vector<SNewBlip>`
- * (matching IDA's own generic type guess above); the real binary shape is
- * `msvc8::vector<SNewBlip>` -- see `AppendPendingNewBlip`'s citation for the
- * evidence (`FUN_005CBC70`'s push_back growth-fill emission).
  */
 void CAiReconDBImpl::UpdateBlips(
   ReconBlipMap::iterator it,

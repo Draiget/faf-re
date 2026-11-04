@@ -31,7 +31,6 @@ namespace
   };
 
   gpg::RType* gSSTIArmyConstantDataType = nullptr;
-  gpg::RType* gSSTIArmyVariableDataType = nullptr;
 
   [[nodiscard]] gpg::RType* ResolveSSTIArmyConstantDataType()
   {
@@ -44,13 +43,6 @@ namespace
     return gSSTIArmyConstantDataType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveSSTIArmyVariableDataType()
-  {
-    if (!gSSTIArmyVariableDataType) {
-      gSSTIArmyVariableDataType = gpg::LookupRType(typeid(moho::SSTIArmyVariableData));
-    }
-    return gSSTIArmyVariableDataType;
-  }
 } // namespace
 
 namespace moho
@@ -78,7 +70,7 @@ namespace moho
     }
 
     const gpg::RType* const constantType = ResolveSSTIArmyConstantDataType();
-    const gpg::RType* const variableType = ResolveSSTIArmyVariableDataType();
+    const gpg::RType* const variableType = gpg::RTypeOf<moho::SSTIArmyVariableData>();
     GPG_ASSERT(constantType != nullptr);
     GPG_ASSERT(variableType != nullptr);
 
@@ -98,7 +90,7 @@ namespace moho
     }
 
     const gpg::RType* const constantType = ResolveSSTIArmyConstantDataType();
-    const gpg::RType* const variableType = ResolveSSTIArmyVariableDataType();
+    const gpg::RType* const variableType = gpg::RTypeOf<moho::SSTIArmyVariableData>();
     GPG_ASSERT(constantType != nullptr);
     GPG_ASSERT(variableType != nullptr);
 

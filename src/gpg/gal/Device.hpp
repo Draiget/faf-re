@@ -660,6 +660,14 @@ namespace gpg::gal
       std::uint32_t byteCount
     );
 
+    /**
+     * Engine addition: the owner won't lock this static buffer again, so a backend that keeps a CPU
+     * copy of it can free that. Nothing here. A later write lock still works; a later read lock on
+     * these backends reads zeros and logs a warning.
+     */
+    virtual void ReleaseBufferCopy(VertexBuffer& buffer);
+    virtual void ReleaseBufferCopy(IndexBuffer& buffer);
+
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)
   };

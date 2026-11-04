@@ -21,22 +21,6 @@ namespace
   }
 
   /**
-   * Address: 0x0050CAD0 (FUN_0050CAD0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `SOCellPos`.
-   */
-  [[nodiscard]] gpg::RType* ResolveSOCellPosType()
-  {
-    gpg::RType* type = moho::SOCellPos::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SOCellPos));
-      moho::SOCellPos::sType = type;
-    }
-    return type;
-  }
-
-  /**
    * Address: 0x0050BEF0 (FUN_0050BEF0)
    *
    * What it does:

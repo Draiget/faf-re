@@ -50,6 +50,8 @@ namespace faf::remote
      * into view ids, allocating on first appearance, and sorts the records by their new ids.
      */
     void Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand);
+    /** `simId` as this view's client knows it, allocating on first appearance. */
+    [[nodiscard]] std::uint32_t EntityId(const std::uint32_t simId) { return MapsEntity(simId) ? Entity(simId) : simId; }
     /** `Translate` for one record, without the sort. */
     void TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand);
 

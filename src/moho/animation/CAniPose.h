@@ -323,12 +323,14 @@ namespace moho
       }
     }
 
-    /// Frees the heap buffer `mBegin` points at, by way of the capacity it was allocated with.
+    /// Frees the heap buffer `mBegin` points at, by way of the capacity it was allocated with. A lane-sized array
+    /// doesn't go back to SimBlockLane: the binary's sim thread frees no pose array between a formation's free and
+    /// the next formation's allocation, so that formation reuses the block (replay 27064121 at beat 7380).
     void FreeHeapBones() noexcept
     {
 #if defined(_M_X64) || defined(__x86_64__)
       if (capacity() == kBinaryLaneBones) {
-        SimBlockLane::Free(mBegin);
+        ::operator delete(mBegin);
         return;
       }
 #endif

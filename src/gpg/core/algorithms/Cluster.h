@@ -1,11 +1,20 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <string>
+#include <unordered_map>
 #include <cstddef>
 #include <cstdint>
 
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
+
+namespace gpg
+{
+    class ReadArchive;
+    class WriteArchive;
+}
 
 namespace gpg::HaStar
 {
@@ -563,6 +572,14 @@ namespace gpg::HaStar
          * Forces the requested cluster to be available by repeatedly running background work.
          */
         void EnsureClusterExists(int width, unsigned int height, int level);
+
+        /**
+         * Engine addition (replay keyframes): the rebuild state and every cluster's data. A saved
+         * game keeps none of it and rebuilds the map from the start of the load, which changes when
+         * path results arrive. Clusters with equal data share one payload through `shared`.
+         */
+        void SaveExact(gpg::WriteArchive* archive) const;
+        void LoadExact(gpg::ReadArchive* archive, std::unordered_map<std::string, Cluster>& shared);
 
     public:
         std::uint32_t mNumLevels;

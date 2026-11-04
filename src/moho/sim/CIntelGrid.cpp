@@ -63,15 +63,6 @@ namespace
     ResetTypeInfoVectors(*typeInfo);
   }
 
-  gpg::RType* CachedIntelGridType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CIntelGrid));
-    }
-    return cached;
-  }
-
   // 0x005BE081..0x005BE0A7: the binary forms `1.0f / gridSize` once (divss)
   // and multiplies every coordinate by that reciprocal (mulss); it never
   // divides the coordinate itself, so the scaled value rounds like `v * (1/g)`.
@@ -116,7 +107,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedIntelGridType();
+    out.mType = gpg::RTypeOf<moho::CIntelGrid>();
     return out;
   }
 

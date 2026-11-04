@@ -624,6 +624,7 @@ namespace moho
       // Raw GPU upload: index blob into the locked index buffer.
       std::copy_n(scm_file::GetIndices(*mesh), indexBytes / sizeof(std::int16_t), mappedIndices);
       mIndexBuffer->Unlock();
+      device->ReleaseBufferCopy(*mIndexBuffer); // engine addition: nothing locks a mesh's buffers again
     }
 
     // --- Vertex declaration + static vertex buffer. ---
@@ -675,6 +676,7 @@ namespace moho
     }
 
     mStaticVertexBuffer->Unlock();
+    device->ReleaseBufferCopy(*mStaticVertexBuffer); // engine addition: as the index buffer above
   }
 
   /**

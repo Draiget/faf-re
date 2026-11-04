@@ -50,6 +50,7 @@ namespace moho
 
     std::once_flag sPlanOnce;
     SPlacementPlan sPlan;
+    bool sProcessCpusLocked = false;
 
     /// The `RelationProcessorCore` / `RelationNumaNode` records, or an empty buffer.
     [[nodiscard]] std::vector<unsigned char> QueryProcessorRelation(const LOGICAL_PROCESSOR_RELATIONSHIP relation)
@@ -211,6 +212,62 @@ namespace moho
     "ideal processors on separate physical cores, 2 pins them there. Applies to threads as they start.",
     &sys_ThreadPlacement
   );
+
+  bool AssignProcessCpus(const char* const cpuList)
+  {
+    DWORD_PTR wanted = 0;
+    const char* cursor = cpuList;
+    const unsigned long bitCount = sizeof(DWORD_PTR) * 8u;
+    while (*cursor != '\0') {
+      char* end = nullptr;
+      const unsigned long first = std::strtoul(cursor, &end, 10);
+      if (end == cursor) {
+        return false;
+      }
+      unsigned long last = first;
+      cursor = end;
+      if (*cursor == '-') {
+        last = std::strtoul(cursor + 1, &end, 10);
+        if (end == cursor + 1) {
+          return false;
+        }
+        cursor = end;
+      }
+      if (last < first || last >= bitCount) {
+        return false;
+      }
+      for (unsigned long cpu = first; cpu <= last; ++cpu) {
+        wanted |= DWORD_PTR{1} << cpu;
+      }
+      if (*cursor == ',') {
+        ++cursor;
+      } else if (*cursor != '\0') {
+        return false;
+      }
+    }
+    if (wanted == 0 || !::SetProcessAffinityMask(::GetCurrentProcess(), wanted)) {
+      return false;
+    }
+    // Read back: inside a Windows job with its own CPU limit the call reports success and changes nothing,
+    // and on Linux a CPU outside the container's set just drops out.
+    DWORD_PTR processMask = 0;
+    DWORD_PTR systemMask = 0;
+    return ::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask) && processMask == wanted;
+  }
+
+  void LockAssignedProcessCpus()
+  {
+    DWORD_PTR processMask = 0;
+    DWORD_PTR systemMask = 0;
+    if (::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask) && processMask != systemMask) {
+      sProcessCpusLocked = true;
+    }
+  }
+
+  bool ProcessCpusAreLocked() noexcept
+  {
+    return sProcessCpusLocked;
+  }
 
   void PlaceCurrentThread(const EThreadRole role, const unsigned int index)
   {

@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <initializer_list>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -10,6 +9,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -31,21 +31,6 @@ namespace
       Finish();
     }
   };
-
-  /**
-   * Element-type reflection cache for `SSTIEntityConstantData` itself, mirroring
-   * the `Cached<Type>Type()`/`Resolve<Type>Type()` helpers used throughout this
-   * codebase for the same lazy-resolve-and-cache need (e.g. `CachedShieldType`
-   * in Shield.cpp).
-   */
-  [[nodiscard]] gpg::RType* CachedSSTIEntityConstantDataType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::SSTIEntityConstantData));
-    }
-    return sType;
-  }
 
   /**
    * VFTABLE: matches every other `SerSaveLoadHelper<T>` payload in this
@@ -88,7 +73,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = CachedSSTIEntityConstantDataType();
+      gpg::RType* const type = gpg::RTypeOf<moho::SSTIEntityConstantData>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;
@@ -173,30 +158,13 @@ namespace
     , mSerSaveFunc(&SerializeSSTIEntityConstantDataSerializerCallback)
   {}
 
-
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] gpg::RType* ResolveEntIdType()
   {
     static gpg::RType* sType = nullptr;
     if (sType == nullptr) {
-      sType = ResolveTypeByAnyName({"EntId", "Moho::EntId", "int", "signed int"});
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(std::int32_t));
-      }
+      // Retail's `Moho::EntId` class (EntIdSerializer's type), never `int`'s, which has no
+      // serializer.
+      sType = gpg::RTypeOf<moho::EntIdValue>();
     }
     return sType;
   }

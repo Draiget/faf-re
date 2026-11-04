@@ -38,35 +38,6 @@ namespace
     return typeInfo;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CCommandTask));
-      CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAiCommandDispatchType()
-  {
-    gpg::RType* type = IAiCommandDispatch::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(IAiCommandDispatch));
-      IAiCommandDispatch::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQueueStatusListenerType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Listener<EUnitCommandQueueStatus>));
-    }
-    return type;
-  }
-
 } // namespace
 
 /**
@@ -94,7 +65,7 @@ namespace
    */
   void AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    AddBaseIfPresent(typeInfo, CachedCCommandTaskType(), 0x00);
+    AddBaseIfPresent(typeInfo, gpg::RTypeOf<CCommandTask>(), 0x00);
   }
 
   /**
@@ -107,7 +78,7 @@ namespace
    */
   void AddBase_IAiCommandDispatch(gpg::RType* const typeInfo)
   {
-    AddBaseIfPresent(typeInfo, CachedIAiCommandDispatchType(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, IAiCommandDispatch>());
+    AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiCommandDispatch>(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, IAiCommandDispatch>());
   }
 
   /**
@@ -120,7 +91,7 @@ namespace
    */
   void AddBase_Listener_EUnitCommandQueueStatus(gpg::RType* const typeInfo)
   {
-    AddBaseIfPresent(typeInfo, CachedQueueStatusListenerType(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, Listener<EUnitCommandQueueStatus>>());
+    AddBaseIfPresent(typeInfo, gpg::RTypeOf<Listener<EUnitCommandQueueStatus>>(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, Listener<EUnitCommandQueueStatus>>());
   }
 
 } // namespace

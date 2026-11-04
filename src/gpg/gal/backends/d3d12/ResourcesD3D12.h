@@ -166,6 +166,8 @@ namespace gpg::gal
 
     [[nodiscard]] std::uint8_t* Lock(std::uint32_t offset, std::uint32_t size, MohoD3DLockFlags flags);
     void Unlock();
+    /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
+    void ReleaseCopy() noexcept;
 
     /** The address draws read from, ready for reading. */
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);
@@ -179,6 +181,8 @@ namespace gpg::gal
     void PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset);
     /** A static buffer's resource, for a GPU copy into it; nullptr for a dynamic buffer. */
     [[nodiscard]] d3d12::TrackedResource* CopyDestination();
+    /** Where this static buffer starts in that resource. */
+    [[nodiscard]] std::uint64_t ResourceOffset() const noexcept { return mResourceOffset; }
 
   private:
     void TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk);
@@ -190,7 +194,10 @@ namespace gpg::gal
     bool mDynamic = false;
     D3D12_RESOURCE_STATES mReadState = D3D12_RESOURCE_STATE_GENERIC_READ;
     backend::LockShadow mShadow;
-    d3d12::TrackedResource mResource;    // static buffers
+    d3d12::TrackedResource mResource;    // static buffers with a resource of their own
+    d3d12::TrackedResource* mTracked = &mResource; // or the large buffer this one shares (gal::gSharedBuffers)
+    std::uint64_t mResourceOffset = 0;
+    Microsoft::WRL::ComPtr<IUnknown> mSharedRange;
     bool mUnwritten = false;             // placed, and not yet uploaded whole
     D3D12_GPU_VIRTUAL_ADDRESS mChunk = 0; // dynamic buffers: the current copy in upload memory
     std::uint8_t* mChunkCpu = nullptr;

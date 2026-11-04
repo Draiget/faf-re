@@ -111,6 +111,6 @@ namespace moho
    * and unlinks it. Eleven callers -- every erase, tidy and range destroy of
    * the vector that holds one. The two jump-only alias lanes at 0x005EE820
    * and 0x005EF8B0 are dead: zero data_refs and zero call_edges for both, and
-   * no source-level caller anywhere in `src/**`.
+   * no source-level caller anywhere in `src/ **`.
    */
 } // namespace moho

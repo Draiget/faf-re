@@ -1,4 +1,6 @@
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/debug/CPathDebugger.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <typeinfo>
 
@@ -9,7 +11,6 @@
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kCreatePathDebuggerName = "_c_CreatePathDebugger";
   constexpr const char* kCreatePathDebuggerHelpText = "_c_CreatePathDebugger(luaobj,spec)";
   constexpr const char* kCPathDebuggerLuaClassName = "CPathDebugger";
@@ -45,20 +46,6 @@ namespace
     return moho::CPathDebugger::sType;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    return moho::SCR_FindLuaInitFormSet("User");
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
 } // namespace
 
 namespace moho
@@ -153,7 +140,7 @@ namespace moho
   CScrLuaInitForm* func__c_CreatePathDebugger_LuaFuncDef()
   {
     static CCreatePathDebugger_LuaFuncDef binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kCreatePathDebuggerName,
       &cfunc__c_CreatePathDebugger,
       nullptr,
@@ -172,10 +159,7 @@ namespace moho
    */
   int cfunc__c_CreatePathDebuggerL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreatePathDebuggerHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCreatePathDebuggerHelpText);
 
     CPathDebugger* pathDebugger = nullptr;
     {
@@ -208,7 +192,7 @@ namespace moho
   CScrLuaInitForm* func_CPathDebuggerDestroy_LuaFuncDef()
   {
     static CPathDebuggerDestroy_LuaFuncDef binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kCPathDebuggerDestroyName,
       &cfunc_CPathDebuggerDestroy,
       &CScrLuaMetatableFactory<CPathDebugger>::Instance(),
@@ -227,10 +211,7 @@ namespace moho
    */
   int cfunc_CPathDebuggerDestroyL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCPathDebuggerDestroyHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCPathDebuggerDestroyHelpText);
 
     CPathDebugger* pathDebugger = nullptr;
     {
@@ -265,7 +246,7 @@ namespace moho
   CScrLuaInitForm* register_moho_PathDebugger_methods_ClassBinder()
   {
     static CScrLuaClassBinder binder(
-      UserLuaInitSet(), "moho.PathDebugger_methods", &CScrLuaMetatableFactory<CPathDebugger>::Instance(),
+      moho::SCR_UserLuaInitSet(), "moho.PathDebugger_methods", &CScrLuaMetatableFactory<CPathDebugger>::Instance(),
       kCPathDebuggerLuaClassName, ""
     );
     return &binder;

@@ -1,4 +1,5 @@
 #include "moho/ai/CAiReconDBImplTypeInfo.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdlib>
 #include <cstdint>
@@ -142,22 +143,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiReconDBImplType()
-  {
-    if (!CAiReconDBImpl::sType) {
-      CAiReconDBImpl::sType = gpg::LookupRType(typeid(CAiReconDBImpl));
-    }
-    return CAiReconDBImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAiReconDBType()
-  {
-    if (!IAiReconDB::sType) {
-      IAiReconDB::sType = gpg::LookupRType(typeid(IAiReconDB));
-    }
-    return IAiReconDB::sType;
-  }
-
   [[nodiscard]] gpg::RType* CachedReconBlipType()
   {
     if (!gReconBlipType) {
@@ -182,38 +167,6 @@ namespace
       SReconKey::sType = gSReconKeyType;
     }
     return gSReconKeyType;
-  }
-
-  template <typename T>
-  [[nodiscard]] gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
   }
 
   [[nodiscard]] gpg::RRef MakeReconBlipObjectRef(ReconBlip* object)
@@ -319,7 +272,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CreateAiReconDbRefOwned()
   {
-    return MakeTypedRef(new CAiReconDBImpl(nullptr, false), CachedCAiReconDBImplType());
+    return gpg::MakeTypedRef(new CAiReconDBImpl(nullptr, false), gpg::RTypeOf<CAiReconDBImpl>());
   }
 
   [[maybe_unused]] void DeleteAiReconDbOwned(void* object)
@@ -364,7 +317,7 @@ namespace
    */
   void AddIAiReconDBBase(gpg::RType* typeInfo)
   {
-    gpg::RType* const baseType = CachedIAiReconDBType();
+    gpg::RType* const baseType = gpg::RTypeOf<IAiReconDB>();
     gpg::RField field{};
     field.mName = baseType->GetName();
     field.mType = baseType;

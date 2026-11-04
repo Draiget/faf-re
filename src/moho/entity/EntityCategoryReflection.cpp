@@ -1,3 +1,4 @@
+#include "moho/lua/ScrLuaUserData.h"
 #include "moho/entity/EntityCategoryReflection.h"
 
 #include <cstdint>
@@ -23,7 +24,6 @@
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kEntityCategoryLuaClassName = "EntityCategory";
   constexpr const char* kEntityCategoryAddHelpText = "Generate a category list that is the sum of both categories";
   constexpr const char* kEntityCategorySubHelpText = "Generate a category list of units that is of cat1 but not of cat2";
@@ -32,28 +32,10 @@ namespace
   constexpr const char* kSecondsPerTickHelpText = "SecondsPerTick() - Return how many seconds in a tick";
   constexpr const char* kEntityCategoryGetUnitListHelpText = "Get a list of units blueprint names from a category";
 
-  [[nodiscard]] gpg::RType* CachedBVIntSetType()
-  {
-    if (!moho::BVIntSet::sType) {
-      moho::BVIntSet::sType = gpg::LookupRType(typeid(moho::BVIntSet));
-    }
-    return moho::BVIntSet::sType;
-  }
-
   [[nodiscard]] const gpg::RRef& NullOwnerRef()
   {
     static const gpg::RRef kNullOwner{nullptr, nullptr};
     return kNullOwner;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Core"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Core");
-    return fallbackSet;
   }
 
   class EntityCategoryLuaMetatableFactory final : public moho::CScrLuaObjectFactory
@@ -106,38 +88,6 @@ namespace
     return index;
   }
 
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
-  {
-    if (!moho::EntityCategorySet::sType) {
-      moho::EntityCategorySet::sType = gpg::LookupRType(typeid(moho::EntityCategorySet));
-    }
-    return moho::EntityCategorySet::sType;
-  }
-
   [[nodiscard]] moho::RRuleGameRulesImpl* ResolveCategoryRules(const moho::EntityCategorySet& categorySet) noexcept
   {
     return static_cast<moho::RRuleGameRulesImpl*>(categorySet.mUniverse.mRules);
@@ -187,7 +137,7 @@ namespace
    */
   [[nodiscard]] moho::EntityCategorySet* TryUpcastEntityCategoryOrThrow(const gpg::RRef& source)
   {
-    gpg::RType* const entityCategoryType = CachedEntityCategorySetType();
+    gpg::RType* const entityCategoryType = gpg::RTypeOf<moho::EntityCategorySet>();
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, entityCategoryType);
     auto* const categorySet = static_cast<moho::EntityCategorySet*>(upcast.mObj);
     if (!categorySet) {
@@ -276,7 +226,7 @@ namespace
       payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
-    const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
+    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
     return TryUpcastEntityCategoryOrThrow(userDataRef);
   }
 
@@ -304,7 +254,7 @@ namespace
   CScrLuaInitForm* register_EntityCategory()
   {
     static CScrLuaClassBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "moho.EntityCategory",
       &EntityCategoryLuaMetatableFactory::Instance(),
       kEntityCategoryLuaClassName,
@@ -396,10 +346,7 @@ namespace
    */
   int cfunc_EntityCategory__addL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategoryAddHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kEntityCategoryAddHelpText);
 
     const LuaPlus::LuaObject lhsObject(LuaPlus::LuaStackObject(state, 1));
     EntityCategorySet* const lhs = func_GetCObj_EntityCategory(lhsObject);
@@ -422,7 +369,7 @@ namespace
   CScrLuaInitForm* func_EntityCategory__add_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "__add",
       &moho::cfunc_EntityCategory__add,
       &EntityCategoryLuaMetatableFactory::Instance(),
@@ -453,10 +400,7 @@ namespace
    */
   int cfunc_EntityCategory__subL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategorySubHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kEntityCategorySubHelpText);
 
     const LuaPlus::LuaObject lhsObject(LuaPlus::LuaStackObject(state, 1));
     EntityCategorySet* const lhs = func_GetCObj_EntityCategory(lhsObject);
@@ -479,7 +423,7 @@ namespace
   CScrLuaInitForm* func_EntityCategory__sub_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "__sub",
       &moho::cfunc_EntityCategory__sub,
       &EntityCategoryLuaMetatableFactory::Instance(),
@@ -510,10 +454,7 @@ namespace
    */
   int cfunc_EntityCategory__mulL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategoryMulHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kEntityCategoryMulHelpText);
 
     const LuaPlus::LuaObject lhsObject(LuaPlus::LuaStackObject(state, 1));
     EntityCategorySet* const lhs = func_GetCObj_EntityCategory(lhsObject);
@@ -536,7 +477,7 @@ namespace
   CScrLuaInitForm* func_EntityCategory__mul_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "__mul",
       &moho::cfunc_EntityCategory__mul,
       &EntityCategoryLuaMetatableFactory::Instance(),
@@ -574,10 +515,7 @@ namespace
    */
   int cfunc_EntityCategoryEmptyL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategoryEmptyHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kEntityCategoryEmptyHelpText);
 
     const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
     EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
@@ -596,7 +534,7 @@ namespace
   CScrLuaInitForm* func_EntityCategoryEmpty_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "EntityCategoryEmpty",
       &moho::cfunc_EntityCategoryEmpty,
       nullptr,
@@ -637,10 +575,7 @@ namespace
    */
   int cfunc_SecondsPerTickL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSecondsPerTickHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kSecondsPerTickHelpText);
 
     lua_pushnumber(state->m_state, 0.1f);
     (void)lua_gettop(state->m_state);
@@ -656,7 +591,7 @@ namespace
   CScrLuaInitForm* func_SecondsPerTick_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "SecondsPerTick",
       &moho::cfunc_SecondsPerTick,
       nullptr,
@@ -708,10 +643,7 @@ namespace
    */
   int cfunc_EntityCategoryGetUnitListL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategoryGetUnitListHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kEntityCategoryGetUnitListHelpText);
 
     const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
     EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
@@ -747,7 +679,7 @@ namespace
   CScrLuaInitForm* func_EntityCategoryGetUnitList_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "EntityCategoryGetUnitList",
       &moho::cfunc_EntityCategoryGetUnitList,
       nullptr,
@@ -783,7 +715,7 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : NullOwnerRef();
 
     archive->Write(EntityCategoryHelper::StaticGetClass(), helper, owner);
-    archive->Write(CachedBVIntSetType(), &set->mBits, NullOwnerRef());
+    archive->Write(gpg::RTypeOf<moho::BVIntSet>(), &set->mBits, NullOwnerRef());
   }
 
   /**
@@ -801,7 +733,7 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : NullOwnerRef();
 
     archive->Read(EntityCategoryHelper::StaticGetClass(), helper, owner);
-    archive->Read(CachedBVIntSetType(), &set->mBits, NullOwnerRef());
+    archive->Read(gpg::RTypeOf<moho::BVIntSet>(), &set->mBits, NullOwnerRef());
   }
 
   /**

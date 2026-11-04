@@ -34,35 +34,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCUnitPodAssistType()
-  {
-    gpg::RType* type = moho::CUnitPodAssist::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitPodAssist));
-      moho::CUnitPodAssist::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] moho::IAiCommandDispatchImpl* AsDispatchImpl(moho::CCommandTask* const dispatchTask) noexcept
   {
@@ -197,35 +168,7 @@ namespace
     ownerUnit->SimulationRef->mOGrid->ForAllEntitiesIterator(outHits, moho::ENTITYTYPE_Unit, scanSphere);
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
 
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -609,13 +552,13 @@ namespace moho
   )
   {
     const gpg::RRef baseRef{};
-    archive->Read(CachedCCommandTaskType(), this, baseRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), this, baseRef);
 
     const gpg::RRef ptrRef{};
     archive->ReadPointer(&mDispatchTask, &ptrRef);
 
     const gpg::RRef weakRef{};
-    archive->Read(CachedWeakPtrUnitType(), &mAssistTarget, weakRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mAssistTarget, weakRef);
   }
 
   /**
@@ -630,14 +573,14 @@ namespace moho
   ) const
   {
     const gpg::RRef baseRef{};
-    archive->Write(CachedCCommandTaskType(), const_cast<CUnitPodAssist*>(this), baseRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), const_cast<CUnitPodAssist*>(this), baseRef);
 
     gpg::RRef ptrRef{};
     (void)gpg::RRef_CCommandTask(&ptrRef, mDispatchTask);
     gpg::WriteRawPointer(archive, ptrRef, gpg::TrackedPointerState::Unowned, baseRef);
 
     const gpg::RRef weakRef{};
-    archive->Write(CachedWeakPtrUnitType(), const_cast<WeakPtr<Unit>*>(&mAssistTarget), weakRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), const_cast<WeakPtr<Unit>*>(&mAssistTarget), weakRef);
   }
 } // namespace moho
 
@@ -664,7 +607,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeDerivedRef(value, CachedCUnitPodAssistType());
+    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitPodAssist>());
     return outRef;
   }
 } // namespace gpg

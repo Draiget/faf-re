@@ -64,33 +64,6 @@ namespace
     return self;
   }
 
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-
-    return cached;
-  }
-
-  /**
-   * Address: 0x0050CB10 (FUN_0050CB10)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `SPointVector`.
-   */
-  [[nodiscard]] gpg::RType* CachedSPointVectorType()
-  {
-    gpg::RType* cached = moho::SPointVector::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(SPointVector));
-      moho::SPointVector::sType = cached;
-    }
-
-    return cached;
-  }
-
   [[nodiscard]] moho::SPointVector ZeroSPointVector() noexcept
   {
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
@@ -154,7 +127,7 @@ void SPointVector::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   const gpg::RRef ownerRef{};
 
-  gpg::RType* const vectorType = CachedVector3fType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vectorType != nullptr);
   archive->Read(vectorType, &point, ownerRef);
 
@@ -171,7 +144,7 @@ void SPointVector::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   const gpg::RRef ownerRef{};
 
-  gpg::RType* const vectorType = CachedVector3fType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vectorType != nullptr);
   archive->Write(vectorType, &point, ownerRef);
 
@@ -187,7 +160,7 @@ void SPointVector::MemberSerialize(gpg::WriteArchive* const archive) const
  */
 const char* gpg::RVectorType<moho::SPointVector>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSPointVectorType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<SPointVector>()->GetName());
   return sName.c_str();
 }
 
@@ -256,7 +229,7 @@ void gpg::RVectorType<moho::SPointVector>::SerLoad(
   SPointVectorVector loaded{};
   loaded.reserve(static_cast<std::size_t>(count));
 
-  gpg::RType* const elementType = CachedSPointVectorType();
+  gpg::RType* const elementType = gpg::RTypeOf<SPointVector>();
   const gpg::RRef ownerRef{};
   for (unsigned int i = 0; i < count; ++i) {
     moho::SPointVector value = ZeroSPointVector();
@@ -297,7 +270,7 @@ void gpg::RVectorType<moho::SPointVector>::SerSave(
     return;
   }
 
-  gpg::RType* const elementType = CachedSPointVectorType();
+  gpg::RType* const elementType = gpg::RTypeOf<SPointVector>();
   const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
   for (unsigned int i = 0; i < count; ++i) {
     const moho::SPointVector& value = (*storage)[static_cast<std::size_t>(i)];

@@ -6,6 +6,7 @@
 // creation. Listed in sources.cmake right after StartupHelpers.cpp; its
 // bootstrap registers its user-set forms in the order StartupHelpers.cpp did.
 
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/movie/sfd/IndependentSfdBackend.h"
 #include "moho/misc/StartupHelpers.h"
 #include "legacy/containers/AutoPtr.h"
@@ -126,13 +127,8 @@ namespace
    * `vector_string::operator[]` symbol shape; the natural `map[key]` idiom
    * the compiler would inline does not guarantee the out-of-line emission.
    *
-   * DB-integrity fix: this was originally typed over `std::map`/
-   * `std::vector`/`std::string` (modern STL), which compiles to a
-   * completely different, unrelated set of symbols -- not the
-   * `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` `_Tree`
-   * insert/lower_bound bodies this binary actually links (FUN_008CB860 /
-   * FUN_008CBA70, `legacy/containers/RbTree.h` + `Map.h`). Retyped to the
-   * legacy ABI containers so the template family is instantiated again.
+   * Retyped to the legacy ABI containers so the template family is
+   * instantiated again.
    */
   msvc8::vector<msvc8::string>& SubscriptStringToStringVectorMap(
     msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& map,
@@ -370,19 +366,6 @@ namespace
    * 0x00BE6C80 registers.
    */
   msvc8::auto_ptr<moho::CMovieManager> sMovieManager;
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
 } // namespace
 
 
@@ -420,11 +403,7 @@ int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetCommandLineArgHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kGetCommandLineArgHelpText);
 
   LuaPlus::LuaStackObject optionArg(state, 1);
   const char* const optionText = optionArg.GetString();
@@ -478,7 +457,7 @@ int moho::cfunc_GetCommandLineArg(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetCommandLineArg_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetCommandLineArg",
     &moho::cfunc_GetCommandLineArg,
     nullptr,
@@ -501,10 +480,7 @@ int moho::cfunc_HasCommandLineArgL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kHasCommandLineArgHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kHasCommandLineArgHelpText);
 
   LuaPlus::LuaStackObject optionArg(state, 1);
   const char* const optionText = optionArg.GetString();
@@ -536,7 +512,7 @@ int moho::cfunc_HasCommandLineArg(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_HasCommandLineArg_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "HasCommandLineArg",
     &moho::cfunc_HasCommandLineArg,
     nullptr,
@@ -644,7 +620,7 @@ int moho::cfunc_GetTextureDimensions(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetTextureDimensions_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetTextureDimensions",
     &moho::cfunc_GetTextureDimensions,
     nullptr,
@@ -675,7 +651,7 @@ int moho::cfunc_SetMovieVolume(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetMovieVolume_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "SetMovieVolume",
     &moho::cfunc_SetMovieVolume,
     nullptr,
@@ -695,10 +671,7 @@ moho::CScrLuaInitForm* moho::func_SetMovieVolume_LuaFuncDef()
 int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetMovieVolumeHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kSetMovieVolumeHelpText);
 
   LuaPlus::LuaStackObject volumeArg(state, 1);
   if (lua_type(rawState, 1) != LUA_TNUMBER) {
@@ -730,7 +703,7 @@ int moho::cfunc_GetMovieVolume(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetMovieVolume_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetMovieVolume",
     &moho::cfunc_GetMovieVolume,
     nullptr,
@@ -750,10 +723,7 @@ moho::CScrLuaInitForm* moho::func_GetMovieVolume_LuaFuncDef()
 int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetMovieVolumeHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kGetMovieVolumeHelpText);
 
   lua_pushnumber(rawState, MOV_GetVolume());
   (void)lua_gettop(rawState);
@@ -782,7 +752,7 @@ int moho::cfunc_GetAntiAliasingOptions(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetAntiAliasingOptions_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetAntiAliasingOptions",
     &moho::cfunc_GetAntiAliasingOptions,
     nullptr,
@@ -805,13 +775,7 @@ int moho::cfunc_GetAntiAliasingOptionsL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kGetAntiAliasingOptionsHelpText, 0, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kGetAntiAliasingOptionsHelpText);
 
   LuaPlus::LuaObject optionsTable(state);
   optionsTable.AssignNewTable(state, 0, 0);
@@ -861,7 +825,7 @@ int moho::cfunc_GetOptions(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetOptions_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetOptions",
     &moho::cfunc_GetOptions,
     nullptr,
@@ -884,10 +848,7 @@ int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetOptionsHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetOptionsHelpText);
 
   LuaPlus::LuaStackObject keyArg(state, 1);
   const char* keyText = lua_tostring(rawState, 1);
@@ -933,7 +894,7 @@ int moho::cfunc_GetPreference(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetPreference_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetPreference",
     &moho::cfunc_GetPreference,
     nullptr,
@@ -1018,7 +979,7 @@ int moho::cfunc_SetPreference(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetPreference_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "SetPreference",
     &moho::cfunc_SetPreference,
     nullptr,
@@ -1041,10 +1002,7 @@ int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetPreferenceHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetPreferenceHelpText);
 
   LuaPlus::LuaObject valueObject(LuaPlus::LuaStackObject(state, 2));
 
@@ -1083,10 +1041,7 @@ int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
 int moho::cfunc_SavePreferences(lua_State* const luaContext)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSavePreferencesHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kSavePreferencesHelpText);
 
   USER_SavePreferences();
   return 0;
@@ -1102,7 +1057,7 @@ int moho::cfunc_SavePreferences(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SavePreferences_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "SavePreferences",
     &moho::cfunc_SavePreferences,
     nullptr,
@@ -1146,7 +1101,7 @@ int moho::cfunc_DebugFacilitiesEnabled(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_DebugFacilitiesEnabled_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "DebugFacilitiesEnabled",
     &moho::cfunc_DebugFacilitiesEnabled,
     nullptr,
@@ -1178,12 +1133,7 @@ moho::CScrLuaInitForm* moho::j_func_DebugFacilitiesEnabled_LuaFuncDef()
 int moho::cfunc_DebugFacilitiesEnabledL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kDebugFacilitiesEnabledHelpText, 0, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kDebugFacilitiesEnabledHelpText);
 
   lua_pushboolean(rawState, USER_DebugFacilitiesEnabled() ? 1 : 0);
   (void)lua_gettop(rawState);

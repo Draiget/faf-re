@@ -122,11 +122,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
   [[nodiscard]] float ReadHeightSampleMeters(

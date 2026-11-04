@@ -452,6 +452,8 @@ void CClientBase::Process(CMessage& msg)
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Ready):
     mReady = true;
+    // Engine addition (wld_PreciseSharedStart): note when this ready was handled, for the shared start.
+    mManager->NoteClientReady(mIndex);
     return;
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject): {
@@ -806,7 +808,7 @@ void CClientBase::UpdateState(
         outPipe->Write(message.mBuff.start_, message.mBuff.Size());
 
         if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {
-          mValidCommandSources.Remove(mCommandSourceId);
+          (void)mValidCommandSources.Remove(mCommandSourceId);
           mValidCommandSources.Finalize();
           hasCommandSource = false;
           mCommandSourceId = kInvalidCommandSource;

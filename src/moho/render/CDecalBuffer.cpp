@@ -45,7 +45,7 @@ namespace
     }
 
     const std::uint32_t recycled = pool.mReleasedLows.GetNext(std::numeric_limits<std::uint32_t>::max());
-    pool.mReleasedLows.Remove(recycled);
+    (void)pool.mReleasedLows.Remove(recycled);
     return recycled;
   }
 

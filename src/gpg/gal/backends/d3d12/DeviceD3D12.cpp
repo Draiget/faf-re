@@ -387,6 +387,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mCursor.Destroy();
     mUpload.Release();
     mPlacedTextures.Release();
+    mSharedBuffers.Release();
     mPlacedBuffers.Release();
     mRtvPool.Release();
     mDsvPool.Release();
@@ -502,6 +503,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mUpload.Initialize(mDevice.Get());
     mPlacedTextures.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, L"placed textures");
     mPlacedBuffers.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS, L"placed buffers");
+    mSharedBuffers.Initialize(&mPlacedBuffers);
     mRtvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 256U);
     mDsvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 256U);
     mSrvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096U);
@@ -1282,6 +1284,16 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     FinishDraw();
   }
 
+  void DeviceD3D12::ReleaseBufferCopy(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferD3D12&>(buffer).Storage().ReleaseCopy();
+  }
+
+  void DeviceD3D12::ReleaseBufferCopy(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferD3D12&>(buffer).Storage().ReleaseCopy();
+  }
+
   bool DeviceD3D12::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount
@@ -1305,12 +1317,18 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (sourceResource == nullptr) {
       return false;
     }
+    // Two buffers sharing one large buffer: it cannot be source and destination at once.
+    if (target->resource.Get() == sourceResource) {
+      return false;
+    }
     // In command order: earlier draws reading the destination are recorded
     // before this barrier, and later draws move it back to VERTEX_AND_CONSTANT
     // in PrepareForDraw.
     Transition(*target, D3D12_RESOURCE_STATE_COPY_DEST);
     FlushBarriers();
-    mList->CopyBufferRegion(target->resource.Get(), destinationOffset, sourceResource, sourceBase + sourceOffset, byteCount);
+    mList->CopyBufferRegion(
+      target->resource.Get(), to.ResourceOffset() + destinationOffset, sourceResource, sourceBase + sourceOffset, byteCount
+    );
     return true;
   }
 
@@ -1478,6 +1496,15 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     Garbage garbage;
     garbage.serial = RecordingSerial();
     garbage.resource = std::move(resource);
+    mGarbage.push_back(std::move(garbage));
+  }
+
+  void DeviceD3D12::RetireSharedRange(ComPtr<IUnknown> range)
+  {
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    Garbage garbage;
+    garbage.serial = RecordingSerial();
+    garbage.sharedRange = std::move(range);
     mGarbage.push_back(std::move(garbage));
   }
 

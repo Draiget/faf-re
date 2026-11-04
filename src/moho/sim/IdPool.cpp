@@ -1,4 +1,5 @@
 #include "moho/sim/IdPool.h"
+#include "moho/sim/SimArchiveMode.h"
 
 #include <limits>
 #include <new>
@@ -267,6 +268,11 @@ BVIntSetAddResult IdPool::QueueReleasedLowId(const unsigned int lowId)
  */
 void IdPool::Update()
 {
+  // Engine addition (replay keyframes): the opening sync of a restored sim closes no beat of the game.
+  if (gSimKeyframeRestoring.load(std::memory_order_relaxed)) {
+    return;
+  }
+
   const int nextEnd = (mSubRes2.mEnd + 1) % kHistoryCapacity;
   if (nextEnd == mSubRes2.mStart) {
     BVIntSet& oldestSet = AsBitSet(mSubRes2.mData[mSubRes2.mStart]);
@@ -308,6 +314,18 @@ void IdPool::MemberDeserialize(gpg::ReadArchive* const archive)
   mNextLowId = static_cast<std::int32_t>(nextLowId);
 
   archive->Read(CachedBVIntSetType(), &mReleasedLows, NullOwnerRef());
+
+  // Engine addition (replay keyframes): the recycle ring as it was, see MemberSerialize.
+  if (gSimExactArchive.load(std::memory_order_relaxed)) {
+    std::uint32_t slots = 0;
+    archive->ReadUInt(&slots);
+    mSubRes2.Reset();
+    for (std::uint32_t slot = 0; slot < slots; ++slot) {
+      BVIntSet snapshot{};
+      archive->Read(CachedBVIntSetType(), &snapshot, NullOwnerRef());
+      mSubRes2.PushSnapshot(snapshot);
+    }
+  }
 }
 
 /**
@@ -318,6 +336,25 @@ void IdPool::MemberDeserialize(gpg::ReadArchive* const archive)
  */
 void IdPool::MemberSerialize(gpg::WriteArchive* const archive) const
 {
+  // Engine addition (replay keyframes): a retail save hands every id the ring still holds back to
+  // the free set, so after a load they are reused up to 100 beats sooner than in the game that
+  // saved. A keyframe keeps the cursor, the free set and the ring exactly.
+  if (gSimExactArchive.load(std::memory_order_relaxed)) {
+    archive->WriteInt(mNextLowId);
+    archive->Write(CachedBVIntSetType(), &mReleasedLows, NullOwnerRef());
+
+    std::uint32_t slots = 0;
+    for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {
+      ++slots;
+    }
+    archive->WriteUInt(slots);
+    for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {
+      BVIntSet snapshot = AsBitSet(mSubRes2.mData[index]);
+      archive->Write(CachedBVIntSetType(), &snapshot, NullOwnerRef());
+    }
+    return;
+  }
+
   BVIntSet compactedReleased = mReleasedLows;
 
   for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {

@@ -205,4 +205,12 @@ namespace moho
    * Returns first init-form set whose name exactly matches `setName`.
    */
   [[nodiscard]] CScrLuaInitFormSet* SCR_FindLuaInitFormSet(const char* setName) noexcept;
+
+  /**
+   * Engine addition: the one "Sim", "Core" and "User" init-form sets, for the binders
+   * of every file. Finds the set if a file has made it, or makes it.
+   */
+  [[nodiscard]] CScrLuaInitFormSet& SCR_SimLuaInitSet();
+  [[nodiscard]] CScrLuaInitFormSet& SCR_CoreLuaInitSet();
+  [[nodiscard]] CScrLuaInitFormSet& SCR_UserLuaInitSet();
 } // namespace moho
