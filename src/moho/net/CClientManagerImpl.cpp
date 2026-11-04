@@ -1469,3 +1469,13 @@ void CClientManagerImpl::RewindToStart()
   }
 }
 
+bool CClientManagerImpl::IsReplay()
+{
+  std::scoped_lock lock(mLock);
+  for (const CClientBase* const client : mClients) {
+    if (client != nullptr && dynamic_cast<const CReplayClient*>(client) != nullptr) {
+      return true;
+    }
+  }
+  return false;
+}

@@ -1400,10 +1400,14 @@ int moho::cfunc_ScrubReplayL(LuaPlus::LuaState* const state)
   }
 
   if (targetTick < session->mGameTick) {
-    // Rewind / scrub backward: requires session restart.
-    // Stash restart target in static handover slot and call RestartSession.
-    CWldSession::sPendingRestartScrubTarget = targetTick;
-    moho::cfunc_RestartSession(rawState);
+    // Rewind / scrub backward: attempt in-place keyframe rewind to tick 0
+    if (!session->RewindToStart()) {
+      // Fallback: requires session restart if keyframe rewind unavailable.
+      CWldSession::sPendingRestartScrubTarget = targetTick;
+      moho::cfunc_RestartSession(rawState);
+    } else if (targetTick > 0) {
+      session->StartScrubToBeat(targetTick);
+    }
   } else {
     // Forward scrub within current session
     session->StartScrubToBeat(targetTick);

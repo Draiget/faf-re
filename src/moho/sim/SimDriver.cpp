@@ -44,6 +44,11 @@
 #include "Sim.h"
 #include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimKeyframe.h"
+#include "moho/misc/CSaveGameRequestImpl.h"
+#include <filesystem>
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/ReadArchive.h"
+
 
 using namespace moho;
 
@@ -57,6 +62,58 @@ namespace moho
 namespace
 {
   bool gSimInterlocked = false;
+
+std::string sInitialKeyframePath;
+  moho::SSimKeyframeHeader sInitialKeyframeHeader{};
+  bool sHasInitialKeyframe = false;
+
+  void CaptureInitialKeyframeLocked(moho::Sim* const sim, const std::uint32_t processId)
+  {
+    if (sim == nullptr) {
+      return;
+    }
+
+    if (sInitialKeyframePath.empty()) {
+      const std::filesystem::path tempDir = std::filesystem::temp_directory_path();
+      sInitialKeyframePath = (tempDir / ("faf_replay_initial_" + std::to_string(processId) + ".bin")).string();
+    }
+
+    try {
+      moho::gSimExactSaveCount.fetch_add(1u);
+      moho::gSimExactArchive.store(true);
+
+      std::FILE* file = nullptr;
+      if (fopen_s(&file, sInitialKeyframePath.c_str(), "wb") != 0 || file == nullptr) {
+        gpg::Warnf("CSimDriver: failed to open %s for initial keyframe", sInitialKeyframePath.c_str());
+        moho::gSimExactArchive.store(false);
+        return;
+      }
+
+      boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
+
+      moho::SIM_CaptureKeyframeHeader(*sim, sInitialKeyframeHeader);
+      if (!moho::SIM_WriteKeyframeHeader(file, sInitialKeyframeHeader)) {
+        gpg::Warnf("CSimDriver: failed to write keyframe header to %s", sInitialKeyframePath.c_str());
+        moho::gSimExactArchive.store(false);
+        return;
+      }
+
+      gpg::WriteArchive* const archive = gpg::CreateFastBinaryWriteArchive(sharedFile);
+      sim->SaveState(archive);
+      delete archive;
+
+      moho::gSimExactArchive.store(false);
+      sHasInitialKeyframe = true;
+      gpg::Logf("CSimDriver: initial keyframe captured at beat %u, tick %u to %s",
+                sInitialKeyframeHeader.beat, sInitialKeyframeHeader.tick, sInitialKeyframePath.c_str());
+    } catch (const std::exception& ex) {
+      moho::gSimExactArchive.store(false);
+      gpg::Warnf("CSimDriver: exception while capturing initial keyframe: %s", ex.what());
+    } catch (...) {
+      moho::gSimExactArchive.store(false);
+      gpg::Warnf("CSimDriver: unknown exception while capturing initial keyframe");
+    }
+  }
 
   // Issue-thread pacing, from CSimDriver::ThreadRun (0x0073BDF0).
   constexpr unsigned int kCurrentThreadId = 0xFFFFFFFFu;
@@ -913,6 +970,12 @@ CSimDriver::~CSimDriver()
   }
 
   mSyncDataQueue.ClearAndDelete();
+
+  if (sHasInitialKeyframe && !sInitialKeyframePath.empty()) {
+    std::error_code ignored;
+    std::filesystem::remove(sInitialKeyframePath, ignored);
+    sHasInitialKeyframe = false;
+  }
 }
 
 /**
@@ -1296,6 +1359,7 @@ void CSimDriver::ShutDown()
  * The whole loop lives on this thread in the binary; `Dispatch` (slot 5) only
  * duplicates it for interlocked mode, where the caller drives beats itself.
  */
+
 void CSimDriver::ThreadCreateSim()
 {
   PinThisThreadToOneNumaNodeIfRequested();
@@ -1335,11 +1399,16 @@ void CSimDriver::ThreadCreateSim()
 
   boost::mutex::scoped_lock lock(mLock);
 
-  mSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadRun, this));
-
   // The opening sync: the frame machine waits on it before it will leave
   // Initialize.
   FinalizeSyncDispatchLocked(lock);
+
+  // Engine addition: capture initial keyframe at tick 0 for fast rewind without restart
+  if (mClientManager != nullptr && mClientManager->IsReplay() && !sHasInitialKeyframe) {
+    CaptureInitialKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+  }
+
+  mSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadRun, this));
   SetStateAndNotify(EDriverState::Ready);
 
   while (!mStopCreateSimThread) {
@@ -2281,4 +2350,90 @@ float moho::SIM_GetLeadSimSpeedEstimate() noexcept
     return 0.0f;
   }
   return gLeadSimSpeedEstimate.load(std::memory_order_relaxed);
+}
+
+bool CSimDriver::RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo)
+{
+  if (!sHasInitialKeyframe || sInitialKeyframePath.empty() || !loadInfo) {
+    return false;
+  }
+
+  boost::mutex::scoped_lock lock(mLock);
+
+  // 1. Stop issue thread
+  if (mSimThread) {
+    mStopSimThread = true;
+    if (mConnectionEvent) {
+      SetEvent(mConnectionEvent);
+    }
+    lock.unlock();
+    JoinAndDeleteThread(mSimThread);
+    lock.lock();
+  }
+
+  // 2. Stop sim thread
+  if (mCreateSimThread) {
+    mStopCreateSimThread = true;
+    mStateChanged.notify_all();
+
+    while (mState != EDriverState::Stopped && mState != EDriverState::Failed && mState != EDriverState::Ready) {
+      lock.unlock();
+      PerformNextEvent();
+      lock.lock();
+    }
+
+    lock.unlock();
+    JoinAndDeleteThread(mCreateSimThread);
+    lock.lock();
+  }
+
+  // 3. Clean up existing sim
+  if (mSim) {
+    mSim->Shutdown();
+    FinalizeSyncDispatchLocked(lock);
+    mSim.reset();
+  }
+
+  // 4. Clear sync queue & reset counters
+  mSyncDataQueue.ClearAndDelete();
+  mDispatchBeat = 1;
+  mNextIssueBeat = 1;
+  mLastDequeuedBeat = -1;
+  mSimBusy = false;
+  mState = EDriverState::Startup;
+  mStopCreateSimThread = false;
+  mStopSimThread = false;
+
+  // 5. Rewind client manager
+  if (mClientManager) {
+    mClientManager->RewindToStart();
+  }
+
+  // 6. Open keyframe file and begin keyframe restore
+  std::FILE* rawFile = nullptr;
+  if (fopen_s(&rawFile, sInitialKeyframePath.c_str(), "rb") != 0 || rawFile == nullptr) {
+    gpg::Warnf("CSimDriver::RewindToStart: cannot read %s", sInitialKeyframePath.c_str());
+    return false;
+  }
+
+  boost::shared_ptr<std::FILE> keyframeFile(rawFile, moho::SFileStarCloser{});
+  moho::SSimKeyframeHeader keyframeHeader{};
+  if (!moho::SIM_ReadKeyframeHeader(rawFile, keyframeHeader)) {
+    gpg::Warnf("CSimDriver::RewindToStart: %s is not a valid keyframe", sInitialKeyframePath.c_str());
+    return false;
+  }
+
+  moho::SIM_BeginKeyframeRestore(keyframeHeader);
+  loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
+  mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
+
+  // 7. Restart ThreadCreateSim
+  mCreateSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this));
+
+  // 8. Wait for sim thread to recreate sim and reach Ready state
+  while (mState != EDriverState::Ready && mState != EDriverState::Failed) {
+    mStateChanged.wait(lock);
+  }
+
+  return mState == EDriverState::Ready;
 }

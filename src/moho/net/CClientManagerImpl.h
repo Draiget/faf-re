@@ -614,6 +614,11 @@ namespace moho
      * Engine addition: Rewinds client manager and all replay clients to beat 0.
      */
     void RewindToStart();
+
+    /**
+     * Engine addition: Returns true if any active client is a CReplayClient.
+     */
+    [[nodiscard]] bool IsReplay();
   };
 
   static_assert(offsetof(CClientManagerImpl, mLock) == 0x40C, "CClientManagerImpl::mLock offset must be 0x40C");

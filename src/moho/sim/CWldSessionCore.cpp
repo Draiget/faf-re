@@ -1,4 +1,7 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include "gpg/core/utils/BoostWrappers.h"
+#include "moho/misc/LaunchInfoBase.h"
+
 #include <chrono>
 
 namespace moho
@@ -2016,6 +2019,91 @@ namespace
   {
     return mTotalReplayBeats;
   }
+
+  /**
+   * Engine addition: Rewinds replay session to tick 0 from keyframe without session restart.
+   */
+  bool CWldSession::RewindToStart()
+  {
+    if (!IsReplay) {
+      return false;
+    }
+
+    ISTIDriver* const simDriver = sSimDriver.get();
+    if (simDriver == nullptr) {
+      return false;
+    }
+
+    // 1. Clear selection
+    SetSelection(WeakSet<UserEntity>());
+    mExtraSelection.Clear();
+
+    // 2. Clear orphan entities
+    for (auto orphan = mOrphans.begin(); orphan != mOrphans.end();) {
+      UserEntity* const entity = *orphan;
+      ++orphan;
+      delete entity;
+    }
+
+    // 3. Clear active entities
+    for (auto it = mEntities.begin(); it != mEntities.end();) {
+      UserEntity* const entity = it->second;
+      it = mEntities.erase(it);
+      delete entity;
+    }
+
+    // 4. Delete mirrored user armies
+    for (std::size_t armyIndex = 0; armyIndex < userArmies.size(); ++armyIndex) {
+      if (UserArmy* const army = userArmies[armyIndex]; army != nullptr) {
+        delete army;
+      }
+      userArmies[armyIndex] = nullptr;
+    }
+
+    // 5. Reset session clock and state
+    mGameTick = 0;
+    mTimeSinceLastTick = 0.0f;
+    mLastBeatWasTick = 0;
+    IsGameOver = 0;
+    mIsScrubbing = false;
+    mScrubTargetBeat = -1;
+
+    // 6. Build LaunchInfoLoad from session map & rules
+    boost::shared_ptr<LaunchInfoLoad> loadInfo;
+    (void)boost::ConstructSharedLaunchInfoLoadFromRaw(&loadInfo, new LaunchInfoLoad());
+
+    auto* const playableMap = (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr) ? mWldMap->mTerrainRes->mMap : nullptr;
+    if (playableMap == nullptr) {
+      return false;
+    }
+
+    loadInfo->mGameRules = mRules;
+    loadInfo->mMap = new STIMap(playableMap);
+    if (mLaunchInfo) {
+      loadInfo->mGameMods = mLaunchInfo->mGameMods;
+      loadInfo->mScenarioInfo = mLaunchInfo->mScenarioInfo;
+      loadInfo->mArmyLaunchInfo = mLaunchInfo->mArmyLaunchInfo;
+      loadInfo->mCommandSources = mLaunchInfo->mCommandSources;
+      loadInfo->mLanguage = mLaunchInfo->mLanguage;
+      loadInfo->mCheatsEnabled = mLaunchInfo->mCheatsEnabled;
+    }
+
+    // 7. Rewind sim driver
+    if (!simDriver->RewindToStart(loadInfo)) {
+      return false;
+    }
+
+    // 8. Consume opening sync
+    if (simDriver->HasSyncData()) {
+      SSyncData* syncData = nullptr;
+      simDriver->GetSyncData(syncData);
+      DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
+    }
+
+    gpg::Logf("CWldSession::RewindToStart: successfully rewound replay to tick 0");
+    return true;
+  }
+
 
   /**
    * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)

@@ -14,6 +14,7 @@ namespace moho
   class Sim;
   class CD3DPrimBatcher;
   class ISaveRequest;
+  class LaunchInfoLoad;
   struct SSyncData;
 
   /**
@@ -204,6 +205,9 @@ namespace moho
     // Renders network/sync diagnostics overlay.
     virtual void
     DrawNetworkStats(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY) = 0;
+
+    // Engine addition: Replay keyframe rewind to beat 0 without session restart.
+    virtual bool RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo) = 0;
   };
 
   static_assert(sizeof(ISTIDriver) == 0x4, "ISTIDriver size must be 0x4");

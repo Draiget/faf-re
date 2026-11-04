@@ -811,6 +811,11 @@ namespace moho
     void DrawNetworkStatsPanel(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY);
 
     /**
+     * Engine addition: Rewinds simulation from initial keyframe without session restart.
+     */
+    bool RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo) override;
+
+    /**
      * Address: 0x0073F430 (FUN_0073F430)
      */
     DWORD PerformNextEvent();

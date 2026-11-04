@@ -600,7 +600,7 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
       const gpg::Rect2i rect{flatten.x0, flatten.z0, flatten.x1, flatten.z1};
       stamped->SetElevationRect(rect, &flatten.elevation);
     }
-    mCurBeat = keyframe->beat - 1u;
+    mCurBeat = keyframe->beat > 0u ? keyframe->beat - 1u : 0u;
     // No collection until SIM_FinishKeyframeRestore: what the load leaves unreachable has to stay,
     // as it did in the game until its next collection.
     mLuaState->m_state->l_G->GCthreshold = 0xFFFFFFFFu;
