@@ -1,7 +1,7 @@
 name: 3p-rejoin-eject-one
 description: >
   One of two players votes to eject while a killed player is coming back, during the transfer of the save.
-  The other player's dialog must say who voted, and the player coming back must not hang; the game goes on as the original game does with one vote. Uses mpemu-rejoin-orders, whose hook votes in clients
+  The other player's dialog must say who voted, and the player coming back is told at once why it can't have its seat. The game goes on as the original game does with one vote: once the other player's dialog ejects them after its time. Uses mpemu-rejoin-orders, whose hook votes in clients
   started with /testejectvote. init_mpemu_rejoin_orders.lua must be in the FAF bin and
   bin_x64 folders. Do not click into the game windows.
 timeout: 20m
@@ -36,7 +36,7 @@ steps:
   - wait: 15s
   - note: player 2 restarts and takes its seat back
   - rejoin: { uid: 2, source: 1, peers: [{ uid: 1, source: 0 }, { uid: 3, source: 2 }] }
-  - wait: 4m
+  - wait: 5m
 
 expect:
   allLaunched: true
@@ -44,5 +44,7 @@ expect:
   noCrash: true
   logsContain:
     - { uids: [1], pattern: 'rejoin-test: voting to eject client 2' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: refused: A player voted to eject you' }
+    - { uids: [1, 3], pattern: 'rejoin-test: order first 21 from source 1 ' }
   logsAbsent:
     - { uids: [1, 3], pattern: 'mismatched' }

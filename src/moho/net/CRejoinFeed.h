@@ -156,6 +156,13 @@ namespace moho
   void REJOIN_ServeRestartedPeers(CClientManagerImpl& manager);
 
   /**
+   * Engine addition (issue #275), with `mLock` held, as the player here votes to eject
+   * `seat` and its link closes: a client on its way back hears why, and so does one
+   * that comes back later.
+   */
+  void REJOIN_NoteSeatEjected(CClientManagerImpl& manager, CNetClient& seat);
+
+  /**
    * Engine addition (issue #275), with `mLock` held: `peer`, back from a restart,
    * asks for what it lost, or says where its old stream ends. In that case whatever
    * this client holds past that beat goes; no client can have run it, as a beat

@@ -176,6 +176,25 @@ void CPeerFeatures::Receive(CClientManagerImpl& manager, CNetClient& client, CMe
   );
 }
 
+void CPeerFeatures::NoteRejoinEjected(const int clientIndex, const std::uint32_t address, const std::uint16_t port)
+{
+  SPeer& peer = mPeers[static_cast<std::size_t>(clientIndex)];
+  peer.ejected = true;
+  peer.ejectedAddress = address;
+  peer.ejectedPort = port;
+}
+
+int CPeerFeatures::FindEjectedSeat(const std::uint32_t address, const std::uint16_t port) const
+{
+  for (std::size_t index = 0; index < mPeers.size(); ++index) {
+    const SPeer& peer = mPeers[index];
+    if (peer.ejected && peer.ejectedAddress == address && peer.ejectedPort == port) {
+      return static_cast<int>(index);
+    }
+  }
+  return -1;
+}
+
 bool CPeerFeatures::HasRejoinKey(const int clientIndex) const
 {
   return clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size() &&

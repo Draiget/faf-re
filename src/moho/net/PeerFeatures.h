@@ -72,8 +72,17 @@ namespace moho
     RejoinChallenge = 6,
     /// The answer: the 64-byte signature. Nothing of the game goes out before a good one.
     RejoinProof = 7,
-    /// To a client that could not prove its seat, just before its link closes, so it can say why.
+    /// To a client that can't have its seat, just before its link closes, so it can say why: an `ERejoinRefusal`.
     RejoinRefused = 8,
+  };
+
+  /// Why a client can't have its seat back. Sent as a byte, so values never change.
+  enum class ERejoinRefusal : std::uint8_t
+  {
+    /// It could not prove the seat is its player's.
+    Key = 0,
+    /// The player here voted to eject it.
+    Ejected = 1,
   };
 
   /// Where a client taking its seat back has got. Sent as a byte, so values never change.
@@ -144,6 +153,12 @@ namespace moho
     /// A client came back on a new link.
     void NoteRejoinStarted(int clientIndex);
 
+    /// The player here voted to eject the client on that seat, on the link it had.
+    void NoteRejoinEjected(int clientIndex, std::uint32_t address, std::uint16_t port);
+
+    /// The seat whose player was voted out from that address, or -1.
+    [[nodiscard]] int FindEjectedSeat(std::uint32_t address, std::uint16_t port) const;
+
     /// Whether this client knows the seat's public key, and so can test a rejoin at all.
     [[nodiscard]] bool HasRejoinKey(int clientIndex) const;
 
@@ -180,6 +195,9 @@ namespace moho
       SRejoinNonce nonce{};
       bool challenged{false};
       bool proven{false};
+      bool ejected{false};
+      std::uint32_t ejectedAddress{0};
+      std::uint16_t ejectedPort{0};
     };
 
     void SendKeyTo(CClientManagerImpl& manager, CNetClient& peer);

@@ -810,6 +810,9 @@ namespace
       }
       if (IsPeerMessage(*message, EPeerMessageKind::RejoinRefused)) {
         mRefused = true;
+        if (message->GetMessageSize() > static_cast<int>(kKindBytes)) {
+          mRefusal = static_cast<ERejoinRefusal>(message->mBuff.start_[3 + kKindBytes]);
+        }
         return;
       }
       if (IsPeerMessage(*message, EPeerMessageKind::RejoinInfo)) {
@@ -837,6 +840,7 @@ namespace
 
     [[nodiscard]] bool Reported() const { return mReported; }
     [[nodiscard]] bool Refused() const { return mRefused; }
+    [[nodiscard]] ERejoinRefusal Refusal() const { return mRefusal; }
     [[nodiscard]] const std::vector<char>& Recording() const { return mRecording; }
     [[nodiscard]] std::vector<CMessage>& Held() { return mHeld; }
 
@@ -847,6 +851,7 @@ namespace
     std::int32_t mRecordingSize{0};
     bool mReported{false};
     bool mRefused{false};
+    ERejoinRefusal mRefusal{ERejoinRefusal::Key};
     INetConnection* mLink{nullptr};
     int mLocalSource{-1};
     int mPeerSource{-1};
@@ -1225,6 +1230,19 @@ namespace
 
 namespace
 {
+  void WriteRefusal(INetConnection& link, const ERejoinRefusal why)
+  {
+    CMessage refusal(EClientMsg::CLIMSG_PeerFeatures);
+    CMessageStream stream(refusal);
+    stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinRefused));
+    stream.Write(static_cast<std::uint8_t>(why));
+    NetDataSpan span{
+      reinterpret_cast<std::uint8_t*>(refusal.mBuff.start_),
+      reinterpret_cast<std::uint8_t*>(refusal.mBuff.end_),
+    };
+    link.Write(&span);
+  }
+
   /**
    * A connection from a seat's old address that has not proved it is that seat's player. It is
    * not the seat's link: nothing of the game reaches it, nothing it says counts as the seat's, and
@@ -1272,6 +1290,12 @@ namespace
     [[nodiscard]] const SPendingServe& Serve() const { return mServe; }
     [[nodiscard]] std::vector<CMessage>& AfterProof() { return mAfterProof; }
 
+    void Refuse(const ERejoinRefusal why)
+    {
+      WriteRefusal(*mLink, why);
+      mState = EState::Failed;
+    }
+
     /// Takes this candidate off its link, which goes to the seat or is closed.
     [[nodiscard]] INetConnection* Release()
     {
@@ -1295,10 +1319,15 @@ namespace
       if (value >= 0) {
         return;
       }
+      if (mSeat.mEjectPending || mSeat.mEjected) {
+        gpg::Logf("REJOIN: client %d asked for a seat this player voted to eject", mSeat.GetIndex());
+        Refuse(ERejoinRefusal::Ejected);
+        return;
+      }
       CPeerFeatures& features = *mManager.mPeerFeatures;
       if (!features.HasRejoinKey(mSeat.GetIndex())) {
         gpg::Warnf("REJOIN: client %d's seat was asked for, and this client has no key for it", mSeat.GetIndex());
-        Refuse();
+        Refuse(ERejoinRefusal::Key);
         return;
       }
 
@@ -1334,21 +1363,8 @@ namespace
         mState = EState::Proven;
       } else {
         gpg::Warnf("REJOIN: client %d's proof failed; it gets nothing of the game", mSeat.GetIndex());
-        Refuse();
+        Refuse(ERejoinRefusal::Key);
       }
-    }
-
-    void Refuse()
-    {
-      CMessage refusal(EClientMsg::CLIMSG_PeerFeatures);
-      CMessageStream stream(refusal);
-      stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinRefused));
-      NetDataSpan span{
-        reinterpret_cast<std::uint8_t*>(refusal.mBuff.start_),
-        reinterpret_cast<std::uint8_t*>(refusal.mBuff.end_),
-      };
-      mLink->Write(&span);
-      mState = EState::Failed;
     }
 
     CClientManagerImpl& mManager;
@@ -1373,6 +1389,10 @@ namespace
         (void)sCandidates[index].release();
         sCandidates.erase(sCandidates.begin() + static_cast<std::ptrdiff_t>(index));
         continue;
+      }
+      // The vote came between its proof and now: the seat is no longer there to take.
+      if (candidate.State() == CRejoinCandidate::EState::Proven && (candidate.Seat().mEjectPending || candidate.Seat().mEjected)) {
+        candidate.Refuse(ERejoinRefusal::Ejected);
       }
       const auto state = candidate.State();
       if (state == CRejoinCandidate::EState::Waiting && !candidate.Expired()) {
@@ -1402,6 +1422,17 @@ namespace
   }
 } // namespace
 
+void moho::REJOIN_NoteSeatEjected(CClientManagerImpl& manager, CNetClient& seat)
+{
+  INetConnection& link = *seat.mConnection;
+  manager.mPeerFeatures->NoteRejoinEjected(seat.GetIndex(), static_cast<std::uint32_t>(link.GetAddr()), static_cast<std::uint16_t>(link.GetPort()));
+
+  const ERejoinStage stage = manager.mPeerFeatures->RejoinStatus(seat.GetIndex()).stage;
+  if (stage == ERejoinStage::Transfer || stage == ERejoinStage::Loading || stage == ERejoinStage::CatchingUp) {
+    WriteRefusal(link, ERejoinRefusal::Ejected);
+  }
+}
+
 void moho::REJOIN_ServeRestartedPeers(CClientManagerImpl& manager)
 {
   SettleCandidates(manager);
@@ -1418,6 +1449,11 @@ void moho::REJOIN_ServeRestartedPeers(CClientManagerImpl& manager)
         peer = net;
         break;
       }
+    }
+    if (peer == nullptr) {
+      // Voted out here: the seat's link is gone, and its player is told so rather than left to wait.
+      const int ejected = manager.mPeerFeatures->FindEjectedSeat(static_cast<std::uint32_t>(address), static_cast<std::uint16_t>(port));
+      peer = ejected >= 0 ? dynamic_cast<CNetClient*>(manager.mClients[static_cast<std::size_t>(ejected)]) : nullptr;
     }
     if (peer == nullptr) {
       connector->Reject(address, port);
@@ -1678,7 +1714,11 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
   bool complete = true;
   for (const auto& peer : list) {
     if (peer->receiver.Refused()) {
-      return refuse("The other players did not accept this computer's key for that seat. If the seat is yours, its key file has changed or gone.");
+      return refuse(
+        peer->receiver.Refusal() == ERejoinRefusal::Ejected
+          ? "A player voted to eject you, so you cannot take your seat back."
+          : "The other players did not accept this computer's key for that seat. If the seat is yours, its key file has changed or gone."
+      );
     }
     complete = complete && peer->receiver.Reported();
   }

@@ -4,6 +4,7 @@
 
 #include "CClientManagerImpl.h"
 #include "Common.h"
+#include "CRejoinFeed.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
 #include "ELobbyMsg.h"
@@ -116,6 +117,10 @@ void CNetClient::Process(
 void CNetClient::Open()
 {
   if (mConnection != nullptr) {
+    // Engine addition (issue #275): set only when `CClientBase::Eject` is what closes the link.
+    if (mEjectPending) {
+      REJOIN_NoteSeatEjected(*mManager, *this);
+    }
     mConnection->ScheduleDestroy();
     mConnection = nullptr;
   }
