@@ -284,7 +284,6 @@ endif()
 # the executable at /fafengine (DISK_SetupDataAndSearchPaths; see
 # docs/RENDERER_BACKENDS.md). And the DXC runtime (dxcompiler.dll, dxil.dll),
 # which Direct3D 12 and Vulkan load to compile their shaders.
-option(FAF_GENERATE_MOD "Assemble the FAFEngine Lua changes as a ready-to-use FAF mod in build/mods/FAFEngine" OFF)
 
 set(_faf_dxc_bin "${FAF_DEPENDENCIES_DIR}/dxc/bin/${_faf_sdk_arch}")
 add_custom_command(TARGET faf_main POST_BUILD
@@ -292,25 +291,10 @@ add_custom_command(TARGET faf_main POST_BUILD
           "${_faf_dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:faf_main>"
   VERBATIM)
 
-if(FAF_GENERATE_MOD)
-  set(_faf_mod_dir "${CMAKE_BINARY_DIR}/mods/FAFEngine")
-  add_custom_command(TARGET faf_main POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E rm -rf "$<TARGET_FILE_DIR:faf_main>/fafengine"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${_faf_mod_dir}/hook/lua/options"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${_faf_mod_dir}/hook/lua/ui/game"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${_faf_mod_dir}/lua/ui/game"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/data/fafengine/mod_info.lua" "${_faf_mod_dir}/mod_info.lua"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/data/fafengine/icon.png" "${_faf_mod_dir}/icon.png"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/data/fafengine/lua/options/options.lua" "${_faf_mod_dir}/hook/lua/options/options.lua"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/data/fafengine/lua/ui/game/gamemain.lua" "${_faf_mod_dir}/hook/lua/ui/game/gamemain.lua"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/data/fafengine/lua/ui/game/replay_timeline.lua" "${_faf_mod_dir}/lua/ui/game/replay_timeline.lua"
-    VERBATIM)
-else()
-  add_custom_command(TARGET faf_main POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
-            "$<TARGET_FILE_DIR:faf_main>/fafengine"
-    VERBATIM)
-endif()
+add_custom_command(TARGET faf_main POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
+          "$<TARGET_FILE_DIR:faf_main>/fafengine"
+  VERBATIM)
 
 # --- faf_sim: the simulation ------------------------------------------------------------
 # faf_sim (plan WPR.11) is the simulation as programs without the client link it
