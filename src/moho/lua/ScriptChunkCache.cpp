@@ -492,7 +492,6 @@ namespace
       platform::SetX87PrecisionControl(_PC_24); // as the loader thread, so number literals read alike
       moho::FILE_ExcludeThreadFromReadRecording();
       const moho::CZipFileReadScope archiveReads;
-      const moho::DiskLookupBatch diskLookups;
       LuaPlus::LuaState compiler(LuaPlus::LuaState::LIB_BASE);
       lua::NameLuaVm(compiler.m_state, "Script precompile"); // diagnostics label only
       for (;;) {

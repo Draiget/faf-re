@@ -805,21 +805,11 @@ namespace moho
       gpg::Die("Unable to load FX files at local store [/effects/*.fx]");
     }
 
-    msvc8::vector<msvc8::string> mountedPaths{};
     for (const msvc8::string& effectPath : effectPaths) {
-      msvc8::string mountedPath{};
-      waitHandleSet->mHandle->FindFile(&mountedPath, effectPath.c_str(), nullptr);
-      mountedPaths.push_back(mountedPath);
-    }
-    // Engine addition: the backend translates the whole set on worker threads first, so the
-    // effects below are created from translations already made (EffectSourceCache.h).
-    CD3DEffect::PrepareEffectSources(mountedPaths);
-
-    for (std::size_t index = 0U; index < effectPaths.size(); ++index) {
-      const msvc8::string& effectPath = effectPaths[index];
-      const msvc8::string& mountedPath = mountedPaths[index];
       CD3DEffect* const effect = new CD3DEffect();
 
+      msvc8::string mountedPath{};
+      waitHandleSet->mHandle->FindFile(&mountedPath, effectPath.c_str(), nullptr);
       if (!effect->InitEffectFromFile(mountedPath.c_str())) {
         delete effect;
         gpg::Die(

@@ -204,26 +204,6 @@ namespace moho
   [[nodiscard]] std::uint64_t DISK_FileLookupGeneration();
 
   /**
-   * Engine addition (`res_LoadDirectoryCache`): while one of these is alive, the thread remembers
-   * which folders of each mount are missing, and `CVFSImpl::FindFile` skips a mount whose folder for
-   * the file is missing instead of asking the disk or the archive for the file. A session load looks
-   * for every script and blueprint again under each hook folder (`/fafengine`, each mod's `hook`),
-   * and for every mesh's textures, in each of some twenty archives and loose folders, nearly always
-   * in a folder that is not there. What the thread learnt is dropped when the outermost batch ends
-   * and whenever the lookups are invalidated (`DISK_InvalidateFileLookups`, a disk-watch event, a
-   * mount change); a loose folder created by something else during the batch is not seen until then.
-   */
-  class DiskLookupBatch
-  {
-  public:
-    DiskLookupBatch() noexcept;
-    ~DiskLookupBatch();
-
-    DiskLookupBatch(const DiskLookupBatch&) = delete;
-    DiskLookupBatch& operator=(const DiskLookupBatch&) = delete;
-  };
-
-  /**
    * Engine addition (dedicated-server plan WPR.22, `res_EnumOrderFuzz`): the order-fuzz seed, 0
    * when off. Resolved from `/enumorderfuzz N` on first use, then the console variable.
    */

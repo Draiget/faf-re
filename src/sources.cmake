@@ -46,7 +46,6 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/d3d11/EffectSourceD3D11.cpp
   gpg/gal/backends/d3d11/GpuDrivenD3D11.cpp
   gpg/gal/backends/common/BackendErrors.cpp
-  gpg/gal/backends/common/EffectSourceCache.cpp
   gpg/gal/backends/dxgi/DxgiFormats.cpp
   gpg/gal/effects/EffectText.cpp
   gpg/gal/effects/EffectDescription.cpp

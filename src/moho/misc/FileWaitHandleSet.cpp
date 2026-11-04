@@ -1665,19 +1665,6 @@ msvc8::string* moho::FWaitHandleSet::GetErrorString()
   return &sFallbackError;
 }
 
-bool moho::FWaitHandleSet::HasArchiveFolder(const gpg::StrArg sourcePath)
-{
-  msvc8::string prefix{};
-  gpg::STR_CanonizeFilename(&prefix, sourcePath);
-  prefix.append("\\", 1u);
-
-  Wait();
-  const FWHSZipEntryMap::iterator entry = mZipEntries.lower_bound(prefix);
-  const bool found = entry != mZipEntries.end() && gpg::STR_StartsWith(entry->first.c_str(), prefix.c_str());
-  Notify();
-  return found;
-}
-
 /**
  * Address: 0x00459300 (FUN_00459300, Moho::FWaitHandleSet::ReadFile)
  *

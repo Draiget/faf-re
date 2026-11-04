@@ -9,7 +9,6 @@
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
-#include "gpg/gal/backends/common/EffectSourceCache.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/ProjectileIconRenderer.h"
 #include "moho/render/RangeGpuRenderer.h"
@@ -31,15 +30,6 @@ namespace moho
       "Keep Direct3D 12 pipeline states on disk across sessions, so they are not compiled again in the frame that "
       "first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it off at startup.",
       &gpg::gal::gPipelineDiskCache
-    );
-
-    /** Engine addition: `ren_EffectSourceCache` (see gpg/gal/backends/common/EffectSourceCache.h). */
-    TConVar<bool> gTConVar_ren_EffectSourceCache(
-      "ren_EffectSourceCache",
-      "Direct3D 12 and Vulkan: keep each effect's translated source on disk and translate a set of effects on worker "
-      "threads ahead of their creation (1, the default), or translate each one as it is created (0). Read when "
-      "effects are created; /noeffectcache turns it off at startup.",
-      &gpg::gal::effects::gEffectSourceCache
     );
 
     /** Engine addition: `d3d_PlacedResources` (see gpg/gal/PlacedResources.h). */

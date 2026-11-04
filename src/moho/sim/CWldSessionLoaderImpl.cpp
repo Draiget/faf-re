@@ -234,11 +234,10 @@ namespace moho
       platform::SetX87PrecisionControl(_PC_24);
       gEarlySimScenario.store(nullptr, std::memory_order_release); // a scenario at a freed one's address is not ready
 
-      // Engine addition: the load looks for each script and blueprint under every hook folder, which
-      // a missing folder answers (DiskLookupBatch), and compiles each of them, which the script cache
-      // answers when the source is unchanged. Its archives stay open through the load task's
-      // CZipFileReadScope (SWldScenarioLoadControl::RunWorkerThread, res_ZipKeepOpen).
-      const DiskLookupBatch diskLookups;
+      // Engine addition: the load compiles each script and blueprint, which the script cache answers
+      // when the source is unchanged. Its archives stay open through the load task's
+      // CZipFileReadScope (SWldScenarioLoadControl::RunWorkerThread, res_ZipKeepOpen), and its hook
+      // lookups come from lua_HookProbeCache's listings.
       const ScriptChunkCacheBatch scriptChunks;
 
       {

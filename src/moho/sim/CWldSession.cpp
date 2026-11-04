@@ -15027,13 +15027,6 @@ namespace moho
         FILE_BeginReadRecording();
       }
 
-      // Engine addition (res_LoadDirectoryCache, res_ZipKeepOpen): the game interface imports its
-      // scripts and reads its textures here, each script looked for again under every hook folder,
-      // as a session load does; the main thread remembers the missing folders and keeps its last
-      // archive open until the interface is built.
-      const DiskLookupBatch diskLookups;
-      const CZipFileReadScope archiveReads;
-
       CWldSession* const session = gActiveWldSession;
       if (session != nullptr && session->mState != nullptr) {
         (void)UI_StartGameUI(session->mState);
