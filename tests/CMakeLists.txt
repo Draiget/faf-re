@@ -52,6 +52,11 @@ add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTest
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
 
+# Engine addition: where UserDecal:SetOrientation puts a decal's corner so it stays centred.
+add_executable(faf_scripted_decal_tests EXCLUDE_FROM_ALL scripted_decal/PlacementTests.cpp)
+target_include_directories(faf_scripted_decal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME scripted_decal_placement COMMAND faf_scripted_decal_tests)
+
 # Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
 # same exe checks Microsoft's on Windows and Wine's under Wine.
 add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTests.cpp)

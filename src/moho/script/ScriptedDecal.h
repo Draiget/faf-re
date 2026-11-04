@@ -70,9 +70,9 @@ namespace moho
      * Address: 0x0087ECE0 (FUN_0087ECE0, Moho::ScriptedDecal::SetPosition)
      *
      * What it does:
-     * Stores one world-space position, re-centres the decal quad on it, and
-     * republishes the terrain decal's transform. Invalid (NaN) positions are
-     * dropped without touching any lane.
+     * Stores one world-space position, re-centres the decal quad on it at the
+     * current heading, and republishes the terrain decal's transform. Invalid
+     * (NaN) positions are dropped without touching any lane.
      */
     void SetPosition(const Wm3::Vector3f& worldPosition);
 
@@ -93,6 +93,16 @@ namespace moho
      * the current position so the quad stays centred on it.
      */
     void SetScale(const Wm3::Vector3f& scale);
+
+    /**
+     * FAF addition, not in the shipped binary: Lua `UserDecal:SetOrientation`.
+     *
+     * What it does:
+     * Turns the decal by `heading` radians about +y (`CWldTerrainDecal`'s
+     * `mOrientation.y`: the quad's x edge points along (cos h, sin h) in x/z)
+     * and keeps it centred on the current position.
+     */
+    void SetOrientation(float heading);
 
     /**
      * Address: 0x0087EDE0 (FUN_0087EDE0, Moho::ScriptedDecal::SetTexture)
@@ -119,10 +129,22 @@ namespace moho
     IDecalManager* mDecalManager;                           // +0x44
     CameraImpl* mWorldCamera;                               // +0x48
     Wm3::Vector3f mScale;                                   // +0x4C
-    Wm3::Vector3f mWorldPosition;                           // +0x58
+    /**
+     * The point the decal is centred on. The binary keeps the quad's corner
+     * here (`centre - scale / 2`, 0x0087ECE0), so each `SetScale`, which
+     * reapplies this lane as a position (0x0087ED90), moved the decal by
+     * another half of its size. The engine keeps the centre instead and gives
+     * the terrain decal the corner.
+     */
+    Wm3::Vector3f mWorldPosition; // +0x58
+
+    // Engine addition, not in the binary: the heading `SetOrientation` gave,
+    // in radians. Kept here because `SetTexture` replaces the terrain decal.
+    float mHeading; // +0x64
   };
 
-  static_assert(sizeof(ScriptedDecal) == 0x64, "ScriptedDecal size must be 0x64");
+  // 0x64 in the binary, plus the engine's mHeading.
+  static_assert(sizeof(ScriptedDecal) == 0x68, "ScriptedDecal size must be 0x68");
   static_assert(offsetof(ScriptedDecal, mDecal) == 0x34, "ScriptedDecal::mDecal offset must be 0x34");
   static_assert(
     offsetof(ScriptedDecal, mDynamicTexture) == 0x3C, "ScriptedDecal::mDynamicTexture offset must be 0x3C"
@@ -253,6 +275,30 @@ namespace moho
    * Reads one world-space vector argument and applies it via `ScriptedDecal::SetPosition`.
    */
   int cfunc_ScriptedDecalSetPositionL(LuaPlus::LuaState* state);
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_ScriptedDecalSetOrientationL`.
+   */
+  int cfunc_ScriptedDecalSetOrientation(lua_State* luaContext);
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Publishes the `ScriptedDecal:SetOrientation(heading)` Lua binder.
+   */
+  CScrLuaInitForm* func_ScriptedDecalSetOrientation_LuaFuncDef();
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Reads one heading in radians and applies it via `ScriptedDecal::SetOrientation`.
+   */
+  int cfunc_ScriptedDecalSetOrientationL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x0087F950 (FUN_0087F950, cfunc_ScriptedDecalDestroy)
