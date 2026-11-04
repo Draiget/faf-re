@@ -282,7 +282,7 @@ void CReplayClient::Start()
   mReplayWorkerCondition.notify_all();
 }
 
-void CReplayClient::RewindToStart()
+void CReplayClient::RewindToStart(const std::int32_t skipBeats)
 {
   std::scoped_lock lock(mManager->mLock);
 
@@ -295,16 +295,21 @@ void CReplayClient::RewindToStart()
   mReplayMessage.Clear();
   mPipe.Clear();
 
-  mQueuedBeat = 0;
-  mDispatchedBeat = 0;
-  mReplayBeat = 0;
-  mAvailableBeatRemote = 0;
-  mLatestBeatDispatchedRemote = 0;
+  mQueuedBeat = static_cast<uint32_t>(skipBeats);
+  mDispatchedBeat = static_cast<uint32_t>(skipBeats);
+  mReplayBeat = static_cast<uint32_t>(skipBeats);
+  mAvailableBeatRemote = static_cast<uint32_t>(skipBeats);
+  mLatestBeatDispatchedRemote = skipBeats;
+  mLatestAckReceived.assign(mLatestAckReceived.size(), skipBeats);
   mReplayPollRequested = false;
   mCurrentSourceAllowed = false;
   mCommandSourceId = 0xFFu;
   mEjectPending = false;
   mReady = true;
+
+  if (skipBeats > 0) {
+    SkipBeats(skipBeats);
+  }
 
   Start();
 }

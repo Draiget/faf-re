@@ -105,7 +105,7 @@ namespace moho
      * Engine addition: Rewinds the replay stream to its initial position (beat 0)
      * and resets internal packet queue states.
      */
-    void RewindToStart();
+    void RewindToStart(std::int32_t skipBeats = 0);
 
   private:
     /**

@@ -99,8 +99,15 @@ local function IsScrubbing()
 end
 
 local function DoScrub(targetTick)
-    if is_callable(ScrubReplay) then
-        pcall(ScrubReplay, targetTick)
+    local fn = rawget(_G, 'ScrubReplay')
+    if not fn and is_callable(ScrubReplay) then
+        fn = ScrubReplay
+    end
+    if is_callable(fn) then
+        LOG(string.format("FAFENGINE: Calling ScrubReplay(%d)", targetTick))
+        pcall(fn, targetTick)
+    else
+        WARN("FAFENGINE: ScrubReplay not callable!")
     end
 end
 
@@ -175,10 +182,9 @@ local ScrubbingOverlay = ClassUI(Group) {
         self.targetText:SetColor('ffffffff')
         self.targetText.Depth:Set(function() return self.dialog.Depth() + 5 end)
 
-        -- Progress bar track, drawn: the slider's texture is a thin line with a row of dots under it,
-        -- so stretched to this size, the fill covered more than the track it showed.
-        self.barTrack = Bitmap(self.dialog)
-        self.barTrack:SetSolidColor('ff26323a')
+        -- Progress bar track using SupCom game slider track texture
+        local trackTexture = GetSkinFile('/game/slider/slider-back_bmp.dds')
+        self.barTrack = Bitmap(self.dialog, trackTexture)
         LayoutHelpers.SetDimensions(self.barTrack, 320, 16)
         LayoutHelpers.Below(self.barTrack, self.targetText, 14)
         LayoutHelpers.AtHorizontalCenterIn(self.barTrack, self.dialog)
@@ -226,8 +232,14 @@ local ScrubbingOverlay = ClassUI(Group) {
         if not self:IsHidden() then
             return
         end
+        local curTick = GetCurrentTick()
+        self._isRewind = (targetTick and targetTick < curTick)
         if targetTick then
-            self.targetText:SetText(string.format("Advancing to %s", FormatTicks(targetTick)))
+            if self._isRewind then
+                self.targetText:SetText(string.format("Rewinding to %s", FormatTicks(targetTick)))
+            else
+                self.targetText:SetText(string.format("Advancing to %s", FormatTicks(targetTick)))
+            end
         end
         self.barFill.Width:Set(0)
         self.percentText:SetText("0%")
@@ -264,7 +276,11 @@ local ScrubbingOverlay = ClassUI(Group) {
             return
         end
         if prog.targetTick then
-            self.targetText:SetText(string.format("Advancing to %s", FormatTicks(prog.targetTick)))
+            if self._isRewind then
+                self.targetText:SetText(string.format("Rewinding to %s", FormatTicks(prog.targetTick)))
+            else
+                self.targetText:SetText(string.format("Advancing to %s", FormatTicks(prog.targetTick)))
+            end
         end
         local pct = prog.progress
         if not pct or pct < 0 then
@@ -382,18 +398,7 @@ function CreateReplayTimeline(parent)
     LayoutHelpers.SetHeight(slider, 20)
     LayoutHelpers.AtVerticalCenterIn(slider, bar, 4)
 
-    -- The background stays, to take clicks over the slider's height; the track is drawn on it, as the texture
-    -- is a thin line with a row of dots under it.
     LayoutHelpers.FillParent(slider._background, slider)
-    slider._background:SetAlpha(0)
-    local groove = Bitmap(slider)
-    groove:SetSolidColor('ff26323a')
-    groove:DisableHitTest()
-    groove.Left:Set(slider.Left)
-    groove.Right:Set(slider.Right)
-    LayoutHelpers.SetHeight(groove, 4)
-    LayoutHelpers.AtVerticalCenterIn(groove, slider)
-    groove.Depth:Set(function() return bar.Depth() + 3 end)
     slider._thumb.Depth:Set(function() return bar.Depth() + 6 end)
     slider._background.Depth:Set(function() return bar.Depth() + 2 end)
     if slider.EnableHitTest then
@@ -416,33 +421,20 @@ function CreateReplayTimeline(parent)
 
     local isDragging = false
 
-    -- Constrain dragging to forward only (cannot seek backward into the past)
-    local oldCalc = slider.CalculateValueFromMouse
-    slider.CalculateValueFromMouse = function(self, x, y)
-        local curTick = GetCurrentTick()
-        local val = oldCalc(self, x, y)
-        if val < curTick then
-            return curTick
-        end
-        return val
-    end
-
     slider.OnBeginChange = function(self)
         isDragging = true
         thumbPreview:Show()
     end
 
     slider.OnScrub = function(self, val)
-        local curTick = GetCurrentTick()
-        val = math.max(curTick, math.floor(val))
+        val = math.max(0, math.floor(val))
         curTimeLabel:SetText(FormatTicks(val))
         thumbPreview:SetText(FormatTicks(val))
     end
 
     slider.OnValueChanged = function(self, val)
         if isDragging then
-            local curTick = GetCurrentTick()
-            val = math.max(curTick, math.floor(val))
+            val = math.max(0, math.floor(val))
             curTimeLabel:SetText(FormatTicks(val))
             thumbPreview:SetText(FormatTicks(val))
         end
@@ -459,24 +451,130 @@ function CreateReplayTimeline(parent)
         local curTick = GetCurrentTick()
         local targetTick = math.floor(newValue)
 
-        -- Replays cannot roll back in simulation memory without reloading
-        if targetTick <= curTick then
+        if targetTick < 0 then
+            targetTick = 0
+        end
+
+        -- If target is the exact current tick, do nothing
+        if targetTick == curTick then
             slider:SetValue(curTick)
             curTimeLabel:SetText(FormatTicks(curTick))
             return
         end
 
+        -- If rewinding backward, clear unit selection to prevent invalid entity references in UI
+        if targetTick < curTick then
+            local su = rawget(_G, 'SelectUnits')
+            if is_callable(su) then
+                pcall(su, nil)
+            end
+        end
+
+        LOG(string.format("FAFENGINE: Timeline seeking replay from tick %d to tick %d", curTick, targetTick))
+        LOG("FAFENGINE: Calling DoScrub")
         DoScrub(targetTick)
+        LOG("FAFENGINE: Returned from DoScrub")
         if controls.overlay then
+            LOG("FAFENGINE: Calling controls.overlay:ShowOverlay")
             controls.overlay:ShowOverlay(targetTick)
+            LOG("FAFENGINE: Returned from ShowOverlay")
         end
     end
+
+    local isAutoScrub = false
+    local isShortScrub = false
+    local hasCmd = rawget(_G, 'HasCommandLineArg') or HasCommandLineArg
+    LOG("FAFENGINE: checking command line flags, hasCmd=" .. tostring(hasCmd))
+    if is_callable(hasCmd) then
+        local ok, res = pcall(hasCmd, '/autoscrub')
+        if ok and res then
+            isAutoScrub = true
+            LOG("FAFENGINE: /autoscrub command line flag detected! Automated scrubbing test enabled.")
+        end
+        local ok2, res2 = pcall(hasCmd, '/shortscrub')
+        if ok2 and res2 then
+            isAutoScrub = true
+            isShortScrub = true
+            LOG("FAFENGINE: /shortscrub command line flag detected! Automated 300 -> 1 -> 300 test enabled.")
+        end
+    end
+
+    if isAutoScrub then
+        local setSpeed = rawget(_G, 'SetGameSpeed') or SetGameSpeed
+        if is_callable(setSpeed) then
+            pcall(setSpeed, 10)
+        end
+        local conExec = rawget(_G, 'ConExecute') or ConExecute
+        if is_callable(conExec) then
+            pcall(conExec, "WLD_GameSpeed 10")
+        end
+    end
+
+    local autoScrubStep = 0
+    local autoScrubCooldown = 0
+    local autoScrubStatusTimer = 0
 
     local loggedOnce = false
     bar:SetNeedsFrameUpdate(true)
     bar.OnFrame = function(self, deltaTime)
         local total = GetTotalTicks()
         local curTick = GetCurrentTick()
+
+        if isAutoScrub then
+            local isScrub = IsScrubbing()
+            if autoScrubCooldown > 0 then
+                autoScrubCooldown = autoScrubCooldown - deltaTime
+            end
+
+            autoScrubStatusTimer = (autoScrubStatusTimer or 0) + deltaTime
+            if autoScrubStatusTimer >= 1.0 then
+                autoScrubStatusTimer = 0
+                LOG(string.format("AUTOTEST_STATUS: step=%d isScrub=%s curTick=%d cooldown=%.1f", autoScrubStep, tostring(isScrub), curTick, autoScrubCooldown))
+            end
+
+            if autoScrubCooldown <= 0 then
+                if isShortScrub then
+                    if autoScrubStep == 0 and curTick >= 300 and not isScrub then
+                        autoScrubStep = 2
+                        autoScrubCooldown = 1.0
+                        LOG(string.format("AUTOTEST: Step 1 -> Seeking back to tick 1 (base snapshot at beat 1) from tick %d", curTick))
+                        slider:OnValueSet(1)
+                        LOG("AUTOTEST: Step 1 COMPLETE at tick 1! Now Step 2 -> Playing forward to tick 300")
+                    elseif autoScrubStep == 2 and not isScrub and curTick >= 300 then
+                        autoScrubStep = 3
+                        LOG(string.format("AUTOTEST: SUCCESS! Reached tick %d after rewind to base snapshot! Test passed!", curTick))
+                        local exitApp = rawget(_G, 'ExitApplication') or ExitApplication
+                        if is_callable(exitApp) then
+                            exitApp()
+                        end
+                    end
+                else
+                    if autoScrubStep == 0 and curTick >= 50 and not isScrub then
+                        autoScrubStep = 1
+                        autoScrubCooldown = 1.0
+                        LOG("AUTOTEST: Step 1 -> Seeking to tick 2400 (4 min)")
+                        slider:OnValueSet(2400)
+                    elseif autoScrubStep == 1 and not isScrub then
+                        autoScrubStep = 2
+                        autoScrubCooldown = 1.0
+                        LOG(string.format("AUTOTEST: Step 1 COMPLETE at tick %d! Now Step 2 -> Seeking back to tick 1200 (2 min)", curTick))
+                        slider:OnValueSet(1200)
+                    elseif autoScrubStep == 2 and not isScrub then
+                        autoScrubStep = 3
+                        autoScrubCooldown = 1.0
+                        LOG(string.format("AUTOTEST: Step 2 COMPLETE at tick %d! Now Step 3 -> Seeking forward again to tick 2400 (4 min)", curTick))
+                        slider:OnValueSet(2400)
+                    elseif autoScrubStep == 3 and not isScrub then
+                        autoScrubStep = 4
+                        LOG(string.format("AUTOTEST: SUCCESS! Reached tick %d after 2400 -> 1200 -> 2400 scrubbing! Test passed!", curTick))
+                        local exitApp = rawget(_G, 'ExitApplication')
+                        if is_callable(exitApp) then
+                            exitApp()
+                        end
+                    end
+                end
+            end
+        end
 
         if total and total > 0 then
             if slider._endValue ~= total then

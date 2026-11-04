@@ -613,7 +613,7 @@ namespace moho
     /**
      * Engine addition: Rewinds client manager and all replay clients to beat 0.
      */
-    void RewindToStart();
+    void RewindToStart(std::int32_t skipBeats = 0);
 
     /**
      * Engine addition: Returns true if any active client is a CReplayClient.

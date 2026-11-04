@@ -2394,22 +2394,7 @@ bool CSimDriver::RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo
     mSim.reset();
   }
 
-  // 4. Clear sync queue & reset counters
-  mSyncDataQueue.ClearAndDelete();
-  mDispatchBeat = 1;
-  mNextIssueBeat = 1;
-  mLastDequeuedBeat = -1;
-  mSimBusy = false;
-  mState = EDriverState::Startup;
-  mStopCreateSimThread = false;
-  mStopSimThread = false;
-
-  // 5. Rewind client manager
-  if (mClientManager) {
-    mClientManager->RewindToStart();
-  }
-
-  // 6. Open keyframe file and begin keyframe restore
+  // 4. Open keyframe file and read keyframe header
   std::FILE* rawFile = nullptr;
   if (fopen_s(&rawFile, sInitialKeyframePath.c_str(), "rb") != 0 || rawFile == nullptr) {
     gpg::Warnf("CSimDriver::RewindToStart: cannot read %s", sInitialKeyframePath.c_str());
@@ -2423,6 +2408,25 @@ bool CSimDriver::RewindToStart(const boost::shared_ptr<LaunchInfoLoad>& loadInfo
     return false;
   }
 
+  const std::int32_t startBeat = static_cast<std::int32_t>(keyframeHeader.beat);
+  const std::int32_t skipBeats = startBeat > 0 ? startBeat - 1 : 0;
+
+  // 5. Clear sync queue & reset counters to keyframe beat
+  mSyncDataQueue.ClearAndDelete();
+  mDispatchBeat = startBeat;
+  mNextIssueBeat = startBeat;
+  mLastDequeuedBeat = -1;
+  mSimBusy = false;
+  mState = EDriverState::Startup;
+  mStopCreateSimThread = false;
+  mStopSimThread = false;
+
+  // 6. Rewind client manager and replay stream skipping already executed beats
+  if (mClientManager) {
+    mClientManager->RewindToStart(skipBeats);
+  }
+
+  // 7. Begin keyframe restore
   moho::SIM_BeginKeyframeRestore(keyframeHeader);
   loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
   mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);

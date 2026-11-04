@@ -1441,29 +1441,35 @@ void CClientManagerImpl::Disconnect()
   CMessage message{ECmdStreamOp::CMDST_EndGame};
   ProcessClients(message);
 }
-void CClientManagerImpl::RewindToStart()
+void CClientManagerImpl::RewindToStart(const std::int32_t skipBeats)
 {
   std::scoped_lock lock(mLock);
-  mDispatchedBeat = 0;
-  mAvailableBeat = 0;
-  mFullyQueuedBeat = 0;
-  mPartiallyQueuedBeat = 0;
+  mDispatchedBeat = skipBeats;
+  mAvailableBeat = skipBeats;
+  mFullyQueuedBeat = skipBeats;
+  mPartiallyQueuedBeat = skipBeats;
   mLastEmittedCommandSource = 0xFF;
   mStream.Clear();
+  if (mStreamCheck != nullptr) {
+    mStreamCheck = std::make_unique<CommandStreamCheck>(mClients.size(), mStreamCheck->StopsOnDivergence());
+  }
+  for (CClientBase* client : mClients) {
+    if (client != nullptr) {
+      client->mQueuedBeat = static_cast<uint32_t>(skipBeats);
+      client->mDispatchedBeat = static_cast<uint32_t>(skipBeats);
+      client->mAvailableBeatRemote = static_cast<uint32_t>(skipBeats);
+      client->mLatestBeatDispatchedRemote = skipBeats;
+      client->mPipe.Clear();
+      client->mLatestAckReceived.assign(client->mLatestAckReceived.size(), skipBeats);
+      client->mCommandSourceId = 0xFFu;
+      client->mEjectPending = false;
+      client->mReady = true;
+    }
+  }
   for (CClientBase* client : mClients) {
     if (client != nullptr) {
       if (auto* const replayClient = dynamic_cast<CReplayClient*>(client)) {
-        replayClient->RewindToStart();
-      } else {
-        client->mQueuedBeat = 0;
-        client->mDispatchedBeat = 0;
-        client->mAvailableBeatRemote = 0;
-        client->mLatestBeatDispatchedRemote = 0;
-        client->mPipe.Clear();
-        client->mLatestAckReceived.assign(client->mLatestAckReceived.size(), 0);
-        client->mCommandSourceId = 0xFFu;
-        client->mEjectPending = false;
-        client->mReady = true;
+        replayClient->RewindToStart(skipBeats);
       }
     }
   }
