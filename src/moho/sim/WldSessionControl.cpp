@@ -1,13 +1,7 @@
 #include "moho/sim/CWldSessionPrivate.h"
 
 #include <chrono>
-#include <fstream>
-#include <thread>
-#include <vector>
 
-#include "gpg/gal/effects/EffectRuntime.h"
-#include "moho/misc/CZipFile.h"
-#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/render/GpuPathSettings.h"
 #include "moho/render/SkyDome.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
@@ -546,99 +540,6 @@ namespace
       ReleaseWldGameDataHandles(&gameData);
     }
 
-    // Engine addition: the archive entries read (on any thread) while the last session's first
-    // frame was built and drawn, which the next session reads ahead on a helper thread while its
-    // main thread waits for the sim. The first frame's reads are then copies of cached entries
-    // instead of reads and inflates of game archives. The list is the canonical paths, one per
-    // line, rewritten after every first frame; a path no longer in the mounted archives is skipped.
-    // Never destroyed: a thread still joinable at exit (a load quit before its first frame) would
-    // terminate the process.
-    std::thread& FirstFrameWarmup()
-    {
-      static auto* const warmup = new std::thread();
-      return *warmup;
-    }
-    constexpr std::size_t kFirstFrameReadLimit = 8192;
-
-    [[nodiscard]] std::string FirstFrameReadsPath()
-    {
-      const std::string& directory = gpg::gal::effects::ShaderCacheDirectory();
-      return directory.empty() ? std::string() : directory + "first-frame-reads.txt";
-    }
-
-    bool res_FirstFrameWarmup = true;
-    TConVar<bool> gTConVar_res_FirstFrameWarmup(
-      "res_FirstFrameWarmup",
-      "Note the game archive entries read while a session's first frame is built and drawn, and read them ahead "
-      "during the next session's loading wait (1, the default), or neither (0). Read when a session loads.",
-      &res_FirstFrameWarmup
-    );
-
-    void StartFirstFrameWarmup()
-    {
-      if (!res_FirstFrameWarmup) {
-        return;
-      }
-      if (FirstFrameWarmup().joinable()) {
-        FirstFrameWarmup().join();
-      }
-      const std::string path = FirstFrameReadsPath();
-      if (path.empty()) {
-        return;
-      }
-      std::vector<std::string> entries;
-      std::ifstream file(path);
-      for (std::string line; entries.size() < kFirstFrameReadLimit && std::getline(file, line);) {
-        if (!line.empty()) {
-          entries.push_back(std::move(line));
-        }
-      }
-      if (entries.empty()) {
-        return;
-      }
-      FirstFrameWarmup() = std::thread([entries = std::move(entries)] {
-        gpg::SetThreadName(0xFFFFFFFFu, "First frame warmup");
-        FILE_ExcludeThreadFromReadRecording();
-        FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
-        if (waitHandleSet == nullptr) {
-          return;
-        }
-        const auto started = std::chrono::steady_clock::now();
-        {
-          const CZipFileReadScope archiveReads;
-          for (const std::string& entry : entries) {
-            try {
-              waitHandleSet->WarmArchiveEntry(entry.c_str());
-            } catch (...) {
-              // The first frame reads it itself.
-            }
-          }
-        }
-        gpg::Logf("First frame warm-up: %zu archive entries read ahead in %.1f ms", entries.size(),
-          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
-      });
-    }
-
-    void SaveFirstFrameReads(const std::vector<std::string>& entries)
-    {
-      if (FirstFrameWarmup().joinable()) {
-        FirstFrameWarmup().join();
-      }
-      const std::string path = FirstFrameReadsPath();
-      if (path.empty() || entries.empty()) {
-        return;
-      }
-      const std::string temporary = path + ".tmp";
-      std::ofstream file(temporary, std::ios::trunc);
-      for (std::size_t index = 0U; index < entries.size() && index < kFirstFrameReadLimit; ++index) {
-        file << entries[index] << '\n';
-      }
-      file.close();
-      if (!file || !::MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
-        ::DeleteFileA(temporary.c_str());
-      }
-    }
-
     /**
      * Address: 0x0088C3F0 (FUN_0088C3F0, func_DoInitializing)
      *
@@ -675,21 +576,9 @@ namespace
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepareStart).count());
       }
 
-      // Engine addition: once per session, while the loading screen waits for the sim, read ahead
-      // the archive entries the last session's first frame read (StartFirstFrameWarmup).
-      if (static const CWldSession* sWarmedFor = nullptr; sWarmedFor != gActiveWldSession) {
-        sWarmedFor = gActiveWldSession;
-        StartFirstFrameWarmup();
-      }
-
       simDriver->Dispatch();
       if (!simDriver->HasSyncData()) {
         return;
-      }
-
-      // Engine addition: the archive reads of this first frame, for the next session's warm-up.
-      if (res_FirstFrameWarmup) {
-        FILE_BeginReadRecording();
       }
 
       CWldSession* const session = gActiveWldSession;
@@ -796,13 +685,6 @@ namespace
 
       simDriver->Dispatch();
       CClientManagerImpl* const clientManager = simDriver->GetClientManager();
-
-      // Engine addition: this first runs on the frame after the new interface's first draw; what
-      // that frame read from the archives is kept for the next session (StartFirstFrameWarmup).
-      if (static const CWldSession* sSavedFor = nullptr; sSavedFor != gActiveWldSession) {
-        sSavedFor = gActiveWldSession;
-        SaveFirstFrameReads(FILE_EndReadRecording());
-      }
 
       // Engine addition: the frame that built the game interface has been drawn, with the UI's
       // first update (`OnFirstUpdate`) and the world's first render, which take a few hundred ms

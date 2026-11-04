@@ -13,7 +13,6 @@
 #include <memory>
 #include <mutex>
 #include <new>
-#include <set>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
@@ -1720,55 +1719,7 @@ namespace
     &gpg::str_LowerInPlace
   );
 
-  // Engine addition: FILE_BeginReadRecording's state - whether it records and what was read.
-  std::mutex gReadRecordingLock;
-  std::atomic<bool> gReadRecording{false};
-  thread_local bool tReadRecordingExcluded = false;
-  std::set<std::string> gRecordedReads;
-
-  void NoteRecordedRead(const msvc8::string& canonicalPath)
-  {
-    if (gReadRecording.load(std::memory_order_relaxed) && !tReadRecordingExcluded) {
-      const std::lock_guard<std::mutex> guard(gReadRecordingLock);
-      gRecordedReads.emplace(canonicalPath.c_str());
-    }
-  }
 } // namespace
-
-void moho::FILE_BeginReadRecording()
-{
-  const std::lock_guard<std::mutex> guard(gReadRecordingLock);
-  gRecordedReads.clear();
-  gReadRecording.store(true);
-}
-
-std::vector<std::string> moho::FILE_EndReadRecording()
-{
-  const std::lock_guard<std::mutex> guard(gReadRecordingLock);
-  gReadRecording.store(false);
-  return {std::make_move_iterator(gRecordedReads.begin()), std::make_move_iterator(gRecordedReads.end())};
-}
-
-void moho::FILE_ExcludeThreadFromReadRecording()
-{
-  tReadRecordingExcluded = true;
-}
-
-void moho::FWaitHandleSet::WarmArchiveEntry(const gpg::StrArg canonicalPath)
-{
-  ScopedWaitNotify notifyGuard(*this);
-  const FWHSZipEntryMap::iterator zipEntry = mZipEntries.find(msvc8::string(canonicalPath != nullptr ? canonicalPath : ""));
-  if (zipEntry == mZipEntries.end() || zipEntry->second.mHandle == nullptr) {
-    return;
-  }
-  SFileWaitHandle* const handle = zipEntry->second.mHandle;
-  const std::uint32_t zipEntryIndex = zipEntry->second.mZipEntryIndex;
-  ScopedHandleRef handleRef(handle);
-  notifyGuard.NotifyNow();
-  if (CZipFile* const zipFile = handle->mZipFile; zipFile != nullptr) {
-    (void)zipFile->ReadEntry(zipEntryIndex);
-  }
-}
 
 /**
  * Address: 0x004596C0 (FUN_004596C0, Moho::FWaitHandleSet::MemoryMapFile)
@@ -1805,7 +1756,6 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
     }
 
     DISK_TraceAccess("map", canonicalPath.c_str());
-    NoteRecordedRead(canonicalPath); // engine addition, see FILE_BeginReadRecording
     return zipFile->ReadEntry(zipEntryIndex);
   }
 
