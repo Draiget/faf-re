@@ -192,7 +192,7 @@ namespace gpg::gal
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
       std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled;
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // in the effect's state
     };
 
     struct ProgramState;

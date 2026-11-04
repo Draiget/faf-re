@@ -207,7 +207,7 @@ namespace gpg::gal
       std::uint64_t tableFrame = 0;               // the frame's view arena the table is in
       std::uint64_t tableEpoch = 0;
       D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled; // what the texture table holds
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // what the texture table holds, in the effect's state
       std::uint32_t techniqueIndex = 0;
       std::uint32_t passIndex = 0;
       const char* technique = ""; // diagnostics
