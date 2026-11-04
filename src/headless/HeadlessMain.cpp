@@ -204,6 +204,8 @@ namespace
       "  --path-spelling <file>    Linux: write each path found on disk only by ignoring case, as asked and as on disk\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
+      "  --pace <ms>               one beat per this many ms, as a live game plays (100 is speed 0); time a late\n"
+      "                            beat loses is not made up, and the run prints how much was lost\n"
       "  --timeout <minutes>       give up after this long (default 180)\n"
       "  --label <text>            prefix for every printed line\n"
       "  engine flags as in the game: /log <file>, /synclog <dir>, /simworkers <n>,\n"
@@ -332,6 +334,7 @@ int main(int argc, char** argv)
   (void)ReadIntOption("--loopback-turns", options.loopbackTurnTolerance, bad);
   (void)ReadIntOption("--checksum-period", options.checksumPeriod, bad);
   (void)ReadIntOption("--lead", options.replayLead, bad);
+  (void)ReadIntOption("--pace", options.paceMs, bad);
   (void)ReadIntOption("--timeout", options.timeoutMinutes, bad);
   if (ReadIntOption("--view-packets-entries-every", options.viewPacketsEntriesEvery, bad)
       && options.viewPacketsEntriesEvery < 1) {

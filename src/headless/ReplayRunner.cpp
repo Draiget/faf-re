@@ -8,6 +8,7 @@
 
 #include <Windows.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -678,6 +679,10 @@ namespace faf::headless
     double lastReport = 0.0;
     bool ready = false;
     const HANDLE syncAvailable = driver->GetSyncDataAvailableEvent();
+    const double pacePeriod = options.paceMs / 1000.0;
+    double nextPacedBeat = 0.0; // seconds of play: when the next beat may leave the queue
+    int lateBeats = 0;
+    double lateSeconds = 0.0;
 
     while (!result.gameOver) {
       const double elapsed = SecondsSince(playStart);
@@ -692,6 +697,15 @@ namespace faf::headless
       }
 
       driver->Dispatch();
+      // `--pace`: the issue thread tops up only past the last beat taken from the queue, so holding
+      // the next one back holds the sim too.
+      if (pacePeriod > 0.0 && ready) {
+        const double waitSeconds = nextPacedBeat - SecondsSince(playStart);
+        if (waitSeconds > 0.0) {
+          ::Sleep(std::max(1, static_cast<int>(waitSeconds * 1000.0)));
+          continue;
+        }
+      }
       if (!driver->HasSyncData()) {
         // `WLD_DoPostInitializing` / `WLD_DoWaiting`: the first beat is out and this client
         // is ready; once every client is, the issue thread may run.
@@ -793,6 +807,18 @@ namespace faf::headless
         if (result.gameOver) {
           break;
         }
+
+        if (pacePeriod > 0.0 && ready) {
+          // A game that lost time doesn't get it back: the next beat is one period from here.
+          const double now = SecondsSince(playStart);
+          const double late = now - nextPacedBeat;
+          if (late > 0.002 && nextPacedBeat > 0.0) {
+            ++lateBeats;
+            lateSeconds += late;
+          }
+          nextPacedBeat = (late > 0.002 ? now : nextPacedBeat) + pacePeriod;
+          break;
+        }
       }
 
       if (elapsed - lastReport >= 30.0) {
@@ -818,6 +844,10 @@ namespace faf::headless
 #endif
     result.playSeconds = SecondsSince(playStart);
     result.mismatches = ChecksumMismatchCount();
+    if (pacePeriod > 0.0) {
+      std::printf("[%s] pace %d ms: %d of %d beats late, %.1f s lost\n", label, options.paceMs, lateBeats, result.beats, lateSeconds);
+      std::fflush(stdout);
+    }
     if (digestFile != nullptr) {
       std::fclose(digestFile);
     }
