@@ -176,12 +176,12 @@ namespace moho
     header.singleStep = flags[0] != 0u;
     header.gameEnded = flags[1] != 0u;
     header.gameOver = flags[2] != 0u;
-    return true;
+    return header.beat > 0u;
   }
 
   void SIM_BeginKeyframeRestore(SSimKeyframeHeader header)
   {
-    gSimBeatOrigin.store(header.beat > 0u ? static_cast<std::int32_t>(header.beat) - 1 : 0);
+    gSimBeatOrigin.store(static_cast<std::int32_t>(header.beat) - 1);
 
     sRestoredBlocks.clear();
     sRestoredFormationPointers.clear();

@@ -1158,6 +1158,11 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
   FAF_PROFILE_FRAME("Sim Beat");
 
+  // Engine addition: capture initial keyframe at beat 1 for rewind without session restart
+  if (mClientManager != nullptr && mClientManager->IsReplay() && !sHasInitialKeyframe && beatToDispatch == 1) {
+    CaptureInitialKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+  }
+
   if (mSimBusy) {
     return;
   }
@@ -1402,11 +1407,6 @@ void CSimDriver::ThreadCreateSim()
   // The opening sync: the frame machine waits on it before it will leave
   // Initialize.
   FinalizeSyncDispatchLocked(lock);
-
-  // Engine addition: capture initial keyframe at tick 0 for fast rewind without restart
-  if (mClientManager != nullptr && mClientManager->IsReplay() && !sHasInitialKeyframe) {
-    CaptureInitialKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
-  }
 
   mSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadRun, this));
   SetStateAndNotify(EDriverState::Ready);
