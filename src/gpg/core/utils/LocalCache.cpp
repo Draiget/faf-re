@@ -4,6 +4,8 @@
 #include <ShlObj.h>
 
 #include <cstdlib>
+#include <filesystem>
+#include <system_error>
 
 #include "gpg/core/utils/Logging.h"
 
@@ -12,25 +14,29 @@ namespace gpg
   const std::string& LocalCacheDirectory()
   {
     static const std::string directory = [] {
-      std::string path;
+      // As StartupHelpers' paths: the shell folder (the XDG one on Linux, platform/posix), then
+      // std::filesystem, so the headless Linux build keeps the same caches.
+      std::filesystem::path folder;
       if (const char* const configured = std::getenv("FAF_SHADER_CACHE_DIR"); configured != nullptr && configured[0] != '\0') {
-        path = configured;
+        folder = configured;
       } else {
-        char localAppData[MAX_PATH]{};
-        if (SUCCEEDED(::SHGetFolderPathA(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, localAppData))) {
-          path = std::string(localAppData) + "\\FAForever\\ShaderCache";
+        wchar_t localAppData[MAX_PATH]{};
+        if (SUCCEEDED(::SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppData))) {
+          folder = std::filesystem::path(localAppData) / "FAForever" / "ShaderCache";
         }
       }
-      if (path.empty()) {
+      if (folder.empty()) {
         return std::string();
       }
+      std::error_code error;
+      std::filesystem::create_directories(folder, error);
+      if (error) {
+        gpg::Warnf("cannot create the cache directory %s (%s); nothing is cached", folder.string().c_str(), error.message().c_str());
+        return std::string();
+      }
+      std::string path = folder.string();
       if (path.back() != '\\' && path.back() != '/') {
-        path += '\\';
-      }
-      const int result = ::SHCreateDirectoryExA(nullptr, path.c_str(), nullptr);
-      if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS) {
-        gpg::Warnf("cannot create the cache directory %s (error %d); nothing is cached", path.c_str(), result);
-        return std::string();
+        path += static_cast<char>(std::filesystem::path::preferred_separator);
       }
       return path;
     }();

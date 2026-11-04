@@ -3,11 +3,13 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <filesystem>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -61,6 +63,14 @@ namespace
   // Bump when the file's layout changes; the compiler itself is keyed by the executable.
   constexpr char kMagic[8] = {'F', 'A', 'F', 'L', 'U', 'A', 'C', '2'};
   constexpr std::uint64_t kMaxFileBytes = 512ULL << 20U;
+
+  /// Milliseconds on a steady clock, for the flush's idle wait.
+  [[nodiscard]] std::uint64_t SteadyMs() noexcept
+  {
+    return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()
+    );
+  }
 
   /// A chunk's name and source, hashed two ways, and the source's length.
   struct SChunkKey
@@ -209,7 +219,7 @@ namespace
       std::vector<SKeptChunk> kept;
       {
         const std::lock_guard<std::mutex> lock(mMutex);
-        if (mBatches == 0 || !mCompiledAny || (!now && ::GetTickCount64() - mLastCompiled < 3000U)) {
+        if (mBatches == 0 || !mCompiledAny || (!now && SteadyMs() - mLastCompiled < 3000U)) {
           return;
         }
         kept = Kept();
@@ -260,7 +270,7 @@ namespace
       // One a helper compiled that its loader did not take is not written unless a loader takes it.
       mChunks.emplace(key, SCachedChunk{kept, used, used ? std::uint8_t{0} : kMaxIdleWrites});
       mCompiledAny = true;
-      mLastCompiled = ::GetTickCount64();
+      mLastCompiled = SteadyMs();
     }
 
   private:
@@ -367,7 +377,11 @@ namespace
       DWORD written = 0;
       const bool ok = ::WriteFile(file, out.data(), static_cast<DWORD>(out.size()), &written, nullptr) && written == out.size();
       ::CloseHandle(file);
-      if (!ok || !::MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+      std::error_code renamed;
+      if (ok) {
+        std::filesystem::rename(temporary, path, renamed); // replaces the old file, as MoveFileEx's REPLACE_EXISTING
+      }
+      if (!ok || renamed) {
         ::DeleteFileA(temporary.c_str());
       }
     }
