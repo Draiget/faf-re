@@ -215,6 +215,9 @@ def main():
     with open(args.data, encoding="utf-8") as f:
         data = json.load(f)
 
+    for r in replays:  # the chart splits the desyncs by cause itself, from its data file
+        if r["verdict"] == "expected-desync":
+            r["verdict"] = "desync"
     played = [r for r in replays if r["verdict"] in PLAYED]
     errors = [r for r in replays if r["verdict"] == "error" and not str(r.get("why", "")).startswith(NOT_REACHED)]
     counts = {v: sum(r["verdict"] == v for r in played) for v in PLAYED}
