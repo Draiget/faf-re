@@ -36,6 +36,14 @@ namespace moho
       &gpg::gal::gPlacedResources
     );
 
+    /** Engine addition: `d3d_SharedBuffers` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_d3d_SharedBuffers(
+      "d3d_SharedBuffers",
+      "Direct3D 12: small static buffers sit at offsets inside large buffers (1, the default), or each takes at "
+      "least 64 KB of a heap (0). Needs d3d_PlacedResources. Read at each creation.",
+      &gpg::gal::gSharedBuffers
+    );
+
     /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */
     TConVar<int> gTConVar_d3d_UploadIdleMB(
       "d3d_UploadIdleMB",

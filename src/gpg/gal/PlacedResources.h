@@ -19,4 +19,12 @@ namespace gpg::gal
    * `d3d_UploadIdleMB` (moho), read at each retire.
    */
   extern int gUploadIdleMB;
+
+  /**
+   * Engine addition: Direct3D 12 keeps small static buffers at offsets inside large buffers. A
+   * buffer of its own takes at least 64 KB of a heap, and most mesh buffers are far smaller: 61 MB
+   * of them took 296 MB. Console variable `d3d_SharedBuffers` (moho), read at each creation; it
+   * needs `d3d_PlacedResources`.
+   */
+  extern bool gSharedBuffers;
 } // namespace gpg::gal
