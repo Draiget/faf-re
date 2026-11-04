@@ -1,0 +1,59 @@
+name: 2p-rejoin-demo
+description: >
+  2p-rejoin-probe to watch: two windows titled rejoin-demo-stays and rejoin-demo-back.
+  At 2 minutes the second one is killed and its window closes; the first waits with
+  the disconnect dialog. 15 s later the second starts again, loads, catches up and
+  plays on. Needs init_mpemu_localvault.lua in the FAF bin folder. Do not click into
+  the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+  DisconnectionDelay02: '90'
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\rejoin_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Stays, faction: uef, args: ['/title', 'rejoin-demo-stays', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0'] }
+  - { uid: 2, name: Rejoins, faction: cybran, args: ['/title', 'rejoin-demo-back', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 2m
+  - note: killing player 2
+  - kill: 2
+  - wait: 15s
+  - note: player 2 restarts and takes its seat back
+  - rejoin: { uid: 2, source: 1, peers: [{ uid: 1, source: 0 }] }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [1], pattern: 'REJOIN: client \d+:\S+ served' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: caught up' }
+    - { uids: [1], pattern: 'REJOIN: showing Rejoins as lost' }
+    - { uids: [1], pattern: 'REJOIN: showing Rejoins as loading' }
+    - { uids: [1], pattern: 'REJOIN: showing Rejoins as back' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: showing Rejoins as back' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: screen says connecting' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: screen says catchingUp' }
+  logsAbsent:
+    - { uids: [1], pattern: 'Error running .*/lua/ui/uimain|Evaluating LazyVar failed' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'Error running .*/lua/ui/uimain|Evaluating LazyVar failed' }
+    - { uids: [1], pattern: 'mismatched' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'mismatched' }

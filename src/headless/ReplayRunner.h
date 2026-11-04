@@ -17,6 +17,10 @@ namespace faf::headless
     std::string replayPath;     // `.scfareplay`
     std::string label;          // prefix of every line headless prints
     int focusArmy = -1;         // the army whose view `Sim::Sync` builds; -1 = observer
+    std::string rejoinPeers;    // when set, no replay: take seat `rejoinSource` back from these peers (address:port=source,...)
+    int rejoinPort = 0;         // with `rejoinPeers`: this client's game port
+    int rejoinSource = -1;      // when set: play as this source of a live game (CRejoinFeed.h)
+    int rejoinBeat = 0;         // with `rejoinSource`: the beat the driver takes over
     std::string digestPath;     // when set: one "beat digest" line per checksummed beat
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;  // when set: the entities lane of the wire format, per beat (CSV)

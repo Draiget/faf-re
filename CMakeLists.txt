@@ -131,6 +131,7 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()
 add_subdirectory(cmake/deps/monocypher)
+add_subdirectory(cmake/deps/zstd)
 
 # --- Profiler (optional Tracy integration) --------------------------------------------
 option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)

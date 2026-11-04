@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
@@ -32,6 +33,8 @@
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StringUtils.h"
+#include "moho/net/CRejoinFeed.h"
+#include "moho/net/NetConVars.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/Common.h"
@@ -369,6 +372,10 @@ namespace moho
     }
 
     std::unique_ptr<gpg::Stream> replayStream = OpenGPGNetURI(replayPath.c_str(), EGpgNetOpenMode::Write);
+    // Engine addition (issue #275): a peer back from a restart gets this recording from here.
+    if (net_RejoinAccept != 0 && replayStream != nullptr) {
+      replayStream = REJOIN_WrapRecording(std::move(replayStream));
+    }
     gpg::Stream* const stream = replayStream.get();
     if (stream == nullptr) {
       // Two clients sharing one profile both target LastGame; the second open
@@ -425,6 +432,9 @@ namespace moho
     }
 
     stream->Write(launchInfo->mInitSeed);
+    if (net_RejoinAccept != 0) {
+      REJOIN_SealRecordingHeader(stream);
+    }
 
     return msvc8::auto_ptr<gpg::Stream>(replayStream.release());
   }
@@ -1037,6 +1047,37 @@ namespace moho
       clientEntry.SetNumber("ping", client->GetStatusMetricA());
       clientEntry.SetNumber("quiet", client->GetStatusMetricB());
       clientEntry.SetBoolean("local", static_cast<IClient*>(client) == localClient);
+
+      // Engine addition (issue #275): only while this client takes its seat back.
+      // Once it is on its way back it isn't reported as quiet, so FAF's Connectivity
+      // dialog doesn't open and auto-eject it; /fafengine's hook of that dialog shows
+      // a panel with the stage instead.
+      {
+        std::scoped_lock rejoinLock(clientManager->mLock);
+        SRejoinStatus rejoin{};
+        if (static_cast<IClient*>(client) != localClient) {
+          rejoin = clientManager->mPeerFeatures->RejoinStatus(static_cast<int>(clientIndex));
+        } else if (clientManager->mRejoinFeed != nullptr) {
+          rejoin = clientManager->mRejoinFeed->Status();
+        }
+        // The link's loss is only noticed long after it goes quiet. This is when
+        // FAF's dialog opens, so the panel says why from the same moment.
+        constexpr float kQuietMilliseconds = 5000.0f;
+        if (rejoin.stage == ERejoinStage::None && static_cast<IClient*>(client) != localClient &&
+            static_cast<float>(client->GetStatusMetricB()) > kQuietMilliseconds &&
+            clientManager->mPeerFeatures->EveryoneSupports(*clientManager, EPeerFeature::Rejoin)) {
+          rejoin.stage = ERejoinStage::Lost;
+        }
+        if (rejoin.stage != ERejoinStage::None) {
+          clientEntry.SetString("rejoinStage", RejoinStageName(rejoin.stage));
+          if (rejoin.progress >= 0.0f) {
+            clientEntry.SetNumber("rejoinProgress", rejoin.progress);
+          }
+          if (rejoin.stage != ERejoinStage::Lost) {
+            clientEntry.SetNumber("quiet", 0.0f);
+          }
+        }
+      }
 
       LuaPlus::LuaObject commandSources{};
       commandSources.AssignNewTable(state, 0, 0);

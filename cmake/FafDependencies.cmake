@@ -221,6 +221,12 @@ set(_faf_download_monocypher
     "https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz"
     "bc1ca30b1b2654e4e7daf2492c0d204200e55137f23fda6b7142fd7d523bd6b4"
     "Monocypher-4.0.2")
+# Zstandard 1.5.7 (BSD-3-Clause): packs a returning player's save (issue #275). The release
+# archive; cmake/deps/zstd builds it.
+set(_faf_download_zstd
+    "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
+    "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+    "zstd-1.5.7")
 
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
@@ -389,6 +395,9 @@ faf_dependency_download(usrsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
+if(NOT FAF_ZSTD_DIR)
+  faf_dependency_download(zstd)
+endif()
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)

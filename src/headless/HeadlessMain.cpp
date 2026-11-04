@@ -217,6 +217,12 @@ namespace
       "  --launch-check           rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --path-spelling <file>    Linux: write each path found on disk only by ignoring case, as asked and as on disk\n"
+      "  --rejoin-source <n>       play as this command source of a live game, every other client fed from the\n"
+      "                            replay (needs --focus on its army); the rehearsal of a rejoin\n"
+      "  --rejoin-beat <n>         with --rejoin-source: the driver issues this client's beats after this one\n"
+      "  --rejoin-peers <list>     no replay: take seat --rejoin-source back in a running game from these peers,\n"
+      "                            written address:port=source,...; needs the seat's key (/rejoinkeyfile)\n"
+      "  --rejoin-port <n>         with --rejoin-peers: this client's game port\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --pace <ms>               one beat per this many ms, as a live game plays (100 is speed 0); time a late\n"
@@ -272,11 +278,15 @@ int main(int argc, char** argv)
   bool bad = false;
   (void)ReadOption("--label", gLabel);
   options.label = gLabel;
-  if (!ReadOption("--replay", options.replayPath) || !moho::CFG_GetArgOption("/init", 1, nullptr)) {
+  const bool liveRejoin = ReadOption("--rejoin-peers", options.rejoinPeers);
+  if ((!ReadOption("--replay", options.replayPath) && !liveRejoin) || !moho::CFG_GetArgOption("/init", 1, nullptr)) {
     PrintUsage();
     return kExitBadInput;
   }
   (void)ReadIntOption("--focus", options.focusArmy, bad);
+  (void)ReadIntOption("--rejoin-source", options.rejoinSource, bad);
+  (void)ReadIntOption("--rejoin-port", options.rejoinPort, bad);
+  (void)ReadIntOption("--rejoin-beat", options.rejoinBeat, bad);
   (void)ReadOption("--digests", options.digestPath);
   (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadOption("--sync-dump", options.syncDumpPath);

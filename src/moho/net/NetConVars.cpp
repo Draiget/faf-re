@@ -33,6 +33,21 @@ namespace moho
   int32_t net_PeerFeatures = 0;
   // Read as a lobby link is established and for each message on it.
   int32_t net_LobbyPeerFeatures = 1;
+  // Read as peers' messages arrive (issue #275). Off: a lost link and a
+  // restarted peer behave as in the binary.
+  int32_t net_RejoinAccept = 0;
+  // net_MaxSendRate while a peer's history goes out: 2048 bytes a second would
+  // keep every player waiting for minutes after a long game.
+  int32_t net_RejoinSendRate = 1048576;
+  // Read when a restarted client asks for the game and when a peer answers.
+  // Off, or between different builds, the client replays the recording instead.
+  int32_t net_RejoinKeyframes = 1;
+  // Every player waits while the save is made; 0 writes it through the plain archive.
+  int32_t net_RejoinFastSave = 1;
+  // Every player waits while the save is packed and sent.
+  int32_t net_RejoinZstd = 1;
+  // A link's 32 packets on the way carry 16 KB a round trip, far under net_RejoinSendRate.
+  int32_t net_RejoinWindow = 128;
   int32_t net_DebugAlterOrdersTo = -1;
   // Read when a game's UDP socket is made (NET_MakeUDPConnector); 0 keeps the
   // system's buffer size, as the binary does (issue #236).
@@ -181,6 +196,44 @@ namespace moho
       "1 (default): tell every other player in the lobby what this engine supports (docs/PEER_FEATURES.md); "
       "0: send nothing and ignore theirs, as the original game. Next lobby link.",
       &net_LobbyPeerFeatures
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinAccept(
+      "net_RejoinAccept",
+      "1: a peer whose link is lost keeps its seat until ejected, and may take it back by restarting with /rejoin; "
+      "0 (default) as the original game.",
+      &net_RejoinAccept
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinSendRate(
+      "net_RejoinSendRate",
+      "Bytes per second any one client may be sent while a restarted peer gets the game's history (net_RejoinAccept).",
+      &net_RejoinSendRate
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinWindow(
+      "net_RejoinWindow",
+      "Packets that may be on the way on a link to a restarted peer of the same build; 32 as every other link.",
+      &net_RejoinWindow
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinZstd(
+      "net_RejoinZstd",
+      "1 (default): the save for a restarted peer is packed with zstd; 0: with zlib, as replay keyframes are.",
+      &net_RejoinZstd
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinFastSave(
+      "net_RejoinFastSave",
+      "1 (default): the save for a restarted peer goes through the fast archive; 0: the plain one.",
+      &net_RejoinFastSave
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinKeyframes(
+      "net_RejoinKeyframes",
+      "1 (default): a restarted peer of the same build loads a save of the running game; "
+      "0: it replays the game from the start (net_RejoinAccept).",
+      &net_RejoinKeyframes
     );
 
     TConVar<int32_t> gTConVar_net_CheckOrderStreams(
