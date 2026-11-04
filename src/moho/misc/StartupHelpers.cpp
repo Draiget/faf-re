@@ -2609,7 +2609,6 @@ namespace
    * What it does:
    * Parses one leading root token span and reports token start/length.
    */
-  [[nodiscard]]
   void ParsePathRootTokenSpan(const msvc8::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
   {
     if (outStart != nullptr) {

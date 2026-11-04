@@ -1303,15 +1303,15 @@ namespace moho
           keyTransform.orient_ = blended;
         } else {
           // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-          std::memcpy(&keyTransform.pos_, key1.position, sizeof(keyTransform.pos_));
+          std::memcpy(static_cast<void*>(&keyTransform.pos_), key1.position, sizeof(keyTransform.pos_));
           // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-          std::memcpy(&keyTransform.orient_, key1.rotation, sizeof(keyTransform.orient_));
+          std::memcpy(static_cast<void*>(&keyTransform.orient_), key1.rotation, sizeof(keyTransform.orient_));
         }
       } else {
         // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-        std::memcpy(&keyTransform.pos_, key0.position, sizeof(keyTransform.pos_));
+        std::memcpy(static_cast<void*>(&keyTransform.pos_), key0.position, sizeof(keyTransform.pos_));
         // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-        std::memcpy(&keyTransform.orient_, key0.rotation, sizeof(keyTransform.orient_));
+        std::memcpy(static_cast<void*>(&keyTransform.orient_), key0.rotation, sizeof(keyTransform.orient_));
       }
 
       CAniPoseBone& bone = poseBones[boneIndex];

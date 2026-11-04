@@ -379,7 +379,7 @@ CNetUDPConnection::CNetUDPConnection(
   }
 
   // Initialize pings structure and ping time
-  std::memset(&mPings, 0, sizeof(mPings));
+  std::memset(static_cast<void*>(&mPings), 0, sizeof(mPings));
   mPingTime = 0.0f;
 }
 

@@ -115,7 +115,8 @@ list(APPEND _faf_main_options ${FAF_WARNING_OPTIONS})
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 if(FAF_SYNTAX_ONLY)
-  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs>")
+  # /Zs doesn't use the -c the build rule passes.
+  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs;-Wno-unused-command-line-argument>")
 endif()
 
 # --- Per-file settings ---------------------------------------------------------------

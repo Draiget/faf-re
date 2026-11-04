@@ -41,8 +41,8 @@ namespace moho
     void CopyLanesFrom(const VTransform& rhs) noexcept
     {
       if (mem_InlineTransformCopy) {
-        std::memcpy(&orient_, &rhs.orient_, sizeof(orient_));
-        std::memcpy(&pos_, &rhs.pos_, sizeof(pos_));
+        std::memcpy(static_cast<void*>(&orient_), &rhs.orient_, sizeof(orient_));
+        std::memcpy(static_cast<void*>(&pos_), &rhs.pos_, sizeof(pos_));
       } else {
         orient_ = rhs.orient_; // the binary's Wm3 assignments
         pos_ = rhs.pos_;
