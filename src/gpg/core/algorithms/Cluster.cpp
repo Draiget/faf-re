@@ -2148,6 +2148,15 @@ int Cluster::cmp(const Cluster& other) const
     }
 
     const unsigned int nodeCount = self->mNodeCount;
+
+    // The binary's inline compare (0x00954057..0x00954072) stops at the first word that differs, and the
+    // node count is the first byte, so it never reads past a smaller cluster. std::memcmp may read ahead
+    // over its whole length, which faulted at the end of a mapping (replay 26904000). Counts that differ
+    // decide the order here, as that first byte does in the binary.
+    if (nodeCount != rhs->mNodeCount) {
+        return (nodeCount < rhs->mNodeCount) ? -1 : 1;
+    }
+
     const std::size_t payloadBytes =
         (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
     const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
